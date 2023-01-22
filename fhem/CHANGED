@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  93_DbRep: reduceLog -> Handling of field 'value' with NULL value,
+                      improve averageValue avgTimeWeightMean, Thanks to alkazaa 
  - feature: 76_SMAInverter: read EnergyMeter data
                             read SPOT_EPVTOTAL/SPOT_EPVTODAY (Hybrid Inverter)
                             reset TODAY Counter

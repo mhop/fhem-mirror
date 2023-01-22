@@ -59,6 +59,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.51.3"  => "22.01.2023  extend DbRep_averval avgTimeWeightMean by alkazaa, Restructuring of DbRep_averval ".
+                            "DbRep_reduceLog -> Handling of field 'value' with NULL value ",
   "8.51.2"  => "13.01.2023  rewrite sub DbRep_OutputWriteToDB, new averageValue option writeToDBSingleStart ",
   "8.51.1"  => "11.01.2023  write TYPE uppercase with writeToDB option, Commandref edited, fix add SQL Cache History ".
                             "set PRAGMA auto_vacuum = FULL when execute SQLite vacuum command",
@@ -402,6 +404,13 @@ my %dbrep_hmainf = (
     changeValue        => { fn => "DbRep_changeVal",     fndone => "DbRep_changeDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history", renmode => "changeval" },
 );
 
+my %dbrep_havgfn = (                                                                   # Schemafunktionen von averageValue                          
+  avgArithmeticMean       => { fn => \&_DbRep_avgArithmeticMean },
+  avgDailyMeanGWS         => { fn => \&_DbRep_avgDailyMeanGWS   },
+  avgDailyMeanGWSwithGTS  => { fn => \&_DbRep_avgDailyMeanGWS   },
+  avgTimeWeightMean       => { fn => \&_DbRep_avgTimeWeightMean },
+);
+
 
 # Variablendefinitionen
 my %dbrep_col                 = ("DEVICE"  => 64, "READING" => 64, );                  # Standard Feldbreiten falls noch nicht getInitData ausgeführt
@@ -729,7 +738,7 @@ sub DbRep_Set {
        Log3 ($name, 3, "DbRep $name - ################################################################");
 
        DbRep_beforeproc ($hash, "restore");
-       DbRep_Main       ($hash,$opt,$prop);
+       DbRep_Main       ($hash, $opt, $prop);
 
        return;
   }
@@ -780,7 +789,7 @@ sub DbRep_Set {
           Log3 ($name, 3, "DbRep $name - ###                    new reduceLog run                     ###");
           Log3 ($name, 3, "DbRep $name - ################################################################");
 
-          DbRep_Main ($hash,$opt);
+          DbRep_Main ($hash, $opt, $prop);
 
           return;
       }
@@ -2126,8 +2135,13 @@ sub DbRep_getInitData {
 
   $rt   = $rt.",".$brt;
 
-  $opt  = DbRep_trim ($opt)  if($opt);
-  $prop = DbRep_trim ($prop) if($prop);
+  $opt  = DbRep_trim ($opt) if($opt);
+  
+  if($prop) {
+      $prop = DbRep_trim    ($prop);
+      $prop = encode_base64 ($prop, "");
+  }
+  
   $err  = q{};
 
 return "$name|$err|$mints|$rt|$opt|$prop|$fret|$idxstate|$grants|$enc|$encc";
@@ -2216,12 +2230,12 @@ sub DbRep_getInitDataDone {
   my $string    = shift;
   my @a         = split "\\|", $string;
   my $name      = $a[0];
-  my $err       = $a[1] ? decode_base64($a[1]) : '';
+  my $err       = $a[1]  ? decode_base64($a[1]) : '';
   my $mints     = decode_base64($a[2]);
   my $bt        = $a[3];
   my $opt       = $a[4];
-  my $prop      = $a[5];
-  my $fret      = $a[6] ? \&{$a[6]} : '';
+  my $prop      = $a[5]  ? decode_base64($a[5])  : '';
+  my $fret      = $a[6]  ? \&{$a[6]} : '';
   my $idxstate  = decode_base64($a[7]);
   my $grants    = $a[8]  ? decode_base64($a[8])  : '';
   my $enc       = $a[9]  ? decode_base64($a[9])  : '';
@@ -3253,301 +3267,34 @@ sub DbRep_averval {
   my $prop    = $paref->{prop};
   my $ts      = $paref->{ts};
 
-  my $acf     = AttrVal($name, "averageCalcForm", "avgArithmeticMean");            # Festlegung Berechnungsschema f. Mittelwert
+  my $bst     = [gettimeofday];                                                    # Background-Startzeit
+  my $acf     = AttrVal ($name, 'averageCalcForm', 'avgArithmeticMean');           # Festlegung Berechnungsschema f. Mittelwert
   my $qlf     = "avg";
 
-  my ($gts,$gtsstr) = (0,q{});                                                     # Variablen für Grünlandtemperatursumme GTS
-
-  my ($sql,$sth,$selspec,$addon,$gtsreached);
-
-  my $bst = [gettimeofday];                                                        # Background-Startzeit
+  my ($gts, $gtsstr) = (0, q{});                                                   # Variablen für Grünlandtemperatursumme GTS
 
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
   return "$name|$err" if ($err);
 
-  Log3 ($name, 4, "DbRep $name - averageValue calculation sceme: ".$acf);
-
-  no warnings 'uninitialized';
-
   my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash);                         # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef)
+  my @ts                     = split "\\|", $ts;                                   # Timestampstring to Array
+  
+  $paref->{qlf}              = $qlf;
+  $paref->{tsaref}           = \@ts;
+  $paref->{dbmodel}          = $dbmodel;
+  $paref->{IsTimeSet}        = $IsTimeSet;
+  $paref->{IsAggrSet}        = $IsAggrSet;
+  $paref->{dbh}              = $dbh;
+  
+  Log3 ($name, 4, "DbRep $name - averageValue calculation sceme: ".$acf);
   Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
-
-  my @ts = split("\\|", $ts);                                                      # Timestampstring to Array
   Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");
 
-  if($acf eq "avgArithmeticMean") {                                                # arithmetischer Mittelwert
-                                                                                   # vorbereiten der DB-Abfrage, DB-Modell-abhaengig
-      $addon = '';
-      if ($dbmodel eq "POSTGRESQL") {
-         $selspec = "AVG(VALUE::numeric)";
-      }
-      elsif ($dbmodel eq "MYSQL") {
-          $selspec = "AVG(VALUE)";
-      }
-      elsif ($dbmodel eq "SQLITE") {
-          $selspec = "AVG(VALUE)";
-      }
-      else {
-          $selspec = "AVG(VALUE)";
-      }
-      $qlf = "avgam";
-  }
-  elsif ($acf =~ /avgDailyMeanGWS/x) {                                            # Tagesmittelwert Temperaturen nach Schema des deutschen Wetterdienstes
-      # SELECT VALUE FROM $table WHERE DEVICE="MyWetter" AND READING="temperature" AND TIMESTAMP >= "2018-01-28 $i:00:00" AND TIMESTAMP <= "2018-01-28 ($i+1):00:00" ORDER BY TIMESTAMP DESC LIMIT 1;
-      $addon   = "ORDER BY TIMESTAMP DESC LIMIT 1";
-      $selspec = "VALUE";
-      $qlf     = "avgdmgws";
-  }
-  elsif ($acf eq "avgTimeWeightMean") {
-      $addon   = "ORDER BY TIMESTAMP ASC";
-      $selspec = "TIMESTAMP,VALUE";
-      $qlf     = "avgtwm";
-  }
+  my $st = [gettimeofday];                                                                           # SQL-Startzeit
 
-  my $st = [gettimeofday];                                                        # SQL-Startzeit
+  ($err, my $arrstr, my $wrstr, $qlf, $gtsstr, my $gtsreached) = &{$dbrep_havgfn{$acf}{fn}} ($paref);
+  return "$name|$err" if ($err);
 
-  my ($arrstr,$wrstr,@rsf,@rsn,@wsf,@wsn);                                        # DB-Abfrage zeilenweise für jeden Array-Eintrag
-
-  for my $row (@ts) {
-      my @a                     = split("#", $row);
-      my $runtime_string        = $a[0];
-      my $runtime_string_first  = $a[1];
-      my $runtime_string_next   = $a[2];
-
-      if($acf eq "avgArithmeticMean") {                                           # arithmetischer Mittelwert (Standard)
-          #
-          if ($IsTimeSet || $IsAggrSet) {
-             $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
-          }
-          else {
-              $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,undef,undef,$addon);
-          }
-
-          ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
-          return "$name|$err" if ($err);
-
-          my @line = $sth->fetchrow_array();
-
-          Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);
-
-          my $aval = (DbRep_checktimeaggr($hash))[2];
-          if($aval eq "hour") {
-              @rsf     = split(/[ :]/,$runtime_string_first);
-              @rsn     = split(/[ :]/,$runtime_string_next);
-              $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."|";
-          }
-          elsif ($aval eq "minute") {
-              @rsf     = split(/[ :]/,$runtime_string_first);
-              @rsn     = split(/[ :]/,$runtime_string_next);
-              $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."-".$rsf[2]."|";
-          }
-          else {
-              @rsf     = split(" ",$runtime_string_first);
-              @rsn     = split(" ",$runtime_string_next);
-              $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."|";
-          }
-
-          @wsf    = split(" ",$runtime_string_first);
-          @wsn    = split(" ",$runtime_string_next);
-          $wrstr .= $runtime_string."#".$line[0]."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
-      }
-      elsif ($acf =~ /avgDailyMeanGWS/x) {
-          # Berechnung des Tagesmittelwertes (Temperatur) nach der Vorschrift des deutschen Wetterdienstes
-          # Berechnung der Tagesmittel aus 24 Stundenwerten, Bezugszeit für einen Tag i.d.R. 23:51 UTC des
-          # Vortages bis 23:50 UTC, d.h. 00:51 bis 23:50 MEZ
-          # Wenn mehr als 3 Stundenwerte fehlen -> Berechnung aus den 4 Hauptterminen (00, 06, 12, 18 UTC),
-          # d.h. 01, 07, 13, 19 MEZ
-          # https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html
-          #
-          my $sum = 0;
-          my $anz = 0;                                                               # Anzahl der Messwerte am Tag
-          my($t01,$t07,$t13,$t19);                                                   # Temperaturen der Haupttermine
-          my ($bdate,undef) = split(" ",$runtime_string_first);
-
-          for my $i (0..23) {
-              my $bsel = $bdate." ".sprintf("%02d",$i).":00:00";
-              my $esel = ($i<23) ? $bdate." ".sprintf("%02d",$i).":59:59" : $runtime_string_next;
-
-              $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"'$bsel'","'$esel'",$addon);
-
-              ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
-              return "$name|$err" if ($err);
-
-              my $val = $sth->fetchrow_array();
-
-              Log3 ($name, 5, "DbRep $name - SQL result: $val") if($val);
-
-              $val = DbRep_numval ($val);                                            # nichtnumerische Zeichen eliminieren
-
-              if(defined($val) && looks_like_number($val)) {
-                  $sum += $val;
-                  $t01 = $val if($val && $i == 00);                                  # Wert f. Stunde 01 ist zw. letzter Wert vor 01
-                  $t07 = $val if($val && $i == 06);
-                  $t13 = $val if($val && $i == 12);
-                  $t19 = $val if($val && $i == 18);
-                  $anz++;
-              }
-          }
-
-          if($anz >= 21) {
-              $sum = $sum/24;
-          }
-          elsif ($anz >= 4 && $t01 && $t07 && $t13 && $t19) {
-              $sum = ($t01+$t07+$t13+$t19)/4;
-          }
-          else {
-              $sum = qq{<html>insufficient values - execute <b>get $name versionNotes 2</b> for further information</html>};
-          }
-
-          my $aval = (DbRep_checktimeaggr($hash))[2];
-
-          if($aval eq "hour") {
-              @rsf     = split(/[ :]/,$runtime_string_first);
-              @rsn     = split(/[ :]/,$runtime_string_next);
-              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";
-          }
-          elsif ($aval eq "minute") {
-              @rsf     = split(/[ :]/,$runtime_string_first);
-              @rsn     = split(/[ :]/,$runtime_string_next);
-              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."-".$rsf[2]."|";
-          }
-          else {
-              @rsf     = split(" ",$runtime_string_first);
-              @rsn     = split(" ",$runtime_string_next);
-              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|";
-          }
-
-          @wsf    = split(" ",$runtime_string_first);
-          @wsn    = split(" ",$runtime_string_next);
-          $wrstr .= $runtime_string."#".$sum."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
-
-          ### Grünlandtemperatursumme lt. https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme ###
-          my ($y,$m,$d) = split "-", $runtime_string;
-          if ($acf eq "avgDailyMeanGWSwithGTS" && looks_like_number($sum)) {
-              $m    = DbRep_removeLeadingZero ($m);
-              $d    = DbRep_removeLeadingZero ($d);
-              $gts  = 0 if($m == 1 && $d == 1);
-
-              my $f = $sum <= 0 ? 0    :
-                      $m   >= 3 ? 1.00 :                                          # Faktorenberechnung lt. https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme
-                      $m   == 2 ? 0.75 : 0.5;
-
-              $gts += $sum*$f;
-
-              if($gts >= 200) {
-                  $gtsreached = $gtsreached // $runtime_string;
-              }
-
-              $gtsstr .= $runtime_string."#".$gts."#".$rsf[0]."|";
-          }
-          #############################################################################################
-      }
-      elsif ($acf eq "avgTimeWeightMean") {
-          # zeitgewichteten Mittelwert berechnen
-          # http://massmatics.de/merkzettel/#!837:Gewichteter_Mittelwert
-          #
-          # $tsum = timestamp letzter Messpunkt - timestamp erster Messpunkt
-          # $t1 = timestamp wert1
-          # $t2 = timestamp wert2
-          # $dt = $t2 - $t1
-          # $t1 = $t2
-          # .....
-          # (val1*$dt/$tsum) + (val2*$dt/$tsum) + .... + (valn*$dt/$tsum)
-          #
-
-          # gesamte Zeitspanne $tsum zwischen ersten und letzten Datensatz der Zeitscheibe ermitteln
-          my ($tsum,$tf,$tl,$tn,$to,$dt,$val,$val1);
-          my $sum    = 0;
-          my $addonf = 'ORDER BY TIMESTAMP ASC LIMIT 1';
-          my $addonl = 'ORDER BY TIMESTAMP DESC LIMIT 1';
-          my $sqlf   = DbRep_createSelectSql($hash,$table,"TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addonf);
-          my $sqll   = DbRep_createSelectSql($hash,$table,"TIMESTAMP",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addonl);
-
-          eval { $tf = ($dbh->selectrow_array($sqlf))[0];
-                 $tl = ($dbh->selectrow_array($sqll))[0];
-                 1;
-               }
-               or do { $err = encode_base64($@,"");
-                       Log3 ($name, 2, "DbRep $name - $@");
-                       $dbh->disconnect;
-                       return "$name|$err";
-                     };
-
-          if(!$tf || !$tl) {                                                   # kein Start- und/oder Ende Timestamp in Zeitscheibe vorhanden -> keine Werteberechnung möglich
-              $sum = "insufficient values";
-          }
-          else {
-              my ($yyyyf, $mmf, $ddf, $hhf, $minf, $secf) = ($tf =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-              my ($yyyyl, $mml, $ddl, $hhl, $minl, $secl) = ($tl =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-
-              $tsum = (timelocal($secl, $minl, $hhl, $ddl, $mml-1, $yyyyl-1900))-
-                      (timelocal($secf, $minf, $hhf, $ddf, $mmf-1, $yyyyf-1900));
-
-              if ($IsTimeSet || $IsAggrSet) {
-                  $sql = DbRep_createSelectSql($hash, $table, $selspec, $device, $reading, "'$runtime_string_first'", "'$runtime_string_next'", $addon);
-              }
-              else {
-                  $sql = DbRep_createSelectSql($hash, $table, $selspec, $device, $reading, undef, undef, $addon);
-              }
-
-              ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
-              return "$name|$err" if ($err);
-
-              my @twm_array =  map { $_->[0]."_ESC_".$_->[1] } @{$sth->fetchall_arrayref()};
-
-              for my $twmrow (@twm_array) {
-                  ($tn,$val) = split("_ESC_",$twmrow);
-                  $val       = DbRep_numval ($val);                                        # nichtnumerische Zeichen eliminieren
-
-                  my ($yyyyt1, $mmt1, $ddt1, $hht1, $mint1, $sect1) = ($tn =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-                  $tn = timelocal($sect1, $mint1, $hht1, $ddt1, $mmt1-1, $yyyyt1-1900);
-
-                  if(!$to) {
-                      $val1 = $val;
-                      $to   = $tn;
-                      next;
-                  }
-
-                  $dt   = $tn - $to;
-                  $sum += $val1 * ($dt/$tsum) if($tsum);
-                  $val1 = $val;
-                  $to   = $tn;
-
-                  Log3 ($name, 5, "DbRep $name - data element: $twmrow");
-                  Log3 ($name, 5, "DbRep $name - time sum: $tsum, delta time: $dt, value: $val1, twm: ".($tsum ? $val1*($dt/$tsum) : 0));
-              }
-          }
-
-          my $aval = (DbRep_checktimeaggr($hash))[2];
-          
-          if($aval eq "hour") {
-              @rsf     = split /[ :]/,$runtime_string_first;
-              @rsn     = split /[ :]/,$runtime_string_next;
-              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";
-          }
-          elsif ($aval eq "minute") {
-              @rsf     = split /[ :]/,$runtime_string_first;
-              @rsn     = split /[ :]/,$runtime_string_next;
-              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."-".$rsf[2]."|";
-          }
-          else {
-              @rsf     = split " ",$runtime_string_first;
-              @rsn     = split " ",$runtime_string_next;
-              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|";
-          }
-
-          #@wsf    = split " ",$runtime_string_first;
-          #@wsn    = split " ",$runtime_string_next;
-          
-          $runtime_string_first =~ s/\s/_/xs;
-          $runtime_string_next  =~ s/\s/_/xs;
-          
-          #$wrstr .= $runtime_string."#".$sum."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
-          $wrstr .= $runtime_string."#".$sum."#".$runtime_string_first."#".$runtime_string_next."|";    # Kombi zum Rückschreiben in die DB
-      }
-  }
-
-  $sth->finish;
   $dbh->disconnect;
 
   my $rt = tv_interval($st);                                                                         # SQL-Laufzeit ermitteln
@@ -3561,14 +3308,396 @@ sub DbRep_averval {
       $rt = $rt+$wrt;
   }
 
+  no warnings 'uninitialized';
+  
   $arrstr = encode_base64($arrstr, "");                                                              # Daten müssen als Einzeiler zurückgegeben werden
   $device = encode_base64($device, "");
   $gtsstr = encode_base64($gtsstr, "");
 
-  my $brt = tv_interval($bst);                                                                      # Background-Laufzeit ermitteln
+  my $brt = tv_interval($bst);                                                                       # Background-Laufzeit ermitteln
   $rt     = $rt.",".$brt;
 
 return "$name|$err|$arrstr|$device|$reading|$rt|$irowdone|$gtsstr|$gtsreached";
+}
+
+####################################################################################################
+#      averageValue Typ avgArithmeticMean
+#      arithmetischer Mittelwert (Standard)
+####################################################################################################
+sub _DbRep_avgArithmeticMean {
+  my $paref     = shift;
+  
+  my $hash      = $paref->{hash};
+  my $name      = $paref->{name};
+  my $table     = $paref->{table};
+  my $device    = $paref->{device};
+  my $reading   = $paref->{reading};
+  my $qlf       = $paref->{qlf};
+  my $tsaref    = $paref->{tsaref};
+  my $dbmodel   = $paref->{dbmodel};
+  my $dbh       = $paref->{dbh};
+  my $IsTimeSet = $paref->{IsTimeSet};
+  my $IsAggrSet = $paref->{IsAggrSet};
+                                               
+  my ($err, $sth, $sql, $arrstr, $wrstr);
+  my (@rsf, @rsn);
+  
+  $qlf        = 'avgam';
+  my $addon   = q{};
+  my $selspec = 'AVG(VALUE)';
+  
+  if ($dbmodel eq "POSTGRESQL") {
+     $selspec = 'AVG(VALUE::numeric)';
+  }
+  
+  for my $row (@{$tsaref}) {
+      my @ar                    = split "#", $row;
+      my $runtime_string        = $ar[0];
+      my $runtime_string_first  = $ar[1];
+      my $runtime_string_next   = $ar[2];
+      
+      my $avg = '-';
+      
+      if ($IsTimeSet || $IsAggrSet) {
+          $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
+      }
+      else {
+          $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,undef,undef,$addon);
+      }
+
+      ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+      return $err if ($err);
+
+      my @line = $sth->fetchrow_array();
+      $avg     = $line[0] if($line[0]);
+      my $aval = (DbRep_checktimeaggr($hash))[2];
+      
+      Log3 ($name, 5, "DbRep $name - SQL result: $avg ");
+      
+      if($aval eq "hour") {
+          @rsf     = split /[ :]/, $runtime_string_first;
+          @rsn     = split /[ :]/, $runtime_string_next;
+          $arrstr .= $runtime_string."#".$avg."#".$rsf[0]."_".$rsf[1]."|";
+      }
+      elsif ($aval eq "minute") {
+          @rsf     = split /[ :]/, $runtime_string_first;
+          @rsn     = split /[ :]/, $runtime_string_next;
+          $arrstr .= $runtime_string."#".$avg."#".$rsf[0]."_".$rsf[1]."-".$rsf[2]."|";
+      }
+      else {
+          @rsf     = split " ", $runtime_string_first;
+          @rsn     = split " ", $runtime_string_next;
+          $arrstr .= $runtime_string."#".$avg."#".$rsf[0]."|";
+      }
+
+      my @wsf = split " ", $runtime_string_first;
+      my @wsn = split " ", $runtime_string_next;
+      
+      $wrstr .= $runtime_string."#".$avg."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
+  }
+  
+  $sth->finish;
+  
+return ($err, $arrstr, $wrstr, $qlf);
+}
+
+####################################################################################################
+#      averageValue Typ avgDailyMeanGWS
+# Berechnung des Tagesmittelwertes (Temperatur) nach der Vorschrift des deutschen Wetterdienstes
+#
+# Berechnung der Tagesmittel aus 24 Stundenwerten, Bezugszeit für einen Tag i.d.R. 23:51 UTC des
+# Vortages bis 23:50 UTC, d.h. 00:51 bis 23:50 MEZ
+# Wenn mehr als 3 Stundenwerte fehlen -> Berechnung aus den 4 Hauptterminen (00, 06, 12, 18 UTC),
+# d.h. 01, 07, 13, 19 MEZ
+# https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html
+#
+####################################################################################################
+sub _DbRep_avgDailyMeanGWS {
+  my $paref     = shift;
+  
+  my $hash      = $paref->{hash};
+  my $name      = $paref->{name};
+  my $table     = $paref->{table};
+  my $device    = $paref->{device};
+  my $reading   = $paref->{reading};
+  my $qlf       = $paref->{qlf};
+  my $tsaref    = $paref->{tsaref};
+  my $dbh       = $paref->{dbh};
+                                               
+  my ($err, $sth, $arrstr, $wrstr, $gtsreached);
+  my (@rsf, @rsn);
+  
+  my ($gts,$gtsstr) = (0, q{});                                                    # Variablen für Grünlandtemperatursumme GTS
+  
+  my $acf     = AttrVal ($name, 'averageCalcForm', 'avgArithmeticMean');           # Festlegung Berechnungsschema f. Mittelwert
+  my $addon   = "ORDER BY TIMESTAMP DESC LIMIT 1";
+  my $selspec = "VALUE";
+  $qlf        = "avgdmgws";
+  
+  for my $row (@{$tsaref}) {
+      my @ar                    = split "#", $row;
+      my $runtime_string        = $ar[0];
+      my $runtime_string_first  = $ar[1];
+      my $runtime_string_next   = $ar[2];
+      
+      my $sum = 0;
+      my $anz = 0;                                                                 # Anzahl der Messwerte am Tag
+      my ($t01,$t07,$t13,$t19);                                                    # Temperaturen der Haupttermine
+      my ($bdate,undef) = split(" ",$runtime_string_first);
+
+      for my $i (0..23) {
+          my $bsel = $bdate." ".sprintf("%02d",$i).":00:00";
+          my $esel = ($i < 23) ? $bdate." ".sprintf("%02d",$i).":59:59" : $runtime_string_next;
+
+          my $sql = DbRep_createSelectSql ($hash,$table,$selspec,$device,$reading,"'$bsel'","'$esel'",$addon);
+
+          ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+          return $err if ($err);
+
+          my $val = $sth->fetchrow_array();
+
+          Log3 ($name, 5, "DbRep $name - SQL result: $val") if($val);
+
+          $val = DbRep_numval ($val);                                              # nichtnumerische Zeichen eliminieren
+
+          if(defined $val && looks_like_number($val)) {
+              $sum += $val;
+              $t01 = $val if($val && $i == 00);                                    # Wert f. Stunde 01 ist zw. letzter Wert vor 01
+              $t07 = $val if($val && $i == 06);
+              $t13 = $val if($val && $i == 12);
+              $t19 = $val if($val && $i == 18);
+              $anz++;
+          }
+      }
+
+      if($anz >= 21) {
+          $sum = $sum/24;
+      }
+      elsif ($anz >= 4 && $t01 && $t07 && $t13 && $t19) {
+          $sum = ($t01+$t07+$t13+$t19)/4;
+      }
+      else {
+          $sum = qq{<html>insufficient values - execute <b>get $name versionNotes 2</b> for further information</html>};
+      }
+
+      my $aval = (DbRep_checktimeaggr($hash))[2];
+
+      if($aval eq "hour") {
+          @rsf     = split /[ :]/, $runtime_string_first;
+          @rsn     = split /[ :]/, $runtime_string_next;
+          $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";
+      }
+      elsif ($aval eq "minute") {
+          @rsf     = split /[ :]/, $runtime_string_first;
+          @rsn     = split /[ :]/, $runtime_string_next;
+          $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."-".$rsf[2]."|";
+      }
+      else {
+          @rsf     = split " ", $runtime_string_first;
+          @rsn     = split " ", $runtime_string_next;
+          $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|";
+      }
+
+      my @wsf = split " ", $runtime_string_first;
+      my @wsn = split " ", $runtime_string_next;
+      
+      $wrstr .= $runtime_string."#".$sum."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
+
+      ### Grünlandtemperatursumme lt. https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme ###
+      my ($y,$m,$d) = split "-", $runtime_string;
+      
+      if ($acf eq 'avgDailyMeanGWSwithGTS' && looks_like_number($sum)) {
+          $m    = DbRep_removeLeadingZero ($m);
+          $d    = DbRep_removeLeadingZero ($d);
+          $gts  = 0 if($m == 1 && $d == 1);
+
+          my $f = $sum <= 0 ? 0    :
+                  $m   >= 3 ? 1.00 :                                          # Faktorenberechnung lt. https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme
+                  $m   == 2 ? 0.75 : 
+                  0.5;
+
+          $gts += $sum*$f;
+
+          if($gts >= 200) {
+              $gtsreached = $gtsreached // $runtime_string;
+          }
+
+          $gtsstr .= $runtime_string."#".$gts."#".$rsf[0]."|";
+      }
+  }
+  
+  $sth->finish;
+  
+return ($err, $arrstr, $wrstr, $qlf, $gtsstr, $gtsreached);
+}
+
+####################################################################################################
+#      averageValue Typ avgTimeWeightMean
+#      zeitgewichteter Mittelwert
+# 
+# http://massmatics.de/merkzettel/#!837:Gewichteter_Mittelwert
+#
+# $tsum = timestamp letzter Messpunkt - timestamp erster Messpunkt
+# $t1 = timestamp wert1
+# $t2 = timestamp wert2
+# $dt = $t2 - $t1
+# $t1 = $t2
+# .....
+# (val1*$dt/$tsum) + (val2*$dt/$tsum) + .... + (valn*$dt/$tsum)
+#
+####################################################################################################
+sub _DbRep_avgTimeWeightMean {
+  my $paref     = shift;
+  
+  my $hash      = $paref->{hash};
+  my $name      = $paref->{name};
+  my $table     = $paref->{table};
+  my $device    = $paref->{device};
+  my $reading   = $paref->{reading};
+  my $qlf       = $paref->{qlf};
+  my $tsaref    = $paref->{tsaref};
+  my $dbh       = $paref->{dbh};
+  my $IsTimeSet = $paref->{IsTimeSet};
+  my $IsAggrSet = $paref->{IsAggrSet};
+                                               
+  my ($err, $sth, $sql, $arrstr, $wrstr, $bin_end, $val1);
+  my (@rsf, @rsn);
+  
+  $qlf        = 'avgtwm';
+  my $selspec = 'TIMESTAMP,VALUE';
+  my $addon   = 'ORDER BY TIMESTAMP ASC';
+  my $addonl  = 'ORDER BY TIMESTAMP DESC LIMIT 1';
+  
+  for my $row (@{$tsaref}) {
+      my @ar                    = split "#", $row;
+      my $runtime_string        = $ar[0];
+      my $runtime_string_first  = $ar[1];
+      my $runtime_string_next   = $ar[2];
+      
+      my $aval = (DbRep_checktimeaggr($hash))[2];         
+
+      my ($tf,$tl,$tn,$to,$dt,$val);                                                                                                          
+      
+      if ($bin_end) {                                                     # das $bin_end des letzten Bin ist der effektive Zeitpunkt des letzten Datenwertes
+          $tf = $bin_end;                                                 # der vorherigen Periode, die in die aktuelle Periode übernommen wird
+      }                         
+      else {                                                              # dies ist der erste Mittelungsplatz, und mit einem "Peek-back-in-time" wird versucht, den Wert unmittelbar vor der Startzeit zu ermitteln
+          my ($year,$month,$day,$hour,$min,$sec) = $runtime_string_first =~ m/(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/xs;
+          my $time                               = timelocal ($sec,$min,$hour,$day,$month-1,$year);
+
+          if ($aval eq 'hour' || $aval eq 'minute') {
+              $time -= 3600;                                              # um 1 Stunde zurückblicken
+          }
+          elsif ($aval eq 'day') {
+              $time -= 24 * 3600;                                         # um 1 Tag zurückblicken
+          }
+          elsif ($aval eq 'week') {
+              $time -= 7 * 24 * 3600;                                     # um 1 Woche zurückblicken                                                                                    
+          }
+          else {
+              $time -= 30 * 24 * 3600;                                    # um 1 Monat zurückblicken
+          };          
+          
+          my $newtime_string = strftime ("%Y-%m-%d %H:%M:%S", localtime ($time));   
+          $sql               = DbRep_createSelectSql($hash, $table, $selspec, $device, $reading, "'$newtime_string'", "'$runtime_string_first'", $addonl);
+            
+          ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+          return $err if ($err);
+            
+          my @twm_array = map { $_->[0]."_ESC_".$_->[1] } @{$sth->fetchall_arrayref()};
+            
+          for my $twmrow (@twm_array) {
+              ($tn,$val1) = split "_ESC_", $twmrow;
+              $val1       = DbRep_numval ($val1);                         # nichtnumerische Zeichen eliminieren
+              $bin_end    = $runtime_string_first;                        # der letzte Wert vor dem vollständigen Zeitrahmen wird auf den Beginn des Zeitrahmens "gefälscht"
+              $tf         = $runtime_string_first;
+          };
+      } 
+
+      my $tsum = 0;
+      my $sum  = 0;
+                                                                                   
+      if ($IsTimeSet || $IsAggrSet) {
+          $sql = DbRep_createSelectSql($hash, $table, $selspec, $device, $reading, "'$runtime_string_first'", "'$runtime_string_next'", $addon);
+      }
+      else {
+          $sql = DbRep_createSelectSql($hash, $table, $selspec, $device, $reading, undef, undef, $addon);
+      }
+
+      ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+      return $err if ($err);
+
+      my @twm_array = map { $_->[0]."_ESC_".$_->[1] } @{$sth->fetchall_arrayref()};
+                                        
+      if ($bin_end) {                                                               # der letzte Datenwert aus dem vorherigen Bin wird dem aktuellen Bin vorangestellt, 
+          unshift @twm_array, $bin_end.'_ESC_'.$val1;                               # wobei das vorherige $bin_end als Zeitstempel verwendet wird
+      }
+
+      # für jeden Bin wird die Endzeit aufgezeichnet, um sie für den nächsten Bin zu verwenden
+      my ($yyyyf, $mmf, $ddf, $hhf, $minf, $secf) = $runtime_string_next =~ /(\d+)-*(\d+)*-*(\d+)*\s*(\d+)*:*(\d+)*:*(\d+)*/xs;
+      $bin_end  = $runtime_string_next;
+      $bin_end .='-01' if (!$mmf);
+      $bin_end .='-01' if (!$ddf);
+      $bin_end .=' 00' if (!$hhf);
+      $bin_end .=':00' if (!$minf); 
+      $bin_end .=':00' if (!$secf);
+
+      for my $twmrow (@twm_array) {
+          ($tn,$val) = split "_ESC_", $twmrow;
+          $val       = DbRep_numval ($val);                                                 # nichtnumerische Zeichen eliminieren
+
+          my ($yyyyt1, $mmt1, $ddt1, $hht1, $mint1, $sect1) = $tn =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/xs;
+          $tn                                               = timelocal ($sect1, $mint1, $hht1, $ddt1, $mmt1-1, $yyyyt1-1900);
+
+          if(!$to) {
+            $val1 = $val;
+            $to   = $tn;
+            next;
+          }
+
+          $dt    = $tn - $to;
+          $tsum += $dt;                                                                     # Bildung der Zeitsumme für die spätere Division
+                                                 
+          $sum  += $val1 * $dt if ($val1);                                                  # die Division durch die Gesamtzeit wird am Ende, außerhalb der Schleife durchgeführt                                                                                                                   
+          $val1  = $val;
+          $to    = $tn;
+
+          Log3 ($name, 5, "DbRep $name - data element: $twmrow");
+          Log3 ($name, 5, "DbRep $name - time sum: $tsum, delta time: $dt, value: $val1, twm: ".($tsum ? $val1*($dt/$tsum) : 0));
+      }
+ 
+      $dt    = timelocal($secf, $minf, $hhf, $ddf, $mmf-1, $yyyyf-1900) - $to;              # die Zeitspanne des letzten Datenwertes in diesem Bin wird für diesen Bin berücksichtigt                                                                                               
+                                                                                            # $dt ist das Zeitgewicht des letzten Wertes in diesem Bin                
+      $tsum += $dt;
+      $sum  += $val1 * $dt if ($val1);
+      $sum  /= $tsum if ($tsum > 0);
+      $sum   = "insufficient values" if ($sum == 0); 
+     
+      if($aval eq "hour") {
+          @rsf     = split /[ :]/,$runtime_string_first;
+          @rsn     = split /[ :]/,$runtime_string_next;
+          $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";
+      }
+      elsif ($aval eq "minute") {
+          @rsf     = split /[ :]/,$runtime_string_first;
+          @rsn     = split /[ :]/,$runtime_string_next;
+          $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."-".$rsf[2]."|";
+      }
+      else {
+          @rsf     = split " ",$runtime_string_first;
+          @rsn     = split " ",$runtime_string_next;
+          $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|";
+      }
+      
+      $runtime_string_first =~ s/\s/_/xs;
+      $runtime_string_next  =~ s/\s/_/xs;
+      
+      $wrstr .= $runtime_string."#".$sum."#".$runtime_string_first."#".$runtime_string_next."|";    # Kombi zum Rückschreiben in die DB
+  }
+  
+  $sth->finish;
+  
+return ($err, $arrstr, $wrstr, $qlf);
 }
 
 ####################################################################################################
@@ -3627,7 +3756,7 @@ sub DbRep_avervalDone {
   my @agts = split("\\|", $gtsstr);
 
   for my $gts (@agts) {
-      my @ay                = split("#", $gts);
+      my @ay                = split "#", $gts;
       my $rt_string         = $ay[0];
       my $val               = $ay[1];
       my $rtf               = $ay[2]."__";
@@ -3645,9 +3774,10 @@ sub DbRep_avervalDone {
 
   readingsBeginUpdate($hash);
 
-  my @arr = split("\\|", $arrstr);
+  my @arr = split "\\|", $arrstr;
+  
   for my $row (@arr) {
-      my @a                = split("#", $row);
+      my @a                = split "#", $row;
       my $runtime_string   = $a[0];
       my $c                = $a[1];
       my $rsf              = $a[2]."__";
@@ -7451,8 +7581,6 @@ sub DbRep_Index {
 
   my ($sth,$rows,@six);
 
-  Log3 ($name, 5, "DbRep $name -> Start DbRep_Index");
-
   my $bst = [gettimeofday];                                         # Background-Startzeit
 
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, $p);
@@ -8019,7 +8147,7 @@ sub DbRep_mysql_DumpClientSide {
  $Jahr           += 1900;
  $Monat          += 1;
  $Jahrestag      += 1;
- my $CTIME_String = strftime "%Y-%m-%d %T",localtime(time);
+ my $CTIME_String = strftime "%Y-%m-%d %T", localtime(time);
  my $time_stamp   = $Jahr."_".sprintf("%02d",$Monat)."_".sprintf("%02d",$Monatstag)."_".sprintf("%02d",$Stunden)."_".sprintf("%02d",$Minuten);
  my $starttime    = sprintf("%02d",$Monatstag).".".sprintf("%02d",$Monat).".".$Jahr."  ".sprintf("%02d",$Stunden).":".sprintf("%02d",$Minuten);
 
@@ -9289,8 +9417,7 @@ sub DbRep_reduceLog {
     my $nts        = $paref->{rsf};
     my $ots        = $paref->{rsn} // "";
 
-    my @a          = @{$hash->{HELPER}{REDUCELOG}};
-
+    my @a   = @{$hash->{HELPER}{REDUCELOG}};
     my $err = q{};
 
     if (!$ots) {
@@ -9299,8 +9426,6 @@ sub DbRep_reduceLog {
         $err = encode_base64($err,"");
         return "$name|$err";
     }
-
-    Log3 ($name, 5, "DbRep $name -> Start DbLog_reduceLog");
 
     BlockingInformParent("DbRep_delHashValFromBlocking", [$name, "HELPER","REDUCELOG"], 1);
 
@@ -9397,21 +9522,22 @@ sub DbRep_reduceLog {
            ))
          );
 
-    my ($sth_del, $sth_upd, $sth_delD, $sth_updD, $sth_get);
-
-    ($err, $sth_del)  = DbRep_prepareCachedOnly ($name, $dbh, "DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+    ($err, my $sth_del)     = DbRep_prepareOnly ($name, $dbh, "DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+    return "$name|$err" if ($err);
+    
+    ($err, my $sth_delNull) = DbRep_prepareOnly ($name, $dbh, "DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND VALUE IS NULL");
     return "$name|$err" if ($err);
 
-    ($err, $sth_upd)  = DbRep_prepareCachedOnly ($name, $dbh, "UPDATE $table SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+    ($err, my $sth_upd)     = DbRep_prepareOnly ($name, $dbh, "UPDATE $table SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
     return "$name|$err" if ($err);
 
-    ($err, $sth_delD) = DbRep_prepareCachedOnly ($name, $dbh, "DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
+    ($err, my $sth_delD)    = DbRep_prepareOnly ($name, $dbh, "DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
     return "$name|$err" if ($err);
 
-    ($err, $sth_updD) = DbRep_prepareCachedOnly ($name, $dbh, "UPDATE $table SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
+    ($err, my $sth_updD)    = DbRep_prepareOnly ($name, $dbh, "UPDATE $table SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
     return "$name|$err" if ($err);
 
-    ($err, $sth_get) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+    ($err, my $sth_get)     = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
     return "$name|$err" if ($err);
 
 
@@ -9452,6 +9578,7 @@ sub DbRep_reduceLog {
                         name            => $name,
                         dbh             => $dbh,
                         sth_del         => $sth_del,
+                        sth_delNull     => $sth_delNull,
                         table           => $table,
                         dayRowsref      => \@dayRows,
                         deletedCountref => \$deletedCount,
@@ -9579,8 +9706,6 @@ sub DbRep_reduceLog {
 
     my $ret = encode_base64("reduceLog finished. $result", "");
 
-    Log3 ($name, 5, "DbRep $name -> DbRep_reduceLogNbl finished");
-
 return "$name|$err|$ret|$brt";
 }
 
@@ -9592,18 +9717,17 @@ sub _DbRep_rl_deleteDayRows {
   my $name            = $paref->{name};
   my $dbh             = $paref->{dbh};
   my $sth_del         = $paref->{sth_del};
+  my $sth_delNull     = $paref->{sth_delNull};
   my $table           = $paref->{table};
   my $dayRowsref      = $paref->{dayRowsref};
   my $deletedCountref = $paref->{deletedCountref};
   my $processingDay   = $paref->{processingDay};
 
-  my $err = q{};
-
+  my $err     = q{};
+  my $c       = 0;
   my @dayRows = @{$dayRowsref};
 
   #Log3 ($name, 3, "DbRep $name - content dayRows Array:\n".Dumper @dayRows);
-
-  my $c        = 0;
 
   for my $delRow (@dayRows) {
       $c++;
@@ -9623,9 +9747,22 @@ sub _DbRep_rl_deleteDayRows {
           my $th = _DbRep_rl_logThreshold ($#dayRows);
 
           for my $delRow (@dayRows) {
-              Log3 ($name, 5, "DbRep $name - DELETE FROM $table WHERE (DEVICE=$delRow->[1]) AND (READING=$delRow->[3]) AND (TIMESTAMP=$delRow->[0]) AND (VALUE=$delRow->[4])");
+              my $device  = $delRow->[1];
+              my $reading = $delRow->[3];
+              my $time    = $delRow->[0];
+              my $value   = $delRow->[4] // 'NULL';
+              
+              if ($value eq 'NULL') {
+                  Log3 ($name, 5, "DbRep $name - DELETE FROM $table WHERE (DEVICE=$device) AND (READING=$reading) AND (TIMESTAMP=$time) AND VALUE IS $value");
 
-              $sth_del->execute(($delRow->[1], $delRow->[3], $delRow->[0], $delRow->[4]));
+                  $sth_delNull->execute($device, $reading, $time);                   
+              }
+              else {
+                  Log3 ($name, 5, "DbRep $name - DELETE FROM $table WHERE (DEVICE=$device) AND (READING=$reading) AND (TIMESTAMP=$time) AND (VALUE=$value)");
+
+                  $sth_del->execute($device, $reading, $time, $value);                  
+              }
+              
               $i++;
 
               my $params = {
@@ -9678,12 +9815,11 @@ sub _DbRep_rl_updateHour {
   my $ndp             = $paref->{ndp};
 
   my $err = q{};
+  my $c   = 0;
 
   #Log3 ($name, 3, "DbRep $name - content hourlyKnown Hash:\n".Dumper %$hourlyKnownref);
 
   push(@$updateHourref, {%$hourlyKnownref});
-
-  my $c = 0;
 
   for my $hourHash (@$updateHourref) {                                                             # Only count for logging...
       for my $hourKey (keys %$hourHash) {
@@ -15412,11 +15548,14 @@ return;
       </table>
     </ul>
     <br>
-    <br>
 
-    <b>Hinweis:</b> <br>
-    When the vacuum command is executed, the PRAGMA <b>auto_vacuum = FULL</b> is automatically applied to SQLite databases.
+    <b>Note:</b> <br>
+    When the vacuum command is executed, the PRAGMA <b>auto_vacuum = FULL</b> is automatically applied to SQLite databases. <br>
+    The vacuum command requires additional temporary memory. If there is not enough space in the default TMPDIR directory, 
+    SQLite can be assigned a sufficiently large directory by setting the environment variable <b>SQLITE_TMPDIR</b>. <br>
+    (see also: <a href="https://www.sqlite.org/tempfiles.html">www.sqlite.org/tempfiles</a>)
     </li>
+    <br>
     <br>
 
     <br>
@@ -16593,7 +16732,7 @@ return;
         attr Rep.Agent role Agent         <br>
         attr Rep.Agent room DbLog         <br>
         attr Rep.Agent showproctime 1     <br>
-        attr Rep.Agent stateFormat { ReadingsVal("$name","state", undef) eq "running" ? "renaming" : ReadingsVal("$name","state", undef). " &raquo;; ProcTime: ".ReadingsVal("$name","sql_processing_time", undef)." sec"}  <br>
+        attr Rep.Agent stateFormat { ReadingsVal($name, 'state', '') eq 'running' ? 'renaming' : ReadingsVal($name, 'state', ''). ' &raquo;; ProcTime: '.ReadingsVal($name, 'sql_processing_time', '').' sec'}  <br>
         attr Rep.Agent timeout 86400      <br>
         </code>
         <br>
@@ -18318,12 +18457,16 @@ return;
       </table>
     </ul>
     <br>
-    <br>
 
     <b>Hinweis:</b> <br>
     Bei der Ausführung des vacuum Kommandos wird bei SQLite Datenbanken automatisch das PRAGMA <b>auto_vacuum = FULL</b>
-    angewendet.
+    angewendet. <br>
+    Das vacuum Kommando erfordert zusätzlichen temporären Speicherplatz. Sollte der Platz im Standard TMPDIR Verzeichnis
+    nicht ausreichen, kann SQLite durch setzen der Umgebungsvariable <b>SQLITE_TMPDIR</b> ein ausreichend großes Verzeichnis 
+    zugewiesen werden. <br>
+    (siehe: <a href="https://www.sqlite.org/tempfiles.html">www.sqlite.org/tempfiles</a>)
     </li>
+    <br>
     <br>
 
    <br>
@@ -19518,7 +19661,7 @@ return;
         attr Rep.Agent role Agent         <br>
         attr Rep.Agent room DbLog         <br>
         attr Rep.Agent showproctime 1     <br>
-        attr Rep.Agent stateFormat { ReadingsVal("$name","state", undef) eq "running" ? "renaming" : ReadingsVal("$name","state", undef). " &raquo;; ProcTime: ".ReadingsVal("$name","sql_processing_time", undef)." sec"}  <br>
+        attr Rep.Agent stateFormat { ReadingsVal($name, 'state', '') eq 'running' ? 'renaming' : ReadingsVal($name, 'state', ''). ' &raquo;; ProcTime: '.ReadingsVal($name, 'sql_processing_time', '').' sec'}  <br>
         attr Rep.Agent timeout 86400      <br>
         </code>
         <br>
