@@ -1,9 +1,9 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 26244 2022-07-18 16:49:55Z DS_Starter $
+# $Id: 49_SSCam.pm 27053 2023-01-14 13:00:46Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
-#       (c) 2015-2022 by Heiko Maaz
+#       (c) 2015-2023 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
@@ -185,7 +185,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "9.10.7" => "29.07.2022  allow placeholders #CAM, #DATE, #TIME, #FILE, #CTIME (also for Email) ",
+  "9.10.9" => "22.01.2023  substitution of \$#TIME corrected ",
+  "9.10.8" => "14.01.2023  add blank line in setter runView, goPreset, runPatrol ",
+  "9.10.7" => "02.08.2022  allow placeholders #CAM, #DATE, #TIME, #FILE, #CTIME (also for Email) ",
   "9.10.6" => "18.07.2022  textField-long property set for recChatTxt, recEmailTxt, recTelegramTxt, snapChatTxt, snapEmailTxt, snapTelegramTxt, ".
                            "set 'part1type' to default => text/html instead of text/plain",
   "9.10.5" => "01.07.2022  fix noQuotesForSID using in streaming devices type mjpeg ",
@@ -1578,30 +1580,31 @@ sub Set {
   } elsif(IsModelCam($hash)) {
       # selist für Cams
       my $hlslfw = IsCapHLS($hash) ? ",live_fw_hls," : ",";
+      
       $setlist   = "Unknown argument $opt, choose one of ".
+                   "createSnapGallery:noArg ".
+                   "createStreamDev:generic,hls,lastsnap,mjpeg,switched ".
+                   "createReadingsGroup ".
                    "credentials ".
-                   "smtpcredentials ".
+                   "disable:noArg ".
+                   "enable:noArg ".
                    "expmode:auto,day,night ".
-                   "on ".
-                   "off:noArg ".
                    "motdetsc:disable,camera,SVS ".
                    "snap ".
                    (AttrVal($name, "snapGalleryBoost",0) ? (AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0)) ? "snapGallery:noArg " : "snapGallery:$defSnum " : " ").
-                   "createReadingsGroup ".
-                   "createSnapGallery:noArg ".
-                   "createStreamDev:generic,hls,lastsnap,mjpeg,switched ".
-                   "enable:noArg ".
-                   "disable:noArg ".
+                   "on ".
+                   "off:noArg ".                   
                    "optimizeParams ".
-                   "runView:live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
+                   "runView:#,live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
                    "stopView:noArg ".
+                   "smtpcredentials ".
                    (IsCapPTZObjTrack($hash) ? "startTracking:noArg " : "").
                    (IsCapPTZObjTrack($hash) ? "stopTracking:noArg " : "").
                    (IsCapPTZPan($hash)      ? "setPreset ": "").
                    (IsCapPTZPan($hash)      ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
                    (IsCapPTZPan($hash)      ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
-                   (IsCapPTZPan($hash)      ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
-                   (IsCapPTZPan($hash)      ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
+                   (IsCapPTZPan($hash)      ? "runPatrol:#,".ReadingsVal("$name", "Patrols", "")." " : "").
+                   (IsCapPTZPan($hash)      ? "goPreset:#,".ReadingsVal("$name", "Presets", "")." " : "").
                    (IsCapPTZ($hash)         ? "createPTZcontrol:noArg " : "").
                    (IsCapPTZAbs($hash)      ? "goAbsPTZ"." " : ""). 
                    (IsCapPTZDir($hash)      ? "move"." " : "").
@@ -2566,7 +2569,7 @@ sub _setrunView {                        ## no critic "not used"
   my $prop  = $paref->{prop};
   my $prop1 = $paref->{prop1};
   
-  return if(!IsModelCam($hash));
+  return if(!IsModelCam($hash) || !$prop);
 
   my $spec = join " ", @$aref;
   if($spec =~ /STRM:/x) {
@@ -6281,7 +6284,7 @@ sub _parsegethomemodestate {                            ## no critic "not used"
   my $name  = $paref->{name};
   my $data  = $paref->{data};
          
-  my $lang    = AttrVal("global","language","EN");
+  my $lang    = AttrVal('global', 'language', 'EN');
   my $hmst    = $data->{'data'}{'on'}; 
   my $hmststr = $hmst == 1 ? "on" : "off";
   
@@ -9103,12 +9106,13 @@ sub ptzPanel {
   my $ftui        = $paref->{ftui};  
   
   my $hash        = $defs{$name};
-  my $iconpath    = AttrVal    ("$name", "ptzPanel_iconPath",   "www/images/sscam");
-  my $iconprefix  = AttrVal    ("$name", "ptzPanel_iconPrefix", "black_btn_"      );
-  my $valPresets  = ReadingsVal("$name", "Presets",             ""                );
-  my $valPatrols  = ReadingsVal("$name", "Patrols",             ""                );
+  my $iconpath    = AttrVal         ("$name", 'ptzPanel_iconPath',   'www/images/sscam');
+  my $iconprefix  = AttrVal         ("$name", 'ptzPanel_iconPrefix',       'black_btn_');
+  my $valPresets  = '#,'.ReadingsVal("$name", 'Presets',                             '');
+  my $valPatrols  = '#,'.ReadingsVal("$name", 'Patrols',                             '');
   my $rowisset    = 0;
   my ($pbs,$pbsf) = ("","");
+  
   my ($row,$ptz_ret);
   
   return "" if(myVersion($hash) <= 71);
@@ -9135,9 +9139,10 @@ sub ptzPanel {
       $rownr = sprintf("%2.2d",$rownr);
       $row   = AttrVal("$name","ptzPanel_row$rownr",undef);
       next if (!$row);
+      
       $rowisset = 1;
       $ptz_ret .= "<tr>";
-      my @btn = split (",",$row);                                                                            # die Anzahl Buttons in einer Reihe
+      my @btn   = split (",",$row);                                                                          # die Anzahl Buttons in einer Reihe
       
       for my $btnnr (0..$#btn) {                 
           $ptz_ret .= "<td class='ptzcontrol'>";
@@ -9205,6 +9210,7 @@ sub ptzPanel {
           } 
           else {                                                                                      # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
               my $iPath = FW_iconPath($img);                                                          # automatisches Suchen der Icons im FHEMWEB iconPath
+              
               if($iPath) {
                   $iPath = "$FW_ME/$FW_icondir/$iPath";
               } 
@@ -9224,7 +9230,6 @@ sub ptzPanel {
           $cmd1     = "ftui.setFhemStatus('set $name setZoom $cmd')" if($ftui); 
           
           $ptz_ret .= "<a onClick=\"$cmd1\">$img</a>";  
-
           $ptz_ret .= "</td>";  
       }
       
@@ -9293,7 +9298,7 @@ sub ptzPanel {
       return $ptz_ret;
   } 
   else {
-      return "";
+      return '';
   }
 }
 
@@ -10107,7 +10112,7 @@ sub _prepSendTelegram {
        $subjt = trim($subjt);
        $subjt =~ s/[\$#]CAM/$calias/gx;
        $subjt =~ s/[\$#]DATE/$date/gx;
-       $subjt =~ s/\[\$#]TIME/$time/gx;
+       $subjt =~ s/[\$#]TIME/$time/gx;
    }       
    
    my %telemsg       = ();
@@ -10912,10 +10917,12 @@ sub __sendEmailblocking {                                                    ## 
 
           for my $key (@unique) {                                                               # attach mail
               next if(!cache($name, "c_isvalidkey", "$sdat"."{$key}{imageData}")); 
+              
               $ct      = cache($name, "c_read", "$sdat"."{$key}{createdTm}");
               $img     = cache($name, "c_read", "$sdat"."{$key}{imageData}");
               $fname   = cache($name, "c_read", "$sdat"."{$key}{fileName}");
               $decoded = MIME::Base64::decode_base64($img); 
+              
               $mailmsg->attach(
                   Type        => $part2type,
                   Data        => $decoded,
@@ -10949,6 +10956,7 @@ sub __sendEmailblocking {                                                    ## 
               $ct      = delete $vdat->{$key}{createdTm};
               $video   = delete $vdat->{$key}{imageData};
               $fname   = delete $vdat->{$key}{fileName};
+              
               $mailmsg->attach(
                   Type        => $part2type,
                   Data        => $video,
@@ -10986,9 +10994,11 @@ sub __sendEmailblocking {                                                    ## 
           # attach mail
           for my $key (@unique) {
               next if(!cache($name, "c_isvalidkey", "$vdat"."{$key}{imageData}")); 
+              
               $ct      = cache($name, "c_read", "$vdat"."{$key}{createdTm}");
               $video   = cache($name, "c_read", "$vdat"."{$key}{imageData}");   
               $fname   = cache($name, "c_read", "$vdat"."{$key}{fileName}"); 
+              
               $mailmsg->attach(
                   Type        => $part2type,
                   Data        => $video,
@@ -13457,12 +13467,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     
         <ul>   
         <table>  
-        <colgroup> <col width=10%> <col width=90%> </colgroup>
-          <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
-          <tr><td> $DATE  </td><td>- current date </td></tr>
-          <tr><td> $TIME  </td><td>- current time </td></tr>
-          <tr><td> $FILE  </td><td>- Name of recording file </td></tr>
-          <tr><td> $CTIME </td><td>- recording creation time </td></tr>
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> $CAM (#CAM)     </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+          <tr><td> $DATE (#DATE)   </td><td>- current date </td></tr>
+          <tr><td> $TIME (#TIME)   </td><td>- current time </td></tr>
+          <tr><td> $FILE (#FILE)   </td><td>- Name of recording file </td></tr>
+          <tr><td> $CTIME (#CTIME) </td><td>- recording creation time </td></tr>
         </table>
         </ul>     
         <br>    
@@ -13483,12 +13493,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     
         <ul>   
         <table>  
-        <colgroup> <col width=10%> <col width=90%> </colgroup>
-          <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
-          <tr><td> $DATE  </td><td>- current date  </td></tr>
-          <tr><td> $TIME  </td><td>- aktuelle time </td></tr>
-          <tr><td> $FILE  </td><td>- Filename of the (last) recording (only usable in body)      </td></tr>
-          <tr><td> $CTIME </td><td>- Creation time of the (last) recording (only usable in body) </td></tr>
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> $CAM (#CAM)     </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+          <tr><td> $DATE (#DATE)   </td><td>- current date  </td></tr>
+          <tr><td> $TIME (#TIME)   </td><td>- aktuelle time </td></tr>
+          <tr><td> $FILE (#FILE)   </td><td>- Filename of the (last) recording (only usable in body)      </td></tr>
+          <tr><td> $CTIME (#CTIME) </td><td>- Creation time of the (last) recording (only usable in body) </td></tr>
         </table>
         </ul>     
         <br>
@@ -13513,12 +13523,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     
         <ul>   
         <table>  
-        <colgroup> <col width=10%> <col width=90%> </colgroup>
-          <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
-          <tr><td> $DATE  </td><td>- current date </td></tr>
-          <tr><td> $TIME  </td><td>- current time </td></tr>
-          <tr><td> $FILE  </td><td>- Name of recording file </td></tr>
-          <tr><td> $CTIME </td><td>- recording creation time </td></tr>
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> $CAM   (#CAM)   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+          <tr><td> $DATE  (#DATE)  </td><td>- current date </td></tr>
+          <tr><td> $TIME  (#TIME)  </td><td>- current time </td></tr>
+          <tr><td> $FILE  (#FILE)  </td><td>- Name of recording file </td></tr>
+          <tr><td> $CTIME (#CTIME) </td><td>- recording creation time </td></tr>
         </table>
         </ul>     
         <br>    
@@ -13624,12 +13634,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     
         <ul>   
         <table>  
-        <colgroup> <col width=10%> <col width=90%> </colgroup>
-          <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
-          <tr><td> $DATE  </td><td>- current date </td></tr>
-          <tr><td> $TIME  </td><td>- current time </td></tr>
-          <tr><td> $FILE  </td><td>- Name of snapshot file </td></tr>
-          <tr><td> $CTIME </td><td>- creation time of the snapshot </td></tr>
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> $CAM   (#CAM)   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+          <tr><td> $DATE  (#DATE)  </td><td>- current date </td></tr>
+          <tr><td> $TIME  (#TIME)  </td><td>- current time </td></tr>
+          <tr><td> $FILE  (#FILE)  </td><td>- Name of snapshot file         </td></tr>
+          <tr><td> $CTIME (#CTIME) </td><td>- creation time of the snapshot </td></tr>
         </table>
         </ul>     
         <br>    
@@ -13650,12 +13660,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     
         <ul>   
         <table>  
-        <colgroup> <col width=10%> <col width=90%> </colgroup>
-          <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
-          <tr><td> $DATE  </td><td>- current date </td></tr>
-          <tr><td> $TIME  </td><td>- current time </td></tr>
-          <tr><td> $FILE  </td><td>- Filename of the (last) snapshot (only usable in body)      </td></tr>
-          <tr><td> $CTIME </td><td>- Creation time of the (last) snapshot (only usable in body) </td></tr>
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> $CAM   (#CAM)   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+          <tr><td> $DATE  (#DATE)  </td><td>- current date </td></tr>
+          <tr><td> $TIME  (#TIME)  </td><td>- current time </td></tr>
+          <tr><td> $FILE  (#FILE)  </td><td>- Filename of the (last) snapshot (only usable in body)      </td></tr>
+          <tr><td> $CTIME (#CTIME) </td><td>- Creation time of the (last) snapshot (only usable in body) </td></tr>
         </table>
         </ul>     
         <br>
@@ -13681,12 +13691,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     
         <ul>   
         <table>  
-        <colgroup> <col width=10%> <col width=90%> </colgroup>
-          <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
-          <tr><td> $DATE  </td><td>- current date </td></tr>
-          <tr><td> $TIME  </td><td>- current time </td></tr>
-          <tr><td> $FILE  </td><td>- Name of snapshot file </td></tr>
-          <tr><td> $CTIME </td><td>- creation time of the snapshot </td></tr>
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> $CAM   (#CAM)   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
+          <tr><td> $DATE  (#DATE)  </td><td>- current date </td></tr>
+          <tr><td> $TIME  (#TIME)  </td><td>- current time </td></tr>
+          <tr><td> $FILE  (#FILE)  </td><td>- Name of snapshot file         </td></tr>
+          <tr><td> $CTIME (#CTIME) </td><td>- creation time of the snapshot </td></tr>
         </table>
         </ul>     
         <br>    
@@ -14510,10 +14520,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <ul>
   <li><b> on [&lt;rectime&gt;] <br>
-                              [recEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] <br>
-                              [recTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] <br>
-                              [recChatTxt:"chatbot => &lt;SSChatBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] <br> </b>
-                              &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
+  [recEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] <br>
+  [recTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] <br>
+  [recChatTxt:"chatbot => &lt;SSChatBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] </b> <br> 
+  &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)
+  </li>
+  <br>
 
   Startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem 
   Attribut "rectime" individuell festgelegt werden. 
@@ -15489,12 +15501,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     
         <ul>   
         <table>  
-        <colgroup> <col width=10%> <col width=90%> </colgroup>
-          <tr><td> $CAM   </td><td>- Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden ist </td></tr>
-          <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
-          <tr><td> $TIME  </td><td>- aktuelle Zeit </td></tr>
-          <tr><td> $FILE  </td><td>- Filename </td></tr>
-          <tr><td> $CTIME </td><td>- Erstellungszeit der Aufnahme </td></tr>
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> $CAM   (#CAM)   </td><td>- Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden ist </td></tr>
+          <tr><td> $DATE  (#DATE)  </td><td>- aktuelles Datum </td></tr>
+          <tr><td> $TIME  (#TIME)  </td><td>- aktuelle Zeit   </td></tr>
+          <tr><td> $FILE  (#FILE)  </td><td>- Filename                     </td></tr>
+          <tr><td> $CTIME (#CTIME) </td><td>- Erstellungszeit der Aufnahme </td></tr>
         </table>
         </ul>     
         <br>    
@@ -15515,12 +15527,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     
         <ul>   
         <table>  
-        <colgroup> <col width=10%> <col width=90%> </colgroup>
-          <tr><td> $CAM   </td><td>- Device-Alias bzw. der Name der Kamera in der SVS falls der Device-Alias nicht vorhanden ist </td></tr>
-          <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
-          <tr><td> $TIME  </td><td>- aktuelle Zeit   </td></tr>
-          <tr><td> $FILE  </td><td>- Filename der (letzten) Aufnahme (nur in body verwendbar)        </td></tr>
-          <tr><td> $CTIME </td><td>- Erstellungszeit des (letzten) Aufnahme (nur in body verwendbar) </td></tr>
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> $CAM   (#CAM)   </td><td>- Device-Alias bzw. der Name der Kamera in der SVS falls der Device-Alias nicht vorhanden ist </td></tr>
+          <tr><td> $DATE  (#DATE)  </td><td>- aktuelles Datum </td></tr>
+          <tr><td> $TIME  (#TIME)  </td><td>- aktuelle Zeit   </td></tr>
+          <tr><td> $FILE  (#FILE)  </td><td>- Filename der (letzten) Aufnahme (nur in body verwendbar)        </td></tr>
+          <tr><td> $CTIME (#CTIME) </td><td>- Erstellungszeit des (letzten) Aufnahme (nur in body verwendbar) </td></tr>
         </table>
         </ul>     
         <br>
@@ -15545,12 +15557,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     
         <ul>   
         <table>  
-        <colgroup> <col width=10%> <col width=90%> </colgroup>
-          <tr><td> $CAM   </td><td>- Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden ist </td></tr>
-          <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
-          <tr><td> $TIME  </td><td>- aktuelle Zeit </td></tr>
-          <tr><td> $FILE  </td><td>- Filename </td></tr>
-          <tr><td> $CTIME </td><td>- Erstellungszeit der Aufnahme </td></tr>
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> $CAM   (#CAM)   </td><td>- Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden ist </td></tr>
+          <tr><td> $DATE  (#DATE)  </td><td>- aktuelles Datum </td></tr>
+          <tr><td> $TIME  (#TIME)  </td><td>- aktuelle Zeit   </td></tr>
+          <tr><td> $FILE  (#FILE)  </td><td>- Filename                     </td></tr>
+          <tr><td> $CTIME (#CTIME) </td><td>- Erstellungszeit der Aufnahme </td></tr>
         </table>
         </ul>     
         <br>    
@@ -15657,12 +15669,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     
         <ul>   
         <table>  
-        <colgroup> <col width=10%> <col width=90%> </colgroup>
-          <tr><td> $CAM   </td><td>- Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden ist </td></tr>
-          <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
-          <tr><td> $TIME  </td><td>- aktuelle Zeit </td></tr>
-          <tr><td> $FILE  </td><td>- Filename des Schnappschusses </td></tr>
-          <tr><td> $CTIME </td><td>- Erstellungszeit des Schnappschusses </td></tr>
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> $CAM   (#CAM)   </td><td>- Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden ist </td></tr>
+          <tr><td> $DATE  (#DATE)  </td><td>- aktuelles Datum </td></tr>
+          <tr><td> $TIME  (#TIME)  </td><td>- aktuelle Zeit   </td></tr>
+          <tr><td> $FILE  (#FILE)  </td><td>- Filename des Schnappschusses        </td></tr>
+          <tr><td> $CTIME (#CTIME) </td><td>- Erstellungszeit des Schnappschusses </td></tr>
         </table>
         </ul>     
         <br>    
@@ -15684,12 +15696,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     
         <ul>   
         <table>  
-        <colgroup> <col width=10%> <col width=90%> </colgroup>
-          <tr><td> $CAM   </td><td>- Device-Alias bzw. der Name der Kamera in der SVS falls der Device-Alias nicht vorhanden ist </td></tr>
-          <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
-          <tr><td> $TIME  </td><td>- aktuelle Zeit   </td></tr>
-          <tr><td> $FILE  </td><td>- Filename des (letzten) Schnappschusses (nur in body verwendbar)         </td></tr>
-          <tr><td> $CTIME </td><td>- Erstellungszeit des (letzten) Schnappschusses (nur in body verwendbar)  </td></tr>
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> $CAM   (#CAM)   </td><td>- Device-Alias bzw. der Name der Kamera in der SVS falls der Device-Alias nicht vorhanden ist </td></tr>
+          <tr><td> $DATE  (#DATE)  </td><td>- aktuelles Datum </td></tr>
+          <tr><td> $TIME  (#TIME)  </td><td>- aktuelle Zeit   </td></tr>
+          <tr><td> $FILE  (#FILE)  </td><td>- Filename des (letzten) Schnappschusses (nur in body verwendbar)         </td></tr>
+          <tr><td> $CTIME (#CTIME) </td><td>- Erstellungszeit des (letzten) Schnappschusses (nur in body verwendbar)  </td></tr>
         </table>
         </ul>     
         <br>    
@@ -15715,12 +15727,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     
         <ul>   
         <table>  
-        <colgroup> <col width=10%> <col width=90%> </colgroup>
-          <tr><td> $CAM   </td><td>- Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden ist </td></tr>
-          <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
-          <tr><td> $TIME  </td><td>- aktuelle Zeit </td></tr>
-          <tr><td> $FILE  </td><td>- Filename des Schnappschusses </td></tr>
-          <tr><td> $CTIME </td><td>- Erstellungszeit des Schnappschusses </td></tr>
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> $CAM   (#CAM)   </td><td>- Device-Alias bzw. den Namen der Kamera in der SVS ersetzt falls der Device-Alias nicht vorhanden ist </td></tr>
+          <tr><td> $DATE  (#DATE)  </td><td>- aktuelles Datum </td></tr>
+          <tr><td> $TIME  (#TIME)  </td><td>- aktuelle Zeit   </td></tr>
+          <tr><td> $FILE  (#FILE)  </td><td>- Filename des Schnappschusses        </td></tr>
+          <tr><td> $CTIME (#CTIME) </td><td>- Erstellungszeit des Schnappschusses </td></tr>
         </table>
         </ul>     
         <br>    
