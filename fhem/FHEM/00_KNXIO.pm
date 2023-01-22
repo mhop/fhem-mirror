@@ -42,6 +42,7 @@
 #            fix src-addr for Mode M,H
 #            change internal PhyAddr to reabable format + range checking on define.
 # 19/12/2022 cleanup
+# xx/01/2023 cleanup, simplify _openDev
 
 
 package KNXIO; ## no critic 'package'
@@ -199,7 +200,9 @@ sub KNXIO_Define {
 
 	Log3 ($name, 3, qq{KNXIO_define ($name): opening device mode=$mode});
 
-	return InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDev,$hash);
+#	return InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDev,$hash);
+	return InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDev,$hash) if (! $init_done);
+	return KNXIO_openDev($hash);
 }
 
 #####################################
@@ -423,8 +426,9 @@ sub KNXIO_ReadH {
 		}
 		my $phyaddr = unpack('x18n',$buf);
 		$hash->{PhyAddr} = KNXIO_addr2hex($phyaddr,2); # correct Phyaddr.
+#		DoTrigger($name, 'CONNECTED');
 		readingsSingleUpdate($hash, 'state', 'connected', 1);
-		Log3 ($name, 3, qq{KNXIO ($name) connected});
+		Log3 ($name, 3, qq{KNXIO $name connected});
 		InternalTimer(gettimeofday() + 60, \&KNXIO_keepAlive, $hash); # start keepalive
 		$hash->{KNXIOhelper}->{SEQUENCECNTR} = 0;
 	}
@@ -648,7 +652,7 @@ sub KNXIO_openDev {
 			return;
 		}
 		readingsSingleUpdate($hash, 'state', 'disconnected', 1);
-		return;
+		return qq{KNXIO_openDev ($name): open failed};
 	}
 
 	if (exists $hash->{DNSWAIT}) {
@@ -663,8 +667,9 @@ sub KNXIO_openDev {
 	}
 	return if (! exists($hash->{DeviceName})); # DNS failed !
 
-	my $reopen = (exists($hash->{NEXT_OPEN}))?1:0; # 
-	my $param = $hash->{DeviceName}; # (connection-code):ip:port or socket param
+	my $reopen = (exists($hash->{NEXT_OPEN}))?1:0;
+	my $param = $hash->{DeviceName}; # ip:port or UNIX:STREAM:<socket param>
+=pod
 	my ($ccode, $host, $port) = split(/[:]/ix,$param);
 	if (! defined($port)) {
 		$port = $host;
@@ -672,6 +677,8 @@ sub KNXIO_openDev {
 		$ccode = undef;
 	}
 	$host = $port if ($param =~ /UNIX:STREAM:/ix); 
+=cut
+	my ($host, $port) = split(/[:]/ix,$param);
 
 	Log3 ($name, 5, qq{KNXIO_openDev ($name): $mode , $host , $port , reopen= $reopen});
 
@@ -682,13 +689,13 @@ sub KNXIO_openDev {
 		delete $hash->{TCPDev}; # devio ?
 		$ret = TcpServer_Open($hash, $port, $host, 1);
 		if (defined($ret)) { # error
-			Log3 ($name, 2, qq{KNXIO_openDev ($name): " can't connect: "  $ret}) if(!$reopen); 
-			return;
+			Log3 ($name, 2, qq{KNXIO_openDev ($name): can't connect: $ret}) if(!$reopen); 
+			return qq{KNXIO_openDev ($name): can't connect: $ret};
 		} 
 		$ret = TcpServer_MCastAdd($hash,$host);
 		if (defined($ret)) { # error
 			Log3 ($name, 2, qq{KNXIO_openDev ($name):  MC add failed: $ret}) if(!$reopen);
-			return;
+			return qq{KNXIO_openDev ($name):  MC add failed: $ret};
 		}
 
 		TcpServer_SetLoopbackMode($hash,0); # disable loopback
@@ -700,9 +707,10 @@ sub KNXIO_openDev {
 
 	### socket mode
 	elsif ($mode eq 'S') {
+		$host = (split(/[:]/ix,$param))[2]; # UNIX:STREAM:<socket path>
 		if (!(-S -r -w $host) && $init_done) {
 			Log3 ($name, 2, q{KNXIO_openDev ($name): Socket not available - (knxd running?)});
-			return;
+			return qq{KNXIO_openDev ($name): Socket not available - (knxd running?)};
 		}
 		$ret = DevIo_OpenDev($hash,$reopen,\&KNXIO_init); # no callback
 	}
@@ -712,7 +720,7 @@ sub KNXIO_openDev {
 		my $conn = 0;
 		$conn = IO::Socket::INET->new(PeerAddr => "$host:$port", Type => SOCK_DGRAM, Proto => 'udp', Reuse => 1);
 		if (!($conn)) {
-			Log3 ($name, 2, qq{KNXIO_openDev ($name): " can't connect: " $ERRNO}) if(!$reopen);
+			Log3 ($name, 2, qq{KNXIO_openDev ($name): can't connect: $ERRNO}) if(!$reopen);
 			$readyfnlist{"$name.$param"} = $hash;
 			readingsSingleUpdate($hash, 'state', 'disconnected', 1);
 			$hash->{NEXT_OPEN} = gettimeofday() + $reconnectTO;
@@ -762,10 +770,9 @@ sub KNXIO_init {
 
 	# state 'connected' is set in decode_EMI (model ST) or in readH (model H)  
 	else {
-
 #		DoTrigger($name, 'CONNECTED');
 		readingsSingleUpdate($hash, 'state', 'connected', 1);
-		Log3 ($name, 3, qq{KNXIO ($name) connected});
+		Log3 ($name, 3, qq{KNXIO $name connected});
 	}
 
 	return;
@@ -895,7 +902,7 @@ sub KNXIO_closeDev {
 	my $param = $hash->{DeviceName};
 
 	if ($hash->{model} eq 'M') {
-		TcpServer_Close($hash);
+		TcpServer_Close($hash,0);
 	}
 	else {
 		DevIo_CloseDev($hash);
@@ -942,8 +949,9 @@ sub KNXIO_decodeEMI {
 	if ($id != 0x0027) {
 		if ($id == 0x0026) {
 			Log3 ($name, 4, 'KNXIO_decodeEMI: OpenGrpCon response received');
+#			DoTrigger($name, 'CONNECTED');
 			readingsSingleUpdate($hash, 'state', 'connected', 1);
-			Log3 ($name, 3, qq{KNXIO ($name) connected});
+			Log3 ($name, 3, qq{KNXIO $name connected});
 		}
 		else {
 			Log3 ($name, 3, 'KNXIO_decodeEMI: invalid message code ' . sprintf('%04x',$id));
@@ -993,10 +1001,10 @@ sub KNXIO_decodeCEMI {
 	}
 
 	$addlen += 2;
-	my ($ctrlbyte1, $ctrlbyte2, $src, $dst, $tcf, $acpi, @data) = unpack('x' . $addlen .  'CCnnCCC*',$buf);
+	my ($ctrlbyte1, $ctrlbyte2, $src, $dst, $tcf, $acpi, @data) = unpack('x' . $addlen . 'CCnnCCC*',$buf);
 
 	if (($ctrlbyte1 & 0xF0) != 0xB0) { # standard frame/no repeat/broadcast - see 03_06_03 EMI_IMI specs
-		Log3 ($name, 4, 'KNXIO_decodeCEMI: wrong ctrlbyte1 ' . sprintf("%02x",$ctrlbyte1)  . ', discard packet');
+		Log3 ($name, 4, 'KNXIO_decodeCEMI: wrong ctrlbyte1 ' . sprintf("%02x",$ctrlbyte1) . ', discard packet');
 		return;
 	}
 	my $prio = ($ctrlbyte1 & 0x0C) >>2; # priority
