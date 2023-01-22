@@ -59,7 +59,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.51.3"  => "21.01.2023  extend DbRep_averval avgTimeWeightMean by alkazaa, Restructuring of DbRep_averval ",
+  "8.51.3"  => "22.01.2023  extend DbRep_averval avgTimeWeightMean by alkazaa, Restructuring of DbRep_averval ".
+                            "DbRep_reduceLog -> Handling of field 'value' with NULL value ",
   "8.51.2"  => "13.01.2023  rewrite sub DbRep_OutputWriteToDB, new averageValue option writeToDBSingleStart ",
   "8.51.1"  => "11.01.2023  write TYPE uppercase with writeToDB option, Commandref edited, fix add SQL Cache History ".
                             "set PRAGMA auto_vacuum = FULL when execute SQLite vacuum command",
@@ -403,7 +404,7 @@ my %dbrep_hmainf = (
     changeValue        => { fn => "DbRep_changeVal",     fndone => "DbRep_changeDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history", renmode => "changeval" },
 );
 
-my %dbrep_havgfn = (                                                               # Schemafunktionen von averageValue                          
+my %dbrep_havgfn = (                                                                   # Schemafunktionen von averageValue                          
   avgArithmeticMean       => { fn => \&_DbRep_avgArithmeticMean },
   avgDailyMeanGWS         => { fn => \&_DbRep_avgDailyMeanGWS   },
   avgDailyMeanGWSwithGTS  => { fn => \&_DbRep_avgDailyMeanGWS   },
@@ -737,7 +738,7 @@ sub DbRep_Set {
        Log3 ($name, 3, "DbRep $name - ################################################################");
 
        DbRep_beforeproc ($hash, "restore");
-       DbRep_Main       ($hash,$opt,$prop);
+       DbRep_Main       ($hash, $opt, $prop);
 
        return;
   }
@@ -788,7 +789,7 @@ sub DbRep_Set {
           Log3 ($name, 3, "DbRep $name - ###                    new reduceLog run                     ###");
           Log3 ($name, 3, "DbRep $name - ################################################################");
 
-          DbRep_Main ($hash,$opt);
+          DbRep_Main ($hash, $opt, $prop);
 
           return;
       }
@@ -2134,8 +2135,13 @@ sub DbRep_getInitData {
 
   $rt   = $rt.",".$brt;
 
-  $opt  = DbRep_trim ($opt)  if($opt);
-  $prop = DbRep_trim ($prop) if($prop);
+  $opt  = DbRep_trim ($opt) if($opt);
+  
+  if($prop) {
+      $prop = DbRep_trim    ($prop);
+      $prop = encode_base64 ($prop, "");
+  }
+  
   $err  = q{};
 
 return "$name|$err|$mints|$rt|$opt|$prop|$fret|$idxstate|$grants|$enc|$encc";
@@ -2224,12 +2230,12 @@ sub DbRep_getInitDataDone {
   my $string    = shift;
   my @a         = split "\\|", $string;
   my $name      = $a[0];
-  my $err       = $a[1] ? decode_base64($a[1]) : '';
+  my $err       = $a[1]  ? decode_base64($a[1]) : '';
   my $mints     = decode_base64($a[2]);
   my $bt        = $a[3];
   my $opt       = $a[4];
-  my $prop      = $a[5];
-  my $fret      = $a[6] ? \&{$a[6]} : '';
+  my $prop      = $a[5]  ? decode_base64($a[5])  : '';
+  my $fret      = $a[6]  ? \&{$a[6]} : '';
   my $idxstate  = decode_base64($a[7]);
   my $grants    = $a[8]  ? decode_base64($a[8])  : '';
   my $enc       = $a[9]  ? decode_base64($a[9])  : '';
@@ -3284,7 +3290,7 @@ sub DbRep_averval {
   Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
   Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");
 
-  my $st = [gettimeofday];                                                         # SQL-Startzeit
+  my $st = [gettimeofday];                                                                           # SQL-Startzeit
 
   ($err, my $arrstr, my $wrstr, $qlf, $gtsstr, my $gtsreached) = &{$dbrep_havgfn{$acf}{fn}} ($paref);
   return "$name|$err" if ($err);
@@ -7575,8 +7581,6 @@ sub DbRep_Index {
 
   my ($sth,$rows,@six);
 
-  Log3 ($name, 5, "DbRep $name -> Start DbRep_Index");
-
   my $bst = [gettimeofday];                                         # Background-Startzeit
 
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, $p);
@@ -9413,8 +9417,7 @@ sub DbRep_reduceLog {
     my $nts        = $paref->{rsf};
     my $ots        = $paref->{rsn} // "";
 
-    my @a          = @{$hash->{HELPER}{REDUCELOG}};
-
+    my @a   = @{$hash->{HELPER}{REDUCELOG}};
     my $err = q{};
 
     if (!$ots) {
@@ -9423,8 +9426,6 @@ sub DbRep_reduceLog {
         $err = encode_base64($err,"");
         return "$name|$err";
     }
-
-    Log3 ($name, 5, "DbRep $name -> Start DbLog_reduceLog");
 
     BlockingInformParent("DbRep_delHashValFromBlocking", [$name, "HELPER","REDUCELOG"], 1);
 
@@ -9521,21 +9522,22 @@ sub DbRep_reduceLog {
            ))
          );
 
-    my ($sth_del, $sth_upd, $sth_delD, $sth_updD, $sth_get);
-
-    ($err, $sth_del)  = DbRep_prepareCachedOnly ($name, $dbh, "DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+    ($err, my $sth_del)     = DbRep_prepareOnly ($name, $dbh, "DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+    return "$name|$err" if ($err);
+    
+    ($err, my $sth_delNull) = DbRep_prepareOnly ($name, $dbh, "DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND VALUE IS NULL");
     return "$name|$err" if ($err);
 
-    ($err, $sth_upd)  = DbRep_prepareCachedOnly ($name, $dbh, "UPDATE $table SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+    ($err, my $sth_upd)     = DbRep_prepareOnly ($name, $dbh, "UPDATE $table SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
     return "$name|$err" if ($err);
 
-    ($err, $sth_delD) = DbRep_prepareCachedOnly ($name, $dbh, "DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
+    ($err, my $sth_delD)    = DbRep_prepareOnly ($name, $dbh, "DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
     return "$name|$err" if ($err);
 
-    ($err, $sth_updD) = DbRep_prepareCachedOnly ($name, $dbh, "UPDATE $table SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
+    ($err, my $sth_updD)    = DbRep_prepareOnly ($name, $dbh, "UPDATE $table SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
     return "$name|$err" if ($err);
 
-    ($err, $sth_get) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+    ($err, my $sth_get)     = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
     return "$name|$err" if ($err);
 
 
@@ -9576,6 +9578,7 @@ sub DbRep_reduceLog {
                         name            => $name,
                         dbh             => $dbh,
                         sth_del         => $sth_del,
+                        sth_delNull     => $sth_delNull,
                         table           => $table,
                         dayRowsref      => \@dayRows,
                         deletedCountref => \$deletedCount,
@@ -9703,8 +9706,6 @@ sub DbRep_reduceLog {
 
     my $ret = encode_base64("reduceLog finished. $result", "");
 
-    Log3 ($name, 5, "DbRep $name -> DbRep_reduceLogNbl finished");
-
 return "$name|$err|$ret|$brt";
 }
 
@@ -9716,18 +9717,17 @@ sub _DbRep_rl_deleteDayRows {
   my $name            = $paref->{name};
   my $dbh             = $paref->{dbh};
   my $sth_del         = $paref->{sth_del};
+  my $sth_delNull     = $paref->{sth_delNull};
   my $table           = $paref->{table};
   my $dayRowsref      = $paref->{dayRowsref};
   my $deletedCountref = $paref->{deletedCountref};
   my $processingDay   = $paref->{processingDay};
 
-  my $err = q{};
-
+  my $err     = q{};
+  my $c       = 0;
   my @dayRows = @{$dayRowsref};
 
   #Log3 ($name, 3, "DbRep $name - content dayRows Array:\n".Dumper @dayRows);
-
-  my $c        = 0;
 
   for my $delRow (@dayRows) {
       $c++;
@@ -9747,9 +9747,22 @@ sub _DbRep_rl_deleteDayRows {
           my $th = _DbRep_rl_logThreshold ($#dayRows);
 
           for my $delRow (@dayRows) {
-              Log3 ($name, 5, "DbRep $name - DELETE FROM $table WHERE (DEVICE=$delRow->[1]) AND (READING=$delRow->[3]) AND (TIMESTAMP=$delRow->[0]) AND (VALUE=$delRow->[4])");
+              my $device  = $delRow->[1];
+              my $reading = $delRow->[3];
+              my $time    = $delRow->[0];
+              my $value   = $delRow->[4] // 'NULL';
+              
+              if ($value eq 'NULL') {
+                  Log3 ($name, 5, "DbRep $name - DELETE FROM $table WHERE (DEVICE=$device) AND (READING=$reading) AND (TIMESTAMP=$time) AND VALUE IS $value");
 
-              $sth_del->execute(($delRow->[1], $delRow->[3], $delRow->[0], $delRow->[4]));
+                  $sth_delNull->execute($device, $reading, $time);                   
+              }
+              else {
+                  Log3 ($name, 5, "DbRep $name - DELETE FROM $table WHERE (DEVICE=$device) AND (READING=$reading) AND (TIMESTAMP=$time) AND (VALUE=$value)");
+
+                  $sth_del->execute($device, $reading, $time, $value);                  
+              }
+              
               $i++;
 
               my $params = {
@@ -9802,12 +9815,11 @@ sub _DbRep_rl_updateHour {
   my $ndp             = $paref->{ndp};
 
   my $err = q{};
+  my $c   = 0;
 
   #Log3 ($name, 3, "DbRep $name - content hourlyKnown Hash:\n".Dumper %$hourlyKnownref);
 
   push(@$updateHourref, {%$hourlyKnownref});
-
-  my $c = 0;
 
   for my $hourHash (@$updateHourref) {                                                             # Only count for logging...
       for my $hourKey (keys %$hourHash) {
