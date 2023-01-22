@@ -62,6 +62,7 @@ use FHEM::SynoModules::SMUtils qw(
                                   delCallParts
                                   setReadingErrorNone
                                   setReadingErrorState
+                                  timestampToDateTime
                                  );                                                # Hilfsroutinen Modul
 use Data::Dumper;                                                                
 use MIME::Base64;
@@ -185,6 +186,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.10.9" => "22.01.2023  substitution of \$#TIME corrected ",
   "9.10.8" => "14.01.2023  add blank line in setter runView, goPreset, runPatrol ",
   "9.10.7" => "02.08.2022  allow placeholders #CAM, #DATE, #TIME, #FILE, #CTIME (also for Email) ",
   "9.10.6" => "18.07.2022  textField-long property set for recChatTxt, recEmailTxt, recTelegramTxt, snapChatTxt, snapEmailTxt, snapTelegramTxt, ".
@@ -4150,7 +4152,7 @@ sub Get {
                     ;
     } 
     else {                                                                           # getlist für SVS Devices
-        $getlist .= ($hash->{HELPER}{API}{HMODE}{VER}?"homeModeState:noArg ": "").
+        $getlist .= ($hash->{HELPER}{API}{HMODE}{VER} ? "homeModeState:noArg " : "").
                     "listLog "
                     ;
     }
@@ -6283,26 +6285,16 @@ sub _parsegethomemodestate {                            ## no critic "not used"
   my $name  = $paref->{name};
   my $data  = $paref->{data};
          
-  my $lang    = AttrVal("global","language","EN");
   my $hmst    = $data->{'data'}{'on'}; 
   my $hmststr = $hmst == 1 ? "on" : "off";
   
-  my $update_time;
-
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-  
-  if($lang eq "DE") {
-      $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
-  } 
-  else {
-      $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
-  }               
+  my ($date, $time) = timestampToDateTime ();  
 
   readingsBeginUpdate ($hash);
-  readingsBulkUpdate  ($hash, "HomeModeState",  $hmststr     );
-  readingsBulkUpdate  ($hash, "LastUpdateTime", $update_time );
-  readingsBulkUpdate  ($hash, "Errorcode",      "none"       );
-  readingsBulkUpdate  ($hash, "Error",          "none"       );
+  readingsBulkUpdate  ($hash, "HomeModeState",  $hmststr          );
+  readingsBulkUpdate  ($hash, "LastUpdateTime", $date.' / '.$time );
+  readingsBulkUpdate  ($hash, "Errorcode",      "none"            );
+  readingsBulkUpdate  ($hash, "Error",          "none"            );
   readingsEndUpdate   ($hash, 1);
                 
 return;
@@ -6680,27 +6672,16 @@ sub _parseGetcaminfo {                                  ## no critic "not used"
   my $verbose = $paref->{verbose};
   my $camname = $paref->{camname};
   
-  my $lang    = AttrVal("global","language","EN");
-  
-  my $update_time;
-  
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+  my ($date, $time) = timestampToDateTime ();
 
-  if($lang eq "DE") {
-      $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
-  } 
-  else {
-      $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
-  }
+  my $camLiveMode   = $data->{'data'}->{'cameras'}->[0]->{'camLiveMode'};              
+  $camLiveMode      = $hrkeys{camLiveMode}{$camLiveMode};
 
-  my $camLiveMode = $data->{'data'}->{'cameras'}->[0]->{'camLiveMode'};              
-  $camLiveMode    = $hrkeys{camLiveMode}{$camLiveMode};
+  my $deviceType    = $data->{'data'}->{'cameras'}->[0]->{'deviceType'};                
+  $deviceType       = $hrkeys{deviceType}{$deviceType};
 
-  my $deviceType  = $data->{'data'}->{'cameras'}->[0]->{'deviceType'};                
-  $deviceType     = $hrkeys{deviceType}{$deviceType};
-
-  my $camStatus   = jboolmap($data->{'data'}->{'cameras'}->[0]->{'camStatus'});                
-  $camStatus      = $hrkeys{camStatus}{$camStatus};
+  my $camStatus     = jboolmap($data->{'data'}->{'cameras'}->[0]->{'camStatus'});                
+  $camStatus        = $hrkeys{camStatus}{$camStatus};
 
   if ($camStatus eq "enabled") {                                   
       if (ReadingsVal("$name", "Record", "Stop") eq "Start") {                 # falls Aufnahme noch läuft -> STATE = on setzen
@@ -6771,7 +6752,7 @@ sub _parseGetcaminfo {                                  ## no critic "not used"
   readingsBulkUpdate($hash, "CapPIR",             $pdcap);
   readingsBulkUpdate($hash, "Availability",       $camStatus);
   readingsBulkUpdate($hash, "DeviceType",         $deviceType);
-  readingsBulkUpdate($hash, "LastUpdateTime",     $update_time);
+  readingsBulkUpdate($hash, "LastUpdateTime",     $date.' / '.$time);
   readingsBulkUpdate($hash, "Record",             $recStatus);
   readingsBulkUpdate($hash, "UsedSpaceMB",        $data->{'data'}{'cameras'}[0]{'volume_space'});
   readingsBulkUpdate($hash, "VideoFolder",        AttrVal($name, "videofolderMap", $data->{'data'}{'cameras'}[0]{'folder'}));
@@ -7012,8 +6993,6 @@ sub _parsegeteventlist {                                ## no critic "not used"
   my $verbose = $paref->{verbose};
   my $camname = $paref->{camname};
   
-  my $lang      = AttrVal("global","language","EN"); 
-  
   my $eventnum  = $data->{'data'}{'total'};
   my $lrec      = $data->{'data'}{'events'}[0]{name};
   my $lrecid    = $data->{'data'}{'events'}[0]{'eventId'}; 
@@ -7021,19 +7000,13 @@ sub _parsegeteventlist {                                ## no critic "not used"
   my ($lastrecstarttime,$lastrecstoptime);
 
   if ($eventnum > 0) {
-      $lastrecstarttime = $data->{'data'}{'events'}[0]{startTime};
-      my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstarttime);
+      $lastrecstarttime = $data->{'data'}{'events'}[0]{startTime};      
+      my ($date, $time) = timestampToDateTime ($lastrecstarttime);
+      $lastrecstarttime = $date.' / '.$time;
       
-      if($lang eq "DE") {
-          $lastrecstarttime = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
-      } 
-      else {
-          $lastrecstarttime = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
-      }
-      
-      $lastrecstoptime                                      = $data->{'data'}{'events'}[0]{stopTime};
-      ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstoptime);
-      $lastrecstoptime                                      = sprintf "%02d:%02d:%02d" , $hour , $min , $sec ;
+      $lastrecstoptime = $data->{'data'}{'events'}[0]{stopTime};      
+      ($date, $time)   = timestampToDateTime ($lastrecstoptime);
+      $lastrecstoptime = $time;
   }
 
   readingsBeginUpdate ($hash);
@@ -9508,30 +9481,27 @@ sub prepareSendData {
            $dat = $data{SSCam}{RS};                                # Referenz zum summarischen Hash einsetzen
        } 
        else {
-           cache($name, "c_clear"); 
+           cache ($name, 'c_clear'); 
+           
            for my $key (keys%{$asref}) {
                cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{createdTm}", delete $asref->{$key}{createdTm});
                cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{imageData}", delete $asref->{$key}{imageData});
                cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{fileName}",  delete $asref->{$key}{fileName});  
            }
+           
            $dat = "{RS}{multiple_snapsend}";                       # Referenz zum summarischen Hash einsetzen           
        }
        
-       $calias = AttrVal($name,"alias",$hash->{NAME});             # Alias des SVS-Devices 
-       $hash->{HELPER}{TRANSACTION} = "multiple_snapsend";         # fake Transaction im SVS Device setzen 
+       $calias = AttrVal ($name, 'alias', $hash->{NAME});          # Alias des SVS-Devices 
+       $hash->{HELPER}{TRANSACTION} = 'multiple_snapsend';         # fake Transaction im SVS Device setzen 
        last;                                                       # Schleife verlassen und mit Senden weiter
    }
    
-   my $sp       = AttrVal($name, "smtpPort", 25); 
-   my $nousessl = AttrVal($name, "smtpNoUseSSL", 0); 
-   
-   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-   
-   my $date     = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
-   my $time     = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;   
-   
-   my $sslfrominit = 0;
-   my $smtpsslport = 465;
+   my $sp            = AttrVal ($name, 'smtpPort',    25); 
+   my $nousessl      = AttrVal ($name, 'smtpNoUseSSL', 0);  
+   my ($date, $time) = timestampToDateTime ();
+   my $sslfrominit   = 0;
+   my $smtpsslport   = 465;
    
    if(AttrVal($name,"smtpSSLPort",0)) {
        $sslfrominit = 1;
@@ -9618,10 +9588,11 @@ sub prepareSendData {
    }
 
    ### Schnappschüsse mit Telegram versenden
-   #########################################
+   # snapTelegramTxt aus $hash->{HELPER}{TELEMSG}
+   # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, 
+   #           peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
+   ############################################################################
    if($OpMode =~ /^getsnap/x && $hash->{HELPER}{CANTELESNAP}) {     
-       # snapTelegramTxt aus $hash->{HELPER}{TELEMSG}
-       # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
        delete $hash->{HELPER}{CANTELESNAP};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
        
@@ -9654,10 +9625,11 @@ sub prepareSendData {
    }
 
    ### Aufnahmen mit Telegram versenden
-   ####################################
+   # recTelegramTxt aus $hash->{HELPER}{TELERECMSG}
+   # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, 
+   #           peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
+   ###########################################################################
    if($OpMode =~ /^GetRec/x && $hash->{HELPER}{CANTELEREC}) {   
-       # recTelegramTxt aus $hash->{HELPER}{TELERECMSG}
-       # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
        delete $hash->{HELPER}{CANTELEREC};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
        
@@ -9690,10 +9662,11 @@ sub prepareSendData {
    }
    
    ### Schnappschüsse mit Synology Chat versenden
-   ##############################################
+   # snapChatTxt aus $hash->{HELPER}{CHATMSG}
+   # Format in $hash->{HELPER}{CHATMSG} muss sein: snapChatTxt:"chatbot => <SSChatBot Device>, 
+   #           peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
+   #############################################################################################
    if($OpMode =~ /^getsnap/x && $hash->{HELPER}{CANCHATSNAP}) {     
-       # snapChatTxt aus $hash->{HELPER}{CHATMSG}
-       # Format in $hash->{HELPER}{CHATMSG} muss sein: snapChatTxt:"chatbot => <SSChatBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
        delete $hash->{HELPER}{CANCHATSNAP};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
        
@@ -9724,10 +9697,11 @@ sub prepareSendData {
    }
    
    ### Aufnahmen mit Synology Chat versenden
-   #########################################
+   # recChatTxt aus $hash->{HELPER}{CHATRECMSG}
+   # Format in $hash->{HELPER}{CHATRECMSG} muss sein: chatbot => <SSChatBot Device>, 
+   #           peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
+   ###################################################################################
    if($OpMode =~ /^GetRec/x && $hash->{HELPER}{CANCHATREC}) {   
-       # recChatTxt aus $hash->{HELPER}{CHATRECMSG}
-       # Format in $hash->{HELPER}{CHATRECMSG} muss sein: chatbot => <SSChatBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
        delete $hash->{HELPER}{CANCHATREC};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
        
@@ -10111,7 +10085,7 @@ sub _prepSendTelegram {
        $subjt = trim($subjt);
        $subjt =~ s/[\$#]CAM/$calias/gx;
        $subjt =~ s/[\$#]DATE/$date/gx;
-       $subjt =~ s/\[\$#]TIME/$time/gx;
+       $subjt =~ s/[\$#]TIME/$time/gx;
    }       
    
    my %telemsg       = ();
@@ -10916,10 +10890,12 @@ sub __sendEmailblocking {                                                    ## 
 
           for my $key (@unique) {                                                               # attach mail
               next if(!cache($name, "c_isvalidkey", "$sdat"."{$key}{imageData}")); 
+              
               $ct      = cache($name, "c_read", "$sdat"."{$key}{createdTm}");
               $img     = cache($name, "c_read", "$sdat"."{$key}{imageData}");
               $fname   = cache($name, "c_read", "$sdat"."{$key}{fileName}");
               $decoded = MIME::Base64::decode_base64($img); 
+              
               $mailmsg->attach(
                   Type        => $part2type,
                   Data        => $decoded,
@@ -10953,6 +10929,7 @@ sub __sendEmailblocking {                                                    ## 
               $ct      = delete $vdat->{$key}{createdTm};
               $video   = delete $vdat->{$key}{imageData};
               $fname   = delete $vdat->{$key}{fileName};
+              
               $mailmsg->attach(
                   Type        => $part2type,
                   Data        => $video,
@@ -10990,9 +10967,11 @@ sub __sendEmailblocking {                                                    ## 
           # attach mail
           for my $key (@unique) {
               next if(!cache($name, "c_isvalidkey", "$vdat"."{$key}{imageData}")); 
+              
               $ct      = cache($name, "c_read", "$vdat"."{$key}{createdTm}");
               $video   = cache($name, "c_read", "$vdat"."{$key}{imageData}");   
               $fname   = cache($name, "c_read", "$vdat"."{$key}{fileName}"); 
+              
               $mailmsg->attach(
                   Type        => $part2type,
                   Data        => $video,
@@ -14514,10 +14493,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <ul>
   <li><b> on [&lt;rectime&gt;] <br>
-                              [recEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] <br>
-                              [recTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] <br>
-                              [recChatTxt:"chatbot => &lt;SSChatBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] <br> </b>
-                              &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
+  [recEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] <br>
+  [recTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] <br>
+  [recChatTxt:"chatbot => &lt;SSChatBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] </b> <br> 
+  &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)
+  </li>
+  <br>
 
   Startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem 
   Attribut "rectime" individuell festgelegt werden. 
