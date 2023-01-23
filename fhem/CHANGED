@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  72_FRITZBOX: our Deklaration nach my (package global)
  - bugfix:  49_SSCAM: substitution of placeholder [$#]TIME corrected
  - bugfix:  93_DbRep: reduceLog -> Handling of field 'value' with NULL value,
                       improve averageValue avgTimeWeightMean, Thanks to alkazaa 
