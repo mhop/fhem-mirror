@@ -46,8 +46,8 @@ my $missingModul = "";
 my $missingModulTelnet = "";
 my $missingModulWeb = "";
 my $missingModulTR064 = "";
-our $FRITZBOX_TR064pwd;
-our $FRITZBOX_TR064user;
+my $FRITZBOX_TR064pwd;
+my $FRITZBOX_TR064user;
 
 eval "use URI::Escape;1" or $missingModul .= "URI::Escape ";
 eval "use MIME::Base64;1" or $missingModul .= "MIME::Base64 ";
