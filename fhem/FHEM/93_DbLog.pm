@@ -38,6 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.6.2"   => "22.01.2023 check Syntax of DbLogValueFn attribute with Log output, Forum:#131777 ",
   "5.6.1"   => "16.01.2023 rewrite sub _DbLog_SBP_connectDB, rewrite sub DbLog_ExecSQL, _DbLog_SBP_onRun_deleteOldDays ",
   "5.6.0"   => "11.01.2023 rename attribute 'bulkInsert' to 'insertMode' ",
   "5.5.12"  => "10.01.2023 changed routine _DbLog_SBP_onRun_LogSequential, edit CommandRef ",
@@ -194,7 +195,7 @@ sub DbLog_Initialize {
 
  $hash->{AttrRenameMap} = { "bulkInsert" => "insertMode",
                           };
-                          
+
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
 
 return;
@@ -409,22 +410,8 @@ sub DbLog_Attr {
            return qq{"$aName" is not valid for database model "$hash->{MODEL}"};
       }
 
-      if( $aName eq 'valueFn' ) {
-          my %specials= (
-             "%TIMESTAMP"     => $name,
-             "%LASTTIMESTAMP" => $name,
-             "%DEVICE"        => $name,
-             "%DEVICETYPE"    => $name,
-             "%EVENT"         => $name,
-             "%READING"       => $name,
-             "%VALUE"         => $name,
-             "%LASTVALUE"     => $name,
-             "%UNIT"          => $name,
-             "%IGNORE"        => $name,
-             "%CN"            => $name
-          );
-
-          my $err = perlSyntaxCheck($aVal, %specials);
+      if($aName =~ /[Vv]alueFn/) {
+          my ($err, $func) = DbLog_checkSyntaxValueFn ($name, $aVal);
           return $err if($err);
       }
 
@@ -1229,33 +1216,25 @@ sub DbLog_Log {
 
   my $memcount           = 0;
   my $re                 = $hash->{REGEXP};
-  my $ts_0               = TimeNow();                                            # timestamp in SQL format YYYY-MM-DD hh:mm:ss
-  my $now                = gettimeofday();                                       # get timestamp in seconds since epoch
+  my $ts_0               = TimeNow();                                                  # timestamp in SQL format YYYY-MM-DD hh:mm:ss
+  my $now                = gettimeofday();                                             # get timestamp in seconds since epoch
   my $DbLogExclude       = AttrVal ($dev_name, 'DbLogExclude',          undef);
   my $DbLogInclude       = AttrVal ($dev_name, 'DbLogInclude',          undef);
   my $DbLogValueFn       = AttrVal ($dev_name, 'DbLogValueFn',             '');
   my $DbLogSelectionMode = AttrVal ($name,     'DbLogSelectionMode','Exclude');
   my $value_fn           = AttrVal ($name,     'valueFn',                  '');
-  my $ctz                = AttrVal ($name,     'convertTimezone',      'none');   # convert time zone
+  my $ctz                = AttrVal ($name,     'convertTimezone',      'none');        # convert time zone
   my $async              = AttrVal ($name,     'asyncMode',                 0);
   my $clim               = AttrVal ($name,     'cacheLimit',  $dblog_cachedef);
   my $ce                 = AttrVal ($name,     'cacheEvents',               0);
 
-  if( $DbLogValueFn =~ m/^\s*(\{.*\})\s*$/s ) {                                  # Funktion aus Device spezifischer DbLogValueFn validieren
-      $DbLogValueFn = $1;
-  }
-  else {
-      $DbLogValueFn = '';
-  }
+  ($err, $DbLogValueFn) = DbLog_checkSyntaxValueFn ($name, $DbLogValueFn, $dev_name);  # Funktion aus Device spezifischer DbLogValueFn validieren
+  $DbLogValueFn = '' if($err);
 
-  if( $value_fn =~ m/^\s*(\{.*\})\s*$/s ) {                                      # Funktion aus Attr valueFn validieren
-      $value_fn = $1;
-  }
-  else {
-      $value_fn = '';
-  }
+  ($err, $value_fn) = DbLog_checkSyntaxValueFn ($name, $value_fn);                     # Funktion aus Attr valueFn validieren
+  $value_fn = '' if($err);
 
-  eval {                                                                         # one Transaction
+  eval {                                                                               # one Transaction
       for (my $i = 0; $i < $max; $i++) {
           my $next  = 0;
           my $event = $events->[$i];
@@ -2552,16 +2531,16 @@ sub _DbLog_SBP_connectDB {
       }
   }
 
-  if ($model eq 'SQLITE') {     
-      my @dos = ("PRAGMA temp_store=MEMORY", 
-                 "PRAGMA synchronous=FULL", 
+  if ($model eq 'SQLITE') {
+      my @dos = ("PRAGMA temp_store=MEMORY",
+                 "PRAGMA synchronous=FULL",
                  "PRAGMA journal_mode=$sltjm",
                  "PRAGMA cache_size=$sltcs"
                 );
-      
+
       for my $do (@dos) {
-          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, $do);  
-          return ($err, q{}) if($err);          
+          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, $do);
+          return ($err, q{}) if($err);
       }
   }
 
@@ -3448,8 +3427,8 @@ sub _DbLog_SBP_onRun_deleteOldDays {
   my $st = [gettimeofday];                                           # SQL-Startzeit
 
   if(defined ($cmd)) {
-      (my $err, $numdel) = _DbLog_SBP_dbhDo ($name, $dbh, $cmd);      
-      
+      (my $err, $numdel) = _DbLog_SBP_dbhDo ($name, $dbh, $cmd);
+
       if ($err) {
           $dbh->disconnect();
           delete $store->{dbh};
@@ -3462,9 +3441,9 @@ sub _DbLog_SBP_onRun_deleteOldDays {
           };
 
           __DbLog_SBP_sendToParent ($subprocess, $ret);
-          return;         
+          return;
       }
-      
+
       $numdel = 0 if($numdel == 0E0);
       $error  = __DbLog_SBP_commitOnly ($name, $dbh, $history);
 
@@ -5042,7 +5021,7 @@ return ($err, @sr);
 #
 # param1: DbLog-hash
 # param2: SQL-Statement
-# 
+#
 ##########################################################################
 sub DbLog_ExecSQL {
   my $hash = shift;
@@ -5055,9 +5034,9 @@ sub DbLog_ExecSQL {
   my $name = $hash->{NAME};
 
   Log3 ($name, 4, "DbLog $name - Backdoor executing: $sql");
-  
-  ($err, my $sth) = _DbLog_SBP_dbhDo ($name, $dbh, $sql);  
-  $sth = 0 if($err); 
+
+  ($err, my $sth) = _DbLog_SBP_dbhDo ($name, $dbh, $sql);
+  $sth = 0 if($err);
 
   __DbLog_SBP_commitOnly     ($name, $dbh);
   __DbLog_SBP_disconnectOnly ($name, $dbh);
@@ -7082,6 +7061,44 @@ return ($upkh,$upkc,$pkh,$pkc);
 }
 
 ################################################################
+# Syntaxcheck von Attr valueFn und DbLogValueFn
+# Rückgabe von Error oder der gesäuberten Funktion
+################################################################
+sub DbLog_checkSyntaxValueFn {
+  my $name     = shift;
+  my $func     = shift;
+  my $devname  = shift // q{};
+
+  my $err = q{};
+
+  if ($func !~ m/^\s*(\{.*\})\s*$/s) {
+      return "Error while syntax checking. The function has to be enclosed by curly brackets.";
+  }
+
+  my %specials= (
+     "%TIMESTAMP"     => $name,
+     "%LASTTIMESTAMP" => $name,
+     "%DEVICE"        => $name,
+     "%DEVICETYPE"    => $name,
+     "%EVENT"         => $name,
+     "%READING"       => $name,
+     "%VALUE"         => $name,
+     "%LASTVALUE"     => $name,
+     "%UNIT"          => $name,
+     "%IGNORE"        => $name,
+     "%CN"            => $name
+  );
+
+  $err = perlSyntaxCheck ($func, %specials);
+
+  Log3 ($name, 1, "DbLog $name - Syntaxcheck <$devname> attribute DbLogValueFn: \n".$err) if($err && $devname);
+
+  $func =~ s/^\s*(\{.*\})\s*$/$1/s;
+
+return ($err, $func);
+}
+
+################################################################
 #  Routine für FHEMWEB Detailanzeige
 ################################################################
 sub DbLog_fhemwebFn {
@@ -8878,7 +8895,7 @@ attr SMA_Energymeter DbLogValueFn
      </li>
   </ul>
   <br>
-  
+
   <ul>
     <a id="DbLog-attr-insertMode"></a>
     <li><b>insertMode</b>
@@ -10564,7 +10581,7 @@ attr SMA_Energymeter DbLogValueFn
      </li>
   </ul>
   <br>
-  
+
   <ul>
     <a id="DbLog-attr-insertMode"></a>
     <li><b>insertMode</b>
