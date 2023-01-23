@@ -1022,7 +1022,7 @@ Log3($$$)
   no strict "refs";
   foreach my $li (keys %logInform) {
     if($defs{$li}) {    # Function wont be called for WARNING, don't know why
-      &{$logInform{$li}}($li, "$tim $loglevel : $text");
+      &{$logInform{$li}}($li, "$tim $loglevel: $text");
     } else {
       delete $logInform{$li};
     }
