@@ -245,7 +245,7 @@ FW_jqueryReadyFn()
             $(sel).append('<option value="'+attrName+'">'+attrName+'</option>');
           $(sel).val(attrName);
           FW_detailSelect(sel, true);
-          $(sel).trigger("change");
+          $(sel).trigger("change").focus();
         });
     });
 
