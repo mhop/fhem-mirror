@@ -404,6 +404,7 @@ FHEM/73_NUKIBridge.pm        CoolTux              Sonstige Systeme
 FHEM/73_PRESENCE.pm          JoWiemann            Unterstützende Dienste
 FHEM/73_WaterCalculator      Sailor               Unterstützende Dienste https://forum.fhem.de/index.php/topic,58579.0.html
 FHEM/74_AMADDevice.pm        CoolTux              Sonstige Systeme
+FHEM/74_AutomowerConnect.pm  Ellert               Sonstige Systeme https://forum.fhem.de/index.php/topic,131661.0.html
 FHEM/74_GardenaSmartDevice.pm CoolTux             Sonstige Systeme
 FHEM/74_HOMBOT.pm            CoolTux              sonstige Systeme
 FHEM/74_HusqvarnaAutomower.pm krannich            Sonstige Systeme
@@ -416,6 +417,7 @@ FHEM/74_UnifiClient.pm       wuehler              Automatisierung
 FHEM/74_UnifiProtect.pm      justme1968           Sonstiges
 FHEM/74_UnifiVideo.pm        justme1968           Sonstiges
 FHEM/74_XiaomiBTLESens       CoolTux              Sonstige Systeme
+FHEM/75_AutomowerConnectDevice.pm  Ellert         Sonstige Systeme https://forum.fhem.de/index.php/topic,131661.0.html
 FHEM/75_MSG.pm               loredo               Automatisierung
 FHEM/75_msgConfig.pm         loredo               Automatisierung
 FHEM/76_msgDialog.pm         orphan/Beta-User     Frontends/Sprachsteuerung https://forum.fhem.de/index.php/topic,125710.0.html
@@ -503,7 +505,7 @@ FHEM/98_CustomReadings.pm    HCS                  Unterstützende Dienste
 FHEM/98_dewpoint.pm          hotbso               Automatisierung
 FHEM/98_DLNARenderer.pm      dominikkarall        Multimedia
 FHEM/98_DOIF.pm              damian-s             Automatisierung/DOIF
-FHEM/98_DOIFtools.pm         Ellert               Automatisierung/DOIF
+FHEM/98_DOIFtools.pm         Ellert               Automatisierung/DOIF https://forum.fhem.de/index.php/topic,63938.0.html
 FHEM/98_Dooya.pm             Jarnsen/ralf9/darkmission        Sonstige Systeme
 FHEM/98_dummy.pm             rudolfkoenig         Automatisierung
 FHEM/98_DSBMobile            KernSani             Codeschnipsel https://forum.fhem.de/index.php/topic,107104.0.html
@@ -667,6 +669,7 @@ contrib/Widgets/DateTimePicker* Matscher          Frontends
 contrib/Wzut/*		     Wzut		  MAX
 contrib/YAF/*                MarcP                Frontends
 
+www/pgm2/automowerconnect.js Ellert               Frontends
 www/codemirror/*             rapster              Frontends
 www/frontend/*               johannnes            Frontends
 www/gplot/*                  rudolfkoenig         Frontends/SVG/Plots/logProxy
