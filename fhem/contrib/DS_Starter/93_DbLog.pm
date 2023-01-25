@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 27082 2023-01-18 22:08:25Z DS_Starter $
+# $Id: 93_DbLog.pm 27111 2023-01-23 19:06:28Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -38,7 +38,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.6.2"   => "22.01.2023 check Syntax of DbLogValueFn attribute with Log output ",
+  "5.7.0"   => "25.01.2023 send Log3() data back ro parent process, improve DbLog_dbReadings function ",
+  "5.6.2"   => "22.01.2023 check Syntax of DbLogValueFn attribute with Log output, Forum:#131777 ",
   "5.6.1"   => "16.01.2023 rewrite sub _DbLog_SBP_connectDB, rewrite sub DbLog_ExecSQL, _DbLog_SBP_onRun_deleteOldDays ",
   "5.6.0"   => "11.01.2023 rename attribute 'bulkInsert' to 'insertMode' ",
   "5.5.12"  => "10.01.2023 changed routine _DbLog_SBP_onRun_LogSequential, edit CommandRef ",
@@ -195,7 +196,7 @@ sub DbLog_Initialize {
 
  $hash->{AttrRenameMap} = { "bulkInsert" => "insertMode",
                           };
-                          
+
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
 
 return;
@@ -1230,7 +1231,7 @@ sub DbLog_Log {
 
   ($err, $DbLogValueFn) = DbLog_checkSyntaxValueFn ($name, $DbLogValueFn, $dev_name);  # Funktion aus Device spezifischer DbLogValueFn validieren
   $DbLogValueFn = '' if($err);
-  
+
   ($err, $value_fn) = DbLog_checkSyntaxValueFn ($name, $value_fn);                     # Funktion aus Attr valueFn validieren
   $value_fn = '' if($err);
 
@@ -1970,9 +1971,7 @@ sub DbLog_execMemCacheAsync {
       my $wrotefile = DbLog_writeFileIfCacheOverflow ($params);                            # Cache exportieren bei Overflow
       return if($wrotefile);
 
-      if ($verbose == 5) {
-          DbLog_logHashContent ($name, $data{DbLog}{$name}{cache}{memcache}, 5, 'MemCache contains: ');
-      }
+      DbLog_logHashContent ( {name => $name, href => $data{DbLog}{$name}{cache}{memcache}, level => 5, logtxt => 'MemCache contains: '} );
 
       my $memc = _DbLog_copyCache      ($name);
       $err     = DbLog_SBP_sendLogData ($hash, 'log_asynch', $memc);                       # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
@@ -2023,9 +2022,7 @@ sub DbLog_execMemCacheSync {
       Log3 ($name, 4, "DbLog $name - ################################################################");
   }
 
-  if ($verbose == 5) {
-      DbLog_logHashContent ($name, $data{DbLog}{$name}{cache}{memcache}, 5, 'TempStore contains: ');
-  }
+  DbLog_logHashContent ( {name => $name, href => $data{DbLog}{$name}{cache}{memcache}, level => 5, logtxt => 'TempStore contains: '} );
 
   my $memc = _DbLog_copyCache ($name);
 
@@ -2110,7 +2107,13 @@ sub DbLog_SBP_onRun {
           }
 
           if ($dbstorepars) {                                                     # DB Verbindungsparameter speichern
-              Log3 ($name, 3, "DbLog $name - DB connection parameters are stored in SubProcess");
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 3,
+                                        msg        => qq(DB connection parameters are stored in SubProcess),
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
 
               $store->{dbparams}{dbconn}      = $memc->{dbconn};
               $store->{dbparams}{dbname}      = (split /;|=/, $memc->{dbconn})[1];
@@ -2126,9 +2129,8 @@ sub DbLog_SBP_onRun {
               $store->{dbparams}{dbstorepars} = $memc->{dbstorepars};             # Status Speicherung DB Parameter 0|1
               $store->{dbparams}{cofaults}    = 0;                                # Anzahl Connectfehler seit letztem erfolgreichen Connect
 
-              if ($verbose == 5) {
-                  DbLog_logHashContent ($name, $store->{dbparams}, 5);
-              }
+
+              DbLog_logHashContent ( {name => $name, href => $store->{dbparams}, level => 5, subprocess => $subprocess} );
 
               $ret = {
                   name => $name,
@@ -2145,15 +2147,33 @@ sub DbLog_SBP_onRun {
           if (!defined $store->{dbparams}{dbstorepars}) {
               $error = qq{DB connection params havn't yet been passed to the subprocess. Data is stored temporarily.};
 
-              Log3 ($name, 3, "DbLog $name - $error");
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 3,
+                                        msg        => $error,
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
 
               for my $idx (sort {$a<=>$b} keys %{$cdata}) {
                   $logstore->{$idx} = $cdata->{$idx};
 
-                  Log3 ($name, 4, "DbLog $name - stored: $idx -> ".$logstore->{$idx});
+                  _DbLog_SBP_Log3Parent ( { name       => $name,
+                                            level      => 4,
+                                            msg        => "stored: $idx -> ".$logstore->{$idx},
+                                            oper       => 'log3parent',
+                                            subprocess => $subprocess
+                                          }
+                                        );
               }
 
-              Log3 ($name, 3, "DbLog $name - DB Connection parameters were requested ...");
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 3,
+                                        msg        => qq(DB Connection parameters were requested ...),
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
 
               $ret = {
                   name     => $name,
@@ -2316,7 +2336,13 @@ sub _DbLog_SBP_checkDiscDelpars {
       my $msg2 = $msg1;
       $msg2    =~ s/<br>//xs;
 
-      Log3 ($name, 3, "DbLog $name - $msg2");
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 3,
+                                msg        => $msg2,
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
 
       my $ret = {
             name => $name,
@@ -2373,14 +2399,21 @@ sub _DbLog_SBP_manageDBconnect {
                  model      => $store->{dbparams}{model},
                  sltjm      => $store->{dbparams}{sltjm},
                  sltcs      => $store->{dbparams}{sltcs},
-                 cofaults   => $store->{dbparams}{cofaults}
+                 cofaults   => $store->{dbparams}{cofaults},
+                 subprocess => $subprocess
                };
 
   if (!defined $store->{dbh}) {
       ($err, $dbh) = _DbLog_SBP_connectDB ($params);
 
       if ($err) {
-          Log3 ($name, 4, "DbLog $name - Database Connection impossible. Transferred data is returned to the cache.");
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 4,
+                                    msg        => qq(Database Connection impossible. Transferred data is returned to the cache.),
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
 
           $ret = {
               name     => $name,
@@ -2402,24 +2435,42 @@ sub _DbLog_SBP_manageDBconnect {
       $isNew                       = 1;
       $store->{dbh}                = $dbh;
 
-      Log3 ($name, 3, "DbLog $name - SubProcess connected to $store->{dbparams}{dbname}");
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 3,
+                                msg        => qq(SubProcess connected to $store->{dbparams}{dbname}),
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
   }
 
   $dbh = $store->{dbh};
 
   if (!$isNew) {                                                                           # kein neuer Database Handle
 
-      my $bool = _DbLog_SBP_pingDB ($name, $dbh);
+      my $bool = _DbLog_SBP_pingDB ( {name => $name, dbh => $dbh, subprocess => $subprocess} );
 
       if (!$bool) {                                                                        # DB Session dead
           delete $store->{dbh};
 
-          Log3 ($name, 4, "DbLog $name - Database Connection dead. Try reconnect ...");
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 4,
+                                    msg        => qq(Database Connection dead. Try reconnect ...),
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
 
           ($err, $dbh) = _DbLog_SBP_connectDB ($params);
 
           if ($err) {
-              Log3 ($name, 4, "DbLog $name - Database Reconnect impossible. Transferred data is returned to the cache.");
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 4,
+                                        msg        => qq(Database Reconnect impossible. Transferred data is returned to the cache.),
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
 
               $ret = {
                   name     => $name,
@@ -2470,7 +2521,8 @@ sub _DbLog_SBP_connectDB {
   my $model      = $paref->{model};
   my $sltjm      = $paref->{sltjm};
   my $sltcs      = $paref->{sltcs};
-  my $cofaults   = $paref->{cofaults} // 0;              # Anzahl Connectfehler seit letztem erfolgreichen Connect
+  my $cofaults   = $paref->{cofaults}   // 0;              # Anzahl Connectfehler seit letztem erfolgreichen Connect
+  my $subprocess = $paref->{subprocess} // q{};
 
   my $dbh = q{};
   my $err = q{};
@@ -2504,13 +2556,34 @@ sub _DbLog_SBP_connectDB {
          1;
       }
       or do { $err = $@;
-
               if ($cofaults <= 10) {
-                  Log3 ($name, 2, "DbLog $name - ERROR: $err");
+                  if ($subprocess) {
+                      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                level      => 2,
+                                                msg        => qq(ERROR: $err),
+                                                oper       => 'log3parent',
+                                                subprocess => $subprocess
+                                              }
+                                            );
+                  }
+                  else {
+                      Log3 ($name, 2, "DbLog $name - ERROR: $err");
+                  }
               }
 
               if ($cofaults == 10) {
-                  Log3 ($name, 2, "DbLog $name - There seems to be a permanent connection error to the database. Further error messages are suppressed.");
+                  if ($subprocess) {
+                      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                level      => 2,
+                                                msg        => qq(There seems to be a permanent connection error to the database. Further error messages are suppressed.),
+                                                oper       => 'log3parent',
+                                                subprocess => $subprocess
+                                              }
+                                            );
+                  }
+                  else {
+                      Log3 ($name, 2, "DbLog $name - There seems to be a permanent connection error to the database. Further error messages are suppressed.");
+                  }
               }
 
               return $err;
@@ -2521,26 +2594,26 @@ sub _DbLog_SBP_connectDB {
   if($utf8) {
       if($model eq "MYSQL") {
           $dbh->{mysql_enable_utf8} = 1;
-          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, 'set names "UTF8"');
+          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, 'set names "UTF8"', $subprocess);
           return ($err, q{}) if($err);
       }
 
       if($model eq "SQLITE") {
-        ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, 'PRAGMA encoding="UTF-8"');
+        ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, 'PRAGMA encoding="UTF-8"', $subprocess);
         return ($err, q{}) if($err);
       }
   }
 
-  if ($model eq 'SQLITE') {     
-      my @dos = ("PRAGMA temp_store=MEMORY", 
-                 "PRAGMA synchronous=FULL", 
+  if ($model eq 'SQLITE') {
+      my @dos = ("PRAGMA temp_store=MEMORY",
+                 "PRAGMA synchronous=FULL",
                  "PRAGMA journal_mode=$sltjm",
                  "PRAGMA cache_size=$sltcs"
                 );
-      
+
       for my $do (@dos) {
-          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, $do);  
-          return ($err, q{}) if($err);          
+          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, $do, $subprocess);
+          return ($err, q{}) if($err);
       }
   }
 
@@ -2551,13 +2624,14 @@ return ($err, $dbh);
 #  einfaches Sdbh->do, return ERROR-String wenn Fehler bzw. die Anzahl der betroffenen Zeilen
 ####################################################################################################
 sub _DbLog_SBP_dbhDo {
-  my $name = shift;
-  my $dbh  = shift;
-  my $sql  = shift;
-  my $info = shift // "simple do statement: $sql";
+  my $name       = shift;
+  my $dbh        = shift;
+  my $sql        = shift;
+  my $subprocess = shift;
+  my $info       = shift // "simple do statement: $sql";
 
-  my $err  = q{};
-  my $rv   = q{};
+  my $err = q{};
+  my $rv  = q{};
 
   Log3 ($name, 4, "DbLog $name - $info");
 
@@ -2565,7 +2639,18 @@ sub _DbLog_SBP_dbhDo {
         1;
       }
       or do { $err = $@;
-              Log3 ($name, 2, "DbLog $name - ERROR - $@");
+              if ($subprocess) {
+                  _DbLog_SBP_Log3Parent ( { name       => $name,
+                                            level      => 2,
+                                            msg        => qq(ERROR - $err),
+                                            oper       => 'log3parent',
+                                            subprocess => $subprocess
+                                          }
+                                        );
+              }
+              else {
+                  Log3 ($name, 2, qq{DbLog $name - ERROR - $err});
+              }
             };
 
 return ($err, $rv);
@@ -2582,9 +2667,12 @@ return ($err, $rv);
 # -> https://blogs.perl.org/users/leon_timmermans/2012/01/what-you-should-know-about-signal-based-timeouts.html
 ############################################################################
 sub _DbLog_SBP_pingDB {
-  my $name = shift;
-  my $dbh  = shift;
-  my $to   = shift  // 10;
+  my $paref      = shift;
+
+  my $name       = $paref->{name};
+  my $dbh        = $paref->{dbh};
+  my $to         = $paref->{to}         // 10;
+  my $subprocess = $paref->{subprocess} // q{};
 
   my $bool;
 
@@ -2599,7 +2687,18 @@ sub _DbLog_SBP_pingDB {
       alarm 0;
 
       if ($@ && $@ =~ /Timeout/xs) {
-          Log3 ($name, 2, "DbLog $name - Database Ping Timeout of >$to seconds< reached");
+          if ($subprocess) {
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 2,
+                                        msg        => qq(Database Ping Timeout of >$to seconds< reached),
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
+          }
+          else {
+              Log3 ($name, 2, "DbLog $name - Database Ping Timeout of >$to seconds< reached");
+          }
       }
 
   };
@@ -2691,24 +2790,42 @@ sub _DbLog_SBP_onRun_LogSequential {
                                                      );
   }
   else {
-      Log3 ($name, 5, "DbLog $name - Primary Key usage suppressed by attribute noSupportPK");
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 5,
+                                msg        => qq(Primary Key usage suppressed by attribute noSupportPK),
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
   }
 
   my $ln = scalar keys %{$logstore};
 
   if ($ln) {                                                                         # temporär gespeicherte Daten hinzufügen
       for my $index (sort {$a<=>$b} keys %{$logstore}) {
-          Log3 ($name, 4, "DbLog $name - add stored data: $index -> ".$logstore->{$index});
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 4,
+                                    msg        => qq(add stored data: $index -> ).$logstore->{$index},
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
 
           $cdata->{$index} = delete $logstore->{$index};
       }
 
       undef %{$logstore};
 
-      Log3 ($name, 4, "DbLog $name - logstore deleted - $ln stored datasets added for processing");
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 4,
+                                msg        => qq(logstore deleted - $ln stored datasets added for processing),
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
   }
 
-  my $faref = __DbLog_SBP_fieldArrays ($name, $cdata);                               # Feldarrays erstellen mit Logausgabe
+  my $faref = __DbLog_SBP_fieldArrays ($name, $cdata, $subprocess);                  # Feldarrays erstellen mit Logausgabe
   my $ceti  = scalar keys %{$cdata};
   my $rv    = 0;
 
@@ -2732,9 +2849,15 @@ sub _DbLog_SBP_onRun_LogSequential {
                                                   );
 
       if ($error) {                                                                  # Eventliste zurückgeben wenn z.B. Disk I/O Error bei SQLITE
-          Log3 ($name, 2, "DbLog $name - ERROR - $error");
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 2,
+                                    msg        => qq(ERROR - $error),
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
 
-          __DbLog_SBP_disconnectOnly ($name, $dbh);
+          __DbLog_SBP_disconnectOnly ($name, $dbh, $subprocess);
           delete $store->{dbh};
 
           $ret = {
@@ -2756,7 +2879,7 @@ sub _DbLog_SBP_onRun_LogSequential {
           $sth_ih->{TraceLevel} = '0';
       }
 
-      $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
+      $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta, $subprocess);
 
       if(!$useta) {                                                                  # keine Transaktion: generate errstr, keine Ausnahme
           _DbLog_SBP_dbhPrintError ($dbh);
@@ -2767,7 +2890,13 @@ sub _DbLog_SBP_onRun_LogSequential {
                  s/_ESC_/\|/gxs for @ao;                                             # escaped Pipe back to "|"
 
                  unless ($rv = $sth_ih->execute ($ao[0], $ao[1], $ao[2], $ao[3], $ao[4], $ao[5], $ao[6])) {
-                     Log3 ($name, 2, "DbLog $name - ERROR in >$operation< - ".$sth_ih->errstr);
+                     _DbLog_SBP_Log3Parent ( { name       => $name,
+                                               level      => 2,
+                                               msg        => "ERROR in >$operation< - ".$sth_ih->errstr,
+                                               oper       => 'log3parent',
+                                               subprocess => $subprocess
+                                             }
+                                           );
                  }
                  else {
                      $ins_hist += $rv;
@@ -2776,20 +2905,37 @@ sub _DbLog_SBP_onRun_LogSequential {
              1;
            }
            or do { $error = $@;
-
-                   Log3 ($name, 2, "DbLog $name - ERROR table $history - $error");
+                   _DbLog_SBP_Log3Parent ( { name       => $name,
+                                             level      => 2,
+                                             msg        => "ERROR table $history - $error",
+                                             oper       => 'log3parent',
+                                             subprocess => $subprocess
+                                           }
+                                         );
 
                    if($useta) {
                        $rowlback = $cdata;                                          # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
 
-                       Log3 ($name, 4, "DbLog $name - Transaction is switched on. Transferred data is returned to the cache.");
+                       _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                 level      => 4,
+                                                 msg        => "Transaction is switched on. Transferred data is returned to the cache.",
+                                                 oper       => 'log3parent',
+                                                 subprocess => $subprocess
+                                               }
+                                             );
                    }
                    else {
-                       Log3 ($name, 2, "DbLog $name - Transaction is switched off. Transferred data is lost.");
+                       _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                 level      => 2,
+                                                 msg        => "Transaction is switched off. Transferred data is lost.",
+                                                 oper       => 'log3parent',
+                                                 subprocess => $subprocess
+                                               }
+                                             );
                    }
 
                    _DbLog_SBP_dbhRaiseError ($dbh);
-                   __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
+                   __DbLog_SBP_rollbackOnly ($name, $dbh, $history, $subprocess);
 
                    $ret = {
                        name     => $name,
@@ -2805,17 +2951,35 @@ sub _DbLog_SBP_onRun_LogSequential {
                  };
 
       _DbLog_SBP_dbhRaiseError ($dbh);
-      __DbLog_SBP_commitOnly   ($name, $dbh, $history);
+      __DbLog_SBP_commitOnly   ($name, $dbh, $history, $subprocess);
 
       if($ins_hist == $ceti) {
-          Log3 ($name, 4, "DbLog $name - $ins_hist of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""));
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 4,
+                                    msg        => "$ins_hist of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""),
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
       }
       else {
           if($usepkh) {
-              Log3 ($name, 3, "DbLog $name - INFO - ".$ins_hist." of $ceti events inserted into table $history due to PK on columns $pkh");
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 3,
+                                        msg        => "INFO - ".$ins_hist." of $ceti events inserted into table $history due to PK on columns $pkh",
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
           }
           else {
-              Log3 ($name, 2, "DbLog $name - WARNING - only ".$ins_hist." of $ceti events inserted into table $history");
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 2,
+                                        msg        => "WARNING - only ".$ins_hist." of $ceti events inserted into table $history",
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
           }
       }
   }
@@ -2911,24 +3075,42 @@ sub _DbLog_SBP_onRun_LogArray {
                                                      );
   }
   else {
-      Log3 ($name, 5, "DbLog $name - Primary Key usage suppressed by attribute noSupportPK");
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 5,
+                                msg        => qq(Primary Key usage suppressed by attribute noSupportPK),
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
   }
 
   my $ln = scalar keys %{$logstore};
 
   if ($ln) {                                                                          # temporär gespeicherte Daten hinzufügen
       for my $index (sort {$a<=>$b} keys %{$logstore}) {
-          Log3 ($name, 4, "DbLog $name - add stored data: $index -> ".$logstore->{$index});
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 4,
+                                    msg        => "add stored data: $index -> ".$logstore->{$index},
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
 
           $cdata->{$index} = delete $logstore->{$index};
       }
 
       undef %{$logstore};
 
-      Log3 ($name, 4, "DbLog $name - logstore deleted - $ln stored datasets added for processing");
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 4,
+                                msg        => "logstore deleted - $ln stored datasets added for processing",
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
   }
 
-  my $faref = __DbLog_SBP_fieldArrays ($name, $cdata);
+  my $faref = __DbLog_SBP_fieldArrays ($name, $cdata, $subprocess);
   my $ceti  = scalar keys %{$cdata};
 
   my ($st,$sth_ih,$sth_ic,$sth_uc,$sqlins,$ins_hist);
@@ -2954,9 +3136,15 @@ sub _DbLog_SBP_onRun_LogArray {
                                                   );
 
       if ($error) {                                                                  # Eventliste zurückgeben wenn z.B. Disk I/O Error bei SQLITE
-          Log3 ($name, 2, "DbLog $name - Error: $error");
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 2,
+                                    msg        => "Error: $error",
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
 
-          __DbLog_SBP_disconnectOnly ($name, $dbh);
+          __DbLog_SBP_disconnectOnly ($name, $dbh, $subprocess);
           delete $store->{dbh};
 
           $ret = {
@@ -2989,7 +3177,7 @@ sub _DbLog_SBP_onRun_LogArray {
       my @n2hist;
       my $rowhref;
 
-      $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
+      $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta, $subprocess);
 
       if(!$useta) {                                                                  # keine Transaktion: generate errstr, keine Ausnahme
           _DbLog_SBP_dbhPrintError ($dbh);
@@ -3002,19 +3190,37 @@ sub _DbLog_SBP_onRun_LogArray {
                $error     = $@;
                $nins_hist = $ceti;
 
-               Log3 ($name, 2, "DbLog $name - Error table $history - $error");
+               _DbLog_SBP_Log3Parent ( { name       => $name,
+                                         level      => 2,
+                                         msg        => "Error table $history - $error",
+                                         oper       => 'log3parent',
+                                         subprocess => $subprocess
+                                       }
+                                     );
 
                if($useta) {
                    $rowlback = $cdata;                                                # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
 
-                   Log3 ($name, 4, "DbLog $name - Transaction is switched on. Transferred data is returned to the cache.");
+                   _DbLog_SBP_Log3Parent ( { name       => $name,
+                                             level      => 4,
+                                             msg        => "Transaction is switched on. Transferred data is returned to the cache.",
+                                             oper       => 'log3parent',
+                                             subprocess => $subprocess
+                                           }
+                                         );
                }
                else {
-                   Log3 ($name, 4, "DbLog $name - Transaction is switched off. Some or all of the transferred data will be lost. Note the following information.");
+                   _DbLog_SBP_Log3Parent ( { name       => $name,
+                                             level      => 4,
+                                             msg        => "Transaction is switched off. Some or all of the transferred data will be lost. Note the following information.",
+                                             oper       => 'log3parent',
+                                             subprocess => $subprocess
+                                           }
+                                         );
                }
 
                _DbLog_SBP_dbhRaiseError ($dbh);
-               __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
+               __DbLog_SBP_rollbackOnly ($name, $dbh, $history, $subprocess);
 
                $ret = {
                    name     => $name,
@@ -3030,7 +3236,7 @@ sub _DbLog_SBP_onRun_LogArray {
            };
 
       _DbLog_SBP_dbhRaiseError ($dbh);
-      __DbLog_SBP_commitOnly   ($name, $dbh, $history);
+      __DbLog_SBP_commitOnly   ($name, $dbh, $history, $subprocess);
 
       no warnings 'uninitialized';
 
@@ -3040,7 +3246,13 @@ sub _DbLog_SBP_onRun_LogArray {
 
           next if($status);                                                      # $status ist "1" wenn insert ok
 
-          Log3 ($name, 4, "DbLog $name - Insert into $history rejected".($usepkh ? " (possible PK violation) " : " ")."->\nTS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple]");
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 4,
+                                    msg        => "Insert into $history rejected".($usepkh ? " (possible PK violation) " : " ")."->\nTS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple]",
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
 
           $event[$tuple]   =~ s/\|/_ESC_/gxs;                                    # escape Pipe "|"
           $reading[$tuple] =~ s/\|/_ESC_/gxs;
@@ -3057,14 +3269,32 @@ sub _DbLog_SBP_onRun_LogArray {
       use warnings;
 
       if(!$nins_hist) {
-          Log3 ($name, 4, "DbLog $name - $ceti of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""));
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 4,
+                                    msg        => "$ceti of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""),
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
       }
       else {
           if($usepkh) {
-              Log3 ($name, 3, "DbLog $name - INFO - ".($ceti-$nins_hist)." of $ceti events inserted into table history due to PK on columns $pkh");
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 3,
+                                        msg        => "INFO - ".($ceti-$nins_hist)." of $ceti events inserted into table history due to PK on columns $pkh",
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
           }
           else {
-              Log3 ($name, 2, "DbLog $name - WARNING - only ".($ceti-$nins_hist)." of $ceti events inserted into table $history");
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 2,
+                                        msg        => "WARNING - only ".($ceti-$nins_hist)." of $ceti events inserted into table $history",
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
 
               my $bkey = 1;
 
@@ -3076,9 +3306,15 @@ sub _DbLog_SBP_onRun_LogArray {
       }
 
       if (defined $rowhref) {                                                           # nicht gespeicherte Datensätze ausgeben
-          Log3 ($name, 2, "DbLog $name - The following data was not saved due to causes that may have been previously displayed:");
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 2,
+                                    msg        => "The following data was not saved due to causes that may have been previously displayed:",
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
 
-          DbLog_logHashContent ($name, $rowhref, 2);
+          DbLog_logHashContent ( {name => $name, href => $rowhref, level => 2, subprocess => $subprocess} );
       }
   }
 
@@ -3197,7 +3433,7 @@ sub __DbLog_SBP_onRun_LogCurrent {
   $sth_uc->bind_param_array (6, [@device]);
   $sth_uc->bind_param_array (7, [@reading]);
 
-  $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
+  $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta, $subprocess);
 
   eval { ($tuples, $rows) = $sth_uc->execute_array( { ArrayTupleStatus => \@tuple_status } );
        };
@@ -3210,7 +3446,13 @@ sub __DbLog_SBP_onRun_LogCurrent {
 
       next if($status);                                                     # $status ist "1" wenn update ok
 
-      Log3 ($name, 5, "DbLog $name - Failed to update in $current - TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple], Status = $status");
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 5,
+                                msg        => "Failed to update in $current - TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple], Status = $status",
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
 
       push @timestamp_cur, $timestamp[$tuple];
       push @device_cur,    $device[$tuple];
@@ -3224,10 +3466,22 @@ sub __DbLog_SBP_onRun_LogCurrent {
   }
 
   if(!$nupd_cur) {
-      Log3 ($name, 4, "DbLog $name - $ceti of $ceti events updated in table $current".($usepkc ? " using PK on columns $pkc" : ""));
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 4,
+                                msg        => "$ceti of $ceti events updated in table $current".($usepkc ? " using PK on columns $pkc" : ""),
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
   }
   else {
-      Log3 ($name, 4, "DbLog $name - $nupd_cur of $ceti events not updated in table $current. Try to insert ".($usepkc ? " using PK on columns $pkc " : " ")."...");
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 4,
+                                msg        => "$nupd_cur of $ceti events not updated in table $current. Try to insert ".($usepkc ? " using PK on columns $pkc " : " ")."...",
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
       $doins = 1;
   }
 
@@ -3253,20 +3507,39 @@ sub __DbLog_SBP_onRun_LogCurrent {
 
           next if($status);                                                # $status ist "1" wenn insert ok
 
-          Log3 ($name, 3, "DbLog $name - Insert into $current rejected - TS: $timestamp[$tuple], Device: $device_cur[$tuple], Reading: $reading_cur[$tuple], Status = $status");
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 3,
+                                    msg        => "Insert into $current rejected - TS: $timestamp[$tuple], Device: $device_cur[$tuple], Reading: $reading_cur[$tuple], Status = $status",
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
 
           $nins_cur++;
       }
 
       if(!$nins_cur) {
-          Log3 ($name, 4, "DbLog $name - ".($#device_cur+1)." of ".($#device_cur+1)." events inserted into table $current ".($usepkc ? " using PK on columns $pkc" : ""));
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 4,
+                                    msg        => ($#device_cur+1)." of ".($#device_cur+1)." events inserted into table $current ".($usepkc ? " using PK on columns $pkc" : ""),
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
       }
       else {
           Log3 ($name, 4, "DbLog $name - ".($#device_cur+1-$nins_cur)." of ".($#device_cur+1)." events inserted into table $current".($usepkc ? " using PK on columns $pkc" : ""));
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 4,
+                                    msg        => ($#device_cur+1-$nins_cur)." of ".($#device_cur+1)." events inserted into table $current".($usepkc ? " using PK on columns $pkc" : ""),
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
       }
   }
 
-  $error = __DbLog_SBP_commitOnly ($name, $dbh, $current);
+  $error = __DbLog_SBP_commitOnly ($name, $dbh, $current, $subprocess);
 
 return;
 }
@@ -3276,8 +3549,9 @@ return;
 #    Datenbankfeld (für Array-Insert)
 #################################################################
 sub __DbLog_SBP_fieldArrays {
-  my $name  = shift;
-  my $cdata = shift;                                                       # Referenz zu Log Daten Hash
+  my $name       = shift;
+  my $cdata      = shift;                                                  # Referenz zu Log Daten Hash
+  my $subprocess = shift;
 
   my (@timestamp,@device,@type,@event,@reading,@value,@unit);
 
@@ -3296,7 +3570,13 @@ sub __DbLog_SBP_fieldArrays {
       push @value,     $a[5];
       push @unit,      $a[6];
 
-      Log3 ($name, 5, "DbLog $name - processing $key -> TS: $a[0], Dev: $a[1], Type: $a[2], Event: $a[3], Reading: $a[4], Val: $a[5], Unit: $a[6]");
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 5,
+                                msg        => "processing $key -> TS: $a[0], Dev: $a[1], Type: $a[2], Event: $a[3], Reading: $a[4], Val: $a[5], Unit: $a[6]",
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
   }
 
   use warnings;
@@ -3320,6 +3600,7 @@ return $faref;
 sub __DbLog_SBP_logLogmodes {
   my $paref       = shift;
 
+  my $subprocess  = $paref->{subprocess};
   my $store       = $paref->{store};                                      # Datenspeicher
   my $memc        = $paref->{memc};
 
@@ -3333,10 +3614,37 @@ sub __DbLog_SBP_logLogmodes {
   my $ac = $dbh->{AutoCommit} ? "ON" : "OFF";
   my $tm = $useta             ? "ON" : "OFF";
 
-  Log3 ($name, 4, "DbLog $name - Operation: $operation");
-  Log3 ($name, 5, "DbLog $name - DbLogType: $DbLogType");
-  Log3 ($name, 4, "DbLog $name - AutoCommit: $ac, Transaction: $tm");
-  Log3 ($name, 4, "DbLog $name - Insert mode: ".($im ? "Sequential" : "Array"));
+  _DbLog_SBP_Log3Parent ( { name       => $name,
+                            level      => 4,
+                            msg        => "Operation: $operation",
+                            oper       => 'log3parent',
+                            subprocess => $subprocess
+                          }
+                        );
+
+  _DbLog_SBP_Log3Parent ( { name       => $name,
+                            level      => 5,
+                            msg        => "DbLogType: $DbLogType",
+                            oper       => 'log3parent',
+                            subprocess => $subprocess
+                          }
+                        );
+
+  _DbLog_SBP_Log3Parent ( { name       => $name,
+                            level      => 4,
+                            msg        => "AutoCommit: $ac, Transaction: $tm",
+                            oper       => 'log3parent',
+                            subprocess => $subprocess
+                          }
+                        );
+
+  _DbLog_SBP_Log3Parent ( { name       => $name,
+                            level      => 4,
+                            msg        => "Insert mode: ".($im ? "Sequential" : "Array"),
+                            oper       => 'log3parent',
+                            subprocess => $subprocess
+                          }
+                        );
 
 return;
 }
@@ -3427,8 +3735,8 @@ sub _DbLog_SBP_onRun_deleteOldDays {
   my $st = [gettimeofday];                                           # SQL-Startzeit
 
   if(defined ($cmd)) {
-      (my $err, $numdel) = _DbLog_SBP_dbhDo ($name, $dbh, $cmd);      
-      
+      (my $err, $numdel) = _DbLog_SBP_dbhDo ($name, $dbh, $cmd, $subprocess);
+
       if ($err) {
           $dbh->disconnect();
           delete $store->{dbh};
@@ -3441,13 +3749,19 @@ sub _DbLog_SBP_onRun_deleteOldDays {
           };
 
           __DbLog_SBP_sendToParent ($subprocess, $ret);
-          return;         
+          return;
       }
-      
-      $numdel = 0 if($numdel == 0E0);
-      $error  = __DbLog_SBP_commitOnly ($name, $dbh, $history);
 
-      Log3 ($name, 3, "DbLog $name - deleteOldDays finished. $numdel entries of database $db deleted.");
+      $numdel = 0 if($numdel == 0E0);
+      $error  = __DbLog_SBP_commitOnly ($name, $dbh, $history, $subprocess);
+
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 3,
+                                msg        => "deleteOldDays finished. $numdel entries of database $db deleted.",
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
   }
 
   my $rt  = tv_interval($st);                                                 # SQL-Laufzeit ermitteln
@@ -3488,7 +3802,13 @@ sub _DbLog_SBP_onRun_userCommand {
   my $res;
   my $ret;
 
-  Log3 ($name, 4, qq{DbLog $name - userCommand requested: "$sql"});
+  _DbLog_SBP_Log3Parent ( { name       => $name,
+                            level      => 4,
+                            msg        => qq{DbLog $name - userCommand requested: "$sql"},
+                            oper       => 'log3parent',
+                            subprocess => $subprocess
+                          }
+                        );
 
   my $st = [gettimeofday];                                                    # SQL-Startzeit
 
@@ -3496,8 +3816,13 @@ sub _DbLog_SBP_onRun_userCommand {
          1;
        }
        or do { $error = $@;
-
-               Log3 ($name, 2, "DbLog $name - Error - $error");
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 2,
+                                        msg        => "Error - $error",
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
 
                $dbh->disconnect();
                delete $store->{dbh};
@@ -3515,7 +3840,13 @@ sub _DbLog_SBP_onRun_userCommand {
 
   $res = defined $res ? $res : 'no result';
 
-  Log3 ($name, 4, qq{DbLog $name - userCommand result: "$res"});
+  _DbLog_SBP_Log3Parent ( { name       => $name,
+                            level      => 4,
+                            msg        => qq{DbLog $name - userCommand result: "$res"},
+                            oper       => 'log3parent',
+                            subprocess => $subprocess
+                          }
+                        );
 
   my $rt  = tv_interval($st);                                                 # SQL-Laufzeit ermitteln
   my $brt = tv_interval($bst);                                                # Background-Laufzeit ermitteln
@@ -3592,7 +3923,13 @@ sub _DbLog_SBP_onRun_importCachefile {
 
   my $msg = "$crows rows read from $infile into temporary Memory store";
 
-  Log3 ($name, 3, "DbLog $name - $msg");
+  _DbLog_SBP_Log3Parent ( { name       => $name,
+                            level      => 3,
+                            msg        => $msg,
+                            oper       => 'log3parent',
+                            subprocess => $subprocess
+                          }
+                        );
 
   $memc->{DbLogType} = 'history';                                                          # nur history-Insert !
   $memc->{im}        = 0;                                                                  # Array-Insert !
@@ -3608,12 +3945,24 @@ sub _DbLog_SBP_onRun_importCachefile {
                                                               );
 
   if (!$error && $nins_hist && keys %{$rowlback}) {
-      Log3 ($name, 2, "DbLog $name - WARNING - $nins_hist datasets from $infile were not imported:");
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 2,
+                                msg        => "WARNING - $nins_hist datasets from $infile were not imported:",
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
 
       for my $index (sort {$a<=>$b} keys %{$rowlback}) {
           chomp $rowlback->{$index};
 
-          Log3 ($name, 2, "$index -> ".$rowlback->{$index});
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 2,
+                                    msg        => "$index -> ".$rowlback->{$index},
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
       }
   }
 
@@ -3628,10 +3977,23 @@ sub _DbLog_SBP_onRun_importCachefile {
 
       unless (rename ($dir.$infile, $dir."impdone_".$infile)) {
           $error = "cachefile $dir$infile couldn't be renamed after import: ".$!;
-          Log3 ($name, 2, "DbLog $name - ERROR - $error");
+
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 2,
+                                    msg        => "ERROR - $error",
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
       }
       else {
-          Log3 ($name, 3, "DbLog $name - cachefile $dir$infile renamed to: ".$dir."impdone_".$infile);
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 3,
+                                    msg        => "cachefile $dir$infile renamed to: ".$dir."impdone_".$infile,
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
       }
   }
 
@@ -3696,14 +4058,28 @@ sub _DbLog_SBP_onRun_reduceLog {
                  0;
   }
 
-  Log3 ($name, 3, "DbLog $name - reduceLog requested with DAYS=$a[0]"
-      .(($average || $filter) ? ', ' : '').(($average) ? "$average" : '')
-      .(($average && $filter) ? ", " : '').(($filter)  ? uc((split('=',$a[-1]))[0]).'='.(split('=',$a[-1]))[1] : ''));
+  my $log = "reduceLog requested with DAYS=$a[0]"
+           .(($average || $filter) ? ', ' : '').($average ? "$average" : '')
+           .(($average && $filter) ? ", " : '').($filter  ? uc((split '=', $a[-1])[0]).'='.(split '=', $a[-1])[1] : '');
+
+  _DbLog_SBP_Log3Parent ( { name       => $name,
+                            level      => 3,
+                            msg        => $log,
+                            oper       => 'log3parent',
+                            subprocess => $subprocess
+                          }
+                        );
 
   my $ac = $dbh->{AutoCommit} ? "ON" : "OFF";
   my $tm = $useta             ? "ON" : "OFF";
 
-  Log3 ($name, 4, "DbLog $name - AutoCommit mode: $ac, Transaction mode: $tm");
+  _DbLog_SBP_Log3Parent ( { name       => $name,
+                            level      => 4,
+                            msg        => qq(AutoCommit mode: $ac, Transaction mode: $tm),
+                            oper       => 'log3parent',
+                            subprocess => $subprocess
+                          }
+                        );
 
   my ($od,$nd) = split ":", $a[0];                                             # $od - Tage älter als , $nd - Tage neuer als
   my ($ots,$nts);
@@ -3729,7 +4105,13 @@ sub _DbLog_SBP_onRun_reduceLog {
       $error .= " and " if($error);
       $error .= "the <no> older days are not set for reduceLog command" if(!$od);
 
-      Log3 ($name, 2, "DbLog $name - ERROR - $error");
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 2,
+                                msg        => qq(ERROR - $error),
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
 
       $ret = {
           name  => $name,
@@ -3753,8 +4135,13 @@ sub _DbLog_SBP_onRun_reduceLog {
          1;
        }
        or do { $error = $@;
-
-               Log3 ($name, 2, "DbLog $name - ERROR - $error");
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 2,
+                                        msg        => qq(ERROR - $error),
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
 
                $dbh->disconnect();
                delete $store->{dbh};
@@ -3774,8 +4161,13 @@ sub _DbLog_SBP_onRun_reduceLog {
          1;
        }
        or do { $error = $@;
-
-               Log3 ($name, 2, "DbLog $name - ERROR - $error");
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 2,
+                                        msg        => qq(ERROR - $error),
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
 
                $dbh->disconnect();
                delete $store->{dbh};
@@ -3813,15 +4205,29 @@ sub _DbLog_SBP_onRun_reduceLog {
                   if($c) {
                       $deletedCount += $c;
 
-                      Log3 ($name, 3, "DbLog $name - reduceLog deleting $c records of day: $processingDay");
+                      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                level      => 3,
+                                                msg        => qq(reduceLog deleting $c records of day: $processingDay),
+                                                oper       => 'log3parent',
+                                                subprocess => $subprocess
+                                              }
+                                            );
 
                       $dbh->{RaiseError} = 1;
                       $dbh->{PrintError} = 0;
 
-                      $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
+                      $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta, $subprocess);
+
                       if ($error) {
-                          Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                    level      => 2,
+                                                    msg        => qq(reduceLog - $error),
+                                                    oper       => 'log3parent',
+                                                    subprocess => $subprocess
+                                                  }
+                                                );
                       }
+
                       $error = q{};
 
                       eval {
@@ -3833,8 +4239,13 @@ sub _DbLog_SBP_onRun_reduceLog {
 
                           for my $delRow (@dayRows) {
                               if($day != 00 || $delRow->[0] !~ /$lastHour/) {
-
-                                  Log3 ($name, 4, "DbLog $name - DELETE FROM $history WHERE (DEVICE=$delRow->[1]) AND (READING=$delRow->[3]) AND (TIMESTAMP=$delRow->[0]) AND (VALUE=$delRow->[4])");
+                                  _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                            level      => 4,
+                                                            msg        => "DELETE FROM $history WHERE (DEVICE=$delRow->[1]) AND (READING=$delRow->[3]) AND (TIMESTAMP=$delRow->[0]) AND (VALUE=$delRow->[4])",
+                                                            oper       => 'log3parent',
+                                                            subprocess => $subprocess
+                                                          }
+                                                        );
 
                                   $sth_del->execute(($delRow->[1], $delRow->[3], $delRow->[0], $delRow->[4]));
                                   $i++;
@@ -3842,7 +4253,13 @@ sub _DbLog_SBP_onRun_reduceLog {
                                   if($i == $th) {
                                       my $prog = $k * $i;
 
-                                      Log3 ($name, 3, "DbLog $name - reduceLog deletion progress of day: $processingDay is: $prog");
+                                      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                                level      => 3,
+                                                                msg        => "reduceLog deletion progress of day: $processingDay is: $prog",
+                                                                oper       => 'log3parent',
+                                                                subprocess => $subprocess
+                                                              }
+                                                            );
 
                                       $i = 0;
                                       $k++;
@@ -3852,21 +4269,42 @@ sub _DbLog_SBP_onRun_reduceLog {
                       };
                       if ($@) {
                           $error = $@;
+                          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                    level      => 2,
+                                                    msg        => "reduceLog ! FAILED ! for day $processingDay: $error",
+                                                    oper       => 'log3parent',
+                                                    subprocess => $subprocess
+                                                  }
+                                                );
 
-                          Log3 ($name, 2, "DbLog $name - reduceLog ! FAILED ! for day $processingDay: $error");
+                          $error = __DbLog_SBP_rollbackOnly ($name, $dbh, $history, $subprocess);
 
-                          $error = __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
                           if ($error) {
-                              Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                        level      => 2,
+                                                        msg        => "reduceLog - $error",
+                                                        oper       => 'log3parent',
+                                                        subprocess => $subprocess
+                                                      }
+                                                    );
                           }
+
                           $error = q{};
                           $ret   = 0;
                       }
                       else {
-                          $error = __DbLog_SBP_commitOnly ($name, $dbh, $history);
+                          $error = __DbLog_SBP_commitOnly ($name, $dbh, $history, $subprocess);
+
                           if ($error) {
-                              Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                        level      => 2,
+                                                        msg        => "reduceLog - $error",
+                                                        oper       => 'log3parent',
+                                                        subprocess => $subprocess
+                                                      }
+                                                    );
                           }
+
                           $error = q{};
                       }
 
@@ -3881,10 +4319,18 @@ sub _DbLog_SBP_onRun_reduceLog {
                   $dbh->{RaiseError} = 1;
                   $dbh->{PrintError} = 0;
 
-                  $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
+                  $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta, $subprocess);
+
                   if ($error) {
-                      Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                level      => 2,
+                                                msg        => "reduceLog - $error",
+                                                oper       => 'log3parent',
+                                                subprocess => $subprocess
+                                              }
+                                            );
                   }
+
                   $error = q{};
 
                   eval {
@@ -3899,7 +4345,13 @@ sub _DbLog_SBP_onRun_reduceLog {
 
                       $updateCount += $c;
 
-                      Log3 ($name, 3, "DbLog $name - reduceLog (hourly-average) updating $c records of day: $processingDay") if($c); # else only push to @averageUpdD
+                      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                level      => 3,
+                                                msg        => "reduceLog (hourly-average) updating $c records of day: $processingDay",
+                                                oper       => 'log3parent',
+                                                subprocess => $subprocess
+                                              }
+                                            ) if($c); # else only push to @averageUpdD
 
                       my $i  = 0;
                       my $k  = 1;
@@ -3920,7 +4372,13 @@ sub _DbLog_SBP_onRun_reduceLog {
                                       $average = sprintf('%.3f', $sum/scalar(@{$hourHash->{$hourKey}->[4]}) );
                                       $sum     = 0;
 
-                                      Log3 ($name, 4, "DbLog $name - UPDATE $history SET TIMESTAMP=$updDate $updHour:30:00, EVENT='rl_av_h', VALUE=$average WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
+                                      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                                level      => 4,
+                                                                msg        => "UPDATE $history SET TIMESTAMP=$updDate $updHour:30:00, EVENT='rl_av_h', VALUE=$average WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]",
+                                                                oper       => 'log3parent',
+                                                                subprocess => $subprocess
+                                                              }
+                                                            );
 
                                       $sth_upd->execute("$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]);
 
@@ -3928,7 +4386,13 @@ sub _DbLog_SBP_onRun_reduceLog {
                                       if($i == $th) {
                                           my $prog = $k * $i;
 
-                                          Log3 ($name, 3, "DbLog $name - reduceLog (hourly-average) updating progress of day: $processingDay is: $prog");
+                                          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                                    level      => 3,
+                                                                    msg        => "reduceLog (hourly-average) updating progress of day: $processingDay is: $prog",
+                                                                    oper       => 'log3parent',
+                                                                    subprocess => $subprocess
+                                                                  }
+                                                                );
 
                                           $i = 0;
                                           $k++;
@@ -3945,21 +4409,40 @@ sub _DbLog_SBP_onRun_reduceLog {
 
                   if ($@) {
                       $error = $@;
+                      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                level      => 2,
+                                                msg        => "reduceLog average=hour ! FAILED ! for day $processingDay: $error",
+                                                oper       => 'log3parent',
+                                                subprocess => $subprocess
+                                              }
+                                            );
 
-                      Log3 ($name, 2, "DbLog $name - reduceLog average=hour ! FAILED ! for day $processingDay: $error");
+                      $error = __DbLog_SBP_rollbackOnly ($name, $dbh, $history, $subprocess);
 
-                      $error = __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
                       if ($error) {
-                          Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                    level      => 2,
+                                                    msg        => "reduceLog - $error",
+                                                    oper       => 'log3parent',
+                                                    subprocess => $subprocess
+                                                  }
+                                                );
                       }
 
                       $error = q{};
                       @averageUpdD = ();
                   }
                   else {
-                      $error = __DbLog_SBP_commitOnly ($name, $dbh, $history);
+                      $error = __DbLog_SBP_commitOnly ($name, $dbh, $history, $subprocess);
+
                       if ($error) {
-                          Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                    level      => 2,
+                                                    msg        => "reduceLog - $error",
+                                                    oper       => 'log3parent',
+                                                    subprocess => $subprocess
+                                                  }
+                                                );
                       }
 
                       $error = q{};
@@ -3975,10 +4458,18 @@ sub _DbLog_SBP_onRun_reduceLog {
                   $dbh->{RaiseError} = 1;
                   $dbh->{PrintError} = 0;
 
-                  $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
+                  $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta, $subprocess);
+
                   if ($error) {
-                      Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                level      => 2,
+                                                msg        => "reduceLog - $error",
+                                                oper       => 'log3parent',
+                                                subprocess => $subprocess
+                                              }
+                                            );
                   }
+
                   $error = q{};
 
                   eval {
@@ -4010,14 +4501,26 @@ sub _DbLog_SBP_onRun_reduceLog {
                                      ((keys %averageHash) <= 30000) ? 1000 :
                                      10000;
 
-                      Log3 ($name, 3, "DbLog $name - reduceLog (daily-average) updating ".(keys %averageHash).", deleting $c records of day: $processingDay") if(keys %averageHash);
+                      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                level      => 3,
+                                                msg        => "reduceLog (daily-average) updating ".(keys %averageHash).", deleting $c records of day: $processingDay",
+                                                oper       => 'log3parent',
+                                                subprocess => $subprocess
+                                              }
+                                            ) if(keys %averageHash);
 
                       for my $reading (keys %averageHash) {
                           $average  = sprintf('%.3f', $averageHash{$reading}->{sum}/scalar(@{$averageHash{$reading}->{tedr}}));
                           $lastUpdH = pop @{$averageHash{$reading}->{tedr}};
 
                           for (@{$averageHash{$reading}->{tedr}}) {
-                              Log3 ($name, 5, "DbLog $name - DELETE FROM $history WHERE DEVICE='$_->[2]' AND READING='$_->[3]' AND TIMESTAMP='$_->[0]'");
+                              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                        level      => 5,
+                                                        msg        => "DELETE FROM $history WHERE DEVICE='$_->[2]' AND READING='$_->[3]' AND TIMESTAMP='$_->[0]'",
+                                                        oper       => 'log3parent',
+                                                        subprocess => $subprocess
+                                                      }
+                                                    );
 
                               $sth_delD->execute(($_->[2], $_->[3], $_->[0]));
 
@@ -4025,14 +4528,25 @@ sub _DbLog_SBP_onRun_reduceLog {
                               if($id == $thd) {
                                   my $prog = $kd * $id;
 
-                                  Log3 ($name, 3, "DbLog $name - reduceLog (daily-average) deleting progress of day: $processingDay is: $prog");
-
+                                  _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                            level      => 3,
+                                                            msg        => "reduceLog (daily-average) deleting progress of day: $processingDay is: $prog",
+                                                            oper       => 'log3parent',
+                                                            subprocess => $subprocess
+                                                          }
+                                                        );
                                   $id = 0;
                                   $kd++;
                               }
                           }
 
-                          Log3 ($name, 4, "DbLog $name - UPDATE $history SET TIMESTAMP=$averageHash{$reading}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$average WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
+                          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                    level      => 4,
+                                                    msg        => "UPDATE $history SET TIMESTAMP=$averageHash{$reading}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$average WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])",
+                                                    oper       => 'log3parent',
+                                                    subprocess => $subprocess
+                                                  }
+                                                );
 
                           $sth_updD->execute(($averageHash{$reading}->{date}." 12:00:00", 'rl_av_d', $average, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0]));
 
@@ -4041,7 +4555,13 @@ sub _DbLog_SBP_onRun_reduceLog {
                           if($iu == $thu) {
                               my $prog = $ku * $id;
 
-                              Log3 ($name, 3, "DbLog $name - reduceLog (daily-average) updating progress of day: $processingDay is: $prog");
+                              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                        level      => 3,
+                                                        msg        => "reduceLog (daily-average) updating progress of day: $processingDay is: $prog",
+                                                        oper       => 'log3parent',
+                                                        subprocess => $subprocess
+                                                      }
+                                                    );
 
                               $iu = 0;
                               $ku++;
@@ -4049,19 +4569,39 @@ sub _DbLog_SBP_onRun_reduceLog {
                       }
                   };
                   if ($@) {
-                      Log3 ($name, 3, "DbLog $name - reduceLog average=day ! FAILED ! for day $processingDay");
+                      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                level      => 3,
+                                                msg        => "reduceLog average=day ! FAILED ! for day $processingDay",
+                                                oper       => 'log3parent',
+                                                subprocess => $subprocess
+                                              }
+                                            );
 
-                      $error = __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
+                      $error = __DbLog_SBP_rollbackOnly ($name, $dbh, $history, $subprocess);
+
                       if ($error) {
-                          Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                    level      => 2,
+                                                    msg        => "reduceLog - $error",
+                                                    oper       => 'log3parent',
+                                                    subprocess => $subprocess
+                                                  }
+                                                );
                       }
 
                       $error = q{};
                   }
                   else {
-                      $error = __DbLog_SBP_commitOnly ($name, $dbh, $history);
+                      $error = __DbLog_SBP_commitOnly ($name, $dbh, $history, $subprocess);
+
                       if ($error) {
-                          Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                    level      => 2,
+                                                    msg        => "reduceLog - $error",
+                                                    oper       => 'log3parent',
+                                                    subprocess => $subprocess
+                                                  }
+                                                );
                       }
 
                       $error = q{};
@@ -4120,8 +4660,13 @@ sub _DbLog_SBP_onRun_reduceLog {
           .(($excludeCount)? ", excluded: $excludeCount" : '')
           .", time: ".sprintf('%.2f',time() - $startTime)."sec";
 
-  Log3 ($name, 3, "DbLog $name - $res");
-
+  _DbLog_SBP_Log3Parent ( { name       => $name,
+                            level      => 3,
+                            msg        => $res,
+                            oper       => 'log3parent',
+                            subprocess => $subprocess
+                          }
+                        );
 
   my $rt  = tv_interval($st);                                                 # SQL-Laufzeit ermitteln
   my $brt = tv_interval($bst);                                                # Background-Laufzeit ermitteln
@@ -4144,21 +4689,35 @@ return;
 #       nur Datenbank "begin transaction"
 ####################################################################################################
 sub __DbLog_SBP_beginTransaction {
-  my $name  = shift;
-  my $dbh   = shift;
-  my $useta = shift;
-  my $info  = shift // "begin Transaction";
+  my $name       = shift;
+  my $dbh        = shift;
+  my $useta      = shift;
+  my $subprocess = shift;
+  my $info       = shift // "begin Transaction";
 
-  my $err   = q{};
+  my $err        = q{};
 
   eval{ if($useta && $dbh->{AutoCommit}) {
            $dbh->begin_work();
-           Log3 ($name, 4, "DbLog $name - $info");
+
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 4,
+                                    msg        => $info,
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
         };
         1;
       }
       or do { $err = $@;
-              Log3 ($name, 2, "DbLog $name - ERROR - $@");
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 2,
+                                        msg        => "ERROR - $err",
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
             };
 
 return $err;
@@ -4168,23 +4727,58 @@ return $err;
 #          nur Datenbank "commit"
 #################################################################
 sub __DbLog_SBP_commitOnly {
-  my $name  = shift;
-  my $dbh   = shift;
-  my $table = shift // 'unspecified';
+  my $name       = shift;
+  my $dbh        = shift;
+  my $table      = shift;
+  my $subprocess = shift // q{};
 
   my $err  = q{};
 
   eval{ if(!$dbh->{AutoCommit}) {
             $dbh->commit();
-            Log3 ($name, 4, qq{DbLog $name - commit inserted data table >$table<});
+
+            if ($subprocess) {
+                _DbLog_SBP_Log3Parent ( { name       => $name,
+                                          level      => 4,
+                                          msg        => qq(commit inserted data table >$table<),
+                                          oper       => 'log3parent',
+                                          subprocess => $subprocess
+                                        }
+                                      );
+            }
+            else {
+                Log3 ($name, 4, qq{DbLog $name - commit inserted data table >$table<});
+            }
         }
         else {
-            Log3 ($name, 4, qq{DbLog $name - insert table >$table< committed by autocommit});
+            if ($subprocess) {
+                _DbLog_SBP_Log3Parent ( { name       => $name,
+                                          level      => 4,
+                                          msg        => qq(insert table >$table< committed by autocommit),
+                                          oper       => 'log3parent',
+                                          subprocess => $subprocess
+                                        }
+                                      );
+            }
+            else {
+                Log3 ($name, 4, qq{DbLog $name - insert table >$table< committed by autocommit});
+            }
         }
         1;
       }
       or do { $err = $@;
-              Log3 ($name, 2, qq{DbLog $name - ERROR commit table >$table<: $err});
+              if ($subprocess) {
+                  _DbLog_SBP_Log3Parent ( { name       => $name,
+                                            level      => 2,
+                                            msg        => qq(ERROR commit table >$table<: $err),
+                                            oper       => 'log3parent',
+                                            subprocess => $subprocess
+                                          }
+                                        );
+              }
+              else {
+                  Log3 ($name, 2, qq{DbLog $name - ERROR commit table >$table<: $err});
+              }
             };
 
 return $err;
@@ -4194,23 +4788,58 @@ return $err;
 #          nur Datenbank "rollback"
 #################################################################
 sub __DbLog_SBP_rollbackOnly {
-  my $name  = shift;
-  my $dbh   = shift;
-  my $table = shift;
+  my $name       = shift;
+  my $dbh        = shift;
+  my $table      = shift;
+  my $subprocess = shift // q{};
 
   my $err  = q{};
 
   eval{ if(!$dbh->{AutoCommit}) {
             $dbh->rollback();
-            Log3 ($name, 4, "DbLog $name - Transaction rollback table $table");
+
+            if ($subprocess) {
+                _DbLog_SBP_Log3Parent ( { name       => $name,
+                                          level      => 4,
+                                          msg        => qq(Transaction rollback table >$table<),
+                                          oper       => 'log3parent',
+                                          subprocess => $subprocess
+                                        }
+                                      );
+            }
+            else {
+                Log3 ($name, 4, "DbLog $name - Transaction rollback table >$table<");
+            }
         }
         else {
-            Log3 ($name, 4, "DbLog $name - data auto rollback table $table");
+            if ($subprocess) {
+                _DbLog_SBP_Log3Parent ( { name       => $name,
+                                          level      => 4,
+                                          msg        => qq(data auto rollback table >$table<),
+                                          oper       => 'log3parent',
+                                          subprocess => $subprocess
+                                        }
+                                      );
+            }
+            else {
+                Log3 ($name, 4, "DbLog $name - data auto rollback table >$table<");
+            }
         }
         1;
       }
       or do { $err = $@;
-              Log3 ($name, 2, "DbLog $name - Error - $err");
+              if ($subprocess) {
+                  _DbLog_SBP_Log3Parent ( { name       => $name,
+                                            level      => 2,
+                                            msg        => qq(ERROR - $err),
+                                            oper       => 'log3parent',
+                                            subprocess => $subprocess
+                                          }
+                                        );
+              }
+              else {
+                  Log3 ($name, 2, "DbLog $name - ERROR - $err");
+              }
             };
 
 return $err;
@@ -4220,19 +4849,49 @@ return $err;
 #       nur Datenbank disconnect
 ####################################################################################################
 sub __DbLog_SBP_disconnectOnly {
-  my $name  = shift;
-  my $dbh   = shift;
+  my $name       = shift;
+  my $dbh        = shift;
+  my $subprocess = shift // q{};
 
-  my $err   = q{};
+  my $err = q{};
 
   eval{ $dbh->disconnect() if(defined $dbh);
         1;
       }
       or do { $err = $@;
-              Log3 ($name, 2, "DbLog $name - ERROR - $@");
+              if ($subprocess) {
+                  _DbLog_SBP_Log3Parent ( { name       => $name,
+                                            level      => 2,
+                                            msg        => qq(ERROR - $err),
+                                            oper       => 'log3parent',
+                                            subprocess => $subprocess
+                                          }
+                                        );
+              }
+              else {
+                  Log3 ($name, 2, "DbLog $name - ERROR - $err");
+              }
             };
 
 return $err;
+}
+
+#################################################################
+#          nur Datenbank "selectrow_array"
+#################################################################
+sub __DbLog_SBP_selectrowArray {
+  my $dbh = shift;
+  my $sql = shift;
+
+  my $err = q{};
+  my @res = ();
+
+  eval { @res = $dbh->selectrow_array($sql);
+         1;
+       }
+       or do { $err = $@ };
+
+return ($err, @res);
 }
 
 #################################################################
@@ -4306,6 +4965,29 @@ sub __DbLog_SBP_sthUpdTable {
              };
 
 return ($err, $sth);
+}
+
+###################################################################################
+#   Daten zur Verbeitung mit Log3() im Parent-Prozess senden
+###################################################################################
+sub _DbLog_SBP_Log3Parent {
+  my $paref = shift;
+
+  my $name    = $paref->{name};
+  my $verbose = AttrVal ($name, 'verbose', $attr{global}{verbose});
+  my $level   = $paref->{level};
+
+  return if($level > $verbose);
+
+  __DbLog_SBP_sendToParent ( $paref->{subprocess},
+                             { name    => $name,
+                               level   => $level,                             # Loglevel
+                               msg     => $paref->{msg},                      # Nutzdaten zur Ausgabe mit Log3() im Parentprozess
+                               oper    => 'log3parent'
+                             }
+                           );
+
+return;
 }
 
 #################################################################
@@ -4436,7 +5118,7 @@ sub DbLog_SBP_sendConnectionData {
   $memc->{dbpassword}  = $attr{"sec$name"}{secret};
   $memc->{model}       = $hash->{MODEL};
   $memc->{cm}          = AttrVal ($name, 'commitMode', $dblog_cmdef);
-  $memc->{verbose}     = AttrVal ($name, 'verbose',               3);
+  $memc->{verbose}     = AttrVal ($name, 'verbose',    $attr{global}{verbose});
   $memc->{utf8}        = defined ($hash->{UTF8}) ? $hash->{UTF8} : 0;
   $memc->{history}     = $hash->{HELPER}{TH};
   $memc->{current}     = $hash->{HELPER}{TC};
@@ -4477,7 +5159,7 @@ sub DbLog_SBP_sendLogData {
   $memc->{tl}        = AttrVal ($name, 'traceLevel',          0);
   $memc->{tf}        = AttrVal ($name, 'traceFlag',       'SQL');
   $memc->{im}        = AttrVal ($name, 'insertMode',          0);
-  $memc->{verbose}   = AttrVal ($name, 'verbose',             3);
+  $memc->{verbose}   = AttrVal ($name, 'verbose', $attr{global}{verbose});
   $memc->{operation} = $oper;
 
   my $err = _DbLog_SBP_sendToChild ($name, $subprocess, $memc);
@@ -4516,7 +5198,7 @@ sub DbLog_SBP_sendCommand {
   $memc->{tl}        = AttrVal ($name, 'traceLevel',     0);
   $memc->{tf}        = AttrVal ($name, 'traceFlag',  'SQL');
   $memc->{im}        = AttrVal ($name, 'insertMode',     0);
-  $memc->{verbose}   = AttrVal ($name, 'verbose',        3);
+  $memc->{verbose}   = AttrVal ($name, 'verbose', $attr{global}{verbose});
   $memc->{operation} = $oper;
   $memc->{arguments} = $arg;
 
@@ -4660,6 +5342,14 @@ sub DbLog_SBP_Read {
       my $ot       = $ret->{ot};
       my $reqdbdat = $ret->{reqdbdat};                                                        # 1 = Request Übertragung DB Verbindungsparameter
       my $oper     = $ret->{oper};                                                            # aktuell ausgeführte Operation
+
+      ## Log3Parent - Log3() Ausgabe
+      ################################
+      if ($oper eq 'log3parent') {
+          my $level = $ret->{level};
+          Log3 ($name, $level, "DbLog $name - ".$msg);
+          return;
+      }
 
       delete $hash->{HELPER}{LONGRUN_PID};
       delete $hash->{HELPER}{LASTLIMITRUNTIME} if(!$msg);
@@ -4932,7 +5622,7 @@ sub _DbLog_manageDBHU {
 
   if (defined $hash->{DBHU}) {
       $dbh     = $hash->{DBHU};
-      my $bool = _DbLog_SBP_pingDB ($name, $dbh);
+      my $bool = _DbLog_SBP_pingDB ( {name => $name, dbh => $dbh} );
 
       if (!$bool) {
           delete $hash->{DBHU};
@@ -5021,7 +5711,7 @@ return ($err, @sr);
 #
 # param1: DbLog-hash
 # param2: SQL-Statement
-# 
+#
 ##########################################################################
 sub DbLog_ExecSQL {
   my $hash = shift;
@@ -5034,11 +5724,11 @@ sub DbLog_ExecSQL {
   my $name = $hash->{NAME};
 
   Log3 ($name, 4, "DbLog $name - Backdoor executing: $sql");
-  
-  ($err, my $sth) = _DbLog_SBP_dbhDo ($name, $dbh, $sql);  
-  $sth = 0 if($err); 
 
-  __DbLog_SBP_commitOnly     ($name, $dbh);
+  ($err, my $sth) = _DbLog_SBP_dbhDo ($name, $dbh, $sql, '');
+  $sth = 0 if($err);
+
+  __DbLog_SBP_commitOnly     ($name, $dbh, 'unspecified');
   __DbLog_SBP_disconnectOnly ($name, $dbh);
 
 return $sth;
@@ -5055,7 +5745,7 @@ return $sth;
 sub DbLog_Get {
   my ($hash, @a) = @_;
   my $name       = $hash->{NAME};
-  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+  my $utf8       = defined($hash->{UTF8}) ? $hash->{UTF8} : 0;
   my $history    = $hash->{HELPER}{TH};
   my $current    = $hash->{HELPER}{TC};
 
@@ -5658,7 +6348,7 @@ sub DbLog_Get {
   }                                                                # Ende for @readings-Schleife über alle Readinggs im get
 
   # Ueberfuehren der gesammelten Werte in die globale Variable %data
-  for(my $j = 0; $j < int(@readings); $j++) {
+  for (my $j = 0; $j < int(@readings); $j++) {
       $min[$j] = 0 if ($min[$j] == (~0 >> 1));                     # if min/max values could not be calculated due to the lack of query results, set them to 0
       $max[$j] = 0 if ($max[$j] == -(~0 >> 1));
 
@@ -6981,20 +7671,38 @@ return;
 #################################################################
 #    einen Hashinhalt mit Schlüssel ausgeben
 #    $href    - Referenz auf den Hash
-#    $verbose - Level für Logausgabe
+#    $level   - Level für Logausgabe
 #################################################################
 sub DbLog_logHashContent {
-  my $name    = shift;
-  my $href    = shift;
-  my $verbose = shift // 3;
-  my $logtxt  = shift // q{};
+  my $paref      = shift;
+
+  my $name       = $paref->{name};
+  my $verbose    = AttrVal ($name, 'verbose', $attr{global}{verbose});
+  my $level      = $paref->{level};
+
+  return if($level > $verbose);
+
+  my $href       = $paref->{href};
+  my $logtxt     = $paref->{logtxt}     // q{};
+  my $subprocess = $paref->{subprocess} // q{};
 
   no warnings 'numeric';
 
   for my $key (sort {$a<=>$b} keys %{$href}) {
       next if(!defined $href->{$key});
 
-      Log3 ($name, $verbose, "DbLog $name - $logtxt $key -> $href->{$key}");
+      if ($subprocess) {
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => $level,
+                                    msg        => qq($logtxt $key -> $href->{$key}),
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
+      }
+      else {
+          Log3 ($name, $level, "DbLog $name - $logtxt $key -> $href->{$key}");
+      }
   }
 
   use warnings;
@@ -7062,16 +7770,16 @@ return ($upkh,$upkc,$pkh,$pkc);
 
 ################################################################
 # Syntaxcheck von Attr valueFn und DbLogValueFn
-# Rückgabe von Error oder der gesäuberten Funktion 
+# Rückgabe von Error oder der gesäuberten Funktion
 ################################################################
 sub DbLog_checkSyntaxValueFn {
   my $name     = shift;
   my $func     = shift;
   my $devname  = shift // q{};
-  
+
   my $err = q{};
-  
-  if ($func !~ m/^\s*(\{.*\})\s*$/s) {      
+
+  if ($func !~ m/^\s*(\{.*\})\s*$/s) {
       return "Error while syntax checking. The function has to be enclosed by curly brackets.";
   }
 
@@ -7092,7 +7800,7 @@ sub DbLog_checkSyntaxValueFn {
   $err = perlSyntaxCheck ($func, %specials);
 
   Log3 ($name, 1, "DbLog $name - Syntaxcheck <$devname> attribute DbLogValueFn: \n".$err) if($err && $devname);
-  
+
   $func =~ s/^\s*(\{.*\})\s*$/$1/s;
 
 return ($err, $func);
@@ -7551,14 +8259,17 @@ sub _DbLog_createQuerySql {
 return $sql;
 }
 
-################################################################
-# get <dbLog> ReadingsVal       <device> <reading> <default>
-# get <dbLog> ReadingsTimestamp <device> <reading> <default>
-################################################################
+########################################################################################
+# get <dbLog> ReadingsVal               <device> <reading> <default>
+# get <dbLog> ReadingsTimestamp         <device> <reading> <default>
+# get <dbLog> ReadingsValTimestamp      <device> <reading> <default>
+# get <dbLog> ReadingsMaxVal[Timestamp] <device> <reading> <default>
+# get <dbLog> ReadingsMinVal[Timestamp] <device> <reading> <default>
+# get <dbLog> ReadingsAvgVal            <device> <reading> <default>
+########################################################################################
 sub DbLog_dbReadings {
   my($hash,@a) = @_;
-
-  my $history = $hash->{HELPER}{TH};
+  my $history  = $hash->{HELPER}{TH};
 
   my $err = _DbLog_manageDBHU ($hash);
   return $err if($err);
@@ -7566,18 +8277,46 @@ sub DbLog_dbReadings {
   my $dbh = $hash->{DBHU};
 
   return 'Wrong Syntax for ReadingsVal!' unless defined($a[4]);
+  
+  my $cmd     = $a[1];
+  my $device  = $a[2];
+  my $reading = $a[3];
+  my $def     = $a[4];
 
-  my $query = "select VALUE,TIMESTAMP from $history where DEVICE= '$a[2]' and READING= '$a[3]' order by TIMESTAMP desc limit 1";
+  my $query = q{};
+  
+  if ($cmd =~ /ReadingsMaxVal(Timestamp)?$/xs) {
+      $query = "select MAX(VALUE),TIMESTAMP from $history where DEVICE= '$device' and READING= '$reading';";
+  }
+  elsif ($cmd =~ /ReadingsMinVal(Timestamp)?$/xs) {
+      $query = "select MIN(VALUE),TIMESTAMP from $history where DEVICE= '$device' and READING= '$reading';";
+  }
+  elsif ($cmd =~ /ReadingsAvgVal/xs) {
+      $query = "select AVG(VALUE) from $history where DEVICE= '$device' and READING= '$reading';";
+  }
+  elsif ($cmd =~ /Readings(Val|ValTimestamp|Timestamp)$/xs) {
+      $query = "select VALUE,TIMESTAMP from $history where DEVICE= '$device' and READING= '$reading' order by TIMESTAMP desc limit 1;";
+  }
+  
+  return ">$cmd< isn't valid!" if(!$query);
+  
+  ($err, my $val, my $timestamp) = __DbLog_SBP_selectrowArray ($dbh, $query);
+  return "error-> $err" if($err);  
 
-  my ($reading,$timestamp) = $dbh->selectrow_array($query);
+  $val       = defined $val       ? $val       : $def;
+  $timestamp = defined $timestamp ? $timestamp : $def;
+  
+  if ($cmd =~ /Readings(Max|Min|Avg)?Val$/xs) {
+      return $val;
+  }
+  elsif ($cmd eq 'ReadingsTimestamp') {
+      return $timestamp;
+  }
+  else {
+      return ("$val , $timestamp");
+  }
 
-  $reading   = defined $reading   ? $reading   : $a[4];
-  $timestamp = defined $timestamp ? $timestamp : $a[4];
-
-  return $reading   if $a[1] eq 'ReadingsVal';
-  return $timestamp if $a[1] eq 'ReadingsTimestamp';
-
-return "Syntax error: $a[1]";
+return;
 }
 
 ################################################################
@@ -7595,13 +8334,13 @@ sub DbLog_setVersionInfo {
 
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 27082 2023-01-18 22:08:25Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 27111 2023-01-23 19:06:28Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/xsg;
       }
       else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 27082 2023-01-18 22:08:25Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 27111 2023-01-23 19:06:28Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -8152,15 +8891,79 @@ return;
   <b>Get</b>
   <br>
   <br>
+  
+  <ul>
+    <a id="DbLog-get-ReadingsMaxVal"></a>
+    <li><b>get &lt;name&gt; ReadingsMaxVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <ul>
+      Determines the record with the largest value of the specified Device / Reading combination from the history table. <br>
+      Only the value or the combination of value and timestamp is returned as string 
+      "&lt;Wert&gt; , &lt;Timestamp&gt;". <br>
+      &lt;default&gt; specifies a defined return value if no value can be determined.
+      <br>
+      <br>
+    
+      <b>Note:</b> <br>
+      This database retrieval works blocking and influences FHEM if the database does not respond or not responds 
+      sufficiently fast.
+    </ul>
+  </ul>
+  </li>
+  <br>
+  
+  <ul>
+    <a id="DbLog-get-ReadingsMinVal"></a>
+    <li><b>get &lt;name&gt; ReadingsMinVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <ul>
+      Determines the record with the smallest value of the specified device / reading combination from the history table. <br>
+      Only the value or the combination of value and timestamp is returned as string 
+      "&lt;Wert&gt; , &lt;Timestamp&gt;". <br>
+      &lt;default&gt; specifies a defined return value if no value can be determined.
+      <br>
+      <br>
+    
+      <b>Note:</b> <br>
+      This database retrieval works blocking and influences FHEM if the database does not respond or not responds 
+      sufficiently fast.
+    </ul>
+  </ul>
+  </li>
+  <br>
+  
+  <ul>
+    <a id="DbLog-get-ReadingsAvgVal"></a>
+    <li><b>get &lt;name&gt; ReadingsAvgVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <ul>
+      Determines the average value of the specified Device / Reading combination from the history table. <br>
+      The simple arithmetic average value is returned. <br>
+      &lt;default&gt; specifies a defined return value if no value can be determined.
+      <br>
+      <br>
+    
+      <b>Note:</b> <br>
+      This database retrieval works blocking and influences FHEM if the database does not respond or not responds 
+      sufficiently fast.
+    </ul>
+  </ul>
+  </li>
+  <br>
 
   <ul>
     <a id="DbLog-get-ReadingsVal"></a>
-    <li><b>get &lt;name&gt; ReadingsVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
-      <ul>
-      Reads the last (newest) value of the specified device/reading combination stored in the history table
-      and returns this value. <br>
-      &lt;default&gt; specifies a defined return value if no value is found in the database.
-      </ul>
+    <li><b>get &lt;name&gt; ReadingsVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <ul>
+      Reads the last (newest) record stored in the history table of the specified Device / Reading
+      combination. <br>
+      Only the value or the combination of value and timestamp is returned as string 
+      "&lt;Wert&gt; , &lt;Timestamp&gt;". <br>
+      &lt;default&gt; specifies a defined return value if no value can be determined.
+      <br>
+      <br>
+    
+      <b>Note:</b> <br>
+      This database retrieval works blocking and influences FHEM if the database does not respond or not responds 
+      sufficiently fast.
+    </ul>
   </ul>
   </li>
   <br>
@@ -8168,11 +8971,17 @@ return;
   <ul>
     <a id="DbLog-get-ReadingsTimestamp"></a>
     <li><b>get &lt;name&gt; ReadingsTimestamp &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
-      <ul>
+    <ul>
       Reads the timestamp of the last (newest) record stored in the history table of the specified
       Device/Reading combination and returns this value. <br>
       &lt;default&gt; specifies a defined return value if no value is found in the database.
-      </ul>
+      <br>
+      <br>
+    
+      <b>Note:</b> <br>
+      This database retrieval works blocking and influences FHEM if the database does not respond or not responds 
+      sufficiently fast.
+    </ul>
   </ul>
   </li>
   <br>
@@ -8895,7 +9704,7 @@ attr SMA_Energymeter DbLogValueFn
      </li>
   </ul>
   <br>
-  
+
   <ul>
     <a id="DbLog-attr-insertMode"></a>
     <li><b>insertMode</b>
@@ -9769,15 +10578,79 @@ attr SMA_Energymeter DbLogValueFn
   <b>Get</b>
   <br>
   <br>
+  
+  <ul>
+    <a id="DbLog-get-ReadingsMaxVal"></a>
+    <li><b>get &lt;name&gt; ReadingsMaxVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <ul>
+      Ermittelt den Datensatz mit dem größten Wert der angegebenen Device / Reading Kombination aus der history Tabelle. <br>
+      Zurück gegeben wird nur der Wert oder die Kombination aus Wert und Timestamp als String 
+      "&lt;Wert&gt; , &lt;Timestamp&gt;". <br>
+      &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert ermittelt werden kann.
+      <br>
+      <br>
+    
+      <b>Hinweis:</b> <br>
+      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht 
+      hinreichend schnell antwortet.
+    </ul>
+  </ul>
+  </li>
+  <br>
+  
+  <ul>
+    <a id="DbLog-get-ReadingsMinVal"></a>
+    <li><b>get &lt;name&gt; ReadingsMinVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <ul>
+      Ermittelt den Datensatz mit dem kleinsten Wert der angegebenen Device / Reading Kombination aus der history Tabelle. <br>
+      Zurück gegeben wird nur der Wert oder die Kombination aus Wert und Timestamp als String 
+      "&lt;Wert&gt; , &lt;Timestamp&gt;". <br>
+      &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert ermittelt werden kann.
+      <br>
+      <br>
+    
+      <b>Hinweis:</b> <br>
+      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht 
+      hinreichend schnell antwortet.
+    </ul>
+  </ul>
+  </li>
+  <br>
+  
+  <ul>
+    <a id="DbLog-get-ReadingsAvgVal"></a>
+    <li><b>get &lt;name&gt; ReadingsAvgVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <ul>
+      Ermittelt den Durchschnittswert der angegebenen Device / Reading Kombination aus der history Tabelle. <br>
+      Zurück gegeben wird der einfache arithmetische Durchschnittswert. <br>
+      &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert ermittelt werden kann.
+      <br>
+      <br>
+    
+      <b>Hinweis:</b> <br>
+      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht 
+      hinreichend schnell antwortet.
+    </ul>
+  </ul>
+  </li>
+  <br>
 
   <ul>
     <a id="DbLog-get-ReadingsVal"></a>
-    <li><b>get &lt;name&gt; ReadingsVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
-      <ul>
-      Liest den letzten (neuesten) in der history Tabelle gespeicherten Wert der angegebenen Device/Reading
-      Kombination und gibt diesen Wert zurück. <br>
-      &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert in der Datenbank gefunden wird.
-      </ul>
+    <li><b>get &lt;name&gt; ReadingsVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <ul>
+      Liest den letzten (neuesten) in der history Tabelle gespeicherten Datensatz der angegebenen Device / Reading
+      Kombination. <br>
+      Zurück gegeben wird nur der Wert oder die Kombination aus Wert und Timestamp als String 
+      "&lt;Wert&gt; , &lt;Timestamp&gt;". <br>
+      &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert ermittelt werden kann.
+      <br>
+      <br>
+    
+      <b>Hinweis:</b> <br>
+      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht 
+      hinreichend schnell antwortet.
+    </ul>
   </ul>
   </li>
   <br>
@@ -9785,11 +10658,17 @@ attr SMA_Energymeter DbLogValueFn
   <ul>
     <a id="DbLog-get-ReadingsTimestamp"></a>
     <li><b>get &lt;name&gt; ReadingsTimestamp &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
-      <ul>
+    <ul>
       Liest den Zeitstempel des letzten (neuesten) in der history Tabelle gespeicherten Datensatzes der angegebenen
       Device/Reading Kombination und gibt diesen Wert zurück. <br>
       &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert in der Datenbank gefunden wird.
-      </ul>
+      <br>
+      <br>
+    
+      <b>Hinweis:</b> <br>
+      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht 
+      hinreichend schnell antwortet.
+    </ul>    
   </ul>
   </li>
   <br>
@@ -10581,7 +11460,7 @@ attr SMA_Energymeter DbLogValueFn
      </li>
   </ul>
   <br>
-  
+
   <ul>
     <a id="DbLog-attr-insertMode"></a>
     <li><b>insertMode</b>
