@@ -323,6 +323,7 @@ sub _Profile {
   my %longDays = %{$hash->{'.longDays'}};
 
   delete $hash->{profil};
+  delete $hash->{profile_IDX};
   my $now = time;
   my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime($now);
     
@@ -331,7 +332,6 @@ sub _Profile {
   for  my $st ( @{$hash->{SWITCHINGTIMES}} ) {
     my ($tage,$time,$parameter,$overrulewday) = _SwitchingTime ($hash, $st);
 
-    
     $idx++;
     for  my $d (@{$tage}) {
       my    @listeDerTage = ($d);
@@ -372,7 +372,11 @@ sub _Profile {
   }
 # ---- Texte Readings aufbauen -----------------------------------------
   #Log3( $hash, 4,  "[$hash->{NAME}] " . sunrise_abs() . " " . sunset_abs() . " " . $longDays{$language}[$wday] );
-  for  my $d (sort keys %{$hash->{profile}}) {
+  for (0..8) {
+    my $pKey  = "Profil $_: $longDays{$language}[$_]";
+    delete $hash->{$pKey};
+  }
+  for my $d (sort keys %{$hash->{profile}}) {
     my $profiltext = q{};
     for  my $t (sort keys %{$hash->{profile}{$d}}) {
       $profiltext .= "$t " .  $hash->{profile}{$d}{$t} . ", ";
@@ -421,8 +425,8 @@ sub _SwitchingTime {
   my $globalDaylistSpec = $hash->{GlobalDaylistSpec};
   my @tageGlobal = @{_daylistAsArray($hash, $globalDaylistSpec)};
 
-  my (@st, $daylist, $time, $timeString, $para);
-  @st = split m{\|}xms, $switchingtime;
+  my ($daylist, $time, $timeString, $para);
+  my @st = split m{\|}xms, $switchingtime;
   my $overrulewday = 0;
   if ( @st == 2 || @st == 3 && $st[2] eq 'w') {
     $daylist = ($globalDaylistSpec ne '') ? $globalDaylistSpec : '0123456';
@@ -433,7 +437,7 @@ sub _SwitchingTime {
     $daylist  = $st[0];
     $time     = $st[1];
     $para     = $st[2];
-    $overrulewday = 1 if defined $st[3] && $st[3] eq 'w';
+    $overrulewday = 1 if defined $st[3] && $st[3] eq 'w' || $st[0] == 8;
   }
 
   my @tage = @{_daylistAsArray($hash, $daylist)};
@@ -501,7 +505,7 @@ sub _daylistAsArray {
       Log3( $hash, 4, "[$name] useless double setting of \$we and !\$we found" );
       $daylist = '0123456';
     }
-    
+
     @days = split m{}x, $daylist;
     @hdays{@days} = undef;
 
@@ -973,6 +977,8 @@ sub WDT_Update {
   my $newParam    = $hash->{profil}{$idx}{PARA};
   my $timToSwitch = $hash->{profil}{$idx}{EPOCH};
   my $overrulewday = $hash->{profil}{$idx}{WE_Override};
+
+  $overrulewday = 1 if $hash->{profil}{$idx}{DAYS} == 8;
 
   #Log3 $hash, 3, "[$name] $idx ". $time . " " . $newParam . " " . join("",@$tage);
 

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  98_WeekdayTimer: !$we handling
  - new:     74_AutomowerConnect: Control Automower + Host
  - new:     75_AutomowerConnectDevice: Control Automower Client
  - new:     automowerconnect.js: Frontend helper
