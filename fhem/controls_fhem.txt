@@ -1,8 +1,8 @@
-REV 27112
+REV 27115
 DIR unused
-UPD 2023-01-24_07:45:03 392045 ./CHANGED
+UPD 2023-01-25_07:45:02 392216 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
-UPD 2023-01-12_07:45:03 46106 ./MAINTAINER.txt
+UPD 2023-01-25_07:45:02 46455 ./MAINTAINER.txt
 UPD 2022-12-07_07:45:02 46565 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2023-01-24_07:45:13 173295 ./fhem.pl
@@ -399,6 +399,7 @@ UPD 2019-12-20_07:45:03 89496 FHEM/73_PRESENCE.pm
 UPD 2022-11-14_07:45:07 130714 FHEM/73_WaterCalculator.pm
 UPD 2022-12-14_07:45:02 2562316 FHEM/73_km200.pm
 UPD 2020-03-11_07:45:03 69300 FHEM/74_AMADDevice.pm
+UPD 2023-01-25_07:45:02 88765 FHEM/74_AutomowerConnect.pm
 UPD 2022-07-02_07:45:03 66877 FHEM/74_GardenaSmartDevice.pm
 UPD 2018-03-22_07:45:04 41340 FHEM/74_HOMBOT.pm
 UPD 2019-04-17_07:45:02 34049 FHEM/74_HusqvarnaAutomower.pm
@@ -411,6 +412,7 @@ UPD 2022-02-05_07:45:02 24942 FHEM/74_UnifiProtect.pm
 UPD 2021-01-10_07:45:02 19703 FHEM/74_UnifiSwitch.pm
 UPD 2021-03-05_07:45:02 16135 FHEM/74_UnifiVideo.pm
 UPD 2022-01-21_07:45:03 54438 FHEM/74_XiaomiBTLESens.pm
+UPD 2023-01-25_07:45:02 76890 FHEM/75_AutomowerConnectDevice.pm
 UPD 2023-01-20_07:45:03 114689 FHEM/75_MSG.pm
 UPD 2023-01-05_07:45:03 35265 FHEM/75_msgConfig.pm
 UPD 2016-08-22_07:45:11 9037 FHEM/76_MSGFile.pm
@@ -742,12 +744,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2023-01-24_07:45:08 4837073 docs/commandref.html
-UPD 2023-01-24_07:45:10 2875703 docs/commandref_DE.html
+UPD 2023-01-25_07:45:07 4870831 docs/commandref.html
+UPD 2023-01-25_07:45:09 2911703 docs/commandref_DE.html
 UPD 2023-01-21_07:45:02 85661 docs/commandref_frame.html
 UPD 2023-01-21_07:45:02 96258 docs/commandref_frame_DE.html
-UPD 2023-01-24_07:45:11 300500 docs/commandref_modular.html
-UPD 2023-01-24_07:45:13 312286 docs/commandref_modular_DE.html
+UPD 2023-01-25_07:45:11 303720 docs/commandref_modular.html
+UPD 2023-01-25_07:45:12 315490 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2394,6 +2396,7 @@ UPD 2015-07-28_14:05:34 2865 www/jscolor/hv.png
 UPD 2015-07-28_14:05:34 29813 www/jscolor/jscolor.js
 UPD 2015-07-28_14:05:34 331 www/pgm2/RSS.js
 UPD 2018-09-24_07:45:03 12353 www/pgm2/alarm.js
+UPD 2023-01-25_07:45:02 7271 www/pgm2/automowerconnect.js
 UPD 2018-05-11_07:45:02 13108 www/pgm2/babble.js
 UPD 2017-02-18_07:45:02 6202 www/pgm2/brightstyle.css
 UPD 2022-08-19_07:45:03 14783 www/pgm2/console.js
@@ -2414,7 +2417,7 @@ UPD 2021-05-15_07:45:04 1960 www/pgm2/doif.js
 UPD 2022-07-30_07:45:03 31441 www/pgm2/f18.js
 UPD 2022-08-24_07:45:03 10106 www/pgm2/f18style.css
 UPD 2022-12-06_07:45:03 8647 www/pgm2/fhemdoc_modular.js
-UPD 2022-12-07_07:45:02 74073 www/pgm2/fhemweb.js
+UPD 2023-01-25_07:45:02 74081 www/pgm2/fhemweb.js
 UPD 2022-03-14_07:45:13 14080 www/pgm2/fhemweb_colorpicker.js
 UPD 2020-01-19_07:45:03 4252 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
