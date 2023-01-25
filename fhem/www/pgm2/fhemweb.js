@@ -1157,7 +1157,8 @@ FW_treeMenu()
         if(!ma[nxt]) {
           $(tr).before("<tr class='menuTree closed level"+i1+"' "+
               "data-mTree='"+lst+"' data-nxt='"+nxt+"'>"+
-              "<td><div><a href='#'>"+ta[i1]+"</a><div></div></div></td></tr>");
+              "<td><div><a href='#' onclick='return false;'>"+ta[i1]+
+                "</a><div></div></div></td></tr>");
         }
         ma[nxt] = true;
         lst = nxt;
