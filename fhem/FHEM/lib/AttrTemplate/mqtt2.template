@@ -5244,6 +5244,7 @@ order:W_01
 { Svn_GetFile('contrib/AttrTemplate/99_attrT_WLED_Utils.pm', 'FHEM/99_attrT_WLED_Utils.pm', sub(){ CommandReload(undef, '99_attrT_WLED_Utils') }) }
 par:BASE_ID;BASE_ID typically is wled;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)[/][^/]+[/][^/]+:, ? $1 : undef }
 par:DEVNAME;Device name as configured;{ AttrVal('DEVICE','readingList','') =~ m,[^:]+[/]([^/]+)[/][^/]+:, ? $1 : undef }
+par:IPADDRESS;Insert Controller-IP ;{ my $ip =InternalVal('DEVICE',InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME})).'_CONN',ReadingsVal('DEVICE','ip', ''));  $ip=~ m/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/x ? $1 : undef }
 par:ICON;ICON as set, defaults to hue_filled_iris;{ AttrVal('DEVICE','icon','hue_filled_iris') }
 attr DEVICE icon ICON
 attr DEVICE setList\
@@ -5286,9 +5287,10 @@ attr DEVICE webCmdLabel RGB:Brightness\
 attr DEVICE setStateList on off toggle dimdown dimup effect_prev effect_next effect_random palette_prev palette_next palette_random palette_reset effect_reset
 attr DEVICE comment For questions about the use of different widgets for color selection see discussion at https://forum.fhem.de/index.php/topic,98880.msg995308.html
 set DEVICE attrTemplate speechcontrol_type_light_255
+setreading DEVICE ip IPADDRESS
 farewell:template has been applied successfully. Note: webCmd and eventMap are just examples; adopt this to your needs.
 attr DEVICE model wled_controller
-setreading DEVICE attrTemplateVersion 20211220
+setreading DEVICE attrTemplateVersion 20230125
 
 
 

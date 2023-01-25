@@ -60,7 +60,7 @@ sub WLED_get {
     url=>"http://$ip/json",
     callback=>sub($$$){
       my ($hash,$err,$data) = @_;
-      WLED_setReadings($dev,$data);
+      WLED_setReadings($dev,$data,$ip);
     }
   });
   return defined $event ? $c : undef;
@@ -69,6 +69,7 @@ sub WLED_get {
 sub WLED_setReadings {
   my $dev  = shift // return;
   my $data = shift // return;
+  my $ip   = shift;
   my $fx   = $data =~  m/effects..\[([^[]*?)]/x ? WLED_subst($1) : '';
   my $pl   = $data =~ m/palettes..\[([^[]*?)]/x ? WLED_subst($1) : '';
   my $hash = $defs{$dev};
@@ -83,6 +84,7 @@ sub WLED_setReadings {
   readingsBulkUpdateIfChanged($hash,'.effects',$fx);
   readingsBulkUpdateIfChanged($hash,'.palettescount',(scalar @p)-1);
   readingsBulkUpdateIfChanged($hash,'.palettes',$pl);
+  readingsBulkUpdateIfChanged($hash,'ip',$ip) if defined $ip;
   readingsEndUpdate($hash,0);
   return;
 }
@@ -99,10 +101,10 @@ sub WLED_set {
   my $dev  = shift // return;
   my $read = shift // return;
   my $val  = shift // return;
-  my $wled = lc(InternalVal($dev,'CID',undef)) // return;
+  my $cid = InternalVal($dev,'CID',undef) // return;
+  my @wled = split('_',$cid);
   my $arr  = ReadingsVal($dev,'.'.$read.'s',undef) // return WLED_get($dev);
-  $wled =~ s/_/\//;
-  my $top  = $wled.'/api F';
+  my $top  = lc($wled[0]).'/'.$wled[1].'/api F';
   $top .= $read eq 'effect'?'X=':'P=';
   my $id;
   my $i = 0;
