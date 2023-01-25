@@ -640,6 +640,7 @@ lib/FHEM/Text/Unicode.pm         Adimarantis      FHEM Development
 lib/FHEM/Utility/CTZ.pm          DS_Starter       Sonstiges
 
 contrib/sacha_gloor/*        rudolfkoenig/orphan  Sonstiges
+contrib/39_VALVES.pm         Beta-User            Heizungssteuerung/Raumklima https://forum.fhem.de/index.php/topic,131849.0.html
 contrib/70_ONKYO_AVR_PULL.pm loredo               (deprecated)
 contrib/DS_Starter/*         DS_Starter           Sonstiges
 contrib/98_EDIPLUG.pm        Wzut                 Sonstige Systeme
