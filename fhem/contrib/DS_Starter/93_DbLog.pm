@@ -5771,11 +5771,11 @@ sub DbLog_Get {
   my $to   = shift @a;                   # Now @a contains the list of column_specs
   my ($internal, @fld);
 
-  if($inf eq "-") {
+  if ($inf eq "-") {
       $inf = "history";
   }
 
-  if($outf eq "int" && $inf eq "current") {
+  if ($outf eq "int" && $inf eq "current") {
       $inf = "history";
       Log3 $name, 3, "Defining DbLog SVG-Plots with :CURRENT is deprecated. Please define DbLog SVG-Plots with :HISTORY instead of :CURRENT. (define <mySVG> SVG <DbLogDev>:<gplotfile>:HISTORY)";
   }
@@ -5784,10 +5784,10 @@ sub DbLog_Get {
       $outf = "-";
       $internal = 1;
   }
-  elsif($outf eq "array") {
+  elsif ($outf eq "array") {
 
   }
-  elsif(lc($outf) eq "webchart") {                           # redirect the get request to the DbLog_chartQuery function
+  elsif (lc($outf) eq "webchart") {                           # redirect the get request to the DbLog_chartQuery function
       return DbLog_chartQuery ($hash, @_);
   }
 
@@ -8277,14 +8277,14 @@ sub DbLog_dbReadings {
   my $dbh = $hash->{DBHU};
 
   return 'Wrong Syntax for ReadingsVal!' unless defined($a[4]);
-  
+
   my $cmd     = $a[1];
   my $device  = $a[2];
   my $reading = $a[3];
   my $def     = $a[4];
 
   my $query = q{};
-  
+
   if ($cmd =~ /ReadingsMaxVal(Timestamp)?$/xs) {
       $query = "select MAX(VALUE),TIMESTAMP from $history where DEVICE= '$device' and READING= '$reading';";
   }
@@ -8297,15 +8297,15 @@ sub DbLog_dbReadings {
   elsif ($cmd =~ /Readings(Val|ValTimestamp|Timestamp)$/xs) {
       $query = "select VALUE,TIMESTAMP from $history where DEVICE= '$device' and READING= '$reading' order by TIMESTAMP desc limit 1;";
   }
-  
+
   return ">$cmd< isn't valid!" if(!$query);
-  
+
   ($err, my $val, my $timestamp) = __DbLog_SBP_selectrowArray ($dbh, $query);
-  return "error-> $err" if($err);  
+  return "error-> $err" if($err);
 
   $val       = defined $val       ? $val       : $def;
   $timestamp = defined $timestamp ? $timestamp : $def;
-  
+
   if ($cmd =~ /Readings(Max|Min|Avg)?Val$/xs) {
       return $val;
   }
@@ -8891,45 +8891,45 @@ return;
   <b>Get</b>
   <br>
   <br>
-  
+
   <ul>
     <a id="DbLog-get-ReadingsMaxVal"></a>
     <li><b>get &lt;name&gt; ReadingsMaxVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
     <ul>
       Determines the record with the largest value of the specified Device / Reading combination from the history table. <br>
-      Only the value or the combination of value and timestamp is returned as string 
+      Only the value or the combination of value and timestamp is returned as string
       "&lt;Wert&gt; , &lt;Timestamp&gt;". <br>
       &lt;default&gt; specifies a defined return value if no value can be determined.
       <br>
       <br>
-    
+
       <b>Note:</b> <br>
-      This database retrieval works blocking and influences FHEM if the database does not respond or not responds 
+      This database retrieval works blocking and influences FHEM if the database does not respond or not responds
       sufficiently fast.
     </ul>
   </ul>
   </li>
   <br>
-  
+
   <ul>
     <a id="DbLog-get-ReadingsMinVal"></a>
     <li><b>get &lt;name&gt; ReadingsMinVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
     <ul>
       Determines the record with the smallest value of the specified device / reading combination from the history table. <br>
-      Only the value or the combination of value and timestamp is returned as string 
+      Only the value or the combination of value and timestamp is returned as string
       "&lt;Wert&gt; , &lt;Timestamp&gt;". <br>
       &lt;default&gt; specifies a defined return value if no value can be determined.
       <br>
       <br>
-    
+
       <b>Note:</b> <br>
-      This database retrieval works blocking and influences FHEM if the database does not respond or not responds 
+      This database retrieval works blocking and influences FHEM if the database does not respond or not responds
       sufficiently fast.
     </ul>
   </ul>
   </li>
   <br>
-  
+
   <ul>
     <a id="DbLog-get-ReadingsAvgVal"></a>
     <li><b>get &lt;name&gt; ReadingsAvgVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
@@ -8939,9 +8939,9 @@ return;
       &lt;default&gt; specifies a defined return value if no value can be determined.
       <br>
       <br>
-    
+
       <b>Note:</b> <br>
-      This database retrieval works blocking and influences FHEM if the database does not respond or not responds 
+      This database retrieval works blocking and influences FHEM if the database does not respond or not responds
       sufficiently fast.
     </ul>
   </ul>
@@ -8954,14 +8954,14 @@ return;
     <ul>
       Reads the last (newest) record stored in the history table of the specified Device / Reading
       combination. <br>
-      Only the value or the combination of value and timestamp is returned as string 
+      Only the value or the combination of value and timestamp is returned as string
       "&lt;Wert&gt; , &lt;Timestamp&gt;". <br>
       &lt;default&gt; specifies a defined return value if no value can be determined.
       <br>
       <br>
-    
+
       <b>Note:</b> <br>
-      This database retrieval works blocking and influences FHEM if the database does not respond or not responds 
+      This database retrieval works blocking and influences FHEM if the database does not respond or not responds
       sufficiently fast.
     </ul>
   </ul>
@@ -8977,9 +8977,9 @@ return;
       &lt;default&gt; specifies a defined return value if no value is found in the database.
       <br>
       <br>
-    
+
       <b>Note:</b> <br>
-      This database retrieval works blocking and influences FHEM if the database does not respond or not responds 
+      This database retrieval works blocking and influences FHEM if the database does not respond or not responds
       sufficiently fast.
     </ul>
   </ul>
@@ -9002,6 +9002,8 @@ return;
           <li>-: identical to "history"</li>
         </ul>
       </li>
+      <br>
+
       <li>&lt;out&gt;<br>
         A dummy parameter for FileLog compatibility. Setting by default to <code>-</code>
         to check the output for plot-computing.<br>
@@ -9014,77 +9016,137 @@ return;
           <li>-: default</li>
         </ul>
       </li>
+      <br>
+
       <li>&lt;from&gt; / &lt;to&gt;<br>
         Used to select the data. Please use the following timeformat or
         an initial substring of it:<br>
-        <ul><code>YYYY-MM-DD_HH24:MI:SS</code></ul></li>
+        <ul>
+          <code>YYYY-MM-DD_HH24:MI:SS</code>
+        </ul>
+      </li>
+      <br>
+
       <li>&lt;column_spec&gt;<br>
         For each column_spec return a set of data separated by
         a comment line on the current connection.<br>
-        Syntax: &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;:&lt;regexp&gt;<br>
+        <br>
+
+        Syntax: &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;:&lt;regexp&gt; <br>
+        <br>
+
         <ul>
           <li>&lt;device&gt;<br>
-            The name of the device. Case sensitive. Using a the joker "%" is supported.</li>
+            The name of the device. Case sensitive. Using a the joker "%" is supported.
+          </li>
+          <br>
+
           <li>&lt;reading&gt;<br>
             The reading of the given device to select. Case sensitive. Using a the joker "%" is supported.
-            </li>
+          </li>
+          <br>
+
           <li>&lt;default&gt;<br>
             no implemented yet
-            </li>
+          </li>
+          <br>
+
           <li>&lt;fn&gt;
             One of the following:
             <ul>
               <li>int<br>
                 Extract the integer at the beginning of the string. Used e.g.
-                for constructs like 10%</li>
+                for constructs like 10%
+              </li>
+              <br>
+
               <li>int&lt;digit&gt;<br>
                 Extract the decimal digits including negative character and
                 decimal point at the beginning og the string. Used e.g.
-                for constructs like 15.7&deg;C</li>
+                for constructs like 15.7&deg;C
+              </li>
+              <br>
+
               <li>delta-h / delta-d<br>
                 Return the delta of the values for a given hour or a given day.
                 Used if the column contains a counter, as is the case for the
-                KS300 rain column.</li>
+                KS300 rain column.
+              </li>
+              <br>
+
               <li>delta-ts<br>
                 Replaced the original value with a measured value of seconds since
                 the last and the actual logentry.
               </li>
-            </ul></li>
+              <br>
+
+            </ul>
+            </li>
+
             <li>&lt;regexp&gt;<br>
               The string is evaluated as a perl expression.  The regexp is executed
               before &lt;fn&gt; parameter.<br>
               Note: The string/perl expression cannot contain spaces,
               as the part after the space will be considered as the
               next column_spec.<br>
+              <br>
+
               <b>Keywords</b>
               <li>$val is the current value returned from the Database.</li>
               <li>$ts is the current timestamp returned from the Database.</li>
               <li>This Logentry will not print out if $val contains th keyword "hide".</li>
               <li>This Logentry will not print out and not used in the following processing
-                  if $val contains th keyword "ignore".</li>
+                  if $val contains th keyword "ignore". </li>
             </li>
-        </ul></li>
+        </ul>
+        </li>
       </ul>
     <br><br>
+
     Examples:
       <ul>
-        <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature</code></li>
-        <li><code>get myDbLog current ALL - - %:temperature</code></li><br>
+        <li>
+          <code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature</code>
+        </li>
+        <br>
+
+        <li><code>get myDbLog current ALL - - %:temperature</code><br>
             you will get all actual readings "temperature" from all logged devices.
             Be careful by using "history" as inputfile because a long execution time will be expected!
+        </li>
+        <br>
+
         <li><code>get myDbLog - - 2012-11-10_10 2012-11-10_20 KS300:temperature::int1</code><br>
-           like from 10am until 08pm at 10.11.2012</li>
-        <li><code>get myDbLog - all 2012-11-10 2012-11-20 KS300:temperature</code></li>
-        <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature KS300:rain::delta-h KS300:rain::delta-d</code></li>
+           like from 10am until 08pm at 10.11.2012
+        </li>
+        <br>
+
+        <li>
+          <code>get myDbLog - all 2012-11-10 2012-11-20 KS300:temperature</code>
+        </li>
+        <br>
+
+        <li>
+          <code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature KS300:rain::delta-h KS300:rain::delta-d</code>
+        </li>
+        <br>
+
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 MyFS20:data:::$val=~s/(on|off).*/$1eq"on"?1:0/eg</code><br>
-           return 1 for all occurance of on* (on|on-for-timer etc) and 0 for all off*</li>
+           return 1 for all occurance of on* (on|on-for-timer etc) and 0 for all off*
+        </li>
+        <br>
+
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 Bodenfeuchte:data:::$val=~s/.*B:\s([-\.\d]+).*/$1/eg</code><br>
            Example of OWAD: value like this: <code>"A: 49.527 % B: 66.647 % C: 9.797 % D: 0.097 V"</code><br>
-           and output for port B is like this: <code>2012-11-20_10:23:54 66.647</code></li>
+           and output for port B is like this: <code>2012-11-20_10:23:54 66.647</code>
+        </li>
+        <br>
+
         <li><code>get DbLog - - 2013-05-26 2013-05-28 Pumpe:data::delta-ts:$val=~s/on/hide/</code><br>
            Setting up a "Counter of Uptime". The function delta-ts gets the seconds between the last and the
            actual logentry. The keyword "hide" will hide the logentry of "on" because this time
-           is a "counter of Downtime"</li>
+           is a "counter of Downtime"
+        </li>
 
       </ul>
     </li>
@@ -9102,46 +9164,69 @@ return;
     <ul>
       <li>&lt;name&gt;<br>
         The name of the defined DbLog, like it is given in fhem.cfg.</li>
+      <br>
+
       <li>&lt;in&gt;<br>
         A dummy parameter for FileLog compatibility. Always set to <code>-</code></li>
+      <br>
+
       <li>&lt;out&gt;<br>
         A dummy parameter for FileLog compatibility. Set it to <code>webchart</code>
         to use the charting related get function.
       </li>
+      <br>
+
       <li>&lt;from&gt; / &lt;to&gt;<br>
         Used to select the data. Please use the following timeformat:<br>
         <ul><code>YYYY-MM-DD_HH24:MI:SS</code></ul></li>
+      <br>
+
       <li>&lt;device&gt;<br>
         A string which represents the device to query.</li>
+      <br>
+
       <li>&lt;querytype&gt;<br>
         A string which represents the method the query should use. Actually supported values are: <br>
-          <code>getreadings</code> to retrieve the possible readings for a given device<br>
-          <code>getdevices</code> to retrieve all available devices<br>
-          <code>timerange</code> to retrieve charting data, which requires a given xaxis, yaxis, device, to and from<br>
-          <code>savechart</code> to save a chart configuration in the database. Requires a given xaxis, yaxis, device, to and from, and a 'savename' used to save the chart<br>
-          <code>deletechart</code> to delete a saved chart. Requires a given id which was set on save of the chart<br>
-          <code>getcharts</code> to get a list of all saved charts.<br>
-          <code>getTableData</code> to get jsonformatted data from the database. Uses paging Parameters like start and limit.<br>
-          <code>hourstats</code> to get statistics for a given value (yaxis) for an hour.<br>
-          <code>daystats</code> to get statistics for a given value (yaxis) for a day.<br>
-          <code>weekstats</code> to get statistics for a given value (yaxis) for a week.<br>
-          <code>monthstats</code> to get statistics for a given value (yaxis) for a month.<br>
-          <code>yearstats</code> to get statistics for a given value (yaxis) for a year.<br>
+        <code>getreadings</code> to retrieve the possible readings for a given device<br>
+        <code>getdevices</code> to retrieve all available devices<br>
+        <code>timerange</code> to retrieve charting data, which requires a given xaxis, yaxis, device, to and from<br>
+        <code>savechart</code> to save a chart configuration in the database. Requires a given xaxis, yaxis, device, to and from, and a 'savename' used to save the chart<br>
+        <code>deletechart</code> to delete a saved chart. Requires a given id which was set on save of the chart<br>
+        <code>getcharts</code> to get a list of all saved charts.<br>
+        <code>getTableData</code> to get jsonformatted data from the database. Uses paging Parameters like start and limit.<br>
+        <code>hourstats</code> to get statistics for a given value (yaxis) for an hour.<br>
+        <code>daystats</code> to get statistics for a given value (yaxis) for a day.<br>
+        <code>weekstats</code> to get statistics for a given value (yaxis) for a week.<br>
+        <code>monthstats</code> to get statistics for a given value (yaxis) for a month.<br>
+        <code>yearstats</code> to get statistics for a given value (yaxis) for a year.<br>
       </li>
+      <br>
+
       <li>&lt;xaxis&gt;<br>
         A string which represents the xaxis</li>
+      <br>
+
       <li>&lt;yaxis&gt;<br>
          A string which represents the yaxis</li>
+      <br>
+
       <li>&lt;savename&gt;<br>
          A string which represents the name a chart will be saved with</li>
+      <br>
+
       <li>&lt;chartconfig&gt;<br>
          A jsonstring which represents the chart to save</li>
+      <br>
+
       <li>&lt;pagingstart&gt;<br>
          An integer used to determine the start for the sql used for query 'getTableData'</li>
+      <br>
+
       <li>&lt;paginglimit&gt;<br>
          An integer used to set the limit for the sql used for query 'getTableData'</li>
-      </ul>
-    <br><br>
+      <br>
+    </ul>
+
     <b>Examples:</b>
       <ul>
         <li><code>get logdb - webchart "" "" "" getcharts</code><br>
@@ -10578,45 +10663,45 @@ attr SMA_Energymeter DbLogValueFn
   <b>Get</b>
   <br>
   <br>
-  
+
   <ul>
     <a id="DbLog-get-ReadingsMaxVal"></a>
     <li><b>get &lt;name&gt; ReadingsMaxVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
     <ul>
       Ermittelt den Datensatz mit dem größten Wert der angegebenen Device / Reading Kombination aus der history Tabelle. <br>
-      Zurück gegeben wird nur der Wert oder die Kombination aus Wert und Timestamp als String 
+      Zurück gegeben wird nur der Wert oder die Kombination aus Wert und Timestamp als String
       "&lt;Wert&gt; , &lt;Timestamp&gt;". <br>
       &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert ermittelt werden kann.
       <br>
       <br>
-    
+
       <b>Hinweis:</b> <br>
-      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht 
+      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
       hinreichend schnell antwortet.
     </ul>
   </ul>
   </li>
   <br>
-  
+
   <ul>
     <a id="DbLog-get-ReadingsMinVal"></a>
     <li><b>get &lt;name&gt; ReadingsMinVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
     <ul>
       Ermittelt den Datensatz mit dem kleinsten Wert der angegebenen Device / Reading Kombination aus der history Tabelle. <br>
-      Zurück gegeben wird nur der Wert oder die Kombination aus Wert und Timestamp als String 
+      Zurück gegeben wird nur der Wert oder die Kombination aus Wert und Timestamp als String
       "&lt;Wert&gt; , &lt;Timestamp&gt;". <br>
       &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert ermittelt werden kann.
       <br>
       <br>
-    
+
       <b>Hinweis:</b> <br>
-      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht 
+      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
       hinreichend schnell antwortet.
     </ul>
   </ul>
   </li>
   <br>
-  
+
   <ul>
     <a id="DbLog-get-ReadingsAvgVal"></a>
     <li><b>get &lt;name&gt; ReadingsAvgVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
@@ -10626,9 +10711,9 @@ attr SMA_Energymeter DbLogValueFn
       &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert ermittelt werden kann.
       <br>
       <br>
-    
+
       <b>Hinweis:</b> <br>
-      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht 
+      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
       hinreichend schnell antwortet.
     </ul>
   </ul>
@@ -10641,14 +10726,14 @@ attr SMA_Energymeter DbLogValueFn
     <ul>
       Liest den letzten (neuesten) in der history Tabelle gespeicherten Datensatz der angegebenen Device / Reading
       Kombination. <br>
-      Zurück gegeben wird nur der Wert oder die Kombination aus Wert und Timestamp als String 
+      Zurück gegeben wird nur der Wert oder die Kombination aus Wert und Timestamp als String
       "&lt;Wert&gt; , &lt;Timestamp&gt;". <br>
       &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert ermittelt werden kann.
       <br>
       <br>
-    
+
       <b>Hinweis:</b> <br>
-      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht 
+      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
       hinreichend schnell antwortet.
     </ul>
   </ul>
@@ -10664,11 +10749,11 @@ attr SMA_Energymeter DbLogValueFn
       &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert in der Datenbank gefunden wird.
       <br>
       <br>
-    
+
       <b>Hinweis:</b> <br>
-      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht 
+      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
       hinreichend schnell antwortet.
-    </ul>    
+    </ul>
   </ul>
   </li>
   <br>
@@ -10692,6 +10777,7 @@ attr SMA_Energymeter DbLogValueFn
           <li>-: identisch wie "history"</li>
         </ul>
       </li>
+      <br>
 
       <li>&lt;out&gt;<br>
         Ein Parameter um eine Kompatibilität zum Filelog herzustellen.
@@ -10705,29 +10791,45 @@ attr SMA_Energymeter DbLogValueFn
           <li>-: default</li>
         </ul>
       </li>
+      <br>
 
       <li>&lt;from&gt; / &lt;to&gt;<br>
         Wird benutzt um den Zeitraum der Daten einzugrenzen. Es ist das folgende
         Zeitformat oder ein Teilstring davon zu benutzen:<br>
-        <ul><code>YYYY-MM-DD_HH24:MI:SS</code></ul></li>
+
+        <ul>
+          <code>YYYY-MM-DD_HH24:MI:SS</code>
+        </ul>
+      </li>
+      <br>
 
       <li>&lt;column_spec&gt;<br>
         Für jede column_spec Gruppe wird ein Datenset zurückgegeben welches
         durch einen Kommentar getrennt wird. Dieser Kommentar repräsentiert
-        die column_spec.<br>
-        Syntax: &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;:&lt;regexp&gt;<br>
+        die column_spec. <br>
+        <br>
+        Syntax: &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;:&lt;regexp&gt; <br>
+        <br>
+
         <ul>
           <li>&lt;device&gt;<br>
             Der Name des Devices. Achtung: Gross/Kleinschreibung beachten!<br>
-            Es kann ein % als Jokerzeichen angegeben werden.</li>
+            Es kann ein % als Jokerzeichen angegeben werden.
+          </li>
+          <br>
+
           <li>&lt;reading&gt;<br>
             Das Reading des angegebenen Devices zur Datenselektion.<br>
             Es kann ein % als Jokerzeichen angegeben werden.<br>
             Achtung: Gross/Kleinschreibung beachten!
           </li>
+          <br>
+
           <li>&lt;default&gt;<br>
             Zur Zeit noch nicht implementiert.
           </li>
+          <br>
+
           <li>&lt;fn&gt;
             Angabe einer speziellen Funktion:
             <ul>
@@ -10750,7 +10852,10 @@ attr SMA_Energymeter DbLogValueFn
                 Ermittelt die vergangene Zeit zwischen dem letzten und dem aktuellen Logeintrag
                 in Sekunden und ersetzt damit den originalen Wert.
               </li>
-            </ul></li>
+            </ul>
+            </li>
+            <br>
+
             <li>&lt;regexp&gt;<br>
               Diese Zeichenkette wird als Perl Befehl ausgewertet.
               Die regexp wird vor dem angegebenen &lt;fn&gt; Parameter ausgeführt.
@@ -10758,9 +10863,11 @@ attr SMA_Energymeter DbLogValueFn
               Bitte zur Beachtung: Diese Zeichenkette darf keine Leerzeichen
               enthalten da diese sonst als &lt;column_spec&gt; Trennung
               interpretiert werden und alles nach dem Leerzeichen als neue
-              &lt;column_spec&gt; gesehen wird.<br>
+              &lt;column_spec&gt; gesehen wird. <br>
+              <br>
 
               <b>Schlüsselwörter</b>
+
               <li>$val ist der aktuelle Wert die die Datenbank für ein Device/Reading ausgibt.</li>
               <li>$ts ist der aktuelle Timestamp des Logeintrages.</li>
               <li>Wird als $val das Schlüsselwort "hide" zurückgegeben, so wird dieser Logeintrag nicht
@@ -10768,36 +10875,51 @@ attr SMA_Energymeter DbLogValueFn
               <li>Wird als $val das Schlüsselwort "ignore" zurückgegeben, so wird dieser Logeintrag
                   nicht für eine Folgeberechnung verwendet.</li>
             </li>
-        </ul></li>
+        </ul>
+        </li>
 
       </ul>
     <br><br>
     <b>Beispiele:</b>
       <ul>
-        <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature</code></li>
+        <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature</code></li><br>
 
-        <li><code>get myDbLog current ALL - - %:temperature</code></li><br>
+        <li><code>get myDbLog current ALL - - %:temperature</code> <br>
             Damit erhält man alle aktuellen Readings "temperature" von allen in der DB geloggten Devices.
             Achtung: bei Nutzung von Jokerzeichen auf die history-Tabelle kann man sein FHEM aufgrund langer Laufzeit lahmlegen!
+        </li>
+        <br>
 
         <li><code>get myDbLog - - 2012-11-10_10 2012-11-10_20 KS300:temperature::int1</code><br>
-           gibt Daten aus von 10Uhr bis 20Uhr am 10.11.2012</li>
+           gibt Daten aus von 10Uhr bis 20Uhr am 10.11.2012
+        </li>
+        <br>
 
-        <li><code>get myDbLog - all 2012-11-10 2012-11-20 KS300:temperature</code></li>
+        <li><code>get myDbLog - all 2012-11-10 2012-11-20 KS300:temperature</code>
+        </li>
+        <br>
 
-        <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature KS300:rain::delta-h KS300:rain::delta-d</code></li>
+        <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature KS300:rain::delta-h KS300:rain::delta-d</code>
+        </li>
+        <br>
 
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 MyFS20:data:::$val=~s/(on|off).*/$1eq"on"?1:0/eg</code><br>
-           gibt 1 zurück für alle Ausprägungen von on* (on|on-for-timer etc) und 0 für alle off*</li>
+           gibt 1 zurück für alle Ausprägungen von on* (on|on-for-timer etc) und 0 für alle off*
+        </li>
+        <br>
 
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 Bodenfeuchte:data:::$val=~s/.*B:\s([-\.\d]+).*/$1/eg</code><br>
            Beispiel von OWAD: Ein Wert wie z.B.: <code>"A: 49.527 % B: 66.647 % C: 9.797 % D: 0.097 V"</code><br>
-           und die Ausgabe ist für das Reading B folgende: <code>2012-11-20_10:23:54 66.647</code></li>
+           und die Ausgabe ist für das Reading B folgende: <code>2012-11-20_10:23:54 66.647</code>
+        </li>
+        <br>
 
         <li><code>get DbLog - - 2013-05-26 2013-05-28 Pumpe:data::delta-ts:$val=~s/on/hide/</code><br>
            Realisierung eines Betriebsstundenzählers. Durch delta-ts wird die Zeit in Sek zwischen den Log-
            Einträgen ermittelt. Die Zeiten werden bei den on-Meldungen nicht ausgegeben welche einer Abschaltzeit
-           entsprechen würden.</li>
+           entsprechen würden.
+        </li>
+        <br>
       </ul>
   </li>
   </ul>
@@ -10814,24 +10936,36 @@ attr SMA_Energymeter DbLogValueFn
 
     <ul>
       <li>&lt;name&gt;<br>
-        Der Name des definierten DbLogs, so wie er in der fhem.cfg angegeben wurde.</li>
+        Der Name des definierten DbLogs, so wie er in der fhem.cfg angegeben wurde.
+      </li>
+      <br>
 
       <li>&lt;in&gt;<br>
         Ein Dummy Parameter um eine Kompatibilität zum Filelog herzustellen.
-        Dieser Parameter ist immer auf <code>-</code> zu setzen.</li>
+        Dieser Parameter ist immer auf <code>-</code> zu setzen.
+      </li>
+      <br>
 
       <li>&lt;out&gt;<br>
         Ein Dummy Parameter um eine Kompatibilität zum Filelog herzustellen.
         Dieser Parameter ist auf <code>webchart</code> zu setzen um die Charting Get Funktion zu nutzen.
       </li>
+      <br>
 
       <li>&lt;from&gt; / &lt;to&gt;<br>
         Wird benutzt um den Zeitraum der Daten einzugrenzen. Es ist das folgende
         Zeitformat zu benutzen:<br>
-        <ul><code>YYYY-MM-DD_HH24:MI:SS</code></ul></li>
+
+        <ul>
+          <code>YYYY-MM-DD_HH24:MI:SS</code>
+        </ul>
+      </li>
+      <br>
 
       <li>&lt;device&gt;<br>
-        Ein String, der das abzufragende Device darstellt.</li>
+        Ein String, der das abzufragende Device darstellt.
+      </li>
+      <br>
 
       <li>&lt;querytype&gt;<br>
         Ein String, der die zu verwendende Abfragemethode darstellt. Zur Zeit unterstützte Werte sind: <br>
@@ -10848,26 +10982,39 @@ attr SMA_Energymeter DbLogValueFn
           <code>monthstats</code> um Statistiken für einen Wert (yaxis) für einen Monat abzufragen.<br>
           <code>yearstats</code> um Statistiken für einen Wert (yaxis) für ein Jahr abzufragen.<br>
       </li>
+      <br>
 
       <li>&lt;xaxis&gt;<br>
-        Ein String, der die X-Achse repräsentiert</li>
+        Ein String, der die X-Achse repräsentiert
+      </li>
+      <br>
 
       <li>&lt;yaxis&gt;<br>
-         Ein String, der die Y-Achse repräsentiert</li>
+         Ein String, der die Y-Achse repräsentiert
+      </li>
+      <br>
 
       <li>&lt;savename&gt;<br>
-         Ein String, unter dem ein Chart in der Datenbank gespeichert werden soll</li>
+         Ein String, unter dem ein Chart in der Datenbank gespeichert werden soll
+      </li>
+      <br>
 
       <li>&lt;chartconfig&gt;<br>
-         Ein jsonstring der den zu speichernden Chart repräsentiert</li>
+         Ein jsonstring der den zu speichernden Chart repräsentiert
+      </li>
+      <br>
 
       <li>&lt;pagingstart&gt;<br>
-         Ein Integer um den Startwert für die Abfrage 'getTableData' festzulegen</li>
+         Ein Integer um den Startwert für die Abfrage 'getTableData' festzulegen
+      </li>
+      <br>
 
       <li>&lt;paginglimit&gt;<br>
-         Ein Integer um den Limitwert für die Abfrage 'getTableData' festzulegen</li>
+         Ein Integer um den Limitwert für die Abfrage 'getTableData' festzulegen
+      </li>
+      <br>
       </ul>
-    <br><br>
+    <br>
 
     <b>Beispiele:</b>
       <ul>
