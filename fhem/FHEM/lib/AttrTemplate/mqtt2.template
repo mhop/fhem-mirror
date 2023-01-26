@@ -755,6 +755,22 @@ deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model zigbee2mqtt_TempHumSensor
 setreading DEVICE attrTemplateVersion 20200904
 
+#contributed by chefschaffner, https://forum.fhem.de/index.php/topic,94495.msg1260253.html#msg1260253
+name:zigbee2mqtt_TempSensor
+desc: Temp sensor via zigbee2mqtt <br>Tested with: OWON THS317-ET Temperature Sensor
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_07a1
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to temp_temperature;{ AttrVal('DEVICE','icon','temp_temperature') }
+attr DEVICE icon ICON
+attr DEVICE stateFormat {sprintf ("Temperature: %.1f°C", ReadingsVal($name,'temperature',0)) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE model zigbee2mqtt_TempSensor
+setreading DEVICE attrTemplateVersion 20230126
+
 #by TomLee, https://forum.fhem.de/index.php/topic,116310.msg1105927.html#msg1105927
 name:zigbee2mqtt_human_body_movement
 desc: Human motion sensor via zigbee2mqtt <br>Tested with: Xiaomi MiJia human RTCGQ01LM body movement sensor (occupancy)
