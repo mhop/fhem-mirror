@@ -44,6 +44,7 @@ BEGIN {
           getKeyValue
           InternalTimer
           InternalVal
+          IsDisabled
           Log3
           readingFnAttributes
           readingsBeginUpdate
@@ -92,6 +93,7 @@ sub Initialize() {
   $hash->{FW_detailFn}= \&FW_detailFn;
   $hash->{AttrFn}     = \&Attr;
   $hash->{AttrList}   = "disable:1,0 " .
+                        "disabledForIntervals " .
                         "mapImagePath " .
                         "mapImageWidthHeight " .
                         "mapImageCoordinatesToRegister:textField-long " .
@@ -200,6 +202,9 @@ EOF
 
   $attr{$name}{room} = $type if( !defined( $attr{$name}{room} ) );
   $attr{$name}{icon} = 'automower' if( !defined( $attr{$name}{icon} ) );
+  if (::AnalyzeCommandChain(undef,"version 75_AutomowerConnectDevice.pm noheader") =~ "^75_AutomowerConnectDevice.pm (.*)Z") {
+    $hash->{VERSION}=$1;
+  }
 
   RemoveInternalTimer($hash);
   InternalTimer( gettimeofday() + 25, \&readMap, $hash, 0);
@@ -228,6 +233,12 @@ sub Notify {
   my $iam = "$type $name Notify:";
   my $mowerNumber = $hash->{helper}{mowerNumber};
   my $events = ::deviceEvents($hosthash,1);
+
+  if ( IsDisabled($name) ) {
+
+    return undef 
+
+  }
 
   if(grep /^state:.connected$/, @{$events}) {
 
@@ -363,7 +374,13 @@ sub CMD {
   my $hostname = $hash->{helper}{hostname};
   my $hosthash = $defs{$hostname};
 
-  if ( AttrVal($name, 'disable', '') ) {
+  if ( IsDisabled($hostname) ) {
+
+    Log3 $name, 3, "$iam Host $hostname disabled"; 
+    return undef 
+
+  }
+  if ( IsDisabled($name) ) {
 
     Log3 $name, 3, "$iam disabled"; 
     return undef 
@@ -500,7 +517,7 @@ sub Set {
       return undef;
 
   ################
-  } elsif ( ReadingsVal( $name, 'state', 'defined' ) !~ /defined/ && $setName eq 'mowerScheduleToAttribute' ) {
+  } elsif ( ReadingsVal( $name, 'state', 'defined' ) !~ /defined|initialized/ && $setName eq 'mowerScheduleToAttribute' ) {
     
       my $calendarjson = JSON::XS->new->pretty(1)->encode ($hash->{helper}{mower}{attributes}{calendar}{tasks});
       if ( $@ ) {
@@ -510,21 +527,21 @@ sub Set {
       return undef;
 
   ################
-  } elsif ( ReadingsVal( $name, 'state', 'defined' ) !~ /defined/ && $setName =~ /^(Start|Park|cuttingHeight)$/ ) {
+  } elsif ( ReadingsVal( $name, 'state', 'defined' ) !~ /defined|initialized/ && $setName =~ /^(Start|Park|cuttingHeight)$/ ) {
     if ( $setVal =~ /^(\d+)$/) {
       CMD($hash ,$setName, $setVal);
       return undef;
     }
 
   ################
-  } elsif ( ReadingsVal( $name, 'state', 'defined' ) !~ /defined|/ && $setName eq 'headlight' ) {
+  } elsif ( ReadingsVal( $name, 'state', 'defined' ) !~ /defined|initialized/ && $setName eq 'headlight' ) {
     if ( $setVal =~ /^(ALWAYS_OFF|ALWAYS_ON|EVENING_ONLY|EVENING_AND_NIGHT)$/) {
       CMD($hash ,$setName, $setVal);
       return undef;
     }
 
   ################
-  } elsif (ReadingsVal( $name, 'state', 'defined' ) !~ /defined/ && $setName =~ /ParkUntilFurtherNotice|ParkUntilNextSchedule|Pause|ResumeSchedule|sendScheduleFromAttributeToMower/) {
+  } elsif (ReadingsVal( $name, 'state', 'defined' ) !~ /defined|initialized/ && $setName =~ /ParkUntilFurtherNotice|ParkUntilNextSchedule|Pause|ResumeSchedule|sendScheduleFromAttributeToMower/) {
     CMD($hash,$setName);
     return undef;
   }
@@ -540,7 +557,7 @@ sub FW_detailFn {
   my ($FW_wname, $name, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$name};
   my $type = $hash->{TYPE};
-  return undef if( AttrVal($name, 'disable', 0) || !AttrVal($name, 'showMap', 1) );
+  return undef if( IsDisabled($name) || !AttrVal($name, 'showMap', 1) );
   if ( $hash->{helper} && $hash->{helper}{mower} && $hash->{helper}{mower}{attributes} && $hash->{helper}{mower}{attributes}{positions} && @{$hash->{helper}{mower}{attributes}{positions}} > 0 ) {
     my $img = "./fhem/$type/$name/map";
     my $zoom=AttrVal($name,"mapImageZoom",0.7);
@@ -1024,7 +1041,8 @@ sub readMap {
 <a id="AutomowerConnectDevice"></a>
 <h3>AutomowerConnectDevice</h3>
 <ul>
-  <u><b>FHEM-FORUM:</b></u> <a target="_blank" href="https://forum.fhem.de/index.php/topic,131661.0.html"> AutomowerConnect und AutomowerConnectDevice</a>
+  <u><b>FHEM-FORUM:</b></u> <a target="_blank" href="https://forum.fhem.de/index.php/topic,131661.0.html"> AutomowerConnect und AutomowerConnectDevice</a><br>
+  <u><b>FHEM-Wiki:</b></u> <a target="_blank" href="https://wiki.fhem.de/wiki/AutomowerConnect"> AutomowerConnect und AutomowerConnectDevice: Wie erstellt man eine Karte des Mähbereiches?</a>
   <br><br>
   <u><b>Introduction</b></u>
   <br><br>
@@ -1042,7 +1060,7 @@ sub readMap {
   <u><b>Requirements</b></u>
   <br><br>
   <ul>
-    <li>An active entity (device, host) of the AutomowerConnect module is required It has to run with an application key under which more than one mower is registered.</li>
+    <li>An active entity (device, host) of the AutomowerConnect module is required.</li>
     <li>Readings and state connected are shown after a host's update.</li>
   </ul>
   <br>
@@ -1178,6 +1196,9 @@ sub readMap {
       Longitude: <code>(LongitudeMeter_1 - LongitudeMeter_2) / (LongitudeDegree_1 - LongitudeDegree _2)</code><br>
       Latitude: <code>(LatitudeMeter_1 - LatitudeMeter_2) / (LatitudeDegree_1 - LatitudeDegree _2)</code></li>
 
+     <li><a href="disable">disable</a></li>
+     <li><a href="disabledForIntervals">disabledForIntervals</a></li>
+
 
     <li><a id='AutomowerConnectDevice-attr-'></a><br>
       <code>attr &lt;name&gt;  &lt;&gt;</code><br>
@@ -1188,7 +1209,7 @@ sub readMap {
   <a id="AutomowerConnectDeviceReadings"></a>
   <b>Readings</b>
   <ul>
-    <li>batteryPercent - Battery power in percent</li>
+    <li>batteryPercent - battery state of charge in percent</li>
     <li>mower_activity - current activity "UNKNOWN" | "NOT_APPLICABLE" | "MOWING" | "GOING_HOME" | "CHARGING" | "LEAVING" | "PARKED_IN_CS" | "STOPPED_IN_GARDEN"</li>
     <li>mower_commandStatus - Status of the last sent command cleared each status update</li>
     <li>mower_errorCode - last error code</li>
@@ -1263,7 +1284,7 @@ sub readMap {
   <u><b>Anforderungen</b></u>
   <br><br>
   <ul>
-    <li>Es wird eine aktive Instanz (Device, FHEM-Gerät) des Moduls AutomowerConnect vorausgesetzt, die mit einem Application Key läuft unter dem mindestens zwei Husqvarna Automower registriert sind.</a>.</li>
+    <li>Es wird eine aktive Instanz (Device, FHEM-Gerät) des Moduls AutomowerConnect vorausgesetzt.</a>.</li>
     <li>Readings und der Status connected wird erst angezeigt, wenn in dem Hostgerät ein Update erfolgt ist.</a>.</li>
   </ul>
   <br>
@@ -1405,6 +1426,9 @@ sub readMap {
       Longitude: <code>(LongitudeMeter_1 - LongitudeMeter_2) / (LongitudeDegree_1 - LongitudeDegree _2)</code><br>
       Latitude: <code>(LatitudeMeter_1 - LatitudeMeter_2) / (LatitudeDegree_1 - LatitudeDegree _2)</code></li>
 
+     <li><a href="disable">disable</a></li>
+     <li><a href="disabledForIntervals">disabledForIntervals</a></li>
+
 
 <li><a id='AutomowerConnectDevice-attr-'></a><br>
       <code>attr &lt;name&gt;  &lt;&gt;</code><br>
@@ -1416,7 +1440,7 @@ sub readMap {
   <a id="AutomowerConnectDeviceReadings"></a>
   <b>Readings</b>
   <ul>
-    <li>batteryPercent - Batteryladung in Prozent (ohne %-Zeichen)</li>
+    <li>batteryPercent - Batterieladung in Prozent</li>
     <li>mower_activity - aktuelle Aktivität "UNKNOWN" | "NOT_APPLICABLE" | "MOWING" | "GOING_HOME" | "CHARGING" | "LEAVING" | "PARKED_IN_CS" | "STOPPED_IN_GARDEN"</li>
     <li>mower_commandStatus - Status des letzten uebermittelten Kommandos wird duch Statusupdate zurückgesetzt.</li>
     <li>mower_errorCode - last error code</li>

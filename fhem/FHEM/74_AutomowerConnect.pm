@@ -1,4 +1,6 @@
 ###############################################################################
+#
+# $Id$
 # 
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -15,8 +17,6 @@
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
 #
-#
-# $Id$
 #
 #
 # Husqvarnas Open API is used
@@ -47,6 +47,7 @@ BEGIN {
           getKeyValue
           InternalTimer
           InternalVal
+          IsDisabled
           Log3
           Log
           readingFnAttributes
@@ -96,6 +97,7 @@ sub Initialize() {
   $hash->{AttrFn}     = \&Attr;
   $hash->{AttrList}   = "interval " .
                         "disable:1,0 " .
+                        "disabledForIntervals " .
                         "mapImagePath " .
                         "mapImageWidthHeight " .
                         "mapImageCoordinatesToRegister:textField-long " .
@@ -211,6 +213,9 @@ EOF
 
   $attr{$name}{room} = $type if( !defined( $attr{$name}{room} ) );
   $attr{$name}{icon} = 'automower' if( !defined( $attr{$name}{icon} ) );
+  if (::AnalyzeCommandChain(undef,"version 74_AutomowerConnect.pm noheader") =~ "^74_AutomowerConnect.pm (.*)Z") {
+    $hash->{VERSION}=$1;
+  }
 
   RemoveInternalTimer($hash);
   InternalTimer( gettimeofday() + 2, \&APIAuth, $hash, 1);
@@ -235,11 +240,14 @@ sub APIAuth {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   my $iam = "$type $name APIAuth:";
+  my $interval = $hash->{helper}{interval};
+  if ( IsDisabled($name) ) {
 
-  if ( AttrVal($name, 'disable', '') ) {
+    readingsSingleUpdate($hash,'state','disabled',1) if( ReadingsVal($name,'state','') ne 'disabled' );
+    RemoveInternalTimer( $hash, \&APIAuth );
+    InternalTimer( gettimeofday() + $interval, \&APIAuth, $hash, 0 );
 
-    Log3 $name, 3, "$iam disabled"; 
-    return undef 
+    return undef;
 
   }
 
@@ -252,6 +260,7 @@ sub APIAuth {
 
     } else {
 
+      readingsSingleUpdate( $hash, 'state', 'authentification', 1 );
       my $client_id = $hash->{helper}->{client_id};
       my $client_secret = $hash->{helper}->{passObj}->getReadPassword($name);
       my $grant_type = $hash->{helper}->{grant_type};
@@ -267,7 +276,6 @@ sub APIAuth {
         data        => $data,
         callback    => \&APIAuthResponse,
       });
-      readingsSingleUpdate( $hash, 'state', 'authentification', 1 );
     }
   } else {
     RemoveInternalTimer( $hash, \&APIAuth);
@@ -347,12 +355,6 @@ sub getMower {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   my $iam = "$type $name getMower:";
-
-  if ( AttrVal($name, 'disable', '') ) {
-    Log3 $name, 3, "$iam disabled"; 
-    return undef 
-  }
-
   my $access_token = ReadingsVal($name,".access_token","");
   my $provider = ReadingsVal($name,".provider","");
   my $client_id = $hash->{helper}->{client_id};
@@ -545,7 +547,7 @@ sub sendCMD {
   my $type = $hash->{TYPE};
   my $iam = "$type $name sendCMD:";
 
-  if ( AttrVal($name, 'disable', '') ) {
+  if ( IsDisabled($name) ) {
     Log3 $name, 3, "$iam disabled"; 
     return undef 
   }
@@ -675,7 +677,8 @@ sub Set {
 
   Log3 $name, 4, "$iam called with $setName " . ($setVal ? $setVal : "") if ($setName !~ /^(\?|client_secret)$/);
 
-  if ( $setName eq 'getUpdate' ) {
+  if ( !IsDisabled($name) && $setName eq 'getUpdate' ) {
+
     RemoveInternalTimer($hash, \&APIAuth);
     APIAuth($hash);
     return undef;
@@ -716,14 +719,14 @@ sub Set {
       return undef;
     }
 
-  } elsif ( $setName eq 'getNewAccessToken' ) {
+  } elsif ( !IsDisabled($name) && $setName eq 'getNewAccessToken' ) {
     if ( $setVal ) {
 
-    readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, '.access_token', '', 0 );
-      readingsBulkUpdateIfChanged( $hash, 'state', 'initialized');
-      readingsBulkUpdateIfChanged( $hash, 'mower_commandStatus', 'cleared');
-    readingsEndUpdate($hash, 1);
+      readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, '.access_token', '', 0 );
+        readingsBulkUpdateIfChanged( $hash, 'state', 'initialized');
+        readingsBulkUpdateIfChanged( $hash, 'mower_commandStatus', 'cleared');
+      readingsEndUpdate($hash, 1);
 
       RemoveInternalTimer($hash, \&APIAuth);
       APIAuth($hash);
@@ -869,16 +872,10 @@ sub Attr {
   if( $attrName eq "disable" ) {
     if( $cmd eq "set" and $attrVal eq "1" ) {
 
-      RemoveInternalTimer( $hash );
-      readingsSingleUpdate ( $hash, "state", "disabled", 1 );
       Log3 $name, 3, "$iam $cmd $attrName disabled";
 
     } elsif( $cmd eq "del" or $cmd eq 'set' and !$attrVal ) {
 
-      readingsSingleUpdate ( $hash, "state", "initialized", 1 );
-      readMap( $hash );
-      RemoveInternalTimer( $hash, \&APIAuth );
-      InternalTimer( gettimeofday() + 2, \&APIAuth, $hash, 0 );
       Log3 $name, 3, "$iam $cmd $attrName enabled";
 
     }
@@ -1269,7 +1266,8 @@ sub readMap {
 <a id="AutomowerConnect"></a>
 <h3>AutomowerConnect</h3>
 <ul>
-  <u><b>FHEM-FORUM:</b></u> <a target="_blank" href="https://forum.fhem.de/index.php/topic,131661.0.html"> AutomowerConnect und AutomowerConnectDevice</a>
+  <u><b>FHEM-FORUM:</b></u> <a target="_blank" href="https://forum.fhem.de/index.php/topic,131661.0.html"> AutomowerConnect und AutomowerConnectDevice</a><br>
+  <u><b>FHEM-Wiki:</b></u> <a target="_blank" href="https://wiki.fhem.de/wiki/AutomowerConnect"> AutomowerConnect und AutomowerConnectDevice: Wie erstellt man eine Karte des Mähbereiches?</a>
   <br><br>
   <u><b>Introduction</b></u>
   <br><br>
@@ -1288,6 +1286,7 @@ sub readMap {
   <ul>
     <li>Max 1 request per second and application key.</li>
     <li>Max 10 000 request per month and application key.</li>
+    <li>'There is a timeout of 10 minutes in the mower to preserve data traffic and save battery...'</li>
     <li>This results in a recommended interval of 600 seconds.</li><br>
   </ul>
   <u><b>Requirements</b></u>
@@ -1304,7 +1303,7 @@ sub readMap {
     <code>define &lt;device name&gt; AutomowerConnect &lt;application key&gt; [&lt;mower number&gt;]</code><br>
     Example:<br>
     <code>define myMower AutomowerConnect 123456789012345678901234567890123456</code> First device: the default mower number is 0.<br>
-    It has to be set a <b>client_secret</b>. It's the application secret from the <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.
+    It has to be set a <b>client_secret</b>. It's the application secret from the <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.<br>
     <code>set myMower &lt;client secret&gt;</code>
     <br><br>
     Additional mower devices<br>
@@ -1361,7 +1360,8 @@ sub readMap {
       <code>set &lt;name&gt; sendScheduleFromAttributeToMower</code><br>
       Sends the schedule to the mower. NOTE: Do not use for 550 EPOS and Ceora.</li>
 
-     <li><a id='AutomowerConnect-set-'></a><br>
+
+      <li><a id='AutomowerConnect-set-'></a><br>
       <code>set &lt;name&gt; </code><br>
       </li>
 
@@ -1449,6 +1449,8 @@ sub readMap {
       Longitude: <code>(LongitudeMeter_1 - LongitudeMeter_2) / (LongitudeDegree_1 - LongitudeDegree _2)</code><br>
       Latitude: <code>(LatitudeMeter_1 - LatitudeMeter_2) / (LatitudeDegree_1 - LatitudeDegree _2)</code></li>
 
+     <li><a href="disable">disable</a></li>
+     <li><a href="disabledForIntervals">disabledForIntervals</a></li>
 
 
     <li><a id='AutomowerConnect-attr-'></a><br>
@@ -1463,7 +1465,7 @@ sub readMap {
     <li>api_MowerFound - all mower registered under the application key (client_id) </li>
     <li>api_token_expires - date when session of Husqvarna Cloud expires</li>
     <li>api_access_token - current session token (shortend) of Husqvarna Cloud</li>
-    <li>batteryPercent - Battery power in percent</li>
+    <li>batteryPercent - battery state of charge in percent</li>
     <li>mower_activity - current activity "UNKNOWN" | "NOT_APPLICABLE" | "MOWING" | "GOING_HOME" | "CHARGING" | "LEAVING" | "PARKED_IN_CS" | "STOPPED_IN_GARDEN"</li>
     <li>mower_commandStatus - Status of the last sent command cleared each status update</li>
     <li>mower_errorCode - last error code</li>
@@ -1538,6 +1540,7 @@ sub readMap {
   <ul>
     <li>Maximal 1 Request pro Sekunde und Application Key.</li>
     <li>Maximal 10 000 Requests pro Monat und Application Key.</li>
+    <li>'Der Mäher sendet seine Daten nur alle 10 Minuten, um den Datenverkehr zu begrenzen und Batterie zu sparen...' </li>
     <li>Daraus ergibt sich ein empfohlenes Abfrageinterval von 600 Sekunden</li><br>
   </ul>
   <u><b>Anforderungen</b></u>
@@ -1554,13 +1557,13 @@ sub readMap {
     <code>define &lt;device name&gt; AutomowerConnect &lt;application key&gt; [&lt;mower number&gt;]</code><br>
     Beispiel:<br>
     <code>define myMower AutomowerConnect 123456789012345678901234567890123456</code> Erstes Gerät: die Defaultmähernummer ist 0.<br>
-    Es muss ein <b>client_secret</b> gesetzt werden. Es ist das Application Secret vom <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.
+    Es muss ein <b>client_secret</b> gesetzt werden. Es ist das Application Secret vom <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.<br>
     <code>set myMower &lt;client secret&gt;</code><br>
     <br>
     Zusätzlicher Mähroboter<br>
     <code>define &lt;device name&gt; AutomowerConnectDevice &lt;host name&gt; &lt;mower number&gt;</code><br>
     Beispiel:<br>
-    <code>define myAdditionalMower AutomowerConnectDevice MyMower 1</code> Zweites Gerät mit Hostname <i>myMower</i> und Mähernumme <i>1</i>
+    <code>define myAdditionalMower AutomowerConnectDevice MyMower 1</code> Zweites Gerät mit Hostname <i>myMower</i> und Mähernummer <i>1</i>
     <br><br>
   </ul>
   <br>
@@ -1701,6 +1704,9 @@ sub readMap {
       Longitude: <code>(LongitudeMeter_1 - LongitudeMeter_2) / (LongitudeDegree_1 - LongitudeDegree _2)</code><br>
       Latitude: <code>(LatitudeMeter_1 - LatitudeMeter_2) / (LatitudeDegree_1 - LatitudeDegree _2)</code></li>
 
+     <li><a href="disable">disable</a></li>
+     <li><a href="disabledForIntervals">disabledForIntervals</a></li>
+
 
 <li><a id='AutomowerConnect-attr-'></a><br>
       <code>attr &lt;name&gt;  &lt;&gt;</code><br>
@@ -1712,10 +1718,10 @@ sub readMap {
   <a id="AutomowerConnectReadings"></a>
   <b>Readings</b>
   <ul>
-    <li>api_MowerFound - Alle Mährobuter, die unter dem genutzten Application Key (client_id) registriert sind.</li>
+    <li>api_MowerFound - Alle Mähroboter, die unter dem genutzten Application Key (client_id) registriert sind.</li>
     <li>api_token_expires - Datum wann die Session der Husqvarna Cloud abläuft</li>
     <li>api_access_token - aktueller Sitzungstoken (gek&uuml;rzt) für die Husqvarna Cloud</li>
-    <li>batteryPercent - Batteryladung in Prozent</li>
+    <li>batteryPercent - Batterieladung in Prozent</li>
     <li>mower_activity - aktuelle Aktivität "UNKNOWN" | "NOT_APPLICABLE" | "MOWING" | "GOING_HOME" | "CHARGING" | "LEAVING" | "PARKED_IN_CS" | "STOPPED_IN_GARDEN"</li>
     <li>mower_commandStatus - Status des letzten uebermittelten Kommandos wird duch Statusupdate zurückgesetzt.</li>
     <li>mower_errorCode - last error code</li>
