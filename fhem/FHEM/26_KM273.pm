@@ -86,11 +86,13 @@
 #       0017    21.01.2018  mike3436            KM273_StoreElementList          function stores element list in json format
 #       0017    21.01.2018  mike3436            KM273_LoadElementList           function read external element list from json format, executed on Attribut ListenOnly=1
 #       0017    08.05.2018  mike3436            KM273_LoadElementList           JSON library load by 'require' instead 'use' for more compatibility
+#       0018    26.01.2023  mike3436            CA_Init, CAN_Read, CAN_Write    functions extended to communicate with socketcand over TCP/IP
 
 package main;
 use strict;
 use warnings;
 use Time::HiRes qw( time sleep );
+use DevIo;
 
 my @KM273_getsBase = (
     'XDHW_STOP_TEMP',
@@ -2395,8 +2397,6 @@ sub KM273_Initialize($)
 {
     my ($hash) = @_;
 
-    require "$attr{global}{modpath}/FHEM/DevIo.pm";
-
     $hash->{DefFn}      = 'KM273_Define';
     $hash->{UndefFn}    = 'KM273_Undef';
     $hash->{SetFn}      = 'KM273_Set';
@@ -2428,7 +2428,7 @@ sub KM273_Define($$)
     my $name = $hash->{NAME};
     Log3 $name, 3, "$name: KM273_Define";
 
-    $hash->{VERSION} = "0017";
+    $hash->{VERSION} = "0018";
     
     my @param = split('[ \t]+', $def);
 
@@ -3006,13 +3006,27 @@ sub CAN_Write($$)
     my $name = $hash->{NAME};
     Log3 $name, 4, "$name: CAN_Write $data";
 
-    DevIo_SimpleWrite($hash, $data."\r", 0);
+    if ($hash->{DeviceType} eq "TCP")
+    {
+      my ($dir,$id,$len,$data1) = unpack "A1A8A1A*",$data;
+      $id = '4'.substr($id,1) if (($dir eq 'R') && (substr($id,0,1) eq '0'));
+      $id = '5'.substr($id,1) if (($dir eq 'R') && (substr($id,0,1) eq '1'));
+      my $dataout = "< send $id $len";
+      for my $idx (0 .. $len-1) {$dataout .= " ".substr($data1,$idx*2,2);}
+      $dataout .= " >";
+      Log3 $name, 4, "$name: CAN_Write $dataout";
+      DevIo_SimpleWrite($hash, $dataout, 0);
+    }
+    else
+    {
+      DevIo_SimpleWrite($hash, $data."\r", 0);
+    }
 
     return undef;
 }
 
 my @CAN_BufferIn = ();
-
+my $oldframedata = '';
 #####################################
 sub CAN_ReadBuffer($)
 {
@@ -3022,6 +3036,31 @@ sub CAN_ReadBuffer($)
 
     my $buf = DevIo_SimpleRead($hash);
     return undef if(!defined($buf));
+    
+    Log3 $name, 4, "$name: CAN_ReadBuffer recv '$buf'";
+    
+    if ($hash->{DeviceType} eq "TCP")
+    {
+      my @frames = split(/>/,$buf,-1);
+      $frames[0] = $oldframedata.$frames[0] if ($oldframedata ne '');
+      $oldframedata = $frames[-1];
+      pop @frames;
+      foreach my $frame (@frames)
+      {
+        my @val = split(' ',$frame,-1);
+        if ((scalar @val >= 5) && ($val[0] eq '<') && ($val[1] eq 'frame'))
+        {
+          my $datalen = (length $val[4]) / 2;
+          my $data = "T".$val[2].$datalen.$val[4];
+          push @CAN_BufferIn, $data;
+        }
+        else
+        {
+          push @CAN_BufferIn,$frame;
+        }
+      }
+      return undef;
+    }
 
     my @values = split('\r',$buf);
 
@@ -3139,7 +3178,14 @@ sub CAN_Close($)
     my $name = $hash->{NAME};
     Log3 $name, 3, "$name: CAN_Close";
 
-    DevIo_SimpleWrite($hash, "C\rC\rC\r", 0);
+    if ($hash->{DeviceType} eq "TCP")
+    {
+      DevIo_SimpleWrite($hash, "< close can0 >", 0);
+    }
+    else
+    {
+      DevIo_SimpleWrite($hash, "C\rC\rC\r", 0);
+    }
     DevIo_CloseDev($hash);
     return undef;
 }
@@ -3151,8 +3197,21 @@ sub CAN_DoInit($)
     my $name = $hash->{NAME};
     Log3 $name, 3, "$name: CAN_DoInit";
 
-    DevIo_DoSimpleRead($hash);
-    DevIo_SimpleWrite($hash, "C\rC\rV\rV\rv\rS4\rO\r", 0);
+    $hash->{DeviceType} = "USB";
+    my $C1 = substr($hash->{DeviceName},0,1);
+    my $C1IsNum = (($C1 ge '0') && ($C1 le '9'));
+    $hash->{DeviceType} = "TCP" if $C1IsNum;
+
+    if ($hash->{DeviceType} eq "TCP")
+    {
+      DevIo_SimpleWrite($hash, "< open can0 >< rawmode >", 0);
+    }
+    else
+    {
+      DevIo_DoSimpleRead($hash);
+      DevIo_SimpleWrite($hash, "C\rC\rV\rV\rv\rS4\rO\r", 0);
+    }
+
     return undef;
 }
 
@@ -3168,13 +3227,15 @@ sub CAN_DoInit($)
 <ul>
     <i>KM273</i> implements the can bus communication with the buderus logatherm wps heat pump<br>
     The software expect an SLCAN compatible module like USBtin
+    It is also possible to communicate over TCP/IP with a socketcand interface can0
     <br><br>
     <a name="KM273define"></a>
     <b>Define</b>
     <ul>
         <code>define &lt;name&gt; KM273 &lt;device&gt;</code>
         <br><br>
-        Example: <code>define myKM273 KM273 /dev/ttyACM0@115200</code>
+        Example SLCAN USB: <code>define myKM273 KM273 /dev/ttyACM0@115200</code><br>
+        Example socketcand: <code>define myKM273 KM273 192.168.178.74:29536</code>
         <br><br>
     </ul>
     <br>
