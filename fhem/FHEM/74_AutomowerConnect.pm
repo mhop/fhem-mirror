@@ -470,7 +470,8 @@ sub getMowerResponse {
         readingsBulkUpdateIfChanged($hash, $pref."_name", $hash->{helper}{mower}{attributes}{$pref}{name} );
         my $model = $hash->{helper}{mower}{attributes}{$pref}{model};
         $model =~ s/AUTOMOWER./AUTOMOWER®/;
-        readingsBulkUpdateIfChanged($hash, $pref."_model", $model );
+        $hash->{MODEL} = $model if ( $model && $hash->{MODEL} ne $model );
+        # readingsBulkUpdateIfChanged($hash, $pref."_model", $model );
         readingsBulkUpdateIfChanged($hash, $pref."_serialNumber", $hash->{helper}{mower}{attributes}{$pref}{serialNumber} );
         $pref = 'planner';
         readingsBulkUpdateIfChanged($hash, "planner_restrictedReason", $hash->{helper}{mower}{attributes}{$pref}{restrictedReason} );
@@ -1505,7 +1506,6 @@ sub readMap {
     <li>status_statusTimestampDiff - time difference in seconds between the last and second last change of the API content</li>
     <li>status_statusTimestampOld - local time of second last change of the API content</li>
     <li>system_name - name of the mower</li>
-    <li>system_model - model of the mower</li>
     <li>system_serialNumber - serial number of the mower</li>
 
   </ul>
@@ -1760,7 +1760,6 @@ sub readMap {
     <li>status_statusTimestampDiff - Zeitdifferenz zwichen den beiden letzten Änderungen im Inhalt der Daten aus der API</li>
     <li>status_statusTimestampOld - Lokalzeit der vorletzten Änderung der Daten in der API</li>
     <li>system_name - Name des Automowers</li>
-    <li>system_model - Model des Automowers</li>
     <li>system_serialNumber - Seriennummer des Automowers</li>
   </ul>
 </ul>

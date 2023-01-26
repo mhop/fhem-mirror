@@ -1,7 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
- - feature: 74_AutomowerConnect: add attr disabledForIntervals
- - feature: 75_AutomowerConnectDevice: add attr disabledForIntervals
+ - feature: 74_AutomowerConnect: add disabledForIntervals, Internal MODEL
+ - feature: 75_AutomowerConnectDevice: add disabledForIntervals, Internal MODEL
  - bugfix:  98_WeekdayTimer: !$we handling
  - new:     74_AutomowerConnect: Control Automower + Host
  - new:     75_AutomowerConnectDevice: Control Automower Client
