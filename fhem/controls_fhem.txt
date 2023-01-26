@@ -1,8 +1,8 @@
-REV 27115
+REV 27122
 DIR unused
-UPD 2023-01-25_07:45:02 392216 ./CHANGED
+UPD 2023-01-26_07:45:04 392259 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
-UPD 2023-01-25_07:45:02 46455 ./MAINTAINER.txt
+UPD 2023-01-26_07:45:04 46585 ./MAINTAINER.txt
 UPD 2022-12-07_07:45:02 46565 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2023-01-24_07:45:13 173295 ./fhem.pl
@@ -525,7 +525,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2021-03-28_07:45:04 28050 FHEM/98_WOL.pm
-UPD 2022-02-06_07:45:02 71360 FHEM/98_WeekdayTimer.pm
+UPD 2023-01-26_07:45:04 71553 FHEM/98_WeekdayTimer.pm
 UPD 2020-08-03_07:45:02 3963 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2019-05-27_07:45:02 12847 FHEM/98_apptime.pm
@@ -653,7 +653,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2022-01-15_07:45:03 10338 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2023-01-12_07:45:03 412105 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2023-01-26_07:45:04 412414 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2022-12-13_07:45:02 11263 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -748,8 +748,8 @@ UPD 2023-01-25_07:45:07 4870831 docs/commandref.html
 UPD 2023-01-25_07:45:09 2911703 docs/commandref_DE.html
 UPD 2023-01-21_07:45:02 85661 docs/commandref_frame.html
 UPD 2023-01-21_07:45:02 96258 docs/commandref_frame_DE.html
-UPD 2023-01-25_07:45:11 303720 docs/commandref_modular.html
-UPD 2023-01-25_07:45:12 315490 docs/commandref_modular_DE.html
+UPD 2023-01-26_07:45:12 303720 docs/commandref_modular.html
+UPD 2023-01-26_07:45:14 315490 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2417,7 +2417,7 @@ UPD 2021-05-15_07:45:04 1960 www/pgm2/doif.js
 UPD 2022-07-30_07:45:03 31441 www/pgm2/f18.js
 UPD 2022-08-24_07:45:03 10106 www/pgm2/f18style.css
 UPD 2022-12-06_07:45:03 8647 www/pgm2/fhemdoc_modular.js
-UPD 2023-01-25_07:45:02 74081 www/pgm2/fhemweb.js
+UPD 2023-01-26_07:45:04 74122 www/pgm2/fhemweb.js
 UPD 2022-03-14_07:45:13 14080 www/pgm2/fhemweb_colorpicker.js
 UPD 2020-01-19_07:45:03 4252 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
