@@ -23,9 +23,16 @@ sub sonos2mqtt
 my ($NAME,$EVENT)=@_;
 my @arr = split(' ',$EVENT);
 my ($cmd,$vol,$text,$value);
+my $speak_json;
 $cmd = $arr[0];
 # quick response for devStateIcon
 if($cmd eq 'devStateIcon') {return sonos2mqtt_devStateIcon($NAME)}
+if($cmd eq 'speak') {
+   if ($arr[1] =~ /^[a-z]{2}-[A-Z]{2}$/) { 
+      my (undef, $lang, $voice, $volume, @text) = split(/ /, $EVENT); 
+      $speak_json = sprintf('{"lang": "%s", "name":"%s", "volume":%s, "text": "%s","delayMs":700}', $lang, $voice, $volume, join(" ", @text));
+   }
+}
 
 my $bridge = (devspec2array('a:model=sonos2mqtt_bridge'))[0];
 my $devicetopic = ReadingsVal($bridge,'devicetopic','sonos');
@@ -35,7 +42,16 @@ if ($NAME eq $bridge){
    if($cmd eq 'notifyall') {return qq($devicetopic/cmd/notify {"trackUri":"$arr[2]","onlyWhenPlaying":false,"timeout":100,"volume":$arr[1],"delayMs":700})}
    if($cmd eq 'announcementall') {
       ($cmd,$text) = split(' ', $EVENT,2);
-      fhem("setreading $tts text ".ReadingsVal($tts,'text',' ').' '.$text.";sleep 0.4 tts;set $tts tts [$tts:text];sleep $tts:playing:.0 ;set $NAME notifyall [$tts:vol] [$tts:httpName];deletereading $tts text");
+      fhem("set $bridge speak 20 $text");
+   }
+   if($cmd eq 'speak') {
+     if ($arr[1] =~ /^[a-z]{2}-[A-Z]{2}$/) { 
+       return sprintf('%s %s', "$devicetopic/cmd/speak", $speak_json);
+     }
+     else {
+       ($cmd,$vol,$text) = split(' ', $EVENT,3);
+       fhem("set $tts tts $text;sleep $tts:playing:.0 ;set $NAME notifyall $vol [$tts:httpName]") ;
+     }
    }
    if($cmd eq 'Favorites') {return "$devicetopic/".ReadingsVal((devspec2array('a:model=sonos2mqtt_speaker'))[0],'uuid','').q(/control {"command": "adv-command","input": {"cmd": "GetFavorites","reply": "Favorites"}})}
    if($cmd eq 'listalarms') {fhem("sleep $bridge:Alarms:.* ;{sonos2mqtt_alarm(\"$bridge\",'alarmlist')}");return "$devicetopic/cmd/listalarm"}
@@ -133,8 +149,7 @@ if($cmd eq 'sayText') {fhem("setreading $tts text ".ReadingsVal($tts,'text',' ')
 # test first of String like de-DE 
 if($cmd eq 'speak') {
   if ($arr[1] =~ /^[a-z]{2}-[A-Z]{2}$/) { 
-     my (undef, $lang, $voice, $volume, @text) = split(/ /, $EVENT); 
-     return sprintf('%s {"command":"speak","input":{"lang": "%s", "name":"%s", "volume":%s, "text": "%s","delayMs":700}}', $topic, $lang, $voice, $volume, join(" ", @text));
+     return sprintf('%s {"command":"speak","input":%s}', $topic, $speak_json);
   }
   else {
     ($cmd,$vol,$text) = split(' ', $EVENT,3);
@@ -260,6 +275,7 @@ my $bridge = (devspec2array('a:model=sonos2mqtt_bridge'))[0];
 if ($devspec eq 'a:model=sonos2mqtt_bridge'){
    sonos2mqtt_mod_list($devspec,'setList','notifyall:textField'.q( {sonos2mqtt($NAME,$EVENT)}));
    sonos2mqtt_mod_list($devspec,'setList','announcementall:textField'.q( {sonos2mqtt($NAME,$EVENT)}));
+   sonos2mqtt_mod_list($devspec,'setList','speak:textField'.q( {sonos2mqtt($NAME,$EVENT)}));
    sonos2mqtt_mod_list($devspec,'setList','setalarm:textField $DEVICETOPIC/cmd/setalarm');
    sonos2mqtt_mod_list($devspec,'readingList',AttrVal($bridge,"devicetopic",'sonos').'/RINCON_([0-9A-Z]+)/Favorites:.* Favorites');
    sonos2mqtt_mod_list($devspec,'readingList',AttrVal($bridge,"devicetopic",'sonos').'/RINCON_([0-9A-Z]+)/Reply:.* Reply');
