@@ -38,7 +38,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.7.0"   => "25.01.2023 send Log3() data back ro parent process, improve DbLog_dbReadings function ",
+  "5.8.0"   => "27.01.2023 new Get menu for a selection of getters ",
+  "5.7.0"   => "25.01.2023 send Log3() data back ro parent process, improve _DbLog_dbReadings function ",
   "5.6.2"   => "22.01.2023 check Syntax of DbLogValueFn attribute with Log output, Forum:#131777 ",
   "5.6.1"   => "16.01.2023 rewrite sub _DbLog_SBP_connectDB, rewrite sub DbLog_ExecSQL, _DbLog_SBP_onRun_deleteOldDays ",
   "5.6.0"   => "11.01.2023 rename attribute 'bulkInsert' to 'insertMode' ",
@@ -118,6 +119,19 @@ my %DbLog_hset = (                                                              
   importCachefile  => { fn => \&_DbLog_setimportCachefile },
   reduceLog        => { fn => \&_DbLog_setreduceLog       },
   reduceLogNbl     => { fn => \&_DbLog_setreduceLog       },
+);
+
+my %DbLog_hget = (                                                                # Hash der Get-Funktion
+  ReadingsVal             => { fn => \&_DbLog_dbReadings   },
+  ReadingsTimestamp       => { fn => \&_DbLog_dbReadings   },
+  ReadingsValTimestamp    => { fn => \&_DbLog_dbReadings   },
+  ReadingsMaxVal          => { fn => \&_DbLog_dbReadings   },
+  ReadingsMaxValTimestamp => { fn => \&_DbLog_dbReadings   },
+  ReadingsMinVal          => { fn => \&_DbLog_dbReadings   },
+  ReadingsMinValTimestamp => { fn => \&_DbLog_dbReadings   },
+  ReadingsAvgVal          => { fn => \&_DbLog_dbReadings   },
+  webchart                => { fn => \&_DbLog_chartQuery   },
+  plotdata                => { fn => \&_DbLog_plotData     },
 );
 
 my %DbLog_columns = ("DEVICE"  => 64,
@@ -5028,7 +5042,7 @@ sub DbLog_SBP_CheckAndInit {
   my $err = q{};
 
   if (defined $hash->{SBP_PID} && defined $hash->{HELPER}{LONGRUN_PID}) {       # Laufzeit des letzten Kommandos prüfen -> timeout
-      my $to = AttrVal($name, 'timeout', $dblog_todef);
+      my $to = AttrVal ($name, 'timeout', $dblog_todef);
       my $rt = gettimeofday() - $hash->{HELPER}{LONGRUN_PID};                   # aktuelle Laufzeit
 
       if ($rt >= $to) {                                                         # SubProcess beenden, möglicherweise tot
@@ -5738,38 +5752,461 @@ return $sth;
 #
 # GET Funktion
 # wird zb. zur Generierung der Plots implizit aufgerufen
-# infile : [-|current|history]
-# outfile: [-|ALL|INT|WEBCHART]
+# in : [-|current|history]
+# out: [-|ALL|INT|WEBCHART]
 #
 ################################################################
 sub DbLog_Get {
   my ($hash, @a) = @_;
+  
+  return qq{"get X" needs at least an argument} if(@a < 2);
+    
   my $name       = $hash->{NAME};
-  my $utf8       = defined($hash->{UTF8}) ? $hash->{UTF8} : 0;
-  my $history    = $hash->{HELPER}{TH};
-  my $current    = $hash->{HELPER}{TC};
+  @a             = (map { my $p = $_; $p =~ s/\s//xg; $p; } @a);
+    
+  shift @a;                                                                    # Device Name wird entfernt
+  
+  my $opt = $a[0];                                                             # Kommando spezifizieren / ableiten
+  $opt    = 'plotdata' if(lc($a[0]) =~ /^(-|current|history)$/ixs);
+  $opt    = 'webchart' if(lc($a[1]) && lc($a[1]) eq 'webchart');
 
-  my ($dbh,$err);
+  my $params = {
+      hash  => $hash,
+      name  => $name,
+      opt   => $opt,
+      aref  => \@a
+  };
 
-  if ($a[1] =~ m/^Readings/) {
-      return DbLog_dbReadings($hash, @a);
+  if($DbLog_hget{$opt} && defined &{$DbLog_hget{$opt}{fn}}) {
+      return &{$DbLog_hget{$opt}{fn}} ($params);                              
+  } 
+  
+   my $getlist = "Unknown argument $opt, choose one of ".
+                "ReadingsVal: ".
+                "ReadingsTimestamp ".
+                "ReadingsValTimestamp ".
+                "ReadingsMaxVal ".
+                "ReadingsMaxValTimestamp ".
+                "ReadingsMinVal ".
+                "ReadingsMinValTimestamp ".
+                "ReadingsAvgVal "
+                ;
+  
+return $getlist;
+}
+
+########################################################################################
+# get <dbLog> ReadingsVal               <device> <reading> <default>
+# get <dbLog> ReadingsTimestamp         <device> <reading> <default>
+# get <dbLog> ReadingsValTimestamp      <device> <reading> <default>
+# get <dbLog> ReadingsMaxVal[Timestamp] <device> <reading> <default>
+# get <dbLog> ReadingsMinVal[Timestamp] <device> <reading> <default>
+# get <dbLog> ReadingsAvgVal            <device> <reading> <default>
+########################################################################################
+sub _DbLog_dbReadings {
+  my $paref   = shift;
+  
+  my $hash    = $paref->{hash};
+  my @args    = @{$paref->{aref}};
+  my $history = $hash->{HELPER}{TH};
+
+  my $err = _DbLog_manageDBHU ($hash);
+  return $err if($err);
+
+  my $dbh = $hash->{DBHU};
+
+  return 'Wrong Syntax for getting Reading values!' unless defined($args[3]);
+
+  my $cmd     = $args[0];
+  my $device  = $args[1];
+  my $reading = $args[2];
+  my $def     = $args[3];
+
+  my $query = q{};
+
+  if ($cmd =~ /ReadingsMaxVal(Timestamp)?$/xs) {
+      $query = "select MAX(VALUE),TIMESTAMP from $history where DEVICE= '$device' and READING= '$reading';";
+  }
+  elsif ($cmd =~ /ReadingsMinVal(Timestamp)?$/xs) {
+      $query = "select MIN(VALUE),TIMESTAMP from $history where DEVICE= '$device' and READING= '$reading';";
+  }
+  elsif ($cmd =~ /ReadingsAvgVal/xs) {
+      $query = "select AVG(VALUE) from $history where DEVICE= '$device' and READING= '$reading';";
+  }
+  elsif ($cmd =~ /Readings(Val|ValTimestamp|Timestamp)$/xs) {
+      $query = "select VALUE,TIMESTAMP from $history where DEVICE= '$device' and READING= '$reading' order by TIMESTAMP desc limit 1;";
   }
 
-  return "Usage: get $a[0] <in> <out> <from> <to> <column_spec>...\n".
-     "  where column_spec is <device>:<reading>:<default>:<fn>\n" .
-     "  see the #DbLog entries in the .gplot files\n" .
-     "  <in> is not used, only for compatibility for FileLog, please use - \n" .
-     "  <out> is a prefix, - means stdout\n"
-     if(int(@a) < 5);
+  return ">$cmd< isn't valid!" if(!$query);
 
-  shift @a;
-  my $inf  = lc(shift @a);
-  my $outf = lc(shift @a);               # Wert ALL: get all colums from table, including a header
-                                         # Wert Array: get the columns as array of hashes
-                                         # Wert INT: internally used by generating plots
-  my $from = shift @a;
-  my $to   = shift @a;                   # Now @a contains the list of column_specs
+  ($err, my $val, my $timestamp) = __DbLog_SBP_selectrowArray ($dbh, $query);
+  return "error-> $err" if($err);
+
+  $val       = defined $val       ? $val       : $def;
+  $timestamp = defined $timestamp ? $timestamp : $def;
+
+  if ($cmd =~ /Readings(Max|Min|Avg)?Val$/xs) {
+      return $val;
+  }
+  elsif ($cmd eq 'ReadingsTimestamp') {
+      return $timestamp;
+  }
+  else {
+      return ("$val , $timestamp");
+  }
+
+return;
+}
+
+################################################################
+#     Getter für chartQuery
+################################################################
+sub _DbLog_chartQuery {
+  my $paref = shift;
+  
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my @a     = @{$paref->{aref}};
+  
+  return "Usage: \n".
+         "get $name &lt;in&gt; &lt;out&gt; &lt;from&gt; &lt;to&gt; &lt;column_spec&gt;...\n".
+         "where column_spec is &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;\n".
+         "(see the #DbLog entries in the .gplot files)\n".
+         "\n".
+         "Notes:\n".
+         "&lt;in&gt; is not used, only for compatibility for FileLog, please use '-' for &lt;in&gt; \n".
+         "&lt;out&gt; is a prefix, '-' means stdout\n"
+         if(int(@a) < 4);
+  
+  my ($sql, $countsql) = _DbLog_createQuerySql ($paref);
+
+  if ($sql eq "error") {
+     return DbLog_jsonError("Could not setup SQL String. Check your input data.");
+  }
+  elsif ($sql eq "errordb") {
+     return DbLog_jsonError("The Database Type is not supported!");
+  }
+
+  my $err = _DbLog_manageDBHU ($hash);
+  return $err if($err);
+
+  my $dbh = $hash->{DBHU};
+
+  my $totalcount;
+
+  if (defined $countsql && $countsql ne "") {
+      my $query_handle = $dbh->prepare($countsql)
+      or return DbLog_jsonError("Could not prepare statement: " . $dbh->errstr . ", SQL was: " .$countsql);
+
+      $query_handle->execute()
+      or return DbLog_jsonError("Could not execute statement: " . $query_handle->errstr);
+
+      my @data = $query_handle->fetchrow_array();
+      $totalcount = join ", ", @data;
+  }
+
+  my $query_handle = $dbh->prepare($sql)                                                                  
+      or return DbLog_jsonError("Could not prepare statement: " . $dbh->errstr . ", SQL was: " .$sql);    # prepare the query
+
+  $query_handle->execute()                                                             
+      or return DbLog_jsonError("Could not execute statement: " . $query_handle->errstr);                 # execute the query
+
+  my $columns = $query_handle->{'NAME'};
+  my $columncnt;
+
+  if($columns) {                                                                                          # When columns are empty but execution was successful, we have done a successful INSERT, UPDATE or DELETE
+      $columncnt = scalar @$columns;
+  }
+  else {
+      return '{"success": "true", "msg":"All ok"}';
+  }
+
+  my $i          = 0;
+  my $jsonstring = '{"data":[';
+
+  while ( my @data = $query_handle->fetchrow_array()) {
+      if($i == 0) {
+          $jsonstring .= '{';
+      }
+      else {
+          $jsonstring .= ',{';
+      }
+
+      for ($i = 0; $i < $columncnt; $i++) {
+          $jsonstring .= '"';
+          $jsonstring .= uc($query_handle->{NAME}->[$i]);
+          $jsonstring .= '":';
+
+          if (defined $data[$i]) {
+              my $fragment =  substr($data[$i],0,1);
+
+              if ($fragment eq "{") {
+                  $jsonstring .= $data[$i];
+              }
+              else {
+                  $jsonstring .= '"'.$data[$i].'"';
+              }
+          }
+          else {
+              $jsonstring .= '""'
+          }
+
+          if($i != ($columncnt -1)) {
+             $jsonstring .= ',';
+          }
+      }
+
+      $jsonstring .= '}';
+  }
+
+  $jsonstring .= ']';
+
+  if (defined $totalcount && $totalcount ne "") {
+      $jsonstring .= ',"totalCount": '.$totalcount.'}';
+  }
+  else {
+      $jsonstring .= '}';
+  }
+
+return $jsonstring;
+}
+
+################################################################
+#                Prepare the SQL String
+################################################################
+sub _DbLog_createQuerySql {
+    my $paref = shift;
+   
+    my $hash  = $paref->{hash};
+    my @a     = @{$paref->{aref}};
+
+    my $starttime       = $a[2];
+    $starttime          =~ s/_/ /;
+    my $endtime         = $a[3];
+    $endtime            =~ s/_/ /;
+    my $device          = $a[4];
+    my $userquery       = $a[5];
+    my $xaxis           = $a[6];
+    my $yaxis           = $a[7];
+    my $savename        = $a[8];
+    my $jsonChartConfig = $a[9];
+    my $pagingstart     = $a[10];
+    my $paginglimit     = $a[11];
+    
+    my $dbmodel         = $hash->{MODEL};
+    my $history         = $hash->{HELPER}{TH};
+    my $current         = $hash->{HELPER}{TC};
+
+    my ($sql, $jsonstring, $countsql, $hourstats, $daystats, $weekstats, $monthstats, $yearstats);
+
+    if ($dbmodel eq "POSTGRESQL") {
+        ### POSTGRESQL Queries for Statistics ###
+        ### hour:
+        $hourstats  = "SELECT to_char(timestamp, 'YYYY-MM-DD HH24:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+        $hourstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
+        $hourstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $hourstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+        ### day:
+        $daystats  = "SELECT to_char(timestamp, 'YYYY-MM-DD 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+        $daystats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
+        $daystats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $daystats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+        ### week:
+        $weekstats  = "SELECT date_trunc('week',timestamp) AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+        $weekstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
+        $weekstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $weekstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+        ### month:
+        $monthstats  = "SELECT to_char(timestamp, 'YYYY-MM-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+        $monthstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
+        $monthstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $monthstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+        ### year:
+        $yearstats  = "SELECT to_char(timestamp, 'YYYY-01-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+        $yearstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
+        $yearstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+    }
+    elsif ($dbmodel eq "MYSQL") {
+        ### MYSQL Queries for Statistics ###
+        ### hour:
+        $hourstats  = "SELECT date_format(timestamp, '%Y-%m-%d %H:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+        $hourstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
+        $hourstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
+        $hourstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+        ### day:
+        $daystats  = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+        $daystats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
+        $daystats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
+        $daystats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+        ### week:
+        $weekstats  = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+        $weekstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
+        $weekstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
+        $weekstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ";
+        $weekstats .= "GROUP BY date_format(timestamp, '%Y-%u 00:00:00') ORDER BY 1;";
+
+        ### month:
+        $monthstats  = "SELECT date_format(timestamp, '%Y-%m-01 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+        $monthstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
+        $monthstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
+        $monthstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+        ### year:
+        $yearstats  = "SELECT date_format(timestamp, '%Y-01-01 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+        $yearstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
+        $yearstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
+        $yearstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+    }
+    elsif ($dbmodel eq "SQLITE") {
+        ### SQLITE Queries for Statistics ###
+        ### hour:
+        $hourstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+        $hourstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
+        $hourstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $hourstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m-%d %H:00:00', TIMESTAMP);";
+
+        ### day:
+        $daystats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+        $daystats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
+        $daystats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $daystats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m-%d 00:00:00', TIMESTAMP);";
+
+        ### week:
+        $weekstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+        $weekstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
+        $weekstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $weekstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%W 00:00:00', TIMESTAMP);";
+
+        ### month:
+        $monthstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+        $monthstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
+        $monthstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $monthstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m 00:00:00', TIMESTAMP);";
+
+        ### year:
+        $yearstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+        $yearstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
+        $yearstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y 00:00:00', TIMESTAMP);";
+
+    }
+    else {
+        $sql = "errordb";
+    }
+
+    if($userquery eq "getreadings") {
+        $sql = "SELECT distinct(reading) FROM $history WHERE device = '".$device."'";
+    }
+    elsif ($userquery eq "getdevices") {
+        $sql = "SELECT distinct(device) FROM $history";
+    }
+    elsif ($userquery eq "timerange") {
+        $sql = "SELECT ".$xaxis.", VALUE FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ORDER BY TIMESTAMP;";
+    }
+    elsif ($userquery eq "hourstats") {
+        $sql = $hourstats;
+    }
+    elsif ($userquery eq "daystats") {
+        $sql = $daystats;
+    }
+    elsif ($userquery eq "weekstats") {
+        $sql = $weekstats;
+    }
+    elsif ($userquery eq "monthstats") {
+        $sql = $monthstats;
+    }
+    elsif ($userquery eq "yearstats") {
+        $sql = $yearstats;
+    }
+    elsif ($userquery eq "savechart") {
+        $sql = "INSERT INTO frontend (TYPE, NAME, VALUE) VALUES ('savedchart', '$savename', '$jsonChartConfig')";
+    }
+    elsif ($userquery eq "renamechart") {
+        $sql = "UPDATE frontend SET NAME = '$savename' WHERE ID = '$jsonChartConfig'";
+    }
+    elsif ($userquery eq "deletechart") {
+        $sql = "DELETE FROM frontend WHERE TYPE = 'savedchart' AND ID = '".$savename."'";
+    }
+    elsif ($userquery eq "updatechart") {
+        $sql = "UPDATE frontend SET VALUE = '$jsonChartConfig' WHERE ID = '".$savename."'";
+    }
+    elsif ($userquery eq "getcharts") {
+        $sql = "SELECT * FROM frontend WHERE TYPE = 'savedchart'";
+    }
+    elsif ($userquery eq "getTableData") {
+        if ($device ne '""' && $yaxis ne '""') {
+            $sql       = "SELECT * FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+            $sql      .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
+            $sql      .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
+
+            $countsql  = "SELECT count(*) FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+            $countsql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
+        }
+        elsif ($device ne '""' && $yaxis eq '""') {
+            $sql       = "SELECT * FROM $history WHERE DEVICE = '$device' ";
+            $sql      .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
+            $sql      .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
+
+            $countsql  = "SELECT count(*) FROM $history WHERE DEVICE = '$device' ";
+            $countsql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
+        }
+        else {
+            $sql       = "SELECT * FROM $history";
+            $sql      .= " WHERE TIMESTAMP Between '$starttime' AND '$endtime'";
+            $sql      .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
+
+            $countsql  = "SELECT count(*) FROM $history";
+            $countsql .= " WHERE TIMESTAMP Between '$starttime' AND '$endtime'";
+        }
+
+        return ($sql, $countsql);
+    }
+    else {
+        $sql = "error";
+    }
+
+return $sql;
+}
+
+################################################################
+#     Getter für SVG Plotgenerierung
+################################################################
+sub _DbLog_plotData {
+  my $paref = shift;
+  
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my @a     = @{$paref->{aref}};
+  
+  return "Usage: \n".
+         "get $name &lt;in&gt; &lt;out&gt; &lt;from&gt; &lt;to&gt; &lt;column_spec&gt;...\n".
+         "where column_spec is &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;\n".
+         "(see the #DbLog entries in the .gplot files)\n".
+         "\n".
+         "Notes:\n".
+         "&lt;in&gt; is not used, only for compatibility for FileLog, please use '-' for &lt;in&gt; \n".
+         "&lt;out&gt; is a prefix, '-' means stdout\n"
+         if(int(@a) < 4);
+     
+  my ($dbh,$err);
   my ($internal, @fld);
+  
+  my $utf8    = defined($hash->{UTF8}) ? $hash->{UTF8} : 0;
+  my $history = $hash->{HELPER}{TH};
+  my $current = $hash->{HELPER}{TC};
+  my $inf     = lc(shift @a);
+  my $outf    = lc(shift @a);               # Wert ALL:   get all colums from table, including a header
+                                            # Wert Array: get the columns as array of hashes
+                                            # Wert INT:   internally used by generating plots
+  my $from    = shift @a;
+  my $to      = shift @a;                   # Now @a contains the list of column_specs
 
   if ($inf eq "-") {
       $inf = "history";
@@ -5781,40 +6218,36 @@ sub DbLog_Get {
   }
 
   if($outf eq "int") {
-      $outf = "-";
+      $outf     = "-";
       $internal = 1;
   }
   elsif ($outf eq "array") {
 
   }
-  elsif (lc($outf) eq "webchart") {                           # redirect the get request to the DbLog_chartQuery function
-      return DbLog_chartQuery ($hash, @_);
-  }
 
-  ########################
-  # getter für SVG
-  ########################
-  my @readings = ();
   my (%sqlspec, %from_datetime, %to_datetime);
+  
+  my @readings = ();
+  my $verbose  = AttrVal ($name, 'verbose', $attr{global}{verbose});
 
   # uebergebenen Timestamp anpassen
   # moegliche Formate: YYYY | YYYY-MM | YYYY-MM-DD | YYYY-MM-DD_HH24
   $from          =~ s/_/\ /g;
   $to            =~ s/_/\ /g;
-  %from_datetime = DbLog_explode_datetime($from, DbLog_explode_datetime("2000-01-01 00:00:00", ()));
-  %to_datetime   = DbLog_explode_datetime($to, DbLog_explode_datetime("2099-01-01 00:00:00", ()));
+  %from_datetime = DbLog_explode_datetime ($from, DbLog_explode_datetime("2000-01-01 00:00:00", ()));
+  %to_datetime   = DbLog_explode_datetime ($to,   DbLog_explode_datetime("2099-01-01 00:00:00", ()));
   $from          = $from_datetime{datetime};
   $to            = $to_datetime{datetime};
 
   $err = DbLog_checkTimeformat($from);                                     # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
   if($err) {
-      Log3($name, 1, "DbLog $name - wrong date/time format (from: $from) requested by SVG: $err");
+      Log3 ($name, 1, "DbLog $name - wrong date/time format (from: $from) requested by SVG: $err");
       return;
   }
 
   $err = DbLog_checkTimeformat($to);                                       # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
   if($err) {
-      Log3($name, 1, "DbLog $name - wrong date/time format (to: $to) requested by SVG: $err");
+      Log3 ($name, 1, "DbLog $name - wrong date/time format (to: $to) requested by SVG: $err");
       return;
   }
 
@@ -5835,20 +6268,22 @@ sub DbLog_Get {
   # extract the Device:Reading arguments into @readings array
   # Ausgangspunkt ist z.B.: KS300:temperature KS300:rain::delta-h KS300:rain::delta-d
   for (my $i = 0; $i < int(@a); $i++) {
-      @fld = split(":", $a[$i], 5);
-      $readings[$i][0] = $fld[0];         # Device
-      $readings[$i][1] = $fld[1];         # Reading
-      $readings[$i][2] = $fld[2];         # Default
-      $readings[$i][3] = $fld[3];         # function
-      $readings[$i][4] = $fld[4];         # regexp
+      @fld             = split ":", $a[$i], 5;
+      $readings[$i][0] = $fld[0];                                   # Device
+      $readings[$i][1] = $fld[1];                                   # Reading
+      $readings[$i][2] = $fld[2];                                   # Default
+      $readings[$i][3] = $fld[3];                                   # function
+      $readings[$i][4] = $fld[4];                                   # regexp
 
       $readings[$i][1] = "%" if(!$readings[$i][1] || length($readings[$i][1])==0);   # falls Reading nicht gefuellt setze Joker
   }
 
-  Log3 $name, 4, "DbLog $name - ################################################################";
-  Log3 $name, 4, "DbLog $name - ###                  new get data for SVG                    ###";
-  Log3 $name, 4, "DbLog $name - ################################################################";
-  Log3($name, 4, "DbLog $name - main PID: $hash->{PID}, secondary PID: $$");
+  if ($verbose > 3) {
+      Log3 ($name, 4, "DbLog $name - ################################################################");
+      Log3 ($name, 4, "DbLog $name - ###                  new get data for SVG                    ###");
+      Log3 ($name, 4, "DbLog $name - ################################################################");
+      Log3 ($name, 4, "DbLog $name - main PID: $hash->{PID}, secondary PID: $$");
+  }
 
   my $samePID = $hash->{PID} == $$ ? 1 : 0;
 
@@ -5932,9 +6367,11 @@ sub DbLog_Get {
 
       if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
           $deltacalc = 1;
-
-          Log3($name, 4, "DbLog $name - deltacalc: hour") if($readings[$i]->[3] eq "delta-h");   # geändert V4.8.0 / 14.10.2019
-          Log3($name, 4, "DbLog $name - deltacalc: day")  if($readings[$i]->[3] eq "delta-d");   # geändert V4.8.0 / 14.10.2019
+          
+          if ($verbose > 3) {
+              Log3 ($name, 4, "DbLog $name - deltacalc: hour") if($readings[$i]->[3] eq "delta-h");   # geändert V4.8.0 / 14.10.2019
+              Log3 ($name, 4, "DbLog $name - deltacalc: day")  if($readings[$i]->[3] eq "delta-d");   # geändert V4.8.0 / 14.10.2019
+          }
       }
 
       my ($stm);
@@ -6064,17 +6501,18 @@ sub DbLog_Get {
               #evaluate
               my $val = $sql_value;
               my $ts  = $sql_timestamp;
+              
               eval("$readings[$i]->[4]");
               $sql_value     = $val;
               $sql_timestamp = $ts;
+              
               if($@) {
                   Log3 ($name, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@");
               }
           }
 
           if($sql_timestamp lt $from && $deltacalc) {
-              if(Scalar::Util::looks_like_number($sql_value)) {
-                  # nur setzen wenn numerisch
+              if(Scalar::Util::looks_like_number($sql_value)) {                                  # nur setzen wenn numerisch
                   $minval    = $sql_value if($sql_value < $minval || ($minval =  (~0 >> 1)) );   # geändert V4.8.0 / 14.10.2019
                   $maxval    = $sql_value if($sql_value > $maxval || ($maxval = -(~0 >> 1)) );   # geändert V4.8.0 / 14.10.2019
                   $lastv[$i] = $sql_value;
@@ -6092,12 +6530,12 @@ sub DbLog_Get {
               }
 
               ############ Auswerten des 4. Parameters: function ###################
-              if($readings[$i]->[3] && $readings[$i]->[3] eq "int") {                  # nur den integerwert uebernehmen falls zb value=15°C
+              if($readings[$i]->[3] && $readings[$i]->[3] eq "int") {                         # nur den integerwert uebernehmen falls zb value=15°C
                   $out_value  = $1 if($sql_value =~ m/^(\d+).*/o);
                   $out_tstamp = $sql_timestamp;
                   $writeout   = 1;
               }
-              elsif ($readings[$i]->[3] && $readings[$i]->[3] =~ m/^int(\d+).*/o) {  # Uebernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
+              elsif ($readings[$i]->[3] && $readings[$i]->[3] =~ m/^int(\d+).*/o) {           # Uebernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
                   $out_value  = $1 if($sql_value =~ m/^([-\.\d]+).*/o);
                   $out_tstamp = $sql_timestamp;
                   $writeout   = 1;
@@ -6123,7 +6561,7 @@ sub DbLog_Get {
                       $writeout = 1;
                   }
               }
-              elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {       # Berechnung eines Delta-Stundenwertes
+              elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {                # Berechnung eines Delta-Stundenwertes
                   %tstamp = DbLog_explode_datetime($sql_timestamp, ());
 
                   if($lastd[$i] eq "undef") {
@@ -6147,15 +6585,14 @@ sub DbLog_Get {
                               $cnt[$i]++;
                               $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
 
-                              if ($outf =~ m/(all)/) {
-                                  # Timestamp: Device, Type, Event, Reading, Value, Unit
+                              if ($outf =~ m/(all)/) {                                  # Timestamp: Device, Type, Event, Reading, Value, Unit
                                   $retvaldummy .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
 
                               } elsif ($outf =~ m/(array)/) {
                                   push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
                               }
                               else {
-                                  $out_tstamp   =~ s/\ /_/g; #needed by generating plots
+                                  $out_tstamp   =~ s/\ /_/g;                            #needed by generating plots
                                   $retvaldummy .= "$out_tstamp $out_value\n";
                               }
                           }
@@ -6371,11 +6808,11 @@ sub DbLog_Get {
       delete $hash->{DBHU};
   }
 
-  if($internal) {
+  if ($internal) {
       $internal_data = \$retval;
       return undef;
   }
-  elsif($outf =~ m/(array)/) {
+  elsif ($outf =~ m/(array)/) {
       return @ReturnArray;
   }
   else {
@@ -7956,370 +8393,6 @@ return;
 }
 
 ################################################################
-#
-# Do the query
-#
-################################################################
-sub DbLog_chartQuery {
-  my ($sql, $countsql) = _DbLog_createQuerySql (@_);
-
-  if ($sql eq "error") {
-     return DbLog_jsonError("Could not setup SQL String. Check your input data.");
-  }
-  elsif ($sql eq "errordb") {
-     return DbLog_jsonError("The Database Type is not supported!");
-  }
-
-  my ($hash, @a) = @_;
-
-  my $err = _DbLog_manageDBHU ($hash);
-  return $err if($err);
-
-  my $dbh = $hash->{DBHU};
-
-  my $totalcount;
-
-  if (defined $countsql && $countsql ne "") {
-      my $query_handle = $dbh->prepare($countsql)
-      or return DbLog_jsonError("Could not prepare statement: " . $dbh->errstr . ", SQL was: " .$countsql);
-
-      $query_handle->execute()
-      or return DbLog_jsonError("Could not execute statement: " . $query_handle->errstr);
-
-      my @data = $query_handle->fetchrow_array();
-      $totalcount = join ", ", @data;
-  }
-
-  # prepare the query
-  my $query_handle = $dbh->prepare($sql)
-      or return DbLog_jsonError("Could not prepare statement: " . $dbh->errstr . ", SQL was: " .$sql);
-
-  # execute the query
-  $query_handle->execute()
-      or return DbLog_jsonError("Could not execute statement: " . $query_handle->errstr);
-
-  my $columns = $query_handle->{'NAME'};
-  my $columncnt;
-
-  # When columns are empty but execution was successful, we have done a successful INSERT, UPDATE or DELETE
-  if($columns) {
-      $columncnt = scalar @$columns;
-  }
-  else {
-      return '{"success": "true", "msg":"All ok"}';
-  }
-
-  my $i          = 0;
-  my $jsonstring = '{"data":[';
-
-  while ( my @data = $query_handle->fetchrow_array()) {
-      if($i == 0) {
-          $jsonstring .= '{';
-      }
-      else {
-          $jsonstring .= ',{';
-      }
-
-      for ($i = 0; $i < $columncnt; $i++) {
-          $jsonstring .= '"';
-          $jsonstring .= uc($query_handle->{NAME}->[$i]);
-          $jsonstring .= '":';
-
-          if (defined $data[$i]) {
-              my $fragment =  substr($data[$i],0,1);
-
-              if ($fragment eq "{") {
-                  $jsonstring .= $data[$i];
-              }
-              else {
-                  $jsonstring .= '"'.$data[$i].'"';
-              }
-          }
-          else {
-              $jsonstring .= '""'
-          }
-
-          if($i != ($columncnt -1)) {
-             $jsonstring .= ',';
-          }
-      }
-
-      $jsonstring .= '}';
-  }
-
-  $jsonstring .= ']';
-
-  if (defined $totalcount && $totalcount ne "") {
-      $jsonstring .= ',"totalCount": '.$totalcount.'}';
-  }
-  else {
-      $jsonstring .= '}';
-  }
-
-return $jsonstring;
-}
-
-################################################################
-#                Prepare the SQL String
-################################################################
-sub _DbLog_createQuerySql {
-    my ($hash, @a) = @_;
-
-    my $starttime       = $_[5];
-    $starttime          =~ s/_/ /;
-    my $endtime         = $_[6];
-    $endtime            =~ s/_/ /;
-    my $device          = $_[7];
-    my $userquery       = $_[8];
-    my $xaxis           = $_[9];
-    my $yaxis           = $_[10];
-    my $savename        = $_[11];
-    my $jsonChartConfig = $_[12];
-    my $pagingstart     = $_[13];
-    my $paginglimit     = $_[14];
-    my $dbmodel         = $hash->{MODEL};
-    my $history         = $hash->{HELPER}{TH};
-    my $current         = $hash->{HELPER}{TC};
-
-    my ($sql, $jsonstring, $countsql, $hourstats, $daystats, $weekstats, $monthstats, $yearstats);
-
-    if ($dbmodel eq "POSTGRESQL") {
-        ### POSTGRESQL Queries for Statistics ###
-        ### hour:
-        $hourstats  = "SELECT to_char(timestamp, 'YYYY-MM-DD HH24:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
-        $hourstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $hourstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
-        $hourstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
-
-        ### day:
-        $daystats  = "SELECT to_char(timestamp, 'YYYY-MM-DD 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
-        $daystats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $daystats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
-        $daystats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
-
-        ### week:
-        $weekstats  = "SELECT date_trunc('week',timestamp) AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
-        $weekstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $weekstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
-        $weekstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
-
-        ### month:
-        $monthstats  = "SELECT to_char(timestamp, 'YYYY-MM-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
-        $monthstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $monthstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
-        $monthstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
-
-        ### year:
-        $yearstats  = "SELECT to_char(timestamp, 'YYYY-01-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
-        $yearstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $yearstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
-        $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
-    }
-    elsif ($dbmodel eq "MYSQL") {
-        ### MYSQL Queries for Statistics ###
-        ### hour:
-        $hourstats  = "SELECT date_format(timestamp, '%Y-%m-%d %H:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
-        $hourstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $hourstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
-        $hourstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
-
-        ### day:
-        $daystats  = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
-        $daystats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $daystats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
-        $daystats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
-
-        ### week:
-        $weekstats  = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
-        $weekstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $weekstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
-        $weekstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ";
-        $weekstats .= "GROUP BY date_format(timestamp, '%Y-%u 00:00:00') ORDER BY 1;";
-
-        ### month:
-        $monthstats  = "SELECT date_format(timestamp, '%Y-%m-01 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
-        $monthstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $monthstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
-        $monthstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
-
-        ### year:
-        $yearstats  = "SELECT date_format(timestamp, '%Y-01-01 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
-        $yearstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $yearstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
-        $yearstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
-    }
-    elsif ($dbmodel eq "SQLITE") {
-        ### SQLITE Queries for Statistics ###
-        ### hour:
-        $hourstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
-        $hourstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $hourstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
-        $hourstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m-%d %H:00:00', TIMESTAMP);";
-
-        ### day:
-        $daystats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
-        $daystats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $daystats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
-        $daystats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m-%d 00:00:00', TIMESTAMP);";
-
-        ### week:
-        $weekstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
-        $weekstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $weekstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
-        $weekstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%W 00:00:00', TIMESTAMP);";
-
-        ### month:
-        $monthstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
-        $monthstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $monthstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
-        $monthstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m 00:00:00', TIMESTAMP);";
-
-        ### year:
-        $yearstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
-        $yearstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $yearstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
-        $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y 00:00:00', TIMESTAMP);";
-
-    }
-    else {
-        $sql = "errordb";
-    }
-
-    if($userquery eq "getreadings") {
-        $sql = "SELECT distinct(reading) FROM $history WHERE device = '".$device."'";
-    }
-    elsif ($userquery eq "getdevices") {
-        $sql = "SELECT distinct(device) FROM $history";
-    }
-    elsif ($userquery eq "timerange") {
-        $sql = "SELECT ".$xaxis.", VALUE FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ORDER BY TIMESTAMP;";
-    }
-    elsif ($userquery eq "hourstats") {
-        $sql = $hourstats;
-    }
-    elsif ($userquery eq "daystats") {
-        $sql = $daystats;
-    }
-    elsif ($userquery eq "weekstats") {
-        $sql = $weekstats;
-    }
-    elsif ($userquery eq "monthstats") {
-        $sql = $monthstats;
-    }
-    elsif ($userquery eq "yearstats") {
-        $sql = $yearstats;
-    }
-    elsif ($userquery eq "savechart") {
-        $sql = "INSERT INTO frontend (TYPE, NAME, VALUE) VALUES ('savedchart', '$savename', '$jsonChartConfig')";
-    }
-    elsif ($userquery eq "renamechart") {
-        $sql = "UPDATE frontend SET NAME = '$savename' WHERE ID = '$jsonChartConfig'";
-    }
-    elsif ($userquery eq "deletechart") {
-        $sql = "DELETE FROM frontend WHERE TYPE = 'savedchart' AND ID = '".$savename."'";
-    }
-    elsif ($userquery eq "updatechart") {
-        $sql = "UPDATE frontend SET VALUE = '$jsonChartConfig' WHERE ID = '".$savename."'";
-    }
-    elsif ($userquery eq "getcharts") {
-        $sql = "SELECT * FROM frontend WHERE TYPE = 'savedchart'";
-    }
-    elsif ($userquery eq "getTableData") {
-        if ($device ne '""' && $yaxis ne '""') {
-            $sql       = "SELECT * FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
-            $sql      .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
-            $sql      .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
-
-            $countsql  = "SELECT count(*) FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
-            $countsql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
-        }
-        elsif ($device ne '""' && $yaxis eq '""') {
-            $sql       = "SELECT * FROM $history WHERE DEVICE = '$device' ";
-            $sql      .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
-            $sql      .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
-
-            $countsql  = "SELECT count(*) FROM $history WHERE DEVICE = '$device' ";
-            $countsql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
-        }
-        else {
-            $sql       = "SELECT * FROM $history";
-            $sql      .= " WHERE TIMESTAMP Between '$starttime' AND '$endtime'";
-            $sql      .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
-
-            $countsql  = "SELECT count(*) FROM $history";
-            $countsql .= " WHERE TIMESTAMP Between '$starttime' AND '$endtime'";
-        }
-
-        return ($sql, $countsql);
-    }
-    else {
-        $sql = "error";
-    }
-
-return $sql;
-}
-
-########################################################################################
-# get <dbLog> ReadingsVal               <device> <reading> <default>
-# get <dbLog> ReadingsTimestamp         <device> <reading> <default>
-# get <dbLog> ReadingsValTimestamp      <device> <reading> <default>
-# get <dbLog> ReadingsMaxVal[Timestamp] <device> <reading> <default>
-# get <dbLog> ReadingsMinVal[Timestamp] <device> <reading> <default>
-# get <dbLog> ReadingsAvgVal            <device> <reading> <default>
-########################################################################################
-sub DbLog_dbReadings {
-  my($hash,@a) = @_;
-  my $history  = $hash->{HELPER}{TH};
-
-  my $err = _DbLog_manageDBHU ($hash);
-  return $err if($err);
-
-  my $dbh = $hash->{DBHU};
-
-  return 'Wrong Syntax for ReadingsVal!' unless defined($a[4]);
-
-  my $cmd     = $a[1];
-  my $device  = $a[2];
-  my $reading = $a[3];
-  my $def     = $a[4];
-
-  my $query = q{};
-
-  if ($cmd =~ /ReadingsMaxVal(Timestamp)?$/xs) {
-      $query = "select MAX(VALUE),TIMESTAMP from $history where DEVICE= '$device' and READING= '$reading';";
-  }
-  elsif ($cmd =~ /ReadingsMinVal(Timestamp)?$/xs) {
-      $query = "select MIN(VALUE),TIMESTAMP from $history where DEVICE= '$device' and READING= '$reading';";
-  }
-  elsif ($cmd =~ /ReadingsAvgVal/xs) {
-      $query = "select AVG(VALUE) from $history where DEVICE= '$device' and READING= '$reading';";
-  }
-  elsif ($cmd =~ /Readings(Val|ValTimestamp|Timestamp)$/xs) {
-      $query = "select VALUE,TIMESTAMP from $history where DEVICE= '$device' and READING= '$reading' order by TIMESTAMP desc limit 1;";
-  }
-
-  return ">$cmd< isn't valid!" if(!$query);
-
-  ($err, my $val, my $timestamp) = __DbLog_SBP_selectrowArray ($dbh, $query);
-  return "error-> $err" if($err);
-
-  $val       = defined $val       ? $val       : $def;
-  $timestamp = defined $timestamp ? $timestamp : $def;
-
-  if ($cmd =~ /Readings(Max|Min|Avg)?Val$/xs) {
-      return $val;
-  }
-  elsif ($cmd eq 'ReadingsTimestamp') {
-      return $timestamp;
-  }
-  else {
-      return ("$val , $timestamp");
-  }
-
-return;
-}
-
-################################################################
 #               Versionierungen des Moduls setzen
 #  Die Verwendung von Meta.pm und Packages wird berücksichtigt
 ################################################################
@@ -8985,13 +9058,18 @@ return;
   </ul>
   </li>
   <br>
+  <br>
+  
+<b>Get</b> for the use of plot data
+  <br>
+  <br>
 
   <ul>
-    <li><b>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
-          &lt;to&gt; &lt;column_spec&gt; </b> <br><br>
+    <li><b>get &lt;name&gt; &lt;in&gt; &lt;out&gt; &lt;from&gt; &lt;to&gt; &lt;column_spec&gt; </b> <br><br>
 
     Read data from the Database, used by frontends to plot data without direct
-    access to the Database.<br>
+    access to the Database. <br>
+    <br>
 
     <ul>
       <li>&lt;in&gt;<br>
@@ -9032,7 +9110,7 @@ return;
         a comment line on the current connection.<br>
         <br>
 
-        Syntax: &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;:&lt;regexp&gt; <br>
+        <b>Syntax:</b> &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;:&lt;regexp&gt; <br>
         <br>
 
         <ul>
@@ -9154,25 +9232,28 @@ return;
     <br>
 
   <b>Get</b> when used for webcharts
+  <br>
+  <br>
+  
   <ul>
-    <li><b>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
+    <li><b>get &lt;name&gt; &lt;in&gt; &lt;out&gt; &lt;from&gt;
           &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; </b> <br><br>
 
     Query the Database to retrieve JSON-Formatted Data, which is used by the charting frontend.
     <br>
-
+    <br>
+    
     <ul>
       <li>&lt;name&gt;<br>
         The name of the defined DbLog, like it is given in fhem.cfg.</li>
       <br>
 
       <li>&lt;in&gt;<br>
-        A dummy parameter for FileLog compatibility. Always set to <code>-</code></li>
+        Always set to <code>-</code></li>
       <br>
 
       <li>&lt;out&gt;<br>
-        A dummy parameter for FileLog compatibility. Set it to <code>webchart</code>
-        to use the charting related get function.
+        Is to be set to <code>webchart</code>.
       </li>
       <br>
 
@@ -9207,7 +9288,7 @@ return;
       <br>
 
       <li>&lt;yaxis&gt;<br>
-         A string which represents the yaxis</li>
+         A string representing the Y-axis to be set to the name of the reading to be evaluated. </li>
       <br>
 
       <li>&lt;savename&gt;<br>
@@ -9231,15 +9312,20 @@ return;
       <ul>
         <li><code>get logdb - webchart "" "" "" getcharts</code><br>
             Retrieves all saved charts from the Database</li>
+            <br>
         <li><code>get logdb - webchart "" "" "" getdevices</code><br>
             Retrieves all available devices from the Database</li>
+            <br>
         <li><code>get logdb - webchart "" "" ESA2000_LED_011e getreadings</code><br>
             Retrieves all available Readings for a given device from the Database</li>
+            <br>
         <li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e timerange TIMESTAMP day_kwh</code><br>
             Retrieves charting data, which requires a given xaxis, yaxis, device, to and from<br>
             Will ouput a JSON like this: <code>[{'TIMESTAMP':'2013-02-11 00:10:10','VALUE':'0.22431388090756'},{'TIMESTAMP'.....}]</code></li>
+            <br>
         <li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e savechart TIMESTAMP day_kwh tageskwh</code><br>
             Will save a chart in the database with the given name and the chart configuration parameters</li>
+            <br>
         <li><code>get logdb - webchart "" "" "" deletechart "" "" 7</code><br>
             Will delete a chart from the database with the given id</li>
       </ul>
@@ -10665,7 +10751,7 @@ attr SMA_Energymeter DbLogValueFn
   <br>
 
   <ul>
-    <a id="DbLog-get-ReadingsMaxVal"></a>
+    <a id="DbLog-get-ReadingsMaxVal" data-pattern="ReadingsMaxVal.*"></a>
     <li><b>get &lt;name&gt; ReadingsMaxVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
     <ul>
       Ermittelt den Datensatz mit dem größten Wert der angegebenen Device / Reading Kombination aus der history Tabelle. <br>
@@ -10684,7 +10770,7 @@ attr SMA_Energymeter DbLogValueFn
   <br>
 
   <ul>
-    <a id="DbLog-get-ReadingsMinVal"></a>
+    <a id="DbLog-get-ReadingsMinVal" data-pattern="ReadingsMinVal.*"></a>
     <li><b>get &lt;name&gt; ReadingsMinVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
     <ul>
       Ermittelt den Datensatz mit dem kleinsten Wert der angegebenen Device / Reading Kombination aus der history Tabelle. <br>
@@ -10721,7 +10807,7 @@ attr SMA_Energymeter DbLogValueFn
   <br>
 
   <ul>
-    <a id="DbLog-get-ReadingsVal"></a>
+    <a id="DbLog-get-ReadingsVal" data-pattern="ReadingsVal.*"></a>
     <li><b>get &lt;name&gt; ReadingsVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
     <ul>
       Liest den letzten (neuesten) in der history Tabelle gespeicherten Datensatz der angegebenen Device / Reading
@@ -10757,10 +10843,14 @@ attr SMA_Energymeter DbLogValueFn
   </ul>
   </li>
   <br>
+  <br>
+  
+<b>Get</b> für die Nutzung von Plot-Daten
+  <br>
+  <br>
 
   <ul>
-    <li><b>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
-          &lt;to&gt; &lt;column_spec&gt; </b> <br><br>
+    <li><b>get &lt;name&gt; &lt;in&gt; &lt;out&gt; &lt;from&gt; &lt;to&gt; &lt;column_spec&gt; </b> <br><br>
 
     Liesst Daten aus der Datenbank. Wird durch die Frontends benutzt um Plots
     zu generieren ohne selbst auf die Datenank zugreifen zu müssen.
@@ -10808,7 +10898,7 @@ attr SMA_Energymeter DbLogValueFn
         durch einen Kommentar getrennt wird. Dieser Kommentar repräsentiert
         die column_spec. <br>
         <br>
-        Syntax: &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;:&lt;regexp&gt; <br>
+        <b>Syntax:</b> &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;:&lt;regexp&gt; <br>
         <br>
 
         <ul>
@@ -10926,12 +11016,16 @@ attr SMA_Energymeter DbLogValueFn
   <br>
 
   <b>Get</b> für die Nutzung von webcharts
+  <br>
+  <br>
+  
   <ul>
-    <li><b>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
+    <li><b>get &lt;name&gt; &lt;in&gt; &lt;out&gt; &lt;from&gt;
           &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; </li></b>
     <br>
 
-    Liest Daten aus der Datenbank aus und gibt diese in JSON formatiert aus. Wird für das Charting Frontend genutzt
+    Liest Daten aus der Datenbank aus und gibt diese in JSON formatiert aus. Wird für das Charting Frontend genutzt.
+    <br>
     <br>
 
     <ul>
@@ -10941,14 +11035,12 @@ attr SMA_Energymeter DbLogValueFn
       <br>
 
       <li>&lt;in&gt;<br>
-        Ein Dummy Parameter um eine Kompatibilität zum Filelog herzustellen.
         Dieser Parameter ist immer auf <code>-</code> zu setzen.
       </li>
       <br>
 
       <li>&lt;out&gt;<br>
-        Ein Dummy Parameter um eine Kompatibilität zum Filelog herzustellen.
-        Dieser Parameter ist auf <code>webchart</code> zu setzen um die Charting Get Funktion zu nutzen.
+        Dieser Parameter ist auf <code>webchart</code> zu setzen.
       </li>
       <br>
 
@@ -10990,7 +11082,7 @@ attr SMA_Energymeter DbLogValueFn
       <br>
 
       <li>&lt;yaxis&gt;<br>
-         Ein String, der die Y-Achse repräsentiert
+         Ein String, der die Y-Achse repräsentiert und auf den Namen des auszuwertenden Readings zu setzen ist.
       </li>
       <br>
 
@@ -11020,20 +11112,20 @@ attr SMA_Energymeter DbLogValueFn
       <ul>
         <li><code>get logdb - webchart "" "" "" getcharts</code><br>
             Liefert alle gespeicherten Charts aus der Datenbank</li>
-
+            <br>
         <li><code>get logdb - webchart "" "" "" getdevices</code><br>
             Liefert alle verfügbaren Devices aus der Datenbank</li>
-
+            <br>
         <li><code>get logdb - webchart "" "" ESA2000_LED_011e getreadings</code><br>
             Liefert alle verfügbaren Readings aus der Datenbank unter Angabe eines Gerätes</li>
-
+            <br>
         <li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e timerange TIMESTAMP day_kwh</code><br>
             Liefert Chart-Daten, die auf folgenden Parametern basieren: 'xaxis', 'yaxis', 'device', 'to' und 'from'<br>
             Die Ausgabe erfolgt als JSON, z.B.: <code>[{'TIMESTAMP':'2013-02-11 00:10:10','VALUE':'0.22431388090756'},{'TIMESTAMP'.....}]</code></li>
-
+            <br>
         <li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e savechart TIMESTAMP day_kwh tageskwh</code><br>
             Speichert einen Chart unter Angabe eines 'savename' und seiner zugehörigen Konfiguration</li>
-
+            <br>
         <li><code>get logdb - webchart "" "" "" deletechart "" "" 7</code><br>
             Löscht einen zuvor gespeicherten Chart unter Angabe einer id</li>
       </ul>
