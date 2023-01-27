@@ -93,6 +93,7 @@ sub Initialize() {
   $hash->{FW_detailFn}= \&FW_detailFn;
   $hash->{AttrFn}     = \&Attr;
   $hash->{AttrList}   = "disable:1,0 " .
+                        "debug:1,0 " .
                         "disabledForIntervals " .
                         "mapImagePath " .
                         "mapImageWidthHeight " .
@@ -240,12 +241,13 @@ sub Notify {
 
   }
 
-  if(grep /^state:.connected$/, @{$events}) {
+  if ( grep /^state:.connected$/, @{$events} ) {
 
-    my $maxMower = @{$hosthash->{helper}{mowers}};
+    my $maxMower = 0;
+    $maxMower = @{$hash->{helper}{mowers}} if ( ref ( $hash->{helper}{mowers} ) eq 'ARRAY' );
     if ($maxMower <= $mowerNumber || $mowerNumber < 0 ) {
 
-      Log3 $name, 2, "$iam mower number $mowerNumber not available. Change definition of $name.";
+      Log3 $name, 2, "$iam wrong mower number $mowerNumber ($maxMower mower available). Change definition of $name.";
       return undef;
 
     }
@@ -442,44 +444,46 @@ sub CMDResponse {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
+  my $statuscode = $param->{code};
   my $iam = "$type $name CMDResponse:";
 
-  if($err ne "") {
-      readingsSingleUpdate( $hash, 'state', 'error', 1 );
-      Log3 $name, 2, "$iam error while requesting ".$param->{url}." - $err";     
-                                         
-  } elsif($data ne "") {
+  Log3 $name, 1, "\ndebug $iam \n\$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}" if ( AttrVal($name, 'debug', '') );
+
+  if( !$err && $statuscode == 202 && $data ) {
 
     my $result = eval { decode_json($data) };
     if ($@) {
+
       Log3( $name, 2, "$iam - JSON error while request: $@");
-      return;
-    }
 
-    $hash->{helper}{CMDResponse} = $result;
-    if ($result->{message}) {
-      readingsSingleUpdate( $hash, 'state', 'error', 1 );
-      Log3 $name, 2, "$iam" . $data;
-      $hash->{helper}->{mower_commandStatus} = $result->{message};
-
-    } elsif ($result->{errors}) {
-      Log3 $name, 2, "$iam" . $data;
-      readingsSingleUpdate( $hash, 'state', 'error', 1 );
-      $hash->{helper}->{mower_commandStatus} = 'ERROR - '. $result->{errors}[0]{title};
-   } elsif ($result->{data}) {
-      Log3 $name, 5, $data; 
-      if ( ref ($result->{data}) eq 'ARRAY') {
-      $hash->{helper}->{mower_commandStatus} = 'OK - '. $result->{data}[0]{type};
     } else {
-      $hash->{helper}->{mower_commandStatus} = 'OK - '. $result->{data}{type};
-    }
+
+      $hash->{helper}{CMDResponse} = $result;
+      if ($result->{data}) {
+        
+        Log3 $name, 5, $data; 
+        if ( ref ($result->{data}) eq 'ARRAY') {
+
+        $hash->{helper}->{mower_commandStatus} = 'OK - '. $result->{data}[0]{type};
+
+        } else {
+
+        $hash->{helper}->{mower_commandStatus} = 'OK - '. $result->{data}{type};
+
+        }
+
+        readingsSingleUpdate($hash, 'mower_commandStatus', $hash->{helper}->{mower_commandStatus} ,1);
+        return undef;
+
+      }
 
     }
-
-    readingsSingleUpdate($hash, 'mower_commandStatus', $hash->{helper}->{mower_commandStatus} ,1);
 
   }
 
+  readingsSingleUpdate($hash, 'mower_commandStatus', "ERROR statuscode $statuscode" ,1);
+  Log3 $name, 2, "\n$iam \n\$statuscode [$statuscode]\n\$err [$err],\n\$data [$data]\n\$param->url $param->{url}";
+  return undef;
 }
 
 ##############################################################
