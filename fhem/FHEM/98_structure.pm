@@ -46,10 +46,11 @@ structure_Initialize($)
     async_delay
     clientstate_behavior:relative,relativeKnown,absolute,last 
     clientstate_priority
+    considerDisabledMembers
     disable
     disabledForIntervals
-    considerDisabledMembers
     evaluateSetResult:1,0
+    filterEvents:1,0
     propagateAttr
     setStateIndirectly:1,0
     setStructType:0,1
@@ -210,6 +211,21 @@ structure_Notify($$)
   return "" if(IsDisabled($me));
 
   return "" if (! exists $hash->{".memberHash"}->{$devName});
+
+  if(AttrVal($me, "filterEvents", 0) &&
+     AttrVal($devName, $devmap, 0)) { #131841
+    my %re;
+    map { 
+      my @val = split(":",$_);
+      $re{$val[0]} = 1 if(@val==1 || @val==3);
+    } attrSplit($attr{$devName}{$devmap});
+    my @re = keys %re;
+    my $fnd;
+    map {
+      my $e = $_; map { $fnd = 1 if($e =~ m/^$_:/) } @re;
+    } @{deviceEvents($dev, 0)};
+    return "" if(!$fnd);
+  }
 
   my $behavior = AttrVal($me, "clientstate_behavior", "absolute");
   my %clientstate;
@@ -768,6 +784,14 @@ structure_Attr($@)
       compute the new status.
       </li>
 
+    <a id="structure-attr-filterEvents"></a>
+    <li>filterEvents<br>
+      if set, and the device triggering the event has a struct_type map, the
+      only events (i.e. reading names) contained in the structure map will
+      trigger the structure. Note: only the readingName and
+      readingName:oldVal:newVal entries of the struct_type map are considered.
+      </li>
+
     <a id="structure-attr-propagateAttr"></a>
     <li>propagateAttr &lt;regexp&gt;<br>
       if the regexp matches the name of the attribute, then this attribute will
@@ -1014,6 +1038,15 @@ structure_Attr($@)
       unterschiedliches setzt (wie z.Bsp. beim set statusRequest), dann muss
       dieses Attribut auf 1 gesetzt werden, wenn die Struktur Instanz diesen
       neuen Status auswerten soll.
+      </li>
+
+    <a id="structure-attr-filterEvents"></a>
+    <li>filterEvents<br>
+      falls gesetzt, und das Event ausl&ouml;sende Ger&auml;t &uuml;ber ein
+      struct_type map verf&uuml;gt, dann werden nur solche Events die
+      Strukturberechnung ausl&ouml;sen, die in diesem map enthalten sind.<br>
+      Achtung: in struct_type map werden nur die readingName und
+      readingName:oldVal:newVal Eintr&auml;ge ber&uuml;cksichtigt.
       </li>
 
     <a id="structure-attr-propagateAttr"></a>
