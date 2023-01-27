@@ -244,7 +244,7 @@ sub Notify {
   if ( grep /^state:.connected$/, @{$events} ) {
 
     my $maxMower = 0;
-    $maxMower = @{$hash->{helper}{mowers}} if ( ref ( $hash->{helper}{mowers} ) eq 'ARRAY' );
+    $maxMower = @{$hosthash->{helper}{mowers}} if ( ref ( $hosthash->{helper}{mowers} ) eq 'ARRAY' );
     if ($maxMower <= $mowerNumber || $mowerNumber < 0 ) {
 
       Log3 $name, 2, "$iam wrong mower number $mowerNumber ($maxMower mower available). Change definition of $name.";
