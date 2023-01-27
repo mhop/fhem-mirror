@@ -97,6 +97,7 @@ sub Initialize() {
   $hash->{AttrFn}     = \&Attr;
   $hash->{AttrList}   = "interval " .
                         "disable:1,0 " .
+                        "debug:1,0 " .
                         "disabledForIntervals " .
                         "mapImagePath " .
                         "mapImageWidthHeight " .
@@ -217,12 +218,20 @@ EOF
     $hash->{VERSION}=$1;
   }
 
-  RemoveInternalTimer($hash);
-  InternalTimer( gettimeofday() + 2, \&APIAuth, $hash, 1);
-  InternalTimer( gettimeofday() + 30, \&readMap, $hash, 0);
   AddExtension( $name, \&GetMap, "$type/$name/map" );
 
-  readingsSingleUpdate( $hash, 'state', 'defined', 1 );
+  if( $hash->{helper}->{passObj}->getReadPassword($name) ) {
+
+    RemoveInternalTimer($hash);
+    InternalTimer( gettimeofday() + 2, \&APIAuth, $hash, 1);
+    InternalTimer( gettimeofday() + 30, \&readMap, $hash, 0);
+    readingsSingleUpdate( $hash, 'state', 'defined', 1 );
+
+  } else {
+
+    readingsSingleUpdate( $hash, 'state', 'defined - client_secret missing', 1 );
+
+  }
 
   return undef;
 
@@ -278,6 +287,7 @@ sub APIAuth {
       });
     }
   } else {
+
     RemoveInternalTimer( $hash, \&APIAuth);
     InternalTimer(gettimeofday() + 20, \&APIAuth, $hash, 0);
 
@@ -291,31 +301,24 @@ sub APIAuthResponse {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
+  my $statuscode = $param->{code};
+  my $interval = $hash->{helper}{interval};
   my $iam = "$type $name APIAuthResponse:";
 
-  if($err) {
-    
-    Log3 $name, 2, "$iam error [$err], data [$data] for url $param->{url}";
-    readingsSingleUpdate( $hash, 'state', 'error', 1 );
+  Log3 $name, 1, "\ndebug $iam \n\$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}" if ( AttrVal($name, 'debug', '') );
 
-  } elsif( $data ) {
+  if( !$err && $statuscode == 200 && $data) {
 
     my $result = eval { decode_json($data) };
     if ($@) {
-      Log3 $name, 2, "$iam JSON error [ $@ ]";
-      readingsSingleUpdate( $hash, 'state', 'error', 1 );
-      return undef;
-    }
 
-    if ($result->{errors} || $result->{message}) {
-      Log3 $name, 2, "$iam error [ $data ]";
-      readingsSingleUpdate( $hash, 'state', 'error', 1 );
-    
+      Log3 $name, 2, "$iam JSON error [ $@ ]";
+      readingsSingleUpdate( $hash, 'state', 'error JSON', 1 );
+
     } else {
-      Log3 $name, 5, "$iam $data"; 
 
       $hash->{helper}->{auth} = $result;
-
+      
       # Update readings
       readingsBeginUpdate($hash);
         readingsBulkUpdateIfChanged($hash,'.access_token',$hash->{helper}{auth}{access_token},0 );
@@ -338,9 +341,20 @@ sub APIAuthResponse {
       readingsEndUpdate($hash, 1);
 
       getMower( $hash );
+      return undef;
     }
+
+  } else {
+
+    readingsSingleUpdate( $hash, 'state', "error statuscode $statuscode", 1 );
+    Log3 $name, 1, "\n$iam\n\$statuscode [$statuscode]\n\$err [$err],\n\$data [$data]\n\$param->url $param->{url}";
+
   }
-return undef;
+
+  RemoveInternalTimer( $hash, \&APIAuth );
+  InternalTimer( gettimeofday() + $interval, \&APIAuth, $hash, 0 );
+  return undef;
+
 }
 
 
@@ -382,155 +396,162 @@ sub getMowerResponse {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
+  my $statuscode = $param->{code};
+  my $interval = $hash->{helper}{interval};
   my $iam = "$type $name getMowerResponse:";
   my $mowerNumber = $hash->{helper}{mowerNumber};
   
-  if($err ne "") {
+  Log3 $name, 1, "\ndebug $iam \n\$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}" if ( AttrVal($name, 'debug', '') );
+  
+  if( !$err && $statuscode == 200 && $data) {
     
-    Log3 $name, 2, "$iam request error ".$param->{url}." - $err";
-    
-  } elsif ( $data ) {
     if ( $data eq "[]" ) {
       
-      Log3 $name, 2, "$iam Please register an automower first";
-
+      Log3 $name, 2, "$iam no mower data present";
+      
     } else {
 
-      #Log3 $name, 5, $data; 
-      
       my $result = eval { decode_json($data) };
       if ($@) {
+
         Log3( $name, 2, "$iam - JSON error while request: $@");
-        return undef;
-      }
-      if ($result->{message}) {
-        Log3( $name, 2, "$iam - API error while request: $data");
-        return undef;
-      }
-      $hash->{helper}{mowers} = $result->{data};
-      my $maxMower = @{$hash->{helper}{mowers}};
-      if ($maxMower <= $mowerNumber || $mowerNumber < 0 ) {
 
-        Log3 $name, 2, "$iam mower number $mowerNumber not available. Change definition of $name.";
-        return undef;
-
-      }
-      my $foundMower .= '0 => '.$hash->{helper}{mowers}[0]{attributes}{system}{name};
-      for (my $i = 1; $i < $maxMower; $i++) {
-        $foundMower .= ' | '.$i.' => '.$hash->{helper}{mowers}[$i]{attributes}{system}{name};
-      }
-      Log3 $name, 5, "$iam found $foundMower ";
-
-      if ( defined ($hash->{helper}{mower}{id}) ){
-
-        $hash->{helper}{mowerold} = dclone( $hash->{helper}{mower} );
-        
       } else {
 
-        $hash->{helper}{mowerold} = dclone( $hash->{helper}{mowers}[$mowerNumber] );
-        
-        $hash->{helper}{searchpos} = [ dclone( $hash->{helper}{mowerold}{attributes}{positions}[0] ), dclone( $hash->{helper}{mowerold}{attributes}{positions}[1] ) ];
+        $hash->{helper}{mowers} = $result->{data};
+        my $maxMower = 0;
+        $maxMower = @{$hash->{helper}{mowers}} if ( ref ( $hash->{helper}{mowers} ) eq 'ARRAY' );
+        if ($maxMower <= $mowerNumber || $mowerNumber < 0 ) {
 
-        $hash->{helper}{areapos} = [ dclone( $hash->{helper}{mowerold}{attributes}{positions}[0] ), dclone( $hash->{helper}{mowerold}{attributes}{positions}[1] ) ];
-        $hash->{helper}{areapos}[0]{statusTimestamp} = $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
-        $hash->{helper}{areapos}[1]{statusTimestamp} = $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} - 12000;
+          Log3 $name, 2, "$iam wrong mower number $mowerNumber ($maxMower mower available). Change definition of $name.";
+          return undef;
 
-        $hash->{helper}{cspos} = [ dclone( $hash->{helper}{mowerold}{attributes}{positions}[0] ), dclone( $hash->{helper}{mowerold}{attributes}{positions}[1] ) ];
-        $hash->{helper}{cspos}[0]{statusTimestamp} = $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
-        $hash->{helper}{cspos}[1]{statusTimestamp} = $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} - 600000;
-      }
-
-      $hash->{helper}{mower} = dclone( $hash->{helper}{mowers}[$mowerNumber] );
-      my $storediff = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
-      if ($storediff) {
-        AlignArray( $hash );
-        FW_detailFn_Update ($hash) if (AttrVal($name,'showMap',1));
-        
-      }
-
-      # Update readings
-      readingsBeginUpdate($hash);
-
-        readingsBulkUpdateIfChanged($hash, "batteryPercent", $hash->{helper}{mower}{attributes}{battery}{batteryPercent} ); 
-        readingsBulkUpdateIfChanged($hash, 'api_MowerFound', $foundMower );
-        my $pref = 'mower';
-        readingsBulkUpdateIfChanged($hash, $pref.'_id', $hash->{helper}{mower}{id} );
-        readingsBulkUpdateIfChanged($hash, $pref.'_mode', $hash->{helper}{mower}{attributes}{$pref}{mode} );
-        readingsBulkUpdateIfChanged($hash, $pref.'_activity', $hash->{helper}{mower}{attributes}{$pref}{activity} );
-        readingsBulkUpdateIfChanged($hash, $pref.'_state', $hash->{helper}{mower}{attributes}{$pref}{state} );
-        readingsBulkUpdateIfChanged($hash, $pref.'_commandStatus', 'cleared' );
-        my $tstamp = $hash->{helper}{mower}{attributes}{$pref}{errorCodeTimestamp};
-        my $timestamp = FmtDateTime($tstamp/1000);
-        readingsBulkUpdateIfChanged($hash, $pref."_errorCodeTimestamp", $tstamp ? $timestamp : '-' );
-        my $errc = $hash->{helper}{mower}{attributes}{$pref}{errorCode};
-        readingsBulkUpdateIfChanged($hash, $pref.'_errorCode', $tstamp ? $errc  : '-');
-        my $errd = $hash->{helper}{errortable}{$errc};
-        readingsBulkUpdateIfChanged($hash, $pref.'_errorDescription', $tstamp ? $errd : '-');
-        $pref = 'system';
-        readingsBulkUpdateIfChanged($hash, $pref."_name", $hash->{helper}{mower}{attributes}{$pref}{name} );
-        my $model = $hash->{helper}{mower}{attributes}{$pref}{model};
-        $model =~ s/AUTOMOWER./AUTOMOWER®/;
-        $hash->{MODEL} = $model if ( $model && $hash->{MODEL} ne $model );
-        # readingsBulkUpdateIfChanged($hash, $pref."_model", $model );
-        readingsBulkUpdateIfChanged($hash, $pref."_serialNumber", $hash->{helper}{mower}{attributes}{$pref}{serialNumber} );
-        $pref = 'planner';
-        readingsBulkUpdateIfChanged($hash, "planner_restrictedReason", $hash->{helper}{mower}{attributes}{$pref}{restrictedReason} );
-        readingsBulkUpdateIfChanged($hash, "planner_overrideAction", $hash->{helper}{mower}{attributes}{$pref}{override}{action} );
-        
-        $tstamp = $hash->{helper}{mower}{attributes}{$pref}{nextStartTimestamp};
-        $timestamp = FmtDateTime($tstamp/1000);
-        readingsBulkUpdateIfChanged($hash, "planner_nextStart", $tstamp ? $timestamp : '-' );  
-        $pref = 'statistics';
-        readingsBulkUpdateIfChanged($hash, $pref."_numberOfChargingCycles", $hash->{helper}->{mower}{attributes}{$pref}{numberOfChargingCycles} );
-        readingsBulkUpdateIfChanged($hash, $pref."_totalCuttingTime", $hash->{helper}->{mower}{attributes}{$pref}{totalCuttingTime} );
-        readingsBulkUpdateIfChanged($hash, $pref."_totalChargingTime", $hash->{helper}->{mower}{attributes}{$pref}{totalChargingTime} );
-        readingsBulkUpdateIfChanged($hash, $pref."_totalSearchingTime", $hash->{helper}->{mower}{attributes}{$pref}{totalSearchingTime} );
-        readingsBulkUpdateIfChanged($hash, $pref."_numberOfCollisions", $hash->{helper}->{mower}{attributes}{$pref}{numberOfCollisions} );
-        readingsBulkUpdateIfChanged($hash, $pref."_totalRunningTime", $hash->{helper}->{mower}{attributes}{$pref}{totalRunningTime} );
-        $pref = 'settings';
-        readingsBulkUpdateIfChanged($hash, $pref."_headlight", $hash->{helper}->{mower}{attributes}{$pref}{headlight}{mode} );
-        readingsBulkUpdateIfChanged($hash, $pref."_cuttingHeight", $hash->{helper}->{mower}{attributes}{$pref}{cuttingHeight} );
-        $pref = 'status';
-        readingsBulkUpdateIfChanged($hash, $pref."_connected", $hash->{helper}{mower}{attributes}{metadata}{connected} );
-        readingsBulkUpdateIfChanged($hash, $pref."_Timestamp", FmtDateTime( $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp}/1000 ));
-        readingsBulkUpdateIfChanged($hash, $pref."_TimestampDiff", $storediff/1000 );
-        readingsBulkUpdateIfChanged($hash, $pref."_TimestampOld", FmtDateTime( $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp}/1000 ));
-        $pref = 'positions';
-        readingsBulkUpdateIfChanged($hash, $pref."_lastLatitude", $hash->{helper}{mower}{attributes}{$pref}[0]{latitude} );
-        readingsBulkUpdateIfChanged($hash, $pref."_lastLongitude", $hash->{helper}{mower}{attributes}{$pref}[0]{longitude} );
-        readingsBulkUpdateIfChanged($hash, 'state', 'connected' );
-
-        my @time = localtime();
-        my $secs = ( $time[2] * 3600 ) + ( $time[1] * 60 ) + $time[0];
-        my $interval = $hash->{helper}->{interval};
-        # do at midnight
-        if ( $secs <= $interval ) {
-
-          readingsBulkUpdateIfChanged( $hash, 'statistics_lastDayTrack', ReadingsNum( $name, 'statistics_currentDayTrack', 0 ));
-          readingsBulkUpdateIfChanged( $hash, 'statistics_lastDayArea', ReadingsNum( $name, 'statistics_currentDayArea', 0 ));
-          readingsBulkUpdateIfChanged( $hash, 'statistics_currentWeekTrack', ReadingsNum( $name, 'statistics_currentWeekTrack', 0 ) + ReadingsNum( $name, 'statistics_currentDayTrack', 0 ));
-          readingsBulkUpdateIfChanged( $hash, 'statistics_currentWeekArea', ReadingsNum( $name, 'statistics_currentWeekArea', 0 ) + ReadingsNum( $name, 'statistics_currentDayArea', 0 ));
-          readingsBulkUpdateIfChanged( $hash, 'statistics_currentDayTrack', 0, 0);
-          readingsBulkUpdateIfChanged( $hash, 'statistics_currentDayArea', 0, 0);
-         # do on mondays
-          if ( $time[6] == 1 && $secs <= $interval ) {
-
-            readingsBulkUpdateIfChanged( $hash, 'statistics_lastWeekTrack', ReadingsNum( $name, 'statistics_currentWeekTrack', 0 ));
-            readingsBulkUpdateIfChanged( $hash, 'statistics_lastWeekArea', ReadingsNum( $name, 'statistics_currentWeekArea', 0 ));
-            readingsBulkUpdateIfChanged( $hash, 'statistics_currentWeekTrack', 0, 0);
-            readingsBulkUpdateIfChanged( $hash, 'statistics_currentWeekArea', 0, 0);
-
-          }
         }
-      readingsEndUpdate($hash, 1);
-      
-      RemoveInternalTimer( $hash, \&APIAuth );
-      InternalTimer( gettimeofday() + $interval, \&APIAuth, $hash, 0 );
-      
+        my $foundMower .= '0 => '.$hash->{helper}{mowers}[0]{attributes}{system}{name};
+        for (my $i = 1; $i < $maxMower; $i++) {
+          $foundMower .= ' | '.$i.' => '.$hash->{helper}{mowers}[$i]{attributes}{system}{name};
+        }
+        Log3 $name, 5, "$iam found $foundMower ";
+
+        if ( defined ($hash->{helper}{mower}{id}) ){
+
+          $hash->{helper}{mowerold} = dclone( $hash->{helper}{mower} );
+          
+        } else {
+
+          $hash->{helper}{mowerold} = dclone( $hash->{helper}{mowers}[$mowerNumber] );
+          
+          $hash->{helper}{searchpos} = [ dclone( $hash->{helper}{mowerold}{attributes}{positions}[0] ), dclone( $hash->{helper}{mowerold}{attributes}{positions}[1] ) ];
+
+          $hash->{helper}{areapos} = [ dclone( $hash->{helper}{mowerold}{attributes}{positions}[0] ), dclone( $hash->{helper}{mowerold}{attributes}{positions}[1] ) ];
+          $hash->{helper}{areapos}[0]{statusTimestamp} = $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
+          $hash->{helper}{areapos}[1]{statusTimestamp} = $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} - 12000;
+
+          $hash->{helper}{cspos} = [ dclone( $hash->{helper}{mowerold}{attributes}{positions}[0] ), dclone( $hash->{helper}{mowerold}{attributes}{positions}[1] ) ];
+          $hash->{helper}{cspos}[0]{statusTimestamp} = $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
+          $hash->{helper}{cspos}[1]{statusTimestamp} = $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} - 600000;
+        }
+
+        $hash->{helper}{mower} = dclone( $hash->{helper}{mowers}[$mowerNumber] );
+        my $storediff = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
+        if ($storediff) {
+
+          AlignArray( $hash );
+          FW_detailFn_Update ($hash) if (AttrVal($name,'showMap',1));
+
+        }
+
+        # Update readings
+        readingsBeginUpdate($hash);
+
+          readingsBulkUpdateIfChanged($hash, "batteryPercent", $hash->{helper}{mower}{attributes}{battery}{batteryPercent} ); 
+          readingsBulkUpdateIfChanged($hash, 'api_MowerFound', $foundMower );
+          my $pref = 'mower';
+          readingsBulkUpdateIfChanged($hash, $pref.'_id', $hash->{helper}{mower}{id} );
+          readingsBulkUpdateIfChanged($hash, $pref.'_mode', $hash->{helper}{mower}{attributes}{$pref}{mode} );
+          readingsBulkUpdateIfChanged($hash, $pref.'_activity', $hash->{helper}{mower}{attributes}{$pref}{activity} );
+          readingsBulkUpdateIfChanged($hash, $pref.'_state', $hash->{helper}{mower}{attributes}{$pref}{state} );
+          readingsBulkUpdateIfChanged($hash, $pref.'_commandStatus', 'cleared' );
+          my $tstamp = $hash->{helper}{mower}{attributes}{$pref}{errorCodeTimestamp};
+          my $timestamp = FmtDateTime($tstamp/1000);
+          readingsBulkUpdateIfChanged($hash, $pref."_errorCodeTimestamp", $tstamp ? $timestamp : '-' );
+          my $errc = $hash->{helper}{mower}{attributes}{$pref}{errorCode};
+          readingsBulkUpdateIfChanged($hash, $pref.'_errorCode', $tstamp ? $errc  : '-');
+          my $errd = $hash->{helper}{errortable}{$errc};
+          readingsBulkUpdateIfChanged($hash, $pref.'_errorDescription', $tstamp ? $errd : '-');
+          $pref = 'system';
+          readingsBulkUpdateIfChanged($hash, $pref."_name", $hash->{helper}{mower}{attributes}{$pref}{name} );
+          my $model = $hash->{helper}{mower}{attributes}{$pref}{model};
+          $model =~ s/AUTOMOWER./AUTOMOWER®/;
+          $hash->{MODEL} = $model if ( $model && $hash->{MODEL} ne $model );
+          # readingsBulkUpdateIfChanged($hash, $pref."_model", $model );
+          readingsBulkUpdateIfChanged($hash, $pref."_serialNumber", $hash->{helper}{mower}{attributes}{$pref}{serialNumber} );
+          $pref = 'planner';
+          readingsBulkUpdateIfChanged($hash, "planner_restrictedReason", $hash->{helper}{mower}{attributes}{$pref}{restrictedReason} );
+          readingsBulkUpdateIfChanged($hash, "planner_overrideAction", $hash->{helper}{mower}{attributes}{$pref}{override}{action} );
+          
+          $tstamp = $hash->{helper}{mower}{attributes}{$pref}{nextStartTimestamp};
+          $timestamp = FmtDateTime($tstamp/1000);
+          readingsBulkUpdateIfChanged($hash, "planner_nextStart", $tstamp ? $timestamp : '-' );  
+          $pref = 'statistics';
+          readingsBulkUpdateIfChanged($hash, $pref."_numberOfChargingCycles", $hash->{helper}->{mower}{attributes}{$pref}{numberOfChargingCycles} );
+          readingsBulkUpdateIfChanged($hash, $pref."_totalCuttingTime", $hash->{helper}->{mower}{attributes}{$pref}{totalCuttingTime} );
+          readingsBulkUpdateIfChanged($hash, $pref."_totalChargingTime", $hash->{helper}->{mower}{attributes}{$pref}{totalChargingTime} );
+          readingsBulkUpdateIfChanged($hash, $pref."_totalSearchingTime", $hash->{helper}->{mower}{attributes}{$pref}{totalSearchingTime} );
+          readingsBulkUpdateIfChanged($hash, $pref."_numberOfCollisions", $hash->{helper}->{mower}{attributes}{$pref}{numberOfCollisions} );
+          readingsBulkUpdateIfChanged($hash, $pref."_totalRunningTime", $hash->{helper}->{mower}{attributes}{$pref}{totalRunningTime} );
+          $pref = 'settings';
+          readingsBulkUpdateIfChanged($hash, $pref."_headlight", $hash->{helper}->{mower}{attributes}{$pref}{headlight}{mode} );
+          readingsBulkUpdateIfChanged($hash, $pref."_cuttingHeight", $hash->{helper}->{mower}{attributes}{$pref}{cuttingHeight} );
+          $pref = 'status';
+          readingsBulkUpdateIfChanged($hash, $pref."_connected", $hash->{helper}{mower}{attributes}{metadata}{connected} );
+          readingsBulkUpdateIfChanged($hash, $pref."_Timestamp", FmtDateTime( $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp}/1000 ));
+          readingsBulkUpdateIfChanged($hash, $pref."_TimestampDiff", $storediff/1000 );
+          readingsBulkUpdateIfChanged($hash, $pref."_TimestampOld", FmtDateTime( $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp}/1000 ));
+          $pref = 'positions';
+          readingsBulkUpdateIfChanged($hash, $pref."_lastLatitude", $hash->{helper}{mower}{attributes}{$pref}[0]{latitude} );
+          readingsBulkUpdateIfChanged($hash, $pref."_lastLongitude", $hash->{helper}{mower}{attributes}{$pref}[0]{longitude} );
+          readingsBulkUpdateIfChanged($hash, 'state', 'connected' );
+
+          my @time = localtime();
+          my $secs = ( $time[2] * 3600 ) + ( $time[1] * 60 ) + $time[0];
+          my $interval = $hash->{helper}->{interval};
+          # do at midnight
+          if ( $secs <= $interval ) {
+
+            readingsBulkUpdateIfChanged( $hash, 'statistics_lastDayTrack', ReadingsNum( $name, 'statistics_currentDayTrack', 0 ));
+            readingsBulkUpdateIfChanged( $hash, 'statistics_lastDayArea', ReadingsNum( $name, 'statistics_currentDayArea', 0 ));
+            readingsBulkUpdateIfChanged( $hash, 'statistics_currentWeekTrack', ReadingsNum( $name, 'statistics_currentWeekTrack', 0 ) + ReadingsNum( $name, 'statistics_currentDayTrack', 0 ));
+            readingsBulkUpdateIfChanged( $hash, 'statistics_currentWeekArea', ReadingsNum( $name, 'statistics_currentWeekArea', 0 ) + ReadingsNum( $name, 'statistics_currentDayArea', 0 ));
+            readingsBulkUpdateIfChanged( $hash, 'statistics_currentDayTrack', 0, 0);
+            readingsBulkUpdateIfChanged( $hash, 'statistics_currentDayArea', 0, 0);
+           # do on mondays
+            if ( $time[6] == 1 && $secs <= $interval ) {
+
+              readingsBulkUpdateIfChanged( $hash, 'statistics_lastWeekTrack', ReadingsNum( $name, 'statistics_currentWeekTrack', 0 ));
+              readingsBulkUpdateIfChanged( $hash, 'statistics_lastWeekArea', ReadingsNum( $name, 'statistics_currentWeekArea', 0 ));
+              readingsBulkUpdateIfChanged( $hash, 'statistics_currentWeekTrack', 0, 0);
+              readingsBulkUpdateIfChanged( $hash, 'statistics_currentWeekArea', 0, 0);
+
+            }
+          }
+        readingsEndUpdate($hash, 1);
+        
+        RemoveInternalTimer( $hash, \&APIAuth );
+        InternalTimer( gettimeofday() + $interval, \&APIAuth, $hash, 0 );
+        return undef;
+
+      }
     }
     
+  } else {
+
+    readingsSingleUpdate( $hash, 'state', "error statuscode $statuscode", 1 );
+    Log3 $name, 1, "\ndebug $iam \n\$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}";
+
   }
-  
+  RemoveInternalTimer( $hash, \&APIAuth );
+  InternalTimer( gettimeofday() + $interval, \&APIAuth, $hash, 0 );
   return undef;
 
 }
@@ -607,44 +628,47 @@ sub CMDResponse {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
+  my $statuscode = $param->{code};
+  my $interval = $hash->{helper}{interval};
   my $iam = "$type $name CMDResponse:";
 
-  if($err ne "") {
-      readingsSingleUpdate( $hash, 'state', 'error', 1 );
-      Log3 $name, 2, "$iam error while requesting ".$param->{url}." - $err";     
-                                         
-  } elsif($data ne "") {
+  Log3 $name, 1, "\ndebug $iam \n\$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}" if ( AttrVal($name, 'debug', '') );
+
+  if( !$err && $statuscode == 202 && $data ) {
 
     my $result = eval { decode_json($data) };
     if ($@) {
+
       Log3( $name, 2, "$iam - JSON error while request: $@");
-      return;
-    }
 
-    $hash->{helper}{CMDResponse} = $result;
-    if ($result->{message}) {
-      readingsSingleUpdate( $hash, 'state', 'error', 1 );
-      Log3 $name, 2, "$iam" . $data;
-      $hash->{helper}->{mower_commandStatus} = $result->{message};
-
-    } elsif ($result->{errors}) {
-      Log3 $name, 2, "$iam" . $data;
-      readingsSingleUpdate( $hash, 'state', 'error', 1 );
-      $hash->{helper}->{mower_commandStatus} = 'ERROR - '. $result->{errors}[0]{title};
-   } elsif ($result->{data}) {
-      Log3 $name, 5, $data; 
-      if ( ref ($result->{data}) eq 'ARRAY') {
-      $hash->{helper}->{mower_commandStatus} = 'OK - '. $result->{data}[0]{type};
     } else {
-      $hash->{helper}->{mower_commandStatus} = 'OK - '. $result->{data}{type};
-    }
+
+      $hash->{helper}{CMDResponse} = $result;
+      if ($result->{data}) {
+        
+        Log3 $name, 5, $data; 
+        if ( ref ($result->{data}) eq 'ARRAY') {
+
+        $hash->{helper}->{mower_commandStatus} = 'OK - '. $result->{data}[0]{type};
+
+        } else {
+
+        $hash->{helper}->{mower_commandStatus} = 'OK - '. $result->{data}{type};
+
+        }
+
+        readingsSingleUpdate($hash, 'mower_commandStatus', $hash->{helper}->{mower_commandStatus} ,1);
+        return undef;
+
+      }
 
     }
-
-    readingsSingleUpdate($hash, 'mower_commandStatus', $hash->{helper}->{mower_commandStatus} ,1);
 
   }
 
+  readingsSingleUpdate($hash, 'mower_commandStatus', "ERROR statuscode $statuscode" ,1);
+  Log3 $name, 2, "\n$iam \n\$statuscode [$statuscode]\n\$err [$err],\n\$data [$data]\n\$param->url $param->{url}";
+  return undef;
 }
 
 #########################
@@ -652,7 +676,7 @@ sub Get {
   my ($hash,@val) = @_;
   my $type = $hash->{TYPE};
 
-  return "$type $hash->{NAME} Get: needs at least an argument" if ( @val < 2 );
+  return "$type $hash->{NAME} Get: needs at least one argument" if ( @val < 2 );
 
   my ($name,$setName,$setVal,$setVal2,$setVal3) = @val;
   my $iam = "$type $name Get:";
@@ -671,7 +695,7 @@ sub Set {
   my ($hash,@val) = @_;
   my $type = $hash->{TYPE};
 
-  return "$type $hash->{NAME} Set: needs at least an argument" if ( @val < 2 );
+  return "$type $hash->{NAME} Set: needs at least one argument" if ( @val < 2 );
 
   my ($name,$setName,$setVal,$setVal2,$setVal3) = @val;
   my $iam = "$type $name Set:";
@@ -705,6 +729,8 @@ sub Set {
       my ($passResp, $passErr) = $hash->{helper}->{passObj}->setStorePassword($name, $setVal);
       Log3 $name, 1, "$iam error: $passErr" if ($passErr);
       return "$iam $passErr" if( $passErr );
+      RemoveInternalTimer($hash, \&APIAuth);
+      APIAuth($hash);
       return undef;
     }
 
@@ -721,18 +747,16 @@ sub Set {
     }
 
   } elsif ( !IsDisabled($name) && $setName eq 'getNewAccessToken' ) {
-    if ( $setVal ) {
 
-      readingsBeginUpdate($hash);
-        readingsBulkUpdateIfChanged( $hash, '.access_token', '', 0 );
-        readingsBulkUpdateIfChanged( $hash, 'state', 'initialized');
-        readingsBulkUpdateIfChanged( $hash, 'mower_commandStatus', 'cleared');
-      readingsEndUpdate($hash, 1);
+    readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, '.access_token', '', 0 );
+      readingsBulkUpdateIfChanged( $hash, 'state', 'initialized');
+      readingsBulkUpdateIfChanged( $hash, 'mower_commandStatus', 'cleared');
+    readingsEndUpdate($hash, 1);
 
       RemoveInternalTimer($hash, \&APIAuth);
       APIAuth($hash);
       return undef;
-    }
 
   } elsif (ReadingsVal( $name, 'state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /ParkUntilFurtherNotice|ParkUntilNextSchedule|Pause|ResumeSchedule|sendScheduleFromAttributeToMower/) {
     sendCMD($hash,$setName);
