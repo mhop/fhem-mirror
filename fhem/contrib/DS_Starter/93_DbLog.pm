@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 27111 2023-01-23 19:06:28Z DS_Starter $
+# $Id: 93_DbLog.pm 27111 2023-01-28 19:06:28Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -4909,6 +4909,71 @@ return ($err, @res);
 }
 
 #################################################################
+#  einfaches Query prepare, Rückgabe Statement Handle                  
+#################################################################
+sub __DbLog_SBP_prepareOnly {
+  my $name       = shift;
+  my $dbh        = shift;
+  my $query      = shift;
+  my $subprocess = shift // q{};
+
+  my $err = q{};
+  my $sth;
+  
+  eval{ $sth = $dbh->prepare ($query);
+        1;
+      }
+      or do { $err = $@;
+              if ($subprocess) {
+                  _DbLog_SBP_Log3Parent ( { name       => $name,
+                                            level      => 2,
+                                            msg        => qq(ERROR - $err),
+                                            oper       => 'log3parent',
+                                            subprocess => $subprocess
+                                          }
+                                        );
+              }
+              else {
+                  Log3 ($name, 2, qq{DbLog $name - ERROR - $err});
+              }
+            };
+
+return ($err, $sth);
+}
+
+#################################################################
+#  einfaches Query execute                                        
+#################################################################
+sub __DbLog_SBP_executeOnly {
+  my $name       = shift;
+  my $sth        = shift;
+  my $subprocess = shift // q{};
+
+  my $err = q{};
+  my $result;
+  
+  eval{ $result = $sth->execute();
+        1;
+      }
+      or do { $err = $@;
+              if ($subprocess) {
+                  _DbLog_SBP_Log3Parent ( { name       => $name,
+                                            level      => 2,
+                                            msg        => qq(ERROR - $err),
+                                            oper       => 'log3parent',
+                                            subprocess => $subprocess
+                                          }
+                                        );
+              }
+              else {
+                  Log3 ($name, 2, qq{DbLog $name - ERROR - $err});
+              }
+            };
+
+return ($err, $sth, $result);
+}
+
+#################################################################
 #    erstellt Statement Handle für Insert Daten in die
 #    angegebene Tabelle
 #################################################################
@@ -5895,22 +5960,22 @@ sub _DbLog_chartQuery {
   my $totalcount;
 
   if (defined $countsql && $countsql ne "") {
-      my $query_handle = $dbh->prepare($countsql)
-      or return DbLog_jsonError("Could not prepare statement: " . $dbh->errstr . ", SQL was: " .$countsql);
+      ($err, my $query_handle) = __DbLog_SBP_prepareOnly ($name, $dbh, $countsql);
+      return DbLog_jsonError("Could not prepare statement: " .$err. ", SQL was: " .$countsql) if($err);
 
-      $query_handle->execute()
-      or return DbLog_jsonError("Could not execute statement: " . $query_handle->errstr);
+      ($err, $query_handle) = __DbLog_SBP_executeOnly ($name, $query_handle);
+      return DbLog_jsonError("Could not execute statement: " . $err) if($err);
 
       my @data = $query_handle->fetchrow_array();
       $totalcount = join ", ", @data;
   }
 
-  my $query_handle = $dbh->prepare($sql)                                                                  
-      or return DbLog_jsonError("Could not prepare statement: " . $dbh->errstr . ", SQL was: " .$sql);    # prepare the query
-
-  $query_handle->execute()                                                             
-      or return DbLog_jsonError("Could not execute statement: " . $query_handle->errstr);                 # execute the query
-
+  ($err, my $query_handle) = __DbLog_SBP_prepareOnly ($name, $dbh, $sql);
+  return DbLog_jsonError("Could not prepare statement: " .$err. ", SQL was: " .$sql) if($err);
+   
+  ($err, $query_handle) = __DbLog_SBP_executeOnly ($name, $query_handle);
+  return DbLog_jsonError("Could not execute statement: " . $err) if($err);
+      
   my $columns = $query_handle->{'NAME'};
   my $columncnt;
 
@@ -8966,7 +9031,7 @@ return;
   <br>
 
   <ul>
-    <a id="DbLog-get-ReadingsMaxVal"></a>
+    <a id="DbLog-get-ReadingsMaxVal" data-pattern="ReadingsMaxVal.*"></a>
     <li><b>get &lt;name&gt; ReadingsMaxVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
     <ul>
       Determines the record with the largest value of the specified Device / Reading combination from the history table. <br>
@@ -8978,14 +9043,15 @@ return;
 
       <b>Note:</b> <br>
       This database retrieval works blocking and influences FHEM if the database does not respond or not responds
-      sufficiently fast.
+      sufficiently fast. For non-blocking database queries is referred to the module DbRep.
+      .
     </ul>
   </ul>
   </li>
   <br>
 
   <ul>
-    <a id="DbLog-get-ReadingsMinVal"></a>
+    <a id="DbLog-get-ReadingsMinVal" data-pattern="ReadingsMinVal.*"></a>
     <li><b>get &lt;name&gt; ReadingsMinVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
     <ul>
       Determines the record with the smallest value of the specified device / reading combination from the history table. <br>
@@ -8997,7 +9063,7 @@ return;
 
       <b>Note:</b> <br>
       This database retrieval works blocking and influences FHEM if the database does not respond or not responds
-      sufficiently fast.
+      sufficiently fast. For non-blocking database queries is referred to the module DbRep.
     </ul>
   </ul>
   </li>
@@ -9015,14 +9081,14 @@ return;
 
       <b>Note:</b> <br>
       This database retrieval works blocking and influences FHEM if the database does not respond or not responds
-      sufficiently fast.
+      sufficiently fast. For non-blocking database queries is referred to the module DbRep.
     </ul>
   </ul>
   </li>
   <br>
 
   <ul>
-    <a id="DbLog-get-ReadingsVal"></a>
+    <a id="DbLog-get-ReadingsVal" data-pattern="ReadingsVal.*"></a>
     <li><b>get &lt;name&gt; ReadingsVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
     <ul>
       Reads the last (newest) record stored in the history table of the specified Device / Reading
@@ -9035,7 +9101,7 @@ return;
 
       <b>Note:</b> <br>
       This database retrieval works blocking and influences FHEM if the database does not respond or not responds
-      sufficiently fast.
+      sufficiently fast. For non-blocking database queries is referred to the module DbRep.
     </ul>
   </ul>
   </li>
@@ -9053,14 +9119,14 @@ return;
 
       <b>Note:</b> <br>
       This database retrieval works blocking and influences FHEM if the database does not respond or not responds
-      sufficiently fast.
+      sufficiently fast. For non-blocking database queries is referred to the module DbRep.
     </ul>
   </ul>
   </li>
   <br>
   <br>
   
-<b>Get</b> for the use of plot data
+<b>Get</b> for the use of SVG plots
   <br>
   <br>
 
@@ -9284,27 +9350,34 @@ return;
       <br>
 
       <li>&lt;xaxis&gt;<br>
-        A string which represents the xaxis</li>
+        A string which represents the xaxis. It must be a valid field name of the history table, like e.g.
+        TIMESTAMP.
+      </li>
       <br>
 
       <li>&lt;yaxis&gt;<br>
-         A string representing the Y-axis to be set to the name of the reading to be evaluated. </li>
+         A string representing the Y-axis to be set to the name of the reading to be evaluated. 
+      </li>
       <br>
 
       <li>&lt;savename&gt;<br>
-         A string which represents the name a chart will be saved with</li>
+         A string which represents the name a chart will be saved with.
+      </li>
       <br>
 
       <li>&lt;chartconfig&gt;<br>
-         A jsonstring which represents the chart to save</li>
+         A jsonstring which represents the chart to save.
+      </li>
       <br>
 
       <li>&lt;pagingstart&gt;<br>
-         An integer used to determine the start for the sql used for query 'getTableData'</li>
+         An integer used to determine the start for the sql used for query 'getTableData'.
+      </li>
       <br>
 
       <li>&lt;paginglimit&gt;<br>
-         An integer used to set the limit for the sql used for query 'getTableData'</li>
+         An integer used to set the limit for the sql used for query 'getTableData'.
+      </li>
       <br>
     </ul>
 
@@ -10763,7 +10836,8 @@ attr SMA_Energymeter DbLogValueFn
 
       <b>Hinweis:</b> <br>
       Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
-      hinreichend schnell antwortet.
+      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep 
+      verwiesen.
     </ul>
   </ul>
   </li>
@@ -10782,7 +10856,8 @@ attr SMA_Energymeter DbLogValueFn
 
       <b>Hinweis:</b> <br>
       Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
-      hinreichend schnell antwortet.
+      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep 
+      verwiesen.
     </ul>
   </ul>
   </li>
@@ -10800,7 +10875,8 @@ attr SMA_Energymeter DbLogValueFn
 
       <b>Hinweis:</b> <br>
       Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
-      hinreichend schnell antwortet.
+      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep 
+      verwiesen.
     </ul>
   </ul>
   </li>
@@ -10820,7 +10896,8 @@ attr SMA_Energymeter DbLogValueFn
 
       <b>Hinweis:</b> <br>
       Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
-      hinreichend schnell antwortet.
+      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep 
+      verwiesen.
     </ul>
   </ul>
   </li>
@@ -10838,14 +10915,15 @@ attr SMA_Energymeter DbLogValueFn
 
       <b>Hinweis:</b> <br>
       Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
-      hinreichend schnell antwortet.
+      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep 
+      verwiesen.
     </ul>
   </ul>
   </li>
   <br>
   <br>
   
-<b>Get</b> für die Nutzung von Plot-Daten
+<b>Get</b> für die Nutzung von SVG-Plots
   <br>
   <br>
 
@@ -11077,7 +11155,8 @@ attr SMA_Energymeter DbLogValueFn
       <br>
 
       <li>&lt;xaxis&gt;<br>
-        Ein String, der die X-Achse repräsentiert
+        Ein String, der die X-Achse repräsentiert. Es muß ein gültiger Feldname der history-Tabelle sein, wie z.B.
+        TIMESTAMP.
       </li>
       <br>
 
@@ -11087,22 +11166,22 @@ attr SMA_Energymeter DbLogValueFn
       <br>
 
       <li>&lt;savename&gt;<br>
-         Ein String, unter dem ein Chart in der Datenbank gespeichert werden soll
+         Ein String, unter dem ein Chart in der Datenbank gespeichert werden soll.
       </li>
       <br>
 
       <li>&lt;chartconfig&gt;<br>
-         Ein jsonstring der den zu speichernden Chart repräsentiert
+         Ein jsonstring der den zu speichernden Chart repräsentiert.
       </li>
       <br>
 
       <li>&lt;pagingstart&gt;<br>
-         Ein Integer um den Startwert für die Abfrage 'getTableData' festzulegen
+         Ein Integer um den Startwert für die Abfrage 'getTableData' festzulegen.
       </li>
       <br>
 
       <li>&lt;paginglimit&gt;<br>
-         Ein Integer um den Limitwert für die Abfrage 'getTableData' festzulegen
+         Ein Integer um den Limitwert für die Abfrage 'getTableData' festzulegen.
       </li>
       <br>
       </ul>
