@@ -132,6 +132,7 @@ my %DbLog_hget = (                                                              
   ReadingsAvgVal          => { fn => \&_DbLog_dbReadings   },
   webchart                => { fn => \&_DbLog_chartQuery   },
   plotdata                => { fn => \&_DbLog_plotData     },
+  dataRetrieval           => { fn => \&_DbLog_chartQuery   },
 );
 
 my %DbLog_columns = ("DEVICE"  => 64,
@@ -4888,7 +4889,7 @@ return ($err, @res);
 }
 
 #################################################################
-#  einfaches Query prepare, Rückgabe Statement Handle                  
+#  einfaches Query prepare, Rückgabe Statement Handle
 #################################################################
 sub __DbLog_SBP_prepareOnly {
   my $name       = shift;
@@ -4898,7 +4899,7 @@ sub __DbLog_SBP_prepareOnly {
 
   my $err = q{};
   my $sth;
-  
+
   eval{ $sth = $dbh->prepare ($query);
         1;
       }
@@ -4916,7 +4917,7 @@ return ($err, $sth);
 }
 
 #################################################################
-#  einfaches Query execute                                        
+#  einfaches Query execute
 #################################################################
 sub __DbLog_SBP_executeOnly {
   my $name       = shift;
@@ -4925,7 +4926,7 @@ sub __DbLog_SBP_executeOnly {
 
   my $err = q{};
   my $result;
-  
+
   eval{ $result = $sth->execute();
         1;
       }
@@ -5026,7 +5027,7 @@ sub _DbLog_SBP_Log3Parent {
   my $verbose = AttrVal ($name, 'verbose', $attr{global}{verbose});
 
   return if($level > $verbose);
-  
+
   my $msg        = $paref->{msg};
   my $subprocess = $paref->{subprocess};
 
@@ -5806,14 +5807,14 @@ return $sth;
 ################################################################
 sub DbLog_Get {
   my ($hash, @a) = @_;
-  
+
   return qq{"get X" needs at least an argument} if(@a < 2);
-    
+
   my $name       = $hash->{NAME};
   @a             = (map { my $p = $_; $p =~ s/\s//xg; $p; } @a);
-    
+
   shift @a;                                                                    # Device Name wird entfernt
-  
+
   my $opt = $a[0];                                                             # Kommando spezifizieren / ableiten
   $opt    = 'plotdata' if(lc($a[0]) =~ /^(-|current|history)$/ixs);
   $opt    = 'webchart' if($a[1] && lc($a[1]) eq 'webchart');
@@ -5826,9 +5827,9 @@ sub DbLog_Get {
   };
 
   if($DbLog_hget{$opt} && defined &{$DbLog_hget{$opt}{fn}}) {
-      return &{$DbLog_hget{$opt}{fn}} ($params);                              
-  } 
-  
+      return &{$DbLog_hget{$opt}{fn}} ($params);
+  }
+
    my $getlist = "Unknown argument $opt, choose one of ".
                 "ReadingsVal: ".
                 "ReadingsTimestamp ".
@@ -5837,9 +5838,10 @@ sub DbLog_Get {
                 "ReadingsMaxValTimestamp ".
                 "ReadingsMinVal ".
                 "ReadingsMinValTimestamp ".
-                "ReadingsAvgVal "
+                "ReadingsAvgVal ".
+                "dataRetrieval: "
                 ;
-  
+
 return $getlist;
 }
 
@@ -5853,7 +5855,7 @@ return $getlist;
 ########################################################################################
 sub _DbLog_dbReadings {
   my $paref   = shift;
-  
+
   my $hash    = $paref->{hash};
   my @args    = @{$paref->{aref}};
   my $history = $hash->{HELPER}{TH};
@@ -5911,21 +5913,24 @@ return;
 ################################################################
 sub _DbLog_chartQuery {
   my $paref = shift;
-  
+
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my @a     = @{$paref->{aref}};
-  
-  return "Usage: \n".
-         "get $name &lt;in&gt; &lt;out&gt; &lt;from&gt; &lt;to&gt; &lt;column_spec&gt;...\n".
-         "where column_spec is &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;\n".
-         "(see the #DbLog entries in the .gplot files)\n".
-         "\n".
-         "Notes:\n".
-         "&lt;in&gt; is not used, only for compatibility for FileLog, please use '-' for &lt;in&gt; \n".
-         "&lt;out&gt; is a prefix, '-' means stdout\n"
-         if(int(@a) < 4);
-  
+  my $opt   = $paref->{opt};
+
+  if ($opt eq 'webchart') {
+      return "Usage: \n".
+             "get $name &lt;in&gt; &lt;out&gt; &lt;from&gt; &lt;to&gt; &lt;column_spec&gt;...\n".
+             "where column_spec is &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;\n".
+             "(see the #DbLog entries in the .gplot files)\n".
+             "\n".
+             "Notes:\n".
+             "&lt;in&gt; is not used, only for compatibility for FileLog, please use '-' for &lt;in&gt; \n".
+             "&lt;out&gt; is a prefix, '-' means stdout\n"
+             if(int(@a) < 4);
+  }
+
   my ($sql, $countsql) = _DbLog_createQuerySql ($paref);
 
   if ($sql eq "error") {
@@ -5955,14 +5960,14 @@ sub _DbLog_chartQuery {
 
   ($err, my $query_handle) = __DbLog_SBP_prepareOnly ($name, $dbh, $sql);
   return DbLog_jsonError("Could not prepare statement: " .$err. ", SQL was: " .$sql) if($err);
-   
+
   ($err, $query_handle) = __DbLog_SBP_executeOnly ($name, $query_handle);
   return DbLog_jsonError("Could not execute statement: " . $err) if($err);
-      
+
   my $columns = $query_handle->{'NAME'};
   my $columncnt;
 
-  if($columns) {                                                                                          # When columns are empty but execution was successful, we have done a successful INSERT, UPDATE or DELETE
+  if($columns) {                                                                  # When columns are empty but execution was successful, we have done a successful INSERT, UPDATE or DELETE
       $columncnt = scalar @$columns;
   }
   else {
@@ -5970,7 +5975,9 @@ sub _DbLog_chartQuery {
   }
 
   my $i          = 0;
-  my $jsonstring = '{"data":[';
+  my $jsonstring = q({);
+  $jsonstring   .= q("success": "true", ) if($opt eq 'dataRetrieval');
+  $jsonstring   .= q("data":[);
 
   while ( my @data = $query_handle->fetchrow_array()) {
       if($i == 0) {
@@ -5981,12 +5988,12 @@ sub _DbLog_chartQuery {
       }
 
       for ($i = 0; $i < $columncnt; $i++) {
-          $jsonstring .= '"';
+          $jsonstring .= q(");
           $jsonstring .= uc($query_handle->{NAME}->[$i]);
-          $jsonstring .= '":';
+          $jsonstring .= q(":);
 
           if (defined $data[$i]) {
-              my $fragment =  substr($data[$i],0,1);
+              my $fragment =  substr $data[$i], 0, 1;
 
               if ($fragment eq "{") {
                   $jsonstring .= $data[$i];
@@ -6000,20 +6007,20 @@ sub _DbLog_chartQuery {
           }
 
           if($i != ($columncnt -1)) {
-             $jsonstring .= ',';
+             $jsonstring .= q(,);
           }
       }
 
-      $jsonstring .= '}';
+      $jsonstring .= q(});
   }
 
-  $jsonstring .= ']';
+  $jsonstring .= q(]);
 
   if (defined $totalcount && $totalcount ne "") {
       $jsonstring .= ',"totalCount": '.$totalcount.'}';
   }
   else {
-      $jsonstring .= '}';
+      $jsonstring .= q(});
   }
 
 return $jsonstring;
@@ -6024,26 +6031,43 @@ return $jsonstring;
 ################################################################
 sub _DbLog_createQuerySql {
     my $paref = shift;
-   
+
+    my $opt   = $paref->{opt};
     my $hash  = $paref->{hash};
     my @a     = @{$paref->{aref}};
 
-    my $starttime       = $a[2];
-    $starttime          =~ s/_/ /;
-    my $endtime         = $a[3];
-    $endtime            =~ s/_/ /;
-    my $device          = $a[4];
-    my $userquery       = $a[5];
+    my $starttime       = $a[2];                        # <from>
+    my $endtime         = $a[3];                        # <to>
+    my $device          = $a[4];                        # <device>
+    my $querytype       = $a[5];                        # <querytype>
     my $xaxis           = $a[6];                        # ein Datenbankfeld wie TIMESTAMP, READING, DEVICE, UNIT, EVENT
-    my $yaxis           = $a[7];                        # ein Reading Name 
-    my $savename        = $a[8];
-    my $jsonChartConfig = $a[9];
-    my $pagingstart     = $a[10];
-    my $paginglimit     = $a[11];
-    
+    my $reading         = $a[7];                        # ein Reading Name (<yaxis>)
+    my $savename        = $a[8];                        # <savename>
+    my $jsonChartConfig = $a[9];                        # <chartconfig>
+    my $offset          = $a[10];                       # <pagingstart>
+    my $limit           = $a[11];                       # <paginglimit>
+
     my $dbmodel         = $hash->{MODEL};
     my $history         = $hash->{HELPER}{TH};
     my $current         = $hash->{HELPER}{TC};
+
+    if ($opt eq 'dataRetrieval') {
+        $querytype = $a[1];
+        $device    = $a[2];
+        $reading   = $a[3];
+        $starttime = $a[4];
+        $endtime   = $a[5];
+        $offset    = $a[6];
+        $limit     = $a[7];
+        $xaxis     = 'TIMESTAMP';
+        
+        if ($querytype eq 'last') {
+            $limit = '10' if(!$limit);
+        }
+    }
+
+    $starttime =~ s/_/ /;
+    $endtime   =~ s/_/ /;
 
     my ($sql, $jsonstring, $countsql, $hourstats, $daystats, $weekstats, $monthstats, $yearstats);
 
@@ -6052,31 +6076,31 @@ sub _DbLog_createQuerySql {
         ### hour:
         $hourstats  = "SELECT to_char(timestamp, 'YYYY-MM-DD HH24:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
         $hourstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $hourstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $hourstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
         $hourstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
         ### day:
         $daystats  = "SELECT to_char(timestamp, 'YYYY-MM-DD 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
         $daystats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $daystats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $daystats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
         $daystats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
         ### week:
         $weekstats  = "SELECT date_trunc('week',timestamp) AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
         $weekstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $weekstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $weekstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
         $weekstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
         ### month:
         $monthstats  = "SELECT to_char(timestamp, 'YYYY-MM-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
         $monthstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $monthstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $monthstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
         $monthstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
         ### year:
         $yearstats  = "SELECT to_char(timestamp, 'YYYY-01-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
         $yearstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $yearstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $yearstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
         $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
     }
     elsif ($dbmodel eq "MYSQL") {
@@ -6084,32 +6108,32 @@ sub _DbLog_createQuerySql {
         ### hour:
         $hourstats  = "SELECT date_format(timestamp, '%Y-%m-%d %H:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
         $hourstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $hourstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
+        $hourstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
         $hourstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
         ### day:
         $daystats  = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
         $daystats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $daystats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
+        $daystats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
         $daystats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
         ### week:
         $weekstats  = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
         $weekstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $weekstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
+        $weekstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
         $weekstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ";
         $weekstats .= "GROUP BY date_format(timestamp, '%Y-%u 00:00:00') ORDER BY 1;";
 
         ### month:
         $monthstats  = "SELECT date_format(timestamp, '%Y-%m-01 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
         $monthstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $monthstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
+        $monthstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
         $monthstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
         ### year:
         $yearstats  = "SELECT date_format(timestamp, '%Y-01-01 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
         $yearstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $yearstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
+        $yearstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
         $yearstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
     }
     elsif ($dbmodel eq "SQLITE") {
@@ -6117,31 +6141,31 @@ sub _DbLog_createQuerySql {
         ### hour:
         $hourstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
         $hourstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $hourstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $hourstats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
         $hourstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m-%d %H:00:00', TIMESTAMP);";
 
         ### day:
         $daystats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
         $daystats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $daystats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $daystats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
         $daystats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m-%d 00:00:00', TIMESTAMP);";
 
         ### week:
         $weekstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
         $weekstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $weekstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $weekstats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
         $weekstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%W 00:00:00', TIMESTAMP);";
 
         ### month:
         $monthstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
         $monthstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $monthstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $monthstats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
         $monthstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m 00:00:00', TIMESTAMP);";
 
         ### year:
         $yearstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
         $yearstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $yearstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+        $yearstats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
         $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y 00:00:00', TIMESTAMP);";
 
     }
@@ -6149,66 +6173,77 @@ sub _DbLog_createQuerySql {
         $sql = "errordb";
     }
 
-    if($userquery eq "getreadings") {
-        $sql = "SELECT distinct(reading) FROM $history WHERE device = '".$device."'";
+    if($querytype eq 'getreadings') {
+        $sql = "SELECT distinct(reading) FROM $history WHERE device = '$device'";
     }
-    elsif ($userquery eq "getdevices") {
+    elsif ($querytype eq 'getdevices') {
         $sql = "SELECT distinct(device) FROM $history";
     }
-    elsif ($userquery eq "timerange") {
-        $sql = "SELECT ".$xaxis.", VALUE FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ORDER BY TIMESTAMP;";
+    elsif ($querytype eq 'last') {
+        $sql = "SELECT TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT from $history ORDER BY TIMESTAMP DESC LIMIT $limit";
     }
-    elsif ($userquery eq "hourstats") {
+    elsif ($querytype eq 'timerange') {
+        $sql = "SELECT ".$xaxis.", VALUE FROM $history WHERE READING = '$reading' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ORDER BY TIMESTAMP;";
+    }
+    elsif ($querytype eq 'hourstats') {
         $sql = $hourstats;
     }
-    elsif ($userquery eq "daystats") {
+    elsif ($querytype eq 'daystats') {
         $sql = $daystats;
     }
-    elsif ($userquery eq "weekstats") {
+    elsif ($querytype eq 'weekstats') {
         $sql = $weekstats;
     }
-    elsif ($userquery eq "monthstats") {
+    elsif ($querytype eq 'monthstats') {
         $sql = $monthstats;
     }
-    elsif ($userquery eq "yearstats") {
+    elsif ($querytype eq 'yearstats') {
         $sql = $yearstats;
     }
-    elsif ($userquery eq "savechart") {
+    elsif ($querytype eq 'savechart') {
         $sql = "INSERT INTO frontend (TYPE, NAME, VALUE) VALUES ('savedchart', '$savename', '$jsonChartConfig')";
     }
-    elsif ($userquery eq "renamechart") {
+    elsif ($querytype eq 'renamechart') {
         $sql = "UPDATE frontend SET NAME = '$savename' WHERE ID = '$jsonChartConfig'";
     }
-    elsif ($userquery eq "deletechart") {
+    elsif ($querytype eq 'deletechart') {
         $sql = "DELETE FROM frontend WHERE TYPE = 'savedchart' AND ID = '".$savename."'";
     }
-    elsif ($userquery eq "updatechart") {
+    elsif ($querytype eq 'updatechart') {
         $sql = "UPDATE frontend SET VALUE = '$jsonChartConfig' WHERE ID = '".$savename."'";
     }
-    elsif ($userquery eq "getcharts") {
+    elsif ($querytype eq 'getcharts') {
         $sql = "SELECT * FROM frontend WHERE TYPE = 'savedchart'";
     }
-    elsif ($userquery eq "getTableData") {
-        if ($device ne '""' && $yaxis ne '""') {
-            $sql       = "SELECT * FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+    elsif ($querytype eq 'getTableData') {
+        if ($device ne '""' && $reading ne '""') {
+            $sql       = "SELECT * FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
             $sql      .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
-            $sql      .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
+            $sql      .= " LIMIT '$limit' OFFSET '$offset'";
 
-            $countsql  = "SELECT count(*) FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+            $countsql  = "SELECT count(*) FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
             $countsql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
         }
-        elsif ($device ne '""' && $yaxis eq '""') {
+        elsif ($device ne '""' && $reading eq '""') {
             $sql       = "SELECT * FROM $history WHERE DEVICE = '$device' ";
             $sql      .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
-            $sql      .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
+            $sql      .= " LIMIT '$limit' OFFSET '$offset'";
 
             $countsql  = "SELECT count(*) FROM $history WHERE DEVICE = '$device' ";
+            $countsql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
+        }
+        elsif ($device eq '""' && $reading ne '""') {
+            $sql       = "SELECT * FROM $history WHERE READING = '$reading' ";
+            $sql      .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
+            $sql      .= " LIMIT '$limit' OFFSET '$offset'";
+
+            $countsql  = "SELECT count(*) FROM $history WHERE READING = '$reading' ";
             $countsql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
         }
         else {
             $sql       = "SELECT * FROM $history";
             $sql      .= " WHERE TIMESTAMP Between '$starttime' AND '$endtime'";
-            $sql      .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
+            $sql      .= " LIMIT '$limit' OFFSET '$offset'";
 
             $countsql  = "SELECT count(*) FROM $history";
             $countsql .= " WHERE TIMESTAMP Between '$starttime' AND '$endtime'";
@@ -6228,11 +6263,11 @@ return $sql;
 ################################################################
 sub _DbLog_plotData {
   my $paref = shift;
-  
+
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my @a     = @{$paref->{aref}};
-  
+
   return "Usage: \n".
          "get $name &lt;in&gt; &lt;out&gt; &lt;from&gt; &lt;to&gt; &lt;column_spec&gt;...\n".
          "where column_spec is &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;\n".
@@ -6242,10 +6277,10 @@ sub _DbLog_plotData {
          "&lt;in&gt; is not used, only for compatibility for FileLog, please use '-' for &lt;in&gt; \n".
          "&lt;out&gt; is a prefix, '-' means stdout\n"
          if(int(@a) < 4);
-     
+
   my ($dbh,$err);
   my ($internal, @fld);
-  
+
   my $utf8    = defined($hash->{UTF8}) ? $hash->{UTF8} : 0;
   my $history = $hash->{HELPER}{TH};
   my $current = $hash->{HELPER}{TC};
@@ -6274,7 +6309,7 @@ sub _DbLog_plotData {
   }
 
   my (%sqlspec, %from_datetime, %to_datetime);
-  
+
   my @readings = ();
   my $verbose  = AttrVal ($name, 'verbose', $attr{global}{verbose});
 
@@ -6415,7 +6450,7 @@ sub _DbLog_plotData {
 
       if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
           $deltacalc = 1;
-          
+
           if ($verbose > 3) {
               Log3 ($name, 4, "DbLog $name - deltacalc: hour") if($readings[$i]->[3] eq "delta-h");   # geändert V4.8.0 / 14.10.2019
               Log3 ($name, 4, "DbLog $name - deltacalc: day")  if($readings[$i]->[3] eq "delta-d");   # geändert V4.8.0 / 14.10.2019
@@ -6549,11 +6584,11 @@ sub _DbLog_plotData {
               #evaluate
               my $val = $sql_value;
               my $ts  = $sql_timestamp;
-              
+
               eval("$readings[$i]->[4]");
               $sql_value     = $val;
               $sql_timestamp = $ts;
-              
+
               if($@) {
                   Log3 ($name, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@");
               }
@@ -8745,21 +8780,21 @@ return;
        <colgroup> <col width=20%> <col width=80%> </colgroup>
        <tr><td> <b>&lt;devspec&gt;:&lt;Reading&gt;</b>   </td><td>The device can be specified as <a href="#devspec">device specification</a>.                      </td></tr>
        <tr><td>                                          </td><td>The specification of "Reading" is evaluated as a regular expression.                             </td></tr>
-	   <tr><td>                                          </td><td>If the reading does not exist and the value "Value" is specified, the reading                    </td></tr>
-	   <tr><td>                                          </td><td>will be inserted into the DB if it is not a regular expression and a valid reading name.         </td></tr>
-	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
-	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
-	   <tr><td> <b>Value</b>                             </td><td>Optionally, "Value" can be specified for the reading value.                                      </td></tr>
-	   <tr><td>                                          </td><td>If Value is not specified, the current value of the reading is inserted into the DB.             </td></tr>
-	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
-	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
-	   <tr><td> <b>CN=&lt;caller name&gt;</b>            </td><td>With the key "CN=" (<b>C</b>aller <b>N</b>ame) a string, e.g. the name of the calling device,    </td></tr>
-	   <tr><td>                                          </td><td>can be added to the addLog call.                                                                 </td></tr>
-	   <tr><td>                                          </td><td>With the help of the function stored in the attribute <a href="#DbLog-attr-valueFn">valueFn</a>  </td></tr>
-	   <tr><td>                                          </td><td>this key can be evaluated via the variable $CN.                                                  </td></tr>
-	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
-	   <tr><td> <b>!useExcludes</b>                      </td><td>addLog by default takes into account the readings excluded with the "DbLogExclude" attribute.    </td></tr>
-	   <tr><td>                                          </td><td>With the keyword "!useExcludes" the set attribute "DbLogExclude" is ignored.                     </td></tr>
+       <tr><td>                                          </td><td>If the reading does not exist and the value "Value" is specified, the reading                    </td></tr>
+       <tr><td>                                          </td><td>will be inserted into the DB if it is not a regular expression and a valid reading name.         </td></tr>
+       <tr><td>                                          </td><td>                                                                                                 </td></tr>
+       <tr><td>                                          </td><td>                                                                                                 </td></tr>
+       <tr><td> <b>Value</b>                             </td><td>Optionally, "Value" can be specified for the reading value.                                      </td></tr>
+       <tr><td>                                          </td><td>If Value is not specified, the current value of the reading is inserted into the DB.             </td></tr>
+       <tr><td>                                          </td><td>                                                                                                 </td></tr>
+       <tr><td>                                          </td><td>                                                                                                 </td></tr>
+       <tr><td> <b>CN=&lt;caller name&gt;</b>            </td><td>With the key "CN=" (<b>C</b>aller <b>N</b>ame) a string, e.g. the name of the calling device,    </td></tr>
+       <tr><td>                                          </td><td>can be added to the addLog call.                                                                 </td></tr>
+       <tr><td>                                          </td><td>With the help of the function stored in the attribute <a href="#DbLog-attr-valueFn">valueFn</a>  </td></tr>
+       <tr><td>                                          </td><td>this key can be evaluated via the variable $CN.                                                  </td></tr>
+       <tr><td>                                          </td><td>                                                                                                 </td></tr>
+       <tr><td> <b>!useExcludes</b>                      </td><td>addLog by default takes into account the readings excluded with the "DbLogExclude" attribute.    </td></tr>
+       <tr><td>                                          </td><td>With the keyword "!useExcludes" the set attribute "DbLogExclude" is ignored.                     </td></tr>
       </table>
       <br>
 
@@ -9010,7 +9045,8 @@ return;
 
   <ul>
     <a id="DbLog-get-ReadingsMaxVal" data-pattern="ReadingsMaxVal.*"></a>
-    <li><b>get &lt;name&gt; ReadingsMaxVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <li><b>get &lt;name&gt; ReadingsMaxVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
+    <br>
     <ul>
       Determines the record with the largest value of the specified Device / Reading combination from the history table. <br>
       Only the value or the combination of value and timestamp is returned as string
@@ -9030,7 +9066,8 @@ return;
 
   <ul>
     <a id="DbLog-get-ReadingsMinVal" data-pattern="ReadingsMinVal.*"></a>
-    <li><b>get &lt;name&gt; ReadingsMinVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <li><b>get &lt;name&gt; ReadingsMinVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
+    <br>
     <ul>
       Determines the record with the smallest value of the specified device / reading combination from the history table. <br>
       Only the value or the combination of value and timestamp is returned as string
@@ -9049,7 +9086,8 @@ return;
 
   <ul>
     <a id="DbLog-get-ReadingsAvgVal"></a>
-    <li><b>get &lt;name&gt; ReadingsAvgVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <li><b>get &lt;name&gt; ReadingsAvgVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
+    <br>
     <ul>
       Determines the average value of the specified Device / Reading combination from the history table. <br>
       The simple arithmetic average value is returned. <br>
@@ -9067,7 +9105,8 @@ return;
 
   <ul>
     <a id="DbLog-get-ReadingsVal" data-pattern="ReadingsVal.*"></a>
-    <li><b>get &lt;name&gt; ReadingsVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <li><b>get &lt;name&gt; ReadingsVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
+    <br>
     <ul>
       Reads the last (newest) record stored in the history table of the specified Device / Reading
       combination. <br>
@@ -9087,7 +9126,8 @@ return;
 
   <ul>
     <a id="DbLog-get-ReadingsTimestamp"></a>
-    <li><b>get &lt;name&gt; ReadingsTimestamp &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <li><b>get &lt;name&gt; ReadingsTimestamp &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
+    <br>
     <ul>
       Reads the timestamp of the last (newest) record stored in the history table of the specified
       Device/Reading combination and returns this value. <br>
@@ -9102,8 +9142,82 @@ return;
   </ul>
   </li>
   <br>
+
+  <ul>
+    <a id="DbLog-get-dataRetrieval"></a>
+    <li><b>get &lt;name&gt; dataRetrieval &lt;querytype&gt; &lt;device&gt; &lt;reading&gt; &lt;from&gt; &lt;to&gt; &lt;offset&gt; &lt;limit&gt; </b>
+    <br>
+
+    <ul>
+      Reads data from the database table history and returns the results formatted as JSON. <br>
+      The query method or the desired query result is determined by the specified &lt;querytype&gt;. <br>
+      Each &lt;querytype&gt; may require additional parameters according to the following table. Parameters not entered 
+      must always be entered as "" if another parameter is entered afterwards.
+      <br>
+      <br>
+
+      <ul>
+       <table>
+       <colgroup> <col width=15%> <col width=85%> </colgroup>
+       <tr><td><b>getdevices</b>   </td><td>Determines all devices stored in the database.                                           </td></tr>
+       <tr><td><b>getreadings</b>  </td><td>Determines all readings stored in the database for a specific device.                    </td></tr>
+       <tr><td>                    </td><td>required parameters: &lt;device&gt;                                                      </td></tr>
+       <tr><td><b>timerange</b>    </td><td>Determines the stored data sets of the specified Device / Reading combination.           </td></tr>
+       <tr><td>                    </td><td>required parameters: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;           </td></tr>
+       <tr><td><b>getTableData</b> </td><td>Determines the stored records of a certain period.                                       </td></tr>
+       <tr><td>                    </td><td>The number of selected records is returned as the key "totalcount".                      </td></tr>
+       <tr><td>                    </td><td>required parameters: &lt;from&gt;, &lt;to&gt;, &lt;offset&gt;, &lt;limit&gt;             </td></tr>
+       <tr><td><b>last</b>         </td><td>Lists the last 10 saved events.                                                          </td></tr>
+       <tr><td>                    </td><td>possible parameters: &lt;limit&gt; (overwrites the default 10)                           </td></tr>
+       <tr><td><b>hourstats</b>    </td><td>Calculates the statistics SUM, AVG, MIN, MAX, COUNT for one hour.                        </td></tr>
+       <tr><td>                    </td><td>required parameters: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;           </td></tr>
+       <tr><td><b>daystats</b>     </td><td>Calculates the statistics SUM, AVG, MIN, MAX, COUNT for one day.                         </td></tr>
+       <tr><td>                    </td><td>required parameters: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;           </td></tr>
+       <tr><td><b>weekstats</b>    </td><td>Calculates the statistics SUM, AVG, MIN, MAX, COUNT for one week.                        </td></tr>
+       <tr><td>                    </td><td>required parameters: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;           </td></tr>
+       <tr><td><b>monthstats</b>   </td><td>Calculates the statistics SUM, AVG, MIN, MAX, COUNT for one month.                       </td></tr>
+       <tr><td>                    </td><td>required parameters: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;           </td></tr>
+       <tr><td><b>yearstats</b>    </td><td>Calculates the statistics SUM, AVG, MIN, MAX, COUNT for one year.                        </td></tr>
+       <tr><td>                    </td><td>required parameters: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;           </td></tr>
+       </table>
+      </ul>
+      <br>
+
+      <b>Note:</b> <br>
+      This database retrieval works blocking and influences FHEM if the database does not respond or not responds
+      sufficiently fast. For non-blocking database queries is referred to the module DbRep.
+      <br>
+      <br>
+
+      <b>Examples:</b>
+      <ul>
+        <li><code>get LogSQLITE3 dataRetrieval getdevices </code>
+        </li>
+
+        <li><code>get LogSQLITE3 dataRetrieval getreadings MySTP_5000 </code>
+        </li>
+
+        <li><code>get LogSQLITE3 dataRetrieval last "" "" "" "" "" 50 </code>
+        </li>
+        
+        <li><code>get LogSQLITE3 dataRetrieval timerange MySTP_5000 etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 </code>
+        </li>
+
+        <li><code>get LogSQLITE3 dataRetrieval getTableData MySTP_5000 "" 2023-01-01_00:00:00 2023-01-25_00:00:00 0 100 </code>
+        </li>
+
+        <li><code>get LogSQLITE3 dataRetrieval getTableData "" etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 0 100 </code>
+        </li>
+        
+        <li><code>get LogSQLITE3 dataRetrieval hourstats MySTP_5000 etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 </code>
+        </li>
+      </ul>
+    </ul>
+  </ul>
+  </li>
   <br>
-  
+  <br>
+
 <b>Get</b> for the use of SVG plots
   <br>
   <br>
@@ -9278,7 +9392,7 @@ return;
   <b>Get</b> when used for webcharts
   <br>
   <br>
-  
+
   <ul>
     <li><b>get &lt;name&gt; &lt;in&gt; &lt;out&gt; &lt;from&gt;
           &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; &lt;chartconfig&gt; &lt;pagingstart&gt; &lt;paginglimit&gt; </b> <br><br>
@@ -9286,7 +9400,7 @@ return;
     Query the Database to retrieve JSON-Formatted Data, which is used by the charting frontend.
     <br>
     <br>
-    
+
     <ul>
       <li>&lt;name&gt;<br>
         The name of the defined DbLog, like it is given in fhem.cfg.</li>
@@ -9328,13 +9442,12 @@ return;
       <br>
 
       <li>&lt;xaxis&gt;<br>
-        A string which represents the xaxis. It must be a valid field name of the history table, like e.g.
-        TIMESTAMP.
+        A string which represents the xaxis. It must be a valid field name, typically 'TIMESTAMP', of the history table.
       </li>
       <br>
 
       <li>&lt;yaxis&gt;<br>
-         A string representing the Y-axis to be set to the name of the reading to be evaluated. 
+         A string representing the Y-axis to be set to the name of the reading to be evaluated.
       </li>
       <br>
 
@@ -9416,32 +9529,32 @@ return;
       </code><br><br>
 
       This attribute sets the processing procedure according to which the DbLog device writes the data to the database. <br>
-	  DbLog uses a sub-process to write the log data into the database and processes the data
+      DbLog uses a sub-process to write the log data into the database and processes the data
       generally not blocking for FHEM. <br>
       Thus, the writing process to the database is generally not blocking and FHEM is not affected in the case
       the database is not performing or is not available (maintenance, error condition). <br>
       (default: 0)
-	  <br><br>
+      <br><br>
 
-	  <ul>
+      <ul>
        <table>
        <colgroup> <col width=5%> <col width=95%> </colgroup>
        <tr><td> 0 - </td><td><b>Synchronous log mode.</b> The data to be logged is only briefly cached and immediately                                              </td></tr>
        <tr><td>     </td><td>written to the database.                                                                                                               </td></tr>
        <tr><td>     </td><td><b>Advantages:</b>                                                                                                                     </td></tr>
-	   <tr><td>     </td><td>In principle, the data is immediately available in the database.                                                                       </td></tr>
-	   <tr><td>     </td><td>Very little to no data is lost when FHEM crashes.                                                                                      </td></tr>
-	   <tr><td>     </td><td><b>Disadvantages:</b>                                                                                                                  </td></tr>
-	   <tr><td>     </td><td>An alternative storage in the file system (in case of database problems) is not supported.                                             </td></tr>
-	   <tr><td>     </td><td>                                                                                                                                       </td></tr>
-	   <tr><td> 1 - </td><td><b>Asynchroner Log-Modus.</b> The data to be logged is first cached in a memory cache and written to the database                      </td></tr>
-	   <tr><td>     </td><td>depending on a <a href="#DbLog-attr-syncInterval">time interval</a> or <a href="#DbLog-attr-cacheLimit">fill level</a> of the cache.   </td></tr>
-	   <tr><td>     </td><td><b>Advantages:</b>                                                                                                                     </td></tr>
-	   <tr><td>     </td><td>The data is cached and will not be lost if the database is unavailable or malfunctions.                                                </td></tr>
-	   <tr><td>     </td><td>The alternative storage of data in the file system is supported.                                                                       </td></tr>
-	   <tr><td>     </td><td><b>Disadvantages:</b>                                                                                                                  </td></tr>
-	   <tr><td>     </td><td>The data is available in the database with a time delay.                                                                               </td></tr>
-	   <tr><td>     </td><td>If FHEM crashes, all data cached in the memory will be lost.                                                                           </td></tr>
+       <tr><td>     </td><td>In principle, the data is immediately available in the database.                                                                       </td></tr>
+       <tr><td>     </td><td>Very little to no data is lost when FHEM crashes.                                                                                      </td></tr>
+       <tr><td>     </td><td><b>Disadvantages:</b>                                                                                                                  </td></tr>
+       <tr><td>     </td><td>An alternative storage in the file system (in case of database problems) is not supported.                                             </td></tr>
+       <tr><td>     </td><td>                                                                                                                                       </td></tr>
+       <tr><td> 1 - </td><td><b>Asynchroner Log-Modus.</b> The data to be logged is first cached in a memory cache and written to the database                      </td></tr>
+       <tr><td>     </td><td>depending on a <a href="#DbLog-attr-syncInterval">time interval</a> or <a href="#DbLog-attr-cacheLimit">fill level</a> of the cache.   </td></tr>
+       <tr><td>     </td><td><b>Advantages:</b>                                                                                                                     </td></tr>
+       <tr><td>     </td><td>The data is cached and will not be lost if the database is unavailable or malfunctions.                                                </td></tr>
+       <tr><td>     </td><td>The alternative storage of data in the file system is supported.                                                                       </td></tr>
+       <tr><td>     </td><td><b>Disadvantages:</b>                                                                                                                  </td></tr>
+       <tr><td>     </td><td>The data is available in the database with a time delay.                                                                               </td></tr>
+       <tr><td>     </td><td>If FHEM crashes, all data cached in the memory will be lost.                                                                           </td></tr>
        </table>
       </ul>
 
@@ -9704,7 +9817,7 @@ return;
       The <a href="#DbLog-attr-DbLogSelectionMode">DbLogSelectionMode</a> attribute must be set accordingly
       to enable DbLogInclude. <br>
       With the <a href="#DbLog-attr-defaultMinInterval">defaultMinInterval</a> attribute a default for
-	  &lt;MinInterval&gt; can be specified.
+      &lt;MinInterval&gt; can be specified.
       <br><br>
 
       <b>Example</b> <br>
@@ -9730,7 +9843,7 @@ return;
       regular expression are excluded from logging to the database. <br>
 
       Readings that have not been excluded via the regex are logged in the database. The behavior of the
-	  storage is controlled with the following optional specifications. <br>
+      storage is controlled with the following optional specifications. <br>
       The optional &lt;MinInterval&gt; addition specifies that a value is saved when at least &lt;MinInterval&gt;
       seconds have passed since the last storage. <br>
 
@@ -9755,7 +9868,7 @@ return;
       The <a href="#DbLog-attr-DbLogSelectionMode">DbLogSelectionMode</a> attribute can be set appropriately
       to disable DbLogExclude. <br>
       With the <a href="#DbLog-attr-defaultMinInterval">defaultMinInterval</a> attribute a default for
-	  &lt;MinInterval&gt; can be specified.
+      &lt;MinInterval&gt; can be specified.
       <br><br>
 
       <b>Example</b> <br>
@@ -10530,22 +10643,22 @@ attr SMA_Energymeter DbLogValueFn
        <colgroup> <col width=20%> <col width=80%> </colgroup>
        <tr><td> <b>&lt;devspec&gt;:&lt;Reading&gt;</b>   </td><td>Das Device kann als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden.                </td></tr>
        <tr><td>                                          </td><td>Die Angabe von "Reading" wird als regulärer Ausdruck ausgewertet.                                </td></tr>
-	   <tr><td>                                          </td><td>Ist das Reading nicht vorhanden und der Wert "Value" angegeben, wird das Reading                 </td></tr>
-	   <tr><td>                                          </td><td>in die DB eingefügt wenn es kein regulärer Ausdruck und ein valider Readingname ist.             </td></tr>
-	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
-	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
-	   <tr><td> <b>Value</b>                             </td><td>Optional kann "Value" für den Readingwert angegeben werden.                                      </td></tr>
-	   <tr><td>                                          </td><td>Ist Value nicht angegeben, wird der aktuelle Wert des Readings in die DB eingefügt.              </td></tr>
-	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
-	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
-	   <tr><td> <b>CN=&lt;caller name&gt;</b>            </td><td>Mit dem Schlüssel "CN=" (<b>C</b>aller <b>N</b>ame) kann dem addLog-Aufruf ein String,           </td></tr>
-	   <tr><td>                                          </td><td>z.B. der Name des aufrufenden Devices, mitgegeben werden.                                        </td></tr>
-	   <tr><td>                                          </td><td>Mit Hilfe der im Attribut <a href="#DbLog-attr-valueFn">valueFn</a> hinterlegten Funktion kann   </td></tr>
-	   <tr><td>                                          </td><td>dieser Schlüssel über die Variable $CN ausgewertet werden.                                       </td></tr>
-	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
-	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
-	   <tr><td> <b>!useExcludes</b>                      </td><td>addLog berücksichtigt per default die mit dem Attribut "DbLogExclude" ausgeschlossenen Readings. </td></tr>
-	   <tr><td>                                          </td><td>Mit dem Schüsselwort "!useExcludes" wird das gesetzte Attribut "DbLogExclude" ignoriert.         </td></tr>
+       <tr><td>                                          </td><td>Ist das Reading nicht vorhanden und der Wert "Value" angegeben, wird das Reading                 </td></tr>
+       <tr><td>                                          </td><td>in die DB eingefügt wenn es kein regulärer Ausdruck und ein valider Readingname ist.             </td></tr>
+       <tr><td>                                          </td><td>                                                                                                 </td></tr>
+       <tr><td>                                          </td><td>                                                                                                 </td></tr>
+       <tr><td> <b>Value</b>                             </td><td>Optional kann "Value" für den Readingwert angegeben werden.                                      </td></tr>
+       <tr><td>                                          </td><td>Ist Value nicht angegeben, wird der aktuelle Wert des Readings in die DB eingefügt.              </td></tr>
+       <tr><td>                                          </td><td>                                                                                                 </td></tr>
+       <tr><td>                                          </td><td>                                                                                                 </td></tr>
+       <tr><td> <b>CN=&lt;caller name&gt;</b>            </td><td>Mit dem Schlüssel "CN=" (<b>C</b>aller <b>N</b>ame) kann dem addLog-Aufruf ein String,           </td></tr>
+       <tr><td>                                          </td><td>z.B. der Name des aufrufenden Devices, mitgegeben werden.                                        </td></tr>
+       <tr><td>                                          </td><td>Mit Hilfe der im Attribut <a href="#DbLog-attr-valueFn">valueFn</a> hinterlegten Funktion kann   </td></tr>
+       <tr><td>                                          </td><td>dieser Schlüssel über die Variable $CN ausgewertet werden.                                       </td></tr>
+       <tr><td>                                          </td><td>                                                                                                 </td></tr>
+       <tr><td>                                          </td><td>                                                                                                 </td></tr>
+       <tr><td> <b>!useExcludes</b>                      </td><td>addLog berücksichtigt per default die mit dem Attribut "DbLogExclude" ausgeschlossenen Readings. </td></tr>
+       <tr><td>                                          </td><td>Mit dem Schüsselwort "!useExcludes" wird das gesetzte Attribut "DbLogExclude" ignoriert.         </td></tr>
       </table>
       <br>
 
@@ -10803,7 +10916,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-get-ReadingsMaxVal" data-pattern="ReadingsMaxVal.*"></a>
-    <li><b>get &lt;name&gt; ReadingsMaxVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <li><b>get &lt;name&gt; ReadingsMaxVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
+    <br>
+
     <ul>
       Ermittelt den Datensatz mit dem größten Wert der angegebenen Device / Reading Kombination aus der history Tabelle. <br>
       Zurück gegeben wird nur der Wert oder die Kombination aus Wert und Timestamp als String
@@ -10814,7 +10929,7 @@ attr SMA_Energymeter DbLogValueFn
 
       <b>Hinweis:</b> <br>
       Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
-      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep 
+      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep
       verwiesen.
     </ul>
   </ul>
@@ -10823,7 +10938,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-get-ReadingsMinVal" data-pattern="ReadingsMinVal.*"></a>
-    <li><b>get &lt;name&gt; ReadingsMinVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <li><b>get &lt;name&gt; ReadingsMinVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
+    <br>
+
     <ul>
       Ermittelt den Datensatz mit dem kleinsten Wert der angegebenen Device / Reading Kombination aus der history Tabelle. <br>
       Zurück gegeben wird nur der Wert oder die Kombination aus Wert und Timestamp als String
@@ -10834,7 +10951,7 @@ attr SMA_Energymeter DbLogValueFn
 
       <b>Hinweis:</b> <br>
       Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
-      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep 
+      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep
       verwiesen.
     </ul>
   </ul>
@@ -10843,7 +10960,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-get-ReadingsAvgVal"></a>
-    <li><b>get &lt;name&gt; ReadingsAvgVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <li><b>get &lt;name&gt; ReadingsAvgVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
+    <br>
+
     <ul>
       Ermittelt den Durchschnittswert der angegebenen Device / Reading Kombination aus der history Tabelle. <br>
       Zurück gegeben wird der einfache arithmetische Durchschnittswert. <br>
@@ -10853,7 +10972,7 @@ attr SMA_Energymeter DbLogValueFn
 
       <b>Hinweis:</b> <br>
       Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
-      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep 
+      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep
       verwiesen.
     </ul>
   </ul>
@@ -10862,7 +10981,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-get-ReadingsVal" data-pattern="ReadingsVal.*"></a>
-    <li><b>get &lt;name&gt; ReadingsVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <li><b>get &lt;name&gt; ReadingsVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
+    <br>
+
     <ul>
       Liest den letzten (neuesten) in der history Tabelle gespeicherten Datensatz der angegebenen Device / Reading
       Kombination. <br>
@@ -10874,7 +10995,7 @@ attr SMA_Energymeter DbLogValueFn
 
       <b>Hinweis:</b> <br>
       Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
-      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep 
+      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep
       verwiesen.
     </ul>
   </ul>
@@ -10883,7 +11004,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-get-ReadingsTimestamp"></a>
-    <li><b>get &lt;name&gt; ReadingsTimestamp &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    <li><b>get &lt;name&gt; ReadingsTimestamp &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
+    <br>
+
     <ul>
       Liest den Zeitstempel des letzten (neuesten) in der history Tabelle gespeicherten Datensatzes der angegebenen
       Device/Reading Kombination und gibt diesen Wert zurück. <br>
@@ -10893,14 +11016,89 @@ attr SMA_Energymeter DbLogValueFn
 
       <b>Hinweis:</b> <br>
       Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
-      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep 
+      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep
       verwiesen.
     </ul>
   </ul>
   </li>
   <br>
+
+  <ul>
+    <a id="DbLog-get-dataRetrieval"></a>
+    <li><b>get &lt;name&gt; dataRetrieval &lt;querytype&gt; &lt;device&gt; &lt;reading&gt; &lt;from&gt; &lt;to&gt; &lt;offset&gt; &lt;limit&gt; </b>
+    <br>
+
+    <ul>
+      Liest Daten aus der Datenbank Tabelle history und gibt die Ergebnisse als JSON formatiert zurück. <br>
+      Die Abfragemethode bzw. das gewünschte Abfrageergebnis wird durch den angegebenen &lt;querytype&gt; bestimmt. <br>
+      Jeder &lt;querytype&gt; verlangt evtl. weitere Parameter gemäß der folgenden Tabelle. Nicht eingegebene Parameter sind
+      immer als "" anzugeben sofern danach noch ein weiterer Parameter eingegeben wird.
+      <br>
+      <br>
+
+      <ul>
+       <table>
+       <colgroup> <col width=15%> <col width=85%> </colgroup>
+       <tr><td><b>getdevices</b>   </td><td>Ermittelt alle in der Datenbank gespeicherten Devices.                                     </td></tr>
+       <tr><td><b>getreadings</b>  </td><td>Ermittelt alle in der Datenbank gespeicherten Readings für ein bestimmtes Device.          </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;                                                        </td></tr>
+       <tr><td><b>timerange</b>    </td><td>Ermittelt die gespeicherten Datensätze der angegebenen Device / Reading Kombination.       </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;             </td></tr>
+       <tr><td><b>getTableData</b> </td><td>Ermittelt die gespeicherten Datensätze eines bestimmten Zeitraumes.                        </td></tr>
+       <tr><td>                    </td><td>Die Anzahl der selektierten Datensätze wird als Schlüssel "totalcount" zurückgegeben.      </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;from&gt;, &lt;to&gt;, &lt;offset&gt;, &lt;limit&gt;               </td></tr>
+       <tr><td><b>last</b>         </td><td>Listet die letzten 10 gespeicherten Events auf.                                            </td></tr>
+       <tr><td>                    </td><td>mögliche Parameter: &lt;limit&gt; (überschreibt den Standard 10)                           </td></tr>
+       <tr><td><b>hourstats</b>    </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für eine Stunde.                       </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;             </td></tr>
+       <tr><td><b>daystats</b>     </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für einen Tag.                         </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;             </td></tr>
+       <tr><td><b>weekstats</b>    </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für eine Woche.                        </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;             </td></tr>
+       <tr><td><b>monthstats</b>   </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für einen Monat.                       </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;             </td></tr>
+       <tr><td><b>yearstats</b>    </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für ein Jahr.                          </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;             </td></tr>
+       </table>
+      </ul>
+      <br>
+
+      <b>Hinweis:</b> <br>
+      Dieser Datenbankabruf arbeitet blockierend und beeinflusst FHEM wenn die Datenbank nicht oder nicht
+      hinreichend schnell antwortet. Für nicht-blockierende Datenbankabfragen wird auf das Modul DbRep
+      verwiesen.
+      <br>
+      <br>
+
+      <b>Beispiele:</b>
+      <ul>
+        <li><code>get LogSQLITE3 dataRetrieval getdevices </code>
+        </li>
+
+        <li><code>get LogSQLITE3 dataRetrieval getreadings MySTP_5000 </code>
+        </li>
+
+        <li><code>get LogSQLITE3 dataRetrieval last "" "" "" "" "" 50 </code>
+        </li>
+        
+        <li><code>get LogSQLITE3 dataRetrieval timerange MySTP_5000 etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 </code>
+        </li>
+
+        <li><code>get LogSQLITE3 dataRetrieval getTableData MySTP_5000 "" 2023-01-01_00:00:00 2023-01-25_00:00:00 0 100 </code>
+        </li>
+
+        <li><code>get LogSQLITE3 dataRetrieval getTableData "" etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 0 100 </code>
+        </li>
+        
+        <li><code>get LogSQLITE3 dataRetrieval hourstats MySTP_5000 etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 </code>
+        </li>
+      </ul>
+    </ul>
+  </ul>
+  </li>
   <br>
-  
+  <br>
+
 <b>Get</b> für die Nutzung von SVG-Plots
   <br>
   <br>
@@ -10999,8 +11197,8 @@ attr SMA_Energymeter DbLogValueFn
                 in Sekunden und ersetzt damit den originalen Wert.
               </li>
             </ul>
-            </li>
-            <br>
+          </li>
+          <br>
 
             <li>&lt;regexp&gt;<br>
               Diese Zeichenkette wird als Perl Befehl ausgewertet.
@@ -11074,10 +11272,11 @@ attr SMA_Energymeter DbLogValueFn
   <b>Get</b> für die Nutzung von webcharts
   <br>
   <br>
-  
+
   <ul>
-<li><b>get &lt;name&gt; &lt;in&gt; &lt;out&gt; &lt;from&gt;
-          &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; &lt;chartconfig&gt; &lt;pagingstart&gt; &lt;paginglimit&gt; </b> <br>
+  <li><b>get &lt;name&gt; &lt;in&gt; &lt;out&gt; &lt;from&gt;
+          &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; &lt;chartconfig&gt; &lt;pagingstart&gt; &lt;paginglimit&gt; </b> 
+    <br>
     <br>
 
     Liest Daten aus der Datenbank aus und gibt diese in JSON formatiert aus. Wird für das Charting Frontend genutzt.
@@ -11086,7 +11285,7 @@ attr SMA_Energymeter DbLogValueFn
 
     <ul>
       <li>&lt;name&gt;<br>
-        Der Name des definierten DbLogs, so wie er in der fhem.cfg angegeben wurde.
+        Der Name des definierten DbLog Devices, so wie er in der fhem.cfg angegeben wurde.
       </li>
       <br>
 
@@ -11133,8 +11332,7 @@ attr SMA_Energymeter DbLogValueFn
       <br>
 
       <li>&lt;xaxis&gt;<br>
-        Ein String, der die X-Achse repräsentiert. Es muß ein gültiger Feldname der history-Tabelle sein, wie z.B.
-        TIMESTAMP.
+        Ein String, der die X-Achse repräsentiert. Es muß ein gültiger Feldname, typisch 'TIMESTAMP', der history-Tabelle sein.
       </li>
       <br>
 
@@ -11186,8 +11384,10 @@ attr SMA_Energymeter DbLogValueFn
         <li><code>get logdb - webchart "" "" "" deletechart "" "" 7</code><br>
             Löscht einen zuvor gespeicherten Chart unter Angabe einer id</li>
       </ul>
-    <br><br>
+    <br>
+    <br>
   </ul>
+  </li>
 
 
   <a id="DbLog-attr"></a>
@@ -11224,34 +11424,34 @@ attr SMA_Energymeter DbLogValueFn
 
       Dieses Attribut stellt den Verarbeitungsprozess ein nach dessen Verfahren das DbLog Device die Daten in die
       Datenbank schreibt. <br>
-	  DbLog verwendet zum Schreiben der Log-Daten in die Datenbank einen SubProzess und verarbeitet die Daten
+      DbLog verwendet zum Schreiben der Log-Daten in die Datenbank einen SubProzess und verarbeitet die Daten
       generell nicht blockierend für FHEM. <br>
       Dadurch erfolgt der Schreibprozess in die Datenbank generell nicht blockierend und FHEM wird in dem Fall,
       dass die Datenbank nicht performant arbeitet oder nicht verfügbar ist (Wartung, Fehlerzustand, etc.),
       nicht beeinträchtigt.<br>
       (default: 0)
-	  <br><br>
+      <br><br>
 
-	  <ul>
+      <ul>
        <table>
        <colgroup> <col width=5%> <col width=95%> </colgroup>
        <tr><td> 0 - </td><td><b>Synchroner Log-Modus.</b> Die zu loggenden Daten werden nur kurz im Cache zwischengespeichert und sofort           </td></tr>
        <tr><td>     </td><td>in die Datenbank geschrieben.                                                                                         </td></tr>
        <tr><td>     </td><td><b>Vorteile:</b>                                                                                                      </td></tr>
-	   <tr><td>     </td><td>Die Daten stehen im Prinzip sofort in der Datenbank zur Verfügung.                                                    </td></tr>
-	   <tr><td>     </td><td>Bei einem Absturz von FHEM gehen sehr wenige bis keine Daten verloren.                                                </td></tr>
-	   <tr><td>     </td><td><b>Nachteile:</b>                                                                                                     </td></tr>
-	   <tr><td>     </td><td>Eine alternative Speicherung im Filesystem (bei Datenbankproblemen) wird nicht unterstützt.                           </td></tr>
-	   <tr><td>     </td><td>                                                                                                                      </td></tr>
-	   <tr><td>     </td><td>                                                                                                                      </td></tr>
-	   <tr><td> 1 - </td><td><b>Asynchroner Log-Modus.</b> Die zu loggenden Daten werden zunächst in einem Memory Cache zwischengespeichert        </td></tr>
-	   <tr><td>     </td><td>und abhängig von einem <a href="#DbLog-attr-syncInterval">Zeitintervall</a> bzw. <a href="#DbLog-attr-cacheLimit">Füllgrad</a> des Caches in die Datenbank geschrieben.   </td></tr>
-	   <tr><td>     </td><td><b>Vorteile:</b>                                                                                                      </td></tr>
-	   <tr><td>     </td><td>Die Daten werden zwischengespeichert und gehen nicht verloren wenn die Datenbank nicht verfügbar ist                  </td></tr>
-	   <tr><td>     </td><td>oder fehlerhaft arbeitet. Die alternative Speicherung im Filesystem wird unterstützt.                                 </td></tr>
-	   <tr><td>     </td><td><b>Nachteile:</b>                                                                                                     </td></tr>
-	   <tr><td>     </td><td>Die Daten stehen zeitlich verzögert in der Datenbank zur Verfügung.                                                   </td></tr>
-	   <tr><td>     </td><td>Bei einem Absturz von FHEM gehen alle im Memory Cache zwischengespeicherten Daten verloren.                           </td></tr>
+       <tr><td>     </td><td>Die Daten stehen im Prinzip sofort in der Datenbank zur Verfügung.                                                    </td></tr>
+       <tr><td>     </td><td>Bei einem Absturz von FHEM gehen sehr wenige bis keine Daten verloren.                                                </td></tr>
+       <tr><td>     </td><td><b>Nachteile:</b>                                                                                                     </td></tr>
+       <tr><td>     </td><td>Eine alternative Speicherung im Filesystem (bei Datenbankproblemen) wird nicht unterstützt.                           </td></tr>
+       <tr><td>     </td><td>                                                                                                                      </td></tr>
+       <tr><td>     </td><td>                                                                                                                      </td></tr>
+       <tr><td> 1 - </td><td><b>Asynchroner Log-Modus.</b> Die zu loggenden Daten werden zunächst in einem Memory Cache zwischengespeichert        </td></tr>
+       <tr><td>     </td><td>und abhängig von einem <a href="#DbLog-attr-syncInterval">Zeitintervall</a> bzw. <a href="#DbLog-attr-cacheLimit">Füllgrad</a> des Caches in die Datenbank geschrieben.   </td></tr>
+       <tr><td>     </td><td><b>Vorteile:</b>                                                                                                      </td></tr>
+       <tr><td>     </td><td>Die Daten werden zwischengespeichert und gehen nicht verloren wenn die Datenbank nicht verfügbar ist                  </td></tr>
+       <tr><td>     </td><td>oder fehlerhaft arbeitet. Die alternative Speicherung im Filesystem wird unterstützt.                                 </td></tr>
+       <tr><td>     </td><td><b>Nachteile:</b>                                                                                                     </td></tr>
+       <tr><td>     </td><td>Die Daten stehen zeitlich verzögert in der Datenbank zur Verfügung.                                                   </td></tr>
+       <tr><td>     </td><td>Bei einem Absturz von FHEM gehen alle im Memory Cache zwischengespeicherten Daten verloren.                           </td></tr>
        </table>
       </ul>
 
@@ -11555,12 +11755,12 @@ attr SMA_Energymeter DbLogValueFn
       </code><br><br>
 
       Mit dem Attribut DbLogExclude werden die Readings definiert, die <b>nicht</b> in der Datenbank gespeichert werden
-	  sollen. <br>
+      sollen. <br>
       Die Definition der auszuschließenden Readings erfolgt über einen regulären Ausdruck und alle Readings, die mit dem
       regulären Ausdruck matchen, werden vom Logging in die Datenbank ausgeschlossen. <br>
 
       Readings, die nicht über den Regex ausgeschlossen wurden, werden in der Datenbank geloggt. Das Verhalten der
-	  Speicherung wird mit den nachfolgenden optionalen Angaben gesteuert. <br>
+      Speicherung wird mit den nachfolgenden optionalen Angaben gesteuert. <br>
       Der optionale Zusatz &lt;MinInterval&gt; gibt an, dass ein Wert dann gespeichert wird wenn mindestens &lt;MinInterval&gt;
       Sekunden seit der letzten Speicherung vergangen sind. <br>
 
@@ -11585,7 +11785,7 @@ attr SMA_Energymeter DbLogValueFn
       Das Attribut <a href="#DbLog-attr-DbLogSelectionMode">DbLogSelectionMode</a> kann entsprechend gesetzt werden
       um DbLogExclude zu deaktivieren. <br>
       Mit dem Attribut <a href="#DbLog-attr-defaultMinInterval">defaultMinInterval</a> kann ein Default für
-	  &lt;MinInterval&gt; vorgegeben werden.
+      &lt;MinInterval&gt; vorgegeben werden.
       <br><br>
 
       <b>Beispiel</b> <br>
