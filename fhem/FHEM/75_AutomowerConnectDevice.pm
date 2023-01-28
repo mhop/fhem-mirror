@@ -201,6 +201,7 @@ EOF
   $errorjson = undef;
   $errortable = undef;
 
+  $hash->{MODEL} = '';
   $attr{$name}{room} = $type if( !defined( $attr{$name}{room} ) );
   $attr{$name}{icon} = 'automower' if( !defined( $attr{$name}{icon} ) );
   if (::AnalyzeCommandChain(undef,"version 75_AutomowerConnectDevice.pm noheader") =~ "^75_AutomowerConnectDevice.pm (.*)Z") {
@@ -302,7 +303,7 @@ sub Notify {
       $pref = 'system';
       readingsBulkUpdateIfChanged($hash, $pref."_name", $hash->{helper}{mower}{attributes}{$pref}{name} );
       my $model = $hash->{helper}{mower}{attributes}{$pref}{model};
-      $model =~ s/AUTOMOWER./AUTOMOWER®/;
+      $model =~ s/AUTOMOWER./AM/;
       $hash->{MODEL} = $model if ( $model && $hash->{MODEL} ne $model );
       # readingsBulkUpdateIfChanged($hash, $pref."_model", $model );
       readingsBulkUpdateIfChanged($hash, $pref."_serialNumber", $hash->{helper}{mower}{attributes}{$pref}{serialNumber} );

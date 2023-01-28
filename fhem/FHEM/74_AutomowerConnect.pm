@@ -212,6 +212,7 @@ EOF
   $errorjson = undef;
   $errortable = undef;
 
+  $hash->{MODEL} = '';
   $attr{$name}{room} = $type if( !defined( $attr{$name}{room} ) );
   $attr{$name}{icon} = 'automower' if( !defined( $attr{$name}{icon} ) );
   if (::AnalyzeCommandChain(undef,"version 74_AutomowerConnect.pm noheader") =~ "^74_AutomowerConnect.pm (.*)Z") {
@@ -482,7 +483,7 @@ sub getMowerResponse {
           $pref = 'system';
           readingsBulkUpdateIfChanged($hash, $pref."_name", $hash->{helper}{mower}{attributes}{$pref}{name} );
           my $model = $hash->{helper}{mower}{attributes}{$pref}{model};
-          $model =~ s/AUTOMOWER./AUTOMOWER®/;
+          $model =~ s/AUTOMOWER./AM/;
           $hash->{MODEL} = $model if ( $model && $hash->{MODEL} ne $model );
           # readingsBulkUpdateIfChanged($hash, $pref."_model", $model );
           readingsBulkUpdateIfChanged($hash, $pref."_serialNumber", $hash->{helper}{mower}{attributes}{$pref}{serialNumber} );
@@ -629,7 +630,6 @@ sub CMDResponse {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   my $statuscode = $param->{code};
-  my $interval = $hash->{helper}{interval};
   my $iam = "$type $name CMDResponse:";
 
   Log3 $name, 1, "\ndebug $iam \n\$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}" if ( AttrVal($name, 'debug', '') );
