@@ -951,7 +951,6 @@ sub _DbLog_setcount {              ## no critic "not used"
   return $err if(!defined $hash->{".fhem"}{subprocess});
 
   Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
-
   Log3 ($name, 4, "DbLog $name - Records count requested.");
 
   DbLog_SBP_sendCommand ($hash, 'count');
@@ -1218,7 +1217,7 @@ sub DbLog_Log {
 
   my $log4rel = $vb4show && !defined $hash->{HELPER}{LONGRUN_PID} ? 1 : 0;
 
-  if(AttrVal ($name, 'verbose', 3) =~ /[45]/xs) {
+  if(AttrVal ($name, 'verbose', 3) > 3) {
       if($log4rel) {
           Log3 ($name, 4, "DbLog $name - ################################################################");
           Log3 ($name, 4, "DbLog $name - ###              start of new Logcycle                       ###");
@@ -1973,7 +1972,7 @@ sub DbLog_execMemCacheAsync {
       $dolog = 0;
   }
 
-  if($verbose =~ /[45]/xs && $dolog) {
+  if($verbose > 3 && $dolog) {
       Log3 ($name, 4, "DbLog $name - ################################################################");
       Log3 ($name, 4, "DbLog $name - ###      New database processing cycle - SBP asynchronous    ###");
       Log3 ($name, 4, "DbLog $name - ################################################################");
@@ -2030,7 +2029,7 @@ sub DbLog_execMemCacheSync {
   my $name    = $hash->{NAME};
   my $verbose = AttrVal ($name, 'verbose', 3);
 
-  if($verbose =~ /[45]/xs) {
+  if($verbose > 3) {
       Log3 ($name, 4, "DbLog $name - ################################################################");
       Log3 ($name, 4, "DbLog $name - ###      New database processing cycle - SBP synchronous     ###");
       Log3 ($name, 4, "DbLog $name - ################################################################");
@@ -2571,33 +2570,23 @@ sub _DbLog_SBP_connectDB {
       }
       or do { $err = $@;
               if ($cofaults <= 10) {
-                  if ($subprocess) {
-                      _DbLog_SBP_Log3Parent ( { name       => $name,
-                                                level      => 2,
-                                                msg        => qq(ERROR: $err),
-                                                oper       => 'log3parent',
-                                                subprocess => $subprocess
-                                              }
-                                            );
-                  }
-                  else {
-                      Log3 ($name, 2, "DbLog $name - ERROR: $err");
-                  }
+                  _DbLog_SBP_Log3Parent ( { name       => $name,
+                                            level      => 2,
+                                            msg        => qq(ERROR: $err),
+                                            oper       => 'log3parent',
+                                            subprocess => $subprocess
+                                          }
+                                        );
               }
 
               if ($cofaults == 10) {
-                  if ($subprocess) {
-                      _DbLog_SBP_Log3Parent ( { name       => $name,
-                                                level      => 2,
-                                                msg        => qq(There seems to be a permanent connection error to the database. Further error messages are suppressed.),
-                                                oper       => 'log3parent',
-                                                subprocess => $subprocess
-                                              }
-                                            );
-                  }
-                  else {
-                      Log3 ($name, 2, "DbLog $name - There seems to be a permanent connection error to the database. Further error messages are suppressed.");
-                  }
+                  _DbLog_SBP_Log3Parent ( { name       => $name,
+                                            level      => 2,
+                                            msg        => qq(There seems to be a permanent connection error to the database. Further error messages are suppressed.),
+                                            oper       => 'log3parent',
+                                            subprocess => $subprocess
+                                          }
+                                        );
               }
 
               return $err;
@@ -2641,7 +2630,7 @@ sub _DbLog_SBP_dbhDo {
   my $name       = shift;
   my $dbh        = shift;
   my $sql        = shift;
-  my $subprocess = shift;
+  my $subprocess = shift // q{};
   my $info       = shift // "simple do statement: $sql";
 
   my $err = q{};
@@ -2653,18 +2642,13 @@ sub _DbLog_SBP_dbhDo {
         1;
       }
       or do { $err = $@;
-              if ($subprocess) {
-                  _DbLog_SBP_Log3Parent ( { name       => $name,
-                                            level      => 2,
-                                            msg        => qq(ERROR - $err),
-                                            oper       => 'log3parent',
-                                            subprocess => $subprocess
-                                          }
-                                        );
-              }
-              else {
-                  Log3 ($name, 2, qq{DbLog $name - ERROR - $err});
-              }
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 2,
+                                        msg        => qq(ERROR - $err),
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
             };
 
 return ($err, $rv);
@@ -2701,18 +2685,13 @@ sub _DbLog_SBP_pingDB {
       alarm 0;
 
       if ($@ && $@ =~ /Timeout/xs) {
-          if ($subprocess) {
-              _DbLog_SBP_Log3Parent ( { name       => $name,
-                                        level      => 2,
-                                        msg        => qq(Database Ping Timeout of >$to seconds< reached),
-                                        oper       => 'log3parent',
-                                        subprocess => $subprocess
-                                      }
-                                    );
-          }
-          else {
-              Log3 ($name, 2, "DbLog $name - Database Ping Timeout of >$to seconds< reached");
-          }
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 2,
+                                    msg        => qq(Database Ping Timeout of >$to seconds< reached),
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
       }
 
   };
@@ -4924,18 +4903,13 @@ sub __DbLog_SBP_prepareOnly {
         1;
       }
       or do { $err = $@;
-              if ($subprocess) {
-                  _DbLog_SBP_Log3Parent ( { name       => $name,
-                                            level      => 2,
-                                            msg        => qq(ERROR - $err),
-                                            oper       => 'log3parent',
-                                            subprocess => $subprocess
-                                          }
-                                        );
-              }
-              else {
-                  Log3 ($name, 2, qq{DbLog $name - ERROR - $err});
-              }
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 2,
+                                        msg        => qq(ERROR - $err),
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
             };
 
 return ($err, $sth);
@@ -4956,18 +4930,13 @@ sub __DbLog_SBP_executeOnly {
         1;
       }
       or do { $err = $@;
-              if ($subprocess) {
-                  _DbLog_SBP_Log3Parent ( { name       => $name,
-                                            level      => 2,
-                                            msg        => qq(ERROR - $err),
-                                            oper       => 'log3parent',
-                                            subprocess => $subprocess
-                                          }
-                                        );
-              }
-              else {
-                  Log3 ($name, 2, qq{DbLog $name - ERROR - $err});
-              }
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 2,
+                                        msg        => qq(ERROR - $err),
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
             };
 
 return ($err, $sth, $result);
@@ -5052,19 +5021,27 @@ return ($err, $sth);
 sub _DbLog_SBP_Log3Parent {
   my $paref = shift;
 
+  my $level   = $paref->{level};
   my $name    = $paref->{name};
   my $verbose = AttrVal ($name, 'verbose', $attr{global}{verbose});
-  my $level   = $paref->{level};
 
   return if($level > $verbose);
+  
+  my $msg        = $paref->{msg};
+  my $subprocess = $paref->{subprocess};
 
-  __DbLog_SBP_sendToParent ( $paref->{subprocess},
-                             { name    => $name,
-                               level   => $level,                             # Loglevel
-                               msg     => $paref->{msg},                      # Nutzdaten zur Ausgabe mit Log3() im Parentprozess
-                               oper    => 'log3parent'
-                             }
-                           );
+  if ($subprocess) {
+      __DbLog_SBP_sendToParent ( $subprocess,
+                                 { name    => $name,
+                                   level   => $level,                             # Loglevel
+                                   msg     => $msg,                               # Nutzdaten zur Ausgabe mit Log3() im Parentprozess
+                                   oper    => 'log3parent'
+                                 }
+                               );
+  }
+  else {
+      Log3 ($name, $level, qq{DbLog $name - $msg});
+  }
 
 return;
 }
@@ -5302,7 +5279,13 @@ sub _DbLog_SBP_sendToChild {
   my $serial = eval { freeze ($data);
                     }
                     or do { my $err = $@;
-                            Log3 ($name, 1, "DbLog $name - Serialization error: $err");
+                            _DbLog_SBP_Log3Parent ( { name       => $name,
+                                                      level      => 1,
+                                                      msg        => qq(Serialization error: $err),
+                                                      oper       => 'log3parent',
+                                                      subprocess => $subprocess
+                                                    }
+                                                  );
                             return $err;
                           };
 
@@ -5457,7 +5440,7 @@ sub DbLog_SBP_Read {
                   for my $key (sort {$a <=>$b} keys %{$rowlback}) {
                       $memcount = DbLog_addMemCacheRow ($name, $rowlback->{$key});                # Datensatz zum Memory Cache hinzufügen
 
-                      Log3 ($name, 5, "DbLog $name - rowback to Cache: $key -> ".$rowlback->{$key});
+                      Log3 ($name, 5, "DbLog $name - row back to Cache: $key -> ".$rowlback->{$key});
                   }
               };
 
@@ -5833,7 +5816,7 @@ sub DbLog_Get {
   
   my $opt = $a[0];                                                             # Kommando spezifizieren / ableiten
   $opt    = 'plotdata' if(lc($a[0]) =~ /^(-|current|history)$/ixs);
-  $opt    = 'webchart' if(lc($a[1]) && lc($a[1]) eq 'webchart');
+  $opt    = 'webchart' if($a[1] && lc($a[1]) eq 'webchart');
 
   my $params = {
       hash  => $hash,
@@ -6051,8 +6034,8 @@ sub _DbLog_createQuerySql {
     $endtime            =~ s/_/ /;
     my $device          = $a[4];
     my $userquery       = $a[5];
-    my $xaxis           = $a[6];
-    my $yaxis           = $a[7];
+    my $xaxis           = $a[6];                        # ein Datenbankfeld wie TIMESTAMP, READING, DEVICE, UNIT, EVENT
+    my $yaxis           = $a[7];                        # ein Reading Name 
     my $savename        = $a[8];
     my $jsonChartConfig = $a[9];
     my $pagingstart     = $a[10];
@@ -8193,18 +8176,13 @@ sub DbLog_logHashContent {
   for my $key (sort {$a<=>$b} keys %{$href}) {
       next if(!defined $href->{$key});
 
-      if ($subprocess) {
-          _DbLog_SBP_Log3Parent ( { name       => $name,
-                                    level      => $level,
-                                    msg        => qq($logtxt $key -> $href->{$key}),
-                                    oper       => 'log3parent',
-                                    subprocess => $subprocess
-                                  }
-                                );
-      }
-      else {
-          Log3 ($name, $level, "DbLog $name - $logtxt $key -> $href->{$key}");
-      }
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => $level,
+                                msg        => qq($logtxt $key -> $href->{$key}),
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
   }
 
   use warnings;
@@ -9303,7 +9281,7 @@ return;
   
   <ul>
     <li><b>get &lt;name&gt; &lt;in&gt; &lt;out&gt; &lt;from&gt;
-          &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; </b> <br><br>
+          &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; &lt;chartconfig&gt; &lt;pagingstart&gt; &lt;paginglimit&gt; </b> <br><br>
 
     Query the Database to retrieve JSON-Formatted Data, which is used by the charting frontend.
     <br>
@@ -11098,8 +11076,8 @@ attr SMA_Energymeter DbLogValueFn
   <br>
   
   <ul>
-    <li><b>get &lt;name&gt; &lt;in&gt; &lt;out&gt; &lt;from&gt;
-          &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; </li></b>
+<li><b>get &lt;name&gt; &lt;in&gt; &lt;out&gt; &lt;from&gt;
+          &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; &lt;chartconfig&gt; &lt;pagingstart&gt; &lt;paginglimit&gt; </b> <br>
     <br>
 
     Liest Daten aus der Datenbank aus und gibt diese in JSON formatiert aus. Wird für das Charting Frontend genutzt.
