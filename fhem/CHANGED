@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  00_KNXIO: PBP fixes
+ - bugfix:  10_KNX: fix define-parsing problem, PBP fixes
  - bugfix: 74_AutomowerConnect: improved error handling, fix missig password bug
  - feature: 74_AutomowerConnect: add disabledForIntervals, Internal MODEL
  - feature: 75_AutomowerConnectDevice: add disabledForIntervals, Internal MODEL
