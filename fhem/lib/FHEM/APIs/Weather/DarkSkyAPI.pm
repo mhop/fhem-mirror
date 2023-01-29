@@ -699,7 +699,7 @@ sub _CallWeatherCallbackFn {
     my $self = shift;
 
     #     ## Aufruf der callbackFn
-    return ::Weather_RetrieveCallbackFn( $self->{devName} );
+    return FHEM::Core::Weather::RetrieveCallbackFn( $self->{devName} );
 }
 
 sub _ErrorHandling {

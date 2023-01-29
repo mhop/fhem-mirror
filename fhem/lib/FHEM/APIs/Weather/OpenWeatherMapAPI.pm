@@ -951,7 +951,7 @@ sub _CallWeatherCallbackFn {
 
     #     print 'Dumperausgabe: ' . Dumper $self;
     ### Aufruf der callbackFn
-    return ::Weather_RetrieveCallbackFn( $self->{devName} );
+    return FHEM::Core::Weather::RetrieveCallbackFn( $self->{devName} );
 }
 
 sub _ErrorHandling {
