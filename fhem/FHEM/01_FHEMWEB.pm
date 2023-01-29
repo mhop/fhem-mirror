@@ -2971,14 +2971,14 @@ FW_readIconsFrom($$)
       }
     }
   }
-  $FW_icons{$dir}{""} = 1; # Do not check empty directories again.
+  $FW_icons{$dir}{""} = undef; # Do not check empty directories again.
 }
 
 sub
 FW_readIcons($)
 {
   my ($dir)= @_;
-  return if($FW_icons{$dir});
+  return if(exists($FW_icons{$dir}));
   FW_readIconsFrom($dir, "");
 }
 
