@@ -6053,13 +6053,13 @@ sub _DbLog_createQuerySql {
     my $current         = $hash->{HELPER}{TC};
 
     if ($opt eq 'dataRetrieval') {
-        $querytype = $a[1] // qq();
-        $device    = $a[2] // qq();
-        $reading   = $a[3] // qq();
-        $starttime = $a[4] // qq();
-        $endtime   = $a[5] // qq();
-        $offset    = $a[6] // qq();
-        $limit     = $a[7] // qq();
+        $querytype = $a[1];
+        $device    = $a[2];
+        $reading   = $a[3];
+        $starttime = $a[4];
+        $endtime   = $a[5];
+        $offset    = $a[6];
+        $limit     = $a[7];
         $xaxis     = 'TIMESTAMP';
         
         if ($querytype eq 'last') {
@@ -6067,124 +6067,133 @@ sub _DbLog_createQuerySql {
         }
     }
 
-    $starttime =~ s/_/ /;
-    $endtime   =~ s/_/ /;
+    $starttime =~ s/_/ / if($starttime);
+    $endtime   =~ s/_/ / if($endtime);
 
-    my ($sql, $jsonstring, $countsql, $hourstats, $daystats, $weekstats, $monthstats, $yearstats);
+    my ($sql, $jsonstring, $countsql);
+    
+    my ($hourstats, $daystats, $weekstats, $monthstats, $yearstats) = ('error', 'error', 'error', 'error', 'error');
 
-    if ($dbmodel eq "POSTGRESQL") {
-        ### POSTGRESQL Queries for Statistics ###
-        ### hour:
-        $hourstats  = "SELECT to_char(timestamp, 'YYYY-MM-DD HH24:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
-        $hourstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $hourstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
-        $hourstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+    if ($device && $reading && $starttime && $endtime) {
+        if ($dbmodel eq "POSTGRESQL") {
+            ### POSTGRESQL Queries for Statistics ###
+            ### hour:
+            $hourstats  = "SELECT to_char(timestamp, 'YYYY-MM-DD HH24:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+            $hourstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
+            $hourstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
+            $hourstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
-        ### day:
-        $daystats  = "SELECT to_char(timestamp, 'YYYY-MM-DD 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
-        $daystats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $daystats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
-        $daystats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+            ### day:
+            $daystats  = "SELECT to_char(timestamp, 'YYYY-MM-DD 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+            $daystats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
+            $daystats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
+            $daystats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
-        ### week:
-        $weekstats  = "SELECT date_trunc('week',timestamp) AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
-        $weekstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $weekstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
-        $weekstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+            ### week:
+            $weekstats  = "SELECT date_trunc('week',timestamp) AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+            $weekstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
+            $weekstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
+            $weekstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
-        ### month:
-        $monthstats  = "SELECT to_char(timestamp, 'YYYY-MM-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
-        $monthstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $monthstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
-        $monthstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+            ### month:
+            $monthstats  = "SELECT to_char(timestamp, 'YYYY-MM-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+            $monthstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
+            $monthstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
+            $monthstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
-        ### year:
-        $yearstats  = "SELECT to_char(timestamp, 'YYYY-01-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
-        $yearstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
-        $yearstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
-        $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+            ### year:
+            $yearstats  = "SELECT to_char(timestamp, 'YYYY-01-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+            $yearstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
+            $yearstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
+            $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+        }
+        elsif ($dbmodel eq "MYSQL") {
+            ### MYSQL Queries for Statistics ###
+            ### hour:
+            $hourstats  = "SELECT date_format(timestamp, '%Y-%m-%d %H:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+            $hourstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
+            $hourstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
+            $hourstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+            ### day:
+            $daystats  = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+            $daystats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
+            $daystats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
+            $daystats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+            ### week:
+            $weekstats  = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+            $weekstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
+            $weekstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
+            $weekstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ";
+            $weekstats .= "GROUP BY date_format(timestamp, '%Y-%u 00:00:00') ORDER BY 1;";
+
+            ### month:
+            $monthstats  = "SELECT date_format(timestamp, '%Y-%m-01 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+            $monthstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
+            $monthstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
+            $monthstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+            ### year:
+            $yearstats  = "SELECT date_format(timestamp, '%Y-01-01 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+            $yearstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
+            $yearstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
+            $yearstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+        }
+        elsif ($dbmodel eq "SQLITE") {
+            ### SQLITE Queries for Statistics ###
+            ### hour:
+            $hourstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+            $hourstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
+            $hourstats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
+            $hourstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m-%d %H:00:00', TIMESTAMP);";
+
+            ### day:
+            $daystats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+            $daystats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
+            $daystats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
+            $daystats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m-%d 00:00:00', TIMESTAMP);";
+
+            ### week:
+            $weekstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+            $weekstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
+            $weekstats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
+            $weekstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%W 00:00:00', TIMESTAMP);";
+
+            ### month:
+            $monthstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+            $monthstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
+            $monthstats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
+            $monthstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m 00:00:00', TIMESTAMP);";
+
+            ### year:
+            $yearstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+            $yearstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
+            $yearstats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
+            $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y 00:00:00', TIMESTAMP);";
+        }
+        else {
+            $sql = "errordb";
+        }
     }
-    elsif ($dbmodel eq "MYSQL") {
-        ### MYSQL Queries for Statistics ###
-        ### hour:
-        $hourstats  = "SELECT date_format(timestamp, '%Y-%m-%d %H:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
-        $hourstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $hourstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
-        $hourstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
-        ### day:
-        $daystats  = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
-        $daystats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $daystats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
-        $daystats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
-
-        ### week:
-        $weekstats  = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
-        $weekstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $weekstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
-        $weekstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ";
-        $weekstats .= "GROUP BY date_format(timestamp, '%Y-%u 00:00:00') ORDER BY 1;";
-
-        ### month:
-        $monthstats  = "SELECT date_format(timestamp, '%Y-%m-01 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
-        $monthstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $monthstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
-        $monthstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
-
-        ### year:
-        $yearstats  = "SELECT date_format(timestamp, '%Y-01-01 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
-        $yearstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
-        $yearstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' ";
-        $yearstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
-    }
-    elsif ($dbmodel eq "SQLITE") {
-        ### SQLITE Queries for Statistics ###
-        ### hour:
-        $hourstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
-        $hourstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $hourstats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
-        $hourstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m-%d %H:00:00', TIMESTAMP);";
-
-        ### day:
-        $daystats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
-        $daystats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $daystats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
-        $daystats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m-%d 00:00:00', TIMESTAMP);";
-
-        ### week:
-        $weekstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
-        $weekstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $weekstats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
-        $weekstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%W 00:00:00', TIMESTAMP);";
-
-        ### month:
-        $monthstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
-        $monthstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $monthstats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
-        $monthstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m 00:00:00', TIMESTAMP);";
-
-        ### year:
-        $yearstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
-        $yearstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
-        $yearstats .= "FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
-        $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y 00:00:00', TIMESTAMP);";
-
-    }
-    else {
-        $sql = "errordb";
-    }
-
-    if($querytype eq 'getreadings') {
-        $sql = "SELECT distinct(reading) FROM $history WHERE device = '$device'";
-    }
-    elsif ($querytype eq 'getdevices') {
+    $sql = 'error';
+    
+    if ($querytype eq 'getdevices') {
         $sql = "SELECT distinct(device) FROM $history";
+    }
+    elsif($querytype eq 'getreadings') {
+        if ($device) {
+            $sql = "SELECT distinct(reading) FROM $history WHERE device = '$device'";
+        }
     }
     elsif ($querytype eq 'last') {
         $sql = "SELECT TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT from $history ORDER BY TIMESTAMP DESC LIMIT $limit";
     }
     elsif ($querytype eq 'timerange') {
-        $sql = "SELECT ".$xaxis.", VALUE FROM $history WHERE READING = '$reading' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ORDER BY TIMESTAMP;";
+        if ($device && $reading && $starttime && $endtime) {
+            $sql = "SELECT ".$xaxis.", VALUE FROM $history WHERE READING = '$reading' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ORDER BY TIMESTAMP;";
+        }
     }
     elsif ($querytype eq 'hourstats') {
         $sql = $hourstats;
@@ -6251,9 +6260,6 @@ sub _DbLog_createQuerySql {
         }
 
         return ($sql, $countsql);
-    }
-    else {
-        $sql = "error";
     }
 
 return $sql;
