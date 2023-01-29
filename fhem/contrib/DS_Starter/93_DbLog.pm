@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 27111 2023-01-28 19:06:28Z DS_Starter $
+# $Id: 93_DbLog.pm 27111 2023-01-29 19:06:28Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -38,7 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.8.0"   => "27.01.2023 new Get menu for a selection of getters ",
+  "5.8.0"   => "27.01.2023 new Get menu for a selection of getters, fix creation of new subprocess during shutdown sequence ",
   "5.7.0"   => "25.01.2023 send Log3() data back ro parent process, improve _DbLog_dbReadings function ",
   "5.6.2"   => "22.01.2023 check Syntax of DbLogValueFn attribute with Log output, Forum:#131777 ",
   "5.6.1"   => "16.01.2023 rewrite sub _DbLog_SBP_connectDB, rewrite sub DbLog_ExecSQL, _DbLog_SBP_onRun_deleteOldDays ",
@@ -949,7 +949,7 @@ sub _DbLog_setcount {              ## no critic "not used"
   }
 
   my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
-  return $err if(!defined $hash->{".fhem"}{subprocess});
+  return $err if($err);
 
   Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
   Log3 ($name, 4, "DbLog $name - Records count requested.");
@@ -980,7 +980,7 @@ sub _DbLog_setdeleteOldDays {            ## no critic "not used"
   }
 
   my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
-  return $err if(!defined $hash->{".fhem"}{subprocess});
+  return $err if($err);
 
   Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> delEntries" instead.});
   Log3 ($name, 3, "DbLog $name - Deletion of records older than $prop days in database $db requested");
@@ -1010,7 +1010,7 @@ sub _DbLog_setuserCommand {              ## no critic "not used"
   }
 
   my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
-  return $err if(!defined $hash->{".fhem"}{subprocess});
+  return $err if($err);
 
   Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> sqlCmd" instead.});
 
@@ -1117,7 +1117,7 @@ sub _DbLog_setimportCachefile {          ## no critic "not used"
   }
 
   my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
-  return $err if(!defined $hash->{".fhem"}{subprocess});
+  return $err if($err);
 
   DbLog_SBP_sendCommand ($hash, 'importCachefile', $infile);
 
@@ -1159,7 +1159,7 @@ sub _DbLog_setreduceLog {                ## no critic "not used"
       }
 
       my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
-      return $err if(!defined $hash->{".fhem"}{subprocess});
+      return $err if($err);
 
       DbLog_SBP_sendCommand ($hash, 'reduceLog', $arg);
   }
@@ -1930,7 +1930,6 @@ sub DbLog_execMemCacheAsync {
 
   my $async      = AttrVal($name, 'asyncMode', 0);
 
-
   RemoveInternalTimer($hash, 'DbLog_execMemCacheAsync');
 
   if(!$async || IsDisabled($name) || $init_done != 1) {
@@ -2017,7 +2016,7 @@ sub DbLog_execMemCacheSync {
   my $hash = shift;
 
   my $err = DbLog_SBP_CheckAndInit ($hash);                                                    # Subprocess checken und ggf. initialisieren
-  return $err if(!defined $hash->{".fhem"}{subprocess});
+  return $err if($err);
 
   if(defined $hash->{HELPER}{LONGRUN_PID}) {
       if (gettimeofday() - $hash->{HELPER}{LONGRUN_PID} > $dblog_lrpth) {
@@ -5080,6 +5079,8 @@ sub DbLog_SBP_CheckAndInit {
   my $hash = shift;
   my $nscd = shift // 0;                                                        # 1 - kein senden Connectiondata direkt nach Start Subprozess
 
+  return "Shutdown sequence running" if(defined $hash->{HELPER}{SHUTDOWNSEQ});  # Shutdown Sequenz läuft
+  
   my $name = $hash->{NAME};
 
   my $err = q{};
@@ -5099,7 +5100,7 @@ sub DbLog_SBP_CheckAndInit {
 
   if (!defined $hash->{SBP_PID}) {
       $err = _DbLog_SBP_Init ($hash, $nscd);
-      return $err if(!defined $hash->{SBP_PID});
+      return $err if($err);
   }
 
   my $pid = $hash->{SBP_PID};
