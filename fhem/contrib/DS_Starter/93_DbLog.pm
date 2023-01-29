@@ -6053,13 +6053,13 @@ sub _DbLog_createQuerySql {
     my $current         = $hash->{HELPER}{TC};
 
     if ($opt eq 'dataRetrieval') {
-        $querytype = $a[1];
-        $device    = $a[2];
-        $reading   = $a[3];
-        $starttime = $a[4];
-        $endtime   = $a[5];
-        $offset    = $a[6];
-        $limit     = $a[7];
+        $querytype = $a[1] // qq();
+        $device    = $a[2] // qq();
+        $reading   = $a[3] // qq();
+        $starttime = $a[4] // qq();
+        $endtime   = $a[5] // qq();
+        $offset    = $a[6] // qq();
+        $limit     = $a[7] // qq();
         $xaxis     = 'TIMESTAMP';
         
         if ($querytype eq 'last') {
