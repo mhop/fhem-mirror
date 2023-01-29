@@ -14,12 +14,13 @@ package main;
 # - prereq:<cond>, where cond is a perl expression, or devspec2array returning
 #   exactly one device.  Evaluated at initialization(!).
 # - par:<name>:<comment>:<perl>. if there is an additional argument in the set,
-#   name in alle commands will be replaced with it. Else <perl> will be
+#   name in all commands will be replaced with it. Else <perl> will be
 #   excuted: if returns a value, name in the commands will be replaced with it,
-#   else an error message/dialog will request the user to enter a value for
-#   name.
+#   else a dialog will request the user to enter a value for name.
 #   For each name starting with RADIO_, a radio select button is offered. Such
 #   parameters must defined last.
+# - pardefault:<name>:<comment>:<perl>.
+#   Same as par, but the dialog is always shown, with the input is prefilled.
 # - desc: additional text for the "set attrTemplate help ?". If missing, the
 #   last comment before name: will be used for this purpose.
 # - farewell:<text> to be shown after the commands are executed.
@@ -68,7 +69,8 @@ AttrTemplate_Initialize()
 
       } elsif($line =~ m/^name:(.*)/) {
         $name = $1;
-        my (@p,@c);
+        my (@p,@c,%t);
+        $templates{$name}{ptype} = \%t;
         $templates{$name}{pars} = \@p;
         $templates{$name}{cmds} = \@c;
         $templates{$name}{desc} = $lastComment if($lastComment);
@@ -89,8 +91,10 @@ AttrTemplate_Initialize()
 
         }
 
-      } elsif($line =~ m/^par:(.*)/) {
-        push(@{$templates{$name}{pars}}, $1);
+      } elsif($line =~ m/^(par|pardefault):(.*)/) {
+        push(@{$templates{$name}{pars}}, $2);
+        my @v = split(";",$2,2);
+        $templates{$name}{ptype}{$v[0]} = $1;
 
       } elsif($line =~ m/^desc:(.*)/) {
         $templates{$name}{desc} = $1;
@@ -278,7 +282,7 @@ AttrTemplate_Set($$@)
                 if($@);
       if(defined($ret)) {
         $repl{$parname} = $ret;
-        next;
+        next if($h->{ptype}{$parname} ne "pardefault");
       }
     }
 
@@ -292,13 +296,14 @@ AttrTemplate_Set($$@)
       return
       "<html>".
          "<input type='hidden' value='set $name attrTemplate $entry'>".
-         "<p>Specify the unknown parameters for $name/$entry:</p>".
+         "<p>Need the following parameters for the attrTemplate $entry</p><br>".
          "<table class='block wide'><tr>".
          join("</tr><tr>", map { 
            my @t=split("= with ",$_,2);
+           my $v=defined($repl{$t[0]}) ? $repl{$t[0]} : "";
            "<td>$t[1]</td><td>" .($t[0] =~ m/^RADIO_/ ?
              "<input type='radio' name='$name.s' value='$t[0]'>":
-             "<input type='text' name='$t[0]' size='20'></td>")
+             "<input type='text' name='$t[0]' size='20' value='$v'></td>")
          } @mComm)."</tr></table>".
         '<script>
           setTimeout(function(){
