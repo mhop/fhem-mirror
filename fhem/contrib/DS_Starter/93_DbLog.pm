@@ -9225,7 +9225,7 @@ return;
   <ul>
     <li><b>get &lt;name&gt; &lt;in&gt; &lt;out&gt; &lt;from&gt; &lt;to&gt; &lt;column_spec&gt; </b> <br><br>
 
-    Read data from the Database, used by frontends to plot data without direct
+    Read data from the Database used by frontends to plot data without direct
     access to the Database. <br>
     <br>
 
@@ -9397,7 +9397,8 @@ return;
     <li><b>get &lt;name&gt; &lt;in&gt; &lt;out&gt; &lt;from&gt;
           &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; &lt;chartconfig&gt; &lt;pagingstart&gt; &lt;paginglimit&gt; </b> <br><br>
 
-    Query the Database to retrieve JSON-Formatted Data, which is used by the charting frontend.
+    Query the Database to retrieve JSON-Formatted Data, which is used by the charting frontend 
+    (<a href="https://wiki.fhem.de/wiki/Neues_Charting_Frontend">German Wiki: Neues Charting Frontend</a>).
     <br>
     <br>
 
@@ -11279,7 +11280,8 @@ attr SMA_Energymeter DbLogValueFn
     <br>
     <br>
 
-    Liest Daten aus der Datenbank aus und gibt diese in JSON formatiert aus. Wird für das Charting Frontend genutzt.
+    Liest Daten aus der Datenbank aus und gibt diese in JSON formatiert aus. Wird für das Charting Frontend 
+    (<a href="https://wiki.fhem.de/wiki/Neues_Charting_Frontend">Wiki: Neues Charting Frontend</a>) genutzt.
     <br>
     <br>
 
