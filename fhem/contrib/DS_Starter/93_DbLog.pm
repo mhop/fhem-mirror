@@ -6190,6 +6190,12 @@ sub _DbLog_createQuerySql {
     elsif ($querytype eq 'last') {
         $sql = "SELECT TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT from $history ORDER BY TIMESTAMP DESC LIMIT $limit";
     }
+    elsif ($querytype eq 'count') {
+        if ($device) {
+            my $table = $device;
+            $sql      = "SELECT COUNT(*) AS COUNT_".$table." from $table";
+        }
+    }
     elsif ($querytype eq 'timerange') {
         if ($device && $reading && $starttime && $endtime) {
             $sql = "SELECT ".$xaxis.", VALUE FROM $history WHERE READING = '$reading' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ORDER BY TIMESTAMP;";
@@ -9152,7 +9158,7 @@ return;
 
   <ul>
     <a id="DbLog-get-retrieve"></a>
-    <li><b>get &lt;name&gt; retrieve &lt;querytype&gt; &lt;device&gt; &lt;reading&gt; &lt;from&gt; &lt;to&gt; &lt;offset&gt; &lt;limit&gt; </b>
+    <li><b>get &lt;name&gt; retrieve &lt;querytype&gt; &lt;device|table&gt; &lt;reading&gt; &lt;from&gt; &lt;to&gt; &lt;offset&gt; &lt;limit&gt; </b>
     <br>
 
     <ul>
@@ -9169,13 +9175,15 @@ return;
        <tr><td><b>alldevices</b>   </td><td>Determines all devices stored in the database.                                           </td></tr>
        <tr><td><b>allreadings</b>  </td><td>Determines all readings stored in the database for a specific device.                    </td></tr>
        <tr><td>                    </td><td>required parameters: &lt;device&gt;                                                      </td></tr>
-       <tr><td><b>timerange</b>    </td><td>Determines the stored data sets of the specified Device / Reading combination.           </td></tr>
-       <tr><td>                    </td><td>required parameters: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;           </td></tr>
+       <tr><td><b>count</b>        </td><td>Returns the number of records of the specified table.                                    </td></tr>
+       <tr><td>                    </td><td>required parameters: &lt;table&gt; (history or current)                                  </td></tr>     
        <tr><td><b>fetchrows</b>    </td><td>Determines the stored records of a certain period.                                       </td></tr>
        <tr><td>                    </td><td>The number of records in the defined period is returned as the "totalcount" key.         </td></tr>
        <tr><td>                    </td><td>required parameters: &lt;from&gt;, &lt;to&gt;, &lt;offset&gt;, &lt;limit&gt;             </td></tr>
        <tr><td><b>last</b>         </td><td>Lists the last 10 saved events.                                                          </td></tr>
        <tr><td>                    </td><td>possible parameters: &lt;limit&gt; (overwrites the default 10)                           </td></tr>
+       <tr><td><b>timerange</b>    </td><td>Determines the stored data sets of the specified Device / Reading combination.           </td></tr>
+       <tr><td>                    </td><td>required parameters: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;           </td></tr>
        <tr><td><b>hourstats</b>    </td><td>Calculates the statistics SUM, AVG, MIN, MAX, COUNT for one hour.                        </td></tr>
        <tr><td>                    </td><td>required parameters: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;           </td></tr>
        <tr><td><b>daystats</b>     </td><td>Calculates the statistics SUM, AVG, MIN, MAX, COUNT for one day.                         </td></tr>
@@ -9205,6 +9213,9 @@ return;
         </li>
 
         <li><code>get LogSQLITE3 retrieve last "" "" "" "" "" 50 </code>
+        </li>
+        
+        <li><code>get LogSQLITE3 retrieve count history </code>
         </li>
         
         <li><code>get LogSQLITE3 retrieve timerange MySTP_5000 etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 </code>
@@ -11033,7 +11044,7 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-get-retrieve"></a>
-    <li><b>get &lt;name&gt; retrieve &lt;querytype&gt; &lt;device&gt; &lt;reading&gt; &lt;from&gt; &lt;to&gt; &lt;offset&gt; &lt;limit&gt; </b>
+    <li><b>get &lt;name&gt; retrieve &lt;querytype&gt; &lt;device|table&gt; &lt;reading&gt; &lt;from&gt; &lt;to&gt; &lt;offset&gt; &lt;limit&gt; </b>
     <br>
 
     <ul>
@@ -11050,13 +11061,15 @@ attr SMA_Energymeter DbLogValueFn
        <tr><td><b>alldevices</b>   </td><td>Ermittelt alle in der Datenbank gespeicherten Devices.                                            </td></tr>
        <tr><td><b>allreadings</b>  </td><td>Ermittelt alle in der Datenbank gespeicherten Readings für ein bestimmtes Device.                 </td></tr>
        <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;                                                               </td></tr>
-       <tr><td><b>timerange</b>    </td><td>Ermittelt die gespeicherten Datensätze der angegebenen Device / Reading Kombination.              </td></tr>
-       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;                    </td></tr>
+       <tr><td><b>count</b>        </td><td>Liefert die Anzahl Datensätze der angegebenen Tabelle.                                            </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;table&gt; (history oder current)                                         </td></tr>     
        <tr><td><b>fetchrows</b>    </td><td>Ermittelt die gespeicherten Datensätze eines bestimmten Zeitraumes.                               </td></tr>
        <tr><td>                    </td><td>Die Anzahl der Datensätze im definierten Zeitraum wird als Schlüssel "totalcount" zurückgegeben.  </td></tr>
-       <tr><td>                    </td><td>benötigte Parameter: &lt;from&gt;, &lt;to&gt;, &lt;offset&gt;, &lt;limit&gt;                      </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;from&gt;, &lt;to&gt;, &lt;offset&gt;, &lt;limit&gt;                      </td></tr>   
        <tr><td><b>last</b>         </td><td>Listet die letzten 10 gespeicherten Events auf.                                                   </td></tr>
        <tr><td>                    </td><td>mögliche Parameter: &lt;limit&gt; (überschreibt den Standard 10)                                  </td></tr>
+       <tr><td><b>timerange</b>    </td><td>Ermittelt die gespeicherten Datensätze der angegebenen Device / Reading Kombination.              </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;                    </td></tr>
        <tr><td><b>hourstats</b>    </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für eine Stunde.                              </td></tr>
        <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;                    </td></tr>
        <tr><td><b>daystats</b>     </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für einen Tag.                                </td></tr>
@@ -11087,6 +11100,9 @@ attr SMA_Energymeter DbLogValueFn
         </li>
 
         <li><code>get LogSQLITE3 retrieve last "" "" "" "" "" 50 </code>
+        </li>
+        
+        <li><code>get LogSQLITE3 retrieve count history </code>
         </li>
         
         <li><code>get LogSQLITE3 retrieve timerange MySTP_5000 etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 </code>
