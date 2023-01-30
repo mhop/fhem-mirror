@@ -339,9 +339,6 @@ sub APIAuthResponse {
         readingsBulkUpdateIfChanged($hash,'.token_type',$hash->{helper}{auth}{token_type},0 );
         readingsBulkUpdateIfChanged($hash,'.provider',$hash->{helper}{auth}{provider} );
 
-        my $tok = substr($hash->{helper}{auth}{access_token},0,15).'...'.substr($hash->{helper}{auth}{access_token},-15);
-        readingsBulkUpdateIfChanged($hash,'api_token',$tok );
-
         my $expire_date = FmtDateTime($hash->{helper}{auth}{expires});
         readingsBulkUpdateIfChanged($hash,'api_token_expires',$expire_date );
         readingsBulkUpdateIfChanged($hash,'state', 'authenticated');
@@ -792,7 +789,7 @@ sub Set {
     sendCMD($hash,$setName);
     return undef;
   }
-  my $ret = " getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start Park ResumeSchedule:noArg getUpdate:noArg client_secret ";
+  my $ret = " getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,60,60,600,0,lin Park:selectnumbers,60,60,600,0,lin ResumeSchedule:noArg getUpdate:noArg client_secret ";
   $ret .= "chargingStationPositionToAttribute:noArg headlight:ALWAYS_OFF,ALWAYS_ON,EVENING_ONLY,EVENING_AND_NIGHT cuttingHeight:1,2,3,4,5,6,7,8,9 mowerScheduleToAttribute:noArg ";
   $ret .= "sendScheduleFromAttributeToMower:noArg ";
   return "Unknown argument $setName, choose one of".$ret;

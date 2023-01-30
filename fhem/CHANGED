@@ -2,6 +2,7 @@
 # Do not insert empty lines here, update check depends on it.
  - feature:  74_AutomowerConnect: reduce readings, new getter for error codes 
              and internal data, show mower path without registered image
+             add widget selectnumbers to Park and Start setter
  - feature:  75_AutomowerConnectDevice: same as AutomowerConnect
  - feature:  72_FB_CALLMONITOR: tellows.de integriert
                          kleinere Korrekturen

@@ -583,7 +583,7 @@ sub Set {
     CMD($hash,$setName);
     return undef;
   }
-  my $ret = " ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start Park ResumeSchedule:noArg ";
+  my $ret = " ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,60,60,600,0,lin Park:selectnumbers,60,60,600,0,lin ResumeSchedule:noArg ";
   $ret .= "chargingStationPositionToAttribute:noArg headlight:ALWAYS_OFF,ALWAYS_ON,EVENING_ONLY,EVENING_AND_NIGHT cuttingHeight:1,2,3,4,5,6,7,8,9 mowerScheduleToAttribute:noArg ";
   $ret .= "sendScheduleFromAttributeToMower:noArg ";
   return "Unknown argument $setName, choose one of".$ret;
