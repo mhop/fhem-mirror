@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 27111 2023-01-29 19:06:28Z DS_Starter $
+# $Id: 93_DbLog.pm 27111 2023-01-30 19:06:28Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -38,7 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.8.0"   => "27.01.2023 new Get menu for a selection of getters, fix creation of new subprocess during shutdown sequence ",
+  "5.8.0"   => "30.01.2023 new Get menu for a selection of getters, fix creation of new subprocess during shutdown sequence ",
   "5.7.0"   => "25.01.2023 send Log3() data back ro parent process, improve _DbLog_dbReadings function ",
   "5.6.2"   => "22.01.2023 check Syntax of DbLogValueFn attribute with Log output, Forum:#131777 ",
   "5.6.1"   => "16.01.2023 rewrite sub _DbLog_SBP_connectDB, rewrite sub DbLog_ExecSQL, _DbLog_SBP_onRun_deleteOldDays ",
@@ -132,7 +132,7 @@ my %DbLog_hget = (                                                              
   ReadingsAvgVal          => { fn => \&_DbLog_dbReadings   },
   webchart                => { fn => \&_DbLog_chartQuery   },
   plotdata                => { fn => \&_DbLog_plotData     },
-  dataRetrieval           => { fn => \&_DbLog_chartQuery   },
+  retrieve                => { fn => \&_DbLog_chartQuery   },
 );
 
 my %DbLog_columns = ("DEVICE"  => 64,
@@ -5840,7 +5840,7 @@ sub DbLog_Get {
                 "ReadingsMinVal ".
                 "ReadingsMinValTimestamp ".
                 "ReadingsAvgVal ".
-                "dataRetrieval: "
+                "retrieve: "
                 ;
 
 return $getlist;
@@ -5977,7 +5977,7 @@ sub _DbLog_chartQuery {
 
   my $i          = 0;
   my $jsonstring = q({);
-  $jsonstring   .= q("success": "true", ) if($opt eq 'dataRetrieval');
+  $jsonstring   .= q("success": "true", ) if($opt eq 'retrieve');
   $jsonstring   .= q("data":[);
 
   while ( my @data = $query_handle->fetchrow_array()) {
@@ -6052,7 +6052,7 @@ sub _DbLog_createQuerySql {
     my $history         = $hash->{HELPER}{TH};
     my $current         = $hash->{HELPER}{TC};
 
-    if ($opt eq 'dataRetrieval') {
+    if ($opt eq 'retrieve') {
         $querytype = $a[1];
         $device    = $a[2];
         $reading   = $a[3];
@@ -6179,10 +6179,10 @@ sub _DbLog_createQuerySql {
 
     $sql = 'error';
     
-    if ($querytype eq 'getdevices') {
+    if ($querytype eq 'getdevices' || $querytype eq 'alldevices') {
         $sql = "SELECT distinct(device) FROM $history";
     }
-    elsif($querytype eq 'getreadings') {
+    elsif ($querytype eq 'getreadings' || $querytype eq 'allreadings') {
         if ($device) {
             $sql = "SELECT distinct(reading) FROM $history WHERE device = '$device'";
         }
@@ -6225,7 +6225,7 @@ sub _DbLog_createQuerySql {
     elsif ($querytype eq 'getcharts') {
         $sql = "SELECT * FROM frontend WHERE TYPE = 'savedchart'";
     }
-    elsif ($querytype eq 'getTableData') {
+    elsif ($querytype eq 'getTableData' || $querytype eq 'fetchrows') {
         if ($device ne '""' && $reading ne '""') {
             $sql       = "SELECT * FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
             $sql      .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
@@ -9151,8 +9151,8 @@ return;
   <br>
 
   <ul>
-    <a id="DbLog-get-dataRetrieval"></a>
-    <li><b>get &lt;name&gt; dataRetrieval &lt;querytype&gt; &lt;device&gt; &lt;reading&gt; &lt;from&gt; &lt;to&gt; &lt;offset&gt; &lt;limit&gt; </b>
+    <a id="DbLog-get-retrieve"></a>
+    <li><b>get &lt;name&gt; retrieve &lt;querytype&gt; &lt;device&gt; &lt;reading&gt; &lt;from&gt; &lt;to&gt; &lt;offset&gt; &lt;limit&gt; </b>
     <br>
 
     <ul>
@@ -9166,13 +9166,13 @@ return;
       <ul>
        <table>
        <colgroup> <col width=15%> <col width=85%> </colgroup>
-       <tr><td><b>getdevices</b>   </td><td>Determines all devices stored in the database.                                           </td></tr>
-       <tr><td><b>getreadings</b>  </td><td>Determines all readings stored in the database for a specific device.                    </td></tr>
+       <tr><td><b>alldevices</b>   </td><td>Determines all devices stored in the database.                                           </td></tr>
+       <tr><td><b>allreadings</b>  </td><td>Determines all readings stored in the database for a specific device.                    </td></tr>
        <tr><td>                    </td><td>required parameters: &lt;device&gt;                                                      </td></tr>
        <tr><td><b>timerange</b>    </td><td>Determines the stored data sets of the specified Device / Reading combination.           </td></tr>
        <tr><td>                    </td><td>required parameters: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;           </td></tr>
-       <tr><td><b>getTableData</b> </td><td>Determines the stored records of a certain period.                                       </td></tr>
-       <tr><td>                    </td><td>The number of selected records is returned as the key "totalcount".                      </td></tr>
+       <tr><td><b>fetchrows</b>    </td><td>Determines the stored records of a certain period.                                       </td></tr>
+       <tr><td>                    </td><td>The number of records in the defined period is returned as the "totalcount" key.         </td></tr>
        <tr><td>                    </td><td>required parameters: &lt;from&gt;, &lt;to&gt;, &lt;offset&gt;, &lt;limit&gt;             </td></tr>
        <tr><td><b>last</b>         </td><td>Lists the last 10 saved events.                                                          </td></tr>
        <tr><td>                    </td><td>possible parameters: &lt;limit&gt; (overwrites the default 10)                           </td></tr>
@@ -9198,25 +9198,25 @@ return;
 
       <b>Examples:</b>
       <ul>
-        <li><code>get LogSQLITE3 dataRetrieval getdevices </code>
+        <li><code>get LogSQLITE3 retrieve alldevices </code>
         </li>
 
-        <li><code>get LogSQLITE3 dataRetrieval getreadings MySTP_5000 </code>
+        <li><code>get LogSQLITE3 retrieve allreadings MySTP_5000 </code>
         </li>
 
-        <li><code>get LogSQLITE3 dataRetrieval last "" "" "" "" "" 50 </code>
+        <li><code>get LogSQLITE3 retrieve last "" "" "" "" "" 50 </code>
         </li>
         
-        <li><code>get LogSQLITE3 dataRetrieval timerange MySTP_5000 etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 </code>
+        <li><code>get LogSQLITE3 retrieve timerange MySTP_5000 etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 </code>
         </li>
 
-        <li><code>get LogSQLITE3 dataRetrieval getTableData MySTP_5000 "" 2023-01-01_00:00:00 2023-01-25_00:00:00 0 100 </code>
+        <li><code>get LogSQLITE3 retrieve fetchrows MySTP_5000 "" 2023-01-01_00:00:00 2023-01-25_00:00:00 0 100 </code>
         </li>
 
-        <li><code>get LogSQLITE3 dataRetrieval getTableData "" etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 0 100 </code>
+        <li><code>get LogSQLITE3 retrieve fetchrows "" etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 0 100 </code>
         </li>
         
-        <li><code>get LogSQLITE3 dataRetrieval hourstats MySTP_5000 etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 </code>
+        <li><code>get LogSQLITE3 retrieve hourstats MySTP_5000 etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 </code>
         </li>
       </ul>
     </ul>
@@ -11032,8 +11032,8 @@ attr SMA_Energymeter DbLogValueFn
   <br>
 
   <ul>
-    <a id="DbLog-get-dataRetrieval"></a>
-    <li><b>get &lt;name&gt; dataRetrieval &lt;querytype&gt; &lt;device&gt; &lt;reading&gt; &lt;from&gt; &lt;to&gt; &lt;offset&gt; &lt;limit&gt; </b>
+    <a id="DbLog-get-retrieve"></a>
+    <li><b>get &lt;name&gt; retrieve &lt;querytype&gt; &lt;device&gt; &lt;reading&gt; &lt;from&gt; &lt;to&gt; &lt;offset&gt; &lt;limit&gt; </b>
     <br>
 
     <ul>
@@ -11047,26 +11047,26 @@ attr SMA_Energymeter DbLogValueFn
       <ul>
        <table>
        <colgroup> <col width=15%> <col width=85%> </colgroup>
-       <tr><td><b>getdevices</b>   </td><td>Ermittelt alle in der Datenbank gespeicherten Devices.                                     </td></tr>
-       <tr><td><b>getreadings</b>  </td><td>Ermittelt alle in der Datenbank gespeicherten Readings für ein bestimmtes Device.          </td></tr>
-       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;                                                        </td></tr>
-       <tr><td><b>timerange</b>    </td><td>Ermittelt die gespeicherten Datensätze der angegebenen Device / Reading Kombination.       </td></tr>
-       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;             </td></tr>
-       <tr><td><b>getTableData</b> </td><td>Ermittelt die gespeicherten Datensätze eines bestimmten Zeitraumes.                        </td></tr>
-       <tr><td>                    </td><td>Die Anzahl der selektierten Datensätze wird als Schlüssel "totalcount" zurückgegeben.      </td></tr>
-       <tr><td>                    </td><td>benötigte Parameter: &lt;from&gt;, &lt;to&gt;, &lt;offset&gt;, &lt;limit&gt;               </td></tr>
-       <tr><td><b>last</b>         </td><td>Listet die letzten 10 gespeicherten Events auf.                                            </td></tr>
-       <tr><td>                    </td><td>mögliche Parameter: &lt;limit&gt; (überschreibt den Standard 10)                           </td></tr>
-       <tr><td><b>hourstats</b>    </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für eine Stunde.                       </td></tr>
-       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;             </td></tr>
-       <tr><td><b>daystats</b>     </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für einen Tag.                         </td></tr>
-       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;             </td></tr>
-       <tr><td><b>weekstats</b>    </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für eine Woche.                        </td></tr>
-       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;             </td></tr>
-       <tr><td><b>monthstats</b>   </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für einen Monat.                       </td></tr>
-       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;             </td></tr>
-       <tr><td><b>yearstats</b>    </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für ein Jahr.                          </td></tr>
-       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;             </td></tr>
+       <tr><td><b>alldevices</b>   </td><td>Ermittelt alle in der Datenbank gespeicherten Devices.                                            </td></tr>
+       <tr><td><b>allreadings</b>  </td><td>Ermittelt alle in der Datenbank gespeicherten Readings für ein bestimmtes Device.                 </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;                                                               </td></tr>
+       <tr><td><b>timerange</b>    </td><td>Ermittelt die gespeicherten Datensätze der angegebenen Device / Reading Kombination.              </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;                    </td></tr>
+       <tr><td><b>fetchrows</b>    </td><td>Ermittelt die gespeicherten Datensätze eines bestimmten Zeitraumes.                               </td></tr>
+       <tr><td>                    </td><td>Die Anzahl der Datensätze im definierten Zeitraum wird als Schlüssel "totalcount" zurückgegeben.  </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;from&gt;, &lt;to&gt;, &lt;offset&gt;, &lt;limit&gt;                      </td></tr>
+       <tr><td><b>last</b>         </td><td>Listet die letzten 10 gespeicherten Events auf.                                                   </td></tr>
+       <tr><td>                    </td><td>mögliche Parameter: &lt;limit&gt; (überschreibt den Standard 10)                                  </td></tr>
+       <tr><td><b>hourstats</b>    </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für eine Stunde.                              </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;                    </td></tr>
+       <tr><td><b>daystats</b>     </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für einen Tag.                                </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;                    </td></tr>
+       <tr><td><b>weekstats</b>    </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für eine Woche.                               </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;                    </td></tr>
+       <tr><td><b>monthstats</b>   </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für einen Monat.                              </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;                    </td></tr>
+       <tr><td><b>yearstats</b>    </td><td>Errechnet die Statistiken SUM, AVG, MIN, MAX, COUNT für ein Jahr.                                 </td></tr>
+       <tr><td>                    </td><td>benötigte Parameter: &lt;device&gt;, &lt;reading&gt;, &lt;from&gt;, &lt;to&gt;                    </td></tr>
        </table>
       </ul>
       <br>
@@ -11080,25 +11080,25 @@ attr SMA_Energymeter DbLogValueFn
 
       <b>Beispiele:</b>
       <ul>
-        <li><code>get LogSQLITE3 dataRetrieval getdevices </code>
+        <li><code>get LogSQLITE3 retrieve alldevices </code>
         </li>
 
-        <li><code>get LogSQLITE3 dataRetrieval getreadings MySTP_5000 </code>
+        <li><code>get LogSQLITE3 retrieve allreadings MySTP_5000 </code>
         </li>
 
-        <li><code>get LogSQLITE3 dataRetrieval last "" "" "" "" "" 50 </code>
+        <li><code>get LogSQLITE3 retrieve last "" "" "" "" "" 50 </code>
         </li>
         
-        <li><code>get LogSQLITE3 dataRetrieval timerange MySTP_5000 etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 </code>
+        <li><code>get LogSQLITE3 retrieve timerange MySTP_5000 etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 </code>
         </li>
 
-        <li><code>get LogSQLITE3 dataRetrieval getTableData MySTP_5000 "" 2023-01-01_00:00:00 2023-01-25_00:00:00 0 100 </code>
+        <li><code>get LogSQLITE3 retrieve fetchrows MySTP_5000 "" 2023-01-01_00:00:00 2023-01-25_00:00:00 0 100 </code>
         </li>
 
-        <li><code>get LogSQLITE3 dataRetrieval getTableData "" etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 0 100 </code>
+        <li><code>get LogSQLITE3 retrieve fetchrows "" etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 0 100 </code>
         </li>
         
-        <li><code>get LogSQLITE3 dataRetrieval hourstats MySTP_5000 etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 </code>
+        <li><code>get LogSQLITE3 retrieve hourstats MySTP_5000 etotal 2023-01-01_00:00:00 2023-01-25_00:00:00 </code>
         </li>
       </ul>
     </ul>
