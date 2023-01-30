@@ -50,6 +50,8 @@ BEGIN {
           IsDisabled
           Log3
           Log
+          minNum
+          maxNum
           readingFnAttributes
           readingsBeginUpdate
           readingsBulkUpdate
@@ -147,6 +149,14 @@ sub Define{
       mowerNumber               => $mowerNumber,
       scaleToMeterLongitude     => 67425,
       scaleToMeterLatitude      => 108886,
+      minLon                    => 180,
+      maxLon                    => -180,
+      minLat                    => 90,
+      maxLat                    => -90,
+      imageHeight               => 650,
+      imageWidthHeight          => '350 650',
+      posMinMax                 => "-180 90\n 180 -90",
+      newdatasets               => 0,
       client_id                 => $client_id,
       grant_type                => 'client_credentials',
       MAP_PATH                  => '',
@@ -175,7 +185,7 @@ sub Define{
       },
       CHARGING                  => {
         arrayName               => 'cspos',
-        maxLength               => 500,
+        maxLength               => 100,
         callFn                  => \&ChargingStationPosition
       },
       LEAVING                   => {
@@ -185,7 +195,7 @@ sub Define{
       },
       PARKED_IN_CS              => {
         arrayName               => 'cspos',
-        maxLength               => 50,
+        maxLength               => 100,
         callFn                  => \&ChargingStationPosition
       },
       STOPPED_IN_GARDEN         => {
@@ -196,13 +206,10 @@ sub Define{
     }
   );
   
-  # my $helper = retrieve( $name.'_helper' );
-  # my $hashhelper = $hash->{helper};
-  # %$hashhelper = (%$helper, %$hashhelper);
-  
 my $errorjson = <<'EOF';
 {"23":"Wheel drive problem, left","24":"Cutting system blocked","123":"Destination not reachable","710":"SIM card locked","50":"Guide 1 not found","717":"SMS could not be sent","108":"Folding cutting deck sensor defect","4":"Loop sensor problem, front","15":"Lifted","29":"Slope too steep","1":"Outside working area","45":"Cutting height problem, dir","52":"Guide 3 not found","28":"Memory circuit problem","95":"Folding sensor activated","9":"Trapped","114":"Too high discharge current","103":"Cutting drive motor 2 defect","65":"Temporary battery problem","119":"Zone generator problem","6":"Loop sensor problem, left","82":"Wheel motor blocked, rear right","714":"Geofence problem","703":"Connectivity problem","708":"SIM card locked","75":"Connection changed","7":"Loop sensor problem, right","35":"Wheel motor overloaded, right","3":"Wrong loop signal","117":"High internal power loss","0":"Unexpected error","80":"Cutting system imbalance - Warning","110":"Collision sensor error","100":"Ultrasonic Sensor 3 defect","79":"Invalid battery combination - Invalid combination of different battery types.","724":"Communication circuit board SW must be updated","86":"Wheel motor overloaded, rear right","81":"Safety function faulty","78":"Slipped - Mower has Slipped.Situation not solved with moving pattern","107":"Docking sensor defect","33":"Mower tilted","69":"Alarm! Mower switched off","68":"Temporary battery problem","34":"Cutting stopped - slope too steep","127":"Battery problem","73":"Alarm! Mower in motion","74":"Alarm! Outside geofence","713":"Geofence problem","87":"Wheel motor overloaded, rear left","120":"Internal voltage error","39":"Cutting motor problem","704":"Connectivity problem","63":"Temporary battery problem","109":"Loop sensor defect","38":"Electronic problem","64":"Temporary battery problem","113":"Complex working area","93":"No accurate position from satellites","104":"Cutting drive motor 3 defect","709":"SIM card not found","94":"Reference station communication problem","43":"Cutting height problem, drive","13":"No drive","44":"Cutting height problem, curr","118":"Charging system problem","14":"Mower lifted","57":"Guide calibration failed","707":"SIM card requires PIN","99":"Ultrasonic Sensor 2 defect","98":"Ultrasonic Sensor 1 defect","51":"Guide 2 not found","56":"Guide calibration accomplished","49":"Ultrasonic problem","2":"No loop signal","124":"Destination blocked","25":"Cutting system blocked","19":"Collision sensor problem, front","18":"Collision sensor problem, rear","48":"No response from charger","105":"Lift Sensor defect","111":"No confirmed position","10":"Upside down","40":"Limited cutting height range","716":"Connectivity problem","27":"Settings restored","90":"No power in charging station","21":"Wheel motor blocked, left","26":"Invalid sub-device combination","92":"Work area not valid","702":"Connectivity settings restored","125":"Battery needs replacement","5":"Loop sensor problem, rear","12":"Empty battery","55":"Difficult finding home","42":"Limited cutting height range","30":"Charging system problem","72":"Alarm! Mower tilted","85":"Wheel drive problem, rear left","8":"Wrong PIN code","62":"Temporary battery problem","102":"Cutting drive motor 1 defect","116":"High charging power loss","122":"CAN error","60":"Temporary battery problem","705":"Connectivity problem","711":"SIM card locked","70":"Alarm! Mower stopped","32":"Tilt sensor problem","37":"Charging current too high","89":"Invalid system configuration","76":"Connection NOT changed","71":"Alarm! Mower lifted","88":"Angular sensor problem","701":"Connectivity problem","715":"Connectivity problem","61":"Temporary battery problem","66":"Battery problem","106":"Collision sensor defect","67":"Battery problem","112":"Cutting system major imbalance","83":"Wheel motor blocked, rear left","84":"Wheel drive problem, rear right","126":"Battery near end of life","77":"Com board not available","36":"Wheel motor overloaded, left","31":"STOP button problem","17":"Charging station blocked","54":"Weak GPS signal","47":"Cutting height problem","53":"GPS navigation problem","121":"High internal temerature","97":"Left brush motor overloaded","712":"SIM card locked","20":"Wheel motor blocked, right","91":"Switch cord problem","96":"Right brush motor overloaded","58":"Temporary battery problem","59":"Temporary battery problem","22":"Wheel drive problem, right","706":"Poor signal quality","41":"Unexpected cutting height adj","46":"Cutting height blocked","11":"Low battery","16":"Stuck in charging station","101":"Ultrasonic Sensor 4 defect","115":"Too high internal current"}
 EOF
+
   my $errortable = eval { decode_json ($errorjson) };
   if ($@) {
     return "$iam $@";
@@ -434,11 +441,11 @@ sub getMowerResponse {
         }
         Log3 $name, 5, "$iam found $foundMower ";
 
-        if ( defined ($hash->{helper}{mower}{id}) ){
+        if ( defined ($hash->{helper}{mower}{id}) ){ # update dataset
 
           $hash->{helper}{mowerold} = dclone( $hash->{helper}{mower} );
           
-        } else {
+        } else { # first data set
 
           $hash->{helper}{mowerold} = dclone( $hash->{helper}{mowers}[$mowerNumber] );
           
@@ -451,9 +458,17 @@ sub getMowerResponse {
           $hash->{helper}{cspos} = [ dclone( $hash->{helper}{mowerold}{attributes}{positions}[0] ), dclone( $hash->{helper}{mowerold}{attributes}{positions}[1] ) ];
           $hash->{helper}{cspos}[0]{statusTimestamp} = $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
           $hash->{helper}{cspos}[1]{statusTimestamp} = $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} - 600000;
+
+          if ( AttrVal( $name, 'mapImageCoordinatesToRegister', '' ) eq '' ) {
+            posMinMax( $hash, $hash->{helper}{mowerold}{attributes}{positions} );
+          }
+
         }
 
         $hash->{helper}{mower} = dclone( $hash->{helper}{mowers}[$mowerNumber] );
+        # add alignment data set to the end
+        push( @{ $hash->{helper}{mower}{attributes}{positions} }, @{ dclone( $hash->{helper}{searchpos} ) } );
+
         my $storediff = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
         if ($storediff) {
 
@@ -510,8 +525,7 @@ sub getMowerResponse {
           readingsBulkUpdateIfChanged($hash, $pref."_TimestampDiff", $storediff/1000 );
           readingsBulkUpdateIfChanged($hash, $pref."_TimestampOld", FmtDateTime( $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp}/1000 ));
           $pref = 'positions';
-          readingsBulkUpdateIfChanged($hash, $pref."_lastLatitude", $hash->{helper}{mower}{attributes}{$pref}[0]{latitude} );
-          readingsBulkUpdateIfChanged($hash, $pref."_lastLongitude", $hash->{helper}{mower}{attributes}{$pref}[0]{longitude} );
+          readingsBulkUpdateIfChanged($hash, $pref."_lastLonLat", $hash->{helper}{mower}{attributes}{$pref}[0]{longitude} . ' ' . $hash->{helper}{mower}{attributes}{$pref}[0]{latitude} );
           readingsBulkUpdateIfChanged($hash, 'state', 'connected' );
 
           my @time = localtime();
@@ -684,8 +698,23 @@ sub Get {
   Log3 $name, 4, "$iam called with $setName " . ($setVal ? $setVal : "");
 
   if ( $setName eq 'html' ) {
+    
     my $ret = '<html>' . FW_detailFn( undef, $name, undef, undef) . '</html>';
     return $ret;
+
+  } elsif (  $setName eq 'listErrorCodes' ) {
+
+    my $ret = listErrorCodes($hash);
+    return $ret;
+
+  } elsif (  $setName eq 'listInternalData' ) {
+
+    my $ret = listInternalData($hash);
+    return $ret;
+
+  } else {
+  
+    return "Unknown argument $setName, choose one of listErrorCodes:noArg listInternalData:noArg ";
 
   }
 }
@@ -710,7 +739,8 @@ sub Set {
 
   } elsif ( $setName eq 'chargingStationPositionToAttribute' ) {
 
-    my ($xm, $ym, $n) = split(/,\s/,ReadingsVal($name,'status_calcChargingStationPositionXYn','10.1165, 51.28, 0'));
+    my $xm = $hash->{helper}{chargingStation}{longitude} // 10.1165;
+    my $ym = $hash->{helper}{chargingStation}{latitude} // 51.28;
     CommandAttr($hash,"$name chargingStationCoordinates $xm $ym");
     return undef;
 
@@ -774,12 +804,12 @@ sub FW_detailFn {
   my ($FW_wname, $name, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$name};
   my $type = $hash->{TYPE};
-  return undef if( AttrVal($name, 'disable', 0) || !AttrVal($name, 'showMap', 1) );
+  return '' if( AttrVal($name, 'disable', 0) || !AttrVal($name, 'showMap', 1) );
   if ( $hash->{helper} && $hash->{helper}{mower} && $hash->{helper}{mower}{attributes} && $hash->{helper}{mower}{attributes}{positions} && @{$hash->{helper}{mower}{attributes}{positions}} > 0 ) {
     my $img = "./fhem/$type/$name/map";
-    my $zoom=AttrVal($name,"mapImageZoom",0.7);
+    my $zoom=AttrVal( $name,"mapImageZoom", 0.7 );
     
-    AttrVal($name,"mapImageWidthHeight",'100 200') =~ /(\d+)\s(\d+)/;
+    AttrVal( $name,"mapImageWidthHeight", $hash->{helper}{imageWidthHeight} ) =~ /(\d+)\s(\d+)/;
     my ($picx,$picy) = ($1, $2);
     
     $picx=int($picx*$zoom);
@@ -794,7 +824,7 @@ sub FW_detailFn {
     
     return $ret;
   }
-  return undef;
+  return '';
 }
 
 #########################
@@ -806,17 +836,16 @@ sub FW_detailFn_Update {
 
     my @pos = ();
     my @posc = ();
-    # @pos = @{$hash->{helper}{mower}{attributes}{positions}}; # developement mode
     @pos = @{$hash->{helper}{areapos}}; # operational mode
     @posc =@{$hash->{helper}{cspos}}; # maybe operational mode
     my $img = "./fhem/$type/$name/map";
 
-    AttrVal($name,"mapImageCoordinatesToRegister","0 90\n90 0") =~ /(\d*\.?\d+)\s(\d*\.?\d+)(\R|\s)(\d*\.?\d+)\s(\d*\.?\d+)/;
-    my ( $lonlo, $latlo, $lonru, $latru ) = ($1, $2, $4, $5);
+    AttrVal( $name,"mapImageCoordinatesToRegister",$hash->{helper}{posMinMax} ) =~ /(-?\d*\.?\d+)\s(-?\d*\.?\d+)(\R|-?\s)(\d*\.?\d+)\s(-?\d*\.?\d+)/;
+    my ( $lonlo, $latlo, $lonru, $latru ) = ( $1, $2, $4, $5 );
 
-    my $zoom = AttrVal($name,"mapImageZoom",0.7);
+    my $zoom = AttrVal( $name,"mapImageZoom", 0.7 );
     
-    AttrVal($name,"mapImageWidthHeight",'100 200') =~ /(\d+)\s(\d+)/;
+    AttrVal( $name,"mapImageWidthHeight", $hash->{helper}{imageWidthHeight} ) =~ /(\d+)\s(\d+)/;
     my ($picx,$picy) = ($1, $2);
 
     AttrVal($name,'scaleToMeterXY', $hash->{helper}{scaleToMeterLongitude} . ' ' .$hash->{helper}{scaleToMeterLatitude}) =~ /(\d+)\s+(\d+)/;
@@ -833,17 +862,15 @@ sub FW_detailFn_Update {
       use strict "refs";
     }
 
-    my $csimgpos = AttrVal($name,"chargingStationImagePosition","right");
+    my $csimgpos = AttrVal( $name,"chargingStationImagePosition","right" );
+    my $xm = $hash->{helper}{chargingStation}{longitude} // 10.1165;
+    my $ym = $hash->{helper}{chargingStation}{latitude} // 51.28;
 
-    AttrVal($name,"chargingStationCoordinates",'10.1165 51.28') =~  /(\d*\.?\d+)\s(\d*\.?\d+)/;
+    AttrVal( $name,"chargingStationCoordinates","$xm $ym" ) =~  /(-?\d*\.?\d+)\s(-?\d*\.?\d+)/;
     my ($cslo,$csla) = ($1, $2);
 
     my $cslon = int(($lonlo-$cslo) * $picx / $mapx);
     my $cslat = int(($latlo-$csla) * $picy / $mapy);
-    # my $lon = int(($lonlo-$pos[0]{longitude}) * $picx / $mapx);
-    # my $lat = int(($latlo-$pos[0]{latitude}) * $picy / $mapy);
-    # my $lastx = int(($lonlo-$pos[$#pos]{longitude}) * $picx / $mapx);
-    # my $lasty = int(($latlo-$pos[$#pos]{latitude}) * $picy / $mapy);
 
     # MOWING PATH
     my $posxy = int(($lonlo-$pos[0]{longitude}) * $picx / $mapx).",".int(($latlo-$pos[0]{latitude}) * $picy / $mapy);
@@ -977,10 +1004,10 @@ sub Attr {
 
     if( $cmd eq "set" ) {
 
-      if ( AttrVal( $name,'mapImageCoordinatesToRegister', '' ) && $attrVal =~ /(\d*\.?\d+)\s(\d*\.?\d+)(\R|\s)(\d*\.?\d+)\s(\d*\.?\d+)/ ) {
+      if ( AttrVal( $name,'mapImageCoordinatesToRegister', '' ) && $attrVal =~ /(-?\d*\.?\d+)\s(-?\d*\.?\d+)(\R|\s)(-?\d*\.?\d+)\s(-?\d*\.?\d+)/ ) {
 
         my ( $x1, $y1, $x2, $y2 ) = ( $1, $2, $4, $5 );
-        AttrVal( $name,'mapImageCoordinatesToRegister', '' ) =~ /(\d*\.?\d+)\s(\d*\.?\d+)(\R|\s)(\d*\.?\d+)\s(\d*\.?\d+)/;
+        AttrVal( $name,'mapImageCoordinatesToRegister', '' ) =~ /(-?\d*\.?\d+)\s(-?\d*\.?\d+)(\R|\s)(-?\d*\.?\d+)\s(-?\d*\.?\d+)/;
         my ( $lo1, $la1, $lo2, $la2 ) = ( $1, $2, $4, $5 );
         my $scx = int( ( $x1 - $x2) / ( $lo1 - $lo2 ) );
         my $scy = int( ( $y1 - $y2 ) / ( $la1 - $la2 ) );
@@ -1001,7 +1028,7 @@ sub Attr {
 
     if( $cmd eq "set" ) {
 
-      return "$iam $attrName has a wrong format use linewise pairs <floating point longitude><one space character><floating point latitude>" unless($attrVal =~ /(\d*\.?\d+)\s(\d*\.?\d+)(\R|\s)(\d*\.?\d+)\s(\d*\.?\d+)/);
+      return "$iam $attrName has a wrong format use linewise pairs <floating point longitude><one space character><floating point latitude>" unless( $attrVal =~ /(-?\d*\.?\d+)\s(-?\d*\.?\d+)(\R|\s)(-?\d*\.?\d+)\s(-?\d*\.?\d+)/ );
       Log3 $name, 3, "$iam $cmd $attrName $attrVal";
 
     } elsif( $cmd eq "del" ) {
@@ -1014,7 +1041,7 @@ sub Attr {
 
     if( $cmd eq "set" ) {
 
-      return "$iam $attrName has a wrong format use <floating point longitude><one space character><floating point latitude>" unless($attrVal =~ /(\d*\.?\d+)\s(\d*\.?\d+)/);
+      return "$iam $attrName has a wrong format use <floating point longitude><one space character><floating point latitude>" unless( $attrVal =~ /(-?\d*\.?\d+)\s(-?\d*\.?\d+)/ );
       Log3 $name, 3, "$iam $cmd $attrName $attrVal";
 
     } elsif( $cmd eq "del" ) {
@@ -1027,7 +1054,7 @@ sub Attr {
 
     if( $cmd eq "set" ) {
 
-      return "$iam $attrName has a wrong format use <integer longitude><one space character><integer latitude>" unless($attrVal =~ /(\d+)\s(\d+)/);
+      return "$iam $attrName has a wrong format use <integer longitude><one space character><integer latitude>" unless( $attrVal =~ /(\d+)\s(\d+)/ );
       Log3 $name, 3, "$iam $cmd $attrName $attrVal";
 
     } elsif( $cmd eq "del" ) {
@@ -1040,7 +1067,7 @@ sub Attr {
 
     if( $cmd eq "set" ) {
 
-      return "$iam $attrName has a wrong format use <integer longitude><one space character><integer latitude>" unless($attrVal =~ /(\d+)\s(\d+)/);
+      return "$iam $attrName has a wrong format use <integer longitude><one space character><integer latitude>" unless( $attrVal =~ /(\d+)\s(\d+)/ );
       Log3 $name, 3, "$iam $cmd $attrName $attrVal";
 
     } elsif( $cmd eq "del" ) {
@@ -1124,13 +1151,13 @@ sub AlignArray {
     my $activity = $hash->{helper}{mower}{attributes}{mower}{activity};
     my $arrayName = $hash->{helper}{$activity}{arrayName};
     my $maxLength = $hash->{helper}{$activity}{maxLength};
-    for ( $i = 0; $i < $poslen-1; $i++ ) {
+    for ( $i = 0; $i < $poslen-3; $i++ ) { # 3 instead of 1 due to new alignment
       if ( $searchposlon[0] == $hash->{helper}{mower}{attributes}{positions}[ $i ]{longitude}
         && $searchposlat[0] == $hash->{helper}{mower}{attributes}{positions}[ $i ]{latitude}
         && $searchposlon[1] == $hash->{helper}{mower}{attributes}{positions}[ $i+1 ]{longitude}
-        && $searchposlat[1] == $hash->{helper}{mower}{attributes}{positions}[ $i+1 ]{latitude}
-        || $i == $poslen-2 ) {
-        $i++ if ($i == $poslen-2);
+        && $searchposlat[1] == $hash->{helper}{mower}{attributes}{positions}[ $i+1 ]{latitude} ) {
+        # || $i == $poslen-2 ) { # not nessecary due to new alignment
+        # $i++ if ( $i == $poslen-2 ); # not nessecary due to new alignment
         # timediff per step
         my $dt = 0;
         $dt = int(($hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{$arrayName}[0]{statusTimestamp})/$i) if ($i);
@@ -1142,16 +1169,29 @@ sub AlignArray {
 
           unshift (@{$hash->{helper}{searchpos}}, dclone($hash->{helper}{mower}{attributes}{positions}[ $k ]) );
           pop (@{$hash->{helper}{searchpos}}) if (@{$hash->{helper}{searchpos}} > $searchlen);
+
+          my @temp = ();
+          unshift ( @temp, dclone( $hash->{helper}{mower}{attributes}{positions}[ $k ] ) );
+          posMinMax( $hash, \@temp );
+
         }
+
         #callFn if present
         if ($hash->{helper}{$activity}{callFn}) {
+
           $hash->{helper}{$activity}{cnt} = $i;
           no strict "refs";
           &{$hash->{helper}{$activity}{callFn}}($hash);
           use strict "refs";
+
         }
+
+        $hash->{helper}{newdatasets} = $i;
+        readingsSingleUpdate($hash, "statistics_newGeoDataSets", $i, 1);
         last;
+
       }
+
     }
   }
 }
@@ -1166,12 +1206,10 @@ sub ChargingStationPosition {
   my $ym = 0;
   map { $ym += $_->{latitude} } @{$hash->{helper}{cspos}};
   $ym = $ym/$n;
-  $hash->{helper}{chargingStation}{longitude} = $xm;
-  $hash->{helper}{chargingStation}{latitude} = $ym;
-  readingsSingleUpdate($hash, "statistics_ChargingStationPositionXYn", (int($xm * 10000000 + 0.5) / 10000000).", ".(int($ym * 10000000 + 0.5) / 10000000).", ".$n, 0);
+  $hash->{helper}{chargingStation}{longitude} = sprintf("%.8f",$xm);
+  $hash->{helper}{chargingStation}{latitude} = sprintf("%.8f",$ym);
   return undef;
 }
-
 
 #########################
 sub AreaStatistics {
@@ -1192,7 +1230,7 @@ sub AreaStatistics {
   }
   $asum = $lsum * AttrVal($name,'mowerCuttingWidth',0.24);
   my $td = $xyarr[ 0 ]{storedTimestamp} - $xyarr[ $k ]{storedTimestamp};
-  $vm = int($lsum / $td * 1000000 + 0.5)/1000 if ($td);
+  $vm = sprintf( '%.6f', $lsum / $td ) * 1000 if ($td);
   $lsum += int( ReadingsNum( $name, 'statistics_currentDayTrack', 0 ) );
   $asum += int( ReadingsNum( $name, 'statistics_currentDayArea', 0 ) );
   readingsBeginUpdate($hash);
@@ -1273,6 +1311,114 @@ sub readMap {
   } else {
     Log3 $name, 2, "$iam file \"$filename\" does not exist.";
   }
+}
+
+#########################
+sub posMinMax {
+  my ($hash, $poshash) = @_;
+  my $minLon = $hash->{helper}{minLon};
+  my $maxLon = $hash->{helper}{maxLon};
+  my $minLat = $hash->{helper}{minLat};
+  my $maxLat = $hash->{helper}{maxLat};
+ 
+  for ( @{$poshash} ) {
+    $minLon = minNum( $minLon,$_->{longitude} );
+    $maxLon = maxNum( $maxLon,$_->{longitude} );
+    $minLat = minNum( $minLat,$_->{latitude} );
+    $maxLat = maxNum( $maxLat,$_->{latitude} );
+  }
+
+  $hash->{helper}{minLon} = $minLon;
+  $hash->{helper}{maxLon} = $maxLon;
+  $hash->{helper}{minLat} = $minLat;
+  $hash->{helper}{maxLat} = $maxLat;
+  $hash->{helper}{posMinMax} = "$minLon $maxLat\n$maxLon $minLat";
+  $hash->{helper}{imageWidthHeight} = int($hash->{helper}{imageHeight} * ($maxLon-$minLon) / ($maxLat-$minLat)) . ' ' . $hash->{helper}{imageHeight} if ($maxLon-$minLon);
+
+  return undef;
+}
+
+#########################
+sub listInternalData {
+  my ( $hash ) = @_;
+  my $name = $hash->{NAME};
+  my $rowCount = 1;
+  my $ret = '<html><table class="block wide">';
+  $ret .= '<caption><b>Calculated Coordinates For Automatic Registration</b></caption><tbody>';
+
+  $hash->{helper}{posMinMax} =~ /(-?\d*\.?\d+)\s(-?\d*\.?\d+)(\R|-?\s)(\d*\.?\d+)\s(-?\d*\.?\d+)/;
+
+  my $xm = $hash->{helper}{chargingStation}{longitude} // 0;
+  my $ym = $hash->{helper}{chargingStation}{latitude} // 0;
+  my $csnr = scalar @{$hash->{helper}{cspos}};
+  my $csnrmax = $hash->{helper}{PARKED_IN_CS}{maxLength};
+  my $arnr = 0;
+  $arnr = scalar @{$hash->{helper}{areapos}} if( scalar @{$hash->{helper}{areapos}} > 2 );
+  my $arnrmax = $hash->{helper}{MOWING}{maxLength};
+
+  $ret .= '<tr class="col_header"><td> Data Sets ( max )&emsp;</td><td> Corner </td><td> Longitude </td><td> Latitude </td></tr>';
+  $ret .= '<tr class="column odd"><td rowspan="2" style="vertical-align:middle;" > ' . ($csnr + $arnr) . ' ( ' . ($csnrmax + $arnrmax) . ' )&emsp;</td><td> Upper Left </td><td> ' . $1 . ' </td><td> ' . $2 . ' </td></tr>';
+  $ret .= '<tr class="column even"><td> Lower Right </td><td> ' . $4 . ' </td><td> ' . $5 . ' </td></tr>';
+
+  $ret .= '</tbody></table><p>';
+  $ret .= '<table class="block wide">';
+  $ret .= '<caption><b>Calculated Charging Station Coordinates</b></caption><tbody>'; 
+
+  $ret .= '<tr class="col_header"><td> Data Sets (max)&emsp;</td><td> Longitude&emsp;</td><td> Latitude&emsp;</td></tr>';
+  $ret .= '<tr class="column odd"><td> ' . $csnr . ' ( ' . $csnrmax . ' )&emsp;</td><td> ' . $xm . ' </td><td> ' . $ym . '&emsp;</td></tr>';
+
+  $ret .= '</tbody></table><p>';
+  $ret .= '<table class="block wide">';
+  $ret .= '<caption><b>Way Point Stacks</b></caption><tbody>'; 
+
+  $ret .= '<tr class="col_header"><td> Used For Action&emsp;</td><td> Stack Name&emsp;</td><td> Current Size&emsp;</td><td> Max Size&emsp;</td></tr>';
+  $ret .= '<tr class="column odd"><td>PARKED_IN_CS, CHARGING&emsp;</td><td> cspos&emsp;</td><td> ' . $csnr . ' </td><td> ' . $csnrmax . '&emsp;</td></tr>';
+  $ret .= '<tr class="column even"><td>MOWING&emsp;</td><td> areapos&emsp;</td><td> ' . $arnr . ' </td><td> ' . $arnrmax . '&emsp;</td></tr>';
+
+  $ret .= '</tbody></table>';
+  if ( $hash->{TYPE} eq 'AutomowerConnect' ) {
+
+    $ret .= '<p><table class="block wide">';
+    $ret .= '<caption><b>Access Token</b> ( expires: ' . ReadingsVal( $name, 'api_token_expires', 'none') . ' ) </caption><tbody>'; 
+
+    $ret .= '<tr class="column odd"><td style="word-wrap:break-word; max-width:40em">' . ReadingsVal( $name, '.access_token', 'none') . '</td></tr>';
+
+    $ret .= '</tbody></table>';
+
+  }
+ $ret .= '</html>';
+
+  return $ret;
+}
+
+#########################
+sub listErrorCodes {
+  my ( $hash ) = @_;
+  my $rowCount = 1;
+  my %ec = ();
+  my $ec = \%ec;
+  for ( keys %{$hash->{helper}{errortable}} ) {
+    $ec->{sprintf("%03d",$_)} = $hash->{helper}{errortable}{$_} ; 
+  }
+  my $ret = '<html><table class="block wide">';
+  $ret .= '<caption><b>API-Response Status Codes</b></caption><tbody>'; 
+  $ret .= '<tr class="column odd"><td>200, 201, 202<br>204</td><td>response o.k.</td></tr>';
+  $ret .= '<tr class="column even"><td>400, 401, 402<br>403, 404, 415<br>500, 503</td><td>error, detailed information see logfile</td></tr>';
+  $ret .= '</tbody></table><p><table class="block wide">';
+  $ret .= '<caption><b>Mower Error Table</b></caption><tbody>'; 
+  for (sort keys %{$ec}) {
+    $ret .= '<tr class="column ';
+    $ret .= ( $rowCount % 2 ? "odd" : "even" );
+    $ret .= '"><td>';
+    $ret .= $_;
+    $ret .= '</td><td>';
+    $ret .= $ec->{$_};
+    $ret .= '</td></tr>';
+    $rowCount++;
+  }
+  $ret .= '</tbody></table></html>';
+
+  return $ret;
 }
 
 ##############################################################
@@ -1397,8 +1543,16 @@ sub readMap {
   <b>Get</b>
   <ul>
     <li><a id='AutomowerConnect-get-html'>html</a><br>
-      <code>get &lt;name&gt; html </code><br>
+      <code>get &lt;name&gt; html</code><br>
       Returns the mower area image as html code. For use in uiTable, TabletUI, Floorplan, readingsGroup, weblink etc.</li>
+
+    <li><a id='AutomowerConnect-get-listInternalData'>listInternalData</a><br>
+      <code>get &lt;name&gt; listInternalData</code><br>
+      Lists some device internal data</li>
+
+    <li><a id='AutomowerConnect-get-listErrorCodes'>listErrorCodes</a><br>
+      <code>get &lt;name&gt; listErrorCodes</code><br>
+      Lists API response status codes and mower error codes</li>
     <br><br>
   </ul>
   <br>
@@ -1502,13 +1656,12 @@ sub readMap {
     <li>planner_nextStart - next start time</li>
     <li>planner_restrictedReason - reason for parking NONE, WEEK_SCHEDULE, PARK_OVERRIDE, SENSOR, DAILY_LIMIT, FOTA, FROST</li>
     <li>planner_overrideAction - reason for override a planned action NOT_ACTIVE, FORCE_PARK, FORCE_MOW</li>
-    <li>positions_lastLatitude - last known position (latitude)</li>
-    <li>positions_lastLongitude - last known position (longitude)</li>
+    <li>positions_lastLonLat - last known position (longitude latitude)</li>
     <li>state - status of connection FHEM to Husqvarna Cloud API and device state(e.g.  defined, authorization, authorized, connected, error, update)</li>
     <li>status_statusTimestampOld - local time of second last change of the API content</li>
     <li>settings_cuttingHeight - actual cutting height from API</li>
     <li>settings_headlight - actual headlight mode from API</li>
-    <li>statistics_ChargingStationPositionXYn - calculated position of the carging station (longitude, latitude, number of datasets) during mower_activity PARKED_IN_CS and CHARGING</li>
+    <li>statistics_newGeoDataSets - number of new data sets between the last two different time stamps</li>
     <li>statistics_numberOfChargingCycles - number of charging cycles</li>
     <li>statistics_numberOfCollisions - number of collisions</li>
     <li>statistics_totalChargingTime - total charging time in hours</li>
@@ -1648,6 +1801,14 @@ sub readMap {
     <li><a id='AutomowerConnect-get-html'>html</a><br>
       <code>get &lt;name&gt; html </code><br>
       Gibt das Bild des Mäherbereiches html kodiert zurück, zur Verwendung in uiTable, TabletUI, Floorplan, readingsGroup, weblink usw.</li>
+
+    <li><a id='AutomowerConnect-get-listErrorCodes'>listErrorCodes</a><br>
+      <code>get &lt;name&gt; listErrorCodes</code><br>
+      Listet die Statuscode der API-Anfrage und die Fehlercodes des Mähroboters auf.</li>
+
+    <li><a id='AutomowerConnect-get-listInternalData'>listInternalData</a><br>
+      <code>get &lt;name&gt; listErrorCodes</code><br>
+      Listet einige Daten des FHEM-Gerätes auf.</li>
     <br><br>
   </ul>
   <br>
@@ -1757,12 +1918,11 @@ sub readMap {
     <li>planner_nextStart - nächste Startzeit</li>
     <li>planner_restrictedReason - Grund für Parken NONE, WEEK_SCHEDULE, PARK_OVERRIDE, SENSOR, DAILY_LIMIT, FOTA, FROST</li>
     <li>planner_overrideAction -   Grund für vorrangige Aktion NOT_ACTIVE, FORCE_PARK, FORCE_MOW</li>
-    <li>positions_lastLatitude - letzte bekannte Position (Breitengrad)</li>
-    <li>positions_lastLongitude - letzte bekannte Position (Längengrad)</li>
-    <li>state - Status der Verbindung des FHEM-Gerätes zur Husqvarna Cloud API (defined, authorization, authorized, connected, error, update).</li>
+    <li>positions_lastLonLat - letzte bekannte Position (Längengrad Breitengrad)</li>
+    <li>state - Status der Verbindung des FHEM-Gerätes zur Husqvarna Cloud API (defined, authentification, authentified, connected, error, update).</li>
     <li>settings_cuttingHeight - aktuelle Schnitthöhe aus der API</li>
     <li>settings_headlight - aktueller Scheinwerfermode aus der API</li>
-    <li>statistics_ChargingStationPositionXYn - berechnete Position der Ladestation mit den Werten Longitude, Latitude und Anzahl der verwendeten Datensätze wähend der Mower_activity PARKED_IN_CS und CHARGING</li>
+    <li>statistics_newGeoDataSets - Anzahl der neuen Datensätze zwischen den letzten zwei unterschiedlichen Zeitstempeln</li>
     <li>statistics_numberOfChargingCycles - Anzahl der Ladezyklen</li>
     <li>statistics_numberOfCollisions - Anzahl der Kollisionen</li>
     <li>statistics_totalChargingTime - Gesamtladezeit in Stunden</li>
