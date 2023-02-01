@@ -4524,7 +4524,7 @@ sub DbRep_diffval {
                   $vnew              =~ tr/\n//d;
                   
                   if (!DbRep_IsNumeric ($vnew)) {                                   # Test auf $value = "numeric"
-                      Log3 ($name, 2, "DbRep $name - WARNING - dataset has no numeric value >$vnew< and is ignored, >$timestamp<, device >$device<, reading >$reading<.");
+                      Log3 ($name, 2, "DbRep $name - WARNING - dataset has no numeric value >$vnew< and is ignored\ntimestamp >$timestamp<, device >$device<, reading >$reading<");
                       next;
                   }
 
