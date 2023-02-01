@@ -193,6 +193,17 @@ sub Define{
         arrayName               => '',
         maxLength               => 0,
         callFn                  => ''
+      },
+      statistics                => {
+        currentSpeed            => 0,
+        currentDayTrack         => 0,
+        currentDayArea          => 0,
+        lastDayTrack            => 0,
+        lastDayArea             => 0,
+        currentWeekTrack        => 0,
+        currentWeekArea         => 0,
+        lastWeekTrack           => 0,
+        lastWeekArea            => 0
       }
     }
   );
@@ -332,12 +343,7 @@ sub Notify {
       $timestamp = FmtDateTime($tstamp/1000);
       readingsBulkUpdateIfChanged($hash, "planner_nextStart", $tstamp ? $timestamp : '-' );  
       $pref = 'statistics';
-      readingsBulkUpdateIfChanged($hash, $pref."_numberOfChargingCycles", $hash->{helper}->{mower}{attributes}{$pref}{numberOfChargingCycles} );
-      readingsBulkUpdateIfChanged($hash, $pref."_totalCuttingTime", $hash->{helper}->{mower}{attributes}{$pref}{totalCuttingTime} );
-      readingsBulkUpdateIfChanged($hash, $pref."_totalChargingTime", $hash->{helper}->{mower}{attributes}{$pref}{totalChargingTime} );
-      readingsBulkUpdateIfChanged($hash, $pref."_totalSearchingTime", $hash->{helper}->{mower}{attributes}{$pref}{totalSearchingTime} );
       readingsBulkUpdateIfChanged($hash, $pref."_numberOfCollisions", $hash->{helper}->{mower}{attributes}{$pref}{numberOfCollisions} );
-      readingsBulkUpdateIfChanged($hash, $pref."_totalRunningTime", $hash->{helper}->{mower}{attributes}{$pref}{totalRunningTime} );
       $pref = 'settings';
       readingsBulkUpdateIfChanged($hash, $pref."_headlight", $hash->{helper}->{mower}{attributes}{$pref}{headlight}{mode} );
       readingsBulkUpdateIfChanged($hash, $pref."_cuttingHeight", $hash->{helper}->{mower}{attributes}{$pref}{cuttingHeight} );
@@ -348,7 +354,8 @@ sub Notify {
       readingsBulkUpdateIfChanged($hash, $pref."_TimestampOld", FmtDateTime( $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp}/1000 ));
       $pref = 'positions';
       readingsBulkUpdateIfChanged($hash, $pref."_lastLonLat", $hash->{helper}{mower}{attributes}{$pref}[0]{longitude} . ' ' . $hash->{helper}{mower}{attributes}{$pref}[0]{latitude} );
-      readingsBulkUpdateIfChanged($hash, 'state', 'connected' );
+      readingsBulkUpdate($hash, 'state', 'connected',1);
+    readingsEndUpdate($hash, 1);
 
       my @time = localtime();
       my $secs = ( $time[2] * 3600 ) + ( $time[1] * 60 ) + $time[0];
@@ -356,23 +363,24 @@ sub Notify {
       # do at midnight
       if ( $secs <= $interval ) {
 
-        readingsBulkUpdateIfChanged( $hash, 'statistics_lastDayTrack', ReadingsNum( $name, 'statistics_currentDayTrack', 0 ));
-        readingsBulkUpdateIfChanged( $hash, 'statistics_lastDayArea', ReadingsNum( $name, 'statistics_currentDayArea', 0 ));
-        readingsBulkUpdateIfChanged( $hash, 'statistics_currentWeekTrack', ReadingsNum( $name, 'statistics_currentWeekTrack', 0 ) + ReadingsNum( $name, 'statistics_currentDayTrack', 0 ));
-        readingsBulkUpdateIfChanged( $hash, 'statistics_currentWeekArea', ReadingsNum( $name, 'statistics_currentWeekArea', 0 ) + ReadingsNum( $name, 'statistics_currentDayArea', 0 ));
-        readingsBulkUpdateIfChanged( $hash, 'statistics_currentDayTrack', 0, 0);
-        readingsBulkUpdateIfChanged( $hash, 'statistics_currentDayArea', 0, 0);
-       # do on mondays
-        if ( $time[6] == 1 && $secs <= $interval ) {
+            $hash->{helper}{statistics}{lastDayTrack} = $hash->{helper}{statistics}{currentDayTrack};
+            $hash->{helper}{statistics}{lastDayArea} = $hash->{helper}{statistics}{currentDayArea};
+            $hash->{helper}{statistics}{currentWeekTrack} += $hash->{helper}{statistics}{currentDayTrack};
+            $hash->{helper}{statistics}{currentWeekArea} += $hash->{helper}{statistics}{currentDayArea};
+            $hash->{helper}{statistics}{currentDayTrack} = 0;
+            $hash->{helper}{statistics}{currentDayArea} = 0;
+            # do on mondays
+            if ( $time[6] == 1 && $secs <= $interval ) {
 
-          readingsBulkUpdateIfChanged( $hash, 'statistics_lastWeekTrack', ReadingsNum( $name, 'statistics_currentWeekTrack', 0 ));
-          readingsBulkUpdateIfChanged( $hash, 'statistics_lastWeekArea', ReadingsNum( $name, 'statistics_currentWeekArea', 0 ));
-          readingsBulkUpdateIfChanged( $hash, 'statistics_currentWeekTrack', 0, 0);
-          readingsBulkUpdateIfChanged( $hash, 'statistics_currentWeekArea', 0, 0);
+              $hash->{helper}{statistics}{lastWeekTrack} = $hash->{helper}{statistics}{currentWeekTrack};
+              $hash->{helper}{statistics}{lastWeekArea} = $hash->{helper}{statistics}{currentWeekArea};
+              $hash->{helper}{statistics}{currentWeekTrack} = 0;
+              $hash->{helper}{statistics}{currentWeekArea} = 0;
 
         }
       }
-    readingsEndUpdate($hash, 1);
+    readingsSingleUpdate($hash, 'state', 'connected',1);
+
   }
 
   return undef;
@@ -520,18 +528,29 @@ sub Get {
     my $ret = '<html>' . FW_detailFn( undef, $name, undef, undef) . '</html>';
     return $ret;
 
-  } elsif (  $setName eq 'listErrorCodes' ) {
+  } elsif (  $setName eq 'errorCodes' ) {
 
     my $ret = listErrorCodes($hash);
     return $ret;
 
-  } elsif (  $setName eq 'listInternalData' ) {
+  } elsif (  $setName eq 'InternalData' ) {
 
     my $ret = listInternalData($hash);
     return $ret;
+
+  } elsif (  $setName eq 'MowerData' ) {
+
+    my $ret = listMowerData($hash);
+    return $ret;
+
+  } elsif (  $setName eq 'StatisticsData' ) {
+
+    my $ret = listStatisticsData($hash);
+    return $ret;
+
   } else {
-  
-    return "Unknown argument $setName, choose one of listInternalData:noArg listErrorCodes:noArg ";
+
+    return "Unknown argument $setName, choose one of StatisticsData:noArg MowerData:noArg InternalData:noArg errorCodes:noArg ";
 
   }
 }
@@ -962,8 +981,8 @@ sub ChargingStationPosition {
   my $ym = 0;
   map { $ym += $_->{latitude} } @{$hash->{helper}{cspos}};
   $ym = $ym/$n;
-  $hash->{helper}{chargingStation}{longitude} = int($xm * 10000000 + 0.5) / 10000000;
-  $hash->{helper}{chargingStation}{latitude} = int($ym * 10000000 + 0.5) / 10000000;
+  $hash->{helper}{chargingStation}{longitude} = sprintf("%.8f",$xm);
+  $hash->{helper}{chargingStation}{latitude} = sprintf("%.8f",$ym);
   return undef;
 }
 
@@ -971,6 +990,7 @@ sub ChargingStationPosition {
 sub AreaStatistics {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  my $activity = 'MOWING';
   my $i = $hash->{helper}{MOWING}{cnt};
   my $k = 0;
   my @xyarr  = @{$hash->{helper}{areapos}};# areapos
@@ -984,19 +1004,18 @@ sub AreaStatistics {
   my $vm = 0;
   
   for ( $k = 0; $k <= $i-1; $k++) {
-   $lsum += ((($xyarr[ $k ]{longitude} - $xyarr[ $k+1 ]{longitude}) * $sclon)**2 + (($xyarr[ $k ]{latitude} - $xyarr[ $k+1 ]{latitude}) * $sclat)**2)**0.5;
+   $lsum += ((($xyarr[ $k ]{longitude} - $xyarr[ $k+1 ]{longitude}) * $sclon)**2 + (($xyarr[ $k ]{latitude} - $xyarr[ $k+1 ]{latitude}) * $sclat)**2)**0.5; # m
   }
-  $asum = $lsum * AttrVal($name,'mowerCuttingWidth',0.24);
+  $asum = $lsum * AttrVal($name,'mowerCuttingWidth',0.24); # qm
   my $td = $xyarr[ 0 ]{storedTimestamp} - $xyarr[ $k ]{storedTimestamp};
-  $vm = int($lsum / $td * 1000000 + 0.5)/1000 if ($td);
-  $lsum += int( ReadingsNum( $name, 'statistics_currentDayTrack', 0 ) );
-  $asum += int( ReadingsNum( $name, 'statistics_currentDayArea', 0 ) );
-  readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged($hash,'statistics_currentDayTrack', int($lsum)); # m
-    readingsBulkUpdateIfChanged($hash,'statistics_currentDayArea', int($asum)); # qm
-    readingsBulkUpdateIfChanged($hash,'statistics_lastIntervalMowerSpeed', $vm); # m/s
-    readingsBulkUpdateIfChanged($hash,'statistics_lastIntervalNumberOfWayPoints', $i-1); # m/s
-  readingsEndUpdate($hash,1);
+  $vm = sprintf( '%.6f', $lsum / $td ) * 1000 if ($td); # m/s
+  $hash->{helper}{$activity}{speed} = $vm;
+  $hash->{helper}{$activity}{track} = $lsum;
+  $hash->{helper}{$activity}{area} = $asum;
+  $hash->{helper}{statistics}{currentSpeed} = $vm;
+  $hash->{helper}{statistics}{currentDayTrack} += $lsum;
+  $hash->{helper}{statistics}{currentDayArea} += $asum;
+  $hash->{helper}{statistics}{currentSpeed} = $vm;
   return  undef;
 }
 
@@ -1094,6 +1113,89 @@ sub posMinMax {
   $hash->{helper}{imageWidthHeight} = int($hash->{helper}{imageHeight} * ($maxLon-$minLon) / ($maxLat-$minLat)) . ' ' . $hash->{helper}{imageHeight} if ($maxLon-$minLon);
 
   return undef;
+}
+
+#########################
+sub listStatisticsData {
+  my ( $hash ) = @_;
+  my $name = $hash->{NAME};
+  my $cnt = 0;
+  my $ret = '';
+  $ret .= '<html><table class="block wide">';
+  $ret .= '<caption><b>Statistics Data</b></caption><tbody>'; 
+
+  $ret .= '<tr class="col_header"><td> Hash Path </td><td> Value </td><td> Unit </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{numberOfChargingCycles} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{numberOfChargingCycles} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalChargingTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalChargingTime} . ' </td><td> s </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalCuttingTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalCuttingTime} . ' </td><td> s </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} . '<sup>1</sup> </td><td> s </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalSearchingTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalSearchingTime} . ' </td><td> s </td></tr>';
+
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{currentSpeed} &emsp;</td><td> ' . $hash->{helper}{statistics}{currentSpeed} . ' </td><td> m/s </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{currentDayTrack} &emsp;</td><td> ' . $hash->{helper}{statistics}{currentDayTrack} . ' </td><td> m </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{currentDayArea} &emsp;</td><td> ' . $hash->{helper}{statistics}{currentDayArea} . ' </td><td> qm </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{lastDayTrack} &emsp;</td><td> ' . $hash->{helper}{statistics}{lastDayTrack} . ' </td><td> m </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{lastDayArea} &emsp;</td><td> ' . $hash->{helper}{statistics}{lastDayArea} . ' </td><td> qm </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{currentWeekTrack} &emsp;</td><td> ' . $hash->{helper}{statistics}{currentWeekTrack} . ' </td><td> m </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{currentWeekArea} &emsp;</td><td> ' . $hash->{helper}{statistics}{currentWeekArea} . ' </td><td> qm </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{lastWeekTrack} &emsp;</td><td> ' . $hash->{helper}{statistics}{lastWeekTrack} . ' </td><td> m </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{lastWeekArea} &emsp;</td><td> ' . $hash->{helper}{statistics}{lastWeekArea} . ' </td><td> qm </td></tr>';
+
+  $ret .= '</tbody></table>';
+  $ret .= '<p><sup>1</sup> totalRunningTime = totalCuttingTime + totalSearchingTime';
+  $ret .= '</html>';
+
+  return $ret;
+}
+
+#########################
+sub listMowerData {
+  my ( $hash ) = @_;
+  my $name = $hash->{NAME};
+  my $cnt = 0;
+  my $ret = '';
+  $ret .= '<html><table class="block wide">';
+  $ret .= '<caption><b>Mower Data</b></caption><tbody>'; 
+
+  $ret .= '<tr class="col_header"><td> Hash Path </td><td> Value </td><td> Unit </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{type} &emsp;</td><td> ' . $hash->{helper}{mower}{type} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{id} &emsp;</td><td> ' . $hash->{helper}{mower}{id} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{system}{name} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{system}{name} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{system}{model} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{system}{model} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{system}{serialNumber} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{system}{serialNumber} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{battery}{batteryPercent} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{battery}{batteryPercent} . ' </td><td> % </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{mower}{mode} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{mower}{mode} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{mower}{activity} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{mower}{activity} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{mower}{state} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{mower}{state} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{mower}{errorCode} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{mower}{errorCode} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} . ' </td><td> ms </td></tr>';
+
+  my $calendarjson = eval { JSON::XS->new->pretty(1)->encode ($hash->{helper}{mower}{attributes}{calendar}{tasks}) };
+
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td style="vertical-align:middle;" > $hash->{helper}{mower}{attributes}{calendar}{tasks} &emsp;</td><td colspan="2" style="word-wrap:break-word; max-width:34em;" > ' . ($@ ? $@ : $calendarjson) . ' </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{planner}{nextStartTimestamp} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{planner}{nextStartTimestamp} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{planner}{override}{action} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{planner}{override}{action} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{planner}{restrictedReason} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{planner}{restrictedReason} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{metadata}{connected} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{metadata}{connected} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} . ' </td><td> ms </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{positions}[0]{longitude} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{positions}[0]{longitude} . ' </td><td> decimal degree </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{positions}[0]{latitude} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{positions}[0]{latitude} . ' </td><td> decimal degree </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{settings}{headlight}{mode} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{settings}{headlight}{mode} . ' </td><td>  </td></tr>';
+#  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{cuttingBladeUsageTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{cuttingBladeUsageTime} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{numberOfChargingCycles} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{numberOfChargingCycles} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions} . ' </td><td>  </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalChargingTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalChargingTime} . ' </td><td> s </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalCuttingTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalCuttingTime} . ' </td><td> s </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} . '<sup>1</sup> </td><td> s </td></tr>';
+  $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalSearchingTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalSearchingTime} . ' </td><td> s </td></tr>';
+
+  $ret .= '</tbody></table>';
+  $ret .= '<p><sup>1</sup> totalRunningTime = totalCuttingTime + totalSearchingTime';
+  $ret .= '</html>';
+
+  return $ret;
 }
 
 #########################
@@ -1233,34 +1335,43 @@ sub listErrorCodes {
   <ul>
     <li><a id='AutomowerConnectDevice-set-Park'>Park</a><br>
       <code>set &lt;name&gt; Park &lt;number of minutes&gt;</code><br>
-       Parks mower in charging station for &lt;number of minutes&gt;</li>
+      Parks mower in charging station for &lt;number of minutes&gt;</li>
+
     <li><a id='AutomowerConnectDevice-set-ParkUntilFurtherNotice'>ParkUntilFurtherNotice</a><br>
       <code>set &lt;name&gt; ParkUntilFurtherNotice</code><br>
       Parks mower in charging station until further notice</li>
+
     <li><a id='AutomowerConnectDevice-set-ParkUntilNextSchedule'>ParkUntilNextSchedule</a><br>
       <code>set &lt;name&gt; ParkUntilNextSchedule</code><br>
       Parks mower in charging station and starts with next planned start</li>
+
     <li><a id='AutomowerConnectDevice-set-Pause'>Pause</a><br>
       <code>set &lt;name&gt; Pause</code><br>
       Pauses mower immediately at current position</li>
+
     <li><a id='AutomowerConnectDevice-set-ResumeSchedule'>ResumeSchedule</a><br>
       <code>set &lt;name&gt; ResumeSchedule</code><br>
       Starts immediately if in planned intervall, otherwise with next scheduled start&gt;</li>
+
     <li><a id='AutomowerConnectDevice-set-Start'>Start</a><br>
       <code>set &lt;name&gt; Start &lt;number of minutes&gt;</code><br>
       Starts immediately for &lt;number of minutes&gt;</li>
+
     <li><a id='AutomowerConnectDevice-set-chargingStationPositionToAttribute'>chargingStationPositionToAttribute</a><br>
       <code>set &lt;name&gt; chargingStationPositionToAttribute</code><br>
       Sets the calculated charging station coordinates to the corresponding attributes.</li>
+
      <li><a id='AutomowerConnectDevice-set-cuttingHeight'>cuttingHeight</a><br>
       <code>set &lt;name&gt; cuttingHeight &lt;1..9&gt;</code><br>
       Sets the cutting height. NOTE: Do not use for 550 EPOS and Ceora.</li>
+
      <li><a id='AutomowerConnectDevice-set-headlight'>headlight</a><br>
       <code>set &lt;name&gt; headlight &lt;ALWAYS_OFF|ALWAYS_ON|EVENIG_ONLY|EVENING_AND_NIGHT&gt;</code><br>
       </li>
-     <li><a id='AutomowerConnectDevice-set-mowerScheduleToAttrbute'>mowerScheduleToAttrbute</a><br>
-      <code>set &lt;name&gt; mowerScheduleToAttrbute</code><br>
+     <li><a id='AutomowerConnectDevice-set-mowerScheduleToAttribute'>mowerScheduleToAttribute</a><br>
+      <code>set &lt;name&gt; mowerScheduleToAttribute</code><br>
       Writes the schedule in to the attribute <code>moverSchedule</code>.</li>
+
      <li><a id='AutomowerConnectDevice-set-sendScheduleFromAttributeToMower'>sendScheduleFromAttributeToMower</a><br>
       <code>set &lt;name&gt; sendScheduleFromAttributeToMower</code><br>
       Sends the schedule to the mower. NOTE: Do not use for 550 EPOS and Ceora.</li>
@@ -1276,15 +1387,25 @@ sub listErrorCodes {
   <b>Get</b>
   <ul>
     <li><a id='AutomowerConnectDevice-get-html'>html</a><br>
-      <code>get &lt;name&gt; html </code><br>
+      <code>get &lt;name&gt; html</code><br>
       Returns the mower area image as html code. For use in uiTable, TabletUI, Floorplan, readingsGroup, weblink etc.</li>
 
-    <li><a id='AutomowerConnect-get-listInternalData'>listInternalData</a><br>
-      <code>get &lt;name&gt; listInternalData</code><br>
+    <li><a id='AutomowerConnectDevice-get-InternalData'>InternalData</a><br>
+      <code>get &lt;name&gt; InternalData</code><br>
       Lists some device internal data</li>
 
-    <li><a id='AutomowerConnect-get-listErrorCodes'>listErrorCodes</a><br>
-      <code>get &lt;name&gt; listErrorCodes</code><br>
+    <li><a id='AutomowerConnectDevice-get-MowerData'>MowerData</a><br>
+      <code>get &lt;name&gt; MowerData</code><br>
+      Lists all mower data with its hash path exept positon array. The hash path can be used for generating userReadings. The trigger is <i>connected</i>.<br>
+      Example: created reading <code>serialnumber</code> with hash path <code>$hash->{helper}{mower}{attributes}{system}{serialNumber}</code><br><br>
+      <code>attr &lt;name&gt; userReadings serialnumber:connected {$defs{$name}->{helper}{mower}{attributes}{system}{serialNumber}}</code></li>
+
+    <li><a id='AutomowerConnectDevice-get-StatisticsData'>StatisticsData</a><br>
+      <code>get &lt;name&gt; StatisticsData</code><br>
+      Lists statistics data with its hash path. The hash path can be used for generating userReadings. The trigger is <i>connected</i>.</li>
+
+    <li><a id='AutomowerConnectDevice-get-errorCodes'>errorCodes</a><br>
+      <code>get &lt;name&gt; errorCodes</code><br>
       Lists API response status codes and mower error codes</li>
     <br><br>
   </ul>
@@ -1377,40 +1498,22 @@ sub listErrorCodes {
     <li>mower_errorCode - last error code</li>
     <li>mower_errorCodeTimestamp - last error code time stamp</li>
     <li>mower_errorDescription - error description</li>
-    <li>mower_id - ID of the mower</li>
     <li>mower_mode - current working mode "MAIN_AREA" | "SECONDARY_AREA" | "HOME" | "DEMO" | "UNKNOWN"</li>
     <li>mower_state - current status "UNKNOWN" | "NOT_APPLICABLE" | "PAUSED" | "IN_OPERATION" | "WAIT_UPDATING" | "WAIT_POWER_UP" | "RESTRICTED" | "OFF" | "STOPPED" | "ERROR" | "FATAL_ERROR" |"ERROR_AT_POWER_UP"</li>
     <li>planner_nextStart - next start time</li>
     <li>planner_restrictedReason - reason for parking NONE, WEEK_SCHEDULE, PARK_OVERRIDE, SENSOR, DAILY_LIMIT, FOTA, FROST</li>
     <li>planner_overrideAction - reason for override a planned action NOT_ACTIVE, FORCE_PARK, FORCE_MOW</li>
-    <li>positions_lastLonLat - last known position (longitude latitude)</li>
-    <li>state - status of connection FHEM to Husqvarna Cloud API and device state(e.g.  defined, connected, error)</li>
+    <li>state - status of connection FHEM to Husqvarna Cloud API and device state (e.g. defined, connected, error)</li>
     <li>status_statusTimestampOld - local time of second last change of the API content</li>
     <li>settings_cuttingHeight - actual cutting height from API</li>
     <li>settings_headlight - actual headlight mode from API</li>
     <li>statistics_newGeoDataSets - number of new data sets between the last two different time stamps</li>
-    <li>statistics_numberOfChargingCycles - number of charging cycles</li>
     <li>statistics_numberOfCollisions - number of collisions</li>
-    <li>statistics_totalChargingTime - total charging time in hours</li>
-    <li>statistics_totalCuttingTime - total cutting time in hours</li>
-    <li>statistics_totalRunningTime - total running time in hours</li>
-    <li>statistics_totalSearchingTime - total searching time in hours</li>
-    <li>statistics_currentDayTrack - calculated mowed track length in meter during mower_activity MOWING since midnight</li>
-    <li>statistics_currentDayArea - calculated mowed area in square meter during mower_activity MOWING since midnight</li>
-    <li>statistics_lastIntervalNumberOfWayPoints - last Intervals Number of way points</li>
-    <li>statistics_currentMowerSpeed - calculated mower speed in meter per second during mower_activity MOWING for the last interval</li>
-    <li>statistics_lastDayTrack - calculated mowed track length in meter during mower_activity MOWING for yesterday</li>
-    <li>statistics_lastDayArea - calculated mowed area in square meter during mower_activity MOWING for yesterday</li>
-    <li>statistics_currentWeekTrack - calculated mowed track length in meter during mower_activity MOWING of the current week</li>
-    <li>statistics_currentWeekArea - calculated mowed area in square meter during mower_activity MOWING of the current week</li>
-    <li>statistics_lastWeekTrack - calculated mowed track length in meter during mower_activity MOWING of the last week</li>
-    <li>statistics_lastWeekArea - calculated mowed area in square meter during mower_activity MOWING of the last week</li>
     <li>status_connected - state of connetion between mower and Husqvarna Cloud, (1 => true, 0 => false)</li>
     <li>status_statusTimestamp - local time of last change of the API content</li>
     <li>status_statusTimestampDiff - time difference in seconds between the last and second last change of the API content</li>
     <li>status_statusTimestampOld - local time of second last change of the API content</li>
     <li>system_name - name of the mower</li>
-    <li>system_serialNumber - serial number of the mower</li>
 
   </ul>
 </ul>
@@ -1463,34 +1566,44 @@ sub listErrorCodes {
   <ul>
     <li><a id='AutomowerConnectDevice-set-Park'>Park</a><br>
       <code>set &lt;name&gt; Park &lt;number of minutes&gt;</code><br>
-       Parkt den Mäher in der Ladestation (LS) für &lt;number of minutes&gt;</li>
+      Parkt den Mäher in der Ladestation (LS) für &lt;number of minutes&gt;</li>
+
     <li><a id='AutomowerConnectDevice-set-ParkUntilFurtherNotice'>ParkUntilFurtherNotice</a><br>
       <code>set &lt;name&gt; ParkUntilFurtherNotice</code><br>
       Parkt den Mäher bis auf Weiteres in der LS</li>
+
     <li><a id='AutomowerConnectDevice-set-ParkUntilNextSchedule'>ParkUntilNextSchedule</a><br>
       <code>set &lt;name&gt; ParkUntilNextSchedule</code><br>
       Parkt den Mäher bis auf Weiteres in der LS und startet zum nächsten geplanten Zeitpunkt</li>
+
     <li><a id='AutomowerConnectDevice-set-Pause'>Pause</a><br>
       <code>set &lt;name&gt; Pause</code><br>
       Pausiert den Mäher sofort am aktuellen Standort</li>
+
     <li><a id='AutomowerConnectDevice-set-ResumeSchedule'>ResumeSchedule</a><br>
       <code>set &lt;name&gt; ResumeSchedule</code><br>
       Startet im geplanten Interval den Mäher sofort, sonst zum nächsten geplanten Zeitpunkt</li>
+
     <li><a id='AutomowerConnectDevice-set-Start'>Start</a><br>
       <code>set &lt;name&gt; Start &lt;number of minutes&gt;</code><br>
       Startet sofort für &lt;number of minutes&gt;</li>
+
     <li><a id='AutomowerConnectDevice-set-chargingStationPositionToAttribute'>chargingStationPositionToAttribute</a><br>
       <code>set &lt;name&gt; chargingStationPositionToAttribute</code><br>
       Setzt die berechneten Koordinaten der LS in das entsprechende Attribut.</li>
+
      <li><a id='AutomowerConnectDevice-set-cuttingHeight'>cuttingHeight</a><br>
       <code>set &lt;name&gt; cuttingHeight &lt;1..9&gt;</code><br>
       Setzt die Schnitthöhe. HINWEIS: Nicht für 550 EPOS und Ceora geeignet.</li>
+
      <li><a id='AutomowerConnectDevice-set-headlight'>headlight</a><br>
       <code>set &lt;name&gt; headlight &lt;ALWAYS_OFF|ALWAYS_ON|EVENIG_ONLY|EVENING_AND_NIGHT&gt;</code><br>
       Setzt den Scheinwerfermode</li>
-     <li><a id='AutomowerConnectDevice-set-mowerScheduleToAttrbute'>mowerScheduleToAttrbute</a><br>
-      <code>set &lt;name&gt; mowerScheduleToAttrbute</code><br>
+
+     <li><a id='AutomowerConnectDevice-set-mowerScheduleToAttribute'>mowerScheduleToAttribute</a><br>
+      <code>set &lt;name&gt; mowerScheduleToAttribute</code><br>
       Schreibt den Mähplan  ins Attribut <code>moverSchedule</code>.</li>
+
      <li><a id='AutomowerConnectDevice-set-sendScheduleFromAttributeToMower'>sendScheduleFromAttributeToMower</a><br>
       <code>set &lt;name&gt; sendScheduleFromAttributeToMower</code><br>
       Sendet den Mähplan zum Mäher. HINWEIS: Nicht für 550 EPOS und Ceora geeignet.</li>
@@ -1506,13 +1619,23 @@ sub listErrorCodes {
       <code>get &lt;name&gt; html </code><br>
       Gibt das Bild des Mäherbereiches html kodiert zurück, zur Verwendung in uiTable, TabletUI, Floorplan, readingsGroup, weblink usw.</li>
 
-    <li><a id='AutomowerConnect-get-listErrorCodes'>listErrorCodes</a><br>
-      <code>get &lt;name&gt; listErrorCodes</code><br>
+    <li><a id='AutomowerConnectDevice-get-errorCodes'>errorCodes</a><br>
+      <code>get &lt;name&gt; errorCodes</code><br>
       Listet die Statuscode der API-Anfrage und die Fehlercodes des Mähroboters auf.</li>
 
-    <li><a id='AutomowerConnect-get-listInternalData'>listInternalData</a><br>
-      <code>get &lt;name&gt; listErrorCodes</code><br>
+    <li><a id='AutomowerConnectDevice-get-InternalData'>InternalData</a><br>
+      <code>get &lt;name&gt; InternalData</code><br>
       Listet einige Daten des FHEM-Gerätes auf.</li>
+
+    <li><a id='AutomowerConnectDevice-get-MowerData'>MowerData</a><br>
+      <code>get &lt;name&gt; MowerData</code><br>
+      Listet alle Daten des Mähers einschließlich Hashpfad auf ausgenommen das Positonsarray. Der Hashpfad kann zur Erzeugung von userReadings genutzt werden, getriggert wird durch <i>connected</i>.<br>
+      Beispiel: erzeugen des Reading <code>serialnumber</code> mit dem Hashpfad <code>$hash->{helper}{mower}{attributes}{system}{serialNumber}</code><br><br>
+      <code>attr &lt;name&gt; userReadings serialnumber:connected {$defs{$name}->{helper}{mower}{attributes}{system}{serialNumber}}</code></li>
+
+    <li><a id='AutomowerConnectDevice-get-StatisticsData'>StatisticsData</a><br>
+      <code>get &lt;name&gt; StatisticsData</code><br>
+      Listet statistische Daten mit ihrem Hashpfad auf. Der Hashpfad kann zur Erzeugung von userReadings genutzt werden, getriggert wird durch <i>connected</i></li>
     <br><br>
   </ul>
   <br>
@@ -1614,39 +1737,21 @@ sub listErrorCodes {
     <li>mower_errorCode - last error code</li>
     <li>mower_errorCodeTimestamp - last error code time stamp</li>
     <li>mower_errorDescription - error description</li>
-    <li>mower_id - ID des Automowers</li>
     <li>mower_mode - aktueller Arbeitsmodus "MAIN_AREA" | "SECONDARY_AREA" | "HOME" | "DEMO" | "UNKNOWN"</li>
     <li>mower_state - aktueller Status "UNKNOWN" | "NOT_APPLICABLE" | "PAUSED" | "IN_OPERATION" | "WAIT_UPDATING" | "WAIT_POWER_UP" | "RESTRICTED" | "OFF" | "STOPPED" | "ERROR" | "FATAL_ERROR" |"ERROR_AT_POWER_UP"</li>
     <li>planner_nextStart - nächste Startzeit</li>
     <li>planner_restrictedReason - Grund für Parken NONE, WEEK_SCHEDULE, PARK_OVERRIDE, SENSOR, DAILY_LIMIT, FOTA, FROST</li>
     <li>planner_overrideAction -   Grund für vorrangige Aktion NOT_ACTIVE, FORCE_PARK, FORCE_MOW</li>
-    <li>positions_lastLonLat - letzte bekannte Position (Längengrad Breitengrad)</li>
     <li>state - Status der Verbindung des FHEM-Gerätes zur Husqvarna Cloud API (defined, connected, error).</li>
     <li>settings_cuttingHeight - aktuelle Schnitthöhe aus der API</li>
     <li>settings_headlight - aktueller Scheinwerfermode aus der API</li>
     <li>statistics_newGeoDataSets - Anzahl der neuen Datensätze zwischen den letzten zwei unterschiedlichen Zeitstempeln</li>
-    <li>statistics_numberOfChargingCycles - Anzahl der Ladezyklen</li>
     <li>statistics_numberOfCollisions - Anzahl der Kollisionen</li>
-    <li>statistics_totalChargingTime - Gesamtladezeit in Stunden</li>
-    <li>statistics_totalCuttingTime - Gesamtschneidezeit in Stunden</li>
-    <li>statistics_totalRunningTime - Gesamtlaufzeit  in Stunden</li>
-    <li>statistics_totalSearchingTime - Gesamtsuchzeit in Stunden</li>
-    <li>statistics_currentDayTrack - berechnete gefahrene Strecke in Meter bei_Activity MOWING seit Mitternacht</li>
-    <li>statistics_currentDayArea - berechnete übermähte Fläche in Quadratmeter bei der Activity MOWING seit Mitternacht</li>
-    <li>statistics_lastIntervalNumberOfWayPoints - Anzahl der Wegpunkte im letzten Interval</li>
-    <li>statistics_currentMowerSpeed - berechnet Geschwindigkeit in Meter pro Sekunde bei der_Activity MOWING im letzten Interval</li>
-    <li>statistics_lastDayTrack - berechnete gefahrene Strecke in Meter bei_Activity MOWING des letzten Tages</li>
-    <li>statistics_lastDayArea - berechnete übermähte Fläche in Quadratmeter bei der Activity MOWING des letzten Tages</li>
-    <li>statistics_currentWeekTrack - berechnete gefahrene Strecke in Meter bei_Activity MOWING </li>
-    <li>statistics_currentWeekArea - berechnete übermähte Fläche in Quadratmeter bei der Activity MOWING der laufenden Woche</li>
-    <li>statistics_lastWeekTrack - berechnete gefahrene Strecke in Meter bei_Activity MOWING  der letzten Woche</li>
-    <li>statistics_lastWeekArea - berechnete übermähte Fläche in Quadratmeter bei der Activity MOWING der letzten Woche</li>
     <li>status_connected - Status der Verbindung zwischen dem Automower und der Husqvarna Cloud, (1 => true, 0 => false)</li>
     <li>status_statusTimestamp - Lokalzeit der letzten Änderung der Daten in der API</li>
     <li>status_statusTimestampDiff - Zeitdifferenz zwichen den beiden letzten Änderungen im Inhalt der Daten aus der API</li>
     <li>status_statusTimestampOld - Lokalzeit der vorletzten Änderung der Daten in der API</li>
     <li>system_name - Name des Automowers</li>
-    <li>system_serialNumber - Seriennummer des Automowers</li>
   </ul>
 </ul>
 
