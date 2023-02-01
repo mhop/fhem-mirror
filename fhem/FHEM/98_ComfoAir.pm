@@ -827,9 +827,11 @@ sub ReadyFn {
 
     # This is relevant for windows/USB only
     my $po = $hash->{USBDev};
-    my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
-  
-    return ($InBytes>0);
+    if ($po) {
+        my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+        return ($InBytes>0);
+    }
+    return;
 }
 
 
