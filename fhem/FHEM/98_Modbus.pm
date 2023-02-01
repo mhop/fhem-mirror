@@ -37,7 +37,7 @@
 #               
 #                   Allow setting of a _Setup function in the ModbusXY initialize function to be called after init done and not disabled
 #                       this can then modify the parseInfo Hash depending of a model variant or an offset   
-#                       maybe call whenever startUpdateTime is called as well and _setup has not been caled yet?
+#                       maybe call whenever startUpdateTime is called as well and _setup has not been called yet?
 #                       or do it depending on a certain object which is requested during normal getupdate? as expr?
 #           
 #                   learn objects in passive mode
@@ -269,7 +269,7 @@ BEGIN {                         # functions / variables needed from package main
 
 };
 
-my $Module_Version = '4.4.13 - 4.12.2022';
+my $Module_Version = '4.4.14 - 30.1.2023';
 
 my $PhysAttrs = join (' ', 
         'queueDelay',
@@ -289,7 +289,7 @@ my $PhysAttrs = join (' ',
         'skipGarbage:0,1',
         'requestDelay',                         # for debugging / testing / simulations
         'timeoutLogLevel:3,4',
-        'closeAfterResponse:0,1',               # for Modbus over TCP/IP only
+        'closeAfterResponse:0,1,2',             # for Modbus over TCP/IP only
         'silentReconnect:0,1');
         
 my $LogAttrs = join (' ', 
@@ -2804,8 +2804,11 @@ sub HandleRequest {
     my $request = \%requestData;
     
     if (!ParseRequest($hash, $request)) {           # take frame hash and fill request hash
-        Log3 $name, 5, "$name: HandleRequest could not parse request frame yet, wait for more data";
-        return;                                     # continue reading
+        if (!$frame->{ERROR}) {
+            Log3 $name, 5, "$name: HandleRequest could not parse request frame yet, wait for more data" 
+                . ($frame->{ERROR} ? ' (' . $frame->{ERROR} .')' : '');
+            return                                  # continue reading
+        }
     }
     # for unknown fCode $request->{ERRCODE} as well as $frame->{ERROR} are set by ParseRequest, later CreateResponse copies ERRCODE from Request into Response
     # ParseRequest also calls CheckChecksum to set $hash->{FRAME}{CHECKSUMERROR} if necessary
@@ -4388,8 +4391,19 @@ sub ResponseTimeout {
     }
     Profiler($hash, 'Idle');
     DropFrame($hash);                                       # drop $hash->{FRAME} and the relevant part of $hash->{READ}{BUFFER}
-    delete $hash->{nextTimeout};    
-    
+    delete $hash->{nextTimeout};  
+
+    if ($hash->{MODE} eq 'master') {                                # close after last response in queue
+        if (AttrVal($name, 'closeAfterResponse', 0) && ($hash->{QUEUE} ? scalar(@{$hash->{QUEUE}}) : 0) == 0) {
+            Log3 $name, 4, "$name: Timeout will close because closeAfterResponse is set and queue is empty";
+            DoClose($hash);
+        }
+        elsif (AttrVal($name, 'closeAfterResponse', 0) == 2) {      # close after each response regardless of remaining queue entries
+            Log3 $name, 4, "$name: HandleResponse will close because closeAfterResponse is 2";
+            DoClose($hash, {KEEPQUEUE => 1});
+        }
+    }
+       
     $hash->{RETRY} = ($hash->{RETRY} ? $hash->{RETRY} : 0); # deleted in doRequest and handleResponse
     if ($hash->{RETRY} < $retries && $request) {			# retry?
         $hash->{RETRY}++;
@@ -4950,8 +4964,8 @@ sub ObjInfo {
         $reading = $parseInfo->{$key}{reading};
     }
     if (!defined($reading)) {
-        #return (exists($attrDefaults{$oName}{default}) ? $attrDefaults{$oName}{default} : '');
-        $reading = "unnamed-$key";          # don't return default here but use key as reading name and continue
+        return (exists($attrDefaults{$oName}{default}) ? $attrDefaults{$oName}{default} : '');
+        #$reading = "unnamed-$key";          # continuing with a defult reading name will result in returning the dev defaults for e.g. len which breaks splitting etc...
     }
     
     #Log3 $name, 5, "$name: ObjInfo now looks at attrs for oName $oName / reading $reading / $key";
