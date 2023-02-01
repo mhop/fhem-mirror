@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.51.4"  => "01.02.2023  ignore non-numeric values in diffValue and output the erroneous record in the log ",
   "8.51.3"  => "22.01.2023  extend DbRep_averval avgTimeWeightMean by alkazaa, Restructuring of DbRep_averval ".
                             "DbRep_reduceLog -> Handling of field 'value' with NULL value ",
   "8.51.2"  => "13.01.2023  rewrite sub DbRep_OutputWriteToDB, new averageValue option writeToDBSingleStart ",
@@ -4521,6 +4522,11 @@ sub DbRep_diffval {
                   my $timestamp      = $sp[2] ? $sp[1]." ".$sp[2] : $sp[1];
                   my $vnew           = $sp[3];
                   $vnew              =~ tr/\n//d;
+                  
+                  if (!DbRep_IsNumeric ($vnew)) {                                   # Test auf $value = "numeric"
+                      Log3 ($name, 3, "DbRep $name - WARNING - dataset has no numeric value >$vnew< and is ignored\ntimestamp >$timestamp<, device >$device<, reading >$reading<");
+                      next;
+                  }
 
                   $dse  = $vold && (($vnew-$vold) > 0) ? ($vnew-$vold) : 0;
                   @sp   = $runtime_string." ".$timestamp." ".$vnew." ".$dse."\n";
@@ -4558,8 +4564,6 @@ sub DbRep_diffval {
   $sth->finish;
   $dbh->disconnect;
 
-  # Log3 ($name, 5, "DbRep $name - raw data of row_array result:\n @row_array");
-
   my $difflimit = AttrVal($name, "diffAccept", "20");   # legt fest, bis zu welchem Wert Differenzen akzeptiert werden (Ausreißer eliminieren)
 
   # Berechnung diffValue aus Selektionshash
@@ -4588,7 +4592,7 @@ sub DbRep_diffval {
 
       $timestamp         =~ s/\s+$//g;                                        # Leerzeichen am Ende $timestamp entfernen
 
-      if (!looks_like_number($value)) {                                       # Test auf $value = "numeric"
+      if (!DbRep_IsNumeric ($value)) {                                        # Test auf $value = "numeric"
           $a[3] =~ s/\s+$//g;
           Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in diffValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
           $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
@@ -4633,7 +4637,7 @@ sub DbRep_diffval {
           $lval              = $value if($value);                             # Übetrag über Perioden mit value = 0 hinweg !
           $rslval            = $runtime_string;
 
-          Log3 ($name, 4, "DbRep $name - balance difference of $uediff between $rslval and $runtime_string");
+          Log3 ($name, 5, "DbRep $name - balance difference of $uediff between $rslval and $runtime_string");
 
           $diff_total          = $diff ? $diff : 0 if($diff <= $difflimit);
           $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
@@ -4644,10 +4648,10 @@ sub DbRep_diffval {
       $i++;
   }
 
-  Log3 ($name, 4, "DbRep $name - print result of diffValue calculation before encoding ...");
+  Log3 ($name, 5, "DbRep $name - print result of diffValue calculation before encoding ...");
 
   for my $key (sort(keys(%rh))) {
-      Log3 ($name, 4, "runtimestring Key: $key, value: ".$rh{$key});
+      Log3 ($name, 5, "runtimestring Key: $key, value: ".$rh{$key});
   }
 
   my $ncp = DbRep_calcount($hash,\%ch);

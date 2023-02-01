@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbRep: ignore non-numeric values in diffValue and output 
+                      the erroneous record in the log
  - feature:  74_AutomowerConnect: reduce readings, new getter for error codes 
              and internal data, show mower path without registered image
              add widget selectnumbers to Park and Start setter
