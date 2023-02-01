@@ -5862,7 +5862,7 @@ ZWave_fhemwebFn($$$$)
    "var zwd='$d', FW_tp='$FW_tp';" . <<'JSEND'
     $(document).ready(function() {
       $("div#ZWHelp").insertBefore("div.makeTable.internals"); // Move
-      $("div.detLink.ZWPepper").insertAfter("div.detLink.devSpecHelp");
+      $("div.detLink.ZWPepper").insertAfter("div#detLink div.detLink:last");
       if(FW_tp) $("div.img.ZWPepper").appendTo("div#menu");
       $("select.set,select.get").each(function(){
         var ss = $(this).get(0);
