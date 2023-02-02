@@ -317,7 +317,7 @@ sub _ReturnWithError {
     return;
 }
 
-sub _DeleteForecastreadings {
+sub DeleteForecastreadings {
     return 0 unless ( __PACKAGE__ eq caller(0) );
 
     my $hash = shift;
