@@ -4193,8 +4193,8 @@ FW_log($$)
         only the deviceName or have the form deviceName.event or deviceName.*.
         This is always the case when using the <a href="#plotEditor">Plot
         editor</a>. The SVG will be reloaded for <b>any</b> event triggered by
-        this deviceName. Default is off. Note: the plotEmbed attribute must be
-        set.
+        this deviceName. Default is off.<br>
+        Note: this feature needs the plotEmbed attribute set to 1.
         </li>
         <br>
 
@@ -5052,8 +5052,9 @@ FW_log($$)
         bzw. deviceName.*. Wenn man den <a href="#plotEditor">Plot Editor</a>
         benutzt, ist das &uuml;brigens immer der Fall. Die SVG Datei wird bei
         <b>jedem</b> ausl&ouml;senden Event dieses Ger&auml;tes neu geladen.
-        Die Voreinstellung ist aus. Achtung: das plotEmbed Attribute muss
-        gesetzt sein.
+        Die Voreinstellung ist aus.<br>
+        Achtung: fuer dieses Feature muss das plotEmbed Attribute auf 1 gesetzt
+        sein.
         </li><br>
 
     <a id="FHEMWEB-attr-mainInputLength"></a>
