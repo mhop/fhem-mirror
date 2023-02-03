@@ -1,6 +1,6 @@
-REV 27166
+REV 27170
 DIR unused
-UPD 2023-02-02_07:45:03 393533 ./CHANGED
+UPD 2023-02-03_07:45:02 393581 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2023-01-26_07:45:04 46585 ./MAINTAINER.txt
 UPD 2022-12-07_07:45:02 46565 ./configDB.pm
@@ -535,7 +535,7 @@ UPD 2022-06-14_07:45:02 10228 FHEM/98_average.pm
 UPD 2021-04-26_07:45:03 3440 FHEM/98_backup.pm
 UPD 2017-01-09_07:45:02 10293 FHEM/98_cloneDummy.pm
 UPD 2018-03-02_07:47:09 3985 FHEM/98_cmdalias.pm
-UPD 2022-12-07_07:45:02 21579 FHEM/98_configdb.pm
+UPD 2023-02-03_07:45:02 21747 FHEM/98_configdb.pm
 UPD 2018-03-10_07:45:02 1997 FHEM/98_copy.pm
 UPD 2020-04-01_07:45:03 1441 FHEM/98_count.pm
 UPD 2019-03-11_07:45:02 35510 FHEM/98_dewpoint.pm
@@ -748,8 +748,8 @@ UPD 2023-02-02_07:45:08 4880383 docs/commandref.html
 UPD 2023-02-02_07:45:10 2921393 docs/commandref_DE.html
 UPD 2023-01-21_07:45:02 85661 docs/commandref_frame.html
 UPD 2023-01-21_07:45:02 96258 docs/commandref_frame_DE.html
-UPD 2023-02-02_07:45:12 304007 docs/commandref_modular.html
-UPD 2023-02-02_07:45:13 315777 docs/commandref_modular_DE.html
+UPD 2023-02-03_07:45:11 304007 docs/commandref_modular.html
+UPD 2023-02-03_07:45:12 315777 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -778,7 +778,7 @@ UPD 2020-06-29_07:45:03 1765 lib/FHEM/Core/Timer/Helper.pm
 UPD 2021-05-26_07:45:02 6647 lib/FHEM/Core/Timer/Register.pm
 UPD 2021-04-26_07:45:03 8936 lib/FHEM/Core/Utils/FHEMbackup.pm
 UPD 2023-01-18_07:45:03 1432 lib/FHEM/Core/Utils/Math.pm
-UPD 2023-01-30_07:45:05 33996 lib/FHEM/Core/Weather.pm
+UPD 2023-02-03_07:45:02 33945 lib/FHEM/Core/Weather.pm
 UPD 2022-04-01_07:45:02 55179 lib/FHEM/Devices/LGTV/LGTVWebOS.pm
 UPD 2022-09-27_07:45:03 42814 lib/FHEM/Devices/Nuki/Bridge.pm
 UPD 2021-12-18_07:45:03 16385 lib/FHEM/Devices/Nuki/Device.pm
