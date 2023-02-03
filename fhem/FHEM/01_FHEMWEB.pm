@@ -1149,7 +1149,7 @@ FW_answerCall($)
   my $gen = 'generated="'.(time()-1).'"';
   my $lp = 'longpoll="'.AttrVal($FW_wname,"longpoll",
                  $FW_use{sha} && $FW_userAgent=~m/Chrome/ ? "websocket": 1).'"';
-  $FW_id = $FW_chash->{NR} if( !$FW_id );
+  $FW_id = gettimeofday() if( !$FW_id ); #132013
 
   my $dataAttr = FW_dataAttr();
   FW_pO "</head>\n<body name='$t' fw_id='$FW_id' $gen $lp $csrf $dataAttr>";
