@@ -3391,7 +3391,9 @@ sub _DbRep_avgArithmeticMean {
           @rsn     = split " ", $runtime_string_next;
           $arrstr .= $runtime_string."#".$avg."#".$rsf[0]."|";
       }
-
+      
+      next if($avg eq '-');                                                                      # Schreiben von '-' als Durchschnitt verhindern
+      
       my @wsf = split " ", $runtime_string_first;
       my @wsn = split " ", $runtime_string_next;
       
@@ -3448,7 +3450,7 @@ sub _DbRep_avgDailyMeanGWS {
       my $sum = 0;
       my $anz = 0;                                                                 # Anzahl der Messwerte am Tag
       my ($t01,$t07,$t13,$t19);                                                    # Temperaturen der Haupttermine
-      my ($bdate,undef) = split(" ",$runtime_string_first);
+      my ($bdate,undef) = split " ", $runtime_string_first;
 
       for my $i (0..23) {
           my $bsel = $bdate." ".sprintf("%02d",$i).":00:00";
