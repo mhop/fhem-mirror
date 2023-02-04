@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 27102 2023-01-22 17:35:45Z DS_Starter $
+# $Id: 93_DbRep.pm 27164 2023-02-01 21:17:42Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.51.5"  => "04.02.2023  fix Perl Warning Forum: https://forum.fhem.de/index.php/topic,53584.msg1262032.html#msg1262032 ",
   "8.51.4"  => "01.02.2023  ignore non-numeric values in diffValue and output the erroneous record in the log ",
   "8.51.3"  => "22.01.2023  extend DbRep_averval avgTimeWeightMean by alkazaa, Restructuring of DbRep_averval ".
                             "DbRep_reduceLog -> Handling of field 'value' with NULL value ",
@@ -3343,6 +3344,7 @@ sub _DbRep_avgArithmeticMean {
   my ($err, $sth, $sql, $arrstr, $wrstr);
   my (@rsf, @rsn);
   
+  my $aval    = (DbRep_checktimeaggr($hash))[2];
   $qlf        = 'avgam';
   my $addon   = q{};
   my $selspec = 'AVG(VALUE)';
@@ -3371,7 +3373,6 @@ sub _DbRep_avgArithmeticMean {
 
       my @line = $sth->fetchrow_array();
       $avg     = $line[0] if($line[0]);
-      my $aval = (DbRep_checktimeaggr($hash))[2];
       
       Log3 ($name, 5, "DbRep $name - SQL result: $avg ");
       
@@ -3393,6 +3394,8 @@ sub _DbRep_avgArithmeticMean {
 
       my @wsf = split " ", $runtime_string_first;
       my @wsn = split " ", $runtime_string_next;
+      
+      Log3 ($name, 3, "DbRep $name - Write Back String: ".$runtime_string."#".$avg."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|");
       
       $wrstr .= $runtime_string."#".$avg."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
   }
@@ -3430,6 +3433,7 @@ sub _DbRep_avgDailyMeanGWS {
   
   my ($gts,$gtsstr) = (0, q{});                                                    # Variablen für Grünlandtemperatursumme GTS
   
+  my $aval    = (DbRep_checktimeaggr($hash))[2];
   my $acf     = AttrVal ($name, 'averageCalcForm', 'avgArithmeticMean');           # Festlegung Berechnungsschema f. Mittelwert
   my $addon   = "ORDER BY TIMESTAMP DESC LIMIT 1";
   my $selspec = "VALUE";
@@ -3480,8 +3484,6 @@ sub _DbRep_avgDailyMeanGWS {
       else {
           $sum = qq{<html>insufficient values - execute <b>get $name versionNotes 2</b> for further information</html>};
       }
-
-      my $aval = (DbRep_checktimeaggr($hash))[2];
 
       if($aval eq "hour") {
           @rsf     = split /[ :]/, $runtime_string_first;
@@ -3564,6 +3566,7 @@ sub _DbRep_avgTimeWeightMean {
   my ($err, $sth, $sql, $arrstr, $wrstr, $bin_end, $val1);
   my (@rsf, @rsn);
   
+  my $aval    = (DbRep_checktimeaggr($hash))[2];   
   $qlf        = 'avgtwm';
   my $selspec = 'TIMESTAMP,VALUE';
   my $addon   = 'ORDER BY TIMESTAMP ASC';
@@ -3573,9 +3576,7 @@ sub _DbRep_avgTimeWeightMean {
       my @ar                    = split "#", $row;
       my $runtime_string        = $ar[0];
       my $runtime_string_first  = $ar[1];
-      my $runtime_string_next   = $ar[2];
-      
-      my $aval = (DbRep_checktimeaggr($hash))[2];         
+      my $runtime_string_next   = $ar[2];      
 
       my ($tf,$tl,$tn,$to,$dt,$val);                                                                                                          
       
@@ -11543,11 +11544,11 @@ sub DbRep_checktimeaggr {
      $timeoption = 1 if($elem =~ /\b\d+(:\d+)?\b/);
  }
 
- if ( AttrVal($name,"timestamp_begin", undef) ||
-      AttrVal($name,"timestamp_end",   undef) ||
-      AttrVal($name,"timeDiffToNow",   undef) ||
-      AttrVal($name,"timeOlderThan",   undef) ||
-      AttrVal($name,"timeYearPeriod",  undef) || $timeoption ) {
+ if (AttrVal ($name,"timestamp_begin", undef) ||
+     AttrVal ($name,"timestamp_end",   undef) ||
+     AttrVal ($name,"timeDiffToNow",   undef) ||
+     AttrVal ($name,"timeOlderThan",   undef) ||
+     AttrVal ($name,"timeYearPeriod",  undef) || $timeoption ) {
      $IsTimeSet = 1;
  }
 
@@ -13675,12 +13676,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 27102 2023-01-22 17:35:45Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 27164 2023-02-01 21:17:42Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 27102 2023-01-22 17:35:45Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 27164 2023-02-01 21:17:42Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
