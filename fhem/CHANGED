@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  59_Weather: return missing perl modules message
  - bugfix:  59_Weather: fix Undefined subroutine 
  - feature: 74_AutomowerConnect: rework detail view
              getter for MowerData and StatisticsData

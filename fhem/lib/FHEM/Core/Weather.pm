@@ -32,9 +32,18 @@ package FHEM::Core::Weather;
 use strict;
 use warnings;
 
-use Time::HiRes  qw(gettimeofday);
+my $missingModul = '';
+
+eval { use Time::HiRes qw /gettimeofday/; 1 }
+  or $missingModul .= "libtime-hires-perl ";
+
+eval { use Readonly; 1 }
+  or $missingModul .= "libreadonly-perl ";
+
+#use Time::HiRes  qw(gettimeofday);
 use experimental qw /switch/;
-use Readonly;
+
+#use Readonly;
 
 use FHEM::Meta;
 
@@ -318,7 +327,6 @@ sub _ReturnWithError {
 }
 
 sub DeleteForecastreadings {
-
     my $hash = shift;
 
     my $name                    = $hash->{NAME};
@@ -768,6 +776,12 @@ sub Define {
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
+
+    return
+        'Cannot define Weather device. Please use "apt install '
+      . ${missingModul}
+      . ' to install missing perl modules'
+      if ($missingModul);
 
     my $usage =
 "syntax: define <name> Weather [API=<API>] [apikey=<apikey>] [location=<location>] [interval=<interval>] [lang=<lang>]";
