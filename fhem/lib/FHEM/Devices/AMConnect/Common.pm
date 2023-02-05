@@ -298,7 +298,7 @@ sub AlignArray {
     my @searchposlon = ($hash->{helper}{searchpos}[0]{longitude}, $hash->{helper}{searchpos}[1]{longitude});
     my @searchposlat = ($hash->{helper}{searchpos}[0]{latitude}, $hash->{helper}{searchpos}[1]{latitude});
     my $maxLength = $hash->{helper}{$activity}{maxLength};
-    for ( $i = 0; $i < $poslen-3; $i++ ) { # 3 due to 2 alignment data sets at the end
+    for ( $i = 0; $i < $poslen-2; $i++ ) { # 2 due to 2 alignment data sets at the end
       if ( $searchposlon[ 0 ] == $hash->{helper}{mower}{attributes}{positions}[ $i ]{longitude}
         && $searchposlat[ 0 ] == $hash->{helper}{mower}{attributes}{positions}[ $i ]{latitude}
         && $searchposlon[ 1 ] == $hash->{helper}{mower}{attributes}{positions}[ $i+1 ]{longitude}
@@ -306,9 +306,9 @@ sub AlignArray {
         # timediff per step
         my $dt = 0;
         $dt = int(($hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{$arrayName}[0]{statusTimestamp})/$i) if ( $i && @{ $hash->{helper}{$arrayName} } );
-        for ($k=$i-1;$k>-1;$k--) {
-          
-        }
+        
+        
+        
         for ($k=$i-1;$k>-1;$k--) {
 
           if ( @{ $hash->{helper}{$arrayName} } ) {

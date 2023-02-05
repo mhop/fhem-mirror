@@ -550,8 +550,8 @@ sub getMowerResponse {
         my $storediff = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
         if ($storediff) {
 
-          # ::FHEM::Devices::AMConnect::Common::AlignArray( $hash );
-          AlignArray( $hash );
+          ::FHEM::Devices::AMConnect::Common::AlignArray( $hash ); #release
+          # AlignArray( $hash ); # developement
           ::FHEM::Devices::AMConnect::Common::FW_detailFn_Update ($hash) if (AttrVal($name,'showMap',1));
 
         }
