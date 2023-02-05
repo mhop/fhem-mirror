@@ -185,6 +185,7 @@ sub CommandConfigdb {
 
 		when ('migrate') {
 			return "\n Migration not possible. Already running with configDB!" if $configfile eq 'configDB';
+			$data{cfgDB_debug} = 1 if (lc($param1) eq 'debug');
 			Log3('configdb', 4, "configdb: migration requested.");
 			$ret = _cfgDB_Migrate;
 		}

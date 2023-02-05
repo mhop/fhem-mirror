@@ -525,6 +525,7 @@ sub cfgDB_SaveCfg { ## prototype used in fhem.pl
 	$t = localtime;
 	$out = "#created $t";
 	push @rowList, $out;
+    Debug "\n".join("\n",@rowList) if defined($data{cfgDB_debug});
     return @rowList if defined($data{cfgDB_rawList});
 
 # Insert @rowList into database table
@@ -751,6 +752,7 @@ sub _cfgDB_Connect {
 # add configuration entry into fhemconfig
 sub _cfgDB_InsertLine {
 	my ($fhem_dbh, $uuid, $line, $counter) = @_;
+	Log 0, "configDB: $line" if defined($data{cfgDB_debug});
 	my ($c,$d,$p1,$p2) = split(/ /, $line, 4);
 	my $sth = $fhem_dbh->prepare('INSERT INTO fhemconfig values (?, ?, ?, ?, ?, ?)');
 	$sth->execute($c, $d, $p1, $p2, $counter, $uuid);
