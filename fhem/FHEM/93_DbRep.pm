@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.51.5"  => "05.02.2023  fix Perl Warning Forum: https://forum.fhem.de/index.php/topic,53584.msg1262032.html#msg1262032 ",
   "8.51.4"  => "01.02.2023  ignore non-numeric values in diffValue and output the erroneous record in the log ",
   "8.51.3"  => "22.01.2023  extend DbRep_averval avgTimeWeightMean by alkazaa, Restructuring of DbRep_averval ".
                             "DbRep_reduceLog -> Handling of field 'value' with NULL value ",
@@ -3343,6 +3344,7 @@ sub _DbRep_avgArithmeticMean {
   my ($err, $sth, $sql, $arrstr, $wrstr);
   my (@rsf, @rsn);
   
+  my $aval    = (DbRep_checktimeaggr($hash))[2];
   $qlf        = 'avgam';
   my $addon   = q{};
   my $selspec = 'AVG(VALUE)';
@@ -3371,7 +3373,6 @@ sub _DbRep_avgArithmeticMean {
 
       my @line = $sth->fetchrow_array();
       $avg     = $line[0] if($line[0]);
-      my $aval = (DbRep_checktimeaggr($hash))[2];
       
       Log3 ($name, 5, "DbRep $name - SQL result: $avg ");
       
@@ -3390,11 +3391,15 @@ sub _DbRep_avgArithmeticMean {
           @rsn     = split " ", $runtime_string_next;
           $arrstr .= $runtime_string."#".$avg."#".$rsf[0]."|";
       }
-
-      my @wsf = split " ", $runtime_string_first;
-      my @wsn = split " ", $runtime_string_next;
       
-      $wrstr .= $runtime_string."#".$avg."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
+      next if($avg eq '-');                                                                      # Schreiben von '-' als Durchschnitt verhindern
+      
+      my @wsf  = split " ", $runtime_string_first;
+      my @wsn  = split " ", $runtime_string_next;
+      my $wsft = $wsf[1] ? '_'.$wsf[1] : q{};
+      my $wsnt = $wsn[1] ? '_'.$wsn[1] : q{};
+      
+      $wrstr .= $runtime_string."#".$avg."#".$wsf[0].$wsft."#".$wsn[0].$wsnt."|";                # Kombi zum Rückschreiben in die DB
   }
   
   $sth->finish;
@@ -3430,6 +3435,7 @@ sub _DbRep_avgDailyMeanGWS {
   
   my ($gts,$gtsstr) = (0, q{});                                                    # Variablen für Grünlandtemperatursumme GTS
   
+  my $aval    = (DbRep_checktimeaggr($hash))[2];
   my $acf     = AttrVal ($name, 'averageCalcForm', 'avgArithmeticMean');           # Festlegung Berechnungsschema f. Mittelwert
   my $addon   = "ORDER BY TIMESTAMP DESC LIMIT 1";
   my $selspec = "VALUE";
@@ -3444,7 +3450,7 @@ sub _DbRep_avgDailyMeanGWS {
       my $sum = 0;
       my $anz = 0;                                                                 # Anzahl der Messwerte am Tag
       my ($t01,$t07,$t13,$t19);                                                    # Temperaturen der Haupttermine
-      my ($bdate,undef) = split(" ",$runtime_string_first);
+      my ($bdate,undef) = split " ", $runtime_string_first;
 
       for my $i (0..23) {
           my $bsel = $bdate." ".sprintf("%02d",$i).":00:00";
@@ -3480,8 +3486,6 @@ sub _DbRep_avgDailyMeanGWS {
       else {
           $sum = qq{<html>insufficient values - execute <b>get $name versionNotes 2</b> for further information</html>};
       }
-
-      my $aval = (DbRep_checktimeaggr($hash))[2];
 
       if($aval eq "hour") {
           @rsf     = split /[ :]/, $runtime_string_first;
@@ -3564,6 +3568,7 @@ sub _DbRep_avgTimeWeightMean {
   my ($err, $sth, $sql, $arrstr, $wrstr, $bin_end, $val1);
   my (@rsf, @rsn);
   
+  my $aval    = (DbRep_checktimeaggr($hash))[2];   
   $qlf        = 'avgtwm';
   my $selspec = 'TIMESTAMP,VALUE';
   my $addon   = 'ORDER BY TIMESTAMP ASC';
@@ -3573,9 +3578,7 @@ sub _DbRep_avgTimeWeightMean {
       my @ar                    = split "#", $row;
       my $runtime_string        = $ar[0];
       my $runtime_string_first  = $ar[1];
-      my $runtime_string_next   = $ar[2];
-      
-      my $aval = (DbRep_checktimeaggr($hash))[2];         
+      my $runtime_string_next   = $ar[2];      
 
       my ($tf,$tl,$tn,$to,$dt,$val);                                                                                                          
       
@@ -11543,11 +11546,11 @@ sub DbRep_checktimeaggr {
      $timeoption = 1 if($elem =~ /\b\d+(:\d+)?\b/);
  }
 
- if ( AttrVal($name,"timestamp_begin", undef) ||
-      AttrVal($name,"timestamp_end",   undef) ||
-      AttrVal($name,"timeDiffToNow",   undef) ||
-      AttrVal($name,"timeOlderThan",   undef) ||
-      AttrVal($name,"timeYearPeriod",  undef) || $timeoption ) {
+ if (AttrVal ($name,"timestamp_begin", undef) ||
+     AttrVal ($name,"timestamp_end",   undef) ||
+     AttrVal ($name,"timeDiffToNow",   undef) ||
+     AttrVal ($name,"timeOlderThan",   undef) ||
+     AttrVal ($name,"timeYearPeriod",  undef) || $timeoption ) {
      $IsTimeSet = 1;
  }
 
