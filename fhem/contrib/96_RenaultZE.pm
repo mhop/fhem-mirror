@@ -38,6 +38,7 @@
 
 ############################################################################################################################
 # Version History
+# v 1.07 adjusting to new output  format from charges
 # v 1.06 logging "well known error" Failed to forward request to remote service only at log level 5
 # v 1.05 fixed timing problem in update request
 # v 1.04 typo denbled corrected
@@ -98,7 +99,7 @@ use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
 
-my $RenaultZE_version ="V1.06 / 18.01.2023";
+my $RenaultZE_version ="V1.07 / 05.02.2023";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -1246,16 +1247,15 @@ sub RenaultZE_gData_Step2($)
     ### charges start=20200202&end=20210202
     if($data =~ /charges/) {
         my $mtab = $decode_json->{data}->{attributes}->{charges};
-        my $output = "<html><body><b>Charges</b><table border=1 center>";
+        my $output = "<html><body><b>Charges</b><table border=1 align=middle>";
         $output = $output."<tr>";
-        $output = $output."<td align=center>chargeStartDate</td>";
-        $output = $output."<td align=center>chargeEndDate</td>";
-        $output = $output."<td align=center>chargeDuration</td>";
-        $output = $output."<td align=center>chargeStartBatteryLevel</td>";
-        $output = $output."<td align=center>chargeBatteryLevelRecovered</td>";
-        $output = $output."<td align=center>chargePower</td>";
-        $output = $output."<td align=center>chargeStartInstantaneousPower</td>";
-        $output = $output."<td align=center>chargeEndStatus</td>";
+        $output = $output."<td align=center>charge Start Date</td>";
+        $output = $output."<td align=center>charge End Date</td>";
+        $output = $output."<td align=center>charge Duration</td>";
+        $output = $output."<td align=center>charge Start Battery Level</td>";
+        $output = $output."<td align=center>charge End Battery Level</td>";
+        $output = $output."<td align=center>charge Energy Recovered</td>";
+        $output = $output."<td align=center>charge End Status</td>";
         $output = $output."</tr>";
         foreach my $item( @$mtab ) {
              $output = $output."<tr>";
@@ -1263,9 +1263,8 @@ sub RenaultZE_gData_Step2($)
              $output = $output."<td align=center>".$item->{chargeEndDate}."</td>";
              $output = $output."<td align=center>".$item->{chargeDuration}."</td>";
              $output = $output."<td align=center>".$item->{chargeStartBatteryLevel}."</td>";
-             $output = $output."<td align=center>".$item->{chargeBatteryLevelRecovered}."</td>";
-             $output = $output."<td align=center>".$item->{chargePower}."</td>";
-             $output = $output."<td align=center>".$item->{chargeStartInstantaneousPower}."</td>";
+             $output = $output."<td align=center>".$item->{chargeEndBatteryLevel}."</td>";
+             $output = $output."<td align=center>".$item->{chargeEnergyRecovered}."</td>";
              $output = $output."<td align=center>".$item->{chargeEndStatus}."</td>";
              $output = $output."</tr>";
         }
