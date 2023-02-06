@@ -40,7 +40,7 @@ use HttpUtils;
 use DevIo;
 use FritzBoxUtils;
 
-my $ModulVersion = "07.50.1";
+my $ModulVersion = "07.50.2";
 my %tellows = ();
 my %connection_type = (
      0 => "FON1",
@@ -881,8 +881,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
          # Using Cache if enabled
          if(AttrVal($name, "reverse-search-cache", "0") eq "1" and defined($hash->{helper}{CACHE}{$number}))
          {
-            FB_CALLMONITOR_Log $name, 4, "using cache for reverse search of $number";
-            if($hash->{helper}{CACHE}{$number} ne "timeout" or $hash->{helper}{CACHE}{$number} ne "unknown")
+            if($hash->{helper}{CACHE}{$number} ne "timeout" && $hash->{helper}{CACHE}{$number} ne "unknown")
             {
                return $hash->{helper}{CACHE}{$number};
             }
@@ -900,7 +899,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                     $number =~ s/^0049/0/; # remove country code
                     FB_CALLMONITOR_Log $name, 4, "using dasoertliche.de for reverse search of $number";
 
-                    $result = GetFileFromURL("http://www1.dasoertliche.de/?form_name=search_inv&ph=".$number, 5, undef, 1);
+                    $result = GetFileFromURL("https://www1.dasoertliche.de/?form_name=search_inv&ph=".$number, 5, undef, 1);
                     if(not defined($result))
                     {
                         if(AttrVal($name, "reverse-search-cache", "0") eq "1")
@@ -912,7 +911,8 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                     else
                     {
                         #Debug($result);
-                        if($result =~ m,<a href="[^"]*form_name=detail[^"]*".+?class="name ".+?><span class="">(.+?)</span>,)
+                        FB_CALLMONITOR_Log $name, 5, "result(dasOertliche) -> " . $result;
+                        if($result =~ m,<a href="[^"]*form_name=detail[^"]*".+?class="hitlnk_name".+?target="_self">(.+?)</a>,sg)
                         {
                             $invert_match = $1;
                             $invert_match = FB_CALLMONITOR_html2txt($invert_match);
@@ -925,7 +925,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                             FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from dasoertliche.de. Please contact the FHEM community.";
                         }
 
-                        $status = "unknown";
+                        $status = "dasOertliche->unknown result";
                     }
                 }
             }
@@ -956,6 +956,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                     else
                     {
                         #Debug($result);
+                        FB_CALLMONITOR_Log $name, 5, "result(11880) -> " . $result;
                         if($result =~ m,<li\s+[^>]*class="search-result-list-item"\s+[^>]*data-name="([^"]+)",s or $result =~ m,<h\d [^>]*itemprop="name"[^>]*>([^<]+)</h\d>,)
                         {
                             $invert_match = $1;
@@ -969,7 +970,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                             FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from 11880.com. Please contact the FHEM community.";
                         }
 
-                        $status = "unknown";
+                        $status = "11880.com->unknown";
                     }
                 }
             }
@@ -1010,6 +1011,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                     else
                     {
                         #Log 2, $result;
+                        FB_CALLMONITOR_Log $name, 5, "result(search.ch) -> " . $result;
                         if($result =~ m,<entry>(.+?)</entry>,s)
                         {
                             my $xml = $1;
@@ -1037,7 +1039,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                             return $invert_match;
                         }
 
-                        $status = "unknown";
+                        $status = "search.ch->unknown";
                     }
                 }
             }
@@ -1066,6 +1068,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                     else
                     {
                         #Log 2, $result;
+                        FB_CALLMONITOR_Log $name, 5, "result(dasschnelle.at) -> " . $result;
                         if($result =~ /"name"\s*:\s*"([^"]+)",/)
                         {
                             $invert_match = "";
@@ -1085,7 +1088,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                             FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from dasschnelle.at. Please contact the FHEM community.";
                         }
 
-                        $status = "unknown";
+                        $status = "dasschnelle.at->unknown";
                     }
                 }
             }
@@ -1116,6 +1119,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                     else
                     {
                         #Debug($result);
+                        FB_CALLMONITOR_Log $name, 5, "result(herold.at) -> " . $result;
                         if($result =~ m,data-clickpos="name"><span itemprop="name">([^<]+)</span>,)
                         {
                             $invert_match = $1;
@@ -1129,7 +1133,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                             FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from herold.at. Please contact the FHEM community.";
                         }
 
-                        $status = "unknown";
+                        $status = "herold.at->unknown";
                     }
                 }
             }
