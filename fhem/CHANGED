@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  72_FB_CALLMONITOR: RegEx für Suche dasOertliche angepasst
+                         uralt Fehler bei Suche in Cache behoben
  - bugfix:  93_DbRep: fix Perl Warning 
                       Forum: #topic,53584.msg1262032.html#msg1262032
  - change : 74_AutomowerConnect: shift common subs to lib
