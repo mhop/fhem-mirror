@@ -25,6 +25,7 @@
 ################################################################################
 
 package FHEM::Devices::AMConnect::Common;
+my $cvsid = '$Id$';
 use strict;
 use warnings;
 use POSIX;

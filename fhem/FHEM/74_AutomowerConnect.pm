@@ -269,14 +269,14 @@ sub AlignArray {
     my @searchposlon = ($hash->{helper}{searchpos}[0]{longitude}, $hash->{helper}{searchpos}[1]{longitude});
     my @searchposlat = ($hash->{helper}{searchpos}[0]{latitude}, $hash->{helper}{searchpos}[1]{latitude});
     my $maxLength = $hash->{helper}{$activity}{maxLength};
-    for ( $i = 0; $i < $poslen-2; $i++ ) { # 2 due to 2 alignment data sets at the end
+    for ( $i = 0; $i < $poslen-2; $i++ ) { # -2 due to 2 alignment data sets at the end
       if ( $searchposlon[ 0 ] == $hash->{helper}{mower}{attributes}{positions}[ $i ]{longitude}
         && $searchposlat[ 0 ] == $hash->{helper}{mower}{attributes}{positions}[ $i ]{latitude}
         && $searchposlon[ 1 ] == $hash->{helper}{mower}{attributes}{positions}[ $i+1 ]{longitude}
         && $searchposlat[ 1 ] == $hash->{helper}{mower}{attributes}{positions}[ $i+1 ]{latitude} ) {
         # timediff per step
         my $dt = 0;
-        $dt = int(($hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{$arrayName}[0]{statusTimestamp})/$i) if ( $i && @{ $hash->{helper}{$arrayName} } );
+        $dt = int( ( $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{$arrayName}[ 0 ]{statusTimestamp} ) / $i) if ( $i && @{ $hash->{helper}{$arrayName} } );
         for ($k=$i-1;$k>-1;$k--) {
           
         }
@@ -284,15 +284,15 @@ sub AlignArray {
 
           if ( @{ $hash->{helper}{$arrayName} } ) {
 
-            unshift (@{$hash->{helper}{$arrayName}}, dclone($hash->{helper}{mower}{attributes}{positions}[ $k ]) );
+            unshift ( @{$hash->{helper}{$arrayName}}, dclone( $hash->{helper}{mower}{attributes}{positions}[ $k ] ) );
 
           } else {
 
-            $hash->{helper}{$arrayName}[ 0 ] = dclone($hash->{helper}{mower}{attributes}{positions}[ $k ]);
+            $hash->{helper}{$arrayName}[ 0 ] = dclone( $hash->{helper}{mower}{attributes}{positions}[ $k ] );
 
           }
 
-          pop (@{$hash->{helper}{$arrayName}}) if (@{$hash->{helper}{$arrayName}} > $maxLength);
+          pop ( @{ $hash->{helper}{$arrayName} } ) if ( @{ $hash->{helper}{$arrayName} } > $maxLength );
           $hash->{helper}{$arrayName}[ 0 ]{statusTimestamp} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $dt * $k;
 
           push ( @temp, dclone( $hash->{helper}{mower}{attributes}{positions}[ $k ] ) );
@@ -301,7 +301,7 @@ sub AlignArray {
 
         ::FHEM::Devices::AMConnect::Common::posMinMax( $hash, \@temp );
         #callFn if present
-        if ( $hash->{helper}{$activity}{callFn} && @{$hash->{helper}{$arrayName}} > 1) {
+        if ( $hash->{helper}{$activity}{callFn} && @{ $hash->{helper}{$arrayName} } > 1 ) {
 
           $hash->{helper}{$activity}{cnt} = $i;
           no strict "refs";
@@ -319,7 +319,7 @@ sub AlignArray {
   }
 
   $hash->{helper}{newdatasets} = $i;
-  $hash->{helper}{searchpos} = [ dclone( $hash->{helper}{mower}{attributes}{positions}[0] ), dclone( $hash->{helper}{mower}{attributes}{positions}[1] ) ];
+  $hash->{helper}{searchpos} = [ dclone( $hash->{helper}{mower}{attributes}{positions}[ 0 ] ), dclone( $hash->{helper}{mower}{attributes}{positions}[ 1 ] ) ];
   return undef;
 
 }
