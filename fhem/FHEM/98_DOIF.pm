@@ -1704,11 +1704,11 @@ sub DOIF_statistic_bar
     if (defined $value and ($numOrig != 1 or (int($i/$dim) == 0 or $i % $dim > $period1 or $i % $dim == $period1 and !defined ${$va}[$period1]))) {
       $numb++;
       $sum+=$value;
-      if (!defined $maxVal or $value >= $maxVal) {
+      if (!defined $maxVal or $value > $maxVal) {
          $maxVal=$value;
          $maxValSlot=$i;
       }
-      if (!defined $minVal or $value <= $minVal) {
+      if (!defined $minVal or $value < $minVal) {
          $minVal=$value;
          $minValSlot=$i;
       }
@@ -1721,8 +1721,8 @@ sub DOIF_statistic_bar
     ${$bar}{min_value_slot}=$minValSlot;
     ${$bar}{average_value}=$sum/$numb;
     if (${$bar}{period} eq "decade") {
-      ${$bar}{max_value_time}=((${$bar}{last_period2}-int($maxValSlot/$dim))*10+$maxValSlot);
-      ${$bar}{min_value_time}=((${$bar}{last_period2}-int($minValSlot/$dim))*10+$minValSlot);
+      ${$bar}{max_value_time}=((${$bar}{last_period2}-int($maxValSlot/$dim))*10+($maxValSlot % $dim));
+      ${$bar}{min_value_time}=((${$bar}{last_period2}-int($minValSlot/$dim))*10+($minValSlot % $dim));
     } elsif (${$bar}{period} eq "year") {
       ${$bar}{max_value_time}=qw(Jan Feb Mär Apr Mai Jun Jul Aug Sep Okt Nov Dez)[$maxValSlot % $dim]." ".(($period2-int($maxValSlot/$dim)) % 100);
       ${$bar}{min_value_time}=qw(Jan Feb Mär Apr Mai Jun Jul Aug Sep Okt Nov Dez)[$minValSlot % $dim]." ".(($period2-int($minValSlot/$dim)) % 100);
@@ -3920,7 +3920,7 @@ sub DOIF_Perlblock
   my ($hash,$table,$tail,$subs) =@_;
   my ($beginning,$perlblock,$err,$i);
   $i=0;
-  while($tail =~ /(?:^|\n)\s*(\w*)\s*\{/g) {
+  while($tail =~ /(?:^|\n)\s*([\w\.]*)\s*\{/g) {
     my $blockname=$1;
     ($beginning,$perlblock,$err,$tail)=GetBlockDoIf($tail,'[\{\}]');
     if ($err) {
