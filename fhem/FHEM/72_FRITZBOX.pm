@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.5";
+my $ModulVersion = "07.50.6";
 my $missingModul = "";
 my $missingModulTelnet = "";
 my $missingModulWeb = "";
@@ -220,6 +220,7 @@ sub FRITZBOX_Initialize($)
                 ."enableVPNShares:0,1 "
                 ."enableUserInfo:0,1 "
                 ."enableAlarmInfo:0,1 "
+                ."enableWanInfo:0,1 "
                 ."disableDectInfo:0,1 "
                 ."disableFonInfo:0,1 "
                 ."enableSIP:0,1 "
@@ -400,6 +401,14 @@ sub FRITZBOX_Attr($@)
      if ($cmd eq "del" || $aVal == 0) {
        foreach (keys %{ $hash->{READINGS} }) {
          readingsDelete($hash, $_) if $_ =~ /^alarm(\d+)/ && defined $hash->{READINGS}{$_}{VAL};
+       }
+     }
+   }
+
+   if ($aName eq "enableWanInfo") {
+     if ($cmd eq "del" || $aVal == 0) {
+       foreach (keys %{ $hash->{READINGS} }) {
+         readingsDelete($hash, $_) if $_ =~ /^wan_.*/ && defined $hash->{READINGS}{$_}{VAL};
        }
      }
    }
@@ -1126,6 +1135,8 @@ sub FRITZBOX_Get($@)
         $returnStr = FRITZBOX_Kid_Profiles_List($hash);
       } elsif ( $val[0] eq "userInfos") {
         $returnStr = FRITZBOX_User_Info_List($hash);
+      } elsif ( $val[0] eq "wlanEnvironment") {
+        $returnStr = FRITZBOX_WLAN_Environment($hash);
       }
 
       return $returnStr;
@@ -1186,7 +1197,7 @@ sub FRITZBOX_Get($@)
    $list .= "luaQuery"                if AttrVal( $name, "allowTR064Command", 0 );
    $list .= " luaData"                if AttrVal( $name, "allowTR064Command", 0 );
    $list .= " luaFunction"            if AttrVal( $name, "allowTR064Command", 0 );
-   $list .= " luaInfo:lanDevices,vpnShares,kidProfiles,userInfos" if AttrVal( $name, "allowTR064Command", 0 );
+   $list .= " luaInfo:lanDevices,vpnShares,kidProfiles,userInfos,wlanEnvironment" if AttrVal( $name, "allowTR064Command", 0 );
 
    $list .= " lanDeviceInfo"          if AttrVal( $name, "allowTR064Command", 0 );
 
@@ -2562,14 +2573,75 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlan", $result->{box_guestWlan}, "onoff";
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlanRemain", $result->{box_guestWlanRemain};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_macFilter_active", $result->{box_macFilter_active}, "onoff";
+
+# WANs
+
+   # "xhr 1 lang de page chan xhrId environment;
+
+   if (AttrVal( $name, "enableWanInfo", "0")) {
+     my %oldWanDevice;
+     #collect current mac-readings (to delete the ones that are inactive or disappeared)
+     foreach (keys %{ $hash->{READINGS} }) {
+       $oldWanDevice{$_} = $hash->{READINGS}{$_}{VAL} if $_ =~ /^wan_/ && defined $hash->{READINGS}{$_}{VAL};
+     }
+
+     my @webCmdArray;
+     push @webCmdArray, "xhr"         => "1";
+     push @webCmdArray, "lang"        => "de";
+     push @webCmdArray, "page"        => "chan";
+     push @webCmdArray, "xhrId"       => "environment";
+
+     my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+     my $tmp;
+
+     if(defined $result->{Error}) {
+       $tmp = FRITZBOX_ERR_Result($hash, $result);
+     } else {
+
+       FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($result->{data}->{scanlist});
+
+       my $views = $result->{data}->{scanlist};
+       my $nbViews = scalar @$views;
+
+       eval {
+         for(my $i = 0; $i <= $nbViews - 1; $i++) {
+           my $dName = $result->{data}->{scanlist}->[$i]->{ssid};
+           $dName   .= " (Kanal: " . $result->{data}->{scanlist}->[$i]->{channel};
+           $dName   .= ", Band: " . $result->{data}->{scanlist}->[$i]->{bandId} . ")";
+
+           $rName  = $result->{data}->{scanlist}->[$i]->{mac};
+           $rName =~ s/:/_/g;
+           $rName  = "wan_" . $rName;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
+           delete $oldWanDevice{$rName} if exists $oldWanDevice{$rName};
+         }
+       };
+     }
+  # Remove inactive or non existing wan-readings in two steps
+     foreach ( keys %oldWanDevice ) {
+       # set the wan readings to 'inactive' and delete at next readout
+       if ( $oldWanDevice{$_} ne "inactive" ) {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $_, "inactive";
+       }
+       else {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $_, "";
+       }
+     }
+
+   }
+
 # Dect
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_dect", $result->{box_dect}, "onoff";
+
 # Music on Hold
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_moh", $result->{box_moh}, "mohtype";
+
 # Power Rate
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_powerRate", $result->{box_powerRate};
+
 # Box Features
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->is_double_wlan", $result->{is_double_wlan}, "01";
+
 # Box model, firmware and uptimes
 
    # Informationen �ber DSL Verbindung
@@ -2679,13 +2751,13 @@ sub FRITZBOX_Readout_Run_Web($)
       }
    }
 
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwUpdate",    $result->{box_fwUpdate}; #unless(grep { /^(box_fwUpdate)$/ } @reading_list);
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr064",       $result->{box_tr064},       "onoff"; #unless(grep { /^(box_tr064)$/ } @reading_list);
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr069",       $result->{box_tr069},       "onoff"; #unless(grep { /^(box_tr069)$/ } @reading_list);
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_stdDialPort", $result->{box_stdDialPort}, "dialport"; #unless(grep { /^(box_stdDialPort)$/ } @reading_list);
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwUpdate",    $result->{box_fwUpdate};
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr064",       $result->{box_tr064},       "onoff";
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr069",       $result->{box_tr069},       "onoff";
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_stdDialPort", $result->{box_stdDialPort}, "dialport";
    # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipExtern",    $result->{box_ipExtern};
    # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_connect",     $result->{box_connect};
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_cpuTemp",     $result->{box_cpuTemp}; #unless(grep { /^(box_cpuTemp)$/ } @reading_list);
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_cpuTemp",     $result->{box_cpuTemp};
    if ( defined ($result->{dslStatGlobalOut}) && looks_like_number($result->{dslStatGlobalOut}) ) {
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_dsl_upStream", sprintf ("%.3f", $result->{dslStatGlobalOut}/1000000) unless (grep { /^(box_dsl_upStream)$/ } @reading_list);
    }
@@ -6696,6 +6768,75 @@ sub FRITZBOX_Kid_Profiles_List($) {
    return $returnStr;
 }
 
+
+# get list of WLAN in environment
+############################################
+sub FRITZBOX_WLAN_Environment($) {
+
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+
+   # "xhr 1 lang de page chan xhrId environment;
+   #my $queryStr;
+   #$queryStr .= "'xhr'         => '1'\n";
+   #$queryStr .= "'lang'        => 'de'\n";
+   #$queryStr .= "'page'        => 'chan'\n";
+   #$queryStr .= "'xhrId'       => 'environment'\n";
+
+   my @webCmdArray;
+   push @webCmdArray, "xhr"         => "1";
+   push @webCmdArray, "lang"        => "de";
+   push @webCmdArray, "page"        => "chan";
+   push @webCmdArray, "xhrId"       => "environment";
+
+   my $returnStr;
+
+   $returnStr .= "WLAN: Netzwerke in der Umgebung\n";
+   $returnStr .= "---------------------------------\n";
+
+   my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+   my $tmp;
+
+   if(defined $result->{Error}) {
+     $tmp = FRITZBOX_ERR_Result($hash, $result);
+     return $returnStr . $tmp;
+   }
+
+   FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($result->{data}->{scanlist});
+
+   my $views = $result->{data}->{scanlist};
+   my $nbViews = scalar @$views;
+   my $lDump = "";
+
+   $returnStr .= "<table>\n";
+   $returnStr .= "<tr>\n";
+   $returnStr .= "<td>SSID</td><td>Kanal</td><td>BandID\n";
+   $returnStr .= "</tr>\n";
+
+   eval {
+     for(my $i = 0; $i <= $nbViews - 1; $i++) {
+       $returnStr .= "<tr>\n";
+       $returnStr .= "<td>" . $result->{data}->{scanlist}->[$i]->{ssid} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{scanlist}->[$i]->{channel} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{scanlist}->[$i]->{bandId} . "</td>";
+       $returnStr .= "</tr>\n";
+     }
+   };
+   $returnStr .= "</table>\n";
+
+   my @fwV = split(/\./, ReadingsVal($name, "box_fwVersion", "0.0.0.error"));
+
+   my $FW1 = substr($fwV[1],0,2);
+   my $FW2 = substr($fwV[2],0,2);
+
+   # Wirguard VPN only available with Fritz!OS 7.50 and greater
+   # return $returnStr . "</table>\n" if $FW1 <= 7 && $FW2 < 50;
+
+   $returnStr .= "</table>\n";
+
+   return $returnStr;
+}
+
 # get list of VPN Shares
 ############################################
 sub FRITZBOX_VPN_Shares_List($) {
@@ -7004,16 +7145,15 @@ sub FRITZBOX_Lan_Device_Info($$$) {
    my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
 
    if(defined $result->{Error}) {
-      FRITZBOX_Log $hash, 2, "ERROR: get $name $action " . $queryStr;
+      FRITZBOX_Log $hash, 2, "ERROR: get $name $action " . $queryStr . "\n" . FRITZBOX_ERR_Result($hash, $result);
       return "ERROR: holen Lan_Device_Info: " . $action . " f�r: " . $lDevID;
    }
 
    if (exists $result->{data}->{vars}) {
-     FRITZBOX_Log $hash, 4, "INFO: landevice: " . $lDevID . "landevice: " . $result->{data}->{vars}->{dev}->{UID};
+     FRITZBOX_Log $hash, 3, "DEBUG: landevice: " . $lDevID . "landevice: \n" . FRITZBOX_ERR_Result($hash, $result);
 
      if ($action eq "info") {
        if($result->{data}->{vars}->{dev}->{UID} eq $lDevID) {
-          FRITZBOX_Log $hash, 5, "DEBUG: landevice: " . $lDevID . "landevice: \n" . Dumper $result->{data}->{vars}->{dev};
           my $returnStr  = "";
           $returnStr .= "MAC:"       . $result->{data}->{vars}->{dev}->{mac};
           $returnStr .= " IPv4:"     . $result->{data}->{vars}->{dev}->{ipv4}->{current}->{ip};
@@ -7557,6 +7697,7 @@ sub FRITZBOX_fritztris($)
          vpnShares -> Shows a list of active and inactive vpn shares.<br>
          kidProfiles -> Shows a list of internet access profiles.<br>
          userInfos -> Shows a list of FRITZ!BOX users.<br>
+         wlanEnvirnonment -> Shows a list of WLAN neighborhood devices.<br>
       </li><br>
 
       <li><a name="luaQuery"></a>
@@ -7718,6 +7859,12 @@ sub FRITZBOX_fritztris($)
          Switches the takeover of VPN shares as reading off / on.
       </li><br>
 
+      <li><a name="enableWanInfo"></a>
+         <dt><code>enableWanInfo &lt;0 | 1&gt;</code></dt>
+         <br>
+         Switches the takeover of WLAN neighborhood devices as reading off / on.
+      </li><br>
+
       <li><a name="forceTelnetConnection"></a>
          <dt><code>forceTelnetConnection &lt;0 | 1&gt;</code></dt>
          <br>
@@ -7847,6 +7994,10 @@ sub FRITZBOX_fritztris($)
       <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC address and name of an active network device.
       <br>
       If connect via WLAN, the term "WLAN" and (from boxes point of view) the down- and upload rate and the signal strength is added. For LAN devices the LAN port and its speed is added. Inactive or removed devices get first the value "inactive" and will be deleted during the next update.</li>
+      <br>
+      <li><b>wan_</b><i>01_26_FD_12_01_DA</i> - MAC address and name of an active WLAN neighborhood device.
+      <br>
+      shown is the SSID, the channel and the bandwidth. Inactive or removed devices get first the value "inactive" and will be deleted during the next update.</li>
       <br>
       <li><b>radio</b><i>01</i> - Name of the internet radio station <i>01</i></li>
       <br>
@@ -8161,6 +8312,7 @@ sub FRITZBOX_fritztris($)
          vpnShares -> Generiert eine Liste der aktiven und inaktiven VPN Shares.<br>
          kidProfiles -> Generiert eine Liste der Zugangsprofile.<br>
          userInfos -> Generiert eine Liste der FRITZ!BOX Benutzer.<br>
+         wlanEnvirnonment -> Generiert eine Liste der WLAN Nachbarschaftsger�te.<br>
       </li><br>
 
       <li><a name="luaQuery"></a>
@@ -8321,6 +8473,12 @@ sub FRITZBOX_fritztris($)
          Schaltet die übernahme von VPN Shares als Reading aus/ein.
       </li><br>
 
+      <li><a name="enableWanInfo"></a>
+         <dt><code>enableWanInfo &lt;0 | 1&gt;</code></dt>
+         <br>
+         Schaltet die Anzeige von WLAN Nachbarschaft Geräten als Reading aus/ein.
+      </li><br>
+
       <li><a name="forceTelnetConnection"></a>
          <dt><code>forceTelnetConnection &lt;0 | 1&gt;</code></dt>
          <br>
@@ -8449,6 +8607,12 @@ sub FRITZBOX_fritztris($)
       <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines aktiven Netzwerk-Gerätes.
       <br>
       Bei einer WLAN-Verbindung wird "WLAN" und (von der Box gesehen) die Sende- und Empfangsgeschwindigkeit und die Empfangsstärke angehangen. Bei einer LAN-Verbindung wird der LAN-Port und die LAN-Geschwindigkeit angehangen. Gast-Verbindungen werden mit "gWLAN" oder "gLAN" gekennzeichnet.
+      <br>
+      Inaktive oder entfernte Geräte erhalten zuerst den Werte "inactive" und werden beim nächsten Update gelöscht.</li>
+      <br>
+      <li><b>wan_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines aktiven WAN-Gerätes.
+      <br>
+      Es wird die SSID, der Kanal und das Frequenzband angezeigt.
       <br>
       Inaktive oder entfernte Geräte erhalten zuerst den Werte "inactive" und werden beim nächsten Update gelöscht.</li>
       <br>
