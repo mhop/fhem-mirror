@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.4c";
+my $ModulVersion = "07.50.5";
 my $missingModul = "";
 my $missingModulTelnet = "";
 my $missingModulWeb = "";
@@ -173,11 +173,18 @@ sub FRITZBOX_Log($$$)
    my $xline       = ( caller(0) )[2];
 
    my $xsubroutine = ( caller(1) )[3];
+
    my $sub         = ( split( ':', $xsubroutine ) )[2];
-   $sub =~ s/FRITZBOX_//;
+   $sub =~ s/FRITZBOX_//       if ( defined $sub );
+   $sub ||= 'no-subroutine-specified';
 
    my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $hash;
-   Log3 $hash, $loglevel, "FRITZBOX [$instName: $sub.$xline] - " . $text;
+
+   my $avmModel = InternalVal($instName, "MODEL", "0000");
+   $avmModel = $1 if $avmModel =~ m/(\d+)/;
+
+   Log3 $hash, $loglevel, "FRITZBOX!$avmModel [$instName: $sub.$xline] - " . $text;
+
 } # End FRITZBOX_Log
 
 #######################################################################
@@ -221,6 +228,7 @@ sub FRITZBOX_Initialize($)
                                 ."box_ipv6Prefix,box_last_connect_err,box_moh,box_powerRate,box_rateDown,"
                                 ."box_rateUp,box_stdDialPort,box_tr064,box_tr069,box_uptimeConnect,box_uptime,box_wlanCount,box_wlan_2.4GHz,"
                                 ."box_wlan_5GHz,box_vdsl_downStreamRate,box_vdsl_upStreamRate " #,box_model,box_oem
+                ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,_noDefInf_ "
                # ."ttsRessource:Google,ESpeak "
                 .$readingFnAttributes;
 
@@ -344,11 +352,23 @@ sub FRITZBOX_Attr($@)
      }
    }
 
-   if ($aName eq "disableBoxReadings") {
-     my @reading_list = split(/\,/, $aVal);
-     foreach ( @reading_list ) {
-       readingsDelete($hash, $_) if exists $hash->{READINGS}{$_};
+   if ($aName eq "deviceInfo") {
+     if ($cmd eq "set") {
+        my $count = () = ($aVal . ",") =~ m/_default_(.*?)\,/g;
+        return "only one _default_... parameter possible" if $count > 1;
+        
+        return "character | not possible in _default_" if $aVal =~ m/\|/;
+
      }
+   }
+
+   if ($aName eq "disableBoxReadings") {
+     if ($cmd eq "set") {
+       my @reading_list = split(/\,/, $aVal);
+       foreach ( @reading_list ) {
+         readingsDelete($hash, $_) if exists $hash->{READINGS}{$_};
+       }
+     } 
    }
 
    if ($aName eq "enableVPNShares") {
@@ -636,7 +656,7 @@ sub FRITZBOX_Set($$@)
       $queryStr .= "'xhr'   => '1'\n";
 
       if ($val[1] eq "on") {
-         push @webCmdArray, "lockmode"     => $lm_OnOff;
+        push @webCmdArray, "lockmode"     => $lm_OnOff;
 	 push @webCmdArray, "nightsetting" => "1";
   	 push @webCmdArray, "lockday"      => "everyday";
 	 push @webCmdArray, "starthh"      => $start_hh;
@@ -653,7 +673,7 @@ sub FRITZBOX_Set($$@)
 	 $queryStr .= "'endmm'        => '" . $end_mm . "'\n";
       } elsif ( lc($val[1]) =~ /^(ed|wd|we)$/ ) {
 	 push @webCmdArray, "lockmode"     => $lm_OnOff;
-         push @webCmdArray, "event"        => "on" if( $kl_OnOff eq "on");
+        push @webCmdArray, "event"        => "on" if( $kl_OnOff eq "on");
 	 push @webCmdArray, "nightsetting" => "1";
   	 push @webCmdArray, "lockday"      => "everyday" if( lc($val[1]) eq "ed");
   	 push @webCmdArray, "lockday"      => "workday" if( lc($val[1]) eq "wd");
@@ -664,7 +684,7 @@ sub FRITZBOX_Set($$@)
 	 push @webCmdArray, "endmm"        => $end_mm;
 
 	 $queryStr .= "'lockmode'     => '" . $lm_OnOff . "'\n";
-         $queryStr .= "'event'        => 'on'\n" if( $kl_OnOff eq "on");
+        $queryStr .= "'event'        => 'on'\n" if( $kl_OnOff eq "on");
 	 $queryStr .= "'nightsetting' => '1'\n";
 	 $queryStr .= "'lockday'      => 'everyday'\n" if( lc($val[1]) eq "ed");
 	 $queryStr .= "'lockday'      => 'workday'\n"  if( lc($val[1]) eq "wd");
@@ -1463,7 +1483,7 @@ sub FRITZBOX_API_Check_Run($)
             FRITZBOX_Log $hash, 4, "DEBUG: Try to get a FHEMWEB port.";
             
             foreach( keys %defs ) {
-               if ( $defs{$_}->{TYPE} eq "FHEMWEB" && defined $defs{$_}->{PORT} ) {
+               if ( $defs{$_}->{TYPE} eq "FHEMWEB" && !defined $defs{$_}->{TEMPORARY} && defined $defs{$_}->{PORT} ) {
                   $port = $defs{$_}->{PORT};
                   last;
                }
@@ -1926,6 +1946,7 @@ sub FRITZBOX_Readout_Run_Web($)
    my $Sek;
 
    my @reading_list = split(/\,/, AttrVal($name, "disableBoxReadings", "none"));
+
    my $avmModel = InternalVal($name, "MODEL", "FRITZ!Box");
 
 #Start update
@@ -2266,6 +2287,7 @@ sub FRITZBOX_Readout_Run_Web($)
        FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName . "_access_type", "Corp VPN"    if $_->{access_type} == 1;
        FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName . "_access_type", "User VPN"    if $_->{access_type} == 2;
        FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName . "_access_type", "Lan2Lan VPN" if $_->{access_type} == 3;
+       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName . "_access_type", "Wireguard Simple" if $_->{access_type} == 4;
        delete $oldVPNDevice{$rName . "_access_type"} if exists $oldVPNDevice{$rName . "_access_type"};
 
        FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName . "_remote_ip", $_->{remote_ip} eq "" ? "....":$_->{remote_ip};
@@ -2277,21 +2299,32 @@ sub FRITZBOX_Readout_Run_Web($)
        FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName . "_state", $_->{state} eq "" ? "none":$_->{state};
        delete $oldVPNDevice{$rName . "_state"} if exists $oldVPNDevice{$rName . "_state"};
 
-       if ($_->{connected_since} == 0) {
-          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName . "_connected_since", $_->{connected_since};
-       } else {
-          $Sek = $_->{connected_since};
-          $Tag = int($Sek/86400);
-          $Std = int(($Sek/3600)-(24*$Tag));
-          $Min = int(($Sek/60)-($Std*60)-(1440*$Tag));
-          $Sek -= (($Min*60)+($Std*3600)+(86400*$Tag));
+       if ($_->{access_type} <= 3) {
+         if ($_->{connected_since} == 0) {
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName . "_connected_since", "none";
+         } else {
+           $Sek = $_->{connected_since};
 
-          $Std = substr("0".$Std,-2);
-          $Min = substr("0".$Min,-2);
-          $Sek = substr("0".$Sek,-2);
-          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName . "_connected_since", $_->{connected_since} . " sec = " . $Tag . "T $Std:$Min:$Sek";
+           $Tag = int($Sek/86400);
+           $Std = int(($Sek/3600)-(24*$Tag));
+           $Min = int(($Sek/60)-($Std*60)-(1440*$Tag));
+           $Sek -= (($Min*60)+($Std*3600)+(86400*$Tag));
+
+           $Std = substr("0".$Std,-2);
+           $Min = substr("0".$Min,-2);
+           $Sek = substr("0".$Sek,-2);
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName . "_connected_since", $_->{connected_since} . " sec = " . $Tag . "T $Std:$Min:$Sek";
+         }
+         delete $oldVPNDevice{$rName . "_connected_since"} if exists $oldVPNDevice{$rName . "_connected_since"};
+       } else {
+         if ($_->{connected_since} == 0) {
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName . "_last_negotiation", "none";
+         } else {
+           $Sek = (int(time) - $_->{connected_since});
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName . "_last_negotiation", (strftime "%d-%m-%Y %H:%M:%S", localtime($_->{connected_since}));
+         }
+         delete $oldVPNDevice{$rName . "_last_negotiation"} if exists $oldVPNDevice{$rName . "_last_negotiation"};
        }
-       delete $oldVPNDevice{$rName . "_connected_since"} if exists $oldVPNDevice{$rName . "_connected_since"};
 
      }
 
@@ -2340,6 +2373,37 @@ sub FRITZBOX_Readout_Run_Web($)
    my $gWlanCount = 0;
 
    if ( ref $result->{lanDevice} eq 'ARRAY' ) {
+      #Ipv4,IPv6,lanName,devName,Mbit,RSSI "
+      
+      # iPad-Familie [landevice810] (WLAN: 142 / 72 Mbit/s RSSI: -53)
+      my $deviceInfo = AttrVal($name, "deviceInfo", "_defDef_,name,[uid],(connection: speedcomma rssi)");
+
+      $deviceInfo = "_noDefInf_,_defDef_,name,[uid],(connection: speedcomma rssi)" if $deviceInfo eq "_noDefInf_";
+
+      my $noDefInf = $deviceInfo =~ /_noDefInf_/ ? 1 : 0; #_noDefInf_ 
+      $deviceInfo =~ s/\,_noDefInf_|_noDefInf_\,//g;
+
+      my $defDef = $deviceInfo =~ /_defDef_/ ? 1 : 0;
+      $deviceInfo =~ s/\,_defDef_|_defDef_\,//g;
+
+      my $sep = "space";
+      if ( ($deviceInfo . ",") =~ /_default_(.*?)\,/) {
+         $sep = $1;
+         $deviceInfo =~ s/,_default_${sep}|_default_${sep}\,//g;
+      }
+      $deviceInfo =~ s/\,/$sep/g;
+
+      $deviceInfo =~ s/space/ /g;
+      $deviceInfo =~ s/comma/\,/g;
+
+      $sep =~ s/space/ /g;
+      $sep =~ s/comma/\,/g;
+
+      FRITZBOX_Log $hash, 5, "DEBUG: deviceInfo -> " . $deviceInfo;
+
+      # FRITZBOX_Log $hash, 3, "DEBUG: Curl-> " . $strCurl;
+      # unless(grep { /^(box_ipExtern)$/ } @dev_name);
+
       foreach ( @{ $result->{lanDevice} } ) {
          my $dIp   = $_->{ip};
          my $UID   = $_->{UID};
@@ -2347,11 +2411,19 @@ sub FRITZBOX_Readout_Run_Web($)
 
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$dIp", $dName;
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$UID", $dName;
-         $landevice{$dIp}=$dName;
-         $landevice{$UID}=$dName;
+         $landevice{$dIp} = $dName;
+         $landevice{$UID} = $dName;
+
+         my $srTmp = $deviceInfo;
+
+      # lan IPv4 erg�nzen
+         $srTmp =~ s/ipv4/$dIp/g;
+
+      # lan DeviceName erg�nzen
+         $srTmp =~ s/name/$dName/g;
 
       # lan DeviceID erg�nzen
-         $dName .= " [" . $UID . "]";
+         $srTmp =~ s/uid/$UID/g;
 
       # Create a reading if a landevice is connected
       #   if ( $_->{active} || $allowPassiv) {
@@ -2369,34 +2441,100 @@ sub FRITZBOX_Readout_Run_Web($)
                $_->{guest} = $wlanList{$mac}{is_guest}  if defined $wlanList{$mac}{is_guest} && $_->{guest} eq "";
                $wlanCount++;
                $gWlanCount++      if $_->{guest} eq "1";
-               $dName .= " (";
-               $dName .= "g"    if $_->{guest};
-               $dName .= "WLAN: ";
-               $dName .= $wlanList{$mac}{speed} . " / " . $wlanList{$mac}{speed_rx} . " Mbit/s RSSI: ". $wlanList{$mac}{rssi}
-                      if defined $wlanList{$mac};
-               $dName .= ")";
+
+               $dName = $_->{guest} ? "g" : "";
+               $dName .= "WLAN";
+               $srTmp =~ s/connection/$dName/g;
+
+               $dName = $wlanList{$mac}{speed} . " / " . $wlanList{$mac}{speed_rx} . " Mbit/s" ;
+               $srTmp =~ s/speed/$dName/g;
+
+               $dName = defined $wlanList{$mac} ? "RSSI: " . $wlanList{$mac}{rssi} : "";
+               $srTmp =~ s/rssi/$dName/g;
+
             } elsif ( $_->{ethernetport} ) {
-               $dName .= " (";
-               $dName .= "g" if $_->{guest};
+               $dName = $_->{guest} ? "g" : "";
                $dName .= "" . $_->{ethernetport};
-               $dName .= ", 1 Gbit/s"    if $_->{speed} eq "1000";
-               $dName .= ", " . $_->{speed} . " Mbit/s"   if $_->{speed} ne "1000" && $_->{speed} ne "0";
-               $dName .= ")";
-            }
-            if ( $_->{ethernet_port} ) {
-               $dName .= " (";
-               $dName .= "g"         if $_->{guest};
+               if ($dName eq "") {
+                 if ($noDefInf) {
+                    $srTmp =~ s/connection:?/noConnectInfo/g;
+                 } else {
+                    $srTmp =~ s/connection:?${sep}|${sep}connection:?|connection:?//g;
+                 }
+               } else {
+                 $srTmp =~ s/connection/$dName/g;
+               }
+
+               $dName = "1 Gbit/s"    if $_->{speed} eq "1000";
+               $dName = $_->{speed} . " Mbit/s"   if $_->{speed} ne "1000" && $_->{speed} ne "0";
+               if ($_->{speed} eq "0") {
+                 if ($noDefInf) {
+                    $srTmp =~ s/speed/noSpeedInfo/g;
+                 } else {
+                    $srTmp =~ s/speed${sep}|${sep}speed|speed//g;
+                 }
+               } else {
+                 $srTmp =~ s/speed/$dName/g;
+               }
+
+            } elsif ( $_->{ethernet_port} ) {
+               $dName = $_->{guest} ? "g" : "";
                $dName .= "LAN" . $_->{ethernet_port};
+               $srTmp =~ s/connection/$dName/g;
+
                #$dName .= "LAN" . $result_lan->{$_->{_node}};
-               $dName .= ", 1 Gbit/s"    if $_->{speed} eq "1000";
-               $dName .= ", " . $_->{speed} . " Mbit/s"   if $_->{speed} ne "1000" && $_->{speed} ne "0";
-               $dName .= ")";
+               $dName = "1 Gbit/s"    if $_->{speed} eq "1000";
+               $dName = $_->{speed} . " Mbit/s"   if $_->{speed} ne "1000" && $_->{speed} ne "0";
+               $srTmp =~ s/speed/$dName/g;
+
+            } else {
+               $dName = $_->{guest} ? "g" : "";
+               $dName .= "" . $_->{ethernetport};
+               if ($dName eq "") {
+                 if ($noDefInf) {
+                    $srTmp =~ s/connection:?/noConnectInfo/g;
+                 } else {
+                    $srTmp =~ s/connection:?${sep}|${sep}connection:?|connection:?//g;
+                 }
+               } else {
+                 $srTmp =~ s/connection/$dName/g;
+               }
+
+               $dName = "1 Gbit/s"    if $_->{speed} eq "1000";
+               $dName = $_->{speed} . " Mbit/s"   if $_->{speed} ne "1000" && $_->{speed} ne "0";
+               if ($_->{speed} eq "0") {
+                 if ($noDefInf) {
+                    $srTmp =~ s/speed/noSpeedInfo/g;
+                 } else {
+                    $srTmp =~ s/speed${sep}|${sep}speed|speed//g;
+                 }
+               } else {
+                 $srTmp =~ s/speed/$dName/g;
+               }
+
             }
+
+            $srTmp =~ s/rssi${sep}|${sep}rssi|rssi//g;
+
+            if ($defDef) {
+               $srTmp =~ s/\(: \, \)//gi;
+               $srTmp =~ s/\, \)/ \)/gi;
+               $srTmp =~ s/\,\)/\)/gi;
+
+               $srTmp =~ s/\(:/\(/gi;
+
+               $srTmp =~ s/\(\)//g;
+            }
+
+            $srTmp = "no match for Informations" if ($srTmp eq "");
+
             my $rName  = "mac_";
                $rName .= "pas_" if $allowPassiv && $_->{active} == 0;
                $rName .= $mac;
 
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
+            # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $srTmp ;
+
             # $wlanCount++      if $_->{wlan} ;
             # $gWlanCount++      if $_->{wlan}  && $_->{guest} ;
             # Remove mac address from oldLanDevice-List
@@ -2441,7 +2579,7 @@ sub FRITZBOX_Readout_Run_Web($)
    # xhrId all
    # xhr 1 lang de page dslOv xhrId all
 
-   if($result->{box_uptimeHours}) {
+   if($result->{box_uptimeHours} && $result->{box_uptimeHours} ne "no-emu") {
       $Tag = int($result->{box_uptimeHours} / 24);
       $Std = int($result->{box_uptimeHours} - (24 * $Tag));
       $Sek = int($result->{box_uptimeHours} * 3600) + $result->{box_uptimeMinutes} * 60;
@@ -2450,6 +2588,8 @@ sub FRITZBOX_Readout_Run_Web($)
       $Min = substr("0" . $result->{box_uptimeMinutes},-2);
 
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_uptime", $Sek . " sec = " . $Tag . "T " . $Std . ":" . $Min . ":00";
+   } else {
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_uptime", "no-emu";
    }
 
    if ($result->{box_fwVersion}) {
@@ -2512,7 +2652,7 @@ sub FRITZBOX_Readout_Run_Web($)
          }
       }
 
-      if (($avmModel =~ "Box") && (lc($avmModel) !~ "40[2,4,6]0|fiber|cable|68[2,5]0") ) { # FB ohne VDSL
+      if (($avmModel =~ "Box") && (lc($avmModel) !~ "5[4,5][9,3]0|40[2,4,6]0|68[2,5]0|6[5,6][6,9][0,1]|fiber|cable") ) { # FB ohne VDSL
          my @tr064CmdArray = (["WANDSLInterfaceConfig:1", "wandslifconfig1", "GetInfo"]);
          my @tr064Result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
          if ($tr064Result[0]->{UPnPError}) {
@@ -6568,6 +6708,9 @@ sub FRITZBOX_VPN_Shares_List($) {
    #$queryStr .= "'xhr'         => '1'\n";
    #$queryStr .= "'lang'        => 'de'\n";
    #$queryStr .= "'page'        => 'shareVpn'\n";
+   # ab Fritz!OS 7.50 zus�tzlich
+   # "xhr 1 lang de page shareWireguard xhrId all;
+   #$queryStr .= "'page'        => 'shareWireguard'\n";
    #$queryStr .= "'xhrId'       => 'all'\n";
 
    my @webCmdArray;
@@ -6582,67 +6725,126 @@ sub FRITZBOX_VPN_Shares_List($) {
    $returnStr .= "---------------------------------\n";
 
    my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+   my $tmp;
 
    if(defined $result->{Error}) {
-     my $tmp = FRITZBOX_ERR_Result($hash, $result);
+     $tmp = FRITZBOX_ERR_Result($hash, $result);
      return $returnStr . $tmp;
    }
 
-   my $views = $result->{data}->{vpnInfo}->{userConnections};
+   my $views;
+   my $jID;
+   if ($result->{data}->{vpnInfo}->{userConnections}) {
+      $views = $result->{data}->{vpnInfo}->{userConnections};
+      $jID = "vpnInfo";
+   } elsif ($result->{data}->{init}->{userConnections}) {
+      $views = $result->{data}->{init}->{userConnections};
+      $jID = "init";
+   }
 
    $returnStr .= "<table>\n";
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>Connection</td><td>Aktiv</td><td>Verbunden</td><td>UID</td><td>Name</td><td>IP</td>\n";
+   $returnStr .= "<td>Connection</td><td>Typ</td><td>Aktiv</td><td>Verbunden</td><td>UID</td><td>Name</td><td>Remote-IP</td>\n";
    $returnStr .= "</tr>\n";
+
+   FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($result->{data}->{init}->{boxConnections});
 
    eval {
      foreach my $key (keys %$views) {
        FRITZBOX_Log $hash, 4, "INFO: userConnections: ".$key;
        $returnStr .= "<tr>\n";
        $returnStr .= "<td>" . $key . "</td>";
-       $returnStr .= "<td>" . $result->{data}->{vpnInfo}->{userConnections}->{$key}{active} . "</td>";
-       $returnStr .= "<td>" . $result->{data}->{vpnInfo}->{userConnections}->{$key}{connected} . "</td>";
-       $returnStr .= "<td>" . $result->{data}->{vpnInfo}->{userConnections}->{$key}{userId} . "</td>";
-       $returnStr .= "<td>" . $result->{data}->{vpnInfo}->{userConnections}->{$key}{name} . "</td>";
-       $returnStr .= "<td>" . $result->{data}->{vpnInfo}->{userConnections}->{$key}{address} . "</td>";
-       #$returnStr .= "<td>" . $result->{data}->{vpnInfo}->{userConnections}->{$key}{deletable} . "</td>";
-       #$returnStr .= "<td>" . $result->{data}->{vpnInfo}->{userConnections}->{$key}{virtualAddress} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{$jID}->{userConnections}->{$key}{type} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{$jID}->{userConnections}->{$key}{active} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{$jID}->{userConnections}->{$key}{connected} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{$jID}->{userConnections}->{$key}{userId} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{$jID}->{userConnections}->{$key}{name} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{$jID}->{userConnections}->{$key}{address} . "</td>";
+       #$returnStr .= "<td>" . $result->{data}->{$jID}->{userConnections}->{$key}{deletable} . "</td>";
+       #$returnStr .= "<td>" . $result->{data}->{$jID}->{userConnections}->{$key}{virtualAddress} . "</td>";
        $returnStr .= "</tr>\n";
      }
    };
    $returnStr .= "</table>\n";
 
-   $views = $result->{data}->{vpnInfo}->{boxConnections};
+   if ($result->{data}->{vpnInfo}->{boxConnections}) {
+      $views = $result->{data}->{vpnInfo}->{boxConnections};
+      $jID = "vpnInfo";
+   } elsif ($result->{data}->{init}->{boxConnections}) {
+      $views = $result->{data}->{init}->{boxConnections};
+      $jID = "init";
+   }
 
    $returnStr .= "VPN Shares: Box-Verbindungen\n";
    $returnStr .= "----------------------------\n";
    $returnStr .= "<table>\n";
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>Connection</td><td>Aktiv</td><td>Verbunden</td><td>Host</td><td>Name</td><td>IP</td>\n";
+   $returnStr .= "<td>Connection</td><td>Typ</td><td>Aktiv</td><td>Verbunden</td><td>Host</td><td>Name</td><td>Remote-IP</td>\n";
    $returnStr .= "</tr>\n";
+
+   FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($result->{data}->{init}->{boxConnections});
 
    eval {
      foreach my $key (keys %$views) {
        FRITZBOX_Log $hash, 4, "INFO: boxConnections: ".$key;
        $returnStr .= "<tr>\n";
        $returnStr .= "<td>" . $key . "</td>";
-       $returnStr .= "<td>" . $result->{data}->{vpnInfo}->{boxConnections}->{$key}{active} . "</td>";
-       $returnStr .= "<td>" . $result->{data}->{vpnInfo}->{boxConnections}->{$key}{connected} . "</td>";
-       $returnStr .= "<td>" . $result->{data}->{vpnInfo}->{boxConnections}->{$key}{accessHostname} . "</td>";
-       $returnStr .= "<td>" . $result->{data}->{vpnInfo}->{boxConnections}->{$key}{name} . "</td>";
-       $returnStr .= "<td>" . $result->{data}->{vpnInfo}->{boxConnections}->{$key}{remoteIP} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{$jID}->{boxConnections}->{$key}{type} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{$jID}->{boxConnections}->{$key}{active} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{$jID}->{boxConnections}->{$key}{connected} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{$jID}->{boxConnections}->{$key}{accessHostname} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{$jID}->{boxConnections}->{$key}{name} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{$jID}->{boxConnections}->{$key}{remoteIP} . "</td>";
        $returnStr .= "</tr>\n";
      }
    };
+
+   my @fwV = split(/\./, ReadingsVal($name, "box_fwVersion", "0.0.0.error"));
+
+   my $FW1 = substr($fwV[1],0,2);
+   my $FW2 = substr($fwV[2],0,2);
+
+   # Wirguard VPN only available with Fritz!OS 7.50 and greater
+   return $returnStr . "</table>\n" if $FW1 <= 7 && $FW2 < 50;
+
+   @webCmdArray = ();
+   push @webCmdArray, "xhr"         => "1";
+   push @webCmdArray, "lang"        => "de";
+   push @webCmdArray, "page"        => "shareWireguard";
+   push @webCmdArray, "xhrId"       => "all";
+
+   $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+
+   if(defined $result->{Error}) {
+     $tmp = FRITZBOX_ERR_Result($hash, $result);
+     $returnStr .= "</table>\n";
+     return $returnStr . $tmp;
+   }
+
+   if ($result->{data}->{init}->{boxConnections}) {
+     $views = $result->{data}->{init}->{boxConnections};
+     $jID = "init";
+
+     FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($result->{data}->{init}->{boxConnections});
+
+     eval {
+       foreach my $key (keys %$views) {
+         FRITZBOX_Log $hash, 4, "INFO: boxConnections: ".$key;
+         $returnStr .= "<tr>\n";
+         $returnStr .= "<td>" . $key . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{$jID}->{boxConnections}->{$key}{type} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{$jID}->{boxConnections}->{$key}{active} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{$jID}->{boxConnections}->{$key}{connected} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{$jID}->{boxConnections}->{$key}{accessHostname} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{$jID}->{boxConnections}->{$key}{name} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{$jID}->{boxConnections}->{$key}{remoteIp} . "</td>";
+         $returnStr .= "</tr>\n";
+       }
+     };
+   }
    $returnStr .= "</table>\n";
 
-   #FRITZBOX_Log $hash, 3, "INFO: active->keys: ".$nbViews;
-   #FRITZBOX_Log $hash, 3, "INFO: active->status: ".$a_test;
-   #FRITZBOX_Log $hash, 3, "INFO: passive->status: ".$p_test;
-
-   my $tmp = FRITZBOX_ERR_Result($hash, $result);
-
-   return $returnStr . $tmp;
+   return $returnStr;
 }
 
 # get list of lanDevices
@@ -6736,13 +6938,7 @@ sub FRITZBOX_Lan_Devices_List($) {
    }
    $returnStr .= "</table>\n";
 
-   #FRITZBOX_Log $hash, 3, "INFO: active->keys: ".$nbViews;
-   #FRITZBOX_Log $hash, 3, "INFO: active->status: ".$a_test;
-   #FRITZBOX_Log $hash, 3, "INFO: passive->status: ".$p_test;
-
-   my $tmp = FRITZBOX_ERR_Result($hash, $result);
-
-   return $returnStr . $tmp;
+   return $returnStr;
 
 }
 
@@ -6817,12 +7013,12 @@ sub FRITZBOX_Lan_Device_Info($$$) {
 
      if ($action eq "info") {
        if($result->{data}->{vars}->{dev}->{UID} eq $lDevID) {
+          FRITZBOX_Log $hash, 5, "DEBUG: landevice: " . $lDevID . "landevice: \n" . Dumper $result->{data}->{vars}->{dev};
           my $returnStr  = "";
           $returnStr .= "MAC:"       . $result->{data}->{vars}->{dev}->{mac};
           $returnStr .= " IPv4:"     . $result->{data}->{vars}->{dev}->{ipv4}->{current}->{ip};
           $returnStr .= " UID:"      . $result->{data}->{vars}->{dev}->{UID};
           $returnStr .= " NAME:"     . $result->{data}->{vars}->{dev}->{name}->{displayName};
-          $returnStr .= " STATUS:"   . $result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{selectedRights}->{msgid};
           if ( ref ($result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{selectedRights}) eq 'HASH' ) {
              $returnStr .= " ACCESS:"   . $result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{selectedRights}->{msgid} if defined($result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{selectedRights}->{msgid});
           }
@@ -7408,6 +7604,12 @@ sub FRITZBOX_fritztris($)
    <b>Attributes</b>
    <ul>
       <br>
+      <li><a name="INTERVAL"></a>
+         <dt><code>INTERVAL &lt;seconds&gt;</code></dt>
+         <br>
+         Polling-Interval. Default is 300 (seconds). Smallest possible value is 60.
+      </li><br>
+
       <li><a name="allowShellCommand"></a>
          <dt><code>allowShellCommand &lt;0 | 1&gt;</code></dt>
          <br>
@@ -7448,48 +7650,30 @@ sub FRITZBOX_fritztris($)
          It needs to be the name of the path on the FRITZ!BOX. So, it should start with /var/InternerSpeicher if it equals in Windows \\ip-address\fritz.nas
       </li><br>
 
-      <li><a name="forceTelnetConnection"></a>
-         <dt><code>forceTelnetConnection &lt;0 | 1&gt;</code></dt>
+      <li><a name="deviceInfo"></a>
+         <dt><code>deviceInfo &lt;ipv4, name, uid, connection, speed, rssi, _noDefInf_, _default_&, space, comma&gt;</code></dt>
          <br>
-         Always use telnet for remote access (instead of access via the WebGUI or TR-064).
-         <br>
-         This attribute should be enabled for older boxes/firmwares.
+         This attribute can be used to design the content of the device readings (mac_...). If the attribute is not set, sets
+         the content breaks down as follows:<br>
+         <code>name,[uid],(connection: speed, rssi)</code><br><br>
+
+         If the <code>_noDefInf_</code> parameter is set, the order in the list is irrelevant here, non-existent network connection values are shown
+         as noConnectInfo (LAN or WLAN not available) and noSpeedInfo (speed not available).<br><br>
+         You can add your own text or characters via the free input field and classify them between the fixed parameters.<br>
+         There are the following special texts:<br>
+         <code>space</code> => becomes a space.<br>
+         <code>comma</code> => becomes a comma.<br>
+         <code>_default_...</code> => replaces the default space as separator.<br>
+         Examples:<br>
+         <code>_default_commaspace</code> => becomes a comma followed by a space separator.<br>
+         <code>_default_space:space</code> => becomes a space:space separator.<br>
+         Not all possible "nonsensical" combinations are intercepted. So sometimes things can go wrong.
       </li><br>
 
-      <li><a name="fritzBoxIP"></a>
-         <dt><code>fritzBoxIP &lt;IP Address&gt;</code></dt>
+      <li><a name="disableBoxReadings"></a>
+         <dt><code>disableBoxReadings &lt;list&gt;</code></dt>
          <br>
-         Depreciated.
-      </li><br>
-
-      <li><a name="enablePassivLanDevices"></a>
-         <dt><code>enablePassivLanDevices &lt;0 | 1&gt;</code></dt>
-         <br>
-         Switches the takeover of passive network devices as reading off / on.
-      </li><br>
-
-      <li><a name="enableVPNShares"></a>
-         <dt><code>enableVPNShares &lt;0 | 1&gt;</code></dt>
-         <br>
-         Switches the takeover of VPN shares as reading off / on.
-      </li><br>
-
-      <li><a name="enableSIP"></a>
-         <dt><code>enableSIP &lt;0 | 1&gt;</code></dt>
-         <br>
-         Switches the takeover of SIP's as reading off / on.
-      </li><br>
-
-      <li><a name="enableUserInfo"></a>
-         <dt><code>enableUserInfo &lt;0 | 1&gt;</code></dt>
-         <br>
-         Switches the takeover of user information off/on.
-      </li><br>
-
-      <li><a name="enableAlarmInfo"></a>
-         <dt><code>enableAlarmInfo &lt;0 | 1&gt;</code></dt>
-         <br>
-         Switches the takeover of alarm information off/on.
+         disable single box_ Readings.
       </li><br>
 
       <li><a name="disableDectInfo"></a>
@@ -7504,16 +7688,48 @@ sub FRITZBOX_fritztris($)
          Switches the takeover of dect information off/on.
       </li><br>
 
-      <li><a name="disableBoxReadings"></a>
-         <dt><code>disableBoxReadings &lt;list&gt;</code></dt>
+      <li><a name="enableAlarmInfo"></a>
+         <dt><code>enableAlarmInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         disable single box_ Readings.
+         Switches the takeover of alarm information off/on.
       </li><br>
 
-      <li><a name="INTERVAL"></a>
-         <dt><code>INTERVAL &lt;seconds&gt;</code></dt>
+      <li><a name="enablePassivLanDevices"></a>
+         <dt><code>enablePassivLanDevices &lt;0 | 1&gt;</code></dt>
          <br>
-         Polling-Interval. Default is 300 (seconds). Smallest possible value is 60.
+         Switches the takeover of passive network devices as reading off / on.
+      </li><br>
+
+      <li><a name="enableSIP"></a>
+         <dt><code>enableSIP &lt;0 | 1&gt;</code></dt>
+         <br>
+         Switches the takeover of SIP's as reading off / on.
+      </li><br>
+
+      <li><a name="enableUserInfo"></a>
+         <dt><code>enableUserInfo &lt;0 | 1&gt;</code></dt>
+         <br>
+         Switches the takeover of user information off/on.
+      </li><br>
+
+      <li><a name="enableVPNShares"></a>
+         <dt><code>enableVPNShares &lt;0 | 1&gt;</code></dt>
+         <br>
+         Switches the takeover of VPN shares as reading off / on.
+      </li><br>
+
+      <li><a name="forceTelnetConnection"></a>
+         <dt><code>forceTelnetConnection &lt;0 | 1&gt;</code></dt>
+         <br>
+         Always use telnet for remote access (instead of access via the WebGUI or TR-064).
+         <br>
+         This attribute should be enabled for older boxes/firmwares.
+      </li><br>
+
+      <li><a name="fritzBoxIP"></a>
+         <dt><code>fritzBoxIP &lt;IP Address&gt;</code></dt>
+         <br>
+         Depreciated.
       </li><br>
 
       <li><a name="m3uFileLocal"></a>
@@ -7647,7 +7863,8 @@ sub FRITZBOX_fritztris($)
       <li><b>vpn</b><i>n</i> - Name of the VPN</li>
       <li><b>vpn</b><i>n</i><b>_access_type</b> - access type: User VPN | Lan2Lan | Corporate VPN</li>
       <li><b>vpn</b><i>n</i><b>_activated</b> - status if VPN <i>n</i> is active</li>
-      <li><b>vpn</b><i>n</i><b>_connected_since</b> - duaration of the vpn connection <i>n</i> is active</li>
+      <li><b>vpn</b><i>n</i><b>_last_negotiation</b> - timestamp of the last negotiation of the connection (only wireguard)</li>
+      <li><b>vpn</b><i>n</i><b>_connected_since</b> - duration of the connection in seconds (only VPN)</li>
       <li><b>vpn</b><i>n</i><b>_remote_ip</b> - IP from client site</li>
       <li><b>vpn</b><i>n</i><b>_state</b> - not active | ready | none</li>
       <li><b>vpn</b><i>n</i><b>_user_connected</b> - status of VPN <i>n</i> connection</li>
@@ -7990,6 +8207,12 @@ sub FRITZBOX_fritztris($)
    <b>Attributes</b>
    <ul>
       <br>
+      <li><a name="INTERVAL"></a>
+         <dt><code>INTERVAL &lt;seconds&gt;</code></dt>
+         <br>
+         Abfrage-Interval. Standard ist 300 (Sekunden). Der kleinste mögliche Wert ist 60.
+      </li><br>
+
       <li><a name="allowShellCommand"></a>
          <dt><code>allowShellCommand &lt;0 | 1&gt;</code></dt>
          <br>
@@ -8029,48 +8252,31 @@ sub FRITZBOX_fritztris($)
          Es muss ein Pfad auf der FRITZ!BOX sein. D.h., er sollte mit /var/InternerSpeicher starten, wenn es in Windows unter \\ip-address\fritz.nas erreichbar ist.
       </li><br>
 
-      <li><a name="forceTelnetConnection"></a>
-         <dt><code>forceTelnetConnection &lt;0 | 1&gt;</code></dt>
+      <li><a name="deviceInfo"></a>
+         <dt><code>deviceInfo &lt;ipv4, name, uid, connection, speed, rssi, _noDefInf_, _default_&, space, comma&gt;</code></dt>
          <br>
-         Erzwingt den Fernzugriff über Telnet (anstatt über die WebGUI oder TR-064).
+         Mit diesem Attribut kann der Inhalt der Device Readings (mac_...) gestaltet werden. Ist das Attribut nicht gesetzt, setzt
+         sich der Inhalt wie folgt zusammen:<br>
+         <code>name,[uid],(connection: speed, rssi)</code><br><br>
+
+         Wird der Parameter <code>_noDefInf_</code> gesetzt, die Reihenfolge ind der Liste spielt hier keine Rolle, dann werden nicht vorhandene Werte der Netzwerkverbindung
+         mit noConnectInfo (LAN oder WLAN nicht verfügbar) und noSpeedInfo (Geschwindigkeit nicht verfügbar) angezeigt.<br><br>
+         über das freie Eingabefeld können eigene Text oder Zeichen hinzugefügt und zwischen die festen Paramter eingeordnet werden.<br>
+         Hierbei gibt es folgende spezielle Texte:<br>
+         <code>space</code> => wird zu einem Leerzeichen.<br>
+         <code>comma</code> => wird zu einem Komma.<br>
+         <code>_default_...</code> => ersetzt das default Leerzeichen als Trennzeichen.<br>
+         Beispiele:<br>
+         <code>_default_commaspace</code> => wird zu einem Komma gefolgt von einem Leerzeichen als Trenner.<br>
+         <code>_default_space:space</code> => wird zu einem einem Leerzeichen:Leerzeichen als Trenner.<br>
+         Es werden nicht alle möglichen "unsinnigen" Kombinationen abgefangen. Es kann also auch mal schief gehen.
          <br>
-         Dieses Attribut muss bei älteren Geräten/Firmware aktiviert werden.
       </li><br>
 
-      <li><a name="fritzBoxIP"></a>
-         <dt><code>fritzBoxIP &lt;IP Address&gt;</code></dt>
+      <li><a name="disableBoxReadings"></a>
+         <dt><code>disableBoxReadings &lt;liste&gt;</code></dt>
          <br>
-         Veraltet.
-      </li><br>
-
-      <li><a name="enablePassivLanDevices"></a>
-         <dt><code>enablePassivLanDevices &lt;0 | 1&gt;</code></dt>
-         <br>
-         Schaltet die übernahme von passiven Netzwerkgeräten als Reading aus/ein.
-      </li><br>
-
-      <li><a name="enableVPNShares"></a>
-         <dt><code>enableVPNShares &lt;0 | 1&gt;</code></dt>
-         <br>
-         Schaltet die übernahme von VPN Shares als Reading aus/ein.
-      </li><br>
-
-      <li><a name="enableSIP"></a>
-         <dt><code>enableSIP &lt;0 | 1&gt;</code></dt>
-         <br>
-         Schaltet die übernahme von SIP's als Reading aus/ein.
-      </li><br>
-
-      <li><a name="enableUserInfo"></a>
-         <dt><code>enableUserInfo &lt;0 | 1&gt;</code></dt>
-         <br>
-         Schaltet die übernahme von Benutzer Informatioen aus/ein.
-      </li><br>
-
-      <li><a name="enableAlarmInfo"></a>
-         <dt><code>enableAlarmInfo &lt;0 | 1&gt;</code></dt>
-         <br>
-         Schaltet die übernahme von Alarm Informatioen aus/ein.
+         Abwählen einzelner box_ Readings.
       </li><br>
 
       <li><a name="disableDectInfo"></a>
@@ -8085,16 +8291,48 @@ sub FRITZBOX_fritztris($)
          Schaltet die übernahme von Telefon Informatioen aus/ein.
       </li><br>
 
-      <li><a name="disableBoxReadings"></a>
-         <dt><code>disableBoxReadings &lt;liste&gt;</code></dt>
+      <li><a name="enableAlarmInfo"></a>
+         <dt><code>enableAlarmInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Abwählen einzelner box_ Readings.
+         Schaltet die übernahme von Alarm Informatioen aus/ein.
       </li><br>
 
-      <li><a name="INTERVAL"></a>
-         <dt><code>INTERVAL &lt;seconds&gt;</code></dt>
+      <li><a name="enablePassivLanDevices"></a>
+         <dt><code>enablePassivLanDevices &lt;0 | 1&gt;</code></dt>
          <br>
-         Abfrage-Interval. Standard ist 300 (Sekunden). Der kleinste mögliche Wert ist 60.
+         Schaltet die übernahme von passiven Netzwerkgeräten als Reading aus/ein.
+      </li><br>
+
+      <li><a name="enableSIP"></a>
+         <dt><code>enableSIP &lt;0 | 1&gt;</code></dt>
+         <br>
+         Schaltet die übernahme von SIP's als Reading aus/ein.
+      </li><br>
+
+      <li><a name="enableUserInfo"></a>
+         <dt><code>enableUserInfo &lt;0 | 1&gt;</code></dt>
+         <br>
+         Schaltet die übernahme von Benutzer Informatioen aus/ein.
+      </li><br>
+
+      <li><a name="enableVPNShares"></a>
+         <dt><code>enableVPNShares &lt;0 | 1&gt;</code></dt>
+         <br>
+         Schaltet die übernahme von VPN Shares als Reading aus/ein.
+      </li><br>
+
+      <li><a name="forceTelnetConnection"></a>
+         <dt><code>forceTelnetConnection &lt;0 | 1&gt;</code></dt>
+         <br>
+         Erzwingt den Fernzugriff über Telnet (anstatt über die WebGUI oder TR-064).
+         <br>
+         Dieses Attribut muss bei älteren Geräten/Firmware aktiviert werden.
+      </li><br>
+
+      <li><a name="fritzBoxIP"></a>
+         <dt><code>fritzBoxIP &lt;IP Address&gt;</code></dt>
+         <br>
+         Veraltet.
       </li><br>
 
       <li><a name="m3uFileLocal"></a>
@@ -8229,7 +8467,8 @@ sub FRITZBOX_fritztris($)
       <li><b>vpn</b><i>n</i> - Name des VPN</li>
       <li><b>vpn</b><i>n</i><b>_access_type</b> - Verbindungstyp: Benutzer VPN | Netzwert zu Netzwerk | Firmen VPN</li>
       <li><b>vpn</b><i>n</i><b>_activated</b> - Status, ob VPN <i>n</i> aktiv ist</li>
-      <li><b>vpn</b><i>n</i><b>_connected_sice</b> - Dauer der Verbindung</li>
+      <li><b>vpn</b><i>n</i><b>_last_negotiation</b> - Uhrzeit der letzten Aushandlung der Verbindung (nur Wireguard)</li>
+      <li><b>vpn</b><i>n</i><b>_connected_since</b> - Dauer der Verbindung in Sekunden (nur VPN)</li>
       <li><b>vpn</b><i>n</i><b>_remote_ip</b> - IP der Gegenstelle</li>
       <li><b>vpn</b><i>n</i><b>_state</b> - not active | ready | none</li>
       <li><b>vpn</b><i>n</i><b>_user_connected</b> - Status, ob Benutzer VPN <i>n</i> verbunden ist</li>
@@ -8243,3 +8482,19 @@ sub FRITZBOX_fritztris($)
 =end html_DE
 
 =cut--
+
+###############################################################
+# HOST=box:settings/hostname
+# SSID1=wlan:settings/ssid
+# SSID2=wlan:settings/ssid_scnd
+# FORWARDS=forwardrules:settings/rule/list(activated,description,protocol,port,fwip,fwport,endport)
+# SIPS=sip:settings/sip/list(ID,displayname)
+# NUMBERS=telcfg:settings/VoipExtension/listwindow(2,2,Name,enabled) <=== eingeschr�nkte Ergebnismenge
+# DEVICES=ctlusb:settings/device/count
+# PHYS=usbdevices:settings/physmedium/list(name,vendor,serial,fw_version,conntype,capacity,status,usbspeed,model)
+# PHYSCNT=usbdevices:settings/physmediumcnt
+# VOLS=usbdevices:settings/logvol/list(name,status,enable,phyref,filesystem,capacity,usedspace,readonly)
+# VOLSCNT=usbdevices:settings/logvolcnt
+# PARTS=ctlusb:settings/storage-part/count
+# SIP1=sip:settings/sip1/activated
+###############################################################
