@@ -11667,7 +11667,11 @@ sub ReadingsSingleUpdateValue {
  my $name    = $hash->{NAME};
 
  readingsSingleUpdate($hash, $reading, $val, $ev);
+ 
+ readingsBeginUpdate ($hash);
  DbRep_userexit      ($name, $reading, $val);
+ readingsEndUpdate   ($hash, 1);
+ 
  DbRep_autoForward   ($name, $reading, $val);
 
 return;
@@ -11689,14 +11693,20 @@ sub ReadingsSingleUpdateTime {
          $bpt = sprintf "%.4f", $bpt;
          
          readingsSingleUpdate ($hash, "background_processing_time", $bpt, $evt);
+         
+         readingsBeginUpdate  ($hash);
          DbRep_userexit       ($name, "background_processing_time", $bpt);
+         readingsEndUpdate    ($hash, 1);
      }
      
      if (defined $spt) {
         $spt = sprintf "%.4f", $spt;
          
         readingsSingleUpdate ($hash, "sql_processing_time", $spt, $evt);
+        
+        readingsBeginUpdate  ($hash);
         DbRep_userexit       ($name, "sql_processing_time", $spt);
+        readingsEndUpdate    ($hash, 1);
      }
  }
 
@@ -19708,7 +19718,7 @@ return;
                                Die Regexprüfung nach der Erstellung jedes Readings.
                                Ist die Prüfung wahr, wird die angegebene Funktion aufgerufen. <br><br>
 
-                               <b>2. direkte Einngabe von eigenem Code  </b> <br><br>
+                               <b>2. direkte Eingabe von eigenem Code  </b> <br><br>
 
                                Der eigene Code wird in geschweifte Klammern eingeschlossen.
                                Der Aufruf des Codes erfolgt nach der Erstellung jedes Readings.
