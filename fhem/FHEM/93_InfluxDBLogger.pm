@@ -372,7 +372,7 @@ sub InfluxDBLogger_Map($$$$)
     }
 
     $map->{$deviceName}->{$readingName}->{"value"} = $readingValue;
-    $map->{$deviceName}->{$readingName}->{"numeric"} = $readingValue =~ /^[0-9,.E-]+$/;
+    $map->{$deviceName}->{$readingName}->{"numeric"} = $readingValue =~ /^[-+]?[0-9]*[\.\,]?[0-9]+([eE][-+]?[0-9]+)?$/;
 }
 sub InfluxDBLogger_HttpCallback($$$)
 {
