@@ -1549,7 +1549,7 @@ sub setValue_collect
       readingsSingleUpdate ($hash, "error", "${$collect}{output}, ".$@,1);
     }
   }
-  
+  return if (!defined $r);
   
   my ($seconds, $microseconds) = gettimeofday();
   
@@ -1828,6 +1828,8 @@ sub setValue_bar
       readingsSingleUpdate ($hash, "error", "${$bar}{output}, ".$@,1);
     }
   }
+  return if (!defined $r);
+  
   my ($seconds, $microseconds) = gettimeofday();
 
   $r = ($r =~ /(-?\d+(\.\d+)?)/ ? $1 : "N/A");
@@ -2518,11 +2520,14 @@ ParseCommandsDoIf($$$)
 sub DOIF_weekdays($$)
 {
   my ($hash,$weekdays)=@_;
-  my @days=split(',',AttrVal($hash->{NAME},"weekdays","So|Su,Mo,Di|Tu,Mi|We,Do|Th,Fr,Sa,WE,AT|WD,MWE|TWE"));
+  my @days=split(',',AttrVal($hash->{NAME},"weekdays","So|Su,Mo,Di|Tu,Mi|We,Do|Th,Fr,Sa,WE,AT|WD,MWE|TWE,MAT|TWD"));
+  
   for (my $i=@days-1;$i>=0;$i--)
   {
-    $weekdays =~ s/$days[$i]/$i/;
+    my $wd = $i==10 ? "X" : $i;
+    $weekdays =~ s/$days[$i]/$wd/;
   }
+
   return($weekdays);
 }
 
@@ -2652,7 +2657,7 @@ sub DOIF_time {
     }
   }
   if ($ret == 1) {
-    return 1 if ($days eq "" or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we) or ($days =~ /9/ and $twe));
+    return 1 if ($days eq "" or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we) or ($days =~ /9/ and $twe) or ($days =~ /X/ and !$twe));
   }
   return 0;
 }
@@ -2673,7 +2678,7 @@ sub DOIF_time_once {
   my $we=DOIF_we($wday);
   my $twe=DOIF_tomorrow_we($wday);
   if ($flag) {
-    return 1 if ($days eq "" or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we) or ($days =~ /9/ and $twe));
+    return 1 if ($days eq "" or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we) or ($days =~ /9/ and $twe) or ($days =~ /X/ and !$twe));
   }
   return 0;
 }
@@ -4523,12 +4528,6 @@ package DOIF;
 #use Date::Parse qw(str2time);
 use Time::HiRes qw(gettimeofday);
 
-sub set_bar
-{
-  my ($bar,$timeOffset,$valueData)=@_;
-  ::DOIF_set_bar_values($hs,$bar,$timeOffset,$valueData);
-}
-
 sub DOIF_ExecTimer
 {
   my ($timer)=@_;
@@ -5002,7 +5001,7 @@ sub format_value {
   my ($val,$min,$dec)=@_;
   my $format;
   my $value=$val;
-  if ($val eq "") {
+  if (!defined $val or $val eq "") {
     $val="N/A";
     $format='%s';
     $value=$min;
@@ -7853,24 +7852,24 @@ attr di_gong do always</code><br>
 <br>
 Hinter der Zeitangabe kann ein oder mehrere Wochentage getrennt mit einem Pipezeichen | angegeben werden. Die Syntax lautet:<br>
 <br>
-<code>[&lt;time&gt;|0123456789]</code> 0-9 entspricht: 0-Sonntag, 1-Montag, ... bis 6-Samstag sowie 7 für Wochenende und Feiertage (entspricht $we), 8 für Arbeitstage (entspricht !$we) und 9 für Wochenende oder Feiertag morgen (entspricht intern $twe)<br>
+<code>[&lt;time&gt;|0123456789X]</code> mit 0 Sonntag, 1 Montag, ... bis 6 Samstag, 7 Wochenende und Feiertage (entspricht $we), 8 Arbeitstag (entspricht !$we),9 Wochenende oder Feiertag morgen (entspricht intern $twe), X Arbeitstag morgen (entspricht intern !$twe)<br>
 <br>
 alternativ mit Buchstaben-Kürzeln:<br>
 <br>
-<code>[&lt;time&gt;|So Mo Di Mi Do Fr Sa WE AT MWE]</code> WE entspricht der Ziffer 7, AT der Ziffer 8 und MWE der Ziffer 9<br>
+<code>[&lt;time&gt;|So Mo Di Mi Do Fr Sa WE AT MWE MAT]</code> WE entspricht der Ziffer 7, AT der Ziffer 8, MWE der Ziffer 9, MAT dem Buchstaben X<br>
 <br>
 oder entsprechend mit englischen Bezeichnern:<br>
 <br>
-<code>[&lt;time&gt;|Su Mo Tu We Th Fr Sa WE WD TWE]</code><br>
+<code>[&lt;time&gt;|Su Mo Tu We Th Fr Sa WE WD TWE TWD]</code><br>
 <br>
 <li><a name="DOIF_weekdays"></a>
 Mit Hilfe des Attributes <code>weekdays</code> können beliebige Wochentagbezeichnungen definiert werden.<br>
 <a name="weekdays"></a><br>
 Die Syntax lautet:<br>
 <br>
-<code>weekdays &lt;Bezeichnung für Sonntag&gt;,&lt;Bezeichnung für Montag&gt;,...,&lt;Bezeichnung für Wochenende oder Feiertag&gt;,&lt;Bezeichnung für Arbeitstage&gt;,&lt;Bezeichnung für Wochenende oder Feiertag morgen&gt;</code><br>
+<code>weekdays &lt;Bezeichnung für Sonntag&gt;,&lt;Bezeichnung für Montag&gt;,...,&lt;Bezeichnung für Wochenende oder Feiertag&gt;,&lt;Bezeichnung für Arbeitstag&gt;,&lt;Bezeichnung für Wochenende oder Feiertag morgen&gt;,&lt;Bezeichnung für Arbeitstag morgen&gt;</code><br>
 <br>
-Beispiel: <code>di_mydoif attr weekdays Son,Mon,Die,Mit,Don,Fre,Sam,Wochenende,Arbeitstag,WochenendeMorgen</code><br>
+Beispiel: <code>di_mydoif attr weekdays Son,Mon,Die,Mit,Don,Fre,Sam,Wochenende,Arbeitstag,WochenendeMorgen,ArbeitstagMorgen</code><br>
 <br>
 <u>Anwendungsbeispiel</u>: Radio soll am Wochenende und an Feiertagen um 08:30 Uhr eingeschaltet und um 09:30 Uhr ausgeschaltet werden. Am Montag und Mittwoch soll das Radio um 06:30 Uhr eingeschaltet und um 07:30 Uhr ausgeschaltet werden. Hier mit englischen Bezeichnern:<br>
 <br>
