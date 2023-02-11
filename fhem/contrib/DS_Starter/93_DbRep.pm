@@ -59,8 +59,9 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.51.6"  => "10.02.2023  fix execute DbRep_afterproc after generating readings ".
-                            "Forum: https://forum.fhem.de/index.php/topic,53584.msg1262970.html#msg1262970",
+  "8.51.6"  => "11.02.2023  fix execute DbRep_afterproc after generating readings ".
+                            "Forum: https://forum.fhem.de/index.php/topic,53584.msg1262970.html#msg1262970 ".
+                            "fix MySQL 50mostFreqLogsLast2days ",
   "8.51.5"  => "05.02.2023  fix Perl Warning Forum: https://forum.fhem.de/index.php/topic,53584.msg1262032.html#msg1262032 ",
   "8.51.4"  => "01.02.2023  ignore non-numeric values in diffValue and output the erroneous record in the log ",
   "8.51.3"  => "22.01.2023  extend DbRep_averval avgTimeWeightMean by alkazaa, Restructuring of DbRep_averval ".
@@ -1052,9 +1053,9 @@ sub DbRep_Set {
           my ($tq,$gcl);
 
           if($prop eq "50mostFreqLogsLast2days") {
-              $sqlcmd = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > (now() - interval 2 day)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /MYSQL/);
-              $sqlcmd = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > ('now' - '2 days')) group by DEVICE, READING order by countA desc, DEVICE limit 50;"       if($dbmodel =~ /SQLITE/);
-              $sqlcmd = "select Device, reading, count(0) AS countA from history where ( TIMESTAMP > (NOW() - INTERVAL '2' DAY)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
+              $sqlcmd = "select Device, reading, count(0) AS `countA` from history where TIMESTAMP > (NOW() - INTERVAL 2 DAY) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /MYSQL/);
+              $sqlcmd = "select Device, reading, count(0) AS `countA` from history where TIMESTAMP > ('now' - '2 days') group by DEVICE, READING order by countA desc, DEVICE limit 50;"       if($dbmodel =~ /SQLITE/);
+              $sqlcmd = "select Device, reading, count(0) AS countA from history where TIMESTAMP > (NOW() - INTERVAL '2' DAY) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
           }
           elsif ($prop eq "allDevReadCount") {
               $sqlcmd = "select device, reading, count(*) as count from history group by DEVICE, READING order by count desc;";
