@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: AutomowerConnect-family: error message and location on map
+            various settings for map design, mowerpath for all activities
  - feature: 72_FRITZBOX: neue Attr. deviceInfo / enableWanInfo (s. commandRef)
                          Fehlerkorrekturen
  - bugfix:  72_FB_CALLMONITOR: RegEx für Suche dasOertliche angepasst

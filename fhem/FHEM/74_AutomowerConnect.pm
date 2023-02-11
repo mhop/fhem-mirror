@@ -25,6 +25,7 @@
 ################################################################################
 
 package FHEM::AutomowerConnect;
+my $cvsid = '$Id$';
 use strict;
 use warnings;
 use POSIX;
@@ -91,14 +92,13 @@ use constant APIURL => 'https://api.amc.husqvarna.dev/v1';
 sub Initialize() {
   my ($hash) = @_;
 
-  $hash->{DefFn}      = \&Define;
-  $hash->{SetFn}      = \&Set;
-  $hash->{AttrFn}     = \&Attr;
+  $hash->{DefFn}      = \&FHEM::Devices::AMConnect::Common::Define;
   $hash->{GetFn}      = \&FHEM::Devices::AMConnect::Common::Get;
   $hash->{UndefFn}    = \&FHEM::Devices::AMConnect::Common::Undefine;
   $hash->{DeleteFn}   = \&FHEM::Devices::AMConnect::Common::Delete;
   $hash->{RenameFn}   = \&FHEM::Devices::AMConnect::Common::Rename;
   $hash->{FW_detailFn}= \&FHEM::Devices::AMConnect::Common::FW_detailFn;
+  $hash->{SetFn}      = \&Set;
   $hash->{AttrFn}     = \&Attr;
   $hash->{AttrList}   = "interval " .
                         "disable:1,0 " .
@@ -109,6 +109,8 @@ sub Initialize() {
                         "mapImageCoordinatesToRegister:textField-long " .
                         "mapImageCoordinatesUTM:textField-long " .
                         "mapImageZoom " .
+                        "mapBackgroundColor " .
+                        "mapDesignAttributes:textField-long " .
                         "showMap:1,0 " .
                         "chargingStationCoordinates " .
                         "chargingStationImagePosition:left,top,right,bottom,center " .
@@ -128,214 +130,6 @@ sub Initialize() {
 
 ##############################################################
 #
-# DEFINE
-#
-##############################################################
-
-sub Define{
-  my ( $hash, $def ) = @_;
-  my @val = split( "[ \t]+", $def );
-  my $name = $val[0];
-  my $type = $val[1];
-  my $iam = "$type $name Define:";
-
-  return "$iam too few parameters: define <NAME> $type <client_id> [<mower number>]" if( @val < 3 ) ;
-  return "$iam Cannot define $type device. Perl modul $missingModul is missing." if ( $missingModul );
-
-  my $client_id =$val[2];
-  my $mowerNumber = $val[3] ? $val[3] : 0;
-  
-  %$hash = (%$hash,
-    helper => {
-      passObj                   => FHEM::Core::Authentication::Passwords->new($type),
-      interval                  => 600,
-      mowerNumber               => $mowerNumber,
-      scaleToMeterLongitude     => 67425,
-      scaleToMeterLatitude      => 108886,
-      minLon                    => 180,
-      maxLon                    => -180,
-      minLat                    => 90,
-      maxLat                    => -90,
-      imageHeight               => 650,
-      imageWidthHeight          => '350 650',
-      posMinMax                 => "-180 90\n180 -90",
-      newdatasets               => 0,
-      client_id                 => $client_id,
-      grant_type                => 'client_credentials',
-      MAP_PATH                  => '',
-      MAP_MIME                  => '',
-      MAP_CACHE                 => '',
-      cspos                     => [],
-      areapos                   => [],
-      searchpos                 => [],
-      UNKNOWN                   => {
-        arrayName               => '',
-        maxLength               => 0,
-        callFn                  => ''
-      },
-      NOT_APPLICABLE            => {
-        arrayName               => '',
-        maxLength               => 0,
-        callFn                  => ''
-      },
-      MOWING                    => {
-        arrayName               => 'areapos',
-        maxLength               => 500,
-        maxLengthDefault        => 500,
-        callFn                  => \&FHEM::Devices::AMConnect::Common::AreaStatistics
-      },
-      GOING_HOME                => {
-        arrayName               => '',
-        maxLength               => 0,
-        callFn                  => ''
-      },
-      CHARGING                  => {
-        arrayName               => 'cspos',
-        maxLength               => 100,
-        callFn                  => \&FHEM::Devices::AMConnect::Common::ChargingStationPosition
-      },
-      LEAVING                   => {
-        arrayName               => '',
-        maxLength               => 0,
-        callFn                  => ''
-      },
-      PARKED_IN_CS              => {
-        arrayName               => 'cspos',
-        maxLength               => 100,
-        callFn                  => \&FHEM::Devices::AMConnect::Common::ChargingStationPosition
-      },
-      STOPPED_IN_GARDEN         => {
-        arrayName               => '',
-        maxLength               => 0,
-        callFn                  => ''
-      },
-      statistics                => {
-        currentSpeed            => 0,
-        currentDayTrack         => 0,
-        currentDayArea          => 0,
-        lastDayTrack            => 0,
-        lastDayArea             => 0,
-        currentWeekTrack        => 0,
-        currentWeekArea         => 0,
-        lastWeekTrack           => 0,
-        lastWeekArea            => 0
-      }
-    }
-  );
-  
-  $hash->{MODEL} = '';
-  $attr{$name}{room} = $type if( !defined( $attr{$name}{room} ) );
-  $attr{$name}{icon} = 'automower' if( !defined( $attr{$name}{icon} ) );
-  my ($modname) = __FILE__ =~ /(\d\d_.*\.pm)/;
-
-  if (::AnalyzeCommandChain(undef,"version $modname noheader") =~ "^$modname (.*)Z") {
-    $hash->{VERSION}=$1;
-  }
-
-  ::FHEM::Devices::AMConnect::Common::AddExtension( $name, \&FHEM::Devices::AMConnect::Common::GetMap, "$type/$name/map" );
-
-  if( $hash->{helper}->{passObj}->getReadPassword($name) ) {
-
-    RemoveInternalTimer($hash);
-    InternalTimer( gettimeofday() + 2, \&APIAuth, $hash, 1);
-    InternalTimer( gettimeofday() + 30, \&FHEM::Devices::AMConnect::Common::readMap, $hash, 0);
-    readingsSingleUpdate( $hash, 'state', 'defined', 1 );
-
-  } else {
-
-    readingsSingleUpdate( $hash, 'state', 'defined - client_secret missing', 1 );
-
-  }
-
-  return undef;
-
-}
-
-
-#########################
-sub AlignArray {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-  my $activity = $hash->{helper}{mower}{attributes}{mower}{activity};
-  my $arrayName = $hash->{helper}{$activity}{arrayName};
-  my $searchlen = 2;
-  my $i = 0;
-  my @temp = ();
-
-  if ( isGoodActivity( $hash ) ) {
-
-    my $k = -1;
-    my $poslen = @{$hash->{helper}{mower}{attributes}{positions}};
-    my @searchposlon = ($hash->{helper}{searchpos}[0]{longitude}, $hash->{helper}{searchpos}[1]{longitude});
-    my @searchposlat = ($hash->{helper}{searchpos}[0]{latitude}, $hash->{helper}{searchpos}[1]{latitude});
-    my $maxLength = $hash->{helper}{$activity}{maxLength};
-    for ( $i = 0; $i < $poslen-2; $i++ ) { # -2 due to 2 alignment data sets at the end
-      if ( $searchposlon[ 0 ] == $hash->{helper}{mower}{attributes}{positions}[ $i ]{longitude}
-        && $searchposlat[ 0 ] == $hash->{helper}{mower}{attributes}{positions}[ $i ]{latitude}
-        && $searchposlon[ 1 ] == $hash->{helper}{mower}{attributes}{positions}[ $i+1 ]{longitude}
-        && $searchposlat[ 1 ] == $hash->{helper}{mower}{attributes}{positions}[ $i+1 ]{latitude} ) {
-        # timediff per step
-        my $dt = 0;
-        $dt = int( ( $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{$arrayName}[ 0 ]{statusTimestamp} ) / $i) if ( $i && @{ $hash->{helper}{$arrayName} } );
-        for ($k=$i-1;$k>-1;$k--) {
-          
-        }
-        for ($k=$i-1;$k>-1;$k--) {
-
-          if ( @{ $hash->{helper}{$arrayName} } ) {
-
-            unshift ( @{$hash->{helper}{$arrayName}}, dclone( $hash->{helper}{mower}{attributes}{positions}[ $k ] ) );
-
-          } else {
-
-            $hash->{helper}{$arrayName}[ 0 ] = dclone( $hash->{helper}{mower}{attributes}{positions}[ $k ] );
-
-          }
-
-          pop ( @{ $hash->{helper}{$arrayName} } ) if ( @{ $hash->{helper}{$arrayName} } > $maxLength );
-          $hash->{helper}{$arrayName}[ 0 ]{statusTimestamp} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $dt * $k;
-
-          push ( @temp, dclone( $hash->{helper}{mower}{attributes}{positions}[ $k ] ) );
-
-        }
-
-        ::FHEM::Devices::AMConnect::Common::posMinMax( $hash, \@temp );
-        #callFn if present
-        if ( $hash->{helper}{$activity}{callFn} && @{ $hash->{helper}{$arrayName} } > 1 ) {
-
-          $hash->{helper}{$activity}{cnt} = $i;
-          no strict "refs";
-          &{$hash->{helper}{$activity}{callFn}}($hash);
-          use strict "refs";
-
-        }
-
-        last;
-
-      }
-
-    }
-
-  }
-
-  $hash->{helper}{newdatasets} = $i;
-  $hash->{helper}{searchpos} = [ dclone( $hash->{helper}{mower}{attributes}{positions}[ 0 ] ), dclone( $hash->{helper}{mower}{attributes}{positions}[ 1 ] ) ];
-  return undef;
-
-}
-
-#########################
-sub isGoodActivity {
-
-  my ( $hash ) = @_;
-  my $act = $hash->{helper}{mower}{attributes}{mower}{activity};
-  my $ret = $hash->{helper}{$act}{arrayName} && $act eq $hash->{helper}{mowerold}{attributes}{mower}{activity};
-  return $ret;
-
-}
-
-##############################################################
-#
 # API AUTHENTICATION
 #
 ##############################################################
@@ -346,6 +140,8 @@ sub APIAuth {
   my $type = $hash->{TYPE};
   my $iam = "$type $name APIAuth:";
   my $interval = $hash->{helper}{interval};
+  ( $hash->{VERSION} ) = $cvsid =~ /\.pm (.*)Z/ if ( !$hash->{VERSION} );
+
   if ( IsDisabled($name) ) {
 
     readingsSingleUpdate($hash,'state','disabled',1) if( ReadingsVal($name,'state','') ne 'disabled' );
@@ -397,7 +193,7 @@ sub APIAuthResponse {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  my $statuscode = $param->{code};
+  my $statuscode = $param->{code} // '';
   my $interval = $hash->{helper}{interval};
   my $iam = "$type $name APIAuthResponse:";
 
@@ -437,6 +233,7 @@ sub APIAuthResponse {
     }
 
   } else {
+
 
     readingsSingleUpdate( $hash, 'state', "error statuscode $statuscode", 1 );
     Log3 $name, 1, "\n$iam\n\$statuscode [$statuscode]\n\$err [$err],\n\$data [$data]\n\$param->url $param->{url}";
@@ -533,8 +330,8 @@ sub getMowerResponse {
         } else { # first data set
 
           $hash->{helper}{mowerold} = dclone( $hash->{helper}{mowers}[$mowerNumber] );
-          
           $hash->{helper}{searchpos} = [ dclone( $hash->{helper}{mowerold}{attributes}{positions}[0] ), dclone( $hash->{helper}{mowerold}{attributes}{positions}[1] ) ];
+          $hash->{helper}{timestamps}[ 0 ] = $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
 
           if ( AttrVal( $name, 'mapImageCoordinatesToRegister', '' ) eq '' ) {
             ::FHEM::Devices::AMConnect::Common::posMinMax( $hash, $hash->{helper}{mowerold}{attributes}{positions} );
@@ -543,15 +340,16 @@ sub getMowerResponse {
         }
 
         $hash->{helper}{mower} = dclone( $hash->{helper}{mowers}[$mowerNumber] );
-        # add alignment data set to the end
+        # add alignment data set (last matched search positions) to the end
         push( @{ $hash->{helper}{mower}{attributes}{positions} }, @{ dclone( $hash->{helper}{searchpos} ) } );
         $hash->{helper}{newdatasets} = 0;
 
         my $storediff = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
         if ($storediff) {
+          # collect timestamps for analysis
+          unshift ( @{ $hash->{helper}{timestamps} }, $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} );
 
-          ::FHEM::Devices::AMConnect::Common::AlignArray( $hash ); #release
-          # AlignArray( $hash ); # developement
+          ::FHEM::Devices::AMConnect::Common::AlignArray( $hash );
           ::FHEM::Devices::AMConnect::Common::FW_detailFn_Update ($hash) if (AttrVal($name,'showMap',1));
 
         }
@@ -568,7 +366,7 @@ sub getMowerResponse {
           readingsBulkUpdateIfChanged($hash, $pref.'_commandStatus', 'cleared' );
 
           my $tstamp = $hash->{helper}{mower}{attributes}{$pref}{errorCodeTimestamp};
-          my $timestamp = FmtDateTimeGMT($tstamp/1000);
+          my $timestamp = ::FHEM::Devices::AMConnect::Common::FmtDateTimeGMT($tstamp/1000);
           readingsBulkUpdateIfChanged($hash, $pref."_errorCodeTimestamp", $tstamp ? $timestamp : '-' );
 
           my $errc = $hash->{helper}{mower}{attributes}{$pref}{errorCode};
@@ -581,14 +379,16 @@ sub getMowerResponse {
           readingsBulkUpdateIfChanged($hash, $pref."_name", $hash->{helper}{mower}{attributes}{$pref}{name} );
           my $model = $hash->{helper}{mower}{attributes}{$pref}{model};
           $model =~ s/AUTOMOWER./AM/;
+          # $hash->{MODEL} = '' if (!defined $hash->{MODEL});
           $hash->{MODEL} = $model if ( $model && $hash->{MODEL} ne $model );
           $pref = 'planner';
           readingsBulkUpdateIfChanged($hash, "planner_restrictedReason", $hash->{helper}{mower}{attributes}{$pref}{restrictedReason} );
           readingsBulkUpdateIfChanged($hash, "planner_overrideAction", $hash->{helper}{mower}{attributes}{$pref}{override}{action} );
-          
+
           $tstamp = $hash->{helper}{mower}{attributes}{$pref}{nextStartTimestamp};
-          $timestamp = FmtDateTimeGMT($tstamp/1000);
-          readingsBulkUpdateIfChanged($hash, "planner_nextStart", $tstamp ? $timestamp : '-' );  
+          $timestamp = ::FHEM::Devices::AMConnect::Common::FmtDateTimeGMT($tstamp/1000);
+          readingsBulkUpdateIfChanged($hash, "planner_nextStart", $tstamp ? $timestamp : '-' );
+
           $pref = 'statistics';
           readingsBulkUpdateIfChanged($hash, $pref."_numberOfCollisions", $hash->{helper}->{mower}{attributes}{$pref}{numberOfCollisions} );
           readingsBulkUpdateIfChanged($hash, $pref."_newGeoDataSets", $hash->{helper}{newdatasets} );
@@ -596,7 +396,8 @@ sub getMowerResponse {
           readingsBulkUpdateIfChanged($hash, $pref."_headlight", $hash->{helper}->{mower}{attributes}{$pref}{headlight}{mode} );
           readingsBulkUpdateIfChanged($hash, $pref."_cuttingHeight", $hash->{helper}->{mower}{attributes}{$pref}{cuttingHeight} );
           $pref = 'status';
-          readingsBulkUpdateIfChanged($hash, $pref."_connected", ( $hash->{helper}{mower}{attributes}{metadata}{connected} ? 'CONNECTED' : 'OFFLINE') );
+          my $connected = $hash->{helper}{mower}{attributes}{metadata}{connected};
+          readingsBulkUpdateIfChanged($hash, $pref."_connected", ( $connected ? "CONNECTED($connected)"  : "OFFLINE($connected)") );
           readingsBulkUpdateIfChanged($hash, $pref."_Timestamp", FmtDateTime( $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp}/1000 ));
           readingsBulkUpdateIfChanged($hash, $pref."_TimestampDiff", $storediff/1000 );
           readingsBulkUpdateIfChanged($hash, $pref."_TimestampOld", FmtDateTime( $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp}/1000 ));
@@ -615,7 +416,7 @@ sub getMowerResponse {
             $hash->{helper}{statistics}{currentDayTrack} = 0;
             $hash->{helper}{statistics}{currentDayArea} = 0;
             # do on mondays
-            if ( $time[6] == 1 && $secs <= $interval ) {
+            if ( $time[6] == 1 ) {
 
               $hash->{helper}{statistics}{lastWeekTrack} = $hash->{helper}{statistics}{currentWeekTrack};
               $hash->{helper}{statistics}{lastWeekArea} = $hash->{helper}{statistics}{currentWeekArea};
@@ -646,120 +447,7 @@ sub getMowerResponse {
 }
 
 
-##############################################################
-#
-# SEND COMMAND
-#
-##############################################################
-
-sub sendCMD {
-  my ($hash,@cmd) = @_;
-  my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};
-  my $iam = "$type $name sendCMD:";
-
-  if ( IsDisabled($name) ) {
-    Log3 $name, 3, "$iam disabled"; 
-    return undef 
-  }
-
-  my $client_id = $hash->{helper}->{client_id};
-  my $token = ReadingsVal($name,".access_token","");
-  my $provider = ReadingsVal($name,".provider","");
-  my $mower_id = $hash->{helper}{mower}{id};
-
-  my $json = '';
-  my $post = '';
-    
-
-my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nAuthorization: Bearer " . $token . "\r\nAuthorization-Provider: " . $provider . "\r\nContent-Type: application/vnd.api+json";
-  
-
-  if      ($cmd[0] eq "ParkUntilFurtherNotice")     { $json = '{"data":{"type":"'.$cmd[0].'"}}'; $post = 'actions' }
-  elsif   ($cmd[0] eq "ParkUntilNextSchedule")      { $json = '{"data": {"type":"'.$cmd[0].'"}}'; $post = 'actions' }
-  elsif   ($cmd[0] eq "ResumeSchedule")  { $json = '{"data": {"type":"'.$cmd[0].'"}}'; $post = 'actions' }
-  elsif   ($cmd[0] eq "Pause")           { $json = '{"data": {"type":"'.$cmd[0].'"}}'; $post = 'actions' }
-  elsif   ($cmd[0] eq "Park")            { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"duration":'.$cmd[1].'}}}'; $post = 'actions' }
-  elsif   ($cmd[0] eq "Start")           { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"duration":'.$cmd[1].'}}}'; $post = 'actions' }
-  elsif   ($cmd[0] eq "headlight")       { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": {"mode": "'.$cmd[1].'"}}}}'; $post = 'settings' }
-  elsif   ($cmd[0] eq "cuttingHeight")   { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": '.$cmd[1].'}}}'; $post = 'settings' }
-  elsif   ($cmd[0] eq "sendScheduleFromAttributeToMower" && AttrVal( $name, 'mowerSchedule', '')) {
-    
-    my $perl = eval { decode_json (AttrVal( $name, 'mowerSchedule', '')) };
-    if ($@) {
-      return "$iam decode error: $@ \n $perl";
-    }
-    my $jsonSchedule = eval { encode_json ($perl) };
-    if ($@) {
-      return "$iam encode error: $@ \n $json";
-    }
-    $json = '{"data":{"type": "calendar","attributes":{"tasks":'.$jsonSchedule.'}}}'; 
-    $post = 'calendar';
-  }
-
-  Log3 $name, 5, "$iam $header \n $cmd[0] \n $json"; 
-
-  ::HttpUtils_NonblockingGet({
-    url           => APIURL . "/mowers/". $mower_id . "/".$post,
-    timeout       => 20,
-    hash          => $hash,
-    method        => "POST",
-    header        => $header,
-    data          => $json,
-    callback      => \&CMDResponse,
-  });  
-  
-}
-
 #########################
-sub CMDResponse {
-  my ($param, $err, $data) = @_;
-  my $hash = $param->{hash};
-  my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};
-  my $statuscode = $param->{code};
-  my $iam = "$type $name CMDResponse:";
-
-  Log3 $name, 1, "\ndebug $iam \n\$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}" if ( AttrVal($name, 'debug', '') );
-
-  if( !$err && $statuscode == 202 && $data ) {
-
-    my $result = eval { decode_json($data) };
-    if ($@) {
-
-      Log3( $name, 2, "$iam - JSON error while request: $@");
-
-    } else {
-
-      $hash->{helper}{CMDResponse} = $result;
-      if ($result->{data}) {
-        
-        Log3 $name, 5, $data; 
-        if ( ref ($result->{data}) eq 'ARRAY') {
-
-        $hash->{helper}->{mower_commandStatus} = 'OK - '. $result->{data}[0]{type};
-
-        } else {
-
-        $hash->{helper}->{mower_commandStatus} = 'OK - '. $result->{data}{type};
-
-        }
-
-        readingsSingleUpdate($hash, 'mower_commandStatus', $hash->{helper}->{mower_commandStatus} ,1);
-        return undef;
-
-      }
-
-    }
-
-  }
-
-  readingsSingleUpdate($hash, 'mower_commandStatus', "ERROR statuscode $statuscode" ,1);
-  Log3 $name, 2, "\n$iam \n\$statuscode [$statuscode]\n\$err [$err],\n\$data [$data]\n\$param->url $param->{url}";
-  return undef;
-}
-
-
 sub Set {
   my ($hash,@val) = @_;
   my $type = $hash->{TYPE};
@@ -781,7 +469,13 @@ sub Set {
 
     my $xm = $hash->{helper}{chargingStation}{longitude} // 10.1165;
     my $ym = $hash->{helper}{chargingStation}{latitude} // 51.28;
-    CommandAttr($hash,"$name chargingStationCoordinates $xm $ym");
+    CommandAttr( $hash, "$name chargingStationCoordinates $xm $ym" );
+    return undef;
+
+  } elsif ( $setName eq 'defaultDesignAttributesToAttribute' ) {
+
+    my $design = $hash->{helper}{mapdesign};
+    CommandAttr( $hash, "$name mapDesignAttributes $design" );
     return undef;
 
   } elsif ( ReadingsVal( $name, 'state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName eq 'mowerScheduleToAttribute' ) {
@@ -806,13 +500,17 @@ sub Set {
 
   } elsif ( ReadingsVal( $name, 'state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^(Start|Park|cuttingHeight)$/ ) {
     if ( $setVal =~ /^(\d+)$/) {
-      sendCMD($hash ,$setName, $setVal);
+
+      ::FHEM::Devices::AMConnect::Common::CMD($hash ,$setName, $setVal);
       return undef;
+
     }
 
   } elsif ( ReadingsVal( $name, 'state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName eq 'headlight' ) {
     if ( $setVal =~ /^(ALWAYS_OFF|ALWAYS_ON|EVENING_ONLY|EVENING_AND_NIGHT)$/) {
-      sendCMD($hash ,$setName, $setVal);
+
+      ::FHEM::Devices::AMConnect::Common::CMD($hash ,$setName, $setVal);
+
       return undef;
     }
 
@@ -829,12 +527,14 @@ sub Set {
       return undef;
 
   } elsif (ReadingsVal( $name, 'state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /ParkUntilFurtherNotice|ParkUntilNextSchedule|Pause|ResumeSchedule|sendScheduleFromAttributeToMower/) {
-    sendCMD($hash,$setName);
+
+    ::FHEM::Devices::AMConnect::Common::CMD($hash,$setName);
     return undef;
+
   }
   my $ret = " getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,60,60,600,0,lin Park:selectnumbers,60,60,600,0,lin ResumeSchedule:noArg getUpdate:noArg client_secret ";
   $ret .= "chargingStationPositionToAttribute:noArg headlight:ALWAYS_OFF,ALWAYS_ON,EVENING_ONLY,EVENING_AND_NIGHT cuttingHeight:1,2,3,4,5,6,7,8,9 mowerScheduleToAttribute:noArg ";
-  $ret .= "sendScheduleFromAttributeToMower:noArg ";
+  $ret .= "sendScheduleFromAttributeToMower:noArg defaultDesignAttributesToAttribute:noArg ";
   return "Unknown argument $setName, choose one of".$ret;
   
 }
@@ -1021,11 +721,6 @@ sub Attr {
   return undef;
 }
 
-#########################
-sub FmtDateTimeGMT {
-  my $ret = POSIX::strftime( "%F %H:%M:%S", gmtime( shift ) );
-}
-
 ##############################################################
 
 
@@ -1207,7 +902,15 @@ __END__
 
     <li><a id='AutomowerConnect-attr-mapImageZoom'>mapImageZoom</a><br>
       <code>attr &lt;name&gt; mapImageZoom &lt;zoom factor&gt;</code><br>
-      Zoom of a raster image for an area the mower path has to be drawn to. Default: 0.5</li>
+      Zoom of a raster image for an area the mower path has to be drawn to.</li>
+
+    <li><a id='AutomowerConnect-attr-mapBackgroundColor'>mapBackgroundColor</a><br>
+      <code>attr &lt;name&gt; mapBackgroundColor &lt;background-color&gt;</code><br>
+      The value is used as background-color.</li>
+
+    <li><a id='AutomowerConnect-attr-mapDesignAttributes'>mapDesignAttributes</a><br>
+      <code>attr &lt;name&gt; mapDesignAttributes &lt;complete list of design-attributes&gt;</code><br>
+      Load the list of attributes by <code>set &lt;name&gt; defaultDesignAttributesToAttribute</code> to change its values</li>
 
     <li><a id='AutomowerConnect-attr-mapImageCoordinatesToRegister'>mapImageCoordinatesToRegister</a><br>
       <code>attr &lt;name&gt; mapImageCoordinatesToRegister &lt;upper left longitude&gt;&lt;space&gt;&lt;upper left latitude&gt;&lt;line feed&gt;&lt;lower right longitude&gt;&lt;space&gt;&lt;lower right latitude&gt;</code><br>
@@ -1470,6 +1173,14 @@ __END__
       <code>attr &lt;name&gt; mapImageZoom &lt;zoom factor&gt;</code><br>
       Zoomfaktor zur Salierung des Bildes auf das Pfad, Anfangs- u. Endpunkte gezeichnet werden. Standard: 0.5</li>
 
+    <li><a id='AutomowerConnect-attr-mapBackgroundColor'>mapBackgroundColor</a><br>
+      <code>attr &lt;name&gt; mapBackgroundColor &lt;color value&gt;</code><br>
+      Der Wert wird als Hintergrungfarbe benutzt.</li>
+
+    <li><a id='AutomowerConnect-attr-mapDesignAttributes'>mapDesignAttributes</a><br>
+      <code>attr &lt;name&gt; mapDesignAttributes &lt;complete list of design-attributes&gt;</code><br>
+      Lade die Attributliste mit <code>set &lt;name&gt; defaultDesignAttributesToAttribute</code> um die Werte zu ändern.</li>
+
     <li><a id='AutomowerConnect-attr-mapImageCoordinatesToRegister'>mapImageCoordinatesToRegister</a><br>
       <code>attr &lt;name&gt; mapImageCoordinatesToRegister &lt;upper left longitude&gt;&lt;space&gt;&lt;upper left latitude&gt;&lt;line feed&gt;&lt;lower right longitude&gt;&lt;space&gt;&lt;lower right latitude&gt;</code><br>
       Obere linke und untere rechte Ecke der Fläche auf der Erde, die durch das Bild dargestellt wird um das Bild auf der Fläche zu registrieren (oder einzupassen).<br>
@@ -1510,7 +1221,7 @@ __END__
 
     <li><a id='AutomowerConnect-attr-propertyLimits'>propertyLimits</a><br>
       <code>attr &lt;name&gt; propertyLimits &lt;positions list&gt;</code><br>
-      Liste von Positionen, um die Grundstücksgrenze zu beschreiben. Format: Zeilenweise Paare von Longitude- u. Latitudewerten getrennt durch 1 Leerzeichen. Eine Zeile wird aufgeteilt durch (<code>/\s|\R$/</code>).<br>Die genaue Position der Grenzpunkte kann man über die <a target="_blank" href="https://geoportal.de/Anwendungen/Geoportale%20der%20L%C3%A4nder.html">Geoportale der Länder</a> finden. Eine Umrechnung der UTM32 Daten in Meter nach ETRS89 in Dezimalgrad kann über das <a href"https://gdz.bkg.bund.de/koordinatentransformation">BKG-Geodatenzentrum</a> erfolgen.</li>
+      Liste von Positionen, um die Grundstücksgrenze zu beschreiben. Format: Zeilenweise Paare von Longitude- u. Latitudewerten getrennt durch 1 Leerzeichen. Eine Zeile wird aufgeteilt durch (<code>/\s|\R$/</code>).<br>Die genaue Position der Grenzpunkte kann man über die <a target="_blank" href="https://geoportal.de/Anwendungen/Geoportale%20der%20L%C3%A4nder.html">Geoportale der Länder</a> finden. Eine Umrechnung der UTM32 Daten in Meter nach ETRS89 in Dezimalgrad kann über das <a target="_blank" href="https://gdz.bkg.bund.de/koordinatentransformation">BKG-Geodatenzentrum</a> erfolgen.</li>
 
     <li><a id='AutomowerConnect-attr-numberOfWayPointsToDisplay'>numberOfWayPointsToDisplay</a><br>
       <code>attr &lt;name&gt; numberOfWayPointsToDisplay &lt;number of way points&gt;</code><br>
