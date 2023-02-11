@@ -165,7 +165,7 @@ function AutomowerConnectDrawPath ( ctx, div, pos, type ) {
   ctx.beginPath();
   ctx.strokeStyle = div.getAttribute( 'data-'+ type + 'LineColor' );
   ctx.lineWidth=div.getAttribute( 'data-'+ type + 'LineWidth' );
-  ctx.setLineDash([ div.getAttribute( 'data-'+ type + 'LineDash' ) ]);
+  ctx.setLineDash( div.getAttribute( 'data-'+ type + 'LineDash' ).split(",") );
 
   ctx.moveTo(parseInt(pos[0]),parseInt(pos[1]));
   for (var i=2;i<pos.length-1;i+=2){
