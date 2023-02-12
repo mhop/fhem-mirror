@@ -59,6 +59,9 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.51.6"  => "11.02.2023  fix execute DbRep_afterproc after generating readings ".
+                            "Forum: https://forum.fhem.de/index.php/topic,53584.msg1262970.html#msg1262970 ".
+                            "fix MySQL 50mostFreqLogsLast2days ",
   "8.51.5"  => "05.02.2023  fix Perl Warning Forum: https://forum.fhem.de/index.php/topic,53584.msg1262032.html#msg1262032 ",
   "8.51.4"  => "01.02.2023  ignore non-numeric values in diffValue and output the erroneous record in the log ",
   "8.51.3"  => "22.01.2023  extend DbRep_averval avgTimeWeightMean by alkazaa, Restructuring of DbRep_averval ".
@@ -385,9 +388,9 @@ my %dbrep_hmainf = (
     fetchrows          => { fn => "DbRep_fetchrows",     fndone => "DbRep_fetchrowsDone",     fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1                     },
     maxValue           => { fn => "DbRep_maxval",        fndone => "DbRep_maxvalDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
     minValue           => { fn => "DbRep_minval",        fndone => "DbRep_minvalDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
-    exportToFile       => { fn => "DbRep_expfile",       fndone => "DbRep_expfile_Done",      fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 0, table => "history" },
-    importFromFile     => { fn => "DbRep_impfile",       fndone => "DbRep_impfile_Done",      fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 0, table => "history" },
-    tableCurrentFillup => { fn => "DbRep_currentfillup", fndone => "DbRep_currentfillupDone", fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 0, table => "current" },
+    exportToFile       => { fn => "DbRep_expfile",       fndone => "DbRep_expfile_Done",      fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
+    importFromFile     => { fn => "DbRep_impfile",       fndone => "DbRep_impfile_Done",      fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
+    tableCurrentFillup => { fn => "DbRep_currentfillup", fndone => "DbRep_currentfillupDone", fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "current" },
     diffValue          => { fn => "DbRep_diffval",       fndone => "DbRep_diffvalDone",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
     delEntries         => { fn => "DbRep_del",           fndone => "DbRep_del_Done",          fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
     syncStandby        => { fn => "DbRep_syncStandby",   fndone => "DbRep_syncStandbyDone",   fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
@@ -1050,9 +1053,9 @@ sub DbRep_Set {
           my ($tq,$gcl);
 
           if($prop eq "50mostFreqLogsLast2days") {
-              $sqlcmd = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > (now() - interval 2 day)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /MYSQL/);
-              $sqlcmd = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > ('now' - '2 days')) group by DEVICE, READING order by countA desc, DEVICE limit 50;"       if($dbmodel =~ /SQLITE/);
-              $sqlcmd = "select Device, reading, count(0) AS countA from history where ( TIMESTAMP > (NOW() - INTERVAL '2' DAY)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
+              $sqlcmd = "select Device, reading, count(0) AS `countA` from history where TIMESTAMP > (NOW() - INTERVAL 2 DAY) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /MYSQL/);
+              $sqlcmd = "select Device, reading, count(0) AS `countA` from history where TIMESTAMP > ('now' - '2 days') group by DEVICE, READING order by countA desc, DEVICE limit 50;"       if($dbmodel =~ /SQLITE/);
+              $sqlcmd = "select Device, reading, count(0) AS countA from history where TIMESTAMP > (NOW() - INTERVAL '2' DAY) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
           }
           elsif ($prop eq "allDevReadCount") {
               $sqlcmd = "select device, reading, count(*) as count from history group by DEVICE, READING order by count desc;";
@@ -2007,7 +2010,7 @@ sub DbRep_firstconnect {
       # DB Strukturelemente abrufen
       Log3 ($name, 3, "DbRep $name - Connectiontest to database $dbconn with user $dbuser") if($hash->{LASTCMD} ne "minTimestamp");
 
-      ReadingsSingleUpdateValue ($hash, "state", "read database properties", 1);
+      ReadingsSingleUpdateValue ($hash, "state", "running read database properties", 1);
 
       my $params = {
           hash => $hash,
@@ -3729,11 +3732,12 @@ sub DbRep_avervalDone {
 
   delete($hash->{HELPER}{RUNNING_PID});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                     # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, $hash->{LASTCMD});                                # Befehl nach Procedure ausführen incl. state
+      
       return;
   }
 
@@ -3774,9 +3778,6 @@ sub DbRep_avervalDone {
   }
 
   ReadingsBulkUpdateValue ($hash, "reachedGTSthreshold", $gtsreached) if($gtsreached);
-  readingsEndUpdate       ($hash, 1);
-
-  readingsBeginUpdate($hash);
 
   my @arr = split "\\|", $arrstr;
   
@@ -3804,10 +3805,12 @@ sub DbRep_avervalDone {
       }
   }
 
-  ReadingsBulkUpdateValue     ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
-  ReadingsBulkUpdateTimeState ($hash, $brt, $rt, $state);
-  readingsEndUpdate           ($hash, 1);
-
+  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
+  ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, $hash->{LASTCMD});                         # Befehl nach Procedure ausführen incl. state
+  
 return;
 }
 
@@ -3932,11 +3935,12 @@ sub DbRep_countDone {
 
   delete($hash->{HELPER}{RUNNING_PID});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                     # Befehl nach Procedure ausführen
-
   if ($err) {
-      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
+      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, $hash->{LASTCMD});                                # Befehl nach Procedure ausführen
+      
       return;
   }
 
@@ -3963,11 +3967,10 @@ sub DbRep_countDone {
       }
       else {
           my ($ds,$rds) = ("","");
-          $ds           = $device."__" if ($device);
+          $ds           = $device."__"  if ($device);
           $rds          = $reading."__" if ($reading);
 
           if(AttrVal($name,"countEntriesDetail",0)) {
-              # $reading_runtime_string = $rsf.$ds.$rds."COUNT_".$table."__".$runtime_string;
               $reading_runtime_string = $rsf.$rds."COUNT_".$table."__".$runtime_string;
           }
           else {
@@ -3978,8 +3981,10 @@ sub DbRep_countDone {
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c ? $c : "-");
   }
 
-  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
-  readingsEndUpdate           ($hash, 1);
+  ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, $hash->{LASTCMD});                           # Befehl nach Procedure ausführen incl. state
 
 return;
 }
@@ -4167,11 +4172,12 @@ sub DbRep_maxvalDone {
 
   delete($hash->{HELPER}{RUNNING_PID});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                     # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "state",  "error", 1);
+      
+      DbRep_afterproc           ($hash, $hash->{LASTCMD});                                 # Befehl nach Procedure ausführen incl. state
+      
       return;
   }
 
@@ -4209,9 +4215,11 @@ sub DbRep_maxvalDone {
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, defined $rv ? sprintf "%.${ndp}f",$rv : "-");
   }
 
-  ReadingsBulkUpdateValue     ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB|deleteOther/);
-  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
-  readingsEndUpdate           ($hash, 1);
+  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB|deleteOther/);
+  ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, $hash->{LASTCMD});                       # Befehl nach Procedure ausführen incl. state
 
 return;
 }
@@ -4393,11 +4401,12 @@ sub DbRep_minvalDone {
 
   delete($hash->{HELPER}{RUNNING_PID});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                 # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, $hash->{LASTCMD});                                  # Befehl nach Procedure ausführen
+      
       return;
   }
 
@@ -4437,9 +4446,11 @@ sub DbRep_minvalDone {
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, defined($rv) ? sprintf("%.${ndp}f",$rv) : "-");
   }
 
-  ReadingsBulkUpdateValue     ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB|deleteOther/);
-  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
-  readingsEndUpdate           ($hash, 1);
+  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB|deleteOther/);
+  ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, $hash->{LASTCMD});                                  # Befehl nach Procedure ausführen incl. state
 
 return;
 }
@@ -4724,11 +4735,12 @@ sub DbRep_diffvalDone {
 
   delete($hash->{HELPER}{RUNNING_PID});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});           # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, $hash->{LASTCMD});                               # Befehl nach Procedure ausführen
+      
       return;
   }
 
@@ -4766,7 +4778,7 @@ sub DbRep_diffvalDone {
       my @k     = split("\\|",$rh{$key});
       $valid    = 1 if($k[2] =~ /(\d{4})-(\d{2})-(\d{2})_(\d{2}):(\d{2}):(\d{2})/x);   # Datensatz hat einen Wert wenn kompletter Timestamp ist enthalten
       my $rts   = $k[2]."__";
-      $rts      =~ s/:/-/g;                                                            # substituieren unsupported characters -> siehe fhem.pl
+      $rts      =~ s/:/-/g;                                                 # substituieren unsupported characters -> siehe fhem.pl
 
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
           $reading_runtime_string = $rts.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$k[0];
@@ -4782,12 +4794,15 @@ sub DbRep_diffvalDone {
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, (!$valid ? "-" : defined $rv ? sprintf "%.${ndp}f", $rv : "-"));
   }
 
-  ReadingsBulkUpdateValue     ($hash, "db_lines_processed", $irowdone)                   if($hash->{LASTCMD} =~ /writeToDB/);
-  ReadingsBulkUpdateValue     ($hash, "diff_overrun_limit_".$difflimit, $rowsrej)        if($rowsrej);
-  ReadingsBulkUpdateValue     ($hash, "less_data_in_period", $ncpstr)                    if($ncpstr);
-  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,($ncpstr||$rowsrej) ? "Warning" : $state);
-
-  readingsEndUpdate           ($hash, 1);
+  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone)                   if($hash->{LASTCMD} =~ /writeToDB/);
+  ReadingsBulkUpdateValue ($hash, "diff_overrun_limit_".$difflimit, $rowsrej)        if($rowsrej);
+  ReadingsBulkUpdateValue ($hash, "less_data_in_period", $ncpstr)                    if($ncpstr);
+  ReadingsBulkUpdateValue ($hash, "state", qq{WARNING - see readings 'less_data_in_period' or 'diff_overrun_limit_XX'})  
+                                                                                     if($ncpstr||$rowsrej);
+  ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, $hash->{LASTCMD});                        # Befehl nach Procedure ausführen incl. state
 
 return;
 }
@@ -4915,11 +4930,12 @@ sub DbRep_sumvalDone {
 
   delete($hash->{HELPER}{RUNNING_PID});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                          # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state",  "error", 1);
+      
+      DbRep_afterproc           ($hash, $hash->{LASTCMD});                                      # Befehl nach Procedure ausführen
+      
       return;
   }
 
@@ -4954,10 +4970,11 @@ sub DbRep_sumvalDone {
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c ne "" ? sprintf "%.${ndp}f", $c : "-");
   }
 
-  ReadingsBulkUpdateValue     ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
-  ReadingsBulkUpdateTimeState ($hash, $brt, $rt, $state);
-
-  readingsEndUpdate           ($hash, 1);
+  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
+  ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, $hash->{LASTCMD});                      # Befehl nach Procedure ausführen incl. state
 
 return;
 }
@@ -5035,11 +5052,12 @@ sub DbRep_del_Done {
 
   delete($hash->{HELPER}{RUNNING_PID});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                          # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, $hash->{LASTCMD});                                         # Befehl nach Procedure ausführen
+      
       return;
   }
 
@@ -5067,9 +5085,10 @@ sub DbRep_del_Done {
   $rows = $table eq "current" ? $rows : $ds.$rds.$rows;
   Log3 ($name, 3, "DbRep $name - Entries of $hash->{DATABASE}.$table deleted: $rows");
 
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
-
-  readingsEndUpdate ($hash, 1);
+  ReadingsBulkUpdateTime ($hash, $brt, $rt);
+  readingsEndUpdate      ($hash, 1);
+  
+  DbRep_afterproc        ($hash, $hash->{LASTCMD});                          # Befehl nach Procedure ausführen incl. state
 
 return;
 }
@@ -5178,11 +5197,12 @@ sub DbRep_insertDone {
 
   delete($hash->{HELPER}{RUNNING_PID});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, "insert");                          # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, "insert");                                              # Befehl nach Procedure ausführen
+      
       return;
   }
 
@@ -5193,11 +5213,12 @@ sub DbRep_insertDone {
 
   readingsBeginUpdate ($hash);
 
-  ReadingsBulkUpdateValue     ($hash, "number_lines_inserted", $irow);
-  ReadingsBulkUpdateValue     ($hash, "data_inserted", $i_timestamp.", ".$i_device.", ".$i_type.", ".$i_event.", ".$i_reading.", ".$i_value.", ".$i_unit);
-  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,"done");
-
-  readingsEndUpdate ($hash, 1);
+  ReadingsBulkUpdateValue ($hash, "number_lines_inserted", $irow);
+  ReadingsBulkUpdateValue ($hash, "data_inserted", $i_timestamp.", ".$i_device.", ".$i_type.", ".$i_event.", ".$i_reading.", ".$i_value.", ".$i_unit);
+  ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, "insert");                                  # Befehl nach Procedure ausführen incl. state
 
 return;
 }
@@ -5311,13 +5332,14 @@ sub DbRep_currentfillupDone {
 
   Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                          # Befehl nach Procedure ausführen
-
   delete($hash->{HELPER}{RUNNING_PID});
 
   if ($err) {
-      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
+      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, $hash->{LASTCMD});                                    # Befehl nach Procedure ausführen
+      
       return;
   }
 
@@ -5334,10 +5356,12 @@ sub DbRep_currentfillupDone {
   $rowstr = $irow." - limited by reading: ".$reading if(!$device && $reading);
   $rowstr = $irow." - limited by device: ".$device." and reading: ".$reading if($device && $reading);
 
-  readingsBeginUpdate         ($hash);
-  ReadingsBulkUpdateValue     ($hash, "number_lines_inserted", $rowstr);
-  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,"done");
-  readingsEndUpdate           ($hash, 1);
+  readingsBeginUpdate      ($hash);
+  ReadingsBulkUpdateValue  ($hash, "number_lines_inserted", $rowstr);
+  ReadingsBulkUpdateTime   ($hash, $brt, $rt);
+  readingsEndUpdate        ($hash, 1);
+  
+  DbRep_afterproc          ($hash, $hash->{LASTCMD});                     # Befehl nach Procedure ausführen incl. state
 
   Log3 ($name, 3, "DbRep $name - Table '$hash->{DATABASE}'.'current' filled up with rows: $rowstr");
 
@@ -5628,11 +5652,12 @@ sub DbRep_changeDone {
 
   delete($hash->{HELPER}{RUNNING_PID});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, $renmode);                           # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, $renmode);                                             # Befehl nach Procedure ausführen
+      
       return;
   }
 
@@ -5661,8 +5686,10 @@ sub DbRep_changeDone {
           if ($urow == 0);
   }
 
-  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
-  readingsEndUpdate           ($hash, 1);
+  ReadingsBulkUpdateTime ($hash, $brt, $rt);
+  readingsEndUpdate      ($hash, 1);
+  
+  DbRep_afterproc        ($hash, $renmode);                                 # Befehl nach Procedure ausführen incl. state
 
   if ($urow != 0) {
       Log3 ($name, 3, "DbRep ".($hash->{ROLE} eq "Agent" ? "Agent " : "")."$name - DEVICE renamed in \"$hash->{DATABASE}\" - old: \"$old\", new: \"$new\", number: $urow ")  if($renmode eq "devren");
@@ -5768,11 +5795,12 @@ sub DbRep_fetchrowsDone {
 
   delete($hash->{HELPER}{RUNNING_PID});
 
-  my ($erread, $state) = DbRep_afterproc($hash, $hash->{LASTCMD});                          # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, $hash->{LASTCMD});                          # Befehl nach Procedure ausführen
+      
       return;
   }
 
@@ -5874,11 +5902,14 @@ sub DbRep_fetchrowsDone {
   my $sfx = AttrVal("global", "language", "EN");
   $sfx    = $sfx eq "EN" ? "" : "_$sfx";
 
-  ReadingsBulkUpdateValue($hash, "number_fetched_rows", ($nrows>$limit) ? $nrows-1 : $nrows);
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,($nrows-$limit>0) ?
-      "<html>done - Warning: present rows exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRep-attr-limit' target='_blank'>limit</a></html>" : $state);
+  ReadingsBulkUpdateValue ($hash, "number_fetched_rows", ($nrows>$limit) ? $nrows-1 : $nrows);
+  ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+  ReadingsBulkUpdateValue ($hash, "state",
+      "<html>done - Warning: present rows exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRep-attr-limit' target='_blank'>limit</a></html>") if($nrows-$limit>0);
   readingsEndUpdate($hash, 1);
-
+  
+  DbRep_afterproc         ($hash, $hash->{LASTCMD});                      # Befehl nach Procedure ausführen incl. state
+  
 return;
 }
 
@@ -6298,11 +6329,12 @@ sub DbRep_deldoubl_Done {
 
   delete($hash->{HELPER}{RUNNING_PID});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                       # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, $hash->{LASTCMD});                       # Befehl nach Procedure ausführen
+      
       return;
   }
 
@@ -6348,10 +6380,12 @@ sub DbRep_deldoubl_Done {
              $prop =~ /adviceDelete/ ? "number_rows_to_delete" :
              "number_rows_deleted";
 
-  ReadingsBulkUpdateValue     ($hash, "$rnam", "$nrows");
-  ReadingsBulkUpdateTimeState ($hash,$brt,$rt, $l >= $limit ?
-                               "<html>done - Warning: not all items are shown, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#limit' target='_blank'>limit</a> if you want see more</html>" : $state);
-  readingsEndUpdate($hash, 1);
+  ReadingsBulkUpdateValue ($hash, "$rnam", "$nrows");
+  ReadingsBulkUpdateValue ($hash, 'state',
+                           "<html>done - Warning: not all items are shown, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#limit' target='_blank'>limit</a> if you want see more</html>") if($l >= $limit);
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, $hash->{LASTCMD});                    # Befehl nach Procedure ausführen incl. state
 
 return;
 }
@@ -6513,11 +6547,12 @@ sub DbRep_expfile_Done {
 
   delete($hash->{HELPER}{RUNNING_PID});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, "export");                    # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, "export");                    # Befehl nach Procedure ausführen
+      
       return;
   }
 
@@ -6532,10 +6567,12 @@ sub DbRep_expfile_Done {
   $rds              = $reading." -- " if ($reading);
   my $export_string = $ds.$rds." -- ROWS EXPORTED TO FILE(S) -- ";
 
-  readingsBeginUpdate        ($hash);
-  ReadingsBulkUpdateValue    ($hash, $export_string, $nrows);
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
-  readingsEndUpdate          ($hash, 1);
+  readingsBeginUpdate      ($hash);
+  ReadingsBulkUpdateValue  ($hash, $export_string, $nrows);
+  ReadingsBulkUpdateTime   ($hash, $brt, $rt);
+  readingsEndUpdate        ($hash, 1);
+  
+  DbRep_afterproc          ($hash, "export");                    # Befehl nach Procedure ausführen incl. state
 
 return;
 }
@@ -6725,11 +6762,12 @@ sub DbRep_impfile_Done {
 
   delete($hash->{HELPER}{RUNNING_PID});
 
-  my ($erread, $state) = DbRep_afterproc($hash, "import");                  # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, "import");                                       # Befehl nach Procedure ausführen
+      
       return;
   }
 
@@ -6739,10 +6777,12 @@ sub DbRep_impfile_Done {
 
   my $import_string = " -- ROWS IMPORTED FROM FILE -- ";
 
-  readingsBeginUpdate         ($hash);
-  ReadingsBulkUpdateValue     ($hash, $import_string, $irowdone);
-  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
-  readingsEndUpdate           ($hash, 1);
+  readingsBeginUpdate     ($hash);
+  ReadingsBulkUpdateValue ($hash, $import_string, $irowdone);
+  ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, "import");                                       # Befehl nach Procedure ausführen incl. state
 
   Log3 ($name, 3, "DbRep $name - Number of imported datasets to $hash->{DATABASE} from file $infile: $irowdone");
 
@@ -7226,7 +7266,6 @@ sub DbRep_sqlCmdDone {
   delete($hash->{HELPER}{RUNNING_PID});
   
   my $tmpsql           = $data{DbRep}{$name}{sqlcache}{temp};                           # SQL incl. Formatierung aus Zwischenspeicher holen
-  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                     # Befehl nach Procedure ausführen
 
   if ($err) {
     readingsBeginUpdate     ($hash);
@@ -7234,6 +7273,8 @@ sub DbRep_sqlCmdDone {
     ReadingsBulkUpdateValue ($hash, "errortext", $err   );
     ReadingsBulkUpdateValue ($hash, "state",     "error");
     readingsEndUpdate       ($hash, 1);
+    
+    DbRep_afterproc         ($hash, $hash->{LASTCMD});                                 # Befehl nach Procedure ausführen
     
     return;
   }
@@ -7317,8 +7358,10 @@ sub DbRep_sqlCmdDone {
       ReadingsBulkUpdateValue ($hash, "SqlResult", $json);
   }
 
-  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
-  readingsEndUpdate           ($hash, 1);
+  ReadingsBulkUpdateTime ($hash, $brt, $rt);
+  readingsEndUpdate      ($hash, 1);
+  
+  DbRep_afterproc        ($hash, $hash->{LASTCMD});                        # Befehl nach Procedure ausführen incl. state
 
 return;
 }
@@ -7788,20 +7831,23 @@ sub DbRep_IndexDone {
 
   delete($hash->{HELPER}{RUNNING_INDEX});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, "index");                            # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, "index");                                 # Befehl nach Procedure ausführen incl. state
+      
       return;
   }
 
   my ($rt,$brt) = split ",", $bt;
 
-  readingsBeginUpdate         ($hash);
-  ReadingsBulkUpdateValue     ($hash, "index_state", $ret);
-  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
-  readingsEndUpdate           ($hash, 1);
+  readingsBeginUpdate     ($hash);
+  ReadingsBulkUpdateValue ($hash, "index_state", $ret);
+  ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, "index");                                       # Befehl nach Procedure ausführen incl. state
 
 return;
 }
@@ -7812,23 +7858,27 @@ return;
 sub DbRep_IndexAborted {
   my $hash   = shift;
   my $cause  = shift // "Timeout: process terminated";
+  
   my $name   = $hash->{NAME};
   my $dbh    = $hash->{DBH};
 
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_INDEX}{fn} pid:$hash->{HELPER}{RUNNING_INDEX}{pid} $cause");
 
-  no warnings 'uninitialized';
+  ReadingsSingleUpdateValue ($hash, 'state', 'Abort', 0);
+  
   my $erread = DbRep_afterproc ($hash, "index");                                # Befehl nach Procedure ausführen
   $erread    = ", ".(split("but", $erread))[1] if($erread);
 
   my $state = $cause.$erread;
 
   $dbh->disconnect() if(defined($dbh));
+  
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
   Log3 ($name, 2, "DbRep $name - Database index operation aborted due to \"$cause\" ");
 
   delete($hash->{HELPER}{RUNNING_INDEX});
+  
 return;
 }
 
@@ -8085,11 +8135,12 @@ sub DbRep_OptimizeDone {
 
   delete($hash->{HELPER}{RUNNING_OPTIMIZE});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, "optimize");                   # Befehl nach Procedure ausführen
-
   if ($err) {
-      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
+      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, "optimize");                   # Befehl nach Procedure ausführen
+      
       return;
   }
 
@@ -8097,11 +8148,13 @@ sub DbRep_OptimizeDone {
 
   no warnings 'uninitialized';
 
-  readingsBeginUpdate         ($hash);
-  ReadingsBulkUpdateValue     ($hash, "SizeDbBegin_MB", $db_MB_start);
-  ReadingsBulkUpdateValue     ($hash, "SizeDbEnd_MB",   $db_MB_end  );
-  ReadingsBulkUpdateTimeState ($hash, $brt, undef, $state);
-  readingsEndUpdate           ($hash, 1);
+  readingsBeginUpdate     ($hash);
+  ReadingsBulkUpdateValue ($hash, "SizeDbBegin_MB", $db_MB_start);
+  ReadingsBulkUpdateValue ($hash, "SizeDbEnd_MB",   $db_MB_end  );
+  ReadingsBulkUpdateTime  ($hash, $brt, undef);
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, "optimize");                        # Befehl nach Procedure ausführen incl. state
 
   Log3 ($name, 3, "DbRep $name - Optimize tables finished successfully. ");
 
@@ -8777,11 +8830,12 @@ sub DbRep_DumpDone {
   delete($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
   delete($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, "dump");                    # Befehl nach Procedure ausführen
-
   if ($err) {
-      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
+      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, "dump");                                          # Befehl nach Procedure ausführen
+      
       return;
   }
 
@@ -8789,17 +8843,18 @@ sub DbRep_DumpDone {
 
   no warnings 'uninitialized';
 
-  readingsBeginUpdate         ($hash);
-  ReadingsBulkUpdateValue     ($hash, "DumpFileCreated",    $bfile);
-  ReadingsBulkUpdateValue     ($hash, "DumpFileCreatedSize",   $fs);
-  ReadingsBulkUpdateValue     ($hash, "DumpFilesDeleted",     $bfd);
-  ReadingsBulkUpdateValue     ($hash, "DumpRowsCurrent",      $drc);
-  ReadingsBulkUpdateValue     ($hash, "DumpRowsHistory",      $drh);
-  ReadingsBulkUpdateValue     ($hash, "FTP_Message",          $ftp) if($ftp);
-  ReadingsBulkUpdateValue     ($hash, "FTP_DumpFilesDeleted", $ffd) if($ffd);
-  ReadingsBulkUpdateValue     ($hash, "background_processing_time", sprintf("%.4f",$brt));
-  ReadingsBulkUpdateTimeState ($hash,undef,undef,$state);
-  readingsEndUpdate           ($hash, 1);
+  readingsBeginUpdate     ($hash);
+  ReadingsBulkUpdateValue ($hash, "DumpFileCreated",    $bfile);
+  ReadingsBulkUpdateValue ($hash, "DumpFileCreatedSize",   $fs);
+  ReadingsBulkUpdateValue ($hash, "DumpFilesDeleted",     $bfd);
+  ReadingsBulkUpdateValue ($hash, "DumpRowsCurrent",      $drc);
+  ReadingsBulkUpdateValue ($hash, "DumpRowsHistory",      $drh);
+  ReadingsBulkUpdateValue ($hash, "FTP_Message",          $ftp) if($ftp);
+  ReadingsBulkUpdateValue ($hash, "FTP_DumpFilesDeleted", $ffd) if($ffd);
+  ReadingsBulkUpdateValue ($hash, "background_processing_time", sprintf("%.4f",$brt));
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, "dump");                                          # Befehl nach Procedure ausführen incl. state
 
   Log3 ($name, 3, "DbRep $name - Database dump finished successfully. ");
 
@@ -8898,22 +8953,24 @@ sub DbRep_RepairDone {
 
   delete($hash->{HELPER}{RUNNING_REPAIR});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, "repair");                 # Befehl nach Procedure ausführen
-
-  CommandSet(undef,"$dbloghash->{NAME} reopen");                            # Datenbankverbindung in DbLog wieder öffenen
+  CommandSet(undef,"$dbloghash->{NAME} reopen");                               # Datenbankverbindung in DbLog wieder öffenen
 
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, "repair");                             # Befehl nach Procedure ausführen
+      
       return;
   }
 
   no warnings 'uninitialized';
 
-  readingsBeginUpdate         ($hash);
-  ReadingsBulkUpdateValue     ($hash, "background_processing_time", sprintf("%.4f",$brt));
-  ReadingsBulkUpdateTimeState ($hash, undef, undef, $state);
-  readingsEndUpdate           ($hash, 1);
+  readingsBeginUpdate     ($hash);
+  ReadingsBulkUpdateValue ($hash, "background_processing_time", sprintf("%.4f",$brt));
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, "repair");                                   # Befehl nach Procedure ausführen incl. state
 
   Log3 ($name, 3, "DbRep $name - Database repair $hash->{DATABASE} finished - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
 
@@ -9243,21 +9300,24 @@ sub DbRep_restoreDone {
 
   delete($hash->{HELPER}{RUNNING_RESTORE});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, "restore", $bfile);                             # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, "restore", $bfile);                                 # Befehl nach Procedure ausführen
+      
       return;
   }
 
   my ($rt,$brt) = split ",", $bt;
 
-  readingsBeginUpdate         ($hash);
-  ReadingsBulkUpdateValue     ($hash, "RestoreRowsHistory", $drh) if($drh);
-  ReadingsBulkUpdateValue     ($hash, "RestoreRowsCurrent", $drc) if($drc);
-  ReadingsBulkUpdateTimeState ($hash,$brt,undef,$state);
-  readingsEndUpdate           ($hash, 1);
+  readingsBeginUpdate     ($hash);
+  ReadingsBulkUpdateValue ($hash, "RestoreRowsHistory", $drh) if($drh);
+  ReadingsBulkUpdateValue ($hash, "RestoreRowsCurrent", $drc) if($drc);
+  ReadingsBulkUpdateTime  ($hash, $brt, undef);
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, "restore", $bfile);                                      # Befehl nach Procedure ausführen incl. state
 
   Log3 ($name, 3, "DbRep $name - Database restore finished successfully. ");
 
@@ -9390,20 +9450,23 @@ sub DbRep_syncStandbyDone {
 
   delete($hash->{HELPER}{RUNNING_PID});
 
-  my ($erread, $state) = DbRep_afterproc ($hash, "syncStandby");                         # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, "syncStandby");                             # Befehl nach Procedure ausführen
+      
       return;
   }
 
   my ($rt,$brt)  = split ",", $bt;
 
-  readingsBeginUpdate         ($hash);
-  ReadingsBulkUpdateValue     ($hash, "number_lines_inserted_Standby", $irows);
-  ReadingsBulkUpdateTimeState ($hash, $brt, $rt, $state);
-  readingsEndUpdate           ($hash, 1);
+  readingsBeginUpdate     ($hash);
+  ReadingsBulkUpdateValue ($hash, "number_lines_inserted_Standby", $irows);
+  ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, "syncStandby");                                   # Befehl nach Procedure ausführen incl. state
 
 return;
 }
@@ -10346,23 +10409,21 @@ sub DbRep_reduceLogDone {
   delete $hash->{HELPER}{RUNNING_REDUCELOG};
   delete $hash->{HELPER}{REDUCELOG};
 
-  my ($erread, $state) = DbRep_afterproc ($hash, "reduceLog");                       # Befehl nach Procedure ausführen
-
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
+      DbRep_afterproc           ($hash, "reduceLog");                       # Befehl nach Procedure ausführen
+      
       return;
   }
 
-  no warnings 'uninitialized';
-
-  readingsBeginUpdate         ($hash);
-  ReadingsBulkUpdateValue     ($hash, "background_processing_time", sprintf("%.2f",$brt));
-  ReadingsBulkUpdateValue     ($hash, "reduceLogState", $ret);
-  ReadingsBulkUpdateTimeState ($hash, undef, undef, $state);
-  readingsEndUpdate           ($hash, 1);
-
-  use warnings;
+  readingsBeginUpdate     ($hash);
+  ReadingsBulkUpdateValue ($hash, "background_processing_time", sprintf("%.2f", $brt));
+  ReadingsBulkUpdateValue ($hash, "reduceLogState", $ret);
+  readingsEndUpdate       ($hash, 1);
+  
+  DbRep_afterproc         ($hash, "reduceLog");                             # Befehl nach Procedure ausführen
 
 return;
 }
@@ -10373,18 +10434,20 @@ return;
 sub DbRep_reduceLogAborted {
   my $hash  = shift;
   my $cause = shift // "Timeout: process terminated";
+  
   my $name  = $hash->{NAME};
   my $dbh   = $hash->{DBH};
 
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_REDUCELOG}{fn} pid:$hash->{HELPER}{RUNNING_REDUCELOG}{pid} $cause") if($hash->{HELPER}{RUNNING_REDUCELOG});
 
-  no warnings 'uninitialized';
+  ReadingsSingleUpdateValue ($hash, 'state', 'Abort', 0);
 
   my $erread = DbRep_afterproc ($hash, "reduceLog");                  # Befehl nach Procedure ausführen
   $erread    = ", ".(split("but", $erread))[1] if($erread);
 
   my $state = $cause.$erread;
   $dbh->disconnect() if(defined($dbh));
+  
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
   Log3 ($name, 2, "DbRep $name - Database reduceLog aborted: \"$cause\" ");
@@ -10401,12 +10464,13 @@ return;
 sub DbRep_restoreAborted {
   my $hash  = shift;
   my $cause = shift // "Timeout: process terminated";
+  
   my $name  = $hash->{NAME};
   my $dbh   = $hash->{DBH};
 
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_RESTORE}{fn} pid:$hash->{HELPER}{RUNNING_RESTORE}{pid} $cause") if($hash->{HELPER}{RUNNING_RESTORE});
 
-  no warnings 'uninitialized';
+  ReadingsSingleUpdateValue ($hash, 'state', 'Abort', 0);
 
   my $erread = DbRep_afterproc ($hash, "restore");                              # Befehl nach Procedure ausführen
   $erread    = ", ".(split("but", $erread))[1] if($erread);
@@ -10429,6 +10493,7 @@ return;
 sub DbRep_ParseAborted {
   my $hash   = shift;
   my $cause  = shift // "Timeout: process terminated";
+  
   my $name   = $hash->{NAME};
   my $dbh    = $hash->{DBH};
 
@@ -10436,8 +10501,8 @@ sub DbRep_ParseAborted {
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
 
   delete($hash->{HELPER}{RUNNING_PID});
-
-  no warnings 'uninitialized';
+  
+  ReadingsSingleUpdateValue ($hash, 'state', 'Abort', 0);
 
   my $erread = DbRep_afterproc ($hash, "command");                  # Befehl nach Procedure ausführen
   $erread    = ", ".(split("but", $erread))[1] if($erread);
@@ -10445,10 +10510,7 @@ sub DbRep_ParseAborted {
   my $state  = $cause.$erread;
 
   $dbh->disconnect() if(defined($dbh));
-  
-  readingsBeginUpdate     ($hash);      
-  ReadingsBulkUpdateValue ($hash, "state", $state);
-  readingsEndUpdate       ($hash, 1);
+  ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
   Log3 ($name, 2, "DbRep $name - Database command aborted: \"$cause\" ");
 
@@ -10461,13 +10523,14 @@ return;
 sub DbRep_DumpAborted {
   my $hash  = shift;
   my $cause = shift // "Timeout: process terminated";
+  
   my $name  = $hash->{NAME};
   my $dbh   = $hash->{DBH};
 
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} pid:$hash->{HELPER}{RUNNING_BACKUP_CLIENT}{pid} $cause") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} pid:$hash->{HELPER}{RUNNING_BCKPREST_SERVER}{pid} $cause") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
 
-  no warnings 'uninitialized';
+  ReadingsSingleUpdateValue ($hash, 'state', 'Abort', 0);
 
   my $erread = DbRep_afterproc ($hash, "dump");                         # Befehl nach Procedure ausführen
   $erread    = ", ".(split("but", $erread))[1] if($erread);
@@ -10491,12 +10554,13 @@ return;
 sub DbRep_OptimizeAborted {
   my $hash  = shift;
   my $cause = shift // "Timeout: process terminated";
+  
   my $name  = $hash->{NAME};
   my $dbh   = $hash->{DBH};
 
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_OPTIMIZE}}{fn} pid:$hash->{HELPER}{RUNNING_OPTIMIZE}{pid} $cause");
 
-  no warnings 'uninitialized';
+  ReadingsSingleUpdateValue ($hash, 'state', 'Abort', 0);
 
   my $erread = DbRep_afterproc ($hash, "optimize");                      # Befehl nach Procedure ausführen
   $erread    = ", ".(split("but", $erread))[1] if($erread);
@@ -10519,6 +10583,7 @@ return;
 sub DbRep_RepairAborted {
   my $hash      = shift;
   my $cause     = shift // "Timeout: process terminated";
+  
   my $name      = $hash->{NAME};
   my $dbh       = $hash->{DBH};
   my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -10528,8 +10593,8 @@ sub DbRep_RepairAborted {
   # Datenbankverbindung in DbLog wieder öffenen
   my $dbl = $dbloghash->{NAME};
   CommandSet(undef,"$dbl reopen");
-
-  no warnings 'uninitialized';
+  
+  ReadingsSingleUpdateValue ($hash, 'state', 'Abort', 0);
 
   my $erread = DbRep_afterproc ($hash, "repair");                      # Befehl nach Procedure ausführen
   $erread    = ", ".(split("but", $erread))[1] if($erread);
@@ -11603,8 +11668,48 @@ sub ReadingsSingleUpdateValue {
  my $name    = $hash->{NAME};
 
  readingsSingleUpdate($hash, $reading, $val, $ev);
+ 
+ readingsBeginUpdate ($hash);
  DbRep_userexit      ($name, $reading, $val);
+ readingsEndUpdate   ($hash, 1);
+ 
  DbRep_autoForward   ($name, $reading, $val);
+
+return;
+}
+
+####################################################################################################
+#    ReadingsSingleUpdate für Time-Readings
+####################################################################################################
+sub ReadingsSingleUpdateTime {
+ my $hash = shift;
+ my $bpt  = shift;
+ my $spt  = shift;
+ my $evt  = shift;
+ 
+ my $name = $hash->{NAME};
+
+ if (AttrVal($name, "showproctime", 0)) {
+     if (defined $bpt) {
+         $bpt = sprintf "%.4f", $bpt;
+         
+         readingsSingleUpdate ($hash, "background_processing_time", $bpt, $evt);
+         
+         readingsBeginUpdate  ($hash);
+         DbRep_userexit       ($name, "background_processing_time", $bpt);
+         readingsEndUpdate    ($hash, 1);
+     }
+     
+     if (defined $spt) {
+        $spt = sprintf "%.4f", $spt;
+         
+        readingsSingleUpdate ($hash, "sql_processing_time", $spt, $evt);
+        
+        readingsBeginUpdate  ($hash);
+        DbRep_userexit       ($name, "sql_processing_time", $spt);
+        readingsEndUpdate    ($hash, 1);
+     }
+ }
 
 return;
 }
@@ -11635,18 +11740,54 @@ sub ReadingsBulkUpdateTimeState {
  my $brt  = shift;
  my $rt   = shift;
  my $sval = shift;
+ 
  my $name = $hash->{NAME};
 
- if(AttrVal($name, "showproctime", undef)) {
-     readingsBulkUpdate ($hash, "background_processing_time", sprintf("%.4f",$brt)) if(defined($brt));
-     DbRep_userexit     ($name, "background_processing_time", sprintf("%.4f",$brt)) if(defined($brt));
-     readingsBulkUpdate ($hash, "sql_processing_time",        sprintf("%.4f",$rt))  if(defined($rt));
-     DbRep_userexit     ($name, "sql_processing_time",        sprintf("%.4f",$rt))  if(defined($rt));
+ if(AttrVal($name, 'showproctime', 0)) {
+     if (defined $brt) {
+         $brt = sprintf "%.4f", $brt;
+         readingsBulkUpdate ($hash, "background_processing_time", $brt);
+         DbRep_userexit     ($name, "background_processing_time", $brt);
+     }
+     
+     if (defined $rt) {
+         $rt = sprintf "%.4f", $rt;
+         readingsBulkUpdate ($hash, "sql_processing_time", $rt);
+         DbRep_userexit     ($name, "sql_processing_time", $rt);
+     }
  }
 
  readingsBulkUpdate ($hash, "state", $sval);
  DbRep_userexit     ($name, "state", $sval);
  DbRep_autoForward  ($name, "state", $sval);
+
+return;
+}
+
+####################################################################################################
+#    Readingsbulkupdate für processing_time, 
+#    readingsBeginUpdate und readingsEndUpdate muss vor/nach Funktionsaufruf gesetzt werden
+####################################################################################################
+sub ReadingsBulkUpdateTime {
+ my $hash = shift;
+ my $bpt  = shift;
+ my $spt  = shift;
+ 
+ my $name = $hash->{NAME};
+
+ if(AttrVal($name, 'showproctime', 0)) {
+     if (defined $bpt) {
+         $bpt = sprintf "%.4f", $bpt;
+         readingsBulkUpdate ($hash, "background_processing_time", $bpt);
+         DbRep_userexit     ($name, "background_processing_time", $bpt);
+     }
+     
+     if (defined $spt) {
+         $spt = sprintf "%.4f", $spt;
+         readingsBulkUpdate ($hash, "sql_processing_time", $spt);
+         DbRep_userexit     ($name, "sql_processing_time", $spt);
+     }
+ }
 
 return;
 }
@@ -12008,6 +12149,7 @@ sub DbRep_beforeproc {
       if ($err) {
           Log3 ($name, 2, "DbRep $name - command message before $txt: \"$err\" ");
           my $erread = "Warning - message from command before $txt appeared";
+          
           ReadingsSingleUpdateValue ($hash, "before".$txt."_message", $err, 1);
           ReadingsSingleUpdateValue ($hash, "state", $erread, 1);
       }
@@ -12023,25 +12165,32 @@ sub DbRep_afterproc {
   my $hash  = shift;
   my $cmd   = shift // q{process};
   my $bfile = shift // q{};
-  my $name  = $hash->{NAME};
 
   my $erread;
 
-  $cmd = (split " ", $cmd)[0];
-
-  my $ead = AttrVal($name, 'executeAfterProc', '');
+  my $name   = $hash->{NAME};
+  $cmd       = (split " ", $cmd)[0];
+  my $sval   = ReadingsVal ($name, 'state', '');
+  my $ead    = AttrVal     ($name, 'executeAfterProc', '');
 
   if($ead) {
-      Log3 ($name, 4, "DbRep $name - execute command after $cmd: '$ead' ");
+      Log3 ($name, 3, "DbRep $name - execute command after $cmd: '$ead' ");
 
       my $err = AnalyzeCommandChain(undef, $ead);
 
       if ($err) {
           Log3 ($name, 2, qq{DbRep $name - command message after $cmd: "$err"});
-          ReadingsSingleUpdateValue ($hash, "after_".$cmd."_message", $err, 1);
-          $erread = qq{WARNING - $cmd finished, but message after command appeared};
+          
+          $erread = $sval eq 'error' ? $sval : qq(WARNING - $cmd finished, but message after command appeared);
+          
+          ReadingsSingleUpdateValue ($hash, 'after_'.$cmd.'_message', $err, 1);
+          ReadingsSingleUpdateValue ($hash, 'state', $erread, 1);
+          
+          return $erread;
       }
   }
+  
+  return '' if($sval && $sval !~ /running/xs);
 
   my $rtxt  = $cmd eq "dump"      ? "Database backup finished"                :
               $cmd eq "repair"    ? "Repair finished $hash->{DATABASE}"       :
@@ -12050,9 +12199,9 @@ sub DbRep_afterproc {
               $cmd eq "optimize"  ? "optimize tables finished"                :
               "done";
 
-  my $state = $erread // $rtxt;
+  ReadingsSingleUpdateValue ($hash, 'state', $rtxt, 1);
 
-return ($erread, $state);
+return '';
 }
 
 ##############################################################################################
@@ -14849,7 +14998,8 @@ return;
                                The <a href="#DbRep-attr-useAdminCredentials">useAdminCredentials</a> attribute must usually be set to be able to
                                change the rights of the used user.
 
-                               </li> <br>
+                               </li> 
+                               <br>
 
     <a id="DbRep-set-insert"></a>
     <li><b> insert &lt;Date&gt;,&lt;Time&gt;,&lt;Value&gt;,[&lt;Unit&gt;],[&lt;Device&gt;],[&lt;Reading&gt;] </b>
@@ -15512,11 +15662,29 @@ return;
 
                                  </li> <br>
 
+    <a id="DbRep-set-tableCurrentFillup"></a>
     <li><b> tableCurrentFillup </b> - the current-table will be filled u with an extract of the history-table.
                                       The <a href="#DbRep-attr">attributes</a> for limiting time and device, reading are considered.
                                       Thereby the content of the extract can be affected. In the associated DbLog-device the attribute "DbLogType" should be set to
-                                      "SampleFill/History". </li> <br>
+                                      "SampleFill/History". 
+                                     <br>
+                                     <br>
 
+                                     The following attributes are relevant for this function: <br><br>
+
+                                     <ul>
+                                       <table>
+                                       <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                         <tr><td> <b>executeBeforeProc</b>        </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
+                                         <tr><td> <b>executeAfterProc</b>         </td><td>: execution of FHEM command (or Perl-routine) after operation  </td></tr>
+                                       </table>
+                                     </ul>
+                                     <br>
+                                     <br>
+
+                                     </li>
+
+    <a id="DbRep-set-tableCurrentPurge"></a>
     <li><b> tableCurrentPurge </b> - deletes the content of current-table. There are no limits, e.g. by attributes "timestamp_begin", "timestamp_end", device, reading
                                      and so on, considered.
                                      <br>
@@ -17741,7 +17909,9 @@ return;
                                Das Attribut <a href="#DbRep-attr-useAdminCredentials">useAdminCredentials</a> muß gewöhnlich gesetzt sein um
                                die Rechte des verwendeten Users ändern zu können.
 
-                               </li> <br>
+                               </li> 
+                               <br>
+                               
     <a id="DbRep-set-insert"></a>
     <li><b> insert &lt;Datum&gt;,&lt;Zeit&gt;,&lt;Value&gt;,[&lt;Unit&gt;],[&lt;Device&gt;],[&lt;Reading&gt;] </b>
                                  -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value.
@@ -18421,14 +18591,33 @@ return;
                                  <br>
 
                                  </li> <br>
-
+    
+    <a id="DbRep-set-tableCurrentFillup"></a>
     <li><b> tableCurrentFillup </b> - Die current-Tabelle wird mit einem Extrakt der history-Tabelle aufgefüllt.
                                       Die Attribute zur Zeiteinschränkung bzw. device, reading werden ausgewertet.
                                       Dadurch kann der Inhalt des Extrakts beeinflusst werden. Im zugehörigen DbLog-Device sollte sollte das Attribut
-                                      "DbLogType=SampleFill/History" gesetzt sein. </li> <br>
+                                      "DbLogType=SampleFill/History" gesetzt sein. 
+                                      <br>
+                                      <br>
+                                      
+                                     Für diese Funktion sind folgende Attribute relevant: <br><br>
 
+                                     <ul>
+                                     <table>
+                                     <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                        <tr><td> <b>executeBeforeProc</b>    </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start des Befehls </td></tr>
+                                        <tr><td> <b>executeAfterProc</b>     </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende des Befehls </td></tr>
+                                        </table>
+                                     </ul>
+                                     <br>
+                                     <br>
+
+                                     </li> 
+ 
+    <a id="DbRep-set-tableCurrentPurge"></a>
     <li><b> tableCurrentPurge </b> - löscht den Inhalt der current-Tabelle. Es werden keine Limitierungen, z.B. durch die Attribute "timestamp_begin",
                                      "timestamp_end", device, reading, usw. , ausgewertet.
+                                     <br>
                                      <br>
 
                                      Für diese Funktion sind folgende Attribute relevant: <br><br>
@@ -19530,7 +19719,7 @@ return;
                                Die Regexprüfung nach der Erstellung jedes Readings.
                                Ist die Prüfung wahr, wird die angegebene Funktion aufgerufen. <br><br>
 
-                               <b>2. direkte Einngabe von eigenem Code  </b> <br><br>
+                               <b>2. direkte Eingabe von eigenem Code  </b> <br><br>
 
                                Der eigene Code wird in geschweifte Klammern eingeschlossen.
                                Der Aufruf des Codes erfolgt nach der Erstellung jedes Readings.
