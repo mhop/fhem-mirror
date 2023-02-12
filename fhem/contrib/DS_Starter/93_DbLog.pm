@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 27111 2023-01-30 19:06:28Z DS_Starter $
+# $Id: 93_DbLog.pm 27165 2023-02-01 21:48:29Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -38,6 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.8.1"   => "12.02.2023 change field type of DbLogInclude, DbLogExclude to textField-long ",
   "5.8.0"   => "30.01.2023 new Get menu for a selection of getters, fix creation of new subprocess during shutdown sequence ",
   "5.7.0"   => "25.01.2023 send Log3() data back ro parent process, improve _DbLog_dbReadings function ",
   "5.6.2"   => "22.01.2023 check Syntax of DbLogValueFn attribute with Log output, Forum:#131777 ",
@@ -201,8 +202,8 @@ sub DbLog_Initialize {
                                "verbose4Devs ".
                                $readingFnAttributes;
 
-  addToAttrList("DbLogInclude");
-  addToAttrList("DbLogExclude");
+  addToAttrList("DbLogInclude:textField-long");
+  addToAttrList("DbLogExclude:textField-long");
   addToAttrList("DbLogValueFn:textField-long");
 
   $hash->{FW_detailFn}      = "DbLog_fhemwebFn";
@@ -1339,8 +1340,8 @@ sub DbLog_Log {
               $DoIt = 1 if($DbLogSelectionMode =~ m/Exclude/ );
 
               if($DbLogExclude && $DbLogSelectionMode =~ m/Exclude/) {                                        # Bsp: "(temperature|humidity):300,battery:3600:force"
-                  my @v1 = split(/,/, $DbLogExclude);
-
+                  my @v1 = DbLog_attrLong2Array ($DbLogExclude, ',');
+                  
                   for (my $i = 0; $i < int(@v1); $i++) {
                       my @v2 = split /:/, $v1[$i];
                       $DoIt  = 0 if(!$v2[1] && $reading =~ m,^$v2[0]$,);                                      # Reading matcht auf Regexp, kein MinIntervall angegeben
@@ -1363,8 +1364,8 @@ sub DbLog_Log {
               # Im Endeffekt genau die gleiche Pruefung, wie fuer DBLogExclude, lediglich mit umgegkehrtem Ergebnis.
               if($DoIt == 0) {
                   if($DbLogInclude && ($DbLogSelectionMode =~ m/Include/)) {
-                      my @v1 = split /,/, $DbLogInclude;
-
+                      my @v1 = DbLog_attrLong2Array ($DbLogInclude, ',');
+                      
                       for (my $i = 0; $i < int(@v1); $i++) {
                           my @v2 = split /:/, $v1[$i];
                           $DoIt  = 1 if($reading =~ m,^$v2[0]$,);                                               # Reading matcht auf Regexp
@@ -1851,20 +1852,24 @@ sub _DbLog_checkDefMinInt {
   my $force;
   my $DoIt = 1;
 
-  my $defminint = AttrVal($name, "defaultMinInterval", undef);
+  my $defminint = AttrVal ($name, "defaultMinInterval", undef);
   return $DoIt if(!$defminint);                                                        # Attribut "defaultMinInterval" nicht im DbLog gesetzt -> kein ToDo
 
   my $DbLogExclude = AttrVal ($dev_name, "DbLogExclude", undef);
+  $DbLogExclude    = join ",", DbLog_attrLong2Array ($DbLogExclude, ',');
+  
   my $DbLogInclude = AttrVal ($dev_name, "DbLogInclude", undef);
+  $DbLogInclude    = join ",", DbLog_attrLong2Array ($DbLogInclude, ',');
+  
   $defminint       =~ s/[\s\n]/,/g;
-  my @adef         = split(/,/, $defminint);
+  my @adef         = split /,/, $defminint;
   my $inex         = ($DbLogExclude ? $DbLogExclude."," : "").($DbLogInclude ? $DbLogInclude : "");
 
   if($inex) {                                                                          # Quelldevice hat DbLogExclude und/oder DbLogInclude gesetzt
-      my @ie = split(/,/, $inex);
+      my @ie = split /,/, $inex;
 
       for (my $k = 0; $k < int(@ie); $k++) {                                           # Bsp. für das auszuwertende Element
-          my @rif = split(/:/, $ie[$k]);                                               # "(temperature|humidity):300:force"
+          my @rif = split /:/, $ie[$k];                                                # "(temperature|humidity):300:force"
 
           if($reading =~ m,^$rif[0]$, && $rif[1]) {                                    # aktuelles Reading matcht auf Regexp und minInterval ist angegeben
               return $DoIt;                                                            # Reading wurde bereits geprüft -> kein Überschreiben durch $defminint
@@ -1873,8 +1878,8 @@ sub _DbLog_checkDefMinInt {
   }
 
   for (my $l = 0; $l < int(@adef); $l++) {
-      my @adefelem = split("::", $adef[$l]);                                           # Bsp. für ein defaulMInInterval Element:
-      my @dvs      = devspec2array($adefelem[0]);                                      # device::interval[::force]
+      my @adefelem = split "::", $adef[$l];                                             # Bsp. für ein defaulMInInterval Element:
+      my @dvs      = devspec2array ($adefelem[0]);                                      # device::interval[::force]
 
       if(@dvs) {
           for (@dvs) {
@@ -7838,19 +7843,19 @@ sub DbLog_AddLog {
            $found = 1 if($rd =~ m/^$rdspec$/);                                # Reading gefunden
 
            if($DbLogExclude && !$nce) {
-               my @v1 = split(/,/, $DbLogExclude);
+               my @v1 = DbLog_attrLong2Array ($DbLogExclude, ',');
 
                for (my $i = 0; $i < int(@v1); $i++) {
-                   my @v2 = split(/:/, $v1[$i]);                              # MinInterval wegschneiden, Bsp: "(temperature|humidity):600,battery:3600"
+                   my @v2 = split /:/, $v1[$i];                               # MinInterval wegschneiden, Bsp: "(temperature|humidity):600,battery:3600"
 
                    if($rd =~ m,^$v2[0]$,) {                                   # Reading matcht $DbLogExclude -> ausschließen vom addLog
                        $do = 0;
 
                        if($DbLogInclude) {
-                           my @v3 = split(/,/, $DbLogInclude);
+                           my @v3 = DbLog_attrLong2Array ($DbLogInclude, ',');
 
                            for (my $i = 0; $i < int(@v3); $i++) {
-                               my @v4 = split(/:/, $v3[$i]);
+                               my @v4 = split /:/, $v3[$i];
                                $do    = 1 if($rd =~ m,^$v4[0]$,);             # Reading matcht $DbLogInclude -> wieder in addLog einschließen
                            }
                        }
@@ -8180,6 +8185,22 @@ sub DbLog_charfilter {
 return($txt);
 }
 
+###############################################################################
+#   Einen Attributinhalt vom Typ textField-long splitten und als 
+#   Array zurückgeben
+#   Optional kann das Split-Zeichen, default ',', angegeben werden.
+###############################################################################
+sub DbLog_attrLong2Array {
+  my $content = shift;
+  my $sptchar = shift // q{,};
+  
+  return () if(!$content);
+
+  my @v = map { my $p = $_; $p =~ s/\s//xg; $p; } split /$sptchar/xs, $content;                ## no critic 'Map blocks'
+
+return @v;
+}
+
 ################################################################
 # benutzte DB-Feldlängen in Helper und Internals setzen
 ################################################################
@@ -8498,13 +8519,13 @@ sub DbLog_setVersionInfo {
 
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 27111 2023-01-23 19:06:28Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 27165 2023-02-01 21:48:29Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/xsg;
       }
       else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 27111 2023-01-23 19:06:28Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 27165 2023-02-01 21:48:29Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
