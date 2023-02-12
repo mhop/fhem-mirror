@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-11-21 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-02-12 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.74.8" => "11.02.2023  change description of 'mintime', mintime with SunPath value possible ",
   "0.74.7" => "23.01.2023  fix evaljson evaluation ",
   "0.74.6" => "22.11.2022  bugfix consumerLegend tooltip start/end time if language is set to english ",
   "0.74.5" => "21.11.2022  new Attr affectSolCastPercentile ",
@@ -376,7 +377,7 @@ my $rain_base    = 0;                                                           
 my $maxconsumer  = 12;                                                            # maximale Anzahl der möglichen Consumer (Attribut)
 my $epiecHCounts = 10;                                                            # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
 my @ctypes       = qw(dishwasher dryer washingmachine heater charger other);      # erlaubte Consumer Typen
-my $defmintime   = 60;                                                            # default min. Einschalt- bzw. Zykluszeit in Minuten
+my $defmintime   = 60;                                                            # default Einplanungsdauer in Minuten
 my $defctype     = "other";                                                       # default Verbrauchertyp
 my $defcmode     = "can";                                                         # default Planungsmode der Verbraucher
 my $defpopercent = 0.5;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
@@ -1133,13 +1134,21 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   return qq{no valid consumer id "$c"}    if(!ConsumerVal ($hash, $c, "name", ""));
 
   my $startts  = time;
-  my $stopdiff = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
+  my $mintime  = ConsumerVal ($hash, $c, "mintime", $defmintime);
+  
+  if (isSunPath ($hash, $c)) {                                                                 # SunPath ist in mintime gesetzt
+      my (undef, $setshift) = sunShift   ($hash, $c);                                          # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
+      my $tdiff             = (CurrentVal ($hash, 'sunsetTodayTs', 0) + $setshift) - $startts;
+      $mintime              = $tdiff / 60;                                                     # Minuten
+  }
+  
+  my $stopdiff = $mintime * 60;
   my $stopts   = $startts + $stopdiff;
 
   $paref->{consumer} = $c;
   $paref->{ps}       = "planned:";
-  $paref->{startts}  = $startts;                                                # Unix Timestamp für geplanten Switch on
-  $paref->{stopts}   = $stopts;                                                 # Unix Timestamp für geplanten Switch off
+  $paref->{startts}  = $startts;                                                      # Unix Timestamp für geplanten Switch on
+  $paref->{stopts}   = $stopts;                                                       # Unix Timestamp für geplanten Switch off
 
   ___setConsumerPlanningState ($paref);
   ___saveEhodpieces           ($paref);
@@ -1148,7 +1157,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $planstate = ConsumerVal ($hash, $c, "planstate", "");
   my $calias    = ConsumerVal ($hash, $c, "alias",     "");
 
-  writeCacheToFile ($hash, "consumers", $csmcache.$name);                        # Cache File Consumer schreiben
+  writeCacheToFile ($hash, "consumers", $csmcache.$name);                             # Cache File Consumer schreiben
 
   Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate}) if($planstate);
 
@@ -2632,32 +2641,32 @@ sub _attrconsumer {                      ## no critic "not used"
 
   my $err;
 
-  if($cmd eq "set") {
+  if ($cmd eq "set") {
       my ($a,$h) = parseParams ($aVal);
       my $codev  = $a->[0] // "";
 
-      if(!$codev || !$defs{$codev}) {
+      if (!$codev || !$defs{$codev}) {
           return qq{The device "$codev" doesn't exist!};
       }
 
-      if(!$h->{type} || !exists $h->{power}) {
+      if (!$h->{type} || !exists $h->{power}) {
           return qq{The syntax of "$aName" is not correct. Please consider the commandref.};
       }
 
       my $alowt = $h->{type} ~~ @ctypes ? 1 : 0;
-      if(!$alowt) {
+      if (!$alowt) {
         return qq{The type "$h->{type}" isn't allowed!};
       }
 
-      if($h->{power} !~ /^[0-9]+$/xs) {
+      if ($h->{power} !~ /^[0-9]+$/xs) {
           return qq{The key "power" must be specified only by numbers without decimal places};
       }
 
-      if($h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
+      if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
           return qq{The mode "$h->{mode}" isn't allowed!}
       }
 
-      if($h->{interruptable}) {                                                            # Check Regex/Hysterese
+      if (exists $h->{interruptable}) {                                                            # Check Regex/Hysterese
           my (undef,undef,$regex,$hyst) = split ":", $h->{interruptable};
 
           $err = checkRegex ($regex);
@@ -2668,21 +2677,21 @@ sub _attrconsumer {                      ## no critic "not used"
           }
       }
 
-      if($h->{swoncond}) {                                                                 # Check Regex
+      if (exists $h->{swoncond}) {                                                                 # Check Regex
           my (undef,undef,$regex) = split ":", $h->{swoncond};
 
           $err = checkRegex ($regex);
           return $err if($err);
       }
 
-      if($h->{swoffcond}) {                                                                # Check Regex
+      if (exists $h->{swoffcond}) {                                                                # Check Regex
           my (undef,undef,$regex) = split ":", $h->{swoffcond};
 
           $err = checkRegex ($regex);
           return $err if($err);
       }
 
-      if($h->{swstate}) {                                                                # Check Regex
+      if (exists $h->{swstate}) {                                                                  # Check Regex
           my (undef,$onregex,$offregex) = split ":", $h->{swstate};
 
           $err = checkRegex ($onregex);
@@ -2690,6 +2699,14 @@ sub _attrconsumer {                      ## no critic "not used"
 
           $err = checkRegex ($offregex);
           return $err if($err);
+      }
+      
+      if (exists $h->{mintime}) {                                                                # Check Regex
+          my $mintime = $h->{mintime};
+            
+          if (!isNumeric ($mintime) && $mintime !~ /^SunPath/xsi) {
+              return qq(The key "mintime" must be an integer or a string starting with "SunPath.");
+          }
       }
   }
   else {
@@ -2709,7 +2726,7 @@ sub _attrconsumer {                      ## no critic "not used"
       delete $data{$type}{$name}{consumers}{$c};                                           # Consumer Hash Verbraucher löschen
   }
 
-  writeCacheToFile ($hash, "consumers", $csmcache.$name);                                   # Cache File Consumer schreiben
+  writeCacheToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
 
   InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::createAssociatedWith", $hash, 0);
 
@@ -3384,6 +3401,8 @@ sub _specialActivities {
           
           delete $data{$type}{$name}{current}{sunriseToday};
           delete $data{$type}{$name}{current}{sunriseTodayTs};
+          delete $data{$type}{$name}{current}{sunsetToday};
+          delete $data{$type}{$name}{current}{sunsetTodayTs};
 
           $data{$type}{$name}{circular}{99}{ydayDvtn} = CircularVal ($hash, 99, 'tdayDvtn', '-');
           delete $data{$type}{$name}{circular}{99}{tdayDvtn};
@@ -4213,6 +4232,9 @@ sub _transferWeatherValues {
   $data{$type}{$name}{current}{sunriseToday}   = $date.' '.$fc0_SunRise.':00';
   $data{$type}{$name}{current}{sunriseTodayTs} = timestringToTimestamp ($date.' '.$fc0_SunRise.':00');
   
+  $data{$type}{$name}{current}{sunsetToday}    = $date.' '.$fc0_SunSet.':00';
+  $data{$type}{$name}{current}{sunsetTodayTs}  = timestringToTimestamp ($date.' '.$fc0_SunSet.':00');
+  
   if($debug =~ /collectData/x) {
       Log3 ($name, 1, "$name DEBUG> sunrise/sunset today: $fc0_SunRise / $fc0_SunSet, sunrise/sunset tomorrow: $fc1_SunRise / $fc1_SunSet");
   }
@@ -4671,8 +4693,15 @@ sub __calcEnergyPieces {
 
   my $cotype  = ConsumerVal ($hash, $c, "type",    $defctype  );
   my $mintime = ConsumerVal ($hash, $c, "mintime", $defmintime);
-  my $hours   = ceil ($mintime / 60);                                                          # Laufzeit in h
-
+  
+  if (isSunPath ($hash, $c)) {                                                                            # SunPath ist in mintime gesetzt
+      my ($riseshift, $setshift) = sunShift   ($hash, $c);
+      my $tdiff                  = (CurrentVal ($hash, 'sunsetTodayTs',  0) + $setshift) - 
+                                   (CurrentVal ($hash, 'sunriseTodayTs', 0) + $riseshift);
+      $mintime                   = $tdiff / 60;
+  }
+  
+  my $hours   = ceil ($mintime / 60);                                                          # Einplanungsdauer in h
   my $ctote   = ConsumerVal ($hash, $c, "avgenergy", undef);                                   # gemessener durchschnittlicher Energieverbrauch pro Stunde (Wh)
   $ctote      = $ctote ?
                 $ctote :
@@ -4895,17 +4924,32 @@ sub __planSwitchTimes {
 
   my $mode     = ConsumerVal ($hash, $c, "mode",          "can");
   my $calias   = ConsumerVal ($hash, $c, "alias",            "");
-  my $mintime  = ConsumerVal ($hash, $c, "mintime", $defmintime);
-  my $stopdiff = ceil($mintime / 60) * 3600;
+  my $mintime  = ConsumerVal ($hash, $c, "mintime", $defmintime);                                      # Einplanungsdauer
+  
+  if($debug =~ /consumerPlanning/x) {                                                            
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - mode: $mode, mintime: $mintime, relevant method: surplus});
+  }
+      
+  if (isSunPath ($hash, $c)) {                                                                         # SunPath ist in mintime gesetzt
+      my ($riseshift, $setshift) = sunShift   ($hash, $c);
+      my $tdiff                  = (CurrentVal ($hash, 'sunsetTodayTs',  0) + $setshift) -
+                                   (CurrentVal ($hash, 'sunriseTodayTs', 0) + $riseshift);
+      $mintime                   = $tdiff / 60;
+      
+      if($debug =~ /consumerPlanning/x) {                                                            
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Sunrise is shifted by >}.($riseshift / 60).'< minutes');
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Sunset is shifted by >}. ($setshift /  60).'< minutes');
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - mintime calculated: }.$mintime.' minutes');
+      }
+  }
 
+  my $stopdiff       = $mintime * 60;
   $paref->{maxref}   = \%max;
   $paref->{mintime}  = $mintime;
   $paref->{stopdiff} = $stopdiff;
 
   if($mode eq "can") {                                                                                 # Verbraucher kann geplant werden
       if($debug =~ /consumerPlanning/x) {                                                            
-          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - mode: $mode, mintime: $mintime, relevant method: surplus});
-          
           for my $m (sort{$a<=>$b} keys %mtimes) {
               Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - surplus expected: $mtimes{$m}{spexp}, }.
                               qq{starttime: }.$mtimes{$m}{starttime}.", ".
@@ -4916,9 +4960,9 @@ sub __planSwitchTimes {
       for my $ts (sort{$a<=>$b} keys %mtimes) {
           if($mtimes{$ts}{spexp} >= $epiece1) {                                                        # die früheste Startzeit sofern Überschuß größer als Bedarf
               my $starttime       = $mtimes{$ts}{starttime};
+              
               $paref->{starttime} = $starttime;
               $starttime          = ___switchonTimelimits ($paref);
-
               delete $paref->{starttime};
 
               my $startts       = timestringToTimestamp ($starttime);                                  # Unix Timestamp für geplanten Switch on
@@ -4946,9 +4990,7 @@ sub __planSwitchTimes {
       }
   }
   else {                                                                                               # Verbraucher _muß_ geplant werden
-      if($debug =~ /consumerPlanning/x) {                                                                                 
-          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - mode: $mode, mintime: $mintime, relevant method: max});
-          
+      if($debug =~ /consumerPlanning/x) {                                                                                           
           for my $o (sort{$a<=>$b} keys %max) {
               Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - surplus: $max{$o}{spexp}, }.
                               qq{starttime: }.$max{$o}{starttime}.", ".
@@ -5108,7 +5150,7 @@ sub ___planMust {
   my $lang     = $paref->{lang};
 
   my $maxts                    = timestringToTimestamp ($maxref->{$elem}{starttime});                 # Unix Timestamp des max. Überschusses heute
-  my $half                     = floor ($mintime / 2 / 60);                                           # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren
+  my $half                     = floor ($mintime / 2 / 60);                                           # die halbe Gesamtplanungsdauer in h als Vorlaufzeit einkalkulieren
   my $startts                  = $maxts - ($half * 3600);
   my $starttime                = (timestampToTimestring ($startts, $lang))[3];
 
@@ -5142,7 +5184,20 @@ sub ___switchonTimelimits {
   my $hash      = $paref->{hash};
   my $name      = $paref->{name};
   my $c         = $paref->{consumer};
+  my $debug     = $paref->{debug};
+  my $date      = $paref->{date};
   my $starttime = $paref->{starttime};
+  my $lang      = $paref->{lang};
+  
+  if (isSunPath ($hash, $c)) {                                                        # SunPath ist in mintime gesetzt
+      my ($riseshift, $setshift) = sunShift   ($hash, $c);
+      my $startts                = CurrentVal ($hash, 'sunriseTodayTs', 0) + $riseshift;
+      $starttime                 = (timestampToTimestring ($startts, $lang))[3];
+      
+      if($debug =~ /consumerPlanning/x) {                                                            
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - starttime is set to >$starttime< due to >SunPath< is used});
+      }
+  }
 
   my $origtime    = $starttime;
   my $notbefore   = ConsumerVal ($hash, $c, "notbefore", 0);
@@ -5164,9 +5219,9 @@ sub ___switchonTimelimits {
   $starthour = sprintf("%02d", $starthour);
   $starttime =~ s/\s(\d{2}):/ $starthour:/x;
 
-  if($change) {
+  if ($change) {
       my $cname = ConsumerVal ($hash, $c, "name", "");
-      Log3 ($name, 3, qq{$name - Planned starttime "$cname" changed from "$origtime" to "$starttime" due to $change condition});
+      Log3 ($name, 3, qq{$name - Planned starttime of "$cname" changed from "$origtime" to "$starttime" due to $change condition});
   }
 
 return $starttime;
@@ -5334,7 +5389,7 @@ sub ___switchConsumerOn {
       }
       elsif ($mode eq "must" || isConsRcmd($hash, $c)) {                                          # "Muss"-Planung oder Überschuß > Leistungsaufnahme
           CommandSet(undef,"$cname $oncom");
-          my $stopdiff = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
+          #my $stopdiff = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
 
           $paref->{ps} = "switching on:";
 
@@ -5463,11 +5518,19 @@ sub ___setConsumerSwitchingState {
   my $state = $paref->{state};
 
   my $pstate = simplifyCstate (ConsumerVal ($hash, $c, "planstate", ""));
-  my $calias = ConsumerVal    ($hash, $c, "alias", "");                                      # Consumer Device Alias
+  my $calias = ConsumerVal    ($hash, $c, "alias", "");                                            # Consumer Device Alias
   my $auto   = ConsumerVal    ($hash, $c, "auto",   1);
 
   if ($pstate eq 'starting' && isConsumerPhysOn ($hash, $c)) {
-      my $stopdiff      = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
+      my $mintime = ConsumerVal ($hash, $c, "mintime", $defmintime);
+      
+      if (isSunPath ($hash, $c)) {                                                                 # SunPath ist in mintime gesetzt
+          my (undef, $setshift) = sunShift   ($hash, $c);
+          $mintime              = (CurrentVal ($hash, 'sunsetTodayTs', 0) + $setshift) - $t;
+          $mintime             /= 60;
+      }
+  
+      my $stopdiff      = $mintime * 60;
 
       $paref->{ps}      = "switched on:";
       $paref->{startts} = $t;
@@ -5481,7 +5544,7 @@ sub ___setConsumerSwitchingState {
 
       $state = qq{Consumer '$calias' switched on};
 
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                      # Cache File Consumer schreiben
 
       Log3 ($name, 2, "$name - $state");
   }
@@ -6350,9 +6413,23 @@ sub collectAllRegConsumers {
           $interruptable         = $hc->{interruptable};
           ($interruptable,$hyst) = $interruptable =~ /(.*):(.*)$/xs if($interruptable ne '1');
       }
+      
+      delete $data{$type}{$name}{consumers}{$c}{sunriseshift};
+      delete $data{$type}{$name}{consumers}{$c}{sunsetshift};
+      my ($riseshift, $setshift);
+      
+      if (exists $hc->{mintime}) {                                                                # Check Regex
+          my $mintime = $hc->{mintime};
+          
+          if ($mintime =~ /^SunPath/xsi) {
+              (undef, $riseshift, $setshift) = split ":", $mintime, 3;
+              $riseshift *= 60 if($riseshift);
+              $setshift  *= 60 if($setshift);
+          }
+      }
 
-      my $rauto     = $hc->{auto}     // q{};
-      my $ctype     = $hc->{type}     // $defctype;
+      my $rauto     = $hc->{auto} // q{};
+      my $ctype     = $hc->{type} // $defctype;
       my $auto      = 1;
       $auto         = ReadingsVal ($consumer, $rauto, 1) if($rauto);                               # Reading für Ready-Bit -> Einschalten möglich ?
 
@@ -6361,7 +6438,7 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{type}            = $hc->{type}      // $defctype;         # Typ des Verbrauchers
       $data{$type}{$name}{consumers}{$c}{power}           = $hc->{power};                          # Leistungsaufnahme des Verbrauchers in W
       $data{$type}{$name}{consumers}{$c}{avgenergy}       = q{};                                   # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
-      $data{$type}{$name}{consumers}{$c}{mintime}         = $hc->{mintime}   // $hef{$ctype}{mt};  # Initialwert min. Einschalt- bzw. Zykluszeit (evtl. Überschreiben in manageConsumerData)
+      $data{$type}{$name}{consumers}{$c}{mintime}         = $hc->{mintime}   // $hef{$ctype}{mt};  # Initialwert min. Einplanungsdauer (evtl. Überschreiben in manageConsumerData)
       $data{$type}{$name}{consumers}{$c}{mode}            = $hc->{mode}      // $defcmode;         # Planungsmode des Verbrauchers
       $data{$type}{$name}{consumers}{$c}{icon}            = $hc->{icon}      // q{};               # Icon für den Verbraucher
       $data{$type}{$name}{consumers}{$c}{oncom}           = $hc->{on}        // q{};               # Setter Einschaltkommando
@@ -6387,6 +6464,8 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{swoffcondregex}  = $swoffcondregex  // q{};               # Regex einer vorrangigen Ausschaltbedingung
       $data{$type}{$name}{consumers}{$c}{interruptable}   = $interruptable;                        # Ein-Zustand des Verbrauchers ist unterbrechbar
       $data{$type}{$name}{consumers}{$c}{hysteresis}      = $hyst            // $defhyst;          # Hysterese
+      $data{$type}{$name}{consumers}{$c}{sunriseshift}    = $riseshift if(defined $riseshift);     # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
+      $data{$type}{$name}{consumers}{$c}{sunsetshift}     = $setshift  if(defined $setshift);      # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
   }
 
   # Log3 ($name, 5, "$name - all registered consumers:\n".Dumper $data{$type}{$name}{consumers});
@@ -10316,6 +10395,47 @@ sub isSolCastUsed {
 return $ret;
 }
 
+################################################################
+#  liefert Status ob SunPath in mintime gesetzt ist
+################################################################
+sub isSunPath {
+  my $hash = shift;
+  my $c    = shift;
+  
+  my $is      = 0;
+  my $mintime = ConsumerVal ($hash, $c, 'mintime', $defmintime);
+  
+  if ($mintime =~ /SunPath/xsi) {
+      $is = 1;
+      
+      my $sunset  = CurrentVal ($hash, 'sunsetTodayTs',  1);
+      my $sunrise = CurrentVal ($hash, 'sunriseTodayTs', 5);
+      
+      if ($sunrise > $sunset) {
+          $is      = 0;
+          my $name = $hash->{NAME};
+          
+          Log3($name, 1, qq{$name - ERROR - consumer >$c< use >mintime=SunPath< but readings >Today_SunRise< / >Today_SunSet< are not set properly.});
+      }
+  }
+
+return $is;
+}
+
+################################################################
+#  Verschiebung von Sonnenaufgang / Sonnenuntergang
+#  bei Verwendung von mintime = SunPath
+################################################################
+sub sunShift {                          
+  my $hash = shift;
+  my $c    = shift;
+
+  my $riseshift = ConsumerVal ($hash, $c, 'sunriseshift', 0);                  # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
+  my $setshift  = ConsumerVal ($hash, $c, 'sunsetshift',  0);                  # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
+
+
+return ($riseshift, $setshift);
+}
 
 ################################################################
 #  liefert die Zeit des letzten Schaltvorganges
@@ -10576,11 +10696,13 @@ return $def;
 #       tomorrowconsumption  - erwarteter Gesamtverbrauch am morgigen Tag
 #       sunriseToday         - Sonnenaufgang heute
 #       sunriseTodayTs       - Sonnenaufgang heute Unix Timestamp
+#       sunsetToday          - Sonnenuntergang heute
+#       sunsetTodayTs        - Sonnenuntergang heute Unix Timestamp
 #
 # $def: Defaultwert
 #
 ###################################################################################################
-sub CurrentVal {
+sub CurrentVal {                   
   my $hash = shift;
   my $key  = shift;
   my $def  = shift;
@@ -10608,7 +10730,7 @@ return $def;
 #       power           - nominale Leistungsaufnahme des Verbrauchers in W
 #       mode            - Planungsmode des Verbrauchers
 #       icon            - Icon für den Verbraucher
-#       mintime         - min. Einschalt- bzw. Zykluszeit
+#       mintime         - min. Einplanungsdauer
 #       onreg           - Regex für phys. Zustand "ein"
 #       offreg          - Regex für phys. Zustand "aus"
 #       oncom           - Einschaltkommando
@@ -10633,6 +10755,9 @@ return $def;
 #       isIntimeframe   - ist Zeit innerhalb der Planzeit ein/aus
 #       interruptable   - Consumer "on" ist während geplanter "ein"-Zeit unterbrechbar
 #       hysteresis      - Hysterese
+#       sunriseshift    - Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
+#       sunsetshift     - Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
+#
 # $def: Defaultwert
 #
 ####################################################################################################################
@@ -11661,7 +11786,8 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
        <br>
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] <br>
+       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt;  <br>
+                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]] <br>
                          [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] <br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] <br>
                          [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [interruptable=&lt;Option&gt] </b><br><br>
@@ -11714,14 +11840,21 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td>                       </td><td><b>must</b> - der Verbaucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird                </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß.            </td></tr>
             <tr><td> <b>icon</b>           </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                                       </td></tr>
-            <tr><td> <b>mintime</b>        </td><td>Mindestlaufzeit bzw. typische Laufzeit des Verbrauchers nach dem initialen Einschalten in Minuten  (optional)                                  </td></tr>
-            <tr><td>                       </td><td>Die Standard mintime richtet sich nach dem Verbrauchertyp, ist aber mindestens <b>60 Minuten</b>.                                              </td></tr>
-            <tr><td>                       </td><td>Default pro Verbrauchertyp:                                                                                                                    </td></tr>
+            <tr><td> <b>mintime</b>        </td><td>Einplanungsdauer (Minuten oder "SunPath") des Verbrauchers. (optional)                                                                         </td></tr>
+            <tr><td>                       </td><td>Mit der Angabe von <b>SunPath</b> erfolgt die Plaung entsprechend des Sonnenauf- und untergangs.                                               </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
+            <tr><td>                       </td><td><b>SunPath</b>[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;] - die Einplanung erfolgt von Sonnenaufgang bis Sonnenuntergang.                  </td></tr>
+            <tr><td>                       </td><td> Optional kann eine positive / negative Verschiebung (Minuten) der Planungszeit bzgl. Sonnenaufgang bzw. Sonnenuntergang angegeben werden.     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
+            <tr><td>                       </td><td>Ist mintime nicht angegeben, wird eine Standard Einplanungsdauer gemaäß nachfolgender Tabelle verwendet.                                       </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
+            <tr><td>                       </td><td><b>Default mintime nach Verbrauchertyp:</b>                                                                                                    </td></tr>
             <tr><td>                       </td><td>- dishwasher: 180 Minuten                                                                                                                      </td></tr>
             <tr><td>                       </td><td>- dryer: 90 Minuten                                                                                                                            </td></tr>
             <tr><td>                       </td><td>- washingmachine: 120 Minuten                                                                                                                  </td></tr>
             <tr><td>                       </td><td>- heater: 240 Minuten                                                                                                                          </td></tr>
             <tr><td>                       </td><td>- charger: 120 Minuten                                                                                                                         </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>on</b>             </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                                       </td></tr>
             <tr><td> <b>off</b>            </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                                       </td></tr>
             <tr><td> <b>swstate</b>        </td><td>Reading welches den Schaltzustand des Consumers anzeigt (default: 'state').                                                                    </td></tr>
@@ -11762,6 +11895,7 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
          <b>attr &lt;name&gt; consumer02</b> WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12 auto=automatic                     <br>
          <b>attr &lt;name&gt; consumer03</b> Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:-?([1-7][0-9]|[0-9]) swoffcond:EcoFlow:data_data_socSum:100 <br>
          <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
+         <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                          <br>
        </ul>
        </li>
        <br>
