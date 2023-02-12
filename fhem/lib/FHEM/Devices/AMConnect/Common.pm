@@ -377,7 +377,6 @@ sub FW_detailFn {
     my $design = AttrVal( $name, 'mapDesignAttributes', $hash->{helper}{mapdesign} );
     my @adesign = split(/\R/,$design);
     my $mapDesign = 'data-'.join("data-",@adesign);
-    Log3 $name,1 , $mapDesign;
     my ($picx,$picy) = AttrVal( $name,"mapImageWidthHeight", $hash->{helper}{imageWidthHeight} ) =~ /(\d+)\s(\d+)/;
     
     $picx=int($picx*$zoom);
