@@ -48,7 +48,7 @@ sub FW_showRoom();
 sub FW_style($$);
 sub FW_submit($$@);
 sub FW_textfield($$$);
-sub FW_textfieldv($$$$);
+sub FW_textfieldv($$$$;$);
 sub FW_updateHashes();
 sub FW_visibleDevices(;$);
 sub FW_widgetOverride($$;$);
@@ -2395,11 +2395,12 @@ FW_select($$$$$@)
 
 ##################
 sub
-FW_textfieldv($$$$)
+FW_textfieldv($$$$;$)
 {
-  my ($n, $z, $class, $value) = @_;
+  my ($n, $z, $class, $value, $place) = @_;
   my $v;
-  $v=" value='$value'" if(defined($value));
+  $v.=" value='$value'" if(defined($value));
+  $v.=" placeholder='$place'" if(defined($place));
   return if($FW_hiddenroom{input});
   my $s = "<input type='text' name='$n' class='$class' size='$z'$v ".
             "autocorrect='off' autocapitalize='off'/>";
@@ -4799,7 +4800,7 @@ FW_log($$)
         </ul>
         Zweite Variante:<br>
         <ul>
-        Perl regexp eingeschlossen in {}. Wenn der Code undef
+        Perl Ausdruck eingeschlossen in {}. Wenn der Code undef
         zur&uuml;ckliefert, wird das Standard Icon verwendet; wird ein String
         in <> zur&uuml;ck geliefert, wird dieser als HTML String interpretiert.
         Andernfalls wird der String als devStateIcon gem&auml;&szlig; der

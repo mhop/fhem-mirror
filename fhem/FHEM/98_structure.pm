@@ -786,7 +786,7 @@ structure_Attr($@)
 
     <a id="structure-attr-filterEvents"></a>
     <li>filterEvents<br>
-      if set, and the device triggering the event has a struct_type map, the
+      if set, and the device triggering the event has a struct_type map, then
       only events (i.e. reading names) contained in the structure map will
       trigger the structure. Note: only the readingName and
       readingName:oldVal:newVal entries of the struct_type map are considered.
