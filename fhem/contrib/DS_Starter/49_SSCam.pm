@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 27053 2023-01-14 13:00:46Z DS_Starter $
+# $Id: 49_SSCam.pm 27103 2023-02-13 17:50:30Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -62,6 +62,7 @@ use FHEM::SynoModules::SMUtils qw(
                                   delCallParts
                                   setReadingErrorNone
                                   setReadingErrorState
+                                  timestampToDateTime
                                  );                                                # Hilfsroutinen Modul
 use Data::Dumper;                                                                
 use MIME::Base64;
@@ -185,6 +186,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.11.0" => "13.02.2023  Telegram send attributes extended by key option => silent ",
   "9.10.9" => "22.01.2023  substitution of \$#TIME corrected ",
   "9.10.8" => "14.01.2023  add blank line in setter runView, goPreset, runPatrol ",
   "9.10.7" => "02.08.2022  allow placeholders #CAM, #DATE, #TIME, #FILE, #CTIME (also for Email) ",
@@ -1785,6 +1787,7 @@ return;
 ################################################################
 sub _setsnap {                           ## no critic "not used"
   my $paref = shift;
+  
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $prop  = $paref->{prop}  // q{};
@@ -1811,7 +1814,7 @@ sub _setsnap {                           ## no critic "not used"
       ($hash->{HELPER}{INFORM}) = $spec =~ m/STRM:(.*)/xi;          # Snap by SSCamSTRM-Device
   } 
    
-  my $emtxt = AttrVal($name, "snapEmailTxt", "");
+  my $emtxt = AttrVal ($name, "snapEmailTxt", "");
   if($spec =~ /snapEmailTxt:/x) {
       ($emtxt) = $spec =~ m/snapEmailTxt:"(.*)"/xi;
   }
@@ -1823,7 +1826,7 @@ sub _setsnap {                           ## no critic "not used"
       $hash->{HELPER}{SMTPMSG} = $emtxt;
   }
   
-  my $teletxt = AttrVal($name, "snapTelegramTxt", "");
+  my $teletxt = AttrVal ($name, "snapTelegramTxt", "");
   if($spec =~ /snapTelegramTxt:/x) {
       ($teletxt) = $spec =~ m/snapTelegramTxt:"(.*)"/xi;
   }
@@ -1832,7 +1835,7 @@ sub _setsnap {                           ## no critic "not used"
       $hash->{HELPER}{TELEMSG} = $teletxt;
   }
   
-  my $chattxt = AttrVal($name, "snapChatTxt", "");
+  my $chattxt = AttrVal ($name, "snapChatTxt", "");
   if($spec =~ /snapChatTxt:/x) {
       ($chattxt) = $spec =~ m/snapChatTxt:"(.*)"/xi;
   }
@@ -1899,8 +1902,8 @@ sub _setsnapCams {                       ## no critic "not used"
   
   my $emtxt;
   my $teletxt = "";
-  my $rawet   = AttrVal($name, "snapEmailTxt", "");
-  my $bt      = join " ",@$aref;
+  my $rawet   = AttrVal ($name, "snapEmailTxt", "");
+  my $bt      = join " ", @$aref;
   
   if($bt =~ /snapEmailTxt:/x) {
       ($rawet) = $bt =~ m/snapEmailTxt:"(.*)"/xi;
@@ -1914,13 +1917,13 @@ sub _setsnapCams {                       ## no critic "not used"
   my ($csnap,$cmail) = ("","");
   
   for my $key (keys%{$hash->{HELPER}{ALLSNAPREF}}) {
-      if(!AttrVal($key, "snapEmailTxt", "")) {
+      if(!AttrVal ($key, "snapEmailTxt", "")) {
           delete $hash->{HELPER}{ALLSNAPREF}->{$key};                  # Snap dieser Kamera auslösen aber nicht senden
-          $csnap .= $csnap?", $key":$key;
+          $csnap .= $csnap ? ", $key" : $key;
           $emtxt  = "";
       } 
       else {
-          $cmail .= $cmail?", $key":$key;
+          $cmail .= $cmail ? ", $key" : $key;
           $emtxt  = $rawet;
       }
       __camSnap("$key!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt");
@@ -4151,7 +4154,7 @@ sub Get {
                     ;
     } 
     else {                                                                           # getlist für SVS Devices
-        $getlist .= ($hash->{HELPER}{API}{HMODE}{VER}?"homeModeState:noArg ": "").
+        $getlist .= ($hash->{HELPER}{API}{HMODE}{VER} ? "homeModeState:noArg " : "").
                     "listLog "
                     ;
     }
@@ -6284,26 +6287,16 @@ sub _parsegethomemodestate {                            ## no critic "not used"
   my $name  = $paref->{name};
   my $data  = $paref->{data};
          
-  my $lang    = AttrVal('global', 'language', 'EN');
   my $hmst    = $data->{'data'}{'on'}; 
   my $hmststr = $hmst == 1 ? "on" : "off";
   
-  my $update_time;
-
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-  
-  if($lang eq "DE") {
-      $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
-  } 
-  else {
-      $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
-  }               
+  my ($date, $time) = timestampToDateTime ();  
 
   readingsBeginUpdate ($hash);
-  readingsBulkUpdate  ($hash, "HomeModeState",  $hmststr     );
-  readingsBulkUpdate  ($hash, "LastUpdateTime", $update_time );
-  readingsBulkUpdate  ($hash, "Errorcode",      "none"       );
-  readingsBulkUpdate  ($hash, "Error",          "none"       );
+  readingsBulkUpdate  ($hash, "HomeModeState",  $hmststr          );
+  readingsBulkUpdate  ($hash, "LastUpdateTime", $date.' / '.$time );
+  readingsBulkUpdate  ($hash, "Errorcode",      "none"            );
+  readingsBulkUpdate  ($hash, "Error",          "none"            );
   readingsEndUpdate   ($hash, 1);
                 
 return;
@@ -6681,27 +6674,16 @@ sub _parseGetcaminfo {                                  ## no critic "not used"
   my $verbose = $paref->{verbose};
   my $camname = $paref->{camname};
   
-  my $lang    = AttrVal("global","language","EN");
-  
-  my $update_time;
-  
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+  my ($date, $time) = timestampToDateTime ();
 
-  if($lang eq "DE") {
-      $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
-  } 
-  else {
-      $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
-  }
+  my $camLiveMode   = $data->{'data'}->{'cameras'}->[0]->{'camLiveMode'};              
+  $camLiveMode      = $hrkeys{camLiveMode}{$camLiveMode};
 
-  my $camLiveMode = $data->{'data'}->{'cameras'}->[0]->{'camLiveMode'};              
-  $camLiveMode    = $hrkeys{camLiveMode}{$camLiveMode};
+  my $deviceType    = $data->{'data'}->{'cameras'}->[0]->{'deviceType'};                
+  $deviceType       = $hrkeys{deviceType}{$deviceType};
 
-  my $deviceType  = $data->{'data'}->{'cameras'}->[0]->{'deviceType'};                
-  $deviceType     = $hrkeys{deviceType}{$deviceType};
-
-  my $camStatus   = jboolmap($data->{'data'}->{'cameras'}->[0]->{'camStatus'});                
-  $camStatus      = $hrkeys{camStatus}{$camStatus};
+  my $camStatus     = jboolmap($data->{'data'}->{'cameras'}->[0]->{'camStatus'});                
+  $camStatus        = $hrkeys{camStatus}{$camStatus};
 
   if ($camStatus eq "enabled") {                                   
       if (ReadingsVal("$name", "Record", "Stop") eq "Start") {                 # falls Aufnahme noch läuft -> STATE = on setzen
@@ -6772,7 +6754,7 @@ sub _parseGetcaminfo {                                  ## no critic "not used"
   readingsBulkUpdate($hash, "CapPIR",             $pdcap);
   readingsBulkUpdate($hash, "Availability",       $camStatus);
   readingsBulkUpdate($hash, "DeviceType",         $deviceType);
-  readingsBulkUpdate($hash, "LastUpdateTime",     $update_time);
+  readingsBulkUpdate($hash, "LastUpdateTime",     $date.' / '.$time);
   readingsBulkUpdate($hash, "Record",             $recStatus);
   readingsBulkUpdate($hash, "UsedSpaceMB",        $data->{'data'}{'cameras'}[0]{'volume_space'});
   readingsBulkUpdate($hash, "VideoFolder",        AttrVal($name, "videofolderMap", $data->{'data'}{'cameras'}[0]{'folder'}));
@@ -7013,8 +6995,6 @@ sub _parsegeteventlist {                                ## no critic "not used"
   my $verbose = $paref->{verbose};
   my $camname = $paref->{camname};
   
-  my $lang      = AttrVal("global","language","EN"); 
-  
   my $eventnum  = $data->{'data'}{'total'};
   my $lrec      = $data->{'data'}{'events'}[0]{name};
   my $lrecid    = $data->{'data'}{'events'}[0]{'eventId'}; 
@@ -7022,19 +7002,13 @@ sub _parsegeteventlist {                                ## no critic "not used"
   my ($lastrecstarttime,$lastrecstoptime);
 
   if ($eventnum > 0) {
-      $lastrecstarttime = $data->{'data'}{'events'}[0]{startTime};
-      my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstarttime);
+      $lastrecstarttime = $data->{'data'}{'events'}[0]{startTime};      
+      my ($date, $time) = timestampToDateTime ($lastrecstarttime);
+      $lastrecstarttime = $date.' / '.$time;
       
-      if($lang eq "DE") {
-          $lastrecstarttime = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
-      } 
-      else {
-          $lastrecstarttime = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
-      }
-      
-      $lastrecstoptime                                      = $data->{'data'}{'events'}[0]{stopTime};
-      ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstoptime);
-      $lastrecstoptime                                      = sprintf "%02d:%02d:%02d" , $hour , $min , $sec ;
+      $lastrecstoptime = $data->{'data'}{'events'}[0]{stopTime};      
+      ($date, $time)   = timestampToDateTime ($lastrecstoptime);
+      $lastrecstoptime = $time;
   }
 
   readingsBeginUpdate ($hash);
@@ -9509,30 +9483,27 @@ sub prepareSendData {
            $dat = $data{SSCam}{RS};                                # Referenz zum summarischen Hash einsetzen
        } 
        else {
-           cache($name, "c_clear"); 
+           cache ($name, 'c_clear'); 
+           
            for my $key (keys%{$asref}) {
                cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{createdTm}", delete $asref->{$key}{createdTm});
                cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{imageData}", delete $asref->{$key}{imageData});
                cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{fileName}",  delete $asref->{$key}{fileName});  
            }
+           
            $dat = "{RS}{multiple_snapsend}";                       # Referenz zum summarischen Hash einsetzen           
        }
        
-       $calias = AttrVal($name,"alias",$hash->{NAME});             # Alias des SVS-Devices 
-       $hash->{HELPER}{TRANSACTION} = "multiple_snapsend";         # fake Transaction im SVS Device setzen 
+       $calias = AttrVal ($name, 'alias', $hash->{NAME});          # Alias des SVS-Devices 
+       $hash->{HELPER}{TRANSACTION} = 'multiple_snapsend';         # fake Transaction im SVS Device setzen 
        last;                                                       # Schleife verlassen und mit Senden weiter
    }
    
-   my $sp       = AttrVal($name, "smtpPort", 25); 
-   my $nousessl = AttrVal($name, "smtpNoUseSSL", 0); 
-   
-   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-   
-   my $date     = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
-   my $time     = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;   
-   
-   my $sslfrominit = 0;
-   my $smtpsslport = 465;
+   my $sp            = AttrVal ($name, 'smtpPort',    25); 
+   my $nousessl      = AttrVal ($name, 'smtpNoUseSSL', 0);  
+   my ($date, $time) = timestampToDateTime ();
+   my $sslfrominit   = 0;
+   my $smtpsslport   = 465;
    
    if(AttrVal($name,"smtpSSLPort",0)) {
        $sslfrominit = 1;
@@ -9619,14 +9590,16 @@ sub prepareSendData {
    }
 
    ### Schnappschüsse mit Telegram versenden
-   #########################################
+   # snapTelegramTxt aus $hash->{HELPER}{TELEMSG}
+   #
+   # Format in $hash->{HELPER}{TELEMSG} muss sein: 
+   # tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
+   ################################################################################################
    if($OpMode =~ /^getsnap/x && $hash->{HELPER}{CANTELESNAP}) {     
-       # snapTelegramTxt aus $hash->{HELPER}{TELEMSG}
-       # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
        delete $hash->{HELPER}{CANTELESNAP};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
        
-       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       Log3 ($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        
        my $mt = delete $hash->{HELPER}{TELEMSG};
        
@@ -9646,7 +9619,8 @@ sub prepareSendData {
                                     'opmode'      => $OpMode,
                                     'tac'         => $tac, 
                                     'telebot'     => $telemsg->{tbot}, 
-                                    'peers'       => $telemsg->{peers},                                      
+                                    'peers'       => $telemsg->{peers},
+                                    'option'      => $telemsg->{option},         # Versandoptionen                                   
                                     'MediaStream' => '-1',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
                                    }
                            );
@@ -9655,10 +9629,12 @@ sub prepareSendData {
    }
 
    ### Aufnahmen mit Telegram versenden
-   ####################################
+   # recTelegramTxt aus $hash->{HELPER}{TELERECMSG}
+   #
+   # Format in $hash->{HELPER}{TELEMSG} muss sein: 
+   # tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
+   #################################################################################################
    if($OpMode =~ /^GetRec/x && $hash->{HELPER}{CANTELEREC}) {   
-       # recTelegramTxt aus $hash->{HELPER}{TELERECMSG}
-       # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
        delete $hash->{HELPER}{CANTELEREC};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
        
@@ -9682,6 +9658,7 @@ sub prepareSendData {
                                      'opmode'      => $OpMode, 
                                      'telebot'     => $telemsg->{tbot}, 
                                      'peers'       => $telemsg->{peers},
+                                     'option'      => $telemsg->{option},          # Versandoptionen
                                      'tac'         => $tac,                                         
                                      'MediaStream' => '-30',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
                                     }
@@ -9691,10 +9668,11 @@ sub prepareSendData {
    }
    
    ### Schnappschüsse mit Synology Chat versenden
-   ##############################################
+   # snapChatTxt aus $hash->{HELPER}{CHATMSG}
+   # Format in $hash->{HELPER}{CHATMSG} muss sein: snapChatTxt:"chatbot => <SSChatBot Device>, 
+   #           peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
+   #############################################################################################
    if($OpMode =~ /^getsnap/x && $hash->{HELPER}{CANCHATSNAP}) {     
-       # snapChatTxt aus $hash->{HELPER}{CHATMSG}
-       # Format in $hash->{HELPER}{CHATMSG} muss sein: snapChatTxt:"chatbot => <SSChatBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
        delete $hash->{HELPER}{CANCHATSNAP};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
        
@@ -9725,10 +9703,11 @@ sub prepareSendData {
    }
    
    ### Aufnahmen mit Synology Chat versenden
-   #########################################
+   # recChatTxt aus $hash->{HELPER}{CHATRECMSG}
+   # Format in $hash->{HELPER}{CHATRECMSG} muss sein: chatbot => <SSChatBot Device>, 
+   #           peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
+   ###################################################################################
    if($OpMode =~ /^GetRec/x && $hash->{HELPER}{CANCHATREC}) {   
-       # recChatTxt aus $hash->{HELPER}{CHATRECMSG}
-       # Format in $hash->{HELPER}{CHATRECMSG} muss sein: chatbot => <SSChatBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
        delete $hash->{HELPER}{CANCHATREC};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
        
@@ -10096,14 +10075,16 @@ sub _prepSendTelegram {
    my $time   = $paref->{time};
    my $name   = $hash->{NAME};
 
-   my ($tbott,$peert,$subjt);
+   my ($tbott,$peert,$subjt,$optt);
    
-   $mt    =~ s/['"]//gx;
+   $mt =~ s/['"]//gx;
    
-   my ($telebot,$peers,$subj) =  split(",",  $mt, 3  );
-   $tbott                     = (split("=>", $telebot))[1] if($telebot);
-   $peert                     = (split("=>", $peers  ))[1] if($peers);
-   $subjt                     = (split("=>", $subj   ))[1] if($subj);
+   my ($telebot, $peers, $subj, $opt) =  split ",",  $mt, 4;
+   
+   $tbott = (split "=>", $telebot)[1] if($telebot);
+   $peert = (split "=>", $peers  )[1] if($peers);
+   $subjt = (split "=>", $subj   )[1] if($subj);
+   $optt  = (split "=>", $opt    )[1] if($opt);
 
    $tbott = trim($tbott) if($tbott);
    $peert = trim($peert) if($peert);
@@ -10119,6 +10100,7 @@ sub _prepSendTelegram {
    $telemsg{tbot}    = "$tbott" if($tbott);
    $telemsg{peers}   = "$peert" if($peert);
    $telemsg{subject} = "$subjt" if($subjt);
+   $telemsg{option}  = "$optt"  if($optt);
    
 return \%telemsg;
 }
@@ -10150,11 +10132,12 @@ sub _sendTelegram {
        'vdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Hashref der Videodaten
        'telebot'      => {                       'default'=>'',                          'required'=>1, 'set'=>1},  # TelegramBot-Device welches zum Senden verwendet werden soll
        'peers'        => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # TelegramBot Peers
+       'option'       => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # TelegramBot Sendeoptionen
        'MediaStream'  => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Code für MediaStream im TelegramBot (png/jpg = -1)
    );   
    
    my $tac = $extparamref->{tac};
-   
+      
    for my $key (keys %teleparams) {
        $data{SSCam}{$name}{PARAMS}{$tac}{$key} = AttrVal($name, $teleparams{$key}->{attr}, $teleparams{$key}->{default}) 
                                                    if(exists $teleparams{$key}->{attr}); 
@@ -10163,8 +10146,8 @@ sub _sendTelegram {
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key}  if(exists $extparamref->{$key});
        }
  
-       Log3($name, 4, "$name - param $key is set to \"".($data{SSCam}{$name}{PARAMS}{$tac}{$key} // "")."\" ") if($key !~ /[sv]dat/x);
-       Log3($name, 4, "$name - param $key is set")                                                             if($key =~ /[sv]dat/x && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
+       Log3 ($name, 4, "$name - param $key is set to \"".($data{SSCam}{$name}{PARAMS}{$tac}{$key} // "")."\" ") if($key !~ /[sv]dat/x);
+       Log3 ($name, 4, "$name - param $key is set")                                                             if($key =~ /[sv]dat/x && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
    }
    
    $data{SSCam}{$name}{PARAMS}{$tac}{name} = $name;
@@ -10173,12 +10156,16 @@ sub _sendTelegram {
    for my $key (keys(%teleparams)) {
        push(@err, $key) if ($teleparams{$key}->{required} && !$data{SSCam}{$name}{PARAMS}{$tac}{$key});
    }
+   
    if ($#err >= 0) {
        $ret = "Missing at least one required parameter or attribute: ".join(', ',@err);
-       Log3($name, 2, "$name - $ret");
-       readingsBeginUpdate($hash);
-       readingsBulkUpdate($hash,"sendTeleState",$ret);
-       readingsEndUpdate($hash, 1);
+       
+       Log3 ($name, 2, "$name - $ret");
+       
+       readingsBeginUpdate ($hash);
+       readingsBulkUpdate  ($hash, 'sendTeleState', $ret);
+       readingsEndUpdate   ($hash, 1);
+       
        $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
        return $ret;
    }
@@ -10188,18 +10175,25 @@ sub _sendTelegram {
    
    if(!$defs{$telebot}) {
        $ret = "No TelegramBot device \"$telebot\" available";
+       
        readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-       Log3($name, 2, "$name - $ret");
+       
+       Log3 ($name, 2, "$name - $ret");
+       
        $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
        return;
    }
   
    if(!$peers) {
        $peers = AttrVal($telebot,"defaultPeer", "");
+       
        if(!$peers) {
            $ret = "No peers of TelegramBot device \"$telebot\" found";
+       
            readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+    
            Log3($name, 2, "$name - $ret");
+       
            $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
            return;       
        }
@@ -10207,83 +10201,111 @@ sub _sendTelegram {
 
    if(!$data{SSCam}{$name}{PARAMS}{$tac}{sdat} && !$data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {
        $ret = "no video or image data existing for send process by TelegramBot \"$telebot\" ";
+       
        readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-       Log3($name, 2, "$name - $ret");
+       
+       Log3 ($name, 2, "$name - $ret");
+       
        $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
        return;   
    } 
+   
+   my $options = '';
+   my @opta    = split ' ', $data{SSCam}{$name}{PARAMS}{$tac}{option};
+   
+   if (@opta) {
+       
+       for my $o (@opta) {
+           $options .= " -$o-"
+       }
+       
+       $options .= ' ';
+   }  
                                     
-  my ($msg,$subject,$MediaStream,$fname,@as,%seen,@unique);
+   my ($msg,$subject,$MediaStream,$fname,@as,%seen,@unique);
   
-  $cache = cache($name, "c_init");                                                           # Cache initialisieren        
-  Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
+   $cache = cache($name, "c_init");                                                           # Cache initialisieren        
   
-  if(!$cache || $cache eq "internal" ) {
-      if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
-          @as = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{sdat}};
-      } elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
-          @as = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{vdat}};
-      }
-      for my $key (@as) {
-           ($msg,$subject,$MediaStream,$fname) = __extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
-           $ret = __TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
-           if($ret) {
-               readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-               Log3($name, 2, "$name - ERROR: $ret");
-           } 
-           else {
-               $ret = "Telegram message [$key] of transaction \"$tac\" sent to \"$peers\" by \"$telebot\" ";
-               readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-               Log3($name, 3, "$name - $ret");
-           }
-      }
-      $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
-      Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
-      
-  } 
-  else {
-      # alle Serial Numbers "{$sn}" der Transaktion ermitteln 
-      if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
-          extractTIDfromCache ( { name  => $name, 
-                                  tac   => $tac, 
-                                  media => "SENDSNAPS",
-                                  mode  => "serial",
-                                  aref  => \@as
-                                } 
-                              );
-      
-      } elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
-          extractTIDfromCache ( { name  => $name, 
-                                  tac   => $tac, 
-                                  media => "SENDRECS",
-                                  mode  => "serial",
-                                  aref  => \@as
-                                } 
-                              );         
-      }
-      
-      @unique = sort{$b<=>$a} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys
-      
-      for my $key (@unique) {
-           ($msg,$subject,$MediaStream,$fname) = __extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
-           $ret = __TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
-           if($ret) {
-               readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-               Log3($name, 2, "$name - ERROR: $ret");
-           } 
-           else {
-               $ret = "Telegram message [$key] of transaction \"$tac\" sent to \"$peers\" by \"$telebot\" ";
-               readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-               Log3($name, 3, "$name - $ret");
-           }
-      }      
-      $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
-      Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
-  }
+   Log3 ($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
   
-  undef %teleparams;
-  undef %{$extparamref};
-  undef $msg;
+   if(!$cache || $cache eq "internal" ) {
+       if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
+           @as = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{sdat}};
+       } 
+       elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                       # Aufnahmen liegen in einem Hash-Ref in $vdat vor
+           @as = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{vdat}};
+       }
+      
+       for my $key (@as) {
+            ($msg,$subject,$MediaStream,$fname) = __extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
+            $ret = __TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, $options);
+           
+            if($ret) {
+                readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+               
+                Log3 ($name, 2, "$name - ERROR: $ret");
+            } 
+            else {
+                $ret = "Telegram message [$key] of transaction \"$tac\" sent to \"$peers\" by \"$telebot\" ";
+                readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+               
+                Log3 ($name, 3, "$name - $ret");
+            }
+       }
+      
+       $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
+      
+       Log3 ($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+   } 
+   else {
+       # alle Serial Numbers "{$sn}" der Transaktion ermitteln 
+       if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
+           extractTIDfromCache ( { name  => $name, 
+                                   tac   => $tac, 
+                                   media => "SENDSNAPS",
+                                   mode  => "serial",
+                                   aref  => \@as
+                                 } 
+                               );
+       } 
+       elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                       # Aufnahmen liegen in einem Hash-Ref in $vdat vor
+           extractTIDfromCache ( { name  => $name, 
+                                   tac   => $tac, 
+                                   media => "SENDRECS",
+                                   mode  => "serial",
+                                   aref  => \@as
+                                 } 
+                               );         
+       }
+      
+       @unique = sort{$b<=>$a} grep { !$seen{$_}++ } @as;                                     # distinct / unique the keys
+      
+       for my $key (@unique) {
+            ($msg,$subject,$MediaStream,$fname) = __extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
+            $ret = __TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, $options);
+           
+            if($ret) {
+                readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+               
+                Log3 ($name, 2, "$name - ERROR: $ret");
+            } 
+            else {
+                $ret = "Telegram message [$key] of transaction \"$tac\" sent to \"$peers\" by \"$telebot\" ";
+               
+                readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+               
+                Log3 ($name, 3, "$name - $ret");
+            }
+       }      
+      
+       $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
+      
+       Log3 ($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+   }
+  
+   undef %teleparams;
+   undef %{$extparamref};
+   undef $msg;
   
 return;
 }
@@ -10655,18 +10677,20 @@ return (0,undef);
 ###############################################################################
 sub _prepSendMail { 
    my $paref  = shift;
+   
    my $hash   = $paref->{hash};
    my $calias = $paref->{calias};
    my $mt     = $paref->{mt};
    my $date   = $paref->{date};
    my $time   = $paref->{time};
+   
    my $name   = $hash->{NAME}; 
    
    $mt =~ s/['"]//gx;   
    
-   my($subj,$body) =  split ",", $mt, 2;
-   my $subjt       = (split "=>", $subj)[1];
-   my $bodyt       = (split "=>", $body)[1];
+   my ($subj,$body) =  split ",", $mt, 2;
+   my $subjt        = (split "=>", $subj)[1];
+   my $bodyt        = (split "=>", $body)[1];
    
    $subjt = trim($subjt);
    $subjt =~ s/[\$#]CAM/$calias/gx;
@@ -10738,9 +10762,9 @@ sub _sendEmail {
        return $ret;
    }
    
-   Log3($name, 4, "$name - version of loaded module \"$m1\" is \"$vm1\"");
-   Log3($name, 4, "$name - version of \"$m1\" is too old. Use SSL-fallback module \"$m3\" with version \"$vm3\"") if($sslfb && $vm3);
-   Log3($name, 4, "$name - version of loaded module \"$m2\" is \"$vm2\"");
+   Log3 ($name, 4, "$name - version of loaded module \"$m1\" is \"$vm1\"");
+   Log3 ($name, 4, "$name - version of \"$m1\" is too old. Use SSL-fallback module \"$m3\" with version \"$vm3\"") if($sslfb && $vm3);
+   Log3 ($name, 4, "$name - version of loaded module \"$m2\" is \"$vm2\"");
    
    my %mailparams = (
        'smtpFrom'     => {'attr'=>'smtpFrom',    'default'=>'',                          'required'=>1, 'set'=>1},
@@ -10775,8 +10799,9 @@ sub _sendEmail {
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $mailparams{$key}->{default} if (!$extparamref->{$key} && !$mailparams{$key}->{attr});    
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key} if (exists $extparamref->{$key});
        }
-       Log3($name, 4, "$name - param $key is now \"".$data{SSCam}{$name}{PARAMS}{$tac}{$key}."\" ") if($key !~ /sdat/x);
-       Log3($name, 4, "$name - param $key is set") if($key =~ /sdat/x && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
+       
+       Log3 ($name, 4, "$name - param $key is now \"".$data{SSCam}{$name}{PARAMS}{$tac}{$key}."\" ") if($key !~ /sdat/x);
+       Log3 ($name, 4, "$name - param $key is set") if($key =~ /sdat/x && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
    }
    
    $data{SSCam}{$name}{PARAMS}{$tac}{name} = $name;
@@ -10785,6 +10810,7 @@ sub _sendEmail {
    for my $key (keys(%mailparams)) {
        push(@err, $key) if ($mailparams{$key}->{required} && !$data{SSCam}{$name}{PARAMS}{$tac}{$key});
    }
+   
    if ($#err >= 0) {
        $ret = "Missing at least one required parameter or attribute: ".join(', ',@err);
        Log3($name, 2, "$name - $ret");
@@ -15545,12 +15571,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </li>  
   
   <a name="recTelegramTxt"></a>
-  <li><b>recTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]  </b><br>
+  <li><b>recTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;], [option => silent]  </b><br>
     Aktiviert den permanenten Versand von Aufnahmen nach deren Erstellung per TelegramBot. <br>
     Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device 
     anzugeben, welches für den Versand der Daten verwendet werden soll. 
     Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich vorhanden und funktionstüchtig sein. <br>
-    Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. 
+    Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. <br>
+    Durch die optionale Angabe von "option => silent" wird die Signalisierung beim Empfänger unterdrückt. <br>
     Wurde "peers" leer gelassen, wird der Default-Peer des TelegramBot-Device verwendet. <br><br>
     
     Es können die folgenden Platzhalter im subject verwendet werden. <br><br>
@@ -15573,6 +15600,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; #nabugroup, subject =&gt;  <br>
     attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; -123456, subject =&gt;  <br>
     attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+    attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; ohne Signalisierung, option =&gt; silent <br>
     attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm bei $CAM. Es wurde $CTIME die Aufnahme $FILE erstellt. Jetzt ist es $TIME. <br>
       <br>
   </li><br>
@@ -15714,13 +15742,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </li>
   
   <a name="snapTelegramTxt"></a>
-  <li><b>snapTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]  </b><br>
+  <li><b>snapTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;], [option => silent]  </b><br>
     Aktiviert den permanenten Versand von Schnappschüssen nach deren Erstellung per TelegramBot. Wurden mehrere Schnappschüsse ausgelöst, 
     werden sie sequentiell versendet.<br>
     Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device 
     anzugeben, welches für den Versand der Daten verwendet werden soll. 
     Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich vorhanden und funktionstüchtig sein. <br>
-    Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. 
+    Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. <br>
+    Durch die optionale Angabe von "option => silent" wird die Signalisierung beim Empfänger unterdrückt. <br>
     Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot-Devices verwendet. <br><br>
     
     Es können folgende Platzhalter im subject verwendet werden. <br><br>
@@ -15743,6 +15772,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; #nabugroup, subject =&gt;  <br>
     attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; -123456, subject =&gt;  <br>
     attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+    attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; ohne Signalisierung, option =&gt; silent <br>
     attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm bei $CAM. Es wurde $CTIME der Schnappschuss $FILE erstellt <br>
     <br>
   </li><br>
