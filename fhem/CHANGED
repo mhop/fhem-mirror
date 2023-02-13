@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 72_FRITZBOX: Attr. enableWanInfo -> enableWLANneighbors
+                         Attr. wlanNeighborsPrefix
+                         Fehlerkorrekturen <prefix>
+                         get <name> LuaInfo wlanNeighborhood
+                         set <name> rescanWLANneighbors
+                         Fehlerkorrekturen
  - bugfix:  93_DbRep: fix execute DbRep_afterproc after generating readings,
                       fix MySQL sqlSpecial 50mostFreqLogsLast2days
  - feature: AutomowerConnect-family: error message and location on map
