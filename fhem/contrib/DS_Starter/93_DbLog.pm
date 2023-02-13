@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 27165 2023-02-01 21:48:29Z DS_Starter $
+# $Id: 93_DbLog.pm 27165 2023-02-13 21:48:29Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -38,7 +38,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.8.1"   => "12.02.2023 change field type of DbLogInclude, DbLogExclude to textField-long ",
+  "5.8.1"   => "13.02.2023 change field type of DbLogInclude, DbLogExclude to textField-long, ".
+                           "_DbLog_SBP_connectDB evaluate DB Character set and use it for connection collation ",
   "5.8.0"   => "30.01.2023 new Get menu for a selection of getters, fix creation of new subprocess during shutdown sequence ",
   "5.7.0"   => "25.01.2023 send Log3() data back ro parent process, improve _DbLog_dbReadings function ",
   "5.6.2"   => "22.01.2023 check Syntax of DbLogValueFn attribute with Log output, Forum:#131777 ",
@@ -2602,7 +2603,23 @@ sub _DbLog_SBP_connectDB {
   if($utf8) {
       if($model eq "MYSQL") {
           $dbh->{mysql_enable_utf8} = 1;
-          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, 'set names "UTF8"', $subprocess);
+          
+          ($err, my @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW VARIABLES LIKE 'character_set_database';");
+          return ($err, q{}) if($err);
+          
+          my $dbcharset = @se ? uc($se[1]) : "no result";
+          
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 4,
+                                    msg        => qq(Database Character set is >$dbcharset<),
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
+                                
+          $dbcharset = 'UTF8' if($dbcharset !~ /UTF8MB4/xs);
+          
+          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, qq(set names "$dbcharset"), $subprocess);
           return ($err, q{}) if($err);
       }
 
@@ -8194,7 +8211,7 @@ sub DbLog_attrLong2Array {
   my $content = shift;
   my $sptchar = shift // q{,};
   
-  return () if(!$content);
+  return if(!$content);
 
   my @v = map { my $p = $_; $p =~ s/\s//xg; $p; } split /$sptchar/xs, $content;                ## no critic 'Map blocks'
 
