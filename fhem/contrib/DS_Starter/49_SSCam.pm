@@ -12554,11 +12554,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b>set &lt;name&gt; on [&lt;rectime&gt;] <br>
-                             [recEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"] <br>
-                             [recTelegramTxt:"tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]"] <br> 
-                             [recChatTxt:"chatbot => &lt;SSChatBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]"] <br> 
-                             </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> on [&lt;rectime&gt;] <br>
+             [recEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"] <br>
+             [recTelegramTxt:"tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;], option => [silent]"] <br> 
+             [recChatTxt:"chatbot => &lt;SSChatBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]"] <br> 
+             </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
    
   A recording will be started. The default recording time is 15 seconds. It can be individually changed by 
   the <a href="#SSCamattr">attribute</a> "rectime". 
@@ -12613,13 +12613,17 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <b>Examples: </b> <br><br>
   set &lt;name&gt; on [rectime]  <br>
-  # starts a recording, stops automatically after [rectime] <br>
+  # starts a recording, stops automatically after [rectime] <br><br>
+  
   <code> set &lt;name&gt; on 0  </code><br>
-  # starts a permanent record which must be stopped with the "off"-command. <br>
+  # starts a permanent record which must be stopped with the "off"-command. <br><br>
+  
   <code> set &lt;name&gt; on recEmailTxt:"subject => New recording for $CAM created, body => The last recording of $CAM is atteched."  </code><br>
-  # starts a recording and send it after completion by Email. <br>
-  <code> set &lt;name&gt; on recTelegramTxt:"tbot => teleBot, peers => @xxxx , subject => Movement alarm by $CAM. The snapshot $FILE was created at $CTIME"  </code><br>
-  # starts a recording and send it after completion by Telegram. <br>
+  # starts a recording and send it after completion by Email. <br><br>
+  
+  <code> set &lt;name&gt; on recTelegramTxt:"tbot => teleBot, peers => @xxxx , subject => Movement alarm by $CAM. The snapshot $FILE was created at $CTIME, option => silent"  </code><br>
+  # starts a recording and send it after completion by Telegram in silent-mode. <br><br>
+  
   <code> set &lt;name&gt; on recChatTxt:"chatbot => SynChatBot, peers => , subject => Movement alarm by $CAM. The snapshot $FILE was created at $CTIME."  </code><br>
   # starts a recording and send it after completion by Synology Chat. <br>
   </ul>
@@ -12784,7 +12788,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b> snap [&lt;number&gt;] [&lt;time difference&gt;] <br>
   
                                 [snapEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"] <br>
-                                [snapTelegramTxt:"tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]"] <br>
+                                [snapTelegramTxt:"tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;], option => [silent]"] <br>
                                 [snapChatTxt:"chatbot => &lt;SSChatBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]"]    <br>
                                 </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
@@ -12824,7 +12828,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     set &lt;name&gt; snap
     set &lt;name&gt; snap 4 
     set &lt;name&gt; snap 3 3 snapEmailTxt:"subject => Movement alarm $CAM, body => A movement was recognised at Carport"
-    set &lt;name&gt; snap 2 snapTelegramTxt:"tbot => teleBot, peers => , subject => Movement alarm by $CAM. The snapshot $FILE was created at $CTIME"
+    set &lt;name&gt; snap 2 snapTelegramTxt:"tbot => teleBot, peers => , subject => Movement alarm by $CAM. The snapshot $FILE was created at $CTIME, option => silent"
     set &lt;name&gt; snap 2 snapChatTxt:"chatbot => SynChatBot , peers => Frodo Sam, subject => Movement alarm by $CAM. At $CTIME the snapshot  $FILE was created. Now it is: $TIME."
   </pre>
   </ul>
@@ -13537,13 +13541,25 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </li>
   
   <a name="recTelegramTxt"></a>
-  <li><b>recTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
-    Activates the permanent shipping of recordings by TelegramBot after their creation. <br>
-    The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, 
-    which is used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
-    must be available and has to be running well. <br>
-    The setting of "peers" and "subject" is optional, but the keys must (empty) specified. 
-    If "peer" is empty, the default peer of the TelegramBot device is used. <br><br>
+  <li><b>recTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Text&gt;], option => [silent]  </b><br>
+    Enables permanent sending of recordings after their creation via TelegramBot. <br>
+    The attribute must be defined in the specified form. 
+    For optional specifications, the key must be specified >empty<. <br><br>
+    
+    Meaning of the keys: <br><br>
+    
+        <ul>   
+        <table>  
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> tbot     </td><td> Name of the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot-Device</a>  </td></tr>
+          <tr><td> peers    </td><td> List of recipients separated by spaces (optional).                                          </td></tr>
+          <tr><td>          </td><td> If peers is not specified, the default peer of the TelegramBot device is used.              </td></tr>
+          <tr><td> subject  </td><td> the text to be transmitted (optional)                                                       </td></tr>
+          <tr><td> option   </td><td> possible TelegramBot sending options described below (optional)                             </td></tr>
+          <tr><td>          </td><td> <b>silent</b> : the signaling at the receiver is suppressed                                 </td></tr>        
+        </table>
+        </ul>     
+        <br> 
     
     You can use the following placeholders within "subject". <br><br>
     
@@ -13565,6 +13581,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; #nabugroup, subject =&gt;  <br>
     attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; -123456, subject =&gt;  <br>
     attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+    attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; without signalization, option =&gt; silent <br>
     attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm from $CAM. At $CTIME the recording $FILE was created. Now it is $TIME. <br>
     <br>
   </li><br>  
@@ -13704,14 +13721,26 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </li>  
 
   <a name="snapTelegramTxt"></a>
-  <li><b>snapTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
-    Activates the permanent shipping of snapshots by TelegramBot after their creation. If several snapshots were triggert, 
-    they will be sequentially delivered.<br>
-    The attribute has to be defined in the form as described. With key "tbot" the TelegramBot device is specified, 
-    which is used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
-    must be available and has to be running well. <br>
-    The setting of "peers" and "subject" is optional, but the keys must (empty) specified. 
-    If "peer" is empty, the default peer of the TelegramBot device is used. <br><br>
+  <li><b>snapTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;], option => [silent]  </b><br>
+    Enables permanent sending of snapshots after their creation via TelegramBot. 
+    If several snapshots were triggered, they are sent sequentially. <br>
+    The attribute must be defined in the specified form.  
+    For optional specifications, the key must be specified >empty<. <br><br>
+    
+    Meaning of the keys: <br><br>
+    
+        <ul>   
+        <table>  
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> tbot     </td><td> Name of the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot-Device</a>  </td></tr>
+          <tr><td> peers    </td><td> List of recipients separated by spaces (optional).                                          </td></tr>
+          <tr><td>          </td><td> If peers is not specified, the default peer of the TelegramBot device is used.              </td></tr>
+          <tr><td> subject  </td><td> the text to be transmitted (optional)                                                       </td></tr>
+          <tr><td> option   </td><td> possible TelegramBot sending options described below (optional)                             </td></tr>
+          <tr><td>          </td><td> <b>silent</b> : the signaling at the receiver is suppressed                                 </td></tr>        
+        </table>
+        </ul>     
+        <br>
     
     You can use the following placeholders within "subject". <br><br>
     
@@ -13733,6 +13762,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; #nabugroup, subject =&gt;  <br>
     attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; -123456, subject =&gt;  <br>
     attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+    attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; without signalization, option =&gt; silent <br>   
     attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm from $CAM. At $CTIME the snapshot $FILE was created <br>
     <br>
   </li><br>   
@@ -14546,10 +14576,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <ul>
   <li><b> on [&lt;rectime&gt;] <br>
-  [recEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] <br>
-  [recTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] <br>
-  [recChatTxt:"chatbot => &lt;SSChatBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] </b> <br> 
-  &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)
+             [recEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] <br>
+             [recTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;], option => [silent]"] <br>
+             [recChatTxt:"chatbot => &lt;SSChatBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] </b> <br> 
+             &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)
   </li>
   <br>
 
@@ -14607,13 +14637,17 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <b>Beispiele </b>: <br>
   <code> set &lt;name&gt; on [rectime] </code><br>
   # startet die Aufnahme der Kamera &lt;name&gt;, automatischer Stop der Aufnahme nach Ablauf der Zeit [rectime] 
-  (default 15s oder wie im <a href="#SSCamattr">Attribut</a> "rectime" angegeben) <br>
+  (default 15s oder wie im <a href="#SSCamattr">Attribut</a> "rectime" angegeben) <br><br>
+  
   <code> set &lt;name&gt; on 0  </code><br>
-  # startet eine Daueraufnahme die mit "off" gestoppt werden muss. <br>
+  # startet eine Daueraufnahme die mit "off" gestoppt werden muss. <br><br>
+  
   <code> set &lt;name&gt; on recEmailTxt:"subject => Neue Aufnahme $CAM, body => Die aktuelle Aufnahme von $CAM ist angehängt."  </code><br>
-  # startet eine Aufnahme und versendet sie nach Beendigung per Email. <br>
-  <code> set &lt;name&gt; on recTelegramTxt:"tbot => teleBot, peers => @xxxx , subject => Bewegungsalarm bei $CAM. Es wurde $CTIME die Aufnahme $FILE erstellt"  </code><br>
-  # startet eine Aufnahme und versendet sie nach Beendigung per Telegram. <br>
+  # startet eine Aufnahme und versendet sie nach Beendigung per Email. <br><br>
+  
+  <code> set &lt;name&gt; on recTelegramTxt:"tbot => teleBot, peers => @xxxx , subject => Bewegungsalarm bei $CAM. Es wurde $CTIME die Aufnahme $FILE erstellt, option => silent"  </code><br>
+  # startet eine Aufnahme und versendet sie nach Beendigung per Telegram im Silent-Mode. <br><br>
+  
   <code> set &lt;name&gt; on recChatTxt:"chatbot => SynChatBot, peers => , subject => Bewegungsalarm bei $CAM. Es wurde $CTIME die Aufnahme $FILE erstellt. Jetzt ist es $TIME."  </code><br>
   # startet eine Aufnahme und versendet sie nach Beendigung per Synology Chat. <br>
 
@@ -14791,7 +14825,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <ul>
   <li><b> snap [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;] <br>
                                 [snapEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] <br>
-                                [snapTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] <br>
+                                [snapTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;], option => [silent]"] <br>
                                 [snapChatTxt:"chatbot => &lt;SSChatBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"]    <br>
                                 </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
@@ -14819,19 +14853,21 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   gezeigt, temporär überschrieben bzw. geändert werden. Sollte das Attribut "snapEmailTxt" nicht gesetzt sein, wird durch Angabe dieses Tags
   der Email-Versand einmalig aktiviert. (die Tag-Syntax entspricht dem "snapEmailTxt"-Attribut) <br><br>
   
-  Ein <b>Telegram-Versand</b> der Schnappschüsse kann durch Setzen des Attributs <a href="#snapTelegramTxt">snapTelegramTxt</a> permanent aktiviert
-  werden. Das zu verwendende <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich 
+  Ein <b>Telegram-Versand</b> der Schnappschüsse kann durch Setzen des Attributs 
+  <a href="#snapTelegramTxt">snapTelegramTxt</a> permanent aktiviert werden. 
+  Das zu verwendende <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich 
   funktionstüchtig eingerichtet sein. <br>
   Der Text im Attribut "snapTelegramTxt" kann durch die Spezifikation des optionalen "snapTelegramTxt:"-Tags, wie oben 
-  gezeigt, temporär überschrieben bzw. geändert werden. Sollte das Attribut "snapTelegramTxt" nicht gesetzt sein, wird durch Angabe dieses Tags
-  der Telegram-Versand einmalig aktiviert. (die Tag-Syntax entspricht dem "snapTelegramTxt"-Attribut) <br><br>
+  gezeigt, temporär überschrieben bzw. geändert werden. Sollte das Attribut "snapTelegramTxt" nicht gesetzt sein, wird 
+  durch Angabe dieses Tags der Telegram-Versand einmalig aktiviert. 
+  (die Tag-Syntax entspricht dem "snapTelegramTxt"-Attribut) <br><br>
   
   <b>Beispiele:</b>
   <pre>
     set &lt;name&gt; snap
     set &lt;name&gt; snap 4 
     set &lt;name&gt; snap 3 3 snapEmailTxt:"subject => Bewegungsalarm $CAM, body => Eine Bewegung wurde am Carport registriert"
-    set &lt;name&gt; snap 2 snapTelegramTxt:"tbot => teleBot, peers => , subject => Bewegungsalarm bei $CAM. Es wurde $CTIME der Schnappschuss $FILE erstellt"
+    set &lt;name&gt; snap 2 snapTelegramTxt:"tbot => teleBot, peers => , subject => Bewegungsalarm bei $CAM. Es wurde $CTIME der Schnappschuss $FILE erstellt, option => silent"
     set &lt;name&gt; snap 2 snapChatTxt:"chatbot => SynChatBot , peers => Frodo Sam, subject => Bewegungsalarm bei $CAM. Es wurde $CTIME der Schnappschuss $FILE erstellt. Jetzt ist es: $TIME."
   </pre>
   </ul>
@@ -15571,14 +15607,25 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </li>  
   
   <a name="recTelegramTxt"></a>
-  <li><b>recTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;], [option => silent]  </b><br>
+  <li><b>recTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Text&gt;], option => [silent]  </b><br>
     Aktiviert den permanenten Versand von Aufnahmen nach deren Erstellung per TelegramBot. <br>
-    Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device 
-    anzugeben, welches für den Versand der Daten verwendet werden soll. 
-    Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich vorhanden und funktionstüchtig sein. <br>
-    Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. <br>
-    Durch die optionale Angabe von "option => silent" wird die Signalisierung beim Empfänger unterdrückt. <br>
-    Wurde "peers" leer gelassen, wird der Default-Peer des TelegramBot-Device verwendet. <br><br>
+    Das Attribut muß in der angegebenen Form definiert werden. 
+    Bei optionalen Angaben muß der Schlüssel >leer< angegeben werden. <br><br>
+    
+    Bedeutung der Schlüssel: <br><br>
+    
+        <ul>   
+        <table>  
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> tbot     </td><td> Name des <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a>  </td></tr>
+          <tr><td> peers    </td><td> Durch Leerzeichen getrennte Liste der Empfänger (optional).                              </td></tr>
+          <tr><td>          </td><td> Ist peers nicht angegeben, wird der Default-Peer des TelegramBot-Device verwendet.       </td></tr>
+          <tr><td> subject  </td><td> der zu übermittelnde Text (optional)                                                     </td></tr>
+          <tr><td> option   </td><td> mögliche nachfolgend beschriebene TelegramBot Sendeoptionen (optional)                   </td></tr>
+          <tr><td>          </td><td> <b>silent</b> : die Signalisierung beim Empfänger wird unterdrückt                       </td></tr>        
+        </table>
+        </ul>     
+        <br>    
     
     Es können die folgenden Platzhalter im subject verwendet werden. <br><br>
     
@@ -15742,15 +15789,26 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </li>
   
   <a name="snapTelegramTxt"></a>
-  <li><b>snapTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;], [option => silent]  </b><br>
-    Aktiviert den permanenten Versand von Schnappschüssen nach deren Erstellung per TelegramBot. Wurden mehrere Schnappschüsse ausgelöst, 
-    werden sie sequentiell versendet.<br>
-    Das Attribut muß in der angegebenen Form definiert werden. Im Schlüssel "tbot" ist das TelegramBot-Device 
-    anzugeben, welches für den Versand der Daten verwendet werden soll. 
-    Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich vorhanden und funktionstüchtig sein. <br>
-    Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. <br>
-    Durch die optionale Angabe von "option => silent" wird die Signalisierung beim Empfänger unterdrückt. <br>
-    Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot-Devices verwendet. <br><br>
+  <li><b>snapTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;], option => [silent]  </b><br>
+    Aktiviert den permanenten Versand von Schnappschüssen nach deren Erstellung per TelegramBot. 
+    Wurden mehrere Schnappschüsse ausgelöst, werden sie sequentiell versendet.<br>
+    Das Attribut muß in der angegebenen Form definiert werden.  
+    Bei optionalen Angaben muß der Schlüssel >leer< angegeben werden. <br><br>
+    
+    Bedeutung der Schlüssel: <br><br>
+    
+        <ul>   
+        <table>  
+        <colgroup> <col width=20%> <col width=80%> </colgroup>
+          <tr><td> tbot     </td><td> Name des <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a>  </td></tr>
+          <tr><td> peers    </td><td> Durch Leerzeichen getrennte Liste der Empfänger (optional).                              </td></tr>
+          <tr><td>          </td><td> Ist peers nicht angegeben, wird der Default-Peer des TelegramBot-Device verwendet.       </td></tr>
+          <tr><td> subject  </td><td> der zu übermittelnde Text (optional)                                                     </td></tr>
+          <tr><td> option   </td><td> mögliche nachfolgend beschriebene TelegramBot Sendeoptionen (optional)                   </td></tr>
+          <tr><td>          </td><td> <b>silent</b> : die Signalisierung beim Empfänger wird unterdrückt                       </td></tr>        
+        </table>
+        </ul>     
+        <br> 
     
     Es können folgende Platzhalter im subject verwendet werden. <br><br>
     
@@ -15775,7 +15833,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; ohne Signalisierung, option =&gt; silent <br>
     attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm bei $CAM. Es wurde $CTIME der Schnappschuss $FILE erstellt <br>
     <br>
-  </li><br>
+    <br>
+  </li>
     
   <a name="snapGalleryBoost"></a>
   <li><b>snapGalleryBoost</b><br>
