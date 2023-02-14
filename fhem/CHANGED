@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  98_serviced: serviceAutostop triggered even if device is disabled
  - change:  50_TelegramBot: new reading msgDate and corrections
  - feature: 72_FRITZBOX: Attr. enableWanInfo -> enableWLANneighbors
                          Attr. wlanNeighborsPrefix
