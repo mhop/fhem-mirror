@@ -6784,7 +6784,7 @@ sub FRITZBOX_Kid_Profiles_List($) {
 
    $returnStr .= "<table>\n";
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>Name</td><td>Id</td>\n";
+   $returnStr .= "<td>Name&nbsp;</td><td>Id</td>\n";
    $returnStr .= "</tr>\n";
    $returnStr .= "<tr>\n";
    $returnStr .= "<td>profile2</td>";
@@ -6850,7 +6850,7 @@ sub FRITZBOX_WLAN_Environment($) {
 
    $returnStr .= "<table>\n";
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>MAC</td><td>SSID</td><td>Kanal</td><td>BandID\n";
+   $returnStr .= "<td>MAC&nbsp;</td><td>SSID&nbsp;</td><td>Kanal&nbsp;</td><td>BandID\n";
    $returnStr .= "</tr>\n";
 
    eval {
@@ -6926,7 +6926,7 @@ sub FRITZBOX_VPN_Shares_List($) {
 
    $returnStr .= "<table>\n";
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>Connection</td><td>Typ</td><td>Aktiv</td><td>Verbunden</td><td>UID</td><td>Name</td><td>Remote-IP</td>\n";
+   $returnStr .= "<td>Connection&nbsp;</td><td>Typ&nbsp;</td><td>Aktiv&nbsp;</td><td>Verbunden&nbsp;</td><td>UID&nbsp;</td><td>Name&nbsp;</td><td>Remote-IP&nbsp;</td>\n";
    $returnStr .= "</tr>\n";
 
    FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($result->{data}->{init}->{boxConnections});
@@ -6961,7 +6961,7 @@ sub FRITZBOX_VPN_Shares_List($) {
    $returnStr .= "----------------------------\n";
    $returnStr .= "<table>\n";
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>Connection</td><td>Typ</td><td>Aktiv</td><td>Verbunden</td><td>Host</td><td>Name</td><td>Remote-IP</td>\n";
+   $returnStr .= "<td>Connection&nbsp;</td><td>Typ&nbsp;</td><td>Aktiv&nbsp;</td><td>Verbunden&nbsp;</td><td>Host&nbsp;</td><td>Name&nbsp;</td><td>Remote-IP</td>\n";
    $returnStr .= "</tr>\n";
 
    FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($result->{data}->{init}->{boxConnections});
@@ -7074,7 +7074,7 @@ sub FRITZBOX_Lan_Devices_List($) {
 
    $returnStr .= "<table>\n";
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>MAC</td><td>IPv4</td><td>UID</td><td>NAME</td><td>STATUS</td><td>INFO</td>\n";
+   $returnStr .= "<td>MAC&nbsp;</td><td>IPv4&nbsp;</td><td>UID&nbsp;</td><td>NAME&nbsp;</td><td>STATUS&nbsp;</td><td>INFO</td>\n";
    $returnStr .= "</tr>\n";
 
    for(my $i = 0; $i <= $nbViews - 1; $i++) {
@@ -7101,7 +7101,7 @@ sub FRITZBOX_Lan_Devices_List($) {
    $returnStr .= "-------------------\n";
    $returnStr .= "<table>\n";
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>MAC</td><td>IPv4</td><td>UID</td><td>NAME</td><td>STATUS</td><td>INFO</td>\n";
+   $returnStr .= "<td>MAC&nbsp;</td><td>IPv4&nbsp;</td><td>UID&nbsp;</td><td>NAME&nbsp;</td><td>STATUS&nbsp;</td><td>INFO</td>\n";
    $returnStr .= "</tr>\n";
 
    for(my $i = 0; $i <= $nbViews - 1; $i++) {
