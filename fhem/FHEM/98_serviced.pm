@@ -16,7 +16,7 @@ use Blocking;
 use Time::HiRes;
 use vars qw{%defs};
 
-my $servicedVersion = "1.2.9";
+my $servicedVersion = "1.2.8";
 
 sub serviced_shutdownwait($);
 
@@ -403,7 +403,6 @@ sub serviced_Shutdown($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $autostop = AttrNum($name,"serviceAutostop",0);
-  return if (IsDisabled($name));
   $autostop = $autostop > 300 ? 300 : $autostop;
   if ($autostop)
   {
