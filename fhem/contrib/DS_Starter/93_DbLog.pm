@@ -38,8 +38,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.8.1"   => "13.02.2023 change field type of DbLogInclude, DbLogExclude to textField-long, ".
-                           "_DbLog_SBP_connectDB evaluate DB Character set and use it for connection collation ",
+  "5.8.1"   => "13.02.2023 change field type of DbLogInclude, DbLogExclude to textField-long, configCheck evaluate collation ".
+                           "_DbLog_SBP_connectDB evaluate DB Character/collation set and use it for connection collation ",
   "5.8.0"   => "30.01.2023 new Get menu for a selection of getters, fix creation of new subprocess during shutdown sequence ",
   "5.7.0"   => "25.01.2023 send Log3() data back ro parent process, improve _DbLog_dbReadings function ",
   "5.6.2"   => "22.01.2023 check Syntax of DbLogValueFn attribute with Log output, Forum:#131777 ",
@@ -2602,30 +2602,35 @@ sub _DbLog_SBP_connectDB {
 
   if($utf8) {
       if($model eq "MYSQL") {
-          $dbh->{mysql_enable_utf8} = 1;
-          
-          ($err, my @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW VARIABLES LIKE 'character_set_database';");
-          return ($err, q{}) if($err);
-          
-          my $dbcharset = @se ? uc($se[1]) : "no result";
-          
-          _DbLog_SBP_Log3Parent ( { name       => $name,
-                                    level      => 4,
-                                    msg        => qq(Database Character set is >$dbcharset<),
-                                    oper       => 'log3parent',
-                                    subprocess => $subprocess
-                                  }
-                                );
-                                
-          $dbcharset = 'UTF8' if($dbcharset !~ /UTF8MB4/xs);
-          
-          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, qq(set names "$dbcharset"), $subprocess);
-          return ($err, q{}) if($err);
+          $dbh->{mysql_enable_utf8} = 1;            
       }
 
       if($model eq "SQLITE") {
         ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, 'PRAGMA encoding="UTF-8"', $subprocess);
         return ($err, q{}) if($err);
+      }
+  }
+  
+  if ($model eq "MYSQL") {
+      ($err, my @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW VARIABLES LIKE 'collation_database'");
+      return ($err, q{}) if($err);
+      
+      my $dbcharset = @se ? $se[1] : 'noresult';
+      
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 4,
+                                msg        => qq(Database Character set is >$dbcharset<),
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
+                            
+      if ($dbcharset !~ /noresult|ucs2|utf16|utf32/ixs) {                                                                 # Impermissible Client Character Sets -> https://dev.mysql.com/doc/refman/8.0/en/charset-connection.html 
+          my $collation = $dbcharset;
+          $dbcharset    = (split '_', $collation, 2)[0];
+          
+          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, qq(set names "$dbcharset" collate "$collation"), $subprocess);   # set names utf8 collate utf8_general_ci
+          return ($err, q{}) if($err);
       }
   }
 
@@ -7107,10 +7112,10 @@ sub DbLog_configcheck {
   my ($chutf8mod,$chutf8dat);
 
   if ($dbmodel =~ /MYSQL/) {
-      ($err, @ce) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW VARIABLES LIKE 'character_set_connection'");
+      ($err, @ce) = _DbLog_prepExecQueryOnly ($name, $dbh, qq(SHOW VARIABLES LIKE 'collation_connection'));      # character_set_connection
       $chutf8mod  = @ce ? uc($ce[1]) : "no result";
 
-      ($err, @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW VARIABLES LIKE 'character_set_database'");
+      ($err, @se) = _DbLog_prepExecQueryOnly ($name, $dbh, qq(SHOW VARIABLES LIKE 'collation_database'));        # character_set_database
       $chutf8dat  = @se ? uc($se[1]) : "no result";
 
       if($chutf8mod eq $chutf8dat) {
