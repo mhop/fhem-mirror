@@ -2602,35 +2602,33 @@ sub _DbLog_SBP_connectDB {
 
   if($utf8) {
       if($model eq "MYSQL") {
-          $dbh->{mysql_enable_utf8} = 1;            
+          $dbh->{mysql_enable_utf8} = 1; 
+
+          ($err, my @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW VARIABLES LIKE 'collation_database'");
+          return ($err, q{}) if($err);
+          
+          my $dbcharset = @se ? $se[1] : 'noresult';
+          
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 4,
+                                    msg        => qq(Database Character set is >$dbcharset<),
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
+                                
+          if ($dbcharset !~ /noresult|ucs2|utf16|utf32/ixs) {                                                                 # Impermissible Client Character Sets -> https://dev.mysql.com/doc/refman/8.0/en/charset-connection.html 
+              my $collation = $dbcharset;
+              $dbcharset    = (split '_', $collation, 2)[0];
+              
+              ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, qq(set names "$dbcharset" collate "$collation"), $subprocess);   # set names utf8 collate utf8_general_ci
+              return ($err, q{}) if($err);
+          }        
       }
 
       if($model eq "SQLITE") {
         ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, 'PRAGMA encoding="UTF-8"', $subprocess);
         return ($err, q{}) if($err);
-      }
-  }
-  
-  if ($model eq "MYSQL") {
-      ($err, my @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW VARIABLES LIKE 'collation_database'");
-      return ($err, q{}) if($err);
-      
-      my $dbcharset = @se ? $se[1] : 'noresult';
-      
-      _DbLog_SBP_Log3Parent ( { name       => $name,
-                                level      => 4,
-                                msg        => qq(Database Character set is >$dbcharset<),
-                                oper       => 'log3parent',
-                                subprocess => $subprocess
-                              }
-                            );
-                            
-      if ($dbcharset !~ /noresult|ucs2|utf16|utf32/ixs) {                                                                 # Impermissible Client Character Sets -> https://dev.mysql.com/doc/refman/8.0/en/charset-connection.html 
-          my $collation = $dbcharset;
-          $dbcharset    = (split '_', $collation, 2)[0];
-          
-          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, qq(set names "$dbcharset" collate "$collation"), $subprocess);   # set names utf8 collate utf8_general_ci
-          return ($err, q{}) if($err);
       }
   }
 
