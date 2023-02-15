@@ -711,6 +711,7 @@ sub AlignArray {
 
   }
 
+  resetLastErrorIfCorrected($hash);
   $hash->{helper}{newdatasets} = $i;
   $hash->{helper}{searchpos} = [ dclone( $hash->{helper}{mower}{attributes}{positions}[0] ), dclone( $hash->{helper}{mower}{attributes}{positions}[1] ) ];
   return undef;
@@ -748,7 +749,15 @@ sub isErrorThanPrepare {
 
     }
 
-  } elsif (!$hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} && $hash->{helper}{lasterror}{timestamp} ) {
+  }
+
+}
+
+#########################
+sub resetLastErrorIfCorrected {
+  my ( $hash ) = @_;
+
+  if (!$hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} && $hash->{helper}{lasterror}{timestamp} ) {
 
     $hash->{helper}{lasterror}{positions} = [];
     $hash->{helper}{lasterror}{timestamp} = 0;
@@ -762,7 +771,6 @@ sub isErrorThanPrepare {
   }
 
 }
-
 #########################
 sub isGoodActivity {
 
