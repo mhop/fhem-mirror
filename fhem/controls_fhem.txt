@@ -1,6 +1,6 @@
-REV 27220
+REV 27228
 DIR unused
-UPD 2023-02-14_07:45:05 394889 ./CHANGED
+UPD 2023-02-15_07:45:02 394889 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2023-01-26_07:45:04 46585 ./MAINTAINER.txt
 UPD 2023-02-06_07:45:02 46690 ./configDB.pm
@@ -559,7 +559,7 @@ UPD 2021-10-08_07:45:09 26583 FHEM/98_readingsWatcher.pm
 UPD 2018-03-18_07:45:02 4017 FHEM/98_restore.pm
 UPD 2017-01-16_07:45:02 44459 FHEM/98_rssFeed.pm
 UPD 2019-03-24_07:45:02 2965 FHEM/98_search.pm
-UPD 2021-05-07_07:45:02 25375 FHEM/98_serviced.pm
+UPD 2023-02-15_07:45:02 25408 FHEM/98_serviced.pm
 UPD 2022-07-12_07:45:03 61666 FHEM/98_statistics.pm
 UPD 2023-02-13_07:45:03 36768 FHEM/98_structure.pm
 UPD 2020-12-18_07:45:02 11456 FHEM/98_systemd_watchdog.pm
@@ -748,8 +748,8 @@ UPD 2023-02-14_07:45:09 4885603 docs/commandref.html
 UPD 2023-02-14_07:45:12 2926674 docs/commandref_DE.html
 UPD 2023-01-21_07:45:02 85661 docs/commandref_frame.html
 UPD 2023-01-21_07:45:02 96258 docs/commandref_frame_DE.html
-UPD 2023-02-14_07:45:13 304270 docs/commandref_modular.html
-UPD 2023-02-14_07:45:14 316040 docs/commandref_modular_DE.html
+UPD 2023-02-15_07:45:11 304270 docs/commandref_modular.html
+UPD 2023-02-15_07:45:12 316040 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
