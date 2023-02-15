@@ -12,7 +12,7 @@
 # in this case the MySQL/MariaDB database would be created with the 
 # following statement:
 #
-#   CREATE DATABASE `fhem` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+#   CREATE DATABASE `fhem` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 # 
 # instead of the statement:
 #
