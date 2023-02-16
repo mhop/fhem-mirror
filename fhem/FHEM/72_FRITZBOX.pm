@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.7";
+my $ModulVersion = "07.50.7a";
 my $missingModul = "";
 my $missingModulTelnet = "";
 my $missingModulWeb = "";
@@ -6703,17 +6703,18 @@ sub FRITZBOX_User_Info_List($) {
 
    my $returnStr;
 
-   $returnStr .= "User Informations:\n";
-   $returnStr .= "-------------------------------------------------------- Brechtigungen \n";
-
    my $result = FRITZBOX_Web_Query( $hash, $queryStr) ;
 
    if ( defined $result->{Error} ) {
      my $tmp = FRITZBOX_ERR_Result($hash, $result);
      FRITZBOX_Log $hash, 2, "ERROR: evaluating user info -> " . $tmp;
+     $returnStr .= "Benutzer Informationen:\n";
+     $returnStr .= "---------------------------\n";
      return $returnStr . $tmp;
    } elsif ( defined $result->{AuthorizationRequired} ) {
      FRITZBOX_Log $hash, 2, "ERROR: evaluating user info -> AuthorizationRequired";
+     $returnStr .= "Benutzer Informationen:\n";
+     $returnStr .= "---------------------------\n";
      return $returnStr . "AuthorizationRequired";
    }
 
@@ -6723,9 +6724,12 @@ sub FRITZBOX_User_Info_List($) {
 
    my $views = $result->{user_info};
 
-   $returnStr .= "<table>\n";
+   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>Aktiv&nbsp;</td><td>Name&nbsp;</td><td>Box-ID&nbsp;</td><td>E-Mail&nbsp;</td><td>Box&nbsp;</td><td>Home&nbsp;</td><td>Dial&nbsp;</td><td>NAS&nbsp;</td><td>VPN</td>\n";
+   $returnStr .= '<td colspan="4">Benutzer Informationen</td><td colspan="5">Berechtigungen</td>';
+   $returnStr .= "</tr>\n";
+   $returnStr .= "<tr>\n";
+   $returnStr .= "<td>Aktiv</td><td>Name</td><td>Box-ID</td><td>E-Mail</td><td>Box</td><td>Home</td><td>Dial</td><td>NAS</td><td>VPN</td>\n";
    $returnStr .= "</tr>\n";
 
    eval {
@@ -6770,21 +6774,23 @@ sub FRITZBOX_Kid_Profiles_List($) {
 
    my $returnStr;
 
-   $returnStr .= "Kid Profiles:\n";
-   $returnStr .= "---------------------------------\n";
-
    my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
 
    if(defined $result->{Error}) {
      my $tmp = FRITZBOX_ERR_Result($hash, $result);
+     $returnStr .= "Kid Profiles:\n";
+     $returnStr .= "---------------------------------\n";
      return $returnStr . $tmp;
    }
 
    my $views = $result->{data}->{kidProfiles};
 
-   $returnStr .= "<table>\n";
+   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>Name&nbsp;</td><td>Id</td>\n";
+   $returnStr .= '<td colspan="3">Kid Profiles</td>';
+   $returnStr .= "</tr>\n";
+   $returnStr .= "<tr>\n";
+   $returnStr .= "<td>Name</td><td>Id</td><td>Profil</td>\n";
    $returnStr .= "</tr>\n";
    $returnStr .= "<tr>\n";
    $returnStr .= "<td>profile2</td>";
@@ -6831,14 +6837,13 @@ sub FRITZBOX_WLAN_Environment($) {
 
    my $returnStr;
 
-   $returnStr .= "WLAN: Netzwerke in der Umgebung\n";
-   $returnStr .= "---------------------------------\n";
-
    my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
    my $tmp;
 
    if(defined $result->{Error}) {
      $tmp = FRITZBOX_ERR_Result($hash, $result);
+     $returnStr .= "WLAN: Netzwerke in der Umgebung\n";
+     $returnStr .= "---------------------------------\n";
      return $returnStr . $tmp;
    }
 
@@ -6848,9 +6853,12 @@ sub FRITZBOX_WLAN_Environment($) {
    my $nbViews = scalar @$views;
    my $lDump = "";
 
-   $returnStr .= "<table>\n";
+   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>MAC&nbsp;</td><td>SSID&nbsp;</td><td>Kanal&nbsp;</td><td>BandID\n";
+   $returnStr .= '<td colspan="4">WLAN: Netzwerke in der Umgebung</td>';
+   $returnStr .= "</tr>\n";
+   $returnStr .= "<tr>\n";
+   $returnStr .= "<td>MAC</td><td>SSID</td><td>Kanal</td><td>BandID\n";
    $returnStr .= "</tr>\n";
 
    eval {
@@ -6903,13 +6911,12 @@ sub FRITZBOX_VPN_Shares_List($) {
 
    my $returnStr;
 
-   $returnStr .= "VPN Shares: Benutzer-Verbindungen\n";
-   $returnStr .= "---------------------------------\n";
-
    my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
    my $tmp;
 
    if(defined $result->{Error}) {
+     $returnStr .= "VPN Shares: Benutzer-Verbindungen\n";
+     $returnStr .= "---------------------------------\n";
      $tmp = FRITZBOX_ERR_Result($hash, $result);
      return $returnStr . $tmp;
    }
@@ -6924,9 +6931,12 @@ sub FRITZBOX_VPN_Shares_List($) {
       $jID = "init";
    }
 
-   $returnStr .= "<table>\n";
+   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>Connection&nbsp;</td><td>Typ&nbsp;</td><td>Aktiv&nbsp;</td><td>Verbunden&nbsp;</td><td>UID&nbsp;</td><td>Name&nbsp;</td><td>Remote-IP&nbsp;</td>\n";
+   $returnStr .= '<td colspan="7">VPN Shares: Benutzer-Verbindungen</td>';
+   $returnStr .= "</tr>\n";
+   $returnStr .= "<tr>\n";
+   $returnStr .= "<td>Verbindung</td><td>Typ</td><td>Aktiv</td><td>Verbunden</td><td>UID</td><td>Name</td><td>Remote-IP</td>\n";
    $returnStr .= "</tr>\n";
 
    FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($result->{data}->{init}->{boxConnections});
@@ -6957,11 +6967,13 @@ sub FRITZBOX_VPN_Shares_List($) {
       $jID = "init";
    }
 
-   $returnStr .= "VPN Shares: Box-Verbindungen\n";
-   $returnStr .= "----------------------------\n";
-   $returnStr .= "<table>\n";
+   $returnStr .= "\n";
+   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>Connection&nbsp;</td><td>Typ&nbsp;</td><td>Aktiv&nbsp;</td><td>Verbunden&nbsp;</td><td>Host&nbsp;</td><td>Name&nbsp;</td><td>Remote-IP</td>\n";
+   $returnStr .= '<td colspan="7">VPN Shares: Box-Verbindungen</td>';
+   $returnStr .= "</tr>\n";
+   $returnStr .= "<tr>\n";
+   $returnStr .= "<td>Verbindung</td><td>Typ</td><td>Aktiv</td><td>Verbunden</td><td>Host</td><td>Name</td><td>Remote-IP</td>\n";
    $returnStr .= "</tr>\n";
 
    FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($result->{data}->{init}->{boxConnections});
@@ -7055,13 +7067,12 @@ sub FRITZBOX_Lan_Devices_List($) {
 
    my $returnStr;
 
-   $returnStr  = "LanDevices: Active\n";
-   $returnStr .= "------------------\n";
-
    my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
 
    if(defined $result->{Error}) {
      my $tmp = FRITZBOX_ERR_Result($hash, $result);
+     $returnStr  = "LanDevices: Active\n";
+     $returnStr .= "------------------\n";
      return $returnStr . $tmp;
    }
 
@@ -7072,9 +7083,12 @@ sub FRITZBOX_Lan_Devices_List($) {
    my $nbViews = scalar @$views;
    my $lDump = "";
 
-   $returnStr .= "<table>\n";
+   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>MAC&nbsp;</td><td>IPv4&nbsp;</td><td>UID&nbsp;</td><td>NAME&nbsp;</td><td>STATUS&nbsp;</td><td>INFO</td>\n";
+   $returnStr .= '<td colspan="6">LanDevices: Active</td>';
+   $returnStr .= "</tr>\n";
+   $returnStr .= "<tr>\n";
+   $returnStr .= "<td>MAC</td><td>IPv4</td><td>UID</td><td>NAME</td><td>STATUS</td><td>INFO</td>\n";
    $returnStr .= "</tr>\n";
 
    for(my $i = 0; $i <= $nbViews - 1; $i++) {
@@ -7097,11 +7111,13 @@ sub FRITZBOX_Lan_Devices_List($) {
    $views = $result->{data}->{passive};
    $nbViews = scalar @$views;
 
-   $returnStr .= "LanDevices: Passive\n";
-   $returnStr .= "-------------------\n";
-   $returnStr .= "<table>\n";
+   $returnStr .= "\n";
+   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>MAC&nbsp;</td><td>IPv4&nbsp;</td><td>UID&nbsp;</td><td>NAME&nbsp;</td><td>STATUS&nbsp;</td><td>INFO</td>\n";
+   $returnStr .= '<td colspan="6">LanDevices: Passiv</td>';
+   $returnStr .= "</tr>\n";
+   $returnStr .= "<tr>\n";
+   $returnStr .= "<td>MAC</td><td>IPv4</td><td>UID</td><td>NAME</td><td>STATUS</td><td>INFO</td>\n";
    $returnStr .= "</tr>\n";
 
    for(my $i = 0; $i <= $nbViews - 1; $i++) {
@@ -7191,7 +7207,7 @@ sub FRITZBOX_Lan_Device_Info($$$) {
    }
 
    if (exists $result->{data}->{vars}) {
-     FRITZBOX_Log $hash, 3, "DEBUG: landevice: " . $lDevID . "landevice: \n" . FRITZBOX_ERR_Result($hash, $result);
+     FRITZBOX_Log $hash, 5, "DEBUG: landevice: " . $lDevID . "landevice: \n" . FRITZBOX_ERR_Result($hash, $result);
 
      if ($action eq "info") {
        if($result->{data}->{vars}->{dev}->{UID} eq $lDevID) {
