@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.75.0" => "16.02.2023  new attribute ctrlSolCastAPImaxReq, rename attr ctrlOptimizeSolCastInterval to ctrlSolCastAPIoptimizeReq ",
   "0.74.8" => "11.02.2023  change description of 'mintime', mintime with SunPath value possible ",
   "0.74.7" => "23.01.2023  fix evaljson evaluation ",
   "0.74.6" => "22.11.2022  bugfix consumerLegend tooltip start/end time if language is set to english ",
@@ -361,7 +362,7 @@ my @draattrmust  = qw(Rad1h);                                                   
 my $whistrepeat  = 900;                                                           # Wiederholungsintervall Cache File Daten schreiben
 
 my $apirepetdef  = 3600;                                                          # default Abrufintervall SolCast API (s)
-my $apimaxreqs   = 50;                                                            # max. täglich mögliche Requests SolCast API
+my $apimaxreqdef = 50;                                                            # max. täglich mögliche Requests SolCast API
 my $leadtime     = 3600;                                                          # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung                                                  
 
 my $prdef        = 0.85;                                                          # default Performance Ratio (PR)
@@ -780,11 +781,11 @@ my %hcsr = (                                                                    
   lastretrieval_time         => { fnr => 1, fn => \&SolCastAPIVal, def => '-'         },
   lastretrieval_timestamp    => { fnr => 1, fn => \&SolCastAPIVal, def => '-'         },
   response_message           => { fnr => 1, fn => \&SolCastAPIVal, def => '-'         },
-  todayMaxAPIcalls           => { fnr => 1, fn => \&SolCastAPIVal, def => $apimaxreqs },
+  todayMaxAPIcalls           => { fnr => 1, fn => \&SolCastAPIVal, def => 'apimaxreq' },
   todayDoneAPIcalls          => { fnr => 1, fn => \&SolCastAPIVal, def => 0           },
   todayDoneAPIrequests       => { fnr => 1, fn => \&SolCastAPIVal, def => 0           },
-  todayRemainingAPIcalls     => { fnr => 1, fn => \&SolCastAPIVal, def => $apimaxreqs },
-  todayRemainingAPIrequests  => { fnr => 1, fn => \&SolCastAPIVal, def => $apimaxreqs },
+  todayRemainingAPIcalls     => { fnr => 1, fn => \&SolCastAPIVal, def => 'apimaxreq' },
+  todayRemainingAPIrequests  => { fnr => 1, fn => \&SolCastAPIVal, def => 'apimaxreq' },
   runTimeCentralTask         => { fnr => 2, fn => \&CurrentVal,    def => '-'         },
   runTimeLastAPIAnswer       => { fnr => 2, fn => \&CurrentVal,    def => '-'         },
   runTimeLastAPIProc         => { fnr => 2, fn => \&CurrentVal,    def => '-'         },
@@ -849,9 +850,10 @@ sub Initialize {
                                 "ctrlDebug:multiple-strict,$dm ".
                                 "ctrlInterval ".
                                 "ctrlLanguage:DE,EN ".
-                                "ctrlOptimizeSolCastInterval:1,0 ".
                                 "ctrlNextDayForecastReadings:multiple-strict,$hod ".
                                 "ctrlShowLink:1,0 ".
+                                "ctrlSolCastAPImaxReq:selectnumbers,5,5,60,0,lin ".
+                                "ctrlSolCastAPIoptimizeReq:1,0 ".
                                 "ctrlStatisticReadings:multiple-strict,$srd ".
                                 "disable:1,0 ".
                                 "flowGraphicSize ".
@@ -928,14 +930,15 @@ sub Initialize {
                             "autoRefreshFW"      => "ctrlAutoRefreshFW",
                             "autoRefresh"        => "ctrlAutoRefresh",
                             "showLink"           => "ctrlShowLink",
+                            "debug"              => "ctrlDebug",
                             "optimizeSolCastAPIreqInterval" => "ctrlOptimizeSolCastInterval",
-                            "interval"           => "ctrlInterval",
-                            "createStatisticReadings" => "ctrlStatisticReadings",
-                            "createConsumptionRecReadings" => "ctrlConsRecommendReadings",
-                            "createTomorrowPVFcReadings" => "ctrlNextDayForecastReadings",
-                            "preferredChargeBattery" => "affectBatteryPreferredCharge",
-                            "sameWeekdaysForConsfc"  => "affectConsForecastIdentWeekdays",
-                            "debug"           => "ctrlDebug",
+                            "interval"                      => "ctrlInterval",
+                            "createStatisticReadings"       => "ctrlStatisticReadings",
+                            "createConsumptionRecReadings"  => "ctrlConsRecommendReadings",
+                            "createTomorrowPVFcReadings"    => "ctrlNextDayForecastReadings",
+                            "preferredChargeBattery"        => "affectBatteryPreferredCharge",
+                            "sameWeekdaysForConsfc"         => "affectConsForecastIdentWeekdays",
+                            "ctrlOptimizeSolCastInterval"   => "ctrlSolCastAPIoptimizeReq",
                           };
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
@@ -2038,9 +2041,10 @@ sub _getRoofTopData {
   my $lang  = AttrVal ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang));
 
   if (!$force) {                                                                                   # regulärer SolCast API Abruf
-      my $trr  = SolCastAPIVal($hash, '?All', '?All', 'todayRemainingAPIrequests', $apimaxreqs);
-      my $etxt = $hqtxt{bnsas}{$lang};
-      $etxt    =~ s{<WT>}{($leadtime/60)}eg;
+      my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
+      my $trr       = SolCastAPIVal($hash, '?All', '?All', 'todayRemainingAPIrequests', $apimaxreq);
+      my $etxt      = $hqtxt{bnsas}{$lang};
+      $etxt         =~ s{<WT>}{($leadtime/60)}eg;
       
       if ($trr <= 0) {                                                                            
           readingsSingleUpdate($hash, 'nextSolCastCall', $etxt, 1);
@@ -2088,9 +2092,10 @@ sub _getRoofTopData {
   my @unique = grep { !$seen{$_}++ } @as;
   my $upc    = scalar @unique;                                                                      # Anzahl unique API Keys
 
-  my $asc    = CurrentVal ($hash, 'allstringscount', 1);                                            # Anzahl der Strings
-  my $madr   = sprintf "%.0f", (($apimaxreqs / $asc) * $upc);                                       # max. tägliche Anzahl API Calls
-  my $mpk    = sprintf "%.4f", ($apimaxreqs / $madr);                                               # Requestmultiplikator
+  my $asc       = CurrentVal ($hash, 'allstringscount', 1);                                         # Anzahl der Strings
+  my $apimaxreq = AttrVal    ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
+  my $madr      = sprintf "%.0f", (($apimaxreq / $asc) * $upc);                                     # max. tägliche Anzahl API Calls
+  my $mpk       = sprintf "%.4f", ($apimaxreq / $madr);                                             # Requestmultiplikator
 
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{solCastAPIcallMultiplier}  = $mpk;
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayMaxAPIcalls}          = $madr;
@@ -2403,12 +2408,13 @@ sub ___setLastAPIcallKeyData {
 
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
 
-  my $drr  = $apimaxreqs - SolCastAPIVal($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
-  $drr     = 0 if($drr < 0);
+  my $apimaxreq = AttrVal    ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
+  my $drr       = $apimaxreq - SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+  $drr          = 0 if($drr < 0);
 
-  my $ddc  = SolCastAPIVal($hash, '?All', '?All', 'todayDoneAPIrequests',     0) /
-             SolCastAPIVal($hash, '?All', '?All', 'solCastAPIcallMultiplier', 0);                                   # ausgeführte API Calls
-  my $drc  = SolCastAPIVal($hash, '?All', '?All', 'todayMaxAPIcalls', $apimaxreqs) - $ddc;                          # verbleibende SolCast API Calls am aktuellen Tag
+  my $ddc  = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests',     0) /
+             SolCastAPIVal ($hash, '?All', '?All', 'solCastAPIcallMultiplier', 0);                                  # ausgeführte API Calls
+  my $drc  = SolCastAPIVal ($hash, '?All', '?All', 'todayMaxAPIcalls', $apimaxreq) - $ddc;                          # verbleibende SolCast API Calls am aktuellen Tag
   $drc     = 0 if($drc < 0);
 
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests} = $drr;
@@ -2417,7 +2423,7 @@ sub ___setLastAPIcallKeyData {
 
   ## Berechnung des optimalen Request Intervalls
   ################################################
-  if (AttrVal($name, 'ctrlOptimizeSolCastInterval', 0)) {
+  if (AttrVal($name, 'ctrlSolCastAPIoptimizeReq', 0)) {
       my $date   = strftime "%Y-%m-%d", localtime($t);
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
       my $dart   = $sstime - $t;                                                                                    # verbleibende Sekunden bis Sonnenuntergang
@@ -2598,7 +2604,7 @@ sub Attr {
           }
       }
 
-      if ($init_done == 1 && $aName eq "ctrlOptimizeSolCastInterval") {
+      if ($init_done == 1 && $aName eq "ctrlSolCastAPIoptimizeReq") {
           if (!isSolCastUsed ($hash)) {
               return qq{The attribute $aName is only valid for device model "SolCastAPI".};
           }
@@ -6339,12 +6345,18 @@ sub genStatisticReadings {
   return if(!@csr);
 
   for my $kpi (@csr) {
+      my $def = $hcsr{$kpi}{def};
+      
+      if ($def eq 'apimaxreq') {
+          $def = AttrVal ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
+      }
+      
       if ($hcsr{$kpi}{fnr} == 1) {
-          push @$daref, 'statistic_'.$kpi.'<>'. &{$hcsr{$kpi}{fn}} ($hash, '?All', '?All', $kpi, $hcsr{$kpi}{def});
+          push @$daref, 'statistic_'.$kpi.'<>'. &{$hcsr{$kpi}{fn}} ($hash, '?All', '?All', $kpi, $def);
       }
 
       if ($hcsr{$kpi}{fnr} == 2) {
-          push @$daref, 'statistic_'.$kpi.'<>'. &{$hcsr{$kpi}{fn}} ($hash, $kpi, $hcsr{$kpi}{def});
+          push @$daref, 'statistic_'.$kpi.'<>'. &{$hcsr{$kpi}{fn}} ($hash, $kpi, $def);
       }
   }
 
@@ -9723,7 +9735,7 @@ sub checkPlantConfig {
       my $gdn = AttrVal     ('global', 'dnsServer',                   '');
       my $cfd = AttrVal     ($name,    'affectCloudfactorDamping',    '');
       my $rfd = AttrVal     ($name,    'affectRainfactorDamping',     '');
-      my $osi = AttrVal     ($name,    'ctrlOptimizeSolCastInterval',  0);
+      my $osi = AttrVal     ($name,    'ctrlSolCastAPIoptimizeReq',  0);
       my $pcf = ReadingsVal ($name,    'pvCorrectionFactor_Auto',     '');
 
       my $lam = SolCastAPIVal ($hash, '?All', '?All', 'response_message', 'success');
@@ -9750,8 +9762,8 @@ sub checkPlantConfig {
 
       if (!$osi) {
           $result->{'Common Settings'}{state}   = $warn;
-          $result->{'Common Settings'}{result} .= qq{Attribute ctrlOptimizeSolCastInterval is set to "$osi" <br>};
-          $result->{'Common Settings'}{note}   .= qq{set ctrlOptimizeSolCastInterval to "1" is recommended.<br>};
+          $result->{'Common Settings'}{result} .= qq{Attribute ctrlSolCastAPIoptimizeReq is set to "$osi" <br>};
+          $result->{'Common Settings'}{note}   .= qq{set ctrlSolCastAPIoptimizeReq to "1" is recommended.<br>};
           $result->{'Common Settings'}{warn}    = 1;
       }
 
@@ -9778,7 +9790,7 @@ sub checkPlantConfig {
       if(!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
           $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
           $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
-          $result->{'Common Settings'}{note}   .= qq{affectCloudfactorDamping, affectRainfactorDamping, ctrlOptimizeSolCastInterval <br>};
+          $result->{'Common Settings'}{note}   .= qq{affectCloudfactorDamping, affectRainfactorDamping, ctrlSolCastAPIoptimizeReq <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading, ctrlLanguage, global language <br>};
       }
   }
@@ -11841,7 +11853,7 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß.            </td></tr>
             <tr><td> <b>icon</b>           </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                                       </td></tr>
             <tr><td> <b>mintime</b>        </td><td>Einplanungsdauer (Minuten oder "SunPath") des Verbrauchers. (optional)                                                                         </td></tr>
-            <tr><td>                       </td><td>Mit der Angabe von <b>SunPath</b> erfolgt die Plaung entsprechend des Sonnenauf- und untergangs.                                               </td></tr>
+            <tr><td>                       </td><td>Mit der Angabe von <b>SunPath</b> erfolgt die Planung entsprechend des Sonnenauf- und untergangs.                                              </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td>                       </td><td><b>SunPath</b>[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;] - die Einplanung erfolgt von Sonnenaufgang bis Sonnenuntergang.                  </td></tr>
             <tr><td>                       </td><td> Optional kann eine positive / negative Verschiebung (Minuten) der Planungszeit bzgl. Sonnenaufgang bzw. Sonnenuntergang angegeben werden.     </td></tr>
@@ -11896,6 +11908,7 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
          <b>attr &lt;name&gt; consumer03</b> Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:-?([1-7][0-9]|[0-9]) swoffcond:EcoFlow:data_data_socSum:100 <br>
          <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
          <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                          <br>
+         <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                                  <br>
        </ul>
        </li>
        <br>
@@ -11980,21 +11993,32 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-ctrlOptimizeSolCastInterval"></a>
-       <li><b>ctrlOptimizeSolCastInterval </b><br>
+       <a id="SolarForecast-attr-ctrlShowLink"></a>
+       <li><b>ctrlShowLink </b><br>
+         Anzeige des Links zur Detailansicht des Device über dem Grafikbereich <br>
+         (default: 1)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-ctrlSolCastAPImaxReq"></a>
+       <li><b>ctrlSolCastAPImaxReq </b><br>
+         (nur bei Verwendung Model SolCastAPI) <br><br>
+
+         Die Einstellung der maximal möglichen täglichen Requests an die SolCast API. <br>
+         Dieser Wert wird von SolCast vorgegeben und kann sich entsprechend des SolCast
+         Lizenzmodells ändern. <br>
+         (default: 50)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-ctrlSolCastAPIoptimizeReq"></a>
+       <li><b>ctrlSolCastAPIoptimizeReq </b><br>
          (nur bei Verwendung Model SolCastAPI) <br><br>
 
          Das default Abrufintervall der SolCast API beträgt 1 Stunde. Ist dieses Attribut gesetzt erfolgt ein dynamische
          Anpassung des Intervalls mit dem Ziel die maximal möglichen Abrufe innerhalb von Sonnenauf- und untergang
          auszunutzen. <br>
          (default: 0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlShowLink"></a>
-       <li><b>ctrlShowLink </b><br>
-         Anzeige des Links zur Detailansicht des Device über dem Grafikbereich <br>
-         (default: 1)
        </li>
        <br>
 
@@ -12349,10 +12373,10 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
 
 =for :application/json;q=META.json 76_SolarForecast.pm
 {
-  "abstract": "Creation of solar predictions for PV systems",
+  "abstract": "Creation of solar forecasts of PV systems including consumption forecasts and consumer management",
   "x_lang": {
     "de": {
-      "abstract": "Erstellung solarer Vorhersagen von PV Anlagen"
+      "abstract": "Erstellung solarer Vorhersagen von PV Anlagen inklusive Verbrauchsvorhersagen und Verbrauchermanagement"
     }
   },
   "keywords": [
@@ -12404,6 +12428,10 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
     }
   },
   "resources": {
+    "x_wiki": {
+      "web": "https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung",
+      "title": "SolarForecast - Solare Prognose (PV Erzeugung) und Verbrauchersteuerung"
+    },
     "repository": {
       "x_dev": {
         "type": "svn",
