@@ -38,6 +38,9 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.8.1"   => "13.02.2023 change field type of DbLogInclude, DbLogExclude to textField-long, configCheck evaluate collation ".
+                           "_DbLog_SBP_connectDB: UTF8 -> evaluate DB character/collation set and use it for ".
+                           "setting names connection collation ",
   "5.8.0"   => "30.01.2023 new Get menu for a selection of getters, fix creation of new subprocess during shutdown sequence ",
   "5.7.0"   => "25.01.2023 send Log3() data back ro parent process, improve _DbLog_dbReadings function ",
   "5.6.2"   => "22.01.2023 check Syntax of DbLogValueFn attribute with Log output, Forum:#131777 ",
@@ -201,8 +204,8 @@ sub DbLog_Initialize {
                                "verbose4Devs ".
                                $readingFnAttributes;
 
-  addToAttrList("DbLogInclude");
-  addToAttrList("DbLogExclude");
+  addToAttrList("DbLogInclude:textField-long");
+  addToAttrList("DbLogExclude:textField-long");
   addToAttrList("DbLogValueFn:textField-long");
 
   $hash->{FW_detailFn}      = "DbLog_fhemwebFn";
@@ -1339,8 +1342,8 @@ sub DbLog_Log {
               $DoIt = 1 if($DbLogSelectionMode =~ m/Exclude/ );
 
               if($DbLogExclude && $DbLogSelectionMode =~ m/Exclude/) {                                        # Bsp: "(temperature|humidity):300,battery:3600:force"
-                  my @v1 = split(/,/, $DbLogExclude);
-
+                  my @v1 = DbLog_attrLong2Array ($DbLogExclude, ',');
+                  
                   for (my $i = 0; $i < int(@v1); $i++) {
                       my @v2 = split /:/, $v1[$i];
                       $DoIt  = 0 if(!$v2[1] && $reading =~ m,^$v2[0]$,);                                      # Reading matcht auf Regexp, kein MinIntervall angegeben
@@ -1363,8 +1366,8 @@ sub DbLog_Log {
               # Im Endeffekt genau die gleiche Pruefung, wie fuer DBLogExclude, lediglich mit umgegkehrtem Ergebnis.
               if($DoIt == 0) {
                   if($DbLogInclude && ($DbLogSelectionMode =~ m/Include/)) {
-                      my @v1 = split /,/, $DbLogInclude;
-
+                      my @v1 = DbLog_attrLong2Array ($DbLogInclude, ',');
+                      
                       for (my $i = 0; $i < int(@v1); $i++) {
                           my @v2 = split /:/, $v1[$i];
                           $DoIt  = 1 if($reading =~ m,^$v2[0]$,);                                               # Reading matcht auf Regexp
@@ -1851,20 +1854,24 @@ sub _DbLog_checkDefMinInt {
   my $force;
   my $DoIt = 1;
 
-  my $defminint = AttrVal($name, "defaultMinInterval", undef);
+  my $defminint = AttrVal ($name, "defaultMinInterval", undef);
   return $DoIt if(!$defminint);                                                        # Attribut "defaultMinInterval" nicht im DbLog gesetzt -> kein ToDo
 
   my $DbLogExclude = AttrVal ($dev_name, "DbLogExclude", undef);
+  $DbLogExclude    = join ",", DbLog_attrLong2Array ($DbLogExclude, ',');
+  
   my $DbLogInclude = AttrVal ($dev_name, "DbLogInclude", undef);
+  $DbLogInclude    = join ",", DbLog_attrLong2Array ($DbLogInclude, ',');
+  
   $defminint       =~ s/[\s\n]/,/g;
-  my @adef         = split(/,/, $defminint);
+  my @adef         = split /,/, $defminint;
   my $inex         = ($DbLogExclude ? $DbLogExclude."," : "").($DbLogInclude ? $DbLogInclude : "");
 
   if($inex) {                                                                          # Quelldevice hat DbLogExclude und/oder DbLogInclude gesetzt
-      my @ie = split(/,/, $inex);
+      my @ie = split /,/, $inex;
 
       for (my $k = 0; $k < int(@ie); $k++) {                                           # Bsp. für das auszuwertende Element
-          my @rif = split(/:/, $ie[$k]);                                               # "(temperature|humidity):300:force"
+          my @rif = split /:/, $ie[$k];                                                # "(temperature|humidity):300:force"
 
           if($reading =~ m,^$rif[0]$, && $rif[1]) {                                    # aktuelles Reading matcht auf Regexp und minInterval ist angegeben
               return $DoIt;                                                            # Reading wurde bereits geprüft -> kein Überschreiben durch $defminint
@@ -1873,8 +1880,8 @@ sub _DbLog_checkDefMinInt {
   }
 
   for (my $l = 0; $l < int(@adef); $l++) {
-      my @adefelem = split("::", $adef[$l]);                                           # Bsp. für ein defaulMInInterval Element:
-      my @dvs      = devspec2array($adefelem[0]);                                      # device::interval[::force]
+      my @adefelem = split "::", $adef[$l];                                             # Bsp. für ein defaulMInInterval Element:
+      my @dvs      = devspec2array ($adefelem[0]);                                      # device::interval[::force]
 
       if(@dvs) {
           for (@dvs) {
@@ -2596,9 +2603,28 @@ sub _DbLog_SBP_connectDB {
 
   if($utf8) {
       if($model eq "MYSQL") {
-          $dbh->{mysql_enable_utf8} = 1;
-          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, 'set names "UTF8"', $subprocess);
+          $dbh->{mysql_enable_utf8} = 1; 
+
+          ($err, my @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW VARIABLES LIKE 'collation_database'");
           return ($err, q{}) if($err);
+          
+          my $dbcharset = @se ? $se[1] : 'noresult';
+          
+          _DbLog_SBP_Log3Parent ( { name       => $name,
+                                    level      => 4,
+                                    msg        => qq(Database Character set is >$dbcharset<),
+                                    oper       => 'log3parent',
+                                    subprocess => $subprocess
+                                  }
+                                );
+                                
+          if ($dbcharset !~ /noresult|ucs2|utf16|utf32/ixs) {                                                                 # Impermissible Client Character Sets -> https://dev.mysql.com/doc/refman/8.0/en/charset-connection.html 
+              my $collation = $dbcharset;
+              $dbcharset    = (split '_', $collation, 2)[0];
+              
+              ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, qq(set names "$dbcharset" collate "$collation"), $subprocess);   # set names utf8 collate utf8_general_ci
+              return ($err, q{}) if($err);
+          }        
       }
 
       if($model eq "SQLITE") {
@@ -7073,7 +7099,7 @@ sub DbLog_configcheck {
             "Rating: ".$nok."<br>";
   $check .= "<br>";
 
-  ### Connection und Encoding check
+  ### Connection und Collation check
   #######################################################################
   my $st  = [gettimeofday];                                                                        # Startzeit
   my $dbh = _DbLog_getNewDBHandle ($hash) || return "Can't connect to database.";
@@ -7085,20 +7111,24 @@ sub DbLog_configcheck {
   my ($chutf8mod,$chutf8dat);
 
   if ($dbmodel =~ /MYSQL/) {
-      ($err, @ce) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW VARIABLES LIKE 'character_set_connection'");
+      ($err, @ce) = _DbLog_prepExecQueryOnly ($name, $dbh, qq(SHOW VARIABLES LIKE 'collation_connection'));      # character_set_connection
       $chutf8mod  = @ce ? uc($ce[1]) : "no result";
 
-      ($err, @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW VARIABLES LIKE 'character_set_database'");
+      ($err, @se) = _DbLog_prepExecQueryOnly ($name, $dbh, qq(SHOW VARIABLES LIKE 'collation_database'));        # character_set_database
       $chutf8dat  = @se ? uc($se[1]) : "no result";
 
-      if($chutf8mod eq $chutf8dat) {
+      if ($chutf8dat =~ /utf8mb4/xsi && $chutf8mod eq $chutf8dat) {
           $rec = "settings o.k.";
+      }
+      elsif ($chutf8dat !~ /utf8mb4/xsi && $chutf8mod eq $chutf8dat) {
+          $rec  = "The collation of the database should be changed to 'utf8mb4_bin' so that umlauts and all special characters can be stored. <br>";
+          $rec .= "You can easy do that with the DbRep command <b>set &lt;DbRep-Device&gt; migrateCollation utf8mb4_bin</b>. <br>";
       }
       else {
           $rec = "Both encodings should be identical. You can adjust the usage of UTF8 connection by setting the UTF8 parameter in file '$hash->{CONFIGURATION}' to the right value. ";
       }
 
-      if(uc($chutf8mod) ne "UTF8" && uc($chutf8dat) ne "UTF8") {
+      if ($chutf8mod !~ /utf8/xsi) {
           $dbdhint = "";
       }
       else {
@@ -7162,10 +7192,10 @@ sub DbLog_configcheck {
       return $check;
   }
 
-  $check .= "<u><b>Result of encoding check</u></b><br><br>";
-  $check .= "Encoding used by Client (connection): $chutf8mod <br>" if($dbmodel !~ /SQLITE/);
-  $check .= "Encoding used by DB $dbname: $chutf8dat <br>";
-  $check .= $dbmodel =~ /SQLITE/       ? "Rating: ".$ok."<br>"                                             :
+  $check .= "<u><b>Result of collation check</u></b><br><br>";
+  $check .= "Collation used by Client (connection): $chutf8mod <br>" if($dbmodel !~ /SQLITE/);
+  $check .= "Collation used by DB $dbname: $chutf8dat <br>";
+  $check .= $dbmodel =~ /SQLITE/       ? "Rating: ".$ok."<br>" :
             $rec =~ /settings\so.k./xs ? "Rating: ".$ok."<br>" :
             "Rating: ".$warn."<br>";
   $check .= "<b>Recommendation:</b> $rec $dbdhint <br><br>";
@@ -7452,7 +7482,7 @@ sub DbLog_configcheck {
 
       if (!@six) {
           $check .= "The index 'Search_Idx' is missing. <br>";
-          $rec    = "You can create the index by executing statement <b>'CREATE INDEX Search_Idx ON `$history` (DEVICE, READING, TIMESTAMP) USING BTREE;'</b> <br>";
+          $rec    = "You can create the index by the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_search_Idx</b> <br>";
           $rec   .= "Depending on your database size this command may running a long time. <br>";
           $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
           $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
@@ -7473,6 +7503,7 @@ sub DbLog_configcheck {
               $rec    = "The index should contain the fields 'DEVICE', 'TIMESTAMP', 'READING'. ";
               $rec   .= "You can change the index by executing e.g. <br>";
               $rec   .= "<b>'ALTER TABLE `$history` DROP INDEX `Search_Idx`, ADD INDEX `Search_Idx` (`DEVICE`, `READING`, `TIMESTAMP`) USING BTREE;'</b> <br>";
+              $rec   .= "The DbRep command <b>set &lt;DbRep-Device&gt; index recreate_search_Idx</b> is doing the same for you. <br>";
               $rec   .= "Depending on your database size this command may running a long time. <br>";
           }
       }
@@ -7838,19 +7869,19 @@ sub DbLog_AddLog {
            $found = 1 if($rd =~ m/^$rdspec$/);                                # Reading gefunden
 
            if($DbLogExclude && !$nce) {
-               my @v1 = split(/,/, $DbLogExclude);
+               my @v1 = DbLog_attrLong2Array ($DbLogExclude, ',');
 
                for (my $i = 0; $i < int(@v1); $i++) {
-                   my @v2 = split(/:/, $v1[$i]);                              # MinInterval wegschneiden, Bsp: "(temperature|humidity):600,battery:3600"
+                   my @v2 = split /:/, $v1[$i];                               # MinInterval wegschneiden, Bsp: "(temperature|humidity):600,battery:3600"
 
                    if($rd =~ m,^$v2[0]$,) {                                   # Reading matcht $DbLogExclude -> ausschließen vom addLog
                        $do = 0;
 
                        if($DbLogInclude) {
-                           my @v3 = split(/,/, $DbLogInclude);
+                           my @v3 = DbLog_attrLong2Array ($DbLogInclude, ',');
 
                            for (my $i = 0; $i < int(@v3); $i++) {
-                               my @v4 = split(/:/, $v3[$i]);
+                               my @v4 = split /:/, $v3[$i];
                                $do    = 1 if($rd =~ m,^$v4[0]$,);             # Reading matcht $DbLogInclude -> wieder in addLog einschließen
                            }
                        }
@@ -8178,6 +8209,22 @@ sub DbLog_charfilter {
   $txt =~ s/1degree1/°/g;
 
 return($txt);
+}
+
+###############################################################################
+#   Einen Attributinhalt vom Typ textField-long splitten und als 
+#   Array zurückgeben
+#   Optional kann das Split-Zeichen, default ',', angegeben werden.
+###############################################################################
+sub DbLog_attrLong2Array {
+  my $content = shift;
+  my $sptchar = shift // q{,};
+  
+  return if(!$content);
+
+  my @v = map { my $p = $_; $p =~ s/\s//xg; $p; } split /$sptchar/xs, $content;                ## no critic 'Map blocks'
+
+return @v;
 }
 
 ################################################################
@@ -8562,13 +8609,27 @@ return;
 
   <b>Note:</b> <br>
   In case of fresh installed MySQL/MariaDB system don't forget deleting the anonymous "Everyone"-User with an admin-tool if
-  existing !
+  existing.
   <br><br>
 
   Sample code and Scripts to prepare a MySQL/PostgreSQL/SQLite database you can find in
   <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/dblog">SVN -&gt; contrib/dblog/db_create_&lt;DBType&gt;.sql</a>. <br>
-  (<b>Caution:</b> The local FHEM-Installation subdirectory ./contrib/dblog doesn't contain the freshest scripts !!)
+  (<b>Caution:</b> The local FHEM-Installation subdirectory ./contrib/dblog doesn't contain the freshest scripts!)
   <br><br>
+  
+  The default installation of the MySQL/MariaDB database provides for the use of the <b>utf8_bin</b> collation.
+  With this setting, characters up to 3 bytes long can be stored, which is generally sufficient.
+  However, if characters with a length of 4 bytes (e.g. emojis) are to be stored in the database, the <b>utf8mb4</b> 
+  character set must be used. <br>
+  Accordingly, in this case the MySQL/MariaDB database would be created with the following statement: <br><br>
+  
+  <ul>
+   <code> CREATE DATABASE `fhem` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin; </code>
+  </ul>
+  <br>
+  
+  In the configuration file (see below) utf8 support must be enabled with the key <b>utf8 => 1</b> if utf8 is to be 
+  used. <br><br>
 
   The database contains two tables: <code>current</code> and <code>history</code>. <br>
   The latter contains all events whereas the former only contains the last event for any given reading and device.
@@ -10440,14 +10501,28 @@ attr SMA_Energymeter DbLogValueFn
 
   <b>Hinweis:</b> <br>
   Im Falle eines frisch installierten MySQL/MariaDB Systems bitte nicht vergessen die anonymen "Jeder"-Nutzer mit einem
-  Admin-Tool (z.B. phpMyAdmin) zu löschen falls sie existieren !
+  Admin-Tool (z.B. phpMyAdmin) zu löschen falls sie existieren.
   <br><br>
 
   Beispielcode bzw. Scripts zum Erstellen einer MySQL/PostgreSQL/SQLite Datenbank ist im
   <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/dblog">SVN -&gt; contrib/dblog/db_create_&lt;DBType&gt;.sql</a>
   enthalten. <br>
   (<b>Achtung:</b> Die lokale FHEM-Installation enthält im Unterverzeichnis ./contrib/dblog nicht die aktuellsten
-  Scripte !!) <br><br>
+  Scripte!) <br><br>
+  
+  Die Standardinstallation der MySQL/MariaDB Datenbank sieht die Nutzung der Collation <b>utf8_bin</b> vor.
+  Mit dieser Einstellung können Zeichen bis 3 Byte Länge gespeichert werden was im Allgemeinen ausreichend ist.
+  Sollen jedoch Zeichen mit 4 Byte Länge (z.B. Emojis) in der Datenbank gespeichert werden, ist der Zeichensatz
+  <b>utf8mb4</b> zu verwenden. <br>
+  Dementsprechend wäre in diesem Fall die MySQL/MariaDB Datenbank mit folgendem Statement anzulegen: <br><br>
+  
+  <ul>
+   <code> CREATE DATABASE `fhem` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin; </code>
+  </ul>
+  <br>
+  
+  In der Konfigurationsdatei (siehe unten) ist die utf8-Unterstützung mit dem Schlüssel <b>utf8 => 1</b> einzuschalten 
+  sofern utf8 genutzt werden soll. <br><br>
 
   Die Datenbank beinhaltet 2 Tabellen: <code>current</code> und <code>history</code>. <br>
   Die Tabelle <code>current</code> enthält den letzten Stand pro Device und Reading. <br>
@@ -10542,6 +10617,7 @@ attr SMA_Energymeter DbLogValueFn
     #);
     ####################################################################################
     </pre>
+    
     Wird configDB genutzt, ist das Konfigurationsfile in die configDB hochzuladen ! <br><br>
 
     <b>Hinweis zu Sonderzeichen:</b><br>
