@@ -43,6 +43,7 @@ MQTT2_CLIENT_Initialize($)
     disable:1,0
     disabledForIntervals
     disconnectAfter
+    httpHeader
     ignoreRegexp
     lwt
     lwtRetain
@@ -107,6 +108,10 @@ MQTT2_CLIENT_connect($)
   $hash->{connecting} = 1 if($disco && !$hash->{connecting});
   $hash->{nextOpenDelay} = 5;
   $hash->{BUF}="";
+  if($hash->{DeviceName} =~ m/^wss?:/) {
+    $hash->{binary} = 1;
+    $hash->{header}{"Sec-WebSocket-Protocol"} = "mqtt";
+  }
   return DevIo_OpenDev($hash, $disco, "MQTT2_CLIENT_doinit", sub(){})
                 if($hash->{connecting});
 }
@@ -311,6 +316,14 @@ MQTT2_CLIENT_Attr(@)
     for my $kv (split(" ",$param[0])) {
       my ($k, $v) = split(":", $kv, 2);
       $hash->{sslargs}{$k} = $v;
+    }
+  }
+
+  if($attrName eq "httpHeader") {
+    $hash->{header} = {};
+    for my $kv (split(" ",$param[0])) {
+      my ($k, $v) = split(":", $kv, 2);
+      $hash->{header}{$k} = $v;
     }
   }
 
@@ -873,6 +886,13 @@ MQTT2_CLIENT_feedTheList($$$)
       if set, the connection will be closed after &lt;seconds&gt; of
       inactivity, and will be automatically reopened when sending a command.
       </li><br>
+
+    <a id="MQTT2_CLIENT-attr-httpHeader"></a>
+    <li>header<br>
+      a list of space separated tuples of key:value, used to set the HTTP
+      header when MQTT is used over websocket.
+      </li><br>
+
 
     <a id="MQTT2_CLIENT-attr-ignoreRegexp"></a>
     <li>ignoreRegexp<br>

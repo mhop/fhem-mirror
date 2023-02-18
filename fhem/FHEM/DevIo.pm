@@ -280,8 +280,9 @@ DevIo_SimpleWrite($$$;$)
 
   } elsif($hash->{TCPDev}) {
     if($hash->{WEBSOCKET}) {
-      $msg = Encode::encode('UTF-8', $msg) if($unicodeEncoding && !$hash->{binary});
-      $msg = DevIo_MaskWS($hash->{binary} ? 0x2:0x1, $msg)
+      $msg = Encode::encode('UTF-8', $msg)
+        if($unicodeEncoding && !$hash->{binary});
+      $msg = DevIo_MaskWS($hash->{binary} ? 0x2:0x1, $msg);
     }
     syswrite($hash->{TCPDev}, $msg);
 
