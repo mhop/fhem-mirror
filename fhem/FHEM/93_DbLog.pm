@@ -38,6 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.8.2"   => "18.02.2023 adapt DbLog_configcheck, Forum: https://forum.fhem.de/index.php/topic,132163.msg1264320.html#msg1264320 ",
   "5.8.1"   => "13.02.2023 change field type of DbLogInclude, DbLogExclude to textField-long, configCheck evaluate collation ".
                            "_DbLog_SBP_connectDB: UTF8 -> evaluate DB character/collation set and use it for ".
                            "setting names connection collation ",
@@ -6988,7 +6989,7 @@ sub DbLog_configcheck {
   my $history = $hash->{HELPER}{TH};
   my $current = $hash->{HELPER}{TC};
 
-  my ($check, $rec,%dbconfig);
+  my ($check, $rec, $err, $upd, $msg, @config, %dbconfig);
 
   Log3 ($name, 4, "DbLog $name - ###  Start configCheck   ###");
 
@@ -7048,29 +7049,27 @@ sub DbLog_configcheck {
       }
   }
 
-  my ($errcm,$supd,$uptb) = DbLog_checkModVer($name);                            # DbLog Version
-
   $check .= "<html>";
   $check .= "<u><b>Result of version check</u></b><br><br>";
   $check .= "Used Perl version: $pv <br>";
   $check .= "Used DBI (Database independent interface) version: $dbi <br>";
   $check .= "Used DBD (Database driver) version $dbd <br>";
+  
+  ($err, $upd, $msg, $rec) = _DbLog_checkModVer($name);                            # DbLog Version
 
-  if ($errcm) {
+  $check .= "Used DbLog version: $hash->{HELPER}{VERSION} <br>$msg <br>";
+  
+  if ($err) {
       $check .= "Rating: ".$nok."<br>";
-      $check .= "<b>Recommendation:</b> ERROR - $errcm. $dbdhint <br><br>";
   }
-
-  if ($supd) {
-      $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
+  elsif ($upd) {
       $check .= "Rating: ".$warn."<br>";
-      $check .= "<b>Recommendation:</b> You should update FHEM to get the recent DbLog version from repository ! $dbdhint <br><br>";
   }
   else {
-      $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
       $check .= "Rating: ".$ok."<br>";
-      $check .= "<b>Recommendation:</b> No update of DbLog is needed. $dbdhint <br><br>";
   }
+
+  $check .= "<b>Recommendation:</b> $rec <br>$dbdhint <br><br>";
 
   ### Configuration read check
   #######################################################################
@@ -7078,7 +7077,7 @@ sub DbLog_configcheck {
   my $cpst = configDBUsed() ? qq{configDB (don't forget upload configuration file if changed. Use "configdb filelist" and look for your configuration file.)} : "file";
   $check  .= "Connection parameter store type: $cpst <br>";
 
-  my ($err, @config) = FileRead($hash->{CONFIGURATION});
+  ($err, @config) = FileRead($hash->{CONFIGURATION});
 
   if (!$err) {
       eval join("\n", @config);
@@ -7482,7 +7481,7 @@ sub DbLog_configcheck {
 
       if (!@six) {
           $check .= "The index 'Search_Idx' is missing. <br>";
-          $rec    = "You can create the index by the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_search_Idx</b> <br>";
+          $rec    = "You can create the index by the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Search_Idx</b> <br>";
           $rec   .= "Depending on your database size this command may running a long time. <br>";
           $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
           $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
@@ -7497,13 +7496,13 @@ sub DbLog_configcheck {
               $rec    = "settings o.k.";
           }
           else {
-              $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'DEVICE'. <br>" if (!@six_dev);
-              $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!@six_rdg);
+              $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'DEVICE'. <br>"    if (!@six_dev);
+              $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'READING'. <br>"   if (!@six_rdg);
               $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!@six_tsp);
               $rec    = "The index should contain the fields 'DEVICE', 'TIMESTAMP', 'READING'. ";
               $rec   .= "You can change the index by executing e.g. <br>";
               $rec   .= "<b>'ALTER TABLE `$history` DROP INDEX `Search_Idx`, ADD INDEX `Search_Idx` (`DEVICE`, `READING`, `TIMESTAMP`) USING BTREE;'</b> <br>";
-              $rec   .= "The DbRep command <b>set &lt;DbRep-Device&gt; index recreate_search_Idx</b> is doing the same for you. <br>";
+              $rec   .= "The DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Search_Idx</b> is doing the same for you. <br>";
               $rec   .= "Depending on your database size this command may running a long time. <br>";
           }
       }
@@ -7514,7 +7513,7 @@ sub DbLog_configcheck {
 
       if (!@six) {
           $check .= "The index 'Search_Idx' is missing. <br>";
-          $rec    = "You can create the index by executing statement <b>'CREATE INDEX \"Search_Idx\" ON $history USING btree (device, reading, \"timestamp\")'</b> <br>";
+          $rec    = "You can create the index by the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Search_Idx</b> <br>";
           $rec   .= "Depending on your database size this command may running a long time. <br>";
           $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
           $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
@@ -7535,7 +7534,7 @@ sub DbLog_configcheck {
               $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$idef_tsp);
               $rec    = "The index should contain the fields 'DEVICE', 'READING', 'TIMESTAMP'. ";
               $rec   .= "You can change the index by executing e.g. <br>";
-              $rec   .= "<b>'DROP INDEX \"Search_Idx\"; CREATE INDEX \"Search_Idx\" ON $history USING btree (device, reading, \"timestamp\")'</b> <br>";
+              $rec   .= "the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Search_Idx</b> <br>";
               $rec   .= "Depending on your database size this command may running a long time. <br>";
           }
       }
@@ -7546,7 +7545,7 @@ sub DbLog_configcheck {
 
       if (!$six[0]) {
           $check .= "The index 'Search_Idx' is missing. <br>";
-          $rec    = "You can create the index by executing statement <b>'CREATE INDEX Search_Idx ON `$history` (DEVICE, READING, TIMESTAMP)'</b> <br>";
+          $rec    = "You can create the index by the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Search_Idx</b> <br>";
           $rec   .= "Depending on your database size this command may running a long time. <br>";
           $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
           $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
@@ -7567,7 +7566,7 @@ sub DbLog_configcheck {
               $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$idef_tsp);
               $rec    = "The index should contain the fields 'DEVICE', 'READING', 'TIMESTAMP'. ";
               $rec   .= "You can change the index by executing e.g. <br>";
-              $rec   .= "<b>'DROP INDEX \"Search_Idx\"; CREATE INDEX Search_Idx ON `$history` (DEVICE, READING, TIMESTAMP)'</b> <br>";
+              $rec   .= "the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Search_Idx</b> <br>";
               $rec   .= "Depending on your database size this command may running a long time. <br>";
           }
       }
@@ -7604,7 +7603,7 @@ sub DbLog_configcheck {
 
           if (!@dix) {
               $check .= "At least one DbRep-device assigned to $name is used, but the recommended index 'Report_Idx' is missing. <br>";
-              $rec    = "You can create the index by executing statement <b>'CREATE INDEX Report_Idx ON `$history` (TIMESTAMP,READING) USING BTREE;'</b> <br>";
+              $rec    = "You can create the index by the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Report_Idx</b> <br>";
               $rec   .= "Depending on your database size this command may running a long time. <br>";
               $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
               $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Report_Idx' as well ! <br>";
@@ -7624,7 +7623,7 @@ sub DbLog_configcheck {
                   $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!@dix_tsp);
                   $rec    = "The index should contain the fields 'TIMESTAMP', 'READING'. ";
                   $rec   .= "You can change the index by executing e.g. <br>";
-                  $rec   .= "<b>'ALTER TABLE `$history` DROP INDEX `Report_Idx`, ADD INDEX `Report_Idx` (`TIMESTAMP`, `READING`) USING BTREE'</b> <br>";
+                  $rec   .= "the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Report_Idx</b> <br>";
                   $rec   .= "Depending on your database size this command may running a long time. <br>";
               }
           }
@@ -7635,7 +7634,7 @@ sub DbLog_configcheck {
 
           if (!@dix) {
               $check .= "You use at least one DbRep-device assigned to $name, but the recommended index 'Report_Idx' is missing. <br>";
-              $rec    = "You can create the index by executing statement <b>'CREATE INDEX \"Report_Idx\" ON $history USING btree (\"timestamp\", reading)'</b> <br>";
+              $rec    = "You can create the index by the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Report_Idx</b> <br>";
               $rec   .= "Depending on your database size this command may running a long time. <br>";
               $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
               $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Report_Idx' as well ! <br>";
@@ -7654,7 +7653,7 @@ sub DbLog_configcheck {
                   $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$irep_tsp);
                   $rec    = "The index should contain the fields 'TIMESTAMP', 'READING'. ";
                   $rec   .= "You can change the index by executing e.g. <br>";
-                  $rec   .= "<b>'DROP INDEX \"Report_Idx\"; CREATE INDEX \"Report_Idx\" ON $history USING btree (\"timestamp\", reading)'</b> <br>";
+                  $rec   .= "the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Report_Idx</b> <br>";
                   $rec   .= "Depending on your database size this command may running a long time. <br>";
               }
           }
@@ -7665,7 +7664,7 @@ sub DbLog_configcheck {
 
           if (!$dix[0]) {
               $check .= "The index 'Report_Idx' is missing. <br>";
-              $rec    = "You can create the index by executing statement <b>'CREATE INDEX Report_Idx ON `$history` (TIMESTAMP,READING)'</b> <br>";
+              $rec    = "You can create the index by the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Report_Idx</b> <br>";
               $rec   .= "Depending on your database size this command may running a long time. <br>";
               $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
               $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
@@ -7684,7 +7683,7 @@ sub DbLog_configcheck {
                   $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$irep_tsp);
                   $rec    = "The index should contain the fields 'TIMESTAMP', 'READING'. ";
                   $rec   .= "You can change the index by executing e.g. <br>";
-                  $rec   .= "<b>'DROP INDEX \"Report_Idx\"; CREATE INDEX Report_Idx ON `$history` (TIMESTAMP,READING)'</b> <br>";
+                  $rec   .= "the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Report_Idx</b> <br>";
                   $rec   .= "Depending on your database size this command may running a long time. <br>";
               }
           }
@@ -7708,84 +7707,103 @@ sub DbLog_configcheck {
 return $check;
 }
 
-#########################################################################################
+############################################################################################################
 #                  check Modul Aktualität fhem.de <-> local
-#########################################################################################
-sub DbLog_checkModVer {
+#  return:  0|1 (Err-State), 0-kein Update nötig od. feststellbar/ 1-Update nötig, Message, Recommendation
+############################################################################################################
+sub _DbLog_checkModVer {
   my $name = shift;
   my $src  = "http://fhem.de/fhemupdate/controls_fhem.txt";
+  
+  my $msg  = q{};
+  my $rec  = q{};
 
   if($src !~ m,^(.*)/([^/]*)$,) {
-      Log3 ($name, 1, "DbLog $name - configCheck: Cannot parse $src, probably not a valid http control file");
-      return ("check of new DbLog version not possible, see logfile.");
+      $msg = "Cannot parse $src, probably not a valid http control file";
+      $rec = "Please inform the DbLog Maintainer about the Error Message.";
+      return (1, 0, $msg, $rec);
   }
 
   my $basePath     = $1;
   my $ctrlFileName = $2;
 
-  my ($remCtrlFile, $err) = DbLog_updGetUrl($name,$src);
-  return "check of new DbLog version not possible: $err" if($err);
-
-  if(!$remCtrlFile) {
-      Log3 ($name, 1, "DbLog $name - configCheck: No valid remote control file");
-      return "check of new DbLog version not possible, see logfile.";
+  my ($err, $remCtrlFile) = __DbLog_updGetUrl($name, $src);
+  
+  if ($err) {
+      $msg = "Check of SVN DbLog version not possible: ".$err;
+      $rec = "Try to execute the configCheck later again. Inform the DbLog Maintainer if it seems to be a permanent problem.";
+      return (1, 0, $msg, $rec);
   }
 
-  my @remList = split(/\R/, $remCtrlFile);
-  Log3 ($name, 4, "DbLog $name - configCheck: Got remote $ctrlFileName with ".int(@remList)." entries.");
-
-  my $root = $attr{global}{modpath};
-
-  my @locList;
-  if(open(FD, "$root/FHEM/$ctrlFileName")) {
-      @locList = map { $_ =~ s/[\r\n]//; $_ } <FD>;
-      close(FD);
-      Log3 ($name, 4, "DbLog $name - configCheck: Got local $ctrlFileName with ".int(@locList)." entries.");
+  if (!$remCtrlFile) {
+      $msg = "Check of SVN DbLog version not possible: no valid SVN control file available.";
+      $rec = "Try to execute the configCheck later again. Inform the DbLog Maintainer if it seems to be a permanent problem.";
+      return (1, 0, $msg, $rec);
   }
-  else {
-      Log3 ($name, 1, "DbLog $name - configCheck: can't open $root/FHEM/$ctrlFileName: $!");
-      return "check of new DbLog version not possible, see logfile.";
-  }
+
+  my @remList = split /\R/, $remCtrlFile;
+  my $root    = $attr{global}{modpath};
+  
+  Log3 ($name, 4, "DbLog $name - configCheck: Got SVN $ctrlFileName with ".int(@remList)." entries.");
+  
+  open (FD, "$root/FHEM/$ctrlFileName") or do { $msg = "Automatic check of SVN DbLog version not possible: $!";
+                                                $rec = "Try to solve the problem that has occurred. Compare your local DbLog version with the public version manually.";
+                                                return (1, 0, $msg, $rec);
+                                              };
+  
+  my @locList = map { $_ =~ s/[\r\n]//; $_ } <FD>;
+  close(FD);
+  
+  Log3 ($name, 4, "DbLog $name - configCheck: Got local $ctrlFileName with ".int(@locList)." entries.");
 
   my %lh;
 
   for my $l (@locList) {
-      my @l = split(" ", $l, 4);
+      my @l = split " ", $l, 4;
       next if($l[0] ne "UPD" || $l[3] !~ /93_DbLog/);
-      $lh{$l[3]}{TS} = $l[1];
+      $lh{$l[3]}{TS}  = $l[1];
       $lh{$l[3]}{LEN} = $l[2];
+      
       Log3 ($name, 4, "DbLog $name - configCheck: local version from last update - creation time: ".$lh{$l[3]}{TS}." - bytes: ".$lh{$l[3]}{LEN});
   }
 
-  my $noSzCheck = AttrVal("global", "updateNoFileCheck", configDBUsed());
-
   for my $rem (@remList) {
-      my @r = split(" ", $rem, 4);
+      my @r = split " ", $rem, 4;
       next if($r[0] ne "UPD" || $r[3] !~ /93_DbLog/);
 
       my $fName  = $r[3];
       my $fPath  = "$root/$fName";
       my $fileOk = ($lh{$fName} && $lh{$fName}{TS} eq $r[1] && $lh{$fName}{LEN} eq $r[2]);
 
-      if(!$fileOk) {
-          Log3 ($name, 4, "DbLog $name - configCheck: New remote version of $fName found - creation time: ".$r[1]." - bytes: ".$r[2]);
-          return ("",1,"A new DbLog version is available (creation time: $r[1], size: $r[2] bytes)");
+      if (!$fileOk) {
+          Log3 ($name, 4, "DbLog $name - configCheck: New SVN version of $fName found - creation time: $r[1] ($r[2] Bytes)");
+          
+          $msg = "A new DbLog version is available (creation time: $r[1], size: $r[2] bytes)";
+          $rec = "You should update FHEM to get the recent DbLog version from repository!";
+          return (0, 1, $msg, $rec);
       }
-      if(!$noSzCheck) {
-          my $sz = -s $fPath;
-          if ($fileOk && defined($sz) && $sz ne $r[2]) {
-              Log3 ($name, 4, "DbLog $name - configCheck: remote version of $fName (creation time: $r[1], bytes: $r[2]) differs from local one (bytes: $sz)");
-              return ("",1,"Your local DbLog module is modified.");
-          }
+      
+      my $sz = -s $fPath;
+      
+      if ($fileOk && defined($sz) && $sz ne $r[2]) {
+          Log3 ($name, 4, "DbLog $name - configCheck: SVN version of $fName creation time: $r[1] ($r[2] Bytes) differs from local one ($sz Bytes)");
+          
+          $msg = "Your local DbLog module is modified. The SVN version of $fName has creation time: $r[1] ($r[2] Bytes)";
+          $rec = "You should update FHEM to get the recent DbLog version from repository!";
+          return (0, 1, $msg, $rec);
       }
+      
       last;
   }
+  
+  $msg = "Your local DbLog module is up to date.";
+  $rec = "Update of DbLog is not needed.";
 
-return ("",0,"Your local DbLog module is up to date.");
+return (0, 0, $msg, $rec);
 }
 
 ###################################
-sub DbLog_updGetUrl {
+sub __DbLog_updGetUrl {
   my ($name,$url) = @_;
 
   my %upd_connecthash;
@@ -7798,15 +7816,18 @@ sub DbLog_updGetUrl {
 
   if($err) {
       Log3 ($name, 1, "DbLog $name - configCheck: ERROR while connecting to fhem.de:  $err");
-      return ("",$err);
+      
+      return ($err, "");
   }
+  
   if(!$data) {
       Log3 ($name, 1, "DbLog $name - configCheck: ERROR $url: empty file received");
+      
       $err = 1;
-      return ("",$err);
+      return ($err, "");
   }
 
-return ($data,"");
+return ("", $data);
 }
 
 #########################################################################################
