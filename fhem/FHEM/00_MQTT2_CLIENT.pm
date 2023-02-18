@@ -631,7 +631,7 @@ MQTT2_CLIENT_send($$;$$)
   }
   return if(!$doSend);
 
-  if($immediate) {
+  if($immediate || $hash->{WEBSOCKET}) {
     DevIo_SimpleWrite($hash, $msg, 0);
   } else {
     addToWritebuffer($hash, $msg, undef, 1); # nolimit
