@@ -1,5 +1,8 @@
 ##############################################
 # $Id$
+# forked from 98_dummy.pm
+#
+
 package FHEM::Automation::btdummy; ##no critic qw(Package)
 
   use strict;
@@ -15,12 +18,9 @@ BEGIN {
   GP_Import( qw(
     attr
     AttrVal
-    defs
-    init_done
     InternalTimer
     IsDisabled
     Log3
-    RemoveInternalTimer
     readingFnAttributes
     readingsSingleUpdate
   ) )
