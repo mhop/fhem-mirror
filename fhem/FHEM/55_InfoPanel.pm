@@ -1471,8 +1471,10 @@ sub btIP_Overview {
   foreach my $def (sort keys %defs) {
     if($defs{$def}{TYPE} eq "InfoPanel") {
         $name= $defs{$def}{NAME};
+        my $alias = ' ('.AttrVal($name,'alias','').')';
+        $alias = '' if $alias eq ' ()';
         $url= btIP_getURL();
-        $html.= "$name<br>\n<ul>";
+        $html.= "$name$alias<br>\n<ul>";
         $html.= "<a href='$url/btip/$name.html' target='_blank'>HTML</a><br>\n";
         $html.= "</ul>\n<p>\n";
         }
