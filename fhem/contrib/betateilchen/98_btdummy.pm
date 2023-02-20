@@ -107,6 +107,8 @@ sub Attr {
 
   if($a[2] eq "onDefineFn") {
     if($a[0] eq "set"){
+      $a[3] = "main::$a[3]" if $a[3] !~ m/::/;
+      return "Please define function $a[3] first!" if !defined &{$a[3]};
       InternalTimer(0,$a[3],$a[1],1);
     }
     return;
