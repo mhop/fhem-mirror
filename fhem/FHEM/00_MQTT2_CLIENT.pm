@@ -48,6 +48,7 @@ MQTT2_CLIENT_Initialize($)
     lwt
     lwtRetain
     keepaliveTimeout
+    maxNrConnects
     msgAfterConnect
     msgBeforeDisconnect
     mqttVersion:3.1.1,3.1
@@ -94,6 +95,7 @@ MQTT2_CLIENT_Define($$)
   $hash->{DeviceName} = $host;
   $hash->{clientId} = AttrVal($hash->{NAME}, "clientId", $hash->{NAME});
   $hash->{connecting} = 1;
+  $hash->{nrConnects} = 0;
 
   InternalTimer(1, "MQTT2_CLIENT_connect", $hash, 0); # need attributes
   return undef;
@@ -103,7 +105,14 @@ sub
 MQTT2_CLIENT_connect($)
 {
   my ($hash) = @_;
-  return if($hash->{authError} || AttrVal($hash->{NAME}, "disable", 0));
+  my $me = $hash->{NAME};
+  return if($hash->{authError} || AttrVal($me, "disable", 0));
+  my $mc = AttrVal($me, "maxNrConnects", -1);
+  if($mc ne -1 && $hash->{nrConnects} >= $mc) {
+    Log3 $me, 2, "maxNrConnects ($mc) reached, no more reconnect attemtps";
+    delete($readyfnlist{"$me.".$hash->{DeviceName}}); # Source of retry
+    return;
+  }
   my $disco = (DevIo_getState($hash) eq "disconnected");
   $hash->{connecting} = 1 if($disco && !$hash->{connecting});
   $hash->{nextOpenDelay} = 5;
@@ -124,6 +133,7 @@ MQTT2_CLIENT_doinit($)
 
   ############################## CONNECT
   if($hash->{connecting} == 1) {
+    $hash->{nrConnects}++;
     my $usr = AttrVal($name, "username", "");
     my ($err, $pwd) = getKeyValue($name);
     $pwd = undef if($usr eq "");
@@ -870,6 +880,15 @@ MQTT2_CLIENT_feedTheList($$$)
     <li>connectTimeout &lt;seconds&gt;<br>
       change the HTTP connect timeout, default is 4 seconds. This seems to be
       necessary for some MQTT servers in robotic vacuum cleaners.
+      </li></br>
+
+    <a id="MQTT2_CLIENT-attr-maxNrConnects"></a>
+    <li>maxNrConnects &lt;number&gt;<br>
+      maximum number of established connections. Useful when experimenting with
+      public server, where repeatedly failing connection attempts lead to
+      temporary suspension of the account. The counter is increased after the
+      TCP connection is established, before the MQTT handshake. Reset the
+      counter with the modify or defmod command.
       </li></br>
 
     <li><a href="#disable">disable</a><br>
