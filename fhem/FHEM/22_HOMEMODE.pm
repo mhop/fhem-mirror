@@ -11,12 +11,11 @@ package main;
 
 use strict;
 use warnings;
-use POSIX;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = '1.5.6';
+my $HOMEMODE_version = '1.5.7';
 my $HOMEMODE_Daytimes = '05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night';
 my $HOMEMODE_Seasons = '03.01|spring 06.01|summer 09.01|autumn 12.01|winter';
 my $HOMEMODE_UserModes = 'gotosleep,awoken,asleep';
@@ -2511,7 +2510,7 @@ sub HOMEMODE_execCMDs($$;$)
   my $name = $hash->{NAME};
   my $cmd = HOMEMODE_replacePlaceholders($hash,$cmds,$resident);
   my $err = AnalyzeCommandChain(undef,$cmd);
-  if ($err && $err !~ /^Deleted.reading|Wrote.configuration|good/)
+  if ($err && $err !~ /^Deleted.reading|Wrote.configuration|good|Scheduled.for.sending.after.WAKEUP/)
   {
     Log3 $name,3,"$name: error: $err";
     Log3 $name,3,"$name: error in command: $cmd";
