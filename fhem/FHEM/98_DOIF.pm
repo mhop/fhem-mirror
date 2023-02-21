@@ -1077,7 +1077,7 @@ sub AggrIntDoIf
     $result=$num;
   }
   if ($mode eq "#") {
-    if ($format eq "d") {
+    if (defined $result and $format eq "d") {
       $result = ($result =~ /(-?\d+(\.\d+)?)/ ? $1 : 0);
       $result = round ($result,$place) if (defined $place);
     } 
@@ -1298,16 +1298,17 @@ sub ReadingValDoIf
         if (!defined $hash->{collect}{"$name $reading"}{$hours}) {
           return(undef);
         }
-        setValue_collect($hash,\%{$hash->{collect}{"$name $reading"}{$hours}});
+        DOIF_setValue_collect($hash,\%{$hash->{collect}{"$name $reading"}{$hours}});
         return (\%{$hash->{collect}{"$name $reading"}{$hours}});
-      } elsif ($regExp =~ /^(bar(\d*)(day|week|month|year|decade))/) {
-        my $num = $2;  
-        my $period = $3;
-        if (!defined $hash->{bar}{"$name $reading"}{"$num $period"}) {
+      } elsif ($regExp =~ /^((bar|barAvg)(\d*)(day|week|month|year|decade))/) {
+        my $bartype=$2;
+        my $num = $3;  
+        my $period = $4;
+        if (!defined $hash->{$bartype}{"$name $reading"}{"$num $period"}) {
           return(undef);
         }
-        setValue_bar($hash,\%{$hash->{bar}{"$name $reading"}{"$num $period"}});
-        return (\%{$hash->{bar}{"$name $reading"}{"$num $period"}});
+        DOIF_setValue_bar($hash,\%{$hash->{$bartype}{"$name $reading"}{"$num $period"}});
+        return (\%{$hash->{$bartype}{"$name $reading"}{"$num $period"}});
       } elsif ($regExp =~ /^d(\d)?/) {
         my $round=$1;
         $r = ($r =~ /(-?\d+(\.\d+)?)/ ? $1 : 0);
@@ -1349,29 +1350,27 @@ sub DOIF_save_readings {
   foreach my $key (keys %{$defs{$hash->{NAME}}{READINGS}}) {
     delete $defs{$hash->{NAME}}{READINGS}{$key} if ($key =~ /^(\.col|\.bar)/);
   }
-  if (defined $hash->{collect}) {
-    DOIF_collect_save_values($hash);
-  }
-  if (defined $hash->{bar}) {
-    DOIF_bar_save_values($hash);
-  }
+  DOIF_collect_save_values($hash);
+  DOIF_bar_save_values($hash);
 }
 
 
 sub DOIF_collect_save_values {
   my ($hash)=@_;
-  foreach my $dev_reading (keys %{$hash->{collect}}) {
-    foreach my $hours (keys %{$hash->{collect}{"$dev_reading"}}) {
-      if (ref($hash->{collect}{$dev_reading}{$hours}{values}) eq "ARRAY") {
-        my @va=@{$hash->{collect}{$dev_reading}{$hours}{values}};
-        my @ta=@{$hash->{collect}{$dev_reading}{$hours}{times}};
-        for (@va) { $_ = "" if (!defined $_); };
-        for (@ta) { $_ = "" if (!defined $_); };
-        my $dim=$hash->{collect}{$dev_reading}{$hours}{dim};
-        my $devReading=$dev_reading;
-        $devReading =~ s/ /_/g;
-        ::readingsSingleUpdate($hash,".col_".$dim."_".$devReading."_".$hours."_values",join(",",@va),0);
-        ::readingsSingleUpdate($hash,".col_".$dim."_".$devReading."_".$hours."_times",join(",",@ta),0);
+  if (defined $hash->{collect}) {
+    foreach my $dev_reading (keys %{$hash->{collect}}) {
+      foreach my $hours (keys %{$hash->{collect}{"$dev_reading"}}) {
+        if (ref($hash->{collect}{$dev_reading}{$hours}{values}) eq "ARRAY") {
+          my @va=@{$hash->{collect}{$dev_reading}{$hours}{values}};
+          my @ta=@{$hash->{collect}{$dev_reading}{$hours}{times}};
+          for (@va) { $_ = "" if (!defined $_); };
+          for (@ta) { $_ = "" if (!defined $_); };
+          my $dim=$hash->{collect}{$dev_reading}{$hours}{dim};
+          my $devReading=$dev_reading;
+          $devReading =~ s/ /_/g;
+          ::readingsSingleUpdate($hash,".col_".$dim."_".$devReading."_".$hours."_values",join(",",@va),0);
+          ::readingsSingleUpdate($hash,".col_".$dim."_".$devReading."_".$hours."_times",join(",",@ta),0);
+        }
       }
     }
   }
@@ -1379,20 +1378,24 @@ sub DOIF_collect_save_values {
 
 sub DOIF_bar_save_values {
   my ($hash)=@_;
-  foreach my $dev_reading (keys %{$hash->{bar}}) {
-    foreach my $num_period (keys %{$hash->{bar}{"$dev_reading"}}) {
-      if (ref($hash->{bar}{$dev_reading}{$num_period}{values}) eq "ARRAY") {
-        setValue_bar($hash,\%{$hash->{bar}{$dev_reading}{$num_period}});
-        my @va=@{$hash->{bar}{$dev_reading}{$num_period}{values}};
-        for (@va) { $_ = "" if (!defined $_); };
-        my $dim=$hash->{bar}{$dev_reading}{$num_period}{dim};
-        my $last_period2=$hash->{bar}{$dev_reading}{$num_period}{last_period2};
-        my $last_period1=$hash->{bar}{$dev_reading}{$num_period}{last_period1};
-        my $devReading=$dev_reading;
-        $devReading =~ s/ /_/g;
-        my $numPeriod=$num_period;
-        $numPeriod =~ s/ /_/g;
-        ::readingsSingleUpdate($hash,".bar_".$devReading."_".$numPeriod."_values","$last_period1,$last_period2,".join(",",@va),0);
+  foreach my $bartype ("bar","barAvg") {
+    if (defined $hash->{$bartype}) {
+      foreach my $dev_reading (keys %{$hash->{$bartype}}) {
+        foreach my $num_period (keys %{$hash->{$bartype}{"$dev_reading"}}) {
+          if (ref($hash->{$bartype}{$dev_reading}{$num_period}{values}) eq "ARRAY") {
+            DOIF_setValue_bar($hash,\%{$hash->{$bartype}{$dev_reading}{$num_period}});
+            my @va=@{$hash->{$bartype}{$dev_reading}{$num_period}{values}};
+            for (@va) { $_ = "" if (!defined $_); };
+            my $dim=$hash->{$bartype}{$dev_reading}{$num_period}{dim};
+            my $last_period2=$hash->{$bartype}{$dev_reading}{$num_period}{last_period2};
+            my $last_period1=$hash->{$bartype}{$dev_reading}{$num_period}{last_period1};
+            my $devReading=$dev_reading;
+            $devReading =~ s/ /_/g;
+            my $numPeriod=$num_period;
+            $numPeriod =~ s/ /_/g;
+            ::readingsSingleUpdate($hash,".".$bartype."_".$devReading."_".$numPeriod."_values","$last_period1,$last_period2,".join(",",@va),0);
+          }
+        }
       }
     }
   }
@@ -1431,6 +1434,20 @@ sub DOIF_setColvalue
   }
 }
 
+sub DOIF_get_file_data
+{
+  my ($file) = @_;
+  my $fh;
+  if(!open($fh, $file)) {
+    return "Can't open $file: $!";
+  }
+  my @tpl=<$fh>;
+  close $fh;
+  my $cmd=join("",@tpl);
+  $cmd =~ s/\r//g;
+  return ($cmd);
+}
+
 sub DOIF_modify_card_data
 {
   my ($name,$device,$reading,$colBarDes,$timeOffset,$valueData)=@_;
@@ -1462,33 +1479,52 @@ sub DOIF_setCardValues
   if (!defined $timeOffset or $timeOffset eq "") {
     $timeOffset=0;
   }
-  if ($valueData !~ /^\d\d\d\d/) {
-    return("invalid syntax: $valueData");
-  }
+  ##if ($valueData !~ /^\d\d\d\d/) {
+  ##  return("invalid syntax: $valueData");
+  ##}
   if ($type eq "bar") {
-    setValue_bar($hash,$collect);
+    DOIF_setValue_bar($hash,$collect);
   } else {
-    setValue_collect($hash,$collect);
+    DOIF_setValue_collect($hash,$collect);
   }
-  my @data=split (/[\n\,]/,$valueData);
-  #${$collect}{last_v}=undef;
+  my @data;
+  if ($valueData =~ /\n/) {
+    @data=split (/[\n]/,$valueData);
+  } else {
+    @data=split (/[\,]/,$valueData);
+  }
+  my $out="";
   for (my $i=0;$i < scalar (@data);$i++) {
-    my ($dateTime,$value)=split (/[ \;]/,$data[$i]);
-    if ($dateTime =~ /^\d\d\d\d/) {
-      if ($type eq "bar") {
-        DOIF_setBarvalue ($collect,DOIF_time_sec($dateTime)+$timeOffset,$value);
+    if ($data[$i] !~ /\s*#/) {
+      if ($data[$i] =~ /(.*)[\s;]+([\S^;]*)$/) {
+        my $dateTime = $1;
+        my $value = $2;
+        $value =~ s/\,/\./g;
+        my $time=DOIF_time_sec($dateTime);
+        if (defined $time) {
+          if ($type eq "bar") {
+            DOIF_setBarvalue ($collect,$time+$timeOffset,$value);
+          } else {
+            DOIF_setColvalue ($collect,$time+$timeOffset,$value,$optimize);
+          }
+        } else {
+          $out.="error at: $data[$i]\n";
+        }
       } else {
-        DOIF_setColvalue ($collect,DOIF_time_sec($dateTime)+$timeOffset,$value,$optimize);
+          $out.="error at: $data[$i]\n";
       }
     }
   }
   if ($type eq "bar") {
-    setValue_bar($hash,$collect,undef,1);
+    DOIF_setValue_bar($hash,$collect,undef,1);
   } else {
-    setValue_collect($hash,$collect);
+    DOIF_setValue_collect($hash,$collect);
   }
-  #DOIF_statistic_col ($collect);
-  return;
+  if ($out eq "") {
+    return;
+  } else {
+    return ($out);
+  }
 }
 
 sub DOIF_delete_card_data
@@ -1529,7 +1565,7 @@ sub DOIF_delete_values
   }
 }
 
-sub setValue_collect
+sub DOIF_setValue_collect
 {
   my ($hash,$collect,$statistic)=@_;
   if (!defined ${$collect}{dim}) {
@@ -1685,18 +1721,30 @@ sub DOIF_statistic_col
 
 sub DOIF_time_sec($)
 {
-  my ($str) = @_;
+  my ($dateTime) = @_;
   my @a;
-
-  return time() if(!$str);
-  @a = split(/[\D]/, $str);
-  $a[1]=1 if (!defined $a[1]);
-  $a[2]=1 if (!defined $a[2]);
-  $a[3]=0 if (!defined $a[3]);
-  $a[4]=0 if (!defined $a[4]);
-  $a[5]=0 if (!defined $a[5]);
+  my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst);
+  if ($dateTime =~/^(\d\d\d\d)(?:.(.*))?/) {
+    $year=$1;
+    ($month,$mday,$hour,$min,$sec) = split(/[\D]/, $2) if (defined $2);
+  } elsif ($dateTime =~/(\d\d).(\d\d).(\d\d\d\d)(?:.(\d\d):(\d\d)(?::(\d\d))?)?/) {
+    $mday=$1;
+    $month=$2;
+    $year=$3;
+    $hour=$4;
+    $min=$5;
+    $sec=$6;
+  } else {
+    return (undef);
+  }
+ 
+  $month=1 if (!defined $month);
+  $mday=1 if (!defined $mday);
+  $hour=0 if (!defined $hour);
+  $min=0 if (!defined $min);
+  $sec=0 if (!defined $sec);
   
-  return mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
+  return mktime($sec,$min,$hour,$mday,$month-1,$year-1900,0,0,-1);
 }
 
 sub DOIF_statistic_bar
@@ -1812,6 +1860,27 @@ sub DOIF_setPeriod
   return ($period1,$period2,$begin_period2);
 }
 
+sub DOIF_setBarPosValue
+{
+  my ($bar,$pos,$value)=@_;  
+  my $va=${$bar}{values};
+  if (defined ${$bar}{barType} and ${$bar}{barType} eq "barAvg") {
+    if (defined ${$va}[$pos] and defined ${$bar}{value_pos} and $pos == ${$bar}{value_pos}) {
+      ${$bar}{value_sum}+=$value;
+      ${$bar}{value_num}++;
+      ${$va}[$pos]=${$bar}{value_sum}/${$bar}{value_num};
+    } else {
+      ${$bar}{value_pos}=$pos;
+      ${$bar}{value_sum}=$value;
+      ${$bar}{value_num}=1;
+      ${$va}[$pos]=$value;
+    }
+  } else {  
+    ${$va}[$pos]=$value;
+  }
+}
+
+
 sub DOIF_setBarvalue 
 {
   my ($bar,$seconds,$value)=@_;  
@@ -1824,13 +1893,12 @@ sub DOIF_setBarvalue
   if (defined ${$bar}{last_period2} and $period2 <= ${$bar}{last_period2}) {
     my $diff=(${$bar}{last_period2} - $period2);
     if ($diff < $num) {
-      my $va=${$bar}{values};
-      ${$va}[$diff*$dim+$period1]=$value;
+      DOIF_setBarPosValue($bar,$diff*$dim+$period1,$value);
     }
   }
 }
 
-sub setValue_bar
+sub DOIF_setValue_bar
 {
   my ($hash,$bar,$trigger,$statistic)=@_;
   if (!defined ${$bar}{dim}) {
@@ -1904,7 +1972,8 @@ sub setValue_bar
   ${$bar}{value}=$r;
   if (defined $trigger and $r ne "N/A") {
     if ($timeOffset == 0) {
-      ${$va}[$period1]=${$bar}{value};
+      DOIF_setBarPosValue($bar,$period1,${$bar}{value})
+      #${$va}[$period1]=${$bar}{value};
     } else {
       DOIF_setBarvalue ($bar,$seconds+$timeOffset,${$bar}{value});
     }      
@@ -2153,14 +2222,15 @@ sub ReplaceReadingDoIf
              } else {
               $hash->{collect}{"$name $reading"}{$hours}{output}=$output;
              }
-             setValue_collect($hash,\%{$hash->{collect}{"$name $reading"}{$hours}},1);
+             DOIF_setValue_collect($hash,\%{$hash->{collect}{"$name $reading"}{$hours}},1);
           }
-        } elsif ($format =~ /^(bar(\d*)(day|week|month|year|decade))(-?\d*)?(?::(.*))?/) {
+        } elsif ($format =~ /^((bar|barAvg)(\d*)(day|week|month|year|decade))(-?\d*)?(?::(.*))?/) {
            $regExp = $1;
-           my $num = $2;  
-           my $period = $3;
-           my $timeOffset = $4;
-           $output = $5;
+           my $bartype=$2;
+           my $num = $3;  
+           my $period = $4;
+           my $timeOffset = $5;
+           $output = $6;
            if (defined $cond and $cond >= -7 and $cond <= -4) { #DOIF_Readings,event_Readings,uiTable,uiState
              my $dim;
              if ($period eq "decade") {
@@ -2174,14 +2244,14 @@ sub ReplaceReadingDoIf
              } elsif ($period eq "day") {
                $dim=24;
              }
-             AddRegexpTriggerDoIf($hash,"bar","","bar",$name,$reading);
-             if (ref($hash->{bar}{"$name $reading"}{"$num $period"}{values}) ne "ARRAY")  {
-               delete $hash->{bar}{"$name $reading"}{"$num $period"};
-               my $values=::ReadingsVal($hash->{NAME},".bar_".$name."_".$reading."_".$num."_".$period."_values","");
+             AddRegexpTriggerDoIf($hash,$bartype,"",$bartype,$name,$reading);
+             if (ref($hash->{$bartype}{"$name $reading"}{"$num $period"}{values}) ne "ARRAY")  {
+               delete $hash->{$bartype}{"$name $reading"}{"$num $period"};
+               my $values=::ReadingsVal($hash->{NAME},".".$bartype."_".$name."_".$reading."_".$num."_".$period."_values","");
                my $va;
                my $vadim=($num == 1 ? 2 : $num)*$dim;
                if ($values ne "") {
-                 ($hash->{bar}{"$name $reading"}{"$num $period"}{last_period1},$hash->{bar}{"$name $reading"}{"$num $period"}{last_period2},@{$va})=split (",",$values);
+                 ($hash->{$bartype}{"$name $reading"}{"$num $period"}{last_period1},$hash->{$bartype}{"$name $reading"}{"$num $period"}{last_period2},@{$va})=split (",",$values);
                  if (@{$va} < $vadim) {
                    ${$va}[$vadim-1]=undef;
                  }
@@ -2189,25 +2259,25 @@ sub ReplaceReadingDoIf
                } else {
                  ${$va}[$vadim-1]=undef;
                }
-               $hash->{bar}{"$name $reading"}{"$num $period"}{values} = $va;
-               $hash->{bar}{"$name $reading"}{"$num $period"}{numOrig} = $num;
-               $hash->{bar}{"$name $reading"}{"$num $period"}{num} = $num == 1 ? 2 : $num;
-               $hash->{bar}{"$name $reading"}{"$num $period"}{period} = $period;
-               $hash->{bar}{"$name $reading"}{"$num $period"}{name} = $name;
-               $hash->{bar}{"$name $reading"}{"$num $period"}{reading} = $reading;
-               #$hash->{bar}{"$name $reading"}{"$num $period"}{counter}=$counter;
+               $hash->{$bartype}{"$name $reading"}{"$num $period"}{values} = $va;
+               $hash->{$bartype}{"$name $reading"}{"$num $period"}{numOrig} = $num;
+               $hash->{$bartype}{"$name $reading"}{"$num $period"}{num} = $num == 1 ? 2 : $num;
+               $hash->{$bartype}{"$name $reading"}{"$num $period"}{period} = $period;
+               $hash->{$bartype}{"$name $reading"}{"$num $period"}{name} = $name;
+               $hash->{$bartype}{"$name $reading"}{"$num $period"}{reading} = $reading;
+               #$hash->{$bartype}{"$name $reading"}{"$num $period"}{counter}=$counter;
                
-               $hash->{bar}{"$name $reading"}{"$num $period"}{dim} = $dim;
-               $hash->{bar}{"$name $reading"}{"$num $period"}{type} = "bar";
-               
+               $hash->{$bartype}{"$name $reading"}{"$num $period"}{dim} = $dim;
+               $hash->{$bartype}{"$name $reading"}{"$num $period"}{type} = "bar";
+               $hash->{$bartype}{"$name $reading"}{"$num $period"}{barType} = $bartype;
             } 
             if (!defined $output or $output eq "") {
-              delete $hash->{bar}{"$name $reading"}{"$num $period"}{output};
+              delete $hash->{$bartype}{"$name $reading"}{"$num $period"}{output};
             } else {
-              $hash->{bar}{"$name $reading"}{"$num $period"}{output} = $output;
+              $hash->{$bartype}{"$name $reading"}{"$num $period"}{output} = $output;
             }
-            $hash->{bar}{"$name $reading"}{"$num $period"}{timeOffset} = (defined $timeOffset and $timeOffset ne "") ? $timeOffset : 0; 
-            setValue_bar($hash,\%{$hash->{bar}{"$name $reading"}{"$num $period"}},undef,1);            
+            $hash->{$bartype}{"$name $reading"}{"$num $period"}{timeOffset} = (defined $timeOffset and $timeOffset ne "") ? $timeOffset : 0; 
+            DOIF_setValue_bar($hash,\%{$hash->{$bartype}{"$name $reading"}{"$num $period"}},undef,1);            
           }
         } elsif ($format =~ /^(d[^:]*)(?::(.*))?/) {
           $regExp =$1;
@@ -3435,19 +3505,21 @@ DOIF_Notify($$)
       my $readingregex=CheckRegexpDoIf($hash,"collect",$dev->{NAME},"collect",$eventa,$eventas,$reading);
       if (defined $readingregex) {
         foreach my $hours (keys %{$hash->{collect}{"$device $readingregex"}}){
-          setValue_collect($hash,\%{$hash->{collect}{"$device $readingregex"}{$hours}});
+          DOIF_setValue_collect($hash,\%{$hash->{collect}{"$device $readingregex"}{$hours}});
         }
       }
     }
   }
   
-  if (defined $hash->{Regex}{"bar"}{"$dev->{NAME}"}) {
-    my $device=$dev->{NAME};
-    foreach my $reading (keys %{$hash->{Regex}{"bar"}{$device}{"bar"}}) {
-      my $readingregex=CheckRegexpDoIf($hash,"bar",$dev->{NAME},"bar",$eventa,$eventas,$reading);
-      if (defined $readingregex) {
-        foreach my $period (keys %{$hash->{bar}{"$device $readingregex"}}){
-          setValue_bar($hash,\%{$hash->{bar}{"$device $readingregex"}{$period}},1);
+  foreach my $bartype ("bar","barAvg") {
+    if (defined $hash->{Regex}{$bartype}{"$dev->{NAME}"}) {
+      my $device=$dev->{NAME};
+      foreach my $reading (keys %{$hash->{Regex}{$bartype}{$device}{$bartype}}) {
+        my $readingregex=CheckRegexpDoIf($hash,$bartype,$dev->{NAME},$bartype,$eventa,$eventas,$reading);
+        if (defined $readingregex) {
+          foreach my $period (keys %{$hash->{$bartype}{"$device $readingregex"}}){
+            DOIF_setValue_bar($hash,\%{$hash->{$bartype}{"$device $readingregex"}{$period}},1);
+          }
         }
       }
     }
@@ -3962,7 +4034,7 @@ sub DOIF_Perlblock
   my ($hash,$table,$tail,$subs) =@_;
   my ($beginning,$perlblock,$err,$i);
   $i=0;
-  while($tail =~ /(?:^|\n)\s*([\w\.]*)\s*\{/g) {
+  while($tail =~ /(?:^|\n)\s*([\w\.\/\-]*)\s*\{/g) {
     my $blockname=$1;
     ($beginning,$perlblock,$err,$tail)=GetBlockDoIf($tail,'[\{\}]');
     if ($err) {
@@ -4464,7 +4536,7 @@ DOIF_Set($@)
   } elsif ($arg eq "enable" ) {
       #delete ($defs{$hash->{NAME}}{READINGS}{mode});
       if ($hash->{MODEL} ne "Perl") {
-        readingsSingleUpdate ($hash,"state",ReadingsVal($pn,"last_cmd",""),0) if (ReadingsVal($pn,"last_cmd","") ne "");
+        readingsSingleUpdate ($hash,"state",ReadingsVal($pn,"last_cmd",""),1) if (ReadingsVal($pn,"last_cmd","") ne "");
         delete ($defs{$hash->{NAME}}{READINGS}{last_cmd});
       }
       readingsSingleUpdate ($hash,"mode","enabled",1)
@@ -5444,7 +5516,7 @@ sub card
   my $begin_period2;
 
   if (!defined $col) {
-    return("");
+    return("no definition at collect parameter");
   }
   
   if (ref($col) eq "ARRAY") {
@@ -5466,36 +5538,34 @@ sub card
         $value1[$i]{value}=${$col}[$i];
       }
     }
-  } else {
-    if (ref ($col) eq "HASH") {
-      $colcount++;
-      $value1[0]=$col;
-      if (!defined $dim) {
-        $type=$value1[0]{type};
-        $hours=$value1[0]{hours};
-        $time=$value1[0]{time};
-        $dim=$value1[0]{dim};
-        $period=$value1[0]{period};
-        $period1=$value1[0]{last_period1};
-        $period2=$value1[0]{last_period2};
-        $begin_period2=$value1[0]{begin_period2};
-      }
-    } else {
-      $value1[0]{value}=$col;
+  } elsif (ref ($col) eq "HASH") {
+    $colcount++;
+    $value1[0]=$col;
+    if (!defined $dim) {
+      $type=$value1[0]{type};
+      $hours=$value1[0]{hours};
+      $time=$value1[0]{time};
+      $dim=$value1[0]{dim};
+      $period=$value1[0]{period};
+      $period1=$value1[0]{last_period1};
+      $period2=$value1[0]{last_period2};
+      $begin_period2=$value1[0]{begin_period2};
     }
-  }  
+  } else {
+    return ("wrong definition at collect parameter: $col");
+   # $value1[0]{value}=$col;
+  }
  
   if (ref($unit_a) eq "ARRAY") {
     for (my $i=0;$i < @{$unit_a};$i++) {
       $unit1[$i]=${$unit_a}[$i];
     }
-  } else {
-    if (!defined $unit_a) {
+  } elsif (!defined $unit_a) {
       $unit1[0]="";
-    } else {
+  } else {
       $unit1[0]=$unit_a;
-    }
   }
+
   if (defined $col2) {
     if (ref($col2) eq "ARRAY") {
       for (my $i=0;$i< @{$col2};$i++) {
@@ -5513,8 +5583,7 @@ sub card
           $value2[$i]{value}=${$col2}[$i];
         }
       }
-    } else {
-      if (ref ($col2) eq "HASH") {
+    } elsif (ref ($col2) eq "HASH") {
         $col2count++;
         $value2[0]=$col2;
         if (!defined $dim) {
@@ -5524,27 +5593,21 @@ sub card
           $dim=$value2[0]{dim};
           $period=$value2[0]{period};
         }  
-      } else {
-        $value2[0]{value}=$col2;
-      }
-    }  
+    } else {
+      return ("wrong definition at collect2 parameter: $col2");
+      #  $value2[0]{value}=$col2;
+    }
   }
   if (ref($unit_b) eq "ARRAY") {
     for (my $i=0;$i < @{$unit_b};$i++) {
       $unit2[$i]=${$unit_b}[$i];
     }
-  } else {
-    if (!defined $unit_b) {
+  } elsif (!defined $unit_b) {
       $unit2[0]="";
-    } else {
+  } else {
       $unit2[0]=$unit_b;
-    }
   }
-
- # if (!defined $value1[0]{value}) {
- #   return("");
- # }
- 
+  
   if (!defined $dim) {
     return("");
   }
@@ -5749,7 +5812,9 @@ sub card
   my @outfooter;
 
   if ($type eq "bar") {
+    my ($sec,$minutes,$hour,$mday,$month,$year,$wday,$yday,$isdst); 
     my @desc;
+    my @monthDays;
     my $x;
     my $dimplot=$dim;
     if ($period eq "decade") {
@@ -5758,6 +5823,9 @@ sub card
       @desc= qw(Jan Feb Mär Apr Mai Jun Jul Aug Sep Okt Nov Dez);
     } elsif ($period eq "month") {
       @desc=qw(01 03 05 07 09 11 13 15 17 19 21 23 25 27 29 31);
+      ($sec,$minutes,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime();
+      @monthDays=qw(31 28 31 30 31 30 31 31 30 31 30 31);
+      $monthDays[1]=($year % 4 == 0 and $year % 100 != 0 or $year % 400 == 0) ? 29 : 28;
       $dimplot=32;
     } elsif ($period eq "week") {
       @desc=qw(Mo Di Mi Do Fr Sa So);
@@ -5765,16 +5833,27 @@ sub card
       $dimplot=26;
       @desc=qw(00 02 04 06 08 10 12 14 16 18 20 22 24);
     }
-
+    
+    
+    
     my $xOffset=0.5*$chart_dim/@desc;
     $x=int(($xOffset+$period1*$chart_dim/$dimplot)*10)/10;
     $out.= sprintf('<text text-anchor="end" x=-2.5 y=61 style="fill:#CCCCCC;font-size:7px;">%s</text>',$begin_period2); 
-    $out.= sprintf('<circle cx="%s" cy="%s" r="1.5" fill=#CCCCCC  opacity="1"/>',$x,53);
-
+    $out.= sprintf('<circle cx="%s" cy="53" r="1.5" fill=#CCCCCC  opacity="1"/>',$x);
     for (my $i=0;$i<@desc;$i++) {
       $x=int(($i+0.5)*$chart_dim/@desc*10)/10;
       $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#505050; stroke-width:0.3; stroke-opacity:1" />',$x,0,$x,50);
-      $out.=sprintf('<text text-anchor="middle" x="%s" y="61" style="fill:#CCCCCC;font-size:7px">%s</text>',$x,$desc[$i]);
+      $out.=sprintf('<text text-anchor="middle" x="%s" y="61" style="fill:%s;font-size:7px">%s</text>',$x,($period eq "month" and $desc[$i] > $monthDays[$month]) ? "#A0A0A0":"#CCCCCC",$desc[$i]);
+    }
+    
+    if ($period eq "month") {
+      my $su=$period1+7-$wday;
+      my $first=$su % 7;
+      for (my $i=0;$i<5;$i++) {
+        my $day=$first+$i*7;
+        $x=int(($xOffset+($first+$i*7)*$chart_dim/$dimplot)*10)/10;  
+        $out.=sprintf('<polyline points="%s,63,%s,63"  style="stroke:#CCCCCC; stroke-width:1; stroke-opacity:1" />',$x-2,$x+2) if ($day < $monthDays[$month]);
+      }
     }
     
     my $minVal;
