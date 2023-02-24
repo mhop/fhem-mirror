@@ -3697,7 +3697,9 @@ ResolveDateWildcards($@)
   return $f if($f !~ m/%/);     # Be fast if there is no wildcard
   my $logdir = Logdir();
   $f =~ s/%L/$logdir/g;
-  return strftime($f,@t);
+  my $ret = strftime($f,@t);    # converts from UTF-8 to WideChar
+  $ret = Encode::encode("UTF-8", $ret) if(!$unicodeEncoding);
+  return $ret;
 }
 
 sub
