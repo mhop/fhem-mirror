@@ -121,6 +121,7 @@ MQTT2_CLIENT_connect($)
     $hash->{binary} = 1;
     $hash->{header}{"Sec-WebSocket-Protocol"} = "mqtt";
   }
+  $hash->{nrConnects}++;
   return DevIo_OpenDev($hash, $disco, "MQTT2_CLIENT_doinit", sub(){})
                 if($hash->{connecting});
 }
@@ -133,7 +134,6 @@ MQTT2_CLIENT_doinit($)
 
   ############################## CONNECT
   if($hash->{connecting} == 1) {
-    $hash->{nrConnects}++;
     my $usr = AttrVal($name, "username", "");
     my ($err, $pwd) = getKeyValue($name);
     $pwd = undef if($usr eq "");
