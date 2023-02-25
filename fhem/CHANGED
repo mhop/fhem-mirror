@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbLog: new attr plotInputFieldLength, attr noNotifyDev deleted,
+                      Plot Editor improved
  - feature: 02_RSS: device alias displayed in device overview
  - change:  93_DbLog: adapt configCheck, new get...configCheck, commref edited
  - change:  93_DbLog: adapt configCheck

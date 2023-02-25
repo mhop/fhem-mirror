@@ -38,6 +38,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.8.4"   => "20.02.2023 new attr plotInputFieldLength, improve Plot Editor, delete attr noNotifyDev ".
+                           "move notifyRegexpChanged from Define to initOnStart ",
   "5.8.3"   => "19.02.2023 adapt DbLog_configcheck, new get ... configCheck, commandref edited ",
   "5.8.2"   => "18.02.2023 adapt DbLog_configcheck, Forum: https://forum.fhem.de/index.php/topic,132163.msg1264320.html#msg1264320 ",
   "5.8.1"   => "13.02.2023 change field type of DbLogInclude, DbLogExclude to textField-long, configCheck evaluate collation ".
@@ -155,6 +157,7 @@ my $dblog_cachedef = 500;                       # default Größe cacheLimit bei
 my $dblog_cmdef    = 'basic_ta:on';             # default commitMode
 my $dblog_todef    = 86400;                     # default timeout Sekunden
 my $dblog_lrpth    = 0.8;                       # Schwellenwert für LONGRUN_PID ab dem "Another operation is in progress...." im state ausgegeben wird
+my $dblog_pifl     = 40;                        # default Breite Eingabefelder im Plot Editor
 
 ################################################################
 sub DbLog_Initialize {
@@ -190,7 +193,7 @@ sub DbLog_Initialize {
                                "exportCacheAppend:1,0 ".
                                "insertMode:1,0 ".
                                "noSupportPK:1,0 ".
-                               "noNotifyDev:1,0 ".
+                               "plotInputFieldLength ".
                                "showproctime:1,0 ".
                                "suppressAddLogV3:1,0 ".
                                "suppressUndef:0,1 ".
@@ -233,15 +236,14 @@ sub DbLog_Define {
 
   if($DbLogMMDBI) {
       $err = "Perl module ".$DbLogMMDBI." is missing. On Debian you can install it with: sudo apt-get install libdbi-perl";
-      Log3($name, 1, "DbLog $name - ERROR - $err");
+      Log3 ($name, 1, "DbLog $name - ERROR - $err");
       return "Error: $err";
   }
 
   if ($storabs) {
       $err = "Perl module ".$storabs." is missing. On Debian you can install it with: sudo apt-get install libstorable-perl";
-      Log3($name, 1, "DbLog $name - ERROR - $err");
+      Log3 ($name, 1, "DbLog $name - ERROR - $err");
       return "Error: $err";
-
   }
 
   return "wrong syntax: define <name> DbLog configuration regexp" if(int(@a) != 4);
@@ -258,7 +260,6 @@ sub DbLog_Define {
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                                                      # Modul Meta.pm nicht vorhanden
 
   DbLog_setVersionInfo ($hash);                                                                               # Versionsinformationen setzen
-  notifyRegexpChanged  ($hash, $regexp);                                                                      # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
 
   $hash->{PID}                      = $$;                                                                     # remember PID for plotfork
   $data{DbLog}{$name}{cache}{index} = 0;                                                                      # CacheIndex für Events zum asynchronen Schreiben in DB
@@ -308,8 +309,8 @@ sub _DbLog_initOnStart {
       readingsDelete ($hash, $r);
   }
 
-  DbLog_setSchemeTable ($hash);
-
+  DbLog_setSchemeTable   ($hash);
+  notifyRegexpChanged    ($hash, $hash->{REGEXP});                      # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
   DbLog_SBP_CheckAndInit ($hash);
 
   my $rst = DbLog_SBP_sendConnectionData ($hash);                       # Verbindungsdaten an SubProzess senden
@@ -415,8 +416,10 @@ sub DbLog_Attr {
   my $hash = $defs{$name};
   my $do   = 0;
 
-  if ($aName eq "traceHandles") {
-      return;
+  if ($aName =~ /^(traceHandles|noNotifyDev)$/xs) {
+      my $msg = "$name - The attribute >$aName< is deprecated and is not set anymore.";
+      Log3 ($name, 1, "DbLog $name $msg");
+      return $msg;
   }
 
   if($cmd eq "set") {
@@ -424,6 +427,7 @@ sub DbLog_Attr {
           $aName eq "cacheLimit"             ||
           $aName eq "cacheOverflowThreshold" ||
           $aName eq "SQLiteCacheSize"        ||
+          $aName eq "plotInputFieldLength"   ||
           $aName eq "timeout") {
           if ($aVal !~ /^[0-9]+$/) { return "The Value of $aName is not valid. Use only figures 0-9 !";}
       }
@@ -498,17 +502,6 @@ sub DbLog_Attr {
   if($aName eq "showNotifyTime") {
       if ($cmd ne "set" || !$aVal) {
           delete($defs{$name}{READINGS}{notify_processing_time});
-      }
-  }
-
-  if($aName eq "noNotifyDev") {
-      my $regexp = $hash->{REGEXP};
-
-      if ($cmd eq "set" && $aVal) {
-          delete($hash->{NOTIFYDEV});
-      }
-      else {
-          notifyRegexpChanged($hash, $regexp);
       }
   }
 
@@ -7218,20 +7211,23 @@ sub DbLog_configcheck {
 
   ### Check Plot Erstellungsmodus
   #######################################################################
-  $check          .= "<u><b>Result of plot generation method check</u></b><br><br>";
-  my @webdvs       = devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
-  my ($forks,$emb) = (1,1);
-  my $wall         = "";
+  $check      .= "<u><b>Result of plot generation method check</u></b><br><br>";
+  my @webdvs   = devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
+  my $forks    = 1;
+  my $lpseb    = 1;
+  my $noemb    = 1;
+  my $wall     = "";
 
   for my $web (@webdvs) {
       my $pf  = AttrVal ($web, 'plotfork',    0);
       my $lps = AttrVal ($web, 'longpollSVG', 0);
       my $pe  = AttrVal ($web, 'plotEmbed',   0);
 
-      $forks = 0 if(!$pf);
-      $emb   = 0 if($lps && $pe != 1);
+      $forks  = 0 if(!$pf);
+      $lpseb  = 0 if($lps && $pe != 1);
+      $noemb  = 0 if($pf && !$pe);
 
-      if(!$pf || ($lps && $pe != 1)) {
+      if (!$pf || ($lps && $pe != 1) || ($pf && !$pe)) {
           $wall .= "<b>".$web.": plotfork=".$pf." / plotEmbed=".$pe." / longpollSVG=".$lps."</b><br>";
       }
       else {
@@ -7239,15 +7235,19 @@ sub DbLog_configcheck {
       }
   }
 
-  if (!$forks || !$emb) {
+  if (!$forks || !$lpseb || !$noemb) {
       $rec = q{};
 
       if (!$forks) {
           $check .= "WARNING - at least one of your FHEMWEB devices has attribute 'plotfork = 1' not set. <br>";
       }
 
-      if (!$emb) {
+      if (!$lpseb) {
           $check .= "WARNING - at least one of your FHEMWEB devices has attribute 'longpollSVG = 1' but not 'plotEmbed = 1' set. <br>";
+      }
+      
+      if (!$noemb) {
+          $check .= "WARNING - at least one of your FHEMWEB devices has attribute 'plotEmbed' not set. <br>";
       }
 
       $check .= "<br>";
@@ -7262,7 +7262,13 @@ sub DbLog_configcheck {
                  "See also global attribute <a href=\"http://fhem.de/commandref.html#blockingCallMax\">blockingCallMax</a>. <br>"
       }
 
-      if (!$emb) {
+      if (!$noemb) {
+          $rec .= "You should set attribute 'plotEmbed = (1 | 2)' in relevant devices. ".
+                  "If this attribute is not set, blocking situations may occure when creating plots. <br>".
+                  "Refer to <a href=\"http://fhem.de/commandref.html#FHEMWEB-attr-plotEmbed\">plotEmbed</a> for further information.<br>";
+      }
+      
+      if (!$lpseb) {
           $rec .= "You have to set the attribute 'plotEmbed = 1' in FHEMWEB devices where 'longpollSVG' should be used. ".
                   "Refer to <a href=\"http://fhem.de/commandref.html#FHEMWEB-attr-longpollSVG\">longpollSVG</a> for further information.<br>";
       }
@@ -8436,10 +8442,17 @@ sub DbLog_fhemwebFn {
 return $ret;
 }
 
-################################################################
+#################################################################################
 #  Dropdown-Menü current-Tabelle SVG-Editor
 #  Datenlieferung für SVG EDitor
-################################################################
+#
+#  Beispiel Input Zeile: sysmon:ram:::$val=~s/^Total..([\d.]*).*/$1/eg
+#                          0     1 23 4
+#  $ret .= SVG_txt("par_${r}_0", "", $f[0], 40); # Device  (Column bei FileLog)
+#  $ret .= SVG_txt("par_${r}_1", "", $f[1], 40); # Reading (RegExp bei FileLog)
+#  $ret .= SVG_txt("par_${r}_2", "", $f[2], 1);  # Default not yet implemented
+#  $ret .= SVG_txt("par_${r}_3", "", $f[3], 3);  # Function
+#################################################################################
 sub DbLog_sampleDataFn {
   my $dlName  = shift;
   my $dlog    = shift;
@@ -8447,9 +8460,10 @@ sub DbLog_sampleDataFn {
   my $conf    = shift;
   my $wName   = shift;
 
-  my $desc    = "Device:Reading";
+  my $desc    = "";                                                                         # Beschreibung über Eingabezeile
   my $hash    = $defs{$dlName};
   my $current = $hash->{HELPER}{TC};
+  my $history = $hash->{HELPER}{TH};
 
   my @htmlArr;
   my @example;
@@ -8459,52 +8473,63 @@ sub DbLog_sampleDataFn {
   my $err = _DbLog_manageDBHU ($defs{$dlName});
   return if($err);
 
-  my $dbh = $hash->{DBHU};
+  my $dbh    = $hash->{DBHU};
+  my $ccount = 0;
+  my $dblt   = AttrVal ($dlName, 'DbLogType',              'History');
+  my $pifl   = AttrVal ($dlName, 'plotInputFieldLength', $dblog_pifl);
 
-  my $currentPresent = AttrVal($dlName, 'DbLogType', 'History');
-  my $prescurr       = eval {$dbh->selectrow_array("select count(*) from $current");} || 0;
+  if ($dblt =~ m/Current|SampleFill/xs) {
+      $ccount = eval {$dbh->selectrow_array("select count(*) from $current");} || 0;
+  }
 
-  Log3 ($dlName, 5, "DbLog $dlName - Table $current present: $prescurr (0 = not present or no content)");
+  if ($ccount) {                                                                           # Table Current present, use it for sample data
+      $desc = "Device:Reading:".
+              "<br>Function";                                                              # Beschreibung über Eingabezeile
 
-  if($currentPresent =~ m/Current|SampleFill/ && $prescurr) {                                             # Table Current present, use it for sample data
       my $query = "select device,reading from $current where device <> '' group by device,reading";
       my $sth   = $dbh->prepare( $query );
-
       $sth->execute();
 
       while (my @line = $sth->fetchrow_array()) {
           $counter++;
-          push @example, join " ", @line if($counter <= 8);                                               # show max 8 examples
-          push @colregs, "$line[0]:$line[1]";                                                             # push all eventTypes to selection list
+          push @example, (join ":", @line).':[Function]' if($counter <= 8);                # show max 8 examples
+          push @colregs, "$line[0]:$line[1]";                                              # push all eventTypes to selection list
       }
 
-      #$dbh->disconnect();
       my $cols = join ",", sort { "\L$a" cmp "\L$b" } @colregs;
 
-      for(my $r = 0; $r < $max; $r++) {
-          my @f   = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
+      for (my $r = 0; $r < $max; $r++) {
+          my @f   = split ":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4;                     # Beispiel Input Zeile: sysmon:ram:::$val=~s/^Total..([\d.]*).*/$1/eg
           my $ret = "";
-          $ret .= SVG_sel("par_${r}_0", $cols, "$f[0]:$f[1]");
-#         $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
-#         $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
-#         $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
+
+          no warnings 'uninitialized';                                                     # Forum:74690, bug unitialized
+          $ret .= SVG_sel("par_${r}_0", $cols, "$f[0]:$f[1]");                             # par_<Zeile>_<Spalte>, <Auswahl>, <Vorbelegung>
+          use warnings;
+
+          $ret .= SVG_sel("par_${r}_2", ":", ":");                                         # nur ein Trenner -> wird zu ":::"
+
+          $f[3] =~ /^(:+)?(.*)/xs;
+          $ret .= SVG_txt("par_${r}_3", "<br>", "$2", $pifl);                              # RegExp (z.B. $val=~s/^Total..([\d.]*).*/$1/eg)
+
           push @htmlArr, $ret;
       }
   }
   else {                                                                                   # Table Current not present, so create an empty input field
-      push @example, "No sample data due to missing table '$current'";
+      push @example, '&lt;Device&gt;:&lt;Reading&gt;::[Function]';
 
-      for(my $r = 0; $r < $max; $r++) {
-          my @f   = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
+      $desc = "Device:Reading::".
+              "<br>Function";                                                              # Beschreibung über Eingabezeile
+
+      for (my $r = 0; $r < $max; $r++) {
+          my @f   = split ":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4;
           my $ret = "";
 
           no warnings 'uninitialized';                                                     # Forum:74690, bug unitialized
-          $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]:$f[2]:$f[3]", 20);
+          $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]::", $pifl);                       # letzter Wert -> Breite der Eingabezeile
           use warnings;
 
-#         $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
-#         $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
-#         $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
+          $f[3] =~ /^(:+)?(.*)/xs;
+          $ret .= SVG_txt("par_${r}_3", "<br>", "$2", $pifl);                              # RegExp (z.B. $val=~s/^Total..([\d.]*).*/$1/eg)
 
           push @htmlArr, $ret;
       }
@@ -9660,10 +9685,8 @@ return;
 
   <ul>
     <a id="DbLog-attr-addStateEvent"></a>
-    <li><b>addStateEvent</b>
+    <li><b>addStateEvent [0|1] </b> <br><br>
     <ul>
-      <code>attr &lt;device&gt; addStateEvent [0|1]
-      </code><br><br>
 
       As you probably know the event associated with the state Reading is special, as the "state: "
       string is stripped, i.e event is not "state: on" but just "on". <br>
@@ -9679,10 +9702,8 @@ return;
 
   <ul>
     <a id="DbLog-attr-asyncMode"></a>
-    <li><b>asyncMode</b>
+    <li><b>asyncMode [0|1] </b> <br><br>
     <ul>
-      <code>attr &lt;device&gt; asyncMode [0|1]
-      </code><br><br>
 
       This attribute sets the processing procedure according to which the DbLog device writes the data to the database. <br>
       DbLog uses a sub-process to write the log data into the database and processes the data
@@ -9721,10 +9742,8 @@ return;
 
   <ul>
     <a id="DbLog-attr-commitMode"></a>
-    <li><b>commitMode</b>
+    <li><b>commitMode [basic_ta:on | basic_ta:off | ac:on_ta:on | ac:on_ta:off | ac:off_ta:on] </b> <br><br>
     <ul>
-      <code>attr &lt;device&gt; commitMode [basic_ta:on | basic_ta:off | ac:on_ta:on | ac:on_ta:off | ac:off_ta:on]
-      </code><br><br>
 
       Change the usage of database autocommit- and/or transaction- behavior. <br>
       If transaction "off" is used, not saved datasets are not returned to cache in asynchronous mode. <br>
@@ -9745,9 +9764,8 @@ return;
 
   <ul>
     <a id="DbLog-attr-cacheEvents"></a>
-    <li><b>cacheEvents</b>
+    <li><b>cacheEvents [2|1|0] </b> <br><br>
     <ul>
-      <code>attr &lt;device&gt; cacheEvents [2|1|0] </code><br><br>
 
       <ul>
        <table>
@@ -9767,11 +9785,8 @@ return;
 
   <ul>
      <a id="DbLog-attr-cacheLimit"></a>
-     <li><b>cacheLimit</b>
+     <li><b>cacheLimit &lt;n&gt; </b> <br><br>
      <ul>
-       <code>
-       attr &lt;device&gt; cacheLimit &lt;n&gt;
-       </code><br><br>
 
        In asynchronous logging mode the content of cache will be written into the database and cleared if the number &lt;n&gt; datasets
        in cache has reached. Thereby the timer of asynchronous logging mode will be set new to the value of
@@ -9785,11 +9800,8 @@ return;
 
   <ul>
      <a id="DbLog-attr-cacheOverflowThreshold"></a>
-     <li><b>cacheOverflowThreshold</b>
+     <li><b>cacheOverflowThreshold &lt;n&gt; </b> <br><br>
      <ul>
-       <code>
-       attr &lt;device&gt; cacheOverflowThreshold &lt;n&gt;
-       </code><br><br>
 
        In asynchronous log mode, sets the threshold of &lt;n&gt; records above which the cache contents are exported to a
        file instead of writing the data to the database. <br>
@@ -9810,11 +9822,8 @@ return;
 
   <ul>
      <a id="DbLog-attr-colEvent"></a>
-     <li><b>colEvent</b>
+     <li><b>colEvent &lt;n&gt; </b> <br><br>
      <ul>
-       <code>
-       attr &lt;device&gt; colEvent &lt;n&gt;
-       </code><br><br>
 
        The field length of database field EVENT will be adjusted. By this attribute the default value in the DbLog-device can be
        adjusted if the field length in the databse was changed nanually. If colEvent=0 is set, the database field
@@ -9828,11 +9837,8 @@ return;
 
   <ul>
      <a id="DbLog-attr-colReading"></a>
-     <li><b>colReading</b>
+     <li><b>colReading &lt;n&gt; </b> <br><br>
      <ul>
-       <code>
-       attr &lt;device&gt; colReading &lt;n&gt;
-       </code><br><br>
 
        The field length of database field READING will be adjusted. By this attribute the default value in the DbLog-device can be
        adjusted if the field length in the databse was changed nanually. If colReading=0 is set, the database field
@@ -9846,11 +9852,8 @@ return;
 
   <ul>
      <a id="DbLog-attr-colValue"></a>
-     <li><b>colValue</b>
+     <li><b>colValue &lt;n&gt; </b> <br><br>
      <ul>
-       <code>
-       attr &lt;device&gt; colValue &lt;n&gt;
-       </code><br><br>
 
        The field length of database field VALUE will be adjusted. By this attribute the default value in the DbLog-device can be
        adjusted if the field length in the databse was changed nanually. If colEvent=0 is set, the database field
@@ -9863,12 +9866,24 @@ return;
   <br>
 
   <ul>
-     <a id="DbLog-attr-DbLogType"></a>
-     <li><b>DbLogType</b>
+     <a id="DbLog-attr-convertTimezone"></a>
+     <li><b>convertTimezone [UTC | none] </b> <br><br>
      <ul>
-       <code>
-       attr &lt;device&gt; DbLogType [Current|History|Current/History]
-       </code><br><br>
+
+       UTC - the local timestamp of the event will be converted to UTC. <br>
+       (default: none) <br><br>
+
+       <b>Note:</b> <br>
+       The Perl modules 'DateTime' and 'DateTime::Format::Strptime' must be installed!
+     </ul>
+     </li>
+  </ul>
+  <br>
+
+  <ul>
+     <a id="DbLog-attr-DbLogType"></a>
+     <li><b>DbLogType [Current|History|Current/History] </b> <br><br>
+     <ul>
 
        This attribute determines which table or which tables in the database are wanted to use. If the attribute isn't set,
        the adjustment <i>history</i> will be used as default. <br>
@@ -9903,11 +9918,8 @@ return;
 
   <ul>
     <a id="DbLog-attr-DbLogSelectionMode"></a>
-    <li><b>DbLogSelectionMode</b>
+    <li><b>DbLogSelectionMode [Exclude|Include|Exclude/Include] </b> <br><br>
     <ul>
-      <code>
-      attr &lt;device&gt; DbLogSelectionMode [Exclude|Include|Exclude/Include]
-      </code><br><br>
 
       This attribute, specific to DbLog devices, influences how the device-specific attributes
       <a href="#DbLog-attr-DbLogExclude">DbLogExclude</a> and <a href="#DbLog-attr-DbLogInclude">DbLogInclude</a>
@@ -9939,11 +9951,8 @@ return;
 
   <ul>
     <a id="DbLog-attr-DbLogInclude"></a>
-    <li><b>DbLogInclude</b>
+    <li><b>DbLogInclude Regex[:MinInterval][:force],[Regex[:MinInterval][:force]], ... </b> <br><br>
     <ul>
-      <code>
-      attr <device> DbLogInclude Regex[:MinInterval][:force],[Regex[:MinInterval][:force]], ...
-      </code><br><br>
 
       The DbLogInclude attribute defines the readings to be stored in the database. <br>
       The definition of the readings to be stored is done by a regular expression and all readings that match the regular
@@ -9987,11 +9996,8 @@ return;
 
   <ul>
     <a id="DbLog-attr-DbLogExclude"></a>
-    <li><b>DbLogExclude</b>
+    <li><b>DbLogExclude Regex[:MinInterval][:force],[regex[:MinInterval][:force]] ... </b> <br><br>
     <ul>
-      <code>
-      attr &lt;device&gt; DbLogExclude regex[:MinInterval][:force],[regex[:MinInterval][:force]] ...
-      </code><br><br>
 
       The DbLogExclude attribute defines the readings that <b>should not</b> be stored in the database. <br>
 
@@ -10038,11 +10044,8 @@ return;
 
   <ul>
      <a id="DbLog-attr-DbLogValueFn"></a>
-     <li><b>DbLogValueFn</b>
+     <li><b>DbLogValueFn {} </b> <br><br>
      <ul>
-       <code>
-       attr &lt;device&gt; DbLogValueFn {}
-       </code><br><br>
 
        If DbLog is used, the <i>DbLogValueFn</i> attribute is propagated in all devices.
        This attribute is set in the <b>source devices</b> and allows to change the values before logging
@@ -10080,11 +10083,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-dbSchema"></a>
-    <li><b>dbSchema</b>
+    <li><b>dbSchema &lt;schema&gt; </b> <br><br>
     <ul>
-      <code>
-      attr &lt;device&gt; dbSchema &lt;schema&gt;
-      </code><br><br>
 
       This attribute is available for database types MySQL/MariaDB and PostgreSQL. The table names (current/history) are
       extended by its database schema. It is an advanced feature and normally not necessary to set.
@@ -10096,11 +10096,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-defaultMinInterval"></a>
-    <li><b>defaultMinInterval</b>
+    <li><b>defaultMinInterval &lt;devspec&gt;::&lt;MinInterval&gt;[::force],[&lt;devspec&gt;::&lt;MinInterval&gt;[::force]] ... </b> <br><br>
     <ul>
-      <code>
-      attr &lt;device&gt; defaultMinInterval &lt;devspec&gt;::&lt;MinInterval&gt;[::force],[&lt;devspec&gt;::&lt;MinInterval&gt;[::force]] ...
-      </code><br><br>
 
       With this attribute a default minimum interval for <a href="http://fhem.de/commandref.html#devspec">devspec</a> is defined.
       If a defaultMinInterval is set, the logentry is dropped if the defined interval is not reached <b>and</b> the value vs.
@@ -10125,11 +10122,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-excludeDevs"></a>
-     <li><b>excludeDevs</b>
+     <li><b>excludeDevs &lt;devspec1&gt;[#Reading],&lt;devspec2&gt;[#Reading],&lt;devspec...&gt; </b> <br><br>
      <ul>
-       <code>
-       attr &lt;device&gt; excludeDevs &lt;devspec1&gt;[#Reading],&lt;devspec2&gt;[#Reading],&lt;devspec...&gt;
-       </code><br><br>
 
        The device/reading-combinations "devspec1#Reading", "devspec2#Reading" up to "devspec.." are globally excluded from
        logging into the database. <br>
@@ -10159,11 +10153,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-expimpdir"></a>
-     <li><b>expimpdir</b>
+     <li><b>expimpdir &lt;directory&gt; </b> <br><br>
      <ul>
-       <code>
-       attr &lt;device&gt; expimpdir &lt;directory&gt;
-       </code><br><br>
 
        If the cache content will be exported by <a href="#DbLog-set-exportCache">exportCache</a> command,
        the file will be written into or read from that directory. The default directory is
@@ -10182,11 +10173,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-exportCacheAppend"></a>
-     <li><b>exportCacheAppend</b>
+     <li><b>exportCacheAppend [1|0] </b> <br><br>
      <ul>
-       <code>
-       attr &lt;device&gt; exportCacheAppend [1|0]
-       </code><br><br>
 
        If set, the export of cache ("set &lt;device&gt; exportCache") appends the content to the newest available
        export file. If there is no exististing export file, it will be new created. <br>
@@ -10198,9 +10186,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-insertMode"></a>
-    <li><b>insertMode</b>
+    <li><b>insertMode [1|0] </b> <br><br>
     <ul>
-      <code>attr &lt;device&gt; insertMode [1|0] </code><br><br>
 
       Toggles the insert mode of the database interface. <br><br>
 
@@ -10221,27 +10208,9 @@ attr SMA_Energymeter DbLogValueFn
   <br>
 
   <ul>
-     <a id="DbLog-attr-noNotifyDev"></a>
-     <li><b>noNotifyDev</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; noNotifyDev [1|0]
-       </code><br><br>
-
-       Enforces that NOTIFYDEV won't set and hence won't used. <br>
-     </ul>
-     </li>
-  </ul>
-  <br>
-
-  <ul>
      <a id="DbLog-attr-noSupportPK"></a>
-     <li><b>noSupportPK</b>
+     <li><b>noSupportPK [1|0] </b> <br><br>
      <ul>
-       <code>
-       attr &lt;device&gt; noSupportPK [1|0]
-       </code><br><br>
-
        Deactivates the support of a set primary key by the module.<br>
      </ul>
      </li>
@@ -10249,13 +10218,22 @@ attr SMA_Energymeter DbLogValueFn
   <br>
 
   <ul>
-     <a id="DbLog-attr-SQLiteCacheSize"></a>
-     <li><b>SQLiteCacheSize</b>
+     <a id="DbLog-attr-plotInputFieldLength"></a>
+     <li><b>plotInputFieldLength &lt;Ganzzahl&gt; </b> <br><br>
      <ul>
-       <code>
-       attr &lt;device&gt; SQLiteCacheSize &lt;number of memory pages used for caching&gt;
-       </code><br><br>
+        Width of the Plot Editor input fields for Device:Reading and Function. <br>
+        If the drop-down list is used as input help for Device:Reading, the width of the field is
+        set automatically. <br>
+        (default: 40)
+     </ul>
+     </li>
+  </ul>
+  <br>
 
+  <ul>
+     <a id="DbLog-attr-SQLiteCacheSize"></a>
+     <li><b>SQLiteCacheSize &lt;number of memory pages used for caching&gt; </b> <br><br>
+     <ul>
        The default is about 4MB of RAM to use for caching (page_size=1024bytes, cache_size=4000).<br>
        Embedded devices with scarce amount of RAM can go with 1000 pages or less. This will impact
        the overall performance of SQLite. <br>
@@ -10267,11 +10245,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-SQLiteJournalMode"></a>
-     <li><b>SQLiteJournalMode</b>
+     <li><b>SQLiteJournalMode [WAL|off] </b> <br><br>
      <ul>
-       <code>
-       attr &lt;device&gt; SQLiteJournalMode [WAL|off]
-       </code><br><br>
 
        Determines how SQLite databases are opened. Generally the Write-Ahead-Log (<b>WAL</b>) is the best choice for robustness
        and data integrity.<br>
@@ -10286,10 +10261,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-syncEvents"></a>
-    <li><b>syncEvents</b>
+    <li><b>syncEvents [1|0] </b> <br><br>
     <ul>
-      <code>attr &lt;device&gt; syncEvents [1|0]
-      </code><br><br>
 
       events of reading syncEvents will be created. <br>
     </ul>
@@ -10299,9 +10272,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-showproctime"></a>
-    <li><b>showproctime</b>
+    <li><b>showproctime [1|0] </b> <br><br>
     <ul>
-      <code>attr &lt;device&gt; showproctime [1|0] </code><br><br>
 
       If set, the reading "sql_processing_time" shows the required processing time (in seconds) for the
       SQL execution of the executed function.
@@ -10315,9 +10287,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-showNotifyTime"></a>
-    <li><b>showNotifyTime</b>
+    <li><b>showNotifyTime [1|0] </b> <br><br>
     <ul>
-      <code>attr &lt;device&gt; showNotifyTime [1|0] </code><br><br>
 
       If set, the reading "notify_processing_time" shows the required processing time (in seconds) for the
       processing of the DbLog notify function. <br>
@@ -10337,10 +10308,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-syncInterval"></a>
-    <li><b>syncInterval</b>
+    <li><b>syncInterval &lt;n&gt; </b> <br><br>
     <ul>
-      <code>attr &lt;device&gt; syncInterval &lt;n&gt;
-      </code><br><br>
 
       If the asynchronous mode is set in the DbLog device (asyncMode=1), this attribute sets the interval (seconds) for
       writing data to the database. <br>
@@ -10353,10 +10322,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-suppressAddLogV3"></a>
-    <li><b>suppressAddLogV3</b>
+    <li><b>suppressAddLogV3 [1|0] </b> <br><br>
     <ul>
-      <code>attr &lt;device&gt; suppressAddLogV3 [1|0]
-      </code><br><br>
 
       If set, verbose 3 Logfileentries done by the addLog-function will be suppressed.  <br>
     </ul>
@@ -10366,11 +10333,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-suppressUndef"></a>
-    <li><b>suppressUndef</b>
+    <li><b>suppressUndef </b> <br><br>
     <ul>
-      <code>
-      attr &lt;device&gt; suppressUndef <n>
-      </code><br><br>
 
       Suppresses all undef values when returning data from the DB via get.
 
@@ -10381,11 +10345,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-timeout"></a>
-    <li><b>timeout</b>
+    <li><b>timeout &lt;n&gt; </b> <br><br>
     <ul>
-      <code>
-      attr &lt;device&gt; timeout &lt;n&gt;
-      </code><br><br>
 
       Sets the timeout value for the operations in the SubProcess in seconds. <br>
       If a started operation (logging, command) is not finished within the timeout value,
@@ -10398,11 +10359,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-traceFlag"></a>
-    <li><b>traceFlag</b>
+    <li><b>traceFlag &lt;ALL|SQL|CON|ENC|DBD|TXN&gt; </b> <br><br>
     <ul>
-      <code>
-      attr &lt;device&gt; traceFlag &lt;ALL|SQL|CON|ENC|DBD|TXN&gt;
-      </code><br><br>
 
       Trace flags are used to enable tracing of specific activities within the DBI and drivers. The attribute is only used for
       tracing of errors in case of support. <br><br>
@@ -10428,11 +10386,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-traceLevel"></a>
-    <li><b>traceLevel</b>
+    <li><b>traceLevel &lt;0|1|2|3|4|5|6|7&gt; </b> <br><br>
     <ul>
-      <code>
-      attr &lt;device&gt; traceLevel &lt;0|1|2|3|4|5|6|7&gt;
-      </code><br><br>
 
       Switch on the tracing function of the module. <br>
       <b>Caution !</b> The attribute is only used for tracing errors or in case of support. If switched on <b>very much entries</b>
@@ -10460,11 +10415,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-useCharfilter"></a>
-    <li><b>useCharfilter</b>
+    <li><b>useCharfilter [0|1] </b> <br><br>
     <ul>
-      <code>
-      attr &lt;device&gt; useCharfilter [0|1] <n>
-      </code><br><br>
 
       If set, only ASCII characters from 32 to 126 are accepted in event.
       That are the characters " A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~" .<br>
@@ -10476,11 +10428,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-valueFn"></a>
-     <li><b>valueFn</b>
+     <li><b>valueFn {} </b> <br><br>
      <ul>
-      <code>
-      attr &lt;device&gt; valueFn {}
-      </code><br><br>
 
       This attribute is set in the <b>DbLog device</b> and allows to modify the values before logging
       or exclude the record from logging. <br><br>
@@ -10516,11 +10465,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-verbose4Devs"></a>
-     <li><b>verbose4Devs</b>
+     <li><b>verbose4Devs &lt;device1&gt;,&lt;device2&gt;,&lt;device..&gt; </b> <br><br>
      <ul>
-       <code>
-       attr &lt;device&gt; verbose4Devs &lt;device1&gt;,&lt;device2&gt;,&lt;device..&gt;
-       </code><br><br>
 
        If verbose level 4/5 is used, only output of devices set in this attribute will be reported in FHEM central logfile.
        If this attribute isn't set, output of all relevant devices will be reported if using verbose level 4/5.
@@ -10860,9 +10806,9 @@ attr SMA_Energymeter DbLogValueFn
     <li>
     <a id="DbLog-set-clearReadings"></a>
     <b>set &lt;name&gt; clearReadings </b> <br><br>
-      <ul>
-      Leert Readings die von verschiedenen DbLog-Funktionen angelegt wurden.
 
+    <ul>
+      Leert Readings die von verschiedenen DbLog-Funktionen angelegt wurden.
     </li>
     </ul>
     <br>
@@ -10879,6 +10825,7 @@ attr SMA_Energymeter DbLogValueFn
     <li>
     <a id="DbLog-set-commitCache"></a>
     <b>set &lt;name&gt; commitCache </b> <br><br>
+
     <ul>
       Im asynchronen Modus (<a href="#DbLog-attr-asyncMode">asyncMode=1</a>), werden die im Cache gespeicherten
       Daten in die Datenbank geschrieben und danach der Cache geleert. <br>
@@ -10890,10 +10837,11 @@ attr SMA_Energymeter DbLogValueFn
     <li>
     <a id="DbLog-set-configCheck"></a>
     <b>set &lt;name&gt; configCheck </b> <br><br>
-      <ul>
-        Es werden einige wichtige Einstellungen geprüft und Empfehlungen gegeben falls potentielle Verbesserungen
-        identifiziert wurden. <br>
-        (<b>Hinweis:</b> Dieser Befehl ist abgekündigt und wird in den nächsten Versionen entfernt werden. Verwenden Sie stattdessen "get &lt;name&gt; configCheck".)
+
+    <ul>
+      Es werden einige wichtige Einstellungen geprüft und Empfehlungen gegeben falls potentielle Verbesserungen
+      identifiziert wurden. <br>
+      (<b>Hinweis:</b> Dieser Befehl ist abgekündigt und wird in den nächsten Versionen entfernt werden. Verwenden Sie stattdessen "get &lt;name&gt; configCheck".)
     </li>
     </ul>
     <br>
@@ -10901,6 +10849,7 @@ attr SMA_Energymeter DbLogValueFn
     <li>
     <a id="DbLog-set-count"></a>
     <b>set &lt;name&gt; count </b> <br><br>
+
     <ul>
       Ermittelt die Anzahl der Datensätze in den Tabellen current und history und schreibt die Ergebnisse in die Readings
       countCurrent und countHistory.
@@ -10925,6 +10874,7 @@ attr SMA_Energymeter DbLogValueFn
     <li>
     <a id="DbLog-set-deleteOldDays"></a>
     <b>set &lt;name&gt; deleteOldDays &lt;n&gt; </b> <br><br>
+
     <ul>
       Löscht Datensätze älter als &lt;n&gt; Tage in Tabelle history.
       Die Anzahl der gelöschten Datens&auml;tze wird im Reading lastRowsDeleted protokolliert.
@@ -10950,6 +10900,7 @@ attr SMA_Energymeter DbLogValueFn
     <li>
     <a id="DbLog-set-exportCache"></a>
     <b>set &lt;name&gt; exportCache [nopurge | purgecache] </b> <br><br>
+
     <ul>
       Wenn DbLog im asynchronen Modus betrieben wird, kann der Cache mit diesem Befehl in ein Textfile geschrieben
       werden. <br>
@@ -10973,6 +10924,7 @@ attr SMA_Energymeter DbLogValueFn
     <li>
     <a id="DbLog-set-importCachefile"></a>
     <b>set &lt;name&gt; importCachefile &lt;file&gt; </b> <br><br>
+
     <ul>
       Importiert ein mit "exportCache" geschriebenes File in die Datenbank. <br>
       Die verfügbaren Dateien werden per Default im Verzeichnis (global->modpath)/log/ gesucht und eine Drop-Down Liste
@@ -10999,6 +10951,7 @@ attr SMA_Energymeter DbLogValueFn
     <li>
     <a id="DbLog-set-listCache"></a>
     <b>set &lt;name&gt; listCache </b> <br><br>
+
     <ul>
       Listet die im Memory Cache zwischengespeicherten Daten auf.
     </li>
@@ -11019,6 +10972,7 @@ attr SMA_Energymeter DbLogValueFn
     <li>
     <a id="DbLog-set-reduceLog"></a>
     <b>set &lt;name&gt; reduceLog &lt;no&gt;[:&lt;nn&gt;] [average[=day]] [exclude=device1:reading1,device2:reading2,...] </b> <br><br>
+
     <ul>
       Reduziert historische Datensätze, die älter sind als &lt;no&gt; Tage und (optional) neuer sind als &lt;nn&gt; Tage
       auf einen Eintrag (den ersten) pro Stunde je Device & Reading.<br>
@@ -11050,6 +11004,7 @@ attr SMA_Energymeter DbLogValueFn
     <li>
     <a id="DbLog-set-reduceLogNbl"></a>
     <b>set &lt;name&gt; reduceLogNbl &lt;no&gt;[:&lt;nn&gt;] [average[=day]] [exclude=device1:reading1,device2:reading2,...] </b> <br><br>
+
     <ul>
       Die Funktion ist identisch zu "set &lt;name&gt; reduceLog" und wird demnächst entfernt.
     </ul>
@@ -11059,7 +11014,8 @@ attr SMA_Energymeter DbLogValueFn
     <li>
     <a id="DbLog-set-reopen"></a>
     <b>set &lt;name&gt; reopen [n] </b> <br><br>
-      <ul>
+
+    <ul>
       Schließt die Datenbank und öffnet sie danach sofort wieder wenn keine Zeit [n] in Sekunden angegeben wurde. <br>
       Wurde eine optionale Verzögerungszeit [n] in Sekunden angegeben, wird die Verbindung zur Datenbank geschlossen und
       erst nach Ablauf von [n] Sekunden wieder neu verbunden. <br>
@@ -11072,6 +11028,7 @@ attr SMA_Energymeter DbLogValueFn
     <li>
     <a id="DbLog-set-rereadcfg"></a>
     <b>set &lt;name&gt; rereadcfg </b> <br><br>
+
     <ul>
       Die Konfigurationsdatei wird neu eingelesen. <br>
       Nach dem Einlesen wird eine bestehende Datenbankverbindung beendet und mit den konfigurierten Verbindungsdaten
@@ -11083,6 +11040,7 @@ attr SMA_Energymeter DbLogValueFn
     <li>
     <a id="DbLog-set-stopSubProcess"></a>
     <b>set &lt;name&gt; stopSubProcess </b> <br><br>
+
     <ul>
       Ein laufender SubProzess wird beendet. <br>
       Sobald durch eine Operation ein neuer SubProzess benötigt wird, erfolgt die automatische Neuinitialisierung
@@ -11099,6 +11057,7 @@ attr SMA_Energymeter DbLogValueFn
     <li>
     <a id="DbLog-set-userCommand"></a>
     <b>set &lt;name&gt; userCommand &lt;validSelectStatement&gt; </b> <br><br>
+
     <ul>
       Führt einfache SQL Select Befehle auf der Datenbank aus. <br>
       Das Ergebnis des Statements wird in das Reading "userCommandResult" geschrieben.
@@ -11124,7 +11083,8 @@ attr SMA_Energymeter DbLogValueFn
 
     <li>
     <a id="DbLog-get-configCheck"></a>
-    <b>get &lt;name&gt; configCheck </b> <br>
+    <b>get &lt;name&gt; configCheck </b> <br> <br><br>
+
       <ul>
         Es werden einige wichtige Einstellungen geprüft und Empfehlungen gegeben falls potentielle Verbesserungen
         identifiziert wurden.
@@ -11134,8 +11094,7 @@ attr SMA_Energymeter DbLogValueFn
 
     <li>
     <a id="DbLog-get-ReadingsMaxVal" data-pattern="ReadingsMaxVal.*"></a>
-    <b>get &lt;name&gt; ReadingsMaxVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
-    <br>
+    <b>get &lt;name&gt; ReadingsMaxVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
 
     <ul>
       Ermittelt den Datensatz mit dem größten Wert der angegebenen Device / Reading Kombination aus der history Tabelle. <br>
@@ -11157,8 +11116,7 @@ attr SMA_Energymeter DbLogValueFn
   <ul>
     <li>
     <a id="DbLog-get-ReadingsMinVal" data-pattern="ReadingsMinVal.*"></a>
-    <b>get &lt;name&gt; ReadingsMinVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
-    <br>
+    <b>get &lt;name&gt; ReadingsMinVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
 
     <ul>
       Ermittelt den Datensatz mit dem kleinsten Wert der angegebenen Device / Reading Kombination aus der history Tabelle. <br>
@@ -11180,8 +11138,7 @@ attr SMA_Energymeter DbLogValueFn
   <ul>
     <li>
     <a id="DbLog-get-ReadingsAvgVal"></a>
-    <b>get &lt;name&gt; ReadingsAvgVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
-    <br>
+    <b>get &lt;name&gt; ReadingsAvgVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
 
     <ul>
       Ermittelt den Durchschnittswert der angegebenen Device / Reading Kombination aus der history Tabelle. <br>
@@ -11202,8 +11159,7 @@ attr SMA_Energymeter DbLogValueFn
   <ul>
     <li>
     <a id="DbLog-get-ReadingsVal" data-pattern="ReadingsVal.*"></a>
-    <b>get &lt;name&gt; ReadingsVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
-    <br>
+    <b>get &lt;name&gt; ReadingsVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
 
     <ul>
       Liest den letzten (neuesten) in der history Tabelle gespeicherten Datensatz der angegebenen Device / Reading
@@ -11226,8 +11182,7 @@ attr SMA_Energymeter DbLogValueFn
   <ul>
     <li>
     <a id="DbLog-get-ReadingsTimestamp"></a>
-    <b>get &lt;name&gt; ReadingsTimestamp &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
-    <br>
+    <b>get &lt;name&gt; ReadingsTimestamp &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
 
     <ul>
       Liest den Zeitstempel des letzten (neuesten) in der history Tabelle gespeicherten Datensatzes der angegebenen
@@ -11248,8 +11203,7 @@ attr SMA_Energymeter DbLogValueFn
   <ul>
     <li>
     <a id="DbLog-get-retrieve"></a>
-    <b>get &lt;name&gt; retrieve &lt;querytype&gt; &lt;device|table&gt; &lt;reading&gt; &lt;from&gt; &lt;to&gt; &lt;offset&gt; &lt;limit&gt; </b>
-    <br>
+    <b>get &lt;name&gt; retrieve &lt;querytype&gt; &lt;device|table&gt; &lt;reading&gt; &lt;from&gt; &lt;to&gt; &lt;offset&gt; &lt;limit&gt; </b> <br><br>
 
     <ul>
       Liest Daten aus der Datenbank Tabelle history und gibt die Ergebnisse als JSON formatiert zurück. <br>
@@ -11503,9 +11457,7 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
   <li><b>get &lt;name&gt; &lt;in&gt; &lt;out&gt; &lt;from&gt;
-          &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; &lt;chartconfig&gt; &lt;pagingstart&gt; &lt;paginglimit&gt; </b>
-    <br>
-    <br>
+          &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; &lt;chartconfig&gt; &lt;pagingstart&gt; &lt;paginglimit&gt; </b> <br><br>
 
     Liest Daten aus der Datenbank aus und gibt diese in JSON formatiert aus. Wird für das Charting Frontend
     (<a href="https://wiki.fhem.de/wiki/Neues_Charting_Frontend">Wiki: Neues Charting Frontend</a>) genutzt.
@@ -11626,10 +11578,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-addStateEvent"></a>
-    <li><b>addStateEvent</b>
+    <li><b>addStateEvent [0|1] </b> <br><br>
     <ul>
-      <code>attr &lt;device&gt; addStateEvent [0|1]
-      </code><br><br>
 
       Bekanntlich wird normalerweise bei einem Event mit dem Reading "state" der state-String entfernt, d.h.
       der Event ist nicht zum Beispiel "state: on" sondern nur "on". <br>
@@ -11646,11 +11596,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-asyncMode"></a>
-    <li><b>asyncMode</b>
-    <ul>
-      <code>attr &lt;device&gt; asyncMode [0|1]
-      </code><br><br>
+    <li><b>asyncMode [0|1] </b> <br><br>
 
+    <ul>
       Dieses Attribut stellt den Verarbeitungsprozess ein nach dessen Verfahren das DbLog Device die Daten in die
       Datenbank schreibt. <br>
       DbLog verwendet zum Schreiben der Log-Daten in die Datenbank einen SubProzess und verarbeitet die Daten
@@ -11691,10 +11639,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-cacheEvents"></a>
-    <li><b>cacheEvents</b>
-    <ul>
-      <code>attr &lt;device&gt; cacheEvents [2|1|0] </code><br><br>
+    <li><b>cacheEvents [2|1|0] </b> <br><br>
 
+    <ul>
       <ul>
        <table>
        <colgroup> <col width=5%> <col width=95%> </colgroup>
@@ -11714,12 +11661,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-cacheLimit"></a>
-     <li><b>cacheLimit</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; cacheLimit &lt;n&gt;
-       </code><br><br>
+     <li><b>cacheLimit &lt;n&gt; </b> <br><br>
 
+     <ul>
        Im asynchronen Logmodus wird der Cache in die Datenbank weggeschrieben und geleert wenn die Anzahl &lt;n&gt; Datensätze
        im Cache erreicht ist. <br>
        Der Timer des asynchronen Logmodus wird dabei neu auf den Wert des Attributs "syncInterval"
@@ -11732,12 +11676,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-cacheOverflowThreshold"></a>
-     <li><b>cacheOverflowThreshold</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; cacheOverflowThreshold &lt;n&gt;
-       </code><br><br>
+     <li><b>cacheOverflowThreshold &lt;n&gt; </b> <br><br>
 
+     <ul>
        Legt im asynchronen Logmodus den Schwellenwert von &lt;n&gt; Datensätzen fest, ab dem der Cacheinhalt in ein File
        exportiert wird anstatt die Daten in die Datenbank zu schreiben. <br>
        Die ausgeführte Funktion entspricht dem Set-Kommando "exportCache purgecache" und verwendet dessen Einstellungen.
@@ -11757,12 +11698,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-colEvent"></a>
-     <li><b>colEvent</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; colEvent &lt;n&gt;
-       </code><br><br>
+     <li><b>colEvent &lt;n&gt; </b> <br><br>
 
+     <ul>
        Die Feldlänge für das DB-Feld EVENT wird userspezifisch angepasst. Mit dem Attribut kann der Default-Wert im Modul
        verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. Mit colEvent=0 wird das Datenbankfeld
        EVENT nicht gefüllt. <br>
@@ -11775,12 +11713,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-colReading"></a>
-     <li><b>colReading</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; colReading &lt;n&gt;
-       </code><br><br>
+     <li><b>colReading &lt;n&gt; </b> <br><br>
 
+     <ul>
        Die Feldlänge für das DB-Feld READING wird userspezifisch angepasst. Mit dem Attribut kann der Default-Wert im Modul
        verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. Mit colReading=0 wird das Datenbankfeld
        READING nicht gefüllt. <br>
@@ -11793,12 +11728,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-colValue"></a>
-     <li><b>colValue</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; colValue &lt;n&gt;
-       </code><br><br>
+     <li><b>colValue &lt;n&gt; </b> <br><br>
 
+     <ul>
        Die Feldlänge für das DB-Feld VALUE wird userspezifisch angepasst. Mit dem Attribut kann der Default-Wert im Modul
        verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. Mit colValue=0 wird das Datenbankfeld
        VALUE nicht gefüllt. <br>
@@ -11811,11 +11743,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-commitMode"></a>
-    <li><b>commitMode</b>
-    <ul>
-      <code>attr &lt;device&gt; commitMode [basic_ta:on | basic_ta:off | ac:on_ta:on | ac:on_ta:off | ac:off_ta:on]
-      </code><br><br>
+    <li><b>commitMode [basic_ta:on | basic_ta:off | ac:on_ta:on | ac:on_ta:off | ac:off_ta:on] </b> <br><br>
 
+    <ul>
       Ändert die Verwendung der Datenbank Autocommit- und/oder Transaktionsfunktionen.
       Wird Transaktion "aus" verwendet, werden im asynchronen Modus nicht gespeicherte Datensätze nicht an den Cache zurück
       gegeben.
@@ -11835,12 +11765,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-convertTimezone"></a>
-     <li><b>convertTimezone</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; convertTimezone [UTC | none]
-       </code><br><br>
+     <li><b>convertTimezone [UTC | none] </b> <br><br>
 
+     <ul>
        UTC - der lokale Timestamp des Events wird nach UTC konvertiert. <br>
        (default: none) <br><br>
 
@@ -11853,12 +11780,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-DbLogType"></a>
-     <li><b>DbLogType</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; DbLogType [Current|History|Current/History|SampleFill/History]
-       </code><br><br>
+     <li><b>DbLogType [Current|History|Current/History|SampleFill/History] </b> <br><br>
 
+     <ul>
        Dieses Attribut legt fest, welche Tabelle oder Tabellen in der Datenbank genutzt werden sollen. Ist dieses Attribut nicht gesetzt, wird
        per default die Einstellung <i>history</i> verwendet. <br><br>
 
@@ -11892,12 +11816,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-DbLogSelectionMode"></a>
-    <li><b>DbLogSelectionMode</b>
-    <ul>
-      <code>
-      attr &lt;device&gt; DbLogSelectionMode [Exclude|Include|Exclude/Include]
-      </code><br><br>
+    <li><b>DbLogSelectionMode [Exclude|Include|Exclude/Include] </b> <br><br>
 
+    <ul>
       Dieses für DbLog-Devices spezifische Attribut beeinflußt, wie die Device-spezifischen Attribute
       <a href="#DbLog-attr-DbLogExclude">DbLogExclude</a> und <a href="#DbLog-attr-DbLogInclude">DbLogInclude</a>
       ausgewertet werden. DbLogExclude und DbLogInclude werden in den Quellen-Devices gesetzt. <br>
@@ -11928,12 +11849,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-DbLogInclude"></a>
-    <li><b>DbLogInclude</b>
-    <ul>
-      <code>
-      attr <device> DbLogInclude Regex[:MinInterval][:force],[Regex[:MinInterval][:force]], ...
-      </code><br><br>
+    <li><b>DbLogInclude Regex[:MinInterval][:force],[Regex[:MinInterval][:force]], ...  </b> <br><br>
 
+    <ul>
       Mit dem Attribut DbLogInclude werden die Readings definiert, die in der Datenbank gespeichert werden sollen. <br>
       Die Definition der zu speichernden Readings erfolgt über einen regulären Ausdruck und alle Readings, die mit dem
       regulären Ausdruck matchen, werden in der Datenbank gespeichert. <br>
@@ -11977,12 +11895,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-DbLogExclude"></a>
-    <li><b>DbLogExclude</b>
-    <ul>
-      <code>
-      attr &lt;device&gt; DbLogExclude regex[:MinInterval][:force],[regex[:MinInterval][:force]] ...
-      </code><br><br>
+    <li><b>DbLogExclude Regex[:MinInterval][:force],[regex[:MinInterval][:force]] ... </b> <br><br>
 
+    <ul>
       Mit dem Attribut DbLogExclude werden die Readings definiert, die <b>nicht</b> in der Datenbank gespeichert werden
       sollen. <br>
       Die Definition der auszuschließenden Readings erfolgt über einen regulären Ausdruck und alle Readings, die mit dem
@@ -12028,12 +11943,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-DbLogValueFn"></a>
-     <li><b>DbLogValueFn</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; DbLogValueFn {}
-       </code><br><br>
+     <li><b>DbLogValueFn {} </b> <br><br>
 
+     <ul>
        Wird DbLog genutzt, wird in allen Devices das Attribut <i>DbLogValueFn</i> propagiert.
        Dieses Attribut wird in den <b>Quellendevices</b> gesetzt und erlaubt die Veränderung der Werte vor dem Logging
        oder den Ausschluß des Datensatzes vom Logging. <br><br>
@@ -12070,12 +11982,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-dbSchema"></a>
-    <li><b>dbSchema</b>
-    <ul>
-      <code>
-      attr &lt;device&gt; dbSchema &lt;schema&gt;
-      </code><br><br>
+    <li><b>dbSchema &lt;schema&gt; </b> <br><br>
 
+    <ul>
       Dieses Attribut ist setzbar für die Datenbanken MySQL/MariaDB und PostgreSQL. Die Tabellennamen (current/history) werden
       durch das angegebene Datenbankschema ergänzt. Das Attribut ist ein advanced Feature und nomalerweise nicht nötig zu setzen.
       <br>
@@ -12086,12 +11995,8 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-defaultMinInterval"></a>
-    <li><b>defaultMinInterval</b>
+    <li><b>defaultMinInterval &lt;devspec&gt;::&lt;MinInterval&gt;[::force],[&lt;devspec&gt;::&lt;MinInterval&gt;[::force]] ... </b> <br><br>
     <ul>
-      <code>
-      attr &lt;device&gt; defaultMinInterval &lt;devspec&gt;::&lt;MinInterval&gt;[::force],[&lt;devspec&gt;::&lt;MinInterval&gt;[::force]] ...
-      </code><br><br>
-
       Mit diesem Attribut wird ein Standard Minimum Intervall für <a href="http://fhem.de/commandref_DE.html#devspec">devspec</a> festgelegt.
       Ist defaultMinInterval angegeben, wird der Logeintrag nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der
       Wert des Readings sich <b>nicht</b> verändert hat. <br>
@@ -12115,12 +12020,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-excludeDevs"></a>
-     <li><b>excludeDevs</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; excludeDevs &lt;devspec1&gt;[#Reading],&lt;devspec2&gt;[#Reading],&lt;devspec...&gt;
-       </code><br><br>
+     <li><b>excludeDevs &lt;devspec1&gt;[#Reading],&lt;devspec2&gt;[#Reading],&lt;devspec...&gt; </b> <br><br>
 
+     <ul>
        Die Device/Reading-Kombinationen "devspec1#Reading", "devspec2#Reading" bis "devspec..." werden vom Logging in die
        Datenbank global ausgeschlossen. <br>
        Die Angabe eines auszuschließenden Readings ist optional. <br>
@@ -12150,12 +12052,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-expimpdir"></a>
-     <li><b>expimpdir</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; expimpdir &lt;directory&gt;
-       </code><br><br>
+     <li><b>expimpdir &lt;directory&gt; </b> <br><br>
 
+     <ul>
        In diesem Verzeichnis wird das Cachefile beim Export angelegt bzw. beim Import gesucht. Siehe set-Kommandos
        <a href="#DbLog-set-exportCache">exportCache</a> bzw. <a href="#DbLog-set-importCachefile">importCachefile</a>.
        Das Default-Verzeichnis ist "(global->modpath)/log/".
@@ -12172,12 +12071,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-exportCacheAppend"></a>
-     <li><b>exportCacheAppend</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; exportCacheAppend [1|0]
-       </code><br><br>
+     <li><b>exportCacheAppend [1|0] </b> <br><br>
 
+     <ul>
        Wenn gesetzt, wird beim Export des Cache ("set &lt;device&gt; exportCache") der Cacheinhalt an das neueste bereits vorhandene
        Exportfile angehängt. Ist noch kein Exportfile vorhanden, wird es neu angelegt. <br>
        Ist das Attribut nicht gesetzt, wird bei jedem Exportvorgang ein neues Exportfile angelegt. (default)<br/>
@@ -12188,10 +12084,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-insertMode"></a>
-    <li><b>insertMode</b>
-    <ul>
-      <code>attr &lt;device&gt; insertMode [1|0] </code><br><br>
+    <li><b>insertMode [1|0] </b> <br><br>
 
+    <ul>
       Schaltet den Insert-Modus der Datenbankschnittstelle um. <br><br>
 
       <ul>
@@ -12211,27 +12106,10 @@ attr SMA_Energymeter DbLogValueFn
   <br>
 
   <ul>
-     <a id="DbLog-attr-noNotifyDev"></a>
-     <li><b>noNotifyDev</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; noNotifyDev [1|0]
-       </code><br><br>
-
-       Erzwingt dass NOTIFYDEV nicht gesetzt und somit nicht verwendet wird.<br>
-     </ul>
-     </li>
-  </ul>
-  <br>
-
-  <ul>
      <a id="DbLog-attr-noSupportPK"></a>
-     <li><b>noSupportPK</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; noSupportPK [1|0]
-       </code><br><br>
+     <li><b>noSupportPK [1|0] </b> <br><br>
 
+     <ul>
        Deaktiviert die programmtechnische Unterstützung eines gesetzten Primary Key durch das Modul.<br>
      </ul>
      </li>
@@ -12239,11 +12117,24 @@ attr SMA_Energymeter DbLogValueFn
   <br>
 
   <ul>
-    <a id="DbLog-attr-showproctime"></a>
-    <li><b>showproctime</b>
-    <ul>
-      <code>attr &lt;device&gt; showproctime [1|0] </code><br><br>
+     <a id="DbLog-attr-plotInputFieldLength"></a>
+     <li><b>plotInputFieldLength &lt;Ganzzahl&gt; </b> <br><br>
 
+     <ul>
+        Breite der Plot Editor Eingabefelder für Device:Reading und Funktion. <br>
+        Wird die Drop-Down Liste als Eingabehilfe für Device:Reading verwendet, wird die Breite des Feldes
+        automatisch eingestellt. <br>
+        (default: 40)
+     </ul>
+     </li>
+  </ul>
+  <br>
+
+  <ul>
+    <a id="DbLog-attr-showproctime"></a>
+    <li><b>showproctime [1|0] </b> <br><br>
+
+    <ul>
       Wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) für die
       SQL-Ausführung der durchgeführten Funktion.
       Dabei wird nicht ein einzelnes SQL-Statement, sondern die Summe aller ausgeführten SQL-Kommandos innerhalb der
@@ -12256,10 +12147,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-showNotifyTime"></a>
-    <li><b>showNotifyTime</b>
-    <ul>
-      <code>attr &lt;device&gt; showNotifyTime [1|0] </code><br><br>
+    <li><b>showNotifyTime [1|0] </b> <br><br>
 
+    <ul>
       Wenn gesetzt, zeigt das Reading "notify_processing_time" die benötigte Abarbeitungszeit (in Sekunden) für die
       Abarbeitung der DbLog Notify-Funktion. <br>
       Das Attribut ist für Performance Analysen geeignet und hilft auch die Unterschiede
@@ -12278,12 +12168,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-SQLiteCacheSize"></a>
-     <li><b>SQLiteCacheSize</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; SQLiteCacheSize &lt;Anzahl Memory Pages für Cache&gt;
-       </code><br>
+     <li><b>SQLiteCacheSize &lt;Anzahl Memory Pages für Cache&gt; </b> <br><br>
 
+     <ul>
        Standardmäßig werden ca. 4MB RAM für Caching verwendet (page_size=1024bytes, cache_size=4000).<br>
        Bei Embedded Devices mit wenig RAM genügen auch 1000 Pages - zu Lasten der Performance. <br>
        (default: 4000)
@@ -12294,12 +12181,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-SQLiteJournalMode"></a>
-     <li><b>SQLiteJournalMode</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; SQLiteJournalMode [WAL|off]
-       </code><br><br>
+     <li><b>SQLiteJournalMode [WAL|off] </b> <br><br>
 
+     <ul>
        Moderne SQLite Datenbanken werden mit einem Write-Ahead-Log (<b>WAL</b>) geöffnet, was optimale Datenintegrität
        und gute Performance gewährleistet.<br>
        Allerdings benötigt WAL zusätzlich ungefähr den gleichen Festplattenplatz wie die eigentliche Datenbank. Bei knappem
@@ -12314,11 +12198,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-syncEvents"></a>
-    <li><b>syncEvents</b>
-    <ul>
-      <code>attr &lt;device&gt; syncEvents [1|0]
-      </code><br><br>
+    <li><b>syncEvents [1|0] </b> <br><br>
 
+    <ul>
       es werden Events für Reading NextSync erzeugt. <br>
     </ul>
     </li>
@@ -12327,15 +12209,12 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-syncInterval"></a>
-    <li><b>syncInterval</b>
-    <ul>
-      <code>attr &lt;device&gt; syncInterval &lt;n&gt;
-      </code><br><br>
+    <li><b>syncInterval &lt;n&gt; </b> <br><br>
 
+    <ul>
       Wenn im DbLog-Device der asynchrone Modus eingestellt ist (asyncMode=1), wird mit diesem Attribut das Intervall
       (Sekunden) zum Wegschreiben der zwischengespeicherten Daten in die Datenbank festgelegt. <br>
       (default: 30)
-
     </ul>
     </li>
   </ul>
@@ -12343,11 +12222,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-suppressAddLogV3"></a>
-    <li><b>suppressAddLogV3</b>
-    <ul>
-      <code>attr &lt;device&gt; suppressAddLogV3 [1|0]
-      </code><br><br>
+    <li><b>suppressAddLogV3 [1|0] </b> <br><br>
 
+    <ul>
       Wenn gesetzt werden verbose 3 Logeinträge durch die addLog-Funktion unterdrückt.  <br>
     </ul>
     </li>
@@ -12356,13 +12233,10 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-suppressUndef"></a>
-    <li><b>suppressUndef</b>
+    <li><b>suppressUndef</b> <br><br>
+
     <ul>
-      <code>attr &lt;device&gt; suppressUndef <n>
-      </code><br><br>
-
       Unterdrückt alle undef Werte die durch eine Get-Anfrage, z.B. Plot, aus der Datenbank selektiert werden.
-
     </ul>
     </li>
   </ul>
@@ -12370,12 +12244,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-timeout"></a>
-    <li><b>timeout</b>
-    <ul>
-      <code>
-      attr &lt;device&gt; timeout &lt;n&gt;
-      </code><br><br>
+    <li><b>timeout &lt;n&gt; </b> <br><br>
 
+    <ul>
       Setzt den Timeout-Wert für die Operationen im SubProzess in Sekunden. <br>
       Ist eine gestartete Operation (Logging, Kommando) nicht innerhalb des Timeout-Wertes beendet,
       wird der laufende SubProzess abgebrochen und ein neuer Prozess gestartet. <br>
@@ -12387,12 +12258,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-traceFlag"></a>
-    <li><b>traceFlag</b>
-    <ul>
-      <code>
-      attr &lt;device&gt; traceFlag &lt;ALL|SQL|CON|ENC|DBD|TXN&gt;
-      </code><br><br>
+    <li><b>traceFlag &lt;ALL|SQL|CON|ENC|DBD|TXN&gt; </b> <br><br>
 
+    <ul>
       Bestimmt das Tracing von bestimmten Aktivitäten innerhalb des Datenbankinterfaces und Treibers. Das Attribut ist nur
       für den Fehler- bzw. Supportfall gedacht. <br><br>
 
@@ -12417,12 +12285,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-traceLevel"></a>
-    <li><b>traceLevel</b>
-    <ul>
-      <code>
-      attr &lt;device&gt; traceLevel &lt;0|1|2|3|4|5|6|7&gt;
-      </code><br><br>
+    <li><b>traceLevel &lt;0|1|2|3|4|5|6|7&gt; </b> <br><br>
 
+    <ul>
       Schaltet die Trace-Funktion des Moduls ein. <br>
       <b>Achtung !</b> Das Attribut ist nur für den Fehler- bzw. Supportfall gedacht. Es werden <b>sehr viele Einträge</b> in
       das FHEM Logfile vorgenommen ! <br><br>
@@ -12450,12 +12315,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
     <a id="DbLog-attr-useCharfilter"></a>
-    <li><b>useCharfilter</b>
-    <ul>
-      <code>
-      attr &lt;device&gt; useCharfilter [0|1] <n>
-      </code><br><br>
+    <li><b>useCharfilter [0|1] </b> <br><br>
 
+    <ul>
       wenn gesetzt, werden nur ASCII Zeichen von 32 bis 126 im Event akzeptiert. (default: 0) <br>
       Das sind die Zeichen " A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~". <br>
       Umlaute und "€" werden umgesetzt (z.B. ä nach ae, € nach EUR).  <br>
@@ -12466,12 +12328,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-valueFn"></a>
-     <li><b>valueFn</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; valueFn {}
-       </code><br><br>
+     <li><b>valueFn {} </b> <br><br>
 
+     <ul>
        Dieses Attribut wird im <b>DbLog-Device</b> gesetzt und erlaubt die Veränderung der Werte vor dem Logging
        oder den Ausschluß des Datensatzes vom Logging. <br><br>
 
@@ -12506,12 +12365,9 @@ attr SMA_Energymeter DbLogValueFn
 
   <ul>
      <a id="DbLog-attr-verbose4Devs"></a>
-     <li><b>verbose4Devs</b>
-     <ul>
-       <code>
-       attr &lt;device&gt; verbose4Devs &lt;device1&gt;,&lt;device2&gt;,&lt;device..&gt;
-       </code><br><br>
+     <li><b>verbose4Devs &lt;device1&gt;,&lt;device2&gt;,&lt;device..&gt; </b> <br><br>
 
+     <ul>
        Mit verbose Level 4/5 werden nur Ausgaben bezüglich der in diesem Attribut aufgeführten Devices im Logfile
        protokolliert. Ohne dieses Attribut werden mit verbose 4/5 Ausgaben aller relevanten Devices im Logfile protokolliert.
        Die angegebenen Devices werden als Regex ausgewertet. <br><br>
