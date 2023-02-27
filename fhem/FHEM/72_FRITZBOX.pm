@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.7a";
+my $ModulVersion = "07.50.8";
 my $missingModul = "";
 my $missingModulTelnet = "";
 my $missingModulWeb = "";
@@ -69,7 +69,7 @@ eval "use SOAP::Lite;1" or $missingModulTR064 .= "Soap::Lite ";
 eval "use Data::Dumper;1" or $missingModulTR064 .= "Data::Dumper ";
 
 sub FRITZBOX_Log($$$);
-sub FRITZBOX_Init($);
+sub FRITZBOX_Initialize($);
 sub FRITZBOX_Set_Cmd_Start($);
 sub FRITZBOX_Shell_Exec($$);
 sub FRITZBOX_StartRadio_Shell($@);
@@ -85,10 +85,16 @@ sub FRITZBOX_Web_Query($$@);
 sub FRITZBOX_Lua_Data($$@);
 sub FRITZBOX_Process_JSON($$$@);
 sub FRITZBOX_ERR_Result($$;@);
+sub FRITZBOX_Run_GuestWlan_Shell($);
+sub FRITZBOX_Run_GuestWlan_Shell($);
+sub FRITZBOX_Run_Call_Web($);
+sub FRITZBOX_Run_Call_Shell($);
 sub FRITZBOX_Run_macFilter($);
 sub FRITZBOX_Run_chgProfile($);
 sub FRITZBOX_Run_lockLandevice($);
 sub FRITZBOX_Run_enableVPNshare($);
+sub FRITZBOX_Run_rescan_neighborhood($);
+
 our $telnet;
 
 my %fonModel = (
@@ -229,7 +235,9 @@ sub FRITZBOX_Initialize($)
                                 ."box_guestWlan,box_guestWlanCount,box_guestWlanRemain,box_macFilter_active,box_ipExtern,box_ipv6Extern,"
                                 ."box_ipv6Prefix,box_last_connect_err,box_moh,box_powerRate,box_rateDown,"
                                 ."box_rateUp,box_stdDialPort,box_tr064,box_tr069,box_uptimeConnect,box_uptime,box_wlanCount,box_wlan_2.4GHz,"
-                                ."box_wlan_5GHz,box_vdsl_downStreamRate,box_vdsl_upStreamRate " #,box_model,box_oem
+                                ."box_wlan_5GHz,box_vdsl_downStreamRate,box_vdsl_upStreamRate "
+               #                 ."box_docsis30_Ds_powerLevels,box_docsis30_Ds_latencys,box_docsis30_Ds_frequencys,box_docsis30_Ds_corrErrors,box_docsis30_Ds_nonCorrErrors,box_docsis30_Ds_mses,"
+               #                 ."box_docsis30_Us_powerLevels,box_docsis30_Us_frequencys,box_docsis31_Us_powerLevels,box_docsis31_Us_frequencys,box_docsis31_Ds_powerLevels,box_docsis31_Ds_frequencys,"
                 ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,_noDefInf_ "
                # ."ttsRessource:Google,ESpeak "
                 .$readingFnAttributes;
@@ -684,42 +692,42 @@ sub FRITZBOX_Set($$@)
 
       if ($val[1] eq "on") {
         push @webCmdArray, "lockmode"     => $lm_OnOff;
-	 push @webCmdArray, "nightsetting" => "1";
-  	 push @webCmdArray, "lockday"      => "everyday";
-	 push @webCmdArray, "starthh"      => $start_hh;
-	 push @webCmdArray, "startmm"      => $start_mm;
-	 push @webCmdArray, "endhh"        => $end_hh;
-	 push @webCmdArray, "endmm"        => $end_mm;
+	push @webCmdArray, "nightsetting" => "1";
+  	push @webCmdArray, "lockday"      => "everyday";
+	push @webCmdArray, "starthh"      => $start_hh;
+	push @webCmdArray, "startmm"      => $start_mm;
+	push @webCmdArray, "endhh"        => $end_hh;
+	push @webCmdArray, "endmm"        => $end_mm;
 
-	 $queryStr .= "'lockmode'     => '" . $lm_OnOff . "'\n";
-	 $queryStr .= "'nightsetting' => '1'\n";
-	 $queryStr .= "'lockday'      => 'everyday'\n";
-	 $queryStr .= "'starthh'      => '" . $start_hh . "'\n";
-	 $queryStr .= "'startmm'      => '" . $start_mm . "'\n";
-	 $queryStr .= "'endhh'        => '" . $end_hh . "'\n";
-	 $queryStr .= "'endmm'        => '" . $end_mm . "'\n";
+	$queryStr .= "'lockmode'     => '" . $lm_OnOff . "'\n";
+	$queryStr .= "'nightsetting' => '1'\n";
+	$queryStr .= "'lockday'      => 'everyday'\n";
+	$queryStr .= "'starthh'      => '" . $start_hh . "'\n";
+	$queryStr .= "'startmm'      => '" . $start_mm . "'\n";
+	$queryStr .= "'endhh'        => '" . $end_hh . "'\n";
+	$queryStr .= "'endmm'        => '" . $end_mm . "'\n";
       } elsif ( lc($val[1]) =~ /^(ed|wd|we)$/ ) {
-	 push @webCmdArray, "lockmode"     => $lm_OnOff;
+	push @webCmdArray, "lockmode"     => $lm_OnOff;
         push @webCmdArray, "event"        => "on" if( $kl_OnOff eq "on");
-	 push @webCmdArray, "nightsetting" => "1";
-  	 push @webCmdArray, "lockday"      => "everyday" if( lc($val[1]) eq "ed");
-  	 push @webCmdArray, "lockday"      => "workday" if( lc($val[1]) eq "wd");
-  	 push @webCmdArray, "lockday"      => "weekend" if( lc($val[1]) eq "we");
-	 push @webCmdArray, "starthh"      => $start_hh;
-	 push @webCmdArray, "startmm"      => $start_mm;
-	 push @webCmdArray, "endhh"        => $end_hh;
-	 push @webCmdArray, "endmm"        => $end_mm;
+	push @webCmdArray, "nightsetting" => "1";
+  	push @webCmdArray, "lockday"      => "everyday" if( lc($val[1]) eq "ed");
+  	push @webCmdArray, "lockday"      => "workday" if( lc($val[1]) eq "wd");
+  	push @webCmdArray, "lockday"      => "weekend" if( lc($val[1]) eq "we");
+	push @webCmdArray, "starthh"      => $start_hh;
+	push @webCmdArray, "startmm"      => $start_mm;
+	push @webCmdArray, "endhh"        => $end_hh;
+	push @webCmdArray, "endmm"        => $end_mm;
 
-	 $queryStr .= "'lockmode'     => '" . $lm_OnOff . "'\n";
+	$queryStr .= "'lockmode'     => '" . $lm_OnOff . "'\n";
         $queryStr .= "'event'        => 'on'\n" if( $kl_OnOff eq "on");
-	 $queryStr .= "'nightsetting' => '1'\n";
-	 $queryStr .= "'lockday'      => 'everyday'\n" if( lc($val[1]) eq "ed");
-	 $queryStr .= "'lockday'      => 'workday'\n"  if( lc($val[1]) eq "wd");
-	 $queryStr .= "'lockday'      => 'weekend'\n"  if( lc($val[1]) eq "we");
-	 $queryStr .= "'starthh'      => '" . $start_hh . "'\n";
-	 $queryStr .= "'startmm'      => '" . $start_mm . "'\n";
-	 $queryStr .= "'endhh'        => '" . $end_hh . "'\n";
-	 $queryStr .= "'endmm'        => '" . $end_mm . "'\n";
+	$queryStr .= "'nightsetting' => '1'\n";
+	$queryStr .= "'lockday'      => 'everyday'\n" if( lc($val[1]) eq "ed");
+	$queryStr .= "'lockday'      => 'workday'\n"  if( lc($val[1]) eq "wd");
+	$queryStr .= "'lockday'      => 'weekend'\n"  if( lc($val[1]) eq "we");
+	$queryStr .= "'starthh'      => '" . $start_hh . "'\n";
+	$queryStr .= "'startmm'      => '" . $start_mm . "'\n";
+	$queryStr .= "'endhh'        => '" . $end_hh . "'\n";
+	$queryStr .= "'endmm'        => '" . $end_mm . "'\n";
       }
 
       push @webCmdArray, "idx"   => substr($val[0], 4);
@@ -1150,6 +1158,8 @@ sub FRITZBOX_Get($@)
 
       return "Wrong number of arguments, usage: get $name argName1 argValue1" if int @val != 1;
 
+      my $avmModel = InternalVal($name, "MODEL", "FRITZ!Box");
+
       if ( $val[0] eq "lanDevices") {
         $returnStr = FRITZBOX_Lan_Devices_List($hash);
       } elsif ( $val[0] eq "vpnShares") {
@@ -1160,6 +1170,8 @@ sub FRITZBOX_Get($@)
         $returnStr = FRITZBOX_User_Info_List($hash);
       } elsif ( $val[0] eq "wlanNeighborhood") {
         $returnStr = FRITZBOX_WLAN_Environment($hash);
+      } elsif ( $val[0] eq "docsisInformation" && ($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]")) {
+        $returnStr = FRITZBOX_DOCSIS_Informations($hash);
       }
 
       return $returnStr;
@@ -1216,11 +1228,13 @@ sub FRITZBOX_Get($@)
       return FRITZBOX_TR064_Get_ServiceList ($hash);
    }
 
+   my $avmModel = InternalVal($name, "MODEL", "FRITZ!Box");
    my $list;
    $list .= "luaQuery"                if AttrVal( $name, "allowTR064Command", 0 );
    $list .= " luaData"                if AttrVal( $name, "allowTR064Command", 0 );
    $list .= " luaFunction"            if AttrVal( $name, "allowTR064Command", 0 );
    $list .= " luaInfo:lanDevices,vpnShares,kidProfiles,userInfos,wlanNeighborhood" if AttrVal( $name, "allowTR064Command", 0 );
+   $list .= ",docsisInformation"  if AttrVal( $name, "allowTR064Command", 0 ) && ($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]");
 
    $list .= " lanDeviceInfo"          if AttrVal( $name, "allowTR064Command", 0 );
 
@@ -1553,9 +1567,9 @@ sub FRITZBOX_API_Check_Run($)
       if ($content =~ /<j:Name>/) {
          FRITZBOX_Log $hash, 5, "DEBUG: jason_boxinfo returned: $content";
 
-         FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1)   if ( $content =~ /<j:Name>(.*)<\/j:Name>/ ); # && unless(grep { /^(box_model)$/ } @reading_list);
-         FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)    if $content =~ /<j:OEM>(.*)<\/j:OEM>/; # && unless(grep { /^(box_oem)$/ } @reading_list);
-         FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1)    if $content =~ /<j:Version>(.*)<\/j:Version>/ ;
+         FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1)     if $content =~ /<j:Name>(.*)<\/j:Name>/;
+         FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
+         FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1) if $content =~ /<j:Version>(.*)<\/j:Version>/ ;
 
       } else {
          # Ansonsten Box-Model per system_status einlesen
@@ -1582,9 +1596,9 @@ sub FRITZBOX_API_Check_Run($)
             # 7 Firmwareversion
             # 8 Sub-Version/Unterversion der Firmware
             # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0]; # unless(grep { /^(box_model)$/ } @reading_list);
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $result[7];
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9]; # unless(grep { /^(box_oem)$/ } @reading_list);
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
          }
          else {
             FRITZBOX_Log $hash, 2, "ERROR: " . $response->status_line;
@@ -1979,7 +1993,8 @@ sub FRITZBOX_Readout_Run_Web($)
    my $Min;
    my $Sek;
 
-   my @reading_list = split(/\,/, AttrVal($name, "disableBoxReadings", "none"));
+   my $views;
+   my $nbViews;
 
    my $avmModel = InternalVal($name, "MODEL", "FRITZ!Box");
 
@@ -2561,68 +2576,6 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlanRemain", $result->{box_guestWlanRemain};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_macFilter_active", $result->{box_macFilter_active}, "onoff";
 
-# WANs
-
-   # "xhr 1 lang de page chan xhrId environment useajax 1;
-
-   if (AttrVal( $name, "enableWLANneighbors", "0")) {
-     my $nbhPrefix = AttrVal( $name, "wlanNeighborsPrefix",  "nbh_" );
-     my %oldWanDevice;
-     #collect current mac-readings (to delete the ones that are inactive or disappeared)
-     foreach (keys %{ $hash->{READINGS} }) {
-       $oldWanDevice{$_} = $hash->{READINGS}{$_}{VAL} if $_ =~ /^nbh_/ && defined $hash->{READINGS}{$_}{VAL};
-     }
-
-     my @webCmdArray;
-     push @webCmdArray, "xhr"         => "1";
-     push @webCmdArray, "lang"        => "de";
-     push @webCmdArray, "page"        => "chan";
-     push @webCmdArray, "xhrId"       => "environment";
-
-     my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
-     my $tmp;
-
-     if(defined $result->{Error}) {
-       $tmp = FRITZBOX_ERR_Result($hash, $result);
-     } else {
-
-       FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($result->{data}->{scanlist});
-
-       my $views = $result->{data}->{scanlist};
-       my $nbViews = scalar @$views;
-
-       eval {
-         for(my $i = 0; $i <= $nbViews - 1; $i++) {
-           my $dName = $result->{data}->{scanlist}->[$i]->{ssid};
-           $dName   .= " (Kanal: " . $result->{data}->{scanlist}->[$i]->{channel};
-           $dName   .= ", Band: " . $result->{data}->{scanlist}->[$i]->{bandId} . ")";
-
-           $rName  = $result->{data}->{scanlist}->[$i]->{mac};
-           $rName =~ s/:/_/g;
-           $rName  = $nbhPrefix . $rName;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
-           delete $oldWanDevice{$rName} if exists $oldWanDevice{$rName};
-         }
-       };
-       $rName  = "box_wlan_lastScanTime";
-       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $result->{data}->{lastScantime};
-       delete $oldWanDevice{$rName} if exists $oldWanDevice{$rName};
-     }
-  # Remove inactive or non existing wan-readings in two steps
-     foreach ( keys %oldWanDevice ) {
-       # set the wan readings to 'inactive' and delete at next readout
-       if ( $oldWanDevice{$_} ne "inactive" ) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $_, "inactive";
-       }
-       else {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $_, "";
-       }
-     }
-
-   } else {
-     FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_lastScanTime", "";
-   }
-
 # Dect
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_dect", $result->{box_dect}, "onoff";
 
@@ -2663,87 +2616,6 @@ sub FRITZBOX_Readout_Run_Web($)
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $result->{box_fwVersion_neu};
    }
 
-   if ( AttrVal( $name, "allowTR064Command", 0 )) {
-      my $strCurl = `curl "http://$host:49000/igdupnp/control/WANIPConn1" -H "Content-Type: text/xml; charset=\'utf-8\'" -H "SoapAction:urn:schemas-upnp-org:service:WANIPConnection:1#GetStatusInfo" -d "<?xml version=\'1.0\' encoding=\'utf-8\'?> <s:Envelope s:encodingStyle=\'http://schemas.xmlsoap.org/soap/encoding/\' xmlns:s=\'http://schemas.xmlsoap.org/soap/envelope/\'> <s:Body> <u:GetStatusInfo xmlns:u=\'urn:schemas-upnp-org:service:WANIPConnection:1\' /> </s:Body> </s:Envelope>" -s`;
-
-      FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
-
-      if($strCurl =~ m/<NewConnectionStatus>(.*?)<\/NewConnectionStatus>/i) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_connect", $1;
-      }
-      if($strCurl =~ m/<NewLastConnectionError>(.*?)<\/NewLastConnectionError>/i) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_last_connect_err", $1;
-      }
-
-      if($strCurl =~ m/<NewUptime>(.*?)<\/NewUptime>/i) {
-         $Sek = $1;
-         $Tag  = int($Sek/86400);
-         $Std  = int(($Sek/3600)-(24*$Tag));
-         $Min = int(($Sek/60)-($Std*60)-(1440*$Tag));
-         $Sek -= (($Min*60)+($Std*3600)+(86400*$Tag));
-
-         $Std = substr("0".$Std,-2);
-         $Min = substr("0".$Min,-2);
-         $Sek = substr("0".$Sek,-2);
-
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_uptimeConnect", $1 . " sec = " . $Tag . "T $Std:$Min:$Sek";
-      }
-
-      $strCurl = `curl "http://$host:49000/igdupnp/control/WANIPConn1" -H "Content-Type: text/xml; charset=\'utf-8\'" -H "SoapAction:urn:schemas-upnp-org:service:WANIPConnection:1#GetExternalIPAddress" -d "<?xml version=\'1.0\' encoding=\'utf-8\'?> <s:Envelope s:encodingStyle=\'http://schemas.xmlsoap.org/soap/encoding/\' xmlns:s=\'http://schemas.xmlsoap.org/soap/envelope/\'> <s:Body> <u:GetExternalIPAddress xmlns:u=\'urn:schemas-upnp-org:service:WANIPConnection:1\' /> </s:Body> </s:Envelope>" -s`;
-
-      FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
-
-      if($strCurl =~ m/<NewExternalIPAddress>(.*?)<\/NewExternalIPAddress>/i) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipExtern", $1; #unless(grep { /^(box_ipExtern)$/ } @reading_list);
-      }
-
-      $strCurl = `curl "http://$host:49000/igdupnp/control/WANIPConn1" -H "Content-Type: text/xml; charset=\'utf-8\'" -H "SoapAction:urn:schemas-upnp-org:service:WANIPConnection:1#X_AVM_DE_GetExternalIPv6Address" -d "<?xml version=\'1.0\' encoding=\'utf-8\'?> <s:Envelope s:encodingStyle=\'http://schemas.xmlsoap.org/soap/encoding/\' xmlns:s=\'http://schemas.xmlsoap.org/soap/envelope/\'> <s:Body> <u:GetExternalIPAddress xmlns:u=\'urn:schemas-upnp-org:service:WANIPConnection:1\' /> </s:Body> </s:Envelope>" -s`;
-
-      FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
-
-      if($strCurl =~ m/<NewPrefixLength>(.*?)<\/NewPrefixLength>/i) {
-         if ($1 != 0) {
-            if($strCurl =~ m/<NewExternalIPv6Address>(.*?)<\/NewExternalIPv6Address>/i) {
-               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6Extern", $1; #unless(grep { /^(box_ipv6Extern)$/ } @reading_list);
-
-               $strCurl = `curl "http://$host:49000/igdupnp/control/WANIPConn1" -H "Content-Type: text/xml; charset=\'utf-8\'" -H "SoapAction:urn:schemas-upnp-org:service:WANIPConnection:1#X_AVM_DE_GetIPv6Prefix" -d "<?xml version=\'1.0\' encoding=\'utf-8\'?> <s:Envelope s:encodingStyle=\'http://schemas.xmlsoap.org/soap/encoding/\' xmlns:s=\'http://schemas.xmlsoap.org/soap/envelope/\'> <s:Body> <u:GetExternalIPAddress xmlns:u=\'urn:schemas-upnp-org:service:WANIPConnection:1\' /> </s:Body> </s:Envelope>" -s`;
-
-               FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
-
-               if($strCurl =~ m/<NewIPv6Prefix>(.*?)<\/NewIPv6Prefix>/i) {
-                  FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6Prefix", $1; #unless(grep { /^(box_ipv6Prefix)$/ } @reading_list);
-               }
-            }
-         }
-      }
-
-      if (($avmModel =~ "Box") && (lc($avmModel) !~ "5[4,5][9,3]0|40[2,4,6]0|68[2,5]0|6[5,6][6,9][0,1]|fiber|cable") ) { # FB ohne VDSL
-         my @tr064CmdArray = (["WANDSLInterfaceConfig:1", "wandslifconfig1", "GetInfo"]);
-         my @tr064Result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-         if ($tr064Result[0]->{UPnPError}) {
-            $strCurl = Dumper (@tr064Result);
-            FRITZBOX_Log $hash, 2, "ERROR: Curl-> " . $strCurl;
-         } else {
-            $strCurl = Dumper (@tr064Result);
-            FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
-            if ($strCurl =~ /.NewDownstreamCurrRate. => '(.*)'/) {
-               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_vdsl_downStreamRate", $1/1000; #unless(grep { /^(box_vdsl_downStreamRate)$/ } @reading_list);
-            } else {
-               FRITZBOX_Log $hash, 4, "INFO: box_vdsl_downStreamRate Curl-> " . $strCurl;
-            }
-
-            if ($strCurl =~ /.NewUpstreamCurrRate. => '(.*)'/) {
-               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_vdsl_upStreamRate", $1/1000; #unless(grep { /^(box_vdsl_upStreamRate)$/ } @reading_list);
-            } else {
-               FRITZBOX_Log $hash, 4, "INFO: box_vdsl_upStreamRate Curl-> " . $strCurl;
-            }
-         }
-      } else {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_vdsl_downStreamRate", ""; #unless(grep { /^(box_vdsl_downStreamRate)$/ } @reading_list);
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_vdsl_upStreamRate", ""; #unless(grep { /^(box_vdsl_upStreamRate)$/ } @reading_list);
-      }
-   }
-
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwUpdate",    $result->{box_fwUpdate};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr064",       $result->{box_tr064},       "onoff";
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr069",       $result->{box_tr069},       "onoff";
@@ -2752,10 +2624,10 @@ sub FRITZBOX_Readout_Run_Web($)
    # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_connect",     $result->{box_connect};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_cpuTemp",     $result->{box_cpuTemp};
    if ( defined ($result->{dslStatGlobalOut}) && looks_like_number($result->{dslStatGlobalOut}) ) {
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_dsl_upStream", sprintf ("%.3f", $result->{dslStatGlobalOut}/1000000) unless (grep { /^(box_dsl_upStream)$/ } @reading_list);
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_dsl_upStream", sprintf ("%.3f", $result->{dslStatGlobalOut}/1000000);
    }
    if ( defined ($result->{dslStatGlobalIn}) && looks_like_number($result->{dslStatGlobalIn}) ) {
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_dsl_downStream", sprintf ("%.3f", $result->{dslStatGlobalIn}/1000000) unless (grep { /^(box_dsl_downStream)$/ } @reading_list) ;
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_dsl_downStream", sprintf ("%.3f", $result->{dslStatGlobalIn}/1000000);
    }
 
 # GSM
@@ -2853,13 +2725,335 @@ sub FRITZBOX_Readout_Run_Web($)
    }
 
 
-# statistics
 # attr global showInternalValues 0
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, ".box_TodayBytesReceivedHigh", $result->{TodayBytesReceivedHigh};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, ".box_TodayBytesReceivedLow", $result->{TodayBytesReceivedLow};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, ".box_TodayBytesSentHigh", $result->{TodayBytesSentHigh};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, ".box_TodayBytesSentLow", $result->{TodayBytesSentLow};
 
+
+# informations depending on TR064 or data.lua
+   # WLAN neighbors
+
+   # "xhr 1 lang de page chan xhrId environment useajax 1;
+
+   if (AttrVal( $name, "enableWLANneighbors", "0")) {
+     my $nbhPrefix = AttrVal( $name, "wlanNeighborsPrefix",  "nbh_" );
+     my %oldWanDevice;
+
+     #collect current mac-readings (to delete the ones that are inactive or disappeared)
+     foreach (keys %{ $hash->{READINGS} }) {
+       $oldWanDevice{$_} = $hash->{READINGS}{$_}{VAL} if $_ =~ /^nbh_/ && defined $hash->{READINGS}{$_}{VAL};
+     }
+
+     my @webCmdArray;
+     push @webCmdArray, "xhr"         => "1";
+     push @webCmdArray, "lang"        => "de";
+     push @webCmdArray, "page"        => "chan";
+     push @webCmdArray, "xhrId"       => "environment";
+
+     my $resultWan = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+     my $tmpWan;
+
+     if(defined $resultWan->{Error}) {
+       $tmpWan = FRITZBOX_ERR_Result($hash, $resultWan);
+       FRITZBOX_Log $hash, 3, "ERROR: " . $tmpWan;
+     } else {
+
+       FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($resultWan->{data}->{scanlist});
+
+       $views = $resultWan->{data}->{scanlist};
+       $nbViews = scalar @$views;
+
+       eval {
+         for(my $i = 0; $i <= $nbViews - 1; $i++) {
+           my $dName = $resultWan->{data}->{scanlist}->[$i]->{ssid};
+           $dName   .= " (Kanal: " . $resultWan->{data}->{scanlist}->[$i]->{channel};
+           $dName   .= ", Band: " . $resultWan->{data}->{scanlist}->[$i]->{bandId} . ")";
+
+           $rName  = $resultWan->{data}->{scanlist}->[$i]->{mac};
+           $rName =~ s/:/_/g;
+           $rName  = $nbhPrefix . $rName;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
+           delete $oldWanDevice{$rName} if exists $oldWanDevice{$rName};
+         }
+       };
+       $rName  = "box_wlan_lastScanTime";
+       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $resultWan->{data}->{lastScantime};
+       delete $oldWanDevice{$rName} if exists $oldWanDevice{$rName};
+     }
+     # Remove inactive or non existing wan-readings in two steps
+     foreach ( keys %oldWanDevice ) {
+       # set the wan readings to 'inactive' and delete at next readout
+       if ( $oldWanDevice{$_} ne "inactive" ) {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $_, "inactive";
+       }
+       else {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $_, "";
+       }
+     }
+
+   } else {
+     FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_lastScanTime", "";
+   }
+
+   # DOCSIS Informationen FB Cable
+   # InternalVal($name, "MODEL", "FRITZ!Box")
+   if (($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]") ) { # FB Cable
+#   if (1==1) {
+      my $tmpSIS;
+      my $returnStr;
+
+      my $powerLevels;
+      my $frequencys;
+      my $latencys;
+      my $corrErrors;
+      my $nonCorrErrors;
+      my $mses;
+
+      my %oldDocDevice;
+
+      #collect current mac-readings (to delete the ones that are inactive or disappeared)
+      foreach (keys %{ $hash->{READINGS} }) {
+        $oldDocDevice{$_} = $hash->{READINGS}{$_}{VAL} if $_ =~ /^box_docsis/ && defined $hash->{READINGS}{$_}{VAL};
+      }
+
+      # xhr 1 lang de page docInfo xhrId all no_sidrenew nop
+      my @webCmdArray;
+      push @webCmdArray, "xhr"         => "1";
+      push @webCmdArray, "lang"        => "de";
+      push @webCmdArray, "page"        => "docInfo";
+      push @webCmdArray, "xhrId"       => "all";
+      push @webCmdArray, "no_sidrenew" => "";
+
+#      my $TestSIS = '{"pid":"docInfo","hide":{"mobile":true,"ssoSet":true,"liveTv":true},"time":[],"data":{"channelDs":{"docsis31":[{"powerLevel":"-1.6","type":"4K","channel":1,"channelID":0,"frequency":"751 - 861"},{"powerLevel":"7.7","type":"4K","channel":2,"channelID":1,"frequency":"175 - 237"}],"docsis30":[{"type":"256QAM","corrErrors":92890,"mse":"-36.4","powerLevel":"5.1","channel":1,"nonCorrErrors":9773,"latency":0.32,"channelID":7,"frequency":"538"},{"type":"256QAM","corrErrors":20553,"mse":"-37.4","powerLevel":"10.2","channel":2,"nonCorrErrors":9420,"latency":0.32,"channelID":26,"frequency":"698"},{"type":"256QAM","corrErrors":28673,"mse":"-37.6","powerLevel":"10.0","channel":3,"nonCorrErrors":140,"latency":0.32,"channelID":25,"frequency":"690"},{"type":"256QAM","corrErrors":25930,"mse":"-37.6","powerLevel":"10.0","channel":4,"nonCorrErrors":170,"latency":0.32,"channelID":27,"frequency":"706"},{"type":"256QAM","corrErrors":98698,"mse":"-36.6","powerLevel":"8.8","channel":5,"nonCorrErrors":9151,"latency":0.32,"channelID":30,"frequency":"746"},{"type":"256QAM","corrErrors":24614,"mse":"-37.4","powerLevel":"9.4","channel":6,"nonCorrErrors":9419,"latency":0.32,"channelID":28,"frequency":"730"},{"type":"256QAM","corrErrors":25882,"mse":"-37.4","powerLevel":"9.9","channel":7,"nonCorrErrors":9308,"latency":0.32,"channelID":24,"frequency":"682"},{"type":"256QAM","corrErrors":33817,"mse":"-37.4","powerLevel":"9.8","channel":8,"nonCorrErrors":146,"latency":0.32,"channelID":23,"frequency":"674"},{"type":"256QAM","corrErrors":112642,"mse":"-37.6","powerLevel":"7.8","channel":9,"nonCorrErrors":7783,"latency":0.32,"channelID":3,"frequency":"490"},{"type":"256QAM","corrErrors":41161,"mse":"-37.6","powerLevel":"9.8","channel":10,"nonCorrErrors":203,"latency":0.32,"channelID":21,"frequency":"658"},{"type":"256QAM","corrErrors":33219,"mse":"-37.4","powerLevel":"8.8","channel":11,"nonCorrErrors":10962,"latency":0.32,"channelID":18,"frequency":"634"},{"type":"256QAM","corrErrors":32680,"mse":"-37.6","powerLevel":"9.2","channel":12,"nonCorrErrors":145,"latency":0.32,"channelID":19,"frequency":"642"},{"type":"256QAM","corrErrors":33001,"mse":"-37.4","powerLevel":"9.8","channel":13,"nonCorrErrors":7613,"latency":0.32,"channelID":22,"frequency":"666"},{"type":"256QAM","corrErrors":42666,"mse":"-37.4","powerLevel":"8.1","channel":14,"nonCorrErrors":172,"latency":0.32,"channelID":17,"frequency":"626"},{"type":"256QAM","corrErrors":41023,"mse":"-37.4","powerLevel":"9.3","channel":15,"nonCorrErrors":10620,"latency":0.32,"channelID":20,"frequency":"650"},{"type":"256QAM","corrErrors":106921,"mse":"-37.6","powerLevel":"7.4","channel":16,"nonCorrErrors":356,"latency":0.32,"channelID":4,"frequency":"498"},{"type":"256QAM","corrErrors":86650,"mse":"-36.4","powerLevel":"4.9","channel":17,"nonCorrErrors":85,"latency":0.32,"channelID":12,"frequency":"578"},{"type":"256QAM","corrErrors":91838,"mse":"-36.4","powerLevel":"4.8","channel":18,"nonCorrErrors":168,"latency":0.32,"channelID":8,"frequency":"546"},{"type":"256QAM","corrErrors":110719,"mse":"-35.8","powerLevel":"4.5","channel":19,"nonCorrErrors":103,"latency":0.32,"channelID":10,"frequency":"562"},{"type":"256QAM","corrErrors":111846,"mse":"-37.6","powerLevel":"8.2","channel":20,"nonCorrErrors":247,"latency":0.32,"channelID":2,"frequency":"482"},{"type":"256QAM","corrErrors":668242,"mse":"-36.6","powerLevel":"5.8","channel":21,"nonCorrErrors":6800,"latency":0.32,"channelID":5,"frequency":"522"},{"type":"256QAM","corrErrors":104070,"mse":"-36.6","powerLevel":"5.3","channel":22,"nonCorrErrors":149,"latency":0.32,"channelID":6,"frequency":"530"},{"type":"256QAM","corrErrors":120994,"mse":"-35.8","powerLevel":"4.4","channel":23,"nonCorrErrors":10240,"latency":0.32,"channelID":9,"frequency":"554"},{"type":"256QAM","corrErrors":59145,"mse":"-36.4","powerLevel":"5.3","channel":24,"nonCorrErrors":9560,"latency":0.32,"channelID":11,"frequency":"570"},{"type":"256QAM","corrErrors":118271,"mse":"-37.6","powerLevel":"8.4","channel":25,"nonCorrErrors":810,"latency":0.32,"channelID":1,"frequency":"474"},{"type":"256QAM","corrErrors":40255,"mse":"-37.4","powerLevel":"6.5","channel":26,"nonCorrErrors":13474,"latency":0.32,"channelID":15,"frequency":"602"},{"type":"256QAM","corrErrors":62716,"mse":"-36.4","powerLevel":"5.3","channel":27,"nonCorrErrors":9496,"latency":0.32,"channelID":13,"frequency":"586"},{"type":"256QAM","corrErrors":131364,"mse":"-36.6","powerLevel":"8.9","channel":28,"nonCorrErrors":12238,"latency":0.32,"channelID":29,"frequency":"738"}]},"oem":"lgi","readyState":"ready","channelUs":{"docsis31":[],"docsis30":[{"powerLevel":"43.0","type":"64QAM","channel":1,"multiplex":"ATDMA","channelID":4,"frequency":"51"},{"powerLevel":"44.3","type":"64QAM","channel":2,"multiplex":"ATDMA","channelID":2,"frequency":"37"},{"powerLevel":"43.8","type":"64QAM","channel":3,"multiplex":"ATDMA","channelID":3,"frequency":"45"},{"powerLevel":"45.8","type":"64QAM","channel":4,"multiplex":"ATDMA","channelID":1,"frequency":"31"}]}},"sid":"14341afbc7d83b4c"}';
+#      my $resultSIS = FRITZBOX_Process_JSON($hash, $TestSIS, "14341afbc7d83b4c", ""); ;
+      
+      my $resultSIS = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+
+      if(defined $resultSIS->{Error}) {
+        $tmpSIS = FRITZBOX_ERR_Result($hash, $resultSIS);
+        FRITZBOX_Log $hash, 3, "ERROR: " . $tmpSIS;
+      } else {
+
+        FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($resultSIS->{data});
+
+        $views = $resultSIS->{data}->{channelUs}->{docsis30};
+        $nbViews = scalar @$views;
+
+        if ($nbViews > 0) {
+
+          $powerLevels = "";
+          $frequencys  = "";
+
+          eval {
+            for(my $i = 0; $i <= $nbViews - 1; $i++) {
+#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis30}->[$i]->{channel} . "</td>";
+#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis30}->[$i]->{channelID} . "</td>";
+#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis30}->[$i]->{multiplex} . "</td>";
+#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis30}->[$i]->{type} . "</td>";
+              $powerLevels .= $resultSIS->{data}->{channelUs}->{docsis30}->[$i]->{powerLevel} . " ";
+              $frequencys  .= $resultSIS->{data}->{channelUs}->{docsis30}->[$i]->{frequency} . " ";
+            }
+
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Us_powerLevels", substr($powerLevels,0,-1);
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Us_frequencys", substr($frequencys,0,-1);
+            delete $oldDocDevice{box_docsis30_Us_powerLevels} if exists $oldDocDevice{box_docsis30_Us_powerLevels};
+            delete $oldDocDevice{box_docsis30_Us_frequencys} if exists $oldDocDevice{box_docsis30_Us_frequencys};
+          };
+        }
+
+        $views = $resultSIS->{data}->{channelUs}->{docsis31};
+        $nbViews = scalar @$views;
+
+        if ($nbViews > 0) {
+
+          $powerLevels = "";
+          $frequencys  = "";
+
+          eval {
+            for(my $i = 0; $i <= $nbViews - 1; $i++) {
+#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis31}->[$i]->{channel} . "</td>";
+#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis31}->[$i]->{channelID} . "</td>";
+#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis31}->[$i]->{multiplex} . "</td>" if $result->{data}->{channelUs}->{docsis31}->[$i]->{multiplex};
+#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis31}->[$i]->{type} . "</td>";
+              $powerLevels .= $resultSIS->{data}->{channelUs}->{docsis31}->[$i]->{powerLevel} . " ";
+              $frequencys  .= $resultSIS->{data}->{channelUs}->{docsis31}->[$i]->{frequency} . " ";
+            }
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis31_Us_powerLevels", substr($powerLevels,0,-1);
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis31_Us_frequencys", substr($frequencys,0,-1);
+            delete $oldDocDevice{box_docsis31_Us_powerLevels} if exists $oldDocDevice{box_docsis31_Us_powerLevels};
+            delete $oldDocDevice{box_docsis31_Us_frequencys} if exists $oldDocDevice{box_docsis31_Us_frequencys};
+          };
+
+        }
+
+        $views = $resultSIS->{data}->{channelDs}->{docsis30};
+        $nbViews = scalar @$views;
+
+        if ($nbViews > 0) {
+
+          $powerLevels   = "";
+          $latencys      = "";
+          $frequencys    = "";
+          $corrErrors    = "";
+          $nonCorrErrors = "";
+          $mses          = "";
+
+          eval {
+            for(my $i = 0; $i <= $nbViews - 1; $i++) {
+#              $returnStr .= "<td>" . $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{channel} . "</td>";
+#              $returnStr .= "<td>" . $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{channelID} . "</td>";
+#              $returnStr .= "<td>" . $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{type} . "</td>";
+              $powerLevels   .= $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{powerLevel} . " ";
+              $latencys      .= $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{latency} . " ";
+              $frequencys    .= $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{frequency} . " ";
+              $corrErrors    .= $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{corrErrors} . " ";
+              $nonCorrErrors .= $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{nonCorrErrors} . " ";
+              $mses          .= $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{mse} . " ";
+            }
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Ds_powerLevels", substr($powerLevels,0,-1);
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Ds_latencys", substr($latencys,0,-1);
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Ds_frequencys", substr($frequencys,0,-1);
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Ds_corrErrors", substr($corrErrors,0,-1);
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Ds_nonCorrErrors", substr($latencys,0,-1);
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Ds_mses", substr($mses,0,-1);
+            delete $oldDocDevice{box_docsis30_Ds_powerLevels} if exists $oldDocDevice{box_docsis30_Ds_powerLevels};
+            delete $oldDocDevice{box_docsis30_Ds_latencys} if exists $oldDocDevice{box_docsis30_Ds_latencys};
+            delete $oldDocDevice{box_docsis30_Ds_frequencys} if exists $oldDocDevice{box_docsis30_Ds_frequencys};
+            delete $oldDocDevice{box_docsis30_Ds_corrErrors} if exists $oldDocDevice{box_docsis30_Ds_corrErrors};
+            delete $oldDocDevice{box_docsis30_Ds_nonCorrErrors} if exists $oldDocDevice{box_docsis30_Ds_nonCorrErrors};
+            delete $oldDocDevice{box_docsis30_Ds_mses} if exists $oldDocDevice{box_docsis30_Ds_mses};
+          };
+
+        }
+
+        $views = $resultSIS->{data}->{channelDs}->{docsis31};
+        $nbViews = scalar @$views;
+
+        if ($nbViews > 0) {
+
+          $powerLevels = "";
+          $frequencys  = "";
+
+          eval {
+            for(my $i = 0; $i <= $nbViews - 1; $i++) {
+#              $returnStr .= "<td>" . $resultSIS->{data}->{channelDs}->{docsis31}->[$i]->{channel} . "</td>";
+#              $returnStr .= "<td>" . $resultSIS->{data}->{channelDs}->{docsis31}->[$i]->{channelID} . "</td>";
+#              $returnStr .= "<td>" . $resultSIS->{data}->{channelDs}->{docsis31}->[$i]->{type} . "</td>";
+              $powerLevels .= $resultSIS->{data}->{channelDs}->{docsis31}->[$i]->{powerLevel} . " ";
+              $frequencys  .= $resultSIS->{data}->{channelDs}->{docsis31}->[$i]->{frequency} . " ";
+            }
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis31_Ds_powerLevels", substr($powerLevels,0,-1);
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis31_Ds_frequencys", substr($frequencys,0,-1);
+            delete $oldDocDevice{box_docsis31_Ds_powerLevels} if exists $oldDocDevice{box_docsis31_Ds_powerLevels};
+            delete $oldDocDevice{box_docsis31_Ds_frequencys} if exists $oldDocDevice{box_docsis31_Ds_frequencys};
+          };
+        }
+      }
+
+      # Remove inactive or non existing wan-readings in two steps
+      foreach ( keys %oldDocDevice ) {
+        # set the wan readings to 'inactive' and delete at next readout
+        if ( $oldDocDevice{$_} ne "inactive" ) {
+          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $_, "inactive";
+        }
+        else {
+          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $_, "";
+        }
+      }
+   }
+
+   if ( AttrVal( $name, "allowTR064Command", 0 )) {
+
+      my $strCurl;
+
+      if (($avmModel =~ "Box") && (lc($avmModel) !~ "5[4,5][9,3]0|40[2,4,6]0|68[2,5]0|6[4,5,6][3,6,9][0,1]|fiber|cable") ) { # FB ohne VDSL
+         my @tr064CmdArray = (["WANDSLInterfaceConfig:1", "wandslifconfig1", "GetInfo"]);
+         my @tr064Result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
+         if ($tr064Result[0]->{UPnPError}) {
+            $strCurl = Dumper (@tr064Result);
+            FRITZBOX_Log $hash, 2, "ERROR: Curl-> " . $strCurl;
+         } else {
+            $strCurl = Dumper (@tr064Result);
+            FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
+            if ($strCurl =~ /.NewDownstreamCurrRate. => '(.*)'/) {
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_vdsl_downStreamRate", $1/1000;
+
+            } else {
+               FRITZBOX_Log $hash, 4, "INFO: box_vdsl_downStreamRate Curl-> " . $strCurl;
+            }
+
+            if ($strCurl =~ /.NewUpstreamCurrRate. => '(.*)'/) {
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_vdsl_upStreamRate", $1/1000;
+            } else {
+               FRITZBOX_Log $hash, 4, "INFO: box_vdsl_upStreamRate Curl-> " . $strCurl;
+            }
+         }
+      } else {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_vdsl_downStreamRate", "";
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_vdsl_upStreamRate", "";
+      }
+
+      # box_uptimeConnect
+      $strCurl = `curl "http://$host:49000/igdupnp/control/WANIPConn1" -H "Content-Type: text/xml; charset=\'utf-8\'" -H "SoapAction:urn:schemas-upnp-org:service:WANIPConnection:1#GetStatusInfo" -d "<?xml version=\'1.0\' encoding=\'utf-8\'?> <s:Envelope s:encodingStyle=\'http://schemas.xmlsoap.org/soap/encoding/\' xmlns:s=\'http://schemas.xmlsoap.org/soap/envelope/\'> <s:Body> <u:GetStatusInfo xmlns:u=\'urn:schemas-upnp-org:service:WANIPConnection:1\' /> </s:Body> </s:Envelope>" -s`;
+
+      FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
+
+      if($strCurl =~ m/<NewConnectionStatus>(.*?)<\/NewConnectionStatus>/i) {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_connect", $1;
+      }
+      if($strCurl =~ m/<NewLastConnectionError>(.*?)<\/NewLastConnectionError>/i) {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_last_connect_err", $1;
+      }
+
+      if($strCurl =~ m/<NewUptime>(.*?)<\/NewUptime>/i) {
+         $Sek = $1;
+         $Tag  = int($Sek/86400);
+         $Std  = int(($Sek/3600)-(24*$Tag));
+         $Min = int(($Sek/60)-($Std*60)-(1440*$Tag));
+         $Sek -= (($Min*60)+($Std*3600)+(86400*$Tag));
+
+         $Std = substr("0".$Std,-2);
+         $Min = substr("0".$Min,-2);
+         $Sek = substr("0".$Sek,-2);
+
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_uptimeConnect", $1 . " sec = " . $Tag . "T $Std:$Min:$Sek";
+      }
+
+      # box_ipExtern
+      $strCurl = `curl "http://$host:49000/igdupnp/control/WANIPConn1" -H "Content-Type: text/xml; charset=\'utf-8\'" -H "SoapAction:urn:schemas-upnp-org:service:WANIPConnection:1#GetExternalIPAddress" -d "<?xml version=\'1.0\' encoding=\'utf-8\'?> <s:Envelope s:encodingStyle=\'http://schemas.xmlsoap.org/soap/encoding/\' xmlns:s=\'http://schemas.xmlsoap.org/soap/envelope/\'> <s:Body> <u:GetExternalIPAddress xmlns:u=\'urn:schemas-upnp-org:service:WANIPConnection:1\' /> </s:Body> </s:Envelope>" -s`;
+
+      FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
+
+      if($strCurl =~ m/<NewExternalIPAddress>(.*?)<\/NewExternalIPAddress>/i) {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipExtern", $1;
+      }
+
+      # box_ipv6
+      $strCurl = `curl "http://$host:49000/igdupnp/control/WANIPConn1" -H "Content-Type: text/xml; charset=\'utf-8\'" -H "SoapAction:urn:schemas-upnp-org:service:WANIPConnection:1#X_AVM_DE_GetExternalIPv6Address" -d "<?xml version=\'1.0\' encoding=\'utf-8\'?> <s:Envelope s:encodingStyle=\'http://schemas.xmlsoap.org/soap/encoding/\' xmlns:s=\'http://schemas.xmlsoap.org/soap/envelope/\'> <s:Body> <u:GetExternalIPAddress xmlns:u=\'urn:schemas-upnp-org:service:WANIPConnection:1\' /> </s:Body> </s:Envelope>" -s`;
+
+      FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
+
+      if($strCurl =~ m/<NewPrefixLength>(.*?)<\/NewPrefixLength>/i) {
+         if ($1 != 0) {
+            if($strCurl =~ m/<NewExternalIPv6Address>(.*?)<\/NewExternalIPv6Address>/i) {
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6Extern", $1; 
+
+               $strCurl = `curl "http://$host:49000/igdupnp/control/WANIPConn1" -H "Content-Type: text/xml; charset=\'utf-8\'" -H "SoapAction:urn:schemas-upnp-org:service:WANIPConnection:1#X_AVM_DE_GetIPv6Prefix" -d "<?xml version=\'1.0\' encoding=\'utf-8\'?> <s:Envelope s:encodingStyle=\'http://schemas.xmlsoap.org/soap/encoding/\' xmlns:s=\'http://schemas.xmlsoap.org/soap/envelope/\'> <s:Body> <u:GetExternalIPAddress xmlns:u=\'urn:schemas-upnp-org:service:WANIPConnection:1\' /> </s:Body> </s:Envelope>" -s`;
+
+               FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
+
+               if($strCurl =~ m/<NewIPv6Prefix>(.*?)<\/NewIPv6Prefix>/i) {
+                  FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6Prefix", $1;
+               }
+            }
+         }
+      }
+
+   }
+
+# statistics
    push @roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
    my $returnStr = join('|', @roReadings );
 
@@ -2975,6 +3169,47 @@ sub FRITZBOX_Readout_Process($$)
          }
          elsif ($rName eq "box_model") {
             $hash->{MODEL} = $rValue;
+            if (($rValue =~ "Box") && (lc($rValue) =~ "6[4,5,6][3,6,9][0,1]") ) {
+            #if (1==1) {
+                my $cable = "allowShellCommand:0,1 "
+                ."allowTR064Command:0,1 "
+                ."boxUser "
+                ."disable:0,1 "
+                ."defaultCallerName "
+                ."defaultUploadDir "
+                ."forceTelnetConnection:0,1 "
+                ."fritzBoxIP "
+                ."INTERVAL "
+                ."m3uFileLocal "
+                ."m3uFileURL "
+                ."ringWithIntern:0,1,2 "
+                ."telnetUser "
+                ."telnetTimeOut "
+                ."useGuiHack:0,1 "
+                ."userTickets "
+                ."enablePassivLanDevices:0,1 "
+                ."enableVPNShares:0,1 "
+                ."enableUserInfo:0,1 "
+                ."enableAlarmInfo:0,1 "
+                ."enableWLANneighbors:0,1 "
+                ."wlanNeighborsPrefix "
+                ."disableDectInfo:0,1 "
+                ."disableFonInfo:0,1 "
+                ."enableSIP:0,1 "
+                ."disableBoxReadings:multiple-strict,box_connect,box_cpuTemp,box_dect,box_dsl_downStream,box_dsl_upStream,"
+                                ."box_guestWlan,box_guestWlanCount,box_guestWlanRemain,box_macFilter_active,box_ipExtern,box_ipv6Extern,"
+                                ."box_ipv6Prefix,box_last_connect_err,box_moh,box_powerRate,box_rateDown,"
+                                ."box_rateUp,box_stdDialPort,box_tr064,box_tr069,box_uptimeConnect,box_uptime,box_wlanCount,box_wlan_2.4GHz,"
+                                ."box_wlan_5GHz,box_vdsl_downStreamRate,box_vdsl_upStreamRate," #,box_model,box_oem
+                                ."box_docsis30_Ds_powerLevels,box_docsis30_Ds_latencys,box_docsis30_Ds_frequencys,box_docsis30_Ds_corrErrors,box_docsis30_Ds_nonCorrErrors,box_docsis30_Ds_mses,"
+                                ."box_docsis30_Us_powerLevels,box_docsis30_Us_frequencys,box_docsis31_Us_powerLevels,box_docsis31_Us_frequencys,box_docsis31_Ds_powerLevels,box_docsis31_Ds_frequencys "
+                ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,_noDefInf_ "
+                .$readingFnAttributes;
+
+              setDevAttrList($hash->{NAME}, $cable);
+            } else {
+              setDevAttrList($hash->{NAME});
+            }
             $rValue .= " [".$values{box_oem}."]" if $values{box_oem};
          }
          if ($rName !~ /->|box_fwUpdate|box_oem|readoutTime/) {
@@ -3219,8 +3454,8 @@ sub FRITZBOX_Set_Cmd_Start($)
       $timeout += 30;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
-      $cmdFunction = "FRITZBOX_Call_Run_Web";
-      $cmdFunction = "FRITZBOX_Call_Run_Shell" if $forceShell;
+      $cmdFunction = "FRITZBOX_Run_Call_Web";
+      $cmdFunction = "FRITZBOX_Run_Call_Shell" if $forceShell;
    }
 # Preparing SET guestWLAN
    elsif ($val[0] eq "guestwlan") {
@@ -3228,8 +3463,8 @@ sub FRITZBOX_Set_Cmd_Start($)
       $timeout = 20;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
-      $cmdFunction = "FRITZBOX_GuestWlan_Run_Web";
-      $cmdFunction = "FRITZBOX_GuestWlan_Run_Shell" if $forceShell;
+      $cmdFunction = "FRITZBOX_Run_GuestWlan_Shell";
+      $cmdFunction = "FRITZBOX_Run_GuestWlan_Shell" if $forceShell;
    }
 # Preparing SET RING
    elsif ($val[0] eq "ring") {
@@ -3264,7 +3499,7 @@ sub FRITZBOX_Set_Cmd_Start($)
       $timeout = 10;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
-      $cmdFunction = "FRITZBOX_Wlan_rescan_neighborhood";
+      $cmdFunction = "FRITZBOX_Run_rescan_neighborhood";
    }
 # Preparing SET macFilter
    elsif ($val[0] eq "macfilter") {
@@ -3472,7 +3707,8 @@ sub FRITZBOX_Run_macFilter($)
 }
 
 #######################################################################
-sub FRITZBOX_Wlan_rescan_neighborhood {
+sub FRITZBOX_Run_rescan_neighborhood($)
+{
    my ($string) = @_;
    my ($name, $cmd, @val) = split "\\|", $string;
    my $hash = $defs{$name};
@@ -3509,7 +3745,8 @@ sub FRITZBOX_Wlan_rescan_neighborhood {
    my $returnStr = join('|', @roReadings );
    FRITZBOX_Log $hash, 5, "DEBUG: Handover to main process: " . $returnStr;
    return $name . "|2|" . encode_base64($returnStr,"");
-}
+
+} # End FRITZBOX_Run_rescan_neighborhood
 
 #######################################################################
 sub FRITZBOX_Run_chgProfile($)
@@ -3767,7 +4004,8 @@ sub FRITZBOX_Run_chgProfile($)
    my $returnStr = join('|', @roReadings );
    FRITZBOX_Log $hash, 5, "DEBUG: Handover to main process: " . $returnStr;
    return $name . "|2|" . encode_base64($returnStr,"");
-}
+
+} # End FRITZBOX_Run_chgProfile
 
 #######################################################################
 sub FRITZBOX_Run_enableVPNshare($)
@@ -3863,7 +4101,8 @@ sub FRITZBOX_Run_enableVPNshare($)
    my $returnStr = join('|', @roReadings );
    FRITZBOX_Log $hash, 5, "DEBUG: Handover to main process: " . $returnStr;
    return $name . "|2|" . encode_base64($returnStr,"");
-}
+
+} # End FRITZBOX_Run_enableVPNshare
 
 #######################################################################
 sub FRITZBOX_Run_lockLandevice($)
@@ -3986,9 +4225,11 @@ sub FRITZBOX_Run_lockLandevice($)
    $returnStr = join('|', @roReadings );
    FRITZBOX_Log $hash, 5, "DEBUG: Handover to main process: " . $returnStr;
    return $name . "|2|" . encode_base64($returnStr,"");
-}
+
+} # End FRITZBOX_Run_lockLandevice
+
 #######################################################################
-sub FRITZBOX_Call_Run_Shell($)
+sub FRITZBOX_Run_Call_Shell($)
 {
    my ($string) = @_;
    my ($name, @val) = split "\\|", $string;
@@ -4148,10 +4389,10 @@ sub FRITZBOX_Call_Run_Shell($)
 
    return $name."|1|Calling done";
 
-} # End FRITZBOX_Call_Run_Shell
+} # End FRITZBOX_Run_Call_Shell
 
 #######################################################################
-sub FRITZBOX_Call_Run_Web($)
+sub FRITZBOX_Run_Call_Web($)
 {
    my ($string) = @_;
    my ($name, @val) = split "\\|", $string;
@@ -4326,10 +4567,10 @@ sub FRITZBOX_Call_Run_Web($)
 
    return $name."|1|Calling done";
 
-} # End FRITZBOX_Call_Run_Web
+} # End FRITZBOX_Run_Call_Web
 
 #######################################################################
-sub FRITZBOX_GuestWlan_Run_Shell($)
+sub FRITZBOX_Run_GuestWlan_Shell($)
 {
    my ($string) = @_;
    my ($name, @val) = split "\\|", $string;
@@ -4378,10 +4619,10 @@ sub FRITZBOX_GuestWlan_Run_Shell($)
    FRITZBOX_Log $hash, 5, "DEBUG: Handover to main process: ".$returnStr;
    return $name."|2|".encode_base64($returnStr,"");
 
-} # end FRITZBOX_GuestWlan_Run_Shell
+} # end FRITZBOX_Run_GuestWlan_Shell
 
 #######################################################################
-sub FRITZBOX_GuestWlan_Run_Web($)
+sub FRITZBOX_Run_GuestWlan_Web($)
 {
    my ($string) = @_;
    my ($name, @val) = split "\\|", $string;
@@ -4455,7 +4696,7 @@ sub FRITZBOX_GuestWlan_Run_Web($)
    FRITZBOX_Log $hash, 5, "DEBUG: Handover to main process: ".$returnStr;
    return $name."|2|".encode_base64($returnStr,"");
 
-} # end FRITZBOX_GuestWlan_Run_Web
+} # end FRITZBOX_Run_GuestWlan_Shell
 
 #######################################################################
 sub FRITZBOX_Wlan_Run_Shell($)
@@ -6724,7 +6965,8 @@ sub FRITZBOX_User_Info_List($) {
 
    my $views = $result->{user_info};
 
-   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+#   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+   $returnStr .= '<table cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="4">Benutzer Informationen</td><td colspan="5">Berechtigungen</td>';
    $returnStr .= "</tr>\n";
@@ -6785,7 +7027,8 @@ sub FRITZBOX_Kid_Profiles_List($) {
 
    my $views = $result->{data}->{kidProfiles};
 
-   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+#   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+   $returnStr .= '<table cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="3">Kid Profiles</td>';
    $returnStr .= "</tr>\n";
@@ -6814,6 +7057,154 @@ sub FRITZBOX_Kid_Profiles_List($) {
    return $returnStr;
 }
 
+# get list of DOCSIS informations
+############################################
+sub FRITZBOX_DOCSIS_Informations($) {
+
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+
+   # xhr 1 lang de page docInfo xhrId all no_sidrenew nop
+   my @webCmdArray;
+   push @webCmdArray, "xhr"         => "1";
+   push @webCmdArray, "lang"        => "de";
+   push @webCmdArray, "page"        => "docInfo";
+   push @webCmdArray, "xhrId"       => "all";
+   push @webCmdArray, "no_sidrenew" => "";
+
+   my $returnStr;
+
+   my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+   my $tmp;
+
+   if(defined $result->{Error}) {
+     $tmp = FRITZBOX_ERR_Result($hash, $result);
+     $returnStr .= "DOCSIS: Informationen\n";
+     $returnStr .= "---------------------------------\n";
+     return $returnStr . $tmp;
+   }
+
+   FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($result->{data});
+
+   my $views;
+   my $nbViews;
+
+   # $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+   $returnStr .= '<table cellspacing="10" cellpadding="20">';
+   $returnStr .= "<tr>\n";
+   $returnStr .= '<td colspan="10">DOCSIS Informationen</td>';
+   $returnStr .= "</tr>\n";
+   $returnStr .= "<tr>\n";
+   $returnStr .= "<td>Kanal</td><td>KanalID</td><td>Multiplex</td><td>Typ</td><td>Powerlevel</td><td>Frequenz</td>";
+   $returnStr .= "<td>Latenz</td><td>corrErrors</td><td>nonCorrErrors</td><td>MSE</td>\n";
+   $returnStr .= "</tr>\n";
+
+   $views = $result->{data}->{channelUs}->{docsis30};
+   $nbViews = scalar @$views;
+
+   if ($nbViews > 0) {
+     $returnStr .= "<tr>\n";
+     $returnStr .= '<td colspan="10">channelUs - docsis30</td>';
+     $returnStr .= "</tr>\n";
+
+     eval {
+       for(my $i = 0; $i <= $nbViews - 1; $i++) {
+         $returnStr .= "<tr>\n";
+         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{channel} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{channelID} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{multiplex} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{type} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{powerLevel} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{frequency} . "</td>";
+         $returnStr .= "</tr>\n";
+       }
+     };
+
+     $returnStr .= "</tr>\n";
+     $returnStr .= '<td colspan="10"> </td>';
+     $returnStr .= "</tr>\n";
+   }
+
+   $views = $result->{data}->{channelUs}->{docsis31};
+   $nbViews = scalar @$views;
+
+   if ($nbViews > 0) {
+     $returnStr .= "</tr>\n";
+     $returnStr .= '<td colspan="10">channelUs - docsis31</td>';
+     $returnStr .= "</tr>\n";
+
+     eval {
+       for(my $i = 0; $i <= $nbViews - 1; $i++) {
+         $returnStr .= "<tr>\n";
+         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{channel} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{channelID} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{multiplex} . "</td>" if $result->{data}->{channelUs}->{docsis31}->[$i]->{multiplex};
+         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{type} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{powerLevel} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{frequency} . "</td>";
+         $returnStr .= "</tr>\n";
+       }
+     };
+
+     $returnStr .= "</tr>\n";
+     $returnStr .= '<td colspan="10"> </td>';
+     $returnStr .= "</tr>\n";
+   }
+
+   $views = $result->{data}->{channelDs}->{docsis30};
+   $nbViews = scalar @$views;
+
+   if ($nbViews > 0) {
+     $returnStr .= "</tr>\n";
+     $returnStr .= '<td colspan="10">channelDs - docsis30</td>';
+     $returnStr .= "</tr>\n";
+
+     eval {
+       for(my $i = 0; $i <= $nbViews - 1; $i++) {
+         $returnStr .= "<tr>\n";
+         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{channel} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{channelID} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{type} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{powerLevel} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{latency} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{frequency} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{corrErrors} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{nonCorrErrors} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{mse} . "</td>";
+         $returnStr .= "</tr>\n";
+       }
+     };
+
+     $returnStr .= "</tr>\n";
+     $returnStr .= '<td colspan="10"> </td>';
+     $returnStr .= "</tr>\n";
+   }
+
+   $views = $result->{data}->{channelDs}->{docsis31};
+   $nbViews = scalar @$views;
+
+   if ($nbViews > 0) {
+     $returnStr .= "</tr>\n";
+     $returnStr .= '<td colspan="10">channelDs - docsis31</td>';
+     $returnStr .= "</tr>\n";
+
+     eval {
+       for(my $i = 0; $i <= $nbViews - 1; $i++) {
+         $returnStr .= "<tr>\n";
+         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis31}->[$i]->{channel} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis31}->[$i]->{channelID} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis31}->[$i]->{type} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis31}->[$i]->{powerLevel} . "</td>";
+         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis31}->[$i]->{frequency} . "</td>";
+         $returnStr .= "</tr>\n";
+       }
+     };
+   }
+
+   $returnStr .= "</table>\n";
+
+   return $returnStr;
+}
 
 # get list of WLAN in environment
 ############################################
@@ -6851,14 +7242,14 @@ sub FRITZBOX_WLAN_Environment($) {
 
    my $views = $result->{data}->{scanlist};
    my $nbViews = scalar @$views;
-   my $lDump = "";
 
-   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+   #$returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+   $returnStr .= '<table cellspacing="5" cellpadding="10">';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="4">WLAN: Netzwerke in der Umgebung</td>';
    $returnStr .= "</tr>\n";
    $returnStr .= "<tr>\n";
-   $returnStr .= "<td>MAC</td><td>SSID</td><td>Kanal</td><td>BandID\n";
+   $returnStr .= "<td>MAC</td><td>SSID</td><td>Kanal</td><td>BandID</td>\n";
    $returnStr .= "</tr>\n";
 
    eval {
@@ -6871,15 +7262,6 @@ sub FRITZBOX_WLAN_Environment($) {
        $returnStr .= "</tr>\n";
      }
    };
-   $returnStr .= "</table>\n";
-
-   my @fwV = split(/\./, ReadingsVal($name, "box_fwVersion", "0.0.0.error"));
-
-   my $FW1 = substr($fwV[1],0,2);
-   my $FW2 = substr($fwV[2],0,2);
-
-   # Wirguard VPN only available with Fritz!OS 7.50 and greater
-   # return $returnStr . "</table>\n" if $FW1 <= 7 && $FW2 < 50;
 
    $returnStr .= "</table>\n";
 
@@ -6931,7 +7313,8 @@ sub FRITZBOX_VPN_Shares_List($) {
       $jID = "init";
    }
 
-   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+#   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+   $returnStr .= '<table cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="7">VPN Shares: Benutzer-Verbindungen</td>';
    $returnStr .= "</tr>\n";
@@ -6968,7 +7351,8 @@ sub FRITZBOX_VPN_Shares_List($) {
    }
 
    $returnStr .= "\n";
-   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+#   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+   $returnStr .= '<table cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="7">VPN Shares: Box-Verbindungen</td>';
    $returnStr .= "</tr>\n";
@@ -7083,7 +7467,8 @@ sub FRITZBOX_Lan_Devices_List($) {
    my $nbViews = scalar @$views;
    my $lDump = "";
 
-   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+#   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+   $returnStr .= '<table cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="6">LanDevices: Active</td>';
    $returnStr .= "</tr>\n";
@@ -7112,7 +7497,8 @@ sub FRITZBOX_Lan_Devices_List($) {
    $nbViews = scalar @$views;
 
    $returnStr .= "\n";
-   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+#   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+   $returnStr .= '<table cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="6">LanDevices: Passiv</td>';
    $returnStr .= "</tr>\n";
@@ -7429,7 +7815,8 @@ sub FRITZBOX_fritztris($)
    $returnStr .= '<div id="game" style="background:white;"></div></div></td></tr></table>';
 
    return $returnStr;
-}
+
+} # End FRITZBOX_fritztris
 
 #####################################
 #{my @cmd;; $cmd=webCmdArray, "active" => "on";
@@ -7754,7 +8141,7 @@ sub FRITZBOX_fritztris($)
       </li><br>
 
       <li><a name="luaInfo"></a>
-         <dt><code>get &lt;name&gt; luaInfo &lt;landevices|vpnShares|kidProfiles|userInfos&gt;</code></dt>
+         <dt><code>get &lt;name&gt; luaInfo &lt;landevices|vpnShares|kidProfiles|userInfos|wlanNeighborhood|docsisInformation&gt;</code></dt>
          <br>
          Needs FRITZ!OS 7.21 or higher.<br>
          lanDevices -> Shows a list of active and inactive lan devices.<br>
@@ -7762,6 +8149,7 @@ sub FRITZBOX_fritztris($)
          kidProfiles -> Shows a list of internet access profiles.<br>
          userInfos -> Shows a list of FRITZ!BOX users.<br>
          wlanNeighborhood -> Shows a list of WLAN neighborhood devices.<br>
+         docsisInformation -> Shows DOCSIS informations (only Cable).<br>
       </li><br>
 
       <li><a name="luaQuery"></a>
@@ -8038,6 +8426,15 @@ sub FRITZBOX_fritztris($)
       <li><b>box_wlan_2.4GHz</b> - Current state of the 2.4 GHz WLAN</li>
       <li><b>box_wlan_5GHz</b> - Current state of the 5 GHz WLAN</li>
       <li><b>box_wlan_lastScanTime</b> - last scan of the WLAN neighborhood. This readings is only available if the attribut enableWLANneighbors is set.</li>
+
+      <br>
+      <li><b>box_docsis30_Ds_powerLevels</b> - Only Fritz!Box Cable</li>
+      <li><b>box_docsis30_Ds_latencys</b> - Only Fritz!Box Cable</li>
+      <li><b>box_docsis30_Ds_frequencys</b> - Only Fritz!Box Cable</li>
+      <li><b>box_docsis30_Ds_corrErrors</b> - Only Fritz!Box Cable</li>
+      <li><b>box_docsis30_Ds_nonCorrErrors</b> - Only Fritz!Box Cable</li>
+      <li><b>box_docsis30_Ds_mses</b> - Only Fritz!Box Cable</li>
+
       <br>
       <li><b>dect</b><i>1</i> - Name of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Alarm ring tone of the DECT device <i>1</i></li>
@@ -8383,7 +8780,7 @@ sub FRITZBOX_fritztris($)
       </li><br>
 
       <li><a name="luaInfo"></a>
-         <dt><code>get &lt;name&gt; luaInfo &lt;landevices|vpnShares|kidProfiles|userInfos&gt|wlanNeighborhood;</code></dt>
+         <dt><code>get &lt;name&gt; luaInfo &lt;landevices|vpnShares|kidProfiles|userInfos&gt|wlanNeighborhood|docsisInformation;</code></dt>
          <br>
          Benötigt FRITZ!OS 7.21 oder höher.<br>
          lanDevices -> Generiert eine Liste der aktiven und inaktiven Netzwerkgeräte.<br>
@@ -8391,6 +8788,7 @@ sub FRITZBOX_fritztris($)
          kidProfiles -> Generiert eine Liste der Zugangsprofile.<br>
          userInfos -> Generiert eine Liste der FRITZ!BOX Benutzer.<br>
          wlanNeighborhood -> Generiert eine Liste der WLAN Nachbarschaftsgeräte.<br>
+         docsisInformation -> Zeigt Informationen zu DOCSIS an (nur Cable).<br>
       </li><br>
 
       <li><a name="luaQuery"></a>
@@ -8664,6 +9062,14 @@ sub FRITZBOX_fritztris($)
       <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
       <li><b>box_wlan_5GHz</b> - Aktueller Status des 5-GHz-WLAN</li>
       <li><b>box_wlan_lastScanTime</b> - Letzter Scan der WLAN Umgebung. Ist nur vorhanden, wenn das Attribut enableWLANneighbors gesetzt ist.</li>
+
+      <br>
+      <li><b>box_docsis30_Ds_powerLevels</b> - Nur Fritz!Box Cable</li>
+      <li><b>box_docsis30_Ds_latencys</b> - Nur Fritz!Box Cable</li>
+      <li><b>box_docsis30_Ds_frequencys</b> - Nur Fritz!Box Cable</li>
+      <li><b>box_docsis30_Ds_corrErrors</b> - Nur Fritz!Box Cable</li>
+      <li><b>box_docsis30_Ds_nonCorrErrors</b> - Nur Fritz!Box Cable</li>
+      <li><b>box_docsis30_Ds_mses</b> - Nur Fritz!Box Cable</li>
 
       <br>
       <li><b>dect</b><i>1</i> - Name des DECT Telefons <i>1</i></li>
