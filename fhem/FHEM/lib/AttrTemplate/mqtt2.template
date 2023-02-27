@@ -55,8 +55,8 @@ setreading DEVICE attrTemplateVersion 20220110
 #MQTT2 IO ignoreRegexp
 #
 name:MQTT2_IO_ignoreRegexp_basic
-filter:TYPE=MQTT2_DEVICE
 desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "cmnd" tasmota and "command" for shelly. <br>Additionally homeassistat discovery branch will be deactivated. <br>NOTE: early experimental version...
+filter:TYPE=MQTT2_DEVICE
 order:000002
 par:IODEVNAME;Name of the IO-Device; { InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME})) }
 set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_shelly \IODEVNAME=IODEVNAME
@@ -1028,6 +1028,22 @@ attr DEVICE model zigbee2mqtt_symfonsik_sound_controller
 attr DEVICE userReadings volume:brightness.* {int(ReadingsVal($name,"brightness",10)/2.55)}
 deletereading -q DEVICE (?!associatedWith|IODev).*
 setreading DEVICE attrTemplateVersion 20200904
+
+
+#based on contribution by RomanticBoy83: https://forum.fhem.de/index.php/topic,131980.msg1263455.html#msg1263455
+name:zigbee2mqtt_zigbee2mqtt_ir_interface
+desc: IR interface controlled by zigbee2mqtt <br>Tested with: Moes UFO-R11, https://www.zigbee2mqtt.io/devices/UFO-R11.html
+order:L_16m
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to it_remote;{ AttrVal("DEVICE","icon","it_remote") }
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE setList \
+  learn_ir_code:uzsuToggle,ON,OFF $\DEVICETOPIC/set {"learn_ir_code":"$EVTPART1"}\
+  ir_code_to_send:textField $\DEVICETOPIC/set {"ir_code_to_send":"$EVTPART1"}
+attr DEVICE model zigbee2mqtt_ir_interface
+setreading DEVICE attrTemplateVersion 20230227
 
 
 # Eurotronic Spirit ZigBee version
@@ -5522,7 +5538,7 @@ attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/device:.* device
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_hub_bridge
-setreading DEVICE attrTemplateVersion 20200812
+setreading DEVICE attrTemplateVersion 20220812
 { AttrTemplate_Initialize() }
 
 
@@ -5544,8 +5560,14 @@ option:{ RADIO_SINGLE }
 attr DEVICE readingList INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
+  INVERTERLONG_ID/ch0/Q_AC:.* Q_AC\
+  INVERTERLONG_ID/ch0/F_AC:.* F_AC\
+  INVERTERLONG_ID/ch0/PF_AC:.* PF_AC\
+  INVERTERLONG_ID/ch0/P_DC:.* P_DC\
   INVERTERLONG_ID/ch0/Freq:.* Freq\
   INVERTERLONG_ID/ch0/Temp:.* temperature\
+  INVERTERLONG_ID/ch0/ALARM_MES_ID:.* ALARM_MES_ID\
+  INVERTERLONG_ID/ch0/Efficiency:.* Efficiency\
   INVERTERLONG_ID/ch0/YieldDay:.* {}\
   INVERTERLONG_ID/ch0/YieldTotal:.* {}\
   INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
@@ -5555,15 +5577,23 @@ attr DEVICE readingList INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC\
-  INVERTERLONG_ID/ch1/YieldDay:.* YieldDay\
+  INVERTERLONG_ID/ch1/U_DC:.* U_DC\
+  INVERTERLONG_ID/ch1/Irridation:.* Irridation1\
+  INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
   INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal
 option:{ RADIO_DOUBLE }
 attr DEVICE readingList \
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
+  INVERTERLONG_ID/ch0/Q_AC:.* Q_AC\
+  INVERTERLONG_ID/ch0/F_AC:.* F_AC\
+  INVERTERLONG_ID/ch0/PF_AC:.* PF_AC\
+  INVERTERLONG_ID/ch0/P_DC:.* P_DC\
   INVERTERLONG_ID/ch0/Freq:.* Freq\
   INVERTERLONG_ID/ch0/Temp:.* temperature\
+  INVERTERLONG_ID/ch0/ALARM_MES_ID:.* ALARM_MES_ID\
+  INVERTERLONG_ID/ch0/Efficiency:.* Efficiency\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
   INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
@@ -5573,10 +5603,14 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
+  INVERTERLONG_ID/ch1/U_DC:.* U_DC1\
+  INVERTERLONG_ID/ch1/Irridation:.* Irridation1\
   INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
   INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal1\
   INVERTERLONG_ID/ch2/I_DC:.* I_DC2\
   INVERTERLONG_ID/ch2/P_DC:.* P_DC2\
+  INVERTERLONG_ID/ch2/U_DC:.* U_DC2\
+  INVERTERLONG_ID/ch2/Irridation:.* Irridation2\
   INVERTERLONG_ID/ch2/YieldDay:.* YieldDay2\
   INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2
 option:{ RADIO_QUATTRO }
@@ -5584,7 +5618,16 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
+  INVERTERLONG_ID/ch0/P_AC:.* P_AC\
+  INVERTERLONG_ID/ch0/Q_AC:.* Q_AC\
+  INVERTERLONG_ID/ch0/F_AC:.* F_AC\
+  INVERTERLONG_ID/ch0/PF_AC:.* PF_AC\
+  INVERTERLONG_ID/ch0/P_DC:.* P_DC\
   INVERTERLONG_ID/ch0/Freq:.* Freq\
+  INVERTERLONG_ID/ch0/Temp:.* temperature\
+  INVERTERLONG_ID/ch0/ALARM_MES_ID:.* ALARM_MES_ID\
+  INVERTERLONG_ID/ch0/Efficiency:.* Efficiency\
+  INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/Temp:.* temperature\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
@@ -5595,18 +5638,27 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
+  INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
+  INVERTERLONG_ID/ch1/U_DC:.* U_DC1\
+  INVERTERLONG_ID/ch1/Irridation:.* Irridation1\
   INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
   INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal1\
   INVERTERLONG_ID/ch2/I_DC:.* I_DC2\
   INVERTERLONG_ID/ch2/P_DC:.* P_DC2\
+  INVERTERLONG_ID/ch2/U_DC:.* U_DC2\
+  INVERTERLONG_ID/ch2/Irridation:.* Irridation2\
   INVERTERLONG_ID/ch2/YieldDay:.* YieldDay2\
   INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2\
   INVERTERLONG_ID/ch3/I_DC:.* I_DC3\
   INVERTERLONG_ID/ch3/P_DC:.* P_DC3\
+  INVERTERLONG_ID/ch3/U_DC:.* U_DC3\
+  INVERTERLONG_ID/ch3/Irridation:.* Irridation3\
   INVERTERLONG_ID/ch3/YieldDay:.* YieldDay3\
   INVERTERLONG_ID/ch3/YieldTotal:.* YieldTotal3\
   INVERTERLONG_ID/ch4/I_DC:.* I_DC4\
   INVERTERLONG_ID/ch4/P_DC:.* P_DC4\
+  INVERTERLONG_ID/ch4/U_DC:.* U_DC4\
+  INVERTERLONG_ID/ch4/Irridation:.* Irridation4\
   INVERTERLONG_ID/ch4/YieldDay:.* YieldDay4\
   INVERTERLONG_ID/ch4/YieldTotal:.* YieldTotal4
 option:global
@@ -5620,7 +5672,7 @@ attr DEVICE setList \
   limit_persistent_pct:slider,2,1,100 BASE_ID/devcontrol/INVERTER_NR/11/257 $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20200905
+setreading DEVICE attrTemplateVersion 20230227
 
 # contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
 name:hoymiles_opendtu_hub_bridge
