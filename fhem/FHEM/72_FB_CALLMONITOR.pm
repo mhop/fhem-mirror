@@ -40,7 +40,7 @@ use HttpUtils;
 use DevIo;
 use FritzBoxUtils;
 
-my $ModulVersion = "07.50.2";
+my $ModulVersion = "07.50.3a";
 my %tellows = ();
 my %connection_type = (
      0 => "FON1",
@@ -813,30 +813,31 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
          FB_CALLMONITOR_Log $name, 4, "reverse search for $number at tellows.de.";
          unless (AttrVal($name, "reverse-search-tellows-api-key", undef) || AttrVal($name, "reverse-search-tellows-api-partner", undef)) {
             FB_CALLMONITOR_Log $name, 4, "reverse search cancled for $number at tellows.de.";
-            $status = "login missing";
+            $status = "tellows.de -> login missing";
          } else {
             $result = FB_CALLMONITOR_tellowsRating($hash, $number);	### tellows	!!! $external_number --> $number !!!
 
             if(not defined($result)) {
-               if(AttrVal($name, "reverse-search-cache", "0") eq "1") {
-                  $status = "timeout";
-                  undef($result);
-               }
+               $status = "tellows.de -> timeout";
+               undef($result);
             } else {
-               #Debug($result);
                if( $result =~ /<name>([^"].*?)</ ) {
                   $invert_match = $1;
                   $invert_match = FB_CALLMONITOR_html2txt($invert_match);
                   FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
-                  undef($result);
-                  $status = $invert_match;
+#                  $status = $invert_match;
+#                  undef($result);
                } elsif ( $result =~ /ERROR(.*?)/ ) {
                   FB_CALLMONITOR_Log $name, 4, "reverse search name $number not available from tellows.de. $1.";
-                  $status = "Fehler";
+#                  $status = "error";
+#                  undef($result);
+               } else {
+                  FB_CALLMONITOR_Log $name, 4, "unknown error for $number at tellows.de. $1.";
+#                  $status = "unknown error";
+#                  undef($result);
                }
-
-               $status = "minimum";
             }
+            undef($result);
          }
       }
 
@@ -890,258 +891,219 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
          # Ask dasoertliche.de
          if($method eq "dasoertliche.de")
          {
-                unless(($number =~ /^0?[1-9]/ and $country_code eq "0049") or $number =~ /^0049/)
-                {
-                    FB_CALLMONITOR_Log $name, 4, "skip using dasoertliche.de for reverse search of $number because of non-german number";
-                }
-                else
-                {
-                    $number =~ s/^0049/0/; # remove country code
-                    FB_CALLMONITOR_Log $name, 4, "using dasoertliche.de for reverse search of $number";
-
-                    $result = GetFileFromURL("https://www1.dasoertliche.de/?form_name=search_inv&ph=".$number, 5, undef, 1);
-                    if(not defined($result))
-                    {
-                        if(AttrVal($name, "reverse-search-cache", "0") eq "1")
-                        {
-                            $status = "timeout";
-                            undef($result);
-                        }
-                    }
-                    else
-                    {
-                        #Debug($result);
-                        FB_CALLMONITOR_Log $name, 5, "result(dasOertliche) -> " . $result;
-                        if($result =~ m,<a href="[^"]*form_name=detail[^"]*".+?class="hitlnk_name".+?target="_self">(.+?)</a>,sg)
-                        {
-                            $invert_match = $1;
-                            $invert_match = FB_CALLMONITOR_html2txt($invert_match);
-                            FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
-                            undef($result);
-                            return $invert_match;
-                        }
-                        elsif(not $result =~ /wir konnten keine Treffer finden/)
-                        {
-                            FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from dasoertliche.de. Please contact the FHEM community.";
-                        }
-
-                        $status = "dasOertliche->unknown result";
-                    }
-                }
-            }
-
-             # Ask 11880.com
-            elsif($method eq "11880.com")
+            unless(($number =~ /^0?[1-9]/ and $country_code eq "0049") or $number =~ /^0049/)
             {
-                unless(($number =~ /^0?[1-9]/ and $country_code eq "0049") or $number =~ /^0049/)
-                {
-                    FB_CALLMONITOR_Log $name, 4, "skip using 11880.com for reverse search of $number because of non-german number";
-                }
-                else
-                {
-                    $number =~ s/^0049/0/; # remove country code
-                    FB_CALLMONITOR_Log $name, 4, "using 11880.com for reverse search of $number";
-
-                    $result = GetFileFromURL("https://www.11880.com/suche/".$number."/deutschland", 5, undef, 1);
-
-                    if(not defined($result))
-                    {
-                        FB_CALLMONITOR_Log $name, 4, "unable to retrieve result for reverse search of $number via $method";
-                        if(AttrVal($name, "reverse-search-cache", "0") eq "1")
-                        {
-                            $status = "timeout";
-                            undef($result);
-                        }
-                    }
-                    else
-                    {
-                        #Debug($result);
-                        FB_CALLMONITOR_Log $name, 5, "result(11880) -> " . $result;
-                        if($result =~ m,<li\s+[^>]*class="search-result-list-item"\s+[^>]*data-name="([^"]+)",s or $result =~ m,<h\d [^>]*itemprop="name"[^>]*>([^<]+)</h\d>,)
-                        {
-                            $invert_match = $1;
-                            $invert_match = FB_CALLMONITOR_html2txt($invert_match);
-                            FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
-                            undef($result);
-                            return $invert_match;
-                        }
-                        elsif(not $result =~ /Leider nichts gefunden/i)
-                        {
-                            FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from 11880.com. Please contact the FHEM community.";
-                        }
-
-                        $status = "11880.com->unknown";
-                    }
-                }
-            }
-
-            # SWITZERLAND ONLY!!! Ask search.ch
-            elsif($method eq  "search.ch")
-            {
-                unless(($number =~ /^0?[1-9]/ and $country_code eq "0041") or $number =~ /^0041/)
-                {
-                    FB_CALLMONITOR_Log $name, 4, "skip using search.ch for reverse search of $number because of non-swiss number";
-                }
-                else
-                {
-                    my $api_key = AttrVal($name, "apiKeySearchCh", undef);
-
-                    unless(defined($api_key))
-                    {
-                        FB_CALLMONITOR_Log $name, 1, "WARNING! no API key for swiss.ch configured. Please obtain an API key from https://tel.search.ch/api/getkey and set attribute apiKeySearchCh with your key";
-
-                        # use old key
-                        FB_CALLMONITOR_Log $name, 1, "using generic API key for reverse search via search.ch. WILL BE REMOVED IN A FUTURE RELEASE";
-                        $api_key = "b0b1207cb7c9d0048867de887aa9a4fd";
-                    }
-
-                    $number =~ s/^0041/0/; # remove country code
-
-                    FB_CALLMONITOR_Log $name, 4, "using search.ch for reverse search of $number";
-
-                    $result = GetFileFromURL("http://tel.search.ch/api/?key=".urlEncode($api_key)."&maxnum=1&was=".$number, 5, undef, 1);
-                    if(not defined($result))
-                    {
-                        if(AttrVal($name, "reverse-search-cache", "0") eq "1")
-                        {
-                            $status = "timeout";
-                            undef($result);
-                        }
-                    }
-                    else
-                    {
-                        #Log 2, $result;
-                        FB_CALLMONITOR_Log $name, 5, "result(search.ch) -> " . $result;
-                        if($result =~ m,<entry>(.+?)</entry>,s)
-                        {
-                            my $xml = $1;
-
-                            $invert_match = "";
-
-                            if($xml =~ m,<tel:firstname>(.+?)</tel:firstname>,)
-                            {
-                                $invert_match .= $1;
-                            }
-
-                            if($xml =~ m,<tel:name>(.+?)</tel:name>,)
-                            {
-                                $invert_match .= " $1";
-                            }
-
-                            if($xml =~ m,<tel:occupation>(.+?)</tel:occupation>,)
-                            {
-                                $invert_match .= ", $1";
-                            }
-
-                            $invert_match = FB_CALLMONITOR_html2txt($invert_match);
-                            FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
-                            undef($result);
-                            return $invert_match;
-                        }
-
-                        $status = "search.ch->unknown";
-                    }
-                }
-            }
-
-            # Austria ONLY!!! Ask dasschnelle.at
-            elsif($method eq "dasschnelle.at")
-            {
-                unless(($number =~ /^0?[1-9]/ and $country_code eq "0043") or $number =~ /^0043/)
-                {
-                    FB_CALLMONITOR_Log $name, 4, "skip using dasschnelle.at for reverse search of $number because of non-austrian number";
-                }
-                else
-                {
-                    $number =~ s/^0043/0/; # remove country code
-                    FB_CALLMONITOR_Log $name, 4, "using dasschnelle.at for reverse search of $number";
-
-                    $result = GetFileFromURL("http://www.dasschnelle.at/ergebnisse?what=".$number."&where=&rubrik=0&bezirk=0&orderBy=Standard&mapsearch=false", 5, undef, 1);
-                    if(not defined($result))
-                    {
-                        if(AttrVal($name, "reverse-search-cache", "0") eq "1")
-                        {
-                            $status = "timeout";
-                            undef($result);
-                        }
-                    }
-                    else
-                    {
-                        #Log 2, $result;
-                        FB_CALLMONITOR_Log $name, 5, "result(dasschnelle.at) -> " . $result;
-                        if($result =~ /"name"\s*:\s*"([^"]+)",/)
-                        {
-                            $invert_match = "";
-
-                            while($result =~ /"name"\s*:\s*"([^"]+)",/g)
-                            {
-                                $invert_match = $1 if(length($1) > length($invert_match));
-                            }
-
-                            $invert_match = FB_CALLMONITOR_html2txt($invert_match);
-                            FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
-                            undef($result);
-                            return $invert_match;
-                        }
-                        elsif(not $result =~ /Ihre Suche nach .* war erfolglos/)
-                        {
-                            FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from dasschnelle.at. Please contact the FHEM community.";
-                        }
-
-                        $status = "dasschnelle.at->unknown";
-                    }
-                }
-            }
-
-            # Austria ONLY!!! Ask herold.at
-            elsif($method eq "herold.at")
-            {
-                unless(($number =~ /^0?[1-9]/ and $country_code eq "0043") or $number =~ /^0043/)
-                {
-                    FB_CALLMONITOR_Log $name, 4, "skip using herold.at for reverse search of $number because of non-austrian number";
-                }
-                else
-                {
-                    $number =~ s/^0043/0/; # remove country code
-                    FB_CALLMONITOR_Log $name, 4, "using herold.at for reverse search of $number";
-
-                    $result = GetFileFromURL("https://www.herold.at/gelbe-seiten/telefon_".$number."/", 5, undef, 1);
-
-                    if(not defined($result))
-                    {
-                        FB_CALLMONITOR_Log $name, 4, "unable to retrieve result for reverse search of $number via $method";
-                        if(AttrVal($name, "reverse-search-cache", "0") eq "1")
-                        {
-                            $status = "timeout";
-                            undef($result);
-                        }
-                    }
-                    else
-                    {
-                        #Debug($result);
-                        FB_CALLMONITOR_Log $name, 5, "result(herold.at) -> " . $result;
-                        if($result =~ m,data-clickpos="name"><span itemprop="name">([^<]+)</span>,)
-                        {
-                            $invert_match = $1;
-                            $invert_match = FB_CALLMONITOR_html2txt($invert_match);
-                            FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
-                            undef($result);
-                            return $invert_match;
-                        }
-                        elsif($result !~ /Wir konnten zu den eingegebenen Suchkriterien keine Ergebnisse finden/)
-                        {
-                            FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from herold.at. Please contact the FHEM community.";
-                        }
-
-                        $status = "herold.at->unknown";
-                    }
-                }
+               FB_CALLMONITOR_Log $name, 4, "skip using dasoertliche.de for reverse search of $number because of non-german number";
             }
             else
             {
-                FB_CALLMONITOR_Log $name, 3, "unknown reverse search method $method" if ($method ne "tellows.de");
+               $number =~ s/^0049/0/; # remove country code
+               FB_CALLMONITOR_Log $name, 4, "using dasoertliche.de for reverse search of $number";
+
+               $result = GetFileFromURL("https://www1.dasoertliche.de/?form_name=search_inv&ph=".$number, 5, undef, 1);
+               if(not defined($result))
+               {
+                  $status = "timeout";
+                  undef($result);
+               }
+               else
+               {
+                  FB_CALLMONITOR_Log $name, 5, "result(dasOertliche) -> " . $result;
+                  if($result =~ m,<a href="[^"]*form_name=detail[^"]*".+?class="hitlnk_name".+?target="_self">(.+?)</a>,sg)
+                  {
+                     $invert_match = $1;
+                     $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                     FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                     undef($result);
+                     return $invert_match;
+                  }
+                  elsif(not $result =~ /wir konnten keine Treffer finden/)
+                  {
+                     FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from dasoertliche.de. Please contact the FHEM community.";
+                  } 
+                  
+                  $status = "unknown";
+               }
             }
-        }
+         }
+
+         # Ask 11880.com
+         elsif($method eq "11880.com")
+         {
+            unless(($number =~ /^0?[1-9]/ and $country_code eq "0049") or $number =~ /^0049/)
+            {
+               FB_CALLMONITOR_Log $name, 4, "skip using 11880.com for reverse search of $number because of non-german number";
+            }
+            else
+            {
+               $number =~ s/^0049/0/; # remove country code
+               FB_CALLMONITOR_Log $name, 4, "using 11880.com for reverse search of $number";
+
+               $result = GetFileFromURL("https://www.11880.com/suche/".$number."/deutschland", 5, undef, 1);
+
+               if(not defined($result))
+               {
+                  FB_CALLMONITOR_Log $name, 4, "unable to retrieve result for reverse search of $number via $method";
+                  $status = "timeout";
+                  undef($result);
+               }
+               else
+               {
+                  FB_CALLMONITOR_Log $name, 5, "result(11880) -> " . $result;
+                  if($result =~ m,<li\s+[^>]*class="search-result-list-item"\s+[^>]*data-name="([^"]+)",s or $result =~ m,<h\d [^>]*itemprop="name"[^>]*>([^<]+)</h\d>,)
+                  {
+                     $invert_match = $1;
+                     $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                     FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                     undef($result);
+                     return $invert_match;
+                  }
+                  elsif(not $result =~ /Leider nichts gefunden/i)
+                  {
+                     FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from 11880.com. Please contact the FHEM community.";
+                  }
+
+                  $status = "unknown";
+               }
+            }
+         }
+
+         # SWITZERLAND ONLY!!! Ask search.ch
+         elsif($method eq  "search.ch")
+         {
+            unless(($number =~ /^0?[1-9]/ and $country_code eq "0041") or $number =~ /^0041/)
+            {
+               FB_CALLMONITOR_Log $name, 4, "skip using search.ch for reverse search of $number because of non-swiss number";
+            } else {
+
+               my $api_key = AttrVal($name, "apiKeySearchCh", undef);
+
+               unless(defined($api_key)) {
+                  FB_CALLMONITOR_Log $name, 1, "WARNING! no API key for swiss.ch configured. Please obtain an API key from https://tel.search.ch/api/getkey and set attribute apiKeySearchCh with your key";
+
+                  # use old key
+                  FB_CALLMONITOR_Log $name, 1, "using generic API key for reverse search via search.ch. WILL BE REMOVED IN A FUTURE RELEASE";
+                  $api_key = "b0b1207cb7c9d0048867de887aa9a4fd";
+               }
+
+               $number =~ s/^0041/0/; # remove country code
+
+               FB_CALLMONITOR_Log $name, 4, "using search.ch for reverse search of $number";
+
+               $result = GetFileFromURL("http://tel.search.ch/api/?key=".urlEncode($api_key)."&maxnum=1&was=".$number, 5, undef, 1);
+               if(not defined($result)) {
+                  $status = "timeout";
+                  undef($result);
+               } else {
+                  FB_CALLMONITOR_Log $name, 5, "result(search.ch) -> " . $result;
+                  if($result =~ m,<entry>(.+?)</entry>,s) {
+                     my $xml = $1;
+
+                     $invert_match = "";
+                     if($xml =~ m,<tel:firstname>(.+?)</tel:firstname>,) {
+                        $invert_match .= $1;
+                     }
+
+                     if($xml =~ m,<tel:name>(.+?)</tel:name>,) {
+                        $invert_match .= " $1";
+                     }
+
+                     if($xml =~ m,<tel:occupation>(.+?)</tel:occupation>,) {
+                        $invert_match .= ", $1";
+                     }
+
+                     $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                     FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                     undef($result);
+                     return $invert_match;
+                  }
+                  $status = "unknown";
+               }
+            }
+         }
+
+         # Austria ONLY!!! Ask dasschnelle.at
+         elsif($method eq "dasschnelle.at")
+         {
+            unless(($number =~ /^0?[1-9]/ and $country_code eq "0043") or $number =~ /^0043/)
+            {
+               FB_CALLMONITOR_Log $name, 4, "skip using dasschnelle.at for reverse search of $number because of non-austrian number";
+            }
+            else
+            {
+               $number =~ s/^0043/0/; # remove country code
+               FB_CALLMONITOR_Log $name, 4, "using dasschnelle.at for reverse search of $number";
+
+               $result = GetFileFromURL("http://www.dasschnelle.at/ergebnisse?what=".$number."&where=&rubrik=0&bezirk=0&orderBy=Standard&mapsearch=false", 5, undef, 1);
+               if(not defined($result))
+               {
+                  $status = "timeout";
+                  undef($result);
+               } else {
+                  #Log 2, $result;
+                  FB_CALLMONITOR_Log $name, 5, "result(dasschnelle.at) -> " . $result;
+                  if($result =~ /"name"\s*:\s*"([^"]+)",/)
+                  {
+                     $invert_match = "";
+
+                     while($result =~ /"name"\s*:\s*"([^"]+)",/g) {
+                        $invert_match = $1 if(length($1) > length($invert_match));
+                     }
+
+                     $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                     FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                     undef($result);
+                     return $invert_match;
+                  }
+                  elsif(not $result =~ /Ihre Suche nach .* war erfolglos/)
+                  {
+                     FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from dasschnelle.at. Please contact the FHEM community.";
+                  }
+                  $status = "unknown";
+               }
+            }
+         }
+
+         # Austria ONLY!!! Ask herold.at
+         elsif($method eq "herold.at")
+         {
+            unless(($number =~ /^0?[1-9]/ and $country_code eq "0043") or $number =~ /^0043/)
+            {
+               FB_CALLMONITOR_Log $name, 4, "skip using herold.at for reverse search of $number because of non-austrian number";
+            } else {
+               $number =~ s/^0043/0/; # remove country code
+               FB_CALLMONITOR_Log $name, 4, "using herold.at for reverse search of $number";
+
+               $result = GetFileFromURL("https://www.herold.at/gelbe-seiten/telefon_".$number."/", 5, undef, 1);
+
+               if(not defined($result)) {
+                  FB_CALLMONITOR_Log $name, 4, "unable to retrieve result for reverse search of $number via $method";
+                  $status = "timeout";
+                  undef($result);
+               } else {
+                  #Debug($result);
+                  FB_CALLMONITOR_Log $name, 5, "result(herold.at) -> " . $result;
+                  if($result =~ m,data-clickpos="name"><span itemprop="name">([^<]+)</span>,)
+                  {
+                     $invert_match = $1;
+                     $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                     FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                     undef($result);
+                     return $invert_match;
+                  }
+                  elsif($result !~ /Wir konnten zu den eingegebenen Suchkriterien keine Ergebnisse finden/)
+                  {
+                     FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from herold.at. Please contact the FHEM community.";
+                  }
+                  $status = "unknown";
+               }
+            }
+         }
+         else
+         {
+            FB_CALLMONITOR_Log $name, 3, "unknown reverse search method $method" if ($method ne "tellows.de");
+         }
+      }
     }
 
     if(AttrVal($name, "reverse-search-cache", "0") eq "1" and defined($status))
