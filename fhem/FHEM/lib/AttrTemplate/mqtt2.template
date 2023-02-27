@@ -5535,10 +5535,17 @@ attr DEVICE autocreate 1
 attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/free_heap:.* free_heap\
   BASE_ID/uptime:.* uptime\
-  BASE_ID/device:.* device
+  BASE_ID/device:.* device\
+  BASE_ID/mqtt:.* mqtt\
+  BASE_ID/ip_addr:.* ip_addr\
+  BASE_ID/comm_start:.* comm_start\
+  BASE_ID/comm_stop:.* comm_stop\
+  BASE_ID/dis_night_comm:.* dis_night_comm\
+  BASE_ID/comm_disabled:.* comm_disabled\
+  BASE_ID/comm_dis_ts:.* comm_dis_ts
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_hub_bridge
-setreading DEVICE attrTemplateVersion 20220812
+setreading DEVICE attrTemplateVersion 20230227
 { AttrTemplate_Initialize() }
 
 
