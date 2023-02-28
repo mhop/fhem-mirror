@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.8";
+my $ModulVersion = "07.50.8a";
 my $missingModul = "";
 my $missingModulTelnet = "";
 my $missingModulWeb = "";
@@ -85,7 +85,7 @@ sub FRITZBOX_Web_Query($$@);
 sub FRITZBOX_Lua_Data($$@);
 sub FRITZBOX_Process_JSON($$$@);
 sub FRITZBOX_ERR_Result($$;@);
-sub FRITZBOX_Run_GuestWlan_Shell($);
+sub FRITZBOX_Run_GuestWlan_Web($);
 sub FRITZBOX_Run_GuestWlan_Shell($);
 sub FRITZBOX_Run_Call_Web($);
 sub FRITZBOX_Run_Call_Shell($);
@@ -3463,7 +3463,7 @@ sub FRITZBOX_Set_Cmd_Start($)
       $timeout = 20;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
-      $cmdFunction = "FRITZBOX_Run_GuestWlan_Shell";
+      $cmdFunction = "FRITZBOX_Run_GuestWlan_Web";
       $cmdFunction = "FRITZBOX_Run_GuestWlan_Shell" if $forceShell;
    }
 # Preparing SET RING
