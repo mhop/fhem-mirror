@@ -947,9 +947,12 @@ sub UpdateStatus {
 
 sub getCipher {
 
-  my $hash = shift;
+    my $hash = shift;
+    # Version von Crypt::CBC feststellen , Forum -> https://forum.fhem.de/index.php/topic,80703.msg1264423.html#msg1264423
+    # THX to clumsy
+    my $version = $Crypt::CBC::VERSION // 2;
 
-  return Crypt::CBC->new(
+    return Crypt::CBC->new(
 			-key         => $hash->{'.key'},
 			-cipher      => 'Crypt::OpenSSL::AES',
 			-header      => 'none',
@@ -957,7 +960,17 @@ sub getCipher {
 			-literal_key => 1,
 			-keysize     => 16,
 			-padding     => 'space'
-			);
+			) if ($version < 3);
+
+    return Crypt::CBC->new(
+                        -pass        => $hash->{'.key'},
+                        -cipher      => 'Crypt::OpenSSL::AES',
+                        -header      => 'none',
+                        -iv          => $hash->{'.iv'},
+                        -pbkdf       => 'none',
+                        -keysize     => 16,
+                        -padding     => 'none'
+                        ) ;
 }
 
 sub send_packet {
