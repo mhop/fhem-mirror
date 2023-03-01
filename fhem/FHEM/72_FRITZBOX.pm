@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.8a";
+my $ModulVersion = "07.50.8b";
 my $missingModul = "";
 my $missingModulTelnet = "";
 my $missingModulWeb = "";
@@ -2799,8 +2799,8 @@ sub FRITZBOX_Readout_Run_Web($)
 
    # DOCSIS Informationen FB Cable
    # InternalVal($name, "MODEL", "FRITZ!Box")
-   if (($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]") ) { # FB Cable
-#   if (1==1) {
+#   if (($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]") ) { # FB Cable
+   if (1==1) {
       my $tmpSIS;
       my $returnStr;
 
@@ -2826,7 +2826,9 @@ sub FRITZBOX_Readout_Run_Web($)
       push @webCmdArray, "xhrId"       => "all";
       push @webCmdArray, "no_sidrenew" => "";
 
+#     for debugging
 #      my $TestSIS = '{"pid":"docInfo","hide":{"mobile":true,"ssoSet":true,"liveTv":true},"time":[],"data":{"channelDs":{"docsis31":[{"powerLevel":"-1.6","type":"4K","channel":1,"channelID":0,"frequency":"751 - 861"},{"powerLevel":"7.7","type":"4K","channel":2,"channelID":1,"frequency":"175 - 237"}],"docsis30":[{"type":"256QAM","corrErrors":92890,"mse":"-36.4","powerLevel":"5.1","channel":1,"nonCorrErrors":9773,"latency":0.32,"channelID":7,"frequency":"538"},{"type":"256QAM","corrErrors":20553,"mse":"-37.4","powerLevel":"10.2","channel":2,"nonCorrErrors":9420,"latency":0.32,"channelID":26,"frequency":"698"},{"type":"256QAM","corrErrors":28673,"mse":"-37.6","powerLevel":"10.0","channel":3,"nonCorrErrors":140,"latency":0.32,"channelID":25,"frequency":"690"},{"type":"256QAM","corrErrors":25930,"mse":"-37.6","powerLevel":"10.0","channel":4,"nonCorrErrors":170,"latency":0.32,"channelID":27,"frequency":"706"},{"type":"256QAM","corrErrors":98698,"mse":"-36.6","powerLevel":"8.8","channel":5,"nonCorrErrors":9151,"latency":0.32,"channelID":30,"frequency":"746"},{"type":"256QAM","corrErrors":24614,"mse":"-37.4","powerLevel":"9.4","channel":6,"nonCorrErrors":9419,"latency":0.32,"channelID":28,"frequency":"730"},{"type":"256QAM","corrErrors":25882,"mse":"-37.4","powerLevel":"9.9","channel":7,"nonCorrErrors":9308,"latency":0.32,"channelID":24,"frequency":"682"},{"type":"256QAM","corrErrors":33817,"mse":"-37.4","powerLevel":"9.8","channel":8,"nonCorrErrors":146,"latency":0.32,"channelID":23,"frequency":"674"},{"type":"256QAM","corrErrors":112642,"mse":"-37.6","powerLevel":"7.8","channel":9,"nonCorrErrors":7783,"latency":0.32,"channelID":3,"frequency":"490"},{"type":"256QAM","corrErrors":41161,"mse":"-37.6","powerLevel":"9.8","channel":10,"nonCorrErrors":203,"latency":0.32,"channelID":21,"frequency":"658"},{"type":"256QAM","corrErrors":33219,"mse":"-37.4","powerLevel":"8.8","channel":11,"nonCorrErrors":10962,"latency":0.32,"channelID":18,"frequency":"634"},{"type":"256QAM","corrErrors":32680,"mse":"-37.6","powerLevel":"9.2","channel":12,"nonCorrErrors":145,"latency":0.32,"channelID":19,"frequency":"642"},{"type":"256QAM","corrErrors":33001,"mse":"-37.4","powerLevel":"9.8","channel":13,"nonCorrErrors":7613,"latency":0.32,"channelID":22,"frequency":"666"},{"type":"256QAM","corrErrors":42666,"mse":"-37.4","powerLevel":"8.1","channel":14,"nonCorrErrors":172,"latency":0.32,"channelID":17,"frequency":"626"},{"type":"256QAM","corrErrors":41023,"mse":"-37.4","powerLevel":"9.3","channel":15,"nonCorrErrors":10620,"latency":0.32,"channelID":20,"frequency":"650"},{"type":"256QAM","corrErrors":106921,"mse":"-37.6","powerLevel":"7.4","channel":16,"nonCorrErrors":356,"latency":0.32,"channelID":4,"frequency":"498"},{"type":"256QAM","corrErrors":86650,"mse":"-36.4","powerLevel":"4.9","channel":17,"nonCorrErrors":85,"latency":0.32,"channelID":12,"frequency":"578"},{"type":"256QAM","corrErrors":91838,"mse":"-36.4","powerLevel":"4.8","channel":18,"nonCorrErrors":168,"latency":0.32,"channelID":8,"frequency":"546"},{"type":"256QAM","corrErrors":110719,"mse":"-35.8","powerLevel":"4.5","channel":19,"nonCorrErrors":103,"latency":0.32,"channelID":10,"frequency":"562"},{"type":"256QAM","corrErrors":111846,"mse":"-37.6","powerLevel":"8.2","channel":20,"nonCorrErrors":247,"latency":0.32,"channelID":2,"frequency":"482"},{"type":"256QAM","corrErrors":668242,"mse":"-36.6","powerLevel":"5.8","channel":21,"nonCorrErrors":6800,"latency":0.32,"channelID":5,"frequency":"522"},{"type":"256QAM","corrErrors":104070,"mse":"-36.6","powerLevel":"5.3","channel":22,"nonCorrErrors":149,"latency":0.32,"channelID":6,"frequency":"530"},{"type":"256QAM","corrErrors":120994,"mse":"-35.8","powerLevel":"4.4","channel":23,"nonCorrErrors":10240,"latency":0.32,"channelID":9,"frequency":"554"},{"type":"256QAM","corrErrors":59145,"mse":"-36.4","powerLevel":"5.3","channel":24,"nonCorrErrors":9560,"latency":0.32,"channelID":11,"frequency":"570"},{"type":"256QAM","corrErrors":118271,"mse":"-37.6","powerLevel":"8.4","channel":25,"nonCorrErrors":810,"latency":0.32,"channelID":1,"frequency":"474"},{"type":"256QAM","corrErrors":40255,"mse":"-37.4","powerLevel":"6.5","channel":26,"nonCorrErrors":13474,"latency":0.32,"channelID":15,"frequency":"602"},{"type":"256QAM","corrErrors":62716,"mse":"-36.4","powerLevel":"5.3","channel":27,"nonCorrErrors":9496,"latency":0.32,"channelID":13,"frequency":"586"},{"type":"256QAM","corrErrors":131364,"mse":"-36.6","powerLevel":"8.9","channel":28,"nonCorrErrors":12238,"latency":0.32,"channelID":29,"frequency":"738"}]},"oem":"lgi","readyState":"ready","channelUs":{"docsis31":[],"docsis30":[{"powerLevel":"43.0","type":"64QAM","channel":1,"multiplex":"ATDMA","channelID":4,"frequency":"51"},{"powerLevel":"44.3","type":"64QAM","channel":2,"multiplex":"ATDMA","channelID":2,"frequency":"37"},{"powerLevel":"43.8","type":"64QAM","channel":3,"multiplex":"ATDMA","channelID":3,"frequency":"45"},{"powerLevel":"45.8","type":"64QAM","channel":4,"multiplex":"ATDMA","channelID":1,"frequency":"31"}]}},"sid":"14341afbc7d83b4c"}';
+#      my $TestSIS = '{"pid":"docInfo","hide":{"mobile":true,"ssoSet":true,"liveTv":true},"time":[],"data":{"channelDs":{"docsis30":[{"type":"256QAM","corrErrors":92890,"mse":"-36.4","powerLevel":"5.1","channel":1,"nonCorrErrors":9773,"latency":0.32,"channelID":7,"frequency":"538"},{"type":"256QAM","corrErrors":20553,"mse":"-37.4","powerLevel":"10.2","channel":2,"nonCorrErrors":9420,"latency":0.32,"channelID":26,"frequency":"698"},{"type":"256QAM","corrErrors":28673,"mse":"-37.6","powerLevel":"10.0","channel":3,"nonCorrErrors":140,"latency":0.32,"channelID":25,"frequency":"690"},{"type":"256QAM","corrErrors":25930,"mse":"-37.6","powerLevel":"10.0","channel":4,"nonCorrErrors":170,"latency":0.32,"channelID":27,"frequency":"706"},{"type":"256QAM","corrErrors":98698,"mse":"-36.6","powerLevel":"8.8","channel":5,"nonCorrErrors":9151,"latency":0.32,"channelID":30,"frequency":"746"},{"type":"256QAM","corrErrors":24614,"mse":"-37.4","powerLevel":"9.4","channel":6,"nonCorrErrors":9419,"latency":0.32,"channelID":28,"frequency":"730"},{"type":"256QAM","corrErrors":25882,"mse":"-37.4","powerLevel":"9.9","channel":7,"nonCorrErrors":9308,"latency":0.32,"channelID":24,"frequency":"682"},{"type":"256QAM","corrErrors":33817,"mse":"-37.4","powerLevel":"9.8","channel":8,"nonCorrErrors":146,"latency":0.32,"channelID":23,"frequency":"674"},{"type":"256QAM","corrErrors":112642,"mse":"-37.6","powerLevel":"7.8","channel":9,"nonCorrErrors":7783,"latency":0.32,"channelID":3,"frequency":"490"},{"type":"256QAM","corrErrors":41161,"mse":"-37.6","powerLevel":"9.8","channel":10,"nonCorrErrors":203,"latency":0.32,"channelID":21,"frequency":"658"},{"type":"256QAM","corrErrors":33219,"mse":"-37.4","powerLevel":"8.8","channel":11,"nonCorrErrors":10962,"latency":0.32,"channelID":18,"frequency":"634"},{"type":"256QAM","corrErrors":32680,"mse":"-37.6","powerLevel":"9.2","channel":12,"nonCorrErrors":145,"latency":0.32,"channelID":19,"frequency":"642"},{"type":"256QAM","corrErrors":33001,"mse":"-37.4","powerLevel":"9.8","channel":13,"nonCorrErrors":7613,"latency":0.32,"channelID":22,"frequency":"666"},{"type":"256QAM","corrErrors":42666,"mse":"-37.4","powerLevel":"8.1","channel":14,"nonCorrErrors":172,"latency":0.32,"channelID":17,"frequency":"626"},{"type":"256QAM","corrErrors":41023,"mse":"-37.4","powerLevel":"9.3","channel":15,"nonCorrErrors":10620,"latency":0.32,"channelID":20,"frequency":"650"},{"type":"256QAM","corrErrors":106921,"mse":"-37.6","powerLevel":"7.4","channel":16,"nonCorrErrors":356,"latency":0.32,"channelID":4,"frequency":"498"},{"type":"256QAM","corrErrors":86650,"mse":"-36.4","powerLevel":"4.9","channel":17,"nonCorrErrors":85,"latency":0.32,"channelID":12,"frequency":"578"},{"type":"256QAM","corrErrors":91838,"mse":"-36.4","powerLevel":"4.8","channel":18,"nonCorrErrors":168,"latency":0.32,"channelID":8,"frequency":"546"},{"type":"256QAM","corrErrors":110719,"mse":"-35.8","powerLevel":"4.5","channel":19,"nonCorrErrors":103,"latency":0.32,"channelID":10,"frequency":"562"},{"type":"256QAM","corrErrors":111846,"mse":"-37.6","powerLevel":"8.2","channel":20,"nonCorrErrors":247,"latency":0.32,"channelID":2,"frequency":"482"},{"type":"256QAM","corrErrors":668242,"mse":"-36.6","powerLevel":"5.8","channel":21,"nonCorrErrors":6800,"latency":0.32,"channelID":5,"frequency":"522"},{"type":"256QAM","corrErrors":104070,"mse":"-36.6","powerLevel":"5.3","channel":22,"nonCorrErrors":149,"latency":0.32,"channelID":6,"frequency":"530"},{"type":"256QAM","corrErrors":120994,"mse":"-35.8","powerLevel":"4.4","channel":23,"nonCorrErrors":10240,"latency":0.32,"channelID":9,"frequency":"554"},{"type":"256QAM","corrErrors":59145,"mse":"-36.4","powerLevel":"5.3","channel":24,"nonCorrErrors":9560,"latency":0.32,"channelID":11,"frequency":"570"},{"type":"256QAM","corrErrors":118271,"mse":"-37.6","powerLevel":"8.4","channel":25,"nonCorrErrors":810,"latency":0.32,"channelID":1,"frequency":"474"},{"type":"256QAM","corrErrors":40255,"mse":"-37.4","powerLevel":"6.5","channel":26,"nonCorrErrors":13474,"latency":0.32,"channelID":15,"frequency":"602"},{"type":"256QAM","corrErrors":62716,"mse":"-36.4","powerLevel":"5.3","channel":27,"nonCorrErrors":9496,"latency":0.32,"channelID":13,"frequency":"586"},{"type":"256QAM","corrErrors":131364,"mse":"-36.6","powerLevel":"8.9","channel":28,"nonCorrErrors":12238,"latency":0.32,"channelID":29,"frequency":"738"}]},"oem":"lgi","readyState":"ready","channelUs":{"docsis30":[{"powerLevel":"43.0","type":"64QAM","channel":1,"multiplex":"ATDMA","channelID":4,"frequency":"51"},{"powerLevel":"44.3","type":"64QAM","channel":2,"multiplex":"ATDMA","channelID":2,"frequency":"37"},{"powerLevel":"43.8","type":"64QAM","channel":3,"multiplex":"ATDMA","channelID":3,"frequency":"45"},{"powerLevel":"45.8","type":"64QAM","channel":4,"multiplex":"ATDMA","channelID":1,"frequency":"31"}]}},"sid":"14341afbc7d83b4c"}';
 #      my $resultSIS = FRITZBOX_Process_JSON($hash, $TestSIS, "14341afbc7d83b4c", ""); ;
       
       my $resultSIS = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
@@ -2838,8 +2840,11 @@ sub FRITZBOX_Readout_Run_Web($)
 
         FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($resultSIS->{data});
 
-        $views = $resultSIS->{data}->{channelUs}->{docsis30};
-        $nbViews = scalar @$views;
+        $nbViews = 0;
+        if (defined $resultSIS->{data}->{channelUs}->{docsis30}) {
+          $views = $resultSIS->{data}->{channelUs}->{docsis30};
+          $nbViews = scalar @$views;
+        }
 
         if ($nbViews > 0) {
 
@@ -2848,10 +2853,6 @@ sub FRITZBOX_Readout_Run_Web($)
 
           eval {
             for(my $i = 0; $i <= $nbViews - 1; $i++) {
-#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis30}->[$i]->{channel} . "</td>";
-#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis30}->[$i]->{channelID} . "</td>";
-#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis30}->[$i]->{multiplex} . "</td>";
-#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis30}->[$i]->{type} . "</td>";
               $powerLevels .= $resultSIS->{data}->{channelUs}->{docsis30}->[$i]->{powerLevel} . " ";
               $frequencys  .= $resultSIS->{data}->{channelUs}->{docsis30}->[$i]->{frequency} . " ";
             }
@@ -2863,8 +2864,11 @@ sub FRITZBOX_Readout_Run_Web($)
           };
         }
 
-        $views = $resultSIS->{data}->{channelUs}->{docsis31};
-        $nbViews = scalar @$views;
+        $nbViews = 0;
+        if (defined $resultSIS->{data}->{channelUs}->{docsis31}) {
+          $views = $resultSIS->{data}->{channelUs}->{docsis31};
+          $nbViews = scalar @$views;
+        }
 
         if ($nbViews > 0) {
 
@@ -2873,10 +2877,6 @@ sub FRITZBOX_Readout_Run_Web($)
 
           eval {
             for(my $i = 0; $i <= $nbViews - 1; $i++) {
-#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis31}->[$i]->{channel} . "</td>";
-#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis31}->[$i]->{channelID} . "</td>";
-#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis31}->[$i]->{multiplex} . "</td>" if $result->{data}->{channelUs}->{docsis31}->[$i]->{multiplex};
-#              $returnStr .= "<td>" . $resultSIS->{data}->{channelUs}->{docsis31}->[$i]->{type} . "</td>";
               $powerLevels .= $resultSIS->{data}->{channelUs}->{docsis31}->[$i]->{powerLevel} . " ";
               $frequencys  .= $resultSIS->{data}->{channelUs}->{docsis31}->[$i]->{frequency} . " ";
             }
@@ -2888,8 +2888,11 @@ sub FRITZBOX_Readout_Run_Web($)
 
         }
 
-        $views = $resultSIS->{data}->{channelDs}->{docsis30};
-        $nbViews = scalar @$views;
+        $nbViews = 0;
+        if (defined $resultSIS->{data}->{channelDs}->{docsis30}) {
+          $views = $resultSIS->{data}->{channelDs}->{docsis30};
+          $nbViews = scalar @$views;
+        }
 
         if ($nbViews > 0) {
 
@@ -2902,9 +2905,6 @@ sub FRITZBOX_Readout_Run_Web($)
 
           eval {
             for(my $i = 0; $i <= $nbViews - 1; $i++) {
-#              $returnStr .= "<td>" . $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{channel} . "</td>";
-#              $returnStr .= "<td>" . $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{channelID} . "</td>";
-#              $returnStr .= "<td>" . $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{type} . "</td>";
               $powerLevels   .= $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{powerLevel} . " ";
               $latencys      .= $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{latency} . " ";
               $frequencys    .= $resultSIS->{data}->{channelDs}->{docsis30}->[$i]->{frequency} . " ";
@@ -2928,8 +2928,11 @@ sub FRITZBOX_Readout_Run_Web($)
 
         }
 
-        $views = $resultSIS->{data}->{channelDs}->{docsis31};
-        $nbViews = scalar @$views;
+        $nbViews = 0;
+        if (defined $resultSIS->{data}->{channelDs}->{docsis31}) {
+          $views = $resultSIS->{data}->{channelDs}->{docsis31};
+          $nbViews = scalar @$views;
+        }
 
         if ($nbViews > 0) {
 
@@ -2938,9 +2941,6 @@ sub FRITZBOX_Readout_Run_Web($)
 
           eval {
             for(my $i = 0; $i <= $nbViews - 1; $i++) {
-#              $returnStr .= "<td>" . $resultSIS->{data}->{channelDs}->{docsis31}->[$i]->{channel} . "</td>";
-#              $returnStr .= "<td>" . $resultSIS->{data}->{channelDs}->{docsis31}->[$i]->{channelID} . "</td>";
-#              $returnStr .= "<td>" . $resultSIS->{data}->{channelDs}->{docsis31}->[$i]->{type} . "</td>";
               $powerLevels .= $resultSIS->{data}->{channelDs}->{docsis31}->[$i]->{powerLevel} . " ";
               $frequencys  .= $resultSIS->{data}->{channelDs}->{docsis31}->[$i]->{frequency} . " ";
             }
@@ -7099,8 +7099,11 @@ sub FRITZBOX_DOCSIS_Informations($) {
    $returnStr .= "<td>Latenz</td><td>corrErrors</td><td>nonCorrErrors</td><td>MSE</td>\n";
    $returnStr .= "</tr>\n";
 
-   $views = $result->{data}->{channelUs}->{docsis30};
-   $nbViews = scalar @$views;
+   $nbViews = 0;
+   if (defined $result->{data}->{channelUs}->{docsis30}) {
+     $views = $result->{data}->{channelUs}->{docsis30};
+     $nbViews = scalar @$views;
+   }
 
    if ($nbViews > 0) {
      $returnStr .= "<tr>\n";
@@ -7125,8 +7128,11 @@ sub FRITZBOX_DOCSIS_Informations($) {
      $returnStr .= "</tr>\n";
    }
 
-   $views = $result->{data}->{channelUs}->{docsis31};
-   $nbViews = scalar @$views;
+   $nbViews = 0;
+   if (defined $result->{data}->{channelUs}->{docsis31}) {
+     $views = $result->{data}->{channelUs}->{docsis31};
+     $nbViews = scalar @$views;
+   }
 
    if ($nbViews > 0) {
      $returnStr .= "</tr>\n";
@@ -7151,8 +7157,11 @@ sub FRITZBOX_DOCSIS_Informations($) {
      $returnStr .= "</tr>\n";
    }
 
-   $views = $result->{data}->{channelDs}->{docsis30};
-   $nbViews = scalar @$views;
+   $nbViews = 0;
+   if (defined $result->{data}->{channelDs}->{docsis30}) {
+     $views = $result->{data}->{channelDs}->{docsis30};
+     $nbViews = scalar @$views;
+   }
 
    if ($nbViews > 0) {
      $returnStr .= "</tr>\n";
@@ -7180,8 +7189,11 @@ sub FRITZBOX_DOCSIS_Informations($) {
      $returnStr .= "</tr>\n";
    }
 
-   $views = $result->{data}->{channelDs}->{docsis31};
-   $nbViews = scalar @$views;
+   $nbViews = 0;
+   if (defined $result->{data}->{channelDs}->{docsis31}) {
+     $views = $result->{data}->{channelDs}->{docsis31};
+     $nbViews = scalar @$views;
+   }
 
    if ($nbViews > 0) {
      $returnStr .= "</tr>\n";
