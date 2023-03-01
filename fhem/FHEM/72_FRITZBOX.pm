@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.8b";
+my $ModulVersion = "07.50.8c";
 my $missingModul = "";
 my $missingModulTelnet = "";
 my $missingModulWeb = "";
@@ -1997,6 +1997,10 @@ sub FRITZBOX_Readout_Run_Web($)
    my $nbViews;
 
    my $avmModel = InternalVal($name, "MODEL", "FRITZ!Box");
+   my @fwV = split(/\./, ReadingsVal($name, "box_fwVersion", "0.0.0.error"));
+
+   my $FW1 = substr($fwV[1],0,2);
+   my $FW2 = substr($fwV[2],0,2);
 
 #Start update
    FRITZBOX_Log $hash, 4, "INFO: Prepare query string for luaQuery.";
@@ -2798,8 +2802,7 @@ sub FRITZBOX_Readout_Run_Web($)
    }
 
    # DOCSIS Informationen FB Cable
-   # InternalVal($name, "MODEL", "FRITZ!Box")
-   if (($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]") ) { # FB Cable
+   if (($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]") && ($FW1 >= 7) && ($FW2 >= 21) ) { # FB Cable
 #   if (1==1) {
       my $tmpSIS;
       my $returnStr;
