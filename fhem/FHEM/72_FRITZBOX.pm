@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.8c";
+my $ModulVersion = "07.50.8e";
 my $missingModul = "";
 my $missingModulTelnet = "";
 my $missingModulWeb = "";
@@ -236,10 +236,7 @@ sub FRITZBOX_Initialize($)
                                 ."box_ipv6Prefix,box_last_connect_err,box_moh,box_powerRate,box_rateDown,"
                                 ."box_rateUp,box_stdDialPort,box_tr064,box_tr069,box_uptimeConnect,box_uptime,box_wlanCount,box_wlan_2.4GHz,"
                                 ."box_wlan_5GHz,box_vdsl_downStreamRate,box_vdsl_upStreamRate "
-               #                 ."box_docsis30_Ds_powerLevels,box_docsis30_Ds_latencys,box_docsis30_Ds_frequencys,box_docsis30_Ds_corrErrors,box_docsis30_Ds_nonCorrErrors,box_docsis30_Ds_mses,"
-               #                 ."box_docsis30_Us_powerLevels,box_docsis30_Us_frequencys,box_docsis31_Us_powerLevels,box_docsis31_Us_frequencys,box_docsis31_Ds_powerLevels,box_docsis31_Ds_frequencys,"
                 ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,_noDefInf_ "
-               # ."ttsRessource:Google,ESpeak "
                 .$readingFnAttributes;
 
 } # end FRITZBOX_Initialize
@@ -285,18 +282,24 @@ sub FRITZBOX_Define($$)
    $hash->{APICHECKED} = 0;
    $hash->{fhem}->{is_double_wlan} = -1;
    $hash->{LUAQUERY} = -1;
-   $hash->{REMOTE} = -1;
-   $hash->{TELNET} = -1;
-   $hash->{TR064} = -1;
-   $hash->{WEBCM} = -1;
+   $hash->{LUADATA}  = -1;
+   $hash->{REMOTE}   = -1;
+   $hash->{TELNET}   = -1;
+   $hash->{TR064}    = -1;
+   $hash->{WEBCM}    = -1;
+
    RemoveInternalTimer($hash->{helper}{TimerReadout});
-   InternalTimer(gettimeofday()+1 , "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 0);
+   InternalTimer(gettimeofday() + 1 , "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 0);
 
 # Inform about missing PERL modules
    if ( $missingModulTelnet || $missingModulWeb || $missingModulTR064 ) {
       my $msg = "INFO: Modul functionality limited because of missing perl modules: ".$missingModulTelnet . $missingModulWeb . $missingModulTR064;
       FRITZBOX_Log $hash, 2, $msg;
       $hash->{PERL} = $msg;
+   } else {
+      my $msg = "The support for telnet and operation on a Fritz!Box has been discontinued. The functions are disabled.";
+      FRITZBOX_Log $hash, 2, $msg;
+      $hash->{INFO} = $msg;
    }
 
    return undef;
@@ -1408,38 +1411,37 @@ sub FRITZBOX_API_Check_Run($)
    my $startTime = time();
 
    my $host = $hash->{HOST};
-   my @reading_list = split(/\,/, AttrVal($name, "disableBoxReadings", "none"));
 
 # if no FritzBoxIP is set, check if FHEM runs on a FritzBox under root user
-    # unless (qx ( [ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0 ))
-   if ( $host =~ /undefined|local/ ) {
-      # set default host
-      $host = "fritz.box";
-      if ( -X "/usr/bin/ctlmgr_ctl" ) {
-         if ( $< != 0 ) {
-            FRITZBOX_Log $hash, 3, "INFO: Fhem is running on a Fritz!Box but not as 'root' user (currently " .
-                                    ( getpwuid( $< ) )[ 0 ] . "). Cannot run in local mode.";
-         }
-         else {
-            $fritzShell = 1;
-            $host = "local"; # mark as local host
-            FRITZBOX_Log $hash, 3, "INFO: Fhem is running on a Fritz!Box as 'root' user.";
-         }
-      }
-   }
+#    # unless (qx ( [ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0 ))
+#   if ( $host =~ /undefined|local/ ) {
+#      # set default host
+#      $host = "fritz.box";
+#      if ( -X "/usr/bin/ctlmgr_ctl" ) {
+#         if ( $< != 0 ) {
+#            FRITZBOX_Log $hash, 3, "INFO: Fhem is running on a Fritz!Box but not as 'root' user (currently " .
+#                                    ( getpwuid( $< ) )[ 0 ] . "). Cannot run in local mode.";
+#         }
+#         else {
+#            $fritzShell = 1;
+#            $host = "local"; # mark as local host
+#            FRITZBOX_Log $hash, 3, "INFO: Fhem is running on a Fritz!Box as 'root' user.";
+#         }
+#      }
+#   }
 
 # change host name if necessary
-   FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "->HOST", $host)      if $host ne $hash->{HOST};
+   FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "->HOST", $host) if $host ne $hash->{HOST};
 
 # Determine local or remote mode
-   if ($fritzShell) {
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->REMOTE", 0;
-      FRITZBOX_Log $hash, 3, "INFO: FRITZBOX modul runs in local mode.";
-   }
-   else {
+#   if ($fritzShell) {
+#      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->REMOTE", 0;
+#      FRITZBOX_Log $hash, 3, "INFO: FRITZBOX modul runs in local mode.";
+#   }
+#   else {
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->REMOTE", 1;
       FRITZBOX_Log $hash, 3, "INFO: FRITZBOX modul runs in remote mode.";
-   }
+#   }
 
 # Check if perl modules for remote APIs exists
    if ($missingModulWeb) {
@@ -1449,17 +1451,18 @@ sub FRITZBOX_API_Check_Run($)
    else {
       my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
 
-   # Check if webcm exists
-      $response = $agent->get( "http://".$host."/cgi-bin/webcm" );
-
-      if ($response->is_success) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WEBCM", 1;
-         FRITZBOX_Log $hash, 3, "INFO: API webcm found (".$response->code.").";
-      }
-      else {
+#   # Check if webcm exists
+#      $response = $agent->get( "http://".$host."/cgi-bin/webcm" );
+#
+#      if ($response->is_success) {
+#         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WEBCM", 1;
+#         FRITZBOX_Log $hash, 3, "INFO: API webcm found (".$response->code.").";
+#      }
+#      else {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WEBCM", 0;
-         FRITZBOX_Log $hash, 4, "DEBUG: API webcm does not exist (".$response->status_line.")";
-      }
+         FRITZBOX_Log $hash, 4, "DEBUG: API webcm does not exist ( disabled in source )";
+#         FRITZBOX_Log $hash, 4, "DEBUG: API webcm does not exist (".$response->status_line.")";
+#      }
 
    # Check if query.lua exists
       $response = $agent->get( "http://".$host."/query.lua" );
@@ -1475,6 +1478,22 @@ sub FRITZBOX_API_Check_Run($)
       else {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 0;
          FRITZBOX_Log $hash, 3, "INFO: API luaQuery does not exist (".$response->status_line.")";
+      }
+
+   # Check if data.lua exists
+      $response = $agent->get( "http://".$host."/data.lua" );
+
+      if ($response->is_success) {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 1;
+         FRITZBOX_Log $hash, 4, "DEBUG: API luaData found (".$response->code.").";
+      }
+      elsif ($response->code eq "500" || $response->code eq "403") {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 1;
+         FRITZBOX_Log $hash, 3, "INFO: API luaData found but responded with: ".$response->status_line;
+      }
+      else {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 0;
+         FRITZBOX_Log $hash, 3, "INFO: API luaData does not exist (".$response->status_line.")";
       }
 
    # Check if tr064 specification exists and determine TR064-Port
@@ -1599,31 +1618,30 @@ sub FRITZBOX_API_Check_Run($)
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $result[7];
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
-         }
-         else {
+         } else {
             FRITZBOX_Log $hash, 2, "ERROR: " . $response->status_line;
-         } #;
-      } #;
+         }
+      }
    }
 
 # Check if telnet modul exists
-   if ($missingModulTelnet) {
-      FRITZBOX_Log $hash, 3, "INFO: Cannot check for telnet access because perl modul $missingModulTelnet is missing on this system.\n";
-   }
-   else {
-      my $timeout = AttrVal( $name, "telnetTimeOut", "10");
-      my $telnet = new Net::Telnet ( Host=>$host, Port => 23, Timeout=>$timeout, Errmode=>'return', Prompt=>'/# $/');
-      if (!$telnet) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TELNET", 0;
-         $telnet = undef;
-         FRITZBOX_Log $hash, 4, "DEBUG: No telnet connection available for $host: $!";
-      }
-      else {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TELNET", 1;
-         $telnet->close;
-         FRITZBOX_Log $hash, 4, "INFO: Telnet connection availabel.";
-      }
-   }
+#   if ($missingModulTelnet) {
+#      FRITZBOX_Log $hash, 3, "INFO: Cannot check for telnet access because perl modul $missingModulTelnet is missing on this system.\n";
+#   }
+#   else {
+#      my $timeout = AttrVal( $name, "telnetTimeOut", "10");
+#      my $telnet = new Net::Telnet ( Host=>$host, Port => 23, Timeout=>$timeout, Errmode=>'return', Prompt=>'/# $/');
+#      if (!$telnet) {
+#         $telnet = undef;
+          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TELNET", 0;
+          FRITZBOX_Log $hash, 4, "DEBUG: No telnet connection available while disabled in source!";
+#      }
+#      else {
+#         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TELNET", 1;
+#         $telnet->close;
+#         FRITZBOX_Log $hash, 4, "INFO: Telnet connection availabel.";
+#      }
+#   }
 
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", 1;
 
@@ -7007,10 +7025,6 @@ sub FRITZBOX_Kid_Profiles_List($) {
    my $name = $hash->{NAME};
 
    # "xhr 1 lang de page shareVpn xhrId all;
-   #my $queryStr;
-   #$queryStr .= "'xhr'         => '1'\n";
-   #$queryStr .= "'lang'        => 'de'\n";
-   #$queryStr .= "'page'        => 'kidPro'\n";
 
    my @webCmdArray;
    push @webCmdArray, "xhr"         => "1";
@@ -7229,11 +7243,6 @@ sub FRITZBOX_WLAN_Environment($) {
    my $name = $hash->{NAME};
 
    # "xhr 1 lang de page chan xhrId environment requestCount 0 useajax 1;
-   #my $queryStr;
-   #$queryStr .= "'xhr'         => '1'\n";
-   #$queryStr .= "'lang'        => 'de'\n";
-   #$queryStr .= "'page'        => 'chan'\n";
-   #$queryStr .= "'xhrId'       => 'environment'\n";
 
    my @webCmdArray;
    push @webCmdArray, "xhr"         => "1";
@@ -7291,14 +7300,6 @@ sub FRITZBOX_VPN_Shares_List($) {
    my $name = $hash->{NAME};
 
    # "xhr 1 lang de page shareVpn xhrId all;
-   #my $queryStr;
-   #$queryStr .= "'xhr'         => '1'\n";
-   #$queryStr .= "'lang'        => 'de'\n";
-   #$queryStr .= "'page'        => 'shareVpn'\n";
-   # ab Fritz!OS 7.50 zusätzlich
-   # "xhr 1 lang de page shareWireguard xhrId all;
-   #$queryStr .= "'page'        => 'shareWireguard'\n";
-   #$queryStr .= "'xhrId'       => 'all'\n";
 
    my @webCmdArray;
    push @webCmdArray, "xhr"         => "1";
@@ -7447,22 +7448,19 @@ sub FRITZBOX_Lan_Devices_List($) {
    my ($hash) = @_;
    my $name = $hash->{NAME};
 
-   # "xhr 1 lang de page netDev xhrId cleanup useajax 1 no_sidrenew nop;
+   my @fwV = split(/\./, ReadingsVal($name, "box_fwVersion", "0.0.0.error"));
+
+   my $FW1 = substr($fwV[1],0,2);
+   my $FW2 = substr($fwV[2],0,2);
+
+   FRITZBOX_Log $hash, 4, "INFO: FRITZBOX_Lan_Device_Info für Version: $FW1.$FW2 ";
+
    my @webCmdArray;
+   # "xhr 1 lang de page netDev xhrId cleanup useajax 1 no_sidrenew nop;
    push @webCmdArray, "xhr"         => "1";
    push @webCmdArray, "lang"        => "de";
    push @webCmdArray, "page"        => "netDev";
-   push @webCmdArray, "xhrId"       => "cleanup";
-   push @webCmdArray, "useajax"     => "1";
-   # push @webCmdArray, "no_sidrenew" => "";
-
-   #my $queryStr;
-   #$queryStr .= "'xhr'         => '1'\n";
-   #$queryStr .= "'lang'        => 'de'\n";
-   #$queryStr .= "'page'        => 'netDev'\n";
-   #$queryStr .= "'xhrId'       => 'cleanup'\n";
-   #$queryStr .= "'useajax'     => '1'\n";
-   #$queryStr .= "'no_sidrenew' => ''\n";
+   push @webCmdArray, "xhrId"       => "all";
 
    my $returnStr;
 
@@ -7482,7 +7480,7 @@ sub FRITZBOX_Lan_Devices_List($) {
    my $nbViews = scalar @$views;
    my $lDump = "";
 
-#   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
+#  $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
    $returnStr .= '<table cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="6">LanDevices: Active</td>';
@@ -7491,25 +7489,31 @@ sub FRITZBOX_Lan_Devices_List($) {
    $returnStr .= "<td>MAC</td><td>IPv4</td><td>UID</td><td>NAME</td><td>STATUS</td><td>INFO</td>\n";
    $returnStr .= "</tr>\n";
 
-   for(my $i = 0; $i <= $nbViews - 1; $i++) {
-     $returnStr .= "<tr>\n";
-     $returnStr .= "<td>" . $result->{data}->{active}->[$i]->{mac} . "</td>";
-     $returnStr .= "<td>" . $result->{data}->{active}->[$i]->{ipv4}->{ip} . "</td>";
-     $returnStr .= "<td>" . $result->{data}->{active}->[$i]->{UID} . "</td>";
-     $returnStr .= "<td>" . $result->{data}->{active}->[$i]->{name} . "</td>";
-     # if( exists $result->{data}->{active}->[$i]->{state}->{class}) {
-     if( ref($result->{data}->{active}->[$i]->{state}) eq "HASH") {
-        $returnStr .= "<td>" . $result->{data}->{active}->[$i]->{state}->{class} . "</td>";
-     } else {
-        $returnStr .= "<td>" . $result->{data}->{active}->[$i]->{state} . "</td>";
+   $nbViews = 0;
+   if (defined $result->{data}->{active}) {
+     $views = $result->{data}->{active};
+     $nbViews = scalar @$views;
+   }
+
+   if ($nbViews > 0) {
+
+     for(my $i = 0; $i <= $nbViews - 1; $i++) {
+       $returnStr .= "<tr>\n";
+       $returnStr .= "<td>" . $result->{data}->{active}->[$i]->{mac} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{active}->[$i]->{ipv4}->{ip} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{active}->[$i]->{UID} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{active}->[$i]->{name} . "</td>";
+       # if( exists $result->{data}->{active}->[$i]->{state}->{class}) {
+       if( ref($result->{data}->{active}->[$i]->{state}) eq "HASH") {
+         $returnStr .= "<td>" . $result->{data}->{active}->[$i]->{state}->{class} . "</td>";
+       } else {
+         $returnStr .= "<td>" . $result->{data}->{active}->[$i]->{state} . "</td>";
+       }
+       $returnStr .= "<td>" . $result->{data}->{active}->[$i]->{properties}->[1]->{txt} . "</td>" if defined ($result->{data}->{active}->[$i]->{properties}->[1]->{txt});
+       $returnStr .= "</tr>\n";
      }
-     $returnStr .= "<td>" . $result->{data}->{active}->[$i]->{properties}->[1]->{txt} . "</td>" if defined ($result->{data}->{active}->[$i]->{properties}->[1]->{txt});
-     $returnStr .= "</tr>\n";
    }
    $returnStr .= "</table>\n";
-
-   $views = $result->{data}->{passive};
-   $nbViews = scalar @$views;
 
    $returnStr .= "\n";
 #   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
@@ -7521,20 +7525,29 @@ sub FRITZBOX_Lan_Devices_List($) {
    $returnStr .= "<td>MAC</td><td>IPv4</td><td>UID</td><td>NAME</td><td>STATUS</td><td>INFO</td>\n";
    $returnStr .= "</tr>\n";
 
-   for(my $i = 0; $i <= $nbViews - 1; $i++) {
-     $returnStr .= "<tr>\n";
-     $returnStr .= "<td>" . $result->{data}->{passive}->[$i]->{mac} . "</td>";
-     $returnStr .= "<td>" . $result->{data}->{passive}->[$i]->{ipv4}->{ip} . "</td>";
-     $returnStr .= "<td>" . $result->{data}->{passive}->[$i]->{UID} . "</td>";
-     $returnStr .= "<td>" . $result->{data}->{passive}->[$i]->{name} . "</td>";
-     if (ref($result->{data}->{passive}->[$i]->{state}) ne "ARRAY") {
-       $returnStr .= "<td>" . $result->{data}->{passive}->[$i]->{state} . "</td>";
-     } else {
-       $returnStr .= "<td>---</td>";
-     }
-     $returnStr .= "<td>" . $result->{data}->{passive}->[$i]->{properties}->[1]->{txt} . "</td>" if defined ($result->{data}->{passive}->[$i]->{properties}->[1]->{txt});
-     $returnStr .= "</tr>\n";
+   if (defined $result->{data}->{passive}) {
+     $views = $result->{data}->{passive};
+     $nbViews = scalar @$views;
    }
+
+   if ($nbViews > 0) {
+
+     for(my $i = 0; $i <= $nbViews - 1; $i++) {
+       $returnStr .= "<tr>\n";
+       $returnStr .= "<td>" . $result->{data}->{passive}->[$i]->{mac} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{passive}->[$i]->{ipv4}->{ip} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{passive}->[$i]->{UID} . "</td>";
+       $returnStr .= "<td>" . $result->{data}->{passive}->[$i]->{name} . "</td>";
+       if (ref($result->{data}->{passive}->[$i]->{state}) ne "ARRAY") {
+         $returnStr .= "<td>" . $result->{data}->{passive}->[$i]->{state} . "</td>";
+       } else {
+         $returnStr .= "<td>---</td>";
+       }
+       $returnStr .= "<td>" . $result->{data}->{passive}->[$i]->{properties}->[1]->{txt} . "</td>" if defined ($result->{data}->{passive}->[$i]->{properties}->[1]->{txt});
+       $returnStr .= "</tr>\n";
+     }
+   }
+
    $returnStr .= "</table>\n";
 
    return $returnStr;
@@ -7549,7 +7562,6 @@ sub FRITZBOX_Lan_Device_Info($$$) {
    FRITZBOX_Log $hash, 4, "INFO: LanDevice to proof: " . $lDevID . " for: " . $action;
 
    my @webCmdArray;
-   my $queryStr;
    my $returnStr;
 
    #xhr 1
@@ -7566,7 +7578,6 @@ sub FRITZBOX_Lan_Device_Info($$$) {
    push @webCmdArray, "backToPage" => "netDev";
    push @webCmdArray, "dev" => $lDevID;
    push @webCmdArray, "initalRefreshParamsSaved" => "true";
-   #push @webCmdArray, "no_sidrenew" => "";
    push @webCmdArray, "lang" => "de";
 
    my @fwV = split(/\./, ReadingsVal($name, "box_fwVersion", "0.0.0.error"));
@@ -7584,26 +7595,10 @@ sub FRITZBOX_Lan_Device_Info($$$) {
 
    FRITZBOX_Log $hash, 4, "INFO: set $name $action " . join(" ", @webCmdArray);
 
-   $queryStr .= "'xhr' => '1'\n";
-   $queryStr .= "'xhrId' => 'all'\n";
-   $queryStr .= "'backToPage' => 'netDev'\n";
-   $queryStr .= "'dev' => '" . $lDevID . "'\n";
-   $queryStr .= "'initalRefreshParamsSaved' => 'true'\n";
-   #$queryStr .= "'no_sidrenew' => ''\n";
-   $queryStr .= "'lang' => 'de'\n";
-
-   if ($FW1 >= 7 && $FW2 >= 25) {
-      $queryStr .= "'page'      => 'edit_device'\n";
-   } else {
-      $queryStr .= "'page'      => 'edit_device2'\n";
-   }
-
-   FRITZBOX_Log $hash, 5, "DEBUG: get $name $action " . $queryStr;
-
    my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
 
    if(defined $result->{Error}) {
-      FRITZBOX_Log $hash, 2, "ERROR: get $name $action " . $queryStr . "\n" . FRITZBOX_ERR_Result($hash, $result);
+      FRITZBOX_Log $hash, 2, "ERROR: get $name $action \n" . FRITZBOX_ERR_Result($hash, $result);
       return "ERROR: holen Lan_Device_Info: " . $action . " für: " . $lDevID;
    }
 
