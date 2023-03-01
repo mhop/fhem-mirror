@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix: 72_FRITZBOX: Fehler bei DOCSIS ohne docsis31
  - bugfix: 72_FRITZBOX: wlanGuest on|off
  - feature: 72_FRITZBOX: FB Cable DOCSIS Informationen
             get <name> luaInfo docsisInformation
