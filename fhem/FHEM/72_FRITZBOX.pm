@@ -2799,8 +2799,8 @@ sub FRITZBOX_Readout_Run_Web($)
 
    # DOCSIS Informationen FB Cable
    # InternalVal($name, "MODEL", "FRITZ!Box")
-#   if (($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]") ) { # FB Cable
-   if (1==1) {
+   if (($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]") ) { # FB Cable
+#   if (1==1) {
       my $tmpSIS;
       my $returnStr;
 
