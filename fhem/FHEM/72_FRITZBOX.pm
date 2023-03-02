@@ -2784,26 +2784,33 @@ sub FRITZBOX_Readout_Run_Web($)
 
        FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($resultWan->{data}->{scanlist});
 
-       $views = $resultWan->{data}->{scanlist};
-       $nbViews = scalar @$views;
+       $nbViews = 0;
+       if (defined $resultWan->{data}->{scanlist}) {
+         $views = $resultWan->{data}->{scanlist};
+         $nbViews = scalar @$views;
+       }
 
-       eval {
-         for(my $i = 0; $i <= $nbViews - 1; $i++) {
-           my $dName = $resultWan->{data}->{scanlist}->[$i]->{ssid};
-           $dName   .= " (Kanal: " . $resultWan->{data}->{scanlist}->[$i]->{channel};
-           $dName   .= ", Band: " . $resultWan->{data}->{scanlist}->[$i]->{bandId} . ")";
+       if ($nbViews > 0) {
 
-           $rName  = $resultWan->{data}->{scanlist}->[$i]->{mac};
-           $rName =~ s/:/_/g;
-           $rName  = $nbhPrefix . $rName;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
-           delete $oldWanDevice{$rName} if exists $oldWanDevice{$rName};
-         }
-       };
-       $rName  = "box_wlan_lastScanTime";
-       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $resultWan->{data}->{lastScantime};
-       delete $oldWanDevice{$rName} if exists $oldWanDevice{$rName};
+         eval {
+           for(my $i = 0; $i <= $nbViews - 1; $i++) {
+             my $dName = $resultWan->{data}->{scanlist}->[$i]->{ssid};
+             $dName   .= " (Kanal: " . $resultWan->{data}->{scanlist}->[$i]->{channel};
+             $dName   .= ", Band: " . $resultWan->{data}->{scanlist}->[$i]->{bandId} . ")";
+
+             $rName  = $resultWan->{data}->{scanlist}->[$i]->{mac};
+             $rName =~ s/:/_/g;
+             $rName  = $nbhPrefix . $rName;
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
+             delete $oldWanDevice{$rName} if exists $oldWanDevice{$rName};
+           }
+         };
+         $rName  = "box_wlan_lastScanTime";
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $resultWan->{data}->{lastScantime};
+         delete $oldWanDevice{$rName} if exists $oldWanDevice{$rName};
+       }
      }
+
      # Remove inactive or non existing wan-readings in two steps
      foreach ( keys %oldWanDevice ) {
        # set the wan readings to 'inactive' and delete at next readout
