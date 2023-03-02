@@ -7480,13 +7480,6 @@ sub FRITZBOX_Lan_Devices_List($) {
      return $returnStr . $tmp;
    }
 
-   my $p_test = $result->{data}->{passive}->[0]->{state};
-   my $a_test = $result->{data}->{active}->[0]->{state};
-
-   my $views = $result->{data}->{active};
-   my $nbViews = scalar @$views;
-   my $lDump = "";
-
 #  $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
    $returnStr .= '<table cellspacing="10" cellpadding="20">';
    $returnStr .= "<tr>\n";
@@ -7496,7 +7489,9 @@ sub FRITZBOX_Lan_Devices_List($) {
    $returnStr .= "<td>MAC</td><td>IPv4</td><td>UID</td><td>NAME</td><td>STATUS</td><td>INFO</td>\n";
    $returnStr .= "</tr>\n";
 
-   $nbViews = 0;
+   my $views;
+   my $nbViews = 0;
+
    if (defined $result->{data}->{active}) {
      $views = $result->{data}->{active};
      $nbViews = scalar @$views;
@@ -7531,6 +7526,8 @@ sub FRITZBOX_Lan_Devices_List($) {
    $returnStr .= "<tr>\n";
    $returnStr .= "<td>MAC</td><td>IPv4</td><td>UID</td><td>NAME</td><td>STATUS</td><td>INFO</td>\n";
    $returnStr .= "</tr>\n";
+
+   $nbViews = 0;
 
    if (defined $result->{data}->{passive}) {
      $views = $result->{data}->{passive};
