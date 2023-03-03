@@ -5530,7 +5530,8 @@ farewell:template has been applied successfully. <br>Note: In case you use an ex
 par:BASE_ID;BASE_ID as set on the esp;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)/version:, ? $1 : undef }
 par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
 attr DEVICE icon ICON
-attr DEVICE bridgeRegexp BASE_ID/([^/]+)/ch[0-9]+/.*:.* "BASE_ID_$1"
+attr DEVICE bridgeRegexp BASE_ID/([^/]+)/ch[0-9]+/.*:.* "BASE_ID_$1"\
+  BASE_ID/([^/]+)/(available|last_success):.* "BASE_ID_$1"
 attr DEVICE autocreate 1
 attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/free_heap:.* free_heap\
@@ -5542,10 +5543,15 @@ attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/comm_stop:.* comm_stop\
   BASE_ID/dis_night_comm:.* dis_night_comm\
   BASE_ID/comm_disabled:.* comm_disabled\
-  BASE_ID/comm_dis_ts:.* comm_dis_ts
+  BASE_ID/comm_dis_ts:.* comm_dis_ts\
+  BASE_ID/status:.* status\
+  BASE_ID/total/P_AC:.* P_AC\
+  BASE_ID/total/P_DC:.* P_DC\
+  BASE_ID/total/YieldDay:.* YieldDay\
+  BASE_ID/total/YieldTotal:.* YieldTotal
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_hub_bridge
-setreading DEVICE attrTemplateVersion 20230227
+setreading DEVICE attrTemplateVersion 20230228
 { AttrTemplate_Initialize() }
 
 
@@ -5564,7 +5570,9 @@ par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
 attr DEVICE icon ICON
 deletereading -q DEVICE .*_.*
 option:{ RADIO_SINGLE }
-attr DEVICE readingList INVERTERLONG_ID/ch0/U_AC:.* U_AC\
+attr DEVICE readingList INVERTERLONG_ID/available:.* available\
+  INVERTERLONG_ID/last_success:.* last_success\
+  INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
   INVERTERLONG_ID/ch0/Q_AC:.* Q_AC\
@@ -5585,11 +5593,13 @@ attr DEVICE readingList INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC\
   INVERTERLONG_ID/ch1/U_DC:.* U_DC\
-  INVERTERLONG_ID/ch1/Irridation:.* Irridation1\
+  INVERTERLONG_ID/ch1/Irradiation:.* Irradiation1\
   INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
   INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal
 option:{ RADIO_DOUBLE }
 attr DEVICE readingList \
+  INVERTERLONG_ID/available:.* available\
+  INVERTERLONG_ID/last_success:.* last_success\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
@@ -5611,17 +5621,19 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
   INVERTERLONG_ID/ch1/U_DC:.* U_DC1\
-  INVERTERLONG_ID/ch1/Irridation:.* Irridation1\
+  INVERTERLONG_ID/ch1/Irradiation:.* Irradiation1\
   INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
   INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal1\
   INVERTERLONG_ID/ch2/I_DC:.* I_DC2\
   INVERTERLONG_ID/ch2/P_DC:.* P_DC2\
   INVERTERLONG_ID/ch2/U_DC:.* U_DC2\
-  INVERTERLONG_ID/ch2/Irridation:.* Irridation2\
+  INVERTERLONG_ID/ch2/Irradiation:.* Irradiation2\
   INVERTERLONG_ID/ch2/YieldDay:.* YieldDay2\
   INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2
 option:{ RADIO_QUATTRO }
 attr DEVICE readingList \
+  INVERTERLONG_ID/available:.* available\
+  INVERTERLONG_ID/last_success:.* last_success\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
@@ -5647,25 +5659,25 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
   INVERTERLONG_ID/ch1/U_DC:.* U_DC1\
-  INVERTERLONG_ID/ch1/Irridation:.* Irridation1\
+  INVERTERLONG_ID/ch1/Irradiation:.* Irradiation1\
   INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
   INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal1\
   INVERTERLONG_ID/ch2/I_DC:.* I_DC2\
   INVERTERLONG_ID/ch2/P_DC:.* P_DC2\
   INVERTERLONG_ID/ch2/U_DC:.* U_DC2\
-  INVERTERLONG_ID/ch2/Irridation:.* Irridation2\
+  INVERTERLONG_ID/ch2/Irradiation:.* Irradiation2\
   INVERTERLONG_ID/ch2/YieldDay:.* YieldDay2\
   INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2\
   INVERTERLONG_ID/ch3/I_DC:.* I_DC3\
   INVERTERLONG_ID/ch3/P_DC:.* P_DC3\
   INVERTERLONG_ID/ch3/U_DC:.* U_DC3\
-  INVERTERLONG_ID/ch3/Irridation:.* Irridation3\
+  INVERTERLONG_ID/ch3/Irradiation:.* Irradiation3\
   INVERTERLONG_ID/ch3/YieldDay:.* YieldDay3\
   INVERTERLONG_ID/ch3/YieldTotal:.* YieldTotal3\
   INVERTERLONG_ID/ch4/I_DC:.* I_DC4\
   INVERTERLONG_ID/ch4/P_DC:.* P_DC4\
   INVERTERLONG_ID/ch4/U_DC:.* U_DC4\
-  INVERTERLONG_ID/ch4/Irridation:.* Irridation4\
+  INVERTERLONG_ID/ch4/Irradiation:.* Irradiation4\
   INVERTERLONG_ID/ch4/YieldDay:.* YieldDay4\
   INVERTERLONG_ID/ch4/YieldTotal:.* YieldTotal4
 option:global
@@ -5679,7 +5691,7 @@ attr DEVICE setList \
   limit_persistent_pct:slider,2,1,100 BASE_ID/devcontrol/INVERTER_NR/11/257 $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20230227
+setreading DEVICE attrTemplateVersion 20230228
 
 # contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
 name:hoymiles_opendtu_hub_bridge
