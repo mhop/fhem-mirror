@@ -3038,6 +3038,16 @@ FW_dev2image($;$)
     Log3 $FW_wname, 1, "devStateIcon $name: $@" if($@);
     return ($html, $link, 1) if(defined($html) && $html =~ m/^<.*>$/s);
     $devStateIcon = $html;
+    if($devStateIcon) { # 132483
+      foreach my $l (split(" ", $devStateIcon)) {
+        my ($re, $iconName, $link) = split(":", $l, 3);
+        eval { "Hallo" =~ m/^$re$/ };    
+        if($@) {
+          Log 1, "ERROR: $name devStateIcon evaluated to $devStateIcon => $@";
+          return "ERROR, check the log";
+        }
+      }
+    }
   }
 
   if(defined($devStateIcon)) {
