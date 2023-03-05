@@ -306,7 +306,7 @@ my %sleepers;                   # list of sleepers
 my %delayedShutdowns;           # definitions needing delayed shutdown
 my %fuuidHash;                  # for duplicate checking
 my $globalUniqueID;             # cache it
-my $LOG;                        # log file handle, formerly LOG
+my $LOG;                        # Log file handle, formerly LOG
 
 my $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
 
