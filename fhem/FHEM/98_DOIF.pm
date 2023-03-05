@@ -1810,9 +1810,9 @@ sub DOIF_statistic_bar
       ${$bar}{min_value_time}=sprintf("%02d.%02d",$mday,$month+1);
     } elsif (${$bar}{period} eq "day") {
       my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday)=gmtime(($period2-int($maxValSlot/$dim))*86400+(($maxValSlot % $dim))*3600);
-      ${$bar}{max_value_time}=qw(So Mo Di Mi Do Fr Sa)[$wday]." ".$hour.":";
+      ${$bar}{max_value_time}=sprintf("%s %02d:",qw(So Mo Di Mi Do Fr Sa)[$wday],$hour);
       ($sec,$min,$hour,$mday,$month,$year,$wday,$yday)=gmtime(($period2-int($minValSlot/$dim))*86400+(($minValSlot % $dim))*3600);
-      ${$bar}{min_value_time}=qw(So Mo Di Mi Do Fr Sa)[$wday]." ".$hour.":";
+      ${$bar}{min_value_time}=sprintf("%s %02d:",qw(So Mo Di Mi Do Fr Sa)[$wday],$hour);
     }
   }
 }
@@ -5337,23 +5337,21 @@ sub plot {
       $dimdev=$dim; 
     }
     my $wide=$chart_dim/$dimdev;
-    #my $barWide=$wide*0.7;
-    #my $barWide=$barWide/$num+($num-1)*$barWide/$num*0.005;
-    #my $xBar=$barWide/$num;
 
+    my $barOffset=0.8;
+    my $barsWide=$wide*0.85;
+    my $barWide=int(100*$barsWide/(($numOrig-1)*$barOffset+1))/100;
+    my $xBar=$barWide*$barOffset;
 
-    my $xBar=int(0.7*$wide/$numOrig*100)/100;
-    my $barWide=int($wide/$numOrig*0.8*100)/100;
 
 
      my $xOffset;
     if ($period eq "month" or $period eq "day") {
-      $xOffset=$wide*0.61;
+      $xOffset=$wide*0.6;
     } else {
-      $xOffset=$wide*0.13;    
+      $xOffset=$wide*0.08;    
     }
-   
-   
+    
 #    $out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:#CCCCCC; stroke-width:0.3; stroke-opacity:0.7" />',$yNull,$chart_dim,$yNull);
     
     if ($averageVal) {
