@@ -302,6 +302,18 @@
 #     RCnoName20_17E9 plus   MS;P1=-744;P2=221;P3=679;P4=-278;P5=-7860;D=2521212134213434343434342134212134212121213421212134343434212121;CP=2;SP=5;R=66;O;m2;
 #     RCnoName20_17E9 minus  MS;P0=233;P1=-7903;P3=-278;P5=-738;P6=679;D=0105050563056363636363630563050563050505050505630563050505630505;CP=0;SP=1;R=71;O;m1;
 #}
+# - Remote control with 10 buttons for Leroy Deckenventilator [Protocol 20]
+#{    https://forum.fhem.de/index.php/topic,53282.msg1233431.html#msg1233431 @ steffen83 2022-09-01
+#     RCnoName20_10_3E00 light_on   MU;P0=-8774;P1=282;P2=-775;P3=815;P4=-253;P5=-32001;D=10121234343434341212121212121212121212123434343412121234343412343415;CP=1;
+#     RCnoName20_10_3E00 light_off  MU;P0=-238;P1=831;P3=300;P4=-762;P5=-363;P6=192;P7=-8668;D=01010101010343434343434343434343434103415156464156464641564646734341010101010343434343434343434343434103410103434103434341034343734341010101010343434343434343434343434103410103434103434341034343734341010101010343434343434343434343434103410103434103434341;CP=3;O;
+#     RCnoName20_10_3E00 fan_stop   MU;P0=184;P1=-380;P2=128;P3=-9090;P4=-768;P5=828;P6=-238;P7=298;D=45656565656747474747474747474747474567474560404515124040451040374745656565656747474747474747474747474567474567474565674747456747374745656565656747474747474747474747474567474567474565674747456747374745656565656747474747474747474747474567474567474565674747;CP=7;O;
+#}
+# - Remote control DC-1961-TG with 12 buttons for ceiling fan with lighting [Protocol 20]
+#{    https://forum.fhem.de/index.php/topic,53282.msg1240911.html#msg1240911 @ Skusi  2022-10-23
+#     DC_1961_TG_1846 light_on_off   MS;P1=291;P2=-753;P3=762;P4=-249;P5=-8312;D=151212123434121212123412121234341234123412341212121234341212341234;CP=1;SP=5;R=224;O;m2;
+#     DC_1961_TG_1846 fan_off        MS;P1=-760;P2=747;P3=-282;P4=253;P5=-8335;D=454141412323414141412341414123234123412341412323234123232323412323;CP=4;SP=5;R=27;O;m2;
+#     DC_1961_TG_1846 fan_direction  MS;P0=-8384;P1=255;P2=-766;P3=754;P4=-263;D=101212123434121212123412121234341234123412341212341234341212341212;CP=1;SP=0;R=27;O;m2;
+#}
 ###############################################################################################################################################################################
 # - Remote control Momento for wireless digital picture frame [Protocol 97]
 #{    elektron-bbs 2020-03-21
@@ -400,9 +412,10 @@ package main;
 
 use strict;
 use warnings;
+use FHEM::Meta;
 no warnings 'portable';  # Support for 64-bit ints required
 
-our $VERSION = '2022-07-27';
+our $VERSION = '2022-09-13';
 
 sub SD_UT_bin2tristate;
 sub SD_UT_tristate2bin;
@@ -766,6 +779,36 @@ my %models = (
                     Protocol          => 'P20',
                     Typ               => 'remote'
                   },
+  'RCnoName20_10' => { '00011110' => 'light_on',
+                       '00010110' => 'light_off',
+                       '00010101' => 'fan_low',
+                       '00011111' => 'fan_mid',
+                       '00010100' => 'fan_high',
+                       '00010010' => 'fan_stop',
+                       '00010011' => 'fan_natural',
+                       '00011101' => 'time_1h',
+                       '00010001' => 'time_2h',
+                       '00011001' => 'time_4h',
+                       hex_length => [8],
+                       Protocol   => 'P20',
+                       Typ        => 'remote'
+                     },
+  'DC_1961_TG' => { '10100111' => 'fan_off',
+                    '10100001' => 'fan_1',
+                    '10100010' => 'fan_2',
+                    '10100011' => 'fan_3',
+                    '10100100' => 'fan_4',
+                    '10100101' => 'fan_5',
+                    '10100110' => 'fan_6',
+                    '10101001' => 'fan_direction',
+                    '10101000' => 'light_on_off',
+                    '10101011' => 'time_2h',
+                    '10101100' => 'time_4h',
+                    '10101101' => 'time_8h',
+                    hex_length => [8],
+                    Protocol   => 'P20',
+                    Typ        => 'remote'
+                  },
   'Momento' =>  { '0001'      => 'power',
                   '0010'      => 'play/pause',
                   '0011'      => 'back',
@@ -935,6 +978,7 @@ sub SD_UT_Initialize {
     'Momento.*'    => {ATTR => 'model:Momento', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
     'OR28V.*'      => {ATTR => 'model:OR28V', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
     'RCnoName20.*' => {ATTR => 'model:RCnoName20', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
+    'DC_1961_TG.*' => {ATTR => 'model:DC_1961_TG', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
     'TC6861.*'     => {ATTR => 'model:TR401', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
     'TR401.*'      => {ATTR => 'model:TR401', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
     'Techmar.*'    => {ATTR => 'model:Techmar', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
@@ -942,7 +986,7 @@ sub SD_UT_Initialize {
     'xavax.*'      => {ATTR => 'model:xavax', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
     'unknown_please_select_model' => {ATTR => 'model:unknown', FILTER => '%NAME', autocreateThreshold => '5:180', GPLOT => q{}},
   };
-  return;
+  return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 #############################
@@ -979,52 +1023,46 @@ sub SD_UT_Define {
   }
 
   ### [2] checks CAME_TOP_432EV & Novy_840029 & Novy_840039 & Unitec_47031 ###
-  if (($a[2] eq 'CAME_TOP_432EV' || $a[2] eq 'Novy_840029' || $a[2] eq 'Novy_840039' || $a[2] eq 'Unitec_47031') && not $a[3] =~ /^[0-9a-fA-F]{2}/xms) {
-    return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){2}";
-  }
+  # uncoverable condition true 
+  return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){2}" if (($a[2] eq 'CAME_TOP_432EV' || $a[2] eq 'Novy_840029' || $a[2] eq 'Novy_840039' || $a[2] eq 'Unitec_47031') && not $a[3] =~ /^[0-9a-fA-F]{2}/xms);
   ### [3] checks SA_434_1_mini | QUIGG_DMV | TR_502MSV | BeSmart_S4 ###
-  if (($a[2] eq 'SA_434_1_mini' || $a[2] eq 'QUIGG_DMV' || $a[2] eq 'TR_502MSV' || $a[2] eq 'BeSmart_S4') && not $a[3] =~ /^[0-9a-fA-F]{3}/xms) {
-    return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short or long (must be 3 chars) or not HEX (0-9 | a-f | A-F){3}";
-  }
-  ### [4 nibble] checks Neff SF01_01319004 & BOSCH SF01_01319004_Typ2 & Chilitec_22640 & ESTO KL_RF01 & RCnoName20 & xavax & BF_301 & Meikee_xx ###
-  if (($a[2] eq 'SF01_01319004' || $a[2] eq 'SF01_01319004_Typ2' || $a[2] eq 'Chilitec_22640' || $a[2] eq 'KL_RF01' || $a[2] eq 'RCnoName20' || $a[2] eq 'xavax' || $a[2] eq 'BF_301' || $a[2] eq 'Meikee_21' || $a[2] eq 'Meikee_24') && not $a[3] =~ /^[0-9a-fA-F]{4}/xms) {
-    return "Wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 4 chars) or not hex (0-9 | a-f | A-F) {4}";
-  }
+  # uncoverable condition true 
+  return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short or long (must be 3 chars) or not HEX (0-9 | a-f | A-F){3}" if (($a[2] eq 'SA_434_1_mini' || $a[2] eq 'QUIGG_DMV' || $a[2] eq 'TR_502MSV' || $a[2] eq 'BeSmart_S4') && not $a[3] =~ /^[0-9a-fA-F]{3}/xms);    
+  ### [4 nibble] checks Neff SF01_01319004 & BOSCH SF01_01319004_Typ2 & Chilitec_22640 & ESTO KL_RF01 & RCnoName20 & RCnoName20_10 & DC-1961-TG & xavax & BF_301 & Meikee_xx ###
+  # uncoverable condition true 
+  return "Wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 4 chars) or not hex (0-9 | a-f | A-F) {4}" if (($a[2] eq 'SF01_01319004' || $a[2] eq 'SF01_01319004_Typ2' || $a[2] eq 'Chilitec_22640' || $a[2] eq 'KL_RF01' || $a[2] eq 'RCnoName20' || $a[2] eq 'RCnoName20_10' || $a[2] eq 'DC_1961_TG' || $a[2] eq 'xavax' || $a[2] eq 'BF_301' || $a[2] eq 'Meikee_21' || $a[2] eq 'Meikee_24') && not $a[3] =~ /^[0-9a-fA-F]{4}/xms);
   ### [6] checks Manax | mumbi ###
-  if ($a[2] eq 'RC_10' && not $a[3] =~ /^[0-9a-fA-F]{4}_([ABCD]|all)$/xms) {
-    return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){4}_[ABCD]|[all]";
-  }
-
+  # uncoverable condition true 
+  return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){4}_[ABCD]|[all]" if ($a[2] eq 'RC_10' && not $a[3] =~ /^[0-9a-fA-F]{4}_([ABCD]|all)$/xms) ;
+  
   ### [6] checks MD_2003R | MD_210R | MD_2018R | Navaris | AC114_01B | Visivo ###
-  if (($a[2] eq 'MD_2003R' || $a[2] eq 'MD_210R' || $a[2] eq 'MD_2018R' || $a[2] eq 'Navaris' || $a[2] eq 'AC114_01B' || $a[2] eq 'Visivo') && not $a[3] =~ /^[0-9a-fA-F]{6}/xms) {
-    return "wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 6 chars) or not hex (0-9 | a-f | A-F){6}";
-  }
-
+  # uncoverable condition true 
+  return "wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 6 chars) or not hex (0-9 | a-f | A-F){6}" if (($a[2] eq 'MD_2003R' || $a[2] eq 'MD_210R' || $a[2] eq 'MD_2018R' || $a[2] eq 'Navaris' || $a[2] eq 'AC114_01B' || $a[2] eq 'Visivo') && not $a[3] =~ /^[0-9a-fA-F]{6}/xms);
+  
   ### [7] checks Hoermann HSM4 | Krinner_LUMIX | Momento ###
-  if (($a[2] eq 'HSM4' || $a[2] eq 'Krinner_LUMIX' || $a[2] eq 'Momento') && not $a[3] =~ /^[0-9a-fA-F]{7}/xms) {
-    return "wrong HEX-Value! ($a[3]) $a[2]  Hex-value to short or long (must be 7 chars) or not hex (0-9 | a-f | A-F){7}";
-  }
+  # uncoverable branch true 
+  return "wrong HEX-Value! ($a[3]) $a[2]  Hex-value to short or long (must be 7 chars) or not hex (0-9 | a-f | A-F){7}" if (($a[2] eq 'HSM4' || $a[2] eq 'Krinner_LUMIX' || $a[2] eq 'Momento') && not $a[3] =~ /^[0-9a-fA-F]{7}/xms);
 
   ### [7] checks Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx (tristate code)###
+  # uncoverable branch true 
   return "wrong tristate code! ($a[3]) $a[2] code to short or long (must be 7 chars) or values not 0, 1 or F" if (($a[2] eq 'Tedsen_SKX1xx' || $a[2] eq 'Tedsen_SKX2xx' || $a[2] eq 'Tedsen_SKX4xx' || $a[2] eq 'Tedsen_SKX6xx') && not $a[3] =~ /^[01fF]{7}$/xms);
   ### [8 nibble] checks Techmar ###
-  if (($a[2] eq 'Techmar') && not $a[3] =~ /^[0-9a-fA-F]{8}$/xms) {
-    return "wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 8 chars) or not hex (0-9 | a-f | A-F)";
-  }
+  # uncoverable branch true 
+  return "wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 8 chars) or not hex (0-9 | a-f | A-F)" if (($a[2] eq 'Techmar') && not $a[3] =~ /^[0-9a-fA-F]{8}$/xms);
   ### [9] checks Hoermann HS1-868-BS ###
+  # uncoverable branch true 
   return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){9}" if ($a[2] eq 'HS1_868_BS' && not $a[3] =~ /^[0-9a-fA-F]{9}/xms);
   ### [14] checks LED_XM21_0 ###
+  # uncoverable branch true 
   return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){14}" if ($a[2] eq 'LED_XM21_0' && not $a[3] =~ /^[0-9a-fA-F]{14}/xms);
 
   ### [3] checks TR401 (Well-Light) ###
-  if ($a[2] eq 'TR401' && not $a[3] =~ /^[0-9]_[1-4]/xms) {
-    return "wrong devicecode! ($a[3]) $a[2] must be [0-9]_[1-4]";
-  }
+  # uncoverable branch true 
+  return "wrong devicecode! ($a[3]) $a[2] must be [0-9]_[1-4]" if ($a[2] eq 'TR401' && not $a[3] =~ /^[0-9]_[1-4]/xms);
 
   ### [3] checks TC6861 (Busch-Transcontrol HF) [P121] ###
-  if ($a[2] eq 'TC6861' && not $a[3] =~ /^[0-9A-F]{3}_[1-3]$/xms) {
-    return "SD_UT model $a[2] wrong devicecode: ($a[3]) - must be 3 digit house code (hex 0-9 A-F) _ 1 digit channel (dec 1-3) - e.g. 3DC_1";
-  }
+  # uncoverable branch true 
+  return "SD_UT model $a[2] wrong devicecode: ($a[3]) - must be 3 digit house code (hex 0-9 A-F) _ 1 digit channel (dec 1-3) - e.g. 3DC_1" if ($a[2] eq 'TC6861' && not $a[3] =~ /^[0-9A-F]{3}_[1-3]$/xms);  
 
   $hash->{versionModule} = $VERSION;
   $hash->{lastMSG} =  'no data';
@@ -1196,8 +1234,8 @@ sub SD_UT_Set {
     } elsif ($model eq 'OR28V') {
       $msg = $models{$model}{Protocol} . '#';
       $msgEnd .= '#R' . $repeats; # R1 wird vom SIGNALduino nicht als MS erkannt!
-    ############ RCnoName20 ############
-    } elsif ($model eq 'RCnoName20') {
+    ############ RCnoName20 | RCnoName20_10 | DC-1961-TG ############
+    } elsif ($model eq 'RCnoName20' || $model eq 'RCnoName20_10' || $model eq 'DC_1961_TG') {
       my $adr = sprintf( "%016b", hex($definition[1])); # argument 1 - adress to binary with 16 bits
       $msg = $models{$model}{Protocol} . '#' . $adr;
       $msgEnd = '#R' . $repeats;
@@ -1365,6 +1403,22 @@ sub SD_UT_Set {
         $msg .= sprintf('%012b', hex $housecode);
         $msg .= $models{$model}{ch}{$ch} . $msgEnd;
         # $msg .= $models{$model}{ch}{$ch} . 'P' . $msgEnd;
+      ############ RCnoName20_10 or DC-1961-TG [P20] ############
+      } elsif ($model eq 'RCnoName20_10' || $model eq 'DC_1961_TG') {
+        $msg .= $save; # button
+        my $rollingCode = ReadingsVal($name, 'rollingCode', 0);
+        $rollingCode += 1;
+        if ($rollingCode > 7) {
+          $rollingCode = 0;
+        }
+        readingsSingleUpdate($hash, 'rollingCode' , $rollingCode, 0);
+        $msg .= sprintf('%04b', $rollingCode); # rolling code
+        my $xor = 10;
+        for (my $n = 4; $n < 32; $n += 4) { # without P20#
+          $xor ^= oct('0b' . substr($msg, $n, 4));
+        }
+        $msg .= sprintf('%04b', $xor); # check
+        $msg .= $msgEnd;
       } else {
         $msg .= $save.$msgEnd;
       }
@@ -1631,6 +1685,19 @@ sub SD_UT_Parse {
       $def = $modules{SD_UT}{defptr}{$devicedef};
       $model = 'RCnoName20';
       $name = 'RCnoName20_' . $deviceCode;
+      ### Remote control RCnoName20_10 or DC-1961-TG [P20] ###
+      my $xor = 0;
+      for (my $n = 0; $n < 8; $n++) {
+        $xor ^= hex(substr($rawData,$n,1));
+      }
+      if ($xor == 10) {
+        my $button = substr($bitData,16,8);
+        $model = 'RCnoName20_10' if exists $models{'RCnoName20_10'}{$button};
+        $model = 'DC_1961_TG' if exists $models{'DC_1961_TG'}{$button};
+        $devicedef = $model . ' ' . $deviceCode if (!$def);
+        $def = $modules{SD_UT}{defptr}{$devicedef} if (!$def);
+        $name = $model . '_' . $deviceCode;
+      }
     }
     if (!$def && $protocol == 92) {
       ### Remote control Krinner_LUMIX [P92] ###
@@ -2060,6 +2127,12 @@ sub SD_UT_Parse {
   } elsif ($model eq 'RCnoName20' && $protocol == 20) {
     $state = substr($bitData,16,15);  # last bit is filled
     $deviceCode = substr($rawData,0,4);
+  ### Remote control RCnoName20_10 or DC-1961-TG[P20] ###
+  } elsif (($model eq 'RCnoName20_10' || $model eq 'DC_1961_TG') && $protocol == 20) {
+    $state = substr($bitData,16,8);
+    $deviceCode = substr($rawData,0,4);
+    my $rollingCode = hex(substr($rawData,6,1));
+    readingsBulkUpdate($hash, 'rollingCode', $rollingCode, 0);
   ### Remote control xavax [P26] ###
   } elsif ($model eq 'xavax' && $protocol == 26) {
     $state = substr($bitData,32,8);
@@ -2323,6 +2396,11 @@ sub SD_UT_Attr {
           $deviceCode = substr($bitData,0,16);
           $deviceCode = sprintf("%04X", oct( "0b$deviceCode" ) );
           $devicename = $devicemodel.'_'.$deviceCode;
+        ############ RCnoName20 ############
+        } elsif ($attrValue eq 'RCnoName20' || $attrValue eq 'RCnoName20_10' || $attrValue eq 'DC_1961_TG') {
+          $deviceCode = substr($bitData,0,16);
+          $deviceCode = sprintf("%04X", oct( "0b$deviceCode" ) );
+          $devicename = $devicemodel.'_'.$deviceCode;
         ############ unknown ############
         } else {
           $devicename = 'unknown_please_select_model';
@@ -2363,7 +2441,7 @@ sub SD_UT_Attr {
 
 ###################################
 sub SD_UT_bin2tristate {
-  my $bitData = shift // return undef;
+  my $bitData = shift // return;
   my %bintotristate=(
      '00' => '0',
      '10' => 'F',
@@ -2378,7 +2456,7 @@ sub SD_UT_bin2tristate {
 
 ###################################
 sub SD_UT_tristate2bin {
-  my $tsData = shift // return undef;
+  my $tsData = shift // return;
   my %tristatetobin=(
      '0' => '00',
      'F' => '10',
@@ -2422,8 +2500,10 @@ sub SD_UT_tristate2bin {
     <li>Busch-Transcontrol HF - remote control 6861&nbsp;&nbsp;&nbsp;<small>(module model: TC6861, protocol 121)</small></li>
     <li>CAME swing gate drive&nbsp;&nbsp;&nbsp;<small>(module model: CAME_TOP_432EV, protocol 86)</small></li>
     <li>ChiliTec LED X-Mas light&nbsp;&nbsp;&nbsp;<small>(module model: Chilitec_22640, protocol 14)</small></li>
+    <li>DC-1961-TG - remote control with 12 buttons for ceiling fan with lighting&nbsp;&nbsp;&nbsp;<small>(module model: DC_1961_TG, protocol 20)</small></li>
     <li>ESTO ceiling lamp&nbsp;&nbsp;&nbsp;<small>(module model: KL_RF01, protocol 93)</small></li>
     <li>Remote control with 4 buttons for diesel heating&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName20, protocol 20)</small></li>
+    <li>Remote control with 10 buttons for Leroy ceiling fan&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName20_10, protocol 20)</small></li>
     <li>Hoermann HS1-868-BS&nbsp;&nbsp;&nbsp;<small>(module model: HS1_868_BS, protocol 69)</small></li>
     <li>Hoermann HSM4&nbsp;&nbsp;&nbsp;<small>(module model: HSM4, protocol 69)</small></li>
     <li>Krinner LUMIX X-Mas light string&nbsp;&nbsp;&nbsp;<small>(module model: Krinner_LUMIX, protocol 92)</small></li>
@@ -2573,7 +2653,7 @@ sub SD_UT_tristate2bin {
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#IODev">IODev</a></li>
     <li><a name="model"></a>model<br>
-      The attribute indicates the model type of your device (AC114_01B, BeSmart_S4, Buttons_five, Buttons_six, CAME_TOP_432EV, Chilitec_22640, KL_RF01, HS1-868-BS, HSM4, QUIGG_DMV, LED_XM21_0, Meikee_21, Meikee_24, Momento, Navaris, Novy_840029, Novy_840039, OR28V, RC_10, RH787T, SA_434_1_mini, SF01_01319004, TC6861, TR60C1, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031, unknown).
+      The attribute indicates the model type of your device (AC114_01B, BeSmart_S4, Buttons_five, Buttons_six, CAME_TOP_432EV, Chilitec_22640, DC_1961_TG, HS1-868-BS, HSM4, KL_RF01, LED_XM21_0, Meikee_21, Meikee_24, Momento, Navaris, Novy_840029, Novy_840039, OR28V, QUIGG_DMV, RC_10, RH787T, SA_434_1_mini, SF01_01319004, TC6861, TR60C1, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031, unknown).<br>
       If the attribute is changed, a new device is created using <a href="#autocreate">autocreate</a>. Autocreate must be activated for this.
     </li>
     <li><a name="repeats"></a>repeats<br>
@@ -2647,8 +2727,10 @@ sub SD_UT_tristate2bin {
     <li>Busch-Transcontrol HF - Handsender 6861&nbsp;&nbsp;&nbsp;<small>(Modulmodel: TC6861, Protokoll 121)</small></li>
     <li>CAME Drehtor Antrieb&nbsp;&nbsp;&nbsp;<small>(Modulmodel: CAME_TOP_432EV, Protokoll 86)</small></li>
     <li>ChiliTec LED Christbaumkerzen&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Chilitec_22640, Protokoll 14)</small></li>
+    <li>DC-1961-TG - Fernbedienung mit 12 Tasten für Deckenventilator mit Beleuchtung&nbsp;&nbsp;&nbsp;<small>(Modulmodel: DC_1961_TG, Protokoll 20)</small></li>
     <li>ESTO Deckenlampe&nbsp;&nbsp;&nbsp;<small>(Modulmodel: KL_RF01, Protokoll 93)</small></li>
     <li>Fernbedienung mit 4 Tasten f&uuml;r Diesel-Heizung &nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName20, Protokoll 20)</small></li>
+    <li>Fernbedienung mit 10 Tasten f&uuml;r Leroy Deckenventilator&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName20_10, Protokoll 20)</small></li>
     <li>Hoermann HS1-868-BS&nbsp;&nbsp;&nbsp;<small>(Modulmodel: HS1_868_BS, Protokoll 69)</small></li>
     <li>Hoermann HSM4&nbsp;&nbsp;&nbsp;<small>(Modulmodel: HSM4, Protokoll 69)</small></li>
     <li>Krinner LUMIX Christbaumkerzen&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Krinner_LUMIX, Protokol 92)</small></li>
@@ -2798,7 +2880,7 @@ sub SD_UT_tristate2bin {
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#IODev">IODev</a></li>
     <li><a name="model"></a>model<br>
-      Diese Attribut bezeichnet den Modelltyp Ihres Ger&auml;tes (AC114_01B, BeSmart_S4, Buttons_five, Buttons_six, CAME_TOP_432EV, Chilitec_22640, KL_RF01, HS1-868-BS, HSM4, QUIGG_DMV, LED_XM21_0, Meikee_21, Meikee_24, Momento, Navaris, Novy_840029, Novy_840039, OR28V, RC_10, RH787T, SA_434_1_mini, SF01_01319004, TC6861, TR60C1, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031, unknown).
+      Diese Attribut bezeichnet den Modelltyp Ihres Ger&auml;tes (AC114_01B, BeSmart_S4, Buttons_five, Buttons_six, CAME_TOP_432EV, Chilitec_22640, DC_1961_TG, HS1-868-BS, HSM4, KL_RF01, LED_XM21_0, Meikee_21, Meikee_24, Momento, Navaris, Novy_840029, Novy_840039, OR28V, QUIGG_DMV, RC_10, RH787T, SA_434_1_mini, SF01_01319004, TC6861, TR60C1, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031, unknown).<br>
       Bei &Auml;nderung des Attributes wird ein neues Gerät mittels <a href="#autocreate">autocreate</a> erzeugt. Autocreate muss dazu aktiviert sein.
     </li>
     <li><a name="repeats"></a>repeats<br>
@@ -2848,4 +2930,97 @@ sub SD_UT_tristate2bin {
 </ul>
 
 =end html_DE
+=for :application/json;q=META.json 14_SD_UT.pm
+{
+  "author": [
+    "HomeAuto_User <>",
+    "elektron-bbs"
+  ],
+  "description": "module for some SIGNALduino devices",
+  "dynamic_config": 1,
+  "keywords": [
+    "fhem-sonstige-systeme",
+    "fhem-hausautomations-systeme",
+    "fhem-mod",
+    "signalduino"
+  ],
+  "license": [
+    "GPL_2"
+  ],
+  "meta-spec": {
+    "url": "https://metacpan.org/pod/CPAN::Meta::Spec",
+    "version": 2
+  },
+  "name": "FHEM::SD_UT",
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918623,
+        "lib::SD_Protocols": "0",
+        "perl": 5.018,
+        "strict": "0",
+        "warnings": "0"
+      }
+    },
+    "develop": {
+      "requires": {
+        "lib::SD_Protocols": "0",
+        "strict": "0",
+        "warnings": "0"
+      }
+    }
+  },
+  "release_status": "stable",
+  "resources": {
+    "bugtracker": {
+      "web": "https://github.com/RFD-FHEM/RFFHEM/issues"
+    },
+    "x_testData": [
+      {
+        "url": "https://raw.githubusercontent.com/RFD-FHEM/RFFHEM/master/t/FHEM/14_SD_UT/testData.json",
+        "testname": "Testdata with SD_UT sensors"
+      }
+    ],
+    "repository": {
+      "x_master": {
+        "type": "git",
+        "url": "https://github.com/RFD-FHEM/RFFHEM.git",
+        "web": "https://github.com/RFD-FHEM/RFFHEM/blob/master/FHEM/14_SD_UT.pm"
+      },
+      "type": "svn",
+      "url": "https://svn.fhem.de/fhem",
+      "web": "https://svn.fhem.de/trac/browser/trunk/fhem/FHEM/14_SD_UT.pm",
+      "x_branch": "trunk",
+      "x_filepath": "fhem/FHEM/",
+      "x_raw": "https://svn.fhem.de/trac/export/latest/trunk/fhem/FHEM/14_SD_UT.pm",
+      "x_dev": {
+        "type": "git",
+        "url": "https://github.com/RFD-FHEM/RFFHEM.git",
+        "web": "https://raw.githubusercontent.com/RFD-FHEM/RFFHEM/master/FHEM/14_SD_UT.pm",
+        "x_branch": "master",
+        "x_filepath": "FHEM/",
+        "x_raw": "https://github.com/RFD-FHEM/RFFHEM/blob/master/FHEM/14_SD_UT.pm"
+      }
+    },
+    "x_commandref": {
+      "web": "https://commandref.fhem.de/#SD_UT"
+    },
+    "x_support_community": {
+      "board": "Sonstige Systeme",
+      "boardId": "29",
+      "cat": "FHEM - Hausautomations-Systeme",
+      "title": "FHEM - Hausautomations-Systeme >> Sonstige Systeme",
+      "web": "https://forum.fhem.de/index.php/board,29.0.html"
+    }
+  },
+  "x_fhem_maintainer": [
+    "HomeAuto_User",
+    "elektron-bbs"
+  ],
+  "x_fhem_maintainer_github": [
+    "HomeAutoUser",
+    "elektron-bbs"
+  ]
+}
+=end :application/json;q=META.json
 =cut
