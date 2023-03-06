@@ -41,9 +41,8 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.8e";
+my $ModulVersion = "07.50.9";
 my $missingModul = "";
-my $missingModulTelnet = "";
 my $missingModulWeb = "";
 my $missingModulTR064 = "";
 my $FRITZBOX_TR064pwd;
@@ -53,8 +52,6 @@ eval "use URI::Escape;1" or $missingModul .= "URI::Escape ";
 eval "use MIME::Base64;1" or $missingModul .= "MIME::Base64 ";
 
 use FritzBoxUtils; ## only for web access login
-
-eval "use Net::Telnet;1" or $missingModulTelnet .= "Net::Telnet ";
 
 #sudo apt-get install libjson-perl
 # eval "use JSON::XS;1" or $missingModulWeb .= "JSON::XS ";
@@ -71,8 +68,6 @@ eval "use Data::Dumper;1" or $missingModulTR064 .= "Data::Dumper ";
 sub FRITZBOX_Log($$$);
 sub FRITZBOX_Initialize($);
 sub FRITZBOX_Set_Cmd_Start($);
-sub FRITZBOX_Shell_Exec($$);
-sub FRITZBOX_StartRadio_Shell($@);
 sub FRITZBOX_StartRadio_Web($@);
 sub FRITZBOX_Readout_Add_Reading ($$$$@);
 sub FRITZBOX_Readout_Process($$);
@@ -86,16 +81,12 @@ sub FRITZBOX_Lua_Data($$@);
 sub FRITZBOX_Process_JSON($$$@);
 sub FRITZBOX_ERR_Result($$;@);
 sub FRITZBOX_Run_GuestWlan_Web($);
-sub FRITZBOX_Run_GuestWlan_Shell($);
 sub FRITZBOX_Run_Call_Web($);
-sub FRITZBOX_Run_Call_Shell($);
 sub FRITZBOX_Run_macFilter($);
 sub FRITZBOX_Run_chgProfile($);
 sub FRITZBOX_Run_lockLandevice($);
 sub FRITZBOX_Run_enableVPNshare($);
 sub FRITZBOX_Run_rescan_neighborhood($);
-
-our $telnet;
 
 my %fonModel = (
         '0x01' => "MT-D"
@@ -206,21 +197,17 @@ sub FRITZBOX_Initialize($)
   $hash->{SetFn}    = "FRITZBOX_Set";
   $hash->{GetFn}    = "FRITZBOX_Get";
   $hash->{AttrFn}   = "FRITZBOX_Attr";
-  $hash->{AttrList} = "allowShellCommand:0,1 "
-                ."allowTR064Command:0,1 "
-                ."boxUser "
+  $hash->{AttrList} = "boxUser "
+#               ."allowTR064Command:0,1 ";
                 ."disable:0,1 "
-                ."defaultCallerName "
-                ."defaultUploadDir "
-                ."forceTelnetConnection:0,1 "
+#                ."defaultCallerName "
+#                ."defaultUploadDir "
                 ."fritzBoxIP "
                 ."INTERVAL "
                 ."m3uFileLocal "
                 ."m3uFileURL "
-                ."ringWithIntern:0,1,2 "
-                ."telnetUser "
-                ."telnetTimeOut "
-                ."useGuiHack:0,1 "
+#                ."ringWithIntern:0,1,2 "
+#                ."useGuiHack:0,1 "
                 ."userTickets "
                 ."enablePassivLanDevices:0,1 "
                 ."enableVPNShares:0,1 "
@@ -237,6 +224,7 @@ sub FRITZBOX_Initialize($)
                                 ."box_rateUp,box_stdDialPort,box_tr064,box_tr069,box_uptimeConnect,box_uptime,box_wlanCount,box_wlan_2.4GHz,"
                                 ."box_wlan_5GHz,box_vdsl_downStreamRate,box_vdsl_upStreamRate "
                 ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,_noDefInf_ "
+                ."disableTableFormat:multiple-strict,border(8),cellspacing(10),cellpadding(20) "
                 .$readingFnAttributes;
 
 } # end FRITZBOX_Initialize
@@ -283,23 +271,25 @@ sub FRITZBOX_Define($$)
    $hash->{fhem}->{is_double_wlan} = -1;
    $hash->{LUAQUERY} = -1;
    $hash->{LUADATA}  = -1;
-   $hash->{REMOTE}   = -1;
-   $hash->{TELNET}   = -1;
    $hash->{TR064}    = -1;
-   $hash->{WEBCM}    = -1;
-
+   
    RemoveInternalTimer($hash->{helper}{TimerReadout});
    InternalTimer(gettimeofday() + 1 , "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 0);
 
 # Inform about missing PERL modules
-   if ( $missingModulTelnet || $missingModulWeb || $missingModulTR064 ) {
-      my $msg = "INFO: Modul functionality limited because of missing perl modules: ".$missingModulTelnet . $missingModulWeb . $missingModulTR064;
+   if ( $missingModulWeb || $missingModulTR064 ) {
+      my $msg = "INFO: Modul functionality limited because of missing perl modules: " . $missingModulWeb . $missingModulTR064;
       FRITZBOX_Log $hash, 2, $msg;
       $hash->{PERL} = $msg;
    } else {
       my $msg = "The support for telnet and operation on a Fritz!Box has been discontinued. The functions are disabled.";
       FRITZBOX_Log $hash, 2, $msg;
       $hash->{INFO} = $msg;
+      $msg = "The following attributes are not longer supperted:\n"
+           . "useGuiHack, ringWithIntern, defaultCallerName, allowTR064Command\n"
+           . "Use deleteattr to delete from Attributes.";
+      FRITZBOX_Log $hash, 2, $msg;
+      $hash->{INFO2} = $msg;
    }
 
    return undef;
@@ -368,11 +358,13 @@ sub FRITZBOX_Attr($@)
 
    if ($aName eq "deviceInfo") {
      if ($cmd eq "set") {
-        my $count = () = ($aVal . ",") =~ m/_default_(.*?)\,/g;
-        return "only one _default_... parameter possible" if $count > 1;
+       my $count = () = ($aVal . ",") =~ m/_default_(.*?)\,/g;
+       return "only one _default_... parameter possible" if $count > 1;
         
-        return "character | not possible in _default_" if $aVal =~ m/\|/;
+       return "character | not possible in _default_" if $aVal =~ m/\|/;
 
+       $aVal =~ s/\,/\,\n/g;
+       $_[3] = $aVal;
      }
    }
 
@@ -382,6 +374,8 @@ sub FRITZBOX_Attr($@)
        foreach ( @reading_list ) {
          readingsDelete($hash, $_) if exists $hash->{READINGS}{$_};
        }
+       $aVal =~ s/\,/\,\n/g;
+       $_[3] = $aVal;
      } 
    }
 
@@ -475,64 +469,71 @@ sub FRITZBOX_Set($$@)
 {
    my ($hash, $name, $cmd, @val) = @_;
    my $resultStr = "";
+   my $mesh = ReadingsVal($name, "box_meshRole", "master");
 
-   my $list =  "call"
-            .  " checkAPIs:noArg"
-            .  " diversity"
-            .  " guestWlan:on,off"
+   my $list =  " checkAPIs:noArg"
             .  " password"
+            .  " update:noArg";
+
+# set abh�ngig von TR064
+   $list    .= " call"
+            .  " diversity"
             .  " ring"
             .  " tam"
-            .  " update:noArg"
-            .  " wlan:on,off"
-            .  " rescanWLANneighbors:noArg"
-            .  " lockLandevice"
-            .  " enableVPNshare"
-            .  " chgProfile"
-            .  " switchIPv4DNS:provider,other"
-            .  " dectRingblock"
-            .  " macFilter:on,off";
+            if $hash->{TR064} == 1 && $hash->{SECPORT} && ($hash->{MODEL} =~ "Box") && $mesh eq "master";
+
+# set abh�ngig von TR064 und luaCall
+   $list    .= " wlan:on,off"
+            .  " guestWlan:on,off"
+            if $hash->{TR064} == 1 && $hash->{SECPORT} && $hash->{LUAQUERY} == 1;
 
    $list    .= " wlan2.4:on,off"
             .  " wlan5:on,off"
-            if $hash->{fhem}->{is_double_wlan} == 1;
+            if $hash->{fhem}->{is_double_wlan} == 1 && $hash->{TR064} == 1 && $hash->{SECPORT} && $hash->{LUAQUERY} == 1;
 
-   $list    .= " alarm"
+# set abh�ngig von TR064 und data.lua
+   $list    .= " macFilter:on,off"
+            .  " enableVPNshare"
+            if ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && $hash->{TR064} == 1 && $hash->{SECPORT}  && $mesh eq "master";
+
+# set abh�ngig von data.lua
+   $list    .= " switchIPv4DNS:provider,other"
             .  " dect:on,off"
-            .  " startRadio"
-            if $hash->{WEBCM}==1 || $hash->{TELNET}==1;
+            .  " dectRingblock"
+            .  " lockLandevice"
+            .  " macFilter:on,off"
+            .  " chgProfile"
+            if ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && $mesh eq "master";
 
-   $list    .= " sendMail"
-            .  " customerRingTone"
-            .  " moh"
-            if $hash->{TELNET}==1;
+#   $list    .= " alarm"
+#            .  " startRadio";
+
+   $list    .= " rescanWLANneighbors:noArg"
+            if ($hash->{LUADATA} == 1);
+
+#   $list    .= " sendMail"
+#            .  " customerRingTone"
+#            .  " moh"
+#            if $hash->{TELNET}==1;
 
             # . " convertMOH"
             # . " convertRingTone"
 
-   my $forceShell = ( AttrVal( $name, "forceTelnetConnection",  0 ) == 1 || defined $hash->{REMOTE} && $hash->{REMOTE} == 0 );
-
 # set alarm
-   if ( lc $cmd eq 'alarm') {
-      if ( int @val > 0 && $val[0] =~ /^(1|2|3)$/ ) {
-         FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd ".join(" ", @val);
-         unless ($hash->{WEBCM}==1 || $forceShell) {
-            FRITZBOX_Log $hash, 2, "'set ... alarm' is not supported by the limited interfaces of your Fritz!Box firmware.";
-            return "ERROR: 'set ... alarm' is not supported by the limited interfaces of your Fritz!Box firmware.";
-         }
-
-         return FRITZBOX_Set_Alarm_Web ($hash, @val) unless $forceShell;
-         return FRITZBOX_Set_Alarm_Shell ($hash, @val);
-      }
-
-   }
+#   if ( lc $cmd eq 'alarm') {
+#      if ( int @val > 0 && $val[0] =~ /^(1|2|3)$/ ) {
+#         FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd ".join(" ", @val);
+#      }
+#
+#   }
 # set call
-   elsif ( lc $cmd eq 'call') {
-      if (int @val > 0) {
-         FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd ".join(" ", @val);
+   if ( lc $cmd eq 'call' && $mesh eq "master") {
+      if (int @val >= 0 && int @val <= 2) {
+         FRITZBOX_Log $hash, 3, "DEBUG: set $name $cmd ".join(" ", @val);
          push @cmdBuffer, "call ".join(" ", @val);
          return FRITZBOX_Set_Cmd_Start $hash->{helper}{TimerCmd};
-      }
+      }         
+
    # } elsif ( lc $cmd eq 'convertmoh') {
       # if (int @val > 0)
       # {
@@ -555,37 +556,57 @@ sub FRITZBOX_Set($$@)
       FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
       $hash->{fhem}{LOCAL} = 0;
       return undef;
-   }
-   elsif ( lc $cmd eq 'customerringtone') {
-      if (int @val > 0)
-      {
-         FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd ".join(" ", @val);
-         return FRITZBOX_SetCustomerRingTone ($hash, @val);
-      }
+#   }
+#   elsif ( lc $cmd eq 'customerringtone') {
+#      if (int @val > 0)
+#      {
+#         FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd ".join(" ", @val);
+#      }
 
    }
-   elsif ( lc $cmd eq 'dect') {
+   elsif ( lc $cmd eq 'dect' && $mesh eq "master") {
       if (int @val == 1 && $val[0] =~ /^(on|off)$/) {
          FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd ".join(" ", @val);
-         my $state = $val[0];
-         $state =~ s/on/1/;
-         $state =~ s/off/0/;
-         if ($forceShell) { # Shell
-            FRITZBOX_Shell_Exec( $hash, "ctlmgr_ctl w dect settings/enabled $state");
-         } else { #webcm
-            my @webCmdArray = ( ["dect:settings/enabled" => $state] );
-            unless ($hash->{WEBCM}==1) {
-               FRITZBOX_Log $hash, 2, "'set ... dect' is not supported by the limited interfaces of your Fritz!Box firmware.";
-               return "ERROR: 'set ... dect' is not supported by the limited interfaces of your Fritz!Box firmware.";
-            }
-            FRITZBOX_Web_CmdPost ($hash, \@webCmdArray);
+
+         if ($hash->{LUADATA}==1) {
+           # xhr 1 activateDect off apply nop lang de page dectSet
+
+           my @webCmdArray;
+           my $returnStr;
+
+           push @webCmdArray, "xhr"            => "1";
+           push @webCmdArray, "activateDect"   => $val[0];
+           push @webCmdArray, "apply"          => "";
+           push @webCmdArray, "lang"           => "de";
+           push @webCmdArray, "page"           => "dectSet";
+
+           FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd \n" . join(" ", @webCmdArray);
+
+           my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+
+           my $tmp;
+           if (defined $result->{Error} ) {
+             $tmp = "ERROR: " . $result->{Error};
+             FRITZBOX_Log $hash, 2, "ERROR: dectringblock " . $val[0] . " - " . $tmp;
+           } elsif (defined $result->{sid} ) {
+             if (defined $result->{data}->{vars}->{dectEnabled}) {
+               readingsSingleUpdate($hash,"box_dect",$val[0], 1);
+               $tmp = $result->{data}->{vars}->{dectEnabled} ? "DECT aktiv" : "DECT inaktiv";
+               return $tmp;
+             } else {
+               $tmp = $result->{sid};
+             }
+           } else {
+             $tmp = "Unexpected result: " . Dumper ($result);
+           }
+           return $tmp;
+
          }
 
-         readingsSingleUpdate($hash,"box_dect",$val[0], 1);
-         return undef;
+         return "ERROR: data.lua not available";
       }
    }
-   elsif ( lc $cmd eq 'diversity') {
+   elsif ( lc $cmd eq 'diversity' && $mesh eq "master") {
       if ( int @val == 2 && $val[1] =~ /^(on|off)$/ ) {
          FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd ".join(" ", @val);
          unless (defined $hash->{READINGS}{"diversity".$val[0]}) {
@@ -596,14 +617,8 @@ sub FRITZBOX_Set($$@)
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
-         if ($forceShell) { # Shell
-            FRITZBOX_Shell_Exec( $hash, "ctlmgr_ctl w telcfg settings/Diversity".( $val[0] - 1 )."/Active ".$state );
-         }
-         elsif ( $hash->{WEBCM}==1 ) { #webcm
-            my @webCmdArray = ( ["telcfg:settings/Diversity".( $val[0] - 1 )."/Active " => $state] );
-            FRITZBOX_Web_CmdPost ($hash, \@webCmdArray);
-         }
-         elsif ( $hash->{TR064}==1 ) { #tr064
+
+         if ( $hash->{TR064}==1 ) { #tr064
             my @tr064CmdArray = (["X_AVM-DE_OnTel:1", "x_contact", "SetDeflectionEnable", "NewDeflectionId", $val[0] - 1, "NewEnable", $state] );
             FRITZBOX_TR064_Cmd ($hash, 0, \@tr064CmdArray);
          }
@@ -615,7 +630,7 @@ sub FRITZBOX_Set($$@)
          return undef;
       }
    }
-   elsif ( lc $cmd eq 'dectringblock') {
+   elsif ( lc $cmd eq 'dectringblock' && $mesh eq "master") {
       my @fwV = split(/\./, ReadingsVal($name, "box_fwVersion", "0.0.0.error"));
 
       my $FW1 = substr($fwV[1],0,2);
@@ -695,42 +710,25 @@ sub FRITZBOX_Set($$@)
 
       if ($val[1] eq "on") {
         push @webCmdArray, "lockmode"     => $lm_OnOff;
-	push @webCmdArray, "nightsetting" => "1";
-  	push @webCmdArray, "lockday"      => "everyday";
-	push @webCmdArray, "starthh"      => $start_hh;
-	push @webCmdArray, "startmm"      => $start_mm;
-	push @webCmdArray, "endhh"        => $end_hh;
-	push @webCmdArray, "endmm"        => $end_mm;
+        push @webCmdArray, "nightsetting" => "1";
+        push @webCmdArray, "lockday"      => "everyday";
+        push @webCmdArray, "starthh"      => $start_hh;
+        push @webCmdArray, "startmm"      => $start_mm;
+        push @webCmdArray, "endhh"        => $end_hh;
+        push @webCmdArray, "endmm"        => $end_mm;
 
-	$queryStr .= "'lockmode'     => '" . $lm_OnOff . "'\n";
-	$queryStr .= "'nightsetting' => '1'\n";
-	$queryStr .= "'lockday'      => 'everyday'\n";
-	$queryStr .= "'starthh'      => '" . $start_hh . "'\n";
-	$queryStr .= "'startmm'      => '" . $start_mm . "'\n";
-	$queryStr .= "'endhh'        => '" . $end_hh . "'\n";
-	$queryStr .= "'endmm'        => '" . $end_mm . "'\n";
       } elsif ( lc($val[1]) =~ /^(ed|wd|we)$/ ) {
-	push @webCmdArray, "lockmode"     => $lm_OnOff;
+        push @webCmdArray, "lockmode"     => $lm_OnOff;
         push @webCmdArray, "event"        => "on" if( $kl_OnOff eq "on");
-	push @webCmdArray, "nightsetting" => "1";
-  	push @webCmdArray, "lockday"      => "everyday" if( lc($val[1]) eq "ed");
-  	push @webCmdArray, "lockday"      => "workday" if( lc($val[1]) eq "wd");
-  	push @webCmdArray, "lockday"      => "weekend" if( lc($val[1]) eq "we");
-	push @webCmdArray, "starthh"      => $start_hh;
-	push @webCmdArray, "startmm"      => $start_mm;
-	push @webCmdArray, "endhh"        => $end_hh;
-	push @webCmdArray, "endmm"        => $end_mm;
+        push @webCmdArray, "nightsetting" => "1";
+        push @webCmdArray, "lockday"      => "everyday" if( lc($val[1]) eq "ed");
+        push @webCmdArray, "lockday"      => "workday" if( lc($val[1]) eq "wd");
+        push @webCmdArray, "lockday"      => "weekend" if( lc($val[1]) eq "we");
+        push @webCmdArray, "starthh"      => $start_hh;
+        push @webCmdArray, "startmm"      => $start_mm;
+        push @webCmdArray, "endhh"        => $end_hh;
+        push @webCmdArray, "endmm"        => $end_mm;
 
-	$queryStr .= "'lockmode'     => '" . $lm_OnOff . "'\n";
-        $queryStr .= "'event'        => 'on'\n" if( $kl_OnOff eq "on");
-	$queryStr .= "'nightsetting' => '1'\n";
-	$queryStr .= "'lockday'      => 'everyday'\n" if( lc($val[1]) eq "ed");
-	$queryStr .= "'lockday'      => 'workday'\n"  if( lc($val[1]) eq "wd");
-	$queryStr .= "'lockday'      => 'weekend'\n"  if( lc($val[1]) eq "we");
-	$queryStr .= "'starthh'      => '" . $start_hh . "'\n";
-	$queryStr .= "'startmm'      => '" . $start_mm . "'\n";
-	$queryStr .= "'endhh'        => '" . $end_hh . "'\n";
-	$queryStr .= "'endmm'        => '" . $end_mm . "'\n";
       }
 
       push @webCmdArray, "idx"   => substr($val[0], 4);
@@ -738,14 +736,7 @@ sub FRITZBOX_Set($$@)
       push @webCmdArray, "lang"  => "de";
       push @webCmdArray, "page"  => "edit_dect_ring_block";
 
-      $queryStr .= "'idx'   => '" . substr($val[0], 4) . "'\n";
-      $queryStr .= "'apply' => ''\n";
-      $queryStr .= "'lang'  => 'de'\n";
-      $queryStr .= "'page'  => 'edit_dect_ring_block'\n";
-
-      FRITZBOX_Log $hash, 4, "INFO: set $name $cmd \n" . join(" ", @webCmdArray);
-
-      FRITZBOX_Log $hash, 5, "DEBUG: get $name $cmd \n" . $queryStr;
+      FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd \n" . join(" ", @webCmdArray);
 
       my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
 
@@ -768,7 +759,7 @@ sub FRITZBOX_Set($$@)
       return $tmp;
 
    }
-   elsif ( lc $cmd eq 'switchipv4dns') {
+   elsif ( lc $cmd eq 'switchipv4dns' && $mesh eq "master") {
 
       if (int @val == 1 && $val[0] =~ /^(provider|other)$/) {
          my @fwV = split(/\./, ReadingsVal($name, "box_fwVersion", "0.0.0.error"));
@@ -867,7 +858,7 @@ sub FRITZBOX_Set($$@)
       }
 
    }
-   elsif ( lc $cmd eq 'enablevpnshare') {
+   elsif ( lc $cmd eq 'enablevpnshare' && $mesh eq "master") {
 
       if ( int @val == 2 && $val[1] =~ /^(on|off)$/ ) {
          my @fwV = split(/\./, ReadingsVal($name, "box_fwVersion", "0.0.0.error"));
@@ -907,7 +898,7 @@ sub FRITZBOX_Set($$@)
       }
 
    }
-   elsif ( lc $cmd eq 'macfilter') {
+   elsif ( lc $cmd eq 'macfilter' && $mesh eq "master") {
 
       if ( int @val == 1 && $val[0] =~ /^(on|off)$/ ) {
 
@@ -921,7 +912,7 @@ sub FRITZBOX_Set($$@)
       }
 
    }
-   elsif ( lc $cmd eq 'locklandevice') {
+   elsif ( lc $cmd eq 'locklandevice' && $mesh eq "master") {
 
       if (int @val == 2) {
 
@@ -939,7 +930,7 @@ sub FRITZBOX_Set($$@)
       }
 
    }
-   elsif ( lc $cmd eq 'chgprofile') {
+   elsif ( lc $cmd eq 'chgprofile' && $mesh eq "master") {
 
       if(int @val == 2) {
 
@@ -965,22 +956,12 @@ sub FRITZBOX_Set($$@)
          return FRITZBOX_Set_Cmd_Start $hash->{helper}{TimerCmd};
       }
    }
-   elsif ( lc $cmd eq 'moh') {
-      if (int @val > 0)
-      {
-         FRITZBOX_Log $hash, 4, "INFO: set $name $cmd ".join(" ", @val);
-         $resultStr = FRITZBOX_SetMOH $hash, @val;
-         if ($resultStr =~ /^[012]$/ )
-         {
-            readingsSingleUpdate($hash,"box_guestWlan",$mohtype{$resultStr}, 1);
-            return undef;
-         }
-         else
-         {
-            return $resultStr;
-         }
-      }
-   }
+#   elsif ( lc $cmd eq 'moh' && $mesh eq "master") {
+#      if (int @val > 0)
+#      {
+#         FRITZBOX_Log $hash, 4, "INFO: set $name $cmd ".join(" ", @val);
+#      }
+#   }
 # set password
    elsif ( lc $cmd eq 'password') {
       if (int @val == 1)
@@ -989,45 +970,36 @@ sub FRITZBOX_Set($$@)
       }
    }
 #set Ring
-   elsif ( lc $cmd eq 'ring') {
+   elsif ( lc $cmd eq 'ring' && $mesh eq "master") {
       if (int @val > 0) {
          FRITZBOX_Log $hash, 4, "INFO: set $name $cmd ".join(" ", @val);
          push @cmdBuffer, "ring ".join(" ", @val);
          return FRITZBOX_Set_Cmd_Start $hash->{helper}{TimerCmd};
       }
+#   }
+#   elsif ( lc $cmd eq 'sendmail') {
+#      FRITZBOX_Log $hash, 4, "INFO: set $name $cmd ".join(" ", @val);
+#      return "'set ... sendMail' is not supported by the limited interfaces of your Fritz!Box firmware."
+#         unless $hash->{TELNET}==1;
+#      FRITZBOX_SendMail_Shell $hash, @val;
+#      return undef;
+#   }
+#   elsif ( lc $cmd eq 'startradio') {
+#      if (int @val > 0) {
+#         FRITZBOX_Log $hash, 4, "INFO: set $name $cmd ".join(" ", @val);
+#         return FRITZBOX_StartRadio_Web $hash, @val;
+#      }
    }
-   elsif ( lc $cmd eq 'sendmail') {
-      FRITZBOX_Log $hash, 4, "INFO: set $name $cmd ".join(" ", @val);
-      return "'set ... sendMail' is not supported by the limited interfaces of your Fritz!Box firmware."
-         unless $hash->{TELNET}==1;
-      FRITZBOX_SendMail_Shell $hash, @val;
-      return undef;
-   }
-   elsif ( lc $cmd eq 'startradio') {
-      if (int @val > 0) {
-         FRITZBOX_Log $hash, 4, "INFO: set $name $cmd ".join(" ", @val);
-         return "'set ... startRadio' is not supported by the limited interfaces of your Fritz!Box firmware."
-            unless $hash->{WEBCM}==1 || $forceShell;
-         return FRITZBOX_StartRadio_Web $hash, @val unless $forceShell;
-         return FRITZBOX_StartRadio_Shell $hash, @val;
-      }
-   }
-   elsif ( lc $cmd eq 'tam') {
+   elsif ( lc $cmd eq 'tam' && $mesh eq "master") {
       if ( int @val == 2 && defined( $hash->{READINGS}{"tam".$val[0]} ) && $val[1] =~ /^(on|off)$/ ) {
          FRITZBOX_Log $hash, 4, "INFO: set $name $cmd ".join(" ", @val);
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
-         if ($forceShell) { # Shell
-            FRITZBOX_Shell_Exec( $hash, "ctlmgr_ctl w tam settings/TAM".( $val[0] - 1 )."/Active ".$state );
-         }
-         elsif ($hash->{SECPORT}) { #TR-064
+
+         if ($hash->{SECPORT}) { #TR-064
             my @tr064CmdArray = (["X_AVM-DE_TAM:1", "x_tam", "SetEnable", "NewIndex", $val[0] - 1 , "NewEnable", $state]);
             FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-         }
-         else { #webcm
-            my @webCmdArray = ( ["tam:settings/TAM".( $val[0] - 1 )."/Active" => $state] );
-            FRITZBOX_Web_CmdPost ($hash, \@webCmdArray);
          }
 
          readingsSingleUpdate($hash,"tam".$val[0]."_state",$val[1], 1);
@@ -1074,7 +1046,7 @@ sub FRITZBOX_Get($@)
    my ($hash, $name, $cmd, @val) = @_;
    my $returnStr;
 
-   if( lc $cmd eq "luaquery" && AttrVal( $name, "allowTR064Command", 0 ) && defined $hash->{SECPORT}) {
+   if( lc $cmd eq "luaquery" && $hash->{LUAQUERY}) {
    # get Fritzbox luaQuery inetstat:status/Today/BytesReceivedLow
    # get Fritzbox luaQuery telcfg:settings/AlarmClock/list(Name,Active,Time,Number,Weekdays)
       FRITZBOX_Log $hash, 4, "INFO: get $name $cmd ".join(" ", @val);
@@ -1091,7 +1063,7 @@ sub FRITZBOX_Get($@)
 
       return $returnStr . $tmp;
 
-   } elsif( lc $cmd eq "luafunction" && AttrVal( $name, "allowTR064Command", 0 ) && defined $hash->{SECPORT}) {
+   } elsif( lc $cmd eq "luafunction" && $hash->{LUAQUERY}) {
       FRITZBOX_Log $hash, 4, "INFO: get $name $cmd ".join(" ", @val);
 
       return "Wrong number of arguments, usage: get $name luaQuery <query>" if int @val !=1;
@@ -1106,7 +1078,7 @@ sub FRITZBOX_Get($@)
 
       return $returnStr . $tmp;
 
-   } elsif( lc $cmd eq "luadata" && AttrVal( $name, "allowTR064Command", 0 ) && defined $hash->{SECPORT}) {
+   } elsif( lc $cmd eq "luadata" && $hash->{LUADATA}) {
       FRITZBOX_Log $hash, 4, "INFO: get $name $cmd [" . int(@val) . "] " . join(" ", @val);
 
       return "Wrong number of arguments, usage: get $name argName1 argValue1 [argName2 argValue2] ..." if int @val < 2 || int(@val) %2 == 1;
@@ -1134,7 +1106,7 @@ sub FRITZBOX_Get($@)
 
       return $returnStr . $tmp;
 
-   } elsif( lc $cmd eq "landeviceinfo" && AttrVal( $name, "allowTR064Command", 0 ) && defined $hash->{SECPORT})  {
+   } elsif( lc $cmd eq "landeviceinfo" && $hash->{LUADATA})  {
 
       return "Wrong number of arguments, usage: get $name argName1 argValue1" if int @val != 1;
 
@@ -1144,7 +1116,7 @@ sub FRITZBOX_Get($@)
 
       return FRITZBOX_Lan_Device_Info( $hash, $erg, "info");
 
-   } elsif( lc $cmd eq "luainfo"  && AttrVal( $name, "allowTR064Command", 0 ) && defined $hash->{SECPORT})  {
+   } elsif( lc $cmd eq "luainfo")  {
       my @fwV = split(/\./, ReadingsVal($name, "box_fwVersion", "0.0.0.error"));
 
       my $FW1 = substr($fwV[1],0,2);
@@ -1163,37 +1135,35 @@ sub FRITZBOX_Get($@)
 
       my $avmModel = InternalVal($name, "MODEL", "FRITZ!Box");
 
-      if ( $val[0] eq "lanDevices") {
+      if ( $val[0] eq "lanDevices" && $hash->{LUADATA}) {
         $returnStr = FRITZBOX_Lan_Devices_List($hash);
-      } elsif ( $val[0] eq "vpnShares") {
+
+      } elsif ( $val[0] eq "vpnShares" && $hash->{LUADATA}) {
         $returnStr = FRITZBOX_VPN_Shares_List($hash);
-      } elsif ( $val[0] eq "kidProfiles") {
+
+      } elsif ( $val[0] eq "kidProfiles" && $hash->{LUAQUERY}) {
         $returnStr = FRITZBOX_Kid_Profiles_List($hash);
-      } elsif ( $val[0] eq "userInfos") {
+
+      } elsif ( $val[0] eq "userInfos" && $hash->{LUAQUERY}) {
         $returnStr = FRITZBOX_User_Info_List($hash);
-      } elsif ( $val[0] eq "wlanNeighborhood") {
+
+      } elsif ( $val[0] eq "wlanNeighborhood" && $hash->{LUADATA}) {
         $returnStr = FRITZBOX_WLAN_Environment($hash);
-      } elsif ( $val[0] eq "docsisInformation" && ($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]")) {
+
+      } elsif ( $val[0] eq "docsisInformation" && $hash->{LUADATA} && ($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]")) {
         $returnStr = FRITZBOX_DOCSIS_Informations($hash);
       }
 
       return $returnStr;
 
-   } elsif( lc $cmd eq "ringtones" ) {
-      FRITZBOX_Log $hash, 4, "INFO: get $name $cmd ".join(" ", @val);
-      $returnStr  = "Ring tones to use with 'set <name> ring <intern> <duration> <ringTone>'\n";
-      $returnStr .= "----------------------------------------------------------------------\n";
-      $returnStr .= join "\n", sort values %ringTone;
-      return $returnStr;
-
-   } elsif( lc $cmd eq "shellcommand" && int @val && AttrVal( $name, "allowShellCommand", 0 ) ) {
-      FRITZBOX_Log $hash, 4, "INFO: get $name $cmd ".join(" ", @val);
-      return "'get ... shellcommand' is not supported by the limited interfaces of your Fritz!Box firmware."
-      unless $hash->{TELNET}==1;
-      my $shCmd = join " ", @val;
-      return FRITZBOX_Shell_Exec( $hash, $shCmd );
-
-   } elsif( lc $cmd eq "tr064command" && AttrVal( $name, "allowTR064Command", 0 ) ) {
+#   } elsif( lc $cmd eq "ringtones" ) {
+#      FRITZBOX_Log $hash, 4, "INFO: get $name $cmd ".join(" ", @val);
+#      $returnStr  = "Ring tones to use with 'set <name> ring <intern> <duration> <ringTone>'\n";
+#      $returnStr .= "----------------------------------------------------------------------\n";
+#      $returnStr .= join "\n", sort values %ringTone;
+#      return $returnStr;
+#
+   } elsif( lc $cmd eq "tr064command" && defined $hash->{SECPORT}) {
 # http://fritz.box:49000/tr64desc.xml
 #get Fritzbox tr064command DeviceInfo:1 deviceinfo GetInfo
 #get Fritzbox tr064command X_VoIP:1 x_voip X_AVM-DE_GetPhonePort NewIndex 1
@@ -1227,25 +1197,30 @@ sub FRITZBOX_Get($@)
       $returnStr .= $tmp;
       return $returnStr;
 
-   } elsif( lc $cmd eq "tr064servicelist" ) {
+   } elsif( lc $cmd eq "tr064servicelist" && defined $hash->{SECPORT}) {
       return FRITZBOX_TR064_Get_ServiceList ($hash);
    }
 
    my $avmModel = InternalVal($name, "MODEL", "FRITZ!Box");
+   my $mesh = ReadingsVal($name, "box_meshRole", "master");
+
    my $list;
-   $list .= "luaQuery"                if AttrVal( $name, "allowTR064Command", 0 );
-   $list .= " luaData"                if AttrVal( $name, "allowTR064Command", 0 );
-   $list .= " luaFunction"            if AttrVal( $name, "allowTR064Command", 0 );
-   $list .= " luaInfo:lanDevices,vpnShares,kidProfiles,userInfos,wlanNeighborhood" if AttrVal( $name, "allowTR064Command", 0 );
-   $list .= ",docsisInformation"  if AttrVal( $name, "allowTR064Command", 0 ) && ($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]");
+   $list .= "luaQuery"                if $hash->{LUAQUERY};
+   $list .= " luaData"                if $hash->{LUADATA};
+   $list .= " luaFunction"            if $hash->{LUAQUERY};
 
-   $list .= " lanDeviceInfo"          if AttrVal( $name, "allowTR064Command", 0 );
+   # luaData
+   $list .= " luaInfo:" if $hash->{LUADATA} || $hash->{LUAQUERY};
+   $list .= "lanDevices,vpnShares,wlanNeighborhood" if $hash->{LUADATA};
+   $list .= ",kidProfiles,userInfos" if $hash->{LUAQUERY};
+   $list .= ",docsisInformation" if $hash->{LUADATA} && ($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]");
 
-   $list .= " tr064Command"           if AttrVal( $name, "allowTR064Command", 0 ) && defined $hash->{SECPORT};;
-   $list .= " tr064ServiceList:noArg" if AttrVal( $name, "allowTR064Command", 0 );
+   $list .= " lanDeviceInfo"          if $hash->{LUADATA};
 
-   $list .= " ringTones:noArg";
-   $list .= " shellCommand"           if AttrVal( $name, "allowShellCommand", 0 ) && $hash->{TELNET}==1;
+   $list .= " tr064Command"           if defined $hash->{SECPORT};
+   $list .= " tr064ServiceList:noArg" if defined $hash->{SECPORT};
+
+#   $list .= " ringTones:noArg";
 
    return "Unknown argument $cmd, choose one of $list";
 
@@ -1368,7 +1343,6 @@ sub FRITZBOX_Readout_Start($)
 # Run shell or web api, restrict interval
    else {
       $runFn = "FRITZBOX_Readout_Run_Web";
-      $runFn = "FRITZBOX_Readout_Run_Shell"     if AttrVal( $name, "forceTelnetConnection",  0 ) == 1 || $hash->{REMOTE} == 0;
    }
 
    if( $interval != 0 ) {
@@ -1381,7 +1355,6 @@ sub FRITZBOX_Readout_Start($)
       FRITZBOX_Log $hash, 4, "INFO: Old readout process still running. Killing old process ".$hash->{helper}{READOUT_RUNNING_PID};
       BlockingKill( $hash->{helper}{READOUT_RUNNING_PID} );
       # stop FHEM, giving a FritzBox some time to free the memory
-      sleep 5     unless $hash->{REMOTE}==1;
       delete( $hash->{helper}{READOUT_RUNNING_PID} );
    }
 
@@ -1411,37 +1384,18 @@ sub FRITZBOX_API_Check_Run($)
    my $startTime = time();
 
    my $host = $hash->{HOST};
+   my $boxUser = AttrVal( $name, "boxUser", "" );
 
-# if no FritzBoxIP is set, check if FHEM runs on a FritzBox under root user
-#    # unless (qx ( [ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0 ))
-#   if ( $host =~ /undefined|local/ ) {
-#      # set default host
-#      $host = "fritz.box";
-#      if ( -X "/usr/bin/ctlmgr_ctl" ) {
-#         if ( $< != 0 ) {
-#            FRITZBOX_Log $hash, 3, "INFO: Fhem is running on a Fritz!Box but not as 'root' user (currently " .
-#                                    ( getpwuid( $< ) )[ 0 ] . "). Cannot run in local mode.";
-#         }
-#         else {
-#            $fritzShell = 1;
-#            $host = "local"; # mark as local host
-#            FRITZBOX_Log $hash, 3, "INFO: Fhem is running on a Fritz!Box as 'root' user.";
-#         }
-#      }
-#   }
+   if ( $host =~ /undefined/ ) {
+     my $tmp = "fritzBoxIP";
+        $tmp .= ", boxUser" if $boxUser eq "";
+        $tmp .= " nicht definiert";
+
+     FRITZBOX_Log $hash, 2, "INFO: " . $hash->{HINWEIS};
+   }
 
 # change host name if necessary
    FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "->HOST", $host) if $host ne $hash->{HOST};
-
-# Determine local or remote mode
-#   if ($fritzShell) {
-#      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->REMOTE", 0;
-#      FRITZBOX_Log $hash, 3, "INFO: FRITZBOX modul runs in local mode.";
-#   }
-#   else {
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->REMOTE", 1;
-      FRITZBOX_Log $hash, 3, "INFO: FRITZBOX modul runs in remote mode.";
-#   }
 
 # Check if perl modules for remote APIs exists
    if ($missingModulWeb) {
@@ -1450,19 +1404,6 @@ sub FRITZBOX_API_Check_Run($)
 # Check for remote APIs
    else {
       my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
-
-#   # Check if webcm exists
-#      $response = $agent->get( "http://".$host."/cgi-bin/webcm" );
-#
-#      if ($response->is_success) {
-#         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WEBCM", 1;
-#         FRITZBOX_Log $hash, 3, "INFO: API webcm found (".$response->code.").";
-#      }
-#      else {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WEBCM", 0;
-         FRITZBOX_Log $hash, 4, "DEBUG: API webcm does not exist ( disabled in source )";
-#         FRITZBOX_Log $hash, 4, "DEBUG: API webcm does not exist (".$response->status_line.")";
-#      }
 
    # Check if query.lua exists
       $response = $agent->get( "http://".$host."/query.lua" );
@@ -1583,12 +1524,15 @@ sub FRITZBOX_API_Check_Run($)
 
       $response = $agent->get( $url );
       my $content  = $response->content;
+      my $fwVersion = "0.0.0.error";
+
       if ($content =~ /<j:Name>/) {
          FRITZBOX_Log $hash, 5, "DEBUG: jason_boxinfo returned: $content";
 
          FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1)     if $content =~ /<j:Name>(.*)<\/j:Name>/;
          FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
          FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1) if $content =~ /<j:Version>(.*)<\/j:Version>/ ;
+         $fwVersion = $1 if $content =~ /<j:Version>(.*)<\/j:Version>/ ;
 
       } else {
          # Ansonsten Box-Model per system_status einlesen
@@ -1618,30 +1562,13 @@ sub FRITZBOX_API_Check_Run($)
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $result[7];
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
+            $fwVersion = $result[7];
+
          } else {
             FRITZBOX_Log $hash, 2, "ERROR: " . $response->status_line;
          }
       }
    }
-
-# Check if telnet modul exists
-#   if ($missingModulTelnet) {
-#      FRITZBOX_Log $hash, 3, "INFO: Cannot check for telnet access because perl modul $missingModulTelnet is missing on this system.\n";
-#   }
-#   else {
-#      my $timeout = AttrVal( $name, "telnetTimeOut", "10");
-#      my $telnet = new Net::Telnet ( Host=>$host, Port => 23, Timeout=>$timeout, Errmode=>'return', Prompt=>'/# $/');
-#      if (!$telnet) {
-#         $telnet = undef;
-          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TELNET", 0;
-          FRITZBOX_Log $hash, 4, "DEBUG: No telnet connection available while disabled in source!";
-#      }
-#      else {
-#         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TELNET", 1;
-#         $telnet->close;
-#         FRITZBOX_Log $hash, 4, "INFO: Telnet connection availabel.";
-#      }
-#   }
 
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", 1;
 
@@ -1655,321 +1582,6 @@ sub FRITZBOX_API_Check_Run($)
 
 } #end FRITZBOX_API_Check_Run
 
-# Starts the data capturing via Telnet and sets the new timer
-#######################################################################
-sub FRITZBOX_Readout_Run_Shell($)
-{
-   my ($name) = @_;
-   my $hash = $defs{$name};
-
-   my $result;
-   my $rName;
-   my @cmdArray;
-   my @readoutCmdArray;
-   my $resultArray;
-   my @roReadings;
-   my %dectFonID;
-   my $i;
-   my $startTime = time();
-
-   my $slowRun = 0;
-   if ( int(time/3600) != $hash->{fhem}{lastHour} || $hash->{fhem}{LOCAL} != 0) {
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->lastHour", int(time/3600);
-      $slowRun = 1;
-      FRITZBOX_Log $hash, 4, "INFO: Start update of slow changing device readings.";
-   }
-   else {
-      FRITZBOX_Log $hash, 4, "INFO: Start update of fast changing device readings.";
-   }
-
-   my $returnStr;
-
-   $result = FRITZBOX_Telnet_OpenCon( $hash );
-   return $name."|".encode_base64("Error|$result","")
-      if $result;
-
-   my @reading_list = split(/\,/, AttrVal($name, "disableBoxReadings", "none"));
-
-   if ($slowRun == 1) {
-
-     # Init and Counters
-      push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol" ];
-      push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol/User/count" ];
-      push @readoutCmdArray, ["", "ctlmgr_ctl r dect settings/Handset/count" ];
-      push @readoutCmdArray, ["fhem->radioCount", "ctlmgr_ctl r configd settings/WEBRADIO/count" ];
-      push @readoutCmdArray, ["", "ctlmgr_ctl r user settings/user/count" ];
-      push @readoutCmdArray, ["", 'echo $CONFIG_AB_COUNT'];
-      push @readoutCmdArray, ["", "ctlmgr_ctl r landevice settings/landevice/count" ];
-      push @readoutCmdArray, ["", "ctlmgr_ctl r tam settings/TAM/count" ];
-      push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/RefreshDiversity" ];
-      push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/Diversity/count" ];
-
-   # Box Features
-      push @readoutCmdArray, [ "fhem->is_double_wlan", "ctlmgr_ctl r wlan settings/feature_flags/DBDC", "01" ];
-
-   # Box model and firmware and uptime
-      push @readoutCmdArray, [ "box_model", 'echo $CONFIG_PRODUKT_NAME' ]; # unless(grep { /^(box_model)$/ } @reading_list);
-      push @readoutCmdArray, [ "box_oem", 'echo $OEM' ]; # unless(grep { /^(box_oem)$/ } @reading_list);
-      push @readoutCmdArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver" ];
-      push @readoutCmdArray, [ "box_fwUpdate", "ctlmgr_ctl r updatecheck status/update_available_hint" ]; #unless(grep { /^(box_fwUpdate)$/ } @reading_list);
-      push @readoutCmdArray, [ "box_tr069", "ctlmgr_ctl r tr069 settings/enabled", "onoff" ]; #unless(grep { /^(box_tr069)$/ } @reading_list);
-      push @readoutCmdArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver" ]; #unless(grep { /^(box_fwVersion)$/ } @reading_list);
-      push @readoutCmdArray, [ "box_uptimeHours", "ctlmgr_ctl r logic status/uptime_hours" ]; #unless(grep { /^(box_uptime)$/ } @reading_list);
-      push @readoutCmdArray, [ "box_uptimeMinutes", "ctlmgr_ctl r logic status/uptime_minutes" ]; #unless(grep { /^(box_uptime)$/ } @reading_list);
-
-
-   # Execute commands
-      $resultArray = FRITZBOX_Shell_Query( $hash, \@readoutCmdArray, \@roReadings);
-
-      return $name."|".encode_base64("Error|No STDOUT from shell command.","")
-         unless defined $resultArray;
-
-      my $dectCount = $resultArray->[1];
-      $dectCount = 1 unless $dectCount=~ /\d/;
-      $dectCount--;
-      my $handsetCount = $resultArray->[2];
-      $handsetCount = 1 unless $dectCount=~ /\d/;
-      $handsetCount--;
-      my $radioCount = $resultArray->[3];
-      $radioCount = 0 unless $radioCount=~ /\d/;
-      my $userCount = $resultArray->[4];
-      my $fonCount = $resultArray->[5];
-      my $lanDeviceCount = $resultArray->[6];
-      my $tamCount = $resultArray->[7];
-      my $divCount = $resultArray->[9];
-
-
-   # Internetradioliste erzeugen
-      $i = 0;
-      $rName = "radio00";
-      while ( $i<$radioCount || defined $hash->{READINGS}{$rName} )
-      {
-         push @readoutCmdArray, [ $rName, "ctlmgr_ctl r configd settings/WEBRADIO".$i."/Name" ];
-         $i++;
-         $rName = sprintf ("radio%02d",$i);
-      }
-
-      $resultArray = FRITZBOX_Shell_Query( $hash, \@readoutCmdArray, \@roReadings );
-
-      my @radio = ();
-      for (0..$radioCount-1)
-      {
-         if ($resultArray->[$_] ne "")
-         {
-            $radio[$_] = $resultArray->[$_];
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->radio->".$_, $resultArray->[$_];
-         }
-      }
-
-   # LanDevice-Liste erzeugen
-      if ($lanDeviceCount > 0 )
-      {
-         for (0..$lanDeviceCount-1)
-         {
-            push @readoutCmdArray, [ "", "ctlmgr_ctl r landevice settings/landevice".$_."/ip" ];
-            push @readoutCmdArray, [ "", "ctlmgr_ctl r landevice settings/landevice".$_."/name" ];
-         }
-         $resultArray = FRITZBOX_Shell_Query( $hash, \@readoutCmdArray, \@roReadings );
-
-         %landevice = ();
-         for (0..$lanDeviceCount-1)
-         {
-            my $offset = 2 * $_;
-            my $dIp = $resultArray->[ $offset ];
-            my $dName = $resultArray->[ $offset +1];
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$dIp", $dName;
-            $landevice{$dIp}=$dName;
-         }
-      }
-
-# Dect Telefonnummern bestimmen
-      for (1..$dectCount)
-      {
-        # 0 Dect-Interne Nummer
-         push @readoutCmdArray, [ "dect".$_."_intern", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Intern" ];
-        # 1 Dect-Telefonname
-         push @readoutCmdArray, [ "dect".$_, "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Name" ];
-        # 2 Internal Ring Tone Name
-         push @readoutCmdArray, [ "dect".$_."_intRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/IntRingTone", "ringtone" ];
-        # 3 Alarm Ring Tone Name
-         push @readoutCmdArray, [ "dect".$_."_alarmRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/AlarmRingTone0", "ringtone" ];
-        # 4 Radio Name
-         push @readoutCmdArray, [ "dect".$_."_radio", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/RadioRingID", "radio" ];
-        # 5 Background image
-         push @readoutCmdArray, [ "dect".$_."_imagePath", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/ImagePath" ];
-        # 6 Customer Ring Tone
-         push @readoutCmdArray, [ "dect".$_."_custRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingTone" ];
-        # 7 Customer Ring Tone Name
-         push @readoutCmdArray, [ "dect".$_."_custRingToneName", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingToneName" ];
-        # 8 UserID
-         push @readoutCmdArray, [ "", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Id" ];
-      }
-      $resultArray = FRITZBOX_Shell_Query( $hash, \@readoutCmdArray, \@roReadings );
-
-      for (1..$dectCount)
-      {
-         my $offset = $_ * 9 - 9;
-         my $intern = $resultArray->[$offset];
-         my $ID = $resultArray->[ $offset + 8 ];
-         if ($intern)
-         {
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->name", $resultArray->[ $offset + 1 ];
-            $dectFonID{$ID}{User} = $_;
-            $dectFonID{$ID}{Intern} = $intern;
-         }
-      }
-
-# Assign data of DECT handset to DECT numbers
-      for (0..$handsetCount) {
-        # 0 Handset FonUser
-         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".$_."/User", "" ];
-        # 1 Handset manufacturer
-         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".$_."/Manufacturer" ];
-        # 2 Phone Model
-         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".$_."/Model", "model" ];
-        # 3 Firmware Version
-         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".$_."/FWVersion" ];
-      }
-      $resultArray = FRITZBOX_Shell_Query( $hash, \@readoutCmdArray, \@roReadings );
-
-   # Handset and DECT user can be in different orders
-      for (0..$handsetCount) {
-         my $offset = $_ * 4;
-         my $dectUserID = $resultArray->[$offset];
-         if ($dectUserID) {
-            my $dectUser = $dectFonID{$dectUserID}{User};
-            push @roReadings, "dect".$dectUser."_manufacturer|" . $resultArray->[ $offset + 1 ];
-            FRITZBOX_Log $hash, 5, "DEBUG: dect".$dectUser."_manufacturer: " . $resultArray->[ $offset + 1 ];
-            push @roReadings, "dect".$dectUser."_model|" . $resultArray->[ $offset + 2 ];
-            FRITZBOX_Log $hash, 5, "DEBUG: dect".$dectUser."_model: " . $resultArray->[ $offset + 2 ];
-            push @roReadings, "dect".$dectUser."_fwVersion|" . $resultArray->[ $offset + 3 ];
-            FRITZBOX_Log $hash, 5, "DEBUG: dect".$dectUser."_fwVersion: " . $resultArray->[ $offset + 3 ];
-            my $intern = $dectFonID{$dectUserID}{Intern};
-            push @roReadings, "fhem->$intern->brand|" . $resultArray->[ $offset + 1 ];
-            push @roReadings, "fhem->$intern->model|" . $resultArray->[ $offset + 2 ];;
-         }
-      }
-
-   # Analog Fons Name
-      for (1..$fonCount) {
-         push @readoutCmdArray, ["fon".$_, "ctlmgr_ctl r telcfg settings/MSN/Port".($_-1)."/Name" ];
-         push @readoutCmdArray, ["fon".$_."_out", "ctlmgr_ctl r telcfg settings/MSN/Port".($_-1)."/MSN" ];
-      }
-      $resultArray = FRITZBOX_Shell_Query( $hash, \@readoutCmdArray, \@roReadings );
-
-   # Number of analog Fons
-      for (1..$fonCount) {
-         push @roReadings, "fon".$_."_intern|".$_
-            if $resultArray->[($_-1)*2];
-      }
-
-# Prepare new command array
-   # Check if TAM is displayed
-      for (0..$tamCount-1) {
-         push @readoutCmdArray, [ "", "ctlmgr_ctl r tam settings/TAM".$_."/Display" ];
-      }
-   # Check if user (parent control) is not completely blocked
-      for (0..$userCount-1)
-      {
-         push @readoutCmdArray, ["", "ctlmgr_ctl r user settings/user".$_."/filter_profile_UID" ];
-      }
-   #!!! Execute commands !!!
-      $resultArray = FRITZBOX_Shell_Query( $hash, \@readoutCmdArray, \@roReadings );
-
-
-# Prepare new command array
-   #Get TAM readings
-      for (0..$tamCount-1) {
-         $rName = "tam".($_+1);
-         if ($resultArray->[$_] eq "1" || defined $hash->{READINGS}{$rName} )
-         {
-            push @readoutCmdArray, [ $rName, "ctlmgr_ctl r tam settings/TAM". $_ ."/Name" ];
-            push @readoutCmdArray, [ $rName."_state", "ctlmgr_ctl r tam settings/TAM".$_."/Active", "onoff" ];
-            push @readoutCmdArray, [ $rName."_newMsg", "ctlmgr_ctl r tam settings/TAM".$_."/NumNewMessages" ];
-            push @readoutCmdArray, [ $rName."_oldMsg", "ctlmgr_ctl r tam settings/TAM".$_."/NumOldMessages" ];
-         }
-      }
-
-   # user profiles
-      $i=0;
-      $rName = "user01";
-      while ($i<$userCount || defined $hash->{READINGS}{$rName})
-      {
-   # do not show data for unlimited, blocked or default access rights
-         if ($resultArray->[$i+$tamCount] !~ /^filtprof[134]$/ || defined $hash->{READINGS}{$rName} )
-         {
-            push @readoutCmdArray, [$rName, "ctlmgr_ctl r user settings/user".$i."/name", "deviceip" ];
-            push @readoutCmdArray, [$rName."_thisMonthTime", "ctlmgr_ctl r user settings/user".$i."/this_month_time", "secondsintime" ];
-            push @readoutCmdArray, [$rName."_todayTime", "ctlmgr_ctl r user settings/user".$i."/today_time", "secondsintime" ];
-            push @readoutCmdArray, [$rName."_todaySeconds", "ctlmgr_ctl r user settings/user".$i."/today_time" ];
-            push @readoutCmdArray, [$rName."_type", "ctlmgr_ctl r user settings/user".$i."/type", "usertype" ];
-         }
-         $i++;
-         $rName = sprintf ("user%02d",$i+1);
-      }
-
-   # Diversity
-      $i=0;
-      $rName = "diversity1";
-      while ( $i < $divCount || defined $hash->{READINGS}{$rName} )
-      {
-        # Diversity number
-         push @readoutCmdArray, [$rName, "ctlmgr_ctl r telcfg settings/Diversity".$i."/MSN" ];
-        # Diversity state
-         push @readoutCmdArray, [$rName."_state", "ctlmgr_ctl r telcfg settings/Diversity".$i."/Active", "onoff" ];
-        # Diversity destination
-         push @readoutCmdArray, [$rName."_dest", "ctlmgr_ctl r telcfg settings/Diversity".$i."/Destination"];
-         $i++;
-         $rName = "diversity".($i+1);
-      }
-
-   # !!! Execute commands !!!
-      FRITZBOX_Shell_Query( $hash, \@readoutCmdArray, \@roReadings );
-   }
-
-# WLAN
-   push @readoutCmdArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
-# 2nd WLAN
-   push @readoutCmdArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
-# MAC Filter
-   push @readoutCmdArray, [ "box_macFilter_active", "ctlmgr_ctl r wlan settings/is_macfilter_active", "onoff" ];
-# G�ste WLAN
-   push @readoutCmdArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
-   push @readoutCmdArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
-# Dect
-   push @readoutCmdArray, [ "box_dect", "ctlmgr_ctl r dect settings/enabled", "onoff" ];
-# Music on Hold
-   push @readoutCmdArray, [ "box_moh", "ctlmgr_ctl r telcfg settings/MOHType", "mohtype" ];
-# Power Rate
-   push @readoutCmdArray, [ "box_powerRate", "ctlmgr_ctl r power status/rate_sumact"];
-
-# Alarm clock
-   for (0..2)
-   {
-     # Alarm clock name
-      push @readoutCmdArray, ["alarm".($_+1), "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Name" ];
-     # Alarm clock state
-      push @readoutCmdArray, ["alarm".($_+1)."_state", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Active", "onoff" ];
-     # Alarm clock time
-      push @readoutCmdArray, ["alarm".($_+1)."_time", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Time", "altime" ];
-     # Alarm clock number
-      push @readoutCmdArray, ["alarm".($_+1)."_target", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Number", "alnumber" ];
-     # Alarm clock weekdays
-      push @readoutCmdArray, ["alarm".($_+1)."_wdays", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Weekdays", "aldays" ];
-   }
-
-   FRITZBOX_Shell_Query( $hash, \@readoutCmdArray, \@roReadings );
-
-   push @roReadings, "readoutTime|" . sprintf( "%.2f", time()-$startTime);
-   $returnStr .= join('|', @roReadings );
-
-   FRITZBOX_Telnet_CloseCon ( $hash );
-
-   FRITZBOX_Log $hash, 4, "INFO: Captured " . @roReadings . " values";
-   FRITZBOX_Log $hash, 5, "DEBUG: Handover to main process (".length ($returnStr)."): ".$returnStr;
-   return $name."|".encode_base64($returnStr,"");
-
-} # End FRITZBOX_Readout_Run_Shell
 
 # http://fritz.box/cgi-bin/webcm?wlan:settings/guest_ap_enabled=1&sid=
       # FRITZBOX_Log $hash, 3, "INFO: Web connection established with $sid";
@@ -2449,6 +2061,8 @@ sub FRITZBOX_Readout_Run_Web($)
       # iPad-Familie [landevice810] (WLAN: 142 / 72 Mbit/s RSSI: -53)
       my $deviceInfo = AttrVal($name, "deviceInfo", "_defDef_,name,[uid],(connection: speedcomma rssi)");
 
+      $deviceInfo =~ s/\n//g;
+
       $deviceInfo = "_noDefInf_,_defDef_,name,[uid],(connection: speedcomma rssi)" if $deviceInfo eq "_noDefInf_";
 
       my $noDefInf = $deviceInfo =~ /_noDefInf_/ ? 1 : 0; #_noDefInf_ 
@@ -2755,20 +2369,59 @@ sub FRITZBOX_Readout_Run_Web($)
 
 
 # informations depending on TR064 or data.lua
+   # Getting Mesh Information
+
+   my @webCmdArray;
+
+   if ( $FW1 >= 7 && $FW2 >= 21 && $hash->{LUADATA}) {
+
+     my %oldMeshDevice;
+
+     #$oldMeshDevice{box_meshRole} = $hash->{READINGS}{box_meshRole}{VAL} if defined $hash->{READINGS}{box_meshRole}{VAL};
+
+     # xhr 1 lang de page wlanmesh xhrId all
+     push @webCmdArray, "xhr"         => "1";
+     push @webCmdArray, "lang"        => "de";
+     push @webCmdArray, "page"        => "wlanmesh";
+     push @webCmdArray, "xhrId"       => "all";
+
+     my $resultMesh = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+     my $tmpMesh;
+
+     if(defined $resultMesh->{Error}) {
+       $tmpMesh = FRITZBOX_ERR_Result($hash, $resultMesh);
+       FRITZBOX_Log $hash, 3, "ERROR: " . $tmpMesh;
+     } else {
+
+       FRITZBOX_Log $hash, 5, "DEBUG: \n" . Dumper ($resultMesh->{data}->{vars});
+
+       if (defined $resultMesh->{data}->{vars}->{role}->{value}) {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_meshRole", $resultMesh->{data}->{vars}->{role}->{value};
+      #   delete $oldMeshDevice{box_meshRole} if exists $oldMeshDevice{box_meshRole};
+       }
+
+      # if ( $oldMeshDevice{box_meshRole} ne "inactive" ) {
+      #   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_meshRole", "inactive";
+      # } else {
+      #   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_meshRole", "";
+      # }
+     }
+   }
+
    # WLAN neighbors
 
    # "xhr 1 lang de page chan xhrId environment useajax 1;
 
-   if (AttrVal( $name, "enableWLANneighbors", "0")) {
+   if (AttrVal( $name, "enableWLANneighbors", "0") && $hash->{LUADATA}) {
      my $nbhPrefix = AttrVal( $name, "wlanNeighborsPrefix",  "nbh_" );
      my %oldWanDevice;
 
      #collect current mac-readings (to delete the ones that are inactive or disappeared)
      foreach (keys %{ $hash->{READINGS} }) {
-       $oldWanDevice{$_} = $hash->{READINGS}{$_}{VAL} if $_ =~ /^nbh_/ && defined $hash->{READINGS}{$_}{VAL};
+       $oldWanDevice{$_} = $hash->{READINGS}{$_}{VAL} if $_ =~ /^${nbhPrefix}/ && defined $hash->{READINGS}{$_}{VAL};
      }
 
-     my @webCmdArray;
+     @webCmdArray = ();
      push @webCmdArray, "xhr"         => "1";
      push @webCmdArray, "lang"        => "de";
      push @webCmdArray, "page"        => "chan";
@@ -2827,7 +2480,7 @@ sub FRITZBOX_Readout_Run_Web($)
    }
 
    # DOCSIS Informationen FB Cable
-   if (($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]") && ($FW1 >= 7) && ($FW2 >= 21) ) { # FB Cable
+   if (($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]") && ($FW1 >= 7) && ($FW2 >= 21) && $hash->{LUADATA}) { # FB Cable
 #   if (1==1) {
       my $tmpSIS;
       my $returnStr;
@@ -2992,7 +2645,7 @@ sub FRITZBOX_Readout_Run_Web($)
       }
    }
 
-   if ( AttrVal( $name, "allowTR064Command", 0 )) {
+   if ( $hash->{TR064} == 1 && $hash->{SECPORT} ) {
 
       my $strCurl;
 
@@ -3199,21 +2852,16 @@ sub FRITZBOX_Readout_Process($$)
             $hash->{MODEL} = $rValue;
             if (($rValue =~ "Box") && (lc($rValue) =~ "6[4,5,6][3,6,9][0,1]") ) {
             #if (1==1) {
-                my $cable = "allowShellCommand:0,1 "
-                ."allowTR064Command:0,1 "
-                ."boxUser "
+                my $cable = "boxUser "
                 ."disable:0,1 "
-                ."defaultCallerName "
-                ."defaultUploadDir "
-                ."forceTelnetConnection:0,1 "
+            #    ."defaultCallerName "
+            #    ."defaultUploadDir "
                 ."fritzBoxIP "
                 ."INTERVAL "
                 ."m3uFileLocal "
                 ."m3uFileURL "
-                ."ringWithIntern:0,1,2 "
-                ."telnetUser "
-                ."telnetTimeOut "
-                ."useGuiHack:0,1 "
+            #    ."ringWithIntern:0,1,2 "
+            #    ."useGuiHack:0,1 "
                 ."userTickets "
                 ."enablePassivLanDevices:0,1 "
                 ."enableVPNShares:0,1 "
@@ -3282,11 +2930,13 @@ sub FRITZBOX_Readout_Process($$)
          if ( $values{box_tr064} eq "off" && defined $hash->{SECPORT} ) {
             FRITZBOX_Log $hash, 3, "INFO: TR-064 is switched off";
             delete $hash->{SECPORT};
+            $hash->{TR064} = 0;
          }
          elsif ( $values{box_tr064} eq "on" && not defined $hash->{SECPORT} ) {
             FRITZBOX_Log $hash, 3, "INFO: TR-064 is switched on";
             my $tr064Port = FRITZBOX_TR064_Init ($hash, $hash->{HOST});
-            $hash->{SECPORT} = $tr064Port    if $tr064Port;
+            $hash->{SECPORT} = $tr064Port if $tr064Port;
+            $hash->{TR064} = 1;
          }
       }
 
@@ -3457,7 +3107,6 @@ sub FRITZBOX_Set_Cmd_Start($)
       shift @cmdBuffer;
       BlockingKill( $hash->{helper}{CMD_RUNNING_PID} );
       # stop FHEM, giving FritzBox some time to free the memory
-      sleep 5     unless $hash->{REMOTE}==1;
       delete $hash->{helper}{CMD_RUNNING_PID};
       return unless int @cmdBuffer;
    }
@@ -3472,7 +3121,6 @@ sub FRITZBOX_Set_Cmd_Start($)
    return if exists $hash->{helper}{CMD_RUNNING_PID};
 
    my @val = split / /, $cmdBuffer[0];
-   my $forceShell = (AttrVal( $name, "forceTelnetConnection",  0 ) == 1 || $hash->{REMOTE} == 0);
 
 # Preparing SET Call
    if ($val[0] eq "call") {
@@ -3483,7 +3131,6 @@ sub FRITZBOX_Set_Cmd_Start($)
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "FRITZBOX_Run_Call_Web";
-      $cmdFunction = "FRITZBOX_Run_Call_Shell" if $forceShell;
    }
 # Preparing SET guestWLAN
    elsif ($val[0] eq "guestwlan") {
@@ -3492,7 +3139,6 @@ sub FRITZBOX_Set_Cmd_Start($)
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "FRITZBOX_Run_GuestWlan_Web";
-      $cmdFunction = "FRITZBOX_Run_GuestWlan_Shell" if $forceShell;
    }
 # Preparing SET RING
    elsif ($val[0] eq "ring") {
@@ -3505,7 +3151,6 @@ sub FRITZBOX_Set_Cmd_Start($)
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "FRITZBOX_Ring_Run_Web";
-      $cmdFunction = "FRITZBOX_Ring_Run_Shell" if $forceShell;
    }
 # Preparing SET WLAN
    elsif ($val[0] eq "wlan") {
@@ -3513,7 +3158,6 @@ sub FRITZBOX_Set_Cmd_Start($)
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "FRITZBOX_Wlan_Run_Web";
-      $cmdFunction = "FRITZBOX_Wlan_Run_Shell" if $forceShell;
    }
 # Preparing SET WLAN2.4
    elsif ( $val[0] =~ /^wlan(2\.4|5)$/ ) {
@@ -3657,7 +3301,6 @@ sub FRITZBOX_Run_macFilter($)
       FRITZBOX_Log $hash, 2, "ERROR: AuthorizationRequired -> " . $result->{AuthorizationRequired};
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "macFilterStat", "macFilter->ERROR: AuthorizationRequired";
    } elsif ( ! defined ($result->{box_macFilter_active}) ) {
-#         unless( defined ($result->{box_macFilter_active}) ) {
       FRITZBOX_Log $hash, 2, "ERROR: MAC Filter not available";
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "macFilterStat", "macFilter->ERROR: MAC Filter not available";
    } elsif ( $switch == $result->{box_macFilter_active} ) {
@@ -3837,6 +3480,8 @@ sub FRITZBOX_Run_chgProfile($)
    push @webCmdArrayP, "lang"        => "de";
    push @webCmdArrayP, "page"        => "kidPro";
 
+   FRITZBOX_Log $hash, 5, "DEBUG: get $name $cmd " . join(" ", @webCmdArrayP);
+
    $result = FRITZBOX_Lua_Data( $hash, \@webCmdArrayP) ;
 
    if(defined $result->{Error}) {
@@ -3943,70 +3588,7 @@ sub FRITZBOX_Run_chgProfile($)
                push @webCmdArray, "apply"              => "true";
             }
 
-            FRITZBOX_Log $hash, 3, "INFO: set $name $cmd " . join(" ", @webCmdArray);
-
-            $queryStr .= "'xhr'                => '1'\n";
-            $queryStr .= "'dev_name'           => '" . $lanDevice_Info->{data}->{vars}->{dev}->{name}->{displayName} . "'\n";
-            $queryStr .= "'dev_ip'             => '" . $lanDevice_Info->{data}->{vars}->{dev}->{ipv4}->{current}->{ip} . "'\n";
-            $queryStr .= "'kisi_profile'       => '" . $val[1] . "'\n";
-            $queryStr .= "'back_to_page'       => 'netDev'\n";
-            $queryStr .= "'dev'                => '" . $val[0] . "'\n";
-            $queryStr .= "'lang'               => 'de'\n";
-
-            if ($lanDevice_Info->{data}->{vars}->{dev}->{ipv4}->{current}->{dhcp} eq "1") {
-               $queryStr .= "'static_dhcp'        => 'on'\n";
-            } else {
-               $queryStr .= "'static_dhcp'        => 'off'\n";
-            }
-
-            if ($FW1 >= 7 && $FW2 >= 25) {
-               $queryStr .= "'page'      => 'edit_device'\n";
-            } else {
-               $queryStr .= "'page'      => 'edit_device2'\n";
-            }
-
-            if ($FW1 <= 7 && $FW2 < 50) {
-               $queryStr .= "'dev_ip3'            => '" . (split(/\./, $lanDevice_Info->{data}->{vars}->{dev}->{ipv4}->{current}->{ip}))[3] . "'\n";
-
-               if ($lanDevice_Info->{data}->{vars}->{dev}->{portForwarding}->{allowForwarding} eq "true") {
-                  $queryStr .= "'allow_pcp_and_upnp' => 'on'\n";
-               } else {
-                  $queryStr .= "'allow_pcp_and_upnp' => 'off'\n";
-               }
-
-               if ($lanDevice_Info->{data}->{vars}->{dev}->{realtime}->{state} eq "true") {
-                  $queryStr .= "'realtimedevice'     => 'on'\n";
-               } else {
-                  $queryStr .= "'realtimedevice'     => 'off'\n";
-               }
-
-               $queryStr .= "'interface_id1'      => '" . (split(/:/, $lanDevice_Info->{data}->{vars}->{dev}->{ipv6}->{iface}->{ifaceid}))[2] . "'\n"; #42a2
-               $queryStr .= "'interface_id2'      => '" . (split(/:/, $lanDevice_Info->{data}->{vars}->{dev}->{ipv6}->{iface}->{ifaceid}))[3] . "'\n"; #dbff
-               $queryStr .= "'interface_id3'      => '" . (split(/:/, $lanDevice_Info->{data}->{vars}->{dev}->{ipv6}->{iface}->{ifaceid}))[4] . "'\n"; #fe51
-               $queryStr .= "'interface_id4'      => '" . (split(/:/, $lanDevice_Info->{data}->{vars}->{dev}->{ipv6}->{iface}->{ifaceid}))[5] . "'\n"; #a472
-               $queryStr .= "'apply'              => ''\n";
-
-            } else {
-               if ($lanDevice_Info->{data}->{vars}->{dev}->{ipv4}->{portForwarding}->{allowForwarding}) {
-                  $queryStr .= "'allow_pcp_and_upnp' => 'on'\n";
-               } else {
-                  $queryStr .= "'allow_pcp_and_upnp' => 'off'\n";
-               }
-
-               if ($lanDevice_Info->{data}->{vars}->{dev}->{realtime}->{state} eq "true") {
-                  $queryStr .= "'internetdetail'     => 'realtime'\n";
-               } else {
-                  $queryStr .= "'internetdetail' => '" . $lanDevice_Info->{data}->{vars}->{dev}->{netAccess}->{kisi}->{selectedRights}->{msgid} . "'\n";
-               }
-
-               $queryStr .= "dev_ip0' => '" . (split(/\./, $lanDevice_Info->{data}->{vars}->{dev}->{ipv4}->{current}->{ip}))[0] . "'\n";
-               $queryStr .= "dev_ip1' => '" . (split(/\./, $lanDevice_Info->{data}->{vars}->{dev}->{ipv4}->{current}->{ip}))[1] . "'\n";
-               $queryStr .= "dev_ip2' => '" . (split(/\./, $lanDevice_Info->{data}->{vars}->{dev}->{ipv4}->{current}->{ip}))[2] . "'\n";
-               $queryStr .= "dev_ip3' => '" . (split(/\./, $lanDevice_Info->{data}->{vars}->{dev}->{ipv4}->{current}->{ip}))[3] . "'\n";
-               $queryStr .= "'apply'  => 'true'\n";
-            }
-
-            FRITZBOX_Log $hash, 4, "INFO: get $name $cmd " . $queryStr;
+            FRITZBOX_Log $hash, 5, "DEBUG: get $name $cmd " . join(" ", @webCmdArray);
 
             $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
 
@@ -4140,7 +3722,6 @@ sub FRITZBOX_Run_lockLandevice($)
    my $hash = $defs{$name};
    my $result;
    my @webCmdArray;
-   my @tr064CmdArray;
    my @roReadings;
    my $startTime = time();
 
@@ -4152,7 +3733,6 @@ sub FRITZBOX_Run_lockLandevice($)
    # lang de
    # page edit_device2
 
-   my $queryStr;
    my $returnStr;
 
    push @webCmdArray, "xhr" => "1";
@@ -4190,37 +3770,13 @@ sub FRITZBOX_Run_lockLandevice($)
 
    FRITZBOX_Log $hash, 4, "INFO: set $name $cmd " . join(" ", @webCmdArray);
 
-   $queryStr .= "'xhr'       => '1'\n";
-   if ($val[1] eq "on") {
-     $queryStr .= "'kisi_profile' => 'filtprof1'\n";
-   }
-     $queryStr .= "'dev'       => '" . $val[0] . "'\n";
-     $queryStr .= "'lang'      => 'de'\n";
-
-   if ($FW1 <= 7 && $FW2 < 21) {
-     $queryStr .= "'block_dev' => ''\n";
-     $queryStr .= "'page'      => 'edit_device2'\n";
-   } elsif ($FW1 >= 7 && $FW2 < 50) {
-     $queryStr .= "'block_dev' => ''\n";
-     $queryStr .= "'page'      => 'edit_device'\n";
-   } else {
-     if($val[1] eq "on") {
-       $queryStr .= "'internetdetail' => 'blocked'\n";
-     } else {
-       $queryStr .= "'internetdetail' => 'unlimited'\n";
-     }
-     $queryStr .= "'page'           => 'edit_device'\n";
-     $queryStr .= "'apply'          => 'true'\n";
-     $queryStr .= "'dev_name'       => '" . $dev_name . "'\n";
-   }
-
-   FRITZBOX_Log $hash, 5, "DEBUG: get $name $cmd " . $queryStr;
+   FRITZBOX_Log $hash, 5, "DEBUG: get $name $cmd " . join(" ", @webCmdArray);
 
    my $lock_res = FRITZBOX_Lan_Device_Info( $hash, $val[0], "lockLandevice");
 
    unless (($lock_res =~ /blocked/ && $val[1] eq "on") || ($lock_res =~ /unlimited/ && $val[1] eq "off")) {
 
-     my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+     my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray);
 
      if ( defined $result->{Error} ) {
        FRITZBOX_Log $hash, 2, "ERROR: lockLandevice status: " . $result->{Error};
@@ -4257,397 +3813,69 @@ sub FRITZBOX_Run_lockLandevice($)
 } # End FRITZBOX_Run_lockLandevice
 
 #######################################################################
-sub FRITZBOX_Run_Call_Shell($)
-{
-   my ($string) = @_;
-   my ($name, @val) = split "\\|", $string;
-   my $hash = $defs{$name};
-
-   return "$name|0|Error: At least one parameter must be defined."
-         unless int @val;
-
-   my $result;
-   my @cmdArray;
-   my $duration = 60;
-   my $extNo = $val[0];
-   my %field;
-   my $lastField;
-   my $ttsLink;
-
- # Check if 1st parameter is a valid number
-   return $name."|0|Error: Parameter '$extNo' not a valid phone number"
-      unless $extNo =~ /^[\d\*\#+,]+$/;
-   $extNo =~ s/#$//;
-
- # Check if 2nd parameter is the duration
-   shift @val;
-   if (int @val)
-   {
-      if ($val[0] =~ /^\d+$/ && int $val[0] > 0)
-      {
-         $duration = $val[0];
-         FRITZBOX_Log $hash, 5, "DEBUG: Extracted call duration of $duration s.";
-         shift @val;
-      }
-   }
-
-# Extract text to say or play
-   foreach (@val)
-    {
-      if ($_ =~ /^(say|play):/i)
-      {
-         $lastField = $1;
-         $_ =~ s/^$1://;
-      }
-      $field{$lastField} .= $_." "
-         if $lastField;
-    }
-
-# Create tts link to say as moh
-   if ( $field{say} )
-   {
-      unless ($hash->{READINGS}{box_moh})
-      {
-         FRITZBOX_Log $hash, 2, "ERROR: Cannot do Text2Speech because box has no music on hold";
-      }
-      else
-      {
-         chop $field{say};
-         # http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT];
-         $ttsLink = $ttsLinkTemplate;
-         my $ttsText = substr $field{say},0,100;
-         my $ttsLang = "de";
-         if ($ttsText =~ /^\((en|es|fr|nl)\)/i )
-         {
-            $ttsLang = $1;
-            $ttsText =~ s/^\($1\)\s*//i;
-         }
-         $ttsLink =~ s/\[SPRACHE\]/$ttsLang/;
-         $ttsText = uri_escape($ttsText);
-         $ttsLink =~ s/\[TEXT\]/$ttsText/;
-         FRITZBOX_Log $hash, 5, "DEBUG: Created Text2Speech internet link: $ttsLink";
-      }
-   }
-
-   if ($field{play})
-   {
-      unless ($hash->{READINGS}{box_moh})
-      {
-         FRITZBOX_Log $hash, 2, "ERROR: Cannot play mp3 because box has no music on hold";
-      }
-      elsif ($ttsLink)
-      {
-         FRITZBOX_Log $hash, 3, "INFO: Ignore 'play:' because Text2Speech already defined.";
-      }
-      else
-      {
-         chop $field{play};
-         $ttsLink = $field{play};
-         FRITZBOX_Log $hash, 5, "DEBUG: Extracted MP3 ring tone: $ttsLink";
-      }
-   }
-
-   $result = FRITZBOX_Telnet_OpenCon( $hash );
-   return "$name|0|$result"
-      if $result;
-
-   @cmdArray = ();
-
-# Creation fhemRadioStation for ttsLink
-   if ($ttsLink) {
-#Preparing 1st command array
-      push @cmdArray, '[ -f "'.$mohUpload.'" ] && rm "'.$mohUpload.'"';
-      push @cmdArray, '[ -f "'.$mohOld.'" ] && rm "'.$mohOld.'"';
-      push @cmdArray, '[ -f "'.$mohNew.'" ] && rm "'.$mohNew.'"';
-      push @cmdArray, 'wget -U Mozilla -O "'.$mohUpload.'" "'.$ttsLink.'"';
-      push @cmdArray, '[ -f "'.$mohUpload.'" ] && echo 1 || echo 0';
-      push @cmdArray, '[ -e /var/flash/fx_moh ] && echo 1 || echo 0';
-# Execute 1st command array
-      $result = FRITZBOX_Shell_Exec ( $hash, \@cmdArray );
-      return "$name|0|Could not access '$ttsLink'"
-         unless $result->[4] eq "1";
-      return "$name|0|Could locate '/var/flash/fx_moh'"
-         unless $result->[5] eq "1";
-
-   #Prepare 2nd command array
-      push @cmdArray, 'if [ ! -f "/var/tmp/ffmpeg_mp3.tables" ]; then playerd_tables; fi';
-      push @cmdArray, 'ffmpegconv -i "'.$mohUpload.'" -o "'.$mohNew.'" --limit 32 --type 6';
-      push @cmdArray, '[ -f "'.$mohNew.'" ] && echo 1 || echo 0';
-   # Execute 2nd command array
-      $result = FRITZBOX_Shell_Exec ( $hash, \@cmdArray );
-      return "Could not convert '$ttsLink'"
-         unless $result->[2] eq "1";
-
-   #Execute 3rd command array
-      FRITZBOX_Shell_Exec( $hash, \@cmdArray );
-
-   #Prepare 4th command array
-      push @cmdArray, 'cat /var/flash/fx_moh >"'.$mohOld.'"';
-      push @cmdArray, 'cat "'.$mohNew.'" >/var/flash/fx_moh';
-      push @cmdArray, 'killall -sigusr1 telefon';
-      push @cmdArray, 'rm "'.$mohUpload.'"';
-      push @cmdArray, 'rm "'.$mohNew.'"';
-   # Execute 4th command array
-      FRITZBOX_Shell_Exec ( $hash, \@cmdArray );
-   }
-
-#Preparing 4th command array
-# switch to (dial port 1-3) to avoid ringing of internal phone
-   my $ringWithIntern = AttrVal( $name, "ringWithIntern", 1 );
-   # push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 60";
-   push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort $ringWithIntern"
-         if $ringWithIntern =~ /^([1-3])$/ ;
-
-   FRITZBOX_Log $hash, 4, "INFO: Call $extNo for $duration seconds";
-   push @cmdArray, "ctlmgr_ctl w telcfg command/Dial ".$extNo."#";
-   push @cmdArray, "sleep ".($duration+1); # 1s added because it takes sometime until it starts ringing
-   push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup $ringWithIntern";
-   push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50";
-   if ($ttsLink)
-   {
-      push @cmdArray, 'cat "'.$mohOld.'" >/var/flash/fx_moh';
-      push @cmdArray, 'killall -sigusr1 telefon';
-      push @cmdArray, 'rm "'.$mohOld.'"';
-   }
-
-# Execute command array
-   FRITZBOX_Shell_Exec( $hash, \@cmdArray );
-
-   FRITZBOX_Telnet_CloseCon( $hash );
-
-   return $name."|1|Calling done";
-
-} # End FRITZBOX_Run_Call_Shell
-
-#######################################################################
 sub FRITZBOX_Run_Call_Web($)
 {
    my ($string) = @_;
    my ($name, @val) = split "\\|", $string;
    my $hash = $defs{$name};
 
-   return "$name|0|Error: At least one parameter must be defined."
-         unless int @val;
+   FRITZBOX_Log $hash, 3, "DEBUG: set $name " . join(" ", @val);
+
+   unless (int @val) {
+     FRITZBOX_Log $hash, 3, "DEBUG: At least one parameter must be defined.";
+     return "$name|0|Error: At least one parameter must be defined."
+   }
 
    my $result;
-   my @shellCmdArray;
-   my @webCmdArray;
-   my @tr064CmdArray;
+   my @tr064CallArray;
    my $duration = 60;
    my $extNo = $val[0];
-   my %field;
-   my $lastField;
-   my $ttsLink;
 
  # Check if 1st parameter is a valid number
-   return $name."|0|Error: Parameter '$extNo' not a valid phone number"
-      unless $extNo =~ /^[\d\*\#+,]+$/;
+
+   unless ($extNo =~ /^[\d\*\#+,]+$/) {
+     FRITZBOX_Log $hash, 3, "DEBUG: Parameter '$extNo' not a valid phone number.";
+     return $name."|0|Error: Parameter '$extNo' not a valid phone number"
+   }
+
    $extNo =~ s/#$//;
 
  # Check if 2nd parameter is the duration
+
    shift @val;
    if (int @val) {
       if ($val[0] =~ /^\d+$/ && int $val[0] > 0) {
          $duration = $val[0];
-         FRITZBOX_Log $hash, 5, "DEBUG: Extracted call duration of $duration s.";
+         FRITZBOX_Log $hash, 3, "DEBUG: Extracted call duration of $duration s.";
          shift @val;
       }
    }
 
-# Extract text to say or play
-   foreach (@val) {
-      if ($_ =~ /^(say|play):/i)  {
-         $lastField = $1;
-         $_ =~ s/^$1://;
-      }
-      $field{$lastField} .= $_." "    if $lastField;
-    }
-
-# Create tts link to say as moh
-   if ( $field{say} ) {
-      unless ($hash->{READINGS}{box_moh}) {
-         FRITZBOX_Log $hash, 2, "ERROR: Cannot do Text2Speech because box has no music on hold";
-      }
-      else {
-         chop $field{say};
-         # http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT];
-         $ttsLink = $ttsLinkTemplate;
-         my $ttsText = substr $field{say},0,100;
-         my $ttsLang = "de";
-         if ($ttsText =~ /^\((en|es|fr|nl)\)/i ) {
-            $ttsLang = $1;
-            $ttsText =~ s/^\($1\)\s*//i;
-         }
-         $ttsLink =~ s/\[SPRACHE\]/$ttsLang/;
-         $ttsText = uri_escape($ttsText);
-         $ttsLink =~ s/\[TEXT\]/$ttsText/;
-         FRITZBOX_Log $hash, 5, "DEBUG: Created Text2Speech internet link: $ttsLink";
-      }
-   }
-
-   if ($field{play}) {
-      unless ($hash->{READINGS}{box_moh}) {
-         FRITZBOX_Log $hash, 2, "ERROR: Cannot play mp3 because box has no music on hold";
-      }
-      elsif ($ttsLink) {
-         FRITZBOX_Log $hash, 3, "INFO: Ignore 'play:' because Text2Speech already defined.";
-      }
-      else {
-         chop $field{play};
-         $ttsLink = $field{play};
-         FRITZBOX_Log $hash, 5, "DEBUG: Extracted MP3 ring tone: $ttsLink";
-      }
-   }
-
-   if ( $hash->{TELNET} == 1 && $ttsLink ) {
-      $result = FRITZBOX_Telnet_OpenCon( $hash );
-      return "$name|0|$result"    if $result;
-
-      @shellCmdArray = ();
-
-   # Creation MOH for ttsLink
-      if ($ttsLink) {
-   #Preparing 1st command array
-         push @shellCmdArray, '[ -f "'.$mohUpload.'" ] && rm "'.$mohUpload.'"';
-         push @shellCmdArray, '[ -f "'.$mohOld.'" ] && rm "'.$mohOld.'"';
-         push @shellCmdArray, '[ -f "'.$mohNew.'" ] && rm "'.$mohNew.'"';
-         push @shellCmdArray, 'wget -U Mozilla -O "'.$mohUpload.'" "'.$ttsLink.'"';
-         push @shellCmdArray, '[ -f "'.$mohUpload.'" ] && echo 1 || echo 0';
-         push @shellCmdArray, '[ -e /var/flash/fx_moh ] && echo 1 || echo 0';
-   # Execute 1st command array
-         $result = FRITZBOX_Shell_Exec ( $hash, \@shellCmdArray );
-         return "$name|0|Could not access '$ttsLink'"
-            unless $result->[4] eq "1";
-         return "$name|0|Could locate '/var/flash/fx_moh'"
-            unless $result->[5] eq "1";
-
-      #Prepare 2nd command array
-         push @shellCmdArray, 'if [ ! -f "/var/tmp/ffmpeg_mp3.tables" ]; then playerd_tables; fi';
-         push @shellCmdArray, 'ffmpegconv -i "'.$mohUpload.'" -o "'.$mohNew.'" --limit 32 --type 6';
-         push @shellCmdArray, '[ -f "'.$mohNew.'" ] && echo 1 || echo 0';
-      # Execute 2nd command array
-         $result = FRITZBOX_Shell_Exec ( $hash, \@shellCmdArray );
-         return "Could not convert '$ttsLink'"
-            unless $result->[2] eq "1";
-
-      #Execute 3rd command array
-         FRITZBOX_Shell_Exec( $hash, \@shellCmdArray );
-
-      #Prepare 4th command array
-         push @shellCmdArray, 'cat /var/flash/fx_moh >"'.$mohOld.'"';
-         push @shellCmdArray, 'cat "'.$mohNew.'" >/var/flash/fx_moh';
-         push @shellCmdArray, 'killall -sigusr1 telefon';
-         push @shellCmdArray, 'rm "'.$mohUpload.'"';
-         push @shellCmdArray, 'rm "'.$mohNew.'"';
-      # Execute 4th command array
-         FRITZBOX_Shell_Exec ( $hash, \@shellCmdArray );
-      }
-   }
-   elsif ( $hash->{TELNET} != 1 && $ttsLink ) {
-      FRITZBOX_Log $hash, 3, "INFO: Your Fritz!OS version has limited interfaces. Parameter 'play:' and 'say:' ignored.";
-   }
-
-# Preparing 4th command array to switch to (dial port 1-3) to avoid ringing of internal phone
-   my $ringWithIntern = AttrVal( $name, "ringWithIntern", 1 );
-   if ($ringWithIntern =~ /^([1-3])$/ && $hash->{WEBCM} == 1 ) {
-      push @webCmdArray, "telcfg:settings/DialPort" => $ringWithIntern;
-      $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
-   }
-
-#Preparing 5th command array to ring
-      FRITZBOX_Log $hash, 4, "INFO: Call $extNo for $duration seconds";
-   if ( $hash->{WEBCM} == 1 ) { # ring with webcm
-      push @webCmdArray, "telcfg:command/Dial" => $extNo."#";
-      $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
-   }
-   elsif ($hash->{SECPORT}) { #or ring with TR-064
-      push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialNumber", "NewX_AVM-DE_PhoneNumber", $extNo."#"];
-      $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
+#Preparing command array to ring // X_VoIP:1 x_voip X_AVM-DE_DialNumber NewX_AVM-DE_PhoneNumber 01622846962#
+   FRITZBOX_Log $hash, 3, "INFO: Call $extNo for $duration seconds - " . $hash->{SECPORT};
+   if ($hash->{SECPORT}) {
+      push @tr064CallArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialNumber", "NewX_AVM-DE_PhoneNumber", $extNo."#"];
+      $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CallArray);
+      FRITZBOX_Log $hash, 3, "DEBUG: result of calling number $extNo -> " .  $result;
    }
    else {
       FRITZBOX_Log $hash, 3, "INFO: Your Fritz!OS version has limited interfaces. You cannot use call.";
    }
 
+   FRITZBOX_Log $hash, 3, "DEBUG: waiting";
    sleep $duration; #+1; # 1s added because it takes sometime until it starts ringing
+   FRITZBOX_Log $hash, 3, "DEBUG: stop ringing ";
 
-#Preparing 5th and 6th command array to stop ringing and reset dial port
-   if ( $hash->{WEBCM} == 1 ) { # hangup with webcm
-      push (@webCmdArray, "telcfg:command/Hangup" => "")      unless $hash->{SECPORT};
-      push @webCmdArray, "telcfg:settings/DialPort" => 50;
-      $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
-   }
-   elsif ($hash->{SECPORT}) { #or hangup with TR-064
-      push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialHangup"];
-      $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray )   if $hash->{SECPORT};
-   }
-
-#Preparing 7th command array to reset everything
-   if ( $hash->{TELNET} == 1 && $ttsLink ) {
-      push @shellCmdArray, 'cat "'.$mohOld.'" >/var/flash/fx_moh';
-      push @shellCmdArray, 'killall -sigusr1 telefon';
-      push @shellCmdArray, 'rm "'.$mohOld.'"';
-
-   # Execute command array
-      FRITZBOX_Shell_Exec( $hash, \@shellCmdArray );
-
-      FRITZBOX_Telnet_CloseCon( $hash );
+#Preparing command array to stop ringing and reset dial port // X_VoIP:1 x_voip X_AVM-DE_DialHangup
+   if ($hash->{SECPORT}) { #or hangup with TR-064
+      push @tr064CallArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialHangup"];
+      $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CallArray);
+      FRITZBOX_Log $hash, 3, "DEBUG: result of stop ringing number $extNo -> ".  $result;
    }
 
    return $name."|1|Calling done";
 
 } # End FRITZBOX_Run_Call_Web
-
-#######################################################################
-sub FRITZBOX_Run_GuestWlan_Shell($)
-{
-   my ($string) = @_;
-   my ($name, @val) = split "\\|", $string;
-   my $hash = $defs{$name};
-   my $result;
-   my @readoutCmdArray;
-   my @roReadings;
-   my $startTime = time();
-
-   my $state = $val[0];
-   $state =~ s/on/1/;
-   $state =~ s/off/0/;
-
-   $result = FRITZBOX_Telnet_OpenCon( $hash );
-   return "$name|0|$result"
-      if $result;
-
-   my $returnStr;
-
-   $result = FRITZBOX_Shell_Exec $hash, "[ -n `ctlmgr_ctl r wlan settings/guest_pskvalue` ] && echo 1 || echo 0";
-   return "$name|0|Error: No password defined for guest WLAN."
-      unless $result;
-
-# Set WLAN on if guestWLAN on
-   push @readoutCmdArray, [ "", "ctlmgr_ctl w wlan settings/wlan_enable 1"]
-      if $state == 1;
-# Set guestWLAN
-   push @readoutCmdArray, [ "", "ctlmgr_ctl w wlan settings/guest_ap_enabled $state"];
-# Read WLAN
-   push @readoutCmdArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
-# Read 2nd WLAN
-   push @readoutCmdArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
-# Read G�ste WLAN
-   push @readoutCmdArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
-   push @readoutCmdArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
-# Read MAC Filter
-   push @readoutCmdArray, [ "box_macFilter_active", "ctlmgr_ctl r wlan settings/is_macfilter_active", ];
-
-# Execute commands
-   FRITZBOX_Shell_Query( $hash, \@readoutCmdArray, \@roReadings);
-
-   FRITZBOX_Telnet_CloseCon ( $hash );
-
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
-   $returnStr .= join('|', @roReadings );
-   FRITZBOX_Log $hash, 5, "DEBUG: Handover to main process: ".$returnStr;
-   return $name."|2|".encode_base64($returnStr,"");
-
-} # end FRITZBOX_Run_GuestWlan_Shell
 
 #######################################################################
 sub FRITZBOX_Run_GuestWlan_Web($)
@@ -4665,39 +3893,21 @@ sub FRITZBOX_Run_GuestWlan_Web($)
    $state =~ s/on/1/;
    $state =~ s/off/0/;
 
-   # $result = FRITZBOX_Shell_Exec $hash, "[ -n `ctlmgr_ctl r wlan settings/guest_pskvalue` ] && echo 1 || echo 0";
-   # return "$name|0|Error: No password defined for guest WLAN."
-      # unless $result;
-
-
 # Set guestWLAN, if necessary set also WLAN
-   if ( $hash->{WEBCM}==1 ) { #webcm
-      push @webCmdArray, "wlan:settings/wlan_enable" => "1"    if $state == 1;
-      # push @webCmdArray, "active" => "on";
-      # FRITZBOX_Web_CmdPost ($hash, \@webCmdArray, '/wlan/wlan_settings.lua');
-      push @webCmdArray, "wlan:settings/guest_ap_enabled" => $state;
-      $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
-   }
-   elsif ( $hash->{SECPORT} ) { #TR-064
+   if ( $hash->{SECPORT} ) { #TR-064
       if ($state == 1) { # WLAN on when Guest WLAN on
          push @tr064CmdArray, ["WLANConfiguration:2", "wlanconfig2", "SetEnable", "NewEnable", "1"]
                   if $hash->{fhem}->{is_double_wlan} == 1;
          push @tr064CmdArray, ["WLANConfiguration:1", "wlanconfig1", "SetEnable", "NewEnable", "1"];
       }
       my $gWlanNo = 2;
-      $gWlanNo = 3
-         if $hash->{fhem}->{is_double_wlan} == 1;
+      $gWlanNo = 3 if $hash->{fhem}->{is_double_wlan} == 1;
       push @tr064CmdArray, ["WLANConfiguration:".$gWlanNo, "wlanconfig".$gWlanNo, "SetEnable", "NewEnable", $state];
       $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
    }
    else { #no API
       FRITZBOX_Log $hash, 2, "ERROR: No API available to switch WLAN.";
    }
-
-   # push @webCmdArray, "autoupdate" => "on";
-   # push @webCmdArray, "activate_guest_access" => $val[0];
-   # FRITZBOX_Web_CmdPost ($hash, \@webCmdArray, '/wlan/guest_access.lua');
-#POSTDATA=autoupdate=on&activate_guest_access=on&guest_ssid=Gast-WLAN&sec_mode=3&wpa_key=Baby%2412sitter&push_service=on&group_access=on&down_time_activ=on&down_time_value=240&disconnect_guest_access=on&apply=
 
 # Read WLAN-Status
    my $queryStr = "&box_wlan_24GHz=wlan:settings/ap_enabled"; # WLAN
@@ -4727,51 +3937,6 @@ sub FRITZBOX_Run_GuestWlan_Web($)
 } # end FRITZBOX_Run_GuestWlan_Shell
 
 #######################################################################
-sub FRITZBOX_Wlan_Run_Shell($)
-{
-   my ($string) = @_;
-   my ($name, $cmd, @val) = split "\\|", $string;
-   my $hash = $defs{$name};
-   my $result;
-   my @readoutCmdArray;
-   my @roReadings;
-   my $startTime = time();
-
-   my $state = $val[0];
-   $state =~ s/on/1/;
-   $state =~ s/off/0/;
-
-   $result = FRITZBOX_Telnet_OpenCon( $hash );
-   return "$name|0|$result"
-      if $result;
-
-   my $returnStr;
-
-# Set WLAN
-   push @readoutCmdArray, [ "", "ctlmgr_ctl w wlan settings/wlan_enable $state"];
-# Read WLAN
-   push @readoutCmdArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
-# Read 2nd WLAN
-   push @readoutCmdArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
-# Read G�ste WLAN
-   push @readoutCmdArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
-   push @readoutCmdArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
-# Read MAC Filter
-   push @readoutCmdArray, [ "box_macFilter_active", "ctlmgr_ctl r wlan settings/is_macfilter_active", ];
-
-# Execute commands
-   FRITZBOX_Shell_Query( $hash, \@readoutCmdArray, \@roReadings);
-
-   FRITZBOX_Telnet_CloseCon ( $hash );
-
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
-   $returnStr .= join('|', @roReadings );
-   FRITZBOX_Log $hash, 5, "DEBUG: Handover to main process: ".$returnStr;
-   return $name."|2|".encode_base64($returnStr,"");
-
-} # end FRITZBOX_Wlan_Run_Shell
-
-#######################################################################
 sub FRITZBOX_Wlan_Run_Web($)
 {
    my ($string) = @_;
@@ -4788,17 +3953,7 @@ sub FRITZBOX_Wlan_Run_Web($)
    $state =~ s/off/0/;
 
 # Set WLAN
-   if ($hash->{WEBCM}) { #webcm
-      push @webCmdArray, "wlan:settings/wlan_enable" => $state         if $cmd eq "wlan";
-      push @webCmdArray, "wlan:settings/ap_enabled" => $state          if $cmd eq "wlan2.4";
-      push @webCmdArray, "wlan:settings/ap_enabled_scnd" => $state     if $cmd eq "wlan5";
-      push @webCmdArray, "wlan:settings/is_macfilter_active" => $state if $cmd eq "macfilter";
-      FRITZBOX_Log $hash, 3, "INFO: WEBCM Command.";
-      FRITZBOX_Web_CmdPost ($hash, \@webCmdArray);
-      # push @webCmdArray, "active" => "on" if $val[0] eq "on";
-      # FRITZBOX_Web_CmdPost ($hash, \@webCmdArray, '/wlan/wlan_settings.lua');
-   }
-   elsif ($hash->{SECPORT}) { #TR-064
+   if ($hash->{SECPORT}) { #TR-064
       push @tr064CmdArray, ["WLANConfiguration:2", "wlanconfig2", "SetEnable", "NewEnable", $state]
                if $hash->{fhem}->{is_double_wlan} == 1 && $cmd ne "wlan2.4";
       push @tr064CmdArray, ["WLANConfiguration:1", "wlanconfig1", "SetEnable", "NewEnable", $state]
@@ -4838,259 +3993,6 @@ sub FRITZBOX_Wlan_Run_Web($)
 } # end FRITZBOX_Wlan_Run_Web
 
 #######################################################################
-sub FRITZBOX_Ring_Run_Shell($)
-{
-   my ($string) = @_;
-   my ($name, @val) = split "\\|", $string;
-   my $hash = $defs{$name};
-
-   return "$name|0|Error: At least one parameter must be defined."
-         unless int @val;
-
-   my $result;
-   my $curCallerName;
-   my @cmdArray;
-   my $duration = 5;
-   my $intNo = $val[0];
-   my @FritzFons;
-   my $ringTone;
-   my %field;
-   my $lastField;
-   my $ttsLink;
-   my $fhemRadioStation;
-
- # Check if 1st parameter are comma separated numbers
-   return $name."|0|Error: Parameter '$intNo' not a number (only commas (,) are allowed to separate numbers)"
-      unless $intNo =~ /^[\d,]+$/;
-   $intNo =~ s/#$//;
-
-# Create a hash for the DECT devices whose ring tone (or radio station) can be changed
-   foreach ( split( /,/, $intNo ) ) {
-      if (defined $hash->{fhem}{$_}{brand} && "AVM" eq $hash->{fhem}{$_}{brand}) {
-         FRITZBOX_Log $hash, 5, "DEBUG: Internal number $_ seems to be a Fritz!Fon.";
-         push @FritzFons, $_ - 609;
-      }
-   }
-
- # Check if 2nd parameter is the duration
-   shift @val;
-   if (int @val)
-   {
-      if ($val[0] =~ /^\d+$/ && int $val[0] > 0)
-      {
-         $duration = $val[0];
-         FRITZBOX_Log $hash, 5, "DEBUG: Extracted ring duration of $duration s.";
-         shift @val;
-      }
-   }
-
- # Check if next parameter is a valid ring tone
-   if (int @val)
-   {
-      if ($val[0] !~ /^(msg|show|say|play):/i)
-      {
-         $ringTone = $val[0];
-         $ringTone = $ringToneNumber{lc $val[0]};
-         unless (defined ($ringTone)) {
-            FRITZBOX_Log $hash, 2, "ERROR: Ring tone '" . $val[0] . "' not valid";
-            return $name."|0|Error: Ring tone '" . $val[0] . "' not valid";
-         }
-         FRITZBOX_Log $hash, 5, "DEBUG: Ring tone $ringTone will be used.";
-         shift @val;
-      }
-   }
-
-# Extract text to say, play or show
-   foreach (@val)
-    {
-      if ($_ =~ /^(show|msg|say|play):/i)
-      {
-         $lastField = $1;
-         $_ =~ s/^$1://;
-      }
-      $field{$lastField} .= $_." "
-         if $lastField;
-    }
-
-   my $msg = AttrVal( $name, "defaultCallerName", "FHEM" );
-   if ( $field{show} ) {
-      chop $field{show};
-      $msg = $field{show};
-   } elsif ( $field{msg} ) {
-      chop $field{msg};
-      $msg = $field{msg};
-   }
-   $msg = substr($msg, 0, 30);
-
-# Determine number of Internet Radio to play mp3 or say tts
-   if ( $field{say} || $field{play} ) {
-      foreach (keys %{$hash->{fhem}{radio}})
-      {
-         if ($hash->{fhem}{radio}{$_} eq "FHEM")
-         {
-            $fhemRadioStation = $_;
-            last;
-         }
-      }
-      if ( not defined $fhemRadioStation && $hash->{fhem}{radioCount} )
-      {
-         $fhemRadioStation = $hash->{fhem}{radioCount}-1;
-      }
-   }
-
-# Create tts link to play as internet radio
-   if ( $field{say} )
-   {
-      if ($fhemRadioStation)
-      {
-         $ringTone = 33;
-         chop $field{say};
-         # http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT];
-         $ttsLink = $ttsLinkTemplate;
-         my $ttsText = substr $field{say},0,100;
-         my $ttsLang = "de";
-         if ($ttsText =~ /^\((en|es|fr|nl)\)/i )
-         {
-            $ttsLang = $1;
-            $ttsText =~ s/^\($1\)\s*//i;
-         }
-         $ttsLink =~ s/\[SPRACHE\]/$ttsLang/;
-         $ttsText = uri_escape($ttsText);
-         $ttsLink =~ s/\[TEXT\]/$ttsText/;
-         FRITZBOX_Log $hash, 5, "DEBUG: Created Text2Speech internet link: $ttsLink";
-      }
-      else
-      {
-         FRITZBOX_Log $hash, 2, "ERROR: Cannot do Text2Speech because box has no internet radio";
-      }
-   }
-
-   if ($field{play})
-   {
-      unless ($fhemRadioStation)
-      {
-        FRITZBOX_Log $hash, 2, "ERROR: Cannot play mp3 because box has no internet radio";
-      }
-      elsif ($ttsLink)
-      {
-         FRITZBOX_Log $hash, 4, "INFO: Ignore 'play:' because Text2Speech already defined.";
-      }
-      else
-      {
-         $ringTone = 33;
-         chop $field{play};
-         $ttsLink = $field{play};
-         FRITZBOX_Log $hash, 5, "DEBUG: Extracted MP3 ring tone: $ttsLink";
-      }
-   }
-   $result = FRITZBOX_Telnet_OpenCon( $hash );
-   return "$name|0|$result"
-      if $result;
-
-#Preparing 1st command array
-   @cmdArray = ();
-
-# Creation fhemRadioStation for ttsLink
-   if (int (@FritzFons) == 0 && $ttsLink)
-   {
-      FRITZBOX_Log $hash, 3, "INFO: No Fritz!Fon identified, parameter 'say:' will be ignored."
-   }
-   elsif (int (@FritzFons) && $ttsLink && $hash->{fhem}{radio}{$fhemRadioStation} ne "FHEM")
-   {
-      FRITZBOX_Log $hash, 3, "INFO: Create new internet radio station $fhemRadioStation: 'FHEM' for ringing with text-to-speech";
-      push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO".$fhemRadioStation."/Name FHEM";
-      push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO".$fhemRadioStation."/Bitmap 1023";
-   #Execute command array
-      FRITZBOX_Shell_Exec( $hash, \@cmdArray )
-   }
-
-#Preparing 2nd command array
-# Change ring tone of Fritz!Fons
-   if ($ringTone)
-   {
-      FRITZBOX_Log $hash, 3, "INFO: No Fritz!Fon identified, ring tone will be ignored."
-         unless @FritzFons;
-      foreach (@FritzFons)
-      {
-         push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User$_/IntRingTone";
-         push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User$_/IntRingTone $ringTone";
-         FRITZBOX_Log $hash, 4, "INFO: Change temporarily internal ring tone of Fritz!Fon DECT $_ to $ringTone";
-         if ($ttsLink)
-         {
-            push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User$_/RadioRingID";
-            push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User$_/RadioRingID ".$fhemRadioStation;
-            FRITZBOX_Log $hash, 4, "INFO: Change temporarily radio station of Fritz!Fon DECT $_ to $fhemRadioStation (FHEM)";
-         }
-      }
-   }
-
-# uses name of port 0-3 (dial port 1-4) to show messages on ringing phone
-   my $ringWithIntern = AttrVal( $name, "ringWithIntern", 0 );
-   if ( $ringWithIntern =~ /^([1-3])$/ )
-   {
-      push @cmdArray, "ctlmgr_ctl r telcfg settings/MSN/Port".($ringWithIntern-1)."/Name";
-      push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '$msg'";
-      FRITZBOX_Log $hash, 4, "INFO: Change temporarily name of calling number $ringWithIntern to '$msg'";
-      push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort $ringWithIntern"
-   }
-   elsif ($field{show})
-   {
-      FRITZBOX_Log $hash, 3, "INFO: Parameter 'show:' ignored because attribute 'ringWithIntern' not defined."
-   }
-
-# Set tts-Message
-   push @cmdArray, 'ctlmgr_ctl w configd settings/WEBRADIO'.$fhemRadioStation.'/URL "'.$ttsLink.'"'
-      if $ttsLink;
-
-#Execute command array
-   $result = FRITZBOX_Shell_Exec( $hash, \@cmdArray )
-      if int( @cmdArray ) > 0;
-
-   $intNo =~ s/,/#/g;
-
-#Preparing 3rd command array to ring and reset everything
-   FRITZBOX_Log $hash, 4, "INFO: Ringing $intNo for $duration seconds";
-   push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo."#";
-   push @cmdArray, "sleep ".($duration+1); # 1s added because it takes sometime until it starts ringing
-   push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
-   push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50"
-      if $ringWithIntern != 0 ;
-# Reset internal ring tones for the Fritz!Fons
-   if ($ringTone)
-   {
-      for (0 .. $#FritzFons)
-      {
-         push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$FritzFons[$_]."/IntRingTone ".$result->[2*$_];
-      # Reset internet station for the Fritz!Fons
-         if ($ttsLink)
-         {
-            push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$FritzFons[$_]."/RadioRingID ".$result->[2*(int(@FritzFons)+$_)];
-         }
-      }
-   }
-# Reset name of calling number
-   if ($ringWithIntern =~ /^([1-2])$/)
-   {
-      if ($ttsLink) {
-         push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[4*int(@FritzFons)]."'";
-         push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
-         push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
-      } elsif ($ringTone) {
-         push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[2*int(@FritzFons)]."'";
-      } else {
-         push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[0]."'";
-      }
-   }
-
-# Execute command array
-   FRITZBOX_Shell_Exec( $hash, \@cmdArray );
-
-   FRITZBOX_Telnet_CloseCon( $hash );
-
-   return $name."|1|Ringing done";
-} # End FRITZBOX_Ring_Run_Shell
-
-#######################################################################
 sub FRITZBOX_Ring_Run_Web($)
 {
    my ($string) = @_;
@@ -5103,8 +4005,6 @@ sub FRITZBOX_Ring_Run_Web($)
    my $result;
    my @tr064Result;
    my $curCallerName;
-   my @webCmdArray;
-   my @getCmdArray;
    my @tr064CmdArray;
    my @roReadings;
    my $duration = -1;
@@ -5114,10 +4014,8 @@ sub FRITZBOX_Ring_Run_Web($)
    my %field;
    my $lastField;
    my $ttsLink;
-   my $fhemRadioStation;
    my $startValue;
    my $startTime = time();
-   my $useGuiHack = AttrVal( $name, "useGuiHack", 0 );
 
  # Check if 1st parameter are comma separated numbers
    return $name."|0|Error (set ring): Parameter '$intNo' not a number (only commas (,) are allowed to separate phone numbers)"
@@ -5143,129 +4041,9 @@ sub FRITZBOX_Ring_Run_Web($)
       }
    }
 
- # Check if next parameter is a valid ring tone
-   if (int @val) {
-      if ($val[0] !~ /^(msg|show|say|play):/i) {
-         $ringTone = $val[0];
-         $ringTone = $ringToneNumber{lc $val[0]};
-         return $name."|0|Error (set ring): Ring tone '".$val[0]."' not valid"
-            unless defined $ringTone;
-         FRITZBOX_Log $hash, 5, "DEBUG: Ring tone $ringTone will be used.";
-         shift @val;
-      }
-   }
-
-# Extract text to say, play or show
-   foreach (@val) {
-      if ($_ =~ /^(show|msg|say|play):/i) {
-         $lastField = $1;
-         $_ =~ s/^$1://;
-      }
-      $field{$lastField} .= $_." "     if $lastField;
-    }
-
-# build message to show
-   my $msg = AttrVal( $name, "defaultCallerName", "FHEM" );
-   if ( $field{show} ) {
-      chop $field{show};
-      $msg = $field{show};
-   }
-   elsif ( $field{msg} ) {
-      chop $field{msg};
-      $msg = $field{msg};
-   }
-   $msg = substr($msg, 0, 30);
-# no webcm no Message
-   unless ( $hash->{WEBCM}==1 ) {
-      $msg = "";
-      FRITZBOX_Log $hash, 3, "INFO: Your Fritz!OS version has limited interfaces. Parameter 'show:' ignored."
-         if $field{msg} || $field{show};
-   }
-
-# Determine number of Internet Radio to play mp3 or say tts
-   if ( $field{say} || $field{play} ) {
-      foreach (keys %{$hash->{fhem}{radio}}) {
-         if ($hash->{fhem}{radio}{$_} eq "FHEM") {
-            $fhemRadioStation = $_;
-            last;
-         }
-      }
-   # FHEM Radiostation needs to be created at last radio position
-      $fhemRadioStation = $hash->{fhem}{radioCount}-1
-         if not defined $fhemRadioStation && $hash->{fhem}{radioCount};
-   }
-
-# Create tts link to play as internet radio
-   if ( $field{say} ) {
-      if ($fhemRadioStation) {
-         $ringTone = 33;
-         chop $field{say};
-         # my $ttsRessource = AttrVal( $name, "ttsRessource", "Google" );
-         # Speak with espeak  # sudo apt-get install espeak
-         # if ($ttsRessource eq "ESpeak"){
-             # $cmd = "sudo espeak -vde+f3 -k5 -s150 \"" . $ttsText . "\"";
-             # FRITZBOX_Log $hash, 4, "INFO: Text2Speech:" .$cmd;
-             # system($cmd);
-         # }
-
-      # speak with Translate.Google
-         # http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT];
-         $ttsLink = $ttsLinkTemplate;
-         my $ttsText = substr $field{say},0,100;
-         my $ttsLang = "de";
-         if ($ttsText =~ /^\((en|es|fr|nl)\)/i ) {
-            $ttsLang = $1;
-            $ttsText =~ s/^\($1\)\s*//i;
-         }
-         $ttsLink =~ s/\[SPRACHE\]/$ttsLang/;
-         $ttsText = uri_escape($ttsText);
-         $ttsLink =~ s/\[TEXT\]/$ttsText/;
-         FRITZBOX_Log $hash, 5, "DEBUG: Created Text2Speech internet link: $ttsLink";
-      }
-      else {
-         FRITZBOX_Log $hash, 2, "INFO: Cannot do Text2Speech because box has no internet radio";
-      }
-   }
-
-# Extract play link
-   if ( $field{play} ) {
-      unless ($fhemRadioStation)
-      {
-        FRITZBOX_Log $hash, 3, "INFO: Cannot play mp3 because box has no internet radio";
-      }
-      elsif ($ttsLink)
-      {
-         FRITZBOX_Log $hash, 3, "INFO: Ignore 'play:' because Text2Speech already defined.";
-      }
-      else
-      {
-         $ringTone = 33;
-         chop $field{play};
-         $ttsLink = $field{play};
-         FRITZBOX_Log $hash, 5, "DEBUG: Extracted MP3 ring tone: $ttsLink";
-      }
-   }
-
-# Store current values for fon and dect port
-   my $queryStr = "&dectUser=telcfg:settings/Foncontrol/User/list(Id,Intern,IntRingTone,RadioRingID)"; # DECT Numbers
-   $queryStr .= "&fonPort=telcfg:settings/MSN/Port/list(Name,MSN)"; # Fon ports
-   $queryStr .= "&dialPort=telcfg:settings/DialPort"; #Dial Port
-   $queryStr .= "&useClickToDial=telcfg:settings/UseClickToDial"; # Use Click2Dial
-   FRITZBOX_Log $hash, 4, "INFO: Read current dect and fon port values from box";
-   $startValue = FRITZBOX_Web_Query( $hash, $queryStr, 'UTF-8') ;
-
-#Preparing 1st command array
-   @webCmdArray = ();
-
 # Check ClickToDial
    unless ($startValue->{useClickToDial}) {
-      if ($hash->{WEBCM}) { # mit webcm
-         push @webCmdArray, "telcfg:settings/UseClickToDial" => 1;
-         push @webCmdArray, "telcfg:settings/DialPort" => 50;
-         $startValue->{dialPort}=50;
-           FRITZBOX_Log $hash, 3, "INFO: Switch ClickToDial on, set dial port 50";
-      }
-      elsif ($hash->{SECPORT}) { # oder mit TR064
+      if ($hash->{SECPORT}) { # oder mit TR064
          # get port name
          push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_GetPhonePort", "NewIndex", "1"];
          @tr064Result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
@@ -5289,104 +4067,15 @@ sub FRITZBOX_Ring_Run_Web($)
    if (int (@FritzFons) == 0 && $ttsLink) {
       FRITZBOX_Log $hash, 3, "INFO: No Fritz!Fon identified, parameter 'say:' will be ignored.";
    }
-# Creation fhemRadioStation for ttsLink
-   elsif (int (@FritzFons) && $ttsLink && $hash->{fhem}{radio}{$fhemRadioStation} ne "FHEM") {
-      push @webCmdArray, "configd:settings/WEBRADIO".$fhemRadioStation."/Name" => "FHEM";
-      push @webCmdArray, "configd:settings/WEBRADIO".$fhemRadioStation."/Bitmap" => "1023";
-      if (int @webCmdArray) {
-         FRITZBOX_Log $hash, 3, "INFO: Create new internet radio station $fhemRadioStation: 'FHEM' for ringing with text-to-speech"
-      }
-      else {
-         FRITZBOX_Log $hash, 3, "INFO: Your Fritz!OS version has limited interfaces. Cannot create radio station 'FHEM' for ringing with text-to-speech."
-      }
-   }
-
-   #Execute command array
-   FRITZBOX_Web_CmdPost( $hash, \@webCmdArray )       if int @webCmdArray;
-
-#Preparing 2nd command array to set ring parameters
-# Change ring tone of Fritz!Fons
-   if ( $ringTone && $hash->{WEBCM}==0 && $useGuiHack == 0 ) {
-      FRITZBOX_Log $hash, 3, "INFO: Your Fritz!OS version has limited interfaces. Ring tone cannot be changed."
-   }
-   elsif ($ringTone && @FritzFons == 0) {
-      FRITZBOX_Log $hash, 3, "INFO: No Fritz!Fon identified, ring tone will be ignored.";
-   }
-   elsif ($ringTone) {
-      foreach (@FritzFons) {
-         push @webCmdArray, "telcfg:settings/Foncontrol/User".$_."/IntRingTone" => $ringTone
-            unless $useGuiHack;
-         my $getCmdStr = "&start_ringtest=1&idx=".$_."&ringtone=".$ringTone;
-         FRITZBOX_Log $hash, 4, "INFO: Change temporarily internal ring tone of dect".$_." to $ringTone";
-         if ($ttsLink) {
-            push @webCmdArray, "telcfg:settings/Foncontrol/User".$_."/RadioRingID" => $fhemRadioStation
-               unless $useGuiHack;
-            $getCmdStr .= "&ring_tone_radio_test=".$fhemRadioStation;
-            FRITZBOX_Log $hash, 4, "INFO: Change temporarily radio station of dect".$_." to $fhemRadioStation (FHEM)";
-         }
-         push @getCmdArray, [ "fon_devices/edit_dect_ring_tone.lua" => $getCmdStr]
-               if $useGuiHack;
-      }
-   }
-
-# Change dial port and its name (dial port 1-3) to show messages on ringing phones
-   my $ringWithIntern = AttrVal( $name, "ringWithIntern", 0 );
-   if ( $ringWithIntern =~ /^([1-3])$/ && $msg) {
-      if ($startValue->{fonPort}->[$ringWithIntern-1]->{Name}) {
-         push @webCmdArray, "telcfg:settings/MSN/Port".($ringWithIntern-1)."/Name" => $msg;
-            FRITZBOX_Log $hash, 4, "INFO: Change temporarily name of dial port 'fon$ringWithIntern' to '$msg'";
-      }
-      else {
-         FRITZBOX_Log $hash, 2, "ERROR: Current name of dial port 'fon$ringWithIntern' could not be determined -> Did not change the name.";
-         my $temp = Dumper( $startValue );
-         FRITZBOX_Log $hash, 3, "DEBUG: info: \n".$temp;
-      }
-      push @webCmdArray, "telcfg:settings/DialPort" => $ringWithIntern;
-         FRITZBOX_Log $hash, 4, "INFO: Set dial port to '" . $dialPort{$ringWithIntern} . "' (MSN: ".$startValue->{fonPort}->[$ringWithIntern-1]{MSN} .").";
-   }
-# set dial port to 50 (all Fons)
-   elsif ($msg) {
-      FRITZBOX_Log $hash, 3, "INFO: Parameter 'show:' ignored because attribute 'ringWithIntern' not defined." if $field{show};
-      push @webCmdArray, "telcfg:settings/DialPort" => 50;
-      FRITZBOX_Log $hash, 4, "INFO: Set dial port to 50 (all fons)";
-   }
-
-# Set tts-Message
-   if ($ttsLink) {
-   # Create m3u-file (if ring tone and radio station cannot be changed because of missing interfaces)
-      if ( $hash->{M3U_LOCAL} ne "undefined" ) {
-         if (open my $fh, '>', $hash->{M3U_LOCAL}) {
-            print $fh $ttsLink . "\n";
-            close $fh;
-            FRITZBOX_Log $hash, 4, "INFO: Filled m3u file '" . $hash->{M3U_LOCAL} . "' with '$ttsLink'.";
-            $ttsLink = $hash->{M3U_URL} if $hash->{M3U_URL} ne "undefined";
-         }
-         else {
-            my $msg = "ERROR: Cannot create file '".$hash->{M3U_LOCAL}."' because: ".$!."\n";
-            FRITZBOX_Log $hash, 4, $msg;
-         }
-      }
-      push @webCmdArray, 'configd:settings/WEBRADIO'.$fhemRadioStation.'/URL' => $ttsLink;
-   }
-#Execute command array
-   $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray )
-      if $hash->{WEBCM}==1 && int( @webCmdArray ) > 0;
-
-   $result = FRITZBOX_Web_CmdGet( $hash, \@getCmdArray )
-      if int( @getCmdArray ) > 0;
 
    $intNo =~ s/,/#/g;
 
 #Preparing 3rd command array to ring
    FRITZBOX_Log $hash, 4, "INFO: Ringing $intNo for $duration seconds";
-   if ( $hash->{WEBCM}==1 ) {
-      push @webCmdArray, "telcfg:command/Dial" => "**".$intNo."#";
-      $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
-   }
-   elsif ($hash->{SECPORT}) {
+   if ($hash->{SECPORT}) {
       push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialNumber", "NewX_AVM-DE_PhoneNumber", "**".$intNo."#"];
       @tr064Result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-      return $name."|0|Error (set ring): ".$tr064Result[0]->{Error}     if $tr064Result[0]->{Error};
+      return $name."|0|Error (set ring): ".$tr064Result[0]->{Error} if $tr064Result[0]->{Error};
    }
    else {
       FRITZBOX_Log $hash, 3, "INFO: Your Fritz!OS version has limited interfaces. You cannot ring.";
@@ -5398,55 +4087,8 @@ sub FRITZBOX_Ring_Run_Web($)
 #Preparing 4th command array to stop ringing (but not when duration is 0 or play: and say: is used without duration)
    unless ( $duration == 0 || $duration == -1 && $ttsLink ) {
       push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialHangup"];
-      $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray )      if $hash->{SECPORT} && $hash->{WEBCM} != 1;
-      push( @webCmdArray, "telcfg:command/Hangup" => "" )   if $hash->{WEBCM}==1;
+      $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray ) if $hash->{SECPORT};
    }
-
-#Preparing 5th command array to reset everything
-   push @webCmdArray, "telcfg:settings/DialPort" => $startValue->{dialPort}      if defined $startValue->{dialPort};
-      FRITZBOX_Log $hash, 4, "INFO: Reset dial port to '".$dialPort{$startValue->{dialPort}}."'.";
-# Reset internal ring tones for the Fritz!Fons
-   if ($ringTone) {
-      foreach (@FritzFons) {
-         my $value = $startValue->{dectUser}->[$_]->{IntRingTone};
-         push @webCmdArray, "telcfg:settings/Foncontrol/User".$_."/IntRingTone" => $value
-            unless $useGuiHack;
-         my $getCmdStr = "&ring_tone_radio_test=1&idx=".$_."&start_ringtest=1&ringtone=".$value;
-            FRITZBOX_Log $hash, 4, "INFO: Reset ring tone of dect$_ to $value";
-         # Reset internet station for the Fritz!Fons
-         if ($ttsLink) {
-            $value = $startValue->{dectUser}->[$_]->{RadioRingID};
-            push @webCmdArray, "telcfg:settings/Foncontrol/User".$_."/RadioRingID" => $value
-               unless $useGuiHack;
-            $getCmdStr .= "&ring_tone_radio_test=".$value;
-            FRITZBOX_Log $hash, 4, "INFO: Reset radio station of dect$_ to $value";
-         }
-         push @getCmdArray, [ "fon_devices/edit_dect_ring_tone.lua" => $getCmdStr ]
-               if $useGuiHack ;
-      }
-   }
-
-# Reset name of calling number
-   if ($ringWithIntern =~ /^([1-2])$/) {
-      my $fonName = $startValue->{fonPort}->[$ringWithIntern-1]->{Name};
-      if ($fonName) {# darf nie leer sein
-         push( @webCmdArray, "telcfg:settings/MSN/Port".($ringWithIntern-1)."/Name" => $fonName ) ;
-            FRITZBOX_Log $hash, 4, "INFO: Reset name of dial port fon$ringWithIntern to '$fonName'";
-      }
-   }
-
-# ??? Switch of Internet Radio stations
-   # if (!$ttsLink && defined $ringTone && $ringTone ==33 ) {
-      # push @webCmdArray, "telcfg:command/Dial **".$intNo;
-      # push @webCmdArray, "telcfg:command/Hangup **".$intNo;
-   # }
-#set Fritzbox ring 612 show:test test say:test test
-
-# Execute command array
-   $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
-
-   $result = FRITZBOX_Web_CmdGet( $hash, \@getCmdArray )
-      if int( @getCmdArray ) > 0;
 
    if ( $result->[0] == 1 ) {
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->[1];
@@ -5460,81 +4102,6 @@ sub FRITZBOX_Ring_Run_Web($)
 
    # return $name."|1|Ringing done";
 } # End FRITZBOX_Ring_Run_Web
-
-#######################################################################
-sub FRITZBOX_Set_Alarm_Shell($@)
-{
-   my ($hash, @val) = @_;
-   my $name = $hash->{NAME};
-
-   my $alarm = $val[0];
-   shift @val;
-
-   my $para = " ".join(" ", @val);
-
-   my $state = 1;
-   my $stateTxt = "on";
-   if ($para =~ /off/i)
-   {
-      $state = 0;
-      $stateTxt = "off";
-   }
-
-   my $time;
-   my $timeTxt;
-   if ($para =~ /([0-2]?\d):([0-5]\d)/ )
-   {
-      if ($1<10)
-      {
-         $time = 0;
-         $timeTxt = "0";
-      }
-      $time .= $1.$2;
-      $timeTxt .= $1.":".$2;
-      $time = undef if $time > 2359;
-   }
-
-   my $day; my $dayTxt;
-   my %alDayValues = %alarmDays;
-   $alDayValues{0} = "once";
-   $alDayValues{127} = "daily";
-   while (my ($key, $value) = each(%alDayValues) )
-   {
-      if ($para =~ /$value/i)
-      {
-         $day += $key ;
-         $dayTxt .= $value." ";
-      }
-   }
-
-   my $result = FRITZBOX_Telnet_OpenCon( $hash );
-   return "$name|Error|$result"
-      if $result;
-
-   readingsBeginUpdate($hash);
-
-   FRITZBOX_Shell_Exec( $hash, "ctlmgr_ctl w telcfg settings/AlarmClock".($alarm-1)."/Active ".$state );
-   readingsBulkUpdate($hash,"alarm".$alarm."_state",$stateTxt);
-
-   if (defined $time)
-   {
-      FRITZBOX_Shell_Exec( $hash, "ctlmgr_ctl w telcfg settings/AlarmClock".($alarm-1)."/Time ".$time );
-      readingsBulkUpdate($hash,"alarm".$alarm."_time",$timeTxt);
-   }
-
-   if (defined $day)
-   {
-      FRITZBOX_Shell_Exec( $hash, "ctlmgr_ctl w telcfg settings/AlarmClock".($alarm-1)."/Weekdays ".$day );
-      chop $dayTxt;
-      readingsBulkUpdate($hash,"alarm".$alarm."_wdays",$dayTxt);
-   }
-
-   readingsEndUpdate($hash, 1);
-
-   FRITZBOX_Telnet_CloseCon( $hash );
-
-   return undef;
-} # end FRITZBOX_Set_Alarm_Shell
 
 #######################################################################
 sub FRITZBOX_Set_Alarm_Web($@)
@@ -5583,26 +4150,6 @@ sub FRITZBOX_Set_Alarm_Web($@)
       }
    }
 
-   readingsBeginUpdate($hash);
-
-   push @webCmdArray, "telcfg:settings/AlarmClock".($alarm-1)."/Active" => $state;
-   readingsBulkUpdate($hash,"alarm".$alarm."_state",$stateTxt);
-
-   if (defined $time)
-   {
-      push @webCmdArray, "telcfg:settings/AlarmClock".($alarm-1)."/Time" => $time;
-      readingsBulkUpdate($hash,"alarm".$alarm."_time",$timeTxt);
-   }
-
-   if (defined $day)
-   {
-      push @webCmdArray, "telcfg:settings/AlarmClock".($alarm-1)."/Weekdays" => $day;
-      chop $dayTxt;
-      readingsBulkUpdate($hash,"alarm".$alarm."_wdays",$dayTxt);
-   }
-
-   FRITZBOX_Web_CmdPost ($hash, \@webCmdArray);
-   readingsEndUpdate($hash, 1);
 
    return undef;
 } # end FRITZBOX_Set_Alarm_Web
@@ -5618,95 +4165,7 @@ sub FRITZBOX_SetMOH($@)
    my $uploadFile = '/var/tmp/fhem_moh_upload';
    my $mohFile = '/var/tmp/fhem_fx_moh';
 
-   return "Error: Fritz!Box has no music on hold" unless defined $hash->{READINGS}{box_moh};
-
-   if (lc $type eq lc $mohtype{0} || $type eq "0") {
-      FRITZBOX_Shell_Exec ($hash, 'ctlmgr_ctl w telcfg settings/MOHType 0');
-      return 0;
-   }
-   elsif (lc $type eq lc $mohtype{1} || $type eq "1") {
-      FRITZBOX_Shell_Exec ($hash, 'ctlmgr_ctl w telcfg settings/MOHType 1');
-      return 1;
-   }
-   return "Error: Unvalid parameter '$type'" unless lc $type eq lc $mohtype{2} || $type eq "2";
-
-# Load customer MOH file
-
-   my $inFile = join " ", @file;
-   my $uploadDir = AttrVal( $name, "defaultUploadDir",  "" );
-   $uploadDir .= "/"
-      unless $uploadDir =~ /\/$|^$/;
-
-   if ($inFile !~ /^say:/i)
-   {
-      $inFile = $uploadDir.$inFile
-         unless $inFile =~ /^\//;
-      return "Error: Please give a complete file path or define the attribute 'defaultUploadDir'"
-         unless $inFile =~ /^\//;
-      return "Error: Only MP3 files can be used for 'music on hold'."
-         unless $inFile =~ /\.mp3$/i;
-   }
-
-   $result = FRITZBOX_Telnet_OpenCon( $hash );
-   return "$name|0|$result"
-      if $result;
-
-   push @cmdArray, '[ -f "'.$uploadFile.'" ] && rm "'.$uploadFile.'"';
-   push @cmdArray, '[ -f "'.$mohFile.'" ] && rm "'.$mohFile.'"';
-
-   if ($inFile =~ /^say:/i)
-   {
-      FRITZBOX_Log $hash, 4, "INFO: Converting Text2Speech";
-      # 'wget -U Mozilla -O "[ZIEL]" "http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT]"';
-      my $ttsCmd = $ttsCmdTemplate;
-      $ttsCmd =~ s/\[ZIEL\]/$uploadFile/;
-      my $ttsText = $inFile;
-      $ttsText =~ s/^say:\s*//i;
-      my $ttsLang = "de";
-      if ($ttsText =~ /^\((en|es|fr|nl)\)/i )
-      {
-         $ttsLang = $1;
-         $ttsText =~ s/^\($1\)\s*//i;
-      }
-      $ttsCmd =~ s/\[SPRACHE\]/$ttsLang/;
-      # $ttsText = ($ttsText." ") x int(60/length($ttsText))
-         # if length($ttsText) < 30;
-      $ttsText = substr($ttsText,0,70);
-      $ttsText = uri_escape($ttsText);
-      $ttsCmd =~ s/\[TEXT\]/$ttsText/;
-      push @cmdArray, $ttsCmd;
-   }
-   elsif ($inFile =~ /^(ftp|http):\/\//)
-   {
-      push @cmdArray, 'wget -U Mozilla -O "'.$uploadFile.'" "'.$inFile.'"';
-   } else {
-      push @cmdArray, 'cp "'.$inFile.'" "'.$uploadFile.'"';
-   }
-   push @cmdArray, '[ -f "'.$uploadFile.'" ] && echo 1 || echo 0';
-# Execute command array
-   $result = FRITZBOX_Shell_Exec ( $hash, \@cmdArray );
-   return "Could not access '$inFile'"
-      unless $result->[3] eq "1";
-
-#Prepare 2nd command array
-   push @cmdArray, 'if [ ! -f "/var/tmp/ffmpeg_mp3.tables" ]; then playerd_tables; fi';
-   push @cmdArray, 'ffmpegconv -i "'.$uploadFile.'" -o "'.$mohFile.'" --limit 32 --type 6';
-   push @cmdArray, '[ -f "'.$mohFile.'" ] && echo 1 || echo 0';
-# Execute 2nd command array
-   $result = FRITZBOX_Shell_Exec ( $hash, \@cmdArray );
-   return "Could not convert '$inFile'"
-      unless $result->[2] eq "1";
-
-#Prepare 3rd command array
-   push @cmdArray, 'cat "'.$mohFile.'" >/var/flash/fx_moh';
-   push @cmdArray, 'killall -sigusr1 telefon';
-   push @cmdArray, 'rm "'.$uploadFile.'"';
-   push @cmdArray, 'rm "'.$mohFile.'"';
-# Execute 3rd command array
-   $result = FRITZBOX_Shell_Exec ( $hash, \@cmdArray );
-
-   FRITZBOX_Telnet_CloseCon( $hash );
-   return 2;
+   return undef;
 }
 
 #######################################################################
@@ -5717,6 +4176,7 @@ sub FRITZBOX_SetCustomerRingTone($@)
    my $result;
    my $name = $hash->{NAME};
    my $uploadDir = AttrVal( $name, "defaultUploadDir",  "" );
+
    $uploadDir .= "/"
       unless $uploadDir =~ /\/$|^$/;
 
@@ -5730,36 +4190,7 @@ sub FRITZBOX_SetCustomerRingTone($@)
    return "Error: Only MP3 or G722 files can be uploaded to the phone."
       unless $inFile =~ /\.mp3$|.g722$/i;
 
-   my $uploadFile = '/var/InternerSpeicher/FRITZ/fonring/'.int(time()).'.g722';
-   push @cmdArray, 'if [ ! -d /var/InternerSpeicher/FRITZ/fonring ]; then mkdir -p "/var/InternerSpeicher/FRITZ/fonring"; fi';
-   push @cmdArray, '[ -x /etc/init.d/rc.preaudio.sh ] && /etc/init.d/rc.preaudio.sh start';
-
-   $inFile =~ s/file:\/\///i;
-
-# mp3 files are converted
-   if ( $inFile =~ /\.mp3$/i ) {
-      push @cmdArray, 'picconv.sh "file://'.$inFile.'" "'.$uploadFile.'" ringtonemp3';
-
-# G722 files are copied
-   } elsif ( $inFile =~ /\.g722$/i ) {
-      push @cmdArray, "cp '$inFile' '$uploadFile'";
-
-# all other formats fail
-   } else {
-      return "Error: only MP3 or G722 files can be uploaded to the phone";
-   }
-
- # trigger the loading of the file to the phone, file will be deleted by the box as soon as the upload has finished
-   push @cmdArray, '/usr/bin/pbd --set-ringtone-url --book="255" --id="'.$intern.'" --url="file://'.$uploadFile.'" --name="FHEM'.int(time()).'"';
-
-   $result = FRITZBOX_Telnet_OpenCon( $hash );
-   return $result if $result;
-
-   FRITZBOX_Shell_Exec ($hash, \@cmdArray);
-
-   FRITZBOX_Telnet_CloseCon( $hash );
-
-   return "Upload of ring tone will take about 1 minute. Do not work with the phone until its done.";
+   return undef;
 }
 
 #######################################################################
@@ -5788,9 +4219,9 @@ sub FRITZBOX_ConvertMOH ($@)
    my $outFile = $inFile;
    $outFile = substr($inFile,0,-4)
       if ($inFile =~ /\.(mp3|wav)$/i);
-   my $returnStr = FRITZBOX_Shell_Exec ($hash
-      , 'ffmpegconv -i "'.$inFile.'" -o "'.$outFile.'.moh" --limit 32 --type 6');
-   return $returnStr;
+
+   return undef;
+
 } # end FRITZBOX_ConvertMOH
 
 #######################################################################
@@ -5819,9 +4250,9 @@ sub FRITZBOX_ConvertRingTone ($@)
    my $outFile = $inFile;
    $outFile = substr($inFile,0,-4)
       if ($inFile =~ /\.(mp3|wav)$/i);
-   my $returnStr = FRITZBOX_Shell_Exec ($hash
-      , 'picconv.sh "file://'.$inFile.'" "'.$outFile.'.g722" ringtonemp3');
-   return $returnStr;
+
+   return undef
+;
 } # end FRITZBOX_ConvertRingTone
 
 #######################################################################
@@ -5874,81 +4305,9 @@ sub FRITZBOX_SendMail_Shell($@)
    push @cmdArray, "rm /var/tmp/fhem_nachricht.txt"
       if $field{body};
 
-   FRITZBOX_Shell_Exec( $hash, \@cmdArray );
-
    return undef;
 }
 
-#######################################################################
-sub FRITZBOX_StartRadio_Shell($@)
-{
-   my ($hash, @val) = @_;
-   my @cmdArray;
-   my $name = $hash->{NAME};
-   my $intNo = $val[0];
-   my $radioStation;
-   my $radioStationName;
-   my $result;
-
-# Check if 1st parameter is a number
-   return "Error: 1st Parameter '$intNo' not an internal DECT number"
-      unless $intNo =~ /^61[012345]$/;
-
-# Check if the 1st parameter is a Fritz!Fon
-   return "Error: Internal number $intNo does not seem to be a Fritz!Fon."
-      unless $hash->{fhem}{$intNo}{brand} eq "AVM";
-
-# Check if remaining parameter is an internet Radio Station
-   shift (@val);
-   if (@val) {
-      $radioStationName = join (" ", @val);
-      if ($radioStationName =~ /^\d+$/) {
-         $radioStation = $radioStationName;
-         $radioStationName = $hash->{fhem}{radio}{$radioStation};
-         return "Error: Unknown internet radio number $radioStation."
-            unless defined $radioStationName;
-      }
-      else {
-         foreach (keys %{$hash->{fhem}{radio}}) {
-            if (lc $hash->{fhem}{radio}{$_} eq lc $radioStationName) {
-               $radioStation = $_;
-               last;
-            }
-         }
-         return "Error: Unknown internet radio station '$radioStationName'"
-            unless defined $radioStation;
-
-      }
-   }
-
-   $result = FRITZBOX_Telnet_OpenCon( $hash );
-   return $result if $result;
-
-# Get current ringtone
-   my $userNo = $intNo-609;
-   push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User".$userNo."/IntRingTone";
-   push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User".$userNo."/RadioRingID";
-   $result = FRITZBOX_Shell_Exec( $hash, \@cmdArray );
-
-   my $curRingTone = $result->[0];
-   my $curRadioStation = $result->[1];
-
-# Start Internet Radio and reset ring tone
-   push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$userNo."/IntRingTone 33";
-   push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$userNo."/RadioRingID $radioStation"
-      if defined $radioStation;
-   push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
-   push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$userNo."/IntRingTone $curRingTone";
-   push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$userNo."/RadioRingID $curRadioStation"
-      if defined $radioStation;
-
-# Execute command array
-   FRITZBOX_Shell_Exec( $hash, \@cmdArray );
-
-   FRITZBOX_Telnet_CloseCon( $hash );
-
-   return undef;
-}
 
 #######################################################################
 sub FRITZBOX_StartRadio_Web($@)
@@ -6001,347 +4360,16 @@ sub FRITZBOX_StartRadio_Web($@)
    my $startValue = FRITZBOX_Web_Query( $hash, $queryStr );
 
 # Set ring tone Internet Radio
-      FRITZBOX_Log $hash, 5, "DEBUG: Set ring tone of $intNo to radio $radioStation";
-   push @webCmdArray, "telcfg:settings/Foncontrol/User".$userNo."/IntRingTone" => 33;
-   push @webCmdArray, "telcfg:settings/Foncontrol/User".$userNo."/RadioRingID" => $radioStation
-      if defined $radioStation;
-   FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
 
-      FRITZBOX_Log $hash, 5, "DEBUG: Call $intNo";
+   FRITZBOX_Log $hash, 5, "DEBUG: Call $intNo";
+
    if ($hash->{SECPORT}) { #ring with TR-064
       push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialNumber", "NewX_AVM-DE_PhoneNumber", "**".$intNo."#"];
       FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
    }
-   else { # ring with webcm
-      push @webCmdArray, "telcfg:command/Dial" => "**".$intNo."#";
-      FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
-   }
-
-# Reset ring tone
-      FRITZBOX_Log $hash, 5, "DEBUG: Reset ring tones.";
-   push @webCmdArray, "telcfg:settings/Foncontrol/User".$userNo."/IntRingTone" => $startValue->{curRingTone};
-   push @webCmdArray, "telcfg:settings/Foncontrol/User".$userNo."/RadioRingID" => $startValue->{curRadioStation}
-      if defined $radioStation;
-   FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
 
    return undef;
 } # END sub FRITZBOX_StartRadio_Web
-
-#'picconv.sh "'.$inFile.'" "'.$outFile.'.g722" ringtonemp3'
-#picconv.sh "file://$dir/upload.mp3" "$dir/$filename" ringtonemp3
-#"ffmpegconv  -i '$inFile' -o '$outFile.g722' --limit 240");
-#ffmpegconv -i "${in}" -o "${out}" --limit 240
-#pbd --set-image-url --book=255 --id=612 --url=/var/InternerSpeicher/FRITZ/fonring/1416431162.g722 --type=1
-#pbd --set-image-url --book=255 --id=612 --url=file://var/InternerSpeicher/FRITZBOXtest.g722 --type=1
-#ctlmgr_ctl r user settings/user0/bpjm_filter_enable
-#/usr/bin/pbd --set-ringtone-url --book="255" --id="612" --url="file:///var/InternerSpeicher/claydermann.g722" --name="Claydermann"
-# /usr/bin/moh_upload
-
-#######################################################################
-sub FRITZBOX_Shell_Query($$$)
-{
-   my ($hash, $readoutCmdArray, $roReadings) = @_;
-   my @cmdArray;
-   my $rValue;
-   my $rName;
-   my $rFormat;
-
-   my $count = int @{$readoutCmdArray} - 1;
-   for (0..$count)
-   {
-      push @cmdArray, $readoutCmdArray->[$_][1];
-   }
-
-   my $resultArray = FRITZBOX_Shell_Exec( $hash, \@cmdArray);
-   if (defined ($resultArray))
-   {
-      $count = int @{$resultArray} -1;
-      for (0..$count)
-      {
-         $rValue = $resultArray->[$_];
-         $rFormat = $readoutCmdArray->[$_][2];
-         $rFormat = "" unless defined $rFormat;
-         $rValue = FRITZBOX_Readout_Format ($hash, $rFormat, $rValue);
-         $rName = $readoutCmdArray->[$_][0];
-         if ($rName ne "")
-         {
-            FRITZBOX_Log $hash, 5, "DEBUG: $rName: $rValue";
-            push @{$roReadings}, $rName."|".$rValue;
-         }
-      }
-   }
-   @{$readoutCmdArray} = ();
-
-   return $resultArray;
-}
-
-# Executed the command on the FritzBox Shell (remote or local)
-############################################
-sub FRITZBOX_Shell_Exec($$)
-{
-   my ($hash, $cmd) = @_;
-   my $openedTelnet = 0;
-
-   if ($hash->{REMOTE} == 1) {
-      unless (defined $telnet) {
-         return undef
-            if (FRITZBOX_Telnet_OpenCon($hash));
-         $openedTelnet = 1;
-      }
-      my $retVal = FRITZBOX_Shell_Exec_Telnet($hash, $cmd);
-      FRITZBOX_Telnet_CloseCon ( $hash ) if $openedTelnet;
-      return $retVal;
-   }
-   else {
-      return FRITZBOX_Shell_Exec_Local($hash, $cmd);
-   }
-
-}
-
-# Executed the command on the fhem server (on the FritzBox Shell)
-############################################
-sub FRITZBOX_Shell_Exec_Local($$)
-{
-   my ($hash, $cmd) = @_;
-
-   if (ref \$cmd eq "SCALAR") {
-      FRITZBOX_Log $hash, 5, "DEBUG: Execute '".$cmd."'";
-      my $result = qx($cmd);
-      chomp $result;
-      FRITZBOX_Log $hash, 5, "DEBUG: Result '$result'";
-      return $result;
-   }
-   elsif (ref \$cmd eq "REF") {
-      if ( int (@{$cmd}) > 0 )
-      {
-         FRITZBOX_Log $hash, 4, "INFO: Execute " . int ( @{$cmd} ) . " command(s)";
-         FRITZBOX_Log $hash, 5, "DEBUG: Commands: '" . join( " | ", @{$cmd} ) . "'";
-         my $cmdStr = join "\necho ' |#|'\n", @{$cmd};
-         $cmdStr .= "\necho ' |#|'";
-         my $result = qx($cmdStr);
-         unless (defined $result)
-         {
-            FRITZBOX_Log $hash, 1, "ERROR: No STDOUT from shell command.";
-            return undef;
-         }
-         $result =~ s/\n|\r//g;
-         my @resultArray = split /\|#\|/, $result;
-         for (0 .. $#resultArray)
-         {
-            $resultArray[$_] =~ s/\s$//;
-         }
-         @{$cmd} = ();
-         FRITZBOX_Log $hash, 4, "INFO: Received ".int(@resultArray)." answer(s)";
-         FRITZBOX_Log $hash, 5, "DEBUG: Result: '" . join (" | ", @resultArray)."'";
-         return \@resultArray;
-      }
-      else
-      {
-         FRITZBOX_Log $hash, 4, "INFO: No shell command to execute.";
-      }
-   }
-   else {
-      FRITZBOX_Log $hash, 1, "ERROR: wrong perl parameter";
-   }
-}
-
-# Executed a command via Telnet
-############################################
-sub FRITZBOX_Shell_Exec_Telnet($$)
-{
-   my ($hash, $cmd) = @_;
-   my @output;
-   my $result;
-
-
-   if (ref \$cmd eq "SCALAR") {
-      FRITZBOX_Log $hash, 4, "INFO: Execute '".$cmd."'";
-      @output=$telnet->cmd($cmd);
-      $result = $output[0];
-      chomp $result;
-      my $log = join " ", @output;
-      chomp $log;
-      FRITZBOX_Log $hash, 4, "INFO: Result '$log'";
-      return $result;
-   }
-   elsif (ref \$cmd eq "REF") {
-      my @resultArray = ();
-      if ( int (@{$cmd}) > 0 )
-      {
-         FRITZBOX_Log $hash, 4, "INFO: Execute " . int ( @{$cmd} ) . " command(s)";
-
-         foreach (@{$cmd})
-         {
-            FRITZBOX_Log $hash, 5, "DEBUG: Execute '$_'";
-            unless ($_ =~ /^sleep/)
-            {
-               @output=$telnet->cmd($_);
-               $result = $output[0] || "";
-               chomp $result;
-               my $log = join "", @output;
-               chomp $log;
-               FRITZBOX_Log $hash, 5, "DEBUG: Result '$log'";
-            }
-            else
-            {
-               FRITZBOX_Log $hash, 4, "INFO: Do '$_' in perl.";
-               eval ($_);
-               $result = "";
-            }
-            push @resultArray, $result;
-         }
-         @{$cmd} = ();
-         FRITZBOX_Log $hash, 4, "INFO: Received ".int(@resultArray)." answer(s)";
-      }
-      else
-      {
-         FRITZBOX_Log $hash, 4, "INFO: No shell command to execute.";
-      }
-      return \@resultArray;
-   }
-   else {
-      FRITZBOX_Log $hash, 1, "ERROR: wrong perl parameter";
-      return undef;
-   }
-}
-
-# Opens a Telnet Connection to an external FritzBox
-############################################
-sub FRITZBOX_Telnet_OpenCon($)
-{
-   my ($hash) = @_;
-   my $name = $hash->{NAME};
-
-   return undef       unless $hash->{REMOTE} == 1;
-
-   if ($missingModulTelnet) {
-      my $msg = "ERROR: Perl modul ".$missingModulTelnet."is missing on this system. Please install before using this modul.";
-      FRITZBOX_Log $hash, 2, $msg;
-      return $msg;
-   }
-
-   my $host = $hash->{HOST};
-
-   my $pwd = FRITZBOX_readPassword($hash);
-   my $msg;
-   my $before;
-   my $match;
-
-   unless (defined $pwd) {
-      $msg = "ERROR: No password set. Please define it with 'set $name password YourPassword'";
-      FRITZBOX_Log $hash, 2, $msg;
-      # return $msg;
-
-      my $pwdFile = AttrVal( $name, "pwdFile", "fb_pwd.txt");
-      FRITZBOX_Log $hash, 5, "DEBUG: Open password file '$pwdFile' to extract password";
-      if (open(IN, "<" . $pwdFile)) {
-         $pwd = <IN>;
-         close(IN);
-        FRITZBOX_Log $hash, 5, "DEBUG: Close password file";
-      } else {
-         FRITZBOX_Log $hash, 2, $msg;
-         return $msg;
-      }
-   }
-
-   my $user = AttrVal( $name, "telnetUser", "" );
-
-      FRITZBOX_Log $hash, 4, "INFO: Open Telnet connection to $host";
-   my $timeout = AttrVal( $name, "telnetTimeOut", "10");
-   $telnet = new Net::Telnet ( Host=>$host, Port => 23, Timeout=>$timeout, Errmode=>'return', Prompt=>'/# $/');
-   if (!$telnet) {
-      $msg = "ERROR: Could not open telnet connection to $host: $!";
-      FRITZBOX_Log $hash, 2, $msg;
-      $telnet = undef;
-      return $msg;
-   }
-
-   FRITZBOX_Log $hash, 5, "DEBUG: Wait for user or password prompt.";
-   unless ( ($before,$match) = $telnet->waitfor('/(user|login|password): $/i') ) {
-      $msg = "ERROR: Telnet error while waiting for user or password prompt: ".$telnet->errmsg;
-      FRITZBOX_Log $hash, 2, $msg;
-      $telnet->close;
-      $telnet = undef;
-      return $msg;
-   }
-   if ( $match =~ /(user|login): / && $user eq "") {
-      $msg = "ERROR: Telnet login requires user name but attribute 'telnetUser' not defined";
-      FRITZBOX_Log $hash, 2, $msg;
-      $telnet->close;
-      $telnet = undef;
-      return $msg;
-   }
-   elsif ( $match =~ /(user|login): /) {
-      FRITZBOX_Log $hash, 5, "DEBUG: Entering user name";
-      $telnet->print( $user );
-
-      FRITZBOX_Log $hash, 5, "DEBUG: Wait for password prompt";
-      unless ($telnet->waitfor( '/password: $/i' ))
-      {
-         $msg = "ERROR: Telnet error while waiting for password prompt: ".$telnet->errmsg;
-         FRITZBOX_Log $hash, 2, $msg;
-         $telnet->close;
-         $telnet = undef;
-         return $msg;
-      }
-   }
-   elsif ( $match eq "password: " && $user ne "") {
-      FRITZBOX_Log $hash, 3, "INFO: Attribute 'telnetUser' defined but telnet login did not prompt for user name.";
-   }
-
-      FRITZBOX_Log $hash, 5, "DEBUG: Entering password";
-   $telnet->print( $pwd );
-
-      FRITZBOX_Log $hash, 5, "DEBUG: Wait for command prompt";
-   unless ( ($before,$match) = $telnet->waitfor( '/# $|Login failed./i' )) {
-      $msg = "ERROR: Telnet error while waiting for command prompt: ".$telnet->errmsg;
-      FRITZBOX_Log $hash, 2, $msg;
-      $telnet->close;
-      $telnet = undef;
-      return $msg;
-   }
-   elsif ( $match eq "Login failed.") {
-      $msg = "ERROR: Telnet login failed. Wrong password.";
-      FRITZBOX_Log $hash, 2, $msg;
-      $telnet->close;
-      $telnet = undef;
-      return $msg;
-   }
-
-# redirect console messages
-   $telnet->cmd("setconsole -r");
-
-      FRITZBOX_Log $hash, 5, "DEBUG: Change command prompt";
-   $telnet->prompt('/<xFHEMx> $/');
-   unless ($telnet->cmd("PS1='<xFHEMx> '")) {
-      $msg = "ERROR: Telnet could not change command prompt - ".$telnet->errmsg;
-      FRITZBOX_Log $hash, 2, $msg;
-      $telnet->close;
-      $telnet = undef;
-      return $msg;
-   }
-
-   return undef;
-} # end FRITZBOX_Telnet_OpenCon
-
-# Closes a Telnet Connection to an external FritzBox
-############################################
-sub FRITZBOX_Telnet_CloseCon($)
-{
-   my ($hash) = @_;
-
-   return undef
-      unless $hash->{REMOTE} == 1;
-
-   if (defined $telnet) {
-      FRITZBOX_Log $hash, 4, "INFO: Close Telnet connection";
-      $telnet->close;
-      $telnet = undef;
-   }
-   else {
-      FRITZBOX_Log $hash, 1, "INFO: Cannot close an undefined Telnet connection";
-   }
-} # end FRITZBOX_Telnet_CloseCon
 
 # Execute a Command via TR-064
 #################################################
@@ -6543,8 +4571,6 @@ sub FRITZBOX_TR064_Init ($$)
    my ($hash, $host) = @_;
    my $name = $hash->{NAME};
 
-   return   if AttrVal( $name, "forceTelnetConnection",  0 );
-
    if ($missingModulTR064) {
       FRITZBOX_Log $hash, 2,  "ERROR: Cannot use TR-064. Perl modul " . $missingModulTR064 . " is missing on this system. Please install.";
       return undef;
@@ -6586,8 +4612,6 @@ sub FRITZBOX_Web_OpenCon ($)
 {
    my ($hash) = @_;
    my $name = $hash->{NAME};
-   return undef
-      unless $hash->{REMOTE} == 1;
 
    if ($missingModulWeb) {
       FRITZBOX_Log $hash, 2, "ERROR: Perl modul ".$missingModulWeb."is missing on this system. Please install before using this modul.";
@@ -6627,68 +4651,6 @@ sub FRITZBOX_Web_OpenCon ($)
 
  }
 
-# Execute commands via the web connection
-############################################
-sub FRITZBOX_Web_CmdPost($$@)
-{
-   my ($hash, $webCmdArray, $page) = @_;
-   my $name = $hash->{NAME};
-
-   unless ( $hash->{WEBCM}==1 ) {
-      @{$webCmdArray} = ();
-      my $msg = "ERROR: API webcm not available on the box.";
-      FRITZBOX_Log $hash, 4, $msg;
-      my @retArray = (0, $msg);
-      return \@retArray;
-   }
-
-   my $sid = FRITZBOX_Web_OpenCon($hash);
-   unless ($sid) {
-      my @retArray = (2, "Didn't get a session ID");
-      return \@retArray;
-   }
-
-
-# Complete the arguments
-   if ($page) {
-      $page .= "?sid=".$sid;
-      push @{$webCmdArray}, "apply" => "";
-   }
-   else {
-      $page = '/cgi-bin/webcm';
-   }
-   push @{$webCmdArray}, "sid" => $sid;
-
-   my $host = $hash->{HOST};
-   my $url = 'http://'.$host.$page;
-
-   FRITZBOX_Log $hash, 3, "INFO: Posting ".(@{$webCmdArray} /2) ." parameters to '$url'";
-   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
-   my $response = $agent->post( $url, $webCmdArray );
-   @{$webCmdArray} = ();
-
-   if ($response->is_error) {
-      FRITZBOX_Log $hash, 2, "ERROR: ".$response->status_line;
-      my @retArray = (0, "Error: ".$response->status_line);
-      return \@retArray;
-   }
-
-   FRITZBOX_Log $hash, 3, "INFO: Response: ".$response->content;
-# if ($response->content)
-   # {
-      # my @retArray = (0, "Command not executed");
-      # return \@retArray;
-   # }
-
-   my @retArray = (1, $sid);
-   return \@retArray;
-}
-
-# Execute commands via the web connection
-############################################
-#set Fritzbox ring 612 ringring
-#URL=http://fritz.box/fon_devices/edit_dect_ring_tone.lua?idx=4&sid=5695bd219020152b&start_ringtest=1&ringtone=4&xhr=1&t1436900289183=nocache
-#URL=http://fritz.box/fon_devices/edit_dect_ring_tone.lua?idx=4&sid=5695bd219020152b&start_ringtest=2&xhr=1&t1436900295372=nocache
 
 sub FRITZBOX_Web_CmdGet($$)
 {
@@ -6802,6 +4764,12 @@ sub FRITZBOX_Lua_Data($$@)
 
    my $name = $hash->{NAME};
    my $LogInfo = 4;
+
+   if ($hash->{LUADATA} <= 0) {
+      my %retHash = ( "Error" => "data.lua not supportet", "Info" => "Fritz!Box or Fritz!OS outdated" ) ;
+      FRITZBOX_Log $hash, 2, "ERROR: data.lua not supportet. Fritz!Box or Fritz!OS outdated.";
+      return \%retHash;
+   }
 
    my $sid = FRITZBOX_Web_OpenCon( $hash );
    unless ($sid) {
@@ -6993,8 +4961,14 @@ sub FRITZBOX_User_Info_List($) {
 
    my $views = $result->{user_info};
 
-#   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
-   $returnStr .= '<table cellspacing="10" cellpadding="20">';
+#  border(8),cellspacing(10),cellpadding(20)
+   my $tableFormat = AttrVal($name, "disableTableFormat", "undef");
+
+   $returnStr .= '<table';
+   $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+   $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+   $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+   $returnStr .= '>';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="4">Benutzer Informationen</td><td colspan="5">Berechtigungen</td>';
    $returnStr .= "</tr>\n";
@@ -7051,8 +5025,14 @@ sub FRITZBOX_Kid_Profiles_List($) {
 
    my $views = $result->{data}->{kidProfiles};
 
-#   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
-   $returnStr .= '<table cellspacing="10" cellpadding="20">';
+#  border(8),cellspacing(10),cellpadding(20)
+   my $tableFormat = AttrVal($name, "disableTableFormat", "undef");
+
+   $returnStr .= '<table';
+   $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+   $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+   $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+   $returnStr .= '>';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="3">Kid Profiles</td>';
    $returnStr .= "</tr>\n";
@@ -7113,8 +5093,14 @@ sub FRITZBOX_DOCSIS_Informations($) {
    my $views;
    my $nbViews;
 
-   # $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
-   $returnStr .= '<table cellspacing="10" cellpadding="20">';
+#  border(8),cellspacing(10),cellpadding(20)
+   my $tableFormat = AttrVal($name, "disableTableFormat", "undef");
+
+   $returnStr .= '<table';
+   $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+   $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+   $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+   $returnStr .= '>';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="10">DOCSIS Informationen</td>';
    $returnStr .= "</tr>\n";
@@ -7274,8 +5260,14 @@ sub FRITZBOX_WLAN_Environment($) {
    my $views = $result->{data}->{scanlist};
    my $nbViews = scalar @$views;
 
-   #$returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
-   $returnStr .= '<table cellspacing="5" cellpadding="10">';
+#  border(8),cellspacing(10),cellpadding(20)
+   my $tableFormat = AttrVal($name, "disableTableFormat", "undef");
+
+   $returnStr .= '<table';
+   $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+   $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+   $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+   $returnStr .= '>';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="4">WLAN: Netzwerke in der Umgebung</td>';
    $returnStr .= "</tr>\n";
@@ -7336,8 +5328,14 @@ sub FRITZBOX_VPN_Shares_List($) {
       $jID = "init";
    }
 
-#   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
-   $returnStr .= '<table cellspacing="10" cellpadding="20">';
+#  border(8),cellspacing(10),cellpadding(20)
+   my $tableFormat = AttrVal($name, "disableTableFormat", "undef");
+
+   $returnStr .= '<table';
+   $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+   $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+   $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+   $returnStr .= '>';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="7">VPN Shares: Benutzer-Verbindungen</td>';
    $returnStr .= "</tr>\n";
@@ -7374,8 +5372,14 @@ sub FRITZBOX_VPN_Shares_List($) {
    }
 
    $returnStr .= "\n";
-#   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
-   $returnStr .= '<table cellspacing="10" cellpadding="20">';
+#  border(8),cellspacing(10),cellpadding(20)
+   $tableFormat = AttrVal($name, "disableTableFormat", "undef");
+
+   $returnStr .= '<table';
+   $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+   $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+   $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+   $returnStr .= '>';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="7">VPN Shares: Box-Verbindungen</td>';
    $returnStr .= "</tr>\n";
@@ -7460,7 +5464,7 @@ sub FRITZBOX_Lan_Devices_List($) {
    my $FW1 = substr($fwV[1],0,2);
    my $FW2 = substr($fwV[2],0,2);
 
-   FRITZBOX_Log $hash, 4, "INFO: FRITZBOX_Lan_Device_Info f�r Version: $FW1.$FW2 ";
+   FRITZBOX_Log $hash, 4, "INFO: FRITZBOX_Lan_Device_List f�r Version: $FW1.$FW2 ";
 
    my @webCmdArray;
    # "xhr 1 lang de page netDev xhrId cleanup useajax 1 no_sidrenew nop;
@@ -7480,8 +5484,14 @@ sub FRITZBOX_Lan_Devices_List($) {
      return $returnStr . $tmp;
    }
 
-#  $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
-   $returnStr .= '<table cellspacing="10" cellpadding="20">';
+#  border(8),cellspacing(10),cellpadding(20)
+   my $tableFormat = AttrVal($name, "disableTableFormat", "undef");
+
+   $returnStr .= '<table';
+   $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+   $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+   $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+   $returnStr .= '>';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="6">LanDevices: Active</td>';
    $returnStr .= "</tr>\n";
@@ -7518,8 +5528,14 @@ sub FRITZBOX_Lan_Devices_List($) {
    $returnStr .= "</table>\n";
 
    $returnStr .= "\n";
-#   $returnStr .= '<table border="8" cellspacing="10" cellpadding="20">';
-   $returnStr .= '<table cellspacing="10" cellpadding="20">';
+#  border(8),cellspacing(10),cellpadding(20)
+   $tableFormat = AttrVal($name, "disableTableFormat", "undef");
+
+   $returnStr .= '<table';
+   $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+   $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+   $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+   $returnStr .= '>';
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="6">LanDevices: Passiv</td>';
    $returnStr .= "</tr>\n";
@@ -7649,6 +5665,8 @@ sub FRITZBOX_Lan_Device_Info($$$) {
    }
 }
 
+# get info for restrinctions for kids
+############################################
 sub FRITZBOX_Lua_Kids($$@)
 {
    my ($hash, $queryStr, $charSet) = @_;
@@ -7718,7 +5736,7 @@ sub FRITZBOX_Lua_Kids($$@)
 }
 
 #####################################
-# checks and stores FritzBox password used for telnet or webinterface connection
+# checks and stores FritzBox password used for webinterface connection
 sub FRITZBOX_storePassword($$)
 {
     my ($hash, $password) = @_;
@@ -7833,37 +5851,6 @@ sub FRITZBOX_fritztris($)
 } # End FRITZBOX_fritztris
 
 #####################################
-#{my @cmd;; $cmd=webCmdArray, "active" => "on";
-# FRITZBOX_Web_CmdPost ($hash, \@webCmdArray, '/wlan/wlan_settings.lua');
-
-
-      # <li><code>set &lt;name&gt; convertRingTone &lt;fullFilePath&gt;</code>
-         # <br>
-         # Converts the mp3-file fullFilePath to the G722 format and puts it in the same path.
-         # <br>
-         # The file has to be placed on the file system of the FRITZ!BOX.
-      # </li><br>
-
-      # <li><code>set &lt;name&gt; convertMusicOnHold &lt;fullFilePath&gt;</code>
-         # <br>
-         # <i>Not implemented yet.</i> Converts the mp3-file fullFilePath to a format that can be used for "Music on Hold".
-         # <br>
-         # The file has to be placed on the file system of the fritzbox.
-      # </li><br>
-
-      # <li><code>set &lt;name&gt; convertRingTone &lt;fullFilePath&gt;</code>
-         # <br>
-         # Konvertiert die  mp3-Datei fullFilePath in das G722-Format und legt es im selben Pfad ab.
-         # <br>
-         # Die Datei muss im Dateisystem der FRITZ!BOX liegen.
-      # </li><br>
-
-      # <li><code>set &lt;name&gt; convertMusicOnHold &lt;fullFilePath&gt;</code>
-         # <br>
-         # <i>Not implemented yet.</i> Converts the mp3-file fullFilePath to a format that can be used for "Music on Hold".
-         # <br>
-         # The file has to be placed on the file system of the fritzbox.
-      # </li><br>
 
 1;
 
@@ -7883,9 +5870,7 @@ sub FRITZBOX_fritztris($)
    <br>
    For detail instructions, look at and please maintain the <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki</b></a>.
    <br/><br/>
-   The modul switches in local mode if FHEM runs on a FRITZ!BOX (as root user!). Otherwise, it tries to open a web or telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the FRITZ!BOX. For remote access the password must <u>once</u> be set.
-   <br/><br/>
-   The box is partly controlled via the official TR-064 interface but also via undocumented interfaces between web interface and firmware kernel. The modul works best with Fritz!OS 6.24. AVM has removed internal interfaces (telnet, webcm) from later Fritz!OS versions without replacement. <b>For these versions, some modul functions are hence restricted or do not work at all (see remarks to required API).</b>
+   The box is partly controlled via the official TR-064 interface but also via undocumented interfaces between web interface and firmware kernel.</br>
    <br>
    The modul was tested on FRITZ!BOX 7390 and 7490 with Fritz!OS 6.20 and higher.
    <br>
@@ -7913,19 +5898,10 @@ sub FRITZBOX_fritztris($)
    <a name="FRITZBOXset"></a>
    <b>Set</b>
    <ul>
-      <li><a name="alarm"></a>
-         <dt><code>set &lt;name&gt; alarm &lt;number&gt; [on|off] [time] [once|daily|Mo|Tu|We|Th|Fr|Sa|So]</code></dt>
-         <br>
-         Switches the alarm number (1, 2 or 3) on or off (default is on). Sets the time and weekday. If no state is given it is switched on.
-         <br>
-         Requires the API: Telnet or webcm.
-      </li><br>
-
       <li><a name="call"></a>
-         <dt><code>set &lt;name&gt; call &lt;number&gt; [duration] [say:text|play:MP3URL]</code></dt>
+         <dt><code>set &lt;name&gt; call &lt;number&gt; [duration]</code></dt>
          <br>
-         Calls for 'duration' seconds (default 60) the given number from an internal port (default 1 or attribute 'ringWithIntern'). If the call is taken a text or sound can be played as music on hold (moh). The internal port will also ring.
-         Say and play requires the API: Telnet or webcm.
+         Calls for 'duration' seconds (default 60) the given number from an internal port (default 1).
       </li><br>
 
       <li><a name="checkAPIs"></a>
@@ -7944,20 +5920,12 @@ sub FRITZBOX_fritztris($)
          <br>
       </li><br>
 
-      <li><a name="customerRingTone"></a>
-         <dt><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;fullFilePath&gt;</code></dt>
-         <br>
-         Uploads the file fullFilePath on the given handset. Only mp3 or G722 format is allowed.
-         <br>
-         The file has to be placed on the file system of the FRITZ!BOX.
-         <br>
-         The upload takes about one minute before the tone is available.
-      </li><br>
-
       <li><a name="dect"></a>
          <dt><code>set &lt;name&gt; dect &lt;on|off&gt;</code></dt>
          <br>
-         Switches the DECT base of the box on or off. Requires the API: Telnet or webcm.
+         Switches the DECT base of the box on or off.
+         <br>
+         Requires the API: Telnet, webcm or FRITZ!OS 7.21 or higher.
       </li><br>
 
       <li><a name="diversity"></a>
@@ -8023,21 +5991,9 @@ sub FRITZBOX_fritztris($)
          Needs FRITZ!OS 7.21 or higher
       </li><br>
 
-      <li><a name="moh"></a>
-         <dt><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3FileIncludingPath|say:Text&gt;]</code></dt>
-         <br>
-         Example: <code>set &lt;name&gt; moh customer say:Die Wanne ist voll</code>
-         <br>
-         <code>set &lt;name&gt; moh customer /var/InternerSpeicher/warnung.mp3</code>
-         <br>
-         Changes the 'music on hold' of the Box. The parameter 'customer' allows to upload a mp3 file. Alternatively a text can be spoken with "say:". The music on hold has <u>always</u> a length of 8.2 s. It is played continuously during the broking of calls or if the module rings a phone and the call is taken. So, it can be used to transmit little messages of 8 s.
-         <br>
-      </li><br>
-
       <li><a name="password"></a>
          <dt><code>set &lt;name&gt; password &lt;password&gt;</code></dt>
          <br>
-         Stores the password for remote telnet access.
       </li><br>
 
       <li><a name="rescanWLANneighbors"></a>
@@ -8075,26 +6031,6 @@ sub FRITZBOX_fritztris($)
          Say and play <u>may</u> work only with one single Fritz!Fon at a time.
          <br>
          The behaviour may vary depending on the Fritz!OS.
-      </li><br>
-
-      <li><a name="sendMail"></a>
-         <dt><code>set &lt;name&gt; sendMail [to:&lt;Address&gt;] [subject:&lt;Subject&gt;] [body:&lt;Text&gt;]</code></dt>
-         <br>
-         Sends an email via the email notification service that is configured in push service of the FRITZ!BOX.
-         Use "\n" for line breaks in the body.
-         All parameters can be omitted. Make sure the messages are not classified as junk by your email client.
-         <br>
-         Requires Telnet access to the box.
-         <br>
-      </li><br>
-
-      <li><a name="startRadio"></a>
-         <dt><code>set &lt;name&gt; startRadio &lt;internalNumber&gt; [name or number]</code></dt>
-         <br>
-         Plays the internet radio on the given Fritz!Fon. Default is the current <u>ring tone</u> radio station of the phone.
-         So, <b>not</b> the station that is selected at the handset.
-         An available internet radio can be selected by its name or (reading) number.
-         <br>
       </li><br>
 
       <li><a name="tam"></a>
@@ -8172,21 +6108,6 @@ sub FRITZBOX_fritztris($)
          Shows informations via query.lua requests.
       </li><br>
 
-      <li><a name="ringTones"></a>
-         <dt><code>get &lt;name&gt; ringTones</code></dt>
-         <br>
-         Shows the list of ring tones that can be used.
-      </li><br>
-
-      <li><a name="shellCommand"></a>
-         <dt><code>get &lt;name&gt; shellCommand &lt;Command&gt;</code></dt>
-         <br>
-         Runs the given command on the FRITZ!BOX shell and returns the result.
-         Can be used to run shell commands not included in this modul.
-         <br>
-         Only available if the attribute "allowShellCommand" is set.
-      </li><br>
-
       <li><a name="tr064Command"></a>
          <dt><code>get &lt;name&gt; tr064Command &lt;service&gt; &lt;control&gt; &lt;action&gt; [[argName1 argValue1] ...]</code></dt>
          <br>
@@ -8196,7 +6117,6 @@ sub FRITZBOX_fritztris($)
          <br>
          Example: <code>get &lt;name&gt; tr064Command X_AVM-DE_OnTel:1 x_contact GetDECTHandsetInfo NewDectID 1</code>
          <br>
-         Only available if the attribute "allowTR064Command" is set.
       </li><br>
 
       <li><a name="tr064ServiceList"></a>
@@ -8223,38 +6143,12 @@ sub FRITZBOX_fritztris($)
          Enables the get command "shellCommand"
       </li><br>
 
-      <li><a name="allowTR064Command"></a>
-         <dt><code>allowTR064Command &lt;0 | 1&gt;</code></dt>
-         <br>
-         Enables the get command "tr064Command"
-      </li><br>
-
       <li><a name="boxUser"></a>
          <dt><code>boxUser &lt;user name&gt;</code></dt>
          <br>
          User name that is used for TR064 or other web based access. By default no user name is required to login.
          <br>
          If the FRITZ!BOX is configured differently, the user name has to be defined with this attribute.
-      </li><br>
-
-      <li><a name="defaultCallerName"></a>
-         <dt><code>defaultCallerName &lt;Text&gt;</code></dt>
-         <br>
-         The default text to show on the ringing phone as 'caller'.
-         <br>
-         This is done by temporarily changing the name of the calling internal number during the ring.
-         <br>
-         Maximal 30 characters are allowed. The attribute "ringWithIntern" must also be specified.
-         <br>
-         Required API: Telnet or webcmd
-      </li><br>
-
-      <li><a name="defaultUploadDir"></a>
-         <dt><code>defaultUploadDir &lt;fritzBoxPath&gt;</code></dt>
-         <br>
-         This is the default path that will be used if a file name does not start with / (slash).
-         <br>
-         It needs to be the name of the path on the FRITZ!BOX. So, it should start with /var/InternerSpeicher if it equals in Windows \\ip-address\fritz.nas
       </li><br>
 
       <li><a name="deviceInfo"></a>
@@ -8293,6 +6187,12 @@ sub FRITZBOX_fritztris($)
          <dt><code>disableFonInfo &lt;0 | 1&gt;</code></dt>
          <br>
          Switches the takeover of dect information off/on.
+      </li><br>
+
+      <li><a name="disableTableFormat"></a>
+         <dt><code>disableTableFormat&lt;border(8),cellspacing(10),cellpadding(20)&gt;</code></dt>
+         <br>
+         Disables table format parameters.
       </li><br>
 
       <li><a name="enableAlarmInfo"></a>
@@ -8337,14 +6237,6 @@ sub FRITZBOX_fritztris($)
          Defines a new prefix for the reading name of the wlan neighborhood devices that is build from the mac address. Default prefix is nbh_.
       </li><br>
 
-      <li><a name="forceTelnetConnection"></a>
-         <dt><code>forceTelnetConnection &lt;0 | 1&gt;</code></dt>
-         <br>
-         Always use telnet for remote access (instead of access via the WebGUI or TR-064).
-         <br>
-         This attribute should be enabled for older boxes/firmwares.
-      </li><br>
-
       <li><a name="fritzBoxIP"></a>
          <dt><code>fritzBoxIP &lt;IP Address&gt;</code></dt>
          <br>
@@ -8365,35 +6257,6 @@ sub FRITZBOX_fritztris($)
       <li><a name="m3uFileURL"></a>
          <dt><code>m3uFileURL &lt;URL&gt;</code></dt>
          <br>
-      </li><br>
-
-      <li><a name="ringWithIntern"></a>
-         <dt><code>ringWithIntern &lt;1 | 2 | 3&gt;</code></dt>
-         <br>
-         To ring a phone a caller must always be specified. Default of this module is 50 "ISDN:Wählhilfe".
-         <br>
-         To show a message (default: "FHEM") during a ring the internal phone numbers 1-3 can be specified here.
-         The concerned analog phone socket <u>must</u> exist.
-      </li><br>
-
-      <li><a name="telnetTimeOut"></a>
-         <dt><code>telnetTimeOut &lt;seconds&gt;</code></dt>
-         <br>
-         Maximal time to wait for an answer during a telnet session. Default is 10 s.
-      </li><br>
-
-      <li><a name="telnetUser"></a>
-         <dt><code>telnetUser &lt;user name&gt;</code></dt>
-         <br>
-         User name that is used for telnet access. By default no user name is required to login.
-         <br>
-         If the FRITZ!BOX is configured differently, the user name has to be defined with this attribute.
-      </li><br>
-
-      <li><a name="useGuiHack"></a>
-         <dt><code>useGuiHack &lt;0 | 1&gt;</code></dt>
-         <br>
-         If the APIs do not allow the change of the ring tone (Fritz!OS >6.24), check the <a href="http://www.fhemwiki.de/wiki/FRITZBOX#Klingelton-Einstellung_und_Abspielen_von_Sprachnachrichten_bei_Fritz.21OS-Versionen_.3E6.24">WIKI</a> (German) to understand the use of this attribute.
       </li><br>
 
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
@@ -8421,6 +6284,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_ipv6Extern</b> - Internet IPv6 of the FRITZ!BOX</li>
       <li><b>box_ipv6Prefix</b> - Internet IPv6 Prefix of the FRITZ!BOX for the LAN/WLAN</li>
       <li><b>box_macFilter_active</b> - Status of the WLAN MAC filter (restrict WLAN access to known WLAN devices)</li>
+      <li><b>box_meshRole</b> - from version 07.21 the mesh role (master, slave) is displayed.</li>
       <li><b>box_model</b> - FRITZ!BOX model</li>
       <li><b>box_moh</b> - music-on-hold setting</li>
       <li><b>box_model</b> - FRITZ!BOX model</li>
@@ -8521,9 +6385,7 @@ sub FRITZBOX_fritztris($)
    <br>
    Für detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki</b></a> konsultieren und ergänzen.
    <br/><br/>
-   Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer FRITZ!BOX läuft (als root-Benutzer!). Ansonsten versucht es eine Web oder Telnet Verbindung zu "fritz.box" zu öffnen. D.h. Telnet (#96*7*) muss auf der FRITZ!BOX erlaubt sein. Für diesen Fernzugriff muss <u>einmalig</u> das Passwort gesetzt werden.
-   <br/><br/>
-   Die Steuerung erfolgt teilweise über die offizielle TR-064-Schnittstelle und teilweise über undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern. Das Modul funktioniert am besten mit dem Fritz!OS 6.24. Bei den nachfolgenden Fritz!OS Versionen hat AVM einige interne Schnittstellen (telnet, webcm) ersatzlos gestrichen. <b>Einige Modul-Funktionen sind dadurch nicht oder nur eingeschränkt verfügbar (siehe Anmerkungen zu benötigten API).</b>
+   Die Steuerung erfolgt teilweise über die offizielle TR-064-Schnittstelle und teilweise über undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern.</br>
    <br>
    Bitte auch die anderen FRITZ!BOX-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
@@ -8548,21 +6410,12 @@ sub FRITZBOX_fritztris($)
    <a name="FRITZBOXset"></a>
    <b>Set</b>
    <ul>
-      <li><a name="alarm"></a>
-         <dt><code>set &lt;name&gt; alarm &lt;number&gt; [on|off] [time] [once|daily|Mo|Tu|We|Th|Fr|Sa|So]</code></dt>
-         <br>
-         Schaltet den Weckruf Nummer 1, 2 oder 3 an oder aus (Standard ist on). Setzt die Zeit und den Wochentag.
-         <br>
-         Benötigt die API: Telnet oder webcm.
-      </li><br>
-
       <li><a name="call"></a>
-         <dt><code>set &lt;name&gt; call &lt;number&gt; [duration] [say:text|play:MP3URL]</code></dt>
+         <dt><code>set &lt;name&gt; call &lt;number&gt; [duration]</code></dt>
          <br>
-         Ruft für 'Dauer' Sekunden (Standard 60 s) die angegebene Telefonnummer von einem internen Telefonanschluss an (Standard ist 1 oder das Attribut 'ringWithIntern'). Wenn der Angerufene abnimmt, hört er die Wartemusik oder den angegebenen Text oder Klang.
+         Ruft für 'Dauer' Sekunden (Standard 60 s) die angegebene Telefonnummer von einem internen Telefonanschluss an (Standard ist 1). Wenn der Angerufene abnimmt, hört er die Wartemusik.
          Der interne Telefonanschluss klingelt ebenfalls.
          <br>
-         "say:" und "play:" benötigen die API: Telnet oder webcm.
       </li><br>
 
       <li><a name="checkAPIs"></a>
@@ -8579,19 +6432,12 @@ sub FRITZBOX_fritztris($)
          Benötigt FRITZ!OS 7.21 oder höher. <br>
       </li><br>
 
-      <li><a name="customerRingTone"></a>
-         <dt><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;fullFilePath&gt;</code></dt>
-         Lädt die MP3-Datei als Klingelton auf das angegebene Telefon. Die Datei muss im Dateisystem der FRITZ!BOX liegen.
-         <br>
-         Das Hochladen dauert etwa eine Minute bis der Klingelton verfügbar ist. (API: Telnet)
-      </li><br>
-
       <li><a name="dect"></a>
          <dt><code>set &lt;name&gt; dect &lt;on|off&gt;</code></dt>
          <br>
          Schaltet die DECT-Basis der Box an oder aus.
          <br>
-         Benötigt die API: Telnet oder webcm.
+         Benötigt Telnet, webcm oder mindestens FRITZ!OS 7.21
       </li><br>
 
       <li><a name="diversity"></a>
@@ -8661,18 +6507,6 @@ sub FRITZBOX_fritztris($)
          Needs FRITZ!OS 7.21 or higher
       </li><br>
 
-      <li><a name="moh"></a>
-         <dt><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3FileIncludingPath|say:Text&gt;]</code></dt>
-         <br>
-         Beispiel: <code>set &lt;name&gt; moh customer say:Die Wanne ist voll</code>
-         <br>
-         <code>set &lt;name&gt; moh customer /var/InternerSpeicher/warnung.mp3</code>
-         <br>
-         ändert die Wartemusik ('music on hold') der Box. Mit dem Parameter 'customer' kann eine eigene MP3-Datei aufgespielt werden.
-         Alternativ kann mit "say:" auch ein Text gesprochen werden. Die Wartemusik hat <u>immer</u> eine Länge von 8,13 s. Sie wird kontinuierlich während des Makelns von Gesprächen aber auch bei Nutzung der internen Wählhilfe bis zum Abheben des rufenden Telefons abgespielt. Dadurch können über FHEM dem Angerufenen 8s-Nachrichten vorgespielt werden.
-         <br>
-      </li><br>
-
       <li><a name="password"></a>
          <dt><code>set &lt;name&gt; password &lt;password&gt;</code></dt>
          <br>
@@ -8717,24 +6551,6 @@ sub FRITZBOX_fritztris($)
          Das Abspielen ist eventuell nicht auf mehreren Fritz!Fons gleichzeitig möglich.
          <br>
          Je nach Fritz!OS kann das beschriebene Verhalten abweichen.
-         <br>
-      </li><br>
-
-      <li><a name="sendMail"></a>
-         <dt><code>set &lt;name&gt; sendMail [to:&lt;Address&gt;] [subject:&lt;Subject&gt;] [body:&lt;Text&gt;]</code></dt>
-         <br>
-         Sendet eine Email über den Emailbenachrichtigungsservice der als Push Service auf der FRITZ!BOX konfiguriert wurde.
-         Mit "\n" kann einen Zeilenumbruch im Textkörper erzeut werden.
-         Alle Parameter können ausgelassen werden. Bitte kontrolliert, dass die Email nicht im Junk-Verzeichnis landet.
-         <br>
-         Benötigt einen Telnet Zugang zur Box.
-         <br>
-      </li><br>
-
-      <li><a name="startRadio"></a>
-         <dt><code>set &lt;name&gt; startRadio &lt;internalNumber&gt; [name or number]</code></dt>
-         <br>
-         Startet das Internetradio auf dem angegebenen Fritz!Fon. Eine verfügbare Radiostation kann über den Namen oder die (Gerätewert)Nummer ausgewählt werden. Ansonsten wird die in der Box als Internetradio-Klingelton eingestellte Station abgespielt. (Also <b>nicht</b> die am Telefon ausgewählte.)
          <br>
       </li><br>
 
@@ -8811,21 +6627,6 @@ sub FRITZBOX_fritztris($)
          Zeigt Informations durch Abfragen der query.lua.
       </li><br>
 
-      <li><a name="ringTones"></a>
-         <dt><code>get &lt;name&gt; ringTones</code></dt>
-         <br>
-         Zeigt die Liste der Klingeltöne, die benutzt werden können.
-      </li><br>
-
-      <li><a name="shellCommand"></a>
-         <dt><code>get &lt;name&gt; shellCommand &lt;Command&gt;</code></dt>
-         <br>
-         Führt den angegebenen Befehl auf der FRITZ!BOX-Shell aus und gibt das Ergebnis zurück.
-         Kann benutzt werden, um Shell-Befehle auszuführen, die nicht im Modul implementiert sind.
-         <br>
-         Muss zuvor über das Attribute "allowShellCommand" freigeschaltet werden.
-      </li><br>
-
       <li><a name="tr064Command"></a>
          <dt><code>get &lt;name&gt; tr064Command &lt;service&gt; &lt;control&gt; &lt;action&gt; [[argName1 argValue1] ...]</code></dt>
          <br>
@@ -8835,7 +6636,6 @@ sub FRITZBOX_fritztris($)
          <br>
          Beispiel: <code>get &lt;name&gt; tr064Command X_AVM-DE_OnTel:1 x_contact GetDECTHandsetInfo NewDectID 1</code>
          <br>
-         Muss zuvor über das Attribute "allowTR064Command" freigeschaltet werden.
       </li><br>
 
       <li><a name="tr064ServiceList"></a>
@@ -8861,37 +6661,11 @@ sub FRITZBOX_fritztris($)
          Freischalten des get-Befehls "shellCommand"
       </li><br>
 
-      <li><a name="allowTR064Command"></a>
-         <dt><code>allowTR064Command &lt;0 | 1&gt;</code></dt>
-         <br>
-         Freischalten des get-Befehls "tr064Command" und "luaQuery"
-      </li><br>
-
       <li><a name="boxUser"></a>
          <dt><code>boxUser &lt;user name&gt;</code></dt>
          <br>
          Benutzername für den TR064- oder einen anderen webbasierten Zugang. Normalerweise wird keine Benutzername für das Login benötigt.
          Wenn die FRITZ!BOX anders konfiguriert ist, kann der Nutzer über dieses Attribut definiert werden.
-      </li><br>
-
-      <li><a name="defaultCallerName"></a>
-         <dt><code>defaultCallerName &lt;Text&gt;</code></dt>
-         <br>
-         Standard-Text, der auf dem angerufenen internen Telefon als "Anrufer" gezeigt wird.
-         <br>
-         Dies erfolgt, indem während des Klingelns temporär der Name der internen anrufenden Nummer geändert wird.
-         <br>
-         Es sind maximal 30 Zeichen erlaubt. Das Attribute "ringWithIntern" muss ebenfalls spezifiziert sein.
-         <br>
-         Benötigt die API: Telnet oder webcmd
-         </li><br>
-
-      <li><a name="defaultUploadDir"></a>
-         <dt><code>defaultUploadDir &lt;fritzBoxPath&gt;</code></dt>
-         <br>
-         Dies ist der Standard-Pfad der für Dateinamen benutzt wird, die nicht mit einem / (Schrägstrich) beginnen.
-         <br>
-         Es muss ein Pfad auf der FRITZ!BOX sein. D.h., er sollte mit /var/InternerSpeicher starten, wenn es in Windows unter \\ip-address\fritz.nas erreichbar ist.
       </li><br>
 
       <li><a name="deviceInfo"></a>
@@ -8903,7 +6677,7 @@ sub FRITZBOX_fritztris($)
 
          Wird der Parameter <code>_noDefInf_</code> gesetzt, die Reihenfolge ind der Liste spielt hier keine Rolle, dann werden nicht vorhandene Werte der Netzwerkverbindung
          mit noConnectInfo (LAN oder WLAN nicht verfügbar) und noSpeedInfo (Geschwindigkeit nicht verfügbar) angezeigt.<br><br>
-         über das freie Eingabefeld können eigene Text oder Zeichen hinzugefügt und zwischen die festen Paramter eingeordnet werden.<br>
+         Über das freie Eingabefeld können eigene Text oder Zeichen hinzugefügt und zwischen die festen Paramter eingeordnet werden.<br>
          Hierbei gibt es folgende spezielle Texte:<br>
          <code>space</code> => wird zu einem Leerzeichen.<br>
          <code>comma</code> => wird zu einem Komma.<br>
@@ -8924,43 +6698,49 @@ sub FRITZBOX_fritztris($)
       <li><a name="disableDectInfo"></a>
          <dt><code>disableDectInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die übernahme von Dect Informatioen aus/ein.
+         Schaltet die Übernahme von Dect Informationen aus/ein.
       </li><br>
 
       <li><a name="disableFonInfo"></a>
          <dt><code>disableFonInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die übernahme von Telefon Informatioen aus/ein.
+         Schaltet die Übernahme von Telefon Informationen aus/ein.
+      </li><br>
+
+      <li><a name="disableTableFormat"></a>
+         <dt><code>disableTableFormat&lt;border(8),cellspacing(10),cellpadding(20)&gt;</code></dt>
+         <br>
+         Deaktiviert Parameter für die Formatierung der Tabelle.
       </li><br>
 
       <li><a name="enableAlarmInfo"></a>
          <dt><code>enableAlarmInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die übernahme von Alarm Informatioen aus/ein.
+         Schaltet die Übernahme von Alarm Informationen aus/ein.
       </li><br>
 
       <li><a name="enablePassivLanDevices"></a>
          <dt><code>enablePassivLanDevices &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die übernahme von passiven Netzwerkgeräten als Reading aus/ein.
+         Schaltet die Übernahme von passiven Netzwerkgeräten als Reading aus/ein.
       </li><br>
 
       <li><a name="enableSIP"></a>
          <dt><code>enableSIP &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die übernahme von SIP's als Reading aus/ein.
+         Schaltet die Übernahme von SIP's als Reading aus/ein.
       </li><br>
 
       <li><a name="enableUserInfo"></a>
          <dt><code>enableUserInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die übernahme von Benutzer Informatioen aus/ein.
+         Schaltet die Übernahme von Benutzer Informationen aus/ein.
       </li><br>
 
       <li><a name="enableVPNShares"></a>
          <dt><code>enableVPNShares &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die übernahme von VPN Shares als Reading aus/ein.
+         Schaltet die Übernahme von VPN Shares als Reading aus/ein.
       </li><br>
 
       <li><a name="enableWLANneighbors"></a>
@@ -8973,14 +6753,6 @@ sub FRITZBOX_fritztris($)
          <dt><code>wlanNeighborsPrefix &lt;prefix&gt;</code></dt>
          <br>
          Definiert einen Präfix für den Reading Namen der WLAN Nachbarschaftsgeräte, der aus der MAC Adresse gebildet wird. Der default Präfix ist nbh_.
-      </li><br>
-
-      <li><a name="forceTelnetConnection"></a>
-         <dt><code>forceTelnetConnection &lt;0 | 1&gt;</code></dt>
-         <br>
-         Erzwingt den Fernzugriff über Telnet (anstatt über die WebGUI oder TR-064).
-         <br>
-         Dieses Attribut muss bei älteren Geräten/Firmware aktiviert werden.
       </li><br>
 
       <li><a name="fritzBoxIP"></a>
@@ -9003,34 +6775,6 @@ sub FRITZBOX_fritztris($)
       <li><a name="m3uFileURL"></a>
          <dt><code>m3uFileURL &lt;URL&gt;</code></dt>
          <br>
-      </li><br>
-
-      <li><a name="ringWithIntern"></a>
-         <dt><code>ringWithIntern &lt;1 | 2 | 3&gt;</code></dt>
-         <br>
-         Um ein Telefon klingeln zu lassen, muss in der FRITZ!BOX eine Anrufer (Wählhilfe, Wert 'box_stdDialPort') spezifiziert werden.
-         <br>
-         Um während des Klingelns eine Nachricht (Standard: "FHEM") anzuzeigen, kann hier die interne Nummer 1-3 angegeben werden.
-         Der entsprechende analoge Telefonanschluss muss vorhanden sein.
-      </li><br>
-
-      <li><a name="telnetTimeOut"></a>
-         <dt><code>telnetTimeOut &lt;seconds&gt;</code></dt>
-         <br>
-         Maximale Zeit, bis zu der während einer Telnet-Sitzung auf Antwort gewartet wird. Standard ist 10 s.
-      </li><br>
-
-      <li><a name="telnetUser"></a>
-         <dt><code>telnetUser &lt;user name&gt;</code></dt>
-         <br>
-         Benutzername für den Telnetzugang. Normalerweise wird keine Benutzername für das Login benötigt.
-         Wenn die FRITZ!BOX anders konfiguriert ist, kann der Nutzer über dieses Attribut definiert werden.
-      </li><br>
-
-      <li><a name="useGuiHack"></a>
-         <dt><code>useGuiHack &lt;0 | 1&gt;</code></dt>
-         <br>
-         Falls die APIs der Box nicht mehr die änderung des Klingeltones unterstützen (Fritz!OS >6.24), kann dieses Attribute entsprechend der <a href="http://www.fhemwiki.de/wiki/FRITZBOX#Klingelton-Einstellung_und_Abspielen_von_Sprachnachrichten_bei_Fritz.21OS-Versionen_.3E6.24">WIKI-Anleitung</a> genutzt werden.
       </li><br>
 
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
@@ -9056,8 +6800,9 @@ sub FRITZBOX_fritztris($)
       <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des Gäste-WLAN</li>
       <li><b>box_ipExtern</b> - Internet IPv4 der FRITZ!BOX</li>
       <li><b>box_ipv6Extern</b> - Internet IPv6 der FRITZ!BOX</li>
-      <li><b>box_ipv6Prefix</b> - Internet IPv6 Prefix der FRITZ!BOX f�r das LAN/WLAN</li>
-      <li><b>box_macFilter_active</b> - Status des WLAN MAC-Filter (WLAN-Zugang auf die bekannten WLAN-Ger�te beschr�nken)</li>
+      <li><b>box_ipv6Prefix</b> - Internet IPv6 Prefix der FRITZ!BOX für das LAN/WLAN</li>
+      <li><b>box_macFilter_active</b> - Status des WLAN MAC-Filter (WLAN-Zugang auf die bekannten WLAN-Ger�te beschränken)</li>
+      <li><b>box_meshRole</b> - ab Version 07.21 wird die Mesh Rolle (master, slave) angezeigt.</li>
       <li><b>box_model</b> - FRITZ!BOX-Modell</li>
       <li><b>box_moh</b> - Wartemusik-Einstellung</li>
       <li><b>box_connect</b> - Verbindungsstatus: Unconfigured, Connecting, Authenticating, Connected, PendingDisconnect, Disconnecting, Disconnected</li>
