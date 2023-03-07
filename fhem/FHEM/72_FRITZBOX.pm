@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.9";
+my $ModulVersion = "07.50.9a";
 my $missingModul = "";
 my $missingModulWeb = "";
 my $missingModulTR064 = "";
@@ -237,13 +237,15 @@ sub FRITZBOX_Define($$)
 
    return "Usage: define <name> FRITZBOX [IP address]" if(@args <2 || @args >3);
 
+   return "Error: no valid IPv4 Address: $args[2]" if defined $args[2] && $args[2] !~ m/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/;
+
    my $name = $args[0];
 
    $hash->{NAME}    = $name;
    $hash->{VERSION} = $ModulVersion;
 
    $hash->{HOST} = "undefined";
-   $hash->{HOST} = $args[2]     if defined $args[2];
+   $hash->{HOST} = $args[2]     if defined $args[2] && $args[2] =~ m/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/;
    $hash->{fhem}{definedHost} = $hash->{HOST}; # to cope with old attribute definitions
 
    my $msg;
@@ -285,12 +287,21 @@ sub FRITZBOX_Define($$)
       my $msg = "The support for telnet and operation on a Fritz!Box has been discontinued. The functions are disabled.";
       FRITZBOX_Log $hash, 2, $msg;
       $hash->{INFO} = $msg;
-      $msg = "The following attributes are not longer supperted:\n"
-           . "useGuiHack, ringWithIntern, defaultCallerName, allowTR064Command\n"
+      $msg = "The following attributes are not longer supported:\n"
+           . "useGuiHack, ringWithIntern, defaultCallerName, allowTR064Command,\n"
+           . "forceTelnetConnection, telnetUser, telnetTimeOut\n"
            . "Use deleteattr to delete from Attributes.";
       FRITZBOX_Log $hash, 2, $msg;
       $hash->{INFO2} = $msg;
    }
+
+   CommandDeleteAttr(undef,"$hash useGuiHack -silent");
+   CommandDeleteAttr(undef,"$hash ringWithIntern -silent");
+   CommandDeleteAttr(undef,"$hash defaultCallerName -silent");
+   CommandDeleteAttr(undef,"$hash allowTR064Command -silent");
+   CommandDeleteAttr(undef,"$hash forceTelnetConnection -silent");
+   CommandDeleteAttr(undef,"$hash telnetUser -silent");
+   CommandDeleteAttr(undef,"$hash telnetTimeOut -silent");
 
    return undef;
 } #end FRITZBOX_Define
@@ -349,6 +360,7 @@ sub FRITZBOX_Attr($@)
 
    if ($aName eq "fritzBoxIP") {
      if ($cmd eq "set") {
+       return "plain IPv4 recommended" if $aVal !~ m/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/;
        $hash->{HOST} = $aVal;
      }
      else {
@@ -363,8 +375,8 @@ sub FRITZBOX_Attr($@)
         
        return "character | not possible in _default_" if $aVal =~ m/\|/;
 
-       $aVal =~ s/\,/\,\n/g;
-       $_[3] = $aVal;
+#       $aVal =~ s/\,/\,\n/g;
+#       $_[3] = $aVal;
      }
    }
 
@@ -374,8 +386,8 @@ sub FRITZBOX_Attr($@)
        foreach ( @reading_list ) {
          readingsDelete($hash, $_) if exists $hash->{READINGS}{$_};
        }
-       $aVal =~ s/\,/\,\n/g;
-       $_[3] = $aVal;
+#       $aVal =~ s/\,/\,\n/g;
+#       $_[3] = $aVal;
      } 
    }
 
@@ -1386,12 +1398,16 @@ sub FRITZBOX_API_Check_Run($)
    my $host = $hash->{HOST};
    my $boxUser = AttrVal( $name, "boxUser", "" );
 
-   if ( $host =~ /undefined/ ) {
-     my $tmp = "fritzBoxIP";
-        $tmp .= ", boxUser" if $boxUser eq "";
-        $tmp .= " nicht definiert";
+   if ( $host =~ /undefined/ || $boxUser eq "") {
+     my $tmp = "";
+        $tmp = "fritzBoxIP" if $host =~ /undefined/;
+        $tmp .= ", " if $host =~ /undefined/ && $boxUser eq "";
+        $tmp .= " boxUser (bei Repeatern nicht unbedingt notwendig)" if $boxUser eq "";
+        $tmp .= " nicht definiert. Bitte auch das Passwort mit <set $name password> setzen.";
 
-     FRITZBOX_Log $hash, 2, "INFO: " . $hash->{HINWEIS};
+     FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "->HINWEIS", $tmp);
+
+     FRITZBOX_Log $hash, 2, "ERROR: " . $tmp;
    }
 
 # change host name if necessary
@@ -2735,6 +2751,8 @@ sub FRITZBOX_Readout_Run_Web($)
    }
 
 # statistics
+   FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "->HINWEIS", "");
+
    push @roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
    my $returnStr = join('|', @roReadings );
 
@@ -2844,6 +2862,7 @@ sub FRITZBOX_Readout_Process($$)
             else {
                $hash->{$rName1}{$rName2} = $rValue;
             }
+            delete ($hash->{HINWEIS}) if $rName2 eq "HINWEIS" && $rValue eq "";
          }
          elsif ($rName eq "box_fwVersion" && defined $values{box_fwUpdate}) {
             $rValue .= " (old)" if $values{box_fwUpdate} eq "1";
@@ -2888,6 +2907,7 @@ sub FRITZBOX_Readout_Process($$)
             }
             $rValue .= " [".$values{box_oem}."]" if $values{box_oem};
          }
+
          if ($rName !~ /->|box_fwUpdate|box_oem|readoutTime/) {
             if ($rValue ne "") {
                readingsBulkUpdate( $hash, $rName, $rValue );
@@ -4635,9 +4655,8 @@ sub FRITZBOX_Web_OpenCon ($)
       return undef;
    }
    my $user = AttrVal( $name, "boxUser", "" );
-   $user = AttrVal( $name, "telnetUser", "" ) if $user eq "";
 
-   FRITZBOX_Log $hash, 4, "INFO: Open Web connection to $host";
+   FRITZBOX_Log $hash, 4, "INFO: Open Web connection to $host : $user";
    FRITZBOX_Log $hash, 4, "INFO: getting new SID";
    $sid = (FB_doCheckPW($host, $user, $pwd));
 
@@ -5876,7 +5895,7 @@ sub FRITZBOX_fritztris($)
    <br>
    Check also the other FRITZ!BOX moduls: <a href="#SYSMON">SYSMON</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
-   <i>The modul uses the Perl modul 'Net::Telnet', 'JSON::XS', 'LWP', 'SOAP::Lite' for remote access.</i>
+   <i>The modul uses the Perl modul 'JSON::XS', 'LWP', 'SOAP::Lite' for remote access.</i>
    <br/><br/>
 
    <a name="FRITZBOXdefine"></a>
@@ -5925,14 +5944,14 @@ sub FRITZBOX_fritztris($)
          <br>
          Switches the DECT base of the box on or off.
          <br>
-         Requires the API: Telnet, webcm or FRITZ!OS 7.21 or higher.
+         Requires FRITZ!OS 7.21 or higher.
       </li><br>
 
       <li><a name="diversity"></a>
          <dt><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code></dt>
          <br>
          Switches the call diversity number (1, 2 ...) on or off.
-         A call diversity for an incoming number has to be created with the FRITZ!BOX web interface. Requires the API: Telnet, webcm or TR064 (>=6.50).
+         A call diversity for an incoming number has to be created with the FRITZ!BOX web interface. Requires TR064 (>=6.50).
          <br>
          Note! Only a diversity for a concret home number and <u>without</u> filter for the calling number can be set. Hence, an approbriate <i>diversity</i>-reading must exist.
       </li><br>
@@ -6004,7 +6023,7 @@ sub FRITZBOX_fritztris($)
       </li><br>
 
       <li><a name="ring"></a>
-         <dt><code>set &lt;name&gt; ring &lt;intNumbers&gt; [duration [ringTone]] [show:Text]  [say:Text | play:MP3URL]</code></dt>
+         <dt><code>set &lt;name&gt; ring &lt;intNumbers&gt; [duration] [show:Text]  [say:Text | play:MP3URL]</code></dt>
          <dt>Example:</dt>
          <dd>
          <code>set &lt;name&gt; ring 611,612 5 Budapest show:It is raining</code>
@@ -6020,8 +6039,6 @@ sub FRITZBOX_fritztris($)
          Ring tone will be ignored for collected calls (9 or 50).
          <br>
          If the call is taken the callee hears the "music on hold" which can also be used to transmit messages.
-         <br>
-         The parameter <i>ringtone, show:, say:</i> and <i>play:</i> require the API Telnet or webcm.
          <br/><br/>
          If the <a href=#FRITZBOXattr>attribute</a> 'ringWithIntern' is specified, the text behind 'show:' will be shown as the callers name.
          Maximal 30 characters are allowed.
@@ -6389,7 +6406,7 @@ sub FRITZBOX_fritztris($)
    <br>
    Bitte auch die anderen FRITZ!BOX-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
-   <i>Das Modul nutzt das Perlmodule 'Net::Telnet', 'JSON::XS', 'LWP', 'SOAP::Lite' für den Fernzugriff.</i>
+   <i>Das Modul nutzt das Perlmodule 'JSON::XS', 'LWP', 'SOAP::Lite' für den Fernzugriff.</i>
    <br/><br/>
    <a name="FRITZBOXdefine"></a>
    <b>Define</b>
@@ -6437,7 +6454,7 @@ sub FRITZBOX_fritztris($)
          <br>
          Schaltet die DECT-Basis der Box an oder aus.
          <br>
-         Benötigt Telnet, webcm oder mindestens FRITZ!OS 7.21
+         Benötigt mindestens FRITZ!OS 7.21
       </li><br>
 
       <li><a name="diversity"></a>
@@ -6445,12 +6462,10 @@ sub FRITZBOX_fritztris($)
          <br>
          Schaltet die Rufumleitung (Nummer 1, 2 ...) für einzelne Rufnummern an oder aus.
          <br>
-         Die Rufumleitung muss zuvor auf der FRITZ!BOX eingerichtet werden. Benötigt die API: Telnet oder webcm.
-         <br>
          Achtung! Es lassen sich nur Rufumleitungen für einzelne angerufene Telefonnummern (also nicht "alle") und <u>ohne</u> Abhängigkeit von der anrufenden Nummer schalten.
          Es muss also ein <i>diversity</i>-Geräwert geben.
          <br>
-         Benötigt die API: Telnet, webcm oder TR064 (>=6.50).
+         Benötigt die API: TR064 (>=6.50).
       </li><br>
 
       <li><a name="guestWlan"></a>
@@ -6510,7 +6525,7 @@ sub FRITZBOX_fritztris($)
       <li><a name="password"></a>
          <dt><code>set &lt;name&gt; password &lt;password&gt;</code></dt>
          <br>
-         Speichert das Passwort für den Fernzugriff über Telnet.
+         Speichert das Passwort für den Fernzugriff.
       </li><br>
 
       <li><a name="rescanWLANneighbors"></a>
@@ -6521,7 +6536,7 @@ sub FRITZBOX_fritztris($)
       </li><br>
 
       <li><a name="ring"></a>
-         <dt><code>set &lt;name&gt; ring &lt;intNumbers&gt; [duration [ringTone]] [show:Text]  [say:Text | play:MP3URL]</code></dt>
+         <dt><code>set &lt;name&gt; ring &lt;intNumbers&gt; [duration] [show:Text]  [say:Text | play:MP3URL]</code></dt>
          <br>
          <dt>Beispiel:</dt>
          <dd>
@@ -6540,8 +6555,6 @@ sub FRITZBOX_fritztris($)
          <br>
          Wenn der Anruf angenommen wird, hört der Angerufene die Wartemusik (music on hold), welche ebenfalls zur Nachrichtenübermittlung genutzt werden kann.
          <br>
-         Die Parameter <i>Klingelton, show:, say:</i> und <i>play:</i> benötigen die API Telnet oder webcm.
-         <br/><br/>
          Wenn das <a href=#FRITZBOXattr>Attribut</a> 'ringWithIntern' existiert, wird der Text hinter 'show:' als Name des Anrufers angezeigt.
          Er darf maximal 30 Zeichen lang sein.
          <br/><br/>
