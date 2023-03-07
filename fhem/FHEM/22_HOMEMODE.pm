@@ -15,7 +15,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = '1.5.8';
+my $HOMEMODE_version = '1.5.9';
 my $HOMEMODE_Daytimes = '05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night';
 my $HOMEMODE_Seasons = '03.01|spring 06.01|summer 09.01|autumn 12.01|winter';
 my $HOMEMODE_UserModes = 'gotosleep,awoken,asleep';
@@ -89,17 +89,17 @@ sub HOMEMODE_Define($$)
   $hash->{NOTIFYDEV} = 'global';
   if ($init_done && !defined $hash->{OLDDEF})
   {
-    $attr{$name}{devStateIcon}  = 'absent:user_away:dnd+on\n'.
-                                  'gone:user_ext_away:dnd+on\n'.
-                                  'dnd:audio_volume_mute:dnd+off\n'.
-                                  'gotosleep:scene_sleeping:dnd+on\n'.
-                                  'asleep:scene_sleeping_alternat:dnd+on\n'.
-                                  'awoken:weather_sunrise:dnd+on\n'.
-                                  'home:status_available:dnd+on\n'.
-                                  'morning:weather_sunrise:dnd+on\n'.
-                                  'day:weather_sun:dnd+on\n'.
-                                  'afternoon:weather_summer:dnd+on\n'.
-                                  'evening:weather_sunset:dnd+on\n'.
+    $attr{$name}{devStateIcon}  = "absent:user_away:dnd+on\n".
+                                  "gone:user_ext_away:dnd+on\n".
+                                  "dnd:audio_volume_mute:dnd+off\n".
+                                  "gotosleep:scene_sleeping:dnd+on\n".
+                                  "asleep:scene_sleeping_alternat:dnd+on\n".
+                                  "awoken:weather_sunrise:dnd+on\n".
+                                  "home:status_available:dnd+on\n".
+                                  "morning:weather_sunrise:dnd+on\n".
+                                  "day:weather_sun:dnd+on\n".
+                                  "afternoon:weather_summer:dnd+on\n".
+                                  "evening:weather_sunset:dnd+on\n".
                                   'night:weather_moon_phases_2:dnd+on';
     $attr{$name}{icon}          = 'floor';
     $attr{$name}{room}          = 'HOMEMODE';
