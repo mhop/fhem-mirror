@@ -386,6 +386,7 @@ attr DEVICE webCmd toggle:on:off:brightness:ct:rgb
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); $ret->{state}=lc($ret->{state}) if defined $ret->{state}; return $ret }
 attr DEVICE jsonMap color_temp:ct
+attr DEVICE getList power_on_behavior:noArg power_on_behavior $\DEVICETOPIC/get {"power_on_behavior": ""}
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"brightness": BRIGHTNESS , "state":"ON", "color_temp": CTVALUE}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
@@ -393,12 +394,13 @@ attr DEVICE setList \
   ct:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"color_temp":"$EVTPART1"}\
   warm:noArg $\DEVICETOPIC/set {"brightness": BRIGHTNESS , "color_temp": CTWARMVALUE}\
   white:noArg $\DEVICETOPIC/set {"brightness": BRIGHTNESS, "color_temp": CTWHITEVALUE}\
-  rgb:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
+  rgb:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}\
+  power_on_behavior:on,off $\DEVICETOPIC/set {"power_on_behavior": "$EVTPART1"}
 attr DEVICE userReadings rgb:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_x',0),ReadingsVal($name,'color_y',0),ReadingsVal($name,'brightness',254))}
 attr DEVICE comment The specified ct and brightness values in on and warm etc. commands ​​can be adjusted at any time via the setList attribute
 set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
-setreading DEVICE attrTemplateVersion 20221201
+setreading DEVICE attrTemplateVersion 20230323
 
 # zigbee2mqtt 2 channel dimmer device
 name:zigbee2mqtt_2channel_dimmer_split
@@ -1033,6 +1035,7 @@ setreading DEVICE attrTemplateVersion 20200904
 #based on contribution by RomanticBoy83: https://forum.fhem.de/index.php/topic,131980.msg1263455.html#msg1263455
 name:zigbee2mqtt_zigbee2mqtt_ir_interface
 desc: IR interface controlled by zigbee2mqtt <br>Tested with: Moes UFO-R11, https://www.zigbee2mqtt.io/devices/UFO-R11.html
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_16m
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
@@ -5531,7 +5534,7 @@ par:BASE_ID;BASE_ID as set on the esp;{ AttrVal('DEVICE','readingList','') =~ m,
 par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
 attr DEVICE icon ICON
 attr DEVICE bridgeRegexp BASE_ID/([^/]+)/ch[0-9]+/.*:.* "BASE_ID_$1"\
-  BASE_ID/([^/]+)/(available|last_success):.* "BASE_ID_$1"
+  BASE_ID/([^/]+)/(available|last_success|ack_pwr_limit):.* "BASE_ID_$1"
 attr DEVICE autocreate 1
 attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/free_heap:.* free_heap\
@@ -5551,14 +5554,16 @@ attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/total/YieldTotal:.* YieldTotal
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_hub_bridge
-setreading DEVICE attrTemplateVersion 20230228
+setreading DEVICE attrTemplateVersion 20230313
 { AttrTemplate_Initialize() }
+#   "setup/set_time",
+#   "setup/sync_ntp
 
 
 name:hoymiles_microinverter_inverter
 prereq:{my @devices=devspec2array('model=hoymiles_microinverter_hub_bridge');return 1 if $devices[0];return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/ch0/U_AC:.*
-desc:Early version, device represents a single microinverter. Use this with "ahoy" firmware for ESP8266+nRF24L01+. Wait some time until the target device got <b>readings for channel 0</b> (AC part, refreshing your browser window may help to get them visible)!
+desc:Early version, device represents a single microinverter. Use this with "ahoy" firmware (since 0.5.99) for ESP8266+nRF24L01+. Wait some time until the target device got <b>readings for channel 0</b> (AC part, refreshing your browser window may help to get them visible)!
 order:W_061
 par:BASE_ID;BASE_ID as set on the esp (e.g. inverters). No CID;{ AttrVal('DEVICE','readingList','') =~ m,^\s*([^:\s]+)/[^/]+/ch0/U_AC:,m ? $1 : undef }
 par:INVERTERLONG_ID;INVERTERLONG_ID Base_Id plus inverter name as set in webinterface;{ AttrVal('DEVICE','readingList','') =~ m,^\s*([^:]+/[^/]+)/ch0/U_AC:,m ? $1 : undef }
@@ -5682,16 +5687,12 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch4/YieldTotal:.* YieldTotal4
 option:global
 attr DEVICE setList \
-  on:noArg BASE_ID/devcontrol/INVERTER_NR/0 on\
-  off:noArg BASE_ID/devcontrol/INVERTER_NR/1 off\
-  reboot:noArg BASE_ID/devcontrol/INVERTER_NR/2 restart\
-  limit BASE_ID/devcontrol/INVERTER_NR/11/0 $EVTPART1\
-  limit_pct:slider,2,1,100 BASE_ID/devcontrol/INVERTER_NR/11/1 $EVTPART1\
-  limit_persistent_abs BASE_ID/devcontrol/INVERTER_NR/11/256 $EVTPART1\
-  limit_persistent_pct:slider,2,1,100 BASE_ID/devcontrol/INVERTER_NR/11/257 $EVTPART1
+  reboot:noArg BASE_ID/ctrl/restart/INVERTER_NR\
+  limit BASE_ID/ctrl/limit/INVERTER_NR $EVTPART1W\
+  limit_pct:slider,2,1,100 BASE_ID/ctrl/limit/INVERTER_NR $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20230228
+setreading DEVICE attrTemplateVersion 20230313
 
 # contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
 name:hoymiles_opendtu_hub_bridge
