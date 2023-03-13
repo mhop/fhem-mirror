@@ -3,6 +3,7 @@
 # forked from 98_dummy.pm
 #
 
+
 package FHEM::Automation::btdummy; ##no critic qw(Package)
 
   use strict;
