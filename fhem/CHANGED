@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change: SVN is moved to a new server (same hostname, different IP)
  - bugfix: 72_FRITZBOX: Zeilenumbruch bei Attr entfernt
  - bugfix: 72_FRITZBOX: Fehler bereinigt
  - feature: 72_FRITZBOX: telnet/WEBCM entfernt
