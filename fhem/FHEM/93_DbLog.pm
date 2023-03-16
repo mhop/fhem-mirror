@@ -38,6 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.8.5"   => "16.03.2023 fix using https in configCheck after SVN server change ",
   "5.8.4"   => "20.02.2023 new attr plotInputFieldLength, improve Plot Editor, delete attr noNotifyDev ".
                            "move notifyRegexpChanged from Define to initOnStart ",
   "5.8.3"   => "19.02.2023 adapt DbLog_configcheck, new get ... configCheck, commandref edited ",
@@ -7733,7 +7734,7 @@ return $check;
 ############################################################################################################
 sub _DbLog_checkModVer {
   my $name = shift;
-  my $src  = "http://fhem.de/fhemupdate/controls_fhem.txt";
+  my $src  = "https://fhem.de/fhemupdate/controls_fhem.txt";
 
   my $msg  = q{};
   my $rec  = q{};
