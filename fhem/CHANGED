@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
  - bugfix: 72_FRITZBOX: Pruefung Attr FritzBoxIP um URL erweitert
+                        Umlaute auf HTML Namen umgestellt
  - bugfix:  93_DBLog: fix using https in configCheck after SVN server change
  - change: SVN is moved to a new server (same hostname, different IP)
  - bugfix: 72_FRITZBOX: Zeilenumbruch bei Attr entfernt
