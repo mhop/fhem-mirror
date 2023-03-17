@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.9a";
+my $ModulVersion = "07.50.9b";
 my $missingModul = "";
 my $missingModulWeb = "";
 my $missingModulTR064 = "";
@@ -348,6 +348,66 @@ sub FRITZBOX_Rename($$)
     setKeyValue($old_index, undef);
 }
 
+###############################################################################
+# Expression régulière pour valider une URL en Perl                           #
+# Regular expression for URL validation in Perl                               #
+#                                                                             #
+# La sous-routine url_regex fournit l'expression régulière pour valider une   #
+# URL. Ne sont pas reconnus les noms de domaine en punycode et les addresses  #
+# IPv6.                                                                       #
+# The url_regex subroutine returns the regular expression used to validate an #
+# URL. Domain names in punycode and IPv6 adresses are not recognized.         #
+#                                                                             #
+# La liste de tests est celle publiée à l'adresse suivante, excepté deux      #
+# cas qui sont donnés comme faux, alors qu'ils sont justes.                   #
+# The test list is the one published at the following adress, except for two  #
+# cases given as false, although they are correct.                            #
+#                                                                             #
+# https://mathiasbynens.be/demo/url-regex                                     #
+#                                                                             #
+# Droit d'auteur // Copyright                                                 #
+# ===========================                                                 #
+#                                                                             #
+# Auteur // Author : Guillaume Lestringant                                    #
+#                                                                             #
+# L'expression régulière est très largement basée sur celle publiée par       #
+# Diego Perini sous licence MIT (https://gist.github.com/dperini/729294).     #
+# Voir plus loin le texte de ladite licence (en anglais seulement).           #
+# The regular expression is very largely based on the one published by        #
+# Diego Perini under MIT license (https://gist.github.com/dperini/729294).    #
+# See further for the text of sayed license.                                  #
+#                                                                             #
+# Le présent code est placé sous licence CeCIll-B, dont le texte se trouve à  #
+# l'adresse http://cecill.info/licences/Licence_CeCILL-B_V1-fr.html           #
+# This actual code is released under CeCIll-B license, whose text can be      #
+# found at the adress http://cecill.info/licences/Licence_CeCILL-B_V1-en.html #
+# It is an equivalent to BSD license, but valid under French law.             #
+###############################################################################
+sub FRITZBOX_Url_Regex {
+    my $proto = "(?:https?|ftp)://";
+    my $id = "?:\\S+(?::\\S*)?@";
+    my $ip_excluded = "(?!(?:10|127)(?:\\.\\d{1,3}){3})"
+        . "(?!(?:169\\.254|192\\.168)(?:\\.\\d{1,3}){2})"
+        . "(?!172\\.(?:1[6-9]|2\\d|3[0-1])(?:\\.\\d{1,3}){2})";
+    my $ip_included = "(?:1\\d\\d|2[01]\\d|22[0-3]|[1-9]\\d?)"
+        . "(?:\\.(?:2[0-4]\\d|25[0-5]|1?\\d{1,2})){2}"
+        . "(?:\\.(?:1\\d\\d|2[0-4]\\d|25[0-4]|[1-9]\\d?))";
+#    my $ip = "$ip_excluded$ip_included";
+    my $ip = "$ip_included";
+    my $chars = "a-z\\x{00a1}-\\x{ffff}";
+    my $base = "(?:[${chars}0-9]-*)*[${chars}0-9]+";
+    my $host = "(?:$base)";
+    my $domain = "(?:\\.$base)*";
+    my $tld = "(?:\\.(?:[${chars}]{2,}))";
+    my $fulldomain = $host . $domain . $tld . "\\.?";
+    my $name = "(?:$ip|$fulldomain)";
+    my $port = "(?::\\d{2,5})?";
+    my $path = "(?:[/?#]\\S*)?";
+
+#    return "^($proto($id)?$name$port$path)\$";
+    return "^($name)\$";
+}
+
 #######################################################################
 sub FRITZBOX_Attr($@)
 {
@@ -358,9 +418,11 @@ sub FRITZBOX_Attr($@)
 
    my $hash = $defs{$name};
 
+   my $URL_MATCH = FRITZBOX_Url_Regex();
+
    if ($aName eq "fritzBoxIP") {
      if ($cmd eq "set") {
-       return "plain IPv4 recommended" if $aVal !~ m/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/;
+       return "plain IPv4/URL (without http(s)) or valid IPv4/URL recommended" if $aVal !~ m=$URL_MATCH=i;
        $hash->{HOST} = $aVal;
      }
      else {
