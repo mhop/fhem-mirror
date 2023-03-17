@@ -235,9 +235,11 @@ sub FRITZBOX_Define($$)
    my ($hash, $def) = @_;
    my @args = split("[ \t][ \t]*", $def);
 
+   my $URL_MATCH = FRITZBOX_Url_Regex();
+
    return "Usage: define <name> FRITZBOX [IP address]" if(@args <2 || @args >3);
 
-   return "Error: no valid IPv4 Address: $args[2]" if defined $args[2] && $args[2] !~ m/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/;
+   return "Error: no valid IPv4 Address: $args[2]" if defined $args[2] && $args[2] !~ m=$URL_MATCH=i;
 
    my $name = $args[0];
 
@@ -245,7 +247,7 @@ sub FRITZBOX_Define($$)
    $hash->{VERSION} = $ModulVersion;
 
    $hash->{HOST} = "undefined";
-   $hash->{HOST} = $args[2]     if defined $args[2] && $args[2] =~ m/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/;
+   $hash->{HOST} = $args[2]     if defined $args[2] && $args[2] =~ m=$URL_MATCH=i;
    $hash->{fhem}{definedHost} = $hash->{HOST}; # to cope with old attribute definitions
 
    my $msg;
@@ -349,17 +351,17 @@ sub FRITZBOX_Rename($$)
 }
 
 ###############################################################################
-# Expression r√©guli√®re pour valider une URL en Perl                           #
+# Expression rÈguliËre pour valider une URL en Perl                           #
 # Regular expression for URL validation in Perl                               #
 #                                                                             #
-# La sous-routine url_regex fournit l'expression r√©guli√®re pour valider une   #
+# La sous-routine url_regex fournit l'expression rÈguliËre pour valider une   #
 # URL. Ne sont pas reconnus les noms de domaine en punycode et les addresses  #
 # IPv6.                                                                       #
 # The url_regex subroutine returns the regular expression used to validate an #
 # URL. Domain names in punycode and IPv6 adresses are not recognized.         #
 #                                                                             #
-# La liste de tests est celle publi√©e √† l'adresse suivante, except√© deux      #
-# cas qui sont donn√©s comme faux, alors qu'ils sont justes.                   #
+# La liste de tests est celle publiÈe ‡ l'adresse suivante, exceptÈ deux      #
+# cas qui sont donnÈs comme faux, alors qu'ils sont justes.                   #
 # The test list is the one published at the following adress, except for two  #
 # cases given as false, although they are correct.                            #
 #                                                                             #
@@ -370,14 +372,14 @@ sub FRITZBOX_Rename($$)
 #                                                                             #
 # Auteur // Author : Guillaume Lestringant                                    #
 #                                                                             #
-# L'expression r√©guli√®re est tr√®s largement bas√©e sur celle publi√©e par       #
+# L'expression rÈguliËre est trËs largement basÈe sur celle publiÈe par       #
 # Diego Perini sous licence MIT (https://gist.github.com/dperini/729294).     #
 # Voir plus loin le texte de ladite licence (en anglais seulement).           #
 # The regular expression is very largely based on the one published by        #
 # Diego Perini under MIT license (https://gist.github.com/dperini/729294).    #
 # See further for the text of sayed license.                                  #
 #                                                                             #
-# Le pr√©sent code est plac√© sous licence CeCIll-B, dont le texte se trouve √†  #
+# Le prÈsent code est placÈ sous licence CeCIll-B, dont le texte se trouve ‡  #
 # l'adresse http://cecill.info/licences/Licence_CeCILL-B_V1-fr.html           #
 # This actual code is released under CeCIll-B license, whose text can be      #
 # found at the adress http://cecill.info/licences/Licence_CeCILL-B_V1-en.html #
@@ -4362,13 +4364,13 @@ sub FRITZBOX_SendMail_Shell($@)
       chop $field{body};
       $field{body} =~ s/"/\\"/g;
 # change none ASCII chars in octal code for ISO-8859-1 (acc. http://www.pjb.com.au/comp/diacritics.html)
-      $field{body} =~ s/√Ñ|√É‚Äû/\\304/g;
-      $field{body} =~ s/√ñ|√É‚Äì/\\326/g;
-      $field{body} =~ s/√ú|√É≈ì/\\334/g;
-      $field{body} =~ s/√ü|√É≈∏/\\337/g;
-      $field{body} =~ s/√§|&auml;/\\344/g;
-      $field{body} =~ s/√∂|√É¬∂/\\366/g;
-      $field{body} =~ s/√º|√É¬º/\\374/g;
+      $field{body} =~ s/ƒ|√Ñ/\\304/g;
+      $field{body} =~ s/÷|√ñ/\\326/g;
+      $field{body} =~ s/‹|√ú/\\334/g;
+      $field{body} =~ s/ﬂ|√ü/\\337/g;
+      $field{body} =~ s/‰|&auml;/\\344/g;
+      $field{body} =~ s/ˆ|√∂/\\366/g;
+      $field{body} =~ s/¸|√º/\\374/g;
 
       push @cmdArray, '/bin/echo -e "'.$field{body}.'" >/var/tmp/fhem_nachricht.txt';
       $cmd .=  " -i '/var/tmp/fhem_nachricht.txt'";
@@ -6545,8 +6547,8 @@ sub FRITZBOX_fritztris($)
          Aktiviert / Deaktiviert die Klingelsperre f&uuml;r das DECT-Telefon mit der ID dect<n> f&uuml;r Zeitr&auml;ume:<br>
          &lt;hh:mm-hh:mm&gt; = Uhrzeit_von bis Uhrzeit_bis<br>
          &lt;days&gt; = wd f&uuml;r Werktags, ed f&uuml;r Jeden Tag, we f&uuml;r Wochenende<br>
-         lmode:on|off = lmode definiert die Sperre. Bei off ist sie aus, au√É≈∏er f&uuml;r den angegebenen Zeitraum.<br>
-                                                    Bei on ist die Sperre an, au√É≈∏er f&uuml;r den angegebenen Zeitraum<br>
+         lmode:on|off = lmode definiert die Sperre. Bei off ist sie aus, au&szlig;er f&uuml;r den angegebenen Zeitraum.<br>
+                                                    Bei on ist die Sperre an, au&szlig;er f&uuml;r den angegebenen Zeitraum<br>
          emode:on|off = emode schaltet Events bei gesetzter Klingelsperre ein/aus. Siehe hierzu die FRITZ!BOX Dokumentation<br>
          Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
       </li><br>
