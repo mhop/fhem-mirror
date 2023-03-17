@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.9b";
+my $ModulVersion = "07.50.9c";
 my $missingModul = "";
 my $missingModulWeb = "";
 my $missingModulTR064 = "";
@@ -246,7 +246,7 @@ sub FRITZBOX_Define($$)
    $hash->{NAME}    = $name;
    $hash->{VERSION} = $ModulVersion;
 
-   $hash->{HOST} = "undefined";
+   $hash->{HOST} = "fritz.box";
    $hash->{HOST} = $args[2]     if defined $args[2] && $args[2] =~ m=$URL_MATCH=i;
    $hash->{fhem}{definedHost} = $hash->{HOST}; # to cope with old attribute definitions
 
@@ -4501,33 +4501,43 @@ sub FRITZBOX_TR064_Cmd($$$)
          -> uri( "urn:dslforum-org:service:".$service )
          -> proxy('https://'.$host.":".$port."/upnp/control/".$control, ssl_opts => [ SSL_verify_mode => 0 ], timeout => 10  )
          -> readable(1);
-      my $res = $soap -> call( $action => @soapParams );
 
-      unless( $res ) { # Transport-Error
-         FRITZBOX_Log $hash, 5, "DEBUG: TR064-Transport-Error: ".$soap->transport->status;
-         my %errorMsg = ( "Error" => $soap->transport->status );
-         push @retArray, \%errorMsg;
-         $FRITZBOX_TR064pwd = undef;
-      }
-      elsif( $res->fault ) { # SOAP Error - will be defined if Fault element is in the message
-         # my $fcode   =  $s->faultcode;   #
-         # my $fstring =  $s->faultstring; # also available
-         # my $factor  =  $s->faultactor;
+      my $res = eval { $soap -> call( $action => @soapParams )};
 
-         my $ecode =  $res->faultdetail->{'UPnPError'}->{'errorCode'};
-         my $edesc =  $res->faultdetail->{'UPnPError'}->{'errorDescription'};
+      if ($@) {
+        FRITZBOX_Log $hash, 2, "INFO: TR064-PARAM-Error: " . $@;
+        my %errorMsg = ( "Error" => $@ );
+        push @retArray, \%errorMsg;
+        $FRITZBOX_TR064pwd = undef;
 
-         FRITZBOX_Log $hash, 5, "DEBUG: TR064 error $ecode:$edesc ($logMsg)";
+      } else {
 
-         @{$cmdArray} = ();
-         # my $fdetail = Dumper($res->faultdetail); # returns value of 'detail' element as string or object
-         # return "Error\n".$fdetail;
+        unless( $res ) { # Transport-Error
+          FRITZBOX_Log $hash, 5, "DEBUG: TR064-Transport-Error: ".$soap->transport->status;
+          my %errorMsg = ( "Error" => $soap->transport->status );
+          push @retArray, \%errorMsg;
+          $FRITZBOX_TR064pwd = undef;
+        }
+        elsif( $res->fault ) { # SOAP Error - will be defined if Fault element is in the message
+          # my $fcode   =  $s->faultcode;   #
+          # my $fstring =  $s->faultstring; # also available
+          # my $factor  =  $s->faultactor;
 
-         push @retArray, $res->faultdetail;
-         $FRITZBOX_TR064pwd = undef;
-      }
-      else { # normal result
-         push @retArray, $res->body;
+          my $ecode =  $res->faultdetail->{'UPnPError'}->{'errorCode'};
+          my $edesc =  $res->faultdetail->{'UPnPError'}->{'errorDescription'};
+
+          FRITZBOX_Log $hash, 5, "DEBUG: TR064 error $ecode:$edesc ($logMsg)";
+
+          @{$cmdArray} = ();
+          # my $fdetail = Dumper($res->faultdetail); # returns value of 'detail' element as string or object
+          # return "Error\n".$fdetail;
+
+          push @retArray, $res->faultdetail;
+          $FRITZBOX_TR064pwd = undef;
+        }
+        else { # normal result
+          push @retArray, $res->body;
+        }
       }
    }
 
