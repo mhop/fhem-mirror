@@ -349,17 +349,17 @@ sub FRITZBOX_Rename($$)
 }
 
 ###############################################################################
-# Expression rÈguliËre pour valider une URL en Perl                           #
+# Expression r√©guli√®re pour valider une URL en Perl                           #
 # Regular expression for URL validation in Perl                               #
 #                                                                             #
-# La sous-routine url_regex fournit l'expression rÈguliËre pour valider une   #
+# La sous-routine url_regex fournit l'expression r√©guli√®re pour valider une   #
 # URL. Ne sont pas reconnus les noms de domaine en punycode et les addresses  #
 # IPv6.                                                                       #
 # The url_regex subroutine returns the regular expression used to validate an #
 # URL. Domain names in punycode and IPv6 adresses are not recognized.         #
 #                                                                             #
-# La liste de tests est celle publiÈe ‡ l'adresse suivante, exceptÈ deux      #
-# cas qui sont donnÈs comme faux, alors qu'ils sont justes.                   #
+# La liste de tests est celle publi√©e √† l'adresse suivante, except√© deux      #
+# cas qui sont donn√©s comme faux, alors qu'ils sont justes.                   #
 # The test list is the one published at the following adress, except for two  #
 # cases given as false, although they are correct.                            #
 #                                                                             #
@@ -370,14 +370,14 @@ sub FRITZBOX_Rename($$)
 #                                                                             #
 # Auteur // Author : Guillaume Lestringant                                    #
 #                                                                             #
-# L'expression rÈguliËre est trËs largement basÈe sur celle publiÈe par       #
+# L'expression r√©guli√®re est tr√®s largement bas√©e sur celle publi√©e par       #
 # Diego Perini sous licence MIT (https://gist.github.com/dperini/729294).     #
 # Voir plus loin le texte de ladite licence (en anglais seulement).           #
 # The regular expression is very largely based on the one published by        #
 # Diego Perini under MIT license (https://gist.github.com/dperini/729294).    #
 # See further for the text of sayed license.                                  #
 #                                                                             #
-# Le prÈsent code est placÈ sous licence CeCIll-B, dont le texte se trouve ‡  #
+# Le pr√©sent code est plac√© sous licence CeCIll-B, dont le texte se trouve √†  #
 # l'adresse http://cecill.info/licences/Licence_CeCILL-B_V1-fr.html           #
 # This actual code is released under CeCIll-B license, whose text can be      #
 # found at the adress http://cecill.info/licences/Licence_CeCILL-B_V1-en.html #
@@ -549,14 +549,14 @@ sub FRITZBOX_Set($$@)
             .  " password"
             .  " update:noArg";
 
-# set abh‰ngig von TR064
+# set abh√§ngig von TR064
    $list    .= " call"
             .  " diversity"
             .  " ring"
             .  " tam"
             if $hash->{TR064} == 1 && $hash->{SECPORT} && ($hash->{MODEL} =~ "Box") && $mesh eq "master";
 
-# set abh‰ngig von TR064 und luaCall
+# set abh√§ngig von TR064 und luaCall
    $list    .= " wlan:on,off"
             .  " guestWlan:on,off"
             if $hash->{TR064} == 1 && $hash->{SECPORT} && $hash->{LUAQUERY} == 1;
@@ -565,12 +565,12 @@ sub FRITZBOX_Set($$@)
             .  " wlan5:on,off"
             if $hash->{fhem}->{is_double_wlan} == 1 && $hash->{TR064} == 1 && $hash->{SECPORT} && $hash->{LUAQUERY} == 1;
 
-# set abh‰ngig von TR064 und data.lua
+# set abh√§ngig von TR064 und data.lua
    $list    .= " macFilter:on,off"
             .  " enableVPNshare"
             if ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && $hash->{TR064} == 1 && $hash->{SECPORT}  && $mesh eq "master";
 
-# set abh‰ngig von data.lua
+# set abh√§ngig von data.lua
    $list    .= " switchIPv4DNS:provider,other"
             .  " dect:on,off"
             .  " dectRingblock"
@@ -710,7 +710,7 @@ sub FRITZBOX_Set($$@)
       my $FW1 = substr($fwV[1],0,2);
       my $FW2 = substr($fwV[2],0,2);
 
-      FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd f¸r Version: $FW1.$FW2 ";
+      FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd f√ºr Version: $FW1.$FW2 ";
 
       if ($FW1 <= 7 && $FW2 < 21) {
          FRITZBOX_Log $hash, 2, "ERROR: FritzOS version must be greater than 7.20";
@@ -841,7 +841,7 @@ sub FRITZBOX_Set($$@)
          my $FW1 = substr($fwV[1],0,2);
          my $FW2 = substr($fwV[2],0,2);
 
-         FRITZBOX_Log $hash, 4, "INFO: set $name $cmd f¸r Version: $FW1.$FW2 ";
+         FRITZBOX_Log $hash, 4, "INFO: set $name $cmd f√ºr Version: $FW1.$FW2 ";
 
          if ($FW1 <= 7 && $FW2 < 21) {
            FRITZBOX_Log $hash, 2, "ERROR: FritzOS version must be greater than 7.20";
@@ -940,7 +940,7 @@ sub FRITZBOX_Set($$@)
          my $FW1 = substr($fwV[1],0,2);
          my $FW2 = substr($fwV[2],0,2);
 
-         FRITZBOX_Log $hash, 4, "INFO: set $name $cmd f¸r Version: $FW1.$FW2 ";
+         FRITZBOX_Log $hash, 4, "INFO: set $name $cmd f√ºr Version: $FW1.$FW2 ";
 
          if ($FW1 <= 7 && $FW2 < 21) {
            FRITZBOX_Log $hash, 2, "ERROR: FritzOS version must be greater than 7.20";
@@ -1196,7 +1196,7 @@ sub FRITZBOX_Get($@)
       my $FW1 = substr($fwV[1],0,2);
       my $FW2 = substr($fwV[2],0,2);
 
-      FRITZBOX_Log $hash, 4, "INFO: set $name $cmd f¸r Version: $FW1.$FW2 ";
+      FRITZBOX_Log $hash, 4, "INFO: set $name $cmd f√ºr Version: $FW1.$FW2 ";
 
       if ($FW1 <= 7 && $FW2 < 21) {
         FRITZBOX_Log $hash, 2, "ERROR: FritzOS version must be greater than 7.20";
@@ -1312,7 +1312,7 @@ sub FRITZBOX_Proof_Params($@) {
    my $FW1 = substr($fwV[1],0,2);
    my $FW2 = substr($fwV[2],0,2);
 
-   FRITZBOX_Log $hash, 4, "INFO: set $name $cmd f¸r Version: $FW1.$FW2 ";
+   FRITZBOX_Log $hash, 4, "INFO: set $name $cmd f√ºr Version: $FW1.$FW2 ";
 
    if ($FW1 <= 7 && $FW2 < 21) {
       FRITZBOX_Log $hash, 2, "ERROR: FritzOS version must be greater than 7.20";
@@ -1542,7 +1542,7 @@ sub FRITZBOX_API_Check_Run($)
       my $m3uFileLocal = AttrVal( $name, "m3uFileLocal", $globalModPath."/www/images/".$name.".m3u" );
 
       if (open my $fh, '>', $m3uFileLocal) {
-         my $ttsText = uri_escape("Lirumlarumlˆffelstielwerdasnichtkannderkannnichtviel");
+         my $ttsText = uri_escape("Lirumlaruml√∂ffelstielwerdasnichtkannderkannnichtviel");
          my $ttsLink = $ttsLinkTemplate;
          $ttsLink =~ s/\[TEXT\]/$ttsText/;
          $ttsLink =~ s/\[SPRACHE\]/fr/;
@@ -2108,7 +2108,7 @@ sub FRITZBOX_Readout_Run_Web($)
       foreach ( @{ $result->{wlanList} } ) {
          my $mac = $_->{mac};
          $mac =~ s/:/_/g;
-         # Anscheinend gibt es Anmeldungen sowohl f√ºr Repeater als auch f√ºr FBoxen
+         # Anscheinend gibt es Anmeldungen sowohl f√É¬ºr Repeater als auch f√É¬ºr FBoxen
          $wlanList{$mac}{speed} = $_->{speed}   if ! defined $wlanList{$mac}{speed} || $_->{speed} ne "0";
          $wlanList{$mac}{speed_rx} = $_->{speed_rx} if ! defined $wlanList{$mac}{speed_rx} || $_->{speed_rx} ne "0";
          #$wlanList{$mac}{speed_rx} = $result_lan->{$_->{_node}};
@@ -2179,13 +2179,13 @@ sub FRITZBOX_Readout_Run_Web($)
 
          my $srTmp = $deviceInfo;
 
-      # lan IPv4 erg‰nzen
+      # lan IPv4 erg√§nzen
          $srTmp =~ s/ipv4/$dIp/g;
 
-      # lan DeviceName erg‰nzen
+      # lan DeviceName erg√§nzen
          $srTmp =~ s/name/$dName/g;
 
-      # lan DeviceID erg‰nzen
+      # lan DeviceID erg√§nzen
          $srTmp =~ s/uid/$UID/g;
 
       # Create a reading if a landevice is connected
@@ -2304,7 +2304,7 @@ sub FRITZBOX_Readout_Run_Web($)
 
 # Box model, firmware and uptimes
 
-   # Informationen ¸ber DSL Verbindung
+   # Informationen √ºber DSL Verbindung
    # xhr 1
    # lang de
    # page dslOv
@@ -2381,7 +2381,7 @@ sub FRITZBOX_Readout_Run_Web($)
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_newMsg", $_->{NumNewMessages};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_oldMsg", $_->{NumOldMessages};
       }
-# Lˆschen ausgeblendeter TAMs
+# L√∂schen ausgeblendeter TAMs
       elsif (defined $hash->{READINGS}{$rName} )
       {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName,"";
@@ -3404,7 +3404,7 @@ sub FRITZBOX_Run_macFilter($)
       my $FW1 = substr($fwV[1],0,2);
       my $FW2 = substr($fwV[2],0,2);
 
-      FRITZBOX_Log $hash, 4, "INFO: set $name $cmd f¸r Version: $FW1.$FW2 ";
+      FRITZBOX_Log $hash, 4, "INFO: set $name $cmd f√ºr Version: $FW1.$FW2 ";
 
       FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd " . join(" ", @webCmdArray);
 
@@ -3605,7 +3605,7 @@ sub FRITZBOX_Run_chgProfile($)
             my $FW1 = substr($fwV[1],0,2);
             my $FW2 = substr($fwV[2],0,2);
 
-            FRITZBOX_Log $hash, 4, "INFO: set $name $cmd f¸r Version: $FW1.$FW2 ";
+            FRITZBOX_Log $hash, 4, "INFO: set $name $cmd f√ºr Version: $FW1.$FW2 ";
 
             push @webCmdArray, "xhr"                => "1";
             push @webCmdArray, "dev_name"           => $lanDevice_Info->{data}->{vars}->{dev}->{name}->{displayName};
@@ -3831,7 +3831,7 @@ sub FRITZBOX_Run_lockLandevice($)
    my $FW2 = substr($fwV[2],0,2);
    my $dev_name = $hash->{fhem}->{landevice}->{$val[0]};
 
-   FRITZBOX_Log $hash, 4, "INFO: set $name $cmd f¸r Version: $FW1.$FW2 ";
+   FRITZBOX_Log $hash, 4, "INFO: set $name $cmd f√ºr Version: $FW1.$FW2 ";
 
    if ($FW1 <= 7 && $FW2 < 21) {
      push @webCmdArray, "page"      => "edit_device2";
@@ -3994,7 +3994,7 @@ sub FRITZBOX_Run_GuestWlan_Web($)
 # Read WLAN-Status
    my $queryStr = "&box_wlan_24GHz=wlan:settings/ap_enabled"; # WLAN
    $queryStr .= "&box_wlan_5GHz=wlan:settings/ap_enabled_scnd"; # 2nd WLAN
-   $queryStr .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # G‰ste WLAN
+   $queryStr .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # G√§ste WLAN
    $queryStr .= "&box_guestWlanRemain=wlan:settings/guest_time_remain";
    $queryStr .= "&box_macFilter_active=wlan:settings/is_macfilter_active";
 
@@ -4050,7 +4050,7 @@ sub FRITZBOX_Wlan_Run_Web($)
 # Read WLAN-Status
    my $queryStr = "&box_wlan_24GHz=wlan:settings/ap_enabled"; # WLAN
    $queryStr .= "&box_wlan_5GHz=wlan:settings/ap_enabled_scnd"; # 2nd WLAN
-   $queryStr .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # G‰ste WLAN
+   $queryStr .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # G√§ste WLAN
    $queryStr .= "&box_guestWlanRemain=wlan:settings/guest_time_remain";
    $queryStr .= "&box_macFilter_active=wlan:settings/is_macfilter_active";
 
@@ -4362,13 +4362,13 @@ sub FRITZBOX_SendMail_Shell($@)
       chop $field{body};
       $field{body} =~ s/"/\\"/g;
 # change none ASCII chars in octal code for ISO-8859-1 (acc. http://www.pjb.com.au/comp/diacritics.html)
-      $field{body} =~ s/ƒ|√Ñ/\\304/g;
-      $field{body} =~ s/÷|√ñ/\\326/g;
-      $field{body} =~ s/‹|√ú/\\334/g;
-      $field{body} =~ s/ﬂ|√ü/\\337/g;
-      $field{body} =~ s/‰|&auml;/\\344/g;
-      $field{body} =~ s/ˆ|√∂/\\366/g;
-      $field{body} =~ s/¸|√º/\\374/g;
+      $field{body} =~ s/√Ñ|√É‚Äû/\\304/g;
+      $field{body} =~ s/√ñ|√É‚Äì/\\326/g;
+      $field{body} =~ s/√ú|√É≈ì/\\334/g;
+      $field{body} =~ s/√ü|√É≈∏/\\337/g;
+      $field{body} =~ s/√§|&auml;/\\344/g;
+      $field{body} =~ s/√∂|√É¬∂/\\366/g;
+      $field{body} =~ s/√º|√É¬º/\\374/g;
 
       push @cmdArray, '/bin/echo -e "'.$field{body}.'" >/var/tmp/fhem_nachricht.txt';
       $cmd .=  " -i '/var/tmp/fhem_nachricht.txt'";
@@ -4677,7 +4677,7 @@ sub FRITZBOX_TR064_Init ($$)
 
 #   $hash->{TR064USER} = "dslf-config";
 
-   # jetzt die Zertifikats¸berpr¸fung (sofort) abschalten
+   # jetzt die Zertifikats√ºberpr√ºfung (sofort) abschalten
    BEGIN {
       $ENV{PERL_LWP_SSL_VERIFY_HOSTNAME}=0;
    }
@@ -5545,7 +5545,7 @@ sub FRITZBOX_Lan_Devices_List($) {
    my $FW1 = substr($fwV[1],0,2);
    my $FW2 = substr($fwV[2],0,2);
 
-   FRITZBOX_Log $hash, 4, "INFO: FRITZBOX_Lan_Device_List f¸r Version: $FW1.$FW2 ";
+   FRITZBOX_Log $hash, 4, "INFO: FRITZBOX_Lan_Device_List f√ºr Version: $FW1.$FW2 ";
 
    my @webCmdArray;
    # "xhr 1 lang de page netDev xhrId cleanup useajax 1 no_sidrenew nop;
@@ -5686,7 +5686,7 @@ sub FRITZBOX_Lan_Device_Info($$$) {
    my $FW1 = substr($fwV[1],0,2);
    my $FW2 = substr($fwV[2],0,2);
 
-   FRITZBOX_Log $hash, 4, "INFO: FRITZBOX_Lan_Device_Info f¸r Version: $FW1.$FW2 ";
+   FRITZBOX_Log $hash, 4, "INFO: FRITZBOX_Lan_Device_Info f√ºr Version: $FW1.$FW2 ";
 
    if ($FW1 >= 7 && $FW2 >= 25) {
       push @webCmdArray, "page" => "edit_device";
@@ -5700,7 +5700,7 @@ sub FRITZBOX_Lan_Device_Info($$$) {
 
    if(defined $result->{Error}) {
       FRITZBOX_Log $hash, 2, "ERROR: get $name $action \n" . FRITZBOX_ERR_Result($hash, $result);
-      return "ERROR: holen Lan_Device_Info: " . $action . " f¸r: " . $lDevID;
+      return "ERROR: holen Lan_Device_Info: " . $action . " f√ºr: " . $lDevID;
    }
 
    if (exists $result->{data}->{vars}) {
@@ -5742,7 +5742,7 @@ sub FRITZBOX_Lan_Device_Info($$$) {
    } else {
      FRITZBOX_Log $hash, 2, "ERROR: landevice: " . $lDevID . "landevice: Fehler holen Lan_Device_Info";
 
-     return "ERROR: Lan_Device_Info: " . $action . " f¸r: " . $lDevID;
+     return "ERROR: Lan_Device_Info: " . $action . " f√ºr: " . $lDevID;
    }
 }
 
@@ -6545,8 +6545,8 @@ sub FRITZBOX_fritztris($)
          Aktiviert / Deaktiviert die Klingelsperre f&uuml;r das DECT-Telefon mit der ID dect<n> f&uuml;r Zeitr&auml;ume:<br>
          &lt;hh:mm-hh:mm&gt; = Uhrzeit_von bis Uhrzeit_bis<br>
          &lt;days&gt; = wd f&uuml;r Werktags, ed f&uuml;r Jeden Tag, we f&uuml;r Wochenende<br>
-         lmode:on|off = lmode definiert die Sperre. Bei off ist sie aus, au√üer f&uuml;r den angegebenen Zeitraum.<br>
-                                                    Bei on ist die Sperre an, au√üer f&uuml;r den angegebenen Zeitraum<br>
+         lmode:on|off = lmode definiert die Sperre. Bei off ist sie aus, au√É≈∏er f&uuml;r den angegebenen Zeitraum.<br>
+                                                    Bei on ist die Sperre an, au√É≈∏er f&uuml;r den angegebenen Zeitraum<br>
          emode:on|off = emode schaltet Events bei gesetzter Klingelsperre ein/aus. Siehe hierzu die FRITZ!BOX Dokumentation<br>
          Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
       </li><br>
@@ -6876,7 +6876,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_ipExtern</b> - Internet IPv4 der FRITZ!BOX</li>
       <li><b>box_ipv6Extern</b> - Internet IPv6 der FRITZ!BOX</li>
       <li><b>box_ipv6Prefix</b> - Internet IPv6 Prefix der FRITZ!BOX f&uuml;r das LAN/WLAN</li>
-      <li><b>box_macFilter_active</b> - Status des WLAN MAC-Filter (WLAN-Zugang auf die bekannten WLAN-Ger‰te beschr&auml;nken)</li>
+      <li><b>box_macFilter_active</b> - Status des WLAN MAC-Filter (WLAN-Zugang auf die bekannten WLAN-Ger√§te beschr&auml;nken)</li>
       <li><b>box_meshRole</b> - ab Version 07.21 wird die Mesh Rolle (master, slave) angezeigt.</li>
       <li><b>box_model</b> - FRITZ!BOX-Modell</li>
       <li><b>box_moh</b> - Wartemusik-Einstellung</li>
@@ -6978,7 +6978,7 @@ sub FRITZBOX_fritztris($)
 # SSID2=wlan:settings/ssid_scnd
 # FORWARDS=forwardrules:settings/rule/list(activated,description,protocol,port,fwip,fwport,endport)
 # SIPS=sip:settings/sip/list(ID,displayname)
-# NUMBERS=telcfg:settings/VoipExtension/listwindow(2,2,Name,enabled) <=== eingeschr‰nkte Ergebnismenge
+# NUMBERS=telcfg:settings/VoipExtension/listwindow(2,2,Name,enabled) <=== eingeschr√§nkte Ergebnismenge
 # DEVICES=ctlusb:settings/device/count
 # PHYS=usbdevices:settings/physmedium/list(name,vendor,serial,fw_version,conntype,capacity,status,usbspeed,model)
 # PHYSCNT=usbdevices:settings/physmediumcnt
