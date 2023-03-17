@@ -1542,7 +1542,7 @@ sub FRITZBOX_API_Check_Run($)
       my $m3uFileLocal = AttrVal( $name, "m3uFileLocal", $globalModPath."/www/images/".$name.".m3u" );
 
       if (open my $fh, '>', $m3uFileLocal) {
-         my $ttsText = uri_escape("Lirumlarumlöffelstielwerdasnichtkannderkannnichtviel");
+         my $ttsText = uri_escape("Lirumlaruml�ffelstielwerdasnichtkannderkannnichtviel");
          my $ttsLink = $ttsLinkTemplate;
          $ttsLink =~ s/\[TEXT\]/$ttsText/;
          $ttsLink =~ s/\[SPRACHE\]/fr/;
@@ -1756,7 +1756,7 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&is_double_wlan=wlan:settings/feature_flags/DBDC"; # Box Feature
    $queryStr .= "&box_wlan_24GHz=wlan:settings/ap_enabled"; # WLAN
    $queryStr .= "&box_wlan_5GHz=wlan:settings/ap_enabled_scnd"; # 2nd WLAN
-   $queryStr .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # Gäste WLAN
+   $queryStr .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # G&auml;ste WLAN
    $queryStr .= "&box_guestWlanRemain=wlan:settings/guest_time_remain";
    $queryStr .= "&box_macFilter_active=wlan:settings/is_macfilter_active";
    $queryStr .= "&TodayBytesReceivedHigh=inetstat:status/Today/BytesReceivedHigh";
@@ -1896,7 +1896,7 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
 
-# Dect-Geräteliste erstellen
+# Dect-Ger&auml;teliste erstellen
    if ( $result->{handsetCount} =~ /[1-9]/ ) {
      $runNo = 0;
      foreach ( @{ $result->{dectUser} } ) {
@@ -4366,7 +4366,7 @@ sub FRITZBOX_SendMail_Shell($@)
       $field{body} =~ s/�|Ö/\\326/g;
       $field{body} =~ s/�|Ü/\\334/g;
       $field{body} =~ s/�|ß/\\337/g;
-      $field{body} =~ s/�|ä/\\344/g;
+      $field{body} =~ s/�|&auml;/\\344/g;
       $field{body} =~ s/�|ö/\\366/g;
       $field{body} =~ s/�|ü/\\374/g;
 
@@ -4677,7 +4677,7 @@ sub FRITZBOX_TR064_Init ($$)
 
 #   $hash->{TR064USER} = "dslf-config";
 
-   # jetzt die Zertifikatsüberprüfung (sofort) abschalten
+   # jetzt die Zertifikats�berpr�fung (sofort) abschalten
    BEGIN {
       $ENV{PERL_LWP_SSL_VERIFY_HOSTNAME}=0;
    }
@@ -6460,15 +6460,15 @@ sub FRITZBOX_fritztris($)
 <h3>FRITZBOX</h3>
 <div>
 <ul>
-   Steuert gewisse Funktionen eines FRITZ!BOX Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) können als Signalgeräte genutzt werden. MP3-Dateien und Text (Text2Speech) können als Klingelton oder einem angerufenen Telefon abgespielt werden.
+   Steuert gewisse Funktionen eines FRITZ!BOX Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. MP3-Dateien und Text (Text2Speech) k&ouml;nnen als Klingelton oder einem angerufenen Telefon abgespielt werden.
    <br>
-   Für detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki</b></a> konsultieren und ergänzen.
+   F&uuml;r detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki</b></a> konsultieren und erg&auml;nzen.
    <br/><br/>
-   Die Steuerung erfolgt teilweise über die offizielle TR-064-Schnittstelle und teilweise über undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern.</br>
+   Die Steuerung erfolgt teilweise &uuml;ber die offizielle TR-064-Schnittstelle und teilweise &uuml;ber undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern.</br>
    <br>
    Bitte auch die anderen FRITZ!BOX-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
-   <i>Das Modul nutzt das Perlmodule 'JSON::XS', 'LWP', 'SOAP::Lite' für den Fernzugriff.</i>
+   <i>Das Modul nutzt das Perlmodule 'JSON::XS', 'LWP', 'SOAP::Lite' f&uuml;r den Fernzugriff.</i>
    <br/><br/>
    <a name="FRITZBOXdefine"></a>
    <b>Define</b>
@@ -6492,7 +6492,7 @@ sub FRITZBOX_fritztris($)
       <li><a name="call"></a>
          <dt><code>set &lt;name&gt; call &lt;number&gt; [duration]</code></dt>
          <br>
-         Ruft für 'Dauer' Sekunden (Standard 60 s) die angegebene Telefonnummer von einem internen Telefonanschluss an (Standard ist 1). Wenn der Angerufene abnimmt, hört er die Wartemusik.
+         Ruft f&uuml;r 'Dauer' Sekunden (Standard 60 s) die angegebene Telefonnummer von einem internen Telefonanschluss an (Standard ist 1). Wenn der Angerufene abnimmt, h&ouml;rt er die Wartemusik.
          Der interne Telefonanschluss klingelt ebenfalls.
          <br>
       </li><br>
@@ -6506,9 +6506,9 @@ sub FRITZBOX_fritztris($)
       <li><a name="chgProfile"></a>
          <dt><code>set &lt;name&gt; chgProfile &lt;number&gt; &lt;filtprof<i>n</i>&gt;</code></dt><br>
          &lt;number&gt; ist die ID des landevice<i>n..n</i> oder dessen MAC <br>
-         ändert das Profile filtprof mit der Nummer 1..n des Netzgeräts.<br>
-         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: chgProfileStat <br>
-         Benötigt FRITZ!OS 7.21 oder höher. <br>
+         &auml;ndert das Profile filtprof mit der Nummer 1..n des Netzger&auml;ts.<br>
+         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: chgProfileStat <br>
+         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her. <br>
       </li><br>
 
       <li><a name="dect"></a>
@@ -6516,56 +6516,56 @@ sub FRITZBOX_fritztris($)
          <br>
          Schaltet die DECT-Basis der Box an oder aus.
          <br>
-         Benötigt mindestens FRITZ!OS 7.21
+         Ben&ouml;tigt mindestens FRITZ!OS 7.21
       </li><br>
 
       <li><a name="diversity"></a>
          <dt><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code></dt>
          <br>
-         Schaltet die Rufumleitung (Nummer 1, 2 ...) für einzelne Rufnummern an oder aus.
+         Schaltet die Rufumleitung (Nummer 1, 2 ...) f&uuml;r einzelne Rufnummern an oder aus.
          <br>
-         Achtung! Es lassen sich nur Rufumleitungen für einzelne angerufene Telefonnummern (also nicht "alle") und <u>ohne</u> Abhängigkeit von der anrufenden Nummer schalten.
-         Es muss also ein <i>diversity</i>-Geräwert geben.
+         Achtung! Es lassen sich nur Rufumleitungen f&uuml;r einzelne angerufene Telefonnummern (also nicht "alle") und <u>ohne</u> Abh&auml;ngigkeit von der anrufenden Nummer schalten.
+         Es muss also ein <i>diversity</i>-Ger&auml;wert geben.
          <br>
-         Benötigt die API: TR064 (>=6.50).
+         Ben&ouml;tigt die API: TR064 (>=6.50).
       </li><br>
 
       <li><a name="guestWlan"></a>
          <dt><code>set &lt;name&gt; guestWlan &lt;on|off&gt;</code></dt>
          <br>
-         Schaltet das Gäste-WLAN an oder aus. Das Gäste-Passwort muss gesetzt sein. Wenn notwendig wird auch das normale WLAN angeschaltet.
+         Schaltet das G&auml;ste-WLAN an oder aus. Das G&auml;ste-Passwort muss gesetzt sein. Wenn notwendig wird auch das normale WLAN angeschaltet.
       </li><br>
 
       <li><a name="dectRingblock"></a>
          <dt><code>set &lt;name&gt; dectRingblock &lt;dect&lt;nn&gt;&gt; &lt;on|off&gt;</code></dt>
          <br>
-         Aktiviert / Deaktiviert die Klingelsperre für das DECT-Telefon mit der ID dect<n>. Die ID kann der Readingliste
+         Aktiviert / Deaktiviert die Klingelsperre f&uuml;r das DECT-Telefon mit der ID dect<n>. Die ID kann der Readingliste
          des &lt;name&gt; Device entnommen werden.<br><br>
           <code>set &lt;name&gt; dectRingblock &lt;dect&lt;nn&gt;&gt; &lt;days&gt; &lt;hh:mm-hh:mm&gt; [lmode:on|off] [emode:on|off]</code><br><br>
-         Aktiviert / Deaktiviert die Klingelsperre für das DECT-Telefon mit der ID dect<n> für Zeiträume:<br>
+         Aktiviert / Deaktiviert die Klingelsperre f&uuml;r das DECT-Telefon mit der ID dect<n> f&uuml;r Zeitr&auml;ume:<br>
          &lt;hh:mm-hh:mm&gt; = Uhrzeit_von bis Uhrzeit_bis<br>
-         &lt;days&gt; = wd für Werktags, ed für Jeden Tag, we für Wochenende<br>
-         lmode:on|off = lmode definiert die Sperre. Bei off ist sie aus, außer für den angegebenen Zeitraum.<br>
-                                                    Bei on ist die Sperre an, außer für den angegebenen Zeitraum<br>
+         &lt;days&gt; = wd f&uuml;r Werktags, ed f&uuml;r Jeden Tag, we f&uuml;r Wochenende<br>
+         lmode:on|off = lmode definiert die Sperre. Bei off ist sie aus, außer f&uuml;r den angegebenen Zeitraum.<br>
+                                                    Bei on ist die Sperre an, außer f&uuml;r den angegebenen Zeitraum<br>
          emode:on|off = emode schaltet Events bei gesetzter Klingelsperre ein/aus. Siehe hierzu die FRITZ!BOX Dokumentation<br>
-         Benötigt FRITZ!OS 7.21 oder höher.
+         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
       </li><br>
 
       <li><a name="macFilter"></a>
          <dt><code>set &lt;name&gt; macFilter &lt;on|off&gt;</code></dt>
          <br>
-         Schaltet den MAC Filter an oder aus. In der FRITZ!BOX unter "neue WLAN Geräte zulassen/sperren<br>
-         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: macFilterStat <br>
-         Benötigt FRITZ!OS 7.21 oder höher.
+         Schaltet den MAC Filter an oder aus. In der FRITZ!BOX unter "neue WLAN Ger&auml;te zulassen/sperren<br>
+         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: macFilterStat <br>
+         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
       </li><br>
 
       <li><a name="lockLandevice"></a>
          <dt><code>set &lt;name&gt; lockLandevice &lt;number&gt; &lt;on|off&gt;</code></dt>
          <br>
          &lt;number&gt; ist die ID des landevice<i>n..n</i> oder dessen MAC.<br>
-         Schaltet das Netzgerät an oder aus.<br>
-         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: lockLandevStat <br>
-         Benötigt FRITZ!OS 7.21 oder höher.
+         Schaltet das Netzger&auml;t an oder aus.<br>
+         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: lockLandevStat <br>
+         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
       </li><br>
 
       <li><a name="enableVPNshare"></a>
@@ -6573,28 +6573,28 @@ sub FRITZBOX_fritztris($)
          <br>
          &lt;number&gt; ist die Nummer des Readings vpn<i>n..n</i>_user.. oder _box <br>
          Schaltet das VPN share mit der Nummer nn an oder aus.<br>
-         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: enableVPNshareStat <br>
-         Benötigt FRITZ!OS 7.21 oder höher.
+         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: enableVPNshareStat <br>
+         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
       </li><br>
 
       <li><a name="switchIPv4DNS"></a>
          <dt><code>set &lt;name&gt; switchIPv4DNS &lt;provider|other&gt;</code></dt>
          <br>
-         Ändert den IPv4 DNS auf Internetanbieter oder einem alternativen DNS (sofern in der FRITZ!BOX hinterlegt).<br>
+         &Auml;ndert den IPv4 DNS auf Internetanbieter oder einem alternativen DNS (sofern in der FRITZ!BOX hinterlegt).<br>
          Needs FRITZ!OS 7.21 or higher
       </li><br>
 
       <li><a name="password"></a>
          <dt><code>set &lt;name&gt; password &lt;password&gt;</code></dt>
          <br>
-         Speichert das Passwort für den Fernzugriff.
+         Speichert das Passwort f&uuml;r den Fernzugriff.
       </li><br>
 
       <li><a name="rescanWLANneighbors"></a>
          <dt><code>set &lt;name&gt; rescanWLANneighbors</code></dt>
          <br>
-         Löst eine Scan der WLAN Umgebung aus.
-         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: rescanWLANneighbors <br>
+         L&ouml;st eine Scan der WLAN Umgebung aus.
+         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: rescanWLANneighbors <br>
       </li><br>
 
       <li><a name="ring"></a>
@@ -6608,22 +6608,22 @@ sub FRITZBOX_fritztris($)
          <br>
          <code>set &lt;name&gt; ring 610 10 play:http://raspberrypi/sound.mp3</code>
          </dd>
-         Lässt die internen Nummern für "Dauer" Sekunden und (auf Fritz!Fons) mit dem angegebenen "Klingelton" klingeln.
+         L&auml;sst die internen Nummern f&uuml;r "Dauer" Sekunden und (auf Fritz!Fons) mit dem angegebenen "Klingelton" klingeln.
          <br>
-         Mehrere interne Nummern müssen durch ein Komma (ohne Leerzeichen) getrennt werden.
+         Mehrere interne Nummern m&uuml;ssen durch ein Komma (ohne Leerzeichen) getrennt werden.
          <br>
-         Standard-Dauer ist 5 Sekunden. Es kann aber zu Verzögerungen in der FRITZ!BOX kommen. Standard-Klingelton ist der interne Klingelton des Gerätes.
-         Der Klingelton wird für Rundrufe (9 oder 50) ignoriert.
+         Standard-Dauer ist 5 Sekunden. Es kann aber zu Verz&ouml;gerungen in der FRITZ!BOX kommen. Standard-Klingelton ist der interne Klingelton des Ger&auml;tes.
+         Der Klingelton wird f&uuml;r Rundrufe (9 oder 50) ignoriert.
          <br>
-         Wenn der Anruf angenommen wird, hört der Angerufene die Wartemusik (music on hold), welche ebenfalls zur Nachrichtenübermittlung genutzt werden kann.
+         Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold), welche ebenfalls zur Nachrichten&uuml;bermittlung genutzt werden kann.
          <br>
          Wenn das <a href=#FRITZBOXattr>Attribut</a> 'ringWithIntern' existiert, wird der Text hinter 'show:' als Name des Anrufers angezeigt.
          Er darf maximal 30 Zeichen lang sein.
          <br/><br/>
          Auf Fritz!Fons wird der Text (max. 100 Zeichen) hinter dem Parameter 'say:' direkt angesagt und ersetzt den Klingelton.
          <br>
-         Alternativ kann mit 'play:' auch ein MP3-Link (vom einem Webserver) abgespielt werden. Dabei wird die Internetradiostation 39 'FHEM' erzeugt und translate.google.com für Text2Speech genutzt. Es wird <u>immer</u> der komplette Text/Klang abgespielt. Bis zum Ende der 'Klingeldauer' klingelt das Telefon dann mit seinem Standard-Klingelton.
-         Das Abspielen ist eventuell nicht auf mehreren Fritz!Fons gleichzeitig möglich.
+         Alternativ kann mit 'play:' auch ein MP3-Link (vom einem Webserver) abgespielt werden. Dabei wird die Internetradiostation 39 'FHEM' erzeugt und translate.google.com f&uuml;r Text2Speech genutzt. Es wird <u>immer</u> der komplette Text/Klang abgespielt. Bis zum Ende der 'Klingeldauer' klingelt das Telefon dann mit seinem Standard-Klingelton.
+         Das Abspielen ist eventuell nicht auf mehreren Fritz!Fons gleichzeitig m&ouml;glich.
          <br>
          Je nach Fritz!OS kann das beschriebene Verhalten abweichen.
          <br>
@@ -6638,7 +6638,7 @@ sub FRITZBOX_fritztris($)
       <li><a name="update"></a>
          <dt><code>set &lt;name&gt; update</code></dt>
          <br>
-         Startet eine Aktualisierung der Gerätewerte.
+         Startet eine Aktualisierung der Ger&auml;tewerte.
       </li><br>
 
       <li><a name="wlan"></a>
@@ -6668,31 +6668,31 @@ sub FRITZBOX_fritztris($)
          <dt><code>get &lt;name&gt; lanDeviceInfo &lt;number&gt;</code></dt>
          <br>
          &lt;number&gt; ist die ID des landevice<i>n..n</i> oder dessen MAC
-         Zeigt Informationen über das Netzwerkgerät an.<br>
-	  Benötigt FRITZ!OS 7.21 oder höher.
+         Zeigt Informationen &uuml;ber das Netzwerkger&auml;t an.<br>
+	  Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
       </li><br>
 
       <li><a name="luaData"></a>
          <dt><code>get &lt;name&gt; luaData &lt;Command&gt;</code></dt>
          <br>
-         Führt Komandos über data.lua aus.
+         F&uuml;hrt Komandos &uuml;ber data.lua aus.
       </li><br>
 
       <li><a name="luaFunction"></a>
          <dt><code>get &lt;name&gt; luaFunction &lt;Command&gt;</code></dt>
          <br>
-         Führt AVM lua Funktionen aus.
+         F&uuml;hrt AVM lua Funktionen aus.
       </li><br>
 
       <li><a name="luaInfo"></a>
          <dt><code>get &lt;name&gt; luaInfo &lt;landevices|vpnShares|kidProfiles|userInfos&gt|wlanNeighborhood|docsisInformation;</code></dt>
          <br>
-         Benötigt FRITZ!OS 7.21 oder höher.<br>
-         lanDevices -> Generiert eine Liste der aktiven und inaktiven Netzwerkgeräte.<br>
+         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.<br>
+         lanDevices -> Generiert eine Liste der aktiven und inaktiven Netzwerkger&auml;te.<br>
          vpnShares -> Generiert eine Liste der aktiven und inaktiven VPN Shares.<br>
          kidProfiles -> Generiert eine Liste der Zugangsprofile.<br>
          userInfos -> Generiert eine Liste der FRITZ!BOX Benutzer.<br>
-         wlanNeighborhood -> Generiert eine Liste der WLAN Nachbarschaftsgeräte.<br>
+         wlanNeighborhood -> Generiert eine Liste der WLAN Nachbarschaftsger&auml;te.<br>
          docsisInformation -> Zeigt Informationen zu DOCSIS an (nur Cable).<br>
       </li><br>
 
@@ -6705,9 +6705,9 @@ sub FRITZBOX_fritztris($)
       <li><a name="tr064Command"></a>
          <dt><code>get &lt;name&gt; tr064Command &lt;service&gt; &lt;control&gt; &lt;action&gt; [[argName1 argValue1] ...]</code></dt>
          <br>
-         Führt über TR-064 Aktionen aus (siehe <a href="http://avm.de/service/schnittstellen/">Schnittstellenbeschreibung</a> von AVM).
+         F&uuml;hrt &uuml;ber TR-064 Aktionen aus (siehe <a href="http://avm.de/service/schnittstellen/">Schnittstellenbeschreibung</a> von AVM).
          <br>
-         argValues mit Leerzeichen müssen in Anführungszeichen eingeschlossen werden.
+         argValues mit Leerzeichen m&uuml;ssen in Anf&uuml;hrungszeichen eingeschlossen werden.
          <br>
          Beispiel: <code>get &lt;name&gt; tr064Command X_AVM-DE_OnTel:1 x_contact GetDECTHandsetInfo NewDectID 1</code>
          <br>
@@ -6716,7 +6716,7 @@ sub FRITZBOX_fritztris($)
       <li><a name="tr064ServiceList"></a>
          <dt><code>get &lt;name&gt; tr064ServiceListe</code></dt>
          <br>
-         Zeigt die Liste der TR-064-Dienste und Aktionen, die auf dem Gerät erlaubt sind.
+         Zeigt die Liste der TR-064-Dienste und Aktionen, die auf dem Ger&auml;t erlaubt sind.
       </li><br>
    </ul>
 
@@ -6727,7 +6727,7 @@ sub FRITZBOX_fritztris($)
       <li><a name="INTERVAL"></a>
          <dt><code>INTERVAL &lt;seconds&gt;</code></dt>
          <br>
-         Abfrage-Interval. Standard ist 300 (Sekunden). Der kleinste mögliche Wert ist 60.
+         Abfrage-Interval. Standard ist 300 (Sekunden). Der kleinste m&ouml;gliche Wert ist 60.
       </li><br>
 
       <li><a name="allowShellCommand"></a>
@@ -6739,8 +6739,8 @@ sub FRITZBOX_fritztris($)
       <li><a name="boxUser"></a>
          <dt><code>boxUser &lt;user name&gt;</code></dt>
          <br>
-         Benutzername für den TR064- oder einen anderen webbasierten Zugang. Normalerweise wird keine Benutzername für das Login benötigt.
-         Wenn die FRITZ!BOX anders konfiguriert ist, kann der Nutzer über dieses Attribut definiert werden.
+         Benutzername f&uuml;r den TR064- oder einen anderen webbasierten Zugang. Normalerweise wird keine Benutzername f&uuml;r das Login ben&ouml;tigt.
+         Wenn die FRITZ!BOX anders konfiguriert ist, kann der Nutzer &uuml;ber dieses Attribut definiert werden.
       </li><br>
 
       <li><a name="deviceInfo"></a>
@@ -6751,8 +6751,8 @@ sub FRITZBOX_fritztris($)
          <code>name,[uid],(connection: speed, rssi)</code><br><br>
 
          Wird der Parameter <code>_noDefInf_</code> gesetzt, die Reihenfolge ind der Liste spielt hier keine Rolle, dann werden nicht vorhandene Werte der Netzwerkverbindung
-         mit noConnectInfo (LAN oder WLAN nicht verfügbar) und noSpeedInfo (Geschwindigkeit nicht verfügbar) angezeigt.<br><br>
-         Über das freie Eingabefeld können eigene Text oder Zeichen hinzugefügt und zwischen die festen Paramter eingeordnet werden.<br>
+         mit noConnectInfo (LAN oder WLAN nicht verf&uuml;gbar) und noSpeedInfo (Geschwindigkeit nicht verf&uuml;gbar) angezeigt.<br><br>
+         &Uuml;ber das freie Eingabefeld k&ouml;nnen eigene Text oder Zeichen hinzugef&uuml;gt und zwischen die festen Paramter eingeordnet werden.<br>
          Hierbei gibt es folgende spezielle Texte:<br>
          <code>space</code> => wird zu einem Leerzeichen.<br>
          <code>comma</code> => wird zu einem Komma.<br>
@@ -6760,74 +6760,74 @@ sub FRITZBOX_fritztris($)
          Beispiele:<br>
          <code>_default_commaspace</code> => wird zu einem Komma gefolgt von einem Leerzeichen als Trenner.<br>
          <code>_default_space:space</code> => wird zu einem einem Leerzeichen:Leerzeichen als Trenner.<br>
-         Es werden nicht alle möglichen "unsinnigen" Kombinationen abgefangen. Es kann also auch mal schief gehen.
+         Es werden nicht alle m&ouml;glichen "unsinnigen" Kombinationen abgefangen. Es kann also auch mal schief gehen.
          <br>
       </li><br>
 
       <li><a name="disableBoxReadings"></a>
          <dt><code>disableBoxReadings &lt;liste&gt;</code></dt>
          <br>
-         Abwählen einzelner box_ Readings.
+         Abw&auml;hlen einzelner box_ Readings.
       </li><br>
 
       <li><a name="disableDectInfo"></a>
          <dt><code>disableDectInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die Übernahme von Dect Informationen aus/ein.
+         Schaltet die &Uuml;bernahme von Dect Informationen aus/ein.
       </li><br>
 
       <li><a name="disableFonInfo"></a>
          <dt><code>disableFonInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die Übernahme von Telefon Informationen aus/ein.
+         Schaltet die &Uuml;bernahme von Telefon Informationen aus/ein.
       </li><br>
 
       <li><a name="disableTableFormat"></a>
          <dt><code>disableTableFormat&lt;border(8),cellspacing(10),cellpadding(20)&gt;</code></dt>
          <br>
-         Deaktiviert Parameter für die Formatierung der Tabelle.
+         Deaktiviert Parameter f&uuml;r die Formatierung der Tabelle.
       </li><br>
 
       <li><a name="enableAlarmInfo"></a>
          <dt><code>enableAlarmInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die Übernahme von Alarm Informationen aus/ein.
+         Schaltet die &Uuml;bernahme von Alarm Informationen aus/ein.
       </li><br>
 
       <li><a name="enablePassivLanDevices"></a>
          <dt><code>enablePassivLanDevices &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die Übernahme von passiven Netzwerkgeräten als Reading aus/ein.
+         Schaltet die &Uuml;bernahme von passiven Netzwerkger&auml;ten als Reading aus/ein.
       </li><br>
 
       <li><a name="enableSIP"></a>
          <dt><code>enableSIP &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die Übernahme von SIP's als Reading aus/ein.
+         Schaltet die &Uuml;bernahme von SIP's als Reading aus/ein.
       </li><br>
 
       <li><a name="enableUserInfo"></a>
          <dt><code>enableUserInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die Übernahme von Benutzer Informationen aus/ein.
+         Schaltet die &Uuml;bernahme von Benutzer Informationen aus/ein.
       </li><br>
 
       <li><a name="enableVPNShares"></a>
          <dt><code>enableVPNShares &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die Übernahme von VPN Shares als Reading aus/ein.
+         Schaltet die &Uuml;bernahme von VPN Shares als Reading aus/ein.
       </li><br>
 
       <li><a name="enableWLANneighbors"></a>
          <dt><code>enableWLANneighbors &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die Anzeige von WLAN Nachbarschaft Geräten als Reading aus/ein.
+         Schaltet die Anzeige von WLAN Nachbarschaft Ger&auml;ten als Reading aus/ein.
       </li><br>
 
       <li><a name="wlanNeighborsPrefix"></a>
          <dt><code>wlanNeighborsPrefix &lt;prefix&gt;</code></dt>
          <br>
-         Definiert einen Präfix für den Reading Namen der WLAN Nachbarschaftsgeräte, der aus der MAC Adresse gebildet wird. Der default Präfix ist nbh_.
+         Definiert einen Pr&auml;fix f&uuml;r den Reading Namen der WLAN Nachbarschaftsger&auml;te, der aus der MAC Adresse gebildet wird. Der default Pr&auml;fix ist nbh_.
       </li><br>
 
       <li><a name="fritzBoxIP"></a>
@@ -6839,12 +6839,12 @@ sub FRITZBOX_fritztris($)
       <li><a name="m3uFileLocal"></a>
          <dt><code>m3uFileLocal &lt;/path/fileName&gt;</code></dt>
          <br>
-         Steht als Work around zur Verfügung, wenn der Klingelton eines Fritz!Fon, auf Grund von Firmware Restriktionen (fehlendes Telnet oder WebCMD) nicht gewechselt werden kann.
+         Steht als Work around zur Verf&uuml;gung, wenn der Klingelton eines Fritz!Fon, auf Grund von Firmware Restriktionen (fehlendes Telnet oder WebCMD) nicht gewechselt werden kann.
          <br>
-         Funktionsweise: Wenn der Fhem Server zusätzlich einen Web Server zur Verfügung hat, dann kann das Fritz!Fon eine m3u Datei von diesem Web Server als eine Radio Station abspielen.
-         Hierfür muss eine Internet Radio Station auf dem Fritz!Fon auf die Server URL für diese Datei zeigen und der interne Klingelton muss auf diese Station eingestellt werden.
+         Funktionsweise: Wenn der Fhem Server zus&auml;tzlich einen Web Server zur Verf&uuml;gung hat, dann kann das Fritz!Fon eine m3u Datei von diesem Web Server als eine Radio Station abspielen.
+         Hierf&uuml;r muss eine Internet Radio Station auf dem Fritz!Fon auf die Server URL f&uuml;r diese Datei zeigen und der interne Klingelton muss auf diese Station eingestellt werden.
          <br>
-         Ist das Attribut gesetzt, wird die Server Datei "m3uFileLocal" (lokale Adresse der Fritz!Fon URL) mit der URL der text2speech Engine (say:) oder mit der MP3-Datei (play:) gefüllt. Das Fritz!Fon spielt dann diese URL ab.
+         Ist das Attribut gesetzt, wird die Server Datei "m3uFileLocal" (lokale Adresse der Fritz!Fon URL) mit der URL der text2speech Engine (say:) oder mit der MP3-Datei (play:) gef&uuml;llt. Das Fritz!Fon spielt dann diese URL ab.
       </li><br>
 
       <li><a name="m3uFileURL"></a>
@@ -6870,13 +6870,13 @@ sub FRITZBOX_fritztris($)
       <li><b>box_dsl_downStream</b> - Min Effektive Datenrate  (MBit/s)</li>
       <li><b>box_dsl_upStream</b> - Min Effektive Datenrate  (MBit/s)</li>
       <li><b>box_fwVersion</b> - Firmware-Version der Box, wenn veraltet dann wird '(old)' angehangen</li>
-      <li><b>box_guestWlan</b> - Aktueller Status des Gäste-WLAN</li>
-      <li><b>box_guestWlanCount</b> - Anzahl der Geräte die über das Gäste-WLAN verbunden sind</li>
-      <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des Gäste-WLAN</li>
+      <li><b>box_guestWlan</b> - Aktueller Status des G&auml;ste-WLAN</li>
+      <li><b>box_guestWlanCount</b> - Anzahl der Ger&auml;te die &uuml;ber das G&auml;ste-WLAN verbunden sind</li>
+      <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des G&auml;ste-WLAN</li>
       <li><b>box_ipExtern</b> - Internet IPv4 der FRITZ!BOX</li>
       <li><b>box_ipv6Extern</b> - Internet IPv6 der FRITZ!BOX</li>
-      <li><b>box_ipv6Prefix</b> - Internet IPv6 Prefix der FRITZ!BOX für das LAN/WLAN</li>
-      <li><b>box_macFilter_active</b> - Status des WLAN MAC-Filter (WLAN-Zugang auf die bekannten WLAN-Ger�te beschränken)</li>
+      <li><b>box_ipv6Prefix</b> - Internet IPv6 Prefix der FRITZ!BOX f&uuml;r das LAN/WLAN</li>
+      <li><b>box_macFilter_active</b> - Status des WLAN MAC-Filter (WLAN-Zugang auf die bekannten WLAN-Ger�te beschr&auml;nken)</li>
       <li><b>box_meshRole</b> - ab Version 07.21 wird die Mesh Rolle (master, slave) angezeigt.</li>
       <li><b>box_model</b> - FRITZ!BOX-Modell</li>
       <li><b>box_moh</b> - Wartemusik-Einstellung</li>
@@ -6887,12 +6887,12 @@ sub FRITZBOX_fritztris($)
       <li><b>box_powerRate</b> - aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
       <li><b>box_rateDown</b> - Download-Geschwindigkeit des letzten Intervals in kByte/s</li>
       <li><b>box_rateUp</b> - Upload-Geschwindigkeit des letzten Intervals in kByte/s</li>
-      <li><b>box_stdDialPort</b> - Anschluss der geräteseitig von der Wählhilfe genutzt wird</li>
-      <li><b>box_tr064</b> - Anwendungsschnittstelle TR-064 (wird auch von diesem Modul benötigt)</li>
+      <li><b>box_stdDialPort</b> - Anschluss der ger&auml;teseitig von der W&auml;hlhilfe genutzt wird</li>
+      <li><b>box_tr064</b> - Anwendungsschnittstelle TR-064 (wird auch von diesem Modul ben&ouml;tigt)</li>
       <li><b>box_tr069</b> - Provider-Fernwartung TR-069 (sicherheitsrelevant!)</li>
       <li><b>box_vdsl_downStreamRate</b> - Aktuelle Datenrate (MBit/s)</li>
       <li><b>box_vdsl_upStreamRate</b> - Aktuelle Datenrate (MBit/s)</li>
-      <li><b>box_wlanCount</b> - Anzahl der Geräte die über WLAN verbunden sind</li>
+      <li><b>box_wlanCount</b> - Anzahl der Ger&auml;te die &uuml;ber WLAN verbunden sind</li>
       <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
       <li><b>box_wlan_5GHz</b> - Aktueller Status des 5-GHz-WLAN</li>
       <li><b>box_wlan_lastScanTime</b> - Letzter Scan der WLAN Umgebung. Ist nur vorhanden, wenn das Attribut enableWLANneighbors gesetzt ist.</li>
@@ -6907,7 +6907,7 @@ sub FRITZBOX_fritztris($)
 
       <br>
       <li><b>dect</b><i>1</i> - Name des DECT Telefons <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Klingelton beim Wecken über das DECT Telefon <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Klingelton beim Wecken &uuml;ber das DECT Telefon <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_custRingTone</b> - Benutzerspezifischer Klingelton des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_fwVersion</b> - Firmware-Version des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_intern</b> - Interne Nummer des DECT Telefons <i>1</i></li>
@@ -6924,22 +6924,22 @@ sub FRITZBOX_fritztris($)
       <li><b>fon</b><i>1</i><b>_intern</b> - Interne Nummer des analogen Telefonanschlusses <i>1</i></li>
       <li><b>fon</b><i>1</i><b>_out</b> - ausgehende Nummer des Anschlusses <i>1</i></li>
       <br>
-      <li><b>gsm_internet</b> - Internetverbindung errichtet über Mobilfunk-Stick </li>
-      <li><b>gsm_rssi</b> - Indikator der empfangenen GSM-Signalstärke (0-100)</li>
+      <li><b>gsm_internet</b> - Internetverbindung errichtet &uuml;ber Mobilfunk-Stick </li>
+      <li><b>gsm_rssi</b> - Indikator der empfangenen GSM-Signalst&auml;rke (0-100)</li>
       <li><b>gsm_state</b> - Status der Mobilfunk-Verbindung</li>
-      <li><b>gsm_technology</b> - GSM-Technologie, die für die Datenübertragung genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
+      <li><b>gsm_technology</b> - GSM-Technologie, die f&uuml;r die Daten&uuml;bertragung genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
       <br>
-      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines aktiven Netzwerk-Gerätes.
+      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines aktiven Netzwerk-Ger&auml;tes.
       <br>
-      Bei einer WLAN-Verbindung wird "WLAN" und (von der Box gesehen) die Sende- und Empfangsgeschwindigkeit und die Empfangsstärke angehangen. Bei einer LAN-Verbindung wird der LAN-Port und die LAN-Geschwindigkeit angehangen. Gast-Verbindungen werden mit "gWLAN" oder "gLAN" gekennzeichnet.
+      Bei einer WLAN-Verbindung wird "WLAN" und (von der Box gesehen) die Sende- und Empfangsgeschwindigkeit und die Empfangsst&auml;rke angehangen. Bei einer LAN-Verbindung wird der LAN-Port und die LAN-Geschwindigkeit angehangen. Gast-Verbindungen werden mit "gWLAN" oder "gLAN" gekennzeichnet.
       <br>
-      Inaktive oder entfernte Geräte erhalten zuerst den Werte "inactive" und werden beim nächsten Update gelöscht.</li>
+      Inaktive oder entfernte Ger&auml;te erhalten zuerst den Werte "inactive" und werden beim n&auml;chsten Update gel&ouml;scht.</li>
       <br>
-      <li><b>nbh_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines aktiven WAN-Gerätes.
+      <li><b>nbh_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines aktiven WAN-Ger&auml;tes.
       <br>
       Es wird die SSID, der Kanal und das Frequenzband angezeigt.
       <br>
-      Inaktive oder entfernte Geräte erhalten zuerst den Werte "inactive" und werden beim nächsten Update gelöscht.</li>
+      Inaktive oder entfernte Ger&auml;te erhalten zuerst den Werte "inactive" und werden beim n&auml;chsten Update gel&ouml;scht.</li>
       <br>
       <li><b>radio</b><i>01</i> - Name der Internetradiostation <i>01</i></li>
       <br>
@@ -6948,7 +6948,7 @@ sub FRITZBOX_fritztris($)
       <li><b>tam</b><i>1</i><b>_oldMsg</b> - Anzahl alter Nachrichten auf dem Anrufbeantworter <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_state</b> - Aktueller Status des Anrufbeantworters <i>1</i></li>
       <br>
-      <li><b>user</b><i>01</i> - Name von Nutzer/IP <i>1</i> für den eine Zugangsbeschränkung (Kindersicherung) eingerichtet ist</li>
+      <li><b>user</b><i>01</i> - Name von Nutzer/IP <i>1</i> f&uuml;r den eine Zugangsbeschr&auml;nkung (Kindersicherung) eingerichtet ist</li>
       <li><b>user</b><i>01</i>_thisMonthTime - Internetnutzung des Nutzers/IP <i>1</i> im aktuellen Monat (Kindersicherung)</li>
       <li><b>user</b><i>01</i>_todaySeconds - heutige Internetnutzung des Nutzers/IP <i>1</i> in Sekunden (Kindersicherung)</li>
       <li><b>user</b><i>01</i>_todayTime - heutige Internetnutzung des Nutzers/IP <i>1</i> (Kindersicherung)</li>
