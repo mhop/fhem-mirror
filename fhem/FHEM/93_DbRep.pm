@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.52.1"  => "19.03.2023  fix Perl Warnings ",
   "8.52.0"  => "17.02.2023  get utf8mb4 info by connect db and set connection collation accordingly, new setter migrateCollation ",
   "8.51.6"  => "11.02.2023  fix execute DbRep_afterproc after generating readings ".
                             "Forum: https://forum.fhem.de/index.php/topic,53584.msg1262970.html#msg1262970 ".
@@ -3526,8 +3527,10 @@ sub _DbRep_avgDailyMeanGWS {
 
       my @wsf = split " ", $runtime_string_first;
       my @wsn = split " ", $runtime_string_next;
-
-      $wrstr .= $runtime_string."#".$sum."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
+      my $wsft = $wsf[1] ? '_'.$wsf[1] : q{};
+      my $wsnt = $wsn[1] ? '_'.$wsn[1] : q{};
+      
+      $wrstr .= $runtime_string."#".$sum."#".$wsf[0].$wsft."#".$wsn[0].$wsnt."|";                # Kombi zum Rückschreiben in die DB
 
       ### Grünlandtemperatursumme lt. https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme ###
       my ($y,$m,$d) = split "-", $runtime_string;
@@ -3633,8 +3636,8 @@ sub _DbRep_avgTimeWeightMean {
 
           for my $twmrow (@twm_array) {
               ($tn,$val1) = split "_ESC_", $twmrow;
-              $val1       = DbRep_numval ($val1);                         # nichtnumerische Zeichen eliminieren
-              $bin_end    = $runtime_string_first;                        # der letzte Wert vor dem vollständigen Zeitrahmen wird auf den Beginn des Zeitrahmens "gefälscht"
+              $val1       = DbRep_numval ($val1);                                   # nichtnumerische Zeichen eliminieren
+              $bin_end    = $runtime_string_first;                                  # der letzte Wert vor dem vollständigen Zeitrahmen wird auf den Beginn des Zeitrahmens "gefälscht"
               $tf         = $runtime_string_first;
           };
       }
@@ -3654,7 +3657,7 @@ sub _DbRep_avgTimeWeightMean {
 
       my @twm_array = map { $_->[0]."_ESC_".$_->[1] } @{$sth->fetchall_arrayref()};
 
-      if ($bin_end) {                                                               # der letzte Datenwert aus dem vorherigen Bin wird dem aktuellen Bin vorangestellt,
+      if ($bin_end && $val1) {                                                      # der letzte Datenwert aus dem vorherigen Bin wird dem aktuellen Bin vorangestellt,
           unshift @twm_array, $bin_end.'_ESC_'.$val1;                               # wobei das vorherige $bin_end als Zeitstempel verwendet wird
       }
 
@@ -3691,8 +3694,8 @@ sub _DbRep_avgTimeWeightMean {
           Log3 ($name, 5, "DbRep $name - time sum: $tsum, delta time: $dt, value: $val1, twm: ".($tsum ? $val1*($dt/$tsum) : 0));
       }
 
-      $dt    = timelocal($secf, $minf, $hhf, $ddf, $mmf-1, $yyyyf-1900) - $to;              # die Zeitspanne des letzten Datenwertes in diesem Bin wird für diesen Bin berücksichtigt
-                                                                                            # $dt ist das Zeitgewicht des letzten Wertes in diesem Bin
+      $dt    = timelocal($secf, $minf, $hhf, $ddf, $mmf-1, $yyyyf-1900);                    # die Zeitspanne des letzten Datenwertes in diesem Bin wird für diesen Bin berücksichtigt
+      $dt   -= $to if ($to);                                                                # $dt ist das Zeitgewicht des letzten Wertes in diesem Bin
       $tsum += $dt;
       $sum  += $val1 * $dt if ($val1);
       $sum  /= $tsum if ($tsum > 0);

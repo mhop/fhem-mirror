@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  93_DbRep: fix Perl Warnings
  - bugfix: 72_FRITZBOX: Pruefung Attr FritzBoxIP um URL erweitert
                         Umlaute auf HTML Namen umgestellt
                         get <name> tr064Command gehärtet
