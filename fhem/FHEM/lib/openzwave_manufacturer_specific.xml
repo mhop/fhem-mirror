@@ -1797,6 +1797,7 @@
   <Manufacturer id="000A" name="Techniku"></Manufacturer>
   <Manufacturer id="0299" name="TechniSat">
     <Product type="0002" id="1a90" name="Single-Switch" config="technisat/03009499.xml"/>
+    <Product type="0003" id="1a91" name="Double-Switch" config="technisat/03009498.xml"/>
     <Product type="0005" id="1a93" name="Shutter" config="technisat/03009496.xml"/>
     <Product type="0004" id="1a92" name="Dimmer" config="technisat/03009497.xml"/>
   </Manufacturer>
