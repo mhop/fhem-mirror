@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.9c";
+my $ModulVersion = "07.50.9d";
 my $missingModul = "";
 my $missingModulWeb = "";
 my $missingModulTR064 = "";
@@ -248,6 +248,7 @@ sub FRITZBOX_Define($$)
 
    $hash->{HOST} = "fritz.box";
    $hash->{HOST} = $args[2]     if defined $args[2] && $args[2] =~ m=$URL_MATCH=i;
+
    $hash->{fhem}{definedHost} = $hash->{HOST}; # to cope with old attribute definitions
 
    my $msg;
@@ -402,7 +403,8 @@ sub FRITZBOX_Url_Regex {
     my $domain = "(?:\\.$base)*";
     my $tld = "(?:\\.(?:[${chars}]{2,}))";
     my $fulldomain = $host . $domain . $tld . "\\.?";
-    my $name = "(?:$ip|$fulldomain)";
+#    my $name = "(?:$ip|$fulldomain)";
+    my $name = "(?:$ip|$host)";
     my $port = "(?::\\d{2,5})?";
     my $path = "(?:[/?#]\\S*)?";
 
@@ -2530,6 +2532,8 @@ sub FRITZBOX_Readout_Run_Web($)
              my $dName = $resultWan->{data}->{scanlist}->[$i]->{ssid};
              $dName   .= " (Kanal: " . $resultWan->{data}->{scanlist}->[$i]->{channel};
              $dName   .= ", Band: " . $resultWan->{data}->{scanlist}->[$i]->{bandId} . ")";
+             $dName   =~ s/24ghz/2.4 GHz/;
+             $dName   =~ s/5ghz/5 GHz/;
 
              $rName  = $resultWan->{data}->{scanlist}->[$i]->{mac};
              $rName =~ s/:/_/g;
@@ -5965,7 +5969,7 @@ sub FRITZBOX_fritztris($)
    <br/><br/>
    The box is partly controlled via the official TR-064 interface but also via undocumented interfaces between web interface and firmware kernel.</br>
    <br>
-   The modul was tested on FRITZ!BOX 7390 and 7490 with Fritz!OS 6.20 and higher.
+   The modul was tested on FRITZ!BOX 7590, 7490 and FRITZ!WLAN Repeater 1750E with Fritz!OS 7.50 and higher.
    <br>
    Check also the other FRITZ!BOX moduls: <a href="#SYSMON">SYSMON</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
@@ -5978,7 +5982,7 @@ sub FRITZBOX_fritztris($)
       <br>
       <code>define &lt;name&gt; FRITZBOX  [host]</code>
       <br/>
-         The attribute <i>host</i> is the web address (name or IP) of the FRITZ!BOX. If it is missing, the modul switches in local mode or uses the default host address "fritz.box".
+      The parameter <i>host</i> is the web address (name or IP) of the FRITZ!BOX. If it is missing, the modul uses the default host address "fritz.box".
       <br/><br/>
       Example: <code>define Fritzbox FRITZBOX</code>
       <br/><br/>
@@ -6228,12 +6232,6 @@ sub FRITZBOX_fritztris($)
          Polling-Interval. Default is 300 (seconds). Smallest possible value is 60.
       </li><br>
 
-      <li><a name="allowShellCommand"></a>
-         <dt><code>allowShellCommand &lt;0 | 1&gt;</code></dt>
-         <br>
-         Enables the get command "shellCommand"
-      </li><br>
-
       <li><a name="boxUser"></a>
          <dt><code>boxUser &lt;user name&gt;</code></dt>
          <br>
@@ -6329,9 +6327,8 @@ sub FRITZBOX_fritztris($)
       </li><br>
 
       <li><a name="fritzBoxIP"></a>
-         <dt><code>fritzBoxIP &lt;IP Address&gt;</code></dt>
+         <dt><code>fritzBoxIP &lt;IP Address| DNS&gt;</code></dt>
          <br>
-         Depreciated.
       </li><br>
 
       <li><a name="m3uFileLocal"></a>
@@ -6478,6 +6475,8 @@ sub FRITZBOX_fritztris($)
    <br/><br/>
    Die Steuerung erfolgt teilweise &uuml;ber die offizielle TR-064-Schnittstelle und teilweise &uuml;ber undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern.</br>
    <br>
+   Das Modul wurde auf der FRITZ!BOX 7590, 7490 und dem FRITZ!WLAN Repeater 1750E mit Fritz!OS 7.50 und höer getestet.
+   <br>
    Bitte auch die anderen FRITZ!BOX-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
    <i>Das Modul nutzt das Perlmodule 'JSON::XS', 'LWP', 'SOAP::Lite' f&uuml;r den Fernzugriff.</i>
@@ -6488,7 +6487,7 @@ sub FRITZBOX_fritztris($)
       <br>
       <code>define &lt;name&gt; FRITZBOX [host]</code>
       <br/>
-      Das Attribut <i>host</i> ist die Web-Adresse (Name oder IP) der FRITZ!BOX. Fehlt es, so schaltet das Modul in den lokalen Modus oder nutzt die Standardadresse "fritz.box".
+      Der Parameter <i>host</i> ist die Web-Adresse (Name oder IP) der FRITZ!BOX / Repeater. Fehlt er, so wird die Standardadresse "fritz.box" genutzt.
       <br/><br/>
       Beispiel: <code>define Fritzbox FRITZBOX</code>
       <br/><br/>
@@ -6650,7 +6649,7 @@ sub FRITZBOX_fritztris($)
       <li><a name="update"></a>
          <dt><code>set &lt;name&gt; update</code></dt>
          <br>
-         Startet eine Aktualisierung der Ger&auml;tewerte.
+         Startet eine Aktualisierung der Ger&auml;te Readings.
       </li><br>
 
       <li><a name="wlan"></a>
@@ -6740,12 +6739,6 @@ sub FRITZBOX_fritztris($)
          <dt><code>INTERVAL &lt;seconds&gt;</code></dt>
          <br>
          Abfrage-Interval. Standard ist 300 (Sekunden). Der kleinste m&ouml;gliche Wert ist 60.
-      </li><br>
-
-      <li><a name="allowShellCommand"></a>
-         <dt><code>allowShellCommand &lt;0 | 1&gt;</code></dt>
-         <br>
-         Freischalten des get-Befehls "shellCommand"
       </li><br>
 
       <li><a name="boxUser"></a>
@@ -6843,9 +6836,8 @@ sub FRITZBOX_fritztris($)
       </li><br>
 
       <li><a name="fritzBoxIP"></a>
-         <dt><code>fritzBoxIP &lt;IP Address&gt;</code></dt>
+         <dt><code>fritzBoxIP &lt;IP Address | DNS&gt;</code></dt>
          <br>
-         Veraltet.
       </li><br>
 
       <li><a name="m3uFileLocal"></a>
