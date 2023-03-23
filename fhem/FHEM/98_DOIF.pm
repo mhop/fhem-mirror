@@ -1247,7 +1247,7 @@ sub ReadingValDoIf
     $r=$defs{$name}{READINGS}{$reading}{VAL};
     $r="" if (!defined($r));
     if ($regExp) {
-      if ($regExp =~ /^(avg|med|diff|inc)(\d*)/) {
+      if ($regExp =~ /^(avg|med|diffpsec|diff|inc)(\d*)/) {
         my @a=@{$hash->{accu}{"$name $reading"}{value}};
         my $func=$1;      
         my $dim=$2;
@@ -1256,7 +1256,7 @@ sub ReadingValDoIf
         @a=splice (@a, -$num,$num);
         if ($func eq "avg" or $func eq "med") {
           return ($r) if (!@a);
-        } elsif ($func eq "diff" or $func eq "inc") {
+        } elsif ($func eq "diff" or $func eq "diffpsec" or $func eq "inc") {
           return (0) if (@a <= 1);
         }
         if ($func eq "avg") {
@@ -1272,6 +1272,10 @@ sub ReadingValDoIf
             } else {
               return ($vals[int($num/2) - 1] + $vals[int($num/2)])/2;
             }
+        } elsif ($func eq "diffpsec") {
+          my @t=@{$hash->{accu}{"$name $reading"}{time}};
+          @t=splice (@t, -$num,$num);
+          return (int(($a[-1]-$a[0])/($t[-1]-$t[0])*1000000)/1000000);
         } elsif ($func eq "diff") {
           return (($a[-1]-$a[0]));
         } elsif  ($func eq "inc") {
@@ -1342,6 +1346,13 @@ sub accu_setValue
     my $r=ReadingsVal($name,$reading,0);
     $r = ($r =~ /(-?\d+(\.\d+)?)/ ? $1 : 0);
     push (@{$a},$r);
+    if (defined $hash->{accu}{"$name $reading"}{time}) {
+      my $t=$hash->{accu}{"$name $reading"}{time};
+      shift (@{$t}) if (@{$t} >= $dim);
+      #push (@{$t},time_str2num(ReadingsTimestamp($name,$reading,"")));
+      my ($seconds, $microseconds) = gettimeofday();
+      push (@{$t},$seconds+$microseconds/1000000);
+    }
   }
 }
 
@@ -2168,16 +2179,17 @@ sub ReplaceReadingDoIf
           $regExp=$1;
           $output=$2;
           return ($regExp,"no round brackets in regular expression") if ($regExp !~ /.*\(.*\)/);
-        } elsif ($format =~ /^((avg|med|diff|inc)(\d*))/) {
+        } elsif ($format =~ /^((avg|med|diffpsec|diff|inc)(\d*))/) {
            AddRegexpTriggerDoIf($hash,"accu","","accu",$name,$reading);
            $regExp =$1;
            my $dim=$3;
            $dim=2 if (!defined $dim or !$dim);
-           if (defined $hash->{accu}{"$name $reading"}{dim}) {
-             $hash->{accu}{"$name $reading"}{dim}=$hash->{accu}{"$name $reading"}{dim} < $dim ? $dim : $hash->{accu}{"$name $reading"}{dim};
-           } else {
+           if (!defined $hash->{accu}{"$name $reading"}{dim} or $hash->{accu}{"$name $reading"}{dim} != $dim) {
+#             $hash->{accu}{"$name $reading"}{dim}=$hash->{accu}{"$name $reading"}{dim} != $dim ? $dim : $hash->{accu}{"$name $reading"}{dim};
+#           } else {
              $hash->{accu}{"$name $reading"}{dim}=$dim;
              @{$hash->{accu}{"$name $reading"}{value}}=();
+             @{$hash->{accu}{"$name $reading"}{time}}=() if ($2 eq "diffpsec");
            }
         } elsif ($format =~ /^((\d*)col(\d*)(\w?))(?::(.*))?/) {
            $regExp =$1;
@@ -2391,6 +2403,7 @@ sub setDOIF_Reading
   $hash->{helper}{event}=join(",",@{$eventa}) if ($eventa);
 
   my $ret = eval $hash->{$ReadingType}{$DOIF_Reading};
+
   if ($@) {
     $@ =~ s/^(.*) at \(eval.*\)(.*)$/$1,$2/;
     $ret="error in $ReadingType: ".$@;
@@ -2400,6 +2413,9 @@ sub setDOIF_Reading
     Log3 ($hash->{NAME},3 , "$hash->{NAME}: warning in $ReadingType: $DOIF_Reading");
   } 
   $lastWarningMsg="";
+  if (!defined $ret) {
+    return;
+  }
   if ($ReadingType eq "event_Readings") {
     readingsSingleUpdate ($hash,$DOIF_Reading,$ret,1);
   } elsif ($ret ne ReadingsVal($hash->{NAME},$DOIF_Reading,"") or !defined $defs{$hash->{NAME}}{READINGS}{$DOIF_Reading}) {
@@ -5550,7 +5566,11 @@ sub card
       $begin_period2=$value1[0]{begin_period2};
     }
   } else {
-    return ("wrong definition at collect parameter: $col");
+    if ($col eq "") {
+      return ("not defined collect reading");
+    } else {
+      return ("wrong definition at collect parameter, return value: $col");
+    }
    # $value1[0]{value}=$col;
   }
  
@@ -7318,7 +7338,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events">Ereignissteuerung über Auswertung von Events</a><br>
   <a href="#DOIF_Angaben_im_Ausfuehrungsteil">Angaben im Ausführungsteil</a><br>
   <a href="#DOIF_Filtern_nach_Zahlen">Filtern nach Ausdrücken mit Ausgabeformatierung</a><br>
-  <a href="#DOIF_Reading_Funktionen">Durchschnitt, Median, Differenz, anteiliger Anstieg</a><br>
+  <a href="#DOIF_Reading_Funktionen">Durchschnitt, Median, Differenz, Änderungsrate, anteiliger Anstieg</a><br>
   <a href="#DOIF_aggregation">Aggregieren von Werten</a><br>
   <a href="#DOIF_Zeitsteuerung">Zeitsteuerung</a><br>
   <a href="#DOIF_Relative_Zeitangaben">Relative Zeitangaben</a><br>
@@ -7632,7 +7652,7 @@ Der Inhalt des Dummys Alarm soll in einem Text eingebunden werden:<br>
 Die Definition von regulären Ausdrücken mit Nutzung der Perl-Variablen $1, $2 usw. kann in der Perldokumentation nachgeschlagen werden.<br>
 <br>
 <a name="DOIF_Reading_Funktionen"></a><br>
-<b>Durchschnitt, Median, Differenz, anteiliger Anstieg</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<b>Durchschnitt, Median, Differenz, Änderungsrate, anteiliger Anstieg</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 Die folgenden Funktionen werden auf die letzten gesendeten Werte eines Readings angewendet. Das angegebene Reading muss Events liefern, damit seine Werte intern im Modul gesammelt und die Berechnung der angegenen Funktion erfolgen kann.<br>
 <br>
@@ -7640,7 +7660,7 @@ Syntax<br>
 <br>
 <code>[&lt;device&gt;:&lt;reading&gt;:&lt;function&gt;&lt;number of last values&gt;]</code><br>
 <br>
-&lt;number of last values&gt; ist optional. Wird sie nicht angegeben, so werden bei Durchschnitt/Differenz/Anstieg die letzten beiden Werte, bei Median die letzten drei Werte, ausgewertet.<br>
+&lt;number of last values&gt; ist optional. Wird sie nicht angegeben, so werden bei Durchschnitt/Differenz/Änderungsrate/Anstieg die letzten beiden Werte, bei Median die letzten drei Werte, ausgewertet.<br>
 <br>
 <u>Durchschnitt</u><br>
 <br>
@@ -7678,6 +7698,23 @@ Bsp.:<br>
 <br>
 Wenn die Temperaturdifferenz zwischen dem letzten und dem fünftletzten Wert um mindestens drei Grad fällt, dann Anweisung ausführen.<br>
 <br>
+<u>Änderungsrate</u><br>
+<br>
+Es wird die Änderungsrate (Veränderung pro Zeit) zwischen dem letzten und dem x-ten zurückliegenden Wert berechnet. Es wird der Differenzenquotient von zwei Werten und deren Zeitdifferenz gebildet. 
+Mit Hilfe dieser Funktion können momentane Verbräuche von Wasser, elektrischer Energie, Gas usw. bestimmt, ausgewertet oder visualisiert werden.<br>
+<br>
+Funktion: <b>diffpsec</b><br>
+<br>
+Berechnung:<br>
+<br>
+(letzter Wert - zurückliegender Wert)/(Zeitpunkt des letzten Wertes - Zeitpunkt des zurückliegenden Wertes)<br>
+<br>
+Bsp.:<br>
+<br>
+<code>define di_pv DOIF ([pv:total_feed:diffpsec]*3600 &gt; 1) (set heating on) DOELSE (set heating off)</code><br>
+<br>
+Wenn die momentane PV-Einspeise-Leistung mehr als 1 kW beträgt, dann soll die Heizung eingeschaltet werden, sonst soll sie ausgeschaltet werden. Das total_feed-Reading beinhaltet den PV-Ertrag in Wh.<br>
+<br>
 <u>anteiliger Anstieg</u><br>
 <br>
 Funktion: <b>inc</b><br>
@@ -7694,8 +7731,8 @@ Wenn die Feuchtigkeit im Bad der letzten beiden Werte um über zehn Prozent anst
 <br>
 Zu beachten:<br>
 <br>
-Der Durchschnitt/Median/Differenz/Anstieg werden bereits gebildet, sobald die ersten Werte eintreffen. Beim ersten Wert ist der Durchschnitt bzw. Median logischerweise der Wert selbst,
-Differenz und der Anstieg ist in diesem Fall 0. Die intern gesammelten Werte werden nicht dauerhaft gespeichert, nach einem Neustart sind sie gelöscht. Die angegebenen Readings werden intern automatisch für die Auswertung nach Zahlen gefiltert.<br> 
+Differenz/Änderungsrate/Anstieg werden gebildet, sobald zwei Werte eintreffen. Die intern gesammelten Werte werden nicht dauerhaft gespeichert, nach einem Neustart sind sie gelöscht. 
+Die angegebenen Readings werden intern automatisch für die Auswertung nach Zahlen gefiltert.<br> 
 <br>
 <a name="DOIF_Angaben_im_Ausfuehrungsteil"></a><br>
 <b>Angaben im Ausführungsteil (gilt nur für FHEM-Modus)</b>:&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
