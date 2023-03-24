@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.75.1" => "24.03.2023  change epieces for consumer type washingmachine ",
   "0.75.0" => "16.02.2023  new attribute ctrlSolCastAPImaxReq, rename attr ctrlOptimizeSolCastInterval to ctrlSolCastAPIoptimizeReq ",
   "0.74.8" => "11.02.2023  change description of 'mintime', mintime with SunPath value possible ",
   "0.74.7" => "23.01.2023  fix evaljson evaluation ",
@@ -773,7 +774,7 @@ my %hef = (                                                                     
   "charger"        => { f => 1.00, m => 1.00, l => 1.00, mt => 120         },    # m   = Faktor Energieverbrauch zwischen erster und letzter Stunde
   "dishwasher"     => { f => 0.45, m => 0.10, l => 0.45, mt => 180         },    # l   = Faktor Energieverbrauch in letzter Stunde
   "dryer"          => { f => 0.40, m => 0.40, l => 0.20, mt => 90          },    # mt  = default mintime (Minuten)
-  "washingmachine" => { f => 0.30, m => 0.40, l => 0.30, mt => 120         },
+  "washingmachine" => { f => 0.50, m => 0.30, l => 0.40, mt => 120         },
 );
 
 my %hcsr = (                                                                                  # Funktiontemplate zur Erstellung optionaler Statistikreadings
