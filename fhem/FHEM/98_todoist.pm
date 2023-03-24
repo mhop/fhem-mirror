@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.15";
+my $version = "1.3.17";
 my $apiUrl = "https://api.todoist.com/sync/v9/";
 
 my $srandUsed;
@@ -399,7 +399,10 @@ sub todoist_UpdateTask($$$) {
   ## use task content
   elsif (@temp && $temp[0] =~ /title/i) {
     $title = encode_utf8($temp[1]);
-    $title = $h->{"title"} if ($h->{"title"});
+    $taskId = $hash->{helper}{"TITLES"}{$title} if ($hash->{helper}{"TITLES"});
+  }
+  elsif (defined($h->{"title"}) || defined($h->{"TITLE"}) || defined($h->{"Title"})) {
+	$title = $h->{"title"} if ($h->{"title"});
     $title = $h->{"TITLE"} if ($h->{"TITLE"});
     $title = $h->{"Title"} if ($h->{"Title"});
     $taskId = $hash->{helper}{"TITLES"}{$title} if ($hash->{helper}{"TITLES"});
