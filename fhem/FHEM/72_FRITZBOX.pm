@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.10";
+my $ModulVersion = "07.50.10a";
 my $missingModul = "";
 my $missingModulWeb = "";
 my $missingModulTR064 = "";
@@ -221,9 +221,10 @@ sub FRITZBOX_Initialize($)
                 ."enableSIP:0,1 "
                 ."disableBoxReadings:multiple-strict,box_connect,box_cpuTemp,box_dect,box_dsl_downStream,box_dsl_upStream,"
                                 ."box_guestWlan,box_guestWlanCount,box_guestWlanRemain,box_macFilter_active,box_ipv4_Extern,box_ipv6_Extern,"
-                                ."box_ipv6_Prefix,box_last_connect_err,box_moh,box_powerRate,box_rateDown,box_wlan_LogExtended,box_sys_LogNewest,box_wlan_LogNewest,"
-                                ."box_rateUp,box_stdDialPort,box_tr064,box_tr069,box_uptimeConnect,box_uptime,box_wlan_Count,box_wlan_2.4GHz,"
-                                ."box_wlan_5GHz,box_vdsl_downStreamRate,box_vdsl_upStreamRate "
+                                ."box_ipv6_Prefix,box_last_connect_err,box_moh,box_powerRate,box_rateDown,box_wlan_LogExtended,"
+                                ."box_fon_LogNewest,box_sys_LogNewest,box_wlan_LogNewest,"
+                                ."box_rateUp,box_stdDialPort,box_tr064,box_tr069,box_upnp,box_upnp_control_activated,box_uptimeConnect,box_uptime,"
+                                ."box_wlan_Count,box_wlan_2.4GHz,box_wlan_5GHz,box_vdsl_downStreamRate,box_vdsl_upStreamRate "
                 ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,_noDefInf_ "
                 ."disableTableFormat:multiple-strict,border(8),cellspacing(10),cellpadding(20) "
                 .$readingFnAttributes;
@@ -298,6 +299,7 @@ sub FRITZBOX_Define($$)
    $hash->{LUAQUERY} = -1;
    $hash->{LUADATA}  = -1;
    $hash->{TR064}    = -1;
+   $hash->{UPNP}     = -1;
    
    RemoveInternalTimer($hash->{helper}{TimerReadout});
    InternalTimer(gettimeofday() + 1 , "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 0);
@@ -1591,6 +1593,7 @@ sub FRITZBOX_API_Check_Run($)
       if ($response->is_success) {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 1;
          FRITZBOX_Log $hash, 4, "DEBUG: API luaData found (".$response->code.").";
+         # xhr 1 lang de page netSet xhrId all
       }
       elsif ($response->code eq "500" || $response->code eq "403") {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 1;
@@ -1834,6 +1837,8 @@ sub FRITZBOX_Readout_Run_Web($)
    #$queryStr .= "&box_connect=connection0:status/connect"; # Internet connection state
    $queryStr .= "&box_tr064=tr064:settings/enabled"; # TR064
    $queryStr .= "&box_tr069=tr069:settings/enabled"; # TR069
+   $queryStr .= "&box_upnp=box:settings/upnp_activated"; #UPNP
+   $queryStr .= "&box_upnpCtrl=box:settings/upnp_control_activated";
    $queryStr .= "&box_fwUpdate=updatecheck:status/update_available_hint";
    if (AttrVal( $name, "enableUserInfo", "0")) {
      $queryStr .= "&userProfil=user:settings/user/list(name,filter_profile_UID,this_month_time,today_time,type)"; # User profiles
@@ -2417,8 +2422,11 @@ sub FRITZBOX_Readout_Run_Web($)
    }
 
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwUpdate",    $result->{box_fwUpdate};
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr064",       $result->{box_tr064},       "onoff";
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr069",       $result->{box_tr069},       "onoff";
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr064",       $result->{box_tr064}, "onoff";
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr069",       $result->{box_tr069}, "onoff";
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_upnp",        $result->{box_upnp}, "onoff";
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_upnp_control_activated", $result->{box_upnpCtrl}, "onoff";
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->UPNP",          $result->{box_upnp};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_stdDialPort", $result->{box_stdDialPort}, "dialport";
    # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv4_Extern",    $result->{box_ipExtern};
    # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_connect",     $result->{box_connect};
@@ -2666,10 +2674,13 @@ sub FRITZBOX_Readout_Run_Web($)
      FRITZBOX_Log $hash, 5, "DEBUG: wlanLogExtended -> " . $tmpData;
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_LogExtended", $tmpData;
    }
-   if ( defined $resultData->{data}->{filter} && $resultData->{data}->{filter} eq "wlan") {
+   if ( defined $resultData->{data}->{filter} && $resultData->{data}->{filter} eq "wlan" && defined $resultData->{data}->{log}) {
      $tmpData = $resultData->{data}->{log}->[0]->{id} . " " . $resultData->{data}->{log}->[0]->{date} . " " . $resultData->{data}->{log}->[0]->{time} ;
      FRITZBOX_Log $hash, 5, "DEBUG: wlanLogLast -> " . $tmpData;
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_LogNewest", $tmpData;
+   } else {
+     FRITZBOX_Log $hash, 5, "DEBUG: wlanLogLast -> none";
+     FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_LogNewest", "none";
    }
 
    # SYS log error while login (505)
@@ -2688,10 +2699,38 @@ sub FRITZBOX_Readout_Run_Web($)
    if(defined $resultData->{Error}) {
      $tmpData = FRITZBOX_ERR_Result($hash, $resultData);
      FRITZBOX_Log $hash, 3, "ERROR: " . $tmpData;
-   } elsif ( defined $resultData->{data}->{filter} && $resultData->{data}->{filter} eq "sys") {
+   } elsif ( defined $resultData->{data}->{filter} && $resultData->{data}->{filter} eq "sys" && defined $resultData->{data}->{log}) {
      $tmpData = $resultData->{data}->{log}->[0]->{id} . " " . $resultData->{data}->{log}->[0]->{date} . " " . $resultData->{data}->{log}->[0]->{time} ;
      FRITZBOX_Log $hash, 5, "DEBUG: sysLogLast -> " . $tmpData;
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_sys_LogNewest", $tmpData;
+   } else {
+     FRITZBOX_Log $hash, 5, "DEBUG: sysLogLast -> none";
+     FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_sys_LogNewest", "none";
+   }
+
+   # FON log error while login (505)
+
+   # xhr 1 lang de page log xhrId log filter fon
+
+   @webCmdArray = ();
+   push @webCmdArray, "xhr"         => "1";
+   push @webCmdArray, "lang"        => "de";
+   push @webCmdArray, "page"        => "log";
+   push @webCmdArray, "xhrId"       => "log";
+   push @webCmdArray, "filter"      => "fon";
+
+   $resultData = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+
+   if(defined $resultData->{Error}) {
+     $tmpData = FRITZBOX_ERR_Result($hash, $resultData);
+     FRITZBOX_Log $hash, 3, "ERROR: " . $tmpData;
+   } elsif ( defined $resultData->{data}->{filter} && $resultData->{data}->{filter} eq "sys" && defined $resultData->{data}->{log}) {
+     $tmpData = $resultData->{data}->{log}->[0]->{id} . " " . $resultData->{data}->{log}->[0]->{date} . " " . $resultData->{data}->{log}->[0]->{time} ;
+     FRITZBOX_Log $hash, 5, "DEBUG: sysLogLast -> " . $tmpData;
+     FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fon_LogNewest", $tmpData;
+   } else {
+     FRITZBOX_Log $hash, 5, "DEBUG: sysLogLast -> none";
+     FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fon_LogNewest", "none";
    }
 
    # DOCSIS Informationen FB Cable
@@ -3091,8 +3130,9 @@ sub FRITZBOX_Readout_Process($$)
                 ."enableSIP:0,1 "
                 ."disableBoxReadings:multiple-strict,box_connect,box_cpuTemp,box_dect,box_dsl_downStream,box_dsl_upStream,"
                                 ."box_guestWlan,box_guestWlanCount,box_guestWlanRemain,box_macFilter_active,box_ipv4_Extern,box_ipv6_Extern,"
-                                ."box_ipv6_Prefix,box_last_connect_err,box_moh,box_powerRate,box_rateDown,box_sys_LogNewest,box_wlan_LogExtended,box_wlan_LogNewest,"
-                                ."box_rateUp,box_stdDialPort,box_tr064,box_tr069,box_uptimeConnect,box_uptime,box_wlan_Count,box_wlan_2.4GHz,"
+                                ."box_ipv6_Prefix,box_last_connect_err,box_moh,box_powerRate,box_rateDown,"
+                                ."box_fon_LogNewest,box_sys_LogNewest,box_wlan_LogExtended,box_wlan_LogNewest,"
+                                ."box_rateUp,box_stdDialPort,box_tr064,box_tr069,box_upnp,box_upnp_control_activated,box_uptimeConnect,box_uptime,box_wlan_Count,box_wlan_2.4GHz,"
                                 ."box_wlan_5GHz,box_vdsl_downStreamRate,box_vdsl_upStreamRate," #,box_model,box_oem
                                 ."box_docsis30_Ds_powerLevels,box_docsis30_Ds_latencys,box_docsis30_Ds_frequencys,box_docsis30_Ds_corrErrors,box_docsis30_Ds_nonCorrErrors,box_docsis30_Ds_mses,"
                                 ."box_docsis30_Us_powerLevels,box_docsis30_Us_frequencys,box_docsis31_Us_powerLevels,box_docsis31_Us_frequencys,box_docsis31_Ds_powerLevels,box_docsis31_Ds_frequencys "
@@ -6682,6 +6722,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_dect</b> - Current state of the DECT base: activ, inactiv</li>
       <li><b>box_dsl_downStream</b> - minimum effective data rate  (MBit/s)</li>
       <li><b>box_dsl_upStream</b> - minimum effective data rate  (MBit/s)</li>
+      <li><b>box_fon_LogNewest</b> - newest phone event: ID Date Time </li>
       <li><b>box_fwVersion</b> - Firmware version of the box, if outdated then '(old)' is appended</li>
       <li><b>box_guestWlan</b> - Current state of the guest WLAN</li>
       <li><b>box_guestWlanCount</b> - Number of devices connected to guest WLAN</li>
@@ -6696,6 +6737,8 @@ sub FRITZBOX_fritztris($)
       <li><b>box_model</b> - FRITZ!BOX model</li>
       <li><b>box_connect</b> - connection state: Unconfigured, Connecting, Authenticating, Connected, PendingDisconnect, Disconnecting, Disconnected</li>
       <li><b>box_last_connect_err</b> - last connection error</li>
+      <li><b>box_upnp</b> - application interface UPNP (needed by this modul)</li>
+      <li><b>box_upnp_control_activated</b> - state if control via UPNP is enabled</li>
       <li><b>box_uptime</b> - uptime since last reboot</li>
       <li><b>box_uptimeConnect</b> - connect uptime since last reconnect</li>
       <li><b>box_powerRate</b> - current power in percent of maximal power</li>
@@ -7237,6 +7280,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_dect</b> - Aktueller Status des DECT-Basis: aktiv, inaktiv</li>
       <li><b>box_dsl_downStream</b> - Min Effektive Datenrate  (MBit/s)</li>
       <li><b>box_dsl_upStream</b> - Min Effektive Datenrate  (MBit/s)</li>
+      <li><b>box_fon_LogNewest</b> - aktuellstes Telefonie-Ereignis: ID Datum Zeit </li>
       <li><b>box_fwVersion</b> - Firmware-Version der Box, wenn veraltet dann wird '(old)' angehangen</li>
       <li><b>box_guestWlan</b> - Aktueller Status des G&auml;ste-WLAN</li>
       <li><b>box_guestWlanCount</b> - Anzahl der Ger&auml;te die &uuml;ber das G&auml;ste-WLAN verbunden sind</li>
@@ -7250,6 +7294,8 @@ sub FRITZBOX_fritztris($)
       <li><b>box_moh</b> - Wartemusik-Einstellung</li>
       <li><b>box_connect</b> - Verbindungsstatus: Unconfigured, Connecting, Authenticating, Connected, PendingDisconnect, Disconnecting, Disconnected</li>
       <li><b>box_last_connect_err</b> - letzter Verbindungsfehler</li>
+      <li><b>box_upnp</b> - Status der Anwendungsschnittstelle UPNP (wird auch von diesem Modul ben&ouml;tigt)</li>
+      <li><b>box_upnp_control_activated</b> - Status Kontrolle über UPNP</li>
       <li><b>box_uptime</b> - Laufzeit seit letztem Neustart</li>
       <li><b>box_uptimeConnect</b> - Verbindungsdauer seit letztem Neuverbinden</li>
       <li><b>box_powerRate</b> - aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
@@ -7257,7 +7303,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_rateUp</b> - Upload-Geschwindigkeit des letzten Intervals in kByte/s</li>
       <li><b>box_sys_LogNewest</b> - aktuellstes Systemereignis: ID Datum Zeit </li>
       <li><b>box_stdDialPort</b> - Anschluss der ger&auml;teseitig von der W&auml;hlhilfe genutzt wird</li>
-      <li><b>box_tr064</b> - Anwendungsschnittstelle TR-064 (wird auch von diesem Modul ben&ouml;tigt)</li>
+      <li><b>box_tr064</b> - Status der Anwendungsschnittstelle TR-064 (wird auch von diesem Modul ben&ouml;tigt)</li>
       <li><b>box_tr069</b> - Provider-Fernwartung TR-069 (sicherheitsrelevant!)</li>
       <li><b>box_vdsl_downStreamRate</b> - Aktuelle Datenrate (MBit/s)</li>
       <li><b>box_vdsl_upStreamRate</b> - Aktuelle Datenrate (MBit/s)</li>
