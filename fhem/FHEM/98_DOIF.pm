@@ -1857,12 +1857,12 @@ sub DOIF_setPeriod
     my $offset=($min - $gmin)/60 + $hour - $ghour + 24 * ($year - $gyear || $yday - $gyday); # time zone offset
     if ($period eq "week") {
       $period1=$wday == 0 ? 6: $wday-1;
-      $period2=int(($seconds+3*86400+($isdst+$offset)*3600)/604800);
+      $period2=int(($seconds+3*86400+$offset*3600)/604800);
       ($sec,$min,$hour,$mday,$month,$year,$wday,$yday) = gmtime($period2*604800-3*86400);
       $begin_period2=sprintf("%02d.%02d-",$mday,$month+1);
     } elsif ($period eq "day") {
       $period1=$hour;
-      $period2=int(($seconds+($isdst+$offset)*3600)/86400);
+      $period2=int(($seconds+$offset*3600)/86400);
       #($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($period2*86400+($isdst+$offset)*3600);
       #$begin_period2=sprintf("%02d.%02d",$mday,$month+1);
       $begin_period2=qw(So Mo Di Mi Do Fr Sa)[$wday];
