@@ -134,7 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.75.1" => "24.03.2023  change epieces for consumer type washingmachine ",
+  "0.75.1" => "24.03.2023  change epieces for consumer type washingmachine, PV Vorhersage auf WR Kapazität begrenzen ",
   "0.75.0" => "16.02.2023  new attribute ctrlSolCastAPImaxReq, rename attr ctrlOptimizeSolCastInterval to ctrlSolCastAPIoptimizeReq ",
   "0.74.8" => "11.02.2023  change description of 'mintime', mintime with SunPath value possible ",
   "0.74.7" => "23.01.2023  fix evaljson evaluation ",
@@ -3708,7 +3708,7 @@ sub __calcDWDforecast {
   my $invcapacity = CurrentVal ($hash, "invertercapacity", 0);                                       # Max. Leistung des Invertrs
 
   if ($invcapacity && $pvsum > $invcapacity) {
-      $pvsum = $invcapacity + ($invcapacity * 0.01);                                                 # PV Vorhersage auf WR Kapazität zzgl. 1% begrenzen
+      $pvsum = $invcapacity;                                                                         # PV Vorhersage auf WR Kapazität begrenzen
 
       if($debug =~ /radiationProcess/x) {
           Log3 ($name, 1, "$name DEBUG> PV forecast limited to $pvsum Watt due to inverter capacity");
@@ -3948,7 +3948,7 @@ sub __calcSolCastEstimates {
   my $invcapacity = CurrentVal ($hash, 'invertercapacity', 0);                                       # Max. Leistung des Invertrs
 
   if ($invcapacity && $pvsum > $invcapacity) {
-      $pvsum = $invcapacity + ($invcapacity * 0.01);                                                 # PV Vorhersage auf WR Kapazität zzgl. 1% begrenzen
+      $pvsum = $invcapacity;                                                                         # PV Vorhersage auf WR Kapazität begrenzen
 
       if($debug =~ /radiationProcess/x) {
           Log3 ($name, 1, "$name DEBUG> PV forecast limited to $pvsum Watt due to inverter capacity");
