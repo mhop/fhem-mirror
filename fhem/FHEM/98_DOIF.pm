@@ -3913,7 +3913,7 @@ sub DOIF_SetTimer {
     $next_time+=86400;
   }
   ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($next_time);
-  if ($isdst_now != $isdst) {
+  if ($isdst_now != $isdst and !$rel) {
     if ($isdst_now == 1) {
       $next_time+=3600 if ($isdst == 0);
     } else {
