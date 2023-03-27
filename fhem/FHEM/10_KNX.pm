@@ -116,9 +116,13 @@
 #              modify KNX_set
 #              add pulldown menu for attr IODev with vaild IO-devs
 #              KNX_scan now avail also from cmd-line
-# MH 20220129  PBP changes /ms flag
+# MH 20230129  PBP changes /ms flag
 #              syntax check on attr stateCmd & putCmd
 #              fix define parsing
+# MH 20230328  syntax check on attr stateregex
+#              reminder to migrate to KNXIO
+#              announce answerreading as deprecated
+#              replace cascading if..elsif with given
 
 
 package KNX; ## no critic 'package'
@@ -128,6 +132,8 @@ use warnings;
 use Encode qw(encode decode);
 use Time::HiRes qw(gettimeofday);
 use Scalar::Util qw(looks_like_number);
+use feature qw(switch);
+no if $] >= 5.017011, warnings => 'experimental';
 use GPUtils qw(GP_Import GP_Export); # Package Helper Fn
 
 ### perlcritic parameters
@@ -719,8 +725,8 @@ sub KNX_Set {
 		$cmd = shift(@arg); #shift args as with newsyntax $arg[0] is cmd
 		return $thisSub . 'no cmd found' if(!defined($cmd));
 	}
-	else {
-		(my $err, $targetGadName, $cmd) = KNX_Set_oldsyntax($hash,$targetGadName,@arg); # process old syntax targetGadName contains command!
+	else { # process old syntax targetGadName contains command!
+		(my $err, $targetGadName, $cmd) = KNX_Set_oldsyntax($hash,$targetGadName,@arg);
 		return $thisSub . $err if defined($err);
 	}
 
@@ -737,6 +743,8 @@ sub KNX_Set {
 	my $value = $cmd; #process set command with $value as output
 	#Text neads special treatment - additional args may be blanked words
 	$value .= q{ } . join (q{ }, @arg) if (($model =~ m/^dpt16/ixms) && (scalar (@arg) > 0));
+	# compatibility with widgetoverride :time
+	$value .= ':00' if ($model eq 'dpt10' && $value =~ /^[\d]{2}:[\d]{2}$/xms);
 
 	#Special commands for dpt1 and dpt1.001
 	if ($model =~ m/^(?:dpt1|dpt1.001)$/ixms) {
@@ -922,19 +930,25 @@ sub KNX_Attr {
 	my $hash = $defs{$name};
 	my $value = undef;
 
-	if ($cmd eq 'set') {
-		return qq{KNX_Attr ($name): Attribute "$aName" is not supported/have no function at all, pls. check cmdref for equivalent function.} if ($aName =~ m/(listenonly|readonly|slider)/ixms);
+	if ($cmd eq 'set' && $aName =~ m/(listenonly|readonly|slider)/ixms) {
+		return qq{KNX_Attr ($name): Attribute "$aName" is not supported/have no function at all, pls. check cmdref for equivalent function.};
+	}
 
+	if ($cmd eq 'set' && $aName eq 'answerReading') { # deprecate announcement
+		Log3 ($name, 3, qq{KNX_Attr ($name): Attribute "$aName" will be deprecated soon, consider using Attr "putCmd" instead});
+	}
+
+	if ($cmd eq 'set' && $init_done) {
 		if ($aName eq 'KNX_toggle') { # validate device/reading
 			my ($srcDev,$srcReading) = split(qr/:/xms,$aVal); # format: <device>:<reading>
 			$srcDev = $name if ($srcDev eq '$self');
 			return 'no valid device for attr: KNX_toggle' if (!IsDevice($srcDev));
 			$value = ReadingsVal($srcDev,$srcReading,undef) if (defined($srcReading)); #test for value  
-			return 'no valid device/reading value for attr: KNX_toggle' if (!defined($value) && $init_done); # maybe device/reading not defined during start
+			return 'no valid device/reading value for attr: KNX_toggle' if (!defined($value) );
 		}
 
 		# check valid IODev
-		elsif ($aName eq 'IODev' && $init_done) {
+		elsif ($aName eq 'IODev') {
 			return KNX_chkIODev($hash,$aVal);
 		}
 
@@ -943,12 +957,15 @@ sub KNX_Attr {
 			my $err = perlSyntaxCheck($aVal, %specials);
 			return qq{syntax check failed for $aName: \n $err} if($err);
 		}
-=pod
+
 		elsif ($aName eq 'stateRegex') { # test for syntax errors
-			my $err = eval { "HALLO" =~ m/$aVal/xms };
-			return qq{syntax check failed for $aName: \n $@} if ($@); ## no critic (Variables::ProhibitPunctuationVars)
+			my @aValS = split(/\s+|\//xms,$aVal);
+			foreach (@aValS) {
+				next if ($_ eq q{} );
+				my $err = main::CheckRegexp($_,'Attr stateRegex'); # fhem.pl
+				return qq{syntax check failed for $aName: \n $err} if (defined($err));
+			}
 		}
-=cut
 	} # /set
 
 	if ($cmd eq 'del') {
@@ -1005,11 +1022,17 @@ sub KNX_Parse {
 	my $ioName = $iohash->{NAME};
 	return q{} if ((IsDisabled($ioName) == 1) || IsDummy($ioName)); # IO - device is disabled or dummy
 
+	#frienldy reminder to migrate to KNXIO.....only once after def or fhem-start!
+	if (!exists($iohash->{INFO}) && ($iohash->{TYPE} =~ /^(?:TUL|KNXTUL)/xms) ) {
+		$iohash->{INFO} = qq{consider migrating $ioName to KNXIO Module}; # set flag
+		KNX_Log ($ioName, 2, q{INFO: } . $iohash->{INFO});
+	}
+
 	#Msg format: C<src>[wrp]<group><value> i.e. Cw00000101
 	my ($src,$cmd,$gadCode,$val) = $msg =~ m/^$TULid([0-9a-f]{5})([prw])([0-9a-f]{5})(.*)$/ixms; 
 	my @foundMsgs;
 
-	Log3 ($ioName, 4, qq{KNX_Parse -enter: IO-name=$ioName src=} . KNX_hexToName2($src) . q{ dest=} . KNX_hexToName($gadCode) . qq{ msg=$msg});
+	KNX_Log ($ioName, 4, q{src=} . KNX_hexToName2($src) . q{ dest=} . KNX_hexToName($gadCode) . qq{ msg=$msg});
 
 	#gad not defined yet, give feedback for autocreate
 	return KNX_autoCreate($iohash,$gadCode) if (! (exists $modules{KNX}->{defptr}->{$gadCode}));
@@ -1053,12 +1076,12 @@ sub KNX_Parse {
 		#handle read messages
 		elsif ($cmd =~ /[r]/ixms) {
 			my $putName = $deviceHash->{GADDETAILS}->{$gadName}->{RDNAMEPUT};
-			Log3 ($deviceName, 5, qq{KNX_Parse_r ($deviceName): GET});
 
 			my $value = undef;
 			#high priority - eval
 			my $cmdAttr = AttrVal($deviceName, 'putCmd', undef);
 			if ((defined($cmdAttr)) && ($cmdAttr ne q{})) {
+				$value = ReadingsVal($deviceName, 'state', undef); #default - prepare for removal of answerreading
 				$value = KNX_eval ($deviceHash, $gadName, $value, $cmdAttr);
 				if (defined($value) && ($value ne q{}) && ($value ne 'ERROR')) { # answer only, if eval was successful
 					Log3 ($deviceName, 5, qq{KNX_Parse_r ($deviceName): replaced by Attr putCmd=$cmdAttr VALUE=$value});
@@ -1266,9 +1289,8 @@ sub KNX_checkAndClean {
 
 	my $pattern = $dpttypes{$model}->{PATTERN};
 
-	#trim whitespaces at the end
+	#trim whitespaces at begin & end
 	$value =~ s/^\s+|\s+$//gixms;
-	$value .= ':00' if ($model eq 'dpt10' && $value =~ /^[\d]{2}:[\d]{2}$/gixms); # compatibility with widgetoverride :time
 
 #new code: match against model pattern -to be tested!!!
 #	my $pattern = $dpttypes{$model}->{PATTERN});
@@ -1851,6 +1873,25 @@ sub KNX_gadNameByNO {
 	return $targetGadName;
 }
 
+### unified Log handling
+### calling param: same as Log3: hash/name/undef, loglevel, logtext
+### prependes device, subroutine, linenr. to Log msg
+### return undef
+sub KNX_Log {
+        my $dev    = shift || 'global';
+        my $loglvl = shift;
+        my $logtxt = shift;
+
+        my $sub  = (caller(1))[3] || 'main';
+        my $line = (caller(0))[2];
+        my $name = ( ref($dev) eq "HASH" ) ? $dev->{NAME} : $dev;
+        $sub =~ s/.+[:]+//xms;
+
+        Log3 ($name, $loglvl, qq{$name [$sub $line]: $logtxt});
+        return;
+}
+
+##############################################
 ########## public utility functions ##########
 # when called from FHEM cmd-line
 sub main::KNX_scancmd {
@@ -2096,13 +2137,15 @@ The answer from the bus-device updates the readings &lt;getName&gt; and state.</
 <p><strong>Special attributes</strong></p>
 <ul>
 <a id="KNX-attr-answerReading"></a><li>answerReading<br/>
-  If enabled, FHEM answers on read requests. The content of reading &lt;state&gt; is sent to the bus as answer. 
-  If defined, the content of the reading &lt;putName&gt; is used as value for the answer.</li>
+  If enabled, FHEM answers on read requests. The content of reading state is sent to the bus as answer. 
+  If defined, the content of the reading &lt;putName&gt; is used as value for the answer. This attribute has no effect if the putCmd attribute is set!<br/>
+  <b>This attribute (and reading &lt;putName&gt;) will be deprecated soon,</b> as replacement you can use for example:<br/>
+  <code>attr &lt;device&gt; putCmd {return $state if ($gadName eq 'g1');} </code> </li>
 <br/>
 <a id="KNX-attr-stateRegex"></a><li>stateRegex<br/>
   You can pass n pairs of regex-patterns and strings to replace, seperated by a space. A regex-pair is always in the format /&lt;readingName&gt;[:&lt;value&gt;]/[2nd part]/.
   The first part of the regex must exactly match the readingname, and optional (separated by a colon) the readingValue. If first part match, the matching part will be replaced by the 2nd part of the regex.
-  If the 2nd part is empty, the value will be ignored and state-reading is not updated.  
+  If the 2nd part is empty, the value is ignored and reading state will not get updated.  
   The substitution is done every time, a reading is updated. You can use this function for converting, adding units, having more fun with icons, ...<br/>
   This function has only an impact on the content of reading state. It is executed directly after replacing the reading-names and processing "format" Attr, but before stateCmd.</li>
 <br/>
@@ -2111,15 +2154,15 @@ The answer from the bus-device updates the readings &lt;getName&gt; and state.</
   Please supply a valid perl command like using the attribute stateFormat.<br/>
   Unlike stateFormat the stateCmd modifies also the content of the reading <b>state</b>, not only the hash-content for visualization.<br/>
   You can access the device-hash ( e.g: $hash{IODev} ) in yr. perl-cmd. In addition the variables "$name", "$gadName" and "$state" are avaliable. 
-  A return value must be set and overrides reading "state".</li>
+  A return value must be set and overrides reading state.</li>
 <br/>
 <a id="KNX-attr-putCmd"></a> <li>putCmd<br/>
   Every time a KNX-value is requested from the bus to FHEM, the content of putCmd is evaluated before the answer is sent. You can use a perl-command for modifying content. 
-  If putCmd is defined, the attr "answerReading" has no effect.
+  If putCmd is defined, the attr answerReading has no effect.
   This command is executed directly before sending the data. A copy is stored in the reading &lt;putName&gt;.<br/>
   Each device only knows one putCmd, so you have to take care about the different GAD's in the perl string.<br/>
   Like in stateCmd you can access the device hash ("$hash") in yr. perl-cmd. In addition the variables "$name", "$gadName" and "$state" are avaliable. 
-  "$state" contains the prefilled return-value. The return-value overrides reading "state".</li>
+  On entry, "$state" contains the current value of reading "state". The return-value will be sent to KNX-bus. The reading "state" will NOT get updated!</li>
 <br/>
 <a id="KNX-attr-format"></a><li>format<br/>
   The content of this attribute is appended to every sent/received value before readings are set, it replaces the default unit-value! 
@@ -2127,10 +2170,10 @@ The answer from the bus-device updates the readings &lt;getName&gt; and state.</
 <br/>
 <a id="KNX-attr-disable"></a><li>disable<br/>
   Disable the device if set to <b>1</b>. No send/receive from bus and no set/get possible. Delete this attr to enable device again. 
-  As an aid for debugging, an additional INTERNAL: &lt;RAWMSG&gt; will show any message received from bus while the device is disabled.</li>
+  As an aid for debugging, an additional INTERNAL: "RAWMSG" will show any message received from bus while the device is disabled.</li>
 <br/>
 <a id="KNX-attr-KNX_toggle"></a><li>KNX_toggle<br/>
-  Lookup current value before issuing "set device &lt;gadName&gt; toggle" cmd.<br/> 
+  Lookup current value before issuing <code>set device &lt;gadName&gt; toggle</code> cmd.<br/> 
   FHEM has to retrieve a current value to make the toggle-cmd acting correctly. This attribute can be used to define the source of the current value.<br/>
   Format is: <b>&lt;devicename&gt;&colon;&lt;readingname&gt;</b>. If you want to use a reading from own device, you can use "$self" as devicename.
   Be aware that only <b>on</b> and <b>off</b> are supported as valid values when defining device:readingname.<br/>
@@ -2147,6 +2190,10 @@ The answer from the bus-device updates the readings &lt;getName&gt; and state.</
   <b>&lt;gadName&gt;@set&colon;&lt;widgetName,parameter&gt;</b> This avoids overwriting the GET pulldown in FHEMWEB detail page.
   For details, pls see <a href="#FHEMWEB-attr-widgetOverride">FHEMWEB-attribute</a>.</li>
 <br/>
+<!--
+<a id="KNX-attr-answerReading"></a><li>answerReading - This attr is deprecated. As replacement you can use for example:<br/>
+  <code>attr &lt;device&gt; putCmd {return $state if ($gadName eq 'g1');}</code> </li>
+-->
 <a id="KNX-attr-listenonly"></a><li>listenonly - This attr is deprecated - use "listenonly" option in device definition</li> 
 <a id="KNX-attr-readonly"></a><li>readonly - This attr is deprecated - use "get" option in device definition</li>
 <a id="KNX-attr-slider"></a><li>slider - This attr is deprecated - use attribute widgetOverride &lt;gadName&gt;:slider,&lt;start-&gt;,&lt;step-&gt;,&lt;end-range&gt; instead</li>
@@ -2272,8 +2319,8 @@ The answer from the bus-device updates the readings &lt;getName&gt; and state.</
 <ul>
 <li><b>KNX_scan</b> Function to be called from scripts or FHEM cmdline. 
 <br/>Selects all KNX-definitions (specified by the argument) that support a "get" from the device. 
-Issues a "get" cmd to each selected device/GAD. 
-The result of the "get" cmd  will be stored in the respective readings - same as a <code>get &lt;device&gt; &lt;gadName&gt;</code> from cmd-line. 
+Issues a <code>get &lt;device&gt; &lt;gadName&gt;</code> cmd to each selected device/GAD. 
+The result of the "get" cmd  will be stored in the respective readings. 
 <br/>Useful after a fhem-start to syncronize the readings with the status of the KNX-device.
 <br/>The "get" cmds are scheduled asynchronous, with a delay of 200ms between each get. (avoid overloading KNX-bus) 
 Returns number of "get's" issued.<br/>
@@ -2296,10 +2343,6 @@ When using KNX_scan or any 'set or get &lt;device&gt; ...' in a global:INITIALIZ
 <br/>Example:<br/>
 <code>defmod initialized_nf notify global:INITIALIZED sleep 10 quiet;; set KNX_date now;; set KNX_time now;; KNX_scan;;</code>
 <br/>This avoids sending requests while the KNX-Gateway has not finished its initial handshake-procedure with FHEM (the KNX-IO-device).  
-<!--
-<br/><br/>If you want to use this function as a FHEM cmd, define a cmdalias-device, e.g:<br/>
-<code>defmod cmd_KNXscan cmdalias knxscan .* AS { my $res = KNX_scan($EVTPART0);; return 'Number of GAs scanned: '. $res;; }</code>
--->
 <br/>
 </li>
 </ul>
