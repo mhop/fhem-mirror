@@ -4677,9 +4677,13 @@ sub DbRep_diffval {
 
       if ($runtime_string eq $lastruntimestring) {                                    # Ergebnishash erzeugen
           if ($i == 1) {
-              $diff_total          = $diff ? $diff : 0 if(abs $diff <= $dlim);
+              if(abs $diff <= $dlim) {
+                  $diff_total = $diff ? $diff : 0;
+              }
+              
               $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
-              $ch{$runtime_string} = 1 if($value);
+              
+              $ch{$runtime_string} = 1 if(defined $a[3]);              
               $lval                = $value ? $value : 0;
               $rslval              = $runtime_string;
           }
@@ -4700,16 +4704,17 @@ sub DbRep_diffval {
       else {                                                                          # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen und Übertragsdifferenz bilden
           $lastruntimestring = $runtime_string;
           $i                 = 1;
-          $uediff            = $value - $lval if($value > $lval);
+          #$uediff            = $value - $lval if($value > $lval);
+          $uediff            = $value - $lval;
           $diff              = $uediff;
-          $lval              = $value if($value);                                     # Übetrag über Perioden mit value = 0 hinweg !
+          $lval              = $value if($value);                                     # Übertrag über Perioden mit value = 0 hinweg !
           $rslval            = $runtime_string;
 
           Log3 ($name, 5, "DbRep $name - balance difference of $uediff between $rslval and $runtime_string");
 
           $diff_total          = $diff ? $diff : 0 if(abs $diff <= $dlim);
           $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
-          $ch{$runtime_string} = 1 if($value);
+          $ch{$runtime_string} = 1 if(defined $a[3]);
           $uediff              = 0;
       }
 
@@ -17842,7 +17847,8 @@ return;
      Berechnet den Differenzwert des Datenbankfelds "VALUE" in den angegebenen Zeitgrenzen 
      (siehe verschiedenen time*-Attribute). <br><br>
      
-     Es wird die Differenz aus den VALUE-Werten der im Aggregationszeitraum (z.B. day) vorhandenen Datensätze gebildet.
+     Es wird die Differenz aus den VALUE-Werten der im Aggregationszeitraum (z.B. day) vorhandenen Datensätze gebildet und
+     aufsummiert.
      Ein Übertragswert aus der Vorperiode (<a href="#DbRep-attr-aggregation">aggregation</a>) zur darauf folgenden 
      Aggregationsperiode wird berücksichtigt, sofern diese Periode einen Value-Wert enhtält.  <br><br>    
      
