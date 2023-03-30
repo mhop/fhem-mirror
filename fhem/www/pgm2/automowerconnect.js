@@ -193,7 +193,7 @@ function AutomowerConnectUpdateDetail (dev, type, imgsrc, picx, picy, csx, csy, 
         // draw area limits
         if ( plixy.length > 0 ) AutomowerConnectLimits( ctx, div, plixy, 'property' );
         // draw scale
-        AutomowerConnectScale( ctx, div, picx, picy, scalx, 'scale' );
+        AutomowerConnectScale( ctx, picx, picy, scalx );
         // draw charging station path
         AutomowerConnectDrawPath ( ctx, div, posc, 'chargingStationPath' );
         // draw path for other activity
