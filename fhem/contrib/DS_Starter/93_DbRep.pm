@@ -4581,10 +4581,6 @@ sub DbRep_diffval {
                       Log3 ($name, 3, "DbRep $name - WARNING - dataset has no numeric value >$vnew< and is ignored\ntimestamp >$timestamp<, device >$device<, reading >$reading<");
                       next;
                   }
-
-                  #$dse  = $vold && (($vnew-$vold) > 0) ? ($vnew-$vold) : 0;
-                  #@sp   = $runtime_string." ".$timestamp." ".$vnew." ".$dse."\n";
-                  #$vold = $vnew;
                   
                   if (!defined $vold) {
                       $vold = $vnew;
@@ -4687,8 +4683,6 @@ sub DbRep_diffval {
               $lval                = $value ? $value : 0;
               $rslval              = $runtime_string;
           }
-
-          $ch{$runtime_string}++ if(defined $a[3] && $i > 1);
           
           if ($diff) {
               if(abs $diff <= $dlim) {
@@ -4696,22 +4690,22 @@ sub DbRep_diffval {
               }
 
               $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
-              #$ch{$runtime_string}++ if($value && $i > 1);
-              $lval                = $value;
-              $rslval              = $runtime_string;
           }
+          
+          $lval                = $value;
+          $rslval              = $runtime_string;
+          $ch{$runtime_string}++ if(defined $a[3] && $i > 1);
       }
       else {                                                                          # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen und Übertragsdifferenz bilden
           $lastruntimestring = $runtime_string;
           $i                 = 1;
-          #$uediff            = $value - $lval if($value > $lval);
           $uediff            = $value - $lval;
           $diff              = $uediff;
           $lval              = $value if($value);                                     # Übertrag über Perioden mit value = 0 hinweg !
-          $rslval            = $runtime_string;
 
           Log3 ($name, 5, "DbRep $name - balance difference of $uediff between $rslval and $runtime_string");
 
+          $rslval              = $runtime_string;
           $diff_total          = $diff ? $diff : 0 if(abs $diff <= $dlim);
           $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
           $ch{$runtime_string} = 1 if(defined $a[3]);
