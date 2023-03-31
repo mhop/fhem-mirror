@@ -609,6 +609,17 @@ HttpUtils_Connect2($)
       $par{SSL_verify_mode} = 0
         if(!$hash->{sslargs} || !defined($hash->{sslargs}{SSL_verify_mode}));
 
+      for my $p ("alpn", "npn") { #111959
+        my $n = "SSL_${p}_protocols";
+        next if(!$par{$n});
+        if(IO::Socket::SSL->can("can_${p}")) {
+          my @a = split(",",$par{$n});
+          $par{$n} = \@a;
+        } else {
+          Log 1, "ERROR: the SSL library has no support for $n";
+        }
+      }
+
       return HttpUtils_Connect2NonblockingSSL($hash,\%par)
         if($hash->{callback});
       
