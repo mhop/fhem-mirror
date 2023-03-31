@@ -1,4 +1,4 @@
-REV 27369
+REV 27374
 DIR unused
 UPD 2023-03-28_07:45:02 397254 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -748,8 +748,8 @@ UPD 2023-03-28_07:45:08 4866710 docs/commandref.html
 UPD 2023-03-26_07:45:12 2906753 docs/commandref_DE.html
 UPD 2023-01-21_07:45:02 85661 docs/commandref_frame.html
 UPD 2023-01-21_07:45:02 96258 docs/commandref_frame_DE.html
-UPD 2023-03-30_07:45:13 304770 docs/commandref_modular.html
-UPD 2023-03-30_07:45:14 316540 docs/commandref_modular_DE.html
+UPD 2023-03-31_07:45:12 304770 docs/commandref_modular.html
+UPD 2023-03-31_07:45:13 316540 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2398,7 +2398,7 @@ UPD 2015-07-28_14:05:34 2865 www/jscolor/hv.png
 UPD 2015-07-28_14:05:34 29813 www/jscolor/jscolor.js
 UPD 2015-07-28_14:05:34 331 www/pgm2/RSS.js
 UPD 2018-09-24_07:45:03 12353 www/pgm2/alarm.js
-UPD 2023-02-12_07:45:03 8530 www/pgm2/automowerconnect.js
+UPD 2023-03-31_07:45:02 8516 www/pgm2/automowerconnect.js
 UPD 2018-05-11_07:45:02 13108 www/pgm2/babble.js
 UPD 2017-02-18_07:45:02 6202 www/pgm2/brightstyle.css
 UPD 2022-08-19_07:45:03 14783 www/pgm2/console.js
