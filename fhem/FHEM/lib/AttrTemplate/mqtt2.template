@@ -5542,6 +5542,7 @@ attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/device:.* device\
   BASE_ID/mqtt:.* mqtt\
   BASE_ID/ip_addr:.* ip_addr\
+  BASE_ID/wifi_rssi:.* wifi_rssi\
   BASE_ID/comm_start:.* comm_start\
   BASE_ID/comm_stop:.* comm_stop\
   BASE_ID/dis_night_comm:.* dis_night_comm\
@@ -5554,7 +5555,7 @@ attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/total/YieldTotal:.* YieldTotal
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_hub_bridge
-setreading DEVICE attrTemplateVersion 20230313
+setreading DEVICE attrTemplateVersion 20230328
 { AttrTemplate_Initialize() }
 #   "setup/set_time",
 #   "setup/sync_ntp
@@ -5697,7 +5698,7 @@ setreading DEVICE attrTemplateVersion 20230313
 # contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
 name:hoymiles_opendtu_hub_bridge
 filter:TYPE=MQTT2_DEVICE
-desc:Early version! Use this with "openDTU" firmware for ESP8266+nRF24L01+. For further details visit  https://github.com/tbnobody/OpenDTU and https://www.mikrocontroller.net/topic/525778. Resulting <b>device represents the interfacing ESP-MCU</b>, all inverters will be forwarded into own MQTT2_DEVICE instances.
+desc:Early version! Use this with "OpenDTU" firmware for ESP32+nRF24L01+. For further details visit  https://github.com/tbnobody/OpenDTU and https://www.mikrocontroller.net/topic/525778. Resulting <b>device represents the interfacing ESP-MCU</b>, all inverters will be forwarded into own MQTT2_DEVICE instances.
 order:W_07
 farewell:template has been applied successfully. Note: In case you use an external MQTT server or not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like "|devcontrol/[0-8]+/[0-8]+". For the single microinverters, please be patient, until the Readings concerning the AC will have been sent in.
 par:BASE_ID;Base topic as set in OpenDTU MQTT settings;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)/([^:]+)/name:, ? $1 : undef }
@@ -5720,7 +5721,7 @@ setreading DEVICE attrTemplateVersion 20221215
 name:hoymiles_opendtu_microinverter
 prereq:{my @devices=devspec2array('model=hoymiles_opendtu_hub_bridge');return 1 if $devices[0];return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/status/producing:.*
-desc:Early version, device represents a single microinverter. Use this with "opendtu" firmware for ESP8266+nRF24L01+. Wait some time until the target device got <b>readings for channel 0</b> (AC part, refreshing your browser window may help to get them visible)!
+desc:Early version, device represents a single microinverter. Use this with "OpenDTU" firmware for ESP32+nRF24L01+. Wait some time until the target device got <b>readings for channel 0</b> (AC part, refreshing your browser window may help to get them visible)!
 order:W_071
 par:INVERTERLONG_ID;INVERTERLONG_ID Serieal Id of inverter as set in webinterface;{ AttrVal('DEVICE','readingList','') =~ m,^\s*([^:]+/[^/]+)/status/producing:,m ? $1 : undef }
 par:RADIO_SINGLE;inverter has just one channel;{ undef }
