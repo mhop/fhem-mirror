@@ -1,14 +1,14 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.14"
+SCRIPTVERSION="3.15"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
 SIGNALPATH=/opt
 SIGNALUSER=signal-cli
 LIBPATH=/usr/lib
-SIGNALVERSION="0.11.4"
-LIBRARYVERSION="0.11.2" #Typically = SIGNALVERSION, but can be used if libsignal did not change
+SIGNALVERSION="0.11.7"
+LIBRARYVERSION="0.22.0"
 SIGNALVAR=/var/lib/$SIGNALUSER
 DBSYSTEMD=/etc/dbus-1/system.d
 DBSYSTEMS=/usr/share/dbus-1/system-services
@@ -171,14 +171,24 @@ if [ $ARCH = "armv7l" ]; then
 elif [ $ARCH = "x86_64" ]; then
 	ARCH="amd64"
 	ARCHJ="x64"
+	GLIBC="2.28" #should work with 2.31 as well
 elif [ $ARCH = "aarch64" ]; then
-	ARCH="aarch64"
-	ARCHJ="aarch64"	
-	GLIBC="2.28" #experimental
+	BITS=`getconf LONG_BIT`
+	if [ "$BITS" = "64" ]; then
+		ARCH="aarch64"
+		ARCHJ="aarch64"	
+		GLIBC="2.28" #experimental
+		SIGNALVERSION="0.11.2"
+		LIBRARYVERSION="0.11.2"
+		echo "64bit ARM (aarch64) currently only supported with signal-cli 0.11.2"
+	else 
+		ARCH="armhf"
+		ARCHJ="arm"
+	fi
 fi
 
 IDENTSTR=$ARCH-glibc$GLIBC-$LIBRARYVERSION
-KNOWN=("amd64-glibc2.27-0.11.2" "amd64-glibc2.28-0.11.2" "amd64-glibc2.31-0.11.2" "armhf-glibc2.28-0.11.2" "armhf-glibc2.31-0.11.2" "aarch64-glibc2.28-0.11.2")
+KNOWN=("amd64-glibc2.27-0.11.2" "amd64-glibc2.28-0.22.0" "armhf-glibc2.28-0.22.0" "armhf-glibc2.31-0.22.0" "aarch64-glibc2.28-0.11.2")
 
 GETLIBS=1
 if [[ ! " ${KNOWN[*]} " =~ " ${IDENTSTR} " ]]; then
@@ -209,12 +219,19 @@ echo "Please verify that these settings are correct:"
 echo "Signal-cli User:              $SIGNALUSER"
 echo "Signal-cli Install directory: $SIGNALPATH"
 echo "Signal config storage:        $SIGNALVAR"
-echo "Signal version:               $SIGNALVERSION"
+echo "Signal version:               $SIGNALVERSION (libsignal-client v$LIBRARYVERSION)"
 echo "System library path:          $LIBPATH"
 echo "System architecture:          $ARCH"
 echo "System GLIBC version:         $GLIBC"
 echo "Using Java version:           $JAVACMD"
 echo "Native Java $JAVA_VERSION              $JAVA_NATIVE (current version:$JVER)"
+fi
+
+if [ ! $(id -u) = 0 ] ; then
+  # the script needs to be executed with sudo (or root)
+  echo
+  echo "Please run $0 with sudo"
+  exit 1
 fi
 
 check_and_update() {
@@ -631,7 +648,6 @@ if [ -z "$OPERATION" ] ; then
 	echo "start    : Start the signal-cli service (or respective docker processes)"
 	echo "all      : Run system, install, start and test (default)"
 	echo
-	echo "!!! Everything needs to run with sudo/root !!!"
 	OPERATION=all
 else
 	echo "You chose the following option: $OPERATION"
