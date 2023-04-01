@@ -38,6 +38,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.8.6"   => "25.03.2023 change _DbLog_plotData (intx), Plot Editor: include functions delta-h, delta-h, ...".
+                           "remove setter deleteOldDaysNbl, reduceLogNbl ",
   "5.8.5"   => "16.03.2023 fix using https in configCheck after SVN server change ",
   "5.8.4"   => "20.02.2023 new attr plotInputFieldLength, improve Plot Editor, delete attr noNotifyDev ".
                            "move notifyRegexpChanged from Define to initOnStart ",
@@ -154,11 +156,12 @@ my %DbLog_columns = ("DEVICE"  => 64,
 
 # Defaultwerte
 ###############
-my $dblog_cachedef = 500;                       # default Größe cacheLimit bei asynchronen Betrieb
-my $dblog_cmdef    = 'basic_ta:on';             # default commitMode
-my $dblog_todef    = 86400;                     # default timeout Sekunden
-my $dblog_lrpth    = 0.8;                       # Schwellenwert für LONGRUN_PID ab dem "Another operation is in progress...." im state ausgegeben wird
-my $dblog_pifl     = 40;                        # default Breite Eingabefelder im Plot Editor
+my $dblog_cachedef = 500;                                                       # default Größe cacheLimit bei asynchronen Betrieb
+my $dblog_cmdef    = 'basic_ta:on';                                             # default commitMode
+my $dblog_todef    = 86400;                                                     # default timeout Sekunden
+my $dblog_lrpth    = 0.8;                                                       # Schwellenwert für LONGRUN_PID ab dem "Another operation is in progress...." im state ausgegeben wird
+my $dblog_pifl     = 40;                                                        # default Breite Eingabefelder im Plot Editor
+my $dblog_svgfnset = ',delta-d,delta-h,delta-ts,int,int1,int2,int3,int4,int5';  # Funktionen für SVG sampleDataFn
 
 ################################################################
 sub DbLog_Initialize {
@@ -573,11 +576,9 @@ sub DbLog_Set {
                 "configCheck:noArg ".
                 "countNbl:noArg ".
                 "deleteOldDays ".
-                "deleteOldDaysNbl ".
                 "eraseReadings:noArg ".
                 "listCache:noArg ".
                 "reduceLog ".
-                "reduceLogNbl ".
                 "rereadcfg:noArg ".
                 "reopen ".
                 "stopSubProcess:noArg ".
@@ -6637,14 +6638,18 @@ sub _DbLog_plotData {
                   $writeout   = 1 if(!$deltacalc);
               }
 
-              ############ Auswerten des 4. Parameters: function ###################
+              ############ Auswerten des 4. Parameters: Funktion ###################
+              ######################################################################
               if($readings[$i]->[3] && $readings[$i]->[3] eq "int") {                         # nur den integerwert uebernehmen falls zb value=15°C
                   $out_value  = $1 if($sql_value =~ m/^(\d+).*/o);
                   $out_tstamp = $sql_timestamp;
                   $writeout   = 1;
               }
               elsif ($readings[$i]->[3] && $readings[$i]->[3] =~ m/^int(\d+).*/o) {           # Uebernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
-                  $out_value  = $1 if($sql_value =~ m/^([-\.\d]+).*/o);
+                  $readings[$i]->[3] =~ m/^int(\d+).*/xs;
+                  my $dnum    = $1;
+                  #$out_value  = $1 if($sql_value =~ m/^([-\.\d]+).*/o);         
+                  $out_value  = $1 if($sql_value =~ m/^(-?\d+\.?\d{1,$dnum}).*/xs);           # V5.8.6
                   $out_tstamp = $sql_timestamp;
                   $writeout   = 1;
               }
@@ -8443,17 +8448,19 @@ sub DbLog_fhemwebFn {
 return $ret;
 }
 
-#################################################################################
+############################################################################################
 #  Dropdown-Menü current-Tabelle SVG-Editor
 #  Datenlieferung für SVG EDitor
 #
-#  Beispiel Input Zeile: sysmon:ram:::$val=~s/^Total..([\d.]*).*/$1/eg
-#                          0     1 23 4
+#  <device>:<reading>:<default>:<fn>:<regexp>
+#  Beispiel Input Zeile: sysmon:ram::delta-h:$val=~s/^Total..([\d.]*).*/$1/eg
+#                          0     1 2 3       4
 #  $ret .= SVG_txt("par_${r}_0", "", $f[0], 40); # Device  (Column bei FileLog)
 #  $ret .= SVG_txt("par_${r}_1", "", $f[1], 40); # Reading (RegExp bei FileLog)
 #  $ret .= SVG_txt("par_${r}_2", "", $f[2], 1);  # Default not yet implemented
-#  $ret .= SVG_txt("par_${r}_3", "", $f[3], 3);  # Function
-#################################################################################
+#  $ret .= SVG_txt("par_${r}_3", "", $f[3], 10); # Function
+#  $ret .= SVG_txt("par_${r}_4", "", $f[4], 10); # RegExp (int, delta-h, delta-d, delta-ts)
+#############################################################################################
 sub DbLog_sampleDataFn {
   my $dlName  = shift;
   my $dlog    = shift;
@@ -8484,8 +8491,8 @@ sub DbLog_sampleDataFn {
   }
 
   if ($ccount) {                                                                           # Table Current present, use it for sample data
-      $desc = "Device:Reading:".
-              "<br>Function";                                                              # Beschreibung über Eingabezeile
+      $desc = "Device:Reading [Function]".
+              "<br>[RegExp] &lt;unused&gt;";                                               # Beschreibung über Eingabezeile
 
       my $query = "select device,reading from $current where device <> '' group by device,reading";
       my $sth   = $dbh->prepare( $query );
@@ -8493,44 +8500,46 @@ sub DbLog_sampleDataFn {
 
       while (my @line = $sth->fetchrow_array()) {
           $counter++;
-          push @example, (join ":", @line).':[Function]' if($counter <= 8);                # show max 8 examples
+          push @example, (join ":", @line).' [Function]<br>[RegExp]' if($counter <= 4);    # show max 4 examples
           push @colregs, "$line[0]:$line[1]";                                              # push all eventTypes to selection list
       }
 
       my $cols = join ",", sort { "\L$a" cmp "\L$b" } @colregs;
 
       for (my $r = 0; $r < $max; $r++) {
-          my @f   = split ":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4;                     # Beispiel Input Zeile: sysmon:ram:::$val=~s/^Total..([\d.]*).*/$1/eg
-          my $ret = "";
+          my @f   = split ":", ($dlog->[$r] ? $dlog->[$r] : "::::"), 5;                    # Beispiel Input Zeile > sysmon:ram::delta-h:$val=~s/^Total..([\d.]*).*/$1/eg          
+          my $ret = q{};                                                                   #                           0   1  2 3       4
 
           no warnings 'uninitialized';                                                     # Forum:74690, bug unitialized
-          $ret .= SVG_sel("par_${r}_0", $cols, "$f[0]:$f[1]");                             # par_<Zeile>_<Spalte>, <Auswahl>, <Vorbelegung>
+          $ret .= SVG_sel ("par_${r}_0", $cols, "$f[0]:$f[1]");                            # par_<Zeile>_<Spalte>, <Auswahl>, <Vorbelegung>
           use warnings;
 
-          $ret .= SVG_sel("par_${r}_2", ":", ":");                                         # nur ein Trenner -> wird zu ":::"
+          $ret .= SVG_sel ("par_${r}_3", $dblog_svgfnset, $f[3]);                          # Funktionsauswahl
 
-          $f[3] =~ /^(:+)?(.*)/xs;
-          $ret .= SVG_txt("par_${r}_3", "<br>", "$2", $pifl);                              # RegExp (z.B. $val=~s/^Total..([\d.]*).*/$1/eg)
+          $f[4] =~ /^(:+)?(.*)/xs;
+          $ret .= SVG_txt ("par_${r}_4", "<br>", "$2", $pifl);                             # RegExp (z.B. $val=~s/^Total..([\d.]*).*/$1/eg)
 
+          $ret .= SVG_txt ("par_${r}_2", "", $f[2], 1);                                    # der Defaultwert (nicht ausgewertet)
+          
           push @htmlArr, $ret;
       }
   }
   else {                                                                                   # Table Current not present, so create an empty input field
-      push @example, '&lt;Device&gt;:&lt;Reading&gt;::[Function]';
+      push @example, '&lt;Device&gt;:&lt;Reading&gt;::[Function]<br>[RegExp]';
 
-      $desc = "Device:Reading::".
-              "<br>Function";                                                              # Beschreibung über Eingabezeile
+      $desc = "Device:Reading::[Function]".
+              "<br>RegExp";                                                                # Beschreibung über Eingabezeile
 
       for (my $r = 0; $r < $max; $r++) {
-          my @f   = split ":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4;
-          my $ret = "";
+          my @f   = split ":", ($dlog->[$r] ? $dlog->[$r] : "::::"), 5;
+          my $ret = q{};
 
           no warnings 'uninitialized';                                                     # Forum:74690, bug unitialized
-          $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]::", $pifl);                       # letzter Wert -> Breite der Eingabezeile
+          $ret .= SVG_txt ("par_${r}_0", "", "$f[0]:$f[1]::$f[3]", $pifl);                 # letzter Wert -> Breite der Eingabezeile
           use warnings;
 
-          $f[3] =~ /^(:+)?(.*)/xs;
-          $ret .= SVG_txt("par_${r}_3", "<br>", "$2", $pifl);                              # RegExp (z.B. $val=~s/^Total..([\d.]*).*/$1/eg)
+          $f[4] =~ /^(:+)?(.*)/xs;
+          $ret .= SVG_txt ("par_${r}_3", "<br>", "$2", $pifl);                             # RegExp (z.B. $val=~s/^Total..([\d.]*).*/$1/eg)
 
           push @htmlArr, $ret;
       }
@@ -9015,16 +9024,6 @@ return;
     <br>
 
     <li>
-    <a id="DbLog-set-deleteOldDaysNbl"></a>
-    <b>set &lt;name&gt; deleteOldDaysNbl &lt;n&gt; </b> <br><br>
-      <ul>
-      The function is identical to "set &lt;name&gt; deleteOldDays" and will be removed soon.
-      <br>
-    </ul>
-    </li>
-    <br>
-
-    <li>
     <a id="DbLog-set-eraseReadings"></a>
     <b>set &lt;name&gt; eraseReadings </b> <br><br>
     <ul>
@@ -9127,15 +9126,6 @@ return;
       <b>Note</b> <br>
       During the runtime of the command, data to be logged is temporarily stored in the memory cache and written to
       the database after the command is finished.
-    </ul>
-    </li>
-    <br>
-
-    <li>
-    <a id="DbLog-set-reduceLogNbl"></a>
-    <b>set &lt;name&gt; reduceLogNbl &lt;no&gt;[:&lt;nn&gt;] [average[=day]] [exclude=device1:reading1,device2:reading2,...] </b> <br><br>
-    <ul>
-      The function is identical to "set &lt;name&gt; reduceLog" and will be removed soon.
     </ul>
     </li>
     <br>
@@ -10889,16 +10879,6 @@ attr SMA_Energymeter DbLogValueFn
     <br>
 
     <li>
-    <a id="DbLog-set-deleteOldDaysNbl"></a>
-    <b>set &lt;name&gt; deleteOldDaysNbl &lt;n&gt; </b> <br><br>
-      <ul>
-      Die Funktion ist identisch zu "set &lt;name&gt; deleteOldDays" und wird demnächst entfernt.
-      <br>
-    </ul>
-    </li>
-    <br>
-
-    <li>
     <a id="DbLog-set-exportCache"></a>
     <b>set &lt;name&gt; exportCache [nopurge | purgecache] </b> <br><br>
 
@@ -10998,16 +10978,6 @@ attr SMA_Energymeter DbLogValueFn
       <b>Hinweis</b> <br>
       Während der Laufzeit des Befehls werden zu loggende Daten temporär im Memory Cache gespeichert und nach Beendigung
       des Befehls in die Datenbank geschrieben.
-    </ul>
-    </li>
-    <br>
-
-    <li>
-    <a id="DbLog-set-reduceLogNbl"></a>
-    <b>set &lt;name&gt; reduceLogNbl &lt;no&gt;[:&lt;nn&gt;] [average[=day]] [exclude=device1:reading1,device2:reading2,...] </b> <br><br>
-
-    <ul>
-      Die Funktion ist identisch zu "set &lt;name&gt; reduceLog" und wird demnächst entfernt.
     </ul>
     </li>
     <br>

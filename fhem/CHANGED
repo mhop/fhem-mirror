@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DBLog: Plot Editor - include functions like delta-h, delta-h
+                      !! setter deleteOldDaysNbl, reduceLogNbl removed !!
  - change:  10_KNX: syntax check on Attr., internal code improvement 
  - change:  00_KNXIO: rework logging & duplicate msg detection
  - bugfx: 72_FRITZBOX: Fehler bei leerem Ereignislog FB bereinigt
