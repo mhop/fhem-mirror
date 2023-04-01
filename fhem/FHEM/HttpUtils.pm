@@ -557,6 +557,14 @@ HttpUtils_Connect2NonblockingSSL($$)
     }
 
     $hash->{hu_sslAdded} = $hash->{keepalive} ? 1 : 2;
+
+    Log 4, "alpn_selected:".$hash->{conn}->alpn_selected()
+      if($par->{SSL_alpn_protocols} &&
+         $hash->{conn}->can('alpn_selected'));
+    Log 4, "next_proto_negotiated:".$hash->{conn}->next_proto_negotiated()
+      if($par->{SSL_npn_protocols} &&
+         $hash->{conn}->can('next_proto_negotiated'));
+
     return HttpUtils_Connect2($hash); # Continue with HTML-Processing
   };
 

@@ -40,6 +40,7 @@ MQTT2_CLIENT_Initialize($)
     clientId
     clientOrder
     connectTimeout
+    connectFn
     disable:1,0
     disabledForIntervals
     disconnectAfter
@@ -97,7 +98,17 @@ MQTT2_CLIENT_Define($$)
   $hash->{connecting} = 1;
   $hash->{nrConnects} = 0;
 
-  InternalTimer(1, "MQTT2_CLIENT_connect", $hash, 0); # need attributes
+  InternalTimer(1, sub($){
+    my $cfn = AttrVal($hash->{NAME}, "connectFn", undef);
+    if($cfn) {
+      my %specials= ("%NAME" => $hash->{NAME});
+      $cfn = EvalSpecials($cfn, %specials);
+      AnalyzeCommand(undef, $cfn); # $cfn calls connect 
+    } else {
+      MQTT2_CLIENT_connect($hash);
+    }
+  }, $hash, 0);
+
   return undef;
 }
 
@@ -136,6 +147,8 @@ MQTT2_CLIENT_doinit($)
   if($hash->{connecting} == 1) {
     my $usr = AttrVal($name, "username", "");
     my ($err, $pwd) = getKeyValue($name);
+    $usr = $hash->{".usr"} if($hash->{".usr"}); # AWS/WORX
+    $pwd = $hash->{".pwd"} if($hash->{".pwd"});
     $pwd = undef if($usr eq "");
     if($err) {
       Log 1, "ERROR: $err";
@@ -874,6 +887,14 @@ MQTT2_CLIENT_feedTheList($$$)
       relevant when autocreate is active, and the default order
       (MQTT2_DEVICE MQTT_GENERIC_BRIDGE) is not adequate.
       Note: Changing the attribute affects _all_ MQTT2_CLIENT instances.
+      </li></br>
+
+    <a id="MQTT2_CLIENT-attr-connectFn"></a>
+    <li>connectFn {...}<br>
+      if set, do not connect immediately, but evaluate the argument, which in
+      turn has to call the connect function via fhem("set NAME connect") or
+      MQTT2_CLIENT_connect(...).<br>
+      Needed by AWS-IOT connect with custom auth.
       </li></br>
 
     <a id="MQTT2_CLIENT-attr-connectTimeout"></a>
