@@ -4674,13 +4674,12 @@ sub DbRep_diffval {
       if ($runtime_string eq $lastruntimestring) {                                    # Ergebnishash erzeugen
           if ($i == 1) {
               if(abs $diff <= $dlim) {
-                  $diff_total = $diff ? $diff : 0;
+                  $diff_total = $diff;
               }
               
               $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
-              
               $ch{$runtime_string} = 1 if(defined $a[3]);              
-              $lval                = $value ? $value : 0;
+              $lval                = $value;
               $rslval              = $runtime_string;
           }
           
@@ -4705,8 +4704,12 @@ sub DbRep_diffval {
 
           Log3 ($name, 5, "DbRep $name - balance difference of $uediff between $rslval and $runtime_string");
 
-          $rslval              = $runtime_string;
-          $diff_total          = $diff ? $diff : 0 if(abs $diff <= $dlim);
+          $rslval = $runtime_string;
+          
+          if(abs $diff <= $dlim) {
+              $diff_total = $diff;
+          }
+          
           $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
           $ch{$runtime_string} = 1 if(defined $a[3]);
           $uediff              = 0;
@@ -19440,7 +19443,7 @@ sub dbval {
   ausgewertet.   
   <br><br>
   
-  (default: 20, nur positve Differenzen zwischen Vorgänger und Nachfolger)
+  (default: 20, nur positive Differenzen zwischen Vorgänger und Nachfolger)
   <br><br>
   
   <ul>
