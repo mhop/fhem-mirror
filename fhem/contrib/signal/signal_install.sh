@@ -177,10 +177,6 @@ elif [ $ARCH = "aarch64" ]; then
 	if [ "$BITS" = "64" ]; then
 		ARCH="aarch64"
 		ARCHJ="aarch64"	
-		GLIBC="2.28" #experimental
-		SIGNALVERSION="0.11.2"
-		LIBRARYVERSION="0.11.2"
-		echo "64bit ARM (aarch64) currently only supported with signal-cli 0.11.2"
 	else 
 		ARCH="armhf"
 		ARCHJ="arm"
@@ -188,7 +184,7 @@ elif [ $ARCH = "aarch64" ]; then
 fi
 
 IDENTSTR=$ARCH-glibc$GLIBC-$LIBRARYVERSION
-KNOWN=("amd64-glibc2.27-0.11.2" "amd64-glibc2.28-0.22.0" "armhf-glibc2.28-0.22.0" "armhf-glibc2.31-0.22.0" "aarch64-glibc2.28-0.11.2")
+KNOWN=("amd64-glibc2.27-0.11.2" "amd64-glibc2.28-0.22.0" "armhf-glibc2.28-0.22.0" "armhf-glibc2.31-0.22.0" "aarch64-glibc2.31-0.22.0")
 
 GETLIBS=1
 if [[ ! " ${KNOWN[*]} " =~ " ${IDENTSTR} " ]]; then
