@@ -1529,7 +1529,7 @@ sub DOIF_setCardValues
   if ($type eq "bar") {
     DOIF_setValue_bar($hash,$collect,undef,1);
   } else {
-    DOIF_setValue_collect($hash,$collect);
+    DOIF_setValue_collect($hash,$collect,1);
   }
   if ($out eq "") {
     return;
