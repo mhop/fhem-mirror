@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.52.2"  => "28.03.2023  diffValue ",
   "8.52.1"  => "19.03.2023  fix Perl Warnings ",
   "8.52.0"  => "17.02.2023  get utf8mb4 info by connect db and set connection collation accordingly, new setter migrateCollation ",
   "8.51.6"  => "11.02.2023  fix execute DbRep_afterproc after generating readings ".
@@ -1792,16 +1793,27 @@ sub DbRep_Attr {
             delete($attr{$name}{timeOlderThan});
             delete($attr{$name}{timeYearPeriod});
         }
-        if ($aName =~ /ftpTimeout|timeout|diffAccept/) {
+        
+        if ($aName =~ /ftpTimeout|timeout/) {
             unless ($aVal =~ /^[0-9]+$/) {
                 return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";
             }
         }
+        
+        if ($aName =~ /diffAccept/) {
+            my ($sign, $daval) = DbRep_ExplodeDiffAcc ($aVal);
+            
+            if (!$daval) {
+                return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";
+            }
+        }
+        
         if ($aName eq "readingNameMap") {
             unless ($aVal =~ m/^[A-Za-z\d_\.-]+$/) {
                 return " Unsupported character in $aName found. Use only A-Z a-z _ . -";
             }
         }
+        
         if ($aName eq "timeDiffToNow") {
             unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[ydhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ ) {
                 return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"y:1 d:10 h:6 m:12 s:20\". Refer to commandref !";
@@ -1810,6 +1822,7 @@ sub DbRep_Attr {
             delete($attr{$name}{timestamp_end});
             delete($attr{$name}{timeYearPeriod});
         }
+        
         if ($aName eq "timeOlderThan") {
             unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[ydhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ ) {
                  return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"y:1 d:10 h:6 m:12 s:20\". Refer to commandref !";
@@ -1818,6 +1831,7 @@ sub DbRep_Attr {
             delete($attr{$name}{timestamp_end});
             delete($attr{$name}{timeYearPeriod});
         }
+        
         if ($aName eq "dumpMemlimit" || $aName eq "dumpSpeed") {
             unless ($aVal =~ /^[0-9]+$/) {
                 return "The Value of $aName is not valid. Use only figures 0-9 without decimal places.";
@@ -1836,9 +1850,11 @@ sub DbRep_Attr {
                 }
             }
         }
+        
         if ($aName eq "ftpUse") {
             delete($attr{$name}{ftpUseSSL});
         }
+        
         if ($aName eq "ftpUseSSL") {
             delete($attr{$name}{ftpUse});
         }
@@ -4512,10 +4528,13 @@ sub DbRep_diffval {
       $selspec = "TIMESTAMP,VALUE";
   }
 
-  my $st = [gettimeofday];                                                              # SQL-Startzeit
-
   my @row_array;
   my @array;
+  
+  my $difflimit     = AttrVal ($name, 'diffAccept', 20);                                # legt fest, bis zu welchem Wert Differenzen akzeptiert werden (Ausreißer eliminieren)
+  my ($sign, $dlim) = DbRep_ExplodeDiffAcc ($difflimit);                                # $sign -> Vorzeichen (+-)
+
+  my $st = [gettimeofday];                                                              # SQL-Startzeit
 
   for my $row (@ts) {                                                                   # DB-Abfrage zeilenweise für jeden Array-Eintrag
       my @a                     = split("#", $row);
@@ -4530,10 +4549,10 @@ sub DbRep_diffval {
       }
 
       if ($IsTimeSet || $IsAggrSet) {
-          $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'ORDER BY TIMESTAMP');
+          $sql = DbRep_createSelectSql($hash, $table, $selspec, $device , $reading, "'$runtime_string_first'", "'$runtime_string_next'", 'ORDER BY TIMESTAMP');
       }
       else {
-          $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,undef,undef,'ORDER BY TIMESTAMP');
+          $sql = DbRep_createSelectSql($hash, $table, $selspec, $device, $reading, undef, undef, 'ORDER BY TIMESTAMP');
       }
 
       ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
@@ -4549,7 +4568,7 @@ sub DbRep_diffval {
               my @sp;
               my $dse = 0;
               my $vold;
-              my @sqlite_array;
+              my @db_array;
 
               for my $row (@array) {
                   @sp                = split("[ \t][ \t]*", $row, 4);
@@ -4562,15 +4581,25 @@ sub DbRep_diffval {
                       Log3 ($name, 3, "DbRep $name - WARNING - dataset has no numeric value >$vnew< and is ignored\ntimestamp >$timestamp<, device >$device<, reading >$reading<");
                       next;
                   }
-
-                  $dse  = $vold && (($vnew-$vold) > 0) ? ($vnew-$vold) : 0;
+                  
+                  if (!defined $vold) {
+                      $vold = $vnew;
+                  }
+                  
+                  if ($sign =~ /\+-/xs) {                                           # sowohl positive als auch negative Abweichung auswerten
+                      $dse = $vnew - $vold;
+                  }
+                  else {
+                      $dse = ($vnew - $vold) > 0 ? ($vnew - $vold) : 0;             # nur positive Abweichung auswerten
+                  }
+                  
                   @sp   = $runtime_string." ".$timestamp." ".$vnew." ".$dse."\n";
                   $vold = $vnew;
 
-                  push @sqlite_array, @sp;
+                  push @db_array, @sp;
               }
 
-              @array = @sqlite_array;
+              @array = @db_array;
           }
       }
 
@@ -4599,8 +4628,6 @@ sub DbRep_diffval {
   $sth->finish;
   $dbh->disconnect;
 
-  my $difflimit = AttrVal($name, "diffAccept", "20");   # legt fest, bis zu welchem Wert Differenzen akzeptiert werden (Ausreißer eliminieren)
-
   # Berechnung diffValue aus Selektionshash
   my %rh  = ();                   # Ergebnishash, wird alle Ergebniszeilen enthalten
   my %ch  = ();                   # counthash, enthält die Anzahl der verarbeiteten Datasets pro runtime_string
@@ -4625,9 +4652,9 @@ sub DbRep_diffval {
       my $value          = $a[3] ? $a[3]           : 0;
       my $diff           = $a[4] ? $a[4]           : 0;
 
-      $timestamp         =~ s/\s+$//g;                                        # Leerzeichen am Ende $timestamp entfernen
+      $timestamp         =~ s/\s+$//g;                                                # Leerzeichen am Ende $timestamp entfernen
 
-      if (!DbRep_IsNumeric ($value)) {                                        # Test auf $value = "numeric"
+      if (!DbRep_IsNumeric ($value)) {                                                # Test auf $value = "numeric"
           $a[3] =~ s/\s+$//g;
           Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in diffValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
           $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
@@ -4636,47 +4663,55 @@ sub DbRep_diffval {
 
       Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, TIMESTAMP: $timestamp, VALUE: $value, DIFF: $diff");
 
-      $diff_current = $timestamp." ".$diff;                                    # String ignorierter Zeilen erzeugen
+      $diff_current = $timestamp." ".$diff;                                           # String ignorierter Zeilen erzeugen
 
-      if($diff > $difflimit) {
+      if(abs $diff > $dlim) {
           $rejectstr .= $diff_before." -> ".$diff_current."\n";
       }
 
       $diff_before = $diff_current;
 
-      if ($runtime_string eq $lastruntimestring) {                            # Ergebnishash erzeugen
+      if ($runtime_string eq $lastruntimestring) {                                    # Ergebnishash erzeugen
           if ($i == 1) {
-              $diff_total          = $diff ? $diff : 0 if($diff <= $difflimit);
+              if(abs $diff <= $dlim) {
+                  $diff_total = $diff;
+              }
+              
               $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
-              $ch{$runtime_string} = 1 if($value);
+              $ch{$runtime_string} = 1 if(defined $a[3]);              
               $lval                = $value;
               $rslval              = $runtime_string;
           }
-
+          
           if ($diff) {
-              if($diff <= $difflimit) {
-                  $diff_total = $diff_total+$diff;
+              if(abs $diff <= $dlim) {
+                  $diff_total = $diff_total + $diff;
               }
 
               $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
-              $ch{$runtime_string}++ if($value && $i > 1);
-              $lval                = $value;
-              $rslval              = $runtime_string;
           }
+          
+          $lval                = $value;
+          $rslval              = $runtime_string;
+          $ch{$runtime_string}++ if(defined $a[3] && $i > 1);
       }
-      else {                                                                  # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen und Übertragsdifferenz bilden
+      else {                                                                          # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen und Übertragsdifferenz bilden
           $lastruntimestring = $runtime_string;
           $i                 = 1;
-          $uediff            = $value - $lval if($value > $lval);
+          $uediff            = $value - $lval;
           $diff              = $uediff;
-          $lval              = $value if($value);                             # Übetrag über Perioden mit value = 0 hinweg !
-          $rslval            = $runtime_string;
+          $lval              = $value if($value);                                     # Übertrag über Perioden mit value = 0 hinweg !
 
           Log3 ($name, 5, "DbRep $name - balance difference of $uediff between $rslval and $runtime_string");
 
-          $diff_total          = $diff ? $diff : 0 if($diff <= $difflimit);
+          $rslval = $runtime_string;
+          
+          if(abs $diff <= $dlim) {
+              $diff_total = $diff;
+          }
+          
           $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
-          $ch{$runtime_string} = 1 if($value);
+          $ch{$runtime_string} = 1 if(defined $a[3]);
           $uediff              = 0;
       }
 
@@ -4705,7 +4740,7 @@ sub DbRep_diffval {
   }
 
   # Ergebnishash als Einzeiler zurückgeben
-  # ignorierte Zeilen ($diff > $difflimit)
+  # ignorierte Zeilen (abs $diff > $dlim)
   my $rowsrej;
   $rowsrej = encode_base64 ($rejectstr, "") if($rejectstr);
 
@@ -4741,15 +4776,15 @@ sub DbRep_diffvalDone {
   my $device     = $a[3] ? decode_base64($a[3]) : '';
   my $reading    = $a[4];
   my $bt         = $a[5];
-  my $rowsrej    = $a[6] ? decode_base64($a[6]) : '';                         # String von Datensätzen die nicht berücksichtigt wurden (diff Schwellenwert Überschreitung)
-  my $ncpslist   = $a[6] ? decode_base64($a[7]) : '';                         # Hash von Perioden die nicht kalkuliert werden konnten "no calc in period"
+  my $rowsrej    = $a[6] ? decode_base64($a[6]) : '';                                  # String von Datensätzen die nicht berücksichtigt wurden (diff Schwellenwert Überschreitung)
+  my $ncpslist   = $a[6] ? decode_base64($a[7]) : '';                                  # Hash von Perioden die nicht kalkuliert werden konnten "no calc in period"
   my $irowdone   = $a[8];
 
-  my $ndp        = AttrVal($name, "numDecimalPlaces", $dbrep_defdecplaces);
-  my $difflimit  = AttrVal($name, "diffAccept", "20");                        # legt fest, bis zu welchem Wert Differenzen akzeptoert werden (Ausreißer eliminieren)AttrVal($name, "diffAccept", "20");
-
-  my $hash       = $defs{$name};
-
+  my $hash          = $defs{$name};
+  my $ndp           = AttrVal ($name, "numDecimalPlaces", $dbrep_defdecplaces);
+  my $difflimit     = AttrVal ($name, 'diffAccept', 20);                               # legt fest, bis zu welchem Wert Differenzen akzeptiert werden (Ausreißer eliminieren)
+  my ($sign, $dlim) = DbRep_ExplodeDiffAcc ($difflimit);
+  
   my $reading_runtime_string;
 
   Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
@@ -4816,7 +4851,7 @@ sub DbRep_diffvalDone {
   }
 
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone)                   if($hash->{LASTCMD} =~ /writeToDB/);
-  ReadingsBulkUpdateValue ($hash, "diff_overrun_limit_".$difflimit, $rowsrej)        if($rowsrej);
+  ReadingsBulkUpdateValue ($hash, "diff_overrun_limit_".$dlim, $rowsrej)             if($rowsrej);
   ReadingsBulkUpdateValue ($hash, "less_data_in_period", $ncpstr)                    if($ncpstr);
   ReadingsBulkUpdateValue ($hash, "state", qq{WARNING - see readings 'less_data_in_period' or 'diff_overrun_limit_XX'})
                                                                                      if($ncpstr||$rowsrej);
@@ -6878,7 +6913,7 @@ sub DbRep_sqlCmd {
   my (@rows,$row,@head);
   my $nrows = 0;
 
-  if($sql =~ m/^\s*(call|explain|select|pragma|show)/is) {
+  if($sql =~ m/^\s*(call|explain|select|pragma|show|describe)/is) {
       @head = map { uc($sth->{NAME}[$_]) } keys @{$sth->{NAME}};                   # https://metacpan.org/pod/DBI#NAME1
       if (@head) {
           $row = join("$srs", @head);
@@ -7026,7 +7061,7 @@ sub DbRep_sqlCmdBlocking {
   }
 
   my $nrows = 0;
-  if($sql =~ m/^\s*(call|explain|select|pragma|show)/is) {
+  if($sql =~ m/^\s*(call|explain|select|pragma|show|describe)/is) {
       while (my @line = $sth->fetchrow_array()) {
           Log3 ($name, 4, "DbRep $name - SQL result: @line");
           $ret .= "\n" if($nrows);                                              # Forum: #103295
@@ -13912,6 +13947,23 @@ return $val;
 }
 
 ################################################################
+#          Zerlegung des Attributwertes "diffAccept"
+################################################################
+sub DbRep_ExplodeDiffAcc {
+  my $val   = shift // q{empty};
+  
+  my $sign  = q{};
+  my $daval = q{};
+
+  if ($val =~/^(\+?-?)([0-9]+)$/xs) {
+      $sign  = $1;
+      $daval = $2;
+  }
+
+return ($sign, $daval);
+}
+
+################################################################
 #  Prüfung auf numerischen Wert (vorzeichenbehaftet)
 ################################################################
 sub DbRep_IsNumeric {
@@ -17787,63 +17839,74 @@ return;
 
                                  </li>
 
-    <li><b> diffValue [display | writeToDB] </b>
-                                 - berechnet den Differenzwert des Datenbankfelds "VALUE" in den angegebenen Zeitgrenzen (siehe verschiedenen time*-Attribute).
-                                 Es muss das auszuwertende Reading im Attribut <a href="#DbRep-attr-reading">reading</a> angegeben sein. <br>
-                                 Diese Funktion ist z.B. zur Auswertung von Daten sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. <br>
-                                 Es wird immer die Differenz aus den VALUE-Werten der im Aggregationszeitraum (z.B. day) vorhandenen Datensätzen gebildet und aufsummiert,
-                                 wobei ein Übertragswert der Vorperiode (<a href="#DbRep-attr-aggregation">aggregation</a>) zur darauf folgenden Aggregationsperiode berücksichtigt wird, sofern diese einen Value-Wert
-                                 enhtält.  <br>
-                                 Dabei wird ein Zählerüberlauf (Neubeginn bei 0) mit berücksichtigt (vergleiche Attribut <a href="#DbRep-attr-diffAccept">diffAccept</a>). <br>
-                                 Wird in einer auszuwertenden Zeit- bzw. Aggregationsperiode nur ein Datensatz gefunden, kann die Differenz in Verbindung mit dem
-                                 Differenzübertrag der Vorperiode berechnet werden. in diesem Fall kann es zu einer logischen Ungenauigkeit in der Zuordnung der Differenz
-                                 zu der Aggregationsperiode kommen. Deswegen wird eine Warnung im "state" und das
-                                 Reading "less_data_in_period" mit einer Liste der betroffenen Perioden wird erzeugt. <br><br>
+    <li><b> diffValue [display | writeToDB] </b> <br><br>
+    
+     Berechnet den Differenzwert des Datenbankfelds "VALUE" in den angegebenen Zeitgrenzen 
+     (siehe verschiedenen time*-Attribute). <br><br>
+     
+     Es wird die Differenz aus den VALUE-Werten der im Aggregationszeitraum (z.B. day) vorhandenen Datensätze gebildet und
+     aufsummiert.
+     Ein Übertragswert aus der Vorperiode (<a href="#DbRep-attr-aggregation">aggregation</a>) zur darauf folgenden 
+     Aggregationsperiode wird berücksichtigt, sofern diese Periode einen Value-Wert enhtält.  <br><br>    
+     
+     In der Standardeinstellung wertet die Funktion nur positive Differenzen aus wie sie z.B. bei einem stetig ansteigenden
+     Zählerwert auftreten. 
+     Mit dem Attribut <a href="#DbRep-attr-diffAccept">diffAccept</a>) kann sowohl die akzeptierte Differenzschwelle als 
+     auch die Möglichkeit negative Differenzen auszuwerten eingestellt werden. <br><br>
+     
+     <ul>
+       <b>Hinweis: </b><br>
+       Im Auswertungs- bzw. Aggregationszeitraum (Tag, Woche, Monat, etc.) sollten dem Modul pro Periode mindestens ein 
+       Datensatz zu Beginn und ein Datensatz gegen Ende des Aggregationszeitraumes zur Verfügung stehen um eine möglichst 
+       genaue Auswertung der Differenzwerte vornehmen zu können. <br>
+       
+       Wird in einer auszuwertenden Zeit- bzw. Aggregationsperiode nur ein Datensatz gefunden, kann die Differenz in 
+       Verbindung mit dem Differenzübertrag der Vorperiode berechnet werden. in diesem Fall kann es zu einer logischen 
+       Ungenauigkeit in der Zuordnung der Differenz zu der Aggregationsperiode kommen. In diesem Fall wird eine Warnung 
+       im state ausgegeben und das Reading <b>less_data_in_period</b> mit einer Liste der betroffenen Perioden erzeugt.
+     <br>
+     <br>
+     </ul>
+     
+     Ist keine oder die Option <b>display</b> angegeben, werden die Ergebnisse nur angezeigt. <br><br>
+     
+     Mit der Option <b>writeToDB</b> werden die Berechnungsergebnisse mit einem neuen Readingnamen
+     in der Datenbank gespeichert. <br>
+     Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet,
+     wobei der originale Readingname durch das Attribut <a href="#DbRep-attr-readingNameMap">readingNameMap</a> ersetzt 
+     werden kann. <br>
+     Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
+     Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode
+     abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann.
+     Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
 
-                                 <ul>
-                                 <b>Hinweis: </b><br>
-                                 Im Auswertungs- bzw. Aggregationszeitraum (Tag, Woche, Monat, etc.) sollten dem Modul pro Periode mindestens ein Datensatz
-                                 zu Beginn und ein Datensatz gegen Ende des Aggregationszeitraumes zur Verfügung stehen um eine möglichst genaue Auswertung
-                                 der Differenzwerte vornehmen zu können.
-                                 <br>
-                                 <br>
-                                 </ul>
-                                 Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit
-                                 der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
-                                 in der Datenbank gespeichert. <br>
-                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet,
-                                 wobei der originale Readingname durch das Attribut <a href="#DbRep-attr-readingNameMap">readingNameMap</a> ersetzt werden kann.
-                                 Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
-                                 Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode
-                                 abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann.
-                                 Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
+     <ul>
+     <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
+     diff_day_totalpac <br>
+     # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>
+     </ul>
+     <br>
 
-                                 <ul>
-                                 <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
-                                 diff_day_totalpac <br>
-                                 # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>
-                                 </ul>
-                                 <br>
+     Die für die Funktion relevanten Attribute sind: <br><br>
 
-                                 Zusammengefasst sind die zur Steuerung dieser Funktion relevanten Attribute: <br><br>
+     <ul>
+      <table>
+      <colgroup> <col width=5%> <col width=95%> </colgroup>
+        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
+        <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+        <tr><td> <b>diffAccept</b>                             </td><td>: akzeptierte positive Werte-Differenz zwischen zwei unmittelbar aufeinander folgenden Datensätzen </td></tr>
+        <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start Operation </td></tr>
+        <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende Operation </td></tr>
+        <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+        <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>
+        <tr><td> <b>time*</b>                                  </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+        <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+      </table>
+     </ul>
+     <br>
 
-                                 <ul>
-                                 <table>
-                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                    <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
-                                    <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                    <tr><td> <b>diffAccept</b>                             </td><td>: akzeptierte positive Werte-Differenz zwischen zwei unmittelbar aufeinander folgenden Datensätzen </td></tr>
-                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start Operation </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende Operation </td></tr>
-                                    <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
-                                    <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>
-                                    <tr><td> <b>time*</b>                                  </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                    <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
-                                    </table>
-                                 </ul>
-                                 <br>
-
-                                 </li> <br>
+     </li> 
+     <br>
 
     <li><b> dumpMySQL [clientSide | serverSide]</b> <br><br>
 
@@ -19372,25 +19435,41 @@ sub dbval {
                                 </li>
 
   <a id="DbRep-attr-diffAccept"></a>
-  <li><b>diffAccept </b>      - gilt für Funktion diffValue. diffAccept legt fest bis zu welchem Schwellenwert eine berechnete positive Werte-Differenz
-                                zwischen zwei unmittelbar aufeinander folgenden Datensätzen akzeptiert werden soll (Standard ist 20). <br>
-                                Damit werden fehlerhafte DB-Einträge mit einem unverhältnismäßig hohen Differenzwert von der Berechnung ausgeschlossen und
-                                verfälschen nicht das Ergebnis. Sollten Schwellenwertüberschreitungen vorkommen, wird das Reading "diff_overrun_limit_&lt;diffLimit&gt;"
-                                erstellt. (&lt;diffLimit&gt; wird dabei durch den aktuellen Attributwert ersetzt)
-                                Es enthält eine Liste der relevanten Wertepaare. Mit verbose 3 werden diese Datensätze ebenfalls im Logfile protokolliert.
-                                <br><br>
+  <li><b>diffAccept [+-]&lt;Schwellenwert&gt; </b> <br><br>
+  
+  diffAccept legt für die Funktion diffValue fest, bis zu welchem &lt;Schwellenwert&gt; eine 
+  Werte-Differenz zwischen zwei unmittelbar aufeinander folgenden Datensätzen akzeptiert werden. <br>
+  Wird dem Schwellenwert <b>+-</b> (optional) vorangestellt, werden sowohl positive als auch negative Differenzen 
+  ausgewertet.   
+  <br><br>
+  
+  (default: 20, nur positive Differenzen zwischen Vorgänger und Nachfolger)
+  <br><br>
+  
+  <ul>
+    <b>Beispiel: </b> <br>
+    attr <Name> diffAccept +-10000
+  </ul>
+  <br>
+  
+  Bei Schwellenwertüberschreitungen wird das Reading <b>diff_overrun_limit_&lt;Schwellenwert&gt;</b>
+  erstellt. <br>
+  Es enthält eine Liste der relevanten Wertepaare. Mit verbose 3 werden diese Datensätze ebenfalls im Logfile protokolliert.
+  <br><br>
 
-                                  <ul>
-                                  Beispiel Ausgabe im Logfile beim Überschreiten von diffAccept=10: <br><br>
+  <ul>
+    <b>Beispiel Ausgabe im Logfile beim Überschreiten von diffAccept=10:</b> <br><br>
 
-                                  DbRep Rep.STP5000.etotal -> data ignored while calc diffValue due to threshold overrun (diffAccept = 10): <br>
-                                  2016-04-09 08:50:50 0.0340 -> 2016-04-09 12:42:01 13.3440 <br><br>
+    DbRep Rep.STP5000.etotal -> data ignored while calc diffValue due to threshold overrun (diffAccept = 10): <br>
+    2016-04-09 08:50:50 0.0340 -> 2016-04-09 12:42:01 13.3440 <br><br>
 
-                                  # Der erste Datensatz mit einem Wert von 0.0340 ist untypisch gering zum nächsten Wert 13.3440 und führt zu einem zu hohen
-                                  Differenzwert. <br>
-                                  # Es ist zu entscheiden ob der Datensatz gelöscht, ignoriert, oder das Attribut diffAccept angepasst werden sollte.
-                                  </ul><br>
-                                  </li>
+    # Der Differenz zwischen dem ersten Datensatz mit einem Wert von 0.0340 zum nächsten Wert 13.3440 ist untypisch hoch
+    und führt zu einem zu hohen Differenzwert. <br>
+    # Es ist zu entscheiden ob der Datensatz gelöscht, ignoriert, oder das Attribut diffAccept angepasst werden sollte.
+  </ul>
+  
+  <br>
+  </li>
 
   <a id="DbRep-attr-dumpComment"></a>
   <li><b>dumpComment </b>     - User-Kommentar. Er wird im Kopf des durch den Befehl "dumpMyQL clientSide" erzeugten Dumpfiles

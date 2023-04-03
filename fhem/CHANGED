@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_DbRep: diffValue can operate positive and negative differences, 
+                      sqlCmd can execute 'describe' statement
  - bugfix: 72_FRITZBOX: Fehlerkorrekturen: u.a. fritzLog
                feature: set name wakeUpCall ... / Attr disableHostIPv4check
  - change:  93_DBLog: Plot Editor - include functions like delta-h, delta-h
