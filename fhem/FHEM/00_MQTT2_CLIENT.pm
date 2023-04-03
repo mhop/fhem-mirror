@@ -49,7 +49,7 @@ MQTT2_CLIENT_Initialize($)
     lwt
     lwtRetain
     keepaliveTimeout
-    maxNrConnects
+    maxFailedConnects
     msgAfterConnect
     msgBeforeDisconnect
     mqttVersion:3.1.1,3.1
@@ -98,41 +98,41 @@ MQTT2_CLIENT_Define($$)
   $hash->{connecting} = 1;
   $hash->{nrConnects} = 0;
 
-  InternalTimer(1, sub($){
-    my $cfn = AttrVal($hash->{NAME}, "connectFn", undef);
-    if($cfn) {
-      my %specials= ("%NAME" => $hash->{NAME});
-      $cfn = EvalSpecials($cfn, %specials);
-      AnalyzeCommand(undef, $cfn); # $cfn calls connect 
-    } else {
-      MQTT2_CLIENT_connect($hash);
-    }
-  }, $hash, 0);
-
+  InternalTimer(1, \&MQTT2_CLIENT_connect, $hash, 0);
   return undef;
 }
 
 sub
-MQTT2_CLIENT_connect($)
+MQTT2_CLIENT_connect($;$)
 {
-  my ($hash) = @_;
+  my ($hash,$calledFromConnectFn) = @_;
+
   my $me = $hash->{NAME};
   return if($hash->{authError} || AttrVal($me, "disable", 0));
-  my $mc = AttrVal($me, "maxNrConnects", -1);
-  if($mc ne -1 && $hash->{nrConnects} >= $mc) {
-    Log3 $me, 2, "maxNrConnects ($mc) reached, no more reconnect attemtps";
+  my $mc = AttrVal($me, "maxFailedConnects", -1);
+  $hash->{nrFailedConnects} = 0 if(!defined($hash->{nrFailedConnects}));
+  if($mc ne -1 && $hash->{nrFailedConnects} >= $mc) {
+    Log3 $me, 2, "maxFailedConnects ($mc) reached, no more reconnect attemtps";
     delete($readyfnlist{"$me.".$hash->{DeviceName}}); # Source of retry
     return;
   }
+
+  my $cfn = AttrVal($hash->{NAME}, "connectFn", undef); # for AWS-IOT / auth
+  if($cfn && !$calledFromConnectFn) {
+    $cfn = EvalSpecials($cfn, ("%NAME" => $hash->{NAME}));
+    return AnalyzeCommand(undef, $cfn);
+  }
+
   my $disco = (DevIo_getState($hash) eq "disconnected");
   $hash->{connecting} = 1 if($disco && !$hash->{connecting});
-  $hash->{nextOpenDelay} = 5;
+  $hash->{nextOpenDelay} = 10;
   $hash->{BUF}="";
   if($hash->{DeviceName} =~ m/^wss?:/) {
     $hash->{binary} = 1;
     $hash->{header}{"Sec-WebSocket-Protocol"} = "mqtt";
   }
   $hash->{nrConnects}++;
+  $hash->{nrFailedConnects}++;  # delete on CONNACK
   return DevIo_OpenDev($hash, $disco, "MQTT2_CLIENT_doinit", sub(){})
                 if($hash->{connecting});
 }
@@ -147,8 +147,7 @@ MQTT2_CLIENT_doinit($)
   if($hash->{connecting} == 1) {
     my $usr = AttrVal($name, "username", "");
     my ($err, $pwd) = getKeyValue($name);
-    $usr = $hash->{".usr"} if($hash->{".usr"}); # AWS/WORX
-    $pwd = $hash->{".pwd"} if($hash->{".pwd"});
+    $usr = $hash->{".usr"} if(defined($hash->{".usr"})); # AWS-IOT/WORX
     $pwd = undef if($usr eq "");
     if($err) {
       Log 1, "ERROR: $err";
@@ -199,10 +198,17 @@ MQTT2_CLIENT_doinit($)
 
 
   } elsif($hash->{connecting} == 3) {
-    my $onc = AttrVal($name, "msgAfterConnect", "");
     delete($hash->{connecting});
+
+    my $mac = AttrVal($name, "msgAfterConnect", "");
     MQTT2_CLIENT_doPublish($hash, $2, $3, $1, 1)
-      if($onc && $onc =~ m/^(-r\s)?([^\s]*)\s*(.*)$/);
+      if($mac && $mac =~ m/^(-r\s)?([^\s]*)\s*(.*)$/);
+
+    my $eac = AttrVal($name, "execAfterConnect", "");
+    if($eac) {
+      $eac = EvalSpecials($eac, ("%NAME" => $name));
+      return AnalyzeCommand(undef, $eac);
+    }
 
     if($hash->{qosQueue} && @{$hash->{qosQueue}}) {
       my $pa = $hash->{qosQueue};
@@ -448,6 +454,7 @@ MQTT2_CLIENT_Set($@)
     MQTT2_CLIENT_Disco($hash) if($init_done);
 
   } elsif($a[0] eq "connect") {
+    $hash->{maxFailedConnects} = 0;
     MQTT2_CLIENT_connect($hash) if(!$hash->{FD});
 
   } elsif($a[0] eq "disconnect") {
@@ -511,6 +518,7 @@ MQTT2_CLIENT_Read($@)
   $hash->{lastMsgTime} = gettimeofday();
 
   # Lowlevel debugging
+  Log3 $name, 4, "$name received $cpt";
   if(AttrVal($name, "verbose", 1) >= 5) {
     my $pltxt = $pl;
     $pltxt =~ s/([^ -~])/"(".ord($1).")"/ge;
@@ -523,6 +531,7 @@ MQTT2_CLIENT_Read($@)
     my $rc = ord(substr($pl,1,1));
     if($rc == 0) {
       MQTT2_CLIENT_doinit($hash);
+      delete($hash->{nrFailedConnects});
 
     } else {
       my @txt = ("Accepted", "bad proto", "bad id", "server unavailable",
@@ -580,7 +589,7 @@ MQTT2_CLIENT_Read($@)
     MQTT2_CLIENT_feedTheList($hash, $tp, $val, 1);
 
   } else {
-    Log 1, "M2: Unhandled packet $cpt, disconneting $name";
+    Log 1, "MQTT2_CLIENT: Unhandled packet $cpt, disconneting $name";
     MQTT2_CLIENT_Disco($hash);
     return;
   }
@@ -903,13 +912,13 @@ MQTT2_CLIENT_feedTheList($$$)
       necessary for some MQTT servers in robotic vacuum cleaners.
       </li></br>
 
-    <a id="MQTT2_CLIENT-attr-maxNrConnects"></a>
-    <li>maxNrConnects &lt;number&gt;<br>
-      maximum number of established connections. Useful when experimenting with
+    <a id="MQTT2_CLIENT-attr-maxFailedConnects"></a>
+    <li>maxFailedConnects &lt;number&gt;<br>
+      maximum number of failed connections. Useful when experimenting with a
       public server, where repeatedly failing connection attempts lead to
-      temporary suspension of the account. The counter is increased after the
-      TCP connection is established, before the MQTT handshake. Reset the
-      counter with the modify or defmod command.
+      temporary suspension of the account. The counter is increased before the
+      TCP connection is established, and reset after the MQTT CONNACK message
+      or by the set connect command.
       </li></br>
 
     <li><a href="#disable">disable</a><br>
@@ -970,6 +979,12 @@ MQTT2_CLIENT_feedTheList($$$)
       publish the topic after each connect or reconnect.<br>
       If the optional -r is specified, then the publish sets the retain flag.
       </li></br>
+
+    <a id="MQTT2_CLIENT-attr-execAfterConnect"></a>
+    <li>execAfterConnect FHEM-command<br>
+      FHEM-command is executed after connect.
+      </li></br>
+
 
     <a id="MQTT2_CLIENT-attr-msgBeforeDisconnect"></a>
     <li>msgBeforeDisconnect [-r] topic message<br>
