@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  93_DbRep: fix diffValue writeToDB: Fm:#53584.msg1270905#msg1270905
  - feature: 93_DbRep: diffValue can operate positive and negative differences, 
                       sqlCmd can execute 'describe' statement
  - bugfix: 72_FRITZBOX: Fehlerkorrekturen: u.a. fritzLog
