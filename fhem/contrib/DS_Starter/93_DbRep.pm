@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 27340 2023-03-19 07:45:02Z DS_Starter $
+# $Id: 93_DbRep.pm 27393 2023-04-04 19:30:04Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -59,7 +59,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.52.2"  => "28.03.2023  diffValue ",
+  "8.52.3"  => "04.04.2023  fix diffValue writeToDB: https://forum.fhem.de/index.php?topic=53584.msg1270905#msg1270905 ",
+  "8.52.2"  => "28.03.2023  diffValue can operate positive and negative differences, sqlCmd can execute 'describe' statement ",
   "8.52.1"  => "19.03.2023  fix Perl Warnings ",
   "8.52.0"  => "17.02.2023  get utf8mb4 info by connect db and set connection collation accordingly, new setter migrateCollation ",
   "8.51.6"  => "11.02.2023  fix execute DbRep_afterproc after generating readings ".
@@ -4571,7 +4572,7 @@ sub DbRep_diffval {
               my @db_array;
 
               for my $row (@array) {
-                  @sp                = split("[ \t][ \t]*", $row, 4);
+                  @sp                = split /\s+/x, $row, 4;
                   my $runtime_string = $sp[0];
                   my $timestamp      = $sp[2] ? $sp[1]." ".$sp[2] : $sp[1];
                   my $vnew           = $sp[3];
@@ -4607,15 +4608,15 @@ sub DbRep_diffval {
           my $aval = AttrVal($name, "aggregation", "");
 
           if($aval eq "hour") {
-              my @rsf = split(/[ :]/,$runtime_string_first);
+              my @rsf = split /[ :]/, $runtime_string_first;
               @array  = ($runtime_string." ".$rsf[0]."_".$rsf[1]."\n");
           }
           elsif($aval eq "minute") {
-              my @rsf = split(/[ :]/,$runtime_string_first);
+              my @rsf = split /[ :]/, $runtime_string_first;
               @array  = ($runtime_string." ".$rsf[0]."_".$rsf[1]."-".$rsf[2]."\n");
           }
           else {
-              my @rsf = split(" ",$runtime_string_first);
+              my @rsf = split " ", $runtime_string_first;
               @array  = ($runtime_string." ".$rsf[0]."\n");
           }
       }
@@ -4648,7 +4649,10 @@ sub DbRep_diffval {
       my @a              = split /\s+/x, $row, 6;
       my $runtime_string = decode_base64($a[0]);
       $lastruntimestring = $runtime_string if ($i == 1);
-      my $timestamp      = $a[2] ? $a[1]."_".$a[2] : $a[1];
+      
+      next if(!$a[2]);
+      
+      my $timestamp      = $a[1]."_".$a[2];
       my $value          = $a[3] ? $a[3]           : 0;
       my $diff           = $a[4] ? $a[4]           : 0;
 
@@ -6913,7 +6917,7 @@ sub DbRep_sqlCmd {
   my (@rows,$row,@head);
   my $nrows = 0;
 
-  if($sql =~ m/^\s*(call|explain|select|pragma|show)/is) {
+  if($sql =~ m/^\s*(call|explain|select|pragma|show|describe)/is) {
       @head = map { uc($sth->{NAME}[$_]) } keys @{$sth->{NAME}};                   # https://metacpan.org/pod/DBI#NAME1
       if (@head) {
           $row = join("$srs", @head);
@@ -7061,7 +7065,7 @@ sub DbRep_sqlCmdBlocking {
   }
 
   my $nrows = 0;
-  if($sql =~ m/^\s*(call|explain|select|pragma|show)/is) {
+  if($sql =~ m/^\s*(call|explain|select|pragma|show|describe)/is) {
       while (my @line = $sth->fetchrow_array()) {
           Log3 ($name, 4, "DbRep $name - SQL result: @line");
           $ret .= "\n" if($nrows);                                              # Forum: #103295
@@ -14095,12 +14099,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 27340 2023-03-19 07:45:02Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 27393 2023-04-04 19:30:04Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 27340 2023-03-19 07:45:02Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 27393 2023-04-04 19:30:04Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
