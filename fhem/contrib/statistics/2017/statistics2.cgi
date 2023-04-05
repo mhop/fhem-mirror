@@ -23,13 +23,18 @@ GNU General Public License for more details.
 database stuff provided by betateilchen
 visualisation provided by markusbloch
 
+--------------------------------------------------------------------------------
+
+2023-04-05 - add support for makeOffical() (count official modules only)
+
+
 =cut
 
 use strict;
 use warnings;
 use DBI;
 use CGI qw(:standard Vars);
-#use Data::Dumper;
+#use Data::Dumper; # for debug only
 use JSON;
 use POSIX qw(mktime strftime);
 use Time::HiRes qw(time);
@@ -40,7 +45,7 @@ use Geo::IP;
 sub insertDB();
 sub getLocation();
 sub revInfo($);
-sub makeOfficial();
+sub makeOfficial($);
 sub add2total();
 sub doAggregate();
 sub viewStatistics();
@@ -64,7 +69,12 @@ my $sth;
 my $limit  = "datetime('now', '-12 months')";
 
 # path to working copy 
-my $fhemPathSvn = '/opt/fhem';
+
+# used for development (betateilchen)
+# my $fhemPathSvn = '/opt/fhem';
+
+# used for production on FHEM server
+my $fhemPathSvn = '/home/rko/fhemupdate/fhem';
   
 # ---------- decide target ----------
 
@@ -89,8 +99,9 @@ sub insertDB() {
   my $geo      = getLocation();
 
   my $decoded  = decode_json($json);
-  $json = revInfo($decoded) if (defined($decoded->{'system'}{'revision'}));
-  makeOfficial(); # delete inofficial modules from statistics data
+     $decoded  = revInfo($decoded) if (defined($decoded->{'system'}{'revision'}));
+     $decoded  = makeOfficial($decoded);
+  $json        = encode_json($decoded);
 
   $dbh = DBI->connect($dsn,"","", { RaiseError => 1, ShowErrorStatement => 1 }) ||
           die "Cannot connect: $DBI::errstr";
@@ -127,26 +138,33 @@ sub getLocation() {
 }
 
 sub revInfo($) {
-   # replace revision number with revision date
-   my ($decoded) = @_;
-   my $rev = $decoded->{'system'}{'revision'} + 1;
-   if($rev =~ /^\d+$/) {
-     my $d = (split(/ /,qx(sudo -u rko /usr/bin/svn info -r $rev $fhemPathSvn|grep Date:)))[3];
+  # replace revision number with revision date
+  my ($decoded) = @_;
+  my $rev = $decoded->{'system'}{'revision'} + 1;
+  if($rev =~ /^\d+$/) {
+
+#     used for development (betateilchen)
 #     my $d = (split(/ /,qx(/usr/bin/svn info -r $rev $fhemPathSvn|grep Date:)))[3];
+
+#     used for production on FHEM server
+     my $d = (split(/ /,qx(sudo -u rko /usr/bin/svn info -r $rev $fhemPathSvn|grep Date:)))[3];
+
      return undef unless (defined($d));
      my ($year,$mon,$mday) = split(/-/,$d);
      $decoded->{'system'}{'revdate'} = mktime(0,0,7,$mday,($mon-1),($year-1900),0,0,0);
-     return encode_json $decoded;
-   }
+     return $decoded;
+  }
 }
 
-sub makeOfficial() {
-  my %official = ();
+sub makeOfficial($) {
+  # delete inofficial modules from statistics data
+  my ($decoded) = @_;
+  my %official = ('system'=>1);
   open (FH, "$fhemPathSvn/controls_fhem.txt") || die "Sorry!!";
     while (<FH>) { $official{$1} = 1 if ($_ =~ /FHEM\/\d\d_(.*)\.pm/) }
   close FH;
   foreach my $key (keys %$decoded) { delete $decoded->{$key} unless $official{$key} }
-  return;
+  return $decoded;
 }
 
 sub add2total() {
