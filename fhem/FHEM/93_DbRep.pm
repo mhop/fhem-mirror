@@ -4747,7 +4747,7 @@ sub DbRep_diffval {
   # ignorierte Zeilen (abs $diff > $dlim)
   my $rowsrej;
   $rowsrej = encode_base64 ($rejectstr, "") if($rejectstr);
-Log3 ($name, 1, "DbRep $name - rh: ".Dumper %rh) ;
+
   my $rows = join('§', %rh);                                                          # Ergebnishash
 
   my ($wrt,$irowdone);                                                                # Ergebnisse in Datenbank schreiben
