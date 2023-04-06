@@ -1275,7 +1275,7 @@ sub FRITZBOX_Get($@)
    } elsif( lc $cmd eq "luafunction" && $hash->{LUAQUERY} == 1) {
       FRITZBOX_Log $hash, 4, "INFO: get $name $cmd ".join(" ", @val);
 
-      return "Wrong number of arguments, usage: get $name luaQuery <query>" if int @val !=1;
+      return "Wrong number of arguments, usage: get $name luafunction <query>" if int @val !=1;
 
       $returnStr  = "Result of function call '$val[0]' \n";
       $returnStr .= "----------------------------------------------------------------------\n";
@@ -8019,7 +8019,7 @@ sub FRITZBOX_fritztris($)
 =cut--
 
 ###############################################################
-# HOST=box:settings/hostname
+# HOST=box:settings/hostname 
 # SSID1=wlan:settings/ssid
 # SSID2=wlan:settings/ssid_scnd
 # FORWARDS=forwardrules:settings/rule/list(activated,description,protocol,port,fwip,fwport,endport)
@@ -8034,6 +8034,20 @@ sub FRITZBOX_fritztris($)
 # SIP1=sip:settings/sip1/activated
 ###############################################################
 # 
+#   23 Internetverbindung wurde getrennt.
+#   24 Internetverbindung wurde erfolgreich hergestellt. IP-Adresse: ..., DNS-Server: ... und ..., Gateway: ..., Breitband-PoP: ..., LineID:...
+#   25 Internetverbindung IPv6 wurde erfolgreich hergestellt. IP-Adresse: ...:...:...:...:...:...:...:...
+#   26 Internetverbindung wurde getrennt.
+#   28 Internetverbindung IPv6 wurde getrennt, Präfix nicht mehr gültig.
+#
+#   73 Anmeldung der Internetrufnummer <Nummer> war nicht erfolgreich. Ursache: Gegenstelle antwortet nicht. Zeitüberschreitung.
+#   85 Die Internetverbindung wird kurz unterbrochen, um der Zwangstrennung durch den Anbieter zuvorzukommen.
+#
+#  119 Information des Anbieters über die Geschwindigkeit des Internetzugangs (verfügbare Bitrate): nnnn/nnnn kbit/s
+#
+#  201 Es liegt keine Störung der Telefonie mehr vor. Alle Rufnummern sind ab sofort wieder verfügbar.
+#  205 Anmeldung für IP-Telefoniegerät "Telefonie-Gerät" von IP-Adresse ... nicht erfolgreich.
+#
 #  401 SIP_UNAUTHORIZED, Beschreibung steht in der Hilfe (Webinterface)
 #  403 SIP_FORBIDDEN, Beschreibung steht in der Hilfe (Webinterface)
 #  404 SIP_NOT_FOUND, Gegenstelle nicht erreichbar (local part der SIP-URL nicht erreichbar (Host schon))
@@ -8054,12 +8068,55 @@ sub FRITZBOX_fritztris($)
 #  505 Anmeldung des Benutzers xx an der FRITZ!Box-Benutzeroberfläche von IP-Adresse yy gescheitert (falsches Kennwort)
 #  506 Anmeldung einer App des Benutzers FhemUser von IP-Adresse
 #  510 Anmeldung einer App mit unbekanntem Anmeldenamen von IP-Adresse ... gescheitert.
-
+#
 #  689 WLAN-Anmeldung ist gescheitert : Die MAC-Adresse des WLAN-Geräts ist gesperrt. MAC-Adresse
 #  692 WLAN-Anmeldung ist gescheitert : Verbindungsaufbau fehlgeschlagen. MAC-Adresse
 #  705 WLAN-Gerät Anmeldung gescheitert (5 GHz): ungültiger WLAN-Schlüssel. MAC-Adresse
+#  748 [...] WLAN-Gerät angemeldet (n,n GHz), nn Mbit/s, PC-..., IP ..., MAC ... .
+#  752 [...] WLAN-Gerät hat sich abgemeldet (n,n GHz), PC-..., IP ..., MAC ....
+#  754 [...] WLAN-Gerät wurde abgemeldet (.,. GHz), PC-..., IP ..., MAC ... .
+#  756 WLAN-Gerät hat sich neu angemeldet (n,n GHz), nn Mbit/s, Gerät, IP ..., MAC ....
 #  782 WLAN-Anmeldung ist gescheitert : Die erneute Anmeldung ist aufgrund aktiver "Unterstützung für geschützte Anmeldungen von WLAN-Geräten (PMF)
-
+#
 # 2364 Ein neues Gerät wurde an der FRITZ!Box angemeldet (Schnurlostelefon)
 # 2358 Einstellungen wurden gesichert. Diese Änderung erfolgte von Ihrem Heimnetzgerät ... (IP-Adresse: ...)
+# 2380 Es besteht keine Verbindung mehr zu den verschlüsselten DNS-Servern.
+# 2383 Es wurde erfolgreich eine Verbindung - samt vollständiger Validierung - zu den verschlüsselten DNS-Servern aufgebaut.
+# 2380 Es besteht keine Verbindung mehr zu den verschlüsselten DNS-Servern.
+# 3330 Verbindung zum Online-Speicher hergestellt.
+# 
 ###############################################################
+# xhr: 1
+# holdmusic: 0 == Sprache, 1 == Musik
+# apply: 
+# sid: e41f179ca279ceef
+# lang: de
+# page: moh_upload
+#
+# xhr: 1
+# sid: e41f179ca279ceef
+# lang: de
+# page: phoneline
+# xhrId: all
+#
+# xhr: 1
+# sid: e41f179ca279ceef
+# page: sipQual
+#
+# xhr: 1
+# sid: e41f179ca279ceef
+# page: numLi
+#
+# xhr: 1
+# chooseexport: cfgexport
+# uiPass: Dan01Mar02
+# sid: 6328ea6dcf5a2a9b
+# ImportExportPassword: Dan01Mar02
+# ConfigExport: 
+# AssetsImportExportPassword: 
+# AssetsExport: 
+# back_to_page: sysSave
+# apply: 
+# lang: de
+# page: sysSave
+#
