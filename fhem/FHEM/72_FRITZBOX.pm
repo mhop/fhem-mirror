@@ -7035,24 +7035,31 @@ sub FRITZBOX_fritztris($)
       <br>
 
       <li><a name="fritzLog"></a>
-         <dt><code>get &lt;name&gt; fritzLog &lt;hash | table&gt; &lt;all | sys | wlan | usb | net | fon&gt;</code></dt>
+         <dt><code>get &lt;name&gt; fritzLog &lt;table&gt; &lt;all | sys | wlan | usb | net | fon&gt;</code></dt>
          <br>
-         &lt;hash&gt; forwards the result to a function (non-blocking) myUtilsFritzLogExPost($hash, $filter, $result) for own processing.
+         &lt;table&gt; displays the result in FhemWeb as a table.
+         <br><br>
+         <dt><code>get &lt;name&gt; fritzLog &lt;hash&gt; [on|off] &lt;all | sys | wlan | usb | net | fon&gt;</code></dt>
+         <br>
+         &lt;hash&gt; [on] forwards the result to a function (non-blocking) myUtilsFritzLogExPostnb($hash, $filter, $result) for own processing.
+         <br>
+         &lt;hash&gt; &lt;off&gt; forwards the result to a function (blocking) myUtilsFritzLogExPost($hash, $filter, $result) f&uuml;r eigene Verarbeitung weiter.
          <br>
          where:<br>
          $hash -> Fhem Device hash,<br>
          $filter -> log filter,<br>
          $result -> return of the data.lua query as JSON.
          <br><br>
-         &lt;table&gt; displays the result in FhemWeb as a table.
-         <br>
+         [on|off] gives parameter &lt;hash&gt; indicates whether further processing is blocking [off] or non-blocking [on] (default).
+         <br><br>
          &lt;all | sys | wlan | usb | net | fon&gt; these parameters are used to filter the log information.
          <br><br>
          Feeback stored in the readings:<br>
-         retStat_fritzLogExPost = status of myUtilsFritzLogExPost<br>
+         retStat_fritzLogExPost = status of myUtilsFritzLogExPostnb / myUtilsFritzLogExPostnb<br>
          retStat_fritzLogInfo = status log info request
          <br><br>
          Needs FRITZ!OS 7.21 or higher.
+         <br>
       </li><br>
 
       <li><a name="lanDeviceInfo"></a>
@@ -7636,24 +7643,30 @@ sub FRITZBOX_fritztris($)
    <ul>
       <br>
       <li><a name="fritzLog"></a>
-         <dt><code>get &lt;name&gt; fritzLog &lt;hash | table&gt; &lt;all | sys | wlan | usb | net | fon&gt;</code></dt>
+         <dt><code>get &lt;name&gt; fritzLog &lt;table&gt; &lt;all | sys | wlan | usb | net | fon&gt;</code></dt>
          <br>
-         &lt;hash&gt; leitet das Ergebnis an eine Funktion (non blocking) myUtilsFritzLogExPost($hash, $filter, $result) f&uuml;r eigene Verarbeitung weiter.
+         &lt;table&gt; zeigt das Ergebnis im FhemWeb als Tabelle an.
+         <br><br>
+         <dt><code>get &lt;name&gt; fritzLog &lt;hash&gt; [on|off] &lt;all | sys | wlan | usb | net | fon&gt;</code></dt>
+         <br>
+         &lt;hash&gt; leitet das Ergebnis als Standard an eine Funktion (non blocking) myUtilsFritzLogExPostnb($hash, $filter, $result) f&uuml;r eigene Verarbeitung weiter.
+         <br>
+         &lt;hash&gt; &lt;off&gt; leitet das Ergebnis an eine Funktion (blocking) myUtilsFritzLogExPost($hash, $filter, $result) f&uuml;r eigene Verarbeitung weiter.
          <br>
          wobei:
          <br>
          $hash -> Fhem Device hash,<br>
          $filter -> gew&auml;hlter Log Filter,<br>
-         $result -> R&uuml;ckgabe der data.lua Abfrage im JSON Format.
+         $result -> R&uuml;ckgabe der data.lua Abfrage im JSON Format.<br>
+         <br> 
+         [on|off] gibt bei Parameter &lt;hash&gt; an, ob die Weiterverarbeitung blocking [off] oder non blocking [on] (default) erfolgt.
          <br><br>
-         &lt;table&gt; zeigt das Ergebnis im FhemWeb als Tabelle an.
-         <br>
          &lt;all | sys | wlan | usb | net | fon&gt; &uuml;ber diese Parameter erfolgt die Filterung der Log-Informationen.
          <br><br>
 	  Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
          <br><br>
          R&uuml;ckmeldung in den Readings:<br>
-         retStat_fritzLogExPost = Status des Funktionsaufrufes myUtilsFritzLogExPost<br>
+         retStat_fritzLogExPost = Status des Funktionsaufrufes myUtilsFritzLogExPostnb / myUtilsFritzLogExPost<br>
          retStat_fritzLogInfo = Status der Log Informations Abfrage.
          <br>
       </li><br>
