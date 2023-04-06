@@ -7039,7 +7039,7 @@ sub FRITZBOX_fritztris($)
          <br>
          &lt;table&gt; displays the result in FhemWeb as a table.
          <br><br>
-         <dt><code>get &lt;name&gt; fritzLog &lt;hash&gt; [on|off] &lt;all | sys | wlan | usb | net | fon&gt;</code></dt>
+         <dt><code>get &lt;name&gt; fritzLog &lt;hash&gt; &lt;all | sys | wlan | usb | net | fon&gt; [on|off]</code></dt>
          <br>
          &lt;hash&gt; [on] forwards the result to a function (non-blocking) myUtilsFritzLogExPostnb($hash, $filter, $result) for own processing.
          <br>
@@ -7050,9 +7050,9 @@ sub FRITZBOX_fritztris($)
          $filter -> log filter,<br>
          $result -> return of the data.lua query as JSON.
          <br><br>
-         [on|off] gives parameter &lt;hash&gt; indicates whether further processing is blocking [off] or non-blocking [on] (default).
-         <br><br>
          &lt;all | sys | wlan | usb | net | fon&gt; these parameters are used to filter the log information.
+         <br><br>
+         [on|off] gives parameter &lt;hash&gt; indicates whether further processing is blocking [off] or non-blocking [on] (default).
          <br><br>
          Feeback stored in the readings:<br>
          retStat_fritzLogExPost = status of myUtilsFritzLogExPostnb / myUtilsFritzLogExPostnb<br>
@@ -7647,7 +7647,7 @@ sub FRITZBOX_fritztris($)
          <br>
          &lt;table&gt; zeigt das Ergebnis im FhemWeb als Tabelle an.
          <br><br>
-         <dt><code>get &lt;name&gt; fritzLog &lt;hash&gt; [on|off] &lt;all | sys | wlan | usb | net | fon&gt;</code></dt>
+         <dt><code>get &lt;name&gt; fritzLog &lt;hash&gt; &lt;all | sys | wlan | usb | net | fon&gt; [on|off]</code></dt>
          <br>
          &lt;hash&gt; leitet das Ergebnis als Standard an eine Funktion (non blocking) myUtilsFritzLogExPostnb($hash, $filter, $result) f&uuml;r eigene Verarbeitung weiter.
          <br>
@@ -7658,10 +7658,10 @@ sub FRITZBOX_fritztris($)
          $hash -> Fhem Device hash,<br>
          $filter -> gew&auml;hlter Log Filter,<br>
          $result -> R&uuml;ckgabe der data.lua Abfrage im JSON Format.<br>
-         <br> 
-         [on|off] gibt bei Parameter &lt;hash&gt; an, ob die Weiterverarbeitung blocking [off] oder non blocking [on] (default) erfolgt.
          <br><br>
          &lt;all | sys | wlan | usb | net | fon&gt; &uuml;ber diese Parameter erfolgt die Filterung der Log-Informationen.
+         <br><br>
+         [on|off] gibt bei Parameter &lt;hash&gt; an, ob die Weiterverarbeitung blocking [off] oder non blocking [on] (default) erfolgt.
          <br><br>
 	  Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
          <br><br>
