@@ -5,6 +5,12 @@ use warnings;
 
 # https://github.com/iobroker-community-adapters/ioBroker.worx
 # https://forum.fhem.de/index.php?topic=111959
+#
+# Usage:
+#   define m2c MQTT2_CLIENT xx
+#   attr m2c username a@bc.de
+#   attr m2c connectFn {use LandroidUtils;;Landroid_connect($NAME,"worx")}
+#   set m2c password mySecret
 
 my %types = (
    worx => {
@@ -33,7 +39,7 @@ my %types = (
     }
 );
 
-# Step 1: request & parse the access_token
+# Step 1: check parameters, request & parse the access_token
 sub
 Landroid_connect($$)
 {
