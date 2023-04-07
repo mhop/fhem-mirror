@@ -458,7 +458,7 @@ MQTT2_CLIENT_Set($@)
     MQTT2_CLIENT_Disco($hash) if($init_done);
 
   } elsif($a[0] eq "connect") {
-    $hash->{maxFailedConnects} = 0;
+    $hash->{nrFailedConnects} = 0;
     MQTT2_CLIENT_connect($hash) if(!$hash->{FD});
 
   } elsif($a[0] eq "disconnect") {
@@ -785,7 +785,7 @@ MQTT2_CLIENT_addToFeedList($$)
 }
 
 sub
-MQTT2_CLIENT_feedTheList($$$)
+MQTT2_CLIENT_feedTheList($$$;$)
 {
   my ($server, $tp, $val, $cid) = @_;
   my $fl = $server->{".feedList"};

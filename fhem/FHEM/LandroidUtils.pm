@@ -74,15 +74,16 @@ Landroid_connect($$)
 
   HttpUtils_NonblockingGet({
     url=>"https://$t->{loginUrl}/oauth/token",
+    timeout=>60,
     callback=> sub($$$){
       my ($h,$e,$d) = @_;
       return Log3 $m2c, 1, "$errPrefix $e" if($e);
       return Log3 $m2c, 1, "$errPrefix no data" if(!$d);
       Log3 $m2c, 5, $d;
       $m2c->{".auth"} = json2nameValue($d);
-      return Log3 $m2c, 1, "$errPrefix no access_token"
+      return Log3 $m2c, 1, "$errPrefix no access_token / $d"
         if(!$m2c->{".auth"}{access_token});
-      Log3 $m2c, 4, "$m2c_name: Got auth info";
+      Log3 $m2c, 4, "$m2c_name: Got auth info, request: ".$data->{grant_type};
       setReadingsVal($m2c, ".refresh_token",
                      $m2c->{".auth"}{refresh_token}, TimeNow());
       InternalTimer(gettimeofday()+$ra-60,
@@ -121,11 +122,11 @@ Landroid_connect2($)
       Log3 $m2c, 5, $d;
       my $me = json2nameValue($d);
       return Log3 $m2c, 1, "$errPrefix no userId/mqttEndpoint"
-        if(!$me->{userId} || !$me->{mqttEndpoint});
+        if(!$me->{id} || !$me->{mqtt_endpoint});
       Log3 $m2c, 4, "$m2c_name: Got userId/mqttEndpoint";
       $m2c->{userId} = $me->{id};
       $m2c->{mqttEndpoint} = $me->{mqtt_endpoint};
-      Landroid_connect3($m2c);
+      Landroid_connect3($m2c_name);
     }
   });
 }
