@@ -1102,11 +1102,11 @@ sub KNXIO_keepAliveTO {
 	my $name = $hash->{NAME};
 	my $cntrTO = $hash->{KNXIOhelper}->{CNTRTO};
 
+	return KNXIO_disconnect($hash) if ($cntrTO >= 2); # nr of timeouts exceeded
+
 	$cntrTO++;
 	KNXIO_Log ($name, 3, qq{timeout - retry $cntrTO});
-
-	return KNXIO_keepAlive($hash,$cntrTO) if ($cntrTO < 3);
-	KNXIO_disconnect($hash); # nr of timeouts exceeded
+	KNXIO_keepAlive($hash,$cntrTO);
 	return;
 }
 
