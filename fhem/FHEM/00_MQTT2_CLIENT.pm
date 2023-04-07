@@ -119,9 +119,15 @@ MQTT2_CLIENT_connect($;$)
   }
 
   my $cfn = AttrVal($hash->{NAME}, "connectFn", undef); # for AWS-IOT / auth
-  if($cfn && !$calledFromConnectFn) {
-    $cfn = EvalSpecials($cfn, ("%NAME" => $hash->{NAME}));
-    return AnalyzeCommand(undef, $cfn);
+  if($cfn) {
+    if($calledFromConnectFn) {
+      delete($hash->{inConnectFn});
+    } else {
+      return if($hash->{inConnectFn}); # called by readyFn
+      $hash->{inConnectFn} = 1;
+      $cfn = EvalSpecials($cfn, ("%NAME" => $hash->{NAME}));
+      return AnalyzeCommand(undef, $cfn);
+    }
   }
 
   my $disco = (DevIo_getState($hash) eq "disconnected");
@@ -458,7 +464,8 @@ MQTT2_CLIENT_Set($@)
     MQTT2_CLIENT_Disco($hash) if($init_done);
 
   } elsif($a[0] eq "connect") {
-    $hash->{nrFailedConnects} = 0;
+    delete($hash->{inConnectFn});
+    delete($hash->{nrFailedConnects});
     MQTT2_CLIENT_connect($hash) if(!$hash->{FD});
 
   } elsif($a[0] eq "disconnect") {

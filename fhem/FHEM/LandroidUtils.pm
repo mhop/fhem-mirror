@@ -9,8 +9,9 @@ use warnings;
 # Usage:
 #   define m2c MQTT2_CLIENT xx
 #   attr m2c username a@bc.de
-#   attr m2c connectFn {use LandroidUtils;;Landroid_connect($NAME,"worx")}
+#   attr m2c connectFn {use LandroidUtils;;Landroid_connect($NAME,"worx",1)}
 #   set m2c password mySecret
+# If the last parameter to Landroid_connect is 1, devices will be autocreated
 
 my %types = (
    worx => {
@@ -41,9 +42,9 @@ my %types = (
 
 # Step 1: check parameters, request & parse the access_token
 sub
-Landroid_connect($$)
+Landroid_connect($$;$)
 {
-  my ($m2c_name, $type) = @_;
+  my ($m2c_name, $type, $autocreate) = @_;
   my $errPrefix = "ERROR: Landroid_connect $m2c_name -";
   my $m2c = $defs{$m2c_name}; 
   my $usr = AttrVal($m2c_name, "username", "");
@@ -55,6 +56,7 @@ Landroid_connect($$)
   return Log 1, "$errPrefix unknown type $type" if(!$types{$type});
 
   $m2c->{landroidType} = $type;
+  $m2c->{autocreate} = 1 if($autocreate);
   my $t = $types{$type};
   RemoveInternalTimer("landroidTmr_$m2c_name");
 
@@ -87,7 +89,10 @@ Landroid_connect($$)
       setReadingsVal($m2c, ".refresh_token",
                      $m2c->{".auth"}{refresh_token}, TimeNow());
       InternalTimer(gettimeofday()+$ra-60,
-        sub(){ Landroid_connect($m2c_name, $type)}, "landroidTmr_$m2c_name", 0);
+        sub(){
+          Log3 $m2c, 4, "$m2c_name: requesting new token";
+          Landroid_connect($m2c_name, $type)
+        }, "landroidTmr_$m2c_name", 0) if($ra > 60);
       Landroid_connect2($m2c_name);
     },
     header => {
@@ -98,7 +103,7 @@ Landroid_connect($$)
   });
 }
 
-# Step 2: get userId & mqttEndpoint
+# Step 2: get userId
 sub
 Landroid_connect2($)
 {
@@ -121,11 +126,10 @@ Landroid_connect2($)
       return Log3 $m2c, 1, "$errPrefix no data" if(!$d);
       Log3 $m2c, 5, $d;
       my $me = json2nameValue($d);
-      return Log3 $m2c, 1, "$errPrefix no userId/mqttEndpoint"
-        if(!$me->{id} || !$me->{mqtt_endpoint});
-      Log3 $m2c, 4, "$m2c_name: Got userId/mqttEndpoint";
+      return Log3 $m2c, 1, "$errPrefix no userId"
+        if(!$me->{id});
+      Log3 $m2c, 4, "$m2c_name: Got userId: $me->{id}";
       $m2c->{userId} = $me->{id};
-      $m2c->{mqttEndpoint} = $me->{mqtt_endpoint};
       Landroid_connect3($m2c_name);
     }
   });
@@ -168,7 +172,7 @@ Landroid_connect3($)
         my $sn = $dl->{$i1."_serial_number"};
         last if(!$sn);
         my $m2d = $sn{$sn};
-        if(!$m2d) {
+        if(!$m2d && $m2c->{autocreate}) {
           my $m2d_name = makeDeviceName($m2c_name."_".$dl->{$i1."_name"});
           DoTrigger("global", "UNDEFINED $m2d_name MQTT2_DEVICE $sn");
           $m2d = $defs{$m2d_name};
@@ -183,13 +187,14 @@ Landroid_connect3($)
           my $val = $dl->{$key};
           next if(!defined($val));
           $val =~ s,\\/,/,g; # Bug in the backend?
-          setReadingsVal($m2d, $readingName, $val, $now);
-          push @subs, $val if($readingName eq "mqtt_topics_command_out");
-          if($readingName eq "mqtt_topics_command_in") {
-            push @cmds, $val;
+          setReadingsVal($m2d, $readingName, $val, $now) if($m2c->{autocreate});
+          push @cmds, $val if($readingName eq "mqtt_topics_command_in");
+          if($readingName eq "mqtt_topics_command_out") {
+            push @subs, $val;
             $attr{$m2d->{NAME}}{readingList}="$val:.* {json2nameValue(\$EVENT)}"
-              if(!$attr{$m2d->{NAME}}{readingList});
+              if(!$attr{$m2d->{NAME}}{readingList} && $m2c->{autocreate});
           }
+          $m2c->{mqttEndpoint} = $val if($readingName eq "mqtt_endpoint");
         }
       }
       my $a = $attr{$m2c_name};
@@ -229,7 +234,8 @@ Landroid_connect4($)
   my $a = $attr{$m2c_name};
   $a->{keepaliveTimeout} = 600;
   $a->{maxFailedConnects} = 1;
-  MQTT2_CLIENT_connect($defs{$m2c_name}, 1);
+  MQTT2_CLIENT_Disco($m2c, 1); # Make sure reconnect will work
+  MQTT2_CLIENT_connect($m2c, 1);
 }
 
 1;

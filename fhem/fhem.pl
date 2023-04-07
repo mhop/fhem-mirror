@@ -842,11 +842,13 @@ while (1) {
   }
 
   foreach my $p (keys %readyfnlist) {
-    next if(!$readyfnlist{$p});                 # due to rereadcfg / delete
+    my $h = $readyfnlist{$p};
+    next if(!$h);                 # due to rereadcfg / delete
+    next if($h->{NEXT_OPEN} && gettimeofday() < $h->{NEXT_OPEN});
 
-    if(CallFn($readyfnlist{$p}{NAME}, "ReadyFn", $readyfnlist{$p})) {
+    if(CallFn($h->{NAME}, "ReadyFn", $h)) {
       if($readyfnlist{$p}) {                    # delete itself inside ReadyFn
-        CallFn($readyfnlist{$p}{NAME}, "ReadFn", $readyfnlist{$p});
+        CallFn($h->{NAME}, "ReadFn", $h);
       }
 
     }
