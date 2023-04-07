@@ -44,6 +44,7 @@ MQTT2_CLIENT_Initialize($)
     disable:1,0
     disabledForIntervals
     disconnectAfter
+    execAfterConnect
     httpHeader
     ignoreRegexp
     lwt
@@ -129,7 +130,8 @@ MQTT2_CLIENT_connect($;$)
   $hash->{BUF}="";
   if($hash->{DeviceName} =~ m/^wss?:/) {
     $hash->{binary} = 1;
-    $hash->{header}{"Sec-WebSocket-Protocol"} = "mqtt";
+    $hash->{header}{"Sec-WebSocket-Protocol"} = "mqtt" # Worx has mqttv3.1
+      if(!defined($hash->{header}{"Sec-WebSocket-Protocol"}));
   }
   $hash->{nrConnects}++;
   $hash->{nrFailedConnects}++;  # delete on CONNACK
@@ -145,9 +147,11 @@ MQTT2_CLIENT_doinit($)
 
   ############################## CONNECT
   if($hash->{connecting} == 1) {
+    delete($hash->{header}) if($hash->{DeviceName} =~ m/^wss?:/);
     my $usr = AttrVal($name, "username", "");
     my ($err, $pwd) = getKeyValue($name);
     $usr = $hash->{".usr"} if(defined($hash->{".usr"})); # AWS-IOT/WORX
+    $pwd = $hash->{".pwd"} if(defined($hash->{".pwd"}));
     $pwd = undef if($usr eq "");
     if($err) {
       Log 1, "ERROR: $err";

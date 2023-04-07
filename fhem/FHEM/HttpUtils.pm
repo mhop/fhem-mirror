@@ -49,7 +49,7 @@ filename2MIMEType($) {
 sub
 urlEncode($) {
   $_= $_[0];
-  s/([\x00-\x2F \x3A-\x40 \x5B-\x60 \x7B-\xFF])/sprintf("%%%02x",ord($1))/eg;
+  s/([\x00-\x2F \x3A-\x40 \x5B-\x60 \x7B-\xFF])/sprintf("%%%02X",ord($1))/eg;
   return $_;
 }
 
