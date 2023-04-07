@@ -48,6 +48,8 @@
 #            replace GP_Import: Devio,Tcpserver,HttpUtils with use stmts   
 # 28/03/2023 cleanup
 #            rework Logging, duplicate msg detection
+# 04/04/2023 limit retries for keepalive timeouts
+#            rework Logging
 
 
 package KNXIO; ## no critic 'package'
@@ -438,7 +440,7 @@ sub KNXIO_ReadH {
 			$hash->{PhyAddr} = KNXIO_addr2hex($phyaddr,2); # correct Phyaddr.
 #			DoTrigger($name, 'CONNECTED');
 			readingsSingleUpdate($hash, 'state', 'connected', 1);
-			KNXIO_Log ($name, 3, qq{$name connected});
+			KNXIO_Log ($name, 3, q{connected});
 			$hash->{KNXIOhelper}->{SEQUENCECNTR} = 0;
 			return InternalTimer(gettimeofday() + 60, \&KNXIO_keepAlive, $hash); # start keepalive
 		}
@@ -737,7 +739,7 @@ sub KNXIO_openDev {
 		$selectlist{"$name.$param"} = $hash;
 
 		my $retxt = ($reopen)?'reappeared':'opened';
-		KNXIO_Log ($name, 3, qq{device $retxt});
+		KNXIO_Log ($name, 3, qq{$retxt});
 		$ret = KNXIO_init($hash);
 	}
 
@@ -747,7 +749,7 @@ sub KNXIO_openDev {
 	}
 
 	if(defined($ret) && $ret) {
-		KNXIO_Log ($name, 1, q{Cannot open KNXIO-Device - ignoring it});
+		KNXIO_Log ($name, 1, q{Cannot open device - ignoring it});
 		KNXIO_closeDev($hash);
 	}
 
@@ -774,7 +776,7 @@ sub KNXIO_init {
 	else {
 #		DoTrigger($name, 'CONNECTED');
 		readingsSingleUpdate($hash, 'state', 'connected', 1);
-		KNXIO_Log ($name, 3, qq{connected});
+		KNXIO_Log ($name, 3, q{connected});
 	}
 
 	return;
@@ -891,7 +893,7 @@ sub KNXIO_disconnect {
 
 	::DevIo_Disconnected($hash);
 
-	KNXIO_Log ($name, 1, qq{disconnected, waiting to reappear});
+	KNXIO_Log ($name, 1, q{disconnected, waiting to reappear});
 
 	$readyfnlist{"$name.$param"} = $hash; # Start polling
 	$hash->{NEXT_OPEN} = gettimeofday() + $reconnectTO;
@@ -955,7 +957,7 @@ sub KNXIO_decodeEMI {
 			KNXIO_Log ($name, 4, 'OpenGrpCon response received');
 #			DoTrigger($name, 'CONNECTED');
 			readingsSingleUpdate($hash, 'state', 'connected', 1);
-			KNXIO_Log ($name, 3, qq{connected});
+			KNXIO_Log ($name, 3, q{connected});
 		}
 		else {
 			KNXIO_Log ($name, 3, 'invalid message code ' . sprintf('%04x',$id));
@@ -1075,12 +1077,16 @@ sub KNXIO_hex2addr {
 }
 
 ### keep alive for mode H - every minute
-# triggered on conn-response & 
+# triggered on conn-response & connstate response
+# 2nd param is undef unless called from KNXIO_keepAliveTO
 sub KNXIO_keepAlive {
 	my $hash = shift;
-	my $name = $hash->{NAME};
+	my $cntrTO = shift // 0; #retry counter
 
-	KNXIO_Log ($name, 4, 'expect ConnectionStateResponse');
+	my $name = $hash->{NAME};
+	$hash->{KNXIOhelper}->{CNTRTO} = $cntrTO;
+
+	KNXIO_Log ($name, 4, 'send conn state request - expect connection state response');
 
 	my $msg = pack('nnnCCnnnn',(0x0610,0x0207,16,$hash->{KNXIOhelper}->{CCID},0, 0x0801,0,0,0));
 	RemoveInternalTimer($hash,\&KNXIO_keepAlive);
@@ -1092,11 +1098,16 @@ sub KNXIO_keepAlive {
 ### keep alive timeout
 sub KNXIO_keepAliveTO {
 	my $hash = shift;
-	my $name = $hash->{NAME};
 
-	KNXIO_Log ($name, 3, 'timeout - retry');
-	
-	return KNXIO_keepAlive($hash);
+	my $name = $hash->{NAME};
+	my $cntrTO = $hash->{KNXIOhelper}->{CNTRTO};
+
+	$cntrTO++;
+	KNXIO_Log ($name, 3, qq{timeout - retry $cntrTO});
+
+	return KNXIO_keepAlive($hash,$cntrTO) if ($cntrTO < 3);
+	KNXIO_disconnect($hash); # nr of timeouts exceeded
+	return;
 }
 
 ### TO hit while sending...
@@ -1129,14 +1140,17 @@ sub KNXIO_TunnelRequestTO {
 ### prependes device, subroutine, linenr. to Log msg
 ### return undef
 sub KNXIO_Log {
-	my $dev    = shift || 'global';
-	my $loglvl = shift;
+	my $dev    = shift // 'global';
+	my $loglvl = shift // 5;
 	my $logtxt = shift;
 
-	my $sub  = (caller(1))[3] || 'main';
+	my $name = ( ref($dev) eq 'HASH' ) ? $dev->{NAME} : $dev;
+	my $dloglvl = AttrVal($name,'verbose',undef) // AttrVal('global','verbose',3);
+	return if ($loglvl > $dloglvl); # shortcut performance
+
+	my $sub  = (caller(1))[3] // 'main';
 	my $line = (caller(0))[2];
-	my $name = ( ref($dev) eq "HASH" ) ? $dev->{NAME} : $dev;
-	$sub =~ s/.+[:]+//xms;
+	$sub =~ s/^.+[:]+//xms;
 
 	Log3 ($name, $loglvl, qq{$name [$sub $line]: $logtxt});
 	return;
