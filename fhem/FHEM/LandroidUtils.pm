@@ -63,15 +63,13 @@ Landroid_connect($$;$)
   my $rt = ReadingsVal($m2c_name, ".refresh_token", undef);
   my $ra = ReadingsAge($m2c_name, ".refresh_token", 0);
   my $data;
-  if($rt && $ra < 1800) { # refresh
+  if($rt && $ra < 3600) { # refresh
     $data = { grant_type=>"refresh_token", refresh_token=>$rt,
              client_id=>$t->{clientId}, scope=>"*" };
-    $ra = 3600-$ra;
 
   } else {
     $data = { grant_type=>"password", username=>$usr, password=>$pwd, 
              client_id=>$t->{clientId}, scope=>"*" };
-    $ra = 3600;
   }
 
   HttpUtils_NonblockingGet({
@@ -88,11 +86,11 @@ Landroid_connect($$;$)
       Log3 $m2c, 4, "$m2c_name: Got auth info, request: ".$data->{grant_type};
       setReadingsVal($m2c, ".refresh_token",
                      $m2c->{".auth"}{refresh_token}, TimeNow());
-      InternalTimer(gettimeofday()+$ra-60,
+      InternalTimer(gettimeofday()+3540,
         sub(){
           Log3 $m2c, 4, "$m2c_name: requesting new token";
           Landroid_connect($m2c_name, $type)
-        }, "landroidTmr_$m2c_name", 0) if($ra > 60);
+        }, "landroidTmr_$m2c_name", 0);
       Landroid_connect2($m2c_name);
     },
     header => {
