@@ -76,11 +76,11 @@ Landroid_connect($$)
     url=>"https://$t->{loginUrl}/oauth/token",
     callback=> sub($$$){
       my ($h,$e,$d) = @_;
-      return Log3 $m2c, 1, "$errPrefix: $e" if($e);
-      return Log3 $m2c, 1, "$errPrefix: no data" if(!$d);
+      return Log3 $m2c, 1, "$errPrefix $e" if($e);
+      return Log3 $m2c, 1, "$errPrefix no data" if(!$d);
       Log3 $m2c, 5, $d;
       $m2c->{".auth"} = json2nameValue($d);
-      return Log3 $m2c, 1, "$errPrefix: no access_token"
+      return Log3 $m2c, 1, "$errPrefix no access_token"
         if(!$m2c->{".auth"}{access_token});
       Log3 $m2c, 4, "$m2c_name: Got auth info";
       setReadingsVal($m2c, ".refresh_token",
@@ -116,11 +116,11 @@ Landroid_connect2($)
     },
     callback=>sub($$$){
       my ($h,$e,$d) = @_;
-      return Log3 $m2c, 1, "$errPrefix: $e" if($e);
-      return Log3 $m2c, 1, "$errPrefix: no data" if(!$d);
+      return Log3 $m2c, 1, "$errPrefix $e" if($e);
+      return Log3 $m2c, 1, "$errPrefix no data" if(!$d);
       Log3 $m2c, 5, $d;
       my $me = json2nameValue($d);
-      return Log3 $m2c, 1, "$errPrefix: no userId/mqttEndpoint"
+      return Log3 $m2c, 1, "$errPrefix no userId/mqttEndpoint"
         if(!$me->{userId} || !$me->{mqttEndpoint});
       Log3 $m2c, 4, "$m2c_name: Got userId/mqttEndpoint";
       $m2c->{userId} = $me->{id};
@@ -130,7 +130,7 @@ Landroid_connect2($)
   });
 }
 
-# Step 3: get device list & create devices if necessary
+# Step 3: get device list & create MQTT2_DEVICEs if necessary
 sub
 Landroid_connect3($)
 {
@@ -148,11 +148,11 @@ Landroid_connect3($)
     },
     callback => sub(){
       my ($h,$e,$d) = @_;
-      return Log3 $m2c, 1, "$errPrefix: $e" if($e);
-      return Log3 $m2c, 1, "$errPrefix: no data" if(!$d);
+      return Log3 $m2c, 1, "$errPrefix $e" if($e);
+      return Log3 $m2c, 1, "$errPrefix no data" if(!$d);
       Log3 $m2c, 5, $d;
       my $dl = json2nameValue($d); # DeviceList
-      return Log3 $m2c, 1, "$errPrefix - no devicelist" if(!$dl);
+      return Log3 $m2c, 1, "$errPrefix no devicelist" if(!$dl);
       Log3 $m2c, 4, "$m2c_name: Got device info";
       my %sn;
       for my $d (keys %defs) {
@@ -228,7 +228,7 @@ Landroid_connect4($)
   my $a = $attr{$m2c_name};
   $a->{keepaliveTimeout} = 600;
   $a->{maxFailedConnects} = 1;
-  #MQTT2_CLIENT_connect($defs{$m2c_name}, 1);
+  MQTT2_CLIENT_connect($defs{$m2c_name}, 1);
 }
 
 1;
