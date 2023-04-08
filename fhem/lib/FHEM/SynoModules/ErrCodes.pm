@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       ErrCodes.pm
 #
-#       (c) 2020 - 2022  by Heiko Maaz
+#       (c) 2020 - 2023  by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module provides Synology API Error Codes.
@@ -32,7 +32,7 @@ use warnings;
 use utf8;
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.3.6');
+use version; our $VERSION = version->declare('1.3.7');
 
 use Exporter ('import');
 our @EXPORT_OK   = qw(expErrorsAuth expErrors);                 
@@ -166,12 +166,15 @@ my %errsschat = (                                                       # Standa
   100  => "Unknown error",
   101  => "Payload is empty",
   102  => "API does not exist - may be the Synology Chat Server package is stopped",
+  105  => "Insufficient user privilege",
   117  => "illegal file name or path",
+  119  => "Invalid cookie in POST request",
   120  => "payload has wrong format",
   404  => "bot is not legal - may be the bot is not active or the botToken is wrong",
   407  => "record not valid",
   409  => "exceed max file size",
   410  => "message too long",
+  415  => "Post exceeds allowable delete time (Post ID might be already deleted or is not available)",
   800  => "malformed or unsupported URL",
   805  => "empty API data received - may be the Synology Chat Server package is stopped",
   806  => "couldn't get Synology Chat API informations",

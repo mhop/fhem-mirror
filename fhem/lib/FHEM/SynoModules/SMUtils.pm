@@ -26,17 +26,18 @@
 #########################################################################################################################
 
 # Version History
-# 1.25.0   new sub timestampToDateTime
-# 1.24.2   fix evalDecodeJSON return
-# 1.24.2   fix evaljson return
-# 1.24.1   extend moduleVersion by useCTZ
-# 1.24.0   new sub encodeSpecChars
-# 1.23.1   correct version format
-# 1.23.0   new sub evalDecodeJSON
-# 1.22.0   new sub addCHANGED
-# 1.21.0   new sub timestringToTimestamp / createReadingsFromArray
-# 1.20.7   change to defined ... in sub _addSendqueueSimple
-# 1.20.6   delete $hash->{OPMODE} in checkSendRetry
+# 1.26.0  08.04.2023  add postid to _addSendqueueExtended
+# 1.25.0              new sub timestampToDateTime
+# 1.24.2              fix evalDecodeJSON return
+# 1.24.2              fix evaljson return
+# 1.24.1              extend moduleVersion by useCTZ
+# 1.24.0              new sub encodeSpecChars
+# 1.23.1              correct version format
+# 1.23.0              new sub evalDecodeJSON
+# 1.22.0              new sub addCHANGED
+# 1.21.0              new sub timestringToTimestamp / createReadingsFromArray
+# 1.20.7              change to defined ... in sub _addSendqueueSimple
+# 1.20.6              delete $hash->{OPMODE} in checkSendRetry
 
 package FHEM::SynoModules::SMUtils;                                          
 
@@ -55,7 +56,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version 0.77; our $VERSION = version->declare('1.25.0');
+use version 0.77; our $VERSION = version->declare('1.26.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -1709,12 +1710,14 @@ return;
 #    $text    = zu übertragender Text
 #    $fileUrl = opt. zu übertragendes File
 #    $channel = opt. Channel
+#    $postid  = opt. Post Id (zu löschen)
 #
 ######################################################################################
 sub _addSendqueueExtended {
     my $paref      = shift;
     my $name       = $paref->{name};
     my $hash       = $defs{$name};
+    
     my $opmode     = $paref->{opmode}  // do {my $err = qq{internal ERROR -> opmode is empty}; Log3($name, 1, "$name - $err"); setReadingErrorState ($hash, $err); return};
     my $method     = $paref->{method}  // do {my $err = qq{internal ERROR -> method is empty}; Log3($name, 1, "$name - $err"); setReadingErrorState ($hash, $err); return};
     my $userid     = $paref->{userid}  // do {my $err = qq{internal ERROR -> userid is empty}; Log3($name, 1, "$name - $err"); setReadingErrorState ($hash, $err); return};
@@ -1722,8 +1725,9 @@ sub _addSendqueueExtended {
     my $fileUrl    = $paref->{fileUrl};
     my $channel    = $paref->{channel};
     my $attachment = $paref->{attachment};
+    my $postid     = $paref->{postid};
     
-    if(!$text && $opmode !~ /chatUserlist|chatChannellist|apiInfo/x) {
+    if(!$text && $opmode !~ /chatUserlist|chatChannellist|apiInfo|delPostId/x) {
         my $err = qq{can't add message to queue: "text" is empty};
         Log3($name, 2, "$name - ERROR - $err");
         
@@ -1739,7 +1743,8 @@ sub _addSendqueueExtended {
         'channel'    => $channel,
         'text'       => $text,
         'attachment' => $attachment,
-        'fileUrl'    => $fileUrl,  
+        'fileUrl'    => $fileUrl, 
+        'postid'     => $postid,      
         'retryCount' => 0             
     };
               
@@ -1843,7 +1848,7 @@ sub checkSendRetry {
   my $forbidSend = q{};
   my $startfnref = \&{$startfn};
   
-  my @forbidlist = qw(100 101 103 117 120 400 401 407 408 409 410 414 418 419 420 800 900
+  my @forbidlist = qw(100 101 103 117 120 400 401 407 408 409 410 414 415 418 419 420 800 900
                       1000 1001 1002 1003 1004 1006 1007 1100 1101 1200 1300 1301 1400
                       1401 1402 1403 1404 1405 1800 1801 1802 1803 1804 1805 2000 2001    
                       2002 9002);                                                         # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !

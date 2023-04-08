@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       API.pm
 #
-#       (c) 2020 - 2022 by Heiko Maaz
+#       (c) 2020 - 2023 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module provides Synology API information.
@@ -24,6 +24,11 @@
 #       along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #########################################################################################################################
+#
+# 08.04.2023 1.4.0  add SYNO.Chat.Post to _staticChat
+#
+#
+#
 
 package FHEM::SynoModules::API;                                          
 
@@ -32,7 +37,7 @@ use warnings;
 use utf8;
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.3.0');
+use version; our $VERSION = version->declare('1.4.0');
 
 # use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/SynoModules/API.pm
 
@@ -102,11 +107,14 @@ return \%hapi;
 
 ########################################################################
 #      Liefert die statischen Informationen der Chat API
+#   mk : 1 - API Key muss vorhanden sein
+#        0 - API Key kann vorhanden sein
 ########################################################################
 sub _staticChat {
   my %hapi = (                                                    
       INFO     => { NAME => "SYNO.API.Info",      mk => 1 }, 
       EXTERNAL => { NAME => "SYNO.Chat.External", mk => 1 },
+      POST     => { NAME => "SYNO.Chat.Post",     mk => 1 },
   );
 
 return \%hapi;
@@ -114,6 +122,8 @@ return \%hapi;
 
 ########################################################################
 #      Liefert die statischen Informationen der Calendar API
+#   mk : 1 - API Key muss vorhanden sein
+#        0 - API Key kann vorhanden sein
 ########################################################################
 sub _staticCalendar {
   my %hapi = (                                                    
