@@ -6870,10 +6870,10 @@ sub ring
 
   if (defined $valDec) {
       $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan><tspan style="fill:%s;font-size:60%%;font-weight:normal;">%s</tspan></text>',
-                     ($icflag ? 41:$yNum),color($currColor,$ln),(defined $icon or $half eq "1") ? 15:15,$fontformat,$valInt,$valDec,color($currColor,$lu),$unittext);
+                     ($icflag ? 41:$yNum),color($currColor,$ln),(defined $icon or $half eq "1") ? 14:15,$fontformat,$valInt,$valDec,color($currColor,$lu),$unittext);
   } else {
     $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s<tspan style="fill:%s;font-size:60%%;font-weight:normal;">%s</tspan></text>',
-                   ($icflag ? 41:$yNum),color($currColor,$ln),(defined $icon or $half eq "1") ? 15:15,$fontformat,$valInt,color($currColor,$lu),$unittext);
+                   ($icflag ? 41:$yNum),color($currColor,$ln),(defined $icon or $half eq "1") ? 14:15,$fontformat,$valInt,color($currColor,$lu),$unittext);
   }
   $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;%s">%s</text>',
                  ($icflag ? 50.5:$yUnit),color($currColor,$lu),($icflag or $half eq "1") ? 8:8,$unitformat,$unit) if (defined $unit);
