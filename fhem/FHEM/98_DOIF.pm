@@ -7040,7 +7040,7 @@ sub ring2
   
   if (defined $valDec2) {
     $out.= sprintf('<text text-anchor="middle" x="%s" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan><tspan style="fill:%s;font-size:60%%;font-weight:normal;">%s</tspan></text>',
-                   ($icflag ? 50:41),($icflag ? 41:42.5),color($currColor2,$ln),(defined ($icon) ? 12:13),$fontformat2,$valInt2,$valDec2,color($currColor,$lu),$unittext2);
+                   ($icflag ? 50:41),($icflag ? 41:42.5),color($currColor2,$ln),(defined ($icon) ? 12:13),$fontformat2,$valInt2,$valDec2,color($currColor2,$lu),$unittext2);
   } else {
     $out.= sprintf('<text text-anchor="middle" x="%s" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s<tspan style="fill:%s;font-size:60%%;font-weight:normal;">%s</tspan></text>',
                    ($icflag ? 50:41),($icflag ? 41:42.5),color($currColor2,$ln),(defined ($icon) ? 12:13),$fontformat2,$valInt2,color($currColor2,$lu),$unittext2);
