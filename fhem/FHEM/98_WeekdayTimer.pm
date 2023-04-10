@@ -331,29 +331,28 @@ sub _Profile {
   my $idx = 0;
   for  my $st ( @{$hash->{SWITCHINGTIMES}} ) {
     my ($tage,$time,$parameter,$overrulewday) = _SwitchingTime ($hash, $st);
-
     $idx++;
     for  my $d (@{$tage}) {
       my    @listeDerTage = ($d);
       push  (@listeDerTage, _getDaysList($hash, $d, $time)) if ($d>=7);
-      
+
       for my $day (@listeDerTage) {
         my $dayOfEchteZeit = $day;
-        #####
+
         if ($day < 7) {
           my $relativeDay = ($day - $wday ) % 7;
-          #my $relativeDay = $day - $wday; 
-          #$relativeDay = $relativeDay + 7 if $relativeDay < 0 ;
-          $dayOfEchteZeit = undef if ($hash->{helper}{WEDAYS}{$relativeDay} && $overrulewday);
+          $dayOfEchteZeit = undef if $hash->{helper}{WEDAYS}{$relativeDay} && defined $overrulewday && $overrulewday !~ m{$day}x;
+        } elsif ($day==7) {
+            $dayOfEchteZeit = ($wday>=1&&$wday<=5) ? 6 : $wday; # ggf. Samstag
+        } elsif ($day==8) {
+            $dayOfEchteZeit = ($wday==0||$wday==6) ? 1 : $wday; # ggf. Montag
         }
-        $dayOfEchteZeit = ($wday>=1&&$wday<=5) ? 6 : $wday  if ($day==7); # ggf. Samstag $wday ~~ [1..5]
-        $dayOfEchteZeit = ($wday==0||$wday==6) ? 1 : $wday  if ($day==8); # ggf. Montag  $wday ~~ [0, 6]
         if (defined $dayOfEchteZeit) { 
           my $echtZeit = _getHHMMSS($hash, $dayOfEchteZeit, $time);
           $hash->{profile}    {$day}{$echtZeit} = $parameter;
           $hash->{profile_IDX}{$day}{$echtZeit} = $idx;
         }
-      };
+      }
     }
   }
 # ---- Zeitpunkte des aktuellen Tages mit EPOCH ermitteln --------------
@@ -427,17 +426,22 @@ sub _SwitchingTime {
 
   my ($daylist, $time, $timeString, $para);
   my @st = split m{\|}xms, $switchingtime;
-  my $overrulewday = 0;
+  my $overrulewday;
   if ( @st == 2 || @st == 3 && $st[2] eq 'w') {
     $daylist = ($globalDaylistSpec ne '') ? $globalDaylistSpec : '0123456';
     $time    = $st[0];
     $para    = $st[1];
-    $overrulewday = 1 if defined $st[2] && $st[2] eq 'w';
+    $overrulewday = 'w' if defined $st[2] && $st[2] eq 'w';
   } elsif ( @st == 3 || @st == 4) {
     $daylist  = $st[0];
     $time     = $st[1];
     $para     = $st[2];
-    $overrulewday = 1 if defined $st[3] && $st[3] eq 'w' || $st[0] == 8;
+    if ( defined $st[3] && $st[3] eq 'w' ) {
+        $overrulewday = 'w'; 
+    } elsif ($st[0] =~ m{8}x ) {
+        $overrulewday = $daylist;
+        $overrulewday =~ s{8}{}x;# was: $st[0] == 8; might be: $st[0] eq '8'?!?
+    }
   }
 
   my @tage = @{_daylistAsArray($hash, $daylist)};
@@ -529,7 +533,7 @@ sub _getHHMMSS {
 
   # Zeitangabe verarbeiten.
   $time = qq{"$time"} if $time !~  m{\A\{.*\}\z}xms;
-  my $date           = $now+($d-$wday)*DAYSECONDS;
+  my $date           = $now+abs($d-$wday)*DAYSECONDS;
   my $timeString     = '{ my $date='."$date;" .$time."}";
   my $eTimeString    = AnalyzePerlCommand( $hash, $timeString );                            # must deliver HH:MM[:SS]
 
