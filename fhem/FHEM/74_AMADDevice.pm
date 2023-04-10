@@ -56,6 +56,7 @@ use GPUtils qw(GP_Import GP_Export);
 
 main::LoadModule('AMADCommBridge');
 
+
 my $missingModul = '';
 eval "use Encode qw(encode encode_utf8);1" or $missingModul .= 'Encode ';
 
@@ -793,7 +794,7 @@ sub Set($$@) {
 
         $path .=
             'openURL?url='
-          . $openurl
+          . urlEncode($openurl)
           . '&browserapp='
           . $bapp
           . '&browserappclass='

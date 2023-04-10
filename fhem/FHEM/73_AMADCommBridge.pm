@@ -945,6 +945,9 @@ qx(cat $fhempath/FHEM/lib/74_AMADautomagicFlowset_$flowsetversion.xml);
 
         Log3( $name, 4, "AMADCommBridge ($name) - No PARTIAL buffer" );
     }
+    
+    return
+      if ( !defined($json) );
 
     Log3( $name, 5, "AMADCommBridge ($name) - Incoming data: " . $json );
 
@@ -1462,7 +1465,7 @@ sub ParseMsg($$) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v4.4.3",
+  "version": "v4.4.4",
   "x_flowsetversion": "4.4.3",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"

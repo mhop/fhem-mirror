@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix: 74_AMADDevice: much more bugfixes
  - change: Update Synology lib modules
  - bugfix: 72_FRITZBOX: Fehlerkorrekturen: u.a. Verhalten bei disable
                feature: attr nonblockingTimeOut <50|75|100|125>
