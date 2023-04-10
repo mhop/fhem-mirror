@@ -106,7 +106,7 @@ upd_metainit($)
        Log 1, $msg;
        return $msg;
      }
-     print FH "http://fhem.de/fhemupdate/controls_fhem.txt\n";
+     print FH "https://fhem.de/fhemupdate/controls_fhem.txt\n";
      close(FH);
   }
   return undef;
