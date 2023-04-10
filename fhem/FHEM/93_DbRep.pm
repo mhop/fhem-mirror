@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.52.4"  => "10.04.2023  fix perl warning ",
   "8.52.3"  => "04.04.2023  fix diffValue writeToDB: https://forum.fhem.de/index.php?topic=53584.msg1270905#msg1270905 ",
   "8.52.2"  => "28.03.2023  diffValue can operate positive and negative differences, sqlCmd can execute 'describe' statement ",
   "8.52.1"  => "19.03.2023  fix Perl Warnings ",
@@ -4781,7 +4782,7 @@ sub DbRep_diffvalDone {
   my $reading    = $a[4];
   my $bt         = $a[5];
   my $rowsrej    = $a[6] ? decode_base64($a[6]) : '';                                  # String von Datensätzen die nicht berücksichtigt wurden (diff Schwellenwert Überschreitung)
-  my $ncpslist   = $a[6] ? decode_base64($a[7]) : '';                                  # Hash von Perioden die nicht kalkuliert werden konnten "no calc in period"
+  my $ncpslist   = $a[7] ? decode_base64($a[7]) : '';                                  # Hash von Perioden die nicht kalkuliert werden konnten "no calc in period"
   my $irowdone   = $a[8];
 
   my $hash          = $defs{$name};
