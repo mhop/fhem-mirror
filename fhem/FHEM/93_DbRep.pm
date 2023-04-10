@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.52.5"  => "10.04.2023  change diffValue, Forum: https://forum.fhem.de/index.php?msg=1271853 ",
   "8.52.4"  => "10.04.2023  fix perl warning ",
   "8.52.3"  => "04.04.2023  fix diffValue writeToDB: https://forum.fhem.de/index.php?topic=53584.msg1270905#msg1270905 ",
   "8.52.2"  => "28.03.2023  diffValue can operate positive and negative differences, sqlCmd can execute 'describe' statement ",
@@ -4539,7 +4540,7 @@ sub DbRep_diffval {
   my $st = [gettimeofday];                                                              # SQL-Startzeit
 
   for my $row (@ts) {                                                                   # DB-Abfrage zeilenweise für jeden Array-Eintrag
-      my @a                     = split("#", $row);
+      my @a                     = split "#", $row;
       my $runtime_string        = $a[0];
       my $runtime_string_first  = $a[1];
       my $runtime_string_next   = $a[2];
@@ -4617,8 +4618,9 @@ sub DbRep_diffval {
               @array  = ($runtime_string." ".$rsf[0]."_".$rsf[1]."-".$rsf[2]."\n");
           }
           else {
-              my @rsf = split " ", $runtime_string_first;
-              @array  = ($runtime_string." ".$rsf[0]."\n");
+              my $rsfe = encode_base64((split " ", $runtime_string_first)[0],"");
+              my @rsf  = split " ", $runtime_string_first;
+              @array   = ($rsfe." ".$rsf[0]."\n");
           }
       }
 
@@ -4651,11 +4653,14 @@ sub DbRep_diffval {
       my $runtime_string = decode_base64($a[0]);
       $lastruntimestring = $runtime_string if ($i == 1);
       
-      next if(!$a[2]);
+      if(!$a[2]) {
+          $rh{$runtime_string} = $runtime_string."|-|".$runtime_string;
+          next;
+      }
       
       my $timestamp      = $a[1]."_".$a[2];
-      my $value          = $a[3] ? $a[3]           : 0;
-      my $diff           = $a[4] ? $a[4]           : 0;
+      my $value          = $a[3] ? $a[3] : 0;
+      my $diff           = $a[4] ? $a[4] : 0;
 
       $timestamp         =~ s/\s+$//g;                                                # Leerzeichen am Ende $timestamp entfernen
 
@@ -4740,7 +4745,7 @@ sub DbRep_diffval {
           Log3 ($name, 3, $key) ;
       }
 
-      $ncps     = join('§', %$ncp);
+      $ncps     = join '§', %$ncp;
       $ncpslist = encode_base64($ncps,"");
   }
 
@@ -4749,7 +4754,7 @@ sub DbRep_diffval {
   my $rowsrej;
   $rowsrej = encode_base64 ($rejectstr, "") if($rejectstr);
 
-  my $rows = join('§', %rh);                                                          # Ergebnishash
+  my $rows = join '§', %rh;                                                           # Ergebnishash
 
   my ($wrt,$irowdone);                                                                # Ergebnisse in Datenbank schreiben
 
@@ -13459,7 +13464,7 @@ sub DbRep_OutputWriteToDB {
 
       for my $key (sort(keys(%rh))) {
           my @k  = split "\\|", $rh{$key};
-          $value = defined($k[1]) ? sprintf("%.${ndp}f",$k[1]) : undef;
+          $value = defined($k[1]) && $k[1] ne '-' ? sprintf("%.${ndp}f",$k[1]) : undef;
           $rsf   = $k[2];                                                        # Datum / Zeit für DB-Speicherung
 
           ($date,$time) = split "_", $rsf;
