@@ -395,12 +395,12 @@ attr DEVICE setList \
   warm:noArg $\DEVICETOPIC/set {"brightness": BRIGHTNESS , "color_temp": CTWARMVALUE}\
   white:noArg $\DEVICETOPIC/set {"brightness": BRIGHTNESS, "color_temp": CTWHITEVALUE}\
   rgb:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}\
-  power_on_behavior:on,off $\DEVICETOPIC/set {"power_on_behavior": "$EVTPART1"}
+  power_on_behavior:on,off,toggle,previous $\DEVICETOPIC/set {"power_on_behavior": "$EVTPART1"}
 attr DEVICE userReadings rgb:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_x',0),ReadingsVal($name,'color_y',0),ReadingsVal($name,'brightness',254))}
 attr DEVICE comment The specified ct and brightness values in on and warm etc. commands ​​can be adjusted at any time via the setList attribute
 set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
-setreading DEVICE attrTemplateVersion 20230323
+setreading DEVICE attrTemplateVersion 20230410
 
 # zigbee2mqtt 2 channel dimmer device
 name:zigbee2mqtt_2channel_dimmer_split
