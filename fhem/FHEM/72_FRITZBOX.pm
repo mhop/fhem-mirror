@@ -7399,6 +7399,72 @@ sub FRITZBOX_fritztris($)
       <li><b>retStat_wlanLogExtended</b> - Return Status: set &lt;name&gt; wlanLogExtended &lt;on|off&gt;</li>
    </ul>
    <br>
+   <a name="FRITZBOX Event-Codes"></a>
+   <b>Event-Codes</b>
+   <ul><br>
+      <li><b>11</b> DSL ist verf&uuml;gbar (DSL-Synchronisierung besteht mit n/n kbit/s).</li>
+      <li><b>12</b> DSL-Synchronisierung beginnt (Training).</li>
+      <li><b>14</b> Mobilfunkmodem initialisiert.</li>
+      <li><b>23</b> Internetverbindung wurde getrennt.</li>
+      <li><b>24</b> Internetverbindung wurde erfolgreich hergestellt. IP-Adresse: ..., DNS-Server: ... und ..., Gateway: ..., Breitband-PoP: ..., LineID:...</li>
+      <li><b>25</b> Internetverbindung IPv6 wurde erfolgreich hergestellt. IP-Adresse: ...:...:...:...:...:...:...:...</li>
+      <li><b>26</b> Internetverbindung wurde getrennt.</li>
+      <li><b>27</b> IPv6-Pr&auml;fix wurde erfolgreich bezogen. Neues Pr&auml;fix: ....:....:....:....:/nn</li>
+      <li><b>28</b> Internetverbindung IPv6 wurde getrennt, Pr&auml;fix nicht mehr g&uuml;ltig.</li>
+      <br>
+      <li><b>73</b> Anmeldung der Internetrufnummer <Nummer> war nicht erfolgreich. Ursache: Gegenstelle antwortet nicht. Zeit&uuml;berschreitung.</li>
+      <li><b>85</b> Die Internetverbindung wird kurz unterbrochen, um der Zwangstrennung durch den Anbieter zuvorzukommen.</li>
+      <br>
+     <li><b>119</b> Information des Anbieters &uuml;ber die Geschwindigkeit des Internetzugangs (verf&uuml;gbare Bitrate): nnnn/nnnn kbit/s</li>
+     <li><b>131</b> USB-Ger&auml;t 1003, Klasse 'USB 2.0 (hi-speed) storage', angesteckt</li>
+     <li><b>132</b> USB-Ger&auml;t 1002 abgezogen</li>
+     <li><b>140</b> Der USB-Speicher ZTE-MMCStorage-01 wurde eingebunden.</li>
+     <br>
+     <li><b>201</b> Es liegt keine St&ouml;rung der Telefonie mehr vor. Alle Rufnummern sind ab sofort wieder verf&uuml;gbar.</li>
+     <li><b>205</b> Anmeldung f&uuml;r IP-Telefonieger&auml;t "Telefonie-Ger&auml;t" von IP-Adresse ... nicht erfolgreich.</li>
+     <li><b>267</b> Integrierter Faxempfang wurde aktiviert auf USB-Speicher 'xxx'.</li>
+     <br>
+     <li><b>401</b> SIP_UNAUTHORIZED, Beschreibung steht in der Hilfe (Webinterface)</li>
+     <li><b>403</b> SIP_FORBIDDEN, Beschreibung steht in der Hilfe (Webinterface)</li>
+     <li><b>404</b> SIP_NOT_FOUND, Gegenstelle nicht erreichbar (local part der SIP-URL nicht erreichbar (Host schon))</li>
+     <li><b>405</b> SIP_METHOD_NOT_ALLOWED</li>
+     <li><b>406</b> SIP_NOT_ACCEPTED</li>
+     <li><b>408</b> SIP_NO_ANSWER</li>
+     <br>
+     <li><b>484</b> SIP_ADDRESS_INCOMPLETE, Beschreibung steht in der Hilfe (Webinterface)</li>
+     <li><b>485</b> SIP_AMBIGUOUS, Beschreibung steht in der Hilfe (Webinterface)</li>
+     <br>
+     <li><b>486</b> SIP_BUSY_HERE, Ziel besetzt (vermutlich auch andere Gr&uuml;nde bei der Gegenstelle)</li>
+     <li><b>487</b> SIP_REQUEST_TERMINATED, Anrufversuch beendet (Gegenstelle nahm nach ca. 30 Sek. nicht ab)</li>
+     <br>
+     <li><b>500</b> Anmeldung an der FRITZ!Box-Benutzeroberfl&auml;che von von IP-Adresse ...</li>
+     <li><b>501</b> Anmeldung an der FRITZ!Box-Benutzeroberfl&auml;che von IP-Adresse ... gescheitert (falsches Kennwort).</li>
+     <li><b>503</b> Anmeldung an der FRITZ!Box-Benutzeroberfl&auml;che von IP-Adresse yy gescheitert (ung&uuml;ltige Sitzungskennung). Zur Sicherheit werden</li>
+     <li><b>504</b> Anmeldung des Benutzers FhemUser an der FRITZ!Box-Benutzeroberfl&auml;che von IP-Adresse ...</li>
+     <li><b>505</b> Anmeldung des Benutzers xx an der FRITZ!Box-Benutzeroberfl&auml;che von IP-Adresse yy gescheitert (falsches Kennwort)</li>
+     <li><b>506</b> Anmeldung einer App des Benutzers FhemUser von IP-Adresse</li>
+     <li><b>510</b> Anmeldung einer App mit unbekanntem Anmeldenamen von IP-Adresse ... gescheitert.</li>
+     <br>
+     <li><b>689</b> WLAN-Anmeldung ist gescheitert : Die MAC-Adresse des WLAN-Ger&auml;ts ist gesperrt. MAC-Adresse</li>
+     <li><b>692</b> WLAN-Anmeldung ist gescheitert : Verbindungsaufbau fehlgeschlagen. MAC-Adresse</li>
+     <li><b>705</b> WLAN-Ger&auml;t Anmeldung gescheitert (5 GHz): ung&uuml;ltiger WLAN-Schl&uuml;ssel. MAC-Adresse</li>
+     <li><b>706</b> [...] WLAN-Ger&auml;t Anmeldung am Gastzugang gescheitert (n,n GHz): ung&uuml;ltiger WLAN-Schl&uuml;ssel. MAC-Adresse: nn:nn:nn:nn:nn:nn.</li>
+     <li><b>748</b> [...] WLAN-Ger&auml;t angemeldet (n,n GHz), nn Mbit/s, PC-..., IP ..., MAC ... .</li>
+     <li><b>752</b> [...] WLAN-Ger&auml;t hat sich abgemeldet (n,n GHz), PC-..., IP ..., MAC ....</li>
+     <li><b>754</b> [...] WLAN-Ger&auml;t wurde abgemeldet (.,. GHz), PC-..., IP ..., MAC ... .</li>
+     <li><b>756</b> WLAN-Ger&auml;t hat sich neu angemeldet (n,n GHz), nn Mbit/s, Ger&auml;t, IP ..., MAC ....</li>
+     <li><b>782</b> WLAN-Anmeldung ist gescheitert : Die erneute Anmeldung ist aufgrund aktiver "Unterst&uuml;tzung f&uuml;r gesch&uuml;tzte Anmeldungen von WLAN-Ger&auml;ten (PMF)</li>
+     <br>
+    <li><b>2104</b> Die Systemzeit wurde erfolgreich aktualisiert von Zeitserver nnn.nnn.nnn.nnn .</li>
+
+    <li><b>2364</b> Ein neues Ger&auml;t wurde an der FRITZ!Box angemeldet (Schnurlostelefon)</li>
+    <li><b>2358</b> Einstellungen wurden gesichert. Diese &auml;nderung erfolgte von Ihrem Heimnetzger&auml;t ... (IP-Adresse: ...)</li>
+    <li><b>2380</b> Es besteht keine Verbindung mehr zu den verschl&uuml;sselten DNS-Servern.</li>
+    <li><b>2383</b> Es wurde erfolgreich eine Verbindung - samt vollst&auml;ndiger Validierung - zu den verschl&uuml;sselten DNS-Servern aufgebaut.</li>
+    <li><b>2380</b> Es besteht keine Verbindung mehr zu den verschl&uuml;sselten DNS-Servern.</li>
+    <li><b>3330</b> Verbindung zum Online-Speicher hergestellt.</li>
+   </ul>
+   <br>
 </ul>
 </div>
 
@@ -8008,6 +8074,72 @@ sub FRITZBOX_fritztris($)
       <li><b>retStat_wlanLogExtended</b> - Return Status: set &lt;name&gt; wlanLogExtended &lt;on|off&gt;</li>
    </ul>
    <br>
+   <a name="FRITZBOX Ereignis-Codes"></a>
+   <b>Ereignis-Codes</b>
+   <ul><br>
+      <li><b>11</b> DSL ist verf&uuml;gbar (DSL-Synchronisierung besteht mit n/n kbit/s).</li>
+      <li><b>12</b> DSL-Synchronisierung beginnt (Training).</li>
+      <li><b>14</b> Mobilfunkmodem initialisiert.</li>
+      <li><b>23</b> Internetverbindung wurde getrennt.</li>
+      <li><b>24</b> Internetverbindung wurde erfolgreich hergestellt. IP-Adresse: ..., DNS-Server: ... und ..., Gateway: ..., Breitband-PoP: ..., LineID:...</li>
+      <li><b>25</b> Internetverbindung IPv6 wurde erfolgreich hergestellt. IP-Adresse: ...:...:...:...:...:...:...:...</li>
+      <li><b>26</b> Internetverbindung wurde getrennt.</li>
+      <li><b>27</b> IPv6-Pr&auml;fix wurde erfolgreich bezogen. Neues Pr&auml;fix: ....:....:....:....:/nn</li>
+      <li><b>28</b> Internetverbindung IPv6 wurde getrennt, Pr&auml;fix nicht mehr g&uuml;ltig.</li>
+      <br>
+      <li><b>73</b> Anmeldung der Internetrufnummer <Nummer> war nicht erfolgreich. Ursache: Gegenstelle antwortet nicht. Zeit&uuml;berschreitung.</li>
+      <li><b>85</b> Die Internetverbindung wird kurz unterbrochen, um der Zwangstrennung durch den Anbieter zuvorzukommen.</li>
+      <br>
+     <li><b>119</b> Information des Anbieters &uuml;ber die Geschwindigkeit des Internetzugangs (verf&uuml;gbare Bitrate): nnnn/nnnn kbit/s</li>
+     <li><b>131</b> USB-Ger&auml;t 1003, Klasse 'USB 2.0 (hi-speed) storage', angesteckt</li>
+     <li><b>132</b> USB-Ger&auml;t 1002 abgezogen</li>
+     <li><b>140</b> Der USB-Speicher ZTE-MMCStorage-01 wurde eingebunden.</li>
+     <br>
+     <li><b>201</b> Es liegt keine St&ouml;rung der Telefonie mehr vor. Alle Rufnummern sind ab sofort wieder verf&uuml;gbar.</li>
+     <li><b>205</b> Anmeldung f&uuml;r IP-Telefonieger&auml;t "Telefonie-Ger&auml;t" von IP-Adresse ... nicht erfolgreich.</li>
+     <li><b>267</b> Integrierter Faxempfang wurde aktiviert auf USB-Speicher 'xxx'.</li>
+     <br>
+     <li><b>401</b> SIP_UNAUTHORIZED, Beschreibung steht in der Hilfe (Webinterface)</li>
+     <li><b>403</b> SIP_FORBIDDEN, Beschreibung steht in der Hilfe (Webinterface)</li>
+     <li><b>404</b> SIP_NOT_FOUND, Gegenstelle nicht erreichbar (local part der SIP-URL nicht erreichbar (Host schon))</li>
+     <li><b>405</b> SIP_METHOD_NOT_ALLOWED</li>
+     <li><b>406</b> SIP_NOT_ACCEPTED</li>
+     <li><b>408</b> SIP_NO_ANSWER</li>
+     <br>
+     <li><b>484</b> SIP_ADDRESS_INCOMPLETE, Beschreibung steht in der Hilfe (Webinterface)</li>
+     <li><b>485</b> SIP_AMBIGUOUS, Beschreibung steht in der Hilfe (Webinterface)</li>
+     <br>
+     <li><b>486</b> SIP_BUSY_HERE, Ziel besetzt (vermutlich auch andere Gr&uuml;nde bei der Gegenstelle)</li>
+     <li><b>487</b> SIP_REQUEST_TERMINATED, Anrufversuch beendet (Gegenstelle nahm nach ca. 30 Sek. nicht ab)</li>
+     <br>
+     <li><b>500</b> Anmeldung an der FRITZ!Box-Benutzeroberfl&auml;che von von IP-Adresse ...</li>
+     <li><b>501</b> Anmeldung an der FRITZ!Box-Benutzeroberfl&auml;che von IP-Adresse ... gescheitert (falsches Kennwort).</li>
+     <li><b>503</b> Anmeldung an der FRITZ!Box-Benutzeroberfl&auml;che von IP-Adresse yy gescheitert (ung&uuml;ltige Sitzungskennung). Zur Sicherheit werden</li>
+     <li><b>504</b> Anmeldung des Benutzers FhemUser an der FRITZ!Box-Benutzeroberfl&auml;che von IP-Adresse ...</li>
+     <li><b>505</b> Anmeldung des Benutzers xx an der FRITZ!Box-Benutzeroberfl&auml;che von IP-Adresse yy gescheitert (falsches Kennwort)</li>
+     <li><b>506</b> Anmeldung einer App des Benutzers FhemUser von IP-Adresse</li>
+     <li><b>510</b> Anmeldung einer App mit unbekanntem Anmeldenamen von IP-Adresse ... gescheitert.</li>
+     <br>
+     <li><b>689</b> WLAN-Anmeldung ist gescheitert : Die MAC-Adresse des WLAN-Ger&auml;ts ist gesperrt. MAC-Adresse</li>
+     <li><b>692</b> WLAN-Anmeldung ist gescheitert : Verbindungsaufbau fehlgeschlagen. MAC-Adresse</li>
+     <li><b>705</b> WLAN-Ger&auml;t Anmeldung gescheitert (5 GHz): ung&uuml;ltiger WLAN-Schl&uuml;ssel. MAC-Adresse</li>
+     <li><b>706</b> [...] WLAN-Ger&auml;t Anmeldung am Gastzugang gescheitert (n,n GHz): ung&uuml;ltiger WLAN-Schl&uuml;ssel. MAC-Adresse: nn:nn:nn:nn:nn:nn.</li>
+     <li><b>748</b> [...] WLAN-Ger&auml;t angemeldet (n,n GHz), nn Mbit/s, PC-..., IP ..., MAC ... .</li>
+     <li><b>752</b> [...] WLAN-Ger&auml;t hat sich abgemeldet (n,n GHz), PC-..., IP ..., MAC ....</li>
+     <li><b>754</b> [...] WLAN-Ger&auml;t wurde abgemeldet (.,. GHz), PC-..., IP ..., MAC ... .</li>
+     <li><b>756</b> WLAN-Ger&auml;t hat sich neu angemeldet (n,n GHz), nn Mbit/s, Ger&auml;t, IP ..., MAC ....</li>
+     <li><b>782</b> WLAN-Anmeldung ist gescheitert : Die erneute Anmeldung ist aufgrund aktiver "Unterst&uuml;tzung f&uuml;r gesch&uuml;tzte Anmeldungen von WLAN-Ger&auml;ten (PMF)</li>
+     <br>
+    <li><b>2104</b> Die Systemzeit wurde erfolgreich aktualisiert von Zeitserver nnn.nnn.nnn.nnn .</li>
+
+    <li><b>2364</b> Ein neues Ger&auml;t wurde an der FRITZ!Box angemeldet (Schnurlostelefon)</li>
+    <li><b>2358</b> Einstellungen wurden gesichert. Diese &auml;nderung erfolgte von Ihrem Heimnetzger&auml;t ... (IP-Adresse: ...)</li>
+    <li><b>2380</b> Es besteht keine Verbindung mehr zu den verschl&uuml;sselten DNS-Servern.</li>
+    <li><b>2383</b> Es wurde erfolgreich eine Verbindung - samt vollst&auml;ndiger Validierung - zu den verschl&uuml;sselten DNS-Servern aufgebaut.</li>
+    <li><b>2380</b> Es besteht keine Verbindung mehr zu den verschl&uuml;sselten DNS-Servern.</li>
+    <li><b>3330</b> Verbindung zum Online-Speicher hergestellt.</li>
+   </ul>
+   <br>
 </ul>
 </div>
 =end html_DE
@@ -8028,60 +8160,6 @@ sub FRITZBOX_fritztris($)
 # VOLSCNT=usbdevices:settings/logvolcnt
 # PARTS=ctlusb:settings/storage-part/count
 # SIP1=sip:settings/sip1/activated
-###############################################################
-# 
-#   23 Internetverbindung wurde getrennt.
-#   24 Internetverbindung wurde erfolgreich hergestellt. IP-Adresse: ..., DNS-Server: ... und ..., Gateway: ..., Breitband-PoP: ..., LineID:...
-#   25 Internetverbindung IPv6 wurde erfolgreich hergestellt. IP-Adresse: ...:...:...:...:...:...:...:...
-#   26 Internetverbindung wurde getrennt.
-#   28 Internetverbindung IPv6 wurde getrennt, Präfix nicht mehr gültig.
-#
-#   73 Anmeldung der Internetrufnummer <Nummer> war nicht erfolgreich. Ursache: Gegenstelle antwortet nicht. Zeitüberschreitung.
-#   85 Die Internetverbindung wird kurz unterbrochen, um der Zwangstrennung durch den Anbieter zuvorzukommen.
-#
-#  119 Information des Anbieters über die Geschwindigkeit des Internetzugangs (verfügbare Bitrate): nnnn/nnnn kbit/s
-#
-#  201 Es liegt keine Störung der Telefonie mehr vor. Alle Rufnummern sind ab sofort wieder verfügbar.
-#  205 Anmeldung für IP-Telefoniegerät "Telefonie-Gerät" von IP-Adresse ... nicht erfolgreich.
-#
-#  401 SIP_UNAUTHORIZED, Beschreibung steht in der Hilfe (Webinterface)
-#  403 SIP_FORBIDDEN, Beschreibung steht in der Hilfe (Webinterface)
-#  404 SIP_NOT_FOUND, Gegenstelle nicht erreichbar (local part der SIP-URL nicht erreichbar (Host schon))
-#  405 SIP_METHOD_NOT_ALLOWED
-#  406 SIP_NOT_ACCEPTED
-#  408 SIP_NO_ANSWER
-# 
-#  484 SIP_ADDRESS_INCOMPLETE, Beschreibung steht in der Hilfe (Webinterface)
-#  485 SIP_AMBIGUOUS, Beschreibung steht in der Hilfe (Webinterface)
-# 
-#  486 SIP_BUSY_HERE, Ziel besetzt (vermutlich auch andere Gründe bei der Gegenstelle)
-#  487 SIP_REQUEST_TERMINATED, Anrufversuch beendet (Gegenstelle nahm nach ca. 30 Sek. nicht ab)
-# 
-#  500 Anmeldung an der FRITZ!Box-Benutzeroberfläche von von IP-Adresse ...
-#  501 Anmeldung an der FRITZ!Box-Benutzeroberfläche von IP-Adresse ... gescheitert (falsches Kennwort).
-#  503 Anmeldung an der FRITZ!Box-Benutzeroberfläche von IP-Adresse yy gescheitert (ungültige Sitzungskennung). Zur Sicherheit werden
-#  504 Anmeldung des Benutzers FhemUser an der FRITZ!Box-Benutzeroberfläche von IP-Adresse ...
-#  505 Anmeldung des Benutzers xx an der FRITZ!Box-Benutzeroberfläche von IP-Adresse yy gescheitert (falsches Kennwort)
-#  506 Anmeldung einer App des Benutzers FhemUser von IP-Adresse
-#  510 Anmeldung einer App mit unbekanntem Anmeldenamen von IP-Adresse ... gescheitert.
-#
-#  689 WLAN-Anmeldung ist gescheitert : Die MAC-Adresse des WLAN-Geräts ist gesperrt. MAC-Adresse
-#  692 WLAN-Anmeldung ist gescheitert : Verbindungsaufbau fehlgeschlagen. MAC-Adresse
-#  705 WLAN-Gerät Anmeldung gescheitert (5 GHz): ungültiger WLAN-Schlüssel. MAC-Adresse
-#  706 [...] WLAN-Gerät Anmeldung am Gastzugang gescheitert (n,n GHz): ungültiger WLAN-Schlüssel. MAC-Adresse: nn:nn:nn:nn:nn:nn.
-#  748 [...] WLAN-Gerät angemeldet (n,n GHz), nn Mbit/s, PC-..., IP ..., MAC ... .
-#  752 [...] WLAN-Gerät hat sich abgemeldet (n,n GHz), PC-..., IP ..., MAC ....
-#  754 [...] WLAN-Gerät wurde abgemeldet (.,. GHz), PC-..., IP ..., MAC ... .
-#  756 WLAN-Gerät hat sich neu angemeldet (n,n GHz), nn Mbit/s, Gerät, IP ..., MAC ....
-#  782 WLAN-Anmeldung ist gescheitert : Die erneute Anmeldung ist aufgrund aktiver "Unterstützung für geschützte Anmeldungen von WLAN-Geräten (PMF)
-#
-# 2364 Ein neues Gerät wurde an der FRITZ!Box angemeldet (Schnurlostelefon)
-# 2358 Einstellungen wurden gesichert. Diese Änderung erfolgte von Ihrem Heimnetzgerät ... (IP-Adresse: ...)
-# 2380 Es besteht keine Verbindung mehr zu den verschlüsselten DNS-Servern.
-# 2383 Es wurde erfolgreich eine Verbindung - samt vollständiger Validierung - zu den verschlüsselten DNS-Servern aufgebaut.
-# 2380 Es besteht keine Verbindung mehr zu den verschlüsselten DNS-Servern.
-# 3330 Verbindung zum Online-Speicher hergestellt.
-# 
 ###############################################################
 # xhr: 1
 # holdmusic: 0 == Sprache, 1 == Musik
