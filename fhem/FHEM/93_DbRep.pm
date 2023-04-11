@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.52.6"  => "11.04.2023  change diffValue for aggr month ",
   "8.52.5"  => "10.04.2023  change diffValue, Forum: https://forum.fhem.de/index.php?msg=1271853 ",
   "8.52.4"  => "10.04.2023  fix perl warning ",
   "8.52.3"  => "04.04.2023  fix diffValue writeToDB: https://forum.fhem.de/index.php?topic=53584.msg1270905#msg1270905 ",
@@ -4609,7 +4610,11 @@ sub DbRep_diffval {
       if(!@array) {
           my $aval = AttrVal($name, "aggregation", "");
 
-          if($aval eq "hour") {
+          if($aval eq "month") {
+              my @rsf = split /[ -]/, $runtime_string_first;
+              @array  = ($runtime_string." ".$rsf[0]."_".$rsf[1]."\n");
+          }
+          elsif($aval eq "hour") {
               my @rsf = split /[ :]/, $runtime_string_first;
               @array  = ($runtime_string." ".$rsf[0]."_".$rsf[1]."\n");
           }
