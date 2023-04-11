@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.13";
+my $ModulVersion = "07.50.13a";
 my $missingModul = "";
 my $missingModulWeb = "";
 my $missingModulTR064 = "";
@@ -53,19 +53,15 @@ eval "use MIME::Base64;1" or $missingModul .= "MIME::Base64 ";
 eval "use IO::Socket;1" or $missingModul .= "IO::Socket ";
 eval "use Net::Ping;1" or $missingModul .= "Net::Ping ";
 
-
 use FritzBoxUtils; ## only for web access login
 
 #sudo apt-get install libjson-perl
-# eval "use JSON::XS;1" or $missingModulWeb .= "JSON::XS ";
 eval "use JSON;1" or $missingModulWeb .= "JSON ";
-
 eval "use LWP::UserAgent;1" or $missingModulWeb .= "LWP::UserAgent ";
-eval "use URI::Escape;1" or $missingModulTR064 .= "URI::Escape ";
 
+eval "use URI::Escape;1" or $missingModulTR064 .= "URI::Escape ";
 # sudo apt-get install libsoap-lite-perl
 eval "use SOAP::Lite;1" or $missingModulTR064 .= "Soap::Lite ";
-
 eval "use Data::Dumper;1" or $missingModulTR064 .= "Data::Dumper ";
 
 sub FRITZBOX_Log($$$);
@@ -2711,7 +2707,7 @@ sub FRITZBOX_Readout_Run_Web($)
            $devname = $_;
            $device  = $devID{$_};
 
-           FRITZBOX_Log $hash, 5, "DEBUG: fd-Dev: $devname $device";
+           FRITZBOX_Log $hash, 5, "DEBUG: fd-Dev: $device $devname";
 
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$dectFonID{$devname}."_device", $device if $dectFonID{$devname};
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fon".$fonFonID{$devname}."_device", $device if $fonFonID{$devname};
@@ -3613,7 +3609,7 @@ sub FRITZBOX_Readout_Add_Reading ($$$$@)
    $rFormat = "" unless defined $rFormat;
    $rValue = FRITZBOX_Readout_Format ($hash, $rFormat, $rValue);
 
-   $rValue = (grep { /^($rName)$/ } @reading_list) ? "" : $rValue;
+   $rValue = (grep { /^($rName)$/ } @reading_list) ? "" : $rValue if ($rName !~ /->/);
 
    push @{$roReadings}, $rName . "|" . $rValue ;
 
@@ -5392,7 +5388,7 @@ sub FRITZBOX_Web_OpenCon ($)
       return undef;
    }
 
-   FRITZBOX_Log $hash, 5, "DEBUG: checking HOST -> " . $hash->{DEF};
+   FRITZBOX_Log $hash, 5, "DEBUG: checking HOST -> " . $hash->{DEF} if defined $hash->{DEF};
 
    # my $hash = $defs{$name};
    my $host = $hash->{HOST};
@@ -8072,6 +8068,7 @@ sub FRITZBOX_fritztris($)
 #  689 WLAN-Anmeldung ist gescheitert : Die MAC-Adresse des WLAN-Geräts ist gesperrt. MAC-Adresse
 #  692 WLAN-Anmeldung ist gescheitert : Verbindungsaufbau fehlgeschlagen. MAC-Adresse
 #  705 WLAN-Gerät Anmeldung gescheitert (5 GHz): ungültiger WLAN-Schlüssel. MAC-Adresse
+#  706 [...] WLAN-Gerät Anmeldung am Gastzugang gescheitert (n,n GHz): ungültiger WLAN-Schlüssel. MAC-Adresse: nn:nn:nn:nn:nn:nn.
 #  748 [...] WLAN-Gerät angemeldet (n,n GHz), nn Mbit/s, PC-..., IP ..., MAC ... .
 #  752 [...] WLAN-Gerät hat sich abgemeldet (n,n GHz), PC-..., IP ..., MAC ....
 #  754 [...] WLAN-Gerät wurde abgemeldet (.,. GHz), PC-..., IP ..., MAC ... .
