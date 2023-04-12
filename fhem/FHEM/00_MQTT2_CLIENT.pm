@@ -54,6 +54,7 @@ MQTT2_CLIENT_Initialize($)
     msgAfterConnect
     msgBeforeDisconnect
     mqttVersion:3.1.1,3.1
+    nextOpenDelay
     privacy:0,1
     qosMaxQueueLength
     rawEvents
@@ -118,21 +119,21 @@ MQTT2_CLIENT_connect($;$)
     return;
   }
 
-  my $cfn = AttrVal($hash->{NAME}, "connectFn", undef); # for AWS-IOT / auth
+  my $cfn = AttrVal($me, "connectFn", undef); # for AWS-IOT / auth
   if($cfn) {
     if($calledFromConnectFn) {
       delete($hash->{inConnectFn});
     } else {
       return if($hash->{inConnectFn}); # called by readyFn
       $hash->{inConnectFn} = 1;
-      $cfn = EvalSpecials($cfn, ("%NAME" => $hash->{NAME}));
+      $cfn = EvalSpecials($cfn, ("%NAME" => $me));
       return AnalyzeCommand(undef, $cfn);
     }
   }
 
   my $disco = (DevIo_getState($hash) eq "disconnected");
   $hash->{connecting} = 1 if($disco && !$hash->{connecting});
-  $hash->{nextOpenDelay} = 10;
+  $hash->{nextOpenDelay} = AttrVal($me, "nextOpenDelay", 10);
   $hash->{BUF}="";
   if($hash->{DeviceName} =~ m/^wss?:/) {
     $hash->{binary} = 1;
@@ -983,6 +984,14 @@ MQTT2_CLIENT_feedTheList($$$;$)
     <a id="MQTT2_CLIENT-attr-mqttVersion"></a>
     <li>mqttVersion 3.1,3.1.1<br>
       set the MQTT protocol version in the CONNECT header, default is 3.1
+      </li></br>
+
+    <a id="MQTT2_CLIENT-attr-nextOpenDelay"></a>
+    <li>nextOpenDelay &lt;sec&gt;<br>
+      if the server is unavailable or after it terminates the connection,
+      MQTT2_CLIENT tries to reconnect every "nextOpenDelay" seconds. The
+      default is 10, but this is too short in some cases, especially if a
+      failed reconnect is problematic (see maxFailedConnects).
       </li></br>
 
     <a id="MQTT2_CLIENT-attr-msgAfterConnect"></a>
