@@ -231,7 +231,8 @@ Landroid_connect4($)
 
   my $a = $attr{$m2c_name};
   $a->{keepaliveTimeout} = 600;
-  $a->{maxFailedConnects} = 1;
+  $a->{maxFailedConnects} = 20;
+  $a->{nextOpenDelay} = 180;
   MQTT2_CLIENT_Disco($m2c, 1); # Make sure reconnect will work
   MQTT2_CLIENT_connect($m2c, 1);
 }
