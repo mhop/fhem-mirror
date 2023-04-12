@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix: 72_FRITZBOX: TR-064 Problem (topic=133142.0)
  - bugfix: 72_FRITZBOX: Fehler in Evaluierung RegEx
  - change: 93_DbRep: diffValue Forum: forum.fhem.de/index.php?msg=1271853 
  - bugfix: 98_WeekdayTimer: sunday handling in special cases
