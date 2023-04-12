@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.13a";
+my $ModulVersion = "07.50.13b";
 my $missingModul = "";
 my $missingModulWeb = "";
 my $missingModulTR064 = "";
@@ -5163,7 +5163,7 @@ sub FRITZBOX_TR064_Cmd($$$)
 
       my $logMsg = "service='$service', control='$control', action='$action'";
    # Prepare action parameter
-      foreach (keys %params) {
+      foreach (sort keys %params) {
          $logMsg .= ", parameter".(int(@soapParams)+1)."='$_' => '$params{$_}'" ;
          push @soapParams, SOAP::Data->name( $_ => $params{$_} );
       }
