@@ -190,7 +190,8 @@ Landroid_connect3($)
           if($readingName eq "mqtt_topics_command_out") {
             push @subs, $val;
             $attr{$m2d->{NAME}}{readingList}="$val:.* {json2nameValue(\$EVENT)}"
-              if(!$attr{$m2d->{NAME}}{readingList} && $m2c->{autocreate});
+              if($m2c->{autocreate} &&
+                 !AttrVal($m2d->{NAME}, "readingList", undef));
           }
           $m2c->{mqttEndpoint} = $val if($readingName eq "mqtt_endpoint");
         }
@@ -230,9 +231,9 @@ Landroid_connect4($)
   $m2c->{clientId} = "$prefix/USER/$m2c->{userId}/FHEM/$wxid";
 
   my $a = $attr{$m2c_name};
-  $a->{keepaliveTimeout} = 600;
-  $a->{maxFailedConnects} = 20;
-  $a->{nextOpenDelay} = 180;
+  $a->{keepaliveTimeout}  = 600 if(!AttrVal($m2c_name, "keepaliveTimeout",0));
+  $a->{maxFailedConnects} =  20 if(!AttrVal($m2c_name, "maxFailedConnects", 0));
+  $a->{nextOpenDelay}     = 180 if(!AttrVal($m2c_name, "nextOpenDelay", 0));
   MQTT2_CLIENT_Disco($m2c, 1); # Make sure reconnect will work
   MQTT2_CLIENT_connect($m2c, 1);
 }
