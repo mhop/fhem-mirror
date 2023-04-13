@@ -231,9 +231,12 @@ Landroid_connect4($)
   $m2c->{clientId} = "$prefix/USER/$m2c->{userId}/FHEM/$wxid";
 
   my $a = $attr{$m2c_name};
-  $a->{keepaliveTimeout}  = 600 if(!AttrVal($m2c_name, "keepaliveTimeout",0));
-  $a->{maxFailedConnects} =  20 if(!AttrVal($m2c_name, "maxFailedConnects", 0));
-  $a->{nextOpenDelay}     = 180 if(!AttrVal($m2c_name, "nextOpenDelay", 0));
+  $a->{keepaliveTimeout} = 600
+        if(!defined(AttrVal($m2c_name, "keepaliveTimeout", undef)));
+  $a->{maxFailedConnects} =  20
+        if(!defined(AttrVal($m2c_name, "maxFailedConnects", undef)));
+  $a->{nextOpenDelay} = 180
+        if(!defined(AttrVal($m2c_name, "nextOpenDelay", undef)));
   MQTT2_CLIENT_Disco($m2c, 1); # Make sure reconnect will work
   MQTT2_CLIENT_connect($m2c, 1);
 }
