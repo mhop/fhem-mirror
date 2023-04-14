@@ -201,7 +201,7 @@ function AutomowerConnectUpdateDetail (dev, type, imgsrc, picx, picy, csx, csy, 
 
       if ( pos.length > 4 ) {
         // draw mowing path
-        var mowpos = pos.slice(4);
+        var mowpos = pos.slice(2);
         AutomowerConnectDrawPath ( ctx, div, mowpos, 'mowingPath' );
 
         // draw start

@@ -177,8 +177,6 @@ sub Notify {
 
     my $storediff = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
     if ($storediff) {
-      # collect timestamps for analysis
-      unshift ( @{ $hash->{helper}{timestamps} }, $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} );
 
       ::FHEM::Devices::AMConnect::Common::AlignArray( $hash );
       ::FHEM::Devices::AMConnect::Common::FW_detailFn_Update ($hash) if (AttrVal($name,'showMap',1));
@@ -255,6 +253,10 @@ sub Notify {
               $hash->{helper}{statistics}{lastWeekArea} = $hash->{helper}{statistics}{currentWeekArea};
               $hash->{helper}{statistics}{currentWeekTrack} = 0;
               $hash->{helper}{statistics}{currentWeekArea} = 0;
+
+              #clear position arrays
+              $hash->{helper}{areapos} = [];
+              $hash->{helper}{otherpos} = [];
 
         }
       }
@@ -663,7 +665,14 @@ __END__
 
     <li><a id='AutomowerConnectDevice-attr-mapDesignAttributes'>mapDesignAttributes</a><br>
       <code>attr &lt;name&gt; mapDesignAttributes &lt;complete list of design-attributes&gt;</code><br>
-      Load the list of attributes by <code>set &lt;name&gt; defaultDesignAttributesToAttribute</code> to change its values</li>
+      Load the list of attributes by <code>set &lt;name&gt; defaultDesignAttributesToAttribute</code> to change its values. Some default values are 
+      <ul>
+        <li>mower path (activity MOWING): red</li>
+        <li>path in CS (activity CHARGING,PARKED_IN_CS): grey</li>
+        <li>path for interval with error (all activities with error): kind of magenta</li>
+        <li>all other activities: green</li>
+      </ul>
+    </li>
 
     <li><a id='AutomowerConnectDevice-attr-mapImageCoordinatesToRegister'>mapImageCoordinatesToRegister</a><br>
       <code>attr &lt;name&gt; mapImageCoordinatesToRegister &lt;upper left longitude&gt;&lt;space&gt;&lt;upper left latitude&gt;&lt;line feed&gt;&lt;lower right longitude&gt;&lt;space&gt;&lt;lower right latitude&gt;</code><br>
@@ -706,7 +715,9 @@ __END__
 
     <li><a id='AutomowerConnectDevice-attr-numberOfWayPointsToDisplay'>numberOfWayPointsToDisplay</a><br>
       <code>attr &lt;name&gt; numberOfWayPointsToDisplay &lt;number of way points&gt;</code><br>
-      Set the number of way points stored and displayed, default 500</li>
+      Set the number of way points stored and displayed, default 5000.
+      While in activity MOWING every 30 s a geo data set is generated.
+      While in activity PARKED_IN_CS/CHARGING every 42 min a geo data set is generated.</li>
 
      <li><a id='AutomowerConnectDevice-attr-scaleToMeterXY'>scaleToMeterXY</a><br>
       <code>attr &lt;name&gt; scaleToMeterXY &lt;scale factor longitude&gt;&lt;seperator&gt;&lt;scale factor latitude&gt;</code><br>
@@ -902,7 +913,14 @@ __END__
 
     <li><a id='AutomowerConnectDevice-attr-mapDesignAttributes'>mapDesignAttributes</a><br>
       <code>attr &lt;name&gt; mapDesignAttributes &lt;complete list of design-attributes&gt;</code><br>
-      Lade die Attributliste mit <code>set &lt;name&gt; defaultDesignAttributesToAttribute</code> um die Werte zu ändern.</li>
+      Lade die Attributliste mit <code>set &lt;name&gt; defaultDesignAttributesToAttribute</code> um die Werte zu ändern. Einige Vorgabewerte:
+      <ul>
+        <li>Pfad beim mähen (Aktivität MOWING): rot</li>
+        <li>In der Ladestation (Aktivität CHARGING,PARKED_IN_CS): grau</li>
+        <li>Pfad eines Intervalls mit Fehler (alle Aktivitäten with error): Eine Art Magenta</li>
+        <li>Pfad aller anderen Aktivitäten: grün</li>
+      </ul>
+    </li>
 
     <li><a id='AutomowerConnectDevice-attr-mapImageCoordinatesToRegister'>mapImageCoordinatesToRegister</a><br>
       <code>attr &lt;name&gt; mapImageCoordinatesToRegister &lt;upper left longitude&gt;&lt;space&gt;&lt;upper left latitude&gt;&lt;line feed&gt;&lt;lower right longitude&gt;&lt;space&gt;&lt;lower right latitude&gt;</code><br>
@@ -948,7 +966,8 @@ __END__
 
     <li><a id='AutomowerConnectDevice-attr-numberOfWayPointsToDisplay'>numberOfWayPointsToDisplay</a><br>
       <code>attr &lt;name&gt; numberOfWayPointsToDisplay &lt;number of way points&gt;</code><br>
-      Legt die Anzahl der gespeicherten und anzuzeigenden Wegpunkte fest, default 500</li>
+      Legt die Anzahl der gespeicherten und anzuzeigenden Wegpunkte fest, default 5000.
+      Während der Aktivität MOWING wird ca. alle 30 s und während PARKED_IN_CS/CHARGING wird alle 42 min ein Geodatensatz erzeugt.</li>
 
      <li><a id='AutomowerConnectDevice-attr-scaleToMeterXY'>scaleToMeterXY</a><br>
       <code>attr &lt;name&gt; scaleToMeterXY &lt;scale factor longitude&gt;&lt;seperator&gt;&lt;scale factor latitude&gt;</code><br>
