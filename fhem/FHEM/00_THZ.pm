@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 12/2022
-my $thzversion = "0.206";
+# by immi 04/2023
+my $thzversion = "0.207";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -1213,7 +1213,7 @@ sub THZ_Set($@){
     }
     elsif ($cmdhash->{type} =~ /7prog|8party/) {          
         ($arg, $arg1)=split('--', $arg);
-        return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if (($arg ne "n.a.") and ($arg1 ne "n.a.") and (($arg !~ /^(?:\d|[01]\d|2[0-3]):[0-5]\d$/ )  or ($arg1 !~ /^(?:\d|[01]\d|2[0-3]):[0-5]\d$/ )) ) ;
+        return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if (($arg ne "n.a.") and ($arg1 ne "n.a.") and (($arg !~ /^(?:\d|[01]\d|2[0-3]):[0-5]\d$/ )  or ($arg1 !~ /^24:00|(?:\d|[01]\d|2[0-3]):[0-5]\d$/ )) ) ;
     }
     elsif ($cmdhash->{type} eq "2opmode") {
         $arg1=undef;
