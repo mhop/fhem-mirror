@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 7x_AutomowerConnect(Device): add attribute to determine
+            the days of a week when the way point stack will be reset
  - bugfix: AutomowerConnectFamily:minor fixes and changes in cref
  - bugfix: 72_FRITZBOX: kleinere Korrekturen
  - bugfix: 72_FRITZBOX: TR-064 Problem (topic=133142.0)

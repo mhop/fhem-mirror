@@ -114,6 +114,7 @@ sub Initialize() {
                         "mowingAreaLimits:textField-long " .
                         "propertyLimits:textField-long " .
                         "numberOfWayPointsToDisplay " .
+                        "weekdaysToResetWayPoints " .
                         $readingFnAttributes;
 
   return undef;
@@ -240,25 +241,30 @@ sub Notify {
       # do at midnight
       if ( $secs <= $interval ) {
 
-            $hash->{helper}{statistics}{lastDayTrack} = $hash->{helper}{statistics}{currentDayTrack};
-            $hash->{helper}{statistics}{lastDayArea} = $hash->{helper}{statistics}{currentDayArea};
-            $hash->{helper}{statistics}{currentWeekTrack} += $hash->{helper}{statistics}{currentDayTrack};
-            $hash->{helper}{statistics}{currentWeekArea} += $hash->{helper}{statistics}{currentDayArea};
-            $hash->{helper}{statistics}{currentDayTrack} = 0;
-            $hash->{helper}{statistics}{currentDayArea} = 0;
-            # do on mondays
-            if ( $time[6] == 1 ) {
+        $hash->{helper}{statistics}{lastDayTrack} = $hash->{helper}{statistics}{currentDayTrack};
+        $hash->{helper}{statistics}{lastDayArea} = $hash->{helper}{statistics}{currentDayArea};
+        $hash->{helper}{statistics}{currentWeekTrack} += $hash->{helper}{statistics}{currentDayTrack};
+        $hash->{helper}{statistics}{currentWeekArea} += $hash->{helper}{statistics}{currentDayArea};
+        $hash->{helper}{statistics}{currentDayTrack} = 0;
+        $hash->{helper}{statistics}{currentDayArea} = 0;
+        # do on mondays
+        if ( $time[6] == 1 ) {
 
-              $hash->{helper}{statistics}{lastWeekTrack} = $hash->{helper}{statistics}{currentWeekTrack};
-              $hash->{helper}{statistics}{lastWeekArea} = $hash->{helper}{statistics}{currentWeekArea};
-              $hash->{helper}{statistics}{currentWeekTrack} = 0;
-              $hash->{helper}{statistics}{currentWeekArea} = 0;
-
-              #clear position arrays
-              $hash->{helper}{areapos} = [];
-              $hash->{helper}{otherpos} = [];
+          $hash->{helper}{statistics}{lastWeekTrack} = $hash->{helper}{statistics}{currentWeekTrack};
+          $hash->{helper}{statistics}{lastWeekArea} = $hash->{helper}{statistics}{currentWeekArea};
+          $hash->{helper}{statistics}{currentWeekTrack} = 0;
+          $hash->{helper}{statistics}{currentWeekArea} = 0;
 
         }
+
+        #clear position arrays
+        if ( AttrVal( $name, 'weekdaysToResetWayPoints', 1 ) =~ $time[6] ) {
+          
+          $hash->{helper}{areapos} = [];
+          $hash->{helper}{otherpos} = [];
+
+        }
+
       }
     readingsSingleUpdate($hash, 'state', 'connected',1);
 
@@ -389,6 +395,19 @@ sub Attr {
 
     }
 
+  ##########
+  } elsif( $attrName eq "weekdaysToResetWayPoints" ) {
+
+    if( $cmd eq "set" ) {
+
+      return "$iam $attrName is invalid enter a combination of weekday numbers <0123456>" unless( $attrVal =~ /0|1|2|3|4|5|6/ );
+      Log3 $name, 3, "$iam $cmd $attrName $attrVal";
+
+    } elsif( $cmd eq "del" ) {
+
+      Log3 $name, 3, "$iam $cmd $attrName and set default to 1";
+
+    }
   ##########
   } elsif ( $attrName eq 'numberOfWayPointsToDisplay' ) {
     
@@ -718,6 +737,14 @@ __END__
       Set the number of way points stored and displayed, default 5000.
       While in activity MOWING every 30 s a geo data set is generated.
       While in activity PARKED_IN_CS/CHARGING every 42 min a geo data set is generated.</li>
+
+    <li><a id='AutomowerConnect-attr-weekdaysToResetWayPoints'>weekdaysToResetWayPoints</a><br>
+      <code>attr &lt;name&gt; weekdaysToResetWayPoints &lt;any combination of weekday numbers from 0123456&gt;</code><br>
+      A combination of weekday numbers when the way point stack will be reset, default 1.</li>
+
+    <li><a id='AutomowerConnect-attr-weekdaysToResetWayPoints'>weekdaysToResetWayPoints</a><br>
+      <code>attr &lt;name&gt; weekdaysToResetWayPoints &lt;any combination of weekday numbers from 0123456&gt;</code><br>
+      Eine Kombination von Wochentagnummern an denen der Wegpunktspeicher gelöscht wird, default 1.</li>
 
      <li><a id='AutomowerConnectDevice-attr-scaleToMeterXY'>scaleToMeterXY</a><br>
       <code>attr &lt;name&gt; scaleToMeterXY &lt;scale factor longitude&gt;&lt;seperator&gt;&lt;scale factor latitude&gt;</code><br>
