@@ -207,7 +207,8 @@ sub JsonMod_Attr {
 sub JsonMod_ReadPvtConfig {
 	my ($hash) = @_;
 
-	my sub clean {
+	# my sub clean {
+	local *clean = sub {
 		$hash->{'CONFIG'}->{'SECRET'} = {};
 		return;
 	};
@@ -247,6 +248,7 @@ sub JsonMod_DoReadings {
 	my ($hash, $data) = @_;
 	my $name = $hash->{'NAME'};
 
+	JsonMod_Logger($hash, 5, 'start JsonPath');
 	my $path = JsonMod::JSON::Path->new($data);
 
 	my $newReadings = {};
@@ -255,9 +257,13 @@ sub JsonMod_DoReadings {
 		$oldReadings->{$key} = 0;
 	};
 
+	# lexical subs are supected to cause segv under rare conditions, see forum #133135
+	# changed to localized globs
+
 	# sanitize reading names to comply with fhem naming conventions
 	# (allowed chars: A-Za-z/\d_\.-)
-	my sub sanitizedSetReading {
+	# my sub sanitizedSetReading {
+	local *sanitizedSetReading = sub {
 		my ($r, $v) = @_;
 
 		# convert into valid reading
@@ -280,7 +286,8 @@ sub JsonMod_DoReadings {
 		#printf "1 %s %s %s %s\n", $r, length($r), $v, length($v);
 	};
 
-	my sub concat {
+	# my sub concat {
+	local *concat = sub {
 		my @args = @_;
 		my $result = '';
 		foreach my $arg (@args) {
@@ -315,7 +322,8 @@ sub JsonMod_DoReadings {
 
 		# control warnings, required in multi()
 		my $warnings = 1;
-		my sub logWarnings {
+		# my sub logWarnings {
+		local *logWarnings = sub {
 			return unless ($warnings);
 			my ($msg) = @_;
 			$msg =~ s/at \(eval.*$//;
@@ -324,7 +332,8 @@ sub JsonMod_DoReadings {
 
 		if ($cmd eq 'single') {
 
-			my sub jsonPath {
+			# my sub jsonPath {
+			local *jsonPath = sub {
 				my ($propertyPath) = @_;
 				my $presult = $path->get($propertyPath)->getResultValue();
 				
@@ -338,7 +347,8 @@ sub JsonMod_DoReadings {
 				return undef;
 			};
 
-			my sub jsonPathf {
+			# my sub jsonPathf {
+			local *jsonPathf = sub {
 				my ($propertyPath, $format) = @_;
 				$format //= '%s';
 				my $presult = jsonPath($propertyPath);
@@ -348,7 +358,8 @@ sub JsonMod_DoReadings {
 				return undef;
 			};
 
-			my sub s1 {
+			# my sub s1 {
+			local *s1 = sub {
 				my ($readingValue, $readingName, $default) = @_;
 				$readingValue //= $default;
 				die ('missing reading name') unless ($readingName);
@@ -374,21 +385,23 @@ sub JsonMod_DoReadings {
 			my $resultObject;
 			my $index = 0;
 
-			my sub count {
+			# my sub count {
+			local *count = sub {
 				return $index;
 			};
 
-			my sub index {
-				my @args = @_;
-				if (scalar @args > 1) {
-					return CORE::index($args[0], $args[1], $args[2]);
-				} else {
-					JsonMod_Logger($hash, 1, 'use of \'index()\' as item counter is depraced in \'%s%s\'. Replace with \'count\'.', $cmd, $args);
-					return $index;
-				};
-			};
+			# my sub index {
+			# 	my @args = @_;
+			# 	if (scalar @args > 1) {
+			# 		return CORE::index($args[0], $args[1], $args[2]);
+			# 	} else {
+			# 		JsonMod_Logger($hash, 1, 'use of \'index()\' as item counter is depraced in \'%s%s\'. Replace with \'count\'.', $cmd, $args);
+			# 		return $index;
+			# 	};
+			# };
 
-			my sub property {
+			# my sub property {
+			local *property = sub {
 				my ($propertyPath, $default) = @_;
 				#$default //= '';
 				return unless (defined($resultObject));
@@ -407,7 +420,8 @@ sub JsonMod_DoReadings {
 				return undef;
 			};
 
-			my sub propertyf {
+			# my sub propertyf {
+			local *propertyf = sub {
 				my ($propertyPath, $default, $format) = @_;
 				$format //= '%s';
 				my $presult = property($propertyPath, $default);
@@ -417,19 +431,22 @@ sub JsonMod_DoReadings {
 				return undef;
 			};
 
-			my sub jsonPath {
+			# my sub jsonPath {
+			local *jsonPath = sub {
 				my ($jsonPathExpression) = @_;
 				$resultSet = $path->get($jsonPathExpression)->getResultValue() unless (defined($resultSet));
 				return $jsonPathExpression;
 			};
 
-			my sub m2 {
+			# my sub m2 {
+			local *m2 = sub {
 				my ($jsonPathExpression, $readingName, $readingValue) = @_;
 				sanitizedSetReading($readingName, $readingValue);
 				$index++;
 			};
 
-			my sub m1 {
+			# my sub m1 {
+			local *m1 = sub {
 				my ($jsonPathExpression, $readingName, $readingValue) = @_;
 
 				$warnings = 1;
@@ -459,7 +476,8 @@ sub JsonMod_DoReadings {
 
 			my $index = 0;
 
-			my sub c1 {
+			# my sub c1 {
+			local *c1 = sub {
 				my ($jsonPathExpression) = @_;
 				$jsonPathExpression //= '$..*';
 
@@ -638,7 +656,8 @@ sub JsonMod_ApiResponse {
 	$hash->{'SOURCE'} = sprintf('%s (%s)', $url, $param->{'code'} //= '');
 	$hash->{'API_LAST_MSG'} = $param->{'code'} //= 'failed';
 
-	my sub doError {
+	# my sub doError {
+	local *doError = sub {
 		my ($msg) = @_;
 		$hash->{'API_LAST_MSG'} = $msg;
 		my $next = Time::HiRes::time() + 600;
@@ -682,15 +701,19 @@ sub JsonMod_ApiResponse {
 		$data = $1;
 	};
 
+	JsonMod_Logger($hash, 5, 'start json decoding');
 	my $rs = JsonMod::JSON::StreamReader->new()->parse($data);
 	if (not $rs or ((ref($rs) ne 'HASH') and ref($rs) ne 'ARRAY')) {
 		return doError('invalid server response');
 	};
+	JsonMod_Logger($hash, 5, 'finished json decoding');
 
 	#use Memory::Usage;
 	#my $mu = Memory::Usage->new();
 	#$mu->record('before');
+	JsonMod_Logger($hash, 5, 'start do readings');
 	JsonMod_DoReadings($hash, $rs);
+	JsonMod_Logger($hash, 5, 'finished do readings');
 	#$mu->record('after');
 	#$mu->dump();
 
@@ -830,10 +853,21 @@ BEGIN {
 	};
 };
 
-
 sub new {
 	my $class = shift;
 	my $self = {};
+	$self->{'ESCAPE'} = {
+		'"'     => '"',
+		'\\'    => '\\',
+		'/'     => '/',
+		'b'     => "\x08",
+		'f'     => "\x0c",
+		'n'     => "\x0a",
+		'r'     => "\x0d",
+		't'     => "\x09",
+		'u2028' => "\x{2028}",
+		'u2029' => "\x{2029}"
+	};
 	bless $self, $class;
 	return $self;
 };
@@ -1308,7 +1342,6 @@ sub getResultNormalized {
 	foreach my $e (@{$self->{'nList'}}) {
 		print "$e\n";
 	};
-
 };
 
 sub getResultValue {
@@ -1698,7 +1731,8 @@ sub listDates {
 
 	#return [] if ($self->{R}++ > 25);
 
-	my sub daysOfMonth {
+	# my sub daysOfMonth {
+	local *daysOfMonth = sub {
 		my ($m, $y) = @_;
 		my (@d) = (0,31,28,31,30,31,30,31,31,30,31,30,31);
 		# leapyear
