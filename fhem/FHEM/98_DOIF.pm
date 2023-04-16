@@ -5379,7 +5379,8 @@ sub plot {
       for (my $j=0; $j < $dim; $j++) {
         my $num;
         if ($numOrig == 1) {
-          if ($j < $period1 or $j == $period1 and defined ${$a}[($i)*$dim+$j]) {
+          ##if ($j < $period1 or $j == $period1 and defined ${$a}[($i)*$dim+$j]) {
+          if (defined ${$a}[($i)*$dim+$j]) {
             $num = 1;
           } else {
             $num = 2;
