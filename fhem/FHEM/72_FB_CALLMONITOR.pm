@@ -2328,6 +2328,7 @@ sub FB_CALLMONITOR_readPassword($;$)
 
    if ($sub !~ /readRemotePhonebookViaTelnet|requestHTTPviaTR064|identifyPhoneBooksViaWeb|readRemotePhonebookViaWeb/) {
      FB_CALLMONITOR_Log $hash, 2, "EMERGENCY: unauthorized call for reading password from: $sub";
+     $hash->{EMERGENCY} = "Unauthorized call for reading password from: [$sub]";
      return undef;
    }
 
