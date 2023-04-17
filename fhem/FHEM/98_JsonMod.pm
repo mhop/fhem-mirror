@@ -671,7 +671,7 @@ sub JsonMod_ApiResponse {
 	};
 
 	my ($content, $encoding);
-	foreach my $header (split /\r\n/, $param->{'httpheader'}) {
+	foreach my $header (split /\r\n/, $param->{'httpheader'} //= '') {
 		last if (($content, $encoding) = $header =~ m/^Content-Type:\s([^;]+).*charset=(.+)/);
 	};
 
