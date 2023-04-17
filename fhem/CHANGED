@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  72_FB_CALLMONITOR: Passwort Sicherheit
  - feature: 7x_AutomowerConnect(Device): add attribute to determine
             the days of a week when the way point stack will be reset
  - bugfix: AutomowerConnectFamily:minor fixes and changes in cref
@@ -22,7 +23,7 @@
                       !! setter deleteOldDaysNbl, reduceLogNbl removed !!
  - change:  10_KNX: syntax check on Attr., internal code improvement 
  - change:  00_KNXIO: rework logging & duplicate msg detection
- - bugfx: 72_FRITZBOX: Fehler bei leerem Ereignislog FB bereinigt
+ - bugfix: 72_FRITZBOX: Fehler bei leerem Ereignislog FB bereinigt
  - feature: 72_FRITZBOX: Neu: box_upnp, box_upnp_control_activated
             box_fon_logNewest
  - feature: 72_FRITZBOX: Neu: get <name> fritzLog <hash | table> <...>
