@@ -40,7 +40,7 @@ use HttpUtils;
 use DevIo;
 use FritzBoxUtils;
 
-my $ModulVersion = "07.50.3a";
+my $ModulVersion = "07.50.3b";
 my %tellows = ();
 my %connection_type = (
      0 => "FON1",
@@ -2319,6 +2319,17 @@ sub FB_CALLMONITOR_readPassword($;$)
 {
     my ($hash, $testPassword) = @_;
     my $name = $hash->{NAME};
+
+   my $xline       = ( caller(0) )[2];
+   my $xsubroutine = ( caller(1) )[3];
+   my $sub         = ( split( ':', $xsubroutine ) )[2];
+   $sub =~ s/FB_CALLMONITOR_//       if ( defined $sub );
+   $sub ||= 'no-subroutine-specified';
+
+   if ($sub !~ /readRemotePhonebookViaTelnet|requestHTTPviaTR064|identifyPhoneBooksViaWeb|readRemotePhonebookViaWeb/) {
+     FB_CALLMONITOR_Log $hash, 2, "EMERGENCY: unauthorized call for reading password from: $sub";
+     return undef;
+   }
 
     my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
     my $key = getUniqueId().$index;
