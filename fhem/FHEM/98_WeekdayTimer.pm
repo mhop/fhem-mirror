@@ -1308,7 +1308,7 @@ sub getDaysAsHash {
 ################################################################################
 sub getDaysAsCondition {
   my $tage         = shift;
-  my $overrulewday = shift // return;
+  my $overrulewday = shift // 0;
 
   my %days     = map {$_ => 1} @{$tage};
 
