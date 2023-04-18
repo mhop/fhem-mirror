@@ -12,6 +12,13 @@ use warnings;
 #   attr m2c connectFn {use LandroidUtils;;Landroid_connect($NAME,"worx",1)}
 #   set m2c password mySecret
 # If the last parameter to Landroid_connect is 1, devices will be autocreated
+# For debugging use "attr m2c verbose 4"
+# 
+# Developer stuff:
+# - access_token is a three-part entity, it is used for HTTP requesting data
+#   or MQTT-Connect, it is valid for 1h
+# - refresh_token is used to get a new access_token, validity period unclear
+# - auth with user/pw should be avoided, unclear why
 
 my %types = (
    worx => {
@@ -45,8 +52,15 @@ sub
 Landroid_connect($$;$)
 {
   my ($m2c_name, $type, $autocreate) = @_;
-  my $errPrefix = "ERROR: Landroid_connect $m2c_name -";
   my $m2c = $defs{$m2c_name}; 
+
+  if($m2c->{NEXT_OPEN} && gettimeofday() < $m2c->{NEXT_OPEN}) {
+    delete($m2c->{inConnectFn});
+    return;
+  }
+  delete($m2c->{NEXT_OPEN});
+
+  my $errPrefix = "ERROR: Landroid_connect $m2c_name -";
   my $usr = AttrVal($m2c_name, "username", "");
   my $pwd = getKeyValue($m2c_name);
 
@@ -56,14 +70,19 @@ Landroid_connect($$;$)
   return Log 1, "$errPrefix unknown type $type" if(!$types{$type});
 
   $m2c->{landroidType} = $type;
-  $m2c->{autocreate} = 1 if($autocreate);
+  $m2c->{autocreate} = $autocreate ? 1 : 0;
   my $t = $types{$type};
-  RemoveInternalTimer("landroidTmr_$m2c_name");
+
+  if(ReadingsVal($m2c_name, ".access_token", undef) &&
+       ReadingsAge($m2c_name, ".access_token", 0) <
+       ReadingsVal($m2c_name, ".expires_in", 0)) {
+    Log3 $m2c, 4, "$m2c_name: reusing the acess_token";
+    return Landroid_connect2($m2c_name);
+  }
 
   my $rt = ReadingsVal($m2c_name, ".refresh_token", undef);
-  my $ra = ReadingsAge($m2c_name, ".refresh_token", 0);
   my $data;
-  if($rt && $ra < 3600) { # refresh
+  if($rt) { # try refresh first
     $data = { grant_type=>"refresh_token", refresh_token=>$rt,
              client_id=>$t->{clientId}, scope=>"*" };
 
@@ -77,20 +96,24 @@ Landroid_connect($$;$)
     timeout=>60,
     callback=> sub($$$){
       my ($h,$e,$d) = @_;
-      return Log3 $m2c, 1, "$errPrefix $e" if($e);
-      return Log3 $m2c, 1, "$errPrefix no data" if(!$d);
+      return Landroid_retry($m2c, "$errPrefix $e") if($e);
+      return Landroid_retry($m2c, "$errPrefix no data") if(!$d);
       Log3 $m2c, 5, $d;
-      $m2c->{".auth"} = json2nameValue($d);
-      return Log3 $m2c, 1, "$errPrefix no access_token / $d"
-        if(!$m2c->{".auth"}{access_token});
-      Log3 $m2c, 4, "$m2c_name: Got auth info, request: ".$data->{grant_type};
-      setReadingsVal($m2c, ".refresh_token",
-                     $m2c->{".auth"}{refresh_token}, TimeNow());
-      InternalTimer(gettimeofday()+3540,
-        sub(){
-          Log3 $m2c, 4, "$m2c_name: requesting new token";
-          Landroid_connect($m2c_name, $type)
-        }, "landroidTmr_$m2c_name", 0);
+      my $auth = json2nameValue($d);
+      if(!$auth->{access_token}) {
+        if($data->{grant_type} eq "refresh_token") {
+          readingsDelete($m2c, ".refresh_token");
+          Log3 $m2c, 4, "$errPrefix refresh_token failed, trying full auth";
+          Landroid_connect($m2c_name, $type, $autocreate);
+        } else {
+          Landroid_retry($m2c, "$errPrefix got no access_token", $d);
+        }
+        return;
+      }
+
+      Log3 $m2c, 4, "$m2c_name: Got auth info, type ".$data->{grant_type};
+      map { setReadingsVal($m2c, ".$_", $auth->{$_}, TimeNow()) }
+            ( "refresh_token", "access_token", "expires_in", "token_type");
       Landroid_connect2($m2c_name);
     },
     header => {
@@ -110,22 +133,31 @@ Landroid_connect2($)
 
   my $errPrefix = "ERROR: Landroid_connect2 $m2c_name -";
   my $t = $types{$m2c->{landroidType}};
-  my $p = $m2c->{".auth"};
 
   HttpUtils_NonblockingGet({
     url => "https://$t->{url}/api/v2/users/me",
     header => { 
       "Accept"=>"application/json",
-      "Authorization"=>"Bearer ".$p->{access_token},
+      "Authorization"=>"Bearer ".ReadingsVal($m2c_name,".access_token","")
     },
     callback=>sub($$$){
       my ($h,$e,$d) = @_;
-      return Log3 $m2c, 1, "$errPrefix $e" if($e);
-      return Log3 $m2c, 1, "$errPrefix no data" if(!$d);
+      return Landroid_retry($m2c, "$errPrefix $e") if($e);
+      return Landroid_retry($m2c, "$errPrefix no data") if(!$d);
       Log3 $m2c, 5, $d;
       my $me = json2nameValue($d);
-      return Log3 $m2c, 1, "$errPrefix no userId"
-        if(!$me->{id});
+      if(!$me->{id}) {
+        if($m2c->{authRetry}) {
+          Landroid_retry($m2c, "$errPrefix no userId after auth retry", $d);
+        } else {
+          $m2c->{authRetry} = 1;
+          readingsDelete($m2c, ".access_token");
+          Log3 $m2c, 4, "$errPrefix no userId, retrying auth / $d";
+          Landroid_connect($m2c_name, $m2c->{landroidType}, $m2c->{autocreate});
+        }
+        return;
+      }
+      delete($m2c->{authRetry});
       Log3 $m2c, 4, "$m2c_name: Got userId: $me->{id}";
       $m2c->{userId} = $me->{id};
       Landroid_connect3($m2c_name);
@@ -139,7 +171,6 @@ Landroid_connect3($)
 {
   my ($m2c_name) = @_;
   my $m2c = $defs{$m2c_name};
-  my $p = $m2c->{".auth"};
   my $t = $types{$m2c->{landroidType}};
   my $errPrefix = "ERROR: Landroid_connect3 $m2c_name -";
 
@@ -147,15 +178,15 @@ Landroid_connect3($)
     url => "https://$t->{url}/api/v2/product-items?status=1",
     header => { 
       "Accept"=>"application/json",
-      "Authorization"=>"Bearer ".$p->{access_token},
+      "Authorization"=>"Bearer ".ReadingsVal($m2c_name,".access_token","")
     },
     callback => sub(){
       my ($h,$e,$d) = @_;
-      return Log3 $m2c, 1, "$errPrefix $e" if($e);
-      return Log3 $m2c, 1, "$errPrefix no data" if(!$d);
+      return Landroid_retry($m2c, "$errPrefix $e") if($e);
+      return Landroid_retry($m2c, "$errPrefix no data") if(!$d);
       Log3 $m2c, 5, $d;
       my $dl = json2nameValue($d); # DeviceList
-      return Log3 $m2c, 1, "$errPrefix no devicelist" if(!$dl);
+      return Landroid_retry($m2c, "$errPrefix no devicelist") if(!$dl);
       Log3 $m2c, 4, "$m2c_name: Got device info";
       my %sn;
       for my $d (keys %defs) {
@@ -174,8 +205,7 @@ Landroid_connect3($)
           my $m2d_name = makeDeviceName($m2c_name."_".$dl->{$i1."_name"});
           DoTrigger("global", "UNDEFINED $m2d_name MQTT2_DEVICE $sn");
           $m2d = $defs{$m2d_name};
-          next if(!$m2d);
-          $attr{$m2d_name}{IODev} = $m2c->{NAME};
+          $attr{$m2d_name}{IODev} = $m2c->{NAME} if($m2d);
         }
 
         for my $key (keys %{$dl}) {
@@ -185,13 +215,16 @@ Landroid_connect3($)
           my $val = $dl->{$key};
           next if(!defined($val));
           $val =~ s,\\/,/,g; # Bug in the backend?
-          setReadingsVal($m2d, $readingName, $val, $now) if($m2c->{autocreate});
-          push @cmds, $val if($readingName eq "mqtt_topics_command_in");
-          if($readingName eq "mqtt_topics_command_out") {
-            push @subs, $val;
-            $attr{$m2d->{NAME}}{readingList}="$val:.* {json2nameValue(\$EVENT)}"
-              if($m2c->{autocreate} &&
-                 !AttrVal($m2d->{NAME}, "readingList", undef));
+          if($m2d) { # autocreate deactivated
+            my $m2d_name = $m2d->{NAME};
+            setReadingsVal($m2d, $readingName,$val,$now) if($m2c->{autocreate});
+            push @cmds, $val if($readingName eq "mqtt_topics_command_in");
+            if($readingName eq "mqtt_topics_command_out") {
+              push @subs, $val;
+              $attr{$m2d_name}{readingList}="$val:.* {json2nameValue(\$EVENT)}"
+                if($m2c->{autocreate} &&
+                   !AttrVal($m2d->{NAME}, "readingList", undef));
+            }
           }
           $m2c->{mqttEndpoint} = $val if($readingName eq "mqtt_endpoint");
         }
@@ -212,7 +245,7 @@ Landroid_connect4($)
   my ($m2c_name) = @_;
   my $m2c = $defs{$m2c_name};
 
-  my $at = $m2c->{".auth"}{access_token};
+  my $at = ReadingsVal($m2c_name, ".access_token", "");
   $at =~ tr,_-,/+,; # base64 url-safe to standard base64 
   my @token = map { urlEncode($_) } split('[.]', $at);
   $m2c->{".usr"} = "FHEM?jwt=$token[0].$token[1]&".
@@ -221,6 +254,7 @@ Landroid_connect4($)
   $m2c->{DeviceName} = "$m2c->{mqttEndpoint}:443";
   $m2c->{sslargs}{SSL_alpn_protocols} = "mqtt";
   $m2c->{SSL} = 1;
+  $m2c->{devioLoglevel} = AttrVal($m2c_name, "verbose", 4);
 
   my $wxid = ReadingsVal($m2c_name, "wxid", undef);
   if(!defined($wxid)) {
@@ -237,8 +271,26 @@ Landroid_connect4($)
         if(!defined(AttrVal($m2c_name, "maxFailedConnects", undef)));
   $a->{nextOpenDelay} = 180
         if(!defined(AttrVal($m2c_name, "nextOpenDelay", undef)));
-  MQTT2_CLIENT_Disco($m2c, 1); # Make sure reconnect will work
+
+  MQTT2_CLIENT_Disco($m2c); # Make sure reconnect will work
+  delete $readyfnlist{"$m2c_name.".$m2c->{DeviceName}};
+  delete $m2c->{DevIoJustClosed};
   MQTT2_CLIENT_connect($m2c, 1);
+}
+
+# Log error, and retry it later, triggered from ReadyFn
+sub
+Landroid_retry($$;$)
+{
+  my ($m2c, $err, $debug) = @_;
+  my $m2c_name = $m2c->{NAME};
+
+  Log3 $m2c, 1, $err;
+  Log3 $m2c, 4, $debug if($debug);
+
+  $m2c->{NEXT_OPEN} = gettimeofday()+AttrVal($m2c_name, "nextOpenDelay", 180);
+  delete($m2c->{inConnectFn});
+  $readyfnlist{"$m2c_name.$m2c->{DeviceName}"} = $m2c;
 }
 
 1;
