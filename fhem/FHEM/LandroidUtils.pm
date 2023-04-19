@@ -49,16 +49,18 @@ my %types = (
 
 # Step 1: check parameters, request & parse the access_token
 sub
-Landroid_connect($$;$)
+Landroid_connect($$;$$)
 {
-  my ($m2c_name, $type, $autocreate) = @_;
+  my ($m2c_name, $type, $autocreate, $noToCheck) = @_;
   my $m2c = $defs{$m2c_name}; 
 
-  if($m2c->{NEXT_OPEN} && gettimeofday() < $m2c->{NEXT_OPEN}) {
+  if(!$noToCheck && $m2c->{".CONNECT_TO"} &&
+     gettimeofday() < $m2c->{".CONNECT_TO"}) {
     delete($m2c->{inConnectFn});
+    $readyfnlist{"$m2c_name.$m2c->{DeviceName}"} = $m2c;
     return;
   }
-  delete($m2c->{NEXT_OPEN});
+  $m2c->{".CONNECT_TO"} = gettimeofday()+AttrVal($m2c_name,"nextOpenDelay",180);
 
   my $errPrefix = "ERROR: Landroid_connect $m2c_name -";
   my $usr = AttrVal($m2c_name, "username", "");
@@ -104,7 +106,7 @@ Landroid_connect($$;$)
         if($data->{grant_type} eq "refresh_token") {
           readingsDelete($m2c, ".refresh_token");
           Log3 $m2c, 4, "$errPrefix refresh_token failed, trying full auth";
-          Landroid_connect($m2c_name, $type, $autocreate);
+          Landroid_connect($m2c_name, $type, $autocreate, 1);
         } else {
           Landroid_retry($m2c, "$errPrefix got no access_token", $d);
         }
@@ -153,7 +155,7 @@ Landroid_connect2($)
           $m2c->{authRetry} = 1;
           readingsDelete($m2c, ".access_token");
           Log3 $m2c, 4, "$errPrefix no userId, retrying auth / $d";
-          Landroid_connect($m2c_name, $m2c->{landroidType}, $m2c->{autocreate});
+          Landroid_connect($m2c_name,$m2c->{landroidType},$m2c->{autocreate},1);
         }
         return;
       }
@@ -207,6 +209,7 @@ Landroid_connect3($)
           $m2d = $defs{$m2d_name};
           $attr{$m2d_name}{IODev} = $m2c->{NAME} if($m2d);
         }
+         my $m2d_name = $m2d ? $m2d->{NAME} : "";
 
         for my $key (keys %{$dl}) {
           next if($key =~ m/^${i1}_(auto_schedule|last_status)/);
@@ -215,16 +218,14 @@ Landroid_connect3($)
           my $val = $dl->{$key};
           next if(!defined($val));
           $val =~ s,\\/,/,g; # Bug in the backend?
-          if($m2d) { # autocreate deactivated
-            my $m2d_name = $m2d->{NAME};
-            setReadingsVal($m2d, $readingName,$val,$now) if($m2c->{autocreate});
-            push @cmds, $val if($readingName eq "mqtt_topics_command_in");
-            if($readingName eq "mqtt_topics_command_out") {
-              push @subs, $val;
-              $attr{$m2d_name}{readingList}="$val:.* {json2nameValue(\$EVENT)}"
-                if($m2c->{autocreate} &&
-                   !AttrVal($m2d->{NAME}, "readingList", undef));
-            }
+          setReadingsVal($m2d, $readingName,$val,$now)
+                if($m2c->{autocreate} && $m2d);
+          push @cmds, $val if($readingName eq "mqtt_topics_command_in");
+          if($readingName eq "mqtt_topics_command_out") {
+            push @subs, $val;
+            $attr{$m2d_name}{readingList}="$val:.* {json2nameValue(\$EVENT)}"
+                if($m2c->{autocreate} && $m2d &&
+                   !AttrVal($m2d_name, "readingList", undef));
           }
           $m2c->{mqttEndpoint} = $val if($readingName eq "mqtt_endpoint");
         }
@@ -283,14 +284,10 @@ sub
 Landroid_retry($$;$)
 {
   my ($m2c, $err, $debug) = @_;
-  my $m2c_name = $m2c->{NAME};
-
   Log3 $m2c, 1, $err;
   Log3 $m2c, 4, $debug if($debug);
-
-  $m2c->{NEXT_OPEN} = gettimeofday()+AttrVal($m2c_name, "nextOpenDelay", 180);
   delete($m2c->{inConnectFn});
-  $readyfnlist{"$m2c_name.$m2c->{DeviceName}"} = $m2c;
+  $readyfnlist{"$m2c->{NAME}.$m2c->{DeviceName}"} = $m2c;
 }
 
 1;
