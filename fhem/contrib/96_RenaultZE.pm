@@ -38,6 +38,7 @@
 
 ############################################################################################################################
 # Version History
+# v 1.08 new KAMERON API key
 # v 1.07 adjusting to new output  format from charges
 # v 1.06 logging "well known error" Failed to forward request to remote service only at log level 5
 # v 1.05 fixed timing problem in update request
@@ -99,7 +100,7 @@ use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
 
-my $RenaultZE_version ="V1.07 / 05.02.2023";
+my $RenaultZE_version ="V1.08 / 19.04.2023";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -158,7 +159,8 @@ sub RenaultZE_Define($$) {
     $hash->{STATE}        = "defined";
     $hash->{GIGYA_API}    = '3_7PLksOyBRkHv126x5WhHb-5pqC1qFR8pQjxSeLB6nhAnPERTUlwnYoznHSxwX668';
     #$hash->{KAMEREON_API} = 'Ae9FDWugRxZQAGm3Sxgk7uJn6Q4CGEA2';
-    $hash->{KAMEREON_API} = 'VAX7XYKGfa92yMvXculCkEFyfZbuM7Ss';
+    #$hash->{KAMEREON_API} = 'VAX7XYKGfa92yMvXculCkEFyfZbuM7Ss';
+    $hash->{KAMEREON_API} = 'YjkKtHmGfaceeuExUDKGxrLZGGvtVS0J';
     $hash->{VERSION}      = $RenaultZE_version;
 
     readingsSingleUpdate($hash,"ze_Gigya_JWT_lastCall","0",1) unless (ReadingsVal($name,"ze_Gigya_JWT_lastCall","empty") ne "empty");
