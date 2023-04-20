@@ -1476,10 +1476,10 @@ sub Pushover_HttpUri ($$;$) {
 
         # replace any URL-encoded \n with their hex equivalent
         # but ignore \\n
-        $v =~ s/(?<!%5c)(%5cn)/%0a/g;
+        $v =~ s/(?<!%5c)(%5cn)/%0a/gi;
 
         # replace any URL-encoded \\n by \n
-        $v =~ s/%5c%5cn/%5cn/g;
+        $v =~ s/%5c%5cn/%5cn/gi;
 
         $uri .= "&" if ($uri);
         $uri .= "$n=$v";
