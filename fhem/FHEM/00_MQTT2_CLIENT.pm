@@ -408,7 +408,7 @@ MQTT2_CLIENT_Attr(@)
     }
   }
 
-  if($attrName eq "disable") {
+  if($attrName eq "disable" && $init_done) {
     if($type eq "set" && $param[0]) {
       MQTT2_CLIENT_Disco($hash,1)
         if(DevIo_getState($hash) ne "disconnected");
