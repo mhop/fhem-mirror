@@ -414,7 +414,7 @@ MQTT2_CLIENT_Attr(@)
         if(DevIo_getState($hash) ne "disconnected");
 
     } else {
-      InternalTimer(0, \&MQTT2_CLIENT_connect, $hash, 1)
+      InternalTimer(0, \&MQTT2_CLIENT_connect, $hash)
         if(DevIo_getState($hash) ne "opened");
     }
   }
