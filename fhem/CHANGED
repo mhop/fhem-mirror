@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix: 72_FRITZBOX: weitere Stabilisierung
+ - feature: 72_FRITZBOX: set <name> reboot
+            Readings für Mobilfunkgeräte als Fall Back
+            attr <name> m3uFileActive <0 | 1>
  - change:  72_FB_CALLMONITOR: Passwort Sicherheit
  - feature: 7x_AutomowerConnect(Device): add attribute to determine
             the days of a week when the way point stack will be reset
