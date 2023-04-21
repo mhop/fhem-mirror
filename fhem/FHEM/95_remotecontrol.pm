@@ -99,6 +99,7 @@ RC_Define()
   my ($hash, $def) = @_;
   $hash->{STATE}       = "initialized";
   $hash->{".htmlCode"} = "";
+  $hash->{".fw_me"} = "";
   return undef;
 }
 
@@ -201,7 +202,9 @@ RC_Get($@)
 
   ## get htmlcode
   if($arg eq "htmlcode") {
-    $hash->{".htmlCode"} = RC_attr2html($name) if ($hash->{".htmlCode"} eq "");
+    $hash->{".htmlCode"} = RC_attr2html($name)
+        if(!$hash->{".htmlCode"} || $FW_ME ne $hash->{".fw_me"});
+    $hash->{".fw_me"} = $FW_ME; # Multi FHEMWEB Support / rko
     return $hash->{".htmlCode"};
   ## get layout
   } elsif ($arg eq "layout") {
@@ -389,6 +392,8 @@ RC_layout_itunes() {
 
 
 =pod
+=item summary    display remotecontrol buttons in FHEMWEB to generate events
+=item summary_DE zeigt eine Fernbedienung in FHEMWEB um Events zu generieren
 =begin html
 
 <a name="remotecontrol"></a>
