@@ -748,7 +748,7 @@ sub FRITZBOX_Set($$@)
 
          if ( $hash->{TR064}==1 ) { #tr064
             readingsSingleUpdate($hash, "box_lastFhemReboot", strftime("%d.%m.%Y %H:%M:%S", localtime(time())), 1 );
-            my @tr064CmdArray = (["DeviceConfig:", "deviceconfig", "Reboot"] );
+            my @tr064CmdArray = (["DeviceConfig:1", "deviceconfig", "Reboot"] );
             FRITZBOX_TR064_Cmd ($hash, 0, \@tr064CmdArray);
          }
          else {
