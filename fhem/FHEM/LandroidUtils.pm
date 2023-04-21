@@ -223,7 +223,8 @@ Landroid_connect3($)
           push @cmds, $val if($readingName eq "mqtt_topics_command_in");
           if($readingName eq "mqtt_topics_command_out") {
             push @subs, $val;
-            $attr{$m2d_name}{readingList}="$val:.* {json2nameValue(\$EVENT)}"
+            CommandAttr(undef,
+                "$m2d_name readingList $val:.* {json2nameValue(\$EVENT)}")
                 if($m2c->{autocreate} && $m2d &&
                    !AttrVal($m2d_name, "readingList", undef));
           }
