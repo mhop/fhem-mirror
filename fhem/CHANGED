@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix: 72_FRITZBOX: Dumper Fehler
  - bugfix: 72_FRITZBOX: weitere Stabilisierung
  - feature: 72_FRITZBOX: set <name> reboot
             Readings für Mobilfunkgeräte als Fall Back
