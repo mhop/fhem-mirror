@@ -5308,7 +5308,8 @@ sub FRITZBOX_SOAP_Test_Request($$$)
    my $hash = $defs{FritzBox};
 
    return Dumper FRITZBOX_SOAP_Request($hash, $control_url, $service_type, $service_command);
-}
+
+} # FRITZBOX_SOAP_Test_Request
 
 # Execute a Command via SOAP Request
 #################################################
@@ -5356,11 +5357,11 @@ EOD
    my $resp_init = $ua->post($init_url, Content_Type => 'text/xml; charset=utf-8', Content => $init_request);
    my $xml_resp = XMLin($resp_init->decoded_content);
 
-   FRITZBOX_Log $hash, 5, "DEBUG: XML_RESONSE:\n" . Dumper $xml_resp;
+#   FRITZBOX_Log $hash, 5, "DEBUG: XML_RESONSE:\n" . Dumper $xml_resp;
 
    return $xml_resp;
 
-} # end of FRITZBOX_TR064_Cmd
+} # FRITZBOX_SOAP_Request
 
 # Execute a Command via TR-064
 #################################################
