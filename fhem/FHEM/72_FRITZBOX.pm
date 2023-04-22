@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.15";
+my $ModulVersion = "07.50.15a";
 my $missingModul = "";
 my $missingModulWeb = "";
 my $missingModulTR064 = "";
