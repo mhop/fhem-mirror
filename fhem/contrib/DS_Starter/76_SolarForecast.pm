@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-02-12 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-04-23 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -134,6 +134,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.75.3" => "23.04.2023  fix Illegal division by zero at ./FHEM/76_SolarForecast.pm line 6199 ",
+  "0.75.2" => "16.04.2023  some minor changes ",
   "0.75.1" => "24.03.2023  change epieces for consumer type washingmachine, PV Vorhersage auf WR Kapazität begrenzen ",
   "0.75.0" => "16.02.2023  new attribute ctrlSolCastAPImaxReq, rename attr ctrlOptimizeSolCastInterval to ctrlSolCastAPIoptimizeReq ",
   "0.74.8" => "11.02.2023  change description of 'mintime', mintime with SunPath value possible ",
@@ -2155,11 +2157,11 @@ sub __solCast_ApiRequest {
             "&api_key=".
             $apikey;
 
-  if($debug =~ /solcastProcess/x) {                                                                                         # nur für Debugging
+  if($debug =~ /solcastProcess/x) {                                                                   # nur für Debugging
       Log3 ($name, 1, qq{$name DEBUG> Request SolCast API for string "$string": $url});
   }
 
-  my $caller = (caller(0))[3];                                          # Rücksprungmarke
+  my $caller = (caller(0))[3];                                                                        # Rücksprungmarke
 
   my $param = {
       url        => $url,
@@ -6195,8 +6197,8 @@ sub _createSummaries {
 
   my $selfconsumptionrate = 0;
   my $autarkyrate         = 0;
-  $selfconsumptionrate    = sprintf("%.0f", $selfconsumption / $pvgen * 100) if($pvgen * 1 > 0);
-  $autarkyrate            = sprintf("%.0f", $selfconsumption / ($selfconsumption + $gcon) * 100) if($selfconsumption);
+  $selfconsumptionrate    = sprintf ("%.0f", $selfconsumption / $pvgen * 100)                     if($pvgen * 1 > 0);
+  $autarkyrate            = sprintf ("%.0f", $selfconsumption / ($selfconsumption + $gcon) * 100) if($selfconsumption);
 
   $data{$type}{$name}{current}{consumption}         = $consumption;
   $data{$type}{$name}{current}{selfconsumption}     = $selfconsumption;
@@ -11059,7 +11061,7 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
           <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung liefert                                       </td></tr>
-          <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugten Energie liefert (ein stetig aufsteigender Zähler) </td></tr>
+          <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler) </td></tr>
           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                     </td></tr>
           <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt (max. möglicher Output in Watt) </td></tr>
         </table>
