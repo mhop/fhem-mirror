@@ -168,7 +168,7 @@ function AutomowerConnectDrawPath ( ctx, div, pos, type ) {
   ctx.setLineDash( div.getAttribute( 'data-'+ type + 'LineDash' ).split(",") );
 
   ctx.moveTo(parseInt(pos[0]),parseInt(pos[1]));
-  for (var i=2;i<pos.length-1;i+=2){
+  for (var i=2;i<pos.length;i+=2){
     ctx.lineTo(parseInt(pos[i]),parseInt(pos[i+1]));
   }
   ctx.stroke();
@@ -196,35 +196,26 @@ function AutomowerConnectUpdateDetail (dev, type, imgsrc, picx, picy, csx, csy, 
         AutomowerConnectScale( ctx, picx, picy, scalx );
         // draw charging station path
         AutomowerConnectDrawPath ( ctx, div, posc, 'chargingStationPath' );
+      if ( pos.length > 2 ) {
+        // draw mowing path
+        AutomowerConnectDrawPath ( ctx, div, pos, 'mowingPath' );
         // draw path for other activity
         if ( poso.length > 1 ) AutomowerConnectDrawPath ( ctx, div, poso, 'otherActivityPath' );
 
-      if ( pos.length > 4 ) {
-        // draw mowing path
-        var mowpos = pos.slice(2);
-        AutomowerConnectDrawPath ( ctx, div, mowpos, 'mowingPath' );
-
         // draw start
-        ctx.beginPath();
-        ctx.setLineDash([]);
-        ctx.lineWidth=3;
-        ctx.strokeStyle = 'white';
-        ctx.fillStyle= 'black';
-        ctx.arc(parseInt(pos[pos.length-2]), parseInt(pos[pos.length-1]), 4, 0, 2 * Math.PI, false);
-        ctx.fill();
-        ctx.stroke();
+        if ( div.getAttribute( 'data-mowingPathDisplayStart' ) ) {
+          ctx.beginPath();
+          ctx.setLineDash([]);
+          ctx.lineWidth=3;
+          ctx.strokeStyle = 'white';
+          ctx.fillStyle= 'black';
+          ctx.arc(parseInt(pos[pos.length-2]), parseInt(pos[pos.length-1]), 4, 0, 2 * Math.PI, false);
+          ctx.fill();
+          ctx.stroke();
+        }
 
         // draw mower icon
         AutomowerConnectIcon( ctx, pos[0], pos[1], 'bottom', 'M' );
-
-        //draw last line
-        ctx.beginPath();
-        ctx.lineWidth=1;
-        ctx.setLineDash([6, 2]);
-        ctx.moveTo(parseInt(pos[0]),parseInt(pos[1]));
-        ctx.lineTo(parseInt(pos[2]),parseInt(pos[3]));
-        ctx.strokeStyle = '#ff0000';
-        ctx.stroke();
 
       }
 

@@ -105,6 +105,8 @@ sub Initialize() {
                         "mapImageZoom " .
                         "mapBackgroundColor " .
                         "mapDesignAttributes:textField-long " .
+                        "mapZones:textField-long " .
+                        "mowerActivityToHighLight:textField-long " .
                         "showMap:1,0 " .
                         "chargingStationCoordinates " .
                         "chargingStationImagePosition:left,top,right,bottom,center " .
@@ -195,6 +197,12 @@ sub Notify {
       readingsBulkUpdateIfChanged($hash, $pref.'_state', $hash->{helper}{mower}{attributes}{$pref}{state} );
       readingsBulkUpdateIfChanged($hash, $pref.'_commandStatus', 'cleared' );
 
+      if ( AttrVal($name, 'mapZones', 0) && $hash->{helper}{currentZone} && $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{curZoneCnt} ) {
+        my $curZon = $hash->{helper}{currentZone};
+        my $curZonCnt = $hash->{helper}{mapZones}{$curZon}{curZoneCnt};
+        readingsBulkUpdateIfChanged($hash, $pref.'_currentZone', $curZon . '(' . $curZonCnt . '/' . $hash->{helper}{newdatasets} . ')' );
+      }
+
       my $tstamp = $hash->{helper}{mower}{attributes}{$pref}{errorCodeTimestamp};
       my $timestamp = ::FHEM::Devices::AMConnect::Common::FmtDateTimeGMT($tstamp/1000);
       readingsBulkUpdateIfChanged($hash, $pref."_errorCodeTimestamp", $tstamp ? $timestamp : '-' );
@@ -247,13 +255,49 @@ sub Notify {
         $hash->{helper}{statistics}{currentWeekArea} += $hash->{helper}{statistics}{currentDayArea};
         $hash->{helper}{statistics}{currentDayTrack} = 0;
         $hash->{helper}{statistics}{currentDayArea} = 0;
-        # do on mondays
+
+        if ( AttrVal($name, 'mapZones', 0) && defined( $hash->{helper}{mapZones} ) ) {
+          
+          my @zonekeys = sort (keys %{$hash->{helper}{mapZones}});
+          my $sumLastDayCnt=0;
+          my $sumCurrentWeekCnt=0;
+          map { 
+            $hash->{helper}{mapZones}{$_}{lastDayCnt} = $hash->{helper}{mapZones}{$_}{zoneCnt};
+            $sumLastDayCnt += $hash->{helper}{mapZones}{$_}{lastDayCnt};
+            $hash->{helper}{mapZones}{$_}{currentWeekCnt} += $hash->{helper}{mapZones}{$_}{lastDayCnt};
+            $sumCurrentWeekCnt += $hash->{helper}{mapZones}{$_}{currentWeekCnt};
+            $hash->{helper}{mapZones}{$_}{zoneCnt} = 0;
+          } @zonekeys;
+
+          map { 
+            $hash->{helper}{mapZones}{$_}{lastDayCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{lastDayCnt} / $sumLastDayCnt * 100 );
+            $hash->{helper}{mapZones}{$_}{currentWeekCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{currentWeekCnt} / $sumCurrentWeekCnt * 100 );
+          } @zonekeys;
+
+        }
+        # do on days
         if ( $time[6] == 1 ) {
 
           $hash->{helper}{statistics}{lastWeekTrack} = $hash->{helper}{statistics}{currentWeekTrack};
           $hash->{helper}{statistics}{lastWeekArea} = $hash->{helper}{statistics}{currentWeekArea};
           $hash->{helper}{statistics}{currentWeekTrack} = 0;
           $hash->{helper}{statistics}{currentWeekArea} = 0;
+
+          if ( AttrVal($name, 'mapZones', 0) && defined( $hash->{helper}{mapZones} ) ) {
+
+            my @zonekeys = sort (keys %{$hash->{helper}{mapZones}});
+            my $sumLastWeekCnt=0;
+            map { 
+              $hash->{helper}{mapZones}{$_}{lastWeekCnt} = $hash->{helper}{mapZones}{$_}{currentWeekCnt};
+              $sumLastWeekCnt += $hash->{helper}{mapZones}{$_}{lastWeekCnt};
+              $hash->{helper}{mapZones}{$_}{currentWeekCnt} = 0;
+            } @zonekeys;
+
+            map { 
+              $hash->{helper}{mapZones}{$_}{lastWeekCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{lastWeekCnt} / $sumLastWeekCnt * 100 );
+            } @zonekeys;
+
+          }
 
         }
 
@@ -311,6 +355,13 @@ sub Set {
     return undef;
 
   ################
+  } elsif ( $setName eq 'mapZonesTemplateToAttribute' ) {
+
+    my $tpl = $hash->{helper}{mapZonesTpl};
+    CommandAttr( $hash, "$name mapZones $tpl" );
+    return undef;
+
+  ################
   } elsif ( ReadingsVal( $name, 'state', 'defined' ) !~ /defined|initialized/ && $setName =~ /^(Start|Park|cuttingHeight)$/ ) {
     if ( $setVal =~ /^(\d+)$/) {
 
@@ -337,7 +388,7 @@ sub Set {
   }
   my $ret = " ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,60,60,600,0,lin Park:selectnumbers,60,60,600,0,lin ResumeSchedule:noArg ";
   $ret .= "chargingStationPositionToAttribute:noArg headlight:ALWAYS_OFF,ALWAYS_ON,EVENING_ONLY,EVENING_AND_NIGHT cuttingHeight:1,2,3,4,5,6,7,8,9 mowerScheduleToAttribute:noArg ";
-  $ret .= "sendScheduleFromAttributeToMower:noArg defaultDesignAttributesToAttribute:noArg ";
+  $ret .= "sendScheduleFromAttributeToMower:noArg defaultDesignAttributesToAttribute:noArg mapZonesTemplateToAttribute:noArg ";
   return "Unknown argument $setName, choose one of".$ret;
 
 }
@@ -380,7 +431,7 @@ sub Attr {
         }
 
         ::FHEM::Devices::AMConnect::Common::readMap($hash);
-        Log3 $name, 3, "$iam $cmd $attrName $attrVal";
+        Log3 $name, 4, "$iam $cmd $attrName $attrVal";
       } else {
         return "$iam $attrName wrong image type, use webp, png, jpeg or jpg";
         Log3 $name, 3, "$iam wrong image type, use webp, png, jpeg or jpg";
@@ -400,8 +451,8 @@ sub Attr {
 
     if( $cmd eq "set" ) {
 
-      return "$iam $attrName is invalid enter a combination of weekday numbers <0123456>" unless( $attrVal =~ /0|1|2|3|4|5|6/ );
-      Log3 $name, 3, "$iam $cmd $attrName $attrVal";
+      return "$iam $attrName is invalid, enter a combination of weekday numbers, space or - [0123456 -]" unless( $attrVal =~ /0|1|2|3|4|5|6| |-/ );
+      Log3 $name, 4, "$iam $cmd $attrName $attrVal";
 
     } elsif( $cmd eq "del" ) {
 
@@ -419,7 +470,7 @@ sub Attr {
       for ( my $i = $icurr; $i > $attrVal; $i-- ) {
         pop @{$hash->{helper}{areapos}};
       }
-      Log3 $name, 3, "$iam $cmd $attrName $attrVal";
+      Log3 $name, 4, "$iam $cmd $attrName $attrVal";
 
     } elsif( $cmd eq "del" ) {
 
@@ -522,6 +573,57 @@ sub Attr {
         return "$iam $attrName encode error: $@ \n $json";
       }
       Log3 $name, 4, "$iam $cmd $attrName array";
+
+    }
+  ##########
+  } elsif( $attrName eq "mapZones" ) {
+    if( $cmd eq "set" ) {
+
+      my $longitude = 10;
+      my $latitude = 52;
+      my $perl = eval { decode_json ($attrVal) };
+
+      if ($@) {
+        return "$iam $cmd $attrName decode error: $@ \n $attrVal";
+      }
+
+      for ( keys %{$perl} ) {
+
+         my $cond = eval "($perl->{$_}{condition})";
+
+        if ($@) {
+          return "$iam $cmd $attrName syntax error in condition: $@ \n $perl->{$_}{condition}";
+        }
+
+      }
+
+      Log3 $name, 4, "$iam $cmd $attrName";
+      $hash->{helper}{mapZones} = $perl;
+
+    } elsif( $cmd eq "del" ) {
+
+      delete $hash->{helper}{mapZones};
+      delete $hash->{helper}{currentZone};
+      CommandDeleteReading( $hash, "$name mower_currentZone" );
+      Log3 $name, 3, "$iam $cmd $attrName";
+
+    }
+  ##########
+  } elsif( $attrName eq "mowerActivityToHighLight" ) {
+    if( $cmd eq "set" ) {
+
+      my $act = 'LEAVING';
+      my $actold = 'LEAVING';
+      my $perl = eval "($attrVal)";
+
+      if ($@) {
+        return "$iam $cmd $attrName syntax error in condition: $@ \n $attrVal";
+      }
+      Log3 $name, 4, "$iam $cmd $attrName";
+
+    } elsif( $cmd eq "del" ) {
+
+      Log3 $name, 3, "$iam $cmd $attrName";
 
     }
   }
@@ -738,19 +840,63 @@ __END__
       While in activity MOWING every 30 s a geo data set is generated.
       While in activity PARKED_IN_CS/CHARGING every 42 min a geo data set is generated.</li>
 
-    <li><a id='AutomowerConnect-attr-weekdaysToResetWayPoints'>weekdaysToResetWayPoints</a><br>
-      <code>attr &lt;name&gt; weekdaysToResetWayPoints &lt;any combination of weekday numbers from 0123456&gt;</code><br>
-      A combination of weekday numbers when the way point stack will be reset, default 1.</li>
-
-    <li><a id='AutomowerConnect-attr-weekdaysToResetWayPoints'>weekdaysToResetWayPoints</a><br>
-      <code>attr &lt;name&gt; weekdaysToResetWayPoints &lt;any combination of weekday numbers from 0123456&gt;</code><br>
-      Eine Kombination von Wochentagnummern an denen der Wegpunktspeicher gelöscht wird, default 1.</li>
+    <li><a id='AutomowerConnectDevice-attr-weekdaysToResetWayPoints'>weekdaysToResetWayPoints</a><br>
+      <code>attr &lt;name&gt; weekdaysToResetWayPoints &lt;any combination of weekday numbers, space or minus [0123456 -]&gt;</code><br>
+      A combination of weekday numbers when the way point stack will be reset. No reset for space or minus. The way points are shifted through the dedicated stack.Default 1.</li>
 
      <li><a id='AutomowerConnectDevice-attr-scaleToMeterXY'>scaleToMeterXY</a><br>
       <code>attr &lt;name&gt; scaleToMeterXY &lt;scale factor longitude&gt;&lt;seperator&gt;&lt;scale factor latitude&gt;</code><br>
       The scale factor depends from the Location on earth, so it has to be calculated for short ranges only. &lt;seperator&gt; is one space character.<br>
       Longitude: <code>(LongitudeMeter_1 - LongitudeMeter_2) / (LongitudeDegree_1 - LongitudeDegree _2)</code><br>
       Latitude: <code>(LatitudeMeter_1 - LatitudeMeter_2) / (LatitudeDegree_1 - LatitudeDegree _2)</code></li>
+
+    <li><a id='AutomowerConnectDevice-attr-mapZones'>mapZones</a><br>
+      <code>attr &lt;name&gt; mapZones &lt;valid perl condition to separate Zones&gt;</code><br>
+      Provide the zones with conditions as JSON-String:<br>
+      The waypoints are accessable by the variables $longitude und $latitude.<br>
+      Zones have have to be separated by conditions in alphabetical order of their names.<br>
+      The last zone is determined by the remaining waypoints.<br>
+      Syntactical example:<br>
+      <code>
+      '{<br>
+        &emsp;&emsp;&emsp;&emsp;"&lt;name_1&gt;" : {<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_1 from other zones&gt;"<br>
+        &emsp;&emsp;},<br>
+        &emsp;&emsp;&emsp;&emsp;"&lt;name_2&gt;" : {<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_2 from other zones, except name_1&gt;"<br>
+        &emsp;&emsp;},<br>
+        &emsp;&emsp;&emsp;&emsp;"&lt;name_3&gt;" : {<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_3 from other zones, except name_1 and name_2&gt;"<br>
+        &emsp;&emsp;},<br>
+        &emsp;&emsp;&emsp;&emsp;"&lt;name_n-1&gt;" : {<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_n-1 from other zones ,except the zones already seperated&gt;"<br>
+        &emsp;&emsp;},<br>
+        &emsp;&emsp;&emsp;&emsp;"&lt;name n&gt;" : {<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "Use undef because the last zone remains."<br>
+        &emsp;&emsp;}<br>
+      }'<br>
+      </code><br>
+      Example with two Zones and virtual lines defined by latitude 52.6484600648553, 52.64839739580418 (horizontal) and longitude 9.54799477359984 (vertikal). all way points above 52.6484600648553 or all way points above 52.64839739580418 and all way points to the right of 9.54799477359984 belong to zone 01_oben. All other way points belong to zone 02_unten.<br>
+      <code>
+      '{<br>
+        &emsp;&emsp;&emsp;&emsp;"01_oben" : {<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "$latitude > 52.6484600648553 || $longitude > 9.54799477359984 && $latitude > 52.64839739580418"<br>
+        &emsp;&emsp;},<br>
+        &emsp;&emsp;&emsp;&emsp;"02_unten" : {<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "undef"<br>
+        &emsp;&emsp;}<br>
+      }'<br>
+      </code></li>
+
+    <li><a id='AutomowerConnectDevice-attr-mowerActivityToHighLight'>mowerActivityToHighLight</a><br>
+      <code>attr &lt;name&gt; mowerActivityToHighLight &lt;perl condition to determine a path section&gt;</code><br>
+      A perl condition to highlight a path section by mower activities.<br>
+      The current interval activity is accessible by $act. The last intervall activity is accessible by $actold.<br>
+      LineColor, LineDash and LineWidth are adjustable by the attribut <i>mapDesignAttributes</i> under otherActivityPath...<br>
+      Example: Highlight path when leaving charging station.<br>
+      <code>attr &lt;name&gt; mowerActivityToHighLight $act =~ /MOWING|LEAVING/ && $actold =~ /LEAVING|PARKED_IN_CS|CHARGING/</code><br>
+      Example: Highlight path when returning to charging station.<br>
+      <code>attr &lt;name&gt; mowerActivityToHighLight $act =~ /PARKED_IN_CS|CHARGING|GOING_HOME/ && $actold =~ /MOWING|GOING_HOME/</code><br></li>
 
      <li><a href="disable">disable</a></li>
      <li><a href="disabledForIntervals">disabledForIntervals</a></li>
@@ -768,6 +914,7 @@ __END__
     <li>batteryPercent - battery state of charge in percent</li>
     <li>mower_activity - current activity "UNKNOWN" | "NOT_APPLICABLE" | "MOWING" | "GOING_HOME" | "CHARGING" | "LEAVING" | "PARKED_IN_CS" | "STOPPED_IN_GARDEN"</li>
     <li>mower_commandStatus - Status of the last sent command cleared each status update</li>
+    <li>mower_currentZone - Zone name with activity MOWING in the last interval and number of way points in parenthesis.</li>
     <li>mower_errorCode - last error code</li>
     <li>mower_errorCodeTimestamp - last error code time stamp</li>
     <li>mower_errorDescription - error description</li>
@@ -916,7 +1063,7 @@ __END__
   </ul>
     <br>
     <a id="AutomowerConnectDeviceAttributes"></a>
-    <b>Attributes</b>
+    <b>Attribute</b>
   <ul>
 
     <li><a id='AutomowerConnectDevice-attr-mapImagePath'>mapImagePath</a><br>
@@ -961,7 +1108,7 @@ __END__
       Format: Zeilenweise Paare von Longitude- u. Latitudewerten getrennt durch 1 Leerzeichen. Die Zeilen werden aufgeteilt durch (<code>/\s|\R$/</code>).<br>
       Die Angabe der UTM Koordinaten muss als Dezimalzahl in Meter erfolgen.<br>
       Das Attribut muss nach dem Attribut mapImageCoordinatesToRegister gesetzt werden.<br>
-      Dieses Attribut berechnet die Skalierungsfaktoren. Das Attribut scaleToMeterXY wird entsprechend gesetzt</li>
+      Dieses Attribut berechnet die Skalierungsfaktoren. Das Attribut scaleToMeterXY wird entsprechend gesetzt.</li>
 
     <li><a id='AutomowerConnectDevice-attr-showMap'>showMap</a><br>
       <code>attr &lt;name&gt; showMap &lt;&gt;<b>1</b>,0</code><br>
@@ -996,11 +1143,64 @@ __END__
       Legt die Anzahl der gespeicherten und anzuzeigenden Wegpunkte fest, default 5000.
       Während der Aktivität MOWING wird ca. alle 30 s und während PARKED_IN_CS/CHARGING wird alle 42 min ein Geodatensatz erzeugt.</li>
 
+    <li><a id='AutomowerConnectDevice-attr-weekdaysToResetWayPoints'>weekdaysToResetWayPoints</a><br>
+      <code>attr &lt;name&gt; weekdaysToResetWayPoints &lt;any combination of weekday numbers, space or minus [0123456 -]&gt;</code><br>
+      Eine Kombination von Wochentagnummern an denen der Wegpunktspeicher gelöscht wird. Keine Löschung bei Leer- oder Minuszeichen, die Wegpunkte werden durch den zugeteilten Wegpunktspeicher geschoben. Standard 1.</li>
+
      <li><a id='AutomowerConnectDevice-attr-scaleToMeterXY'>scaleToMeterXY</a><br>
       <code>attr &lt;name&gt; scaleToMeterXY &lt;scale factor longitude&gt;&lt;seperator&gt;&lt;scale factor latitude&gt;</code><br>
       Der Skalierfaktor hängt vom Standort ab und muss daher für kurze Strecken berechnet werden. &lt;seperator&gt; ist 1 Leerzeichen.<br>
       Longitude: <code>(LongitudeMeter_1 - LongitudeMeter_2) / (LongitudeDegree_1 - LongitudeDegree _2)</code><br>
       Latitude: <code>(LatitudeMeter_1 - LatitudeMeter_2) / (LatitudeDegree_1 - LatitudeDegree _2)</code></li>
+
+    <li><a id='AutomowerConnectDevice-attr-mapZones'>mapZones</a><br>
+      <code>attr &lt;name&gt; mapZones &lt;JSON string with zone names in alpabetical order and valid perl condition to seperate the zones&gt;</code><br>
+      Die Wegpunkte stehen über die Perlvariablen $longitude und $latitude zur Verfügung.<br>
+      Die Zonennamen und Bedingungen müssen als JSON-String angegeben werden.<br>
+      Die Zonennamen müssen in alphabetischer Reihenfolge durch Bedingungen abgegrenzt werden.<br>
+      Die letzte Zone ergibt sich aus den übrig gebliebenen Wegpunkten.<br>
+      Syntaxbeispiel:<br>
+      <code>
+      '{<br>
+        &emsp;&emsp;&emsp;&emsp;"&lt;name_1&gt;" : {<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_1 from other zones&gt;"<br>
+        &emsp;&emsp;},<br>
+        &emsp;&emsp;&emsp;&emsp;"&lt;name_2&gt;" : {<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_2 from other zones, except name_1&gt;"<br>
+        &emsp;&emsp;},<br>
+        &emsp;&emsp;&emsp;&emsp;"&lt;name_3&gt;" : {<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_3 from other zones, except name_1 and name_2&gt;"<br>
+        &emsp;&emsp;},<br>
+        &emsp;&emsp;&emsp;&emsp;"&lt;name_n-1&gt;" : {<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_n-1 from other zones ,except the zones already seperated&gt;"<br>
+        &emsp;&emsp;},<br>
+        &emsp;&emsp;&emsp;&emsp;"&lt;name n&gt;" : {<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "Use undef because the last zone remains."<br>
+        &emsp;&emsp;}<br>
+      }'<br>
+      </code><br>
+      Beispiel mit zwei Zonen und gedachten Linien bestimmt durch die Punkte Latitude 52.6484600648553, 52.64839739580418 (horizontal) und 9.54799477359984 (vertikal). Alle Wegpunkte deren Latitude über einer horizontalen Linie mit der Latitude 52.6484600648553 liegen oder alle Wegpunkte deren Latitude über einer horizontalen Linie mit der Latitude 52.64839739580418 liegen und deren Longitude rechts von einer vertikale Linie mit der Longitude 9.54799477359984 liegen, gehören zur Zone 01_oben Alle anderen Wegpunkte gehören zur Zone 02_unten.
+      <code>
+      '{<br>
+        &emsp;&emsp;&emsp;&emsp;"01_oben" : {<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "$latitude > 52.6484600648553 || $longitude > 9.54799477359984 && $latitude > 52.64839739580418"<br>
+        &emsp;&emsp;},<br>
+        &emsp;&emsp;&emsp;&emsp;"02_unten" : {<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "undef"<br>
+        &emsp;&emsp;}<br>
+      }'<br>
+      </code></li>
+
+    <li><a id='AutomowerConnectDevice-attr-mowerActivityToHighLight'>mowerActivityToHighLight</a><br>
+      <code>attr &lt;name&gt; mowerActivityToHighLight &lt;perl condition to determine a path section&gt;</code><br>
+      Eine Perl Bedingung, die Aktivitäten verknüpft, um einen Pfadabschnitt festzulegen, der hervorgehoben wird.<br>
+      Die Aktivität im aktuellen Interval steht über die Perlvariable $act und die Aktivität im letzten Intervall über $actold zur Verfügung.<br>
+      Die Farbe, Strichstärke und Muster können über das Attribut <i>mapDesignAttributes</i> unter otherActivityPath... eingestellt werden.<br>
+      Beispiel: Pfad beim Verlassen der Ladestation hervorheben.<br>
+      <code>attr &lt;name&gt; mowerActivityToHighLight $act =~ /MOWING|LEAVING/ && $actold =~ /LEAVING|PARKED_IN_CS|CHARGING/</code><br>
+      Beispiel: Pfad beim Zurückkehren zur Ladestation hervorheben.<br>
+      <code>attr &lt;name&gt; mowerActivityToHighLight $act =~ /PARKED_IN_CS|CHARGING|GOING_HOME/ && $actold =~ /MOWING|GOING_HOME/</code><br>
+      </li>
 
      <li><a href="disable">disable</a></li>
      <li><a href="disabledForIntervals">disabledForIntervals</a></li>
@@ -1019,6 +1219,7 @@ __END__
     <li>batteryPercent - Batterieladung in Prozent</li>
     <li>mower_activity - aktuelle Aktivität "UNKNOWN" | "NOT_APPLICABLE" | "MOWING" | "GOING_HOME" | "CHARGING" | "LEAVING" | "PARKED_IN_CS" | "STOPPED_IN_GARDEN"</li>
     <li>mower_commandStatus - Status des letzten uebermittelten Kommandos wird duch Statusupdate zurückgesetzt.</li>
+    <li>mower_currentZone - Name der Zone im aktuell abgefragten Intervall, in der der Mäher gemäht hat und Anzahl der Wegpunkte in der Zone in Klammern.</li>
     <li>mower_errorCode - last error code</li>
     <li>mower_errorCodeTimestamp - last error code time stamp</li>
     <li>mower_errorDescription - error description</li>

@@ -137,13 +137,32 @@ errorPathLineDash=""
 errorPathLineWidth="2"
 chargingStationPathLineColor="#999999"
 chargingStationPathLineDash="6,2"
-chargingStationPathLineWidth="1"
+chargingStationPathLineWidth="3"
 otherActivityPathLineColor="#33cc33"
 otherActivityPathLineDash="6,2"
-otherActivityPathLineWidth="1"
+otherActivityPathLineWidth="2"
+mowingPathDisplayStart=""
 mowingPathLineColor="#ff0000"
 mowingPathLineDash="6,2"
 mowingPathLineWidth="1"';
+
+my $mapZonesTpl = '{
+  "A_Zone_1" : {
+    "condition"  : "<condition to separate Zone_1 from other zones>"
+  },
+  "B_Zone_2" : {
+    "condition"  : "<condition to separate Zone_2 from other zones, except myZone_1>"
+  },
+  "C_Zone_3" : {
+    "condition"  : "<condition to separate Zone_3 from other zones, except myZone_1 and myZone_2>"
+  },
+  "D_Zone_x" : {
+    "condition"  : "<condition to separate Zone_x from other zones ,except the zones already seperated>"
+  },
+  "E_LastZone" : {
+    "condition"  : "Use undef because the last zone remains."
+  }
+}';
 
 
   %$hash = (%$hash,
@@ -163,6 +182,7 @@ mowingPathLineWidth="1"';
       imageHeight               => 650,
       imageWidthHeight          => '350 650',
       mapdesign                 => $mapAttr,
+      mapZonesTpl               => $mapZonesTpl,
       posMinMax                 => "-180 90\n180 -90",
       newdatasets               => 0,
       MAP_PATH                  => '',
@@ -185,7 +205,7 @@ mowingPathLineWidth="1"';
       },
       UNKNOWN                   => {
         arrayName               => 'otherpos',
-        maxLength               => 50,
+        maxLength               => 100,
         cnt                     => 0,
         callFn                  => ''
       },
@@ -661,73 +681,92 @@ sub CMDResponse {
 sub AlignArray {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  my $activity = $hash->{helper}{mower}{attributes}{mower}{activity};
-  my $arrayName = $hash->{helper}{$activity}{arrayName};
+  my $act = $hash->{helper}{mower}{attributes}{mower}{activity};
+  my $actold = $hash->{helper}{mowerold}{attributes}{mower}{activity};
   my $searchlen = 2;
-  my $i = 0;
+  my $cnt = 0;
   my $tmp = [];
 
-  if ( isGoodActivity( $hash ) ) {
+  my $poslen = @{ $hash->{helper}{mower}{attributes}{positions} };
+  my @searchposlon = ( $hash->{helper}{searchpos}[0]{longitude}, $hash->{helper}{searchpos}[1]{longitude} );
+  my @searchposlat = ( $hash->{helper}{searchpos}[0]{latitude}, $hash->{helper}{searchpos}[1]{latitude} );
 
-    my $poslen = @{ $hash->{helper}{mower}{attributes}{positions} };
-    my @searchposlon = ( $hash->{helper}{searchpos}[0]{longitude}, $hash->{helper}{searchpos}[1]{longitude} );
-    my @searchposlat = ( $hash->{helper}{searchpos}[0]{latitude}, $hash->{helper}{searchpos}[1]{latitude} );
-    my $maxLength = $hash->{helper}{$activity}{maxLength};
-    for ( $i = 0; $i < $poslen-2; $i++ ) { # -2 due to 2 alignment data sets at the end
-      if ( $searchposlon[ 0 ] == $hash->{helper}{mower}{attributes}{positions}[ $i ]{longitude}
-        && $searchposlat[ 0 ] == $hash->{helper}{mower}{attributes}{positions}[ $i ]{latitude}
-        && $searchposlon[ 1 ] == $hash->{helper}{mower}{attributes}{positions}[ $i+1 ]{longitude}
-        && $searchposlat[ 1 ] == $hash->{helper}{mower}{attributes}{positions}[ $i+1 ]{latitude} ) {
+  for ( $cnt = 0; $cnt < $poslen-1; $cnt++ ) { # <-1 due to 2 alignment data sets at the end
 
-        if ( $i > 0 ) {
-          my @ar = @{ $hash->{helper}{mower}{attributes}{positions} }[ 0 .. $i-1 ];
-          $tmp = dclone( \@ar );
-          
-          if ( $i && @{ $hash->{helper}{$arrayName} } ) {
+    if ( $searchposlon[ 0 ] == $hash->{helper}{mower}{attributes}{positions}[ $cnt ]{longitude}
+      && $searchposlat[ 0 ] == $hash->{helper}{mower}{attributes}{positions}[ $cnt ]{latitude}
+      && $searchposlon[ 1 ] == $hash->{helper}{mower}{attributes}{positions}[ $cnt+1 ]{longitude}
+      && $searchposlat[ 1 ] == $hash->{helper}{mower}{attributes}{positions}[ $cnt+1 ]{latitude} ) {
 
-            unshift ( @{ $hash->{helper}{$arrayName} }, @$tmp );
+      if ( $cnt > 0 ) {
 
-          } elsif ( $i ) {
+        my @ar = @{ $hash->{helper}{mower}{attributes}{positions} }[ 0 .. $cnt-1 ];
+        $tmp = dclone( \@ar );
 
-            $hash->{helper}{$arrayName} = $tmp;
+        if ( @{ $hash->{helper}{areapos} } ) {
 
-          }
-
-          while ( @{ $hash->{helper}{$arrayName} } > $maxLength ) {
-
-              pop ( @{ $hash->{helper}{$arrayName}} ); # reduce to max allowed length
-
-          }
-
-          posMinMax( $hash, $tmp );
-          #callFn if present
-          if ( $hash->{helper}{$activity}{callFn} ) {
-
-            $hash->{helper}{$activity}{cnt} = $i;
-            no strict "refs";
-            &{ $hash->{helper}{$activity}{callFn} }( $hash );
-            use strict "refs";
-
-          }
+          unshift ( @{ $hash->{helper}{areapos} }, @$tmp );
 
         } else {
 
-          $hash->{helper}{$activity}{cnt} = 0;
+          $hash->{helper}{areapos} = $tmp;
 
         }
 
-        last;
+        while ( @{ $hash->{helper}{areapos} } > $hash->{helper}{MOWING}{maxLength} ) {
+
+            pop ( @{ $hash->{helper}{areapos}} ); # reduce to max allowed length
+
+        }
+
+        posMinMax( $hash, $tmp );
+
+        if ( $act =~ /^(MOWING)$/ && $actold =~ /^(MOWING|LEAVING|PARKED_IN_CS|CHARGING)$/ ) {
+
+          AreaStatistics ( $hash, $tmp, $cnt );
+
+        }
+
+        if ( AttrVal($name, 'mapZones', 0) && $act =~ /^(MOWING)$/ && $actold =~ /^(MOWING|LEAVING|PARKED_IN_CS|CHARGING)$/ ) {
+
+          $tmp = dclone( \@ar );
+          ZoneHandling ( $hash, $tmp, $cnt );
+
+        }
+
+        if ( $act =~ /^(CHARGING|PARKED_IN_CS)$/ && $actold =~ /^(PARKED_IN_CS|CHARGING)$/ ) {
+
+          $tmp = dclone( \@ar );
+          ChargingStationPosition ( $hash, $tmp, $cnt );
+
+        }
+
+        my $val = AttrVal($name, 'mowerActivityToHighLight', 0);
+
+        if ( $val && eval( "$val" ) ) {
+
+          $tmp = dclone( \@ar );
+          HighlightPath ( $hash, $tmp, $cnt );
+
+        }
+
+      } else {
+
+        $cnt = 0;
 
       }
 
-    }
+      last;
 
-    isErrorThanPrepare( $hash, $tmp );
+    }
 
   }
 
+  isErrorThanPrepare( $hash, $tmp );
+
   resetLastErrorIfCorrected($hash);
-  $hash->{helper}{newdatasets} = $i;
+
+  $hash->{helper}{newdatasets} = $cnt;
   $hash->{helper}{searchpos} = [ dclone( $hash->{helper}{mower}{attributes}{positions}[0] ), dclone( $hash->{helper}{mower}{attributes}{positions}[1] ) ];
   return undef;
 
@@ -787,27 +826,84 @@ sub resetLastErrorIfCorrected {
 
 }
 #########################
-sub isGoodActivity {
+sub ZoneHandling {
+  my ( $hash, $poshash, $cnt ) = @_;
+  my $name = $hash->{NAME};
+  my $zone = '';
+  my $nextzone = '';
+  my @pos = @$poshash;
+  my $longitude = 0;
+  my $latitude = 0;
+  my @zonekeys = sort (keys %{$hash->{helper}{mapZones}});
+  my $i = 0;
+  my $k = 0;
 
-  my ( $hash ) = @_;
-  my $act = $hash->{helper}{mower}{attributes}{mower}{activity};
-  my $actold = $hash->{helper}{mowerold}{attributes}{mower}{activity};
-  
-  my $ret = $hash->{helper}{$act}{arrayName} && (
-             $act eq $actold
-          || $act =~ /^(MOWING)$/ && $actold =~ /^(LEAVING|PARKED_IN_CS|CHARGING)$/
-          # || $act =~ /^(GOING_HOME)$/ && $actold =~ /^(MOWING)$/
-          || $act =~ /^(CHARGING|PARKED_IN_CS)$/ && $actold =~ /^(PARKED_IN_CS|CHARGING)$/
-          || $act =~ /^(NOT_APPLICABLE)$/ && $actold =~ /^(UNKNOWN|NOT_APPLICABLE|MOWING|GOING_HOME|CHARGING|LEAVING|PARKED_IN_CS|STOPPED_IN_GARDEN)$/);
-  return $ret;
+  map{ $hash->{helper}{mapZones}{$_}{curZoneCnt} = 0 } @zonekeys;
+
+  for ( $i = 0; $i < $cnt; $i++){
+
+    $longitude = $pos[$i]{longitude};
+    $latitude = $pos[$i]{latitude};
+
+    for ( $k = 0; $k < @zonekeys-1; $k++){
+
+      if ( eval ("$hash->{helper}{mapZones}{$zonekeys[$k]}{condition}") ) {
+
+        if ( $hash->{helper}{mapZones}{$zonekeys[$k]}{curZoneCnt} == $i) { # find current zone and count  consecutive way points
+
+          $hash->{helper}{mapZones}{$zonekeys[$k]}{curZoneCnt}++;
+          $hash->{helper}{currentZone} = $zonekeys[$k];
+
+        }
+
+       $hash->{helper}{mapZones}{$zonekeys[$k]}{zoneCnt}++;
+
+        last;
+
+      } elsif ( $k == @zonekeys-2 ) { # last zone
+
+        if ( $hash->{helper}{mapZones}{$zonekeys[$k+1]}{curZoneCnt} == $i) { # find current zone and count  consecutive way points
+
+          $hash->{helper}{mapZones}{$zonekeys[$k+1]}{curZoneCnt}++;
+          $hash->{helper}{currentZone} = $zonekeys[$k+1];
+
+        }
+
+        $hash->{helper}{mapZones}{$zonekeys[$k+1]}{zoneCnt}++;
+
+      }
+
+      my $sumDayCnt=0;
+      map { $sumDayCnt += $hash->{helper}{mapZones}{$_}{zoneCnt} } @zonekeys;
+      map { $hash->{helper}{mapZones}{$_}{currentDayCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{zoneCnt} / $sumDayCnt * 100 ) } @zonekeys;
+
+    }
+
+  }
 
 }
 
 #########################
 sub ChargingStationPosition {
-  my ($hash) = @_;
+  my ( $hash, $poshash, $cnt ) = @_;
+  if ( $cnt && @{ $hash->{helper}{cspos} } ) {
+
+    unshift ( @{ $hash->{helper}{cspos} }, @$poshash );
+
+  } elsif ( $cnt ) {
+
+    $hash->{helper}{cspos} = $poshash;
+
+  }
+
+  while ( @{ $hash->{helper}{cspos} } > $hash->{helper}{PARKED_IN_CS}{maxLength} ) {
+
+      pop ( @{ $hash->{helper}{cspos}} ); # reduce to max allowed length
+
+  }
   my $n = @{$hash->{helper}{cspos}};
   if ( $n > 0 ) {
+
     my $xm = 0;
     map { $xm += $_->{longitude} } @{$hash->{helper}{cspos}};
     $xm = $xm/$n;
@@ -816,16 +912,38 @@ sub ChargingStationPosition {
     $ym = $ym/$n;
     $hash->{helper}{chargingStation}{longitude} = sprintf("%.8f",$xm);
     $hash->{helper}{chargingStation}{latitude} = sprintf("%.8f",$ym);
+
+  }
+  return undef;
+}
+
+
+#########################
+sub HighlightPath {
+  my ( $hash, $poshash, $cnt ) = @_;
+  if ( $cnt && @{ $hash->{helper}{otherpos} } ) {
+
+    unshift ( @{ $hash->{helper}{otherpos} }, @$poshash );
+
+  } elsif ( $cnt ) {
+
+    $hash->{helper}{otherpos} = $poshash;
+
+  }
+
+  while ( @{ $hash->{helper}{otherpos} } > $hash->{helper}{UNKNOWN}{maxLength} ) {
+
+      pop ( @{ $hash->{helper}{otherpos}} ); # reduce to max allowed length
+
   }
   return undef;
 }
 
 #########################
 sub AreaStatistics {
-  my ($hash) = @_;
+  my ( $hash, $poshash, $i ) = @_;
   my $name = $hash->{NAME};
   my $activity = 'MOWING';
-  my $i = $hash->{helper}{$activity}{cnt};
   my $k = 0;
   my @xyarr  = @{$hash->{helper}{areapos}};# areapos
   my $n = scalar @xyarr;
@@ -975,6 +1093,40 @@ sub listStatisticsData {
     $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{<b>lastWeekTrack</b>} &emsp;</td><td> ' . sprintf( "%.0f", $hash->{helper}{statistics}{lastWeekTrack} ) . ' </td><td> m </td></tr>';
     $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{<b>lastWeekArea</b>} &emsp;</td><td> ' . sprintf( "%.0f", $hash->{helper}{statistics}{lastWeekArea} ) . ' </td><td> qm </td></tr>';
 
+    if ( AttrVal($name, 'mapZones', 0) && defined( $hash->{helper}{mapZones} ) ) {
+
+    my @zonekeys = sort (keys %{$hash->{helper}{mapZones}});
+
+    for ( @zonekeys ) {
+
+      $cnt++;
+      $ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ) . '"><td> $hash->{helper}{mapZones}{' . $_ . '}{<b>currentDayCntPct</b>} &emsp;</td><td> ' . ( $hash->{helper}{mapZones}{$_}{currentDayCntPct} ? $hash->{helper}{mapZones}{$_}{currentDayCntPct} : '' ) . ' </td><td> % </td></tr>';
+
+    }
+
+    for ( @zonekeys ) {
+
+      $cnt++;
+      $ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ) . '"><td> $hash->{helper}{mapZones}{' . $_ . '}{<b>lastDayCntPct</b>} &emsp;</td><td> ' . ( $hash->{helper}{mapZones}{$_}{lastDayCntPct} ? $hash->{helper}{mapZones}{$_}{lastDayCntPct} : '' ) . ' </td><td> % </td></tr>';
+
+    }
+
+    for ( @zonekeys ) {
+
+      $cnt++;
+      $ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ) . '"><td> $hash->{helper}{mapZones}{' . $_ . '}{<b>currentWeekCntPct</b>} &emsp;</td><td> ' . ( $hash->{helper}{mapZones}{$_}{currentWeekCntPct} ? $hash->{helper}{mapZones}{$_}{currentWeekCntPct} : '' ) . ' </td><td> % </td></tr>';
+
+    }
+
+    for ( @zonekeys ) {
+
+      $cnt++;
+      $ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ) . '"><td> $hash->{helper}{mapZones}{' . $_ . '}{<b>lastWeekCntPct</b>} &emsp;</td><td> ' . ( $hash->{helper}{mapZones}{$_}{lastWeekCntPct} ? $hash->{helper}{mapZones}{$_}{lastWeekCntPct} : '' ). ' </td><td> % </td></tr>';
+
+    }
+
+  }
+
     $ret .= '</tbody></table>';
     $ret .= '<p><sup>1</sup> totalRunningTime = totalCuttingTime + totalSearchingTime';
     $ret .= '</html>';
@@ -1088,7 +1240,7 @@ sub listInternalData {
     $ret .= '<tr class="col_header"><td> Used For Action&emsp;</td><td> Stack Name&emsp;</td><td> Current Size&emsp;</td><td> Max Size&emsp;</td></tr>';
     $ret .= '<tr class="column odd"><td>PARKED_IN_CS, CHARGING&emsp;</td><td> cspos&emsp;</td><td> ' . $csnr . ' </td><td> ' . $csnrmax . '&emsp;</td></tr>';
     $ret .= '<tr class="column even"><td>MOWING&emsp;</td><td> areapos&emsp;</td><td> ' . $arnr . ' </td><td> ' . $arnrmax . '&emsp;</td></tr>';
-    $ret .= '<tr class="column odd"><td>UNKNOWN, NOT_APPLICABLE, LEAVING,<br>GOING_HOME, STOPPED_IN_GARDEN&emsp;</td>
+    $ret .= '<tr class="column odd"><td>User defined activities&emsp;</td>
              <td style="vertical-align:middle;" > otherpos&emsp;</td><td style="vertical-align:middle;" > ' . $ornr . ' </td>
              <td style="vertical-align:middle;" > ' . $ornrmax . '&emsp;</td></tr>';
     $ret .= '<tr class="column even"><td>NOT_APPLICABLE with error time stamp&emsp;</td><td> lasterror/positions&emsp;</td><td> ' . $ernr . ' </td><td> -&emsp;</td></tr>';
