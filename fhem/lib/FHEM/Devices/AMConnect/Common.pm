@@ -185,6 +185,7 @@ my $mapZonesTpl = '{
       mapZonesTpl               => $mapZonesTpl,
       posMinMax                 => "-180 90\n180 -90",
       newdatasets               => 0,
+      newzonedatasets               => 0,
       MAP_PATH                  => '',
       MAP_MIME                  => '',
       MAP_CACHE                 => '',
@@ -727,7 +728,8 @@ sub AlignArray {
 
         }
 
-        if ( AttrVal($name, 'mapZones', 0) && $act =~ /^(MOWING)$/ && $actold =~ /^(MOWING|LEAVING|PARKED_IN_CS|CHARGING)$/ ) {
+        if ( AttrVal($name, 'mapZones', 0) && $act =~ /^(MOWING)$/ && $actold =~ /^(MOWING|LEAVING|PARKED_IN_CS|CHARGING)$/ 
+                                           || $act =~ /^(GOING_HOME|PARKED_IN_CS|CHARGING)$/ && $actold =~ /^(MOWING)$/ ) {
 
           $tmp = dclone( \@ar );
           ZoneHandling ( $hash, $tmp, $cnt );
@@ -849,7 +851,7 @@ sub ZoneHandling {
 
       if ( eval ("$hash->{helper}{mapZones}{$zonekeys[$k]}{condition}") ) {
 
-        if ( $hash->{helper}{mapZones}{$zonekeys[$k]}{curZoneCnt} == $i) { # find current zone and count  consecutive way points
+        if ( $hash->{helper}{mapZones}{$zonekeys[$k]}{curZoneCnt} == $i) { # find current zone and count consecutive way points
 
           $hash->{helper}{mapZones}{$zonekeys[$k]}{curZoneCnt}++;
           $hash->{helper}{currentZone} = $zonekeys[$k];
@@ -873,13 +875,14 @@ sub ZoneHandling {
 
       }
 
-      my $sumDayCnt=0;
-      map { $sumDayCnt += $hash->{helper}{mapZones}{$_}{zoneCnt} } @zonekeys;
-      map { $hash->{helper}{mapZones}{$_}{currentDayCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{zoneCnt} / $sumDayCnt * 100 ) } @zonekeys;
-
     }
 
   }
+
+      my $sumDayCnt=0;
+      map { $sumDayCnt += $hash->{helper}{mapZones}{$_}{zoneCnt} } @zonekeys;
+      map { $hash->{helper}{mapZones}{$_}{currentDayCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{zoneCnt} / $sumDayCnt * 100 ) } @zonekeys if ( $sumDayCnt );
+      $hash->{helper}{newzonedatasets} = $cnt;      
 
 }
 

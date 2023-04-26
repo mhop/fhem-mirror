@@ -200,7 +200,7 @@ sub Notify {
       if ( AttrVal($name, 'mapZones', 0) && $hash->{helper}{currentZone} && $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{curZoneCnt} ) {
         my $curZon = $hash->{helper}{currentZone};
         my $curZonCnt = $hash->{helper}{mapZones}{$curZon}{curZoneCnt};
-        readingsBulkUpdateIfChanged($hash, $pref.'_currentZone', $curZon . '(' . $curZonCnt . '/' . $hash->{helper}{newdatasets} . ')' );
+        readingsBulkUpdateIfChanged($hash, $pref.'_currentZone', $curZon . '(' . $curZonCnt . '/' . $hash->{helper}{newzonedatasets} . ')' );
       }
 
       my $tstamp = $hash->{helper}{mower}{attributes}{$pref}{errorCodeTimestamp};
@@ -271,8 +271,11 @@ sub Notify {
 
           map { 
             $hash->{helper}{mapZones}{$_}{lastDayCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{lastDayCnt} / $sumLastDayCnt * 100 );
+          } @zonekeys if( $sumLastDayCnt );
+
+          map { 
             $hash->{helper}{mapZones}{$_}{currentWeekCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{currentWeekCnt} / $sumCurrentWeekCnt * 100 );
-          } @zonekeys;
+          } @zonekeys if( $sumCurrentWeekCnt );
 
         }
         # do on days
@@ -295,7 +298,7 @@ sub Notify {
 
             map { 
               $hash->{helper}{mapZones}{$_}{lastWeekCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{lastWeekCnt} / $sumLastWeekCnt * 100 );
-            } @zonekeys;
+            } @zonekeys if( $sumLastWeekCnt );
 
           }
 
@@ -914,7 +917,7 @@ __END__
     <li>batteryPercent - battery state of charge in percent</li>
     <li>mower_activity - current activity "UNKNOWN" | "NOT_APPLICABLE" | "MOWING" | "GOING_HOME" | "CHARGING" | "LEAVING" | "PARKED_IN_CS" | "STOPPED_IN_GARDEN"</li>
     <li>mower_commandStatus - Status of the last sent command cleared each status update</li>
-    <li>mower_currentZone - Zone name with activity MOWING in the last interval and number of way points in parenthesis.</li>
+    <li>mower_currentZone - Zone name with activity MOWING in the last status time stamp interval and number of way points in parenthesis.</li>
     <li>mower_errorCode - last error code</li>
     <li>mower_errorCodeTimestamp - last error code time stamp</li>
     <li>mower_errorDescription - error description</li>
@@ -1219,7 +1222,7 @@ __END__
     <li>batteryPercent - Batterieladung in Prozent</li>
     <li>mower_activity - aktuelle Aktivität "UNKNOWN" | "NOT_APPLICABLE" | "MOWING" | "GOING_HOME" | "CHARGING" | "LEAVING" | "PARKED_IN_CS" | "STOPPED_IN_GARDEN"</li>
     <li>mower_commandStatus - Status des letzten uebermittelten Kommandos wird duch Statusupdate zurückgesetzt.</li>
-    <li>mower_currentZone - Name der Zone im aktuell abgefragten Intervall, in der der Mäher gemäht hat und Anzahl der Wegpunkte in der Zone in Klammern.</li>
+    <li>mower_currentZone - Name der Zone im aktuell abgefragten Intervall der Statuszeitstempel, in der der Mäher gemäht hat und Anzahl der Wegpunkte in der Zone in Klammern.</li>
     <li>mower_errorCode - last error code</li>
     <li>mower_errorCodeTimestamp - last error code time stamp</li>
     <li>mower_errorDescription - error description</li>
