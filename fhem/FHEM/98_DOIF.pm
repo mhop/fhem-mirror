@@ -2291,7 +2291,7 @@ sub ReplaceReadingDoIf
             $hash->{$bartype}{"$name $reading"}{"$num $period"}{timeOffset} = (defined $timeOffset and $timeOffset ne "") ? $timeOffset : 0; 
             DOIF_setValue_bar($hash,\%{$hash->{$bartype}{"$name $reading"}{"$num $period"}},undef,1);            
           }
-        } elsif ($format =~ /^(d\d)(?::(.*))?/) {
+        } elsif ($format =~ /^(d\d?)(?::(.*))?/) {
           $regExp =$1;
           $output=$2;
         }else {
