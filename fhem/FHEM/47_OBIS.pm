@@ -22,6 +22,7 @@ use Time::HiRes qw(gettimeofday usleep);
 use Scalar::Util qw(looks_like_number);
 use POSIX qw{strftime};
 use DevIo;
+use HttpUtils;
 no warnings 'portable';  # Support for 64-bit ints required
 
 my %OBIS_channels = (
@@ -110,7 +111,7 @@ sub OBIS_Initialize($)
   $hash->{GetFn} = "OBIS_Get";
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off extChannels:on,off,auto unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both resetAfterNoDataTime createPreValues:on,off ".
+  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off extChannels:on,off,auto unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both resetAfterNoDataTime createPreValues:on,off httpAuthorization ".
   					  $readingFnAttributes;
 }
 
@@ -195,7 +196,17 @@ sub OBIS_Define($$)
   Log3 $hash, 5, "OBIS ($name) - Opening device...";
 
   if (! -f $dev) {
-    DevIo_OpenDev($hash, 0, "OBIS_Init", $hash->{helper}{NETDEV} ? "OBIS_Callback" : undef);
+    if ($dev !~ /^https?:\/\/.*/i ) {
+      DevIo_OpenDev($hash, 0, "OBIS_Init", $hash->{helper}{NETDEV} ? "OBIS_Callback" : undef);
+    } else {
+      $hash->{helper}{LASTDATA} = "";
+      HttpUtils_NonblockingGet({
+		hash	 => $hash,
+		header	 => $hash->{helper}{HTTPAUTH},
+        url      => $dev,
+        callback => \&OBIS_HttpCallback
+     });
+    }
   } else {
     # Debug mode: Open a FHEM debug session and process it...
     Log3 $hash, 1, "OBIS ($name) - Replaying session";
@@ -279,14 +290,24 @@ sub OBIS_GetUpdate($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
+	my $dev = $hash->{DeviceName};
 	my $type= $hash->{MeterType};
 	RemoveInternalTimer($hash, "OBIS_GetUpdate");
 
 	$hash->{helper}{EoM}=-1;
 	if ($hash->{helper}{DEVICES}[1] eq "") {return undef;}
 	if( $init_done ) {
-		DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
-		Log3 $hash, 4, "OBIS ($name) - Wrote $hash->{helper}{DEVICES}[0]";
+		if ($dev =~ /^https?:\/\/.*/i ) {
+			HttpUtils_NonblockingGet({
+				hash	 => $hash,
+				url      => $dev,
+				header	 => $hash->{helper}{HTTPAUTH},
+				callback => \&OBIS_HttpCallback
+			});
+		} else {
+			DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
+			Log3 $hash, 4, "OBIS ($name) - Wrote $hash->{helper}{DEVICES}[0]";
+		}
 	}
 	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
     Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
@@ -538,6 +559,25 @@ sub OBIS_trySMLdecode($$)
 	} while (length ($remainingSML)>4);
 	return ($newMsg,$remainingSML);
 }
+
+sub OBIS_HttpCallback($$$)
+{
+	my ($param, $err, $data) = @_;
+	my $hash = $param->{hash};
+	my $name = $hash->{NAME};
+	if ($err) {
+		Log3 $hash,1,"OBIS ($name) - Error $err";
+	} else {
+		Log3 $hash,5,"OBIS ($name) - Got data, len " . length $data;
+		if ($hash->{helper}{LASTDATA} eq $data) {
+			Log3 $hash,4,"OBIS ($name) - HTTP data unchanged";
+		} else {
+			$hash->{helper}{LASTDATA} = $data;
+			OBIS_Parse($hash, $data);
+		}
+	}
+}
+
 
 sub OBIS_Parse($$)
 {
@@ -841,6 +881,11 @@ Log3 $name, 3, "OBIS ($name) - Attr $aName Val $aVal, dopoll = $dopoll";
 			 	}
 			 }			
 		}
+		if ($aName eq "httpAuthorization") {
+			return "OBIS ($name) - $name: attr httpAuthorization must be in the format user:password, e.g. for Tibber Pulse admin:ABCD-1234"
+				if ($aVal!~/^\w+:.*$/);
+			$hash->{helper}{HTTPAUTH} = "Authorization: Basic " . encode_base64($aVal);
+		}			
 	}
 	return undef;
 }
@@ -939,7 +984,8 @@ sub OBIS_CRC16($$) {
     <code>define &lt;name&gt; OBIS device|none [MeterType] </code><br>
     <br>
       &lt;device&gt; specifies the serial port or hostname/ip-address:port
-      to communicate with the smartmeter.
+      to communicate with the smartmeter. For Tibber Pulse and requesting via HTTP,
+      specify the URL in the LAN.
       In case of a <b>serial device</b> and with Linux:
       <ul>
       <li>the device will be named /dev/ttyUSBx, where x is a number.</li>
@@ -1012,7 +1058,10 @@ sub OBIS_CRC16($$) {
       If on a TCP-connection no data was received for the given time, the connection is
       closed and reopened
       </li>
-      
+   <code>httpAuthorization</code><br>
+      If the SML data is fetched by HTTP (Usecase: e.g. Tibber Pulse), this attribute is
+      used to authenticate the HTTP-request. The format must be
+      <username>:<password>, e.g. for Tibber Pulse something like "admin:<Password near QR-Code on the bridge>"
   <br>
 </ul></ul>
 
@@ -1029,7 +1078,8 @@ sub OBIS_CRC16($$) {
   <ul>
     <code>define &lt;name&gt; OBIS device|none [MeterType] </code><br>
     <br>
-      &lt;device&gt; gibt den seriellen Port oder den Hostnamen/die IP-Adresse:Port an. <br>
+      &lt;device&gt; gibt den seriellen Port oder den Hostnamen/die IP-Adresse:Port an. Für den Tibber Pulse ist stattdessen die vollständige URL im LAN 
+      anzugeben, unter der die Daten geladen werden können.<br>
       Bei <b>seriellem Port</b> (USB) und Linux gibt man hier entweder
       <ul>
       <li>als Ger&auml;t etwas wie /dev/ttyUSBx, an (x eine Zahl)</li>
@@ -1099,6 +1149,11 @@ sub OBIS_CRC16($$) {
    <code>resetAfterNoDataTime</code><br>
       Bei TCP-Verbindungen wird nach der angegebenen Zahl Sekunden die Verbindung
       geschlossen und neu ge&ouml;ffnet, wenn keine Daten empfangen wurden
+      </li><li>  
+   <code>httpAuthorization</code><br>
+      Werden die SML-Daten per HTTP abgefragt (Usecase: Tibber Pulse z.B.), wird hiermit
+      die Authentifizierung für den HTTP-Request gesetzt. Das Format muss
+      <username>:<passwort> sein, also für den Tibber Pulse i.d.R. "admin:<Passwort bei QR-Code auf der Bridge>"
       </li>
   <br>
 </ul></ul>
