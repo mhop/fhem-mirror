@@ -289,20 +289,19 @@ sub cref_findInfo {
 
 =pod
 =item command
-=item summary    show help for module or device
-=item summary_DE Hilfe f&uuml;r Module und Ger&auml;te
+=item summary    show help for command, module or device
 =begin html
 
 <a name="help"></a>
 <h3>?, help</h3>
   <ul>
-    <code>? [&lt;moduleName|deviceName&gt;] [<language>]</code><br/>
-    <code>help [&lt;moduleName|deviceName&gt;] [<language>]</code><br/>
+    <code>?&nbsp;&nbsp;&nbsp;&nbsp;[&lt;commandName|moduleName|deviceName&gt;] [&lt;language&gt;]</code><br/>
+    <code>help [&lt;commandName|moduleName|deviceName&gt;] [&lt;language&gt;]</code><br/>
     <br/>
     <ul>
       <li>Returns a list of available commands, when called without a
         moduleName/deviceName.</li>
-      <li>Returns a module dependent helptext, same as in commandref.</li>
+      <li>Returns a module/command dependent helptext, same as in commandref.</li>
       <li>language will be determined in following order: 
          <ul>
          <li>valid parameter &lt;language&gt; given</li>
@@ -314,28 +313,5 @@ sub cref_findInfo {
   </ul>
 
 =end html
-
-=begin html_DE
-
-<a name="help"></a>
-<h3>?, help</h3>
-  <ul>
-    <code>? [&lt;moduleName|deviceName&gt;] [<language>]</code><br/>
-    <code>help [&lt;moduleName|deviceName&gt;] [<language>]</code><br/>
-    <br>
-    <ul>
-      <li>Liefert eine Liste aller Befehle mit einer Kurzbeschreibung zur&uuml;ck.</li>
-      <li>Falls moduleName oder deviceName spezifiziert ist, wird die modul-spezifische Hilfe
-          aus commandref zur&uuml;ckgeliefert.</li>
-      <li>Die anzuzeigende Sprache wird in folgender Reihenfolge bestimmt: 
-         <ul>
-         <li>g&uuml;ltiger Parameter &lt;language&gt; beim Aufruf &uuml;bergeben</li>
-         <li>globales Attribut language</li>
-         <li>falls alles fehlt: englisch</li>
-         </ul>
-      </li>
-    </ul>
-  </ul>
-=end html_DE
 
 =cut
