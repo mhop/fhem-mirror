@@ -3533,7 +3533,7 @@ sub FRITZBOX_Readout_Run_Web($)
      }
 
    } else {
-     FRITZBOX_Log $hash, 4, "DEBUG: TR064: " . $hash->{TR064}?$hash->{TR064}:"none" . " or secure Port:" . $hash->{SECPORT}?$hash->{SECPORT}:"none" . " not available or wrong Fritz!OS: $FW1.$FW2.";
+     FRITZBOX_Log $hash, 4, "DEBUG: TR064: $hash->{TR064} or secure Port:" . ($hash->{SECPORT} ? $hash->{SECPORT} : "none") . " not available or wrong Fritz!OS: $FW1.$FW2.";
    }
 
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid} if $result->{sid};
