@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix: 72_FRITZBOX: weitere Stabilisierung
+ - feature: 72_FRITZBOX: neue Readings
+            box_dns_Server<n>, box_connection_Type,
+            box_last_auth_err, box_mac_Address
  - feature: 47_OBIS: Support for Tibber Pulse with HTTP-Hack
  - feature: AutomowerConnectFamily: add definiton of zones, possibillity to
             highlight path section, some fixes
