@@ -4799,12 +4799,15 @@ setReadingsVal($$$$)
 
   return if($rname eq "IODev" && !fhem_devSupportsAttr($hash->{NAME}, "IODev"));
 
-  if($hash->{".or"} && grep($rname =~ m/^$_$/, @{$hash->{".or"}}) ) {
-    if(defined($hash->{READINGS}{$rname}) && 
-       defined($hash->{READINGS}{$rname}{VAL}) &&
-        $hash->{READINGS}{$rname}{VAL} ne $val ) {
-      $hash->{OLDREADINGS}{$rname}{VAL} = $hash->{READINGS}{$rname}{VAL};
-      $hash->{OLDREADINGS}{$rname}{TIME} = $hash->{READINGS}{$rname}{TIME};
+  my $or = $hash->{".or"};
+  if($or && grep($rname =~ m/^$_$/, @{$or}) ) {
+    my $rd = $hash->{READINGS};
+    if(defined($rd->{$rname}) && 
+       defined($rd->{$rname}{VAL}) &&
+        ($or->[@{$or}-1] eq "oldreadingsAlways" ||
+         $rd->{$rname}{VAL} ne $val) ) {
+      $hash->{OLDREADINGS}{$rname}{VAL} = $rd->{$rname}{VAL};
+      $hash->{OLDREADINGS}{$rname}{TIME} = $rd->{$rname}{TIME};
     }
   }
 
