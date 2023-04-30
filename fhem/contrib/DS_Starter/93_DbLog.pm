@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 27327 2023-03-16 19:56:33Z DS_Starter $
+# $Id: 93_DbLog.pm 27379 2023-04-01 07:16:52Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -38,8 +38,9 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.8.7"   => "30.04.2023 new Events INITIALIZED, DISCONNECTED ",
   "5.8.6"   => "25.03.2023 change _DbLog_plotData (intx), Plot Editor: include functions delta-h, delta-h, ...".
-                           "remode setter deleteOldDaysNbl, reduceLogNbl ",
+                           "remove setter deleteOldDaysNbl, reduceLogNbl ",
   "5.8.5"   => "16.03.2023 fix using https in configCheck after SVN server change ",
   "5.8.4"   => "20.02.2023 new attr plotInputFieldLength, improve Plot Editor, delete attr noNotifyDev ".
                            "move notifyRegexpChanged from Define to initOnStart ",
@@ -5498,9 +5499,21 @@ sub DbLog_SBP_Read {
       if ($oper =~ /reduceLog/xs) {
           readingsSingleUpdate($hash, 'reduceLogState', $ret->{res}, 1) if($ret->{res});
       }
+      
+      ## sendDbConnectData - Read
+      #############################
+      if ($oper =~ /sendDbConnectData/xs) {
+          DoTrigger ($name, 'INITIALIZED', 1);
+      }
+      
+      ## dbDisconnect - Read
+      ########################
+      if ($oper =~ /dbDisconnect/xs) {
+          DoTrigger ($name, 'DISCONNECTED', 1);
+      }
 
       if(AttrVal($name, 'showproctime', 0) && $ot) {
-          my ($rt,$brt) = split(",", $ot);
+          my ($rt,$brt) = split ",", $ot;
 
           readingsBeginUpdate ($hash);
           readingsBulkUpdate  ($hash, 'background_processing_time', sprintf("%.4f",$brt));
@@ -8615,13 +8628,13 @@ sub DbLog_setVersionInfo {
 
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 27327 2023-03-16 19:56:33Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 27379 2023-04-01 07:16:52Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/xsg;
       }
       else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 27327 2023-03-16 19:56:33Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 27379 2023-04-01 07:16:52Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
