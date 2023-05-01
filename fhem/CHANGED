@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_DbLog: new Events FRAME_INITIALIZED, SUBPROC_INITIALIZED, 
+                      SUBPROC_DISCONNECTED, SUBPROC_STOPPED
+                      (Forum: #133403.0)
  - feature: 48_MieleAtHome: support optional event-api
  - bugfix:  72_FRITZBOX: weitere Stabilisierung
  - feature: 72_FRITZBOX: neue Readings
