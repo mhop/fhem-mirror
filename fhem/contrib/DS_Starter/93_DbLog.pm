@@ -38,7 +38,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.8.7"   => "01.05.2023 new Events FRAME_INITIALIZED, SUBPROC_INITIALIZED, SUBPROC_DISCONNECTED, SUBPROC_STOPPED ",
+  "5.8.7"   => "01.05.2023 new Events FRAME_INITIALIZED, SUBPROC_INITIALIZED, SUBPROC_DISCONNECTED, SUBPROC_STOPPED ".
+               "Forum: https://forum.fhem.de/index.php?topic=133403.0, minor fixes ",
   "5.8.6"   => "25.03.2023 change _DbLog_plotData (intx), Plot Editor: include functions delta-h, delta-h, ...".
                            "remove setter deleteOldDaysNbl, reduceLogNbl ",
   "5.8.5"   => "16.03.2023 fix using https in configCheck after SVN server change ",
@@ -264,6 +265,7 @@ sub DbLog_Define {
   $hash->{HELPER}{OLDSTATE}      = 'initialized';
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                                                      # Modul Meta.pm nicht vorhanden
 
+  DbLog_setSchemeTable ($hash, '');                                                                           # Tabellen initial setzen
   DbLog_setVersionInfo ($hash);                                                                               # Versionsinformationen setzen
 
   $hash->{PID}                      = $$;                                                                     # remember PID for plotfork
@@ -275,8 +277,6 @@ sub DbLog_Define {
       Log3($name, 1, "DbLog $name - Error while reading $hash->{CONFIGURATION}: '$ret' ");
       return $ret;
   }
-
-  InternalTimer(gettimeofday()+2, 'DbLog_setinternalcols', $hash, 0);                                         # set used COLUMNS
 
   DbLog_setReadingstate  ($hash, 'waiting for connection');
   DbLog_SBP_CheckAndInit ($hash, 1);                                                                          # SubProcess starten - direkt nach Define !! um wenig Speicher zu allokieren
@@ -314,8 +314,9 @@ sub _DbLog_initOnStart {
       readingsDelete ($hash, $r);
   }
 
-  DbLog_setSchemeTable         ($hash);  
+  DbLog_setSchemeTable         ($hash);                                 # Tabellenschema nach Laden Attr neu setzen
   notifyRegexpChanged          ($hash, $hash->{REGEXP});                # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
+  DbLog_setinternalcols        ($hash);                                 # verwendete Feldlängen setzen
   
   DoTrigger                    ($name, 'FRAME_INITIALIZED', 1);
   
@@ -455,7 +456,7 @@ sub DbLog_Attr {
   if ($aName =~ /SQLite/xs) {
       if ($init_done == 1) {
           DbLog_SBP_sendDbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
-          InternalTimer(gettimeofday()+2.0, 'DbLog_SBP_sendConnectionData', $hash, 0);      # neue Verbindungsdaten an SubProzess senden
+          InternalTimer(gettimeofday()+0.8, 'DbLog_SBP_sendConnectionData', $hash, 0);      # neue Verbindungsdaten an SubProzess senden
       }
   }
 
@@ -463,13 +464,16 @@ sub DbLog_Attr {
       if ($cmd eq "set" && $aVal) {
           unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 !";}
       }
-      InternalTimer(gettimeofday()+0.5, "DbLog_setinternalcols", $hash, 0);
+      
+      if ($init_done == 1) {
+          InternalTimer(gettimeofday()+0.8, "DbLog_setinternalcols", $hash, 0);
+      }
   }
 
   if($aName eq 'asyncMode') {
       if ($cmd eq "set" && $aVal) {
           $hash->{MODE} = 'asynchronous';
-          InternalTimer(gettimeofday()+2, 'DbLog_execMemCacheAsync', $hash, 0);
+          InternalTimer(gettimeofday()+0.8, 'DbLog_execMemCacheAsync', $hash, 0);
       }
       else {
           $hash->{MODE} = 'synchronous';
@@ -491,7 +495,7 @@ sub DbLog_Attr {
       if ($init_done == 1) {
            DbLog_SBP_sendDbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
 
-          InternalTimer(gettimeofday()+2.0, 'DbLog_SBP_sendConnectionData', $hash, 0);       # neue Verbindungsdaten an SubProzess senden
+          InternalTimer(gettimeofday()+0.8, 'DbLog_SBP_sendConnectionData', $hash, 0);       # neue Verbindungsdaten an SubProzess senden
       }
   }
 
@@ -522,7 +526,7 @@ sub DbLog_Attr {
       DbLog_setReadingstate   ($hash, $val);
 
       if ($do == 0) {
-          InternalTimer(gettimeofday()+2, "_DbLog_initOnStart", $hash, 0);
+          InternalTimer(gettimeofday()+0.8, "_DbLog_initOnStart", $hash, 0);
       }
   }
 
@@ -543,7 +547,7 @@ sub DbLog_Attr {
       if ($init_done == 1) {
            DbLog_SBP_sendDbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
 
-          InternalTimer(gettimeofday()+2.0, 'DbLog_SBP_sendConnectionData', $hash, 0);       # neue Verbindungsdaten an SubProzess senden
+          InternalTimer(gettimeofday()+0.8, 'DbLog_SBP_sendConnectionData', $hash, 0);       # neue Verbindungsdaten an SubProzess senden
       }
   }
 
@@ -8294,6 +8298,7 @@ return @v;
 ################################################################
 sub DbLog_setinternalcols {
   my $hash = shift;
+  
   my $name = $hash->{NAME};
 
   $hash->{HELPER}{DEVICECOL}   = $DbLog_columns{DEVICE};
@@ -8527,7 +8532,6 @@ sub DbLog_sampleDataFn {
 
           no warnings 'uninitialized';                                                     # Forum:74690, bug unitialized
           $ret .= SVG_sel ("par_${r}_0", $cols, "$f[0]:$f[1]");                            # par_<Zeile>_<Spalte>, <Auswahl>, <Vorbelegung>
-          use warnings;
 
           $ret .= SVG_sel ("par_${r}_3", $dblog_svgfnset, $f[3]);                          # Funktionsauswahl
 
@@ -8535,6 +8539,7 @@ sub DbLog_sampleDataFn {
           $ret .= SVG_txt ("par_${r}_4", "<br>", "$2", $pifl);                             # RegExp (z.B. $val=~s/^Total..([\d.]*).*/$1/eg)
 
           $ret .= SVG_txt ("par_${r}_2", "", $f[2], 1);                                    # der Defaultwert (nicht ausgewertet)
+          use warnings;
           
           push @htmlArr, $ret;
       }
@@ -8551,11 +8556,11 @@ sub DbLog_sampleDataFn {
 
           no warnings 'uninitialized';                                                     # Forum:74690, bug unitialized
           $ret .= SVG_txt ("par_${r}_0", "", "$f[0]:$f[1]::$f[3]", $pifl);                 # letzter Wert -> Breite der Eingabezeile
-          use warnings;
 
           $f[4] =~ /^(:+)?(.*)/xs;
           $ret .= SVG_txt ("par_${r}_3", "<br>", "$2", $pifl);                             # RegExp (z.B. $val=~s/^Total..([\d.]*).*/$1/eg)
-
+          use warnings;
+          
           push @htmlArr, $ret;
       }
   }
@@ -8812,6 +8817,25 @@ return;
     If special characters, e.g. @,$ or % which have a meaning in the perl programming
     language are used in a password, these special characters have to be escaped.
     That means in this example you have to use: \@,\$ respectively \%.
+    <br>
+    <br>
+    
+    <b>DbLog specific events</b> <br><br>
+    
+    DbLog generates events depending on the initialisation status of the DbLog device: 
+    <br>
+    <br>
+    
+      <ul>
+       <table>
+       <colgroup> <col width=20%> <col width=80%> </colgroup>
+       <tr><td> FRAME_INITIALIZED    </td><td>- The basic framework is initialised. Blocking (Get) commands can be executed.          </td></tr>
+       <tr><td> SUBPROC_INITIALIZED  </td><td>- The SupProcess is ready for use. Non-blocking (set) commands can be executed.         </td></tr>
+       <tr><td> SUBPROC_DISCONNECTED </td><td>- The SupProcess was separated from the DB.                                             </td></tr>
+       <tr><td> SUBPROC_STOPPED      </td><td>- The SupProcess has been stopped.                                                      </td></tr>
+       </table>
+      </ul>
+    
     <br>
     <br>
     <br>
@@ -10652,6 +10676,25 @@ attr SMA_Energymeter DbLogValueFn
     Werden Sonderzeichen, wie z.B. @, $ oder %, welche eine programmtechnische Bedeutung in Perl haben im Passwort verwendet,
     sind diese Zeichen zu escapen.
     Das heißt in diesem Beispiel wäre zu verwenden: \@,\$ bzw. \%.
+    <br>
+    <br>
+    
+    <b>DbLog spezifische Events</b> <br><br>
+    
+    DbLog generiert Events abhängig vom Initialisierungsstatus des DbLog-Devices: 
+    <br>
+    <br>
+    
+      <ul>
+       <table>
+       <colgroup> <col width=20%> <col width=80%> </colgroup>
+       <tr><td> FRAME_INITIALIZED    </td><td>- Das grundlegende Rahmenwerk ist initialisiert. Blockierend arbeitende (Get)-Kommandos können ausgeführt werden. </td></tr>
+       <tr><td> SUBPROC_INITIALIZED  </td><td>- Der SupProcess ist einsatzbereit. Nichtblockierend arbeitende (Set)-Kommandos können ausgeführt werden.         </td></tr>
+       <tr><td> SUBPROC_DISCONNECTED </td><td>- Der SupProcess wurde von der DB getrennt.                                                                       </td></tr>
+       <tr><td> SUBPROC_STOPPED      </td><td>- Der SupProcess wurde gestoppt.                                                                                  </td></tr>
+       </table>
+      </ul>
+    
     <br>
     <br>
     <br>
