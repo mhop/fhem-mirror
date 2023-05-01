@@ -35,7 +35,7 @@ use Encode qw(encode_utf8);
 use List::Util qw[min max];
 use JSON;
 
-my $version = "1.2.0";
+my $version = "2.1.0";
 
 my $MAH_hasMimeBase64 = 1;
 
@@ -155,6 +155,7 @@ sub MieleAtHome_Initialize($)
 	$hash->{RenameFn}  = "MAH_RenameFn";
 
 	$hash->{AttrList}       = "";
+	$hash->{AttrList}      .= "api:poll,event ";
 	$hash->{AttrList}      .= "clientId ";
 	$hash->{AttrList}      .= "disable:1 ";
 	$hash->{AttrList}      .= "login ";
@@ -190,7 +191,7 @@ sub MAH_DefFn($$)
 	# check syntax
 	my $pCount = int(@a);
 	if ($pCount < 1 || $pCount > 3) {
-		return "Wrong syntax: use define <name> MAH [deviceId] [interval]";
+		return "Wrong syntax: use define <name> MieleAtHome [deviceId] [interval]";
 	}
 
 	my $name     = shift(@a);
@@ -248,15 +249,15 @@ sub MAH_DefFn($$)
 
 	if (defined($deviceId)) {
 		# this will call MAH_refreshAccessToken itself if required
-		InternalTimer(gettimeofday()+($init_done ? 0 : 10), "MAH_updateValues", $hash);
+		InternalTimer(gettimeofday()+($init_done ? 0 : 10), "MAH_start", $hash);
 	} else {
 		InternalTimer(gettimeofday()+($init_done ? 0 : 10), "MAH_refreshAccessToken", $hash);
 	}
 
 	# if MAH_getAccessToken returns "", it will request a new token on its own
-	if (MAH_getAccessToken($hash) ne "") {
-		InternalTimer(gettimeofday()+0, "MAH_updateValues", $hash);
-	}
+	# if (MAH_getAccessToken($hash) ne "") {
+	# 	InternalTimer(gettimeofday()+0, "MAH_startPoll", $hash);
+	# }
 
 	return undef;
 }
@@ -270,6 +271,7 @@ sub MAH_UndefFn($$)
 	my ($hash, $name) = @_;
 
 	RemoveInternalTimer($hash);
+	MAH_closeEventSource($hash);
 
 	delete($modules{MieleAtHome}{defptr}{"mah_".$name});
 
@@ -313,12 +315,25 @@ sub MAH_AttrFn(@)
 		if ($cmd eq "set" && $attrVal eq "1") {
 			readingsSingleUpdate ( $hash, "state", "disabled", 1 );
 			MAH_Log($hash, 3, "disabled");
+			InternalTimer(gettimeofday()+0, "MAH_stopPoll", $hash);
+			InternalTimer(gettimeofday()+0, "MAH_closeEventSource", $hash);
+
 		}
 		elsif ($cmd eq "del") {
 			readingsSingleUpdate ( $hash, "state", "active", 1 );
 			MAH_Log($hash, 3, "enabled");
-			InternalTimer(gettimeofday()+0, "MAH_updateValues", $hash);
+			InternalTimer(gettimeofday()+0, "MAH_start", $hash);
 		}
+	}
+
+	###############
+	#### api ######
+
+	if ($attrName eq "api") {
+		if ($cmd eq "set") {
+			return "Invalid value for attribute $attrName" if ($attrVal ne "poll" && $attrVal ne "event");
+		}
+		InternalTimer(gettimeofday()+0, "MAH_start", $hash) if ($init_done);
 	}
 
 	#################
@@ -442,7 +457,7 @@ sub MAH_SetFn($$@)
 	else
 	{
 		$list   .= "autocreate:noArg " if (!defined($hash->{IODevName}));
-		$list   .= "update:noArg "     if (defined($hash->{DEVICE_ID}));
+		$list   .= "update:noArg "     if (defined($hash->{DEVICE_ID}) && !defined($hash->{EventSource}));
 
 		$list   .= "on:noArg "   if (defined($hash->{DEVICE_ID}) && ReadingsNum($name, "actions_powerOn",  0) == 1);
 		$list   .= "off:noArg "  if (defined($hash->{DEVICE_ID}) && ReadingsNum($name, "actions_powerOff", 0) == 1);
@@ -556,16 +571,55 @@ sub MAH_RenameFn($$)
 }
 
 #------------------------------------------------------------------------------------------------------
-# request values from 3rd party api
+# start either poll- or event-based requests
 #------------------------------------------------------------------------------------------------------
-sub MAH_updateValues($)
+sub MAH_start($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 
 	MAH_Log($hash, 5, "called");
 
-	RemoveInternalTimer($hash, "MAH_updateValues");
+	return undef if (MAH_isDisabled($hash));
+	return undef unless (defined($hash->{DEVICE_ID}));
+	return undef unless (MAH_hasLoginCredentials($hash));
+
+	my $api = AttrVal($name, "api", "poll");
+	MAH_Log($hash, 3, "starting $api");
+
+	if ($api eq "poll") {
+		MAH_closeEventSource($hash);
+		MAH_startPoll($hash);
+	} elsif ($api eq "event") {
+		MAH_stopPoll($hash);
+		MAH_openEventSource($hash);
+	}
+}
+
+#------------------------------------------------------------------------------------------------------
+# stop polling the API
+#------------------------------------------------------------------------------------------------------
+sub MAH_stopPoll($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+
+	MAH_Log($hash, 5, "called");
+
+	RemoveInternalTimer($hash, "MAH_startPoll");
+}
+
+#------------------------------------------------------------------------------------------------------
+# start polling the API
+#------------------------------------------------------------------------------------------------------
+sub MAH_startPoll($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+
+	MAH_Log($hash, 5, "called");
+
+	MAH_stopPoll($hash);
 
 	return undef if (MAH_isDisabled($hash));
 	return undef unless (defined($hash->{DEVICE_ID}));
@@ -574,17 +628,231 @@ sub MAH_updateValues($)
 	my $interval = $hash->{INTERVAL};
 	# force interval of 60s while != Off
 	$interval = min($interval, 60) if ReadingsNum($name, "statusRaw", 1) != 1; # != Off
-	InternalTimer(gettimeofday()+$interval, "MAH_updateValues", $hash) if (defined($interval));
+	InternalTimer(gettimeofday()+$interval, "MAH_startPoll", $hash) if (defined($interval));
 
 	# MAH_getAccessToken will request a new one, if there is none
 	if (MAH_getAccessToken($hash) eq "") {
 		return;
 	}
 
+	MAH_updateValues($hash);
+}
+
+sub MAH_updateValues($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+
+	MAH_Log($hash, 5, "called");
+
 	MAH_sendGetDeviceIdentAndState($hash);
 	MAH_sendGetDeviceActionsRequest($hash);
 }
 
+#------------------------------------------------------------------------------------------------------
+# MAH_closeEventSource
+#------------------------------------------------------------------------------------------------------
+sub MAH_closeEventSource($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+
+	MAH_Log($hash, 5, "called");
+
+	RemoveInternalTimer($hash, "MAH_eventSourceKeepAlive");
+
+	return if(!defined($hash->{helper}{HTTP_CONNECTION}));
+
+	HttpUtils_Close( $hash->{helper}{HTTP_CONNECTION} );
+	delete $hash->{helper}{HTTP_CONNECTION};
+	MAH_updateEventSourceReadings($hash, undef, undef, undef)
+}
+
+#------------------------------------------------------------------------------------------------------
+# request values via event-api
+#------------------------------------------------------------------------------------------------------
+sub MAH_openEventSource($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+
+	MAH_Log($hash, 5, "called");
+
+	MAH_closeEventSource($hash);
+
+	return undef if (MAH_isDisabled($hash));
+	return undef unless (defined($hash->{DEVICE_ID}));
+	return undef unless (MAH_hasLoginCredentials($hash));
+
+	my $deviceId = $hash->{DEVICE_ID};
+	if ($deviceId eq "") {
+		return "Please set deviceId first";
+	}
+
+	# after a new token is requested, MAH_start() is called again
+	my $token = MAH_getAccessToken($hash);
+	if ($token eq "") {
+		return "Please authenticate first";
+	}
+
+	MAH_updateEventSourceReadings($hash, "connecting", TimeNow(), undef);
+
+	my $lang = AttrVal($name, "lang", "en");
+	my $params = {
+	    # loglevel         => 1,
+	    url                => "https://api.mcs3.miele.com/v1/devices/${deviceId}/events",
+	    httpversion        => '1.1',
+	    method             => 'GET',
+	    timeout            => 60, # ping interval from Miele seems to be 20s
+	    incrementalTimeout => 1,
+	    noshutdown         => 1,
+	    keepalive          => 1,
+	    header             => {   "Accept"          => "text/event-stream",
+	                              "Accept-Language" => "${lang}",
+	                              "Authorization"   => "Bearer " . $token },
+	    hash               => $hash,
+	    callback           => \&MAH_eventSourceDispatch,
+	};
+
+	map { $hash->{helper}{HTTP_CONNECTION}{$_} = $params->{$_} } keys %{$params};
+
+	HttpUtils_NonblockingGet( $hash->{helper}{HTTP_CONNECTION} );
+
+	# start keepalive
+	MAH_eventSourceKeepAlive($hash);
+}
+
+#------------------------------------------------------------------------------------------------------
+sub MAH_eventSourceDispatch($$$)
+{
+	my ($param, $err, $data) = @_;
+	my $hash = $param->{hash};
+	my $name = $hash->{NAME};
+
+	MAH_LogReply($hash, $param, $err, $data);
+
+	if ($err) {
+		MAH_updateEventSourceReadings($hash, "error: ${err}", undef, undef);
+
+		MAH_Log($hash, 1, "Error: $err");
+		# MAH_openEventSource() will close first
+		MAH_openEventSource($hash);
+		return undef;
+	}
+
+	MAH_updateEventSourceReadings($hash, "connected", undef, TimeNow());
+
+	# FORMAT: (https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format)
+	# event: ping
+	# data: ping
+	#while ($data ne "" && $data =~ m/event:\s*(.+)(?:\r?\n)?data:\s*(.+)(?:\r?\n)?(.*)/) {
+
+	my $event = "";
+	my $eventData = "";
+	while($data =~ m/([^:]*):\s*(.+)(?:\r?\n)?(.*)/) {
+		my $key = $1;
+		my $value = $2;
+		$data = $3;
+
+		$event     = $2 if ($key eq "event");
+		$eventData = $2 if ($key eq "data");
+
+		next unless ($event ne "" && $eventData ne "");
+
+		MAH_Log($hash, 5, "$event >> $eventData");
+
+		# Attention
+		# currently the /all/-request replies with "devices" and "actions" (both with the indirection {"1234":<DATA>})
+		# while the /1234/-request replys replies wwith "device[]" and "action[s]" ("device" without- and "actions" with the indirection {"1234":<DATA>})
+		# but MAH_updateDeviceReadings() and MAH_updateActionReadings() remove the indirections if needed
+		if      ($event eq "device" || $event eq "devices") {
+			MAH_updateDeviceReadings($hash, $eventData);
+		} elsif ($event eq "action" || $event eq "actions") {
+			MAH_updateActionReadings($hash, $eventData);
+		}
+
+		$event     = "";
+		$eventData = "";
+	}
+}
+
+#------------------------------------------------------------------------------------------------------
+# MAH_eventSourceKeepAlive
+#------------------------------------------------------------------------------------------------------
+sub MAH_eventSourceKeepAlive($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+
+	MAH_Log($hash, 5, "called");
+
+	my $api = AttrVal($name, "api", "poll");
+	return unless ($api eq "event");
+
+	InternalTimer(gettimeofday()+30, "MAH_eventSourceKeepAlive", $hash);
+
+	my $now     = time();
+	my $timeout = 180;
+
+	# if we received an update within last 10s, all is fine ...
+	if (defined ($hash->{EventSourceLastUpdate})) {
+		my $lastUpdate = time_str2num($hash->{EventSourceLastUpdate});
+		if ($now - $lastUpdate <= $timeout) {
+			return;
+		}
+	}
+	MAH_Log($hash, 5, "EventSourceLastUpdate is > 10s ...");
+
+	# if we started withing the last 10s, all is fine, too ...
+	if (defined ($hash->{EventSourceLastConnect})) {
+		my $lastConnect = time_str2num($hash->{EventSourceLastConnect});
+		if ($now - $lastConnect <= $timeout) {
+			return;
+		}
+	}
+	MAH_Log($hash, 5, "EventSourceLastConnect is > $[timeout}s ..."); 
+
+	# ... otherwise ... timeout
+	MAH_Log($hash, 4, "timout in event stream, reconnecting...");
+	MAH_updateEventSourceReadings($hash, "timeout", undef, undef);
+
+	MAH_openEventSource($hash);
+}
+
+#------------------------------------------------------------------------------------------------------
+# MAH_updateEventSourceReadings
+#------------------------------------------------------------------------------------------------------
+sub MAH_updateEventSourceReadings($$$$)
+{
+	my ($hash, $status, $lastConnect, $lastUpdate) = @_;
+	my $name = $hash->{NAME};
+
+	MAH_Log($hash, 5, "called");
+
+	if (!$status && !$lastConnect && !$lastUpdate) {
+		delete($hash->{EventSource});
+		delete($hash->{EventSourceLastUpdate});
+		delete($hash->{EventSourceLastConnect});
+		fhem("deletereading $name _EventSource.*");
+		return;
+	}
+
+	readingsBeginUpdate($hash);
+	if ($status) {
+		$hash->{EventSource}                    = $status;
+		readingsBulkUpdate($hash, "_EventSource", $status);
+	}
+	if ($lastConnect) {
+		$hash->{EventSourceLastConnect}                    = $lastConnect;
+		readingsBulkUpdate($hash, "_EventSourceLastConnect", $lastConnect);
+
+	}
+	if ($lastUpdate) {
+		$hash->{EventSourceLastUpdate}                    = $lastUpdate;
+		readingsBulkUpdate($hash, "_EventSourceLastUpdate", $lastUpdate);
+	}
+	readingsEndUpdate($hash, 1);
+}
 
 #------------------------------------------------------------------------------------------------------
 # MAH_refreshAccessToken
@@ -625,7 +893,7 @@ sub MAH_refreshAccessToken($)
 	my $refreshToken = MAH_getRefreshTokenPrivate($hash);
 	if ($refreshToken ne "" && MAH_getRemainingTokenLifetime($hash) > 0) {
 		MAH_Log($hash, 4, "already have a refresh-token, using this for token-refresh");
-		MAH_doThirdpartyTokenRequest($hash, "", $refreshToken)
+		MAH_doThirdpartyTokenRequest($hash, "", $refreshToken);
 	} else {
 		MAH_doThirdpartyLoginRequest($hash);
 	}
@@ -669,7 +937,7 @@ sub MAH_onThirdpartyLoginReply($$$)
 	my $hash = $param->{hash};
 	my $name = $hash->{NAME};
 
-	MAH_Log($hash, 5, "reply: err:$err, code:$param->{code}, headers:$param->{httpheader}, data:$data");
+	MAH_LogReply($hash, $param, $err, $data);
 
 	if ($err) {
 		MAH_Log($hash, 3, "Error: $err");
@@ -737,7 +1005,7 @@ sub MAH_onOauthLoginReply($$$)
 	my $hash = $param->{hash};
 	my $name = $hash->{NAME};
 
-	MAH_Log($hash, 5, "reply: err:$err, code:$param->{code}, headers:$param->{httpheader}, data:$data");
+	MAH_LogReply($hash, $param, $err, $data);
 
 	if ($err) {
 		MAH_Log($hash, 3, "Error: $err");
@@ -858,7 +1126,7 @@ sub MAH_onThirdpartyTokenReply($$$)
 	my $hash = $param->{hash};
 	my $name = $hash->{NAME};
 
-	MAH_Log($hash, 5, "reply: err:$err, code:$param->{code}, headers:$param->{httpheader}, data:$data");
+	MAH_LogReply($hash, $param, $err, $data);
 
 	if ($err) {
 		MAH_Log($hash, 3, "Error: $err");
@@ -901,7 +1169,7 @@ sub MAH_onThirdpartyTokenReply($$$)
 	$hash->{TOKEN_REFRESH_IN_PROGRESS} = 0;
 
 	if (MAH_getAccessToken($hash) ne "") {
-		InternalTimer(gettimeofday()+0, "MAH_updateValues", $hash);
+		InternalTimer(gettimeofday()+0, "MAH_start", $hash);
 	}
 }
 
@@ -930,7 +1198,7 @@ sub MAH_blockingGetAllDevicesRequest($)
 		method      => "GET",
 	});
 
-	MAH_Log($hash, 5, "reply: err:$err, data:$data");
+	MAH_LogReply($hash, undef, $err, $data);
 
 	if ($err) {
 		MAH_Log($hash, 3, "Error: $err");
@@ -997,7 +1265,7 @@ sub MAH_onGetDeviceIdentAndStateReply($$$)
 	my $hash = $param->{hash};
 	my $name = $hash->{NAME};
 
-	MAH_Log($hash, 5, "reply: err:$err, code:$param->{code}, data:$data");
+	MAH_LogReply($hash, $param, $err, $data);
 
 	if ($err) {
 		MAH_Log($hash, 3, "Error: $err");
@@ -1008,6 +1276,16 @@ sub MAH_onGetDeviceIdentAndStateReply($$$)
 		MAH_Log($hash, 3, "Error: code != 200: $param->{code}");
 		return "invalid status code: " . $param->{code};
 	}
+
+	MAH_updateDeviceReadings($hash, $data);
+}
+
+sub MAH_updateDeviceReadings($$)
+{
+	my ($hash, $data) = @_;
+	my $name = $hash->{NAME};
+
+	MAH_Log($hash, 5, "called");
 
 	my $json = eval{decode_json($data)};
 	if ($@) {
@@ -1024,6 +1302,14 @@ sub MAH_onGetDeviceIdentAndStateReply($$$)
 	if (exists($json->{code})) {
 		MAH_Log($hash, 3, "got error code: $json");
 		return;
+	}
+
+	# the "devices"-reply (from event-sourcing) might be in the 
+	# form {"12345":<DATA>} instead of <DATA> so get rid of this indirection
+	my $deviceId = $hash->{DEVICE_ID};
+	if (exists($json->{$deviceId})) {
+		MAH_Log($hash, 5, "dropping indirection for deviceId");
+		$json = $json->{$deviceId};
 	}
 
 	# decode_utf8() is required due do something like:
@@ -1050,6 +1336,7 @@ sub MAH_onGetDeviceIdentAndStateReply($$$)
 
 	readingsBulkUpdate($hash, "dryingStep",            encode_utf8($json->{state}->{dryingStep}->{value_localized}));
 	readingsBulkUpdate($hash, "light",                 encode_utf8($json->{state}->{light}));
+	readingsBulkUpdate($hash, "batteryLevel",          encode_utf8($json->{state}->{batteryLevel}));
 	readingsBulkUpdate($hash, "programID",             encode_utf8($json->{state}->{ProgramID}->{value_localized}));
 	readingsBulkUpdate($hash, "programPhase",          encode_utf8($json->{state}->{programPhase}->{value_localized}));
 	readingsBulkUpdate($hash, "programType",           encode_utf8($json->{state}->{programType}->{value_localized}));
@@ -1067,11 +1354,12 @@ sub MAH_onGetDeviceIdentAndStateReply($$$)
 	readingsBulkUpdate($hash, "ecoFeedbackWaterForecast",             encode_utf8($json->{state}->{ecoFeedback}->{waterForecast}));
 	readingsBulkUpdate($hash, "ecoFeedbackEnergyForecast",            encode_utf8($json->{state}->{ecoFeedback}->{energyForecast}));
 
-	readingsBulkUpdate($hash, "remoteEnableFullRC",    $json->{state}->{remoteEnable}->{fullRemoteControl});
-	readingsBulkUpdate($hash, "remoteEnableSmartGrid", $json->{state}->{remoteEnable}->{smartGrid});
-	readingsBulkUpdate($hash, "signalDoor",            $json->{state}->{signalDoor});
-	readingsBulkUpdate($hash, "signalFailure",         $json->{state}->{signalFailure});
-	readingsBulkUpdate($hash, "signalInfo",            $json->{state}->{signalInfo});
+	readingsBulkUpdate($hash, "remoteEnableFullRC",      $json->{state}->{remoteEnable}->{fullRemoteControl});
+	readingsBulkUpdate($hash, "remoteEnableSmartGrid",   $json->{state}->{remoteEnable}->{smartGrid});
+	readingsBulkUpdate($hash, "remoteEnableMobileStart", $json->{state}->{remoteEnable}->{mobileStart});
+	readingsBulkUpdate($hash, "signalDoor",              $json->{state}->{signalDoor});
+	readingsBulkUpdate($hash, "signalFailure",           $json->{state}->{signalFailure});
+	readingsBulkUpdate($hash, "signalInfo",              $json->{state}->{signalInfo});
 
 	# target temperature
 	my @targetTemperatures = MAH_decodeTemperature($hash, @{$json->{state}->{targetTemperature}});
@@ -1146,7 +1434,7 @@ sub MAH_onGetDeviceActionsReply($$$)
 	my $hash = $param->{hash};
 	my $name = $hash->{NAME};
 
-	MAH_Log($hash, 5, "reply: err:$err, code:$param->{code}, data:$data");
+	MAH_LogReply($hash, $param, $err, $data);
 
 	if ($err) {
 		MAH_Log($hash, 3, "Error: $err");
@@ -1157,6 +1445,16 @@ sub MAH_onGetDeviceActionsReply($$$)
 		MAH_Log($hash, 3, "Error: code != 200: $param->{code}");
 		return;
 	}
+
+	MAH_updateActionReadings($hash, $data)
+}
+
+sub MAH_updateActionReadings($$)
+{
+	my ($hash, $data) = @_;
+	my $name = $hash->{NAME};
+
+	MAH_Log($hash, 5, "called");
 
 	my $json = eval{decode_json($data)};
 	if ($@) {
@@ -1173,6 +1471,14 @@ sub MAH_onGetDeviceActionsReply($$$)
 	if (exists($json->{code})) {
 		MAH_Log($hash, 3, "got error code: $json");
 		return;
+	}
+
+	# the "actions"-reply (from event-sourcing) might be in the 
+	# form {"12345":<DATA>} instead of <DATA> so get rid of this indirection
+	my $deviceId = $hash->{DEVICE_ID};
+	if (exists($json->{$deviceId})) {
+		MAH_Log($hash, 5, "dropping indirection for deviceId");
+		$json = $json->{$deviceId};
 	}
 
 	no strict "refs";
@@ -1574,13 +1880,14 @@ sub MAH_sendSetActionRequest($$)
 
 	return undef;
 }
+#------------------------------------------------------------------------------------------------------
 sub MAH_onSetActionReply($$$)
 {
 	my ($param, $err, $data) = @_;
 	my $hash = $param->{hash};
 	my $name = $hash->{NAME};
 
-	MAH_Log($hash, 5, "reply: err:$err, code:$param->{code}, data:$data");
+	MAH_LogReply($hash, $param, $err, $data);
 
 	if ($err) {
 		MAH_Log($hash, 3, "Error: $err");
@@ -1952,6 +2259,28 @@ sub MAH_deleteKeyValue($$)
 }
 
 #------------------------------------------------------------------------------------------------------
+# Util: Log replys of network requests
+#------------------------------------------------------------------------------------------------------
+sub MAH_LogReply($$$$)
+{
+	my ($hash, $param, $err, $data) = @_;
+	my $logLevel = 5;
+
+	# prevent warnings with uninitialized variables
+	my $logMessage = "received reply";
+	$logMessage   .= ", err:$err" if ($err);
+	$logMessage   .= ", code:$param->{code}" if ($param && defined($param->{code}));
+	$logMessage   .= ", headers:$param->{httpheader}" if ($param && defined($param->{httpheader}));
+	$logMessage   .= ", data:$data" if ($data);
+
+	my $line       = ( caller(0) )[2];
+	my $modAndSub  = ( caller(1) )[3];
+	my $subroutine = ( split(':', $modAndSub) )[2];
+
+	MAH_LogPrivate($hash, $logLevel, $logMessage, $line, $subroutine);
+}
+
+#------------------------------------------------------------------------------------------------------
 # Util: Log
 #------------------------------------------------------------------------------------------------------
 sub MAH_Log($$$)
@@ -1960,10 +2289,20 @@ sub MAH_Log($$$)
 	my $line       = ( caller(0) )[2];
 	my $modAndSub  = ( caller(1) )[3];
 	my $subroutine = ( split(':', $modAndSub) )[2];
-	my $name       = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : "MieleAtHome";
+
+	MAH_LogPrivate($hash, $logLevel, $logMessage, $line, $subroutine);
+}
+
+#------------------------------------------------------------------------------------------------------
+# Util: LogPrivates
+#------------------------------------------------------------------------------------------------------
+sub MAH_LogPrivate($$$$$)
+{
+	my ($hash, $logLevel, $logMessage, $line, $subroutine) = @_;
+	my $name = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : "MieleAtHome";
 
 	# replace non-printable characters by "<xx>"
-	$logMessage =~ s/([\x{00}-\x{1f}\x{7f}-\x{ffffffff}])/'<'.unpack('(H2)',$1).'>'/ge;
+	$logMessage =~ s/([\x{00}-\x{1f}\x{7f}-\x{7fffffff}])/'<'.unpack('(H2)',$1).'>'/ge;
 
 	Log3($hash, $logLevel, "${name} (MieleAtHome::${subroutine}:${line}) " . $logMessage);
 	#Log3($hash, $logLevel, "${name} (MieleAtHome::${subroutine}:${line}) Stack was: " . MAH_getStacktrace());
@@ -2045,6 +2384,11 @@ sub MAH_getStacktrace()
 	<code>define Waschmaschine MieleAtHome 000123456789@MieleConnection 120</code><br>
 	<br>
 	This statement creates the instance of your specific Miele@home appliance with the name Waschmaschine and the DeviceId 000123456789 and a refresh-interval of 120 seconds. The interval is optional, its default is 120 seconds.<br>
+	<br>
+	<b>Remote starting appliences</b><br>
+	<br>
+	Appliences like wasching mashines can be started remotely via FHEM, but this is rather unintuitive:<br>
+	Therefore the user loads the applience, selects a start or end time within the next 24 hours and presses the start button. The applience then waits for a "remote start" and can be started by FHEM before the start or end time has elapsed. If this is not received within the specified start or end time, it starts itself to be ready in time. <br>
 	<br>
 
 <!--
@@ -2167,6 +2511,10 @@ sub MAH_getStacktrace()
 	<a id="MieleAtHome-attr"></a>
 	<b>Attributes</b>
 	<ul>
+		<li><a id="MieleAtHome-attr-api"></a>
+			<dt><code><b>api [poll|event]</b></code></dt>
+			set to <i>poll</i> if you want FHEM to repeatedly poll the Miele server for updates. Set to <i>event</i> if you want to have a keepalive-connection to the Miele server. With <i>event</i>, updates are received as soon as they are updated on the Miele server. With <i>poll</i> updates are only received in the configured interval. <br><i>poll</i> is the current default but the default will be switched to <i>event</i> after a testing period.
+		</li>
 		<li><a id="MieleAtHome-attr-clientId"></a>
 			<dt><code><b>clientId</b></code></dt>
 			set the <i>clientId</i> of your Miele@home-developer account.

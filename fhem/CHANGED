@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
- - bugfix: 72_FRITZBOX: weitere Stabilisierung
+ - feature: 48_MieleAtHome: support optional event-api
+ - bugfix:  72_FRITZBOX: weitere Stabilisierung
  - feature: 72_FRITZBOX: neue Readings
             box_dns_Server<n>, box_connection_Type,
             box_last_auth_err, box_mac_Address
