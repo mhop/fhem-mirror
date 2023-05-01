@@ -38,7 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.8.7"   => "30.04.2023 new Events INITIALIZED, DISCONNECTED ",
+  "5.8.7"   => "01.05.2023 new Events FRAME_INITIALIZED, SUBPROC_INITIALIZED, SUBPROC_DISCONNECTED, SUBPROC_STOPPED ",
   "5.8.6"   => "25.03.2023 change _DbLog_plotData (intx), Plot Editor: include functions delta-h, delta-h, ...".
                            "remove setter deleteOldDaysNbl, reduceLogNbl ",
   "5.8.5"   => "16.03.2023 fix using https in configCheck after SVN server change ",
@@ -314,16 +314,14 @@ sub _DbLog_initOnStart {
       readingsDelete ($hash, $r);
   }
 
-  DbLog_setSchemeTable   ($hash);
-  notifyRegexpChanged    ($hash, $hash->{REGEXP});                      # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
-  DbLog_SBP_CheckAndInit ($hash);
-
-  my $rst = DbLog_SBP_sendConnectionData ($hash);                       # Verbindungsdaten an SubProzess senden
-  if (!$rst) {
-      Log3 ($name, 3, "DbLog $name - DB connection parameters are initialized in the SubProcess");
-  }
-
-  DbLog_execMemCacheAsync ($hash);                                      # InternalTimer DbLog_execMemCacheAsync starten
+  DbLog_setSchemeTable         ($hash);  
+  notifyRegexpChanged          ($hash, $hash->{REGEXP});                # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
+  
+  DoTrigger                    ($name, 'FRAME_INITIALIZED', 1);
+  
+  DbLog_SBP_CheckAndInit       ($hash);
+  DbLog_SBP_sendConnectionData ($hash);                                 # Verbindungsdaten an SubProzess senden
+  DbLog_execMemCacheAsync      ($hash);                                 # InternalTimer DbLog_execMemCacheAsync starten
 
 return;
 }
@@ -5384,7 +5382,7 @@ sub DbLog_SBP_CleanUp {
   #$subprocess->wait();
 
   kill 'SIGKILL', $pid;
-  waitpid($pid, 0);
+  waitpid ($pid, 0);
 
   Log3 ($name, 2, qq{DbLog $name - SubProcess PID >$pid< stopped});
 
@@ -5394,6 +5392,8 @@ sub DbLog_SBP_CleanUp {
   delete $hash->{HELPER}{LONGRUN_PID};
 
   $hash->{SBP_STATE} = "Stopped";
+  
+  DoTrigger ($name, 'SUBPROC_STOPPED', 1);
 
 return;
 }
@@ -5503,13 +5503,15 @@ sub DbLog_SBP_Read {
       ## sendDbConnectData - Read
       #############################
       if ($oper =~ /sendDbConnectData/xs) {
-          DoTrigger ($name, 'INITIALIZED', 1);
+          Log3 ($name, 3, "DbLog $name - DB connection parameters are initialized in the SubProcess");
+          
+          DoTrigger ($name, 'SUBPROC_INITIALIZED', 1);
       }
       
       ## dbDisconnect - Read
       ########################
       if ($oper =~ /dbDisconnect/xs) {
-          DoTrigger ($name, 'DISCONNECTED', 1);
+          DoTrigger ($name, 'SUBPROC_DISCONNECTED', 1);
       }
 
       if(AttrVal($name, 'showproctime', 0) && $ot) {
