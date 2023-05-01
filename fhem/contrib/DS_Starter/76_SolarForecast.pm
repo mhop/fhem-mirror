@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.76.0" => "01.05.2023  new ctrlStatisticReadings SunMinutes_Remain, SunHours_Remain ",
   "0.75.3" => "23.04.2023  fix Illegal division by zero at ./FHEM/76_SolarForecast.pm line 6199 ",
   "0.75.2" => "16.04.2023  some minor changes ",
   "0.75.1" => "24.03.2023  change epieces for consumer type washingmachine, PV Vorhersage auf WR Kapazität begrenzen ",
@@ -793,6 +794,8 @@ my %hcsr = (                                                                    
   runTimeLastAPIAnswer       => { fnr => 2, fn => \&CurrentVal,    def => '-'         },
   runTimeLastAPIProc         => { fnr => 2, fn => \&CurrentVal,    def => '-'         },
   allStringsFullfilled       => { fnr => 2, fn => \&CurrentVal,    def => 0           },
+  SunHours_Remain            => { fnr => 3, fn => \&CurrentVal,    def => 0           },      # fnr => 3 -> Custom Calc
+  SunMinutes_Remain          => { fnr => 3, fn => \&CurrentVal,    def => 0           },
 );
 
 # Information zu verwendeten internen Datenhashes
@@ -6342,6 +6345,7 @@ sub genStatisticReadings {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $daref = $paref->{daref};
+  my $t     = $paref->{t};              # aktueller UNIX Timestamp
 
   my @csr = split ',', AttrVal($name, 'ctrlStatisticReadings', '');
 
@@ -6360,6 +6364,24 @@ sub genStatisticReadings {
 
       if ($hcsr{$kpi}{fnr} == 2) {
           push @$daref, 'statistic_'.$kpi.'<>'. &{$hcsr{$kpi}{fn}} ($hash, $kpi, $def);
+      }
+      
+      if ($hcsr{$kpi}{fnr} == 3) {
+          if ($kpi eq 'SunHours_Remain') {
+              my $ss  = &{$hcsr{$kpi}{fn}} ($hash, 'sunsetTodayTs',  $def);
+              my $shr = ($ss - $t) / 3600; 
+              $shr    = $shr < 0 ? 0 : $shr;
+              
+              push @$daref, 'statistic_'.$kpi.'<>'. sprintf "%.2f", $shr;
+          }
+          
+          if ($kpi eq 'SunMinutes_Remain') {
+              my $ss  = &{$hcsr{$kpi}{fn}} ($hash, 'sunsetTodayTs',  $def);
+              my $smr = ($ss - $t) / 60;
+              $smr    = $smr < 0 ? 0 : $smr;              
+
+              push @$daref, 'statistic_'.$kpi.'<>'. sprintf "%.0f", $smr;              
+          }
       }
   }
 
@@ -12040,6 +12062,8 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td> <b>runTimeCentralTask</b>        </td><td>die Laufzeit des letzten SolarForecast Intervalls (Gesamtprozess) in Sekunden                      </td></tr>
             <tr><td> <b>runTimeLastAPIAnswer</b>      </td><td>die letzte Antwortzeit der SolCast API (nur Model SolCastAPI) auf einen Request in Sekunden        </td></tr>
             <tr><td> <b>runTimeLastAPIProc</b>        </td><td>die letzte Prozesszeit zur Verarbeitung der empfangenen SolCast API Daten (nur Model SolCastAPI)   </td></tr>
+            <tr><td> <b>SunMinutes_Remain</b>         </td><td>die verbleibenden Minuten bis Sonnenuntergang des aktuellen Tages                                  </td></tr>
+            <tr><td> <b>SunHours_Remain</b>           </td><td>die verbleibenden Stunden bis Sonnenuntergang des aktuellen Tages                                  </td></tr>
             <tr><td> <b>todayMaxAPIcalls</b>          </td><td>die maximal mögliche Anzahl SolCast API Calls (nur Model SolCastAPI).                              </td></tr>
             <tr><td>                                  </td><td>Ein Call kann mehrere API Requests enthalten.                                                      </td></tr>
             <tr><td> <b>todayDoneAPIcalls</b>         </td><td>die Anzahl der am aktuellen Tag ausgeführten SolCast API Calls (nur Model SolCastAPI)              </td></tr>
