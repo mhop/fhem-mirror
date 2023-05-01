@@ -6346,8 +6346,15 @@ sub genStatisticReadings {
   my $name  = $paref->{name};
   my $daref = $paref->{daref};
   my $t     = $paref->{t};              # aktueller UNIX Timestamp
-
+  
+  my @srd = sort keys (%hcsr);
   my @csr = split ',', AttrVal($name, 'ctrlStatisticReadings', '');
+  
+  for my $item (@srd) {
+      next if($item ~~ @csr);
+      
+      deleteReadingspec ($hash, 'statistic_'.$item);
+  }
 
   return if(!@csr);
 
