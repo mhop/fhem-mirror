@@ -27,6 +27,7 @@ var cm_attr = {
     jumpToLine_extraKey: false,
     smartIndent:         false,
     height:              false,
+    gutters:             ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
     extraKeys: {
         'Tab': function(cm) {
             if (cm.somethingSelected()) {
@@ -86,7 +87,12 @@ function AddCodeMirror(e, cb) {
       loadScript("codemirror/codemirror.js", function(){cm_loaded++;} );
         
     // load additional addons
-
+    if (cm_attr.foldGutter) {
+        cm_active++; 
+          loadLink("codemirror/foldgutter.css");
+          loadScript("codemirror/foldgutter.js", function(){cm_loaded++;} );
+        cm_attr.extraKeys: {"Ctrl-Q": function(cm){ cm.foldCode(cm.getCursor()); }};
+    }
     if (cm_attr.braceFold) {
         cm_active++; loadScript("codemirror/brace-fold.js", function(){cm_loaded++;} );
     }
@@ -95,11 +101,6 @@ function AddCodeMirror(e, cb) {
     }
     if (cm_attr.foldCode) {
         cm_active++; loadScript("codemirror/foldcode.js", function(){cm_loaded++;} );
-    }
-    if (cm_attr.foldGutter) {
-        cm_active++; 
-          loadLink("codemirror/foldgutter.css");
-          loadScript("codemirror/foldgutter.js", function(){cm_loaded++;} );
     }
     if (cm_attr.indentFold) {
         cm_active++; loadScript("codemirror/indent-fold.js", function(){cm_loaded++;} );
