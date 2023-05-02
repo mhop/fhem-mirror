@@ -4,8 +4,8 @@ var cm_loaded = 0;
 var cm_active = 0;
 var cm_attr = {
     matchBrackets:       true,
-    bracefold:           true;
-    commentfold:         true;
+    bracefold:           true,
+    commentfold:         true,
     foldCode:            true,
     foldGutter:          true,
     indentFold:          true,
@@ -97,7 +97,9 @@ function AddCodeMirror(e, cb) {
         cm_active++; loadScript("codemirror/foldcode.js", function(){cm_loaded++;} );
     }
     if (cm_attr.foldGutter) {
-        cm_active++; loadScript("codemirror/foldgutter.js", function(){cm_loaded++;} );
+        cm_active++; 
+          loadLink("codemirror/foldgutter.css");
+          loadScript("codemirror/foldgutter.js", function(){cm_loaded++;} );
     }
     if (cm_attr.indentFold) {
         cm_active++; loadScript("codemirror/indent-fold.js", function(){cm_loaded++;} );
