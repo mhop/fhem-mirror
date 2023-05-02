@@ -5572,10 +5572,13 @@ par:INVERTER_NR;INVERTER_NR - order nr. in your setup. Note: numbering starts wi
 par:RADIO_SINGLE;inverter has just one channel;{ undef }
 par:RADIO_DOUBLE;inverter has two channels;{ undef }
 par:RADIO_QUATTRO;inverter has four channels;{ undef }
-par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
+par:ICON;ICON as set, defaults to measure_photovoltaic_inst;{ AttrVal('DEVICE','icon','measure_photovoltaic_inst') }
 attr DEVICE icon ICON
+{ Svn_GetFile('contrib/AttrTemplate/99_attrT_Ahoy_Utils.pm', 'FHEM/99_attrT_Ahoy_Utils.pm', sub(){ CommandReload(undef, '99_attrT_Ahoy_Utils') }) }
 deletereading -q DEVICE .*_.*
+attr DEVICE webCmd :
 option:{ RADIO_SINGLE }
+attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name,1)}
 attr DEVICE readingList INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/last_success:.* last_success\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
@@ -5603,6 +5606,7 @@ attr DEVICE readingList INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
   INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal
 option:{ RADIO_DOUBLE }
+attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name,2)}
 attr DEVICE readingList \
   INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/last_success:.* last_success\
@@ -5637,6 +5641,7 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch2/YieldDay:.* YieldDay2\
   INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2
 option:{ RADIO_QUATTRO }
+attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name)}
 attr DEVICE readingList \
   INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/last_success:.* last_success\
@@ -5693,7 +5698,7 @@ attr DEVICE setList \
   limit_pct:slider,2,1,100 BASE_ID/ctrl/limit/INVERTER_NR $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20230313
+setreading DEVICE attrTemplateVersion 20230502
 
 # contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
 name:hoymiles_opendtu_hub_bridge
