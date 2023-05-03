@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.16f";
+my $ModulVersion = "07.50.17";
 my $missingModul = "";
 my $missingModulWeb = "";
 my $missingModulTR064 = "";
@@ -67,8 +67,6 @@ eval "use SOAP::Lite;1" or $missingModulTR064 .= "Soap::Lite ";
 # $Data::Dumper::Purity = 1;
 # $Data::Dumper::Sortkeys = 1;
 eval "use Data::Dumper;1" or $missingModulTR064 .= "Data::Dumper ";
-
-eval "use XML::Simple;1" or $missingModulTR064 .= "XML::Simple ";
 
 sub FRITZBOX_Log($$$);
 sub FRITZBOX_Initialize($);
@@ -3446,22 +3444,20 @@ sub FRITZBOX_Readout_Run_Web($)
        if(defined $soap_resp->{Error}) {
          FRITZBOX_Log $hash, 4, "DEBUG: SOAP-ERROR -> " . $soap_resp->{Error};
  
-       } elsif(exists $soap_resp->{'s:Body'}->{'u:GetStatusInfoResponse'}) {
+       } elsif ( $soap_resp->{Response} ) {
 
-         if($soap_resp->{'s:Body'}->{'u:GetStatusInfoResponse'}->{NewConnectionStatus}) {
-           $strCurl = $soap_resp->{'s:Body'}->{'u:GetStatusInfoResponse'}->{NewConnectionStatus};
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_connect", $strCurl;
+         $strCurl = $soap_resp->{Response};
+         FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
+
+         if($strCurl =~ m/<NewConnectionStatus>(.*?)<\/NewConnectionStatus>/i) {
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_connect", $1;
+         }
+         if($strCurl =~ m/<NewLastConnectionError>(.*?)<\/NewLastConnectionError>/i) {
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_last_connect_err", $1;
          }
 
-         if($soap_resp->{'s:Body'}->{'u:GetStatusInfoResponse'}->{NewLastConnectionError}) {
-           $strCurl = $soap_resp->{'s:Body'}->{'u:GetStatusInfoResponse'}->{NewLastConnectionError};
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_last_connect_err", $strCurl;
-         }
-
-         if($soap_resp->{'s:Body'}->{'u:GetStatusInfoResponse'}->{NewUptime}) {
-
-           $strCurl = $soap_resp->{'s:Body'}->{'u:GetStatusInfoResponse'}->{NewUptime};
-           $Sek = $strCurl;
+         if($strCurl =~ m/<NewUptime>(.*?)<\/NewUptime>/i) {
+           $Sek = $1;
            $Tag  = int($Sek/86400);
            $Std  = int(($Sek/3600)-(24*$Tag));
            $Min = int(($Sek/60)-($Std*60)-(1440*$Tag));
@@ -3471,7 +3467,7 @@ sub FRITZBOX_Readout_Run_Web($)
            $Min = substr("0".$Min,-2);
            $Sek = substr("0".$Sek,-2);
 
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_uptimeConnect", ($mesh ne "slave") ? $strCurl . " sec = " . $Tag . "T $Std:$Min:$Sek" : "";
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_uptimeConnect", $1 . " sec = " . $Tag . "T $Std:$Min:$Sek";
          }
        }
 
@@ -3486,11 +3482,13 @@ sub FRITZBOX_Readout_Run_Web($)
        if(exists $soap_resp->{Error}) {
          FRITZBOX_Log $hash, 4, "DEBUG: SOAP-ERROR -> " . $soap_resp->{Error};
  
-       } elsif(exists $soap_resp->{'s:Body'}->{'u:GetExternalIPAddressResponse'}) {
+       } elsif ( $soap_resp->{Response} ) {
 
-         if($soap_resp->{'s:Body'}->{'u:GetExternalIPAddressResponse'}->{NewExternalIPAddress}) {
-           $strCurl = $soap_resp->{'s:Body'}->{'u:GetExternalIPAddressResponse'}->{NewExternalIPAddress};
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv4_Extern", ref($strCurl) ? "" : $strCurl;
+         $strCurl = $soap_resp->{Response};
+         FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
+
+         if($strCurl =~ m/<NewExternalIPAddress>(.*?)<\/NewExternalIPAddress>/i) {
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv4_Extern", $1;
          }
        }
      }
@@ -3507,11 +3505,13 @@ sub FRITZBOX_Readout_Run_Web($)
          FRITZBOX_Log $hash, 4, "DEBUG: SOAP/TR064-ERROR -> " . $soap_resp->{Error};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6_Extern", $soap_resp->{ErrLevel} == 2?"unknown error":"";
  
-       } elsif(exists $soap_resp->{'s:Body'}->{'u:X_AVM_DE_GetExternalIPv6AddressResponse'}) {
+       } elsif ( $soap_resp->{Response} ) {
 
-         if($soap_resp->{'s:Body'}->{'u:X_AVM_DE_GetExternalIPv6AddressResponse'}->{NewExternalIPv6Address}) {
-           $strCurl = $soap_resp->{'s:Body'}->{'u:X_AVM_DE_GetExternalIPv6AddressResponse'}->{NewExternalIPv6Address};
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6_Extern",  ref($strCurl) ? "" : $strCurl;
+         $strCurl = $soap_resp->{Response};
+         FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
+
+         if($strCurl =~ m/<NewExternalIPv6Address>(.*?)<\/NewExternalIPv6Address>/i) {
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6_Extern", $1;
          }
        }
 
@@ -3526,11 +3526,13 @@ sub FRITZBOX_Readout_Run_Web($)
          FRITZBOX_Log $hash, 4, "DEBUG: SOAP/TR064-ERROR -> " . $soap_resp->{Error};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6_Extern", $soap_resp->{ErrLevel} == 2?"unknown error":"";
  
-       } elsif(exists $soap_resp->{'s:Body'}->{'u:X_AVM_DE_GetIPv6PrefixResponse'}) {
+       } elsif ( $soap_resp->{Response} ) {
 
-         if($soap_resp->{'s:Body'}->{'u:X_AVM_DE_GetIPv6PrefixResponse'}->{NewIPv6Prefix}) {
-           $strCurl = $soap_resp->{'s:Body'}->{'u:X_AVM_DE_GetIPv6PrefixResponse'}->{NewIPv6Prefix};
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6_Prefix",  ref($strCurl) ? "" : $strCurl;
+         $strCurl = $soap_resp->{Response};
+         FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
+
+         if($strCurl =~ m/<NewIPv6Prefix>(.*?)<\/NewIPv6Prefix>/i) {
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6_Prefix", $1;
          }
        }
      } elsif ($avmModel =~ "Repeater") {
@@ -5460,45 +5462,49 @@ EOD
 
    if (ref($resp_init->decoded_content) eq "HASH") {
      FRITZBOX_Log $hash, 4, "DEBUG: XML_RESONSE:\n" . Dumper ($resp_init->decoded_content);
+     %retHash = ( "Info" => "SOAP response: " . $resp_init->status_line, "Response" => Dumper ($resp_init->decoded_content) ) ;
    } elsif (ref($resp_init->decoded_content) eq "ARRAY") {
      FRITZBOX_Log $hash, 4, "DEBUG: XML_RESONSE:\n" . Dumper ($resp_init->decoded_content);
+     %retHash = ( "Info" => "SOAP response: " . $resp_init->status_line, "Response" => Dumper ($resp_init->decoded_content) ) ;
    } else {
      FRITZBOX_Log $hash, 4, "DEBUG: XML_RESONSE:\n" . $resp_init->decoded_content;
+     %retHash = ( "Info" => "SOAP response: " . $resp_init->status_line, "Response" => $resp_init->decoded_content) ;
    }
 
-   my $xml_resp = eval { XMLin($resp_init->decoded_content) };
+#<?xml version="1.0"?>
+#  <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+#    <s:Body>
+#      <s:Fault>
+#      <faultcode>s:Client</faultcode>
+#      <faultstring>UPnPError</faultstring>
+#      <detail>
+#        <UPnPError xmlns="urn:schemas-upnp-org:control-1-0">
+#          <errorCode>401</errorCode>
+#          <errorDescription>Invalid Action</errorDescription>
+#        </UPnPError>
+#      </detail>
+#    </s:Fault>
+#  </s:Body>
+#</s:Envelope>
 
-   if ($@) {
-     FRITZBOX_Log $hash, 4, "DEBUG: SOAP/TR064-RESPONSE-Error: " . $@;
-     %retHash = ( "Error" => $@, "ErrLevel" => "2" ) ;
-     return \%retHash;
-   } else {
-     unless( $xml_resp ) { # Transport-Error
-       FRITZBOX_Log $hash, 4, "DEBUG: TR064-Transport-Error";
-       %retHash = ( "Error" => "transport error", "ErrLevel" => "1" ) ;
-       return \%retHash;
-     }
-     if(exists $xml_resp->{'s:Body'}->{'s:Fault'}) {
-       if($xml_resp->{'s:Body'}->{'s:Fault'}->{detail}->{UPnPError}->{errorCode}) {
-         FRITZBOX_Log $hash, 5, "DEBUG: SOAP-ERROR -> " . $xml_resp->{'s:Body'}->{'s:Fault'}->{detail}->{UPnPError}->{errorCode};
-         %retHash = ( "Error" => "SOAP-ERROR -> " . $xml_resp->{'s:Body'}->{'s:Fault'}->{detail}->{UPnPError}->{errorCode}, "ErrLevel" => "1" ) ;
-       } else {
-         FRITZBOX_Log $hash, 5, "DEBUG: SOAP-ERROR -> \n" . Dumper $xml_resp;
-         %retHash = ( "Error" => "SOAP-ERROR -> unkown error", "ErrLevel" => "1" ) ;
+   my $sFault = \%retHash;
+
+   if($sFault =~ m/<s:Fault>(.*?)<\/s:Fault>/i) {
+     my $sFaultDetail = $1;
+     if($sFaultDetail =~ m/<errorCode>(.*?)<\/errorCode>/i) {
+       my $errInfo = "Code: $1";
+       if($sFaultDetail =~ m/<errorDescription>(.*?)<\/errorDescription>/i) {
+         $errInfo .= " Text: $1";
        }
-       return \%retHash;
+       FRITZBOX_Log $hash, 4, "INFO: SOAP response error: " . $errInfo;
+       %retHash = ( "Error" => "SOAP response error: " . $errInfo, "ErrLevel" => "1" );
+     } else {
+       FRITZBOX_Log $hash, 4, "INFO: SOAP response error: " . $sFaultDetail;
+       %retHash = ( "Error" => "SOAP response error: " . $sFaultDetail, "ErrLevel" => "1" );
      }
    }
 
-   if (ref($xml_resp) eq "HASH") {
-     FRITZBOX_Log $hash, 4, "DEBUG: XML_RESONSE:\n" . Dumper ($xml_resp);
-   } elsif (ref($xml_resp) eq "ARRAY") {
-     FRITZBOX_Log $hash, 4, "DEBUG: XML_RESONSE:\n" . Dumper ($xml_resp);
-   } else {
-     FRITZBOX_Log $hash, 4, "DEBUG: XML_RESONSE:\n" . $xml_resp;
-   }
-
-   return $xml_resp;
+   return \%retHash;
 
 } # end of FRITZBOX_SOAP_Request
 
@@ -8710,5 +8716,12 @@ sub FRITZBOX_readPassword($)
 #
 # WLANConfiguration:1 wlanconfig1 GetInfo
 # {FRITZBOX_SOAP_Test_Request("FB_Rep_OG", "igdupnp\/control\/wlanconfig1", "urn:schemas-upnp-org:service:WLANConfiguration:1", "GetInfo")}
-#
+# {FRITZBOX_SOAP_Test_Request("FritzBox", "igdupnp\/control\/WANCommonIFC1", "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1", "GetAddonInfos")}
+# 
+# http://fritz.box:49000/igddesc.xml
+# http://fritz.box:49000/any.xml
+# http://fritz.box:49000/igdicfgSCPD.xml
+# http://fritz.box:49000/igddslSCPD.xml
+# http://fritz.box:49000/igdconnSCPD.xml
+# 
 # ggf bei Repeater einbauen: xhr 1 lang de page overview xhrId all useajax 1
