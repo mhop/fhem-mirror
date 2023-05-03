@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  72_FRITZBOX: XML::Simple entfernt
+            wg diverese Inkompatibilitaeten
  - change:  codemirror updated from 5.22.0 to 5.65.13
  - bugfix:  72_FRITZBOX: weitere Stabilisierung
                          TR064 Fehlerhandling
