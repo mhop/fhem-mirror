@@ -4,6 +4,7 @@ var cm_loaded = 0;
 var cm_active = 0;
 var cm_attr = {
     matchBrackets:       true,
+    foldGutter:          false,
     autoRefresh:         true,
     search:              true,
     comment:             true,
@@ -79,6 +80,19 @@ function AddCodeMirror(e, cb) {
       loadScript("codemirror/codemirror.js", function(){cm_loaded++;} );
         
     // load additional addons
+    if (cm_attr.foldGutter) {
+        cm_active++; 
+          loadLink("codemirror/foldgutter.css");
+          loadScript("codemirror/foldgutter.js", function(){cm_loaded++;} );
+        cm_attr.extraKeys['Ctrl-X'] = function(cm){ cm.foldCode(cm.getCursor()) };
+        cm_active++; loadScript("codemirror/brace-fold.js", function(){cm_loaded++;} );
+        cm_active++; loadScript("codemirror/comment-fold.js", function(){cm_loaded++;} );
+        cm_active++; loadScript("codemirror/foldcode.js", function(){cm_loaded++;} );
+        cm_active++; loadScript("codemirror/indent-fold.js", function(){cm_loaded++;} );
+        cm_active++; loadScript("codemirror/markdown-fold.js", function(){cm_loaded++;} );
+        cm_active++; loadScript("codemirror/xml-fold.js", function(){cm_loaded++;} );
+        cm_attr.gutters = ["CodeMirror-linenumbers", "CodeMirror-foldgutter"];
+    }
     if (cm_attr.autoCloseBrackets) {
         cm_active++; loadScript("codemirror/closebrackets.js", function(){cm_loaded++;} );
     }

@@ -303,7 +303,7 @@ FHEM/52_I2C_SHT21            klausw               Sonstige Systeme
 FHEM/52_I2C_SHT3x            macs                 Sonstige Systeme
 FHEM/53_GHoma.pm             klausw               Sonstige Systeme
 FHEM/55_DWD_OpenData.pm      jensb                Unterstützende Dienste/Wettermodule
-FHEM/55_InfoPanel.pm         betateilchen         Unterstützende Dienste
+FHEM/55_InfoPanel.pm         betateilchen         Sonstiges
 FHEM/55_PIFACE.pm            klaus.schauer        Einplatinencomputer
 FHEM/56_POKEYS.pm            axelberner           Sonstiges
 FHEM/57_Calendar.pm          neubert              Unterstützende Dienste/Kalendermodule
@@ -518,7 +518,7 @@ FHEM/98_freezemon            KernSani             Unterstützende Dienste
 FHEM/98_FReplacer.pm         StefanStrobel        Sonstiges
 FHEM/98_GAEBUS.pm            jamesgo              Heizungssteuerung/Raumklima
 FHEM/98_GEOFANCY.pm          loredo               Unterstützende Dienste
-FHEM/98_GoogleAuth.pm        betateilchen         Unterstützende Dienste
+FHEM/98_GoogleAuth.pm        betateilchen         Sonstiges
 FHEM/98_GOOGLECAST.pm        dominikkarall        Multimedia
 FHEM/98_help.pm              betateilchen         Sonstiges
 FHEM/98_HMinfo.pm            martinp876           HomeMatic
@@ -648,7 +648,7 @@ contrib/98_exportdevice.pm   loredo               (deprecated)
 contrib/98_FileLogConvert.pm DeeSPe               Automatisierung
 contrib/97_SprinkleControl.pm Tobias              Unterstützende Dienste
 contrib/98_Sprinkle.pm       Tobias               Unterstützende Dienste
-contrib/betateilchen/*       betateilchen         Sonstiges
+contrib/betateilchen/*       betateilchen         No support!
 contrib/AttrTemplate/*       Beta-User            (depends on attrTemplate)
 contrib/AttrTemplate/99_sonos2mqttUtils.pm Otto123 MQTT
 contrib/commandref*          rudolfkoenig         Sonstiges
@@ -671,7 +671,7 @@ contrib/Wzut/*		     Wzut		  MAX
 contrib/YAF/*                MarcP                Frontends
 
 www/pgm2/automowerconnect.js Ellert               Frontends
-www/codemirror/*             rapster              Frontends
+www/codemirror/*             betateilchen         Sonstiges
 www/frontend/*               johannnes            Frontends
 www/gplot/*                  rudolfkoenig         Frontends/SVG/Plots/logProxy
 www/images/*                 Wuppi68              Frontends

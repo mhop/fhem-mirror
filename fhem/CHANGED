@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  codemirror updated from 5.22.0 to 5.65.13
  - bugfix:  72_FRITZBOX: weitere Stabilisierung
                          TR064 Fehlerhandling
  - feature: 93_DbLog: new Events FRAME_INITIALIZED, SUBPROC_INITIALIZED, 
