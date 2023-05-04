@@ -62,6 +62,7 @@ BEGIN {
           attr
           asyncOutput
           AnalyzePerlCommand
+          AnalyzeCommandChain
           AttrVal
           AttrNum
           CommandAttr
@@ -77,6 +78,7 @@ BEGIN {
           DoTrigger
           Debug
           fhemTimeLocal
+          fhem
           FmtDateTime
           FileWrite
           FileRead
@@ -134,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.77.0" => "03.05.2023  new attribute ctrlUserExitFn ",
   "0.76.0" => "01.05.2023  new ctrlStatisticReadings SunMinutes_Remain, SunHours_Remain ",
   "0.75.3" => "23.04.2023  fix Illegal division by zero at ./FHEM/76_SolarForecast.pm line 6199 ",
   "0.75.2" => "16.04.2023  some minor changes ",
@@ -861,6 +864,7 @@ sub Initialize {
                                 "ctrlSolCastAPImaxReq:selectnumbers,5,5,60,0,lin ".
                                 "ctrlSolCastAPIoptimizeReq:1,0 ".
                                 "ctrlStatisticReadings:multiple-strict,$srd ".
+                                "ctrlUserExitFn:textField-long ".
                                 "disable:1,0 ".
                                 "flowGraphicSize ".
                                 "flowGraphicAnimate:1,0 ".
@@ -2615,6 +2619,18 @@ sub Attr {
               return qq{The attribute $aName is only valid for device model "SolCastAPI".};
           }
       }
+      
+      if ($aName eq "ctrlUserExitFn") {
+          if($cmd eq "set") {
+              if(!$aVal || $aVal !~ m/^\s*(\{.*\})\s*$/xs) {
+                  return "Usage of $aName is wrong. The function has to be specified as \"{<your own code>}\" ";
+              }
+                           
+              $aVal = $1;
+              eval $aVal;
+              return $@ if ($@);
+          }
+      }
 
   }
 
@@ -3180,19 +3196,21 @@ sub centralTask {
       _createSummaries            ($centpars);                                            # Zusammenfassungen erstellen
       _calcTodayPVdeviation       ($centpars);                                            # Vorhersageabweichung erstellen (nach Sonnenuntergang)
 
-      createReadingsFromArray ($hash, \@da, $evt);                                        # Readings erzeugen
+      createReadingsFromArray     ($hash, \@da, $evt);                                    # Readings erzeugen
 
       calcCorrAndQuality          ($centpars);                                            # neue Korrekturfaktor/Qualität berechnen und speichern
 
-      createReadingsFromArray ($hash, \@da, $evt);                                        # Readings erzeugen
+      createReadingsFromArray     ($hash, \@da, $evt);                                    # Readings erzeugen
 
       saveEnergyConsumption       ($centpars);                                            # Energie Hausverbrauch speichern
 
-      setTimeTracking      ($hash, $cst, 'runTimeCentralTask');                           # Zyklus-Laufzeit ermitteln
+      setTimeTracking             ($hash, $cst, 'runTimeCentralTask');                    # Zyklus-Laufzeit ermitteln
 
       genStatisticReadings        ($centpars);                                            # optionale Statistikreadings erstellen
 
-      createReadingsFromArray ($hash, \@da, $evt);                                        # Readings erzeugen
+      createReadingsFromArray     ($hash, \@da, $evt);                                    # Readings erzeugen
+      
+      userExit                    ($centpars);                                            # User spezifische Funktionen ausführen
 
       if ($evt) {
           $centpars->{evt} = $evt;
@@ -10542,6 +10560,40 @@ sub checkRegex {
 return;
 }
 
+################################################################
+#  Funktion um userspezifische Programmaufrufe nach 
+#  Aktualisierung aller Readings zu ermöglichen
+################################################################
+sub userExit {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+
+  my $uefn = AttrVal ($name, 'ctrlUserExitFn', '');
+  return if(!$uefn);
+
+  $uefn =~ s/\s*#.*//g;                                             # Kommentare entfernen
+
+  my $r;
+
+  #$value   =~ s/\\/\\\\/g;                                          # escapen of chars for evaluation
+  #$value   =~ s/'/\\'/g;
+
+  $uefn    =  join ' ', split(/\s+/sx, $uefn);                      # Funktion aus Attr ctrlUserExitFn serialisieren
+
+  if ($uefn =~ m/^\s*(\{.*\})\s*$/xs) {                             # unnamed Funktion direkt in ctrlUserExitFn mit {...}
+      $uefn = $1;
+
+      eval $uefn;
+      
+      if ($@) {
+          Log3 ($name, 1, "$name - ERROR in specific userExitFn: ".$@);
+      }
+  }
+
+return;
+}
+
 ###############################################################################
 #    Wert des pvhist-Hash zurückliefern
 #    Usage:
@@ -12080,6 +12132,30 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
          </table>
          </ul>
        <br>
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-ctrlUserExitFn"></a>
+       <li><b>ctrlUserExitFn {&lt;Code&gt;} </b><br>
+         Nach jedem Zyklus (siehe Attribut <a href="#SolarForecast-attr-ctrlInterval ">ctrlInterval </a>) wird der in diesem
+         Attribut abgegebene userspezifische Code ausgeführt. Der Code ist in geschweiften Klammern {...} einzuschließen. <br>
+         Dem Code werden die Variablen $name und $hash übergeben, die den Namen des SolarForecast Devices und dessen Hash 
+         enthalten.
+         <br>
+         <br>
+         
+         <ul>
+         <b>Beispiel: </b> <br>
+            {                                                                                           <br>                                                             
+              my $batdev = (split " ", ReadingsVal ($name, 'currentBatteryDev', ''))[0];                <br>
+              my $pvfc   = ReadingsNum ($name, 'RestOfDayPVforecast',          0);                      <br>
+              my $cofc   = ReadingsNum ($name, 'RestOfDayConsumptionForecast', 0);                      <br>
+              my $diff   = $pvfc - $cofc;                                                               <br>
+                                                                                                        <br>              
+              readingsSingleUpdate ($defs{$batdev}, 'SolCast_userFn_Difference', $diff, 1);             <br>
+              readingsSingleUpdate ($hash, 'userFn_Bat_Difference', $diff, 1);                          <br>
+            } 
+         </ul>
        </li>
        <br>
 
