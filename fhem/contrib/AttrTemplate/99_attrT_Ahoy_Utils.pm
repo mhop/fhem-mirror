@@ -23,8 +23,8 @@ BEGIN {
           ReadingsVal
           ReadingsNum
           ReadingsAge
+		  isday
           defs
-          isday
           )
     );
 }
@@ -46,15 +46,16 @@ sub devStateIcon {
 
   return if !defined $defs{$devname};
 
-  my $ret = ReadingsNum($devname,'available',0);
-  $ret = $ret > 1 ? '10px-kreis-gruen' : isday() ? '10px-kreis-rot' :'10px-kreis-gelb'; 
-  $ret = FW_makeImage($ret, 'edit_settings');
-  $ret .= ' ';
   my $col = substr(Color::pahColor(-10,50,70,ReadingsNum($devname,'temperature',0),$colors),0,6);
-  $ret .= FW_makeImage("sani_solar_temp\@$col",'file_unknown@grey');
+  my $ret = FW_makeImage("sani_solar_temp\@$col",'file_unknown@grey');
   $ret .= ' ';
   $ret .= ReadingsNum($devname,'temperature',0,1);
   $ret .= ' °C<br>';
+
+  my $avail = ReadingsNum($devname,'available',0);
+  $avail = $avail > 1 ? '10px-kreis-gruen' : isday() ? '10px-kreis-rot' :'10px-kreis-gelb'; 
+  $ret .= FW_makeImage($avail, 'edit_settings');
+  $ret .= ' ';
   $ret .= ReadingsNum($devname,'P_AC',0);
   $ret .= ' W / ';
   $ret .= ReadingsNum($devname,'YieldDay',0);
