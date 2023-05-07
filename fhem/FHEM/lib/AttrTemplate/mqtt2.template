@@ -5591,6 +5591,7 @@ attr DEVICE readingList INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/ch0/Freq:.* Freq\
   INVERTERLONG_ID/ch0/Temp:.* temperature\
   INVERTERLONG_ID/ch0/ALARM_MES_ID:.* ALARM_MES_ID\
+  INVERTERLONG_ID/ch0/LastAlarmCode:.* LastAlarmCode\
   INVERTERLONG_ID/ch0/Efficiency:.* Efficiency\
   INVERTERLONG_ID/ch0/YieldDay:.* {}\
   INVERTERLONG_ID/ch0/YieldTotal:.* {}\
@@ -5620,6 +5621,7 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/Freq:.* Freq\
   INVERTERLONG_ID/ch0/Temp:.* temperature\
   INVERTERLONG_ID/ch0/ALARM_MES_ID:.* ALARM_MES_ID\
+  INVERTERLONG_ID/ch0/LastAlarmCode:.* LastAlarmCode\
   INVERTERLONG_ID/ch0/Efficiency:.* Efficiency\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
@@ -5656,6 +5658,7 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/Freq:.* Freq\
   INVERTERLONG_ID/ch0/Temp:.* temperature\
   INVERTERLONG_ID/ch0/ALARM_MES_ID:.* ALARM_MES_ID\
+  INVERTERLONG_ID/ch0/LastAlarmCode:.* LastAlarmCode\
   INVERTERLONG_ID/ch0/Efficiency:.* Efficiency\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/Temp:.* temperature\
@@ -5698,7 +5701,7 @@ attr DEVICE setList \
   limit_pct:slider,2,1,100 BASE_ID/ctrl/limit/INVERTER_NR $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20230502
+setreading DEVICE attrTemplateVersion 20230507
 
 # contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
 name:hoymiles_opendtu_hub_bridge

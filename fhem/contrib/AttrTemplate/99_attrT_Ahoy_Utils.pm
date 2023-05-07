@@ -24,6 +24,7 @@ BEGIN {
           ReadingsNum
           ReadingsAge
           defs
+          isday
           )
     );
 }
@@ -48,6 +49,7 @@ sub devStateIcon {
   my $ret = ReadingsNum($devname,'available',0);
   $ret = $ret > 1 ? '10px-kreis-gruen' : isday() ? '10px-kreis-rot' :'10px-kreis-gelb'; 
   $ret = FW_makeImage($ret, 'edit_settings');
+  $ret .= ' ';
   my $col = substr(Color::pahColor(-10,50,70,ReadingsNum($devname,'temperature',0),$colors),0,6);
   $ret .= FW_makeImage("sani_solar_temp\@$col",'file_unknown@grey');
   $ret .= ' ';
