@@ -724,7 +724,7 @@ sub AlignArray {
 
         if ( $act =~ /^(MOWING)$/ && $actold =~ /^(MOWING|LEAVING|PARKED_IN_CS|CHARGING)$/ ) {
 
-          AreaStatistics ( $hash, $tmp, $cnt );
+          AreaStatistics ( $hash, $cnt );
 
         }
 
@@ -858,8 +858,8 @@ sub ZoneHandling {
 
         }
 
-       $hash->{helper}{mapZones}{$zonekeys[$k]}{zoneCnt}++;
-
+        $hash->{helper}{mapZones}{$zonekeys[$k]}{zoneLength} += calcPathLength( $hash, $i, $i + 1 );
+        $hash->{helper}{mapZones}{$zonekeys[$k]}{zoneCnt}++;
         last;
 
       } elsif ( $k == @zonekeys-2 ) { # last zone
@@ -871,6 +871,7 @@ sub ZoneHandling {
 
         }
 
+        $hash->{helper}{mapZones}{$zonekeys[$k+1]}{zoneLength} += calcPathLength( $hash, $i, $i + 1 );
         $hash->{helper}{mapZones}{$zonekeys[$k+1]}{zoneCnt}++;
 
       }
@@ -882,7 +883,12 @@ sub ZoneHandling {
       my $sumDayCnt=0;
       map { $sumDayCnt += $hash->{helper}{mapZones}{$_}{zoneCnt} } @zonekeys;
       map { $hash->{helper}{mapZones}{$_}{currentDayCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{zoneCnt} / $sumDayCnt * 100 ) } @zonekeys if ( $sumDayCnt );
-      $hash->{helper}{newzonedatasets} = $cnt;      
+
+      my $sumDayArea=0;
+      map { $sumDayArea += $hash->{helper}{mapZones}{$_}{zoneLength} } @zonekeys;
+      map { $hash->{helper}{mapZones}{$_}{currentDayAreaPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{zoneLength} / $sumDayArea * 100 ) } @zonekeys if ( $sumDayArea );
+
+      $hash->{helper}{newzonedatasets} = $cnt;
 
 }
 
@@ -943,23 +949,30 @@ sub HighlightPath {
 }
 
 #########################
-sub AreaStatistics {
-  my ( $hash, $poshash, $i ) = @_;
+sub calcPathLength {
+  my ( $hash, $istart, $i ) = @_;
   my $name = $hash->{NAME};
-  my $activity = 'MOWING';
   my $k = 0;
   my @xyarr  = @{$hash->{helper}{areapos}};# areapos
   my $n = scalar @xyarr;
   my ($sclon, $sclat) = AttrVal($name,'scaleToMeterXY', $hash->{helper}{scaleToMeterLongitude} . ' ' .$hash->{helper}{scaleToMeterLatitude}) =~ /(-?\d+)\s+(-?\d+)/;
   my $lsum = 0;
-  my $asum = 0;
-  my $vm = 0;
 
-  for ( $k = 0; $k <= $i-1; $k++) {
+  for ( $k = $istart; $k < $i; $k++) {
 
     $lsum += ( ( ( $xyarr[ $k ]{longitude} - $xyarr[ $k+1 ]{longitude} ) * $sclon ) ** 2 + ( ( $xyarr[ $k ]{latitude} - $xyarr[ $k+1 ]{latitude} ) * $sclat ) ** 2 ) ** 0.5 if ( $xyarr[ $k+1 ]{longitude} && $xyarr[ $k+1 ]{latitude} );
 
   }
+  return $lsum;
+}
+
+#########################
+sub AreaStatistics {
+  my ( $hash, $i ) = @_;
+  my $name = $hash->{NAME};
+  my $activity = 'MOWING';
+  my $lsum = calcPathLength( $hash, 0, $i );
+  my $asum = 0;
 
   $asum = $lsum * AttrVal($name,'mowerCuttingWidth',0.24);
   $hash->{helper}{$activity}{track} = $lsum;
@@ -1125,6 +1138,34 @@ sub listStatisticsData {
 
       $cnt++;
       $ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ) . '"><td> $hash->{helper}{mapZones}{' . $_ . '}{<b>lastWeekCntPct</b>} &emsp;</td><td> ' . ( $hash->{helper}{mapZones}{$_}{lastWeekCntPct} ? $hash->{helper}{mapZones}{$_}{lastWeekCntPct} : '' ). ' </td><td> % </td></tr>';
+
+    }
+
+    for ( @zonekeys ) {
+
+      $cnt++;
+      $ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ) . '"><td> $hash->{helper}{mapZones}{' . $_ . '}{<b>currentDayAreaPct</b>} &emsp;</td><td> ' . ( $hash->{helper}{mapZones}{$_}{currentDayAreaPct} ? $hash->{helper}{mapZones}{$_}{currentDayAreaPct} : '' ) . ' </td><td> % </td></tr>';
+
+    }
+
+    for ( @zonekeys ) {
+
+      $cnt++;
+      $ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ) . '"><td> $hash->{helper}{mapZones}{' . $_ . '}{<b>lastDayAreaPct</b>} &emsp;</td><td> ' . ( $hash->{helper}{mapZones}{$_}{lastDayAreaPct} ? $hash->{helper}{mapZones}{$_}{lastDayAreaPct} : '' ) . ' </td><td> % </td></tr>';
+
+    }
+
+    for ( @zonekeys ) {
+
+      $cnt++;
+      $ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ) . '"><td> $hash->{helper}{mapZones}{' . $_ . '}{<b>currentWeekAreaPct</b>} &emsp;</td><td> ' . ( $hash->{helper}{mapZones}{$_}{currentWeekAreaPct} ? $hash->{helper}{mapZones}{$_}{currentWeekAreaPct} : '' ) . ' </td><td> % </td></tr>';
+
+    }
+
+    for ( @zonekeys ) {
+
+      $cnt++;
+      $ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ) . '"><td> $hash->{helper}{mapZones}{' . $_ . '}{<b>lastWeekAreaPct</b>} &emsp;</td><td> ' . ( $hash->{helper}{mapZones}{$_}{lastWeekAreaPct} ? $hash->{helper}{mapZones}{$_}{lastWeekAreaPct} : '' ). ' </td><td> % </td></tr>';
 
     }
 

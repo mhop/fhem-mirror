@@ -261,12 +261,20 @@ sub Notify {
           my @zonekeys = sort (keys %{$hash->{helper}{mapZones}});
           my $sumLastDayCnt=0;
           my $sumCurrentWeekCnt=0;
+          my $sumLastDayArea=0;
+          my $sumCurrentWeekArea=0;
           map { 
             $hash->{helper}{mapZones}{$_}{lastDayCnt} = $hash->{helper}{mapZones}{$_}{zoneCnt};
             $sumLastDayCnt += $hash->{helper}{mapZones}{$_}{lastDayCnt};
             $hash->{helper}{mapZones}{$_}{currentWeekCnt} += $hash->{helper}{mapZones}{$_}{lastDayCnt};
             $sumCurrentWeekCnt += $hash->{helper}{mapZones}{$_}{currentWeekCnt};
             $hash->{helper}{mapZones}{$_}{zoneCnt} = 0;
+
+            $hash->{helper}{mapZones}{$_}{lastDayArea} = $hash->{helper}{mapZones}{$_}{zoneLength};
+            $sumLastDayArea += $hash->{helper}{mapZones}{$_}{lastDayArea};
+            $hash->{helper}{mapZones}{$_}{currentWeekArea} += $hash->{helper}{mapZones}{$_}{lastDayArea};
+            $sumCurrentWeekArea += $hash->{helper}{mapZones}{$_}{currentWeekArea};
+            $hash->{helper}{mapZones}{$_}{zoneLength} = 0;
           } @zonekeys;
 
           map { 
@@ -276,6 +284,14 @@ sub Notify {
           map { 
             $hash->{helper}{mapZones}{$_}{currentWeekCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{currentWeekCnt} / $sumCurrentWeekCnt * 100 );
           } @zonekeys if( $sumCurrentWeekCnt );
+
+          map { 
+            $hash->{helper}{mapZones}{$_}{lastDayAreaPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{lastDayArea} / $sumLastDayArea * 100 );
+          } @zonekeys if( $sumLastDayArea );
+
+          map { 
+            $hash->{helper}{mapZones}{$_}{currentWeekAreaPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{currentWeekArea} / $sumCurrentWeekArea * 100 );
+          } @zonekeys if( $sumCurrentWeekArea );
 
         }
         # do on days
@@ -290,15 +306,23 @@ sub Notify {
 
             my @zonekeys = sort (keys %{$hash->{helper}{mapZones}});
             my $sumLastWeekCnt=0;
+            my $sumLastWeekArea=0;
             map { 
               $hash->{helper}{mapZones}{$_}{lastWeekCnt} = $hash->{helper}{mapZones}{$_}{currentWeekCnt};
               $sumLastWeekCnt += $hash->{helper}{mapZones}{$_}{lastWeekCnt};
               $hash->{helper}{mapZones}{$_}{currentWeekCnt} = 0;
+              $hash->{helper}{mapZones}{$_}{lastWeekArea} = $hash->{helper}{mapZones}{$_}{currentWeekArea};
+              $sumLastWeekArea += $hash->{helper}{mapZones}{$_}{lastWeekArea};
+              $hash->{helper}{mapZones}{$_}{currentWeekArea} = 0;
             } @zonekeys;
 
             map { 
               $hash->{helper}{mapZones}{$_}{lastWeekCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{lastWeekCnt} / $sumLastWeekCnt * 100 );
             } @zonekeys if( $sumLastWeekCnt );
+
+            map { 
+              $hash->{helper}{mapZones}{$_}{lastWeekAreaPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{lastWeekArea} / $sumLastWeekArea * 100 );
+            } @zonekeys if( $sumLastWeekArea );
 
           }
 
