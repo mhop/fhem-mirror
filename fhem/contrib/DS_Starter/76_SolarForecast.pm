@@ -79,11 +79,11 @@ BEGIN {
           Debug
           fhemTimeLocal
           fhem
-          FmtDateTime
           FileWrite
           FileRead
           FileDelete
           FmtTime
+          FmtDateTime
           FW_makeImage
           getKeyValue
           HttpUtils_NonblockingGet
@@ -136,6 +136,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.78.0" => "07.05.2023  activate NotifyFn Forum:https://forum.fhem.de/index.php?msg=1275005, new Consumerkey asynchron ",
+  "0.77.1" => "07.05.2023  rewrite function pageRefresh ",
   "0.77.0" => "03.05.2023  new attribute ctrlUserExitFn ",
   "0.76.0" => "01.05.2023  new ctrlStatisticReadings SunMinutes_Remain, SunHours_Remain ",
   "0.75.3" => "23.04.2023  fix Illegal division by zero at ./FHEM/76_SolarForecast.pm line 6199 ",
@@ -427,6 +429,7 @@ my @dd           = qw( none
                        consumerSwitching
                        consumption
                        graphic
+                       notifyHandling
                        pvCorrection
                        radiationProcess
                        saveData2Cache
@@ -840,7 +843,7 @@ sub Initialize {
   $hash->{ShutdownFn}         = \&Shutdown;
   $hash->{DbLog_splitFn}      = \&DbLogSplit;
   $hash->{AttrFn}             = \&Attr;
-  # $hash->{NotifyFn}           = \&Notify;                                              # wird zur Zeit nicht genutzt/verwendet
+  $hash->{NotifyFn}           = \&Notify;                                             
   $hash->{AttrList}           = "affect70percentRule:1,dynamic,0 ".
                                 "affectBatteryPreferredCharge:slider,0,1,100 ".
                                 "affectCloudfactorDamping:slider,0,1,100 ".
@@ -1194,7 +1197,7 @@ sub _setcurrentForecastDev {              ## no critic "not used"
 
   readingsSingleUpdate ($hash, "currentForecastDev", $prop, 1);
   createAssociatedWith ($hash);
-  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1221,7 +1224,7 @@ sub _setcurrentRadiationDev {              ## no critic "not used"
 
   readingsSingleUpdate ($hash, "currentRadiationDev", $prop, 1);
   createAssociatedWith ($hash);
-  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
   setModel             ($hash);                                             # Model setzen
 
 return;
@@ -1328,7 +1331,7 @@ sub _setinverterDevice {                 ## no critic "not used"
 
   readingsSingleUpdate ($hash, "currentInverterDev", $arg, 1);
   createAssociatedWith ($hash);
-  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1398,7 +1401,7 @@ sub _setmeterDevice {                    ## no critic "not used"
 
   readingsSingleUpdate ($hash, "currentMeterDev", $arg, 1);
   createAssociatedWith ($hash);
-  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1439,7 +1442,7 @@ sub _setbatteryDevice {                  ## no critic "not used"
 
   readingsSingleUpdate ($hash, "currentBatteryDev", $arg, 1);
   createAssociatedWith ($hash);
-  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1957,34 +1960,38 @@ sub _setclientAction {                 ## no critic "not used"
 
   my @args = @{$argsref};
 
-  my $evt      = shift @args;                                                 # Readings Event (state nicht gesteuert)
+  my $c        = shift @args;                                                 # Consumer Index (Nummer)
+  my $evt      = shift @args;                                                 # Readings Event (state wird nicht gesteuert)
   my $action   = shift @args;                                                 # z.B. set, setreading
   my $cname    = shift @args;                                                 # Consumername
   my $tail     = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @args;     ## no critic 'Map blocks' # restliche Befehlsargumente
 
   Log3($name, 4, qq{$name - Client Action received / execute: "$action $cname $tail"});
 
-  if($action eq "set") {
+  if($action eq 'set') {
       CommandSet (undef, "$cname $tail");
+      my $async = ConsumerVal ($hash, $c, 'asynchron', 0);
+      centralTask ($hash, $evt) if(!$async);                                  # nur wenn Consumer synchron arbeitet direkte Statusabfrage, sonst via Notify
+      return;
   }
 
-  if($action eq "get") {
+  if($action eq 'get') {
       if($tail eq 'data') {
           centralTask ($hash, $evt);
           return;
       }
   }
 
-  if($action eq "setreading") {
+  if($action eq 'setreading') {
       CommandSetReading (undef, "$cname $tail");
   }
 
-  if($action eq "consumerImmediatePlanning") {
+  if($action eq 'consumerImmediatePlanning') {
       CommandSet (undef, "$name $action $cname $evt");
       return;
   }
 
-  centralTask ($hash, $evt);
+  centralTask ($hash, $evt);                                     
 
 return;
 }
@@ -2587,15 +2594,20 @@ sub Attr {
   # $name is device name
   # aName and aVal are Attribute name and value
 
-  if($aName eq "disable") {
-      if($cmd eq "set") {
-          $do = ($aVal) ? 1 : 0;
+  if($aName eq 'disable') {
+      if($cmd eq 'set') {
+          $do = $aVal ? 1 : 0;
       }
-      $do  = 0 if($cmd eq "del");
-      $val = ($do == 1 ? "disabled" : "initialized");
+      $do  = 0 if($cmd eq 'del');
+      $val = ($do == 1 ? 'disabled' : 'initialized');
       singleUpdateState ( {hash => $hash, state => $val, evt => 1} );
   }
 
+  if($aName eq 'ctrlAutoRefresh') {     
+      delete $hash->{HELPER}{AREFRESH};
+      delete $hash->{AUTOREFRESH};
+  }
+  
   if($aName eq "ctrlNextDayForecastReadings") {
       deleteReadingspec ($hash, "Tomorrow_Hour.*");
   }
@@ -2631,7 +2643,6 @@ sub Attr {
               return $@ if ($@);
           }
       }
-
   }
 
   my $params = {
@@ -2756,7 +2767,7 @@ sub _attrconsumer {                      ## no critic "not used"
 
   writeCacheToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
 
-  InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::createAssociatedWith", $hash, 0);
+  InternalTimer(gettimeofday()+2, "FHEM::SolarForecast::createAssociatedWith", $hash, 0);
 
 return;
 }
@@ -2791,14 +2802,13 @@ return;
 
 ###################################################################################
 #       Eventverarbeitung
-#       (wird zur Zeit nicht genutzt/verwendet)
+#       - Aktualisierung Consumerstatus bei asynchronen Consumern
 ###################################################################################
 sub Notify {
   # Es werden nur die Events von Geräten verarbeitet die im Hash $hash->{NOTIFYDEV} gelistet sind (wenn definiert).
   # Dadurch kann die Menge der Events verringert werden. In sub DbRep_Define angeben.
 
-  return;         # nicht genutzt zur Zeit
-
+  #return;         # nicht genutzt zur Zeit
 
   my $myHash   = shift;
   my $dev_hash = shift;
@@ -2810,7 +2820,7 @@ sub Notify {
   my $events = deviceEvents($dev_hash, 1);
   return if(!$events);
 
-  my $cdref     = CurrentVal ($myHash, "consumerdevs", "");                                # alle registrierten Consumer
+  my $cdref     = CurrentVal ($myHash, 'consumerdevs', '');                               # alle registrierten Consumer
   my @consumers = ();
   @consumers    = @{$cdref} if(ref $cdref eq "ARRAY");
 
@@ -2819,6 +2829,7 @@ sub Notify {
   if($devName ~~ @consumers) {
       my $cindex;
       my $type = $myHash->{TYPE};
+      
       for my $c (sort{$a<=>$b} keys %{$data{$type}{$myName}{consumers}}) {
           my $cname = ConsumerVal ($myHash, $c, "name", "");
           if($devName eq $cname) {
@@ -2827,19 +2838,52 @@ sub Notify {
           }
       }
 
-      my $autoreading = ConsumerVal ($myHash, $cindex, "autoreading", "");
+      my $debug    = AttrVal     ($myName, 'ctrlDebug',     'none');                      # Debug Mode
+      my $async    = ConsumerVal ($myHash, $cindex, 'asynchron', 0);
+      my $rswstate = ConsumerVal ($myHash, $cindex, 'rswstate', '');
+      
+      if ($debug =~ /notifyHandling/x) {
+          Log3 ($myName, 1, qq{$myName DEBUG> Event received - Consumer Device: $devName, asynchronous: $async});
+      }
+      
+      return if(!$async);                                                                 # Consumer synchron -> keine Weiterverarbeitung
+      
+      my ($reading,$value,$unit);
 
       for my $event (@{$events}) {
           $event  = "" if(!defined($event));
-          my @evl = split(/\s+/x, $event);
+          
+          my @parts = split(/: /,$event, 2);
+          $reading  = shift @parts;
 
-          my @parts   = split(/: /x,$event, 2);
-          my $reading = shift @parts;
+          if(@parts == 2) {
+            $value = $parts[0];
+            $unit  = $parts[1];
+          }
+          else {
+            $value = join(": ", @parts);
+            $unit  = "";
+          }
 
-          if ($reading eq "state" || $reading eq $autoreading) {
-              Log3 ($myName, 4, qq{$myName - start centralTask by Notify - $devName:$reading});
-              RemoveInternalTimer($myHash, "FHEM::SolarForecast::centralTask");
-              InternalTimer      (gettimeofday()+0.5, "FHEM::SolarForecast::centralTask", $myHash, 0);
+          if(!defined($reading)) { $reading = ""; }
+          if(!defined($value))   { $value   = ""; }
+          if($value eq "") {                                              
+              if($event =~ /^.*:\s$/) {                                          
+                  $reading = (split(":", $event))[0];
+              }
+              else {
+                  $reading = "state";
+                  $value   = $event;
+              }
+          }
+
+          if ($reading eq $rswstate) {
+              
+              if ($debug =~ /notifyHandling/x) {
+                  Log3 ($myName, 1, qq{$myName DEBUG> start centralTask by Notify - $devName: $reading $value});
+              }
+              
+              centralTask ($myHash, 0);                                                  # keine Events in SolarForeCast außer 'state'
           }
       }
   }
@@ -5789,7 +5833,7 @@ sub _transferBatteryValues {
   $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{batin} = $batinthishour;                # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
 
   $paref->{batinthishour} = $batinthishour;
-  $paref->{nhour}         = sprintf("%02d",$nhour);
+  $paref->{nhour}         = sprintf "%02d", $nhour;
   $paref->{histname}      = "batinthishour";
   setPVhistory ($paref);
   delete $paref->{histname};
@@ -6338,16 +6382,16 @@ sub saveEnergyConsumption {
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
 
-  my $pvrl    = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_PVreal",          0);
-  my $gfeedin = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridFeedIn",      0);
-  my $gcon    = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
-  my $batin   = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_BatIn",           0);
-  my $batout  = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_BatOut",          0);
+  my $pvrl    = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_PVreal",          0);
+  my $gfeedin = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridFeedIn",      0);
+  my $gcon    = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
+  my $batin   = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_BatIn",           0);
+  my $batout  = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_BatOut",          0);
 
   my $con = $pvrl - $gfeedin + $gcon - $batin + $batout;
 
   $paref->{con}      = $con;
-  $paref->{nhour}    = sprintf("%02d",$chour+1);
+  $paref->{nhour}    = sprintf "%02d", $chour+1;
   $paref->{histname} = "con";
   setPVhistory ($paref);
   delete $paref->{histname};
@@ -6454,11 +6498,16 @@ sub collectAllRegConsumers {
           ($rpcurr,$upcurr,$pthreshold) = split ":", $pcurr;
       }
 
+      my $asynchron;
+      if(exists $hc->{asynchron}) {
+          $asynchron = $hc->{asynchron};
+      }
+
       my ($rswstate,$onreg,$offreg);
       if(exists $hc->{swstate}) {
           ($rswstate,$onreg,$offreg) = split ":", $hc->{swstate};
       }
-
+      
       my ($dswoncond,$rswoncond,$swoncondregex);
       if(exists $hc->{swoncond}) {                                                                # zusätzliche Einschaltbedingung
           ($dswoncond,$rswoncond,$swoncondregex) = split ":", $hc->{swoncond};
@@ -6516,6 +6565,7 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{notbefore}       = $hc->{notbefore} // q{};               # nicht einschalten vor Stunde in 24h Format (00-23)
       $data{$type}{$name}{consumers}{$c}{notafter}        = $hc->{notafter}  // q{};               # nicht einschalten nach Stunde in 24h Format (00-23)
       $data{$type}{$name}{consumers}{$c}{rswstate}        = $rswstate        // 'state';           # Schaltstatus Reading
+      $data{$type}{$name}{consumers}{$c}{asynchron}       = $asynchron       // 0;                 # Arbeitsweise FHEM Consumer Device
       $data{$type}{$name}{consumers}{$c}{onreg}           = $onreg           // 'on';              # Regex für 'ein'
       $data{$type}{$name}{consumers}{$c}{offreg}          = $offreg          // 'off';             # Regex für 'aus'
       $data{$type}{$name}{consumers}{$c}{dswoncond}       = $dswoncond       // q{};               # Device zur Lieferung einer zusätzliche Einschaltbedingung
@@ -6542,7 +6592,6 @@ sub FwFn {
   my ($FW_wname, $name, $room, $pageHash) = @_;                                  # pageHash is set for summaryFn.
   my $hash = $defs{$name};
 
-  RemoveInternalTimer($hash, \&pageRefresh);
   $hash->{HELPER}{FW} = $FW_wname;
 
   my $ret = "<html>";
@@ -6550,32 +6599,42 @@ sub FwFn {
   $ret   .= "</html>";
 
   # Autorefresh nur des aufrufenden FHEMWEB-Devices
-  my $al = AttrVal($name, "ctrlAutoRefresh", 0);
+  my $al = AttrVal ($name, 'ctrlAutoRefresh', 0);
   if($al) {
-      InternalTimer(gettimeofday()+$al, \&pageRefresh, $hash, 0);
-      Log3 ($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
+      pageRefresh ($hash);
   }
 
 return $ret;
 }
 
-################################################################
+###########################################################################
+# Seitenrefresh festgelegt durch SolarForecast-Attribut "ctrlAutoRefresh" 
+# und "ctrlAutoRefreshFW"
+###########################################################################
 sub pageRefresh {
   my $hash = shift;
   my $name = $hash->{NAME};
-
-  # Seitenrefresh festgelegt durch SolarForecast-Attribut "ctrlAutoRefresh" und "ctrlAutoRefreshFW"
-  my $rd = AttrVal($name, "ctrlAutoRefreshFW", $hash->{HELPER}{FW});
-  { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } $rd }       ## no critic 'Map blocks'
-
-  my $al = AttrVal($name, "ctrlAutoRefresh", 0);
+  
+  my $al = AttrVal($name, 'ctrlAutoRefresh', 0);
 
   if($al) {
-      InternalTimer(gettimeofday()+$al, \&pageRefresh, $hash, 0);
-      Log3 ($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
+      my $rftime = gettimeofday()+$al;
+      
+      if (!$hash->{HELPER}{AREFRESH} || $hash->{HELPER}{AREFRESH} <= gettimeofday()) {
+          RemoveInternalTimer ($hash, \&pageRefresh);
+          InternalTimer($rftime, \&pageRefresh, $hash, 0);
+          
+          my $rd = AttrVal ($name, 'ctrlAutoRefreshFW', $hash->{HELPER}{FW});
+          { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } $rd }       ## no critic 'Map blocks'
+          
+          $hash->{HELPER}{AREFRESH} = $rftime;
+          $hash->{AUTOREFRESH}      = FmtDateTime($rftime);
+      }
   }
   else {
-      RemoveInternalTimer($hash, \&pageRefresh);
+      delete $hash->{HELPER}{AREFRESH};
+      delete $hash->{AUTOREFRESH};
+      RemoveInternalTimer ($hash, \&pageRefresh);
   }
 
 return;
@@ -6947,10 +7006,10 @@ sub _graphicHeader {
          $lup = "$day.$month.$year&nbsp;$time";
       }
 
-      my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction 0 get $name data')"};                               # Update Button generieren
+      my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction - 0 get $name data')"};                               # Update Button generieren
 
       if ($ftui eq "ftui") {
-          $cmdupdate = qq{"ftui.setFhemStatus('set $name clientAction 0 get $name data')"};
+          $cmdupdate = qq{"ftui.setFhemStatus('set $name clientAction - 0 get $name data')"};
       }
 
       my $cmdplchk = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name plantConfigCheck', function(data){FW_okDialog(data)})"};          # Plant Check Button generieren
@@ -7310,18 +7369,18 @@ sub _graphicConsumerLegend {
       my $autord     = ConsumerVal ($hash, $c, "autoreading",             "");                      # Readingname f. Automatiksteuerung
       my $auto       = ConsumerVal ($hash, $c, "auto",                     1);                      # Automatic Mode
 
-      my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction 0 set $cname $oncom')"};
-      my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction 0 set $cname $offcom')"};
-      my $cmdautoon  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction 0 setreading $cname $autord 1')"};
-      my $cmdautooff = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction 0 setreading $cname $autord 0')"};
-      my $implan     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction 0 consumerImmediatePlanning $c')"};
+      my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 set $cname $oncom')"};
+      my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 set $cname $offcom')"};
+      my $cmdautoon  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 setreading $cname $autord 1')"};
+      my $cmdautooff = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 setreading $cname $autord 0')"};
+      my $implan     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 consumerImmediatePlanning $c')"};
 
       if ($ftui eq "ftui") {
-          $cmdon      = qq{"ftui.setFhemStatus('set $name clientAction 0 set $cname $oncom')"};
-          $cmdoff     = qq{"ftui.setFhemStatus('set $name clientAction 0 set $cname $offcom')"};
-          $cmdautoon  = qq{"ftui.setFhemStatus('set $name clientAction 0 setreading $cname $autord 1')"};
-          $cmdautooff = qq{"ftui.setFhemStatus('set $name clientAction 0 setreading $cname $autord 0')"};
-          $implan     = qq{"ftui.setFhemStatus('set $name clientAction 0 consumerImmediatePlanning $c')"};
+          $cmdon      = qq{"ftui.setFhemStatus('set $name clientAction $c 0 set $cname $oncom')"};
+          $cmdoff     = qq{"ftui.setFhemStatus('set $name clientAction $c 0 set $cname $offcom')"};
+          $cmdautoon  = qq{"ftui.setFhemStatus('set $name clientAction $c 0 setreading $cname $autord 1')"};
+          $cmdautooff = qq{"ftui.setFhemStatus('set $name clientAction $c 0 setreading $cname $autord 0')"};
+          $implan     = qq{"ftui.setFhemStatus('set $name clientAction $c 0 consumerImmediatePlanning $c')"};
       }
 
       $cmdon      = q{} if(!$oncom);
@@ -10069,8 +10128,8 @@ sub createAssociatedWith {
 
   RemoveInternalTimer($hash, "FHEM::SolarForecast::createAssociatedWith");
 
-  if($init_done == 1) {
-      my @nd;
+  if($init_done) {
+      my (@cd,@nd);
       my ($afc,$ara,$ain,$ame,$aba,$h);
 
       my $fcdev = ReadingsVal($name, "currentForecastDev",  "");             # Weather forecast Device
@@ -10098,8 +10157,10 @@ sub createAssociatedWith {
           my ($ac,$hc) = parseParams ($codev);
           $codev       = $ac->[0] // "";
 
-          push @nd, $codev if($codev);
+          push @cd, $codev if($codev);
       }
+      
+      @nd = @cd;
 
       push @nd, $fcdev;
       push @nd, $radev if($radev ne $fcdev && $radev !~ /SolCast-API/xs);
@@ -10108,7 +10169,7 @@ sub createAssociatedWith {
       push @nd, $badev;
 
       if(@nd) {
-          # $hash->{NOTIFYDEV} = join ",", @nd;                                   # zur Zeit nicht benutzt
+          $hash->{NOTIFYDEV} = join ",", @cd if(@cd);
           readingsSingleUpdate ($hash, ".associatedWith", join(" ",@nd), 0);
       }
   }
@@ -10832,6 +10893,7 @@ return $def;
 #       oncom           - Einschaltkommando
 #       offcom          - Ausschaltkommando
 #       onoff           - logischer ein/aus Zustand des am Consumer angeschlossenen Endverbrauchers
+#       asynchron       - Arbeitsweise des FHEM Consumer Devices
 #       retotal         - Reading der Leistungsmessung
 #       uetotal         - Unit der Leistungsmessung
 #       rpcurr          - Readingname des aktuellen Verbrauchs
@@ -11883,10 +11945,12 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt;  <br>
-                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]] <br>
-                         [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] <br>
+                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]              <br>
+                         [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]  <br>
+                         [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] <br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] <br>
-                         [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [interruptable=&lt;Option&gt] </b><br><br>
+                         [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [interruptable=&lt;Option&gt] </b><br>
+                         <br>
 
         Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
         ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose.
@@ -11942,7 +12006,7 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td>                       </td><td><b>SunPath</b>[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;] - die Einplanung erfolgt von Sonnenaufgang bis Sonnenuntergang.                  </td></tr>
             <tr><td>                       </td><td> Optional kann eine positive / negative Verschiebung (Minuten) der Planungszeit bzgl. Sonnenaufgang bzw. Sonnenuntergang angegeben werden.     </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td>                       </td><td>Ist mintime nicht angegeben, wird eine Standard Einplanungsdauer gemaäß nachfolgender Tabelle verwendet.                                       </td></tr>
+            <tr><td>                       </td><td>Ist mintime nicht angegeben, wird eine Standard Einplanungsdauer gemäß nachfolgender Tabelle verwendet.                                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td>                       </td><td><b>Default mintime nach Verbrauchertyp:</b>                                                                                                    </td></tr>
             <tr><td>                       </td><td>- dishwasher: 180 Minuten                                                                                                                      </td></tr>
@@ -11956,6 +12020,10 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td> <b>swstate</b>        </td><td>Reading welches den Schaltzustand des Consumers anzeigt (default: 'state').                                                                    </td></tr>
             <tr><td>                       </td><td><b>on-Regex</b> - regulärer Ausdruck für den Zustand 'ein' (default: 'on')                                                                     </td></tr>
             <tr><td>                       </td><td><b>off-Regex</b> - regulärer Ausdruck für den Zustand 'aus' (default: 'off')                                                                   </td></tr>
+            <tr><td> <b>asynchron</b>      </td><td>die Art der Schaltstatus Ermittlung im Verbraucher Device. Die Statusermittlung des Verbrauchers nach einem Schaltbefehl erfolgt nur           </td></tr>
+            <tr><td>                       </td><td>durch Abfrage innerhalb eines Datensammelintervals (synchron) oder zusätzlich durch Eventverarbeitung (asynchron).                             </td></tr>
+            <tr><td>                       </td><td><b>0</b> - ausschließlich synchrone Verarbeitung von Schaltzuständen  (default)                                                                </td></tr>
+            <tr><td>                       </td><td><b>1</b> - zusätzlich asynchrone Verarbeitung von Schaltzuständen durch Eventverarbeitung                                                      </td></tr>
             <tr><td> <b>notbefore</b>      </td><td>Startzeitpunkt Verbraucher nicht vor angegebener Stunde (01..23) einplanen (optional)                                                          </td></tr>
             <tr><td> <b>notafter</b>       </td><td>Startzeitpunkt Verbraucher nicht nach angegebener Stunde (01..23) einplanen (optional)                                                         </td></tr>
             <tr><td> <b>auto</b>           </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                                          </td></tr>
@@ -12036,6 +12104,7 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td> <b>consumerSwitching</b>  </td><td>Operationen des internen Consumer Schaltmodul                  </td></tr>
             <tr><td> <b>consumption</b>        </td><td>Verbrauchskalkulation und -nutzung                             </td></tr>
             <tr><td> <b>graphic</b>            </td><td>Informationen der Modulgrafik                                  </td></tr>
+            <tr><td> <b>notifyHandling</b>     </td><td>Ablauf der Eventverarbeitung im Modul                          </td></tr>
             <tr><td> <b>pvCorrection</b>       </td><td>Erstellung und Anwendung der Autokorrektur                     </td></tr>
             <tr><td> <b>radiationProcess</b>   </td><td>Sammlung und Verarbeitung der Solarstrahlungsdaten             </td></tr>
             <tr><td> <b>saveData2Cache</b>     </td><td>Datenspeicherung in internen Speicherstrukturen                </td></tr>
