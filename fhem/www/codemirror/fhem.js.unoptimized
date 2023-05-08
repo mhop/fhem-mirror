@@ -882,7 +882,8 @@ CodeMirror.commands.autocomplete = function(cm) {
 var keywords = ["at","attr","define","defmod","delete","deleteattr","deletereading",
   "IF","DOIF","DOELSEIF","DOELSE","displayattr","fhem","get","getstate",
   "list","modify","notify","set","setdefaultattr","setreading","setstate","trigger",
-  "AttrVal","OldTimestamp","OldValue","ReadingsVal","ReadingsNum","ReadingsTimestamp",
+  "AttrVal","OldTimestamp","OldValue","OldReadingsVal","OldReadingsNum",
+  "OldReadingsTimestamp","ReadingsVal","ReadingsNum","ReadingsTimestamp",
   "Value","set_State","get_State","set_Reading","get_Reading","set_Event","set_Exec",
   "get_Exec","del_Exec","fhem_set","set_Event","set_Reading_Begin","set_Reading_Update",
   "set_Reading_End","subs","init","WID","STY","PUP","IMPORT"];
@@ -898,7 +899,7 @@ var devices = [];
 CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, options) {
 
 	if( devices.length == 0 ) {
-		$.getJSON( '/fhem?cmd=jsonlist2$FW_CSRF', function ( data ) {
+		$.getJSON( '/fhem?cmd=jsonlist2', function ( data ) {
             if( devices.length == 0 ) {
                 data.Results.foreach( function(k,v) {
                     devices.push(v);
