@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.17";
+my $ModulVersion = "07.50.17f";
 my $missingModul = "";
 my $missingModulWeb = "";
 my $missingModulTR064 = "";
@@ -80,7 +80,7 @@ sub FRITZBOX_SetMOH($@);
 sub FRITZBOX_TR064_Init($$);
 sub FRITZBOX_Wlan_Run($);
 sub FRITZBOX_Web_Query($$@);
-sub FRITZBOX_Lua_Data($$@);
+sub FRITZBOX_Function_Lua($$$@);
 sub FRITZBOX_Process_JSON($$$@);
 sub FRITZBOX_ERR_Result($$;@);
 sub FRITZBOX_Run_GuestWlan_Web($);
@@ -227,7 +227,7 @@ sub FRITZBOX_Initialize($)
                                 ."box_ipv6_Prefix,box_dns_Server,box_last_connect_err,box_moh,box_powerRate,box_rateDown,box_wlan_LogExtended,"
                                 ."box_fon_LogNewest,box_sys_LogNewest,box_wlan_LogNewest,"
                                 ."box_rateUp,box_stdDialPort,box_tr064,box_tr069,box_upnp,box_upnp_control_activated,box_uptimeConnect,box_uptime,"
-                                ."box_wlan_Count,box_wlan_2.4GHz,box_wlan_5GHz,"
+                                ."box_wan_AccessType,box_wlan_Count,box_wlan_2.4GHz,box_wlan_5GHz,"
                                 ."box_vdsl_downStreamRate,box_vdsl_upStreamRate,box_vdsl_downStreamMaxRate,box_vdsl_upStreamMaxRate "
                 ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,_noDefInf_ "
                 ."disableTableFormat:multiple-strict,border(8),cellspacing(10),cellpadding(20) "
@@ -306,6 +306,7 @@ sub FRITZBOX_Define($$)
    $hash->{fhem}{modulVersion} = '$Date$';
    $hash->{fhem}{lastHour}     = 0;
    $hash->{fhem}{LOCAL}        = 0;
+   $hash->{_BETA}              = 0;
 
    $hash->{helper}{TimerReadout} = $name.".Readout";
    $hash->{helper}{TimerCmd} = $name.".Cmd";
@@ -704,7 +705,7 @@ sub FRITZBOX_Set($$@)
 
            FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd \n" . join(" ", @webCmdArray);
 
-           my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+           my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
            my $tmp;
            if (defined $result->{Error} ) {
@@ -880,7 +881,7 @@ sub FRITZBOX_Set($$@)
 
       FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd \n" . join(" ", @webCmdArray);
 
-      my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+      my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
       my $tmp;
       if (defined $result->{Error} ) {
@@ -925,7 +926,7 @@ sub FRITZBOX_Set($$@)
 
            FRITZBOX_Log $hash, 4, "INFO: data.lua: " . join(" ", @webCmdArray);
 
-           my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+           my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
            if(defined $result->{Error}) {
               FRITZBOX_Log $hash, 2, "ERROR: DNS IPv4 not set to " . $val[0] . " - " . $result->{Error};
@@ -946,7 +947,7 @@ sub FRITZBOX_Set($$@)
 
            FRITZBOX_Log $hash, 4, "INFO: data.lua: " . join(" ", @webCmdArray);
 
-           my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+           my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
            if(defined $result->{Error}) {
               FRITZBOX_Log $hash, 2, "ERROR: DNS IPv4 not set to " . $val[0] . " - " . $result->{Error};
@@ -977,7 +978,7 @@ sub FRITZBOX_Set($$@)
 
            FRITZBOX_Log $hash, 4, "INFO: data.lua: " . join(" ", @webCmdArray);
 
-           $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+           $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
            if(defined $result->{Error}) {
               FRITZBOX_Log $hash, 2, "ERROR: DNS IPv4 not set to " . $val[0] . " - " . $result->{Error};
@@ -1289,7 +1290,35 @@ sub FRITZBOX_Get($@)
       $returnStr  = "Result of data = " . $queryStr . "\n";
       $returnStr .= "----------------------------------------------------------------------\n";
 
-      my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+      my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
+
+      my $flag = 1;
+      my $tmp = FRITZBOX_ERR_Result($hash, $result, 1);
+
+      return $returnStr . $tmp;
+
+   } elsif( lc $cmd eq "luadectringtone" && $hash->{LUADATA} == 1 && $hash->{_BETA}) {
+      FRITZBOX_Log $hash, 3, "INFO: get $name $cmd [" . int(@val) . "] " . join(" ", @val);
+
+      return "Wrong number of arguments, usage: get $name argName1 argValue1 [argName2 argValue2] ..." if int @val < 2 || int(@val) %2 == 1;
+
+      my @webCmdArray;
+      my $queryStr;
+      for(my $i = 0; $i <= (int @val)/2 - 1; $i++) {
+        $val[2*$i+1] = "" if lc($val[2*$i+1]) eq "nop";
+        $val[2*$i+1] =~ tr/\&/ /;
+        push @webCmdArray, $val[2*$i+0] => $val[2*$i+1];
+        $queryStr .= "'$val[2*$i+0]' => '$val[2*$i+1]'\n";
+      }
+
+      $queryStr =~ tr/\&/ /;
+
+      FRITZBOX_Log $hash, 4, "DEBUG: get $name $cmd " . $queryStr;
+
+      $returnStr  = "Result of data = " . $queryStr . "\n";
+      $returnStr .= "----------------------------------------------------------------------\n";
+
+      my $result = FRITZBOX_Function_Lua($hash, "fon_devices\/edit_dect_ring_tone", \@webCmdArray) ;
 
       my $flag = 1;
       my $tmp = FRITZBOX_ERR_Result($hash, $result, 1);
@@ -1416,6 +1445,7 @@ sub FRITZBOX_Get($@)
    my $list;
    $list .= "luaQuery"                if $hash->{LUAQUERY} == 1;
    $list .= " luaData"                if $hash->{LUADATA} == 1;
+   $list .= " luaDectRingTone"        if $hash->{LUADATA} == 1 && $hash->{_BETA};
    $list .= " luaFunction"            if $hash->{LUAQUERY} == 1;
 
    # luaData
@@ -2132,7 +2162,7 @@ sub FRITZBOX_Readout_Run_Web($)
      push @webCmdArray, "page"        => "alarm";
      push @webCmdArray, "xhrId"       => "all";
       
-     $resultData = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+     $resultData = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
      if(defined $resultData->{Error}) {
        $tmpData = FRITZBOX_ERR_Result($hash, $resultData);
@@ -2718,7 +2748,7 @@ sub FRITZBOX_Readout_Run_Web($)
      push @webCmdArray, "page"        => "wlanmesh";
      push @webCmdArray, "xhrId"       => "all";
 
-     $resultData = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+     $resultData = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
      if(defined $resultData->{Error}) {
        $tmpData = FRITZBOX_ERR_Result($hash, $resultData);
@@ -2753,7 +2783,7 @@ sub FRITZBOX_Readout_Run_Web($)
        push @webCmdArray, "page"        => "chan";
        push @webCmdArray, "xhrId"       => "environment";
 
-       $resultData = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+       $resultData = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
        if(defined $resultData->{Error}) {
          $tmpData = FRITZBOX_ERR_Result($hash, $resultData);
@@ -2820,7 +2850,7 @@ sub FRITZBOX_Readout_Run_Web($)
        push @webCmdArray, "lang"        => "de";
        push @webCmdArray, "page"        => "kidPro";
 
-       my $resultData = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+       my $resultData = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
        if(defined $resultData->{Error}) {
          $tmpData = FRITZBOX_ERR_Result($hash, $resultData);
@@ -2861,7 +2891,7 @@ sub FRITZBOX_Readout_Run_Web($)
        push @webCmdArray, "filter"      => "wlan";
      }
 
-     $resultData = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+     $resultData = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
      if(defined $resultData->{Error}) {
        $tmpData = FRITZBOX_ERR_Result($hash, $resultData);
@@ -2909,7 +2939,7 @@ sub FRITZBOX_Readout_Run_Web($)
        push @webCmdArray, "filter"      => "sys";
      }
 
-     $resultData = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+     $resultData = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
      if(defined $resultData->{Error}) {
        $tmpData = FRITZBOX_ERR_Result($hash, $resultData);
@@ -2954,7 +2984,7 @@ sub FRITZBOX_Readout_Run_Web($)
        push @webCmdArray, "filter"      => "fon";
      }
 
-     $resultData = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+     $resultData = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
      if(defined $resultData->{Error}) {
        $tmpData = FRITZBOX_ERR_Result($hash, $resultData);
@@ -2995,7 +3025,7 @@ sub FRITZBOX_Readout_Run_Web($)
        push @webCmdArray, "page"        => "mobile";
        push @webCmdArray, "xhrId"       => "all";
 
-       $resultData = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+       $resultData = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
        if(defined $resultData->{Error}) {
          $tmpData = FRITZBOX_ERR_Result($hash, $resultData);
@@ -3084,7 +3114,7 @@ sub FRITZBOX_Readout_Run_Web($)
 #        my $TestSIS = '{"pid":"docInfo","hide":{"mobile":true,"ssoSet":true,"liveTv":true},"time":[],"data":{"channelDs":{"docsis30":[{"type":"256QAM","corrErrors":92890,"mse":"-36.4","powerLevel":"5.1","channel":1,"nonCorrErrors":9773,"latency":0.32,"channelID":7,"frequency":"538"},{"type":"256QAM","corrErrors":20553,"mse":"-37.4","powerLevel":"10.2","channel":2,"nonCorrErrors":9420,"latency":0.32,"channelID":26,"frequency":"698"},{"type":"256QAM","corrErrors":28673,"mse":"-37.6","powerLevel":"10.0","channel":3,"nonCorrErrors":140,"latency":0.32,"channelID":25,"frequency":"690"},{"type":"256QAM","corrErrors":25930,"mse":"-37.6","powerLevel":"10.0","channel":4,"nonCorrErrors":170,"latency":0.32,"channelID":27,"frequency":"706"},{"type":"256QAM","corrErrors":98698,"mse":"-36.6","powerLevel":"8.8","channel":5,"nonCorrErrors":9151,"latency":0.32,"channelID":30,"frequency":"746"},{"type":"256QAM","corrErrors":24614,"mse":"-37.4","powerLevel":"9.4","channel":6,"nonCorrErrors":9419,"latency":0.32,"channelID":28,"frequency":"730"},{"type":"256QAM","corrErrors":25882,"mse":"-37.4","powerLevel":"9.9","channel":7,"nonCorrErrors":9308,"latency":0.32,"channelID":24,"frequency":"682"},{"type":"256QAM","corrErrors":33817,"mse":"-37.4","powerLevel":"9.8","channel":8,"nonCorrErrors":146,"latency":0.32,"channelID":23,"frequency":"674"},{"type":"256QAM","corrErrors":112642,"mse":"-37.6","powerLevel":"7.8","channel":9,"nonCorrErrors":7783,"latency":0.32,"channelID":3,"frequency":"490"},{"type":"256QAM","corrErrors":41161,"mse":"-37.6","powerLevel":"9.8","channel":10,"nonCorrErrors":203,"latency":0.32,"channelID":21,"frequency":"658"},{"type":"256QAM","corrErrors":33219,"mse":"-37.4","powerLevel":"8.8","channel":11,"nonCorrErrors":10962,"latency":0.32,"channelID":18,"frequency":"634"},{"type":"256QAM","corrErrors":32680,"mse":"-37.6","powerLevel":"9.2","channel":12,"nonCorrErrors":145,"latency":0.32,"channelID":19,"frequency":"642"},{"type":"256QAM","corrErrors":33001,"mse":"-37.4","powerLevel":"9.8","channel":13,"nonCorrErrors":7613,"latency":0.32,"channelID":22,"frequency":"666"},{"type":"256QAM","corrErrors":42666,"mse":"-37.4","powerLevel":"8.1","channel":14,"nonCorrErrors":172,"latency":0.32,"channelID":17,"frequency":"626"},{"type":"256QAM","corrErrors":41023,"mse":"-37.4","powerLevel":"9.3","channel":15,"nonCorrErrors":10620,"latency":0.32,"channelID":20,"frequency":"650"},{"type":"256QAM","corrErrors":106921,"mse":"-37.6","powerLevel":"7.4","channel":16,"nonCorrErrors":356,"latency":0.32,"channelID":4,"frequency":"498"},{"type":"256QAM","corrErrors":86650,"mse":"-36.4","powerLevel":"4.9","channel":17,"nonCorrErrors":85,"latency":0.32,"channelID":12,"frequency":"578"},{"type":"256QAM","corrErrors":91838,"mse":"-36.4","powerLevel":"4.8","channel":18,"nonCorrErrors":168,"latency":0.32,"channelID":8,"frequency":"546"},{"type":"256QAM","corrErrors":110719,"mse":"-35.8","powerLevel":"4.5","channel":19,"nonCorrErrors":103,"latency":0.32,"channelID":10,"frequency":"562"},{"type":"256QAM","corrErrors":111846,"mse":"-37.6","powerLevel":"8.2","channel":20,"nonCorrErrors":247,"latency":0.32,"channelID":2,"frequency":"482"},{"type":"256QAM","corrErrors":668242,"mse":"-36.6","powerLevel":"5.8","channel":21,"nonCorrErrors":6800,"latency":0.32,"channelID":5,"frequency":"522"},{"type":"256QAM","corrErrors":104070,"mse":"-36.6","powerLevel":"5.3","channel":22,"nonCorrErrors":149,"latency":0.32,"channelID":6,"frequency":"530"},{"type":"256QAM","corrErrors":120994,"mse":"-35.8","powerLevel":"4.4","channel":23,"nonCorrErrors":10240,"latency":0.32,"channelID":9,"frequency":"554"},{"type":"256QAM","corrErrors":59145,"mse":"-36.4","powerLevel":"5.3","channel":24,"nonCorrErrors":9560,"latency":0.32,"channelID":11,"frequency":"570"},{"type":"256QAM","corrErrors":118271,"mse":"-37.6","powerLevel":"8.4","channel":25,"nonCorrErrors":810,"latency":0.32,"channelID":1,"frequency":"474"},{"type":"256QAM","corrErrors":40255,"mse":"-37.4","powerLevel":"6.5","channel":26,"nonCorrErrors":13474,"latency":0.32,"channelID":15,"frequency":"602"},{"type":"256QAM","corrErrors":62716,"mse":"-36.4","powerLevel":"5.3","channel":27,"nonCorrErrors":9496,"latency":0.32,"channelID":13,"frequency":"586"},{"type":"256QAM","corrErrors":131364,"mse":"-36.6","powerLevel":"8.9","channel":28,"nonCorrErrors":12238,"latency":0.32,"channelID":29,"frequency":"738"}]},"oem":"lgi","readyState":"ready","channelUs":{"docsis30":[{"powerLevel":"43.0","type":"64QAM","channel":1,"multiplex":"ATDMA","channelID":4,"frequency":"51"},{"powerLevel":"44.3","type":"64QAM","channel":2,"multiplex":"ATDMA","channelID":2,"frequency":"37"},{"powerLevel":"43.8","type":"64QAM","channel":3,"multiplex":"ATDMA","channelID":3,"frequency":"45"},{"powerLevel":"45.8","type":"64QAM","channel":4,"multiplex":"ATDMA","channelID":1,"frequency":"31"}]}},"sid":"14341afbc7d83b4c"}';
 #        my $resultData = FRITZBOX_Process_JSON($hash, $TestSIS, "14341afbc7d83b4c", ""); ;
       
-        $resultData = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+        $resultData = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
         if(defined $resultData->{Error}) {
           $tmpData = FRITZBOX_ERR_Result($hash, $resultData);
@@ -3442,7 +3472,7 @@ sub FRITZBOX_Readout_Run_Web($)
        $soap_resp = FRITZBOX_SOAP_Request($hash,$control_url . "WANIPConn1", $service_type, $service_command);
 
        if(defined $soap_resp->{Error}) {
-         FRITZBOX_Log $hash, 4, "DEBUG: SOAP-ERROR -> " . $soap_resp->{Error};
+         FRITZBOX_Log $hash, 5, "DEBUG: SOAP-ERROR -> " . $soap_resp->{Error};
  
        } elsif ( $soap_resp->{Response} ) {
 
@@ -3480,7 +3510,7 @@ sub FRITZBOX_Readout_Run_Web($)
        $soap_resp = FRITZBOX_SOAP_Request($hash,$control_url . "WANIPConn1", $service_type, $service_command);
 
        if(exists $soap_resp->{Error}) {
-         FRITZBOX_Log $hash, 4, "DEBUG: SOAP-ERROR -> " . $soap_resp->{Error};
+         FRITZBOX_Log $hash, 5, "DEBUG: SOAP-ERROR -> " . $soap_resp->{Error};
  
        } elsif ( $soap_resp->{Response} ) {
 
@@ -3495,14 +3525,14 @@ sub FRITZBOX_Readout_Run_Web($)
 
      if ($avmModel =~ "Box") {
        #-------------------------------------------------------------------------------------
-       # box_ipv6 ->  NewPreferedLifetime, NewExternalIPv6Address, NewValidLifetime, NewPrefixLength
 
+       # box_ipv6 ->  NewPreferedLifetime, NewExternalIPv6Address, NewValidLifetime, NewPrefixLength
        $service_command = "X_AVM_DE_GetExternalIPv6Address";
 
        $soap_resp = FRITZBOX_SOAP_Request($hash,$control_url . "WANIPConn1", $service_type, $service_command);
 
        if(exists $soap_resp->{Error}) {
-         FRITZBOX_Log $hash, 4, "DEBUG: SOAP/TR064-ERROR -> " . $soap_resp->{Error};
+         FRITZBOX_Log $hash, 5, "DEBUG: SOAP/TR064-ERROR -> " . $soap_resp->{Error};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6_Extern", $soap_resp->{ErrLevel} == 2?"unknown error":"";
  
        } elsif ( $soap_resp->{Response} ) {
@@ -3523,7 +3553,7 @@ sub FRITZBOX_Readout_Run_Web($)
        $soap_resp = FRITZBOX_SOAP_Request($hash,$control_url . "WANIPConn1", $service_type, $service_command);
 
        if(exists $soap_resp->{Error}) {
-         FRITZBOX_Log $hash, 4, "DEBUG: SOAP/TR064-ERROR -> " . $soap_resp->{Error};
+         FRITZBOX_Log $hash, 5, "DEBUG: SOAP/TR064-ERROR -> " . $soap_resp->{Error};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6_Extern", $soap_resp->{ErrLevel} == 2?"unknown error":"";
  
        } elsif ( $soap_resp->{Response} ) {
@@ -3535,6 +3565,26 @@ sub FRITZBOX_Readout_Run_Web($)
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6_Prefix", $1;
          }
        }
+
+       # box_wan_AccessType
+       $service_command = "GetCommonLinkProperties";
+
+       $soap_resp = FRITZBOX_SOAP_Request($hash,$control_url . "WANCommonIFC1", "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1", $service_command);
+
+       if(exists $soap_resp->{Error}) {
+         FRITZBOX_Log $hash, 5, "DEBUG: SOAP/TR064-ERROR -> " . $soap_resp->{Error};
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wan_AccessType", $soap_resp->{ErrLevel} == 2?"unknown error":"";
+ 
+       } elsif ( $soap_resp->{Response} ) {
+
+         $strCurl = $soap_resp->{Response};
+         FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
+
+         if($strCurl =~ m/<NewWANAccessType>(.*?)<\/NewWANAccessType>/i) {
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wan_AccessType", $1;
+         }
+       }
+
      } elsif ($avmModel =~ "Repeater") {
 
      } else {
@@ -3705,7 +3755,7 @@ sub FRITZBOX_Readout_Process($$)
                                 ."box_ipv6_Prefix,box_dns_Server,box_last_connect_err,box_moh,box_powerRate,box_rateDown,"
                                 ."box_fon_LogNewest,box_sys_LogNewest,box_wlan_LogExtended,box_wlan_LogNewest,"
                                 ."box_rateUp,box_stdDialPort,box_tr064,box_tr069,box_upnp,box_upnp_control_activated,box_uptimeConnect,box_uptime,"
-                                ."box_wlan_Count,box_wlan_2.4GHz,box_wlan_5GHz,"
+                                ."box_wan_AccessType,box_wlan_Count,box_wlan_2.4GHz,box_wlan_5GHz,"
                                 ."box_vdsl_downStreamRate,box_vdsl_upStreamRate,box_vdsl_downStreamMaxRate,box_vdsl_upStreamMaxRate,"
                                 ."box_docsis30_Ds_powerLevels,box_docsis30_Ds_latencys,box_docsis30_Ds_frequencys,box_docsis30_Ds_corrErrors,box_docsis30_Ds_nonCorrErrors,box_docsis30_Ds_mses,"
                                 ."box_docsis30_Us_powerLevels,box_docsis30_Us_frequencys,box_docsis31_Us_powerLevels,box_docsis31_Us_frequencys,box_docsis31_Ds_powerLevels,box_docsis31_Ds_frequencys "
@@ -4218,7 +4268,7 @@ sub FRITZBOX_Run_wakeUpCall($)
 
    FRITZBOX_Log $hash, 5, "DEBUG: data.lua: \n" . join(" ", @webCmdArray);
 
-   $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+   $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
    if(defined $result->{Error}) {
      FRITZBOX_Log $hash, 2, "ERROR: setting wakeUpCall: " . $result->{Error};
@@ -4293,7 +4343,7 @@ sub FRITZBOX_Run_fritzloginfo($)
 
      FRITZBOX_Log $hash, 5, "DEBUG: data.lua: \n" . join(" ", @webCmdArray);
 
-     my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+     my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
      if(defined $result->{Error}) {
        FRITZBOX_Log $hash, 2, "ERROR: wlanLogExtended: " . $result->{Error};
@@ -4328,7 +4378,7 @@ sub FRITZBOX_Run_fritzloginfo($)
 
      FRITZBOX_Log $hash, 5, "DEBUG: data.lua: \n" . join(" ", @webCmdArray);
 
-     my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+     my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
      if(defined $result->{Error}) {
        FRITZBOX_Log $hash, 2, "ERROR: fritzLogInfo: " . $result->{Error};
@@ -4431,7 +4481,7 @@ sub FRITZBOX_Run_macFilter($)
 
       FRITZBOX_Log $hash, 5, "DEBUG: set $name $cmd " . join(" ", @webCmdArray);
 
-      $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+      $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
       if(defined $result->{Error}) {
          FRITZBOX_Log $hash, 2, "ERROR: setting MAC Filter: " . $result->{Error};
@@ -4499,7 +4549,7 @@ sub FRITZBOX_Run_rescan_neighborhood($)
 
    FRITZBOX_Log $hash, 5, "DEBUG: data.lua: \n" . join(" ", @webCmdArray);
 
-   $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+   $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
    if(defined $result->{Error}) {
      FRITZBOX_Log $hash, 2, "ERROR: rescan WLAN neighborhood: " . $result->{Error};
@@ -4581,7 +4631,7 @@ sub FRITZBOX_Run_chgProfile($)
 
    FRITZBOX_Log $hash, 5, "DEBUG: get $name $cmd " . join(" ", @webCmdArrayP);
 
-   $result = FRITZBOX_Lua_Data( $hash, \@webCmdArrayP) ;
+   $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArrayP) ;
 
    if(defined $result->{Error}) {
       FRITZBOX_Log $hash, 2, "ERROR: changing Kid Profile: " . $result->{Error};
@@ -4689,7 +4739,7 @@ sub FRITZBOX_Run_chgProfile($)
 
             FRITZBOX_Log $hash, 5, "DEBUG: get $name $cmd " . join(" ", @webCmdArray);
 
-            $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+            $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
             my $tmp = FRITZBOX_ERR_Result($hash, $result, 1);
 
@@ -4780,7 +4830,7 @@ sub FRITZBOX_Run_enableVPNshare($)
 
        FRITZBOX_Log $hash, 5, "DEBUG: data.lua: \n" . join(" ", @webCmdArray);
 
-       $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+       $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
        if(defined $result->{Error}) {
          FRITZBOX_Log $hash, 2, "ERROR: enable $val[0] share: " . $result->{Error};
@@ -4877,7 +4927,7 @@ sub FRITZBOX_Run_lockLandevice($)
 
    unless (($lock_res =~ /blocked/ && $val[1] eq "on") || ($lock_res =~ /unlimited/ && $val[1] eq "off")) {
 
-     my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray);
+     my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray);
 
      if ( defined $result->{Error} ) {
        FRITZBOX_Log $hash, 2, "ERROR: lockLandevice status: " . $result->{Error};
@@ -5445,17 +5495,15 @@ EOD
    my $init_url = "https://$host:$port/$control_url";
    my $resp_init = $ua->post($init_url, Content_Type => 'text/xml; charset=utf-8', Content => $init_request);
 
-   FRITZBOX_Log $hash, 5, "DEBUG: SOAP response error: " . $resp_init->status_line;
-
    # Check the outcome of the response
    unless ($resp_init->is_success) {
-     FRITZBOX_Log $hash, 2, "INFO: SOAP response error: " . $resp_init->status_line;
+     FRITZBOX_Log $hash, 4, "INFO: SOAP response error: " . $resp_init->status_line;
      %retHash = ( "Error" => "SOAP response error: " . $resp_init->status_line, "ErrLevel" => "1" ) ;
      return \%retHash;
    }
 
    unless( $resp_init->decoded_content ) {
-     FRITZBOX_Log $hash, 2, "INFO: SOAP response error: " . $resp_init->status_line;
+     FRITZBOX_Log $hash, 4, "INFO: SOAP response error: " . $resp_init->status_line;
      %retHash = ( "Error" => "SOAP response error: " . $resp_init->status_line, "ErrLevel" => "1" ) ;
      return \%retHash;
    }
@@ -5909,9 +5957,9 @@ sub FRITZBOX_Web_Query($$@)
 
 # Read box values via the web connection
 ############################################
-sub FRITZBOX_Lua_Data($$@)
+sub FRITZBOX_Function_Lua($$$@)
 {
-   my ($hash, $queryStr, $charSet) = @_;
+   my ($hash, $luaFunction, $queryStr, $charSet) = @_;
    $charSet = "" unless defined $charSet;
 
    my $name = $hash->{NAME};
@@ -5933,18 +5981,18 @@ sub FRITZBOX_Lua_Data($$@)
 
    FRITZBOX_Log $hash, 4, "INFO: Request data via API dataQuery.";
    my $host = $hash->{HOST};
-   my $url = 'http://' . $host . '/data.lua?sid=' . $sid;
+   my $url = 'http://' . $host . '/' . $luaFunction . '.lua?sid=' . $sid;
 
    FRITZBOX_Log $hash, 4, "INFO: URL: $url";
 
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 180);
    my $response = $agent->post ( $url, $queryStr );
 
-   FRITZBOX_Log $hash, 5, "DEBUG: Response: " . $response->status_line . "\n" . $response->content;
+   FRITZBOX_Log $hash, 4, "DEBUG: Response: " . $response->status_line . "\n" . $response->content;
 
    unless ($response->is_success) {
       my %retHash = ("Error" => $response->status_line, "ResetSID" => "1");
-      FRITZBOX_Log $hash, 5, "DEBUG: \n".$response->status_line;
+      FRITZBOX_Log $hash, 4, "DEBUG: \n".$response->status_line;
       return \%retHash;
    }
 
@@ -6244,7 +6292,7 @@ sub FRITZBOX_Fritz_Log_Info($$$) {
 
    FRITZBOX_Log $hash, 3, "INFO: set $name $logInfo " . join(" ", @webCmdArray);
 
-   my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+   my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
    if(defined $result->{Error}) {
      $returnStr .= "FritzLog Filter:$logInfo\n";
@@ -6324,7 +6372,7 @@ sub FRITZBOX_Kid_Profiles_List($) {
 
    my $returnStr;
 
-   my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+   my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
    if(defined $result->{Error}) {
      my $tmp = FRITZBOX_ERR_Result($hash, $result);
@@ -6389,7 +6437,7 @@ sub FRITZBOX_DOCSIS_Informations($) {
 
    my $returnStr;
 
-   my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+   my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
    my $tmp;
 
    if(defined $result->{Error}) {
@@ -6557,7 +6605,7 @@ sub FRITZBOX_WLAN_Environment($) {
 
    my $returnStr;
 
-   my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+   my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
    my $tmp;
 
    if(defined $result->{Error}) {
@@ -6621,7 +6669,7 @@ sub FRITZBOX_VPN_Shares_List($) {
 
    my $returnStr;
 
-   my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+   my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
    my $tmp;
 
    if(defined $result->{Error}) {
@@ -6731,7 +6779,7 @@ sub FRITZBOX_VPN_Shares_List($) {
    push @webCmdArray, "page"        => "shareWireguard";
    push @webCmdArray, "xhrId"       => "all";
 
-   $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+   $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
    if(defined $result->{Error}) {
      $tmp = FRITZBOX_ERR_Result($hash, $result);
@@ -6789,7 +6837,7 @@ sub FRITZBOX_Lan_Devices_List($) {
 
    my $returnStr;
 
-   my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+   my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
    if(defined $result->{Error}) {
      my $tmp = FRITZBOX_ERR_Result($hash, $result);
@@ -6929,7 +6977,7 @@ sub FRITZBOX_Lan_Device_Info($$$) {
 
    FRITZBOX_Log $hash, 4, "INFO: set $name $action " . join(" ", @webCmdArray);
 
-   my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
+   my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray) ;
 
    if(defined $result->{Error}) {
       FRITZBOX_Log $hash, 2, "ERROR: get $name $action \n" . FRITZBOX_ERR_Result($hash, $result);
@@ -7677,6 +7725,7 @@ sub FRITZBOX_readPassword($)
       <li><b>box_vdsl_downStreamMaxRate</b> - Max down stream data rate (MBit/s)</li>
       <li><b>box_vdsl_upStreamRate</b> - Current up stream data rate (MBit/s)</li>
       <li><b>box_vdsl_upStreamMaxRate</b> - Max up stream data rate (MBit/s)</li>
+      <li><b>box_wan_AccessType</b> - access type (DSL, Ethernet, ...)</li>
       <li><b>box_wlan_Count</b> - Number of devices connected via WLAN</li>
       <li><b>box_wlan_2.4GHz</b> - Current state of the 2.4 GHz WLAN</li>
       <li><b>box_wlan_5GHz</b> - Current state of the 5 GHz WLAN</li>
@@ -8375,6 +8424,7 @@ sub FRITZBOX_readPassword($)
       <li><b>box_vdsl_downStreamMaxRate</b> - Maximale DownStream Datenrate (MBit/s)</li>
       <li><b>box_vdsl_upStreamRate</b> - Aktuelle UpStream Datenrate (MBit/s)</li>
       <li><b>box_vdsl_upStreamMaxRate</b> - Maximale UpStream Datenrate (MBit/s)</li>
+      <li><b>box_wan_AccessType</b> - Verbindungstyp (DSL, Ethernet, ...)</li>
       <li><b>box_wlan_Count</b> - Anzahl der Ger&auml;te die &uuml;ber WLAN verbunden sind</li>
       <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
       <li><b>box_wlan_5GHz</b> - Aktueller Status des 5-GHz-WLAN</li>
