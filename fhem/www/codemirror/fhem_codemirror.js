@@ -14,6 +14,7 @@ var cm_attr = {
     autoCloseBrackets:   true,
     indentUnit:          4,
     type:                "fhem",
+    mode:                "fhem",
     theme:               "blackboard",
     indentWithTabs:      true,
     autofocus:           true,
@@ -87,11 +88,7 @@ function AddCodeMirror(e, cb) {
           loadScript("codemirror/foldgutter.js", function(){cm_loaded++;} );
         cm_attr.extraKeys['Ctrl-X'] = function(cm){ cm.foldCode(cm.getCursor()) };
         cm_active++; loadScript("codemirror/brace-fold.js", function(){cm_loaded++;} );
-        cm_active++; loadScript("codemirror/comment-fold.js", function(){cm_loaded++;} );
         cm_active++; loadScript("codemirror/foldcode.js", function(){cm_loaded++;} );
-        cm_active++; loadScript("codemirror/indent-fold.js", function(){cm_loaded++;} );
-        cm_active++; loadScript("codemirror/markdown-fold.js", function(){cm_loaded++;} );
-        cm_active++; loadScript("codemirror/xml-fold.js", function(){cm_loaded++;} );
         cm_attr.gutters = ["CodeMirror-linenumbers", "CodeMirror-foldgutter"];
     }
     if (cm_attr.autoCloseBrackets) {
