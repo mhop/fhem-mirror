@@ -6,6 +6,7 @@ var cm_attr = {
     matchBrackets:       true,
     foldGutter:          false,
     autoRefresh:         true,
+    fullScreen:          false,
     search:              true,
     comment:             true,
     autocomplete:        true,
@@ -141,7 +142,17 @@ function AddCodeMirror(e, cb) {
             $("head").append('<style type="text/css">.CodeMirror {height:' + cm_attr.height + 'px;}');
         }
     }
-    
+    if (cm_attr.fullScreen) {
+        cm_active++;
+        loadLink("codemirror/fullscreen.css");
+        loadScript("codemirror/fullscreen.js", function(){cm_loaded++;} );
+        cm_attr.extraKeys['F10'] = function(cm) {
+            cm.setOption("fullScreen", !cm.getOption("fullScreen"));
+        }
+        cm_attr.extraKeys['Esc'] = function(cm) {
+            if (cm.getOption("fullScreen")) cm.setOption("fullScreen", false);
+        }
+    }    
     // get the type from hidden filename extension, load the type-file.js, theme.css and call cm_wait
     var ltype;
     $("input[name=save]").each(function() {

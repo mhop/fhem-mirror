@@ -233,6 +233,35 @@ CodeMirror.defineMode("fhem",function(){
                 '$['                            :    5,
                 '$OLD_PERL_VERSION'             :    5,
                 '$]'                            :    5,
+                '$_blockingcalls'               :    5,
+                '$SELF'                         :    5,
+                '$cmd'                          :    5,
+                '$DEVICE'                       :    5,
+                '$device'                       :    5,
+                '$EVENT'                        :    5,
+                '$event'                        :    5,
+                '$EVENTS'                       :    5,
+                '$events'                       :    5,
+                '$number'                       :    5,
+                '$name'                         :    5,
+                '$TYPE'                         :    5,
+                '$STATE'                        :    5,
+                '$room'                         :    5,
+                '$group'                        :    5,
+                '$week'                         :    5,
+                '$hm'                           :    5,
+                '$md'                           :    5,
+                '$ymd'                          :    5,
+                '$twe'                          :    5,
+                '$TABLE'                        :    5,
+                '$TD'                           :    5,
+                '$TR'                           :    5,
+                '$TC'                           :    5,
+                '$TPL'                          :    5,
+                '$ATTRIBUTESFIRST'              :    5,
+                '$SHOWNOSTATE'                  :    5,
+                '$SHOWNODEVICELINE'             :    5,
+                '$SHOWNODEVICELINK'             :    5,
                                                 //      PERL blocks
                 'if'                            :[1,1],
                 elsif                           :[1,1],
@@ -471,6 +500,11 @@ CodeMirror.defineMode("fhem",function(){
                 notify                          :2,
                 set                             :2,
                 ReadingsVal                     :1,
+                OldReadingsVal                  :1,
+                ReadingsNum                     :1,
+                OldReadingsNum                  :1,
+                ReadingsTimestamp               :1,
+                OldReadingsTimestamp            :1,
                 Value                           :1,
                 fhem                            :1,
                 IF                              :2,
@@ -845,16 +879,26 @@ CodeMirror.commands.autocomplete = function(cm) {
 	CodeMirror.showHint(cm, CodeMirror.hint.fhem, {async:true});
 }
 
-var keywords = ["at","attr","define","defmod","delete","deleteattr","deletereading","IF","DOIF","DOELSEIF","DOELSE","displayattr","fhem","get","getstate",
+var keywords = ["at","attr","define","defmod","delete","deleteattr","deletereading",
+  "IF","DOIF","DOELSEIF","DOELSE","displayattr","fhem","get","getstate",
   "list","modify","notify","set","setdefaultattr","setreading","setstate","trigger",
-  "AttrVal","OldTimestamp","OldValue","ReadingsVal","ReadingsTimestamp","Value"];
-var variables = ["$defs","$hms","$hour","$isdst","$mday","$min","$month","$sec","$wday","$we","$yday","$year"];
+  "AttrVal","OldTimestamp","OldValue","ReadingsVal","ReadingsNum","ReadingsTimestamp",
+  "Value","set_State","get_State","set_Reading","get_Reading","set_Event","set_Exec",
+  "get_Exec","del_Exec","fhem_set","set_Event","set_Reading_Begin","set_Reading_Update",
+  "set_Reading_End","subs","init","WID","STY","PUP","IMPORT"];
+
+var variables = ["$defs","$hms","$hour","$isdst","$mday","$min","$month","$sec","$wday",
+  "$we","$yday","$year",
+  "$_blockingcalls","$SELF","$cmd","$DEVICE","$device","$EVENT","$event","$EVENTS",
+  "$events","$number","$name","$TYPE","$STATE","$room","$group","$week","$hm","$md",
+  "$ymd","$twe","$TABLE","$TD","$TR","$TC","$TPL","$ATTRIBUTESFIRST","$SHOWNOSTATE",
+  "$SHOWNODEVICELINE","$SHOWNODEVICELINK"];
 var devices = [];
 
 CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, options) {
 
 	if( devices.length == 0 ) {
-		$.getJSON( '/fhem?cmd=jsonlist2&XHR=1', function ( data ) {
+		$.getJSON( '/fhem?cmd=jsonlist2$FW_CSRF', function ( data ) {
             if( devices.length == 0 ) {
                 data.Results.foreach( function(k,v) {
                     devices.push(v);
@@ -928,7 +972,7 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 		_var = getDeviceAttributes(d);
 	}
 	// only device readings names
-	else if( /.*(ReadingsVal|ReadingsTimestamp)[ \t]*\([ \t]*\"([\w_\.]+)\"[ \t]*,[ \t]*\"([\w-]*)$/.test(line) ) {
+	else if( /.*(^OldReadingsVal|^OldReadingsNum|^OldReadingsTimestamp|^ReadingsVal|^ReadingsNum|^ReadingsTimestamp)[ \t]*\([ \t]*\"([\w_\.]+)\"[ \t]*,[ \t]*\"([\w-]*)$/.test(line) ) {
 		_key = _dev = _var = [];
 	    var device = RegExp.$2;
 		word = RegExp.$3;
@@ -937,7 +981,7 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 		_var = getDeviceReadings(d);
 	}
 	// only device names
-	else if( /.*(OldTimestamp|OldValue|Value|ReadingsVal|ReadingsTimestamp|AttrVal)[ \t]*\([ \t]*\"([\w_\.]+)$/.test(line) ) {
+	else if( /.*(OldTimestamp|OldValue|Value|^OldReadingsVal|^OldReadingsNum|^OldReadingsTimestamp|^ReadingsVal|^ReadingsNum|ReadingsTimestamp|AttrVal)[ \t]*\([ \t]*\"([\w_\.]+)$/.test(line) ) {
 		_key = _var = [];
 		word = RegExp.$2;
 		start = end - word.length;
