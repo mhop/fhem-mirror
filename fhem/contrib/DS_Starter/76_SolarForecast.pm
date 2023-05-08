@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-05-07 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-05-08 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.78.1" => "08.05.2023  change default icon it_ups_on_battery to batterie ",
   "0.78.0" => "07.05.2023  activate NotifyFn Forum:https://forum.fhem.de/index.php?msg=1275005, new Consumerkey asynchron ",
   "0.77.1" => "07.05.2023  rewrite function pageRefresh ",
   "0.77.0" => "03.05.2023  new attribute ctrlUserExitFn ",
@@ -634,6 +635,8 @@ my %htitles = (                                                                 
                 DE => qq{verzoegert}                                                                               },
   conrec   => { EN => qq{Current time is within the consumption planning},
                 DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung}                                      },
+  conrecba => { EN => qq{Current time is within the consumption planning, Priority charging Battery is active},
+                DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung, Vorrangladen Batterie ist aktiv}     },
   connorec => { EN => qq{Consumption planning is outside current time\n(Click for immediate planning)},
                 DE => qq{Verbrauchsplanung liegt ausserhalb aktueller Zeit\n(Klick f&#252;r sofortige Einplanung)} },
   pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\n\nOn:&nbsp;<start>\nOff:&nbsp;<stop>},
@@ -7417,7 +7420,7 @@ sub _graphicConsumerLegend {
                   if($planstate =~ /priority/xs) {
                       my (undef,$color) = split('@', $caicon);
                       $color            = $color ? '@'.$color : '';
-                      $isricon          = "<a title='$htitles{conrec}{$lang}\n\n$surplusinfo\n$pstate' onClick=$implan>".FW_makeImage('it_ups_charging'.$color, '')." </a>";
+                      $isricon          = "<a title='$htitles{conrecba}{$lang}\n\n$surplusinfo\n$pstate' onClick=$implan>".FW_makeImage('batterie'.$color, '')." </a>";
                   }
               }
           }
