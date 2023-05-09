@@ -900,8 +900,7 @@ var devices = [];
 CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, options) {
 
 	if( devices.length == 0 ) {
-        csrf = body.getAttribute('fwcsrf');
-		$.getJSON( '/fhem?cmd=jsonlist2&fwcsrf='+csrf, function ( data ) {
+        $.getJSON( addcsrf('/fhem?cmd=jsonlist2'), function ( data ) {
             if( devices.length == 0 ) {
                 data.Results.foreach( function(k,v) {
                     devices.push(v);
