@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 72_FRITZBOX: neue Readings:
+            dect<n>_ringAllowed - Klingelzeiten des DECT Telefons <n>
+            dect<n>_NoRingWithNightSetting - Bei aktiver Klingelsperre
+              keine Ereignisse signalisieren für das DECT Telefon <n>
  - feature: codemirror: code folding added
  - feature: 72_FRITZBOX: verbose bei SOAP auf 4 gesetzt
  - feature: AutomowerConnectFamily: enhanced zone statistics
