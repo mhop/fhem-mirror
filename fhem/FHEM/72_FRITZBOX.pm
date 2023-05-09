@@ -2113,14 +2113,20 @@ sub FRITZBOX_Readout_Run_Web($)
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_imagePath",              $_->{ImagePath} ;
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_NoRingWithNightSetting", $_->{NoRingWithNightSetting}, "onoff";
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_NoRingTimeFlags"       , $_->{NoRingTimeFlags};
+
+           # telcfg:settings/Foncontrol/User/list(Name,NoRingTime,RingAllowed,NoRingTimeFlags,NoRingWithNightSetting)
            if ($_->{NoRingTime}) {
-             my $ringAllowed;
+             my $notAllowed;
              if($_->{RingAllowed} eq "1") {
-               $ringAllowed = "Mo-So";
-             } elsif($_->{RingAllowed} eq "4") {
-               $ringAllowed = "Sa-So";
-             } elsif($_->{RingAllowed} eq "5") {
-               $ringAllowed = "Mo-Fr";
+               $notAllowed = "Mo-So";
+             } elsif($_->{RingAllowed} eq "2") {
+               $notAllowed = "Mo-Fr 00:00-24:00 Sa-So";
+             } elsif($_->{RingAllowed} eq "3") {
+               $notAllowed = "Sa-So 00:00-24:00 Mo-Fr";
+             } elsif($_->{RingAllowed} eq "4" || $_->{RingAllowed} eq "2") {
+               $notAllowed = "Sa-So";
+             } elsif($_->{RingAllowed} eq "5" || $_->{RingAllowed} eq "3") {
+               $notAllowed = "Mo-Fr";
              }
 
              my $NoRingTime  = $_->{NoRingTime};
@@ -2128,7 +2134,7 @@ sub FRITZBOX_Readout_Run_Web($)
              substr($NoRingTime, 5, 0) = "-";
              substr($NoRingTime, 8, 0) = ":";
 
-             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_NoRingTime", $ringAllowed . " " . $NoRingTime;
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_NoRingTime", $notAllowed . " " . $NoRingTime;
            } else {
              FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_NoRingTime", "not defined";
            }
