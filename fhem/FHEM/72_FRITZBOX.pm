@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.17f";
+my $ModulVersion = "07.50.17g";
 my $missingModul = "";
 my $missingModulWeb = "";
 my $missingModulTR064 = "";
@@ -1881,6 +1881,8 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Log $hash, 4, "INFO: Prepare query string for luaQuery.";
 
    my $queryStr = "&radio=configd:settings/WEBRADIO/list(Name)"; # Webradio
+   #queryStr .= "&box_dectRingTone=dect:settings/ServerRingtone/list(UID,Name)"; #settings/LastSetServerRingtoneState
+   #queryStr .= "&box_dectNightTime=dect:settings/NightTime";
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
    $queryStr .= "&handsetCount=dect:settings/Handset/count"; # Anzahl Handsets
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion,Productname)"; # DECT Handsets
@@ -1900,7 +1902,7 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&box_stdDialPort=telcfg:settings/DialPort"; #Dial Port
 
 #   unless (AttrVal( $name, "disableDectInfo", "0")) {
-      $queryStr .= "&dectUser=telcfg:settings/Foncontrol/User/list(Id,Name,Intern,IntRingTone,AlarmRingTone0,RadioRingID,ImagePath,G722RingTone,G722RingToneName)"; # DECT Numbers
+      $queryStr .= "&dectUser=telcfg:settings/Foncontrol/User/list(Id,Name,Intern,IntRingTone,AlarmRingTone0,RadioRingID,ImagePath,G722RingTone,G722RingToneName,NoRingTime,RingAllowed,NoRingTimeFlags,NoRingWithNightSetting)"; # DECT Numbers
 #   }
 
    unless (AttrVal( $name, "disableFonInfo", "0")) {
@@ -1910,6 +1912,8 @@ sub FRITZBOX_Readout_Run_Web($)
    if (AttrVal( $name, "enableAlarmInfo", "0")) {
       $queryStr .= "&alarmClock=telcfg:settings/AlarmClock/list(Name,Active,Time,Number,Weekdays)"; # Alarm Clock
    }
+
+#   $queryStr .= "&ringGender=telcfg:settings/VoiceRingtoneGender"; # >= 7.39
 
    $queryStr .= "&diversity=telcfg:settings/Diversity/list(MSN,Active,Destination)"; # Diversity (Rufumleitung)
    $queryStr .= "&box_moh=telcfg:settings/MOHType"; # Music on Hold
@@ -2082,6 +2086,14 @@ sub FRITZBOX_Readout_Run_Web($)
    }
 
 # Dect-Geräteliste erstellen
+
+   my %oldDECTDevice;
+
+   #collect current dect-readings (to delete the ones that are inactive or disappeared)
+   foreach (keys %{ $hash->{READINGS} }) {
+     $oldDECTDevice{$_} = $hash->{READINGS}{$_}{VAL} if $_ =~ /^dect(\d+)_|^dect(\d+)/ && defined $hash->{READINGS}{$_}{VAL};
+   }
+
    my $noDect = AttrVal( $name, "disableDectInfo", "0");
    if ( $result->{handsetCount} =~ /[1-9]/ ) {
      $runNo = 0;
@@ -2091,14 +2103,34 @@ sub FRITZBOX_Readout_Run_Web($)
        my $id = $_->{Id};
        if ($intern) {
          unless ($noDect) {
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo,                     $_->{Name} ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_intern",           $intern ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_alarmRingTone",    $_->{AlarmRingTone0}, "ringtone" ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_intRingTone",      $_->{IntRingTone}, "ringtone" ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_radio",            $_->{RadioRingID}, "radio" ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_custRingTone",     $_->{G722RingTone} ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_custRingToneName", $_->{G722RingToneName} ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_imagePath",        $_->{ImagePath} ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo,                           $_->{Name} ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_intern",                 $intern ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_alarmRingTone",          $_->{AlarmRingTone0}, "ringtone" ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_intRingTone",            $_->{IntRingTone}, "ringtone" ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_radio",                  $_->{RadioRingID}, "radio" ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_custRingTone",           $_->{G722RingTone} ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_custRingToneName",       $_->{G722RingToneName} ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_imagePath",              $_->{ImagePath} ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_NoRingWithNightSetting", $_->{NoRingWithNightSetting}, "onoff";
+           if ($_->{NoRingTime}) {
+             my $ringAllowed;
+             if($_->{RingAllowed} eq "1") {
+               $ringAllowed = "Mo-So";
+             } elsif($_->{RingAllowed} eq "4") {
+               $ringAllowed = "Sa-So";
+             } elsif($_->{RingAllowed} eq "5") {
+               $ringAllowed = "Mo-Fr";
+             }
+
+             my $allowTime  = $_->{NoRingTime};
+             substr($allowTime, 2, 0) = ":";
+             substr($allowTime, 5, 0) = "-";
+             substr($allowTime, 8, 0) = ":";
+
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_ringAllowed", $ringAllowed . " " . $allowTime;
+           } else {
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_ringAllowed", "Mo-So 00:00-24:00";
+           }
 
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->id",   $id ;
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->userId", $runNo;
@@ -2107,6 +2139,9 @@ sub FRITZBOX_Readout_Run_Web($)
          $dectFonID{$id}{User}   = $runNo;
          $dectFonID{$name}       = $runNo;
 
+         foreach (keys %oldDECTDevice) {
+           delete $oldDECTDevice{$_} if $_ =~ /^dect${runNo}_|^dect${runNo}/ && defined $oldDECTDevice{$_};
+         }
          FRITZBOX_Log $hash, 5, "INFO: dect: $name, $runNo";
 
        }
@@ -2130,6 +2165,16 @@ sub FRITZBOX_Readout_Run_Web($)
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->brand", $_->{Manufacturer};
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->model", $_->{Model},       "model";
          }
+       }
+     }
+
+   # Remove inactive or non existing sip-readings in two steps
+     foreach ( keys %oldDECTDevice) {
+       # set the sip readings to 'inactive' and delete at next readout
+       if ( $oldDECTDevice{$_} ne "inactive" ) {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $_, "inactive";
+       } else {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $_, "";
        }
      }
    }
@@ -2248,7 +2293,7 @@ sub FRITZBOX_Readout_Run_Web($)
       my $sip_inactive = 0;
       my %oldSIPDevice;
 
-      #collect current mac-readings (to delete the ones that are inactive or disappeared)
+      #collect current sip-readings (to delete the ones that are inactive or disappeared)
       foreach (keys %{ $hash->{READINGS} }) {
          $oldSIPDevice{$_} = $hash->{READINGS}{$_}{VAL} if $_ =~ /^sip(\d+)_/ && defined $hash->{READINGS}{$_}{VAL};
       }
@@ -2583,7 +2628,7 @@ sub FRITZBOX_Readout_Run_Web($)
 
 # Box model, firmware and uptimes
 
-   # Informationen Ã¼ber DSL Verbindung
+   # Informationen über DSL Verbindung
    # xhr 1
    # lang de
    # page dslOv
@@ -7761,7 +7806,9 @@ sub FRITZBOX_readPassword($)
       <li><b>dect</b><i>n</i><b>_intRingTone</b> - Internal ring tone of the DECT device <i>1</i></li>
       <li><b>dect</b><i>n</i><b>_manufacturer</b> - Manufacturer of the DECT device <i>1</i></li>
       <li><b>dect</b><i>n</i><b>_model</b> - Model of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>n</i><b>_NoRingWithNightSetting</b> - Do not signal any events for the DECT telephone <i>n</i> when the Do Not Disturb feature is active</li>
       <li><b>dect</b><i>n</i><b>_radio</b> - Current internet radio station ring tone of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>n</i><b>_ringAllowed</b> - Ring times of the DECT telephone <i>n</i></li>
       <br>
       <li><b>diversity</b><i>n</i> - Own (incoming) phone number of the call diversity <i>1</i></li>
       <li><b>diversity</b><i>n</i><b>_dest</b> - Destination of the call diversity <i>1</i></li>
@@ -8457,7 +8504,9 @@ sub FRITZBOX_readPassword($)
       <li><b>dect</b><i>n</i><b>_intRingTone</b> - Interner Klingelton des DECT Telefons <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_manufacturer</b> - Hersteller des DECT Telefons <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_model</b> - Modell des DECT Telefons <i>n</i></li>
+      <li><b>dect</b><i>n</i><b>_NoRingWithNightSetting</b> - Bei aktiver Klingelsperre keine Ereignisse signalisieren f&uuml;r das DECT Telefon <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_radio</b> - aktueller Internet-Radio-Klingelton des DECT Telefons <i>n</i></li>
+      <li><b>dect</b><i>n</i><b>_ringAllowed</b> - Klingelzeiten des DECT Telefons <i>n</i></li>
       <br>
       <li><b>diversity</b><i>n</i> - Eigene Rufnummer der Rufumleitung <i>n</i></li>
       <li><b>diversity</b><i>n</i><b>_dest</b> - Zielnummer der Rufumleitung <i>n</i></li>
