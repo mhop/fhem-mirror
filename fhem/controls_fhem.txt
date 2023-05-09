@@ -1,6 +1,6 @@
-REV 27530
+REV 27538
 DIR unused
-UPD 2023-05-08_07:45:02 399726 ./CHANGED
+UPD 2023-05-09_07:45:02 399825 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2023-05-04_07:45:02 46559 ./MAINTAINER.txt
 UPD 2023-02-06_07:45:02 46690 ./configDB.pm
@@ -382,7 +382,7 @@ UPD 2019-07-13_07:45:02 131256 FHEM/71_YAMAHA_NP.pm
 UPD 2019-11-07_07:45:03 19531 FHEM/71_ZM_Monitor.pm
 UPD 2021-11-29_07:45:03 89494 FHEM/72_FB_CALLLIST.pm
 UPD 2023-04-18_07:45:03 129882 FHEM/72_FB_CALLMONITOR.pm
-UPD 2023-05-04_07:45:02 382719 FHEM/72_FRITZBOX.pm
+UPD 2023-05-09_07:45:02 385270 FHEM/72_FRITZBOX.pm
 UPD 2022-02-07_07:45:02 29303 FHEM/72_TA_CMI_JSON.pm
 UPD 2022-10-10_07:45:03 15950 FHEM/72_UBUS_CALL.pm
 UPD 2022-10-10_07:45:03 17284 FHEM/72_UBUS_CLIENT.pm
@@ -745,12 +745,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2023-05-02_07:45:09 4888354 docs/commandref.html
-UPD 2023-05-02_07:45:12 2925493 docs/commandref_DE.html
+UPD 2023-05-09_07:45:08 4888430 docs/commandref.html
+UPD 2023-05-09_07:45:12 2925572 docs/commandref_DE.html
 UPD 2023-05-01_07:45:03 85822 docs/commandref_frame.html
 UPD 2023-05-01_07:45:03 96447 docs/commandref_frame_DE.html
-UPD 2023-05-08_07:45:13 305404 docs/commandref_modular.html
-UPD 2023-05-08_07:45:14 317183 docs/commandref_modular_DE.html
+UPD 2023-05-09_07:45:13 305404 docs/commandref_modular.html
+UPD 2023-05-09_07:45:14 317183 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -800,21 +800,20 @@ UPD 2023-05-04_07:45:02 4475 www/codemirror/brace-fold.js
 UPD 2023-05-04_07:45:02 7123 www/codemirror/closebrackets.js
 UPD 2023-05-04_07:45:02 8720 www/codemirror/codemirror.css
 UPD 2023-05-04_07:45:02 401787 www/codemirror/codemirror.js
-UPD 2023-05-04_07:45:02 2164 www/codemirror/comment-fold.js
 UPD 2023-05-04_07:45:02 9230 www/codemirror/comment.js
 UPD 2023-05-04_07:45:02 40492 www/codemirror/css.js
 UPD 2023-05-04_07:45:02 507 www/codemirror/dialog.css
 UPD 2023-05-04_07:45:02 5252 www/codemirror/dialog.js
 UPD 2023-05-04_07:45:02 1187 www/codemirror/eclipse.css
-UPD 2016-04-21_07:45:12 13942 www/codemirror/fhem.js
-UPD 2016-04-21_07:45:12 62906 www/codemirror/fhem.js.unoptimized
-UPD 2023-05-04_07:45:02 7388 www/codemirror/fhem_codemirror.js
+UPD 2023-05-09_07:45:02 15216 www/codemirror/fhem.js
+UPD 2023-05-09_07:45:02 65620 www/codemirror/fhem.js.unoptimized
+UPD 2023-05-09_07:45:02 7543 www/codemirror/fhem_codemirror.js
 UPD 2023-05-04_07:45:02 4985 www/codemirror/foldcode.js
 UPD 2023-05-04_07:45:02 435 www/codemirror/foldgutter.css
 UPD 2023-05-04_07:45:02 5539 www/codemirror/foldgutter.js
-UPD 2023-05-04_07:45:02 1676 www/codemirror/indent-fold.js
+UPD 2023-05-09_07:45:02 116 www/codemirror/fullscreen.css
+UPD 2023-05-09_07:45:02 1497 www/codemirror/fullscreen.js
 UPD 2023-05-04_07:45:02 2143 www/codemirror/jump-to-line.js
-UPD 2023-05-04_07:45:02 1608 www/codemirror/markdown-fold.js
 UPD 2023-05-04_07:45:02 6216 www/codemirror/match-highlighter.js
 UPD 2023-05-04_07:45:02 6818 www/codemirror/matchbrackets.js
 UPD 2023-05-04_07:45:02 56084 www/codemirror/perl.js
@@ -823,7 +822,6 @@ UPD 2023-05-04_07:45:02 12234 www/codemirror/searchcursor.js
 UPD 2023-05-04_07:45:02 649 www/codemirror/show-hint.css
 UPD 2023-05-04_07:45:02 19792 www/codemirror/show-hint.js
 UPD 2023-05-04_07:45:02 232206 www/codemirror/vim.js
-UPD 2023-05-04_07:45:02 6702 www/codemirror/xml-fold.js
 UPD 2023-05-04_07:45:02 13353 www/codemirror/xml.js
 UPD 2022-03-08_07:45:02 955 www/gplot/ElsnerWS.gplot
 UPD 2022-03-08_07:45:02 889 www/gplot/ElsnerWS_2.gplot
