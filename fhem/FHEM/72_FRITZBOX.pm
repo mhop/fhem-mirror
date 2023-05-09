@@ -2112,6 +2112,7 @@ sub FRITZBOX_Readout_Run_Web($)
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_custRingToneName",       $_->{G722RingToneName} ;
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_imagePath",              $_->{ImagePath} ;
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_NoRingWithNightSetting", $_->{NoRingWithNightSetting}, "onoff";
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_NoRingTimeFlags"       , $_->{NoRingTimeFlags};
            if ($_->{NoRingTime}) {
              my $ringAllowed;
              if($_->{RingAllowed} eq "1") {
@@ -2122,14 +2123,14 @@ sub FRITZBOX_Readout_Run_Web($)
                $ringAllowed = "Mo-Fr";
              }
 
-             my $allowTime  = $_->{NoRingTime};
-             substr($allowTime, 2, 0) = ":";
-             substr($allowTime, 5, 0) = "-";
-             substr($allowTime, 8, 0) = ":";
+             my $NoRingTime  = $_->{NoRingTime};
+             substr($NoRingTime, 2, 0) = ":";
+             substr($NoRingTime, 5, 0) = "-";
+             substr($NoRingTime, 8, 0) = ":";
 
-             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_ringAllowed", $ringAllowed . " " . $allowTime;
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_NoRingTime", $ringAllowed . " " . $NoRingTime;
            } else {
-             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_ringAllowed", "Mo-So 00:00-24:00";
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_NoRingTime", "not defined";
            }
 
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->id",   $id ;
@@ -7808,7 +7809,7 @@ sub FRITZBOX_readPassword($)
       <li><b>dect</b><i>n</i><b>_model</b> - Model of the DECT device <i>1</i></li>
       <li><b>dect</b><i>n</i><b>_NoRingWithNightSetting</b> - Do not signal any events for the DECT telephone <i>n</i> when the Do Not Disturb feature is active</li>
       <li><b>dect</b><i>n</i><b>_radio</b> - Current internet radio station ring tone of the DECT device <i>1</i></li>
-      <li><b>dect</b><i>n</i><b>_ringAllowed</b> - Ring times of the DECT telephone <i>n</i></li>
+      <li><b>dect</b><i>n</i><b>_NoRingTime</b> - declined ring times of the DECT telephone <i>n</i></li>
       <br>
       <li><b>diversity</b><i>n</i> - Own (incoming) phone number of the call diversity <i>1</i></li>
       <li><b>diversity</b><i>n</i><b>_dest</b> - Destination of the call diversity <i>1</i></li>
@@ -8506,7 +8507,7 @@ sub FRITZBOX_readPassword($)
       <li><b>dect</b><i>n</i><b>_model</b> - Modell des DECT Telefons <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_NoRingWithNightSetting</b> - Bei aktiver Klingelsperre keine Ereignisse signalisieren f&uuml;r das DECT Telefon <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_radio</b> - aktueller Internet-Radio-Klingelton des DECT Telefons <i>n</i></li>
-      <li><b>dect</b><i>n</i><b>_ringAllowed</b> - Klingelzeiten des DECT Telefons <i>n</i></li>
+      <li><b>dect</b><i>n</i><b>_NoRingTime</b> - Klingelsperren des DECT Telefons <i>n</i></li>
       <br>
       <li><b>diversity</b><i>n</i> - Eigene Rufnummer der Rufumleitung <i>n</i></li>
       <li><b>diversity</b><i>n</i><b>_dest</b> - Zielnummer der Rufumleitung <i>n</i></li>
