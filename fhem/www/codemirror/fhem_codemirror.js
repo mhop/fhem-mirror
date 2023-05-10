@@ -86,7 +86,9 @@ function AddCodeMirror(e, cb) {
         cm_active++; 
           loadLink("codemirror/foldgutter.css");
           loadScript("codemirror/foldgutter.js", function(){cm_loaded++;} );
-        cm_attr.extraKeys['Ctrl-X'] = function(cm){ cm.foldCode(cm.getCursor()) };
+        cm_attr.extraKeys['Ctrl-X'] = function(cm){ cm.foldCode(cm.getCursor(),{ scanUp: true }); };
+        cm_attr.extraKeys['Ctrl-I'] = function(cm){ CodeMirror.commands.foldAll(cm); };
+        cm_attr.extraKeys['Ctrl-J'] = function(cm){ CodeMirror.commands.unfoldAll(cm); };
         cm_active++; loadScript("codemirror/brace-fold.js", function(){cm_loaded++;} );
         cm_active++; loadScript("codemirror/foldcode.js", function(){cm_loaded++;} );
         cm_attr.gutters = ["CodeMirror-linenumbers", "CodeMirror-foldgutter"];
