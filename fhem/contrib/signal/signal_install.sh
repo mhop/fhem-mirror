@@ -1,14 +1,15 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.15"
+SCRIPTVERSION="3.16"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
 SIGNALPATH=/opt
 SIGNALUSER=signal-cli
 LIBPATH=/usr/lib
-SIGNALVERSION="0.11.8"
-LIBRARYVERSION="0.22.0"
+SIGNALVERSION="0.11.10"
+LIBRARYVERSION="0.23.1"
+LIBSIG=libsignal_jni.tgz
 SIGNALVAR=/var/lib/$SIGNALUSER
 DBSYSTEMD=/etc/dbus-1/system.d
 DBSYSTEMS=/usr/share/dbus-1/system-services
@@ -167,36 +168,24 @@ APT=`which apt`
 GLIBC=`ldd --version |  grep -m1 -o '[0-9]\.[0-9][0-9]' | head -n 1`
 if [ $ARCH = "armv7l" ]; then 
 	ARCH="armhf"
+	ARCHL="armv7-unknown-linux-gnueabihf.tar.gz"
 	ARCHJ="arm"
 elif [ $ARCH = "x86_64" ]; then
 	ARCH="amd64"
+	ARCHL="x86_64-unknown-linux-gnu.tar.gz"
 	ARCHJ="x64"
-	GLIBC="2.28" #should work with 2.31 as well
 elif [ $ARCH = "aarch64" ]; then
 	BITS=`getconf LONG_BIT`
 	if [ "$BITS" = "64" ]; then
 		ARCH="aarch64"
+		ARCHL="aarch64-unknown-linux-gnu.tar.gz"
 		ARCHJ="aarch64"	
 	else 
 		ARCH="armhf"
+		ARCHL="armv7-unknown-linux-gnueabihf.tar.gz"
 		ARCHJ="arm"
 	fi
 fi
-
-IDENTSTR=$ARCH-glibc$GLIBC-$LIBRARYVERSION
-KNOWN=("amd64-glibc2.27-0.11.2" "amd64-glibc2.28-0.22.0" "armhf-glibc2.28-0.22.0" "armhf-glibc2.31-0.22.0" "aarch64-glibc2.31-0.22.0")
-
-GETLIBS=1
-if [[ ! " ${KNOWN[*]} " =~ " ${IDENTSTR} " ]]; then
-    echo "$IDENTSTR is an unsupported combination - signal-cli binary libraries might not work"
-	if [ "$GLIBC" != "2.31" ]; then
-	    GLIBC=2.28
-		echo "Fallback to GLIBC $GLIBC";
-	else
-	   GETLIBS=0
-	fi
-fi
-IDENTSTR=$ARCH-glibc$GLIBC-$LIBRARYVERSION
 
 if [ $OSNAME != "Linux" ]; then
 	echo "Only Linux systems are supported (you: $OSNAME), quitting"
@@ -358,6 +347,20 @@ fi
 #After this, signal-cli should be running and ready to use over dbus
 install_signal_cli() {
 
+IDENTSTR=libsignal_v$LIBRARYVERSION/libsignal_jni.so-v$LIBRARYVERSION-$ARCHL
+
+GETLIBS=1
+echo -n "Checking/downloading native library..."
+wget -qN https://github.com/exquo/signal-libs-build/releases/download/$IDENTSTR -O /tmp/$LIBSIG
+if [ -s /tmp/$LIBSIG ]; then
+	echo "done"
+else
+	echo "error"
+	echo "Could not find native lib $LIBRARYVERSION for $ARCHL"
+	GETLIBS=0
+	exit
+fi
+
 check_and_create_path $SIGNALPATH
 check_and_create_path $SIGNALVAR
 
@@ -399,20 +402,15 @@ if [ $NEEDINSTALL = 1 ]; then
 		rm -rf signal
 		mv "signal-cli-$SIGNALVERSION" signal
 		if [ "$GETLIBS" = 1 ]; then
-			echo -n "Downloading native libraries..."
 			cd /tmp
-			rm -rf libsignal_jni.so libzkgroup.so
-			wget -qN https://github.com/bublath/FHEM-Signalbot/raw/main/$IDENTSTR/libsignal_jni.so
-			echo "done"
+			tar zxf $LIBSIG
 			echo "Updating native libs for $IDENTSTR"
 			zip -u $SIGNALPATH/signal/lib/libsignal-client-*.jar libsignal_jni.so
 
-			#Use updated libs in jar instead of /usr/lib
-			#mv libsignal_jni.so libzkgroup.so $LIBPATH
-			#rm -f $LIBDIR/libzkgroup.so $LIBDIR/libsignal_jni.so
 		fi
 		echo "done"
 		rm -f /tmp/signal-cli-$SIGNALVERSION.tar.gz
+		#rm -f /tmp/$LIBSIG
 	fi
 fi
 
