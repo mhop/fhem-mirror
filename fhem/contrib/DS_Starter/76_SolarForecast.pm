@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-05-08 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-05-11 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.78.2" => "11.05.2023  extend debug radiationProcess ",
   "0.78.1" => "08.05.2023  change default icon it_ups_on_battery to batterie ",
   "0.78.0" => "07.05.2023  activate NotifyFn Forum:https://forum.fhem.de/index.php?msg=1275005, new Consumerkey asynchron ",
   "0.77.1" => "07.05.2023  rewrite function pageRefresh ",
@@ -3604,7 +3605,7 @@ sub _transferDWDRadiationValues {
       $hod         = sprintf "%02d", int ($hod)+1;                                            # Stunde des Tages
 
       if($debug =~ /radiationProcess/x) {
-          Log3 ($name, 1, qq{$name DEBUG> date: $wantdt, rad: fc${fd}_${fh2}_Rad1h, Rad1h: $rad});
+          Log3 ($name, 1, qq{$name DEBUG> got from device - starttime: $wantdt, reading: fc${fd}_${fh2}_Rad1h, value: $rad});
       }
 
       my $params = {
@@ -3629,6 +3630,10 @@ sub _transferDWDRadiationValues {
       $data{$type}{$name}{nexthours}{$time_str}{today}      = $fd == 0 ? 1 : 0;
       $data{$type}{$name}{nexthours}{$time_str}{Rad1h}      = $rad;                           # nur Info: original Vorhersage Strahlungsdaten
 
+      if($debug =~ /radiationProcess/x) {
+          Log3 ($name, 1, qq{$name DEBUG> wrote to nextHours Hash - pvfc: $calcpv, hod: $hod, Rad1h: $rad});
+      }
+      
       if($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{pvfc} = $calcpv;
       }
@@ -8348,7 +8353,7 @@ END3
       $pos_left = ($consumer_start * 2) - 50;                                                         # -XX -> Start Lage Consumer Beschriftung
 
       for my $c2 (@consumers) {
-          $currentPower    = sprintf("%.1f", ReadingsNum($name, "consumer${c2}_currentPower", 0));
+          $currentPower    = sprintf "%.1f", ReadingsNum($name, "consumer${c2}_currentPower", 0);
           $currentPower    =~ s/\.0$// if (int($currentPower) > 0);                                   # .0 am Ende interessiert nicht
           my $consumerTime = ConsumerVal ($hash, $c2, "remainTime", "");                              # Restlaufzeit
           my $rpcurr       = ConsumerVal ($hash, $c2, "rpcurr",     "");                              # Readingname f. current Power
@@ -12566,66 +12571,4 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
     "photovoltaik",
     "electricity",
     "forecast",
-    "graphics",
-    "Autarky",
-    "Consumer",
-    "PV"
-  ],
-  "version": "v1.1.1",
-  "release_status": "testing",
-  "author": [
-    "Heiko Maaz <heiko.maaz@t-online.de>"
-  ],
-  "x_fhem_maintainer": [
-    "DS_Starter"
-  ],
-  "x_fhem_maintainer_github": [
-    "nasseeder1"
-  ],
-  "prereqs": {
-    "runtime": {
-      "requires": {
-        "FHEM": 5.00918799,
-        "perl": 5.014,
-        "POSIX": 0,
-        "GPUtils": 0,
-        "Encode": 0,
-        "Color": 0,
-        "utf8": 0,
-        "HttpUtils": 0,
-        "JSON": 4.020,
-        "FHEM::SynoModules::SMUtils": 1.0220,
-        "Time::HiRes": 0
-      },
-      "recommends": {
-        "FHEM::Meta": 0,
-        "FHEM::Utility::CTZ": 1.00,
-        "DateTime": 0,
-        "DateTime::Format::Strptime": 0,
-        "Storable": 0,
-        "Data::Dumper": 0
-      },
-      "suggests": {
-      }
-    }
-  },
-  "resources": {
-    "x_wiki": {
-      "web": "https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung",
-      "title": "SolarForecast - Solare Prognose (PV Erzeugung) und Verbrauchersteuerung"
-    },
-    "repository": {
-      "x_dev": {
-        "type": "svn",
-        "url": "https://svn.fhem.de/trac/browser/trunk/fhem/contrib/DS_Starter",
-        "web": "https://svn.fhem.de/trac/browser/trunk/fhem/contrib/DS_Starter/76_SolarForecast.pm",
-        "x_branch": "dev",
-        "x_filepath": "fhem/contrib/",
-        "x_raw": "https://svn.fhem.de/fhem/trunk/fhem/contrib/DS_Starter/76_SolarForecast.pm"
-      }
-    }
-  }
-}
-=end :application/json;q=META.json
-
-=cut
+    
