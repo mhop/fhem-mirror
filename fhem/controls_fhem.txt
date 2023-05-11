@@ -1,4 +1,4 @@
-REV 27545
+REV 27549
 DIR unused
 UPD 2023-05-10_07:45:03 400073 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -749,8 +749,8 @@ UPD 2023-05-10_07:45:09 4888702 docs/commandref.html
 UPD 2023-05-10_07:45:12 2925828 docs/commandref_DE.html
 UPD 2023-05-01_07:45:03 85822 docs/commandref_frame.html
 UPD 2023-05-01_07:45:03 96447 docs/commandref_frame_DE.html
-UPD 2023-05-10_07:45:13 305404 docs/commandref_modular.html
-UPD 2023-05-10_07:45:14 317183 docs/commandref_modular_DE.html
+UPD 2023-05-11_07:45:13 305404 docs/commandref_modular.html
+UPD 2023-05-11_07:45:14 317183 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -807,7 +807,7 @@ UPD 2023-05-04_07:45:02 5252 www/codemirror/dialog.js
 UPD 2023-05-04_07:45:02 1187 www/codemirror/eclipse.css
 UPD 2023-05-10_07:45:03 15179 www/codemirror/fhem.js
 UPD 2023-05-10_07:45:03 65578 www/codemirror/fhem.js.unoptimized
-UPD 2023-05-09_07:45:02 7543 www/codemirror/fhem_codemirror.js
+UPD 2023-05-11_07:45:02 7739 www/codemirror/fhem_codemirror.js
 UPD 2023-05-04_07:45:02 4985 www/codemirror/foldcode.js
 UPD 2023-05-04_07:45:02 435 www/codemirror/foldgutter.css
 UPD 2023-05-04_07:45:02 5539 www/codemirror/foldgutter.js
