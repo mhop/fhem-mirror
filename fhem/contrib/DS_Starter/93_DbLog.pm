@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 27504 2023-05-11 19:36:29Z DS_Starter $
+# $Id: 93_DbLog.pm 27504 2023-05-12 19:36:29Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -28,6 +28,7 @@ eval "use FHEM::Utility::CTZ qw(:all);1;"        or my $ctzAbsent     = 1;      
 eval "use Storable qw(freeze thaw);1;"           or my $storabs       = "Storable";         ## no critic 'eval'
 
 #use Data::Dumper;
+use Scalar::Util qw(looks_like_number);
 use Time::HiRes qw(gettimeofday tv_interval usleep);
 use Time::Local;
 use Encode qw(encode_utf8);
@@ -38,7 +39,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.8.8"   => "11.05.2023  ",
+  "5.8.8"   => "11.05.2023 _DbLog_ParseEvent changed default splitting, Forum: https://forum.fhem.de/index.php?topic=133537.0 ",
   "5.8.7"   => "01.05.2023 new Events FRAME_INITIALIZED, SUBPROC_INITIALIZED, SUBPROC_DISCONNECTED, SUBPROC_STOPPED ".
                "Forum: https://forum.fhem.de/index.php?topic=133403.0, minor fixes ",
   "5.8.6"   => "25.03.2023 change _DbLog_plotData (intx), Plot Editor: include functions delta-h, delta-h, ...".
@@ -1564,26 +1565,20 @@ sub _DbLog_ParseEvent {
   # "day-temp: 22.0 (Celsius)" -> "day-temp", "22.0 (Celsius)"
   my @parts = split /: /, $event, 2;
   
-  if(scalar @parts == 2) {
+  if(scalar @parts == 2) {                                               # V 5.8.8 default Splitting komplett umgebaut
       $reading = shift @parts;
       my $tail = shift @parts;
       @parts   = split " ", $tail;
+      
+      $value = $tail;
+      $unit  = q{};
     
-      if (scalar @parts <= 2) {
+      if (scalar @parts <= 2 && looks_like_number($parts[0])) {
           $value = $parts[0];
-          $unit  = $parts[1] // q{};        
+          $unit  = $parts[1] // q{};            
       }
-      else {
-          $value = $tail;
-          $unit  = q{};         
-      }
-  }
-  else {
-      $value = join ": ", @parts;
-      $unit  = "";
   }
 
-  #default
   if(!defined($reading)) { $reading = ""; }
   if(!defined($value))   { $value   = ""; }
   if($value eq "") {                                                     # Default Splitting geändert 04.01.20 Forum: #106992
@@ -1598,7 +1593,7 @@ sub _DbLog_ParseEvent {
 
   # globales Abfangen von                                                 # changed in Version 4.12.5
   # - humidity
-  if($reading =~ m(^humidity))    { $unit = "%"; }                        # wenn reading mit humidity beginnt
+  #if($reading =~ m(^humidity))    { $unit = "%"; }                        # wenn reading mit humidity beginnt
 
 
   # the interpretation of the argument depends on the device type
