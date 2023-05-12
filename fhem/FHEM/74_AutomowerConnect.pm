@@ -44,6 +44,7 @@ BEGIN {
         qw(
           AttrVal
           CommandAttr
+          CommandDeleteReading
           FmtDateTime
           getKeyValue
           InternalTimer
@@ -358,156 +359,18 @@ sub getMowerResponse {
         # Update readings
         readingsBeginUpdate($hash);
 
-          readingsBulkUpdateIfChanged($hash, "batteryPercent", $hash->{helper}{mower}{attributes}{battery}{batteryPercent} ); 
-          readingsBulkUpdateIfChanged($hash, 'api_MowerFound', $foundMower );
-          my $pref = 'mower';
-          readingsBulkUpdateIfChanged($hash, $pref.'_mode', $hash->{helper}{mower}{attributes}{$pref}{mode} );
-          readingsBulkUpdateIfChanged($hash, $pref.'_activity', $hash->{helper}{mower}{attributes}{$pref}{activity} );
-          readingsBulkUpdateIfChanged($hash, $pref.'_state', $hash->{helper}{mower}{attributes}{$pref}{state} );
-          readingsBulkUpdateIfChanged($hash, $pref.'_commandStatus', 'cleared' );
+          readingsBulkUpdateIfChanged($hash, 'api_MowerFound', $foundMower ); # host only
+          ::FHEM::Devices::AMConnect::Common::fillReadings( $hash );
 
-          if ( AttrVal($name, 'mapZones', 0) && $hash->{helper}{currentZone} && $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{curZoneCnt} ) {
-            my $curZon = $hash->{helper}{currentZone};
-            my $curZonCnt = $hash->{helper}{mapZones}{$curZon}{curZoneCnt};
-            readingsBulkUpdateIfChanged($hash, $pref.'_currentZone', $curZon . '(' . $curZonCnt . '/' . $hash->{helper}{newzonedatasets} . ')' );
-          }
-
-          my $tstamp = $hash->{helper}{mower}{attributes}{$pref}{errorCodeTimestamp};
-          my $timestamp = ::FHEM::Devices::AMConnect::Common::FmtDateTimeGMT($tstamp/1000);
-          readingsBulkUpdateIfChanged($hash, $pref."_errorCodeTimestamp", $tstamp ? $timestamp : '-' );
-
-          my $errc = $hash->{helper}{mower}{attributes}{$pref}{errorCode};
-          readingsBulkUpdateIfChanged($hash, $pref.'_errorCode', $tstamp ? $errc  : '-');
-
-          my $errd = $::FHEM::Devices::AMConnect::Common::errortable->{$errc};
-          readingsBulkUpdateIfChanged($hash, $pref.'_errorDescription', $tstamp ? $errd : '-');
-
-          $pref = 'system';
-          readingsBulkUpdateIfChanged($hash, $pref."_name", $hash->{helper}{mower}{attributes}{$pref}{name} );
-          my $model = $hash->{helper}{mower}{attributes}{$pref}{model};
-          $model =~ s/AUTOMOWER./AM/;
-          # $hash->{MODEL} = '' if (!defined $hash->{MODEL});
-          $hash->{MODEL} = $model if ( $model && $hash->{MODEL} ne $model );
-          $pref = 'planner';
-          readingsBulkUpdateIfChanged($hash, "planner_restrictedReason", $hash->{helper}{mower}{attributes}{$pref}{restrictedReason} );
-          readingsBulkUpdateIfChanged($hash, "planner_overrideAction", $hash->{helper}{mower}{attributes}{$pref}{override}{action} );
-
-          $tstamp = $hash->{helper}{mower}{attributes}{$pref}{nextStartTimestamp};
-          $timestamp = ::FHEM::Devices::AMConnect::Common::FmtDateTimeGMT($tstamp/1000);
-          readingsBulkUpdateIfChanged($hash, "planner_nextStart", $tstamp ? $timestamp : '-' );
-
-          $pref = 'statistics';
-          readingsBulkUpdateIfChanged($hash, $pref."_numberOfCollisions", $hash->{helper}->{mower}{attributes}{$pref}{numberOfCollisions} );
-          readingsBulkUpdateIfChanged($hash, $pref."_newGeoDataSets", $hash->{helper}{newdatasets} );
-          $pref = 'settings';
-          readingsBulkUpdateIfChanged($hash, $pref."_headlight", $hash->{helper}->{mower}{attributes}{$pref}{headlight}{mode} );
-          readingsBulkUpdateIfChanged($hash, $pref."_cuttingHeight", $hash->{helper}->{mower}{attributes}{$pref}{cuttingHeight} );
-          $pref = 'status';
-          my $connected = $hash->{helper}{mower}{attributes}{metadata}{connected};
-          readingsBulkUpdateIfChanged($hash, $pref."_connected", ( $connected ? "CONNECTED($connected)"  : "OFFLINE($connected)") );
-          readingsBulkUpdateIfChanged($hash, $pref."_Timestamp", FmtDateTime( $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp}/1000 ));
-          readingsBulkUpdateIfChanged($hash, $pref."_TimestampDiff", $storediff/1000 );
-          readingsBulkUpdateIfChanged($hash, $pref."_TimestampOld", FmtDateTime( $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp}/1000 ));
         readingsEndUpdate($hash, 1);
 
-        my @time = localtime();
-        my $secs = ( $time[2] * 3600 ) + ( $time[1] * 60 ) + $time[0];
-        my $interval = $hash->{helper}->{interval};
-        # do at midnight
-        if ( $secs <= $interval ) {
+        ::FHEM::Devices::AMConnect::Common::calculateStatistics( $hash );
 
-          $hash->{helper}{statistics}{lastDayTrack} = $hash->{helper}{statistics}{currentDayTrack};
-          $hash->{helper}{statistics}{lastDayArea} = $hash->{helper}{statistics}{currentDayArea};
-          $hash->{helper}{statistics}{currentWeekTrack} += $hash->{helper}{statistics}{currentDayTrack};
-          $hash->{helper}{statistics}{currentWeekArea} += $hash->{helper}{statistics}{currentDayArea};
-          $hash->{helper}{statistics}{currentDayTrack} = 0;
-          $hash->{helper}{statistics}{currentDayArea} = 0;
-
-          if ( AttrVal($name, 'mapZones', 0) && defined( $hash->{helper}{mapZones} ) ) {
-            
-            my @zonekeys = sort (keys %{$hash->{helper}{mapZones}});
-            my $sumLastDayCnt=0;
-            my $sumCurrentWeekCnt=0;
-            my $sumLastDayArea=0;
-            my $sumCurrentWeekArea=0;
-            map { 
-              $hash->{helper}{mapZones}{$_}{lastDayCnt} = $hash->{helper}{mapZones}{$_}{zoneCnt};
-              $sumLastDayCnt += $hash->{helper}{mapZones}{$_}{lastDayCnt};
-              $hash->{helper}{mapZones}{$_}{currentWeekCnt} += $hash->{helper}{mapZones}{$_}{lastDayCnt};
-              $sumCurrentWeekCnt += $hash->{helper}{mapZones}{$_}{currentWeekCnt};
-              $hash->{helper}{mapZones}{$_}{zoneCnt} = 0;
-
-              $hash->{helper}{mapZones}{$_}{lastDayArea} = $hash->{helper}{mapZones}{$_}{zoneLength};
-              $sumLastDayArea += $hash->{helper}{mapZones}{$_}{lastDayArea};
-              $hash->{helper}{mapZones}{$_}{currentWeekArea} += $hash->{helper}{mapZones}{$_}{lastDayArea};
-              $sumCurrentWeekArea += $hash->{helper}{mapZones}{$_}{currentWeekArea};
-              $hash->{helper}{mapZones}{$_}{zoneLength} = 0;
-            } @zonekeys;
-
-            map { 
-              $hash->{helper}{mapZones}{$_}{lastDayCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{lastDayCnt} / $sumLastDayCnt * 100 );
-            } @zonekeys if( $sumLastDayCnt );
-
-            map { 
-              $hash->{helper}{mapZones}{$_}{currentWeekCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{currentWeekCnt} / $sumCurrentWeekCnt * 100 );
-            } @zonekeys if( $sumCurrentWeekCnt );
-
-            map { 
-              $hash->{helper}{mapZones}{$_}{lastDayAreaPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{lastDayArea} / $sumLastDayArea * 100 );
-            } @zonekeys if( $sumLastDayArea );
-
-            map { 
-              $hash->{helper}{mapZones}{$_}{currentWeekAreaPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{currentWeekArea} / $sumCurrentWeekArea * 100 );
-            } @zonekeys if( $sumCurrentWeekArea );
-
-          }
-          # do on days
-          if ( $time[6] == 1 ) {
-
-            $hash->{helper}{statistics}{lastWeekTrack} = $hash->{helper}{statistics}{currentWeekTrack};
-            $hash->{helper}{statistics}{lastWeekArea} = $hash->{helper}{statistics}{currentWeekArea};
-            $hash->{helper}{statistics}{currentWeekTrack} = 0;
-            $hash->{helper}{statistics}{currentWeekArea} = 0;
-
-            if ( AttrVal($name, 'mapZones', 0) && defined( $hash->{helper}{mapZones} ) ) {
-
-              my @zonekeys = sort (keys %{$hash->{helper}{mapZones}});
-              my $sumLastWeekCnt=0;
-              my $sumLastWeekArea=0;
-              map { 
-                $hash->{helper}{mapZones}{$_}{lastWeekCnt} = $hash->{helper}{mapZones}{$_}{currentWeekCnt};
-                $sumLastWeekCnt += $hash->{helper}{mapZones}{$_}{lastWeekCnt};
-                $hash->{helper}{mapZones}{$_}{currentWeekCnt} = 0;
-                $hash->{helper}{mapZones}{$_}{lastWeekArea} = $hash->{helper}{mapZones}{$_}{currentWeekArea};
-                $sumLastWeekArea += $hash->{helper}{mapZones}{$_}{lastWeekArea};
-                $hash->{helper}{mapZones}{$_}{currentWeekArea} = 0;
-              } @zonekeys;
-
-              map { 
-                $hash->{helper}{mapZones}{$_}{lastWeekCntPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{lastWeekCnt} / $sumLastWeekCnt * 100 );
-              } @zonekeys if( $sumLastWeekCnt );
-
-              map { 
-                $hash->{helper}{mapZones}{$_}{lastWeekAreaPct} = sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{lastWeekArea} / $sumLastWeekArea * 100 );
-              } @zonekeys if( $sumLastWeekArea );
-
-            }
-
-          }
-
-          #clear position arrays
-          if ( AttrVal( $name, 'weekdaysToResetWayPoints', 1 ) =~ $time[6] ) {
-            
-            $hash->{helper}{areapos} = [];
-            $hash->{helper}{otherpos} = [];
-
-          }
-
-        }
         readingsSingleUpdate($hash, 'state', 'connected', 1 );
-        
+
         RemoveInternalTimer( $hash, \&APIAuth );
         InternalTimer( gettimeofday() + $interval, \&APIAuth, $hash, 0 );
+
         return undef;
 
       }
@@ -713,14 +576,14 @@ sub Attr {
 
     if( $cmd eq "set" ) {
 
-      return "$iam $cmd $attrName $attrVal Interval must be greater than 0, recommended 600" unless($attrVal > 0);
+      return "$iam $cmd $attrName $attrVal Interval must be greater than 0, recommended 420" unless($attrVal > 0);
       $hash->{helper}->{interval} = $attrVal;
       Log3 $name, 3, "$iam $cmd $attrName $attrVal";
 
     } elsif( $cmd eq "del" ) {
 
-      $hash->{helper}->{interval} = 600;
-      Log3 $name, 3, "$iam $cmd $attrName and set default 600";
+      $hash->{helper}->{interval} = 420;
+      Log3 $name, 3, "$iam $cmd $attrName and set default 420";
 
     }
   ##########
@@ -901,6 +764,8 @@ __END__
     <li>An arbitrary map can be used as background for the mower path.</li>
     <li>The map has to be a raster image in webp, png or jpg format.</li>
     <li>It's possible to control everything the API offers, e.g. schedule, headlight, cutting height and actions like start, pause, park etc. </li>
+    <li>Zones are definable. </li>
+    <li>Cutting height can be set for each zone differently. </li>
     <li>All API data is stored in the device hash, the last and the second last one. Use <code>{Dumper $defs{&lt;name&gt;}}</code> in the commandline to find the data and build userReadings out of it.</li><br>
   </ul>
   <u><b>Limits for the Automower Connect API</b></u>
@@ -1036,7 +901,7 @@ __END__
   <ul>
     <li><a id='AutomowerConnect-attr-interval'>interval</a><br>
       <code>attr &lt;name&gt; interval &lt;time in seconds&gt;</code><br>
-      Time in seconds that is used to get new data from Husqvarna Cloud. Default: 600</li>
+      Time in seconds that is used to get new data from Husqvarna Cloud. Default: 420</li>
     <li><a id='AutomowerConnect-attr-mapImagePath'>mapImagePath</a><br>
       <code>attr &lt;name&gt; mapImagePath &lt;path to image&gt;</code><br>
       Path of a raster image file for an area the mower path has to be drawn to.<br>
@@ -1132,30 +997,38 @@ __END__
       <code>
       '{<br>
         &emsp;&emsp;&emsp;&emsp;"&lt;name_1&gt;" : {<br>
-          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_1 from other zones&gt;"<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_1 from other zones&gt;",<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"cuttingHeight"  : "&lt;cutting height for the first zone&gt;"<br>
         &emsp;&emsp;},<br>
         &emsp;&emsp;&emsp;&emsp;"&lt;name_2&gt;" : {<br>
-          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_2 from other zones, except name_1&gt;"<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_2 from other zones, except name_1&gt;",<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"cuttingHeight"  : "&lt;cutting height for the second zone&gt;"<br>
         &emsp;&emsp;},<br>
         &emsp;&emsp;&emsp;&emsp;"&lt;name_3&gt;" : {<br>
-          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_3 from other zones, except name_1 and name_2&gt;"<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_3 from other zones, except name_1 and name_2&gt;",<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"cuttingHeight"  : "&lt;cutting height for the third zone&gt;"<br>
         &emsp;&emsp;},<br>
         &emsp;&emsp;&emsp;&emsp;"&lt;name_n-1&gt;" : {<br>
-          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_n-1 from other zones ,except the zones already seperated&gt;"<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_n-1 from other zones ,except the zones already seperated&gt;",<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"cuttingHeight"  : "&lt;cutting height for the nth-1 zone&gt;"<br>
         &emsp;&emsp;},<br>
         &emsp;&emsp;&emsp;&emsp;"&lt;name n&gt;" : {<br>
-          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "Use 'undef' because the last zone remains."<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "Use 'undef' because the last zone remains.",<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"cuttingHeight"  : "&lt;cutting height for the nth zone&gt;"<br>
         &emsp;&emsp;}<br>
       }'<br>
       </code><br>
       Example with two Zones and virtual lines defined by latitude 52.6484600648553, 52.64839739580418 (horizontal) and longitude 9.54799477359984 (vertikal). all way points above 52.6484600648553 or all way points above 52.64839739580418 and all way points to the right of 9.54799477359984 belong to zone 01_oben. All other way points belong to zone 02_unten.<br>
+      There are different cutting heightts each zone
       <code>
       '{<br>
         &emsp;&emsp;&emsp;&emsp;"01_oben" : {<br>
-          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "$latitude > 52.6484600648553 || $longitude > 9.54799477359984 && $latitude > 52.64839739580418"<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "$latitude > 52.6484600648553 || $longitude > 9.54799477359984 && $latitude > 52.64839739580418",<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"cuttingHeight"  : "7"<br>
         &emsp;&emsp;},<br>
         &emsp;&emsp;&emsp;&emsp;"02_unten" : {<br>
-          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "undef"<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "undef",<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"cuttingHeight"  : "3"<br>
         &emsp;&emsp;}<br>
       }'<br>
       </code></li>
@@ -1233,6 +1106,8 @@ __END__
     <li>Der Pfad kann mit einer beliebigen Karte hinterlegt werden.</li>
     <li>Die Karte muss als Rasterbild im webp, png oder jpg Format vorliegen.</li>
     <li>Es ist möglich alles was die API anbietet zu steuern, z.B. Mähplan,Scheinwerfer, Schnitthöhe und Aktionen wie, Start, Pause, Parken usw. </li>
+    <li>Zonen können selbst definiert werden. </li>
+    <li>Die Schnitthöhe kann je selbstdefinierter Zone eingestellt werden. </li>
     <li>Die letzten und vorletzten Daten aus der API sind im Gerätehash gespeichert, Mit <code>{Dumper $defs{&lt;device name&gt;}}</code> in der Befehlezeile können die Daten angezeigt werden und daraus userReadings erstellt werden.</li><br>
   </ul>
   <u><b>Limit Automower Connect API</b></u>
@@ -1366,7 +1241,7 @@ __END__
   <ul>
     <li><a id='AutomowerConnect-attr-interval'>interval</a><br>
       <code>attr &lt;name&gt; interval &lt;time in seconds&gt;</code><br>
-      Zeit in Sekunden nach denen neue Daten aus der Husqvarna Cloud abgerufen werden. Standard: 600</li>
+      Zeit in Sekunden nach denen neue Daten aus der Husqvarna Cloud abgerufen werden. Standard: 420</li>
 
     <li><a id='AutomowerConnect-attr-mapImagePath'>mapImagePath</a><br>
       <code>attr &lt;name&gt; mapImagePath &lt;path to image&gt;</code><br>
@@ -1465,30 +1340,39 @@ __END__
       <code>
       '{<br>
         &emsp;&emsp;&emsp;&emsp;"&lt;name_1&gt;" : {<br>
-          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_1 from other zones&gt;"<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_1 from other zones&gt;",<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"cuttingHeight"  : "&lt;cutting height for the first zone&gt;"<br>
         &emsp;&emsp;},<br>
         &emsp;&emsp;&emsp;&emsp;"&lt;name_2&gt;" : {<br>
-          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_2 from other zones, except name_1&gt;"<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_2 from other zones, except name_1&gt;",<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"cuttingHeight"  : "&lt;cutting height for the second zone&gt;"<br>
         &emsp;&emsp;},<br>
         &emsp;&emsp;&emsp;&emsp;"&lt;name_3&gt;" : {<br>
-          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_3 from other zones, except name_1 and name_2&gt;"<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_3 from other zones, except name_1 and name_2&gt;",<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"cuttingHeight"  : "&lt;cutting height for the third zone&gt;"<br>
         &emsp;&emsp;},<br>
         &emsp;&emsp;&emsp;&emsp;"&lt;name_n-1&gt;" : {<br>
-          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_n-1 from other zones ,except the zones already seperated&gt;"<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "&lt;condition to separate name_n-1 from other zones ,except the zones already seperated&gt;",<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"cuttingHeight"  : "&lt;cutting height for the nth-1 zone&gt;"<br>
         &emsp;&emsp;},<br>
         &emsp;&emsp;&emsp;&emsp;"&lt;name n&gt;" : {<br>
-          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "Use 'undef' because the last zone remains."<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "Use 'undef' because the last zone remains.",<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"cuttingHeight"  : "&lt;cutting height for the nth zone&gt;"<br>
         &emsp;&emsp;}<br>
       }'<br>
       </code><br>
-      Beispiel mit zwei Zonen und gedachten Linien bestimmt durch die Punkte Latitude 52.6484600648553, 52.64839739580418 (horizontal) und 9.54799477359984 (vertikal). Alle Wegpunkte deren Latitude über einer horizontalen Linie mit der Latitude 52.6484600648553 liegen oder alle Wegpunkte deren Latitude über einer horizontalen Linie mit der Latitude 52.64839739580418 liegen und deren Longitude rechts von einer vertikale Linie mit der Longitude 9.54799477359984 liegen, gehören zur Zone 01_oben. Alle anderen Wegpunkte gehören zur Zone 02_unten.
+      Beispiel mit zwei Zonen und gedachten Linien bestimmt durch die Punkte Latitude 52.6484600648553, 52.64839739580418 (horizontal) und 9.54799477359984 (vertikal). Alle Wegpunkte deren Latitude über einer horizontalen Linie mit der Latitude 52.6484600648553 liegen oder alle Wegpunkte deren Latitude über einer horizontalen Linie mit der Latitude 52.64839739580418 liegen und deren Longitude rechts von einer vertikale Linie mit der Longitude 9.54799477359984 liegen, gehören zur Zone 01_oben. Alle anderen Wegpunkte gehören zur Zone 02_unten.<br>
+      In den Zonen sind unterschiedliche Schnitthöhen eingestellt.<br>
+
       <code>
       '{<br>
         &emsp;&emsp;&emsp;&emsp;"01_oben" : {<br>
-          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "$latitude > 52.6484600648553 || $longitude > 9.54799477359984 && $latitude > 52.64839739580418"<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "$latitude > 52.6484600648553 || $longitude > 9.54799477359984 && $latitude > 52.64839739580418",<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"cuttingHeight"  : "7"<br>
         &emsp;&emsp;},<br>
         &emsp;&emsp;&emsp;&emsp;"02_unten" : {<br>
-          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "undef"<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"condition"  : "undef",<br>
+          &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;"cuttingHeight"  : "3"<br>
         &emsp;&emsp;}<br>
       }'<br>
       </code></li>

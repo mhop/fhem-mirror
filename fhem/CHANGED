@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: AutomowerConnectFamily: set cutting height for user defined zones
+            automatically, code cleaning, some fixes
  - feature: 72_FRITZBOX: neue Readings:
             dect<n>_NoRingTime - Ruhezeiten des DECT Telefons <n>
             dect<n>_NoRingWithNightSetting - Bei aktiver Klingelsperre
