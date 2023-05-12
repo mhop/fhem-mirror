@@ -551,7 +551,7 @@ sub cfgDB_SaveState {
     # don't write statefile in rescue mode
     return if ($configDB{attr}{rescue} == 1);
 
-    _cfgDB_deleteRF;
+#    _cfgDB_deleteRF;
 
 	$t = localtime;
 	$out = "#$t";
