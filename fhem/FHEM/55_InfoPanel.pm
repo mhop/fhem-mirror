@@ -63,6 +63,8 @@
 # 2018-05-06 - 16695 - changed: check plotName exists
 # 2018-05-28 - $Rev$ - changed: remove misleading link in commandref
 #
+# 2023-05-12 - $Rev$ - added:   support for named parameters in define
+#
 ##############################################
 =cut
 
@@ -160,14 +162,19 @@ sub InfoPanel_Initialize {
 
 sub btIP_Define {
   my ($hash, $def) = @_;
-  my @a = split("[ \t]+", $def);
-  return "Usage: define <name> InfoPanel filename"  if(int(@a) != 3);
-  my $name= $a[0];
-  my $filename= $a[2];
-
+  my $name = $hash->{NAME};
   $hash->{NOTIFYDEV} = 'global';
   $hash->{fhem}{div} = '';
-  $hash->{LAYOUTFILE} = $filename;
+
+  my ($unnamedParams,$namedParams) = parseParams($def);
+
+  if ($unnamedParams->[2]) {
+    $hash->{LAYOUTFILE} = $unnamedParams->[2];
+  } elsif ($namedParams->{layout}) {
+    $hash->{LAYOUTFILE} = $namedParams->{layout};
+  } else {
+    return "Usage: define <name> InfoPanel layout=layoutFileName";
+  }
 
   btIP_addExtension("btIP_CGI","btip","InfoPanel");
   btIP_readLayout($hash);
@@ -1529,10 +1536,10 @@ sub btIP_getURL {
 	<a name="InfoPaneldefine"></a>
 	<b>Define</b><br/><br/>
     <ul>
-       <code>define &lt;name&gt; InfoPanel &lt;layoutFileName&gt;</code><br/>
+       <code>define &lt;name&gt; InfoPanel layout=layoutFileName</code><br/>
        <br/>
        Example:<br/><br>
-       <ul><code>define myInfoPanel InfoPanel ./FHEM/panel.layout</code><br/></ul>
+       <ul><code>define myInfoPanel InfoPanel layout=./FHEM/panel.layout</code><br/></ul>
     </ul>
 	<br/><br/>
 
