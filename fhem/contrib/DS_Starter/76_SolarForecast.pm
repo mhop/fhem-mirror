@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-05-11 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-05-13 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.79.0" => "13.05.2023  new consumer key locktime ",
   "0.78.2" => "11.05.2023  extend debug radiationProcess ",
   "0.78.1" => "08.05.2023  change default icon it_ups_on_battery to batterie ",
   "0.78.0" => "07.05.2023  activate NotifyFn Forum:https://forum.fhem.de/index.php?msg=1275005, new Consumerkey asynchron ",
@@ -5184,17 +5185,22 @@ return;
 #     Planungsdaten bzw. aktuelle Planungszustände setzen
 ################################################################
 sub ___setConsumerPlanningState {
-  my $paref   = shift;
-  my $hash    = $paref->{hash};
-  my $name    = $paref->{name};
-  my $type    = $paref->{type};
-  my $c       = $paref->{consumer};
-  my $ps      = $paref->{ps};                                                # Planstatus
-  my $startts = $paref->{startts};                                           # Unix Timestamp für geplanten Switch on
-  my $stopts  = $paref->{stopts};                                            # Unix Timestamp für geplanten Switch off
-  my $lang    = $paref->{lang};
+  my $paref     = shift;
+  my $hash      = $paref->{hash};
+  my $name      = $paref->{name};
+  my $type      = $paref->{type};
+  my $c         = $paref->{consumer};
+  my $ps        = $paref->{ps};                    # Planstatus
+  my $startts   = $paref->{startts};               # Unix Timestamp für geplanten Switch on
+  my $stopts    = $paref->{stopts};                # Unix Timestamp für geplanten Switch off
+  my $loffts    = $paref->{lastAutoOffTs};         # Timestamp des letzten Off-Schaltens bzw. letzter Unterbrechnung im Automatikmodus
+  my $lang      = $paref->{lang};
   
   my ($starttime,$stoptime);
+  
+  if (defined $loffts) {
+      $data{$type}{$name}{consumers}{$c}{lastAutoOffTs} = $loffts;
+  }
 
   if ($startts) {
       $starttime                                       = (timestampToTimestring ($startts, $lang))[3];
@@ -5438,6 +5444,8 @@ sub ___switchConsumerOn {
   ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c);                                       # zusätzliche Switch off Bedingung
   Log3 ($name, 1, "$name - $err") if($err);
 
+  my $iilt = isInLocktime ($paref);                                                               # Sperrzeit Status ermitteln
+  
   if ($debug =~ /consumerSwitching/x) {                                                           # nur für Debugging
       my $cons   = CurrentVal  ($hash, 'consumption',  0);
       my $nompow = ConsumerVal ($hash, $c, 'power', '-');
@@ -5445,14 +5453,14 @@ sub ___switchConsumerOn {
 
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - general switching parameters => }.
                       qq{auto mode: $auto, current Consumption: $cons W, nompower: $nompow, surplus: $sp W, }.
-                      qq{planning state: $pstate, start timestamp: }.($startts ? $startts : "undef")
+                      qq{isInLocktime: $iilt, planning state: $pstate, start timestamp: }.($startts ? $startts : "undef")
            );
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - current Context is switching "on" => }.
                       qq{swoncond: $swoncond, on-command: $oncom }
            );
   }
 
-  if ($auto && $oncom && $swoncond && !$swoffcond &&                                              # kein Einschalten wenn zusätzliche Switch off Bedingung zutrifft
+  if ($auto && $oncom && $swoncond && !$swoffcond && !$iilt &&                                    # kein Einschalten wenn zusätzliche Switch off Bedingung zutrifft
       simplifyCstate($pstate) =~ /planned|priority|starting/xs &&
       isInTimeframe ($hash, $c)) {                                                                # Verbraucher Start ist geplant && Startzeit überschritten
       my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                                   # Consumer Planungsmode
@@ -5490,7 +5498,7 @@ sub ___switchConsumerOn {
           (isInterruptable($hash, $c) == 3 && isConsRcmd ($hash, $c)))    &&
          isInTimeframe    ($hash, $c)                                     &&
          simplifyCstate   ($pstate) =~ /interrupted|interrupting/xs       &&
-         $auto && $oncom) {
+         $auto && $oncom && !$iilt) {
 
       CommandSet(undef,"$cname $oncom");
 
@@ -5631,13 +5639,15 @@ sub ___setConsumerSwitchingState {
       Log3 ($name, 2, "$name - $state");
   }
   elsif ($pstate eq 'stopping' && isConsumerPhysOff ($hash, $c)) {
-      $paref->{ps}     = "switched off:";
-      $paref->{stopts} = $t;
+      $paref->{ps}            = "switched off:";
+      $paref->{stopts}        = $t;
+      $paref->{lastAutoOffTs} = $t;
 
       ___setConsumerPlanningState ($paref);
 
       delete $paref->{ps};
       delete $paref->{stopts};
+      delete $paref->{lastAutoOffTs};
 
       $state = qq{Consumer '$calias' switched off};
 
@@ -5659,11 +5669,13 @@ sub ___setConsumerSwitchingState {
       Log3 ($name, 2, "$name - $state");
   }
   elsif ($pstate eq 'interrupting' && isConsumerPhysOff ($hash, $c)) {
-      $paref->{ps} = "interrupted:";
+      $paref->{ps}            = "interrupted:";
+      $paref->{lastAutoOffTs} = $t;
 
       ___setConsumerPlanningState ($paref);
 
       delete $paref->{ps};
+      delete $paref->{lastAutoOffTs};
 
       $state = qq{Consumer '$calias' switched off (interrupted)};
 
@@ -6546,6 +6558,11 @@ sub collectAllRegConsumers {
               $setshift  *= 60 if($setshift);
           }
       }
+      
+      my $clt;
+      if (exists $hc->{locktime}) { 
+          $clt = $hc->{locktime};
+      }
 
       my $rauto     = $hc->{auto} // q{};
       my $ctype     = $hc->{type} // $defctype;
@@ -6574,6 +6591,7 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{notafter}        = $hc->{notafter}  // q{};               # nicht einschalten nach Stunde in 24h Format (00-23)
       $data{$type}{$name}{consumers}{$c}{rswstate}        = $rswstate        // 'state';           # Schaltstatus Reading
       $data{$type}{$name}{consumers}{$c}{asynchron}       = $asynchron       // 0;                 # Arbeitsweise FHEM Consumer Device
+      $data{$type}{$name}{consumers}{$c}{locktime}        = $clt             // 0;                 # Sperrzeit im Automatikmodus
       $data{$type}{$name}{consumers}{$c}{onreg}           = $onreg           // 'on';              # Regex für 'ein'
       $data{$type}{$name}{consumers}{$c}{offreg}          = $offreg          // 'off';             # Regex für 'aus'
       $data{$type}{$name}{consumers}{$c}{dswoncond}       = $dswoncond       // q{};               # Device zur Lieferung einer zusätzliche Einschaltbedingung
@@ -10449,6 +10467,28 @@ return ConsumerVal ($hash, $c, 'isIntimeframe', 0);
 }
 
 ################################################################
+#  liefert Entscheidung ob sich Consumer $c noch in der 
+#  Sperrzeit befindet
+################################################################
+sub isInLocktime {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+  my $t     = $paref->{t}; 
+  
+  my $iilt = 0;
+  my $clt  = ConsumerVal ($hash, $c, 'locktime',      0);
+  my $lot  = ConsumerVal ($hash, $c, 'lastAutoOffTs', 0);
+  
+  if ($t - $lot <= $clt) {
+      $iilt = 1;
+  }
+  
+return $iilt;
+}
+
+################################################################
 #  liefert den Status "Consumption Recommended" von Consumer $c
 ################################################################
 sub isConsRcmd {
@@ -10920,6 +10960,7 @@ return $def;
 #       swoffcondregex  - Regex einer einer vorrangige Ausschaltbedingung
 #       isIntimeframe   - ist Zeit innerhalb der Planzeit ein/aus
 #       interruptable   - Consumer "on" ist während geplanter "ein"-Zeit unterbrechbar
+#       lastAutoOffTs   - Timestamp des letzten Off-Schaltens bzw. letzter Unterbrechnung (nur Automatik-Modus) 
 #       hysteresis      - Hysterese
 #       sunriseshift    - Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
 #       sunsetshift     - Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
@@ -11955,7 +11996,7 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt;  <br>
                          [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]              <br>
                          [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]  <br>
-                         [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] <br>
+                         [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [locktime=&lt;Sekunden&gt;]<br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] <br>
                          [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [interruptable=&lt;Option&gt] </b><br>
                          <br>
@@ -12057,6 +12098,9 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td>                       </td><td>PV Überschuß (wenn power ungleich 0) vorliegt.                                                                                                 </td></tr>
             <tr><td>                       </td><td>Die optionale Hysterese ist ein numerischer Wert um den der Ausschaltpunkt gegenüber dem Soll-Einschaltpunkt                                   </td></tr>
             <tr><td>                       </td><td>angehoben wird sofern der ausgewertete Readingwert ebenfalls numerisch ist. (default: 0)                                                       </td></tr>
+            <tr><td> <b>locktime</b>       </td><td>Sperrzeit nach dem Ausschalten oder der Unterbrechung des Verbrauchers (Sekunden).                                                             </td></tr>
+            <tr><td>                       </td><td>Der Verbraucher wird erst wieder eingeschaltet wenn die angegebene Sperrzeit abgelaufen ist.                                                   </td></tr> 
+            <tr><td>                       </td><td><b>Hinweis:</b> Der Schalter 'locktime' ist nur im Automatik-Modus wirksam.                                                                    </td></tr>            
          </table>
          </ul>
        <br>
