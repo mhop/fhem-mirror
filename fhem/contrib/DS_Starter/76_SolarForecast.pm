@@ -12098,7 +12098,7 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td>                       </td><td>PV Überschuß (wenn power ungleich 0) vorliegt.                                                                                                 </td></tr>
             <tr><td>                       </td><td>Die optionale Hysterese ist ein numerischer Wert um den der Ausschaltpunkt gegenüber dem Soll-Einschaltpunkt                                   </td></tr>
             <tr><td>                       </td><td>angehoben wird sofern der ausgewertete Readingwert ebenfalls numerisch ist. (default: 0)                                                       </td></tr>
-            <tr><td> <b>locktime</b>       </td><td>Sperrzeit nach dem Ausschalten oder der Unterbrechung des Verbrauchers (Sekunden).                                                             </td></tr>
+            <tr><td> <b>locktime</b>       </td><td>Sperrzeit in Sekunden nachdem der Verbraucher ausgeschaltet oder unterbrochen wurde (optional).                                                </td></tr>
             <tr><td>                       </td><td>Der Verbraucher wird erst wieder eingeschaltet wenn die angegebene Sperrzeit abgelaufen ist.                                                   </td></tr> 
             <tr><td>                       </td><td><b>Hinweis:</b> Der Schalter 'locktime' ist nur im Automatik-Modus wirksam.                                                                    </td></tr>            
          </table>
