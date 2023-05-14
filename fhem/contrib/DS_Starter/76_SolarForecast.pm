@@ -10493,8 +10493,7 @@ sub isInLocktime {
       $iilt = 1;
       $rlt  = $clt - ($t - $lot);                                                 # remain lock time
   }
-  
-  Log3 ($name, 1, "$name - consumer: $c, time: $t, lastAutoOffTs: $lot, RLT: $rlt");
+
 return ($iilt,$rlt);
 }
 
