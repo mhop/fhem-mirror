@@ -586,8 +586,6 @@ my %hqtxt = (                                                                   
               DE => qq{nach}                                                                                                },
   nxtscc => { EN => qq{next SolCast call},
               DE => qq{n&auml;chste SolCast Abfrage}                                                                        },  
-  pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop>},
-              DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop>}                              },
   fulfd  => { EN => qq{fulfilled},
               DE => qq{erf&uuml;llt}                                                                                        },
   pmtp   => { EN => qq{produced more than predicted :-D},
@@ -608,6 +606,8 @@ my %hqtxt = (                                                                   
               DE => qq{Sieht ganz gut aus &#128528;, die Anlagenkonfiguration ist prinzipiell in Ordnung. Bitte beachten Sie die Warnungen (<W>).}             },
   strnok => { EN => qq{Oh no &#128577;, the system configuration is incorrect. Please check the settings and notes!},
               DE => qq{Oh nein &#128546;, die Anlagenkonfiguration ist fehlerhaft. Bitte überprüfen Sie die Einstellungen und Hinweise!}                       },
+  pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop><br>Remaining lock time:&nbsp;<RLT> seconds},
+              DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop><br>verbleibende Sperrzeit:&nbsp;<RLT> Sekunden}                  },
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
@@ -641,8 +641,6 @@ my %htitles = (                                                                 
                 DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung, Vorrangladen Batterie ist aktiv}     },
   connorec => { EN => qq{Consumption planning is outside current time\n(Click for immediate planning)},
                 DE => qq{Verbrauchsplanung liegt ausserhalb aktueller Zeit\n(Klick f&#252;r sofortige Einplanung)} },
-  pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\n\nOn:&nbsp;<start>\nOff:&nbsp;<stop>},
-                DE => qq{Planungsstatus:&nbsp;<pstate>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>}                     },
   akorron  => { EN => qq{Enable auto correction with:\nset <NAME> pvCorrectionFactor_Auto on},
                 DE => qq{Einschalten Autokorrektur mit:\nset <NAME> pvCorrectionFactor_Auto on}                    },
   splus    => { EN => qq{PV surplus sufficient},
@@ -665,6 +663,8 @@ my %htitles = (                                                                 
                 DE => qq{API Schl&#252;ssel existiert nicht}                                                       },
   scrsdne  => { EN => qq{Rooftop site does not exist or is not accessible},
                 DE => qq{Rooftop ID existiert nicht oder ist nicht abrufbar}                                       },
+  pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\n\nOn:&nbsp;<start>\nOff:&nbsp;<stop>\nRemaining lock time:&nbsp;<RLT> seconds},
+                DE => qq{Planungsstatus:&nbsp;<pstate>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>\nverbleibende Sperrzeit:&nbsp;<RLT> Sekunden}     },
 );
 
 my %weather_ids = (
@@ -4728,8 +4728,11 @@ sub _manageConsumerData {
       $data{$type}{$name}{consumers}{$c}{state} = $costate;
 
       my ($pstate,$starttime,$stoptime)         = __getPlanningStateAndTimes ($paref);
-
-      push @$daref, "consumer${c}<>"              ."name='$alias' state='$costate' planningstate='$pstate' ";     # Consumer Infos
+      my ($iilt,$rlt)                           = isInLocktime ($paref);                                          # Sperrzeit Status ermitteln
+      my $constate                              = "name='$alias' state='$costate' planningstate='$pstate'";
+      $constate                                .= " remainLockTime='$rlt'" if($rlt);
+      
+      push @$daref, "consumer${c}<>"              .$constate;                                                     # Consumer Infos
       push @$daref, "consumer${c}_planned_start<>"."$starttime" if($starttime);                                   # Consumer Start geplant
       push @$daref, "consumer${c}_planned_stop<>". "$stoptime"  if($stoptime);                                    # Consumer Stop geplant
   }
@@ -5444,7 +5447,7 @@ sub ___switchConsumerOn {
   ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c);                                       # zusätzliche Switch off Bedingung
   Log3 ($name, 1, "$name - $err") if($err);
 
-  my $iilt = isInLocktime ($paref);                                                               # Sperrzeit Status ermitteln
+  my ($iilt,$rlt) = isInLocktime ($paref);                                                        # Sperrzeit Status ermitteln
   
   if ($debug =~ /consumerSwitching/x) {                                                           # nur für Debugging
       my $cons   = CurrentVal  ($hash, 'consumption',  0);
@@ -6719,6 +6722,7 @@ sub entryGraphic {
       type           => $hash->{TYPE},
       ftui           => $ftui,
       maxhours       => $maxhours,
+      t              => time,
       modulo         => 1,
       dstyle         => qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'},     # TD-Style
       offset         => $offset,
@@ -7421,12 +7425,15 @@ sub _graphicConsumerLegend {
       $paref->{consumer} = $c;
 
       my ($planstate,$starttime,$stoptime) = __getPlanningStateAndTimes ($paref);
+      my ($iilt,$rlt)                      = isInLocktime ($paref);                                   # Sperrzeit Status ermitteln
+      
       my $pstate                           = $caicon eq "times"    ? $hqtxt{pstate}{$lang}  : $htitles{pstate}{$lang};
       my $surplusinfo                      = isConsRcmd($hash, $c) ? $htitles{splus}{$lang} : $htitles{nosplus}{$lang};
 
       $pstate =~ s/<pstate>/$planstate/xs;
       $pstate =~ s/<start>/$starttime/xs;
       $pstate =~ s/<stop>/$stoptime/xs;
+      $pstate =~ s/<RLT>/$rlt/xs;
       $pstate =~ s/\s+/&nbsp;/gxs         if($caicon eq "times");
       
       if ($clink) {
@@ -10478,14 +10485,17 @@ sub isInLocktime {
   my $t     = $paref->{t}; 
   
   my $iilt = 0;
+  my $rlt  = 0;
   my $clt  = ConsumerVal ($hash, $c, 'locktime',      0);
   my $lot  = ConsumerVal ($hash, $c, 'lastAutoOffTs', 0);
   
   if ($t - $lot <= $clt) {
       $iilt = 1;
+      $rlt  = $clt - ($t - $lot);                                                 # remain lock time
   }
   
-return $iilt;
+  Log3 ($name, 1, "$name - consumer: $c, time: $t, lastAutoOffTs: $lot, RLT: $rlt");
+return ($iilt,$rlt);
 }
 
 ################################################################
