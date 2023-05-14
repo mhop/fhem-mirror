@@ -28,6 +28,7 @@ eval "use FHEM::Utility::CTZ qw(:all);1;"        or my $ctzAbsent     = 1;      
 eval "use Storable qw(freeze thaw);1;"           or my $storabs       = "Storable";         ## no critic 'eval'
 
 #use Data::Dumper;
+use Scalar::Util qw(looks_like_number);
 use Time::HiRes qw(gettimeofday tv_interval usleep);
 use Time::Local;
 use Encode qw(encode_utf8);
@@ -38,6 +39,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.8.8"   => "11.05.2023 _DbLog_ParseEvent changed default splitting, Forum: https://forum.fhem.de/index.php?topic=133537.0 ",
   "5.8.7"   => "01.05.2023 new Events FRAME_INITIALIZED, SUBPROC_INITIALIZED, SUBPROC_DISCONNECTED, SUBPROC_STOPPED ".
                "Forum: https://forum.fhem.de/index.php?topic=133403.0, minor fixes ",
   "5.8.6"   => "25.03.2023 change _DbLog_plotData (intx), Plot Editor: include functions delta-h, delta-h, ...".
@@ -1561,26 +1563,27 @@ sub _DbLog_ParseEvent {
 
   # split the event into reading, value and unit
   # "day-temp: 22.0 (Celsius)" -> "day-temp", "22.0 (Celsius)"
-  my @parts = split(/: /,$event, 2);
-  $reading  = shift @parts;
-
-  if(@parts == 2) {
-    $value = $parts[0];
-    $unit  = $parts[1];
+  my @parts = split /: /, $event;
+  
+  if(scalar @parts == 2) {                                               # V 5.8.8 default Splitting komplett umgebaut
+      $reading = shift @parts;
+      my $tail = shift @parts;
+      @parts   = split " ", $tail;
+      
+      $value = $tail;
+      $unit  = q{};
+    
+      if (scalar @parts <= 2 && looks_like_number($parts[0])) {
+          $value = $parts[0];
+          $unit  = $parts[1] // q{};            
+      }
   }
-  else {
-    $value = join(": ", @parts);
-    $unit  = "";
-  }
 
-  # Log3 $name, 2, "DbLog $name - ParseEvent - Event: $event, Reading: $reading, Value: $value, Unit: $unit";
-
-  #default
   if(!defined($reading)) { $reading = ""; }
   if(!defined($value))   { $value   = ""; }
-  if($value eq "") {                                                     # Default Splitting geändert 04.01.20 Forum: #106992
-      if($event =~ /^.*:\s$/) {                                          # und 21.01.20 Forum: #106769
-          $reading = (split(":", $event))[0];
+  if($value eq "") {                                                     
+      if($event =~ /:\s/) {                                              # 21.01.20 Forum: #106769
+          ($reading,$value) = split /: /, $event, 2;
       }
       else {
           $reading = "state";
@@ -1588,11 +1591,8 @@ sub _DbLog_ParseEvent {
       }
   }
 
-  #globales Abfangen von                                                  # changed in Version 4.12.5
-  # - temperature
+  # globales Abfangen von                                                 # changed in Version 4.12.5
   # - humidity
-  #if   ($reading =~ m(^temperature)) { $unit = "°C"; }                   # wenn reading mit temperature beginnt
-  #elsif($reading =~ m(^humidity))    { $unit = "%"; }                    # wenn reading mit humidity beginnt
   if($reading =~ m(^humidity))    { $unit = "%"; }                        # wenn reading mit humidity beginnt
 
 
@@ -1615,7 +1615,8 @@ sub _DbLog_ParseEvent {
               $value =~ s/ \(Celsius\)//;
               $value =~ s/([-\.\d]+).*/$1/;
               $unit  = "°C";
-          } elsif (lc($reading) =~ m/(humidity|vwc)/) {
+          } 
+          elsif (lc($reading) =~ m/(humidity|vwc)/) {
               $value =~ s/ \(\%\)//;
              $unit  = "%";
           }
@@ -1633,13 +1634,13 @@ sub _DbLog_ParseEvent {
       }
   }
 
-  # ZWAVE
-  elsif ($type eq "ZWAVE") {
-      if ( $value =~/([-\.\d]+)\s([a-z].*)/i ) {
-          $value = $1;
-          $unit  = $2;
-      }
-  }
+  # ZWAVE                                                             # V 5.8.8 rausgenommen
+  #elsif ($type eq "ZWAVE") {
+  #    if ( $value =~/([-\.\d]+)\s([a-z].*)/i ) {
+  #        $value = $1;
+  #        $unit  = $2;
+  #    }
+  #}
 
   # FBDECT
   elsif ($type eq "FBDECT") {
@@ -1652,7 +1653,7 @@ sub _DbLog_ParseEvent {
   # MAX
   elsif(($type eq "MAX")) {
       $unit = "°C" if(lc($reading) =~ m/temp/);
-      $unit = "%"   if(lc($reading) eq "valveposition");
+      $unit = "%"  if(lc($reading) eq "valveposition");
   }
 
   # FS20
@@ -1661,7 +1662,8 @@ sub _DbLog_ParseEvent {
           $value   = $1;
           $reading = "dim";
           $unit    = "%";
-      } elsif(!defined($value) || $value eq "") {
+      } 
+      elsif(!defined($value) || $value eq "") {
           $value   = $reading;
           $reading = "data";
       }
@@ -1674,35 +1676,43 @@ sub _DbLog_ParseEvent {
           $reading = $parts[0];
           $value   = $parts[1];
           $unit    = "";
-      } elsif($reading =~ m(-temp)) {
+      } 
+      elsif($reading =~ m(-temp)) {
           $value =~ s/ \(Celsius\)//; $unit= "°C";
-      } elsif($reading =~ m(temp-offset)) {
+      } 
+      elsif($reading =~ m(temp-offset)) {
           $value =~ s/ \(Celsius\)//; $unit= "°C";
-      } elsif($reading =~ m(^actuator[0-9]*)) {
+      } 
+      elsif($reading =~ m(^actuator[0-9]*)) {
           if($value eq "lime-protection") {
               $reading = "actuator-lime-protection";
               undef $value;
-          } elsif($value =~ m(^offset:)) {
+          } 
+          elsif($value =~ m(^offset:)) {
               $reading = "actuator-offset";
               @parts   = split(/: /,$value);
               $value   = $parts[1];
               if(defined $value) {
                   $value =~ s/%//; $value = $value*1.; $unit = "%";
               }
-          } elsif($value =~ m(^unknown_)) {
+          } 
+          elsif($value =~ m(^unknown_)) {
               @parts   = split(/: /,$value);
               $reading = "actuator-" . $parts[0];
               $value   = $parts[1];
               if(defined $value) {
                   $value =~ s/%//; $value = $value*1.; $unit = "%";
               }
-          } elsif($value =~ m(^synctime)) {
+          } 
+          elsif($value =~ m(^synctime)) {
               $reading = "actuator-synctime";
               undef $value;
-          } elsif($value eq "test") {
+          } 
+          elsif($value eq "test") {
               $reading = "actuator-test";
               undef $value;
-          } elsif($value eq "pair") {
+          } 
+          elsif($value eq "pair") {
               $reading = "actuator-pair";
               undef $value;
           }
@@ -1731,13 +1741,16 @@ sub _DbLog_ParseEvent {
   elsif($type eq "HMS" || $type eq "CUL_WS" || $type eq "OWTHERM") {
       if($event =~ m(T:.*)) {
           $reading = "data"; $value= $event;
-      } elsif($reading eq "temperature") {
+      } 
+      elsif($reading eq "temperature") {
           $value =~ s/ \(Celsius\)//;
           $value =~ s/([-\.\d]+).*/$1/; #OWTHERM
           $unit  = "°C";
-      } elsif($reading eq "humidity") {
+      } 
+      elsif($reading eq "humidity") {
           $value =~ s/ \(\%\)//; $unit= "%";
-      } elsif($reading eq "battery") {
+      } 
+      elsif($reading eq "battery") {
           $value =~ s/ok/1/;
           $value =~ s/replaced/1/;
           $value =~ s/empty/0/;
@@ -1770,9 +1783,11 @@ sub _DbLog_ParseEvent {
   elsif($type eq "TRX_WEATHER") {
       if($reading eq "energy_current") {
           $value =~ s/ W//;
-      } elsif($reading eq "energy_total") {
+      } 
+      elsif($reading eq "energy_total") {
           $value =~ s/ kWh//;
-      } elsif($reading eq "battery") {
+      } 
+      elsif($reading eq "battery") {
           if ($value =~ m/(\d+)\%/) {
               $value = $1;
           }
