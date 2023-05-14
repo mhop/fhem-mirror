@@ -5,10 +5,23 @@ FW_version["f18.js"] = "$Id$";
 // Known bugs: AbsSize is wrong for ColorSlider
 var f18_attr={}, f18_sd, f18_icon={}, f18_room, f18_grid=20, f18_margin=10;
 var f18_small = (screen.width < 480 || screen.height < 480);
+var f18_cols = {
+  "default":{ bg:     "FFFFE7", fg:    "000000", link:   "278727", 
+              evenrow:"F8F8E0", oddrow:"F0F0D8", header: "E0E0C8",
+              menu:   "D7FFFF", sel:   "A0FFFF", inpBack:"FFFFFF" },
+  light:    { bg:     "F8F8F8", fg:    "465666", link:   "4C9ED9",
+              evenrow:"E8E8E8", oddrow:"F0F0F0", header: "DDDDDD",
+              menu:   "EEEEEE", sel:   "CAC8CF", inpBack:"FFFFFF" },
+  dark:     { bg:     "444444", fg:    "CCCCCC", link:   "FF9900",
+              evenrow:"333333", oddrow:"111111", header: "222222",
+              menu:   "111111", sel:   "333333", inpBack:"444444" }
+};
+var f18_isday;
 
 $(window).resize(f18_resize);
 $(document).ready(function(){
   f18_room  = $("div#content").attr("room");
+  f18_isday = $("body").attr("data-isday");
   f18_sd = $("body").attr("data-styleData");
   if(f18_sd) {
     eval("f18_sd="+f18_sd);
@@ -201,6 +214,19 @@ f18_special()
       });
   };
 
+  var addSelect = function(name, inRoom, desc, opts, fn)
+  {
+    addRow(name, desc, "<select>"+opts+"</select>");
+    $(appendTo+" tr.ar_"+name+" select")
+      .val(attr(name, inRoom))
+      .change(function(){
+        var c = $(this).val();
+        setAttr(name, c, inRoom);
+        if(fn)
+          fn(c);
+      });
+  }
+
   var addColorChooser = function(name, desc)
   {
     addRow(name, desc, "<div class='cp'></div>");
@@ -375,6 +401,14 @@ f18_special()
                         f18_setWrapColumns);
     addHider("widePortrait",true,"Show all columns<br>in portrait mode",
                         f18_setWidePortrait);
+
+    addHider("dayNightActive", true, "Day and Night styles");
+    var opt = '<option>custom</option>'+
+              '<option>default</option>'+
+              '<option>light</option>'+
+              '<option>dark</option>';
+    addSelect("dayStyle",   true, "Day Style",   opt);
+    addSelect("nightStyle", true, "Night Style", opt);
 
     $("div.f18colors").css("margin-top", "20px");
     $("tr.f18 div.fileList").each(function(e){ f18_addPinToStyleDiv(this) });
@@ -715,18 +749,7 @@ f18_setAttr(name, value, dontSave)
 function
 f18_resetCol(name, room)
 {
-  var cols = {
-    "default":{ bg:     "FFFFE7", fg:    "000000", link:   "278727", 
-                evenrow:"F8F8E0", oddrow:"F0F0D8", header: "E0E0C8",
-                menu:   "D7FFFF", sel:   "A0FFFF", inpBack:"FFFFFF" },
-    light:    { bg:     "F8F8F8", fg:    "465666", link:   "4C9ED9",
-                evenrow:"E8E8E8", oddrow:"F0F0F0", header: "DDDDDD",
-                menu:   "EEEEEE", sel:   "CAC8CF", inpBack:"FFFFFF" },
-    dark:     { bg:     "444444", fg:    "CCCCCC", link:   "FF9900",
-                evenrow:"333333", oddrow:"111111", header: "222222",
-                menu:   "111111", sel:   "333333", inpBack:"444444" }
-  };
-  var col = (name ? cols[name] : cols["default"]);
+  var col = name ? f18_cols[name] : f18_cols["default"];
   var prefix = (room && room != 'all' ? "Room."+room+".cols." : "cols.");
   for(var c in col)
     f18_attr[prefix+c] = col[c];
@@ -736,8 +759,12 @@ f18_resetCol(name, room)
 function
 f18_setCss(why)
 {
-  var style = "";
-  function col(n) { return f18_getAttr("cols."+n, true) };
+  var style = "", dnCols;
+  if(f18_getAttr("dayNightActive"))
+    dnCols = f18_isday ? f18_cols[f18_getAttr("dayStyle")] :
+                         f18_cols[f18_getAttr("nightStyle")];
+  function col(n) { return dnCols ? dnCols[n] : f18_getAttr("cols."+n, true) };
+
   function bg(c) { return "{ background:#"+c+"; fill:#"+c+"; }\n" }
   function fg(c) { return "{ color:#"+c+"; }\n" }
   style += ".col_fg, body, input, textarea "+fg(col("fg"));
