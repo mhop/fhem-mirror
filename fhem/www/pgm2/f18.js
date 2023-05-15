@@ -21,7 +21,7 @@ var f18_isday;
 $(window).resize(f18_resize);
 $(document).ready(function(){
   f18_room  = $("div#content").attr("room");
-  f18_isday = $("body").attr("data-isday");
+  f18_isday = $("body").attr("data-isDay") == 1 ? 1 : 0;
   f18_sd = $("body").attr("data-styleData");
   if(f18_sd) {
     eval("f18_sd="+f18_sd);
