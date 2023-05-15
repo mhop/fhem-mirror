@@ -1,12 +1,15 @@
 # $Id$
+
+=for comment
 ####################################################################################################
 #
 #	98_PID20.pm
 #	The PID device is a loop controller, used to set the value e.g of a heating
 #	valve dependent of the current and desired temperature.
 #
-#	This module is derived from the contrib/99_PID by Alexander Titzel.
-#  The framework of the module is derived from proposals by betateilchen.
+#	This module is derived from the contrib/99_PID.pm by Alexander Titzel.
+#	The framework of the module is derived from proposals by betateilchen.
+#	PID calculations developed and provided by John
 #
 #	This file is part of fhem.
 #
@@ -21,7 +24,7 @@
 #	GNU General Public License for more details.
 #
 #	You should have received a copy of the GNU General Public License
-#	along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#	along with fhem. If not, see <http://www.gnu.org/licenses/>.
 #
 #
 # V 1.00.c
@@ -59,15 +62,40 @@
 #               Fix:     adjust commandref 
 # V 1.0.0.9     Feature: new attribute pidIPortionCallBeforeSetting for user specific callback 
 #               before setting a new value to p-portion
+#
 ####################################################################################################
+#
+# Maintainer CHANGED
+#
+# 2023-05-14    patches (betateilchen)
+#
+#               attribute disabledForIntervals         (added)
+#               improved handling for disabled devices (uses IsDisabled() now)
+#
+#               attribute pidRoundReadings             (added)
+#               rounding values if desired             (implemented)
+#               commandref for new attribute           (added)
+#
+#               attribute pidActorMapCmd               (added)
+#               syntax check for attribute value       (added)
+#               map actuation value to command         (implemented)
+#               commandref for new attribute           (added)
+#
+#               id-Tags added to commandref            (for define/set/get/attributes)
+#
+####################################################################################################
+=cut
+
 package main;
 
 use strict;
 use warnings;
+
+no if $] >= 5.017011, warnings => 'experimental';
+
 use feature qw/say switch/;
 use vars qw(%defs);
 use vars qw($readingFnAttributes);
-use vars qw(%attr);
 use vars qw(%modules);
 
 my $PID20_Version = "1.0.0.9";
@@ -102,6 +130,7 @@ sub PID20_Initialize($)
     . 'pidActorKeepAlive '
     . 'pidActorLimitLower '
     . 'pidActorLimitUpper '
+    . 'pidActorMapCmd:textField-long '
     . 'pidActorCallBeforeSetting '
     . 'pidIPortionCallBeforeSetting '
     . 'pidCalcInterval '
@@ -120,7 +149,9 @@ sub PID20_Initialize($)
     . 'pidDebugDelta:0,1 '
     . 'pidDebugUpdate:0,1 '
     . 'pidDebugNotify:0,1 '
+    . 'pidRoundReadings:2,3,4,5 '
     . 'disable:0,1 '
+    . 'disabledForIntervals:textField-long '
     . $readingFnAttributes;
 }
 
@@ -158,7 +189,8 @@ sub PID20_Define($$$)
   my $reFloat = '^([\\+,\\-]?\\d+\\.?\d*$)';    # gleitpunkt
   if ( @a != 4 )
   {
-    return "wrong syntax: define <name> PID20 " . "<sensor>:reading:[regexp] <actor>[:cmd] ";
+    return "wrong syntax: define &lt;name&gt; PID20 " 
+    . "&lt;sensor&gt;:reading:[regexp] &lt;actor&gt;[:cmd] ";
   }
   ###################
   # Sensor
@@ -172,7 +204,7 @@ sub PID20_Define($$$)
     return $msg;
   }
 
-  # if reading of sender is unkown
+  # if reading of sender is unknown
   if ( ReadingsVal( $sensor, $reading, 'unknown' ) eq 'unkown' )
   {
     my $msg = "$name: Unknown reading $reading for sensor device $sensor specified";
@@ -224,13 +256,10 @@ sub PID20_Notify($$)
   my $name       = $hash->{NAME};
   my $sensorName = $hash->{helper}{sensor};
   my $DEBUG      = AttrVal( $name, 'pidDebugNotify', '0' ) eq '1';
-  my $disable    = AttrVal( $name, 'disable', '0' );
 
   # no action if disabled
-  if ( $disable eq '1' )
-  {
-    return '';
-  }
+  return if IsDisabled($name);
+
   return if ( $dev->{NAME} ne $sensorName );
   my $sensorReadingName = $hash->{helper}{reading};
   my $regexp            = $hash->{helper}{regexp};
@@ -681,7 +710,7 @@ sub PID20_Calc($)
     {
       $readingUpdateReq = 1;         # update the readings
       
-      # check calback for actuation
+      # check callback for actuation
       my $actorCallBeforeSetting = AttrVal( $name, 'pidActorCallBeforeSetting', undef );
       if ( defined($actorCallBeforeSetting) && exists &$actorCallBeforeSetting )
       {
@@ -693,9 +722,23 @@ sub PID20_Calc($)
       }
 
       #build command for fhem
-      PID20_Log $hash, 5, 'actor:' . $hash->{helper}{actor} . ' actorCommand:' . $hash->{helper}{actorCommand}
-        . ' actuation:' . $actuation;
-      my $cmd = sprintf( "set %s %s %g", $hash->{helper}{actor}, $hash->{helper}{actorCommand}, $actuation );
+      my $cmd    = '';
+      my $mapping = AttrVal($name,'pidActorMapCmd',undef);
+      if (defined($mapping)){
+        eval "\$mapping = $mapping";
+        if($@) {
+          $cmd = "ERROR in cmdMap $@";
+        } else {
+          my $mapCmd = undef;
+          $mapCmd    = $mapping->{default}    if (defined ($mapping->{default}));
+          $mapCmd    = $mapping->{$actuation} if (defined ($mapping->{$actuation}));
+          $cmd       = sprintf( "set %s %s", $hash->{helper}{actor}, $mapCmd );
+        }
+      } else {
+        $cmd = sprintf( "set %s %s %g", $hash->{helper}{actor}, $hash->{helper}{actorCommand}, $actuation );
+      }
+
+      PID20_Log $hash, 5, $cmd;
 
       # execute command
       my $ret;
@@ -717,6 +760,14 @@ sub PID20_Calc($)
     # ---------------- update request
     if ($readingUpdateReq)
     {
+      my $r = AttrVal($name,'pidRoundReadings',-1);
+      if ($r != -1) {
+        $pPortion      = round($pPortion,$r)      if looks_like_number($pPortion);
+        $dPortion      = round($dPortion,$r)      if looks_like_number($dPortion);
+        $iPortion      = round($iPortion,$r)      if looks_like_number($iPortion);
+        $delta         = round($delta,$r)         if looks_like_number($delta);
+        $actuationCalc = round($actuationCalc,$r) if looks_like_number($actuationCalc);
+      }
       readingsBeginUpdate($hash);
       readingsBulkUpdate( $hash, $hash->{helper}{desiredName},  $desired )       if ( $desired ne '' );
       readingsBulkUpdate( $hash, $hash->{helper}{measuredName}, $sensorValue )   if ( $sensorValue ne '' );
@@ -765,19 +816,30 @@ sub PID20_Attr($$$$)
    # PID20_Log $hash, 5, 'disable'; 
     PID20_RestartTimer($hash,2);
   }
+  if ( $attribute eq 'pidActorMapCmd' )
+  {
+    my $test;
+    eval "\$test = $value";
+    if($@) {
+      $msg = "ERROR in pidActorMapCmd: $@";
+    }
+  }
   return $msg;
 }
 
 1;
 
 =pod
+=item helper
+=item summary    create a PID device based on any combination of sensor and actor
+=item summary_DE erzeugt ein PID device aus beliebigem Sensor und Aktor
 =begin html
 
-<a name="PID20"></a>
+<a id="PID20"></a>
 <h3>PID20</h3>
 <ul>
 
-	<a name="PID20define"></a>
+	<a id="PID20-define"></a>
 	<b>Define</b>
 	<ul>
 		<br/>
@@ -787,29 +849,33 @@ sub PID20_Attr($$$$)
 	</ul>
 	<br/><br/>
 
-	<a name="PID20set"></a>
+	<a id="PID20-set"></a>
 	<b>Set-Commands</b><br/>
 	<ul>
 
 		<br/>
+		<a id="PID20-set-desired"></a>
 		<code>set &lt;name&gt; desired &lt;value&gt;</code>
 		<br/><br/>
 		<ul>Set desired value for PID</ul>
 		<br/>
 
 		<br/>
+		<a id="PID20-set-start"></a>
 		<code>set &lt;name&gt; start</code>
 		<br/><br/>
 		<ul>Start PID processing again, using frozen values from former stop.</ul>
 		<br/>
 
 		<br/>
+		<a id="PID20-set-stop"></a>
 		<code>set &lt;name&gt; stop</code>
 		<br/><br/>
 		<ul>PID stops processing, freezing all values.</ul>
 		<br/>
 
 		<br/>
+		<a id="PID20-set-restart"></a>
 		<code>set &lt;name&gt; restart &lt;value&gt;</code>
 		<br/><br/>
 		<ul>Same as start, but uses value as start value for actor</ul>
@@ -818,43 +884,64 @@ sub PID20_Attr($$$$)
 	</ul>
 	<br/><br/>
 
-	<a name="PID20get"></a>
+	<a id="PID20-get"></a>
 	<b>Get-Commands</b><br/>
 	<ul>
-
 		<br/>
+		<a id="PID20-get-params"></a>
 		<code>get &lt;name&gt; params</code>
 		<br/><br/>
 		<ul>Get list containing current parameters.</ul>
 		<br/>
-
 	</ul>
 	<br/><br/>
 
-	<a name="PID20attr"></a>
+	<a id="PID20-attr"></a>
 	<b>Attributes</b><br/><br/>
 	<ul>
 		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+		<li><a href="#disable">disable</a></li>
+		<li><a href="#disabledForIntervals">disabledForIntervals</a></li>
 		<br/>
-		<li><b>disable</b> - disable the PID device, possible values: 0,1; default: 0</li>
-		<li><b>pidActorValueDecPlaces</b> - number of demicals, possible values: 0..5; default: 0</li>
+		<a id="PID20-attr-pidActorValueDecPlaces"></a>
+		<li><b>pidActorValueDecPlaces</b> - number of demicals, possible values: 0..5; default: 0</li><br>
+		<a id="PID20-attr-pidRoundReadings"></a>
+		<li><b>pidRoundReadings</b> - round readings to number of demicals, possible values: 2..5; default: not rounded</li><br>
+		<a id="PID20-attr-pidActorInterval"></a>
 		<li><b>pidActorInterval</b> - number of seconds to wait between to commands sent to actor; default: 180</li>
+		<a id="PID20-attr-pidActorTreshold"></a>
 		<li><b>pidActorTreshold</b> - threshold to be reached before command will be sent to actor; default: 1</li>
+		<a id="PID20-attr-pidActorErrorAction"></a>
 		<li><b>pidActorErrorAction</b> - required action on error, possible values: freeze,errorPos; default: freeze</li>
+		<a id="PID20-attr-pidActorErrorPos"></a>
 		<li><b>pidActorErrorPos</b> - actor's position to be used in case of error; default: 0</li>
+		<a id="PID20-attr-pidActorKeepAlive"></a>
 		<li><b>pidActorKeepAlive</b> - number of seconds to force command to be sent to actor; default: 1800</li>
+		<a id="PID20-attr-pidActorLimitLower"></a>
 		<li><b>pidActorLimitLower</b> - lower limit for actor; default: 0</li>
+		<a id="PID20-attr-pidActorLimitUpper"></a>
 		<li><b>pidActorLimitUpper</b> - upper limit for actor; default: 100</li>
+		<a id="PID20-attr-pidCalcInterval"></a>
 		<li><b>pidCalcInterval</b> - interval (seconds) to calculate new pid values; default: 60</li>
+		<a id="PID20-attr-pidDeltaTreshold"></a>
 		<li><b>pidDeltaTreshold</b> - if delta < delta-threshold the pid will enter idle state; default: 0</li>
+		<a id="PID20-attr-pidDesiredName"></a>
 		<li><b>pidDesiredName</b> - reading's name for desired value; default: desired</li>
+		<a id="PID20-attr-pidFactor_P"></a>
 		<li><b>pidFactor_P</b> - P value for PID; default: 25</li>
+		<a id="PID20-attr-pidFactor_I"></a>
 		<li><b>pidFactor_I</b> - I value for PID; default: 0.25</li>
+		<a id="PID20-attr-pidFactor_D"></a>
 		<li><b>pidFactor_D</b> - D value for PID; default: 0</li>
+		<a id="PID20-attr-pidMeasuredName"></a>
 		<li><b>pidMeasuredName</b> - reading's name for measured value; default: measured</li>
+		<a id="PID20-attr-pidSensorTimeout"></a>
 		<li><b>pidSensorTimeout</b> - number of seconds to wait before sensor will be recognized n/a; default: 3600</li>
+		<a id="PID20-attr-pidReverseAction"></a>
 		<li><b>pidReverseAction</b> - reverse PID operation mode, possible values: 0,1; default: 0</li>
+		<a id="PID20-attr-pidUpdateInterval"></a>
 		<li><b>pidUpdateInterval</b> - number of seconds to wait before an update will be forced for plotting; default: 300</li>
+		<a id="PID20-attr-pidActorCallBeforeSetting"></a>
 		<li><b>pidActorCallBeforeSetting</b> - an optional callback-function,which can manipulate the actorValue; default: not defined
         <pre>
         # Exampe for callback-function
@@ -870,6 +957,7 @@ sub PID20_Attr($$$$)
               return $actValue;
           }</pre>
 		  </li>
+		<a id="PID20-attr-pidIPortionCallBeforeSetting"></a>
 		<li><b>pidIPortionCallBeforeSetting</b> - an optional callback-function, which can manipulate the value of I-Portion; default: not defined
         <pre>
         # Exampe for callback-function
@@ -885,6 +973,18 @@ sub PID20_Attr($$$$)
               return $actValue;
           }</pre>
 		  </li>
+		<a id="PID20-attr-pidActorMapCmd"></a>
+		<li><b>pidActorMapCmd</b> - add an optional hash for mapping actuation value to user-defined actor command.
+<pre>
+Example: attr &lt;device&gt; pidActorMapCmd {'1'=>'on-for-timer 90','0'=>'off','default'=>'off'}
+
+This will map an actuation value 0 to "off", resulting in "set &lt;actor&gt; off" being sent,
+an actuation value 1 will be mapped to "on-for-timer 90", resulting in "set &lt;actor&gt; on-for-timer 90" being sent,
+any other actuation value will be mapped to "off".
+
+You can use any dummy-command in define syntax, which will be ignored, if this attribut is set.
+</pre>
+		</li>
 	</ul>
 	<br/><br/>
 
