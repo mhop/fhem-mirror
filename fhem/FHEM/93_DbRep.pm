@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.52.7"  => "16.05.2023  DbRep_afterproc, DbRep_beforeproc can execute FHEM commands as well as PERL code ",
   "8.52.6"  => "11.04.2023  change diffValue for aggr month ",
   "8.52.5"  => "10.04.2023  change diffValue, Forum: https://forum.fhem.de/index.php?msg=1271853 ",
   "8.52.4"  => "10.04.2023  fix perl warning ",
@@ -465,8 +466,8 @@ sub DbRep_Initialize {
                        "dumpMemlimit ".
                        "dumpSpeed ".
                        "dumpFilesKeep:0,1,2,3,4,5,6,7,8,9,10 ".
-                       "executeBeforeProc ".
-                       "executeAfterProc ".
+                       "executeBeforeProc:textField-long ".
+                       "executeAfterProc:textField-long ".
                        "expimpfile ".
                        "fastStart:0,1 ".
                        "fetchRoute:ascent,descent ".
@@ -1633,6 +1634,16 @@ sub DbRep_Attr {
             if ($aVal =~ m/^\s*(\{.*\})\s*$/xs) {                             # unnamed Funktion direkt in userExitFn mit {...}
                 $aVal = $1;
                 my ($NAME,$READING,$VALUE) = ('','','');
+                eval $aVal;
+                return $@ if ($@);
+            }
+        }
+    }
+    
+    if ($aName =~ /executeAfterProc|executeBeforeProc/xs) {
+        if($cmd eq "set") {
+            if ($aVal =~ m/^\s*(\{.*\}|{.*|.*})\s*$/xs) {                             
+                $aVal = $1;
                 eval $aVal;
                 return $@ if ($@);
             }
@@ -4836,11 +4847,6 @@ sub DbRep_diffvalDone {
   }
 
   my %rh = split("§", $rowlist);
-
-  #Log3 ($name, 4, "DbRep $name - print result of diffValue calculation after decoding ...");
-  #for my $key (sort(keys(%rh))) {
-  #    Log3 ($name, 4, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key});
-  #}
 
   readingsBeginUpdate($hash);
 
@@ -12402,21 +12408,21 @@ return ($txt);
 ###################################################################################
 sub DbRep_beforeproc {
   my $hash = shift;
-  my $txt  = shift // q{process};
+  my $cmd  = shift // q{process};
 
   my $name = $hash->{NAME};
+  my $fn   = AttrVal($name, 'executeBeforeProc', '');
 
-  my $ebd = AttrVal($name, 'executeBeforeProc', '');
-
-  if($ebd) {
-      Log3 ($name, 3, "DbRep $name - execute command before $txt: '$ebd' ");
-      my $err = AnalyzeCommandChain(undef, $ebd);
+  if($fn) {
+      Log3 ($name, 3, "DbRep $name - execute command before $cmd: '$fn' ");
+      
+      my $err = _DbRep_procCode ($hash, $fn);
 
       if ($err) {
-          Log3 ($name, 2, "DbRep $name - command message before $txt: \"$err\" ");
-          my $erread = "Warning - message from command before $txt appeared";
+          Log3 ($name, 2, "DbRep $name - command message before $cmd: \"$err\" ");
+          my $erread = "Warning - message from command before $cmd appeared";
 
-          ReadingsSingleUpdateValue ($hash, "before".$txt."_message", $err, 1);
+          ReadingsSingleUpdateValue ($hash, "before_".$cmd."_message", $err, 1);
           ReadingsSingleUpdateValue ($hash, "state", $erread, 1);
       }
   }
@@ -12432,21 +12438,21 @@ sub DbRep_afterproc {
   my $cmd   = shift // q{process};
   my $bfile = shift // q{};
 
-  my $erread;
+  my ($err,$erread);
 
   my $name   = $hash->{NAME};
   $cmd       = (split " ", $cmd)[0];
   my $sval   = ReadingsVal ($name, 'state', '');
-  my $ead    = AttrVal     ($name, 'executeAfterProc', '');
+  my $fn     = AttrVal     ($name, 'executeAfterProc', '');
 
-  if($ead) {
-      Log3 ($name, 3, "DbRep $name - execute command after $cmd: '$ead' ");
-
-      my $err = AnalyzeCommandChain(undef, $ead);
-
+  if($fn) {
+      Log3 ($name, 3, "DbRep $name - execute command after $cmd: '$fn' ");
+      
+      $err = _DbRep_procCode ($hash, $fn);
+      
       if ($err) {
-          Log3 ($name, 2, qq{DbRep $name - command message after $cmd: "$err"});
-
+          Log3 ($name, 2, qq{DbRep $name - command message after $cmd: >$err<});
+          
           $erread = $sval eq 'error' ? $sval : qq(WARNING - $cmd finished, but message after command appeared);
 
           ReadingsSingleUpdateValue ($hash, 'after_'.$cmd.'_message', $err, 1);
@@ -12468,6 +12474,34 @@ sub DbRep_afterproc {
   ReadingsSingleUpdateValue ($hash, 'state', $rtxt, 1);
 
 return '';
+}
+
+###################################################################################
+#     Befehl oder Code prozessieren      
+###################################################################################
+sub _DbRep_procCode {
+  my $hash = shift;
+  my $fn   = shift;
+  
+  my $err  = q{};
+  my $name = $hash->{NAME};
+
+  $fn =~ s/\s*#.*//g;                                          # Kommentare entfernen
+  $fn =  join ' ', split /\s+/sx, $fn;                         # Funktion serialisieren
+  
+  if ($fn =~ m/^\s*(\{.*\})\s*$/xs) {                          # unnamed Funktion direkt mit {...}
+      $fn = $1;
+
+      eval $fn;
+      if ($@) {
+          $err = $@;
+      }
+  }
+  else {
+      $err = AnalyzeCommandChain (undef, $fn);
+  }
+      
+return $err;
 }
 
 ##############################################################################################
@@ -16508,54 +16542,59 @@ sub dbval {
   </li>
 
   <a id="DbRep-attr-executeAfterProc"></a>
-  <li><b>executeAfterProc </b> - you can specify a FHEM command or perl function which should be executed
-                                 <b>after command execution</b>. <br>
-                                 Perl functions have to be enclosed in {} .<br><br>
+  <li><b>executeAfterProc </b> <br><br>
+  
+  You can specify a FHEM command or Perl code that should be executed <b>after the command is processed</b>. <br>
+  Perl code is to be enclosed in {...}. The variables $hash (hash of the DbRep device) and $name 
+  (name of the DbRep device) are available. <br><br>
 
-                                <ul>
-                                <b>Example:</b> <br><br>
-                                attr &lt;name&gt; executeAfterProc set og_gz_westfenster off; <br>
-                                attr &lt;name&gt; executeAfterProc {adump ("&lt;name&gt;")} <br><br>
+  <ul>
+    <b>Example:</b> <br><br>
+    attr &lt;name&gt; executeAfterProc set og_gz_westfenster off; <br>
+    attr &lt;name&gt; executeAfterProc {adump ($name)} <br><br>
 
-                                # "adump" is a function defined in 99_myUtils.pm e.g.: <br>
+    # "adump" is a function defined in 99_myUtils. <br>
 
 <pre>
 sub adump {
     my ($name) = @_;
-    my $hash = $defs{$name};
-    # own function, e.g.
-    Log3($name, 3, "DbRep $name -> Dump finished");
+    my $hash   = $defs{$name};
+    # the own function, e.g.
+    Log3($name, 3, "DbRep $name -> Dump is finished");
 
     return;
 }
 </pre>
-</ul>
-</li>
+  </ul>
+  </li>
 
   <a id="DbRep-attr-executeBeforeProc"></a>
-  <li><b>executeBeforeProc </b> - you can specify a FHEM command or perl function which should be executed
-                                 <b>before command execution</b>. <br>
-                                 Perl functions have to be enclosed in {} .<br><br>
+  <li><b>executeBeforeProc </b> <br><br>
+  
+  A FHEM command or Perl code can be specified which is to be executed <b>before the command is processed</b>. <br>
+  Perl code is to be enclosed in {...}. The variables $hash (hash of the DbRep device) and $name 
+  (name of the DbRep device) are available. <br><br>
 
-                                <ul>
-                                <b>Example:</b> <br><br>
-                                attr &lt;name&gt; executeBeforeProc set og_gz_westfenster on; <br>
-                                attr &lt;name&gt; executeBeforeProc {bdump ("&lt;name&gt;")} <br><br>
+  <ul>
+    <b>Example:</b> <br><br>
+    attr &lt;name&gt; executeBeforeProc set og_gz_westfenster on; <br>
+    attr &lt;name&gt; executeBeforeProc {bdump ($name)}           <br><br>
 
-                                # "bdump" is a function defined in 99_myUtils.pm e.g.: <br>
+    # "bdump" is a function defined in 99_myUtils. <br>
 
 <pre>
 sub bdump {
     my ($name) = @_;
-    my $hash = $defs{$name};
-    # own function, e.g.
-    Log3($name, 3, "DbRep $name -> Dump starts now");
+    my $hash   = $defs{$name};
+    # the own function, e.g.
+    Log3($name, 3, "DbRep $name -> Dump starts");
 
     return;
 }
 </pre>
-</ul>
-</li>
+   </ul>
+   </li>
+
 
   <a id="DbRep-attr-expimpfile"></a>
   <li><b>expimpfile &lt;/path/file&gt; [MAXLINES=&lt;lines&gt;] </b>
@@ -19550,54 +19589,60 @@ sub dbval {
   </li>
 
   <a id="DbRep-attr-executeAfterProc"></a>
-  <li><b>executeAfterProc </b> - Es kann ein FHEM-Kommando oder eine Perl-Funktion angegeben werden welche <b>nach der
-                                  Befehlsabarbeitung</b> ausgeführt werden soll. <br>
-                                  Funktionen sind in {} einzuschließen.<br><br>
+  <li><b>executeAfterProc </b> <br><br>
+  
+  Es kann ein FHEM-Kommando oder Perl Code angegeben werden der <b>nach der Befehlsabarbeitung</b> ausgeführt 
+  werden soll. <br>
+  Perl Code ist in {...} einzuschließen. Es stehen die Variablen $hash (Hash des DbRep Devices) und $name 
+  (Name des DbRep-Devices) zur Verfügung. <br><br>
 
-                                <ul>
-                                <b>Beispiel:</b> <br><br>
-                                attr &lt;name&gt; executeAfterProc set og_gz_westfenster off; <br>
-                                attr &lt;name&gt; executeAfterProc {adump ("&lt;name&gt;")} <br><br>
+  <ul>
+    <b>Beispiel:</b> <br><br>
+    attr &lt;name&gt; executeAfterProc set og_gz_westfenster off; <br>
+    attr &lt;name&gt; executeAfterProc {adump ($name)} <br><br>
 
-                                # "adump" ist eine in 99_myUtils definierte Funktion. <br>
+    # "adump" ist eine in 99_myUtils definierte Funktion. <br>
 
 <pre>
 sub adump {
     my ($name) = @_;
-    my $hash = $defs{$name};
+    my $hash   = $defs{$name};
     # die eigene Funktion, z.B.
     Log3($name, 3, "DbRep $name -> Dump ist beendet");
 
     return;
 }
 </pre>
-</ul>
-</li>
+  </ul>
+  </li>
 
   <a id="DbRep-attr-executeBeforeProc"></a>
-  <li><b>executeBeforeProc </b> - Es kann ein FHEM-Kommando oder eine Perl-Funktion angegeben werden welche <b>vor der
-                                  Befehlsabarbeitung</b> ausgeführt werden soll. <br>
-                                  Funktionen sind in {} einzuschließen.<br><br>
+  <li><b>executeBeforeProc </b> <br><br>
+  
+  Es kann ein FHEM-Kommando oder Perl Code angegeben werden der <b>vor der Befehlsabarbeitung</b> ausgeführt 
+  werden soll. <br>
+  Perl Code ist in {...} einzuschließen. Es stehen die Variablen $hash (Hash des DbRep Devices) und $name 
+  (Name des DbRep-Devices) zur Verfügung. <br><br>
 
-                                  <ul>
-                                  <b>Beispiel:</b> <br><br>
-                                  attr &lt;name&gt; executeBeforeProc set og_gz_westfenster on; <br>
-                                  attr &lt;name&gt; executeBeforeProc {bdump ("&lt;name&gt;")} <br><br>
+  <ul>
+    <b>Beispiel:</b> <br><br>
+    attr &lt;name&gt; executeBeforeProc set og_gz_westfenster on; <br>
+    attr &lt;name&gt; executeBeforeProc {bdump ($name)}           <br><br>
 
-                                  # "bdump" ist eine in 99_myUtils definierte Funktion. <br>
+    # "bdump" ist eine in 99_myUtils definierte Funktion. <br>
 
 <pre>
 sub bdump {
     my ($name) = @_;
-    my $hash = $defs{$name};
+    my $hash   = $defs{$name};
     # die eigene Funktion, z.B.
     Log3($name, 3, "DbRep $name -> Dump startet");
 
     return;
 }
 </pre>
-</ul>
-</li>
+   </ul>
+   </li>
 
   <a id="DbRep-attr-expimpfile"></a>
   <li><b>expimpfile &lt;/Pfad/Filename&gt; [MAXLINES=&lt;lines&gt;]</b>
