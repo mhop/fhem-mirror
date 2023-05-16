@@ -12624,4 +12624,66 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
     "photovoltaik",
     "electricity",
     "forecast",
-    
+    "graphics",
+    "Autarky",
+    "Consumer",
+    "PV"
+  ],
+  "version": "v1.1.1",
+  "release_status": "testing",
+  "author": [
+    "Heiko Maaz <heiko.maaz@t-online.de>"
+  ],
+  "x_fhem_maintainer": [
+    "DS_Starter"
+  ],
+  "x_fhem_maintainer_github": [
+    "nasseeder1"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014,
+        "POSIX": 0,
+        "GPUtils": 0,
+        "Encode": 0,
+        "Color": 0,
+        "utf8": 0,
+        "HttpUtils": 0,
+        "JSON": 4.020,
+        "FHEM::SynoModules::SMUtils": 1.0220,
+        "Time::HiRes": 0
+      },
+      "recommends": {
+        "FHEM::Meta": 0,
+        "FHEM::Utility::CTZ": 1.00,
+        "DateTime": 0,
+        "DateTime::Format::Strptime": 0,
+        "Storable": 0,
+        "Data::Dumper": 0
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "x_wiki": {
+      "web": "https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung",
+      "title": "SolarForecast - Solare Prognose (PV Erzeugung) und Verbrauchersteuerung"
+    },
+    "repository": {
+      "x_dev": {
+        "type": "svn",
+        "url": "https://svn.fhem.de/trac/browser/trunk/fhem/contrib/DS_Starter",
+        "web": "https://svn.fhem.de/trac/browser/trunk/fhem/contrib/DS_Starter/76_SolarForecast.pm",
+        "x_branch": "dev",
+        "x_filepath": "fhem/contrib/",
+        "x_raw": "https://svn.fhem.de/fhem/trunk/fhem/contrib/DS_Starter/76_SolarForecast.pm"
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
+
+=cut
