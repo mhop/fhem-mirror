@@ -1027,7 +1027,7 @@ sub _DbLog_setexportCache {              ## no critic "not used"
   my $logsref = $paref->{logsref};
   my $dir     = $paref->{dir};
 
-  return "Device is not in asynch working mode" if(!AttrVal($name, 'asyncMode', 0));
+  # return "Device is not in asynch working mode" if(!AttrVal($name, 'asyncMode', 0));
 
   my $cln;
   my $crows = 0;
