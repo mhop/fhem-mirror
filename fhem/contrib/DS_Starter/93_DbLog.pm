@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 27504 2023-05-12 19:36:29Z DS_Starter $
+# $Id: 93_DbLog.pm 27569 2023-05-14 21:00:32Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -39,9 +39,11 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.9.0"   => "16.05.2023 Server shutdown -> write cachefile if database connect can't be done during delayed shutdown ". 
+                           "Forum: https://forum.fhem.de/index.php?topic=133599.0 ",
   "5.8.8"   => "11.05.2023 _DbLog_ParseEvent changed default splitting, Forum: https://forum.fhem.de/index.php?topic=133537.0 ",
   "5.8.7"   => "01.05.2023 new Events FRAME_INITIALIZED, SUBPROC_INITIALIZED, SUBPROC_DISCONNECTED, SUBPROC_STOPPED ".
-               "Forum: https://forum.fhem.de/index.php?topic=133403.0, minor fixes ",
+                           "Forum: https://forum.fhem.de/index.php?topic=133403.0, minor fixes ",
   "5.8.6"   => "25.03.2023 change _DbLog_plotData (intx), Plot Editor: include functions delta-h, delta-h, ...".
                            "remove setter deleteOldDaysNbl, reduceLogNbl ",
   "5.8.5"   => "16.03.2023 fix using https in configCheck after SVN server change ",
@@ -1563,7 +1565,7 @@ sub _DbLog_ParseEvent {
 
   # split the event into reading, value and unit
   # "day-temp: 22.0 (Celsius)" -> "day-temp", "22.0 (Celsius)"
-  my @parts = split /: /, $event, 2;
+  my @parts = split /: /, $event;
   
   if(scalar @parts == 2) {                                               # V 5.8.8 default Splitting komplett umgebaut
       $reading = shift @parts;
@@ -1581,9 +1583,9 @@ sub _DbLog_ParseEvent {
 
   if(!defined($reading)) { $reading = ""; }
   if(!defined($value))   { $value   = ""; }
-  if($value eq "") {                                                     # Default Splitting geändert 04.01.20 Forum: #106992
-      if($event =~ /^.*:\s$/) {                                          # und 21.01.20 Forum: #106769
-          $reading = (split ":", $event)[0];
+  if($value eq "") {                                                     
+      if($event =~ /:\s/) {                                              # 21.01.20 Forum: #106769
+          ($reading,$value) = split /: /, $event, 2;
       }
       else {
           $reading = "state";
@@ -1593,7 +1595,7 @@ sub _DbLog_ParseEvent {
 
   # globales Abfangen von                                                 # changed in Version 4.12.5
   # - humidity
-  #if($reading =~ m(^humidity))    { $unit = "%"; }                        # wenn reading mit humidity beginnt
+  if($reading =~ m(^humidity))    { $unit = "%"; }                        # wenn reading mit humidity beginnt
 
 
   # the interpretation of the argument depends on the device type
@@ -1634,13 +1636,13 @@ sub _DbLog_ParseEvent {
       }
   }
 
-  # ZWAVE
-  elsif ($type eq "ZWAVE") {
-      if ( $value =~/([-\.\d]+)\s([a-z].*)/i ) {
-          $value = $1;
-          $unit  = $2;
-      }
-  }
+  # ZWAVE                                                             # V 5.8.8 rausgenommen
+  #elsif ($type eq "ZWAVE") {
+  #    if ( $value =~/([-\.\d]+)\s([a-z].*)/i ) {
+  #        $value = $1;
+  #        $unit  = $2;
+  #    }
+  #}
 
   # FBDECT
   elsif ($type eq "FBDECT") {
@@ -5467,14 +5469,24 @@ sub DbLog_SBP_Read {
       if ($oper =~ /log_/xs) {
           my $rowlback = $ret->{rowlback};
 
-          if($rowlback) {                                                                         # one Transaction
+          if($rowlback) {                                                                                  
               my $memcount;
 
-              eval {
+              eval {                                                                                         # one Transaction
                   for my $key (sort {$a <=>$b} keys %{$rowlback}) {
-                      $memcount = DbLog_addMemCacheRow ($name, $rowlback->{$key});                # Datensatz zum Memory Cache hinzufügen
+                      $memcount = DbLog_addMemCacheRow ($name, $rowlback->{$key});                           # Datensatz zum Memory Cache hinzufügen
 
                       Log3 ($name, 5, "DbLog $name - row back to Cache: $key -> ".$rowlback->{$key});
+                  }
+                  
+                  if ($hash->{HELPER}{SHUTDOWNSEQ} && $memcount) {
+                      Log3 ($name, 2, "DbLog $name - no connection to the database possible in the last database write cycle, export to file instead...");
+                      
+                      my $error = CommandSet (undef, qq{$name exportCache purgecache});
+
+                      if ($error) {                                                                          # Fehler beim Export Cachefile
+                          Log3 ($name, 1, "DbLog $name - ERROR - while exporting Cache file: $error");
+                      }                    
                   }
               };
 
@@ -8650,13 +8662,13 @@ sub DbLog_setVersionInfo {
 
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 27504 2023-05-01 19:36:29Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 27569 2023-05-14 21:00:32Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/xsg;
       }
       else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 27504 2023-05-01 19:36:29Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 27569 2023-05-14 21:00:32Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
