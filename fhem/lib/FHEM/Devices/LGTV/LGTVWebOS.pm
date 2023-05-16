@@ -2,7 +2,7 @@
 #
 # Developed with VSCodium and richterger perl plugin.
 #
-#  (c) 2017-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2017-2023 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
@@ -53,7 +53,7 @@ BEGIN {
           init_done
           selectlist
           defs
-          )
+        )
     );
 }
 
@@ -133,7 +133,7 @@ my %lgCommands = (
     "getAudioStatus"        => ["ssap://audio/getStatus"],
     "getCurrentChannel"     => ["ssap://tv/getCurrentChannel"],
     "getChannelProgramInfo" => ["ssap://tv/getChannelProgramInfo"],
-    "getForegroundAppInfo" =>
+    "getForegroundAppInfo"  =>
       ["ssap://com.webos.applicationManager/getForegroundAppInfo"],
     "getAppList"   => ["ssap://com.webos.applicationManager/listApps"],
     "getAppStatus" => ["ssap://com.webos.service.appstatus/getAppStatus"],
@@ -156,12 +156,12 @@ my %lgCommands = (
     "closeApp"    => ["ssap://system.launcher/close"],
     "openApp"     => ["ssap://system.launcher/open"],
     "closeWebApp" => ["ssap://webapp/closeWebApp"],
-    "openChannel" => [ "ssap://tv/openChannel", "channelNumber" ],
+    "openChannel" => [ "ssap://tv/openChannel",         "channelNumber" ],
     "launchApp"   => [ "ssap://system.launcher/launch", "id" ],
     "screenMsg"   => [ "ssap://system.notifications/createToast", "message" ],
-    "mute"        => [ "ssap://audio/setMute", "mute" ],
-    "volume"      => [ "ssap://audio/setVolume", "volume" ],
-    "switchInput" => [ "ssap://tv/switchInput", "input" ],
+    "mute"        => [ "ssap://audio/setMute",                    "mute" ],
+    "volume"      => [ "ssap://audio/setVolume",                  "volume" ],
+    "switchInput" => [ "ssap://tv/switchInput",                   "input" ],
 );
 
 my %openApps = (
@@ -363,6 +363,8 @@ sub TimerStatusRequest {
     else {
         ::readingsBulkUpdateIfChanged( $hash, 'state', 'off' )
           if ( ::ReadingsVal( $name, 'state', 'off' ) ne 'off' );
+        ::readingsBulkUpdateIfChanged( $hash, 'power', 'off' )
+          if ( ::ReadingsVal( $name, 'power', 'off' ) ne 'off' );
 
         Presence($hash)
           if ( ::AttrVal( $name, 'pingPresence', 0 ) == 1 );
@@ -686,6 +688,7 @@ sub Close {
     delete( $hash->{FD} );
 
     ::readingsSingleUpdate( $hash, 'state', 'off', 1 );
+    ::readingsSingleUpdate( $hash, 'power', 'off', 1 );
 
     ::Log3( $name, 4, "LGTV_WebOS ($name) - Socket Disconnected" );
 
@@ -962,6 +965,7 @@ sub ResponseProcessing {
 "LGTV_WebOS ($name) - Sucessfull WS connection to $hash->{HOST}"
                 );
                 ::readingsSingleUpdate( $hash, 'state', 'on', 1 );
+                ::readingsSingleUpdate( $hash, 'power', 'on', 1 );
 
             }
             else {
@@ -1342,6 +1346,7 @@ sub WriteReadings {
     }
 
     ::readingsBulkUpdateIfChanged( $hash, 'state', 'on' );
+    ::readingsBulkUpdateIfChanged( $hash, 'power', 'on' );
 
     ::readingsEndUpdate( $hash, 1 );
 
@@ -1409,7 +1414,7 @@ sub Pairing {
             "signatures" => [
                 {
                     "signatureVersion" => 1,
-                    "signature" =>
+                    "signature"        =>
 "eyJhbGdvcml0aG0iOiJSU0EtU0hBMjU2Iiwia2V5SWQiOiJ0ZXN0LXNpZ25pbmctY2VydCIsInNpZ25hdHVyZVZlcnNpb24iOjF9.hrVRgjCwXVvE2OOSpDZ58hR+59aFNwYDyjQgKk3auukd7pcegmE2CzPCa0bJ0ZsRAcKkCTJrWo5iDzNhMBWRyaMOv5zWSrthlf7G128qvIlpMT0YNY+n/FaOHE73uLrS/g7swl3/qH/BGFG2Hu4RlL48eb3lLKqTt2xKHdCs6Cd4RMfJPYnzgvI4BNrFUKsjkcu+WD4OO2A27Pq1n50cMchmcaXadJhGrOqH5YmHdOCj5NSHzJYrsW0HPlpuAx/ECMeIZYDh6RMqaFM2DXzdKX9NmmyqzJ3o/0lkk/N97gfVRLW5hA29yeAwaCViZNCP8iC9aO0q9fQojoa7NQnAtw=="
                 }
             ]
@@ -1440,7 +1445,7 @@ sub CreateSendCommand {
       if ( $type ne 'register' );
     $command->{id}      = $type . "_" . ::gettimeofday();
     $command->{type}    = $type;
-    $command->{uri}     = $uri if ($uri);
+    $command->{uri}     = $uri     if ($uri);
     $command->{payload} = $payload if ( defined($payload) );
 
 #::Log3( $name, 5, "LGTV_WebOS ($name) - Payload Message: $command->{payload}{message}" );

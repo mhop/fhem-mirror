@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  82_LGTV_WebOS: fix little typos and change version
  - change:  93_DBLog: changed default splitting, Forum: #133537
  - feature: AutomowerConnectFamily: set cutting height for user defined zones
             automatically, code cleaning, some fixes
