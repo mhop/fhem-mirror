@@ -1,4 +1,4 @@
-# $Id$
+# $Id$we Beta-User $
 #############################################################################
 #
 #     98_WeekdayTimer.pm
@@ -1068,7 +1068,7 @@ sub checkIfDeviceIsHeatingType {
   my $allSets = getAllSets($dName);
 
   for my $ts (@tempSet) {
-  if ($allSets =~ m{$ts}xms) {
+    if ($allSets =~ m{$ts}xms) {
       Log3( $hash, 4, "[$name] device type heating recognized, setModifier:$ts" );
       $hash->{setModifier} = $ts;
       return $ts
@@ -1297,7 +1297,7 @@ sub checkDaysCondition {
 ################################################################################
 sub getDaysAsHash {
   my $hash = shift;
-  my $tage = shift //return {};
+  my $tage = shift // return {};
 
   my %days = map {$_ => 1} @{$tage};
   delete @days{7,8};
@@ -1308,7 +1308,7 @@ sub getDaysAsHash {
 ################################################################################
 sub getDaysAsCondition {
   my $tage         = shift;
-  my $overrulewday = shift // 0;
+  my $overrulewday = shift;
 
   my %days     = map {$_ => 1} @{$tage};
 
@@ -1316,7 +1316,7 @@ sub getDaysAsCondition {
   my $notWe    = $days{8}; delete $days{8};  #!$we
 
   my $tageExp  = 'defined $days->{$wday}';
-     $tageExp .= ' && !$we' if $overrulewday;
+     $tageExp .= ' && !$we' if defined $overrulewday;
      $tageExp .= ' ||  $we' if defined $we;
      $tageExp .= ' || !$we' if defined $notWe;
   return $tageExp;
@@ -1327,11 +1327,11 @@ sub Attr {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   $attrVal = 0 if !defined $attrVal;
 
-  my $hash = $defs{$name};
+  my $hash = $defs{$name} // return 'error: device not defined!';
   if ( $attrName eq 'WDT_eventMap' ) {
     if($cmd eq 'set') {
       my @ret = split m{[: \r\n]}x, $attrVal;
-      return "WDT_eventMap: Odd number of elements" if int(@ret) % 2;
+      return 'WDT_eventMap: Odd number of elements' if int(@ret) % 2;
       my %ret = @ret;
       for (keys %ret) {
         $ret{$_} =~ s{\+}{ }gxms;
@@ -1341,22 +1341,22 @@ sub Attr {
       delete $hash->{WDT_EVENTMAP};
     }
     $attr{$name}{$attrName} = $attrVal;
-    return if (!$init_done);
+    return if !$init_done;
     return WDT_Start($hash);
   }
   return if !$init_done;
   if( $attrName eq 'disable' ) {
     _DeleteTimer($hash);
-    ###RemoveInternalTimer($fnHash);
     readingsSingleUpdate ($hash, 'disabled',  $attrVal, 1);
     $attr{$name}{$attrName} = $attrVal;
-    return RemoveInternalTimer($hash,\&WDT_SetTimerOfDay) if $attrVal;
+    if ( $attrVal ) {
+      readingsSingleUpdate ($hash, 'state', 'inactive', 1);
+      return RemoveInternalTimer($hash,\&WDT_SetTimerOfDay);
+    }
     return WDT_Start($hash);
-    #return WDT_SetTimerOfDay( { HASH => $hash} ) if !$attrVal;
   }
   if ( $attrName eq 'weekprofile' ) {
     $attr{$name}{$attrName} = $attrVal;
-    #return WDT_Start($hash);
   } 
   if ( $attrName eq 'switchInThePast' ) {
     $attr{$name}{$attrName} = $attrVal;
@@ -1384,7 +1384,6 @@ sub Attr {
 
   return;
 }
-
 
 ################################################################################
 sub WeekdayTimer_SetParm {
