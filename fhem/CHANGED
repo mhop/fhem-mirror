@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  75_AutomowerConnectDevice: last revision, declared deprecated
+            will be removed soon, change definition to AutomowerConnect
+            use different application key
+ - change:  74_AutomowerConnect: Common.pm remove attr mowerActivityToHighLight
+            extend design attributes, automowerconnect.js enhanced highlighting
  - change:  93_DbRep: attr executeBeforeProc, executeAfterProc can execute 
                       FHEM commands as well as PERL code
  - bugfix:  82_LGTV_WebOS: fix little typos and change version

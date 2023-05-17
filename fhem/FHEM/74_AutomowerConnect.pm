@@ -113,7 +113,6 @@ sub Initialize() {
                         "mapBackgroundColor " .
                         "mapDesignAttributes:textField-long " .
                         "mapZones:textField-long " .
-                        "mowerActivityToHighLight:textField-long " .
                         "showMap:1,0 " .
                         "chargingStationCoordinates " .
                         "chargingStationImagePosition:left,top,right,bottom,center " .
@@ -329,16 +328,17 @@ sub getMowerResponse {
 
         if ( defined ($hash->{helper}{mower}{id}) ){ # update dataset
 
-          $hash->{helper}{mowerold} = dclone( $hash->{helper}{mower} );
-          
+          $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp};
+          $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mower}{attributes}{mower}{activity};
+
         } else { # first data set
 
-          $hash->{helper}{mowerold} = dclone( $hash->{helper}{mowers}[$mowerNumber] );
-          $hash->{helper}{searchpos} = [ dclone( $hash->{helper}{mowerold}{attributes}{positions}[0] ), dclone( $hash->{helper}{mowerold}{attributes}{positions}[1] ) ];
-          $hash->{helper}{timestamps}[ 0 ] = $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
+          $hash->{helper}{searchpos} = [ dclone( $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions}[0] ), dclone( $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions}[1] ) ];
+          $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{metadata}{statusTimestamp};
+          $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{mower}{activity};
 
           if ( AttrVal( $name, 'mapImageCoordinatesToRegister', '' ) eq '' ) {
-            ::FHEM::Devices::AMConnect::Common::posMinMax( $hash, $hash->{helper}{mowerold}{attributes}{positions} );
+            ::FHEM::Devices::AMConnect::Common::posMinMax( $hash, $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions} );
           }
 
         }
@@ -348,8 +348,8 @@ sub getMowerResponse {
         push( @{ $hash->{helper}{mower}{attributes}{positions} }, @{ dclone( $hash->{helper}{searchpos} ) } );
         $hash->{helper}{newdatasets} = 0;
 
-        my $storediff = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
-        if ($storediff) {
+        $hash->{helper}{storediff} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
+        if ($hash->{helper}{storediff}) {
 
           ::FHEM::Devices::AMConnect::Common::AlignArray( $hash );
           ::FHEM::Devices::AMConnect::Common::FW_detailFn_Update ($hash) if (AttrVal($name,'showMap',1));
@@ -711,24 +711,6 @@ sub Attr {
       Log3 $name, 3, "$iam $cmd $attrName";
 
     }
-  ##########
-  } elsif( $attrName eq "mowerActivityToHighLight" ) {
-    if( $cmd eq "set" ) {
-
-      my $act = 'LEAVING';
-      my $actold = 'LEAVING';
-      my $perl = eval "($attrVal)";
-
-      if ($@) {
-        return "$iam $cmd $attrName syntax error in condition: $@ \n $attrVal";
-      }
-      Log3 $name, 4, "$iam $cmd $attrName";
-
-    } elsif( $cmd eq "del" ) {
-
-      Log3 $name, 3, "$iam $cmd $attrName";
-
-    }
   }
   return undef;
 }
@@ -751,22 +733,21 @@ __END__
 <a id="AutomowerConnect" ></a>
 <h3>AutomowerConnect</h3>
 <ul>
-  <u><b>FHEM-FORUM:</b></u> <a target="_blank" href="https://forum.fhem.de/index.php/topic,131661.0.html"> AutomowerConnect und AutomowerConnectDevice</a><br>
-  <u><b>FHEM-Wiki:</b></u> <a target="_blank" href="https://wiki.fhem.de/wiki/AutomowerConnect"> AutomowerConnect und AutomowerConnectDevice: Wie erstellt man eine Karte des Mähbereiches?</a>
+  <u><b>FHEM-FORUM:</b></u> <a target="_blank" href="https://forum.fhem.de/index.php/topic,131661.0.html"> AutomowerConnect</a><br>
+  <u><b>FHEM-Wiki:</b></u> <a target="_blank" href="https://wiki.fhem.de/wiki/AutomowerConnect"> AutomowerConnect: Wie erstellt man eine Karte des Mähbereiches?</a>
   <br><br>
   <u><b>Introduction</b></u>
   <br><br>
   <ul>
     <li>This module allows the communication between the Husqvarna Cloud and FHEM to control Husqvarna Automower equipped with a Connect Module (SIM).</li>
-    <li>It acts as Device for one mower and it acts as host for aditional mower registered in the API.</li>
-    <li>Additional mower have to be defined with the modul AutomowerConnectDevice.</li>
+    <li>It acts as Device for one mower. Use this Module for aditional mower registered in the API. Provide a different application key and application secret each mower</li>
     <li>The mower path is shown in the detail view.</li>
     <li>An arbitrary map can be used as background for the mower path.</li>
     <li>The map has to be a raster image in webp, png or jpg format.</li>
     <li>It's possible to control everything the API offers, e.g. schedule, headlight, cutting height and actions like start, pause, park etc. </li>
     <li>Zones are definable. </li>
     <li>Cutting height can be set for each zone differently. </li>
-    <li>All API data is stored in the device hash, the last and the second last one. Use <code>{Dumper $defs{&lt;name&gt;}}</code> in the commandline to find the data and build userReadings out of it.</li><br>
+    <li>All API data is stored in the device hash. Use <code>{Dumper $defs{&lt;name&gt;}}</code> in the commandline to find the data and build userReadings out of it.</li><br>
   </ul>
   <u><b>Limits for the Automower Connect API</b></u>
   <br><br>
@@ -780,7 +761,7 @@ __END__
   <br><br>
   <ul>
     <li>To get access to the API an application has to be created in the <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.</li>
-    <li>During registration an application key (client_id) and an application secret (client secret) is provided. Use these for for the module. The module uses client credentials as grant type for authorization.</li>
+    <li>During registration an application key (client_id) and an application secret (client secret) is provided. Use these for for the module.</li>
     <li>The module uses client credentials as grant type for authorization.</li>
   </ul>
   <br>
@@ -792,11 +773,6 @@ __END__
     <code>define myMower AutomowerConnect 123456789012345678901234567890123456</code> First device: the default mower number is 0.<br>
     It has to be set a <b>client_secret</b>. It's the application secret from the <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.<br>
     <code>set myMower &lt;client secret&gt;</code>
-    <br><br>
-    Additional mower devices<br>
-    <code>define &lt;device name&gt; AutomowerConnectDevice &lt;host name&gt; &lt;mower number&gt;</code><br>
-    Example:<br>
-    <code>define myAdditionalMower AutomowerConnectDevice MyMower 1</code> Second device with host name <i>myMower</i> and mower number <i>1</i>
     <br><br>
   </ul>
   <br>
@@ -1033,16 +1009,6 @@ __END__
       }'<br>
       </code></li>
 
-    <li><a id='AutomowerConnect-attr-mowerActivityToHighLight'>mowerActivityToHighLight</a><br>
-      <code>attr &lt;name&gt; mowerActivityToHighLight &lt;perl condition to determine a path section&gt;</code><br>
-      A perl condition to highlight a path section by mower activities.<br>
-      The current interval activity is accessible by $act. The last intervall activity is accessible by $actold.<br>
-      LineColor, LineDash and LineWidth are adjustable by the attribut <i>mapDesignAttributes</i> under otherActivityPath...<br>
-      Example: Highlight path when leaving charging station.<br>
-      <code>attr &lt;name&gt; mowerActivityToHighLight $act =~ /MOWING|LEAVING/ && $actold =~ /LEAVING|PARKED_IN_CS|CHARGING/</code><br>
-      Example: Highlight path when returning to charging station.<br>
-      <code>attr &lt;name&gt; mowerActivityToHighLight $act =~ /PARKED_IN_CS|CHARGING|GOING_HOME/ && $actold =~ /MOWING|GOING_HOME/</code><br></li>
-
      <li><a href="disable">disable</a></li>
      <li><a href="disabledForIntervals">disabledForIntervals</a></li>
 
@@ -1078,7 +1044,6 @@ __END__
     <li>status_connected - state of connetion between mower and Husqvarna Cloud, (1 => CONNECTED, 0 => OFFLINE)</li>
     <li>status_statusTimestamp - local time of last change of the API content</li>
     <li>status_statusTimestampDiff - time difference in seconds between the last and second last change of the API content</li>
-    <li>status_statusTimestampOld - local time of second last change of the API content</li>
     <li>system_name - name of the mower</li>
 
   </ul>
@@ -1093,22 +1058,21 @@ __END__
 <a id="AutomowerConnect"></a>
 <h3>AutomowerConnect</h3>
 <ul>
-  <u><b>FHEM-FORUM:</b></u> <a target="_blank" href="https://forum.fhem.de/index.php/topic,131661.0.html"> AutomowerConnect und AutomowerConnectDevice</a><br>
-  <u><b>FHEM-Wiki:</b></u> <a target="_blank" href="https://wiki.fhem.de/wiki/AutomowerConnect"> AutomowerConnect und AutomowerConnectDevice: Wie erstellt man eine Karte des Mähbereiches?</a>
+  <u><b>FHEM-FORUM:</b></u> <a target="_blank" href="https://forum.fhem.de/index.php/topic,131661.0.html"> AutomowerConnect</a><br>
+  <u><b>FHEM-Wiki:</b></u> <a target="_blank" href="https://wiki.fhem.de/wiki/AutomowerConnect"> AutomowerConnect : Wie erstellt man eine Karte des Mähbereiches?</a>
   <br><br>
   <u><b>Einleitung</b></u>
   <br><br>
   <ul>
     <li>Dieses Modul etabliert eine Kommunikation zwischen der Husqvarna Cloud and FHEM, um einen Husqvarna Automower zu steuern, der mit einem Connect Modul (SIM) ausgerüstet ist.</li>
-    <li>Es arbeitet als Device für einen Mähroboter und übernimmt die Rolle als Host für zusätzliche in der API registrierte Mähroboter.</li>
-    <li>Zusätzliche Mähroboter sollten mit dem Modul AutomowerConnectDevice definiert werden..</li>
+    <li>Es arbeitet als Device für einen Mähroboter. Für zusätzliche in der API registrierte Mähroboter ist für jeden Mäher ein extra Appilcation Key mit Application Secret zu verwenden.</li>
     <li>Der Pfad des Mähroboters wird in der Detailansicht des FHEMWEB Frontends angezeigt.</li>
     <li>Der Pfad kann mit einer beliebigen Karte hinterlegt werden.</li>
     <li>Die Karte muss als Rasterbild im webp, png oder jpg Format vorliegen.</li>
     <li>Es ist möglich alles was die API anbietet zu steuern, z.B. Mähplan,Scheinwerfer, Schnitthöhe und Aktionen wie, Start, Pause, Parken usw. </li>
     <li>Zonen können selbst definiert werden. </li>
     <li>Die Schnitthöhe kann je selbstdefinierter Zone eingestellt werden. </li>
-    <li>Die letzten und vorletzten Daten aus der API sind im Gerätehash gespeichert, Mit <code>{Dumper $defs{&lt;device name&gt;}}</code> in der Befehlezeile können die Daten angezeigt werden und daraus userReadings erstellt werden.</li><br>
+    <li>Die Daten aus der API sind im Gerätehash gespeichert, Mit <code>{Dumper $defs{&lt;device name&gt;}}</code> in der Befehlezeile können die Daten angezeigt werden und daraus userReadings erstellt werden.</li><br>
   </ul>
   <u><b>Limit Automower Connect API</b></u>
   <br><br>
@@ -1134,11 +1098,6 @@ __END__
     <code>define myMower AutomowerConnect 123456789012345678901234567890123456</code> Erstes Gerät: die Defaultmähernummer ist 0.<br>
     Es muss ein <b>client_secret</b> gesetzt werden. Es ist das Application Secret vom <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.<br>
     <code>set myMower &lt;client secret&gt;</code><br>
-    <br>
-    Zusätzlicher Mähroboter<br>
-    <code>define &lt;device name&gt; AutomowerConnectDevice &lt;host name&gt; &lt;mower number&gt;</code><br>
-    Beispiel:<br>
-    <code>define myAdditionalMower AutomowerConnectDevice MyMower 1</code> Zweites Gerät mit Hostname <i>myMower</i> und Mähernummer <i>1</i>
     <br><br>
   </ul>
   <br>
@@ -1377,17 +1336,6 @@ __END__
       }'<br>
       </code></li>
 
-    <li><a id='AutomowerConnect-attr-mowerActivityToHighLight'>mowerActivityToHighLight</a><br>
-      <code>attr &lt;name&gt; mowerActivityToHighLight &lt;perl condition to determine a path section&gt;</code><br>
-      Eine Perl Bedingung, die Aktivitäten verknüpft, um einen Pfadabschnitt festzulegen, der hervorgehoben wird.<br>
-      Die Aktivität im aktuellen Intervall steht über die Perlvariable $act und die Aktivität im letzten Intervall über $actold zur Verfügung.<br>
-      Die Farbe, Strichstärke und Muster können über das Attribut <i>mapDesignAttributes</i> unter otherActivityPath... eingestellt werden.<br>
-      Beispiel: Pfad beim Verlassen der Ladestation hervorheben.<br>
-      <code>attr &lt;name&gt; mowerActivityToHighLight $act =~ /MOWING|LEAVING/ && $actold =~ /LEAVING|PARKED_IN_CS|CHARGING/</code><br>
-      Beispiel: Pfad beim Zurückkehren zur Ladestation hervorheben.<br>
-      <code>attr &lt;name&gt; mowerActivityToHighLight $act =~ /PARKED_IN_CS|CHARGING|GOING_HOME/ && $actold =~ /MOWING|GOING_HOME/</code><br>
-      </li>
-
      <li><a href="disable">disable</a></li>
      <li><a href="disabledForIntervals">disabledForIntervals</a></li>
 
@@ -1424,7 +1372,6 @@ __END__
     <li>status_connected - Status der Verbindung zwischen dem Automower und der Husqvarna Cloud, (1 => CONNECTED, 0 => OFFLINE)</li>
     <li>status_statusTimestamp - Lokalzeit der letzten Änderung der Daten in der API</li>
     <li>status_statusTimestampDiff - Zeitdifferenz zwischen den beiden letzten Änderungen im Inhalt der Daten aus der API</li>
-    <li>status_statusTimestampOld - Lokalzeit der vorletzten Änderung der Daten in der API</li>
     <li>system_name - Name des Automowers</li>
   </ul>
 </ul>

@@ -137,10 +137,16 @@ errorPathLineDash=""
 errorPathLineWidth="2"
 chargingStationPathLineColor="#999999"
 chargingStationPathLineDash="6,2"
-chargingStationPathLineWidth="3"
-otherActivityPathLineColor="#33cc33"
+chargingStationPathLineWidth="1"
+otherActivityPathLineColor="#999999"
 otherActivityPathLineDash="6,2"
-otherActivityPathLineWidth="2"
+otherActivityPathLineWidth="1"
+leavingPathLineColor="#33cc33"
+leavingPathLineDash="6,2"
+leavingPathLineWidth="2"
+goingHomePathLineColor="#0099ff"
+goingHomePathLineDash="6,2"
+goingHomePathLineWidth="2"
 mowingPathDisplayStart=""
 mowingPathLineColor="#ff0000"
 mowingPathLineDash="6,2"
@@ -195,7 +201,6 @@ my $mapZonesTpl = '{
       MAP_MIME                  => '',
       MAP_CACHE                 => '',
       cspos                     => [],
-      otherpos                  => [],
       areapos                   => [],
       searchpos                 => [],
       timestamps                => [],
@@ -210,18 +215,21 @@ my $mapZonesTpl = '{
         olLat                   => 0
       },
       UNKNOWN                   => {
-        arrayName               => 'otherpos',
+        short                   => 'U',
+        arrayName               => '',
         maxLength               => 100,
         cnt                     => 0,
         callFn                  => ''
       },
       NOT_APPLICABLE            => {
-        arrayName               => 'otherpos',
+        short                   => 'N',
+        arrayName               => '',
         maxLength               => 50,
         cnt                     => 0,
         callFn                  => ''
       },
       MOWING                    => {
+        short                   => 'M',
         arrayName               => 'areapos',
         maxLength               => 5000,
         maxLengthDefault        => 5000,
@@ -229,30 +237,35 @@ my $mapZonesTpl = '{
         callFn                  => \&FHEM::Devices::AMConnect::Common::AreaStatistics
       },
       GOING_HOME                => {
-        arrayName               => 'otherpos',
+        short                   => 'G',
+        arrayName               => '',
         maxLength               => 50,
         cnt                     => 0,
         callFn                  => ''
       },
       CHARGING                  => {
+        short                   => 'C',
         arrayName               => 'cspos',
         maxLength               => 100,
         cnt                     => 0,
         callFn                  => \&FHEM::Devices::AMConnect::Common::ChargingStationPosition
       },
       LEAVING                   => {
-        arrayName               => 'otherpos',
+        short                   => 'L',
+        arrayName               => '',
         maxLength               => 50,
         cnt                     => 0,
         callFn                  => ''
       },
       PARKED_IN_CS              => {
+        short                   => 'P',
         arrayName               => 'cspos',
         maxLength               => 100,
         cnt                     => 0,
         callFn                  => \&FHEM::Devices::AMConnect::Common::ChargingStationPosition
       },
       STOPPED_IN_GARDEN         => {
+        short                   => 'S',
         arrayName               => 'otherpos',
         maxLength               => 50,
         cnt                     => 0,
@@ -297,6 +310,10 @@ my $mapZonesTpl = '{
     }
 
   } elsif ( $type eq 'AutomowerConnectDevice' ) {
+
+  $hash->{HINWEIS1} = 'Dieses Modul nicht mehr verwenden, die Entwicklung ist eingestellt.';
+  $hash->{HINWEIS2} = 'Bestehende Instanzen muessen umgehend auf AutomowerConnect umgestellt werden.';
+  $hash->{HINWEIS3} = 'Für jedes Geraet ist ein extra Application Key zu verwenden.';
 
     RemoveInternalTimer($hash);
     InternalTimer( gettimeofday() + 25, \&readMap, $hash, 0);
@@ -438,7 +455,6 @@ sub FW_detailFn_Update {
 
     my @pos = @{ $hash->{helper}{areapos} };
     my @posc = @{ $hash->{helper}{cspos} };
-    my @posother = @{ $hash->{helper}{otherpos} };
     my @poserr = @{ $hash->{helper}{lasterror}{positions} };
    my $img = "./fhem/$type/$name/map";
 
@@ -474,23 +490,12 @@ sub FW_detailFn_Update {
     my $cslat = int(($latlo-$csla) * $picy / $mapy);
 
     # MOWING PATH
-    my $posxy = int($lonlo * $picx / $mapx).",".int($latlo * $picy / $mapy);
+    my $posxy = int( $lonlo * $picx / $mapx ).",".int( $latlo * $picy / $mapy );
     if ( @pos > 1 ) {
 
-      $posxy = int(($lonlo-$pos[0]{longitude}) * $picx / $mapx).",".int(($latlo-$pos[0]{latitude}) * $picy / $mapy);
+      $posxy = int( ( $lonlo-$pos[ 0 ]{longitude} ) * $picx / $mapx ).",".int( ( $latlo-$pos[ 0 ]{latitude} ) * $picy / $mapy ).",'".$pos[ 0 ]{act}."'";
       for (my $i=1;$i<@pos;$i++){
-        $posxy .= ",".int(($lonlo-$pos[$i]{longitude}) * $picx / $mapx).",".int(($latlo-$pos[$i]{latitude}) * $picy / $mapy);
-      }
-
-    }
-
-    # OTHER PATH
-    my $posoxy = int($lonlo * $picx / $mapx).",".int($latlo * $picy / $mapy);
-    if ( @posother > 1 ) {
-
-      $posoxy = int(($lonlo-$posother[0]{longitude}) * $picx / $mapx).",".int(($latlo-$posother[0]{latitude}) * $picy / $mapy);
-      for (my $i=1;$i<@posother;$i++){
-        $posoxy .= ",".int(($lonlo-$posother[$i]{longitude}) * $picx / $mapx).",".int(($latlo-$posother[$i]{latitude}) * $picy / $mapy);
+        $posxy .= ",".int( ( $lonlo - $pos[ $i ]{longitude} ) * $picx / $mapx ).",".int( ( $latlo - $pos[ $i ]{latitude} ) * $picy / $mapy ).",'".$pos[ $i ]{act}."'";
       }
 
     }
@@ -551,10 +556,10 @@ sub FW_detailFn_Update {
 
     my $erray = "$errlon,$errlat,$errx,$erry,$poserrxy";
     
-    # Log3 $name, 1, "AutomowerConnectUpdateDetail ( '$name', '$type', '$img', $picx, $picy, $cslon, $cslat, '$csimgpos', $scalx, '$errdesc', [ $posxy ], [ $limi ], [ $propli ], [ $poscxy ], [ $erray ] )";
+    # Log3 $name, 1, "AutomowerConnectUpdateDetail ( '$name', '$type', '$img', $picx, $picy, $cslon, $cslat, '$csimgpos', $scalx, '$errdesc', [ $posxy ], [ $limi ], [ $propli ], [ $erray ] )";
 
     map { 
-      ::FW_directNotify("#FHEMWEB:$_", "AutomowerConnectUpdateDetail ( '$name', '$type', '$img', $picx, $picy, $cslon, $cslat, '$csimgpos', $scalx, [ '$errdesc', '$errdate' ], [ $posxy ], [ $limi ], [ $propli ], [ $poscxy ], [ $erray ], [ $posoxy ] )","");
+      ::FW_directNotify("#FHEMWEB:$_", "AutomowerConnectUpdateDetail ( '$name', '$type', '$img', $picx, $picy, $cslon, $cslat, '$csimgpos', $scalx, [ '$errdesc', '$errdate' ], [ $posxy ], [ $limi ], [ $propli ], [ $erray ] )","");
     } devspec2array("TYPE=FHEMWEB");
   }
   return undef;
@@ -707,6 +712,9 @@ sub AlignArray {
       if ( $cnt > 0 ) {
 
         my @ar = @{ $hash->{helper}{mower}{attributes}{positions} }[ 0 .. $cnt-1 ];
+
+        map { $_->{act} = $hash->{helper}{$act}{short} } @ar;
+
         $tmp = dclone( \@ar );
 
         if ( @{ $hash->{helper}{areapos} } ) {
@@ -753,15 +761,6 @@ sub AlignArray {
 
           $tmp = dclone( \@ar );
           ChargingStationPosition ( $hash, $tmp, $cnt );
-
-        }
-
-        my $val = AttrVal($name, 'mowerActivityToHighLight', 0);
-
-        if ( $val && eval( "$val" ) ) {
-
-          $tmp = dclone( \@ar );
-          HighlightPath ( $hash, $tmp, $cnt );
 
         }
 
@@ -910,71 +909,6 @@ sub ZoneHandling {
 }
 
 #########################
-sub setCuttingHeight {
-  my ( $hash, $poshash, $cnt ) = @_;
-  my $name = $hash->{NAME};
-  my $zone = '';
-  my $nextzone = '';
-  my @pos = @$poshash;
-  my $longitude = 0;
-  my $latitude = 0;
-  my @zonekeys = sort (keys %{$hash->{helper}{mapZones}});
-  my $i = 0;
-  my $k = 0;
-
-  map{ $hash->{helper}{mapZones}{$_}{curZoneCnt} = 0 } @zonekeys;
-
-  for ( $i = 0; $i < $cnt; $i++){
-
-    $longitude = $pos[$i]{longitude};
-    $latitude = $pos[$i]{latitude};
-
-    for ( $k = 0; $k < @zonekeys-1; $k++){
-
-      if ( eval ("$hash->{helper}{mapZones}{$zonekeys[$k]}{condition}") ) {
-
-        if ( $hash->{helper}{mapZones}{$zonekeys[$k]}{curZoneCnt} == $i) { # find current zone and count consecutive way points
-
-          $hash->{helper}{mapZones}{$zonekeys[$k]}{curZoneCnt}++;
-          $hash->{helper}{currentZone} = $zonekeys[$k];
-
-        }
-
-        $hash->{helper}{mapZones}{$zonekeys[$k]}{zoneCnt}++;
-        $hash->{helper}{mapZones}{$zonekeys[$k]}{zoneLength} += calcPathLength( $hash, $i, $i + 1 );
-        last;
-
-      } elsif ( $k == @zonekeys-2 ) { # last zone
-
-        if ( $hash->{helper}{mapZones}{$zonekeys[$k+1]}{curZoneCnt} == $i) { # find current zone and count  consecutive way points
-
-          $hash->{helper}{mapZones}{$zonekeys[$k+1]}{curZoneCnt}++;
-          $hash->{helper}{currentZone} = $zonekeys[$k+1];
-
-        }
-
-        $hash->{helper}{mapZones}{$zonekeys[$k+1]}{zoneCnt}++;
-        $hash->{helper}{mapZones}{$zonekeys[$k+1]}{zoneLength} += calcPathLength( $hash, $i, $i + 1 );
-
-      }
-
-    }
-
-  }
-
-      my $sumDayCnt=0;
-      my $sumDayArea=0;
-      map { $sumDayCnt += $hash->{helper}{mapZones}{$_}{zoneCnt};
-            $hash->{helper}{mapZones}{$_}{currentDayCntPct} = ( $sumDayCnt ? sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{zoneCnt} / $sumDayCnt * 100 ) : 0 );
-            $sumDayArea += $hash->{helper}{mapZones}{$_}{zoneLength};
-            $hash->{helper}{mapZones}{$_}{currentDayAreaPct} = ( $sumDayArea ? sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{zoneLength} / $sumDayArea * 100 ) : 0 );
-      } @zonekeys;
-
-      $hash->{helper}{newzonedatasets} = $cnt;
-
-}
-
-#########################
 sub ChargingStationPosition {
   my ( $hash, $poshash, $cnt ) = @_;
   if ( $cnt && @{ $hash->{helper}{cspos} } ) {
@@ -1008,27 +942,6 @@ sub ChargingStationPosition {
   return undef;
 }
 
-
-#########################
-sub HighlightPath {
-  my ( $hash, $poshash, $cnt ) = @_;
-  if ( $cnt && @{ $hash->{helper}{otherpos} } ) {
-
-    unshift ( @{ $hash->{helper}{otherpos} }, @$poshash );
-
-  } elsif ( $cnt ) {
-
-    $hash->{helper}{otherpos} = $poshash;
-
-  }
-
-  while ( @{ $hash->{helper}{otherpos} } > $hash->{helper}{UNKNOWN}{maxLength} ) {
-
-      pop ( @{ $hash->{helper}{otherpos}} ); # reduce to max allowed length
-
-  }
-  return undef;
-}
 
 #########################
 sub calcPathLength {
@@ -1213,10 +1126,8 @@ sub fillReadings {
   my $connected = $hash->{helper}{mower}{attributes}{metadata}{connected};
   readingsBulkUpdateIfChanged($hash, $pref."_connected", ( $connected ? "CONNECTED($connected)"  : "OFFLINE($connected)") );
 
-  my $storediff = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
   readingsBulkUpdateIfChanged($hash, $pref."_Timestamp", FmtDateTime( $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp}/1000 ));
-  readingsBulkUpdateIfChanged($hash, $pref."_TimestampDiff", $storediff/1000 );
-  readingsBulkUpdateIfChanged($hash, $pref."_TimestampOld", FmtDateTime( $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp}/1000 ));
+  readingsBulkUpdateIfChanged($hash, $pref."_TimestampDiff", $hash->{helper}{storediff}/1000 );
 
   return undef;
 }
@@ -1474,9 +1385,6 @@ sub listInternalData {
   $arnr = scalar @{ $hash->{helper}{areapos} } if( scalar @{ $hash->{helper}{areapos} } > 2 );
   my $arnrmax = $hash->{helper}{MOWING}{maxLength};
 
-  my $ornr = scalar @{ $hash->{helper}{otherpos} };
-  my $ornrmax = $hash->{helper}{UNKNOWN}{maxLength};
-
   my $ernr = scalar @{ $hash->{helper}{lasterror}{positions} };
 
   $hash->{helper}{posMinMax} =~ /(-?\d*\.?\d+)\s(-?\d*\.?\d+)(\R|\s)(-?\d*\.?\d+)\s(-?\d*\.?\d+)/;
@@ -1484,7 +1392,7 @@ sub listInternalData {
   if ( $::init_done && $1 && $2 && $4 && $5 ) {
 
     $ret .= '<tr class="col_header"><td> Data Sets ( max )&emsp;</td><td> Corner </td><td> Longitude </td><td> Latitude </td></tr>';
-    $ret .= '<tr class="column odd"><td rowspan="2" style="vertical-align:middle;" > ' . ($csnr + $arnr) . ' ( ' . ($csnrmax + $arnrmax) . ' )&emsp;</td><td> Upper Left </td><td> ' . $1 . ' </td><td> ' . $2 . ' </td></tr>';
+    $ret .= '<tr class="column odd"><td rowspan="2" style="vertical-align:middle;" > ' . $arnr . ' ( ' . $arnrmax . ' )&emsp;</td><td> Upper Left </td><td> ' . $1 . ' </td><td> ' . $2 . ' </td></tr>';
     $ret .= '<tr class="column even"><td> Lower Right </td><td> ' . $4 . ' </td><td> ' . $5 . ' </td></tr>';
 
     $ret .= '</tbody></table><p>';
@@ -1498,12 +1406,9 @@ sub listInternalData {
     $ret .= '<table class="block wide">';
     $ret .= '<caption><b>Way Point Stacks</b></caption><tbody>'; 
 
-    $ret .= '<tr class="col_header"><td> Used For Action&emsp;</td><td> Stack Name&emsp;</td><td> Current Size&emsp;</td><td> Max Size&emsp;</td></tr>';
+    $ret .= '<tr class="col_header"><td> Used For Activities&emsp;</td><td> Stack Name&emsp;</td><td> Current Size&emsp;</td><td> Max Size&emsp;</td></tr>';
     $ret .= '<tr class="column odd"><td>PARKED_IN_CS, CHARGING&emsp;</td><td> cspos&emsp;</td><td> ' . $csnr . ' </td><td> ' . $csnrmax . '&emsp;</td></tr>';
-    $ret .= '<tr class="column even"><td>MOWING&emsp;</td><td> areapos&emsp;</td><td> ' . $arnr . ' </td><td> ' . $arnrmax . '&emsp;</td></tr>';
-    $ret .= '<tr class="column odd"><td>User defined activities&emsp;</td>
-             <td style="vertical-align:middle;" > otherpos&emsp;</td><td style="vertical-align:middle;" > ' . $ornr . ' </td>
-             <td style="vertical-align:middle;" > ' . $ornrmax . '&emsp;</td></tr>';
+    $ret .= '<tr class="column even"><td>ALL&emsp;</td><td> areapos&emsp;</td><td> ' . $arnr . ' </td><td> ' . $arnrmax . '&emsp;</td></tr>';
     $ret .= '<tr class="column even"><td>NOT_APPLICABLE with error time stamp&emsp;</td><td> lasterror/positions&emsp;</td><td> ' . $ernr . ' </td><td> -&emsp;</td></tr>';
 
     $ret .= '</tbody></table>';
