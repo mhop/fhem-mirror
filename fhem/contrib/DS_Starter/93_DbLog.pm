@@ -5480,7 +5480,7 @@ sub DbLog_SBP_Read {
                   }
                   
                   if ($hash->{HELPER}{SHUTDOWNSEQ} && $memcount) {
-                      Log3 ($name, 2, "DbLog $name - no connection to the database possible in the last database write cycle, export to file instead...");
+                      Log3 ($name, 2, "DbLog $name - an error occurred during the last write cycle to the database, the data is exported to a file instead ... ......");
                       
                       my $error = CommandSet (undef, qq{$name exportCache purgecache});
 
