@@ -5598,8 +5598,9 @@ attr DEVICE readingList INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
   INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
   INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
+  INVERTERLONG_ID/ch0/FWBuildHourMinute:.* FWBuildHourMinute\
   INVERTERLONG_ID/ch0/HWPartId:.* HWPartId\
-  INVERTERLONG_ID/ch0/PowerLimit:.* limit\
+  INVERTERLONG_ID/ch0/active_PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC\
   INVERTERLONG_ID/ch1/U_DC:.* U_DC\
@@ -5628,8 +5629,9 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
   INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
   INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
+  INVERTERLONG_ID/ch0/FWBuildHourMinute:.* FWBuildHourMinute\
   INVERTERLONG_ID/ch0/HWPartId:.* HWPartId\
-  INVERTERLONG_ID/ch0/PowerLimit:.* limit\
+  INVERTERLONG_ID/ch0/active_PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
   INVERTERLONG_ID/ch1/U_DC:.* U_DC1\
@@ -5667,8 +5669,9 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
   INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
   INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
+  INVERTERLONG_ID/ch0/FWBuildHourMinute:.* FWBuildHourMinute\
   INVERTERLONG_ID/ch0/HWPartId:.* HWPartId\
-  INVERTERLONG_ID/ch0/PowerLimit:.* limit\
+  INVERTERLONG_ID/ch0/active_PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
@@ -5701,7 +5704,7 @@ attr DEVICE setList \
   limit_pct:slider,2,1,100 BASE_ID/ctrl/limit/INVERTER_NR $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20230507
+setreading DEVICE attrTemplateVersion 20230517
 
 # contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
 name:hoymiles_opendtu_hub_bridge
