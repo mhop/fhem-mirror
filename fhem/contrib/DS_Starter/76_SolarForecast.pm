@@ -2638,7 +2638,7 @@ sub Attr {
       }
       
       if ($aName eq "ctrlUserExitFn") {
-          if($cmd eq "set") {
+          if($cmd eq "set" && $init_done) {
               if(!$aVal || $aVal !~ m/^\s*(\{.*\})\s*$/xs) {
                   return "Usage of $aName is wrong. The function has to be specified as \"{<your own code>}\" ";
               }
@@ -10693,9 +10693,6 @@ sub userExit {
   $uefn =~ s/\s*#.*//g;                                             # Kommentare entfernen
 
   my $r;
-
-  #$value   =~ s/\\/\\\\/g;                                          # escapen of chars for evaluation
-  #$value   =~ s/'/\\'/g;
 
   $uefn    =  join ' ', split(/\s+/sx, $uefn);                      # Funktion aus Attr ctrlUserExitFn serialisieren
 
