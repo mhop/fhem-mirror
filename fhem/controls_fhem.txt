@@ -1,6 +1,6 @@
-REV 27580
+REV 27586
 DIR unused
-UPD 2023-05-17_07:45:02 400464 ./CHANGED
+UPD 2023-05-18_07:45:03 400812 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2023-05-16_07:45:03 46553 ./MAINTAINER.txt
 UPD 2023-05-13_07:45:03 46691 ./configDB.pm
@@ -399,7 +399,7 @@ UPD 2019-12-20_07:45:03 89496 FHEM/73_PRESENCE.pm
 UPD 2022-11-14_07:45:07 130714 FHEM/73_WaterCalculator.pm
 UPD 2022-12-14_07:45:02 2562316 FHEM/73_km200.pm
 UPD 2023-04-11_07:45:03 69312 FHEM/74_AMADDevice.pm
-UPD 2023-05-13_07:45:03 72785 FHEM/74_AutomowerConnect.pm
+UPD 2023-05-18_07:45:03 69480 FHEM/74_AutomowerConnect.pm
 UPD 2022-07-02_07:45:03 66877 FHEM/74_GardenaSmartDevice.pm
 UPD 2018-03-22_07:45:04 41340 FHEM/74_HOMBOT.pm
 UPD 2019-04-17_07:45:02 34049 FHEM/74_HusqvarnaAutomower.pm
@@ -412,7 +412,7 @@ UPD 2022-02-05_07:45:02 24942 FHEM/74_UnifiProtect.pm
 UPD 2021-01-10_07:45:02 19703 FHEM/74_UnifiSwitch.pm
 UPD 2021-03-05_07:45:02 16135 FHEM/74_UnifiVideo.pm
 UPD 2022-01-21_07:45:03 54438 FHEM/74_XiaomiBTLESens.pm
-UPD 2023-05-13_07:45:03 61103 FHEM/75_AutomowerConnectDevice.pm
+UPD 2023-05-18_07:45:03 56213 FHEM/75_AutomowerConnectDevice.pm
 UPD 2023-01-20_07:45:03 114689 FHEM/75_MSG.pm
 UPD 2023-01-05_07:45:03 35265 FHEM/75_msgConfig.pm
 UPD 2016-08-22_07:45:11 9037 FHEM/76_MSGFile.pm
@@ -525,7 +525,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2021-03-28_07:45:04 28050 FHEM/98_WOL.pm
-UPD 2023-04-19_07:45:03 71612 FHEM/98_WeekdayTimer.pm
+UPD 2023-05-18_07:45:03 71615 FHEM/98_WeekdayTimer.pm
 UPD 2020-08-03_07:45:02 3963 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2019-05-27_07:45:02 12847 FHEM/98_apptime.pm
@@ -654,7 +654,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2022-01-15_07:45:03 10338 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2023-05-07_07:45:03 417508 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2023-05-18_07:45:03 417715 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2022-12-13_07:45:02 11263 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -745,12 +745,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2023-05-17_07:45:08 4892047 docs/commandref.html
-UPD 2023-05-17_07:45:11 2927495 docs/commandref_DE.html
+UPD 2023-05-18_07:45:09 4888349 docs/commandref.html
+UPD 2023-05-18_07:45:12 2923451 docs/commandref_DE.html
 UPD 2023-05-01_07:45:03 85822 docs/commandref_frame.html
 UPD 2023-05-01_07:45:03 96447 docs/commandref_frame_DE.html
-UPD 2023-05-17_07:45:12 306160 docs/commandref_modular.html
-UPD 2023-05-17_07:45:14 317924 docs/commandref_modular_DE.html
+UPD 2023-05-18_07:45:13 306032 docs/commandref_modular.html
+UPD 2023-05-18_07:45:14 317805 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -780,7 +780,7 @@ UPD 2021-05-26_07:45:02 6647 lib/FHEM/Core/Timer/Register.pm
 UPD 2021-04-26_07:45:03 8936 lib/FHEM/Core/Utils/FHEMbackup.pm
 UPD 2023-01-18_07:45:03 1432 lib/FHEM/Core/Utils/Math.pm
 UPD 2023-02-06_07:45:02 34302 lib/FHEM/Core/Weather.pm
-UPD 2023-05-13_07:45:03 72414 lib/FHEM/Devices/AMConnect/Common.pm
+UPD 2023-05-18_07:45:03 69258 lib/FHEM/Devices/AMConnect/Common.pm
 UPD 2023-05-16_07:45:03 55562 lib/FHEM/Devices/LGTV/LGTVWebOS.pm
 UPD 2022-09-27_07:45:03 42814 lib/FHEM/Devices/Nuki/Bridge.pm
 UPD 2021-12-18_07:45:03 16385 lib/FHEM/Devices/Nuki/Device.pm
@@ -2406,7 +2406,7 @@ UPD 2015-07-28_14:05:34 2865 www/jscolor/hv.png
 UPD 2015-07-28_14:05:34 29813 www/jscolor/jscolor.js
 UPD 2015-07-28_14:05:34 331 www/pgm2/RSS.js
 UPD 2018-09-24_07:45:03 12353 www/pgm2/alarm.js
-UPD 2023-04-26_07:45:03 8290 www/pgm2/automowerconnect.js
+UPD 2023-05-18_07:45:03 9149 www/pgm2/automowerconnect.js
 UPD 2018-05-11_07:45:02 13108 www/pgm2/babble.js
 UPD 2017-02-18_07:45:02 6202 www/pgm2/brightstyle.css
 UPD 2022-08-19_07:45:03 14783 www/pgm2/console.js
