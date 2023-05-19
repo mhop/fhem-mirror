@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-05-13 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-05-19 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.79.1" => "19.05.2023  extend debug solcastProcess, new key solcastAPIcall ",
   "0.79.0" => "13.05.2023  new consumer key locktime ",
   "0.78.2" => "11.05.2023  extend debug radiationProcess ",
   "0.78.1" => "08.05.2023  change default icon it_ups_on_battery to batterie ",
@@ -437,6 +438,7 @@ my @dd           = qw( none
                        radiationProcess
                        saveData2Cache
                        solcastProcess
+                       solcastAPIcall
                      );
 
 # Steuerhashes
@@ -2176,7 +2178,7 @@ sub __solCast_ApiRequest {
             "&api_key=".
             $apikey;
 
-  if($debug =~ /solcastProcess/x) {                                                                   # nur für Debugging
+  if($debug =~ /solcastProcess|solcastAPIcall/x) {                                                                   # nur für Debugging
       Log3 ($name, 1, qq{$name DEBUG> Request SolCast API for string "$string": $url});
   }
 
@@ -2208,16 +2210,20 @@ sub __solCast_ApiResponse {
   my $err        = shift;
   my $myjson     = shift;
 
-  my $hash       = $paref->{hash};
-  my $name       = $hash->{NAME};
-  my $caller     = $paref->{caller};
-  my $string     = $paref->{string};
-  my $allstrings = $paref->{allstrings};
-  my $stc        = $paref->{stc};                                                                          # Startzeit API Abruf
-  my $lang       = $paref->{lang};
+  my $hash        = $paref->{hash};
+  my $name        = $hash->{NAME};
+  my $caller      = $paref->{caller};
+  my $string      = $paref->{string};
+  my $allstrings  = $paref->{allstrings};
+  my $stc         = $paref->{stc};                                                                          # Startzeit API Abruf
+  my $lang        = $paref->{lang};
   
-  my $type       = $hash->{TYPE};
-  my $t          = time;
+  my $type        = $hash->{TYPE};
+  
+  my $debug       = AttrVal ($name, 'ctrlDebug', 'none');
+  
+  $paref->{debug} = $debug;
+  $paref->{t}     = time;
 
   my $msg;
 
@@ -2252,7 +2258,6 @@ sub __solCast_ApiResponse {
       }
 
       my $jdata = decode_json ($myjson);
-      my $debug = AttrVal     ($name, 'ctrlDebug', 'none');
 
       if($debug =~ /solcastProcess/x) {                                                                                         # nur für Debugging
           Log3 ($name, 1, qq{$name DEBUG> SolCast API server response for string "$string":\n}. Dumper $jdata);
@@ -2271,7 +2276,7 @@ sub __solCast_ApiResponse {
 
           Log3 ($name, 3, "$name - $msg");
 
-          ___setLastAPIcallKeyData ($hash, $lang, $t);
+          ___setLastAPIcallKeyData ($paref);
 
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $jdata->{'response_status'}{'message'};
 
@@ -2352,7 +2357,7 @@ sub __solCast_ApiResponse {
 
   Log3 ($name, 4, qq{$name - SolCast API answer received for string "$string"});
 
-  ___setLastAPIcallKeyData ($hash, $lang, $t);
+  ___setLastAPIcallKeyData ($paref);
 
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'success';
 
@@ -2418,12 +2423,15 @@ return ($err, $starttmstr);
 #  $t - Unix Timestamp
 ################################################################
 sub ___setLastAPIcallKeyData {
-  my $hash = shift;
-  my $lang = shift;
-  my $t    = shift // time;
+  my $paref = shift;
+  
+  my $hash  = $paref->{hash};                                                                   
+  my $lang  = $paref->{lang};
+  my $debug = $paref->{debug};
+  my $t     = $paref->{t} // time;
 
-  my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};
+  my $name  = $hash->{NAME};    
+  my $type  = $hash->{TYPE};
 
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];   # letzte Abrufzeit
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                       # letzter Abrufzeitstempel
@@ -2442,6 +2450,10 @@ sub ___setLastAPIcallKeyData {
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests} = $drr;
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIcalls}    = $drc;
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}         = $ddc;
+  
+  if($debug =~ /solcastProcess|solcastAPIcall/x) {                                                                                  
+      Log3 ($name, 1, "$name DEBUG> SolCast API Call - done API Calls: $ddc");
+  }
 
   ## Berechnung des optimalen Request Intervalls
   ################################################
@@ -2455,7 +2467,9 @@ sub ___setLastAPIcallKeyData {
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $apirepetdef;
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = int ($dart / $drc) if($dart && $drc);
 
-      # Log3 ($name, 1, qq{$name - madr: $madr, drc: $drc, dart: $dart, interval: }. SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', ""));
+      if($debug =~ /solcastProcess|solcastAPIcall/x) {                                                                                  
+          Log3 ($name, 1, "$name DEBUG> SolCast API Call - Sunset: $sstime, remain Sec to Sunset: $dart, new calc interval: ".SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $apirepetdef));
+      }
   }
   else {
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $apirepetdef;
@@ -2464,6 +2478,11 @@ sub ___setLastAPIcallKeyData {
   ####
 
   my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $apirepetdef);
+  
+  if($debug =~ /solcastProcess|solcastAPIcall/x) {  
+      Log3 ($name, 1, "$name DEBUG> SolCast API Call - remaining API Calls: $drc");
+      Log3 ($name, 1, "$name DEBUG> SolCast API Call - next API Call: ".(timestampToTimestring ($t + $apiitv, $lang))[0]);
+  }
 
   readingsSingleUpdate ($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
 
@@ -12167,6 +12186,7 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td> <b>radiationProcess</b>   </td><td>Sammlung und Verarbeitung der Solarstrahlungsdaten             </td></tr>
             <tr><td> <b>saveData2Cache</b>     </td><td>Datenspeicherung in internen Speicherstrukturen                </td></tr>
             <tr><td> <b>solcastProcess</b>     </td><td>Abruf und Verarbeitung von SolCast API Daten                   </td></tr>
+            <tr><td> <b>solcastAPIcall</b>     </td><td>Aufruf SolCast API Schnittstelle ohne Daten                    </td></tr>
          </table>
          </ul>
        </li>
