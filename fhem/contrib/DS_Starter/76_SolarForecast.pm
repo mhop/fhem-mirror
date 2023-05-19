@@ -2112,6 +2112,7 @@ sub _getRoofTopData {
   ## statische SolCast API Kennzahlen bereitstellen
   ###################################################
   my %seen;
+  my $debug  = AttrVal ($name, 'ctrlDebug', 'none');
   my @as     = map { $data{$type}{$name}{solcastapi}{'?IdPair'}{$_}{apikey}; } keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}};
   my @unique = grep { !$seen{$_}++ } @as;
   my $upc    = scalar @unique;                                                                      # Anzahl unique API Keys
@@ -2123,6 +2124,13 @@ sub _getRoofTopData {
 
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{solCastAPIcallMultiplier}  = $mpk;
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayMaxAPIcalls}          = $madr;
+  
+  if($debug =~ /solcastAPIcall/x) {        
+      Log3 ($name, 1, "$name DEBUG> SolCast API Call - count unique API Keys: $upc");  
+      Log3 ($name, 1, "$name DEBUG> SolCast API Call - all strings count: $asc");
+      Log3 ($name, 1, "$name DEBUG> SolCast API Call - max possible daily API calls: $asc");
+      Log3 ($name, 1, "$name DEBUG> SolCast API Call - Requestmultiplier: $mpk");
+  }
 
   ##
 
