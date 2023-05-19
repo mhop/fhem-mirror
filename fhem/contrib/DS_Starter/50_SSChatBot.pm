@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.15.0" => "19.05.2023  Test ",
   "1.14.0" => "08.04.2023  prepared for new Setter deletePostId, loglevel for HttpUtils ",
   "1.13.0" => "14.01.2023  new attr spareHost, sparePort ",
   "1.12.1" => "28.11.2020  fix cannot send after received anything, fix greedy regex in _botCGIcheckData ",
@@ -1130,20 +1131,20 @@ sub chatOp {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout: $httptimeout s");
 
    if ($opmode =~ /^chatUserlist$|^chatChannellist$/x) {
-      $url = "$inprot://$inaddr:$inport/webapi/$extapipath?api=$extapi&version=$exapiver&method=$method&token=\"$token\"";
+      $url = qq($inprot://$inaddr:$inport/webapi/$extapipath?api=$extapi&version=$exapiver&method=$method&token="$token");
    }
    elsif ($opmode eq 'sendItem') {
       # Form: payload={"text": "a fun image", "file_url": "http://imgur.com/xxxxx" "user_ids": [5]} 
       #       payload={"text": "First line of message to post in the channel" "user_ids": [5]}
       #       payload={"text": "Check this!! <https://www.synology.com|Click here> for details!" "user_ids": [5]}
       
-      $url  = "$inprot://$inaddr:$inport/webapi/$extapipath?api=$extapi&version=$exapiver&method=$method&token=\"$token\"";
-      $url .= "&payload={";
-      $url .= "\"text\": \"$text\","          if($text);
-      $url .= "\"file_url\": \"$fileUrl\","   if($fileUrl);
-      $url .= "\"attachments\": $attachment," if($attachment);
-      $url .= "\"user_ids\": [$userid]"       if($userid);
-      $url .= "}";
+      $url  = qq($inprot://$inaddr:$inport/webapi/$extapipath?api=$extapi&version=$exapiver&method=$method&token="$token");
+      $url .= qq(&payload={);
+      $url .= qq("text": "$text",)            if($text);
+      $url .= qq("file_url": "$fileUrl",)     if($fileUrl);
+      $url .= qq("attachments": $attachment,) if($attachment);
+      $url .= qq("user_ids": [$userid])       if($userid);
+      $url .= qq(});
    }
    elsif ($opmode eq 'delPostId') {
        $method    = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{method};
@@ -1156,7 +1157,7 @@ sub chatOp {
    else {
        return;
    }
-
+   
    my $part = $url;
    
    if(AttrVal($name, "showTokenInLog", "0") == 1) {
@@ -1166,6 +1167,8 @@ sub chatOp {
        $part =~ s/$token/<secret>/x;
        Log3 ($name, 4, "$name - Call-Out >$humethod<: $part");
    }
+   
+   $url = formString ($url, 'url');
    
    $param = {
        url      => $url,
@@ -1482,7 +1485,13 @@ sub formString {
   my $func = shift;
   my ($replacements,$pat);
     
-  if($func ne "attachement") {
+  if ($func eq 'url') {
+      $replacements = {
+          '"' => "%22",
+          " " => "%20",
+      }
+  }
+  elsif ($func ne 'attachement') {
       $replacements = {
           '"'       => "´",                         # doppelte Hochkomma sind im Text nicht erlaubt
           " H"      => "%20H",                      # Bug in HttpUtils(?) wenn vor großem H ein Zeichen + Leerzeichen vorangeht
