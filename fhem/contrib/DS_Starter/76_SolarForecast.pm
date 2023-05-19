@@ -2128,7 +2128,7 @@ sub _getRoofTopData {
   if($debug =~ /solcastAPIcall/x) {        
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - count unique API Keys: $upc");  
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - all strings count: $asc");
-      Log3 ($name, 1, "$name DEBUG> SolCast API Call - max possible daily API calls: $asc");
+      Log3 ($name, 1, "$name DEBUG> SolCast API Call - max possible daily API calls: $madr");
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - Requestmultiplier: $mpk");
   }
 
