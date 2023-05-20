@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  75_AutomowerConnectDevice: deleted,
+               change definition to AutomowerConnect before updating, 
+               use different application key each definition
  - change:  50_SSChatBot: support of loglevel in HttpUtils
  - change:  75_AutomowerConnectDevice: last revision, declared deprecated
             will be removed soon, change definition to AutomowerConnect
