@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  50_SSChatBot: compatibility to DSM starting with DSM 7.2 RC, 
+                          Forum: https://forum.fhem.de/index.php?msg=1276303
  - change:  75_AutomowerConnectDevice: deleted,
                change definition to AutomowerConnect before updating, 
                use different application key each definition
