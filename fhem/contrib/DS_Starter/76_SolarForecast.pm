@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-05-19 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-05-21 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.79.2" => "21.05.2023  change process to calculate solCastAPIcallMultiplier, todayMaxAPIcalls ",
   "0.79.1" => "19.05.2023  extend debug solcastProcess, new key solcastAPIcall ",
   "0.79.0" => "13.05.2023  new consumer key locktime ",
   "0.78.2" => "11.05.2023  extend debug radiationProcess ",
@@ -1301,7 +1302,7 @@ sub _setmoduleRoofTops {                ## no critic "not used"
   }
 
   readingsSingleUpdate ($hash, "moduleRoofTops", $arg, 1);
-  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
+  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
 
   return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
 
@@ -2043,9 +2044,9 @@ sub Get {
           return qq{Credentials of $name are not set."};
       }
 
-      $params->{force} = 1 if($opt eq 'roofTopData');
+      $params->{force} = 1 if($opt eq 'roofTopData');                       # forcierter (manueller) Abruf SolCast API
 
-      $ret = &{$hget{$opt}{fn}} ($params);                              # forcierter (manueller) Abruf SolCast API
+      $ret = &{$hget{$opt}{fn}} ($params);                              
       return $ret;
   }
 
@@ -2109,30 +2110,38 @@ sub _getRoofTopData {
 
   my $type = $hash->{TYPE};
 
-  ## statische SolCast API Kennzahlen bereitstellen
-  ###################################################
+  ## statische SolCast API Kennzahlen 
+  ## (solCastAPIcallMultiplier, todayMaxAPIcalls) berechnen
+  ##########################################################
   my %seen;
   my $debug  = AttrVal ($name, 'ctrlDebug', 'none');
-  my @as     = map { $data{$type}{$name}{solcastapi}{'?IdPair'}{$_}{apikey}; } keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}};
-  my @unique = grep { !$seen{$_}++ } @as;
-  my $upc    = scalar @unique;                                                                      # Anzahl unique API Keys
 
-  my $asc       = CurrentVal ($hash, 'allstringscount', 1);                                         # Anzahl der Strings
-  my $apimaxreq = AttrVal    ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
-  my $madr      = sprintf "%.0f", (($apimaxreq / $asc) * $upc);                                     # max. tägliche Anzahl API Calls
-  my $mpk       = sprintf "%.4f", ($apimaxreq / $madr);                                             # Requestmultiplikator
-
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{solCastAPIcallMultiplier}  = $mpk;
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayMaxAPIcalls}          = $madr;
+  my %mx;
+  my $maxcnt;
   
-  if($debug =~ /solcastAPIcall/x) {        
-      Log3 ($name, 1, "$name DEBUG> SolCast API Call - count unique API Keys: $upc");  
-      Log3 ($name, 1, "$name DEBUG> SolCast API Call - all strings count: $asc");
-      Log3 ($name, 1, "$name DEBUG> SolCast API Call - max possible daily API calls: $madr");
-      Log3 ($name, 1, "$name DEBUG> SolCast API Call - Requestmultiplier: $mpk");
+  for my $pk (keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}}) {
+      my $apikey = SolCastAPIVal ($hash, '?IdPair', $pk, 'apikey', '');
+      next if(!$apikey);
+      
+      $mx{$apikey} += 1;
+      $maxcnt       = $mx{$apikey} if(!$maxcnt || $mx{$apikey} > $maxcnt);
   }
 
-  ##
+  my $asc       = CurrentVal ($hash, 'allstringscount', 1);                                   # Anzahl der Strings
+  my $apimaxreq = AttrVal    ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
+  my $madc      = sprintf "%.0f", ($apimaxreq / $maxcnt);                                     # max. tägliche Anzahl API Calls
+  my $mpk       = $maxcnt // 1;                                                               # Requestmultiplikator
+
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{solCastAPIcallMultiplier}  = $mpk;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayMaxAPIcalls}          = $madc;
+  
+  if($debug =~ /solcastAPIcall/x) {          
+      Log3 ($name, 1, "$name DEBUG> SolCast API Call - max possible daily API requests: $apimaxreq");
+      Log3 ($name, 1, "$name DEBUG> SolCast API Call - Requestmultiplier: $mpk");
+      Log3 ($name, 1, "$name DEBUG> SolCast API Call - possible daily API Calls: $madc");
+  }
+
+  #########################
 
   $paref->{allstrings} = ReadingsVal($name, 'inverterStrings', '');
   $paref->{lang}       = $lang;
@@ -2285,6 +2294,10 @@ sub __solCast_ApiResponse {
           Log3 ($name, 3, "$name - $msg");
 
           ___setLastAPIcallKeyData ($paref);
+          
+          if($debug =~ /solcastAPIcall/x) {        
+              Log3 ($name, 1, "$name DEBUG> SolCast API Call - response status: ".$jdata->{'response_status'}{'message'});
+          }
 
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $jdata->{'response_status'}{'message'};
 
@@ -2476,7 +2489,7 @@ sub ___setLastAPIcallKeyData {
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = int ($dart / $drc) if($dart && $drc);
 
       if($debug =~ /solcastProcess|solcastAPIcall/x) {                                                                                  
-          Log3 ($name, 1, "$name DEBUG> SolCast API Call - Sunset: $sstime, remain Sec to Sunset: $dart, new calc interval: ".SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $apirepetdef));
+          Log3 ($name, 1, "$name DEBUG> SolCast API Call - Sunset: $sstime, remain Sec to Sunset: $dart, new interval: ".SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $apirepetdef));
       }
   }
   else {
