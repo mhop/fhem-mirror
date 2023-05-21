@@ -12327,7 +12327,7 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td> <b>SunHours_Remain</b>           </td><td>die verbleibenden Stunden bis Sonnenuntergang des aktuellen Tages                                  </td></tr>
             <tr><td> <b>todayDoneAPIcalls</b>         </td><td>die Anzahl der am aktuellen Tag ausgeführten SolCast API Calls (nur Model SolCastAPI)              </td></tr>
             <tr><td> <b>todayDoneAPIrequests</b>      </td><td>die Anzahl der am aktuellen Tag ausgeführten SolCast API Requests (nur Model SolCastAPI)           </td></tr>
-            <tr><td> <b>todayGridFeedIn</b>           </td><td>die in das öffentliche Netz eingespeiste PV Leistung des aktuellen Tages                           </td></tr>
+            <tr><td> <b>todayGridFeedIn</b>           </td><td>die in das öffentliche Netz eingespeiste PV Energie des aktuellen Tages                            </td></tr>
             <tr><td> <b>todayMaxAPIcalls</b>          </td><td>die maximal mögliche Anzahl SolCast API Calls (nur Model SolCastAPI).                              </td></tr>
             <tr><td>                                  </td><td>Ein Call kann mehrere API Requests enthalten.                                                      </td></tr>
             <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Calls (nur Model SolCastAPI)            </td></tr>
