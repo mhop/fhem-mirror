@@ -2295,7 +2295,7 @@ sub __solCast_ApiResponse {
 
           ___setLastAPIcallKeyData ($paref);
           
-          if($debug =~ /solcastAPIcall/x) {        
+          if($debug =~ /solcastProcess|solcastAPIcall/x) {      
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - response status: ".$jdata->{'response_status'}{'message'});
           }
 
