@@ -9603,12 +9603,16 @@ sub listDataPool {
 
           my $cfq = qq{};
           if(ref $quality eq "HASH") {
+              no warnings 'numeric';
+              
               for my $q (sort {$a<=>$b} keys %{$h->{$idx}{quality}}) {
                   $cfq   .= " " if($cfq);
                   $cfq   .= "$q=".$h->{$idx}{quality}{$q};
                   my $ct1 = ($cfq =~ tr/=// // 0) / 10;
                   $cfq   .= "\n              " if($ct1 =~ /^([1-9])?$/);
               }
+              
+              use warnings;
           }
           else {
               $cfq = $quality;
@@ -9625,7 +9629,8 @@ sub listDataPool {
           }
           else {
               $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn\n";
-              $sq .= "      feedintotal: $fitot, initdayfeedin: $idfi, gridcontotal: $gcontot, initdaygcon: $idgcon";
+              $sq .= "      feedintotal: $fitot, initdayfeedin: $idfi\n";
+              $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon";
           }
       }
   }
