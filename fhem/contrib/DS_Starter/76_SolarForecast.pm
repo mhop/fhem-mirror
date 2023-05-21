@@ -136,8 +136,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.79.3" => "21.05.2023  new CircularVal initdayfeedin, deactivate \$hash->{HELPER}{INITFEEDTOTAL} ".
-                           "new statistic Reading statistic_todayGridFeedIn ",
+  "0.79.3" => "21.05.2023  new CircularVal initdayfeedin, deactivate \$hash->{HELPER}{INITFEEDTOTAL}, \$hash->{HELPER}{INITCONTOTAL} ".
+                           "new statistic Readings statistic_todayGridFeedIn, statistic_todayGridConsumption ",
   "0.79.2" => "21.05.2023  change process to calculate solCastAPIcallMultiplier, todayMaxAPIcalls ",
   "0.79.1" => "19.05.2023  extend debug solcastProcess, new key solcastAPIcall ",
   "0.79.0" => "13.05.2023  new consumer key locktime ",
@@ -813,6 +813,7 @@ my %hcsr = (                                                                    
   SunHours_Remain            => { fnr => 3, fn => \&CurrentVal,    par => '', def => 0           },      # fnr => 3 -> Custom Calc
   SunMinutes_Remain          => { fnr => 3, fn => \&CurrentVal,    par => '', def => 0           },
   todayGridFeedIn            => { fnr => 3, fn => \&CircularVal,   par => 99, def => 0           },
+  todayGridConsumption       => { fnr => 3, fn => \&CircularVal,   par => 99, def => 0           },
 );
 
 # Information zu verwendeten internen Datenhashes
@@ -1868,9 +1869,11 @@ sub _setreset {                          ## no critic "not used"
   if($prop eq "currentMeterDev") {
       readingsDelete($hash, "Current_GridConsumption");
       readingsDelete($hash, "Current_GridFeedIn");
-      delete $hash->{HELPER}{INITCONTOTAL};
+      # delete $hash->{HELPER}{INITCONTOTAL};
       # delete $hash->{HELPER}{INITFEEDTOTAL};
       delete $data{$type}{$name}{circular}{99}{initdayfeedin};
+      delete $data{$type}{$name}{circular}{99}{gridcontotal};
+      delete $data{$type}{$name}{circular}{99}{initdaygcon};
       delete $data{$type}{$name}{circular}{99}{feedintotal};
       delete $data{$type}{$name}{current}{gridconsumption};
       delete $data{$type}{$name}{current}{tomorrowconsumption};
@@ -2492,7 +2495,8 @@ sub ___setLastAPIcallKeyData {
   ################################################
   if (AttrVal($name, 'ctrlSolCastAPIoptimizeReq', 0)) {
       my $date   = strftime "%Y-%m-%d", localtime($t);
-      my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
+      my $sunset = $date.' '.ReadingsVal ($name, "Today_SunSet", '00:00').':00';
+      my $sstime = timestringToTimestamp ($sunset);
       my $dart   = $sstime - $t;                                                                                    # verbleibende Sekunden bis Sonnenuntergang
       $dart      = 0 if($dart < 0);
       $drc      += 1;                                                                                               
@@ -2501,7 +2505,7 @@ sub ___setLastAPIcallKeyData {
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = int ($dart / $drc) if($dart && $drc);
 
       if($debug =~ /solcastProcess|solcastAPIcall/x) {                                                                                  
-          Log3 ($name, 1, "$name DEBUG> SolCast API Call - Sunset: $sstime, remain Sec to Sunset: $dart, new interval: ".SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $apirepetdef));
+          Log3 ($name, 1, "$name DEBUG> SolCast API Call - Sunset: $sunset, remain Sec to Sunset: $dart, new interval: ".SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $apirepetdef));
       }
   }
   else {
@@ -3524,7 +3528,7 @@ sub _specialActivities {
               }
           }
 
-          delete $hash->{HELPER}{INITCONTOTAL};
+          # delete $hash->{HELPER}{INITCONTOTAL};
           # delete $hash->{HELPER}{INITFEEDTOTAL};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
@@ -3532,6 +3536,7 @@ sub _specialActivities {
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIcalls};
           
           delete $data{$type}{$name}{circular}{99}{initdayfeedin};
+          delete $data{$type}{$name}{circular}{99}{initdaygcon};
           delete $data{$type}{$name}{current}{sunriseToday};
           delete $data{$type}{$name}{current}{sunriseTodayTs};
           delete $data{$type}{$name}{current}{sunsetToday};
@@ -4525,7 +4530,8 @@ sub _transferMeterValues {
   my $ftuf    = $ftunit =~ /^kWh$/xi ? 1000 : 1;
   my $fitotal = ReadingsNum ($medev, $ft, 0) * $ftuf;                                                # Einspeisung total (Wh)
   
-  $data{$type}{$name}{circular}{99}{feedintotal} = $fitotal;                                         # Total Feedin speichern
+  $data{$type}{$name}{circular}{99}{gridcontotal} = $gctotal;                                        # Total Netzbezug speichern
+  $data{$type}{$name}{circular}{99}{feedintotal}  = $fitotal;                                        # Total Feedin speichern
   
   my $debug = $paref->{debug};
   if($debug =~ /collectData/x) {
@@ -4544,22 +4550,24 @@ sub _transferMeterValues {
   my $docon = 0;
   
   if ($gcdaypast == 0) {                                                                             # Management der Stundenberechnung auf Basis Totalwerte GridConsumtion
-      if (defined $hash->{HELPER}{INITCONTOTAL}) {
+      if (defined CircularVal ($hash, 99, 'initdaygcon', undef)) {
           $docon = 1;
       }
       else {
-          $hash->{HELPER}{INITCONTOTAL} = $gctotal;
+          # $hash->{HELPER}{INITCONTOTAL}                 = $gctotal;
+          $data{$type}{$name}{circular}{99}{initdaygcon} = $gctotal;
       }
   }
-  elsif (!defined $hash->{HELPER}{INITCONTOTAL}) {
-      $hash->{HELPER}{INITCONTOTAL} = $gctotal-$gcdaypast-ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
+  elsif (!defined CircularVal ($hash, 99, 'initdaygcon', undef)) {
+      # $hash->{HELPER}{INITCONTOTAL}                  = $gctotal-$gcdaypast-ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
+      $data{$type}{$name}{circular}{99}{initdaygcon} = $gctotal-$gcdaypast-ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
   }
   else {
       $docon = 1;
   }
 
   if ($docon) {
-      my $gctotthishour = int ($gctotal - ($gcdaypast + $hash->{HELPER}{INITCONTOTAL}));
+      my $gctotthishour = int ($gctotal - ($gcdaypast + CircularVal ($hash, 99, 'initdaygcon', 0)));
 
       if($gctotthishour < 0) {
           $gctotthishour = 0;
@@ -6543,6 +6551,15 @@ sub genStatisticReadings {
               
               push @$daref, 'statistic_'.$kpi.'<>'. (sprintf "%.1f", $dfi).' Wh';
           }
+ 
+          if ($kpi eq 'todayGridConsumption') {
+              my $idgcon = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaygcon',  $def);         # initialer Tagesstartwert
+              my $cgcon  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'gridcontotal', $def);         # aktuelles total Netzbezug           
+          
+              my $dgcon  = $cgcon - $idgcon;
+              
+              push @$daref, 'statistic_'.$kpi.'<>'. (sprintf "%.1f", $dgcon).' Wh';
+          } 
       }
   }
 
@@ -9566,7 +9583,10 @@ sub listDataPool {
           my $batout   = CircularVal ($hash, $idx, "batout",        "-");
           my $tdayDvtn = CircularVal ($hash, $idx, "tdayDvtn",      "-");
           my $ydayDvtn = CircularVal ($hash, $idx, "ydayDvtn",      "-");
+          my $fitot    = CircularVal ($hash, $idx, "feedintotal",   "-");
           my $idfi     = CircularVal ($hash, $idx, "initdayfeedin", "-");
+          my $gcontot  = CircularVal ($hash, $idx, "gridcontotal",  "-");
+          my $idgcon   = CircularVal ($hash, $idx, "initdaygcon",   "-");
 
           my $pvcf = qq{};
           if(ref $pvcorrf eq "HASH") {
@@ -9604,7 +9624,8 @@ sub listDataPool {
               $sq .= "      quality: $cfq";
           }
           else {
-              $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn, initdayfeedin: $idfi";
+              $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn\n";
+              $sq .= "      feedintotal: $fitot, initdayfeedin: $idfi, gridcontotal: $gcontot, initdaygcon: $idgcon";
           }
       }
   }
@@ -10853,6 +10874,9 @@ return $def;
 #             tdayDvtn       - heutige Abweichung PV Prognose/Erzeugung in %
 #             ydayDvtn       - gestrige Abweichung PV Prognose/Erzeugung in %
 #             initdayfeedin  - initialer Wert für "gridfeedin" zu Beginn des Tages (Wh)
+#             feedintotal    - Einspeisung PV Energie total (Wh)
+#             initdaygcon    - initialer Wert für "gcon" zu Beginn des Tages (Wh)
+#             gridcontotal   - Netzbetug total (Wh)
 #
 #    $def: Defaultwert
 #
@@ -11876,7 +11900,10 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td> <b>quality</b>       </td><td>Qualität der Autokorrekturfaktoren (max. 30), höhere Werte = höhere Qualität                                       </td></tr>
             <tr><td> <b>tdayDvtn</b>      </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                      </td></tr>
             <tr><td> <b>ydayDvtn</b>      </td><td>gestrige Abweichung PV Prognose/Erzeugung in %                                                                     </td></tr>
+            <tr><td> <b>feedintotal</b>   </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                         </td></tr>
             <tr><td> <b>initdayfeedin</b> </td><td>initialer PV Einspeisewert zu Beginn des aktuellen Tages (Wh)                                                      </td></tr>
+            <tr><td> <b>gridcontotal</b>  </td><td>vom öffentlichen Netz total bezogene Energie (Wh)                                                                  </td></tr>
+            <tr><td> <b>initdaygcon</b>   </td><td>initialer Netzbezugswert zu Beginn des aktuellen Tages (Wh)                                                        </td></tr>
          </table>
       </ul>
 
@@ -12327,6 +12354,7 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td> <b>SunHours_Remain</b>           </td><td>die verbleibenden Stunden bis Sonnenuntergang des aktuellen Tages                                  </td></tr>
             <tr><td> <b>todayDoneAPIcalls</b>         </td><td>die Anzahl der am aktuellen Tag ausgeführten SolCast API Calls (nur Model SolCastAPI)              </td></tr>
             <tr><td> <b>todayDoneAPIrequests</b>      </td><td>die Anzahl der am aktuellen Tag ausgeführten SolCast API Requests (nur Model SolCastAPI)           </td></tr>
+            <tr><td> <b>todayGridConsumption</b>      </td><td>die aus dem öffentlichen Netz bezogene Energie des aktuellen Tages                                 </td></tr>
             <tr><td> <b>todayGridFeedIn</b>           </td><td>die in das öffentliche Netz eingespeiste PV Energie des aktuellen Tages                            </td></tr>
             <tr><td> <b>todayMaxAPIcalls</b>          </td><td>die maximal mögliche Anzahl SolCast API Calls (nur Model SolCastAPI).                              </td></tr>
             <tr><td>                                  </td><td>Ein Call kann mehrere API Requests enthalten.                                                      </td></tr>
