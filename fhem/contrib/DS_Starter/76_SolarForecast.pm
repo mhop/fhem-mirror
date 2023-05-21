@@ -136,6 +136,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.79.3" => "21.05.2023  new CircularVal initdayfeedin, deactivate \$hash->{HELPER}{INITFEEDTOTAL} ".
+                           "new statistic Reading statistic_todayGridFeedIn ",
   "0.79.2" => "21.05.2023  change process to calculate solCastAPIcallMultiplier, todayMaxAPIcalls ",
   "0.79.1" => "19.05.2023  extend debug solcastProcess, new key solcastAPIcall ",
   "0.79.0" => "13.05.2023  new consumer key locktime ",
@@ -794,22 +796,23 @@ my %hef = (                                                                     
   "washingmachine" => { f => 0.50, m => 0.30, l => 0.40, mt => 120         },
 );
 
-my %hcsr = (                                                                                  # Funktiontemplate zur Erstellung optionaler Statistikreadings
-  currentAPIinterval         => { fnr => 1, fn => \&SolCastAPIVal, def => 0           },
-  lastretrieval_time         => { fnr => 1, fn => \&SolCastAPIVal, def => '-'         },
-  lastretrieval_timestamp    => { fnr => 1, fn => \&SolCastAPIVal, def => '-'         },
-  response_message           => { fnr => 1, fn => \&SolCastAPIVal, def => '-'         },
-  todayMaxAPIcalls           => { fnr => 1, fn => \&SolCastAPIVal, def => 'apimaxreq' },
-  todayDoneAPIcalls          => { fnr => 1, fn => \&SolCastAPIVal, def => 0           },
-  todayDoneAPIrequests       => { fnr => 1, fn => \&SolCastAPIVal, def => 0           },
-  todayRemainingAPIcalls     => { fnr => 1, fn => \&SolCastAPIVal, def => 'apimaxreq' },
-  todayRemainingAPIrequests  => { fnr => 1, fn => \&SolCastAPIVal, def => 'apimaxreq' },
-  runTimeCentralTask         => { fnr => 2, fn => \&CurrentVal,    def => '-'         },
-  runTimeLastAPIAnswer       => { fnr => 2, fn => \&CurrentVal,    def => '-'         },
-  runTimeLastAPIProc         => { fnr => 2, fn => \&CurrentVal,    def => '-'         },
-  allStringsFullfilled       => { fnr => 2, fn => \&CurrentVal,    def => 0           },
-  SunHours_Remain            => { fnr => 3, fn => \&CurrentVal,    def => 0           },      # fnr => 3 -> Custom Calc
-  SunMinutes_Remain          => { fnr => 3, fn => \&CurrentVal,    def => 0           },
+my %hcsr = (                                                                                             # Funktiontemplate zur Erstellung optionaler Statistikreadings
+  currentAPIinterval         => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => 0           },      # par = Parameter zur spezifischen Verwendung
+  lastretrieval_time         => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => '-'         },
+  lastretrieval_timestamp    => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => '-'         },
+  response_message           => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => '-'         },
+  todayMaxAPIcalls           => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => 'apimaxreq' },
+  todayDoneAPIcalls          => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => 0           },
+  todayDoneAPIrequests       => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => 0           },
+  todayRemainingAPIcalls     => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => 'apimaxreq' },
+  todayRemainingAPIrequests  => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => 'apimaxreq' },
+  runTimeCentralTask         => { fnr => 2, fn => \&CurrentVal,    par => '', def => '-'         },
+  runTimeLastAPIAnswer       => { fnr => 2, fn => \&CurrentVal,    par => '', def => '-'         },
+  runTimeLastAPIProc         => { fnr => 2, fn => \&CurrentVal,    par => '', def => '-'         },
+  allStringsFullfilled       => { fnr => 2, fn => \&CurrentVal,    par => '', def => 0           },
+  SunHours_Remain            => { fnr => 3, fn => \&CurrentVal,    par => '', def => 0           },      # fnr => 3 -> Custom Calc
+  SunMinutes_Remain          => { fnr => 3, fn => \&CurrentVal,    par => '', def => 0           },
+  todayGridFeedIn            => { fnr => 3, fn => \&CircularVal,   par => 99, def => 0           },
 );
 
 # Information zu verwendeten internen Datenhashes
@@ -1866,7 +1869,9 @@ sub _setreset {                          ## no critic "not used"
       readingsDelete($hash, "Current_GridConsumption");
       readingsDelete($hash, "Current_GridFeedIn");
       delete $hash->{HELPER}{INITCONTOTAL};
-      delete $hash->{HELPER}{INITFEEDTOTAL};
+      # delete $hash->{HELPER}{INITFEEDTOTAL};
+      delete $data{$type}{$name}{circular}{99}{initdayfeedin};
+      delete $data{$type}{$name}{circular}{99}{feedintotal};
       delete $data{$type}{$name}{current}{gridconsumption};
       delete $data{$type}{$name}{current}{tomorrowconsumption};
       delete $data{$type}{$name}{current}{gridfeedin};
@@ -3194,6 +3199,7 @@ sub centralTask {
   #delete $data{$type}{$name}{solcastapi}{'#All'};
   #delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todaySolCastAPIcalls};
   delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls};
+  delete $data{$type}{$name}{circular}{99}{initgridfeedintotal};
 
   for my $n (1..24) {
       $n = sprintf "%02d", $n;
@@ -3519,12 +3525,13 @@ sub _specialActivities {
           }
 
           delete $hash->{HELPER}{INITCONTOTAL};
-          delete $hash->{HELPER}{INITFEEDTOTAL};
+          # delete $hash->{HELPER}{INITFEEDTOTAL};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIcalls};
           
+          delete $data{$type}{$name}{circular}{99}{initdayfeedin};
           delete $data{$type}{$name}{current}{sunriseToday};
           delete $data{$type}{$name}{current}{sunriseTodayTs};
           delete $data{$type}{$name}{current}{sunsetToday};
@@ -4496,7 +4503,7 @@ sub _transferMeterValues {
       ($gfin,$gco) = substSpecialCases ($params);
   }
 
-  if ($gf eq "-gcon") {                                                                       # Spezialfall gfeedin bei neg. gcon
+  if ($gf eq "-gcon") {                                                                              # Spezialfall gfeedin bei neg. gcon
       $params = {
           dev  => $medev,
           rdg  => $gc,
@@ -4507,16 +4514,18 @@ sub _transferMeterValues {
   }
 
   push @$daref, "Current_GridConsumption<>".(int $gco)." W";
-  $data{$type}{$name}{current}{gridconsumption} = int $gco;                                   # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+  $data{$type}{$name}{current}{gridconsumption} = int $gco;                                          # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
 
   push @$daref, "Current_GridFeedIn<>".(int $gfin)." W";
-  $data{$type}{$name}{current}{gridfeedin} = int $gfin;                                       # Hilfshash Wert current grid Feed in
+  $data{$type}{$name}{current}{gridfeedin} = int $gfin;                                              # Hilfshash Wert current grid Feed in
 
   my $ctuf    = $ctunit =~ /^kWh$/xi ? 1000 : 1;
-  my $gctotal = ReadingsNum ($medev, $gt, 0) * $ctuf;                                         # Bezug total (Wh)
+  my $gctotal = ReadingsNum ($medev, $gt, 0) * $ctuf;                                                # Bezug total (Wh)
 
   my $ftuf    = $ftunit =~ /^kWh$/xi ? 1000 : 1;
-  my $fitotal = ReadingsNum ($medev, $ft, 0) * $ftuf;                                         # Einspeisung total (Wh)
+  my $fitotal = ReadingsNum ($medev, $ft, 0) * $ftuf;                                                # Einspeisung total (Wh)
+  
+  $data{$type}{$name}{circular}{99}{feedintotal} = $fitotal;                                         # Total Feedin speichern
   
   my $debug = $paref->{debug};
   if($debug =~ /collectData/x) {
@@ -4533,6 +4542,7 @@ sub _transferMeterValues {
   }
 
   my $docon = 0;
+  
   if ($gcdaypast == 0) {                                                                             # Management der Stundenberechnung auf Basis Totalwerte GridConsumtion
       if (defined $hash->{HELPER}{INITCONTOTAL}) {
           $docon = 1;
@@ -4542,7 +4552,7 @@ sub _transferMeterValues {
       }
   }
   elsif (!defined $hash->{HELPER}{INITCONTOTAL}) {
-      $hash->{HELPER}{INITCONTOTAL} = $gctotal-$gcdaypast-ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
+      $hash->{HELPER}{INITCONTOTAL} = $gctotal-$gcdaypast-ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
   }
   else {
       $docon = 1;
@@ -4567,23 +4577,26 @@ sub _transferMeterValues {
   }
 
   my $dofeed = 0;
+  
   if ($gfdaypast == 0) {                                                                              # Management der Stundenberechnung auf Basis Totalwerte GridFeedIn
-      if (defined $hash->{HELPER}{INITFEEDTOTAL}) {
+      if (defined CircularVal ($hash, 99, 'initdayfeedin', undef)) {
           $dofeed = 1;
       }
       else {
-          $hash->{HELPER}{INITFEEDTOTAL} = $fitotal;
+          # $hash->{HELPER}{INITFEEDTOTAL}                   = $fitotal;
+          $data{$type}{$name}{circular}{99}{initdayfeedin} = $fitotal;
       }
   }
-  elsif (!defined $hash->{HELPER}{INITFEEDTOTAL}) {
-      $hash->{HELPER}{INITFEEDTOTAL} = $fitotal-$gfdaypast-ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridFeedIn", 0);
+  elsif (!defined CircularVal ($hash, 99, 'initdayfeedin', undef)) {
+      # $hash->{HELPER}{INITFEEDTOTAL}                   = $fitotal - $gfdaypast - ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridFeedIn", 0);
+      $data{$type}{$name}{circular}{99}{initdayfeedin} = $fitotal - $gfdaypast - ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridFeedIn", 0);
   }
   else {
       $dofeed = 1;
   }
 
   if ($dofeed) {
-      my $gftotthishour = int ($fitotal - ($gfdaypast + $hash->{HELPER}{INITFEEDTOTAL}));
+      my $gftotthishour = int ($fitotal - ($gfdaypast + CircularVal ($hash, 99, 'initdayfeedin', 0)));
 
       if($gftotthishour < 0) {
           $gftotthishour = 0;
@@ -6520,6 +6533,15 @@ sub genStatisticReadings {
               $smr    = $smr < 0 ? 0 : $smr;              
 
               push @$daref, 'statistic_'.$kpi.'<>'. sprintf "%.0f", $smr;              
+          }
+          
+          if ($kpi eq 'todayGridFeedIn') {
+              my $idfi = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdayfeedin', $def);         # initialer Tagesstartwert
+              my $cfi  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'feedintotal',   $def);         # aktuelles total Feed In            
+          
+              my $dfi  = $cfi - $idfi;
+              
+              push @$daref, 'statistic_'.$kpi.'<>'. (sprintf "%.1f", $dfi).' Wh';
           }
       }
   }
@@ -9528,22 +9550,23 @@ sub listDataPool {
           return qq{Circular cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $pvfc     = CircularVal ($hash, $idx, "pvfc",       "-");
-          my $pvrl     = CircularVal ($hash, $idx, "pvrl",       "-");
-          my $confc    = CircularVal ($hash, $idx, "confc",      "-");
-          my $gcons    = CircularVal ($hash, $idx, "gcons",      "-");
-          my $gfeedin  = CircularVal ($hash, $idx, "gfeedin",    "-");
-          my $wid      = CircularVal ($hash, $idx, "weatherid",  "-");
-          my $wtxt     = CircularVal ($hash, $idx, "weathertxt", "-");
-          my $wccv     = CircularVal ($hash, $idx, "wcc",        "-");
-          my $wrprb    = CircularVal ($hash, $idx, "wrp",        "-");
-          my $temp     = CircularVal ($hash, $idx, "temp",       "-");
-          my $pvcorrf  = CircularVal ($hash, $idx, "pvcorrf",    "-");
-          my $quality  = CircularVal ($hash, $idx, "quality",    "-");
-          my $batin    = CircularVal ($hash, $idx, "batin",      "-");
-          my $batout   = CircularVal ($hash, $idx, "batout",     "-");
-          my $tdayDvtn = CircularVal ($hash, $idx, "tdayDvtn",   "-");
-          my $ydayDvtn = CircularVal ($hash, $idx, "ydayDvtn",   "-");
+          my $pvfc     = CircularVal ($hash, $idx, "pvfc",          "-");
+          my $pvrl     = CircularVal ($hash, $idx, "pvrl",          "-");
+          my $confc    = CircularVal ($hash, $idx, "confc",         "-");
+          my $gcons    = CircularVal ($hash, $idx, "gcons",         "-");
+          my $gfeedin  = CircularVal ($hash, $idx, "gfeedin",       "-");
+          my $wid      = CircularVal ($hash, $idx, "weatherid",     "-");
+          my $wtxt     = CircularVal ($hash, $idx, "weathertxt",    "-");
+          my $wccv     = CircularVal ($hash, $idx, "wcc",           "-");
+          my $wrprb    = CircularVal ($hash, $idx, "wrp",           "-");
+          my $temp     = CircularVal ($hash, $idx, "temp",          "-");
+          my $pvcorrf  = CircularVal ($hash, $idx, "pvcorrf",       "-");
+          my $quality  = CircularVal ($hash, $idx, "quality",       "-");
+          my $batin    = CircularVal ($hash, $idx, "batin",         "-");
+          my $batout   = CircularVal ($hash, $idx, "batout",        "-");
+          my $tdayDvtn = CircularVal ($hash, $idx, "tdayDvtn",      "-");
+          my $ydayDvtn = CircularVal ($hash, $idx, "ydayDvtn",      "-");
+          my $idfi     = CircularVal ($hash, $idx, "initdayfeedin", "-");
 
           my $pvcf = qq{};
           if(ref $pvcorrf eq "HASH") {
@@ -9581,7 +9604,7 @@ sub listDataPool {
               $sq .= "      quality: $cfq";
           }
           else {
-              $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn";
+              $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn, initdayfeedin: $idfi";
           }
       }
   }
@@ -10804,7 +10827,7 @@ sub HistoryVal {
 return $def;
 }
 
-#############################################################################
+#####################################################################################################
 #    Wert des circular-Hash zurückliefern
 #    Achtung: die Werte im circular-Hash haben nicht
 #             zwingend eine Beziehung zueinander !!
@@ -10812,7 +10835,7 @@ return $def;
 #    Usage:
 #    CircularVal ($hash, $hod, $key, $def)
 #
-#    $hod: Stunde des Tages (01,02,...,24)
+#    $hod: Stunde des Tages (01,02,...,24) bzw. 99 (besondere Verwendung)
 #    $key:    pvrl       - realer PV Ertrag
 #             pvfc       - PV Vorhersage
 #             confc      - Vorhersage Hausverbrauch (Wh)
@@ -10826,11 +10849,14 @@ return $def;
 #             wrp        - DWD Regenwahrscheinlichkeit
 #             temp       - Außentemperatur
 #             pvcorrf    - PV Autokorrekturfaktoren (HASH)
-#             tdayDvtn   - heutige Abweichung PV Prognose/Erzeugung in %
-#             ydayDvtn   - gestrige Abweichung PV Prognose/Erzeugung in %
+#             
+#             tdayDvtn       - heutige Abweichung PV Prognose/Erzeugung in %
+#             ydayDvtn       - gestrige Abweichung PV Prognose/Erzeugung in %
+#             initdayfeedin  - initialer Wert für "gridfeedin" zu Beginn des Tages (Wh)
+#
 #    $def: Defaultwert
 #
-#############################################################################
+#####################################################################################################
 sub CircularVal {
   my $hash = shift;
   my $hod  = shift;
@@ -11834,22 +11860,23 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>pvfc</b>     </td><td>PV Vorhersage für die nächsten 24h ab aktueller Stunde des Tages                                                   </td></tr>
-            <tr><td> <b>pvrl</b>     </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!) </td></tr>
-            <tr><td> <b>confc</b>    </td><td>erwarteter Energieverbrauch (Wh)                                                                                   </td></tr>
-            <tr><td> <b>gcon</b>     </td><td>realer Leistungsbezug aus dem Stromnetz                                                                            </td></tr>
-            <tr><td> <b>gfeedin</b>  </td><td>reale Leistungseinspeisung in das Stromnetz                                                                        </td></tr>
-            <tr><td> <b>batin</b>    </td><td>Batterieladung                                                                                                     </td></tr>
-            <tr><td> <b>batout</b>   </td><td>Batterieentladung                                                                                                  </td></tr>
-            <tr><td> <b>wcc</b>      </td><td>Grad der Wolkenüberdeckung                                                                                         </td></tr>
-            <tr><td> <b>wrp</b>      </td><td>Grad der Regenwahrscheinlichkeit                                                                                   </td></tr>
-            <tr><td> <b>temp</b>     </td><td>Außentemperatur                                                                                                    </td></tr>
-            <tr><td> <b>wid</b>      </td><td>ID des vorhergesagten Wetters                                                                                      </td></tr>
-            <tr><td> <b>wtxt</b>     </td><td>Beschreibung des vorhergesagten Wetters                                                                            </td></tr>
-            <tr><td> <b>corr</b>     </td><td>Autokorrekturfaktoren für die Stunde des Tages und der Bewölkungsrange (0..10)                                     </td></tr>
-            <tr><td> <b>quality</b>  </td><td>Qualität der Autokorrekturfaktoren (max. 30), höhere Werte = höhere Qualität                                       </td></tr>
-            <tr><td> <b>tdayDvtn</b> </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                      </td></tr>
-            <tr><td> <b>ydayDvtn</b> </td><td>gestrige Abweichung PV Prognose/Erzeugung in %                                                                     </td></tr>
+            <tr><td> <b>pvfc</b>          </td><td>PV Vorhersage für die nächsten 24h ab aktueller Stunde des Tages                                                   </td></tr>
+            <tr><td> <b>pvrl</b>          </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!) </td></tr>
+            <tr><td> <b>confc</b>         </td><td>erwarteter Energieverbrauch (Wh)                                                                                   </td></tr>
+            <tr><td> <b>gcon</b>          </td><td>realer Leistungsbezug aus dem Stromnetz                                                                            </td></tr>
+            <tr><td> <b>gfeedin</b>       </td><td>reale Leistungseinspeisung in das Stromnetz                                                                        </td></tr>
+            <tr><td> <b>batin</b>         </td><td>Batterieladung                                                                                                     </td></tr>
+            <tr><td> <b>batout</b>        </td><td>Batterieentladung                                                                                                  </td></tr>
+            <tr><td> <b>wcc</b>           </td><td>Grad der Wolkenüberdeckung                                                                                         </td></tr>
+            <tr><td> <b>wrp</b>           </td><td>Grad der Regenwahrscheinlichkeit                                                                                   </td></tr>
+            <tr><td> <b>temp</b>          </td><td>Außentemperatur                                                                                                    </td></tr>
+            <tr><td> <b>wid</b>           </td><td>ID des vorhergesagten Wetters                                                                                      </td></tr>
+            <tr><td> <b>wtxt</b>          </td><td>Beschreibung des vorhergesagten Wetters                                                                            </td></tr>
+            <tr><td> <b>corr</b>          </td><td>Autokorrekturfaktoren für die Stunde des Tages und der Bewölkungsrange (0..10)                                     </td></tr>
+            <tr><td> <b>quality</b>       </td><td>Qualität der Autokorrekturfaktoren (max. 30), höhere Werte = höhere Qualität                                       </td></tr>
+            <tr><td> <b>tdayDvtn</b>      </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                      </td></tr>
+            <tr><td> <b>ydayDvtn</b>      </td><td>gestrige Abweichung PV Prognose/Erzeugung in %                                                                     </td></tr>
+            <tr><td> <b>initdayfeedin</b> </td><td>initialer PV Einspeisewert zu Beginn des aktuellen Tages (Wh)                                                      </td></tr>
          </table>
       </ul>
 
@@ -12298,10 +12325,11 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td> <b>runTimeLastAPIProc</b>        </td><td>die letzte Prozesszeit zur Verarbeitung der empfangenen SolCast API Daten (nur Model SolCastAPI)   </td></tr>
             <tr><td> <b>SunMinutes_Remain</b>         </td><td>die verbleibenden Minuten bis Sonnenuntergang des aktuellen Tages                                  </td></tr>
             <tr><td> <b>SunHours_Remain</b>           </td><td>die verbleibenden Stunden bis Sonnenuntergang des aktuellen Tages                                  </td></tr>
-            <tr><td> <b>todayMaxAPIcalls</b>          </td><td>die maximal mögliche Anzahl SolCast API Calls (nur Model SolCastAPI).                              </td></tr>
-            <tr><td>                                  </td><td>Ein Call kann mehrere API Requests enthalten.                                                      </td></tr>
             <tr><td> <b>todayDoneAPIcalls</b>         </td><td>die Anzahl der am aktuellen Tag ausgeführten SolCast API Calls (nur Model SolCastAPI)              </td></tr>
             <tr><td> <b>todayDoneAPIrequests</b>      </td><td>die Anzahl der am aktuellen Tag ausgeführten SolCast API Requests (nur Model SolCastAPI)           </td></tr>
+            <tr><td> <b>todayGridFeedIn</b>           </td><td>die in das öffentliche Netz eingespeiste PV Leistung des aktuellen Tages                           </td></tr>
+            <tr><td> <b>todayMaxAPIcalls</b>          </td><td>die maximal mögliche Anzahl SolCast API Calls (nur Model SolCastAPI).                              </td></tr>
+            <tr><td>                                  </td><td>Ein Call kann mehrere API Requests enthalten.                                                      </td></tr>
             <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Calls (nur Model SolCastAPI)            </td></tr>
             <tr><td> <b>todayRemainingAPIrequests</b> </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Requests (nur Model SolCastAPI)         </td></tr>
          </table>
