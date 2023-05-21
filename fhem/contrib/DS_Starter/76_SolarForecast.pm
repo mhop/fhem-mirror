@@ -2295,16 +2295,23 @@ sub __solCast_ApiResponse {
 
           ___setLastAPIcallKeyData ($paref);
           
-          if($debug =~ /solcastProcess|solcastAPIcall/x) {      
-              Log3 ($name, 1, "$name DEBUG> SolCast API Call - response status: ".$jdata->{'response_status'}{'message'});
-          }
-
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $jdata->{'response_status'}{'message'};
+          
+          if ($jdata->{'response_status'}{'error_code'} eq 'TooManyRequests') {
+              $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests} = 0;
+          }
 
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
           $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
           $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
+          if($debug =~ /solcastProcess|solcastAPIcall/x) { 
+              my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
+              
+              Log3 ($name, 1, "$name DEBUG> SolCast API Call - response status: ".$jdata->{'response_status'}{'message'});
+              Log3 ($name, 1, "$name DEBUG> SolCast API Call - todayRemainingAPIrequests: ".SolCastAPIVal($hash, '?All', '?All', 'todayRemainingAPIrequests', $apimaxreq));
+          }
+          
           return;
       }
 
