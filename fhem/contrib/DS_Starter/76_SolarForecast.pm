@@ -1389,6 +1389,7 @@ sub _setmeterDevice {                    ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
 
@@ -1410,6 +1411,13 @@ sub _setmeterDevice {                    ## no critic "not used"
   if($h->{gcon} eq "-gfeedin" && $h->{gfeedin} eq "-gcon") {
       return qq{Incorrect input. It is not allowed that the keys gcon and gfeedin refer to each other.};
   }
+   
+  ## alte Speicherwerte löschen
+  ###############################
+  delete $data{$type}{$name}{circular}{99}{feedintotal};
+  delete $data{$type}{$name}{circular}{99}{initdayfeedin};
+  delete $data{$type}{$name}{circular}{99}{gridcontotal};
+  delete $data{$type}{$name}{circular}{99}{initdaygcon};
 
   readingsSingleUpdate ($hash, "currentMeterDev", $arg, 1);
   createAssociatedWith ($hash);
