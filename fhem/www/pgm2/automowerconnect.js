@@ -175,35 +175,91 @@ function AutomowerConnectDrawPath ( ctx, div, pos, type ) {
 
 }
 
-function AutomowerConnectDrawPathColor ( ctx, div, pos, colorat ) {
+function AutomowerConnectDrawPathColorRev ( ctx, div, pos, colorat ) {
   // draw path
   var type = colorat[ pos[ 2 ] ];
   ctx.beginPath();
   ctx.strokeStyle = div.getAttribute( 'data-'+ type + 'LineColor' );
   ctx.lineWidth=div.getAttribute( 'data-'+ type + 'LineWidth' );
   ctx.setLineDash( div.getAttribute( 'data-'+ type + 'LineDash' ).split(",") );
-  ctx.moveTo( parseInt( pos[0] ), parseInt( pos[ 1 ] ) );
+  ctx.moveTo( parseInt( pos[ 0 ] ), parseInt( pos[ 1 ] ) );
+  var i = 0;
 
-  for (var i=3;i<pos.length;i+=3){
+  for ( i = 3; i<pos.length; i+=3 ){
 
-    ctx.lineTo( parseInt( pos[ i ] ),parseInt( pos[ i+1 ] ) );
+    ctx.lineTo( parseInt( pos[ i ] ),parseInt( pos[ i + 1 ] ) );
 
-    if ( colorat[ pos[ i+2 ] ] != type ){
+    if ( colorat[ pos[ i + 2 ] ] != type ){
 
       ctx.stroke();
-      var type = colorat[ pos[ i + 2 ] ];
+      type = colorat[ pos[ i + 2 ] ];
       ctx.beginPath();
+      ctx.moveTo( parseInt( pos[ i ] ), parseInt( pos[ i + 1 ] ) );
       ctx.strokeStyle = div.getAttribute( 'data-'+ type + 'LineColor' );
       ctx.lineWidth=div.getAttribute( 'data-'+ type + 'LineWidth' );
-      ctx.setLineDash( div.getAttribute( 'data-'+ type + 'LineDash' ).split(",") );
+      ctx.setLineDash( div.getAttribute( 'data-'+ type + 'LineDash' ).split( "," ) );
 
     }
   }
-  
+
   ctx.stroke();
 
 }
 
+function AutomowerConnectDrawPathColor ( ctx, div, pos, colorat ) {
+  // draw path
+  var type = colorat[ pos[ pos.length-1 ] ];
+  ctx.beginPath();
+  ctx.strokeStyle = div.getAttribute( 'data-'+ type + 'LineColor' );
+  ctx.lineWidth=div.getAttribute( 'data-'+ type + 'LineWidth' );
+  ctx.setLineDash( div.getAttribute( 'data-'+ type + 'LineDash' ).split(",") );
+  ctx.moveTo( parseInt( pos[ pos.length-3 ] ), parseInt( pos[ pos.length-2 ] ) );
+  var i = 0;
+
+  for ( i = pos.length-3; i>-1; i-=3 ){
+
+    ctx.lineTo( parseInt( pos[ i ] ),parseInt( pos[ i + 1 ] ) );
+
+    if ( colorat[ pos[ i + 2 ] ] != type ){
+
+      ctx.stroke();
+      type = colorat[ pos[ i + 2 ] ];
+      ctx.beginPath();
+      ctx.moveTo( parseInt( pos[ i ] ), parseInt( pos[ i + 1 ] ) );
+      ctx.strokeStyle = div.getAttribute( 'data-'+ type + 'LineColor' );
+      ctx.lineWidth=div.getAttribute( 'data-'+ type + 'LineWidth' );
+      ctx.setLineDash( div.getAttribute( 'data-'+ type + 'LineDash' ).split( "," ) );
+
+    }
+  }
+
+  ctx.stroke();
+
+}
+
+function AutomowerConnectTor ( x0, y0, x1, y1 ) {
+  var dy = y0-y1;
+  var dx = x0-x1;
+  var dyx = dx ? Math.abs( dy / dx ) : 999;
+  var ret = '';
+  // position of icon relative to path end point
+  if ( dx >= 0 && dy >= 0 && Math.abs( dyx ) >= 1 ) ret = 'top';
+  if ( dx >= 0 && dy >= 0 && Math.abs( dyx )  < 1 ) ret = 'left';
+  if ( dx < 0  && dy >= 0 && Math.abs( dyx ) >= 1 ) ret = 'top';
+  if ( dx < 0  && dy >= 0 && Math.abs( dyx )  < 1 ) ret = 'right';
+
+  if ( dx >= 0 && dy <  0 && Math.abs( dyx ) >= 1 ) ret = 'bottom';
+  if ( dx >= 0 && dy <  0 && Math.abs( dyx )  < 1 ) ret = 'left';
+  if ( dx < 0  && dy <  0 && Math.abs( dyx ) >= 1 ) ret = 'bottom';
+  if ( dx < 0  && dy <  0 && Math.abs( dyx )  < 1 ) ret = 'right';
+
+  //~ log ('AUTOMOWERCONNECTTOR:');
+  //~ log ('dx:  ' + dx);
+  //~ log ('dy:  ' + dy);
+  //~ log ('dyx: ' + dyx);
+  //~ log ('ret: ' + ret);
+  return ret;
+}
 //AutomowerConnectUpdateDetail (<devicename>, <type> <background-image path>, <imagesize x>, <imagesize y>, <relative position of CS marker>,<scale x>, <error description>, <path array>, <area limits array>, <property limits array>, <error array>)
 function AutomowerConnectUpdateDetail (dev, type, imgsrc, picx, picy, csx, csy, csrel, scalx, errdesc, pos, lixy, plixy, erray) {
   const colorat = {
@@ -251,7 +307,7 @@ function AutomowerConnectUpdateDetail (dev, type, imgsrc, picx, picy, csx, csy, 
         }
 
         // draw mower icon
-        AutomowerConnectIcon( ctx, pos[0], pos[1], 'bottom', 'M' );
+        AutomowerConnectIcon( ctx, pos[0], pos[1], AutomowerConnectTor ( pos[3], pos[4], pos[0], pos[1] ), 'M' );
 
       }
 
