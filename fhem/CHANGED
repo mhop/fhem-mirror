@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  00_KNXIO: multiple changes, see Forum #127792
+ - change:  10_KNX: multiple changes, see Forum #122582
  - change:  74_AutomowerConnect: Common.pm, automowerconnect.js
             use of websocket for realtime events, more at 
             https://forum.fhem.de/index.php?topic=131661.msg1276678#msg1276678
