@@ -50,6 +50,9 @@
 #            rework Logging, duplicate msg detection
 # 04/04/2023 limit retries for keepalive timeouts
 #            rework Logging
+# 15/05/2023 new "<device>:INITIALIZED" event after sucessful start
+#            change (shorten) timeout parameters on disconnect
+#            cmd-ref: correct wiki links, W3C conformance
 
 
 package KNXIO; ## no critic 'package'
@@ -107,9 +110,9 @@ GP_Export(qw(Initialize ) );
 # global vars/constants
 my $PAT_IP   = '[\d]{1,3}(\.[\d]{1,3}){3}';
 my $PAT_PORT = '[\d]{4,5}';
-my $TULID    = 'C';
+my $KNXID    = 'C';
 my $reconnectTO = 10; # Waittime after disconnect
-my $svnid    = '$Id$';
+my $SVNID    = '$Id$';
 
 #####################################
 sub Initialize {
@@ -138,8 +141,8 @@ sub KNXIO_Define {
 	my @arg = split(/[\s\t\n]+/xms,$def);
 	my $name = $arg[0] // return 'KNXIO-define: no name specified';
 	$hash->{NAME} = $name;
-	$svnid =~ s/.*\.pm\s(.+)Z.*/$1/ixms;
-	$hash->{SVN} = $svnid; # store svn info in dev hash
+	$SVNID =~ s/.*\.pm\s([^\s]+\s[^\s]+).*/$1/ixms;
+	$hash->{SVN} = $SVNID; # store svn info in dev hash
 
 	return q{KNXIO-define: invalid mode specified, valid modes are one of: H M S T X} if ((scalar(@arg) >= 3) && $arg[2] !~ /[HMSTX]/ixms);
 
@@ -210,7 +213,10 @@ sub KNXIO_Define {
 
 	KNXIO_Log ($name, 3, qq{opening mode=$mode});
 
-	return InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDev,$hash) if (! $init_done);
+	if (! $init_done) {
+		InternalTimer(gettimeofday() + 30.0,\&KNXIO_initcomplete,$hash); # provide INIIALIZED EVENT
+		return InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDev,$hash);
+	}
 	return KNXIO_openDev($hash);
 }
 
@@ -433,7 +439,7 @@ sub KNXIO_ReadH {
 			if ($errcode > 0) {
 				KNXIO_Log ($name, 3, q{ConnectionResponse received } .
                                       qq{CCID= $hash->{KNXIOhelper}->{CCID} Status=} . KNXIO_errCodes($errcode));
-				KNXIO_disconnect($hash);
+				KNXIO_disconnect($hash,2);
 				return;
 			}
 			my $phyaddr = unpack('x18n',$buf);
@@ -451,7 +457,7 @@ sub KNXIO_ReadH {
 			if ($errcode > 0) {
 				KNXIO_Log ($name, 3, q{ConnectionStateResponse received } .
                                       qq{CCID= $hash->{KNXIOhelper}->{CCID} Status= } . KNXIO_errCodes($errcode));
-				KNXIO_disconnect($hash);
+				KNXIO_disconnect($hash,2);
 				return;
 			}
 			return InternalTimer(gettimeofday() + 60, \&KNXIO_keepAlive, $hash);
@@ -497,7 +503,7 @@ sub KNXIO_Write {
 	my $mode = $hash->{model};
 
 	KNXIO_Log ($name, 5, 'started');
-	return if(!defined($fn) && $fn ne $TULID);
+	return if(!defined($fn) && $fn ne $KNXID);
 	if (ReadingsVal($name, 'state', 'disconnected') ne 'connected') {
 		KNXIO_Log ($name, 3, qq{called while not connected! Msg: $msg lost});
 		return;
@@ -782,6 +788,23 @@ sub KNXIO_init {
 	return;
 }
 
+### provide <device> INITIALIZED event
+### called for KNXIO_define ONLY on FHEM start!
+### by Internaltimer with significant delay
+sub KNXIO_initcomplete {
+	my $hash = shift;
+
+	RemoveInternalTimer($hash,\&KNXIO_initcomplete);
+	my $name = $hash->{NAME};
+	if (ReadingsVal($name,'state','disconnected') eq 'connected') {
+		DoTrigger($name,'INITIALIZED');
+	} 
+	elsif (AttrVal($name,'disable','disabled') ne 'disabled') {
+		 KNXIO_Log ($name, 3, q{failed}); 
+	}
+	return;
+}
+
 ### prepare connection request
 ### called from init, disconn response, disconn request
 ### returns packed string, ready for sending with DevIo
@@ -885,9 +908,12 @@ sub KNXIO_deldupes {
 	return grep { !$seen{substr($_,6) }++ } @arr; # ignore C<src-addr>
 }
 
-###
+### disconnect and wait for nxt open
+## second param specifies optional open delay (sec)
 sub KNXIO_disconnect {
 	my $hash = shift;
+	my $opendelay = shift // $reconnectTO;
+
 	my $name = $hash->{NAME};
 	my $param = $hash->{DeviceName};
 
@@ -896,7 +922,7 @@ sub KNXIO_disconnect {
 	KNXIO_Log ($name, 1, q{disconnected, waiting to reappear});
 
 	$readyfnlist{"$name.$param"} = $hash; # Start polling
-	$hash->{NEXT_OPEN} = gettimeofday() + $reconnectTO;
+	$hash->{NEXT_OPEN} = gettimeofday() + $opendelay;
 
 	return;
 }
@@ -928,7 +954,8 @@ sub KNXIO_closeDev {
 	KNXIO_Log ($name, 3, q{closed}) if ($init_done);;
 
 	readingsSingleUpdate($hash, 'state', 'disconnected', 1);
-	DoTrigger($name, 'DISCONNECTED');
+#	DoTrigger($name, 'DISCONNECTED');
+	DoTrigger($name, 'disconnected');
 
 	return;
 }
@@ -985,7 +1012,7 @@ sub KNXIO_decodeEMI {
 	$data[0] = ($data[0] & 0x3f); # 6 bit data in byte 0
 	shift @data if (scalar(@data) > 1 ); # byte 0 is ununsed if length > 1
 	
-	my $outbuf = $TULID . $src . substr($rwp,0,1) . $dst . sprintf('%02x' x scalar(@data),@data);
+	my $outbuf = $KNXID . $src . substr($rwp,0,1) . $dst . sprintf('%02x' x scalar(@data),@data);
 	KNXIO_Log ($name, 5, qq{outbuf=$outbuf});
 
 	return $outbuf;
@@ -1044,7 +1071,7 @@ sub KNXIO_decodeCEMI {
 	$data[0] = ($data[0] & 0x3f); # 6 bit data in byte 0
 	shift @data if (scalar(@data) > 1 ); # byte 0 is ununsed if length > 1
 
-	my $outbuf = $TULID . $src . substr($rwp,0,1) . $dst . sprintf('%02x' x scalar(@data),@data);
+	my $outbuf = $KNXID . $src . substr($rwp,0,1) . $dst . sprintf('%02x' x scalar(@data),@data);
 	KNXIO_Log ($name, 5, qq{outbuf=$outbuf});
 
 	return $outbuf;
@@ -1102,7 +1129,7 @@ sub KNXIO_keepAliveTO {
 	my $name = $hash->{NAME};
 	my $cntrTO = $hash->{KNXIOhelper}->{CNTRTO};
 
-	return KNXIO_disconnect($hash) if ($cntrTO >= 2); # nr of timeouts exceeded
+	return KNXIO_disconnect($hash,3) if ($cntrTO >= 2); # nr of timeouts exceeded
 
 	$cntrTO++;
 	KNXIO_Log ($name, 3, qq{timeout - retry $cntrTO});
@@ -1201,17 +1228,16 @@ sub KNXIO_errCodes {
 <a id="KNXIO"></a>
 <h3>KNXIO</h3>
 <ul>
-<p>This is a IO-module for KNX-devices. It provides an interface between FHEM and a KNX-Gateway. The Gateway can be either a KNX-Router/KNX-GW or the KNXD-daemon.
+<li><p>This is a IO-module for KNX-devices. It provides an interface between FHEM and a KNX-Gateway. The Gateway can be either a KNX-Router/KNX-GW or the KNXD-daemon.
    FHEM KNX-devices use this module as IO-Device. This Module does <b>NOT</b> support the deprecated EIB-Module!
 </p>
-<p>A (german) wiki page is avaliable here: <a href="http://www.fhemwiki.de/wiki/KNXIO">FHEM Wiki</a></p>
+<p>A (german) wiki page is avaliable here: <a href="https://wiki.fhem.de/wiki/KNXIO">FHEM Wiki</a></p>
+</li>
+<li><a id="KNXIO-define"></a><strong>Define</strong>
+<pre><code>define &lt;name&gt; KNXIO (H|M|T) &lt;(ip-address|hostname):port&gt; &lt;phy-adress&gt;</code>
+<code>define &lt;name&gt; KNXIO S &lt;UNIX socket-path&gt; &lt;phy-adress&gt;</code>
+<code>define &lt;name&gt; KNXIO X</code></pre>
 
-<a id="KNXIO-define"></a>
-<p><strong>Define</strong></p>
-<p><code>define &lt;name&gt; KNXIO (H|M|T) &lt;(ip-address|hostname):port&gt; &lt;phy-adress&gt;</code> <br/>or<br/>
-<code>define &lt;name&gt; KNXIO S &lt;UNIX socket-path&gt; &lt;phy-adress&gt;</code> <br/>or<br/>
-<code>define &lt;name&gt; KNXIO X</code></p> 
-<ul>
 <b>Connection Types (mode)</b> (first parameter):
 <ul>
 <li><b>H</b> Host Mode - connect to a KNX-router with UDP point-point protocol.<br/>
@@ -1243,36 +1269,48 @@ sub KNXIO_errCodes {
 <li>The physical address is used as the source address of messages sent to KNX network. This address should be one of the defined client pool-addresses of KNXD or Router.</li>
 </ul>
 
-<p>All parameters are mandatory. Pls. ensure that you only have <b>one path</b> between your KNX-Installation and FHEM! 
-  Do not define multiple KNXIO- or KNXTUL- or TUL-definitions at the same time. </p>
-
+<br/>All parameters are mandatory. Pls. ensure that you only have <b>one path</b> between your KNX-Installation and FHEM! 
+  Do not define multiple KNXIO- or KNXTUL- or TUL-definitions at the same time. <br/>
 Examples:
 <pre><code>    define myKNXGW KNXIO H 192.168.1.201:3671 0.0.51
     define myKNXGW KNXIO M 224.0.23.12:3671 0.0.51 
     define myKNXGW KNXIO S /var/run/knx 0.0.51
-    define myKNXGW KNXIO T 192.168.1.200:6720 0.0.51</code></pre>
+    define myKNXGW KNXIO T 192.168.1.200:6720 0.0.51
+</code>
 Suggested parameters for KNXD (Version &gt;= 0.14.30), with systemd:
-<pre><code>    KNXD_OPTS="-e 0.0.50 -E 0.0.51:8 -D -T -S -b ip:"                            # knxd acts as multicast client - do NOT use -R !
+<code>
+    KNXD_OPTS="-e 0.0.50 -E 0.0.51:8 -D -T -S -b ip:"                            # knxd acts as multicast client - do NOT use -R !
     KNXD_OPTS="-e 0.0.50 -E 0.0.51:8 -D -T -R -S -b ipt:192.168.xx.yy"           # connect to a knx-router with ip-addr
-    KNXD_OPTS="-e 0.0.50 -E 0.0.51:8 -D -T -R -S -single -b tpuarts:/dev/ttyxxx" # connect to a serial/USB KNX GW  </code></pre>
-  The -e and -E parameters must match the definitions in the KNX-router (set by ETS)! 
-</ul>
+    KNXD_OPTS="-e 0.0.50 -E 0.0.51:8 -D -T -R -S -single -b tpuarts:/dev/ttyxxx" # connect to a serial/USB KNX GW  
+</code></pre>
+  The -e and -E parameters must match the definitions in the KNX-router (set by ETS)!<br/><br/> 
+</li>
 
-<a id="KNXIO-set"></a>
-<p><strong>Set</strong> - No Set cmd implemented</p>
+<li><a id="KNXIO-set"></a><strong>Set</strong> - No Set cmd implemented.
+  If you want to restart communication, use Attr disable.<br/><br/></li>
+<li><a id="KNXIO-get"></a><strong>Get</strong> - No Get cmd impemented<br/><br/></li>
 
-<a id="KNXIO-get"></a>
-<p><strong>Get</strong> - No Get cmd impemented</p>
-
-<a id="KNXIO-attr"></a>
-<p><strong>Attributes</strong></p>
+<li><a id="KNXIO-attr"></a><strong>Attributes</strong><br/>
 <ul>
-<a id="KNXIO-attr-disable"></a><li><b>disable</b> - 
+<li><a id="KNXIO-attr-disable"></a><b>disable</b> - 
   Disable the device if set to <b>1</b>. No send/receive from bus possible. Delete this attr to enable device again.</li>
-<a id="KNXIO-attr-verbose"></a><li><b>verbose</b> - 
-  increase verbosity of Log-Messages, system-wide default is set in "global" device. For a detailed description see: <a href="#verbose">global-attr verbose</a> </li> 
+<li><a id="KNXIO-attr-verbose"></a><b>verbose</b> - 
+  increase verbosity of Log-Messages, system-wide default is set in "global" device. For a detailed description see: <a href="#verbose">global-attr verbose</a> <br/></li> 
 </ul>
-<br/>
+<br/></li>
+<li><a id="KNXIO-events"></a><strong>Events</strong><br/>
+<ul>
+<li><b>&lt;device&gt;&colon;INITIALIZED</b> -
+  This event is triggered 30 sec after FHEM init is complete <b>and</b> the device is connected. It can be used (in a notify ...) 
+  to syncronize the status of FHEM-KNX-devices with the KNX-Hardware.
+  Do not use the <code>global&colon;INITIALIZED</code> event for this purpose, the KNX-GW is not ready for communication at that time!<br/>
+  Example: <code>defmod KNXinit_nf notify &lt;KNXIO-device&gt;&colon;INITIALIZED get &lt;KNX-device&gt; &lt;gadName&gt;</code></li>
+<li><b>&lt;device&gt;&colon;disconnected</b> -
+  triggered if connection to KNX-GW/KNXD failed. Recovery is attempted.</li>
+<li><b>&lt;device&gt;&colon;connected</b> -
+  triggered if connection to KNX-GW/KNXD is established.</li>
+</ul>
+</li>
 </ul>
 
 =end html
