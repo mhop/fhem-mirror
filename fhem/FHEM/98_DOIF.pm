@@ -5529,6 +5529,7 @@ sub card
   my $period1;
   my $period2;  
   my $begin_period2;
+  
 
   if (!defined $col) {
     return("no definition at collect parameter");
@@ -5807,6 +5808,35 @@ sub card
   $out.= sprintf('<rect x="11" y="0" width="%d" height="%d" rx="2" ry="2" fill="url(#gradcardback)"/>',$bwidth-2,$bheight);
 
   $out.='<polyline points="11,23 '.($bwidth+9).',23"  style="stroke:gray; stroke-width:0.7" />' if (defined $head);
+
+  sub r_details {
+    my ($min,$max,$minColor,$maxColor,$unit,$unit0,$func,$decfont,$model,$value)=@_;
+        
+    my $r_min = defined $value->{min} ? $value->{min} : $min;
+    my $r_max = defined $value->{max} ? $value->{max} : $max;
+    my $r_minColor = defined $value->{minColor} ? $value->{minColor} : $minColor;
+    my $r_maxColor = defined $value->{maxColor} ? $value->{maxColor} : $maxColor;
+    my $r_unit = defined $value->{unit} ? $value->{unit} : (defined $unit ? $unit : $unit0);
+    my $r_unitColor = (split(",",$r_unit))[1];
+       $r_unit = (split(",",$r_unit))[0];
+    my $r_func = defined $value->{func} ? $value->{func} : $func;
+    my $r_decfont = defined $value->{decfont} ? $value->{decfont} : $decfont;
+    if (!defined $r_decfont) {
+      $r_decfont = "";  
+    } else {
+      if (defined $r_unitColor) {
+        my ($dec,$styleVal,$styleDesc,$unit)=split(",",$r_decfont);
+        $dec="" if (!defined $dec);
+        $styleVal="" if (!defined $styleVal);
+        $styleDesc="" if (!defined $styleDesc);
+        $unit="" if (!defined $unit);
+        $r_decfont="$dec,$styleVal,fill:$r_unitColor,$unit";
+      }
+    }
+    my $r_model = defined $value->{model} ? $value->{model} : $model;
+    return($r_min,$r_max,$r_minColor,$r_maxColor,$r_unit,$r_func,$r_decfont,$r_model);
+  }
+ 
   if (defined $head) {
     $out.= sprintf('<text text-anchor="start" x="%s" y="19" style="fill:#CCCCCC; font-size:12.5px;%s">%s</text>',defined $ic ? 34:14,$header_style,$header_txt) if (defined $header); 
     if (defined $icon and $icon ne "" and  $icon ne " ") {
@@ -5828,22 +5858,8 @@ sub card
     for (my $i=0;$i<@value1;$i++) {
       if (!defined $value1[$i]{ring} or $hring eq "1"){
         $out .= sprintf('<g transform = "translate(%s,1)">',$bwidth+7-($count_rings_head-$j++)*43);
-          my $r_min = defined $value1[$i]{min} ? $value1[$i]{min} : $min;
-          my $r_max = defined $value1[$i]{max} ? $value1[$i]{max} : $max;
-          my $r_minColor = defined $value1[$i]{minColor} ? $value1[$i]{minColor} : $minColor;
-          my $r_maxColor = defined $value1[$i]{maxColor} ? $value1[$i]{maxColor} : $maxColor;
-          my $r_unit = defined $value1[$i]{unit} ? $value1[$i]{unit} : $unit1[$i];
-          my $r_unitColor = (split(",",$r_unit))[1];
-             $r_unit = (split(",",$r_unit))[0];
-          my $r_func = defined $value1[$i]{func} ? $value1[$i]{func} : $func;
-          my $r_decfont = defined $value1[$i]{decfont} ? $value1[$i]{decfont} : $decfont;
-          $r_decfont = "" if (!defined $r_decfont);
-          my $r_model = defined $value1[$i]{model} ? $value1[$i]{model} : $model;
-          $out .=  ui_Table::ring($value1[$i]{value},$r_min,$r_max,$r_minColor,$r_maxColor,$r_unit,"70,1",$r_func,(defined $r_unitColor ? $r_decfont.",,fill:".$r_unitColor:$r_decfont),$r_model,$lightness);
-     #   my $unitColor = (split(",",$unit1[$i]))[1];
-     #   my $unit = (split(",",$unit1[$i]))[0];
-     #   $decfont = "" if (!defined $decfont);
-     #   $out. =  ui_Table::ring($value1[$i]{value},$min,$max,$minColor,$maxColor,$unit,"70,1",$func,(defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont),$model,$lightness);
+        my ($r_min,$r_max,$r_minColor,$r_maxColor,$r_unit,$r_func,$r_decfont,$r_model)=r_details($min,$max,$minColor,$maxColor,$unit1[$i],$unit1[0],$func,$decfont,$model,\%{$value1[$i]});  
+        $out .=  ui_Table::ring($value1[$i]{value},$r_min,$r_max,$r_minColor,$r_maxColor,$r_unit,"70,1",$r_func,$r_decfont,$r_model,$lightness);
         $out .= '</g>';
       }
     }
@@ -5851,18 +5867,8 @@ sub card
       for (my $i=0;$i<@value2;$i++) {
         if (!defined $value2[$i]{ring} or $hring eq "1"){
           $out .= sprintf('<g transform = "translate(%s,1)">',$bwidth+7-($count_rings_head-$j++)*43);
-          my $r_min = defined $value2[$i]{min} ? $value2[$i]{min} : $min2;
-          my $r_max = defined $value2[$i]{max} ? $value2[$i]{max} : $max2;
-          my $r_minColor = defined $value2[$i]{minColor} ? $value2[$i]{minColor} : $minColor2;
-          my $r_maxColor = defined $value2[$i]{maxColor} ? $value2[$i]{maxColor} : $maxColor2;
-          my $r_unit = defined $value2[$i]{unit} ? $value2[$i]{unit} : $unit2[$i];
-          my $r_unitColor = (split(",",$r_unit))[1];
-             $r_unit = (split(",",$r_unit))[0];
-          my $r_func = defined $value2[$i]{func} ? $value2[$i]{func} : $func2;
-          my $r_decfont = defined $value2[$i]{decfont} ? $value2[$i]{decfont} : $decfont2;
-          $r_decfont = "" if (!defined $r_decfont);
-          my $r_model = defined $value2[$i]{model} ? $value2[$i]{model} : $model;
-          $out .=  ui_Table::ring($value2[$i]{value},$r_min,$r_max,$r_minColor,$r_maxColor,$r_unit,"70,1",$r_func,(defined $r_unitColor ? $r_decfont.",,fill:".$r_unitColor:$r_decfont),$r_model,$lightness);
+          my ($r_min,$r_max,$r_minColor,$r_maxColor,$r_unit,$r_func,$r_decfont,$r_model)=r_details($min2,$max2,$minColor2,$maxColor2,$unit2[$i],$unit2[0],$func2,$decfont2,$model,\%{$value2[$i]});  
+          $out .=  ui_Table::ring($value2[$i]{value},$r_min,$r_max,$r_minColor,$r_maxColor,$r_unit,"70,1",$r_func,$r_decfont,$r_model,$lightness);
           $out .= '</g>';
         }
       }
@@ -5943,7 +5949,7 @@ sub card
     my $j=0;
     for (my $i=0;$i<@value1;$i++) {
       if (defined $value1[$i]{dim}) {
-        ($outplot,$outfooter) = plot ($value1[$i],[$min,$minVal],[$max,$maxVal],$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim, $noColor,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$j*10,undef,-2.5,"end",(split(",",$unit1[$i]))[1],(split(",",$unit1[$i]))[0]);
+        ($outplot,$outfooter) = plot ($value1[$i],[$min,$minVal],[$max,$maxVal],$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim, $noColor,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$j*10,undef,-2.5,"end",(defined $unit1[$i]?(split(",",$unit1[$i]))[1] : undef),(defined $unit1[$i] ? ( split(",",$unit1[$i]))[0] : undef));
         $j++;
         $out.=$outplot;
         push (@outfooter,$outfooter);
@@ -6032,7 +6038,7 @@ sub card
     my $j=0;
     for (my $i=0;$i<@value1;$i++) {
       if (defined $value1[$i]{dim}) {
-        ($outplot,$outfooter) = plot ($value1[$i],[$min,$minVal],[$max,$maxVal],$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim, $j == 0 ? $noColor:-1,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$j*10,undef,-2.5,"end",(split(",",$unit1[$i]))[1],(split(",",$unit1[$i]))[0]);
+        ($outplot,$outfooter) = plot ($value1[$i],[$min,$minVal],[$max,$maxVal],$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim, $j == 0 ? $noColor:-1,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$j*10,undef,-2.5,"end",(defined $unit1[$i]?(split(",",$unit1[$i]))[1] : undef),(defined $unit1[$i] ? ( split(",",$unit1[$i]))[0] : undef));
         $j++;
         $out.=$outplot;
         push (@outfooter,$outfooter);
@@ -6053,7 +6059,7 @@ sub card
       my $j=0;
       for (my $i=0;$i<@value2;$i++) {
         if (defined $value2[$i]{dim}) {
-          ($outplot,$outfooter) = plot ($value2[$i],[$min2,$minVal2],[$max2,$maxVal2],$minColor2,$maxColor2,$dec2,$func2,$steps,$x_prop,$chart_dim, $j == 0 ? $noColor:-1,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$offset+$j*10,undef,$chart_dim+3,"start",(split(",",$unit2[$i]))[1],(split(",",$unit2[$i]))[0]);
+          ($outplot,$outfooter) = plot ($value2[$i],[$min2,$minVal2],[$max2,$maxVal2],$minColor2,$maxColor2,$dec2,$func2,$steps,$x_prop,$chart_dim, $j == 0 ? $noColor:-1,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$offset+$j*10,undef,$chart_dim+3,"start",(defined $unit2[$i]?(split(",",$unit2[$i]))[1] : undef),(defined $unit2[$i] ? ( split(",",$unit2[$i]))[0] : undef));
           $j++;
           $out.=$outplot;
           push (@outfooter,$outfooter);
@@ -6066,31 +6072,26 @@ sub card
     if ($hring eq "") {
       $out.=sprintf('<g transform="translate(%s,6)">',$bwidth-49);
       if (@colcount >= 2 ) {
-        my $unit_1=(split(",",$unit1[$colcount[0]]))[0];
-        my $unit_2=(split(",",$unit1[$colcount[1]]))[0];
-        my $unitColor=(split(",",$unit1[$colcount[0]]))[1];
-        my $unitColor2=(split(",",$unit1[$colcount[1]]))[1];
-        $decfont="" if (!defined $decfont);
-        $out.= ui_Table::ring2($value1[$colcount[0]]{value},$min,$max,$minColor,$maxColor,$unit_1,92,$func,defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont,
-               $value1[$colcount[1]]{value},$min,$max,$minColor,$maxColor,$unit_2,$func,defined $unitColor2 ? $decfont.",,fill:".$unitColor2:$decfont,$lightness,(defined $head or !defined $icon) ? undef: $icon,$model);
+        my ($r_min1,$r_max1,$r_minColor1,$r_maxColor1,$r_unit1,$r_func1,$r_decfont1,$r_model)=r_details($min,$max,$minColor,$maxColor,$unit1[$colcount[0]],$unit1[$colcount[0]],$func,$decfont,$model,\%{$value1[$colcount[0]]});  
+        my ($r_min2,$r_max2,$r_minColor2,$r_maxColor2,$r_unit2,$r_func2,$r_decfont2)=r_details($min,$max,$minColor,$maxColor,$unit1[$colcount[1]],$unit1[$colcount[1]],$func,$decfont,$model,\%{$value1[$colcount[1]]});  
+        $out.= ui_Table::ring2($value1[$colcount[0]]{value},$r_min1,$r_max1,$r_minColor1,$r_maxColor1,$r_unit1,92,$r_func1,$r_decfont1,
+               $value1[$colcount[1]]{value},$r_min2,$r_max2,$r_minColor2,$r_maxColor2,$r_unit2,$r_func2,$r_decfont2,$lightness,(defined $head or !defined $icon) ? undef: $icon,$r_model);
       } elsif (@colcount == 0 and @col2count >= 2 ) {
-        my $unit_1=(split(",",$unit2[$col2count[0]]))[0];
-        my $unit_2=(split(",",$unit2[$col2count[1]]))[0];
-        my $unitColor=(split(",",$unit2[$col2count[0]]))[1];
-        my $unitColor2=(split(",",$unit2[$col2count[1]]))[1];
-        $decfont="" if (!defined $decfont);
-        $out.= ui_Table::ring2($value2[$col2count[0]]{value},$min,$max,$minColor,$maxColor,$unit_1,92,$func,defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont,
-               $value2[$col2count[1]]{value},$min2,$max2,$minColor2,$maxColor2,$unit_2,$func2,defined $unitColor2 ? $decfont.",,fill:".$unitColor2:$decfont,$lightness,(defined $head or !defined $icon) ? undef: $icon,$model);
+        my ($r_min1,$r_max1,$r_minColor1,$r_maxColor1,$r_unit1,$r_func1,$r_decfont1,$r_model)=r_details($min2,$max2,$minColor2,$maxColor2,$unit2[$col2count[0]],$unit2[$col2count[0]],$func2,$decfont2,$model,\%{$value2[$colcount[0]]});  
+        my ($r_min2,$r_max2,$r_minColor2,$r_maxColor2,$r_unit2,$r_func2,$r_decfont2)=r_details($min2,$max2,$minColor2,$maxColor2,$unit2[$col2count[1]],$unit2[$col2count[1]],$func2,$decfont2,$model,\%{$value2[$colcount[1]]});  
+        $out.= ui_Table::ring2($value2[$col2count[0]]{value},$r_min1,$r_max1,$r_minColor1,$r_maxColor1,$r_unit1,92,$r_func1,$r_decfont1,
+               $value2[$col2count[1]]{value},$r_min2,$r_max2,$r_minColor2,$r_maxColor2,$r_unit2,$r_func2,$r_decfont2,$lightness,(defined $head or !defined $icon) ? undef: $icon,$r_model);
       } elsif (@colcount == 1 and @col2count >= 1) {
-        my $unit_1=(split(",",$unit1[$colcount[0]]))[0];
-        my $unit_2=(split(",",$unit2[$col2count[0]]))[0];
-        $out.= ui_Table::ring2($value1[$colcount[0]]{value},$min,$max,$minColor,$maxColor,$unit_1,92,$func,$decfont,$value2[$col2count[0]]{value},$min2,$max2,$minColor2,$maxColor2,$unit_2,$func2,$decfont2,$lightness,((defined $head or !defined $icon) ? undef: $icon),$model);
+        my ($r_min1,$r_max1,$r_minColor1,$r_maxColor1,$r_unit1,$r_func1,$r_decfont1,$r_model)=r_details($min,$max,$minColor,$maxColor,$unit1[$colcount[0]],$unit1[$colcount[0]],$func,$decfont,$model,\%{$value1[$colcount[0]]});  
+        my ($r_min2,$r_max2,$r_minColor2,$r_maxColor2,$r_unit2,$r_func2,$r_decfont2)=r_details($min2,$max2,$minColor2,$maxColor2,$unit2[$col2count[0]],$unit2[$col2count[0]],$func2,$decfont2,$model,\%{$value2[$col2count[0]]});  
+        $out.= ui_Table::ring2($value1[$colcount[0]]{value},$r_min1,$r_max1,$r_minColor1,$r_maxColor1,$r_unit1,92,$r_func1,$r_decfont1,
+               $value2[$col2count[0]]{value},$r_min2,$r_max2,$r_minColor2,$r_maxColor2,$r_unit2,$r_func2,$r_decfont2,$lightness,(defined $head or !defined $icon) ? undef: $icon,$r_model);
       } elsif (@colcount == 1 and @col2count == 0) {
-        my $unit_1=(split(",",$unit1[$colcount[0]]))[0];
-        $out.= ui_Table::ring($value1[$colcount[0]]{value},$min,$max,$minColor,$maxColor,$unit_1,92,$func,$decfont,$model,$lightness,(defined $head or !defined $icon) ? undef: $icon);
+        my ($r_min,$r_max,$r_minColor,$r_maxColor,$r_unit,$r_func,$r_decfont,$r_model)=r_details($min,$max,$minColor,$maxColor,$unit1[$colcount[0]],$unit1[$colcount[0]],$func,$decfont,$model,\%{$value1[$colcount[0]]});  
+        $out.= ui_Table::ring($value1[$colcount[0]]{value},$r_min,$r_max,$r_minColor,$r_maxColor,$r_unit,92,$r_func,$r_decfont,$r_model,$lightness,(defined $head or !defined $icon) ? undef: $icon);
       } elsif (@colcount == 0 and @col2count == 1) { 
-        my $unit_2=(split(",",$unit2[$col2count[0]]))[0];
-        $out.= ui_Table::ring($value2[$col2count[0]]{value},$min2,$max2,$minColor2,$maxColor2,$unit_2,92,$func2,$decfont2,$model,$lightness,(defined $head or !defined $icon) ? undef: $icon);
+        my ($r_min,$r_max,$r_minColor,$r_maxColor,$r_unit,$r_func,$r_decfont,$r_model)=r_details($min2,$max2,$minColor2,$maxColor2,$unit2[$col2count[0]],$unit2[$col2count[0]],$func2,$decfont2,$model,\%{$value2[$col2count[0]]});  
+        $out.= ui_Table::ring($value2[$col2count[0]]{value},$r_min,$r_max,$r_minColor,$r_maxColor,$r_unit,92,$r_func,$r_decfont,$r_model,$lightness,(defined $head or !defined $icon) ? undef: $icon);
       }
       $out.='</g>';
       $out.=sprintf('<text text-anchor="middle" x="%s" y="68" style="fill:#CCCCCC;font-size:8px">%s</text>',$bwidth-21,::strftime("%H:%M:%S",localtime($time)));
