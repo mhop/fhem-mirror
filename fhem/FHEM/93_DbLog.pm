@@ -39,9 +39,11 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.9.0"   => "16.05.2023 Server shutdown -> write cachefile if database connect can't be done during delayed shutdown ". 
+                           "Forum: https://forum.fhem.de/index.php?topic=133599.0 ",
   "5.8.8"   => "11.05.2023 _DbLog_ParseEvent changed default splitting, Forum: https://forum.fhem.de/index.php?topic=133537.0 ",
   "5.8.7"   => "01.05.2023 new Events FRAME_INITIALIZED, SUBPROC_INITIALIZED, SUBPROC_DISCONNECTED, SUBPROC_STOPPED ".
-               "Forum: https://forum.fhem.de/index.php?topic=133403.0, minor fixes ",
+                           "Forum: https://forum.fhem.de/index.php?topic=133403.0, minor fixes ",
   "5.8.6"   => "25.03.2023 change _DbLog_plotData (intx), Plot Editor: include functions delta-h, delta-h, ...".
                            "remove setter deleteOldDaysNbl, reduceLogNbl ",
   "5.8.5"   => "16.03.2023 fix using https in configCheck after SVN server change ",
@@ -1025,7 +1027,7 @@ sub _DbLog_setexportCache {              ## no critic "not used"
   my $logsref = $paref->{logsref};
   my $dir     = $paref->{dir};
 
-  return "Device is not in asynch working mode" if(!AttrVal($name, 'asyncMode', 0));
+  # return "Device is not in asynch working mode" if(!AttrVal($name, 'asyncMode', 0));
 
   my $cln;
   my $crows = 0;
@@ -5467,14 +5469,24 @@ sub DbLog_SBP_Read {
       if ($oper =~ /log_/xs) {
           my $rowlback = $ret->{rowlback};
 
-          if($rowlback) {                                                                         # one Transaction
+          if($rowlback) {                                                                                  
               my $memcount;
 
-              eval {
+              eval {                                                                                         # one Transaction
                   for my $key (sort {$a <=>$b} keys %{$rowlback}) {
-                      $memcount = DbLog_addMemCacheRow ($name, $rowlback->{$key});                # Datensatz zum Memory Cache hinzufügen
+                      $memcount = DbLog_addMemCacheRow ($name, $rowlback->{$key});                           # Datensatz zum Memory Cache hinzufügen
 
                       Log3 ($name, 5, "DbLog $name - row back to Cache: $key -> ".$rowlback->{$key});
+                  }
+                  
+                  if ($hash->{HELPER}{SHUTDOWNSEQ} && $memcount) {
+                      Log3 ($name, 2, "DbLog $name - an error occurred during the last write cycle to the database, the data is exported to a file instead ... ......");
+                      
+                      my $error = CommandSet (undef, qq{$name exportCache purgecache});
+
+                      if ($error) {                                                                          # Fehler beim Export Cachefile
+                          Log3 ($name, 1, "DbLog $name - ERROR - while exporting Cache file: $error");
+                      }                    
                   }
               };
 
