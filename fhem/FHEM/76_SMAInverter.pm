@@ -32,6 +32,13 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.23.2" => "20.05.2023  add new SMAInverter_StatusText",
+  "2.23.1" => "19.05.2023  add String 3 (only STP X Inverter)",
+  "2.23.0" => "14.05.2023  read firmware version",
+  "2.22.2" => "01.05.2023  fix name STPxxSE".
+                           "add new Readings (GeneralOperatingStatus, OperatingStatus, BACKRELAYRELAY)",
+  "2.22.1" => "23.04.2023  add STP X",
+  "2.22.0" => "03.04.2023  add SI x.xM-13",
   "2.21.6" => "12.02.2023  read PV-Power (DC) from Hybridinverter, set state to PV-Power (Hybridinverter)",
   "2.21.5" => "08.02.2023  bugfix reset TODAY Counter",
   "2.21.4" => "28.01.2023  bugfix save INVCLASS && INVTYPE",
@@ -295,10 +302,18 @@ my %SMAInverter_devtypes = (
 9403 => "SB4.0-1AV-41 (Sunny Boy 4.0 AV-41)",
 9404 => "SB5.0-1AV-41 (Sunny Boy 5.0 AV-41)",
 9405 => "SB6.0-1AV-41 (Sunny Boy 6.0 AV-41)",
-19048 => "STP5.0SE (SUNNY TRIPOWER 8.0 SE)",
-19049 => "STP6.0SE (SUNNY TRIPOWER 8.0 SE)",
+9473 => "SI 3.0M-13 (Sunny Island 3.0M)",
+9474 => "SI 4.4M-13 (Sunny Island 4.4M)",
+9475 => "SI 6.0H-13 (Sunny Island 6.0H)",
+9476 => "SI 8.0H-13 (Sunny Island 8.0H)",
+19048 => "STP5.0SE (SUNNY TRIPOWER 5.0 SE)",
+19049 => "STP6.0SE (SUNNY TRIPOWER 6.0 SE)",
 19050 => "STP8.0SE (SUNNY TRIPOWER 8.0 SE)",
-19051 => "STP10.0SE (SUNNY TRIPOWER 8.0 SE)",
+19051 => "STP10.0SE (SUNNY TRIPOWER 10.0 SE)",
+9490 => "STP X 50-12 (SUNNY TRIPOWER X 50-12)",
+9491 => "STP X 50-15 (SUNNY TRIPOWER X 50-15)",
+9492 => "STP X 50-20 (SUNNY TRIPOWER X 50-20)",
+9488 => "STP X 50-25 (SUNNY TRIPOWER X 50-25)",
 );
 
 # Wechselrichter Class-Hash DE
@@ -583,7 +598,7 @@ sub SMAInverter_GetData($) {
  Log3 ($name, 4, "$name - ###############################################################");
  Log3 ($name, 4, "$name - ##########  Begin of new SMAInverter get data cycle  ##########");
  Log3 ($name, 4, "$name - ###############################################################");
- Log3 ($name, 4, "$name - timeout cycles since module start: $hash->{HELPER}{FAULTEDCYCLES}");
+ Log3 ($name, 4, "$name - timeout cycles since module start: $hash->{HELPER}{FAULTEDCYCLES}, Interval: $interval");
 
  # decide of operation
  if(AttrVal($name,"mode","automatic") eq "automatic") {
@@ -643,6 +658,7 @@ sub SMAInverter_GetData($) {
 
 $hash->{HELPER}{firtRunDay} = $firtRunDay;
 
+Log3 ($name, 4, "$name - start BlockingCall");
 $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAInverter_getstatusDoParse", "$name", "SMAInverter_getstatusParseDone", $timeout, "SMAInverter_getstatusParseAborted", $hash);
 $hash->{HELPER}{RUNNING_PID}{loglevel} = 4;
 
@@ -654,11 +670,14 @@ return;
 ###############################################################
 sub SMAInverter_getstatusDoParse($) {
  my ($name)   = @_;
+ Log3 ($name, 4, "$name - running BlockingCall SMAInverter_getstatusDoParse");
+  
  my $hash     = $defs{$name};
  my $interval = AttrVal($name, "interval", 60);
  my $sc       = AttrVal($name, "SBFSpotComp", 0);
  my ($sup_EnergyProduction,
      $sup_PVEnergyProduction,
+	 $sup_Firmware,
      $sup_SpotDCPower,
 	 $sup_SpotDCPower_2,
 	 $sup_SpotDCPower_3,
@@ -687,6 +706,10 @@ sub SMAInverter_getstatusDoParse($) {
      $sup_OperationTime,
      $sup_InverterTemperature,
      $sup_GridRelayStatus,
+	 $sup_BackupRelayStatus,
+	 $sup_OperatingStatus,
+	 $sup_GeneralOperatingStatus,
+	 $sup_WaitingTimeUntilFeedIn,
      $sup_SpotBatteryLoad,
      $sup_SpotBatteryUnload,
      $sup_DeviceStatus,
@@ -702,6 +725,7 @@ sub SMAInverter_getstatusDoParse($) {
 	 $inv_SPOT_EPVTODAY, $inv_SPOT_EPVTOTAL,
      $inv_susyid,
      $inv_serial,
+	 $inv_Firmware,
      $inv_SPOT_PDC,$inv_SPOT_PDC1, $inv_SPOT_PDC2, $inv_SPOT_PDC3,
      $inv_SPOT_PAC1, $inv_SPOT_PAC2, $inv_SPOT_PAC3, $inv_SPOT_PACTOT,
      $inv_PACMAX1, $inv_PACMAX2, $inv_PACMAX3, $inv_PACMAX1_2,
@@ -721,6 +745,7 @@ sub SMAInverter_getstatusDoParse($) {
      $inv_BAT_LOADTODAY, $inv_BAT_LOADTOTAL, $inv_BAT_CAPACITY,$inv_BAT_UNLOADTODAY,$inv_BAT_UNLOADTOTAL,
 	 $inv_BAT_Manufacturer,
      $inv_SPOT_FREQ, $inv_SPOT_OPERTM, $inv_SPOT_FEEDTM, $inv_TEMP, $inv_GRIDRELAY, $inv_STATUS,
+	 $inv_BACKUPRELAY, $inv_OperatingStatus, $inv_GeneralOperatingStatus, $inv_WaitingTimeUntilFeedIn,
 	 $Meter_Grid_FeedIn, $Meter_Grid_Consumation,$Meter_Total_Yield,$Meter_Total_Consumation,
 	 $Meter_Power_Grid_FeedIn,$Meter_Power_Grid_Consumation,
 	 $Meter_Grid_FeedIn_PAC1, $Meter_Grid_FeedIn_PAC2, $Meter_Grid_FeedIn_PAC3, $Meter_Grid_Consumation_PAC1, $Meter_Grid_Consumation_PAC2, $Meter_Grid_Consumation_PAC3,
@@ -735,6 +760,7 @@ sub SMAInverter_getstatusDoParse($) {
  my $INVTYPE_NAME = ReadingsVal($name,"INV_TYPE",ReadingsVal($name,"device_type",""));
  my $firtRunDay = $hash->{HELPER}{firtRunDay};
  my $readParameter = 0;
+ my $INVFWMAIN = InternalVal($name, "INVFWMAIN", 0);
  
  Log3 ($name, 4, "$name -> INVCLASS $INVCLASS");
  Log3 ($name, 4, "$name -> INVTYPE $INVTYPE");	
@@ -748,7 +774,7 @@ sub SMAInverter_getstatusDoParse($) {
  # Background-Startzeit
  $bst = [gettimeofday];
  
- Log3 ($name, 4, "$name -> Start BlockingCall SMAInverter_getstatusDoParse");
+ Log3 ($name, 4, "$name -> start BlockingCall SMAInverter_getstatusDoParse");
 
  # set dependency from surise/sunset used for inverter operation time
  my $offset = AttrVal($name,"offset",0);
@@ -865,20 +891,22 @@ sub SMAInverter_getstatusDoParse($) {
                      "sup_SpotACTotalPower"            # Check SpotACTotalPower             
                      );
 	 
-     push(@commands, "sup_ChargeStatus") if($INVCLASS eq "8009" || $INVCLASS eq "8007"); 	# Check BatteryChargeStatus
+	 if($INVCLASS eq "8009" || $INVCLASS eq "8007")
+	 {
+		push(@commands, "sup_ChargeStatus"); 				# Check BatteryChargeStatus
+		push(@commands, "sup_SpotBatteryLoad");       	    # Check Batteryload
+		push(@commands, "sup_SpotBatteryUnload");       	# Check BatteryUnload
+	 }
+	 
 	 push(@commands, "sup_PVEnergyProduction") if($INVCLASS eq "8009");    					# Check PV-EnergyProduction (Hybrid Inverter)
      push(@commands, "sup_SpotDCPower_3")      if($INVCLASS eq "8009");  					# SpotDCPower summary
 	 
-	 push(@commands, "sup_SpotDCPower_2")      if($INVTYPE  eq "9999999"); 					# SpotDCPower String 3 and more
-	 
-	 
-	 push(@commands, "sup_SpotBatteryLoad");       	    # Check Batteryload
-     push(@commands, "sup_SpotBatteryUnload");       	# Check BatteryUnload
+	 #push(@commands, "sup_SpotDCPower_2")      if($INVTYPE  >= 9488 && $INVTYPE  <= 9493);  # SpotDCPower String 3 and more
 	 
      if($detail_level > 0) {
          # Detail Level 1 or 2 >> get voltage and current levels
          push(@commands, "sup_SpotDCVoltage");         # Check SpotDCVoltage
-		 push(@commands, "sup_SpotDCVoltage_2") if($INVTYPE eq "9999999"); # SpotDCVoltage String 3 and more
+		 #push(@commands, "sup_SpotDCVoltage_2") if($INVTYPE  >= 9488 && $INVTYPE  <= 9493); # SpotDCVoltage String 3 and more
          push(@commands, "sup_SpotACVoltage");         # Check SpotACVoltage
 		 push(@commands, "sup_SpotACCurrent");         # Check SpotACCurrent
 		 
@@ -896,7 +924,8 @@ sub SMAInverter_getstatusDoParse($) {
 		 {
 			push(@commands, "sup_BatteryInfo_2");     # Check BatteryInfo Voltage
 		 }
-		 else{
+		 elsif($INVCLASS eq "8009" || $INVCLASS eq "8007")
+		 {
 			push(@commands, "sup_BatteryInfo");        	# Check BatteryInfo 
 		 }
      }
@@ -910,7 +939,9 @@ sub SMAInverter_getstatusDoParse($) {
           push(@commands, "sup_MaxACPower2");           # Check MaxACPower2 ?
           push(@commands, "sup_GridRelayStatus");       # Check GridRelayStatus
           push(@commands, "sup_DeviceStatus");          # Check DeviceStatus
-          push(@commands, "sup_BatteryInfo_Capacity") if($readParameter == 1);  # Check BatteryInfo capacity
+          
+		  
+		  push(@commands, "sup_Firmware") if($readParameter == 1); #Read WR Firmwareversion
 		  
 		  if ($INVTYPE_NAME =~ /SBS(6\.0|5\.0|3\.7)/xs)
 		  {
@@ -920,6 +951,7 @@ sub SMAInverter_getstatusDoParse($) {
 		  
 		  if ($INVCLASS eq "8007" || $INVCLASS eq "8009")
 		  {
+		    push(@commands, "sup_BatteryInfo_Capacity") if($readParameter == 1);  # Check BatteryInfo capacity
 			#push(@commands, "sup_BatteryInfo_3");     
 			push(@commands, "sup_BatteryInfo_4") if($readParameter == 1);   # Check BatteryInfo rated apacity 
 			#push(@commands, "sup_BatteryInfo_5");  
@@ -927,6 +959,11 @@ sub SMAInverter_getstatusDoParse($) {
 		  
 		  #push(@commands, "sup_Insulation_1");  # Isolationsüberwachung
 		  #push(@commands, "sup_Insulation_2");  # Isolationsüberwachung
+		  	
+		  push(@commands, "sup_GeneralOperatingStatus");			
+		  push(@commands, "sup_OperatingStatus") if($INVCLASS eq "8009"); 
+		  push(@commands, "sup_BackupRelayStatus") if($INVCLASS eq "8009"); 
+		  #push(@commands, "sup_WaitingTimeUntilFeedIn") if($INVCLASS eq "8009"); 
      }
 	 
 	 if($readEnergyMeter_data > 0) {
@@ -944,9 +981,11 @@ sub SMAInverter_getstatusDoParse($) {
 
          for my $i(@commands) {
              if ($i eq "sup_TypeLabel") {
+			      Log3 $name, 5, "$name -> sup_TypeLabel";
                  ($sup_TypeLabel,$inv_TYPE,$inv_CLASS,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x58000200, 0x00821E00, 0x008220FF);
              }
              elsif ($i eq "sup_EnergyProduction") {
+			      Log3 $name, 5, "$name -> sup_EnergyProduction";
                  ($sup_EnergyProduction,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00260100, 0x002622FF);
              }
 			 elsif ($i eq "sup_PVEnergyProduction") {
@@ -954,31 +993,31 @@ sub SMAInverter_getstatusDoParse($) {
                  ($sup_PVEnergyProduction,$inv_SPOT_EPVTODAY,$inv_SPOT_EPVTOTAL,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x0046c300, 0x0046c3FF);
              }
              elsif ($i eq "sup_SpotDCPower") {
-                 ($sup_SpotDCPower,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00251E00, 0x00251EFF);
-             }
-			 elsif ($i eq "sup_SpotDCPower_2") {
-                 ($sup_SpotDCPower,$inv_SPOT_PDC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00251E00, 0x00251EFF);
+			      Log3 $name, 5, "$name -> sup_SpotDCPower";
+                 ($sup_SpotDCPower,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_SPOT_PDC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00251E00, 0x00251EFF);
              }
 			 elsif ($i eq "sup_SpotDCPower_3") {
 			     Log3 $name, 5, "$name -> sup_SpotDCPower_3";
                  ($sup_SpotDCPower_3,$inv_SPOT_PDC,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x0046c200, 0x0046c2FF);
              }
              elsif ($i eq "sup_SpotACPower") {
+			      Log3 $name, 5, "$name -> sup_SpotACPower";
                  ($sup_SpotACPower,$inv_SPOT_PAC1,$inv_SPOT_PAC2,$inv_SPOT_PAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464000, 0x004642FF);
              }
              elsif ($i eq "sup_SpotACTotalPower") {
+			      Log3 $name, 5, "$name -> sup_SpotACTotalPower";
                  ($sup_SpotACTotalPower,$inv_SPOT_PACTOT,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00263F00, 0x00263FFF);
              }
              elsif ($i eq "sup_ChargeStatus") {
+			      Log3 $name, 5, "$name -> sup_ChargeStatus";
                  ($sup_ChargeStatus,$inv_ChargeStatus,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00295A00, 0x00295AFF);
              }
              elsif ($i eq "sup_SpotDCVoltage") {
-                 ($sup_SpotDCVoltage,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00451F00, 0x004521FF);
-             }
-			 elsif ($i eq "sup_SpotDCVoltage_2") {
-                 ($sup_SpotDCVoltage,$inv_SPOT_UDC3,$inv_SPOT_IDC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00451F00, 0x004521FF);
+			      Log3 $name, 5, "$name -> sup_SpotDCVoltage";
+                 ($sup_SpotDCVoltage,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_UDC3,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_SPOT_IDC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00451F00, 0x004521FF);
              }
              elsif ($i eq "sup_SpotACVoltage") {
+			      Log3 $name, 5, "$name -> sup_SpotACVoltage";
                  ($sup_SpotACVoltage,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_UAC1_2,$inv_SPOT_UAC2_3,$inv_SPOT_UAC3_1,$inv_SPOT_CosPhi,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464800, 0x004656FF);
              }
 			 elsif ($i eq "sup_SpotACCurrent") {
@@ -1030,30 +1069,55 @@ sub SMAInverter_getstatusDoParse($) {
                  ($sup_BatteryInfo_5,$inv_BAT_Typ,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x58020200, 0x00B18900, 0x00B189FF);
              }			 
              elsif ($i eq "sup_SpotGridFrequency") {
+			     Log3 $name, 5, "$name -> sup_SpotGridFrequency";
                  ($sup_SpotGridFrequency,$inv_SPOT_FREQ,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00465700, 0x004657FF);
              }
              elsif ($i eq "sup_OperationTime") {
+			     Log3 $name, 5, "$name -> sup_OperationTime";
                  ($sup_OperationTime,$inv_SPOT_OPERTM,$inv_SPOT_FEEDTM,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00462E00, 0x00462FFF);
              }
              elsif ($i eq "sup_InverterTemperature") {
+			     Log3 $name, 5, "$name -> sup_InverterTemperature";
                  ($sup_InverterTemperature,$inv_TEMP,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x52000200, 0x00237700, 0x002377FF);
              }
              elsif ($i eq "sup_MaxACPower") {
+			     Log3 $name, 5, "$name -> sup_MaxACPower";
                  ($sup_MaxACPower,$inv_PACMAX1,$inv_PACMAX2,$inv_PACMAX3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00411E00, 0x004120FF);
              }
              elsif ($i eq "sup_MaxACPower2") {
+			     Log3 $name, 5, "$name -> sup_MaxACPower2";
                  ($sup_MaxACPower2,$inv_PACMAX1_2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00832A00, 0x00832AFF);
              }
              elsif ($i eq "sup_GridRelayStatus") {
+			     Log3 $name, 5, "$name -> sup_GridRelayStatus";
                  ($sup_GridRelayStatus,$inv_GRIDRELAY,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x00416400, 0x004164FF);
              }
+			 elsif ($i eq "sup_BackupRelayStatus") {
+			     Log3 $name, 5, "$name -> sup_BackupRelayStatus";
+                 ($sup_BackupRelayStatus,$inv_BACKUPRELAY,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x08412500, 0x084125FF);
+             }
+			 elsif ($i eq "sup_OperatingStatus") {
+                 Log3 $name, 5, "$name -> sup_OperatingStatus";
+				 ($sup_OperatingStatus,$inv_OperatingStatus,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x08412B00, 0x08412BFF);
+             }
+			 elsif ($i eq "sup_GeneralOperatingStatus") {
+                 Log3 $name, 5, "$name -> sup_GeneralOperatingStatus";
+				 ($sup_GeneralOperatingStatus,$inv_GeneralOperatingStatus,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x08412800, 0x084128FF);
+             }
+			 elsif ($i eq "sup_WaitingTimeUntilFeedIn") {
+                 Log3 $name, 5, "$name -> sup_WaitingTimeUntilFeedIn";
+				 ($sup_WaitingTimeUntilFeedIn,$inv_WaitingTimeUntilFeedIn,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00416600, 0x004166FF);
+             }
              elsif ($i eq "sup_DeviceStatus") {
+			     Log3 $name, 5, "$name -> sup_DeviceStatus";
                  ($sup_DeviceStatus,$inv_STATUS,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x00214800, 0x002148FF);
              }
              elsif ($i eq "sup_SpotBatteryLoad") {
+			     Log3 $name, 5, "$name -> sup_SpotBatteryLoad";
                  ($sup_SpotBatteryLoad,$inv_BAT_LOADTODAY,$inv_BAT_LOADTOTAL,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00496700, 0x004967FF);
              }
              elsif ($i eq "sup_SpotBatteryUnload") {
+			     Log3 $name, 5, "$name -> sup_SpotBatteryUnload";
                  ($sup_SpotBatteryUnload,$inv_BAT_UNLOADTODAY,$inv_BAT_UNLOADTOTAL,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00496800, 0x004968FF);
              }
 			 elsif ($i eq "sup_EM_1") {
@@ -1079,6 +1143,10 @@ sub SMAInverter_getstatusDoParse($) {
 			 elsif ($i eq "sup_Insulation_2") {
 			     Log3 ($name, 4, "$name -> sup_Insulation_2");
                  ($sup_Insulation_2,$inv_DC_insulation,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51020200, 0x00254F00, 0x00254FFF);
+             }
+			 elsif ($i eq "sup_Firmware") {
+			     Log3 ($name, 4, "$name -> sup_Firmware");
+                 ($sup_Firmware,$inv_Firmware,$INVFWMAIN,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x58000200, 0x00823400, 0x008234FF);
              }
          }
 		 
@@ -1195,10 +1263,8 @@ sub SMAInverter_getstatusDoParse($) {
              }
              if($sup_SpotDCPower) {
                  push(@row_array, "string_1_pdc ".sprintf("%.3f",$inv_SPOT_PDC1/1000)."\n");
-                 push(@row_array, "string_2_pdc ".sprintf("%.3f",$inv_SPOT_PDC2/1000)."\n");	 
-             }
-			 if($sup_SpotDCPower_2) {
-			     push(@row_array, "string_3_pdc ".sprintf("%.3f",$inv_SPOT_PDC3/1000)."\n");	
+                 push(@row_array, "string_2_pdc ".sprintf("%.3f",$inv_SPOT_PDC2/1000)."\n") if ($inv_SPOT_PDC2 ne "-");	
+				 push(@row_array, "string_3_pdc ".sprintf("%.3f",$inv_SPOT_PDC3/1000)."\n") if ($inv_SPOT_PDC3 ne "-");				 
              }
 			 if($sup_SpotDCPower_3) {
 				 push(@row_array, "strings_pdc ".sprintf("%.3f",$inv_SPOT_PDC/1000)."\n");
@@ -1241,11 +1307,11 @@ sub SMAInverter_getstatusDoParse($) {
                  # For Detail Level 1
                  if($sup_SpotDCVoltage) {
                      push(@row_array, "string_1_udc ".sprintf("%.2f",$inv_SPOT_UDC1)."\n");
-                     push(@row_array, "string_2_udc ".sprintf("%.2f",$inv_SPOT_UDC2)."\n");
-					 push(@row_array, "string_3_udc ".sprintf("%.2f",$inv_SPOT_UDC3)."\n") if($INVTYPE eq "9999999");	
+                     push(@row_array, "string_2_udc ".sprintf("%.2f",$inv_SPOT_UDC2)."\n") if($inv_SPOT_UDC2 ne "-");
+					 push(@row_array, "string_3_udc ".sprintf("%.2f",$inv_SPOT_UDC3)."\n") if($inv_SPOT_UDC3 ne "-");	
                      push(@row_array, "string_1_idc ".sprintf("%.3f",$inv_SPOT_IDC1)."\n");
-                     push(@row_array, "string_2_idc ".sprintf("%.3f",$inv_SPOT_IDC2)."\n");
-					 push(@row_array, "string_3_idc ".sprintf("%.3f",$inv_SPOT_IDC3)."\n") if($INVTYPE eq "9999999");	
+                     push(@row_array, "string_2_idc ".sprintf("%.3f",$inv_SPOT_IDC2)."\n") if($inv_SPOT_IDC2 ne "-");
+					 push(@row_array, "string_3_idc ".sprintf("%.3f",$inv_SPOT_IDC3)."\n") if($inv_SPOT_IDC3 ne "-");	
                  }
                  if($sup_SpotACVoltage) {
                      push(@row_array, "phase_1_uac ".sprintf("%.2f",$inv_SPOT_UAC1)."\n") if ($inv_SPOT_UAC1 ne "-");
@@ -1323,6 +1389,9 @@ sub SMAInverter_getstatusDoParse($) {
                      push(@row_array, "device_name "."SN: ".$inv_serial."\n") if($inv_serial);
                      push(@row_array, "serial_number ".$inv_serial."\n") if($inv_serial);
                  }
+				 if($sup_Firmware) {
+                     push(@row_array, "device_firmware ".$inv_Firmware."\n");
+                 }
                  if($sup_MaxACPower) {
                      push(@row_array, "pac_max_phase_1 ".$inv_PACMAX1."\n");
                      push(@row_array, "pac_max_phase_2 ".$inv_PACMAX2."\n");
@@ -1343,6 +1412,19 @@ sub SMAInverter_getstatusDoParse($) {
                  }
                  if($sup_DeviceStatus) {
                      push(@row_array, "device_status ".SMAInverter_StatusText($inv_STATUS)."\n");
+                 }
+				 
+				 if($sup_BackupRelayStatus) {
+                     push(@row_array, "backuprelay_status ".SMAInverter_StatusText($inv_BACKUPRELAY)."\n");
+                 }
+				 if($sup_OperatingStatus) {
+                     push(@row_array, "operating_status ".SMAInverter_StatusText($inv_OperatingStatus)."\n");
+                 }
+				 if($sup_GeneralOperatingStatus) {
+                     push(@row_array, "general_operating_status ".SMAInverter_StatusText($inv_GeneralOperatingStatus)."\n");
+                 }
+				 if($sup_WaitingTimeUntilFeedIn) {
+                     push(@row_array, "waiting_time_until_feed_in ".$inv_WaitingTimeUntilFeedIn."\n");
                  }
              }
              if($detail_level > 2) {
@@ -1391,10 +1473,8 @@ sub SMAInverter_getstatusDoParse($) {
              }
              if($sup_SpotDCPower) {
                  push(@row_array, "SPOT_PDC1 ".$inv_SPOT_PDC1."\n");
-                 push(@row_array, "SPOT_PDC2 ".$inv_SPOT_PDC2."\n");
-             }
-			 if($sup_SpotDCPower_2) {
-			     push(@row_array, "SPOT_PDC3 ".$inv_SPOT_PDC3."\n");	
+                 push(@row_array, "SPOT_PDC2 ".$inv_SPOT_PDC2."\n") if ($inv_SPOT_PDC2 ne "-");	
+				 push(@row_array, "SPOT_PDC3 ".$inv_SPOT_PDC3."\n") if ($inv_SPOT_PDC3 ne "-");	
              }
 			 if($sup_SpotDCPower_3) {
 				 push(@row_array, "SPOT_PDC ".($inv_SPOT_PDC)."\n");
@@ -1437,11 +1517,11 @@ sub SMAInverter_getstatusDoParse($) {
                  # For Detail Level 1
                  if($sup_SpotDCVoltage) {
                      push(@row_array, "SPOT_UDC1 ".$inv_SPOT_UDC1."\n");
-                     push(@row_array, "SPOT_UDC2 ".$inv_SPOT_UDC2."\n");
-					 push(@row_array, "SPOT_UDC3 ".$inv_SPOT_UDC3."\n") if($INVTYPE eq "9999999");
+                     push(@row_array, "SPOT_UDC2 ".$inv_SPOT_UDC2."\n") if($inv_SPOT_UDC2 ne "-");
+					 push(@row_array, "SPOT_UDC3 ".$inv_SPOT_UDC3."\n") if($inv_SPOT_UDC3 ne "-");
                      push(@row_array, "SPOT_IDC1 ".$inv_SPOT_IDC1."\n");
-                     push(@row_array, "SPOT_IDC2 ".$inv_SPOT_IDC2."\n");
-					 push(@row_array, "SPOT_IDC3 ".$inv_SPOT_IDC3."\n") if($INVTYPE eq "9999999");
+                     push(@row_array, "SPOT_IDC2 ".$inv_SPOT_IDC2."\n") if($inv_SPOT_IDC2 ne "-");
+					 push(@row_array, "SPOT_IDC3 ".$inv_SPOT_IDC3."\n") if($inv_SPOT_IDC3 ne "-");
                  }
                  if($sup_SpotACVoltage) {
                      push(@row_array, "SPOT_UAC1 ".$inv_SPOT_UAC1."\n") if ($inv_SPOT_UAC1 ne "-");
@@ -1518,6 +1598,9 @@ sub SMAInverter_getstatusDoParse($) {
                      push(@row_array, "SUSyID ".      $inv_susyid."\n") if($inv_susyid);
                      push(@row_array, "Serialnumber ".$inv_serial."\n") if($inv_serial);
                  }
+				 if($sup_Firmware) {
+                     push(@row_array, "INV_FIRMWARE ".$inv_Firmware."\n");
+                 }
                  if($sup_MaxACPower) {
                      push(@row_array, "INV_PACMAX1 ".$inv_PACMAX1."\n");
                      push(@row_array, "INV_PACMAX2 ".$inv_PACMAX2."\n");
@@ -1538,6 +1621,19 @@ sub SMAInverter_getstatusDoParse($) {
                  }
                  if($sup_DeviceStatus) {
                      push(@row_array, "INV_STATUS ".SMAInverter_StatusText($inv_STATUS)."\n");
+                 }
+
+				 if($sup_BackupRelayStatus) {
+                     push(@row_array, "INV_BACKRELAYRELAY ".SMAInverter_StatusText($inv_BACKUPRELAY)."\n");
+                 }
+				 if($sup_OperatingStatus) {
+                     push(@row_array, "INV_OperatingStatus ".SMAInverter_StatusText($inv_OperatingStatus)."\n");
+                 }
+				 if($sup_GeneralOperatingStatus) {
+                     push(@row_array, "INV_GeneralOperatingStatus ".SMAInverter_StatusText($inv_GeneralOperatingStatus)."\n");
+                 }
+				 if($sup_WaitingTimeUntilFeedIn) {
+                     push(@row_array, "INV_WaitingTimeUntilFeedIn ".$inv_WaitingTimeUntilFeedIn."\n");
                  }
              }
 			 
@@ -1582,7 +1678,7 @@ sub SMAInverter_getstatusDoParse($) {
 
  Log3 ($name, 4, "$name -> BlockingCall SMAInverter_getstatusDoParse finished");
 
-return "$name|$rowlist|$avg|$rt|$INVCLASS|$INVTYPE";
+return "$name|$rowlist|$avg|$rt|$INVCLASS|$INVTYPE|$INVFWMAIN";
 }
 
 ###############################################################
@@ -1598,8 +1694,9 @@ sub SMAInverter_getstatusParseDone ($) {
  my $rt                      = $a[3];
  my ($irt,$brt)              = split(",", $rt);
  
- $hash->{INVCLASS} = $a[4];
- $hash->{INVTYPE}  = $a[5];
+ $hash->{INVCLASS} 			 = $a[4];
+ $hash->{INVTYPE}  			 = $a[5];
+ $hash->{INVFWMAIN}  		 = $a[6];
 
  Log3 ($name, 4, "$name -> Start BlockingCall SMAInverter_getstatusParseDone");
 
@@ -1676,6 +1773,7 @@ sub SMAInverter_SMAcommand($$$$$) {
 	 $inv_SPOT_EPVTODAY, $inv_SPOT_EPVTOTAL,
      $inv_susyid,
      $inv_serial,
+	 $inv_Firmware,
      $inv_SPOT_PDC, $inv_SPOT_PDC1, $inv_SPOT_PDC2, $inv_SPOT_PDC3,
      $inv_SPOT_PAC1, $inv_SPOT_PAC2, $inv_SPOT_PAC3, $inv_SPOT_PACTOT,
      $inv_PACMAX1, $inv_PACMAX2, $inv_PACMAX3, $inv_PACMAX1_2,
@@ -1694,6 +1792,7 @@ sub SMAInverter_SMAcommand($$$$$) {
      $inv_BAT_LOADTODAY, $inv_BAT_LOADTOTAL, $inv_BAT_CAPACITY,$inv_BAT_UNLOADTODAY,$inv_BAT_UNLOADTOTAL,
 	 $inv_BAT_rated_capacity,
      $inv_SPOT_FREQ, $inv_SPOT_OPERTM, $inv_SPOT_FEEDTM, $inv_TEMP, $inv_GRIDRELAY, $inv_STATUS,
+	 $inv_BACKUPRELAY, $inv_OperatingStatus, $inv_GeneralOperatingStatus, $inv_WaitingTimeUntilFeedIn,
 	 $Meter_Grid_FeedIn, $Meter_Grid_Consumation, $Meter_Total_FeedIn, $Meter_Total_Consumation,
 	 $Meter_Power_Grid_FeedIn, $Meter_Power_Grid_Consumation,
 	 $Meter_Grid_FeedIn_PAC1, $Meter_Grid_FeedIn_PAC2, $Meter_Grid_FeedIn_PAC3, $Meter_Grid_Consumation_PAC1, $Meter_Grid_Consumation_PAC2, $Meter_Grid_Consumation_PAC3);
@@ -1897,7 +1996,26 @@ sub SMAInverter_SMAcommand($$$$$) {
  }
 #Meter end
 
-
+ if($data_ID eq 0x8234) {
+     $inv_Firmware = hex(unpack("H*", substr $data, 81, 1));
+	 my $INVFWMAIN = $inv_Firmware;
+	 $inv_Firmware = $inv_Firmware .".". hex(unpack("H*", substr $data, 80, 1));
+	 $inv_Firmware = $inv_Firmware .".". hex(unpack("H*", substr $data, 79, 1));
+	 
+	 my $inv_Firmware_X = hex(unpack("H*", substr $data, 78, 1));
+	 
+	 if($inv_Firmware_X == 4)
+	 {
+		$inv_Firmware = $inv_Firmware ." R";
+	 }
+	 else
+	 {
+	    $inv_Firmware = $inv_Firmware ." ?".$inv_Firmware_X;
+	 }
+	 
+     Log3 $name, 5, "$name - Found Data Firmware=$inv_Firmware data=$data";
+     return (1,$inv_Firmware,$INVFWMAIN,$inv_susyid,$inv_serial);
+ }
 
  if($data_ID eq 0x2601) {
      if (length($data) >= 66) {
@@ -2048,20 +2166,16 @@ sub SMAInverter_SMAcommand($$$$$) {
  }
 
  if($data_ID eq 0x251E) {
-     $inv_SPOT_PDC1 = unpack("V*", substr $data, 62, 4);
-     if($size < 90) {$inv_SPOT_PDC2 = 0; } else {$inv_SPOT_PDC2 = unpack("V*", substr $data, 90, 4); } # catch short response, in case PDC2 not supported
-     $inv_SPOT_PDC1 = ($inv_SPOT_PDC1 == 2147483648) ? 0 : $inv_SPOT_PDC1;
-     $inv_SPOT_PDC2 = ($inv_SPOT_PDC2 == 2147483648) ? 0 : $inv_SPOT_PDC2;
-     Log3 $name, 5, "$name - Found Data SPOT_PDC1=$inv_SPOT_PDC1 and SPOT_PDC2=$inv_SPOT_PDC2";
-     return (1,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_susyid,$inv_serial);
+     $inv_SPOT_PDC1 = unpack("l*", substr $data, 62, 4);
+     if($size < 90) {$inv_SPOT_PDC2 = "-"; }  else {$inv_SPOT_PDC2 = unpack("l*", substr $data, 90, 4); } # catch short response, in case PDC2 not supported
+	 if($size < 118) {$inv_SPOT_PDC3 = "-"; } else {$inv_SPOT_PDC3 = unpack("l*", substr $data, 118, 4); } # catch short response, in case PDC3 not supported
+	 
+     $inv_SPOT_PDC1 = ($inv_SPOT_PDC1 eq 2147483648) ? 0 : $inv_SPOT_PDC1;
+     $inv_SPOT_PDC2 = ($inv_SPOT_PDC2 eq 2147483648) ? 0 : $inv_SPOT_PDC2;
+	 $inv_SPOT_PDC3 = ($inv_SPOT_PDC3 eq 2147483648) ? 0 : $inv_SPOT_PDC3;
+     Log3 $name, 5, "$name - Found Data SPOT_PDC1=$inv_SPOT_PDC1, SPOT_PDC2=$inv_SPOT_PDC2 and SPOT_PDC3=$inv_SPOT_PDC3";
+     return (1,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_SPOT_PDC3,$inv_susyid,$inv_serial);
  }
-  
- if($data_ID eq 0xAAAA) {
-     $inv_SPOT_PDC3 = unpack("V*", substr $data, 62, 4);
-     $inv_SPOT_PDC3 = ($inv_SPOT_PDC3 == 2147483648) ? 0 : $inv_SPOT_PDC3;
-     Log3 $name, 5, "$name - Found Data SPOT_PDC3=$inv_SPOT_PDC3";
-     return (1,$inv_SPOT_PDC3,$inv_susyid,$inv_serial);
- } 
  
  if($data_ID eq 0x46C2) {
      $inv_SPOT_PDC = unpack("V*", substr $data, 62, 4);
@@ -2118,32 +2232,33 @@ sub SMAInverter_SMAcommand($$$$$) {
      $inv_SPOT_UDC1 = unpack("l*", substr $data, 62, 4);
      # catch shorter responses in case not second string supported
      if($size < 146) {
-        $inv_SPOT_UDC2 = 0;
+        $inv_SPOT_UDC2 = "-";
+		$inv_SPOT_UDC3 = "-";
         $inv_SPOT_IDC1 = unpack("l*", substr $data, 90, 4);
-        $inv_SPOT_IDC2 = 0;
-     } else {
+        $inv_SPOT_IDC2 = "-";
+		$inv_SPOT_IDC3 = "-";
+     } elsif($size < 194) {
         $inv_SPOT_UDC2 = unpack("l*", substr $data, 90, 4);
+		$inv_SPOT_UDC3 = "-";
         $inv_SPOT_IDC1 = unpack("l*", substr $data, 118, 4);
         $inv_SPOT_IDC2 = unpack("l*", substr $data, 146, 4);
+		$inv_SPOT_IDC3 = "-";
+     } else {
+		$inv_SPOT_UDC2 = unpack("l*", substr $data, 90, 4);
+		$inv_SPOT_UDC3 = unpack("l*", substr $data, 118, 4);
+        $inv_SPOT_IDC1 = unpack("l*", substr $data, 146, 4);
+        $inv_SPOT_IDC2 = unpack("l*", substr $data, 170, 4);
+		$inv_SPOT_IDC2 = unpack("l*", substr $data, 202, 4);
      }
-     if(($inv_SPOT_UDC1 eq -2147483648) || ($inv_SPOT_UDC1 eq 0xFFFFFFFF)) {$inv_SPOT_UDC1 = 0; } else {$inv_SPOT_UDC1 = $inv_SPOT_UDC1 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_UDC2 eq -2147483648) || ($inv_SPOT_UDC2 eq 0xFFFFFFFF)) {$inv_SPOT_UDC2 = 0; } else {$inv_SPOT_UDC2 = $inv_SPOT_UDC2 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IDC1 eq -2147483648) || ($inv_SPOT_IDC1 eq 0xFFFFFFFF)) {$inv_SPOT_IDC1 = 0; } else {$inv_SPOT_IDC1 = $inv_SPOT_IDC1 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IDC2 eq -2147483648) || ($inv_SPOT_IDC2 eq 0xFFFFFFFF)) {$inv_SPOT_IDC2 = 0; } else {$inv_SPOT_IDC2 = $inv_SPOT_IDC2 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     
-     Log3 $name, 5, "$name - Found Data SPOT_UDC1=$inv_SPOT_UDC1 and SPOT_UDC2=$inv_SPOT_UDC2 and SPOT_IDC1=$inv_SPOT_IDC1 and SPOT_IDC2=$inv_SPOT_IDC2";
-     return (1,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_susyid,$inv_serial);
- }
- 
- if($data_ID eq 0xBBBB) {
-     $inv_SPOT_UDC3 = unpack("l*", substr $data, 62, 4);
-     $inv_SPOT_IDC3 = unpack("l*", substr $data, 90, 4);
-
-     if(($inv_SPOT_UDC3 eq -2147483648) || ($inv_SPOT_UDC3 eq 0xFFFFFFFF)) {$inv_SPOT_UDC3 = 0; } else {$inv_SPOT_UDC3 = $inv_SPOT_UDC3 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IDC3 eq -2147483648) || ($inv_SPOT_IDC3 eq 0xFFFFFFFF)) {$inv_SPOT_IDC3 = 0; } else {$inv_SPOT_IDC3 = $inv_SPOT_IDC3 / 1000; }     # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     
-     Log3 $name, 5, "$name - Found Data SPOT_UDC3=$inv_SPOT_UDC3 and SPOT_IDC3=$inv_SPOT_IDC3";
-     return (1,$inv_SPOT_UDC3,$inv_SPOT_IDC3,$inv_susyid,$inv_serial);
+     if(($inv_SPOT_UDC1 eq -2147483648) || ($inv_SPOT_UDC1 eq 0xFFFFFFFF)) {$inv_SPOT_UDC1 = 0; } elsif($inv_SPOT_UDC1 ne "-") {$inv_SPOT_UDC1 = $inv_SPOT_UDC1 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_UDC2 eq -2147483648) || ($inv_SPOT_UDC2 eq 0xFFFFFFFF)) {$inv_SPOT_UDC2 = 0; } elsif($inv_SPOT_UDC2 ne "-") {$inv_SPOT_UDC2 = $inv_SPOT_UDC2 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+	 if(($inv_SPOT_UDC3 eq -2147483648) || ($inv_SPOT_UDC3 eq 0xFFFFFFFF)) {$inv_SPOT_UDC3 = 0; } elsif($inv_SPOT_UDC3 ne "-") {$inv_SPOT_UDC3 = $inv_SPOT_UDC3 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_IDC1 eq -2147483648) || ($inv_SPOT_IDC1 eq 0xFFFFFFFF)) {$inv_SPOT_IDC1 = 0; } elsif($inv_SPOT_IDC1 ne "-") {$inv_SPOT_IDC1 = $inv_SPOT_IDC1 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_IDC2 eq -2147483648) || ($inv_SPOT_IDC2 eq 0xFFFFFFFF)) {$inv_SPOT_IDC2 = 0; } elsif($inv_SPOT_IDC2 ne "-") {$inv_SPOT_IDC2 = $inv_SPOT_IDC2 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_IDC3 eq -2147483648) || ($inv_SPOT_IDC3 eq 0xFFFFFFFF)) {$inv_SPOT_IDC3 = 0; } elsif($inv_SPOT_IDC3 ne "-") {$inv_SPOT_IDC3 = $inv_SPOT_IDC2 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+	 
+     Log3 $name, 5, "$name - Found Data SPOT_UDC1=$inv_SPOT_UDC1, SPOT_UDC2=$inv_SPOT_UDC2, SPOT_UDC3=$inv_SPOT_UDC3, SPOT_IDC1=$inv_SPOT_IDC1, SPOT_IDC2=$inv_SPOT_IDC2 and SPOT_IDC3=$inv_SPOT_IDC3";
+     return (1,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_UDC3,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_SPOT_IDC3,$inv_susyid,$inv_serial);
  }
 
  if($data_ID eq 0x4648) {
@@ -2384,7 +2499,7 @@ sub SMAInverter_SMAcommand($$$$$) {
      } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
          Log3 $name, 5, "$name - Found Data INV_GRIDRELAY=$inv_GRIDRELAY";
          return (1,$inv_GRIDRELAY,$inv_susyid,$inv_serial);
-     }
+ }
 
  if($data_ID eq 0x2148) {
      $i = 0;
@@ -2397,7 +2512,54 @@ sub SMAInverter_SMAcommand($$$$$) {
      } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));    # 0x00FFFFFE is the end marker for attributes
          Log3 $name, 5, "$name - Found Data inv_STATUS=$inv_STATUS";
          return (1,$inv_STATUS,$inv_susyid,$inv_serial);
-     }
+ }
+
+ if($data_ID eq 0x4125) {
+     $i = 0;
+     $temp = 0;
+     $inv_BACKUPRELAY = 0x00FFFFFD;                                                               # Code for No Information;
+     do {
+         $temp = unpack("V*", substr $data, 62 + $i*4, 4);
+         if(($temp & 0xFF000000) ne 0) { $inv_BACKUPRELAY = $temp & 0x00FFFFFF; }
+         $i = $i + 1;
+     } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
+         Log3 $name, 5, "$name - Found Data inv_BACKUPRELAY=$inv_BACKUPRELAY";
+         return (1,$inv_BACKUPRELAY,$inv_susyid,$inv_serial);
+ }	 
+	 
+ if($data_ID eq 0x412b) {
+     $i = 0;
+     $temp = 0;
+     $inv_OperatingStatus = 0x00FFFFFD;                                                               # Code for No Information;
+     do {
+         $temp = unpack("V*", substr $data, 62 + $i*4, 4);
+         if(($temp & 0xFF000000) ne 0) { $inv_OperatingStatus = $temp & 0x00FFFFFF; }
+         $i = $i + 1;
+     } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
+         Log3 $name, 5, "$name - Found Data inv_OperatingStatus=$inv_OperatingStatus";
+         return (1,$inv_OperatingStatus,$inv_susyid,$inv_serial);
+ }	 
+ 
+  if($data_ID eq 0x4128) {
+     $i = 0;
+     $temp = 0;
+     $inv_GeneralOperatingStatus = 0x00FFFFFD;                                                               # Code for No Information;
+     do {
+         $temp = unpack("V*", substr $data, 62 + $i*4, 4);
+         if(($temp & 0xFF000000) ne 0) { $inv_GeneralOperatingStatus = $temp & 0x00FFFFFF; }
+         $i = $i + 1;
+     } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
+         Log3 $name, 5, "$name - Found Data inv_GeneralOperatingStatus=$inv_GeneralOperatingStatus";
+         return (1,$inv_GeneralOperatingStatus,$inv_susyid,$inv_serial);
+ }	 
+ 
+ if($data_ID eq 0x4166) {
+
+     $inv_WaitingTimeUntilFeedIn = unpack("l*", substr $data, 62, 4);
+     Log3 $name, 5, "$name - Found Data inv_WaitingTimeUntilFeedIn=$inv_WaitingTimeUntilFeedIn";
+     return (1,$inv_WaitingTimeUntilFeedIn,$inv_susyid,$inv_serial);
+ }		
+
 
 return 0;
 }
@@ -2692,7 +2854,16 @@ sub SMAInverter_StatusText($) {
  if($code eq 51)       { return (AttrVal("global", "language", "EN") eq "DE") ? "geschlossen" : "Closed"; }
  if($code eq 311)      { return (AttrVal("global", "language", "EN") eq "DE") ? "offen" : "Open"; }
  if($code eq 16777213) { return (AttrVal("global", "language", "EN") eq "DE") ? "Information liegt nicht vor" : "No Information"; }
-
+ 
+ if($code eq 235) 	   { return (AttrVal("global", "language", "EN") eq "DE") ? "Netzparallelbetrieb" : "parallel grid operation"; }
+ if($code eq 1463) 	   { return (AttrVal("global", "language", "EN") eq "DE") ? "Ersatzstrombetrieb" : "backup"; }
+ if($code eq 2119) 	   { return (AttrVal("global", "language", "EN") eq "DE") ? "Abregelung" : "derating"; }
+ if($code eq 569) 	   { return (AttrVal("global", "language", "EN") eq "DE") ? "Eingeschaltet" : "activated"; }
+ if($code eq 1295) 	   { return (AttrVal("global", "language", "EN") eq "DE") ? "Standby" : "standby"; }
+ if($code eq 295) 	   { return (AttrVal("global", "language", "EN") eq "DE") ? "MPP" : "MPP"; }
+ if($code eq 1795) 	   { return (AttrVal("global", "language", "EN") eq "DE") ? "Verriegelt" : "locked"; }
+ if($code eq 1779) 	   { return (AttrVal("global", "language", "EN") eq "DE") ? "Getrennt" : "disconnected"; }
+ 
  if($code eq 35)       { return (AttrVal("global", "language", "EN") eq "DE") ? "Fehler" : "Fault"; }
  if($code eq 303)      { return "Off"; }
  if($code eq 307)      { return "Ok"; }
@@ -2950,6 +3121,7 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 <li><b>SPOT_IAC3 / phase_3_iac</b>          		:  Grid current phase L3 </li>
 <li><b>SPOT_IDC1 / string_1_idc</b>         		:  DC current input </li>
 <li><b>SPOT_IDC2 / string_2_idc</b>         		:  DC current input </li>
+<li><b>SPOT_IDC3 / string_3_idc</b>         		:  DC current input </li>
 <li><b>SPOT_OPERTM / operation_time</b>     		:  Operation Time </li>
 <li><b>SPOT_PAC1 / phase_1_pac</b>          		:  Power L1  </li>
 <li><b>SPOT_PAC2 / phase_2_pac</b>          		:  Power L2  </li>
@@ -2957,6 +3129,7 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 <li><b>SPOT_PACTOT / total_pac</b>          		:  Total Power </li>
 <li><b>SPOT_PDC1 / string_1_pdc</b>         		:  DC power input 1 </li>
 <li><b>SPOT_PDC2 / string_2_pdc</b>         		:  DC power input 2 </li>
+<li><b>SPOT_PDC3 / string_3_pdc</b>         		:  DC power input 3 </li>
 <li><b>SPOT_PDC / strings_pds</b>    				:  DC power summary (only Hybrid-Inverter)</li>
 <li><b>SPOT_UAC1 / phase_1_uac</b>          		:  Grid voltage phase L1 </li>
 <li><b>SPOT_UAC2 / phase_2_uac</b>          		:  Grid voltage phase L2 </li>
@@ -2966,13 +3139,19 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 <li><b>SPOT_UAC3_1 / phase_3_1_uac</b>      		:  Grid voltage phase L3-L1 </li>
 <li><b>SPOT_UDC1 / string_1_udc</b>         		:  DC voltage input </li>
 <li><b>SPOT_UDC2 / string_2_udc</b>         		:  DC voltage input </li>
+<li><b>SPOT_UDC3 / string_3_udc</b>         		:  DC voltage input </li>
 <li><b>SUSyID / susyid</b>                  		:  Inverter SUSyID </li>
 <li><b>INV_TEMP / device_temperature</b>    		:  Inverter temperature </li>
 <li><b>INV_TYPE / device_type</b>           		:  Inverter Type </li>
 <li><b>POWER_IN / power_in</b>              		:  Battery Charging power </li>
 <li><b>POWER_OUT / power_out</b>            		:  Battery Discharging power </li>
-<li><b>INV_GRIDRELAY / gridrelay_status</b> 		:  Grid Relay/Contactor Status </li>
+<li><b>INV_GRIDRELAY / gridrelay_status</b> 		:  Grid Relay/Contactor Status</li>
+<li><b>INV_BACKUPRELAY / backuprelay_status</b>     :  Backup Relay/Contactor Status (only Hybrid-Inverter)</li>
+<li><b>INV_GeneralOperatingStatus / general_operating_status</b> </li>    
+<li>												:  General Status from the Inverter (MPP/Activated/Derating)</li>
+<li><b>INV_OperatingStatus / operating_status</b> 	:  operating status from the Inverter (Parallel grid operation/Backup) (only Hybrid-Inverter)</li>
 <li><b>INV_STATUS / device_status</b>       		:  Inverter Status </li>
+<li><b>INV_FIRMWARE / device_firmware</b>       	:  Inverter firmware version </li>
 <li><b>SPOT_BACKUP_IAC1 / phase_backup_1_iac</b>    :  Backup current phase L1 </li>
 <li><b>SPOT_BACKUP_IAC2 / phase_backup_2_iac</b>    :  Backup current phase L2 </li>
 <li><b>SPOT_BACKUP_IAC3 / phase_backup_3_iac</b>    :  Backup current phase L3 </li>
@@ -3217,6 +3396,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <li><b>SPOT_IAC3 / phase_3_iac</b>          		:  Netz Strom phase L3 </li>
 <li><b>SPOT_IDC1 / string_1_idc</b>         		:  DC Strom Eingang 1 </li>
 <li><b>SPOT_IDC2 / string_2_idc</b>         		:  DC Strom Eingang 2 </li>
+<li><b>SPOT_IDC3 / string_3_idc</b>         		:  DC Strom Eingang 3 </li>
 <li><b>SPOT_OPERTM / operation_time</b>     		:  Betriebsstunden </li>
 <li><b>SPOT_PAC1 / phase_1_pac</b>          		:  Leistung L1  </li>
 <li><b>SPOT_PAC2 / phase_2_pac</b>          		:  Leistung L2  </li>
@@ -3224,6 +3404,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <li><b>SPOT_PACTOT / total_pac</b>          		:  Gesamtleistung </li>
 <li><b>SPOT_PDC1 / string_1_pdc</b>         		:  DC Leistung Eingang 1 </li>
 <li><b>SPOT_PDC2 / string_2_pdc</b>         		:  DC Leistung Eingang 2 </li>
+<li><b>SPOT_PDC2 / string_3_pdc</b>         		:  DC Leistung Eingang 3 </li>
 <li><b>SPOT_PDC / strings_pds</b>       			:  DC Leistung gesamt (bei Hybridwechselrichtern)</li>
 <li><b>SPOT_UAC1 / phase_1_uac</b>          		:  Netz Spannung phase L1 </li>
 <li><b>SPOT_UAC2 / phase_2_uac</b>          		:  Netz Spannung phase L2 </li>
@@ -3233,13 +3414,19 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <li><b>SPOT_UAC3_1 / phase_3_1_uac</b>          	:  Netz Spannung phase L3-L1 </li>
 <li><b>SPOT_UDC1 / string_1_udc</b>         		:  DC Spannung Eingang 1 </li>
 <li><b>SPOT_UDC2 / string_2_udc</b>         		:  DC Spannung Eingang 2 </li>
+<li><b>SPOT_UDC3 / string_3_udc</b>         		:  DC Spannung Eingang 3 </li>
 <li><b>SUSyID / susyid</b>                  		:  Wechselrichter SUSyID </li>
 <li><b>INV_TEMP / device_temperature</b>    		:  Wechselrichter Temperatur </li>
 <li><b>INV_TYPE / device_type</b>           		:  Wechselrichter Typ </li>
 <li><b>POWER_IN / power_in</b>              		:  Akku Ladeleistung </li>
 <li><b>POWER_OUT / power_out</b>            		:  Akku Entladeleistung </li>
 <li><b>INV_GRIDRELAY / gridrelay_status</b> 		:  Netz Relais Status </li>
+<li><b>INV_BACKUPRELAY / backuprelay_status</b>     :  Backup Relais Status (bei Hybridwechselrichtern)</li>
+<li><b>INV_GeneralOperatingStatus / general_operating_status</b> </li>    
+<li>												:  Allgemeiner Betriebszustand des Wechselrichters (MPP/Eingeschaltet/Abregelung)</li>
+<li><b>INV_OperatingStatus / operating_status</b> 	:  Betriebsstatus des Wechselrichters (Netzparallelbetrieb/Backup) (bei Hybridwechselrichtern)</li>
 <li><b>INV_STATUS / device_status</b>       		:  Wechselrichter Status </li>
+<li><b>INV_FIRMWARE / device_firmware</b>       	:  Wechselrichter Firmwareversion </li>
 <li><b>SPOT_BACKUP_IAC1 / phase_backup_1_iac</b>    :  Backup Strom phase L1 </li>
 <li><b>SPOT_BACKUP_IAC2 / phase_backup_2_iac</b>    :  Backup Strom phase L2 </li>
 <li><b>SPOT_BACKUP_IAC3 / phase_backup_3_iac</b>    :  Backup Strom phase L3 </li>
@@ -3284,7 +3471,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v1.1.1",
+  "version": "v2.23.2",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
