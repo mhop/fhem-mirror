@@ -423,7 +423,6 @@ MQTT2_DEVICE_Set($@)
       readingsSingleUpdate($hash, "state", "set_$cmdSE", 1);
       delete($hash->{skipStateFormat});
     } else {
-      shift(@a);
       unshift(@a, "set");
       readingsSingleUpdate($hash, $cmdName, join(" ",@a), 1);
     }
@@ -457,7 +456,7 @@ MQTT2_DEVICE_Attr($$)
     return undef;
   }
 
-  if($attrName =~ m/(.*)List/) {
+  if($attrName =~ m/^(get|set|reading)List/) {
     my $atype = $1;
     if($type eq "del") {
       MQTT2_DEVICE_delReading($dev) if($atype eq "reading");
