@@ -103,6 +103,7 @@ sub Initialize() {
   $hash->{GetFn}      = \&FHEM::Devices::AMConnect::Common::Get;
   $hash->{UndefFn}    = \&FHEM::Devices::AMConnect::Common::Undefine;
   $hash->{DeleteFn}   = \&FHEM::Devices::AMConnect::Common::Delete;
+  $hash->{ShutdownFn} = \&FHEM::Devices::AMConnect::Common::Shutdown;
   $hash->{RenameFn}   = \&FHEM::Devices::AMConnect::Common::Rename;
   $hash->{FW_detailFn}= \&FHEM::Devices::AMConnect::Common::FW_detailFn;
   $hash->{ReadFn}     = \&wsRead; 
@@ -198,7 +199,7 @@ sub APIAuth {
   } else {
 
     RemoveInternalTimer( $hash, \&APIAuth );
-    InternalTimer( gettimeofday() + 20, \&APIAuth, $hash, 0 );
+    InternalTimer( gettimeofday() + 10, \&APIAuth, $hash, 0 );
 
   }
   return undef;
@@ -235,7 +236,18 @@ sub APIAuthResponse {
         readingsBulkUpdateIfChanged($hash,'.provider',$hash->{helper}{auth}{provider},0 );
         readingsBulkUpdateIfChanged($hash,'.user_id',$hash->{helper}{auth}{user_id},0 );
 
-        $hash->{helper}{auth}{expires} = $result->{expires_in} + gettimeofday();
+        # refresh token between 00:00 and 01:00
+        my $expire = $result->{expires_in} + gettimeofday();
+        my ( @tim ) = localtime( $expire );
+        my $seconds = $tim[0] + $tim[1] * 60 + $tim[2] * 3600;
+        if ($seconds > 3600) {
+          $tim[ 0 ] = 0;
+          $tim[ 1 ] = 0;
+          $tim[ 2 ] = 1;
+          $expire = ::timelocal( @tim );
+        }
+
+        $hash->{helper}{auth}{expires} = $expire;
         readingsBulkUpdateIfChanged($hash,'.expires',$hash->{helper}{auth}{expires},0 );
         readingsBulkUpdateIfChanged($hash,'.scope',$hash->{helper}{auth}{scope},0 );
         readingsBulkUpdateIfChanged($hash,'.token_type',$hash->{helper}{auth}{token_type},0 );
@@ -346,11 +358,13 @@ sub getMowerResponse {
 
           $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp};
           $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mower}{attributes}{mower}{activity};
+          $hash->{helper}{mowerold}{attributes}{statistics}{numberOfCollisions} = $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions};
 
         } else { # first data set
 
           $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{metadata}{statusTimestamp};
           $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{mower}{activity};
+          $hash->{helper}{mowerold}{attributes}{statistics}{numberOfCollisions} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{statistics}{numberOfCollisions};
 
           if ( AttrVal( $name, 'mapImageCoordinatesToRegister', '' ) eq '' ) {
             ::FHEM::Devices::AMConnect::Common::posMinMax( $hash, $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions} );
@@ -365,18 +379,17 @@ sub getMowerResponse {
 
         $hash->{helper}{storediff} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
 
+        ::FHEM::Devices::AMConnect::Common::calculateStatistics($hash);
+
         # Update readings
         readingsBeginUpdate($hash);
 
-          readingsBulkUpdateIfChanged($hash, 'api_MowerFound', $foundMower ); # host only
+          readingsBulkUpdateIfChanged($hash, 'api_MowerFound', $foundMower );
           ::FHEM::Devices::AMConnect::Common::fillReadings( $hash );
 
         readingsEndUpdate($hash, 1);
 
         readingsSingleUpdate($hash, 'device_state', 'connected', 1 );
-
-        # initialize statistics 
-        ::FHEM::Devices::AMConnect::Common::initStatistics($hash);
 
         # schedule new access token
         RemoveInternalTimer( $hash, \&APIAuth );
@@ -480,6 +493,10 @@ sub wsRead {
           $hash->{helper}{mower}{attributes}{planner} = dclone( $result->{attributes}{planner} );
           $hash->{helper}{storediff} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
 
+          $hash->{helper}{detailFnNewPos} = 0;
+          ::FHEM::Devices::AMConnect::Common::isErrorThanPrepare( $hash );
+          ::FHEM::Devices::AMConnect::Common::resetLastErrorIfCorrected( $hash );
+
         }
 
         if ( $result->{type} eq "positions-event" ) {
@@ -489,8 +506,23 @@ sub wsRead {
             # $result->{attributes}{positions}[ $i ]->{nr}=$i;
           # };
           $hash->{helper}{mower}{attributes}{positions} = dclone( $result->{attributes}{positions} );
+
           ::FHEM::Devices::AMConnect::Common::AlignArray( $hash );
-          ::FHEM::Devices::AMConnect::Common::FW_detailFn_Update ($hash) if (AttrVal($name,'showMap',1));
+
+          my $deltaTime = $hash->{helper}{positionsTime} - $hash->{helper}{statusTime};
+
+          # if encounter positions shortly after status-event count it as error positions  
+          if ( $hash->{helper}{mower}{attributes}{mower}{errorCode} && $deltaTime > 0 && $deltaTime < 0.29 && @{ $result->{attributes}{positions} } < 3) {
+
+            $hash->{helper}{areapos}[ 0 ]{act} = 'N';
+            $hash->{helper}{areapos}[ 1 ]{act} = 'N';
+            $hash->{helper}{lasterror}{positions} = [dclone( $hash->{helper}{areapos}[ 0 ] ), dclone( $hash->{helper}{areapos}[ 1 ] ) ];
+            $hash->{helper}{errorstack}[0]{positions} = [dclone( $hash->{helper}{areapos}[ 0 ] ), dclone( $hash->{helper}{areapos}[ 1 ] ) ];
+
+          }
+
+          $hash->{helper}{detailFnNewPos} = scalar @{ $result->{attributes}{positions} };
+          ::FHEM::Devices::AMConnect::Common::FW_detailFn_Update ($hash);
 
         }
 
@@ -499,6 +531,7 @@ sub wsRead {
           $hash->{helper}{mower}{attributes}{calendar} = dclone( $result->{attributes}{calendar} ) if ( defined ( $result->{attributes}{calendar} ) );
           $hash->{helper}{mower}{attributes}{settings}{headlight} = $result->{attributes}{headlight} if ( defined ( $result->{attributes}{headlight} ) );
           $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} = $result->{attributes}{cuttingHeight} if ( defined ( $result->{attributes}{cuttingHeight} ) );
+
         }
 
         # Update readings
@@ -893,7 +926,7 @@ __END__
     It has to be set a <b>client_secret</b>. It's the application secret from the <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.<br>
     <code>set myMower &lt;client secret&gt;</code>
     <br><br>
-   </ul>
+  </ul>
   <br>
 
   <a id="AutomowerConnectSet"></a>
@@ -931,11 +964,11 @@ __END__
       <code>set &lt;name&gt; client_secret &lt;application secret&gt;</code><br>
       Sets the mandatory application secret (client secret)</li>
 
-     <li><a id='AutomowerConnect-set-cuttingHeight'>cuttingHeight</a><br>
+    <li><a id='AutomowerConnect-set-cuttingHeight'>cuttingHeight</a><br>
       <code>set &lt;name&gt; cuttingHeight &lt;1..9&gt;</code><br>
       Sets the cutting height. NOTE: Do not use for 550 EPOS and Ceora.</li>
 
-     <li><a id='AutomowerConnect-set-getNewAccessToken'>getNewAccessToken</a><br>
+    <li><a id='AutomowerConnect-set-getNewAccessToken'>getNewAccessToken</a><br>
       <code>set &lt;name&gt; getNewAccessToken</code><br>
       Gets a new access token</li>
 
@@ -943,27 +976,31 @@ __END__
       <code>set &lt;name&gt; getUpdate</code><br>
       Gets data from the API. This is done each intervall automatically.</li>
 
-     <li><a id='AutomowerConnect-set-headlight'>headlight</a><br>
+    <li><a id='AutomowerConnect-set-headlight'>headlight</a><br>
       <code>set &lt;name&gt; headlight &lt;ALWAYS_OFF|ALWAYS_ON|EVENIG_ONLY|EVENING_AND_NIGHT&gt;</code><br>
+    </li>
 
-      </li>
-     <li><a id='AutomowerConnect-set-mowerScheduleToAttribute'>mowerScheduleToAttribute</a><br>
+    <li><a id='AutomowerConnect-set-mowerScheduleToAttribute'>mowerScheduleToAttribute</a><br>
       <code>set &lt;name&gt; mowerScheduleToAttribute</code><br>
       Writes the schedule in to the attribute <code>moverSchedule</code>.</li>
 
-     <li><a id='AutomowerConnect-set-sendScheduleFromAttributeToMower'>sendScheduleFromAttributeToMower</a><br>
+    <li><a id='AutomowerConnect-set-sendScheduleFromAttributeToMower'>sendScheduleFromAttributeToMower</a><br>
       <code>set &lt;name&gt; sendScheduleFromAttributeToMower</code><br>
       Sends the schedule to the mower. NOTE: Do not use for 550 EPOS and Ceora.</li>
 
-     <li><a id='AutomowerConnect-set-mapZonesTemplateToAttribute'>mapZonesTemplateToAttribute</a><br>
+    <li><a id='AutomowerConnect-set-mapZonesTemplateToAttribute'>mapZonesTemplateToAttribute</a><br>
       <code>set &lt;name&gt; mapZonesTemplateToAttribute</code><br>
       Load the command reference example into the attribute mapZones.</li>
 
+    <li><a id='AutomowerConnect-set-defaultDesignAttributesToAttribute'>defaultDesignAttributesToAttribute</a><br>
+      <code>set &lt;name&gt; mapZonesTemplateToAttribute</code><br>
+      Load default design attributes.</li>
 
-      <li><a id='AutomowerConnect-set-'></a><br>
+
+    <li><a id='AutomowerConnect-set-'></a><br>
       <code>set &lt;name&gt; </code><br>
-      </li>
-
+    </li>
+    <br><br>
   </ul>
   <br>
 
@@ -986,11 +1023,15 @@ __END__
 
     <li><a id='AutomowerConnect-get-StatisticsData'>StatisticsData</a><br>
       <code>get &lt;name&gt; StatisticsData</code><br>
-      Lists statistics data with its hash path. The hash path can be used for generating userReadings. The trigger is <i>connected</i>.</li>
+      Lists statistics data with its hash path. The hash path can be used for generating userReadings. The trigger is <i>device_state: connected</i>.</li>
 
     <li><a id='AutomowerConnect-get-errorCodes'>errorCodes</a><br>
       <code>get &lt;name&gt; errorCodes</code><br>
       Lists API response status codes and mower error codes</li>
+
+    <li><a id='AutomowerConnect-get-errorStack'>errorStack</a><br>
+      <code>get &lt;name&gt; errorStack</code><br>
+      Lists error stack.</li>
     <br><br>
   </ul>
   <br>
@@ -1024,10 +1065,12 @@ __END__
       <code>attr &lt;name&gt; mapDesignAttributes &lt;complete list of design-attributes&gt;</code><br>
       Load the list of attributes by <code>set &lt;name&gt; defaultDesignAttributesToAttribute</code> to change its values. Some default values are 
       <ul>
-        <li>mower path (activity MOWING): red</li>
-        <li>path in CS (activity CHARGING,PARKED_IN_CS): grey</li>
+        <li>mower path for activity MOWING: red</li>
+        <li>path in CS, activity CHARGING,PARKED_IN_CS: grey</li>
+        <li>path for activity LEAVING: green</li>
+        <li>path for activityGOING_HOME: blue</li>
         <li>path for interval with error (all activities with error): kind of magenta</li>
-        <li>all other activities: green</li>
+        <li>all other activities: grey</li>
       </ul>
     </li>
 
@@ -1043,7 +1086,7 @@ __END__
       This attribute has to be set after the attribute mapImageCoordinatesToRegister. The values are used to calculate the scale factors and the attribute scaleToMeterXY is set accordingly.</li>
 
     <li><a id='AutomowerConnect-attr-showMap'>showMap</a><br>
-      <code>attr &lt;name&gt; showMap &lt;&gt;<b>1</b>,0</code><br>
+      <code>attr &lt;name&gt; showMap &lt;<b>1</b>,0&gt;</code><br>
       Shows Map on (1 default) or not (0).</li>
 
    <li><a id='AutomowerConnect-attr-chargingStationCoordinates'>chargingStationCoordinates</a><br>
@@ -1164,7 +1207,7 @@ __END__
     <li>settings_cuttingHeight - actual cutting height from API</li>
     <li>settings_headlight - actual headlight mode from API</li>
     <li>statistics_newGeoDataSets - number of new data sets between the last two different time stamps</li>
-    <li>statistics_numberOfCollisions - Number of Collisions</li>
+    <li>statistics_numberOfCollisions - Number of collisions (last day/all days)</li>
     <li>status_connected - state of connetion between mower and Husqvarna Cloud.</li>
     <li>status_statusTimestamp - local time of last change of the API content</li>
     <li>status_statusTimestampDiff - time difference in seconds between the last and second last change of the API content</li>
@@ -1281,6 +1324,10 @@ __END__
       <code>set &lt;name&gt; mapZonesTemplateToAttribute</code><br>
       Läd das Beispiel aus der Befehlsreferenz in das Attribut mapZones.</li>
 
+     <li><a id='AutomowerConnect-set-defaultDesignAttributesToAttribute'>defaultDesignAttributesToAttribute</a><br>
+      <code>set &lt;name&gt; mapZonesTemplateToAttribute</code><br>
+      Läd die Standartdesignattribute.</li>
+
     <li><a id='AutomowerConnect-set-'></a><br>
       <code>set &lt;name&gt; </code><br>
       </li>
@@ -1308,7 +1355,11 @@ __END__
 
     <li><a id='AutomowerConnect-get-StatisticsData'>StatisticsData</a><br>
       <code>get &lt;name&gt; StatisticsData</code><br>
-      Listet statistische Daten mit ihrem Hashpfad auf. Der Hashpfad kann zur Erzeugung von userReadings genutzt werden, getriggert wird durch <i>connected</i></li>
+      Listet statistische Daten mit ihrem Hashpfad auf. Der Hashpfad kann zur Erzeugung von userReadings genutzt werden, getriggert wird durch <i>device_state: connected</i></li>
+
+    <li><a id='AutomowerConnect-get-errorStack'>errorStack</a><br>
+      <code>get &lt;name&gt; errorStack</code><br>
+      Listet die gespeicherten Fehler auf.</li>
     <br><br>
   </ul>
   <br>
@@ -1345,10 +1396,12 @@ __END__
       <code>attr &lt;name&gt; mapDesignAttributes &lt;complete list of design-attributes&gt;</code><br>
       Lade die Attributliste mit <code>set &lt;name&gt; defaultDesignAttributesToAttribute</code> um die Werte zu ändern. Einige Vorgabewerte:
       <ul>
-        <li>Pfad beim mähen (Aktivität MOWING): rot</li>
-        <li>In der Ladestation (Aktivität CHARGING,PARKED_IN_CS): grau</li>
+        <li>Pfad beim mähen, Aktivität MOWING: rot</li>
+        <li>In der Ladestation, Aktivität CHARGING,PARKED_IN_CS: grau</li>
+        <li>Pfad für die Aktivität LEAVING: grün</li>
+        <li>Pfad für Aktivität GOING_HOME: blau</li>
         <li>Pfad eines Intervalls mit Fehler (alle Aktivitäten with error): Eine Art Magenta</li>
-        <li>Pfad aller anderen Aktivitäten: grün</li>
+        <li>Pfad aller anderen Aktivitäten: grau</li>
       </ul>
     </li>
 
@@ -1367,7 +1420,7 @@ __END__
       Dieses Attribut berechnet die Skalierungsfaktoren. Das Attribut scaleToMeterXY wird entsprechend gesetzt.</li>
 
     <li><a id='AutomowerConnect-attr-showMap'>showMap</a><br>
-      <code>attr &lt;name&gt; showMap &lt;&gt;<b>1</b>,0</code><br>
+      <code>attr &lt;name&gt; showMap &lt;<b>1</b>,0&gt;</code><br>
       Zeigt die Karte an (1 default) oder nicht (0).</li>
 
    <li><a id='AutomowerConnect-attr-chargingStationCoordinates'>chargingStationCoordinates</a><br>
@@ -1490,7 +1543,7 @@ __END__
     <li>settings_cuttingHeight - aktuelle Schnitthöhe aus der API</li>
     <li>settings_headlight - aktueller Scheinwerfermode aus der API</li>
     <li>statistics_newGeoDataSets - Anzahl der neuen Datensätze zwischen den letzten zwei unterschiedlichen Zeitstempeln</li>
-    <li>statistics_numberOfCollisions - Anzahl der Kollisionen</li>
+    <li>statistics_numberOfCollisions - Anzahl der Kollisionen (letzter Tag/alle Tage)</li>
     <li>status_connected - Status der Verbindung zwischen dem Automower und der Husqvarna Cloud.</li>
     <li>status_statusTimestamp - Lokalzeit der letzten Änderung der Daten in der API</li>
     <li>status_statusTimestampDiff - Zeitdifferenz zwischen den beiden letzten Änderungen im Inhalt der Daten aus der API</li>

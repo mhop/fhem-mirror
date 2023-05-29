@@ -69,6 +69,7 @@ BEGIN {
           devspec2array
           DevIo_IsOpen
           DevIo_CloseDev
+          DevIo_setStates
           )
     );
 }
@@ -171,24 +172,26 @@ my $mapZonesTpl = '{
       imageHeight               => 650,
       imageWidthHeight          => '350 650',
       mapdesign                 => $mapAttr,
+      detailFnFirst             => 0,
+      detailFnNewPos            => 0,
+      detailFnAttrMaxPos        => 5000,
       mapZonesTpl               => $mapZonesTpl,
       posMinMax                 => "-180 90\n180 -90",
       newdatasets               => 0,
-      newzonedatasets               => 0,
+      newzonedatasets           => 0,
+      positionsTime             => 0,
+      statusTime                => 0,
       MAP_PATH                  => '',
       MAP_MIME                  => '',
       MAP_CACHE                 => '',
       cspos                     => [],
       areapos                   => [],
+      errorstack                => [],
       lasterror                 => {
         positions               => [],
         timestamp               => 0,
         errordesc               => '-',
-        errordate               => '',
-        sizex                   => 0,
-        sizey                   => 0,
-        olLon                   => 0,
-        olLat                   => 0
+        errordate               => ''
       },
       UNKNOWN                   => {
         short                   => 'U',
@@ -255,6 +258,7 @@ my $mapZonesTpl = '{
         lastDayTrack            => 0,
         lastDayArea             => 0,
         lastDaytime             => 0,
+        lastDayCollisions       => 0,
         currentWeekTrack        => 0,
         currentWeekArea         => 0,
         currentWeekTime         => 0,
@@ -280,13 +284,15 @@ my $mapZonesTpl = '{
 
     RemoveInternalTimer($hash);
     InternalTimer( gettimeofday() + 2, \&::FHEM::AutomowerConnect::APIAuth, $hash, 1);
-    InternalTimer( gettimeofday() + 30, \&readMap, $hash, 0);
+    InternalTimer( gettimeofday() + 20, \&readMap, $hash, 0);
 
-    readingsSingleUpdate( $hash, 'device_state', 'defined', 1 );
+      DevIo_setStates( $hash, "disconnected" );
+      readingsSingleUpdate( $hash, 'device_state', 'defined', 1 );
 
   } else {
 
-    readingsSingleUpdate( $hash, 'device_state', 'defined - client_secret missing', 1 );
+      DevIo_setStates( $hash, "disconnected" );
+      readingsSingleUpdate( $hash, 'device_state', 'defined - client_secret missing', 1 );
 
   }
 
@@ -295,14 +301,22 @@ my $mapZonesTpl = '{
 }
 
 #########################
+sub Shutdown {
+  my ( $hash, $arg )  = @_;
+
+  DevIo_CloseDev( $hash ) if ( DevIo_IsOpen( $hash ) );
+  DevIo_setStates( $hash, "closed" );
+
+  return undef;
+}
+
+#########################
 sub Undefine {
   my ( $hash, $arg )  = @_;
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  DevIo_CloseDev( $hash ) if ( DevIo_IsOpen( $hash ) );
   RemoveInternalTimer( $hash );
-
   ::FHEM::Devices::AMConnect::Common::RemoveExtension("$type/$name/map");
   return undef;
 }
@@ -377,9 +391,14 @@ sub Get {
     my $ret = ::FHEM::Devices::AMConnect::Common::listStatisticsData($hash);
     return $ret;
 
+  } elsif (  $setName eq 'errorStack' ) {
+
+    my $ret = ::FHEM::Devices::AMConnect::Common::listErrorStack($hash);
+    return $ret;
+
   } else {
 
-    return "Unknown argument $setName, choose one of StatisticsData:noArg MowerData:noArg InternalData:noArg errorCodes:noArg ";
+    return "Unknown argument $setName, choose one of StatisticsData:noArg MowerData:noArg InternalData:noArg errorCodes:noArg errorStack:noArg ";
 
   }
 }
@@ -398,56 +417,18 @@ sub FW_detailFn {
     my $design = AttrVal( $name, 'mapDesignAttributes', $hash->{helper}{mapdesign} );
     my @adesign = split(/\R/,$design);
     my $mapDesign = 'data-'.join("data-",@adesign);
+
     my ($picx,$picy) = AttrVal( $name,"mapImageWidthHeight", $hash->{helper}{imageWidthHeight} ) =~ /(\d+)\s(\d+)/;
-    
     $picx=int($picx*$zoom);
     $picy=int($picy*$zoom);
-    
-    my $ret = "";
-    $ret .= "<style> .${type}_${name}_div{padding:0px !important;$bgstyle background-image: url('$img');background-size: ${picx}px ${picy}px; background-repeat: no-repeat; width: ${picx}px; height: ${picy}px; }</style>";
-    $ret .= "<div id='${type}_${name}_div' class='${type}_${name}_div' $mapDesign >";
-    $ret .= "<canvas id='${type}_${name}_canvas' width='$picx' height='$picy' ></canvas>";
-    $ret .= "</div>";
-    
-    InternalTimer( gettimeofday() + 2.0, \&FW_detailFn_Update, $hash, 0 );
-    
-    return $ret;
-  }
-  return '';
-}
-
-#########################
-sub FW_detailFn_Update {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};
-  if ( $hash->{helper} && $hash->{helper}{mower} && $hash->{helper}{mower}{attributes} && $hash->{helper}{mower}{attributes}{positions} && @{$hash->{helper}{mower}{attributes}{positions}} > 0 ) {
-
-    my @pos = @{ $hash->{helper}{areapos} };
-    my @posc = @{ $hash->{helper}{cspos} };
-    my @poserr = @{ $hash->{helper}{lasterror}{positions} };
-   my $img = "./fhem/$type/$name/map";
 
     my ( $lonlo, $latlo, $dummy, $lonru, $latru ) = AttrVal( $name,"mapImageCoordinatesToRegister",$hash->{helper}{posMinMax} ) =~ /(-?\d*\.?\d+)\s(-?\d*\.?\d+)(\R|\s)(-?\d*\.?\d+)\s(-?\d*\.?\d+)/;
-
-    my $zoom = AttrVal( $name,"mapImageZoom", 0.7 );
-    
-    my ($picx,$picy) = AttrVal( $name,"mapImageWidthHeight", $hash->{helper}{imageWidthHeight} ) =~ /(\d+)\s(\d+)/;
+    my $mapx = $lonlo-$lonru;
+    my $mapy = $latlo-$latru;
 
     AttrVal($name,'scaleToMeterXY', $hash->{helper}{scaleToMeterLongitude} . ' ' .$hash->{helper}{scaleToMeterLatitude}) =~ /(-?\d+)\s+(-?\d+)/;
     my $scalx = ( $lonru - $lonlo ) * $1;
     my $scaly = ( $latlo - $latru ) * $2;
-
-    $picx = int($picx*$zoom);
-    $picy = int($picy*$zoom);
-    my $mapx = $lonlo-$lonru;
-    my $mapy = $latlo-$latru;
-
-    if ( ($hash->{helper}{PARKED_IN_CS}{callFn} || $hash->{helper}{CHARGING}{callFn}) && (!$hash->{helper}{chargingStation}{longitude} || !$hash->{helper}{chargingStation}{latitude}) ) {
-      no strict "refs";
-      &{$hash->{helper}{PARKED_IN_CS}{callFn}}($hash);
-      use strict "refs";
-    }
 
     # CHARGING STATION POSITION 
     my $csimgpos = AttrVal( $name,"chargingStationImagePosition","right" );
@@ -455,31 +436,9 @@ sub FW_detailFn_Update {
     my $ym = $hash->{helper}{chargingStation}{latitude} // 51.28;
 
     my ($cslo,$csla) = AttrVal( $name,"chargingStationCoordinates","$xm $ym" ) =~  /(-?\d*\.?\d+)\s(-?\d*\.?\d+)/;
-
     my $cslon = int(($lonlo-$cslo) * $picx / $mapx);
     my $cslat = int(($latlo-$csla) * $picy / $mapy);
-
-    # MOWING PATH
-    my $posxy = int( $lonlo * $picx / $mapx ).",".int( $latlo * $picy / $mapy );
-    if ( @pos > 1 ) {
-
-      $posxy = int( ( $lonlo-$pos[ 0 ]{longitude} ) * $picx / $mapx ).",".int( ( $latlo-$pos[ 0 ]{latitude} ) * $picy / $mapy ).",'".$pos[ 0 ]{act}."'";
-      for (my $i=1;$i<@pos;$i++){
-        $posxy .= ",".int( ( $lonlo - $pos[ $i ]{longitude} ) * $picx / $mapx ).",".int( ( $latlo - $pos[ $i ]{latitude} ) * $picy / $mapy ).",'".$pos[ $i ]{act}."'";
-      }
-
-    }
-
-    # CHARGING STATION PATH 
-    my $poscxy = int( ( $lonru-$lonlo ) * $picx / $mapx ).",".int( ( $latlo - $latru ) * $picy / $mapy );
-    if ( @posc > 1 ) {
-
-      $poscxy = int( ( $lonlo-$posc[0]{longitude} ) * $picx / $mapx ).",".int( ( $latlo-$posc[0]{latitude} ) * $picy / $mapy );
-      for (my $i=1;$i<@posc;$i++){
-        $poscxy .= ",".int(($lonlo-$posc[$i]{longitude}) * $picx / $mapx).",".int(($latlo-$posc[$i]{latitude}) * $picy / $mapy);
-      }
-
-    }
+    my $csdata = 'data-csimgpos="'.$csimgpos.'" data-cslon="'.$cslon.'" data-cslat="'.$cslat.'"';
 
     # AREA LIMITS
     my $arealimits = AttrVal($name,'mowingAreaLimits','');
@@ -491,6 +450,7 @@ sub FW_detailFn_Update {
         $limi .= ",".int( ( $lonlo - $lixy[ $i ] ) * $picx / $mapx).",".int( ( $latlo-$lixy[$i+1] ) * $picy / $mapy);
       }
     }
+    $limi = 'data-areaLimitsPath="'.$limi.'"';
 
     # PROPERTY LIMITS
     my $propertylimits = AttrVal($name,'propertyLimits','');
@@ -502,36 +462,119 @@ sub FW_detailFn_Update {
         $propli .= ",".int(($lonlo-$propxy[$i]) * $picx / $mapx).",".int(($latlo-$propxy[$i+1]) * $picy / $mapy);
       }
     }
+    $propli = 'data-propertyLimitsPath="'.$propli.'"';
 
-    # ERROR MESSAGE
-    my $errlon = int( ( $lonlo - $hash->{helper}{lasterror}{olLon} ) * $picx / $mapx );
-    my $errlat = int( ( $latlo - $hash->{helper}{lasterror}{olLat} ) * $picy / $mapy );
-    my $errx = int( $hash->{helper}{lasterror}{sizex} * $picx / -$mapx );
-    my $erry = int( $hash->{helper}{lasterror}{sizey} * $picy / $mapy );
-    my $errdesc = $hash->{helper}{lasterror}{errordesc};
-    my $errdate = $hash->{helper}{lasterror}{errordate};
+    # MOWING PATH
+    my @pos = @{ $hash->{helper}{areapos} };
+    # my $posxy = $cslon . "," . $cslat . ",P";
+    my $posxy = '';
 
-    # ERROR PATH
-    my $poserrxy = int( ( $lonru-$lonlo ) / 2 * $picx / $mapx ).",".int( ( $latlo - $latru ) / 2 * $picy / $mapy );;
+    if ( @pos > 1 ) {
 
-    if ( @poserr > 0 ) {
+      $posxy = int( ( $lonlo-$pos[ 0 ]{longitude} ) * $picx / $mapx ).",".int( ( $latlo-$pos[ 0 ]{latitude} ) * $picy / $mapy ).",".$pos[ 0 ]{act};
 
-      $poserrxy = int( ( $lonlo - $poserr[ 0 ]{longitude} ) * $picx / $mapx ) . "," . int( ( $latlo - $poserr[ 0 ]{latitude} ) * $picy / $mapy );
+      for ( my $i = 1; $i < ( @pos > 5000 ? 5000 : @pos ); $i++ ){
 
-      for ( my $i = 1; $i < @poserr; $i++ ){
-        $poserrxy .= ",".int( ( $lonlo - $poserr[ $i ]{longitude} ) * $picx / $mapx) . "," . int( ( $latlo - $poserr[ $i ]{latitude} ) * $picy / $mapy );
+        $posxy .= ",".int( ( $lonlo - $pos[ $i ]{longitude} ) * $picx / $mapx ).",".int( ( $latlo - $pos[ $i ]{latitude} ) * $picy / $mapy ).",".$pos[ $i ]{act};
+
       }
 
     }
 
-    my $erray = "$errlon,$errlat,$errx,$erry,$poserrxy";
-    
-    # Log3 $name, 1, "AutomowerConnectUpdateDetail ( '$name', '$type', '$img', $picx, $picy, $cslon, $cslat, '$csimgpos', $scalx, '$errdesc', [ $posxy ], [ $limi ], [ $propli ], [ $erray ] )";
+    $posxy = 'data-mowingPath="'.$posxy.'"';
 
-    map { 
-      ::FW_directNotify("#FHEMWEB:$_", "AutomowerConnectUpdateDetail ( '$name', '$type', '$img', $picx, $picy, $cslon, $cslat, '$csimgpos', $scalx, [ '$errdesc', '$errdate' ], [ $posxy ], [ $limi ], [ $propli ], [ $erray ] )","");
-    } devspec2array("TYPE=FHEMWEB");
+
+    my $ret = "";
+    $ret .= "<style>
+    .${type}_${name}_div{padding:0px !important;
+      $bgstyle background-image: url('$img');
+      background-size: ${picx}px ${picy}px;
+      background-repeat: no-repeat; 
+      width: ${picx}px; height: ${picy}px;
+      position: relative;}
+    .${type}_${name}_canvas_0{
+      position: absolute; left: 0; top: 0; z-index: 0;}
+    .${type}_${name}_canvas_1{
+      position: absolute; left: 0; top: 0; z-index: 1;}
+    </style>";
+    $ret .= "<div id='${type}_${name}_div' class='${type}_${name}_div' $mapDesign $csdata $limi $propli $posxy >";
+    $ret .= "<canvas id='${type}_${name}_canvas_0' class='${type}_${name}_canvas_0' width='$picx' height='$picy' ></canvas>";
+    $ret .= "<canvas id='${type}_${name}_canvas_1' class='${type}_${name}_canvas_1' width='$picx' height='$picy' ></canvas>";
+    $ret .= "</div>";
+    $hash->{helper}{detailFnFirst} = 1;
+    InternalTimer( gettimeofday() + 1.5, \&FW_detailFn_Update, $hash, 0 );
+    
+    return $ret;
   }
+  return '';
+}
+
+#########################
+sub FW_detailFn_Update {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  return undef if( AttrVal($name, 'disable', 0) || !AttrVal($name, 'showMap', 1) );
+
+  my @pos = @{ $hash->{helper}{areapos} };
+  my @poserr = @{ $hash->{helper}{lasterror}{positions} };
+
+  my ( $lonlo, $latlo, $dummy, $lonru, $latru ) = AttrVal( $name,"mapImageCoordinatesToRegister",$hash->{helper}{posMinMax} ) =~ /(-?\d*\.?\d+)\s(-?\d*\.?\d+)(\R|\s)(-?\d*\.?\d+)\s(-?\d*\.?\d+)/;
+
+  my $zoom = AttrVal( $name,"mapImageZoom", 0.7 );
+  
+  my ($picx,$picy) = AttrVal( $name,"mapImageWidthHeight", $hash->{helper}{imageWidthHeight} ) =~ /(\d+)\s(\d+)/;
+
+  AttrVal($name,'scaleToMeterXY', $hash->{helper}{scaleToMeterLongitude} . ' ' .$hash->{helper}{scaleToMeterLatitude}) =~ /(-?\d+)\s+(-?\d+)/;
+  my $scalx = ( $lonru - $lonlo ) * $1;
+  my $scaly = ( $latlo - $latru ) * $2;
+
+  $picx = int($picx*$zoom);
+  $picy = int($picy*$zoom);
+  my $mapx = $lonlo-$lonru;
+  my $mapy = $latlo-$latru;
+
+  # MOWING PATH
+  my $posxy = '';
+
+  if ( @pos > 0 && $hash->{helper}{detailFnNewPos}) {
+
+    $posxy = int( ( $lonlo-$pos[ 0 ]{longitude} ) * $picx / $mapx ).",".int( ( $latlo-$pos[ 0 ]{latitude} ) * $picy / $mapy ).",'".$pos[ 0 ]{act}."'";
+    my $imax = ( @pos > 5000 ? @pos - 5000 + $hash->{helper}{detailFnNewPos} : $hash->{helper}{detailFnNewPos} );
+
+    for ( my $i = 1; $i < $imax; $i++ ){
+
+      $posxy .= ",".int( ( $lonlo - $pos[ $i ]{longitude} ) * $picx / $mapx ).",".int( ( $latlo - $pos[ $i ]{latitude} ) * $picy / $mapy ).",'".$pos[ $i ]{act}."'";
+
+    }
+
+  }
+
+  # ERROR MESSAGE
+  my $errdesc = $hash->{helper}{lasterror}{errordesc};
+  my $errdate = $hash->{helper}{lasterror}{errordate};
+
+  # ERROR PATH
+  my $poserrxy = int( ( $lonru-$lonlo ) / 2 * $picx / $mapx ).",".int( ( $latlo - $latru ) / 2 * $picy / $mapy );;
+
+  if ( @poserr > 0 ) {
+
+    $poserrxy = int( ( $lonlo - $poserr[ 0 ]{longitude} ) * $picx / $mapx ) . "," . int( ( $latlo - $poserr[ 0 ]{latitude} ) * $picy / $mapy );
+
+    for ( my $i = 1; $i < @poserr; $i++ ){
+      $poserrxy .= ",".int( ( $lonlo - $poserr[ $i ]{longitude} ) * $picx / $mapx) . "," . int( ( $latlo - $poserr[ $i ]{latitude} ) * $picy / $mapy );
+    }
+
+  }
+
+  # Log3 $name, 1, "AutomowerConnectUpdateDetail ( '$name', '$type', $detailFnFirst, $picx, $picy, $scalx, [ '$errdesc', '$errdate' ], [ $posxy ], [ $poserrxy ] )";
+  my $detailFnFirst = $hash->{helper}{detailFnFirst};
+
+  map { 
+    ::FW_directNotify("#FHEMWEB:$_", "AutomowerConnectUpdateDetail ( '$name', '$type', $detailFnFirst, $picx, $picy, $scalx, [ '$errdesc', '$errdate' ], [ $posxy ], [ $poserrxy ] )","");
+  } devspec2array("TYPE=FHEMWEB");
+
+  $hash->{helper}{detailFnFirst} = 0;
   return undef;
 }
 
@@ -669,7 +712,7 @@ sub AlignArray {
   my $name = $hash->{NAME};
   my $act = $hash->{helper}{mower}{attributes}{mower}{activity};
   my $actold = $hash->{helper}{mowerold}{attributes}{mower}{activity};
-   my $cnt = @{ $hash->{helper}{mower}{attributes}{positions} };
+  my $cnt = @{ $hash->{helper}{mower}{attributes}{positions} };
   my $tmp = [];
 
   if ( $cnt > 0 ) {
@@ -744,10 +787,6 @@ sub AlignArray {
 
   }
 
-  isErrorThanPrepare( $hash, $tmp );
-
-  resetLastErrorIfCorrected($hash);
-
   $hash->{helper}{newdatasets} = $cnt;
   return undef;
 
@@ -755,33 +794,27 @@ sub AlignArray {
 
 #########################
 sub isErrorThanPrepare {
-  my ( $hash, $poshash ) = @_;
+  my ( $hash ) = @_;
+  my $name = $hash->{NAME};
+
   if ( $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} ) {
 
-    if ( ( $hash->{helper}{lasterror}{timestamp} != $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} ) && @$poshash) {
-
-      my $minLon = minNum( 180, $poshash->[ 0 ]{longitude} );
-      my $maxLon = maxNum( -180, $poshash->[ 0 ]{longitude} );
-      my $minLat = minNum( 90, $poshash->[ 0 ]{latitude} );
-      my $maxLat = maxNum( -90, $poshash->[ 0 ]{latitude} );
-
-      for ( @{ $poshash } ) {
-        $minLon = minNum( $minLon, $_->{longitude} );
-        $maxLon = maxNum( $maxLon, $_->{longitude} );
-        $minLat = minNum( $minLat, $_->{latitude} );
-        $maxLat = maxNum( $maxLat, $_->{latitude} );
-      }
+    if ( ( $hash->{helper}{lasterror}{timestamp} != $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} ) && @{ $hash->{helper}{areapos} } > 1) {
 
       my $ect = $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp};
-      $hash->{helper}{lasterror}{positions} = dclone $poshash;
+      $hash->{helper}{areapos}[ 0 ]{act} = 'N';
+      $hash->{helper}{areapos}[ 1 ]{act} = 'N';
+      $hash->{helper}{lasterror}{positions} = [ dclone( $hash->{helper}{areapos}[ 0 ] ), dclone( $hash->{helper}{areapos}[ 1 ] ) ];
       $hash->{helper}{lasterror}{timestamp} = $ect;
-      $hash->{helper}{lasterror}{olLon} = $minLon;
-      $hash->{helper}{lasterror}{olLat} = $maxLat;
-      $hash->{helper}{lasterror}{sizex} = sprintf('%.7f',$maxLon - $minLon);
-      $hash->{helper}{lasterror}{sizey} = sprintf('%.7f',$maxLat - $minLat);
       my $errc = $hash->{helper}{mower}{attributes}{mower}{errorCode};
       $hash->{helper}{lasterror}{errordesc} = $::FHEM::Devices::AMConnect::Common::errortable->{$errc};
       $hash->{helper}{lasterror}{errordate} = FmtDateTimeGMT( $ect / 1000 );
+      $hash->{helper}{lasterror}{errorzone} = $hash->{helper}{currentZone} if ( defined( $hash->{helper}{currentZone} ) );
+
+      my $tmp = dclone( $hash->{helper}{lasterror} );
+      unshift ( @{ $hash->{helper}{errorstack} }, $tmp );
+      pop ( @{ $hash->{helper}{errorstack} } ) if ( @{ $hash->{helper}{errorstack} } > 5 );
+      ::FHEM::Devices::AMConnect::Common::FW_detailFn_Update ($hash);
 
     }
 
@@ -792,17 +825,15 @@ sub isErrorThanPrepare {
 #########################
 sub resetLastErrorIfCorrected {
   my ( $hash ) = @_;
+  my $name = $hash->{NAME};
 
   if (!$hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} && $hash->{helper}{lasterror}{timestamp} ) {
 
     $hash->{helper}{lasterror}{positions} = [];
     $hash->{helper}{lasterror}{timestamp} = 0;
-    $hash->{helper}{lasterror}{olLon} = 0;
-    $hash->{helper}{lasterror}{olLat} = 0;
-    $hash->{helper}{lasterror}{sizex} = 0;
-    $hash->{helper}{lasterror}{sizey} = 0;
     $hash->{helper}{lasterror}{errordesc} = '-';
     $hash->{helper}{lasterror}{errordate} = '';
+    ::FHEM::Devices::AMConnect::Common::FW_detailFn_Update ($hash);
 
   }
 
@@ -1101,7 +1132,7 @@ sub fillReadings {
   readingsBulkUpdateIfChanged($hash, "planner_nextStart", $tstamp ? $timestamp : '-' );
 
   $pref = 'statistics';
-  readingsBulkUpdateIfChanged($hash, $pref."_numberOfCollisions", $hash->{helper}->{mower}{attributes}{$pref}{numberOfCollisions} );
+  readingsBulkUpdateIfChanged($hash, $pref."_numberOfCollisions", '(' . $hash->{helper}{statistics}{lastDayCollisions} . '/' . $hash->{helper}{mower}{attributes}{$pref}{numberOfCollisions} . ')' );
   readingsBulkUpdateIfChanged($hash, $pref."_newGeoDataSets", $hash->{helper}{newdatasets} );
   $pref = 'settings';
   readingsBulkUpdateIfChanged($hash, $pref."_headlight", $hash->{helper}{mower}{attributes}{$pref}{headlight}{mode} );
@@ -1117,19 +1148,6 @@ sub fillReadings {
 }
 
 #########################
-sub initStatistics {
-  my ( $hash ) = @_;
-  my ( @tim ) = localtime(time);
-  $tim[ 0 ] = 0;
-  $tim[ 1 ] = 0;
-  $tim[ 2 ] = 0;
-  my $ret = ::timelocal( @tim ) + 86417;
-  RemoveInternalTimer( $hash, \&calculateStatistics );
-  InternalTimer( $ret, \&calculateStatistics, $hash, 0 );
-return undef;
-}
-
-#########################
 sub calculateStatistics {
   my ( $hash ) = @_;
   my $name = $hash->{NAME};
@@ -1138,6 +1156,7 @@ sub calculateStatistics {
   $hash->{helper}{statistics}{lastDayTrack} = $hash->{helper}{statistics}{currentDayTrack};
   $hash->{helper}{statistics}{lastDayArea} = $hash->{helper}{statistics}{currentDayArea};
   $hash->{helper}{statistics}{lastDayTime} = $hash->{helper}{statistics}{currentDayTime};
+  $hash->{helper}{statistics}{lastDayCollisions} = $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions} - $hash->{helper}{mowerold}{attributes}{statistics}{numberOfCollisions};
   $hash->{helper}{statistics}{currentWeekTrack} += $hash->{helper}{statistics}{currentDayTrack};
   $hash->{helper}{statistics}{currentWeekArea} += $hash->{helper}{statistics}{currentDayArea};
   $hash->{helper}{statistics}{currentWeekTime} += $hash->{helper}{statistics}{currentDayTime};
@@ -1200,7 +1219,6 @@ sub calculateStatistics {
 
   }
 
-  initStatistics( $hash );
   return undef;
 }
 
@@ -1236,6 +1254,8 @@ sub listStatisticsData {
     $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{<b>lastWeekTrack</b>} &emsp;</td><td> ' . sprintf( "%.0f", $hash->{helper}{statistics}{lastWeekTrack} ) . ' </td><td> m </td></tr>';
     $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{<b>lastWeekArea</b>} &emsp;</td><td> ' . sprintf( "%.0f", $hash->{helper}{statistics}{lastWeekArea} ) . ' </td><td> qm </td></tr>';
     $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{<b>lastWeekTime</b>} &emsp;</td><td> ' . sprintf( "%.0f", $hash->{helper}{statistics}{lastWeekTime} ) . ' </td><td> s </td></tr>';
+    
+    $cnt++;$ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{statistics}{<b>lastDayCollisions</b>} &emsp;</td><td> ' . sprintf( "%.0f", $hash->{helper}{statistics}{lastDayCollisions} ) . ' </td><td>  </td></tr>';
 
     if ( AttrVal($name, 'mapZones', 0) && defined( $hash->{helper}{mapZones} ) ) {
 
@@ -1365,6 +1385,37 @@ sub listMowerData {
   } else {
 
     return '<html><table class="block wide"><tr><td>mower data is not yet available</td></tr></table></html>';
+
+  }
+}
+
+#########################
+sub listErrorStack {
+  my ( $hash ) = @_;
+  my $name = $hash->{NAME};
+  my $cnt = 0;
+  my $ret = '';
+  if ( $::init_done && defined( $hash->{helper}{mower}{type} ) && @{ $hash->{helper}{errorstack} } ) {
+
+    $ret .= '<html><table class="block wide">';
+    $ret .= '<caption><b>Last Errors</b></caption><tbody>'; 
+
+    $ret .= '<tr class="col_header"><td> Timestamp </td><td> Description </td><td> &emsp;Zone &emsp;</td><td> Position </td></tr>';
+
+    for ( my $i = 0; $i < @{ $hash->{helper}{errorstack} }; $i++ ) {
+
+      $cnt++; $ret .= '<tr class="column '.( $cnt % 2 ? 'odd' : 'even' ).'"><td> ' . $hash->{helper}{errorstack}[$i]{errordate} . ' </td><td> ' . $hash->{helper}{errorstack}[$i]{errordesc} . ' </td><td> ' . $hash->{helper}{errorstack}[$i]{errorzone} . ' </td><td> ' . $hash->{helper}{errorstack}[$i]{positions}[0]{longitude} . ' / ' . $hash->{helper}{errorstack}[$i]{positions}[0]{latitude} . ' </td></tr>';
+
+    }
+
+    $ret .= '</tbody></table>';
+    $ret .= '</html>';
+
+    return $ret;
+
+  } else {
+
+    return '<html><table class="block wide"><tr><td>No error in stack. </td></tr></table></html>';
 
   }
 }
