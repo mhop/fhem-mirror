@@ -394,8 +394,10 @@ sub getMowerResponse {
         # schedule new access token
         RemoveInternalTimer( $hash, \&APIAuth );
         InternalTimer( ReadingsVal($name, '.expires', 600)-37, \&APIAuth, $hash, 0 );
+
         # Websocket initialisieren, schedule ping, reopen
-        wsReopen( $hash );
+        RemoveInternalTimer( $hash, \&wsReopen );
+        InternalTimer( gettimeofday() + 1.5, \&wsReopen, $hash, 0 );
 
         return undef;
 
@@ -614,6 +616,13 @@ sub Set {
       my ($passResp, $passErr) = $hash->{helper}->{passObj}->setStorePassword($name, $setVal);
       Log3 $name, 1, "$iam error: $passErr" if ($passErr);
       return "$iam $passErr" if( $passErr );
+
+      readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, '.access_token', '', 0 );
+        readingsBulkUpdateIfChanged( $hash, 'device_state', 'initialized');
+        readingsBulkUpdateIfChanged( $hash, 'mower_commandStatus', 'cleared');
+      readingsEndUpdate($hash, 1);
+      
       RemoveInternalTimer($hash, \&APIAuth);
       APIAuth($hash);
       return undef;
@@ -774,6 +783,12 @@ sub Attr {
     if( $cmd eq "set" ) {
 
       return "$iam $attrName has a wrong format use linewise pairs <floating point longitude><one space character><floating point latitude>" unless( $attrVal =~ /(-?\d*\.?\d+)\s(-?\d*\.?\d+)(\R|\s)(-?\d*\.?\d+)\s(-?\d*\.?\d+)/ );
+      my ( $lo1, $la1, $lo2, $la2 ) = ( $1, $2, $4, $5 );
+      return "$iam $attrName illegal value 0 for the difference of longitudes." unless ( $lo1 - $lo2 );
+      return "$iam $attrName illegal value 0 for the difference of latitudes." unless ( $la1 - $la2 );
+      
+      
+
       Log3 $name, 3, "$iam $cmd $attrName $attrVal";
 
     } elsif( $cmd eq "del" ) {
