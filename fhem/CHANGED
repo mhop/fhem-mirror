@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  74_AutomowerConnect: improved background image loading
+            Commandref: Hint to connect application key with Automower Connect
+            API in Developer Portal.
  - bugfix:  74_AutomowerConnect: prevent division by zero, delay ws init
             force new access token when set client_secret
  - change:  74_AutomowerConnect: Common.pm, automowerconnect.js

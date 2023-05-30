@@ -181,9 +181,6 @@ my $mapZonesTpl = '{
       newzonedatasets           => 0,
       positionsTime             => 0,
       statusTime                => 0,
-      MAP_PATH                  => '',
-      MAP_MIME                  => '',
-      MAP_CACHE                 => '',
       cspos                     => [],
       areapos                   => [],
       errorstack                => [],
@@ -280,18 +277,29 @@ my $mapZonesTpl = '{
 
   AddExtension( $name, \&GetMap, "$type/$name/map" );
 
+  if ( $::init_done ) {
+
+    my $attrVal = $attr{$name}{mapImagePath};
+
+    if ($attrVal =~ '(webp|png|jpg|jpeg)$' ) {
+
+      $hash->{helper}{MAP_PATH} = $attrVal;
+      $hash->{helper}{MAP_MIME} = "image/".$1;
+      readMap( $hash );
+
+    }
+
+  }
+
   if( $hash->{helper}->{passObj}->getReadPassword($name) ) {
 
     RemoveInternalTimer($hash);
     InternalTimer( gettimeofday() + 2, \&::FHEM::AutomowerConnect::APIAuth, $hash, 1);
-    InternalTimer( gettimeofday() + 20, \&readMap, $hash, 0);
 
-      DevIo_setStates( $hash, "disconnected" );
       readingsSingleUpdate( $hash, 'device_state', 'defined', 1 );
 
   } else {
 
-      DevIo_setStates( $hash, "disconnected" );
       readingsSingleUpdate( $hash, 'device_state', 'defined - client_secret missing', 1 );
 
   }
@@ -1033,23 +1041,31 @@ sub readMap {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   my $iam = "$type $name readMap:";
-  RemoveInternalTimer( $hash, \&::FHEM::Devices::AMConnect::Common::readMap );
   my $filename = $hash->{helper}{MAP_PATH};
-  
+
   if ( $filename and -e $filename ) {
+
     open my $fh, '<:raw', $filename or die $!;
     my $content = '';
+
     while (1) {
+
       my $success = read $fh, $content, 1024, length($content);
       die $! if not defined $success;
       last if not $success;
+
     }
+
     close $fh;
     $hash->{helper}{MAP_CACHE} = $content;
     Log3 $name, 5, "$iam file \"$filename\" content length: ".length($content);
+
   } else {
+
     Log3 $name, 2, "$iam file \"$filename\" does not exist.";
+
   }
+
 }
 
 #########################

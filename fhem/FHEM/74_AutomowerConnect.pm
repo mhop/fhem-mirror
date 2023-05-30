@@ -692,19 +692,24 @@ sub Attr {
   } elsif ( $attrName eq 'mapImagePath' ) {
 
     if( $cmd eq "set") {
+
       if ($attrVal =~ '(webp|png|jpg|jpeg)$' ) {
+
         $hash->{helper}{MAP_PATH} = $attrVal;
         $hash->{helper}{MAP_MIME} = "image/".$1;
+        ::FHEM::Devices::AMConnect::Common::readMap( $hash );
 
-        if ($attrVal =~ /(\d+)x(\d+)/) {
-          CommandAttr($hash,"$name mapImageWidthHeight $1 $2");
+        if ( $attrVal =~ /(\d+)x(\d+)/ ) {
+          $attr{$name}{mapImageWidthHeight} = "$1 $2";
         }
 
-        ::FHEM::Devices::AMConnect::Common::readMap( $hash );
         Log3 $name, 3, "$iam $cmd $attrName $attrVal";
+
       } else {
+
         return "$iam $cmd $attrName wrong image type, use webp, png, jpeg or jpg";
         Log3 $name, 3, "$iam $cmd $attrName wrong image type, use webp, png, jpeg or jpg";
+      
       }
 
     } elsif( $cmd eq "del" ) {
@@ -763,9 +768,13 @@ sub Attr {
         my ( $x1, $y1, $x2, $y2 ) = ( $1, $2, $4, $5 );
         AttrVal( $name,'mapImageCoordinatesToRegister', '' ) =~ /(-?\d*\.?\d+)\s(-?\d*\.?\d+)(\R|\s)(-?\d*\.?\d+)\s(-?\d*\.?\d+)/;
         my ( $lo1, $la1, $lo2, $la2 ) = ( $1, $2, $4, $5 );
+
+        return "$iam $attrName illegal value 0 for the difference of longitudes." unless ( $lo1 - $lo2 );
+        return "$iam $attrName illegal value 0 for the difference of latitudes." unless ( $la1 - $la2 );
+
         my $scx = int( ( $x1 - $x2) / ( $lo1 - $lo2 ) );
         my $scy = int( ( $y1 - $y2 ) / ( $la1 - $la2 ) );
-        CommandAttr($hash,"$name scaleToMeterXY $scx $scy");
+        $attr{$name}{scaleToMeterXY} = "$scx $scy";
 
       } else {
         return "$iam $attrName has a wrong format use linewise pairs <floating point longitude><one space character><floating point latitude> or the attribute mapImageCoordinatesToRegister was not set before.";
@@ -929,6 +938,7 @@ __END__
   <ul>
     <li>To get access to the API an application has to be created in the <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.</li>
     <li>During registration an application key (client_id) and an application secret (client secret) is provided. Use these for for the module.</li>
+    <li>Don't forget to connect you API key to the Automower API.</li>
     <li>The module uses client credentials as grant type for authorization.</li>
   </ul>
   <br>
@@ -1010,11 +1020,6 @@ __END__
     <li><a id='AutomowerConnect-set-defaultDesignAttributesToAttribute'>defaultDesignAttributesToAttribute</a><br>
       <code>set &lt;name&gt; mapZonesTemplateToAttribute</code><br>
       Load default design attributes.</li>
-
-
-    <li><a id='AutomowerConnect-set-'></a><br>
-      <code>set &lt;name&gt; </code><br>
-    </li>
     <br><br>
   </ul>
   <br>
@@ -1188,13 +1193,9 @@ __END__
       }'<br>
       </code></li>
 
-     <li><a href="disable">disable</a></li>
-     <li><a href="disabledForIntervals">disabledForIntervals</a></li>
-
-
-    <li><a id='AutomowerConnect-attr-'></a><br>
-      <code>attr &lt;name&gt;  &lt;&gt;</code><br>
-      </li>
+    <li><a href="disable">disable</a></li>
+    <li><a href="disabledForIntervals">disabledForIntervals</a></li>
+    <br><br>
   </ul>
   <br>
 
@@ -1254,14 +1255,17 @@ __END__
     <li>Es ist möglich alles was die API anbietet zu steuern, z.B. Mähplan,Scheinwerfer, Schnitthöhe und Aktionen wie, Start, Pause, Parken usw. </li>
     <li>Zonen können selbst definiert werden. </li>
     <li>Die Schnitthöhe kann je selbstdefinierter Zone eingestellt werden. </li>
-    <li>Die Daten aus der API sind im Gerätehash gespeichert, Mit <code>{Dumper $defs{&lt;device name&gt;}}</code> in der Befehlezeile können die Daten angezeigt werden und daraus userReadings erstellt werden.</li><br>
+    <li>Die Daten aus der API sind im Gerätehash gespeichert, Mit <code>{Dumper $defs{&lt;device name&gt;}}</code> in der Befehlezeile können die Daten angezeigt werden und daraus userReadings erstellt werden.</li>
+  <br>
   </ul>
   <u><b>Anforderungen</b></u>
   <br><br>
   <ul>
     <li>Für den Zugriff auf die API muss eine Application angelegt werden, im <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.</li>
     <li>Währenddessen wird ein Application Key (client_id) und ein Application Secret (client secret) bereitgestellt. Diese sind für dieses Modul zu nutzen.</li>
+    <li>Der Application Key muss im Portal mit der Automower API verbunden werden.</li>
     <li>Das Modul nutzt Client Credentials als Granttype zur Authorisierung.</li>
+  <br>
   </ul>
   <br>
   <a id="AutomowerConnectDefine"></a>
@@ -1272,7 +1276,7 @@ __END__
     <code>define myMower AutomowerConnect 123456789012345678901234567890123456</code> Erstes Gerät: die Defaultmähernummer ist 0.<br>
     Es muss ein <b>client_secret</b> gesetzt werden. Es ist das Application Secret vom <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.<br>
     <code>set myMower &lt;client secret&gt;</code><br>
-    <br><br>
+    <br>
   </ul>
   <br>
 
@@ -1342,10 +1346,9 @@ __END__
      <li><a id='AutomowerConnect-set-defaultDesignAttributesToAttribute'>defaultDesignAttributesToAttribute</a><br>
       <code>set &lt;name&gt; mapZonesTemplateToAttribute</code><br>
       Läd die Standartdesignattribute.</li>
-
-    <li><a id='AutomowerConnect-set-'></a><br>
-      <code>set &lt;name&gt; </code><br>
-      </li>
+      <br>
+  </ul>
+  <br>
 
   <a id="AutomowerConnectGet"></a>
   <b>Get</b>
@@ -1375,12 +1378,10 @@ __END__
     <li><a id='AutomowerConnect-get-errorStack'>errorStack</a><br>
       <code>get &lt;name&gt; errorStack</code><br>
       Listet die gespeicherten Fehler auf.</li>
-    <br><br>
+    <br>
   </ul>
   <br>
 
-  </ul>
-    <br>
     <a id="AutomowerConnectAttributes"></a>
     <b>Attributes</b>
   <ul>
@@ -1525,12 +1526,7 @@ __END__
 
      <li><a href="disable">disable</a></li>
      <li><a href="disabledForIntervals">disabledForIntervals</a></li>
-
-
-<li><a id='AutomowerConnect-attr-'></a><br>
-      <code>attr &lt;name&gt;  &lt;&gt;</code><br>
-      </li>
-      
+  <br>
   </ul>
   <br>
 
