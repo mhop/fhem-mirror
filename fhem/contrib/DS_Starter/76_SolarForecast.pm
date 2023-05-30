@@ -12079,16 +12079,18 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       
       <b>ForecastSolar-API</b> <br>
       
-      Die konstenfreie Nutzung der API erfordert keine Registrierung. Die API-Anfragen sind in der kostenfreien 
+      Die kostenfreie Nutzung der API erfordert keine Registrierung. Die API-Anfragen sind in der kostenfreien 
       Version auf 12 innerhalb einer Stunde begrenzt. Ein Tageslimit gibt es dabei nicht. Das Modul ermittelt automatisch 
       das optimale Abfrageintervall in Abhängigkeit der konfigurierten Strings.
       <br><br>
       
       <b>DWD_OpenData Device</b> <br>      
       
-      Der DWD-Dienst wird über ein FHEM Device vpm Typ DWD_OpenData eingebunden.
+      Der DWD-Dienst wird über ein FHEM Device vom Typ DWD_OpenData eingebunden.
       Ist noch kein Device des Typs DWD_OpenData vorhanden, muß es vorab definiert werden 
       (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
+      Um eine gute Strahlungsprognose zu erhalten sollte eine sehr dem Anlagenstandort gelegene DWD-Station genutzt 
+      werden. Leider liefern nicht alle DWD-Station die benötigten Rad1h-Werte. <br>
       Im ausgewählten DWD_OpenData Device müssen mindestens diese Attribute gesetzt sein: <br><br>
 
       <ul>
