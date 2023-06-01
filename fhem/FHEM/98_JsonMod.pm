@@ -32,6 +32,10 @@ use List::Util qw( any );
 use Text::Balanced qw ( extract_codeblock extract_delimited extract_bracketed );
 use Time::Local qw( timelocal timegm );
 use Unicode::Normalize qw( NFD );
+# support system://'curl '
+use IPC::Open3;
+use Symbol 'gensym'; 
+
 
 #use Memory::Usage;
 
@@ -77,7 +81,7 @@ sub JsonMod_Define {
 	$hash->{'CRON'} = JsonMod::Cron->new();
 
 	return "no FUUID, is fhem up to date?" if (not $hash->{'FUUID'});
-	return "wrong source definition" if ($source !~ m/^(https:|http:|file:)/);
+	return "wrong source definition" if ($source !~ m/^(https:|http:|file:|system:)/);
 
 	$hash->{'CONFIG'}->{'SOURCE'} = $source;
 	#($hash->{'NOTIFYDEV'}) = devspec2array('TYPE=Global');
@@ -276,9 +280,8 @@ sub JsonMod_DoReadings {
 		utf8::encode($r) if utf8::is_utf8($r);
 		$r =~ s/\s/_/g;	# whitespace 
 		$r =~ s/([^A-Za-z0-9\/_\.-])//g;
-		# prevent a totally stripped reading name
-		# todo, log it?
-		#$r = "_Identifier_$_index" unless($r);
+		# prevent a totally stripped reading name / todo, log it?
+		$r = "__CONVERSATION_ERROR__" unless($r);
 		$v //='';
 		utf8::encode($v) if utf8::is_utf8($v);
 		$newReadings->{$r} = $v;
@@ -309,7 +312,7 @@ sub JsonMod_DoReadings {
 		$readingList =~ s/\//\\\//g; # escape slash forum 122166
 		($args, $readingList, $cmd) = extract_codeblock ($readingList, '()', '(?m)[^(]*');
 		$readingList =~ s/\\\//\//g; # revert escaped slash
-		$args =~ s/\\\//\//g; # revert escaped slash
+		$args =~ s/\\\//\//g if defined($args); # revert escaped slash
 		# say 'A:'.$args;
 		# say 'R:'.$readingList;
 		# say 'C:'.$cmd;
@@ -382,10 +385,14 @@ sub JsonMod_DoReadings {
 		} elsif ($cmd eq 'multi') {
 
 			my $resultSet;
+			my $resultNode;
 			my $resultObject;
 			my $index = 0;
 
-			# my sub count {
+			local *node = sub {
+				return $resultNode;
+			};
+
 			local *count = sub {
 				return $index;
 			};
@@ -434,15 +441,17 @@ sub JsonMod_DoReadings {
 			# my sub jsonPath {
 			local *jsonPath = sub {
 				my ($jsonPathExpression) = @_;
-				$resultSet = $path->get($jsonPathExpression)->getResultValue() unless (defined($resultSet));
+				# $resultSet = $path->get($jsonPathExpression)->getResultValue() unless (defined($resultSet));
+				$resultSet = $path->get($jsonPathExpression)->getResultList() unless (defined($resultSet));
 				return $jsonPathExpression;
 			};
 
 			# my sub m2 {
 			local *m2 = sub {
 				my ($jsonPathExpression, $readingName, $readingValue) = @_;
+				# print "in m2 $jsonPathExpression, $readingName, $readingValue\n";
 				sanitizedSetReading($readingName, $readingValue);
-				$index++;
+				# $index++;
 			};
 
 			# my sub m1 {
@@ -452,11 +461,16 @@ sub JsonMod_DoReadings {
 				$warnings = 1;
 
 				if (ref($resultSet) eq 'ARRAY') {
-					foreach (@{$resultSet}) {
-						$resultObject = $_;
+					foreach my $res (@{$resultSet}) {
+						$resultNode = $res->[0];
+						$resultObject = $res->[1]; # value
+						# print "array: $resultNode $resultObject \n";
+						# use Data::Dumper;
+						# print Dumper $resultObject;
 						eval 'm2'.$args; warn $@ if $@;
+						$index++;
 					};
-				};				
+				};
 			};
 
 			{
@@ -580,8 +594,8 @@ sub JsonMod_ApiRequest {
 
 	my $source = $hash->{'CONFIG'}->{'SOURCE'};
 
-	# file
-	if ($source =~ m/^file:\/(.+)/) {
+	# file: correct file:/.. but also accepted file://..
+	if ($source =~ m/^file:[\/]{1,2}(.+)/) {
 		$hash->{'CONFIG'}->{'IN_REQUEST'} = 0;
 		$hash->{'API_LAST_RES'} = Time::HiRes::time();
 
@@ -606,8 +620,77 @@ sub JsonMod_ApiRequest {
 		} else {
 			$hash->{'SOURCE'} = sprintf('%s', $filename);
 			$hash->{'API_LAST_MSG'} = 404;
+			return;
 		};
 	};
+
+	# system: e.g. system://curl https://www.google.de
+	# must return valid json via pipe
+	if ($source =~ m/^system:\/\/(.+)/) {
+		my $cmd = $1;
+		my ($wtr, $rdr);  # pipes r+w
+		my $err = gensym();  # err
+
+		my $pid = open3($wtr, $rdr, $err, $cmd);
+		my $name = "JsonMod-System-$hash->{NAME}";
+
+		my ($data, $error);
+
+		my $select_rdr = {
+			FD => fileno($rdr),
+			NAME => $hash->{NAME}, # required in case fhem.pl executes delete
+			directReadFn => sub {
+				my $r = @_;
+				my $res;
+        		my $len = sysread $rdr, $res, 8192;
+				if ($len == 0) {
+					# reap zombie and retrieve exit status
+    				waitpid( $pid, 0 );
+    				my $child_exit_status = $?;
+					# my $child_exit_status = $? >> 8;
+					delete $selectlist{$name};
+					# delete $selectlist{$name.'-err'};
+					my $param = {
+						hash => $hash,
+						cron =>	$hash->{'CONFIG'}->{'CRON'},
+						code => $child_exit_status,
+					};
+					return JsonMod_ApiResponse($param, $error, $data);
+				} else {
+					$data .= $res;
+				}
+			}
+		};
+		$selectlist{$name} = $select_rdr;
+
+		# my $select_err = {
+		# 	FD => fileno($err),
+		# 	directReadFn => sub {
+		# 		my $r = @_;
+		# 		my $res;
+        # 		my $len = sysread $err, $res, 8192;
+		# 		# EOF
+		# 		if ($len == 0) {
+		# 			# reap zombie and retrieve exit status
+    	# 			waitpid( $pid, 0 );
+    	# 			my $child_exit_status = $?;
+		# 			# my $child_exit_status = $? >> 8;
+		# 			delete $selectlist{$name.'-rdr'};
+		# 			delete $selectlist{$name.'-err'};
+		# 			my $param = {
+		# 				hash => $hash,
+		# 				cron =>	$hash->{'CONFIG'}->{'CRON'},
+		# 				code => $child_exit_status,
+		# 			};
+		# 			JsonMod_ApiResponse($param, $e, $data);
+		# 		} else {
+		# 			$e .= $res;
+		# 		}
+		# 	}
+		# };
+		# $selectlist{$name.'-err'} = $select_err;
+		return;
+	}
 
 	my $param = {
 		'hash'		=>		$hash,
@@ -1898,11 +1981,22 @@ sub listDates {
 				</li>
 				<li>
 					count|count()<br>
-					<i>the old syntax index() is depraced but for a limited period of time still functional.</i>
 					Contains the index number of the current list element. 
-					Within 'multi()' instructions for generating reading names, ie by using concat('item_', count) or similar.
+					Within 'multi()' instructions for generating reading names, eg by using concat('item_', count) or similar.
 				</li>
-				within the expresiions single() and multi(), additional perl expressions may be used if required. 
+				<li>
+					node|node()<br>
+					Contains the normalized path expression of the current node. Required to access the keys of an object when iterating over a keys/value structure of an object. 
+					Within 'multi()' instructions eg for generating reading names from object keys.
+				</li>
+			</ul>
+			<br>within the expresiions single() and multi(), additional perl expressions may be used if required.<br><br>
+			Since the reading names are typically generated from the content of the JSON, it is the responsibility of the user to ensure that the fhem naming conventions are followed. JsonMod will make the following adjustments to the readings name if necessary and possible:
+			<ul>
+			<li>All non-ACSII characters are converted to an ASCII equivalent if possible</li>
+			<li>All forbidden characters are removed from the name</li>
+			<li>if a conversion fails, the name is set as "__CONVERSATION_ERROR__"</li>
+			<li>in case of multiple same reading names, the last one overwrites the previous one</li>
 			</ul>
 		</li>
 	</ul>
