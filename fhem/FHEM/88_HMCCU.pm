@@ -9324,6 +9324,12 @@ sub HMCCU_ScaleValue ($$$$$;$)
 	my $name = $hash->{NAME};
 	my $ioHash = HMCCU_GetHash ($hash);
 
+	if (!defined($value) || !HMCCU_IsFltNum($value)) {
+		my $logValue = $value // 'undef';
+		HMCCU_Log ($hash, 5, "Value $logValue is not numeric. chn=$chnno, dpt=$dpt");
+		return $value;
+	}
+
 	my $boundsChecking = (
 		$mode == 2 ||
 		($mode == 0 && $dpt =~ /^LEVEL/ && ($value == -0.005 || $value == 1.005 || $value == 1.01)) ||
@@ -9981,11 +9987,11 @@ sub HMCCU_Min ($$)
 	my ($a, $b) = @_;
 	
 	if (!defined($a) || !defined($b)) {
-		HMCCU_Log (undef, 2, "Argument not defined in HMCCU_Min ".stacktraceAsString(undef));
+		HMCCU_Log (undef, 5, "Argument not defined in HMCCU_Min ".stacktraceAsString(undef));
 		return 0;
 	}
 	if (!HMCCU_IsFltNum($a) || !HMCCU_IsFltNum($b)) {
-		HMCCU_Log (undef, 2, "Argument $a or $b isn't numeric in HMCCU_Min ".stacktraceAsString(undef));
+		HMCCU_Log (undef, 5, "Argument $a or $b isn't numeric in HMCCU_Min ".stacktraceAsString(undef));
 		return 0;
 	}
 	
@@ -9997,11 +10003,11 @@ sub HMCCU_Max ($$)
 	my ($a, $b) = @_;
 	
 	if (!defined($a) || !defined($b)) {
-		HMCCU_Log (undef, 2, "Argument not defined in HMCCU_Min ".stacktraceAsString(undef));
+		HMCCU_Log (undef, 5, "Argument not defined in HMCCU_Min ".stacktraceAsString(undef));
 		return 0;
 	}
 	if (!HMCCU_IsFltNum($a) || !HMCCU_IsFltNum($b)) {
-		HMCCU_Log (undef, 2, "Argument $a or $b isn't numeric in HMCCU_Max ".stacktraceAsString(undef));
+		HMCCU_Log (undef, 5, "Argument $a or $b isn't numeric in HMCCU_Max ".stacktraceAsString(undef));
 		return 0;
 	}
 
