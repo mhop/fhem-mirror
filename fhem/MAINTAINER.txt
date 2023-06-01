@@ -592,6 +592,7 @@ FHEM/HMCCUConf.pm            zap                  HomeMatic
 FHEM/HMConfig.pm             martinp876           HomeMatic
 FHEM/HOMESTATEtk.pm          loredo               Automatisierung
 FHEM/HttpUtils.pm            rudolfkoenig         Automatisierung
+FHEM/LandroidUtils.pm        frober               MQTT https://forum.fhem.de/index.php/topic,111959.0.html
 FHEM/MaxCommon.pm            Wzut                 MAX
 FHEM/Meta.pm                 loredo               FHEM Development
 FHEM/msgSchema.pm            loredo               Automatisierung
