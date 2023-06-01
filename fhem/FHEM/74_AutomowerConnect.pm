@@ -245,7 +245,7 @@ sub APIAuthResponse {
           $tim[ 0 ] = 0;
           $tim[ 1 ] = 0;
           $tim[ 2 ] = 1;
-          $expire = ::timelocal( @tim );
+          $expire = timelocal( @tim );
         }
 
         $hash->{helper}{auth}{expires} = $expire;
