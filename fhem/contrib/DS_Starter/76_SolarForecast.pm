@@ -9150,9 +9150,7 @@ return;
 
 ################################################################
 #  Korrekturfaktoren und Qualität in Abhängigkeit von DWD
-#  Bewölkung errechnen:
-#  Abweichung PVreal / PVforecast bei eingeschalteter automat.
-#  Korrektur berechnen, im Circular Hash speichern
+#  Bewölkung errechnen
 ################################################################
 sub _calcCAQfromDWDcloudcover {
   my $paref = shift;
@@ -9389,9 +9387,9 @@ sub _calcCAQfromAPIPercentil {
       next if(!$pvval);
 
       $paref->{hour}           = $h;
-      my ($pvhis,$fchis,$dnum) = __Pv_Fc_Dnum_Hist ($paref);                                                  # historischen Percentilfaktor / Qualität ermitteln
+      my ($pvhis,$fchis,$dnum) = __Pv_Fc_Dnum_Hist ($paref);                                               # historischen Percentilfaktor / Qualität ermitteln
 
-      my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), 'percentile', 1.0);               # bisher definiertes Percentil/Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
+      my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), 'percentile', 0);               
       $oldfac             = 1.0 if(1 * $oldfac == 0 || $oldfac >= 10);
 
       my @sts   = split ",", ReadingsVal($name, 'inverterStrings', '');
@@ -9400,17 +9398,17 @@ sub _calcCAQfromAPIPercentil {
       my $est50 = 0;
 
       for my $s (@sts) {
-          $est50 += SolCastAPIVal ($hash, $s, $tmstr, 'pv_estimate50', 0);                                     # Standardpercentil
+          $est50 += SolCastAPIVal ($hash, $s, $tmstr, 'pv_estimate50', 0);                                     
       }
 
-      if(!$est50) {                                                                                            # kein Standardpercentile vorhanden
-          debugLog ($paref, "pvCorrection", "Simple Corrf -> hour: $h, the correction factor can't be calculated because of the default percentile has no value yet");
+      if(!$est50) {                                                                                            
+          debugLog ($paref, "pvCorrection", "Simple Corrf -> hour: $h, the correction factor can't be calculated because of no PV forecast");
           next;
       }
 
-      my $perc = sprintf "%.2f", ($pvval / $est50);                                                            # berechneter Faktor der Stunde -> speichern in pvHistory
+      my $perc = sprintf "%.2f", ($pvval / $est50);                                                       # berechneter Faktor der Stunde -> speichern in pvHistory
 
-      $paref->{pvcorrf}  = $perc.'/1';                                                                         # Korrekturfaktor / Qualität in History speichern
+      $paref->{pvcorrf}  = $perc.'/1';                                                                    # Korrekturfaktor / Qualität in History speichern
       $paref->{nhour}    = sprintf("%02d",$h);
       $paref->{histname} = "pvcorrfactor";
 
@@ -9420,8 +9418,7 @@ sub _calcCAQfromAPIPercentil {
       delete $paref->{nhour};
       delete $paref->{pvcorrf};
 
-      debugLog ($paref, 'pvCorrection', "Simple Corrf -> PV estimate for hour of day >$h<: $est50");
-      debugLog ($paref, 'pvCorrection', "Simple Corrf -> number checked days: $dnum, pvreal: $pvval, correction factor: $perc");
+      debugLog ($paref, 'pvCorrection', "Simple Corrf -> PV for hour >$h< -> estimate without corr factor: $est50, real: $pvval");
 
       my $factor;
       my ($usenhd) = __useNumHistDays ($name);                                                            # ist Attr affectNumHistDays gesetzt ?
@@ -9451,7 +9448,7 @@ sub _calcCAQfromAPIPercentil {
           Log3 ($name, 3, "$name - new correction factor calculated: $factor (old: $oldfac) for hour: $h calculated") if($factor != $oldfac);
       }
       
-      debugLog ($paref, 'pvCorrection',   "Simple Corrf -> old circular correction: $oldfac, new correction: $factor");
+      debugLog ($paref, 'pvCorrection',   "Simple Corrf -> old circular correction: $oldfac, new correction: $factor, number of days for calc: $dnum");
       debugLog ($paref, 'saveData2Cache', "Simple Corrf -> write correction factor into circular Hash: $factor, Hour $h");
 
       my $type = $paref->{type};
