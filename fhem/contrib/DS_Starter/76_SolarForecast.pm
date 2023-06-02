@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-06-01 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-06-02 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,7 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.80.2" => "01.06.2023  new ctrlDebug keys epiecesCalc, change selfconsumption ",
+  "0.80.2" => "02.06.2023  new ctrlDebug keys epiecesCalc, change selfconsumption with graphic Adjustment,  ",
   "0.80.1" => "31.05.2023  adapt _calcCAQfromAPIPercentil to calculate corrfactor like _calcCAQfromDWDcloudcover ",
   "0.80.0" => "28.05.2023  Support for Forecast.Solar-API (https://doc.forecast.solar/api), rename Getter solCastData to solApiData ".
                            "rename ctrlDebug keys: solcastProcess -> apiProcess, solcastAPIcall -> apiCall ".
@@ -1632,6 +1632,10 @@ return;
 
 ################################################################
 #                 Setter moduleDirection
+#
+#  Angabe entweder als Azimut-Bezeichner oder direkte
+#  Azimut Angabe -180 ...0...180
+#
 ################################################################
 sub _setmoduleDirection {                ## no critic "not used"
   my $paref = shift;
@@ -1639,7 +1643,7 @@ sub _setmoduleDirection {                ## no critic "not used"
   my $name  = $paref->{name};
   my $arg   = $paref->{arg} // return qq{no module direction was provided};
 
-  my $dirs  = "N|NE|E|SE|S|SW|W|NW";                                                # mögliche Richtungsangaben
+  my $dirs  = "N|NE|E|SE|S|SW|W|NW";                                                # mögliche Azimut-Bezeichner wenn keine direkte Azimut Angabe
 
   my ($a,$h) = parseParams ($arg);
 
@@ -1648,13 +1652,13 @@ sub _setmoduleDirection {                ## no critic "not used"
   }
 
   while (my ($key, $value) = each %$h) {
-      if($value !~ /^(?:$dirs)$/x) {
+      if($value !~ /^(?:$dirs)$/x && ($value !~ /^(?:-?[0-9]{1,3})$/x || $value < -180 || $value > 180)) {
           return qq{The module direction of "$key" is wrong: $value};
       }
   }
 
-  readingsSingleUpdate ($hash, "moduleDirection", $arg, 1);
-  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);                    # Anlagenkonfiguration File schreiben
+  readingsSingleUpdate ($hash, "moduleDirection", $arg,         1);
+  writeCacheToFile     ($hash, "plantconfig",     $plantcfg.$name);                # Anlagenkonfiguration File schreiben
 
   return if(_checkSetupNotComplete ($hash));                                       # keine Stringkonfiguration wenn Setup noch nicht komplett
 
@@ -2664,9 +2668,9 @@ sub __forecastSolar_ApiRequest {
       return $err;
   }
   
-  my $tilt = StringVal ($hash, $string, 'tilt', '<unknown>');
-  my $az   = StringVal ($hash, $string, 'dir',  '<unknown>');
-  my $peak = StringVal ($hash, $string, 'peak', '<unknown>');
+  my $tilt = StringVal ($hash, $string, 'tilt',   '<unknown>');
+  my $az   = StringVal ($hash, $string, 'azimut', '<unknown>');
+  my $peak = StringVal ($hash, $string, 'peak',   '<unknown>');
 
   my $url = "https://api.forecast.solar/estimate/watthours/period/".
             $lat."/".
@@ -2764,11 +2768,11 @@ sub __forecastSolar_ApiResponse {
 
       ## bei Überschreitung des Stundenlimit kommt:
       ###############################################
-      # message -> code	429                                        (sonst 0)
-      # message -> type	error                                      (sonst 'success')
-      # message -> text	Rate limit for API calls reached.          (sonst leer)
-      # message -> ratelimit ->  period	   3600
-      #                      ->  limit	   12
+      # message -> code 429                                        (sonst 0)
+      # message -> type error                                      (sonst 'success')
+      # message -> text Rate limit for API calls reached.          (sonst leer)
+      # message -> ratelimit ->  period    3600
+      #                      ->  limit     12
       #                      ->  retry-at  2023-05-27T11:01:53+02:00  (= lokale Zeit)
 
       if ($jdata->{'message'}{'code'}) {
@@ -3800,10 +3804,12 @@ sub createStringConfig {                 ## no critic "not used"
       return qq{Please complete command "set $name moduleDirection".} if(!$dir);
 
       my ($ad,$hd) = parseParams ($dir);
+      my $iwrong   = qq{Please check the input of set "moduleDirection". It seems to be wrong.};
 
       while (my ($key, $value) = each %$hd) {
           if ($key ~~ @istrings) {
-              $data{$type}{$name}{strings}{$key}{dir} = $value;
+              $data{$type}{$name}{strings}{$key}{dir}    = _azimuth2ident ($value) // return $iwrong;
+              $data{$type}{$name}{strings}{$key}{azimut} = _ident2azimuth ($value) // return $iwrong;
           }
           else {
               return qq{Check "moduleDirection" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
@@ -3830,7 +3836,69 @@ sub createStringConfig {                 ## no critic "not used"
   }
 
   $data{$type}{$name}{current}{allStringsFullfilled} = 1;
+  
 return;
+}
+
+################################################################
+#  formt die Azimut Angabe in Azimut-Bezeichner um
+#  Azimut-Bezeichner werden direkt zurück gegeben
+################################################################
+sub _azimuth2ident {
+  my $az = shift;
+
+  return $az if($az =~ /^[A-Za-z]*$/xs);
+  
+  my $id = $az == -180 ? 'N'  :
+           $az <= -158 ? 'N'  :
+           $az <= -134 ? 'NE' :
+           $az == -135 ? 'NE' :
+           $az <= -113 ? 'NE' :
+           $az <= -89  ? 'E'  :
+           $az == -90  ? 'E'  :
+           $az <= -68  ? 'E'  :
+           $az <= -44  ? 'SE' :
+           $az == -45  ? 'SE' :
+           $az <= -23  ? 'SE' :
+           $az <= -1   ? 'S'  :
+           $az == 0    ? 'S'  :
+           $az <= 23   ? 'S'  :
+           $az <= 44   ? 'SW' :
+           $az == 45   ? 'SW' :
+           $az <= 67   ? 'SW' :
+           $az <= 89   ? 'W'  :
+           $az == 90   ? 'W'  :
+           $az <= 112  ? 'W'  :
+           $az <= 134  ? 'NW' :
+           $az == 135  ? 'NW' :
+           $az <= 157  ? 'NW' :
+           $az <= 179  ? 'N'  :
+           $az == 180  ? 'N'  :
+           undef;
+
+return $id;
+}
+
+################################################################
+#  formt einen Azimut-Bezeichner in ein Azimut um
+#  numerische  werden direkt zurück gegeben
+################################################################
+sub _ident2azimuth {
+  my $id = shift;
+
+  return $id if(isNumeric ($id));
+  
+  my $az = $id eq 'N'  ? -180 :
+           $id eq 'NE' ? -135 :
+		   $id eq 'E'  ? -90  :
+           $id eq 'SE' ? -45  :
+		   $id eq 'S'  ? 0    :
+           $id eq 'SW' ? 45   :
+           $id eq 'W'  ? 90   :
+           $id eq 'NW' ? 135  :
+		   undef;
+
+return $az;
 }
 
 ################################################################
@@ -6721,8 +6789,8 @@ sub _createSummaries {
 
   my $selfconsumptionrate = 0;
   my $autarkyrate         = 0;
-  $selfconsumptionrate    = sprintf ("%.0f", $selfconsumption / $pvgen * 100)                     if($pvgen * 1 > 0);
-  $autarkyrate            = sprintf ("%.0f", $selfconsumption / ($selfconsumption + $gcon) * 100) if($selfconsumption);
+  $selfconsumptionrate    = sprintf "%.0f", $selfconsumption / $pvgen * 100                                           if($pvgen * 1 > 0);
+  $autarkyrate            = sprintf "%.0f", ($selfconsumption + $batout) / ($selfconsumption + $batout + $gcon) * 100 if($selfconsumption + $batout);
 
   $data{$type}{$name}{current}{consumption}         = $consumption;
   $data{$type}{$name}{current}{selfconsumption}     = $selfconsumption;
@@ -11537,10 +11605,11 @@ return $def;
 # Usage:
 # StringVal ($hash, $strg, $key, $def)
 #
-# $strg:      - Name des Strings aus modulePeakString 
-# $key:  peak - Peakleistung aus modulePeakString
-#        tilt - Neigungswinkel der Module aus moduleTiltAngle
-#        dir  - Ausrichtung der Module aus moduleDirection 
+# $strg:        - Name des Strings aus modulePeakString 
+# $key:  peak   - Peakleistung aus modulePeakString
+#        tilt   - Neigungswinkel der Module aus moduleTiltAngle
+#        dir    - Ausrichtung der Module als Azimut-Bezeichner (N,NE,E,SE,S,SW,W,NW)
+#        azimut - Ausrichtung der Module als Azimut Angabe -180 .. 0 .. 180
 #
 # $def:  Defaultwert
 #
@@ -12075,7 +12144,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-set-moduleDirection"></a>
       <li><b>moduleDirection &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br>
-      (nur bei Verwendung des DWD_OpenData RadiationDev) <br><br>
+      (nur Model DWD, ForecastSolarAPI) <br><br>
 
       Ausrichtung &lt;dir&gt; der Solarmodule im String "StringnameX". Der Stringname ist ein Schlüsselwert des
       Readings <b>inverterStrings</b>. <br>
