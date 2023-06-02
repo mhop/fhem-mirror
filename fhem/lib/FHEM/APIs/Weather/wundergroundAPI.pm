@@ -542,6 +542,16 @@ sub _ProcessingRetrieveData {
                                         )
                                     )
                                 ),
+                                'temperature' => int(
+                                    sprintf(
+                                        "%.1f",
+                                        (
+                                              $data->{temperatureMax}[$i]
+                                            ? $data->{temperatureMax}[$i]
+                                            : 0
+                                        )
+                                    ) + 0.5
+                                ),
                                 'low_c' => int(
                                     sprintf( "%.1f",
                                         $data->{temperatureMin}[$i] ) + 0.5

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  59_Weather: wunderground API fix lost temperature reading
  - bugfix:  88_HMCCU: Fixed scaling of non numeric reading values
  - bugfix:  74_AutomowerConnect: improved background image loading
             Commandref: Hint to connect application key with Automower Connect
