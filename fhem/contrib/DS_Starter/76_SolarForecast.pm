@@ -8639,7 +8639,7 @@ sub _flowGraphic {
       $soc    = 0;
   }
   else {
-      $csc -= $batout;
+      #$csc -= $batout;
   }
 
   my $grid_color    = $cgfi   ? 'flowg grid_color1'               : 'flowg grid_color2';
