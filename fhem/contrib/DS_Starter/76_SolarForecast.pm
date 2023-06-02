@@ -136,7 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.80.2" => "01.06.2023  new ctrlDebug keys epiecesCalc ",
+  "0.80.2" => "01.06.2023  new ctrlDebug keys epiecesCalc, change selfconsumption ",
   "0.80.1" => "31.05.2023  adapt _calcCAQfromAPIPercentil to calculate corrfactor like _calcCAQfromDWDcloudcover ",
   "0.80.0" => "28.05.2023  Support for Forecast.Solar-API (https://doc.forecast.solar/api), rename Getter solCastData to solApiData ".
                            "rename ctrlDebug keys: solcastProcess -> apiProcess, solcastAPIcall -> apiCall ".
@@ -6713,7 +6713,7 @@ sub _createSummaries {
   my $batout  = CurrentVal ($hash, "powerbatout",             0);                                       # aktuelle Batterieentladung
 
   my $consumption         = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
-  my $selfconsumption     = int ($pvgen - $gfeedin - $batin + $batout);
+  my $selfconsumption     = int ($pvgen - $gfeedin - $batin);
   $selfconsumption        = $selfconsumption < 0 ? 0 : $selfconsumption;
 
   my $surplus             = int ($pvgen - $consumption);                                                # aktueller Überschuß
