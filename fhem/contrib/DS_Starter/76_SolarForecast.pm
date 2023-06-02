@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.80.2" => "01.06.2023  new ctrlDebug keys epiecesCalc ",
   "0.80.1" => "31.05.2023  adapt _calcCAQfromAPIPercentil to calculate corrfactor like _calcCAQfromDWDcloudcover ",
   "0.80.0" => "28.05.2023  Support for Forecast.Solar-API (https://doc.forecast.solar/api), rename Getter solCastData to solApiData ".
                            "rename ctrlDebug keys: solcastProcess -> apiProcess, solcastAPIcall -> apiCall ".
@@ -364,60 +365,60 @@ my %vNotesIntern = (
 
 ## Konstanten
 ###############
-my $deflang      = 'EN';                                                          # default Sprache wenn nicht konfiguriert
-my @chours       = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten
-my $kJtokWh      = 0.00027778;                                                    # Umrechnungsfaktor kJ in kWh
-my $defmaxvar    = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
-my $definterval  = 70;                                                            # Standard Abfrageintervall
-my $defslidenum  = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
+my $deflang        = 'EN';                                                          # default Sprache wenn nicht konfiguriert
+my @chours         = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten
+my $kJtokWh        = 0.00027778;                                                    # Umrechnungsfaktor kJ in kWh
+my $defmaxvar      = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
+my $definterval    = 70;                                                            # Standard Abfrageintervall
+my $defslidenum    = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
 
-my $pvhcache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
-my $pvccache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
-my $plantcfg     = $attr{global}{modpath}."/FHEM/FhemUtils/PVCfg_SolarForecast_"; # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
-my $csmcache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVCsm_SolarForecast_"; # Filename-Fragment für Consumer Status (wird mit Devicename ergänzt)
-my $scpicache    = $attr{global}{modpath}."/FHEM/FhemUtils/ScApi_SolarForecast_"; # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
+my $pvhcache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
+my $pvccache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
+my $plantcfg       = $attr{global}{modpath}."/FHEM/FhemUtils/PVCfg_SolarForecast_"; # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
+my $csmcache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVCsm_SolarForecast_"; # Filename-Fragment für Consumer Status (wird mit Devicename ergänzt)
+my $scpicache      = $attr{global}{modpath}."/FHEM/FhemUtils/ScApi_SolarForecast_"; # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
 
-my $calcmaxd     = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
-my @dweattrmust  = qw(TTT Neff R101 ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
-my @draattrmust  = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
-my $whistrepeat  = 900;                                                           # Wiederholungsintervall Cache File Daten schreiben
+my $calcmaxd       = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
+my @dweattrmust    = qw(TTT Neff R101 ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
+my @draattrmust    = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
+my $whistrepeat    = 900;                                                           # Wiederholungsintervall Cache File Daten schreiben
 
-my $solapirepdef = 3600;                                                          # default Abrufintervall SolCast API (s)
-my $forapirepdef = 900;                                                           # default Abrufintervall ForecastSolar API (s)
-my $apimaxreqdef = 50;                                                            # max. täglich mögliche Requests SolCast API
-my $leadtime     = 3600;                                                          # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung                                                  
+my $solapirepdef   = 3600;                                                          # default Abrufintervall SolCast API (s)
+my $forapirepdef   = 900;                                                           # default Abrufintervall ForecastSolar API (s)
+my $apimaxreqdef   = 50;                                                            # max. täglich mögliche Requests SolCast API
+my $leadtime       = 3600;                                                          # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung                                                  
 
-my $prdef        = 0.85;                                                          # default Performance Ratio (PR)
-my $tempcoeffdef = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
-my $tempmodinc   = 25;                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
-my $tempbasedef  = 25;                                                            # Temperatur Module bei Nominalleistung
-my $cldampdef    = 35;                                                            # Gewichtung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
-my $cloud_base   = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung
+my $prdef          = 0.85;                                                          # default Performance Ratio (PR)
+my $tempcoeffdef   = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
+my $tempmodinc     = 25;                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
+my $tempbasedef    = 25;                                                            # Temperatur Module bei Nominalleistung
+my $cldampdef      = 35;                                                            # Gewichtung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
+my $cloud_base     = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung
 
-my $rdampdef     = 10;                                                            # Gewichtung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
-my $rain_base    = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung
+my $rdampdef       = 10;                                                            # Gewichtung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
+my $rain_base      = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung
 
-my $maxconsumer  = 12;                                                            # maximale Anzahl der möglichen Consumer (Attribut)
-my $epiecHCounts = 10;                                                            # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
-my @ctypes       = qw(dishwasher dryer washingmachine heater charger other);      # erlaubte Consumer Typen
-my $defmintime   = 60;                                                            # default Einplanungsdauer in Minuten
-my $defctype     = "other";                                                       # default Verbrauchertyp
-my $defcmode     = "can";                                                         # default Planungsmode der Verbraucher
-my $defpopercent = 0.5;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
-my $defhyst      = 0;                                                             # default Hysterese
+my $maxconsumer    = 12;                                                            # maximale Anzahl der möglichen Consumer (Attribut)
+my $epiecMaxCycles = 10;                                                            # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
+my @ctypes         = qw(dishwasher dryer washingmachine heater charger other);      # erlaubte Consumer Typen
+my $defmintime     = 60;                                                            # default Einplanungsdauer in Minuten
+my $defctype       = "other";                                                       # default Verbrauchertyp
+my $defcmode       = "can";                                                         # default Planungsmode der Verbraucher
+my $defpopercent   = 0.5;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
+my $defhyst        = 0;                                                             # default Hysterese
 
-my $caicondef    = 'clock@gold';                                                  # default consumerAdviceIcon
-my $flowGSizedef = 400;                                                           # default flowGraphicSize
-my $histhourdef  = 2;                                                             # default Anzeige vorangegangene Stunden
-my $wthcolddef   = 'C7C979';                                                      # Wetter Icon Tag default Farbe
-my $wthcolndef   = 'C7C7C7';                                                      # Wetter Icon Nacht default Farbe
-my $b1coldef     = 'FFAC63';                                                      # default Farbe Beam 1
-my $b1fontcoldef = '0D0D0D';                                                      # default Schriftfarbe Beam 1
-my $b2coldef     = 'C4C4A7';                                                      # default Farbe Beam 2
-my $b2fontcoldef = '000000';                                                      # default Schriftfarbe Beam 2
-my $fgCDdef      = 130;                                                           # Abstand Verbrauchericons zueinander
+my $caicondef      = 'clock@gold';                                                  # default consumerAdviceIcon
+my $flowGSizedef   = 400;                                                           # default flowGraphicSize
+my $histhourdef    = 2;                                                             # default Anzeige vorangegangene Stunden
+my $wthcolddef     = 'C7C979';                                                      # Wetter Icon Tag default Farbe
+my $wthcolndef     = 'C7C7C7';                                                      # Wetter Icon Nacht default Farbe
+my $b1coldef       = 'FFAC63';                                                      # default Farbe Beam 1
+my $b1fontcoldef   = '0D0D0D';                                                      # default Schriftfarbe Beam 1
+my $b2coldef       = 'C4C4A7';                                                      # default Farbe Beam 2
+my $b2fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 2
+my $fgCDdef        = 130;                                                           # Abstand Verbrauchericons zueinander
 
-                                                                                  # default CSS-Style
+                                                                                    # default CSS-Style
 my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-size: 60px; }                                     \n}.
                    qq{.flowg.sun_active     { stroke: orange; fill: orange; }                                                  \n}.
                    qq{.flowg.sun_inactive   { stroke: gray; fill: gray; }                                                      \n}.
@@ -443,6 +444,7 @@ my @dd           = qw( none
                        consumerPlanning
                        consumerSwitching
                        consumption
+                       epiecesCalc
                        graphic
                        notifyHandling
                        pvCorrection
@@ -5079,8 +5081,8 @@ sub _manageConsumerData {
       ## bei Tageswechsel Rücksetzen in _specialActivities
       #######################################################
       my $starthour;
-      if(isConsumerLogOn ($hash, $c, $pcurr)) {                                               # Verbraucher ist logisch "an"
-            if(ConsumerVal ($hash, $c, "onoff", "off") eq "off") {
+      if (isConsumerLogOn ($hash, $c, $pcurr)) {                                                  # Verbraucher ist logisch "an"
+            if (ConsumerVal ($hash, $c, "onoff", "off") eq "off") {
                 $data{$type}{$name}{consumers}{$c}{startTime}       = $t;
                 $data{$type}{$name}{consumers}{$c}{onoff}           = "on";
                 my $stimes                                          = ConsumerVal ($hash, $c, "numberDayStarts", 0);     # Anzahl der On-Schaltungen am Tag
@@ -5090,12 +5092,12 @@ sub _manageConsumerData {
 
             $starthour = strftime "%H", localtime(ConsumerVal ($hash, $c, "startTime", $t));
 
-            if($chour eq $starthour) {
+            if ($chour eq $starthour) {
                 my $runtime                                   = (($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60);                  # in Minuten ! (gettimeofday sind ms !)
                 $data{$type}{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($hash, $c, "lastMinutesOn", 0) + $runtime;
             }
             else {                                                                                                               # neue Stunde hat begonnen
-                if(ConsumerVal ($hash, $c, "onoff", "off") eq "on") {
+                if (ConsumerVal ($hash, $c, "onoff", "off") eq "on") {
                     $data{$type}{$name}{consumers}{$c}{startTime}     = timestringToTimestamp ($date." ".sprintf("%02d",$chour).":00:00");
                     $data{$type}{$name}{consumers}{$c}{minutesOn}     = ($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60;                # in Minuten ! (gettimeofday sind ms !)
                     $data{$type}{$name}{consumers}{$c}{lastMinutesOn} = 0;
@@ -5106,7 +5108,7 @@ sub _manageConsumerData {
           $data{$type}{$name}{consumers}{$c}{onoff} = "off";
           $starthour                                = strftime "%H", localtime(ConsumerVal ($hash, $c, "startTime", $t));
 
-          if($chour ne $starthour) {
+          if ($chour ne $starthour) {
               $data{$type}{$name}{consumers}{$c}{minutesOn} = 0;
               delete $data{$type}{$name}{consumers}{$c}{startTime};
           }
@@ -5208,7 +5210,7 @@ sub __calcEnergyPieces {
       delete $data{$type}{$name}{consumers}{$c}{epiecHist};
       delete $data{$type}{$name}{consumers}{$c}{epiecHour};
 
-      for my $h (1..$epiecHCounts) {
+      for my $h (1..$epiecMaxCycles) {
           delete $data{$type}{$name}{consumers}{$c}{"epiecHist_".$h};
           delete $data{$type}{$name}{consumers}{$c}{"epiecHist_".$h."_hours"};
       }
@@ -5220,7 +5222,7 @@ sub __calcEnergyPieces {
   my $mintime = ConsumerVal ($hash, $c, "mintime", $defmintime);
   
   if (isSunPath ($hash, $c)) {                                                                            # SunPath ist in mintime gesetzt
-      my ($riseshift, $setshift) = sunShift   ($hash, $c);
+      my ($riseshift, $setshift) = sunShift    ($hash, $c);
       my $tdiff                  = (CurrentVal ($hash, 'sunsetTodayTs',  0) + $setshift) - 
                                    (CurrentVal ($hash, 'sunriseTodayTs', 0) + $riseshift);
       $mintime                   = $tdiff / 60;
@@ -5253,22 +5255,24 @@ sub __calcEnergyPieces {
 return;
 }
 
-###################################################################
+#################################################################################
 #  Verbraucherspezifische Energiestück Ermittlung
 #
-#  epiecHCounts = x gibt an wie viele Zyklen betrachtet werden
-#                      sollen
-#  epiecHist => x ist der Index des Speicherbereichs der aktuell
-#               benutzt wird.
+#  epiecMaxCycles    => gibt an wie viele Zyklen betrachtet werden
+#                       sollen
+#  epiecHist         => ist die Nummer des Zyklus der aktuell
+#                       benutzt wird.
 #
-#  epiecHist_x => 1=x 2=x 3=x 4=x epieces eines Index
-#  epiecHist_x_hours => x Stunden des Durchlauf bzw. wie viele
-#                         Einträge epiecHist_x hat
-#  epiecAVG => 1=x 2=x und epiecAVG_hours => x enthalten die
-#              durchschnittlichen Werte der in epiecHCounts
-#              vorgegebenen Durchläufe.
+#  epiecHist_x       => 1=.. 2=.. 3=.. 4=.. epieces eines Zyklus
+#  epiecHist_x_hours => Stunden des Durchlauf bzw. wie viele
+#                       Einträge epiecHist_x hat
+#  epiecAVG          => 1=.. 2=.. durchschnittlicher Verbrauch pro Betriebsstunde
+#                       1, 2, .. usw.
+#                       wäre ein KPI um eine angepasste Einschaltung zu 
+#                       realisieren
+#  epiecAVG_hours    => durchschnittliche Betriebsstunden
 #
-###################################################################
+#################################################################################
 sub ___csmSpecificEpieces {
   my $paref = shift;
   my $hash  = $paref->{hash};
@@ -5278,76 +5282,91 @@ sub ___csmSpecificEpieces {
   my $etot  = $paref->{etot};
   my $t     = $paref->{t};
 
-  if(ConsumerVal ($hash, $c, "onoff", "off") eq "on") {                                                 # Status "Aus" verzögern um Pausen im Waschprogramm zu überbrücken
+  if (ConsumerVal ($hash, $c, "onoff", "off") eq "on") {                                                # Status "Aus" verzögern um Pausen im Waschprogramm zu überbrücken
       $data{$type}{$name}{consumers}{$c}{lastOnTime} = $t;
   }
 
-  my $offTime = defined $data{$type}{$name}{consumers}{$c}{lastOnTime} ?
+  my $tsloff = defined $data{$type}{$name}{consumers}{$c}{lastOnTime} ?
                 $t - $data{$type}{$name}{consumers}{$c}{lastOnTime}    :
                 99;
+                
+  debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - time since last Switch Off (tsloff): $tsloff seconds});
 
-  if($offTime < 300) {                                                                                  # erst nach 60s ist das Gerät aus
-      my $epiecHist       = "";
+  if ($tsloff < 300) {                                                                                  # erst nach Auszeit >= X Sekunden wird ein neuer epiec-Zyklus gestartet
+      my $ecycle          = "";
       my $epiecHist_hours = "";
 
-      if(ConsumerVal ($hash, $c, "epiecHour", -1) < 0) {                                                # neue Aufzeichnung
+      if (ConsumerVal ($hash, $c, "epiecHour", -1) < 0) {                                               # neue Aufzeichnung
           $data{$type}{$name}{consumers}{$c}{epiecStartTime} = $t;
           $data{$type}{$name}{consumers}{$c}{epiecHist}     += 1;
-          $data{$type}{$name}{consumers}{$c}{epiecHist}      = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > $epiecHCounts);
+          $data{$type}{$name}{consumers}{$c}{epiecHist}      = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > $epiecMaxCycles);
 
-          $epiecHist = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);
-          delete $data{$type}{$name}{consumers}{$c}{$epiecHist};                                        # Löschen, wird neu erfasst
+          $ecycle = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);
+          
+          delete $data{$type}{$name}{consumers}{$c}{$ecycle};                                           # Löschen, wird neu erfasst
       }
 
-      $epiecHist       = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);                          # Namen fürs Speichern
+      $ecycle          = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);                          # Zyklusnummer für Namen  
       $epiecHist_hours = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0)."_hours";
-      my $epiecHour    = floor (($t - ConsumerVal ($hash, $c, "epiecStartTime", $t)) / 60 / 60) + 1;    # aktuelle Betriebsstunde ermitteln, ( / 60min) mögliche wäre auch durch 15min        /Minute /Stunde
+      my $epiecHour    = floor (($t - ConsumerVal ($hash, $c, "epiecStartTime", $t)) / 60 / 60) + 1;    # aktuelle Betriebsstunde ermitteln, ( / 60min) mögliche wäre auch durch 15min /Minute /Stunde
 
-      if(ConsumerVal ($hash, $c, "epiecHour", 0) != $epiecHour) {                                       # Stundenwechsel? Differenz von etot noch auf die vorherige Stunde anrechnen
+      debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - current cycle number (ecycle): $ecycle});
+      debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - Operating hour after switch on (epiecHour): $epiecHour});
+      
+      if (ConsumerVal ($hash, $c, "epiecHour", 0) != $epiecHour) {                                      # Betriebsstundenwechsel ? Differenz von etot noch auf die vorherige Betriebsstunde anrechnen
           my $epiecHour_last = $epiecHour - 1;
 
-          $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour_last} = sprintf '%.2f', ($etot - ConsumerVal ($hash, $c, "epiecStartEtotal", 0)) if($epiecHour > 1);
-          $data{$type}{$name}{consumers}{$c}{epiecStartEtotal}            = $etot;
+          $data{$type}{$name}{consumers}{$c}{$ecycle}{$epiecHour_last} = sprintf '%.2f', ($etot - ConsumerVal ($hash, $c, "epiecStartEtotal", 0)) if($epiecHour > 1);
+          $data{$type}{$name}{consumers}{$c}{epiecStartEtotal}         = $etot;
+          
+          debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - Operating hours change - new etotal (epiecStartEtotal): $etot});
       }
 
-      my $ediff                                                  = $etot - ConsumerVal ($hash, $c, "epiecStartEtotal", 0);
-      $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour} = sprintf '%.2f', $ediff;
-      $data{$type}{$name}{consumers}{$c}{epiecHour}              = $epiecHour;
-      $data{$type}{$name}{consumers}{$c}{$epiecHist_hours}       = $ediff ? $epiecHour : $epiecHour - 1; # wenn mehr als 1 Wh verbraucht wird die Stunde gezählt
+      my $ediff                                               = $etot - ConsumerVal ($hash, $c, "epiecStartEtotal", 0);
+      $data{$type}{$name}{consumers}{$c}{$ecycle}{$epiecHour} = sprintf '%.2f', $ediff;
+      $data{$type}{$name}{consumers}{$c}{epiecHour}           = $epiecHour;
+      $data{$type}{$name}{consumers}{$c}{$epiecHist_hours}    = $ediff ? $epiecHour : $epiecHour - 1;    # wenn mehr als 1 Wh verbraucht wird die Stunde gezählt
+  
+      debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - energy consumption in operating hour $epiecHour (ediff): $ediff});
   }
   else {                                                                                                 # Durchschnitt ermitteln
-      if(ConsumerVal ($hash, $c, "epiecHour", 0) > 0) {                                                  # Durchschnittliche Stunden ermitteln
+      if (ConsumerVal ($hash, $c, "epiecHour", 0) > 0) {                                                 
           my $hours = 0;
 
-          for my $h (1..$epiecHCounts) {                                                                 # durchschnittliche Stunden über alle epieces ermitteln und aufrunden
+          for my $h (1..$epiecMaxCycles) {                                                               # durchschnittliche Betriebsstunden über alle epieces ermitteln und aufrunden
               $hours += ConsumerVal ($hash, $c, "epiecHist_".$h."_hours", 0);
           }
 
-          $hours                                             = ceil ($hours / $epiecHCounts);
-          $data{$type}{$name}{consumers}{$c}{epiecAVG_hours} = $hours;
+          my $avghours                                       = ceil ($hours / $epiecMaxCycles);
+          $data{$type}{$name}{consumers}{$c}{epiecAVG_hours} = $avghours;                                # durchschnittliche Betriebsstunden pro Zyklus
+          
+          debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - Average operating hours per cycle (epiecAVG_hours): $avghours});
 
           delete $data{$type}{$name}{consumers}{$c}{epiecAVG};                                           # Durchschnitt für epics ermitteln
 
-          for my $hour (1..$hours) {                                                                     # jede Stunde durchlaufen
+          for my $hour (1..$avghours) {                                                                  # jede Stunde durchlaufen
               my $hoursE = 1;
 
-              for my $h (1..$epiecHCounts) {                                                             # jedes epiec durchlaufen
-                  my $epiecHist = "epiecHist_".$h;
+              for my $h (1..$epiecMaxCycles) {                                                           # jedes epiec durchlaufen
+                  my $ecycle = "epiecHist_".$h;
 
-                  if(defined $data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour}) {
-                      if($data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour} > 5) {
-                          $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} += $data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour};
+                  if (defined $data{$type}{$name}{consumers}{$c}{$ecycle}{$hour}) {
+                      if ($data{$type}{$name}{consumers}{$c}{$ecycle}{$hour} > 5) {
+                          $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} += $data{$type}{$name}{consumers}{$c}{$ecycle}{$hour};
                           $hoursE += 1;
                       }
                   }
 
               }
 
-              my $eavg = defined $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} ?
-                         $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour}         :
-                         0;
-
-              $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} = sprintf('%.2f', $eavg / $hoursE);    # Durchschnitt ermittelt und in epiecAVG schreiben
+              my $eavg  = defined $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} ?
+                          $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour}         :
+                          0;
+              
+              my $ahval = sprintf '%.2f', $eavg / $hoursE;                                               # Durchschnitt ermittelt und speichern
+              $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} = $ahval;
+          
+              debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - Average epiece of operating hour $hour: $ahval});
           }
       }
 
@@ -5448,7 +5467,7 @@ sub __planSwitchTimes {
   debugLog ($paref, "consumerPlanning", qq{$name DEBUG> consumer "$c" - mode: $mode, mintime: $mintime, relevant method: surplus});
       
   if (isSunPath ($hash, $c)) {                                                                         # SunPath ist in mintime gesetzt
-      my ($riseshift, $setshift) = sunShift   ($hash, $c);
+      my ($riseshift, $setshift) = sunShift    ($hash, $c);
       my $tdiff                  = (CurrentVal ($hash, 'sunsetTodayTs',  0) + $setshift) -
                                    (CurrentVal ($hash, 'sunriseTodayTs', 0) + $riseshift);
       $mintime                   = $tdiff / 60;
@@ -6822,17 +6841,18 @@ sub saveEnergyConsumption {
   my $paref = shift;
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
-
-  my $pvrl    = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_PVreal",          0);
-  my $gfeedin = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridFeedIn",      0);
-  my $gcon    = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
-  my $batin   = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_BatIn",           0);
-  my $batout  = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_BatOut",          0);
+  
+  my $shr     = $chour+1;
+  my $pvrl    = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_PVreal",          0);
+  my $gfeedin = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_GridFeedIn",      0);
+  my $gcon    = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_GridConsumption", 0);
+  my $batin   = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_BatIn",           0);
+  my $batout  = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_BatOut",          0);
 
   my $con = $pvrl - $gfeedin + $gcon - $batin + $batout;
 
   $paref->{con}      = $con;
-  $paref->{nhour}    = sprintf "%02d", $chour+1;
+  $paref->{nhour}    = sprintf "%02d", $shr;
   $paref->{histname} = "con";
   setPVhistory ($paref);
   delete $paref->{histname};
@@ -12805,17 +12825,18 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>apiCall</b>              </td><td>Aufruf ForecastSolar API Schnittstelle ohne Daten              </td></tr>
-            <tr><td> <b>apiProcess</b>           </td><td>Abruf und Verarbeitung von API Daten                           </td></tr>          
-            <tr><td> <b>collectData</b>          </td><td>detailliierte Datensammlung                                    </td></tr>
-            <tr><td> <b>consumerPlanning</b>     </td><td>Consumer Einplanungsprozesse                                   </td></tr>
-            <tr><td> <b>consumerSwitching</b>    </td><td>Operationen des internen Consumer Schaltmodul                  </td></tr>
-            <tr><td> <b>consumption</b>          </td><td>Verbrauchskalkulation und -nutzung                             </td></tr>    
-            <tr><td> <b>graphic</b>              </td><td>Informationen der Modulgrafik                                  </td></tr>
-            <tr><td> <b>notifyHandling</b>       </td><td>Ablauf der Eventverarbeitung im Modul                          </td></tr>
-            <tr><td> <b>pvCorrection</b>         </td><td>Berechnung und Anwendung PV Korrekturfaktoren                  </td></tr>
-            <tr><td> <b>radiationProcess</b>     </td><td>Sammlung und Verarbeitung der Solarstrahlungsdaten             </td></tr>
-            <tr><td> <b>saveData2Cache</b>       </td><td>Datenspeicherung in internen Speicherstrukturen                </td></tr>
+            <tr><td> <b>apiCall</b>              </td><td>Aufruf ForecastSolar API Schnittstelle ohne Daten                                </td></tr>
+            <tr><td> <b>apiProcess</b>           </td><td>Abruf und Verarbeitung von API Daten                                             </td></tr>          
+            <tr><td> <b>collectData</b>          </td><td>detailliierte Datensammlung                                                      </td></tr>
+            <tr><td> <b>consumerPlanning</b>     </td><td>Consumer Einplanungsprozesse                                                     </td></tr>
+            <tr><td> <b>consumerSwitching</b>    </td><td>Operationen des internen Consumer Schaltmodul                                    </td></tr>
+            <tr><td> <b>consumption</b>          </td><td>Verbrauchskalkulation und -nutzung                                               </td></tr> 
+            <tr><td> <b>epiecesCalc</b>          </td><td>Berechnung des spezifischen Energieverbrauchs je Betriebsstunde und Verbraucher  </td></tr>                
+            <tr><td> <b>graphic</b>              </td><td>Informationen der Modulgrafik                                                    </td></tr>
+            <tr><td> <b>notifyHandling</b>       </td><td>Ablauf der Eventverarbeitung im Modul                                            </td></tr>
+            <tr><td> <b>pvCorrection</b>         </td><td>Berechnung und Anwendung PV Korrekturfaktoren                                    </td></tr>
+            <tr><td> <b>radiationProcess</b>     </td><td>Sammlung und Verarbeitung der Solarstrahlungsdaten                               </td></tr>
+            <tr><td> <b>saveData2Cache</b>       </td><td>Datenspeicherung in internen Speicherstrukturen                                  </td></tr>
          </table>
          </ul>
        </li>
