@@ -153,21 +153,6 @@ function AutomowerConnectIcon( ctx, csx, csy, csrel, type ) {
   }
 }
 
-function AutomowerConnectDrawPath ( ctx, div, pos, type ) {
-  // draw path
-  ctx.beginPath();
-  ctx.strokeStyle = div.getAttribute( 'data-'+ type + 'LineColor' );
-  ctx.lineWidth=div.getAttribute( 'data-'+ type + 'LineWidth' );
-  ctx.setLineDash( div.getAttribute( 'data-'+ type + 'LineDash' ).split(",") );
-
-  ctx.moveTo(parseInt(pos[0]),parseInt(pos[1]));
-  for (var i=2;i<pos.length;i+=2){
-    ctx.lineTo(parseInt(pos[i]),parseInt(pos[i+1]));
-  }
-  ctx.stroke();
-
-}
-
 function AutomowerConnectDrawPathColorRev ( ctx, div, pos, colorat ) {
   // draw path
   var type = colorat[ pos[ 2 ] ];
@@ -222,6 +207,39 @@ function AutomowerConnectDrawPathColor ( ctx, div, pos, colorat ) {
       ctx.strokeStyle = div.getAttribute( 'data-'+ type + 'LineColor' );
       ctx.lineWidth=div.getAttribute( 'data-'+ type + 'LineWidth' );
       ctx.setLineDash( div.getAttribute( 'data-'+ type + 'LineDash' ).split( "," ) );
+
+    }
+  }
+
+  ctx.stroke();
+
+}
+
+function AutomowerConnectDrawDotColor ( ctx, div, pos, colorat ) {
+  // draw dots
+  var type = colorat[ pos[ pos.length-1 ] ];
+  ctx.beginPath();
+  ctx.fillStyle = div.getAttribute( 'data-'+ type + 'LineColor' );
+  var fillWidth = 4
+  var fillWidth = div.getAttribute( 'data-'+ type + 'DotWidth' )
+  //~ ctx.lineWidth=div.getAttribute( 'data-'+ type + 'LineWidth' );
+  //~ ctx.setLineDash( div.getAttribute( 'data-'+ type + 'LineDash' ).split(",") );
+  //~ ctx.moveTo( parseInt( pos[ pos.length-3 ] ), parseInt( pos[ pos.length-2 ] ) );
+  var i = 0;
+
+  for ( i = pos.length; i>-1; i-=3 ){
+
+    ctx.fillRect( parseInt( pos[ i ] ),parseInt( pos[ i + 1 ] ), fillWidth, fillWidth );
+
+    if ( colorat[ pos[ i + 2 ] ] != type ){
+
+      ctx.stroke();
+      type = colorat[ pos[ i + 2 ] ];
+      //~ ctx.beginPath();
+      ctx.fillRect( parseInt( pos[ i ] ), parseInt( pos[ i + 1 ] ), fillWidth, fillWidth );
+      ctx.fillStyle = div.getAttribute( 'data-'+ type + 'LineColor' );
+      fillWidth=div.getAttribute( 'data-'+ type + 'DotWidth' );
+      //~ ctx.setLineDash( div.getAttribute( 'data-'+ type + 'LineDash' ).split( "," ) );
 
     }
   }
@@ -324,7 +342,15 @@ function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, sca
       if ( pos.length > 3 ) {
 
         // draw mowing path color
-         AutomowerConnectDrawPathColor ( ctx, div, pos, colorat );
+        if ( div.getAttribute( 'data-mowingPathUseDots' ) ) {
+
+          AutomowerConnectDrawDotColor ( ctx, div, pos, colorat );
+
+        } else {
+
+          AutomowerConnectDrawPathColor ( ctx, div, pos, colorat );
+
+        }
 
         // draw start
         if ( div.getAttribute( 'data-mowingPathDisplayStart' ) ) {

@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  74_AutomowerConnect: Common.pm, automowerconnect.js
+            shift subs to library, mowing path: display only way point dots
+            alternatively
  - bugfix:  59_Weather: wunderground API fix lost temperature reading
  - bugfix:  88_HMCCU: Fixed scaling of non numeric reading values
  - bugfix:  74_AutomowerConnect: improved background image loading
