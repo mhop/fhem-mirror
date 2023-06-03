@@ -136,7 +136,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.80.2" => "02.06.2023  new ctrlDebug keys epiecesCalc, change selfconsumption with graphic Adjustment,  ",
+  "0.80.2" => "02.06.2023  new ctrlDebug keys epiecesCalc, change selfconsumption with graphic Adjustment, moduleDirection ".
+                           "accepts azimut values -180 .. 0 .. 180 as well as azimut identifier (S, SE ..) ",
   "0.80.1" => "31.05.2023  adapt _calcCAQfromAPIPercentil to calculate corrfactor like _calcCAQfromDWDcloudcover ",
   "0.80.0" => "28.05.2023  Support for Forecast.Solar-API (https://doc.forecast.solar/api), rename Getter solCastData to solApiData ".
                            "rename ctrlDebug keys: solcastProcess -> apiProcess, solcastAPIcall -> apiCall ".
@@ -12148,26 +12149,32 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       Ausrichtung &lt;dir&gt; der Solarmodule im String "StringnameX". Der Stringname ist ein Schlüsselwert des
       Readings <b>inverterStrings</b>. <br>
-      Die Richtungsangabe &lt;dir&gt; kann eine der folgenden Werte sein: <br><br>
+      Die Richtungsangabe &lt;dir&gt; kann als Azimut Kennung oder als Azimut Wert angegeben werden: <br><br>
 
       <ul>
          <table>
-         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>N</b>  </td><td>Nordausrichtung            </td></tr>
-            <tr><td> <b>NE</b> </td><td>Nord-Ost Ausrichtung       </td></tr>
-            <tr><td> <b>E</b>  </td><td>Ostausrichtung             </td></tr>
-            <tr><td> <b>SE</b> </td><td>Süd-Ost Ausrichtung        </td></tr>
-            <tr><td> <b>S</b>  </td><td>Südausrichtung             </td></tr>
-            <tr><td> <b>SW</b> </td><td>Süd-West Ausrichtung       </td></tr>
-            <tr><td> <b>W</b>  </td><td>Westausrichtung            </td></tr>
-            <tr><td> <b>NW</b> </td><td>Nord-West Ausrichtung      </td></tr>
+         <colgroup> <col width="30%"> <col width="20%"> <col width="50%"> </colgroup>
+            <tr><td> <b>Kennung</b>   </td><td><b>Azimut</b> </td><td>                           </td></tr>
+            <tr><td> N                </td><td>-180          </td><td>Nordausrichtung            </td></tr>
+            <tr><td> NE               </td><td>-135          </td><td>Nord-Ost Ausrichtung       </td></tr>
+            <tr><td> E                </td><td>-90           </td><td>Ostausrichtung             </td></tr>
+            <tr><td> SE               </td><td>-45           </td><td>Süd-Ost Ausrichtung        </td></tr>
+            <tr><td> S                </td><td>0             </td><td>Südausrichtung             </td></tr>
+            <tr><td> SW               </td><td>45            </td><td>Süd-West Ausrichtung       </td></tr>
+            <tr><td> W                </td><td>90            </td><td>Westausrichtung            </td></tr>
+            <tr><td> NW               </td><td>135           </td><td>Nord-West Ausrichtung      </td></tr>
          </table>
       </ul>
       <br>
+      
+      Azimut Werte sind Ganzzahlen im Bereich von -180 bis 180. Azimut Zwischenwerte, die nicht exakt auf eine 
+      Kennung passen, werden auf die nächstgelegene Kennung abstrahiert wenn die gewählte API nur mit Kennungen 
+      arbeitet. Das Modul verwendet den genaueren Azimut Wert sofern die API die Verwendung unterstützt, z.B. die
+      ForecastSolar-API.
 
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; moduleDirection Ostdach=E Südgarage=S S3=NW <br>
+        set &lt;name&gt; moduleDirection Ostdach=-90 Südgarage=S S3=NW <br>
       </ul>
       </li>
     </ul>
