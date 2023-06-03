@@ -153,7 +153,7 @@ mowingPathLineColor="#ff0000"
 mowingPathLineDash="6,2"
 mowingPathLineWidth="1"
 mowingPathDotWidth="4"
-mowingPathUseDots="0"';
+mowingPathUseDots=""';
 
 my $mapZonesTpl = '{
     "01_oben" : {
