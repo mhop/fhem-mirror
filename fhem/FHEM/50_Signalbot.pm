@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.12";
+my $Signalbot_VERSION="3.13";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -220,7 +220,7 @@ sub Signalbot_Set($@) {					#
 		my @cm=split(",",$args[0]);
 		$cmd=$cmd.$cm[0];
 		$args[0]=$cm[1];
-		print "$cmd ".join(":",@args)."\n";
+		LogUnicode $hash->{NAME}, 3, $hash->{NAME}.": $cmd ".join(":",@args);
 	}
 	
 	if ( $cmd eq "signalAccount" ) {
@@ -364,7 +364,9 @@ sub Signalbot_Set($@) {					#
 		my $number=Signalbot_translateContact($hash,$nickname);
 		return "Unknown contact" if !defined $number;
 		delete $hash->{helper}{contacts}{$number} if defined $hash->{helper}{contacts}{$number};
+		Signalbot_CallA($hash,"deleteContact",$number);
 		Signalbot_CallA($hash,"deleteRecipient",$number);
+		delete $hash->{helper}{contacts}{$number};
 		return;
 	} elsif ( $cmd eq "deleteGroup" || $cmd eq "groupdelete") {
 		return "Usage: set ".$hash->{NAME}." deleteGroup <groupname>" if (@args<1);
@@ -1052,7 +1054,7 @@ sub Signalbot_ReceiptReceived {
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "sentMsgRecipient", $sender);
 	readingsBulkUpdate($hash, 'sentMsgTimestamp', strftime("%d-%m-%Y %H:%M:%S", localtime($timestamp/1000)));
-	readingsEndUpdate($hash, 0);
+	readingsEndUpdate($hash, 1);
 }
 
 sub Signalbot_SyncMessageReceived {
@@ -1151,7 +1153,7 @@ sub Signalbot_setup2($@) {
 	}
 	my $version=Signalbot_CallS($hash,"version");
 	my $account=ReadingsVal($name,"account","none");
-	if (!defined $version) {
+	if (!defined $version || ($version =~ /\d+\.\d+\.\d+/) == 0){
 		if ($Signalbot_Retry<3) {
 			$Signalbot_Retry++;
 			InternalTimer(gettimeofday() + 10, 'Signalbot_setup', $hash, 0);
@@ -1423,7 +1425,12 @@ sub Signalbot_Read($@){
 	my $counter=5;
 	while (defined $msg || $counter>0) {
 		$dbus->blocking(0);
-		$msg = $dbus->get_message();
+		$msg = eval{$dbus->get_message()};
+		if ($@) { 
+			# This is fatal reinitialize
+			Signalbot_setup($hash); 
+			return; 
+		}
 		if ($msg) {
 			#Signal handling
 			my $callback = $msg->get_header('MEMBER');
@@ -1676,7 +1683,7 @@ sub Signalbot_sendMessage($@) {
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "sentMsg", $mes);
 	readingsBulkUpdate($hash, 'sentMsgTimestamp', "pending");
-	readingsEndUpdate($hash, 0);
+	readingsEndUpdate($hash, 1);
 	Signalbot_CallA($hash,"sendMessage",$mes,\@attach,\@recipient); 
 }
 
@@ -1715,7 +1722,7 @@ sub Signalbot_sendGroupMessage($@) {
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "sentMsg", $mes);
 	readingsBulkUpdate($hash, 'sentMsgTimestamp', "pending");
-	readingsEndUpdate($hash, 0);
+	readingsEndUpdate($hash, 1);
 
 	Signalbot_CallA($hash,"sendGroupMessage",$mes,\@attach,\@arr); 
 }
@@ -2002,6 +2009,11 @@ sub Signalbot_Detail {
 	if (defined $DBus_missing) {
 		return "Perl module Protocol:DBus not found, please install with<br><b>sudo cpan install Protocol::DBus</b><br> and restart FHEM<br><br>";
 	}
+
+	if (ReadingsVal($name,"state",0) eq "unavailable") {
+		return "Dbus could not be initialized, please validate your Linux installation<br><br>";
+	}
+
 	my $multi=$hash->{helper}{multi};
 	my $version=$hash->{helper}{version};
 	$multi=0 if !defined $multi;
@@ -2014,7 +2026,7 @@ sub Signalbot_Detail {
 		$ret .= "Signal-cli is running in single-mode, please consider starting it without -u parameter (e.g. by re-running the installer)<br>";
 	}
 	if($version<1100 || $multi==0) {
-		$ret .= '<br>You can download the installer <a href="www/signal/signal_install.sh" download>here</a> or your www/signal directory and run it with<br><b>sudo ./signal_install.sh</b><br><br>';
+		$ret .= '<br>You can download the installer <a href="fhem/www/signal/signal_install.sh" download>here</a> or your www/signal directory and run it with<br><b>sudo ./signal_install.sh</b><br><br>';
 	}
 	return $ret if ($hash->{helper}{version}<1100);
 	

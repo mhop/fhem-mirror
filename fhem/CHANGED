@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  50_Signalbot: Minor change in event behavior and catch dbus error
  - change:  74_AutomowerConnect: Common.pm, automowerconnect.js
             shift subs to library, mowing path: display only way point dots
             alternatively
