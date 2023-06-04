@@ -450,7 +450,8 @@ MQTT2_SERVER_Read($@)
     }
     $val = (length($pl)>$off ? substr($pl, $off) : "");
     if($unicodeEncoding) {
-      if(!$shash->{binaryTopicRegexp} || $tp !~ m/^$shash->{binaryTopicRegexp}$/) {
+      if(!$shash->{binaryTopicRegexp} ||
+         $tp !~ m/^$shash->{binaryTopicRegexp}$/) {
         $val = Encode::decode('UTF-8', $val);
       }
     }
@@ -585,13 +586,16 @@ MQTT2_SERVER_doPublish($$$$;$)
   my $fl = $server->{".feedList"};
   if($fl) {
     my $ts = sprintf("%s.%03d", FmtTime($now), 1000*($now-int($now)));
+    my $informVal = $val; # Convert it to text for websocket
+    $informVal =~ s/([^ -~])/"(".ord($1).")"/ge; 
     foreach my $fwid (keys %{$fl}) {
       my $cl = $FW_id2inform{$fwid};
       if(!$cl || !$cl->{inform}{filter} || $cl->{inform}{filter} ne '^$') {
         delete($fl->{$fwid});
         next;
       }
-      FW_AsyncOutput($cl, "", toJSON([$ts,defined($cid)?$cid:"SENT",$tp,$val]));
+      FW_AsyncOutput($cl, "",
+                   toJSON([$ts, defined($cid)?$cid:"SENT", $tp, $informVal]));
     }
     delete($server->{".feedList"}) if(!keys %{$fl});
   }
