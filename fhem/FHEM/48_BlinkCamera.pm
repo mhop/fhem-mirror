@@ -72,7 +72,6 @@ my $repositoryID = '$Id$';
 #   add set option verifyPin for pin verification - not verified
 #   add doc for verifyPin (experimental)
 #SVN 7.8.2020
-
 #   add version id as internal - sourceVersion
 #   removed old homescreen functonality
 #   doc attr maxRetries
@@ -83,14 +82,28 @@ my $repositoryID = '$Id$';
 #   camera...Thumbnail reading only set after file is received
 #   alertupdate - reset after 10 cycles skipped
 #   add more log for alertupdating and remove skipped value
-
 #   login changed to V5 api and also new format of response  #msg1141218
 #   reset unique id as additional reset option
 #   change header for auth to new value token-auth
 #   adapter also region from login to new tier
 #   changed alert handing only when network is identified
-
 #   Correct perl warning on setup call with empty event timestamp #msg1142674
+#   Add description for allert readings
+# 5.2.2023
+#   #msg1228374 - könnte man in der commandref mal aktualisieren, dass man den code auch per sms bekommen kann statt nur email
+#   Added doorbells (lotus) cameras - basic function
+#   Get thumbnail working for doorbells/lotus
+#   Add alerts only for known cameras
+#   video alert working for doorbells 
+#   camdisable/camenable not working for Lotus --> now with return message
+
+# 6.2.2023
+#   added type for syncmodule 
+#   added message for lveview being unsupported
+#   camEnable/camDisable working now for doorbells/lotus
+#   liveview cmd will also set liveCam reading to identify stream
+#   getThumbnail for doorbells working
+
 #   
 #   
 #   
@@ -99,6 +112,17 @@ my $repositoryID = '$Id$';
 ##############################################################################
 ##############################################################################
 # TASKS 
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   subtype for syncmodule needed?
+#   Button press?
+#   schlummermodus
+#
 #
 #   Set thumbnail Req reading only after thumbnail stored (from internal)
 #
@@ -191,6 +215,8 @@ my $BlinkCamera_verifyPinjson = "{ \"pin\" : \"q_pin_q\" }";
 my $BlinkCamera_configCamAlertjson = "{ \"camera\" : \"q_id_q\", \"id\" : \"q_id_q\", \"network\" : \"q_network_q\", \"motion_alert\" : \"q_alert_q\" }";
 
 my $BlinkCamera_configOwljson = "{ \"enabled\" : q_value_q }";
+
+my $BlinkCamera_configLotusjson = "{ \"enabled\" : q_value_q }";
 
 # OLD my $BlinkCamera_deleteVideojson = "{ \"video_list\" : [ q_id_q ] }";
 my $BlinkCamera_deleteVideojson = "{ \"media_list\" : [ q_id_q ] }";
@@ -765,6 +791,20 @@ sub BlinkCamera_DoCmd($$;$$$)
           $hash->{HU_DO_PARAMS}->{data} = $BlinkCamera_configOwljson;
           $hash->{HU_DO_PARAMS}->{data} =~ s/q_value_q/$alert/g;
           Log3 $name, 4, "BlinkCamera_DoCmd $name:   cam type: ".$ctype.":  - data :".$hash->{HU_DO_PARAMS}->{data}.":";
+        } elsif ( $ctype eq "lotus" ) {
+#          $ret = "BlinkCamera_DoCmd $name: camera type (".$ctype.") unsupported !!";
+        
+          if ($cmd eq "camEnable") {
+            $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v1/accounts/".$hash->{account}.
+                    "/networks/".$net."/doorbells/".$par1."/config";
+            $hash->{HU_DO_PARAMS}->{data} = $BlinkCamera_configLotusjson;
+            $hash->{HU_DO_PARAMS}->{data} =~ s/q_value_q/$alert/g;
+          } else {
+            $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v1/accounts/".$hash->{account}.
+                    "/networks/".$net."/doorbells/".$par1."/disable";
+            $hash->{HU_DO_PARAMS}->{data} = "";
+          }
+          Log3 $name, 4, "BlinkCamera_DoCmd $name:   cam type: ".$ctype.":  - data :".$hash->{HU_DO_PARAMS}->{data}.":";
         } else {
           $ret = "BlinkCamera_DoCmd $name: camera type (".$ctype.") unknown !!";
         }
@@ -874,6 +914,9 @@ sub BlinkCamera_DoCmd($$;$$$)
         } elsif ( $ctype eq "owl" ) {
           # https://rest-prde.immedia-semi.com/api/v1/accounts/<accid>/networks/<netid>/owls/<camid>/thumbnail
           $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v1/accounts/".$hash->{account}."/networks/".$net."/owls/".$par1."/thumbnail";
+          Log3 $name, 4, "BlinkCamera_DoCmd $name:  $cmd cam type: ".$ctype.":  ";
+        } elsif ( $ctype eq "lotus" ) {
+          $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v1/accounts/".$hash->{account}."/networks/".$net."/doorbells/".$par1."/thumbnail";
           Log3 $name, 4, "BlinkCamera_DoCmd $name:  $cmd cam type: ".$ctype.":  ";
         } else {
           $ret = "BlinkCamera_DoCmd $name: $cmd camera type (".$ctype.") unknown !!";
@@ -1005,6 +1048,10 @@ sub BlinkCamera_DoCmd($$;$$$)
           $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v5/accounts/".$hash->{account}."/networks/".$net."/cameras/".$par1."/liveview";
         } elsif ( $ctype eq "owl" ) {
           $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v1/accounts/".$hash->{account}."/networks/".$net."/owls/".$par1."/liveview";
+        } elsif ( $ctype eq "lotus" ) {
+          $hash->{HU_DO_PARAMS}->{url} = 
+              $hash->{URL}."/api/v1/accounts/".$hash->{account}."/networks/".$net."/doorbells/".$par1."/liveview";
+#          $ret = "BlinkCamera_DoCmd $name: $cmd camera type (".$ctype.") unsupported !!";
         } else {
           $ret = "BlinkCamera_DoCmd $name: $cmd camera type (".$ctype.") unknown !!";
         }
@@ -1305,6 +1352,7 @@ sub BlinkCamera_ParseHomescreen($$$)
   $readUpdates->{networkSyncSerial} = "";
   $readUpdates->{networkSyncFirmware} = "";
   $readUpdates->{networkSyncWifi} = "";
+  $readUpdates->{networkSyncType} = "";
   if ( defined( $syncList ) ) {
     foreach my $module ( @$syncList ) {
       if ( $module->{network_id} eq $network ) {
@@ -1314,6 +1362,7 @@ sub BlinkCamera_ParseHomescreen($$$)
         $readUpdates->{networkSyncSerial} = $module->{serial} if ( defined( $module->{serial} ) );
         $readUpdates->{networkSyncFirmware} = $module->{fw_version} if ( defined( $module->{fw_version} ) );
         $readUpdates->{networkSyncWifi} = $module->{wifi_strength} if ( defined( $module->{wifi_strength} ) );
+        $readUpdates->{networkSyncType} = $module->{type} if ( defined( $module->{type} ) );
         Log3 $name, 4, "BlinkCamera_ParseHomescreen $name:  found sync module info for network ";
         last;
       }
@@ -1321,9 +1370,10 @@ sub BlinkCamera_ParseHomescreen($$$)
   }
 
 
-  # Cameras and Owls (blink mini)
+  # Cameras and Owls (blink mini) and lotus (doorbells)
   my $camList = $result->{cameras};
   my $owlList = $result->{owls};
+  my $lotusList = $result->{doorbells};
   
   return $ret if ( ( ! defined( $camList ) ) &&  ( ! defined( $owlList ) ) ); 
   
@@ -1428,6 +1478,63 @@ sub BlinkCamera_ParseHomescreen($$$)
         if ( defined( $device->{signals} ) ) {
           my $signal = $device->{signals};
           $readUpdates->{"networkCamera".$device->{id}."Temp"} = $signal->{temp}; 
+        }
+      }
+    }
+
+  }
+
+  # loop through doorbells (lotus) and get the requested camera information 
+  if ( defined( $lotusList ) ) {
+  
+    foreach my $device ( @$lotusList ) {
+      if ( $device->{network_id} eq $network ) {
+        my $active = "disabled";
+        if ( defined( $device->{enabled} ) ) {
+          $active = "armed" if ( $device->{enabled} == 1 );
+          $active = "armed" if ( $device->{enabled} eq "true" );
+#        $active = "armed" if ( $device->{enabled} );
+        }
+        
+        $readUpdates->{"networkCamera".$device->{id}} = $device->{name}.":".$active;
+        $readUpdates->{"networkCamera".$device->{id}."Name"} = $device->{name};
+        $readUpdates->{"networkCamera".$device->{id}."Type"} = "lotus";
+        $readUpdates->{"networkCamera".$device->{id}."Active"} = $active;
+        $readUpdates->{"networkCamera".$device->{id}."Enabled"} = defined($device->{enabled})?$device->{enabled}:"undef";
+        $cameraGets .= $device->{name}.",".$device->{id}.",";
+        $cameras .= $device->{id}.":".$device->{name}."\n";
+        
+        if ( defined( $device->{thumbnail} ) ) {
+          # Load Thumbnail only if not already there
+          if ( ( ! defined( $hash->{"thumbnail".$device->{id}."Url"} ) ||
+               ( $hash->{"thumbnail".$device->{id}."Url"} ne $device->{thumbnail} ) ) ) {
+            if ( ! defined( $hash->{"thumbnail".$device->{id}."Req"} ) ) {
+  #              Debug "retreive thumbnail from homescreen for ".$device->{id};
+              # Do thumbnail request only of not already there (e.g. by polling)
+              $hash->{"thumbnail".$device->{id}."Req"} = $device->{thumbnail};
+              BlinkCamera_DoCmd( $hash, "thumbnail", $device->{id}, "HIDDEN" );
+            } else {
+              Log3 $name, 4, "BlinkCamera_ParseHomescreen $name:  thumbnail Req already defined for ".$device->{id};
+            }
+          } else {
+            # already there just update readings
+            $readUpdates->{"networkCamera".$device->{id}."Url"} = BlinkCamera_getwebname( $hash ).
+                BlinkCamera_ReplacePattern( $BlinkCamera_camerathumbnail, $device->{id}, $name ); 
+          }
+# do this only after storag of thumbnail being completed          $readUpdates->{"networkCamera".$device->{id}."Thumbnail"} = $device->{thumbnail} ; 
+        }
+        $readUpdates->{"networkCamera".$device->{id}."Batt"} = $device->{battery} if ( defined( $device->{battery} ) );
+        $readUpdates->{"networkCamera".$device->{id}."Firmware"} = $device->{fw_version} if ( defined( $device->{fw_version} ) );
+        $readUpdates->{"networkCamera".$device->{id}."Status"} = $device->{status} if ( defined( $device->{status} ) );
+        $readUpdates->{"networkCamera".$device->{id}."Mode"} = $device->{doorbell_mode} if ( defined( $device->{doorbell_mode} ) );
+        $readUpdates->{"networkCamera".$device->{id}."Snooze"} = $device->{snooze} if ( defined( $device->{snooze} ) );
+
+
+        if ( defined( $device->{signals} ) ) {
+          my $signal = $device->{signals};
+          $readUpdates->{"networkCamera".$device->{id}."SignalLfr"} = $signal->{lfr}; 
+          $readUpdates->{"networkCamera".$device->{id}."SignalWifi"} = $signal->{wifi}; 
+          $readUpdates->{"networkCamera".$device->{id}."SignalBattery"} = $signal->{battery}; 
         }
       }
     }
@@ -1713,6 +1820,7 @@ sub BlinkCamera_Callback($$$)
     
     } elsif ($cmd eq "liveview" ) {
       $readUpdates{liveVideo} = $result->{server};
+      $readUpdates{liveCam} = $par1;
 
     } else {
       
@@ -2411,17 +2519,22 @@ sub BlinkCamera_HandleAlertEntry( $$$$ ) {
       
       if ( ( $alertTime gt $lastUpdate ) && ( length($alertViewed) == 0 ) ) {
         Log3 $name, 5, "BlinkCamera_HandleAlertEntry $name: id  :$id: is new alert ";
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash, "alertVideo", $alertVideo );        
-        readingsBulkUpdate($hash, "alertCamera", $alertCamera );        
-        
         my $cname = BlinkCamera_GetCameraName( $hash, $alertCamera );
-        readingsBulkUpdate($hash, "alertCameraName", $cname ) if ( defined( $cname ) );        
+        
+        if ( defined( $cname ) ) {
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash, "alertVideo", $alertVideo );        
+          readingsBulkUpdate($hash, "alertCamera", $alertCamera );        
+          
+          readingsBulkUpdate($hash, "alertCameraName", $cname );        
 
-        readingsBulkUpdate($hash, "alertTime", $alertTime );        
-        readingsBulkUpdate($hash, "alertID", $id );        
+          readingsBulkUpdate($hash, "alertTime", $alertTime );        
+          readingsBulkUpdate($hash, "alertID", $id );        
 
-        readingsEndUpdate($hash, 1);
+          readingsEndUpdate($hash, 1);
+        } else {
+          # cameraname not found --> ignore
+        }
       }
 
       # eval eventTimestamp to check for latest and update event timestamp
@@ -2511,7 +2624,7 @@ sub BlinkCamera_AnalyzeAlertResults( $$$ ) {
   <b>Disclaimer</b>: Since there are no official APIs for the blink cameras, there is no guarantee for this module to continue working. Several changes over the years have caused temporary outages due to incompatibe changes done by the provider of the Blink cameras. 
   <br><br>
 
-  The blink device contains the possibility to regular poll for updates (i.e. specifically for notificatio0ns/alerts) 
+  The blink device contains the possibility to regular poll for updates (i.e. specifically for notifications/alerts) 
   MOst commands that change configurations are not synchronous, but the result will be returned after polling for status information. This is automatically handled in the device and the result of the cmd is marked in the reading <code>cmdResult</code> with the value "SUCCESS".
   <br>
   Traditional Blink cameras and also the BlinkMini types should work
@@ -2543,7 +2656,7 @@ sub BlinkCamera_AnalyzeAlertResults( $$$ ) {
   <br><br>
     <li><code>login</code><br>Initiate a login to the blink servers. This is usually done automatically when needed or when the login is expired
     </li>
-    <li><code>verifyPin</code><br>can be used to verify the pin send from blink via email (experimental currently)
+    <li><code>verifyPin</code><br>can be used to verify the pin send from blink via email/sms 
     </li>
     <li><code>arm</code> or <code>disarm</code><br>All enabled cameras in the system will be armed (i.e. they will be set to a mode where alarms/videos are automatically created based on the current settings) / disarmed (set to inactive mode where no video is recorded.
     </li>
@@ -2583,7 +2696,7 @@ sub BlinkCamera_AnalyzeAlertResults( $$$ ) {
     <li><code>getVideoAlert [ &lt;video id&gt; ]</code><br>Retrieve the video for the corresponding id (or if ommitted as specified in the reading <code>alertID</code>) and store the video in a local file in the directory given in the attribute <code>proxyDir</code>
     </li>
     
-    <li><code>liveview &lt;camera name or number or "all"&gt;</code><br>Request a link to the live video stream. The live video stream access (URL) will be stored in the reading liveVideo. The link to the video is an rtsp - which can be shown in video players like VLC.
+    <li><code>liveview &lt;camera name or number or "all"&gt;</code><br>Request a link to the live video stream. The live video stream access (URL) will be stored in the reading liveVideo (the associated cam id in liveCam). The link to the video is an rtsp - which can be shown in video players like VLC.
     <br>
     Note: Live video streaming might have a substantially negative effect on battery life<br>
     </li>
@@ -2654,6 +2767,9 @@ sub BlinkCamera_AnalyzeAlertResults( $$$ ) {
     <li><code>networkCamera... </code><br>Set of readings specific for each camera (identified by the cameraID in the reading name). Providing status and name of the camera / most recent thumbnail / url for the thumbnail to the proxy </li> 
     <li><code>networkCamera<cameraid>Enabled</code><br>Shows the enabled (active) status of the camera (known values: 0 / 1 / "undef" - last value will be given if this value is not contained in the camerainfo </li> 
 
+    <br>
+    
+    <li><code>alert... </code><br>Set of readings specifying the last alert (movement alert) coming from one of the devices. Especially the ID is relevant here for accessing the corresponding video secifically. Additionally the camera, time and video url are specifed here. </li> 
     
   </ul> 
 
