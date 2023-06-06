@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.18";
+my $version = "1.3.20";
 my $apiUrl = "https://api.todoist.com/sync/v9/";
 
 my $srandUsed;
@@ -626,6 +626,161 @@ sub todoist_UpdateTask($$$) {
 
 # create Task
 sub todoist_CreateTask($$) {
+  my ($hash,$cmd) = @_;
+  
+  my($a, $h) = parseParams($cmd);
+  
+  my $name=$hash->{NAME};
+  
+  my $param;
+  
+  my $pwd="";
+  
+  my $assigne_id="";
+  
+  ## we try to send a due_date (in developement)
+  my @tmp = split( ":", join(" ",@$a) );
+  
+  my $title=encode_utf8($tmp[0]);
+  
+  $title = encode_utf8($h->{"title"}) if ($h->{"title"});
+  
+  my $check=1;
+  
+  # we can avoid duplicates in FHEM. There may still come duplicates coming from another app
+  if (AttrVal($name,"avoidDuplicates",0) == 1 && todoist_inArray(\@{$hash->{helper}{"TITS"}},$title)) {
+    $check=-1;
+  }
+  
+  if ($check==1) {
+  
+    ## if no token is needed and device is not disabled, check token and get list vom todoist
+    if (!$hash->{helper}{PWD_NEEDED} && !IsDisabled($name)) {
+      
+      ## get password
+      $pwd=todoist_GetPwd($hash);
+      
+      if ($pwd) {
+		  
+		 # JSON String start- and endpoint
+		my $commandsStart="[{";
+
+		my $commandsEnd="}]";
+		
+		# some random string for UUID   
+		my $uuid = todoist_genUUID();  
+		# some random string for tempID   
+		my $tempId = todoist_genUUID(); 
+      
+        Log3 $name,5, "$name: hash: ".Dumper($hash);
+		
+		my %args=(); 
+        
+        # data array for API - we could transfer more data        
+        %args = (
+          project_id           => int($hash->{PID}),
+          content              => $title,
+        );
+        
+        
+        ## check for dueDate as Parameter or part of title - push to hash
+        if (!$tmp[1] && $h->{"dueDate"}) { ## parameter
+          $args{'date_string'} = $h->{"dueDate"};
+        }
+        elsif ($tmp[1]) { ## title
+          $args{'date_string'} = $tmp[1];
+        }
+        else {
+        
+        }
+        
+        ## if someone uses due_date - no problem
+        $args{'date_string'} = $h->{"due_date"} if ($h->{"due_date"});
+        
+        $args{'date_string'} = encode_utf8($args{'date_string'});
+        
+        ## Task parent_id
+        $args{'parent_id'} = int($h->{"parent_id"}) if ($h->{"parent_id"});
+        $args{'parent_id'} = int($h->{"parentID"}) if ($h->{"parentID"});
+        $args{'parent_id'} = int($h->{"parentId"}) if ($h->{"parentId"});
+        
+        my $parentId = 0;
+        $parentId = %args{'parent_id'} if (%args{'parent_id'});
+        
+        ## Task priority
+        $args{'priority'} = $h->{"priority"} if ($h->{"priority"});
+        
+        ## who is responsible for the task?
+        $args{'responsible_uid'} = $h->{"responsibleUid"} if ($h->{"responsibleUid"});
+        $args{'responsible_uid'} = $h->{"responsible"} if ($h->{"responsible"});
+        
+        ## who assigned the task? 
+        $args{'assigned_by_uid'} = $h->{"assignedByUid"} if ($h->{"assignedByUid"});
+        $args{'assigned_by_uid'} = $h->{"assignedBy"} if ($h->{"assignedByUid"});
+        
+        ## order of the task
+        $args{'item_order'} = $h->{"order"} if ($h->{"order"});
+        
+        ## child order  of the task
+        $args{'child_order'} = $h->{"child_order"} if ($h->{"child_order"});
+		
+		
+		my $dataArr=$commandsStart.'"type":"item_add","temp_id":"'.$tempId.'","uuid":"'.$uuid.'","args":'.encode_json(\%args).$commandsEnd;   
+        
+        
+        
+        Log3 $name,4, "todoist ($name): Data Array sent to todoist API: ".Dumper(%args);
+		
+		my $data= {
+			token     =>    $pwd,
+			commands  =>    $dataArr
+		};
+      
+        
+        $param = {
+          url        => $apiUrl."sync",
+          data       => $data,
+          tTitle     => $title,
+          method     => "POST",
+          wType      => "create",
+          parentId   => $parentId,
+          timeout    => 7,
+          header     => "Content-Type: application/x-www-form-urlencoded\r\n".
+					    "Authorization: Bearer ".$pwd,
+          hash       => $hash,
+          callback   => \&todoist_HandleTaskCallback,  ## call callback sub to work with the data we get
+        };
+        
+        Log3 $name,5, "todoist ($name): Param: ".Dumper($param);
+        
+        ## non-blocking access to todoist API
+        InternalTimer(gettimeofday()+0.1, "HttpUtils_NonblockingGet", $param, 0);
+      }
+      else {
+        todoist_ErrorReadings($hash,"access token empty");
+      }
+    }
+    else {
+      if (!IsDisabled($name)) {
+        todoist_ErrorReadings($hash,"no access token set");
+      }
+      else {
+          todoist_ErrorReadings($hash,"device is disabled");
+      }
+    }
+  }
+  else {
+    map {FW_directNotify("#FHEMWEB:$_", "if (typeof todoist_ErrorDialog === \"function\") todoist_ErrorDialog('$name','$title ".$todoist_tt->{"alreadythere"}."','".$todoist_tt->{"error"}."')", "")} devspec2array("TYPE=FHEMWEB");
+    todoist_ErrorReadings($hash,"duplicate detected","duplicate detected");
+  }
+  
+  
+  return undef;
+}
+
+
+# create Task
+sub todoist_CreateTask_old($$) {
   my ($hash,$cmd) = @_;
   
   my($a, $h) = parseParams($cmd);
