@@ -788,6 +788,7 @@ sub _FillSelfHashWithWeatherResponseForOnecallDaily {
                 'moonset'    => strftime(
                     "%a, %H:%M", localtime( $data->{daily}->[$i]->{moonset} )
                 ),
+                'summary'     => $data->{daily}->[$i]->{summary},
                 'temperature' =>
                   int( sprintf( "%.0f", $data->{daily}->[$i]->{temp}->{day} ) ),
                 'temperature_morn' => int(
@@ -1031,7 +1032,7 @@ sub _strftimeWrapper {
 	  ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v3.2.6",
+  "version": "v3.2.7",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
