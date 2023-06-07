@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.23";
+my $version = "1.3.24";
 my $apiUrl = "https://api.todoist.com/sync/v9/";
 
 my $srandUsed;
