@@ -17,13 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-<<<<<<< .mine
-my $version = "1.3.25";
-||||||| .r26953
-my $version = "1.3.15";
-=======
-my $version = "1.3.24";
->>>>>>> .r27665
+my $version = "1.3.26";
 my $apiUrl = "https://api.todoist.com/sync/v9/";
 
 my $srandUsed;
@@ -392,14 +386,8 @@ sub todoist_UpdateTask($$$) {
   my $tid;
   
   ## get Task-ID
-<<<<<<< .mine
   $tid = @$a[0];
  
-||||||| .r26953
-  my $tid = @$a[0];
-=======
-  $tid = @$a[0];
->>>>>>> .r27665
   
   ## check if ID is todoist ID (ID:.*) or title (TITLE:.*)
   my @temp=split(":",$tid);
@@ -413,7 +401,6 @@ sub todoist_UpdateTask($$$) {
   ## use task content
   elsif (@temp && $temp[0] =~ /title/i) {
     $title = encode_utf8($temp[1]);
-<<<<<<< .mine
 	my $nTitle = $title;
 	$nTitle =~ s/ /_/g;
     $taskId = $hash->{helper}{"TITLES"}{$nTitle} if ($hash->{helper}{"TITLES"});
@@ -421,14 +408,6 @@ sub todoist_UpdateTask($$$) {
   elsif (defined($h->{"title"}) || defined($h->{"TITLE"}) || defined($h->{"Title"})) {
 	Log3 $name, 5, "todoist ($name): Debug: ".Dumper($h);
 	$title = $h->{"title"} if ($h->{"title"});
-||||||| .r26953
-    $title = $h->{"title"} if ($h->{"title"});
-=======
-    $taskId = $hash->{helper}{"TITLES"}{$title} if ($hash->{helper}{"TITLES"});
-  }
-  elsif (defined($h->{"title"}) || defined($h->{"TITLE"}) || defined($h->{"Title"})) {
-	$title = $h->{"title"} if ($h->{"title"});
->>>>>>> .r27665
     $title = $h->{"TITLE"} if ($h->{"TITLE"});
     $title = $h->{"Title"} if ($h->{"Title"});
 	my $nTitle = $title;
