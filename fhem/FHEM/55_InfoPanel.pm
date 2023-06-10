@@ -74,6 +74,7 @@
 # 2023-02-20 - 27257 - added:   show alias in overview
 # 2023-05-12 - 27557 - added:   support for named parameters in define
 #                               for new define syntax
+# 2023-06-10 -       - changed: commandref updated to id syntax
 #
 ##############################################
 =cut
@@ -1516,46 +1517,47 @@ sub btIP_getURL {
 =item summary_DE erzeugt ein einfaches Statusdisplay
 =begin html
 
-<a name="InfoPanel"></a>
+<a id="InfoPanel"></a>
 <h3>InfoPanel</h3>
 
 <ul>
     InfoPanel is an extension to <a href="#FHEMWEB">FHEMWEB</a>. You must install FHEMWEB to use InfoPanel.<br/>
     <br/>
     <br/>
-	<b>Prerequesits</b><br/>
-	<br/>
-	<ul>
-	  <li>InfoPanel is an extension to <a href="#FHEMWEB">FHEMWEB</a>. You must install FHEMWEB to use InfoPanel.</li>
-	  <br/>
-	  <li>Module uses following additional Perl modules:<br/><br/>
-		<ul><code>MIME::Base64 Image::Info</code></ul><br/>
-		If not already installed in your environment, please install them using appropriate commands from your environment.<br/><br/>
-		Package installation in debian environments: <code>apt-get install libmime-base64-perl libimage-info-perl</code></li>
-	  <br/>
-	  <li>You can use this module without the two additional perl modules, but in this case, you have to accept some limitations:<br/>
-	      <br/>
-	      <ul>
-	         <li>layout tag img can not be used</li>
-	         <li>layout tag plot can only handle scale = 1 and inline = 0</li>
-	      </ul>
-	  </li>
-	</ul>
-	<br/><br/>
-	
-	<a name="InfoPaneldefine"></a>
-	<b>Define</b><br/><br/>
+    <b>Prerequesits</b><br/>
+    <br/>
+    <ul>
+      <li>InfoPanel is an extension to <a href="#FHEMWEB">FHEMWEB</a>. You must install FHEMWEB to use InfoPanel.</li>
+      <br/>
+      <li>Module uses following additional Perl modules:<br/><br/>
+        <ul><code>MIME::Base64 Image::Info</code></ul><br/>
+        If not already installed in your environment, please install them using appropriate commands from your environment.<br/><br/>
+        Package installation in debian environments: <code>apt-get install libmime-base64-perl libimage-info-perl</code></li>
+      <br/>
+      <li>You can use this module without the two additional perl modules, but in this case, you have to accept some limitations:<br/>
+          <br/>
+          <ul>
+             <li>layout tag img can not be used</li>
+             <li>layout tag plot can only handle scale = 1 and inline = 0</li>
+          </ul>
+      </li>
+    </ul>
+    <br/><br/>
+
+    <a id="InfoPanel-define"></a>
+    <b>Define</b><br/><br/>
     <ul>
        <code>define &lt;name&gt; InfoPanel layout=layoutFileName</code><br/>
        <br/>
        Example:<br/><br>
        <ul><code>define myInfoPanel InfoPanel layout=./FHEM/panel.layout</code><br/></ul>
     </ul>
-	<br/><br/>
+    <br/><br/>
 
-	<a name="InfoPanelset"></a>
-	<b>Set-Commands</b><br/><br/>
+    <a id="InfoPanel-set"></a>
+    <b>Set-Commands</b><br/><br/>
     <ul>
+       <a id="InfoPanel-set-reread"></a>
        <li><code>set &lt;name&gt; reread</code>
        <ul><br/>
           Rereads the <a href="#InfoPanellayout">layout definition</a> from the file.<br/><br/>
@@ -1565,78 +1567,96 @@ sub btIP_getURL {
              Autoread can be disabled via <a href="#InfoPanelattr">attribute</a>.
           </ul>
        </ul></li><br/>
+       <a id="InfoPanel-set-ovEnable"></a>
        <li><code>set &lt;name&gt; ovEnable &lt;xconditionName&gt;</code>
          <ul><br/>
           set an override "1" to named xcondition 
          </ul>
        </li><br/>
+       <a id="InfoPanel-set-ovDisable"></a>
        <li><code>set &lt;name&gt; ovDisable &lt;xconditionName&gt;</code>
          <ul><br/>
           set an override "0" to named xcondition 
          </ul>
        </li><br/>
+       <a id="InfoPanel-set-ovClear"></a>
        <li><code>set &lt;name&gt; ovClear &lt;xconditionName&gt|all;</code>
          <ul><br/>
           delete an existing overrides to named xcondition. "all" will clear all overrides.<br/>
          </ul>
        </li>
     </ul>
-	<br/><br/>
+    <br/><br/>
 
-	<a name="InfoPanelget"></a>
-	<b>Get-Commands</b><br/><br/>
-	<ul>
+    <a id="InfoPanel-get"></a>
+    <b>Get-Commands</b><br/><br/>
+    <ul>
+       <a id="InfoPanel-get-counter"></a>
        <li><code>get &lt;name&gt; counter</code>
        <ul><br/>
           return value from internal counter<br/>
        </ul></li><br/>
+       <a id="InfoPanel-get-layout"></a>
        <li><code>get &lt;name&gt; layout</code>
        <ul><br/>
           return complete layout definition<br/>
        </ul></li><br/>
+       <a id="InfoPanel-get-overrides"></a>
        <li><code>get &lt;name&gt; overrides</code>
        <ul><br/>
           return list of defined overrides<br/>
        </ul></li><br/>
        <br/>
-	</ul>
-	<br/><br/>
+    </ul>
+    <br/><br/>
 
-	<a name="InfoPanelattr"></a>
-	<b>Attributes</b><br/><br/>
-	<ul>
-		<li><b>autoreread</b> - disables automatic layout reread after edit if set to 1</li>
-		<li><b>refresh</b> - time (in seconds) after which the HTML page will be reloaded automatically.<br/>
-	        Any values below 60 seconds will not become valid.</li>
-		<li><b>showTime</b> - disables generation timestamp in state if set to 0</li>
-		<li><b>size</b> - The dimensions of the picture in the format
-            <code>&lt;width&gt;x&lt;height&gt;</code></li>
-		<li><b>useViewPort</b> - add viewport meta tag to fit mobile displays</li>
-		<li><b>mobileApp</b> - add support for mobile fullscreen experience</li>
-		<li><b>title</b> - webpage title to be shown in Browser</li>
-		<br/>
-		<li><b>bgcenter</b> - background images will not be centered if attribute set to 0. Default: show centered</li>
-		<li><b>bgcolor</b> - defines the background color, use html-hexcodes to specify color, eg 00FF00 for green background. Default color is black. You can use bgcolor=none to disable use of any background color</li>
-		<li><b>bgdir</b> - directory containing background images</li>
-		<li><b>bgopacity</b> - set opacity for background image, values 0...1.0</li>
-		<li><b>tmin</b> - background picture will be shown at least <code>tmin</code> seconds, 
-		    no matter how frequently the RSS feed consumer accesses the page.</li>
-		<br/>
-		<b>Important:</b> bgcolor and bgdir will be evaluated by <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> use quotes for absolute values!<br/>
-	</ul>
-	<br/><br/>
+    <a id="InfoPanel-attr"></a>
+    <b>Attributes</b><br/><br/>
+    <ul>
+      <a id="InfoPanel-attr-autoread"></a>
+      <li><b>autoreread</b> - disables automatic layout reread after edit if set to 1</li>
+      <a id="InfoPanel-attr-refresh"></a>
+      <li><b>refresh</b> - time (in seconds) after which the HTML page will be reloaded automatically.<br/>
+           Any values below 60 seconds will not become valid.</li>
+      <a id="InfoPanel-attr-showTime"></a>
+      <li><b>showTime</b> - disables generation timestamp in state if set to 0</li>
+      <a id="InfoPanel-attr-size"></a>
+      <li><b>size</b> - The dimensions of the picture in the format
+           <code>&lt;width&gt;x&lt;height&gt;</code></li>
+      <a id="InfoPanel-attr-useViewPort"></a>
+      <li><b>useViewPort</b> - add viewport meta tag to fit mobile displays</li>
+      <a id="InfoPanel-attr-mobileApp"></a>
+      <li><b>mobileApp</b> - add support for mobile fullscreen experience</li>
+      <a id="InfoPanel-attr-title"></a>
+      <li><b>title</b> - webpage title to be shown in Browser</li>
+      <br/>
+      <a id="InfoPanel-attr-bgcenter"></a>
+      <li><b>bgcenter</b> - background images will not be centered if attribute set to 0. Default: show centered</li>
+      <a id="InfoPanel-attr-bgcolor"></a>
+      <li><b>bgcolor</b> - defines the background color, use html-hexcodes to specify color, eg 00FF00 for green background. Default color is black. You can use bgcolor=none to disable use of any background color</li>
+      <a id="InfoPanel-attr-bgdir"></a>
+      <li><b>bgdir</b> - directory containing background images</li>
+      <a id="InfoPanel-attr-bgopacity"></a>
+      <li><b>bgopacity</b> - set opacity for background image, values 0...1.0</li>
+      <a id="InfoPanel-attr-tmin"></a>
+      <li><b>tmin</b> - background picture will be shown at least <code>tmin</code> seconds, 
+          no matter how frequently the feed consumer accesses the page.</li>
+      <br/>
+      <b>Important:</b> bgcolor and bgdir will be evaluated by <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> use quotes for absolute values!<br/>
+    </ul>
+    <br/><br/>
 
     <a name="InfoPanelreadings"></a>
-	<b>Generated Readings/Events:</b><br/><br/>
-	<ul>
-	   <li>state - show time and date of last layout evaluation</li>
-	</ul>
-	<br/><br/>
+    <b>Generated Readings/Events:</b><br/><br/>
+    <ul>
+       <li>state - show time and date of last layout evaluation</li>
+    </ul>
+    <br/><br/>
 
-    <a name="InfoPanellayout"></a>
-	<b>Layout definition</b><br/>
-	<br/>
-	<ul>
+    <a id="InfoPanel-layout"></a>
+    <b>Layout definition</b><br/>
+    <br/>
+    <ul>
        All parameters in curly brackets can be evaluated by <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code></br>
        <br/>
        <li><code>area &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; &lt;{link}&gt;</code><br/>
@@ -1933,14 +1953,14 @@ sub btIP_getURL {
            </ul></li><br/>
        <br/>
 
-	</ul>
-	<br/>
+    </ul>
+    <br/>
 
-	<b>Author's notes</b><br/>
-	<br/>
-	<ul>
-		<li>Have fun!</li><br/>
-	</ul>
+    <b>Author's notes</b><br/>
+    <br/>
+    <ul>
+      <li>Have fun!</li><br/>
+    </ul>
 </ul>
 
 =end html
