@@ -121,9 +121,8 @@ __END__
   <u><b>Requirements</b></u>
   <br><br>
   <ul>
-    <li>To get access to the API an application has to be created in the <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.</li>
+    <li>To get access to the API an application has to be created in the <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>. The application has to be connected with the AutomowerConnect API.</li>
     <li>During registration an application key (client_id) and an application secret (client secret) is provided. Use these for for the module.</li>
-    <li>Don't forget to connect you API key to the Automower API.</li>
     <li>The module uses client credentials as grant type for authorization.</li>
   </ul>
   <br>
@@ -180,11 +179,11 @@ __END__
 
     <li><a id='AutomowerConnect-set-getNewAccessToken'>getNewAccessToken</a><br>
       <code>set &lt;name&gt; getNewAccessToken</code><br>
-      Gets a new access token</li>
+      For debug purpose only.</li>
 
     <li><a id='AutomowerConnect-set-getUpdate'>getUpdate</a><br>
       <code>set &lt;name&gt; getUpdate</code><br>
-      Gets data from the API. This is done each intervall automatically.</li>
+      For debug purpose only.</li>
 
     <li><a id='AutomowerConnect-set-headlight'>headlight</a><br>
       <code>set &lt;name&gt; headlight &lt;ALWAYS_OFF|ALWAYS_ON|EVENIG_ONLY|EVENING_AND_NIGHT&gt;</code><br>
@@ -410,8 +409,8 @@ __END__
     <li>statistics_newGeoDataSets - number of new data sets between the last two different time stamps</li>
     <li>statistics_numberOfCollisions - Number of collisions (last day/all days)</li>
     <li>status_connected - state of connetion between mower and Husqvarna Cloud.</li>
-    <li>status_statusTimestamp - local time of last change of the API content</li>
-    <li>status_statusTimestampDiff - time difference in seconds between the last and second last change of the API content</li>
+    <li>status_statusTimestamp - local time of last status update</li>
+    <li>status_statusTimestampDiff - time difference in seconds between the last and second last status update</li>
     <li>system_name - name of the mower</li>
 
   </ul>
@@ -446,9 +445,8 @@ __END__
   <u><b>Anforderungen</b></u>
   <br><br>
   <ul>
-    <li>Für den Zugriff auf die API muss eine Application angelegt werden, im <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.</li>
+    <li>Für den Zugriff auf die API muss eine Application angelegt werden, im <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>angelegt und mit der Automower Connect API verbunden werden.</li>
     <li>Währenddessen wird ein Application Key (client_id) und ein Application Secret (client secret) bereitgestellt. Diese sind für dieses Modul zu nutzen.</li>
-    <li>Der Application Key muss im Portal mit der Automower API verbunden werden.</li>
     <li>Das Modul nutzt Client Credentials als Granttype zur Authorisierung.</li>
   <br>
   </ul>
@@ -506,11 +504,11 @@ __END__
 
      <li><a id='AutomowerConnect-set-getNewAccessToken'>getNewAccessToken</a><br>
       <code>set &lt;name&gt; getNewAccessToken</code><br>
-      Holt ein neues Access Token.</li>
+      Nur zur Fehlerbehebung.</li>
 
     <li><a id='AutomowerConnect-set-getUpdate'>getUpdate</a><br>
       <code>set &lt;name&gt; getUpdate</code><br>
-      Liest die Daten von der API. Das passiert jedes Interval automatisch.</li>
+      Nur zur Fehlerbehebung.</li>
 
      <li><a id='AutomowerConnect-set-headlight'>headlight</a><br>
       <code>set &lt;name&gt; headlight &lt;ALWAYS_OFF|ALWAYS_ON|EVENIG_ONLY|EVENING_AND_NIGHT&gt;</code><br>
@@ -741,8 +739,8 @@ __END__
     <li>statistics_newGeoDataSets - Anzahl der neuen Datensätze zwischen den letzten zwei unterschiedlichen Zeitstempeln</li>
     <li>statistics_numberOfCollisions - Anzahl der Kollisionen (letzter Tag/alle Tage)</li>
     <li>status_connected - Status der Verbindung zwischen dem Automower und der Husqvarna Cloud.</li>
-    <li>status_statusTimestamp - Lokalzeit der letzten Änderung der Daten in der API</li>
-    <li>status_statusTimestampDiff - Zeitdifferenz zwischen den beiden letzten Änderungen im Inhalt der Daten aus der API</li>
+    <li>status_statusTimestamp - Lokalzeit des letzten Statusupdates in der API</li>
+    <li>status_statusTimestampDiff - Zeitdifferenz zwischen dem letzten und vorletzten Statusupdate.</li>
     <li>system_name - Name des Automowers</li>
   </ul>
 </ul>

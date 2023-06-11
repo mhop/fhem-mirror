@@ -152,7 +152,7 @@ mowingPathDisplayStart=""
 mowingPathLineColor="#ff0000"
 mowingPathLineDash="6,2"
 mowingPathLineWidth="1"
-mowingPathDotWidth="4"
+mowingPathDotWidth="2"
 mowingPathUseDots=""';
 
 my $mapZonesTpl = '{
@@ -169,10 +169,12 @@ my $mapZonesTpl = '{
   %$hash = (%$hash,
     helper => {
       passObj                   => FHEM::Core::Authentication::Passwords->new($type),
-      interval                  => 420,
-      interval_auth             => 86345,
+      interval                  => 840,
       interval_ws               => 7110,
       interval_ping             => 60,
+      retry_interval_apiauth    => 840,
+      retry_interval_getmower   => 840,
+      midnightCycle             => 1,
       client_id                 => $client_id,
       grant_type                => 'client_credentials',
       mowerNumber               => $mowerNumber,
@@ -186,8 +188,6 @@ my $mapZonesTpl = '{
       imageWidthHeight          => '350 650',
       mapdesign                 => $mapAttr,
       detailFnFirst             => 0,
-      detailFnNewPos            => 0,
-      detailFnAttrMaxPos        => 5000,
       mapZonesTpl               => $mapZonesTpl,
       posMinMax                 => "-180 90\n180 -90",
       newdatasets               => 0,
@@ -289,6 +289,7 @@ my $mapZonesTpl = '{
 
 
   AddExtension( $name, \&GetMap, "$type/$name/map" );
+  # AddExtension( $name, \&GetJson, "$type/$name/json" );
 
   if ( $::init_done ) {
 
@@ -379,11 +380,13 @@ sub Rename {
 sub Get {
   my ($hash,@val) = @_;
   my $type = $hash->{TYPE};
-
-  return "$type $hash->{NAME} Get: needs at least one argument" if ( @val < 2 );
-
-  my ($name,$setName,$setVal,$setVal2,$setVal3) = @val;
+  my $name = $hash->{NAME};
   my $iam = "$type $name Get:";
+
+  return "$iam needs at least one argument" if ( @val < 2 );
+  return "$iam disabled" if ( IsDisabled( $name ) );
+
+  my ($pname,$setName,$setVal,$setVal2,$setVal3) = @val;
 
   Log3 $name, 4, "$iam called with $setName " . ($setVal ? $setVal : "");
 
@@ -487,26 +490,6 @@ sub FW_detailFn {
     }
     $propli = 'data-propertyLimitsPath="'.$propli.'"';
 
-    # MOWING PATH
-    my @pos = @{ $hash->{helper}{areapos} };
-    # my $posxy = $cslon . "," . $cslat . ",P";
-    my $posxy = '';
-
-    if ( @pos > 1 ) {
-
-      $posxy = int( ( $lonlo-$pos[ 0 ]{longitude} ) * $picx / $mapx ).",".int( ( $latlo-$pos[ 0 ]{latitude} ) * $picy / $mapy ).",".$pos[ 0 ]{act};
-
-      for ( my $i = 1; $i < ( @pos > 5000 ? 5000 : @pos ); $i++ ){
-
-        $posxy .= ",".int( ( $lonlo - $pos[ $i ]{longitude} ) * $picx / $mapx ).",".int( ( $latlo - $pos[ $i ]{latitude} ) * $picy / $mapy ).",".$pos[ $i ]{act};
-
-      }
-
-    }
-
-    $posxy = 'data-mowingPath="'.$posxy.'"';
-
-
     my $ret = "";
     $ret .= "<style>
     .${type}_${name}_div{padding:0px !important;
@@ -520,12 +503,12 @@ sub FW_detailFn {
     .${type}_${name}_canvas_1{
       position: absolute; left: 0; top: 0; z-index: 1;}
     </style>";
-    $ret .= "<div id='${type}_${name}_div' class='${type}_${name}_div' $mapDesign $csdata $limi $propli $posxy >";
+    $ret .= "<div id='${type}_${name}_div' class='${type}_${name}_div' $mapDesign $csdata $limi $propli >";
     $ret .= "<canvas id='${type}_${name}_canvas_0' class='${type}_${name}_canvas_0' width='$picx' height='$picy' ></canvas>";
     $ret .= "<canvas id='${type}_${name}_canvas_1' class='${type}_${name}_canvas_1' width='$picx' height='$picy' ></canvas>";
     $ret .= "</div>";
     $hash->{helper}{detailFnFirst} = 1;
-    InternalTimer( gettimeofday() + 1.5, \&FW_detailFn_Update, $hash, 0 );
+    InternalTimer( gettimeofday() + 2, \&FW_detailFn_Update, $hash, 0 );
     
     return $ret;
 
@@ -563,12 +546,11 @@ sub FW_detailFn_Update {
   # MOWING PATH
   my $posxy = '';
 
-  if ( @pos > 0 && $hash->{helper}{detailFnNewPos}) {
+  if ( @pos > 0 ) {
 
     $posxy = int( ( $lonlo-$pos[ 0 ]{longitude} ) * $picx / $mapx ).",".int( ( $latlo-$pos[ 0 ]{latitude} ) * $picy / $mapy ).",'".$pos[ 0 ]{act}."'";
-    my $imax = ( @pos > 5000 ? @pos - 5000 + $hash->{helper}{detailFnNewPos} : $hash->{helper}{detailFnNewPos} );
 
-    for ( my $i = 1; $i < $imax; $i++ ){
+    for ( my $i = 1; $i < @pos; $i++ ){
 
       $posxy .= ",".int( ( $lonlo - $pos[ $i ]{longitude} ) * $picx / $mapx ).",".int( ( $latlo - $pos[ $i ]{latitude} ) * $picy / $mapy ).",'".$pos[ $i ]{act}."'";
 
@@ -615,22 +597,8 @@ sub APIAuth {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   my $iam = "$type $name APIAuth:";
-  my $interval = $hash->{helper}{interval};
-  # ( $hash->{VERSION} ) = $cvsid =~ /\.pm (.*)Z/ if ( !$hash->{VERSION} );
 
-
-  if ( IsDisabled($name) ) {
-
-    readingsSingleUpdate( $hash,'device_state','disabled',1) if ( ReadingsVal( $name, 'device_state', '' ) ne 'disabled' );
-    RemoveInternalTimer( $hash, \&wsReopen );
-    RemoveInternalTimer( $hash, \&wsKeepAlive );
-    DevIo_CloseDev( $hash ) if ( DevIo_IsOpen( $hash ) );
-    RemoveInternalTimer( $hash, \&APIAuth );
-    InternalTimer( gettimeofday() + $interval, \&APIAuth, $hash, 0 );
-
-    return undef;
-
-  }
+  return if( IsDisabled( $name ) );
 
   if ( !$update && $::init_done ) {
 
@@ -665,7 +633,7 @@ sub APIAuth {
   } else {
 
     RemoveInternalTimer( $hash, \&APIAuth );
-    InternalTimer( gettimeofday() + 10, \&APIAuth, $hash, 0 );
+    InternalTimer( gettimeofday() + 15, \&APIAuth, $hash, 0 );
 
   }
   return undef;
@@ -678,7 +646,6 @@ sub APIAuthResponse {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   my $statuscode = $param->{code} // '';
-  my $interval = $hash->{helper}{interval};
   my $iam = "$type $name APIAuthResponse:";
 
   Log3 $name, 1, "\ndebug $iam \n\$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}" if ( AttrVal($name, 'debug', '') );
@@ -724,7 +691,8 @@ sub APIAuthResponse {
         readingsBulkUpdateIfChanged($hash,'mower_commandStatus', 'cleared');
       readingsEndUpdate($hash, 1);
 
-      getMower( $hash );
+      RemoveInternalTimer( $hash, \&getMower );
+      InternalTimer( gettimeofday() + 1.5, \&getMower, $hash, 0 );
       return undef;
     }
 
@@ -736,7 +704,8 @@ sub APIAuthResponse {
   }
 
   RemoveInternalTimer( $hash, \&APIAuth );
-  InternalTimer( gettimeofday() + $interval, \&APIAuth, $hash, 0 );
+  InternalTimer( gettimeofday() + $hash->{helper}{retry_interval_apiauth}, \&APIAuth, $hash, 0 );
+  Log3 $name, 1, "$iam failed retry in $hash->{helper}{retry_interval_apiauth} seconds.";
   return undef;
 
 }
@@ -785,7 +754,7 @@ sub getMowerResponse {
   my $iam = "$type $name getMowerResponse:";
   my $mowerNumber = $hash->{helper}{mowerNumber};
   
-  Log3 $name, 1, "\ndebug $iam \n\$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}" if ( AttrVal($name, 'debug', '') );
+  Log3 $name, 1, "debug $iam \$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}" if ( AttrVal($name, 'debug', '') );
   
   if( !$err && $statuscode == 200 && $data) {
     
@@ -820,20 +789,20 @@ sub getMowerResponse {
         }
         Log3 $name, 5, "$iam found $foundMower ";
 
-        if ( defined ($hash->{helper}{mower}{id}) ) { # update dataset
+        if ( defined ($hash->{helper}{mower}{id}) && $hash->{helper}{midnightCycle} ) { # update dataset
 
           $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp};
           $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mower}{attributes}{mower}{activity};
           $hash->{helper}{mowerold}{attributes}{statistics}{numberOfCollisions} = $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions};
 
-        } else { # first data set
+        } elsif ( !defined ($hash->{helper}{mower}{id}) ) { # first data set
 
           $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{metadata}{statusTimestamp};
           $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{mower}{activity};
           $hash->{helper}{mowerold}{attributes}{statistics}{numberOfCollisions} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{statistics}{numberOfCollisions};
 
           if ( AttrVal( $name, 'mapImageCoordinatesToRegister', '' ) eq '' ) {
-            ::FHEM::Devices::AMConnect::Common::posMinMax( $hash, $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions} );
+            posMinMax( $hash, $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions} );
           }
 
         }
@@ -845,41 +814,52 @@ sub getMowerResponse {
 
         $hash->{helper}{storediff} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
 
-        ::FHEM::Devices::AMConnect::Common::calculateStatistics($hash);
+        calculateStatistics($hash) if ( $hash->{helper}{midnightCycle} );
 
         # Update readings
         readingsBeginUpdate($hash);
 
           readingsBulkUpdateIfChanged($hash, 'api_MowerFound', $foundMower );
-          ::FHEM::Devices::AMConnect::Common::fillReadings( $hash );
+          fillReadings( $hash );
+          readingsBulkUpdate($hash, 'device_state', 'connected' );
 
         readingsEndUpdate($hash, 1);
 
-        readingsSingleUpdate($hash, 'device_state', 'connected', 1 );
 
         # schedule new access token
-        RemoveInternalTimer( $hash, \&APIAuth );
-        InternalTimer( ReadingsVal($name, '.expires', 600)-37, \&APIAuth, $hash, 0 );
+        RemoveInternalTimer( $hash, \&getNewAccessToken );
+        InternalTimer( ReadingsVal($name, '.expires', 600)-37, \&getNewAccessToken, $hash, 0 );
 
         # Websocket initialisieren, schedule ping, reopen
         RemoveInternalTimer( $hash, \&wsReopen );
         InternalTimer( gettimeofday() + 1.5, \&wsReopen, $hash, 0 );
+        $hash->{helper}{midnightCycle} = 0;
 
         return undef;
 
       }
+
     }
     
   } else {
 
     readingsSingleUpdate( $hash, 'device_state', "error statuscode $statuscode", 1 );
-    Log3 $name, 1, "\ndebug $iam \n\$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}";
+    Log3 $name, 1, "$iam \$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}";
 
   }
+
   RemoveInternalTimer( $hash, \&APIAuth );
-  InternalTimer( gettimeofday() + $hash->{helper}{interval}, \&APIAuth, $hash, 0 );
+  InternalTimer( gettimeofday() + $hash->{helper}{retry_interval_getmower}, \&APIAuth, $hash, 0 );
+  Log3 $name, 1, "$iam failed retry in $hash->{helper}{retry_interval_getmower} seconds.";
   return undef;
 
+}
+
+#########################
+sub getNewAccessToken {
+  my ($hash) = @_;
+  $hash->{helper}{midnightCycle} = 1;
+  APIAuth( $hash );
 }
 
 ##############################################################
@@ -895,7 +875,7 @@ sub CMD {
   my $iam = "$type $name CMD:";
   $hash->{helper}{mower_commandSend} = $cmd[ 0 ] . ' ' . ( $cmd[ 1 ] ? $cmd[ 1 ] : '' );
 
-  if ( IsDisabled($name) ) {
+  if ( IsDisabled( $name ) ) {
 
     Log3 $name, 3, "$iam disabled"; 
     return undef 
@@ -1014,15 +994,17 @@ sub CMDResponse {
 sub Set {
   my ($hash,@val) = @_;
   my $type = $hash->{TYPE};
-
-  return "$type $hash->{NAME} Set: needs at least one argument" if ( @val < 2 );
-
-  my ($name,$setName,$setVal,$setVal2,$setVal3) = @val;
+  my $name = $hash->{NAME};
   my $iam = "$type $name Set:";
+
+  return "$iam: needs at least one argument" if ( @val < 2 );
+  return "Unknown argument, $iam is disabled, choose one of none:noArg" if ( IsDisabled( $name ) );
+
+  my ($pname,$setName,$setVal,$setVal2,$setVal3) = @val;
 
   Log3 $name, 4, "$iam called with $setName " . ($setVal ? $setVal : "") if ($setName !~ /^(\?|client_secret)$/);
 
-  if ( !IsDisabled($name) && $setName eq 'getUpdate' ) {
+  if ( !$hash->{helper}{midnightCycle} && $setName eq 'getUpdate' ) {
 
     RemoveInternalTimer($hash, \&APIAuth);
     APIAuth($hash);
@@ -1090,7 +1072,7 @@ sub Set {
       return undef;
     }
 
-  } elsif ( !IsDisabled($name) && $setName eq 'getNewAccessToken' ) {
+  } elsif ( $setName eq 'getNewAccessToken' ) {
 
     readingsBeginUpdate($hash);
       readingsBulkUpdateIfChanged( $hash, '.access_token', '', 0 );
@@ -1126,10 +1108,16 @@ sub Attr {
   if( $attrName eq "disable" ) {
     if( $cmd eq "set" and $attrVal eq "1" ) {
 
+      readingsSingleUpdate( $hash,'device_state','disabled',1);
+      RemoveInternalTimer( $hash );
+      DevIo_CloseDev( $hash ) if ( DevIo_IsOpen( $hash ) );
+      DevIo_setStates( $hash, "closed" );
       Log3 $name, 3, "$iam $cmd $attrName disabled";
 
     } elsif( $cmd eq "del" or $cmd eq 'set' and !$attrVal ) {
 
+      RemoveInternalTimer( $hash, \&APIAuth);
+      InternalTimer( gettimeofday() + 1, \&APIAuth, $hash, 0 );
       Log3 $name, 3, "$iam $cmd $attrName enabled";
 
     }
@@ -1183,8 +1171,8 @@ sub Attr {
   ##########
   } elsif ( $attrName eq 'numberOfWayPointsToDisplay' ) {
     
-    my $icurr = @{$hash->{helper}{areapos}};
-    if( $cmd eq "set" && $attrVal =~ /\d+/ && $attrVal > $hash->{helper}{MOWING}{maxLengthDefault}) {
+    my $icurr = scalar @{$hash->{helper}{areapos}};
+    if( $cmd eq "set" && $attrVal =~ /\d+/ && $attrVal > 100 ) {
 
       # reduce array
       $hash->{helper}{MOWING}{maxLength} = $attrVal;
@@ -1648,7 +1636,7 @@ sub RemoveExtension {
 sub GetMap() {
   my ($request) = @_;
 
-  if ( $request =~ /^\/(AutomowerConnectDevice|AutomowerConnect)\/(\w+)\/map/ ) {
+  if ( $request =~ /^\/(AutomowerConnect)\/(\w+)\/map/ ) {
 
     my $type   = $1;
     my $name   = $2;
@@ -1660,9 +1648,27 @@ sub GetMap() {
     return ( $mapMime, $mapData );
 
   }
-  return ( "text/plain; charset=utf-8", "No AutomowerConnect(Device) device for webhook $request" );
+  return ( "text/plain; charset=utf-8", "No AutomowerConnect device for webhook $request" );
 
 }
+
+#########################
+# sub GetJson() {
+  # my ($request) = @_;
+
+  # if ( $request =~ /^\/(AutomowerConnect)\/(\w+)\/json/ ) {
+
+    # my $type   = $1;
+    # my $name   = $2;
+    # my $hash = $::defs{$name};
+    # my $jsonMime = "application/json";
+    # my $jsonData = eval { encode_json ( $hash->{helper}{areapos} ) };
+    # return ( $jsonMime, $jsonData );
+
+  # }
+  # return ( "text/plain; charset=utf-8", "No AutomowerConnect device for webhook $request" );
+
+# }
 
 #########################
 sub readMap {
@@ -1737,57 +1743,56 @@ sub fillReadings {
   my ( $hash ) = @_;
   my $name = $hash->{NAME};
 
-  readingsBulkUpdateIfChanged($hash, '.mower_id', $hash->{helper}{mower}{id}, 0 ); 
-  readingsBulkUpdateIfChanged($hash, "batteryPercent", $hash->{helper}{mower}{attributes}{battery}{batteryPercent} ); 
+  readingsBulkUpdateIfChanged( $hash, '.mower_id', $hash->{helper}{mower}{id}, 0 ); 
+  readingsBulkUpdateIfChanged( $hash, "batteryPercent", $hash->{helper}{mower}{attributes}{battery}{batteryPercent} ); 
   my $pref = 'mower';
-  readingsBulkUpdateIfChanged($hash, $pref.'_mode', $hash->{helper}{mower}{attributes}{$pref}{mode} );
-  readingsBulkUpdateIfChanged($hash, $pref.'_activity', $hash->{helper}{mower}{attributes}{$pref}{activity} );
-  readingsBulkUpdateIfChanged($hash, $pref.'_state', $hash->{helper}{mower}{attributes}{$pref}{state} );
-  readingsBulkUpdateIfChanged($hash, $pref.'_commandStatus', 'cleared' );
-  readingsBulkUpdateIfChanged($hash, $pref.'_commandSend', ( $hash->{helper}{mower_commandSend} ? $hash->{helper}{mower_commandSend} : '-' ) );
-  readingsBulkUpdateIfChanged($hash, $pref.'_wsEvent', $hash->{helper}{wsResult}{type} );
+  readingsBulkUpdateIfChanged( $hash, $pref.'_mode', $hash->{helper}{mower}{attributes}{$pref}{mode} );
+  readingsBulkUpdateIfChanged( $hash, $pref.'_activity', $hash->{helper}{mower}{attributes}{$pref}{activity} );
+  readingsBulkUpdateIfChanged( $hash, $pref.'_state', $hash->{helper}{mower}{attributes}{$pref}{state} );
+  readingsBulkUpdateIfChanged( $hash, $pref.'_commandStatus', 'cleared' );
+  readingsBulkUpdateIfChanged( $hash, $pref.'_commandSend', ( $hash->{helper}{mower_commandSend} ? $hash->{helper}{mower_commandSend} : '-' ) );
 
   if ( AttrVal($name, 'mapZones', 0) && $hash->{helper}{currentZone} && $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{curZoneCnt} ) {
     my $curZon = $hash->{helper}{currentZone};
     my $curZonCnt = $hash->{helper}{mapZones}{$curZon}{curZoneCnt};
-    readingsBulkUpdateIfChanged($hash, $pref.'_currentZone', $curZon . '(' . $curZonCnt . '/' . $hash->{helper}{newzonedatasets} . ')' );
+    readingsBulkUpdateIfChanged( $hash, $pref.'_currentZone', $curZon . '(' . $curZonCnt . '/' . $hash->{helper}{newzonedatasets} . ')' );
   }
 
   my $tstamp = $hash->{helper}{mower}{attributes}{$pref}{errorCodeTimestamp};
-  my $timestamp = FmtDateTimeGMT($tstamp/1000);
-  readingsBulkUpdateIfChanged($hash, $pref."_errorCodeTimestamp", $tstamp ? $timestamp : '-' );
+  my $timestamp = FmtDateTimeGMT( $tstamp/1000 );
+  readingsBulkUpdateIfChanged( $hash, $pref."_errorCodeTimestamp", $tstamp ? $timestamp : '-' );
 
   my $errc = $hash->{helper}{mower}{attributes}{$pref}{errorCode};
-  readingsBulkUpdateIfChanged($hash, $pref.'_errorCode', $tstamp ? $errc  : '-');
+  readingsBulkUpdateIfChanged( $hash, $pref.'_errorCode', $tstamp ? $errc  : '-');
 
   my $errd = $errortable->{$errc};
-  readingsBulkUpdateIfChanged($hash, $pref.'_errorDescription', $tstamp ? $errd : '-');
+  readingsBulkUpdateIfChanged( $hash, $pref.'_errorDescription', $tstamp ? $errd : '-');
 
   $pref = 'system';
-  readingsBulkUpdateIfChanged($hash, $pref."_name", $hash->{helper}{mower}{attributes}{$pref}{name} );
+  readingsBulkUpdateIfChanged( $hash, $pref."_name", $hash->{helper}{mower}{attributes}{$pref}{name} );
   my $model = $hash->{helper}{mower}{attributes}{$pref}{model};
   $model =~ s/AUTOMOWER./AM/;
   $hash->{MODEL} = $model if ( $model && $hash->{MODEL} ne $model );
   $pref = 'planner';
-  readingsBulkUpdateIfChanged($hash, "planner_restrictedReason", $hash->{helper}{mower}{attributes}{$pref}{restrictedReason} );
-  readingsBulkUpdateIfChanged($hash, "planner_overrideAction", $hash->{helper}{mower}{attributes}{$pref}{override}{action} );
+  readingsBulkUpdateIfChanged( $hash, "planner_restrictedReason", $hash->{helper}{mower}{attributes}{$pref}{restrictedReason} );
+  readingsBulkUpdateIfChanged( $hash, "planner_overrideAction", $hash->{helper}{mower}{attributes}{$pref}{override}{action} );
 
   $tstamp = $hash->{helper}{mower}{attributes}{$pref}{nextStartTimestamp};
-  $timestamp = FmtDateTimeGMT($tstamp/1000);
+  $timestamp = FmtDateTimeGMT( $tstamp/1000 );
   readingsBulkUpdateIfChanged($hash, "planner_nextStart", $tstamp ? $timestamp : '-' );
 
   $pref = 'statistics';
-  readingsBulkUpdateIfChanged($hash, $pref."_numberOfCollisions", '(' . $hash->{helper}{statistics}{lastDayCollisions} . '/' . $hash->{helper}{mower}{attributes}{$pref}{numberOfCollisions} . ')' );
-  readingsBulkUpdateIfChanged($hash, $pref."_newGeoDataSets", $hash->{helper}{newdatasets} );
+  readingsBulkUpdateIfChanged( $hash, $pref."_numberOfCollisions", '(' . $hash->{helper}{statistics}{lastDayCollisions} . '/' . $hash->{helper}{mower}{attributes}{$pref}{numberOfCollisions} . ')' );
+  readingsBulkUpdateIfChanged( $hash, $pref."_newGeoDataSets", $hash->{helper}{newdatasets} );
   $pref = 'settings';
-  readingsBulkUpdateIfChanged($hash, $pref."_headlight", $hash->{helper}{mower}{attributes}{$pref}{headlight}{mode} );
-  readingsBulkUpdateIfChanged($hash, $pref."_cuttingHeight", $hash->{helper}{mower}{attributes}{$pref}{cuttingHeight} );
+  readingsBulkUpdateIfChanged( $hash, $pref."_headlight", $hash->{helper}{mower}{attributes}{$pref}{headlight}{mode} );
+  readingsBulkUpdateIfChanged( $hash, $pref."_cuttingHeight", $hash->{helper}{mower}{attributes}{$pref}{cuttingHeight} );
   $pref = 'status';
   my $connected = $hash->{helper}{mower}{attributes}{metadata}{connected};
-  readingsBulkUpdateIfChanged($hash, $pref."_connected", ( $connected ? "CONNECTED($connected)"  : "OFFLINE($connected)") );
+  readingsBulkUpdateIfChanged( $hash, $pref."_connected", ( $connected ? "CONNECTED($connected)"  : "OFFLINE($connected)") );
 
-  readingsBulkUpdateIfChanged($hash, $pref."_Timestamp", FmtDateTime( $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp}/1000 )); # verschieben nach websocket fill
-  readingsBulkUpdateIfChanged($hash, $pref."_TimestampDiff", $hash->{helper}{storediff}/1000 );# verschieben nach websocket fill
+  readingsBulkUpdateIfChanged( $hash, $pref."_Timestamp", FmtDateTime( $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp}/1000 ) ); # verschieben nach websocket fill
+  readingsBulkUpdateIfChanged( $hash, $pref."_TimestampDiff", $hash->{helper}{storediff}/1000 );# verschieben nach websocket fill
 
   return undef;
 }
@@ -2207,8 +2212,8 @@ sub wsInit {
   $hash->{First_Read} = 1;
   RemoveInternalTimer( $hash, \&wsReopen );
   RemoveInternalTimer( $hash, \&wsKeepAlive );
-  InternalTimer( gettimeofday() + 7110, \&wsReopen, $hash, 0 );
-  InternalTimer( gettimeofday() + 60, \&wsKeepAlive, $hash, 0 );
+  InternalTimer( gettimeofday() + $hash->{helper}{interval_ws}, \&wsReopen, $hash, 0 );
+  InternalTimer( gettimeofday() + $hash->{helper}{interval_ping}, \&wsKeepAlive, $hash, 0 );
   return undef;
 
 }
@@ -2279,7 +2284,6 @@ sub wsRead {
           $hash->{helper}{mower}{attributes}{planner} = dclone( $result->{attributes}{planner} );
           $hash->{helper}{storediff} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
 
-          $hash->{helper}{detailFnNewPos} = 0;
           isErrorThanPrepare( $hash );
           resetLastErrorIfCorrected( $hash );
 
@@ -2307,7 +2311,6 @@ sub wsRead {
 
           }
 
-          $hash->{helper}{detailFnNewPos} = scalar @{ $result->{attributes}{positions} };
           FW_detailFn_Update ($hash);
 
         }
@@ -2324,6 +2327,7 @@ sub wsRead {
         readingsBeginUpdate($hash);
 
           fillReadings( $hash );
+          readingsBulkUpdate( $hash, 'mower_wsEvent', $hash->{helper}{wsResult}{type} );
 
         readingsEndUpdate($hash, 1);
 

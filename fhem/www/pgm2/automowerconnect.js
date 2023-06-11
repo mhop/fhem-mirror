@@ -4,7 +4,7 @@ FW_version["automowerconnect.js"] = "$Id$";
 function AutomowerConnectShowError( ctx, div, dev, picx, picy, errdesc, erray ) {
   // ERROR BANNER
   ctx.beginPath();
-  ctx.fillStyle = div.getAttribute( 'data-errorBackgroundColor' );;
+  ctx.fillStyle = div.getAttribute( 'data-errorBackgroundColor' );
   ctx.font = div.getAttribute( 'data-errorFont' );
   var m = ctx.measureText( errdesc[ 1 ] + ', ' + dev + ': ' + errdesc[ 0 ] ).width > picy - 6;
 
@@ -273,6 +273,9 @@ function AutomowerConnectTor ( x0, y0, x1, y1 ) {
 }
 //AutomowerConnectUpdateDetail (<devicename>, <type>, <detailfnfirst>, <imagesize x>, <imagesize y>,<scale x>, <error description>, <path array>, <error array>)
 function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, scalx, errdesc, pos, erray) {
+  //~ $.getJSON('./fhem/AutomowerConnect/am430x/json', function(data) {
+    //~ log(data[0].longitude+'  '+data[0].latitude+'  '+data[0].act);
+//~ });
   const colorat = {
     "U" : "otherActivityPath",
     "N" : "errorPath",
@@ -321,23 +324,6 @@ function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, sca
       
       const ctx = canvas.getContext( '2d' );
       ctx.clearRect( 0, 0, canvas.width, canvas.height );
-      const attrpath = div.getAttribute( 'data-mowingPath' );
-      var oldpath = "";
-
-      if ( attrpath ) {
-
-        oldpath = attrpath.split( "," );
-        pos.push( ...oldpath );
-
-        while ( pos.length > 5000 ) {
-
-          pos.pop();
-
-        }
-
-      }
-
-      div.setAttribute( 'data-mowingPath', pos.join( "," ) );
 
       if ( pos.length > 3 ) {
 
@@ -359,7 +345,7 @@ function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, sca
           ctx.lineWidth=3;
           ctx.strokeStyle = 'white';
           ctx.fillStyle= 'black';
-          ctx.arc(parseInt(pos[pos.length-3]), parseInt(pos[pos.length-2]), 4, 0, 2 * Math.PI, false);
+          ctx.arc( parseInt( pos[ pos.length-3 ] ), parseInt( pos[ pos.length-2 ] ), 4, 0, 2 * Math.PI, false );
           ctx.fill();
           ctx.stroke();
         }
