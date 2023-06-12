@@ -307,10 +307,14 @@ MQTT2_JSON($;$)
 }
 
 sub
-MQTT2_getCmdHash($)
+MQTT2_getCmdHash($$)
 {
-  my ($list) = @_;
+  my ($hash, $list) = @_;
   my (%h, @cmd);
+
+  $list = AnalyzePerlCommand($hash ? $hash->{CL} : undef, $1)
+        if($list =~ m/^{(.*)}/s);    #133903
+
   map { 
     my ($k,$v) = split(" ",$_,2);
     push @cmd, $k;
@@ -365,7 +369,7 @@ MQTT2_DEVICE_Get($@)
   return "Not enough arguments for get" if(!defined($a[1]));
   my $name = $hash->{NAME};
 
-  my ($gets,$cmdList) = MQTT2_getCmdHash(AttrVal($name, "getList", ""));
+  my ($gets,$cmdList) = MQTT2_getCmdHash($hash, AttrVal($name, "getList", ""));
   return "Unknown argument $a[1], choose one of $cmdList" if(!$gets->{$a[1]});
   return undef if(IsDisabled($name));
   Log3 $hash, 3, "MQTT2_DEVICE get ".join(" ", @a);
@@ -395,7 +399,7 @@ MQTT2_DEVICE_Set($@)
   return "Not enough arguments for set" if(!defined($a[1]));
   my $name = $hash->{NAME};
 
-  my ($sets,$cmdList) = MQTT2_getCmdHash(AttrVal($name, "setList", ""));
+  my ($sets,$cmdList) = MQTT2_getCmdHash($hash, AttrVal($name, "setList", ""));
   my $cmdName = $a[1];
   return MQTT2_DEVICE_addPos($hash,@a) if($cmdName eq "addPos"); # hidden cmd
   my $cmd = $sets->{$cmdName};
@@ -530,8 +534,8 @@ MQTT2_DEVICE_Attr($$)
   if($attrName eq "periodicCmd") {
     if($type eq "set") {
       if($init_done) {
-        my ($gets,undef) = MQTT2_getCmdHash(AttrVal($dev, "getList", ""));
-        my ($sets,undef) = MQTT2_getCmdHash(AttrVal($dev, "setList", ""));
+        my ($gets,undef) = MQTT2_getCmdHash($hash, AttrVal($dev,"getList",""));
+        my ($sets,undef) = MQTT2_getCmdHash($hash, AttrVal($dev,"setList",""));
         for my $np (split(" ", $param)) {
           return "$np ist not of the form cmd:period" if($np !~ m/(.*):(.*)/);
           return "$1 is neither a get nor a set command"
@@ -557,7 +561,7 @@ MQTT2_DEVICE_periodic()
   my $name = $hash->{NAME};
   my $param = AttrVal($name, "periodicCmd", "");
   return if(!$param);
-  my ($gets,undef) = MQTT2_getCmdHash(AttrVal($name, "getList", ""));
+  my ($gets,undef) = MQTT2_getCmdHash($hash, AttrVal($name, "getList", ""));
   my $cnt = ++$hash->{periodicCounter};
   for my $np (split(" ", $param)) {
     next if($np !~ m/(.*):(.*)/ || $cnt % int($2));
@@ -1129,6 +1133,9 @@ zigbee2mqtt_devStateIcon255($;$$)
           MQTT message will be sent.</li>
         <li>SetExtensions is activated</li>
         <li>if the topic name ends with :r, then the retain flag is set</li>
+        <li>if the whole argument is enclosed in {}, then it is evaluated as a
+          perl expression. The string returned will be interpreted as described
+          above.</li>
       </ul>
       </li><br>
 
