@@ -138,6 +138,9 @@
 #              cmd-ref: correct wiki links,  W3C conformance...
 #              error-msg on invalid set dpt1 cmd (on-till...)
 #              Attr anwerReading now deprecated - converted to putCmd - autosave will be deactivated during fhem-restart if a answerReading is converted - use save!
+# MH 292306xx  move KNX_scan Function to KNXIO-Module - update both KNXIO and KNX-Module !!!
+#              update cmd-ref
+#
 # todo         replace cascading if..elsif with given
 # todo-9/2023  final removal of attr answerReading conversion
 
@@ -455,9 +458,6 @@ sub Initialize {
 	$hash->{noAutocreatedFilelog} = 1; # autocreate devices create no FileLog
 	$hash->{AutoCreate} = {'KNX_.*'  => { ATTR => 'disable:1'} }; #autocreate devices are disabled by default
 
-	# register KNX_scan cmd (use from cmd-line)
-	$cmds{KNX_scan} = { Fn  => "KNX_scancmd", Hlp => '<devspec>,request values from KNX-Hardware. Use "help KNX" for more help',};
-
 	return;
 }
 
@@ -482,11 +482,11 @@ sub KNX_Define {
                q{[<group:model[:GAD-name][:set|get|listenonly][:nosuffix]>]"}) if (int(@a) < 3 || $a[2] !~ m/^(?:$PAT_GAD|$PAT_GAD_HEX)/ixms);
 
 	$hash->{'.DEFLINE'} = join(q{ },@a); # temp store defs for define2...
-	return InternalTimer(gettimeofday() + 5.0,\&KNX_Define2,$hash) if (! $init_done);
+	return InternalTimer(gettimeofday() + 3.0,\&KNX_Define2,$hash) if (! $init_done);
 	return KNX_Define2($hash);
 }
 
-### continue define 5 sec after init complete!
+### continue define after init complete
 sub KNX_Define2 {
 	my $hash = shift // return;
 
@@ -692,7 +692,7 @@ sub KNX_Get {
 	return;
 }
 
-#Does something according the given cmd...
+#send Value to bus
 #############################
 sub KNX_Set {
 	my ($hash, $name, $targetGadName, @arg) = @_;
@@ -1864,79 +1864,6 @@ sub KNX_Log {
 	return;
 }
 
-##############################################
-########## public utility functions ##########
-# when called from FHEM cmd-line
-sub main::KNX_scancmd {
-	my $cl = shift;
-	my $devs = shift;
-	$devs = 'TYPE=KNX' if (! defined($devs) || $devs eq q{}); # select all if nothing defined
-#	return main::KNX_scan($devs);
-	main::KNX_scan($devs);
-	return;
-}
-
-### get state of devices from KNX_Hardware
-# called with devspec as argument
-# e.g : KNX_scan() / KNX_scan('device1') / KNX_scan('device1, dev2,dev3,...' / KNX_scan('room=Kueche'), ...
-# returns number of "gets" executed
-sub main::KNX_scan {
-	my $devs = shift // 'TYPE=KNX'; # select all if nothing defined
-
-	if (! $init_done) { # avoid scan before init complete
-		Log3 (undef, 2,'KNX_scan command rejected during FHEM-startup!');
-		return 0;
-	}
-
-	my @devlist = devspec2array($devs);
-
-	my $i = 0; #counter devices
-	my $j = 0; #counter devices with get
-	my $k = 0; #counter total get's
-	my $getsarr = q{};
-
-	foreach my $knxdef (@devlist) {
-		next unless $knxdef;
-		next if($knxdef eq $devs && !$defs{$knxdef});
-		my $devhash = $defs{$knxdef};
-		next if ((! defined($devhash)) || ($devhash->{TYPE} ne 'KNX') || $devhash->{DEF} =~ /$MODELERR/ixms);
-
-		#check if IO-device is ready
-		my $iodev = $devhash->{IODev}->{NAME};
-		next if (! defined($iodev));
-		my $iostate = ReadingsVal($iodev,'state',q{});
-		next if ($iostate ne 'connected');
- 
-		$i++;
-		my $k0 = $k; #save previous number of get's
-		foreach my $key (keys %{$devhash->{GADDETAILS}}) {
-			last if (! defined($key));
-			my $option = $devhash->{GADDETAILS}->{$key}->{OPTION};
-			next if (defined($option) && $option =~ /(?:set|listenonly)/ixms);
-			$k++;
-			$getsarr .= $knxdef . q{ } . $key . q{,};
-		}
-		$j++ if ($k > $k0);
-	}
-	Log3 (undef, 3, qq{KNX_scan: $i devices selected (regex= $devs) / $j devices with get / $k "gets" executing...});
-	doKNX_scan($getsarr) if ($k > 0);
-	return $k;
-}
-
-### issue all get cmd's - each one delayed by InternalTimer
-sub doKNX_scan {
-	my ($devgad, $arr) = split(/,/xms,shift,2);
-
-	my ($name, $gadName) = split(/[\s]/xms,$devgad);
-	KNX_Get ($defs{$name}, $name, $gadName);
-
-	if (defined($arr) && $arr ne q{}) {
-		return InternalTimer(gettimeofday() + 0.2,\&doKNX_scan,$arr); # does not support array-> use string...
-	}
-	Log3 (undef, 3, q{KNX_scan: finished});
-	return;
-}
-
 
 1;
 
@@ -1993,96 +1920,111 @@ sub doKNX_scan {
 <a id="KNX"></a>
 <h3>KNX</h3>
 <ul><li><strong>Introduction</strong><br/>
-<p>KNX is a standard for building automation / home automation. It is mainly based on a twisted pair wiring, but also other mediums (ip, wireless) are specified.</p>
-<p>For getting started, please refer to this document: <a href="https://www.knx.org/knx-en/for-your-home/">KNX for your home</a> -  knx.org web-site.</p>
-<p>While the <a href="#TUL">TUL-module</a>, <a href="#KNXTUL">KNXTUL-module</a>, or <a href="#KNXIO">KNXIO-module</a> represent the connection to the KNX network, 
- the KNX module represent a individual KNX device. <br /> 
-This module provides a basic set of operations (on, off, toggle, on-until, on-for-timer) to switch on/off KNX devices and to send values to the bus.&nbsp;</p>
-<p>Sophisticated setups can be achieved by combining multiple KNX-groupaddresses:datapoints (GAD's:dpt's) in one KNX device instance.</p>
-<p>KNX defines a series of Datapoint Type as standard data types used to allow general interpretation of values of devices manufactured by different vendors.
- These datatypes are used to interpret the status of a device, so the readings in FHEM will show the correct value and optional unit.</p>
-<p>For each received telegram there will be a reading containing the received value and the sender address.<br /> 
-For every set, there will be a reading containing the sent value.<br /> 
+<p>KNX is a standard for building automation / home automation. It is mainly based on a twisted pair wiring, 
+but also other mediums (ip, wireless) are specified.</p>
+<p>For getting started, please refer to this document&colon; 
+<a href="https://www.knx.org/knx-en/for-your-home/">KNX for your home</a> -  knx.org web-site.</p>
+<p>While the <a href="#TUL">TUL-module</a>, <a href="#KNXTUL">KNXTUL-module</a>, 
+or <a href="#KNXIO">KNXIO-module</a> represent the connection to the KNX network, 
+ the KNX module represent a individual KNX device. <br/> 
+This module provides a basic set of operations (on, off, toggle, on-until, on-for-timer) to switch on/off KNX
+ devices and to send values to the bus.&nbsp;</p>
+<p>Sophisticated setups can be achieved by combining multiple KNX-groupaddresses&colon;datapoints (GAD's&colon;dpt's)
+ in one KNX device instance.</p>
+<p>KNX defines a series of Datapoint Type as standard data types used to allow general interpretation of values
+ of devices manufactured by different vendors.
+ These datatypes are used to interpret the status of a device, so the readings in FHEM will show the
+ correct value and optional unit.</p>
+<p>For each received telegram there will be a reading containing the received value and the sender address.<br/> 
+For every set, there will be a reading containing the sent value.<br/> 
 The reading &lt;state&gt; will be updated with the last sent or received value.&nbsp;</p>
-<p>A (german) wiki page is avaliable here: <a href="https://wiki.fhem.de/wiki/KNX">FHEM Wiki</a></p>
+<p>A (german) wiki page is avaliable here&colon; <a href="https://wiki.fhem.de/wiki/KNX">FHEM Wiki</a></p>
 </li>
 
 <li><a id="KNX-define"></a><strong>Define</strong><br/>
-<p><code>define &lt;name&gt; KNX &lt;group&gt;:&lt;dpt&gt;[:[&lt;gadName&gt;]:[set|get|listenonly]:[nosuffix]] [&lt;group&gt;:&lt;dpt&gt; ..] <del>[IODev]</del></code></p>
-<p><strong>Important:&nbsp;a KNX device needs at least one&nbsp;valid DPT.</strong> Please refer to <a href="#KNX-dpt">avaliable DPT</a>.
- Otherwise the system cannot en- or decode messages.<br />
-<strong>Devices defined by autocreate have to be reworked with the suitable dpt and the disable attribute deleted. Otherwise they won't do anything.</strong></p>
-
-<p>The &lt;group&gt; parameter is either a group name notation (0-31/0-7/0-255) or the hex representation of it ([00-1f][0-7][00-ff]) (5 digits). 
- All of the defined groups can be used for bus-communication. 
- It is not allowed to have the same group-address more then once in one device. You can have multiple devices containing the same group-adresses.<br /> 
-As described above the parameter &lt;DPT&gt; must contain the corresponding DPT - matching the dpt-spec of the KNX-Hardware.</p> 
-<p>The GAD's are per default named with "g&lt;number&gt;". The corresponding reading-names are getG&lt;number&gt; and setG&lt;number&gt;.<br /> 
-The optional parameteter &lt;gadName&gt; may contain an alias for the GAD. The following gadNames are <b>not allowed:</b> on, off, on-for-timer,
- on-until, off-for-timer, off-until, toggle, raw, rgb, string, value, set, get, listenonly, nosuffix -  because of conflict with cmds &amp; parameters.<br />
+<p><code>define &lt;name&gt; KNX &lt;group&gt;&colon;&lt;dpt&gt;[&colon;[&lt;gadName&gt;]&colon;[set|get|listenonly]&colon;[nosuffix]] [&lt;group&gt;&colon;&lt;dpt&gt; ..] <del>[IODev]</del></code></p>
+<p><strong>Important&colon; a KNX device needs at least one&nbsp;valid DPT.</strong> Please refer to <a href="#KNX-dpt">avaliable DPT</a>.
+ Otherwise the system cannot en- or decode messages.<br/>
+<strong>Devices defined by autocreate have to be reworked with the suitable dpt and the disable attribute deleted.
+ Otherwise they won't do anything.</strong></p>
+<p>The &lt;group&gt; parameter is either a group name notation (0-31/0-7/0-255) or the hex representation of it
+ ([00-1f][0-7][00-ff]) (5 digits).  All of the defined groups can be used for bus-communication. 
+ It is not allowed to have the same group-address more then once in one device. You can have multiple devices containing
+ the same group-adresses.<br/> 
+As described above the parameter &lt;dpt&gt; has to contain the corresponding DPT - matching the dpt-spec of the KNX-Hardware.</p> 
+<p>The gadNames are default named "g&lt;number&gt;". The corresponding reading-names are getG&lt;number&gt; 
+and setG&lt;number&gt;.<br/> 
+The optional parameteter &lt;gadName&gt; may contain an alias for the GAD. The following gadNames are <b>not allowed&colon;</b>
+ on, off, on-for-timer, on-until, off-for-timer, off-until, toggle, raw, rgb, string, value, set, get, listenonly, nosuffix
+ -  because of conflict with cmds &amp; parameters.<br/>
 If you supply &lt;gadName&gt; this name is used instead. The readings are &lt;gadName&gt;-get and &lt;gadName&gt;-set. 
 The synonyms &lt;getName&gt; and &lt;setName&gt; are used in this documentation.<br/>
 If you add the option "nosuffix", &lt;getName&gt; and &lt;setName&gt; have the identical name - only &lt;gadName&gt;.<br/>
-If you want to restrict the GAD, you can use the options "get", "set", or "listenonly".  The usage should be self-explanatory. It is not possible to combine the options.</p>
-<p><b>Specifying an IO-Device in define is now deprecated!</b> Use attribute <a href="#KNX-attr-IODev">IODev</a> instead, but only if absolutely required!</p>
-<p>The first group is used for sending by default. If you want to send to a different group, you have to address it. E.g: <code>set &lt;name&gt; &lt;gadName&gt; &lt;value&gt; </code>
+If you want to restrict the GAD, you can use the options "get", "set", or "listenonly".  The usage should be self-explanatory.
+ It is not possible to combine the options.</p>
+<p><b>Specifying an IO-Device in define is now deprecated!</b> Use attribute <a href="#KNX-attr-IODev">IODev</a> instead,
+ but only if absolutely required!</p>
+<p>The first group is used for sending by default. If you want to send to a different group, you have to address it.
+ E.g&colon; <code>set &lt;name&gt; &lt;gadName&gt; &lt;value&gt; </code>
  Without additional attributes, all incoming and outgoing messages are in addition copied into reading &lt;state&gt;.</p>
-<p>If enabled, the module <a href="#autocreate">autocreate</a> is creating a new definition for any unknown group-address. However, the new device will be disabled
- until you added a DPT to the definition and delete the <a href="#KNX-attr-disable">disable</a> attribute. The device name will be KNX_nnmmooo where nn is the line adress, mm the area and ooo the device.
- No FileLog or SVG definition is created for KNX-devices by autocreate. Use for example <code>define &lt;name&gt; FileLog &lt;filename&gt; KNX_.*</code> 
- to create a single FileLog-definition for all KNX-devices created by autocreate.<br />  
- Another option is to disable autocreate for KNX-devices in production environments (when no changes / additions are expected) by using&colon;
- <code>attr &lt;autocreate&gt; ignoreTypes KNX_.*</code><br/>
-Examples:</p>
+<p>If enabled, the module <a href="#autocreate">autocreate</a> is creating a new definition for any unknown group-address.
+ However, the new device will be disabled until you added a DPT to the definition and delete the
+ <a href="#KNX-attr-disable">disable</a> attribute. The device name will be KNX_nnmmooo where nn is the line adress,
+ mm the area and ooo the device.
+ No FileLog or SVG definition is created for KNX-devices by autocreate. Use for example 
+ <code>define &lt;name&gt; FileLog &lt;filename&gt; KNX_.*</code> to create a single FileLog-definition for all KNX-devices
+ created by autocreate.<br/>  
+ Another option is to disable autocreate for KNX-devices in production environments (when no changes / additions are expected)
+ by using&colon;<br/>
+ <code>attr &lt;autocreate&gt; ignoreTypes KNX_.*</code></p>
 <pre>
-<code>   define lamp1 KNX 0/10/11:dpt1</code>
-<code>   attr lamp1 webCmd on:off</code>
-<code>   attr lamp1 devStateIcon on:li_wht_on:off off:li_wht_off:on</code>
-<code> </code>
-<code>   define lamp2 KNX 0/10/12:dpt1:steuern:set 0/10/13:dpt1.001:status:listenonly</code>
-<code> </code>
-<code>   define lamp3 KNX 00A0D:dpt1.001</code>
-</pre>
+Examples&colon;
+<code>   define lamp1 KNX 0/10/11&colon;dpt1
+   attr lamp1 webCmd on&colon;off
+   attr lamp1 devStateIcon on&colon;li_wht_on&colon;off off&colon;li_wht_off&colon;on
+
+   define lamp2 KNX 0/10/12&colon;dpt1&colon;steuern&colon;set 0/10/13&colon;dpt1.001&colon;status&colon;listenonly
+
+   define lamp3 KNX 00A0D&colon;dpt1.001
+</code></pre>
 </li>
 
 <li><a id="KNX-set"></a><strong>Set</strong><br/>
-<p><code>set &lt;deviceName&gt; [&lt;gadName&gt;] &lt;on|off|toggle&gt;<br />
-  set &lt;deviceName&gt; [&lt;gadName&gt;] &lt;on-for-timer|off-for-timer&gt; &lt;on/off time in seconds&gt;<br />
-  set &lt;deviceName&gt; [&lt;gadName&gt;] &lt;on-until|off-until&gt; &lt;timespec&gt;<br />
-  set &lt;deviceName&gt; [&lt;gadName&gt;] &lt;value&gt;<br /></code></p>
-<p>Set sends the given value to the bus.<br /> If &lt;gadName&gt; is omitted, the first listed GAD of the device is used. 
- If the GAD is restricted in the definition with "get" or "listenonly", the set-command will be refused.<br /> 
+<p><code>set &lt;deviceName&gt; [&lt;gadName&gt;] &lt;on|off|toggle&gt;<br/>
+  set &lt;deviceName&gt; [&lt;gadName&gt;] &lt;on-for-timer|off-for-timer&gt; &lt;duration seconds&gt;<br/>
+  set &lt;deviceName&gt; [&lt;gadName&gt;] &lt;on-until|off-until&gt; &lt;timespec&gt;<br/>
+  set &lt;deviceName&gt; [&lt;gadName&gt;] &lt;value&gt;<br/></code></p>
+<p>Set sends the given value to the bus.<br/> If &lt;gadName&gt; is omitted, the first listed GAD of the device is used. 
+ If the GAD is restricted in the definition with "get" or "listenonly", the set-command will be refused.<br/> 
  For dpt1 and dpt1.001 valid values are on, off, toggle and blink. Also the timer-functions can be used.
- A running Timer-function will be canncelled if a new set cmd (on,off,on-for-,....) for this GAD is issued.  
- For all other DPT (dpt1.xxx) the min- and max-values can be used for en- and decoding alternatively to on/off.
- All other DPTs: allowed values or range of values are spedicified here: <a href="#KNX-dpt">KNX-dpt</a><br/> 
- After successful sending the value, it is stored in the readings &lt;setName&gt; and state.<br/>
-
-<a id="KNX-examples"></a>
-Examples:</p>
+ A running timer-function will be cancelled if a new set cmd (on,off,on-for-,....) for this GAD is issued.<br/>  
+ For all other dpt1.&lt;xxx&gt; the min- and max-values can be used for en- and decoding alternatively to on/off.<br/>
+ All DPTs&colon; allowed values or range of values are specified here&colon; <a href="#KNX-dpt">KNX-dpt</a><br/> 
+ After successful sending, the value is stored in readings &lt;setName&gt; and state.</p>
 <pre>
-<code>   set lamp2 on  # gadName omitted</code>
-<code>   set lamp2 off # gadName omitted</code>
-<code>   set lamp2 steuern on</code>
-<code>   set lamp2 steuern off</code>
-<code>   set lamp2 steuern on-for-timer 10 # seconds</code>
-<code>   set lamp2 steuern on-until 13:15:00</code>
-<code> </code>
-<code>   set lamp3 g1 off-until 13:15:00</code>
-<code>   set lamp3 g1 toogle    # lamp3 change state</code>
-<code>   set lamp3 g1 blink 2 4 # lamp3 on for 4 seconds, off for 4 seconds, 2 repeats</code>
-<code> </code>
-<code>   set myThermoDev g1 23.44</code>
-<code> </code>
-<code>   set myMessageDev g1 Hello World! # dpt16 def</code>
-</pre>
+Examples&colon;
+<code>   set lamp2 on  # gadName omitted
+   set lamp2 off # gadName omitted
+   set lamp2 steuern on
+   set lamp2 steuern off
+   set lamp2 steuern on-for-timer 10 # seconds
+   set lamp2 steuern on-until 13&colon;15&colon;00
+
+   set lamp3 g1 off-until 13&colon;15&colon;00
+   set lamp3 g1 toogle    # lamp3 change state
+   set lamp3 g1 blink 2 4 # lamp3 on for 4 seconds, off for 4 seconds, 2 repeats
+
+   set myThermoDev g1 23.44
+
+   set myMessageDev g1 Hello World! # dpt16 def
+</code></pre>
 <p>More complex examples can be found on the (german) <a href="https://wiki.fhem.de/wiki/KNX_Device_Definition_-_Beispiele">Wiki</a></p>
 </li>
 
 <li><a id="KNX-get"></a><strong>Get</strong><br/>
 <p>If you execute "get" for a KNX-Element the status will be requested from the device. The device has to be able to respond to a read -
- this might not be supported by the target device.<br /> 
-If the GAD is restricted in the definition with "set" or "listenonly", the execution will be refused.<br /> 
+ this might not be supported by the target KNX-device.<br/> 
+If the GAD is restricted in the definition with "set" or "listenonly", the execution will be refused.<br/> 
 The answer from the bus-device updates the readings &lt;getName&gt; and state.</p>
 </li>
 
@@ -2131,65 +2073,73 @@ The answer from the bus-device updates the readings &lt;getName&gt; and state.</
 -->
 <li><a id="KNX-attr-stateRegex"></a><b>stateRegex</b><br/>
   You can pass n pairs of regex-patterns and strings to replace, seperated by a space. 
-  A regex-pair is always in the format /&lt;readingName&gt;[:&lt;value&gt;]/[2nd part]/.
+  A regex-pair is always in the format /&lt;readingName&gt;[&colon;&lt;value&gt;]/[2nd part]/.
   The first part of the regex must exactly match the readingname, and optional (separated by a colon) the readingValue. 
   If first part match, the matching part will be replaced by the 2nd part of the regex.
   If the 2nd part is empty, the value is ignored and reading state will not get updated.  
-  The substitution is done every time, a reading is updated. You can use this function for converting, adding units, having more fun with icons, ...<br/>
+  The substitution is done every time, a reading is updated. You can use this function for converting, adding units,
+  having more fun with icons, ...<br/>
   This function has only an impact on the content of reading state. 
   It is executed directly after replacing the reading-names and processing "format" Attr, but before stateCmd.
 <br/></li>
 <li><a id="KNX-attr-stateCmd"></a><b>stateCmd</b><br/>
-  You can supply a perl-command for modifying state. This command is executed directly before updating the reading - so after renaming, format and regex. 
+  You can supply a perl-command for modifying state. This command is executed directly before updating the reading
+  - so after renaming, format and regex. 
   Please supply a valid perl command like using the attribute stateFormat.<br/>
-  Unlike stateFormat the stateCmd modifies also the content of the reading <b>state</b>, not only the hash-content for visualization.<br/>
-  You can access the device-hash ( e.g: $hash{IODev} ) in yr. perl-cmd. In addition the variables "$name", "$gadName" and "$state" are avaliable. 
-  A return value must be set and overrides reading state.
+  Unlike stateFormat the stateCmd modifies also the content of the reading <b>state</b>,
+  not only the hash-content for visualization.<br/>
+  You can access the device-hash ( e.g&colon; $hash{IODev} ) in yr. perl-cmd. In addition the variables
+  "$name", "$gadName" and "$state" are avaliable. A return value must be set and overrides reading state.
 <br/></li>
 <li><a id="KNX-attr-putCmd"></a><b>putCmd</b><br/>
   Every time a KNX-value is requested from the bus to FHEM, the content of putCmd is evaluated before the answer is sent. 
   You can use a perl-command for modifying content. 
   This command is executed directly before sending the data. A copy is stored in the reading &lt;putName&gt;.<br/>
   Each device only knows one putCmd, so you have to take care about the different GAD's in the perl string.<br/>
-  Like in stateCmd you can access the device hash ("$hash") in yr. perl-cmd. In addition the variables "$name", "$gadName" and "$state" are avaliable. 
-  On entry, "$state" contains the current value of reading "state". 
-  The return-value will be sent to KNX-bus. The value has to be in the allowed range for the corresponding dpt, else the send is rejected.
-  The reading "state" will NOT get updated!<br>
-  Examples:
-  <pre>
-  <code>   attr &lt;device&gt; putCmd {return $state if($gadName eq 'status');} </code> #returns value of reading state on request from bus for gadName "status".
-  <code>   attr &lt;device&gt; putCmd {return ReadingsVal('dummydev','state','error') if(...);}         </code> #returns value of device "dummydev" reading "state".
-  <code>   attr &lt;device&gt; putCmd {return (split(/[\s]/xms,TimeNow()))[1] if ($gadName eq 'time');} </code> #returns systemtime-stamp ...</pre>
+  Like in stateCmd you can access the device hash ("$hash") in yr. perl-cmd. In addition the variables 
+  "$name", "$gadName" and "$state" are avaliable. On entry, "$state" contains the current value of reading "state". 
+  The return-value will be sent to KNX-bus. The value has to be in the allowed range for the corresponding dpt,
+  else the send is rejected. The reading "state" will NOT get updated!
+<pre>
+Examples&colon;
+<code>   attr &lt;device&gt; putCmd {return $state if($gadName eq 'status');}  #returns value of reading state on request from bus for gadName "status".
+   attr &lt;device&gt; putCmd {return ReadingsVal('dummydev','state','error') if(...);}          #returns value of device "dummydev" reading "state".
+   attr &lt;device&gt; putCmd {return (split(/[\s]/xms,TimeNow()))[1] if ($gadName eq 'time');}  #returns systemtime-stamp ...
+</code></pre>
 </li>
 <li><a id="KNX-attr-format"></a><b>format</b><br/>
-  The content of this attribute is appended to every sent/received value before readings are set, it replaces the default unit-value! 
-  "format" will be appied to ALL readings, it is better to use the (more complex) "stateCmd" or "stateRegex" Attributes if you have more than one GAD in your device.
+  The content of this attribute is appended to every sent/received value before readings are set, 
+  it replaces the default unit-value! "format" will be appied to ALL readings, it is better to use the (more complex)
+  "stateCmd" or "stateRegex" Attributes if you have more than one GAD in your device.
 <br/></li>
 <li><a id="KNX-attr-disable"></a><b>disable</b><br/>
   Disable the device if set to <b>1</b>. No send/receive from bus and no set/get possible. Delete this attr to enable device again. 
   Deleting this attribute is prevented in case the definition contains errors!
-  <br/>As an aid for debugging, an additional INTERNAL: "RAWMSG" will show any message received from bus while the device is disabled.
+  <br/>As an aid for debugging, an additional INTERNAL&colon; "RAWMSG" will show any message received from bus while the device is disabled.
 <br/></li>
 <li><a id="KNX-attr-KNX_toggle"></a><b>KNX_toggle</b><br/>
   Lookup current value before issuing <code>set device &lt;gadName&gt; toggle</code> cmd.<br/> 
-  FHEM has to retrieve a current value to make the toggle-cmd acting correctly. This attribute can be used to define the source of the current value.<br/>
-  Format is: <b>&lt;devicename&gt;&colon;&lt;readingname&gt;</b>. If you want to use a reading from own device, you can use "$self" as devicename.
-  Be aware that only <b>on</b> and <b>off</b> are supported as valid values when defining device:readingname.<br/>
-  If this attribute is not defined, the current value will be taken from owndevice:readingName-get or, if readingName-get is not defined, 
-  the value will be taken from readingName-set.
+  FHEM has to retrieve a current value to make the toggle-cmd acting correctly. This attribute can be used to 
+  define the source of the current value.<br/>
+  Format is&colon; <b>&lt;devicename&gt;&colon;&lt;readingname&gt;</b>. If you want to use a reading from own device,
+  you can use "$self" as devicename. Be aware that only <b>on</b> and <b>off</b> are supported as valid values
+  when defining device&colon;readingname.<br/>
+  If this attribute is not defined, the current value will be taken from owndevice&colon;readingName-get or,
+  if readingName-get is not defined, the value will be taken from readingName-set.
 <br/></li>
 <li><a id="KNX-attr-IODev"></a><b>IODev</b><br/>
-  Due to changes in IO-Device handling, (default IO-Device will be stored in <b>reading IODev</b>), setting this Attribute is no longer required,  
-  except in cases where multiple IO-devices (of type TUL/KNXTUL/KNXIO) exist in your config. Defining more than one IO-device is <b>NOT recommended</b> 
-  unless you take special care with yr. knxd or KNX-router definitions - to prevent multiple path from KNX-Bus to FHEM resulting in message loops.
+  Due to changes in IO-Device handling, (default IO-Device will be stored in <b>reading IODev</b>), setting this Attribute
+  is no longer required, except in cases where multiple IO-devices (of type TUL/KNXTUL/KNXIO) exist in your config.
+  Defining more than one IO-device is <b>NOT recommended</b> unless you take special care with yr. knxd or KNX-router definitions
+  - to prevent multiple path from KNX-Bus to FHEM resulting in message loops.
 <br/></li>
 <li><a id="KNX-attr-widgetOverride"></a><b>widgetOverride</b><br/>
-  This is a standard FHEMWEB-attribute, the recommendation for use in KNX-module is to specify the following form:
+  This is a standard FHEMWEB-attribute, the recommendation for use in KNX-module is to specify the following form&colon;
   <b>&lt;gadName&gt;@set&colon;&lt;widgetName,parameter&gt;</b> This avoids overwriting the GET pulldown in FHEMWEB detail page.
   For details, pls see <a href="#FHEMWEB-attr-widgetOverride">FHEMWEB-attribute</a>.
 <br/></li>
 <li><a id="KNX-attr-answerReading"></a><b>answerReading</b><br/>
-  This attr is deprecated. It will be converted to equivalent function using attr putCmd:<br/>
+  This attr is deprecated. It will be converted to equivalent function using attr putCmd&colon;<br/>
   <code>   attr &lt;device&gt; putCmd {return $state;}</code> 
 <br/></li>
 </ul>
@@ -2322,30 +2272,30 @@ The result of the "get" cmd  will be stored in the respective readings.
 The command is supported <b>only</b> if the IO-device is of TYPE KNXIO!
 <br/>Useful after a fhem-start to syncronize the readings with the status of the KNX-device.
 <br/>The "get" cmds are scheduled asynchronous, with a delay of 200ms between each get. (avoid overloading KNX-bus) 
-If called as perl-function, returns number of "get" cmds issued.<br/>
-Examples:
+If called as perl-function, returns number of "get" cmds issued.
 <pre>
-<code>syntax when used as perl-function (eg. in at, notify,...)</code>
-<code>   KNX_scan()                    - scan all possible devices</code>
-<code>   KNX_scan('dev-A')             - scan device-A only</code>
-<code>   KNX_scan('dev-A,dev-B,dev-C') - scan device-A, device-B, device-C</code>
-<code>   KNX_scan('room=Kueche')       - scan all KNX-devices in room Kueche</code>
-<code>   KNX_scan('EG_.*')             - scan all KNX-devices where device-names begin with EG_</code> 
-<code>syntax when used from FHEM-cmdline</code>
-<code>   KNX_scan                      - scan all possible devices</code>
-<code>   KNX_scan dev-A                - scan device-A only</code>
-<code>   KNX_scan dev-A,dev-B,dev-C    - scan device-A, device-B, device-C</code>
-<code>   KNX_scan room=Kueche          - scan all KNX-devices in room Kueche</code>
-<code>   KNX_scan EG_.*                - scan all KNX-devices where device-names begin with EG_</code>
-</pre>
-When using KNX_scan or any 'set or get &lt;KNX-device&gt; ...' in a global:INITIALIZED notify, pls. ensure to have some delay in processing the cmd's by using <b>fhem sleep</b>.
-<br/>Example:<br/>
-<code>&nbsp;&nbsp;&nbsp;defmod initialized_nf notify global:INITIALIZED sleep 10 quiet;; set KNX_date now;; set KNX_time now;;</code><br/>
-This avoids sending requests while the KNX-Gateway has not finished its initial handshake-procedure with FHEM (the KNX-IO-device).<br/>
-<br/>If you are using <b>KNXIO-module</b> as IO-device for your KNX-devices, a better solution is available:<br/>
-<code>&nbsp;&nbsp;&nbsp;defmod initializedKNXIO_nf notify &lt;KNXIO-deviceName&gt;:INITIALIZED set KNX_date now;; set KNX_time now;; KNX_scan;;</code><br>
+Examples&colon;
+<code>syntax when used as perl-function (eg. in at, notify,...)
+   KNX_scan()                    - scan all possible devices
+   KNX_scan('dev-A')             - scan device-A only
+   KNX_scan('dev-A,dev-B,dev-C') - scan device-A, device-B, device-C
+   KNX_scan('room=Kueche')       - scan all KNX-devices in room Kueche
+   KNX_scan('EG_.*')             - scan all KNX-devices where device-names begin with EG_
+syntax when used from FHEM-cmdline
+   KNX_scan                      - scan all possible devices
+   KNX_scan dev-A                - scan device-A only
+   KNX_scan dev-A,dev-B,dev-C    - scan device-A, device-B, device-C
+   KNX_scan room=Kueche          - scan all KNX-devices in room Kueche
+   KNX_scan EG_.*                - scan all KNX-devices where device-names begin with EG_
+</code></pre>
+Do <b>not</b> use KNX_scan or any 'set or get &lt;KNX-device&gt; ...' in a global&colon;INITIALIZED notify, the IO-device will not be 
+ ready for communication at that time!
+<br/>
+A better solution is available&colon;<br/>
+<code>&nbsp;&nbsp;&nbsp;defmod initializedKNXIO_nf notify &lt;KNXIO-deviceName&gt;&colon;INITIALIZED set KNX_date now;; set KNX_time now;; KNX_scan;;</code><br>
 This event is triggered 30 seconds after FHEM init complete <b>and</b> the KNXIO-device status is "connected".
-<br/></li>
+<br/><br/>See also <a href="#KNXIO-attr">help KNXIO</a> how to start KNX_scan by using KNXIO-Attribute enableKNXscan, without using any notify,doif,... 
+</li>
 </ul>
 </li>
 </ul>
