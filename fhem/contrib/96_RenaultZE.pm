@@ -38,6 +38,7 @@
 
 ############################################################################################################################
 # Version History
+# v 1.09 fixed problem with readingsBulkUpdate/readingsSingleUpdate in lines 1002ff
 # v 1.08 new KAMERON API key
 # v 1.07 adjusting to new output  format from charges
 # v 1.06 logging "well known error" Failed to forward request to remote service only at log level 5
@@ -100,7 +101,7 @@ use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
 
-my $RenaultZE_version ="V1.08 / 19.04.2023";
+my $RenaultZE_version ="V1.09 / 15.06.2023";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -997,17 +998,21 @@ sub RenaultZE_gData_Step2($)
 
     ### cockpit ###
     if($data =~ /totalMileage/) {
-       readingsSingleUpdate($hash,"totalMileageKm",$decode_json->{data}->{attributes}->{totalMileage},1);
+       readingsBeginUpdate($hash);
+       readingsBulkUpdate($hash,"totalMileageKm",$decode_json->{data}->{attributes}->{totalMileage});
        readingsBulkUpdate($hash,"fuelAutonomy",$decode_json->{data}->{attributes}->{fuelAutonomy})			if ($decode_json->{data}->{attributes}->{fuelAutonomy} gt 0);
        readingsBulkUpdate($hash,"fuelQuantity",$decode_json->{data}->{attributes}->{fuelQuantity})			if ($decode_json->{data}->{attributes}->{fuelQuantity} gt 0);
+       readingsEndUpdate($hash, 1 );
        return 0;
     }
 
     ### hvac-status ###
     if($data =~ /hvacStatus/) {
-       readingsSingleUpdate($hash,"hvacStatus",$decode_json->{data}->{attributes}->{hvacStatus},1);
+       readingsBeginUpdate($hash);
+       readingsBulkUpdate($hash,"hvacStatus",$decode_json->{data}->{attributes}->{hvacStatus});
        readingsBulkUpdate($hash,"socThreshold",$decode_json->{data}->{attributes}->{socThreshold})			if ($decode_json->{data}->{attributes}->{socThreshold} gt 0);
        readingsBulkUpdate($hash,"xternalTemperature",$decode_json->{data}->{attributes}->{xternalTemperature})		if ($decode_json->{data}->{attributes}->{xternalTemperature} gt 0);
+       readingsEndUpdate($hash, 1 );
        return 0;
     }
 
