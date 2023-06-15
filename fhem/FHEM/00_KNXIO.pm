@@ -53,6 +53,10 @@
 # 15/05/2023 new "<device>:INITIALIZED" event after sucessful start
 #            change (shorten) timeout parameters on disconnect
 #            cmd-ref: correct wiki links, W3C conformance
+# xx/06/2023 move cmd KNX_scan from KNX- to KNXIO-Module
+#            extra delay on KNX_scan after each 10th request
+#            new attr enableKNXscan - trigger KNX_scan on startup and/or on every connect
+#            update cmd-ref
 
 
 package KNXIO; ## no critic 'package'
@@ -86,18 +90,18 @@ BEGIN {
     GP_Import(
         qw(readingsSingleUpdate readingsBulkUpdate readingsBulkUpdateIfChanged readingsBeginUpdate readingsEndUpdate
           Log3
-          AttrVal ReadingsVal ReadingsNum setReadingsVal
+          AttrVal AttrNum ReadingsVal ReadingsNum
           AssignIoPort IOWrite
           CommandDefine CommandDelete CommandModify CommandDefMod
           DoTrigger
           Dispatch
-          defs modules attr
+          defs modules attr cmds
           readingFnAttributes
           selectlist readyfnlist 
           InternalTimer RemoveInternalTimer
           init_done
           IsDisabled IsDummy IsDevice
-          deviceEvents devspec2array
+          devspec2array
           AnalyzePerlCommand EvalSpecials
           TimeNow)
     );
@@ -108,6 +112,7 @@ GP_Export(qw(Initialize ) );
 
 #####################################
 # global vars/constants
+my $MODELERR = 'MODEL_NOT_DEFINED';
 my $PAT_IP   = '[\d]{1,3}(\.[\d]{1,3}){3}';
 my $PAT_PORT = '[\d]{4,5}';
 my $KNXID    = 'C';
@@ -126,9 +131,13 @@ sub Initialize {
 	$hash->{UndefFn}    = \&KNXIO_Undef;
 	$hash->{ShutdownFn} = \&KNXIO_Shutdown;
 
-	$hash->{AttrList}   = 'disable:1 verbose:1,2,3,4,5';
+	$hash->{AttrList}   = 'disable:1 verbose:1,2,3,4,5 enableKNXscan:0,1,2';
 	$hash->{Clients}    = 'KNX';
 	$hash->{MatchList}  = { '1:KNX' => '^C.*' };
+
+	# register KNX_scan cmd (use from cmd-line)
+	$cmds{KNX_scan} = { Fn  => 'KNX_scancmd', Hlp => '[<devspec>] request values from KNX-Hardware. Use "help KNX" for more help'};
+
 	return;
 }
 
@@ -214,7 +223,6 @@ sub KNXIO_Define {
 	KNXIO_Log ($name, 3, qq{opening mode=$mode});
 
 	if (! $init_done) {
-		InternalTimer(gettimeofday() + 30.0,\&KNXIO_initcomplete,$hash); # provide INIIALIZED EVENT
 		return InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDev,$hash);
 	}
 	return KNXIO_openDev($hash);
@@ -230,6 +238,9 @@ sub KNXIO_Attr {
 		} else {
 			InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDev,$hash);
 		}
+	}
+	elsif ($cmd eq 'set' && $aName eq 'enableKNXscan' && defined($aVal) && $aVal !~ /[0-2]/xms) {
+		return 'Allowed values: 0-2';
 	}
 	return;
 }
@@ -444,8 +455,8 @@ sub KNXIO_ReadH {
 			}
 			my $phyaddr = unpack('x18n',$buf);
 			$hash->{PhyAddr} = KNXIO_addr2hex($phyaddr,2); # correct Phyaddr.
-#			DoTrigger($name, 'CONNECTED');
-			readingsSingleUpdate($hash, 'state', 'connected', 1);
+
+			KNXIO_handleConn($hash);
 			KNXIO_Log ($name, 3, q{connected});
 			$hash->{KNXIOhelper}->{SEQUENCECNTR} = 0;
 			return InternalTimer(gettimeofday() + 60, \&KNXIO_keepAlive, $hash); # start keepalive
@@ -688,71 +699,76 @@ sub KNXIO_openDev {
 
 	my $reopen = (exists($hash->{NEXT_OPEN}))?1:0;
 	my $param = $hash->{DeviceName}; # ip:port or UNIX:STREAM:<socket param>
-	my ($host, $port) = split(/[:]/ixms,$param);
+	my ($host, $port, $spath) = split(/[:]/ixms,$param);
+#	my ($host, $port) = split(/[:]/ixms,$param);
 
 	KNXIO_Log ($name, 5, qq{$mode , $host , $port , reopen= $reopen});
 
 	my $ret = undef; # result
 
-	### multicast support via TcpServerUtils ...
-	if ($mode eq 'M') {
-		delete $hash->{TCPDev}; # devio ?
-		$ret = ::TcpServer_Open($hash, $port, $host, 1);
-		if (defined($ret)) { # error
-			KNXIO_Log ($name, 2, qq{can't connect: $ret}) if(!$reopen); 
-			return qq{KNXIO_openDev ($name): can't connect: $ret};
-		} 
-		$ret = ::TcpServer_MCastAdd($hash,$host);
-		if (defined($ret)) { # error
-			KNXIO_Log ($name, 2, qq{MC add failed: $ret}) if(!$reopen);
-			return qq{KNXIO_openDev ($name):  MC add failed: $ret};
+	given ($mode) {
+		### multicast support via TcpServerUtils ...
+		when ('M') {
+			delete $hash->{TCPDev}; # devio ?
+			$ret = ::TcpServer_Open($hash, $port, $host, 1);
+			if (defined($ret)) { # error
+				KNXIO_Log ($name, 2, qq{can't connect: $ret}) if(!$reopen); 
+				return qq{KNXIO_openDev ($name): can't connect: $ret};
+			} 
+			$ret = ::TcpServer_MCastAdd($hash,$host);
+			if (defined($ret)) { # error
+				KNXIO_Log ($name, 2, qq{MC add failed: $ret}) if(!$reopen);
+				return qq{KNXIO_openDev ($name):  MC add failed: $ret};
+			}
+
+			::TcpServer_SetLoopbackMode($hash,0); # disable loopback
+
+			delete $hash->{NEXT_OPEN};
+			delete $readyfnlist{"$name.$param"};
+			$ret = KNXIO_init($hash);
 		}
 
-		::TcpServer_SetLoopbackMode($hash,0); # disable loopback
-
-		delete $hash->{NEXT_OPEN};
-		delete $readyfnlist{"$name.$param"};
-		$ret = KNXIO_init($hash);
-	}
-
-	### socket mode
-	elsif ($mode eq 'S') {
-		$host = (split(/[:]/ixms,$param))[2]; # UNIX:STREAM:<socket path>
-		if (!(-S -r -w $host) && $init_done) {
-			KNXIO_Log ($name, 2, q{Socket not available - (knxd running?)});
-			return qq{KNXIO_openDev ($name): Socket not available - (knxd running?)};
+		### socket mode
+		when ('S') {
+#			$host = (split(/[:]/ixms,$param))[2]; # UNIX:STREAM:<socket path>
+			if (!(-S -r -w $spath) ) {
+#			if (!(-S -r -w $host) && $init_done) {
+				KNXIO_Log ($name, 2, q{Socket not available - (knxd running?)});
+				return qq{KNXIO_openDev ($name): Socket not available - (knxd running?)};
+			}
+			$ret = ::DevIo_OpenDev($hash,$reopen,\&KNXIO_init); # no callback
 		}
-		$ret = ::DevIo_OpenDev($hash,$reopen,\&KNXIO_init); # no callback
-	}
 
-	### host udp
-	elsif ($mode eq 'H') {
-		my $conn = 0;
-		$conn = IO::Socket::INET->new(PeerAddr => "$host:$port", Type => SOCK_DGRAM, Proto => 'udp', Reuse => 1);
-		if (!($conn)) {
-			KNXIO_Log ($name, 2, qq{can't connect: $ERRNO}) if(!$reopen);
-			$readyfnlist{"$name.$param"} = $hash;
-			readingsSingleUpdate($hash, 'state', 'disconnected', 1);
-			$hash->{NEXT_OPEN} = gettimeofday() + $reconnectTO;
-			return;
+		### host udp
+		when ('H') {
+			my $conn = 0;
+			$conn = IO::Socket::INET->new(PeerAddr => "$host:$port", Type => SOCK_DGRAM, Proto => 'udp', Reuse => 1);
+			if (!($conn)) {
+				KNXIO_Log ($name, 2, qq{can't connect: $ERRNO}) if(!$reopen);
+				$readyfnlist{"$name.$param"} = $hash;
+				readingsSingleUpdate($hash, 'state', 'disconnected', 1);
+				$hash->{NEXT_OPEN} = gettimeofday() + $reconnectTO;
+				return;
+			}
+			delete $hash->{NEXT_OPEN};
+			delete $hash->{DevIoJustClosed}; # DevIo
+			$conn->setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1);
+			$hash->{TCPDev} = $conn;
+			$hash->{FD} = $conn->fileno();
+			delete $readyfnlist{"$name.$param"};
+			$selectlist{"$name.$param"} = $hash;
+
+#			my $retxt = ($reopen)?'reappeared':'opened';
+			KNXIO_Log ($name, 3, ($reopen)?'reappeared':'opened');
+#			KNXIO_Log ($name, 3, qq{$retxt});
+			$ret = KNXIO_init($hash);
 		}
-		delete $hash->{NEXT_OPEN};
-		delete $hash->{DevIoJustClosed}; # DevIo
-		$conn->setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1);
-		$hash->{TCPDev} = $conn;
-		$hash->{FD} = $conn->fileno();
-		delete $readyfnlist{"$name.$param"};
-		$selectlist{"$name.$param"} = $hash;
 
-		my $retxt = ($reopen)?'reappeared':'opened';
-		KNXIO_Log ($name, 3, qq{$retxt});
-		$ret = KNXIO_init($hash);
-	}
-
-	### tunneling TCP
-	else { # $mode eq 'T'
-		$ret = ::DevIo_OpenDev($hash,$reopen,\&KNXIO_init,\&KNXIO_callback);
-	}
+		### tunneling TCP
+		when ('T') {
+			$ret = ::DevIo_OpenDev($hash,$reopen,\&KNXIO_init,\&KNXIO_callback);
+		}
+	} # /given
 
 	if(defined($ret) && $ret) {
 		KNXIO_Log ($name, 1, q{Cannot open device - ignoring it});
@@ -780,11 +796,30 @@ sub KNXIO_init {
 
 	# state 'connected' is set in decode_EMI (model ST) or in readH (model H)  
 	else {
-#		DoTrigger($name, 'CONNECTED');
-		readingsSingleUpdate($hash, 'state', 'connected', 1);
+		KNXIO_handleConn($hash);
 		KNXIO_Log ($name, 3, q{connected});
 	}
 
+	return;
+}
+
+### handle 'connected event' & state: connected
+###
+sub KNXIO_handleConn {
+	my $hash = shift;
+
+	my $name = $hash->{NAME};
+
+	if (exists($hash->{KNXIOhelper}->{startdone})) {
+		readingsSingleUpdate($hash, 'state', 'connected', 1);
+		main::KNX_scan('TYPE=KNX:FILTER=IODev=' . $name) if (AttrNum($name,'enableKNXscan',0) >= 2); # on every connect
+	}
+	else { # fhem start
+		KNXIO_Log ($name, 3, q{initial-connect});
+		readingsSingleUpdate($hash, 'state', 'connected', 0); # no event
+		$hash->{KNXIOhelper}->{startdone} = 1;
+		InternalTimer(gettimeofday() + 30, \&KNXIO_initcomplete, $hash);
+	}
 	return;
 }
 
@@ -797,6 +832,7 @@ sub KNXIO_initcomplete {
 	RemoveInternalTimer($hash,\&KNXIO_initcomplete);
 	my $name = $hash->{NAME};
 	if (ReadingsVal($name,'state','disconnected') eq 'connected') {
+		main::KNX_scan('TYPE=KNX:FILTER=IODev=' . $name) if (AttrNum($name,'enableKNXscan',0) >= 1); # on 1st connect only
 		DoTrigger($name,'INITIALIZED');
 	} 
 	elsif (AttrVal($name,'disable','disabled') ne 'disabled') {
@@ -954,8 +990,6 @@ sub KNXIO_closeDev {
 	KNXIO_Log ($name, 3, q{closed}) if ($init_done);;
 
 	readingsSingleUpdate($hash, 'state', 'disconnected', 1);
-#	DoTrigger($name, 'DISCONNECTED');
-	DoTrigger($name, 'disconnected');
 
 	return;
 }
@@ -982,8 +1016,7 @@ sub KNXIO_decodeEMI {
 	if ($id != 0x0027) {
 		if ($id == 0x0026) {
 			KNXIO_Log ($name, 4, 'OpenGrpCon response received');
-#			DoTrigger($name, 'CONNECTED');
-			readingsSingleUpdate($hash, 'state', 'connected', 1);
+			KNXIO_handleConn($hash);
 			KNXIO_Log ($name, 3, q{connected});
 		}
 		else {
@@ -1213,6 +1246,84 @@ sub KNXIO_errCodes {
 	return $errtxt; 
 }
 
+##############################################
+########## public utility functions ##########
+# when called from FHEM cmd-line
+sub main::KNX_scancmd {
+	my $cl = shift;
+	my $devs = shift;
+
+	$devs = 'TYPE=KNX' if (! defined($devs) || $devs eq q{}); # select all if nothing defined
+	main::KNX_scan($devs);
+	return;
+}
+
+### get state of devices from KNX_Hardware
+# called with devspec as argument
+# e.g : KNX_scan() / KNX_scan('device1') / KNX_scan('device1,dev2,dev3,...') / KNX_scan('room=Kueche'), ...
+# returns number of "gets" executed
+sub main::KNX_scan {
+	my $devs = shift;
+
+	$devs = 'TYPE=KNX' if (! defined($devs) || $devs eq q{}); # select all if nothing defined
+
+	if (! $init_done) { # avoid scan before init complete
+		Log3 (undef, 2,'KNX_scan command rejected during FHEM-startup!');
+		return 0;
+	}
+
+	my @devlist = devspec2array($devs);
+
+	my $i = 0; #counter devices
+	my $j = 0; #counter devices with get
+	my $k = 0; #counter total get's
+	my $getsarr = q{};
+
+	foreach my $knxdef (@devlist) {
+		next unless $knxdef;
+		next if($knxdef eq $devs && !$defs{$knxdef});
+		my $devhash = $defs{$knxdef};
+		next if ((! defined($devhash)) || ($devhash->{TYPE} ne 'KNX'));
+
+		#check if IO-device is ready
+		my $iodev = $devhash->{IODev}->{NAME};
+		next if (! defined($iodev));
+		next if ($defs{$iodev}->{STATE} ne 'connected'); # yes:KNXIO/FHEM2FHEM no:TUL/KNXTUL 
+
+		$i++;
+		my $k0 = $k; #save previous number of get's
+		foreach my $key (keys %{$devhash->{GADDETAILS}}) {
+			last if (! defined($key));
+			next if($devhash->{GADDETAILS}->{$key}->{MODEL} eq $MODELERR);
+			my $option = $devhash->{GADDETAILS}->{$key}->{OPTION};
+			next if (defined($option) && $option =~ /(?:set|listenonly)/ixms);
+			$k++;
+			$getsarr .= $knxdef . q{ } . $key . q{,};
+		}
+		$j++ if ($k > $k0);
+	}
+	Log3 (undef, 3, qq{KNX_scan: $i devices selected (regex= $devs) / $j devices with get / $k "gets" executing...});
+	doKNX_scan($getsarr) if ($k > 0);
+	return $k;
+}
+
+### issue all get cmd's - each one delayed by InternalTimer
+sub doKNX_scan {
+	my ($devgad, $arr) = split(/,/xms,shift,2);
+
+	my ($name, $gadName) = split(/[\s]/xms,$devgad);
+	KNX::KNX_Get ($defs{$name}, $name, $gadName);
+
+	if (defined($arr) && $arr ne q{}) {
+		my $count = split(/,/xms,$arr); # number of remainig pairs
+		my $delay = ($count % 10 == 0)?2:0.2; # extra delay on each 10th request
+		return InternalTimer(gettimeofday() + $delay,\&doKNX_scan,$arr); # does not support array-> use string...
+	}
+	Log3 (undef, 3, q{KNX_scan: finished});
+	return;
+}
+
+
 1;
 
 =pod
@@ -1231,35 +1342,35 @@ sub KNXIO_errCodes {
 <li><p>This is a IO-module for KNX-devices. It provides an interface between FHEM and a KNX-Gateway. The Gateway can be either a KNX-Router/KNX-GW or the KNXD-daemon.
    FHEM KNX-devices use this module as IO-Device. This Module does <b>NOT</b> support the deprecated EIB-Module!
 </p>
-<p>A (german) wiki page is avaliable here: <a href="https://wiki.fhem.de/wiki/KNXIO">FHEM Wiki</a></p>
+<p>A (german) wiki page is avaliable here&colon; <a href="https://wiki.fhem.de/wiki/KNXIO">FHEM Wiki</a></p>
 </li>
 <li><a id="KNXIO-define"></a><strong>Define</strong>
-<pre><code>define &lt;name&gt; KNXIO (H|M|T) &lt;(ip-address|hostname):port&gt; &lt;phy-adress&gt;</code>
+<pre><code>define &lt;name&gt; KNXIO (H|M|T) &lt;(ip-address|hostname)&colon;port&gt; &lt;phy-adress&gt;</code>
 <code>define &lt;name&gt; KNXIO S &lt;UNIX socket-path&gt; &lt;phy-adress&gt;</code>
 <code>define &lt;name&gt; KNXIO X</code></pre>
 
-<b>Connection Types (mode)</b> (first parameter):
+<b>Connection Types (mode)</b> (first parameter)&colon;
 <ul>
 <li><b>H</b> Host Mode - connect to a KNX-router with UDP point-point protocol.<br/>
   This is the mode also used by ETS when you specify <b>KNXNET/IP</b> as protocol. You do not need a KNXD installation. The protocol is complex and timing critical! 
   If you have delays in FHEM processing close to 1 sec, the protocol may disconnect. It should recover automatically, 
   however KNX-messages could have been lost! 
-  <br>The benefit of this protocol: every sent and received msg has to be acknowledged within 1 second by the communication partner, msg delivery is verified!</li>
+  <br>The benefit of this protocol&colon; every sent and received msg has to be acknowledged within 1 second by the communication partner, msg delivery is verified!</li>
 <li><b>M</b> Multicast mode - connect to KNXD's or KNX-router's multicast-tree.<br/>
   This is the mode also used by ETS when you specify <b>KNXNET/IP Routing</b> as protocol. 
-  If you have a KNX-router that supports multicast, you do not need a KNXD installation. Default address:port is 224.0.23.12:3671<br/>
+  If you have a KNX-router that supports multicast, you do not need a KNXD installation. Default address&colon;port is 224.0.23.12&colon;3671<br/>
   Pls. ensure that you have only <b>one</b> GW/KNXD in your LAN that feed the multicast tree!<br/>
-  <del>This mode requires the <code>IO::Socket::Multicast</code> perl-module to be installed on yr. system. 
+  <del>This mode requires the <code>IO&colon;&colon;Socket&colon;&colon;Multicast</code> perl-module to be installed on yr. system. 
   On Debian systems this can be achieved by <code>apt-get install libio-socket-multicast-perl</code>.</del></li>
-<li><b>T</b> TCP mode - uses a TCP-connection to KNXD (default port: 6720).<br/>
+<li><b>T</b> TCP mode - uses a TCP-connection to KNXD (default port&colon; 6720).<br/>
   This mode is the successor of the TUL-modul, but does not support direct Serial/USB connection to a TPUart-USB Stick.
   If you want to use a TPUart-USB Stick or any other serial KNX-GW, use either the TUL Module, or connect the USB-Stick to KNXD and in turn use modes M,S or T to connect to KNXD.</li>
-<li><b>S</b> Socket mode - communicate via KNXD's UNIX-socket on localhost. default Socket-path: <code>/var/run/knx</code><br/> 
+<li><b>S</b> Socket mode - communicate via KNXD's UNIX-socket on localhost. default Socket-path&colon; <code>/var/run/knx</code><br/> 
   Path might be different, depending on knxd-version or -config specification! This mode is tested ok with KNXD version 0.14.30. It does NOT work with ver. 0.10.0!</li>
 <li><b>X</b> Special mode - for details see KNXIO-wiki!</li>
 </ul>
 <br/>
-<b>ip-address:port</b> or <b>hostname:port</b>
+<b>ip-address&colon;port</b> or <b>hostname&colon;port</b>
 <ul>
 <li>Hostname is supported for mode H and T. Port definition is mandatory.</li>
 </ul>
@@ -1270,20 +1381,19 @@ sub KNXIO_errCodes {
 </ul>
 
 <br/>All parameters are mandatory. Pls. ensure that you only have <b>one path</b> between your KNX-Installation and FHEM! 
-  Do not define multiple KNXIO- or KNXTUL- or TUL-definitions at the same time. <br/>
-Examples:
-<pre><code>    define myKNXGW KNXIO H 192.168.1.201:3671 0.0.51
-    define myKNXGW KNXIO M 224.0.23.12:3671 0.0.51 
+  Do not define multiple KNXIO- or KNXTUL- or TUL-definitions at the same time.
+<pre>Examples&colon;
+<code>    define myKNXGW KNXIO H 192.168.1.201&colon;3671 0.0.51
+    define myKNXGW KNXIO M 224.0.23.12&colon;3671 0.0.51 
     define myKNXGW KNXIO S /var/run/knx 0.0.51
-    define myKNXGW KNXIO T 192.168.1.200:6720 0.0.51
-</code>
-Suggested parameters for KNXD (Version &gt;= 0.14.30), with systemd:
-<code>
-    KNXD_OPTS="-e 0.0.50 -E 0.0.51:8 -D -T -S -b ip:"                            # knxd acts as multicast client - do NOT use -R !
-    KNXD_OPTS="-e 0.0.50 -E 0.0.51:8 -D -T -R -S -b ipt:192.168.xx.yy"           # connect to a knx-router with ip-addr
-    KNXD_OPTS="-e 0.0.50 -E 0.0.51:8 -D -T -R -S -single -b tpuarts:/dev/ttyxxx" # connect to a serial/USB KNX GW  
-</code></pre>
-  The -e and -E parameters must match the definitions in the KNX-router (set by ETS)!<br/><br/> 
+    define myKNXGW KNXIO T 192.168.1.200&colon;6720 0.0.51
+
+Suggested parameters for KNXD (Version &gt;= 0.14.30), with systemd&colon;
+    KNXD_OPTS="-e 0.0.50 -E 0.0.51&colon;8 -D -T -S -b ip&colon;"                 # knxd acts as multicast client - do NOT use -R !
+    KNXD_OPTS="-e 0.0.50 -E 0.0.51&colon;8 -D -T -R -S -b ipt&colon;192.168.xx.yy"           # connect to a knx-router with ip-addr
+    KNXD_OPTS="-e 0.0.50 -E 0.0.51&colon;8 -D -T -R -S -single -b tpuarts&colon;/dev/ttyxxx" # connect to a serial/USB KNX GW  
+  The -e and -E parameters must match the definitions in the KNX-router (set by ETS)!
+</code></pre> 
 </li>
 
 <li><a id="KNXIO-set"></a><strong>Set</strong> - No Set cmd implemented.
@@ -1295,20 +1405,28 @@ Suggested parameters for KNXD (Version &gt;= 0.14.30), with systemd:
 <li><a id="KNXIO-attr-disable"></a><b>disable</b> - 
   Disable the device if set to <b>1</b>. No send/receive from bus possible. Delete this attr to enable device again.</li>
 <li><a id="KNXIO-attr-verbose"></a><b>verbose</b> - 
-  increase verbosity of Log-Messages, system-wide default is set in "global" device. For a detailed description see: <a href="#verbose">global-attr verbose</a> <br/></li> 
+  increase verbosity of Log-Messages, system-wide default is set in "global" device. For a detailed description see&colon; <a href="#verbose">global-attr verbose</a> <br/></li> 
+<li><a id="KNXIO-attr-enableKNXscan"></a><b>enableKNXscan</b> -
+  trigger a KNX_scan cmd at fhemstart or at every connect event. A detailed description of the <a href="#KNX-utilities">KNX_scan cmd</a> is here!
+<pre><code>   0 - never (default if Attr not defined)
+   1 - after fhem start (together with INITIALIZED event)
+   2 - after fhem start and on every connect event</code></pre></li>  
 </ul>
-<br/></li>
+</li>
 <li><a id="KNXIO-events"></a><strong>Events</strong><br/>
 <ul>
 <li><b>&lt;device&gt;&colon;INITIALIZED</b> -
-  This event is triggered 30 sec after FHEM init is complete <b>and</b> the device is connected. It can be used (in a notify ...) 
-  to syncronize the status of FHEM-KNX-devices with the KNX-Hardware.
+  The first &lt;device&gt;&colon;connected event after fhem start is suppressed and replaced (after 30 sec delay) with this event.
+  It can be used (in a notify,doif,...) to syncronize the status of FHEM-KNX-devices with the KNX-Hardware.
   Do not use the <code>global&colon;INITIALIZED</code> event for this purpose, the KNX-GW is not ready for communication at that time!<br/>
-  Example: <code>defmod KNXinit_nf notify &lt;KNXIO-device&gt;&colon;INITIALIZED get &lt;KNX-device&gt; &lt;gadName&gt;</code></li>
-<li><b>&lt;device&gt;&colon;disconnected</b> -
-  triggered if connection to KNX-GW/KNXD failed. Recovery is attempted.</li>
+  Example&colon;<br/>
+  <code>defmod KNXinit_nf notify &lt;device&gt;&colon;INITIALIZED get &lt;KNX-device&gt; &lt;gadName&gt;</code> 
+  # or even simpler, just use Attribute&colon; <br/>
+  <code>attr &lt;device&gt; enableKNXscan 1</code> # to scan all KNX-devices which have this device defined as their IO-device.</li>
 <li><b>&lt;device&gt;&colon;connected</b> -
   triggered if connection to KNX-GW/KNXD is established.</li>
+<li><b>&lt;device&gt;&colon;disconnected</b> -
+  triggered if connection to KNX-GW/KNXD failed. Recovery is attempted.</li>
 </ul>
 </li>
 </ul>
