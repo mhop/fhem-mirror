@@ -41,10 +41,8 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.17g";
+my $ModulVersion = "07.50.17h";
 my $missingModul = "";
-my $missingModulWeb = "";
-my $missingModulTR064 = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
 
@@ -56,27 +54,24 @@ eval "use Net::Ping;1" or $missingModul .= "Net::Ping ";
 use FritzBoxUtils; ## only for web access login
 
 #sudo apt-get install libjson-perl
-eval "use JSON;1" or $missingModulWeb .= "JSON ";
-eval "use LWP::UserAgent;1" or $missingModulWeb .= "LWP::UserAgent ";
+eval "use JSON;1" or $missingModul .= "JSON ";
+eval "use LWP::UserAgent;1" or $missingModul .= "LWP::UserAgent ";
 
-eval "use URI::Escape;1" or $missingModulTR064 .= "URI::Escape ";
+eval "use URI::Escape;1" or $missingModul .= "URI::Escape ";
 # sudo apt-get install libsoap-lite-perl
-eval "use SOAP::Lite;1" or $missingModulTR064 .= "Soap::Lite ";
+eval "use SOAP::Lite;1" or $missingModul .= "Soap::Lite ";
 
 # $Data::Dumper::Terse = 1;
 # $Data::Dumper::Purity = 1;
 # $Data::Dumper::Sortkeys = 1;
-eval "use Data::Dumper;1" or $missingModulTR064 .= "Data::Dumper ";
+eval "use Data::Dumper;1" or $missingModul .= "Data::Dumper ";
 
 sub FRITZBOX_Log($$$);
 sub FRITZBOX_Initialize($);
 sub FRITZBOX_Set_Cmd_Start($);
-sub FRITZBOX_StartRadio_Web($@);
 sub FRITZBOX_Readout_Add_Reading ($$$$@);
 sub FRITZBOX_Readout_Process($$);
 sub FRITZBOX_SendMail_Shell($@);
-sub FRITZBOX_SetCustomerRingTone($@);
-sub FRITZBOX_SetMOH($@);
 sub FRITZBOX_TR064_Init($$);
 sub FRITZBOX_Wlan_Run($);
 sub FRITZBOX_Web_Query($$@);
@@ -327,8 +322,8 @@ sub FRITZBOX_Define($$)
    InternalTimer(gettimeofday() + 1 , "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 0);
 
 # Inform about missing PERL modules
-   if ( $missingModulWeb || $missingModulTR064 ) {
-      my $msg = "Modul functionality limited because of missing perl modules: " . $missingModulWeb . $missingModulTR064;
+   if ( $missingModul ) {
+      my $msg = "Modul functionality limited because of missing perl modules: " . $missingModul;
       FRITZBOX_Log $hash, 2, "INFO: " . $msg;
       $hash->{PERL} = $msg;
    } else {
@@ -1347,17 +1342,18 @@ sub FRITZBOX_Get($@)
       }
 
       if (int @val == 2) {
-        return "Wrong 1st parmeter, usage hash or table for first parameter" if $val[0] !~ /hash|table/;
-        return "Wrong 2nd parmeter, usage all, sys, wlan, usb, net, fon" if $val[1] !~ /all|sys|wlan|usb|net|fon/;
+        return "1st parmeter is wrong, usage hash or table for first parameter" if $val[0] !~ /hash|table/;
+        return "2nd parmeter is wrong, usage &lt;all|sys|wlan|usb|net|fon&gt" if $val[1] !~ /all|sys|wlan|usb|net|fon/;
       } elsif(int @val == 3 && $val[0] eq "hash") {
-        return "Wrong 1st parmeter, usage hash or table for first parameter" if $val[0] !~ /hash|table/;
-        return "Wrong 2nd parmeter, usage all, sys, wlan, usb, net, fon" if $val[1] !~ /all|sys|wlan|usb|net|fon/;
-        return "Wrong 3nd parmeter, usage on or off" if $val[2] !~ /on|off/;
+        return "1st parmeter is wrong, usage hash or table for first parameter" if $val[0] !~ /hash|table/;
+        return "2nd parmeter is wrong, usage &lt;all|sys|wlan|usb|net|fon&gt" if $val[1] !~ /all|sys|wlan|usb|net|fon/;
+        return "3nd parmeter is wrong, usage on or off" if $val[2] !~ /on|off/;
+      } elsif(int @val == 1) {
+        return "number of arguments is wrong, usage: get fritzLog &lt;" . $name. "&gt; &lt;hash&gt; &lt;all|sys|wlan|usb|net|fon&gt; [on|off]" if $val[0] eq "hash";
+        return "number of arguments is wrong, usage: get fritzLog &lt;" . $name. "&gt; &lt;table&gt; &lt;all|sys|wlan|usb|net|fon&gt;" if $val[0] eq "table";
       } else {
-        return "Wrong number of arguments, usage: get <$name> <hash|table> <all|sys|wlan|usb|net|fon> [on|off]" if $val[0] eq "hash";
-        return "Wrong number of arguments, usage: get <$name> <hash|table> <all|sys|wlan|usb|net|fon>" if $val[0] eq "table";
+        return "number of arguments is wrong, usage: get fritzLog &lt;" . $name. "&gt; &lt;hash|table&gt; &lt;all|sys|wlan|usb|net|fon&gt; [on|off]";
       }
-
 
       if ($val[0] eq "hash") {
          push @cmdBuffer, "fritzloginfo " . join(" ", @val);
@@ -1650,9 +1646,10 @@ sub FRITZBOX_API_Check_Run($)
    FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "->HOST", $host) if $host ne $hash->{HOST};
 
 # Check if perl modules for remote APIs exists
-   if ($missingModulWeb) {
-      FRITZBOX_Log $hash, 3, "INFO: Cannot check for box model and APIs webcm, luaQuery and TR064 because perl modul $missingModulWeb is missing on this system.";
+   if ($missingModul) {
+      FRITZBOX_Log $hash, 3, "INFO: Cannot check for box model and APIs webcm, luaQuery and TR064 because perl modul $missingModul is missing on this system.";
    }
+
 # Check for remote APIs
    else {
       my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
@@ -5316,46 +5313,6 @@ sub FRITZBOX_Ring_Run_Web($)
 } # end FRITZBOX_Ring_Run_Web
 
 #######################################################################
-sub FRITZBOX_SetMOH($@)
-{
-   my ($hash, $type, @file) = @_;
-   my $returnStr;
-   my @cmdArray;
-   my $result;
-   my $name = $hash->{NAME};
-   my $uploadFile = '/var/tmp/fhem_moh_upload';
-   my $mohFile = '/var/tmp/fhem_fx_moh';
-
-   return undef;
-} # end FRITZBOX_SetMOH
-
-#######################################################################
-sub FRITZBOX_SetCustomerRingTone($@)
-{
-   my ($hash, $intern, @file) = @_;
-   my @cmdArray;
-   my $result;
-   my $name = $hash->{NAME};
-   my $uploadDir = AttrVal( $name, "defaultUploadDir",  "" );
-
-   $uploadDir .= "/"
-      unless $uploadDir =~ /\/$|^$/;
-
-   my $inFile = join " ", @file;
-   $inFile = $uploadDir.$inFile
-      unless $inFile =~ /^\//;
-
-   return "Error: Please give a complete file path or the attribute 'defaultUploadDir'"
-      unless $inFile =~ /^\//;
-
-   return "Error: Only MP3 or G722 files can be uploaded to the phone."
-      unless $inFile =~ /\.mp3$|.g722$/i;
-
-   return undef;
-
-} # end FRITZBOX_SetCustomerRingTone
-
-#######################################################################
 sub FRITZBOX_ConvertMOH ($@)
 {
    my ($hash, @file) = @_;
@@ -5413,76 +5370,9 @@ sub FRITZBOX_ConvertRingTone ($@)
    $outFile = substr($inFile,0,-4)
       if ($inFile =~ /\.(mp3|wav)$/i);
 
-   return undef
-;
-} # end FRITZBOX_ConvertRingTone
-
-#######################################################################
-sub FRITZBOX_StartRadio_Web($@)
-{
-   my ($hash, @val) = @_;
-   my @webCmdArray;
-   my @getCmdArray;
-   my @tr064CmdArray;
-   my $name = $hash->{NAME};
-   my $intNo = $val[0];
-   my $radioStation;
-   my $radioStationName;
-   my $result;
-
-# Check if 1st parameter is a number
-   return "Error: 1st Parameter '$intNo' not an internal DECT number"
-      unless $intNo =~ /^61[012345]$/;
-
-# Check if the 1st parameter is a Fritz!Fon
-   return "Error: Internal number $intNo does not seem to be a Fritz!Fon."
-      unless $hash->{fhem}{$intNo}{brand} eq "AVM";
-
-# Check if remaining parameter is an internet Radio Station
-   shift (@val);
-   if (@val) {
-      $radioStationName = join (" ", @val);
-      if ($radioStationName =~ /^\d+$/) {
-         $radioStation = $radioStationName;
-         $radioStationName = $hash->{fhem}{radio}{$radioStation};
-         return "Error: Unknown internet radio number $radioStation."
-            unless defined $radioStationName;
-      }
-      else {
-         foreach (keys %{$hash->{fhem}{radio}}) {
-            if (lc $hash->{fhem}{radio}{$_} eq lc $radioStationName) {
-               $radioStation = $_;
-               last;
-            }
-         }
-         return "Error: Unknown internet radio station '$radioStationName'"
-            unless defined $radioStation;
-
-      }
-   }
-
-# Get current ringtone
-   my $userNo = $intNo-609;
-   my $queryStr = "&curRingTone=telcfg:settings/Foncontrol/User".$userNo."/IntRingTone";
-   $queryStr .= "&curRadioStation=telcfg:settings/Foncontrol/User".$userNo."/RadioRingID";
-   my $startValue = FRITZBOX_Web_Query( $hash, $queryStr );
-
-# Set ring tone Internet Radio
-   if ( defined $startValue->{Error} ) {
-      FRITZBOX_Log $hash, 2, "ERROR: ".$startValue->{Error};
-   } else {
-
-     FRITZBOX_Log $hash, 5, "DEBUG: Call $intNo";
-
-     if ($hash->{SECPORT}) { #ring with TR-064
-        push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialNumber", "NewX_AVM-DE_PhoneNumber", "**".$intNo."#"];
-        FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-     }
-   }
-
    return undef;
 
-} # end sub FRITZBOX_StartRadio_Web
+} # end FRITZBOX_ConvertRingTone
 
 # Execute a Command via SOAP Request
 # {FRITZBOX_SOAP_Test_Request("FritzBox", "igdupnp\/control\/WANIPConn1", "urn:schemas-upnp-org:service:WANIPConnection:1", "GetStatusInfo")}
@@ -5705,8 +5595,8 @@ sub FRITZBOX_TR064_Get_ServiceList($)
    my $name = $defs{NAME};
 
 
-   if ( $missingModulWeb ) {
-      my $msg = "ERROR: Perl modul " . $missingModulWeb . "is missing on this system. Please install before using this modul.";
+   if ( $missingModul ) {
+      my $msg = "ERROR: Perl modul " . $missingModul . " is missing on this system. Please install before using this modul.";
       FRITZBOX_Log $hash, 2, $msg;
       return $msg;
    }
@@ -5817,8 +5707,8 @@ sub FRITZBOX_TR064_Init ($$)
    my ($hash, $host) = @_;
    my $name = $hash->{NAME};
 
-   if ($missingModulTR064) {
-      FRITZBOX_Log $hash, 2,  "ERROR: Cannot use TR-064. Perl modul " . $missingModulTR064 . " is missing on this system. Please install.";
+   if ($missingModul) {
+      FRITZBOX_Log $hash, 2,  "ERROR: Cannot use TR-064. Perl modul " . $missingModul . " is missing on this system. Please install.";
       return undef;
    }
 
@@ -5860,8 +5750,8 @@ sub FRITZBOX_Web_OpenCon ($)
    my ($hash) = @_;
    my $name = $hash->{NAME};
 
-   if ($missingModulWeb) {
-      FRITZBOX_Log $hash, 2, "ERROR: Perl modul ".$missingModulWeb."is missing on this system. Please install before using this modul.";
+   if ($missingModul) {
+      FRITZBOX_Log $hash, 2, "ERROR: Perl modul ".$missingModul." is missing on this system. Please install before using this modul.";
       return undef;
    }
 
@@ -8831,3 +8721,8 @@ sub FRITZBOX_readPassword($)
 # http://fritz.box:49000/igdconnSCPD.xml
 # 
 # ggf bei Repeater einbauen: xhr 1 lang de page overview xhrId all useajax 1
+#
+#   my $userNo = $intNo-609;
+#   my $queryStr = "&curRingTone=telcfg:settings/Foncontrol/User".$userNo."/IntRingTone";
+#   $queryStr .= "&curRadioStation=telcfg:settings/Foncontrol/User".$userNo."/RadioRingID";
+#   my $startValue = FRITZBOX_Web_Query( $hash, $queryStr );
