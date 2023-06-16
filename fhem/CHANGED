@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 72_FRITZBOX: Attribut: disableHostIPv4check
+ - bugfix:  72_FRITZBOX: Parameter Fehlerbehandlung: get fritzLog
  - change:  10_KNX: moved KNX_scan function to KNXIO-module, see Forum #122582
  - change:  00_KNXIO: update KNX and KNXIO-module at same time!, Forum #127792
             added new Attr. enableKNXscan, see cmd-ref 
