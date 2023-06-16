@@ -6,7 +6,7 @@ function AutomowerConnectShowError( ctx, div, dev, picx, picy, errdesc, erray ) 
   ctx.beginPath();
   ctx.fillStyle = div.getAttribute( 'data-errorBackgroundColor' );
   ctx.font = div.getAttribute( 'data-errorFont' );
-  var m = ctx.measureText( errdesc[ 1 ] + ', ' + dev + ': ' + errdesc[ 0 ] ).width > picy - 6;
+  var m = ctx.measureText( errdesc[ 1 ] + ', ' + dev + ': ' + errdesc[ 2 ] + ' - ' + errdesc[ 0 ] ).width > picx - 6;
 
   if ( m ) {
 
@@ -24,11 +24,11 @@ function AutomowerConnectShowError( ctx, div, dev, picx, picy, errdesc, erray ) 
   if ( m ) {
 
   ctx.fillText( errdesc[ 1 ] + ', ' + dev + ':', 3, 15 );
-  ctx.fillText( errdesc[ 0 ], 3, 30 );
+  ctx.fillText( errdesc[ 2 ] + ' - ' + errdesc[ 0 ], 3, 30 );
 
   } else {
 
-  ctx.fillText( errdesc[ 1 ] + ', ' + dev + ': ' + errdesc[ 0 ], 3, 15 );
+  ctx.fillText( errdesc[ 1 ] + ', ' + dev + ': ' + errdesc[ 2 ] + ' - ' + errdesc[ 0 ], 3, 15 );
 
   }
 
@@ -271,11 +271,18 @@ function AutomowerConnectTor ( x0, y0, x1, y1 ) {
   //~ log ('ret: ' + ret);
   return ret;
 }
+
+function AutomowerConnectUpdateJson ( path ) {
+  $.getJSON( path, function( data, textStatus ) {
+    log( 'AutomowerConnectUpdateJson ( '+path+' ): status '+textStatus );
+    AutomowerConnectUpdateDetail ( data.name, data.type, data.detailfnfirst, data.picx, data.picy, data.scalx, data.errdesc, data.posxy, data.poserrxy );
+
+  });
+
+}
+
 //AutomowerConnectUpdateDetail (<devicename>, <type>, <detailfnfirst>, <imagesize x>, <imagesize y>,<scale x>, <error description>, <path array>, <error array>)
 function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, scalx, errdesc, pos, erray) {
-  //~ $.getJSON('./fhem/AutomowerConnect/am430x/json', function(data) {
-    //~ log(data[0].longitude+'  '+data[0].latitude+'  '+data[0].act);
-//~ });
   const colorat = {
     "U" : "otherActivityPath",
     "N" : "errorPath",
@@ -286,7 +293,6 @@ function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, sca
     "L" : "leavingPath",
     "G" : "goingHomePath"
   };
-//  log('pos.length '+pos.length+' lixy.length '+lixy.length+', scalx '+scalx );
 //  log('loop: Start '+ type+' '+dev );
   if (FW_urlParams.detail == dev || 1) {
     const canvas_0 = document.getElementById(type+'_'+dev+'_canvas_0');
@@ -295,7 +301,7 @@ function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, sca
 
     if ( canvas && canvas_0 ) {
 
-//    log('loop: canvas && canvas_0 true '+ type+' '+dev );
+//    log('loop: canvas && canvas_0 true '+ type+' '+dev + ' detailfnfirst '+detailfnfirst);
 
       if ( detailfnfirst ) {
 
@@ -306,6 +312,7 @@ function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, sca
         // draw area limits
         const lixy = div.getAttribute( 'data-areaLimitsPath' ).split(",");
         if ( lixy.length > 0 ) AutomowerConnectLimits( ctx0, div, lixy, 'area' );
+//        log('pos.length '+pos.length+' lixy.length '+lixy.length+', scalx '+scalx );
 
         // draw property limits
         const plixy = div.getAttribute( 'data-propertyLimitsPath' ).split( "," );

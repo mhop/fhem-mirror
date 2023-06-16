@@ -378,10 +378,38 @@ __END__
       </code></li>
 
     <li><a href="disable">disable</a></li>
+
     <li><a href="disabledForIntervals">disabledForIntervals</a></li>
     <br><br>
   </ul>
   <br>
+
+
+  <a id="AutomowerConnectUserAttr"></a>
+  <b>userattr</b><br>
+  <ul>
+  The following user attributes are taken into account.<br>
+
+    <li><a id='AutomowerConnect-attr-loglevelDevIo'>loglevelDevIo</a><br>
+      <code>attr &lt;name&gt; loglevelDevIo &lt;[012345]&gt;</code><br>
+      Set internal deviologlevel, <a target="_blank" href="https://wiki.fhem.de/wiki/DevIo#Wichtige_Internals_zur_Konfiguration"> DevIo: Wichtige_Internals_zur_Konfiguration</a> </li>
+
+    <li><a id='AutomowerConnect-attr-timeoutGetMower'>timeoutGetMower</a><br>
+      <code>attr &lt;name&gt; timeoutGetMower &lt;[6 to 60]&gt;</code><br>
+      Set timeout for API call, default 5 s. </li>
+
+    <li><a id='AutomowerConnect-attr-timeoutApiAuth'>ApiAuth</a><br>
+      <code>attr &lt;name&gt; timeoutApiAuth &lt;[6 to 60]&gt;</code><br>
+      Set timeout for API call, default 5 s. </li>
+
+    <li><a id='AutomowerConnect-attr-timeoutCMD'>timeoutCMD</a><br>
+      <code>attr &lt;name&gt; timeoutCMD &lt;[6 to 60]&gt;</code><br>
+      Set timeout for API call, default 5 s. </li><br>
+  The response time is meassured and logged if a timeout ist set to 60 s.
+
+    <br><br>
+  </ul>
+
 
   <a id="AutomowerConnectReadings"></a>
   <b>Readings</b>
@@ -407,7 +435,7 @@ __END__
     <li>settings_cuttingHeight - actual cutting height from API</li>
     <li>settings_headlight - actual headlight mode from API</li>
     <li>statistics_newGeoDataSets - number of new data sets between the last two different time stamps</li>
-    <li>statistics_numberOfCollisions - Number of collisions (last day/all days)</li>
+    <li>statistics_numberOfCollisions - Number of collisions (current day/last day/all days)</li>
     <li>status_connected - state of connetion between mower and Husqvarna Cloud.</li>
     <li>status_statusTimestamp - local time of last status update</li>
     <li>status_statusTimestampDiff - time difference in seconds between the last and second last status update</li>
@@ -708,10 +736,38 @@ __END__
       </code></li>
 
      <li><a href="disable">disable</a></li>
+
      <li><a href="disabledForIntervals">disabledForIntervals</a></li>
   <br>
   </ul>
   <br>
+
+
+  <a id="AutomowerConnectUserAttr"></a>
+  <b>userattr</b><br>
+  <ul>
+  Die folgenden Benutzerattribute werden unterstützt.<br>
+
+    <li><a id='AutomowerConnect-attr-loglevelDevIo'>loglevelDevIo</a><br>
+      <code>attr &lt;name&gt; loglevelDevIo &lt;[012345]&gt;</code><br>
+      Setzt das Internal deviologlevel, <a target="_blank" href="https://wiki.fhem.de/wiki/DevIo#Wichtige_Internals_zur_Konfiguration"> DevIo: Wichtige_Internals_zur_Konfiguration</a> </li>
+
+    <li><a id='AutomowerConnect-attr-timeoutGetMower'>timeoutGetMower</a><br>
+      <code>attr &lt;name&gt; timeoutGetMower &lt;[6 to 60]&gt;</code><br>
+      Setzt den Timeout für das Lesen der Mäherdaten, default 5 s. </li>
+
+    <li><a id='AutomowerConnect-attr-timeoutApiAuth'>timeoutApiAuth</a><br>
+      <code>attr &lt;name&gt; timeoutApiAuth &lt;[6 to 60]&gt;</code><br>
+      Setzt den Timeout für die Authentifikation, default 5 s. </li>
+
+    <li><a id='AutomowerConnect-attr-timeoutCMD'>timeoutCMD</a><br>
+      <code>attr &lt;name&gt; timeoutCMD &lt;[6 to 60]&gt;</code><br>
+      Setzt den Timeout für Befehl senden, default 15 s. </li><br>
+  Wird ein Timeout auf 60 s gesetzt, wird die Antwortzeit gemessen und geloggt.
+
+    <br><br>
+  </ul>
+
 
   <a id="AutomowerConnectReadings"></a>
   <b>Readings</b>
@@ -737,7 +793,7 @@ __END__
     <li>settings_cuttingHeight - aktuelle Schnitthöhe aus der API</li>
     <li>settings_headlight - aktueller Scheinwerfermode aus der API</li>
     <li>statistics_newGeoDataSets - Anzahl der neuen Datensätze zwischen den letzten zwei unterschiedlichen Zeitstempeln</li>
-    <li>statistics_numberOfCollisions - Anzahl der Kollisionen (letzter Tag/alle Tage)</li>
+    <li>statistics_numberOfCollisions - Anzahl der Kollisionen (laufender Tag/letzter Tag/alle Tage)</li>
     <li>status_connected - Status der Verbindung zwischen dem Automower und der Husqvarna Cloud.</li>
     <li>status_statusTimestamp - Lokalzeit des letzten Statusupdates in der API</li>
     <li>status_statusTimestampDiff - Zeitdifferenz zwischen dem letzten und vorletzten Statusupdate.</li>

@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  74_AutomowerConnect: Common.pm, automowerconnect.js
+            handle userattr for API timeouts and logleveldevio, measure
+            response time, prevent some warnings, update map via FW extension,
+            reduce side effects while maually update mower data via polling
  - feature: 72_FRITZBOX: Attribut: disableHostIPv4check
  - bugfix:  72_FRITZBOX: Parameter Fehlerbehandlung: get fritzLog
  - change:  10_KNX: moved KNX_scan function to KNXIO-module, see Forum #122582
