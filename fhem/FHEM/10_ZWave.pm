@@ -99,7 +99,7 @@ my %zwave_class = (
                "..2607(..)(..)" =>
                       'sprintf("swmSwitchType:primary %s secondary %s",
                           Zwave_switchType($1), Zwave_switchType($2))', }}, #V3
-  SWITCH_ALL               => { id => '27',
+  SWITCH_ALL               => { id => '27', obsoleted=>1,
     set   => { swaIncludeNone  => "0100",
                swaIncludeOff   => "0101",
                swaIncludeOn    => "0102",
@@ -111,8 +111,8 @@ my %zwave_class = (
                "03270301"      => "swa:off",
                "03270302"      => "swa:on",
                "032703ff"      => "swa:on off" } },
-  SWITCH_TOGGLE_BINARY     => { id => '28' },
-  SWITCH_TOGGLE_MULTILEVEL => { id => '29' },
+  SWITCH_TOGGLE_BINARY     => { id => '28', obsoleted=>1 },
+  SWITCH_TOGGLE_MULTILEVEL => { id => '29', deprecated=>1 },
   CHIMNEY_FAN              => { id => '2a' },
   SCENE_ACTIVATION         => { id => '2b',
     set   => { sceneActivate => "01%02x%02x" },
@@ -130,7 +130,7 @@ my %zwave_class = (
                 '"group_".hex($1).":scene ".hex($2)."duration ".hex($3)' } },
   ZIP_CLIENT               => { id => '2e' },
   ZIP_ADV_SERVICES         => { id => '2f' },
-  SENSOR_BINARY            => { id => '30',
+  SENSOR_BINARY            => { id => '30', deprecated=>1,
     get   => { sbStatus    => "02"        },
     parse => { "03300300"  => "state:closed",
                "033003ff"  => "state:open",
@@ -156,7 +156,7 @@ my %zwave_class = (
                "0.3304(..)(..)(.*)"=> '"ccStatus_".hex($1).":".hex($2)',
                "..3304(..)(..)(.*)"=> 'ZWave_ccParse(hex($1),hex($2))' } },
   ZIP_ADV_CLIENT           => { id => '34' },
-  METER_PULSE              => { id => '35' },
+  METER_PULSE              => { id => '35', deprecated=>1 },
   BASIC_TARIFF_INFO        => { id => '36' },
   HRV_STATUS               => { id => '37',
     get   => { hrvStatus   => "01%02x",
@@ -291,7 +291,7 @@ my %zwave_class = (
                "03450307"  => "fanState:upDownCirc",
                "03450308"  => "fanState:quietCirc"
                } } ,
-  CLIMATE_CONTROL_SCHEDULE => { id => '46',
+  CLIMATE_CONTROL_SCHEDULE => { id => '46', deprecated=>1,
     set   => { ccs                => 'ZWave_ccsSet("%s")' ,
                ccsOverride        => 'ZWave_ccsSetOverride("%s")'},
     get   => { ccs                => 'ZWave_ccsGet("%s")',
@@ -310,7 +310,7 @@ my %zwave_class = (
     parse => { "034c02(.*)" => '"doorLockLoggingRecordsSupported:".hex($val)',
                "..4c04(.*)" => 'ZWave_doorLLRParse($hash, $1)'} },
   NETWORK_MANAGEMANT_BASIC => { id => '4d' },
-  SCHEDULE_ENTRY_LOCK      => { id => '4e', # V1, V2, V3
+  SCHEDULE_ENTRY_LOCK      => { id => '4e', deprecated=>1, # V1, V2, V3
     get   =>  { scheduleEntryLockTypeSupported  => '09',
                 scheduleEntryLockWeekDay        => "04%02x%02x",
                 scheduleEntryLockYearDay        => "07%02x%02x",
@@ -342,7 +342,7 @@ my %zwave_class = (
                   'ZWave_scheduleEntryLockDailyRepeatingParse($hash, $1)'
               }},
   ZI_6LOWPAN               => { id => '4f' },
-  BASIC_WINDOW_COVERING    => { id => '50',
+  BASIC_WINDOW_COVERING    => { id => '50', obsoleted=>1,
     set   => { coveringClose => "0140",
                coveringOpen => "0100",
                coveringStop => "02"  },
@@ -350,7 +350,7 @@ my %zwave_class = (
               "03500100"   => "covering:open",
               "03500200"   => "covering:stop",
               "03500240"   => "covering:stop" } },
-  MTP_WINDOW_COVERING      => { id => '51' },
+  MTP_WINDOW_COVERING      => { id => '51, obsoleted=>1' },
   NETWORK_MANAGEMENT_PROXY => { id => '52' },
   NETWORK_SCHEDULE         => { id => '53', # V1, Schedule
     get   => {  scheduleSupported => "01",
@@ -362,10 +362,10 @@ my %zwave_class = (
     parse => { "..5302(.*)" => 'ZWave_scheduleSupportedParse($hash, $1)',
                "..5305(.*)" => 'ZWave_scheduleParse($hash, $1)',
                "..5309(.*)" => 'ZWave_scheduleStateParse($hash, $1)' } },
-  NETWORK_MANAGEMENT_PRIMARY=>{ id => '54' },
+  NETWORK_MANAGEMENT_PRIMARY=>{ id => '54', obsoleted=>1 },
   TRANSPORT_SERVICE        => { id => '55' },
-  CRC_16_ENCAP             => { id => '56' }, # Parse is handled in the code
-  APPLICATION_CAPABILITY   => { id => '57' },
+  CRC_16_ENCAP             => { id => '56', deprecated=>1 }, # Parse in code
+  APPLICATION_CAPABILITY   => { id => '57', obsoleted=>1 },
   ZIP_ND                   => { id => '58' },
   ASSOCIATION_GRP_INFO     => { id => '59',
     get   => { associationGroupName => "01%02x",
@@ -443,7 +443,7 @@ my %zwave_class = (
     get   => { config      => "05%02x",
                configAll   => 'ZWave_configAllGet($hash)' },
     parse => { "^..70..(..)(..)(.*)" => 'ZWave_configParse($hash,$1,$2,$3)'} },
-  ALARM                    => { id => '71',
+  ALARM                    => { id => '71', deprecated=>1,
     set   => {
       alarmnotification   => 'ZWave_ALARM_06_Set("%s")',    # >=V2
       },
@@ -490,7 +490,7 @@ my %zwave_class = (
                "03750301"    => "protection:seq",
                "03750302"    => "protection:on",
                "047503(..)(..)"  => 'ZWave_protectionParse($1, $2)'} },
-  LOCK                     => { id => '76' },
+  LOCK                     => { id => '76', deprecated=>1 },
   NODE_NAMING              => { id => '77',
     set   => { name     => '(undef, "0100".unpack("H*", "%s"))',
                location => '(undef, "0400".unpack("H*", "%s"))' },
@@ -514,9 +514,9 @@ my %zwave_class = (
     get   => { fwMetaData  => 'ZWave_firmware($hash, "")'  },
     set   => { fwUpdate    => 'ZWave_firmware($hash, "%s")'},
     parse => { "..7a(..)(.*)" => 'ZWave_firmwareUpdateParse($hash, $1, $2)' } },
-  GROUPING_NAME            => { id => '7b' },
-  REMOTE_ASSOCIATION_ACTIVATE=>{id => '7c' },
-  REMOTE_ASSOCIATION       => { id => '7d' },
+  GROUPING_NAME            => { id => '7b', deprecated=>1 },
+  REMOTE_ASSOCIATION_ACTIVATE=>{id => '7c', obsoleted=>1 },
+  REMOTE_ASSOCIATION       => { id => '7d', obsoleted=>1 },
   BATTERY                  => { id => '80',
     get   => { battery     => "02" },
     parse => { "0.8003(..)"=> 'ZWave_battery($1)'} } ,
@@ -526,7 +526,7 @@ my %zwave_class = (
     parse => { "028105"        => "clock:get",
                "048106(..)(..)"=> 'ZWave_clockParse($1,$2)' }},
   HAIL                     => { id => '82',
-    parse => { "028201"    => "hail:01"}},
+    parse => { "028201"    => "hail:01", obsoleted=>1}},
   WAKE_UP                  => { id => '84',
     set   => { wakeupInterval => "04%06x%02x",
                wakeupNoMoreInformation => "08" },
@@ -575,7 +575,7 @@ my %zwave_class = (
     parse => { "038703(..)"    => '($1 eq "00" ? "indState:off" :
                                ($1 eq "ff" ? "indState:on" :
                                              "indState:dim ".hex($1)))'} },
-  PROPRIETARY              => { id => '88' },
+  PROPRIETARY              => { id => '88', deprecated=>1 },
   LANGUAGE                 => { id => '89' },
   TIME                     => { id => '8a' ,
     set   => { timeOffset   => 'ZWave_timeOffsetSet($hash, "%s")' },
@@ -618,16 +618,20 @@ my %zwave_class = (
                "..9881(.*)"=> 'ZWave_secDecrypt($hash, $1, 0)',
                "..98c1(.*)"=> 'ZWave_secDecrypt($hash, $1, 1)' } },
   AV_TAGGING_MD            => { id => '99' },
-  IP_CONFIGURATION         => { id => '9a' },
+  IP_CONFIGURATION         => { id => '9a', obsoleted=>1 },
   ASSOCIATION_COMMAND_CONFIGURATION
                            => { id => '9b' },
-  SENSOR_ALARM             => { id => '9c',
+  SENSOR_ALARM             => { id => '9c', deprecated=>1,
     get   => { alarm       => "01%02x" },
     parse => { "..9c02(..)(..)(..)(....)" =>
       '"alarm_type_$2:level ".hex($3)." node ".hex($1)." seconds ".hex($4)'} },
   SILENCE_ALARM            => { id => '9d' },
-  SENSOR_CONFIGURATION     => { id => '9e' },
+  SENSOR_CONFIGURATION     => { id => '9e', obsoleted=>1 },
   SECURITY_S2              => { id => '9f' },
+  IR_REPEATER              => { id => 'a0' },
+  AUTHENTICATION           => { id => 'a1' },
+  AUTHENTICATION_MEDIA_WRITE=>{ id => 'a2' },
+  GENERIC_SCHEDULE         => { id => 'a3' },
   MARK                     => { id => 'ef' },
   NON_INTEROPERABLE        => { id => 'f0' },
 );
@@ -5379,6 +5383,12 @@ ZWave_Parse($$@)
     if($cmd eq "ZW_CONTROLLER_CHANGE" && $evt eq "protocolDone") {
       AnalyzeCommand(undef, "set $ioName addNode off");
     }
+
+  } elsif($cmd eq "ZW_APPLICATION_COMMAND_HANLDER_BRIDGE") {#134005 experimental
+    $arg =~ m/^(..)(..)/;
+    $id = $1; 
+    $arg = substr($arg, 2, hex($2)*2+2);
+    $cmd = "APPLICATION_COMMAND_HANDLER";
   }
 
   if($evt) {
