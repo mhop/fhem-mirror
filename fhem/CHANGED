@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 76_SMAInverter: bugfix DC-Power 
  - change:  74_AutomowerConnect: Common.pm, automowerconnect.js
             handle userattr for API timeouts and logleveldevio, measure
             response time, prevent some warnings, update map via FW extension,
