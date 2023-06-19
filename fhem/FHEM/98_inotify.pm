@@ -155,7 +155,7 @@ sub inotify_Notify ($$) {
 	
 	if (!IsDisabled($name)) {
 	  inotify_Watch($hash);
-	  $attr{$name}{"mask"}=~s/\|/,/g;
+	  $attr{$name}{"mask"}=~s/\|/,/g if($attr{$name}{"mask"}); 
 	}
 
   return undef;
@@ -245,11 +245,11 @@ sub inotify_Attr($@) {
 			return "$name: mask has to be a list of possible masks divided by comma. Select out of ".join(', ',@maskAttrs) if (!$check);
 			Log3 $name, 4, "inotify ($name): set attribut $attrName to $attrVal";		
 			inotify_setMasks ($hash,$attrVal);
-			InternalTimer(gettimeofday()+1, "inotify_Watch", $hash, 0) if (!IsDisabled($name));
+			inotify_refreshWatcher ($hash);
 		}
 		elsif ( $cmd eq "del") {
 			delete ($hash->{helper}{"masks"});
-			InternalTimer(gettimeofday()+1, "inotify_Watch", $hash, 0) if (!IsDisabled($name));
+			inotify_refreshWatcher ($hash);
 		}
 	}
 	
@@ -257,11 +257,11 @@ sub inotify_Attr($@) {
 		if ( $cmd eq "set" ) {
 			return "$name: $attrName has to be 0 or 1" if ($attrVal !~ /^(0|1)$/);
 			Log3 $name, 4, "inotify ($name): set attribut $attrName to $attrVal";
-			InternalTimer(gettimeofday()+1, "inotify_Watch", $hash, 0) if (!IsDisabled($name));
+			inotify_refreshWatcher ($hash);
 		}
 		elsif ( $cmd eq "del" ) {
 			Log3 $name, 4, "inotify ($name): deleted attribut $attrName";
-			InternalTimer(gettimeofday()+1, "inotify_Watch", $hash, 0) if (!IsDisabled($name));
+			inotify_refreshWatcher ($hash);
 		}
 	}
 	
@@ -276,7 +276,7 @@ sub inotify_Active($;$) {
 	$ndel = 0 if (!defined($ndel));
 	
 	CommandDeleteAttr(undef,"$name disable") if (AttrVal($name,"disable",0)==1 && $ndel==0);
-	InternalTimer(gettimeofday()+1, "inotify_Watch", $hash, 0);
+	inotify_refreshWatcher ($hash);
 	
 	readingsSingleUpdate($hash,"state","active",1);
 	
@@ -299,6 +299,13 @@ sub inotify_Inactive($) {
 }
 
 
+sub inotify_refreshWatcher($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	RemoveInternalTimer($hash,"inotify_Watch");
+	InternalTimer(gettimeofday()+1, "inotify_Watch", $hash, 0) if (!IsDisabled($name));
+}
+
 sub inotify_Watch($) {
 	my ($hash, $arg) = @_;
 	
@@ -320,23 +327,35 @@ sub inotify_Watch($) {
 		
 	if ($subF!=1) {
 		push @{$hash->{helper}{dirs}},$path;
-		$watch[0] = $inotify->watch ($path, IN_ALL_EVENTS, sub {
+		my $watcher = $inotify->watch ($path, IN_ALL_EVENTS, sub {
 			my $e = shift;
-			Log3 $name, 4, "inotify ($name): path to watch ".$path;
 			inotify_AnalyseEvent($hash,$e);
 		});
+		if($watcher){
+			Log3 $name, 4, "inotify ($name): path to watch ".$path;
+			$watch[0] = $watcher;
+		}
+		else{
+			Log3 $name, 2, "inotify ($name):Error: $! for ".$path;
+		}
 	}
 	else {
 		my $i=0;
 		my @dirs = split(/\n/,`find $path -type d`);
 		@{$hash->{helper}{dirs}}=@dirs;
 		foreach my $entry (@dirs) {
-		    Log3 $name, 4, "inotify ($name): path to watch ".$entry;
-		   	$watch[$i] = $inotify->watch ($entry, IN_ALL_EVENTS, sub {
-					my $e = shift;
-					inotify_AnalyseEvent($hash,$e);
-				});
-				$i++;
+		    	my $watcher = $inotify->watch ($entry, IN_ALL_EVENTS, sub {
+				my $e = shift;
+				inotify_AnalyseEvent($hash,$e);
+			});
+			if($watcher){
+				Log3 $name, 4, "inotify ($name): path to watch ".$entry;
+			    $watch[$i] = $watcher;
+ 				$i++;
+			}
+			else{
+				Log3 $name, 2, "inotify ($name):Error: $! for ".$entry;
+			}
 		}
 	}
 
@@ -350,6 +369,7 @@ sub inotify_Watch($) {
 	}
 	
 	Log3 $name, 3, "inotify ($name): startet watching ".$watchString;
+	readingsSingleUpdate($hash,"state","active",0);
 	
 	return;
 }
@@ -420,6 +440,7 @@ sub inotify_AnalyseEvent($$) {
 			readingsBulkUpdate($hash,"lastEventFile",$e->fullname);
 			readingsBulkUpdate($hash,"lastEventMask",$mask);
 			readingsEndUpdate( $hash, 1 );
+			addEvent($hash, "$mask: ".$e->fullname, gettimeofday());
 		
 			Log3 $name, 4, "inotify ($name): got event ".$mask." for ".$e->fullname;
 			Log3 $name, 1, "inotify ($name): got error ".$mask." for ".$e->fullname if ($mask eq "IN_Q_OVERFLOW");
@@ -437,7 +458,7 @@ sub inotify_setMasks ($$) {
 	my ($hash,$attrVal) = @_;
 	my $name = $hash->{NAME}; 
 	
-	$attr{$name}{"mask"}=~s/\|/,/g;
+	$attr{$name}{"mask"}=~s/\|/,/g if($attr{$name}{"mask"});
 	if ($attrVal) {
 		my @masks = split(/\,/,$attrVal);
 		@{$hash->{helper}{"masks"}} = @masks;
