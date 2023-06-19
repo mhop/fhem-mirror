@@ -34,7 +34,7 @@ eval "use File::Find;1" or $missingModule .= "File::Find ";
 
 #######################
 # Global variables
-my $version = "0.6.1";
+my $version = "0.6.4";
 our $inotify;
 our @watch;
 
