@@ -32,6 +32,7 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.23.3" => "19.06.2023  buxfix DC-Power",
   "2.23.2" => "20.05.2023  add new SMAInverter_StatusText",
   "2.23.1" => "19.05.2023  add String 3 (only STP X Inverter)",
   "2.23.0" => "14.05.2023  read firmware version",
@@ -1172,7 +1173,7 @@ sub SMAInverter_getstatusDoParse($) {
          my $cnt15  = int(900/$interval);          # Anzahl der Zyklen innerhalb 15 Minuten = Summe aller Messzyklen
          my $cntsum = $cnt15+1;                    # Sicherheitszuschlag Summe Anzahl aller Zyklen
          my @averagebuf;
-         if ($sup_TypeLabel && $sup_EnergyProduction && $inv_CLASS =~ /8001|8002|8007|8009/xs) {
+         if ($sup_TypeLabel && $sup_SpotACTotalPower && $inv_CLASS =~ /8001|8002|8007|8009/xs) {
 		     my $power = $inv_SPOT_PACTOT;
 			 $power = $inv_SPOT_PDC if($inv_CLASS =~ /8009/xs); #DC Leistung bei Hybrid verwenden
 			 
@@ -2170,9 +2171,9 @@ sub SMAInverter_SMAcommand($$$$$) {
      if($size < 90) {$inv_SPOT_PDC2 = "-"; }  else {$inv_SPOT_PDC2 = unpack("l*", substr $data, 90, 4); } # catch short response, in case PDC2 not supported
 	 if($size < 118) {$inv_SPOT_PDC3 = "-"; } else {$inv_SPOT_PDC3 = unpack("l*", substr $data, 118, 4); } # catch short response, in case PDC3 not supported
 	 
-     $inv_SPOT_PDC1 = ($inv_SPOT_PDC1 eq 2147483648) ? 0 : $inv_SPOT_PDC1;
-     $inv_SPOT_PDC2 = ($inv_SPOT_PDC2 eq 2147483648) ? 0 : $inv_SPOT_PDC2;
-	 $inv_SPOT_PDC3 = ($inv_SPOT_PDC3 eq 2147483648) ? 0 : $inv_SPOT_PDC3;
+     $inv_SPOT_PDC1 = (abs($inv_SPOT_PDC1) eq 2147483648) ? 0 : $inv_SPOT_PDC1;
+     $inv_SPOT_PDC2 = (abs($inv_SPOT_PDC2) eq 2147483648) ? 0 : $inv_SPOT_PDC2;
+	 $inv_SPOT_PDC3 = (abs($inv_SPOT_PDC3) eq 2147483648) ? 0 : $inv_SPOT_PDC3;
      Log3 $name, 5, "$name - Found Data SPOT_PDC1=$inv_SPOT_PDC1, SPOT_PDC2=$inv_SPOT_PDC2 and SPOT_PDC3=$inv_SPOT_PDC3";
      return (1,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_SPOT_PDC3,$inv_susyid,$inv_serial);
  }
@@ -3121,7 +3122,6 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 <li><b>SPOT_IAC3 / phase_3_iac</b>          		:  Grid current phase L3 </li>
 <li><b>SPOT_IDC1 / string_1_idc</b>         		:  DC current input </li>
 <li><b>SPOT_IDC2 / string_2_idc</b>         		:  DC current input </li>
-<li><b>SPOT_IDC3 / string_3_idc</b>         		:  DC current input </li>
 <li><b>SPOT_OPERTM / operation_time</b>     		:  Operation Time </li>
 <li><b>SPOT_PAC1 / phase_1_pac</b>          		:  Power L1  </li>
 <li><b>SPOT_PAC2 / phase_2_pac</b>          		:  Power L2  </li>
@@ -3129,7 +3129,6 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 <li><b>SPOT_PACTOT / total_pac</b>          		:  Total Power </li>
 <li><b>SPOT_PDC1 / string_1_pdc</b>         		:  DC power input 1 </li>
 <li><b>SPOT_PDC2 / string_2_pdc</b>         		:  DC power input 2 </li>
-<li><b>SPOT_PDC3 / string_3_pdc</b>         		:  DC power input 3 </li>
 <li><b>SPOT_PDC / strings_pds</b>    				:  DC power summary (only Hybrid-Inverter)</li>
 <li><b>SPOT_UAC1 / phase_1_uac</b>          		:  Grid voltage phase L1 </li>
 <li><b>SPOT_UAC2 / phase_2_uac</b>          		:  Grid voltage phase L2 </li>
@@ -3139,7 +3138,6 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 <li><b>SPOT_UAC3_1 / phase_3_1_uac</b>      		:  Grid voltage phase L3-L1 </li>
 <li><b>SPOT_UDC1 / string_1_udc</b>         		:  DC voltage input </li>
 <li><b>SPOT_UDC2 / string_2_udc</b>         		:  DC voltage input </li>
-<li><b>SPOT_UDC3 / string_3_udc</b>         		:  DC voltage input </li>
 <li><b>SUSyID / susyid</b>                  		:  Inverter SUSyID </li>
 <li><b>INV_TEMP / device_temperature</b>    		:  Inverter temperature </li>
 <li><b>INV_TYPE / device_type</b>           		:  Inverter Type </li>
@@ -3396,7 +3394,6 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <li><b>SPOT_IAC3 / phase_3_iac</b>          		:  Netz Strom phase L3 </li>
 <li><b>SPOT_IDC1 / string_1_idc</b>         		:  DC Strom Eingang 1 </li>
 <li><b>SPOT_IDC2 / string_2_idc</b>         		:  DC Strom Eingang 2 </li>
-<li><b>SPOT_IDC3 / string_3_idc</b>         		:  DC Strom Eingang 3 </li>
 <li><b>SPOT_OPERTM / operation_time</b>     		:  Betriebsstunden </li>
 <li><b>SPOT_PAC1 / phase_1_pac</b>          		:  Leistung L1  </li>
 <li><b>SPOT_PAC2 / phase_2_pac</b>          		:  Leistung L2  </li>
@@ -3404,7 +3401,6 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <li><b>SPOT_PACTOT / total_pac</b>          		:  Gesamtleistung </li>
 <li><b>SPOT_PDC1 / string_1_pdc</b>         		:  DC Leistung Eingang 1 </li>
 <li><b>SPOT_PDC2 / string_2_pdc</b>         		:  DC Leistung Eingang 2 </li>
-<li><b>SPOT_PDC2 / string_3_pdc</b>         		:  DC Leistung Eingang 3 </li>
 <li><b>SPOT_PDC / strings_pds</b>       			:  DC Leistung gesamt (bei Hybridwechselrichtern)</li>
 <li><b>SPOT_UAC1 / phase_1_uac</b>          		:  Netz Spannung phase L1 </li>
 <li><b>SPOT_UAC2 / phase_2_uac</b>          		:  Netz Spannung phase L2 </li>
@@ -3414,7 +3410,6 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <li><b>SPOT_UAC3_1 / phase_3_1_uac</b>          	:  Netz Spannung phase L3-L1 </li>
 <li><b>SPOT_UDC1 / string_1_udc</b>         		:  DC Spannung Eingang 1 </li>
 <li><b>SPOT_UDC2 / string_2_udc</b>         		:  DC Spannung Eingang 2 </li>
-<li><b>SPOT_UDC3 / string_3_udc</b>         		:  DC Spannung Eingang 3 </li>
 <li><b>SUSyID / susyid</b>                  		:  Wechselrichter SUSyID </li>
 <li><b>INV_TEMP / device_temperature</b>    		:  Wechselrichter Temperatur </li>
 <li><b>INV_TYPE / device_type</b>           		:  Wechselrichter Typ </li>
@@ -3471,7 +3466,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.23.2",
+  "version": "v2.23.0",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
