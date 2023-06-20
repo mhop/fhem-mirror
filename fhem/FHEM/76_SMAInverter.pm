@@ -32,6 +32,7 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.23.4" => "20.06.2023  buxfix DC-Power 2.0",
   "2.23.3" => "19.06.2023  buxfix DC-Power",
   "2.23.2" => "20.05.2023  add new SMAInverter_StatusText",
   "2.23.1" => "19.05.2023  add String 3 (only STP X Inverter)",
@@ -2168,12 +2169,20 @@ sub SMAInverter_SMAcommand($$$$$) {
 
  if($data_ID eq 0x251E) {
      $inv_SPOT_PDC1 = unpack("l*", substr $data, 62, 4);
-     if($size < 90) {$inv_SPOT_PDC2 = "-"; }  else {$inv_SPOT_PDC2 = unpack("l*", substr $data, 90, 4); } # catch short response, in case PDC2 not supported
-	 if($size < 118) {$inv_SPOT_PDC3 = "-"; } else {$inv_SPOT_PDC3 = unpack("l*", substr $data, 118, 4); } # catch short response, in case PDC3 not supported
+	 #$inv_SPOT_PDC1 = (abs($inv_SPOT_PDC1) eq 2147483648) ? 0 : $inv_SPOT_PDC1;
+	 if(($inv_SPOT_PDC1 eq -2147483648) || ($inv_SPOT_PDC1 eq 0xFFFFFFFF)) {$inv_SPOT_PDC1 = "-"; }
 	 
-     $inv_SPOT_PDC1 = (abs($inv_SPOT_PDC1) eq 2147483648) ? 0 : $inv_SPOT_PDC1;
-     $inv_SPOT_PDC2 = (abs($inv_SPOT_PDC2) eq 2147483648) ? 0 : $inv_SPOT_PDC2;
-	 $inv_SPOT_PDC3 = (abs($inv_SPOT_PDC3) eq 2147483648) ? 0 : $inv_SPOT_PDC3;
+     if($size < 90) {$inv_SPOT_PDC2 = "-"; }  else {
+		$inv_SPOT_PDC2 = unpack("l*", substr $data, 90, 4);
+		#$inv_SPOT_PDC2 = (abs($inv_SPOT_PDC2) eq 2147483648) ? 0 : $inv_SPOT_PDC2;
+		if(($inv_SPOT_PDC2 eq -2147483648) || ($inv_SPOT_PDC2 eq 0xFFFFFFFF)) {$inv_SPOT_PDC2 = "-"; }
+	 } # catch short response, in case PDC2 not supported
+	 if($size < 118) {$inv_SPOT_PDC3 = "-"; } else {
+		$inv_SPOT_PDC3 = unpack("l*", substr $data, 118, 4); 
+		#$inv_SPOT_PDC3 = (abs($inv_SPOT_PDC3) eq 2147483648) ? 0 : $inv_SPOT_PDC3;
+		if(($inv_SPOT_PDC3 eq -2147483648) || ($inv_SPOT_PDC3 eq 0xFFFFFFFF)) {$inv_SPOT_PDC3 = "-"; }
+	 } # catch short response, in case PDC3 not supported
+	 
      Log3 $name, 5, "$name - Found Data SPOT_PDC1=$inv_SPOT_PDC1, SPOT_PDC2=$inv_SPOT_PDC2 and SPOT_PDC3=$inv_SPOT_PDC3";
      return (1,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_SPOT_PDC3,$inv_susyid,$inv_serial);
  }
