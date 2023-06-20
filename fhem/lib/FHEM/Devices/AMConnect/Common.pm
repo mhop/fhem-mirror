@@ -94,9 +94,11 @@ if ($@) {
 }
 $errorjson = undef;
 
-use constant AUTHURL => 'https://api.authentication.husqvarnagroup.dev/v1';
-use constant APIURL => 'https://api.amc.husqvarna.dev/v1';
-use constant WSDEVICENAME => 'wss:ws.openapi.husqvarna.dev:443/v1';
+use constant { 
+  AUTHURL       => 'https://api.authentication.husqvarnagroup.dev/v1',
+  APIURL        => 'https://api.amc.husqvarna.dev/v1',
+  WSDEVICENAME  => 'wss:ws.openapi.husqvarna.dev:443/v1'
+};
 
 
 ##############################################################
@@ -173,11 +175,13 @@ my $mapZonesTpl = '{
       interval                  => 840,
       interval_ws               => 7110,
       interval_ping             => 60,
+      use_position_polling      => 0,
+      additional_polling        => 0,
       retry_interval_apiauth    => 840,
       retry_interval_getmower   => 840,
       timeout_apiauth           => 5,
       timeout_getmower          => 5,
-      timeout_cmd               => 15,
+      timeout_cmd               => 10,
       midnightCycle             => 1,
       client_id                 => $client_id,
       grant_type                => 'client_credentials',
@@ -197,6 +201,7 @@ my $mapZonesTpl = '{
       newdatasets               => 0,
       newzonedatasets           => 0,
       positionsTime             => 0,
+      storesum                  => 0,
       statusTime                => 0,
       cspos                     => [],
       areapos                   => [],
@@ -680,6 +685,8 @@ sub APIAuth {
 
       my $header = "Content-Type: application/x-www-form-urlencoded\r\nAccept: application/json";
       my $data = 'grant_type=' . $grant_type.'&client_id=' . $client_id . '&client_secret=' . $client_secret;
+      readingsSingleUpdate( $hash, 'api_callsThisMonth' , ReadingsVal( $name,  'api_callsThisMonth', 0 ) + 1, 0) if ( $hash->{helper}{additional_polling} );
+
       ::HttpUtils_NonblockingGet( {
         url         => AUTHURL . '/oauth2/token',
         timeout     => $timeout,
@@ -792,19 +799,145 @@ sub getMower {
 
   my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: " . $client_id . "\r\nAuthorization: Bearer " . $access_token . "\r\nAuthorization-Provider: " . $provider;
   Log3 $name, 5, "$iam header [ $header ]";
+  readingsSingleUpdate( $hash, 'api_callsThisMonth' , ReadingsVal( $name, 'api_callsThisMonth', 0 ) + 1, 0) if ( $hash->{helper}{additional_polling} );
 
   ::HttpUtils_NonblockingGet({
-    url        => APIURL . "/mowers",
+    url        => APIURL . '/mowers',
     timeout    => $timeout,
     hash       => $hash,
     method     => "GET",
     header     => $header,  
     callback   => \&getMowerResponse,
     t_begin    => scalar gettimeofday()
-  }); 
+  });
   
 
   return undef;
+}
+
+#########################
+sub getMowerWs {
+  
+  my ( $hash ) = @_;
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  my $iam = "$type $name getMowerWs:";
+  my $access_token = ReadingsVal($name,".access_token","");
+  my $provider = ReadingsVal($name,".provider","");
+  my $client_id = $hash->{helper}->{client_id};
+  my $timeout = AttrVal( $name, 'timeoutGetMower', $hash->{helper}->{timeout_getmower} );
+
+  my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: " . $client_id . "\r\nAuthorization: Bearer " . $access_token . "\r\nAuthorization-Provider: " . $provider;
+  Log3 $name, 5, "$iam header [ $header ]";
+  readingsSingleUpdate( $hash, 'api_callsThisMonth' , ReadingsVal( $name,  'api_callsThisMonth', 0 ) + 1, 0) if ( $hash->{helper}{additional_polling} );
+
+  ::HttpUtils_NonblockingGet( {
+    url        => APIURL . '/mowers/' . $hash->{helper}{mower}{id},
+    timeout    => $timeout,
+    hash       => $hash,
+    method     => "GET",
+    header     => $header,  
+    callback   => \&getMowerResponseWs,
+    t_begin    => scalar gettimeofday()
+  } );
+
+  return undef;
+}
+
+#########################
+sub getMowerResponseWs {
+
+  my ( $param, $err, $data ) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  my $statuscode = $param->{code} // '';
+  my $iam = "$type $name getMowerResponseWs:";
+
+  Log3 $name, 1, "$iam response time ". sprintf( "%.2f", ( gettimeofday() - $param->{t_begin} ) ) . ' s' if ( $param->{timeout} == 60 );
+  Log3 $name, 1, "debug $iam \$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}" if ( AttrVal($name, 'debug', '') );
+
+  if( !$err && $statuscode == 200 && $data) {
+
+    if ( $data eq '' ) {
+
+      Log3 $name, 2, "$iam no mower data present";
+
+    } else {
+
+      my $result = eval { decode_json($data) };
+
+      if ($@) {
+
+        Log3( $name, 2, "$iam - JSON error while request: $@");
+
+      } else {
+
+        $hash->{helper}{wsResult}{mower} = dclone( $result->{data} ) if ( AttrVal($name, 'debug', '') );
+        $hash->{helper}{mower}{attributes}{statistics} = dclone( $result->{data}{attributes}{statistics} );
+
+        if ( $hash->{helper}{use_position_polling} ) {
+
+          my $cnt = 0;
+          my $tmp = [];
+          my $poslen = @{ $result->{data}{attributes}{positions} };
+
+          for ( $cnt = 0; $cnt < $poslen; $cnt++ ) { 
+
+            if (   $hash->{helper}{searchpos}[ 0 ]{longitude} == $result->{data}{attributes}{positions}[ $cnt ]{longitude}
+                && $hash->{helper}{searchpos}[ 0 ]{latitude} == $result->{data}{attributes}{positions}[ $cnt ]{latitude} ) {
+
+              if ( $cnt > 0 ) {
+
+                my @ar;
+                push @ar, @{ $result->{data}{attributes}{positions} }[ 0 .. $cnt-1 ];
+                $hash->{helper}{mower}{attributes}{positions} = dclone( \@ar );
+                AlignArray( $hash );
+                FW_detailFn_Update ($hash);
+
+              } else {
+
+                $hash->{helper}{mower}{attributes}{positions} = [];
+
+              }
+
+              last;
+
+            }
+
+          }
+
+        }
+
+        isErrorThanPrepare( $hash );
+        resetLastErrorIfCorrected( $hash );
+
+        # Update readings
+        readingsBeginUpdate($hash);
+
+          fillReadings( $hash );
+          # readingsBulkUpdate( $hash, 'mower_wsEvent', $hash->{helper}{wsResult}{type} ); #to do check what event
+          readingsBulkUpdate( $hash, 'mower_wsEvent', 'status-event' );
+
+        readingsEndUpdate($hash, 1);
+
+        $hash->{helper}{searchpos} = [ dclone $result->{data}{attributes}{positions}[ 0 ] ];
+
+        return undef;
+
+      }
+
+    }
+    
+  } else {
+
+    readingsSingleUpdate( $hash, 'device_state', "additional Polling error statuscode $statuscode", 1 );
+    Log3 $name, 1, "$iam \$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}";
+
+  }
+
+  return undef;
+
 }
 
 #########################
@@ -866,6 +999,7 @@ sub getMowerResponse {
           $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{mower}{activity};
           $hash->{helper}{mowerold}{attributes}{statistics}{numberOfCollisions} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{statistics}{numberOfCollisions};
           $hash->{helper}{statistics}{numberOfCollisionsOld} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{statistics}{numberOfCollisions};
+          $hash->{helper}{searchpos} = [ dclone $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions}[0] ];
 
           if ( AttrVal( $name, 'mapImageCoordinatesToRegister', '' ) eq '' ) {
             posMinMax( $hash, $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions} );
@@ -959,7 +1093,6 @@ sub CMD {
     
 
 my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nAuthorization: Bearer " . $token . "\r\nAuthorization-Provider: " . $provider . "\r\nContent-Type: application/vnd.api+json";
-  
 
   if      ($cmd[0] eq "ParkUntilFurtherNotice")     { $json = '{"data":{"type":"'.$cmd[0].'"}}'; $post = 'actions' }
   elsif   ($cmd[0] eq "ParkUntilNextSchedule")      { $json = '{"data": {"type":"'.$cmd[0].'"}}'; $post = 'actions' }
@@ -970,7 +1103,7 @@ my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nA
   elsif   ($cmd[0] eq "headlight")       { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": {"mode": "'.$cmd[1].'"}}}}'; $post = 'settings' }
   elsif   ($cmd[0] eq "cuttingHeight")   { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": '.$cmd[1].'}}}'; $post = 'settings' }
   elsif   ($cmd[0] eq "sendScheduleFromAttributeToMower" && AttrVal( $name, 'mowerSchedule', '')) {
-    
+
     my $perl = eval { decode_json (AttrVal( $name, 'mowerSchedule', '')) };
     if ($@) {
       return "$iam decode error: $@ \n $perl";
@@ -984,8 +1117,9 @@ my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nA
   }
 
   Log3 $name, 5, "$iam $header \n $cmd[0] \n $json"; 
+  readingsSingleUpdate( $hash, 'api_callsThisMonth' , ReadingsVal( $name,  'api_callsThisMonth', 0 ) + 1, 0) if ( $hash->{helper}{additional_polling} );
 
-  ::HttpUtils_NonblockingGet({
+  ::HttpUtils_NonblockingGet( {
     url           => APIURL . "/mowers/". $mower_id . "/".$post,
     timeout       => $timeout,
     hash          => $hash,
@@ -993,9 +1127,9 @@ my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nA
     header        => $header,
     data          => $json,
     callback      => \&CMDResponse,
-    t_begin    => scalar gettimeofday()
-  });  
-  
+    t_begin       => scalar gettimeofday()
+  } );  
+
 }
 
 ##############################################################
@@ -1266,6 +1400,37 @@ sub Attr {
 
     }
   ##########
+  } elsif( $attrName eq 'addPollingMinInterval' ) {
+
+    if( $cmd eq "set" ) {
+
+      return "$iam $attrVal is invalid, allowed time in seconds as integer 0, 29 and higher." unless( $attrVal =~ /^\d+$/ && ( $attrVal == 0 || $attrVal > 28 ) );
+      $hash->{helper}{additional_polling} = $attrVal;
+      Log3 $name, 4, "$iam $cmd $attrName $attrVal";
+
+    } elsif( $cmd eq "del" ) {
+
+      $hash->{helper}{additional_polling} = 0;
+      readingsDelete( $hash, 'api_callsThisMonth' );
+      Log3 $name, 3, "$iam $cmd $attrName and set default value 0.";
+
+    }
+  ##########
+  } elsif( $attrName eq 'addPositionPolling' ) {
+
+    if( $cmd eq "set" ) {
+
+      return "$iam $attrVal is invalid, allowed time in seconds as integer 0, 29 and higher." unless( $attrVal == 0 || $attrVal == 1 );
+      $hash->{helper}{use_position_polling} = $attrVal;
+      Log3 $name, 4, "$iam $cmd $attrName $attrVal";
+
+    } elsif( $cmd eq "del" ) {
+
+      $hash->{helper}{use_position_polling} = 0;
+      Log3 $name, 3, "$iam $cmd $attrName and set default value 0.";
+
+    }
+  ##########
   } elsif ( $attrName eq 'numberOfWayPointsToDisplay' ) {
     
     my $icurr = scalar @{$hash->{helper}{areapos}};
@@ -1434,6 +1599,7 @@ sub Attr {
 sub AlignArray {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  my $use_position_polling = AttrVal( $name, 'addPositionPolling', 0 );
   my $act = $hash->{helper}{mower}{attributes}{mower}{activity};
   my $actold = $hash->{helper}{mowerold}{attributes}{mower}{activity};
   my $cnt = @{ $hash->{helper}{mower}{attributes}{positions} };
@@ -1455,9 +1621,12 @@ sub AlignArray {
 
     }
 
-    @ar = reverse @ar if ( $cnt > 1 ); # positions seem to be in reversed order
+    if ( !$use_position_polling ) {
 
-    # @ar = @ar if ( $cnt > 1 ); # positions seem to be not in reversed order
+      @ar = reverse @ar if ( $cnt > 1 ); # positions seem to be in reversed order
+      # @ar = @ar if ( $cnt > 1 ); # positions seem to be not in reversed order
+
+    }
 
     $tmp = dclone( \@ar );
 
@@ -1972,6 +2141,8 @@ sub calculateStatistics {
 
   }
 
+  readingsSingleUpdate( $hash, 'api_callsThisMonth' , 0, 0) if ( $hash->{helper}{additional_polling} && $time[3] == 1 ); # reset monthly API calls
+
   #clear position arrays
   if ( AttrVal( $name, 'weekdaysToResetWayPoints', 1 ) =~ $time[6] ) {
 
@@ -2356,7 +2527,8 @@ sub wsRead {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   my $iam = "$type $name wsRead:";
-
+  my $additional_polling = $hash->{helper}{additional_polling} * 1000;
+  my $use_position_polling = $hash->{helper}{use_position_polling};
   my $buf = DevIo_SimpleRead( $hash );
   return "" if ( !defined($buf) );
 
@@ -2393,35 +2565,44 @@ sub wsRead {
           $hash->{helper}{mower}{attributes}{mower} = dclone( $result->{attributes}{mower} );
           $hash->{helper}{mower}{attributes}{planner} = dclone( $result->{attributes}{planner} );
           $hash->{helper}{storediff} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
+          $hash->{helper}{storesum} += $hash->{helper}{storediff} if ( $additional_polling );
 
-          isErrorThanPrepare( $hash );
-          resetLastErrorIfCorrected( $hash );
+          if ( !$additional_polling ) {
+
+            isErrorThanPrepare( $hash );
+            resetLastErrorIfCorrected( $hash );
+
+          } elsif ( $additional_polling < $hash->{helper}{storesum} && !$hash->{helper}{midnightCycle} ) {
+
+            $hash->{helper}{storesum} = 0;
+            # RemoveInternalTimer( $hash, \&getMowerWs );
+            # InternalTimer(gettimeofday() + 2,  \&getMowerWs, $hash, 0 );
+            getMowerWs( $hash );
+            Log3 $name, 4, "$iam received websocket data, and polling is on: >$buf<";
+            $hash->{First_Read} = 0;
+            return;
+
+          }
 
         }
 
         if ( $result->{type} eq "positions-event" ) {
 
+          if ( !$use_position_polling || $use_position_polling && !$additional_polling ) {
+
           $hash->{helper}{positionsTime} = gettimeofday();
-          # for ( my $i=0;$i<@{$result->{attributes}{positions}};$i++ ) {
-            # $result->{attributes}{positions}[ $i ]->{nr}=$i;
-          # };
           $hash->{helper}{mower}{attributes}{positions} = dclone( $result->{attributes}{positions} );
 
-          AlignArray( $hash );
+            AlignArray( $hash );
+            FW_detailFn_Update ($hash);
 
-          # my $deltaTime = $hash->{helper}{positionsTime} - $hash->{helper}{statusTime};
+          } elsif ( $use_position_polling && $additional_polling ) {
 
-          # if encounter positions shortly after status-event count it as error positions  
-          # if ( $hash->{helper}{mower}{attributes}{mower}{errorCode} && $deltaTime > 0 && $deltaTime < 0.29 && @{ $result->{attributes}{positions} } < 3) {
+            Log3 $name, 4, "$iam received websocket data, but position polling is on: >$buf<";
+            $hash->{First_Read} = 0;
+            return;
 
-            # $hash->{helper}{areapos}[ 0 ]{act} = 'N';
-            # $hash->{helper}{areapos}[ 1 ]{act} = 'N';
-            # $hash->{helper}{lasterror}{positions} = [dclone( $hash->{helper}{areapos}[ 0 ] ), dclone( $hash->{helper}{areapos}[ 1 ] ) ];
-            # $hash->{helper}{errorstack}[0]{positions} = [dclone( $hash->{helper}{areapos}[ 0 ] ), dclone( $hash->{helper}{areapos}[ 1 ] ) ];
-
-          # }
-
-          FW_detailFn_Update ($hash);
+          }
 
         }
 
@@ -2446,8 +2627,8 @@ sub wsRead {
     }
 
   }
-  Log3 $name, 4, "$iam received websocket data: >$buf<";
 
+  Log3 $name, 4, "$iam received websocket data: >$buf<";
   $hash->{First_Read} = 0;
   return;
 

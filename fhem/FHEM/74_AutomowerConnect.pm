@@ -77,6 +77,8 @@ sub Initialize() {
                         "propertyLimits:textField-long " .
                         "weekdaysToResetWayPoints " .
                         "numberOfWayPointsToDisplay " .
+                        "addPollingMinInterval " .
+                        "addPositionPolling:1,0 " .
                         $::readingFnAttributes;
 
   $::data{FWEXT}{AutomowerConnect}{SCRIPT} = "automowerconnect.js";
@@ -122,7 +124,7 @@ __END__
   <br><br>
   <ul>
     <li>To get access to the API an application has to be created in the <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>. The application has to be connected with the AutomowerConnect API.</li>
-    <li>During registration an application key (client_id) and an application secret (client secret) is provided. Use these for for the module.</li>
+    <li>During registration an application key (client_id) and an application secret (client secret) is provided. Use these for the module.</li>
     <li>The module uses client credentials as grant type for authorization.</li>
   </ul>
   <br>
@@ -243,9 +245,6 @@ __END__
   <a id="AutomowerConnectAttributes"></a>
   <b>Attributes</b>
   <ul>
-    <li><a id='AutomowerConnect-attr-interval'>interval</a><br>
-      <code>attr &lt;name&gt; interval &lt;time in seconds&gt;</code><br>
-      Time in seconds that is used to get new data from Husqvarna Cloud. Default: 420</li>
     <li><a id='AutomowerConnect-attr-mapImagePath'>mapImagePath</a><br>
       <code>attr &lt;name&gt; mapImagePath &lt;path to image&gt;</code><br>
       Path of a raster image file for an area the mower path has to be drawn to.<br>
@@ -272,7 +271,7 @@ __END__
         <li>mower path for activity MOWING: red</li>
         <li>path in CS, activity CHARGING,PARKED_IN_CS: grey</li>
         <li>path for activity LEAVING: green</li>
-        <li>path for activityGOING_HOME: blue</li>
+        <li>path for activity GOING_HOME: blue</li>
         <li>path for interval with error (all activities with error): kind of magenta</li>
         <li>all other activities: grey</li>
       </ul>
@@ -377,6 +376,14 @@ __END__
       }'<br>
       </code></li>
 
+    <li><a id='AutomowerConnect-attr-addPollingMinInterval'>addPollingMinInterval</a><br>
+      <code>attr &lt;name&gt; addPollingMinInterval &lt;interval in seconds&gt;</code><br>
+      Set minimum intervall for additional polling, default 0 (no polling). Gets periodically statistics data from mower. Make sure to be within API limits.</li>
+
+    <li><a id='AutomowerConnect-attr-addPositionPolling'>addPositionPolling</a><br>
+      <code>attr &lt;name&gt; addPositionPolling &lt;[1|<b>0</b>]&gt;</code><br>
+      Set position polling, default 0 (no position polling). Gets periodically position data from mower, instead from websocket. Must not be set without setting attribute addPollingMinInterval.</li>
+
     <li><a href="disable">disable</a></li>
 
     <li><a href="disabledForIntervals">disabledForIntervals</a></li>
@@ -398,7 +405,7 @@ __END__
       <code>attr &lt;name&gt; timeoutGetMower &lt;[6 to 60]&gt;</code><br>
       Set timeout for API call, default 5 s. </li>
 
-    <li><a id='AutomowerConnect-attr-timeoutApiAuth'>ApiAuth</a><br>
+    <li><a id='AutomowerConnect-attr-timeoutApiAuth'>timeoutApiAuth</a><br>
       <code>attr &lt;name&gt; timeoutApiAuth &lt;[6 to 60]&gt;</code><br>
       Set timeout for API call, default 5 s. </li>
 
@@ -415,6 +422,7 @@ __END__
   <b>Readings</b>
   <ul>
     <li>api_MowerFound - all mower registered under the application key (client_id) </li>
+    <li>api_callsThisMonth - counts monthly API calls, if attribute addPollingMinInterval is set.</li>
     <li>api_token_expires - date when session of Husqvarna Cloud expires</li>
     <li>batteryPercent - battery state of charge in percent</li>
     <li>mower_activity - current activity "UNKNOWN" | "NOT_APPLICABLE" | "MOWING" | "GOING_HOME" | "CHARGING" | "LEAVING" | "PARKED_IN_CS" | "STOPPED_IN_GARDEN"</li>
@@ -596,10 +604,6 @@ __END__
     <a id="AutomowerConnectAttributes"></a>
     <b>Attributes</b>
   <ul>
-    <li><a id='AutomowerConnect-attr-interval'>interval</a><br>
-      <code>attr &lt;name&gt; interval &lt;time in seconds&gt;</code><br>
-      Zeit in Sekunden nach denen neue Daten aus der Husqvarna Cloud abgerufen werden. Standard: 420</li>
-
     <li><a id='AutomowerConnect-attr-mapImagePath'>mapImagePath</a><br>
       <code>attr &lt;name&gt; mapImagePath &lt;path to image&gt;</code><br>
       Pfad zur Bilddatei. Auf das Bild werden Pfad, Anfangs- u. Endpunkte gezeichnet.<br>
@@ -735,6 +739,14 @@ __END__
       }'<br>
       </code></li>
 
+    <li><a id='AutomowerConnect-attr-addPollingMinInterval'>addPollingMinInterval</a><br>
+      <code>attr &lt;name&gt; addPollingMinInterval &lt;interval in seconds&gt;</code><br>
+      Setzt das Mindestintervall für zusätzliches Polling der API, default 0 (kein Polling). Liest periodisch statistische Daten vom Mäher. Es muss sichergestellt werden, das die API Begrenzung (10000 Anfragen pro Monat) eingehalten wird.</li>
+
+    <li><a id='AutomowerConnect-attr-addPositionPolling'>addPositionPolling</a><br>
+      <code>attr &lt;name&gt; addPositionPolling &lt;[1|<b>0</b>]&gt;</code><br>
+      Setzt das Positionspolling, default 0 (kein Positionpolling). Liest periodisch Positiondaten des Mähers, an Stelle der über Websocket gelieferten Daten. Darf nur im Zusammenhang mit dem Attribut addPollingMinInterval verwendet werden.</li>
+
      <li><a href="disable">disable</a></li>
 
      <li><a href="disabledForIntervals">disabledForIntervals</a></li>
@@ -773,6 +785,7 @@ __END__
   <b>Readings</b>
   <ul>
     <li>api_MowerFound - Alle Mähroboter, die unter dem genutzten Application Key (client_id) registriert sind.</li>
+    <li>api_callsThisMonth - Zählt die im Monat erfolgten API Aufrufe, wenn das Attribut addPollingMinInterval gesetzt ist.</li>
     <li>api_token_expires - Datum wann die Session der Husqvarna Cloud abläuft</li>
     <li>batteryPercent - Batterieladung in Prozent</li>
     <li>mower_activity - aktuelle Aktivität "UNKNOWN" | "NOT_APPLICABLE" | "MOWING" | "GOING_HOME" | "CHARGING" | "LEAVING" | "PARKED_IN_CS" | "STOPPED_IN_GARDEN"</li>
