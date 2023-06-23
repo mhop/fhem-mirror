@@ -297,7 +297,6 @@ my $mapZonesTpl = '{
   $hash->{Host} = 'ws.openapi.husqvarna.dev';
   $hash->{Port} = '443/v1';
 
-
   AddExtension( $name, \&GetMap, "$type/$name/map" );
   AddExtension( $name, \&GetJson, "$type/$name/json" );
 
@@ -1138,7 +1137,7 @@ sub CMDResponse {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  my $statuscode = $param->{code};
+  my $statuscode = $param->{code} // '';
   my $iam = "$type $name CMDResponse:";
 
   Log3 $name, 1, "$iam response time ". sprintf( "%.2f", ( gettimeofday() - $param->{t_begin} ) ) . ' s' if ( $param->{timeout} == 60 );
@@ -1404,7 +1403,7 @@ sub Attr {
 
     if( $cmd eq "set" ) {
 
-      return "$iam $attrVal is invalid, allowed time in seconds as integer 0, 29 and higher." unless( $attrVal =~ /^\d+$/ && ( $attrVal == 0 || $attrVal > 28 ) );
+      return "$iam $attrVal is invalid, allowed time in seconds >= 0." unless( $attrVal >= 0 ) );
       $hash->{helper}{additional_polling} = $attrVal;
       Log3 $name, 4, "$iam $cmd $attrName $attrVal";
 
@@ -1420,7 +1419,7 @@ sub Attr {
 
     if( $cmd eq "set" ) {
 
-      return "$iam $attrVal is invalid, allowed time in seconds as integer 0, 29 and higher." unless( $attrVal == 0 || $attrVal == 1 );
+      return "$iam $attrVal is invalid, allowed value 0 or 1." unless( $attrVal == 0 || $attrVal == 1 );
       $hash->{helper}{use_position_polling} = $attrVal;
       Log3 $name, 4, "$iam $cmd $attrName $attrVal";
 
@@ -1599,7 +1598,7 @@ sub Attr {
 sub AlignArray {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  my $use_position_polling = AttrVal( $name, 'addPositionPolling', 0 );
+  my $use_position_polling = $hash->{helper}{use_position_polling};
   my $act = $hash->{helper}{mower}{attributes}{mower}{activity};
   my $actold = $hash->{helper}{mowerold}{attributes}{mower}{activity};
   my $cnt = @{ $hash->{helper}{mower}{attributes}{positions} };
@@ -1611,7 +1610,7 @@ sub AlignArray {
     my $deltaTime = $hash->{helper}{positionsTime} - $hash->{helper}{statusTime};
 
     # if encounter positions shortly after status event old activity is assigned to positions  
-    if ( $cnt > 1 && $deltaTime > 0 && $deltaTime < 0.29 ) {
+    if ( $cnt > 1 && $deltaTime > 0 && $deltaTime < 0.29 && !$use_position_polling) {
 
       map { $_->{act} = $hash->{helper}{$actold}{short} } @ar;
 
@@ -2482,7 +2481,7 @@ sub wsKeepAlive {
   my ($hash) = @_;
   RemoveInternalTimer( $hash, \&wsKeepAlive);
   DevIo_Ping($hash);
-  InternalTimer(gettimeofday() + 60, \&wsKeepAlive, $hash, 0);
+  InternalTimer(gettimeofday() + $hash->{helper}{interval_ping}, \&wsKeepAlive, $hash, 0);
   
 }
 
@@ -2538,7 +2537,7 @@ sub wsRead {
 
     if ( $@ ) {
 
-      Log3( $name, 2, "$iam - JSON error while request: $@");
+      Log3( $name, 1, "$iam - JSON error while request: $@\n\nbuffer content: >$buf<\n");
 
     } else {
 
@@ -2566,13 +2565,14 @@ sub wsRead {
           $hash->{helper}{mower}{attributes}{planner} = dclone( $result->{attributes}{planner} );
           $hash->{helper}{storediff} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
           $hash->{helper}{storesum} += $hash->{helper}{storediff} if ( $additional_polling );
+          my $act = $result->{attributes}{mower}{activity};
 
           if ( !$additional_polling ) {
 
             isErrorThanPrepare( $hash );
             resetLastErrorIfCorrected( $hash );
 
-          } elsif ( $additional_polling < $hash->{helper}{storesum} && !$hash->{helper}{midnightCycle} ) {
+          } elsif ( ( $additional_polling < $hash->{helper}{storesum} || $additional_polling && $act eq 'LEAVING' ) && !$hash->{helper}{midnightCycle} ) {
 
             $hash->{helper}{storesum} = 0;
             # RemoveInternalTimer( $hash, \&getMowerWs );

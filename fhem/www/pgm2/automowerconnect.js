@@ -275,7 +275,8 @@ function AutomowerConnectTor ( x0, y0, x1, y1 ) {
 function AutomowerConnectUpdateJson ( path ) {
   $.getJSON( path, function( data, textStatus ) {
     log( 'AutomowerConnectUpdateJson ( '+path+' ): status '+textStatus );
-    AutomowerConnectUpdateDetail ( data.name, data.type, data.detailfnfirst, data.picx, data.picy, data.scalx, data.errdesc, data.posxy, data.poserrxy );
+    if ( textStatus == 'success') 
+      AutomowerConnectUpdateDetail ( data.name, data.type, data.detailfnfirst, data.picx, data.picy, data.scalx, data.errdesc, data.posxy, data.poserrxy );
 
   });
 

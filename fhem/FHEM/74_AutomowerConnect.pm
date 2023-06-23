@@ -378,11 +378,11 @@ __END__
 
     <li><a id='AutomowerConnect-attr-addPollingMinInterval'>addPollingMinInterval</a><br>
       <code>attr &lt;name&gt; addPollingMinInterval &lt;interval in seconds&gt;</code><br>
-      Set minimum intervall for additional polling, default 0 (no polling). Gets periodically statistics data from mower. Make sure to be within API limits.</li>
+      Set minimum intervall for additional polling, default 0 (no polling). Gets periodically statistics data from mower. Make sure to be within API limits (10000 calls per month).</li>
 
     <li><a id='AutomowerConnect-attr-addPositionPolling'>addPositionPolling</a><br>
       <code>attr &lt;name&gt; addPositionPolling &lt;[1|<b>0</b>]&gt;</code><br>
-      Set position polling, default 0 (no position polling). Gets periodically position data from mower, instead from websocket. Must not be set without setting attribute addPollingMinInterval.</li>
+      Set position polling, default 0 (no position polling). Gets periodically position data from mower, instead from websocket. It has no effect without setting attribute addPollingMinInterval.</li>
 
     <li><a href="disable">disable</a></li>
 
@@ -745,7 +745,7 @@ __END__
 
     <li><a id='AutomowerConnect-attr-addPositionPolling'>addPositionPolling</a><br>
       <code>attr &lt;name&gt; addPositionPolling &lt;[1|<b>0</b>]&gt;</code><br>
-      Setzt das Positionspolling, default 0 (kein Positionpolling). Liest periodisch Positiondaten des Mähers, an Stelle der über Websocket gelieferten Daten. Darf nur im Zusammenhang mit dem Attribut addPollingMinInterval verwendet werden.</li>
+      Setzt das Positionspolling, default 0 (kein Positionpolling). Liest periodisch Positiondaten des Mähers, an Stelle der über Websocket gelieferten Daten. Das Attribut ist nur wirksam, wenn durch das Attribut addPollingMinInterval das Polling eingeschaltet ist.</li>
 
      <li><a href="disable">disable</a></li>
 
