@@ -23,22 +23,21 @@
 
 #
 #   ToDo / Ideas 
-#                   Datentypen vorbelegen - gelten falls nichts anderes per attr definiert ist
-#                       reading attr could be optional -> reading name is then object name like h234
-#
-#                   LastError Reading per logical device with error code and affected reading
 #                   verify that nextOpenDelay is integer and >= 1
-#                   set active results in error when tcp is already open
-#                   enforce nextOpenDelay even if slave immediately closes after open https://forum.fhem.de/index.php/topic,75638.570.html
-#                   set generateTestData to create rData hash and calls to is(getEvent...), save config, ...
-#
-#                   when define of relay is modified -> close all open TCP server connection devices to force reconnect and get correct parameters
-#                   debug two tcp relays in parallel on same physical bus (logs shown by mike have strange incoming frames, responses seem to go to wrong device)
+#                   set 'active' results in error when tcp is already open
+#                   enforce nextOpenDelay even if slave immediately closes
+#                       after open https://forum.fhem.de/index.php/topic,75638.570.html
+#                   
+#                   when define of relay is modified -> close all open TCP server connection devices 
+#                       to force reconnect and get correct parameters
+#                   debug two tcp relays in parallel on same physical bus 
+#                       (logs shown by mike have strange incoming frames, responses seem to go to wrong device)
 #               
-#                   Allow setting of a _Setup function in the ModbusXY initialize function to be called after init done and not disabled
+#                   Allow setting of a _Setup function in the ModbusXY initialize function 
+#                       to be called after init done and not disabled
 #                       this can then modify the parseInfo Hash depending of a model variant or an offset   
 #                       maybe call whenever startUpdateTime is called as well and _setup has not been called yet?
-#                       or do it depending on a certain object which is requested during normal getupdate? as expr?
+#                       or do it depending on a certain object which is requested during normal getupdate? expr?
 #           
 #                   learn objects in passive mode
 #
@@ -51,25 +50,20 @@
 #                   test requesting fc 15 multiple coils
 #                   test pack c/I types as response
 #                   register offset as attribute evaluated at runtime when sending and parsing (Comptrol etc.)
+#
 #                   clearBufferAfterParsing als Option, die den Rest des Buffers wegwirft
 #
 #                   get reading key (type / adr)
 #                   filterEcho (wie in private post im Forum vorgeschlagen)
-#                   docu for set saveAsModule to save attr definitions as module and add it to .setlist
-#                   define data types VT_R4 -> revregs, len2, unpack f> ...
+#
 #                   async output for scan? table? with revregs etc.?
 #                   get object-interpretations h123 -> Alle Variationen mit revregs und bswap und unpacks ...
-#                   nonblocking disable attr für xp
 #
 #                   average response time per modbus id in profiling
-#                   reread after failed requests / timeouts -> rereadList filled in getUpdate, remove in parse?
 #
 #                   attr with a list of set commands / requests to launch when polling (Helios support)
 #
 #                   set/get definition with multiple requests as raw containig opt. readings / input
-#
-#                   Autoconfigure? (Combine testweise erhöhen, Fingerprinting -> DB?, ...?)
-#
 #
 
 
@@ -269,7 +263,7 @@ BEGIN {                         # functions / variables needed from package main
 
 };
 
-my $Module_Version = '4.4.14 - 30.1.2023';
+my $Module_Version = '4.5.5 - 9.5.2023';
 
 my $PhysAttrs = join (' ', 
         'queueDelay',
@@ -289,7 +283,8 @@ my $PhysAttrs = join (' ',
         'skipGarbage:0,1',
         'requestDelay',                         # for debugging / testing / simulations
         'timeoutLogLevel:3,4',
-        'closeAfterResponse:0,1,2',             # for Modbus over TCP/IP only
+        'closeAfterResponse:0,1,2',             # for Modbus over TCP/IP only (1= close after queue is done, 2= close after each response)
+        'showError:0,1',
         'silentReconnect:0,1');
         
 my $LogAttrs = join (' ', 
@@ -323,6 +318,7 @@ my $ObjAttrs = join (' ',
         'obj-[cdih][0-9]+-set',
         'obj-[cdih][0-9]+-setexpr',
         'obj-[cdih][0-9]+-textArg',
+        'obj-[cdih][0-9]+-noArg',
         'obj-[cdih][0-9]+-revRegs',
         'obj-[cdih][0-9]+-bswapRegs',
         'obj-[cdih][0-9]+-len',
@@ -338,20 +334,19 @@ my $ObjAttrs = join (' ',
         'obj-[cdih][0-9]+-group',
         'obj-[cdih][0-9]+-poll',
         'obj-[cdih][0-9]+-polldelay',
-        'obj-[cdih][0-9]+-overrideFCread',
-        'obj-[cdih][0-9]+-overrideFCwrite'
+        'obj-[cdih][0-9]+-overrideFCread',      # override fc for read operation
+        'obj-[cdih][0-9]+-overrideFCwrite'      # override fc for write operation
         );
         
 my $DevAttrs = join (' ',
-        'dev-([cdih]-)?read',
-        'dev-([cdih]-)?write',
+        'dev-([cdih]-)?read',                   # override fc for type and read
+        'dev-([cdih]-)?write',                  # override fc for type and qrite
         'dev-([cdih]-)?combine',
         'dev-([cdih]-)?allowShortResponses',
         'dev-([cdih]-)?addressErrCode',
         'dev-([cdih]-)?valueErrCode',
         'dev-([cdih]-)?notAllowedErrCode',
         
-
         'dev-([cdih]-)?defRevRegs',
         'dev-([cdih]-)?defBswapRegs',
         'dev-([cdih]-)?defLen',
@@ -388,7 +383,18 @@ my $DevAttrs = join (' ',
         'dev-timing-serverTimeout',
         'dev-timing-serverTimeoutAbs',      # just for testing
         'dev-timing-sendDelay',
-        'dev-timing-commDelay');
+        'dev-timing-commDelay',
+
+        'dev-fc[\d]+Response-unpack',               # custom function codes
+        'dev-fc[\d]+Response-fieldList',            # $response hash keys like ADR, LEN, VALUES
+        'dev-fc[\d]+Response-fieldExpr-.*',         # expression for above fields
+
+        'dev-fc[\d]+Request-unpack',                # custom function codes
+        'dev-fc[\d]+Request-fieldList',             # $request hash keys like ADR, LEN, VALUES
+        'dev-fc[\d]+Request-fieldExpr-.*',          # expression for above fields
+);
+
+my @pduFields = ('ADR', 'LEN', 'TYPE', 'VALUES', 'PDULEXP');    # allowed fields in request- and response-hash for fieldList and fieldExpr
 
 my %errCodes = (
     '01' => 'illegal function',
@@ -408,10 +414,10 @@ my %PDUOverhead = (         # bytes on top of the PDU (fcode, data)
     'TCP'   =>  7);
 
 my %fcMap = (
-    1   =>  {   read => 1, 
-                type => 'c',
-                default => 1,
-                objReturn => 1,
+    1   =>  {   read => 1,          # this function code can read
+                type => 'c',        # this handles object of type c
+                default => 1,       # this is the default fc for this type and operation
+                objReturn => 1,     # return an object in the response
             },
     2   =>  {   read => 1, 
                 type => 'd',
@@ -428,7 +434,7 @@ my %fcMap = (
                 default => 1,
                 objReturn => 1,
             },
-    5   =>  {   write => 1, 
+    5   =>  {   write => 1,         # this request is a write request and contains data
                 type => 'c',
                 default => 1,
                 objReturn => 1,
@@ -481,8 +487,52 @@ my %attrDefaults = (
                          default    => 'n'},
 );
 
-my $updateCache;        # hash ref to cache getUpdateHash after combine
-my $parseInfoCache;     # hash ref to cache obj parsing info
+
+my %builtInType = (
+    'signed short'                  =>  'signed short big',     # 16 bits signed integer big endian (high, low)
+    'signed short big'              => { len        => 1,
+                                         unpack     => 's>'},   
+    'unsigned short'                => 'unsigned short big',    # 16 bits unsigned big endian
+    'unsigned short big'            => { len        => 1,
+                                         unpack     => 'n'},    
+
+    'signed short little'           => { len        => 1,       # 16 bits signed integer vax / little endian (low high)
+                                         unpack     => 's<'},   
+    'unsigned short little'         => { len        => 1,
+                                         unpack     => 'v'},    
+
+    'signed long'                   =>  'signed long big',      # 32 bits / 2 registers signed long integer big endian (high low)
+    'signed long big'               => { len        => 2,
+                                        unpack      => 'l>'},
+    'unsigned long'                 => 'unsigned long big',     # 32 bits / 2 registers unsigned long integer big endian
+    'unsigned long big'             => { len        => 2,
+                                        unpack      => 'L>'},
+                                         
+    'signed long little'            => { len        => 2,       # 32 bits / 2 registers signed long integer vax / little endian (low high)
+                                         unpack     => 'l<'},
+    'unsigned long little'          => { len        => 2,
+                                         unpack     => 'L<'},   # 32 bits / 2 registers unsigned long integer vax / little endian (low high)
+
+    'real'                          => 'float32 big',           # 32 bit floating point big endian
+    'float'                         => 'float32 big',
+    'float32'                       => 'float32 big',
+    'float32 big'                   => { len        => 2,
+                                         unpack     => 'f>'},
+    'float litte'                   => 'float32 little',        # 32 bit floating point little endian
+    'float32 little'                => { len        => 2,
+                                         unpack     => 'f<'},
+
+    'double'                        => 'float64 big',           # 64 bit floating point big endian
+    'float64'                       => 'float64 big',
+    'float64 big'                   => { len        => 4,
+                                         unpack     => 'f>'},
+    'double little'                 => 'float64 little',        # 64 bit floating point little endian
+    'float64 little'                => { len        => 4,
+                                         unpack     => 'f<'},
+
+    'string'                        => { unpack     => 'a*',    # string / byte array
+                                         len        => 2},      # default len 2 - should be overwritten
+);
 
 
 ###########################################################
@@ -563,7 +613,7 @@ sub DefineFn {
     $ioHash->{NOTIFYDEV}    = 'global';     # NotifyFn nur aufrufen wenn global events (INITIALIZED)
     DoClose($ioHash);                       # make sure everything is losed initally, set state to disconnected
 
-    Log3 $name, 3, "$name: defined as $dev";
+    Log3 $name, 4, "$name: defined as $dev";
     return;                             # open is done later from NOTIFY
 }
 
@@ -609,7 +659,7 @@ sub DefineLDFn {
         (  $name,    $module,    $id,    $ipPort,    $proto) 
       = ($+{name}, $+{module}, $+{id}, $+{ipport}, $+{proto});
         $mode     = 'slave';
-        $logInfo  = ($ipPort ? "listening at $ipPort" : ' with connection through io device');
+        $logInfo  = ($ipPort ? " listening at $ipPort" : ' with connection through io device');
     }
     # passive define
     elsif ($def =~ m{\A  $rxName $rxSp $rxModule 
@@ -640,7 +690,7 @@ sub DefineLDFn {
     $hash->{MODBUSID} = $id;
     $hash->{MODE}     = $mode;
     $hash->{PROTOCOL} = $proto // 'RTU';
-    Log3 $name, 3, "$name: defined $mode with id $id, protocol $hash->{PROTOCOL}" . ($logInfo // '');
+    Log3 $name, 4, "$name: defined $mode with id $id, protocol $hash->{PROTOCOL}" . ($logInfo // '');
     
     # for Modbus TCP physical hash = logical hash so MODE is set for physical device as well.    
     # for Modbus over IODev this is set when IODev Attr and GetIOHash is called 
@@ -703,14 +753,12 @@ sub UndefFn {
 
     # lösche auch die Verweise aus logischen Modulen auf dieses physische.
     foreach my $d (keys %{$ioHash->{defptr}}) {             # go through all logical devices using this physical
-        Log3 $name, 3, "$name: Undef is removing IO device for $d";
+        Log3 $name, 4, "$name: Undef is removing IO device for $d";
         my $lHash = $defs{$d};
         delete $lHash->{IODev} if ($lHash);                 # remove IODev entry at logical device
         UpdateTimer($lHash, \&Modbus::GetUpdate, 'stop');   # stop update timer of logical device
     }
-    Profiler($ioHash, 'Idle');                              # category to book time, Delay, Fhem, Idle, Read, Send or Wait
-    
-    #Log3 $name, 3, "$name: _UnDef done";
+    Profiler($ioHash, 'Idle');                              # category to book time, Delay, Fhem, Idle, Read, Send or Wait    
     return;
 }
 
@@ -722,7 +770,7 @@ sub UndefLDFn {
     my $hash = shift;
     my $arg  = shift;
     my $name = $hash->{NAME};
-    Log3 $name, 3, "$name: _UnDef is preparing $name for deletion";
+    Log3 $name, 5, "$name: _UnDef is preparing $name for deletion";
     UnregAtIODev($hash);
     
     # device is already in the process of being deleted so we should not issue commandDelete inside _Close again
@@ -754,11 +802,11 @@ sub AttrFn {
     if ($aName eq 'disable' && $init_done) {        # only after init_done, otherwise see NotifyFN
         # disable on a physical device
         if ($cmd eq "set" && $aVal) {
-            Log3 $name, 3, "$name: attr disable set" . (IsOpen($hash) ? ", closing connection" : "");
+            Log3 $name, 4, "$name: attr disable set" . (IsOpen($hash) ? ", closing connection" : "");
             GoToState($hash, 'disabled');       # close, stop timers and set state
         }
         elsif ($cmd eq 'del' || ($cmd eq 'set' && !$aVal)) {
-            Log3 $name, 3, "$name: attr disable removed";
+            Log3 $name, 4, "$name: attr disable removed";
             DoOpen($hash) if (!AttrVal($name, 'closeAfterResponse', 0));
         }
     }   
@@ -775,12 +823,41 @@ sub AttrLDFn {
     my $aVal  = shift;                  # attribute value
     my $hash  = $defs{$name};           # reference to the Fhem device hash
     
-    #Log3 $name, 5, "$name: attr $aName " . ($aVal // 'undef') . " $cmd";
+    #Log3 $name, 3, "$name: attr $aName " . ($aVal // 'undef') . " $cmd";
     if ($cmd eq 'set') {
-        if ($aName =~ /expr/) {     # validate all Expressions
+        if ($aName =~ /expr/) {         # validate all Expressions
             return "Invalid Expression $aVal" 
                 if (!EvalExpr($hash, {expr => $aVal, checkOnly => 1, action => "attr $aName"} ));
         } 
+        elsif ($aName =~ /unpack$/) {    # validate all pack / unpack codes
+            #Log3 $name, 3, "$name: checking unpack code $aVal";
+            return if ($aVal eq 'none' && $aName =~ /dev-fc/);
+            local $SIG{__WARN__} = sub { Log3 $name, 3, "$name: checking unpack code $aVal in attr $aName created warning: @_"; };
+            my $result = eval {my $test = pack ($aVal, 1)};
+            if ($@) {
+                Log3 $name, 5, "$name: checking unpack code $aVal in attr $aName created error: $@";
+                return "Invalid pack / unpack code $aVal in attr $aName";
+            }
+        } 
+        elsif ($aName =~ /dev-fc[\d]+.*-fieldExpr-(.*)/) {
+            #Log3 $name, 3, "$name: checking custom fc field expr for $1: $aVal";
+            if (!grep /^$1$/, @pduFields) {
+                return "invalid field $1 in attr $aName";
+            }
+            my $pduHash  = {};
+            my $request  = {};
+            my $response = {};
+            return "Invalid Expression $aVal" 
+                if (!EvalExpr($hash, {expr => $aVal, '$request' => $request, '$pduHash' => $pduHash, '$response' => $response, 
+                    checkOnly => 1, action => "attr $aName"} ));
+        }
+        elsif ($aName =~ /dev-fc[\d]+.*-fieldList/) {
+            #Log3 $name, 3, "$name: checking custom fc field list $aVal";
+            my @flist = split ', ', $aVal;
+            foreach my $fld (@flist) {
+                return "invalid field $fld in attr $aName $aVal" if (!grep /^$fld$/, @pduFields);
+            }
+        }
         elsif ($aName eq 'IODev') {
             if ($hash->{TCPConn}) {
                 return "Attr IODev is not allowed for devices connected through TCP";
@@ -843,7 +920,7 @@ sub AttrLDFn {
             TcpServer_SetSSL($hash);        # check libs and set flag
             if($hash->{CD}) {
                 my $ret = IO::Socket::SSL->start_SSL($hash->{CD});
-                Log3 $name, 3, "$hash->{NAME} start_SSL: $ret" if($ret);
+                Log3 $name, 4, "$hash->{NAME} start_SSL: $ret" if($ret);
             }
         }
         
@@ -856,7 +933,7 @@ sub AttrLDFn {
             }
             if (!$hash->{LeadingZeros}) {
                 $hash->{LeadingZeros} = 1;
-                Log3 $name, 3, "$name: attr support for leading zeros in object addresses enabled. This might slow down the fhem modbus module a bit";
+                Log3 $name, 4, "$name: attr support for leading zeros in object addresses enabled. This might slow down the fhem modbus module a bit";
             }
         }
         ManageUserAttr($hash, $aName);
@@ -880,8 +957,9 @@ sub AttrLDFn {
     }
 
     if ($aName =~ /(^obj-)|(^dev-)/) {
-        $updateCache = undef;                   # cached update hash needs to be recalculated when obj / dev info changes
-        $parseInfoCache = undef;                # cached ObjInfo and DevInfo results
+        delete $hash->{UPDATECACHE};            # cached update hash needs to be recalculated when obj / dev info changes
+        delete $hash->{PICACHE};                # cached ObjInfo and DevInfo results
+        delete $hash->{DICACHE};                # cached DevInfo results for custom FCs
     }
     $hash->{'.updateSetGet'} = 1;
     #Log3 $name, 5, "$name: attr change set updateGetSetList to 1";
@@ -891,7 +969,7 @@ sub AttrLDFn {
             GoToState($hash, 'disabled');       # set state, close / stop timers 
         } 
         elsif ($cmd eq 'del' || ($cmd eq 'set' && !$aVal)) {    # disable removed / cleared
-            Log3 $name, 3, "$name: attr disable removed";
+            Log3 $name, 4, "$name: attr disable removed";
             GoToState($hash, 'enabled');        # set state, open / start update timer
         }
     }   
@@ -914,7 +992,7 @@ sub UpdateGetSetList {
         $hash->{'.setList'}  = "reconnect:noArg saveAsModule createAttrsFromParseInfo ";
         if ($hash->{MODE} && $hash->{MODE} eq 'master') {
             $hash->{'.setList'} .= "interval reread:noArg stop:noArg start:noArg close:noArg ";
-            $hash->{'.setList'} .= "scanStop:noArg scanModbusObjects ";
+            $hash->{'.setList'} .= "scanStop:noArg scanModbusObjects sendRaw ";
             $hash->{'.setList'} .= "scanModbusId " if ($hash->{PROTOCOL} =~ /RTU|ASCII/);
         }
         if (AttrVal($name, 'enableSetInactive', 1)) {
@@ -1047,7 +1125,7 @@ sub SetLDFn {
     my $hash      = shift @setValArr;       # reference to Fhem device hash
     my $name      = shift @setValArr;       # Fhem device name
     my $setName   = shift @setValArr;       # name of the set option
-    my $setVal    = join(' ', @setValArr);  # set values as one string   
+    my $setVal    = @setValArr ? join(' ', @setValArr) : undef;  # set values as one string   
     my $async     = AttrVal($name, 'nonPrioritizedSet', 0);
 
     return "\"set $name\" needs at least an argument" if (!$setName);
@@ -1068,8 +1146,12 @@ sub SetLDFn {
         UpdateGetSetList($hash) if ($hash->{'.updateSetGet'});
         #Log3 $name, 5, "$name: set $setName not found, return list $hash->{'.setList'}" if ($setName ne '?');
         return "Unknown argument $setName, choose one of $hash->{'.setList'}";
+    }
+    if (ObjInfo($hash, $objCombi, 'noArg')) {
+        $setVal = 1;                            # dummy value for noArg
+        Log3 $name, 4, "$name: set with noArg for $setName, using value 1";
     } 
-    if (!defined($setVal)) {
+    elsif (!defined($setVal)) {
         Log3 $name, 3, "$name: set without value for $setName";
         return "No Value given to set $setName";
     }
@@ -1083,7 +1165,6 @@ sub SetLDFn {
     my $type   = substr($objCombi, 0, 1);
     my $adr    = substr($objCombi, 1);
     my $len    = ObjInfo($hash, $objCombi, 'len');
-    #my $fCode  = DevInfo($hash, $type, 'write', $defaultFCode{$type}{write});
     my $fCode  = GetFC($hash, {TYPE => $type, ADR => $adr, LEN => $len, OPERATION => 'write'});
     my $ioHash = GetIOHash($hash);                      # ioHash has been checked in GetSetChecks above already
     DoRequest($hash, {TYPE => $type, ADR => $adr, LEN => $len, OPERATION => 'write', VALUES => $packedVal, FORCE => !$async, DBGINFO => "set $setName"});
@@ -1091,7 +1172,7 @@ sub SetLDFn {
     # DoRequest should call QueueRequest which calls StartQueueTimer without delay ...
     
     if (!$async) {
-        my $err = ReadAnswer($ioHash);
+        my $err = ReadAnswer($ioHash);                  # wait for the response
         return $err if ($err);
     }
     if ($fCode == 15 || $fCode == 16) {                 # read after write
@@ -1122,7 +1203,7 @@ sub ControlSet {
             return 'No valid Interval specified';
         } 
         $hash->{Interval} = $setVal;
-        Log3 $name, 3, "$name: set interval changed interval to $hash->{Interval} seconds";
+        Log3 $name, 4, "$name: set interval changed interval to $hash->{Interval} seconds";
         UpdateTimer($hash, \&Modbus::GetUpdate, 'start');           # set / change timer
         return '0';
     } 
@@ -1170,13 +1251,37 @@ sub ControlSet {
     if ($setName eq 'start') {
         my $msg = CheckDisable($hash);
         return $msg if ($msg);
-
         return 'set start is only allowed when Fhem is Modbus master' if ($hash->{MODE} ne 'master');
         UpdateTimer($hash, \&Modbus::GetUpdate, 'start');           # set / change timer
         return '0';
     } 
+    if ($setName eq 'sendRaw') {
+        my $msg = CheckDisable($hash);
+        return $msg if ($msg);
+        return 'set sendRaw is only allowed when Fhem is Modbus master' if ($hash->{MODE} ne 'master');
+        
+        my %requestData;                        # create new request structure
+        my $request = \%requestData;
+
+        $request->{MODBUSID}   = $hash->{MODBUSID};
+        $request->{READING}    = 'dummy';
+        $request->{TYPE}       = '';
+        $request->{ADR}        = 0;
+        $request->{LEN}        = 0;
+        $request->{VALUES}     = $setVal;
+        $request->{MASTERHASH} = $hash;                                             # logical device in charge
+        $request->{TID}        = int(rand(255)) if ($hash->{PROTOCOL} eq 'TCP');    # transaction id for Modbus TCP
+        $request->{FCODE}      = 999;           # dummy for raw sending
+        weaken $request->{MASTERHASH};
+
+        my $ioHash   = GetIOHash($hash);        # send queue is at physical hash
+        delete $ioHash->{RETRY};
+        QueueRequest($ioHash, $request);        # queue and process / set queue timer depending on force
+        return '0';
+    } 
+
     if ($setName eq 'scanStop') {
-        Log3 $name, 3, '$name: scanStop - try asyncOutput to $hash';
+        Log3 $name, 4, '$name: scanStop - try asyncOutput to $hash';
         my $cl = $hash->{CL};
         asyncOutput($cl, 'Hallo <b>Du</b>');
         
@@ -1211,7 +1316,7 @@ sub ControlSet {
             $hash->{scanOType}  = substr($3,0,1);
             $hash->{scanOAdr} = substr($3,1);
         }
-        Log3 $name, 3, "$name: set scan range specified as Modbus Id $hash->{scanIdStart} to $hash->{scanIdEnd}" .
+        Log3 $name, 4, "$name: set scan range specified as Modbus Id $hash->{scanIdStart} to $hash->{scanIdEnd}" .
                         " with $hash->{scanOType}$hash->{scanOAdr}, Len ";
         delete $hash->{scanId};
         
@@ -1220,7 +1325,7 @@ sub ControlSet {
         RemoveInternalTimer ("scan:$name");
         InternalTimer($now+$scanDelay, \&Modbus::ScanIds, "scan:$name", 0);   
         return '0';
-    } 
+    }
     if ($setName eq 'scanModbusObjects') { 
         my $msg = CheckDisable($hash);
         return $msg if ($msg);
@@ -1238,7 +1343,7 @@ sub ControlSet {
             $hash->{scanOEnd}   = $3;
             $hash->{scanOLen}   = ($5 ? $5 : 1);
         }
-        Log3 $name, 3, "$name: set scan $hash->{scanOType} from $hash->{scanOStart} to $hash->{scanOEnd} len $hash->{scanOLen}";        
+        Log3 $name, 4, "$name: set scan $hash->{scanOType} from $hash->{scanOStart} to $hash->{scanOEnd} len $hash->{scanOLen}";        
         delete $hash->{scanOAdr};
         
         my $now        = gettimeofday();
@@ -1300,7 +1405,7 @@ sub createAttrsFromParseInfo {
             CommandAttr(undef, "$name $attrName $val");
         }
     }
-    Log3 $name, 3, "$name: createAttrsFromParseInfo done";
+    Log3 $name, 4, "$name: createAttrsFromParseInfo done";
     return '0';
 }
 
@@ -1324,7 +1429,7 @@ sub SaveAsModule {
         $content .= $_;
     }
     close $tmpl;
-    Log3 $name, 3, "$name: template file $tFile read successfully";
+    Log3 $name, 4, "$name: template file $tFile read successfully";
 
     my $t     = '';
     my $last  = 'x';
@@ -1508,7 +1613,7 @@ sub NotifyFn {
     # DEFINED is not triggered if init is not done.
     
     if (IsDisabled($name)) {
-        Log3 $name, 3, "$name: Notify / Init: device is disabled";
+        Log3 $name, 4, "$name: Notify / Init: device is disabled";
         return;
     }   
     if ($hash->{TYPE} eq 'Modbus' || $hash->{TCPConn}) {	# physical or TCP -> call open (even for slave)
@@ -1519,7 +1624,7 @@ sub NotifyFn {
     else {                                            	    # logical dev and not TCP  -> check for IO Device
         delete $hash->{IODev};                          	# force call to setIODev / register and set state to opened
         my $ioHash = GetIOHash($hash);                      # get / search and register at iodev
-        Log3 $name, 3, "$name: Notify / Init: " . ($ioHash ? "using $ioHash->{NAME}" : "no IODev") . " for communication";
+        Log3 $name, 4, "$name: Notify / Init: " . ($ioHash ? "using $ioHash->{NAME}" : "no IODev") . " for communication";
     }
     if ($hash->{TYPE} ne 'Modbus' && $hash->{MODE} eq 'master') {   # Mode Master     
         UpdateTimer($hash, \&Modbus::GetUpdate, 'start');
@@ -1527,7 +1632,7 @@ sub NotifyFn {
     elsif ($hash->{MODE} && $hash->{MODE} eq 'relay') {             # Mode relay -> find / check relay device
         my $reName = $hash->{RELAY};
         my $reIOHash = GetRelayIO($hash);
-        Log3 $name, 3, "$name: Notify / Init: " . ($reIOHash ? "using $reIOHash->{NAME}" : "no device") . " as Modbus relay device (master)";
+        Log3 $name, 4, "$name: Notify / Init: " . ($reIOHash ? "using $reIOHash->{NAME}" : "no device") . " as Modbus relay device (master)";
     }
     #Log3 $name, 3, '$name: _Notify done';
     return;
@@ -1878,7 +1983,7 @@ sub ReadFn {
     HandleGaps($hash);                          # check timing / frameGap and remove old buffer if necessary
     $hash->{READ}{BUFFER} .= $buf;              # now add new data to buffer
     $hash->{REMEMBER}{lrecv} = $now;            # rember time for physical side
-    Log3 $name, 5, "$name: readFn buffer: " . ShowBuffer($hash);
+    Log3 $name, 5, "$name: readFn buffer: " . ShowBuffer($hash) . " mode $hash->{MODE}, expect $hash->{EXPECT}";
     delete $hash->{FRAME};                      # remove old stuff
 
     if (!$hash->{MODE} || !$hash->{PROTOCOL}) { # MODE and PROTOCOL keys are taken from logical device in NOTIFY
@@ -1896,7 +2001,7 @@ sub ReadFn {
         my $frame = $hash->{FRAME};              # is set after calling ParseFrameStart
         
 
-        # only for testing - remove later # todo: remove
+        # only for testing
         my $attrsName = $name;
         if ($hash->{CHILDOF}) {
             $attrsName = $hash->{CHILDOF}{NAME};
@@ -1914,13 +2019,11 @@ sub ReadFn {
             $hash->{LastRequest} = $now;
         }
 
-
         # EXPECT exists on io dev. Special case for relays:
         #     there are two io devs. receiving side and forwarding side. 
         #     read can be called when a new request comes in on receiving side (mode relay)
         #     or when a response comes in at forwarding side (mode master)
         
-
         if ($hash->{EXPECT} eq 'request') {             # --- REQUEST ---
             return if (!HandleRequest($hash)) ;         # check for valid PDU, parse, return if frame not complete (yet)
             # ERROR is only set by Checksum Check or unsupported fCode here.
@@ -1953,6 +2056,7 @@ sub ReadFn {
             Log3 $name, 3, "$name: internal error, illegal EXPECT value " . $hash->{EXPECT} // 'undefined';
             ResetExpect($hash);
         }
+        Log3 $name, 5, "$name: readFn end buffer: " . ShowBuffer($hash) . " mode $hash->{MODE}, expect $hash->{EXPECT}";
         return if (!$hash->{READ}{BUFFER});             # return if no more data, else parse on
     } # next round in loop
     return; # never reached
@@ -2045,7 +2149,7 @@ sub ReadAnswer {
             next READLOOP;
         }    
         my $frame = $hash->{FRAME};         # is set after HandleFrameStart     
-        if (HandleResponse($hash)) {        # end of parsing. error or valid frame, cleans up and sets Profiler to 'Idle' if done
+        if (HandleResponse($hash)) {        # end of parsing. Error or valid frame, cleans up and sets Profiler to 'Idle' if done
             DropFrame($hash);               # drop $hash->{FRAME} and the relevant part of $hash->{READ}{BUFFER}
             if ($hash->{RESPONSE}{ERRCODE}) {
                 my $ret = "Error code $hash->{RESPONSE}{ERRCODE} / $errCodes{$hash->{RESPONSE}{ERRCODE}}";
@@ -2055,7 +2159,7 @@ sub ReadAnswer {
             return;
         }
     } 
-    # READOOP exited because of error / timeout
+    # READLOOP exited because of error / timeout
     $timeRest = $hash->{nextTimeout} - gettimeofday();          # timeout?
     if ($timeRest <= 0) {
         $msg .= ($msg ? ', ' : '') . 'Timeout in Readanswer';
@@ -2069,8 +2173,12 @@ sub ReadAnswer {
     DropFrame($hash);                           # drop $hash->{FRAME} and the relevant part of $hash->{READ}{BUFFER}
     delete $hash->{nextTimeout};
     delete $hash->{REQUEST};
-    # todo: normal queue delay when closeAfterResponse 2?
-    StartQueueTimer($hash, \&Modbus::ProcessRequestQueue, {delay => 0});    # call processRequestQueue at next possibility if appropriate
+    if (AttrVal($name, 'closeAfterResponse', 0) == 2) {
+        StartQueueTimer($hash, \&Modbus::ProcessRequestQueue);    # normal delay
+    }
+    else {
+        StartQueueTimer($hash, \&Modbus::ProcessRequestQueue, {delay => 0});    # call processRequestQueue at next possibility if appropriate
+    }
     return $msg;
 }
 
@@ -2137,7 +2245,7 @@ sub ParseFrameStart {
     my ($id, $fCode, $data, $tid, $dlen, $pdu, $null);
     my $expectId;
     $expectId = $hash->{REQUEST}{MODBUSID} if ($hash->{REQUEST} && $hash->{REQUEST}{MODBUSID}); 
-    # todo: should be removed in passive mode when the last request was not valid
+    # $hash->{REQUEST} is removed in HandleRequest when the last request was not valid (CRC)
     
     Log3 $name, 5, "$name: ParseFrameStart called from " . FhemCaller() .
         ($expectId ? " protocol $proto expecting id $expectId" : '');
@@ -2188,12 +2296,12 @@ sub ParseFrameStart {
 # of a TCP slave parent device ...
 #############################################################################
 sub HandleResponse {
-    my $hash      = shift;                              # the physical io device hash
+    my $hash      = shift;                      # the physical io device hash
     my $name      = $hash->{NAME};
     my $frame     = $hash->{FRAME};
-    my $request   = $hash->{REQUEST};                   # the request for this response
-    my $masterHash;                                     # the logical (master) device - for timing    
-    my $relayHash;
+    my $request   = $hash->{REQUEST};           # the request for this response
+    my $masterHash;                             # the logical (master) device - for timing / attrs  
+    my $relayHash;                              # the relay parent device of the request
     
     Log3 $name, 5, "$name: HandleResponse called from " . FhemCaller();
     
@@ -2213,7 +2321,7 @@ sub HandleResponse {
         if ($hash->{PROTOCOL} eq 'TCP' && $request->{TID} != $frame->{TID}) {   # wrong. dont need to wait for another answer...
             AddFrameError($frame, "TID $frame->{TID} in Modbus TCP response does not match request TID $request->{TID}");
         }   
-        if ($request->{FCODE} != $frame->{FCODE} && $frame->{FCODE} < 128) {
+        if ($request->{FCODE} != $frame->{FCODE} && $frame->{FCODE} < 128 && $request->{FCODE} != 999) {
             AddFrameError($frame, "Function code $frame->{FCODE} in Modbus response does not match request function code $request->{FCODE}");
         }
     } 
@@ -2227,56 +2335,72 @@ sub HandleResponse {
         $masterHash->{REMEMBER}{lrecv} = gettimeofday();
         $hash->{REMEMBER}{lname}  = $masterHash->{NAME};    # logical device name
     }
-    
+    Log3 $name, 5, "$name: HandleResponse is now creating response hash, masterHash is " 
+        . ($masterHash ? $masterHash : 'undef');
     my %responseData;                                       # create new response structure
     my $response = \%responseData;
     if ($request) {
-        #Log3 $name, 5, "$name: prefill reponse hash with request " . RequestText($request);
-        $response->{ADR}        = $request->{ADR};          # prefill so we don't need $request in ParseResponse and it gets shorter
-        $response->{LEN}        = $request->{LEN};
-        $response->{OPERATION}  = $request->{OPERATION};    # for later call to ParseDataString
-
         if ($masterHash) {
             $response->{MASTERHASH} = $masterHash;
             weaken $response->{MASTERHASH};
         }
-        if ($request->{RELAYHASH}) {        # not $relayHash!
-            $response->{RELAYHASH}  = $request->{RELAYHASH};
+        if ($request->{RELAYHASH}) {        # not $relayHash! (which would be the parent device if tcp)
+            $response->{RELAYHASH}  = $request->{RELAYHASH};    # the relay connection device
             weaken $response->{RELAYHASH};
         }
     }   # if no request known, we will skip most of the part below
-    
-    # parse response and fill response hash
+    Log3 $name, 5, "$name: HandleResponse is now calling ParseResponse, masterHash is " 
+    . ($masterHash ? $masterHash : 'undef');
+    # parse response and fill response hash, returns undef if incomplete
     # also $frame->{PDULEXP} will be set now if not already earlier.    
     return if (!ParseResponse($hash, $response, $masterHash));  # frame not complete - continue reading
-    $hash->{RESPONSE} = $response;                              # save in receiving io hash for later parsing of response??
+    $hash->{RESPONSE} = $response;                              # save in receiving io hash for later use
     
     delete $hash->{nextTimeout};            # at least we didn't have a timeout now. Remove it to allow new requests while parsing
     delete $hash->{TIMEOUTS};               # clear timeout counter
     delete $hash->{RETRY};                  # retry counter (if retry after timeout is wanted)
 
-    if ($request && !$frame->{ERROR}) {     # only parse / relay if we know the request and no error (AddFrameError) - otherwise fall through and finish parsing
-        Profiler($hash, 'Fhem');   
-        if ($response->{ERRCODE}) {         # valid error message response
-            my $errCode  = $errCodes{$response->{ERRCODE}};
+    if ($request && !$frame->{ERROR}) {     # only parse / relay if we know the request and no frame error - otherwise fall through and finish parsing
+        Profiler($hash, 'Fhem');
+        my $rErrC = $response->{ERRCODE};
+        if ($rErrC) {                       # valid error message response
             if ($masterHash) {              # be quiet if no logical device hash (not our responsibility)
-                Log3 $name, 4, "$name: HandleResponse got response with error code " . unpack ('H*', pack('C', $response->{FCODE})) 
-                        . " / $response->{ERRCODE}" . ($errCode ? ", $errCode" : '');
+                my $errCodeT  = $errCodes{$rErrC};
+                my $errString = unpack ('H*', pack('C', $response->{FCODE})) 
+                    . " / $rErrC" . ($errCodeT ? ", $errCodeT" : '');
+                Log3 $name, 4, "$name: HandleResponse got response with error code $errString";
+                if (AttrVal($name, "showError", 0)) {
+                    readingsSingleUpdate($hash, "LAST_ERROR", "slave replied with error code $errString", 1);
+                }
             }
         } 
         else {                              # no error response, now check if we can parse data
-            if ($frame->{FCODE} < 15) {     # is there data to parse? (nothing to parse after response to 15 / 16)
+            if ($fcMap{$frame->{FCODE}}{objReturn} || exists $response->{VALUES}) {     # data to parse?
                 Log3 $name, 5, "$name: now parsing response data objects, master is " . 
                     ($masterHash ? $masterHash->{NAME} : 'undefined') . " relay is " .
                     ($relayHash ? $relayHash->{NAME} : 'undefined');
                 ParseDataString($masterHash, $response) if ($masterHash);
                 ParseDataString($relayHash, $response) if ($relayHash);
+            } elsif ($request->{FCODE} == 999) {
+                my $hexData = unpack ('H*', $frame->{DATA});
+                my $hexFC   = sprintf ('%1X', $frame->{FCODE});
+                $hexData = ($hexData ? $hexData : 'no data');
+                Log3 $name, 4, "$name: got reply to raw request: fCode $hexFC, $hexData";
+                readingsSingleUpdate($masterHash, "rawResponse-$hexFC", $hexData, 1);
             }
         }
         RelayResponse($hash, $request, $response) if ($relayHash && $request);       # add to {ERROR} if relay device is unavailable
     }
+    if ($frame->{ERROR}) {
+        LogFrame($hash, 'HandleResponse error', 4);
+        if (AttrVal($name, "showError", 0)) {
+            readingsSingleUpdate($hash, "LAST_ERROR", $frame->{ERROR}, 1);
+        }
+    }
+    else {
+        LogFrame($hash, 'HandleResponse done', 4);
+    }
     
-    LogFrame($hash, ($hash->{FRAME}{ERROR} ? "HandleResponse error" : 'HandleResponse done'), 4);
     Statistics($hash, 'Timeouts', 0);       # damit bei Bedarf das Reading gesetzt wird
     ResetExpect($hash);                     # for master back to 'idle', otherwise back to 'request'
     Profiler($hash, 'Idle');
@@ -2284,13 +2408,13 @@ sub HandleResponse {
     delete $hash->{RESPONSE};
     RemoveInternalTimer ("timeout:$name");  # remove ResponseTimeout timer now that Response has arrived
     
-    if ($hash->{MODE} eq 'master') {
+    if ($hash->{MODE} eq 'master') {                                # close after last response in queue
         if (AttrVal($name, 'closeAfterResponse', 0) && ($hash->{QUEUE} ? scalar(@{$hash->{QUEUE}}) : 0) == 0) {
             Log3 $name, 4, "$name: HandleResponse will close because closeAfterResponse is set and queue is empty";
             DoClose($hash);
             return 1;
         }
-        elsif (AttrVal($name, 'closeAfterResponse', 0) == 2) {
+        elsif (AttrVal($name, 'closeAfterResponse', 0) == 2) {      # close after each response regardless of remaining queue entries
             Log3 $name, 4, "$name: HandleResponse will close because closeAfterResponse is 2";
             DoClose($hash, {KEEPQUEUE => 1});
             StopQueueTimer($hash);      # restart with full queue delay
@@ -2298,9 +2422,138 @@ sub HandleResponse {
             return 1;    
         }
     }
-    
     StartQueueTimer($hash, \&Modbus::ProcessRequestQueue, {delay => 0});    # set  timer to call processRequestQueue asap
     return 1;                               # error or not, parsing is done.
+}
+
+
+##################################################################################
+# create hash with information about custom function codes and other information 
+# from dev- attrs for an individual master / slave and separate for requests / responses
+# called with the logical device hash, function code and pduType (Request / Response)
+sub createDevInfoCache {
+    my $hash      = shift;                                  # the logical master device to access parsing attrs
+    my $fCode     = shift;
+    my $pduType   = shift;                                  # Request or Response for looking up attrs
+    my $name      = $hash->{NAME};                          # the name of the logical device
+    my $cFc       = 'fc' . $fCode . $pduType;               # key for potential custom function code
+    my $unpack    = DevInfo($hash, $cFc, 'unpack');         # unpack for custom fcode?
+    my @fNames    = split (', ', DevInfo($hash, $cFc, 'fieldList'));    
+
+    my %di;
+    $di{UNPACK} = $unpack;
+    $di{FNAMES} = \@fNames;
+    $di{EXPRS}  = {};
+
+    Log3 $name, 5, "$name: createDevInfoCache fc $fCode called";
+
+    my %temp;
+    foreach my $fld (@pduFields) {                          # for all potential fields
+        my $expr = DevInfo($hash, $cFc, 'fieldExpr-' . $fld);   # check if there is an expr defined
+        if ($expr) {
+            $di{EXPRS}{$fld} = $expr;                       # put exprs temporarily in $di{EXTRA}
+            Log3 $name, 5, "$name: createDevInfoCache fc $fCode field $fld expr $expr";
+            $temp{$fld} = 1;
+        }
+    }
+    foreach my $fld (@fNames) {                             # for all fields unsed for unpacking
+        delete $temp{$fld};                                 # remove from temp hash
+        Log3 $name, 5, "$name: createDevInfoCache fc $fCode remove field $fld from EXTRAS";
+    }
+    my @extras = keys %temp;
+    $di{EXTRAS} = \@extras;
+
+    # brokenFCx could be set for masters that should interpret wrong responses from a special slave.
+    # today no more such attrs should be introduced but individual dev-fcxRespnse attr should be used instead
+    if ($fCode == 3 && $pduType eq 'Response' && DevInfo($hash, 'h', 'brokenFC3')) {  # devices that respond with wrong pdu: fCode, adr, registers
+        Log3 $name, 5, "$name: createDevInfoCache fc $fCode modifies definitions for Broken FC3";
+        $di{TYPE}   = 'h';
+        $di{UNPACK} = 'na*';
+        $di{FNAMES} = ['ADR', 'VALUES'];                    # fields to be unpacked
+        $di{EXTRAS} = ['LEN', 'PDULEXP'];                   # more fields to be set, array also defines order of evaluation!
+        #$di{EXPRS}{VALUES}  = 'length($val) > $pduHash->{LEN}*2 ? substr($val, 0, $pduHash->{LEN}*2) : $val';      # not really necessary
+        $di{EXPRS}{LEN}     = '$val * 2';                   # brokenFC3 should only be set for a master and this will only be used for interpreting responses
+        $di{EXPRS}{PDULEXP} = '$pduHash->{LEN} + 3';        # 1 Byte fCode + 2 Byte adr + 2 bytes per register (after LEN Expression)
+    }
+    if ($fCode == 2 && $pduType eq 'Response' && DevInfo($hash, 'd', 'brokenFC2') eq 'doepke') {
+        Log3 $name, 5, "$name: createDevInfoCache fc $fCode modifies definitions for Broken FC2 doepke";
+        $di{TYPE}   = 'd';
+        $di{UNPACK} = 'Ca*';
+        $di{FNAMES} = ['LEN', 'VALUES'];                    # fields to be unpacked
+        $di{EXTRAS} = ['PDULEXP'];                          # more fields to be set, array also defines order of evaluation!
+        $di{EXPRS}{PDULEXP} = '$pduHash->{LEN} + 2';
+        $di{EXPRS}{VALUES}  = 'substr($val, 1, 1)';         # drop first byte
+    }
+    if ($fCode == 5 && $pduType eq 'Response' && DevInfo($hash, 'd', 'brokenFC5')) {
+        Log3 $name, 5, "$name: createDevInfoCache fc $fCode modifies definitions for Broken FC5";
+        $di{TYPE}   = 'c';                                  # write single coil
+        $di{UNPACK} = 'nH4';                                # 2 bytes adr, 2 bytes values
+        $di{FNAMES} = ['ADR', 'VALUES'];                    # fields to be unpacked
+        $di{EXTRAS} = ['PDULEXP', 'LEN'];                   # more fields to be set, array also defines order of evaluation!
+        $di{EXPRS}{PDULEXP} = '5';
+        $di{EXPRS}{VALUES}  = 'pack ("c", ($val eq "0000" ? 0 : 1)';    # normally ff00 is 1 and 0000 is 0. Broken devices might use 0001 and 0000
+        $di{EXPRS}{LEN}     = '1';
+    }
+    $hash->{DICACHE}{$fCode} = \%di;
+
+    return;
+}
+
+
+##################################################################################
+# parse function code PDUs
+# called with the logical device hash
+# otherwise no information about custiom fc definitions exist
+# could be used tp parse standard fc as well but this would only slow down things 
+# so this function is only used for custom fcs
+sub parsePDU {
+    my $hash      = shift;                                  # the logical master device to access parsing attrs
+    my $frame     = shift;
+    my $pduHash   = shift;                                  # pdu structure to be filled, already contains adr/len/operation/masterhash/relayhash from request
+    my $pduType   = shift;                                  # Request or Response for looking up attrs
+    my $name      = $hash->{NAME};                          # the name of the logical device
+    my $fCode     = $frame->{FCODE};                        # filled in handleFrameStart
+    my $data      = $frame->{DATA};
+
+    createDevInfoCache($hash, $fCode, $pduType) if (!$hash->{DICACHE}{$fCode});
+    my $di        = $hash->{DICACHE}{$fCode};               # cached device info
+
+    my $unpack    = $di->{UNPACK};                          # unpack for custom fcode?
+    my @fNames    = @{$di->{FNAMES}};                       # field names for unpack
+    my @extras    = @{$di->{EXTRAS}};                       # extra expressions
+    my @fields    = ($unpack ne 'none') ? unpack ($unpack, $data) : ();     # unpack data
+    
+    $pduHash->{TYPE} = $di->{TYPE} if ($di->{TYPE});
+    my $logFld       = '';
+    foreach my $fld (@fNames) {                             # assign fields and apply expr if applicable
+        my $val  = shift @fields;
+        my $expr = $di->{EXPRS}{$fld};
+        my $new  = $val;
+        if ($expr) {
+            $new  = EvalExpr($hash, {expr => $expr, val => $val, action => "field expr for $fld", '$pduHash' => $pduHash});
+            Log3 $name, 5, "$name: parsePDU $fld after expr ($expr) is "
+                . HexIfNeeded($new) . " (before: " . (HexIfNeeded($val) // 'null') . ")";
+        } else {
+            Log3 $name, 5, "$name: parsePDU $fld is " . HexIfNeeded($new);
+        }
+        $pduHash->{$fld} = $new;                            # set PDU hash field
+        $logFld .= ($logFld ? ', ' : '') . "$fld = " . HexIfNeeded($new);
+    }
+    foreach my $fld (@extras) {                             # modify potential additional fields like PDULEXP after assigning all unpacked fields
+        my $expr = $di->{EXPRS}{$fld};
+        my $val  = $pduHash->{$fld} // '';
+        my $new  = EvalExpr($hash, {expr => $expr, val => $pduHash->{$fld}, '$pduHash' => $pduHash});
+        Log3 $name, 5, "$name: extra field $fld after expr ($expr) is " . HexIfNeeded($new);
+        $logFld .= ($logFld ? ', ' : '') . "$fld = " . HexIfNeeded($new);
+        $pduHash->{$fld} = $new;                            # set PDU hash
+    }
+    Log3 $name, 5, "$name: parsePDU function code $fCode: data: " . unpack ('H*', $data)
+        . " with unpack code $unpack" . (@fNames ? " to fields " . join (',', @fNames) : '')
+        . ' results in values: ' . $logFld;
+    if (!$frame->{PDULEXP}) {                               # if net set from the TCP frame
+        $frame->{PDULEXP} = ($pduHash->{PDULEXP} ? $pduHash->{PDULEXP} : 1);
+    }
+    return;
 }
 
 
@@ -2310,34 +2563,48 @@ sub HandleResponse {
 # fill {RESPONSE} and some more fields of {FRAME}
 # $frame->{PDULEXP} is set so the following functions can see if they still need to wait for more data
 sub ParseResponse {
-    my $hash       = shift;
-    my $response   = shift;
-    my $masterHash = shift;                                 # to be able to check for brokenFCX or allowShortResponses
+    my $hash       = shift;                                 # the physical device hash
+    my $response   = shift;                                 # response structure to be filled, already contains adr/len/operation/masterhash/relayhash from request
+    my $mHash      = shift;                                 # the logical master device to access parsing attrs, can be undef!
     my $name       = $hash->{NAME};
+    my $mName      = $mHash ? $mHash->{NAME} : '';
     my $frame      = $hash->{FRAME} // {};
+    my $request    = $hash->{REQUEST};
     my $fCode      = $frame->{FCODE};                       # filled in handleFrameStart
     my $data       = $frame->{DATA};
+    my $unpack;
 
-    Log3 $name, 5, "$name: ParseResponse called from " . FhemCaller();
+    if ($mHash) {
+        createDevInfoCache($mHash, $fCode, 'Response') if (!$mHash->{DICACHE}{$fCode});
+        my $di     = $mHash->{DICACHE}{$fCode};              # cached device info
+        $unpack    = $di->{UNPACK};                          # unpack for custom fcode?
+    }
+
+    Log3 $name, 5, "$name: ParseResponse called from " . FhemCaller() . ", fc $fCode"
+        . ($unpack ? ", custom fc unpack $unpack" : '');
     
     use bytes;
     $response->{FCODE}    = $fCode;
     $response->{MODBUSID} = $frame->{MODBUSID};
-    +
+    if ($request) {
+        $response->{ADR}        = $request->{ADR};          # prefill
+        $response->{LEN}        = $request->{LEN};
+        $response->{TYPE}       = $request->{TYPE};
+        $response->{OPERATION}  = $request->{OPERATION};    # for later call to ParseDataString
+    }
+    
     # if we don't have enough data then checksum check will fail later which is fine.
     # however unpack might produce undefined results if there is not enough data so return early.
     my $dataLength = length($data);
-    if ($fCode == 1 || $fCode == 2) {                       
+    if ($unpack) {                                          # custom fCode defined or brokenFCx 
+        parsePDU($mHash, $frame, $response, 'Response');
+    }
+    elsif ($fCode == 1 || $fCode == 2) {                       
         # read coils / discrete inputs,                     pdu: fCode, num of bytes, coils
-        # adr and len are copied from request
+        # adr and len are already copied from request
         return if ($dataLength) < 1;
         my ($len, $values) = unpack ('Ca*', $data);         # length of values data and values from frame
         $values = substr($values, 0, $len) if (length($values) > $len);
-        if ($fCode == 2 && $masterHash && DevInfo($masterHash, 'd', 'brokenFC2', '') eq 'doepke'
-                && length($values) > 1) {
-            Log3 $name, 5, "$name: ParseResponse uses fix for doepke's broken fcode 2";
-            $values = substr($values, 1, 1);
-        }
         $response->{VALUES}   = $values;
         $response->{TYPE}     = ($fCode == 1 ? 'c' : 'd');  # coils or discrete inputs
         $frame->{PDULEXP}     = $len + 2;                   # 1 Byte fCode + 1 Byte len + len of expected values  
@@ -2347,17 +2614,7 @@ sub ParseResponse {
         return if ($dataLength) < 1;
         my ($len, $values) = unpack ('Ca*', $data);
         $response->{TYPE}  = ($fCode == 3 ? 'h' : 'i');     # holding registers / input registers
-        if ($fCode == 3 && $masterHash && DevInfo($masterHash, 'h', 'brokenFC3', 0)) {
-            # devices that respond with wrong pdu           pdu: fCode, adr, registers
-            $len = $response->{LEN} * 2;
-            Log3 $name, 5, "$name: ParseResponse uses fix for broken fcode 3, use len $len from request";
-            my $adr;
-            ($adr, $values)   = unpack ('na*', $data);
-            $response->{ADR}  = $adr;                       # adr of registers
-            $frame->{PDULEXP} = $response->{LEN} * 2 + 3;   # 1 Byte fCode + 2 Byte adr + 2 bytes per register
-        } else {
-            $frame->{PDULEXP}  = $len + 2;                  # 1 Byte fCode + 1 Byte len + len of expected values
-        }
+        $frame->{PDULEXP}  = $len + 2;                      # 1 Byte fCode + 1 Byte len + len of expected values
         $values = substr($values, 0, $len) if (length($values) > $len);
         $response->{VALUES} = $values;    
     } 
@@ -2365,14 +2622,9 @@ sub ParseResponse {
         # write single coil,                                pdu: fCode, adr, coil (FF00)
         return if ($dataLength) < 3;
         my ($adr, $values) = unpack ('nH4', $data);         # 2 bytes adr, 2 bytes values
-        if ($fCode == 5 && $masterHash && DevInfo($masterHash, 'c', 'brokenFC5', 0)) {
-            Log3 $name, 5, "$name: ParseResponse uses fix for broken fcode 5";
-            $values = ($values eq '0000' ? 0 : 1);
-        } else {
-            $values = ($values eq 'ff00' ? 1 : 0);
-        }
         $response->{ADR}    = $adr;                         # adr of coil
         $response->{LEN}    = 1;                            # always one coil
+        $values = ($values eq 'ff00' ? 1 : 0);
         $response->{VALUES} = pack ('c', $values);          # bit as binary string
         $response->{TYPE}   = 'c';                          # coils
         $frame->{PDULEXP}   = 5;                            # 1 Byte fCode + 2 Bytes adr + 2 Bytes coil
@@ -2397,31 +2649,39 @@ sub ParseResponse {
         # error fCode                                       pdu: fCode, data
         return if ($dataLength) < 1;
         $response->{ERRCODE} = unpack ('H2', $data);
-        $frame->{PDULEXP}    = 2;                           # 1 byte error fCode + 1 code   
+        $frame->{PDULEXP}    = 2;                           # 1 byte error fCode + 1 code
     } 
-    else {
-        # other function code
-        AddFrameError($frame, "Function code $fCode not implemented");
-        $frame->{PDULEXP} = 2;                              # minimum to expect (fCode + 1 more)
-        # todo: now we don't know the real length! maybe better drop everything we have ...
-        # todo: set another flag so we know this later!
-    }
-    $response->{PDU} = pack ('C', $fCode) . substr($data, 0, $frame->{PDULEXP});
-
-    CheckChecksum($hash);                                   # calls AddFrameError if needed so $frame->{ERROR} might be set afterwards if checksum wrong
-
-    my $frameLen = $frame->{PDULEXP} + $PDUOverhead{$hash->{PROTOCOL}};
-    my $readLen  = length($hash->{READ}{BUFFER});
-    if ($readLen < $frameLen ) {
-        Log3 $name, 5, "$name: ParseResponse got incomplete frame. Got $readLen but expecting $frameLen bytes";
-        return if ($frame->{ERROR});
-        # frame is too small but no error - even checksum is fine!
-        if (!$masterHash || !DevInfo($masterHash, $response->{TYPE}, 'allowShortResponses', 0)) {
-            Log3 $name, 4, "$name: ParseResponse got frame that looks valid but is too short. set allowShortResponses to allow such frames";
-            return;                                         # short frames are not allowed -> continue reading
+    else {                                                  # other function code / raw send?
+        if ($request && $request->{FCODE} && $request->{FCODE} == 999) {
+            $response->{VALUES} = $data;
+            if (!$frame->{PDULEXP}) {                       # if net set from the TCP frame
+                $frame->{PDULEXP} = 999;                    # maybe just fcode, maybe lots of data ...
+            }
         }
-    }
-    return 1;                                               # frame complete, go on with other checks / handling / dropping
+        else {
+            Log3 $name, 5, "$name: ParseResponse got unknown fcode $fCode";
+            AddFrameError($frame, "Function code $fCode not implemented");
+            if (!$frame->{PDULEXP}) {                       # if net set from the TCP frame
+                $frame->{PDULEXP} = 1;                      # unknown - assume at least 1 byte fc
+            }
+        }
+    }  
+    $response->{PDU} = pack ('C', $fCode) 
+        . ($data ? substr($data, 0, $frame->{PDULEXP}) : '');
+
+    CheckChecksum($hash);                                   # calls AddFrameError if needed ($frame->{ERROR})
+    
+    my $allowShort = DevInfo($mHash, $response->{TYPE}, 'allowShortResponses');
+    my $frLenExp = $frame->{PDULEXP} + $PDUOverhead{$hash->{PROTOCOL}};     # expected frame length
+    my $readLen  = length($hash->{READ}{BUFFER});                           # current frame length
+    return 1 if ($readLen >= $frLenExp);                    # frame seems complete, continue with next steps
+    Log3 $name, 5, "$name: ParseResponse got $readLen but expecting $frLenExp bytes"
+        if ($frame->{PDULEXP} != 999);                      # don't log if expected lenght is unknown (999)
+    return if ($frame->{ERROR});                            # error so far - wait for more data or timeout
+    # frame is too small but no error - even checksum is fine!
+    return 1 if ($allowShort || $frame->{PDULEXP} == 999);  # frame seems valid, continue with next steps
+    Log3 $name, 4, "$name: ParseResponse got short but valid frame. set allowShortResponses to allow";
+    return;                                                 # short not allowed -> continue / wait for more data
 }
 
 
@@ -2527,6 +2787,7 @@ sub WriteObject {
     my $name     = $hash->{NAME};
     my $objCombi = $type . $adr;   
     my $reading  = ObjInfo($hash, $objCombi, 'reading');     # '' if nothing specified
+    Log3 $name, 5, "$name: WriteObject called for $objCombi form " . FhemCaller();
     if (!$reading) {                        # no parse information -> skip to next object
         Log3 $name, 5, "$name: WriteObject has no information about handling $objCombi";
         $transPtr->{ERRCODE} = DevInfo($hash, $type, 'addressErrCode', 2);
@@ -2651,7 +2912,7 @@ sub CreateParseInfoCache {
     my $objCombi = shift;
     my $name     = $hash->{NAME};
     Log3 $name, 5, "$name: CreateParseInfoCache called";
-    $parseInfoCache->{$objCombi} = 
+    $hash->{PICACHE}{$objCombi} = 
         {   'revRegs'     => ObjInfo($hash, $objCombi, 'revRegs'),
             'bswapRegs'   => ObjInfo($hash, $objCombi, 'bswapRegs'),
             'decode'      => ObjInfo($hash, $objCombi, 'decode'),
@@ -2690,20 +2951,19 @@ sub CreateDataObjects {
         my $objCombi = $obj->{objCombi};
         my $objData  = $obj->{data};
 
-        if ($parseInfoCache->{$objCombi}) {
+        if ($hash->{PICACHE}{$objCombi}) {
             #Log3 $name, 5, "$name: Cached parse info exists for $objCombi";
             CreateParseInfoCache($hash, $objCombi) if (!AttrVal($name, 'cacheParseInfo', 0));
         } else {
-            CreateParseInfoCache($hash, $objCombi);
+            CreateParseInfoCache($hash, $objCombi);     # no entry -> recreate for this objCombi
         }
-        my $pi = $parseInfoCache->{$objCombi};
+        my $pi = $hash->{PICACHE}{$objCombi};           # cached for this objCombi until attrs change
 
         $objData = ReverseWordOrder($hash, $objData, $obj->{len}) if ($pi->{'revRegs'});
         $objData = SwapByteOrder   ($hash, $objData, $obj->{len}) if ($pi->{'bswapRegs'});
 
-        # todo: put eval around unpack to catch silly unpack codes that could crash Fhem
-        my @val = unpack ($obj->{unpack}, $objData);  # fill @val array in case unpack contains codes for more fields, other elements can be used in expr later.
-        if (!defined($val[0])) {                      # undefined value as result of unpack -> skip to next object
+        my @val = unpack ($obj->{unpack}, $objData);    # fill @val array in case unpack contains codes for more fields, other elements can be used in expr later.
+        if (!defined($val[0])) {                        # undefined value as result of unpack -> skip to next object
             my $logLvl = AttrVal($name, 'timeoutLogLevel', 3);
             Log3 $name, $logLvl, "$name: CreateDataObjects unpack of " . unpack ('H*', $objData) . " with $obj->{unpack} for $obj->{reading} resulted in undefined value";
             next OBJLOOP;
@@ -2765,7 +3025,7 @@ sub ParseDataString {
 
     CreateDataObjects($hash, $obj, $transPtr);
 
-    Log3 $name, 5, "$name: ParseDataString created " . scalar keys (%{$hash->{gotReadings}}) . " readings";
+    Log3 $name, 5, "$name: ParseDataString created " . scalar keys (%{$hash->{gotReadings}}) . " readings, errcode " . ($transPtr->{ERRCODE} // 'undef');
     return;
 }
 
@@ -2789,13 +3049,13 @@ sub ParseDataString {
 #
 #
 sub HandleRequest {
-    my $hash  = shift;                              # physical or TCP connection device hash
-    my $name  = $hash->{NAME};                      # name of physical serial device or the tcp connection device
-    my $frame = $hash->{FRAME};
-    my $id    = $frame->{MODBUSID};
-    my $fCode = $frame->{FCODE};
-    my $logHash;
-    my $msg   = '';
+    my $hash    = shift;                            # physical or TCP connection device hash
+    my $name    = $hash->{NAME};                    # name of physical serial device or the tcp connection device
+    my $frame   = $hash->{FRAME};
+    my $id      = $frame->{MODBUSID};
+    my $fCode   = $frame->{FCODE};
+    my $logHash = GetLogHash($hash, $id);           # look for Modbus logical slave or relay device (right id)
+    my $msg     = '';
 	delete $hash->{REQUEST};						# any old request in io dev is outdated now
     
     Log3 $name, 5, "$name: HandleRequest called from " . FhemCaller();
@@ -2803,7 +3063,7 @@ sub HandleRequest {
     my %requestData;                                # create new request structure
     my $request = \%requestData;
     
-    if (!ParseRequest($hash, $request)) {           # take frame hash and fill request hash
+    if (!ParseRequest($hash, $logHash, $request)) { # take frame hash and fill request hash
         if (!$frame->{ERROR}) {
             Log3 $name, 5, "$name: HandleRequest could not parse request frame yet, wait for more data" 
                 . ($frame->{ERROR} ? ' (' . $frame->{ERROR} .')' : '');
@@ -2813,7 +3073,7 @@ sub HandleRequest {
     # for unknown fCode $request->{ERRCODE} as well as $frame->{ERROR} are set by ParseRequest, later CreateResponse copies ERRCODE from Request into Response
     # ParseRequest also calls CheckChecksum to set $hash->{FRAME}{CHECKSUMERROR} if necessary
 
-    # got a valid frame - maybe we can't handle it (unsupported fCode -> ERRCODE, set by parseRequest)
+    # got a full frame - maybe we can't handle it (unsupported fCode -> ERRCODE, set by parseRequest)
     Profiler($hash, 'Fhem');   
                                                     
     $hash->{REQUEST} = $request;                    # stick request data to physical or tcp connection hash for parsing the response (e.g. passive), no effect on relays where relay device != master
@@ -2826,8 +3086,7 @@ sub HandleRequest {
         $hash->{EXPECT} = 'request';                # wait for another (hopefully valid) request (hash key should already be set to request - only for clarity)
         delete $hash->{REQUEST};                    # this one was invalid anyway
     } else {
-        $logHash = GetLogHash($hash, $id);              # look for Modbus logical slave or relay device (right id)
-        if ($logHash) {                                 # other errors might need to create a response answer back to the master
+        if ($logHash) {                                     # other errors might need to create a response answer back to the master
             # our id, no cheksum error, we are responsible, logHash is set properly                                          
             if ($hash->{MODE} eq 'slave') {
                 if (!$request->{ERRCODE} && exists $fcMap{$fCode}{write}) {   # supported write fCode request contains data to be parsed and stored
@@ -2869,12 +3128,19 @@ sub HandleRequest {
 # returns undef if not enough data, 1 if success or error ($request->{ERRCODE} is set)
 # fills {PDULEXP} so the following functions can see if they still need to wait for more data
 sub ParseRequest {
-    my $hash    = shift;
-    my $request = shift;
-    my $name    = $hash->{NAME};
-    my $frame   = $hash->{FRAME} // {};
-    my $fCode   = $frame->{FCODE};                      # filled in handleFrameStart
-    my $data    = $frame->{DATA};
+    my $hash       = shift;
+    my $lHash      = shift;
+    my $request    = shift;
+    my $name       = $hash->{NAME};
+    my $frame      = $hash->{FRAME} // {};
+    my $fCode      = $frame->{FCODE};                   # filled in handleFrameStart
+    my $data       = $frame->{DATA};
+    my $cFc        = 'fc' . $fCode . 'Request';         # key for potential custom function code
+    my $cFcUnpack  = DevInfo($lHash, $cFc, 'unpack');   # unpack for custom fcode?
+
+    my $sHash;
+    $sHash      = $lHash->{CHILDOF} if ($lHash->{CHILDOF});     # take info from parent device if TCP server conn
+    my $lName   = $sHash->{NAME};                       # for looking up attrs
     
     Log3 $name, 5, "$name: ParseRequest called from " . FhemCaller();
     
@@ -2884,7 +3150,10 @@ sub ParseRequest {
     $request->{MODBUSID} = $frame->{MODBUSID};
     $request->{TID}      = $frame->{TID} if ($frame->{TID});
 
-    if ($fCode == 1 || $fCode == 2) {
+    if ($cFcUnpack) {                                   # custom fCode defined
+        parsePDU($lHash, $frame, $request, 'Request');
+    }
+    elsif ($fCode == 1 || $fCode == 2) {
         # read coils / discrete inputs,                 pdu: fCode, StartAdr, Len (=number of coils)
         return if ($dataLength) < 4;                    # minimum pdu length minus fcode
         my ($adr, $len) = unpack ('nn', $data);
@@ -2905,42 +3174,42 @@ sub ParseRequest {
     elsif ($fCode == 5) {                     
         # write single coil,                            pdu: fCode, StartAdr, Value (1-bit as FF00)
         return if ($dataLength) < 4;                    # minimum pdu length minus fcode
-        my ($adr, $value) = unpack ('na*', $data);
+        my ($adr, $value)  = unpack ('na*', $data);
         $request->{TYPE}   = 'c';                       # coil
         $request->{ADR}    = $adr;                      # 16 Bit Coil adr
         $request->{LEN}    = 1;
         $request->{VALUES} = $value;
-        $frame->{PDULEXP} = 5;                          # fCode + 2 16Bit Values  
+        $frame->{PDULEXP}  = 5;                         # fCode + 2 16Bit Values  
     } 
     elsif ($fCode == 6) {                     
         # write single holding register,                pdu: fCode, StartAdr, Value
         return if ($dataLength) < 4;                    # minimum pdu length minus fcode
-        my ($adr, $value) = unpack ('na*', $data);
-        $request->{TYPE}  = 'h';                        # holding register
-        $request->{ADR}   = $adr;                       # 16 Bit holding register adr
-        $request->{LEN}   = 1;
+        my ($adr, $value)  = unpack ('na*', $data);
+        $request->{TYPE}   = 'h';                       # holding register
+        $request->{ADR}    = $adr;                      # 16 Bit holding register adr
+        $request->{LEN}    = 1;
         $request->{VALUES} = $value;
-        $frame->{PDULEXP} = 5;                          # fCode + 2x16Bit 
+        $frame->{PDULEXP}  = 5;                         # fCode + 2x16Bit 
     }
     elsif ($fCode == 15) {                    
-        # write multiple coils,                         pdu: fCode, StartAdr, NumOfCoils, ByteCount, Values as bits
+        # write multiple coils,                         pdu: fCode, StartAdr, NumOfCoils, ByteCount, Values / bit
         return if ($dataLength) < 6;                    # minimum pdu length minus fcode
         my ($adr, $len, $bytes, $values) = unpack ('nnCa*', $data);
-        $request->{TYPE}  = 'c';                        # coils
-        $request->{ADR}   = $adr;                       # 16 Bit Coil adr
-        $request->{LEN}   = $len;
+        $request->{TYPE}   = 'c';                       # coils
+        $request->{ADR}    = $adr;                      # 16 Bit Coil adr
+        $request->{LEN}    = $len;
         $request->{VALUES} = $values;
-        $frame->{PDULEXP} = 6 + $bytes;                 # fCode + 2x16Bit + bytecount + values
+        $frame->{PDULEXP}  = 6 + $bytes;                # fCode + 2x16Bit + bytecount + values
     }
     elsif ($fCode == 16) {                    
         # write multiple regs,                          pdu: fCode, StartAdr, NumOfRegs, ByteCount, Values
         my ($adr, $len, $bytes, $values) = unpack ('nnCa*', $data);
         return if ($dataLength) < 6;                    # minimum pdu length minus fcode
-        $request->{TYPE}  = 'h';                        # coils
-        $request->{ADR}   = $adr;                       # 16 Bit Coil adr
-        $request->{LEN}   = $len;
+        $request->{TYPE}   = 'h';                       # coils
+        $request->{ADR}    = $adr;                      # 16 Bit Coil adr
+        $request->{LEN}    = $len;
         $request->{VALUES} = $values;
-        $frame->{PDULEXP} = 6 + $bytes;                 # fCode + 2x16Bit + bytecount + values
+        $frame->{PDULEXP}  = 6 + $bytes;                # fCode + 2x16Bit + bytecount + values
     }
     elsif ($fCode == 17) {
         # report server id (serial only)                pdu: only fCode
@@ -2956,9 +3225,9 @@ sub ParseRequest {
     $request->{PDU} = pack ('C', $fCode) . substr($data, 0, $frame->{PDULEXP});
     CheckChecksum($hash);                               # set $hash->{FRAME}{CHECKSUMERROR} if wrong
 
-    my $frameLen = $frame->{PDULEXP} + $PDUOverhead{$hash->{PROTOCOL}};
+    my $frLenExp = $frame->{PDULEXP} + $PDUOverhead{$hash->{PROTOCOL}};
     my $readLen  = length($hash->{READ}{BUFFER});
-    return if ($readLen < $frameLen );                  # continue reading
+    return if ($readLen < $frLenExp );                  # continue reading
     return 1;                                           # reading done, continue handling / dropping this frame
 }
 
@@ -3138,36 +3407,45 @@ sub CreateResponse {
     my $logHash = shift;
     my $request = shift;
     $logHash    = $logHash->{CHILDOF} if ($logHash->{CHILDOF});
-    my $name    = $logHash->{NAME};                 # name of logical device    
+    my $name    = $logHash->{NAME};                     # name of logical device
     
     Log3 $name, 5, "$name: CreateResponse called from " . FhemCaller() . 
-		($request->{ERRCODE} ? " ErrCode=$request->{ERRCODE}" : '');
+		($request->{ERRCODE} ? ", errcode $request->{ERRCODE}" : '');
     
-    my %responseData;                               # create a new response structure
+    my %responseData;                                   # create a new response structure
     my $response = \%responseData;
     $hash->{RESPONSE} = $response;
     
-    $response->{ADR}      = $request->{ADR} // 0;   # get values for response from request
+    $response->{ADR}      = $request->{ADR} // 0;       # get values for response from request
     $response->{LEN}      = $request->{LEN} // 0;
     $response->{TYPE}     = $request->{TYPE} // '';
     $response->{MODBUSID} = $request->{MODBUSID};
     $response->{FCODE}    = $request->{FCODE};
     $response->{TID}      = $request->{TID}     if ($request->{TID});
-    $response->{ERRCODE}  = $request->{ERRCODE} if ($request->{ERRCODE});
+    $response->{ERRCODE}  = $request->{ERRCODE} // 0;   # initial value to avoid warnings with pack later
+    my $cFc  = 'fc' . $response->{FCODE} . 'Response';  # key for potential custom function code
+    my $cFcQ = 'fc' . $response->{FCODE} . 'Request';   # key for potential custom function code request
     
     # pack one or more values into a values string
     if (exists $fcMap{$response->{FCODE}}{objReturn} && !$response->{ERRCODE}) {
         $response->{VALUES} = PackObj($logHash, $response) 
-    } elsif ($response->{FCODE} == 17) {
+    } 
+
+    elsif ($response->{FCODE} == 17) {
         my $serverId = EvalExpr($logHash, {expr => AttrVal($name, 'serverIdExpr', 'fhem')});
         $response->{VALUES} = $serverId;
-        Log3 $name, 3, "$name: server id requested, send $serverId";
-    }
+        Log3 $name, 4, "$name: server id requested, send $serverId";
+    } 
+    elsif (DevInfo($logHash, $cFc, 'unpack')) {         # custom fcode?
+        my $fL = DevInfo($logHash, $cFcQ, 'fieldList');
+        if ($fL && $fL =~ /ADR/) {                      # request contained ADR field?
+            $response->{VALUES} = PackObj($logHash, $response) 
+        }
+    } 
     
     Log3 $name, 5, "$name: CreateResponse calls PackFrame to prepare response pdu";
-
     $response->{FCODE} += 128 if ($response->{ERRCODE});
-    my $responsePDU   = PackResponse($hash, $response);     # creates response or error PDU Data if {ERRCODE} is set
+    my $responsePDU   = PackResponse($hash, $logHash, $response);     # creates response or error PDU Data if {ERRCODE} is set
     my $responseFrame = PackFrame($hash, $response->{MODBUSID}, $responsePDU, $response->{TID});        
     Log3 $name, 4, "$name: CreateResponse sends " . ResponseText($response) .
                    ", device $name ($hash->{PROTOCOL}), pdu " . 
@@ -3182,32 +3460,29 @@ sub CreateResponse {
 # get the correct function code
 # called from DoRequest
 sub GetFC {
-    my $hash     = shift;
-    my $request  = shift;
+    my $hash     = shift;                               # logical device hash
+    my $request  = shift;                               # request structure containing TYPE, ADR, LEN, OPERATION
     my $type     = $request->{TYPE};
     my $objCombi = $request->{TYPE} . $request->{ADR};
     my $len      = $request->{LEN};
     my $op       = $request->{OPERATION} // 'read';
-    my $name     = $hash->{NAME};                # name of logical device
-    my $fcKey    = ($op =~ /^scan/ ? 'read' : $op);
+    my $name     = $hash->{NAME};                       # name of logical device
+    my $fcKey    = ($op =~ /^scan/ ? 'read' : $op);     # scan becomes read function code
+    my $defFC    = 3;                                   # default fc if nothing in fcMap (should neer happen)
 
-    #my $defFC   = $defaultFCode{$type}{$fcKey};
-    my $defFC   = 3;
-
-    # find default function code first
-    SEARCH:
+    SEARCH:                                             # find default function code first
     foreach my $fc (keys %fcMap) {
         if ($fcMap{$fc}{type} && $fcMap{$fc}{type} eq $type && exists $fcMap{$fc}{$op} && exists $fcMap{$fc}{default}) {
             $defFC = $fc;
             last SEARCH;
         }
     }
-    $defFC    = 16 if ($defFC == 6 && $len > 1);
-    my $fCode = DevInfo($hash, $type, $fcKey, $defFC);              # attribute or devInfo Hash to get fc for "read" or "write"
-    
+    $defFC       = 16 if ($defFC == 6 && $len > 1);                 # 6 becomes 16 for more than one register
+    my $fCode    = DevInfo($hash, $type, $fcKey, $defFC);           # attribute or devInfo Hash to get fc for "read" or "write"
     my $override = ObjInfo($hash, $objCombi, 'overrideFC'.$op);     # attr to override fc for read / write
     $fCode = $override if ($override);
 
+    # error checking and warning
     if (!$fCode) {
         Log3 $name, 3, "$name: GetFC called from " . FhemCaller() . " did not find fCode for $fcKey type $type";
     } 
@@ -3228,6 +3503,9 @@ sub GetFC {
 # called from logical device functions 
 # get, set, scan etc. with logical device hash. 
 # Create request and call QueueRequest
+
+# todo: use group definitions here as well if objects need to be requested together
+
 sub DoRequest {
     my $hash     = shift;
     my $request  = shift;
@@ -3395,8 +3673,12 @@ sub CheckDelays {
 
     DELAYLOOP:
     foreach my $dKey (keys %{$delays}) {
-        if (exists $delays->{$dKey}{if} && ! $delays->{$dKey}{if}) {
+        if (exists $delays->{$dKey}{if} && !$delays->{$dKey}{if}) {
             Log3 $name, 5, "$name: checkDelays $dKey is not relevant";
+            next DELAYLOOP;
+        }
+        if (!$delays->{$dKey}{delay}) {
+            Log3 $name, 5, "$name: checkDelays $dKey is not required";
             next DELAYLOOP;
         }
         my $last = ($delays->{$dKey}{last1} && $delays->{$dKey}{last1} < $delays->{$dKey}{last}) ? 
@@ -3449,7 +3731,7 @@ sub ProcessRequestQueue {
     my $request = NextRequestFromQueue($ioHash);
     my $force   = $request->{FORCE};
     my $reqId   = $request->{MODBUSID};
-    my $maHash  = $request->{MASTERHASH};       # the logical device from which the request came (relay/master)         
+    my $mHash   = $request->{MASTERHASH};        # the logical device from which the request came (relay/master)         
     my $qlen    = scalar(@{$queue});
 
     StopQueueTimer($ioHash, {silent => 1});     # maybe we were called direct
@@ -3457,7 +3739,7 @@ sub ProcessRequestQueue {
         ($request ? ", request: " . RequestText($request) : ', no usable requests in queue');
     return if (!$request);                      # nothing to send
     
-    my $msg = CheckDisable($maHash);
+    my $msg = CheckDisable($mHash);
     if ($msg) {                                 # logical/physical device disabled, logged by CheckDisable
         $msg = 'dropping queue because logical or io device is unavailable or disabled';
         delete $ioHash->{QUEUE};                # drop whole queue
@@ -3486,35 +3768,35 @@ sub ProcessRequestQueue {
         return;
     }
 
-    return if (CheckDelays($ioHash, $maHash, $request));    # might set Profiler to delay
+    return if (CheckDelays($ioHash, $mHash, $request));     # might set Profiler to delay
 
     DropBuffer($ioHash);    
-    RemoveInternalTimer ("timeout:$name");      # remove potential existing ResponseTimeout timer - will be set later
+    RemoveInternalTimer ("timeout:$name");                  # remove potential existing ResponseTimeout timer - will be set later
 
-    my $pdu = PackRequest($ioHash, $request);
+    my $pdu = PackRequest($ioHash, $mHash, $request);       # pack PDU with function code, adr, data from request structure
     if ($pdu) {
-        my $frame = PackFrame($ioHash, $reqId, $pdu, $request->{TID});
+        my $frame = PackFrame($ioHash, $reqId, $pdu, $request->{TID});      # pack PDU as RTU, ASCII / TCP
         LogFrame ($ioHash, "ProcessRequestQueue (V$Module_Version) qlen $qlen, sending " 
             . ShowBuffer($ioHash, $frame) . " via $ioHash->{DeviceName}", 4, $request);
 
         $request->{SENT}   = $now;
-        $request->{FRAME}  = $frame;            # frame as data string for echo detection
-        $ioHash->{REQUEST} = $request;          # save for later handling incoming response
-        $ioHash->{EXPECT}  = 'response';        # expect to read a response
+        $request->{FRAME}  = $frame;                        # frame as data string for echo detection
+        $ioHash->{REQUEST} = $request;                      # save for later handling incoming response
+        $ioHash->{EXPECT}  = 'response';                    # expect to read a response
         
         Statistics($ioHash, 'Requests');
-        SendFrame($ioHash, $reqId, $frame, $maHash);  # send the request, set Profiler key to 'Send'
-        Profiler($ioHash, 'Wait');              # wait for response to our request
+        SendFrame($ioHash, $reqId, $frame, $mHash);         # send the request, set Profiler key to 'Send'
+        Profiler($ioHash, 'Wait');                          # wait for response to our request
 
-        my $timeout = DevInfo($maHash, 'timing', 'timeout', ($request->{RELAYHASH} ? 1.5 : 2));
+        my $timeout = DevInfo($mHash, 'timing', 'timeout', ($request->{RELAYHASH} ? 1.5 : 2));
         my $toTime  = $now+$timeout;
         InternalTimer($toTime, \&Modbus::ResponseTimeout, "timeout:$name", 0);
-        $ioHash->{nextTimeout} = $toTime;       # to be able to calculate remaining timeout time in ReadAnswer
+        $ioHash->{nextTimeout} = $toTime;                   # to be able to calculate remaining timeout time in ReadAnswer
     } else {
         Log3 $name, 3, "ProcessRequestQueue (V$Module_Version) qlen $qlen cant send empty pdu";
     }
 
-    shift(@{$queue});                           # remove first element from queue
+    shift(@{$queue});                                       # remove first element from queue
     readingsSingleUpdate($ioHash, 'QueueLength', ($queue ? scalar(@{$queue}) : 0), 1) if (AttrVal($name, 'enableQueueLengthReading', 0));
     StartQueueTimer($ioHash, \&Modbus::ProcessRequestQueue);    # schedule next call if there are more items in the queue
     return;
@@ -3584,7 +3866,7 @@ sub PackObj {
             Log3 $name, 4, "$name: PackObj for $objCombi is using reading $rname of device $device with value $val";
         }
 
-        $val = EvalExpr($logHash,   {expr => $expr, val => $val, '$type' => $type, '%startAdr' => $startAdr} );
+        $val = EvalExpr($logHash,   {expr => $expr, val => $val, '$type' => $type, '$startAdr' => $startAdr} );
         $val = FormatVal($logHash,  {val => $val, format => ObjInfo($logHash, $objCombi, 'format')});        
         $val = MapConvert($logHash, {map => ObjInfo($logHash, $objCombi, 'map'),        # convert with reverse map
                                      default => ObjInfo($logHash, $objCombi, 'rmapDefault'), 
@@ -3632,6 +3914,34 @@ sub PackObj {
 }
 
 
+##########################################
+# Pack custom fc pdu from fCode, adr, len 
+# and optionally the packed value 
+sub PackPDU {
+    my $hash      = shift;                                  # the logical master device to access parsing attrs
+    my $pduHash   = shift;                                  # pdu structure to be filled, already contains adr/len/operation/masterhash/relayhash from request
+    my $pduType   = shift;                                  # Request or Response for looking up attrs
+    my $name      = $hash->{NAME};                          # the name of the logical device
+    my $fCode     = $pduHash->{FCODE};                      
+    my $cFc       = 'fc' . $fCode . $pduType;               # key for potential custom function code
+
+    my @fNames = split (', ', DevInfo($hash, $cFc, 'fieldList'));
+    my $pack   = DevInfo($hash, $cFc, 'unpack', 'a*');
+    my @fields;
+    foreach my $fld (@fNames) {
+        my $val  = $pduHash->{$fld};
+        my $expr = DevInfo($hash, $cFc, 'fieldExpr-'.$fld);
+        my $new  = EvalExpr($hash, {expr => $expr, val => $val, '$pduHash' => $pduHash});
+        Log3 $name, 5, "$name: pack fc $fCode PDU field $fld after expr ($expr) is $new (before " . ($val // 'null') . ")";
+        push @fields, $new;                 # set pack value list according to defined fieldList
+    }
+    my $data = ($pack ne 'none') ? pack ($pack, @fields) : '';
+    Log3 $name, 5, "$name: pack fc $fCode PDU fields: "
+        . join (',', @fNames) . ' values: ' . join (',', @fields)
+        . ' results in packed pdu ' . unpack ('H*', pack ('C', $fCode) . $data);
+    return $data;
+}
+
 
 
 #######################################
@@ -3639,16 +3949,26 @@ sub PackObj {
 # and optionally the packed value 
 sub PackRequest {
     my $ioHash  = shift;
+    my $mHash   = shift;
     my $request = shift // {};
     my $name    = $ioHash->{NAME};
     my $fCode   = $request->{FCODE};
     my $adr     = $request->{ADR};
     my $len     = $request->{LEN};
     my $values  = $request->{VALUES} // 0;
+
+    my $sHash   = $mHash;
+    $sHash      = $mHash->{CHILDOF} if ($mHash->{CHILDOF});     # take info from parent device if TCP server conn
+    my $lName   = $sHash->{NAME};                       # for looking up attrs
+
+    my $cFc     = 'fc' . $fCode . 'Request';    # key for potential custom function code
     
     #Log3 $name, 5, "$name: PackRequest called from " . FhemCaller();
     my $data;
-    if ($fCode == 1 || $fCode == 2) {           
+    if (DevInfo($mHash, $cFc, 'unpack', 0)) {   # custom fCode defined
+        $data = PackPDU($mHash, $request, 'Request');
+    }
+    elsif ($fCode == 1 || $fCode == 2) {           
     # read coils / discrete inputs,             pdu: fCode, startAdr, len (=number of coils)
         $data = pack ('nn', $adr, $len);        
     } 
@@ -3671,7 +3991,12 @@ sub PackRequest {
     elsif ($fCode == 16) {                    
         # write multiple regs,                  pdu: fCode, startAdr, numOfRegs, byteCount, values
         $data = pack ('nnC', $adr, $len, $len*2) . $values;
-    } 
+    }
+    elsif ($fCode == 999) {                     # raw request
+        # write multiple regs,                  pdu: values (hex)
+        $data = pack ('H*', $values);
+        return $data;
+    }
     else {                                    
         # function code not implemented yet
         Log3 $name, 3, "$name: Send function code $fCode not yet implemented";
@@ -3688,16 +4013,21 @@ sub PackRequest {
 # and relayRequest (for error replies)
 sub PackResponse {
     my $ioHash   = shift;
+    my $lHash    = shift;
     my $response = shift // {};
     my $name     = $ioHash->{NAME};
     my $fCode    = $response->{FCODE};
     my $adr      = $response->{ADR};
     my $len      = $response->{LEN};
     my $values   = $response->{VALUES} // 0;
-    
+    my $cFc      = 'fc' . $fCode . 'Response';    # key for potential custom function code
+
     Log3 $name, 5, "$name: PackResponse called from " . FhemCaller();
     my $data;
-    if ($response->{ERRCODE}) {               # error PDU                     pdu: fCode+128, Errcode
+    if (DevInfo($lHash, $cFc, 'unpack', 0)) {   # custom fCode defined
+        $data = PackPDU($lHash, $response, 'Response');
+    }
+    elsif ($response->{ERRCODE}) {               # error PDU                     pdu: fCode+128, Errcode
         return pack ('CC', $fCode, $response->{ERRCODE});
     } 
     elsif ($fCode == 1 || $fCode == 2) {      # read coils / discrete inputs, pdu: fCode, len (=number of bytes), coils/inputs as bits
@@ -3721,10 +4051,9 @@ sub PackResponse {
     } 
     elsif ($fCode == 17) {                    # report server id,             pdu: fCode, len (=number of bytes), server id string, run indicator, optional data
         $data = pack ('C', length($values)) . $values;
-    } 
-
-    else {                                    # function code not implemented yet
-        Log3 $name, 3, "$name: Send function code $fCode not yet implemented";
+    }
+    else {                                      # function code not implemented yet
+        Log3 $name, 3, "$name: pack response function code $fCode not yet implemented";
         return;
     }
     return pack ('C', $fCode) . $data;
@@ -4008,14 +4337,14 @@ sub GetUpdate {
     Profiler($ioHash, 'Fhem');
     
     my $objHash;
-    if (!AttrVal($name, 'cacheUpdateHash', 0) || !$updateCache) {
+    if (!AttrVal($name, 'cacheUpdateHash', 0) || !$hash->{UPDATECACHE}) {
         $objHash = CreateUpdateHash($hash);    
         CombineUpdateHash($hash, $objHash);
-        $updateCache = $objHash;
+        $hash->{UPDATECACHE} = $objHash;
     }
     else {
         Log3 $name, 4, "$name: GetUpdate is using cached object list";
-        $objHash = $updateCache;
+        $objHash = $hash->{UPDATECACHE};
     }
 
     # now create the requests
@@ -4117,10 +4446,10 @@ sub DropFrame {
             $rest = substr($hash->{READ}{BUFFER}, 1);
         }
         elsif ($hash->{FRAME}{PDULEXP} && $hash->{PROTOCOL}) {
-            my $frameLen = $hash->{FRAME}{PDULEXP} + $PDUOverhead{$hash->{PROTOCOL}};
-            if ($frameLen < $bLen) {
-                $drop = substr($hash->{READ}{BUFFER}, 0, $frameLen);
-                $rest = substr($hash->{READ}{BUFFER}, $frameLen);
+            my $frLenExp = $hash->{FRAME}{PDULEXP} + $PDUOverhead{$hash->{PROTOCOL}};
+            if ($frLenExp < $bLen) {
+                $drop = substr($hash->{READ}{BUFFER}, 0, $frLenExp);
+                $rest = substr($hash->{READ}{BUFFER}, $frLenExp);
             }
         }
     }
@@ -4158,9 +4487,9 @@ sub CheckChecksum {
     delete $frame->{CHECKSUMERROR};
     
     if ($proto eq 'RTU') {
-        my $frameLen = $frame->{PDULEXP} + $PDUOverhead{$hash->{PROTOCOL}}; # everything including id to crc
+        my $frLenExp = $frame->{PDULEXP} + $PDUOverhead{$hash->{PROTOCOL}}; # everything including id to crc
         # for RTU Overhead is 3 (id ... 2 Bytes CRC)
-        my $crcInputLen = ($readLen < $frameLen ? $readLen : $frameLen) - 2; # frame without 2 bytes crc
+        my $crcInputLen = ($readLen < $frLenExp ? $readLen : $frLenExp) - 2; # frame without 2 bytes crc
         my $sent = unpack('v', substr($hash->{READ}{BUFFER}, $crcInputLen, 2));
         my $calc = CRC(substr($hash->{READ}{BUFFER}, 0, $crcInputLen));
         
@@ -4176,17 +4505,17 @@ sub CheckChecksum {
         }
     } 
     elsif ($proto eq 'ASCII') {
-        my $frameLen = $frame->{PDULEXP} * 2 + $PDUOverhead{$hash->{PROTOCOL}}; # everything including id and lrc
+        my $frLenExp = $frame->{PDULEXP} * 2 + $PDUOverhead{$hash->{PROTOCOL}}; # everything including id and lrc
         # for ASCII: Oberhead is 7 (Start:, 2 Ziffern Id, 2 Ziffern LRC, CR LF)
         
-        my $lrcInputLen = ($readLen < $frameLen ? $readLen : $frameLen) - 5;
+        my $lrcInputLen = ($readLen < $frLenExp ? $readLen : $frLenExp) - 5;
         # : (id id ... ) lrc lrc cr lf
         
         my $lrcRead = substr($hash->{READ}{BUFFER}, $lrcInputLen + 1, 2);
         my $lrcData = substr($hash->{READ}{BUFFER}, 1, $lrcInputLen);
         my $sent = hex($lrcRead);
         my $calc = LRC(pack ('H*', $lrcData));
-        #Log3 $name, 5, "$name: CheckChecksum readLen=$readLen, frameLen=$frameLen (exp $frame->{PDULEXP}, " .
+        #Log3 $name, 5, "$name: CheckChecksum readLen=$readLen, frameLen=$frLenExp (exp $frame->{PDULEXP}, " .
         #    "ovr $PDUOverhead{$hash->{PROTOCOL}}), lrcdata " . ShowBuffer($hash, $lrcData) . 
         #    " and lrc " . ShowBuffer($hash, $lrcRead) . 
         #    " calculated " . unpack ('H2', pack ('C', $calc)) . 
@@ -4295,7 +4624,7 @@ sub GoToState {
         } 
         else {
             my $ioHash = GetIOHash($hash);  # get ioHash / check compatibility and set / register if necessary
-            Log3 $name, 3, "$name: " . ($ioHash ? "using $ioHash->{NAME}" : "no IODev") . " for communication";
+            Log3 $name, 4, "$name: " . ($ioHash ? "using $ioHash->{NAME}" : "no IODev") . " for communication";
         }
         if ($hash->{MODE} && $hash->{MODE} eq 'master') {
             UpdateTimer($hash, \&Modbus::GetUpdate, 'start');   # set / change timer
@@ -4335,7 +4664,8 @@ sub ServerTimeout {
 # if this is called then we are Master and did send a request
 # or we were used as relay forward device and did send a request
 
-# todo: how is timeout handled in passive mode?
+# timeout is not handled in passive mode. instead when an invalid response is detected
+# the module tries to interpret it as a request as well
 
 sub ResponseTimeout {
     my $param   = shift;                        # text:name (name of physical io device)
@@ -4346,11 +4676,13 @@ sub ResponseTimeout {
     my $request;
     my $masterHash;
     my $relayHash;
+    my $err = 'timeout waiting for reply';
     
     if ($hash->{REQUEST}) {
         $request    = $hash->{REQUEST};
         $masterHash = $request->{MASTERHASH};               # REQUEST stored in physical hash by ProcessRequestQueue
         $relayHash  = $request->{RELAYHASH};
+        $err .= " to fc $request->{FCODE} to id $request->{MODBUSID}, $request->{TYPE}$request->{ADR}, len $request->{LEN}";
         #Log3 $name, 3, "$name: ResponseTimeout called, master was $masterHash->{NAME}" .
         #    ($relayHash ? " for relay $relayHash->{NAME}" : '');
     } 
@@ -4362,6 +4694,10 @@ sub ResponseTimeout {
     LogFrame($hash, 'Timeout waiting for a modbus response', $logLvl);
     Statistics($hash, 'Timeouts');
     CountTimeouts ($hash);
+    if (AttrVal($name, "showError", 0) && $err) {
+        readingsSingleUpdate($hash, "LAST_ERROR", $err, 1);
+        #Log3 $name, 5, "$name: set LAST_ERR to $err";
+    }
     if ($request && $relayHash) {                           # create an error response through the relay
 		my $origRequest = $relayHash->{REQUEST};
 		if (!$origRequest->{MODBUSID}) {
@@ -4391,7 +4727,7 @@ sub ResponseTimeout {
     }
     Profiler($hash, 'Idle');
     DropFrame($hash);                                       # drop $hash->{FRAME} and the relevant part of $hash->{READ}{BUFFER}
-    delete $hash->{nextTimeout};  
+    delete $hash->{nextTimeout};    
 
     if ($hash->{MODE} eq 'master') {                                # close after last response in queue
         if (AttrVal($name, 'closeAfterResponse', 0) && ($hash->{QUEUE} ? scalar(@{$hash->{QUEUE}}) : 0) == 0) {
@@ -4403,7 +4739,7 @@ sub ResponseTimeout {
             DoClose($hash, {KEEPQUEUE => 1});
         }
     }
-       
+    
     $hash->{RETRY} = ($hash->{RETRY} ? $hash->{RETRY} : 0); # deleted in doRequest and handleResponse
     if ($hash->{RETRY} < $retries && $request) {			# retry?
         $hash->{RETRY}++;
@@ -4638,7 +4974,7 @@ sub RegisterAtIODev {
     my $ioName = $ioHash->{NAME};
 
     return if ($hash->{TCPConn});
-    Log3 $name, 3, "$name: RegisterAtIODev called from " . FhemCaller() . " registers $name at $ioName with id $id" . 
+    Log3 $name, 4, "$name: RegisterAtIODev called from " . FhemCaller() . " registers $name at $ioName with id $id" . 
         ($hash->{MODE} ? ", MODE $hash->{MODE}" : '') .
         ($hash->{PROTOCOL} ? ", PROTOCOL $hash->{PROTOCOL}" : '');
 
@@ -4682,14 +5018,14 @@ sub UnregAtIODev {
                 if ($ldev && $ldev->{PROTOCOL} eq $d->{PROTOCOL}) {
                     $protocolCount++;
                 } else {
-                    Log3 $name, 3, "$name: UnregAtIODev called from " . FhemCaller() . " found device $ld" .
+                    Log3 $name, 4, "$name: UnregAtIODev called from " . FhemCaller() . " found device $ld" .
                             " with protocol $ldev->{PROTOCOL} registered at $d->{NAME} with protocol $d->{PROTOCOL}." .
                             ' This should not happen';
                 }
                 if ($ldev->{MODE} eq $d->{MODE}) {
                     $modeCount++;
                 } else {
-                    Log3 $name, 3, "$name: UnregAtIODev called from " . FhemCaller() . " found device $ld" .
+                    Log3 $name, 4, "$name: UnregAtIODev called from " . FhemCaller() . " found device $ld" .
                             " with mode $ldev->{MODE} registered at $d->{NAME} with mode $d->{MODE}." .
                             ' This should not happen';
                 }
@@ -4718,7 +5054,7 @@ sub UnregAtIODev {
 # The logical device hash pointed to should have this id set as well
 # and if it is TCP connected, the logical hash is also the physical
 #
-# todo: pass mode required (master or slave/relay?) ??
+# idea: pass mode required (master or slave/relay?) ??
 sub GetLogHash {
     my $ioHash = shift;
     my $Id     = shift;
@@ -4952,7 +5288,7 @@ sub ObjInfo {
    
     my $defName     = $attrDefaults{$oName}{devDefault};
     
-    $hash = $hash->{CHILDOF} if ($hash->{CHILDOF});                     # take info from parent device if TCP server conn (TCP slave)
+    $hash = $hash->{CHILDOF} if ($hash->{CHILDOF});     # take info from parent device if TCP conn (TCP slave)
     my $name        = $hash->{NAME};
     my $modHash     = $modules{$hash->{TYPE}};
     my $parseInfo   = ($hash->{parseInfo} ? $hash->{parseInfo} : $modHash->{parseInfo});
@@ -4963,9 +5299,9 @@ sub ObjInfo {
     if (!defined($reading) && $parseInfo->{$key} && $parseInfo->{$key}{reading}) {
         $reading = $parseInfo->{$key}{reading};
     }
-    if (!defined($reading)) {
+    if (!defined($reading)) {   # not even a reading attr for this key / obj
         return (exists($attrDefaults{$oName}{default}) ? $attrDefaults{$oName}{default} : '');
-        #$reading = "unnamed-$key";          # continuing with a defult reading name will result in returning the dev defaults for e.g. len which breaks splitting etc...
+        #$reading = "unnamed-$key";          # continuing with a default reading name will result in returning the dev defaults for e.g. len which breaks splitting etc...
     }
     
     #Log3 $name, 5, "$name: ObjInfo now looks at attrs for oName $oName / reading $reading / $key";
@@ -4983,26 +5319,38 @@ sub ObjInfo {
     return $parseInfo->{$key}{$oName}
         if (defined($parseInfo->{$key}) && defined($parseInfo->{$key}{$oName}));
 
-    # returning unnamed here creates problems because we don't know if a reading actually has been defined e.g. for a slave
+    # returning unnamed here creates problems because we don't know 
+    # if a reading actually has been defined e.g. for a slave
+    #
     #if ($oName eq 'reading') {
-    #    Log3 $name, 5, "$name: ObjInfo called from " . FhemCaller() . " with $key, $oName requested, no attr reading defined, use unnamed-$key instead";
+    #    Log3 $name, 5, "$name: ObjInfo called from " . FhemCaller() 
+    #         . " with $key, $oName requested, no attr reading defined, use unnamed-$key instead";
     #    return "unnamed-$key";                  # if no attr and no parseinfo matche before
     #}
 
     # check for type entry / attr ...
     if ($oName ne 'type') {
         #Log3 $name, 5, "$name: ObjInfo checking types";
-        my $dType = ObjInfo($hash, $key, 'type');
-        if ($dType ne '***NoTypeInfo***') {
+        my $dType = ObjInfo($hash, $key, 'type');           # default (from %atrDefaults) is ***NoTypeInfo***
+        if ($dType ne '***NoTypeInfo***') {                 # assigned type for this object 
             #Log3 $name, 5, "$name: ObjInfo for $key and $oName found type $dType";
-            my $typeSpec = DevInfo($hash, "type-$dType", $oName, '***NoTypeInfo***');
+            my $typeSpec = DevInfo($hash, "type-$dType", $oName, '***NoTypeInfo***');   # dev-type-XYZ-$oName (e.g. len)
             if ($typeSpec ne '***NoTypeInfo***') {
                 #Log3 $name, 5, "$name: ObjInfo $dType specifies $typeSpec for $oName";
                 return $typeSpec;
             }
+            # check predefined types
+            my $rtype = ref($builtInType{$dType});
+            return $builtInType{$dType}{$oName} if ($rtype eq 'HASH' && $builtInType{$dType}{$oName});
+            if ($rtype eq '') {
+                my $indirect = $builtInType{$dType};
+                return $builtInType{$indirect}{$oName} if ($indirect && $builtInType{$indirect} && $builtInType{$indirect}{$oName});
+            }
+            #Log3 $name, 5, "$name: ObjInfo no definition for $oName within type $dType";
         }
         #Log3 $name, 5, "$name: ObjInfo no type";
     }
+    
     # default for object type in deviceInfo / in attributes for device / type
     if ($defName) {
         #Log3 $name, 5, "$name: ObjInfo checking defaults Information defname=$defName";
@@ -5024,8 +5372,6 @@ sub ObjInfo {
         return $devInfo->{$type}{$defName}
             if (defined($devInfo->{$type}) && defined($devInfo->{$type}{$defName}));
     }
-
-    # todo: the final return expression seems redundant
     return (exists($attrDefaults{$oName}{default}) ? $attrDefaults{$oName}{default} : '');
 }
 
@@ -5038,7 +5384,9 @@ sub DevInfo {
     my $type        = shift;
     my $oName       = shift;
     my $lastDefault = shift;
-    $hash = $hash->{CHILDOF} if ($hash->{CHILDOF});                     # take info from parent device if TCP server conn
+    #Log3 undef, 3, "DevInfo, hash is " . ($hash ? $hash : 'undef');
+    return (defined($lastDefault) ? $lastDefault : '') if (!$hash); # so DevInfo can be called if $hash is undef
+    $hash = $hash->{CHILDOF} if ($hash->{CHILDOF});                 # take info from parent if TCP server conn
     my $name        = $hash->{NAME};
     my $modHash     = $modules{$hash->{TYPE}};
     my $devInfo     = ($hash->{deviceInfo} ? $hash->{deviceInfo} : $modHash->{deviceInfo});
@@ -5046,8 +5394,8 @@ sub DevInfo {
     my $adName      = 'dev-'.$oName;
     
     if (defined($attr{$name})) {
-        return $attr{$name}{$aName} if (defined($attr{$name}{$aName}));     # explicit attribute for this object type
-        return $attr{$name}{$adName} if (defined($attr{$name}{$adName}));   # default attribute for all object types
+        return $attr{$name}{$aName} if (defined($attr{$name}{$aName}));     # explicit attribute for this type
+        return $attr{$name}{$adName} if (defined($attr{$name}{$adName}));   # default attribute for all types
     }
     # default for object type in deviceInfo
     return $devInfo->{$type}{$oName} if (defined($devInfo->{$type}) && defined($devInfo->{$type}{$oName}));

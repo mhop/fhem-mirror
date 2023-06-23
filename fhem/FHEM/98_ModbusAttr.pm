@@ -64,15 +64,14 @@ sub Initialize {
 <a id="ModbusAttr"></a>
 <h3>ModbusAttr</h3>
 <ul>
-    ModbusAttr uses the low level Modbus module 98_Modbus.pm to provide a generic Modbus module (as master, slave, relay or passive listener) <br>
-    that can be configured by attributes similar to the way HTTPMOD works for devices with a web interface. <br>
-    ModbusAttr can be used as a Modbus master that queries data from other devices over a serial RS232 / RS485 or TCP connection, <br>
-    it can be used as a Modbus slave (=server) that can make readings of Fhem devices available via Modbus to external Modbus masters,<br>
-    it can act as aModbus relay that receives requests over one connection and forwards them over another connection (e.g. from Modbus TCP to serial Modbus RTU)<br>
+    ModbusAttr uses the low level Modbus module 98_Modbus.pm to provide a generic Modbus module (as master, slave, relay or passive listener) that can be configured by attributes similar to the way HTTPMOD works for devices with a web interface. <br>
+    ModbusAttr can be used as a Modbus master (sometimes also called a Modbus client) that queries data from other devices over a serial RS232 / RS485 or TCP connection, <br>
+    it can be used as a Modbus slave (sometimes also called a Modbus server) that can make readings of Fhem devices available via Modbus to external Modbus masters,<br>
+    it can act as a Modbus relay that receives requests over one connection and forwards them over another connection (e.g. from Modbus TCP to serial Modbus RTU)<br>
     or it can passively listen to other devices that communicate over a serial RS485 connection and extract readings from the objects it sees.<br>
     The supported protocols are Modbus RTU, Modbus ASCII or Modbus TCP.<br>
     There are several attributes that modify the way data objects are converted before they are stored in readings or sent to a device. Data can be modified by a perl expression defined in an atribute, formatted with a format string defined in another attribute or mapped to a table defined in an attribute.<br>
-    Readings can directly correspond to one data object or they can span several objects. A float value for example might be stored in two input or holding registers in the Modbus device. By specifying attributes that define the length of a reading in objects and by specifying the unpack code to get from a raw string to perl variables, all these cases can be described by attributes and no perl coding is necessary.
+    Readings can directly correspond to one data object or they can span several objects. A float value for example might be stored in two input or holding registers in the Modbus device. By specifying attributes that define the type of an object no perl coding is necessary.
 
     <br><br>
     <b>Prerequisites</b>
@@ -84,20 +83,20 @@ sub Initialize {
     <br>
 
     <a id="ModbusAttr-define"></a>
-    <b>Define as Modbus master (=client)</b>
+    <b>Define that Fhem acts as a Modbus master (sometimes called a Modbus client) that queries a slave (sometimes called a Modbus server)</b>
     <ul>
-        <code>
+        <ul><code>
         define <iodevice> Modbus /dev/device@baudrate,bits,parity,stop<br>
         define &lt;name&gt; ModbusAttr &lt;Id&gt; &lt;Interval&gt;
         </code><br>
         or<br>
         <code>
         define &lt;name&gt; ModbusAttr &lt;Id&gt; &lt;Interval&gt; &lt;Address:Port&gt; &lt;RTU|ASCII|TCP&gt;
-        </code><br>
+        </code></ul><br>
         
-        In the first case the module connects to the external Modbus device with Modbus Id &lt;Id&gt; through the serial modbus device (RS232 or RS485). Therefore a physical [[Modbus]] device is defined first<br>
-        In the second case the module connects directly through Modbus TCP or Modbus RTU or ASCII over TCP.<br>
-        If &lt;Interval&gt; is not 0 then the module actively requests data from the external device every &lt;Interval&gt; seconds <br>
+        In the first case the module connects as a master to the external Modbus slave device with Modbus Id &lt;Id&gt; through a serial modbus device (RS232 or RS485). Therefore a physical [[Modbus]] device is defined first<br>
+        In the second case the module connects as a master directly through Modbus TCP or Modbus RTU or ASCII over TCP to a slave device in the network.<br>
+        If &lt;Interval&gt; is not 0 then the module actively requests data from the external device every &lt;Interval&gt; seconds <br><br>
         The objects that the module should request and the readings it should create from these objects have to be defined with attributes (see below). <br>
         These attributes will define a mapping from so called "coils", "digital inputs", "input registers" or "holding registers" of the external device to readings inside Fhem together with the data type and format of the values.<br>
         Interval can be 0 in which case the Module only requests data when it is triggered with a Fhem get-Command.<br>
@@ -109,18 +108,17 @@ sub Initialize {
         define ModbusLine Modbus /dev/ttyUSB1@9600<br>
         define WP ModbusAttr 1 60       
         </code></ul><br>
-        Define WP as a Modbus master that communicates through the Modbus serial interface device named ModbusLine. The protocol defaults to Modbus RTU<br>
+        Defines the Fhem device WP as a Modbus master that communicates through the Modbus serial interface device named ModbusLine to query a Modbus slave with id 1. The protocol defaults to Modbus RTU<br>
         or <br>
         <ul><code>
         define ModbusLine Modbus /dev/ttyUSB1@9600<br>
         define WP ModbusAttr 20 0 ASCII
         </code></ul><br>
-        
-        Define WP as a Modbus master that communicates through the Modbus serial interface device named ModbusLine with Modbus ASCII. 
+        Defines the Fhem device WP as a Modbus master that communicates through the Modbus serial interface device named ModbusLine with Modbus ASCII. 
         Use Modbus Id 20 and don't query the device in a defined interval. Instead individual SET / GET options have to be used for communication.<br>
         or <br>
         <ul><code>define WP ModbusAttr 5 60 192.168.1.122:502 TCP</code></ul><br>
-        to talk Modbus TCP to a device with IP-Address 192.168.1.122 and the reserved port for Modbus TCP 502<br>
+        to talk Modbus TCP to a slave device with IP-Address 192.168.1.122 and the reserved port for Modbus TCP 502<br>
         Note that for Modbus over a TCP connection you don't need a basic Modbus device for the interface like ModbusLine above. <br>
         or <br>
         <ul><code>define WP ModbusAttr 3 60 192.168.1.122:8000 RTU</code></ul><br>
@@ -128,7 +126,7 @@ sub Initialize {
     </ul>
     <br>
 
-    <b>Define as Modbus slave (=server)</b>
+    <b>Define that Fhem acts as a Modbus slave (=server) that can be queried by a Modbus master</b>
     <ul>
         <code>define &lt;name&gt; ModbusAttr &lt;Id&gt; slave|server</code><br>
         or<br>
@@ -150,7 +148,7 @@ sub Initialize {
         to listen for Modbus requests with Id 20 with Modbus ASCII. <br>
         or <br>
         <ul><code>define Data4PLC ModbusAttr 5 slave 192.168.1.2:502 TCP</code></ul><br>
-        to start listening to TCP port 502 on the local address 192.168.1.2. Modbus TCP will be used as protocol and Requests with Modbus Id 5 will be answered.<br>
+        to start listening to TCP port 502 on the local address 192.168.1.2. Modbus TCP will be used as protocol and requests with Modbus Id 5 will be answered.<br>
         Please be aware that opening a port number smaller than 1024 needs root permissions on Unix devices. So it is probably better to use a non standard port number above 1024 instead.<br>
         or <br>
         <ul><code>define Data4PLC ModbusAttr 3 slave 192.168.1.2:8000 RTU</code></ul><br>
@@ -165,7 +163,7 @@ sub Initialize {
         The module listens on a serial (RS485) connection for modbus communication with the given Modbus &lt;Id&gt; and extracts readings. It does not send requests by itself but waits for another master (client) to communicate with a slave (server). So only objects that the other master requests can be seen by Fhem in this configuration. <br>
         The objects that the module recognizes and the readings that it should create from these objects have to be defined with attributes (see below) in the same way as for a Modbus master. <br>
         These attributes will define a mapping from so called "coils", "digital inputs", "input registers" or "holding registers" of the external device to readings inside Fhem together with the data type and format of the values.<br>
-        With this mode a Fhem installation can for example Listen to the communication between an energy counter as slave and a solar control system as master if they use Modbus RTU over RS485. Since only one Master is allowed when using Modbus over serial lines, Fhem can not be master itself. As a passive listener it can however see when the master queries e.g. the current power consumption and then also see the reply from the energy meter and store the value in a Fhem reading.
+        With this mode a Fhem installation can for example listen to the communication between an energy counter as slave and a solar control system as master if they use Modbus RTU over RS485. Since only one Master is allowed when using Modbus over serial lines, Fhem can not be master itself. As a passive listener it can however see when the master queries e.g. the current power consumption and then also see the reply from the energy meter and store the value in a Fhem reading.
         <br>
         Examples:<br>
         <br>
@@ -185,7 +183,7 @@ sub Initialize {
         or<br>
         <code>define &lt;name&gt; ModbusAttr &lt;Id&gt; relay &lt;Address:Port&gt; &lt;RTU|ASCII|TCP&gt; to &lt;FhemMasterDevice&gt;</code><br>
         <br>
-        The module waits for connections from other Modbus masters. It will forward requests if they match the given Modbus &lt;Id&gt; to an already defined Modbus Master device inside Fhem which will send them to its defined slave, take the reply and the pass it back to the original Master.<br>
+        The module waits for connections from other Modbus masters. It will forward requests if they match the given Modbus &lt;Id&gt; to an already defined Modbus Master device inside Fhem which will send them to its defined slave, take the reply and then pass it back to the original Master.<br>
         With this mode a Fhem installation can for example be used in front of a device that only speaks Modbus RTU over RS485 to make it available via Modbus TCP over the local network. 
         <br>
         Examples:<br>
@@ -194,7 +192,7 @@ sub Initialize {
                   define Heating ModbusAttr 22 0<br>
                   define Relay ModbusAttr 33 relay 192.168.1.2:1502 TCP to Heating</code></ul><br>
         Defines MB-485 as a base device for the RS-485 communication with a heating system, <br>
-        defines Heating as a Modbus Master to communicate with the Heating and its Modbus ID 22, <br>
+        defines Heating as a Modbus Master to communicate with the heating and its Modbus ID 22, <br>
         and then defines the relay which listens to the local IP address 192.168.1.2, TCP port 1502, Modbus Id 33 and protocol Modbus-TCP.<br>
         Requests coming in through Modbus TCP and port 1502 are then translated to Modbus RTU and forwarded via RS-485 to the heating system with Modbus Id 22. <br>
         or (unlikely)<br>
@@ -214,7 +212,7 @@ sub Initialize {
     <ul>
         Data objects (holding registers, input registers, coils or discrete inputs) are defined using attributes. 
         If Fhem is Modbus master or passive listener, the attributes assign data objects of external devices (heating systems, power meters, PLCs or other) with their register addresses to readings inside fhem and control how these readings are calculated from the raw values and how they are formatted.<br>
-        Please be aware that Modbus does not define common data types so the representation of a value can be very different from device to device. One device might make a temperature value avaliable as a floating point value that is stored in two holding resgisters, another device might store the temperature multiplied with 10 as an signed integer in one register. Even the order of bytes can vary.<br>
+        Please be aware that Modbus does not define common data types so the representation of a value can be very different from device to device. One device might make a temperature value avaliable as a floating point value that is stored in two holding registers, another device might store the temperature multiplied with 10 as an signed integer in one register. Even the order of bytes can vary.<br>
         Therefore it is typically necessary to specify the data representation as a Perl unpack code.<br>
         A Modbus master can also write values to Objects in the device and attributes define how this is done.<br><br>
         
@@ -222,15 +220,19 @@ sub Initialize {
         <pre>
         define PWP ModbusAttr 5 30
         attr PWP obj-h256-reading Temp_Wasser_ein
+        attr PWP obj-h256-type signed short big
         attr PWP obj-h256-expr $val/10
 
         attr PWP obj-h258-reading Temp_Wasser_Aus
+        attr PWP obj-h258-type signed short big
         attr PWP obj-h258-expr $val/10
 
         attr PWP obj-h262-reading Temp_Luft
+        attr PWP obj-h262-type signed short big
         attr PWP obj-h262-expr $val / 10
 
         attr PWP obj-h770-reading Temp_Soll
+        attr PWP obj-h770-type signed short big
         attr PWP obj-h770-expr $val / 10
         attr PWP obj-h770-set 1
         attr PWP obj-h770-setexpr $val * 10
@@ -240,7 +242,6 @@ sub Initialize {
 
         attr PWP dev-h-combine 5
         attr PWP dev-h-defPoll 1
-        attr PWP dev-h-defUnpack n
 
         attr PWP room Pool-WP
         attr PWP stateFormat {sprintf("%.1f Grad", ReadingsVal($name,"Temp_Wasser_Ein",0))}
@@ -267,10 +268,11 @@ sub Initialize {
         Also some vendors use hexadecimal descriptions of their register addresses. So input register 107 might be noted as hex and means 263 or even 262 as decimal address.<br>
         
         <code>attr PWP obj-h258-reading Temp_Wasser_Aus</code> defines a reading with the name Temp_Wasser_Aus that is read from the Modbus holding register at address 258.<br>
+        The attributes ending on <code>-type</code> specify the data type. In the above example <code>signed short big</code> is a 16 bit signed integer in big endian byte ordering. this information is used by the modbus module to select the correct perl unpack code and length. instead of using a -type attribute it is also possible to specify this unpack code and length explixitely (in older versions of the Fhem Modbus module this was necessary)<br>
         With the attribute ending on <code>-expr</code> you can define a perl expression to do some conversion or calculation on the raw value read from the device. 
         In the above example the raw value has to be devided by 10 to get the real value. If the raw value is also the final value then no <code>-expr</code> attribute is necessary. <br><br>
         
-        An object attribute ending on <code>-set</code> creates a fhem set option. 
+        An object attribute ending on <code>-set</code> creates a fhem set option which allows the user to issue a set command which then sends a Modbus write request to the device.
         In the above example the reading Temp_Soll can be changed to 12 degrees by the user with the fhem command <code>set PWP Temp_Soll 12</code><br>
         The object attributes ending on <code>-min</code> and <code>-max</code> define min and max values for input validation 
         and the attribute ending on <code>-hint</code> will tell fhem to create a selection list so the user can graphically select the defined values.<br><br>
@@ -283,7 +285,6 @@ sub Initialize {
         <code>dev-h-combine 5</code> for example allows the module to combine read requests to objects having an address that differs 5 or less into one read request. 
         Without setting this attribute the module will start individual read requests for each object. 
         Typically the documentation for the modbus interface of a given device states the maximum number of objects that can be read in one function code 3 request.<br>
-        <code>dev-h-defUnpack n</code> means that the values in this example that the values are stored as unsigned short (16-bit) in "network" (big-endian) order. This is only one possibility of many. An integer value might be signed instead of unsigned or it might use different byte ordering (e.g. unpack codes v or s).<br> 
     </ul>
     <br>
     
@@ -291,7 +292,7 @@ sub Initialize {
     <b>Handling Data Types</b>
     <ul>
         The Modbus protocol does not define data types. If the documentation of a device states that for example the current temperature is stored in holding register 102 this leaves room for many interpretations. Not only can the address 102 mean different things (actually decimal 102 or rather 101 if the vendor starts counting at 1 instead of 0 or even 257 or 258 if the vendor used hexadecimal addresses in his documentation ) also the data representation can be many different things. As in every programming language, there are many ways to represent numbers. They can be stored signed or unsigned, they can be integers or floating point numbers, the byte-order can be "big endian" or "small endian", the value can be stored in one holding register or in two holding registers (floating point numbers typically take four bytes which means two holding registers).<br>
-        The Modbus module allows flexible configuration of data representations be assigning a Perl unpack-code, a length, a Perl Expression, and the register ordering. The following example illustrates how this can be done:<br>        
+        The Modbus module allows flexible configuration of data representations by assigning a predefined type and by assigning a Perl unpack-code, a length, a Perl Expression, and the register ordering. The following example illustrates how this can be done:<br>        
         <pre>
         attr PWP obj-h338-reading Pressure
         attr PWP obj-h338-len 2
@@ -302,8 +303,8 @@ sub Initialize {
         In This example a floating point value for the reading "Pressure" is read from the holding registers starting at address 338. 
         The value occupies 32 Bits and is therefore stored in two registers. The Perl pack code to use is f> which means a native single precision float in big endian format (byte order). With revRegs the module is instructed to reverse the order of the registers directly after reading. The format specification then defines how the value is formatted into a reading - in this case with two digits after the comma. See http://perldoc.perl.org/functions/pack.html for Perl pack / unpack codes and http://perldoc.perl.org/functions/sprintf.html for format specifications.<br>
         <br>
-        If you need to read / write many objects for a device, defining all these parameters each time is not elegant. The Modbus module therefore offers twi ways to simplify this task: <br>
-        You can define defaults for every type of object or you can define your own data types once and then refer to them.<br>
+        If you need to read / write many objects for a device, defining all these parameters each time is not elegant. The Modbus module therefore offers two ways to simplify this task: <br>
+        You can use defaults for every type of object or you can use predefined types or define your own data types once and then refer to them.<br>
         This exampe shows how defaults can be specified for holding registers and input registers:<br>
         <pre>
         attr PWP dev-h-defUnpack f>
@@ -314,7 +315,7 @@ sub Initialize {
         attr PWP dev-i-defUnpack n
         attr PWP dev-i-defLen 1
         </pre>
-        <br>
+
         The next example shows how you can define your own data types and then apply them to objects:<br>
         <pre>
         attr WP dev-type-VT_R4-format %.1f
@@ -329,6 +330,36 @@ sub Initialize {
         </pre>
         This example defines a data type with the name VT_R4 which uses an unpack code of f>, length 2 and reversed register ordering. It then assigns this Type to the objects Temp_In and Temp_Out.<br>
         <br>
+        The following data types are already defined and can directly be used instead of specifying unpack codes and lengths:<br>
+        <ul>
+        <li>signed short big</li>
+            16 bits signed integer in big endian byte ordering (high, low)
+        <li>unsigned short big</li>
+            16 bits unsigned integer in big endian byte ordering
+        <li>signed short little</li>
+            16 bits signed integer in vax / little endian byte ordering (low high)
+        <li>unsigned short little</li>
+            16 bits unsigned integer in vax / little endian byte ordering (low high)
+        <li>signed long big</li>
+            32 bits signed integer in big endian byte ordering (high, low), occupies two registers
+        <li>unsigned long big</li>
+            32 bits unsigned integer in big endian byte ordering, occupies two registers
+        <li>signed long little</li>
+            32 bits signed integer in vax / little endian byte ordering (low high), occupies two registers
+        <li>unsigned long little</li>
+            32 bits unsigned integer in vax / little endian byte ordering (low high), occupies two registers
+        <li>float32 big</li>
+            32 bits floating point number in big endian byte ordering, occupies two registers
+        <li>float32 little</li>
+            32 bits floating point number in vax / little endian byte ordering (low high), occupies two registers
+        <li>float64 big</li>
+            64 bits floating point number in big endian byte ordering, occupies four registers
+        <li>float64 little</li>
+            64 bits floating point number in vax / little endian byte ordering (low high), occupies four registers
+        <li>string</li>
+            string with default lenght 2 so the length should be overwritten as needed
+        </ul>
+        additionally there are some predefined abbreviations / aliases for these predefined data types. For exmple the word big can be omitted so unsigned short is the same as unsigned short big or real is an alias for float32 big and double is an alias for floa64 big.
     </ul>
     <br>
     
@@ -360,6 +391,7 @@ sub Initialize {
         </pre>
         
         In this example Fhem allows an external Modbus master to read the temperature of a Fhem device named THSensTerrasse through holding register 256 and the humidity of that Fhem device through holding register 258. Both are encoded as floting point values that span two registers. <br>
+        Instead of specifying unpack codes and lengths predefined data types could be used here as well.
         The master can also read but also write the reading named limit of the device myDummy.
         
     </ul>
@@ -415,6 +447,65 @@ sub Initialize {
         To avoid huge option lists in FHEMWEB, the objects visible as Get in FHEMWEB can be defined by setting an attribute <code>obj-xy-showGet</code> to 1. 
     </ul>
     <br>
+    
+    <a id="ModbusAttr-customFC"></a>
+    <b>custom function codes</b><br>
+    <ul>
+        if a device supports special function codes beyond 1-6 and 15-17 then they can be defined and used with attributes that define how the requests and replies for such function codes are constructed and how they can be parsed.<br><br>
+        
+        simple example for a function code that does not contain data:<br>
+        <pre>
+        attr Master dev-fc66Request-unpack none
+        attr Master dev-fc66Response-unpack none
+        
+        attr Master obj-h9999-reading Reset
+        attr Master obj-h9999-set 1
+        attr Master obj-h9999-overrideFCwrite 66
+        </pre>
+        the unpack none specifies that there is no field in the request with function code 66, the message just consists of the function code and the checksum for modbus RTU.<br>
+        To use a custom function code, it can be assigned to an individual virtual object with the obj-XY-overrideFCwrite attribute so a set command to this object will use the custom function code 
+        and pass the objects type, address and length via the fields TYPE, ADR and LEN. In the above example TYPE, ADR and LEN are not even used.<br><br>
+        
+        The next example defines function code 93 for a master which behaves just like function code 3 to read holding registers:<br>
+        <ul>
+        <pre>
+        attr Master dev-fc93Request-unpack nn
+        attr Master dev-fc93Request-fieldList ADR, LEN
+
+        attr Master dev-fc93Response-unpack Ca*
+        attr Master dev-fc93Response-fieldList LEN, VALUES
+        attr Master dev-fc93Response-fieldExpr-PDULEXP $pduHash->{LEN} + 2
+        attr Master dev-fc93Response-fieldExpr-TYPE 'h'
+        </pre>
+        
+        the relevant part for a custom function code request and response is the part between the modbus id and the checksum (for RTU). 
+        This part is defined with an unpack code and a list of Fields that correspond to the fields defined by the unpack code elements.<br>
+        See the Modbus specification for details on how the request and response looks like for function code 3<br>
+        Possible fields for custom function codes are ADR, LEN, TYPE, VALUES and PDULEXP.<br><br>
+        
+        Example for a slave:
+        <pre>
+        attr Slave  dev-fc93Request-unpack nn
+        attr Slave  dev-fc93Request-fieldList ADR, LEN
+        attr Slave  dev-fc93Request-fieldExpr-PDULEXP 5
+        attr Slave  dev-fc93Request-fieldExpr-TYPE 'h'
+
+        attr Slave  dev-fc93Response-unpack Ca*
+        attr Slave  dev-fc93Response-fieldList LEN, VALUES
+        attr Slave  dev-fc93Response-fieldExpr-LEN $val * 2;
+        </pre>
+        
+        The unpack code nn stands for two 16 bit unsigned numbers. <br>
+        The field TYPE is set with a Perl expression to h (in this case only the constant h)<br>
+        ADR, LEN specify that the numbers unpacked are the holding register address and the length in registers.<br>
+        The field PDULEXP is the expected length of the PDU including the leading Modbus ID byte.<br>
+        For the response this expected PFU length is calculated by adding 2 to the unpacked field LEN
+        For the slave the length field LEN is doubled because in the protocol for function code 3 it means the length in bytes whereas in the module the length means the number of 16 bit registers.<br>
+        If during parsing the fields TYPE, ADR and VALUES are set and there is an object / reading with that type and address defined, then the field VALUES is passed on for interpretation as this object.<br>
+        </ul>
+    </ul>
+    <br>
+    
     <a id="ModbusAttr-attr"></a>
     <b>Attributes</b><br><br>
     <ul>
@@ -430,14 +521,18 @@ sub Initialize {
             enables the built in set commands like interval, stop, start and reread (see above).<br>
             Starting with Version 4 of the Modbus module enableControlSet defaults to 1. This attribute can however be used to disable the set commands by setting the attribute to 0<br>
         <br>
-        
+        </li>
+        <li><a id="ModbusAttr-attr-showError">showError</a><br>
+            if this attribute is set to 1 then a reading with the name LAST_ERROR will be created when a timeout occurs or when a Modbus reply conatins an error code<br>
+        </li>
+        <br>
+            
         please also notice the attributes for the physical modbus interface as documented in 98_Modbus.pm
         <br>
         
         the following list of attributes can be applied to any data object by specifying the objects type and address in the variable part. 
         For many attributes you can also specify default values per object type (see dev- attributes later) or you can specify an object attribute without type and address 
         (e.g. obj-len) which then applies as default for all objects:
-        </li>
         <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-reading" data-pattern="obj-.*-reading">obj-[cdih][0-9]+-reading</a><br> 
             define the name of a reading that corresponds to the modbus data object of type c,d,i or h and a decimal address (e.g. obj-h225-reading).<br>
             For master or passive operation this reading name will be used to create a reading for the modbus device itself. <br>
@@ -554,9 +649,8 @@ sub Initialize {
             Example: attr MBTest obj-h225-encode utf8
         </li>
         <li><a id="ModbusAttr-attr-obj-[ih][0-9]+-type" data-pattern="obj-.*-type">obj-[ih][0-9]+-type</a><br> 
-            defines that this object has a user defined data type. Data types can be defined using the dev-type- attribues.<br>
-            If a device with many objects uses for example floating point values that span two swapped registers with the unpack code f>, then instead of specifying the -unpack, -revRegs, -len, -format and other attributes over and over again, you could define a data type with attributes that start with dev-type-VT_R4- and then 
-            use this definition for each object as e.g. obj-h1234-type VT_R4<br>
+            defines that this object has a predefined or user defined data type. Data types can be defined using the dev-type- attribues.<br>
+            If a device with many objects uses for example floating point values that span two swapped registers with the unpack code f>, then instead of specifying the -unpack, -revRegs, -len, -format and other attributes over and over again, you could define a data type with attributes that start with dev-type-VT_R4- and then use this definition for each object as e.g. obj-h1234-type VT_R4<br>
             example:<br>
             <pre>
             attr WP dev-type-VT_R4-format %.1f
@@ -567,6 +661,7 @@ sub Initialize {
             attr WP obj-h1234-reading Temp_Ist
             attr WP obj-h1234-type VT_R4
             </pre><br>
+            see above for a list of predefined data types.
         
         </li>
         <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-showGet" data-pattern="obj-.*-showGet">obj-[cdih][0-9]+-showGet</a><br> 
@@ -748,7 +843,7 @@ sub Initialize {
             delay for Modbus-TCP connections. This defines how long the module should wait after a failed TCP connection attempt before the next reconnection attempt. This defaults to 60 seconds.
         </li>
         <li><a id="ModbusAttr-attr-nextOpenDelay2">nextOpenDelay2</a><br> 
-            delay for Modbus-TCP connections. This defines how long the module should wait after any  TCP connection attempt before the next reconnection attempt. This defaults to 2 seconds.
+            delay for Modbus-TCP connections. This defines how long the module should wait after any TCP connection attempt before the next reconnection attempt. This defaults to 2 seconds.
         </li>
         <li><a id="ModbusAttr-attr-openTimeout">openTimeout</a><br>     
             timeout to be used when opening a Modbus TCP connection (defaults to 3)
@@ -769,6 +864,9 @@ sub Initialize {
         </li>
         <li><a id="ModbusAttr-attr-nonPrioritizedSet">nonPrioritizedSet</a><br> 
             if set to 1, then set commands will not be sent on the bus before other queued requests and the response will not be waited for.
+        </li>
+        <li><a id="ModbusAttr-attr-nonPrioritizedGet">nonPrioritizedGet</a><br> 
+            if set to 1, then get commands will not be blocking and the response will not be waited for.
         </li>
         <li><a id="ModbusAttr-attr-sortUpdate">sortUpdate</a><br> 
             this attribute has become obsolte. The requests during a getUpdate cycle will always be sorted before beeing queued.
@@ -801,9 +899,34 @@ sub Initialize {
         <li><a id="ModbusAttr-attr-disable">disable</a><br>
             stop communication with the device while this attribute is set to 1. For Modbus over TCP this also closes the TCP connection.
         </li>
+        
+        
+        <li><a id="ModbusAttr-attr-dev-fc[\d]+Response-unpack" data-pattern="dev-.*Response-unpack">dev-fc[\d]+Response-unpack</a><br>
+            defines the pack / unpack code to be used when creating or parsing a custom function code response 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-fc[\d]+Response-fieldList" data-pattern="dev-.*Response-fieldList">dev-fc[\d]+Response-fieldList</a><br>
+            defines the fields that are used for creating or parsing a custom function code response.<br>
+            Possible fields are TYPE, ADR, LEN, VALUES, PDULEXP. They correspond to the unpack code in the attribute above and are specified in a comma seperated list.
+        </li>
+        <li><a id="ModbusAttr-attr-dev-fc[\d]+Response-fieldExpr" data-pattern="dev-.*Response-fieldExpr">dev-fc[\d]+Response-fieldExpr-.*</a><br>
+            defines additional Perl expressions for the fields that are used for creating or parsing a custom function code response.<br>
+            The correspondig field is the last part of the attribute name. Possible fields are TYPE, ADR, LEN, VALUES, PDULEXP.
+        </li>
+        
+        <li><a id="ModbusAttr-attr-dev-fc[\d]+Request-unpack" data-pattern="dev-.*Request-unpack">dev-fc[\d]+Request-unpack</a><br>
+            defines the pack / unpack code to be used when creating or parsing a custom function code request 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-fc[\d]+Request-fieldList" data-pattern="dev-.*Request-fieldList">dev-fc[\d]+Request-fieldList</a><br>
+            defines the fields that are used for creating or parsing a custom function code request.<br>
+            Possible fields are TYPE, ADR, LEN, VALUES, PDULEXP. They correspond to the unpack code in the attribute above and are specified in a comma seperated list.
+        </li>
+        <li><a id="ModbusAttr-attr-dev-fc[\d]+Request-fieldExpr" data-pattern="dev-.*Request-fieldExpr">dev-fc[\d]+Request-fieldExpr-.*</a><br>
+            defines additional Perl expressions for the fields that are used for creating or parsing a custom function code request.<br>
+            The correspondig field is the last part of the attribute name. Possible fields are TYPE, ADR, LEN, VALUES, PDULEXP.
+        </li>
+        
     </ul>
 </ul>
-
 
 =end html
 =cut
