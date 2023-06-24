@@ -1403,7 +1403,7 @@ sub Attr {
 
     if( $cmd eq "set" ) {
 
-      return "$iam $attrVal is invalid, allowed time in seconds >= 0." unless( $attrVal >= 0 ) );
+      return "$iam $attrVal is invalid, allowed time in seconds >= 0." unless( $attrVal >= 0 );
       $hash->{helper}{additional_polling} = $attrVal;
       Log3 $name, 4, "$iam $cmd $attrName $attrVal";
 
