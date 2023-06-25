@@ -32,6 +32,7 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.23.5" => "25.06.2023  buxfix line 1267",
   "2.23.4" => "20.06.2023  buxfix DC-Power 2.0",
   "2.23.3" => "19.06.2023  buxfix DC-Power",
   "2.23.2" => "20.05.2023  add new SMAInverter_StatusText",
@@ -1264,7 +1265,7 @@ sub SMAInverter_getstatusDoParse($) {
                  push(@row_array, "epvtoday ".($inv_SPOT_EPVTODAY/1000)."\n") if ($inv_SPOT_EPVTODAY ne "-");
              }
              if($sup_SpotDCPower) {
-                 push(@row_array, "string_1_pdc ".sprintf("%.3f",$inv_SPOT_PDC1/1000)."\n");
+                 push(@row_array, "string_1_pdc ".sprintf("%.3f",$inv_SPOT_PDC1/1000)."\n") if ($inv_SPOT_PDC1 ne "-");
                  push(@row_array, "string_2_pdc ".sprintf("%.3f",$inv_SPOT_PDC2/1000)."\n") if ($inv_SPOT_PDC2 ne "-");	
 				 push(@row_array, "string_3_pdc ".sprintf("%.3f",$inv_SPOT_PDC3/1000)."\n") if ($inv_SPOT_PDC3 ne "-");				 
              }
@@ -1474,7 +1475,7 @@ sub SMAInverter_getstatusDoParse($) {
                  push(@row_array, "SPOT_EPVTODAY ".$inv_SPOT_EPVTODAY."\n") if ($inv_SPOT_EPVTODAY ne "-");
              }
              if($sup_SpotDCPower) {
-                 push(@row_array, "SPOT_PDC1 ".$inv_SPOT_PDC1."\n");
+                 push(@row_array, "SPOT_PDC1 ".$inv_SPOT_PDC1."\n") if ($inv_SPOT_PDC1 ne "-");
                  push(@row_array, "SPOT_PDC2 ".$inv_SPOT_PDC2."\n") if ($inv_SPOT_PDC2 ne "-");	
 				 push(@row_array, "SPOT_PDC3 ".$inv_SPOT_PDC3."\n") if ($inv_SPOT_PDC3 ne "-");	
              }
@@ -3475,7 +3476,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.23.0",
+  "version": "v2.23.5",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
