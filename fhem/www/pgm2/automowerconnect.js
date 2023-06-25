@@ -294,87 +294,79 @@ function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, sca
     "L" : "leavingPath",
     "G" : "goingHomePath"
   };
-//  log('loop: Start '+ type+' '+dev );
-  if (FW_urlParams.detail == dev || 1) {
-    const canvas_0 = document.getElementById(type+'_'+dev+'_canvas_0');
-    const canvas = document.getElementById(type+'_'+dev+'_canvas_1');
-    const div = document.getElementById(type+'_'+dev+'_div');
+  const div = document.getElementById(type+'_'+dev+'_div');
+  const canvas_0 = document.getElementById(type+'_'+dev+'_canvas_0');
+  const canvas = document.getElementById(type+'_'+dev+'_canvas_1');
 
-    if ( canvas && canvas_0 ) {
+  if ( div && canvas && canvas_0 ) {
 
-//    log('loop: canvas && canvas_0 true '+ type+' '+dev + ' detailfnfirst '+detailfnfirst);
+//    log('loop: div && canvas && canvas_0 true '+ type+' '+dev + ' detailfnfirst '+detailfnfirst);
 
-      if ( detailfnfirst ) {
+    if ( detailfnfirst ) {
 
-        const ctx0 = canvas_0.getContext( '2d' );
-        ctx0.clearRect( 0, 0, canvas.width, canvas.height );
-        const ctx = canvas.getContext( '2d' );
+      const ctx0 = canvas_0.getContext( '2d' );
+      ctx0.clearRect( 0, 0, canvas.width, canvas.height );
+      const ctx = canvas.getContext( '2d' );
 
-        // draw area limits
-        const lixy = div.getAttribute( 'data-areaLimitsPath' ).split(",");
-        if ( lixy.length > 0 ) AutomowerConnectLimits( ctx0, div, lixy, 'area' );
+      // draw area limits
+      const lixy = div.getAttribute( 'data-areaLimitsPath' ).split(",");
+      if ( lixy.length > 0 ) AutomowerConnectLimits( ctx0, div, lixy, 'area' );
 //        log('pos.length '+pos.length+' lixy.length '+lixy.length+', scalx '+scalx );
 
-        // draw property limits
-        const plixy = div.getAttribute( 'data-propertyLimitsPath' ).split( "," );
-        if ( plixy.length > 0 ) AutomowerConnectLimits( ctx0, div, plixy, 'property' );
+      // draw property limits
+      const plixy = div.getAttribute( 'data-propertyLimitsPath' ).split( "," );
+      if ( plixy.length > 0 ) AutomowerConnectLimits( ctx0, div, plixy, 'property' );
 
-        // draw scale
-        AutomowerConnectScale( ctx0, picx, picy, scalx );
+      // draw scale
+      AutomowerConnectScale( ctx0, picx, picy, scalx );
 
-        // draw charging station
-        var csx = div.getAttribute( 'data-cslon' );
-        var csy = div.getAttribute( 'data-cslat' );
-        var csrel = div.getAttribute( 'data-csimgpos' );
-        AutomowerConnectIcon( ctx0, csx , csy, csrel, 'CS' );
+      // draw charging station
+      var csx = div.getAttribute( 'data-cslon' );
+      var csy = div.getAttribute( 'data-cslat' );
+      var csrel = div.getAttribute( 'data-csimgpos' );
+      AutomowerConnectIcon( ctx0, csx , csy, csrel, 'CS' );
 
-      }
-      
-      const ctx = canvas.getContext( '2d' );
-      ctx.clearRect( 0, 0, canvas.width, canvas.height );
-
-      if ( pos.length > 3 ) {
-
-        // draw mowing path color
-        if ( div.getAttribute( 'data-mowingPathUseDots' ) ) {
-
-          AutomowerConnectDrawDotColor ( ctx, div, pos, colorat );
-
-        } else {
-
-          AutomowerConnectDrawPathColor ( ctx, div, pos, colorat );
-
-        }
-
-        // draw start
-        if ( div.getAttribute( 'data-mowingPathDisplayStart' ) ) {
-          ctx.beginPath();
-          ctx.setLineDash([]);
-          ctx.lineWidth=3;
-          ctx.strokeStyle = 'white';
-          ctx.fillStyle= 'black';
-          ctx.arc( parseInt( pos[ pos.length-3 ] ), parseInt( pos[ pos.length-2 ] ), 4, 0, 2 * Math.PI, false );
-          ctx.fill();
-          ctx.stroke();
-        }
-
-        // draw mower icon
-        AutomowerConnectIcon( ctx, pos[0], pos[1], AutomowerConnectTor ( pos[3], pos[4], pos[0], pos[1] ), 'M' );
-
-      }
-
-      // draw error icon and path
-      if ( errdesc[0] != '-' ) AutomowerConnectShowError( ctx, div, dev, picx, picy, errdesc, erray );
-
-    } else {
-      setTimeout(()=>{
-//        log('loop: canvas false '+ type+' '+dev );
-        AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, scalx, errdesc, pos, erray);
-      }, 100);
     }
+    
+    const ctx = canvas.getContext( '2d' );
+    ctx.clearRect( 0, 0, canvas.width, canvas.height );
+
+    if ( pos.length > 3 ) {
+
+      // draw mowing path color
+      if ( div.getAttribute( 'data-mowingPathUseDots' ) ) {
+
+        AutomowerConnectDrawDotColor ( ctx, div, pos, colorat );
+
+      } else {
+
+        AutomowerConnectDrawPathColor ( ctx, div, pos, colorat );
+
+      }
+
+      // draw start
+      if ( div.getAttribute( 'data-mowingPathDisplayStart' ) ) {
+        ctx.beginPath();
+        ctx.setLineDash([]);
+        ctx.lineWidth=3;
+        ctx.strokeStyle = 'white';
+        ctx.fillStyle= 'black';
+        ctx.arc( parseInt( pos[ pos.length-3 ] ), parseInt( pos[ pos.length-2 ] ), 4, 0, 2 * Math.PI, false );
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      // draw mower icon
+      AutomowerConnectIcon( ctx, pos[0], pos[1], AutomowerConnectTor ( pos[3], pos[4], pos[0], pos[1] ), 'M' );
+
+    }
+
+    // draw error icon and path
+    if ( errdesc[0] != '-' ) AutomowerConnectShowError( ctx, div, dev, picx, picy, errdesc, erray );
+
   } else {
     setTimeout(()=>{
-//      log('loop: detail false '+ type+' '+dev );
+      log('AutomowerConnectUpdateDetail loop: div && canvas && canvas_0 false '+ type+' '+dev );
       AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, scalx, errdesc, pos, erray);
     }, 100);
   }

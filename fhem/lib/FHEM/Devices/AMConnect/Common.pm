@@ -195,6 +195,7 @@ my $mapZonesTpl = '{
       maxLat                    => -90,
       imageHeight               => 650,
       imageWidthHeight          => '350 650',
+      map_init_delay            => 2,
       mapdesign                 => $mapAttr,
       mapZonesTpl               => $mapZonesTpl,
       posMinMax                 => "-180 90\n180 -90",
@@ -447,87 +448,82 @@ sub FW_detailFn {
   my $type = $hash->{TYPE};
   return '' if( AttrVal($name, 'disable', 0) || !AttrVal($name, 'showMap', 1) );
 
-  if ( $hash->{helper} && $hash->{helper}{mower} && $hash->{helper}{mower}{attributes} && $hash->{helper}{mower}{attributes}{positions} && @{$hash->{helper}{mower}{attributes}{positions}} > 0 ) {
+  my $img = "$FW_ME/$type/$name/map";
+  my $zoom=AttrVal( $name,"mapImageZoom", 0.7 );
+  my $backgroundcolor = AttrVal($name, 'mapBackgroundColor','');
+  my $bgstyle = $backgroundcolor ? " background-color:$backgroundcolor;" : '';
+  my $design = AttrVal( $name, 'mapDesignAttributes', $hash->{helper}{mapdesign} );
+  my @adesign = split(/\R/,$design);
+  my $mapDesign = 'data-'.join("data-",@adesign);
 
-    my $img = "$FW_ME/$type/$name/map";
-    my $zoom=AttrVal( $name,"mapImageZoom", 0.7 );
-    my $backgroundcolor = AttrVal($name, 'mapBackgroundColor','');
-    my $bgstyle = $backgroundcolor ? " background-color:$backgroundcolor;" : '';
-    my $design = AttrVal( $name, 'mapDesignAttributes', $hash->{helper}{mapdesign} );
-    my @adesign = split(/\R/,$design);
-    my $mapDesign = 'data-'.join("data-",@adesign);
+  my ($picx,$picy) = AttrVal( $name,"mapImageWidthHeight", $hash->{helper}{imageWidthHeight} ) =~ /(\d+)\s(\d+)/;
+  $picx=int($picx*$zoom);
+  $picy=int($picy*$zoom);
 
-    my ($picx,$picy) = AttrVal( $name,"mapImageWidthHeight", $hash->{helper}{imageWidthHeight} ) =~ /(\d+)\s(\d+)/;
-    $picx=int($picx*$zoom);
-    $picy=int($picy*$zoom);
+  my ( $lonlo, $latlo, $dummy, $lonru, $latru ) = AttrVal( $name,"mapImageCoordinatesToRegister",$hash->{helper}{posMinMax} ) =~ /(-?\d*\.?\d+)\s(-?\d*\.?\d+)(\R|\s)(-?\d*\.?\d+)\s(-?\d*\.?\d+)/;
+  my $mapx = $lonlo-$lonru;
+  my $mapy = $latlo-$latru;
 
-    my ( $lonlo, $latlo, $dummy, $lonru, $latru ) = AttrVal( $name,"mapImageCoordinatesToRegister",$hash->{helper}{posMinMax} ) =~ /(-?\d*\.?\d+)\s(-?\d*\.?\d+)(\R|\s)(-?\d*\.?\d+)\s(-?\d*\.?\d+)/;
-    my $mapx = $lonlo-$lonru;
-    my $mapy = $latlo-$latru;
+  AttrVal($name,'scaleToMeterXY', $hash->{helper}{scaleToMeterLongitude} . ' ' .$hash->{helper}{scaleToMeterLatitude}) =~ /(-?\d+)\s+(-?\d+)/;
+  my $scalx = ( $lonru - $lonlo ) * $1;
+  my $scaly = ( $latlo - $latru ) * $2;
 
-    AttrVal($name,'scaleToMeterXY', $hash->{helper}{scaleToMeterLongitude} . ' ' .$hash->{helper}{scaleToMeterLatitude}) =~ /(-?\d+)\s+(-?\d+)/;
-    my $scalx = ( $lonru - $lonlo ) * $1;
-    my $scaly = ( $latlo - $latru ) * $2;
+  # CHARGING STATION POSITION 
+  my $csimgpos = AttrVal( $name,"chargingStationImagePosition","right" );
+  my $xm = $hash->{helper}{chargingStation}{longitude} // 10.1165;
+  my $ym = $hash->{helper}{chargingStation}{latitude} // 51.28;
 
-    # CHARGING STATION POSITION 
-    my $csimgpos = AttrVal( $name,"chargingStationImagePosition","right" );
-    my $xm = $hash->{helper}{chargingStation}{longitude} // 10.1165;
-    my $ym = $hash->{helper}{chargingStation}{latitude} // 51.28;
+  my ($cslo,$csla) = AttrVal( $name,"chargingStationCoordinates","$xm $ym" ) =~  /(-?\d*\.?\d+)\s(-?\d*\.?\d+)/;
+  my $cslon = int(($lonlo-$cslo) * $picx / $mapx);
+  my $cslat = int(($latlo-$csla) * $picy / $mapy);
+  my $csdata = 'data-csimgpos="'.$csimgpos.'" data-cslon="'.$cslon.'" data-cslat="'.$cslat.'"';
 
-    my ($cslo,$csla) = AttrVal( $name,"chargingStationCoordinates","$xm $ym" ) =~  /(-?\d*\.?\d+)\s(-?\d*\.?\d+)/;
-    my $cslon = int(($lonlo-$cslo) * $picx / $mapx);
-    my $cslat = int(($latlo-$csla) * $picy / $mapy);
-    my $csdata = 'data-csimgpos="'.$csimgpos.'" data-cslon="'.$cslon.'" data-cslat="'.$cslat.'"';
-
-    # AREA LIMITS
-    my $arealimits = AttrVal($name,'mowingAreaLimits','');
-    my $limi = '';
-    if ($arealimits) {
-      my @lixy = (split(/\s|,|\R$/,$arealimits));
-      $limi = int( ( $lonlo - $lixy[ 0 ] ) * $picx / $mapx ) . "," . int( ( $latlo - $lixy[ 1 ] ) * $picy / $mapy );
-      for (my $i=2;$i<@lixy;$i+=2){
-        $limi .= ",".int( ( $lonlo - $lixy[ $i ] ) * $picx / $mapx).",".int( ( $latlo-$lixy[$i+1] ) * $picy / $mapy);
-      }
+  # AREA LIMITS
+  my $arealimits = AttrVal($name,'mowingAreaLimits','');
+  my $limi = '';
+  if ($arealimits) {
+    my @lixy = (split(/\s|,|\R$/,$arealimits));
+    $limi = int( ( $lonlo - $lixy[ 0 ] ) * $picx / $mapx ) . "," . int( ( $latlo - $lixy[ 1 ] ) * $picy / $mapy );
+    for (my $i=2;$i<@lixy;$i+=2){
+      $limi .= ",".int( ( $lonlo - $lixy[ $i ] ) * $picx / $mapx).",".int( ( $latlo-$lixy[$i+1] ) * $picy / $mapy);
     }
-    $limi = 'data-areaLimitsPath="'.$limi.'"';
-
-    # PROPERTY LIMITS
-    my $propertylimits = AttrVal($name,'propertyLimits','');
-    my $propli = '';
-    if ($propertylimits) {
-      my @propxy = (split(/\s|,|\R$/,$propertylimits));
-      $propli = int(($lonlo-$propxy[0]) * $picx / $mapx).",".int(($latlo-$propxy[1]) * $picy / $mapy);
-      for (my $i=2;$i<@propxy;$i+=2){
-        $propli .= ",".int(($lonlo-$propxy[$i]) * $picx / $mapx).",".int(($latlo-$propxy[$i+1]) * $picy / $mapy);
-      }
-    }
-    $propli = 'data-propertyLimitsPath="'.$propli.'"';
-
-    my $ret = "";
-    $ret .= "<style>
-    .${type}_${name}_div{padding:0px !important;
-      $bgstyle background-image: url('$img');
-      background-size: ${picx}px ${picy}px;
-      background-repeat: no-repeat; 
-      width: ${picx}px; height: ${picy}px;
-      position: relative;}
-    .${type}_${name}_canvas_0{
-      position: absolute; left: 0; top: 0; z-index: 0;}
-    .${type}_${name}_canvas_1{
-      position: absolute; left: 0; top: 0; z-index: 1;}
-    </style>";
-    $ret .= "<div id='${type}_${name}_div' class='${type}_${name}_div' $mapDesign $csdata $limi $propli >";
-    $ret .= "<canvas id='${type}_${name}_canvas_0' class='${type}_${name}_canvas_0' width='$picx' height='$picy' ></canvas>";
-    $ret .= "<canvas id='${type}_${name}_canvas_1' class='${type}_${name}_canvas_1' width='$picx' height='$picy' ></canvas>";
-    $ret .= "</div>";
-    $hash->{helper}{detailFnFirst} = 1;
-    InternalTimer( gettimeofday() + 2, \&FW_detailFn_Update, $hash, 0 );
-    
-    return $ret;
-
   }
+  $limi = 'data-areaLimitsPath="'.$limi.'"';
 
-  return '';
+  # PROPERTY LIMITS
+  my $propertylimits = AttrVal($name,'propertyLimits','');
+  my $propli = '';
+  if ($propertylimits) {
+    my @propxy = (split(/\s|,|\R$/,$propertylimits));
+    $propli = int(($lonlo-$propxy[0]) * $picx / $mapx).",".int(($latlo-$propxy[1]) * $picy / $mapy);
+    for (my $i=2;$i<@propxy;$i+=2){
+      $propli .= ",".int(($lonlo-$propxy[$i]) * $picx / $mapx).",".int(($latlo-$propxy[$i+1]) * $picy / $mapy);
+    }
+  }
+  $propli = 'data-propertyLimitsPath="'.$propli.'"';
+
+  my $ret = "";
+  $ret .= "<style>
+  .${type}_${name}_div{padding:0px !important;
+    $bgstyle background-image: url('$img');
+    background-size: ${picx}px ${picy}px;
+    background-repeat: no-repeat; 
+    width: ${picx}px; height: ${picy}px;
+    position: relative;}
+  .${type}_${name}_canvas_0{
+    position: absolute; left: 0; top: 0; z-index: 0;}
+  .${type}_${name}_canvas_1{
+    position: absolute; left: 0; top: 0; z-index: 1;}
+  </style>";
+  $ret .= "<div id='${type}_${name}_div' class='${type}_${name}_div' $mapDesign $csdata $limi $propli >";
+  $ret .= "<canvas id='${type}_${name}_canvas_0' class='${type}_${name}_canvas_0' width='$picx' height='$picy' ></canvas>";
+  $ret .= "<canvas id='${type}_${name}_canvas_1' class='${type}_${name}_canvas_1' width='$picx' height='$picy' ></canvas>";
+  $ret .= "</div>";
+  $hash->{helper}{detailFnFirst} = 1;
+  my $mid = $hash->{helper}{map_init_delay};
+  InternalTimer( gettimeofday() + $mid, \&FW_detailFn_Update, $hash, 0 );
+
+  return $ret;
 
 }
 
@@ -2504,7 +2500,8 @@ sub wsCb {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   my $iam = "$type $name wsCb:";
-  Log3 $name, 2, "$iam failed with error: $error" if( $error );
+  my $l = $hash->{devioLoglevel};
+  Log3 $name, ( $l ? $l : 1 ), "$iam failed with error: $error" if( $error );
   return undef;
 
 }
