@@ -297,6 +297,7 @@ my $mapZonesTpl = '{
   ( $hash->{LIBRARY_VERSION} ) = $cvsid =~ /\.pm (.*)Z/;
   $hash->{Host} = 'ws.openapi.husqvarna.dev';
   $hash->{Port} = '443/v1';
+  $hash->{devioNoSTATE} = 1;
 
   AddExtension( $name, \&GetMap, "$type/$name/map" );
   AddExtension( $name, \&GetJson, "$type/$name/json" );
@@ -567,28 +568,12 @@ sub FW_detailFn_Update {
 
   }
 
-  # MOWING PATH OLD
-  # my $posxy = '';
-
-  # if ( @pos > 0 ) {
-
-    # $posxy = int( ( $lonlo-$pos[ 0 ]{longitude} ) * $picx / $mapx ).",".int( ( $latlo-$pos[ 0 ]{latitude} ) * $picy / $mapy ).",'".$pos[ 0 ]{act}."'";
-
-    # for ( my $i = 1; $i < @pos; $i++ ){
-
-      # $posxy .= ",".int( ( $lonlo - $pos[ $i ]{longitude} ) * $picx / $mapx ).",".int( ( $latlo - $pos[ $i ]{latitude} ) * $picy / $mapy ).",'".$pos[ $i ]{act}."'";
-
-    # }
-
-  # }
-
   # ERROR MESSAGE
   my $errdesc = $hash->{helper}{lasterror}{errordesc};
   my $errdate = $hash->{helper}{lasterror}{errordate};
   my $errstate = $hash->{helper}{lasterror}{errorstate};
 
   # ERROR PATH
-
   my @poserrxy = ( int( ( $lonru-$lonlo ) / 2 * $picx / $mapx ), int( ( $latlo - $latru ) / 2 * $picy / $mapy ) );
 
   if ( @poserr > 0 ) {
@@ -601,25 +586,6 @@ sub FW_detailFn_Update {
     }
 
   }
-
-  # ERROR PATH OLD
-  # my $poserrxy = int( ( $lonru-$lonlo ) / 2 * $picx / $mapx ).",".int( ( $latlo - $latru ) / 2 * $picy / $mapy );;
-
-  # if ( @poserr > 0 ) {
-
-    # $poserrxy = int( ( $lonlo - $poserr[ 0 ]{longitude} ) * $picx / $mapx ) . "," . int( ( $latlo - $poserr[ 0 ]{latitude} ) * $picy / $mapy );
-
-    # for ( my $i = 1; $i < @poserr; $i++ ){
-      # $poserrxy .= ",".int( ( $lonlo - $poserr[ $i ]{longitude} ) * $picx / $mapx) . "," . int( ( $latlo - $poserr[ $i ]{latitude} ) * $picy / $mapy );
-    # }
-
-  # }
-
-  # Log3 $name, 1, "AutomowerConnectUpdateDetail ( '$name', '$type', $detailFnFirst, $picx, $picy, $scalx, [ '$errdesc', '$errdate' ], [ $posxy ], [ $poserrxy ] )";
-
-  # map { 
-    # ::FW_directNotify("#FHEMWEB:$_", "AutomowerConnectUpdateDetail ( '$name', '$type', $detailFnFirst, $picx, $picy, $scalx, [ '$errdesc', '$errdate', '$errstate' ], [ $posxy ], [ $poserrxy ] )","");
-  # } devspec2array("TYPE=FHEMWEB");
 
   # prepare hash for json map update
   $hash->{helper}{mapupdate}{name} = $name;

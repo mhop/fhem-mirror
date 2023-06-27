@@ -1,5 +1,6 @@
 
-FW_version["automowerconnect.js"] = "$Id$";
+if ( !(typeof FW_version === 'undefined') )
+  FW_version["automowerconnect.js"] = "$Id$";
 
 function AutomowerConnectShowError( ctx, div, dev, picx, picy, errdesc, erray ) {
   // ERROR BANNER
@@ -274,7 +275,7 @@ function AutomowerConnectTor ( x0, y0, x1, y1 ) {
 
 function AutomowerConnectUpdateJson ( path ) {
   $.getJSON( path, function( data, textStatus ) {
-    log( 'AutomowerConnectUpdateJson ( '+path+' ): status '+textStatus );
+    console.log( 'AutomowerConnectUpdateJson ( \''+path+'\' ): status '+textStatus );
     if ( textStatus == 'success') 
       AutomowerConnectUpdateDetail ( data.name, data.type, data.detailfnfirst, data.picx, data.picy, data.scalx, data.errdesc, data.posxy, data.poserrxy );
 
@@ -366,7 +367,7 @@ function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, sca
 
   } else {
     setTimeout(()=>{
-      log('AutomowerConnectUpdateDetail loop: div && canvas && canvas_0 false '+ type+' '+dev );
+      console.log('AutomowerConnectUpdateDetail loop: div && canvas && canvas_0 false '+ type+' '+dev );
       AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, scalx, errdesc, pos, erray);
     }, 100);
   }

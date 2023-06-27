@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
- - bugfix:  74_AutomowerConnect: Common.pm, automowerconnect.js, fix promlem
+ - feature: 74_AutomowerConnect: Common.pm, prevent DevIo from directly setting
+            STATE, prepare automowerconnect.js for use with FTUI 2
+ - bugfix:  74_AutomowerConnect: Common.pm, automowerconnect.js, fix problem
             with empty positions array
  - feature: 74_AutomowerConnect: Common.pm, add additional API polling
  - feature: 76_SMAInverter: bugfix DC-Power 
