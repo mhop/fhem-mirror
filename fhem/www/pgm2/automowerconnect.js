@@ -283,6 +283,16 @@ function AutomowerConnectUpdateJson ( path ) {
 
 }
 
+function AutomowerConnectUpdateJsonFtui ( path ) {
+  $.getJSON( path, function( data, textStatus ) {
+    console.log( 'AutomowerConnectUpdateJsonFtui ( \''+path+'\' ): status '+textStatus );
+    if ( textStatus == 'success') 
+      AutomowerConnectUpdateDetail ( data.name, data.type, 1, data.picx, data.picy, data.scalx, data.errdesc, data.posxy, data.poserrxy );
+
+  });
+
+}
+
 //AutomowerConnectUpdateDetail (<devicename>, <type>, <detailfnfirst>, <imagesize x>, <imagesize y>,<scale x>, <error description>, <path array>, <error array>)
 function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, scalx, errdesc, pos, erray) {
   const colorat = {
