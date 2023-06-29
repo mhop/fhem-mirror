@@ -143,7 +143,7 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '4.1.15 - 17.12.2022';
+my $Module_Version = '4.1.16 - 4.4.2023';
 
 my $AttrList = join (' ', 
       'reading[0-9]+(-[0-9]+)?Name', 
@@ -801,6 +801,7 @@ sub UpgradeAttributes {
 # if num is like 1-1 then check for 1 if 1-1 not found 
 sub GetFAttr {
     my ($name, $prefix, $num, $type, $val) = @_;
+    #Log3 $name, 5, "$name: GetFAttr prefix $prefix, num $num, type $type, val $val";
     # first look for attribute with the full num in it
     if (defined ($attr{$name}{$prefix . $num . $type})) {
           $val = $attr{$name}{$prefix . $num . $type};
@@ -1248,7 +1249,7 @@ sub SetFn {
 
         if (!GetFAttr($name, 'set', $setNum, 'TextArg') 
                 && !CheckRange($hash, {val => $rawVal, 
-                                        min => GetFAttr($name, 'set', $setNum. 'Min'), 
+                                        min => GetFAttr($name, 'set', $setNum, 'Min'), 
                                         max => GetFAttr($name, 'set', $setNum, 'Max')} ) ) {
             return "set value $rawVal is not within defined range";
         }
@@ -1483,13 +1484,15 @@ sub FormatReading {
 
     my $decode  = GetFAttr($name, $context, $num, 'Decode');
     my $encode  = GetFAttr($name, $context, $num, 'Encode');
-    my $map     = GetFAttr($name, $context, $num, 'Map') if ($context ne 'set');           # not for set!
-       $map     = GetFAttr($name, $context, $num, 'OMap', $map);                           # new syntax
     my $format  = GetFAttr($name, $context, $num, 'Format');
 
-    my $expr    = AttrVal($name, 'readingsExpr'  . $num, '') if ($context eq 'reading');   # old syntax, not set
-       $expr    = GetFAttr($name, $context, $num, 'Expr', $expr) if ($context ne 'set');   # not for set!
-       $expr    = GetFAttr($name, $context, $num, 'OExpr', $expr);                         # new syntax
+    my $map;
+    $map = GetFAttr($name, $context, $num, 'Map') if ($context ne 'set');           # not for set!
+    $map = GetFAttr($name, $context, $num, 'OMap', $map);                           # new syntax
+    my $expr;
+    $expr = AttrVal($name, 'readingsExpr'  . $num, '') if ($context eq 'reading');   # old syntax, not set
+    $expr = GetFAttr($name, $context, $num, 'Expr', $expr) if ($context ne 'set');   # not for set!
+    $expr = GetFAttr($name, $context, $num, 'OExpr', $expr);                         # new syntax
     
     # encode as utf8 if no encode specified and body was decoded or no charset was seen in the header 
     if (!$encode && (!$hash->{'.bodyCharset'} || $hash->{'.bodyCharset'} eq 'internal' )) {   

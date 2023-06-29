@@ -52,12 +52,9 @@ our @EXPORT_OK = qw(UpdateTimer FhemCaller
                     FlattenJSON
                     BodyDecode
                     IsOpen
-                    FmtTimeMs
-                    FmtDate
-                    FmtDateTimeNice
-                    DateDiff
-                    date_str2num
-                    ReadableArray
+                    FmtTimeMs FmtDate FmtDateTimeNice
+                    DateDiff date_str2num
+                    ReadableArray HexIfNeeded
                     Statistics Profiler
                     );
 
@@ -141,7 +138,7 @@ sub UpdateTimer {
     if ($hash->{'.TimeAlign'}) {                                    # TimeAlign: do as if interval started at time w/o drift ...
         my $count   = int(($now - $hash->{'.TimeAlign'}) / $intvl); # $intvl <> 0,has been checked above
         $nextUpdate = $count * $intvl + $hash->{'.TimeAlign'};      # next aligned time >= now, lastUpdate doesn't matter with alignment
-        $nextUpdate += $intvl if ($nextUpdate <= $now);             # works for initial alignment as welas for next round
+        $nextUpdate += $intvl if ($nextUpdate <= $now);             # works for initial alignment as well as for next round
     } 
     else {                                                  # no align time -> just add the interval to now
         if ($hash->{'.LastUpdate'}) {
@@ -278,36 +275,39 @@ sub EvalExpr {
     my $rawVal    = $val;
     my $text      = $val;
     return 0 if ($NlIfNoExp && !$exp);
+    #Log3 $name, 3, "$name: $action with expression $exp on $val called from " . FhemCaller();
     return $val if (!$exp);
 
     my $inCheckEval = ($checkOnly ? 0 : 1);
-
     my $assign = 'package main; ';
     KEYLOOP:
     foreach my $key (keys %{$oRef}) {
-        next KEYLOOP if($key =~ /(checkOnly|nullIfNoExp|expr|action)/);
-        my $type  = ref $oRef->{$key};
+        next KEYLOOP if($key =~ /^(val|checkOnly|nullIfNoExp|expr|action)$/);
+        my $type  = ref $oRef->{$key};              # type of the value
         my $vName = substr($key,1);
-        my $vType = substr($key,0,1);
+        my $vType = substr($key,0,1);               # first character of key
         
         #Log3 $name, 3, "$name: EvalExpr: $action check key $key type $type and vType $vType";
-        if ($type eq 'SCALAR') {
+        if ($type eq 'SCALAR') {                                # value is a reference to a scalar:
             $assign .= "my \$$vName = \${\$oRef->{'$key'}};";   # assign ref to scalar as scalar
         } 
-        elsif ($type eq 'ARRAY' && $vType eq '$') {
+        elsif ($type eq 'ARRAY' && $vType eq '$') {             # value is a reference to an array and key is name of a scalar:
             $assign .= "my \$$vName = \$oRef->{'$key'};";       # assign array ref as array ref
         } 
-        elsif ($type eq 'ARRAY') {
+        elsif ($type eq 'ARRAY') {                              # value is a reference to an array:
             $assign .= "my \@$vName = \@{\$oRef->{'$key'}};";   # assign array ref as array
         } 
-        elsif ($type eq 'HASH' && $vType eq '$') {
+        elsif ($type eq 'HASH' && $vType eq '$') {              # value is a reference to a hash and key is name of a scalar:
             $assign .= "my \$$vName = \$oRef->{'$key'};";       # assign hash ref as hash ref
         } 
-        elsif ($type eq 'HASH') {
+        elsif ($type eq 'HASH') {                               # value is a reference to an array:
             $assign .= "my \%$vName = \%{\$oRef->{'$key'}};";   # assign hash ref as hash
         } 
-        elsif ($type eq '' && $vType eq '$') {
+        elsif ($type eq '' && $vType eq '$') {                  # value is not a reference but a scalar and key starts with $:
             $assign .= "my \$$vName = \$oRef->{'$key'};";       # assign scalar as scalar
+        }
+        else {
+            Log3 $name, 3, "$name: $action ignores strange key $key pointing to type $type";    
         }
     }
     $exp = $assign . ($checkOnly ? 'return undef;' : '') . $exp;
@@ -319,7 +319,7 @@ sub EvalExpr {
         return 0 if ($checkOnly);
     } else {
         return 1 if ($checkOnly);
-        Log3 $name, 5, "$name: $action evaluated $exp to $result";
+        Log3 $name, 5, "$name: $action evaluated $exp to " . HexIfNeeded($result);
     }
     return $result;
 }
@@ -342,10 +342,6 @@ sub FhemCaller {
 # called from Set and FormatReading
 # map example: 0:mittig, 1:über, 2:unterhalb
 
-# todo: potential extension: 0:mittig, 1:über, 2:unterhalb, *:undefined ??
-#           or for slave mode and the reverse map: 0:*??
-# or better pass new named parameters mapDefault / rmapDefault from new attrs?
-
 sub MapConvert {
     my $hash    = shift;
     my $oRef    = shift;                                        # hash ref for passing options and variables for use in expressions
@@ -355,6 +351,7 @@ sub MapConvert {
     my $action         = $oRef->{'action'} // 'apply map';      # context for logging
     my $UndefIfNoMatch = $oRef->{'undefIfNoMatch'} // 0;        # return undef if map is not matching, 
     my $inVal          = $oRef->{'val'};                        # input value
+    my $default        = $oRef->{'default'};                    # undef if not passed
     my $name           = $hash->{NAME};
     
     return $inVal if (!$map);                                   # don't change anything if map is empty
@@ -378,9 +375,9 @@ sub MapConvert {
     else {
         Log3 $name, 3, "$name: MapConvert called from " . FhemCaller() . " did not find $val ($inVal) in" . 
             ($reverse ? " reversed" : "") . " map $map";
-        if (defined($oRef->{'default'})) {
-            Log3 $name, 3, "$name: MapConvert returns defined default value $oRef->{'default'}";
-            return $oRef->{'default'};
+        if (defined($default)) {
+            Log3 $name, 3, "$name: MapConvert returns defined default value $default";
+            return $default;
         }
         return if ($UndefIfNoMatch);                            # no match -> return undef because of $UndefIfNoMatch
         return $inVal;                                          # no match -> return original value 
@@ -644,7 +641,7 @@ sub JsonFlatter {
     my $prefix = shift // '';       # prefix string for resulting key
     my $name   = $hash->{NAME};     # Fhem device name
 
-    #Log3 $name, 5, "$name: JSON Flatter called : prefix $prefix, ref is $ref";
+    Log3 $name, 5, "$name: JSON Flatter called : prefix $prefix, ref is $ref";
     if (ref($ref) eq "ARRAY" ) { 
         my $key = 0;
         foreach my $value (@{$ref}) {
@@ -654,9 +651,10 @@ sub JsonFlatter {
                 JsonFlatter($hash, $value, $prefix.sprintf("%02i",$key+1)."_"); 
             } 
             else { 
-                if (defined ($value)) {             
-                    #Log3 $name, 5, "$name: JSON Flatter sets $prefix$key to $value";
-                    $hash->{ParserData}{JSON}{$prefix.$key} = $value; 
+                if (defined ($value) or 1) {             
+                    Log3 $name, 5, "$name: JSON Flatter sets $prefix$key to "
+                        . ($value // 'empty string');
+                    $hash->{ParserData}{JSON}{$prefix.$key} = ($value // '');
                 }
             }
             $key++;         
@@ -664,15 +662,16 @@ sub JsonFlatter {
     } 
     elsif (ref($ref) eq "HASH" ) {
         while( my ($key,$value) = each %{$ref}) {                                       
-            #Log3 $name, 5, "$name: JSON Flatter in hash while, key = $key, value = $value";
+            Log3 $name, 5, "$name: JSON Flatter in hash while, key = $key, value = " . ($value // 'undef');
             if(ref($value) eq "HASH" or ref($value) eq "ARRAY") {                                                        
-                #Log3 $name, 5, "$name: JSON Flatter doing recursion because value is a " . ref($value);
+                Log3 $name, 5, "$name: JSON Flatter doing recursion because value is a " . ref($value);
                 JsonFlatter($hash, $value, $prefix.$key."_");
             } 
             else { 
-                if (defined ($value)) {             
-                    #Log3 $name, 5, "$name: JSON Flatter sets $prefix$key to $value";
-                    $hash->{ParserData}{JSON}{$prefix.$key} = $value; 
+                if (defined ($value) or 1) {             
+                    Log3 $name, 5, "$name: JSON Flatter sets $prefix$key to "
+                        . ($value // 'empty string');
+                    $hash->{ParserData}{JSON}{$prefix.$key} = ($value // '');
                 }
             }                                                                          
         }                                                                            
@@ -697,7 +696,7 @@ sub FlattenJSON {
     my $logLvl = ($cT =~ /json/i ? 3 : 4);
     if ($@) {
         Log3 $name, $logLvl, "$name: error while parsing JSON data: $@";
-        #Log3 $name, 3, "$name: Content-Type was $cT";
+        Log3 $name, 3, "$name: Content-Type was $cT";
     } 
     else {
         JsonFlatter($hash, $decoded);
@@ -848,10 +847,11 @@ sub FmtDateTimeNice {
 sub DateDiff {
     my $d1 = shift;                                 # earlier date
     my $d2 = shift // FmtDate(gettimeofday());      # later date
-    my $d1d = (split (/ /, $d1))[0];        # split time and date part of string
-    my $d2d = (split (/ /, $d2))[0];        # split time and date part of string
+    my $d1d = (split (/ /, $d1))[0];                # split time and date part of string
+    my $d2d = (split (/ /, $d2))[0];                # split time and date part of string
     # subtract lastdate as number from todays date as number and divide
-    my $days = (date_str2num($d2d) - date_str2num($d1d)) / 86400;
+    #my $days = (date_str2num($d2d) - date_str2num($d1d)) / 86400;  # problem when summer time comes during the interval 
+    my $days = sprintf('%0.f', (date_str2num($d2d) - date_str2num($d1d)) / 86400);
     return $days;
 }
 
@@ -863,6 +863,17 @@ sub date_str2num($) {
   my @a;
   @a = split("[T: -]", $str);
   return mktime(0,0,0,$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
+}
+
+
+####################################################
+# convert text to hex encoded string if it contains
+# characters that are not printable
+sub HexIfNeeded {
+    my $text = shift;
+    return 'undef' if (!defined($text));
+    return "hex " . unpack ('H*', $text) if ($text =~ /\p{XPosixCntrl}/);
+    return $text;
 }
 
 
