@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix : 74_AutomowerConnect: Common.pm fixed bug in WS filter
  - feature: 74_AutomowerConnect: Common.pm Cref update, add Log after WS filter
          add Collisions to statistics and zones if addPollingMinInterval is set
  - feature: 74_AutomowerConnect: Common.pm, prevent DevIo from directly setting

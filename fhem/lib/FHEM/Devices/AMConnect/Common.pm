@@ -2527,15 +2527,14 @@ sub wsRead {
 
       }
 
-      if ( defined( $result->{type} && $result->{id} eq $hash->{helper}{mower_id} ) ) {
+      if ( defined( $result->{type} ) && $result->{id} eq $hash->{helper}{mower_id} ) {
 
+        Log3 $name, 4, "$iam selected websocket data: >$buf<";
         $hash->{helper}{wsResult}{$result->{type}} = dclone( $result );
         $hash->{helper}{wsResult}{type} = $result->{type};
 
         if ( $result->{type} eq "status-event" ) {
 
-          Log3 $name, 4, "$iam select websocket data for \$result->{id} $result->{id}, \$hash->{helper}{mower_id} $hash->{helper}{mower_id}, battery $result->{attributes}{battery}{batteryPercent}";
-  
           $hash->{helper}{statusTime} = gettimeofday();
           $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp};
           $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mower}{attributes}{mower}{activity};
