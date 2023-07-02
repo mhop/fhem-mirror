@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.52.8"  => "28.06.2023  fix check of DbRep_afterproc, DbRep_beforeproc if should exec PERL code ",
   "8.52.7"  => "16.05.2023  DbRep_afterproc, DbRep_beforeproc can execute FHEM commands as well as PERL code ",
   "8.52.6"  => "11.04.2023  change diffValue for aggr month ",
   "8.52.5"  => "10.04.2023  change diffValue, Forum: https://forum.fhem.de/index.php?msg=1271853 ",
@@ -1642,7 +1643,7 @@ sub DbRep_Attr {
     
     if ($aName =~ /executeAfterProc|executeBeforeProc/xs) {
         if($cmd eq "set") {
-            if ($aVal =~ m/^\s*(\{.*\}|{.*|.*})\s*$/xs) {                             
+            if ($aVal =~ m/^\s*(\{.*\}|{.*|.*})\s*$/xs && $aVal !~ /{".*"}/xs) {                             
                 $aVal = $1;
                 eval $aVal;
                 return $@ if ($@);
