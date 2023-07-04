@@ -271,7 +271,7 @@ sub btIP_Notify {
   return if(!grep(m/^FILEWRITE $hash->{LAYOUTFILE}$/, @{$dev->{CHANGED}}));
 
   Log3(undef, 4, "InfoPanel: $hash->{NAME} reread layout after edit.");
-  undef = btIP_readLayout($hash);
+  btIP_readLayout($hash);
   return;
 }
 
