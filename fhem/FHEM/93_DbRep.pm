@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.52.9"  => "05.07.2023  fix wrong SQL syntax for PostgreSQL -> maxValue deleteOther, Forum:#134170 ",
   "8.52.8"  => "28.06.2023  fix check of DbRep_afterproc, DbRep_beforeproc if should exec PERL code ",
   "8.52.7"  => "16.05.2023  DbRep_afterproc, DbRep_beforeproc can execute FHEM commands as well as PERL code ",
   "8.52.6"  => "11.04.2023  change diffValue for aggr month ",
@@ -13700,11 +13701,11 @@ sub DbRep_deleteOtherFromDB {
   my ($dbh,$sth,$timestamp,$value,$addon,$row_extreme_time,$runtime_string_first,$runtime_string_next);
   my @row_array;
 
-  my %rh = split("§", $rows);
+  my %rh = split "§", $rows;
 
   for my $key (sort(keys(%rh))) {
       # Inhalt $rh{$key} -> $runtime_string."|".$max_value."|".$row_max_time."|".$runtime_string_first."|".$runtime_string_next
-      my @k                 = split("\\|",$rh{$key});
+      my @k                 = split "\\|", $rh{$key};
       $value                = $k[1] // undef;
       $row_extreme_time     = $k[2];
       $runtime_string_first = $k[3];
@@ -13728,7 +13729,7 @@ sub DbRep_deleteOtherFromDB {
       my $dlines = 0;
 
       for my $row (@row_array) {
-          my @a = split("\\|",$row);
+          my @a                 = split "\\|", $row;
           $device               = $a[0];
           $reading              = $a[1];
           $value                = $a[2];
@@ -13738,8 +13739,8 @@ sub DbRep_deleteOtherFromDB {
 
           my($date, $time) = split "_", $row_extreme_time;
           $time            =~ s/-/:/gxs;
-          $addon           = qq{AND (TIMESTAMP,VALUE) != ("$date $time","$value")};
-          my $sql          = DbRep_createDeleteSql($hash,$table,$device,$reading,$runtime_string_first,$runtime_string_next,$addon);
+          $addon           = qq{AND (TIMESTAMP,VALUE) != ('$date $time','$value')};
+          my $sql          = DbRep_createDeleteSql($hash, $table, $device, $reading, $runtime_string_first, $runtime_string_next, $addon);
 
           ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
           return $err if ($err);
