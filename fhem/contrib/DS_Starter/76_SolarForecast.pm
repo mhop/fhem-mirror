@@ -7479,10 +7479,6 @@ sub _graphicHeader {
       if ($acu =~ /on/xs) {
           $acicon = FW_makeImage('10px-kreis-gruen.png', $htitles{on}{$lang}." ($acu)");
       }
-      elsif ($acu =~ /off/xs) {
-          $htitles{akorron}{$lang} =~ s/<NAME>/$name/xs;
-          $acicon = FW_makeImage('-', $htitles{akorron}{$lang});
-      }
       elsif ($acu =~ /standby/ixs) {
           my $pcfa    = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');
           my ($rtime) = $pcfa =~ /for (.*?) hours/x;
@@ -7490,7 +7486,8 @@ sub _graphicHeader {
           $acicon     = "$img&nbsp;(Start in ".$rtime." h)";
       }
       else {
-          $acicon = FW_makeImage('10px-kreis-rot.png', $htitles{undef}{$lang});
+          $htitles{akorron}{$lang} =~ s/<NAME>/$name/xs;
+          $acicon = FW_makeImage('-', $htitles{akorron}{$lang});
       }
 
       ## Solare API  Sektion
@@ -11081,7 +11078,7 @@ sub isAutoCorrUsed {
   my $ret = $cauto =~ /on_simple/xs  ? 'on_simple'  :
             $cauto =~ /on_complex/xs ? 'on_complex' :
             $cauto =~ /standby/xs    ? 'standby'    :
-            $cauto =~ /on/xs         ? 'on_simple'  : 
+            $cauto =~ /on/xs         ? 'on_simple'  :
             q{};
 
 return $ret;
