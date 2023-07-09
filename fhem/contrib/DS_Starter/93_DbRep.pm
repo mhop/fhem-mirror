@@ -4097,11 +4097,11 @@ sub DbRep_maxval {
          my $aval = AttrVal($name, "aggregation", "");
          my @rsf;
 
-         if($aval eq "hour") {
+         if ($aval eq "hour") {
              @rsf   = split(/[ :]/,$runtime_string_first);
              @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."!_ESC_!".$runtime_string_first."|".$runtime_string_next);
          }
-         elsif($aval eq "minute") {
+         elsif ($aval eq "minute") {
              @rsf   = split(/[ :]/,$runtime_string_first);
              @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."-".$rsf[2]."!_ESC_!".$runtime_string_first."|".$runtime_string_next);
          }
@@ -11007,7 +11007,7 @@ sub DbRep_createSelectSql {
       }
   }
   
-  if ($dbmodel eq 'POSTGRESQL') {                                              # eingeügt mit V 8.52.10
+  if ($dbmodel eq 'POSTGRESQL') {                                              # eingefügt mit V 8.52.10
       if ($rsn  =~ /\d{4}-\d{2}-\d{2}\s\d{2}$/xs) {
           $rsn .= ':00:00';
       }
@@ -11155,6 +11155,16 @@ sub DbRep_createDeleteSql {
          $vf = "VALUE REGEXP '$valfilter' AND ";
      }
  }
+ 
+  if ($dbmodel eq 'POSTGRESQL') {                                              # eingefügt mit V 8.52.10
+      if ($rsn  =~ /\d{4}-\d{2}-\d{2}\s\d{2}$/xs) {
+          $rsn .= ':00:00';
+      }
+      
+      if ($rsf  =~ /\d{4}-\d{2}-\d{2}\s\d{2}$/xs) {
+          $rsf .= ':00:00';
+      }     
+  }
 
  $sql = "delete FROM $table where ";
 
@@ -11241,7 +11251,7 @@ sub DbRep_createDeleteSql {
  # Timestamp Filter
  ###################
  if ($rsf && $rsn) {
-     $sql .= "TIMESTAMP >= '$rsf' AND TIMESTAMP ".($tnfull?"<=":"<")." '$rsn' $addon;";
+     $sql .= "TIMESTAMP >= '$rsf' AND TIMESTAMP ".($tnfull ? "<=" : "<")." '$rsn' $addon;";
  } else {
      if ($dbmodel eq "POSTGRESQL") {
          $sql .= "true;";
