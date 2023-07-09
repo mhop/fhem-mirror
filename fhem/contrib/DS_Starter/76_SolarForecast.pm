@@ -2066,12 +2066,29 @@ sub Get {
   my $name = shift @a;
   my $opt  = shift @a;
   my $arg  = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @a;     ## no critic 'Map blocks'
+  
+  my @ho   = qw (both
+                 both_noHead
+                 both_noCons
+                 both_noHead_noCons
+                 flow
+                 flow_noHead
+                 flow_noCons
+                 flow_noHead_noCons
+                 forecast
+                 forecast_noHead
+                 forecast_noCons
+                 forecast_noHead_noCons
+                 none
+                );
+                
+  my $hol  = join ",", @ho;
 
   my $getlist = "Unknown argument $opt, choose one of ".
                 "valConsumerMaster:noArg ".
                 "data:noArg ".
                 "forecastQualities:noArg ".
-                "html:both,flow,forecast,none ".
+                "html:$hol ".
                 "nextHours:noArg ".
                 "pvCircular:noArg ".
                 "pvHistory:noArg ".
@@ -7168,6 +7185,16 @@ sub entryGraphic {
   # Verbraucherlegende und Steuerung
   ###################################
   my $legendtxt = _graphicConsumerLegend ($paref);
+  
+  # Headerzeile und/oder Verbraucherlegende ausblenden
+  ######################################################
+  if ($gsel =~ /_noHead/xs) {
+      $header = q{};
+  }
+  
+  if ($gsel =~ /_noCons/xs) {
+      $legendtxt = q{};
+  }
 
   $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
   my $m = $paref->{modulo} % 2;
@@ -7193,8 +7220,10 @@ sub entryGraphic {
   }
 
   $m = $paref->{modulo} % 2;
-
-  if($gsel eq "both" || $gsel eq "forecast") {
+  
+  # Balkengrafik
+  ################
+  if ($gsel =~ /both/xs || $gsel =~ /forecast/xs) {
       my %hfch;
       my $hfcg  = \%hfch;                                                                                   #(hfcg = hash forecast graphic)
 
@@ -7222,7 +7251,9 @@ sub entryGraphic {
 
   $m = $paref->{modulo} % 2;
 
-  if($gsel eq "both" || $gsel eq "flow") {
+  # Flußgrafik
+  ##############
+  if ($gsel =~ /both/xs || $gsel =~ /flow/xs) {
       $ret  .= "<tr class='$htr{$m}{cl}'>";
       my $fg = _flowGraphic ($paref);
       $ret  .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
@@ -12328,11 +12359,20 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       
       <ul>
         <table>
-        <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-        <tr><td> <b>both</b>       </td><td>zeigt Energiefluß- und Balkengrafik an (default)        </td></tr>
-        <tr><td> <b>flow</b>       </td><td>zeigt die Energieflußgrafik an                          </td></tr>
-        <tr><td> <b>forecast</b>   </td><td>zeigt die Balkengrafik an                               </td></tr>
-        <tr><td> <b>none</b>       </td><td>es wird weder Energiefluß- noch Balkengrafik angezeigt  </td></tr>
+        <colgroup> <col width="30%"> <col width="70%"> </colgroup>
+        <tr><td> <b>both</b>                    </td><td>zeigt den Header, die Verbraucherlegende, Energiefluß- und Vorhersagegrafik an (default)   </td></tr>
+        <tr><td> <b>both_noHead</b>             </td><td>zeigt die Verbraucherlegende, Energiefluß- und Vorhersagegrafik an                         </td></tr>
+        <tr><td> <b>both_noCons</b>             </td><td>zeigt den Header, Energiefluß- und Vorhersagegrafik an                                     </td></tr>
+        <tr><td> <b>both_noHead_noCons</b>      </td><td>zeigt Energiefluß- und Vorhersagegrafik an                                                 </td></tr>
+        <tr><td> <b>flow</b>                    </td><td>zeigt den Header, die Verbraucherlegende und Energieflußgrafik an                          </td></tr>
+        <tr><td> <b>flow_noHead</b>             </td><td>zeigt die Verbraucherlegende und die Energieflußgrafik an                                  </td></tr>
+        <tr><td> <b>flow_noCons</b>             </td><td>zeigt den Header und die Energieflußgrafik an                                              </td></tr>
+        <tr><td> <b>flow_noHead_noCons</b>      </td><td>zeigt die Energieflußgrafik an                                                             </td></tr>
+        <tr><td> <b>forecast</b>                </td><td>zeigt den Header, die Verbraucherlegende und die Vorhersagegrafik an                       </td></tr>
+        <tr><td> <b>forecast_noHead</b>         </td><td>zeigt die Verbraucherlegende und die Vorhersagegrafik an                                   </td></tr>
+        <tr><td> <b>forecast_noCons</b>         </td><td>zeigt den Header und die Vorhersagegrafik an                                               </td></tr>
+        <tr><td> <b>forecast_noHead_noCons</b>  </td><td>zeigt die Vorhersagegrafik an                                                              </td></tr>
+        <tr><td> <b>none</b>                    </td><td>zeigt nur den Header und die Verbraucherlegende an                                         </td></tr>
         </table>
       </ul>
          
@@ -13185,10 +13225,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>both</b>       </td><td>zeigt Energiefluß- und Balkengrafik an (default)        </td></tr>
-            <tr><td> <b>flow</b>       </td><td>zeigt die Energieflußgrafik an                          </td></tr>
-            <tr><td> <b>forecast</b>   </td><td>zeigt die Balkengrafik an                               </td></tr>
-            <tr><td> <b>none</b>       </td><td>es wird weder Energiefluß- noch Balkengrafik angezeigt  </td></tr>
+            <tr><td> <b>both</b>       </td><td>zeigt den Header, die Verbraucherlegende, Energiefluß- und Vorhersagegrafik an (default)   </td></tr>
+            <tr><td> <b>flow</b>       </td><td>zeigt den Header, die Verbraucherlegende und Energieflußgrafik an                          </td></tr>
+            <tr><td> <b>forecast</b>   </td><td>zeigt den Header, die Verbraucherlegende und die Vorhersagegrafik an                       </td></tr>
+            <tr><td> <b>none</b>       </td><td>zeigt nur den Header und die Verbraucherlegende an                                         </td></tr>
          </table>
          </ul>
        </li>
