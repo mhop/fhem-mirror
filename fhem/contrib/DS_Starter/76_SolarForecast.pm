@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-07-07 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-07-09 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.80.6" => "09.07.2023  get ... html has some possible arguments now ",
   "0.80.5" => "07.07.2023  calculate _calcCaQcloudcover, _calcCaQsimple both at every time, change setter pvCorrectionFactor_Auto: on_simple, on_complex, off ",
   "0.80.4" => "06.07.2023  new transferprocess for DWD data from solcastapi-Hash to estimate calculation, consolidated ".
                            "the autocorrection model ",
@@ -2070,7 +2071,7 @@ sub Get {
                 "valConsumerMaster:noArg ".
                 "data:noArg ".
                 "forecastQualities:noArg ".
-                "html:noArg ".
+                "html:both,flow,forecast,none ".
                 "nextHours:noArg ".
                 "pvCircular:noArg ".
                 "pvHistory:noArg ".
@@ -3003,8 +3004,9 @@ return centralTask ($hash);
 sub _gethtml {
   my $paref = shift;
   my $name  = $paref->{name};
+  my $arg   = $paref->{arg} // 'both';
 
-return pageAsHtml ($name);
+return pageAsHtml ($name, '-', $arg);
 }
 
 ###############################################################
@@ -7057,10 +7059,11 @@ return;
 ################################################################
 sub pageAsHtml {
   my $name = shift;
-  my $ftui = shift;
+  my $ftui = shift // "";
+  my $gsel = shift // "";                                                                  # direkte Auswahl welche Grafik zurück gegeben werden soll (both, flow, forecast)
 
   my $ret = "<html>";
-  $ret   .= entryGraphic ($name, $ftui);
+  $ret   .= entryGraphic ($name, $ftui, $gsel);
   $ret   .= "</html>";
 
 return $ret;
@@ -7072,6 +7075,7 @@ return $ret;
 sub entryGraphic {
   my $name = shift;
   my $ftui = shift // "";
+  my $gsel = shift // "";                                                                  # direkte Auswahl welche Grafik zurück gegeben werden soll (both, flow, forecast)
 
   my $hash = $defs{$name};
 
@@ -7090,14 +7094,16 @@ sub entryGraphic {
   ###################################
   my $width      = AttrNum ($name, 'graphicBeamWidth',    20);                             # zu klein ist nicht problematisch
   my $maxhours   = AttrNum ($name, 'graphicHourCount',    24);
-  my $alias      = AttrVal ($name, 'alias',            $name);                             # Linktext als Aliasname oder Devicename setzen
-  my $gsel       = AttrVal ($name, 'graphicSelect',   'both');                             # Auswahl der anzuzeigenden Grafiken
+  my $alias      = AttrVal ($name, 'alias',            $name);                             # Linktext als Aliasname oder Devicename setzen  my $html_start = AttrVal ($name, 'graphicStartHtml', undef);                             # beliebige HTML Strings die vor der Grafik ausgegeben werden
   my $html_start = AttrVal ($name, 'graphicStartHtml', undef);                             # beliebige HTML Strings die vor der Grafik ausgegeben werden
-  my $html_end   = AttrVal ($name, 'graphicEndHtml',   undef);                             # beliebige HTML Strings die nach der Grafik ausgegeben werden
+  my $html_end   = AttrVal ($name, 'graphicEndHtml',   undef);                             # beliebige HTML Strings die nach der Grafik ausgegeben werden  my $w          = $width * $maxhours;                                                     # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
   my $w          = $width * $maxhours;                                                     # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
   my $offset     = -1 * AttrNum ($name, 'graphicHistoryHour', $histhourdef);
-
   my $dlink      = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>};
+  
+  if (!$gsel) {
+      $gsel = AttrVal ($name, 'graphicSelect', 'both');                                    # Auswahl der anzuzeigenden Grafiken
+  }
 
   my $paref = {
       hash           => $hash,
@@ -7427,13 +7433,13 @@ sub _graphicHeader {
 
       my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction - 0 get $name data')"};                               # Update Button generieren
 
-      if ($ftui eq "ftui") {
+      if ($ftui eq 'ftui') {
           $cmdupdate = qq{"ftui.setFhemStatus('set $name clientAction - 0 get $name data')"};
       }
 
       my $cmdplchk = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name plantConfigCheck', function(data){FW_okDialog(data)})"};          # Plant Check Button generieren
 
-      if ($ftui eq "ftui") {
+      if ($ftui eq 'ftui') {
           $cmdplchk = qq{"ftui.setFhemStatus('get $name plantConfigCheck')"};
       }
 
@@ -12135,7 +12141,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <b>on_simple:</b> <br>
       Bei dieser Methode wird die stündlich vorhergesagte mit der real erzeugten Energiemenge verglichen und daraus ein 
       für die Zukunft verwendeter Korrekturfaktor für die jeweilige Stunde erstellt. Die von der gewählten API gelieferten
-      Prognosedaten werden <b>nicht</b> zusätzlich mit weiteren Bedingungen wie den Bewökungszustand oder Temperaturen in
+      Prognosedaten werden <b>nicht</b> zusätzlich mit weiteren Bedingungen wie den Bewölkungszustand oder Temperaturen in
       Beziehung gesetzt. <br>
       In diesem Korrekturmodus haben die Attribute
       <a href="#SolarForecast-attr-affectCloudfactorDamping">affectCloudfactorDamping</a> und
@@ -12146,7 +12152,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <b>on_complex:</b> <br>
       Bei dieser Methode wird die stündlich vorhergesagte mit der real erzeugten Energiemenge verglichen und daraus ein 
       für die Zukunft verwendeter Korrekturfaktor für die jeweilige Stunde erstellt. Die von der gewählten API gelieferten
-      Prognosedaten werden außerdem zusätzlich mit weiteren Bedingungen wie den Bewökungszustand oder Temperaturen 
+      Prognosedaten werden außerdem zusätzlich mit weiteren Bedingungen wie den Bewölkungszustand oder Temperaturen 
       verknüpft.
       <br><br>
       
@@ -12317,15 +12323,28 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-get-html"></a>
       <li><b>html </b> <br><br>
-      Die Solar Grafik wird als HTML-Code abgerufen und wiedergegeben. <br>
+      Die Solar Grafik wird als HTML-Code abgerufen und wiedergegeben. Als Argument kann dem Befehl eine der folgenden
+      Selektionen mitgegeben werden: <br><br>
+      
+      <ul>
+        <table>
+        <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+        <tr><td> <b>both</b>       </td><td>zeigt Energiefluß- und Balkengrafik an (default)        </td></tr>
+        <tr><td> <b>flow</b>       </td><td>zeigt die Energieflußgrafik an                          </td></tr>
+        <tr><td> <b>forecast</b>   </td><td>zeigt die Balkengrafik an                               </td></tr>
+        <tr><td> <b>none</b>       </td><td>es wird weder Energiefluß- noch Balkengrafik angezeigt  </td></tr>
+        </table>
+      </ul>
+         
       Die Grafik kann abgerufen und in eigenen Code eingebettet werden. Auf einfache Weise kann dies durch die Definition
       eines weblink-Devices vorgenommen werden: <br><br>
 
       <ul>
-        define wl.SolCast5 weblink htmlCode { FHEM::SolarForecast::pageAsHtml ('SolCast5') }
+        define wl.SolCast5 weblink htmlCode { FHEM::SolarForecast::pageAsHtml ('SolCast5', '-', '&lt;argument&gt;') }
       </ul>
       <br>
-      'SolCast5' ist der Name des einzubindenden SolarForecast-Device.
+      'SolCast5' ist der Name des einzubindenden SolarForecast-Device. <b>&lt;argument&gt;</b> ist eine der oben 
+      beschriebenen Auswahlmöglichkeiten.
       </li>
     </ul>
     <br>
@@ -13159,7 +13178,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicSelect"></a>
        <li><b>graphicSelect </b><br>
-         Wählt die anzuzeigende Grafik des Moduls aus. <br>
+         Wählt die anzuzeigenden Grafiksegmente des Moduls aus. <br>
          Zur Anpassung der Energieflußgrafik steht neben den flowGraphic.*-Attributen auch
          das Attribut <a href="#SolarForecast-attr-flowGraphicCss">flowGraphicCss</a> zur Verfügung. <br><br>
 
@@ -13169,7 +13188,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>both</b>       </td><td>zeigt Energiefluß- und Balkengrafik an (default)        </td></tr>
             <tr><td> <b>flow</b>       </td><td>zeigt die Energieflußgrafik an                          </td></tr>
             <tr><td> <b>forecast</b>   </td><td>zeigt die Balkengrafik an                               </td></tr>
-            <tr><td> <b>none</b>       </td><td>es wird keine Grafik angezeigt                          </td></tr>
+            <tr><td> <b>none</b>       </td><td>es wird weder Energiefluß- noch Balkengrafik angezeigt  </td></tr>
          </table>
          </ul>
        </li>
