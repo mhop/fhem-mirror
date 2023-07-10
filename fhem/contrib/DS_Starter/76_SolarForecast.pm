@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.80.7" => "10.07.2023  Model SolCastAPI: retrieve forecast data of 96h (old 48), create reading DayAfterTomorrow_PVforecast if possible ",
   "0.80.6" => "09.07.2023  get ... html has some possible arguments now ",
   "0.80.5" => "07.07.2023  calculate _calcCaQcloudcover, _calcCaQsimple both at every time, change setter pvCorrectionFactor_Auto: on_simple, on_complex, off ",
   "0.80.4" => "06.07.2023  new transferprocess for DWD data from solcastapi-Hash to estimate calculation, consolidated ".
@@ -2286,7 +2287,7 @@ sub __solCast_ApiRequest {
   my $url = "https://api.solcast.com.au/rooftop_sites/".
             $roofid.
             "/forecasts?format=json".
-            "&hours=48".
+            "&hours=72".                                               # Forum:#134226 -> Abruf 72h statt 48h
             "&api_key=".
             $apikey;
 
@@ -6694,6 +6695,31 @@ sub _createSummaries {
   push @$daref, "Tomorrow_ConsumptionForecast<>".           $tconsum.                          " Wh" if(defined $tconsum);
   push @$daref, "NextHours_Sum04_ConsumptionForecast<>".   (int $next4HoursSum->{Consumption})." Wh";
   push @$daref, "RestOfDayConsumptionForecast<>".          (int $restOfDaySum->{Consumption}). " Wh";
+  
+  ## PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
+  ##############################################################################
+  my $t                = $paref->{t};                                                       # aktuelle Unix-Zeit
+  my $dayaftertomorrow = strftime "%Y-%m-%d", localtime($t + 172800);                       # Datum von Übermorgen
+  my @allstrings       = split ",", ReadingsVal ($name, 'inverterStrings', '');
+  my $fcsumdat         = 0;
+
+  for my $strg (@allstrings) {
+     for my $starttmstr (sort keys %{$data{$type}{$name}{solcastapi}{$strg}}) {
+         next if($starttmstr !~ /$dayaftertomorrow/xs);
+         
+         my $val    = SolCastAPIVal ($hash, $strg, $starttmstr, 'pv_estimate50', 0);
+         $fcsumdat += $val;
+         
+         debugLog ($paref, 'radiationProcess', "dayaftertomorrow PV forecast (raw) - $strg -> $starttmstr -> $val Wh");
+     } 
+  }
+  
+  if ($fcsumdat) {
+      push @$daref, "DayAfterTomorrow_PVforecast_raw<>". (int $fcsumdat). " Wh";
+  }
+  else {
+      deleteReadingspec ($hash, 'DayAfterTomorrow_PVforecast_raw');
+  }
 
 return;
 }
@@ -11600,8 +11626,8 @@ return $def;
 #
 # $tring:  Stringname aus "inverterStrings" (?All für allg. Werte)
 # $ststr:  Startzeit der Form YYYY-MM-DD hh:00:00
-# $key:    pv_estimate - PV Schätzung in Wh
-#          Rad1h       - vorhergesagte Globalstrahlung
+# $key:    pv_estimate50 - PV Schätzung in Wh
+#          Rad1h         - vorhergesagte Globalstrahlung (Model DWD)
 # $def:    Defaultwert
 #
 # Sonderabfragen
@@ -12375,7 +12401,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         <tr><td> <b>none</b>                    </td><td>zeigt nur den Header und die Verbraucherlegende an                                         </td></tr>
         </table>
       </ul>
-         
+      <br>
+      
       Die Grafik kann abgerufen und in eigenen Code eingebettet werden. Auf einfache Weise kann dies durch die Definition
       eines weblink-Devices vorgenommen werden: <br><br>
 
