@@ -591,6 +591,15 @@ FileLog_fhemwebFn($$$$)
       }
       my ($lt, $name) = split(":", $ln);
       $name = $lt if(!$name);
+      if($ln eq "text:linesInTheFile") {
+        my $path = qx(dirname $defs{$d}{currentlogfile});
+        chomp $path;
+        my $filename = "$path/$f";
+        my ($err, @content) =
+                FileRead( {(FileName => $filename, ForceType => "FILE" )} );
+        $name = "$lt (".scalar(@content).")";
+        @content = ();
+      }
       $ret .= FW_pH("$FW_ME/FileLog_logWrapper&dev=$d&type=$lt&file=$f",
                     "<div class=\"dval\">$name</div>", 1, "dval", 1);
     }
