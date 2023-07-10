@@ -10963,7 +10963,8 @@ sub DbRep_createCommonSql {
   ###################
   if (($rsf && $rsn)) {
       # $sql .= "TIMESTAMP >= '$rsf' AND TIMESTAMP ".($tnfull ? "<=" : "<")." '$rsn' ";
-      $sql .= "TIMESTAMP >= ".($rsf eq '?' ? $rsf : qq{'}.$rsf.qq{'})." AND TIMESTAMP ".($tnfull ? "<=" : "<")." ".($rsn eq '?' ? $rsn : qq{'}.$rsn.qq{'})." ";
+      # $sql .= "TIMESTAMP >= ".($rsf eq '?' ? $rsf : qq{'}.$rsf.qq{'})." AND TIMESTAMP ".($tnfull ? "<=" : "<")." ".($rsn eq '?' ? $rsn : qq{'}.$rsn.qq{'})." ";
+      $sql .= _DbRep_timeSelspec ($rsf, $rsn, $tnfull);
   }
   else {
       if ($dbmodel eq "POSTGRESQL") {
@@ -11109,7 +11110,8 @@ sub DbRep_createSelectSql {
   # Timestamp Filter
   ###################
   if (($rsf && $rsn)) {
-      $sql .= "TIMESTAMP >= ".($rsf eq '?' ? $rsf : qq{'}.$rsf.qq{'})." AND TIMESTAMP ".($tnfull ? "<=" : "<")." ".($rsn eq '?' ? $rsn : qq{'}.$rsn.qq{'})." ";
+      # $sql .= "TIMESTAMP >= ".($rsf eq '?' ? $rsf : qq{'}.$rsf.qq{'})." AND TIMESTAMP ".($tnfull ? "<=" : "<")." ".($rsn eq '?' ? $rsn : qq{'}.$rsn.qq{'})." ";
+      $sql .= _DbRep_timeSelspec ($rsf, $rsn, $tnfull);
   }
   else {
       if ($dbmodel eq "POSTGRESQL") {
@@ -11257,7 +11259,9 @@ sub DbRep_createDeleteSql {
  ###################
  if ($rsf && $rsn) {
      #$sql .= "TIMESTAMP >= '$rsf' AND TIMESTAMP ".($tnfull ? "<=" : "<")." '$rsn' $addon;";
-     $sql .= "TIMESTAMP >= ".($rsf eq '?' ? $rsf : qq{'}.$rsf.qq{'})." AND TIMESTAMP ".($tnfull ? "<=" : "<")." ".($rsn eq '?' ? $rsn : qq{'}.$rsn.qq{'})." $addon;";
+     #$sql .= "TIMESTAMP >= ".($rsf eq '?' ? $rsf : qq{'}.$rsf.qq{'})." AND TIMESTAMP ".($tnfull ? "<=" : "<")." ".($rsn eq '?' ? $rsn : qq{'}.$rsn.qq{'})." $addon;";
+     $sql .= _DbRep_timeSelspec ($rsf, $rsn, $tnfull);
+     $sql .= "$addon;";
  } 
  else {
      if ($dbmodel eq "POSTGRESQL") {
@@ -11269,6 +11273,20 @@ sub DbRep_createDeleteSql {
  }
 
 return $sql;
+}
+
+###################################################################################
+#      erzeugt die Zeitabgrenzung für SQL-Statements
+#      ? im Statement ist bei Verwendung von Platzhaltern relevant
+###################################################################################
+sub _DbRep_timeSelspec {
+  my $rsf    = shift;
+  my $rsn    = shift;
+  my $tnfull = shift;
+  
+  my $tlspec = "TIMESTAMP >= ".($rsf eq '?' ? $rsf : qq{'}.$rsf.qq{'})." AND TIMESTAMP ".($tnfull ? "<=" : "<")." ".($rsn eq '?' ? $rsn : qq{'}.$rsn.qq{'})." ";
+      
+return $tlspec;
 }
 
 ####################################################################################################
