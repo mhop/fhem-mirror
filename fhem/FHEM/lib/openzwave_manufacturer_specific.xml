@@ -5,6 +5,7 @@
       <Product config="abus/cfa3010.xml" id="0003" name="HomeTec Pro CFA3010" type="0005" forumNr="106068"/>
     </Manufacturer>
     <Manufacturer id="0371" name="Aeotec Limited">
+      <Product config="aeotec/zwa009V2.xml" id="0009" name="ZWA009 AërQ Temperature &amp; Humidity Sensor V2" type="0002" forumNr="134080"/>
       <Product config="aeotec/zwa011.xml" id="000b" name="ZWA011 Door/Windows Sensor 7" type="0002"/>
       <Product config="aeotec/zwa011.xml" id="000b" name="ZWA011 Door/Windows Sensor 7" type="0102"/>
       <Product config="aeotec/zwa011.xml" id="000b" name="ZWA011 Door/Windows Sensor 7" type="0202"/>
