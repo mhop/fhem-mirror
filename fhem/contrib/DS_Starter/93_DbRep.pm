@@ -6185,27 +6185,27 @@ sub DbRep_delseqdoubl {
 
   my $edge = "balanced";                                                          # positive und negative Flankenvarianz spezifizieren
   if($var && $var =~ /EDGE=/) {
-      ($var,$edge) = split("EDGE=", $var);
+      ($var,$edge) = split "EDGE=", $var;
   }
 
   my ($varpos,$varneg);
   if (defined $var) {
-      ($varpos,$varneg) = split(" ",$var);
-      $varpos = DbRep_trim($varpos);
-      $varneg = $varpos if(!$varneg);
-      $varneg = DbRep_trim($varneg);
+      ($varpos,$varneg) = split " ", $var;
+      $varpos           = DbRep_trim($varpos);
+      $varneg           = $varpos if(!$varneg);
+      $varneg           = DbRep_trim($varneg);
   }
 
   Log3 ($name, 4, "DbRep $name - delSeqDoublets params -> positive variance: ".(defined $varpos ? $varpos : "")
         .", negative variance: ".(defined $varneg ? $varneg : "").", EDGE: $edge");
 
-  my @ts = split("\\|", $ts);                                                     # Timestampstring to Array
+  my @ts = split "\\|", $ts;                                                     # Timestampstring to Array
   Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");
 
   $selspec = "DEVICE,READING,TIMESTAMP,VALUE";
 
   # SQL zusammenstellen für DB-Abfrage
-  $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"?","?","ORDER BY DEVICE,READING,TIMESTAMP ASC");
+  $sql = DbRep_createSelectSql($hash, $table, $selspec, $device, $reading, "?", "?", "ORDER BY DEVICE,READING,TIMESTAMP ASC");
   $sth = $dbh->prepare_cached($sql);
 
   # DB-Abfrage zeilenweise für jeden Timearray-Eintrag
@@ -6219,7 +6219,7 @@ sub DbRep_delseqdoubl {
   no warnings 'uninitialized';
 
   for my $row (@ts) {
-      my @a                     = split("#", $row);
+      my @a                     = split "#", $row;
       my $runtime_string        = $a[0];
       my $runtime_string_first  = $a[1];
       my $runtime_string_next   = $a[2];
@@ -6248,9 +6248,9 @@ sub DbRep_delseqdoubl {
       my $i = 0;
 
       for my $nr (map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3] } @{$sth->fetchall_arrayref()}) {
-          ($ndev,$nread,undef,undef,$nval) = split("_ESC_", $nr);                     # Werte des aktuellen Elements
+          ($ndev,$nread,undef,undef,$nval) = split "_ESC_", $nr;                      # Werte des aktuellen Elements
           $or                              = pop @sel;                                # das letzte Element der Liste
-          ($odev,$oread,undef,undef,$oval) = split("_ESC_", $or);                     # Value des letzten Elements
+          ($odev,$oread,undef,undef,$oval) = split "_ESC_", $or;                      # Value des letzten Elements
 
           if (looks_like_number($oval) && defined $varpos && defined $varneg) {       # unterschiedliche Varianz +/- für numerische Werte
               $varo = $oval + $varpos;
@@ -6295,7 +6295,7 @@ sub DbRep_delseqdoubl {
               }
 
               if ($prop =~ /delete/ && $or) {                         # delete Datensätze
-                  my ($dev,$read,$date,$time,$val) = split("_ESC_", $or);
+                  my ($dev,$read,$date,$time,$val) = split "_ESC_", $or;
                   my $dt                           = $date." ".$time;
                   chomp($val);
                   $dev  =~ s/'/''/g;                                 # escape ' with ''
@@ -10962,7 +10962,8 @@ sub DbRep_createCommonSql {
   # Timestamp Filter
   ###################
   if (($rsf && $rsn)) {
-      $sql .= "TIMESTAMP >= '$rsf' AND TIMESTAMP ".($tnfull ? "<=" : "<")." '$rsn' ";
+      # $sql .= "TIMESTAMP >= '$rsf' AND TIMESTAMP ".($tnfull ? "<=" : "<")." '$rsn' ";
+      $sql .= "TIMESTAMP >= ".($rsf eq '?' ? $rsf : qq{'}.$rsf.qq{'})." AND TIMESTAMP ".($tnfull ? "<=" : "<")." ".($rsn eq '?' ? $rsn : qq{'}.$rsn.qq{'})." ";
   }
   else {
       if ($dbmodel eq "POSTGRESQL") {
@@ -11108,7 +11109,7 @@ sub DbRep_createSelectSql {
   # Timestamp Filter
   ###################
   if (($rsf && $rsn)) {
-      $sql .= "TIMESTAMP >= '$rsf' AND TIMESTAMP ".($tnfull ? "<=" : "<")." '$rsn' ";
+      $sql .= "TIMESTAMP >= ".($rsf eq '?' ? $rsf : qq{'}.$rsf.qq{'})." AND TIMESTAMP ".($tnfull ? "<=" : "<")." ".($rsn eq '?' ? $rsn : qq{'}.$rsn.qq{'})." ";
   }
   else {
       if ($dbmodel eq "POSTGRESQL") {
@@ -11134,6 +11135,7 @@ sub DbRep_createDeleteSql {
  my $dbmodel   = $dbloghash->{MODEL};
  my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
  my $tnfull    = 0;
+ 
  my ($sql,$vf,@dwc,@rwc);
 
  if($table eq "current") {
@@ -11172,7 +11174,7 @@ sub DbRep_createDeleteSql {
  ###################
  $sql .= "( "                                 if(($idanz || $idevswc) && $idevs !~ m(^%$));
  if($idevswc && $idevs !~ m(^%$)) {
-     @dwc    = split(",",$idevswc);
+     @dwc    = split ",", $idevswc;
      my $i   = 1;
      my $len = scalar(@dwc);
 
@@ -11197,7 +11199,7 @@ sub DbRep_createDeleteSql {
  # excluded devices
  ###################
  if($edevswc) {
-     @dwc = split(",",$edevswc);
+     @dwc = split ",", $edevswc;
 
      for (@dwc) {
          $sql .= "DEVICE NOT LIKE '$_' AND ";
@@ -11216,13 +11218,16 @@ sub DbRep_createDeleteSql {
      my $len = scalar(@rwc);
 
      for (@rwc) {
-         if($i<$len) {
+         if ($i<$len) {
              $sql .= "READING LIKE '$_' OR ";
-         } else {
+         } 
+         else {
              $sql .= "READING LIKE '$_' ";
          }
+         
          $i++;
      }
+     
      if($iranz) {
          $sql .= "OR ";
      }
@@ -11251,11 +11256,14 @@ sub DbRep_createDeleteSql {
  # Timestamp Filter
  ###################
  if ($rsf && $rsn) {
-     $sql .= "TIMESTAMP >= '$rsf' AND TIMESTAMP ".($tnfull ? "<=" : "<")." '$rsn' $addon;";
- } else {
+     #$sql .= "TIMESTAMP >= '$rsf' AND TIMESTAMP ".($tnfull ? "<=" : "<")." '$rsn' $addon;";
+     $sql .= "TIMESTAMP >= ".($rsf eq '?' ? $rsf : qq{'}.$rsf.qq{'})." AND TIMESTAMP ".($tnfull ? "<=" : "<")." ".($rsn eq '?' ? $rsn : qq{'}.$rsn.qq{'})." $addon;";
+ } 
+ else {
      if ($dbmodel eq "POSTGRESQL") {
          $sql .= "true;";
-     } else {
+     } 
+     else {
           $sql .= "1;";
      }
  }
