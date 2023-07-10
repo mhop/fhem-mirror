@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  93_DbRep: once more fix SQL syntax for Postgre Forum:#134170
  - feature: 47_OBIS: Add unofficial "set <dev> data <sml-hexstring>"
  - bugfix:  93_DbRep: SQL syntax for Postgre maxValue deleteOther Forum:#134170
  - bugfix:  93_DbRep: fix check of DbRep_afterproc, DbRep_beforeproc if should 
