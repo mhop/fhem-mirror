@@ -269,8 +269,8 @@ sequence_Undef($$)
     <li>strictSequence<br>
       if set (to 1), any "unexpected" event will reset the sequence. This may
       be helpful to avoid brute-force attacks.<br>
-      Note: it will only work as correctly if the sequence is triggering only
-      to the configured devices (check the NOTIFYDEV internal), and the source
+      Note: it will only work correctly if the sequence is triggered only
+      by the configured devices (check the NOTIFYDEV internal), and the source
       is not generating "undesired" events together with the desired ones.
       </li><br>
   </ul>
