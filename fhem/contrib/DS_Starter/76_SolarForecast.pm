@@ -136,7 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.80.7" => "10.07.2023  Model SolCastAPI: retrieve forecast data of 96h (old 48), create reading DayAfterTomorrow_PVforecast if possible ",
+  "0.80.7" => "10.07.2023  Model SolCastAPI: retrieve forecast data of 96h (old 48), create statistic reading dayAfterTomorrowPVforecast if possible ",
   "0.80.6" => "09.07.2023  get ... html has some possible arguments now ",
   "0.80.5" => "07.07.2023  calculate _calcCaQcloudcover, _calcCaQsimple both at every time, change setter pvCorrectionFactor_Auto: on_simple, on_complex, off ",
   "0.80.4" => "06.07.2023  new transferprocess for DWD data from solcastapi-Hash to estimate calculation, consolidated ".
@@ -817,24 +817,25 @@ my %hef = (                                                                     
   "washingmachine" => { f => 0.50, m => 0.30, l => 0.40, mt => 120         },
 );
 
-my %hcsr = (                                                                                             # Funktiontemplate zur Erstellung optionaler Statistikreadings
-  currentAPIinterval         => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => 0           },      # par = Parameter zur spezifischen Verwendung
-  lastretrieval_time         => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => '-'         },
-  lastretrieval_timestamp    => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => '-'         },
-  response_message           => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => '-'         },
-  todayMaxAPIcalls           => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => 'apimaxreq' },
-  todayDoneAPIcalls          => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => 0           },
-  todayDoneAPIrequests       => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => 0           },
-  todayRemainingAPIcalls     => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => 'apimaxreq' },
-  todayRemainingAPIrequests  => { fnr => 1, fn => \&SolCastAPIVal, par => '', def => 'apimaxreq' },
-  runTimeCentralTask         => { fnr => 2, fn => \&CurrentVal,    par => '', def => '-'         },
-  runTimeLastAPIAnswer       => { fnr => 2, fn => \&CurrentVal,    par => '', def => '-'         },
-  runTimeLastAPIProc         => { fnr => 2, fn => \&CurrentVal,    par => '', def => '-'         },
-  allStringsFullfilled       => { fnr => 2, fn => \&CurrentVal,    par => '', def => 0           },
-  SunHours_Remain            => { fnr => 3, fn => \&CurrentVal,    par => '', def => 0           },      # fnr => 3 -> Custom Calc
-  SunMinutes_Remain          => { fnr => 3, fn => \&CurrentVal,    par => '', def => 0           },
-  todayGridFeedIn            => { fnr => 3, fn => \&CircularVal,   par => 99, def => 0           },
-  todayGridConsumption       => { fnr => 3, fn => \&CircularVal,   par => 99, def => 0           },
+my %hcsr = (                                                                                                           # Funktiontemplate zur Erstellung optionaler Statistikreadings
+  currentAPIinterval          => { fnr => 1, fn => \&SolCastAPIVal, par => '',              def => 0           },      # par = Parameter zur spezifischen Verwendung
+  lastretrieval_time          => { fnr => 1, fn => \&SolCastAPIVal, par => '',              def => '-'         },
+  lastretrieval_timestamp     => { fnr => 1, fn => \&SolCastAPIVal, par => '',              def => '-'         },
+  response_message            => { fnr => 1, fn => \&SolCastAPIVal, par => '',              def => '-'         },
+  todayMaxAPIcalls            => { fnr => 1, fn => \&SolCastAPIVal, par => '',              def => 'apimaxreq' },
+  todayDoneAPIcalls           => { fnr => 1, fn => \&SolCastAPIVal, par => '',              def => 0           },
+  todayDoneAPIrequests        => { fnr => 1, fn => \&SolCastAPIVal, par => '',              def => 0           },
+  todayRemainingAPIcalls      => { fnr => 1, fn => \&SolCastAPIVal, par => '',              def => 'apimaxreq' },
+  todayRemainingAPIrequests   => { fnr => 1, fn => \&SolCastAPIVal, par => '',              def => 'apimaxreq' },
+  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,    par => '',              def => '-'         },
+  runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,    par => '',              def => '-'         },
+  runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,    par => '',              def => '-'         },
+  allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,    par => '',              def => 0           },
+  SunHours_Remain             => { fnr => 3, fn => \&CurrentVal,    par => '',              def => 0           },      # fnr => 3 -> Custom Calc
+  SunMinutes_Remain           => { fnr => 3, fn => \&CurrentVal,    par => '',              def => 0           },
+  dayAfterTomorrowPVforecast  => { fnr => 3, fn => \&SolCastAPIVal, par => 'pv_estimate50', def => 0           },
+  todayGridFeedIn             => { fnr => 3, fn => \&CircularVal,   par => 99,              def => 0           },
+  todayGridConsumption        => { fnr => 3, fn => \&CircularVal,   par => 99,              def => 0           },
 );
 
 # Information zu verwendeten internen Datenhashes
@@ -6695,31 +6696,6 @@ sub _createSummaries {
   push @$daref, "Tomorrow_ConsumptionForecast<>".           $tconsum.                          " Wh" if(defined $tconsum);
   push @$daref, "NextHours_Sum04_ConsumptionForecast<>".   (int $next4HoursSum->{Consumption})." Wh";
   push @$daref, "RestOfDayConsumptionForecast<>".          (int $restOfDaySum->{Consumption}). " Wh";
-  
-  ## PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
-  ##############################################################################
-  my $t                = $paref->{t};                                                       # aktuelle Unix-Zeit
-  my $dayaftertomorrow = strftime "%Y-%m-%d", localtime($t + 172800);                       # Datum von Übermorgen
-  my @allstrings       = split ",", ReadingsVal ($name, 'inverterStrings', '');
-  my $fcsumdat         = 0;
-
-  for my $strg (@allstrings) {
-     for my $starttmstr (sort keys %{$data{$type}{$name}{solcastapi}{$strg}}) {
-         next if($starttmstr !~ /$dayaftertomorrow/xs);
-         
-         my $val    = SolCastAPIVal ($hash, $strg, $starttmstr, 'pv_estimate50', 0);
-         $fcsumdat += $val;
-         
-         debugLog ($paref, 'radiationProcess', "dayaftertomorrow PV forecast (raw) - $strg -> $starttmstr -> $val Wh");
-     } 
-  }
-  
-  if ($fcsumdat) {
-      push @$daref, "DayAfterTomorrow_PVforecast_raw<>". (int $fcsumdat). " Wh";
-  }
-  else {
-      deleteReadingspec ($hash, 'DayAfterTomorrow_PVforecast_raw');
-  }
 
 return;
 }
@@ -6901,7 +6877,32 @@ sub genStatisticReadings {
               my $dgcon  = $cgcon - $idgcon;
               
               push @$daref, 'statistic_'.$kpi.'<>'. (sprintf "%.1f", $dgcon).' Wh';
-          } 
+          }
+
+          if ($kpi eq 'dayAfterTomorrowPVforecast') {                                                  # PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
+              my $dayaftertomorrow = strftime "%Y-%m-%d", localtime($t + 172800);                      # Datum von Übermorgen
+              my @allstrings       = split ",", ReadingsVal ($name, 'inverterStrings', '');
+              my $fcsumdat         = 0;
+              my $type             = $paref->{type};
+
+              for my $strg (@allstrings) {
+                 for my $starttmstr (sort keys %{$data{$type}{$name}{solcastapi}{$strg}}) {
+                     next if($starttmstr !~ /$dayaftertomorrow/xs);
+                     
+                     my $val    = &{$hcsr{$kpi}{fn}} ($hash, $strg, $starttmstr, $hcsr{$kpi}{par}, $def);
+                     $fcsumdat += $val;
+                     
+                     debugLog ($paref, 'radiationProcess', "dayaftertomorrow PV forecast (raw) - $strg -> $starttmstr -> $val Wh");
+                 } 
+              }
+              
+              if ($fcsumdat) {
+                  push @$daref, 'statistic_'.$kpi.'<>'. (int $fcsumdat). ' Wh';
+              }
+              else {
+                  push @$daref, 'statistic_'.$kpi.'<>'. $fcsumdat. ' (no data available)';
+              }
+          }
       }
   }
 
@@ -12953,24 +12954,25 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>allStringsFullfilled</b>      </td><td>Erfüllungsstatus der fehlerfreien Generierung aller Strings                                                     </td></tr>
-            <tr><td> <b>currentAPIinterval</b>        </td><td>das aktuelle Abrufintervall der SolCast API (nur Model SolCastAPI) in Sekunden                                  </td></tr>
-            <tr><td> <b>lastretrieval_time</b>        </td><td>der letze Abrufzeitpunkt der API (nur Model SolCastAPI, ForecastSolarAPI)                                       </td></tr>
-            <tr><td> <b>lastretrieval_timestamp</b>   </td><td>der Timestamp der letzen Abrufzeitpunkt der API (nur Model SolCastAPI, ForecastSolarAPI)                        </td></tr>
-            <tr><td> <b>response_message</b>          </td><td>die letzte Statusmeldung der API (nur Model SolCastAPI, ForecastSolarAPI)                                       </td></tr>
-            <tr><td> <b>runTimeCentralTask</b>        </td><td>die Laufzeit des letzten SolarForecast Intervalls (Gesamtprozess) in Sekunden                                   </td></tr>
-            <tr><td> <b>runTimeLastAPIAnswer</b>      </td><td>die letzte Antwortzeit des API Abrufs auf einen Request in Sekunden (nur Model SolCastAPI, ForecastSolarAPI)    </td></tr>
-            <tr><td> <b>runTimeLastAPIProc</b>        </td><td>die letzte Prozesszeit zur Verarbeitung der empfangenen API Daten (nur Model SolCastAPI, ForecastSolarAPI)      </td></tr>
-            <tr><td> <b>SunMinutes_Remain</b>         </td><td>die verbleibenden Minuten bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
-            <tr><td> <b>SunHours_Remain</b>           </td><td>die verbleibenden Stunden bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
-            <tr><td> <b>todayDoneAPIcalls</b>         </td><td>die Anzahl der am aktuellen Tag ausgeführten API Calls (nur Model SolCastAPI, ForecastSolarAPI)                 </td></tr>
-            <tr><td> <b>todayDoneAPIrequests</b>      </td><td>die Anzahl der am aktuellen Tag ausgeführten API Requests (nur Model SolCastAPI, ForecastSolarAPI)              </td></tr>
-            <tr><td> <b>todayGridConsumption</b>      </td><td>die aus dem öffentlichen Netz bezogene Energie am aktuellen Tag                                                 </td></tr>
-            <tr><td> <b>todayGridFeedIn</b>           </td><td>die in das öffentliche Netz eingespeiste PV Energie am aktuellen Tag                                            </td></tr>
-            <tr><td> <b>todayMaxAPIcalls</b>          </td><td>die maximal mögliche Anzahl SolCast API Calls (nur Model SolCastAPI).                                           </td></tr>
-            <tr><td>                                  </td><td>Ein Call kann mehrere API Requests enthalten.                                                                   </td></tr>
-            <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Calls (nur Model SolCastAPI)                         </td></tr>
-            <tr><td> <b>todayRemainingAPIrequests</b> </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Requests (nur Model SolCastAPI)                      </td></tr>
+            <tr><td> <b>allStringsFullfilled</b>       </td><td>Erfüllungsstatus der fehlerfreien Generierung aller Strings                                                     </td></tr>
+            <tr><td> <b>currentAPIinterval</b>         </td><td>das aktuelle Abrufintervall der SolCast API (nur Model SolCastAPI) in Sekunden                                  </td></tr>
+            <tr><td> <b>dayAfterTomorrowPVforecast</b> </td><td>liefert die Vorhersage der PV Erzeugung für Übermorgen (sofern verfügbar) ohne Autokorrektur (Rohdaten).        </td></tr>
+            <tr><td> <b>lastretrieval_time</b>         </td><td>der letze Abrufzeitpunkt der API (nur Model SolCastAPI, ForecastSolarAPI)                                       </td></tr>
+            <tr><td> <b>lastretrieval_timestamp</b>    </td><td>der Timestamp der letzen Abrufzeitpunkt der API (nur Model SolCastAPI, ForecastSolarAPI)                        </td></tr>
+            <tr><td> <b>response_message</b>           </td><td>die letzte Statusmeldung der API (nur Model SolCastAPI, ForecastSolarAPI)                                       </td></tr>
+            <tr><td> <b>runTimeCentralTask</b>         </td><td>die Laufzeit des letzten SolarForecast Intervalls (Gesamtprozess) in Sekunden                                   </td></tr>
+            <tr><td> <b>runTimeLastAPIAnswer</b>       </td><td>die letzte Antwortzeit des API Abrufs auf einen Request in Sekunden (nur Model SolCastAPI, ForecastSolarAPI)    </td></tr>
+            <tr><td> <b>runTimeLastAPIProc</b>         </td><td>die letzte Prozesszeit zur Verarbeitung der empfangenen API Daten (nur Model SolCastAPI, ForecastSolarAPI)      </td></tr>
+            <tr><td> <b>SunMinutes_Remain</b>          </td><td>die verbleibenden Minuten bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
+            <tr><td> <b>SunHours_Remain</b>            </td><td>die verbleibenden Stunden bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
+            <tr><td> <b>todayDoneAPIcalls</b>          </td><td>die Anzahl der am aktuellen Tag ausgeführten API Calls (nur Model SolCastAPI, ForecastSolarAPI)                 </td></tr>
+            <tr><td> <b>todayDoneAPIrequests</b>       </td><td>die Anzahl der am aktuellen Tag ausgeführten API Requests (nur Model SolCastAPI, ForecastSolarAPI)              </td></tr>
+            <tr><td> <b>todayGridConsumption</b>       </td><td>die aus dem öffentlichen Netz bezogene Energie am aktuellen Tag                                                 </td></tr>
+            <tr><td> <b>todayGridFeedIn</b>            </td><td>die in das öffentliche Netz eingespeiste PV Energie am aktuellen Tag                                            </td></tr>
+            <tr><td> <b>todayMaxAPIcalls</b>           </td><td>die maximal mögliche Anzahl SolCast API Calls (nur Model SolCastAPI).                                           </td></tr>
+            <tr><td>                                   </td><td>Ein Call kann mehrere API Requests enthalten.                                                                   </td></tr>
+            <tr><td> <b>todayRemainingAPIcalls</b>     </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Calls (nur Model SolCastAPI)                         </td></tr>
+            <tr><td> <b>todayRemainingAPIrequests</b>  </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Requests (nur Model SolCastAPI)                      </td></tr>
          </table>
          </ul>
        <br>
