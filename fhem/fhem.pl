@@ -1447,9 +1447,9 @@ OpenLogfile($)
     open($LOG, '>&STDOUT') || die "Can't dup stdout: $!";
 
   } else {
-    HandleArchiving($defs{global}) if($defs{global}{currentlogfile});
     $defs{global}{currentlogfile} = $param;
     $defs{global}{logfile} = $attr{global}{logfile};
+    HandleArchiving($defs{global});
 
     restoreDir_mkDir($currlogfile=~m,^/,? "":".", $currlogfile, 1);
     open($LOG, ">>$currlogfile") || return("Can't open $currlogfile: $!");
@@ -4110,8 +4110,6 @@ HandleArchiving($;$)
   my $ard = $attr{$ln}{archivedir};
   return if(!defined($nra));
 
-  $nra++ if($ln eq "global"); # Forum #61450
-
   # If nrarchive is set, then check the last files:
   # Get a list of files:
 
@@ -4123,16 +4121,18 @@ HandleArchiving($;$)
   }
 
   $file =~ s/%./.+/g;
+  my $clf = $log->{currentlogfile};
+  $clf = $2 if($clf =~ m,^(.+)/([^/]+)$,);
+
   my @t = localtime(gettimeofday());
   $dir = ResolveDateWildcards($dir, @t);
   return if(!opendir(DH, $dir));
-  my @files = sort grep {/^$file$/} readdir(DH);
+  my @files = sort grep {$_ =~ m/^$file$/ && $_ ne $clf } readdir(DH);
   @files = sort { (stat("$dir/$a"))[9] <=> (stat("$dir/$b"))[9] } @files
         if(AttrVal("global", "archivesort", "alphanum") eq "timestamp");
   closedir(DH);
 
   my $max = int(@files)-$nra;
-  $max-- if($flogInitial);
   for(my $i = 0; $i < $max; $i++) {
     if($ard) {
       Log 2, "Moving $files[$i] to $ard";
