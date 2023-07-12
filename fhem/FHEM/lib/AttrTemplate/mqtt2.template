@@ -5306,7 +5306,8 @@ attr DEVICE setList\
   palette_reset:noArg BASE_ID/DEVNAME/api FP=0\
   preset:selectnumbers,0,1,15,0,lin BASE_ID/DEVNAME/api PL=$EVTPART1\
   apiraw BASE_ID/DEVNAME/api $EVTPART1\
-  seg BASE_ID/DEVNAME/api {'seg':{'i':[$EVTPART1,[$EVTPART2]]}}
+  seg BASE_ID/DEVNAME/api {'seg':{'i':[$EVTPART1,[$EVTPART2]]}}\
+  seg_name_0 {$EVENT =~ s/^$EVTPART0.//;return qq(BASE_ID/DEVNAME/api {"seg":[{"id":0,"n":"$EVENT"]}})}
 attr DEVICE readingList \
   BASE_ID/DEVNAME/status:.* LWT\
   BASE_ID/DEVNAME/g:.* brightness\
@@ -5319,13 +5320,13 @@ attr DEVICE webCmd rgb:brightness:effectname:speed:intensity:palettename:preset
 attr DEVICE webCmdLabel RGB:Brightness\
 :Effect:Speed:Intensity\
 :Palette:Preset
-attr DEVICE setStateList on off toggle dimdown dimup effect_prev effect_next effect_random palette_prev palette_next palette_random palette_reset effect_reset
+attr DEVICE setStateList on off toggle
 attr DEVICE comment For questions about the use of different widgets for color selection see discussion at https://forum.fhem.de/index.php/topic,98880.msg995308.html
 set DEVICE attrTemplate speechcontrol_type_light_255
 setreading DEVICE ip IPADDRESS
 farewell:template has been applied successfully. Note: webCmd and eventMap are just examples; adopt this to your needs.
 attr DEVICE model wled_controller
-setreading DEVICE attrTemplateVersion 20230125
+setreading DEVICE attrTemplateVersion 20230708
 
 
 
