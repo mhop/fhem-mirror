@@ -137,8 +137,8 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "0.80.8" => "12.07.2023  store battery values initdaybatintot, initdaybatouttot, batintot, batouttot in circular hash ".
-                           "new Attr ctrlStatisticReadings parameter todayBatInTotal, todayBatOutTotal ",
-  "0.80.7" => "10.07.2023  Model SolCastAPI: retrieve forecast data of 96h (old 48), create statistic reading dayAfterTomorrowPVforecast if possible ",
+                           "new Attr ctrlStatisticReadings parameter todayBatIn, todayBatOut ",
+  "0.80.7" => "10.07.2023  Model SolCastAPI: retrieve forecast data of 72h (old 48), create statistic reading dayAfterTomorrowPVforecast if possible ",
   "0.80.6" => "09.07.2023  get ... html has some possible arguments now ",
   "0.80.5" => "07.07.2023  calculate _calcCaQcloudcover, _calcCaQsimple both at every time, change setter pvCorrectionFactor_Auto: on_simple, on_complex, off ",
   "0.80.4" => "06.07.2023  new transferprocess for DWD data from solcastapi-Hash to estimate calculation, consolidated ".
@@ -838,8 +838,8 @@ my %hcsr = (                                                                    
   dayAfterTomorrowPVforecast  => { fnr => 3, fn => \&SolCastAPIVal, par => 'pv_estimate50', def => 0           },
   todayGridFeedIn             => { fnr => 3, fn => \&CircularVal,   par => 99,              def => 0           },
   todayGridConsumption        => { fnr => 3, fn => \&CircularVal,   par => 99,              def => 0           },
-  todayBatInTotal             => { fnr => 3, fn => \&CircularVal,   par => 99,              def => 0           },
-  todayBatOutTotal            => { fnr => 3, fn => \&CircularVal,   par => 99,              def => 0           },
+  todayBatIn                  => { fnr => 3, fn => \&CircularVal,   par => 99,              def => 0           },
+  todayBatOut                 => { fnr => 3, fn => \&CircularVal,   par => 99,              def => 0           },
 );
 
 # Information zu verwendeten internen Datenhashes
@@ -2757,7 +2757,6 @@ sub __forecastSolar_ApiResponse {
   my $stc         = $paref->{stc};                                                                          # Startzeit API Abruf
   my $lang        = $paref->{lang};
   my $debug       = $paref->{debug};
-  
   my $type        = $hash->{TYPE};
   
   my $t           = time;
@@ -6908,7 +6907,7 @@ sub genStatisticReadings {
               push @$daref, 'statistic_'.$kpi.'<>'. (sprintf "%.1f", $dgcon).' Wh';
           }
           
-          if ($kpi eq 'todayBatInTotal') {
+          if ($kpi eq 'todayBatIn') {
               my $idbitot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatintot', $def);     # initialer Tagesstartwert Batterie In total
               my $cbitot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batintot',   $def);          # aktuelles total Batterie In             
           
@@ -6917,7 +6916,7 @@ sub genStatisticReadings {
               push @$daref, 'statistic_'.$kpi.'<>'. (sprintf "%.1f", $dbi).' Wh';
           }
           
-          if ($kpi eq 'todayBatOutTotal') {
+          if ($kpi eq 'todayBatOut') {
               my $idbotot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatouttot', $def);     # initialer Tagesstartwert Batterie Out total
               my $cbotot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batouttot',   $def);          # aktuelles total Batterie Out             
           
@@ -12585,9 +12584,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
     <ul>
       <a id="SolarForecast-get-rooftopData"></a>
-      <li><b>rooftopData </b> <br>
-      (nur bei Verwendung Model SolCastAPI und ForecastSolarAPI) <br><br>
-
+      <li><b>rooftopData </b> <br><br>
       Die erwarteten solaren Strahlungsdaten der definierten Strings werden von der gewählten API abgerufen.
       </li>
     </ul>
@@ -13034,8 +13031,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                   </td><td>Ein Call kann mehrere API Requests enthalten.                                                                   </td></tr>
             <tr><td> <b>todayRemainingAPIcalls</b>     </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Calls (nur Model SolCastAPI)                         </td></tr>
             <tr><td> <b>todayRemainingAPIrequests</b>  </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Requests (nur Model SolCastAPI)                      </td></tr>
-            <tr><td> <b>todayBatInTotal</b>            </td><td>die am aktuellen Tag in die Batterie geladene Energie                                                           </td></tr>
-            <tr><td> <b>todayBatOutTotal</b>           </td><td>die am aktuellen Tag aus der Batterie entnommene Energie                                                        </td></tr>
+            <tr><td> <b>todayBatIn</b>                 </td><td>die am aktuellen Tag in die Batterie geladene Energie                                                           </td></tr>
+            <tr><td> <b>todayBatOut</b>                </td><td>die am aktuellen Tag aus der Batterie entnommene Energie                                                        </td></tr>
          </table>
          </ul>
        <br>
