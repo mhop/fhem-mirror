@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-07-09 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-07-12 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,6 +136,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.80.8" => "12.07.2023  store battery values initdaybatintot, initdaybatouttot, batintot, batouttot in circular hash ".
+                           "new Attr ctrlStatisticReadings parameter todayBatInTotal, todayBatOutTotal ",
   "0.80.7" => "10.07.2023  Model SolCastAPI: retrieve forecast data of 96h (old 48), create statistic reading dayAfterTomorrowPVforecast if possible ",
   "0.80.6" => "09.07.2023  get ... html has some possible arguments now ",
   "0.80.5" => "07.07.2023  calculate _calcCaQcloudcover, _calcCaQsimple both at every time, change setter pvCorrectionFactor_Auto: on_simple, on_complex, off ",
@@ -836,6 +838,8 @@ my %hcsr = (                                                                    
   dayAfterTomorrowPVforecast  => { fnr => 3, fn => \&SolCastAPIVal, par => 'pv_estimate50', def => 0           },
   todayGridFeedIn             => { fnr => 3, fn => \&CircularVal,   par => 99,              def => 0           },
   todayGridConsumption        => { fnr => 3, fn => \&CircularVal,   par => 99,              def => 0           },
+  todayBatInTotal             => { fnr => 3, fn => \&CircularVal,   par => 99,              def => 0           },
+  todayBatOutTotal            => { fnr => 3, fn => \&CircularVal,   par => 99,              def => 0           },
 );
 
 # Information zu verwendeten internen Datenhashes
@@ -1470,6 +1474,7 @@ sub _setbatteryDevice {                  ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
 
@@ -1496,6 +1501,13 @@ sub _setbatteryDevice {                  ## no critic "not used"
   if($h->{pin} eq "-pout" && $h->{pout} eq "-pin") {
       return qq{Incorrect input. It is not allowed that the keys pin and pout refer to each other.};
   }
+  
+  ## alte Speicherwerte löschen
+  ###############################
+  delete $data{$type}{$name}{circular}{99}{initdaybatintot};
+  delete $data{$type}{$name}{circular}{99}{batintot};
+  delete $data{$type}{$name}{circular}{99}{initdaybatouttot};
+  delete $data{$type}{$name}{circular}{99}{batouttot};
 
   readingsSingleUpdate ($hash, "currentBatteryDev", $arg, 1);
   createAssociatedWith ($hash);
@@ -1937,6 +1949,10 @@ sub _setreset {                          ## no critic "not used"
       readingsDelete($hash, "Current_PowerBatIn");
       readingsDelete($hash, "Current_PowerBatOut");
       readingsDelete($hash, "Current_BatCharge");
+      delete $data{$type}{$name}{circular}{99}{initdaybatintot};
+      delete $data{$type}{$name}{circular}{99}{initdaybatouttot};
+      delete $data{$type}{$name}{circular}{99}{batintot};
+      delete $data{$type}{$name}{circular}{99}{batouttot};
       delete $data{$type}{$name}{current}{powerbatout};
       delete $data{$type}{$name}{current}{powerbatin};
       delete $data{$type}{$name}{current}{batcharge};
@@ -1947,7 +1963,7 @@ sub _setreset {                          ## no critic "not used"
   if($prop eq "currentInverterDev") {
       readingsDelete    ($hash, "Current_PV");
       deleteReadingspec ($hash, ".*_PVreal" );
-      writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);                     # Anlagenkonfiguration File schreiben
+      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);                     # Anlagenkonfiguration File schreiben
   }
 
   if($prop eq "consumerPlanning") {                                                  # Verbraucherplanung resetten
@@ -1997,10 +2013,10 @@ sub _setwriteHistory {                   ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
 
-  my $ret;
-
-  $ret = writeCacheToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
-  $ret = writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
+  my $ret = writeCacheToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
+  return $ret if($ret);
+  
+  $ret    = writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
 
 return $ret;
 }
@@ -4100,6 +4116,8 @@ sub _specialActivities {
           
           delete $data{$type}{$name}{circular}{99}{initdayfeedin};
           delete $data{$type}{$name}{circular}{99}{initdaygcon};
+          delete $data{$type}{$name}{circular}{99}{initdaybatintot};
+          delete $data{$type}{$name}{circular}{99}{initdaybatouttot};
           delete $data{$type}{$name}{current}{sunriseToday};
           delete $data{$type}{$name}{current}{sunriseTodayTs};
           delete $data{$type}{$name}{current}{sunsetToday};
@@ -6216,15 +6234,28 @@ sub _transferBatteryValues {
 
       ($pbi,$pbo) = substSpecialCases ($params);
   }
+  
+  # Batterielade-, enladeenergie in Circular speichern
+  ######################################################
+  if (!defined CircularVal ($hash, 99, 'initdaybatintot', undef)) {
+      $data{$type}{$name}{circular}{99}{initdaybatintot} = $btotin;                            # total Batterieladung zu Tagbeginn (Wh)
+  }
+  
+  if (!defined CircularVal ($hash, 99, 'initdaybatouttot', undef)) {                           # total Batterieentladung zu Tagbeginn (Wh)
+      $data{$type}{$name}{circular}{99}{initdaybatouttot} = $btotout;
+  }
+  
+  $data{$type}{$name}{circular}{99}{batintot}  = $btotin;                                      # aktuell total Batterieladung
+  $data{$type}{$name}{circular}{99}{batouttot} = $btotout;                                     # aktuell total Batterieentladung
 
-  my $nhour        = $chour+1;
+  my $nhour = $chour+1;
 
-######
-
-  my $histbatintot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "batintotal", undef);   # totale Betterieladung zu Beginn einer Stunde
+  # Batterieladung aktuelle Stunde in pvHistory speichern
+  #########################################################
+  my $histbatintot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "batintotal", undef);    # totale Batterieladung zu Beginn einer Stunde
 
   my $batinthishour;
-  if(!defined $histbatintot) {                                                                # totale Betterieladung der aktuelle Stunde gesetzt ?
+  if (!defined $histbatintot) {                                                                # totale Batterieladung der aktuelle Stunde gesetzt ?
       $paref->{batintotal} = $btotin;
       $paref->{nhour}      = sprintf("%02d",$nhour);
       $paref->{histname}   = "batintotal";
@@ -6238,7 +6269,7 @@ sub _transferBatteryValues {
       $batinthishour = int ($btotin - $histbatintot);
   }
 
-  if($batinthishour < 0) {
+  if ($batinthishour < 0) {
       $batinthishour = 0;
   }
 
@@ -6250,8 +6281,8 @@ sub _transferBatteryValues {
   setPVhistory ($paref);
   delete $paref->{histname};
 
-######
-
+  # Batterieentladung aktuelle Stunde in pvHistory speichern
+  ############################################################
   my $histbatouttot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "batouttotal", undef);   # totale Betterieladung zu Beginn einer Stunde
 
   my $batoutthishour;
@@ -6283,16 +6314,14 @@ sub _transferBatteryValues {
 
 ######
 
-  push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_BatIn<>". $batinthishour. " Wh";
-  push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_BatOut<>".$batoutthishour." Wh";
-  push @$daref, "Current_PowerBatIn<>". (int $pbi)." W";
-  push @$daref, "Current_PowerBatOut<>".(int $pbo)." W";
-  push @$daref, "Current_BatCharge<>".  $soc." %";
+  push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_BatIn<>".  $batinthishour. " Wh";
+  push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_BatOut<>". $batoutthishour." Wh";
+  push @$daref, "Current_PowerBatIn<>".  (int $pbi)." W";
+  push @$daref, "Current_PowerBatOut<>". (int $pbo)." W";
+  push @$daref, "Current_BatCharge<>".   $soc.      " %";
 
   $data{$type}{$name}{current}{powerbatin}  = int $pbi;                                       # Hilfshash Wert aktuelle Batterieladung
   $data{$type}{$name}{current}{powerbatout} = int $pbo;                                       # Hilfshash Wert aktuelle Batterieentladung
-  $data{$type}{$name}{current}{batintotal}  = int $btotin;                                    # totale Batterieladung
-  $data{$type}{$name}{current}{batouttotal} = int $btotout;                                   # totale Batterieentladung
   $data{$type}{$name}{current}{batcharge}   = $soc;                                           # aktuelle Batterieladung
 
 return;
@@ -6877,6 +6906,24 @@ sub genStatisticReadings {
               my $dgcon  = $cgcon - $idgcon;
               
               push @$daref, 'statistic_'.$kpi.'<>'. (sprintf "%.1f", $dgcon).' Wh';
+          }
+          
+          if ($kpi eq 'todayBatInTotal') {
+              my $idbitot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatintot', $def);     # initialer Tagesstartwert Batterie In total
+              my $cbitot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batintot',   $def);          # aktuelles total Batterie In             
+          
+              my $dbi = $cbitot - $idbitot;
+              
+              push @$daref, 'statistic_'.$kpi.'<>'. (sprintf "%.1f", $dbi).' Wh';
+          }
+          
+          if ($kpi eq 'todayBatOutTotal') {
+              my $idbotot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatouttot', $def);     # initialer Tagesstartwert Batterie Out total
+              my $cbotot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batouttot',   $def);          # aktuelles total Batterie Out             
+          
+              my $dbo = $cbotot - $idbotot;
+              
+              push @$daref, 'statistic_'.$kpi.'<>'. (sprintf "%.1f", $dbo).' Wh';
           }
 
           if ($kpi eq 'dayAfterTomorrowPVforecast') {                                                  # PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
@@ -9924,26 +9971,30 @@ sub listDataPool {
           return qq{Circular cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $pvfc     = CircularVal ($hash, $idx, "pvfc",          "-");
-          my $pvrl     = CircularVal ($hash, $idx, "pvrl",          "-");
-          my $confc    = CircularVal ($hash, $idx, "confc",         "-");
-          my $gcons    = CircularVal ($hash, $idx, "gcons",         "-");
-          my $gfeedin  = CircularVal ($hash, $idx, "gfeedin",       "-");
-          my $wid      = CircularVal ($hash, $idx, "weatherid",     "-");
-          my $wtxt     = CircularVal ($hash, $idx, "weathertxt",    "-");
-          my $wccv     = CircularVal ($hash, $idx, "wcc",           "-");
-          my $wrprb    = CircularVal ($hash, $idx, "wrp",           "-");
-          my $temp     = CircularVal ($hash, $idx, "temp",          "-");
-          my $pvcorrf  = CircularVal ($hash, $idx, "pvcorrf",       "-");
-          my $quality  = CircularVal ($hash, $idx, "quality",       "-");
-          my $batin    = CircularVal ($hash, $idx, "batin",         "-");
-          my $batout   = CircularVal ($hash, $idx, "batout",        "-");
-          my $tdayDvtn = CircularVal ($hash, $idx, "tdayDvtn",      "-");
-          my $ydayDvtn = CircularVal ($hash, $idx, "ydayDvtn",      "-");
-          my $fitot    = CircularVal ($hash, $idx, "feedintotal",   "-");
-          my $idfi     = CircularVal ($hash, $idx, "initdayfeedin", "-");
-          my $gcontot  = CircularVal ($hash, $idx, "gridcontotal",  "-");
-          my $idgcon   = CircularVal ($hash, $idx, "initdaygcon",   "-");
+          my $pvfc     = CircularVal ($hash, $idx, "pvfc",             "-");
+          my $pvrl     = CircularVal ($hash, $idx, "pvrl",             "-");
+          my $confc    = CircularVal ($hash, $idx, "confc",            "-");
+          my $gcons    = CircularVal ($hash, $idx, "gcons",            "-");
+          my $gfeedin  = CircularVal ($hash, $idx, "gfeedin",          "-");
+          my $wid      = CircularVal ($hash, $idx, "weatherid",        "-");
+          my $wtxt     = CircularVal ($hash, $idx, "weathertxt",       "-");
+          my $wccv     = CircularVal ($hash, $idx, "wcc",              "-");
+          my $wrprb    = CircularVal ($hash, $idx, "wrp",              "-");
+          my $temp     = CircularVal ($hash, $idx, "temp",             "-");
+          my $pvcorrf  = CircularVal ($hash, $idx, "pvcorrf",          "-");
+          my $quality  = CircularVal ($hash, $idx, "quality",          "-");
+          my $batin    = CircularVal ($hash, $idx, "batin",            "-");
+          my $batout   = CircularVal ($hash, $idx, "batout",           "-");
+          my $tdayDvtn = CircularVal ($hash, $idx, "tdayDvtn",         "-");
+          my $ydayDvtn = CircularVal ($hash, $idx, "ydayDvtn",         "-");
+          my $fitot    = CircularVal ($hash, $idx, "feedintotal",      "-");
+          my $idfi     = CircularVal ($hash, $idx, "initdayfeedin",    "-");
+          my $gcontot  = CircularVal ($hash, $idx, "gridcontotal",     "-");
+          my $idgcon   = CircularVal ($hash, $idx, "initdaygcon",      "-");
+          my $idbitot  = CircularVal ($hash, $idx, "initdaybatintot",  "-");
+          my $bitot    = CircularVal ($hash, $idx, "batintot",         "-");
+          my $idbotot  = CircularVal ($hash, $idx, "initdaybatouttot", "-");
+          my $botot    = CircularVal ($hash, $idx, "batouttot",        "-");
 
           my $pvcf = qq{};
           if(ref $pvcorrf eq "HASH") {
@@ -9987,7 +10038,9 @@ sub listDataPool {
           else {
               $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn\n";
               $sq .= "      feedintotal: $fitot, initdayfeedin: $idfi\n";
-              $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon";
+              $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon\n";
+              $sq .= "      batintot: $bitot, initdaybatintot: $idbitot\n";
+              $sq .= "      batouttot: $botot, initdaybatouttot: $idbotot\n";
           }
       }
   }
@@ -11370,12 +11423,16 @@ return $def;
 #             temp       - Außentemperatur
 #             pvcorrf    - PV Autokorrekturfaktoren (HASH)
 #             
-#             tdayDvtn       - heutige Abweichung PV Prognose/Erzeugung in %
-#             ydayDvtn       - gestrige Abweichung PV Prognose/Erzeugung in %
-#             initdayfeedin  - initialer Wert für "gridfeedin" zu Beginn des Tages (Wh)
-#             feedintotal    - Einspeisung PV Energie total (Wh)
-#             initdaygcon    - initialer Wert für "gcon" zu Beginn des Tages (Wh)
-#             gridcontotal   - Netzbetug total (Wh)
+#             tdayDvtn         - heutige Abweichung PV Prognose/Erzeugung in %
+#             ydayDvtn         - gestrige Abweichung PV Prognose/Erzeugung in %
+#             initdayfeedin    - initialer Wert für "gridfeedin" zu Beginn des Tages (Wh)
+#             feedintotal      - Einspeisung PV Energie total (Wh)
+#             initdaygcon      - initialer Wert für "gcon" zu Beginn des Tages (Wh)
+#             initdaybatintot  - initialer Wert für Batterie intotal zu Beginn des Tages (Wh)
+#             batintot         - Batterie intotal (Wh)
+#             initdaybatouttot - initialer Wert für Batterie outtotal zu Beginn des Tages (Wh)
+#             batouttot        - Batterie outtotal (Wh)
+#             gridcontotal     - Netzbezug total (Wh)
 #
 #    $def: Defaultwert
 #
@@ -12495,26 +12552,30 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>pvfc</b>          </td><td>PV Vorhersage für die nächsten 24h ab aktueller Stunde des Tages                                                   </td></tr>
-            <tr><td> <b>pvrl</b>          </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!) </td></tr>
-            <tr><td> <b>confc</b>         </td><td>erwarteter Energieverbrauch (Wh)                                                                                   </td></tr>
-            <tr><td> <b>gcon</b>          </td><td>realer Leistungsbezug aus dem Stromnetz                                                                            </td></tr>
-            <tr><td> <b>gfeedin</b>       </td><td>reale Leistungseinspeisung in das Stromnetz                                                                        </td></tr>
-            <tr><td> <b>batin</b>         </td><td>Batterieladung                                                                                                     </td></tr>
-            <tr><td> <b>batout</b>        </td><td>Batterieentladung                                                                                                  </td></tr>
-            <tr><td> <b>wcc</b>           </td><td>Grad der Wolkenüberdeckung                                                                                         </td></tr>
-            <tr><td> <b>wrp</b>           </td><td>Grad der Regenwahrscheinlichkeit                                                                                   </td></tr>
-            <tr><td> <b>temp</b>          </td><td>Außentemperatur                                                                                                    </td></tr>
-            <tr><td> <b>wid</b>           </td><td>ID des vorhergesagten Wetters                                                                                      </td></tr>
-            <tr><td> <b>wtxt</b>          </td><td>Beschreibung des vorhergesagten Wetters                                                                            </td></tr>
-            <tr><td> <b>corr</b>          </td><td>Autokorrekturfaktoren für die Stunde des Tages und der Bewölkungsrange (0..10)                                     </td></tr>
-            <tr><td> <b>quality</b>       </td><td>Qualität der Autokorrekturfaktoren (max. 30), höhere Werte = höhere Qualität                                       </td></tr>
-            <tr><td> <b>tdayDvtn</b>      </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                      </td></tr>
-            <tr><td> <b>ydayDvtn</b>      </td><td>gestrige Abweichung PV Prognose/Erzeugung in %                                                                     </td></tr>
-            <tr><td> <b>feedintotal</b>   </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                         </td></tr>
-            <tr><td> <b>initdayfeedin</b> </td><td>initialer PV Einspeisewert zu Beginn des aktuellen Tages (Wh)                                                      </td></tr>
-            <tr><td> <b>gridcontotal</b>  </td><td>vom öffentlichen Netz total bezogene Energie (Wh)                                                                  </td></tr>
-            <tr><td> <b>initdaygcon</b>   </td><td>initialer Netzbezugswert zu Beginn des aktuellen Tages (Wh)                                                        </td></tr>
+            <tr><td> <b>pvfc</b>             </td><td>PV Vorhersage für die nächsten 24h ab aktueller Stunde des Tages                                                   </td></tr>
+            <tr><td> <b>pvrl</b>             </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!) </td></tr>
+            <tr><td> <b>confc</b>            </td><td>erwarteter Energieverbrauch (Wh)                                                                                   </td></tr>
+            <tr><td> <b>gcon</b>             </td><td>realer Leistungsbezug aus dem Stromnetz                                                                            </td></tr>
+            <tr><td> <b>gfeedin</b>          </td><td>reale Leistungseinspeisung in das Stromnetz                                                                        </td></tr>
+            <tr><td> <b>batin</b>            </td><td>Batterieladung (Wh)                                                                                                </td></tr>
+            <tr><td> <b>batout</b>           </td><td>Batterieentladung (Wh)                                                                                             </td></tr>
+            <tr><td> <b>wcc</b>              </td><td>Grad der Wolkenüberdeckung                                                                                         </td></tr>
+            <tr><td> <b>wrp</b>              </td><td>Grad der Regenwahrscheinlichkeit                                                                                   </td></tr>
+            <tr><td> <b>temp</b>             </td><td>Außentemperatur                                                                                                    </td></tr>
+            <tr><td> <b>wid</b>              </td><td>ID des vorhergesagten Wetters                                                                                      </td></tr>
+            <tr><td> <b>wtxt</b>             </td><td>Beschreibung des vorhergesagten Wetters                                                                            </td></tr>
+            <tr><td> <b>corr</b>             </td><td>Autokorrekturfaktoren für die Stunde des Tages und der Bewölkungsrange (0..10)                                     </td></tr>
+            <tr><td> <b>quality</b>          </td><td>Qualität der Autokorrekturfaktoren (max. 30), höhere Werte = höhere Qualität                                       </td></tr>
+            <tr><td> <b>tdayDvtn</b>         </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                      </td></tr>
+            <tr><td> <b>ydayDvtn</b>         </td><td>gestrige Abweichung PV Prognose/Erzeugung in %                                                                     </td></tr>
+            <tr><td> <b>feedintotal</b>      </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                         </td></tr>
+            <tr><td> <b>initdayfeedin</b>    </td><td>initialer PV Einspeisewert zu Beginn des aktuellen Tages (Wh)                                                      </td></tr>
+            <tr><td> <b>gridcontotal</b>     </td><td>vom öffentlichen Netz total bezogene Energie (Wh)                                                                  </td></tr>
+            <tr><td> <b>initdaygcon</b>      </td><td>initialer Netzbezugswert zu Beginn des aktuellen Tages (Wh)                                                        </td></tr>
+            <tr><td> <b>initdaybatintot</b>  </td><td>initialer Wert der total in die Batterie geladenen Energie zu Beginn des aktuellen Tages (Wh)                      </td></tr>
+            <tr><td> <b>batintot</b>         </td><td>total in die Batterie geladene Energie (Wh)                                                                        </td></tr> 
+            <tr><td> <b>initdaybatouttot</b> </td><td>initialer Wert der total aus der Batterie entnommenen Energie zu Beginn des aktuellen Tages (Wh)                   </td></tr>
+            <tr><td> <b>batouttot</b>        </td><td>total aus der Batterie entnommene Energie (Wh)                                                                     </td></tr>
          </table>
       </ul>
 
@@ -12957,7 +13018,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>allStringsFullfilled</b>       </td><td>Erfüllungsstatus der fehlerfreien Generierung aller Strings                                                     </td></tr>
             <tr><td> <b>currentAPIinterval</b>         </td><td>das aktuelle Abrufintervall der SolCast API (nur Model SolCastAPI) in Sekunden                                  </td></tr>
             <tr><td> <b>dayAfterTomorrowPVforecast</b> </td><td>liefert die Vorhersage der PV Erzeugung für Übermorgen (sofern verfügbar) ohne Autokorrektur (Rohdaten).        </td></tr>
-            <tr><td> <b>lastretrieval_time</b>         </td><td>der letze Abrufzeitpunkt der API (nur Model SolCastAPI, ForecastSolarAPI)                                       </td></tr>
+            <tr><td> <b>lastretrieval_time</b>         </td><td>der letzte Abrufzeitpunkt der API (nur Model SolCastAPI, ForecastSolarAPI)                                      </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>    </td><td>der Timestamp der letzen Abrufzeitpunkt der API (nur Model SolCastAPI, ForecastSolarAPI)                        </td></tr>
             <tr><td> <b>response_message</b>           </td><td>die letzte Statusmeldung der API (nur Model SolCastAPI, ForecastSolarAPI)                                       </td></tr>
             <tr><td> <b>runTimeCentralTask</b>         </td><td>die Laufzeit des letzten SolarForecast Intervalls (Gesamtprozess) in Sekunden                                   </td></tr>
@@ -12973,6 +13034,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                   </td><td>Ein Call kann mehrere API Requests enthalten.                                                                   </td></tr>
             <tr><td> <b>todayRemainingAPIcalls</b>     </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Calls (nur Model SolCastAPI)                         </td></tr>
             <tr><td> <b>todayRemainingAPIrequests</b>  </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Requests (nur Model SolCastAPI)                      </td></tr>
+            <tr><td> <b>todayBatInTotal</b>            </td><td>die am aktuellen Tag in die Batterie geladene Energie                                                           </td></tr>
+            <tr><td> <b>todayBatOutTotal</b>           </td><td>die am aktuellen Tag aus der Batterie entnommene Energie                                                        </td></tr>
          </table>
          </ul>
        <br>
