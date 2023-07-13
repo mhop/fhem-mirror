@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-07-12 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-07-13 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,6 +136,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.80.10"=> "13.07.2023  ccc ",
+  "0.80.9" => "13.07.2023  new method of prediction quality calculation -> sub __calcFcQuality, minor bug fixes ",
   "0.80.8" => "12.07.2023  store battery values initdaybatintot, initdaybatouttot, batintot, batouttot in circular hash ".
                            "new Attr ctrlStatisticReadings parameter todayBatIn, todayBatOut ",
   "0.80.7" => "10.07.2023  Model SolCastAPI: retrieve forecast data of 72h (old 48), create statistic reading dayAfterTomorrowPVforecast if possible ",
@@ -1455,10 +1457,10 @@ sub _setmeterDevice {                    ## no critic "not used"
    
   ## alte Speicherwerte löschen
   ###############################
-  delete $data{$type}{$name}{circular}{99}{feedintotal};
-  delete $data{$type}{$name}{circular}{99}{initdayfeedin};
-  delete $data{$type}{$name}{circular}{99}{gridcontotal};
-  delete $data{$type}{$name}{circular}{99}{initdaygcon};
+  delete $data{$type}{$name}{circular}{'99'}{feedintotal};
+  delete $data{$type}{$name}{circular}{'99'}{initdayfeedin};
+  delete $data{$type}{$name}{circular}{'99'}{gridcontotal};
+  delete $data{$type}{$name}{circular}{'99'}{initdaygcon};
 
   readingsSingleUpdate ($hash, "currentMeterDev", $arg, 1);
   createAssociatedWith ($hash);
@@ -1504,10 +1506,10 @@ sub _setbatteryDevice {                  ## no critic "not used"
   
   ## alte Speicherwerte löschen
   ###############################
-  delete $data{$type}{$name}{circular}{99}{initdaybatintot};
-  delete $data{$type}{$name}{circular}{99}{batintot};
-  delete $data{$type}{$name}{circular}{99}{initdaybatouttot};
-  delete $data{$type}{$name}{circular}{99}{batouttot};
+  delete $data{$type}{$name}{circular}{'99'}{initdaybatintot};
+  delete $data{$type}{$name}{circular}{'99'}{batintot};
+  delete $data{$type}{$name}{circular}{'99'}{initdaybatouttot};
+  delete $data{$type}{$name}{circular}{'99'}{batouttot};
 
   readingsSingleUpdate ($hash, "currentBatteryDev", $arg, 1);
   createAssociatedWith ($hash);
@@ -1930,10 +1932,10 @@ sub _setreset {                          ## no critic "not used"
   if($prop eq "currentMeterDev") {
       readingsDelete($hash, "Current_GridConsumption");
       readingsDelete($hash, "Current_GridFeedIn");
-      delete $data{$type}{$name}{circular}{99}{initdayfeedin};
-      delete $data{$type}{$name}{circular}{99}{gridcontotal};
-      delete $data{$type}{$name}{circular}{99}{initdaygcon};
-      delete $data{$type}{$name}{circular}{99}{feedintotal};
+      delete $data{$type}{$name}{circular}{'99'}{initdayfeedin};
+      delete $data{$type}{$name}{circular}{'99'}{gridcontotal};
+      delete $data{$type}{$name}{circular}{'99'}{initdaygcon};
+      delete $data{$type}{$name}{circular}{'99'}{feedintotal};
       delete $data{$type}{$name}{current}{gridconsumption};
       delete $data{$type}{$name}{current}{tomorrowconsumption};
       delete $data{$type}{$name}{current}{gridfeedin};
@@ -1949,10 +1951,10 @@ sub _setreset {                          ## no critic "not used"
       readingsDelete($hash, "Current_PowerBatIn");
       readingsDelete($hash, "Current_PowerBatOut");
       readingsDelete($hash, "Current_BatCharge");
-      delete $data{$type}{$name}{circular}{99}{initdaybatintot};
-      delete $data{$type}{$name}{circular}{99}{initdaybatouttot};
-      delete $data{$type}{$name}{circular}{99}{batintot};
-      delete $data{$type}{$name}{circular}{99}{batouttot};
+      delete $data{$type}{$name}{circular}{'99'}{initdaybatintot};
+      delete $data{$type}{$name}{circular}{'99'}{initdaybatouttot};
+      delete $data{$type}{$name}{circular}{'99'}{batintot};
+      delete $data{$type}{$name}{circular}{'99'}{batouttot};
       delete $data{$type}{$name}{current}{powerbatout};
       delete $data{$type}{$name}{current}{powerbatin};
       delete $data{$type}{$name}{current}{batcharge};
@@ -3711,6 +3713,7 @@ sub centralTask {
   #delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todaySolCastAPIcalls};
   #delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls};
   #delete $data{$type}{$name}{circular}{99}{initgridfeedintotal};
+  delete $data{$type}{$name}{circular}{'00'}; 
 
   #for my $n (1..24) {
   #    $n = sprintf "%02d", $n;
@@ -4113,17 +4116,17 @@ sub _specialActivities {
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIcalls};
           
-          delete $data{$type}{$name}{circular}{99}{initdayfeedin};
-          delete $data{$type}{$name}{circular}{99}{initdaygcon};
-          delete $data{$type}{$name}{circular}{99}{initdaybatintot};
-          delete $data{$type}{$name}{circular}{99}{initdaybatouttot};
+          delete $data{$type}{$name}{circular}{'99'}{initdayfeedin};
+          delete $data{$type}{$name}{circular}{'99'}{initdaygcon};
+          delete $data{$type}{$name}{circular}{'99'}{initdaybatintot};
+          delete $data{$type}{$name}{circular}{'99'}{initdaybatouttot};
           delete $data{$type}{$name}{current}{sunriseToday};
           delete $data{$type}{$name}{current}{sunriseTodayTs};
           delete $data{$type}{$name}{current}{sunsetToday};
           delete $data{$type}{$name}{current}{sunsetTodayTs};
 
           $data{$type}{$name}{circular}{99}{ydayDvtn} = CircularVal ($hash, 99, 'tdayDvtn', '-');
-          delete $data{$type}{$name}{circular}{99}{tdayDvtn};
+          delete $data{$type}{$name}{circular}{'99'}{tdayDvtn};
 
           delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag aus History löschen
           Log3 ($name, 3, qq{$name - history day "$day" deleted});
@@ -5790,15 +5793,19 @@ sub __setConsRcmdState {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
-  my $c     = $paref->{consumer};                                                         # aktueller Unixtimestamp
+  my $c     = $paref->{consumer};                                                         # aktueller Unix Timestamp
   my $daref = $paref->{daref};
+  my $debug = $paref->{debug};
 
-  my $surplus  = CurrentVal  ($hash, "surplus",                    0);                    # aktueller Energieüberschuß
-  my $nompower = ConsumerVal ($hash, $c, "power",                  0);                    # Consumer nominale Leistungsaufnahme (W)
-  my $ccr      = AttrVal     ($name, 'ctrlConsRecommendReadings', '');                    # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
-  my $rescons  = isConsumerPhysOn($hash, $c) ? 0 : $nompower;                             # resultierender Verbauch nach Einschaltung Consumer
-
-  if (!$nompower || $surplus - $rescons > 0) {
+  my $surplus    = CurrentVal  ($hash, 'surplus',                    0);                  # aktueller Energieüberschuß
+  my $nompower   = ConsumerVal ($hash, $c, 'power',                  0);                  # Consumer nominale Leistungsaufnahme (W)
+  my $ccr        = AttrVal     ($name, 'ctrlConsRecommendReadings', '');                  # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
+  my $rescons    = isConsumerPhysOn($hash, $c) ? 0 : $nompower;                           # resultierender Verbauch nach Einschaltung Consumer
+  
+  my ($spignore, $info, $err) = isSurplusIgnoCond ($hash, $c, $debug);                    # Vorhandensein PV Überschuß ignorieren ?
+  Log3 ($name, 1, "$name - $err") if($err);
+  
+  if (!$nompower || $surplus - $rescons > 0 || $spignore) {
       $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 1;                   # Einschalten des Consumers günstig bzw. Freigabe für "on" von Überschußseite erteilt
   }
   else {
@@ -5973,7 +5980,7 @@ sub ___switchConsumerOff {
       $caution = $swoffcond ? "switch-off condition (key swoffcond) is true" : "planned switch-off time reached/exceeded";
       $state   = qq{switching Consumer '$calias' to '$offcom', caution: $caution};
 
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                                     # Cache File Consumer schreiben
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                                                # Cache File Consumer schreiben
 
       Log3 ($name, 2, "$name - $state (Automatic = $auto)");
   }
@@ -5992,7 +5999,7 @@ sub ___switchConsumerOff {
       $caution = isInterruptable($hash, $c, $hyst) == 2 ? 'interrupt condition' : 'surplus shortage';
       $state   = qq{switching Consumer '$calias' to '$offcom', caution: $caution};
 
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                               # Cache File Consumer schreiben
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                                                # Cache File Consumer schreiben
 
       Log3 ($name, 2, "$name - $state");
   }
@@ -7015,6 +7022,11 @@ sub collectAllRegConsumers {
       if(exists $hc->{swoffcond}) {                                                               # vorrangige Ausschaltbedingung
           ($dswoffcond,$rswoffcond,$swoffcondregex) = split ":", $hc->{swoffcond};
       }
+      
+      my ($dspignorecond,$rigncond,$spignorecondregex);
+      if(exists $hc->{spignorecond}) {                                                            # Bedingung um vorhandenen PV Überschuß zu ignorieren
+          ($dspignorecond,$rigncond,$spignorecondregex) = split ":", $hc->{spignorecond};
+      }
 
       my $interruptable = 0;
       my ($hyst);
@@ -7045,43 +7057,46 @@ sub collectAllRegConsumers {
       my $rauto     = $hc->{auto} // q{};
       my $ctype     = $hc->{type} // $defctype;
       my $auto      = 1;
-      $auto         = ReadingsVal ($consumer, $rauto, 1) if($rauto);                               # Reading für Ready-Bit -> Einschalten möglich ?
+      $auto         = ReadingsVal ($consumer, $rauto, 1) if($rauto);                                   # Reading für Ready-Bit -> Einschalten möglich ?
 
-      $data{$type}{$name}{consumers}{$c}{name}            = $consumer;                             # Name des Verbrauchers (Device)
-      $data{$type}{$name}{consumers}{$c}{alias}           = $alias;                                # Alias des Verbrauchers (Device)
-      $data{$type}{$name}{consumers}{$c}{type}            = $hc->{type}      // $defctype;         # Typ des Verbrauchers
-      $data{$type}{$name}{consumers}{$c}{power}           = $hc->{power};                          # Leistungsaufnahme des Verbrauchers in W
-      $data{$type}{$name}{consumers}{$c}{avgenergy}       = q{};                                   # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
-      $data{$type}{$name}{consumers}{$c}{mintime}         = $hc->{mintime}   // $hef{$ctype}{mt};  # Initialwert min. Einplanungsdauer (evtl. Überschreiben in manageConsumerData)
-      $data{$type}{$name}{consumers}{$c}{mode}            = $hc->{mode}      // $defcmode;         # Planungsmode des Verbrauchers
-      $data{$type}{$name}{consumers}{$c}{icon}            = $hc->{icon}      // q{};               # Icon für den Verbraucher
-      $data{$type}{$name}{consumers}{$c}{oncom}           = $hc->{on}        // q{};               # Setter Einschaltkommando
-      $data{$type}{$name}{consumers}{$c}{offcom}          = $hc->{off}       // q{};               # Setter Ausschaltkommando
-      $data{$type}{$name}{consumers}{$c}{autoreading}     = $rauto;                                # Readingname zur Automatiksteuerung
-      $data{$type}{$name}{consumers}{$c}{auto}            = $auto;                                 # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus
-      $data{$type}{$name}{consumers}{$c}{retotal}         = $rtot            // q{};               # Reading der Leistungsmessung
-      $data{$type}{$name}{consumers}{$c}{uetotal}         = $utot            // q{};               # Unit der Leistungsmessung
-      $data{$type}{$name}{consumers}{$c}{rpcurr}          = $rpcurr          // q{};               # Reading der aktuellen Leistungsaufnahme
-      $data{$type}{$name}{consumers}{$c}{upcurr}          = $upcurr          // q{};               # Unit der aktuellen Leistungsaufnahme
-      $data{$type}{$name}{consumers}{$c}{energythreshold} = $ethreshold;                           # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird
-      $data{$type}{$name}{consumers}{$c}{powerthreshold}  = $pthreshold;                           # Schwellenwert d. aktuellen Leistung(W) ab der ein Verbraucher als aktiv gewertet wird
-      $data{$type}{$name}{consumers}{$c}{notbefore}       = $hc->{notbefore} // q{};               # nicht einschalten vor Stunde in 24h Format (00-23)
-      $data{$type}{$name}{consumers}{$c}{notafter}        = $hc->{notafter}  // q{};               # nicht einschalten nach Stunde in 24h Format (00-23)
-      $data{$type}{$name}{consumers}{$c}{rswstate}        = $rswstate        // 'state';           # Schaltstatus Reading
-      $data{$type}{$name}{consumers}{$c}{asynchron}       = $asynchron       // 0;                 # Arbeitsweise FHEM Consumer Device
-      $data{$type}{$name}{consumers}{$c}{locktime}        = $clt             // 0;                 # Sperrzeit im Automatikmodus
-      $data{$type}{$name}{consumers}{$c}{onreg}           = $onreg           // 'on';              # Regex für 'ein'
-      $data{$type}{$name}{consumers}{$c}{offreg}          = $offreg          // 'off';             # Regex für 'aus'
-      $data{$type}{$name}{consumers}{$c}{dswoncond}       = $dswoncond       // q{};               # Device zur Lieferung einer zusätzliche Einschaltbedingung
-      $data{$type}{$name}{consumers}{$c}{rswoncond}       = $rswoncond       // q{};               # Reading zur Lieferung einer zusätzliche Einschaltbedingung
-      $data{$type}{$name}{consumers}{$c}{swoncondregex}   = $swoncondregex   // q{};               # Regex einer zusätzliche Einschaltbedingung
-      $data{$type}{$name}{consumers}{$c}{dswoffcond}      = $dswoffcond      // q{};               # Device zur Lieferung einer vorrangigen Ausschaltbedingung
-      $data{$type}{$name}{consumers}{$c}{rswoffcond}      = $rswoffcond      // q{};               # Reading zur Lieferung einer vorrangigen Ausschaltbedingung
-      $data{$type}{$name}{consumers}{$c}{swoffcondregex}  = $swoffcondregex  // q{};               # Regex einer vorrangigen Ausschaltbedingung
-      $data{$type}{$name}{consumers}{$c}{interruptable}   = $interruptable;                        # Ein-Zustand des Verbrauchers ist unterbrechbar
-      $data{$type}{$name}{consumers}{$c}{hysteresis}      = $hyst            // $defhyst;          # Hysterese
-      $data{$type}{$name}{consumers}{$c}{sunriseshift}    = $riseshift if(defined $riseshift);     # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
-      $data{$type}{$name}{consumers}{$c}{sunsetshift}     = $setshift  if(defined $setshift);      # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
+      $data{$type}{$name}{consumers}{$c}{name}              = $consumer;                                # Name des Verbrauchers (Device)
+      $data{$type}{$name}{consumers}{$c}{alias}             = $alias;                                   # Alias des Verbrauchers (Device)
+      $data{$type}{$name}{consumers}{$c}{type}              = $hc->{type}         // $defctype;         # Typ des Verbrauchers
+      $data{$type}{$name}{consumers}{$c}{power}             = $hc->{power};                             # Leistungsaufnahme des Verbrauchers in W
+      $data{$type}{$name}{consumers}{$c}{avgenergy}         = q{};                                      # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
+      $data{$type}{$name}{consumers}{$c}{mintime}           = $hc->{mintime}      // $hef{$ctype}{mt};  # Initialwert min. Einplanungsdauer (evtl. Überschreiben in manageConsumerData)
+      $data{$type}{$name}{consumers}{$c}{mode}              = $hc->{mode}         // $defcmode;         # Planungsmode des Verbrauchers
+      $data{$type}{$name}{consumers}{$c}{icon}              = $hc->{icon}         // q{};               # Icon für den Verbraucher
+      $data{$type}{$name}{consumers}{$c}{oncom}             = $hc->{on}           // q{};               # Setter Einschaltkommando
+      $data{$type}{$name}{consumers}{$c}{offcom}            = $hc->{off}          // q{};               # Setter Ausschaltkommando
+      $data{$type}{$name}{consumers}{$c}{autoreading}       = $rauto;                                   # Readingname zur Automatiksteuerung
+      $data{$type}{$name}{consumers}{$c}{auto}              = $auto;                                    # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus
+      $data{$type}{$name}{consumers}{$c}{retotal}           = $rtot               // q{};               # Reading der Leistungsmessung
+      $data{$type}{$name}{consumers}{$c}{uetotal}           = $utot               // q{};               # Unit der Leistungsmessung
+      $data{$type}{$name}{consumers}{$c}{rpcurr}            = $rpcurr             // q{};               # Reading der aktuellen Leistungsaufnahme
+      $data{$type}{$name}{consumers}{$c}{upcurr}            = $upcurr             // q{};               # Unit der aktuellen Leistungsaufnahme
+      $data{$type}{$name}{consumers}{$c}{energythreshold}   = $ethreshold;                              # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird
+      $data{$type}{$name}{consumers}{$c}{powerthreshold}    = $pthreshold;                              # Schwellenwert d. aktuellen Leistung(W) ab der ein Verbraucher als aktiv gewertet wird
+      $data{$type}{$name}{consumers}{$c}{notbefore}         = $hc->{notbefore}    // q{};               # nicht einschalten vor Stunde in 24h Format (00-23)
+      $data{$type}{$name}{consumers}{$c}{notafter}          = $hc->{notafter}     // q{};               # nicht einschalten nach Stunde in 24h Format (00-23)
+      $data{$type}{$name}{consumers}{$c}{rswstate}          = $rswstate           // 'state';           # Schaltstatus Reading
+      $data{$type}{$name}{consumers}{$c}{asynchron}         = $asynchron          // 0;                 # Arbeitsweise FHEM Consumer Device
+      $data{$type}{$name}{consumers}{$c}{locktime}          = $clt                // 0;                 # Sperrzeit im Automatikmodus
+      $data{$type}{$name}{consumers}{$c}{onreg}             = $onreg              // 'on';              # Regex für 'ein'
+      $data{$type}{$name}{consumers}{$c}{offreg}            = $offreg             // 'off';             # Regex für 'aus'
+      $data{$type}{$name}{consumers}{$c}{dswoncond}         = $dswoncond          // q{};               # Device zur Lieferung einer zusätzliche Einschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{rswoncond}         = $rswoncond          // q{};               # Reading zur Lieferung einer zusätzliche Einschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{swoncondregex}     = $swoncondregex      // q{};               # Regex einer zusätzliche Einschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{dswoffcond}        = $dswoffcond         // q{};               # Device zur Lieferung einer vorrangigen Ausschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{rswoffcond}        = $rswoffcond         // q{};               # Reading zur Lieferung einer vorrangigen Ausschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{swoffcondregex}    = $swoffcondregex     // q{};               # Regex einer vorrangigen Ausschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{dspignorecond}     = $dspignorecond      // q{};               # Device liefert Ignore Bedingung
+      $data{$type}{$name}{consumers}{$c}{rigncond}          = $rigncond           // q{};               # Reading liefert Ignore Bedingung
+      $data{$type}{$name}{consumers}{$c}{spignorecondregex} = $spignorecondregex  // q{};               # Regex der Ignore Bedingung      
+      $data{$type}{$name}{consumers}{$c}{interruptable}     = $interruptable;                           # Ein-Zustand des Verbrauchers ist unterbrechbar
+      $data{$type}{$name}{consumers}{$c}{hysteresis}        = $hyst               // $defhyst;          # Hysterese
+      $data{$type}{$name}{consumers}{$c}{sunriseshift}      = $riseshift if(defined $riseshift);        # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
+      $data{$type}{$name}{consumers}{$c}{sunsetshift}       = $setshift  if(defined $setshift);         # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
   }
 
   # Log3 ($name, 5, "$name - all registered consumers:\n".Dumper $data{$type}{$name}{consumers});
@@ -7689,20 +7704,10 @@ sub _graphicHeader {
 
       ## Qualitäts-Icon
       ######################
-      my $pcqicon;
-
-      if ($acu =~ /on_complex/xs) {
-      $pcqicon = $pcq < 0  ? FW_makeImage('15px-blank',          $pvcanz) :
-                 $pcq < 10 ? FW_makeImage('10px-kreis-rot.png',  $pvcanz) :
-                 $pcq < 20 ? FW_makeImage('10px-kreis-gelb.png', $pvcanz) :
-                 FW_makeImage('10px-kreis-gruen.png', $pvcanz);
-      }
-      else {
-      $pcqicon = $pcq < 0 ? FW_makeImage('15px-blank',          $pvcanz) :
-                 $pcq < 3 ? FW_makeImage('10px-kreis-rot.png',  $pvcanz) :
-                 $pcq < 5 ? FW_makeImage('10px-kreis-gelb.png', $pvcanz) :
-                 FW_makeImage('10px-kreis-gruen.png', $pvcanz);
-      }
+      my $pcqicon = $pcq < 0.00 ? FW_makeImage('15px-blank',          $pvcanz) :
+                    $pcq < 0.60 ? FW_makeImage('10px-kreis-rot.png',  $pvcanz) :
+                    $pcq < 0.80 ? FW_makeImage('10px-kreis-gelb.png', $pvcanz) :
+                    FW_makeImage('10px-kreis-gruen.png', $pvcanz);
 
       $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
 
@@ -9229,11 +9234,11 @@ sub _calcCaQcloudcover {
           next;
       }
 
-      my $fcval = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
-      next if(!$fcval);
+      my $pvfc = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
+      next if(!$pvfc);
 
-      my $pvval = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
-      next if(!$pvval);
+      my $pvre = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
+      next if(!$pvre);
 
       $paref->{hour}                  = $h;
       my ($pvhis,$fchis,$dnum,$range) = __Pv_Fc_Ccover_Dnum_Hist ($paref);                                # historische PV / Forecast Vergleichswerte ermitteln
@@ -9246,17 +9251,17 @@ sub _calcCaQcloudcover {
 
       if ($dnum) {                                                                                        # Werte in History vorhanden -> haben Prio !
           $dnum   = $dnum + 1;
-          $pvval  = ($pvval + $pvhis) / $dnum;                                                            # Ertrag aktuelle Stunde berücksichtigen
-          $fcval  = ($fcval + $fchis) / $dnum;                                                            # Vorhersage aktuelle Stunde berücksichtigen
-          $factor = sprintf "%.2f", ($pvval / $fcval);                                                    # Faktorberechnung: reale PV / Prognose
+          $pvre   = ($pvre + $pvhis) / $dnum;                                                             # Ertrag aktuelle Stunde berücksichtigen
+          $pvfc   = ($pvfc + $fchis) / $dnum;                                                             # Vorhersage aktuelle Stunde berücksichtigen
+          $factor = sprintf "%.2f", ($pvre / $pvfc);                                                      # Faktorberechnung: reale PV / Prognose
       }
       elsif ($oldfac && !$usenhd) {                                                                       # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr affectNumHistDays
           $dnum   = $oldq + 1;
-          $factor = sprintf "%.2f", ($pvval / $fcval);
+          $factor = sprintf "%.2f", ($pvre / $pvfc);
           $factor = sprintf "%.2f", ($factor + $oldfac) / 2;
       }
       else {                                                                                              # ganz neuer Wert
-          $factor = sprintf "%.2f", ($pvval / $fcval);
+          $factor = sprintf "%.2f", ($pvre / $pvfc);
           $dnum   = 1;
       }
       
@@ -9268,15 +9273,15 @@ sub _calcCaQcloudcover {
           Log3 ($name, 3, "$name - new correction factor calculated: $factor (old: $oldfac) for hour: $h calculated") if($factor != $oldfac);
       }
       
-      debugLog ($paref, 'pvCorrection', "Cloudcover Corrf -> cloudiness range: $range, hour: $h, days: $dnum, real: $pvval, forecast: $fcval, factor: $factor");
+      debugLog ($paref, 'pvCorrection', "Cloudcover Corrf -> cloudiness range: $range, hour: $h, days: $dnum, real: $pvre, forecast: $pvfc, factor: $factor");
 
       if (defined $range) {
           my $type = $paref->{type};
 
           debugLog ($paref, 'saveData2Cache', "Cloudcover Corrf -> write Complex correction factor into Circular: Factor $factor, Hour $h, Range $range");
 
-          $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$range} = $factor;                  # Korrekturfaktor für Bewölkung der jeweiligen Stunde als Datenquelle eintragen
-          $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{$range} = $dnum;                    # Korrekturfaktor Qualität
+          $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$range} = $factor;                            # Korrekturfaktor für Bewölkung der jeweiligen Stunde als Datenquelle eintragen
+          $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{$range} = __calcFcQuality ($pvfc, $pvre);     # Qualität der Vorhersage für die vergangene Stunde
       
           push @$daref, ".pvCorrectionFactor_".sprintf("%02d",$h)."_cloudcover<>done";
       }
@@ -9420,7 +9425,7 @@ sub _calcCaQsimple {
   my $daref = $paref->{daref};
   my $acu   = $paref->{acu};
 
-  my $maxvar = AttrVal($name, 'affectMaxDayVariance', $defmaxvar);                                             # max. Korrekturvarianz
+  my $maxvar = AttrVal($name, 'affectMaxDayVariance', $defmaxvar);                                         # max. Korrekturvarianz
 
   for my $h (1..23) {
       next if(!$chour || $h > $chour);
@@ -9432,11 +9437,11 @@ sub _calcCaQsimple {
           next;
       }
       
-      my $fcval = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
-      next if(!$fcval);
+      my $pvfc = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
+      next if(!$pvfc);
 
-      my $pvval = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
-      next if(!$pvval);
+      my $pvre = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
+      next if(!$pvre);
 
       $paref->{hour}           = $h;
       my ($pvhis,$fchis,$dnum) = __Pv_Fc_Dnum_Hist ($paref);                                               # historischen Percentilfaktor / Qualität ermitteln
@@ -9458,7 +9463,7 @@ sub _calcCaQsimple {
           next;
       }
 
-      my $perc = sprintf "%.2f", ($pvval / $est50);                                                       # berechneter Faktor der Stunde -> speichern in pvHistory
+      my $perc = sprintf "%.2f", ($pvre / $est50);                                                        # berechneter Faktor der Stunde -> speichern in pvHistory
 
       $paref->{pvcorrf}  = $perc.'/1';                                                                    # Korrekturfaktor / Qualität in History speichern
       $paref->{nhour}    = sprintf("%02d",$h);
@@ -9470,25 +9475,25 @@ sub _calcCaQsimple {
       delete $paref->{nhour};
       delete $paref->{pvcorrf};
 
-      debugLog ($paref, 'pvCorrection', "Simple Corrf -> PV for hour >$h< -> estimate without corr factor: $est50, real: $pvval");
+      debugLog ($paref, 'pvCorrection', "Simple Corrf -> PV for hour >$h< -> estimate without corr factor: $est50, real: $pvre");
 
       my $factor;
       my ($usenhd) = __useNumHistDays ($name);                                                            # ist Attr affectNumHistDays gesetzt ?
 
       if ($dnum) {                                                                                        # Werte in History vorhanden -> haben Prio !          
           $dnum++;
-          $pvval  = ($pvval + $pvhis) / $dnum;                                                            # Ertrag aktuelle Stunde berücksichtigen
-          $fcval  = ($fcval + $fchis) / $dnum;                                                            # Vorhersage aktuelle Stunde berücksichtigen
-          $factor = sprintf "%.2f", ($pvval / $fcval);                                                    # Faktorberechnung: reale PV / Prognose
+          $pvre   = ($pvre + $pvhis) / $dnum;                                                             # Ertrag aktuelle Stunde berücksichtigen
+          $pvfc   = ($pvfc + $fchis) / $dnum;                                                             # Vorhersage aktuelle Stunde berücksichtigen
+          $factor = sprintf "%.2f", ($pvre / $pvfc);                                                      # Faktorberechnung: reale PV / Prognose
       }
       elsif ($oldfac && !$usenhd) {                                                                       # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr affectNumHistDays         
           $dnum   = $oldq + 1;
-          $factor = sprintf "%.2f", ($pvval / $fcval);
+          $factor = sprintf "%.2f", ($pvre / $pvfc);
           $factor = sprintf "%.2f", ($factor + $oldfac) / 2;
       }
       else {                                                                                              # ganz neuer Wert
           $dnum   = 1;
-          $factor = sprintf "%.2f", ($pvval / $fcval);
+          $factor = sprintf "%.2f", ($pvre / $pvfc);
           $oldfac = '-';
       }
       
@@ -9505,8 +9510,8 @@ sub _calcCaQsimple {
 
       my $type = $paref->{type};
 
-      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{percentile} = $factor;                   # Korrekturfaktor der jeweiligen Stunde als Datenquelle eintragen
-      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{percentile} = $dnum;                     # Korrekturfaktor Qualität
+      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{percentile} = $factor;                            # Korrekturfaktor der jeweiligen Stunde als Datenquelle eintragen
+      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{percentile} = __calcFcQuality ($pvfc, $pvre);     # Qualität der Vorhersage für die vergangene Stunde
 
       push @$daref, ".pvCorrectionFactor_".sprintf("%02d",$h)."_apipercentil<>done";
             
@@ -9584,6 +9589,19 @@ sub __Pv_Fc_Dnum_Hist {
   my $fchis = sprintf "%.2f", $pvfc;
       
 return ($pvhis,$fchis,$dnum);
+}
+
+################################################################
+#            Qualität der Vorhersage berechnen
+################################################################
+sub __calcFcQuality {
+  my $pvfc = shift;                                                        # PV Vorhersagewert
+  my $pvre = shift;                                                        # PV reale Erzeugung
+
+  my $diff = $pvfc - $pvre;
+  my $hdv  = 1 - sprintf "%.2f", abs ($diff / $pvre);                      # Abweichung der Stunde, 1 = bestmöglicher Wert   
+
+return $hdv;
 }
 
 ################################################################
@@ -10964,22 +10982,22 @@ sub isAddSwitchOnCond {
   my $info = q{};
   my $err  = q{};
 
-  my $dswoncond = ConsumerVal ($hash, $c, "dswoncond", "");                     # Device zur Lieferung einer zusätzlichen Einschaltbedingung
+  my $dswoncond = ConsumerVal ($hash, $c, 'dswoncond', '');                     # Device zur Lieferung einer zusätzlichen Einschaltbedingung
 
   if($dswoncond && !$defs{$dswoncond}) {
       $err = qq{ERROR - the device "$dswoncond" doesn't exist! Check the key "swoncond" in attribute "consumer${c}"};
       return (0, $info, $err);
   }
 
-  my $rswoncond     = ConsumerVal ($hash, $c, "rswoncond",     "");             # Reading zur Lieferung einer zusätzlichen Einschaltbedingung
-  my $swoncondregex = ConsumerVal ($hash, $c, "swoncondregex", "");             # Regex einer zusätzliche Einschaltbedingung
-  my $condval       = ReadingsVal ($dswoncond, $rswoncond,     "");             # Wert zum Vergleich mit Regex
+  my $rswoncond     = ConsumerVal ($hash, $c, 'rswoncond',     '');             # Reading zur Lieferung einer zusätzlichen Einschaltbedingung
+  my $swoncondregex = ConsumerVal ($hash, $c, 'swoncondregex', '');             # Regex einer zusätzliche Einschaltbedingung
+  my $condval       = ReadingsVal ($dswoncond, $rswoncond,     '');             # Wert zum Vergleich mit Regex
 
   if ($condval =~ m/^$swoncondregex$/x) {
       return (1, $info, $err);
   }
 
-  $info = qq{The device "$dswoncond", reading "$rswoncond" doen't match the Regex "$swoncondregex"};
+  $info = qq{The device "$dswoncond", reading "$rswoncond" doesn't match the Regex "$swoncondregex"};
 
 return (0, $info, $err);
 }
@@ -11011,9 +11029,9 @@ sub isAddSwitchOffCond {
       ($dswoffcond,$rswoffcond,$swoffcondregex) = split ":", $cond;
   }
   else {
-      $dswoffcond     = ConsumerVal ($hash, $c, "dswoffcond",     "");
-      $rswoffcond     = ConsumerVal ($hash, $c, "rswoffcond",     "");
-      $swoffcondregex = ConsumerVal ($hash, $c, "swoffcondregex", "");
+      $dswoffcond     = ConsumerVal ($hash, $c, 'dswoffcond',     '');
+      $rswoffcond     = ConsumerVal ($hash, $c, 'rswoffcond',     '');
+      $swoffcondregex = ConsumerVal ($hash, $c, 'swoffcondregex', '');
   }
 
   if($dswoffcond && !$defs{$dswoffcond}) {
@@ -11040,6 +11058,47 @@ sub isAddSwitchOffCond {
 
 return (0, $info, $err);
 }
+
+################################################################
+#  Funktion liefert "1" wenn die angegebene Bedingung 
+#  aus dem Consumerschlüssel 'spignorecond' erfüllt ist. 
+#
+#  $info - den Info-Status
+#  $err  - einen Error-Status
+#
+################################################################
+sub isSurplusIgnoCond {
+  my $hash  = shift;
+  my $c     = shift;
+  my $debug = shift;
+  
+  my $info = q{};
+  my $err  = q{};
+
+  my $digncond = ConsumerVal ($hash, $c, 'dspignorecond', '');                          # Device zur Lieferung einer "Überschuß Ignore-Bedingung"
+
+  if($digncond && !$defs{$digncond}) {
+      $err = qq{ERROR - the device "$digncond" doesn't exist! Check the key "spignorecond" in attribute "consumer${c}"};
+      return (0, $info, $err);
+  }
+
+  my $rigncond          = ConsumerVal ($hash, $c, 'rigncond',          '');             # Reading zur Lieferung einer zusätzlichen Einschaltbedingung
+  my $spignorecondregex = ConsumerVal ($hash, $c, 'spignorecondregex', '');             # Regex einer zusätzliche Einschaltbedingung
+  my $condval           = ReadingsVal ($digncond, $rigncond,           '');             # Wert zum Vergleich mit Regex
+  
+  if ($condval && $debug =~ /consumerSwitching/x) {
+      my $name = $hash->{NAME};
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - PV surplus ignore condition ist set - device: $digncond, reading: $rigncond, condition: $spignorecondregex});
+  }
+
+  if ($condval && $condval =~ m/^$spignorecondregex$/x) {
+      return (1, $info, $err);
+  }
+
+  $info = qq{The device "$digncond", reading "$rigncond" doesn't match the Regex "$spignorecondregex"};
+
+return (0, $info, $err);
+} 
 
 ################################################################
 #  liefert den Status des Timeframe von Consumer $c
@@ -12543,7 +12602,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a id="SolarForecast-get-pvCircular"></a>
       <li><b>pvCircular </b> <br><br>
       Listet die vorhandenen Werte im Ringspeicher auf.
-      Die Stundenangaben 00 - 24 beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von
+      Die Stundenangaben 01 - 24 beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von
       08 - 09 Uhr. <br>
       Die Stunde 99 hat eine Sonderfunktion. <br>
       Erläuterung der Werte: <br><br>
@@ -12768,12 +12827,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt;  <br>
+       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; <br>
                          [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]              <br>
                          [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]  <br>
                          [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [locktime=&lt;Sekunden&gt;]<br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] <br>
-                         [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [interruptable=&lt;Option&gt] </b><br>
+                         [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] <br>
+                         [interruptable=&lt;Option&gt] </b><br>
                          <br>
 
         Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
@@ -12862,11 +12922,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>swoncond</b>       </td><td>Bedingung die zusätzlich erfüllt sein muß um den Verbraucher einzuschalten (optional). Der geplante Zyklus wird gestartet.                     </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der zusätzlichen Einschaltbedingung                                                                       </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der zusätzlichen Einschaltbedingung                                                                     </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für die Einschaltbedingung erfüllt sein muß                                                              </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für eine 'wahre' Bedingung erfüllt sein muß                                                              </td></tr>
             <tr><td> <b>swoffcond</b>      </td><td>vorrangige Bedingung um den Verbraucher auszuschalten (optional). Der geplante Zyklus wird gestoppt.                                           </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der vorrangigen Ausschaltbedingung                                                                        </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der vorrangigen Ausschaltbedingung                                                                      </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für die Ausschaltbedingung erfüllt sein muß                                                              </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für eine 'wahre' Bedingung erfüllt sein muß                                                              </td></tr>
+            <tr><td> <b>spignorecond</b>   </td><td>Bedingung um einen PV Überschuß zu ignorieren (optional). Bei erfüllter Bedingung wird der Verbraucher entsprechend der Planung eingeschaltet  </td></tr>
+            <tr><td>                       </td><td>auch wenn zu dem Zeitpunkt kein PV Überschuß vorliegt.                                                                                         </td></tr>
+            <tr><td>                       </td><td><b>ACHTUNG:</b> Die Verwendung beider Schlüssel <I>spignorecond</I> und <I>interruptable</I> kann zu einem unerwünschten Verhalten führen!     </td></tr>
+            <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der Bedingung                                                                                             </td></tr>
+            <tr><td>                       </td><td><b>Reading</b> - Reading welches die Bedingung enthält                                                                                         </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für eine 'wahre' Bedingung erfüllt sein muß                                                              </td></tr>
             <tr><td> <b>interruptable</b>  </td><td>definiert die möglichen Unterbrechungsoptionen für den Verbraucher nachdem er gestartet wurde (optional)                                       </td></tr>
             <tr><td>                       </td><td><b>0</b> - Verbraucher wird nicht temporär ausgeschaltet auch wenn der PV Überschuß die benötigte Energie unterschreitet (default)             </td></tr>
             <tr><td>                       </td><td><b>1</b> - Verbraucher wird temporär ausgeschaltet falls der PV Überschuß die benötigte Energie unterschreitet                                 </td></tr>
