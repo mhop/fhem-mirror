@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     98_KNX_scan: implement FHEM-cmd: KNX_scan
+ - change:  00_KNXIO.pm: moved KNX_scan perl function to 10_KNX.pm
+ - change:  10_KNX.pm: moved KNX_scan perl function to 10_KNX.pm 
  - bugfix:  93_DbRep: once more fix SQL syntax for Postgre Forum:#134170
  - feature: 47_OBIS: Add unofficial "set <dev> data <sml-hexstring>"
  - bugfix:  93_DbRep: SQL syntax for Postgre maxValue deleteOther Forum:#134170

@@ -531,6 +531,7 @@ FHEM/98_inotify.pm           marvin78             Automatisierung
 FHEM/98_Installer.pm         loredo               Unterstützende Dienste
 FHEM/98_JsonList2.pm         rudolfkoenig         Automatisierung
 FHEM/98_JsonMod.pm           herrmannj            Automatisierung
+FHEM/98_KNX_scan.pm          erwin                KNX/EIB (Forum #122582) https://forum.fhem.de/index.php/topic,122582.0.html
 FHEM/98_livetracking.pm      markus-m             Unterstützende Dienste
 FHEM/98_logProxy.pm          justme1968           Frontends/SVG Plots logProxy
 FHEM/98_search.pm            loredo               Unterstützende Dienste
