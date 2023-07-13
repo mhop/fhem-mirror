@@ -138,8 +138,10 @@
 #              cmd-ref: correct wiki links,  W3C conformance...
 #              error-msg on invalid set dpt1 cmd (on-till...)
 #              Attr anwerReading now deprecated - converted to putCmd - autosave will be deactivated during fhem-restart if a answerReading is converted - use save!
-# MH 292306xx  move KNX_scan Function to KNXIO-Module - update both KNXIO and KNX-Module !!!
+# MH 20230615  move KNX_scan Function to KNXIO-Module - update both KNXIO and KNX-Module !!!
 #              update cmd-ref
+# MH 202307xx  cleanup, add events chapter to cmd-ref
+#              moved KNX_scan function to KNX-Module, KNX_scan cmdline cmd into new Module 98_KNX_scan.pm
 #
 # todo         replace cascading if..elsif with given
 # todo-9/2023  final removal of attr answerReading conversion
@@ -179,7 +181,7 @@ BEGIN {
           CommandDefMod CommandModify CommandDelete CommandAttr CommandDeleteAttr CommandDeleteReading
           defs modules attr cmds
           perlSyntaxCheck
-          FW_detail FW_wname FW_directNotify
+          FW_detail FW_wname FW_room FW_directNotify
           readingFnAttributes
           InternalTimer RemoveInternalTimer
           GetTimeSpec
@@ -477,9 +479,11 @@ sub KNX_Define {
 	KNX_Log ($name, 5, join (q{ }, @a));
 
 	#too less arguments or no valid 1st gad
-	return (qq{KNX_define: wrong syntax or wrong group-format (0-31/0-7/0-255)\n} . 
-               qq{  "define $name KNX <group:model[:GAD-name][:set|get|listenonly][:nosuffix]> } .
-               q{[<group:model[:GAD-name][:set|get|listenonly][:nosuffix]>]"}) if (int(@a) < 3 || $a[2] !~ m/^(?:$PAT_GAD|$PAT_GAD_HEX)/ixms);
+	if (int(@a) < 3 || $a[2] !~ m/^(?:$PAT_GAD|$PAT_GAD_HEX)/ixms) {
+		return (qq{KNX_define: wrong syntax or wrong group-format (0-31/0-7/0-255)\n} . 
+		       qq{  "define $name KNX <group:model[:GAD-name][:set|get|listenonly][:nosuffix]> } .
+		       q{[<group:model[:GAD-name][:set|get|listenonly][:nosuffix]>]"});
+	}
 
 	$hash->{'.DEFLINE'} = join(q{ },@a); # temp store defs for define2...
 	return InternalTimer(gettimeofday() + 3.0,\&KNX_Define2,$hash) if (! $init_done);
@@ -552,8 +556,8 @@ sub KNX_Define2 {
 		}
 
 		if (scalar(@gadArgs)) {
-			$gadNoSuffix = pop(@gadArgs) if ($gadArgs[-1] =~ /$PAT_GAD_SUFFIX/ixms);
-			$gadOption   = pop(@gadArgs) if (@gadArgs && $gadArgs[-1] =~ /^($PAT_GAD_OPTIONS)$/ixms);
+			$gadNoSuffix = lc(pop(@gadArgs)) if ($gadArgs[-1] =~ /$PAT_GAD_SUFFIX/ixms);
+			$gadOption   = lc(pop(@gadArgs)) if (@gadArgs && $gadArgs[-1] =~ /^($PAT_GAD_OPTIONS)$/ixms);
 			$gadName     = pop(@gadArgs) if (@gadArgs);
 
 			if ($gadName =~ /^$PAT_GAD_NONAME$/ixms) {
@@ -582,7 +586,7 @@ sub KNX_Define2 {
 		}
 
 		KNX_Log ($name, 5, qq{found GAD: $gad NAME: $gadName NO: $gadNo HEX: $gadCode DPT: $gadModel} .
-                    qq{ OPTION: $gadOption}) if (defined ($gadOption));
+		        qq{ OPTION: $gadOption}) if (defined ($gadOption));
 
 		#determine dpt-details
 		my $dptDetails = $dpttypes{$gadModel};
@@ -605,7 +609,7 @@ sub KNX_Define2 {
 		
 		#add details to hash
 		$hash->{GADDETAILS}->{$gadName} = {CODE => $gadCode, MODEL => $gadModel, NO => $gadNo, OPTION => $gadOption,
-                                                   RDNAMEGET => $rdNameGet, RDNAMESET => $rdNameSet, SETLIST => $setlist};
+		                                   RDNAMEGET => $rdNameGet, RDNAMESET => $rdNameSet, SETLIST => $setlist};
 
 		# add gadcode->hash to module DEFPTR - used to find devicename during parse
 		push (@{$modules{KNX}->{defptr}->{$gadCode}}, $hash);
@@ -653,7 +657,9 @@ sub KNX_Get {
 	my $gadName = shift // KNX_gadNameByNO($hash,1); # use first defined GAD if no argument is supplied
 	
 	return qq{KNX_Get ($name): gadName not defined} if (! defined($gadName));
-	KNX_Log ($name, 3, q{too much arguments. Only one argument allowed (gadName). Other Arguments are discarded.}) if (defined(shift));
+	if (defined(shift)) {
+		KNX_Log ($name, 3, q{too much arguments. Only one argument allowed (gadName). Other Arguments are discarded.});
+	}
 
 	#FHEM asks with a ? at startup - no action, no log - if dev is disabled: no SET/GET pulldown !
 	if ($gadName  =~ m/\?/xms) {
@@ -661,7 +667,7 @@ sub KNX_Get {
 		foreach my $key (keys %{$hash->{GADDETAILS}}) {
 			last if (! defined($key));
 			my $option = $hash->{GADDETAILS}->{$key}->{OPTION};
-			next if (defined($option) && $option =~ /(?:set|listenonly)/ixms);
+			next if (defined($option) && $option =~ /(?:set|listenonly)/xms);
 			$getter .= q{ } . $key . ':noArg';
 		}
 		$getter =~ s/^\s+//gixms; #trim leading blank
@@ -681,14 +687,18 @@ sub KNX_Get {
 	my $option = $hash->{GADDETAILS}->{$gadName}->{OPTION};
 
 	#exit if get is prohibited
-	return qq{KNX_Get ($name): did not request a value - "set" or "listenonly" option is defined.} if (defined ($option) && ($option =~ m/(?:set|listenonly)/ixms));
+	if (defined ($option) && ($option =~ m/(?:set|listenonly)/xms)) {
+		return qq{KNX_Get ($name): did not request a value - "set" or "listenonly" option is defined.};
+	}
 
 	KNX_Log ($name, 5, qq{request value for GAD: $group GAD-NAME: $gadName});
 
 	IOWrite($hash, $KNXID, 'r' . $groupc); #send read-request to the bus
 
-	FW_directNotify('#FHEMWEB:' . $FW_wname, 'FW_errmsg(" value for ' . $name . ' - ' . $group . ' requested",5000)', qq{}) if (defined($FW_wname));
-
+	if (defined($FW_wname)) {
+		FW_directNotify('#FHEMWEB:' . $FW_wname, 'FW_errmsg(" value for ' . $name . ' - ' . $group . ' requested",5000)', qq{});
+#		FW_directNotify($FW_cname, 'FW_errmsg(" value for ' . $name . ' - ' . $group . ' requested",5000)', qq{});
+	}
 	return;
 }
 
@@ -729,7 +739,9 @@ sub KNX_Set {
 	my $rdName    = $hash->{GADDETAILS}->{$targetGadName}->{RDNAMESET};
 	my $model     = $hash->{GADDETAILS}->{$targetGadName}->{MODEL}; 
 
-	return $name . q{ did not set a value - "get" or "listenonly" option is defined.} if (defined ($option) && ($option =~ m/(?:get|listenonly)/ixms));
+	if (defined ($option) && ($option =~ m/(?:get|listenonly)/xms)) {
+		return $name . q{ did not set a value - "get" or "listenonly" option is defined.};
+	}
 
 	my $value = $cmd; #process set command with $value as output
 	#Text neads special treatment - additional args may be blanked words
@@ -885,7 +897,7 @@ sub KNX_Set_dpt1 {
 		}
 
 		KNX_Log ($name, 3, qq{current value for "set $name $targetGadName TOGGLE" is not "on" or "off" - } . 
-                                qq{$targetGadName will be switched off}) if ($toggleOldVal !~ /^(?:on|off)/ixms);
+		        qq{$targetGadName will be switched off}) if ($toggleOldVal !~ /^(?:on|off)/ixms);
 		$value = q{on} if ($toggleOldVal =~ m/^off/ixms); # value off is default
 	}
 	#blink - implemented with timer & toggle
@@ -1410,7 +1422,7 @@ sub KNX_encodeByDpt {
 	if (ref($dpttypes{$code}->{ENC}) eq 'CODE') {
 		my $hexval = $dpttypes{$code}->{ENC}->($lvalue, $model);
 		KNX_Log ($name, 5, qq{gadName= $gadName model= $model } .
-                                qq{in-Value= $value out-Value= $lvalue out-ValueHex= $hexval});
+		        qq{in-Value= $value out-Value= $lvalue out-ValueHex= $hexval});
 		return $hexval;
 	}
 	else {
@@ -1435,7 +1447,7 @@ sub KNX_decodeByDpt {
 	if (ref($dpttypes{$code}->{DEC}) eq 'CODE') {
 		my $state = $dpttypes{$code}->{DEC}->($value, $model, $hash);
 		KNX_Log ($name, 5, qq{gadName= $gadName model= $model code= $code value= $value length-value= } . 
-                                length($value) . qq{ state= $state});
+		        length($value) . qq{ state= $state});
 		return $state;
 	}
 	else {
@@ -1864,6 +1876,82 @@ sub KNX_Log {
 	return;
 }
 
+##############################################
+########## public utility functions ##########
+# FHEM cmd-line cmd is handled by 98_KNX_scan.pm
+#
+### get state of devices from KNX_Hardware
+# called with devspec as argument
+# e.g : KNX_scan() / KNX_scan('device1') / KNX_scan('device1,dev2,dev3,...') / KNX_scan('room=Kueche'), ...
+# returns number of "gets" executed
+sub main::KNX_scan {
+	my $devs = shift;
+
+	$devs = 'TYPE=KNX' if (! defined($devs) || $devs eq q{}); # select all if nothing defined
+
+	if (! $init_done) { # avoid scan before init complete
+		Log3 (undef, 2,'KNX_scan command rejected during FHEM-startup!');
+		return 0;
+	}
+
+	my @devlist = devspec2array($devs);
+
+	my $i = 0; #counter devices
+	my $j = 0; #counter devices with get
+	my $k = 0; #counter total get's
+	my $getsarr = q{};
+
+	foreach my $knxdef (@devlist) {
+		next unless $knxdef;
+		next if($knxdef eq $devs && !$defs{$knxdef});
+		my $devhash = $defs{$knxdef};
+		next if ((! defined($devhash)) || ($devhash->{TYPE} ne 'KNX'));
+
+		#check if IO-device is ready
+		my $iodev = $devhash->{IODev}->{NAME};
+		next if (! defined($iodev));
+#		next if ($defs{$iodev}->{STATE} ne 'connected'); # yes:KNXIO/FHEM2FHEM no:TUL/KNXTUL
+		if ($defs{$iodev}->{TYPE} =~ /(?:KNXIO|FHEM2FHEM)/xms) {
+#		next if ($defs{$iodev}->{STATE} ne 'connected' && $defs{$iodev}->{TYPE} =~ /(?:KNXIO|FHEM2FHEM)/xms); # yes:KNXIO/FHEM2FHEM, dont care:TUL/KNXTUL
+			next if ($defs{$iodev}->{STATE} ne 'connected'); 
+		} 
+		else { # all other IO-devs...
+			next if ($defs{$iodev}->{STATE} !~ /(?:initialized|opened|connected)/ixms);
+		}
+
+		$i++;
+		my $k0 = $k; #save previous number of get's
+		foreach my $key (keys %{$devhash->{GADDETAILS}}) {
+			last if (! defined($key));
+			next if($devhash->{GADDETAILS}->{$key}->{MODEL} eq $MODELERR);
+			my $option = $devhash->{GADDETAILS}->{$key}->{OPTION};
+			next if (defined($option) && $option =~ /(?:set|listenonly)/ixms);
+			$k++;
+			$getsarr .= $knxdef . q{ } . $key . q{,};
+		}
+		$j++ if ($k > $k0);
+	}
+	Log3 (undef, 3, qq{KNX_scan: $i devices selected (regex= $devs) / $j devices with get / $k "gets" executing...});
+	doKNX_scan($getsarr) if ($k > 0);
+	return $k;
+}
+
+### issue all get cmd's - each one delayed by InternalTimer
+sub doKNX_scan {
+	my ($devgad, $arr) = split(/,/xms,shift,2);
+
+	my ($name, $gadName) = split(/[\s]/xms,$devgad);
+	KNX_Get ($defs{$name}, $name, $gadName);
+
+	if (defined($arr) && $arr ne q{}) {
+		my $count = split(/,/xms,$arr); # number of remainig pairs
+		my $delay = ($count % 10 == 0)?2:0.2; # extra delay on each 10th request
+		return InternalTimer(gettimeofday() + $delay,\&doKNX_scan,$arr); # does not support array-> use string...
+	}
+	Log3 (undef, 3, q{KNX_scan: finished});
+	return;
+}
+
 
 1;
 
@@ -1942,7 +2030,8 @@ The reading &lt;state&gt; will be updated with the last sent or received value.&
 </li>
 
 <li><a id="KNX-define"></a><strong>Define</strong><br/>
-<p><code>define &lt;name&gt; KNX &lt;group&gt;&colon;&lt;dpt&gt;[&colon;[&lt;gadName&gt;]&colon;[set|get|listenonly]&colon;[nosuffix]] [&lt;group&gt;&colon;&lt;dpt&gt; ..] <del>[IODev]</del></code></p>
+<p><code>define &lt;name&gt; KNX &lt;group&gt;&colon;&lt;dpt&gt;[&colon;[&lt;gadName&gt;]&colon;[set|get|listenonly]&colon;[nosuffix]]
+ [&lt;group&gt;&colon;&lt;dpt&gt; ..] <del>[IODev]</del></code></p>
 <p><strong>Important&colon; a KNX device needs at least one&nbsp;valid DPT.</strong> Please refer to <a href="#KNX-dpt">avaliable DPT</a>.
  Otherwise the system cannot en- or decode messages.<br/>
 <strong>Devices defined by autocreate have to be reworked with the suitable dpt and the disable attribute deleted.
@@ -2000,7 +2089,9 @@ Examples&colon;
  A running timer-function will be cancelled if a new set cmd (on,off,on-for-,....) for this GAD is issued.<br/>  
  For all other dpt1.&lt;xxx&gt; the min- and max-values can be used for en- and decoding alternatively to on/off.<br/>
  All DPTs&colon; allowed values or range of values are specified here&colon; <a href="#KNX-dpt">KNX-dpt</a><br/> 
- After successful sending, the value is stored in readings &lt;setName&gt; and state.</p>
+ After successful sending, the value is stored in readings &lt;setName&gt; and state.<br>
+ Do not use wildcards for &lt;deviceName&gt;, the KNX-GW/Bus might be not perfomant enough to handle that. 
+</p>
 <pre>
 Examples&colon;
 <code>   set lamp2 on  # gadName omitted
@@ -2024,8 +2115,11 @@ Examples&colon;
 <li><a id="KNX-get"></a><strong>Get</strong><br/>
 <p>If you execute "get" for a KNX-Element the status will be requested from the device. The device has to be able to respond to a read -
  this might not be supported by the target KNX-device.<br/> 
-If the GAD is restricted in the definition with "set" or "listenonly", the execution will be refused.<br/> 
-The answer from the bus-device updates the readings &lt;getName&gt; and state.</p>
+ If the GAD is restricted in the definition with "set" or "listenonly", the execution will be refused.<br/> 
+ The answer from the bus-device updates the readings &lt;getName&gt; and state.<br>
+ Do not use wildcards for &lt;deviceName&gt;, the KNX-GW/Bus might be not perfomant enough to handle that,
+ use <a href="#KNX-utilities">KNX_scan</a> cmd instead.
+</p>
 </li>
 
 <li><a id="KNX-attr"></a><strong>Common attributes</strong><br/>
@@ -2067,7 +2161,8 @@ The answer from the bus-device updates the readings &lt;getName&gt; and state.</
 <ul>
 <!--<li><a id="KNX-attr-answerReading"></a>answerReading<br/>
   If enabled, FHEM answers on read requests. The content of reading state is sent to the bus as answer. 
-  If defined, the content of the reading &lt;putName&gt; is used as value for the answer. This attribute has no effect if the putCmd attribute is set!<br/>
+  If defined, the content of the reading &lt;putName&gt; is used as value for the answer.
+  This attribute has no effect if the putCmd attribute is set!<br/>
   <b>This attribute (and reading &lt;putName&gt;) will be deprecated soon,</b> as replacement you can use the Attribute <b>putCmd</b>.
 <br/></li>
 -->
@@ -2144,6 +2239,14 @@ Examples&colon;
 <br/></li>
 </ul>
 <br/></li>
+
+<li><a id="KNX-events"></a><strong>Events</strong><br/>
+  <p>Events are generated for each reading sent or received to/from KNX-Bus unless restricted by <code>event-xxx</code> attributes
+  or modified by <code>eventMap, stateRegex</code> attributes.
+  KNX-events have this format&colon;</p>
+  <pre>   <code>&lt;device&gt; &lt;readingName&gt;&colon; &ltvalue&gt; # reading event
+   &lt;device&gt; &lt;value&gt;                # state event</code></pre>
+</li>
 
 <li><a id="KNX-dpt"></a><strong>DPT - data-point-types</strong><br/>
 <p>The following dpt are implemented and have to be assigned within the device definition. 
@@ -2263,7 +2366,7 @@ Examples&colon;
 </ol>
 <br/></li>
 
-<li><a id="KNX-utilities"></a><strong>KNX Utility Functions</strong><br/>
+<li><a id="KNX-utilities"></a><strong>KNX Utility Functions</strong><br/>&nbsp;
 <ul>
 <li><b>KNX_scan</b> Function to be called from scripts or FHEM cmdline. 
 <br/>Selects all KNX-definitions (specified by the argument) that support a "get" from the device. 
@@ -2273,8 +2376,7 @@ The command is supported <b>only</b> if the IO-device is of TYPE KNXIO!
 <br/>Useful after a fhem-start to syncronize the readings with the status of the KNX-device.
 <br/>The "get" cmds are scheduled asynchronous, with a delay of 200ms between each get. (avoid overloading KNX-bus) 
 If called as perl-function, returns number of "get" cmds issued.
-<pre>
-Examples&colon;
+<pre>Examples&colon;
 <code>syntax when used as perl-function (eg. in at, notify,...)
    KNX_scan()                    - scan all possible devices
    KNX_scan('dev-A')             - scan device-A only
