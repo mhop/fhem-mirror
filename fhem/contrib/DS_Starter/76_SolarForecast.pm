@@ -3694,7 +3694,7 @@ sub centralTask {
   }
   
   my $uac = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');
-  if ($uac eq 'on') {
+  if ($uac eq 'on' && $hash->{MODEL}) {
       if ($hash->{MODEL} eq 'DWD') {
           readingsSingleUpdate ($hash, 'pvCorrectionFactor_Auto', 'on_complex', 0);
       }
@@ -5799,7 +5799,7 @@ sub __setConsRcmdState {
   my $rescons  = isConsumerPhysOn($hash, $c) ? 0 : $nompower;                             # resultierender Verbauch nach Einschaltung Consumer
 
   if (!$nompower || $surplus - $rescons > 0) {
-      $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 1;                   # Einschalten des Consumers günstig
+      $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 1;                   # Einschalten des Consumers günstig bzw. Freigabe für "on" von Überschußseite erteilt
   }
   else {
       $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 0;
@@ -5863,8 +5863,8 @@ sub ___switchConsumerOn {
   
   if ($debug =~ /consumerSwitching/x) {                                                           # nur für Debugging
       my $cons   = CurrentVal  ($hash, 'consumption',  0);
-      my $nompow = ConsumerVal ($hash, $c, 'power', '-');
-      my $sp     = CurrentVal  ($hash, 'surplus',  0);
+      my $nompow = ConsumerVal ($hash, $c, 'power',  '-');
+      my $sp     = CurrentVal  ($hash, 'surplus',      0);
 
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - general switching parameters => }.
                       qq{auto mode: $auto, current Consumption: $cons W, nompower: $nompow, surplus: $sp W, }.
@@ -5890,7 +5890,7 @@ sub ___switchConsumerOn {
 
         delete $paref->{ps};
       }
-      elsif ($mode eq "must" || isConsRcmd($hash, $c)) {                                          # "Muss"-Planung oder Überschuß > Leistungsaufnahme
+      elsif ($mode eq "must" || isConsRcmd($hash, $c)) {                                          # "Muss"-Planung oder Überschuß > Leistungsaufnahme (can)
           CommandSet(undef,"$cname $oncom");
           #my $stopdiff = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
 
@@ -5907,7 +5907,7 @@ sub ___switchConsumerOn {
           Log3 ($name, 2, "$name - $state (Automatic = $auto)");
       }
   }
-  elsif (((isInterruptable($hash, $c) == 1 && isConsRcmd ($hash, $c)) ||                          # unterbrochenen Consumer fortsetzen
+  elsif (((isInterruptable($hash, $c) == 1 && isConsRcmd ($hash, $c))     ||                       # unterbrochenen Consumer fortsetzen
           (isInterruptable($hash, $c) == 3 && isConsRcmd ($hash, $c)))    &&
          isInTimeframe    ($hash, $c)                                     &&
          simplifyCstate   ($pstate) =~ /interrupted|interrupting/xs       &&
@@ -12802,26 +12802,28 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         <br><br>
 
         Der Schlüssel <b>power</b> gibt die nominale Leistungsaufnahme des Verbrauchers gemäß seines Datenblattes an.
-        Dieser Wert wird verwendet um das Schalten des Verbrauchers in Abhängigkeit des aktuellen PV-Überschusses zu
-        steuern. Ist <b>power=0</b> gesetzt, wird der Verbraucher unabhängig von einem ausreichenden PV-Überschuß geschaltet.
+        Dieser Wert wird verwendet um die Schaltzeiten des Verbrauchers zu planen und das Schalten in Abhängigkeit 
+        des tatsächlichen PV-Überschusses zum Einplanungszeitpunkt zu steuern. 
+        Ist <b>power=0</b> gesetzt, wird der Verbraucher unabhängig von einem ausreichend vorhandenem PV-Überschuß 
+        wie eingeplant geschaltet.
         <br><br>
 
          <ul>
          <table>
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
             <tr><td> <b>type</b>           </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                                             </td></tr>
-            <tr><td>                       </td><td><b>dishwasher</b>     - Verbaucher ist eine Spülmaschine                                                                                       </td></tr>
-            <tr><td>                       </td><td><b>dryer</b>          - Verbaucher ist ein Wäschetrockner                                                                                      </td></tr>
-            <tr><td>                       </td><td><b>washingmachine</b> - Verbaucher ist eine Waschmaschine                                                                                      </td></tr>
-            <tr><td>                       </td><td><b>heater</b>         - Verbaucher ist ein Heizstab                                                                                            </td></tr>
-            <tr><td>                       </td><td><b>charger</b>        - Verbaucher ist eine Ladeeinrichtung (Akku, Auto, Fahrrad, etc.)                                                        </td></tr>
+            <tr><td>                       </td><td><b>dishwasher</b>     - Verbraucher ist eine Spülmaschine                                                                                      </td></tr>
+            <tr><td>                       </td><td><b>dryer</b>          - Verbraucher ist ein Wäschetrockner                                                                                     </td></tr>
+            <tr><td>                       </td><td><b>washingmachine</b> - Verbraucher ist eine Waschmaschine                                                                                     </td></tr>
+            <tr><td>                       </td><td><b>heater</b>         - Verbraucher ist ein Heizstab                                                                                           </td></tr>
+            <tr><td>                       </td><td><b>charger</b>        - Verbraucher ist eine Ladeeinrichtung (Akku, Auto, Fahrrad, etc.)                                                       </td></tr>
             <tr><td>                       </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                                          </td></tr>
             <tr><td> <b>power</b>          </td><td>nominale Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                                            </td></tr>
             <tr><td>                       </td><td>(kann auf "0" gesetzt werden)                                                                                                                  </td></tr>
             <tr><td> <b>mode</b>           </td><td>Planungsmodus des Verbrauchers (optional). Erlaubt sind:                                                                                       </td></tr>
             <tr><td>                       </td><td><b>can</b>  - Die Einplanung erfolgt zum Zeitpunkt mit wahrscheinlich genügend verfügbaren PV Überschuß (default)                              </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers zum Planungszeitpunkt unterbleibt bei ungenügendem PV-Überschuß.   </td></tr>
-            <tr><td>                       </td><td><b>must</b> - der Verbaucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird                </td></tr>
+            <tr><td>                       </td><td><b>must</b> - der Verbraucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird               </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß.            </td></tr>
             <tr><td> <b>icon</b>           </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                                       </td></tr>
             <tr><td> <b>mintime</b>        </td><td>Einplanungsdauer (Minuten oder "SunPath") des Verbrauchers. (optional)                                                                         </td></tr>
@@ -12842,7 +12844,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>on</b>             </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                                       </td></tr>
             <tr><td> <b>off</b>            </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                                       </td></tr>
-            <tr><td> <b>swstate</b>        </td><td>Reading welches den Schaltzustand des Consumers anzeigt (default: 'state').                                                                    </td></tr>
+            <tr><td> <b>swstate</b>        </td><td>Reading welches den Schaltzustand des Verbrauchers anzeigt (default: 'state').                                                                 </td></tr>
             <tr><td>                       </td><td><b>on-Regex</b> - regulärer Ausdruck für den Zustand 'ein' (default: 'on')                                                                     </td></tr>
             <tr><td>                       </td><td><b>off-Regex</b> - regulärer Ausdruck für den Zustand 'aus' (default: 'off')                                                                   </td></tr>
             <tr><td> <b>asynchron</b>      </td><td>die Art der Schaltstatus Ermittlung im Verbraucher Device. Die Statusermittlung des Verbrauchers nach einem Schaltbefehl erfolgt nur           </td></tr>
@@ -12857,7 +12859,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>:&lt;Schwellenwert&gt (W) - aktuelle Leistung ab welcher der Verbraucher als aktiv gewertet wird.                                              </td></tr>
             <tr><td> <b>etotal</b>         </td><td>Reading:Einheit (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert (optional)                                    </td></tr>
             <tr><td>                       </td><td>:&lt;Schwellenwert&gt (Wh) - Energieverbrauch pro Stunde ab dem der Verbrauch als gültig gewertet wird.                                        </td></tr>
-            <tr><td> <b>swoncond</b>       </td><td>zusätzliche Bedingung die erfüllt sein muß um den Verbraucher einzuschalten (optional). Der geplante Zyklus wird gestartet.                    </td></tr>
+            <tr><td> <b>swoncond</b>       </td><td>Bedingung die zusätzlich erfüllt sein muß um den Verbraucher einzuschalten (optional). Der geplante Zyklus wird gestartet.                     </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der zusätzlichen Einschaltbedingung                                                                       </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der zusätzlichen Einschaltbedingung                                                                     </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für die Einschaltbedingung erfüllt sein muß                                                              </td></tr>
