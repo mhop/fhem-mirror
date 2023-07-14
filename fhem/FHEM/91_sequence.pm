@@ -86,7 +86,7 @@ sequence_Notify($$)
     my $s = $events->[$i];
     $s = "" if(!defined($s));
     if($n !~ m/^$re$/ && "$n:$s" !~ m/^$re$/) {
-      next if(!$strictSequence && $hash->{IDX});
+      next if(!$strictSequence || !$hash->{IDX});
       RemoveInternalTimer($ln);
       sequence_Trigger($ln, "abort-strict");
       return "";
