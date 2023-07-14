@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-07-13 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-07-14 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,19 +136,20 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.80.10"=> "13.07.2023  ccc ",
+  "0.80.11"=> "14.07.2023  minor fixes and improvements ",
+  "0.80.10"=> "13.07.2023  new key spignorecond in consumer attributes ",
   "0.80.9" => "13.07.2023  new method of prediction quality calculation -> sub __calcFcQuality, minor bug fixes ",
   "0.80.8" => "12.07.2023  store battery values initdaybatintot, initdaybatouttot, batintot, batouttot in circular hash ".
                            "new Attr ctrlStatisticReadings parameter todayBatIn, todayBatOut ",
   "0.80.7" => "10.07.2023  Model SolCastAPI: retrieve forecast data of 72h (old 48), create statistic reading dayAfterTomorrowPVforecast if possible ",
   "0.80.6" => "09.07.2023  get ... html has some possible arguments now ",
-  "0.80.5" => "07.07.2023  calculate _calcCaQcloudcover, _calcCaQsimple both at every time, change setter pvCorrectionFactor_Auto: on_simple, on_complex, off ",
+  "0.80.5" => "07.07.2023  calculate _calcCaQcomplex, _calcCaQsimple both at every time, change setter pvCorrectionFactor_Auto: on_simple, on_complex, off ",
   "0.80.4" => "06.07.2023  new transferprocess for DWD data from solcastapi-Hash to estimate calculation, consolidated ".
                            "the autocorrection model ",
   "0.80.3" => "03.06.2023  preparation for get DWD radiation data to solcastapi-Hash, fix sub isConsumerLogOn (use powerthreshold) ",
   "0.80.2" => "02.06.2023  new ctrlDebug keys epiecesCalc, change selfconsumption with graphic Adjustment, moduleDirection ".
                            "accepts azimut values -180 .. 0 .. 180 as well as azimut identifier (S, SE ..) ",
-  "0.80.1" => "31.05.2023  adapt _calcCaQsimple to calculate corrfactor like _calcCaQcloudcover ",
+  "0.80.1" => "31.05.2023  adapt _calcCaQsimple to calculate corrfactor like _calcCaQcomplex ",
   "0.80.0" => "28.05.2023  Support for Forecast.Solar-API (https://doc.forecast.solar/api), rename Getter solCastData to solApiData ".
                            "rename ctrlDebug keys: solcastProcess -> apiProcess, solcastAPIcall -> apiCall ".
                            "calculate cloudiness correction factors proactively and store it in circular hash ".
@@ -3771,7 +3772,7 @@ sub centralTask {
           day     => $day,
           dayname => $dayname,
           debug   => $debug,
-          lang    => AttrVal ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang)),
+          lang    => getLang ($hash),
           state   => 'running',
           evt     => 0,
           daref   => \@da
@@ -4457,12 +4458,12 @@ return $pvsum;
 
 ######################################################################
 #  Complex:
-#  Liest den bewölkungsabhängigen Korrekturfaktor/Qualität und 
-#  speichert die Werte im Nexthours / PVhistory Hash
+#  Liest bewölkungsabhängige Korrekturfaktor/Qualität und 
+#  speichert die Werte im Nexthours / pvHistory Hash
 #
 #  Simple:
-#  Liest den Korrekturfaktor/Qualität aus pvCircular percentile und
-#  speichert die Werte im Nexthours / PVhistory Hash
+#  Liest Korrekturfaktor/Qualität aus pvCircular percentile und
+#  speichert die Werte im Nexthours / pvHistory Hash
 ######################################################################
 sub ___readCorrf {
   my $paref = shift;
@@ -9199,8 +9200,8 @@ sub calcCorrAndQuality {
 
   $paref->{acu} = $acu;
   
-  _calcCaQcloudcover ($paref);                                               # Korrekturberechnung mit Bewölkung immer! duchführen/speichern
-  _calcCaQsimple     ($paref);                                               # einfache Korrekturberechnung immer! duchführen/speichern
+  _calcCaQcomplex ($paref);                                               # Korrekturberechnung mit Bewölkung immer! duchführen/speichern
+  _calcCaQsimple  ($paref);                                               # einfache Korrekturberechnung immer! duchführen/speichern
   
   delete $paref->{acu};
 
@@ -9211,7 +9212,7 @@ return;
 # PV Ist/Forecast ermitteln und Korrekturfaktoren, Qualität 
 # in Abhängigkeit Bewölkung errechnen und speichern (komplex)
 ################################################################
-sub _calcCaQcloudcover {
+sub _calcCaQcomplex {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -9229,7 +9230,7 @@ sub _calcCaQcloudcover {
       
       if ($cccalc eq "done") {
           #if($debug =~ /pvCorrection/x && $acu eq 'on_complex') {
-          #    Log3 ($name, 1, "$name DEBUG> Cloudcover Corrf -> factor Hour: ".sprintf("%02d",$h)." already calculated");
+          #    Log3 ($name, 1, "$name DEBUG> Complex Corrf -> factor Hour: ".sprintf("%02d",$h)." already calculated");
           #}
           next;
       }
@@ -9241,7 +9242,7 @@ sub _calcCaQcloudcover {
       next if(!$pvre);
 
       $paref->{hour}                  = $h;
-      my ($pvhis,$fchis,$dnum,$range) = __Pv_Fc_Ccover_Dnum_Hist ($paref);                                # historische PV / Forecast Vergleichswerte ermitteln
+      my ($pvhis,$fchis,$dnum,$range) = __Pv_Fc_Complex_Dnum_Hist ($paref);                               # historische PV / Forecast Vergleichswerte ermitteln
 
       my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), $range, 0);                   # bisher definierter Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
       $oldfac             = 1 if(1 * $oldfac == 0);
@@ -9256,7 +9257,7 @@ sub _calcCaQcloudcover {
           $factor = sprintf "%.2f", ($pvre / $pvfc);                                                      # Faktorberechnung: reale PV / Prognose
       }
       elsif ($oldfac && !$usenhd) {                                                                       # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr affectNumHistDays
-          $dnum   = $oldq + 1;
+          $dnum   = 1;
           $factor = sprintf "%.2f", ($pvre / $pvfc);
           $factor = sprintf "%.2f", ($factor + $oldfac) / 2;
       }
@@ -9273,15 +9274,20 @@ sub _calcCaQcloudcover {
           Log3 ($name, 3, "$name - new correction factor calculated: $factor (old: $oldfac) for hour: $h calculated") if($factor != $oldfac);
       }
       
-      debugLog ($paref, 'pvCorrection', "Cloudcover Corrf -> cloudiness range: $range, hour: $h, days: $dnum, real: $pvre, forecast: $pvfc, factor: $factor");
-
+      $pvre = sprintf "%.0f", $pvre;
+      $pvfc = sprintf "%.0f", $pvfc; 
+      
+      debugLog ($paref, 'pvCorrection', "Complex Corrf -> determined values - hour: $h, cloudiness range: $range, average forecast: $pvfc, average real: $pvre, old corrf: $oldfac, new corrf: $factor, days: $dnum");
+                                                             
       if (defined $range) {
           my $type = $paref->{type};
+                  
+          my $qual = __calcFcQuality ($pvfc, $pvre);                                                               # Qualität der Vorhersage für die vergangene Stunde
 
-          debugLog ($paref, 'saveData2Cache', "Cloudcover Corrf -> write Complex correction factor into Circular: Factor $factor, Hour $h, Range $range");
+          debugLog ($paref, 'pvCorrection|saveData2Cache', "Complex Corrf -> write range correction values into Circular: hour: $h, cloudiness range: $range, factor: $factor, quality: $qual");
 
           $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$range} = $factor;                            # Korrekturfaktor für Bewölkung der jeweiligen Stunde als Datenquelle eintragen
-          $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{$range} = __calcFcQuality ($pvfc, $pvre);     # Qualität der Vorhersage für die vergangene Stunde
+          $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{$range} = $qual;
       
           push @$daref, ".pvCorrectionFactor_".sprintf("%02d",$h)."_cloudcover<>done";
       }
@@ -9303,7 +9309,7 @@ return;
 #   unter Berücksichtigung der maximal zu nutzenden Tage
 #   und der relevanten Bewölkung
 ################################################################
-sub __Pv_Fc_Ccover_Dnum_Hist {
+sub __Pv_Fc_Complex_Dnum_Hist {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -9335,21 +9341,21 @@ sub __Pv_Fc_Ccover_Dnum_Hist {
   my $chwcc = HistoryVal ($hash, $day, $hour, "wcc", undef);                           # Wolkenbedeckung Heute & abgefragte Stunde
 
   if(!defined $chwcc) {
-      debugLog ($paref, 'pvCorrection', "Cloudcover Corrf -> Day $day has no cloudiness value set for hour $hour, no past averages can be calculated");
+      debugLog ($paref, 'pvCorrection', "Complex Corrf -> Day $day has no cloudiness value set for hour $hour, no past averages can be calculated");
       return;
   }
 
   my $range = calcRange ($chwcc);                                              
 
   if(scalar(@efa)) {
-      debugLog ($paref, 'pvCorrection', "Cloudcover Corrf -> Raw Days ($calcd) for average check: ".join " ",@efa);
+      debugLog ($paref, 'pvCorrection', "Complex Corrf -> Raw Days ($calcd) for average check: ".join " ",@efa);
   }
   else {                                                                               
-      debugLog ($paref, 'pvCorrection', "Cloudcover Corrf -> Day $day has index $idx. Use only current day for average calc");
+      debugLog ($paref, 'pvCorrection', "Complex Corrf -> Day $day has index $idx. Use only current day for average calc");
       return (undef,undef,undef,$range);
   }
 
-  debugLog ($paref, 'pvCorrection', "Cloudcover Corrf -> cloudiness range of day/hour $day/$hour is: $range");
+  debugLog ($paref, 'pvCorrection', "Complex Corrf -> cloudiness range of day/hour $day/$hour is: $range");
 
   my $dnum         = 0;
   my ($pvrl,$pvfc) = (0,0);
@@ -9358,7 +9364,7 @@ sub __Pv_Fc_Ccover_Dnum_Hist {
       my $histwcc = HistoryVal ($hash, $dayfa, $hour, "wcc", undef);                   # historische Wolkenbedeckung
 
       if(!defined $histwcc) {
-          debugLog ($paref, 'pvCorrection', "Cloudcover Corrf -> Day $dayfa has no cloudiness value set for hour $hour, this history dataset is ignored.");
+          debugLog ($paref, 'pvCorrection', "Complex Corrf -> Day $dayfa has no cloudiness value set for hour $hour, this history dataset is ignored.");
           next;
       }
 
@@ -9369,24 +9375,24 @@ sub __Pv_Fc_Ccover_Dnum_Hist {
           $pvfc  += HistoryVal ($hash, $dayfa, $hour, "pvfc", 0);
           $dnum++;
 
-          debugLog ($paref, 'pvCorrection', "Cloudcover Corrf -> historical Day/hour $dayfa/$hour included - cloudiness range: $range");
+          debugLog ($paref, 'pvCorrection', "Complex Corrf -> historical Day/hour $dayfa/$hour included - cloudiness range: $range");
 
           last if( $dnum == $calcd);
       }
       else {
-          debugLog ($paref, 'pvCorrection', "Cloudcover Corrf -> cloudiness range different: $range/$histwcc (current/historical) -> ignore stored $dayfa/$hour (Day/hour)");
+          debugLog ($paref, 'pvCorrection', "Complex Corrf -> cloudiness range different: $range/$histwcc (current/historical) -> ignore stored $dayfa/$hour (Day/hour)");
       }
   }
 
   if(!$dnum) {
-      debugLog ($paref, 'pvCorrection', "Cloudcover Corrf -> all cloudiness ranges were different/not set -> no historical averages calculated");
+      debugLog ($paref, 'pvCorrection', "Complex Corrf -> all cloudiness ranges were different/not set -> no historical averages calculated");
       return (undef,undef,undef,$range);
   }
 
   my $pvhis = sprintf "%.2f", $pvrl;
   my $fchis = sprintf "%.2f", $pvfc;
 
-  debugLog ($paref, 'pvCorrection', "Cloudcover Corrf -> Summary - cloudiness range: $range, days: $dnum, pvHist:$pvhis, fcHist:$fchis");
+  debugLog ($paref, 'pvCorrection', "Complex Corrf -> Summary - cloudiness range: $range, days: $dnum, pvHist:$pvhis, fcHist:$fchis");
       
 return ($pvhis,$fchis,$dnum,$range);
 }
@@ -9444,39 +9450,11 @@ sub _calcCaQsimple {
       next if(!$pvre);
 
       $paref->{hour}           = $h;
-      my ($pvhis,$fchis,$dnum) = __Pv_Fc_Dnum_Hist ($paref);                                               # historischen Percentilfaktor / Qualität ermitteln
+      my ($pvhis,$fchis,$dnum) = __Pv_Fc_Simple_Dnum_Hist ($paref);                                        # historischen Percentilfaktor / Qualität ermitteln
 
       my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), 'percentile', 0);               
       $oldfac             = 1.0 if(1 * $oldfac == 0 || $oldfac >= 10);
-
-      my @sts   = split ",", ReadingsVal($name, 'inverterStrings', '');
-      my $tmstr = $date.' '.sprintf("%02d",$h-1).':00:00';
-
-      my $est50 = 0;
-
-      for my $s (@sts) {
-          $est50 += SolCastAPIVal ($hash, $s, $tmstr, 'pv_estimate50', 0);                                     
-      }
-
-      if(!$est50) {                                                                                            
-          debugLog ($paref, 'pvCorrection', "Simple Corrf -> hour: $h, the correction factor can't be calculated because of no PV forecast");
-          next;
-      }
-
-      my $perc = sprintf "%.2f", ($pvre / $est50);                                                        # berechneter Faktor der Stunde -> speichern in pvHistory
-
-      $paref->{pvcorrf}  = $perc.'/1';                                                                    # Korrekturfaktor / Qualität in History speichern
-      $paref->{nhour}    = sprintf("%02d",$h);
-      $paref->{histname} = "pvcorrfactor";
-
-      setPVhistory ($paref);
-
-      delete $paref->{histname};
-      delete $paref->{nhour};
-      delete $paref->{pvcorrf};
-
-      debugLog ($paref, 'pvCorrection', "Simple Corrf -> PV for hour >$h< -> estimate without corr factor: $est50, real: $pvre");
-
+      
       my $factor;
       my ($usenhd) = __useNumHistDays ($name);                                                            # ist Attr affectNumHistDays gesetzt ?
 
@@ -9487,7 +9465,7 @@ sub _calcCaQsimple {
           $factor = sprintf "%.2f", ($pvre / $pvfc);                                                      # Faktorberechnung: reale PV / Prognose
       }
       elsif ($oldfac && !$usenhd) {                                                                       # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr affectNumHistDays         
-          $dnum   = $oldq + 1;
+          $dnum   = 1;
           $factor = sprintf "%.2f", ($pvre / $pvfc);
           $factor = sprintf "%.2f", ($factor + $oldfac) / 2;
       }
@@ -9505,13 +9483,17 @@ sub _calcCaQsimple {
           Log3 ($name, 3, "$name - new correction factor calculated: $factor (old: $oldfac) for hour: $h calculated") if($factor != $oldfac);
       }
       
-      debugLog ($paref, 'pvCorrection',   "Simple Corrf -> old circular correction: $oldfac, new correction: $factor, number of days for calc: $dnum");
-      debugLog ($paref, 'saveData2Cache', "Simple Corrf -> write Simple correction factor into Circular: $factor, Hour $h");
+      $pvre    = sprintf "%.0f", $pvre;
+      $pvfc    = sprintf "%.0f", $pvfc;
+      my $qual = __calcFcQuality ($pvfc, $pvre);                                                         # Qualität der Vorhersage für die vergangene Stunde
+      
+      debugLog ($paref, 'pvCorrection',                "Simple Corrf -> determined values - average forecast: $pvfc, average real: $pvre, old corrf: $oldfac, new corrf: $factor, days: $dnum");
+      debugLog ($paref, 'pvCorrection|saveData2Cache', "Simple Corrf -> write percentile correction values into Circular - hour: $h, factor: $factor, quality: $qual");
 
       my $type = $paref->{type};
 
-      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{percentile} = $factor;                            # Korrekturfaktor der jeweiligen Stunde als Datenquelle eintragen
-      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{percentile} = __calcFcQuality ($pvfc, $pvre);     # Qualität der Vorhersage für die vergangene Stunde
+      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{percentile} = $factor;                  # Korrekturfaktor der jeweiligen Stunde als Datenquelle eintragen
+      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{percentile} = $qual;
 
       push @$daref, ".pvCorrectionFactor_".sprintf("%02d",$h)."_apipercentil<>done";
             
@@ -9529,7 +9511,7 @@ return;
 #   unter Berücksichtigung der maximal zu nutzenden Tage
 #   OHNE Bewölkung
 ################################################################
-sub __Pv_Fc_Dnum_Hist {
+sub __Pv_Fc_Simple_Dnum_Hist {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -9588,7 +9570,7 @@ sub __Pv_Fc_Dnum_Hist {
   my $pvhis = sprintf "%.2f", $pvrl;
   my $fchis = sprintf "%.2f", $pvfc;
       
-return ($pvhis,$fchis,$dnum);
+return ($pvhis, $fchis, $dnum);
 }
 
 ################################################################
@@ -9600,7 +9582,9 @@ sub __calcFcQuality {
 
   my $diff = $pvfc - $pvre;
   my $hdv  = 1 - sprintf "%.2f", abs ($diff / $pvre);                      # Abweichung der Stunde, 1 = bestmöglicher Wert   
-
+  
+  $hdv = $hdv < 0 ? 0 : $hdv;
+  
 return $hdv;
 }
 
@@ -9857,7 +9841,7 @@ sub listDataPool {
   my $sub = sub {
       my $day = shift;
       my $ret;
-      for my $key (sort{$a<=>$b} keys %{$h->{$day}}) {
+      for my $key (sort {$a<=>$b} keys %{$h->{$day}}) {
           my $pvrl    = HistoryVal ($hash, $day, $key, "pvrl",        "-");
           my $pvfc    = HistoryVal ($hash, $day, $key, "pvfc",        "-");
           my $gcon    = HistoryVal ($hash, $day, $key, "gcons",       "-");
@@ -10013,13 +9997,22 @@ sub listDataPool {
           my $idbotot  = CircularVal ($hash, $idx, "initdaybatouttot", "-");
           my $botot    = CircularVal ($hash, $idx, "batouttot",        "-");
 
+          no warnings 'numeric';
+          
           my $pvcf = qq{};
           if(ref $pvcorrf eq "HASH") {
-              for my $f (sort keys %{$h->{$idx}{pvcorrf}}) {
+              for my $f (sort {$a<=>$b} keys %{$h->{$idx}{pvcorrf}}) {        
+                  next if($f eq 'percentile');
                   $pvcf .= " " if($pvcf);
                   $pvcf .= "$f=".$h->{$idx}{pvcorrf}{$f};
                   my $ct = ($pvcf =~ tr/=// // 0) / 10;
                   $pvcf .= "\n           " if($ct =~ /^([1-9])?$/);
+              }
+              
+              if (defined $h->{$idx}{pvcorrf}{'percentile'}) {
+                  $pvcf .= "\n           " if($pvcf && $pvcf !~ /\n\s+$/xs);
+                  $pvcf .= " "             if($pvcf);
+                  $pvcf .= "percentile=".$h->{$idx}{pvcorrf}{'percentile'};
               }
           }
           else {
@@ -10027,21 +10020,27 @@ sub listDataPool {
           }
 
           my $cfq = qq{};
-          if(ref $quality eq "HASH") {
-              no warnings 'numeric';
-              
+          if(ref $quality eq "HASH") {              
               for my $q (sort {$a<=>$b} keys %{$h->{$idx}{quality}}) {
+                  next if($q eq 'percentile');
                   $cfq   .= " " if($cfq);
                   $cfq   .= "$q=".$h->{$idx}{quality}{$q};
+                  $cfq   .= "\n              " if($q eq 'percentile');
                   my $ct1 = ($cfq =~ tr/=// // 0) / 10;
                   $cfq   .= "\n              " if($ct1 =~ /^([1-9])?$/);
               }
               
-              use warnings;
+              if (defined $h->{$idx}{quality}{'percentile'}) {
+                  $cfq .= "\n              " if($cfq && $cfq !~ /\n\s+$/xs);
+                  $cfq .= " "                if($cfq);
+                  $cfq .= "percentile=".$h->{$idx}{quality}{'percentile'};
+              }
           }
           else {
               $cfq = $quality;
           }
+          
+          use warnings;
 
           $sq .= "\n" if($sq);
 
@@ -11377,6 +11376,19 @@ sub checkRegex {
              };
 
 return;
+}
+
+################################################################
+#  die eingestellte Modulsprache ermitteln
+################################################################
+sub getLang {
+  my $hash = shift;
+  
+  my $name  = $hash->{NAME};
+  my $glang = AttrVal ('global', 'language', $deflang);
+  my $lang  = AttrVal ($name, 'ctrlLanguage', $glang);
+
+return $lang;
 }
 
 ################################################################
@@ -12927,8 +12939,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der vorrangigen Ausschaltbedingung                                                                        </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der vorrangigen Ausschaltbedingung                                                                      </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für eine 'wahre' Bedingung erfüllt sein muß                                                              </td></tr>
-            <tr><td> <b>spignorecond</b>   </td><td>Bedingung um einen PV Überschuß zu ignorieren (optional). Bei erfüllter Bedingung wird der Verbraucher entsprechend der Planung eingeschaltet  </td></tr>
-            <tr><td>                       </td><td>auch wenn zu dem Zeitpunkt kein PV Überschuß vorliegt.                                                                                         </td></tr>
+            <tr><td> <b>spignorecond</b>   </td><td>Bedingung um einen fehlenden PV Überschuß zu ignorieren (optional). Bei erfüllter Bedingung wird der Verbraucher entsprechend                  </td></tr>
+            <tr><td>                       </td><td>der Planung eingeschaltet auch wenn zu dem Zeitpunkt kein PV Überschuß vorliegt.                                                               </td></tr>
             <tr><td>                       </td><td><b>ACHTUNG:</b> Die Verwendung beider Schlüssel <I>spignorecond</I> und <I>interruptable</I> kann zu einem unerwünschten Verhalten führen!     </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der Bedingung                                                                                             </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading welches die Bedingung enthält                                                                                         </td></tr>
