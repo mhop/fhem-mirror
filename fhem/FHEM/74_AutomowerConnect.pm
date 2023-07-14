@@ -378,7 +378,7 @@ __END__
 
     <li><a id='AutomowerConnect-attr-addPollingMinInterval'>addPollingMinInterval</a><br>
       <code>attr &lt;name&gt; addPollingMinInterval &lt;interval in seconds&gt;</code><br>
-      Set minimum intervall for additional polling, default 0 (no polling). Gets periodically statistics data from mower. Make sure to be within API limits (10000 calls per month).</li>
+      Set minimum intervall for additional polling triggered by status-event, default 0 (no polling). Gets periodically statistics data from mower. Make sure to be within API limits (10000 calls per month).</li>
 
     <li><a id='AutomowerConnect-attr-addPositionPolling'>addPositionPolling</a><br>
       <code>attr &lt;name&gt; addPositionPolling &lt;[1|<b>0</b>]&gt;</code><br>
@@ -741,7 +741,7 @@ __END__
 
     <li><a id='AutomowerConnect-attr-addPollingMinInterval'>addPollingMinInterval</a><br>
       <code>attr &lt;name&gt; addPollingMinInterval &lt;interval in seconds&gt;</code><br>
-      Setzt das Mindestintervall für zusätzliches Polling der API, default 0 (kein Polling). Liest periodisch statistische Daten vom Mäher. Es muss sichergestellt werden, das die API Begrenzung (10000 Anfragen pro Monat) eingehalten wird.</li>
+      Setzt das Mindestintervall für zusätzliches Polling der API nach einem status-event, default 0 (kein Polling). Liest periodisch zusätzlich statistische Daten vom Mäher. Es muss sichergestellt werden, das die API Begrenzung (10000 Anfragen pro Monat) eingehalten wird.</li>
 
     <li><a id='AutomowerConnect-attr-addPositionPolling'>addPositionPolling</a><br>
       <code>attr &lt;name&gt; addPositionPolling &lt;[1|<b>0</b>]&gt;</code><br>

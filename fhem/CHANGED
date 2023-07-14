@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  74_AutomowerConnect: Common.pm try to reconnect if ws is open but
+            not ready, improve leaving path colorization if position polling is
+            on, some changes in automowerconnect.js, Cref update.
  - new:     98_KNX_scan: implement FHEM-cmd: KNX_scan
  - change:  00_KNXIO.pm: moved KNX_scan perl function to 10_KNX.pm
  - change:  10_KNX.pm: moved KNX_scan perl function to 10_KNX.pm 

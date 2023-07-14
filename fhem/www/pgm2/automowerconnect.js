@@ -115,6 +115,44 @@ function AutomowerConnectScale( ctx, picx, picy, scalx ) {
   ctx.stroke();
 }
 
+function AutomowerConnectTag( ctx, pos, colorat ) {
+
+  for ( i = 0; i < pos.length ; i+=3 ){
+
+    if ( pos[ i + 2 ] == 'K' ){
+      ctx.beginPath();
+      ctx.setLineDash( [] );
+      ctx.lineWidth=1.5;
+      ctx.strokeStyle = 'white';
+      ctx.fillStyle= 'black';
+      ctx.arc( parseInt( pos[ i ] ), parseInt( pos[ i + 1 ] ), 2, 0, 2 * Math.PI, false );
+      ctx.fill();
+      ctx.stroke();
+    }
+    if ( pos[ i + 2 ] == 'KE' ){
+      ctx.beginPath();
+      ctx.setLineDash( [] );
+      ctx.lineWidth=3;
+      ctx.strokeStyle = 'white';
+      ctx.fillStyle= 'black';
+      ctx.arc( parseInt( pos[ i ] ), parseInt( pos[ i + 1 ] ), 4, 0, 2 * Math.PI, false );
+      ctx.fill();
+      ctx.stroke();
+    }
+    if ( pos[ i + 2 ] == 'KS' ){
+      ctx.beginPath();
+      ctx.setLineDash( [] );
+      ctx.lineWidth=3;
+      ctx.strokeStyle = 'red';
+      ctx.fillStyle= 'black';
+      ctx.arc( parseInt( pos[ i ] ), parseInt( pos[ i + 1 ] ), 4, 0, 2 * Math.PI, false );
+      ctx.fill();
+      ctx.stroke();
+    }
+
+  }
+
+}
 function AutomowerConnectIcon( ctx, csx, csy, csrel, type ) {
   if (parseInt(csx) > 0 && parseInt(csy) > 0) {
     // draw icon
@@ -302,6 +340,9 @@ function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, sca
     "P" : "chargingStationPath",
     "C" : "chargingStationPath",
     "M" : "mowingPath",
+    "K" : "mowingPath",
+    "KE" : "mowingPath",
+    "KS" : "mowingPath",
     "L" : "leavingPath",
     "G" : "goingHomePath"
   };
@@ -354,6 +395,10 @@ function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, sca
         AutomowerConnectDrawPathColor ( ctx, div, pos, colorat );
 
       }
+
+      // draw collision tag
+      if ( div.getAttribute( 'data-mowingPathShowCollisions' ) )
+        AutomowerConnectTag( ctx, pos, colorat );
 
       // draw start
       if ( div.getAttribute( 'data-mowingPathDisplayStart' ) ) {
