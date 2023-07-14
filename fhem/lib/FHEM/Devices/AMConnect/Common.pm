@@ -1580,8 +1580,7 @@ sub AlignArray {
     my $deltaTime = $hash->{helper}{positionsTime} - $hash->{helper}{statusTime};
 
     # if encounter positions shortly after status event old activity is assigned to positions 
-    if ( $cnt > 1 && $deltaTime > 0 && $deltaTime < 0.29 && !$use_position_polling || 
-         $use_position_polling && ( $actold =~ /LEAVING/ && $act eq 'MOWING' || $act =~ /GOING_HOME/ && $actold eq 'MOWING' ) ) {
+    if ( $cnt > 1 && $deltaTime > 0 && $deltaTime < 0.29 && !$use_position_polling || $use_position_polling && $actold =~ /LEAVING/ && $act eq 'MOWING' ) {
 
       map { $_->{act} = $hash->{helper}{$actold}{short} } @ar;
 
