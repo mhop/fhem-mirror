@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-07-14 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-07-16 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,6 +136,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.80.12"=> "16.07.2023  preparation for alternative switch device in consumer attribute, revise CommandRef ". 
+                           "fix/improve sub ___readCandQ and much more, get pvHistory -> one specific day selectable ".
+                           "get valConsumerMaster -> one specific consumer selectable, enhance consumer key locktime by on-locktime ",
   "0.80.11"=> "14.07.2023  minor fixes and improvements ",
   "0.80.10"=> "13.07.2023  new key spignorecond in consumer attributes ",
   "0.80.9" => "13.07.2023  new method of prediction quality calculation -> sub __calcFcQuality, minor bug fixes ",
@@ -2088,6 +2091,8 @@ sub Get {
   my $opt  = shift @a;
   my $arg  = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @a;     ## no critic 'Map blocks'
   
+  my $type = $hash->{TYPE};
+  
   my @ho   = qw (both
                  both_noHead
                  both_noCons
@@ -2103,16 +2108,21 @@ sub Get {
                  none
                 );
                 
+  my @pha  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$type}{$name}{pvhist}};
+  my @vcm  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$type}{$name}{consumers}};
+                
   my $hol  = join ",", @ho;
+  my $pvl  = join ",", @pha;
+  my $cml  = join ",", @vcm;
 
   my $getlist = "Unknown argument $opt, choose one of ".
-                "valConsumerMaster:noArg ".
+                "valConsumerMaster:#,$cml ".
                 "data:noArg ".
                 "forecastQualities:noArg ".
                 "html:$hol ".
                 "nextHours:noArg ".
                 "pvCircular:noArg ".
-                "pvHistory:noArg ".
+                "pvHistory:#,$pvl ".
                 "rooftopData:noArg ".
                 "solApiData:noArg ".
                 "valCurrent:noArg "
@@ -2123,7 +2133,7 @@ sub Get {
   my $params = {
       hash  => $hash,
       name  => $name,
-      type  => $hash->{TYPE},
+      type  => $type,
       opt   => $opt,
       arg   => $arg
   };
@@ -2154,7 +2164,7 @@ sub _getRoofTopData {
      
   $paref->{date}  = strftime "%Y-%m-%d", localtime(time);                    # aktuelles Datum
   $paref->{debug} = AttrVal ($name, 'ctrlDebug', 'none');
-  $paref->{lang}  = AttrVal ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang));
+  $paref->{lang}  = getLang ($hash);
 
   if($hash->{MODEL} eq 'SolCastAPI') {
       __getSolCastData ($paref);
@@ -3063,8 +3073,9 @@ return pageAsHtml ($name, "ftui");
 sub _getlistPVHistory {
   my $paref = shift;
   my $hash  = $paref->{hash};
+  my $arg   = $paref->{arg};
 
-  my $ret   = listDataPool ($hash, "pvhist");
+  my $ret   = listDataPool ($hash, 'pvhist', $arg);
 
 return $ret;
 }
@@ -3076,7 +3087,7 @@ sub _getlistPVCircular {
   my $paref = shift;
   my $hash  = $paref->{hash};
 
-  my $ret   = listDataPool ($hash, "circular");
+  my $ret   = listDataPool ($hash, 'circular');
 
 return $ret;
 }
@@ -3088,7 +3099,7 @@ sub _getlistNextHours {
   my $paref = shift;
   my $hash  = $paref->{hash};
 
-  my $ret   = listDataPool ($hash, "nexthours");
+  my $ret   = listDataPool ($hash, 'nexthours');
 
 return $ret;
 }
@@ -3100,7 +3111,7 @@ sub _getForecastQualities {
   my $paref = shift;
   my $hash  = $paref->{hash};
 
-  my $ret   = listDataPool ($hash, "qualities");
+  my $ret   = listDataPool ($hash, 'qualities');
 
 return $ret;
 }
@@ -3112,7 +3123,7 @@ sub _getlistCurrent {
   my $paref = shift;
   my $hash  = $paref->{hash};
 
-  my $ret   = listDataPool ($hash, "current");
+  my $ret   = listDataPool ($hash, 'current');
 
 return $ret;
 }
@@ -3123,8 +3134,9 @@ return $ret;
 sub _getlistvalConsumerMaster {
   my $paref = shift;
   my $hash  = $paref->{hash};
+  my $arg   = $paref->{arg};
 
-  my $ret   = listDataPool ($hash, "consumer");
+  my $ret   = listDataPool ($hash, 'consumer', $arg);
 
 return $ret;
 }
@@ -3136,7 +3148,7 @@ sub _getlistSolCastData {
   my $paref = shift;
   my $hash  = $paref->{hash};
 
-  my $ret   = listDataPool ($hash, "solApiData");
+  my $ret   = listDataPool ($hash, 'solApiData');
 
 return $ret;
 }
@@ -3255,7 +3267,15 @@ sub _attrconsumer {                      ## no critic "not used"
 
       my $alowt = $h->{type} ~~ @ctypes ? 1 : 0;
       if (!$alowt) {
-        return qq{The type "$h->{type}" isn't allowed!};
+          return qq{The type "$h->{type}" isn't allowed!};
+      }
+      
+      if (exists $h->{switchdev}) {                                                                      
+          my $dswitch = $h->{switchdev};                                                           # alternatives Schaltdevice
+          
+          if(!$defs{$dswitch}) {
+              return qq{The device "$dswitch" doesn't exist!};
+          }
       }
 
       if ($h->{power} !~ /^[0-9]+$/xs) {
@@ -3328,7 +3348,8 @@ sub _attrconsumer {                      ## no critic "not used"
 
   writeCacheToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
 
-  InternalTimer(gettimeofday()+2, "FHEM::SolarForecast::createAssociatedWith", $hash, 0);
+  InternalTimer(gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask',          [$name, 0], 0);
+  InternalTimer(gettimeofday()+2,   'FHEM::SolarForecast::createAssociatedWith', $hash,      0);
 
 return;
 }
@@ -3381,30 +3402,50 @@ sub Notify {
   my $events = deviceEvents($dev_hash, 1);
   return if(!$events);
 
-  my $cdref     = CurrentVal ($myHash, 'consumerdevs', '');                               # alle registrierten Consumer
+  my $cdref     = CurrentVal ($myHash, 'consumerdevs', '');                               # alle registrierten Consumer und Schaltdevices
   my @consumers = ();
   @consumers    = @{$cdref} if(ref $cdref eq "ARRAY");
 
   return if(!@consumers);
+  
+  my $debug = AttrVal ($myName, 'ctrlDebug', 'none');                                     # Debug Mode
 
   if($devName ~~ @consumers) {
-      my $cindex;
+      my ($cname, $cindex);
       my $type = $myHash->{TYPE};
       
       for my $c (sort{$a<=>$b} keys %{$data{$type}{$myName}{consumers}}) {
-          my $cname = ConsumerVal ($myHash, $c, "name", "");
-          if($devName eq $cname) {
+          $cname = ConsumerVal ($myHash, $c, 'name', '');
+          
+          if ($devName eq $cname) {
               $cindex = $c;
               last;
           }
+          
+          my $dswname = ConsumerVal ($myHash, $c, 'dswitch', '');                         # Switch Device
+
+          if ($devName eq $dswname) {
+              $cindex = $c;
+              $cname  = ConsumerVal ($myHash, $c, 'name', '');
+              
+              if ($debug =~ /notifyHandling/x) {
+                  Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Event device >$devName< is switching device of consumer >$cname< (index: $c)});
+              }
+              
+              last;
+          }          
       }
 
-      my $debug    = AttrVal     ($myName, 'ctrlDebug',     'none');                      # Debug Mode
-      my $async    = ConsumerVal ($myHash, $cindex, 'asynchron', 0);
-      my $rswstate = ConsumerVal ($myHash, $cindex, 'rswstate', '');
+      if (!$cindex) {
+         Log3 ($myName, 2, qq{$myName notifyHandling - Device >$devName< has no consumer index and/or ist not a known switching device. Exiting...});
+         return;
+      }
+
+      my $async    = ConsumerVal ($myHash, $cindex, 'asynchron',      0);
+      my $rswstate = ConsumerVal ($myHash, $cindex, 'rswstate', 'state');
       
       if ($debug =~ /notifyHandling/x) {
-          Log3 ($myName, 1, qq{$myName DEBUG> Event received - Consumer Device: $devName, asynchronous: $async});
+          Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Consumer >$cindex< asynchronous mode: $async});
       }
       
       return if(!$async);                                                                 # Consumer synchron -> keine Weiterverarbeitung
@@ -3441,7 +3482,7 @@ sub Notify {
           if ($reading eq $rswstate) {
               
               if ($debug =~ /notifyHandling/x) {
-                  Log3 ($myName, 1, qq{$myName DEBUG> start centralTask by Notify - $devName: $reading $value});
+                  Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - start centralTask by Notify device: $devName, reading: $reading, value: $value});
               }
               
               centralTask ($myHash, 0);                                                  # keine Events in SolarForeCast außer 'state'
@@ -3673,12 +3714,26 @@ return @pvconf;
 #                       Zentraler Datenabruf
 ################################################################
 sub centralTask {
-  my $hash = shift;
-  my $evt  = shift // 1;                                              # Readings Event generieren
+  my $par = shift;
+  my $evt = shift // 1;                                                # Readings Event generieren
+  
+  my ($hash, $name);
+  if (ref $par eq 'HASH') {                                            # Standard Fn Aufruf
+      $hash = $par;
+      $name = $hash->{NAME};
+  }
+  elsif (ref $par eq 'ARRAY') {                                        # Array Referenz wurde übergeben
+      $name = $par->[0];
+      $evt  = $par->[1] // 1;                                          # Readings Event generieren
+      $hash = $defs{$name};
+  }
+  else {
+      Log (1, "ERROR module ".__PACKAGE__." - function >centralTask< was called with wrong data reference type: >".(ref $par)."<");
+      return;
+  }
 
-  my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  my $cst  = [gettimeofday];                                          # Zyklus-Startzeit
+  my $cst  = [gettimeofday];                                           # Zyklus-Startzeit
 
   RemoveInternalTimer($hash, "FHEM::SolarForecast::centralTask");
   RemoveInternalTimer($hash, "FHEM::SolarForecast::singleUpdateState");
@@ -4361,7 +4416,7 @@ sub __calcPVestimates {
   my $acu        = isAutoCorrUsed ($name);
   
   $paref->{cloudcover}  = $cloudcover;                                                    
-  my ($hc, $hq)         = ___readCorrf ($paref);                                                      # liest den anzuwendenden Korrekturfaktor
+  my ($hc, $hq)         = ___readCandQ ($paref);                                                      # liest den anzuwendenden Korrekturfaktor
   delete $paref->{cloudcover};
 
   my ($lh,$sq,$peakloss, $modtemp);
@@ -4465,7 +4520,7 @@ return $pvsum;
 #  Liest Korrekturfaktor/Qualität aus pvCircular percentile und
 #  speichert die Werte im Nexthours / pvHistory Hash
 ######################################################################
-sub ___readCorrf {
+sub ___readCandQ {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -4478,32 +4533,25 @@ sub ___readCorrf {
   my $acu    = isAutoCorrUsed ($name);                                                                # Autokorrekturmodus
   my $pvcorr = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh1), 1.00);                 # PV Korrekturfaktor (auto oder manuell)
   my $hc     = $pvcorr;                                                                               # Voreinstellung RAW-Korrekturfaktor
-  my $hq     = "m";                                                                                   # Qualität manuell voreingestellt
+  my $hq     = '-';                                                                                   # keine Qualität definiert
 
   if ($acu =~ /on_complex/xs) {                                                                       # Autokorrektur complex soll genutzt werden
       my $range  = calcRange ($cc);                                                                   # Range errechnen
-      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), $range, undef);                  # Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
-      $hq      //= 0;
-      
-      if (!defined $hc) {
-          $hc = 1;                                                                                    # Korrekturfaktor = 1 (keine Korrektur)                       
-          $hq = 0;
-      }
+      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), $range, undef);                  # Korrekturfaktor/Qualität der Stunde des Tages (complex)
+      $hq      //= '-';                                                                  
+      $hc      //= 1;                                                                                 # Korrekturfaktor = 1 (keine Korrektur)                                                                                                        # keine Qualität definiert
       
       $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange} = $range;
   }
   elsif ($acu =~ /on_simple/xs) {
-      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), 'percentile', undef);            # Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
-      $hq      //= 0;
-
-      if (!defined $hc) {
-          $hc = 1;                                                                                    # Korrekturfaktor = 1                        
-          $hq = 0;
-      }      
+      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), 'percentile', undef);            # Korrekturfaktor/Qualität der Stunde des Tages (simple)
+      $hq      //= '-';
+      $hc      //= 1;                                                                                 # Korrekturfaktor = 1     
   }
-  else {
-      $hc = 1;
-      $hq = "-"; 
+  else {                                                                                              # keine Autokorrektur
+      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), 'percentile', undef);            # Korrekturfaktor/Qualität der Stunde des Tages (simple)
+      $hc        = 1;
+      $hq      //= '-';
   }
 
   $hc = sprintf "%.2f", $hc;
@@ -5111,13 +5159,13 @@ sub _manageConsumerData {
 
       if ($dnum) {
           if($consumerco) {
-              $data{$type}{$name}{consumers}{$c}{avgenergy} = ceil ($consumerco/$runhours);                       # Durchschnittsverbrauch pro Stunde in Wh
+              $data{$type}{$name}{consumers}{$c}{avgenergy} = sprintf "%.2f", ($consumerco/$runhours);            # Durchschnittsverbrauch pro Stunde in Wh
           }
           else {
               delete $data{$type}{$name}{consumers}{$c}{avgenergy};
           }
 
-          $data{$type}{$name}{consumers}{$c}{avgruntime} = (ceil($runhours/$dnum)) * 60;                          # Durchschnittslaufzeit am Tag in Minuten
+          $data{$type}{$name}{consumers}{$c}{avgruntime} = sprintf "%.2f", (($runhours / $dnum) * 60);            # Durchschnittslaufzeit am Tag in Minuten
       }
 
       $paref->{consumer} = $c;
@@ -5615,15 +5663,20 @@ sub ___setConsumerPlanningState {
   my $ps        = $paref->{ps};                    # Planstatus
   my $startts   = $paref->{startts};               # Unix Timestamp für geplanten Switch on
   my $stopts    = $paref->{stopts};                # Unix Timestamp für geplanten Switch off
+  my $lonts     = $paref->{lastAutoOnTs};          # Timestamp des letzten On-Schaltens bzw. letzter Fortsetzung im Automatikmodus
   my $loffts    = $paref->{lastAutoOffTs};         # Timestamp des letzten Off-Schaltens bzw. letzter Unterbrechnung im Automatikmodus
   my $lang      = $paref->{lang};
   
   my ($starttime,$stoptime);
   
+  if (defined $lonts) {
+      $data{$type}{$name}{consumers}{$c}{lastAutoOnTs} = $lonts;
+  }
+  
   if (defined $loffts) {
       $data{$type}{$name}{consumers}{$c}{lastAutoOffTs} = $loffts;
   }
-
+  
   if ($startts) {
       $starttime                                       = (timestampToTimestring ($startts, $lang))[3];
       $data{$type}{$name}{consumers}{$c}{planswitchon} = $startts;
@@ -5853,12 +5906,12 @@ sub ___switchConsumerOn {
   my $state = $paref->{state};
   my $debug = $paref->{debug};
 
-  my $pstate  = ConsumerVal ($hash, $c, "planstate",        "");
-  my $startts = ConsumerVal ($hash, $c, "planswitchon",  undef);                                  # geplante Unix Startzeit
-  my $oncom   = ConsumerVal ($hash, $c, "oncom",            "");                                  # Set Command für "on"
-  my $auto    = ConsumerVal ($hash, $c, "auto",              1);
-  my $cname   = ConsumerVal ($hash, $c, "name",             "");                                  # Consumer Device Name
-  my $calias  = ConsumerVal ($hash, $c, "alias",            "");                                  # Consumer Device Alias
+  my $pstate  = ConsumerVal ($hash, $c, 'planstate',        '');
+  my $startts = ConsumerVal ($hash, $c, 'planswitchon',  undef);                                  # geplante Unix Startzeit
+  my $oncom   = ConsumerVal ($hash, $c, 'oncom',            '');                                  # Set Command für "on"
+  my $auto    = ConsumerVal ($hash, $c, 'auto',              1);
+  my $cname   = ConsumerVal ($hash, $c, 'name',             '');                                  # Consumer Device Name
+  my $calias  = ConsumerVal ($hash, $c, 'alias',            '');                                  # Consumer Device Alias
 
   my ($swoncond,$swoffcond,$info,$err);
   ($swoncond,$info,$err)  = isAddSwitchOnCond  ($hash, $c);                                       # zusätzliche Switch on Bedingung
@@ -5873,17 +5926,24 @@ sub ___switchConsumerOn {
       my $cons   = CurrentVal  ($hash, 'consumption',  0);
       my $nompow = ConsumerVal ($hash, $c, 'power',  '-');
       my $sp     = CurrentVal  ($hash, 'surplus',      0);
+      my $lang   = $paref->{lang};
 
+      Log3 ($name, 1, qq{$name DEBUG> ############### consumer "$c" ############### });
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - general switching parameters => }.
                       qq{auto mode: $auto, current Consumption: $cons W, nompower: $nompow, surplus: $sp W, }.
-                      qq{isInLocktime: $iilt, planning state: $pstate, start timestamp: }.($startts ? $startts : "undef")
+                      qq{planstate: $pstate, starttime: }.($startts ? (timestampToTimestring ($startts, $lang))[0] : "undef")
            );
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isInLocktime: $iilt}.($rlt ? ", remainLockTime: $rlt" : ''));     
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - current Context is switching "on" => }.
                       qq{swoncond: $swoncond, on-command: $oncom }
            );
+           
+      if (simplifyCstate($pstate) =~ /planned|priority|starting/xs && isInTimeframe ($hash, $c) && $iilt) {
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - switching on postponed by >isInLocktime<});
+      }
   }
 
-  if ($auto && $oncom && $swoncond && !$swoffcond && !$iilt &&                                    # kein Einschalten wenn zusätzliche Switch off Bedingung zutrifft
+  if ($auto && $oncom && $swoncond && !$swoffcond && !$iilt &&                                    # kein Einschalten wenn zusätzliche Switch off Bedingung oder Sperrzeit zutrifft
       simplifyCstate($pstate) =~ /planned|priority|starting/xs &&
       isInTimeframe ($hash, $c)) {                                                                # Verbraucher Start ist geplant && Startzeit überschritten
       my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                                   # Consumer Planungsmode
@@ -5929,8 +5989,8 @@ sub ___switchConsumerOn {
 
       delete $paref->{ps};
 
-      my $caution = isInterruptable($hash, $c) == 3 ? 'interrupt condition no longer present' : 'existing surplus';
-      $state      = qq{switching Consumer '$calias' to '$oncom', caution: $caution};
+      my $cause = isInterruptable($hash, $c) == 3 ? 'interrupt condition no longer present' : 'existing surplus';
+      $state    = qq{switching Consumer '$calias' to '$oncom', cause: $cause};
 
       writeCacheToFile ($hash, "consumers", $csmcache.$name);                                     # Cache File Consumer schreiben
 
@@ -5965,10 +6025,16 @@ sub ___switchConsumerOff {
 
   Log3 ($name, 1, "$name - $err") if($err);
   
+  my ($iilt,$rlt) = isInLocktime ($paref);                                                        # Sperrzeit Status ermitteln
+  
   debugLog ($paref, "consumerSwitching", qq{consumer "$c" - current Context is switching "off" => }.
                                          qq{swoffcond: $swoffcond, off-command: $offcom});
+                                         
+  if ($stopts && $t >= $stopts && $iilt) {
+      debugLog ($paref, "consumerSwitching", qq{consumer "$c" - switching off postponed by >isInLocktime<});
+  }
 
-  if(($swoffcond || ($stopts && $t >= $stopts)) &&
+  if(($swoffcond || ($stopts && $t >= $stopts)) && !$iilt &&
      ($auto && $offcom && simplifyCstate($pstate) =~ /started|starting|stopping|interrupt|continu/xs)) {
       CommandSet(undef,"$cname $offcom");
 
@@ -5987,7 +6053,7 @@ sub ___switchConsumerOff {
   }
   elsif (((isInterruptable($hash, $c, $hyst) && !isConsRcmd ($hash, $c)) || isInterruptable($hash, $c, $hyst) == 2) &&       # Consumer unterbrechen
          isInTimeframe    ($hash, $c)        && simplifyCstate ($pstate) =~ /started|continued|interrupting/xs      &&
-         $auto && $offcom) {
+         $auto && $offcom && !$iilt) {
 
       CommandSet(undef,"$cname $offcom");
 
@@ -6027,6 +6093,8 @@ sub ___setConsumerSwitchingState {
   my $pstate = simplifyCstate (ConsumerVal ($hash, $c, "planstate", ""));
   my $calias = ConsumerVal    ($hash, $c, "alias", "");                                            # Consumer Device Alias
   my $auto   = ConsumerVal    ($hash, $c, "auto",   1);
+  
+  debugLog ($paref, "consumerSwitching", qq{consumer "$c" - current planning state: $pstate \n});
 
   if ($pstate eq 'starting' && isConsumerPhysOn ($hash, $c)) {
       my $mintime = ConsumerVal ($hash, $c, "mintime", $defmintime);
@@ -6037,16 +6105,17 @@ sub ___setConsumerSwitchingState {
           $mintime             /= 60;
       }
   
-      my $stopdiff      = $mintime * 60;
-
-      $paref->{ps}      = "switched on:";
-      $paref->{startts} = $t;
-      $paref->{stopts}  = $t + $stopdiff;
+      my $stopdiff           = $mintime * 60;
+      $paref->{ps}           = "switched on:";
+      $paref->{startts}      = $t;
+      $paref->{lastAutoOnTs} = $t;
+      $paref->{stopts}       = $t + $stopdiff;
 
       ___setConsumerPlanningState ($paref);
 
       delete $paref->{ps};
       delete $paref->{startts};
+      delete $paref->{lastAutoOnTs};
       delete $paref->{stopts};
 
       $state = qq{Consumer '$calias' switched on};
@@ -6074,10 +6143,12 @@ sub ___setConsumerSwitchingState {
   }
   elsif ($pstate eq 'continuing' && isConsumerPhysOn ($hash, $c)) {
       $paref->{ps} = "continued:";
+      $paref->{lastAutoOnTs} = $t;
 
       ___setConsumerPlanningState ($paref);
 
       delete $paref->{ps};
+      delete $paref->{lastAutoOnTs};
 
       $state = qq{Consumer '$calias' switched on (continued)};
 
@@ -6366,8 +6437,6 @@ sub _estConsumptionForecast {
   my $totcon     = 0;
   my $dnum       = 0;
   my $consumerco = 0;
-  #my $min        =  (~0 >> 1);
-  #my $max        = -(~0 >> 1);
 
   for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
       next if ($n eq $day);                                                                             # aktuellen (unvollständigen) Tag nicht berücksichtigen
@@ -6380,22 +6449,11 @@ sub _estConsumptionForecast {
       my $dcon = HistoryVal ($hash, $n, 99, "con", 0);
       next if(!$dcon);
 
-      #for my $c (sort{$a<=>$b} keys %{$acref}) {                                                        # historischen Verbrauch aller registrierten Verbraucher aufaddieren
-      #    $consumerco += HistoryVal ($hash, $n, 99, "csme${c}", 0);
-      #}
-
-      #$dcon -= $consumerco if($dcon >= $consumerco);                                                    # Verbrauch registrierter Verbraucher aus Verbrauchsvorhersage eliminieren
-
-      #$min  = $dcon if($dcon < $min);
-      #$max  = $dcon if($dcon > $max);
-
       $totcon += $dcon;
       $dnum++;
   }
 
   if ($dnum) {
-       #my $ddiff                                         = ($max - $min)/$dnum;                          # Glättungsdifferenz
-       #my $tomavg                                        = int (($totcon/$dnum)-$ddiff);
        my $tomavg                                        = int ($totcon / $dnum);
        $data{$type}{$name}{current}{tomorrowconsumption} = $tomavg;                                      # prognostizierter Durchschnittsverbrauch aller (gleicher) Wochentage
 
@@ -6430,8 +6488,6 @@ sub _estConsumptionForecast {
 
       $dnum       = 0;
       $consumerco = 0;
-      #$min        =  (~0 >> 1);
-      #$max        = -(~0 >> 1);
       my $utime   = timestringToTimestamp ($nhtime);
       my $nhday   = strftime "%a", localtime($utime);                                               # Wochentagsname des NextHours Key
       my $nhhr    = sprintf("%02d", (int (strftime "%H", localtime($utime))) + 1);                  # Stunde des Tages vom NextHours Key  (01,02,...24)
@@ -6451,18 +6507,13 @@ sub _estConsumptionForecast {
               $consumerco += HistoryVal ($hash, $m, $nhhr, "csme${c}", 0);
           }
 
-          #$hcon -= $consumerco if($hcon >= $consumerco);                                            # Verbrauch registrierter Verbraucher aus Verbrauch eliminieren
           $conhex->{$nhhr} += $hcon - $consumerco if($hcon >= $consumerco);                          # prognostizierter Verbrauch Ex registrierter Verbraucher
-          #$min = $hcon if($hcon < $min);
-          #$max = $hcon if($hcon > $max);
 
           $conh->{$nhhr} += $hcon;
           $dnum++;
       }
 
       if ($dnum) {
-           #my $hdiff                                 = ($max - $min)/$dnum;                         # Glättungsdifferenz
-           #my $conavg                                = int(($conh->{$nhhr}/$dnum)-$hdiff);
            $data{$type}{$name}{nexthours}{$k}{confcEx} = int ($conhex->{$nhhr} / $dnum);
 
            my $conavg                                  = int ($conh->{$nhhr} / $dnum);
@@ -6987,8 +7038,23 @@ sub collectAllRegConsumers {
           Log3 ($name, 1, "$name - $err");
           next;
       }
-
+      
       push @{$data{$type}{$name}{current}{consumerdevs}}, $consumer;                              # alle Consumerdevices in CurrentHash eintragen
+
+      my $dswitch = $hc->{switchdev};                                                             # alternatives Schaltdevice
+
+      if ($dswitch) {
+          if(!$defs{$dswitch}) {
+              my $err = qq{ERROR - the device "$dswitch" doesn't exist anymore! Delete or change the attribute "consumer${c}".};
+              Log3 ($name, 1, "$name - $err");
+              next;
+          }
+          
+          push @{$data{$type}{$name}{current}{consumerdevs}}, $dswitch;                           # Switchdevice zusätzlich in CurrentHash eintragen
+      }
+      else {
+          $dswitch = $consumer;
+      }
 
       my $alias = AttrVal ($consumer, "alias", $consumer);
 
@@ -7008,7 +7074,7 @@ sub collectAllRegConsumers {
       if(exists $hc->{asynchron}) {
           $asynchron = $hc->{asynchron};
       }
-
+      
       my ($rswstate,$onreg,$offreg);
       if(exists $hc->{swstate}) {
           ($rswstate,$onreg,$offreg) = split ":", $hc->{swstate};
@@ -7070,6 +7136,7 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{icon}              = $hc->{icon}         // q{};               # Icon für den Verbraucher
       $data{$type}{$name}{consumers}{$c}{oncom}             = $hc->{on}           // q{};               # Setter Einschaltkommando
       $data{$type}{$name}{consumers}{$c}{offcom}            = $hc->{off}          // q{};               # Setter Ausschaltkommando
+      $data{$type}{$name}{consumers}{$c}{dswitch}           = $dswitch;                                 # Switchdevice zur Kommandoausführung
       $data{$type}{$name}{consumers}{$c}{autoreading}       = $rauto;                                   # Readingname zur Automatiksteuerung
       $data{$type}{$name}{consumers}{$c}{auto}              = $auto;                                    # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus
       $data{$type}{$name}{consumers}{$c}{retotal}           = $rtot               // q{};               # Reading der Leistungsmessung
@@ -7082,7 +7149,7 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{notafter}          = $hc->{notafter}     // q{};               # nicht einschalten nach Stunde in 24h Format (00-23)
       $data{$type}{$name}{consumers}{$c}{rswstate}          = $rswstate           // 'state';           # Schaltstatus Reading
       $data{$type}{$name}{consumers}{$c}{asynchron}         = $asynchron          // 0;                 # Arbeitsweise FHEM Consumer Device
-      $data{$type}{$name}{consumers}{$c}{locktime}          = $clt                // 0;                 # Sperrzeit im Automatikmodus
+      $data{$type}{$name}{consumers}{$c}{locktime}          = $clt                // '0:0';             # Sperrzeit im Automatikmodus ('offlt:onlt')
       $data{$type}{$name}{consumers}{$c}{onreg}             = $onreg              // 'on';              # Regex für 'ein'
       $data{$type}{$name}{consumers}{$c}{offreg}            = $offreg             // 'off';             # Regex für 'aus'
       $data{$type}{$name}{consumers}{$c}{dswoncond}         = $dswoncond          // q{};               # Device zur Lieferung einer zusätzliche Einschaltbedingung
@@ -7401,7 +7468,7 @@ sub _checkSetupNotComplete {
 
   my $link   = qq{<a href="$FW_ME$FW_subdir?detail=$name">$name</a>};
   my $height = AttrNum ($name, 'graphicBeamHeight', 200);
-  my $lang   = AttrVal ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang));
+  my $lang   = getLang ($hash);
 
   if(IsDisabled($name)) {
       $ret .= "<table class='roomoverview'>";
@@ -7502,7 +7569,7 @@ sub _graphicHeader {
   my $pvcorrf00  = NexthoursVal($hash, "NextHour00", "pvcorrf", "-/-");
   my ($pcf,$pcq) = split "/", $pvcorrf00;
   my $pvcanz     = qq{factor: $pcf / quality: $pcq};                                              
-  $pcq           =~ s/-/-1/xs;
+  
   my $pvfc00     =  NexthoursVal($hash, "NextHour00", "pvforecast", undef);
   my $acu        = isAutoCorrUsed ($name);
 
@@ -7705,6 +7772,7 @@ sub _graphicHeader {
 
       ## Qualitäts-Icon
       ######################
+      $pcq        =~ s/-/-1/xs;
       my $pcqicon = $pcq < 0.00 ? FW_makeImage('15px-blank',          $pvcanz) :
                     $pcq < 0.60 ? FW_makeImage('10px-kreis-rot.png',  $pvcanz) :
                     $pcq < 0.80 ? FW_makeImage('10px-kreis-gelb.png', $pvcanz) :
@@ -9581,9 +9649,10 @@ sub __calcFcQuality {
   my $pvre = shift;                                                        # PV reale Erzeugung
 
   my $diff = $pvfc - $pvre;
-  my $hdv  = 1 - sprintf "%.2f", abs ($diff / $pvre);                      # Abweichung der Stunde, 1 = bestmöglicher Wert   
+  my $hdv  = 1 - abs ($diff / $pvre);                                      # Abweichung der Stunde, 1 = bestmöglicher Wert   
   
   $hdv = $hdv < 0 ? 0 : $hdv;
+  $hdv = sprintf "%.2f", $hdv;
   
 return $hdv;
 }
@@ -9747,7 +9816,7 @@ sub setPVhistory {
               $sum += $csme;
           }
 
-          $data{$type}{$name}{pvhist}{$day}{99}{$histname} = $sum;
+          $data{$type}{$name}{pvhist}{$day}{99}{$histname} = sprintf "%.2f", $sum;
       }
   }
 
@@ -9769,7 +9838,7 @@ sub setPVhistory {
       }
 
       my $cycles = HistoryVal ($hash, $day, 99, "cyclescsm${num}", 0);
-      $data{$type}{$name}{pvhist}{$day}{99}{"hourscsme${num}"} = ceil ($minutes / 60 ) if($cycles);
+      $data{$type}{$name}{pvhist}{$day}{99}{"hourscsme${num}"} = sprintf "%.2f", ($minutes / 60 ) if($cycles);
   }
 
   if($histname eq "etotal") {                                                                     # etotal des Wechselrichters
@@ -9832,6 +9901,7 @@ return;
 sub listDataPool {
   my $hash = shift;
   my $htol = shift;
+  my $par  = shift // q{};
 
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
@@ -9929,7 +9999,9 @@ sub listDataPool {
       if (!keys %{$h}) {
           return qq{PV cache is empty.};
       }
+      
       for my $idx (sort{$a<=>$b} keys %{$h}) {
+          next if($par && $idx ne $par);
           $sq .= $idx." => ".$sub->($idx)."\n";
       }
   }
@@ -9939,15 +10011,18 @@ sub listDataPool {
       if (!keys %{$h}) {
           return qq{Consumer cache is empty.};
       }
+      
       for my $i (keys %{$h}) {
           if ($i !~ /^[0-9]{2}$/ix) {                                   # bereinigen ungültige consumer, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219
               delete $data{$type}{$name}{consumers}{$i};
-              Log3 ($name, 3, qq{$name - INFO - invalid consumer key "$i" was deleted from consumer Hash});
+              Log3 ($name, 2, qq{$name - INFO - invalid consumer key "$i" was deleted from consumer Hash});
           }
       }
 
       for my $idx (sort{$a<=>$b} keys %{$h}) {
+          next if($par && $idx ne $par);
           my $cret;
+          
           for my $ckey (sort keys %{$h->{$idx}}) {
               if(ref $h->{$idx}{$ckey} eq "HASH") {
                   my $hk = qq{};
@@ -10102,7 +10177,7 @@ sub listDataPool {
           my $pvcorrf = NexthoursVal ($hash, $idx, "pvcorrf",    "-/-");
           my ($f,$q)  = split "/", $pvcorrf;
           $sq        .= "\n" if($sq);
-          $sq        .= "starttime: $nhts, wcc: $neff, crange: $crange, quality: $q, used factor: $f";
+          $sq        .= "starttime: $nhts, wcc: $neff, crange: $crange, quality: $q, factor: $f";
       }
   }
 
@@ -10751,7 +10826,7 @@ sub createAssociatedWith {
 
   RemoveInternalTimer($hash, "FHEM::SolarForecast::createAssociatedWith");
 
-  if($init_done) {
+  if ($init_done) {
       my (@cd,@nd);
       my ($afc,$ara,$ain,$ame,$aba,$h);
 
@@ -10776,11 +10851,15 @@ sub createAssociatedWith {
       $badev    = $aba->[0] // "";
 
       for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {     # Consumer Devices
-          my $codev    = AttrVal($name, "consumer${c}", "");
-          my ($ac,$hc) = parseParams ($codev);
-          $codev       = $ac->[0] // "";
+          my $consumer = AttrVal($name, "consumer${c}", "");
+          my ($ac,$hc) = parseParams ($consumer);
+          my $codev    = $ac->[0] // '';
 
           push @cd, $codev if($codev);
+                                                                                
+          my $dswitch = $hc->{switchdev} // '';                              # alternatives Schaltdevice
+          
+          push @cd, $dswitch if($dswitch);
       }
       
       @nd = @cd;
@@ -10875,16 +10954,16 @@ sub isConsumerPhysOn {
   my $c    = shift;
   my $name = $hash->{NAME};
 
-  my $cname = ConsumerVal ($hash, $c, "name", "");                       # Devicename Customer
+  my $cname = ConsumerVal ($hash, $c, 'name', '');                       # Devicename Customer
 
   if(!$defs{$cname}) {
       Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the "on" state can't be identified});
       return 0;
   }
 
-  my $reg      = ConsumerVal ($hash, $c, "onreg",       "on");
-  my $rswstate = ConsumerVal ($hash, $c, "rswstate", "state");           # Reading mit Schaltstatus
-  my $swstate  = ReadingsVal ($cname, $rswstate,     "undef");
+  my $reg      = ConsumerVal ($hash, $c, 'onreg',       'on');
+  my $rswstate = ConsumerVal ($hash, $c, 'rswstate', 'state');           # Reading mit Schaltstatus
+  my $swstate  = ReadingsVal ($cname, $rswstate,     'undef');
 
   if ($swstate =~ m/^$reg$/x) {
       return 1;
@@ -10902,16 +10981,16 @@ sub isConsumerPhysOff {
   my $c    = shift;
   my $name = $hash->{NAME};
 
-  my $cname = ConsumerVal ($hash, $c, "name", "");                       # Devicename Customer
+  my $cname = ConsumerVal ($hash, $c, 'name', '');                       # Devicename Customer
 
   if(!$defs{$cname}) {
       Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the "off" state can't be identified});
       return 0;
   }
 
-  my $reg      = ConsumerVal ($hash, $c, "offreg",     "off");
-  my $rswstate = ConsumerVal ($hash, $c, "rswstate", "state");           # Reading mit Schaltstatus
-  my $swstate  = ReadingsVal ($cname, $rswstate,     "undef");
+  my $reg      = ConsumerVal ($hash, $c, 'offreg',     'off');
+  my $rswstate = ConsumerVal ($hash, $c, 'rswstate', 'state');           # Reading mit Schaltstatus
+  my $swstate  = ReadingsVal ($cname, $rswstate,     'undef');
 
   if ($swstate =~ m/^$reg$/x) {
       return 1;
@@ -11122,15 +11201,30 @@ sub isInLocktime {
   
   my $iilt = 0;
   my $rlt  = 0;
-  my $clt  = ConsumerVal ($hash, $c, 'locktime',      0);
-  my $lot  = ConsumerVal ($hash, $c, 'lastAutoOffTs', 0);
+  my $lt   = 0;
+  my $clt  = 0;
   
-  if ($t - $lot <= $clt) {
+  my $ltt = isConsumerPhysOn  ($hash, $c) ? 'onlt'  :                             # Typ der Sperrzeit
+            isConsumerPhysOff ($hash, $c) ? 'offlt' :
+            '';
+                
+  my ($cltoff, $clton) = split ":", ConsumerVal ($hash, $c, 'locktime', '0:0');
+  
+  if ($ltt eq 'onlt') {
+      $lt = ConsumerVal ($hash, $c, 'lastAutoOnTs', 0);
+      $clt = $clton;
+  }
+  elsif ($ltt eq 'offlt') {
+      $lt  = ConsumerVal ($hash, $c, 'lastAutoOffTs', 0);
+      $clt = $cltoff;
+  }
+  
+  if ($t - $lt <= $clt) {
       $iilt = 1;
-      $rlt  = $clt - ($t - $lot);                                                 # remain lock time
+      $rlt  = $clt - ($t - $lt);                                                 # remain lock time
   }
 
-return ($iilt,$rlt);
+return ($iilt, $rlt);
 }
 
 ################################################################
@@ -11325,15 +11419,15 @@ sub lastConsumerSwitchtime {
   my $c    = shift;
   my $name = $hash->{NAME};
 
-  my $cname = ConsumerVal ($hash, $c, "name", "");                             # Devicename Customer
+  my $cname = ConsumerVal ($hash, $c, 'name', '');                             # Devicename Customer
 
   if(!$defs{$cname}) {
       Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the last switching time can't be identified});
       return;
   }
 
-  my $rswstate = ConsumerVal           ($hash, $c, "rswstate", "state");       # Reading mit Schaltstatus
-  my $swtime   = ReadingsTimestamp     ($cname, $rswstate,          "");       # Zeitstempel im Format 2016-02-16 19:34:24
+  my $rswstate = ConsumerVal           ($hash, $c, 'rswstate', 'state');       # Reading mit Schaltstatus
+  my $swtime   = ReadingsTimestamp     ($cname, $rswstate,          '');       # Zeitstempel im Format 2016-02-16 19:34:24
   my $swtimets = timestringToTimestamp ($swtime) if($swtime);                  # Unix Timestamp Format erzeugen
 
 return ($swtime, $swtimets);
@@ -11721,6 +11815,7 @@ return $def;
 #       swoffcondregex  - Regex einer einer vorrangige Ausschaltbedingung
 #       isIntimeframe   - ist Zeit innerhalb der Planzeit ein/aus
 #       interruptable   - Consumer "on" ist während geplanter "ein"-Zeit unterbrechbar
+#       lastAutoOnTs    - Timestamp des letzten On-Schaltens bzw. letzter Fortsetzung (nur Automatik-Modus)
 #       lastAutoOffTs   - Timestamp des letzten Off-Schaltens bzw. letzter Unterbrechnung (nur Automatik-Modus) 
 #       hysteresis      - Hysterese
 #       sunriseshift    - Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
@@ -11738,10 +11833,10 @@ sub ConsumerVal {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  if(defined($data{$type}{$name}{consumers})             &&
-     defined($data{$type}{$name}{consumers}{$co}{$key})  &&
-     defined($data{$type}{$name}{consumers}{$co}{$key})) {
-     return  $data{$type}{$name}{consumers}{$co}{$key};
+  if (defined($data{$type}{$name}{consumers})             &&
+      defined($data{$type}{$name}{consumers}{$co}{$key})  &&
+      defined($data{$type}{$name}{consumers}{$co}{$key})) {
+      return  $data{$type}{$name}{consumers}{$co}{$key};
   }
 
 return $def;
@@ -12255,7 +12350,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-set-moduleTiltAngle"></a>
       <li><b>moduleTiltAngle &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br>
-      (nur bei Verwendung des DWD_OpenData RadiationDev) <br><br>
+      (nur Model DWD, ForecastSolarAPI) <br><br>
 
       Neigungswinkel der Solarmodule. Der Stringname ist ein Schlüsselwert des Readings <b>inverterStrings</b>. <br>
       Mögliche Neigungswinkel sind: 0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90
@@ -12497,10 +12592,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-get-forecastQualities"></a>
       <li><b>forecastQualities </b> <br><br>
-      Zeigt die aktuell verwendeten Korrekturfaktoren mit der jeweiligen Startzeit zur Bestimmung der PV Vorhersage sowie
-      deren Qualitäten an.
-      Die Qualität ergibt sich aus der Anzahl der bereits in der Vergangenheit bewerteten Tage mit einer
-      identischen Bewölkungsrange.
+      Zeigt die zur Bestimmung der PV Vorhersage aktuell verwendeten Korrekturfaktoren mit der jeweiligen Startzeit sowie
+      die bisher im Durchschnitt erreichte Vorhersagequalität dieses Zeitraumes an.
       </li>
     </ul>
     <br>
@@ -12577,9 +12670,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-get-pvHistory"></a>
       <li><b>pvHistory </b> <br><br>
-      Listet die historischen Werte der letzten Tage (max. 31) sortiert nach dem Tagesdatum und Stunde.
+      Zeigt den Inhalt des pvHistory Datenspeichers sortiert nach dem Tagesdatum und Stunde. Mit der Auswahlliste kann ein 
+      bestimmter Tag angesprungen werden. Die Drop-Down Liste enthält die aktuell im Speicher verfügbaren Tage.
+      Ohne Argument wird der gesamte Datenspeicher gelistet.
+      
       Die Stundenangaben beziehen sich auf die jeweilige Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit
-      von 08 - 09 Uhr. <br><br>
+      von 08 Uhr bis 09 Uhr. <br><br>
 
       <ul>
          <table>
@@ -12656,7 +12752,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-get-rooftopData"></a>
       <li><b>rooftopData </b> <br><br>
-      Die erwarteten solaren Strahlungsdaten der definierten Strings werden von der gewählten API abgerufen.
+      Die erwarteten solaren Strahlungsdaten bzw. PV Erzeugungsdaten werden von der gewählten API abgerufen.
       </li>
     </ul>
     <br>
@@ -12692,7 +12788,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-get-valConsumerMaster"></a>
       <li><b>valConsumerMaster </b> <br><br>
-      Listet die aktuell ermittelten Stammdaten der im Device registrierten Verbraucher auf.
+      Zeigt die Daten der aktuell im SolarForecast Device registrierten Verbraucher. <br>
+      Mit der Auswahlliste kann ein bestimmter Verbraucher angesprungen werden. Die Drop-Down Liste enthält die aktuell 
+      im Datenspeicher verfügbaren Verbraucher bzw. Verbrauchernummern. Ohne Argument wird der gesamte Datenspeicher gelistet.
       </li>
     </ul>
     <br>
@@ -12842,7 +12940,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; <br>
                          [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]              <br>
                          [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]  <br>
-                         [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [locktime=&lt;Sekunden&gt;]<br>
+                         [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [locktime=&lt;offlt&gt;:[&lt;onlt&gt;]]<br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] <br>
                          [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] <br>
                          [interruptable=&lt;Option&gt] </b><br>
@@ -12954,8 +13052,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>PV Überschuß (wenn power ungleich 0) vorliegt.                                                                                                 </td></tr>
             <tr><td>                       </td><td>Die optionale Hysterese ist ein numerischer Wert um den der Ausschaltpunkt gegenüber dem Soll-Einschaltpunkt                                   </td></tr>
             <tr><td>                       </td><td>angehoben wird sofern der ausgewertete Readingwert ebenfalls numerisch ist. (default: 0)                                                       </td></tr>
-            <tr><td> <b>locktime</b>       </td><td>Sperrzeit in Sekunden nachdem der Verbraucher ausgeschaltet oder unterbrochen wurde (optional).                                                </td></tr>
-            <tr><td>                       </td><td>Der Verbraucher wird erst wieder eingeschaltet wenn die angegebene Sperrzeit abgelaufen ist.                                                   </td></tr> 
+            <tr><td> <b>locktime</b>       </td><td>Sperrzeiten in Sekunden für die Schaltung des Verbrauchers (optional).                                                                         </td></tr>
+            <tr><td>                       </td><td><b>offlt</b> - Sperrzeit in Sekunden nachdem der Verbraucher ausgeschaltet oder unterbrochen wurde                                             </td></tr>
+            <tr><td>                       </td><td><b>onlt</b> - Sperrzeit in Sekunden nachdem der Verbraucher eingeschaltet oder fortgesetzt wurde                                               </td></tr>
+            <tr><td>                       </td><td>Der Verbraucher wird erst wieder geschaltet wenn die entsprechende Sperrzeit abgelaufen ist.                                                   </td></tr> 
             <tr><td>                       </td><td><b>Hinweis:</b> Der Schalter 'locktime' ist nur im Automatik-Modus wirksam.                                                                    </td></tr>            
          </table>
          </ul>
@@ -12969,6 +13069,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
          <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                          <br>
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                                  <br>
+         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1                                                                                                 <br>
        </ul>
        </li>
        <br>
