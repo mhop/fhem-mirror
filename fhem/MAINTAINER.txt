@@ -486,6 +486,7 @@ FHEM/96_SIP.pm               Wzut,plin            Sonstiges
 FHEM/96_Snapcast.pm          Beta-User            Multimedia
 FHEM/97_PiXtendV2            PiXtend              Sonstige Systeme https://forum.fhem.de/index.php/topic,116308.0.html
 FHEM/97_TrashCal.pm          Tobias               Unterstützende Dienste
+FHEM/98_AirUnit.pm           vuffiraa             Sonstiges
 FHEM/98_alarmclock.pm        FlorianZ             Unterstützende Dienste
 FHEM/98_apptime.pm           martinp876           Sonstiges
 FHEM/98_archetype.pm         orphan/Beta-User     Automatisierung https://forum.fhem.de/index.php/topic,125930.0.html
