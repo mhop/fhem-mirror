@@ -791,7 +791,7 @@ sub SendCommand {
     my $return;
     my $requestFormat = ReadingsVal($name, "requestFormat", "");
 
-    if ($service ne "register" && $service ne "getStatus") {
+    if ($service ne "register" && $service ne "getStatus" && ReadingsVal($name, "state", "") eq "on") {
       return if CheckRegistration($hash, $service, $cmd, $param, @successor);
     }
 
