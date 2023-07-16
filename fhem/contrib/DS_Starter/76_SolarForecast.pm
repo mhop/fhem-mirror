@@ -6021,7 +6021,7 @@ sub ___switchConsumerOff {
 
   my $offcom                 = ConsumerVal        ($hash, $c, "offcom", "");                      # Set Command für "off"
   my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c);                                    # zusätzliche Switch off Bedingung
-  my $caution;
+  my $cause;
 
   Log3 ($name, 1, "$name - $err") if($err);
   
@@ -6044,8 +6044,8 @@ sub ___switchConsumerOff {
 
       delete $paref->{ps};
 
-      $caution = $swoffcond ? "switch-off condition (key swoffcond) is true" : "planned switch-off time reached/exceeded";
-      $state   = qq{switching Consumer '$calias' to '$offcom', caution: $caution};
+      $cause = $swoffcond ? "switch-off condition (key swoffcond) is true" : "planned switch-off time reached/exceeded";
+      $state = qq{switching Consumer '$calias' to '$offcom', cause: $cause};
 
       writeCacheToFile ($hash, "consumers", $csmcache.$name);                                                                # Cache File Consumer schreiben
 
@@ -6063,8 +6063,8 @@ sub ___switchConsumerOff {
 
       delete $paref->{ps};
 
-      $caution = isInterruptable($hash, $c, $hyst) == 2 ? 'interrupt condition' : 'surplus shortage';
-      $state   = qq{switching Consumer '$calias' to '$offcom', caution: $caution};
+      $cause = isInterruptable($hash, $c, $hyst) == 2 ? 'interrupt condition' : 'surplus shortage';
+      $state = qq{switching Consumer '$calias' to '$offcom', cause: $cause};
 
       writeCacheToFile ($hash, "consumers", $csmcache.$name);                                                                # Cache File Consumer schreiben
 
