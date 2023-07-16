@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 26 / 2022-06-08
+# Release 27 / 2023-07-14
 
 package main;
 
@@ -416,31 +416,32 @@ netatmo_Define($$)
 
     $modules{$hash->{TYPE}}{defptr}{"G$tag"} = $hash;
 
-  } elsif( @a == 6  || (uc $a[2] eq "ACCOUNT" && @a == 7 ) ) {
+  } elsif( @a == 7  || (uc $a[2] eq "ACCOUNT" && @a == 8 ) ) {
     $subtype = "ACCOUNT";
     $hash->{model} = "ACCOUNT";
     $hash->{network} = "ok";
 
     delete($hash->{access_token});
     delete($hash->{access_token_app});
-    delete($hash->{refresh_token});
+    #delete($hash->{refresh_token});
     delete($hash->{refresh_token_app});
     delete($hash->{expires_at});
     delete($hash->{expires_at_app});
     delete($hash->{csrf_token});
 
-    my $user = $a[@a-4];
-    my $pass = $a[@a-3];
+    my $user = $a[@a-5];
+    my $pass = $a[@a-4];
     my $username = netatmo_encrypt($user);
     my $password = netatmo_encrypt($pass);
     Log3 $name, 2, "$name: encrypt $user/$pass to $username/$password" if($user ne $username || $pass ne $password);
 
-    my $client_id = $a[@a-2];
-    my $client_secret = $a[@a-1];
+    my $client_id = $a[@a-3];
+    my $client_secret = $a[@a-2];
+    my $refresh_token = $a[@a-1];
 
     #$hash->{DEF} =~ s/$user/$username/g;
     #$hash->{DEF} =~ s/$pass/$password/g;
-    $hash->{DEF} = "ACCOUNT $username $password $client_id $client_secret";
+    $hash->{DEF} = "ACCOUNT $username $password $client_id $client_secret $refresh_token";
 
     $hash->{Clients} = ":netatmo:";
 
@@ -448,6 +449,7 @@ netatmo_Define($$)
     $hash->{helper}{password} = $password;
     $hash->{helper}{client_id} = $client_id;
     $hash->{helper}{client_secret} = $client_secret;
+    $hash->{helper}{refresh_token} = $refresh_token;
 
     $hash->{helper}{INTERVAL} = 60*60 if( !$hash->{helper}{INTERVAL} );
     $attr{$name}{room} = "netatmo" if( !defined($attr{$name}{room}) && defined($name));
@@ -460,7 +462,7 @@ netatmo_Define($$)
     return "Usage: define <name> netatmo device\
        define <name> netatmo userid publickey\
        define <name> netatmo PUBLIC latitude longitude [radius]\
-       define <name> netatmo [ACCOUNT] username password"  if(@a < 3 || @a > 5);
+       define <name> netatmo [ACCOUNT] username password clientid clientsecret refreshtoken"  if(@a < 3 || @a > 5);
   }
 
   $hash->{NAME} = $name;
@@ -595,7 +597,8 @@ netatmo_Set($$@)
 
   $hash->{SUBTYPE} = "unknown" if(!defined($hash->{SUBTYPE}));
   my $list = "";
-  $list = "autocreate:noArg autocreate_homes:noArg autocreate_thermostats:noArg autocreate_homecoachs:noArg" if( $hash->{SUBTYPE} eq "ACCOUNT" );
+  $list = "autocreate:noArg autocreate_homes:noArg autocreate_thermostats:noArg autocreate_homecoachs:noArg " if( $hash->{SUBTYPE} eq "ACCOUNT" );
+  #$list = "authorize:noArg" if( $hash->{SUBTYPE} eq "ACCOUNT" );
   $list = "home:noArg away:noArg" if ($hash->{SUBTYPE} eq "PERSON");
   $list = "empty:noArg notify_movements:never,empty,always notify_unknowns:empty,always notify_animals:true,false record_animals:true,false record_movements:never,empty,always record_alarms:never,empty,always presence_record_humans:ignore,record,record_and_notify presence_record_vehicles:ignore,record,record_and_notify presence_record_animals:ignore,record,record_and_notify presence_record_movements:ignore,record,record_and_notify presence_record_alarms:ignore,record,record_and_notify gone_after presence_enable_notify_from_to:empty,always presence_notify_from presence_notify_to smart_notifs:on,off" if ($hash->{SUBTYPE} eq "HOME");
   $list = "enable disable irmode:auto,always,never led_on_live:on,off mirror:off,on audio:on,off" if ($hash->{SUBTYPE} eq "CAMERA");
@@ -626,6 +629,10 @@ netatmo_Set($$@)
   }
   elsif( $cmd eq "autocreate_homecoachs" ) {
     return netatmo_autocreatehomecoach($hash, 1 );
+    return undef;
+  }
+  elsif( $cmd eq "authorize" ) {
+    return netatmo_getAuth($hash);
     return undef;
   }
   elsif( $cmd eq "home" ) {
@@ -736,22 +743,41 @@ netatmo_Set($$@)
   return "Unknown argument $cmd, choose one of $list";
 }
 
+
+sub
+netatmo_getAuth($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  return Log3 $name, 1, "$name: No client id was found! (getAuth)" if(!defined($hash->{helper}{client_id}));
+
+  my $webhookurl = AttrVal($name,"webhookURL",'https://webhook.local');
+
+  my $callurl = "https://".$hash->{helper}{apiserver}."/oauth2/authorize";
+  $callurl .= "?client_id=".$hash->{helper}{client_id}."&redirect_uri=".$webhookurl."&scope=read_station read_thermostat write_thermostat read_camera write_camera access_camera read_presence write_presence access_presence read_homecoach read_doorbell access_doorbell read_smokedetector&state=auth".int(rand(100));
+  return $callurl;
+}
+
 sub
 netatmo_getToken($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
+  return Log3 $name, 1, "$name: No refresh token was found! (getToken)\nYou will need to generate one at https://dev.netatmo.com/apps/" if(!defined($hash->{helper}{refresh_token}));
+  return undef;
+
   return Log3 $name, 1, "$name: No client id was found! (getToken)" if(!defined($hash->{helper}{client_id}));
   return Log3 $name, 1, "$name: No client secret was found! (getToken)" if(!defined($hash->{helper}{client_secret}));
-  return Log3 $name, 1, "$name: No username was found! (getToken)" if(!defined($hash->{helper}{username}));
-  return Log3 $name, 1, "$name: No password was found! (getToken)" if(!defined($hash->{helper}{password}));
+
+  my $webhookurl = AttrVal($name,"webhookURL",'https://webhook.local');
 
   my($err,$data) = HttpUtils_BlockingGet({
     url => "https://".$hash->{helper}{apiserver}."/oauth2/token",
     timeout => 5,
     noshutdown => 1,
-    data => {grant_type => 'password', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, username => netatmo_decrypt($hash->{helper}{username}), password => netatmo_decrypt($hash->{helper}{password}), scope => 'read_station read_thermostat write_thermostat read_camera write_camera access_camera read_presence write_presence access_presence read_homecoach read_smokedetector'},
+    data => {grant_type => 'authorization_code', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, code => $hash->{helper}{access_code}, redirect_uri => $webhookurl, scope => 'read_station read_thermostat write_thermostat read_camera write_camera access_camera read_presence write_presence access_presence read_homecoach read_smokedetector'},
   });
 
   netatmo_dispatch( {hash=>$hash,type=>'token'},$err,$data );
@@ -810,7 +836,7 @@ netatmo_refreshToken($;$)
     $hash->{network} = "ok";
   }
 
-  if( !$hash->{refresh_token} ) {
+  if( !$hash->{helper}{refresh_token} ) {
     netatmo_getToken($hash);
     return undef;
   }
@@ -822,7 +848,7 @@ netatmo_refreshToken($;$)
       url => "https://".$hash->{helper}{apiserver}."/oauth2/token",
       timeout => 30,
       noshutdown => 1,
-      data => {grant_type => 'refresh_token', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, refresh_token => $hash->{refresh_token}},
+      data => {grant_type => 'refresh_token', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, refresh_token => $hash->{helper}{refresh_token}},
         hash => $hash,
         type => 'token',
         callback => \&netatmo_dispatch,
@@ -832,7 +858,7 @@ netatmo_refreshToken($;$)
       url => "https://".$hash->{helper}{apiserver}."/oauth2/token",
       timeout => 5,
       noshutdown => 1,
-      data => {grant_type => 'refresh_token', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, refresh_token => $hash->{refresh_token}},
+      data => {grant_type => 'refresh_token', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, refresh_token => $hash->{helper}{refresh_token}},
     });
 
     netatmo_dispatch( {hash=>$hash,type=>'token'},$err,$data );
@@ -1109,8 +1135,8 @@ netatmo_parseApp($$$)
   if($@)
   {
     Log3 $name, 2, "$name: invalid json evaluation on dev app check ".$@;
-  return undef;
-}
+    return undef;
+  }
 
   if(defined($json->{body}) && defined($json->{body}{temporary_ban})) {
     readingsBeginUpdate($hash);
@@ -2817,13 +2843,13 @@ netatmo_dispatch($$$)
       $hash->{network} = "disconnected" if($hash->{SUBTYPE} eq "ACCOUNT");
       #CommandDeleteReading( undef, "$hash->{NAME} vpn_url" ) if($hash->{SUBTYPE} eq "CAMERA");
     }
-    readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data");
+    readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if(defined($hash->{status}) && $hash->{status} ne "no data");
     return undef;
   } elsif( $data ) {
     $data =~ s/\n//g;
     if( $data !~ m/^{.*}$/ && $data !~ m/^\[.*\]$/ ) {
       RemoveInternalTimer($hash);
-      InternalTimer(gettimeofday()+300, "netatmo_poll", $hash);
+      InternalTimer(gettimeofday()+600, "netatmo_poll", $hash);
       Log3 $name, 2, "$name: invalid json detected";
       Log3 $name, 4, "$name: $data";
       $hash->{status} = "error";
@@ -3424,17 +3450,17 @@ netatmo_parseThermostatList($$)
     }
 
     foreach my $device (@{$home->{devices}}) {
-    push( @devices, $device );
+      push( @devices, $device );
 
 
-    foreach my $module (@{$device->{modules}}) {
+      foreach my $module (@{$device->{modules}}) {
 
         $module->{main_device} = $device->{id};
-      push( @devices, $module );
+        push( @devices, $module );
 
 
+      }
     }
-  }
   }
 
   $hash->{helper}{thermostats} = \@devices;
@@ -3632,9 +3658,9 @@ netatmo_parseReadings($$;$)
                 Log3 $name, 3, "$name: next extended dynamic update from device ($requested) at ".FmtDateTime($nextdata);
               } else {
                 Log3 $name, 3, "$name: invalid time for dynamic update from device ($requested): ".FmtDateTime($nextdata);
+              }
             }
           }
-        }
         }
         elsif($nextdata >= (gettimeofday()+280))
         {
@@ -6687,13 +6713,13 @@ sub netatmo_weatherIcon()
   Notes:
   <ul>
     <li>JSON has to be installed on the FHEM host.</li>
-    <li>You need to create an app <u><a href="https://dev.netatmo.com/dev/createanapp">here</a></u> to get your <i>client_id / client_secret</i>.<br />Request the full access scope including cameras and thermostats.</li>
+    <li>You need to create an app <u><a href="https://dev.netatmo.com/dev/createanapp">here</a></u> to get your <i>client_id / client_secret</i>.<br />Request the full access scope including cameras and thermostats and generate a refresh token.</li>
   </ul><br>
 
   <a name="netatmo_Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; netatmo [ACCOUNT] &lt;username&gt; &lt;password&gt; &lt;client_id&gt; &lt;client_secret&gt;</code><br>
+    <code>define &lt;name&gt; netatmo [ACCOUNT] &lt;username&gt; &lt;password&gt; &lt;client_id&gt; &lt;client_secret&gt; &lt;refresh_token&gt;</code><br>
     <code>define &lt;name&gt; netatmo &lt;device&gt;</code> (you should use autocreate from the account device!)<br>
     <br>
 
@@ -6704,7 +6730,7 @@ sub netatmo_weatherIcon()
 
     Examples:
     <ul>
-      <code>define netatmo netatmo ACCOUNT abc@test.com myPassword 2134123412399119d4123134 AkqcOIHqrasfdaLKcYgZasd987123asd</code><br>
+      <code>define netatmo netatmo ACCOUNT abc@test.com myPassword 2134123412399119d4123134 AkqcOIHqrasfdaLKcYgZasd987123asd 2134123412399119d4123134|058764ac532fb9a080412baa7d107d42</code><br>
       <code>define netatmo_station netatmo 2f:13:2b:93:12:31</code><br>
       <code>define netatmo_module netatmo MODULE  2f:13:2b:93:12:31 f1:32:b9:31:23:11</code><br>
       <code>define netatmo_publicstation netatmo PUBLIC 70:ee:50:27:2c:9c 02:00:00:27:4a:a6 temperature,humidity 70:ee:50:27:2c:9c pressure 05:00:00:04:cc:42 rain 06:00:00:01:ae:94 windstrength,windangle,guststrength,gustangle</code><br>

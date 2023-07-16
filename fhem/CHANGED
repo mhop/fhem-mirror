@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  38_netatmo: fixed login problems by updating to new auth method
  - change:  74_AutomowerConnect: Common.pm try to reconnect if ws is open but
             not ready, improve leaving path colorization if position polling is
             on, some changes in automowerconnect.js, Cref update.
