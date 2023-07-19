@@ -13259,7 +13259,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
             <tr><td> <b>allStringsFullfilled</b>       </td><td>Erfüllungsstatus der fehlerfreien Generierung aller Strings                                                     </td></tr>
             <tr><td> <b>currentAPIinterval</b>         </td><td>das aktuelle Abrufintervall der SolCast API (nur Model SolCastAPI) in Sekunden                                  </td></tr>
-            <tr><td> <b>currentRunMtsConsumer_XX</b>   </td><td>die Laufzeit (Minuten) des Verbrauchers XX" seit dem letzten Einschalten. (0 - Verbraucher ist aus)             </td></tr>
+            <tr><td> <b>currentRunMtsConsumer_XX</b>   </td><td>die Laufzeit (Minuten) des Verbrauchers "XX" seit dem letzten Einschalten. (0 - Verbraucher ist aus)            </td></tr>
             <tr><td> <b>dayAfterTomorrowPVforecast</b> </td><td>liefert die Vorhersage der PV Erzeugung für Übermorgen (sofern verfügbar) ohne Autokorrektur (Rohdaten).        </td></tr>
             <tr><td> <b>lastretrieval_time</b>         </td><td>der letzte Abrufzeitpunkt der API (nur Model SolCastAPI, ForecastSolarAPI)                                      </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>    </td><td>der Timestamp der letzen Abrufzeitpunkt der API (nur Model SolCastAPI, ForecastSolarAPI)                        </td></tr>
