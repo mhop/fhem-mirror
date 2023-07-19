@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 16 / 2022-04-24
+# Release 17 / 2023-07-20
 
 
 package main;
@@ -115,7 +115,7 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                       59 => { name => "unknown 59", reading => "unknown59", }, # activity #vasistas activity scanwatch
                       60 => { name => "PIM movement", reading => "movementPIM", }, # aura mat #measure vasistas 20-200 peak 800 #vasistas
                       61 => { name => "Maximum movement", reading => "movementMaximum", }, # aura mat #measure vasistas 10-60 peak 600 #vasistas
-                      62 => { name => "unknown 62", reading => "unknown62", }, # aura mat #measure vasistas 20-100 #vasistas, watch ecg
+                      62 => { name => "pNN50", reading => "pNN50", }, # aura mat #measure vasistas 20-100 #vasistas, watch ecg
                       63 => { name => "unknown 63", reading => "unknown63", }, # aura mat #measure vasistas 0-90 #vasistas
                       64 => { name => "unknown 64", reading => "unknown64", }, # aura mat #measure vasistas 30-150 #vasistas
                       65 => { name => "unknown 65", reading => "unknown65", }, # aura mat #measure vasistas 500-4000 peak 5000 #vasistas
@@ -168,11 +168,11 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                      120 => { name => "unknown 120", reading => "unknown120", }, #pulse, vasistas, scanwatch activity device
                      121 => { name => "Snoring", reading => "snoring", }, # sleep #vasistas
                      122 => { name => "Lean Mass (%)", reading => "fatFreeRatio", },
-                     123 => { name => "VO2max", reading => "VO2max", },#
-                     124 => { name => "workoutDuration", reading => "workoutDuration", },#workout
-                     125 => { name => "unknown 125", reading => "unknown125", },#workout vo2max time?
+                     123 => { name => "VO2max (ml/min/kg)", reading => "VO2max", },#
+                     124 => { name => "Training Duration", reading => "trainingDuration", },#workout
+                     125 => { name => "Training Load", reading => "trainingLoad", },#workout vo2max time?
                      126 => { name => "unknown 126", reading => "unknown126", },#
-                     127 => { name => "fitnessLevel", reading => "fitnessLevel", },#scanwatch initial reading fitnesslevel
+                     127 => { name => "Activity Class", reading => "activityClass", },#scanwatch initial reading fitnesslevel
                      128 => { name => "unknown 128", reading => "unknown128", },#vasistas invalid for trackers from 2020/09
                      129 => { name => "unknown 129", reading => "unknown129", },#vasistas sleep, scanwatch *
                      130 => { name => "ECG", reading => "heartECG", },#bpm core
@@ -198,12 +198,22 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                      150 => { name => "unknown 150", reading => "unknown150", },#
                      151 => { name => "unknown 151", reading => "unknown151", },#
                      152 => { name => "unknown 152", reading => "unknown152", },#
-                     153 => { name => "unknown 153", reading => "unknown153", },#watch ecg?
-                     154 => { name => "unknown 154", reading => "unknown154", },#watch ecg?
+                     153 => { name => "SDNN", reading => "sdnn", },#watch ecg
+                     154 => { name => "RMSSD", reading => "rmssd", },#watch ecg
                      155 => { name => "Vascular Age", reading => "vascularAge", },#scale
                      156 => { name => "unknown 156", reading => "unknown156", },#
                      157 => { name => "unknown 157", reading => "unknown157", },#vascularage!
-                     158 => { name => "unknown 158", reading => "unknown158", },#
+                     158 => { name => "Nerve Health Score Conductance Left", reading => "nerveHealthScoreLeft", },#
+                     159 => { name => "Nerve Health Score Conductance Right", reading => "nerveHealthScoreRight", },#
+                     167 => { name => "Nerve Health Score Conductance Feet", reading => "nerveHealthScoreFeet", },#
+                     168 => { name => "Extracellular Water (kg)", reading => "waterExtracellular", },#
+                     169 => { name => "Intracellular Water (kg)", reading => "waterIntracellular", },#
+                     170 => { name => "Visceral Fat", reading => "fatVisceral", },#
+                     174 => { name => "Fat Mass Segments", reading => "fatMassSegments", },#
+                     175 => { name => "Muscle Mass Segments", reading => "muscleMassSegments", },#
+                     196 => { name => "Electrodermal Activity Feet", reading => "electrodermalActivityFeet", },#
+                     197 => { name => "Electrodermal Activity Left", reading => "electrodermalActivityLeft", },#
+                     198 => { name => "Electrodermal Activity Right", reading => "electrodermalActivityRight", },#
                       #-10 => { name => "Speed", reading => "speed", },
                       #-11 => { name => "Pace", reading => "pace", },
                       #-12 => { name => "Altitude", reading => "altitude", },
@@ -212,7 +222,8 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
 
 my %ecg_types = ( 0 => "normal",
                   1 => "signs of atrial fibrillation",
-                  2 => "inconclusive", );
+                  2 => "inconclusive",
+                  6 => "heart rate too low", );
 
 my %heart_types = ( -5 => "4 measurements to go",
                     -4 => "3 measurements to go",
@@ -220,7 +231,8 @@ my %heart_types = ( -5 => "4 measurements to go",
                     -2 => "1 measurement to go",
                      0 => "normal",
                      2 => "unclassified",
-                     4 => "inconclusive", );
+                     4 => "inconclusive",
+                     6 => "heart rate too low", );
 
 my %activity_types =   (  0 => "None",
                           1 => "Walking",
@@ -335,11 +347,13 @@ my %timeline_classes = (  'noise_detected' => { name => "Noise", reading => "ale
                           'snapshot' => { name => "Snapshot", reading => "alertSnapshot", unit => 0, },
                           );
 
-my %sleep_readings = (  'lightsleepduration' => { name => "Light Sleep", reading => "sleepDurationLight", unit => "s", },
+my %sleep_readings = (  'asleepduration' => { name => "Manual Sleep", reading => "sleepDurationExternal", unit => "s", },
+                        'lightsleepduration' => { name => "Light Sleep", reading => "sleepDurationLight", unit => "s", },
                         'deepsleepduration' => { name => "Deep Sleep", reading => "sleepDurationDeep", unit => "s", },
                         'remsleepduration' => { name => "REM Sleep", reading => "sleepDurationREM", unit => "s", },
                         'wakeupduration' => { name => "Awake In Bed", reading => "sleepDurationAwake", unit => "s", },
                         'wakeupcount' => { name => "Wakeup Count", reading => "wakeupCount", unit => 0, },
+                        'out_of_bed_count' => { name => "OOB Count", reading => "outOfBedCount", unit => 0, },
                         'durationtosleep' => { name => "Duration To Sleep", reading => "durationToSleep", unit => "s", },
                         'durationtowakeup' => { name => "Duration To Wake Up", reading => "durationToWakeUp", unit => "s", },
                         'manual_sleep_duration' => { name => "Manual Sleep", reading => "sleepDurationManual", unit => "s", },
@@ -359,6 +373,7 @@ my %sleep_readings = (  'lightsleepduration' => { name => "Light Sleep", reading
                         'apnea_activated' => { name => "Apnea Activated", reading => "apneaActivated", unit => 0, },
                         'apnea_algo_version' => { name => "Apnea Algo Version", reading => "apneaAlgoVersion", unit => 0, },
                         'apnea_hypopnea_index' => { name => "Apnea/Hypopnea Index", reading => "apneaIndex", unit => 0, },
+                        'breathing_disturbances_intensity' => { name => "Breathing Disturbances Intensity", reading => "breathingDisturbancesIntensity", unit => 0, },
                         'pause_duration' => { name => "Pause Duration", reading => "pauseDuration", unit => "s", },
                         #'manual_distance' => { name => "Manual Distance", reading => "manual_distance", unit => 0, },
                         #'steps' => { name => "Steps", reading => "steps", unit => 0, },
@@ -3623,6 +3638,15 @@ sub withings_Dispatch($$$) {
     }
     Log3 $name, 1, "$name: Dispatch ".$param->{type}." json error ".$json->{error} if(defined($json->{error}));
 
+    if(defined($json->{error}) && $json->{error} =~ /Invalid Session/){
+      if( !defined($hash->{IODev}) ){
+        withings_getSessionKey( $hash );
+      } else {
+        withings_getSessionKey( $hash->{IODev} );
+      }
+      return undef;
+    }
+
     Log3 $name, 5, "$name: json returned: ".Dumper($json);
 
     if(defined($param->{enddate}))
@@ -3873,6 +3897,7 @@ sub withings_AuthApp($;$) {
   $userhash->{helper}{OAuthValid} = (int(time)+$json->{body}{expires_in}) if(defined($json->{body}{expires_in}));
   readingsSingleUpdate( $userhash, ".refresh_token", $json->{body}{refresh_token}, 1 ) if(defined($json->{body}{refresh_token}));
 
+  RemoveInternalTimer($userhash, "withings_AuthRefresh");
   InternalTimer(gettimeofday()+$json->{body}{expires_in}-60, "withings_AuthRefresh", $userhash, 0);
 
 
@@ -3892,6 +3917,9 @@ sub withings_AuthRefresh($) {
   my $cid = AttrVal($hash->{IODev}->{NAME},'client_id','');
   my $cs = AttrVal($hash->{IODev}->{NAME},'client_secret','');
   my $ref = ReadingsVal($name,'.refresh_token','');
+
+  #my $sig = "requesttoken,$cid,".$nonce;
+  #$sig=hmac_sha256_hex($sig, AttrVal($name,'client_secret',''));
 
   my $datahash = {
     url => "https://wbsapi.withings.net/v2/oauth2",
