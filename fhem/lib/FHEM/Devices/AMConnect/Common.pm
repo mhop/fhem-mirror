@@ -180,6 +180,7 @@ my $mapZonesTpl = '{
       use_position_polling      => 0,
       additional_polling        => 0,
       reverse_positions_order   => 1,
+      reverse_pollpos_order     => 0,
       retry_interval_apiauth    => 840,
       retry_interval_getmower   => 840,
       retry_interval_wsreopen   => 2,
@@ -609,7 +610,7 @@ sub FW_detailFn_Update {
   $hash->{helper}{mapupdate}{poserrxy} = \@poserrxy;
 
   map { 
-    ::FW_directNotify("#FHEMWEB:$_", "AutomowerConnectUpdateJson ( '$FW_ME/$type/$name/json' )","");
+    ::FW_directNotify("#FHEMWEB:$_", "AutomowerConnectUpdateJson ( '$FW_ME/$type/$name/json' )","") if ( $FW_ME );
   } devspec2array("TYPE=FHEMWEB");
 
   $hash->{helper}{detailFnFirst} = 0;
@@ -629,7 +630,13 @@ sub APIAuth {
   my $type = $hash->{TYPE};
   my $iam = "$type $name APIAuth:";
 
-  return if( IsDisabled( $name ) );
+  if( IsDisabled( $name ) ) {
+
+    RemoveInternalTimer( $hash );
+    InternalTimer( gettimeofday() + $hash->{helper}{retry_interval_apiauth}, \&APIAuth, $hash, 0 );
+    return undef;
+
+  }
 
   if ( !$update && $::init_done ) {
 
@@ -885,6 +892,7 @@ sub getMowerResponseWs {
           fillReadings( $hash );
           # readingsBulkUpdate( $hash, 'mower_wsEvent', $hash->{helper}{wsResult}{type} ); #to do check what event
           readingsBulkUpdate( $hash, 'mower_wsEvent', 'status-event' );
+          readingsBulkUpdateIfChanged( $hash, 'device_state', 'connected' );
 
         readingsEndUpdate($hash, 1);
 
@@ -1568,6 +1576,7 @@ sub AlignArray {
   my $name = $hash->{NAME};
   my $use_position_polling = $hash->{helper}{use_position_polling};
   my $reverse_positions_order = $hash->{helper}{reverse_positions_order};
+  my $reverse_pollpos_order = $hash->{helper}{reverse_pollpos_order};
   my $additional_polling = $hash->{helper}{additional_polling};
   my $act = $hash->{helper}{mower}{attributes}{mower}{activity};
   my $actold = $hash->{helper}{mowerold}{attributes}{mower}{activity};
@@ -1579,8 +1588,16 @@ sub AlignArray {
     my @ar = @{ $hash->{helper}{mower}{attributes}{positions} };
     my $deltaTime = $hash->{helper}{positionsTime} - $hash->{helper}{statusTime};
 
-    # if encounter positions shortly after status event old activity is assigned to positions 
-    if ( $cnt > 1 && $deltaTime > 0 && $deltaTime < 0.29 && !$use_position_polling || $use_position_polling && $actold =~ /LEAVING/ && $act eq 'MOWING' ) {
+    # if encounter positions shortly after status event then old activity is assigned to positions 
+    # or when position polling is on and activity is MOWING first time after LEAVING count new positions as LEAVING
+    #### if ( $cnt > 1 && $deltaTime > 0 && $deltaTime < 0.29 && !$use_position_polling || $use_position_polling && $actold =~ /LEAVING/ && $act eq 'MOWING' ) {
+    # or when position polling is on and activity is GOING_HOME first time after MOWING count new positions as MOWING
+    # or when position polling is on and activity is PARKED_IN_CS|CHARGING first time after GOING_HOME count new positions as GOING_HOME
+    if ( $cnt > 1 && $deltaTime > 0 && $deltaTime < 0.29 && !$use_position_polling || $use_position_polling && 
+          ( $actold =~ /LEAVING/ && $act eq 'MOWING' ||
+            $actold =~ /MOWING/ && $act eq 'GOING_HOME' ||
+            $actold =~ /GOING_HOME/ && $act =~ /PARKED_IN_CS|CHARGING/ )
+       ) {
 
       map { $_->{act} = $hash->{helper}{$actold}{short} } @ar;
 
@@ -1591,6 +1608,14 @@ sub AlignArray {
     }
 
     if ( !$use_position_polling ) {
+
+      if ( $reverse_positions_order ) {
+
+        @ar = reverse @ar if ( $cnt > 1 ); # positions seem to be in reversed order
+
+      }
+
+    } elsif ( $use_position_polling ) {
 
       if ( $reverse_positions_order ) {
 
@@ -2065,8 +2090,8 @@ sub fillReadings {
   my $connected = $hash->{helper}{mower}{attributes}{metadata}{connected};
   readingsBulkUpdateIfChanged( $hash, $pref."_connected", ( $connected ? "CONNECTED($connected)"  : "OFFLINE($connected)") );
 
-  readingsBulkUpdateIfChanged( $hash, $pref."_Timestamp", FmtDateTime( $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp}/1000 ) ); # verschieben nach websocket fill
-  readingsBulkUpdateIfChanged( $hash, $pref."_TimestampDiff", $hash->{helper}{storediff}/1000 );# verschieben nach websocket fill
+  readingsBulkUpdateIfChanged( $hash, $pref."_Timestamp", FmtDateTime( $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp}/1000 ) );
+  readingsBulkUpdateIfChanged( $hash, $pref."_TimestampDiff", $hash->{helper}{storediff}/1000 );
 
   return undef;
 }
@@ -2564,7 +2589,7 @@ sub wsRead {
 
       if ( defined( $result->{type} ) && $result->{id} eq $hash->{helper}{mower_id} ) {
 
-        Log3 $name, 4, "$iam selected websocket data: >$buf<";
+        Log3 $name, 5, "$iam selected websocket data: >$buf<";
         $hash->{helper}{wsResult}{$result->{type}} = dclone( $result );
         $hash->{helper}{wsResult}{type} = $result->{type};
 
@@ -2579,14 +2604,20 @@ sub wsRead {
           $hash->{helper}{mower}{attributes}{planner} = dclone( $result->{attributes}{planner} );
           $hash->{helper}{storediff} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
           $hash->{helper}{storesum} += $hash->{helper}{storediff} if ( $additional_polling );
-          my $act = $result->{attributes}{mower}{activity};
+          my $act = $hash->{helper}{mower}{attributes}{mower}{activity};
+          my $actold = $hash->{helper}{mowerold}{attributes}{mower}{activity};
 
           if ( !$additional_polling ) {
 
             isErrorThanPrepare( $hash );
             resetLastErrorIfCorrected( $hash );
 
-          } elsif ( ( $additional_polling < $hash->{helper}{storesum} || $additional_polling && $act =~ /^(LEAVING|GOING_HOME)/ ) && !$hash->{helper}{midnightCycle} ) {
+          #respect polling min interval with exceptions
+          } elsif ( ( $additional_polling < $hash->{helper}{storesum} || $additional_polling &&
+            ( $act =~ /^(LEAVING|GOING_HOME)/ ||
+              $actold =~ /LEAVING/ && $act eq 'MOWING' ||
+              $actold =~ /GOING_HOME/ && $act =~ /PARKED_IN_CS|CHARGING/
+            ) ) && !$hash->{helper}{midnightCycle} ) {
 
             $hash->{helper}{storesum} = 0;
             # RemoveInternalTimer( $hash, \&getMowerWs );
