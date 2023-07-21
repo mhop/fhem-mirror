@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-07-18 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-07-21 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,7 +136,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.80.13"=> "18.07.2023  include parameter DoN in nextHours hash, new KPI's todayConForecastTillSunset, currentRunMtsConsumer_XX ",
+  "0.80.13"=> "18.07.2023  include parameter DoN in nextHours hash, new KPI's todayConForecastTillSunset, currentRunMtsConsumer_XX ".
+                           "minor fixes and improvements ",
   "0.80.12"=> "16.07.2023  preparation for alternative switch device in consumer attribute, revise CommandRef ". 
                            "fix/improve sub ___readCandQ and much more, get pvHistory -> one specific day selectable ".
                            "get valConsumerMaster -> one specific consumer selectable, enhance consumer key locktime by on-locktime ",
@@ -5953,11 +5954,11 @@ sub ___switchConsumerOn {
   my $cname   = ConsumerVal ($hash, $c, 'name',             '');                                  # Consumer Device Name
   my $calias  = ConsumerVal ($hash, $c, 'alias',            '');                                  # Consumer Device Alias
 
-  my ($swoncond,$swoffcond,$info,$err);
-  ($swoncond,$info,$err)  = isAddSwitchOnCond  ($hash, $c);                                       # zusätzliche Switch on Bedingung
+  my ($swoncond,$swoffcond,$infon,$infoff,$err);
+  ($swoncond,$infon,$err) = isAddSwitchOnCond ($hash, $c);                                        # zusätzliche Switch on Bedingung
   Log3 ($name, 1, "$name - $err") if($err);
 
-  ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c);                                       # zusätzliche Switch off Bedingung
+  ($swoffcond,$infoff,$err) = isAddSwitchOffCond ($hash, $c);                                     # zusätzliche Switch off Bedingung
   Log3 ($name, 1, "$name - $err") if($err);
 
   my ($iilt,$rlt) = isInLocktime ($paref);                                                        # Sperrzeit Status ermitteln
@@ -5977,6 +5978,8 @@ sub ___switchConsumerOn {
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - current Context is switching "on" => }.
                       qq{swoncond: $swoncond, on-command: $oncom }
            );
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOnCond Info: $infon}) if($swoncond && $infon);
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOffCond Info: $infoff}) if($swoffcond && $infoff);
            
       if (simplifyCstate($pstate) =~ /planned|priority|starting/xs && isInTimeframe ($hash, $c) && $iilt) {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - switching on postponed by >isInLocktime<});
@@ -6050,7 +6053,8 @@ sub ___switchConsumerOff {
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};                                                                        # aktueller Unixtimestamp
   my $state = $paref->{state};
-
+  my $debug = $paref->{debug};
+  
   my $pstate  = ConsumerVal ($hash, $c, "planstate",        "");
   my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);                                  # geplante Unix Stopzeit
   my $auto    = ConsumerVal ($hash, $c, "auto",              1);
@@ -6059,20 +6063,31 @@ sub ___switchConsumerOff {
   my $mode    = ConsumerVal ($hash, $c, "mode",      $defcmode);                                  # Consumer Planungsmode
   my $hyst    = ConsumerVal ($hash, $c, "hysteresis", $defhyst);                                  # Hysterese
 
-  my $offcom                 = ConsumerVal        ($hash, $c, "offcom", "");                      # Set Command für "off"
-  my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c);                                    # zusätzliche Switch off Bedingung
+  my $offcom                   = ConsumerVal        ($hash, $c, "offcom", "");                    # Set Command für "off"
+  my ($swoffcond,$infoff,$err) = isAddSwitchOffCond ($hash, $c);                                  # zusätzliche Switch off Bedingung
   my $cause;
 
   Log3 ($name, 1, "$name - $err") if($err);
   
   my ($iilt,$rlt) = isInLocktime ($paref);                                                        # Sperrzeit Status ermitteln
   
-  debugLog ($paref, "consumerSwitching", qq{consumer "$c" - current Context is switching "off" => }.
-                                         qq{swoffcond: $swoffcond, off-command: $offcom});
-                                         
-  if ($stopts && $t >= $stopts && $iilt) {
-      debugLog ($paref, "consumerSwitching", qq{consumer "$c" - switching off postponed by >isInLocktime<});
+  if ($debug =~ /consumerSwitching/x) {                                                           # nur für Debugging   
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - current Context is switching "off" => }.
+                      qq{swoffcond: $swoffcond, off-command: $offcom}
+           );
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOffCond Info: $infoff}) if($swoffcond && $infoff);
+      
+      if ($stopts && $t >= $stopts && $iilt) {
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - switching off postponed by >isInLocktime<});
+      }
   }
+  
+  #debugLog ($paref, "consumerSwitching", qq{consumer "$c" - current Context is switching "off" => }.
+  #                                       qq{swoffcond: $swoffcond, off-command: $offcom});
+                                         
+  #if ($stopts && $t >= $stopts && $iilt) {
+  #    debugLog ($paref, "consumerSwitching", qq{consumer "$c" - switching off postponed by >isInLocktime<});
+  #}
 
   if(($swoffcond || ($stopts && $t >= $stopts)) && !$iilt &&
      ($auto && $offcom && simplifyCstate($pstate) =~ /started|starting|stopping|interrupt|continu/xs)) {
@@ -9114,9 +9129,8 @@ sub substConsumerIcon {
   my $hash = shift;
   my $c    = shift;
 
-  my $name = $hash->{NAME};
-
-  my $cicon   = ConsumerVal ($hash, $c, "icon",        "");                  # Icon des Consumerdevices angegeben ?
+  my $name  = $hash->{NAME};
+  my $cicon = ConsumerVal ($hash, $c, "icon", "");                           # Icon des Consumerdevices angegeben ?
 
   if (!$cicon) {
       $cicon = 'light_light_dim_100';
@@ -13090,9 +13104,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>auto</b>           </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                                          </td></tr>
             <tr><td>                       </td><td>Readingwert = 1 - Schalten freigegeben (default),  0: Schalten blockiert                                                                       </td></tr>
             <tr><td> <b>pcurr</b>          </td><td>Reading:Einheit (W/kW) welches den aktuellen Energieverbrauch liefert (optional)                                                               </td></tr>
-            <tr><td>                       </td><td>:&lt;Schwellenwert&gt (W) - aktuelle Leistung ab welcher der Verbraucher als aktiv gewertet wird.                                              </td></tr>
+            <tr><td>                       </td><td>:&lt;Schwellenwert&gt (W) - Ab diesem Leistungsbezug wird der Verbraucher als aktiv gewertet. Die Angabe ist optional (default: 0)             </td></tr>
             <tr><td> <b>etotal</b>         </td><td>Reading:Einheit (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert (optional)                                    </td></tr>
-            <tr><td>                       </td><td>:&lt;Schwellenwert&gt (Wh) - Energieverbrauch pro Stunde ab dem der Verbrauch als gültig gewertet wird.                                        </td></tr>
+            <tr><td>                       </td><td>:&lt;Schwellenwert&gt (Wh) - Ab diesem Energieverbrauch pro Stunde wird der Verbrauch als gültig gewertet. Optionale Angabe (default: 0)       </td></tr>
             <tr><td> <b>swoncond</b>       </td><td>Bedingung die zusätzlich erfüllt sein muß um den Verbraucher einzuschalten (optional). Der geplante Zyklus wird gestartet.                     </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der zusätzlichen Einschaltbedingung                                                                       </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der zusätzlichen Einschaltbedingung                                                                     </td></tr>
