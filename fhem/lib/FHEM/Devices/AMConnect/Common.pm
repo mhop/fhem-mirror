@@ -632,6 +632,7 @@ sub APIAuth {
 
   if( IsDisabled( $name ) ) {
 
+    readingsSingleUpdate( $hash, 'device_state', 'temporarily disabled', 1 ) if ( ReadingsVal( $name, 'device_state', '' ) !~ /disabled/ );
     RemoveInternalTimer( $hash );
     InternalTimer( gettimeofday() + $hash->{helper}{retry_interval_apiauth}, \&APIAuth, $hash, 0 );
     return undef;
