@@ -1,5 +1,4 @@
 # $Id$
-
 # This modules handles the communication with a TCM 120 or TCM 310 / TCM 400J /
 # TCM 515 EnOcean transceiver chip. As the protocols are radically different,
 # this is actually 2 drivers in one.
@@ -48,7 +47,7 @@ sub TCM_Initialize($) {
   $hash->{UndefFn} = "TCM_Undef";
   $hash->{AttrList} = "assignIODev:select,no,yes baseID .baseIDSaved blockSenderID:own,no .chipIDSaved comModeUTE:auto,biDir,uniDir comType:TCM,RS485 do_not_notify:1,0 " .
                       "dummy:1,0 fingerprint:off,on learningDev:all,teachMsg learningMode:always,demand,nearfield " .
-                      "msgCounter:select,off,on rcvIDShift sendInterval:0,25,40,50,100,150,200,250 smartAckMailboxMax:slider,0,1,20 " .
+                      "msgCounter:select,off,on rcvIDShift sendInterval:0,10,15,20,25,40,50,100,150,200,250 smartAckMailboxMax:slider,0,1,20 " .
                       "smartAckLearnMode:simple,advance,advanceSelectRep";
   return undef;
 }
@@ -117,11 +116,11 @@ sub TCM_InitSerialCom($) {
   # default attributes
   my %setAttrInit;
   if ($comType eq "RS485" || $hash->{DeviceName} eq "none") {
-    %setAttrInit = (sendInterval => {ESP2 => 100, ESP3 => 0},
+    %setAttrInit = (sendInterval => {ESP2 => 100, ESP3 => 15},
                     learningMode => {ESP2 => "always", ESP3 => "always"}
                    );
   }else {
-    %setAttrInit = ("sendInterval" => {ESP2 => 100, ESP3 => 0});
+    %setAttrInit = ("sendInterval" => {ESP2 => 100, ESP3 => 15});
   }
   foreach(keys %setAttrInit) {
     $attrVal = AttrVal($name, $_, undef);
@@ -798,7 +797,7 @@ sub TCM_Ready($) {
   my $po = $hash->{USBDev};
   return undef if(!$po);
   my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
-  return ($InBytes>0);
+  return ($InBytes > 0);
 }
 
 # Get commands TCM 120
@@ -899,6 +898,8 @@ my %sets310 = (
   "maturity" => {packetType => 5, cmd => "10", arg => "0[0-1]"},
   "mode" => {packetType => 5, cmd => "1C", arg => "0[0-1]"},
   "noiseThreshold" => {packetType => 5, cmd => "32", arg => "2E|2F|3[0-8]"},
+  "pskAdd" => {arg => "[0-9a-fA-F]{32}"},
+  "pskDel" => {},
   "remanCode" => {packetType => 5, cmd => "2E", arg => "[0-9A-F]{8}"},
   "remanRepeating" => {packetType => 5, cmd => "30", arg => "0[0-1]"},
   "reset" => {packetType => 5, cmd => "02"},
@@ -953,8 +954,7 @@ sub TCM_Set($@) {
   my ($err, $msg);
   my $chash = ($hash->{MODEL} eq "ESP2" ? \%sets120 : \%sets310);
   my $cmdhash = $chash->{$cmd};
-  return "Unknown argument $cmd, choose one of ".join(" ",sort keys %{$chash})
-          if(!defined($cmdhash));
+  return "Unknown argument $cmd, choose one of ".join(" ",sort keys %{$chash}) if(!defined($cmdhash));
 
   my $cmdHex = $cmdhash->{cmd};
   my $argre = $cmdhash->{arg};
@@ -962,7 +962,11 @@ sub TCM_Set($@) {
   if($argre) {
     return "Argument needed for set $name $cmd ($argre)" if (!defined($arg));
     return "Argument does not match the regexp ($argre)" if ($arg !~ m/$argre/i);
-    if ($cmd eq "smartAckLearn") {
+    if ($cmd eq "pskAdd") {
+      $modules{"$hash->{TYPE}"}{STE}{psk} = $arg;
+      Log3 $name, 3, "TCM $name set $cmd $logArg";
+      return;
+    } elsif ($cmd eq "smartAckLearn") {
       if (($arg + 0) >= 0 && ($arg + 0) <= 4294967) {
         if ($arg == 0) {
           $arg = '0' x 12;
@@ -989,7 +993,10 @@ sub TCM_Set($@) {
   }
   Log3 $name, 3, "TCM $name set $cmd $logArg";
 
-  if($cmd eq "teach") {
+  if($cmd eq "pskDel") {
+    delete $modules{"$hash->{TYPE}"}{STE}{psk};
+    return;
+  } elsif($cmd eq "teach") {
     if ($arg == 0) {
       RemoveInternalTimer($hash, "TCM_ClearTeach");
       while (my ($iDev, $iHash) = each (%{$modules{"$hash->{TYPE}"}{devHash}})) {
@@ -1781,6 +1788,10 @@ sub TCM_Shutdown($) {
       noiseThreshold = 36: -92 dBm<br>
       noiseThreshold = 37: -91 dBm<br>
       noiseThreshold = 38: -90 dBm</li>
+    <li><a id="TCM-set-pskAdd">pskAdd</a> [16 byte hex]<br>
+      Set the pre-shared key (psk) for secure teach-in. The key is stored until the Fhem restart.</li>
+    <li><a id="TCM-set-pskDel">pskDel</a><br>
+      Delete the pre-shared key (psk) for secure teach-in.</li>
     <li><a id="TCM-set-remanCode">remanCode</a> [00000000-FFFFFFFF]<br>
       Sets secure code to unlock Remote Management functionality by radio.</li>
     <li><a id="TCM-set-remanRepeating">remanRepeating</a> [00|01]<br>
@@ -1809,7 +1820,7 @@ sub TCM_Shutdown($) {
       Transmitting additional subtelegram info: Enable = 01, Disable = 00</li>
     <li><a id="TCM-set-teach">teach</a> &lt;t/s&gt;<br>
       Set Fhem in learning mode for RBS, 1BS, 4BS, GP, STE and UTE teach-in / teach-out, see <a href="#TCM-attr-learningMode">learningMode</a>
-      and <a href="#TCM-atrr-learningDev">learningDev</a>.<br>
+      and <a href="#TCM-attr-learningDev">learningDev</a>.<br>
       The command is always required for STE, GB, UTE and to teach-in bidirectional actuators
       e. g. EEP 4BS (RORG A5-20-XX), see <a href="#EnOcean-teach-in">Teach-In / Teach-Out</a>.</li>
     <br>
@@ -1932,7 +1943,7 @@ sub TCM_Shutdown($) {
     </li>
     <li><a id="TCM-attr-sendInterval">sendInterval</a> &lt;0 ... 250&gt;<br>
       ESP2: [sendInterval] = 100 ms is default.<br>
-      ESP3: [sendInterval] = 0 ms is default.<br>
+      ESP3: [sendInterval] = 15 ms is default.<br>
       Smallest interval between two sending telegrams
     </li>
     <li><a id="TCM-attr-smartAckLearnMode">smartAckLearnMode</a> &lt;simple|advance|advanceSelectRep&gt;<br>
