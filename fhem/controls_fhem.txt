@@ -1,4 +1,4 @@
-REV 27786
+REV 27789
 DIR unused
 UPD 2023-07-21_07:45:03 405542 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -750,8 +750,8 @@ UPD 2023-07-21_07:45:09 4896238 docs/commandref.html
 UPD 2023-07-17_07:45:12 2906940 docs/commandref_DE.html
 UPD 2023-05-01_07:45:03 85822 docs/commandref_frame.html
 UPD 2023-05-01_07:45:03 96447 docs/commandref_frame_DE.html
-UPD 2023-07-21_07:45:13 305677 docs/commandref_modular.html
-UPD 2023-07-21_07:45:14 317420 docs/commandref_modular_DE.html
+UPD 2023-07-22_07:45:13 305677 docs/commandref_modular.html
+UPD 2023-07-22_07:45:14 317420 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -781,7 +781,7 @@ UPD 2021-05-26_07:45:02 6647 lib/FHEM/Core/Timer/Register.pm
 UPD 2021-04-26_07:45:03 8936 lib/FHEM/Core/Utils/FHEMbackup.pm
 UPD 2023-01-18_07:45:03 1432 lib/FHEM/Core/Utils/Math.pm
 UPD 2023-02-06_07:45:02 34302 lib/FHEM/Core/Weather.pm
-UPD 2023-07-21_07:45:03 108919 lib/FHEM/Devices/AMConnect/Common.pm
+UPD 2023-07-22_07:45:03 109059 lib/FHEM/Devices/AMConnect/Common.pm
 UPD 2023-05-16_07:45:03 55562 lib/FHEM/Devices/LGTV/LGTVWebOS.pm
 UPD 2022-09-27_07:45:03 42814 lib/FHEM/Devices/Nuki/Bridge.pm
 UPD 2021-12-18_07:45:03 16385 lib/FHEM/Devices/Nuki/Device.pm
