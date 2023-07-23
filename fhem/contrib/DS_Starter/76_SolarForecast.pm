@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-07-21 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-07-23 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,6 +136,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.80.15"=> "23.07.2023  new sub getDebug, new key switchdev in consumer attributes ",
+  "0.80.14"=> "21.07.2023  __substConsumerIcon: use isConsumerLogOn instead of isConsumerPhysOn ",
   "0.80.13"=> "18.07.2023  include parameter DoN in nextHours hash, new KPI's todayConForecastTillSunset, currentRunMtsConsumer_XX ".
                            "minor fixes and improvements ",
   "0.80.12"=> "16.07.2023  preparation for alternative switch device in consumer attribute, revise CommandRef ". 
@@ -2176,8 +2178,8 @@ sub _getRoofTopData {
   my $name  = $hash->{NAME};
      
   $paref->{date}  = strftime "%Y-%m-%d", localtime(time);                    # aktuelles Datum
-  $paref->{debug} = AttrVal ($name, 'ctrlDebug', 'none');
-  $paref->{lang}  = getLang ($hash);
+  $paref->{debug} = getDebug ($hash); 
+  $paref->{lang}  = getLang  ($hash);
 
   if($hash->{MODEL} eq 'SolCastAPI') {
       __getSolCastData ($paref);
@@ -3439,25 +3441,22 @@ sub Notify {
 
   return if(!@consumers);
   
-  my $debug = AttrVal ($myName, 'ctrlDebug', 'none');                                     # Debug Mode
+  my $debug = getDebug ($myHash);                                                         # Debug Mode
 
   if($devName ~~ @consumers) {
       my ($cname, $cindex);
       my $type = $myHash->{TYPE};
       
       for my $c (sort{$a<=>$b} keys %{$data{$type}{$myName}{consumers}}) {
-          $cname = ConsumerVal ($myHash, $c, 'name', '');
+          my ($cname, $dswname) = getCDnames ($myHash, $c);
           
           if ($devName eq $cname) {
               $cindex = $c;
               last;
           }
-          
-          my $dswname = ConsumerVal ($myHash, $c, 'dswitch', '');                         # Switch Device
 
-          if ($devName eq $dswname) {
+          if ($devName eq $dswname) { 
               $cindex = $c;
-              $cname  = ConsumerVal ($myHash, $c, 'name', '');
               
               if ($debug =~ /notifyHandling/x) {
                   Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Event device >$devName< is switching device of consumer >$cname< (index: $c)});
@@ -3845,7 +3844,7 @@ sub centralTask {
       my $minute  = strftime "%M",       localtime($t);                                            # aktuelle Minute
       my $day     = strftime "%d",       localtime($t);                                            # aktueller Tag  (range 01 to 31)
       my $dayname = strftime "%a",       localtime($t);                                            # aktueller Wochentagsname
-      my $debug   = AttrVal              ($name, 'ctrlDebug', 'none');                             # Debug Module
+      my $debug   = getDebug ($hash);                                                              # Debug Module
 
       my $centpars = {
           hash    => $hash,
@@ -4987,7 +4986,7 @@ sub _transferMeterValues {
       }
   }
   elsif (!defined CircularVal ($hash, 99, 'initdaygcon', undef)) {
-      $data{$type}{$name}{circular}{99}{initdaygcon} = $gctotal-$gcdaypast-ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
+      $data{$type}{$name}{circular}{99}{initdaygcon} = $gctotal - $gcdaypast - ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
   }
   else {
       $docon = 1;
@@ -5947,12 +5946,18 @@ sub ___switchConsumerOn {
   my $state = $paref->{state};
   my $debug = $paref->{debug};
 
-  my $pstate  = ConsumerVal ($hash, $c, 'planstate',        '');
-  my $startts = ConsumerVal ($hash, $c, 'planswitchon',  undef);                                  # geplante Unix Startzeit
-  my $oncom   = ConsumerVal ($hash, $c, 'oncom',            '');                                  # Set Command für "on"
-  my $auto    = ConsumerVal ($hash, $c, 'auto',              1);
-  my $cname   = ConsumerVal ($hash, $c, 'name',             '');                                  # Consumer Device Name
-  my $calias  = ConsumerVal ($hash, $c, 'alias',            '');                                  # Consumer Device Alias
+  my ($cname, $dswname) = getCDnames ($hash, $c);                                                 # Consumer und Switch Device Name
+  my $pstate            = ConsumerVal ($hash, $c, 'planstate',        '');
+  my $startts           = ConsumerVal ($hash, $c, 'planswitchon',  undef);                        # geplante Unix Startzeit
+  my $oncom             = ConsumerVal ($hash, $c, 'oncom',            '');                        # Set Command für "on"
+  my $auto              = ConsumerVal ($hash, $c, 'auto',              1);                             
+  my $calias            = ConsumerVal ($hash, $c, 'alias',        $cname);                        # Consumer Device Alias
+    
+  if(!$defs{$dswname}) {
+      $state = qq{ERROR - the device "$dswname" is invalid. Please check device names in consumer "$c" attribute};
+      Log3($name, 1, "$name - $state");
+      return $state;
+  }
 
   my ($swoncond,$swoffcond,$infon,$infoff,$err);
   ($swoncond,$infon,$err) = isAddSwitchOnCond ($hash, $c);                                        # zusätzliche Switch on Bedingung
@@ -5980,6 +5985,7 @@ sub ___switchConsumerOn {
            );
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOnCond Info: $infon}) if($swoncond && $infon);
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOffCond Info: $infoff}) if($swoffcond && $infoff);
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - device >$dswname< is used as switching device});
            
       if (simplifyCstate($pstate) =~ /planned|priority|starting/xs && isInTimeframe ($hash, $c) && $iilt) {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - switching on postponed by >isInLocktime<});
@@ -6002,8 +6008,7 @@ sub ___switchConsumerOn {
         delete $paref->{ps};
       }
       elsif ($mode eq "must" || isConsRcmd($hash, $c)) {                                          # "Muss"-Planung oder Überschuß > Leistungsaufnahme (can)
-          CommandSet(undef,"$cname $oncom");
-          #my $stopdiff = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
+          CommandSet(undef,"$dswname $oncom");
 
           $paref->{ps} = "switching on:";
 
@@ -6024,7 +6029,7 @@ sub ___switchConsumerOn {
          simplifyCstate   ($pstate) =~ /interrupted|interrupting/xs       &&
          $auto && $oncom && !$iilt) {
 
-      CommandSet(undef,"$cname $oncom");
+      CommandSet(undef,"$dswname $oncom");
 
       $paref->{ps} = "continuing:";
 
@@ -6058,11 +6063,11 @@ sub ___switchConsumerOff {
   my $pstate  = ConsumerVal ($hash, $c, "planstate",        "");
   my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);                                  # geplante Unix Stopzeit
   my $auto    = ConsumerVal ($hash, $c, "auto",              1);
-  my $cname   = ConsumerVal ($hash, $c, "name",             "");                                  # Consumer Device Name
   my $calias  = ConsumerVal ($hash, $c, "alias",            "");                                  # Consumer Device Alias
   my $mode    = ConsumerVal ($hash, $c, "mode",      $defcmode);                                  # Consumer Planungsmode
   my $hyst    = ConsumerVal ($hash, $c, "hysteresis", $defhyst);                                  # Hysterese
-
+  
+  my ($cname, $dswname)        = getCDnames         ($hash, $c);                                  # Consumer und Switch Device Name
   my $offcom                   = ConsumerVal        ($hash, $c, "offcom", "");                    # Set Command für "off"
   my ($swoffcond,$infoff,$err) = isAddSwitchOffCond ($hash, $c);                                  # zusätzliche Switch off Bedingung
   my $cause;
@@ -6081,17 +6086,10 @@ sub ___switchConsumerOff {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - switching off postponed by >isInLocktime<});
       }
   }
-  
-  #debugLog ($paref, "consumerSwitching", qq{consumer "$c" - current Context is switching "off" => }.
-  #                                       qq{swoffcond: $swoffcond, off-command: $offcom});
-                                         
-  #if ($stopts && $t >= $stopts && $iilt) {
-  #    debugLog ($paref, "consumerSwitching", qq{consumer "$c" - switching off postponed by >isInLocktime<});
-  #}
 
   if(($swoffcond || ($stopts && $t >= $stopts)) && !$iilt &&
      ($auto && $offcom && simplifyCstate($pstate) =~ /started|starting|stopping|interrupt|continu/xs)) {
-      CommandSet(undef,"$cname $offcom");
+      CommandSet(undef,"$dswname $offcom");
 
       $paref->{ps} = "switching off:";
 
@@ -6110,7 +6108,7 @@ sub ___switchConsumerOff {
          isInTimeframe    ($hash, $c)        && simplifyCstate ($pstate) =~ /started|continued|interrupting/xs      &&
          $auto && $offcom && !$iilt) {
 
-      CommandSet(undef,"$cname $offcom");
+      CommandSet(undef,"$dswname $offcom");
 
       $paref->{ps} = "interrupting:";
 
@@ -7376,7 +7374,6 @@ sub entryGraphic {
       caicon         => AttrVal ($name,    'consumerAdviceIcon',        $caicondef),            # Consumer AdviceIcon
       clegend        => AttrVal ($name,    'consumerLegend',            'icon_top'),            # Lage und Art Cunsumer Legende
       clink          => AttrVal ($name,    'consumerLink'  ,                     1),            # Detail-Link zum Verbraucher
-      debug          => AttrVal ($name,    'ctrlDebug',                     'none'),            # Debug Module
       lotype         => AttrVal ($name,    'graphicLayoutType',           'double'),
       kw             => AttrVal ($name,    'graphicEnergyUnit',               'Wh'),
       height         => AttrNum ($name,    'graphicBeamHeight',                200),
@@ -7400,6 +7397,7 @@ sub entryGraphic {
       flowgconsDist  => AttrVal ($name,    'flowGraphicConsumerDistance', $fgCDdef),            # Abstand Verbrauchericons zueinander
       css            => AttrVal ($name,    'flowGraphicCss',               $cssdef),            # flowGraphicCss Styles
       lang           => AttrVal ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang)),
+      debug          => getDebug ($hash),                                                        # Debug Module
   };
 
   my $ret = q{};
@@ -8079,24 +8077,24 @@ sub _graphicConsumerLegend {
   my $tro    = 0;
 
   for my $c (@consumers) {
-      my $caicon     = $paref->{caicon};                                                            # Consumer AdviceIcon
-      my $cname      = ConsumerVal ($hash, $c, "name",                    "");                      # Name des Consumerdevices
-      my $calias     = ConsumerVal ($hash, $c, "alias",               $cname);                      # Alias des Consumerdevices
-      my $cicon      = ConsumerVal ($hash, $c, "icon",                    "");                      # Icon des Consumerdevices
-      my $oncom      = ConsumerVal ($hash, $c, "oncom",                   "");                      # Consumer Einschaltkommando
-      my $offcom     = ConsumerVal ($hash, $c, "offcom",                  "");                      # Consumer Ausschaltkommando
-      my $autord     = ConsumerVal ($hash, $c, "autoreading",             "");                      # Readingname f. Automatiksteuerung
-      my $auto       = ConsumerVal ($hash, $c, "auto",                     1);                      # Automatic Mode
-
-      my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 set $cname $oncom')"};
-      my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 set $cname $offcom')"};
+      my $caicon            = $paref->{caicon};                                                     # Consumer AdviceIcon
+      my ($cname, $dswname) = getCDnames  ($hash, $c);                                              # Consumer und Switch Device Name 
+      my $calias            = ConsumerVal ($hash, $c, "alias",   $cname);                           # Alias des Consumerdevices
+      my $cicon             = ConsumerVal ($hash, $c, "icon",        "");                           # Icon des Consumerdevices
+      my $oncom             = ConsumerVal ($hash, $c, "oncom",       "");                           # Consumer Einschaltkommando
+      my $offcom            = ConsumerVal ($hash, $c, "offcom",      "");                           # Consumer Ausschaltkommando
+      my $autord            = ConsumerVal ($hash, $c, "autoreading", "");                           # Readingname f. Automatiksteuerung
+      my $auto              = ConsumerVal ($hash, $c, "auto",         1);                           # Automatic Mode
+      
+      my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 set $dswname $oncom')"};
+      my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 set $dswname $offcom')"};
       my $cmdautoon  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 setreading $cname $autord 1')"};
       my $cmdautooff = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 setreading $cname $autord 0')"};
       my $implan     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 consumerImmediatePlanning $c')"};
 
       if ($ftui eq "ftui") {
-          $cmdon      = qq{"ftui.setFhemStatus('set $name clientAction $c 0 set $cname $oncom')"};
-          $cmdoff     = qq{"ftui.setFhemStatus('set $name clientAction $c 0 set $cname $offcom')"};
+          $cmdon      = qq{"ftui.setFhemStatus('set $name clientAction $c 0 set $dswname $oncom')"};
+          $cmdoff     = qq{"ftui.setFhemStatus('set $name clientAction $c 0 set $dswname $offcom')"};
           $cmdautoon  = qq{"ftui.setFhemStatus('set $name clientAction $c 0 setreading $cname $autord 1')"};
           $cmdautooff = qq{"ftui.setFhemStatus('set $name clientAction $c 0 setreading $cname $autord 0')"};
           $implan     = qq{"ftui.setFhemStatus('set $name clientAction $c 0 consumerImmediatePlanning $c')"};
@@ -8934,9 +8932,9 @@ END0
       $pos_left       = $consumer_start + 15;
 
       for my $c0 (@consumers) {
-          my $calias      = ConsumerVal       ($hash, $c0, "alias", "");                            # Name des Consumerdevices
-          $currentPower   = ReadingsNum       ($name, "consumer${c0}_currentPower", 0);
-          my $cicon       = substConsumerIcon ($hash, $c0);                                         # Icon des Consumerdevices
+          my $calias      = ConsumerVal         ($hash, $c0, "alias", "");                          # Name des Consumerdevices
+          $currentPower   = ReadingsNum         ($name, "consumer${c0}_currentPower", 0);
+          my $cicon       = __substConsumerIcon ($hash, $c0, $currentPower);                        # Icon des Consumerdevices
           $cc_dummy      -= $currentPower;
 
           $ret .= '<g id="consumer_'.$c0.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
@@ -9125,9 +9123,10 @@ return $ret;
 #       und setze ggf. Ersatzwerte
 #       $c     - Consumer Nummer
 ################################################################
-sub substConsumerIcon {
-  my $hash = shift;
-  my $c    = shift;
+sub __substConsumerIcon {
+  my $hash  = shift;
+  my $c     = shift;
+  my $pcurr = shift;
 
   my $name  = $hash->{NAME};
   my $cicon = ConsumerVal ($hash, $c, "icon", "");                           # Icon des Consumerdevices angegeben ?
@@ -9140,7 +9139,7 @@ sub substConsumerIcon {
   ($cicon,$color) = split '@', $cicon;
 
   if (!$color) {
-      $color = isConsumerPhysOn($hash, $c) ? 'darkorange' : '';
+      $color = isConsumerLogOn ($hash, $c, $pcurr) ? 'darkorange' : '';
   }
 
   $cicon .= '@'.$color if($color);
@@ -9156,7 +9155,7 @@ sub consinject {
   my $name                 = $hash->{NAME};
   my $ret                  = "";
 
-  my $debug = AttrVal ($name, 'ctrlDebug', 'none');
+  my $debug = getDebug ($hash);                                                        # Debug Module
 
   for (@consumers) {
       if ($_) {
@@ -11031,16 +11030,16 @@ sub isConsumerPhysOn {
   my $c    = shift;
   my $name = $hash->{NAME};
 
-  my $cname = ConsumerVal ($hash, $c, 'name', '');                       # Devicename Customer
-
-  if(!$defs{$cname}) {
-      Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the "on" state can't be identified});
+my ($cname, $dswname) = getCDnames ($hash, $c);                          # Consumer und Switch Device Name
+  
+  if(!$defs{$dswname}) {
+      Log3($name, 1, qq{$name - ERROR - the device "$dswname" is invalid. Please check device names in consumer "$c" attribute});
       return 0;
   }
 
   my $reg      = ConsumerVal ($hash, $c, 'onreg',       'on');
   my $rswstate = ConsumerVal ($hash, $c, 'rswstate', 'state');           # Reading mit Schaltstatus
-  my $swstate  = ReadingsVal ($cname, $rswstate,     'undef');
+  my $swstate  = ReadingsVal ($dswname, $rswstate,   'undef');
 
   if ($swstate =~ m/^$reg$/x) {
       return 1;
@@ -11058,16 +11057,16 @@ sub isConsumerPhysOff {
   my $c    = shift;
   my $name = $hash->{NAME};
 
-  my $cname = ConsumerVal ($hash, $c, 'name', '');                       # Devicename Customer
-
-  if(!$defs{$cname}) {
-      Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the "off" state can't be identified});
+  my ($cname, $dswname) = getCDnames ($hash, $c);                        # Consumer und Switch Device Name
+  
+  if(!$defs{$dswname}) {
+      Log3($name, 1, qq{$name - ERROR - the device "$dswname" is invalid. Please check device names in consumer "$c" attribute});
       return 0;
   }
 
   my $reg      = ConsumerVal ($hash, $c, 'offreg',     'off');
   my $rswstate = ConsumerVal ($hash, $c, 'rswstate', 'state');           # Reading mit Schaltstatus
-  my $swstate  = ReadingsVal ($cname, $rswstate,     'undef');
+  my $swstate  = ReadingsVal ($dswname, $rswstate,    'undef');
 
   if ($swstate =~ m/^$reg$/x) {
       return 1;
@@ -11104,7 +11103,7 @@ sub isConsumerLogOn {
   my $type       = $hash->{TYPE};
   my $nompower   = ConsumerVal ($hash, $c, "power",          0);                           # nominale Leistung lt. Typenschild
   my $rpcurr     = ConsumerVal ($hash, $c, "rpcurr",        "");                           # Reading für akt. Verbrauch angegeben ?
-  my $pthreshold = ConsumerVal ($hash, $c, "powerthreshold", 0);                           # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird
+  my $pthreshold = ConsumerVal ($hash, $c, "powerthreshold", 0);                           # Schwellenwert (W) ab der ein Verbraucher als aktiv gewertet wird
 
   if (!$rpcurr && isConsumerPhysOn($hash, $c)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
       $pcurr = $nompower;
@@ -11332,12 +11331,12 @@ sub isInterruptable {
       return 1;
   }
 
-  my $debug = AttrVal ($name, 'ctrlDebug', 'none');
+  my $debug = getDebug ($hash);                                                            # Debug Module
 
   my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c, $intable, $hyst);
   Log3 ($name, 1, "$name - $err") if($err);
 
-  if ($debug =~ /consumerSwitching/x) {                                                   # nur für Debugging
+  if ($debug =~ /consumerSwitching/x) {                                                   
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isInterruptable Info: $info});
   }
 
@@ -11496,15 +11495,15 @@ sub lastConsumerSwitchtime {
   my $c    = shift;
   my $name = $hash->{NAME};
 
-  my $cname = ConsumerVal ($hash, $c, 'name', '');                             # Devicename Customer
+  my ($cname, $dswname) = getCDnames ($hash, $c);                              # Consumer und Switch Device Name
 
-  if(!$defs{$cname}) {
-      Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the last switching time can't be identified});
+  if(!$defs{$dswname}) {
+      Log3($name, 1, qq{$name - ERROR - The last switching time can't be identified due to the device "$dswname" is invalid. Please check device names in consumer "$c" attribute});
       return;
   }
 
   my $rswstate = ConsumerVal           ($hash, $c, 'rswstate', 'state');       # Reading mit Schaltstatus
-  my $swtime   = ReadingsTimestamp     ($cname, $rswstate,          '');       # Zeitstempel im Format 2016-02-16 19:34:24
+  my $swtime   = ReadingsTimestamp     ($dswname, $rswstate,        '');       # Zeitstempel im Format 2016-02-16 19:34:24
   my $swtimets = timestringToTimestamp ($swtime) if($swtime);                  # Unix Timestamp Format erzeugen
 
 return ($swtime, $swtimets);
@@ -11560,6 +11559,32 @@ sub getLang {
   my $lang  = AttrVal ($name, 'ctrlLanguage', $glang);
 
 return $lang;
+}
+
+################################################################
+#  den eingestellte Debug Modus ermitteln
+################################################################
+sub getDebug {
+  my $hash = shift;
+  
+  my $debug = AttrVal ($hash->{NAME}, 'ctrlDebug', 'none');
+
+return $debug;
+} 
+
+################################################################
+#  Namen des Consumerdivices und des zugeordneten
+#  Switch Devices ermitteln
+################################################################
+sub getCDnames {
+  my $hash = shift;
+  my $c    = shift;
+  
+  my $cname   = ConsumerVal ($hash, $c, "name",        "");                                  # Name des Consumerdevices
+  my $dswname = ConsumerVal ($hash, $c, 'dswitch', $cname);                                  # alternatives Switch Device
+
+
+return ($cname, $dswname);
 }
 
 ################################################################
@@ -12137,12 +12162,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>pin</b>       </td><td>Reading welches die aktuelle Batterieladung liefert                         </td></tr>
-          <tr><td> <b>pout</b>      </td><td>Reading welches die aktuelle Batterieentladung liefert                      </td></tr>
-          <tr><td> <b>intotal</b>   </td><td>Reading welches die totale Batterieladung liefert (fortlaufender Zähler)    </td></tr>
-          <tr><td> <b>outtotal</b>  </td><td>Reading welches die totale Batterieentladung liefert (fortlaufender Zähler) </td></tr>
-          <tr><td> <b>charge</b>    </td><td>Reading welches den aktuellen Ladezustand (in Prozent) liefert              </td></tr>
-          <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                         </td></tr>
+          <tr><td> <b>pin</b>       </td><td>Reading welches die aktuelle Batterieladeleistung liefert                                </td></tr>
+          <tr><td> <b>pout</b>      </td><td>Reading welches die aktuelle Batterieentladeleistung liefert                             </td></tr>
+          <tr><td> <b>intotal</b>   </td><td>Reading welches die totale Batterieladung als fortlaufenden Zähler liefert (optional)    </td></tr>
+          <tr><td> <b>outtotal</b>  </td><td>Reading welches die totale Batterieentladung als fortlaufenden Zähler liefert (optional) </td></tr>
+          <tr><td> <b>charge</b>    </td><td>Reading welches den aktuellen Ladezustand (SOC in Prozent) liefert (optional)            </td></tr>
+          <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                                      </td></tr>
         </table>
       </ul>
       <br>
@@ -13015,7 +13040,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; <br>
+       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]<br>
                          [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]              <br>
                          [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]  <br>
                          [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [locktime=&lt;offlt&gt;:[&lt;onlt&gt;]]<br>
@@ -13058,7 +13083,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
          <ul>
          <table>
-         <colgroup> <col width="12%"> <col width="88%"> </colgroup>
+         <colgroup> <col width="12%"> <col width="88%"> </colgroup>         
             <tr><td> <b>type</b>           </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                                             </td></tr>
             <tr><td>                       </td><td><b>dishwasher</b>     - Verbraucher ist eine Spülmaschine                                                                                      </td></tr>
             <tr><td>                       </td><td><b>dryer</b>          - Verbraucher ist ein Wäschetrockner                                                                                     </td></tr>
@@ -13068,6 +13093,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                                          </td></tr>
             <tr><td> <b>power</b>          </td><td>nominale Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                                            </td></tr>
             <tr><td>                       </td><td>(kann auf "0" gesetzt werden)                                                                                                                  </td></tr>
+            <tr><td> <b>switchdev</b>      </td><td>Das angegebene &lt;device&gt; wird als Schalter Device dem Verbraucher zugeordnet (optional). Schaltvorgänge werden mit diesem Gerät           </td></tr>
+            <tr><td>                       </td><td>ausgeführt. Der Schlüssel ist für Verbraucher nützlich bei denen Energiemessung und Schaltung mit verschiedenen Geräten vorgenommen            </td></tr>  
+            <tr><td>                       </td><td>wird, z.B. Homematic oder readingsProxy. Ist switchdev angegeben, beziehen sich die Schlüssel on, off, swstate und asynchron auf dieses Gerät. </td></tr>
             <tr><td> <b>mode</b>           </td><td>Planungsmodus des Verbrauchers (optional). Erlaubt sind:                                                                                       </td></tr>
             <tr><td>                       </td><td><b>can</b>  - Die Einplanung erfolgt zum Zeitpunkt mit wahrscheinlich genügend verfügbaren PV Überschuß (default)                              </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers zum Planungszeitpunkt unterbleibt bei ungenügendem PV-Überschuß.   </td></tr>
