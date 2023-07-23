@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 17 / 2023-07-20
+# Release 18 / 2023-07-23
 
 
 package main;
@@ -375,12 +375,13 @@ my %sleep_readings = (  'asleepduration' => { name => "Manual Sleep", reading =>
                         'apnea_hypopnea_index' => { name => "Apnea/Hypopnea Index", reading => "apneaIndex", unit => 0, },
                         'breathing_disturbances_intensity' => { name => "Breathing Disturbances Intensity", reading => "breathingDisturbancesIntensity", unit => 0, },
                         'pause_duration' => { name => "Pause Duration", reading => "pauseDuration", unit => "s", },
-                        #'manual_distance' => { name => "Manual Distance", reading => "manual_distance", unit => 0, },
-                        #'steps' => { name => "Steps", reading => "steps", unit => 0, },
-                        #'calories' => { name => "Calories", reading => "calories", unit => 0, },
-                        #'metcumul' => { name => "metcumul", reading => "metcumul", unit => 0, },
-                        #'manual_calories' => { name => "Manual Calories", reading => "manual_calories", unit => 0, },
-                        #'effduration' => { name => "Effective Duration", reading => "effduration", unit => 0, },
+                        'manual_distance' => { name => "Manual Distance", reading => "manual_distance", unit => "m", },
+                        'steps' => { name => "Steps", reading => "steps", unit => 0, },
+                        'calories' => { name => "Calories", reading => "calories", unit => 0, },
+                        'metcumul' => { name => "metcumul", reading => "metcumul", unit => 0, },
+                        'manual_calories' => { name => "Manual Calories", reading => "manual_calories", unit => 0, },
+                        'effduration' => { name => "Effective Duration", reading => "effduration", unit => "s", },
+                        'spo2_average' => { name => "SpO2 Average", reading => "spo2_average", unit => "%", },
                         'intensity' => { name => "Intensity", reading => "intensity", unit => 0, },
                         'distance' => { name => "Distance", reading => "workoutDistance", unit => "m", },
                         'elevation' => { name => "Elevation", reading => "workoutElevation", unit => "m", },
