@@ -1,6 +1,6 @@
-REV 27790
+REV 27793
 DIR unused
-UPD 2023-07-21_07:45:03 405542 ./CHANGED
+UPD 2023-07-24_07:45:03 405604 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2023-07-17_07:45:02 46846 ./MAINTAINER.txt
 UPD 2023-05-13_07:45:03 46691 ./configDB.pm
@@ -176,7 +176,7 @@ UPD 2019-03-16_07:45:03 18457 FHEM/32_TechemWZ.pm
 UPD 2020-04-20_07:45:02 209209 FHEM/32_WifiLight.pm
 UPD 2018-03-02_07:47:09 15860 FHEM/32_mailcheck.pm
 UPD 2021-03-02_07:45:03 7532 FHEM/32_speedtest.pm
-UPD 2023-07-20_07:45:02 171771 FHEM/32_withings.pm
+UPD 2023-07-24_07:45:03 171880 FHEM/32_withings.pm
 UPD 2016-09-30_07:45:11 15878 FHEM/32_yowsup.pm
 UPD 2017-12-15_07:45:02 4576 FHEM/33_readingsChange.pm
 UPD 2021-02-28_07:45:19 90558 FHEM/33_readingsGroup.pm
@@ -750,8 +750,8 @@ UPD 2023-07-21_07:45:09 4896238 docs/commandref.html
 UPD 2023-07-17_07:45:12 2906940 docs/commandref_DE.html
 UPD 2023-05-01_07:45:03 85822 docs/commandref_frame.html
 UPD 2023-05-01_07:45:03 96447 docs/commandref_frame_DE.html
-UPD 2023-07-23_07:45:13 305677 docs/commandref_modular.html
-UPD 2023-07-23_07:45:14 317420 docs/commandref_modular_DE.html
+UPD 2023-07-24_07:45:13 305677 docs/commandref_modular.html
+UPD 2023-07-24_07:45:14 317420 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
