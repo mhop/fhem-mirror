@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-07-23 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-07-24 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,7 +136,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.80.15"=> "23.07.2023  new sub getDebug, new key switchdev in consumer attributes ",
+  "0.80.15"=> "24.07.2023  new sub getDebug, new key switchdev in consumer attributes, change Debug consumtion ".
+                           "reorg data in pvHistory when a hour of day was deleted ",
   "0.80.14"=> "21.07.2023  __substConsumerIcon: use isConsumerLogOn instead of isConsumerPhysOn ",
   "0.80.13"=> "18.07.2023  include parameter DoN in nextHours hash, new KPI's todayConForecastTillSunset, currentRunMtsConsumer_XX ".
                            "minor fixes and improvements ",
@@ -1182,7 +1183,8 @@ sub Set {
       argsref => \@args,
       prop    => $prop,
       prop1   => $prop1,
-      prop2   => $prop2
+      prop2   => $prop2,
+      debug   => getDebug ($hash)
   };
 
   if($hset{$opt} && defined &{$hset{$opt}{fn}}) {
@@ -1853,22 +1855,28 @@ sub _setreset {                          ## no critic "not used"
   my $type  = $hash->{TYPE};
 
   if($prop eq "pvHistory") {
-      my $day   = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
+      my $dday  = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
       my $dhour = $paref->{prop2} // "";                                       # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
 
-      if ($day) {
-          if($dhour) {
-              delete $data{$type}{$name}{pvhist}{$day}{$dhour};
-              Log3($name, 3, qq{$name - Hour "$dhour" of day "$day" deleted in pvHistory});
+      if ($dday) {
+          if ($dhour) {
+              delete $data{$type}{$name}{pvhist}{$dday}{$dhour};
+              Log3 ($name, 3, qq{$name - Hour "$dhour" of day "$dday" deleted in pvHistory});
+              
+              $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
+              $paref->{reorgday} = $dday;
+              setPVhistory ($paref);
+              delete $paref->{reorg};
+              delete $paref->{reorgday};
           }
           else {
-              delete $data{$type}{$name}{pvhist}{$day};
-              Log3($name, 3, qq{$name - Day "$day" deleted in pvHistory});
+              delete $data{$type}{$name}{pvhist}{$dday};
+              Log3 ($name, 3, qq{$name - Day "$dday" deleted in pvHistory});
           }
       }
       else {
           delete $data{$type}{$name}{pvhist};
-          Log3($name, 3, qq{$name - all days of pvHistory deleted});
+          Log3 ($name, 3, qq{$name - all days of pvHistory deleted});
       }
       return;
   }
@@ -6486,10 +6494,11 @@ sub _estConsumptionForecast {
 
   ## Verbrauchsvorhersage für den nächsten Tag
   ##############################################
-  my $tomorrow   = strftime "%a", localtime($t+86400);                                                  # Wochentagsname kommender Tag
-  my $totcon     = 0;
-  my $dnum       = 0;
-  my $consumerco = 0;
+  my $tomorrow = strftime "%a", localtime($t+86400);                                                    # Wochentagsname kommender Tag
+  my $totcon   = 0;
+  my $dnum     = 0;
+  
+  debugLog ($paref, "consumption", "################### Consumption forecast for the next day ###################");
 
   for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
       next if ($n eq $day);                                                                             # aktuellen (unvollständigen) Tag nicht berücksichtigen
@@ -6501,6 +6510,8 @@ sub _estConsumptionForecast {
 
       my $dcon = HistoryVal ($hash, $n, 99, "con", 0);
       next if(!$dcon);
+      
+      debugLog ($paref, "consumption", "History Consumption day >$n<: $dcon");
 
       $totcon += $dcon;
       $dnum++;
@@ -6510,7 +6521,7 @@ sub _estConsumptionForecast {
        my $tomavg                                        = int ($totcon / $dnum);
        $data{$type}{$name}{current}{tomorrowconsumption} = $tomavg;                                      # prognostizierter Durchschnittsverbrauch aller (gleicher) Wochentage
 
-       debugLog ($paref, "consumption", "estimated Consumption for tomorrow: $tomavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
+       debugLog ($paref, "consumption", "estimated Consumption for tomorrow: $tomavg, days for avg: $dnum");
   }
   else {
       my $lang = $paref->{lang};
@@ -6534,16 +6545,18 @@ sub _estConsumptionForecast {
                  "17" => 0, "18" => 0, "19" => 0, "20" => 0,
                  "21" => 0, "22" => 0, "23" => 0, "24" => 0,
                };
+               
+  debugLog ($paref, "consumption", "################### Consumption forecast for the next hours ###################");
 
   for my $k (sort keys %{$data{$type}{$name}{nexthours}}) {
-      my $nhtime = NexthoursVal ($hash, $k, "starttime", undef);                                      # Startzeit
+      my $nhtime = NexthoursVal ($hash, $k, "starttime", undef);                                    # Startzeit
       next if(!$nhtime);
 
-      $dnum       = 0;
-      $consumerco = 0;
-      my $utime   = timestringToTimestamp ($nhtime);
-      my $nhday   = strftime "%a", localtime($utime);                                               # Wochentagsname des NextHours Key
-      my $nhhr    = sprintf("%02d", (int (strftime "%H", localtime($utime))) + 1);                  # Stunde des Tages vom NextHours Key  (01,02,...24)
+      $dnum          = 0;
+      my $consumerco = 0;
+      my $utime      = timestringToTimestamp ($nhtime);
+      my $nhday      = strftime "%a", localtime($utime);                                            # Wochentagsname des NextHours Key
+      my $nhhr       = sprintf("%02d", (int (strftime "%H", localtime($utime))) + 1);               # Stunde des Tages vom NextHours Key  (01,02,...24)
 
       for my $m (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
           next if($m eq $day);                                                                      # next wenn gleicher Tag (Datum) wie heute
@@ -6560,7 +6573,7 @@ sub _estConsumptionForecast {
               $consumerco += HistoryVal ($hash, $m, $nhhr, "csme${c}", 0);
           }
 
-          $conhex->{$nhhr} += $hcon - $consumerco if($hcon >= $consumerco);                          # prognostizierter Verbrauch Ex registrierter Verbraucher
+          $conhex->{$nhhr} += $hcon - $consumerco if($hcon >= $consumerco);                         # prognostizierter Verbrauch Ex registrierter Verbraucher
 
           $conh->{$nhhr} += $hcon;
           $dnum++;
@@ -6568,8 +6581,7 @@ sub _estConsumptionForecast {
 
       if ($dnum) {
            $data{$type}{$name}{nexthours}{$k}{confcEx} = int ($conhex->{$nhhr} / $dnum);
-
-           my $conavg                                  = int ($conh->{$nhhr} / $dnum);
+           my $conavg                                  = int ($conh->{$nhhr}   / $dnum);
            $data{$type}{$name}{nexthours}{$k}{confc}   = $conavg;                                   # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
 
            if (NexthoursVal ($hash, $k, "today", 0)) {                                              # nur Werte des aktuellen Tag speichern
@@ -6582,7 +6594,7 @@ sub _estConsumptionForecast {
                delete $paref->{histname};
            }
 
-           debugLog ($paref, "consumption", "estimated Consumption for $nhday -> starttime: $nhtime, con: $conavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
+           debugLog ($paref, "consumption", "estimated Consumption for $nhday -> starttime: $nhtime, confc: $conavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
       }
   }
 
@@ -9775,12 +9787,15 @@ sub setPVhistory {
   my $pvcorrf        = $paref->{pvcorrf}       // "1.00/0";                # pvCorrectionFactor
   my $temp           = $paref->{temp};                                     # Außentemperatur
   my $val            = $paref->{val}           // qq{};                    # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
-
+  
+  my $reorg          = $paref->{reorg}         // 0;                       # Neuberechnung von Werten in Stunde "99" nach Löschen von Stunden eines Tages
+  my $reorgday       = $paref->{reorgday}      // q{};                     # Tag der reorganisiert werden soll
+  
   my $type = $hash->{TYPE};
 
-  $data{$type}{$name}{pvhist}{$day}{99}{dayname} = $dayname;
+  $data{$type}{$name}{pvhist}{$day}{99}{dayname} = $dayname if($day);
 
-  if($histname eq "batinthishour") {                                                              # Batterieladung
+  if ($histname eq "batinthishour") {                                                             # Batterieladung
       $val = $batinthishour;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{batin} = $batinthishour;
 
@@ -9792,7 +9807,7 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{batin} = $batinsum;
   }
 
-  if($histname eq "batoutthishour") {                                                             # Batterieentladung
+  if ($histname eq "batoutthishour") {                                                            # Batterieentladung
       $val = $batoutthishour;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{batout} = $batoutthishour;
 
@@ -9804,7 +9819,7 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{batout} = $batoutsum;
   }
 
-  if($histname eq "pvrl") {                                                                       # realer Energieertrag
+  if ($histname eq "pvrl") {                                                                      # realer Energieertrag
       $val = $ethishour;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour;
 
@@ -9816,7 +9831,7 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{pvrl} = $pvrlsum;
   }
 
-  if($histname eq "pvfc") {                                                                       # prognostizierter Energieertrag
+  if ($histname eq "pvfc") {                                                                      # prognostizierter Energieertrag
       $val = $calcpv;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{pvfc} = $calcpv;
 
@@ -9828,7 +9843,7 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{pvfc} = $pvfcsum;
   }
 
-  if($histname eq "confc") {                                                                       # prognostizierter Hausverbrauch
+  if ($histname eq "confc") {                                                                      # prognostizierter Hausverbrauch
       $val = $confc;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{confc} = $confc;
 
@@ -9840,7 +9855,7 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{confc} = $confcsum;
   }
 
-  if($histname eq "cons") {                                                                       # bezogene Energie
+  if ($histname eq "cons") {                                                                      # bezogene Energie
       $val = $gcthishour;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{gcons} = $gcthishour;
 
@@ -9852,7 +9867,7 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{gcons} = $gcsum;
   }
 
-  if($histname eq "gfeedin") {                                                                    # eingespeiste Energie
+  if ($histname eq "gfeedin") {                                                                   # eingespeiste Energie
       $val = $fithishour;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{gfeedin} = $fithishour;
 
@@ -9864,7 +9879,7 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{gfeedin} = $gfisum;
   }
 
-  if($histname eq "con") {                                                                       # Energieverbrauch des Hauses
+  if ($histname eq "con") {                                                                      # Energieverbrauch des Hauses
       $val = $con;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{con} = $con;
 
@@ -9876,7 +9891,7 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{con} = $consum;
   }
 
-  if($histname =~ /csm[et][0-9]+$/xs) {                                                          # Verbrauch eines Verbrauchers
+  if ($histname =~ /csm[et][0-9]+$/xs) {                                                         # Verbrauch eines Verbrauchers
       $val = $consumerco;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{$histname} = $consumerco;
 
@@ -9895,11 +9910,11 @@ sub setPVhistory {
       }
   }
 
-  if($histname =~ /cyclescsm[0-9]+$/xs) {                                                          # Anzahl Tageszyklen des Verbrauchers
+  if ($histname =~ /cyclescsm[0-9]+$/xs) {                                                         # Anzahl Tageszyklen des Verbrauchers
       $data{$type}{$name}{pvhist}{$day}{99}{$histname} = $val;
   }
 
-  if($histname =~ /minutescsm[0-9]+$/xs) {                                                         # Anzahl Aktivminuten des Verbrauchers
+  if ($histname =~ /minutescsm[0-9]+$/xs) {                                                        # Anzahl Aktivminuten des Verbrauchers
       $data{$type}{$name}{pvhist}{$day}{$nhour}{$histname} = $val;
       my $minutes = 0;
       my $num     = substr ($histname,10,2);
@@ -9916,56 +9931,91 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{"hourscsme${num}"} = sprintf "%.2f", ($minutes / 60 ) if($cycles);
   }
 
-  if($histname eq "etotal") {                                                                     # etotal des Wechselrichters
+  if ($histname eq "etotal") {                                                                    # etotal des Wechselrichters
       $val = $etotal;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{etotal} = $etotal;
       $data{$type}{$name}{pvhist}{$day}{99}{etotal}     = q{};
   }
 
-  if($histname eq "batintotal") {                                                                 # totale Batterieladung
+  if ($histname eq "batintotal") {                                                                # totale Batterieladung
       $val = $btotin;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{batintotal} = $btotin;
       $data{$type}{$name}{pvhist}{$day}{99}{batintotal}     = q{};
   }
 
-  if($histname eq "batouttotal") {                                                                # totale Batterieentladung
+  if ($histname eq "batouttotal") {                                                               # totale Batterieentladung
       $val = $btotout;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{batouttotal} = $btotout;
       $data{$type}{$name}{pvhist}{$day}{99}{batouttotal}     = q{};
   }
 
-  if($histname eq "weatherid") {                                                                  # Wetter ID
+  if ($histname eq "weatherid") {                                                                 # Wetter ID
       $val = $wid;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{weatherid} = $wid;
       $data{$type}{$name}{pvhist}{$day}{99}{weatherid}     = q{};
   }
 
-  if($histname eq "weathercloudcover") {                                                          # Wolkenbedeckung
+  if ($histname eq "weathercloudcover") {                                                         # Wolkenbedeckung
       $val = $wcc;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{wcc} = $wcc;
       $data{$type}{$name}{pvhist}{$day}{99}{wcc}     = q{};
   }
 
-  if($histname eq "weatherrainprob") {                                                            # Niederschlagswahrscheinlichkeit
+  if ($histname eq "weatherrainprob") {                                                           # Niederschlagswahrscheinlichkeit
       $val = $wrp;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{wrp} = $wrp;
       $data{$type}{$name}{pvhist}{$day}{99}{wrp}     = q{};
   }
 
-  if($histname eq "pvcorrfactor") {                                                               # pvCorrectionFactor
+  if ($histname eq "pvcorrfactor") {                                                              # pvCorrectionFactor
       $val = $pvcorrf;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{pvcorrf} = $pvcorrf;
       $data{$type}{$name}{pvhist}{$day}{99}{pvcorrf}     = q{};
   }
 
-  if($histname eq "temperature") {                                                                # Außentemperatur
+  if ($histname eq "temperature") {                                                               # Außentemperatur
       $val = $temp;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{temp} = $temp;
       $data{$type}{$name}{pvhist}{$day}{99}{temp}     = q{};
   }
+  
+  if ($reorg) {                                                                                   # Reorganisation Stunde "99"
+      if (!$reorgday) {
+         Log3 ($name, 1, "$name - ERROR reorg pvHistory - the day of reorganization is invalid or empty: >$reorgday<");
+         return;
+      }
+      
+      my ($r1, $r2, $r3, $r4, $r5, $r6, $r7, $r8) = (0,0,0,0,0,0,0,0);
+      
+      for my $k (keys %{$data{$type}{$name}{pvhist}{$reorgday}}) {
+          next if($k eq "99");
+          
+          $r1 += HistoryVal ($hash, $reorgday, $k, "batin",   0);
+          $r2 += HistoryVal ($hash, $reorgday, $k, "batout",  0);
+          $r3 += HistoryVal ($hash, $reorgday, $k, "pvrl",    0);
+          $r4 += HistoryVal ($hash, $reorgday, $k, "pvfc",    0);
+          $r5 += HistoryVal ($hash, $reorgday, $k, "confc",   0);
+          $r6 += HistoryVal ($hash, $reorgday, $k, "gcons",   0);
+          $r7 += HistoryVal ($hash, $reorgday, $k, "gfeedin", 0);
+          $r8 += HistoryVal ($hash, $reorgday, $k, "con",     0);
+      }
+      
+      $data{$type}{$name}{pvhist}{$reorgday}{99}{batin}   = $r1;
+      $data{$type}{$name}{pvhist}{$reorgday}{99}{batout}  = $r2;
+      $data{$type}{$name}{pvhist}{$reorgday}{99}{pvrl}    = $r3;
+      $data{$type}{$name}{pvhist}{$reorgday}{99}{pvfc}    = $r4;
+      $data{$type}{$name}{pvhist}{$reorgday}{99}{confc}   = $r5;
+      $data{$type}{$name}{pvhist}{$reorgday}{99}{gcons}   = $r6;
+      $data{$type}{$name}{pvhist}{$reorgday}{99}{gfeedin} = $r7;
+      $data{$type}{$name}{pvhist}{$reorgday}{99}{con}     = $r8;
+      
+      debugLog ($paref, 'saveData2Cache', "setPVhistory -> PV History day >$reorgday< reorganized keys: batin, batout, pvrl, pvfc, con, confc, gcons, gfeedin");
+  }
 
-  debugLog ($paref, 'saveData2Cache', "setPVhistory -> save PV History Day: $day, Hour: $nhour, Key: $histname, Value: $val");
-
+  if ($histname) {
+      debugLog ($paref, 'saveData2Cache', "setPVhistory -> save PV History Day: $day, Hour: $nhour, Key: $histname, Value: $val");
+  }
+  
 return;
 }
 
@@ -10071,8 +10121,16 @@ sub listDataPool {
 
   if ($htol eq "pvhist") {
       $h = $data{$type}{$name}{pvhist};
+      
       if (!keys %{$h}) {
           return qq{PV cache is empty.};
+      }
+      
+      for my $i (keys %{$h}) {
+          if (!isNumeric ($i)) {                                   
+              delete $data{$type}{$name}{pvhist}{$i};
+              Log3 ($name, 2, qq{$name - INFO - invalid key "$i" was deleted from pvHistory storage});
+          }
       }
       
       for my $idx (sort{$a<=>$b} keys %{$h}) {
@@ -10090,7 +10148,7 @@ sub listDataPool {
       for my $i (keys %{$h}) {
           if ($i !~ /^[0-9]{2}$/ix) {                                   # bereinigen ungültige consumer, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219
               delete $data{$type}{$name}{consumers}{$i};
-              Log3 ($name, 2, qq{$name - INFO - invalid consumer key "$i" was deleted from consumer Hash});
+              Log3 ($name, 2, qq{$name - INFO - invalid consumer key "$i" was deleted from consumer storage});
           }
       }
 
@@ -13043,7 +13101,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]<br>
                          [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]              <br>
                          [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]  <br>
-                         [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [locktime=&lt;offlt&gt;:[&lt;onlt&gt;]]<br>
+                         [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]<br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] <br>
                          [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] <br>
                          [interruptable=&lt;Option&gt] </b><br>
