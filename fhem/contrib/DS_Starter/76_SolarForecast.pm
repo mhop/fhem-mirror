@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-07-24 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-07-26 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.80.16"=> "26.07.2023  new consumer type noSchedule, expand maxconsumer to 16, minor changes/fixes ",
   "0.80.15"=> "24.07.2023  new sub getDebug, new key switchdev in consumer attributes, change Debug consumtion ".
                            "reorg data in pvHistory when a hour of day was deleted ",
   "0.80.14"=> "21.07.2023  __substConsumerIcon: use isConsumerLogOn instead of isConsumerPhysOn ",
@@ -418,9 +419,10 @@ my $cloud_base     = 0;                                                         
 my $rdampdef       = 10;                                                            # Gewichtung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
 my $rain_base      = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung
 
-my $maxconsumer    = 12;                                                            # maximale Anzahl der möglichen Consumer (Attribut)
+my $maxconsumer    = 16;                                                            # maximale Anzahl der möglichen Consumer (Attribut)
 my $epiecMaxCycles = 10;                                                            # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
-my @ctypes         = qw(dishwasher dryer washingmachine heater charger other);      # erlaubte Consumer Typen
+my @ctypes         = qw(dishwasher dryer washingmachine heater charger other 
+                        noSchedule);                                                # erlaubte Consumer Typen
 my $defmintime     = 60;                                                            # default Einplanungsdauer in Minuten
 my $defctype       = "other";                                                       # default Verbrauchertyp
 my $defcmode       = "can";                                                         # default Planungsmode der Verbraucher
@@ -632,7 +634,9 @@ my %hqtxt = (                                                                   
   wusond => { EN => qq{wait until sunset},
               DE => qq{bis zum Sonnenuntergang warten}                                                                      },
   snbefb => { EN => qq{should not be empty - maybe you found a bug},
-              DE => qq{sollte nicht leer sein, vielleicht haben Sie einen Bug gefunden}                                     },  
+              DE => qq{sollte nicht leer sein, vielleicht haben Sie einen Bug gefunden}                                     }, 
+  scnp   => { EN => qq{The scheduling of the consumer is not provided},
+              DE => qq{Die Einplanung des Verbrauchers ist nicht vorgesehen}                                                },              
   awd    => { EN => qq{LINK is waiting for solar forecast data ... <br><br>(The configuration can be checked with "set LINK plantConfiguration check".) },
               DE => qq{LINK wartet auf Solarvorhersagedaten ... <br><br>(Die Konfiguration kann mit "set LINK plantConfiguration check" gepr&uuml;ft werden.)} },
   strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please note any information (<I>).},
@@ -828,6 +832,7 @@ my %hef = (                                                                     
   "dishwasher"     => { f => 0.45, m => 0.10, l => 0.45, mt => 180         },    # l   = Faktor Energieverbrauch in letzter Stunde
   "dryer"          => { f => 0.40, m => 0.40, l => 0.20, mt => 90          },    # mt  = default mintime (Minuten)
   "washingmachine" => { f => 0.50, m => 0.30, l => 0.40, mt => 120         },
+  "noSchedule"     => { f => 1.00, m => 1.00, l => 1.00, mt => $defmintime },
 );
 
 my %hcsr = (                                                                                                                               # Funktiontemplate zur Erstellung optionaler Statistikreadings
@@ -1184,6 +1189,7 @@ sub Set {
       prop    => $prop,
       prop1   => $prop1,
       prop2   => $prop2,
+      lang    => getLang  ($hash),
       debug   => getDebug ($hash)
   };
 
@@ -1210,6 +1216,19 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
 
   return qq{no consumer number specified} if(!$c);
   return qq{no valid consumer id "$c"}    if(!ConsumerVal ($hash, $c, "name", ""));
+  
+  if (ConsumerVal ($hash, $c, 'type', $defctype) eq 'noSchedule') {
+      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
+      
+      $paref->{ps}       = 'noSchedule';
+      $paref->{consumer} = $c;
+
+      ___setConsumerPlanningState ($paref);
+
+      delete $paref->{ps}; 
+      delete $paref->{consumer};      
+      return;      
+  }
 
   my $startts  = time;
   my $mintime  = ConsumerVal ($hash, $c, "mintime", $defmintime);
@@ -5458,6 +5477,7 @@ sub __planSwitchTimes {
   my $debug = $paref->{debug};
     
   my $dnp = ___noPlanRelease ($paref);
+  
   if ($dnp) {
       if($debug =~ /consumerPlanning/x) {
           Log3 ($name, 4, qq{$name DEBUG> Planning consumer "$c" - name: }.ConsumerVal ($hash, $c, 'name', '').
@@ -5469,7 +5489,18 @@ sub __planSwitchTimes {
   
   debugLog ($paref, "consumerPlanning", qq{Planning consumer "$c" - name: }.ConsumerVal ($hash, $c, 'name', '').
                                         qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
+                                        
+  if (ConsumerVal ($hash, $c, 'type', $defctype) eq 'noSchedule') {
+      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
+      
+      $paref->{ps} = 'noSchedule';
 
+      ___setConsumerPlanningState ($paref);
+
+      delete $paref->{ps};  
+      return;      
+  } 
+             
   my $type   = $paref->{type};
   my $lang   = $paref->{lang};
   my $nh     = $data{$type}{$name}{nexthours};
@@ -5638,15 +5669,14 @@ sub ___noPlanRelease {
   
   my $dnp   = 0;                                                                           # 0 -> Planung, 1 -> keine Planung
   
-  if(ConsumerVal ($hash, $c, "planstate", undef)) {                                        # Verbraucher ist schon geplant/gestartet/fertig
+  if (ConsumerVal ($hash, $c, 'planstate', undef)) {                                       # Verbraucher ist schon geplant/gestartet/fertig
       $dnp = qq{consumer is already planned};
   }
-
-  if (isSolCastUsed ($hash) || isForecastSolarUsed ($hash)) {
+  elsif (isSolCastUsed ($hash) || isForecastSolarUsed ($hash)) {
       my $tdc = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls', 0);
       
       if ($tdc < 1) {                                                                      # Planung erst nach dem zweiten API Abruf freigeben
-           $dnp = qq{do not plan because off "todayDoneAPIcalls" not set};
+           $dnp = qq{do not plan because off "todayDoneAPIcalls" is not set};
       }
   }
   else {                                                                                   # Planung erst ab "$leadtime" vor Sonnenaufgang freigeben
@@ -7648,7 +7678,7 @@ sub _graphicHeader {
   my $co4h      = ReadingsNum ($name, "NextHours_Sum04_ConsumptionForecast", 0);
   my $coRe      = ReadingsNum ($name, "RestOfDayConsumptionForecast",        0);
   my $coTo      = ReadingsNum ($name, "Tomorrow_ConsumptionForecast",        0);
-  my $coCu      = ReadingsNum ($name, "Current_Consumption",                 0);
+  my $coCu      = CurrentVal  ($hash, 'consumption',                         0);
   my $pv4h      = ReadingsNum ($name, "NextHours_Sum04_PVforecast",          0);
   my $pvRe      = ReadingsNum ($name, "RestOfDayPVforecast",                 0);
   my $pvTo      = ReadingsNum ($name, "Tomorrow_PVforecast",                 0);
@@ -8812,15 +8842,15 @@ sub _flowGraphic {
 
   my $style      = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
-  my $cpv        = ReadingsNum($name, 'Current_PV',              0);
-  my $cgc        = ReadingsNum($name, 'Current_GridConsumption', 0);
-  my $cgfi       = ReadingsNum($name, 'Current_GridFeedIn',      0);
-  my $csc        = ReadingsNum($name, 'Current_SelfConsumption', 0);
-  my $cc         = ReadingsNum($name, 'Current_Consumption',     0);
+  my $cpv        = ReadingsNum ($name, 'Current_PV',              0);
+  my $cgc        = ReadingsNum ($name, 'Current_GridConsumption', 0);
+  my $cgfi       = ReadingsNum ($name, 'Current_GridFeedIn',      0);
+  my $csc        = ReadingsNum ($name, 'Current_SelfConsumption', 0);
+  my $cc         = CurrentVal  ($hash, 'consumption',             0);
   my $cc_dummy   = $cc;
-  my $batin      = ReadingsNum($name, 'Current_PowerBatIn',  undef);
-  my $batout     = ReadingsNum($name, 'Current_PowerBatOut', undef);
-  my $soc        = ReadingsNum($name, 'Current_BatCharge',     100);
+  my $batin      = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
+  my $batout     = ReadingsNum ($name, 'Current_PowerBatOut', undef);
+  my $soc        = ReadingsNum ($name, 'Current_BatCharge',     100);
 
   my $bat_color  = $soc < 26 ? 'flowg bat25' :
                    $soc < 76 ? 'flowg bat50' :
@@ -11585,6 +11615,7 @@ sub simplifyCstate {
         $ps =~ /interrupted/xs    ? 'interrupted'  :
         $ps =~ /continuing/xs     ? 'continuing'   :
         $ps =~ /continued/xs      ? 'continued'    :
+        $ps =~ /noSchedule/xs     ? 'noSchedule'   :
         "unknown";
 
 return $ps;
@@ -13149,6 +13180,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>heater</b>         - Verbraucher ist ein Heizstab                                                                                           </td></tr>
             <tr><td>                       </td><td><b>charger</b>        - Verbraucher ist eine Ladeeinrichtung (Akku, Auto, Fahrrad, etc.)                                                       </td></tr>
             <tr><td>                       </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                                          </td></tr>
+            <tr><td>                       </td><td><b>noSchedule</b>     - für den Verbraucher erfolgt keine Einplanung oder automatische Schaltung.                                              </td></tr>
+            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  
+                                                    Anzeigefunktionen oder manuelle Schaltungen sind verfügbar.                                                                                    </td></tr>
             <tr><td> <b>power</b>          </td><td>nominale Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                                            </td></tr>
             <tr><td>                       </td><td>(kann auf "0" gesetzt werden)                                                                                                                  </td></tr>
             <tr><td> <b>switchdev</b>      </td><td>Das angegebene &lt;device&gt; wird als Schalter Device dem Verbraucher zugeordnet (optional). Schaltvorgänge werden mit diesem Gerät           </td></tr>
