@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-07-26 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-07-27 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.80.17"=> "27.07.2023  change sequence of _createSummaries in centralTask ",
   "0.80.16"=> "26.07.2023  new consumer type noSchedule, expand maxconsumer to 16, minor changes/fixes ",
   "0.80.15"=> "24.07.2023  new sub getDebug, new key switchdev in consumer attributes, change Debug consumtion ".
                            "reorg data in pvHistory when a hour of day was deleted ",
@@ -3922,11 +3923,11 @@ sub centralTask {
       _transferInverterValues     ($centpars);                                            # WR Werte übertragen
       _transferMeterValues        ($centpars);                                            # Energy Meter auswerten
       _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln      
+      _createSummaries            ($centpars);                                            # Zusammenfassungen erstellen      
       _manageConsumerData         ($centpars);                                            # Consumerdaten sammeln und planen
       _estConsumptionForecast     ($centpars);                                            # Verbrauchsprognose erstellen
       _evaluateThresholds         ($centpars);                                            # Schwellenwerte bewerten und signalisieren
       _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
-      _createSummaries            ($centpars);                                            # Zusammenfassungen erstellen
       _calcTodayPVdeviation       ($centpars);                                            # Vorhersageabweichung erstellen (nach Sonnenuntergang)
 
       createReadingsFromArray     ($hash, \@da, $evt);                                    # Readings erzeugen
@@ -5071,6 +5072,309 @@ sub _transferMeterValues {
       setPVhistory ($paref);
       delete $paref->{histname};
   }
+
+return;
+}
+
+################################################################
+#                    Batteriewerte sammeln
+################################################################
+sub _transferBatteryValues {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $chour = $paref->{chour};
+  my $day   = $paref->{day};
+  my $daref = $paref->{daref};
+
+  my ($badev,$a,$h) = useBattery ($name);
+  return if(!$badev);
+
+  my $type = $paref->{type};
+
+  my ($pin,$piunit)    = split ":", $h->{pin};                                                # Readingname/Unit für aktuelle Batterieladung
+  my ($pou,$pounit)    = split ":", $h->{pout};                                               # Readingname/Unit für aktuelle Batterieentladung
+  my ($bin,$binunit)   = split ":", $h->{intotal}  // "-:-";                                  # Readingname/Unit der total in die Batterie eingespeisten Energie (Zähler)
+  my ($bout,$boutunit) = split ":", $h->{outtotal} // "-:-";                                  # Readingname/Unit der total aus der Batterie entnommenen Energie (Zähler)
+  my $batchr           = $h->{charge} // "";                                                  # Readingname Ladezustand Batterie
+
+  return if(!$pin || !$pou);
+
+  $pounit   //= $piunit;
+  $piunit   //= $pounit;
+  $boutunit //= $binunit;
+  $binunit  //= $boutunit;
+  
+  my $piuf      = $piunit   =~ /^kW$/xi  ? 1000 : 1;
+  my $pouf      = $pounit   =~ /^kW$/xi  ? 1000 : 1;
+  my $binuf     = $binunit  =~ /^kWh$/xi ? 1000 : 1;
+  my $boutuf    = $boutunit =~ /^kWh$/xi ? 1000 : 1;
+
+  my $pbo       = ReadingsNum ($badev, $pou,    0) * $pouf;                                    # aktuelle Batterieentladung (W)
+  my $pbi       = ReadingsNum ($badev, $pin,    0) * $piuf;                                    # aktueller Batterieladung (W)
+  my $btotout   = ReadingsNum ($badev, $bout,   0) * $boutuf;                                  # totale Batterieentladung (Wh)
+  my $btotin    = ReadingsNum ($badev, $bin,    0) * $binuf;                                   # totale Batterieladung (Wh)
+  my $soc       = ReadingsNum ($badev, $batchr, 0);
+
+  my $debug = $paref->{debug};
+  if($debug =~ /collectData/x) {
+      Log3 ($name, 1, "$name DEBUG> collect Battery data: device=$badev =>");
+      Log3 ($name, 1, "$name DEBUG> pin=$pbi W, pout=$pbo W, totalin: $btotin Wh, totalout: $btotout Wh, soc: $soc");
+  }
+
+  my $params;
+
+  if ($pin eq "-pout") {                                                                       # Spezialfall pin bei neg. pout
+      $params = {
+          dev  => $badev,
+          rdg  => $pou,
+          rdgf => $pouf
+      };
+
+      ($pbo,$pbi) = substSpecialCases ($params);
+  }
+
+  if ($pou eq "-pin") {                                                                        # Spezialfall pout bei neg. pin
+      $params = {
+          dev  => $badev,
+          rdg  => $pin,
+          rdgf => $piuf
+      };
+
+      ($pbi,$pbo) = substSpecialCases ($params);
+  }
+  
+  # Batterielade-, enladeenergie in Circular speichern
+  ######################################################
+  if (!defined CircularVal ($hash, 99, 'initdaybatintot', undef)) {
+      $data{$type}{$name}{circular}{99}{initdaybatintot} = $btotin;                            # total Batterieladung zu Tagbeginn (Wh)
+  }
+  
+  if (!defined CircularVal ($hash, 99, 'initdaybatouttot', undef)) {                           # total Batterieentladung zu Tagbeginn (Wh)
+      $data{$type}{$name}{circular}{99}{initdaybatouttot} = $btotout;
+  }
+  
+  $data{$type}{$name}{circular}{99}{batintot}  = $btotin;                                      # aktuell total Batterieladung
+  $data{$type}{$name}{circular}{99}{batouttot} = $btotout;                                     # aktuell total Batterieentladung
+
+  my $nhour = $chour+1;
+
+  # Batterieladung aktuelle Stunde in pvHistory speichern
+  #########################################################
+  my $histbatintot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "batintotal", undef);    # totale Batterieladung zu Beginn einer Stunde
+
+  my $batinthishour;
+  if (!defined $histbatintot) {                                                                # totale Batterieladung der aktuelle Stunde gesetzt ?
+      $paref->{batintotal} = $btotin;
+      $paref->{nhour}      = sprintf("%02d",$nhour);
+      $paref->{histname}   = "batintotal";
+      setPVhistory ($paref);
+      delete $paref->{histname};
+
+      my $bitot      = CurrentVal ($hash, "batintotal", $btotin);
+      $batinthishour = int ($btotin - $bitot);
+  }
+  else {
+      $batinthishour = int ($btotin - $histbatintot);
+  }
+
+  if ($batinthishour < 0) {
+      $batinthishour = 0;
+  }
+
+  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{batin} = $batinthishour;                # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+
+  $paref->{batinthishour} = $batinthishour;
+  $paref->{nhour}         = sprintf "%02d", $nhour;
+  $paref->{histname}      = "batinthishour";
+  setPVhistory ($paref);
+  delete $paref->{histname};
+
+  # Batterieentladung aktuelle Stunde in pvHistory speichern
+  ############################################################
+  my $histbatouttot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "batouttotal", undef);   # totale Betterieladung zu Beginn einer Stunde
+
+  my $batoutthishour;
+  if(!defined $histbatouttot) {                                                                 # totale Betterieladung der aktuelle Stunde gesetzt ?
+      $paref->{batouttotal} = $btotout;
+      $paref->{nhour}       = sprintf("%02d",$nhour);
+      $paref->{histname}    = "batouttotal";
+      setPVhistory ($paref);
+      delete $paref->{histname};
+
+      my $botot       = CurrentVal ($hash, "batouttotal", $btotout);
+      $batoutthishour = int ($btotout - $botot);
+  }
+  else {
+      $batoutthishour = int ($btotout - $histbatouttot);
+  }
+
+  if($batoutthishour < 0) {
+      $batoutthishour = 0;
+  }
+
+  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{batout} = $batoutthishour;             # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+
+  $paref->{batoutthishour} = $batoutthishour;
+  $paref->{nhour}          = sprintf("%02d",$nhour);
+  $paref->{histname}       = "batoutthishour";
+  setPVhistory ($paref);
+  delete $paref->{histname};
+
+######
+
+  push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_BatIn<>".  $batinthishour. " Wh";
+  push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_BatOut<>". $batoutthishour." Wh";
+  push @$daref, "Current_PowerBatIn<>".  (int $pbi)." W";
+  push @$daref, "Current_PowerBatOut<>". (int $pbo)." W";
+  push @$daref, "Current_BatCharge<>".   $soc.      " %";
+
+  $data{$type}{$name}{current}{powerbatin}  = int $pbi;                                       # Hilfshash Wert aktuelle Batterieladung
+  $data{$type}{$name}{current}{powerbatout} = int $pbo;                                       # Hilfshash Wert aktuelle Batterieentladung
+  $data{$type}{$name}{current}{batcharge}   = $soc;                                           # aktuelle Batterieladung
+
+return;
+}
+
+################################################################
+#               Zusammenfassungen erstellen
+################################################################
+sub _createSummaries {
+  my $paref  = shift;
+  my $hash   = $paref->{hash};
+  my $name   = $paref->{name};
+  my $type   = $paref->{type};
+  my $daref  = $paref->{daref};
+  my $chour  = $paref->{chour};                                                                       # aktuelle Stunde
+  my $minute = $paref->{minute};                                                                      # aktuelle Minute
+
+  $minute    = (int $minute) + 1;                                                                     # Minute Range umsetzen auf 1 bis 60
+
+  ## Initialisierung
+  ####################
+  my $next1HoursSum = { "PV" => 0, "Consumption" => 0 };
+  my $next2HoursSum = { "PV" => 0, "Consumption" => 0 };
+  my $next3HoursSum = { "PV" => 0, "Consumption" => 0 };
+  my $next4HoursSum = { "PV" => 0, "Consumption" => 0 };
+  my $restOfDaySum  = { "PV" => 0, "Consumption" => 0 };
+  my $tomorrowSum   = { "PV" => 0, "Consumption" => 0 };
+  my $todaySumFc    = { "PV" => 0, "Consumption" => 0 };
+  my $todaySumRe    = { "PV" => 0, "Consumption" => 0 };
+  
+  my $tdConFcTillSunset = 0;
+  my $remainminutes     = 60 - $minute;                                                                # verbleibende Minuten der aktuellen Stunde
+
+  my $restofhourpvfc   = (NexthoursVal($hash, "NextHour00", "pvforecast", 0)) / 60 * $remainminutes;
+  my $restofhourconfc  = (NexthoursVal($hash, "NextHour00", "confc",      0)) / 60 * $remainminutes;
+
+  $next1HoursSum->{PV}          = $restofhourpvfc;
+  $next2HoursSum->{PV}          = $restofhourpvfc;
+  $next3HoursSum->{PV}          = $restofhourpvfc;
+  $next4HoursSum->{PV}          = $restofhourpvfc;
+  $restOfDaySum->{PV}           = $restofhourpvfc;
+
+  $next1HoursSum->{Consumption} = $restofhourconfc;
+  $next2HoursSum->{Consumption} = $restofhourconfc;
+  $next3HoursSum->{Consumption} = $restofhourconfc;
+  $next4HoursSum->{Consumption} = $restofhourconfc;
+  $restOfDaySum->{Consumption}  = $restofhourconfc;
+
+  for my $h (1..47) {
+      my $pvfc  = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'pvforecast', 0);
+      my $confc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'confc',      0);
+      my $istdy = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'today',      0);
+      my $don   = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'DoN',        0);
+      $pvfc     = 0 if($pvfc  < 0);                                                         # PV Prognose darf nicht negativ sein
+      $confc    = 0 if($confc < 0);                                                         # Verbrauchsprognose darf nicht negativ sein
+      
+      if($h == 1) {
+          $next1HoursSum->{PV}          += $pvfc  / 60 * $minute;
+          $next1HoursSum->{Consumption} += $confc / 60 * $minute;
+      }
+
+      if($h <= 2) {
+          $next2HoursSum->{PV}          += $pvfc                 if($h <  2);
+          $next2HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 2);
+          $next2HoursSum->{Consumption} += $confc                if($h <  2);
+          $next2HoursSum->{Consumption} += $confc / 60 * $minute if($h == 2);
+      }
+
+      if($h <= 3) {
+          $next3HoursSum->{PV}          += $pvfc                 if($h <  3);
+          $next3HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 3);
+          $next3HoursSum->{Consumption} += $confc                if($h <  3);
+          $next3HoursSum->{Consumption} += $confc / 60 * $minute if($h == 3);
+      }
+
+      if($h <= 4) {
+          $next4HoursSum->{PV}          += $pvfc                 if($h <  4);
+          $next4HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 4);
+          $next4HoursSum->{Consumption} += $confc                if($h <  4);
+          $next4HoursSum->{Consumption} += $confc / 60 * $minute if($h == 4);
+      }
+
+      if($istdy) {
+          $restOfDaySum->{PV}          += $pvfc;
+          $restOfDaySum->{Consumption} += $confc;
+          $tdConFcTillSunset           += $confc if($don);
+      }
+      else {
+          $tomorrowSum->{PV} += $pvfc;
+      }
+  }
+
+  for my $th (1..24) {
+      $todaySumFc->{PV} += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);
+      $todaySumRe->{PV} += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVreal",     0);
+  }
+
+  push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
+  limitArray ($data{$type}{$name}{current}{h4fcslidereg}, $defslidenum);
+
+  my $gcon    = CurrentVal ($hash, "gridconsumption",         0);                                       # aktueller Netzbezug
+  my $tconsum = CurrentVal ($hash, "tomorrowconsumption", undef);                                       # Verbrauchsprognose für folgenden Tag
+  my $pvgen   = CurrentVal ($hash, "generation",              0);
+  my $gfeedin = CurrentVal ($hash, "gridfeedin",              0);
+  my $batin   = CurrentVal ($hash, "powerbatin",              0);                                       # aktuelle Batterieladung
+  my $batout  = CurrentVal ($hash, "powerbatout",             0);                                       # aktuelle Batterieentladung
+
+  my $consumption         = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
+  my $selfconsumption     = int ($pvgen - $gfeedin - $batin);
+  $selfconsumption        = $selfconsumption < 0 ? 0 : $selfconsumption;
+
+  my $surplus             = int ($pvgen - $consumption);                                                # aktueller Überschuß
+  $surplus                = 0 if($surplus < 0);                                                         # wegen Vergleich nompower vs. surplus
+
+  my $selfconsumptionrate = 0;
+  my $autarkyrate         = 0;
+  $selfconsumptionrate    = sprintf "%.0f", $selfconsumption / $pvgen * 100                                           if($pvgen * 1 > 0);
+  $autarkyrate            = sprintf "%.0f", ($selfconsumption + $batout) / ($selfconsumption + $batout + $gcon) * 100 if($selfconsumption + $batout);
+
+  $data{$type}{$name}{current}{consumption}         = $consumption;
+  $data{$type}{$name}{current}{selfconsumption}     = $selfconsumption;
+  $data{$type}{$name}{current}{selfconsumptionrate} = $selfconsumptionrate;
+  $data{$type}{$name}{current}{autarkyrate}         = $autarkyrate;
+  $data{$type}{$name}{current}{surplus}             = $surplus;
+  $data{$type}{$name}{current}{tdConFcTillSunset}   = $tdConFcTillSunset;
+
+  push @$daref, "Current_Consumption<>".         $consumption.              " W";
+  push @$daref, "Current_SelfConsumption<>".     $selfconsumption.          " W";
+  push @$daref, "Current_SelfConsumptionRate<>". $selfconsumptionrate.      " %";
+  push @$daref, "Current_Surplus<>".             $surplus.                  " W";
+  push @$daref, "Current_AutarkyRate<>".         $autarkyrate.              " %";
+
+  push @$daref, "NextHours_Sum01_PVforecast<>".  (int $next1HoursSum->{PV})." Wh";
+  push @$daref, "NextHours_Sum02_PVforecast<>".  (int $next2HoursSum->{PV})." Wh";
+  push @$daref, "NextHours_Sum03_PVforecast<>".  (int $next3HoursSum->{PV})." Wh";
+  push @$daref, "NextHours_Sum04_PVforecast<>".  (int $next4HoursSum->{PV})." Wh";
+  push @$daref, "RestOfDayPVforecast<>".         (int $restOfDaySum->{PV}). " Wh";
+  push @$daref, "Tomorrow_PVforecast<>".         (int $tomorrowSum->{PV}).  " Wh";
+  push @$daref, "Today_PVforecast<>".            (int $todaySumFc->{PV}).   " Wh";
+  push @$daref, "Today_PVreal<>".                (int $todaySumRe->{PV}).   " Wh"  if(int $todaySumRe->{PV} > ReadingsNum($name, 'Today_PVreal', 0));
+
+  push @$daref, "Tomorrow_ConsumptionForecast<>".           $tconsum.                          " Wh" if(defined $tconsum);
+  push @$daref, "NextHours_Sum04_ConsumptionForecast<>".   (int $next4HoursSum->{Consumption})." Wh";
+  push @$daref, "RestOfDayConsumptionForecast<>".          (int $restOfDaySum->{Consumption}). " Wh";
 
 return;
 }
@@ -6337,166 +6641,6 @@ return ($pstate, $starttime, $stoptime);
 }
 
 ################################################################
-#                    Batteriewerte sammeln
-################################################################
-sub _transferBatteryValues {
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $chour = $paref->{chour};
-  my $day   = $paref->{day};
-  my $daref = $paref->{daref};
-
-  my ($badev,$a,$h) = useBattery ($name);
-  return if(!$badev);
-
-  my $type = $paref->{type};
-
-  my ($pin,$piunit)    = split ":", $h->{pin};                                                # Readingname/Unit für aktuelle Batterieladung
-  my ($pou,$pounit)    = split ":", $h->{pout};                                               # Readingname/Unit für aktuelle Batterieentladung
-  my ($bin,$binunit)   = split ":", $h->{intotal}  // "-:-";                                  # Readingname/Unit der total in die Batterie eingespeisten Energie (Zähler)
-  my ($bout,$boutunit) = split ":", $h->{outtotal} // "-:-";                                  # Readingname/Unit der total aus der Batterie entnommenen Energie (Zähler)
-  my $batchr           = $h->{charge} // "";                                                  # Readingname Ladezustand Batterie
-
-  return if(!$pin || !$pou);
-
-  $pounit   //= $piunit;
-  $piunit   //= $pounit;
-  $boutunit //= $binunit;
-  $binunit  //= $boutunit;
-  
-  my $piuf      = $piunit   =~ /^kW$/xi  ? 1000 : 1;
-  my $pouf      = $pounit   =~ /^kW$/xi  ? 1000 : 1;
-  my $binuf     = $binunit  =~ /^kWh$/xi ? 1000 : 1;
-  my $boutuf    = $boutunit =~ /^kWh$/xi ? 1000 : 1;
-
-  my $pbo       = ReadingsNum ($badev, $pou,    0) * $pouf;                                    # aktuelle Batterieentladung (W)
-  my $pbi       = ReadingsNum ($badev, $pin,    0) * $piuf;                                    # aktueller Batterieladung (W)
-  my $btotout   = ReadingsNum ($badev, $bout,   0) * $boutuf;                                  # totale Batterieentladung (Wh)
-  my $btotin    = ReadingsNum ($badev, $bin,    0) * $binuf;                                   # totale Batterieladung (Wh)
-  my $soc       = ReadingsNum ($badev, $batchr, 0);
-
-  my $debug = $paref->{debug};
-  if($debug =~ /collectData/x) {
-      Log3 ($name, 1, "$name DEBUG> collect Battery data: device=$badev =>");
-      Log3 ($name, 1, "$name DEBUG> pin=$pbi W, pout=$pbo W, totalin: $btotin Wh, totalout: $btotout Wh, soc: $soc");
-  }
-
-  my $params;
-
-  if ($pin eq "-pout") {                                                                       # Spezialfall pin bei neg. pout
-      $params = {
-          dev  => $badev,
-          rdg  => $pou,
-          rdgf => $pouf
-      };
-
-      ($pbo,$pbi) = substSpecialCases ($params);
-  }
-
-  if ($pou eq "-pin") {                                                                        # Spezialfall pout bei neg. pin
-      $params = {
-          dev  => $badev,
-          rdg  => $pin,
-          rdgf => $piuf
-      };
-
-      ($pbi,$pbo) = substSpecialCases ($params);
-  }
-  
-  # Batterielade-, enladeenergie in Circular speichern
-  ######################################################
-  if (!defined CircularVal ($hash, 99, 'initdaybatintot', undef)) {
-      $data{$type}{$name}{circular}{99}{initdaybatintot} = $btotin;                            # total Batterieladung zu Tagbeginn (Wh)
-  }
-  
-  if (!defined CircularVal ($hash, 99, 'initdaybatouttot', undef)) {                           # total Batterieentladung zu Tagbeginn (Wh)
-      $data{$type}{$name}{circular}{99}{initdaybatouttot} = $btotout;
-  }
-  
-  $data{$type}{$name}{circular}{99}{batintot}  = $btotin;                                      # aktuell total Batterieladung
-  $data{$type}{$name}{circular}{99}{batouttot} = $btotout;                                     # aktuell total Batterieentladung
-
-  my $nhour = $chour+1;
-
-  # Batterieladung aktuelle Stunde in pvHistory speichern
-  #########################################################
-  my $histbatintot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "batintotal", undef);    # totale Batterieladung zu Beginn einer Stunde
-
-  my $batinthishour;
-  if (!defined $histbatintot) {                                                                # totale Batterieladung der aktuelle Stunde gesetzt ?
-      $paref->{batintotal} = $btotin;
-      $paref->{nhour}      = sprintf("%02d",$nhour);
-      $paref->{histname}   = "batintotal";
-      setPVhistory ($paref);
-      delete $paref->{histname};
-
-      my $bitot      = CurrentVal ($hash, "batintotal", $btotin);
-      $batinthishour = int ($btotin - $bitot);
-  }
-  else {
-      $batinthishour = int ($btotin - $histbatintot);
-  }
-
-  if ($batinthishour < 0) {
-      $batinthishour = 0;
-  }
-
-  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{batin} = $batinthishour;                # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-
-  $paref->{batinthishour} = $batinthishour;
-  $paref->{nhour}         = sprintf "%02d", $nhour;
-  $paref->{histname}      = "batinthishour";
-  setPVhistory ($paref);
-  delete $paref->{histname};
-
-  # Batterieentladung aktuelle Stunde in pvHistory speichern
-  ############################################################
-  my $histbatouttot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "batouttotal", undef);   # totale Betterieladung zu Beginn einer Stunde
-
-  my $batoutthishour;
-  if(!defined $histbatouttot) {                                                                 # totale Betterieladung der aktuelle Stunde gesetzt ?
-      $paref->{batouttotal} = $btotout;
-      $paref->{nhour}       = sprintf("%02d",$nhour);
-      $paref->{histname}    = "batouttotal";
-      setPVhistory ($paref);
-      delete $paref->{histname};
-
-      my $botot       = CurrentVal ($hash, "batouttotal", $btotout);
-      $batoutthishour = int ($btotout - $botot);
-  }
-  else {
-      $batoutthishour = int ($btotout - $histbatouttot);
-  }
-
-  if($batoutthishour < 0) {
-      $batoutthishour = 0;
-  }
-
-  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{batout} = $batoutthishour;             # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-
-  $paref->{batoutthishour} = $batoutthishour;
-  $paref->{nhour}          = sprintf("%02d",$nhour);
-  $paref->{histname}       = "batoutthishour";
-  setPVhistory ($paref);
-  delete $paref->{histname};
-
-######
-
-  push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_BatIn<>".  $batinthishour. " Wh";
-  push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_BatOut<>". $batoutthishour." Wh";
-  push @$daref, "Current_PowerBatIn<>".  (int $pbi)." W";
-  push @$daref, "Current_PowerBatOut<>". (int $pbo)." W";
-  push @$daref, "Current_BatCharge<>".   $soc.      " %";
-
-  $data{$type}{$name}{current}{powerbatin}  = int $pbi;                                       # Hilfshash Wert aktuelle Batterieladung
-  $data{$type}{$name}{current}{powerbatout} = int $pbo;                                       # Hilfshash Wert aktuelle Batterieentladung
-  $data{$type}{$name}{current}{batcharge}   = $soc;                                           # aktuelle Batterieladung
-
-return;
-}
-
-################################################################
 #     Energieverbrauch Vorhersage kalkulieren
 #
 #     Es werden nur gleiche Wochentage (Mo ... So)
@@ -6743,149 +6887,6 @@ sub _calcReadingsTomorrowPVFc {
 
       push @$daref, "Tomorrow_Hour".$h."_PVforecast<>".$pvfc." Wh";
   }
-
-return;
-}
-
-################################################################
-#               Zusammenfassungen erstellen
-################################################################
-sub _createSummaries {
-  my $paref  = shift;
-  my $hash   = $paref->{hash};
-  my $name   = $paref->{name};
-  my $type   = $paref->{type};
-  my $daref  = $paref->{daref};
-  my $chour  = $paref->{chour};                                                                       # aktuelle Stunde
-  my $minute = $paref->{minute};                                                                      # aktuelle Minute
-
-  $minute    = (int $minute) + 1;                                                                     # Minute Range umsetzen auf 1 bis 60
-
-  ## Initialisierung
-  ####################
-  my $next1HoursSum = { "PV" => 0, "Consumption" => 0 };
-  my $next2HoursSum = { "PV" => 0, "Consumption" => 0 };
-  my $next3HoursSum = { "PV" => 0, "Consumption" => 0 };
-  my $next4HoursSum = { "PV" => 0, "Consumption" => 0 };
-  my $restOfDaySum  = { "PV" => 0, "Consumption" => 0 };
-  my $tomorrowSum   = { "PV" => 0, "Consumption" => 0 };
-  my $todaySumFc    = { "PV" => 0, "Consumption" => 0 };
-  my $todaySumRe    = { "PV" => 0, "Consumption" => 0 };
-  
-  my $tdConFcTillSunset = 0;
-  my $remainminutes     = 60 - $minute;                                                                # verbleibende Minuten der aktuellen Stunde
-
-  my $restofhourpvfc   = (NexthoursVal($hash, "NextHour00", "pvforecast", 0)) / 60 * $remainminutes;
-  my $restofhourconfc  = (NexthoursVal($hash, "NextHour00", "confc",      0)) / 60 * $remainminutes;
-
-  $next1HoursSum->{PV}          = $restofhourpvfc;
-  $next2HoursSum->{PV}          = $restofhourpvfc;
-  $next3HoursSum->{PV}          = $restofhourpvfc;
-  $next4HoursSum->{PV}          = $restofhourpvfc;
-  $restOfDaySum->{PV}           = $restofhourpvfc;
-
-  $next1HoursSum->{Consumption} = $restofhourconfc;
-  $next2HoursSum->{Consumption} = $restofhourconfc;
-  $next3HoursSum->{Consumption} = $restofhourconfc;
-  $next4HoursSum->{Consumption} = $restofhourconfc;
-  $restOfDaySum->{Consumption}  = $restofhourconfc;
-
-  for my $h (1..47) {
-      my $pvfc  = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'pvforecast', 0);
-      my $confc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'confc',      0);
-      my $istdy = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'today',      0);
-      my $don   = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'DoN',        0);
-      $pvfc     = 0 if($pvfc  < 0);                                                         # PV Prognose darf nicht negativ sein
-      $confc    = 0 if($confc < 0);                                                         # Verbrauchsprognose darf nicht negativ sein
-      
-      if($h == 1) {
-          $next1HoursSum->{PV}          += $pvfc  / 60 * $minute;
-          $next1HoursSum->{Consumption} += $confc / 60 * $minute;
-      }
-
-      if($h <= 2) {
-          $next2HoursSum->{PV}          += $pvfc                 if($h <  2);
-          $next2HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 2);
-          $next2HoursSum->{Consumption} += $confc                if($h <  2);
-          $next2HoursSum->{Consumption} += $confc / 60 * $minute if($h == 2);
-      }
-
-      if($h <= 3) {
-          $next3HoursSum->{PV}          += $pvfc                 if($h <  3);
-          $next3HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 3);
-          $next3HoursSum->{Consumption} += $confc                if($h <  3);
-          $next3HoursSum->{Consumption} += $confc / 60 * $minute if($h == 3);
-      }
-
-      if($h <= 4) {
-          $next4HoursSum->{PV}          += $pvfc                 if($h <  4);
-          $next4HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 4);
-          $next4HoursSum->{Consumption} += $confc                if($h <  4);
-          $next4HoursSum->{Consumption} += $confc / 60 * $minute if($h == 4);
-      }
-
-      if($istdy) {
-          $restOfDaySum->{PV}          += $pvfc;
-          $restOfDaySum->{Consumption} += $confc;
-          $tdConFcTillSunset           += $confc if($don);
-      }
-      else {
-          $tomorrowSum->{PV} += $pvfc;
-      }
-  }
-
-  for my $th (1..24) {
-      $todaySumFc->{PV} += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);
-      $todaySumRe->{PV} += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVreal",     0);
-  }
-
-  push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
-  limitArray ($data{$type}{$name}{current}{h4fcslidereg}, $defslidenum);
-
-  my $gcon    = CurrentVal ($hash, "gridconsumption",         0);                                       # aktueller Netzbezug
-  my $tconsum = CurrentVal ($hash, "tomorrowconsumption", undef);                                       # Verbrauchsprognose für folgenden Tag
-  my $pvgen   = CurrentVal ($hash, "generation",              0);
-  my $gfeedin = CurrentVal ($hash, "gridfeedin",              0);
-  my $batin   = CurrentVal ($hash, "powerbatin",              0);                                       # aktuelle Batterieladung
-  my $batout  = CurrentVal ($hash, "powerbatout",             0);                                       # aktuelle Batterieentladung
-
-  my $consumption         = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
-  my $selfconsumption     = int ($pvgen - $gfeedin - $batin);
-  $selfconsumption        = $selfconsumption < 0 ? 0 : $selfconsumption;
-
-  my $surplus             = int ($pvgen - $consumption);                                                # aktueller Überschuß
-  $surplus                = 0 if($surplus < 0);                                                         # wegen Vergleich nompower vs. surplus
-
-  my $selfconsumptionrate = 0;
-  my $autarkyrate         = 0;
-  $selfconsumptionrate    = sprintf "%.0f", $selfconsumption / $pvgen * 100                                           if($pvgen * 1 > 0);
-  $autarkyrate            = sprintf "%.0f", ($selfconsumption + $batout) / ($selfconsumption + $batout + $gcon) * 100 if($selfconsumption + $batout);
-
-  $data{$type}{$name}{current}{consumption}         = $consumption;
-  $data{$type}{$name}{current}{selfconsumption}     = $selfconsumption;
-  $data{$type}{$name}{current}{selfconsumptionrate} = $selfconsumptionrate;
-  $data{$type}{$name}{current}{autarkyrate}         = $autarkyrate;
-  $data{$type}{$name}{current}{surplus}             = $surplus;
-  $data{$type}{$name}{current}{tdConFcTillSunset}   = $tdConFcTillSunset;
-
-  push @$daref, "Current_Consumption<>".         $consumption.              " W";
-  push @$daref, "Current_SelfConsumption<>".     $selfconsumption.          " W";
-  push @$daref, "Current_SelfConsumptionRate<>". $selfconsumptionrate.      " %";
-  push @$daref, "Current_Surplus<>".             $surplus.                  " W";
-  push @$daref, "Current_AutarkyRate<>".         $autarkyrate.              " %";
-
-  push @$daref, "NextHours_Sum01_PVforecast<>".  (int $next1HoursSum->{PV})." Wh";
-  push @$daref, "NextHours_Sum02_PVforecast<>".  (int $next2HoursSum->{PV})." Wh";
-  push @$daref, "NextHours_Sum03_PVforecast<>".  (int $next3HoursSum->{PV})." Wh";
-  push @$daref, "NextHours_Sum04_PVforecast<>".  (int $next4HoursSum->{PV})." Wh";
-  push @$daref, "RestOfDayPVforecast<>".         (int $restOfDaySum->{PV}). " Wh";
-  push @$daref, "Tomorrow_PVforecast<>".         (int $tomorrowSum->{PV}).  " Wh";
-  push @$daref, "Today_PVforecast<>".            (int $todaySumFc->{PV}).   " Wh";
-  push @$daref, "Today_PVreal<>".                (int $todaySumRe->{PV}).   " Wh"  if(int $todaySumRe->{PV} > ReadingsNum($name, 'Today_PVreal', 0));
-
-  push @$daref, "Tomorrow_ConsumptionForecast<>".           $tconsum.                          " Wh" if(defined $tconsum);
-  push @$daref, "NextHours_Sum04_ConsumptionForecast<>".   (int $next4HoursSum->{Consumption})." Wh";
-  push @$daref, "RestOfDayConsumptionForecast<>".          (int $restOfDaySum->{Consumption}). " Wh";
 
 return;
 }
