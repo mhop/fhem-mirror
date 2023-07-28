@@ -979,8 +979,9 @@ sub onInternalMessage {
 
     if ($type == I_PRE_SLEEP_NOTIFICATION) {
         $hash->{preSleep} = $msg->{payload}//500;
-        refreshInternalMySTimer($hash,"Asleep");
-        refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
+        refreshInternalMySTimer($hash,'Asleep');
+        refreshInternalMySTimer($hash,'Alive') if $hash->{timeoutAlive};
+        $hash->{nowSleeping} = 0;
         MYSENSORS::Timer($hash);
         sendRetainedMessages($hash) ;
         return;
