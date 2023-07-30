@@ -39,6 +39,10 @@
 				<Name>SetGet</Name>
 			</Element>
 			<Element>
+				<Value>3</Value>
+				<Name>Deliver</Name>
+			</Element>
+			<Element>
 				<Value>8</Value>
 				<Name>Status</Name>
 			</Element>
@@ -80,6 +84,7 @@
 	<HeaderExtension>
 		<MessageType>1</MessageType>
 		<MessageType>2</MessageType>
+		<MessageType>3</MessageType>
 		<UIntValue>
 			<ID>ReceiverID</ID>
 			<Description>The ID of the device to process the request. Use 4095 for broadcasts.</Description>
@@ -184,50 +189,13 @@
 		<Description>This group contains messages useful for different devices.</Description>
 		<MessageGroupID>0</MessageGroupID>
 		<Message>
-			<Name>Version</Name>
-			<Description>Reports the current firmware version. Version information is only available when set in source code, which is usually only done for official builds by the build robot.</Description>
-			<MessageID>1</MessageID>
-			<MessageType>0</MessageType>
-			<MessageType>8</MessageType>
-			<MessageType>10</MessageType>
-			<Validity>deprecated</Validity>
-			<UIntValue>
-				<ID>Major</ID>
-				<Description>Different major version means incompatible changes.</Description>
-				<Bits>8</Bits>
-				<MinVal>0</MinVal>
-				<MaxVal>255</MaxVal>
-			</UIntValue>
-			<UIntValue>
-				<ID>Minor</ID>
-				<Description>Different minor number means new functionality without breaking compatibility.</Description>
-				<Bits>8</Bits>
-				<MinVal>0</MinVal>
-				<MaxVal>255</MaxVal>
-			</UIntValue>
-			<UIntValue>
-				<ID>Patch</ID>
-				<Description>The patch version is changed when backwards-compatible bug fixes are made.</Description>
-				<Bits>8</Bits>
-				<MinVal>0</MinVal>
-				<MaxVal>255</MaxVal>
-			</UIntValue>
-			<UIntValue>
-				<ID>Hash</ID>
-				<Description>The beginning of the revision ID hash (as reported by Git).</Description>
-				<Bits>32</Bits>
-				<MinVal>0</MinVal>
-				<MaxVal>4294967295</MaxVal>
-			</UIntValue>
-		</Message>
-		<Message>
 			<Name>DeviceInfo</Name>
 			<Description>Reports DeviceType and current firmware version. Version information is only available when set in source code, which is usually only done for official builds by the build robot.</Description>
 			<MessageID>2</MessageID>
 			<MessageType>0</MessageType>
 			<MessageType>8</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<EnumValue>
 				<ID>DeviceType</ID>
 				<Description>The DeviceType can be used to adapt the behavior or representation of the SHC device at the server software (e.g. FHEM).</Description>
@@ -243,6 +211,10 @@
 				<Element>
 					<Value>40</Value>
 					<Name>PowerSwitch</Name>
+				</Element>
+				<Element>
+					<Value>45</Value>
+					<Name>Controller</Name>
 				</Element>
 				<Element>
 					<Value>50</Value>
@@ -329,7 +301,7 @@
 			<MessageType>0</MessageType>
 			<MessageType>8</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<UIntValue>
 				<ID>Percentage</ID>
 				<Description>The remaining capacity of the battery from 0 (empty) to 100 (full).</Description>
@@ -353,7 +325,7 @@
 			<MessageType>8</MessageType>
 			<MessageType>9</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<Array>
 				<Length>8</Length>
 				<BoolValue>
@@ -372,7 +344,7 @@
 			<MessageType>8</MessageType>
 			<MessageType>9</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<Array>
 				<Length>8</Length>
 				<BoolValue>
@@ -398,7 +370,7 @@
 			<MessageType>8</MessageType>
 			<MessageType>9</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<UIntValue>
 				<ID>Pos</ID>
 				<Description>The number of the pin in the port.</Description>
@@ -421,7 +393,7 @@
 			<MessageType>8</MessageType>
 			<MessageType>9</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<UIntValue>
 				<ID>Pos</ID>
 				<Description>The number of the pin in the port.</Description>
@@ -479,7 +451,7 @@
 			<MessageType>0</MessageType>
 			<MessageType>8</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<IntValue>
 				<ID>Temperature</ID>
 				<Description>temperature [1/100 degree celsius], -50°C = -5000, 50°C = 5000</Description>
@@ -495,7 +467,7 @@
 			<MessageType>0</MessageType>
 			<MessageType>8</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<UIntValue>
 				<ID>Humidity</ID>
 				<Description>relative humidity permill, 0..1000 (other values not defined)</Description>
@@ -518,7 +490,7 @@
 			<MessageType>0</MessageType>
 			<MessageType>8</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<UIntValue>
 				<ID>BarometricPressure</ID>
 				<Description>barometric pressure in pascal</Description>
@@ -541,7 +513,7 @@
 			<MessageType>0</MessageType>
 			<MessageType>8</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<UIntValue>
 				<ID>Humidity</ID>
 				<Description>relative humidity permill, 0..1000 (other values not defined)</Description>
@@ -562,7 +534,7 @@
 			<MessageType>0</MessageType>
 			<MessageType>8</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<UIntValue>
 				<ID>Brightness</ID>
 				<Description>brightness in percent</Description>
@@ -578,7 +550,7 @@
 			<MessageType>0</MessageType>
 			<MessageType>8</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<UIntValue>
 				<ID>Distance</ID>
 				<Description>distance in cm</Description>
@@ -630,12 +602,12 @@
 		</Message>
 	</MessageGroup>
 	<MessageGroup>
-		<Name>PowerSwitch</Name>
-		<Description/>
-		<MessageGroupID>20</MessageGroupID>
+		<Name>Display</Name>
+		<Description>This message group contains messages for displays.</Description>
+		<MessageGroupID>40</MessageGroupID>
 		<Message>
-			<Name>SwitchState</Name>
-			<Description>This is the state of the relais and its timeout value.</Description>
+			<Name>Text</Name>
+			<Description>This is a message to get/set text content at a specified position.</Description>
 			<MessageID>1</MessageID>
 			<MessageType>0</MessageType>
 			<MessageType>1</MessageType>
@@ -643,22 +615,38 @@
 			<MessageType>8</MessageType>
 			<MessageType>9</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>deprecated</Validity>
-			<BoolValue>
-				<ID>On</ID>
-				<Description>Tells if the switch is on (active).</Description>
-			</BoolValue>
+			<Validity>test</Validity>
 			<UIntValue>
-				<ID>TimeoutSec</ID>
-				<Description>The time after which the switch is automatically toggled again. Use 0 to disable this.</Description>
-				<Bits>16</Bits>
+				<ID>PosY</ID>
+				<Description>Y (line) position at which the text shall be displayed. Line numbers above 3 are for the corresponding virtual lines / pages.</Description>
+				<Bits>5</Bits>
 				<MinVal>0</MinVal>
-				<MaxVal>65535</MaxVal>
+				<MaxVal>31</MaxVal>
 			</UIntValue>
+			<UIntValue>
+				<ID>PosX</ID>
+				<Description>X (character) position at which the text shall be displayed.</Description>
+				<Bits>7</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>79</MaxVal>
+			</UIntValue>
+			<UIntValue>
+				<ID>Format</ID>
+				<Description>Format, font, or other value which modifies how the text is displayed. Depends on the implementation of the device.</Description>
+				<Bits>4</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>15</MaxVal>
+				<DefaultVal>0</DefaultVal>
+			</UIntValue>
+			<ByteArray>
+				<ID>Text</ID>
+				<Description>40 bytes for the text that shall be displayed. The end of the text is marked with a 0 byte if it's shorter than 40 characters.</Description>
+				<Bytes>40</Bytes>
+			</ByteArray>
 		</Message>
 		<Message>
-			<Name>SwitchStateExt</Name>
-			<Description>This is the state of up to 8 relais and its timeout values.</Description>
+			<Name>Backlight</Name>
+			<Description>This is a message to get/set the backlight mode of a display.</Description>
 			<MessageID>2</MessageID>
 			<MessageType>0</MessageType>
 			<MessageType>1</MessageType>
@@ -666,22 +654,130 @@
 			<MessageType>8</MessageType>
 			<MessageType>9</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>deprecated</Validity>
+			<Validity>test</Validity>
+			<EnumValue>
+				<ID>Mode</ID>
+				<Description>The backlight mode defines when the backlight is switched on. The setting 'Auto' means the backlight is switched on automatically after user interaction and off after a timeout.</Description>
+				<Bits>4</Bits>
+				<Element>
+					<Value>0</Value>
+					<Name>On</Name>
+				</Element>
+				<Element>
+					<Value>1</Value>
+					<Name>Off</Name>
+				</Element>
+				<Element>
+					<Value>2</Value>
+					<Name>Auto</Name>
+				</Element>
+			</EnumValue>
+			<UIntValue>
+				<ID>AutoTimeoutSec</ID>
+				<Description>This is the timeout in seconds after which the backlight is switched off in mode 'Auto'. The value 0 shall be treated as not to change the value when sending a request to the device.</Description>
+				<Bits>8</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>255</MaxVal>
+			</UIntValue>
+		</Message>
+	</MessageGroup>
+	<MessageGroup>
+		<Name>Controller</Name>
+		<Description>This message group contains messages for controller / HMI devices.</Description>
+		<MessageGroupID>45</MessageGroupID>
+		<Message>
+			<Name>MenuSelection</Name>
+			<Description>These are the value indexes of selected menu items. It depends on the configuration of a specific controller device which value each index represents. The indexes of selected menu entries should start with 1, and 0 should be treated as 'not updated' (in a Status/AckStatus/Deliver message) or 'not to be updated' (in a Set/SetGet request). This is to allow smaller (16 byte) packets when there are few menu entries.</Description>
+			<MessageID>1</MessageID>
+			<MessageType>0</MessageType>
+			<MessageType>1</MessageType>
+			<MessageType>2</MessageType>
+			<MessageType>3</MessageType>
+			<MessageType>8</MessageType>
+			<MessageType>9</MessageType>
+			<MessageType>10</MessageType>
+			<Validity>test</Validity>
 			<Array>
-				<Length>8</Length>
-				<BoolValue>
-					<ID>On</ID>
-					<Description/>
-				</BoolValue>
-			</Array>
-			<Array>
-				<Length>8</Length>
+				<Length>16</Length>
 				<UIntValue>
-					<ID>TimeoutSec</ID>
-					<Description>The time after which the switch is automatically toggled again. Use 0 to disable this.</Description>
-					<Bits>16</Bits>
+					<ID>Index</ID>
+					<Description>The index of the selected value of a menu entry.</Description>
+					<Bits>8</Bits>
 					<MinVal>0</MinVal>
-					<MaxVal>65535</MaxVal>
+					<MaxVal>255</MaxVal>
+					<DefaultVal>0</DefaultVal>
+				</UIntValue>
+			</Array>
+		</Message>
+	</MessageGroup>
+	<MessageGroup>
+		<Name>Audio</Name>
+		<Description>This message group contains messages for audio input/output.</Description>
+		<MessageGroupID>50</MessageGroupID>
+		<Message>
+			<Name>Tone</Name>
+			<Description>This is a message to get/set playback of a continuous tone which doesn't stop until another one is requested.</Description>
+			<MessageID>1</MessageID>
+			<MessageType>0</MessageType>
+			<MessageType>1</MessageType>
+			<MessageType>2</MessageType>
+			<MessageType>8</MessageType>
+			<MessageType>9</MessageType>
+			<MessageType>10</MessageType>
+			<Validity>test</Validity>
+			<UIntValue>
+				<ID>Tone</ID>
+				<Description>Tone according frequency table. 0 means OFF.</Description>
+				<Bits>7</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>116</MaxVal>
+			</UIntValue>
+		</Message>
+		<Message>
+			<Name>Melody</Name>
+			<Description>This is a message to play a series of tones (set) or get the currently playing one.</Description>
+			<MessageID>2</MessageID>
+			<MessageType>0</MessageType>
+			<MessageType>1</MessageType>
+			<MessageType>2</MessageType>
+			<MessageType>8</MessageType>
+			<MessageType>9</MessageType>
+			<MessageType>10</MessageType>
+			<Validity>test</Validity>
+			<UIntValue>
+				<ID>Repeat</ID>
+				<Description>The number of times the melody will be repeated. 0 means infinitely.</Description>
+				<Bits>4</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>15</MaxVal>
+			</UIntValue>
+			<BoolValue>
+				<ID>AutoReverse</ID>
+				<Description>If true, the melody will be played back in the normal direction and then in reverse order.</Description>
+			</BoolValue>
+			<Array>
+				<Length>25</Length>
+				<UIntValue>
+					<ID>Time</ID>
+					<Description>The playback time between the previous tone and the new one. The number of seconds used is 0.05 * 1.3 ^ Time and covers the range from 0.03s to 170s. Use 0 to mark the end of the melody. Further values will be ignored.</Description>
+					<Bits>5</Bits>
+					<MinVal>0</MinVal>
+					<MaxVal>31</MaxVal>
+				</UIntValue>
+				<UIntValue>
+				  <ID>Effect</ID>
+				  <Description>Define how the tone is played. 0: Tone is played immediately (default). 1: A sliding tone from the previous to the new one. A sliding tone from or to tone index 0 (off) is not possible. The new tone / no tone will be played back immediately in this case. Other values are free for future use.</Description>
+				  <Bits>3</Bits>
+					<MinVal>0</MinVal>
+					<MaxVal>1</MaxVal>
+					<DefaultVal>0</DefaultVal>
+				</UIntValue>
+				<UIntValue>
+					<ID>Tone</ID>
+					<Description>Index according frequency table. 0 means OFF. The last index (or the first when AutoReverse is true) of the melody will remain audible after the melody is completed.</Description>
+					<Bits>7</Bits>
+					<MinVal>0</MinVal>
+					<MaxVal>116</MaxVal>
 				</UIntValue>
 			</Array>
 		</Message>
@@ -700,7 +796,7 @@
 			<MessageType>8</MessageType>
 			<MessageType>9</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<UIntValue>
 				<ID>Brightness</ID>
 				<Description>The brightness in percent. 0 = Off.</Description>
@@ -719,7 +815,7 @@
 			<MessageType>8</MessageType>
 			<MessageType>9</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<EnumValue>
 				<ID>AnimationMode</ID>
 				<Description>If a time is set, use this animation mode to change the brightness over time (none = leave at start state for the whole time and switch to end state at the end).</Description>
@@ -765,7 +861,7 @@
 			<MessageType>8</MessageType>
 			<MessageType>9</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<UIntValue>
 				<ID>Color</ID>
 				<Description>The color is according to the 6 bit color palette used in SHC.</Description>
@@ -784,7 +880,7 @@
 			<MessageType>8</MessageType>
 			<MessageType>9</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<UIntValue>
 				<ID>Repeat</ID>
 				<Description>The number of times the animation will be repeated. 0 means infinitely.</Description>

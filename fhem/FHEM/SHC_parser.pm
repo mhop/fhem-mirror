@@ -160,6 +160,16 @@ sub init_datafield_positions_noarray($$$$$)
     }
 
     $offset += $bits;
+  } elsif ($field->nodeName eq "ByteArray") {
+    my $id   = ($field->findnodes("ID"))[0]->textContent;
+    my $bytes = ($field->findnodes("Bytes"))[0]->textContent;
+
+    # print "Data field " . $id . " starts at " . $offset . " with " . $bytes . " bytes.\n";
+
+    $dataFields{$messageGroupID . "-" . $messageID . "-" . $id} =
+      new ByteArray($id, $offset, $bytes, $arrayLength, $arrayElementBits);
+
+    $offset += $bytes * 8;
   }
 }
 
@@ -174,7 +184,7 @@ sub init_datafield_positions_array($$$)
     calc_array_bits_ovr($field);    # number of bits for one struct ("set of sub-elements") in a structured array
    # print "Next field is an array with " . $arrayLength . " elements (" . $arrayElementBits . " ovr bits per array element)!\n";
 
-  for my $subfield ($field->findnodes("UIntValue|IntValue|FloatValue|BoolValue|EnumValue")) {
+  for my $subfield ($field->findnodes("UIntValue|IntValue|FloatValue|BoolValue|EnumValue|ByteArray")) {
     my $bits =
       init_datafield_positions_noarray($messageGroupID, $messageID, $subfield, $arrayLength, $arrayElementBits);
   }
@@ -198,6 +208,10 @@ sub calc_array_bits_ovr($)
 
   for my $subfield ($field->findnodes("FloatValue")) {
     $bits += 32;
+  }
+
+  for my $subfield ($field->findnodes("ByteArray")) {
+    $bits += ($subfield->findnodes("Bytes"))[0]->textContent * 8;
   }
 
   return $bits;
@@ -234,7 +248,7 @@ sub init_datafield_positions()
 
       $offset = 0;
 
-      for my $field ($message->findnodes("Array|UIntValue|IntValue|FloatValue|BoolValue|EnumValue")) {
+      for my $field ($message->findnodes("Array|UIntValue|IntValue|FloatValue|BoolValue|EnumValue|ByteArray")) {
 
         # When an array is detected, remember the array length and change the current field node
         # to the inner node for further processing.
@@ -258,10 +272,14 @@ sub parse
 
   $sendMode = 0;
 
+  # PKT:SID=56;PC=1816;MT=3;RID=0;MGID=45;MID=1;MD=010105;efc28d5e
   if (
     (
       $msg =~
 /^PKT:SID=(\d+);PC=(\d+);MT=(\d+);MGID=(\d+);MID=(\d+);MD=([^;]+);.*/
+    )
+    || ($msg =~
+/^PKT:SID=(\d+);PC=(\d+);MT=(3);RID=0;MGID=(\d+);MID=(\d+);MD=([^;]+);.*/
     )
     || ($msg =~
 /^PKT:SID=(\d+);PC=(\d+);MT=(\d+);ASID=\d+;APC=\d+;E=\d+;MGID=(\d+);MID=(\d+);MD=([^;]+);.*/

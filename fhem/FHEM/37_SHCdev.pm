@@ -2,7 +2,7 @@
 # This file is part of the smarthomatic module for FHEM.
 #
 # Copyright (c) 2014 Stefan Baumann
-#               2014, 2015, 2019, 2022 Uwe Freese
+#               2014, 2015, 2019, 2022, 2023 Uwe Freese
 #
 # You can find smarthomatic at www.smarthomatic.org.
 # You can find FHEM at www.fhem.de.
@@ -28,6 +28,7 @@ use strict;
 use feature qw(switch);
 use warnings;
 use SetExtensions;
+use Encode qw(encode_utf8 decode_utf8);
 
 use SHC_parser;
 
@@ -37,6 +38,7 @@ my %dev_state_icons = (
   "PowerSwitch"         => ".*1\\d{7}:on:off .*0\\d{7}:off:on set.*:light_question:off",
   "Dimmer"              => "on:on off:off set.*:light_question:off",
   "EnvSensor"           => undef,
+  "Controller"          => undef,
   "RGBDimmer"           => undef,
   "SoilMoistureMeter"   => ".*H:\\s\\d\\..*:ampel_rot"
 );
@@ -45,6 +47,7 @@ my %web_cmds = (
   "PowerSwitch"         => "on:off:toggle:statusRequest",
   "Dimmer"              => "on:off:statusRequest",
   "EnvSensor"           => undef,
+  "Controller"          => undef,
   "RGBDimmer"           => undef,
   "SoilMoistureMeter"   => undef
 );
@@ -63,6 +66,10 @@ my %dev_state_format = (
     "distance",            "D: ",
     "port",                "Port: ",
     "ains",                "Ain: "
+  ],
+  "Controller"          => [
+    "color",               "Color: ",
+    "brightness",          "Brightness: "
   ],
   "RGBDimmer"           => [
     "color",               "Color: ",
@@ -87,9 +94,19 @@ my %sets = (
                            # Used from SetExtensions.pm
                            "blink on-for-timer on-till off-for-timer off-till intervals",
   "EnvSensor"           => "",
+  "Controller"          => "Color " .
+                           "ColorAnimation " .
+                           "Dimmer.Brightness:slider,0,1,100 " .
+                           "Text " .
+                           "MenuSelection " .
+                           "Backlight " .
+                           "Tone " .
+                           "Melody",
   "RGBDimmer"           => "Color " .
                            "ColorAnimation " .
-                           "Dimmer.Brightness:slider,0,1,100",
+                           "Dimmer.Brightness:slider,0,1,100 " .
+                           "Tone " .
+                           "Melody",
   "SoilMoistureMeter"   => "",
   "Custom"              => "Dimmer.Brightness " .
                            "Dimmer.Animation"
@@ -101,6 +118,7 @@ my %gets = (
   "PowerSwitch" => "",
   "Dimmer"      => "",
   "EnvSensor"   => "din:all,1,2,3,4,5,6,7,8 ain:all,1,2,3,4,5 ain_volt:1,2,3,4,5",
+  "Controller"  => "",
   "RGBDimmer"   => "",
   "Custom"      => ""
 );
@@ -122,7 +140,7 @@ sub SHCdev_Initialize($)
                        ." readonly:1"
                        ." forceOn:1"
                        ." $readingFnAttributes"
-                       ." devtype:EnvSensor,Dimmer,PowerSwitch,RGBDimmer,SoilMoistureMeter";
+                       ." devtype:EnvSensor,Dimmer,PowerSwitch,Controller,RGBDimmer,SoilMoistureMeter";
 }
 
 #####################################
@@ -207,7 +225,7 @@ sub SHCdev_Parse($$)
     return "UNDEFINED SHCdev_$rname SHCdev $raddr";
   }
 
-  if (($msgtypename ne "Status") && ($msgtypename ne "AckStatus")) {
+  if (($msgtypename ne "Status") && ($msgtypename ne "AckStatus") && ($msgtypename ne "Deliver")) {
     Log3 $name, 3, "$rname: Ignoring MessageType $msgtypename";
     return "";
   }
@@ -348,6 +366,42 @@ sub SHCdev_Parse($$)
         }
       }
     }
+  } elsif ($msggroupname eq "Controller") {
+    if ($msgname eq "MenuSelection") {
+      my $index;
+
+      for (my $i = 0 ; $i < 16 ; $i = $i + 1) {
+        $index = $parser->getField("Index" , $i);
+        # index 0 indicates the value was not changed / doesn't exist
+        if ($index != 0) {
+          readingsBulkUpdate($rhash, sprintf("index%02d", $i), $index);
+		}
+      }
+
+      # remember delivery (= user selection)
+      if ($msgtypename eq "Deliver") {
+        readingsBulkUpdate($rhash, "menuSelectionDelivery", 1);
+      }
+    }
+  } elsif ($msggroupname eq "Audio") {
+    if ($msgname eq "Tone") {
+      my $tone = $parser->getField("Tone");
+
+      readingsBulkUpdate($rhash, "tone",         $tone);
+    } elsif ($msgname eq "Melody") {
+      my $repeat = $parser->getField("Repeat");
+      my $autoreverse = $parser->getField("AutoReverse");
+      readingsBulkUpdate($rhash, "repeat", $repeat);
+      readingsBulkUpdate($rhash, "autoreverse", $autoreverse);
+      for (my $i = 0 ; $i < 25 ; $i = $i + 1) {
+        my $time  = $parser->getField("Time" , $i);
+        my $effect = $parser->getField("Effect", $i);
+        my $tone = $parser->getField("Tone", $i);
+        readingsBulkUpdate($rhash, sprintf("time%02d", $i), $time);
+        readingsBulkUpdate($rhash, sprintf("effect%02d", $i), $effect);
+        readingsBulkUpdate($rhash, sprintf("tone%02d", $i), $tone);
+      }
+    }
   } elsif ($msggroupname eq "Dimmer") {
     if ($msgname eq "Brightness") {
       my $brightness = $parser->getField("Brightness");
@@ -370,6 +424,14 @@ sub SHCdev_Parse($$)
         readingsBulkUpdate($rhash, "color$i", $color);
       }
     }
+  } elsif ($msggroupname eq "Display") {
+    if ($msgname eq "Backlight") {
+      my $mode = $parser->getField("Mode");
+      my $autotimeoutsec = $parser->getField("AutoTimeoutSec");
+
+      readingsBulkUpdate($rhash, "backlightMode",        $mode);
+      readingsBulkUpdate($rhash, "backlightAutoTimeSec", $autotimeoutsec);
+	}
   }
 
   # If the devtype is defined add, if not already done, the according webCmds and devStateIcons
@@ -566,7 +628,7 @@ sub SHCdev_Set($@)
     } else {
       return SetExtensions($hash, "", $name, @aa);
     }
-  } elsif ($devtype eq "RGBDimmer") {
+  } elsif (($devtype eq "Controller") || ($devtype eq "RGBDimmer")) {
     if ($cmd eq 'Color') {
       #TODO Verify argument values
       my $color = $arg;
@@ -577,6 +639,17 @@ sub SHCdev_Set($@)
       readingsSingleUpdate($hash, "state", "set-color:$color", 1);
       $parser->initPacket("Dimmer", "Color", "SetGet");
       $parser->setField("Dimmer", "Color", "Color",   $color);
+      SHCdev_Send($hash);
+    } elsif ($cmd eq 'Tone') {
+      #TODO Verify argument values
+      my $tone = $arg;
+
+      # DEBUG
+      # Log3 $name, 3, "$name: Tone args: $arg, $arg2, $arg3, $arg4";
+
+      readingsSingleUpdate($hash, "state", "set-tone:$tone", 1);
+      $parser->initPacket("Audio", "Tone", "SetGet");
+      $parser->setField("Audio", "Tone", "Tone",   $tone);
       SHCdev_Send($hash);
     } elsif ($cmd eq 'ColorAnimation') {
       #TODO Verify argument values
@@ -609,6 +682,44 @@ sub SHCdev_Set($@)
       }
       readingsSingleUpdate($hash, "state", "set-coloranimation", 1);
       SHCdev_Send($hash);
+    } elsif ($cmd eq 'Melody') {
+      #TODO Verify argument values
+
+      $parser->initPacket("Audio", "Melody", "SetGet");
+      $parser->setField("Audio", "Melody", "Repeat", $arg);
+      $parser->setField("Audio", "Melody", "AutoReverse", $arg2);
+
+      my $curtime = 0;
+      my $cureffect = 0;
+      my $curtone = 0;
+      # Iterate over all given command line parameters and set Time, Effect and Tone
+      # accordingly. Fill the remaining values with zero.
+      for (my $i = 0 ; $i < 25 ; $i = $i + 1) {
+        if (!defined($aa[($i * 3) + 3])) {
+          $curtime = 0;
+        } else {
+          $curtime = $aa[($i * 3) + 3];
+        }
+        if (!defined($aa[($i * 3) + 4])) {
+          $cureffect = 0;
+        } else {
+          $cureffect = $aa[($i * 3) + 4];
+        }
+        if (!defined($aa[($i * 3) + 5])) {
+          $curtone = 0;
+        } else {
+          $curtone = $aa[($i * 3) + 5];
+        }
+
+        # DEBUG
+        # Log3 $name, 3, "$name: Nr: $i Time: $curtime Effect: $cureffect Tone: $curtone";
+
+        $parser->setField("Audio", "Melody", "Time" , $curtime, $i);
+        $parser->setField("Audio", "Melody", "Effect", $cureffect, $i);
+        $parser->setField("Audio", "Melody", "Tone", $curtone, $i);
+      }
+      readingsSingleUpdate($hash, "state", "set-melody", 1);
+      SHCdev_Send($hash);
     } elsif ($cmd eq 'Dimmer.Brightness') {
       my $brightness = $arg;
 
@@ -618,6 +729,37 @@ sub SHCdev_Set($@)
       readingsSingleUpdate($hash, "state", "set-brightness:$brightness", 1);
       $parser->initPacket("Dimmer", "Brightness", "SetGet");
       $parser->setField("Dimmer", "Brightness", "Brightness", $brightness);
+      SHCdev_Send($hash);
+    } elsif ($cmd eq 'Text') {
+      $parser->initPacket("Display", "Text", "Set");
+      $parser->setField("Display", "Text", "PosY", $arg);
+      $parser->setField("Display", "Text", "PosX", $arg2);
+      $parser->setField("Display", "Text", "Format", $arg3);
+      $arg4 = decode_utf8($arg4);
+      $arg4 =~ s/(?<!\\)_/ /g; # replace non-escaped '_' with space
+      $arg4 =~ s/\\_/_/g;      # replace escape character from escaped '_'
+      $arg4 =~ s/(?<!\\)\\1/\x01/g; # replace \1 with character 1 (user character)
+      $arg4 =~ s/(?<!\\)\\2/\x02/g; # replace \2 with character 2 (user character)
+      $arg4 =~ s/(?<!\\)\\3/\x03/g; # replace \3 with character 3 (user character)
+      $arg4 =~ s/(?<!\\)\\4/\x04/g; # replace \4 with character 4 (user character)
+      $arg4 =~ s/(?<!\\)\\5/\x05/g; # replace \5 with character 5 (user character)
+      $arg4 =~ s/(?<!\\)\\6/\x06/g; # replace \6 with character 6 (user character)
+      $arg4 =~ s/(?<!\\)\\7/\x07/g; # replace \7 with character 7 (user character)
+      $arg4 =~ s/(?<!\\)\\8/\x08/g; # replace \8 with character 8 (user character)
+      $parser->setField("Display", "Text", "Text", $arg4);
+      SHCdev_Send($hash);
+    } elsif ($cmd eq 'Backlight') {
+      $parser->initPacket("Display", "Backlight", "SetGet");
+      $parser->setField("Display", "Backlight", "Mode", $arg);
+      $parser->setField("Display", "Backlight", "AutoTimeoutSec", $arg2);
+      SHCdev_Send($hash);
+    } elsif ($cmd eq 'MenuSelection') {
+      $parser->initPacket("Controller", "MenuSelection", "SetGet");
+      for (my $i = 0 ; $i < 16 ; $i = $i + 1) {
+        if (defined($aa[$i + 1])) {
+          $parser->setField("Controller", "MenuSelection", "Index", $aa[$i + 1], $i);
+        }
+      }
       SHCdev_Send($hash);
     } else {
       return SetExtensions($hash, "", $name, @aa);
@@ -740,6 +882,7 @@ sub SHCdev_Send($)
     <li>EnvSensor</li>
     <li>PowerSwitch</li>
     <li>Dimmer</li>
+    <li>Controller</li>
     <li>RGBDimmer</li>
     <li>SoilMoistureMeter</li>
   </ul><br>
@@ -774,35 +917,58 @@ sub SHCdev_Send($)
         Sets the brightness in percent. Supported by Dimmer.
     </li><br>
     <li>ani &lt;AnimationMode&gt; &lt;TimeoutSec&gt; &lt;StartBrightness&gt; &lt;EndBrightness&gt;<br>
-        Description and details available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Dimmer_Animation">www.smarthomatic.org</a>
+        Description and details available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Dimmer_Animation">www.smarthomatic.org</a>.
         Supported by Dimmer.
     </li><br>
     <li>statusRequest<br>
         Supported by Dimmer and PowerSwitch.
     </li><br>
     <li>Color &lt;ColorNumber&gt;<br>
-        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Dimmer_Color">www.smarthomatic.org</a>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Dimmer_Color">www.smarthomatic.org</a>.
         The color palette can be found <a href="http://www.smarthomatic.org/devices/rgb_dimmer.html">here</a>
         Supported by RGBDimmer.
     </li><br>
     <li>ColorAnimation &lt;Repeat&gt; &lt;AutoReverse&gt; &lt;Time0&gt; &lt;ColorNumber0&gt; &lt;Time1&gt; &lt;ColorNumber1&gt; ... up to 10 time/color pairs<br>
-        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Dimmer_ColorAnimation">www.smarthomatic.org</a>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Dimmer_ColorAnimation">www.smarthomatic.org</a>.
         The color palette can be found <a href="http://www.smarthomatic.org/devices/rgb_dimmer.html">here</a>
         Supported by RGBDimmer.
     </li><br>
+    <li>Tone &lt;ToneNumber&gt;<br>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Audio_Tone">www.smarthomatic.org</a>.
+        The tone definition can be found <a href="http://www.smarthomatic.org/devices/rgb_dimmer.html">here</a>
+        Supported by RGBDimmer.
+    </li><br>
+    <li>Melody &lt;Repeat&gt; &lt;AutoReverse&gt; &lt;Time0&gt; &lt;Effect0&gt; &lt;ToneNumber0&gt; &lt;Time1&gt; &lt;Effect1&gt; &lt;ToneNumber1&gt; ... up to 25 time/effect/tone pairs<br>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Audio_Melody">www.smarthomatic.org</a>.
+        The tone definition can be found <a href="http://www.smarthomatic.org/devices/rgb_dimmer.html">here</a>
+        Supported by RGBDimmer.
+    </li><br>
+    <li>Text &lt;PosY&gt; &lt;PosX&gt; &lt;Format&gt; &lt;Text&gt;<br>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Display_Text">www.smarthomatic.org</a>. Supported by Controller.<br>
+        <b>Note:</b> Since FHEM parameters can't include spaces, there is a special form to enter them.
+        To add a space to the text, use the underline character (e.g. 'Hello_world').
+        If you want to send an underline character, escape it with the backslash (e.g. '\_test\_').
+    </li><br>
+    <li>MenuSelection &lt;Index00&gt; &lt;Index01&gt; ... &lt;Index15&gt;<br>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Controller_MenuSelection">www.smarthomatic.org</a>. Supported by Controller.<br>
+        When the MenuSelection was initiated by the user with the controller, the reading <b>menuSelectionDelivery</b> will be set additionally to the index00, ... readings. This can be used to distinguish if the menu selection was user initiated or done programmatically by a FHEM "set" command, especially to keep more than one controller with the same options in sync reacting on a change of the menuSelectionDelivery reading.
+    </li><br>
+    <li>Backlight &lt;Mode&gt; &lt;AutoTimeoutSec&gt;<br>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Display_Backlight">www.smarthomatic.org</a>. Supported by Controller.
+    </li><br>
     <li>DigitalPin &lt;Pos&gt; &lt;On&gt;<br>
-        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#GPIO_DigitalPin">www.smarthomatic.org</a>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#GPIO_DigitalPin">www.smarthomatic.org</a>.
         Supported by PowerSwitch.
     </li><br>
     <li>DigitalPinTimeout &lt;Pos&gt; &lt;On&gt; &lt;Timeout&gt;<br>
-        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#GPIO_DigitalPinTimeout">www.smarthomatic.org</a>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#GPIO_DigitalPinTimeout">www.smarthomatic.org</a>.
         Supported by PowerSwitch.
     </li><br>
     <li>DigitalPort &lt;On&gt;<br>
         &lt;On&gt;<br>
         is a bit array (0 or 1) describing the port state. If less than eight bits were provided zero is assumed.
         Example: set SHC_device DigitalPort 10110000 will set pin0, pin2 and pin3 to 1.<br>
-        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#GPIO_DigitalPort">www.smarthomatic.org</a>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#GPIO_DigitalPort">www.smarthomatic.org</a>.
         Supported by PowerSwitch.
     </li><br>
     <li>DigitalPortTimeout &lt;On&gt; &lt;Timeout0&gt; .. &lt;Timeout7&gt;<br>
@@ -811,7 +977,7 @@ sub SHCdev_Send($)
         Example: set SHC_device DigitalPort 10110000 will set pin0, pin2 and pin3 to 1.<br>
         &lt;Timeout0&gt; .. &lt;Timeout7&gt;<br>
         are the timeouts for each pin. If no timeout is provided zero is assumed.
-        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#GPIO_DigitalPortTimeout">www.smarthomatic.org</a>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#GPIO_DigitalPortTimeout">www.smarthomatic.org</a>.
         Supported by PowerSwitch.
     </li><br>
     <li><a href="#setExtensions"> set extensions</a><br>

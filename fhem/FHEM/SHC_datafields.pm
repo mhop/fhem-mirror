@@ -126,7 +126,7 @@ sub setUInt($$$$)
   my $len       = min($length_bits, 8 - $bit);
   my $val8      = get_bits($value, $src_start, $len);
 
-# DEBUG print "   Write value " . $val8 . " (" . $len . " bits) to byte " . $byte . ", dst_start " . $dst_start . "\r\n";
+  # DEBUG print "   Write value " . $val8 . " (" . $len . " bits) to byte " . $byte . ", start bit " . $dst_start . "\r\n";
 
   setUIntBits($byteArrayRef, $byte, $dst_start, $len, $val8);
 
@@ -138,7 +138,7 @@ sub setUInt($$$$)
     $val8 = get_bits($value, $src_start, $len);
     $byte++;
 
-# DEBUG print "   Write value " . $val8 . " (" . $len . " bits) from src_start " . $src_start . " to byte " . $byte . ", dst_start " . $dst_start . "\r\n";
+    # DEBUG print "   Write value " . $val8 . " (" . $len . " bits) from src_start " . $src_start . " to byte " . $byte . ", start bit " . $dst_start . "\r\n";
 
     setUIntBits($byteArrayRef, $byte, $dst_start, $len, $val8);
 
@@ -353,6 +353,70 @@ sub setValue
 
   my $value = $self->{_name2value}{$name};
   SHC_util::setUInt($byteArrayRef, $self->{_offset} + $self->{_arrayElementBits} * $index, $self->{_bits}, $value);
+}
+
+# ----------- ByteArray class -----------
+
+package ByteArray;
+
+sub new
+{
+  my $class = shift;
+  my $self  = {
+    _id               => shift,
+    _offset           => shift,
+    _bytes            => shift,
+    _length           => shift,
+    _arrayElementBits => shift
+  };
+  bless $self, $class;
+  return $self;
+}
+
+sub getValue
+{
+  my ($self, $byteArrayRef, $index) = @_;
+
+  my $res = "";
+  my ($i, $c);
+
+  for ($i = 0; $i < $self->{_bytes}; $i++)
+  {
+    $c = SHC_util::getUInt($byteArrayRef, $self->{_offset} + $self->{_arrayElementBits} * $index + $i * 8, 8);
+
+    if ($c == 0)
+    {
+      last;
+    }
+
+    $res .= Chr($c);
+  }
+
+  return $res;
+}
+
+sub setValue
+{
+  my ($self, $byteArrayRef, $value, $index) = @_;
+
+  my @chars = split("", $value);
+
+  # Set a maximum of _bytes bytes in the data array.
+  my $i;
+  my $strlen = SHC_util::min(length($value), $self->{_bytes});
+
+  for ($i = 0; $i < $strlen; $i++)
+  {
+    #print "set bit " . ($self->{_offset} + $self->{_arrayElementBits} * $index + $i * 8) . " char " . $i . " = " . $chars[$i] . " = ord " . ord($chars[$i]) . "\n";
+
+    SHC_util::setUInt($byteArrayRef, $self->{_offset} + $self->{_arrayElementBits} * $index + $i * 8, 8, ord($chars[$i]));
+  }
+
+  # Fill up the rest of the bytes with 0.
+  for ($i = $strlen; $i < $self->{_bytes}; $i++)
+  {
+    SHC_util::setUInt($byteArrayRef, $self->{_offset} + $self->{_arrayElementBits} * $index + $i * 8, 8, 0);
+  }
 }
 
 1;
