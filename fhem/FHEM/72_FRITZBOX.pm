@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.17h";
+my $ModulVersion = "07.50.17i";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -201,6 +201,7 @@ sub FRITZBOX_Initialize($)
                 ."disable:0,1 "
                 ."nonblockingTimeOut:50,75,100,125 "
                 ."INTERVAL "
+                ."reConnectInterval "
                 ."m3uFileActive:0,1 "
                 ."m3uFileLocal "
                 ."m3uFileURL "
@@ -474,6 +475,12 @@ sub FRITZBOX_Attr($@)
      }
    }
 
+   if ($aName eq "reConnectInterval") {
+     if ($cmd eq "set") {
+       return "the reConnectInterval timer ($aVal sec) should be graeter than 10 sec." if $aVal < 10;
+     }
+   }
+
    if ($aName eq "deviceInfo") {
      if ($cmd eq "set") {
        my $count = () = ($aVal . ",") =~ m/_default_(.*?)\,/g;
@@ -676,6 +683,7 @@ sub FRITZBOX_Set($$@)
    elsif ( lc $cmd eq 'checkapis') {
       FRITZBOX_Log $hash, 3, "INFO: set $name $cmd " . join(" ", @val);
       $hash->{APICHECKED} = 0;
+      $hash->{APICHECK_RET_CODES} = "-";
       $hash->{fhem}{sidTime} = 0;
       $hash->{fhem}{LOCAL} = 1;
       FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
@@ -1578,10 +1586,15 @@ sub FRITZBOX_Readout_Start($)
    my $timeout = $hash->{TIMEOUT};
 
 # First run is an API check
-   unless ( $hash->{APICHECKED} ) {
+   if ( $hash->{APICHECKED} == 0 ) {
       $interval = 10;
       $timeout  = 35;
       $hash->{STATE} = "Check APIs";
+      $runFn = "FRITZBOX_API_Check_Run";
+   } elsif ( $hash->{APICHECKED} < 0 ) {
+      $interval = AttrVal( $name, "reConnectInterval", 180 );
+      $timeout  = 45;
+      $hash->{STATE} = "reCheck APIs every 5 Minutes";
       $runFn = "FRITZBOX_API_Check_Run";
    }
 # Run shell or web api, restrict interval
@@ -1626,8 +1639,11 @@ sub FRITZBOX_API_Check_Run($)
    my @roReadings;
    my $response;
    my $startTime = time();
+   my $apiError = "";
+   my $tr064 = 0;
 
    my $host = $hash->{HOST};
+   my $myVerbose = $hash->{APICHECKED} == 0? 1 : 0;
    my $boxUser = AttrVal( $name, "boxUser", "" );
 
    if ( $host =~ /undefined/ || $boxUser eq "") {
@@ -1659,55 +1675,62 @@ sub FRITZBOX_API_Check_Run($)
 
       if ($response->is_success) {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 1;
-         FRITZBOX_Log $hash, 4, "DEBUG: API luaQuery found (" . $response->code . ").";
+         FRITZBOX_Log $hash, 5-$myVerbose, "DEBUG: API luaQuery found (" . $response->code . ").";
       }
       elsif ($response->code eq "500" || $response->code eq "403") {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 1;
-         FRITZBOX_Log $hash, 3, "INFO: API luaQuery found but responded with: " . $response->status_line;
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 0;
+         FRITZBOX_Log $hash, 4-$myVerbose, "ERROR: API luaQuery call responded with: " . $response->status_line;
       }
       else {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 0;
-         FRITZBOX_Log $hash, 3, "INFO: API luaQuery does not exist (" . $response->status_line . ")";
+         FRITZBOX_Log $hash, 4-$myVerbose, "INFO: API luaQuery does not exist (" . $response->status_line . ")";
       }
+
+      $apiError = "luaQuery:" . $response->code;
 
    # Check if data.lua exists
       $response = $agent->get( "http://".$host."/data.lua" );
 
       if ($response->is_success) {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 1;
-         FRITZBOX_Log $hash, 4, "DEBUG: API luaData found (" . $response->code . ").";
+         FRITZBOX_Log $hash, 5-$myVerbose, "DEBUG: API luaData found (" . $response->code . ").";
          # xhr 1 lang de page netSet xhrId all
       }
       elsif ($response->code eq "500" || $response->code eq "403") {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 1;
-         FRITZBOX_Log $hash, 3, "INFO: API luaData found but responded with: " . $response->status_line;
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 0;
+         FRITZBOX_Log $hash, 4-$myVerbose, "INFO: API luaData call responded with: " . $response->status_line;
       }
       else {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 0;
-         FRITZBOX_Log $hash, 3, "INFO: API luaData does not exist (" . $response->status_line . ")";
+         FRITZBOX_Log $hash, 4-$myVerbose, "INFO: API luaData does not exist (" . $response->status_line . ")";
       }
+
+      $apiError .= " luaData:" . $response->code;
 
    # Check if tr064 specification exists and determine TR064-Port
       $response = $agent->get( "http://".$host.":49000/tr64desc.xml" );
 
       if ($response->is_success) { #determine TR064-Port
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TR064", 1;
-         FRITZBOX_Log $hash, 4, "DEBUG: API TR-064 found.";
+         $tr064 = 1;
+         FRITZBOX_Log $hash, 5-$myVerbose, "DEBUG: API TR-064 found.";
 
       #Determine TR064-Port
          my $tr064Port = FRITZBOX_TR064_Init ( $hash, $host );
          if ($tr064Port) {
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->SECPORT", $tr064Port;
-            FRITZBOX_Log $hash, 4, "DEBUG: TR-064-SecurePort is $tr064Port.";
+            FRITZBOX_Log $hash, 5-$myVerbose, "DEBUG: TR-064-SecurePort is $tr064Port.";
          }
          else {
-            FRITZBOX_Log $hash, 3, "INFO: TR-064-SecurePort does not exist";
+            FRITZBOX_Log $hash, 4-$myVerbose, "INFO: TR-064-SecurePort does not exist";
          }
       }
       else {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TR064", 0;
-         FRITZBOX_Log $hash, 3, "INFO: API TR-064 does not exist: ".$response->status_line;
+         FRITZBOX_Log $hash, 4-$myVerbose, "INFO: API TR-064 does not exist: ".$response->status_line;
       }
+
+      # $apiError .= " TR064:" . $response->code;
 
 
    # Check if m3u can be created and the URL tested
@@ -1732,7 +1755,7 @@ sub FRITZBOX_API_Check_Run($)
            if ( $m3uFileURL eq "unknown" && AttrVal( $name, "m3uFileLocal", "" ) eq "" ) {
 
            # Getting IP of FHEM host
-              FRITZBOX_Log $hash, 4, "DEBUG: Try to get my IP address.";
+              FRITZBOX_Log $hash, 5, "DEBUG: Try to get my IP address.";
               my $socket = IO::Socket::INET->new( Proto => 'tcp', PeerAddr => $host, PeerPort => 'http(80)' );
               my $ip;
               $ip = $socket->sockhost if $socket; #A side-effect of making a socket connection is that our IP address is available from the 'sockhost' method
@@ -1740,7 +1763,7 @@ sub FRITZBOX_API_Check_Run($)
 
            # Get a web port
               my $port;
-              FRITZBOX_Log $hash, 4, "DEBUG: Try to get a FHEMWEB port.";
+              FRITZBOX_Log $hash, 5, "DEBUG: Try to get a FHEMWEB port.";
             
               foreach( keys %defs ) {
                 if ( $defs{$_}->{TYPE} eq "FHEMWEB" && !defined $defs{$_}->{TEMPORARY} && defined $defs{$_}->{PORT} ) {
@@ -1757,7 +1780,7 @@ sub FRITZBOX_API_Check_Run($)
 
         # Check if m3u can be accessed
            unless ( $m3uFileURL eq "unknown" ) {
-             FRITZBOX_Log $hash, 4, "DEBUG: Try to get '$m3uFileURL'";
+             FRITZBOX_Log $hash, 5, "DEBUG: Try to get '$m3uFileURL'";
              $response = $agent->get( $m3uFileURL );
              if ($response->is_error) {
                FRITZBOX_Log $hash, 3, "ERROR: Failed to get '$m3uFileURL': ".$response->status_line;
@@ -1780,8 +1803,9 @@ sub FRITZBOX_API_Check_Run($)
       my $content  = $response->content;
       my $fwVersion = "0.0.0.error";
 
+      $apiError .= " boxModelJason:" . $response->code;
       if ($content =~ /<j:Name>/) {
-         FRITZBOX_Log $hash, 5, "DEBUG: jason_boxinfo returned: $content";
+         FRITZBOX_Log $hash, 5-$myVerbose, "DEBUG: jason_boxinfo returned: $content";
 
          FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1)     if $content =~ /<j:Name>(.*)<\/j:Name>/;
          FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
@@ -1793,11 +1817,11 @@ sub FRITZBOX_API_Check_Run($)
          # Muss nochmal neu gesetzt werden, sonst gibt es einen Fehler (keine Ahnung warum)
          $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
          $url = "http://".$host."/cgi-bin/system_status";
-         FRITZBOX_Log $hash, 5, "DEBUG: Read 'system_status'";
+         FRITZBOX_Log $hash, 5-$myVerbose, "DEBUG: Read 'system_status'";
 
          $response = $agent->get( $url );
          $content  = $response->content;
-         FRITZBOX_Log $hash, 5, "DEBUG: system_status returned: $content";
+         FRITZBOX_Log $hash, 5-$myVerbose, "DEBUG: system_status returned: $content";
          if ($response->is_success) {
             $content=$1    if $content =~ /<body>(.*)<\/body>/;
 
@@ -1819,12 +1843,19 @@ sub FRITZBOX_API_Check_Run($)
             $fwVersion = $result[7];
 
          } else {
-            FRITZBOX_Log $hash, 2, "ERROR: " . $response->status_line;
+            FRITZBOX_Log $hash, 4-$myVerbose, "ERROR: " . $response->status_line;
          }
+         $apiError .= " boxModelSystem:" . $response->code;
       }
    }
 
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", 1;
+   if ($apiError =~ /500|403/) {
+     FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
+     FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", $apiError;
+   } else {
+     FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", 1;
+     FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", "Ok";
+   }
 
    push @roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
    my $returnStr = join('|', @roReadings );
@@ -1832,7 +1863,7 @@ sub FRITZBOX_API_Check_Run($)
    FRITZBOX_Log $hash, 4, "INFO: Captured " . @roReadings . " values";
    FRITZBOX_Log $hash, 5, "DEBUG: Handover to main process (" . length ($returnStr) . "): " . $returnStr;
 
-   return $name."|".encode_base64($returnStr,"");
+   return $name . "|" . encode_base64($returnStr,"");
 
 } #end FRITZBOX_API_Check_Run
 
@@ -3783,6 +3814,7 @@ sub FRITZBOX_Readout_Process($$)
                 ."disable:0,1 "
                 ."nonblockingTimeOut:50,75,100,125 "
                 ."INTERVAL "
+                ."reConnectInterval "
                 ."m3uFileLocal "
                 ."m3uFileURL "
                 ."m3uFileActive:0,1 "
@@ -7467,7 +7499,13 @@ sub FRITZBOX_readPassword($)
       <li><a name="INTERVAL"></a>
          <dt><code>INTERVAL &lt;seconds&gt;</code></dt>
          <br>
-         Polling-Interval. Default is 300 (seconds). Smallest possible value is 60.
+         Polling-Interval. Default is 300 (seconds). Smallest possible value is 60 (seconds).
+      </li><br>
+
+      <li><a name="reConnectInterval"></a>
+         <dt><code>reConnectInterval &lt;seconds&gt;</code></dt>
+         <br>
+         After network failure or FritzBox unavailability. Default is 180 (seconds). The smallest possible value is 10 (seconds).
       </li><br>
 
       <li><a name="nonblockingTimeOut"></a>
@@ -7824,9 +7862,11 @@ sub FRITZBOX_readPassword($)
      <li><b>754</b> [...] WLAN-Ger&auml;t wurde abgemeldet (.,. GHz), PC-..., IP ..., MAC ... .</li>
      <li><b>756</b> WLAN-Ger&auml;t hat sich neu angemeldet (n,n GHz), nn Mbit/s, Ger&auml;t, IP ..., MAC ....</li>
      <li><b>782</b> WLAN-Anmeldung ist gescheitert : Die erneute Anmeldung ist aufgrund aktiver "Unterst&uuml;tzung f&uuml;r gesch&uuml;tzte Anmeldungen von WLAN-Ger&auml;ten (PMF)</li>
+     <li><b>786</b> 5-GHz-Band für [Anzahl] Min. nicht nutzbar wegen Pr&uuml;fung auf bevorrechtigten Nutzer (z. B. Radar) auf dem gew&auml;hlten Kanal (Frequenz [GHz])</li>
+     <li><b>790</b> Radar wurde auf Kanal [Nummer] (Frequenz [Ziffer] GHz) erkannt, automatischer Kanalwechsel wegen bevorrechtigtem Benutzer ausgef&uuml;hrt</li>
      <br>
     <li><b>2104</b> Die Systemzeit wurde erfolgreich aktualisiert von Zeitserver nnn.nnn.nnn.nnn .</li>
-
+     <br>
     <li><b>2364</b> Ein neues Ger&auml;t wurde an der FRITZ!Box angemeldet (Schnurlostelefon)</li>
     <li><b>2358</b> Einstellungen wurden gesichert. Diese &auml;nderung erfolgte von Ihrem Heimnetzger&auml;t ... (IP-Adresse: ...)</li>
     <li><b>2380</b> Es besteht keine Verbindung mehr zu den verschl&uuml;sselten DNS-Servern.</li>
@@ -8169,7 +8209,13 @@ sub FRITZBOX_readPassword($)
       <li><a name="INTERVAL"></a>
          <dt><code>INTERVAL &lt;seconds&gt;</code></dt>
          <br>
-         Abfrage-Interval. Standard ist 300 (Sekunden). Der kleinste m&ouml;gliche Wert ist 60.
+         Abfrage-Interval. Standard ist 300 (Sekunden). Der kleinste m&ouml;gliche Wert ist 60 (Sekunden).
+      </li><br>
+
+      <li><a name="reConnectInterval"></a>
+         <dt><code>reConnectInterval &lt;seconds&gt;</code></dt>
+         <br>
+         reConnect-Interval. Nach Netzwerkausfall oder FritzBox Nichtverfügbarkeit. Standard ist 180 (Sekunden). Der kleinste m&ouml;gliche Wert ist 10  (Sekunden).
       </li><br>
 
       <li><a name="nonblockingTimeOut"></a>
@@ -8528,9 +8574,11 @@ sub FRITZBOX_readPassword($)
      <li><b>754</b> [...] WLAN-Ger&auml;t wurde abgemeldet (.,. GHz), PC-..., IP ..., MAC ... .</li>
      <li><b>756</b> WLAN-Ger&auml;t hat sich neu angemeldet (n,n GHz), nn Mbit/s, Ger&auml;t, IP ..., MAC ....</li>
      <li><b>782</b> WLAN-Anmeldung ist gescheitert : Die erneute Anmeldung ist aufgrund aktiver "Unterst&uuml;tzung f&uuml;r gesch&uuml;tzte Anmeldungen von WLAN-Ger&auml;ten (PMF)</li>
+     <li><b>786</b> 5-GHz-Band für [Anzahl] Min. nicht nutzbar wegen Pr&uuml;fung auf bevorrechtigten Nutzer (z. B. Radar) auf dem gew&auml;hlten Kanal (Frequenz [GHz])</li>
+     <li><b>790</b> Radar wurde auf Kanal [Nummer] (Frequenz [Ziffer] GHz) erkannt, automatischer Kanalwechsel wegen bevorrechtigtem Benutzer ausgef&uuml;hrt</li>
      <br>
     <li><b>2104</b> Die Systemzeit wurde erfolgreich aktualisiert von Zeitserver nnn.nnn.nnn.nnn .</li>
-
+     <br>
     <li><b>2364</b> Ein neues Ger&auml;t wurde an der FRITZ!Box angemeldet (Schnurlostelefon)</li>
     <li><b>2358</b> Einstellungen wurden gesichert. Diese &auml;nderung erfolgte von Ihrem Heimnetzger&auml;t ... (IP-Adresse: ...)</li>
     <li><b>2380</b> Es besteht keine Verbindung mehr zu den verschl&uuml;sselten DNS-Servern.</li>
