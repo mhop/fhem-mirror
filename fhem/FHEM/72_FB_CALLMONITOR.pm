@@ -40,7 +40,7 @@ use HttpUtils;
 use DevIo;
 use FritzBoxUtils;
 
-my $ModulVersion = "07.50.3b";
+my $ModulVersion = "07.50.3d";
 my %tellows = ();
 my %connection_type = (
      0 => "FON1",
@@ -888,7 +888,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
             }
          }
 
-         # Ask dasoertliche.de
+         # Ask dasoertliche.de 0224283746, 02217090777, 02234801804
          if($method eq "dasoertliche.de")
          {
             unless(($number =~ /^0?[1-9]/ and $country_code eq "0049") or $number =~ /^0049/)
@@ -909,7 +909,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                else
                {
                   FB_CALLMONITOR_Log $name, 5, "result(dasOertliche) -> " . $result;
-                  if($result =~ m,<a href="[^"]*form_name=detail[^"]*".+?class="hitlnk_name".+?target="_self">(.+?)</a>,sg)
+                  if($result =~ m/class="hitlnk_name"\>(.*?)\<\/a\>/sg )
                   {
                      $invert_match = $1;
                      $invert_match = FB_CALLMONITOR_html2txt($invert_match);
@@ -917,7 +917,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                      undef($result);
                      return $invert_match;
                   }
-                  elsif(not $result =~ /wir konnten keine Treffer finden/)
+                  elsif($result =~ /wir konnten keine Treffer finden/)
                   {
                      FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from dasoertliche.de. Please contact the FHEM community.";
                   } 
@@ -1195,9 +1195,9 @@ sub FB_CALLMONITOR_tellowsRating($$){
       if($tellows{'score'} == 5){
          $tellows{'text'} = "aus ".$tellows{'location'}.", Tellows-Score: neutral";
       } elsif($tellows{'score'} < 5) {
-         $tellows{'text'} = "aus ".$tellows{'location'}.", Tellows-Score: positiv (".$tellows{'score'}."), häufigster Lob: ".$tellows{'mostCritic'}." (".$tellows{'mostCriticCount'}." x)";
+         $tellows{'text'} = "aus ".$tellows{'location'}.", Tellows-Score: positiv (".$tellows{'score'}."), hÃ¤ufigster Lob: ".$tellows{'mostCritic'}." (".$tellows{'mostCriticCount'}." x)";
       }	else {
-         $tellows{'text'} = "aus ".$tellows{'location'}.", Tellows-Score: negativ (".$tellows{'score'}."), häufigster Reklamegrund: ".$tellows{'mostCritic'}." (".$tellows{'mostCriticCount'}." x)";
+         $tellows{'text'} = "aus ".$tellows{'location'}.", Tellows-Score: negativ (".$tellows{'score'}."), hÃ¤ufigster Reklamegrund: ".$tellows{'mostCritic'}." (".$tellows{'mostCriticCount'}." x)";
       }
 
       return $result;
@@ -1242,18 +1242,18 @@ sub FB_CALLMONITOR_html2txt($)
     $string =~ s/&pos;/'/g;
 
 
-    $string =~ s/(\xe4|&auml;)/ä/g;
-    $string =~ s/(\xc4|&Auml;)/Ä/g;
-    $string =~ s/(\xf6|&ouml;)/ö/g;
-    $string =~ s/(\xd6|&Ouml;)/Ö/g;
-    $string =~ s/(\xfc|&uuml;)/ü/g;
-    $string =~ s/(\xdc|&Uuml;)/Ü/g;
-    $string =~ s/(\xdf|&szlig;)/ß/g;
-    $string =~ s/(\xdf|&szlig;)/ß/g;
-    $string =~ s/(\xe1|&aacute;)/á/g;
-    $string =~ s/(\xe9|&eacute;)/é/g;
-    $string =~ s/(\xc1|&Aacute;)/Á/g;
-    $string =~ s/(\xc9|&Eacute;)/É/g;
+    $string =~ s/(\xe4|&auml;)/Ã¤/g;
+    $string =~ s/(\xc4|&Auml;)/Ã„/g;
+    $string =~ s/(\xf6|&ouml;)/Ã¶/g;
+    $string =~ s/(\xd6|&Ouml;)/Ã–/g;
+    $string =~ s/(\xfc|&uuml;)/Ã¼/g;
+    $string =~ s/(\xdc|&Uuml;)/Ãœ/g;
+    $string =~ s/(\xdf|&szlig;)/ÃŸ/g;
+    $string =~ s/(\xdf|&szlig;)/ÃŸ/g;
+    $string =~ s/(\xe1|&aacute;)/Ã¡/g;
+    $string =~ s/(\xe9|&eacute;)/Ã©/g;
+    $string =~ s/(\xc1|&Aacute;)/Ã/g;
+    $string =~ s/(\xc9|&Eacute;)/Ã‰/g;
     $string =~ s/\\u([a-f\d]{4})/encode('UTF-8',chr(hex($1)))/eig;
     $string =~ s/<[^>]+>//g;
     $string =~ s/&lt;/</g;
@@ -1869,7 +1869,7 @@ sub FB_CALLMONITOR_requestTR064($$$$;$$)
 
     my $name = $hash->{NAME};
 
-       # éxecute the TR-064 request
+       # Ã©xecute the TR-064 request
     my $soap_request = '<?xml version="1.0" encoding="utf-8"?>'.
                        '<s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" >'.
                          '<s:Body>'.
@@ -2894,9 +2894,9 @@ sub FB_CALLMONITOR_sendKeepAlive($)
     Standardwert ist 0 (deaktiviert)<br><br>
 
     <li><a name="internal-number-filter">internal-number-filter</a> &lt;Nummer&gt;[&lt;Nummer&gt;,...]</li>
-    Sofern gesetzt, werden nur Gespr&auml;che für die konfigurierten internen Rufnummern verarbeitet.
+    Sofern gesetzt, werden nur Gespr&auml;che fÃ¼r die konfigurierten internen Rufnummern verarbeitet.
     G&uuml;ltige Werte sind eine einzelne interne Rufnummer oder eine komma-separierte Liste von mehreren internen Rufnummern.
-    Gespr&auml;che für interne Rufnummern, welche nicht in dieser Liste enthalten sind, werden ignoriert und nicht verarbeitet.
+    Gespr&auml;che fÃ¼r interne Rufnummern, welche nicht in dieser Liste enthalten sind, werden ignoriert und nicht verarbeitet.
     Wenn dieses Attribut nicht konfiguriert ist, werden alle Gespr&auml;che regul&auml;r verarbeitet.<br><br>
     Standardm&auml;&szlig;ig ist diese Funktion deaktiviert (nicht gesetzt)<br><br>
 
@@ -2941,10 +2941,10 @@ sub FB_CALLMONITOR_sendKeepAlive($)
     Standardwert ist /var/flash/phonebook (entspricht dem Pfad auf einer FritzBox)<br><br>
 
     <li><a name="reverse-search-tellows-api-key">reverse-search-tellows-api-key</a> &lt;api-key&gt</li>
-    tellows api-key. Für Tests kann der api-key -test123- eingetragen werden<br><br>
+    tellows api-key. FÃ¼r Tests kann der api-key -test123- eingetragen werden<br><br>
 
     <li><a name="reverse-search-tellows-api-partner">reverse-search-tellows-api-partner</a> &lt;api-partner&gt</li>
-    tellows api-partner. Für Tests kann der api-partner -test- eingetragen werden<br><br>
+    tellows api-partner. FÃ¼r Tests kann der api-partner -test- eingetragen werden<br><br>
 
     <li><a name="remove-leading-zero">remove-leading-zero</a> 0,1</li>
     Wenn dieses Attribut aktiviert ist, wird die f&uuml;hrende Null aus der externen Rufnummer (bei eingehenden &amp; abgehenden Anrufen) entfernt. Dies ist z.B. notwendig bei Telefonanlagen.<br><br>
