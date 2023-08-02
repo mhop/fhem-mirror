@@ -1919,7 +1919,7 @@ sub _setreset {                          ## no critic "not used"
                   delete $data{$type}{$name}{pvhist}{$hid}{$circh}{pvcorrf};
               }
 
-              Log3($name, 3, qq{$name - stored PV correction factor / SolCast percentile of hour "$circh" from pvCircular and pvHistory deleted});
+              Log3($name, 3, qq{$name - stored PV correction factor of hour "$circh" from pvCircular and pvHistory deleted});
               return;
           }
 
@@ -1934,7 +1934,7 @@ sub _setreset {                          ## no critic "not used"
               }
           }
 
-          Log3($name, 3, qq{$name - all stored PV correction factors / SolCast percentile from pvCircular and pvHistory deleted});
+          Log3($name, 3, qq{$name - all stored PV correction factors from pvCircular and pvHistory deleted});
       }
 
       return;
