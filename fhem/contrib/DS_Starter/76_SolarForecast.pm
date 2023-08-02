@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-07-27 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-08-02 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,7 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.80.17"=> "27.07.2023  change sequence of _createSummaries in centralTask ",
+  "0.80.17"=> "02.08.2023  change sequence of _createSummaries in centralTask, ComRef edited ",
   "0.80.16"=> "26.07.2023  new consumer type noSchedule, expand maxconsumer to 16, minor changes/fixes ",
   "0.80.15"=> "24.07.2023  new sub getDebug, new key switchdev in consumer attributes, change Debug consumtion ".
                            "reorg data in pvHistory when a hour of day was deleted ",
@@ -12911,30 +12911,30 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>pvfc</b>             </td><td>PV Vorhersage für die nächsten 24h ab aktueller Stunde des Tages                                                   </td></tr>
-            <tr><td> <b>pvrl</b>             </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!) </td></tr>
-            <tr><td> <b>confc</b>            </td><td>erwarteter Energieverbrauch (Wh)                                                                                   </td></tr>
-            <tr><td> <b>gcon</b>             </td><td>realer Leistungsbezug aus dem Stromnetz                                                                            </td></tr>
-            <tr><td> <b>gfeedin</b>          </td><td>reale Leistungseinspeisung in das Stromnetz                                                                        </td></tr>
-            <tr><td> <b>batin</b>            </td><td>Batterieladung (Wh)                                                                                                </td></tr>
-            <tr><td> <b>batout</b>           </td><td>Batterieentladung (Wh)                                                                                             </td></tr>
-            <tr><td> <b>wcc</b>              </td><td>Grad der Wolkenüberdeckung                                                                                         </td></tr>
-            <tr><td> <b>wrp</b>              </td><td>Grad der Regenwahrscheinlichkeit                                                                                   </td></tr>
-            <tr><td> <b>temp</b>             </td><td>Außentemperatur                                                                                                    </td></tr>
-            <tr><td> <b>wid</b>              </td><td>ID des vorhergesagten Wetters                                                                                      </td></tr>
-            <tr><td> <b>wtxt</b>             </td><td>Beschreibung des vorhergesagten Wetters                                                                            </td></tr>
-            <tr><td> <b>corr</b>             </td><td>Autokorrekturfaktoren für die Stunde des Tages und der Bewölkungsrange (0..10)                                     </td></tr>
-            <tr><td> <b>quality</b>          </td><td>Qualität der Autokorrekturfaktoren (max. 30), höhere Werte = höhere Qualität                                       </td></tr>
-            <tr><td> <b>tdayDvtn</b>         </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                      </td></tr>
-            <tr><td> <b>ydayDvtn</b>         </td><td>gestrige Abweichung PV Prognose/Erzeugung in %                                                                     </td></tr>
-            <tr><td> <b>feedintotal</b>      </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                         </td></tr>
-            <tr><td> <b>initdayfeedin</b>    </td><td>initialer PV Einspeisewert zu Beginn des aktuellen Tages (Wh)                                                      </td></tr>
-            <tr><td> <b>gridcontotal</b>     </td><td>vom öffentlichen Netz total bezogene Energie (Wh)                                                                  </td></tr>
-            <tr><td> <b>initdaygcon</b>      </td><td>initialer Netzbezugswert zu Beginn des aktuellen Tages (Wh)                                                        </td></tr>
-            <tr><td> <b>initdaybatintot</b>  </td><td>initialer Wert der total in die Batterie geladenen Energie zu Beginn des aktuellen Tages (Wh)                      </td></tr>
-            <tr><td> <b>batintot</b>         </td><td>total in die Batterie geladene Energie (Wh)                                                                        </td></tr> 
-            <tr><td> <b>initdaybatouttot</b> </td><td>initialer Wert der total aus der Batterie entnommenen Energie zu Beginn des aktuellen Tages (Wh)                   </td></tr>
-            <tr><td> <b>batouttot</b>        </td><td>total aus der Batterie entnommene Energie (Wh)                                                                     </td></tr>
+            <tr><td> <b>pvfc</b>             </td><td>PV Vorhersage für die nächsten 24h ab aktueller Stunde des Tages                                                          </td></tr>
+            <tr><td> <b>pvrl</b>             </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!)        </td></tr>
+            <tr><td> <b>confc</b>            </td><td>erwarteter Energieverbrauch (Wh)                                                                                          </td></tr>
+            <tr><td> <b>gcon</b>             </td><td>realer Leistungsbezug aus dem Stromnetz                                                                                   </td></tr>
+            <tr><td> <b>gfeedin</b>          </td><td>reale Leistungseinspeisung in das Stromnetz                                                                               </td></tr>
+            <tr><td> <b>batin</b>            </td><td>Batterieladung (Wh)                                                                                                       </td></tr>
+            <tr><td> <b>batout</b>           </td><td>Batterieentladung (Wh)                                                                                                    </td></tr>
+            <tr><td> <b>wcc</b>              </td><td>Grad der Wolkenüberdeckung                                                                                                </td></tr>
+            <tr><td> <b>wrp</b>              </td><td>Grad der Regenwahrscheinlichkeit                                                                                          </td></tr>
+            <tr><td> <b>temp</b>             </td><td>Außentemperatur                                                                                                           </td></tr>
+            <tr><td> <b>wid</b>              </td><td>ID des vorhergesagten Wetters                                                                                             </td></tr>
+            <tr><td> <b>wtxt</b>             </td><td>Beschreibung des vorhergesagten Wetters                                                                                   </td></tr>
+            <tr><td> <b>corr</b>             </td><td>Autokorrekturfaktoren für die Stunde des Tages, wobei "percentile" der einfache (simple) Korrekturfaktor ist.             </td></tr>
+            <tr><td> <b>quality</b>          </td><td>Qualität der Autokorrekturfaktoren (0..1), wobei "percentile" die Qualität des einfachen (simple) Korrekturfaktors ist.   </td></tr>
+            <tr><td> <b>tdayDvtn</b>         </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                             </td></tr>
+            <tr><td> <b>ydayDvtn</b>         </td><td>gestrige Abweichung PV Prognose/Erzeugung in %                                                                            </td></tr>
+            <tr><td> <b>feedintotal</b>      </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                                </td></tr>
+            <tr><td> <b>initdayfeedin</b>    </td><td>initialer PV Einspeisewert zu Beginn des aktuellen Tages (Wh)                                                             </td></tr>
+            <tr><td> <b>gridcontotal</b>     </td><td>vom öffentlichen Netz total bezogene Energie (Wh)                                                                         </td></tr>
+            <tr><td> <b>initdaygcon</b>      </td><td>initialer Netzbezugswert zu Beginn des aktuellen Tages (Wh)                                                               </td></tr>
+            <tr><td> <b>initdaybatintot</b>  </td><td>initialer Wert der total in die Batterie geladenen Energie zu Beginn des aktuellen Tages (Wh)                             </td></tr>
+            <tr><td> <b>batintot</b>         </td><td>total in die Batterie geladene Energie (Wh)                                                                               </td></tr> 
+            <tr><td> <b>initdaybatouttot</b> </td><td>initialer Wert der total aus der Batterie entnommenen Energie zu Beginn des aktuellen Tages (Wh)                          </td></tr>
+            <tr><td> <b>batouttot</b>        </td><td>total aus der Batterie entnommene Energie (Wh)                                                                            </td></tr>
          </table>
       </ul>
 
@@ -13057,8 +13057,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-affectMaxDayVariance"></a>
        <li><b>affectMaxDayVariance &lt;Zahl&gt; </b><br>
-         (nur bei Verwendung Model DWD) <br><br>
-
          Maximale Änderungsgröße des PV Vorhersagefaktors (Reading pvCorrectionFactor_XX) pro Tag. <br>
          (default: 0.5)
        </li>
