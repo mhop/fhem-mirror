@@ -12228,7 +12228,7 @@ sub EnOcean_Parse($$) {
         }
         push @event, "1:handle:$handle";
         push @event, "1:state:$handle";
-        push @event, "1:mechanicsState:" . ($db[0] & 0x08 ? 'ok' : 'error');
+        push @event, "1:mechanicsState:" . ($db[0] & 0x08 ? 'error' : 'ok');
         my $blockState = ($db[0] & 0x06) >> 1;
         my @blockState = ('unlocked', 'locked', 'unknown', 'reserved');
         push @event, "1:blockState:" . $blockState[$blockState];
@@ -18053,7 +18053,7 @@ sub EnOcean_sec_parseTeachIn($$$$) {
     # First part of the teach in message
 
     # check if RLC and PK are encrypted with PSK and assign it
-    if (defined $psk) {
+    if ($psk == 1) {
       if (exists $modules{$ioModulesType}{STE}{psk}) {
         $attr{$name}{psk} = $modules{$ioModulesType}{STE}{psk};
       } else {
