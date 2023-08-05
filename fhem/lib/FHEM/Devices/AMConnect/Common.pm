@@ -1384,11 +1384,21 @@ sub Attr {
       $hash->{helper}{additional_polling} = $attrVal;
       Log3 $name, 4, "$iam $cmd $attrName $attrVal";
 
+      if ( $attrVal == 0 ) {
+
+        delete $attr{$name}{addPositionPolling} if ( defined( $attr{$name}{addPositionPolling} ) );
+        $hash->{helper}{use_position_polling} = 0;
+
+      }
+
+
     } elsif( $cmd eq "del" ) {
 
       $hash->{helper}{additional_polling} = 0;
       readingsDelete( $hash, 'api_callsThisMonth' );
       Log3 $name, 3, "$iam $cmd $attrName and set default value 0.";
+      delete $attr{$name}{addPositionPolling} if ( defined( $attr{$name}{addPositionPolling} ) );
+      $hash->{helper}{use_position_polling} = 0;
 
     }
   ##########
@@ -1397,6 +1407,7 @@ sub Attr {
     if( $cmd eq "set" ) {
 
       return "$iam $attrVal is invalid, allowed value 0 or 1." unless( $attrVal == 0 || $attrVal == 1 );
+      return "$iam $attrVal set attribute addPollingMinInterval > 0 first." unless( defined( $attr{$name}{addPollingMinInterval} ) && $attr{$name}{addPollingMinInterval} > 0 );
       $hash->{helper}{use_position_polling} = $attrVal;
       Log3 $name, 4, "$iam $cmd $attrName $attrVal";
 
@@ -2561,12 +2572,15 @@ sub wsRead {
   my $additional_polling = $hash->{helper}{additional_polling} * 1000;
   my $use_position_polling = $hash->{helper}{use_position_polling};
   my $buf = DevIo_SimpleRead( $hash );
-  return "" if ( !defined( $buf ) );
+  return undef if ( !defined( $buf ) );
   Log3 $name, 4, "$iam received websocket data: >$buf<";
 
   if ( $buf ) {
+    
+    $buf =~ s/}\{/},{/g;
+    $buf = "[${buf}]";
 
-    my $result = eval { decode_json( $buf ) };
+    my $bufres = eval { decode_json( $buf ) };
 
     if ( $@ ) {
 
@@ -2574,97 +2588,99 @@ sub wsRead {
 
     } else {
 
-      if ( !defined( $result->{type} ) ) {
+      for my $result (@$bufres) {
 
-        $hash->{helper}{wsResult}{other} = dclone( $result );
+        if ( !defined( $result->{type} ) ) {
 
-        if ( $result =~ /^{"ready":false/ ) {
+          $hash->{helper}{wsResult}{other} = dclone( $result );
 
-          readingsSingleUpdate( $hash, 'mower_wsEvent', 'not ready', 1);
-          $hash->{helper}{retry_interval_wsreopen} = 420;
-          wsReopen($hash);
+          if ( defined( $result->{ready} ) && !$result->{ready} ) {
 
-        }
-
-      }
-
-      if ( defined( $result->{type} ) && $result->{id} eq $hash->{helper}{mower_id} ) {
-
-        Log3 $name, 5, "$iam selected websocket data: >$buf<";
-        $hash->{helper}{wsResult}{$result->{type}} = dclone( $result );
-        $hash->{helper}{wsResult}{type} = $result->{type};
-
-        if ( $result->{type} eq "status-event" ) {
-
-          $hash->{helper}{statusTime} = gettimeofday();
-          $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp};
-          $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mower}{attributes}{mower}{activity};
-          $hash->{helper}{mower}{attributes}{battery} = dclone( $result->{attributes}{battery} );
-          $hash->{helper}{mower}{attributes}{metadata} = dclone( $result->{attributes}{metadata} );
-          $hash->{helper}{mower}{attributes}{mower} = dclone( $result->{attributes}{mower} );
-          $hash->{helper}{mower}{attributes}{planner} = dclone( $result->{attributes}{planner} );
-          $hash->{helper}{storediff} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
-          $hash->{helper}{storesum} += $hash->{helper}{storediff} if ( $additional_polling );
-          my $act = $hash->{helper}{mower}{attributes}{mower}{activity};
-          my $actold = $hash->{helper}{mowerold}{attributes}{mower}{activity};
-
-          if ( !$additional_polling ) {
-
-            isErrorThanPrepare( $hash );
-            resetLastErrorIfCorrected( $hash );
-
-          #respect polling min interval with exceptions
-          } elsif ( ( $additional_polling < $hash->{helper}{storesum} || $additional_polling &&
-            ( $act =~ /^(LEAVING|GOING_HOME)/ ||
-              $actold =~ /LEAVING/ && $act eq 'MOWING' ||
-              $actold =~ /GOING_HOME/ && $act =~ /PARKED_IN_CS|CHARGING/
-            ) ) && !$hash->{helper}{midnightCycle} ) {
-
-            $hash->{helper}{storesum} = 0;
-            # RemoveInternalTimer( $hash, \&getMowerWs );
-            # InternalTimer(gettimeofday() + 2,  \&getMowerWs, $hash, 0 );
-            getMowerWs( $hash );
-            $hash->{First_Read} = 0;
-            return;
+            readingsSingleUpdate( $hash, 'mower_wsEvent', 'not ready', 1);
+            $hash->{helper}{retry_interval_wsreopen} = 420;
+            wsReopen($hash);
 
           }
 
         }
 
-        if ( $result->{type} eq "positions-event" ) {
+        if ( defined( $result->{type} ) && $result->{id} eq $hash->{helper}{mower_id} ) {
 
-          if ( !$use_position_polling || $use_position_polling && !$additional_polling ) {
+          Log3 $name, 5, "$iam selected websocket data: >$buf<";
+          $hash->{helper}{wsResult}{$result->{type}} = dclone( $result );
+          $hash->{helper}{wsResult}{type} = $result->{type};
 
-          $hash->{helper}{positionsTime} = gettimeofday();
-          $hash->{helper}{mower}{attributes}{positions} = dclone( $result->{attributes}{positions} );
+          if ( $result->{type} eq "status-event" ) {
 
-            AlignArray( $hash );
-            FW_detailFn_Update ($hash);
+            $hash->{helper}{statusTime} = gettimeofday();
+            $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp};
+            $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mower}{attributes}{mower}{activity};
+            $hash->{helper}{mower}{attributes}{battery} = dclone( $result->{attributes}{battery} );
+            $hash->{helper}{mower}{attributes}{metadata} = dclone( $result->{attributes}{metadata} );
+            $hash->{helper}{mower}{attributes}{mower} = dclone( $result->{attributes}{mower} );
+            $hash->{helper}{mower}{attributes}{planner} = dclone( $result->{attributes}{planner} );
+            $hash->{helper}{storediff} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
+            $hash->{helper}{storesum} += $hash->{helper}{storediff} if ( $additional_polling );
+            my $act = $hash->{helper}{mower}{attributes}{mower}{activity};
+            my $actold = $hash->{helper}{mowerold}{attributes}{mower}{activity};
 
-          } elsif ( $use_position_polling && $additional_polling ) {
+            if ( !$additional_polling ) {
 
-            $hash->{First_Read} = 0;
-            return;
+              isErrorThanPrepare( $hash );
+              resetLastErrorIfCorrected( $hash );
+
+            #respect polling min interval with exceptions
+            } elsif ( ( $additional_polling < $hash->{helper}{storesum} || $additional_polling &&
+              ( $act =~ /^(LEAVING|GOING_HOME)/ ||
+                $actold =~ /LEAVING/ && $act eq 'MOWING' ||
+                $actold =~ /GOING_HOME/ && $act =~ /PARKED_IN_CS|CHARGING/
+              ) ) && !$hash->{helper}{midnightCycle} ) {
+
+              $hash->{helper}{storesum} = 0;
+              RemoveInternalTimer( $hash, \&getMowerWs );
+              InternalTimer(gettimeofday() + 1,  \&getMowerWs, $hash, 0 );
+              # getMowerWs( $hash );
+              next;
+
+            }
 
           }
 
+          if ( $result->{type} eq "positions-event" ) {
+
+            if ( !$use_position_polling ) {
+
+            $hash->{helper}{positionsTime} = gettimeofday();
+            $hash->{helper}{mower}{attributes}{positions} = dclone( $result->{attributes}{positions} );
+
+              AlignArray( $hash );
+              FW_detailFn_Update ($hash);
+
+            } elsif ( $use_position_polling ) {
+
+              next;
+
+            }
+
+          }
+
+          if ( $result->{type} eq "settings-event" ) {
+
+            $hash->{helper}{mower}{attributes}{calendar} = dclone( $result->{attributes}{calendar} ) if ( defined ( $result->{attributes}{calendar} ) );
+            $hash->{helper}{mower}{attributes}{settings}{headlight} = $result->{attributes}{headlight} if ( defined ( $result->{attributes}{headlight} ) );
+            $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} = $result->{attributes}{cuttingHeight} if ( defined ( $result->{attributes}{cuttingHeight} ) );
+
+          }
+
+          # Update readings
+          readingsBeginUpdate($hash);
+
+            fillReadings( $hash );
+            readingsBulkUpdate( $hash, 'mower_wsEvent', $hash->{helper}{wsResult}{type} );
+
+          readingsEndUpdate($hash, 1);
+
         }
-
-        if ( $result->{type} eq "settings-event" ) {
-
-          $hash->{helper}{mower}{attributes}{calendar} = dclone( $result->{attributes}{calendar} ) if ( defined ( $result->{attributes}{calendar} ) );
-          $hash->{helper}{mower}{attributes}{settings}{headlight} = $result->{attributes}{headlight} if ( defined ( $result->{attributes}{headlight} ) );
-          $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} = $result->{attributes}{cuttingHeight} if ( defined ( $result->{attributes}{cuttingHeight} ) );
-
-        }
-
-        # Update readings
-        readingsBeginUpdate($hash);
-
-          fillReadings( $hash );
-          readingsBulkUpdate( $hash, 'mower_wsEvent', $hash->{helper}{wsResult}{type} );
-
-        readingsEndUpdate($hash, 1);
 
       }
 
