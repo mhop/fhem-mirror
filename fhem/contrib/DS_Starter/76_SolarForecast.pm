@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-08-02 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-08-07 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,7 +136,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.80.17"=> "02.08.2023  change sequence of _createSummaries in centralTask, ComRef edited ",
+  "0.80.18"=> "07.08.2023  change calculation of todayDoneAPIcalls in ___setSolCastAPIcallKeyData, add \$lagtime ".
+                           "Forum: https://forum.fhem.de/index.php?msg=1283487 ",
+  "0.80.17"=> "05.08.2023  change sequence of _createSummaries in centralTask, ComRef edited ",
   "0.80.16"=> "26.07.2023  new consumer type noSchedule, expand maxconsumer to 16, minor changes/fixes ",
   "0.80.15"=> "24.07.2023  new sub getDebug, new key switchdev in consumer attributes, change Debug consumtion ".
                            "reorg data in pvHistory when a hour of day was deleted ",
@@ -409,6 +411,7 @@ my $solapirepdef   = 3600;                                                      
 my $forapirepdef   = 900;                                                           # default Abrufintervall ForecastSolar API (s)
 my $apimaxreqdef   = 50;                                                            # max. täglich mögliche Requests SolCast API
 my $leadtime       = 3600;                                                          # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung                                                  
+my $lagtime        = 1800;                                                          # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
 
 my $prdef          = 0.85;                                                          # default Performance Ratio (PR)
 my $tempcoeffdef   = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
@@ -2252,7 +2255,7 @@ sub __getSolCastData {
       my $srtime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunRise", '23:59').':59');
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
 
-      if ($t < $srtime - $leadtime || $t > $sstime) {
+      if ($t < $srtime - $leadtime || $t > $sstime + $lagtime) {
           readingsSingleUpdate($hash, 'nextSolCastCall', $etxt, 1);
           return "The current time is not between sunrise minus ".($leadtime/60)." minutes and sunset";
       }
@@ -2314,6 +2317,7 @@ sub __getSolCastData {
   #########################
 
   $paref->{allstrings} = ReadingsVal($name, 'inverterStrings', '');
+  $paref->{firstreq}   = 1;                                                                   # 1. Request, V 0.80.18
   
   __solCast_ApiRequest ($paref);
 
@@ -2379,6 +2383,7 @@ sub __solCast_ApiRequest {
       allstrings => $allstrings,
       string     => $string,
       lang       => $paref->{lang},
+      firstreq   => $paref->{firstreq},
       method     => "GET",
       callback   => \&__solCast_ApiResponse
   };
@@ -2633,9 +2638,12 @@ sub ___setSolCastAPIcallKeyData {
   my $drr       = $apimaxreq - SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
   $drr          = 0 if($drr < 0);
 
-  my $ddc  = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests',     0) /
-             SolCastAPIVal ($hash, '?All', '?All', 'solCastAPIcallMultiplier', 1);                                  # ausgeführte API Calls
-  my $drc  = SolCastAPIVal ($hash, '?All', '?All', 'todayMaxAPIcalls', $apimaxreq) - $ddc;                          # verbleibende SolCast API Calls am aktuellen Tag
+  #my $ddc  = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests',     0) /
+  #           SolCastAPIVal ($hash, '?All', '?All', 'solCastAPIcallMultiplier', 1);                                   # ausgeführte API Calls
+  
+  my $ddc  = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls', 0);
+  $ddc    += 1 if($paref->{firstreq});
+  my $drc  = SolCastAPIVal ($hash, '?All', '?All', 'todayMaxAPIcalls', $apimaxreq) - $ddc;                            # verbleibende SolCast API Calls am aktuellen Tag
   $drc     = 0 if($drc < 0);
 
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests} = $drr;
@@ -2650,7 +2658,7 @@ sub ___setSolCastAPIcallKeyData {
       my $date   = strftime "%Y-%m-%d", localtime($t);
       my $sunset = $date.' '.ReadingsVal ($name, "Today_SunSet", '00:00').':00';
       my $sstime = timestringToTimestamp ($sunset);
-      my $dart   = $sstime - $t;                                                                                    # verbleibende Sekunden bis Sonnenuntergang
+      my $dart   = $sstime - $t;                                                                                     # verbleibende Sekunden bis Sonnenuntergang
       $dart      = 0 if($dart < 0);
       $drc      += 1;                                                                                               
 
@@ -2668,7 +2676,7 @@ sub ___setSolCastAPIcallKeyData {
   my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $solapirepdef);
   
   if($debug =~ /apiProcess|apiCall/x) {  
-      Log3 ($name, 1, "$name DEBUG> SolCast API Call - remaining API Calls: $drc");
+      Log3 ($name, 1, "$name DEBUG> SolCast API Call - remaining API Calls: ".($drc - 1));
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - next API Call: ".(timestampToTimestring ($t + $apiitv, $lang))[0]);
   }
 
@@ -2696,7 +2704,7 @@ sub __getForecastSolarData {
       my $srtime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunRise", '23:59').':59');
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
 
-      if ($t < $srtime - $leadtime || $t > $sstime) {
+      if ($t < $srtime - $leadtime || $t > $sstime + $lagtime) {
           readingsSingleUpdate($hash, 'nextSolCastCall', $etxt, 1);
           return "The current time is not between sunrise minus ".($leadtime/60)." minutes and sunset";
       }
@@ -4134,7 +4142,7 @@ return $az;
 sub controlParams {
   my $name = shift;
 
-  my $interval = AttrVal($name, 'ctrlInterval', $definterval);           # 0 wenn manuell gesteuert
+  my $interval = AttrVal ($name, 'ctrlInterval', $definterval);            # 0 wenn manuell gesteuert
 
 return $interval;
 }
@@ -13305,7 +13313,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>apiCall</b>              </td><td>Aufruf ForecastSolar API Schnittstelle ohne Daten                                </td></tr>
+            <tr><td> <b>apiCall</b>              </td><td>Abruf API Schnittstelle ohne Datenausgabe                                        </td></tr>
             <tr><td> <b>apiProcess</b>           </td><td>Abruf und Verarbeitung von API Daten                                             </td></tr>          
             <tr><td> <b>collectData</b>          </td><td>detailliierte Datensammlung                                                      </td></tr>
             <tr><td> <b>consumerPlanning</b>     </td><td>Consumer Einplanungsprozesse                                                     </td></tr>
