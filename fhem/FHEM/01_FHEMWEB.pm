@@ -1600,8 +1600,16 @@ FW_doDetail($)
   $attrList =~ s/\bgroup\b/group:$groupList/;
 
   $attrList = FW_widgetOverride($d, $attrList, "attr");
-  $attrList =~ s/\\/\\\\/g;
-  $attrList =~ s/'/\\'/g;
+  if($attrList =~ m/[\\']/) {
+    $attrList =~ s/([\\'])/\\$1/g;
+    foreach my $k (keys %attrTypeHash) { # Forum #134526
+      if($k =~ m/[\\']/) {
+        my $nk = $k;
+        $nk =~ s/([\\'])/\\$1/g;
+        $attrTypeHash{$nk} = $attrTypeHash{$k};
+      }
+    }
+  }
   FW_pO FW_detailSelect($d, "attr", $attrList, undef, \%attrTypeHash);
 
   FW_makeTable("Attributes", $d, $attr{$d}, "deleteattr");
@@ -2028,7 +2036,7 @@ sub
 FW_showRoom()
 {
   my $roomRe = $FW_room;
-  $roomRe =~ s/([[\]().+*?])/\\$1/g;
+  $roomRe =~ s/([[\\\]().+*?])/\\$1/g;
   return 0 if(!$FW_room ||
               AttrVal($FW_wname,"forbiddenroom","") =~ m/\b$roomRe\b/);
 
