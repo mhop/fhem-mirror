@@ -63,6 +63,9 @@
 # V 1.0.0.9     Feature: new attribute pidIPortionCallBeforeSetting for user specific callback 
 #               before setting a new value to p-portion
 #
+=cut
+
+=for comment
 ####################################################################################################
 #
 # Maintainer CHANGED
@@ -186,6 +189,7 @@ sub PID20_Define($$$)
   my ( $hash, $def ) = @_;
   my @a       = split( "[ \t][ \t]*", $def );
   my $name    = $a[0];
+  my $err     = 0;
   my $reFloat = '^([\\+,\\-]?\\d+\\.?\d*$)';    # gleitpunkt
   if ( @a != 4 )
   {
@@ -201,7 +205,8 @@ sub PID20_Define($$$)
   {
     my $msg = "$name: Unknown sensor device $sensor specified";
     PID20_Log $hash, 1, $msg;
-    return $msg;
+    #return $msg;
+    $err = 1;
   }
 
   # if reading of sender is unknown
@@ -209,18 +214,15 @@ sub PID20_Define($$$)
   {
     my $msg = "$name: Unknown reading $reading for sensor device $sensor specified";
     PID20_Log $hash, 1, $msg;
-    return $msg;
+    #return $msg;
+    $err = 1;
   }
-  $hash->{helper}{sensor} = $sensor;
-  $hash->{VERSION} = $PID20_Version;
 
   # defaults for regexp
   if ( !$regexp )
   {
     $regexp = $reFloat;
   }
-  $hash->{helper}{reading} = $reading;
-  $hash->{helper}{regexp}  = $regexp;
 
   # Actor
   my ( $actor, $cmd ) = split( ":", $a[3], 2 );
@@ -228,16 +230,26 @@ sub PID20_Define($$$)
   {
     my $msg = "$name: Unknown actor device $actor specified";
     PID20_Log $hash, 1, $msg;
-    return $msg;
+    #return $msg;
+    $err = 1;
   }
-  $hash->{helper}{actor}         = $actor;
-  $hash->{helper}{actorCommand}  = ( defined($cmd) ) ? $cmd : '';
-  $hash->{helper}{stopped}       = 0;
-  $hash->{helper}{adjust}        = '';
-  $modules{PID20}{defptr}{$name} = $hash;
-  readingsSingleUpdate( $hash, 'state', 'initializing', 1 );
-  RemoveInternalTimer($name);
-  InternalTimer( gettimeofday() + 10, 'PID20_Calc', $name, 0 );
+
+  $hash->{VERSION} = $PID20_Version;
+  if (!$err) {
+    $hash->{helper}{sensor}        = $sensor;
+    $hash->{helper}{reading}       = $reading;
+    $hash->{helper}{regexp}        = $regexp;
+    $hash->{helper}{actor}         = $actor;
+    $hash->{helper}{actorCommand}  = ( defined($cmd) ) ? $cmd : '';
+    $hash->{helper}{stopped}       = 0;
+    $hash->{helper}{adjust}        = '';
+    $modules{PID20}{defptr}{$name} = $hash;
+    readingsSingleUpdate( $hash, 'state', 'initializing', 1 );
+    RemoveInternalTimer($name);
+    InternalTimer( gettimeofday() + 10, 'PID20_Calc', $name, 0 );
+  } else {
+    readingsSingleUpdate( $hash, 'state', 'PID defined with errors! See logfile for details.', 0 );
+  }
   return undef;
 }
 ########################################
