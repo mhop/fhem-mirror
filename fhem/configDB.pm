@@ -182,6 +182,8 @@
 #
 # 2022-12-06 - added     add raw json output in configdb info
 #
+# 2023-08-07 - fixed     missing uuid in migration process
+#
 ##############################################################################
 =cut
 
@@ -895,6 +897,7 @@ sub _cfgDB_filesize_str {
 # migrate existing fhem config into database
 sub _cfgDB_Migrate {
 	my $ret;
+	$data{saveID} = createUniqueId();
 	$ret = "Starting migration...\n";
 	Log 4, 'configDB: Starting migration';
 	$ret .= "Processing: database initialization\n";
