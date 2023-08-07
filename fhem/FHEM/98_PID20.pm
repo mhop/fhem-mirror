@@ -86,6 +86,12 @@
 #
 #               id-Tags added to commandref            (for define/set/get/attributes)
 #
+# 2023-08-08    patches
+#
+#               invalid name of sensor / reading / actor will no longer
+#               prevent the definition, but will write log entries with errors.
+#
+#
 ####################################################################################################
 =cut
 
