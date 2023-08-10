@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-08-07 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-08-10 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.80.19"=> "10.08.2023  fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1283836 ",
   "0.80.18"=> "07.08.2023  change calculation of todayDoneAPIcalls in ___setSolCastAPIcallKeyData, add \$lagtime ".
                            "Forum: https://forum.fhem.de/index.php?msg=1283487 ",
   "0.80.17"=> "05.08.2023  change sequence of _createSummaries in centralTask, ComRef edited ",
@@ -3842,6 +3843,7 @@ sub centralTask {
   #    deleteReadingspec ($hash, "pvSolCastPercentile_${n}.*");
   #}
   #Log3 ($name, 1, "$name - all Hash Elemente:\n".Dumper $hash);
+  #Log3 ($name, 1, "$name - all nexthours Elemente:\n".Dumper $data{$type}{$name}{nexthours});
   ############################################################################################
 
   if($init_done == 1) {
@@ -4601,6 +4603,8 @@ sub ___readCandQ {
   my $hc     = $pvcorr;                                                                               # Voreinstellung RAW-Korrekturfaktor
   my $hq     = '-';                                                                                   # keine Qualität definiert
 
+  delete $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange};
+  
   if ($acu =~ /on_complex/xs) {                                                                       # Autokorrektur complex soll genutzt werden
       my $range  = calcRange ($cc);                                                                   # Range errechnen
       ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), $range, undef);                  # Korrekturfaktor/Qualität der Stunde des Tages (complex)
@@ -5537,7 +5541,7 @@ sub _manageConsumerData {
       }
 
       if ($dnum) {
-          if($consumerco) {
+          if($consumerco && $runhours) {
               $data{$type}{$name}{consumers}{$c}{avgenergy} = sprintf "%.2f", ($consumerco/$runhours);            # Durchschnittsverbrauch pro Stunde in Wh
           }
           else {
