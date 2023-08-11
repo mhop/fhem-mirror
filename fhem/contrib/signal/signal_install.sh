@@ -1,14 +1,17 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.16"
+SCRIPTVERSION="3.18"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
 SIGNALPATH=/opt
 SIGNALUSER=signal-cli
 LIBPATH=/usr/lib
-SIGNALVERSION="0.11.10"
-LIBRARYVERSION="0.23.1"
+SIGNALVERSION="0.12.0"
+#Check for latest valid version at https://github.com/AsamK/signal-cli/releases
+LIBRARYVERSION="0.30.0"
+#Check for latest valid version at https://github.com/exquo/signal-libs-build/releases
+#Make sure this matches the required version for signal-cli (see lib/libsignal-client-0.xx.x.jar version in signal-cli)
 LIBSIG=libsignal_jni.tgz
 SIGNALVAR=/var/lib/$SIGNALUSER
 DBSYSTEMD=/etc/dbus-1/system.d
@@ -245,6 +248,8 @@ install_and_check diff diffutils
 install_and_check dbus-send dbus
 install_and_check cpan cpanminus
 install_and_check zip zip
+install_and_check qrencode
+
 if [ -z "$BASH" ]; then
 	echo "This script requires bash for some functions. Check if bash is installed."
 	install_and_check bash bash
@@ -410,7 +415,7 @@ if [ $NEEDINSTALL = 1 ]; then
 		fi
 		echo "done"
 		rm -f /tmp/signal-cli-$SIGNALVERSION.tar.gz
-		#rm -f /tmp/$LIBSIG
+		rm -f /tmp/$LIBSIG
 	fi
 fi
 
