@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-08-10 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-08-13 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.80.20"=> "13.08.2023  hange calculation in ___setSolCastAPIcallKeyData once again ",
   "0.80.19"=> "10.08.2023  fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1283836 ",
   "0.80.18"=> "07.08.2023  change calculation of todayDoneAPIcalls in ___setSolCastAPIcallKeyData, add \$lagtime ".
                            "Forum: https://forum.fhem.de/index.php?msg=1283487 ",
@@ -2240,14 +2241,53 @@ sub __getSolCastData {
   my $t     = $paref->{t}     // time;
   my $debug = $paref->{debug};
   my $lang  = $paref->{lang};
+  
+  my $msg;
+  if($ctzAbsent) {
+      $msg = qq{The library FHEM::Utility::CTZ is missing. Please update FHEM completely.};
+      Log3 ($name, 2, "$name - ERROR - $msg");
+      return $msg;
+  }
+
+  my $rmf = reqModFail();
+  if($rmf) {
+      $msg = "You have to install the required perl module: ".$rmf;
+      Log3 ($name, 2, "$name - ERROR - $msg");
+      return $msg;
+  }
+
+  ## statische SolCast API Kennzahlen 
+  ## (solCastAPIcallMultiplier, todayMaxAPIcalls) berechnen
+  ##########################################################
+  my %seen;
+  my %mx;
+  my $maxcnt;
+  
+   my $type = $hash->{TYPE};
+  
+  for my $pk (keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}}) {
+      my $apikey = SolCastAPIVal ($hash, '?IdPair', $pk, 'apikey', '');
+      next if(!$apikey);
+      
+      $mx{$apikey} += 1;
+      $maxcnt       = $mx{$apikey} if(!$maxcnt || $mx{$apikey} > $maxcnt);
+  }
+
+  my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
+  my $madc      = sprintf "%.0f", ($apimaxreq / $maxcnt);                                     # max. tägliche Anzahl API Calls
+  my $mpk       = $maxcnt // 1;                                                               # Requestmultiplikator
+
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{solCastAPIcallMultiplier}  = $mpk;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayMaxAPIcalls}          = $madc;
+
+  #########################
 
   if (!$force) {                                                                                   # regulärer SolCast API Abruf
-      my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
-      my $trr       = SolCastAPIVal($hash, '?All', '?All', 'todayRemainingAPIrequests', $apimaxreq);
+      my $trc       = SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIcalls', $madc);
       my $etxt      = $hqtxt{bnsas}{$lang};
       $etxt         =~ s{<WT>}{($leadtime/60)}eg;
       
-      if ($trr <= 0) {                                                                            
+      if ($trc <= 0) {                                                                            
           readingsSingleUpdate($hash, 'nextSolCastCall', $etxt, 1);
           return qq{SolCast free daily limit is used up};
       }
@@ -2269,45 +2309,6 @@ sub __getSolCastData {
           return qq{The waiting time to the next SolCast API call has not expired yet. The remaining waiting time is $rt seconds};
       }
   }
-
-  my $msg;
-  if($ctzAbsent) {
-      $msg = qq{The library FHEM::Utility::CTZ is missing. Please update FHEM completely.};
-      Log3 ($name, 2, "$name - ERROR - $msg");
-      return $msg;
-  }
-
-  my $rmf = reqModFail();
-  if($rmf) {
-      $msg = "You have to install the required perl module: ".$rmf;
-      Log3 ($name, 2, "$name - ERROR - $msg");
-      return $msg;
-  }
-
-  my $type = $hash->{TYPE};
-
-  ## statische SolCast API Kennzahlen 
-  ## (solCastAPIcallMultiplier, todayMaxAPIcalls) berechnen
-  ##########################################################
-  my %seen;
-
-  my %mx;
-  my $maxcnt;
-  
-  for my $pk (keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}}) {
-      my $apikey = SolCastAPIVal ($hash, '?IdPair', $pk, 'apikey', '');
-      next if(!$apikey);
-      
-      $mx{$apikey} += 1;
-      $maxcnt       = $mx{$apikey} if(!$maxcnt || $mx{$apikey} > $maxcnt);
-  }
-
-  my $apimaxreq = AttrVal    ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
-  my $madc      = sprintf "%.0f", ($apimaxreq / $maxcnt);                                     # max. tägliche Anzahl API Calls
-  my $mpk       = $maxcnt // 1;                                                               # Requestmultiplikator
-
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{solCastAPIcallMultiplier}  = $mpk;
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayMaxAPIcalls}          = $madc;
   
   if($debug =~ /apiCall/x) {          
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - max possible daily API requests: $apimaxreq");
@@ -2315,9 +2316,7 @@ sub __getSolCastData {
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - possible daily API Calls: $madc");
   }
 
-  #########################
-
-  $paref->{allstrings} = ReadingsVal($name, 'inverterStrings', '');
+  $paref->{allstrings} = ReadingsVal ($name, 'inverterStrings', '');
   $paref->{firstreq}   = 1;                                                                   # 1. Request, V 0.80.18
   
   __solCast_ApiRequest ($paref);
@@ -2632,21 +2631,20 @@ sub ___setSolCastAPIcallKeyData {
 
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];   # letzte Abrufzeit
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                       # letzter Abrufzeitstempel
-
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
-
-  my $apimaxreq = AttrVal    ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
-  my $drr       = $apimaxreq - SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
-  $drr          = 0 if($drr < 0);
-
-  #my $ddc  = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests',     0) /
-  #           SolCastAPIVal ($hash, '?All', '?All', 'solCastAPIcallMultiplier', 1);                                   # ausgeführte API Calls
   
-  my $ddc  = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls', 0);
-  $ddc    += 1 if($paref->{firstreq});
-  my $drc  = SolCastAPIVal ($hash, '?All', '?All', 'todayMaxAPIcalls', $apimaxreq) - $ddc;                            # verbleibende SolCast API Calls am aktuellen Tag
-  $drc     = 0 if($drc < 0);
+  my $apimaxreq = AttrVal       ($name, 'ctrlSolCastAPImaxReq',         $apimaxreqdef);
+  my $mpl       = SolCastAPIVal ($hash, '?All', '?All', 'solCastAPIcallMultiplier', 1);
+  my $ddc       = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls',        0);
+  
+  $ddc         += 1 if($paref->{firstreq});
+  my $drc       = SolCastAPIVal ($hash, '?All', '?All', 'todayMaxAPIcalls', $apimaxreq / $mpl) - $ddc;                 # verbleibende SolCast API Calls am aktuellen Tag
+  $drc          = 0 if($drc < 0);
+  
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} = $ddc * $mpl;
 
+  my $drr       = $apimaxreq - ($mpl * $ddc);
+  $drr          = 0 if($drr < 0);
+ 
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests} = $drr;
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIcalls}    = $drc;
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}         = $ddc;
@@ -2659,7 +2657,7 @@ sub ___setSolCastAPIcallKeyData {
       my $date   = strftime "%Y-%m-%d", localtime($t);
       my $sunset = $date.' '.ReadingsVal ($name, "Today_SunSet", '00:00').':00';
       my $sstime = timestringToTimestamp ($sunset);
-      my $dart   = $sstime - $t;                                                                                     # verbleibende Sekunden bis Sonnenuntergang
+      my $dart   = $sstime - $t;                                                                                      # verbleibende Sekunden bis Sonnenuntergang
       $dart      = 0 if($dart < 0);
       $drc      += 1;                                                                                               
 
