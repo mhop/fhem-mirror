@@ -207,12 +207,15 @@ my $mapZonesTpl = '{
       newdatasets               => 0,
       newcollisions             => 0,
       newzonedatasets           => 0,
+      cuttingHeightLatency      => 100,
+      cuttingHeightLast         => 0,
       positionsTime             => 0,
       storesum                  => 0,
       statusTime                => 0,
       cspos                     => [],
       areapos                   => [],
       errorstack                => [],
+      errorstackmax             => 5,
       lasterror                 => {
         positions               => [],
         timestamp               => 0,
@@ -1419,9 +1422,10 @@ sub Attr {
     }
   ##########
   } elsif ( $attrName eq 'numberOfWayPointsToDisplay' ) {
-    
+
+    return "$iam $attrVal is invalid, min value is 100." if ( $attrVal < 100 );
     my $icurr = scalar @{$hash->{helper}{areapos}};
-    if( $cmd eq "set" && $attrVal =~ /\d+/ && $attrVal > 100 ) {
+    if( $cmd eq "set" && $attrVal =~ /\d+/ ) {
 
       # reduce array
       $hash->{helper}{MOWING}{maxLength} = $attrVal;
@@ -1629,7 +1633,7 @@ sub AlignArray {
 
     } elsif ( $use_position_polling ) {
 
-      if ( $reverse_positions_order ) {
+      if ( $reverse_pollpos_order ) {
 
         @ar = reverse @ar if ( $cnt > 1 ); # positions seem to be in reversed order
 
@@ -1676,13 +1680,18 @@ sub AlignArray {
       ZoneHandling ( $hash, $tmp, $cnt );
 
     }
+
     # set cutting height per zone
-    if ( AttrVal($name, 'mapZones', 0) && $act =~ /^MOWING$/
-         && defined( $hash->{helper}{currentZone} ) 
-         && defined( $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{cuttingHeight} )) {
+    
+    if ( AttrVal( $name, 'mapZones', 0 ) && $act =~ /^(MOWING)$/
+        && defined( $hash->{helper}{currentZone} )
+        && defined( $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{cuttingHeight} ) 
+        && $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{cuttingHeight} != $hash->{helper}{mower}{attributes}{settings}{cuttingHeight}
+        && ( $hash->{helper}{cuttingHeightLast} + $hash->{helper}{cuttingHeightLatency} ) < scalar gettimeofday() ) {
 
       RemoveInternalTimer( $hash, \&setCuttingHeight );
       InternalTimer( gettimeofday() + 11, \&setCuttingHeight, $hash, 0 )
+
     }
 
     # if ( $act =~ /^(CHARGING|PARKED_IN_CS)$/ && $actold =~ /^(PARKED_IN_CS|CHARGING)$/ ) {
@@ -1722,7 +1731,7 @@ sub isErrorThanPrepare {
 
       my $tmp = dclone( $hash->{helper}{lasterror} );
       unshift ( @{ $hash->{helper}{errorstack} }, $tmp );
-      pop ( @{ $hash->{helper}{errorstack} } ) if ( @{ $hash->{helper}{errorstack} } > 5 );
+      pop ( @{ $hash->{helper}{errorstack} } ) if ( @{ $hash->{helper}{errorstack} } > $hash->{helper}{errorstackmax} );
       ::FHEM::Devices::AMConnect::Common::FW_detailFn_Update ($hash);
 
     }
@@ -2017,9 +2026,14 @@ sub readMap {
 sub setCuttingHeight {
   my ( $hash ) = @_;
   RemoveInternalTimer( $hash, \&setCuttingHeight );
-  CMD( $hash ,'cuttingHeight', $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{cuttingHeight} )
-       if ( $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{cuttingHeight} != $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} );
-  
+
+  if ( $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{cuttingHeight} != $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} ) {
+
+    CMD( $hash ,'cuttingHeight', $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{cuttingHeight} );
+    $hash->{helper}{cuttingHeightLast} = scalar gettimeofday();
+
+  }
+
   return undef;
 }
 
@@ -2085,7 +2099,7 @@ sub fillReadings {
   $hash->{MODEL} = $model if ( $model && $hash->{MODEL} ne $model );
   $pref = 'planner';
   readingsBulkUpdateIfChanged( $hash, "planner_restrictedReason", $hash->{helper}{mower}{attributes}{$pref}{restrictedReason} );
-  readingsBulkUpdateIfChanged( $hash, "planner_overrideAction", $hash->{helper}{mower}{attributes}{$pref}{override}{action} );
+  readingsBulkUpdateIfChanged( $hash, "planner_overrideAction", $hash->{helper}{mower}{attributes}{$pref}{override}{action} ) if ( $hash->{helper}{mower}{attributes}{$pref}{override}{action} );
 
   $tstamp = $hash->{helper}{mower}{attributes}{$pref}{nextStartTimestamp};
   $timestamp = FmtDateTimeGMT( $tstamp/1000 );
