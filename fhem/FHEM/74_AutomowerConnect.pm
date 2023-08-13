@@ -318,7 +318,7 @@ __END__
 
     <li><a id='AutomowerConnect-attr-numberOfWayPointsToDisplay'>numberOfWayPointsToDisplay</a><br>
       <code>attr &lt;name&gt; numberOfWayPointsToDisplay &lt;number of way points&gt;</code><br>
-      Set the number of way points stored and displayed, default and at least 5000. The way points are shifted through the dedicated stack.</li>
+      Set the number of way points stored and displayed, default is 5000 at least 100. The way points are shifted through the dedicated stack.</li>
 
     <li><a id='AutomowerConnect-attr-weekdaysToResetWayPoints'>weekdaysToResetWayPoints</a><br>
       <code>attr &lt;name&gt; weekdaysToResetWayPoints &lt;any combination of weekday numbers, space or minus [0123456 -]&gt;</code><br>
@@ -680,7 +680,7 @@ __END__
 
     <li><a id='AutomowerConnect-attr-numberOfWayPointsToDisplay'>numberOfWayPointsToDisplay</a><br>
       <code>attr &lt;name&gt; numberOfWayPointsToDisplay &lt;number of way points&gt;</code><br>
-      Legt die Anzahl der gespeicherten und und anzuzeigenden Wegpunkte fest, Standart und Mindestwert 5000. Die Wegpunkte werden durch den zugeteilten Wegpunktspeicher geschoben.</li>
+      Legt die Anzahl der gespeicherten und und anzuzeigenden Wegpunkte fest, Standartwert ist 5000 und Mindestwert ist 100. Die Wegpunkte werden durch den zugeteilten Wegpunktspeicher geschoben.</li>
 
     <li><a id='AutomowerConnect-attr-weekdaysToResetWayPoints'>weekdaysToResetWayPoints</a><br>
       <code>attr &lt;name&gt; weekdaysToResetWayPoints &lt;any combination of weekday numbers, space or minus [0123456 -]&gt;</code><br>
