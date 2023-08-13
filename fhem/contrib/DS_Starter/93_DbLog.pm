@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 27569 2023-05-14 21:00:32Z DS_Starter $
+# $Id: 93_DbLog.pm 27617 2023-05-25 19:56:44Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -39,6 +39,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.9.1"   => "13.08.2023 possible use of alternative tables in _DbLog_plotData Forum:134547 ",
   "5.9.0"   => "16.05.2023 Server shutdown -> write cachefile if database connect can't be done during delayed shutdown ". 
                            "Forum: https://forum.fhem.de/index.php?topic=133599.0 ",
   "5.8.8"   => "11.05.2023 _DbLog_ParseEvent changed default splitting, Forum: https://forum.fhem.de/index.php?topic=133537.0 ",
@@ -530,7 +531,7 @@ sub DbLog_Attr {
       DbLog_setReadingstate   ($hash, $val);
 
       if ($do == 0) {
-          InternalTimer(gettimeofday()+0.8, "_DbLog_initOnStart", $hash, 0);
+          InternalTimer(gettimeofday()+1.8, "_DbLog_initOnStart", $hash, 0);
       }
   }
 
@@ -5869,13 +5870,13 @@ sub DbLog_Get {
 
   return qq{"get X" needs at least an argument} if(@a < 2);
 
-  my $name       = $hash->{NAME};
-  @a             = (map { my $p = $_; $p =~ s/\s//xg; $p; } @a);
+  my $name = $hash->{NAME};
+  @a       = (map { my $p = $_; $p =~ s/\s//xg; $p; } @a);
 
   shift @a;                                                                    # Device Name wird entfernt
 
   my $opt = $a[0];                                                             # Kommando spezifizieren / ableiten
-  $opt    = 'plotdata' if(lc($a[0]) =~ /^(-|current|history)$/ixs);
+  $opt    = 'plotdata' if(lc($a[0]) =~ /^(-|current|history|table_.*)$/ixs);   # table_ als Kennung für Benutzung alternativer Tabellen ab V 5.9.1
   $opt    = 'webchart' if($a[1] && lc($a[1]) eq 'webchart');
 
   my $params = {
@@ -6365,6 +6366,10 @@ sub _DbLog_plotData {
 
   if ($inf eq "-") {
       $inf = "history";
+  }
+  
+  if ($inf =~ /table_/xs) {
+      $inf = (split "_", $inf)[1];          # altervative Tabelle ab V 5.9.1
   }
 
   if ($outf eq "int" && $inf eq "current") {
@@ -8662,13 +8667,13 @@ sub DbLog_setVersionInfo {
 
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 27569 2023-05-14 21:00:32Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 27617 2023-05-25 19:56:44Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/xsg;
       }
       else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 27569 2023-05-14 21:00:32Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 27617 2023-05-25 19:56:44Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
