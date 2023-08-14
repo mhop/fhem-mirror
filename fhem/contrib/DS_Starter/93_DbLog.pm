@@ -6355,25 +6355,26 @@ sub _DbLog_plotData {
   my ($internal, @fld);
 
   my $utf8    = defined($hash->{UTF8}) ? $hash->{UTF8} : 0;
-  my $history = $hash->{HELPER}{TH};
-  my $current = $hash->{HELPER}{TC};
+  my $history = $hash->{HELPER}{TH} // 'history';
+  my $current = $hash->{HELPER}{TC} // 'current';
   my $inf     = lc(shift @a);
   my $outf    = lc(shift @a);               # Wert ALL:   get all colums from table, including a header
                                             # Wert Array: get the columns as array of hashes
                                             # Wert INT:   internally used by generating plots
   my $from    = shift @a;
   my $to      = shift @a;                   # Now @a contains the list of column_specs
+  my $table   = $history;
 
   if ($inf eq "-") {
-      $inf = "history";
+      $table = $history;
   }
   
   if ($inf =~ /table_/xs) {
-      $inf = (split "_", $inf)[1];          # altervative Tabelle ab V 5.9.1
+      $table = (split "_", $inf)[1];       # altervative Tabelle ab V 5.9.1
   }
 
   if ($outf eq "int" && $inf eq "current") {
-      $inf = "history";
+      $table = $history;
       Log3 $name, 3, "Defining DbLog SVG-Plots with :CURRENT is deprecated. Please define DbLog SVG-Plots with :HISTORY instead of :CURRENT. (define <mySVG> SVG <DbLogDev>:<gplotfile>:HISTORY)";
   }
 
@@ -6544,8 +6545,7 @@ sub _DbLog_plotData {
                     READING AS READING,
                     VALUE AS VALUE ";
 
-          $stm .= "FROM $current " if($inf eq "current");
-          $stm .= "FROM $history " if($inf eq "history");
+          $stm .= "FROM $table ";
 
           $stm .= "WHERE 1=1 ";
 
@@ -6571,8 +6571,7 @@ sub _DbLog_plotData {
                    $sqlspec{max_value}
                    $sqlspec{all_max} ";
 
-          $stm .= "FROM $current " if($inf eq "current");
-          $stm .= "FROM $history " if($inf eq "history");
+          $stm .= "FROM $table ";
 
           $stm .= "WHERE 1=1 ";
 
@@ -6596,8 +6595,7 @@ sub _DbLog_plotData {
                       VALUE
                       $sqlspec{all} ";
 
-          $stm .= "FROM $current " if($inf eq "current");
-          $stm .= "FROM $history " if($inf eq "history");
+          $stm .= "FROM $table ";
 
           $stm .= "WHERE 1=1 ";
 
