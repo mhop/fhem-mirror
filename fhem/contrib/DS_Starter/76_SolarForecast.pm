@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-08-13 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2023-08-15 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -136,7 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.80.20"=> "13.08.2023  hange calculation in ___setSolCastAPIcallKeyData once again ",
+  "0.80.20"=> "15.08.2023  hange calculation in ___setSolCastAPIcallKeyData once again, fix some warnings ",
   "0.80.19"=> "10.08.2023  fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1283836 ",
   "0.80.18"=> "07.08.2023  change calculation of todayDoneAPIcalls in ___setSolCastAPIcallKeyData, add \$lagtime ".
                            "Forum: https://forum.fhem.de/index.php?msg=1283487 ",
@@ -890,9 +890,9 @@ my %hcsr = (                                                                    
 sub Initialize {
   my $hash = shift;
 
-  my $fwd   = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
-  my $hod   = join ",", map { sprintf "%02d", $_} (01..24);
-  my $srd   = join ",", sort keys (%hcsr);
+  my $fwd  = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
+  my $hod  = join ",", map { sprintf "%02d", $_} (01..24);
+  my $srd  = join ",", sort keys (%hcsr);
 
   my ($consumer,@allc);
   for my $c (1..$maxconsumer) {
@@ -11384,6 +11384,7 @@ sub isInLocktime {
             '';
                 
   my ($cltoff, $clton) = split ":", ConsumerVal ($hash, $c, 'locktime', '0:0');
+  $clton             //= 0;                                                       # $clton undef möglich, da Angabe optional 
   
   if ($ltt eq 'onlt') {
       $lt = ConsumerVal ($hash, $c, 'lastAutoOnTs', 0);
@@ -11396,7 +11397,7 @@ sub isInLocktime {
   
   if ($t - $lt <= $clt) {
       $iilt = 1;
-      $rlt  = $clt - ($t - $lt);                                                 # remain lock time
+      $rlt  = $clt - ($t - $lt);                                                  # remain lock time
   }
 
 return ($iilt, $rlt);
@@ -11472,7 +11473,7 @@ sub isDWDUsed {
 
   my $ret = 0;
 
-  if($hash->{MODEL} eq 'DWD') {
+  if ($hash->{MODEL} && $hash->{MODEL} eq 'DWD') {
       $ret = 1;
   }
 
@@ -11487,7 +11488,7 @@ sub isSolCastUsed {
 
   my $ret = 0;
 
-  if($hash->{MODEL} eq 'SolCastAPI') {
+  if ($hash->{MODEL} && $hash->{MODEL} eq 'SolCastAPI') {
       $ret = 1;
   }
 
@@ -11502,7 +11503,7 @@ sub isForecastSolarUsed {
 
   my $ret = 0;
 
-  if($hash->{MODEL} eq 'ForecastSolarAPI') {
+  if ($hash->{MODEL} && $hash->{MODEL} eq 'ForecastSolarAPI') {
       $ret = 1;
   }
 
