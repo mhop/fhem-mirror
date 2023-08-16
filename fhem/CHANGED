@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  72_FRITZBOX: Fehler bei ApiCheck für alte FritzOS behoben.
+   feature: FB Name, Model, FritzOS Ermittlung überarbeitet
  - feature: 50_Signalbot: Trust handling, Chat history
  - change:  74_AutomowerConnect: Common.pm pervent JSON decoding error if more
             than one complete JSON string is in DevIo buffer,
