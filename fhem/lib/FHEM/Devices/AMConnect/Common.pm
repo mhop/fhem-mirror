@@ -1682,11 +1682,11 @@ sub AlignArray {
     }
 
     # set cutting height per zone
-    
+    my $cuthi = $hash->{helper}{mower}{attributes}{settings}{cuttingHeight};
     if ( AttrVal( $name, 'mapZones', 0 ) && $act =~ /^(MOWING)$/
         && defined( $hash->{helper}{currentZone} )
-        && defined( $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{cuttingHeight} ) 
-        && $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{cuttingHeight} != $hash->{helper}{mower}{attributes}{settings}{cuttingHeight}
+        && defined( $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{cuttingHeight} )
+        && $hash->{helper}{mapZones}{$hash->{helper}{currentZone}}{cuttingHeight} !~ /$cuthi/
         && ( $hash->{helper}{cuttingHeightLast} + $hash->{helper}{cuttingHeightLatency} ) < scalar gettimeofday() ) {
 
       RemoveInternalTimer( $hash, \&setCuttingHeight );
