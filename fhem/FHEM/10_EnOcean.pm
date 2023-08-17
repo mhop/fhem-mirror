@@ -108,7 +108,7 @@ my %EnO_gwCmd = (
   "setpointBasic" => 4,
   "controlVar"    => 5,
   "fanStage"      => 6,
-  "blindCmd"      => 7,
+  "blindCmd"      => 7
 );
 
 # Some Manufacturers (e.g. Jaeger Direkt) also sell EnOcean products without an entry in the table below.
@@ -451,6 +451,7 @@ my %EnO_eepConfig = (
   "G5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "H5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", model => "Eltako_TF", teachMethod => "confirm", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "I5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", model => "Eltako_FUD14", teachMethod => "confirm", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
+  "J5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", model => "Eltako_FUD61", teachMethod => "confirm", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "G5.3F.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "00D", webCmd => "opens:stop:closes"}},
   "H5.3F.7F" => {attr => {subType => "manufProfile", comMode => "confirm", eep => "A5-3F-7F", manufID => "00D", model => "Eltako_TF", sensorMode => 'pushbutton', settingAccuracy => "high", teachMethod => "confirm", webCmd => "opens:stop:closes"}},
   "I5.3F.7F" => {attr => {subType => "manufProfile", comMode => "confirm", eep => "A5-3F-7F", manufID => "00D", model => "Eltako_FRM60", sensorMode => 'pushbutton', teachMethod => "confirm", webCmd => "opens:stop:closes:position"}},
@@ -522,8 +523,14 @@ my %EnO_models = (
 );
 
 my %EnO_mscRefID = (
-  "0000045C" => {model => "Eltako_F4CT55", version => "0000", attr => {eep => "G6.02.01"}},
-  "0000043E" => {model => "Eltako_FRM60", teachIn => "FFF80D80", version => "0000", attr => {eep => "I5.3F.7F"}}
+  "0000041A" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0103", attr => {eep => "J5.38.08"}},
+  "0000041B" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0102", attr => {eep => "J5.38.08"}},
+  "00000492" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0204", attr => {eep => "J5.38.08"}},
+  "00000493" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0203", attr => {eep => "J5.38.08"}},
+  "000004D0" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0304", attr => {eep => "J5.38.08"}},
+  "000004DD" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0303", attr => {eep => "J5.38.08"}},
+  "0000045C" => {model => "Eltako_F4CT55", version => "0101", attr => {eep => "G6.02.01"}},
+  "0000043E" => {model => "Eltako_FRM60", teachIn => "FFF80D80", version => "0100", attr => {eep => "I5.3F.7F"}}
 );
 
 my @EnO_defaultChannel = ("all", "input", 0..29);
@@ -597,7 +604,7 @@ my %wakeUpCycle = (
   118800 => 60,
   129600 => 61,
   140400 => 62,
-  151200 => 63,
+  151200 => 63
 );
 
 my %wakeUpCycleInv = (
@@ -664,7 +671,7 @@ my %wakeUpCycleInv = (
   60 => 118800,
   61 => 129600,
   62 => 140400,
-  63 => 151200,
+  63 => 151200
 );
 
 my @EnO_resolution = (1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32);
@@ -690,7 +697,7 @@ my %EnO_gpValueEnum = (
   5 => {name => "changeoverMode", enum => {0 => "auto", 1 => "cooling", 2 => "heating"},
                                   enumInv => {"auto" => 0,"cooling" => 1,"heating" => 2}},
   6 => {name => "time"},
-  7 => {name => "battery", unit => "%"},
+  7 => {name => "battery", unit => "%"}
 );
 
 my %EnO_gpValueFlag = (
@@ -721,7 +728,7 @@ my %EnO_gpValueFlag = (
   13 => {name => "start/stop", flag => {0 => "stop", 1 => "start"},
                                flagInv => {"stop" => 0,"start" => 1}},
   14 => {name => "up", flag => {0 => "no_change", 1 => "up"},
-                       flagInv => {"no_change" => 0,"up" => 1}},
+                       flagInv => {"no_change" => 0,"up" => 1}}
 );
 
 my %EnO_gpValueData = (
@@ -756,7 +763,7 @@ my %EnO_gpValueData = (
   29 => {name => "volume", unit => "m3"},
   30 => {name => "volumetric_flow", unit => "m3/s"},
   31 => {name => "sound_pressure_level", unit => "dB"},
-  32 => {name => "correlated_color_temperature", unit => "K"},
+  32 => {name => "correlated_color_temperature", unit => "K"}
 );
 
 # trigger values for down and up commands
@@ -1059,6 +1066,7 @@ sub EnOcean_Define($$) {
           #EnOcean:PacketType:RORG:MessageData:SourceID:Status:OptionalData
           (undef, undef, $rorg, $data, undef, $status, undef) = @msg;
           $attr{$name}{subType} = $EnO_rorgname{$rorg};
+
           if ($attr{$name}{subType} eq "switch") {
             my $nu = (hex($status) & 0x10) >> 4;
             my $t21 = (hex($status) & 0x20) >> 5;
@@ -1098,12 +1106,15 @@ sub EnOcean_Define($$) {
             $hash->{helper}{teachInWait} = "4BS";
             readingsSingleUpdate($hash, "teach", "4BS teach-in is missing", 1);
             Log3 $name, 2, "EnOcean $name 4BS teach-in is missing";
+
           } elsif ($attr{$name}{subType} eq "UTE") {
             $hash->{helper}{teachInWait} = "UTE";
+
           } elsif ($attr{$name}{subType} eq "VLD") {
             $hash->{helper}{teachInWait} = "UTE";
             readingsSingleUpdate($hash, "teach", "UTE teach-in is missing", 1);
             Log3 $name, 2, "EnOcean $name UTE teach-in is missing";
+
           } elsif ($attr{$name}{subType} eq "MSC") {
             $attr{$name}{manufID} = substr($data, 0, 3);
             if ($attr{$name}{manufID} eq '00D') {
@@ -1122,11 +1133,13 @@ sub EnOcean_Define($$) {
                     $attr{$name}{mscRefID} = $refID;
                     $attr{$name}{room} = $autocreateDeviceRoom;
                     $attr{$name}{subDef} = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000") if (!exists $attr{$name}{subDef});
+                    # set device attributes
                     foreach my $attrCntr (keys %{$EnO_eepConfig{$EnO_mscRefID{$refID}{attr}{eep}}{attr}}) {
                       if ($attrCntr eq "subDef") {
                         next;
-                      } elsif ($attrCntr eq "subType" && defined($attr{$name}{$attrCntr})) {
-                        next;
+# Zuweisung des richtigen subType erfolgt nicht
+#                      } elsif ($attrCntr eq "subType" && defined($attr{$name}{$attrCntr})) {
+#                        next;
                       } else {
                         $attr{$name}{$attrCntr} = $EnO_eepConfig{$EnO_mscRefID{$refID}{attr}{eep}}{attr}{$attrCntr};
                       }
@@ -1146,10 +1159,12 @@ sub EnOcean_Define($$) {
               readingsSingleUpdate($hash, "teach", "MSC not supported", 1);
               Log3 $name, 2, "EnOcean $name MSC not supported";
             }
+
           } elsif ($attr{$name}{subType} =~ m/^SEC|ENC$/) {
             $hash->{helper}{teachInWait} = "STE";
             readingsSingleUpdate($hash, "teach", "STE teach-in is missing", 1);
             Log3 $name, 2, "EnOcean $name STE teach-in is missing";
+
           } elsif ($attr{$name}{subType} =~ m/^GPCD|GPSD$/) {
             $hash->{helper}{teachInWait} = "GPTI";
             readingsSingleUpdate($hash, "teach", "GP teach-in is missing", 1);
@@ -7640,6 +7655,7 @@ sub EnOcean_Parse($$) {
       } elsif ($learningDev eq 'teachMsg' && ($rorgname =~ m/^VLD|SEC|ENC$/ || $rorgname eq '4BS' && (hex(substr($data, 6, 2))) & 8)) {
           Log3 undef, 4, "EnOcean Unknown device with SenderID $senderID and $rorgname telegram.";
           return '';
+
       } elsif ($learningDev eq 'teachMsg' && $rorgname eq "MSC") {
           if ($teach && substr($data, 0, 3) eq '00D' && substr($data, 4, 2) eq 'FF') {
             Log3 undef, 1, "EnOcean Unknown device with SenderID $senderID and $rorgname telegram, please define it.";
@@ -8395,7 +8411,6 @@ sub EnOcean_Parse($$) {
           $st = "raw";
         }
 
-#####*
         # signal telegram learn mode status
         my $signalData = EnOcean_signalLearnModeStatus(0, 1, 0, $attr{$name}{eep} eq 'raw' ? 1 : 0, 0, $hash->{DEF}, $attr{$name}{eep} eq 'raw' ? 'FF-FF-FF' : $attr{$name}{eep});
         EnOcean_SndRadio(undef, $hash, 1, 'D0', $signalData, defined($attr{$name}{subDef}) ? $attr{$name}{subDef} : '0' x 8, '00', 'F' x 8);
@@ -8408,12 +8423,15 @@ sub EnOcean_Parse($$) {
     } elsif (exists($hash->{helper}{teachInWait}) && $hash->{helper}{teachInWait} eq 'MSC') {
       # Eltako MSC teach-in response
       my $ownSenderID = defined($attr{$name}{subDef}) ? $attr{$name}{subDef} : $hash->{DEF};
-      if (substr($data, 0, 6) ne substr($ownSenderID, 2, 6)) {
+      if (substr($data, 0, 6) eq substr($ownSenderID, 2, 6)) {
+        readingsSingleUpdate($hash, 'teach', "4BS teach-in accepted EEP: $attr{$name}{eep} Manufacturer: " . $EnO_manuf{$attr{$name}{manufID}}, 1);
+        Log3 $name, 2, "EnOcean $name 4BS teach-in accepted EEP: $attr{$name}{eep} Manufacturer: " . $EnO_manuf{$attr{$name}{manufID}};
+      } else {
         # wrong response, device rejected, clear teach-in request
-        delete $hash->{helper}{teachInWait};
         readingsSingleUpdate($hash, 'teach', '4BS teach-in response wrong, device rejected', 1);
         Log3 $name, 2, "EnOcean $name 4BS teach-in rejected by SenderID $senderID";
       }
+      delete $hash->{helper}{teachInWait};
       return '';
 
     } elsif ($st eq "hvac.01" || $st eq "MD15") {
@@ -13033,12 +13051,14 @@ sub EnOcean_Parse($$) {
       }
     } elsif ($manufID eq "00D") {
         if (substr($data, 4, 2) eq 'FE') {
+          Log3 $name, 2, "EnOcean $name MSC data: $data";
           # teachin states
-          if (substr($data, 6, 6) eq '030301') {
+          if (substr($data, 6, 6) =~ /^03030[12]$/) {
             # teachin started
             if (exists($hash->{helper}{teachInWait}) && $hash->{helper}{teachInWait} eq "MSC" &&
                 exists($attr{$name}{mscRefID}) &&
                 exists($EnO_mscRefID{$attr{$name}{mscRefID}})) {
+              Log3 $name, 2, "EnOcean $name MSC data: $data teachInWait: $hash->{helper}{teachInWait} mscRefID: $attr{$name}{mscRefID}";
               EnOcean_SndRadio(undef, $hash, $packetType, "A5", $EnO_mscRefID{$attr{$name}{mscRefID}}{teachIn}, AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
               push @event, "3:teach:4BS teach-in response sent";
               Log3 $name, 2, "EnOcean $name 4BS teach-in response sent to " . $hash->{DEF};
@@ -13046,15 +13066,17 @@ sub EnOcean_Parse($$) {
               delete $hash->{helper}{teachInWait};
             }
         } elsif (substr($data, 6, 6) eq '030300') {
-          delete $hash->{helper}{teachInWait};
+          # teachin end, keine Löschung, da Telegramm bei FUD61 vor 4BS Telegramm: ID2, ID1, ID0, 0x08 gesendet wird
+          # delete $hash->{helper}{teachInWait};
         } elsif (substr($data, 6, 6) eq '030400') {
+          # ID learned
           delete $hash->{helper}{teachInWait};
           push @event, "3:teach:4BS teach-in accepted EEP: $attr{$name}{eep} Manufacturer: $EnO_manuf{$manufID}";
           Log3 $name, 2, "EnOcean $name 4BS teach-in accepted EEP: $attr{$name}{eep} Manufacturer: $EnO_manuf{$manufID}";
         } elsif (substr($data, 6, 6) eq 'FC0100') {
           delete $hash->{helper}{teachInWait};
           push @event, "3:teach:4BS teach-in not accepted by $hash->{DEF}";
-          Log3 $name, 2, "EnOcean $name 4BS teach-in not accepted by $hash->{DEF}";
+          Log3 $name, 2, "EnOcean $name 4BS teach-in rejected by SenderID $hash->{DEF}";
         }
       }
 
@@ -17013,6 +17035,7 @@ sub EnOcean_SndRadio($$$$$$$$) {
   my $odata = "";
   my $odataLength = 0;
   if ($packetType == 1) {
+    # encryption if necessary
     ($err, $rorg, $data, $response, $loglevel) = EnOcean_sec_convertToSecure($hash, $packetType, $rorg, $data);
     if (defined $err) {
       Log3 $hash->{NAME}, $loglevel, "EnOcean $hash->{NAME} Error: $err";
@@ -18100,111 +18123,111 @@ sub EnOcean_sec_parseTeachIn($$$$) {
       }
     }
 
-      # Decode RLC algorithm and extract RLC and private key (only first part most likely)
-      if ($rlc_algo == 0) {
-        # No RLC used in telegram or internally in memory, use case untested
-        return ("Secure modes without RLC not tested or supported", undef);
-      } elsif ($rlc_algo == 1) {
-        # "RLC= 2-byte long. RLC algorithm consists on incrementing in +1 the previous RLC value
-        # Extract RLC and KEY fields from data trailing SLF field
-        # RLC, KEY, ID, STATUS
-        $crypt =~ /^(....)(.*)$/;
-        $rlc = $1;
-        $key1 = $2;
-        # Store in device hash
-        $attr{$name}{rlcAlgo} = '2++';
-        readingsSingleUpdate($hash, ".rlcRcv", $rlc, 0);
-        # storing backup copy
-        $attr{$name}{rlcRcv} = $rlc;
-        $attr{$name}{keyRcv} = $key1;
-      } elsif ($rlc_algo == 2) {
-        # RLC= 3-byte long. RLC algorithm consists on incrementing in +1 the previous RLC value
-        # Extract RLC and KEY fields from data trailing SLF field
-        # RLC, KEY, ID, STATUS
-        $crypt =~ /^(......)(.*)$/;
-        $rlc = $1;
-        $key1 = $2;
-        # Store in device hash
-        $attr{$name}{rlcAlgo} = '3++';
-        readingsSingleUpdate($hash, ".rlcRcv", $rlc, 0);
-        # storing backup copy
-        $attr{$name}{rlcRcv} = $rlc;
-        $attr{$name}{keyRcv} = $key1;
-      } elsif ($rlc_algo == 3) {
-        # RLC= 4-byte long. RLC algorithm consists on incrementing in +1 the previous RLC value
-        # Extract RLC and KEY fields from data trailing SLF field
-        # RLC, KEY, ID, STATUS
-        $crypt =~ /^(........)(.*)$/;
-        $rlc = $1;
-        $key1 = $2;
-        # Store in device hash
-        $attr{$name}{rlcAlgo} = '4++';
-        readingsSingleUpdate($hash, ".rlcRcv", $rlc, 0);
-        # storing backup copy
-        $attr{$name}{rlcRcv} = $rlc;
-        $attr{$name}{keyRcv} = $key1;
-      } else {
-        # Undefined RLC algorithm
-        return ("Undefined RLC algorithm $rlc_algo", undef);
-      }
+    # Decode RLC algorithm and extract RLC and private key (only first part most likely)
+    if ($rlc_algo == 0) {
+      # No RLC used in telegram or internally in memory, use case untested
+      return ("Secure modes without RLC not tested or supported", undef);
+    } elsif ($rlc_algo == 1) {
+      # "RLC= 2-byte long. RLC algorithm consists on incrementing in +1 the previous RLC value
+      # Extract RLC and KEY fields from data trailing SLF field
+      # RLC, KEY, ID, STATUS
+      $crypt =~ /^(....)(.*)$/;
+      $rlc = $1;
+      $key1 = $2;
+      # Store in device hash
+      $attr{$name}{rlcAlgo} = '2++';
+      readingsSingleUpdate($hash, ".rlcRcv", $rlc, 0);
+      # storing backup copy
+      $attr{$name}{rlcRcv} = $rlc;
+      $attr{$name}{keyRcv} = $key1;
+    } elsif ($rlc_algo == 2) {
+      # RLC= 3-byte long. RLC algorithm consists on incrementing in +1 the previous RLC value
+      # Extract RLC and KEY fields from data trailing SLF field
+      # RLC, KEY, ID, STATUS
+      $crypt =~ /^(......)(.*)$/;
+      $rlc = $1;
+      $key1 = $2;
+      # Store in device hash
+      $attr{$name}{rlcAlgo} = '3++';
+      readingsSingleUpdate($hash, ".rlcRcv", $rlc, 0);
+      # storing backup copy
+      $attr{$name}{rlcRcv} = $rlc;
+      $attr{$name}{keyRcv} = $key1;
+    } elsif ($rlc_algo == 3) {
+      # RLC= 4-byte long. RLC algorithm consists on incrementing in +1 the previous RLC value
+      # Extract RLC and KEY fields from data trailing SLF field
+      # RLC, KEY, ID, STATUS
+      $crypt =~ /^(........)(.*)$/;
+      $rlc = $1;
+      $key1 = $2;
+      # Store in device hash
+      $attr{$name}{rlcAlgo} = '4++';
+      readingsSingleUpdate($hash, ".rlcRcv", $rlc, 0);
+      # storing backup copy
+      $attr{$name}{rlcRcv} = $rlc;
+      $attr{$name}{keyRcv} = $key1;
+    } else {
+      # Undefined RLC algorithm
+      return ("Undefined RLC algorithm $rlc_algo", undef);
+    }
 
-      # RLC Transmission
-      if ($rlc_tx == 0 ) {
-        # Secure operation mode telegrams do not contain RLC, we store and track it ourself
-        $attr{$name}{rlcTX} = 'false';
-      } else {
-        # Secure operation mode messages contain RLC, CAUTION untested
-        $attr{$name}{rlcTX} = 'true';
-      }
+    # RLC Transmission
+    if ($rlc_tx == 0 ) {
+      # Secure operation mode telegrams do not contain RLC, we store and track it ourself
+      $attr{$name}{rlcTX} = 'false';
+    } else {
+      # Secure operation mode messages contain RLC, CAUTION untested
+      $attr{$name}{rlcTX} = 'true';
+    }
 
-      # Decode MAC Algorithm
-      if ($mac_algo == 0) {
-        # No MAC included in the secure telegram
-        # Doesn't make sense for RLC senders like the PTM215, as we can't verify the RLC then...
-        #$attr{$name}{macAlgo} = 'no';
-        return ("Secure mode without MAC algorithm unsupported", undef);
-      } elsif ($mac_algo == 1) {
-        # CMAC is a 3-byte-long code
-        $attr{$name}{macAlgo} = '3';
-      } elsif ($mac_algo == 2) {
-        # MAC is a 4-byte-long code
-        $attr{$name}{macAlgo} = '4';
-      } else {
-        # Undefined MAC algorith;
-        # Nothing we can do either...
-        #$attr{$name}{macAlgo} = 'no';
-        return ("Undefined MAC algorithm $mac_algo", undef);
-      }
+    # Decode MAC Algorithm
+    if ($mac_algo == 0) {
+      # No MAC included in the secure telegram
+      # Doesn't make sense for RLC senders like the PTM215, as we can't verify the RLC then...
+      #$attr{$name}{macAlgo} = 'no';
+      return ("Secure mode without MAC algorithm unsupported", undef);
+    } elsif ($mac_algo == 1) {
+      # CMAC is a 3-byte-long code
+      $attr{$name}{macAlgo} = '3';
+    } elsif ($mac_algo == 2) {
+      # MAC is a 4-byte-long code
+      $attr{$name}{macAlgo} = '4';
+    } else {
+      # Undefined MAC algorith;
+      # Nothing we can do either...
+      #$attr{$name}{macAlgo} = 'no';
+      return ("Undefined MAC algorithm $mac_algo", undef);
+    }
 
-      # Decode data encryption algorithm
-      if ($data_enc == 0) {
-        # Data not encrypted? Right now we will handle this like an error, concrete use case untested
-        #$attr{$name}{secLevel} = 'encapsulation';
-        return ("Secure mode message without data encryption unsupported", undef);
-      } elsif ($data_enc == 1) {
-        # Unspecified
-        return ("Undefined data encryption algorithm $data_enc", undef);
-      } elsif ($data_enc == 2) {
-        # Unspecified
-        return ("Undefined data encryption algorithm $data_enc", undef);
-      } elsif ($data_enc == 3) {
-        # Data will be encrypted/decrypted XORing with a string obtained from a AES128 encryption
-        $attr{$name}{dataEnc} = 'VAES';
-        $attr{$name}{secLevel} = 'encryption';
-      } elsif ($data_enc == 4) {
-        # Data will be encrypted/decrypted using the AES128 algorithm in CBC mode
-        # Might be used in the future right now untested
-        #$attr{$name}{dataEnc} = 'AES-CBC';
-        #$attr{$name}{secLevel} = 'encryption';
-        return ("Secure mode message with AES-CBC data encryption unsupported", undef);
-      } else {
-        # Something went horribly wrong
-        return ("Could not parse data encryption information, $data_enc", undef);
-      }
+    # Decode data encryption algorithm
+    if ($data_enc == 0) {
+      # Data not encrypted? Right now we will handle this like an error, concrete use case untested
+      #$attr{$name}{secLevel} = 'encapsulation';
+      return ("Secure mode message without data encryption unsupported", undef);
+    } elsif ($data_enc == 1) {
+      # Unspecified
+      return ("Undefined data encryption algorithm $data_enc", undef);
+    } elsif ($data_enc == 2) {
+      # Unspecified
+      return ("Undefined data encryption algorithm $data_enc", undef);
+    } elsif ($data_enc == 3) {
+      # Data will be encrypted/decrypted XORing with a string obtained from a AES128 encryption
+      $attr{$name}{dataEnc} = 'VAES';
+      $attr{$name}{secLevel} = 'encryption';
+    } elsif ($data_enc == 4) {
+      # Data will be encrypted/decrypted using the AES128 algorithm in CBC mode
+      # Might be used in the future right now untested
+      #$attr{$name}{dataEnc} = 'AES-CBC';
+      #$attr{$name}{secLevel} = 'encryption';
+      return ("Secure mode message with AES-CBC data encryption unsupported", undef);
+    } else {
+      # Something went horribly wrong
+      return ("Could not parse data encryption information, $data_enc", undef);
+    }
 
-      $hash->{helper}{teachInSTE} = $cnt - 1;
-      # Ok we got a lots of infos and the first part of the private key
-      return (undef, "part 1 received Rlc: $rlc Key1: $key1");
+    $hash->{helper}{teachInSTE} = $cnt - 1;
+    # Ok we got a lots of infos and the first part of the private key
+    return (undef, "part 1 received Rlc: $rlc Key1: $key1");
 
   } elsif ($idx == 1 && exists($hash->{helper}{teachInSTE})) {
     # Second part of the teach-in telegrams
@@ -18660,10 +18683,7 @@ sub EnOcean_sec_createTeachIn($$$$$$$$$$$) {
   my $info = 0x20;
   # DATA_ENC = VAES
   my $slf = 3;
-
-  if ($cryptFunc == 0) {
-    return ("Cryptographic functions are not available", undef, 2);
-  }
+  return ("Cryptographic functions are not available", undef, 2) if ($cryptFunc == 0);
   # generate random private key
   my $pKey;
   for (my $i = 1; $i < 5; $i++) {
@@ -18745,7 +18765,7 @@ sub EnOcean_sec_convertToSecure($$$$) {
   # no encryption with different set profile, required for the LED control of the model Eltako_F4CT55
   my $subTypeSet = AttrVal($name, "subTypeSet", "");
   # encryption needed?
-  return ($err, $rorg, $data, $response, 5) if ($rorg =~ m/^F6|35$/ || $secLevel !~ m/^encapsulation|encryption$/ || $subType eq "STE" || $subTypeSet eq "switch");
+  return ($err, $rorg, $data, $response, 5) if ($rorg =~ m/^F6|35|D0$/ || $secLevel !~ m/^encapsulation|encryption$/ || $subType eq "STE" || $subTypeSet eq "switch");
   return ("Cryptographic functions are not available", undef, undef, $response, 2) if ($cryptFunc == 0);
   my $dataEnc = AttrVal($name, "dataEnc", undef);
 
@@ -18952,12 +18972,12 @@ sub EnOcean_Delete($$) {
   see <a href="#EnOcean-teach-in">Teach-In / Teach-Out</a>.
   <br><br>
   For some devices, Eltako uses a company-specific MSC teach-in process. These devices send special MSC telegrams
-  when switched on. With bidirectional actuators, the MSC telegrams are only sent as long as they are still in the
+  when switched on or the device is set to LRN. With bidirectional actuators, the MSC telegrams are only sent as long as they are still in the
   delivery state or the teach-in process is activated manually. See <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a>
   for the supported devices. To teach-in the devices in Fhem,
-  <br>
+  <ul><br>
   <code>set &lt;IODev&gt; teach &lt;t/s&gt;</code>
-  <br><br>
+  <br></ul>
   must be activated.
   <br><br>
   Devices that communicate encrypted, has to taught-in through specific procedures.
@@ -19320,6 +19340,7 @@ sub EnOcean_Delete($$) {
      <li>G5-38-08 Gateway, Dimming [Eltako FSG, FUD]<br></li>
      <li>H5-38-08 Gateway, Dimming [Eltako TF61D, TF100D]<br></li>
      <li>I5-38-08 Gateway, Dimming [Eltako FUD14] with teachMethod confirm<br></li>
+     <li>J5-38-08 Gateway, Dimming [Eltako FUD61] - MSC teach-in supported<br></li>
      <li>M5-38-08 Gateway, Switching [Eltako FSR14] old version<br></li>
      <li>N5-38-08 Gateway, Switching [Eltako TF61L, TF61R, TF100A, TF100L]<br></li>
      <li>O5-38-08 Gateway, Switching [Eltako FSR14] with teachMethod confirm<br></li>
