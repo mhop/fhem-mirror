@@ -1880,6 +1880,64 @@ set DEVICE attrTemplate set_associatedWith \CHANNELS=3
 attr DEVICE,DEVICE_CH2,DEVICE_CH3 model tasmota_shelly_i3
 setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20210607
 
+#contributed by twdotnet, https://forum.fhem.de/index.php?msg=1282883
+# shelly plus i4 4 channel input switches with device configuration
+name:tasmota_4channel_input_shelly_i4
+filter:TYPE=MQTT2_DEVICE
+desc:Shelly i4 device flashed with Tasmota, provides four input only channels. <p>Device will be configured with selectable SwitchMode and optional GPIO Template. <br>Recommended SwitchModes 1=FollowMode (normally open switches> or 2=InvertedFollowMode (normally closed switches) </p><p>Tasmota 9.1+ is required for <a href=https://tasmota.github.io/docs/Buttons-and-Switches/#setoption114>SetOption114</a> to detach switches from relays.<p>NOTE: <br>A second, third and fourth device will be created for the second, third and fourth input with suffixes *_CH2, *_CH3 and *_CH4</p>
+order:A_03a
+par:RADIO_TEMPLATE;Configure device and GPIO;{ undef }
+par:RADIO_NO_TEMPLATE;Configure device without GPIO template;{ undef }
+par:SWITCHMODE1;SwitchMode for Input 1;{ undef }
+par:SWITCHMODE2;SwitchMode for Input 2;{ undef }
+par:SWITCHMODE3;SwitchMode for Input 3;{ undef }
+par:SWITCHMODE3;SwitchMode for Input 4;{ undef }
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+par:SETCHANNELINFO;Set this to 0 to not set channelinfo;{ 1 }
+par:ICON;ICON as set, defaults to taster;{ AttrVal('DEVICE','icon",'taster') }
+par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
+# autoconfigure device
+option:{RADIO_NO_TEMPLATE}
+set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SwitchMode1 SWITCHMODE1; SwitchMode2 SWITCHMODE2; SwitchMode3 SWITCHMODE3; SwitchMode4 SWITCHMODE4; SetOption26 1; SetOption114 1; SaveData 1
+option:{RADIO_TEMPLATE}
+set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SwitchMode1 SWITCHMODE1; SwitchMode2 SWITCHMODE2; SwitchMode3 SWITCHMODE3; SwitchMode4 SWITCHMODE4; SetOption26 1; SetOption114 1; SaveData 1; template {"NAME":"Shelly Plus i4","GPIO":[0,0,0,0,0,0,0,0,192,0,193,0,0,0,0,0,0,0,0,0,0,0,195,194,0,0,0,0,0,0,0,0,0,0,0,0],"FLAG":0,"BASE":1,"CMND":"SwitchMode1 1 | SwitchMode2 1 | SwitchMode3 1 | SwitchMode4 1 | SwitchTopic 0 | SetOption114 1"}; module 0
+option:global
+# setup main device channel 1
+attr DEVICE icon ICON
+attr DEVICE jsonMap Switch1_Action:state
+attr DEVICE setList \
+  off:noArg    STATTOPIC/Switch1 0\
+  on:noArg     STATTOPIC/Switch1 1\
+  toggle:noArg STATTOPIC/Switch1 2
+attr DEVICE readingList \
+  TELETOPIC/LWT:.* LWT\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE setStateList on off toggle
+attr DEVICE autocreate 0
+
+# create devices for 2nd, 3rd and 4th channel
+loop:#:2:3:4
+copy DEVICE DEVICE_CH#
+defmod DEVICE_CH# MQTT2_\DEVICE DEVICE_CH#
+deleteattr DEVICE_CH# alias
+attr DEVICE_CH# readingList \
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE_CH# jsonMap Switch#_Action:state
+attr DEVICE_CH# setList \
+  off:noArg    STATTOPIC/Switch# 0\
+  on:noArg     STATTOPIC/Switch# 1\
+  toggle:noArg STATTOPIC/Switch# 2
+loop:END
+# associations
+option:{SETCHANNELINFO}
+set DEVICE attrTemplate set_associatedWith \CHANNELS=4
+option:global
+attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 model tasmota_shelly_i4
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20230817
+
 
 # sonoff 4 channel device flashed with Tasmota.
 # contributed by Blauhorn, https://forum.fhem.de/index.php/topic,94495.msg976113.html#msg976113
@@ -5535,7 +5593,7 @@ par:BASE_ID;BASE_ID as set on the esp;{ AttrVal('DEVICE','readingList','') =~ m,
 par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
 attr DEVICE icon ICON
 attr DEVICE bridgeRegexp BASE_ID/([^/]+)/ch[0-9]+/.*:.* "BASE_ID_$1"\
-  BASE_ID/([^/]+)/(available|last_success|ack_pwr_limit):.* "BASE_ID_$1"
+  BASE_ID/([^/]+)/(available|last_success|ack_pwr_limit|alarm/.*):.* "BASE_ID_$1"
 attr DEVICE autocreate 1
 attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/free_heap:.* free_heap\
@@ -5556,7 +5614,7 @@ attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/total/YieldTotal:.* YieldTotal
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_hub_bridge
-setreading DEVICE attrTemplateVersion 20230328
+setreading DEVICE attrTemplateVersion 20230816
 { AttrTemplate_Initialize() }
 #   "setup/set_time",
 #   "setup/sync_ntp
@@ -5573,6 +5631,7 @@ par:INVERTER_NR;INVERTER_NR - order nr. in your setup. Note: numbering starts wi
 par:RADIO_SINGLE;inverter has just one channel;{ undef }
 par:RADIO_DOUBLE;inverter has two channels;{ undef }
 par:RADIO_QUATTRO;inverter has four channels;{ undef }
+par:RADIO_SIXCH;inverter has six channels;{ undef }
 par:ICON;ICON as set, defaults to measure_photovoltaic_inst;{ AttrVal('DEVICE','icon','measure_photovoltaic_inst') }
 attr DEVICE icon ICON
 { Svn_GetFile('contrib/AttrTemplate/99_attrT_Ahoy_Utils.pm', 'FHEM/99_attrT_Ahoy_Utils.pm', sub(){ CommandReload(undef, '99_attrT_Ahoy_Utils') }) }
@@ -5582,6 +5641,7 @@ option:{ RADIO_SINGLE }
 attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name,1)}
 attr DEVICE readingList INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/last_success:.* last_success\
+  INVERTERLONG_ID/ch0/active_PowerLimit:.* active_PowerLimit\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
@@ -5607,12 +5667,16 @@ attr DEVICE readingList INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/ch1/U_DC:.* U_DC\
   INVERTERLONG_ID/ch1/Irradiation:.* Irradiation1\
   INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
-  INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal
+  INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal\
+  INVERTERLONG_ID/ch0/MaxPower:.* MaxPower\
+  INVERTERLONG_ID/alarm/cnt:.* alarmCnt\
+  INVERTERLONG_ID/alarm/[\d]+/[^:]+:.* { $TOPIC =~ m,alarm/([\d]+)/([^:]+),; { "alarm_${1}_$2"=>$EVENT } }
 option:{ RADIO_DOUBLE }
 attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name,2)}
 attr DEVICE readingList \
   INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/last_success:.* last_success\
+  INVERTERLONG_ID/ch0/active_PowerLimit:.* active_PowerLimit\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
@@ -5644,12 +5708,18 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch2/U_DC:.* U_DC2\
   INVERTERLONG_ID/ch2/Irradiation:.* Irradiation2\
   INVERTERLONG_ID/ch2/YieldDay:.* YieldDay2\
-  INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2
+  INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2\
+  INVERTERLONG_ID/ch0/MaxPower:.* MaxPower\
+  INVERTERLONG_ID/ch1/MaxPower:.* MaxPower1\
+  INVERTERLONG_ID/ch2/MaxPower:.* MaxPower2\
+  INVERTERLONG_ID/alarm/cnt:.* alarmCnt\
+  INVERTERLONG_ID/alarm/[\d]+/[^:]+:.* { $TOPIC =~ m,alarm/([\d]+)/([^:]+),; { "alarm_${1}_$2"=>$EVENT } }
 option:{ RADIO_QUATTRO }
 attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name)}
 attr DEVICE readingList \
   INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/last_success:.* last_success\
+  INVERTERLONG_ID/ch0/active_PowerLimit:.* active_PowerLimit\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
@@ -5697,7 +5767,89 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch4/U_DC:.* U_DC4\
   INVERTERLONG_ID/ch4/Irradiation:.* Irradiation4\
   INVERTERLONG_ID/ch4/YieldDay:.* YieldDay4\
-  INVERTERLONG_ID/ch4/YieldTotal:.* YieldTotal4
+  INVERTERLONG_ID/ch4/YieldTotal:.* YieldTotal4\
+  INVERTERLONG_ID/ch0/MaxPower:.* MaxPower\
+  INVERTERLONG_ID/ch1/MaxPower:.* MaxPower1\
+  INVERTERLONG_ID/ch2/MaxPower:.* MaxPower2\
+  INVERTERLONG_ID/ch3/MaxPower:.* MaxPower3\
+  INVERTERLONG_ID/ch4/MaxPower:.* MaxPower4\
+  INVERTERLONG_ID/alarm/cnt:.* alarmCnt\
+  INVERTERLONG_ID/alarm/[\d]+/[^:]+:.* { $TOPIC =~ m,alarm/([\d]+)/([^:]+),; { "alarm_${1}_$2"=>$EVENT } }
+option:{ RADIO_SIXCH }
+attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name,6)}
+attr DEVICE readingList \
+  INVERTERLONG_ID/available:.* available\
+  INVERTERLONG_ID/last_success:.* last_success\
+  INVERTERLONG_ID/ch0/active_PowerLimit:.* active_PowerLimit\
+  INVERTERLONG_ID/ch0/U_AC:.* U_AC\
+  INVERTERLONG_ID/ch0/I_AC:.* I_AC\
+  INVERTERLONG_ID/ch0/P_AC:.* P_AC\
+  INVERTERLONG_ID/ch0/P_AC:.* P_AC\
+  INVERTERLONG_ID/ch0/Q_AC:.* Q_AC\
+  INVERTERLONG_ID/ch0/F_AC:.* F_AC\
+  INVERTERLONG_ID/ch0/PF_AC:.* PF_AC\
+  INVERTERLONG_ID/ch0/P_DC:.* P_DC\
+  INVERTERLONG_ID/ch0/Freq:.* Freq\
+  INVERTERLONG_ID/ch0/Temp:.* temperature\
+  INVERTERLONG_ID/ch0/ALARM_MES_ID:.* ALARM_MES_ID\
+  INVERTERLONG_ID/ch0/LastAlarmCode:.* LastAlarmCode\
+  INVERTERLONG_ID/ch0/Efficiency:.* Efficiency\
+  INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
+  INVERTERLONG_ID/ch0/Temp:.* temperature\
+  INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
+  INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
+  INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
+  INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
+  INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
+  INVERTERLONG_ID/ch0/FWBuildHourMinute:.* FWBuildHourMinute\
+  INVERTERLONG_ID/ch0/HWPartId:.* HWPartId\
+  INVERTERLONG_ID/ch0/active_PowerLimit:.* limit\
+  INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
+  INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
+  INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
+  INVERTERLONG_ID/ch1/U_DC:.* U_DC1\
+  INVERTERLONG_ID/ch1/Irradiation:.* Irradiation1\
+  INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
+  INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal1\
+  INVERTERLONG_ID/ch2/I_DC:.* I_DC2\
+  INVERTERLONG_ID/ch2/P_DC:.* P_DC2\
+  INVERTERLONG_ID/ch2/U_DC:.* U_DC2\
+  INVERTERLONG_ID/ch2/Irradiation:.* Irradiation2\
+  INVERTERLONG_ID/ch2/YieldDay:.* YieldDay2\
+  INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2\
+  INVERTERLONG_ID/ch3/I_DC:.* I_DC3\
+  INVERTERLONG_ID/ch3/P_DC:.* P_DC3\
+  INVERTERLONG_ID/ch3/U_DC:.* U_DC3\
+  INVERTERLONG_ID/ch3/Irradiation:.* Irradiation3\
+  INVERTERLONG_ID/ch3/YieldDay:.* YieldDay3\
+  INVERTERLONG_ID/ch3/YieldTotal:.* YieldTotal3\
+  INVERTERLONG_ID/ch4/I_DC:.* I_DC4\
+  INVERTERLONG_ID/ch4/P_DC:.* P_DC4\
+  INVERTERLONG_ID/ch4/U_DC:.* U_DC4\
+  INVERTERLONG_ID/ch4/Irradiation:.* Irradiation4\
+  INVERTERLONG_ID/ch4/YieldDay:.* YieldDay4\
+  INVERTERLONG_ID/ch4/YieldTotal:.* YieldTotal4\
+  INVERTERLONG_ID/ch5/I_DC:.* I_DC5\
+  INVERTERLONG_ID/ch5/P_DC:.* P_DC5\
+  INVERTERLONG_ID/ch5/U_DC:.* U_DC5\
+  INVERTERLONG_ID/ch5/Irradiation:.* Irradiation5\
+  INVERTERLONG_ID/ch5/YieldDay:.* YieldDay5\
+  INVERTERLONG_ID/ch5/YieldTotal:.* YieldTotal5\
+  INVERTERLONG_ID/ch6/I_DC:.* I_DC6\
+  INVERTERLONG_ID/ch6/P_DC:.* P_DC6\
+  INVERTERLONG_ID/ch6/U_DC:.* U_DC6\
+  INVERTERLONG_ID/ch6/Irradiation:.* Irradiation6\
+  INVERTERLONG_ID/ch6/YieldDay:.* YieldDay6\
+  INVERTERLONG_ID/ch6/YieldTotal:.* YieldTotal6\
+  INVERTERLONG_ID/ch0/MaxPower:.* MaxPower\
+  INVERTERLONG_ID/ch1/MaxPower:.* MaxPower1\
+  INVERTERLONG_ID/ch2/MaxPower:.* MaxPower2\
+  INVERTERLONG_ID/ch3/MaxPower:.* MaxPower3\
+  INVERTERLONG_ID/ch4/MaxPower:.* MaxPower4\
+  INVERTERLONG_ID/ch4/MaxPower:.* MaxPower5\
+  INVERTERLONG_ID/ch5/MaxPower:.* MaxPower6\
+  INVERTERLONG_ID/alarm/cnt:.* alarmCnt\
+  INVERTERLONG_ID/alarm/[\d]+/[^:]+:.* { $TOPIC =~ m,alarm/([\d]+)/([^:]+),; { "alarm_${1}_$2"=>$EVENT } }
 option:global
 attr DEVICE setList \
   reboot:noArg BASE_ID/ctrl/restart/INVERTER_NR\
@@ -5705,7 +5857,7 @@ attr DEVICE setList \
   limit_pct:slider,2,1,100 BASE_ID/ctrl/limit/INVERTER_NR $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20230517
+setreading DEVICE attrTemplateVersion 20230816
 
 # contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
 name:hoymiles_opendtu_hub_bridge
