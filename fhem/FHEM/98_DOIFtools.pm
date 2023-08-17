@@ -612,9 +612,9 @@ sub DOIFtools_Notify($$) {
     }
     # DOIFtools DEF addition
     if ($sn eq "global" and $event =~ "^INITIALIZED\$|^MODIFIED|^DEFINED|^DELETED|^RENAMED|^UNDEFINED") {
-      my @doifList = devspec2array("TYPE=DOIF");
-      $hash->{DEF} = "associated DOIF: ".join(" ",sort @doifList);
-      readingsSingleUpdate($hash,"DOIF_version",fhem("version 98_DOIF.pm noheader",1),0);
+      my $paw = join( ' ', devspec2array( "TYPE=DOIF" ) );
+      readingsSingleUpdate( $hash, '.associatedWith', $paw, 0 );
+      readingsSingleUpdate( $hash, "DOIF_version",fhem("version 98_DOIF.pm noheader",1), 0 );
     }
     # get DOIF version, FHEM revision and default values
     if ($sn eq "global" and $event =~ "^INITIALIZED\$|^MODIFIED $pn") {
@@ -627,7 +627,6 @@ sub DOIFtools_Notify($$) {
         readingsBulkUpdate($hash,".eM", ReadingsVal($pn,".eM","off"));
         readingsBulkUpdate($hash,"statisticsDeviceFilterRegex", ".*") unless ReadingsVal($pn,"statisticsDeviceFilterRegex","");
       readingsEndUpdate($hash,0);
-      $defs{$pn}{VERSION} = fhem("version 98_DOIFtools.pm noheader",1);
       DOIFtoolsSetNotifyDev($hash,1,1);
       #set new attributes and delete old ones
       CommandAttr(undef,"$pn DOIFtoolsExecuteDefinition ".AttrVal($pn,"executeDefinition","")) if (AttrVal($pn,"executeDefinition",""));
@@ -1091,6 +1090,16 @@ sub DOIFtools_Define($$$)
   $hash->{logfile} = AttrVal($pn,"DOIFtoolsLogDir",AttrVal("global","logdir","./log/"))."$hash->{TYPE}Log-%Y-%j.log";
   DOIFtoolsCounterReset($pn);
   readingsSingleUpdate($hash,"state","initialized",0);
+
+  my $cvsid = '$Id$';
+  ( $hash->{VERSION} ) = $cvsid =~ /\.pm (.*)Z/;
+  if ( $init_done ) {
+
+    my $paw = join( ' ', devspec2array( "TYPE=DOIF" ) );
+    readingsSingleUpdate( $hash, '.associatedWith', $paw, 0 );
+
+  }
+
   return undef;
 }
 
