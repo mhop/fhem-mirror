@@ -1091,6 +1091,7 @@ sub DOIFtools_Define($$$)
   DOIFtoolsCounterReset($pn);
   readingsSingleUpdate($hash,"state","initialized",0);
 
+  delete $hash->{DEF};
   my $cvsid = '$Id$';
   ( $hash->{VERSION} ) = $cvsid =~ /\.pm (.*)Z/;
   if ( $init_done ) {
