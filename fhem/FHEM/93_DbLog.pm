@@ -39,6 +39,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.9.1"   => "15.08.2023 possible use of alternative tables in _DbLog_plotData Forum:134547, fix warnings in ".
+                           "_DbLog_SBP_onRun_LogSequential Forum:https://forum.fhem.de/index.php?msg=1284228 ",
   "5.9.0"   => "16.05.2023 Server shutdown -> write cachefile if database connect can't be done during delayed shutdown ". 
                            "Forum: https://forum.fhem.de/index.php?topic=133599.0 ",
   "5.8.8"   => "11.05.2023 _DbLog_ParseEvent changed default splitting, Forum: https://forum.fhem.de/index.php?topic=133537.0 ",
@@ -246,13 +248,13 @@ sub DbLog_Define {
 
   if($DbLogMMDBI) {
       $err = "Perl module ".$DbLogMMDBI." is missing. On Debian you can install it with: sudo apt-get install libdbi-perl";
-      Log3 ($name, 1, "DbLog $name - ERROR - $err");
+      Log3 ($name, 1, "$name - ERROR - $err");
       return "Error: $err";
   }
 
   if ($storabs) {
       $err = "Perl module ".$storabs." is missing. On Debian you can install it with: sudo apt-get install libstorable-perl";
-      Log3 ($name, 1, "DbLog $name - ERROR - $err");
+      Log3 ($name, 1, "$name - ERROR - $err");
       return "Error: $err";
   }
 
@@ -278,7 +280,7 @@ sub DbLog_Define {
   my $ret = DbLog_readCfg($hash);                                                                             # read configuration data
 
   if ($ret) {                                                                                                 # return on error while reading configuration
-      Log3($name, 1, "DbLog $name - Error while reading $hash->{CONFIGURATION}: '$ret' ");
+      Log3($name, 1, "$name - Error while reading $hash->{CONFIGURATION}: '$ret' ");
       return $ret;
   }
 
@@ -378,7 +380,7 @@ sub DbLog_DelayedShutdown {
                      0;
 
   if ($delay_needed) {
-      Log3 ($name, 2, "DbLog $name - Wait for last database cycle due to shutdown ...");
+      Log3 ($name, 2, "$name - Wait for last database cycle due to shutdown ...");
 
   }
 
@@ -426,7 +428,7 @@ sub DbLog_Attr {
 
   if ($aName =~ /^(traceHandles|noNotifyDev)$/xs) {
       my $msg = "$name - The attribute >$aName< is deprecated and is not set anymore.";
-      Log3 ($name, 1, "DbLog $name $msg");
+      Log3 ($name, 1, "$name $msg");
       return $msg;
   }
 
@@ -530,7 +532,7 @@ sub DbLog_Attr {
       DbLog_setReadingstate   ($hash, $val);
 
       if ($do == 0) {
-          InternalTimer(gettimeofday()+0.8, "_DbLog_initOnStart", $hash, 0);
+          InternalTimer(gettimeofday()+1.8, "_DbLog_initOnStart", $hash, 0);
       }
   }
 
@@ -764,7 +766,7 @@ sub _DbLog_setreopen {                   ## no critic "not used"
   DbLog_SBP_sendDbDisconnect ($hash);                                  # an SBP
 
   if (!$prop) {
-      Log3 ($name, 3, "DbLog $name - Reopen requested");
+      Log3 ($name, 3, "$name - Reopen requested");
 
       if($hash->{HELPER}{REOPEN_RUNS}) {
           delete $hash->{HELPER}{REOPEN_RUNS};
@@ -785,7 +787,7 @@ sub _DbLog_setreopen {                   ## no critic "not used"
       delete $hash->{HELPER}{LONGRUN_PID};
 
       my $ts = (split " ",FmtDateTime(gettimeofday()+$prop))[1];
-      Log3 ($name, 2, "DbLog $name - Connection closed until $ts ($prop seconds).");
+      Log3 ($name, 2, "$name - Connection closed until $ts ($prop seconds).");
 
       DbLog_setReadingstate ($hash, "closed until $ts ($prop seconds)");
 
@@ -805,7 +807,7 @@ sub _DbLog_setrereadcfg {                ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
 
-  Log3 ($name, 3, "DbLog $name - Rereadcfg requested.");
+  Log3 ($name, 3, "$name - Rereadcfg requested.");
 
   my $ret = DbLog_readCfg($hash);
   return $ret if $ret;
@@ -819,7 +821,7 @@ sub _DbLog_setrereadcfg {                ## no critic "not used"
   my $rst = DbLog_SBP_sendConnectionData ($hash);                   # neue Verbindungsdaten an SubProzess senden
 
   if (!$rst) {
-      Log3 ($name, 3, "DbLog $name - new DB connection parameters are transmitted ...");
+      Log3 ($name, 3, "$name - new DB connection parameters are transmitted ...");
   }
 
   $ret = "Rereadcfg executed.";
@@ -947,8 +949,8 @@ sub _DbLog_setcount {              ## no critic "not used"
   my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
   return $err if($err);
 
-  Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
-  Log3 ($name, 4, "DbLog $name - Records count requested.");
+  Log3 ($name, 2, qq{$name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
+  Log3 ($name, 4, "$name - Records count requested.");
 
   DbLog_SBP_sendCommand ($hash, 'count');
 
@@ -978,8 +980,8 @@ sub _DbLog_setdeleteOldDays {            ## no critic "not used"
   my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
   return $err if($err);
 
-  Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> delEntries" instead.});
-  Log3 ($name, 3, "DbLog $name - Deletion of records older than $prop days in database $db requested");
+  Log3 ($name, 2, qq{$name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> delEntries" instead.});
+  Log3 ($name, 3, "$name - Deletion of records older than $prop days in database $db requested");
 
   DbLog_SBP_sendCommand ($hash, 'deleteOldDays', $prop);
 
@@ -1008,7 +1010,7 @@ sub _DbLog_setuserCommand {              ## no critic "not used"
   my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
   return $err if($err);
 
-  Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> sqlCmd" instead.});
+  Log3 ($name, 2, qq{$name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> sqlCmd" instead.});
 
   DbLog_SBP_sendCommand ($hash, 'userCommand', $sql);
 
@@ -1070,13 +1072,13 @@ sub _DbLog_setexportCache {              ## no critic "not used"
 
   return $error if($error);
 
-  Log3 ($name, 3, "DbLog $name - $crows Cache rows exported to $outfile");
+  Log3 ($name, 3, "$name - $crows Cache rows exported to $outfile");
 
   if (lc($args[-1]) =~ m/^purgecache/i) {
       delete $data{DbLog}{$name}{cache};
       readingsSingleUpdate ($hash, 'CacheUsage', 0, 1);
 
-      Log3 ($name, 3, "DbLog $name - Cache purged after exporting rows to $outfile.");
+      Log3 ($name, 3, "$name - Cache purged after exporting rows to $outfile.");
   }
 
 return;
@@ -1133,7 +1135,7 @@ sub _DbLog_setreduceLog {                ## no critic "not used"
   my $prop1 = $paref->{prop1};
   my $arg   = $paref->{arg};
 
-  Log3($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> reduceLog" instead.});
+  Log3($name, 2, qq{$name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> reduceLog" instead.});
 
   my ($od,$nd) = split ":", $prop;                                 # $od - Tage älter als , $nd - Tage neuer als
 
@@ -1160,7 +1162,7 @@ sub _DbLog_setreduceLog {                ## no critic "not used"
       DbLog_SBP_sendCommand ($hash, 'reduceLog', $arg);
   }
   else {
-      Log3 ($name, 2, "DbLog $name: reduceLog error, no <days> given.");
+      Log3 ($name, 2, "$name: reduceLog error, no <days> given.");
       return "reduceLog syntax error, no <days> given.";
   }
 
@@ -1216,10 +1218,10 @@ sub DbLog_Log {
 
   if(AttrVal ($name, 'verbose', 3) > 3) {
       if($log4rel) {
-          Log3 ($name, 4, "DbLog $name - ################################################################");
-          Log3 ($name, 4, "DbLog $name - ###              start of new Logcycle                       ###");
-          Log3 ($name, 4, "DbLog $name - ################################################################");
-          Log3 ($name, 4, "DbLog $name - number of events received: $max of device: $dev_name");
+          Log3 ($name, 4, "$name - ################################################################");
+          Log3 ($name, 4, "$name - ###              start of new Logcycle                       ###");
+          Log3 ($name, 4, "$name - ################################################################");
+          Log3 ($name, 4, "$name - number of events received: $max of device: $dev_name");
       }
   }
 
@@ -1252,7 +1254,7 @@ sub DbLog_Log {
           $event    = '' if(!defined($event));
           $event    = DbLog_charfilter($event) if(AttrVal($name, "useCharfilter",0));
 
-          Log3 ($name, 4, "DbLog $name - check Device: $dev_name , Event: $event") if($log4rel);
+          Log3 ($name, 4, "$name - check Device: $dev_name , Event: $event") if($log4rel);
 
           if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
               my $timestamp = $ts_0;
@@ -1270,7 +1272,7 @@ sub DbLog_Log {
                   ($err, $timestamp) = convertTimeZone ($params);
 
                   if ($err) {
-                      Log3 ($name, 1, "DbLog $name - ERROR while converting time zone: $err - exit log loop !");
+                      Log3 ($name, 1, "$name - ERROR while converting time zone: $err - exit log loop !");
                       last;
                   }
               }
@@ -1304,13 +1306,13 @@ sub DbLog_Log {
                           for my $ed (@exdvs) {
                               if($rd) {
                                   if("$dev_name:$reading" =~ m/^$ed:$rd$/) {
-                                      Log3 ($name, 4, "DbLog $name - Device:Reading \"$dev_name:$reading\" global excluded from logging by attribute \"excludeDevs\" ") if($log4rel);
+                                      Log3 ($name, 4, "$name - Device:Reading \"$dev_name:$reading\" global excluded from logging by attribute \"excludeDevs\" ") if($log4rel);
                                       $next = 1;
                                   }
                               }
                               else {
                                   if($dev_name =~ m/^$ed$/) {
-                                      Log3 ($name, 4, "DbLog $name - Device \"$dev_name\" global excluded from logging by attribute \"excludeDevs\" ") if($log4rel);
+                                      Log3 ($name, 4, "$name - Device \"$dev_name\" global excluded from logging by attribute \"excludeDevs\" ") if($log4rel);
                                       $next = 1;
                                   }
                               }
@@ -1321,11 +1323,11 @@ sub DbLog_Log {
                   next if($next);
               }
 
-              Log3 ($name, 5, "DbLog $name - parsed Event: $dev_name , Event: $event") if($log4rel);
+              Log3 ($name, 5, "$name - parsed Event: $dev_name , Event: $event") if($log4rel);
 
               if($log4rel) {
-                  Log3 ($name, 5, qq{DbLog $name - DbLogExclude of "$dev_name": $DbLogExclude}) if($DbLogExclude);
-                  Log3 ($name, 5, qq{DbLog $name - DbLogInclude of "$dev_name": $DbLogInclude}) if($DbLogInclude);
+                  Log3 ($name, 5, qq{$name - DbLogExclude of "$dev_name": $DbLogExclude}) if($DbLogExclude);
+                  Log3 ($name, 5, qq{$name - DbLogInclude of "$dev_name": $DbLogInclude}) if($DbLogInclude);
               }
 
               # Je nach DBLogSelectionMode muss das vorgegebene Ergebnis der Include-, bzw. Exclude-Pruefung
@@ -1412,7 +1414,7 @@ sub DbLog_Log {
 
                       eval $DbLogValueFn;
                       if($@) {
-                          Log3 ($name, 2, "DbLog $name - error device \"$dev_name\" specific DbLogValueFn: ".$@);
+                          Log3 ($name, 2, "$name - error device \"$dev_name\" specific DbLogValueFn: ".$@);
                       }
 
                       if($IGNORE) {                                                                                        # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
@@ -1420,7 +1422,7 @@ sub DbLog_Log {
                           $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE} = $lastv if(defined $lastv);
 
                           if($log4rel) {
-                              Log3 ($name, 4, "DbLog $name - Event ignored by device \"$dev_name\" specific DbLogValueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
+                              Log3 ($name, 4, "$name - Event ignored by device \"$dev_name\" specific DbLogValueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
                           }
 
                           next;
@@ -1433,7 +1435,7 @@ sub DbLog_Log {
                           $timestamp = $TIMESTAMP;
                       }
                       else {
-                          Log3 ($name, 2, "DbLog $name - TIMESTAMP got from DbLogValueFn in $dev_name is invalid: $TIMESTAMP");
+                          Log3 ($name, 2, "$name - TIMESTAMP got from DbLogValueFn in $dev_name is invalid: $TIMESTAMP");
                       }
 
                       $reading = $READING  if($READING ne '');
@@ -1456,7 +1458,7 @@ sub DbLog_Log {
 
                       eval $value_fn;
                       if($@) {
-                          Log3 ($name, 2, "DbLog $name - error valueFn: ".$@);
+                          Log3 ($name, 2, "$name - error valueFn: ".$@);
                       }
 
                       if($IGNORE) {                                                                                     # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
@@ -1464,7 +1466,7 @@ sub DbLog_Log {
                           $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE} = $lastv if(defined $lastv);
 
                           if($log4rel) {
-                              Log3 ($name, 4, "DbLog $name - Event ignored by valueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
+                              Log3 ($name, 4, "$name - Event ignored by valueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
                           }
 
                           next;
@@ -1477,7 +1479,7 @@ sub DbLog_Log {
                           $timestamp = $TIMESTAMP;
                       }
                       else {
-                          Log3 ($name, 2, "DbLog $name - Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
+                          Log3 ($name, 2, "$name - Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
                       }
 
                       $dev_name  = $DEVICE     if($DEVICE ne '');
@@ -1493,7 +1495,7 @@ sub DbLog_Log {
                   my $row = $timestamp."|".$dev_name."|".$dev_type."|".$event."|".$reading."|".$value."|".$unit;
 
                   if($log4rel) {
-                    Log3 ($name, 4, "DbLog $name - added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
+                    Log3 ($name, 4, "$name - added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
                   }
 
                   $memcount = DbLog_addMemCacheRow ($name, $row);                            # Datensatz zum Memory Cache hinzufügen
@@ -1521,7 +1523,7 @@ sub DbLog_Log {
 
           if(!$lmlr || gettimeofday() > $lmlr+($syncival/2)) {
 
-              Log3 ($name, 4, "DbLog $name - Number of cache entries reached cachelimit $clim - start database sync.");
+              Log3 ($name, 4, "$name - Number of cache entries reached cachelimit $clim - start database sync.");
 
               DbLog_execMemCacheAsync ($hash);
 
@@ -1899,7 +1901,7 @@ sub _DbLog_checkDefMinInt {
                   $force = ($adefelem[2] && $adefelem[2] =~ /force/i) ? 1 : 0;         # Forum: #97148
 
                   if(($now-$lt < $adefelem[1]) && ($lv eq $value || $force)) {         # innerhalb defaultMinInterval und LastValue=Value oder force-Option
-                      $DoIt = 0;                                                       # Log3 ($name, 1, "DbLog $name - defaulMInInterval - device \"$dev_name\", reading \"$reading\" inside of $adefelem[1] seconds (force: $force) -> don't log it !");
+                      $DoIt = 0;                                                       # Log3 ($name, 1, "$name - defaulMInInterval - device \"$dev_name\", reading \"$reading\" inside of $adefelem[1] seconds (force: $force) -> don't log it !");
                       return $DoIt;
                   }
               }
@@ -1986,11 +1988,11 @@ sub DbLog_execMemCacheAsync {
   }
 
   if($verbose > 3 && $dolog) {
-      Log3 ($name, 4, "DbLog $name - ################################################################");
-      Log3 ($name, 4, "DbLog $name - ###      New database processing cycle - SBP asynchronous    ###");
-      Log3 ($name, 4, "DbLog $name - ################################################################");
-      Log3 ($name, 4, "DbLog $name - MemCache contains $memcount entries to process");
-      Log3 ($name, 4, "DbLog $name - DbLogType is: ".AttrVal($name, 'DbLogType', 'History'));
+      Log3 ($name, 4, "$name - ################################################################");
+      Log3 ($name, 4, "$name - ###      New database processing cycle - SBP asynchronous    ###");
+      Log3 ($name, 4, "$name - ################################################################");
+      Log3 ($name, 4, "$name - MemCache contains $memcount entries to process");
+      Log3 ($name, 4, "$name - DbLogType is: ".AttrVal($name, 'DbLogType', 'History'));
   }
 
   if($dolog) {
@@ -2009,7 +2011,7 @@ sub DbLog_execMemCacheAsync {
       }
       else {
           if(defined $hash->{HELPER}{SHUTDOWNSEQ}) {
-              Log3 ($name, 2, "DbLog $name - no data for last database write cycle");
+              Log3 ($name, 2, "$name - no data for last database write cycle");
               _DbLog_finishDelayedShutdown ($hash);
           }
       }
@@ -2043,9 +2045,9 @@ sub DbLog_execMemCacheSync {
   my $verbose = AttrVal ($name, 'verbose', 3);
 
   if($verbose > 3) {
-      Log3 ($name, 4, "DbLog $name - ################################################################");
-      Log3 ($name, 4, "DbLog $name - ###      New database processing cycle - SBP synchronous     ###");
-      Log3 ($name, 4, "DbLog $name - ################################################################");
+      Log3 ($name, 4, "$name - ################################################################");
+      Log3 ($name, 4, "$name - ###      New database processing cycle - SBP synchronous     ###");
+      Log3 ($name, 4, "$name - ################################################################");
   }
 
   DbLog_logHashContent ( {name => $name, href => $data{DbLog}{$name}{cache}{memcache}, level => 5, logtxt => 'TempStore contains: '} );
@@ -2668,7 +2670,7 @@ sub _DbLog_SBP_dbhDo {
   my $err = q{};
   my $rv  = q{};
 
-  Log3 ($name, 4, "DbLog $name - $info");
+  Log3 ($name, 4, "$name - $info");
 
   eval{ $rv = $dbh->do($sql);
         1;
@@ -2850,11 +2852,12 @@ sub _DbLog_SBP_onRun_LogSequential {
                             );
   }
 
-  my $faref = __DbLog_SBP_fieldArrays ($name, $cdata, $subprocess);                  # Feldarrays erstellen mit Logausgabe
-  my $ceti  = scalar keys %{$cdata};
-  my $rv    = 0;
+  my $faref    = __DbLog_SBP_fieldArrays ($name, $cdata, $subprocess);               # Feldarrays erstellen mit Logausgabe
+  my $ceti     = scalar keys %{$cdata};
+  my $ins_hist = 0;                                                                  # Forum: https://forum.fhem.de/index.php?msg=1284228
+  my $rv       = 0;
 
-  my (@ins,$st,$sth_ih,$ins_hist);
+  my (@ins,$st,$sth_ih);
 
   if (lc($DbLogType) =~ m(history)) {                                                # insert history mit/ohne primary key
       for my $key (sort {$a<=>$b} keys %{$cdata}) {
@@ -2981,7 +2984,7 @@ sub _DbLog_SBP_onRun_LogSequential {
       if($ins_hist == $ceti) {
           _DbLog_SBP_Log3Parent ( { name       => $name,
                                     level      => 4,
-                                    msg        => "$ins_hist of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""),
+                                    msg        => "$ins_hist of $ceti events inserted into table >$history<".($usepkh ? " using PK on columns $pkh" : ""),
                                     oper       => 'log3parent',
                                     subprocess => $subprocess
                                   }
@@ -2991,7 +2994,7 @@ sub _DbLog_SBP_onRun_LogSequential {
           if($usepkh) {
               _DbLog_SBP_Log3Parent ( { name       => $name,
                                         level      => 3,
-                                        msg        => "INFO - ".$ins_hist." of $ceti events inserted into table $history due to PK on columns $pkh",
+                                        msg        => "INFO - ".$ins_hist." of $ceti events inserted into table >$history< due to PK on columns $pkh",
                                         oper       => 'log3parent',
                                         subprocess => $subprocess
                                       }
@@ -3000,7 +3003,7 @@ sub _DbLog_SBP_onRun_LogSequential {
           else {
               _DbLog_SBP_Log3Parent ( { name       => $name,
                                         level      => 2,
-                                        msg        => "WARNING - only ".$ins_hist." of $ceti events inserted into table $history",
+                                        msg        => "WARNING - only ".$ins_hist." of $ceti events inserted into table >$history<",
                                         oper       => 'log3parent',
                                         subprocess => $subprocess
                                       }
@@ -3553,7 +3556,7 @@ sub __DbLog_SBP_onRun_LogCurrent {
                                 );
       }
       else {
-          Log3 ($name, 4, "DbLog $name - ".($#device_cur+1-$nins_cur)." of ".($#device_cur+1)." events inserted into table $current".($usepkc ? " using PK on columns $pkc" : ""));
+          Log3 ($name, 4, "$name - ".($#device_cur+1-$nins_cur)." of ".($#device_cur+1)." events inserted into table $current".($usepkc ? " using PK on columns $pkc" : ""));
           _DbLog_SBP_Log3Parent ( { name       => $name,
                                     level      => 4,
                                     msg        => ($#device_cur+1-$nins_cur)." of ".($#device_cur+1)." events inserted into table $current".($usepkc ? " using PK on columns $pkc" : ""),
@@ -3829,7 +3832,7 @@ sub _DbLog_SBP_onRun_userCommand {
 
   _DbLog_SBP_Log3Parent ( { name       => $name,
                             level      => 4,
-                            msg        => qq{DbLog $name - userCommand requested: "$sql"},
+                            msg        => qq{$name - userCommand requested: "$sql"},
                             oper       => 'log3parent',
                             subprocess => $subprocess
                           }
@@ -3867,7 +3870,7 @@ sub _DbLog_SBP_onRun_userCommand {
 
   _DbLog_SBP_Log3Parent ( { name       => $name,
                             level      => 4,
-                            msg        => qq{DbLog $name - userCommand result: "$res"},
+                            msg        => qq{$name - userCommand result: "$res"},
                             oper       => 'log3parent',
                             subprocess => $subprocess
                           }
@@ -4772,7 +4775,7 @@ sub __DbLog_SBP_commitOnly {
                                       );
             }
             else {
-                Log3 ($name, 4, qq{DbLog $name - commit inserted data table >$table<});
+                Log3 ($name, 4, qq{$name - commit inserted data table >$table<});
             }
         }
         else {
@@ -4786,7 +4789,7 @@ sub __DbLog_SBP_commitOnly {
                                       );
             }
             else {
-                Log3 ($name, 4, qq{DbLog $name - insert table >$table< committed by autocommit});
+                Log3 ($name, 4, qq{$name - insert table >$table< committed by autocommit});
             }
         }
         1;
@@ -4802,7 +4805,7 @@ sub __DbLog_SBP_commitOnly {
                                         );
               }
               else {
-                  Log3 ($name, 2, qq{DbLog $name - ERROR commit table >$table<: $err});
+                  Log3 ($name, 2, qq{$name - ERROR commit table >$table<: $err});
               }
             };
 
@@ -4833,7 +4836,7 @@ sub __DbLog_SBP_rollbackOnly {
                                       );
             }
             else {
-                Log3 ($name, 4, "DbLog $name - Transaction rollback table >$table<");
+                Log3 ($name, 4, "$name - Transaction rollback table >$table<");
             }
         }
         else {
@@ -4847,7 +4850,7 @@ sub __DbLog_SBP_rollbackOnly {
                                       );
             }
             else {
-                Log3 ($name, 4, "DbLog $name - data auto rollback table >$table<");
+                Log3 ($name, 4, "$name - data auto rollback table >$table<");
             }
         }
         1;
@@ -4863,7 +4866,7 @@ sub __DbLog_SBP_rollbackOnly {
                                         );
               }
               else {
-                  Log3 ($name, 2, "DbLog $name - ERROR - $err");
+                  Log3 ($name, 2, "$name - ERROR - $err");
               }
             };
 
@@ -4894,7 +4897,7 @@ sub __DbLog_SBP_disconnectOnly {
                                         );
               }
               else {
-                  Log3 ($name, 2, "DbLog $name - ERROR - $err");
+                  Log3 ($name, 2, "$name - ERROR - $err");
               }
             };
 
@@ -5072,7 +5075,7 @@ sub _DbLog_SBP_Log3Parent {
                                );
   }
   else {
-      Log3 ($name, $level, qq{DbLog $name - $msg});
+      Log3 ($name, $level, qq{$name - $msg});
   }
 
 return;
@@ -5099,7 +5102,7 @@ sub DbLog_SBP_onExit {
     my $subprocess = shift;
     my $name       = $subprocess->{name};
 
-    Log3 ($name, 1, "DbLog $name - SubProcess EXITED!");
+    Log3 ($name, 1, "$name - SubProcess EXITED!");
 
 return;
 }
@@ -5122,11 +5125,11 @@ sub DbLog_SBP_CheckAndInit {
       my $rt = gettimeofday() - $hash->{HELPER}{LONGRUN_PID};                   # aktuelle Laufzeit
 
       if ($rt >= $to) {                                                         # SubProcess beenden, möglicherweise tot
-          Log3 ($name, 2, qq{DbLog $name - The Subprocess >$hash->{SBP_PID}< has exceeded the timeout of $to seconds});
+          Log3 ($name, 2, qq{$name - The Subprocess >$hash->{SBP_PID}< has exceeded the timeout of $to seconds});
 
           DbLog_SBP_CleanUp ($hash);
 
-          Log3 ($name, 2, qq{DbLog $name - The last running operation was canceled});
+          Log3 ($name, 2, qq{$name - The last running operation was canceled});
       }
   }
 
@@ -5165,7 +5168,7 @@ sub DbLog_SBP_sendDbDisconnect {
 
   if(!defined $subprocess) {
       $err = qq{SubProcess isn't available. Disconnect command couldn't be sent};
-      Log3 ($name, 1, "DbLog $name - ERROR - $err");
+      Log3 ($name, 1, "$name - ERROR - $err");
       return $err;
   }
 
@@ -5195,7 +5198,7 @@ sub DbLog_SBP_sendConnectionData {
 
   if(!defined $subprocess) {
       $err = qq{SubProcess isn't running, DB connection data couldn't be sent};
-      Log3 ($name, 1, "DbLog $name - ERROR - $err");
+      Log3 ($name, 1, "$name - ERROR - $err");
       return $err;
   }
 
@@ -5240,7 +5243,7 @@ sub DbLog_SBP_sendLogData {
   my $subprocess = $hash->{".fhem"}{subprocess};
 
   if(!defined $subprocess) {
-      Log3 ($name, 1, "DbLog $name - ERROR - SubProcess isn't running, processing data couldn't be sent");
+      Log3 ($name, 1, "$name - ERROR - SubProcess isn't running, processing data couldn't be sent");
       return 'no SubProcess is running';
   }
 
@@ -5278,7 +5281,7 @@ sub DbLog_SBP_sendCommand {
   my $subprocess = $hash->{".fhem"}{subprocess};
 
   if(!defined $subprocess) {
-      Log3 ($name, 1, "DbLog $name - ERROR - SubProcess isn't running, processing data couldn't be sent");
+      Log3 ($name, 1, "$name - ERROR - SubProcess isn't running, processing data couldn't be sent");
       return 'no SubProcess is running';
   }
 
@@ -5354,7 +5357,7 @@ sub _DbLog_SBP_Init {
   my $pid = $subprocess->run();
 
   if (!defined $pid) {
-      my $err = "DbLog $name - Cannot create subprocess for non-blocking operation";
+      my $err = "$name - Cannot create subprocess for non-blocking operation";
       Log3 ($name, 1, $err);
 
       DbLog_SBP_CleanUp     ($hash);
@@ -5363,7 +5366,7 @@ sub _DbLog_SBP_Init {
       return 'no SubProcess PID created';
   }
 
-  Log3 ($name, 2, qq{DbLog $name - Subprocess >$pid< initialized ... ready for non-blocking operation});
+  Log3 ($name, 2, qq{$name - Subprocess >$pid< initialized ... ready for non-blocking operation});
 
   $hash->{".fhem"}{subprocess} = $subprocess;
   $hash->{FD}                  = fileno $subprocess->child();
@@ -5377,7 +5380,7 @@ sub _DbLog_SBP_Init {
   if (!$nscd) {
       my $rst = DbLog_SBP_sendConnectionData ($hash);                                        # Verbindungsdaten übertragen
       if (!$rst) {
-          Log3 ($name, 3, "DbLog $name - requested DB connection parameters are transmitted");
+          Log3 ($name, 3, "$name - requested DB connection parameters are transmitted");
       }
   }
 
@@ -5397,7 +5400,7 @@ sub DbLog_SBP_CleanUp {
   my $pid = $subprocess->pid();
   return if(!defined $pid);
 
-  Log3 ($name, 2, qq{DbLog $name - stopping SubProcess PID >$pid< ...});
+  Log3 ($name, 2, qq{$name - stopping SubProcess PID >$pid< ...});
 
   #$subprocess->terminate();
   #$subprocess->wait();
@@ -5405,7 +5408,7 @@ sub DbLog_SBP_CleanUp {
   kill 'SIGKILL', $pid;
   waitpid ($pid, 0);
 
-  Log3 ($name, 2, qq{DbLog $name - SubProcess PID >$pid< stopped});
+  Log3 ($name, 2, qq{$name - SubProcess PID >$pid< stopped});
 
   delete ($selectlist{"$name.$pid"});
   delete $hash->{FD};
@@ -5445,7 +5448,7 @@ sub DbLog_SBP_Read {
       ################################
       if ($oper eq 'log3parent') {
           my $level = $ret->{level};
-          Log3 ($name, $level, "DbLog $name - ".$msg);
+          Log3 ($name, $level, "$name - ".$msg);
           return;
       }
 
@@ -5454,13 +5457,13 @@ sub DbLog_SBP_Read {
 
       my $ce = AttrVal ($name, 'cacheEvents', 0);
 
-      # Log3 ($name, 1, "DbLog $name - Read result of operation: $oper");
-      # Log3 ($name, 1, "DbLog $name - DbLog_SBP_Read: name: $name, msg: $msg, ot: $ot, rowlback: ".Dumper $rowlback);
+      # Log3 ($name, 1, "$name - Read result of operation: $oper");
+      # Log3 ($name, 1, "$name - DbLog_SBP_Read: name: $name, msg: $msg, ot: $ot, rowlback: ".Dumper $rowlback);
 
       if($reqdbdat) {                                                                         # Übertragung DB Verbindungsparameter ist requested
           my $rst = DbLog_SBP_sendConnectionData ($hash);
           if (!$rst) {
-              Log3 ($name, 3, "DbLog $name - requested DB connection parameters are transmitted");
+              Log3 ($name, 3, "$name - requested DB connection parameters are transmitted");
           }
       }
 
@@ -5476,16 +5479,16 @@ sub DbLog_SBP_Read {
                   for my $key (sort {$a <=>$b} keys %{$rowlback}) {
                       $memcount = DbLog_addMemCacheRow ($name, $rowlback->{$key});                           # Datensatz zum Memory Cache hinzufügen
 
-                      Log3 ($name, 5, "DbLog $name - row back to Cache: $key -> ".$rowlback->{$key});
+                      Log3 ($name, 5, "$name - row back to Cache: $key -> ".$rowlback->{$key});
                   }
                   
                   if ($hash->{HELPER}{SHUTDOWNSEQ} && $memcount) {
-                      Log3 ($name, 2, "DbLog $name - an error occurred during the last write cycle to the database, the data is exported to a file instead ... ......");
+                      Log3 ($name, 2, "$name - an error occurred during the last write cycle to the database, the data is exported to a file instead ... ......");
                       
                       my $error = CommandSet (undef, qq{$name exportCache purgecache});
 
                       if ($error) {                                                                          # Fehler beim Export Cachefile
-                          Log3 ($name, 1, "DbLog $name - ERROR - while exporting Cache file: $error");
+                          Log3 ($name, 1, "$name - ERROR - while exporting Cache file: $error");
                       }                    
                   }
               };
@@ -5534,7 +5537,7 @@ sub DbLog_SBP_Read {
       ## sendDbConnectData - Read
       #############################
       if ($oper =~ /sendDbConnectData/xs) {
-          Log3 ($name, 3, "DbLog $name - DB connection parameters are initialized in the SubProcess");
+          Log3 ($name, 3, "$name - DB connection parameters are initialized in the SubProcess");
           
           DoTrigger ($name, 'SUBPROC_INITIALIZED', 1);
       }
@@ -5561,7 +5564,7 @@ sub DbLog_SBP_Read {
       DbLog_setReadingstate ($hash, $state);
 
       if ($hash->{HELPER}{SHUTDOWNSEQ}) {
-          Log3 ($name, 2, "DbLog $name - Last database write cycle done");
+          Log3 ($name, 2, "$name - Last database write cycle done");
           _DbLog_finishDelayedShutdown ($hash);
       }
   }
@@ -5605,11 +5608,11 @@ sub DbLog_writeFileIfCacheOverflow {
   readingsEndUpdate($hash, 1);
 
   if($coft && $memcount >= $coft) {
-      Log3 ($name, 2, "DbLog $name - WARNING - Cache is exported to file instead of logging it to database");
+      Log3 ($name, 2, "$name - WARNING - Cache is exported to file instead of logging it to database");
       my $error = CommandSet (undef, qq{$name exportCache purgecache});
 
       if($error) {                                                                          # Fehler beim Export Cachefile
-          Log3 ($name, 1, "DbLog $name - ERROR - while exporting Cache file: $error");
+          Log3 ($name, 1, "$name - ERROR - while exporting Cache file: $error");
           DbLog_setReadingstate ($hash, $error);
           return $success;
       }
@@ -5751,14 +5754,14 @@ sub _DbLog_manageDBHU {
           $dbh          = _DbLog_getNewDBHandle ($hash) || return "Can't connect to database.";
           $hash->{DBHU} = $dbh;
 
-          Log3 ($name, 4, "DbLog $name - Created new DBHU for PID: $$");
+          Log3 ($name, 4, "$name - Created new DBHU for PID: $$");
       }
   }
   else {
       $dbh          = _DbLog_getNewDBHandle ($hash) || return "Can't connect to database.";
       $hash->{DBHU} = $dbh;
 
-      Log3 ($name, 4, "DbLog $name - Created new DBHU for PID: $$");
+      Log3 ($name, 4, "$name - Created new DBHU for PID: $$");
   }
 
 return;
@@ -5807,21 +5810,21 @@ sub _DbLog_prepExecQueryOnly {
 
   my ($sth,$result);
 
-  Log3 ($name, 4, "DbLog $name - Executing SQL: $sql");
+  Log3 ($name, 4, "$name - Executing SQL: $sql");
 
   eval{ $sth = $dbh->prepare($sql);
         $sth->execute;
         1;
       }
       or do { $err = $@;
-              Log3 ($name, 2, "DbLog $name - ERROR - $err");
+              Log3 ($name, 2, "$name - ERROR - $err");
               return $err;
             };
 
   @sr = $sth->fetchrow_array;
 
   no warnings 'uninitialized';
-  Log3 ($name, 4, "DbLog $name - SQL result: ".join ' ', @sr);
+  Log3 ($name, 4, "$name - SQL result: ".join ' ', @sr);
   use warnings;
 
 return ($err, @sr);
@@ -5845,7 +5848,7 @@ sub DbLog_ExecSQL {
   my $dbh  = $hash->{DBHU};
   my $name = $hash->{NAME};
 
-  Log3 ($name, 4, "DbLog $name - Backdoor executing: $sql");
+  Log3 ($name, 4, "$name - Backdoor executing: $sql");
 
   ($err, my $sth) = _DbLog_SBP_dbhDo ($name, $dbh, $sql, '');
   $sth = 0 if($err);
@@ -5869,13 +5872,13 @@ sub DbLog_Get {
 
   return qq{"get X" needs at least an argument} if(@a < 2);
 
-  my $name       = $hash->{NAME};
-  @a             = (map { my $p = $_; $p =~ s/\s//xg; $p; } @a);
+  my $name = $hash->{NAME};
+  @a       = (map { my $p = $_; $p =~ s/\s//xg; $p; } @a);
 
   shift @a;                                                                    # Device Name wird entfernt
 
   my $opt = $a[0];                                                             # Kommando spezifizieren / ableiten
-  $opt    = 'plotdata' if(lc($a[0]) =~ /^(-|current|history)$/ixs);
+  $opt    = 'plotdata' if(lc($a[0]) =~ /^(-|current|history|table_.*)$/ixs);   # table_ als Kennung für Benutzung alternativer Tabellen ab V 5.9.1
   $opt    = 'webchart' if($a[1] && lc($a[1]) eq 'webchart');
 
   my $params = {
@@ -6354,21 +6357,26 @@ sub _DbLog_plotData {
   my ($internal, @fld);
 
   my $utf8    = defined($hash->{UTF8}) ? $hash->{UTF8} : 0;
-  my $history = $hash->{HELPER}{TH};
-  my $current = $hash->{HELPER}{TC};
+  my $history = $hash->{HELPER}{TH} // 'history';
+  my $current = $hash->{HELPER}{TC} // 'current';
   my $inf     = lc(shift @a);
   my $outf    = lc(shift @a);               # Wert ALL:   get all colums from table, including a header
                                             # Wert Array: get the columns as array of hashes
                                             # Wert INT:   internally used by generating plots
   my $from    = shift @a;
   my $to      = shift @a;                   # Now @a contains the list of column_specs
+  my $table   = $history;
 
   if ($inf eq "-") {
-      $inf = "history";
+      $table = $history;
+  }
+  
+  if ($inf =~ /table_/xs) {
+      $table = (split "_", $inf)[1];        # alternative Tabelle ab V 5.9.1
   }
 
   if ($outf eq "int" && $inf eq "current") {
-      $inf = "history";
+      $table = $history;
       Log3 $name, 3, "Defining DbLog SVG-Plots with :CURRENT is deprecated. Please define DbLog SVG-Plots with :HISTORY instead of :CURRENT. (define <mySVG> SVG <DbLogDev>:<gplotfile>:HISTORY)";
   }
 
@@ -6396,13 +6404,13 @@ sub _DbLog_plotData {
 
   $err = DbLog_checkTimeformat($from);                                     # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
   if($err) {
-      Log3 ($name, 1, "DbLog $name - wrong date/time format (from: $from) requested by SVG: $err");
+      Log3 ($name, 1, "$name - wrong date/time format (from: $from) requested by SVG: $err");
       return;
   }
 
   $err = DbLog_checkTimeformat($to);                                       # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
   if($err) {
-      Log3 ($name, 1, "DbLog $name - wrong date/time format (to: $to) requested by SVG: $err");
+      Log3 ($name, 1, "$name - wrong date/time format (to: $to) requested by SVG: $err");
       return;
   }
 
@@ -6434,10 +6442,10 @@ sub _DbLog_plotData {
   }
 
   if ($verbose > 3) {
-      Log3 ($name, 4, "DbLog $name - ################################################################");
-      Log3 ($name, 4, "DbLog $name - ###                  new get data for SVG                    ###");
-      Log3 ($name, 4, "DbLog $name - ################################################################");
-      Log3 ($name, 4, "DbLog $name - main PID: $hash->{PID}, secondary PID: $$");
+      Log3 ($name, 4, "$name - ################################################################");
+      Log3 ($name, 4, "$name - ###                  new get data for SVG                    ###");
+      Log3 ($name, 4, "$name - ################################################################");
+      Log3 ($name, 4, "$name - main PID: $hash->{PID}, secondary PID: $$");
   }
 
   my $samePID = $hash->{PID} == $$ ? 1 : 0;
@@ -6451,7 +6459,7 @@ sub _DbLog_plotData {
   else {
       $dbh = _DbLog_getNewDBHandle($hash) || return "Can't connect to database.";
 
-      Log3 ($name, 4, "DbLog $name - Created new DBHU for PID: $$");
+      Log3 ($name, 4, "$name - Created new DBHU for PID: $$");
   }
 
   # vorbereiten der DB-Abfrage, DB-Modell-abhaengig
@@ -6524,8 +6532,8 @@ sub _DbLog_plotData {
           $deltacalc = 1;
 
           if ($verbose > 3) {
-              Log3 ($name, 4, "DbLog $name - deltacalc: hour") if($readings[$i]->[3] eq "delta-h");   # geändert V4.8.0 / 14.10.2019
-              Log3 ($name, 4, "DbLog $name - deltacalc: day")  if($readings[$i]->[3] eq "delta-d");   # geändert V4.8.0 / 14.10.2019
+              Log3 ($name, 4, "$name - deltacalc: hour") if($readings[$i]->[3] eq "delta-h");   # geändert V4.8.0 / 14.10.2019
+              Log3 ($name, 4, "$name - deltacalc: day")  if($readings[$i]->[3] eq "delta-d");   # geändert V4.8.0 / 14.10.2019
           }
       }
 
@@ -6539,8 +6547,7 @@ sub _DbLog_plotData {
                     READING AS READING,
                     VALUE AS VALUE ";
 
-          $stm .= "FROM $current " if($inf eq "current");
-          $stm .= "FROM $history " if($inf eq "history");
+          $stm .= "FROM $table ";
 
           $stm .= "WHERE 1=1 ";
 
@@ -6566,8 +6573,7 @@ sub _DbLog_plotData {
                    $sqlspec{max_value}
                    $sqlspec{all_max} ";
 
-          $stm .= "FROM $current " if($inf eq "current");
-          $stm .= "FROM $history " if($inf eq "history");
+          $stm .= "FROM $table ";
 
           $stm .= "WHERE 1=1 ";
 
@@ -6591,8 +6597,7 @@ sub _DbLog_plotData {
                       VALUE
                       $sqlspec{all} ";
 
-          $stm .= "FROM $current " if($inf eq "current");
-          $stm .= "FROM $history " if($inf eq "history");
+          $stm .= "FROM $table ";
 
           $stm .= "WHERE 1=1 ";
 
@@ -6661,13 +6666,13 @@ sub _DbLog_plotData {
               $sql_value     = $val;
               $sql_timestamp = $ts;
 
-              if($@) {
+              if ($@) {
                   Log3 ($name, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@");
               }
           }
 
-          if($sql_timestamp lt $from && $deltacalc) {
-              if(Scalar::Util::looks_like_number($sql_value)) {                                  # nur setzen wenn numerisch
+          if ($sql_timestamp lt $from && $deltacalc) {
+              if (Scalar::Util::looks_like_number($sql_value)) {                                 # nur setzen wenn numerisch
                   $minval    = $sql_value if($sql_value < $minval || ($minval =  (~0 >> 1)) );   # geändert V4.8.0 / 14.10.2019
                   $maxval    = $sql_value if($sql_value > $maxval || ($maxval = -(~0 >> 1)) );   # geändert V4.8.0 / 14.10.2019
                   $lastv[$i] = $sql_value;
@@ -6679,14 +6684,14 @@ sub _DbLog_plotData {
               $out_tstamp  = "";
               $retvaldummy = "";
 
-              if($readings[$i]->[4]) {
+              if ($readings[$i]->[4]) {
                   $out_tstamp = $sql_timestamp;
                   $writeout   = 1 if(!$deltacalc);
               }
 
               ############ Auswerten des 4. Parameters: Funktion ###################
               ######################################################################
-              if($readings[$i]->[3] && $readings[$i]->[3] eq "int") {                         # nur den integerwert uebernehmen falls zb value=15°C
+              if ($readings[$i]->[3] && $readings[$i]->[3] eq "int") {                        # nur den integerwert uebernehmen falls zb value=15°C
                   $out_value  = $1 if($sql_value =~ m/^(\d+).*/o);
                   $out_tstamp = $sql_timestamp;
                   $writeout   = 1;
@@ -6705,7 +6710,7 @@ sub _DbLog_plotData {
                   my @a = split("[- :]", $sql_timestamp);
                   my $akt_ts = mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
 
-                  if($lastd[$i] ne "undef") {
+                  if ($lastd[$i] ne "undef") {
                       @a = split("[- :]", $lastd[$i]);
                   }
 
@@ -6713,7 +6718,7 @@ sub _DbLog_plotData {
                   $out_tstamp = $sql_timestamp;
                   $out_value  = sprintf("%02d", $akt_ts - $last_ts);
 
-                  if(lc($sql_value) =~ m(hide)) {
+                  if (lc($sql_value) =~ m(hide)) {
                       $writeout = 0;
                   }
                   else {
@@ -6723,7 +6728,7 @@ sub _DbLog_plotData {
               elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {                # Berechnung eines Delta-Stundenwertes
                   %tstamp = DbLog_explode_datetime($sql_timestamp, ());
 
-                  if($lastd[$i] eq "undef") {
+                  if ($lastd[$i] eq "undef") {
                       %lasttstamp       = DbLog_explode_datetime($sql_timestamp, ());
                       $lasttstamp{hour} = "00";
                   }
@@ -6731,12 +6736,12 @@ sub _DbLog_plotData {
                       %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
                   }
 
-                  if("$tstamp{hour}" ne "$lasttstamp{hour}") {
+                  if ("$tstamp{hour}" ne "$lasttstamp{hour}") {
                       # Aenderung der Stunde, Berechne Delta
                       # wenn die Stundendifferenz größer 1 ist muss ein Dummyeintrag erstellt werden
                       $retvaldummy = "";
 
-                      if(($tstamp{hour}-$lasttstamp{hour}) > 1) {
+                      if (($tstamp{hour}-$lasttstamp{hour}) > 1) {
                           for (my $j = $lasttstamp{hour}+1; $j < $tstamp{hour}; $j++) {
                               $out_value  = "0";
                               $hour       = $j;
@@ -6744,20 +6749,20 @@ sub _DbLog_plotData {
                               $cnt[$i]++;
                               $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
 
-                              if ($outf =~ m/(all)/) {                                  # Timestamp: Device, Type, Event, Reading, Value, Unit
+                              if ($outf =~ m/(all)/) {                                         # Timestamp: Device, Type, Event, Reading, Value, Unit
                                   $retvaldummy .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
-
-                              } elsif ($outf =~ m/(array)/) {
+                              } 
+                              elsif ($outf =~ m/(array)/) {
                                   push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
                               }
                               else {
-                                  $out_tstamp   =~ s/\ /_/g;                            #needed by generating plots
+                                  $out_tstamp   =~ s/\ /_/g;                                   #needed by generating plots
                                   $retvaldummy .= "$out_tstamp $out_value\n";
                               }
                           }
                       }
 
-                      if(($tstamp{hour}-$lasttstamp{hour}) < 0) {
+                      if (($tstamp{hour}-$lasttstamp{hour}) < 0) {
                           for (my $j = 0; $j < $tstamp{hour}; $j++) {
                               $out_value  = "0";
                               $hour       = $j;
@@ -6793,21 +6798,21 @@ sub _DbLog_plotData {
               elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {                 # Berechnung eines Tages-Deltas
                   %tstamp = DbLog_explode_datetime($sql_timestamp, ());
 
-                  if($lastd[$i] eq "undef") {
+                  if ($lastd[$i] eq "undef") {
                       %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
                   }
                   else {
                       %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
                   }
 
-                  if("$tstamp{day}" ne "$lasttstamp{day}") {                                 # Aenderung des Tages, berechne Delta
-                      $writeout  = 1 if($minval != (~0 >> 1) && $maxval != -(~0 >> 1));      # geändert V4.8.0 / 14.10.2019
-                      $out_value = ($writeout == 1) ? sprintf("%g", $maxval - $minval) : 0;  # if there was no previous reading in the selected time range, produce a null delta, %g - a floating-point number
+                  if ("$tstamp{day}" ne "$lasttstamp{day}") {                                 # Aenderung des Tages, berechne Delta
+                      $writeout  = 1 if($minval != (~0 >> 1) && $maxval != -(~0 >> 1));       # geändert V4.8.0 / 14.10.2019
+                      $out_value = ($writeout == 1) ? sprintf("%g", $maxval - $minval) : 0;   # if there was no previous reading in the selected time range, produce a null delta, %g - a floating-point number
                       $sum[$i]  += $out_value;
                       $cnt[$i]++;
 
                       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00");
-                      $minval     = $maxval if($maxval != -(~0 >> 1));                       # only use the current range's maximum as the new minimum if a proper value was found
+                      $minval     = $maxval if($maxval != -(~0 >> 1));                        # only use the current range's maximum as the new minimum if a proper value was found
 
                       Log3 ($name, 5, "$name - Output delta-d -> TS: $tstamp{day}, LASTTS: $lasttstamp{day}, OUTTS: $out_tstamp, OUTVAL: $out_value, WRITEOUT: $writeout");
                   }
@@ -6838,15 +6843,15 @@ sub _DbLog_plotData {
                   }
               }
 
-              if(Scalar::Util::looks_like_number($sql_value)) {                  # nur setzen wenn numerisch
-                  if($deltacalc) {
-                      if(Scalar::Util::looks_like_number($out_value)) {
-                          if($out_value < $min[$i]) {
+              if (Scalar::Util::looks_like_number($sql_value)) {                  # nur setzen wenn numerisch
+                  if ($deltacalc) {
+                      if (Scalar::Util::looks_like_number($out_value)) {
+                          if ($out_value < $min[$i]) {
                               $min[$i]  = $out_value;
                               $mind[$i] = $out_tstamp;
                           }
 
-                          if($out_value > $max[$i]) {
+                          if ($out_value > $max[$i]) {
                               $max[$i]  = $out_value;
                               $maxd[$i] = $out_tstamp;
                           }
@@ -6855,17 +6860,17 @@ sub _DbLog_plotData {
                       $maxval = $sql_value;
                   }
                   else {
-                      if($firstd[$i] eq "undef") {
+                      if ($firstd[$i] eq "undef") {
                           $firstv[$i] = $sql_value;
                           $firstd[$i] = $sql_timestamp;
                       }
 
-                      if($sql_value < $min[$i]) {
+                      if ($sql_value < $min[$i]) {
                           $min[$i]  = $sql_value;
                           $mind[$i] = $sql_timestamp;
                       }
 
-                      if($sql_value > $max[$i]) {
+                      if ($sql_value > $max[$i]) {
                           $max[$i]  = $sql_value;
                           $maxd[$i] = $sql_timestamp;
                       }
@@ -6883,7 +6888,7 @@ sub _DbLog_plotData {
                   $maxval  = 0;
               }
 
-              if(!$deltacalc) {
+              if (!$deltacalc) {
                   $cnt[$i]++;
                   $lastv[$i] = $sql_value;
               }
@@ -6899,8 +6904,8 @@ sub _DbLog_plotData {
 
       ######## den letzten Abschlusssatz rausschreiben ##########
 
-      if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
-          if($lastd[$i] eq "undef") {
+      if ($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
+          if ($lastd[$i] eq "undef") {
               $out_value  = "0";
               $out_tstamp = DbLog_implode_datetime($from_datetime{year}, $from_datetime{month}, $from_datetime{day}, $from_datetime{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
               $out_tstamp = DbLog_implode_datetime($from_datetime{year}, $from_datetime{month}, $from_datetime{day}, "12", "00", "00") if($readings[$i]->[3] eq "delta-d");
@@ -6915,7 +6920,7 @@ sub _DbLog_plotData {
           $sum[$i] += $out_value;
           $cnt[$i]++;
 
-          if($outf =~ m/(all)/) {
+          if ($outf =~ m/(all)/) {
               $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
           }
           elsif ($outf =~ m/(array)/) {
@@ -7029,7 +7034,7 @@ sub DbLog_configcheck {
 
   my ($check, $rec, $err, $upd, $msg, @config, %dbconfig);
 
-  Log3 ($name, 4, "DbLog $name - ###  Start configCheck   ###");
+  Log3 ($name, 4, "$name - ###  Start configCheck   ###");
 
   my $ok   = FW_makeImage('10px-kreis-gruen.png',     '');
   my $nok  = FW_makeImage('10px-kreis-rot.png',       '');
@@ -7142,7 +7147,7 @@ sub DbLog_configcheck {
   my $dbh = _DbLog_getNewDBHandle ($hash) || return "Can't connect to database.";
   my $ct  = sprintf("%.4f", tv_interval($st));                                                     # Laufzeit ermitteln
 
-  Log3 ($name, 4, "DbLog $name - Time required to establish the database connection: ".$ct);
+  Log3 ($name, 4, "$name - Time required to establish the database connection: ".$ct);
 
   my (@ce,@se);
   my ($chutf8mod,$chutf8dat);
@@ -7659,12 +7664,12 @@ sub DbLog_configcheck {
 
   for my $dbrp (@repdvs) {
       if (!$defs{$dbrp}) {
-          Log3 ($name, 2, "DbLog $name - Device '$dbrp' found by configCheck doesn't exist !");
+          Log3 ($name, 2, "$name - Device '$dbrp' found by configCheck doesn't exist !");
           next;
       }
 
       if ($defs{$dbrp}->{DEF} eq $name) {                                      # DbRep Device verwendet aktuelles DbLog-Device
-          Log3 ($name, 5, "DbLog $name - DbRep-Device '$dbrp' uses $name.");
+          Log3 ($name, 5, "$name - DbRep-Device '$dbrp' uses $name.");
           $isused = 1;
       }
   }
@@ -7816,7 +7821,7 @@ sub _DbLog_checkModVer {
   my @remList = split /\R/, $remCtrlFile;
   my $root    = $attr{global}{modpath};
 
-  Log3 ($name, 4, "DbLog $name - configCheck: Got SVN $ctrlFileName with ".int(@remList)." entries.");
+  Log3 ($name, 4, "$name - configCheck: Got SVN $ctrlFileName with ".int(@remList)." entries.");
 
   open (FD, "$root/FHEM/$ctrlFileName") or do { $msg = "Automatic check of SVN DbLog version not possible: $!";
                                                 $rec = "Try to solve the problem that has occurred. Compare your local DbLog version with the public version manually.";
@@ -7826,7 +7831,7 @@ sub _DbLog_checkModVer {
   my @locList = map { $_ =~ s/[\r\n]//; $_ } <FD>;
   close(FD);
 
-  Log3 ($name, 4, "DbLog $name - configCheck: Got local $ctrlFileName with ".int(@locList)." entries.");
+  Log3 ($name, 4, "$name - configCheck: Got local $ctrlFileName with ".int(@locList)." entries.");
 
   my %lh;
 
@@ -7836,7 +7841,7 @@ sub _DbLog_checkModVer {
       $lh{$l[3]}{TS}  = $l[1];
       $lh{$l[3]}{LEN} = $l[2];
 
-      Log3 ($name, 4, "DbLog $name - configCheck: local version from last update - creation time: ".$lh{$l[3]}{TS}." - bytes: ".$lh{$l[3]}{LEN});
+      Log3 ($name, 4, "$name - configCheck: local version from last update - creation time: ".$lh{$l[3]}{TS}." - bytes: ".$lh{$l[3]}{LEN});
   }
 
   for my $rem (@remList) {
@@ -7848,7 +7853,7 @@ sub _DbLog_checkModVer {
       my $fileOk = ($lh{$fName} && $lh{$fName}{TS} eq $r[1] && $lh{$fName}{LEN} eq $r[2]);
 
       if (!$fileOk) {
-          Log3 ($name, 4, "DbLog $name - configCheck: New SVN version of $fName found - creation time: $r[1] ($r[2] Bytes)");
+          Log3 ($name, 4, "$name - configCheck: New SVN version of $fName found - creation time: $r[1] ($r[2] Bytes)");
 
           $msg = "A new DbLog version is available (creation time: $r[1], size: $r[2] bytes)";
           $rec = "You should update FHEM to get the recent DbLog version from repository.";
@@ -7858,7 +7863,7 @@ sub _DbLog_checkModVer {
       my $sz = -s $fPath;
 
       if ($fileOk && defined($sz) && $sz ne $r[2]) {
-          Log3 ($name, 4, "DbLog $name - configCheck: SVN version of $fName creation time: $r[1] ($r[2] Bytes) differs from local one ($sz Bytes)");
+          Log3 ($name, 4, "$name - configCheck: SVN version of $fName creation time: $r[1] ($r[2] Bytes) differs from local one ($sz Bytes)");
 
           $msg = "Your local DbLog module is modified. The SVN version of $fName has creation time: $r[1] ($r[2] Bytes)";
           $rec = "You should update FHEM to get the recent DbLog version from repository.";
@@ -7887,13 +7892,13 @@ sub __DbLog_updGetUrl {
   my ($err, $data) = HttpUtils_BlockingGet(\%upd_connecthash);
 
   if($err) {
-      Log3 ($name, 1, "DbLog $name - configCheck: ERROR while connecting to fhem.de:  $err");
+      Log3 ($name, 1, "$name - configCheck: ERROR while connecting to fhem.de:  $err");
 
       return ($err, "");
   }
 
   if(!$data) {
-      Log3 ($name, 1, "DbLog $name - configCheck: ERROR $url: empty file received");
+      Log3 ($name, 1, "$name - configCheck: ERROR $url: empty file received");
 
       $err = 1;
       return ($err, "");
@@ -7941,13 +7946,13 @@ sub DbLog_AddLog {
   my $devspec = join(':',@dc);
   my @exdvs   = devspec2array($devspec);
 
-  Log3 ($name, 4, "DbLog $name - Addlog known devices by devspec: @exdvs");
+  Log3 ($name, 4, "$name - Addlog known devices by devspec: @exdvs");
 
   for (@exdvs) {
       $dev_name = $_;
 
       if(!$defs{$dev_name}) {
-          Log3 ($name, 2, "DbLog $name - Device '$dev_name' used by addLog doesn't exist !");
+          Log3 ($name, 2, "$name - Device '$dev_name' used by addLog doesn't exist !");
           next;
       }
 
@@ -7979,7 +7984,7 @@ sub DbLog_AddLog {
                            }
                        }
 
-                       Log3 ($name, 2, "DbLog $name - Device: \"$dev_name\", reading: \"$v2[0]\" excluded by attribute DbLogExclude from addLog !") if($do == 0 && $rd =~ m/^$rdspec$/);
+                       Log3 ($name, 2, "$name - Device: \"$dev_name\", reading: \"$v2[0]\" excluded by attribute DbLogExclude from addLog !") if($do == 0 && $rd =~ m/^$rdspec$/);
                    }
                }
            }
@@ -7988,18 +7993,18 @@ sub DbLog_AddLog {
            push @exrds, $rd if($rd =~ m/^$rdspec$/);
       }
 
-      Log3 $name, 4, "DbLog $name - Readings extracted from Regex: @exrds";
+      Log3 $name, 4, "$name - Readings extracted from Regex: @exrds";
 
       if(!$found) {
           if(goodReadingName($rdspec) && defined($value)) {
-              Log3 $name, 3, "DbLog $name - addLog WARNING - Device: '$dev_name' -> Reading '$rdspec' not found - add it as new reading.";
+              Log3 $name, 3, "$name - addLog WARNING - Device: '$dev_name' -> Reading '$rdspec' not found - add it as new reading.";
               push @exrds,$rdspec;
           }
           elsif (goodReadingName($rdspec) && !defined($value)) {
-              Log3 $name, 2, "DbLog $name - addLog WARNING - Device: '$dev_name' -> new Reading '$rdspec' has no value - can't add it !";
+              Log3 $name, 2, "$name - addLog WARNING - Device: '$dev_name' -> new Reading '$rdspec' has no value - can't add it !";
           }
           else {
-              Log3 $name, 2, "DbLog $name - addLog WARNING - Device: '$dev_name' -> Readingname '$rdspec' is no valid or regexp - can't add regexp as new reading !";
+              Log3 $name, 2, "$name - addLog WARNING - Device: '$dev_name' -> Readingname '$rdspec' is no valid or regexp - can't add regexp as new reading !";
           }
       }
 
@@ -8041,7 +8046,7 @@ sub DbLog_AddLog {
               ($err, $ts) = convertTimeZone ($params);
 
               if ($err) {
-                  Log3 ($name, 1, "DbLog $name - ERROR while converting time zone: $err - exit log loop !");
+                  Log3 ($name, 1, "$name - ERROR while converting time zone: $err - exit log loop !");
                   last;
               }
           }
@@ -8064,7 +8069,7 @@ sub DbLog_AddLog {
 
               eval $value_fn;
 
-              Log3 ($name, 2, "DbLog $name - error valueFn: ".$@) if($@);
+              Log3 ($name, 2, "$name - error valueFn: ".$@) if($@);
 
               if($IGNORE) {                                                                                # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
                  $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$name}{TIME}  = $lastt if($lastt);          # patch Forum:#111423
@@ -8079,7 +8084,7 @@ sub DbLog_AddLog {
                   $ts = $TIMESTAMP;
               }
               else {
-                  Log3 ($name, 2, "DbLog $name - Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
+                  Log3 ($name, 2, "$name - Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
               }
 
               $dev_name     = $DEVICE     if($DEVICE ne '');
@@ -8100,7 +8105,7 @@ sub DbLog_AddLog {
           my $row = $ts."|".$dev_name."|".$dev_type."|".$event."|".$dev_reading."|".$read_val."|".$ut;
 
           if (!AttrVal($name, 'suppressAddLogV3', 0)) {
-              Log3 $name, 3, "DbLog $name - addLog created - TS: $ts, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $dev_reading, Value: $read_val, Unit: $ut";
+              Log3 $name, 3, "$name - addLog created - TS: $ts, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $dev_reading, Value: $read_val, Unit: $ut";
           }
 
           $memcount = DbLog_addMemCacheRow ($name, $row);                                # Datensatz zum Memory Cache hinzufügen
@@ -8175,13 +8180,13 @@ sub DbLog_addCacheLine {
       my $CN            = " ";
 
       eval $value_fn;
-      Log3 ($name, 2, "DbLog $name - error valueFn: ".$@) if($@);
+      Log3 ($name, 2, "$name - error valueFn: ".$@) if($@);
 
       if ($IGNORE) {                                                                                              # kein add wenn $IGNORE=1 gesetzt
           $defs{$i_dev}{Helper}{DBLOG}{$i_reading}{$name}{TIME}  = $lastt if($defs{$i_dev} && $lastt);            # patch Forum:#111423
           $defs{$i_dev}{Helper}{DBLOG}{$i_reading}{$name}{VALUE} = $lastv if($defs{$i_dev} && defined $lastv);
 
-          Log3 ($name, 4, "DbLog $name - Event ignored by valueFn - TS: $i_timestamp, Device: $i_dev, Type: $i_type, Event: $i_evt, Reading: $i_reading, Value: $i_val, Unit: $i_unit");
+          Log3 ($name, 4, "$name - Event ignored by valueFn - TS: $i_timestamp, Device: $i_dev, Type: $i_type, Event: $i_evt, Reading: $i_reading, Value: $i_val, Unit: $i_unit");
 
           next;
       }
@@ -8193,7 +8198,7 @@ sub DbLog_addCacheLine {
           $i_timestamp = $TIMESTAMP;
       }
       else {
-          Log3 ($name, 2, "DbLog $name - Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
+          Log3 ($name, 2, "$name - Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
       }
 
       $i_dev     = $DEVICE     if($DEVICE ne '');
@@ -8209,7 +8214,7 @@ sub DbLog_addCacheLine {
   my $row = $i_timestamp."|".$i_dev."|".$i_type."|".$i_evt."|".$i_reading."|".$i_val."|".$i_unit;
   $row    = DbLog_charfilter($row) if(AttrVal($name, "useCharfilter",0));
 
-  Log3 ($name, 4, "DbLog $name - added by addCacheLine - TS: $i_timestamp, Device: $i_dev, Type: $i_type, Event: $i_evt, Reading: $i_reading, Value: $i_val, Unit: $i_unit");
+  Log3 ($name, 4, "$name - added by addCacheLine - TS: $i_timestamp, Device: $i_dev, Type: $i_type, Event: $i_evt, Reading: $i_reading, Value: $i_val, Unit: $i_unit");
 
   use warnings;
 
@@ -8393,7 +8398,7 @@ sub DbLog_reopen {
   delete $hash->{HELPER}{REOPEN_RUNS_UNTIL};
 
   if($delay) {
-      Log3 ($name, 2, "DbLog $name - Database connection reopened (it was $delay seconds closed).");
+      Log3 ($name, 2, "$name - Database connection reopened (it was $delay seconds closed).");
   }
 
   DbLog_setReadingstate   ($hash, 'reopened');
@@ -8431,8 +8436,8 @@ sub DbLog_checkUsePK {
   $upkh   = 1 if(@pkh && @pkh ne "none");
   $upkc   = 1 if(@pkc && @pkc ne "none");
 
-  Log3 ($name, 4, "DbLog $name - Primary Key used in $history: $pkh");
-  Log3 ($name, 4, "DbLog $name - Primary Key used in $current: $pkc");
+  Log3 ($name, 4, "$name - Primary Key used in $history: $pkh");
+  Log3 ($name, 4, "$name - Primary Key used in $current: $pkc");
 
 return ($upkh,$upkc,$pkh,$pkc);
 }
@@ -8468,7 +8473,7 @@ sub DbLog_checkSyntaxValueFn {
 
   $err = perlSyntaxCheck ($func, %specials);
 
-  Log3 ($name, 1, "DbLog $name - Syntaxcheck <$devname> attribute DbLogValueFn: \n".$err) if($err && $devname);
+  Log3 ($name, 1, "$name - Syntaxcheck <$devname> attribute DbLogValueFn: \n".$err) if($err && $devname);
 
   $func =~ s/^\s*(\{.*\})\s*$/$1/s;
 
@@ -9263,7 +9268,7 @@ return;
 
     <li>
     <a id="DbLog-get-configCheck"></a>
-    <b>get &lt;name&gt; configCheck </b> <br>
+    <b>get &lt;name&gt; configCheck </b> <br><br>
       <ul>
         A number of key settings are reviewed and recommendations are made if potential improvements are identified.
       </ul>
@@ -9294,8 +9299,8 @@ return;
   <ul>
     <li>
     <a id="DbLog-get-ReadingsMinVal" data-pattern="ReadingsMinVal.*"></a>
-    <b>get &lt;name&gt; ReadingsMinVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
-    <br>
+    <b>get &lt;name&gt; ReadingsMinVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    
     <ul>
       Determines the record with the smallest value of the specified device / reading combination from the history table. <br>
       Only the value or the combination of value and timestamp is returned as string
@@ -9315,8 +9320,8 @@ return;
   <ul>
     <li>
     <a id="DbLog-get-ReadingsAvgVal"></a>
-    <b>get &lt;name&gt; ReadingsAvgVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
-    <br>
+    <b>get &lt;name&gt; ReadingsAvgVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    
     <ul>
       Determines the average value of the specified Device / Reading combination from the history table. <br>
       The simple arithmetic average value is returned. <br>
@@ -9335,8 +9340,8 @@ return;
   <ul>
     <li>
     <a id="DbLog-get-ReadingsVal" data-pattern="ReadingsVal.*"></a>
-    <b>get &lt;name&gt; ReadingsVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
-    <br>
+    <b>get &lt;name&gt; ReadingsVal[Timestamp] &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    
     <ul>
       Reads the last (newest) record stored in the history table of the specified Device / Reading
       combination. <br>
@@ -9357,8 +9362,8 @@ return;
   <ul>
     <li>
     <a id="DbLog-get-ReadingsTimestamp"></a>
-    <b>get &lt;name&gt; ReadingsTimestamp &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b>
-    <br>
+    <b>get &lt;name&gt; ReadingsTimestamp &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+    
     <ul>
       Reads the timestamp of the last (newest) record stored in the history table of the specified
       Device/Reading combination and returns this value. <br>
@@ -9377,8 +9382,7 @@ return;
   <ul>
     <li>
     <a id="DbLog-get-retrieve"></a>
-    <b>get &lt;name&gt; retrieve &lt;querytype&gt; &lt;device|table&gt; &lt;reading&gt; &lt;from&gt; &lt;to&gt; &lt;offset&gt; &lt;limit&gt; </b>
-    <br>
+    <b>get &lt;name&gt; retrieve &lt;querytype&gt; &lt;device|table&gt; &lt;reading&gt; &lt;from&gt; &lt;to&gt; &lt;offset&gt; &lt;limit&gt; </b> <br><br>
 
     <ul>
       Reads data from the database table history and returns the results formatted as JSON. <br>
@@ -9462,17 +9466,21 @@ return;
   <ul>
     <li><b>get &lt;name&gt; &lt;in&gt; &lt;out&gt; &lt;from&gt; &lt;to&gt; &lt;column_spec&gt; </b> <br><br>
 
-    Read data from the Database used by frontends to plot data without direct
-    access to the Database. <br>
+    Read data from the Database used by frontends to plot data without direct access to the Database. <br>
     <br>
 
     <ul>
       <li>&lt;in&gt;<br>
-        A dummy parameter for FileLog compatibility. Sessing by defaultto <code>-</code><br>
+        A parameter to establish compatibility with Filelog. <br>
+        In the definition of an SVG device this parameter corresponds to the specification of :&lt;logfile&gt; at the end of the definition.<br>
+        The following characteristics are allowed:<br>
         <ul>
-          <li>current: reading actual readings from table "current"</li>
-          <li>history: reading history readings from table "history"</li>
-          <li>-: identical to "history"</li>
+          <li>current: the values are read from the "current" table.                                                    </li>
+          <li>history: the values are read from the "history" table.                                                    </li>
+          <li>table_&lt;table&gt;: the values are read from the specified alternative table. The table (name)
+                                   must be created in the database with lowercase letters. <br>
+                                   (example: table_energy, "energy" is the alternative table created in the database)   </li>
+          <li>-: identical as "history                                                                                  </li>
         </ul>
       </li>
       <br>
@@ -11139,7 +11147,7 @@ attr SMA_Energymeter DbLogValueFn
 
     <li>
     <a id="DbLog-get-configCheck"></a>
-    <b>get &lt;name&gt; configCheck </b> <br> <br><br>
+    <b>get &lt;name&gt; configCheck </b> <br><br>
 
       <ul>
         Es werden einige wichtige Einstellungen geprüft und Empfehlungen gegeben falls potentielle Verbesserungen
@@ -11350,13 +11358,16 @@ attr SMA_Energymeter DbLogValueFn
 
     <ul>
       <li>&lt;in&gt;<br>
-        Ein Parameter um eine Kompatibilität zum Filelog herzustellen.
-        Dieser Parameter ist per default immer auf <code>-</code> zu setzen.<br>
+        Ein Parameter um eine Kompatibilität zu Filelog herzustellen. <br>
+        In der Definition eines SVG Devices entspricht dieser Paramter der Angabe von :&lt;logfile&gt; am Ende der Definition.<br>
         Folgende Ausprägungen sind zugelassen:<br>
         <ul>
-          <li>current: die aktuellen Werte aus der Tabelle "current" werden gelesen.</li>
-          <li>history: die historischen Werte aus der Tabelle "history" werden gelesen.</li>
-          <li>-: identisch wie "history"</li>
+          <li>current: die Werte werden aus der Tabelle "current" gelesen.                                                   </li>
+          <li>history: die Werte werden aus der Tabelle "history" gelesen.                                                   </li>
+          <li>table_&lt;Tabelle&gt;: die Werte werden aus der angegeben alternativen Tabelle gelesen. Die Tabelle (Name)
+                                     ist in der Datenbank mit Kleinbuchstaben anzulegen.  <br>
+                                     (Beispiel: table_energy, "energy" ist die in der Datenbank angelegte Alternativtabelle) </li>
+          <li>-: identisch wie "history"                                                                                     </li>
         </ul>
       </li>
       <br>
