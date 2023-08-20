@@ -4,20 +4,12 @@
 #
 # 70_PylonLowVoltage.pm
 #
-# A FHEM module to read BMS values from a
-# Pylontech US2000plus/US3000 LiFePo04 battery
+# A FHEM module to read BMS values from Pylontech Low Voltage LiFePo04 batteries.
 #
-# This module is based on 70_Pylontech.pm written 2019 by Harald Schmitz
-# Code modifications and extensions: (c) 2023 by Heiko Maaz   e-mail: Heiko dot Maaz at t-online dot de
+# This module is based on 70_Pylontech.pm written 2019 by Harald Schmitz.
+# Code further development and extensions (c) 2023 by Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
 #
-# Forumlinks:
-# https://forum.fhem.de/index.php?topic=117466.0  (Source of original module)
-# https://forum.fhem.de/index.php?topic=126361.0
-# https://forum.fhem.de/index.php?topic=112947.0
-# https://forum.fhem.de/index.php?topic=32037.0
-#
-# Photovoltaik Forum:
-# https://www.photovoltaikforum.com/thread/130061-pylontech-us2000b-daten-protokolle-programme
+# Credits to FHEM user: satprofi, Audi_Coupe_S, abc2006
 #
 #########################################################################################################################
 # Copyright notice
@@ -41,6 +33,16 @@
 # This copyright notice MUST APPEAR in all copies of the script!
 #
 #########################################################################################################################
+# Forumlinks:
+# https://forum.fhem.de/index.php?topic=117466.0  (Source of module 70_Pylontech.pm)
+# https://forum.fhem.de/index.php?topic=126361.0
+# https://forum.fhem.de/index.php?topic=112947.0
+# https://forum.fhem.de/index.php?topic=32037.0
+#
+# Photovoltaik Forum:
+# https://www.photovoltaikforum.com/thread/130061-pylontech-us2000b-daten-protokolle-programme
+#
+#########################################################################################################################
 #
 #  Leerzeichen entfernen: sed -i 's/[[:space:]]*$//' 70_PylonLowVoltage.pm
 #
@@ -54,6 +56,7 @@ use Time::HiRes qw(gettimeofday ualarm);
 use IO::Socket::INET;
 use Errno qw(ETIMEDOUT EWOULDBLOCK);
 use Scalar::Util qw(looks_like_number);
+use Carp qw(croak carp);
 
 eval "use FHEM::Meta;1"          or my $modMetaAbsent = 1;         ## no critic 'eval'
 eval "use IO::Socket::Timeout;1" or my $iostAbsent    = 1;         ## no critic 'eval'
@@ -113,9 +116,10 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.1.2"  => "20.08.2023 commandref revised, analogValue -> use 'user defined items' ",
   "0.1.1"  => "16.08.2023 integrate US3000C, add print request command in HEX to Logfile, attr timeout ".
-              "change validation of received data, change DEF format, extend evaluation of chargeManagmentInfo ".
-              "add evaluate systemParameters, additional own values packImbalance, packState ",
+                          "change validation of received data, change DEF format, extend evaluation of chargeManagmentInfo ".
+                          "add evaluate systemParameters, additional own values packImbalance, packState ",
   "0.1.0"  => "12.08.2023 initial version, switch to perl package, attributes: disable, interval, add command hashes ".
                           "get ... data command, add meta support and version management, more code changes ",
 );
@@ -173,7 +177,6 @@ my $invalid     = 'unknown';                                         # default v
 my $definterval = 30;                                                # default Abrufintervall der Batteriewerte
 my $defto       = 0.5;                                               # default connection Timeout zum RS485 Gateway
 my @blackl      = qw(state nextCycletime);                           # Ausnahmeliste deleteReadingspec
-
 
 # Steuerhashes
 ###############
@@ -470,7 +473,8 @@ sub Update {
     my %readings  = ();
     my $protocol  = 'tcp';
     my $rtnerr    = q{};
-    my $socket;
+    
+    my ($socket, $success);
 
     if(!$interval) {
         $hash->{OPMODE}          = 'Manual';
@@ -486,8 +490,8 @@ sub Update {
 
     Log3 ($name, 4, "$name - start request cycle to battery number >$hash->{BATADDRESS}< at host:port $hash->{HOST}:$hash->{PORT}");
 
-    eval {
-        local $SIG{ALRM} = sub { die 'gatewaytimeout' };
+    eval {                                                                                     ## no critic 'eval'
+        local $SIG{ALRM} = sub { croak 'gatewaytimeout' };
         ualarm ($timeout * 1000000);                                                           # ualarm in Mikrosekunden
 
         $socket = IO::Socket::INET->new( Proto    => $protocol, 
@@ -516,14 +520,18 @@ sub Update {
         }
 
         IO::Socket::Timeout->enable_timeouts_on ($socket);                       # nur notwendig für read or write timeout
-        $socket->read_timeout ($timeout - 0.2);                                  # Lesetimeout immer kleiner als Sockettimeout
+        my $rwto = $timeout - 0.05;
+        $rwto    = $rwto <= 0 ? 0.005 : $rwto; 
+        
+        $socket->read_timeout  ($rwto);                                          # Read/Writetimeout immer kleiner als Sockettimeout
+        $socket->write_timeout ($rwto);
         $socket->autoflush(1);
 
         my $res;
 
         # relativ statische Werte abrufen
         ###################################
-        if (ReadingsAge ($name, "serialNumber", 601) >= 0) {
+        if (ReadingsAge ($name, "serialNumber", 601) >= 60) {
             # Abruf serialNumber
             #####################
             $res = Request($hash, $socket, $hrsnb{$hash->{BATADDRESS}}{cmd}, 'serialNumber');
@@ -598,33 +606,6 @@ sub Update {
             $readings{moduleSoftwareVersion_manufacture} = 'V'.hex (substr ($res, 15, 2)).'.'.hex (substr ($res, 17, 2)); 
             $readings{moduleSoftwareVersion_mainline}    = 'V'.hex (substr ($res, 19, 2)).'.'.hex (substr ($res, 21, 2)).'.'.hex (substr ($res, 23, 2));
 
-            # Abruf alarmInfo
-            ##################
-            $res = Request($hash, $socket, $hralm{$hash->{BATADDRESS}}{cmd}, 'alarmInfo');
-            
-            $rtnerr = respStat ($res);
-            if ($rtnerr) {
-                doOnError ({ hash     => $hash, 
-                             readings => \%readings,
-                             sock     => $socket,                             
-                             state    => $rtnerr
-                           }
-                          );                  
-                return;
-            }
-            
-            $readings{packCellcount} = hex (substr($res, 17, 2));
-
-            if (substr($res, 19, 30)=="000000000000000000000000000000" && 
-                substr($res, 51, 10)=="0000000000"                     && 
-                substr($res, 67, 2) =="00"                             && 
-                substr($res, 73, 4) =="0000") {
-                $readings{packAlarmInfo} = "ok";
-            }
-            else {
-                $readings{packAlarmInfo} = "failure";
-            }
-
             # Abruf Systemparameter
             ########################
             $res = Request($hash, $socket, $hrspm{$hash->{BATADDRESS}}{cmd}, 'systemParameters');
@@ -654,6 +635,33 @@ sub Update {
             $readings{paramDischargeCurrentLimit}  = sprintf "%.3f", (65535 - (hex substr  ($res, 59, 4))) * 100 / 1000;   # mit Symbol (-)
         }
         
+        # Abruf alarmInfo
+        ##################
+        $res = Request($hash, $socket, $hralm{$hash->{BATADDRESS}}{cmd}, 'alarmInfo');
+        
+        $rtnerr = respStat ($res);
+        if ($rtnerr) {
+            doOnError ({ hash     => $hash, 
+                         readings => \%readings,
+                         sock     => $socket,                             
+                         state    => $rtnerr
+                       }
+                      );                  
+            return;
+        }
+        
+        $readings{packCellcount} = hex (substr($res, 17, 2));
+
+        if (substr($res, 19, 30) eq "000000000000000000000000000000" && 
+            substr($res, 51, 10) eq "0000000000"                     && 
+            substr($res, 67, 2)  eq "00"                             && 
+            substr($res, 73, 4)  eq "0000") {
+            $readings{packAlarmInfo} = "ok";
+        }
+        else {
+            $readings{packAlarmInfo} = "failure";
+        }
+        
         # Abruf chargeManagmentInfo
         ############################
         $res = Request($hash, $socket, $hrcmi{$hash->{BATADDRESS}}{cmd}, 'chargeManagmentInfo');
@@ -677,8 +685,8 @@ sub Update {
         my $cdstat                        = sprintf "%08b", hex substr ($res, 31, 2);                # Rohstatus
         $readings{chargeEnable}           = substr ($cdstat, 0, 1) == 1 ? 'yes' : 'no';              # Bit 7
         $readings{dischargeEnable}        = substr ($cdstat, 1, 1) == 1 ? 'yes' : 'no';              # Bit 6
-        $readings{chargeImmediatelySOC5}  = substr ($cdstat, 2, 1) == 1 ? 'yes' : 'no';              # Bit 5 - SOC 5~9%  -> für Wechselrichter, die aktives Batteriemanagement bei gegebener DC-Spannungsfunktion haben oder Wechselrichter, der von sich aus einen niedrigen SOC/Spannungsgrenzwert hat
-        $readings{chargeImmediatelySOC10} = substr ($cdstat, 3, 1) == 1 ? 'yes' : 'no';              # Bit 4 - SOC 9~13% -> für Wechselrichter hat keine aktive Batterieabschaltung haben
+        $readings{chargeImmediatelySOC05} = substr ($cdstat, 2, 1) == 1 ? 'yes' : 'no';              # Bit 5 - SOC 5~9%  -> für Wechselrichter, die aktives Batteriemanagement bei gegebener DC-Spannungsfunktion haben oder Wechselrichter, der von sich aus einen niedrigen SOC/Spannungsgrenzwert hat
+        $readings{chargeImmediatelySOC09} = substr ($cdstat, 3, 1) == 1 ? 'yes' : 'no';              # Bit 4 - SOC 9~13% -> für Wechselrichter hat keine aktive Batterieabschaltung haben
         $readings{chargeFullRequest}      = substr ($cdstat, 4, 1) == 1 ? 'yes' : 'no';              # Bit 3 - wenn SOC in 30 Tagen nie höher als 97% -> Flag = 1, wenn SOC-Wert ≥ 97% -> Flag = 0
 
         # Abruf analogValue
@@ -700,25 +708,7 @@ sub Update {
             return;
         }     
 
-        $readings{packCellcount}   = hex (substr($res, 17,  2));
-        $readings{packVolt}        = hex (substr($res, 105, 4)) / 1000;
-        my $current                = hex (substr($res, 101, 4));
-        
-        if ($current & 0x8000) {
-            $current = $current - 0x10000;
-        }
-
-        $readings{packCurrent} = sprintf "%.2f", $current / 10;
-
-        if (length($res) == 128) {
-            $readings{packCapacity}       = hex (substr($res, 115, 4)) / 1000;
-            $readings{packCapacityRemain} = hex (substr($res, 109, 4)) / 1000;
-        }
-        else {
-            $readings{packCapacity}       = hex (substr($res, 129, 6)) / 1000;
-            $readings{packCapacityRemain} = hex (substr($res, 123, 6)) / 1000;
-        }
-        
+        $readings{packCellcount}        = hex (substr($res, 17,  2));
         $readings{cellVoltage_01}       = sprintf "%.3f", hex(substr($res,19,4)) / 1000;
         $readings{cellVoltage_02}       = sprintf "%.3f", hex(substr($res,23,4)) / 1000;
         $readings{cellVoltage_03}       = sprintf "%.3f", hex(substr($res,27,4)) / 1000;
@@ -733,13 +723,43 @@ sub Update {
         $readings{cellVoltage_12}       = sprintf "%.3f", hex(substr($res,63,4)) / 1000;
         $readings{cellVoltage_13}       = sprintf "%.3f", hex(substr($res,67,4)) / 1000;
         $readings{cellVoltage_14}       = sprintf "%.3f", hex(substr($res,71,4)) / 1000;
-        $readings{cellVoltage_15}       = sprintf "%.3f", hex(substr($res,75,4)) / 1000;
-        $readings{packCycles}           = hex  (substr($res, 119, 4));
-        $readings{bmsTemperature}       = (hex (substr($res, 81,  4)) - 2731) / 10;
-        $readings{cellTemperature_0104} = (hex (substr($res, 85,  4)) - 2731) / 10;
-        $readings{cellTemperature_0508} = (hex (substr($res, 89,  4)) - 2731) / 10;
-        $readings{cellTemperature_0912} = (hex (substr($res, 93,  4)) - 2731) / 10;
-        $readings{cellTemperature_1315} = (hex (substr($res, 97,  4)) - 2731) / 10;
+        $readings{cellVoltage_15}       = sprintf "%.3f", hex(substr($res,75,4)) / 1000; 
+        # $readings{numberOfTempPos}     =                 hex(substr($res,79,2));              # Anzahl der jetzt folgenden Teperaturpositionen -> 5
+        $readings{bmsTemperature}       = (hex (substr($res, 81,  4)) - 2731) / 10;             # 1
+        $readings{cellTemperature_0104} = (hex (substr($res, 85,  4)) - 2731) / 10;             # 2
+        $readings{cellTemperature_0508} = (hex (substr($res, 89,  4)) - 2731) / 10;             # 3
+        $readings{cellTemperature_0912} = (hex (substr($res, 93,  4)) - 2731) / 10;             # 4
+        $readings{cellTemperature_1315} = (hex (substr($res, 97,  4)) - 2731) / 10;             # 5
+        my $current                     =  hex (substr($res, 101, 4));     
+        $readings{packVolt}             =  hex (substr($res, 105, 4)) / 1000;
+        
+        if ($current & 0x8000) {
+            $current = $current - 0x10000;
+        }
+
+        $readings{packCurrent} = sprintf "%.3f", $current / 10;
+        my $udi                = hex substr($res, 113, 2);                                      # user defined item: 2: Batterien <= 65Ah, 4: Batterien > 65Ah
+        $readings{packCycles}  = hex substr($res, 119, 4);
+$udi = 0;
+        if ($udi == 2) {
+            $readings{packCapacityRemain} = hex (substr($res, 109, 4)) / 1000;
+            $readings{packCapacity}       = hex (substr($res, 115, 4)) / 1000;
+        }
+        elsif ($udi == 4) {
+            $readings{packCapacityRemain} = hex (substr($res, 123, 6)) / 1000;
+            $readings{packCapacity}       = hex (substr($res, 129, 6)) / 1000;
+        }
+        else {
+            doOnError ({ hash     => $hash, 
+                         readings => \%readings,
+                         sock     => $socket,                             
+                         state    => 'wrong value retrieve analogValue -> user defined items: '.$udi
+                       }
+                      );                
+            return;
+        }
+        
+        $success = 1;
     };  # eval
     
     if ($@) {
@@ -763,13 +783,14 @@ sub Update {
     ualarm(0);
     close ($socket) if($socket);
     
-    Log3 ($name, 4, "$name - got fresh values from battery number >$hash->{BATADDRESS}<");
+    if ($success) {
+        Log3 ($name, 4, "$name - got fresh values from battery number >$hash->{BATADDRESS}<");
+        
+        additionalReadings (\%readings);                                                 # zusätzliche eigene Readings erstellen
+        $readings{state} = 'connected';
+    }
     
-    additionalReadings (\%readings);                                                 # zusätzliche eigene Readings erstellen
-    
-    $readings{state} = 'connected' if(!defined $readings{state});
-
-    createReadings ($hash, \%readings);                                              # Readings erstellen
+    createReadings ($hash, \%readings);                                                  # Readings erstellen
 
 return;
 }
@@ -809,7 +830,7 @@ sub Reread {
         $socket->read ($singlechar, 1);
 
         if (!$singlechar && (0+$! == ETIMEDOUT || 0+$! == EWOULDBLOCK)) {                # nur notwendig für read timeout
-            die 'Timeout reading data from battery';
+            croak 'Timeout reading data from battery';
         }
 
         $res = $res . $singlechar if (!(length($res) == 0 && ord($singlechar) == 13))    # ord 13 -> ASCII dezimal für CR (Hex 0d)
@@ -817,7 +838,7 @@ sub Reread {
     } while (length($res) == 0 || ord($singlechar) != 13);
 
     Log3 ($name, 5, "$name - data returned raw: ".$res);
-    Log3 ($name, 5, "$name - data returned:\n"   .Hexdump($res));
+    Log3 ($name, 5, "$name - data returned:\n"   .Hexdump ($res));
 
 return $res;
 }
@@ -836,13 +857,15 @@ return;
 #                  PylonLowVoltage Hexdump
 ###############################################################
 sub Hexdump {
+  my $res = shift;
+  
   my $offset = 0;
   my $result = "";
 
-  for my $chunk (unpack "(a16)*", $_[0]) {
+  for my $chunk (unpack "(a16)*", $res) {
       my $hex  = unpack "H*", $chunk;                                                       # hexadecimal magic
       $chunk   =~ tr/ -~/./c;                                                               # replace unprintables
-      $hex     =~ s/(.{1,8})/$1 /gs;                                                        # insert spaces
+      $hex     =~ s/(.{1,8})/$1 /gxs;                                                       # insert spaces
       $result .= sprintf "0x%08x (%05u)  %-*s %s\n", $offset, $offset, 36, $hex, $chunk;
       $offset += 16;
   }
@@ -901,8 +924,8 @@ sub additionalReadings {
 
     my ($vmax, $vmin);
     
-    $readings->{averageCellVolt} = sprintf "%.3f", $readings->{packVolt} / $readings->{packCellcount};
-    $readings->{packSOC}         = sprintf "%.2f", ($readings->{packCapacityRemain} / $readings->{packCapacity} * 100);
+    $readings->{averageCellVolt} = sprintf "%.3f", $readings->{packVolt} / $readings->{packCellcount}                  if(defined $readings->{packCellcount});
+    $readings->{packSOC}         = sprintf "%.2f", ($readings->{packCapacityRemain} / $readings->{packCapacity} * 100) if(defined $readings->{packCapacity});
     $readings->{packPower}       = sprintf "%.2f", $readings->{packCurrent} * $readings->{packVolt};
     
     for (my $i=1; $i <= $readings->{packCellcount}; $i++) {
@@ -966,7 +989,7 @@ return;
 
 =pod
 =item device
-=item summary Integration of pylontech LiFePo4 low voltage batteries (incl. BMS) over RS485 via ethernet gateway (ethernet interface)
+=item summary Integration of Pylontech LiFePo4 low voltage batteries (incl. BMS) over RS485 via ethernet gateway (ethernet interface)
 =item summary_DE Integration von Pylontech Niedervolt Batterien (mit BMS) über RS485 via Ethernet-Gateway (Ethernet Interface)
 
 =begin html
@@ -974,43 +997,61 @@ return;
 <a id="PylonLowVoltage"></a>
 <h3>PylonLowVoltage</h3>
 <br>
-Module for the integration of batteries with battery management system (BMS) from manufacturer Pylontech via RS485 via RS485 / Ethernet gateway.<br>
-The test was carried out with a US2000plus Pylontech battery, which was connected via a USRiot "USR-TCP" low-cost Ethernet gateway.<br>
-In principle, any other RS485 / Ethernet gateway should also be possible here.<br>
-The module thus only communicates via an Ethernet connection.<br>
+Module for integration of low voltage batteries with battery management system (BMS) of the manufacturer Pylontech via 
+RS485/Ethernet gateway. Communication to the RS485 gateway takes place exclusively via an Ethernet connection.<br>
+The module has been successfully used so far with Pylontech batteries of the following types: <br>
+
+<ul>
+ <li> US2000 </li>
+ <li> US2000plus </li>
+ <li> US3000 </li>
+ <li> US3000C </li>
+</ul>
+
+The following devices have been successfully used as RS485 Ethernet gateways to date: <br>
+<ul>
+ <li> USR-TCP232-304 from the manufacturer USRiot </li>
+ <li> Waveshare RS485 to Ethernet Converter       </li>
+</ul>
+ 
+In principle, any other RS485/Ethernet gateway should also be compatible.
 <br><br>
 
 <b>Requirements</b>
 <br><br>
 This module requires the Perl modules:
 <ul>
-    <li>IO::Socket::INET   (apt-get install libio-socket-multicast-perl)</li>
-    <li>IO::Socket::Timeout   (Installation e.g. via the CPAN shell)    </li>
+    <li>IO::Socket::INET    (apt-get install libio-socket-multicast-perl)                          </li>
+    <li>IO::Socket::Timeout (Installation e.g. via the CPAN shell or the FHEM Installer module)    </li>
 </ul>
-<br>
-<br>
 
 <a id="PylonLowVoltage-define"></a>
 <b>Definition</b>
 <ul>
-  <code><b>define &lt;name&gt; PylonLowVoltage &lt;bataddress&gt; &lt;hostname/ip&gt; &lt;port&gt; [&lt;timeout&gt;]</b></code><br>
+  <code><b>define &lt;name&gt; PylonLowVoltage &lt;hostname/ip&gt;:&lt;port&gt; [&lt;bataddress&gt;]</b></code><br>
   <br>
-  <li><b>bataddress:</b><br>
-  Device address of the Pylontech battery. Up to 6 pylon tech batteries can be connected via a Pylontech specific link link.<br>
-  The first battery in the network (to which the RS485 cable is connected) has the address 1, the next battery has the address 2 and so on.<br>
-  The individual batteries can thus be addressed individually.</li>
   <li><b>hostname/ip:</b><br>
-  Host name oder IP address of the RS485/Ethernet gateways</li>
+     Host name or IP address of the RS485/Ethernet gateway
+  </li>
+
   <li><b>port:</b><br>
-  Port number of the port configured in the RS485 / Ethernet Gateway</li>
-  <li><b>timeout:</b><br>
-  Timeout in seconds for a query (optional, default 10)<br></li>
+     Port number of the port configured in the RS485/Ethernet gateway
+  </li>
+  
+  <li><b>bataddress:</b><br>
+     Device address of the Pylontech battery. Up to 6 Pylontech batteries can be connected via a Pylontech-specific
+     link connection.<br>
+     The first battery in the network (to which the RS485 connection is connected) has the address 1, the next battery
+     then has address 2 and so on.<br>
+     If no device address is specified, address 1 is used.
+  </li>
+  <br>
 </ul>
 
-<b>Working method</b>
+<b>Mode of operation</b>
 <ul>
-The module cyclically reads values that the battery management system provides via the RS485 interface.<br>
-All data is read out at the interval specified in the definition.
+Depending on the setting of the "Interval" attribute, the module cyclically reads values provided by the battery 
+management system via the RS485 interface. 
 </ul>
 
 <a id="PylonLowVoltage-get"></a>
@@ -1018,7 +1059,7 @@ All data is read out at the interval specified in the definition.
 <br>
 <ul>
   <li><b>data</b><br>
-    The data query of the battery management system is executed. The timer of the cyclic query is reinitialized according
+    The data query of the battery management system is executed. The timer of the cyclic query is reinitialized according 
     to the set value of the "interval" attribute.
     <br>
   </li>
@@ -1031,15 +1072,22 @@ All data is read out at the interval specified in the definition.
 <ul>
    <a id="PylonLowVoltage-attr-disable"></a>
    <li><b>disable 0|1</b><br>
-     Activates/deactivates the device.
+     Enables/disables the device definition.
    </li>
    <br>
 
    <a id="PylonLowVoltage-attr-interval"></a>
    <li><b>interval &lt;seconds&gt;</b><br>
-     Interval of data retrieval from the battery in seconds. If "interval" is explicitly set to the value "0", there is no
-     automatic data query. <br>
+     Interval of the data request from the battery in seconds. If "interval" is explicitly set to the value "0", there is 
+     no automatic data request.<br>
      (default: 30)
+   </li>
+   <br>
+   
+   <a id="PylonLowVoltage-attr-timeout"></a>
+   <li><b>timeout &lt;seconds&gt;</b><br>
+     Timeout for establishing the connection to the RS485 gateway. <br>
+     (default: 0.5)
    </li>
    <br>
 </ul>
@@ -1047,30 +1095,57 @@ All data is read out at the interval specified in the definition.
 <a id="PylonLowVoltage-readings"></a>
 <b>Readings</b>
 <ul>
-<li><b>serialNumber</b><br>Serial number (is read only once a minute)<br></li>
-<li><b>batteryVoltage</b><br>Battery voltage of the entire battery [in V]<br></li>
-<li><b>averageCellVoltage</b><br>Mean cell voltage [in V]<br></li>
-<li><b>batteryCurrent</b><br>Battery current [in A]<br></li>
-<li><b>SOC</b><br>State of charge [in%]<br></li>
-<li><b>cycles</b><br>Number of Cycles - The number of cycles is a measure of battery wear.
-A complete load and unload is considered a cycle. If the battery is discharged and recharged 50%, it will only count as half a cycle.
-The manufacturer specifies a lifetime of several 1000 cycles (see data sheet).<br></li>
-<li><b>cellVoltage_1</b><br>Cell voltage of the 1st cell pack [in V] - In the battery 15 cell packs
-are connected in series. Each cell pack consists of parallel cells.<br></li>
-<li><b>cellVoltage_2</b><br>Cell voltage of the 2nd cell pack [in V]<br>
-<b>.</b><br>
-<b>.</b><br>
-<b>.</b><br>
-</li>
-<li><b>cellVoltage_15</b><br>Cell voltage of the 15th cell pack [in V]<br></li>
-<li><b>bmsTemperature</b><br>Temperature of the battery management system (BMS) [in ° C]<br></li>
-<li><b>cellTemperature_0104</b><br>Temperature of cell packs 1 to 4 [in ° C]<br></li>
-<li><b>cellTemperature_0508</b><br>Temperature of cell packs 5 to 8 [in ° C]<br></li>
-<li><b>cellTemperature_0912</b><br>Temperature of cell packs 9 to 12 [in ° C]<br></li>
-<li><b>cellTemperature_1315</b><br>Temperature of cell packs 13 to 15 [in ° C]<br></li>
-<li><b>alarmInfo</b><br>Alarm status [ok - battery module is OK, failure - there is a fault in the battery module]<br>(is read only once a minute)<br></li>
-<li><b>alarmInfoRaw</b><br>Alarm raw data for more detailed analysis<br>(is read only once a minute)<br></li>
-<li><b>state</b><br>Status [ok, failure, offline]<br></li>
+<li><b>averageCellVolt</b><br>        Average cell voltage (V)                                                           </li>
+<li><b>bmsTemperature</b><br>         Temperature (°C) of the battery management system                                  </li>
+<li><b>cellTemperature_0104</b><br>   Temperature (°C) of cell packs 1 to 4                                              </li>
+<li><b>cellTemperature_0508</b><br>   Temperature (°C) of cell packs 5 to 8                                              </li>
+<li><b>cellTemperature_0912</b><br>   Temperature (°C) of the cell packs 9 to 12                                         </li>
+<li><b>cellTemperature_1315</b><br>   Temperature (°C) of the cell packs 13 to 15                                        </li>
+<li><b>cellVoltage_XX</b><br>         Cell voltage (V) of the cell pack XX. In the battery module "packCellcount" 
+                                      cell packs are connected in series. Each cell pack consists of single cells 
+                                      connected in parallel.                                                             </li>
+<li><b>chargeCurrentLimit</b><br>     current limit value for the charging current (A)                                   </li>
+<li><b>chargeEnable</b><br>           current flag loading allowed                                                       </li>
+<li><b>chargeFullRequest</b><br>      current flag charge battery module fully (from the mains if necessary)             </li>
+<li><b>chargeImmediatelySOCXX</b><br> current flag charge battery module immediately 
+                                      (05: SOC limit 5-9%, 09: SOC limit 9-13%)                                          </li>
+<li><b>chargeVoltageLimit</b><br>     current charge voltage limit (V) of the battery module                             </li>
+<li><b>dischargeCurrentLimit</b><br>  current limit value for the discharge current (A)                                  </li>
+<li><b>dischargeEnable</b><br>        current flag unloading allowed                                                     </li>
+<li><b>dischargeVoltageLimit</b><br>  current discharge voltage limit (V) of the battery module                          </li>
+<li><b>packAlarmInfo</b><br>          Alarm status (ok - battery module is OK, failure - there is a fault in the 
+                                      battery module)                                                                    </li>                                                                                                             
+<li><b>packCapacity</b><br>           nominal capacity (Ah) of the battery module                                        </li>
+<li><b>packCapacityRemain</b><br>     current capacity (Ah) of the battery module                                        </li>
+<li><b>packCellcount</b><br>          Number of cell packs in the battery module                                         </li>
+<li><b>packCurrent</b><br>            current charge current (+) or discharge current (-) of the battery module (A)      </li>
+<li><b>packCycles</b><br>             Number of full cycles - The number of cycles is, to some extent, a measure of the 
+                                      wear and tear of the battery. A complete charge and discharge is counted as one 
+                                      cycle. If the battery is discharged and recharged 50%, it only counts as one 
+                                      half cycle. Pylontech specifies a lifetime of several 1000 cycles 
+                                      (see data sheet).                                                                  </li>
+<li><b>packImbalance</b><br>          current imbalance of voltage between the single cells of the 
+                                      battery module (%)                                                                 </li>
+<li><b>packPower</b><br>              current drawn (+) or delivered (-) power (W) of the battery module                 </li>
+<li><b>packSOC</b><br>                State of charge (%) of the battery module                                          </li>
+<li><b>packState</b><br>              current working status of the battery module                                       </li>
+<li><b>packVolt</b><br>               current voltage (V) of the battery module                                          </li>                                               
+
+<li><b>paramCellHighVoltLimit</b><br>      System parameter upper voltage limit (V) of a cell                                 </li>
+<li><b>paramCellLowVoltLimit</b><br>       System parameter lower voltage limit (V) of a cell (alarm limit)                   </li>
+<li><b>paramCellUnderVoltLimit</b><br>     System parameter undervoltage limit (V) of a cell (protection limit)               </li>
+<li><b>paramChargeCurrentLimit</b><br>     System parameter charging current limit (A) of the battery module                  </li>
+<li><b>paramChargeHighTempLimit</b><br>    System parameter upper temperature limit (°C) up to which the battery charges      </li>
+<li><b>paramChargeLowTempLimit</b><br>     System parameter lower temperature limit (°C) up to which the battery charges      </li>
+<li><b>paramDischargeCurrentLimit</b><br>  System parameter discharge current limit (A) of the battery module                 </li>
+<li><b>paramDischargeHighTempLimit</b><br> System parameter upper temperature limit (°C) up to which the battery discharges   </li>
+<li><b>paramDischargeLowTempLimit</b><br>  System parameter lower temperature limit (°C) up to which the battery discharges   </li>
+<li><b>paramModuleHighVoltLimit</b><br>    System parameter upper voltage limit (V) of the battery module                     </li>
+<li><b>paramModuleLowVoltLimit</b><br>     System parameter lower voltage limit (V) of the battery module (alarm limit)       </li>
+<li><b>paramModuleUnderVoltLimit</b><br>   System parameter undervoltage limit (V) of the battery module (protection limit)   </li>
+<li><b>protocolVersion</b><br>             PYLON low voltage RS485 protocol version                                           </li>
+<li><b>serialNumber</b><br>                Serial number                                                                      </li>
+<li><b>softwareVersion</b><br>             Firmware version of the battery module                                             </li>
 </ul>
 <br><br>
 
@@ -1080,7 +1155,7 @@ are connected in series. Each cell pack consists of parallel cells.<br></li>
 <a id="PylonLowVoltage"></a>
 <h3>PylonLowVoltage</h3>
 <br>
-Modul zur Einbindung von Batterien mit Batteriemanagmentsystem (BMS) des Herstellers Pylontech über RS485 via 
+Modul zur Einbindung von Niedervolt-Batterien mit Batteriemanagmentsystem (BMS) des Herstellers Pylontech über RS485 via 
 RS485/Ethernet-Gateway. Die Kommunikation zum RS485-Gateway erfolgt ausschließlich über eine Ethernet-Verbindung.<br>
 Das Modul wurde bisher erfolgreich mit Pylontech Batterien folgender Typen eingesetzt: <br>
 
@@ -1090,26 +1165,23 @@ Das Modul wurde bisher erfolgreich mit Pylontech Batterien folgender Typen einge
  <li> US3000 </li>
  <li> US3000C </li>
 </ul>
- <br>
 
-Als RS485-Ethernet-Gateways wurden bisher folgende Geräte eingesetzt: <br>
+Als RS485-Ethernet-Gateways wurden bisher folgende Geräte erfolgreich eingesetzt: <br>
 <ul>
  <li> USR-TCP232-304 des Herstellers USRiot </li>
  <li> Waveshare RS485 to Ethernet Converter </li>
 </ul>
-<br>
  
-Prinzipiell sollte hier auch jedes andere RS485/Ethernet-Gateway möglich sein.
+Prinzipiell sollte auch jedes andere RS485/Ethernet-Gateway kompatibel sein.
 <br><br>
 
 <b>Voraussetzungen</b>
 <br><br>
 Dieses Modul benötigt die Perl-Module:
 <ul>
-    <li>IO::Socket::INET    (apt-get install libio-socket-multicast-perl)</li>
-    <li>IO::Socket::Timeout (Installation z.B. über die CPAN-Shell)      </li>
+    <li>IO::Socket::INET    (apt-get install libio-socket-multicast-perl)                          </li>
+    <li>IO::Socket::Timeout (Installation z.B. über die CPAN-Shell oder das FHEM Installer Modul)  </li>
 </ul>
-<br>
 
 <a id="PylonLowVoltage-define"></a>
 <b>Definition</b>
@@ -1136,8 +1208,8 @@ Dieses Modul benötigt die Perl-Module:
 
 <b>Arbeitsweise</b>
 <ul>
-Das Modul liest zyklisch Werte aus, die das Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.<br>
-Alle Daten werden mit dem bei der Definition angegebene Intervall ausgelesen.
+Das Modul liest entsprechend der Einstellung des Attributes "interval" zyklisch Werte aus, die das 
+Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt. 
 </ul>
 
 <a id="PylonLowVoltage-get"></a>
@@ -1158,7 +1230,7 @@ Alle Daten werden mit dem bei der Definition angegebene Intervall ausgelesen.
 <ul>
    <a id="PylonLowVoltage-attr-disable"></a>
    <li><b>disable 0|1</b><br>
-     Aktiviert/deaktiviert das Gerät.
+     Aktiviert/deaktiviert die Gerätedefinition.
    </li>
    <br>
 
@@ -1181,29 +1253,57 @@ Alle Daten werden mit dem bei der Definition angegebene Intervall ausgelesen.
 <a id="PylonLowVoltage-readings"></a>
 <b>Readings</b>
 <ul>
-<li><b>serialNumber</b><br>Seriennummer<br>                                         </li>
-<li><b>batteryVoltage</b><br>Batterie Spannung (V) der gesamten Batterie<br>        </li>
-<li><b>averageCellVoltage</b><br>mittlere Zellenspannung (V) <br>                   </li>
-<li><b>batteryCurrent</b><br>Batteriestrom (A)<br>                                  </li>
-<li><b>SOC</b><br>Ladezustand (%)<br>                                               </li>
-<li><b>cycles</b><br>Anzahl der Zyklen - Die Anzahl der Zyklen ist in gewisserweise ein Maß für den Verschleiß der Batterie.
-                     Eine komplettes Laden und Entladen wird als ein Zyklus gewertet.
-                     Wird die Batterie 50% Entladen und wieder aufgeladen, zählt das nur als ein halber Zyklus.
-                     Der Hersteller gibt eine Lebensdauer von mehreren 1000 Zyklen an (siehe Datenblatt).<br>                </li>
-<li><b>cellVoltage_1</b><br>Zellenspannung (V) des 1. Zellenpacks - In der Batterie sind 15 Zellenpacks in Serie geschaltet.
-                            Jedes Zellenpack besteht aus parallel geschalten Einzelzellen.<br>                               </li>
-<li><b>cellVoltage_2</b><br>Zellenspannung (V) des 2. Zellenpacks<br>
-                        <b>.</b><br>
-                        <b>.</b><br>
-                        <b>.</b><br>
-                        </li>
-<li><b>cellVoltage_15</b><br>Zellenspannung (V) des 15. Zellenpacks<br>                            </li>
-<li><b>bmsTemperature</b><br>Temperatur (°C) des Batteriemanagementsystems<br>                     </li>
-<li><b>cellTemperature_0104</b><br>Temperatur (°C) der Zellenpacks 1 bis 4<br>                     </li>
-<li><b>cellTemperature_0508</b><br>Temperatur (°C) der Zellenpacks 5 bis 8<br>                     </li>
-<li><b>cellTemperature_0912</b><br>Temperatur (°C) der Zellenpacks 9 bis 12<br>                    </li>
-<li><b>cellTemperature_1315</b><br>Temperatur (°C) der Zellenpacks 13 bis 15<br>                   </li>
-<li><b>alarmInfo</b><br>Alarmstatus (ok - Batterienmodul ist in Ordnung, failure - im Batteriemodul liegt eine Störung vor)<br></li>                                                                                                               </li>
+<li><b>averageCellVolt</b><br>        mittlere Zellenspannung (V)                                                        </li>
+<li><b>bmsTemperature</b><br>         Temperatur (°C) des Batteriemanagementsystems                                      </li>
+<li><b>cellTemperature_0104</b><br>   Temperatur (°C) der Zellenpacks 1 bis 4                                            </li>
+<li><b>cellTemperature_0508</b><br>   Temperatur (°C) der Zellenpacks 5 bis 8                                            </li>
+<li><b>cellTemperature_0912</b><br>   Temperatur (°C) der Zellenpacks 9 bis 12                                           </li>
+<li><b>cellTemperature_1315</b><br>   Temperatur (°C) der Zellenpacks 13 bis 15                                          </li>
+<li><b>cellVoltage_XX</b><br>         Zellenspannung (V) des Zellenpacks XX. In dem Batteriemodul sind "packCellcount" 
+                                      Zellenpacks in Serie geschaltet verbaut. Jedes Zellenpack besteht aus parallel 
+                                      geschalten Einzelzellen.                                                           </li>
+<li><b>chargeCurrentLimit</b><br>     aktueller Grenzwert für den Ladestrom (A)                                          </li>
+<li><b>chargeEnable</b><br>           aktuelles Flag Laden erlaubt                                                       </li>
+<li><b>chargeFullRequest</b><br>      aktuelles Flag Batteriemodul voll laden (notfalls aus dem Netz)                    </li>
+<li><b>chargeImmediatelySOCXX</b><br> aktuelles Flag Batteriemodul sofort laden 
+                                      (05: SOC Grenze 5-9%, 09: SOC Grenze 9-13%)                                        </li>
+<li><b>chargeVoltageLimit</b><br>     aktuelle Ladespannungsgrenze (V) des Batteriemoduls                                </li>
+<li><b>dischargeCurrentLimit</b><br>  aktueller Grenzwert für den Entladestrom (A)                                       </li>
+<li><b>dischargeEnable</b><br>        aktuelles Flag Entladen erlaubt                                                    </li>
+<li><b>dischargeVoltageLimit</b><br>  aktuelle Entladespannungsgrenze (V) des Batteriemoduls                             </li>
+<li><b>packAlarmInfo</b><br>          Alarmstatus (ok - Batterienmodul ist in Ordnung, failure - im Batteriemodul liegt 
+                                      eine Störung vor)                                                                  </li>                                                                                                             
+<li><b>packCapacity</b><br>           nominale Kapazität (Ah) des Batteriemoduls                                         </li>
+<li><b>packCapacityRemain</b><br>     aktuelle Kapazität (Ah) des Batteriemoduls                                         </li>
+<li><b>packCellcount</b><br>          Anzahl der Zellenpacks im Batteriemodul                                            </li>
+<li><b>packCurrent</b><br>            aktueller Ladestrom (+) bzw. Entladstrom (-) des Batteriemoduls (A)                </li>
+<li><b>packCycles</b><br>             Anzahl der Vollzyklen - Die Anzahl der Zyklen ist in gewisserweise ein Maß für den 
+                                      Verschleiß der Batterie. Eine komplettes Laden und Entladen wird als ein Zyklus 
+                                      gewertet. Wird die Batterie 50% entladen und wieder aufgeladen, zählt das nur als ein 
+                                      halber Zyklus. Pylontech gibt eine Lebensdauer von mehreren 1000 Zyklen an 
+                                      (siehe Datenblatt).                                                                </li>
+<li><b>packImbalance</b><br>          aktuelles Ungleichgewicht der Spannung zwischen den Einzelzellen des 
+                                      Batteriemoduls (%)                                                                 </li>
+<li><b>packPower</b><br>              aktuell bezogene (+) bzw. gelieferte (-) Leistung (W) des Batteriemoduls           </li>
+<li><b>packSOC</b><br>                Ladezustand (%) des Batteriemoduls                                                 </li>
+<li><b>packState</b><br>              aktueller Arbeitsstatus des Batteriemoduls                                         </li>
+<li><b>packVolt</b><br>               aktuelle Spannung (V) des Batteriemoduls                                           </li>                                               
+
+<li><b>paramCellHighVoltLimit</b><br>      Systemparameter obere Spannungsgrenze (V) einer Zelle                         </li>
+<li><b>paramCellLowVoltLimit</b><br>       Systemparameter untere Spannungsgrenze (V) einer Zelle (Alarmgrenze)          </li>
+<li><b>paramCellUnderVoltLimit</b><br>     Systemparameter Unterspannungsgrenze (V) einer Zelle (Schutzgrenze)           </li>
+<li><b>paramChargeCurrentLimit</b><br>     Systemparameter Ladestromgrenze (A) des Batteriemoduls                        </li>
+<li><b>paramChargeHighTempLimit</b><br>    Systemparameter obere Temperaturgrenze (°C) bis zu der die Batterie lädt      </li>
+<li><b>paramChargeLowTempLimit</b><br>     Systemparameter untere Temperaturgrenze (°C) bis zu der die Batterie lädt     </li>
+<li><b>paramDischargeCurrentLimit</b><br>  Systemparameter Entladestromgrenze (A) des Batteriemoduls                     </li>
+<li><b>paramDischargeHighTempLimit</b><br> Systemparameter obere Temperaturgrenze (°C) bis zu der die Batterie entlädt   </li>
+<li><b>paramDischargeLowTempLimit</b><br>  Systemparameter untere Temperaturgrenze (°C) bis zu der die Batterie entlädt  </li>
+<li><b>paramModuleHighVoltLimit</b><br>    Systemparameter obere Spannungsgrenze (V) des Batteriemoduls                  </li>
+<li><b>paramModuleLowVoltLimit</b><br>     Systemparameter untere Spannungsgrenze (V) des Batteriemoduls (Alarmgrenze)   </li>
+<li><b>paramModuleUnderVoltLimit</b><br>   Systemparameter Unterspannungsgrenze (V) des Batteriemoduls (Schutzgrenze)    </li>
+<li><b>protocolVersion</b><br>             PYLON low voltage RS485 Prokollversion                                        </li>
+<li><b>serialNumber</b><br>                Seriennummer                                                                  </li>
+<li><b>softwareVersion</b><br>             Firmware Version des Batteriemoduls                                           </li>
 </ul>
 <br><br>
 
