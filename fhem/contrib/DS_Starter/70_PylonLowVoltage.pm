@@ -116,7 +116,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
-  "0.1.2"  => "20.08.2023 commandref revised, analogValue -> use 'user defined items' ",
+  "0.1.2"  => "20.08.2023 commandref revised, analogValue -> use 'user defined items', refactoring according PBP ",
   "0.1.1"  => "16.08.2023 integrate US3000C, add print request command in HEX to Logfile, attr timeout ".
                           "change validation of received data, change DEF format, extend evaluation of chargeManagmentInfo ".
                           "add evaluate systemParameters, additional own values packImbalance, packState ",
@@ -471,8 +471,6 @@ sub Update {
     my $interval  = AttrVal ($name, 'interval', $definterval);                                 # 0 -> manuell gesteuert
     my $timeout   = AttrVal ($name, 'timeout',        $defto);
     my %readings  = ();
-    my $protocol  = 'tcp';
-    my $rtnerr    = q{};
     
     my ($socket, $success);
 
@@ -494,270 +492,20 @@ sub Update {
         local $SIG{ALRM} = sub { croak 'gatewaytimeout' };
         ualarm ($timeout * 1000000);                                                           # ualarm in Mikrosekunden
 
-        $socket = IO::Socket::INET->new( Proto    => $protocol, 
-                                         PeerAddr => $hash->{HOST}, 
-                                         PeerPort => $hash->{PORT}, 
-                                         Timeout  => $timeout
-                                       );
-                                          
-        if (!$socket) {
-            doOnError ({ hash     => $hash, 
-                         readings => \%readings, 
-                         state    => 'no socket is established to RS485 gateway'
-                       }
-                      );           
-            return;        
-        }
-
-        if (!$socket->connected()) {
-            doOnError ({ hash     => $hash, 
-                         readings => \%readings,
-                         sock     => $socket,                         
-                         state    => 'disconnected'
-                       }
-                      );            
-            return;
-        }
-
-        IO::Socket::Timeout->enable_timeouts_on ($socket);                       # nur notwendig für read or write timeout
-        my $rwto = $timeout - 0.05;
-        $rwto    = $rwto <= 0 ? 0.005 : $rwto; 
+        $socket = _createSocket ($hash, $timeout, \%readings);
+        return if(!$socket);
         
-        $socket->read_timeout  ($rwto);                                          # Read/Writetimeout immer kleiner als Sockettimeout
-        $socket->write_timeout ($rwto);
-        $socket->autoflush(1);
-
-        my $res;
-
-        # relativ statische Werte abrufen
-        ###################################
-        if (ReadingsAge ($name, "serialNumber", 601) >= 60) {
-            # Abruf serialNumber
-            #####################
-            $res = Request($hash, $socket, $hrsnb{$hash->{BATADDRESS}}{cmd}, 'serialNumber');
-            
-            $rtnerr = respStat ($res);
-            if ($rtnerr) {
-                doOnError ({ hash     => $hash, 
-                             readings => \%readings,
-                             sock     => $socket,                             
-                             state    => $rtnerr
-                           }
-                          );                
-                return;
-            }
-
-            my $sernum              = substr ($res, 15, 32);
-            $readings{serialNumber} = pack   ("H*", $sernum);
-            
-            # Abruf manufacturerInfo
-            #########################
-            $res = Request($hash, $socket, $hrmfi{$hash->{BATADDRESS}}{cmd}, 'manufacturerInfo');
-            
-            $rtnerr = respStat ($res);
-            if ($rtnerr) {
-                doOnError ({ hash     => $hash, 
-                             readings => \%readings, 
-                             sock     => $socket,
-                             state    => $rtnerr
-                           }
-                          );                  
-                return;
-            }
-
-            my $BatteryHex             = substr ($res, 13, 20);                       
-            $readings{batteryType}     = pack   ("H*", $BatteryHex);
-            $readings{softwareVersion} = 'V'.hex (substr ($res, 33, 2)).'.'.hex (substr ($res, 35, 2));      # substr ($res, 33, 4);
-            my $ManufacturerHex        = substr ($res, 37, 40);
-            $readings{Manufacturer}    = pack   ("H*", $ManufacturerHex);
-            
-            # Abruf protocolVersion
-            ########################                
-            $res = Request($hash, $socket, $hrprt{$hash->{BATADDRESS}}{cmd}, 'protocolVersion');
-            
-            $rtnerr = respStat ($res);
-            if ($rtnerr) {
-                doOnError ({ hash     => $hash, 
-                             readings => \%readings,
-                             sock     => $socket,                             
-                             state    => $rtnerr
-                           }
-                          );  
-                return;
-            }
-    
-            $readings{protocolVersion} = 'V'.hex (substr ($res, 1, 1)).'.'.hex (substr ($res, 2, 1));
-            
-            # Abruf softwareVersion
-            ########################
-            $res = Request($hash, $socket, $hrswv{$hash->{BATADDRESS}}{cmd}, 'softwareVersion');
-            
-            $rtnerr = respStat ($res);
-            if ($rtnerr) {
-                doOnError ({ hash     => $hash, 
-                             readings => \%readings,
-                             sock     => $socket,                             
-                             state    => $rtnerr
-                           }
-                          );                  
-                return;
-            }
-
-            $readings{moduleSoftwareVersion_manufacture} = 'V'.hex (substr ($res, 15, 2)).'.'.hex (substr ($res, 17, 2)); 
-            $readings{moduleSoftwareVersion_mainline}    = 'V'.hex (substr ($res, 19, 2)).'.'.hex (substr ($res, 21, 2)).'.'.hex (substr ($res, 23, 2));
-
-            # Abruf Systemparameter
-            ########################
-            $res = Request($hash, $socket, $hrspm{$hash->{BATADDRESS}}{cmd}, 'systemParameters');
-
-            $rtnerr = respStat ($res);
-            if ($rtnerr) {
-                doOnError ({ hash     => $hash, 
-                             readings => \%readings,
-                             sock     => $socket,                             
-                             state    => $rtnerr
-                           }
-                          );                  
-                return;
-            }
-            
-            $readings{paramCellHighVoltLimit}      = sprintf "%.3f", (hex substr  ($res, 15, 4)) / 1000;
-            $readings{paramCellLowVoltLimit}       = sprintf "%.3f", (hex substr  ($res, 19, 4)) / 1000;                   # Alarm Limit
-            $readings{paramCellUnderVoltLimit}     = sprintf "%.3f", (hex substr  ($res, 23, 4)) / 1000;                   # Schutz Limit
-            $readings{paramChargeHighTempLimit}    = sprintf "%.1f", ((hex substr ($res, 27, 4)) - 2731) / 10; 
-            $readings{paramChargeLowTempLimit}     = sprintf "%.1f", ((hex substr ($res, 31, 4)) - 2731) / 10; 
-            $readings{paramChargeCurrentLimit}     = sprintf "%.3f", (hex substr  ($res, 35, 4)) * 100 / 1000; 
-            $readings{paramModuleHighVoltLimit}    = sprintf "%.3f", (hex substr  ($res, 39, 4)) / 1000;
-            $readings{paramModuleLowVoltLimit}     = sprintf "%.3f", (hex substr  ($res, 43, 4)) / 1000;                   # Alarm Limit
-            $readings{paramModuleUnderVoltLimit}   = sprintf "%.3f", (hex substr  ($res, 47, 4)) / 1000;                   # Schutz Limit
-            $readings{paramDischargeHighTempLimit} = sprintf "%.1f", ((hex substr ($res, 51, 4)) - 2731) / 10;
-            $readings{paramDischargeLowTempLimit}  = sprintf "%.1f", ((hex substr ($res, 55, 4)) - 2731) / 10;
-            $readings{paramDischargeCurrentLimit}  = sprintf "%.3f", (65535 - (hex substr  ($res, 59, 4))) * 100 / 1000;   # mit Symbol (-)
-        }
-        
-        # Abruf alarmInfo
-        ##################
-        $res = Request($hash, $socket, $hralm{$hash->{BATADDRESS}}{cmd}, 'alarmInfo');
-        
-        $rtnerr = respStat ($res);
-        if ($rtnerr) {
-            doOnError ({ hash     => $hash, 
-                         readings => \%readings,
-                         sock     => $socket,                             
-                         state    => $rtnerr
-                       }
-                      );                  
-            return;
-        }
-        
-        $readings{packCellcount} = hex (substr($res, 17, 2));
-
-        if (substr($res, 19, 30) eq "000000000000000000000000000000" && 
-            substr($res, 51, 10) eq "0000000000"                     && 
-            substr($res, 67, 2)  eq "00"                             && 
-            substr($res, 73, 4)  eq "0000") {
-            $readings{packAlarmInfo} = "ok";
-        }
-        else {
-            $readings{packAlarmInfo} = "failure";
-        }
-        
-        # Abruf chargeManagmentInfo
-        ############################
-        $res = Request($hash, $socket, $hrcmi{$hash->{BATADDRESS}}{cmd}, 'chargeManagmentInfo');
-        
-        $rtnerr = respStat ($res);
-        if ($rtnerr) {
-            doOnError ({ hash     => $hash, 
-                         readings => \%readings,
-                         sock     => $socket,                             
-                         state    => $rtnerr
-                       }
-                      );                 
-            return;
-        }
-
-        $readings{chargeVoltageLimit}    = sprintf "%.3f", hex (substr ($res, 15, 4)) / 1000;        # Genauigkeit 3
-        $readings{dischargeVoltageLimit} = sprintf "%.3f", hex (substr ($res, 19, 4)) / 1000;        # Genauigkeit 3
-        $readings{chargeCurrentLimit}    = sprintf "%.1f", hex (substr ($res, 23, 4)) / 10;          # Genauigkeit 1
-        $readings{dischargeCurrentLimit} = sprintf "%.1f", (65536 - hex substr ($res, 27, 4)) / 10;  # Genauigkeit 1, Fixed point, unsigned integer
-
-        my $cdstat                        = sprintf "%08b", hex substr ($res, 31, 2);                # Rohstatus
-        $readings{chargeEnable}           = substr ($cdstat, 0, 1) == 1 ? 'yes' : 'no';              # Bit 7
-        $readings{dischargeEnable}        = substr ($cdstat, 1, 1) == 1 ? 'yes' : 'no';              # Bit 6
-        $readings{chargeImmediatelySOC05} = substr ($cdstat, 2, 1) == 1 ? 'yes' : 'no';              # Bit 5 - SOC 5~9%  -> für Wechselrichter, die aktives Batteriemanagement bei gegebener DC-Spannungsfunktion haben oder Wechselrichter, der von sich aus einen niedrigen SOC/Spannungsgrenzwert hat
-        $readings{chargeImmediatelySOC09} = substr ($cdstat, 3, 1) == 1 ? 'yes' : 'no';              # Bit 4 - SOC 9~13% -> für Wechselrichter hat keine aktive Batterieabschaltung haben
-        $readings{chargeFullRequest}      = substr ($cdstat, 4, 1) == 1 ? 'yes' : 'no';              # Bit 3 - wenn SOC in 30 Tagen nie höher als 97% -> Flag = 1, wenn SOC-Wert ≥ 97% -> Flag = 0
-
-        # Abruf analogValue
-        ####################
-        # Answer from US2000 = 128 Bytes, from US3000 = 140 Bytes
-        # Remain capacity US2000 hex(substr($res,109,4), US3000 hex(substr($res,123,6)
-        # Module capacity US2000 hex(substr($res,115,4), US3000 hex(substr($res,129,6)
-        ###############################################################################
-        $res = Request($hash, $socket, $hrcmn{$hash->{BATADDRESS}}{cmd}, 'analogValue');
-
-        $rtnerr = respStat ($res);
-        if ($rtnerr) {
-            doOnError ({ hash     => $hash, 
-                         readings => \%readings,
-                         sock     => $socket,                             
-                         state    => $rtnerr
-                       }
-                      );                
-            return;
-        }     
-
-        $readings{packCellcount}        = hex (substr($res, 17,  2));
-        $readings{cellVoltage_01}       = sprintf "%.3f", hex(substr($res,19,4)) / 1000;
-        $readings{cellVoltage_02}       = sprintf "%.3f", hex(substr($res,23,4)) / 1000;
-        $readings{cellVoltage_03}       = sprintf "%.3f", hex(substr($res,27,4)) / 1000;
-        $readings{cellVoltage_04}       = sprintf "%.3f", hex(substr($res,31,4)) / 1000;
-        $readings{cellVoltage_05}       = sprintf "%.3f", hex(substr($res,35,4)) / 1000;
-        $readings{cellVoltage_06}       = sprintf "%.3f", hex(substr($res,39,4)) / 1000;
-        $readings{cellVoltage_07}       = sprintf "%.3f", hex(substr($res,43,4)) / 1000;
-        $readings{cellVoltage_08}       = sprintf "%.3f", hex(substr($res,47,4)) / 1000;
-        $readings{cellVoltage_09}       = sprintf "%.3f", hex(substr($res,51,4)) / 1000;
-        $readings{cellVoltage_10}       = sprintf "%.3f", hex(substr($res,55,4)) / 1000;
-        $readings{cellVoltage_11}       = sprintf "%.3f", hex(substr($res,59,4)) / 1000;
-        $readings{cellVoltage_12}       = sprintf "%.3f", hex(substr($res,63,4)) / 1000;
-        $readings{cellVoltage_13}       = sprintf "%.3f", hex(substr($res,67,4)) / 1000;
-        $readings{cellVoltage_14}       = sprintf "%.3f", hex(substr($res,71,4)) / 1000;
-        $readings{cellVoltage_15}       = sprintf "%.3f", hex(substr($res,75,4)) / 1000; 
-        # $readings{numberOfTempPos}     =                 hex(substr($res,79,2));              # Anzahl der jetzt folgenden Teperaturpositionen -> 5
-        $readings{bmsTemperature}       = (hex (substr($res, 81,  4)) - 2731) / 10;             # 1
-        $readings{cellTemperature_0104} = (hex (substr($res, 85,  4)) - 2731) / 10;             # 2
-        $readings{cellTemperature_0508} = (hex (substr($res, 89,  4)) - 2731) / 10;             # 3
-        $readings{cellTemperature_0912} = (hex (substr($res, 93,  4)) - 2731) / 10;             # 4
-        $readings{cellTemperature_1315} = (hex (substr($res, 97,  4)) - 2731) / 10;             # 5
-        my $current                     =  hex (substr($res, 101, 4));     
-        $readings{packVolt}             =  hex (substr($res, 105, 4)) / 1000;
-        
-        if ($current & 0x8000) {
-            $current = $current - 0x10000;
-        }
-
-        $readings{packCurrent} = sprintf "%.3f", $current / 10;
-        my $udi                = hex substr($res, 113, 2);                                      # user defined item: 2: Batterien <= 65Ah, 4: Batterien > 65Ah
-        $readings{packCycles}  = hex substr($res, 119, 4);
-$udi = 0;
-        if ($udi == 2) {
-            $readings{packCapacityRemain} = hex (substr($res, 109, 4)) / 1000;
-            $readings{packCapacity}       = hex (substr($res, 115, 4)) / 1000;
-        }
-        elsif ($udi == 4) {
-            $readings{packCapacityRemain} = hex (substr($res, 123, 6)) / 1000;
-            $readings{packCapacity}       = hex (substr($res, 129, 6)) / 1000;
-        }
-        else {
-            doOnError ({ hash     => $hash, 
-                         readings => \%readings,
-                         sock     => $socket,                             
-                         state    => 'wrong value retrieve analogValue -> user defined items: '.$udi
-                       }
-                      );                
-            return;
-        }
+        if (ReadingsAge ($name, "serialNumber", 601) >= 60) {                    # relativ statische Werte abrufen
+            return if(_callSerialNumber     ($hash, $socket, \%readings));       # Abruf serialNumber
+            return if(_callManufacturerInfo ($hash, $socket, \%readings));       # Abruf manufacturerInfo            
+            return if(_callProtocolVersion  ($hash, $socket, \%readings));       # Abruf protocolVersion
+            return if(_callSoftwareVersion  ($hash, $socket, \%readings));       # Abruf softwareVersion
+            return if(_callSystemParameters ($hash, $socket, \%readings));       # Abruf systemParameters
+        }   
+               
+        return if(_callAlarmInfo            ($hash, $socket, \%readings));       # Abruf alarmInfo
+        return if(_callChargeManagmentInfo  ($hash, $socket, \%readings));       # Abruf chargeManagmentInfo      
+        return if(_callAnalogValue          ($hash, $socket, \%readings));       # Abruf analogValue
         
         $success = 1;
     };  # eval
@@ -792,6 +540,348 @@ $udi = 0;
     
     createReadings ($hash, \%readings);                                                  # Readings erstellen
 
+return;
+}
+
+###############################################################
+#       Socket erstellen
+###############################################################
+sub _createSocket {               
+  my $hash     = shift; 
+  my $timeout  = shift;    
+  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
+
+  my $socket = IO::Socket::INET->new( Proto    => 'tcp', 
+                                      PeerAddr => $hash->{HOST}, 
+                                      PeerPort => $hash->{PORT}, 
+                                      Timeout  => $timeout
+                                    );
+                                      
+  if (!$socket) {
+      doOnError ({ hash     => $hash, 
+                   readings => $readings, 
+                   state    => 'no socket is established to RS485 gateway'
+                 }
+                );           
+      return;        
+  }
+
+  if (!$socket->connected()) {
+      doOnError ({ hash     => $hash, 
+                   readings => $readings,
+                   sock     => $socket,                         
+                   state    => 'disconnected'
+                 }
+                );            
+      return;
+  }
+
+  IO::Socket::Timeout->enable_timeouts_on ($socket);                       # nur notwendig für read or write timeout
+  my $rwto = $timeout - 0.05;
+  $rwto    = $rwto <= 0 ? 0.005 : $rwto; 
+    
+  $socket->read_timeout  ($rwto);                                          # Read/Writetimeout immer kleiner als Sockettimeout
+  $socket->write_timeout ($rwto);
+  $socket->autoflush(1);
+        
+return $socket;
+}
+
+###############################################################
+#       Abruf serialNumber
+###############################################################
+sub _callSerialNumber {
+  my $hash     = shift;
+  my $socket   = shift;    
+  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
+
+  my $res = Request($hash, $socket, $hrsnb{$hash->{BATADDRESS}}{cmd}, 'serialNumber');
+
+  my $rtnerr = respStat ($res);
+  if ($rtnerr) {
+      doOnError ({ hash     => $hash, 
+                   readings => $readings,
+                   sock     => $socket,                             
+                   state    => $rtnerr
+                 }
+                );                
+      return $rtnerr;
+  }
+
+  my $sernum                = substr ($res, 15, 32);
+  $readings->{serialNumber} = pack   ("H*", $sernum);
+    
+return;
+}
+
+###############################################################
+#       Abruf manufacturerInfo
+###############################################################
+sub _callManufacturerInfo {
+  my $hash     = shift;
+  my $socket   = shift;    
+  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
+
+  my $res = Request($hash, $socket, $hrmfi{$hash->{BATADDRESS}}{cmd}, 'manufacturerInfo');
+    
+  my $rtnerr = respStat ($res);
+  if ($rtnerr) {
+      doOnError ({ hash     => $hash, 
+                   readings => $readings,
+                   sock     => $socket,                             
+                   state    => $rtnerr
+                 }
+                );                
+      return $rtnerr;
+  }
+
+  my $BatteryHex               = substr ($res, 13, 20);                       
+  $readings->{batteryType}     = pack   ("H*", $BatteryHex);
+  $readings->{softwareVersion} = 'V'.hex (substr ($res, 33, 2)).'.'.hex (substr ($res, 35, 2));      # substr ($res, 33, 4);
+  my $ManufacturerHex          = substr ($res, 37, 40);
+  $readings->{Manufacturer}    = pack   ("H*", $ManufacturerHex);
+    
+return;
+}
+
+###############################################################
+#       Abruf protocolVersion
+###############################################################
+sub _callProtocolVersion {
+  my $hash     = shift;
+  my $socket   = shift;    
+  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
+
+  my $res = Request($hash, $socket, $hrprt{$hash->{BATADDRESS}}{cmd}, 'protocolVersion');
+    
+  my $rtnerr = respStat ($res);
+  if ($rtnerr) {
+      doOnError ({ hash     => $hash, 
+                   readings => $readings,
+                   sock     => $socket,                             
+                   state    => $rtnerr
+                 }
+                );                
+      return $rtnerr;
+  }
+
+  $readings->{protocolVersion} = 'V'.hex (substr ($res, 1, 1)).'.'.hex (substr ($res, 2, 1));
+    
+return;
+}
+
+###############################################################
+#       Abruf softwareVersion
+###############################################################
+sub _callSoftwareVersion {
+  my $hash     = shift;
+  my $socket   = shift;    
+  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
+
+  my $res = Request($hash, $socket, $hrswv{$hash->{BATADDRESS}}{cmd}, 'softwareVersion');
+    
+  my $rtnerr = respStat ($res);
+  if ($rtnerr) {
+      doOnError ({ hash     => $hash, 
+                   readings => $readings,
+                   sock     => $socket,                             
+                   state    => $rtnerr
+                 }
+                );                
+      return $rtnerr;
+  }
+
+  $readings->{moduleSoftwareVersion_manufacture} = 'V'.hex (substr ($res, 15, 2)).'.'.hex (substr ($res, 17, 2)); 
+  $readings->{moduleSoftwareVersion_mainline}    = 'V'.hex (substr ($res, 19, 2)).'.'.hex (substr ($res, 21, 2)).'.'.hex (substr ($res, 23, 2));
+  
+return;
+}
+
+###############################################################
+#       Abruf systemParameters
+###############################################################
+sub _callSystemParameters {
+  my $hash     = shift;
+  my $socket   = shift;    
+  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
+
+  my $res = Request($hash, $socket, $hrspm{$hash->{BATADDRESS}}{cmd}, 'systemParameters');
+    
+  my $rtnerr = respStat ($res);
+  if ($rtnerr) {
+      doOnError ({ hash     => $hash, 
+                   readings => $readings,
+                   sock     => $socket,                             
+                   state    => $rtnerr
+                 }
+                );                
+      return $rtnerr;
+  }
+
+  $readings->{paramCellHighVoltLimit}      = sprintf "%.3f", (hex substr  ($res, 15, 4)) / 1000;
+  $readings->{paramCellLowVoltLimit}       = sprintf "%.3f", (hex substr  ($res, 19, 4)) / 1000;                   # Alarm Limit
+  $readings->{paramCellUnderVoltLimit}     = sprintf "%.3f", (hex substr  ($res, 23, 4)) / 1000;                   # Schutz Limit
+  $readings->{paramChargeHighTempLimit}    = sprintf "%.1f", ((hex substr ($res, 27, 4)) - 2731) / 10; 
+  $readings->{paramChargeLowTempLimit}     = sprintf "%.1f", ((hex substr ($res, 31, 4)) - 2731) / 10; 
+  $readings->{paramChargeCurrentLimit}     = sprintf "%.3f", (hex substr  ($res, 35, 4)) * 100 / 1000; 
+  $readings->{paramModuleHighVoltLimit}    = sprintf "%.3f", (hex substr  ($res, 39, 4)) / 1000;
+  $readings->{paramModuleLowVoltLimit}     = sprintf "%.3f", (hex substr  ($res, 43, 4)) / 1000;                   # Alarm Limit
+  $readings->{paramModuleUnderVoltLimit}   = sprintf "%.3f", (hex substr  ($res, 47, 4)) / 1000;                   # Schutz Limit
+  $readings->{paramDischargeHighTempLimit} = sprintf "%.1f", ((hex substr ($res, 51, 4)) - 2731) / 10;
+  $readings->{paramDischargeLowTempLimit}  = sprintf "%.1f", ((hex substr ($res, 55, 4)) - 2731) / 10;
+  $readings->{paramDischargeCurrentLimit}  = sprintf "%.3f", (65535 - (hex substr  ($res, 59, 4))) * 100 / 1000;   # mit Symbol (-)
+  
+return;
+}
+
+###############################################################
+#       Abruf alarmInfo
+###############################################################
+sub _callAlarmInfo {
+  my $hash     = shift;
+  my $socket   = shift;    
+  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
+
+  my $res = Request($hash, $socket, $hralm{$hash->{BATADDRESS}}{cmd}, 'alarmInfo');
+    
+  my $rtnerr = respStat ($res);
+  if ($rtnerr) {
+      doOnError ({ hash     => $hash, 
+                   readings => $readings,
+                   sock     => $socket,                             
+                   state    => $rtnerr
+                 }
+                );                
+      return $rtnerr;
+  }
+
+  $readings->{packCellcount} = hex (substr($res, 17, 2));
+
+  if (substr($res, 19, 30) eq "000000000000000000000000000000" && 
+      substr($res, 51, 10) eq "0000000000"                     && 
+      substr($res, 67, 2)  eq "00"                             && 
+      substr($res, 73, 4)  eq "0000") {
+      $readings->{packAlarmInfo} = "ok";
+  }
+  else {
+      $readings->{packAlarmInfo} = "failure";
+  }
+        
+return;
+}
+
+###############################################################
+#       Abruf chargeManagmentInfo
+###############################################################
+sub _callChargeManagmentInfo {
+  my $hash     = shift;
+  my $socket   = shift;    
+  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
+
+  my $res = Request($hash, $socket, $hrcmi{$hash->{BATADDRESS}}{cmd}, 'chargeManagmentInfo');
+    
+  my $rtnerr = respStat ($res);
+  if ($rtnerr) {
+      doOnError ({ hash     => $hash, 
+                   readings => $readings,
+                   sock     => $socket,                             
+                   state    => $rtnerr
+                 }
+                );                
+      return $rtnerr;
+  }
+
+  $readings->{chargeVoltageLimit}     = sprintf "%.3f", hex (substr ($res, 15, 4)) / 1000;        # Genauigkeit 3
+  $readings->{dischargeVoltageLimit}  = sprintf "%.3f", hex (substr ($res, 19, 4)) / 1000;        # Genauigkeit 3
+  $readings->{chargeCurrentLimit}     = sprintf "%.1f", hex (substr ($res, 23, 4)) / 10;          # Genauigkeit 1
+  $readings->{dischargeCurrentLimit}  = sprintf "%.1f", (65536 - hex substr ($res, 27, 4)) / 10;  # Genauigkeit 1, Fixed point, unsigned integer
+
+  my $cdstat                          = sprintf "%08b", hex substr ($res, 31, 2);                 # Rohstatus
+  $readings->{chargeEnable}           = substr ($cdstat, 0, 1) == 1 ? 'yes' : 'no';               # Bit 7
+  $readings->{dischargeEnable}        = substr ($cdstat, 1, 1) == 1 ? 'yes' : 'no';               # Bit 6
+  $readings->{chargeImmediatelySOC05} = substr ($cdstat, 2, 1) == 1 ? 'yes' : 'no';               # Bit 5 - SOC 5~9%  -> für Wechselrichter, die aktives Batteriemanagement bei gegebener DC-Spannungsfunktion haben oder Wechselrichter, der von sich aus einen niedrigen SOC/Spannungsgrenzwert hat
+  $readings->{chargeImmediatelySOC09} = substr ($cdstat, 3, 1) == 1 ? 'yes' : 'no';               # Bit 4 - SOC 9~13% -> für Wechselrichter hat keine aktive Batterieabschaltung haben
+  $readings->{chargeFullRequest}      = substr ($cdstat, 4, 1) == 1 ? 'yes' : 'no';               # Bit 3 - wenn SOC in 30 Tagen nie höher als 97% -> Flag = 1, wenn SOC-Wert ≥ 97% -> Flag = 0
+        
+return;
+}
+
+#################################################################################
+#       Abruf analogValue
+# Answer from US2000 = 128 Bytes, from US3000 = 140 Bytes
+# Remain capacity US2000 hex(substr($res,109,4), US3000 hex(substr($res,123,6)
+# Module capacity US2000 hex(substr($res,115,4), US3000 hex(substr($res,129,6)
+#################################################################################
+sub _callAnalogValue {
+  my $hash     = shift;
+  my $socket   = shift;    
+  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
+
+  my $res = Request($hash, $socket, $hrcmn{$hash->{BATADDRESS}}{cmd}, 'analogValue');
+    
+  my $rtnerr = respStat ($res);
+  if ($rtnerr) {
+      doOnError ({ hash     => $hash, 
+                   readings => $readings,
+                   sock     => $socket,                             
+                   state    => $rtnerr
+                 }
+                );                
+      return $rtnerr;
+  }
+
+  $readings->{packCellcount}        = hex (substr($res, 17,  2));
+  $readings->{cellVoltage_01}       = sprintf "%.3f", hex(substr($res,19,4)) / 1000;
+  $readings->{cellVoltage_02}       = sprintf "%.3f", hex(substr($res,23,4)) / 1000;
+  $readings->{cellVoltage_03}       = sprintf "%.3f", hex(substr($res,27,4)) / 1000;
+  $readings->{cellVoltage_04}       = sprintf "%.3f", hex(substr($res,31,4)) / 1000;
+  $readings->{cellVoltage_05}       = sprintf "%.3f", hex(substr($res,35,4)) / 1000;
+  $readings->{cellVoltage_06}       = sprintf "%.3f", hex(substr($res,39,4)) / 1000;
+  $readings->{cellVoltage_07}       = sprintf "%.3f", hex(substr($res,43,4)) / 1000;
+  $readings->{cellVoltage_08}       = sprintf "%.3f", hex(substr($res,47,4)) / 1000;
+  $readings->{cellVoltage_09}       = sprintf "%.3f", hex(substr($res,51,4)) / 1000;
+  $readings->{cellVoltage_10}       = sprintf "%.3f", hex(substr($res,55,4)) / 1000;
+  $readings->{cellVoltage_11}       = sprintf "%.3f", hex(substr($res,59,4)) / 1000;
+  $readings->{cellVoltage_12}       = sprintf "%.3f", hex(substr($res,63,4)) / 1000;
+  $readings->{cellVoltage_13}       = sprintf "%.3f", hex(substr($res,67,4)) / 1000;
+  $readings->{cellVoltage_14}       = sprintf "%.3f", hex(substr($res,71,4)) / 1000;
+  $readings->{cellVoltage_15}       = sprintf "%.3f", hex(substr($res,75,4)) / 1000; 
+  # $readings->{numberOfTempPos}     =                 hex(substr($res,79,2));              # Anzahl der jetzt folgenden Teperaturpositionen -> 5
+  $readings->{bmsTemperature}       = (hex (substr($res, 81,  4)) - 2731) / 10;             # 1
+  $readings->{cellTemperature_0104} = (hex (substr($res, 85,  4)) - 2731) / 10;             # 2
+  $readings->{cellTemperature_0508} = (hex (substr($res, 89,  4)) - 2731) / 10;             # 3
+  $readings->{cellTemperature_0912} = (hex (substr($res, 93,  4)) - 2731) / 10;             # 4
+  $readings->{cellTemperature_1315} = (hex (substr($res, 97,  4)) - 2731) / 10;             # 5
+  my $current                       =  hex (substr($res, 101, 4));     
+  $readings->{packVolt}             =  hex (substr($res, 105, 4)) / 1000;
+    
+  if ($current & 0x8000) {
+      $current = $current - 0x10000;
+  }
+
+  $readings->{packCurrent} = sprintf "%.3f", $current / 10;
+  my $udi                  = hex substr($res, 113, 2);                                      # user defined item=Entscheidungskriterium -> 2: Batterien <= 65Ah, 4: Batterien > 65Ah
+  $readings->{packCycles}  = hex substr($res, 119, 4);
+
+  if ($udi == 2) {
+      $readings->{packCapacityRemain} = hex (substr($res, 109, 4)) / 1000;
+      $readings->{packCapacity}       = hex (substr($res, 115, 4)) / 1000;
+  }
+  elsif ($udi == 4) {
+      $readings->{packCapacityRemain} = hex (substr($res, 123, 6)) / 1000;
+      $readings->{packCapacity}       = hex (substr($res, 129, 6)) / 1000;
+  }
+  else {
+      my $err = 'wrong value retrieve analogValue -> user defined items: '.$udi;
+      doOnError ({ hash     => $hash, 
+                   readings => $readings,
+                   sock     => $socket,                             
+                   state    => $err
+                 }
+                );                
+      return $err;
+  }
+        
 return;
 }
 
