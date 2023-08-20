@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2023-08-15 23:53:24Z DS_Starter $
+# $Id$
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -1125,7 +1125,7 @@ sub Set {
 
   return if(IsDisabled($name));
 
-  my ($setlist,@fcdevs,@cfs,@scp,@condevs);
+  my ($setlist,@fcdevs,@cfs,@condevs);
   my ($fcd,$ind,$med,$cf,$sp,$coms) = ('','','','','','');
 
   my @re = qw( ConsumerMaster
@@ -2204,6 +2204,9 @@ return $getlist;
 
 ################################################################
 #                Getter roofTop data
+#
+# für Victron VRM API
+# https://vrmapi.victronenergy.com/v2/installations/<instalation id>/stats?type=forecast&interval=hours&start=<start date and time>&end=<end date and time> 
 ################################################################
 sub _getRoofTopData {
   my $paref = shift;
@@ -12424,9 +12427,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Der DWD-Dienst wird über ein FHEM Device vom Typ DWD_OpenData eingebunden.
       Ist noch kein Device des Typs DWD_OpenData vorhanden, muß es vorab definiert werden 
       (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
-      Um eine gute Strahlungsprognose zu erhalten sollte eine sehr dem Anlagenstandort gelegene DWD-Station genutzt 
+      Um eine gute Strahlungsprognose zu erhalten, sollte eine nahe dem Anlagenstandort gelegene DWD-Station genutzt 
       werden. Leider liefern nicht alle DWD-Station die benötigten Rad1h-Werte. <br>
-      Im ausgewählten DWD_OpenData Device müssen mindestens diese Attribute gesetzt sein: <br><br>
+      Im ausgewählten DWD_OpenData Device müssen mindestens die folgenden Attribute gesetzt sein: <br><br>
 
       <ul>
          <table>
