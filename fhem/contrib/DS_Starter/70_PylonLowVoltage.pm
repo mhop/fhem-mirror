@@ -126,53 +126,6 @@ my %vNotesIntern = (
 
 ## Konstanten
 ###############
-my @PylonRdngs = (
-    'serialNumber',
-    'batteryVoltage',                                                # V
-    'averageCellVoltage',
-    'batteryCurrent',                                                # A
-    'SOC',                                                           # % (state of charge)
-    'cycles',                                                        # charge/discharge cycles (>6000)
-    'cellVoltage_01',                                                # V
-    'cellVoltage_02',
-    'cellVoltage_03',
-    'cellVoltage_04',
-    'cellVoltage_05',
-    'cellVoltage_06',
-    'cellVoltage_07',
-    'cellVoltage_08',
-    'cellVoltage_09',
-    'cellVoltage_10',
-    'cellVoltage_11',
-    'cellVoltage_12',
-    'cellVoltage_13',
-    'cellVoltage_14',
-    'cellVoltage_15',
-    'bmsTemperature',                                                # °C
-    'cellTemperature_0104',
-    'cellTemperature_0508',
-    'cellTemperature_0912',
-    'cellTemperature_1315',
-    'alarmInfoRaw',                                                  # Alarm raw data
-    'alarmInfo',                                                     # ok, failure, offline
-    'power',                                                         # W
-    'capacity',                                                      # Ah
-    'capacityRemain',                                                # Ah
-    'chargeManagmentInfo',                                           # bitte vollladen, SOC<9, SOC<13
-    'max_Ladestrom',                                                 # A
-    'max_Entladestrom',                                              # A
-    'max_Ladespannung',                                              # V
-    'max_Entladespannung',
-    'Ladung',                                                        # erlaubt, nicht erlaubt
-    'Entladung',                                                     # erlaubt, nicht erlaubt
-    'Ausgleichsladung',                                              # ja, nein
-    'Name_Manufacturer',
-    'Name_Battery',
-    'moduleSoftwareVersion_manufacture',
-    'moduleSoftwareVersion_mainline',
-    'softwareVersion',
-    );
-
 my $invalid     = 'unknown';                                         # default value for invalid readings
 my $definterval = 30;                                                # default Abrufintervall der Batteriewerte
 my $defto       = 0.5;                                               # default connection Timeout zum RS485 Gateway
