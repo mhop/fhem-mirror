@@ -134,7 +134,7 @@ my @blackl      = qw(state nextCycletime);                           # Ausnahmel
 # Steuerhashes
 ###############
 my %hrtnc = (                                                        # RTN Codes
-  '00' => { desc => 'normal'               },                          # normal Code
+  '00' => { desc => 'normal'               },                        # normal Code
   '01' => { desc => 'VER error'            },
   '02' => { desc => 'CHKSUM error'         },
   '03' => { desc => 'LCHKSUM error'        },
@@ -143,7 +143,7 @@ my %hrtnc = (                                                        # RTN Codes
   '06' => { desc => 'invalid data'         },
   '90' => { desc => 'ADR error'            },
   '91' => { desc => 'Communication error between Master and Slave Pack' },
-  '99' => { desc => 'unknown error code'   },
+  '99' => { desc => 'unknown error code, data are discarded'            },
 );
 
 ##################################################################################################################################################################
@@ -590,7 +590,7 @@ sub _callManufacturerInfo {
 
   my $BatteryHex               = substr ($res, 13, 20);                       
   $readings->{batteryType}     = pack   ("H*", $BatteryHex);
-  $readings->{softwareVersion} = 'V'.hex (substr ($res, 33, 2)).'.'.hex (substr ($res, 35, 2));      # substr ($res, 33, 4);
+  $readings->{softwareVersion} = 'V'.hex (substr ($res, 33, 2)).'.'.hex (substr ($res, 35, 2));      # 
   my $ManufacturerHex          = substr ($res, 37, 40);
   $readings->{Manufacturer}    = pack   ("H*", $ManufacturerHex);
     
@@ -806,7 +806,7 @@ sub _callAnalogValue {
   $readings->{cellTemperature_0912} = (hex (substr($res, 93,  4)) - 2731) / 10;             # 4
   $readings->{cellTemperature_1315} = (hex (substr($res, 97,  4)) - 2731) / 10;             # 5
   my $current                       =  hex (substr($res, 101, 4));     
-  $readings->{packVolt}             =  hex (substr($res, 105, 4)) / 1000;
+  $readings->{packVolt}             = sprintf "%.3f", hex (substr($res, 105, 4)) / 1000;
     
   if ($current & 0x8000) {
       $current = $current - 0x10000;
@@ -817,12 +817,12 @@ sub _callAnalogValue {
   $readings->{packCycles}  = hex substr($res, 119, 4);
 
   if ($udi == 2) {
-      $readings->{packCapacityRemain} = hex (substr($res, 109, 4)) / 1000;
-      $readings->{packCapacity}       = hex (substr($res, 115, 4)) / 1000;
+      $readings->{packCapacityRemain} = sprintf "%.3f", hex (substr($res, 109, 4)) / 1000;
+      $readings->{packCapacity}       = sprintf "%.3f", hex (substr($res, 115, 4)) / 1000;
   }
   elsif ($udi == 4) {
-      $readings->{packCapacityRemain} = hex (substr($res, 123, 6)) / 1000;
-      $readings->{packCapacity}       = hex (substr($res, 129, 6)) / 1000;
+      $readings->{packCapacityRemain} = sprintf "%.3f", hex (substr($res, 123, 6)) / 1000;
+      $readings->{packCapacity}       = sprintf "%.3f", hex (substr($res, 129, 6)) / 1000;
   }
   else {
       my $err = 'wrong value retrieve analogValue -> user defined items: '.$udi;
@@ -923,9 +923,11 @@ sub respStat {
   my $res  = shift;
 
   my $rst    = substr($res,7,2);
-  my $rtnerr = $hrtnc{99}{desc}.": $rst";
+  my $rtnerr = $hrtnc{99}{desc};
+  
+  my $tail   = (split "~", $res)[1];
     
-  if(defined $hrtnc{$rst}{desc}) {
+  if(defined $hrtnc{$rst}{desc} && substr($res,0,1) eq '~' && $tail =~ /[[:xdigit:]]/g) {
       $rtnerr = $hrtnc{$rst}{desc};
       return if($rtnerr eq 'normal');
   }
@@ -1156,6 +1158,9 @@ management system via the RS485 interface.
 <li><b>dischargeCurrentLimit</b><br>  current limit value for the discharge current (A)                                  </li>
 <li><b>dischargeEnable</b><br>        current flag unloading allowed                                                     </li>
 <li><b>dischargeVoltageLimit</b><br>  current discharge voltage limit (V) of the battery module                          </li>
+
+<li><b>moduleSoftwareVersion_manufacture</b><br> Firmware version of the battery module                                  </li>
+
 <li><b>packAlarmInfo</b><br>          Alarm status (ok - battery module is OK, failure - there is a fault in the 
                                       battery module)                                                                    </li>                                                                                                             
 <li><b>packCapacity</b><br>           nominal capacity (Ah) of the battery module                                        </li>
@@ -1188,7 +1193,7 @@ management system via the RS485 interface.
 <li><b>paramModuleUnderVoltLimit</b><br>   System parameter undervoltage limit (V) of the battery module (protection limit)   </li>
 <li><b>protocolVersion</b><br>             PYLON low voltage RS485 protocol version                                           </li>
 <li><b>serialNumber</b><br>                Serial number                                                                      </li>
-<li><b>softwareVersion</b><br>             Firmware version of the battery module                                             </li>
+<li><b>softwareVersion</b><br>             ---------                                                                          </li>
 </ul>
 <br><br>
 
@@ -1314,6 +1319,9 @@ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
 <li><b>dischargeCurrentLimit</b><br>  aktueller Grenzwert für den Entladestrom (A)                                       </li>
 <li><b>dischargeEnable</b><br>        aktuelles Flag Entladen erlaubt                                                    </li>
 <li><b>dischargeVoltageLimit</b><br>  aktuelle Entladespannungsgrenze (V) des Batteriemoduls                             </li>
+
+<li><b>moduleSoftwareVersion_manufacture</b><br> Firmware Version des Batteriemoduls                                     </li>
+
 <li><b>packAlarmInfo</b><br>          Alarmstatus (ok - Batterienmodul ist in Ordnung, failure - im Batteriemodul liegt 
                                       eine Störung vor)                                                                  </li>                                                                                                             
 <li><b>packCapacity</b><br>           nominale Kapazität (Ah) des Batteriemoduls                                         </li>
@@ -1346,7 +1354,7 @@ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
 <li><b>paramModuleUnderVoltLimit</b><br>   Systemparameter Unterspannungsgrenze (V) des Batteriemoduls (Schutzgrenze)    </li>
 <li><b>protocolVersion</b><br>             PYLON low voltage RS485 Prokollversion                                        </li>
 <li><b>serialNumber</b><br>                Seriennummer                                                                  </li>
-<li><b>softwareVersion</b><br>             Firmware Version des Batteriemoduls                                           </li>
+<li><b>softwareVersion</b><br>             -----------------------------------                                           </li>
 </ul>
 <br><br>
 
