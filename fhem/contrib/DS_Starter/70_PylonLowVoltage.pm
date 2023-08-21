@@ -57,7 +57,6 @@ use IO::Socket::INET;
 use Errno qw(ETIMEDOUT EWOULDBLOCK);
 use Scalar::Util qw(looks_like_number);
 use Carp qw(croak carp);
-use utf8;
 
 eval "use FHEM::Meta;1"          or my $modMetaAbsent = 1;         ## no critic 'eval'
 eval "use IO::Socket::Timeout;1" or my $iostAbsent    = 1;         ## no critic 'eval'
@@ -387,11 +386,15 @@ sub Attr {
       if ($do == 0) {
           InternalTimer(gettimeofday() + 2.0, "FHEM::PylonLowVoltage::Update", $hash, 0);
       }
+      else {
+          deleteReadingspec ($hash);
+          readingsDelete    ($hash, 'nextCycletime');
+      }
   }
 
   if ($aName eq "interval") {
-      unless ($aVal =~ /^[0-9]+$/x) {
-          return qq{The value for $aName is not valid. Use only figures 0-9!};
+      if (!looks_like_number($aVal)) {
+          return qq{The value for $aName is invalid, it must be numeric!};
       }
 
       InternalTimer(gettimeofday()+1.0, "FHEM::PylonLowVoltage::Update", $hash, 0);
@@ -399,7 +402,7 @@ sub Attr {
   
   if ($aName eq "timeout") {
       if (!looks_like_number($aVal)) {
-          return qq{The value for $aName is not valid, it must be numeric!};
+          return qq{The value for $aName is invalid, it must be numeric!};
       }
   }
 
@@ -486,7 +489,7 @@ sub Update {
     close ($socket) if($socket);
     
     if ($success) {
-        Log3 ($name, 4, "$name - got fresh values from battery number >$hash->{BATADDRESS}<");
+        Log3 ($name, 4, "$name - got data from battery number >$hash->{BATADDRESS}< successfully");
         
         additionalReadings (\%readings);                                                 # zusätzliche eigene Readings erstellen
         $readings{state} = 'connected';
@@ -551,7 +554,7 @@ sub _callSerialNumber {
 
   my $res = Request($hash, $socket, $hrsnb{$hash->{BATADDRESS}}{cmd}, 'serialNumber');
 
-  my $rtnerr = respStat ($res);
+  my $rtnerr = responseCheck ($res);
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -580,7 +583,7 @@ sub _callManufacturerInfo {
 
   my $res = Request($hash, $socket, $hrmfi{$hash->{BATADDRESS}}{cmd}, 'manufacturerInfo');
     
-  my $rtnerr = respStat ($res);
+  my $rtnerr = responseCheck ($res);
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -612,7 +615,7 @@ sub _callProtocolVersion {
 
   my $res = Request($hash, $socket, $hrprt{$hash->{BATADDRESS}}{cmd}, 'protocolVersion');
     
-  my $rtnerr = respStat ($res);
+  my $rtnerr = responseCheck ($res);
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -640,7 +643,7 @@ sub _callSoftwareVersion {
 
   my $res = Request($hash, $socket, $hrswv{$hash->{BATADDRESS}}{cmd}, 'softwareVersion');
     
-  my $rtnerr = respStat ($res);
+  my $rtnerr = responseCheck ($res);
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -669,7 +672,7 @@ sub _callSystemParameters {
 
   my $res = Request($hash, $socket, $hrspm{$hash->{BATADDRESS}}{cmd}, 'systemParameters');
     
-  my $rtnerr = respStat ($res);
+  my $rtnerr = responseCheck ($res);
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -708,7 +711,7 @@ sub _callAlarmInfo {
 
   my $res = Request($hash, $socket, $hralm{$hash->{BATADDRESS}}{cmd}, 'alarmInfo');
     
-  my $rtnerr = respStat ($res);
+  my $rtnerr = responseCheck ($res);
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -746,7 +749,7 @@ sub _callChargeManagmentInfo {
 
   my $res = Request($hash, $socket, $hrcmi{$hash->{BATADDRESS}}{cmd}, 'chargeManagmentInfo');
     
-  my $rtnerr = respStat ($res);
+  my $rtnerr = responseCheck ($res);
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -787,7 +790,7 @@ sub _callAnalogValue {
 
   my $res = Request($hash, $socket, $hrcmn{$hash->{BATADDRESS}}{cmd}, 'analogValue');
     
-  my $rtnerr = respStat ($res);
+  my $rtnerr = responseCheck ($res);
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -947,14 +950,14 @@ return $result;
 ###############################################################
 #       Response Status ermitteln
 ###############################################################
-sub respStat {               
+sub responseCheck {               
   my $res = shift;
 
-  my $rtn    = q{_};
-  $rtn       = substr($res,7,2) if($res && length($res) >= 10);
   my $rtnerr = $hrtnc{99}{desc};
+  return $rtnerr if(!$res || $res !~ /^[~A-Z0-9]+\r$/xs);
   
-  return $rtnerr if(!$res || $res !~ /^[~A-Z0-9\r]+$/xs);
+  my $rtn = q{_};
+  $rtn    = substr($res,7,2) if($res && length($res) >= 10);
     
   if(defined $hrtnc{$rtn}{desc} && substr($res, 0, 1) eq '~') {
       $rtnerr = $hrtnc{$rtn}{desc};
