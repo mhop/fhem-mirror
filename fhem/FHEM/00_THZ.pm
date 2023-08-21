@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 04/2023
-my $thzversion = "0.207";
+# by immi 08/2023
+my $thzversion = "0.208";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -428,7 +428,7 @@ my %sets439539common = (
   "p02RoomTempNightHC2SummerMode"=> {cmd2=>"0C056B", argMin =>  "12",	argMax =>   "32",	type =>"5temp",  unit =>" °C"},
   "p03RoomTempStandbyHC2SummerMode"=> {cmd2=>"0C056A", argMin =>  "12",	argMax =>   "32",	type =>"5temp",  unit =>" °C"},
   "p16GradientHC2"		=> {cmd2=>"0C010E", argMin => "0.1",	argMax =>    "5",	type =>"6gradient", unit =>""}, # /100
-  "p17LowEndHC2"		=> {cmd2=>"0C059E", argMin =>   "0",	argMax =>   "10", type =>"5temp",  unit =>" K"},
+  "p17LowEndHC2"		=> {cmd2=>"0C059E", argMin =>   "0",	argMax =>   "10", 	type =>"5temp",  unit =>" K"},
   "p18RoomInfluenceHC2"		=> {cmd2=>"0C010F", argMin =>   "0",	argMax =>  "100",	type =>"0clean", unit =>" %"}, 
   "p04DHWsetDayTemp"		=> {cmd2=>"0A0013", argMin =>  "10",	argMax =>   "55",	type =>"5temp",  unit =>" °C"},
   "p05DHWsetNightTemp"		=> {cmd2=>"0A05BF", argMin =>  "10",	argMax =>   "55",	type =>"5temp",  unit =>" °C"},
@@ -637,7 +637,11 @@ my %sets539only =(
   "p99CoolingHC1Switch"		=> {cmd2=>"0B0287", argMin =>   "0",	argMax =>  "1",		type =>"1clean", unit =>""},
   "p99CoolingHC1SetTemp"	=> {cmd2=>"0B0582", argMin =>  "12",	argMax =>  "27",	type =>"5temp",  unit =>" °C"},    #suggested by TheTrumpeter
   "p99CoolingHC1HysterFlowTemp"	=> {cmd2=>"0B0583", argMin =>  "0.5",	argMax =>  "5",		type =>"5temp",  unit =>" K"}, #suggested by TheTrumpeter
-  "p99CoolingHC1HysterRoomTemp"	=> {cmd2=>"0B0584", argMin =>  "0.5",	argMax =>  "3",		type =>"5temp",  unit =>" K"}  #suggested by TheTrumpeter
+  "p99CoolingHC1HysterRoomTemp"	=> {cmd2=>"0B0584", argMin =>  "0.5",	argMax =>  "3",		type =>"5temp",  unit =>" K"},  #suggested by TheTrumpeter
+  "p99CoolingHC2Switch"		=> {cmd2=>"0C0287", argMin =>   "0",	argMax =>  "1",		type =>"1clean", unit =>""},     #suggested by rett_de
+  "p99CoolingHC2SetTemp"	=> {cmd2=>"0C0582", argMin =>  "12",	argMax =>  "27",	type =>"5temp",  unit =>" °C"},    #suggested by rett_de
+  "p99CoolingHC2HysterFlowTemp"	=> {cmd2=>"0C0583", argMin =>  "0.5",	argMax =>  "5",		type =>"5temp",  unit =>" K"}, #suggested by rett_de
+  "p99CoolingHC2HysterRoomTemp"	=> {cmd2=>"0C0584", argMin =>  "0.5",	argMax =>  "3",		type =>"5temp",  unit =>" K"}  #suggested by Trett_de
 );
   
 
@@ -811,7 +815,8 @@ my %getsonly539 = (  #info from belu and godmorgon
   "sSetHumidityMin"	=> {cmd2=>"0A09D2", type =>"1clean", unit =>" %"},
   "sSetHumidityMax"	=> {cmd2=>"0A09D3", type =>"1clean", unit =>" %"},
   "sCoolHCTotal"	=> {cmd2=>"0A0648", cmd3 =>"0A0649", type =>"1clean", unit =>" kWh"},
-  "sDewPointHC1"	=> {cmd2=>"0B0264", type =>"5temp",  unit =>" °C"}
+  "sDewPointHC1"	=> {cmd2=>"0B0264", type =>"5temp",  unit =>" °C"},
+  "sDewPointHC2"	=> {cmd2=>"0C0264", type =>"5temp",  unit =>" °C"}
  );
 %getsonly539=(%getsonly539, %getsonly439);
 
