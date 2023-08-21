@@ -57,6 +57,7 @@ use IO::Socket::INET;
 use Errno qw(ETIMEDOUT EWOULDBLOCK);
 use Scalar::Util qw(looks_like_number);
 use Carp qw(croak carp);
+use utf8;
 
 eval "use FHEM::Meta;1"          or my $modMetaAbsent = 1;         ## no critic 'eval'
 eval "use IO::Socket::Timeout;1" or my $iostAbsent    = 1;         ## no critic 'eval'
@@ -143,7 +144,7 @@ my %hrtnc = (                                                        # RTN Codes
   '06' => { desc => 'invalid data'         },
   '90' => { desc => 'ADR error'            },
   '91' => { desc => 'Communication error between Master and Slave Pack' },
-  '99' => { desc => 'unknown error code, data are discarded'            },
+  '99' => { desc => 'invalid data received, data are discarded'         },
 );
 
 ##################################################################################################################################################################
@@ -560,6 +561,8 @@ sub _callSerialNumber {
                 );                
       return $rtnerr;
   }
+  
+  __resultLog ($hash, $res);
 
   my $sernum                = substr ($res, 15, 32);
   $readings->{serialNumber} = pack   ("H*", $sernum);
@@ -587,6 +590,8 @@ sub _callManufacturerInfo {
                 );                
       return $rtnerr;
   }
+  
+  __resultLog ($hash, $res);
 
   my $BatteryHex               = substr ($res, 13, 20);                       
   $readings->{batteryType}     = pack   ("H*", $BatteryHex);
@@ -617,6 +622,8 @@ sub _callProtocolVersion {
                 );                
       return $rtnerr;
   }
+  
+  __resultLog ($hash, $res);
 
   $readings->{protocolVersion} = 'V'.hex (substr ($res, 1, 1)).'.'.hex (substr ($res, 2, 1));
     
@@ -643,6 +650,8 @@ sub _callSoftwareVersion {
                 );                
       return $rtnerr;
   }
+  
+  __resultLog ($hash, $res);
 
   $readings->{moduleSoftwareVersion_manufacture} = 'V'.hex (substr ($res, 15, 2)).'.'.hex (substr ($res, 17, 2)); 
   $readings->{moduleSoftwareVersion_mainline}    = 'V'.hex (substr ($res, 19, 2)).'.'.hex (substr ($res, 21, 2)).'.'.hex (substr ($res, 23, 2));
@@ -670,6 +679,8 @@ sub _callSystemParameters {
                 );                
       return $rtnerr;
   }
+  
+  __resultLog ($hash, $res);
 
   $readings->{paramCellHighVoltLimit}      = sprintf "%.3f", (hex substr  ($res, 15, 4)) / 1000;
   $readings->{paramCellLowVoltLimit}       = sprintf "%.3f", (hex substr  ($res, 19, 4)) / 1000;                   # Alarm Limit
@@ -707,6 +718,8 @@ sub _callAlarmInfo {
                 );                
       return $rtnerr;
   }
+  
+  __resultLog ($hash, $res);
 
   $readings->{packCellcount} = hex (substr($res, 17, 2));
 
@@ -743,6 +756,8 @@ sub _callChargeManagmentInfo {
                 );                
       return $rtnerr;
   }
+  
+  __resultLog ($hash, $res);
 
   $readings->{chargeVoltageLimit}     = sprintf "%.3f", hex (substr ($res, 15, 4)) / 1000;        # Genauigkeit 3
   $readings->{dischargeVoltageLimit}  = sprintf "%.3f", hex (substr ($res, 19, 4)) / 1000;        # Genauigkeit 3
@@ -782,6 +797,8 @@ sub _callAnalogValue {
                 );                
       return $rtnerr;
   }
+  
+  __resultLog ($hash, $res);
 
   $readings->{packCellcount}        = hex (substr($res, 17,  2));
   $readings->{cellVoltage_01}       = sprintf "%.3f", hex(substr($res,19,4)) / 1000;
@@ -839,6 +856,21 @@ return;
 }
 
 ###############################################################
+#        Logausgabe Result
+###############################################################
+sub __resultLog {           
+  my $hash = shift;
+  my $res  = shift;
+
+  my $name = $hash->{NAME};
+
+  Log3 ($name, 5, "$name - data returned raw: ".$res);
+  Log3 ($name, 5, "$name - data returned:\n"   .Hexdump ($res));              
+    
+return;
+}
+
+###############################################################
 #                  PylonLowVoltage Request
 ###############################################################
 sub Request {
@@ -866,7 +898,6 @@ sub Reread {
     my $socket = shift;
 
     my $singlechar;
-    my $name = $hash->{NAME};
     my $res  = q{};
 
     do {
@@ -879,9 +910,6 @@ sub Reread {
         $res = $res . $singlechar if (!(length($res) == 0 && ord($singlechar) == 13))    # ord 13 -> ASCII dezimal für CR (Hex 0d)
 
     } while (length($res) == 0 || ord($singlechar) != 13);
-
-    Log3 ($name, 5, "$name - data returned raw: ".$res);
-    Log3 ($name, 5, "$name - data returned:\n"   .Hexdump ($res));
 
 return $res;
 }
@@ -920,15 +948,16 @@ return $result;
 #       Response Status ermitteln
 ###############################################################
 sub respStat {               
-  my $res  = shift;
+  my $res = shift;
 
-  my $rst    = substr($res,7,2);
+  my $rtn    = q{_};
+  $rtn       = substr($res,7,2) if($res && length($res) >= 10);
   my $rtnerr = $hrtnc{99}{desc};
   
-  my $tail   = (split "~", $res)[1];
+  return $rtnerr if(!$res || $res !~ /^[~A-Z0-9\r]+$/xs);
     
-  if(defined $hrtnc{$rst}{desc} && substr($res,0,1) eq '~' && $tail =~ /[[:xdigit:]]/g) {
-      $rtnerr = $hrtnc{$rst}{desc};
+  if(defined $hrtnc{$rtn}{desc} && substr($res, 0, 1) eq '~') {
+      $rtnerr = $hrtnc{$rtn}{desc};
       return if($rtnerr eq 'normal');
   }
     
