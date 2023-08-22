@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.1.3"  => "22.08.2023 permanent socket management, attr gatewayPermLink, improve responseCheck ",
   "0.1.2"  => "20.08.2023 commandref revised, analogValue -> use 'user defined items', refactoring according PBP ",
   "0.1.1"  => "16.08.2023 integrate US3000C, add print request command in HEX to Logfile, attr timeout ".
                           "change validation of received data, change DEF format, extend evaluation of chargeManagmentInfo ".
@@ -130,20 +131,22 @@ my $invalid     = 'unknown';                                         # default v
 my $definterval = 30;                                                # default Abrufintervall der Batteriewerte
 my $defto       = 0.5;                                               # default connection Timeout zum RS485 Gateway
 my @blackl      = qw(state nextCycletime);                           # Ausnahmeliste deleteReadingspec
+my $gpldef      = 0;                                                 # Gateway permanent Link = 0 per default
 
 # Steuerhashes
 ###############
 my %hrtnc = (                                                        # RTN Codes
-  '00' => { desc => 'normal'               },                        # normal Code
-  '01' => { desc => 'VER error'            },
-  '02' => { desc => 'CHKSUM error'         },
-  '03' => { desc => 'LCHKSUM error'        },
-  '04' => { desc => 'CID2 invalidation'    },
-  '05' => { desc => 'Command format error' },
-  '06' => { desc => 'invalid data'         },
-  '90' => { desc => 'ADR error'            },
-  '91' => { desc => 'Communication error between Master and Slave Pack' },
-  '99' => { desc => 'invalid data received, data are discarded'         },
+  '00' => { desc => 'normal'                  },                     # normal Code
+  '01' => { desc => 'VER error'               },
+  '02' => { desc => 'CHKSUM error'            },
+  '03' => { desc => 'LCHKSUM error'           },
+  '04' => { desc => 'CID2 invalidation error' },
+  '05' => { desc => 'Command format error'    },
+  '06' => { desc => 'invalid data error'      },
+  '90' => { desc => 'ADR error'               },
+  '91' => { desc => 'Communication error between Master and Slave Pack'                                  },
+  '98' => { desc => 'insufficient response length <LEN> of minimum length <MLEN> received ... discarded' },
+  '99' => { desc => 'invalid data received ... discarded'                                                },
 );
 
 ##################################################################################################################################################################
@@ -170,13 +173,13 @@ my %hrtnc = (                                                        # RTN Codes
 #  ~    20    02      46    93     E0    02    02      FD   2D
 # 7E  32 30  30 32  34 36 39 33  45 30 30 32  30 32  46 44 32 44
 #
-my %hrsnb = (                                                        # Codierung Abruf serialNumber                     
-  1 => { cmd => "~20024693E00202FD2D\x{0d}" },
-  2 => { cmd => "~20034693E00203FD2B\x{0d}" },
-  3 => { cmd => "~20044693E00204FD29\x{0d}" },
-  4 => { cmd => "~20054693E00205FD27\x{0d}" },
-  5 => { cmd => "~20064693E00206FD25\x{0d}" },
-  6 => { cmd => "~20074693E00207FD23\x{0d}" },
+my %hrsnb = (                                                        # Codierung Abruf serialNumber, mlen = Mindestlänge Antwortstring                    
+  1 => { cmd => "~20024693E00202FD2D\x{0d}", mlen => 52 },
+  2 => { cmd => "~20034693E00203FD2B\x{0d}", mlen => 52 },
+  3 => { cmd => "~20044693E00204FD29\x{0d}", mlen => 52 },
+  4 => { cmd => "~20054693E00205FD27\x{0d}", mlen => 52 },
+  5 => { cmd => "~20064693E00206FD25\x{0d}", mlen => 52 },
+  6 => { cmd => "~20074693E00207FD23\x{0d}", mlen => 52 },
 );
 
 # request command für '1': ~20024651E00202FD33 + CR
@@ -192,13 +195,13 @@ my %hrsnb = (                                                        # Codierung
 #  ~    20    02      46    51     E0    02    02      FD   33
 # 7E  32 30  30 32  34 36 35 31  45 30 30 32  30 32  46 44 32 44
 #
-my %hrmfi = (                                                        # Codierung Abruf manufacturerInfo
-  1 => { cmd => "~20024651E00202FD33\x{0d}" },
-  2 => { cmd => "~20034651E00203FD31\x{0d}" },
-  3 => { cmd => "~20044651E00204FD2F\x{0d}" },
-  4 => { cmd => "~20054651E00205FD2D\x{0d}" },
-  5 => { cmd => "~20064651E00206FD2B\x{0d}" },
-  6 => { cmd => "~20074651E00207FD29\x{0d}" },
+my %hrmfi = (                                                        # Codierung Abruf manufacturerInfo, mlen = Mindestlänge Antwortstring
+  1 => { cmd => "~20024651E00202FD33\x{0d}", mlen => 82 },
+  2 => { cmd => "~20034651E00203FD31\x{0d}", mlen => 82 },
+  3 => { cmd => "~20044651E00204FD2F\x{0d}", mlen => 82 },
+  4 => { cmd => "~20054651E00205FD2D\x{0d}", mlen => 82 },
+  5 => { cmd => "~20064651E00206FD2B\x{0d}", mlen => 82 },
+  6 => { cmd => "~20074651E00207FD29\x{0d}", mlen => 82 },
 );
 
 # request command für '1': ~20024651E00202FD33 + CR
@@ -214,59 +217,59 @@ my %hrmfi = (                                                        # Codierung
 #  ~    00    02      46    4F      E0    02    02      FD   21
 # 7E  30 30  30 32  34 36  34 46  45 30 30 32  30 32  46 44 31 46
 #
-my %hrprt = (                                                        # Codierung Abruf protocolVersion
-  1 => { cmd => "~0002464FE00202FD21\x{0d}" },
-  2 => { cmd => "~0003464FE00203FD1F\x{0d}" },
-  3 => { cmd => "~0004464FE00204FD1D\x{0d}" },
-  4 => { cmd => "~0005464FE00205FD1B\x{0d}" },
-  5 => { cmd => "~0006464FE00206FD19\x{0d}" },
-  6 => { cmd => "~0007464FE00207FD17\x{0d}" },
+my %hrprt = (                                                        # Codierung Abruf protocolVersion, mlen = Mindestlänge Antwortstring
+  1 => { cmd => "~0002464FE00202FD21\x{0d}", mlen => 18 },
+  2 => { cmd => "~0003464FE00203FD1F\x{0d}", mlen => 18 },
+  3 => { cmd => "~0004464FE00204FD1D\x{0d}", mlen => 18 },
+  4 => { cmd => "~0005464FE00205FD1B\x{0d}", mlen => 18 },
+  5 => { cmd => "~0006464FE00206FD19\x{0d}", mlen => 18 },
+  6 => { cmd => "~0007464FE00207FD17\x{0d}", mlen => 18 },
 );
 
 
 my %hrswv = (                                                        # Codierung Abruf softwareVersion
-  1 => { cmd => "~20024696E00202FD2A\x{0d}" },
-  2 => { cmd => "~20034696E00203FD28\x{0d}" },
-  3 => { cmd => "~20044696E00204FD26\x{0d}" },
-  4 => { cmd => "~20054696E00205FD24\x{0d}" },
-  5 => { cmd => "~20064696E00206FD22\x{0d}" },
-  6 => { cmd => "~20074696E00207FD20\x{0d}" },
+  1 => { cmd => "~20024696E00202FD2A\x{0d}", mlen => 30 },
+  2 => { cmd => "~20034696E00203FD28\x{0d}", mlen => 30 },
+  3 => { cmd => "~20044696E00204FD26\x{0d}", mlen => 30 },
+  4 => { cmd => "~20054696E00205FD24\x{0d}", mlen => 30 },
+  5 => { cmd => "~20064696E00206FD22\x{0d}", mlen => 30 },
+  6 => { cmd => "~20074696E00207FD20\x{0d}", mlen => 30 },
 );
 
 my %hralm = (                                                        # Codierung Abruf alarmInfo
-  1 => { cmd => "~20024644E00202FD31\x{0d}" },
-  2 => { cmd => "~20034644E00203FD2F\x{0d}" },
-  3 => { cmd => "~20044644E00204FD2D\x{0d}" },
-  4 => { cmd => "~20054644E00205FD2B\x{0d}" },
-  5 => { cmd => "~20064644E00206FD29\x{0d}" },
-  6 => { cmd => "~20074644E00207FD27\x{0d}" },
+  1 => { cmd => "~20024644E00202FD31\x{0d}", mlen => 82 },
+  2 => { cmd => "~20034644E00203FD2F\x{0d}", mlen => 82 },
+  3 => { cmd => "~20044644E00204FD2D\x{0d}", mlen => 82 },
+  4 => { cmd => "~20054644E00205FD2B\x{0d}", mlen => 82 },
+  5 => { cmd => "~20064644E00206FD29\x{0d}", mlen => 82 },
+  6 => { cmd => "~20074644E00207FD27\x{0d}", mlen => 82 },
 );
 
 my %hrspm = (                                                        # Codierung Abruf Systemparameter
-  1 => { cmd => "~20024647E00202FD2E\x{0d}" },
-  2 => { cmd => "~20034647E00203FD2C\x{0d}" },
-  3 => { cmd => "~20044647E00204FD2A\x{0d}" },
-  4 => { cmd => "~20054647E00205FD28\x{0d}" },
-  5 => { cmd => "~20064647E00206FD26\x{0d}" },
-  6 => { cmd => "~20074647E00207FD24\x{0d}" },
+  1 => { cmd => "~20024647E00202FD2E\x{0d}", mlen => 68 },
+  2 => { cmd => "~20034647E00203FD2C\x{0d}", mlen => 68 },
+  3 => { cmd => "~20044647E00204FD2A\x{0d}", mlen => 68 },
+  4 => { cmd => "~20054647E00205FD28\x{0d}", mlen => 68 },
+  5 => { cmd => "~20064647E00206FD26\x{0d}", mlen => 68 },
+  6 => { cmd => "~20074647E00207FD24\x{0d}", mlen => 68 },
 );
 
-my %hrcmi = (                                                        # Codierung Abruf chargeManagmentInfo
-  1 => { cmd => "~20024692E00202FD2E\x{0d}" },
-  2 => { cmd => "~20034692E00203FD2C\x{0d}" },
-  3 => { cmd => "~20044692E00204FD2A\x{0d}" },
-  4 => { cmd => "~20054692E00205FD28\x{0d}" },
-  5 => { cmd => "~20064692E00206FD26\x{0d}" },
-  6 => { cmd => "~20074692E00207FD24\x{0d}" },
+my %hrcmi = (                                                        # Codierung Abruf chargeManagmentInfo, mlen = Mindestlänge Antwortstring
+  1 => { cmd => "~20024692E00202FD2E\x{0d}", mlen => 38 },
+  2 => { cmd => "~20034692E00203FD2C\x{0d}", mlen => 38 },
+  3 => { cmd => "~20044692E00204FD2A\x{0d}", mlen => 38 },
+  4 => { cmd => "~20054692E00205FD28\x{0d}", mlen => 38 },
+  5 => { cmd => "~20064692E00206FD26\x{0d}", mlen => 38 },
+  6 => { cmd => "~20074692E00207FD24\x{0d}", mlen => 38 },
 );
 
-my %hrcmn = (                                                        # Codierung Abruf analogValue
-  1 => { cmd => "~20024642E00202FD33\x{0d}" },
-  2 => { cmd => "~20034642E00203FD31\x{0d}" },
-  3 => { cmd => "~20044642E00204FD2F\x{0d}" },
-  4 => { cmd => "~20054642E00205FD2D\x{0d}" },
-  5 => { cmd => "~20064642E00206FD2B\x{0d}" },
-  6 => { cmd => "~20074642E00207FD29\x{0d}" },
+my %hrcmn = (                                                        # Codierung Abruf analogValue, mlen = Mindestlänge Antwortstring
+  1 => { cmd => "~20024642E00202FD33\x{0d}", mlen => 128 },
+  2 => { cmd => "~20034642E00203FD31\x{0d}", mlen => 128 },
+  3 => { cmd => "~20044642E00204FD2F\x{0d}", mlen => 128 },
+  4 => { cmd => "~20054642E00205FD2D\x{0d}", mlen => 128 },
+  5 => { cmd => "~20064642E00206FD2B\x{0d}", mlen => 128 },
+  6 => { cmd => "~20074642E00207FD29\x{0d}", mlen => 128 },
 );
 
 
@@ -276,14 +279,16 @@ my %hrcmn = (                                                        # Codierung
 sub Initialize {
   my $hash = shift;
 
-  $hash->{DefFn}    = \&Define;
-  $hash->{UndefFn}  = \&Undef;
-  $hash->{GetFn}    = \&Get;
-  $hash->{AttrFn}   = \&Attr;
-  $hash->{AttrList} = "disable:1,0 ".
-                      "interval ".
-                      "timeout ".
-                      $readingFnAttributes;
+  $hash->{DefFn}      = \&Define;
+  $hash->{UndefFn}    = \&Undef;
+  $hash->{GetFn}      = \&Get;
+  $hash->{AttrFn}     = \&Attr;
+  $hash->{ShutdownFn} = \&Shutdown;
+  $hash->{AttrList}   = "disable:1,0 ".
+                        "gatewayPermLink:1,0 ".
+                        "interval ".
+                        "timeout ".
+                        $readingFnAttributes;
                         
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
   
@@ -312,7 +317,7 @@ sub Define {
 
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                           # Modul Meta.pm nicht vorhanden
   ($hash->{HOST}, $hash->{PORT}) = split ":", $args[2];
-  $hash->{BATADDRESS}             = $args[3] // 1;
+  $hash->{BATADDRESS}            = $args[3] // 1;
   
   if ($hash->{BATADDRESS} !~ /[123456]/xs) {
       return "Define: bataddress must be a value between 1 and 6";
@@ -328,7 +333,8 @@ sub Define {
   };
   use version 0.77; our $VERSION = moduleVersion ($params);                        # Versionsinformationen setzen
 
-  Update ($hash);
+  _closeSocket ($hash);
+  Update       ($hash);
 
 return;
 }
@@ -389,6 +395,7 @@ sub Attr {
       else {
           deleteReadingspec ($hash);
           readingsDelete    ($hash, 'nextCycletime');
+          _closeSocket      ($hash);
       }
   }
 
@@ -425,8 +432,9 @@ sub Update {
 
     return if(IsDisabled ($name));
 
-    my $interval  = AttrVal ($name, 'interval', $definterval);                                 # 0 -> manuell gesteuert
-    my $timeout   = AttrVal ($name, 'timeout',        $defto);
+    my $interval  = AttrVal ($name, 'interval',   $definterval);                               # 0 -> manuell gesteuert
+    my $timeout   = AttrVal ($name, 'timeout',          $defto);
+    my $gpl       = AttrVal ($name, 'gatewayPermLink', $gpldef);                
     my %readings  = ();
     
     my ($socket, $success);
@@ -479,14 +487,15 @@ sub Update {
         doOnError ({ hash     => $hash, 
                      readings => \%readings, 
                      sock     => $socket,
-                     state    => $errtxt
+                     state    => $errtxt,
+                     verbose  => 3
                    }
                   );          
         return;
     }
 
     ualarm(0);
-    close ($socket) if($socket);
+    _closeSocket ($hash) if(!$gpl);
     
     if ($success) {
         Log3 ($name, 4, "$name - got data from battery number >$hash->{BATADDRESS}< successfully");
@@ -507,30 +516,37 @@ sub _createSocket {
   my $hash     = shift; 
   my $timeout  = shift;    
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
-
-  my $socket = IO::Socket::INET->new( Proto    => 'tcp', 
-                                      PeerAddr => $hash->{HOST}, 
-                                      PeerPort => $hash->{PORT}, 
-                                      Timeout  => $timeout
-                                    );
-                                      
-  if (!$socket) {
-      doOnError ({ hash     => $hash, 
-                   readings => $readings, 
-                   state    => 'no socket is established to RS485 gateway'
-                 }
-                );           
-      return;        
-  }
-
-  if (!$socket->connected()) {
+  
+  my $socket   = $hash->{SOCKET};
+  
+  if ($socket && !$socket->connected()) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
                    sock     => $socket,                         
                    state    => 'disconnected'
                  }
-                );            
-      return;
+                );
+      
+      _closeSocket ($hash);
+      undef $socket;
+  }
+  
+  if (!$socket || $socket->connected()) {
+      $socket = IO::Socket::INET->new( Proto    => 'tcp', 
+                                       PeerAddr => $hash->{HOST}, 
+                                       PeerPort => $hash->{PORT}, 
+                                       Timeout  => $timeout
+                                     );   
+  }
+                                      
+  if (!$socket) {
+      doOnError ({ hash     => $hash, 
+                   readings => $readings, 
+                   state    => 'no socket is established to RS485 gateway',
+                   verbose  => 3
+                 }
+                );           
+      return;        
   }
 
   IO::Socket::Timeout->enable_timeouts_on ($socket);                       # nur notwendig für read or write timeout
@@ -540,8 +556,29 @@ sub _createSocket {
   $socket->read_timeout  ($rwto);                                          # Read/Writetimeout immer kleiner als Sockettimeout
   $socket->write_timeout ($rwto);
   $socket->autoflush(1);
+  
+  $hash->{SOCKET} = $socket;
         
 return $socket;
+}
+
+###############################################################
+#       Socket schließen und löschen
+###############################################################
+sub _closeSocket {               
+  my $hash = shift; 
+  
+  my $name   = $hash->{NAME};
+  my $socket = $hash->{SOCKET};
+  
+  if ($socket) {
+      close ($socket);
+      delete $hash->{SOCKET};
+      
+      Log3 ($name, 4, "$name - Socket/Connection to the RS485 gateway was closed as scheduled");
+  }
+    
+return;
 }
 
 ###############################################################
@@ -552,9 +589,15 @@ sub _callSerialNumber {
   my $socket   = shift;    
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request($hash, $socket, $hrsnb{$hash->{BATADDRESS}}{cmd}, 'serialNumber');
+  my $res = Request ({ hash   => $hash, 
+                       socket => $socket, 
+                       cmd    => $hrsnb{$hash->{BATADDRESS}}{cmd}, 
+                       cmdtxt => 'serialNumber'
+                     }
+                    );
 
-  my $rtnerr = responseCheck ($res);
+  my $rtnerr = responseCheck ($res, $hrsnb{$hash->{BATADDRESS}}{mlen});
+  
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -581,9 +624,15 @@ sub _callManufacturerInfo {
   my $socket   = shift;    
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request($hash, $socket, $hrmfi{$hash->{BATADDRESS}}{cmd}, 'manufacturerInfo');
+  my $res = Request ({ hash   => $hash, 
+                       socket => $socket, 
+                       cmd    => $hrmfi{$hash->{BATADDRESS}}{cmd}, 
+                       cmdtxt => 'manufacturerInfo'
+                     }
+                    );
     
-  my $rtnerr = responseCheck ($res);
+  my $rtnerr = responseCheck ($res, $hrmfi{$hash->{BATADDRESS}}{mlen});
+  
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -613,9 +662,15 @@ sub _callProtocolVersion {
   my $socket   = shift;    
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request($hash, $socket, $hrprt{$hash->{BATADDRESS}}{cmd}, 'protocolVersion');
+  my $res = Request ({ hash   => $hash, 
+                       socket => $socket, 
+                       cmd    => $hrprt{$hash->{BATADDRESS}}{cmd}, 
+                       cmdtxt => 'protocolVersion'
+                     }
+                    );
     
-  my $rtnerr = responseCheck ($res);
+  my $rtnerr = responseCheck ($res, $hrprt{$hash->{BATADDRESS}}{mlen});
+  
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -641,9 +696,15 @@ sub _callSoftwareVersion {
   my $socket   = shift;    
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request($hash, $socket, $hrswv{$hash->{BATADDRESS}}{cmd}, 'softwareVersion');
+  my $res = Request ({ hash   => $hash, 
+                       socket => $socket, 
+                       cmd    => $hrswv{$hash->{BATADDRESS}}{cmd}, 
+                       cmdtxt => 'softwareVersion'
+                     }
+                    );
     
-  my $rtnerr = responseCheck ($res);
+  my $rtnerr = responseCheck ($res, $hrswv{$hash->{BATADDRESS}}{mlen});
+  
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -670,9 +731,15 @@ sub _callSystemParameters {
   my $socket   = shift;    
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request($hash, $socket, $hrspm{$hash->{BATADDRESS}}{cmd}, 'systemParameters');
+  my $res = Request ({ hash   => $hash, 
+                       socket => $socket, 
+                       cmd    => $hrspm{$hash->{BATADDRESS}}{cmd}, 
+                       cmdtxt => 'systemParameters'
+                     }
+                    );
     
-  my $rtnerr = responseCheck ($res);
+  my $rtnerr = responseCheck ($res, $hrspm{$hash->{BATADDRESS}}{mlen});
+  
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -709,9 +776,15 @@ sub _callAlarmInfo {
   my $socket   = shift;    
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request($hash, $socket, $hralm{$hash->{BATADDRESS}}{cmd}, 'alarmInfo');
+  my $res = Request ({ hash   => $hash, 
+                       socket => $socket, 
+                       cmd    => $hralm{$hash->{BATADDRESS}}{cmd}, 
+                       cmdtxt => 'alarmInfo'
+                     }
+                    );
     
-  my $rtnerr = responseCheck ($res);
+  my $rtnerr = responseCheck ($res, $hralm{$hash->{BATADDRESS}}{mlen});
+  
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -747,9 +820,15 @@ sub _callChargeManagmentInfo {
   my $socket   = shift;    
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request($hash, $socket, $hrcmi{$hash->{BATADDRESS}}{cmd}, 'chargeManagmentInfo');
+  my $res = Request ({ hash   => $hash, 
+                       socket => $socket, 
+                       cmd    => $hrcmi{$hash->{BATADDRESS}}{cmd}, 
+                       cmdtxt => 'chargeManagmentInfo'
+                     }
+                    );
     
-  my $rtnerr = responseCheck ($res);
+  my $rtnerr = responseCheck ($res, $hrcmi{$hash->{BATADDRESS}}{mlen});
+  
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -788,9 +867,15 @@ sub _callAnalogValue {
   my $socket   = shift;    
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request($hash, $socket, $hrcmn{$hash->{BATADDRESS}}{cmd}, 'analogValue');
+  my $res = Request ({ hash   => $hash, 
+                       socket => $socket, 
+                       cmd    => $hrcmn{$hash->{BATADDRESS}}{cmd}, 
+                       cmdtxt => 'analogValue'
+                     }
+                    );
     
-  my $rtnerr = responseCheck ($res);
+  my $rtnerr = responseCheck ($res, $hrcmn{$hash->{BATADDRESS}}{mlen});
+  
   if ($rtnerr) {
       doOnError ({ hash     => $hash, 
                    readings => $readings,
@@ -876,19 +961,21 @@ return;
 ###############################################################
 #                  PylonLowVoltage Request
 ###############################################################
-sub Request {
-    my $hash   = shift;
-    my $socket = shift;
-    my $cmd    = shift;
-    my $cmdtxt = shift // 'unspecified data';
-    
-    my $name = $hash->{NAME};
-    
-    Log3 ($name, 4, "$name - retrieve battery info: ".$cmdtxt);
-    Log3 ($name, 4, "$name - request command (ASCII): ".$cmd);
-    Log3 ($name, 5, "$name - request command (HEX): ".unpack "H*", $cmd);  
+sub Request {    
+  my $paref = shift;
 
-    printf $socket $cmd;
+  my $hash   = $paref->{hash};
+  my $socket = $paref->{socket};  
+  my $cmd    = $paref->{cmd};
+  my $cmdtxt = $paref->{cmdtxt} // 'unspecified data';
+    
+  my $name = $hash->{NAME};
+    
+  Log3 ($name, 4, "$name - retrieve battery info: ".$cmdtxt);
+  Log3 ($name, 4, "$name - request command (ASCII): ".$cmd);
+  Log3 ($name, 5, "$name - request command (HEX): ".unpack "H*", $cmd);  
+
+  printf $socket $cmd;
 
 return Reread ($hash, $socket);
 }
@@ -920,9 +1007,11 @@ return $res;
 ###############################################################
 #                  PylonLowVoltage Undef
 ###############################################################
-sub Undef {
+sub Shutdown {
   my ($hash, $args) = @_;
+  
   RemoveInternalTimer ($hash);
+  _closeSocket        ($hash); 
 
 return;
 }
@@ -951,13 +1040,26 @@ return $result;
 #       Response Status ermitteln
 ###############################################################
 sub responseCheck {               
-  my $res = shift;
+  my $res  = shift;
+  my $mlen = shift // 0;                # Mindestlänge Antwortstring
 
   my $rtnerr = $hrtnc{99}{desc};
-  return $rtnerr if(!$res || $res !~ /^[~A-Z0-9]+\r$/xs);
+  
+  if(!$res || $res !~ /^[~A-Z0-9]+\r$/xs) {
+      return $rtnerr;
+  }
+  
+  my $len = length($res);
+  
+  if ($len < $mlen) {
+      $rtnerr = $hrtnc{98}{desc};
+      $rtnerr =~ s/<LEN>/$len/xs;
+      $rtnerr =~ s/<MLEN>/$mlen/xs;
+      return $rtnerr;
+  }
   
   my $rtn = q{_};
-  $rtn    = substr($res,7,2) if($res && length($res) >= 10);
+  $rtn    = substr($res,7,2) if($res && $len >= 10);
     
   if(defined $hrtnc{$rtn}{desc} && substr($res, 0, 1) eq '~') {
       $rtnerr = $hrtnc{$rtn}{desc};
@@ -977,16 +1079,18 @@ sub doOnError {
   my $readings = $paref->{readings};     # Referenz auf das Hash der zu erstellenden Readings
   my $state    = $paref->{state};
   my $socket   = $paref->{sock};
+  my $verbose  = $paref->{verbose} // 4;
   
   ualarm(0);
-  close ($socket) if($socket);
 
   my $name           = $hash->{NAME};
   $state             = (split "at ", $state)[0];
   $readings->{state} = $state;
-    
-  Log3 ($name, 3, "$name - ".$readings->{state});
-    
+  $verbose           = 3 if($readings->{state} =~ /error/xsi);
+  
+  Log3 ($name, $verbose, "$name - ".$readings->{state});
+  
+  _closeSocket      ($hash);
   deleteReadingspec ($hash);
   createReadings    ($hash, $readings);                
     
@@ -1152,6 +1256,16 @@ management system via the RS485 interface.
      Enables/disables the device definition.
    </li>
    <br>
+   
+   <a id="PylonLowVoltage-attr-gatewayPermLink"></a>
+   <li><b>gatewayPermLink 0|1</b><br>
+     If set, the connection to the RS485 gateway is not terminated after the data retrieval. Only in case of an error an 
+     existing connection is discarded and re-established. 
+     If the attribute is not set or 0, a new gateway connection is established before each data fetch which
+     is always terminated again after the data retrieval. <br>
+     (default: 0)     
+   </li>
+   <br>
 
    <a id="PylonLowVoltage-attr-interval"></a>
    <li><b>interval &lt;seconds&gt;</b><br>
@@ -1311,6 +1425,16 @@ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
    <a id="PylonLowVoltage-attr-disable"></a>
    <li><b>disable 0|1</b><br>
      Aktiviert/deaktiviert die Gerätedefinition.
+   </li>
+   <br>
+   
+   <a id="PylonLowVoltage-attr-gatewayPermLink"></a>
+   <li><b>gatewayPermLink 0|1</b><br>
+     Wenn gesetzt, wird die Verbindung zum RS485 Gateway nach dem Datenabruf nicht abgebaut. Nur im Fehlerfall wird eine
+     bestehende Verbindung verworfen und neu aufgebaut. 
+     Ist das Attribut nicht gesetzt bzw. 0, erfolgt vor jedem Datenabruf der Aufbau einer neuen Gatewayverbindung die 
+     nach dem Datenabruf grundsätzlich wieder beendet wird. <br>
+     (default: 0)     
    </li>
    <br>
 
