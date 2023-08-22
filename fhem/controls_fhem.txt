@@ -1,4 +1,4 @@
-REV 27863
+REV 27871
 DIR unused
 UPD 2023-08-20_07:45:02 406406 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -36,7 +36,7 @@ UPD 2020-07-15_07:45:02 497774 FHEM/00_SONOS.pm
 UPD 2020-09-03_07:45:03 4722 FHEM/00_Schellenberg.pm
 UPD 2017-06-30_07:45:02 20215 FHEM/00_SmartMeterP1.pm
 UPD 2023-07-21_07:45:03 79723 FHEM/00_TCM.pm
-UPD 2023-04-15_07:45:03 145828 FHEM/00_THZ.pm
+UPD 2023-08-22_07:45:04 146452 FHEM/00_THZ.pm
 UPD 2017-12-16_07:45:02 35823 FHEM/00_TUL.pm
 UPD 2021-06-08_07:45:02 21487 FHEM/00_ZWCUL.pm
 UPD 2022-11-06_07:45:03 45881 FHEM/00_ZWDongle.pm
@@ -750,8 +750,8 @@ UPD 2023-08-20_07:45:08 4901015 docs/commandref.html
 UPD 2023-08-20_07:45:12 2908183 docs/commandref_DE.html
 UPD 2023-05-01_07:45:03 85822 docs/commandref_frame.html
 UPD 2023-05-01_07:45:03 96447 docs/commandref_frame_DE.html
-UPD 2023-08-21_07:45:13 305799 docs/commandref_modular.html
-UPD 2023-08-21_07:45:14 317542 docs/commandref_modular_DE.html
+UPD 2023-08-22_07:45:15 305799 docs/commandref_modular.html
+UPD 2023-08-22_07:45:16 317542 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -788,6 +788,7 @@ UPD 2021-12-18_07:45:03 16385 lib/FHEM/Devices/Nuki/Device.pm
 UPD 2021-07-11_07:45:03 29319 lib/FHEM/Devices/Tesla/Powerwall.pm
 UPD 2023-06-30_07:45:02 42215 lib/FHEM/HTTPMOD/Utils.pm
 UPD 2022-06-01_07:45:03 11892 lib/FHEM/Modbus/TestUtils.pm
+UPD 2023-08-22_07:45:04 24389 lib/FHEM/Scheduler/Cron.pm
 UPD 2023-04-09_07:45:03 10123 lib/FHEM/SynoModules/API.pm
 UPD 2023-04-09_07:45:03 15445 lib/FHEM/SynoModules/ErrCodes.pm
 UPD 2023-04-09_07:45:03 77021 lib/FHEM/SynoModules/SMUtils.pm
@@ -1633,6 +1634,8 @@ UPD 2015-07-28_14:05:32 8453 www/images/fhemSVG/outside_socket.svg
 UPD 2015-07-28_14:05:32 2926 www/images/fhemSVG/people_sensor.svg
 UPD 2019-02-14_07:45:03 1861 www/images/fhemSVG/perl.svg
 UPD 2019-02-14_07:45:03 6193 www/images/fhemSVG/perl6.svg
+UPD 2023-08-22_07:45:04 2949 www/images/fhemSVG/phone_incall.svg
+UPD 2023-08-22_07:45:04 3817 www/images/fhemSVG/phone_ringing.svg
 UPD 2020-11-23_07:45:02 8151 www/images/fhemSVG/phoscon.svg
 UPD 2019-02-14_07:45:03 3977 www/images/fhemSVG/php.svg
 UPD 2019-02-23_07:45:05 2984 www/images/fhemSVG/pushover.svg
