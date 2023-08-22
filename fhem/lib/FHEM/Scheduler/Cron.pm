@@ -8,7 +8,7 @@ use strict;
 use warnings;
 use utf8;
 use POSIX qw( strftime );
-use List::Util qw ( any first );
+use List::Util qw ( any first min );
 use Time::HiRes qw( time );
 use Time::Local qw( timelocal );
 
@@ -408,20 +408,39 @@ sub _next_date {
 		$inclusive?'at or after (inclusive)':'after (exclusive)',
 		($from_date =~ m/(\d{4})(\d{2})(\d{2})/)) if $ENV{EXTENDED_DEBUG};
 
+	# set of possible dates, based on the different methods
+	my @set;
 	#  the mdays/months
-	if (scalar @{$self->{list_of_mdays}}) { 
-		$self->{next_calender_date} = $self->_next_calendar_date($from_date, $inclusive);
+	if (scalar @{$self->{list_of_mdays}}) {
+		# check if cached value can be used
+		if (($self->{working_date} and $self->{next_calender_date}) and 
+			(($inclusive and $self->{next_calender_date} >= $self->{working_date}) or 
+			($self->{next_calender_date} > $self->{working_date}))) {
+			$self->log(5, 'use cached calender date %04d-%02d-%02d', ($self->{next_calender_date} =~ m/(\d{4})(\d{2})(\d{2})/)) if $ENV{EXTENDED_DEBUG};
+			push @set, $self->{next_calender_date};
+		} else {
+			push @set, $self->{next_calender_date} = $self->_next_calendar_date($from_date, $inclusive);
+		}
 	}
 
 	if (scalar @{$self->{list_of_or_wdays}}) {
-		$self->{next_weekday_date} = $self->_next_weekday_date($from_date, $inclusive);
+		# check if cached value can be used
+		if (($self->{working_date} and $self->{next_weekday_date}) and 
+			(($inclusive and $self->{next_weekday_date} >= $self->{working_date}) or 
+			($self->{next_weekday_date} > $self->{working_date}))) {
+			$self->log(5, 'use cached weekday date %04d-%02d-%02d', ($self->{next_weekday_date} =~ m/(\d{4})(\d{2})(\d{2})/)) if $ENV{EXTENDED_DEBUG};
+			push @set, $self->{next_weekday_date};
+		} else {
+			push @set, $self->{next_weekday_date} = $self->_next_weekday_date($from_date, $inclusive);
+		}
 	}
 	
-
-
-	$self->{current_work_date} = $self->{next_calender_date};
-	#exit(0);
-
+	# whatever comes first
+	my $result = min @set;
+	$self->log(5, 'found date %04d-%02d-%02d', 
+		# $inclusive?'at or after (inclusive)':'after (exclusive)',
+		($result =~ m/(\d{4})(\d{2})(\d{2})/)) if $ENV{EXTENDED_DEBUG};
+	return $result;
 }
 
 sub _next_calendar_date {
