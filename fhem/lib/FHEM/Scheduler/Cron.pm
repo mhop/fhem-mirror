@@ -1,4 +1,5 @@
 # $Id$
+# svn commit -m "Cron.pm: wip" lib/FHEM/Scheduler/Cron.pm
 package FHEM::Scheduler::Cron;
 
 use v5.14;
@@ -31,6 +32,11 @@ sub new {
 	*log = \&_log;
 	$self->log(5, '%s loaded', $REVISION) if $ENV{EXTENDED_DEBUG};
 
+	# sort of cache, in general the next expected "from_"
+	# required to synchronize the pointer logic for more efficiency and speed
+	$self->{working_date} = '';
+	$self->{working_time} = '';
+
 	VALIDATE: {
 		do {$self->{error} = sprintf("no cron expression"); last VALIDATE} if (not $cron_text);
 		do {$self->{error} = sprintf("cron expression exceeds limit"); last VALIDATE} if (length($cron_text) > 255);
@@ -48,11 +54,9 @@ sub new {
 				last VALIDATE;
 			}
 		}
-		# at that point all validations where passed
-		# $self->next();
 	}
 	# $self->log(2, '%s', $self->{error}) if ($self->{error} and $ENV{EXTENDED_DEBUG}); 
-	return $self;
+	return wantarray ? ($self, $self->{error}) : $self;
 }
 
 # public entrance
@@ -68,17 +72,6 @@ sub next {
 
 	# internal method
 	return $self->_next($from);
-	
-	
-	# if the time where it was evaluated is in the past but before next date, 
-	# it cant be different and we can skip the evaluation
-
-	#my $ts = $from // Time::HiRes::time();
-	#my $dt = strftime("%Y-%m-%d %H:%M:%S", localtime($ts));
-	#my $date_from = strftime("%Y%m%d", localtime($ts));
-	#print "$ENV{EXTENDED_DEBUG} $date_from\n";
-
-	# is from_date == cached last calc ? 
 
 }
 
@@ -90,51 +83,52 @@ sub _next {
 	my $from_date = substr($from, 0, 8);
 	my $from_time = substr($from, 8, 6);
 
-	$self->log(5, 'date %s time %s', $from_date, $from_time) if $ENV{EXTENDED_DEBUG};
+	$self->log(5, '(reference/in) from_date:%s, from_time:%s', $from_date, $from_time) if $ENV{EXTENDED_DEBUG};
 
-	# thats the case on startup (undef) or when the day component changes
-	if ($from_date ne ($self->{current_work_date} // '')) {
-		# supposed to also set current_work_date to the next possible date
-		my $next_date = $self->_next_date($from_date);
-		#my $next_time; #  = $self->_next_time(-1);
-		
-		# if 'from_date' is the current day, we need to adjust the time component 
-		if ($from_date == $next_date) {
-			$self->log(5, 'date unchanged: %s search next time after %s', $next_date, $from_time) if $ENV{EXTENDED_DEBUG};
-			return $self->_next($from); # day may change
-		} else {
-			my $next_time = $self->_next_time(-1);
-			$self->log(5, 'date changed: %s start time %s', $next_date, $next_time) if $ENV{EXTENDED_DEBUG};
-			return $next_date.$next_time;
-		}
+	my ($next_date, $next_time, $day_changed);
+
+	# If there is a discrepancy between from_date and working_date, we must first perform the next_date calculation. 
+	# Otherwise, this has already been done in previous rounds and can be skipped for efficiency and speed reasons.
+	if ($from_date ne $self->{working_date}) {
+		# reset pointer
+		undef $self->{month_ptr};
+		undef $self->{mday_ptr};
+		$self->{working_date} = $next_date = $self->_next_date($from_date, 1); # inclusive, the from_date is possible
 	} else {
-		my $next_time = $self->_next_time($from_time);
-
-		# carry over ?
-		# adjust date with +1 day
-		return $from_date.$next_time;
+		# load from cache
+		$next_date = $self->{working_date};
 	}
-}
 
-# evaluate different rules and return the earliest possiible date
-sub _next_date {
-	my $self = shift;
-	my $from = shift; # date
-
-	my ($y, $m, $d) = ($from =~ m/(\d{4})(\d{2})(\d{2})/);
-	$self->log(5, 'search next date at or after %04d%02d%02d', $y, $m, $d) if $ENV{EXTENDED_DEBUG};
-
-	#  the mdays/months
-	if (scalar $self->{list_of_mdays}) {
-		$self->{next_calender_date} = $self->_next_calendar_date($y, $m, $d);
-		$self->log(5, 'next calendar date at or after %04d%02d%02d -> %s', $y, $m, $d, $self->{next_calender_date}) if $ENV{EXTENDED_DEBUG};
+	# if (($from_time ne $self->{working_time}) or 
+	# ($from_date ne $next_date)) {
+	if ($from_time ne $self->{working_time}) {
+		# reset pointer
+		undef $self->{hour_ptr};
+		undef $self->{minute_ptr};
 	}
-	
 
+	# time search: 
+	if ($from_date eq $self->{working_date}) {
+	# if ($from_date eq $next_date) {
+		# same day, therefore start with from_time (NON inclusive: >)
+		($next_time, $day_changed) = $self->_next_time($from_time);
+		$self->{working_time} = $next_time;
+	} else {
+		# new day, therefore start with from_time = 000000 (inclusive: >=)
+		# that also requires a pointer reset, done above
+		($next_time, $day_changed) = $next_time = $self->_next_time(000000, 1);
+		$self->{working_time} = $next_time;
+	}
 
-	$self->{current_work_date} = $self->{next_calender_date};
-	#exit(0);
+	# day changed (overflow) in time search?
+	if ($day_changed) {
+		# find next date, (NON inclusive: >)
+		# No need to seach time again, thats done with the overflow already
+		$self->{working_date} = $next_date = $self->_next_date($from_date);
+	}
 
+	$self->log(5, '(result/out) next_date:%s, next_time:%s', $next_date, $next_time) if $ENV{EXTENDED_DEBUG};
+	return $next_date.$next_time;
 }
 
 sub _log {
@@ -403,49 +397,242 @@ sub _parse_wday_item {
 	return 1;
 }
 
-# Input is the time from which the next time is to be determined 
-# input hhmmss or -1: 'from' what time is the 'next' to be derived, -1 is 'first of day'
-# return is greater to the input time (not including 'now') including a 'carry over' indicate 'another day'
+# $from_date: date from which the next time is to be determined as yyyymmdd
+# $inclusive: TRUE: include from date (>=), FALSE: exclude $from_date (>)
+sub _next_date {
+	my $self = shift;
+	my $from_date = shift; # date
+	my $inclusive = shift;
+
+	$self->log(5, 'search next date %s %04d-%02d-%02d', 
+		$inclusive?'at or after (inclusive)':'after (exclusive)',
+		($from_date =~ m/(\d{4})(\d{2})(\d{2})/)) if $ENV{EXTENDED_DEBUG};
+
+	#  the mdays/months
+	if (scalar @{$self->{list_of_mdays}}) { 
+		$self->{next_calender_date} = $self->_next_calendar_date($from_date, $inclusive);
+	}
+
+	if (scalar @{$self->{list_of_or_wdays}}) {
+		$self->{next_weekday_date} = $self->_next_weekday_date($from_date, $inclusive);
+	}
+	
+
+
+	$self->{current_work_date} = $self->{next_calender_date};
+	#exit(0);
+
+}
+
+sub _next_calendar_date {
+	my $self = shift;
+	my $from_date = shift; # date
+	my $inclusive = shift;
+
+	my ($year, $month, $mday) = ($from_date =~ m/(\d{4})(\d{2})(\d{2})/);
+
+	$self->log(5, 'search next calender date %s %04d-%02d-%02d', 
+		$inclusive?'at or after (inclusive)':'after (exclusive)',
+		$year, $month, $mday) if $ENV{EXTENDED_DEBUG};
+
+	# initialize ptr or use cached values
+	# the ptr points to the correspondig list entry
+	$self->{month_ptr} //= sub {
+		$self->log(5, 'initialize month pointer') if $ENV{EXTENDED_DEBUG};
+		my $i = 0;
+		return 0 if ($self->{list_of_months}->[$i] >= $_[0]); 
+		while ($self->{list_of_months}->[$i] < $_[0] and $i < $#{$self->{list_of_months}}) {$i++}
+		return $i}->($month);
+	$self->{mday_ptr} //= sub {
+		$self->log(5, 'initialize mdy pointer') if $ENV{EXTENDED_DEBUG};
+		my $i = 0;
+		return 0 if ($self->{list_of_mdays}->[$i] >= $_[0]); 
+		while ($self->{list_of_mdays}->[$i] < $_[0] and $i < $#{$self->{list_of_mdays}}) {$i++} 
+		return $i}->($mday);
+
+	$self->log(5, 'pointer set: month %d(%d) mday %d(%d)', $self->{month_ptr}, $self->{list_of_months}->[$self->{month_ptr}], $self->{mday_ptr}, $self->{list_of_mdays}->[$self->{mday_ptr}]) if $ENV{EXTENDED_DEBUG};
+
+	my $found = undef;
+	my $year_next = $year;
+	while (not defined($found)) {
+		my ($y, $m, $d) = ($year_next, $self->{list_of_months}->[$self->{month_ptr}], $self->{list_of_mdays}->[$self->{mday_ptr}]);
+		my $candidate = sprintf('%04d%02d%02d', $y, $m, $d);
+		$self->log(5, 'test candidate %04d-%02d-%02d', $y, $m, $d) if $ENV{EXTENDED_DEBUG};
+		
+		# test date is valid (there is no 02-30, and 02-29 only in leap years) and
+		# date is greater or equal then the 'from' date (inclusive) or
+		# date is greater to the 'from' date (NOT inclusive)
+		if ($self->is_valid_date($y, $m, $d) and (
+			($inclusive and $candidate >= sprintf('%04d%02d%02d', $year, $month, $mday)) or
+			($candidate > sprintf('%04d%02d%02d', $year, $month, $mday)))) {
+			# weekdays with 'and' logic			
+			if (scalar @{$self->{list_of_and_wdays}}) {
+				$self->log(5, 'test candidate %04d-%02d-%02d on wday %d against \'and\' list %s', $y, $m, $d, $self->get_weekday($y, $m, $d), join ',',@{$self->{list_of_and_wdays}}) if $ENV{EXTENDED_DEBUG};
+				if (any {$_ == $self->get_weekday($y, $m, $d)} @{$self->{list_of_and_wdays}}) {
+					$found = $candidate;
+					last;
+				}
+			} else {
+				$found = $candidate;
+				last;
+			}
+		}
+
+		# advance ptr
+		$self->{mday_ptr}++;
+		if ($self->{mday_ptr} > $#{$self->{list_of_mdays}}) {
+			$self->{mday_ptr} = 0;
+			$self->{month_ptr}++;
+			if ($self->{month_ptr} > $#{$self->{list_of_months}}) {
+				$self->{month_ptr} = 0;
+				$year_next++;
+			}
+		}
+	}
+	$self->log(5, 'found candidate %04d-%02d-%02d', ($found =~ m/(\d{4})(\d{2})(\d{2})/)) if $ENV{EXTENDED_DEBUG};
+	return $found;
+}
+
+# Input is the date from which the next date is to be determined 
+# input array (year, month, mday) 'from'
+# return is greater or equal to the input date
+sub _next_weekday_date {
+	my $self = shift;
+	my $from_date = shift; # date
+	my $inclusive = shift;
+
+	my ($year, $month, $mday) = ($from_date =~ m/(\d{4})(\d{2})(\d{2})/);
+
+	$self->log(5, 'search next weekday date %s %04d-%02d-%02d', 
+		$inclusive?'at or after (inclusive)':'after (exclusive)',
+		$year, $month, $mday) if $ENV{EXTENDED_DEBUG};
+
+	# test-candidate year
+	my $y = $year;
+	# test-candidate month
+	# initialize cache if not done already
+	if (not defined($self->{month_ptr_wday})) {
+		$self->{month_ptr_wday} = first { print "test $#{$self->{list_of_months}} $_ \n"; $self->{list_of_months}->[$_] >= $month } 0 .. $#{$self->{list_of_months}};
+		$self->{month_ptr_wday} //= 0; # case month < first entry
+	}
+	my $m = $self->{list_of_months}->[$self->{month_ptr_wday}];
+	$y++ if $m < $month;
+	my $d = ($m != $month)?1:$mday;
+
+	printf('first weekday candidate: %4d%02d%02d ptr: %d %s', $y, $m, $d, $self->{month_ptr_wday}, "\n");
+
+	until (($self->{next_weekday_date} // 0) >= sprintf('%4d%02d%02d', $year, $month, $mday)) {
+		# weekday of candidate
+		my $wday = $self->get_weekday($y, $m, $d);
+		# first following upcoming wday from the 'or' list. if the first possible wday < current wday, add one week (7 days)
+		my $first = (first {$_ >= $wday} @{ $self->{list_of_or_wdays} }) // $self->{list_of_or_wdays}->[0] + 7;
+		# how many days in the future 
+		my $day_diff = $first - $wday;
+		my $next_wday_in_month = $d + $day_diff;
+		printf('candidate %4d%02d%02d is weekday %d - next from \'or_list\' is %d - resulting in day %d %s', $y, $m, $d, $wday, $first, $next_wday_in_month, "\n");
+		# if $next_wday_in_month > days in month, advance ptr to next month
+		if ($self->is_valid_date($y, $m, $next_wday_in_month)) {
+			printf('candidate %4d%02d%02d on weekday %d is a valid date %s', $y, $m, $next_wday_in_month, $first % 6, "\n");
+			$self->{next_weekday_date} = sprintf('%4d%02d%02d', $y, $m, $next_wday_in_month);
+			# last;
+		} else {
+			# first day of next available month
+			$self->{month_ptr_wday}++;
+			if ($self->{month_ptr_wday} > $#{$self->{list_of_months}}) {
+				$self->{month_ptr_wday} = 0;
+				$y++;
+			}
+			$m = $self->{list_of_months}->[$self->{month_ptr_wday}];
+			$d = 1;
+		}
+	}
+}
+
+sub get_weekday {
+	my $self = shift;
+	my ($year, $month, $day) = @_;
+	# print "wday test $year, $month, $day \n";
+	if ($month < 3) {
+        $month += 12;
+        $year -= 1;
+    }
+
+    my $k = $year % 100;
+    my $j = int($year / 100);
+
+    # Calculating the day of the week using the Zeller congruence
+    my $f = $day + int((13 * ($month + 1)) / 5) + $k + int($k / 4) + int($j / 4) - (2 * $j);
+    my $weekday_num = ($f + 6) % 7;  # Modification to get Sunday = 0
+
+    return $weekday_num;
+}
+
+
+# $from_time: time from which the next time is to be determined as hhmmss
+# $inclusive: TRUE: include from time (>=), FALSE: exclude $from_time (>)
 sub _next_time {
 	my $self = shift;
 	my $from_time = shift;
+	my $inclusive = shift;
 
-	# minus 1: first of day, required because 000000 means 'next' after 00:00, but never 00:00 itself. Case: day change first is midnight
-	# reset ptr to the very first position and return the result
-	if ($from_time == -1) {
-		$self->{hour_ptr} = 0;
-		$self->{minute_ptr} = 0;
-		return $self->{list_of_hours}->[0] * 1e4 + $self->{list_of_minutes}->[0] * 1e2;
-	}
+	# my ($hour, $minute, $second) = ($from_time =~ m/(\d{2})(\d{2})(\d{2})/);
+	$self->log(5, 'search next time %s %02d:%02d:%02d', 
+		$inclusive?'at or after (inclusive)':'after (exclusive)',
+		($from_time =~ m/(\d{2})(\d{2})(\d{2})/)) if $ENV{EXTENDED_DEBUG};
 
 	my ($hour, $minute, $second) = ($from_time =~ m/(\d{2})(\d{2})(\d{2})/);
 
-	print "$from_time, $hour, $minute, $second\n";
-
-	my $found = undef;
 	# initialize ptr or use cached values
 	# the ptr points to the correspondig list entry
 	$self->{hour_ptr} //= sub {
+		$self->log(5, 'initialize hour pointer') if $ENV{EXTENDED_DEBUG};
 		my $i = 0;
-		# print "test month $_[0] \n"; 
 		return 0 if ($self->{list_of_hours}->[$i] >= $_[0]);
 		while ($self->{list_of_hours}->[$i] < $_[0] and $i < $#{$self->{list_of_hours}}) {$i++}
 		return $i}->($hour);
 	$self->{minute_ptr} //= sub {
+		$self->log(5, 'initialize minute pointer') if $ENV{EXTENDED_DEBUG};
 		my $i = 0; 
-		# print "test mday $_[0] \n"; 
 		return 0 if ($self->{list_of_minutes}->[$i] >= $_[0]); 
 		while ($self->{list_of_minutes}->[$i] < $_[0] and $i < $#{$self->{list_of_minutes}}) {$i++}
 		return $i}->($minute);
 
 	$self->log(5, 'pointer set: hour %d(%d) minute %d(%d)', $self->{hour_ptr}, $self->{list_of_hours}->[$self->{hour_ptr}], $self->{minute_ptr}, $self->{list_of_minutes}->[$self->{minute_ptr}]) if $ENV{EXTENDED_DEBUG};
 
-	#my $candiate = sprintf('%02d%02d%02d', $hour, $minute, $second)) {
-	#while (sprintf('%02d%02d%02d', $hour, $minute, $second)) {
+	my ($found, $day_changed) = (undef, undef);	
+	while (not defined($found)) {
+		my $candidate = sprintf('%02d%02d%02d', $self->{list_of_hours}->[$self->{hour_ptr}], $self->{list_of_minutes}->[$self->{minute_ptr}], 00);
+		$self->log(5, 'test candidate %02d:%02d:%02d', ($candidate =~ m/(\d{2})(\d{2})(\d{2})/)) if $ENV{EXTENDED_DEBUG};
+		
+		if ($inclusive) {
+			$found = $candidate if ($candidate >= $from_time or $day_changed);
+		} else {
+			$found = $candidate if ($candidate > $from_time or $day_changed);
+		}
 
-	# }
+		# need to break here because the pointer increment below trigger a day_changed while advancing.
+		last if defined($found);
+			
+		if (++$self->{minute_ptr} > $#{$self->{list_of_minutes}}) {
+			$self->{minute_ptr} = 0;
+			$self->{hour_ptr}++;
+		};
+		# $self->log(5, 'pointer set: hour %d(%d) minute %d(%d)', $self->{hour_ptr}, $self->{list_of_hours}->[$self->{hour_ptr}], $self->{minute_ptr}, $self->{list_of_minutes}->[$self->{minute_ptr}]) if $ENV{EXTENDED_DEBUG};
 
-	return;
+		if ($self->{hour_ptr} > $#{$self->{list_of_hours}}) {
+			$self->{minute_ptr} = 0;
+			$self->{hour_ptr} = 0;
+			$day_changed = 1;
+		};
+		# $self->log(5, 'pointer set: hour %d(%d) minute %d(%d)', $self->{hour_ptr}, $self->{list_of_hours}->[$self->{hour_ptr}], $self->{minute_ptr}, $self->{list_of_minutes}->[$self->{minute_ptr}]) if $ENV{EXTENDED_DEBUG};
+	}
+	
+	$self->log(5, 'next time %s %02d:%02d:%02d -> %02d:%02d:%02d %s', 
+		$inclusive?'at or after (inclusive)':'after (exclusive)',
+		($from_time =~ m/(\d{2})(\d{2})(\d{2})/), 
+		($found =~ m/(\d{2})(\d{2})(\d{2})/), 
+		$day_changed?'(new day)':'(same day)') if $ENV{EXTENDED_DEBUG};
+	return ($found, $day_changed);
 }
 
 # Input is the date from which the next date is to be determined 
@@ -511,151 +698,6 @@ sub _next_special_date {
 
 
 	} until (scalar @list)
-
-
-}
-
-# Input is the date from which the next date is to be determined 
-# input array (year, month, mday) 'from'
-# return is greater or equal to the input date
-sub _next_weekday_date {
-	my $self = shift;
-	my ($year, $month, $mday) = @_;
-
-	printf('next weekday from: %4d%02d%02d %s', $year, $month, $mday, "\n");
-
-	# return if cache has a value
-
-	# test-candidate year
-	my $y = $year;
-	# test-candidate month
-	# initialize cache if not done already
-	if (not defined($self->{month_ptr_wday})) {
-		$self->{month_ptr_wday} = first { print "test $#{$self->{list_of_months}} $_ \n"; $self->{list_of_months}->[$_] >= $month } 0 .. $#{$self->{list_of_months}};
-		$self->{month_ptr_wday} //= 0; # case month < first entry
-	}
-	my $m = $self->{list_of_months}->[$self->{month_ptr_wday}];
-	$y++ if $m < $month;
-	my $d = ($m != $month)?1:$mday;
-
-	printf('first weekday candidate: %4d%02d%02d ptr: %d %s', $y, $m, $d, $self->{month_ptr_wday}, "\n");
-
-	until (($self->{next_weekday_date} // 0) >= sprintf('%4d%02d%02d', $year, $month, $mday)) {
-		# weekday of candidate
-		my $wday = $self->get_weekday($y, $m, $d);
-		# first following upcoming wday from the 'or' list. if the first possible wday < current wday, add one week (7 days)
-		my $first = (first {$_ >= $wday} @{ $self->{list_of_or_wdays} }) // $self->{list_of_or_wdays}->[0] + 7;
-		# how many days in the future 
-		my $day_diff = $first - $wday;
-		my $next_wday_in_month = $d + $day_diff;
-		printf('candidate %4d%02d%02d is weekday %d - next from \'or_list\' is %d - resulting in day %d %s', $y, $m, $d, $wday, $first, $next_wday_in_month, "\n");
-		# if $next_wday_in_month > days in month, advance ptr to next month
-		if ($self->is_valid_date($y, $m, $next_wday_in_month)) {
-			printf('candidate %4d%02d%02d on weekday %d is a valid date %s', $y, $m, $next_wday_in_month, $first % 6, "\n");
-			$self->{next_weekday_date} = sprintf('%4d%02d%02d', $y, $m, $next_wday_in_month);
-			# last;
-		} else {
-			# first day of next available month
-			$self->{month_ptr_wday}++;
-			if ($self->{month_ptr_wday} > $#{$self->{list_of_months}}) {
-				$self->{month_ptr_wday} = 0;
-				$y++;
-			}
-			$m = $self->{list_of_months}->[$self->{month_ptr_wday}];
-			$d = 1;
-		}
-	}
-}
-
-# Input is the date from which the next date is to be determined 
-# input array (year, month, mday) 'from'
-# return is greater or equal to the input date
-sub _next_calendar_date {
-	my $self = shift;
-	my ($year, $month, $mday) = @_;
-
-	my $found = undef;
-	# initialize ptr or use cached values
-	# the ptr points to the correspondig list entry
-	$self->{month_ptr} //= sub {
-		my $i = 0;
-		# print "test month $_[0] \n"; 
-		return 0 if ($self->{list_of_months}->[$i] >= $_[0]); 
-		while ($self->{list_of_months}->[$i] < $_[0] and $i < $#{$self->{list_of_months}}) {$i++}
-		return $i}->($month);
-	$self->{mday_ptr} //= sub {
-		my $i = 0; 
-		# print "test mday $_[0] \n"; 
-		return 0 if ($self->{list_of_mdays}->[$i] >= $_[0]); 
-		while ($self->{list_of_mdays}->[$i] < $_[0] and $i < $#{$self->{list_of_mdays}}) {$i++} 
-		return $i}->($mday);
-
-	$self->log(5, 'pointer set: month %d(%d) mday %d(%d)', $self->{month_ptr}, $self->{list_of_months}->[$self->{month_ptr}], $self->{mday_ptr}, $self->{list_of_mdays}->[$self->{mday_ptr}]) if $ENV{EXTENDED_DEBUG};
-
-
-	my $year_next = $year;
-	my $candidate;
-	while (not $found) {
-
-		my ($y, $m, $d) = ($year_next, $self->{list_of_months}->[$self->{month_ptr}], $self->{list_of_mdays}->[$self->{mday_ptr}]);
-		# $candiate = sprintf('%4d%02d%02d', $year_next, $self->{list_of_months}->[$self->{month_ptr}], $self->{list_of_mdays}->[$self->{mday_ptr}]);
-		$candidate = sprintf('%04d%02d%02d', $y, $m, $d);
-		$self->log(5, 'test candidate %d', $candidate) if $ENV{EXTENDED_DEBUG};
-		
-		# only to debug
-		# my $wday = $self->get_weekday($y, $m, $d);
-		# print "ceck candiate: $candiate wday: $wday\n";
-		
-		# test date is valid (there is no 02-30, and 02-29 only in leap years) and
-		# date is greater or equal then the 'from' date
-		if ($self->is_valid_date($y, $m, $d) and $candidate >= sprintf('%04d%02d%02d', $year, $month, $mday)) {
-			# weekdays with 'and' logic
-			# print "valid candiate: $candiate $wday\n";
-			$self->log(5, 'test candidate %d on wday %d against \'and\' list %s', $candidate, $self->get_weekday($y, $m, $d), join ',',@{$self->{list_of_and_wdays}}) if $ENV{EXTENDED_DEBUG};
-			if (scalar @{$self->{list_of_and_wdays}}) {
-				if (any {$_ == $self->get_weekday($y, $m, $d)} @{$self->{list_of_and_wdays}}) {
-					$found = 1;
-					last;
-				}
-			} else {
-				$found = 1;
-				last;
-			}
-		}
-
-		# advance ptr
-		$self->{mday_ptr}++;
-		if ($self->{mday_ptr} > $#{$self->{list_of_mdays}}) {
-			$self->{mday_ptr} = 0;
-			$self->{month_ptr}++;
-			if ($self->{month_ptr} > $#{$self->{list_of_months}}) {
-				$self->{month_ptr} = 0;
-				$year_next++;
-			}
-		}
-	}
-	$self->log(5, 'found candidate %d', $candidate) if $ENV{EXTENDED_DEBUG};
-	# print "exit: $self->{month_ptr} $self->{mday_ptr} \n";
-	return $candidate;
-}
-
-sub get_weekday {
-	my $self = shift;
-	my ($year, $month, $day) = @_;
-	# print "wday test $year, $month, $day \n";
-	if ($month < 3) {
-        $month += 12;
-        $year -= 1;
-    }
-
-    my $k = $year % 100;
-    my $j = int($year / 100);
-
-    # Berechnung des Wochentags mithilfe der Zeller-Congruenz
-    my $f = $day + int((13 * ($month + 1)) / 5) + $k + int($k / 4) + int($j / 4) - (2 * $j);
-    my $weekday_num = ($f + 6) % 7;  # Modifikation, um Sonntag = 0 zu erhalten
-
-    return $weekday_num;
 }
 
 sub is_valid_date {
