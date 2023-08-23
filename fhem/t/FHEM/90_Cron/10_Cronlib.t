@@ -60,7 +60,8 @@ my $test = [
     [q(handle '$cron_text'), '0 0 * * 1-5/2', qr(^$), 20230101000000, 20230102000000, 20230104000000, 20230106000000 ],
     [q(handle '$cron_text'), '0 0 * * 1-5,6', qr(^$), 20230101000000, 20230102000000, 20230103000000, 20230104000000, 20230105000000, 20230106000000, 20230107000000 ],
     [q(handle '$cron_text'), '0 0 8 * 1-5,6', qr(^$), 20230101000000, 20230102000000, 20230103000000, 20230104000000, 20230105000000, 20230106000000, 20230107000000, 20230108000000 ],
-    [q(handle '$cron_text'), '0 0 8 * &1-5,6', qr(^$), 20230101000000, 20230102000000, 20230103000000, 20230104000000, 20230105000000, 20230106000000, 20230107000000, 20230108000000 ],
+    [q(handle '$cron_text'), '0 0 2-8 * &1-5,6', qr(^$), 20230101000000, 20230102000000, 20230103000000, 20230104000000, 20230105000000, 20230106000000, 20230107000000, 20230114000000 ],
+    [q(handle '$cron_text'), '0 0 2-8 * 1#1', qr(^$), 20230101000000 ],
 
     # time series
     [q(Timeseries '$cron_text'), '0 12 3,4,5 2 0,2,3,4', qr(^$), 20230102150000, 20230201120000, 20230202120000, 20230203120000, 20230204120000], 
@@ -79,14 +80,17 @@ foreach my $t (@$test) {
     my $ok = 1;
     my $count = 0;
     
-    for my $iter (0 .. $#series -1) {
-        # next unless ($series[$iter]);
-        my $got = $cron_obj->next($series[$iter]);
-        $count++;
-        $ok = 0 if ($got ne $series[$iter +1]);
-        say sprintf('%s   -> expected: %s, got: %s', ($got ne $series[$iter +1])?'not ok':'ok', $series[$iter +1], $got) if $ENV{EXTENDED_DEBUG};
+    unless ($err) {
+        for my $iter (0 .. $#series -1) {
+            # next unless ($series[$iter]);
+            my ($got, $err) = $cron_obj->next($series[$iter]);
+            $count++;
+            $ok = 0 if ($err or (not $got) or ($got ne $series[$iter +1]));
+            say sprintf('%s   -> expected: %s, got: %s', ($got ne $series[$iter +1])?'not ok':'ok', $series[$iter +1], $got) if $ENV{EXTENDED_DEBUG};
+            last if (not $ok);
+        }
     }
-    $ok &&= ($err // '' =~ /$err_expected/);
+    $ok &&= (($err // '') =~ /$err_expected/);
     ok($ok, sprintf('%s %s', eval qq{"$desc"} , $err?"(got '$err')":"(# of passes: $count)"));
 };
 
