@@ -983,18 +983,18 @@ sub Reread {
     my $socket = shift;
 
     my $singlechar;
-    my $res  = q{};
+    my $res = q{};
 
-    do {
+    do {        
         $socket->read ($singlechar, 1);
 
         if (!$singlechar && (0+$! == ETIMEDOUT || 0+$! == EWOULDBLOCK)) {                # nur notwendig für read timeout
             croak 'Timeout reading data from battery';
         }
 
-        $res = $res . $singlechar;
+        $res = $res . $singlechar if(length $singlechar != 0 && $singlechar =~ /[~A-Z0-9\r]+/xs);
 
-    } while (ord($singlechar) != 13);
+    } while (length $singlechar == 0 || ord($singlechar) != 13);
     
 return $res;
 }
