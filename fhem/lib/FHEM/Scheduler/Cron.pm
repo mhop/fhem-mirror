@@ -560,7 +560,6 @@ sub _next_calendar_date {
 	return $found;
 }
 
-
 sub _next_weekday_date {
 	my $self = shift;
 	my $from_date = shift; # date
@@ -630,12 +629,10 @@ sub _next_weekday_date {
 }
 
 # positional weekdays:
-# - 0#2 - second monday in month
-# - 5#6 - 6th friday in month
+# - 1#2 - second monday in month
+# - 5#5 - 5th friday in month
 # - 1#f - first monday
 # - 0#l - last sunday
-# $from_time: time from which the next time is to be determined as hhmmss
-# $inclusive: TRUE: include from time (>=), FALSE: exclude $from_time (>)
 sub _next_positional_date {
 	my $self = shift;
 	my $from_date = shift;
@@ -649,17 +646,6 @@ sub _next_positional_date {
 	
 	my $month_ptr;
 	my @res;
-
-	# # initialize ptr or use cached values
-	# # the ptr points to the correspondig list entry
-	# $self->{positional_month_ptr} //= sub {
-	# 	$self->log(5, 'initialize positional month pointer') if $ENV{EXTENDED_DEBUG};
-	# 	my $t = shift;
-	# 	my $i = 0;
-	# 	return 0 if ($self->{list_of_months}->[$i] >= $t); 
-	# 	while ($self->{list_of_months}->[$i] < $t and $i < $#{$self->{list_of_months}}) {$i++}
-	# 	return $i}->($month);
-	# $self->log(5, 'pointer set: month %d(%d)', $self->{positional_month_ptr}, $self->{list_of_months}->[$self->{positional_month_ptr}]) if $ENV{EXTENDED_DEBUG};
 	
 	for my $item (@{$self->{list_of_positional_wdays}}) {
 		if (defined($self->{positional_date_cache}->{$item})) {
@@ -700,7 +686,7 @@ sub _next_positional_date {
 					if ($self->is_valid_date($y, $m, $day_diff) and 
 						(($inclusive and $candidate >= $from_date) or 
 						(not $inclusive and $candidate > $from_date))) {
-							push @res, $found = $candidate;
+							push @res, $self->{positional_date_cache}->{$item} = $found = $candidate;
 							$self->log(5, 'found candidate %04d-%02d-%02d for %s', $y, $m, $day_diff, $item) if $ENV{EXTENDED_DEBUG};
 							# last and exit loop
 					} else {
@@ -733,7 +719,7 @@ sub _next_positional_date {
 					if ($self->is_valid_date($y, $m, $days_in_month[$m] - $day_diff) and 
 						(($inclusive and $candidate >= $from_date) or 
 						(not $inclusive and $candidate > $from_date))) {
-							push @res, $found = $candidate;
+							push @res, $self->{positional_date_cache}->{$item} = $found = $candidate;
 							$self->log(5, 'found candidate %04d-%02d-%02d for %s', $y, $m, $days_in_month[$m] - $day_diff, $item) if $ENV{EXTENDED_DEBUG};
 							# last and exit loop
 					} else {
