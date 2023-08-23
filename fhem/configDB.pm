@@ -535,7 +535,6 @@ sub cfgDB_SaveCfg { ## prototype used in fhem.pl
 # Insert @rowList into database table
 	my $fhem_dbh = _cfgDB_Connect;
 	my ($num,$uuid) = split(/\:/,_cfgDB_Rotate($fhem_dbh,$internal));
-	Debug "num: $num uuid: $uuid";
 	my $counter = 0;
 	foreach (@rowList) { 
 		_cfgDB_InsertLine($fhem_dbh, $uuid, $_, $counter); 
