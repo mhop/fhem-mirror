@@ -65,6 +65,9 @@ sub next {
 	my $self = shift;
 	my $from = shift;
 
+	# return error if cron was defect (static)
+	if ($self->{error}) { return wantarray ? (undef, $self->{error}) : undef }; 
+
 	# validate input
 	my $from_date = substr($from, 0, 8);
 
@@ -252,11 +255,22 @@ sub _parse_cron_text {
 				$item =~ s/(Sun|Mon|Tue|Wed|Thu|Sat)/$w{$1}/gie;
 				
 				# RULE 4
-				$item =~ s/^[&]//s if ($mday eq '*' and $item =~ m/^[&].*/s);
+				$item =~ s/^&//s if ($mday eq '*' and $item =~ m/^&(?!&).*/s);
 
 				my $res = 1;
-				$res &&= $self->_parse_wday_item($item, $href_or) if ($item =~ m/^[^&].*/s);
-				$res &&= $self->_parse_wday_item($item, $href_and) if ($item =~ m/^[&].*/s);
+				# most specific to most generic
+				if ($item =~ m/^[w,h]$/i) { 				# - weekdays, holidays
+					$res &&= 0;
+				} elsif ($item =~ m/^[0-7]#[1-5,f,l]$/i) { 	# - positional weekday
+					$res &&= 0;
+				} elsif ($item =~ m/^&.*/s) { 				# - and logic
+					$res &&= $self->_parse_wday_item($item, $href_and);
+				} else { 									# - anything else
+					$res &&= $self->_parse_wday_item($item, $href_or)
+				}
+				
+				# $res &&= $self->_parse_wday_item($item, $href_or) if ($item =~ m/^[^&].*/s);
+				# $res &&= $self->_parse_wday_item($item, $href_and) if ($item =~ m/^[&].*/s);
 
 				if (not $res) {
 					$self->{error} = "syntax error in wday item: $item";
@@ -378,10 +392,11 @@ sub _parse_wday_item {
 	my ($self, $in, $href) = @_;
 	my ($start, $stop, $step);
 	
-	($step) = ($in =~ m/\/([1-6])$/);
+	($step) = ($in =~ m/\/([0-9]+)$/);
+	return if (defined($step) and ($step > 6)); # syntax error
 	($start, $stop) = ($in =~ m/^&?([*]|0*[0-7])(?:-([0-7]))?(?:\/(?:[1-6]))?$/);
 	return if (not defined($start) or ($start eq '*' and defined($stop))); # syntax error
-	
+
 	$stop = (defined($step) or ($start eq '*'))?6:$start if (not defined($stop));
 	$start = 0 if $start eq '*';
 	return if ($start > $stop); # syntax error
@@ -567,7 +582,7 @@ sub _next_weekday_date {
 		my $next_wday_in_month = $d + $day_diff;
 		$self->log(5, 'candidate %4d-%02d-%02d is weekday %d - next from \'or_list\' is %d - resulting in mday %d', $y, $m, $d, $wday, $first, $next_wday_in_month) if $ENV{EXTENDED_DEBUG};
 		if ($self->is_valid_date($y, $m, $next_wday_in_month)) {
-			$self->log(5, 'found candidate %4d-%02d-%02d', $y, $m, $next_wday_in_month);
+			$self->log(5, 'found candidate %4d-%02d-%02d', $y, $m, $next_wday_in_month) if $ENV{EXTENDED_DEBUG};
 			$found = sprintf('%4d%02d%02d', $y, $m, $next_wday_in_month);
 			# last;
 		} else {
@@ -609,6 +624,7 @@ sub is_valid_date {
     my ($year, $month, $day) = @_;
 
     # Checking the validity of the year, month and day
+	return 0 unless defined $year && $year =~ /^\d+$/ && defined $month && $month =~ /^\d+$/ && defined $day && $day =~ /^\d+$/;
     return 0 if $year < 0 || $month < 1 || $month > 12 || $day < 1 || $day > 31;
 
     # List of days per month (without leap years)
@@ -621,6 +637,20 @@ sub is_valid_date {
 
     # Check if the day exists in the given month
     return $day <= $days_in_month[$month];
+}
+
+sub is_valid_time {
+	my $self = shift;
+    my ($hour, $minute, $second) = @_;
+
+    # Checking the validity of hour, minute and second
+    return 0 unless defined $hour && $hour =~ /^\d+$/ && defined $minute && $minute =~ /^\d+$/ && defined $second && $second =~ /^\d+$/;
+
+    if ($hour >= 0 && $hour <= 23 && $minute >= 0 && $minute <= 59 && $second >= 0 && $second <= 59) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 
@@ -694,69 +724,74 @@ sub _next_time {
 	return ($found, $day_changed);
 }
 
-# Input is the date from which the next date is to be determined 
-# input array (year, month, mday) 'from'
-# return is greater or equal to the input date
-sub _next_special_date {
+# positional weekdays:
+# - 0#2 - second monday in month
+# - 5#6 - 6th friday in month
+# - 1#f - first monday
+# - 0#l - last sunday
+# $from_time: time from which the next time is to be determined as hhmmss
+# $inclusive: TRUE: include from time (>=), FALSE: exclude $from_time (>)
+sub _next_positional_date {
 	my $self = shift;
-	my ($year, $month, $mday) = @_;
+	my $from_time = shift;
+	my $inclusive = shift;
 
-	printf('next weekday from: %4d%02d%02d %s', $year, $month, $mday, "\n");
+	# printf('next weekday from: %4d%02d%02d %s', $year, $month, $mday, "\n");
 
-	# return if cache has a value
+	# # return if cache has a value
 
-	# test-candidate year
-	my $y = $year;
-	# test-candidate month
-	# initialize cache if not done already
-	if (not defined($self->{month_ptr_special})) {
-		$self->{month_ptr_special} = first { print "test $#{$self->{list_of_months}} $_ \n"; $self->{list_of_months}->[$_] >= $month } 0 .. $#{$self->{list_of_months}};
-		$self->{month_ptr_special} //= 0; # case month < first entry
-	}
-	my $m = $self->{list_of_months}->[$self->{month_ptr_special}];
-	$y++ if $m < $month;
-	my $d = ($m != $month)?1:$mday;
+	# # test-candidate year
+	# my $y = $year;
+	# # test-candidate month
+	# # initialize cache if not done already
+	# if (not defined($self->{month_ptr_special})) {
+	# 	$self->{month_ptr_special} = first { print "test $#{$self->{list_of_months}} $_ \n"; $self->{list_of_months}->[$_] >= $month } 0 .. $#{$self->{list_of_months}};
+	# 	$self->{month_ptr_special} //= 0; # case month < first entry
+	# }
+	# my $m = $self->{list_of_months}->[$self->{month_ptr_special}];
+	# $y++ if $m < $month;
+	# my $d = ($m != $month)?1:$mday;
 
-	printf('first special date candidate: %4d%02d%02d ptr: %d %s', $y, $m, $d, $self->{month_ptr_special}, "\n");
+	# printf('first special date candidate: %4d%02d%02d ptr: %d %s', $y, $m, $d, $self->{month_ptr_special}, "\n");
 
-	# create a list with converted 'special' dates like 0#1 (first sunday in month)
-	@{$self->{list_of_special_wdays}} = ('0#5');
-	my @list;
-	my $href;
+	# # create a list with converted 'special' dates like 0#1 (first sunday in month)
+	# @{$self->{list_of_special_wdays}} = ('0#5');
+	# my @list;
+	# my $href;
 
-	do {
+	# do {
 
-		my $first_wday = $self->get_weekday($y, $m, 1);
-		print "special date: first wday of $m is $first_wday \n";
+	# 	my $first_wday = $self->get_weekday($y, $m, 1);
+	# 	print "special date: first wday of $m is $first_wday \n";
 
-		foreach my $item (@{$self->{list_of_special_wdays}}) {
-			print "special item $item \n";
-			my ($wday, $number) = ($item =~ m/^([0-6])#([1-6])$/g);
-			print "special item: $item = $wday nr $number \n";
-			my $day_diff = ($wday + 7 - $first_wday) %7;
-			print "special item: day_diff $day_diff \n";
-			$day_diff += ($number - 1) * 7;
-			$day_diff += 1;
-			print "special item: day_diff $day_diff \n";
-			if ($self->is_valid_date($y, $m, $day_diff)) {
-				printf ("add to list %d %d %d \n", $y, $m, $day_diff);
-				push @list, sprintf('%4d%02d%02d', $y, $m, $day_diff);
-			}
-		}
+	# 	foreach my $item (@{$self->{list_of_special_wdays}}) {
+	# 		print "special item $item \n";
+	# 		my ($wday, $number) = ($item =~ m/^([0-6])#([1-6])$/g);
+	# 		print "special item: $item = $wday nr $number \n";
+	# 		my $day_diff = ($wday + 7 - $first_wday) %7;
+	# 		print "special item: day_diff $day_diff \n";
+	# 		$day_diff += ($number - 1) * 7;
+	# 		$day_diff += 1;
+	# 		print "special item: day_diff $day_diff \n";
+	# 		if ($self->is_valid_date($y, $m, $day_diff)) {
+	# 			printf ("add to list %d %d %d \n", $y, $m, $day_diff);
+	# 			push @list, sprintf('%4d%02d%02d', $y, $m, $day_diff);
+	# 		}
+	# 	}
 
-		# advance ptr
-		# first day of next available month
-		$self->{month_ptr_special}++;
-		if ($self->{month_ptr_special} > $#{$self->{list_of_months}}) {
-			$self->{month_ptr_special} = 0;
-			$y++;
-		}
-		$m = $self->{list_of_months}->[$self->{month_ptr_special}];
-		$d = 1;
+	# 	# advance ptr
+	# 	# first day of next available month
+	# 	$self->{month_ptr_special}++;
+	# 	if ($self->{month_ptr_special} > $#{$self->{list_of_months}}) {
+	# 		$self->{month_ptr_special} = 0;
+	# 		$y++;
+	# 	}
+	# 	$m = $self->{list_of_months}->[$self->{month_ptr_special}];
+	# 	$d = 1;
 	
 
 
-	} until (scalar @list)
+	# } until (scalar @list)
 }
 
 1;
