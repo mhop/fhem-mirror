@@ -410,7 +410,7 @@ sub _next_date {
 
 	# set of possible dates, based on the different methods
 	my @set;
-	#  the mdays/months
+	# calendar
 	if (scalar @{$self->{list_of_mdays}}) {
 		# check if cached value can be used
 		if (($self->{working_date} and $self->{next_calender_date}) and 
@@ -422,7 +422,7 @@ sub _next_date {
 			push @set, $self->{next_calender_date} = $self->_next_calendar_date($from_date, $inclusive);
 		}
 	}
-
+	# weekday
 	if (scalar @{$self->{list_of_or_wdays}}) {
 		# check if cached value can be used
 		if (($self->{working_date} and $self->{next_weekday_date}) and 
