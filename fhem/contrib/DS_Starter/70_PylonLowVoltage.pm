@@ -116,7 +116,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
-  "0.1.3"  => "22.08.2023 permanent socket management, attr gatewayPermLink, improve responseCheck ",
+  "0.1.3"  => "22.08.2023 improve responseCheck and others ",
   "0.1.2"  => "20.08.2023 commandref revised, analogValue -> use 'user defined items', refactoring according PBP ",
   "0.1.1"  => "16.08.2023 integrate US3000C, add print request command in HEX to Logfile, attr timeout ".
                           "change validation of received data, change DEF format, extend evaluation of chargeManagmentInfo ".
@@ -131,7 +131,6 @@ my $invalid     = 'unknown';                                         # default v
 my $definterval = 30;                                                # default Abrufintervall der Batteriewerte
 my $defto       = 0.5;                                               # default connection Timeout zum RS485 Gateway
 my @blackl      = qw(state nextCycletime);                           # Ausnahmeliste deleteReadingspec
-my $gpldef      = 0;                                                 # Gateway permanent Link = 0 per default
 
 # Steuerhashes
 ###############
@@ -285,7 +284,6 @@ sub Initialize {
   $hash->{AttrFn}     = \&Attr;
   $hash->{ShutdownFn} = \&Shutdown;
   $hash->{AttrList}   = "disable:1,0 ".
-                        "gatewayPermLink:1,0 ".
                         "interval ".
                         "timeout ".
                         $readingFnAttributes;
@@ -433,8 +431,7 @@ sub Update {
     return if(IsDisabled ($name));
 
     my $interval  = AttrVal ($name, 'interval',   $definterval);                               # 0 -> manuell gesteuert
-    my $timeout   = AttrVal ($name, 'timeout',          $defto);
-    my $gpl       = AttrVal ($name, 'gatewayPermLink', $gpldef);                
+    my $timeout   = AttrVal ($name, 'timeout',          $defto);             
     my %readings  = ();
     
     my ($socket, $success);
@@ -457,7 +454,7 @@ sub Update {
         local $SIG{ALRM} = sub { croak 'gatewaytimeout' };
         ualarm ($timeout * 1000000);                                                           # ualarm in Mikrosekunden
 
-        $socket = _createSocket ($hash, $timeout, \%readings);
+        $socket = _openSocket ($hash, $timeout, \%readings);
         return if(!$socket);
         
         if (ReadingsAge ($name, "serialNumber", 601) >= 60) {                    # relativ statische Werte abrufen
@@ -495,7 +492,7 @@ sub Update {
     }
 
     ualarm(0);
-    _closeSocket ($hash) if(!$gpl);
+    _closeSocket ($hash);
     
     if ($success) {
         Log3 ($name, 4, "$name - got data from battery number >$hash->{BATADDRESS}< successfully");
@@ -512,7 +509,7 @@ return;
 ###############################################################
 #       Socket erstellen
 ###############################################################
-sub _createSocket {               
+sub _openSocket {               
   my $hash     = shift; 
   my $timeout  = shift;    
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
@@ -531,22 +528,20 @@ sub _createSocket {
       undef $socket;
   }
   
-  if (!$socket || $socket->connected()) {
+  if (!$socket) {
       $socket = IO::Socket::INET->new( Proto    => 'tcp', 
                                        PeerAddr => $hash->{HOST}, 
                                        PeerPort => $hash->{PORT}, 
                                        Timeout  => $timeout
-                                     );   
-  }
-                                      
-  if (!$socket) {
-      doOnError ({ hash     => $hash, 
-                   readings => $readings, 
-                   state    => 'no socket is established to RS485 gateway',
-                   verbose  => 3
-                 }
-                );           
-      return;        
+                                     ) 
+                or do { doOnError ({ hash     => $hash, 
+                                     readings => $readings, 
+                                     state    => 'no connection is established to RS485 gateway',
+                                     verbose  => 3
+                                   }
+                                  );           
+                        return;                 
+                };                                     
   }
 
   IO::Socket::Timeout->enable_timeouts_on ($socket);                       # nur notwendig für read or write timeout
@@ -555,7 +550,7 @@ sub _createSocket {
     
   $socket->read_timeout  ($rwto);                                          # Read/Writetimeout immer kleiner als Sockettimeout
   $socket->write_timeout ($rwto);
-  $socket->autoflush(1);
+  $socket->autoflush();
   
   $hash->{SOCKET} = $socket;
         
@@ -997,10 +992,10 @@ sub Reread {
             croak 'Timeout reading data from battery';
         }
 
-        $res = $res . $singlechar if (!(length($res) == 0 && ord($singlechar) == 13))    # ord 13 -> ASCII dezimal für CR (Hex 0d)
+        $res = $res . $singlechar;
 
-    } while (length($res) == 0 || ord($singlechar) != 13);
-
+    } while (ord($singlechar) != 13);
+    
 return $res;
 }
 
@@ -1256,16 +1251,6 @@ management system via the RS485 interface.
      Enables/disables the device definition.
    </li>
    <br>
-   
-   <a id="PylonLowVoltage-attr-gatewayPermLink"></a>
-   <li><b>gatewayPermLink 0|1</b><br>
-     If set, the connection to the RS485 gateway is not terminated after the data retrieval. Only in case of an error an 
-     existing connection is discarded and re-established. 
-     If the attribute is not set or 0, a new gateway connection is established before each data fetch which
-     is always terminated again after the data retrieval. <br>
-     (default: 0)     
-   </li>
-   <br>
 
    <a id="PylonLowVoltage-attr-interval"></a>
    <li><b>interval &lt;seconds&gt;</b><br>
@@ -1425,16 +1410,6 @@ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
    <a id="PylonLowVoltage-attr-disable"></a>
    <li><b>disable 0|1</b><br>
      Aktiviert/deaktiviert die Gerätedefinition.
-   </li>
-   <br>
-   
-   <a id="PylonLowVoltage-attr-gatewayPermLink"></a>
-   <li><b>gatewayPermLink 0|1</b><br>
-     Wenn gesetzt, wird die Verbindung zum RS485 Gateway nach dem Datenabruf nicht abgebaut. Nur im Fehlerfall wird eine
-     bestehende Verbindung verworfen und neu aufgebaut. 
-     Ist das Attribut nicht gesetzt bzw. 0, erfolgt vor jedem Datenabruf der Aufbau einer neuen Gatewayverbindung die 
-     nach dem Datenabruf grundsätzlich wieder beendet wird. <br>
-     (default: 0)     
    </li>
    <br>
 
