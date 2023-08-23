@@ -184,6 +184,8 @@
 #
 # 2023-08-07 - fixed     missing uuid in migration process
 #
+# 2023-08-23 - added     show version counter in save message
+#
 ##############################################################################
 =cut
 
@@ -532,7 +534,8 @@ sub cfgDB_SaveCfg { ## prototype used in fhem.pl
 
 # Insert @rowList into database table
 	my $fhem_dbh = _cfgDB_Connect;
-	my $uuid = _cfgDB_Rotate($fhem_dbh,$internal);
+	my ($num,$uuid) = split(/\:/,_cfgDB_Rotate($fhem_dbh,$internal));
+	Debug "num: $num uuid: $uuid";
 	my $counter = 0;
 	foreach (@rowList) { 
 		_cfgDB_InsertLine($fhem_dbh, $uuid, $_, $counter); 
@@ -543,7 +546,7 @@ sub cfgDB_SaveCfg { ## prototype used in fhem.pl
 	my $maxVersions = $configDB{attr}{maxversions};
 	$maxVersions = ($maxVersions) ? $maxVersions : 0;
 	_cfgDB_Reorg($maxVersions,1) if($maxVersions && $internal != -1);
-	return 'configDB saved.';
+	return "configDB saved. ($num)";
 }
 
 # save statefile
@@ -861,7 +864,7 @@ sub _cfgDB_Rotate {
 	$fhem_dbh->do("INSERT INTO fhemversions values ('$newversion', '$uuid', NULL)");
 	Log3(undef,1,"configDB: more than 20 versions in database! Please consider setting a limit.") 
 	    if ($count > 20 && !defined($configDB{attr}{maxversions}));
-	return $uuid;
+	return "$count:$uuid";
 }
 
 sub _cfgDB_filesize_str {
