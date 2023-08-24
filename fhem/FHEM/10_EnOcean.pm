@@ -460,6 +460,7 @@ my %EnO_eepConfig = (
   "N5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "Eltako_TF", teachMethod => "confirm", webCmd => "on:off"}},
   "O5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "Eltako_FSR14", teachMethod => "confirm", webCmd => "on:off"}},
   "P5.38.08" => {attr => {subType => "autoMeterReading.01", comMode => "confirm", eep => "A5-38-08", eventMap => "on:B0 off:BI", gwCmd => "switching", manufID => "00D", model => "Eltako_FSR14M", subTypeSet => "gateway", teachMethod => "confirm", webCmd => "on:off"}, GPLOT => "EnO_power4energy4:Power/Energie,"},
+  "K5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "Eltako_FSR61", teachMethod => "confirm", webCmd => "on:off"}},
   "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}, GPLOT => "EnO_motion:Motion,EnO_brightness4:Brightness,"},
   "G6.02.01" => {attr => {subType => "switch", destinationID => "unicast", eep => "F6-02-01", manufID => "00D", model => "Eltako_F4CT55", sensorMode => 'pushbutton', subTypeSet => "switch"}},
   "L6.02.01" => {attr => {subType => "smokeDetector.02", eep => "F6-05-02", manufID => "00D"}},
@@ -509,6 +510,7 @@ my %EnO_models = (
   "Eltako_FSM61" => {attr => {manufID => "00D"}},
   "Eltako_FSR14" => {attr => {manufID => "00D"}},
   "Eltako_FSR14M" => {attr => {manufID => "00D"}},
+  "Eltako_FSR61" => {attr => {manufID => "00D"}},
   "Eltako_FT55" => {attr => {manufID => "00D"}},
   "Eltako_FTS12" => {attr => {manufID => "00D"}},
   "Eltako_FUD14" => {attr => {manufID => "00D"}},
@@ -3574,7 +3576,7 @@ sub EnOcean_Set($@) {
         if($cmd eq "teach") {
           # teach-in EEP A5-38-08, Manufacturer "Multi user Manufacturer ID"
           #$data = sprintf "%02X000000", $gwCmdID;
-          if ($model =~ m/FSR14|TF$/) {
+          if ($model =~ m/FSR14|FSR14M|FSR61|TF$/) {
             $data = "E0400D80";
           } else {
             $data = "E047FF80";
@@ -3629,8 +3631,23 @@ sub EnOcean_Set($@) {
           }
           #$updateState = 0;
           $data = sprintf "%02X%04X%02X", $gwCmdID, $time, $setCmd;
+
+        } elsif ($cmd eq "teachInSec") {
+          ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
+          ($err, $response, $logLevel) = EnOcean_sec_createTeachIn(undef, $hash, 'uniDir', 'VAES', 'A5-38-08', 3,
+                                                                   '2++', 'false', 'encryption', undef, $subDef, $destinationID);
+          if ($err) {
+            Log3 $name, $logLevel, "EnOcean $name Error: $err";
+            return $err;
+          } else {
+            EnOcean_CommandSave(undef, undef);
+            Log3 $name, $logLevel, "EnOcean $name $response";
+            readingsSingleUpdate($hash, "teach", "STE teach-in sent", 1);
+            return(undef);
+          }
+
         } else {
-          my $cmdList = "local:learn on:noArg off:noArg teach:noArg";
+          my $cmdList = "local:learn on:noArg off:noArg teach:noArg teachInSec:noArg";
           return SetExtensions ($hash, $cmdList, $name, @a);
         }
 
@@ -3769,8 +3786,22 @@ sub EnOcean_Set($@) {
           SetExtensionsCancel($hash);
           $data = sprintf "%02X%02X%02X%02X", $gwCmdID, $dimVal, $rampTime, $setCmd;
 
+        } elsif ($cmd eq "teachInSec") {
+          ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
+          ($err, $response, $logLevel) = EnOcean_sec_createTeachIn(undef, $hash, 'uniDir', 'VAES', 'A5-38-08', 3,
+                                                                   '2++', 'false', 'encryption', undef, $subDef, $destinationID);
+          if ($err) {
+            Log3 $name, $logLevel, "EnOcean $name Error: $err";
+            return $err;
+          } else {
+            EnOcean_CommandSave(undef, undef);
+            Log3 $name, $logLevel, "EnOcean $name $response";
+            readingsSingleUpdate($hash, "teach", "STE teach-in sent", 1);
+            return(undef);
+          }
+
         } else {
-          my $cmdList = "dim:slider,0,1,100 local:learn off:noArg on:noArg openLoopCtrl:noArg teach:noArg";
+          my $cmdList = "dim:slider,0,1,100 local:learn off:noArg on:noArg openLoopCtrl:noArg teach:noArg teachInSec:noArg";
           return SetExtensions ($hash, $cmdList, $name, @a);
         }
         $hash->{helper}{constLightCtrl}[0] = $hash;
@@ -18695,7 +18726,7 @@ sub EnOcean_sec_createTeachIn($$$$$$$$$$$) {
   $attr{$name}{dataEnc} = AttrVal($name, "dataEnc", $dataEnc);
   $attr{$name}{eep} = $eep;
   $attr{$name}{macAlgo} = AttrVal($name, "macAlgo", $macAlgo);
-  $attr{$name}{manufID} = "7FF";
+  $attr{$name}{manufID} = AttrVal($name, "manufID", "7FF");
   $attr{$name}{rlcAlgo} = AttrVal($name, "rlcAlgo", $rlcAlgo);
   $attr{$name}{rlcTX} = AttrVal($name, "rlcTX", $rlcTX);
   $attr{$name}{rocker} = AttrVal($name, "rocker", $rocker) if (defined $rocker);
@@ -19254,7 +19285,7 @@ sub EnOcean_Delete($$) {
   <b>Security features</b><br>
   <ul>
     The receiving and sending of encrypted messages is supported. This module currently allows the secure operating mode of
-    a variety of sensors and PTM 210 / PTM 215 based switches.<br>
+    a variety of sensors, PTM 210 / PTM 215 based switches and profiles gateway/switching and gateway/dimming.<br><br>
     To receive secured telegrams, you first have to start the teach in mode via<br><br>
     <code>set &lt;IODev&gt; teach &lt;t/s&gt;</code><br><br>
     Since the beginning of 2021, the PTM 210 / PTM 215 modules offer a normal mode and two secure modes
@@ -19288,9 +19319,13 @@ sub EnOcean_Delete($$) {
     <ul>
       <code>set &lt;name&gt; teachInSec</code><br><br>
     </ul>
+
+    With the <code>set &lt;name&gt; teachInSec</code> command, all security and device parameters are transferred for the switch.00 profile.<br>
+    For the gateway/switching and gateway/dimming profiles, the device profile must be taught in the second step using the <code>set &lt;name&gt; teach</code> command.<br><br>
+    Please note that this encryption is unidirectional. The receipt telegrams of the actuators are not encrypted.<br><br>
     As for the security of this solution, if someone manages to capture the teach-in telegrams, he can extract the private key,
-    so the added security isn't perfect but relies on the fact, that none listens to you setting up your installation.
-    <br><br>
+    so the added security isn't perfect but relies on the fact, that none listens to you setting up your installation.<br><br>
+
     The cryptographic functions need the additional Perl modules Crypt/Rijndael and Crypt/Random. The module must be installed manually.
     With the help of CPAN at the operating system level, for example,<br><br>
     <ul>
@@ -19339,13 +19374,14 @@ sub EnOcean_Delete($$) {
      <li>G5-10-12 Room Sensor and Control Unit [Eltako FUTH65D]<br></li>
      <li>G5-38-08 Gateway, Dimming [Eltako FSG, FUD]<br></li>
      <li>H5-38-08 Gateway, Dimming [Eltako TF61D, TF100D]<br></li>
-     <li>I5-38-08 Gateway, Dimming [Eltako FUD14] with teachMethod confirm<br></li>
-     <li>J5-38-08 Gateway, Dimming [Eltako FUD61] - MSC teach-in supported<br></li>
+     <li>I5-38-08 Gateway, Dimming [Eltako FUD14] secure and confirm teach-in supported<br></li>
+     <li>J5-38-08 Gateway, Dimming [Eltako FUD61] secure, confirm and MSC teach-in supported<br></li>
      <li>M5-38-08 Gateway, Switching [Eltako FSR14] old version<br></li>
      <li>N5-38-08 Gateway, Switching [Eltako TF61L, TF61R, TF100A, TF100L]<br></li>
-     <li>O5-38-08 Gateway, Switching [Eltako FSR14] with teachMethod confirm<br></li>
-     <li>P5-38-08 Gateway, Switching [Eltako FSR14M] with teachMethod confirm.<br>
+     <li>O5-38-08 Gateway, Switching [Eltako FSR14] secure and confirm teach-in supported<br></li>
+     <li>P5-38-08 Gateway, Switching [Eltako FSR14M] secure and confirm teach-in supported<br>
      In the second step, the automated meter reading electricity function must be taught in via <a href="#EnOcean-teach-in">Teach-In / Teach-Out</a>.<br></li>
+     <li>K5-38-08 Gateway, Switching [Eltako FSR61] secure and confirm teach-in supported<br></li>
      <li>G5-3F-7F Shutter [Eltako FSB]<br></li>
      <li>H5-3F-7F Shutter [Eltako TF61J]<br></li>
      <li>I5-3F-7F Shutter [Eltako FRM60] - MSC teach-in supported<br></li>
@@ -20205,6 +20241,8 @@ sub EnOcean_Delete($$) {
       where <code>value</code> is
         <li>teach<br>
           initiate teach-in mode</li>
+        <li>teachInSec<br>
+          initiate secure teach-in</li>
         <li>on [lock|unlock]<br>
           issue switch on command</li>
         <li>off [lock|unlock]<br>
@@ -20229,6 +20267,8 @@ sub EnOcean_Delete($$) {
           issue dim command</li>
         <li>teach<br>
           initiate teach-in mode</li>
+        <li>teachInSec<br>
+          initiate secure teach-in</li>
         <li>on [lock|unlock]<br>
           issue switch on command</li>
         <li>off [lock|unlock]<br>
@@ -20246,7 +20286,7 @@ sub EnOcean_Delete($$) {
         The attr subType must be gateway and gwCmd must be dimming. This is done if the device was
         created by autocreate.<br>
         For Eltako devices this attributes must be set manually. In addition, the attribute manufID must be set with 00D.
-        Alternatively, the Eltako device can be fully defined using the inofficial EEPs G5-38-08, H5-38-08 or I5-38-08.
+        Alternatively, the Eltako device can be fully defined using the inofficial EEPs G5-38-08, H5-38-08, I5-38-08 or J5-38-08.
         Use the sensor type "PC/FVS" for Eltako devices.
      </li>
      <br><br>
