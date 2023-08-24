@@ -1,9 +1,9 @@
-REV 27878
+REV 27890
 DIR unused
-UPD 2023-08-20_07:45:02 406406 ./CHANGED
+UPD 2023-08-24_07:45:03 406478 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2023-07-17_07:45:02 46846 ./MAINTAINER.txt
-UPD 2023-08-08_07:45:03 46787 ./configDB.pm
+UPD 2023-08-24_07:45:03 46886 ./configDB.pm
 UPD 2023-05-29_07:45:03 21936 ./fhem.cfg.demo
 UPD 2023-07-12_07:45:14 173467 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
@@ -750,8 +750,8 @@ UPD 2023-08-20_07:45:08 4901015 docs/commandref.html
 UPD 2023-08-20_07:45:12 2908183 docs/commandref_DE.html
 UPD 2023-05-01_07:45:03 85822 docs/commandref_frame.html
 UPD 2023-05-01_07:45:03 96447 docs/commandref_frame_DE.html
-UPD 2023-08-23_07:45:12 305799 docs/commandref_modular.html
-UPD 2023-08-23_07:45:13 317542 docs/commandref_modular_DE.html
+UPD 2023-08-24_07:45:13 305799 docs/commandref_modular.html
+UPD 2023-08-24_07:45:15 317542 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -788,7 +788,7 @@ UPD 2021-12-18_07:45:03 16385 lib/FHEM/Devices/Nuki/Device.pm
 UPD 2021-07-11_07:45:03 29319 lib/FHEM/Devices/Tesla/Powerwall.pm
 UPD 2023-06-30_07:45:02 42215 lib/FHEM/HTTPMOD/Utils.pm
 UPD 2022-06-01_07:45:03 11892 lib/FHEM/Modbus/TestUtils.pm
-UPD 2023-08-23_07:45:02 28417 lib/FHEM/Scheduler/Cron.pm
+UPD 2023-08-24_07:45:03 33270 lib/FHEM/Scheduler/Cron.pm
 UPD 2023-04-09_07:45:03 10123 lib/FHEM/SynoModules/API.pm
 UPD 2023-04-09_07:45:03 15445 lib/FHEM/SynoModules/ErrCodes.pm
 UPD 2023-04-09_07:45:03 77021 lib/FHEM/SynoModules/SMUtils.pm
