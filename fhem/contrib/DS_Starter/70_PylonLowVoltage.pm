@@ -57,11 +57,15 @@ use IO::Socket::INET;
 use Errno qw(ETIMEDOUT EWOULDBLOCK);
 use Scalar::Util qw(looks_like_number);
 use Carp qw(croak carp);
+use Blocking;
+use MIME::Base64;
 
-eval "use FHEM::Meta;1"          or my $modMetaAbsent = 1;         ## no critic 'eval'
-eval "use IO::Socket::Timeout;1" or my $iostAbsent    = 1;         ## no critic 'eval'
+eval "use FHEM::Meta;1"                or my $modMetaAbsent = 1;                             ## no critic 'eval'
+eval "use IO::Socket::Timeout;1"       or my $iostAbsent    = 'IO::Socket::Timeout';         ## no critic 'eval'
+eval "use Storable qw(freeze thaw);1;" or my $storabs       = 'Storable';                    ## no critic 'eval'
 
-use FHEM::SynoModules::SMUtils qw(moduleVersion);                  # Hilfsroutinen Modul
+use FHEM::SynoModules::SMUtils qw(moduleVersion);                                            # Hilfsroutinen Modul
+#use Data::Dumper;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
@@ -72,6 +76,8 @@ BEGIN {
       qw(
           AttrVal
           AttrNum
+          BlockingCall
+          BlockingKill
           data
           defs
           fhemTimeLocal
@@ -116,6 +122,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.1.4"  => "24.08.2023 Serialize and deserialize data for update entry, usage of BlockingCall in case of long timeout ",
   "0.1.3"  => "22.08.2023 improve responseCheck and others ",
   "0.1.2"  => "20.08.2023 commandref revised, analogValue -> use 'user defined items', refactoring according PBP ",
   "0.1.1"  => "16.08.2023 integrate US3000C, add print request command in HEX to Logfile, attr timeout ".
@@ -312,6 +319,12 @@ sub Define {
       Log3 ($name, 1, "$name - ERROR - $err");
       return "Error: $err";
   }
+  
+  if ($storabs) {
+      my $err = "Perl module >$storabs< is missing. You have to install this perl module.";
+      Log3 ($name, 1, "$name - ERROR - $err");
+      return "Error: $err";
+  }
 
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                           # Modul Meta.pm nicht vorhanden
   ($hash->{HOST}, $hash->{PORT}) = split ":", $args[2];
@@ -332,7 +345,7 @@ sub Define {
   use version 0.77; our $VERSION = moduleVersion ($params);                        # Versionsinformationen setzen
 
   _closeSocket ($hash);
-  Update       ($hash);
+  manageUpdate ($hash);
 
 return;
 }
@@ -354,7 +367,7 @@ sub Get {
   return if(IsDisabled($name));
 
   if ($opt eq 'data') {
-      Update ($hash);
+      manageUpdate ($hash);
       return;
   }
 
@@ -362,7 +375,7 @@ return $getlist;
 }
 
 ###############################################################
-#                  PylonLowVoltage Update
+#                  PylonLowVoltage Attr
 ###############################################################
 sub Attr {
   my $cmd   = shift;
@@ -388,7 +401,7 @@ sub Attr {
       readingsSingleUpdate ($hash, 'state', $val, 1);
 
       if ($do == 0) {
-          InternalTimer(gettimeofday() + 2.0, "FHEM::PylonLowVoltage::Update", $hash, 0);
+          InternalTimer(gettimeofday() + 2.0, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
       }
       else {
           deleteReadingspec ($hash);
@@ -402,7 +415,7 @@ sub Attr {
           return qq{The value for $aName is invalid, it must be numeric!};
       }
 
-      InternalTimer(gettimeofday()+1.0, "FHEM::PylonLowVoltage::Update", $hash, 0);
+      InternalTimer(gettimeofday()+1.0, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
   }
   
   if ($aName eq "timeout") {
@@ -415,93 +428,231 @@ return;
 }
 
 ###############################################################
-#                  PylonLowVoltage Update
+#             Eintritt in den Update-Prozess
 ###############################################################
-sub Update {
-    my $hash = shift;
-    my $name = $hash->{NAME};
+sub manageUpdate {
+  my $hash = shift;
+  my $name = $hash->{NAME};
 
-    RemoveInternalTimer ($hash);
+  RemoveInternalTimer ($hash);
 
-    if(!$init_done) {
-        InternalTimer(gettimeofday() + 2, "FHEM::PylonLowVoltage::Update", $hash, 0);
-        return;
-    }
+  if(!$init_done) {
+      InternalTimer(gettimeofday() + 2, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
+      return;
+  }
 
-    return if(IsDisabled ($name));
+  return if(IsDisabled ($name));
 
-    my $interval  = AttrVal ($name, 'interval',   $definterval);                               # 0 -> manuell gesteuert
-    my $timeout   = AttrVal ($name, 'timeout',          $defto);             
-    my %readings  = ();
-    
-    my ($socket, $success);
+  my $interval  = AttrVal ($name, 'interval', $definterval);                                 # 0 -> manuell gesteuert
+  my $timeout   = AttrVal ($name, 'timeout',        $defto);             
+  my $readings;
 
-    if(!$interval) {
-        $hash->{OPMODE}          = 'Manual';
-        $readings{nextCycletime} = 'Manual';
-    }
-    else {
-        my $new = gettimeofday() + $interval;
-        InternalTimer ($new, "FHEM::PylonLowVoltage::Update", $hash, 0);                       # Wiederholungsintervall
+  if(!$interval) {
+      $hash->{OPMODE}            = 'Manual';
+      $readings->{nextCycletime} = 'Manual';
+  }
+  else {
+      my $new = gettimeofday() + $interval;
+      InternalTimer ($new, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);                             # Wiederholungsintervall
         
-        $hash->{OPMODE}          = 'Automatic';
-        $readings{nextCycletime} = FmtTime($new);
-    }
+      $hash->{OPMODE}            = 'Automatic';
+      $readings->{nextCycletime} = FmtTime($new);
+  }
 
-    Log3 ($name, 4, "$name - start request cycle to battery number >$hash->{BATADDRESS}< at host:port $hash->{HOST}:$hash->{PORT}");
-
-    eval {                                                                                     ## no critic 'eval'
-        local $SIG{ALRM} = sub { croak 'gatewaytimeout' };
-        ualarm ($timeout * 1000000);                                                           # ualarm in Mikrosekunden
-
-        $socket = _openSocket ($hash, $timeout, \%readings);
-        return if(!$socket);
-        
-        if (ReadingsAge ($name, "serialNumber", 601) >= 60) {                    # relativ statische Werte abrufen
-            return if(_callSerialNumber     ($hash, $socket, \%readings));       # Abruf serialNumber
-            return if(_callManufacturerInfo ($hash, $socket, \%readings));       # Abruf manufacturerInfo            
-            return if(_callProtocolVersion  ($hash, $socket, \%readings));       # Abruf protocolVersion
-            return if(_callSoftwareVersion  ($hash, $socket, \%readings));       # Abruf softwareVersion
-            return if(_callSystemParameters ($hash, $socket, \%readings));       # Abruf systemParameters
-        }   
+  Log3 ($name, 4, "$name - start request cycle to battery number >$hash->{BATADDRESS}< at host:port $hash->{HOST}:$hash->{PORT}");
                
-        return if(_callAlarmInfo            ($hash, $socket, \%readings));       # Abruf alarmInfo
-        return if(_callChargeManagmentInfo  ($hash, $socket, \%readings));       # Abruf chargeManagmentInfo      
-        return if(_callAnalogValue          ($hash, $socket, \%readings));       # Abruf analogValue
-        
-        $success = 1;
-    };  # eval
-    
-    if ($@) {
-        my $errtxt;
-        if ($@ =~ /gatewaytimeout/xs) {
-            $errtxt = 'Timeout in communication to RS485 gateway';                         
-        }
-        else {
-            $errtxt = $@; 
-        }        
-        
-        doOnError ({ hash     => $hash, 
-                     readings => \%readings, 
-                     sock     => $socket,
-                     state    => $errtxt,
-                     verbose  => 3
-                   }
-                  );          
-        return;
-    }
+  my $serial = Serialize ({ name => $name, timeout => $timeout, readings => $readings});
+  
+  if ($timeout < 1.0) {
+      BlockingKill ($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});      
+      startUpdate  (Serialize ( { name => $name, timeout => $timeout, readings => $readings} ));
+  }
+  else {
+     delete $hash->{HELPER}{BKRUNNING} if(defined $hash->{HELPER}{BKRUNNING} && $hash->{HELPER}{BKRUNNING}{pid} =~ /DEAD/xs);  
+     
+     if (defined $hash->{HELPER}{BKRUNNING}) {       
+         Log3 ($name, 3, qq{$name - another BlockingCall PID "$hash->{HELPER}{BKRUNNING}{pid}" is already running ... start Update aborted});
+         
+         return;
+     }
+     
+     my $blto = sprintf "%0d", ($timeout + 10);
+     
+     $hash->{HELPER}{BKRUNNING} = BlockingCall ( "FHEM::PylonLowVoltage::startUpdate",
+                                                 Serialize ( { block => 1, name => $name, timeout => $timeout, readings => $readings} ),
+                                                 "FHEM::PylonLowVoltage::finishUpdate",
+                                                 $blto,                                                  # Blocking Timeout höher als INET-Timeout!
+                                                 "FHEM::PylonLowVoltage::abortUpdate",
+                                                 $hash
+                                               );
 
-    ualarm(0);
-    _closeSocket ($hash);
+
+     if (defined $hash->{HELPER}{BKRUNNING}) {
+         $hash->{HELPER}{BKRUNNING}{loglevel} = 3;                                                       # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
+         
+         Log3 ($name, 4, qq{$name - BlockingCall PID "$hash->{HELPER}{BKRUNNING}{pid}" with Blocking Timeout "$blto" started});
+     }     
+  }
     
-    if ($success) {
-        Log3 ($name, 4, "$name - got data from battery number >$hash->{BATADDRESS}< successfully");
+return;
+}
+
+###############################################################
+#                  PylonLowVoltage startUpdate
+###############################################################
+sub startUpdate {
+  my $serial   = shift;
+  
+  my $paref    = eval { thaw ($serial) };                              # Deserialisierung  
+  
+  my $name     = $paref->{name};
+  my $timeout  = $paref->{timeout};  
+  my $readings = $paref->{readings};
+  my $block    = $paref->{block} // 0;
+  
+  my $hash     = $defs{$name};
+  my $success  = 0;
+  
+  my ($socket);
+
+  eval {                                                                                     ## no critic 'eval'
+      local $SIG{ALRM} = sub { croak 'gatewaytimeout' };
+      ualarm ($timeout * 1000000);                                                           # ualarm in Mikrosekunden
+
+      $socket = _openSocket ($hash, $timeout, $readings);
+      if (!$socket) { $block ? 
+                      return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
+                      return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")); 
+                    }
         
-        additionalReadings (\%readings);                                                 # zusätzliche eigene Readings erstellen
-        $readings{state} = 'connected';
-    }
+      if (ReadingsAge ($name, "serialNumber", 601) >= 60) {                                  # statische Werte abrufen
+          if (_callSerialNumber ($hash, $socket, $readings)) {                               # Abruf serialNumber
+              $block ? 
+              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
+              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));        
+          }
+          
+          if (_callManufacturerInfo ($hash, $socket, $readings)) {                           # Abruf manufacturerInfo
+              $block ? 
+              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
+              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));              
+          }
+          
+          if (_callProtocolVersion  ($hash, $socket, $readings)) {                           # Abruf protocolVersion
+              $block ? 
+              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
+              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));              
+          }
+          
+          if (_callSoftwareVersion  ($hash, $socket, $readings)) {                           # Abruf softwareVersion
+              $block ? 
+              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
+              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));              
+          } 
+          
+          if (_callSystemParameters ($hash, $socket, $readings)) {                           # Abruf systemParameters
+              $block ? 
+              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
+              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));              
+          }       
+      }   
+               
+      if (_callAlarmInfo ($hash, $socket, $readings)) {                                      # Abruf alarmInfo             
+          $block ? 
+          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
+          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));          
+      }   
+      
+      if (_callChargeManagmentInfo ($hash, $socket, $readings)) {                            # Abruf chargeManagmentInfo
+          $block ? 
+          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
+          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));           
+      }      
+      
+      if (_callAnalogValue ($hash, $socket, $readings)) {                                    # Abruf analogValue
+          $block ? 
+          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
+          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));           
+      }       
+        
+      $success = 1;
+  };  # eval
     
-    createReadings ($hash, \%readings);                                                  # Readings erstellen
+  if ($@) {
+      my $errtxt;
+      if ($@ =~ /gatewaytimeout/xs) {
+          $errtxt = 'Timeout in communication to RS485 gateway';                         
+      }
+      else {
+          $errtxt = $@; 
+      }        
+        
+      doOnError ({ hash     => $hash, 
+                   readings => $readings, 
+                   sock     => $socket,
+                   state    => $errtxt,
+                   verbose  => 3
+                 }
+                );  
+                
+      $block ? 
+      return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
+      return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
+  }
+
+  ualarm(0);
+  _closeSocket ($hash);
+  
+  if ($block) {
+      return ( encode_base64 (Serialize ({name => $name, success  => $success, readings => $readings}), "") );
+  }  
+
+return \&finishUpdate ( encode_base64 (Serialize ({name => $name, success  => $success, readings => $readings}), "") );
+}
+
+###############################################################
+#    Restaufgaben nach Update
+###############################################################
+sub finishUpdate {
+  my $serial   = decode_base64 (shift);
+  
+  my $paref    = eval { thaw ($serial) };                                             # Deserialisierung  
+  my $name     = $paref->{name};
+  my $success  = $paref->{success} // 0;  
+  my $readings = $paref->{readings};
+  my $hash     = $defs{$name};
+  
+  delete($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
+  
+  if ($success) {
+      Log3 ($name, 4, "$name - got data from battery number >$hash->{BATADDRESS}< successfully");
+        
+      additionalReadings ($readings);                                                 # zusätzliche eigene Readings erstellen
+      $readings->{state} = 'connected';
+  }
+  else {
+      deleteReadingspec ($hash); 
+  }
+    
+  createReadings ($hash, $readings);                                                  # Readings erstellen
+
+return;
+}
+
+####################################################################################################
+#                    Abbruchroutine BlockingCall Timeout
+####################################################################################################
+sub abortUpdate {
+  my $hash   = shift;
+  my $cause  = shift // "Timeout: process terminated";
+  my $name   = $hash->{NAME};
+  
+  delete($hash->{HELPER}{BKRUNNING});
+
+  Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{BKRUNNING}{fn} pid:$hash->{HELPER}{BKRUNNING}{pid} aborted: $cause");
+  
+  deleteReadingspec    ($hash);
+  readingsSingleUpdate ($hash, 'state', 'Update (Child) process timed out', 1);
 
 return;
 }
@@ -536,17 +687,17 @@ sub _openSocket {
                                      ) 
                 or do { doOnError ({ hash     => $hash, 
                                      readings => $readings, 
-                                     state    => 'no connection is established to RS485 gateway',
+                                     state    => 'no connection to RS485 gateway established',
                                      verbose  => 3
                                    }
                                   );           
                         return;                 
-                };                                     
+                      };                                     
   }
 
   IO::Socket::Timeout->enable_timeouts_on ($socket);                       # nur notwendig für read or write timeout
-  my $rwto = $timeout - 0.05;
-  $rwto    = $rwto <= 0 ? 0.005 : $rwto; 
+  my $rwto = $timeout - 0.1;
+  $rwto    = $rwto <= 0 ? 0.05 : $rwto; 
     
   $socket->read_timeout  ($rwto);                                          # Read/Writetimeout immer kleiner als Sockettimeout
   $socket->write_timeout ($rwto);
@@ -570,7 +721,7 @@ sub _closeSocket {
       close ($socket);
       delete $hash->{SOCKET};
       
-      Log3 ($name, 4, "$name - Socket/Connection to the RS485 gateway was closed as scheduled");
+      Log3 ($name, 4, "$name - Socket/Connection to the RS485 gateway was closed");
   }
     
 return;
@@ -954,6 +1105,23 @@ return;
 }
 
 ###############################################################
+#                   Daten Serialisieren
+###############################################################
+sub Serialize { 
+  my $data = shift;
+  my $name = $data->{name};
+
+  my $serial = eval { freeze ($data)
+                    }
+                    or do { my $err = $@;
+                            Log3 ($name, 2, "$name - Serialization ERROR: $err");
+                            return;
+                          };
+
+return $serial;
+}
+
+###############################################################
 #                  PylonLowVoltage Request
 ###############################################################
 sub Request {    
@@ -1007,6 +1175,7 @@ sub Shutdown {
   
   RemoveInternalTimer ($hash);
   _closeSocket        ($hash); 
+  BlockingKill        ($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
 
 return;
 }
@@ -1085,9 +1254,7 @@ sub doOnError {
   
   Log3 ($name, $verbose, "$name - ".$readings->{state});
   
-  _closeSocket      ($hash);
-  deleteReadingspec ($hash);
-  createReadings    ($hash, $readings);                
+  _closeSocket ($hash);                
     
 return;
 }
@@ -1133,7 +1300,7 @@ sub createReadings {
     
     for my $spec (keys %{$readings}) {
         next if(!defined $readings->{$spec});
-        readingsBulkUpdate ($hash, $spec, $readings->{$spec});
+        readingsBulkUpdate ($hash, $spec, $readings->{$spec}) if(defined $readings->{$spec});
     }
 
     readingsEndUpdate  ($hash, 1);
@@ -1264,6 +1431,10 @@ management system via the RS485 interface.
    <li><b>timeout &lt;seconds&gt;</b><br>
      Timeout for establishing the connection to the RS485 gateway. <br>
      (default: 0.5)
+     
+     <br><br>
+     <b>Note</b>: If a timeout &gt;= 1 second is set, the module switches internally to the use of a parallel process 
+     (BlockingCall) so that write or read delays on the RS485 interface do not lead to blocking states in FHEM.
    </li>
    <br>
 </ul>
@@ -1425,6 +1596,11 @@ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
    <li><b>timeout &lt;Sekunden&gt;</b><br>
      Timeout für den Verbindungsaufbau zum RS485 Gateway. <br>
      (default: 0.5)
+     
+     <br><br>
+     <b>Hinweis</b>: Wird ein Timeout &gt;= 1 Sekunde eingestellt, schaltet das Modul intern auf die Verwendung eines 
+     Parallelprozesses (BlockingCall) um damit Schreib- bzw. Leseverzögerungen auf dem RS485 Interface nicht zu
+     blockierenden Zuständen in FHEM führen.
    </li>
    <br>
 </ul>
@@ -1531,6 +1707,10 @@ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
         "Errno": 0,
         "FHEM::SynoModules::SMUtils": 1.0220,
         "Time::HiRes": 0,
+        "Carp": 0,
+        "Blocking": 0,
+        "Storable": 0,
+        "MIME::Base64": 0,
         "Scalar::Util": 0
       },
       "recommends": {
