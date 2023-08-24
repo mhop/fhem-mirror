@@ -717,7 +717,7 @@ sub _next_positional_date {
 					my $d = $days_in_month[$m] - $day_diff;
 					my $candidate = sprintf('%04d%02d%02d', $y, $m, $d);
 					$self->log(5, 'candidate %04d-%02d-%02d', $y, $m, $d) if $ENV{EXTENDED_DEBUG};
-					if ($d > 1 and $self->is_valid_date($y, $m, $d) and 
+					if ($d > 0 and $self->is_valid_date($y, $m, $d) and 
 						(($inclusive and $candidate >= $from_date) or 
 						(not $inclusive and $candidate > $from_date))) {
 							push @res, $self->{positional_date_cache}->{$item} = $found = $candidate;
