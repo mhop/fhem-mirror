@@ -5630,7 +5630,8 @@ createNtfyHash()
   my %d2a_cache;
   %ntfyHash = ("*" => []);
   foreach my $d (@ntfyList) {
-    my $ndl = $defs{$d}{NOTIFYDEV};
+    my $ndl = $attr{$d}{overrideNotifydev};
+    $ndl = $defs{$d}{NOTIFYDEV} if(!$ndl);
     next if(!$ndl);
     my @ndlarr;
     if($d2a_cache{$ndl}) {
@@ -5648,7 +5649,8 @@ createNtfyHash()
 
   my @nhk = keys %ntfyHash;
   foreach my $d (@ntfyList) {
-    my $ndl = $defs{$d}{NOTIFYDEV};
+    my $ndl = $attr{$d}{overrideNotifydev};
+    $ndl = $defs{$d}{NOTIFYDEV} if(!$ndl);
     my $arr = ($ndl ? $d2a_cache{$ndl} : \@nhk);
     map { push @{$ntfyHash{$_}}, $d } @{$arr};
   }

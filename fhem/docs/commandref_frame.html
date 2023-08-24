@@ -418,6 +418,15 @@ Device specific attributes are documented in the corresponding device section.
         grouping attribute.
         </li><br>
 
+    <a name="overrideNotifydev"></a>
+    <li>overrideNotifydev<br>
+        if set (the argument is a devspec), the optimization for notifications
+        is using this value instead of the module-set NOTIFYDEV internal.
+        Use it only, if you know it better than the module maintainer.
+        In order to be available, the global or the device userattr must be set
+        first, to include it.
+        </li><br>
+
     <a name="room"></a>
     <li>room<br>
         Filter/group devices in frontends. A device can appear in more than one
