@@ -520,10 +520,11 @@ sub startUpdate {
       ualarm ($timeout * 1000000);                                                           # ualarm in Mikrosekunden
 
       $socket = _openSocket ($hash, $timeout, $readings);
-      if (!$socket) { $block ? 
-                      return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
-                      return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")); 
-                    }
+      if (!$socket) { 
+          $block ? 
+          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
+          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")); 
+      }
         
       if (ReadingsAge ($name, "serialNumber", 601) >= 60) {                                  # statische Werte abrufen
           if (_callSerialNumber ($hash, $socket, $readings)) {                               # Abruf serialNumber
@@ -634,7 +635,7 @@ sub finishUpdate {
       deleteReadingspec ($hash); 
   }
     
-  createReadings ($hash, $readings);                                                  # Readings erstellen
+  createReadings ($hash, $success, $readings);                                                  # Readings erstellen
 
 return;
 }
@@ -696,11 +697,9 @@ sub _openSocket {
   }
 
   IO::Socket::Timeout->enable_timeouts_on ($socket);                       # nur notwendig für read or write timeout
-  my $rwto = $timeout - 0.1;
-  $rwto    = $rwto <= 0 ? 0.05 : $rwto; 
     
-  $socket->read_timeout  ($rwto);                                          # Read/Writetimeout immer kleiner als Sockettimeout
-  $socket->write_timeout ($rwto);
+  $socket->read_timeout  (0.5);                                            # Read/Writetimeout immer kleiner als Sockettimeout
+  $socket->write_timeout (0.5);
   $socket->autoflush();
   
   $hash->{SOCKET} = $socket;
@@ -1294,13 +1293,14 @@ return;
 ###############################################################
 sub createReadings {               
     my $hash     = shift;
+    my $success  = shift;
     my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
     readingsBeginUpdate ($hash);
     
-    for my $spec (keys %{$readings}) {
-        next if(!defined $readings->{$spec});
-        readingsBulkUpdate ($hash, $spec, $readings->{$spec}) if(defined $readings->{$spec});
+    for my $rdg (keys %{$readings}) {
+        next if(!defined $readings->{$rdg});
+        readingsBulkUpdate ($hash, $rdg, $readings->{$rdg}) if($success || $rdg ~~ @blackl);
     }
 
     readingsEndUpdate  ($hash, 1);
