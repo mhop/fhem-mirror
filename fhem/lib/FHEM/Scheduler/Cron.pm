@@ -680,14 +680,14 @@ sub _next_positional_date {
 					my ($y, $m) = ($year_next, $self->{list_of_months}->[$temp_month_ptr]);
 					my $first_wday = $self->get_weekday($y, $m, 1);
 					my $day_diff = ($wday + 7 - $first_wday) %7;
-					$day_diff += 1 + (($position - 1) * 7);
-					my $candidate = sprintf('%04d%02d%02d', $y, $m, $day_diff);
-					$self->log(5, 'candidate %04d-%02d-%02d', $y, $m, $day_diff) if $ENV{EXTENDED_DEBUG};
-					if ($self->is_valid_date($y, $m, $day_diff) and 
+					my $d = $day_diff += 1 + (($position - 1) * 7);
+					my $candidate = sprintf('%04d%02d%02d', $y, $m, $d);
+					$self->log(5, 'candidate %04d-%02d-%02d', $y, $m, $d) if $ENV{EXTENDED_DEBUG};
+					if ($d < 32 and $self->is_valid_date($y, $m, $d) and 
 						(($inclusive and $candidate >= $from_date) or 
 						(not $inclusive and $candidate > $from_date))) {
 							push @res, $self->{positional_date_cache}->{$item} = $found = $candidate;
-							$self->log(5, 'found candidate %04d-%02d-%02d for %s', $y, $m, $day_diff, $item) if $ENV{EXTENDED_DEBUG};
+							$self->log(5, 'found candidate %04d-%02d-%02d for %s', $y, $m, $d, $item) if $ENV{EXTENDED_DEBUG};
 							# last and exit loop
 					} else {
 						$temp_month_ptr++;
@@ -714,13 +714,14 @@ sub _next_positional_date {
 					my $last_wday = $self->get_weekday($y, $m, $last_day);
 					my $day_diff = ($last_wday + 7 - $wday) %7;
     				$day_diff += (($position * -1) - 1) * 7;
-					my $candidate = sprintf('%04d%02d%02d', $y, $m, $days_in_month[$m] - $day_diff);
-					$self->log(5, 'candidate %04d-%02d-%02d', $y, $m, $days_in_month[$m] - $day_diff) if $ENV{EXTENDED_DEBUG};
-					if ($self->is_valid_date($y, $m, $days_in_month[$m] - $day_diff) and 
+					my $d = $days_in_month[$m] - $day_diff;
+					my $candidate = sprintf('%04d%02d%02d', $y, $m, $d);
+					$self->log(5, 'candidate %04d-%02d-%02d', $y, $m, $d) if $ENV{EXTENDED_DEBUG};
+					if ($d > 1 and $self->is_valid_date($y, $m, $d) and 
 						(($inclusive and $candidate >= $from_date) or 
 						(not $inclusive and $candidate > $from_date))) {
 							push @res, $self->{positional_date_cache}->{$item} = $found = $candidate;
-							$self->log(5, 'found candidate %04d-%02d-%02d for %s', $y, $m, $days_in_month[$m] - $day_diff, $item) if $ENV{EXTENDED_DEBUG};
+							$self->log(5, 'found candidate %04d-%02d-%02d for %s', $y, $m, $d, $item) if $ENV{EXTENDED_DEBUG};
 							# last and exit loop
 					} else {
 						$temp_month_ptr++;
