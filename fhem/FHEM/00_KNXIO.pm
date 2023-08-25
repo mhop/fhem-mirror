@@ -57,8 +57,9 @@
 #            extra delay on KNX_scan after each 10th request
 #            new attr enableKNXscan - trigger KNX_scan on startup and/or on every connect
 #            update cmd-ref
-# xx/07/2023 cleanup
+# 13/07/2023 cleanup
 #            moved KNX_scan function to KNX-Module, KNX_scan cmdline cmd into new Module 98_KNX_scan.pm
+# 25/08/2023 reorg opendev for mode X
 
 
 package KNXIO; ## no critic 'package'
@@ -159,7 +160,7 @@ sub KNXIO_Define {
 	$hash->{model} = $mode; # use it also for fheminfo statistics
 
 	# handle mode X for FHEM2FHEM configs
-	return InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDev,$hash) if ($mode eq q{X});
+	return InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDevX,$hash) if ($mode eq q{X});
 
 	return q{KNXIO-define syntax: "define <name> KNXIO <H|M|T> <ip-address|hostname>:<port> <phy-adress>" } . "\n" . 
 	       q{         or          "define <name> KNXIO S <pathToUnixSocket> <phy-address>" } if (scalar(@arg) < 5);
@@ -255,7 +256,7 @@ sub KNXIO_Read {
 	my $name = $hash->{NAME};
 	my $mode = $hash->{model};
 
-	return if IsDisabled($name);
+#	return if IsDisabled($name); # move after read function 8/2023
 
 	my $buf = undef;
 	if ($mode eq 'M') {
@@ -268,6 +269,8 @@ sub KNXIO_Read {
 		KNXIO_disconnect($hash);
 		return;
 	}
+
+	return if IsDisabled($name);
 
 	KNXIO_Log ($name, 5, 'buf=' . unpack('H*',$buf));
 
@@ -567,7 +570,7 @@ sub KNXIO_Write {
 			               pack('nnCCC*',$src,$dst,$datasize,0,@data); # send TunnelInd
 
 			# Timeout function - expect TunnelAck within 1 sec! - but if fhem has a delay....
-			$hash->{KNXIOhelper}->{LASTSENTMSG} = $completemsg; # save msg for resend in case of TO
+			$hash->{KNXIOhelper}->{LASTSENTMSG} = unpack('H*',$completemsg); # save msg for resend in case of TO
 			InternalTimer(gettimeofday() + 1.5, \&KNXIO_TunnelRequestTO, $hash);
 		}
 
@@ -675,6 +678,7 @@ sub KNXIO_openDev {
 
 	return if (IsDisabled($name) == 1);
 
+=pod
 	# handle mode X first
 	if ($mode eq 'X') {
 		my @f2flist = devspec2array('TYPE=FHEM2FHEM'); # get F2F devices
@@ -689,6 +693,7 @@ sub KNXIO_openDev {
 		readingsSingleUpdate($hash, 'state', 'disconnected', 1);
 		return qq{KNXIO_openDev ($name): open failed};
 	}
+=cut
 
 	if (exists $hash->{DNSWAIT}) {
 		$hash->{DNSWAIT} += 1;
@@ -776,6 +781,27 @@ sub KNXIO_openDev {
 	}
 
 	return $ret;
+}
+
+### called from define - after init_complete for mode X
+### return undef on success
+sub KNXIO_openDevX {
+	my $hash = shift;
+	my $name = $hash->{NAME};
+
+	return if (IsDisabled($name) == 1);
+
+	my @f2flist = devspec2array('TYPE=FHEM2FHEM'); # get F2F devices
+	foreach my $f2fdev (@f2flist) {
+		next if (IsDevice($f2fdev) == 0); # no F2Fdevice found
+		my $rawdev = $defs{$f2fdev}->{rawDevice};
+		next if (IsDevice($rawdev,'KNXIO') == 0);
+		next if ($rawdev ne $name);
+		KNXIO_init($hash);
+		return;
+	}
+	readingsSingleUpdate($hash, 'state', 'disconnected', 1);
+	return qq{KNXIO_openDevX ($name): open failed};
 }
 
 ### called from DevIo_open or KNXIO_openDev after sucessful open
@@ -1177,7 +1203,7 @@ sub KNXIO_TunnelRequestTO {
 	# try resend...but only once
 	if (exists($hash->{KNXIOhelper}->{LASTSENTMSG})) {
 		KNXIO_Log ($name, 3, 'timeout - attempt resend');
-		my $msg = $hash->{KNXIOhelper}->{LASTSENTMSG};
+		my $msg = pack('H*',$hash->{KNXIOhelper}->{LASTSENTMSG});
 		::DevIo_SimpleWrite($hash,$msg,0);
 		delete $hash->{KNXIOhelper}->{LASTSENTMSG};
 		InternalTimer(gettimeofday() + 1.5, \&KNXIO_TunnelRequestTO, $hash);
