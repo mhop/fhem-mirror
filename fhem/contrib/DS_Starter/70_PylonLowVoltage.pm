@@ -156,9 +156,9 @@ my %hrtnc = (                                                        # RTN Codes
 );
 
 ##################################################################################################################################################################
-# The Basic data format SOI (7EH, ASCII '~') and EOI (CR -> 0DH) are explained and transferred in hexadecimal, 
-# the other items are explained in hexadecimal and transferred by hexadecimal-ASCII, each byte contains two 
-# ASCII, e.g. CID2 4BH transfer 2byte: 
+# The Basic data format SOI (7EH, ASCII '~') and EOI (CR -> 0DH) are explained and transferred in hexadecimal,
+# the other items are explained in hexadecimal and transferred by hexadecimal-ASCII, each byte contains two
+# ASCII, e.g. CID2 4BH transfer 2byte:
 # 34H (the ASCII of ‘4’) and 42H(the ASCII of ‘B’).
 #
 # HEX-ASCII converter: https://www.rapidtables.com/convert/number/ascii-hex-bin-dec-converter.html
@@ -174,12 +174,12 @@ my %hrtnc = (                                                        # RTN Codes
 # LENGTH: LENID + LCHKSUM -> Pylon LFP V2.8 Doku
 # INFO: muß hier mit ADR übereinstimmen
 # CHKSUM: 32+30+30+32+34+36+39+33+45+30+30+32+30+32 = 02D3H -> modulo 65536 = 02D3H -> bitweise invert = 1111 1101 0010 1100 -> +1 = 1111 1101 0010 1101 -> FD2DH
-# 
+#
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
 #  ~    20    02      46    93     E0    02    02      FD   2D
 # 7E  32 30  30 32  34 36 39 33  45 30 30 32  30 32  46 44 32 44
 #
-my %hrsnb = (                                                        # Codierung Abruf serialNumber, mlen = Mindestlänge Antwortstring                    
+my %hrsnb = (                                                        # Codierung Abruf serialNumber, mlen = Mindestlänge Antwortstring
   1 => { cmd => "~20024693E00202FD2D\x{0d}", mlen => 52 },
   2 => { cmd => "~20034693E00203FD2B\x{0d}", mlen => 52 },
   3 => { cmd => "~20044693E00204FD29\x{0d}", mlen => 52 },
@@ -196,7 +196,7 @@ my %hrsnb = (                                                        # Codierung
 # LENGTH: LENID + LCHKSUM -> Pylon LFP V2.8 Doku
 # INFO: muß hier mit ADR übereinstimmen
 # CHKSUM: 32+30+30+32+34+36+35+31+45+30+30+32+30+32 = 02CDH -> modulo 65536 = 02CDH -> bitweise invert = 1111 1101 0011 0010 -> +1 = 1111 1101 0011 0011 -> FD33H
-# 
+#
 # SOI  VER    ADR   CID1  CID2      LENGTH    INFO     CHKSUM
 #  ~    20    02      46    51     E0    02    02      FD   33
 # 7E  32 30  30 32  34 36 35 31  45 30 30 32  30 32  46 44 32 44
@@ -211,14 +211,14 @@ my %hrmfi = (                                                        # Codierung
 );
 
 # request command für '1': ~20024651E00202FD33 + CR
-# command (HEX):           
+# command (HEX):
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
 # CID1: Kommando spezifisch, hier 46H
 # CID2: Kommando spezifisch, hier 4FH
 # LENGTH: LENID + LCHKSUM -> Pylon LFP V2.8 Doku
 # INFO: muß hier mit ADR übereinstimmen
 # CHKSUM: 30+30+30+33+34+36+34+46+45+30+30+32+30+33 = 02E1H -> modulo 65536 = 02E1H -> bitweise invert = 1111 1101 0001 1110 -> +1 = 1111 1101 0001 1111 -> FD1FH
-# 
+#
 # SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
 #  ~    00    02      46    4F      E0    02    02      FD   21
 # 7E  30 30  30 32  34 36  34 46  45 30 30 32  30 32  46 44 31 46
@@ -294,9 +294,9 @@ sub Initialize {
                         "interval ".
                         "timeout ".
                         $readingFnAttributes;
-                        
+
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
-  
+
 return;
 }
 
@@ -311,15 +311,15 @@ sub Define {
       return "Define: too few arguments. Usage:\n" .
               "define <name> PylonLowVoltage <host>:<port> [<bataddress>]";
   }
-  
+
   my $name = $hash->{NAME};
-  
+
   if ($iostAbsent) {
       my $err = "Perl module >$iostAbsent< is missing. You have to install this perl module.";
       Log3 ($name, 1, "$name - ERROR - $err");
       return "Error: $err";
   }
-  
+
   if ($storabs) {
       my $err = "Perl module >$storabs< is missing. You have to install this perl module.";
       Log3 ($name, 1, "$name - ERROR - $err");
@@ -329,11 +329,11 @@ sub Define {
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                           # Modul Meta.pm nicht vorhanden
   ($hash->{HOST}, $hash->{PORT}) = split ":", $args[2];
   $hash->{BATADDRESS}            = $args[3] // 1;
-  
+
   if ($hash->{BATADDRESS} !~ /[123456]/xs) {
       return "Define: bataddress must be a value between 1 and 6";
   }
-    
+
   my $params = {
       hash        => $hash,
       notes       => \%vNotesIntern,
@@ -417,7 +417,7 @@ sub Attr {
 
       InternalTimer(gettimeofday()+1.0, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
   }
-  
+
   if ($aName eq "timeout") {
       if (!looks_like_number($aVal)) {
           return qq{The value for $aName is invalid, it must be numeric!};
@@ -444,7 +444,7 @@ sub manageUpdate {
   return if(IsDisabled ($name));
 
   my $interval  = AttrVal ($name, 'interval', $definterval);                                 # 0 -> manuell gesteuert
-  my $timeout   = AttrVal ($name, 'timeout',        $defto);             
+  my $timeout   = AttrVal ($name, 'timeout',        $defto);
   my $readings;
 
   if(!$interval) {
@@ -454,30 +454,28 @@ sub manageUpdate {
   else {
       my $new = gettimeofday() + $interval;
       InternalTimer ($new, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);                             # Wiederholungsintervall
-        
+
       $hash->{OPMODE}            = 'Automatic';
       $readings->{nextCycletime} = FmtTime($new);
   }
 
   Log3 ($name, 4, "$name - start request cycle to battery number >$hash->{BATADDRESS}< at host:port $hash->{HOST}:$hash->{PORT}");
-               
-  my $serial = Serialize ({ name => $name, timeout => $timeout, readings => $readings});
-  
+
   if ($timeout < 1.0) {
-      BlockingKill ($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});      
+      BlockingKill ($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
       startUpdate  (Serialize ( { name => $name, timeout => $timeout, readings => $readings} ));
   }
   else {
-     delete $hash->{HELPER}{BKRUNNING} if(defined $hash->{HELPER}{BKRUNNING} && $hash->{HELPER}{BKRUNNING}{pid} =~ /DEAD/xs);  
-     
-     if (defined $hash->{HELPER}{BKRUNNING}) {       
+     delete $hash->{HELPER}{BKRUNNING} if(defined $hash->{HELPER}{BKRUNNING} && $hash->{HELPER}{BKRUNNING}{pid} =~ /DEAD/xs);
+
+     if (defined $hash->{HELPER}{BKRUNNING}) {
          Log3 ($name, 3, qq{$name - another BlockingCall PID "$hash->{HELPER}{BKRUNNING}{pid}" is already running ... start Update aborted});
-         
+
          return;
      }
-     
-     my $blto = sprintf "%0d", ($timeout + 10);
-     
+
+     my $blto = sprintf "%.0f", ($timeout + 10);
+
      $hash->{HELPER}{BKRUNNING} = BlockingCall ( "FHEM::PylonLowVoltage::startUpdate",
                                                  Serialize ( { block => 1, name => $name, timeout => $timeout, readings => $readings} ),
                                                  "FHEM::PylonLowVoltage::finishUpdate",
@@ -489,11 +487,11 @@ sub manageUpdate {
 
      if (defined $hash->{HELPER}{BKRUNNING}) {
          $hash->{HELPER}{BKRUNNING}{loglevel} = 3;                                                       # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
-         
+
          Log3 ($name, 4, qq{$name - BlockingCall PID "$hash->{HELPER}{BKRUNNING}{pid}" with Blocking Timeout "$blto" started});
-     }     
+     }
   }
-    
+
 return;
 }
 
@@ -502,17 +500,17 @@ return;
 ###############################################################
 sub startUpdate {
   my $serial   = shift;
-  
-  my $paref    = eval { thaw ($serial) };                              # Deserialisierung  
-  
+
+  my $paref    = eval { thaw ($serial) };                              # Deserialisierung
+
   my $name     = $paref->{name};
-  my $timeout  = $paref->{timeout};  
+  my $timeout  = $paref->{timeout};
   my $readings = $paref->{readings};
   my $block    = $paref->{block} // 0;
-  
+
   my $hash     = $defs{$name};
   my $success  = 0;
-  
+
   my ($socket);
 
   eval {                                                                                     ## no critic 'eval'
@@ -520,93 +518,93 @@ sub startUpdate {
       ualarm ($timeout * 1000000);                                                           # ualarm in Mikrosekunden
 
       $socket = _openSocket ($hash, $timeout, $readings);
-      if (!$socket) { 
-          $block ? 
-          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
-          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")); 
+      if (!$socket) {
+          $block ?
+          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
+          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
       }
-        
+
       if (ReadingsAge ($name, "serialNumber", 601) >= 60) {                                  # statische Werte abrufen
           if (_callSerialNumber ($hash, $socket, $readings)) {                               # Abruf serialNumber
-              $block ? 
-              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
-              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));        
+              $block ?
+              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
+              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
           }
-          
+
           if (_callManufacturerInfo ($hash, $socket, $readings)) {                           # Abruf manufacturerInfo
-              $block ? 
-              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
-              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));              
+              $block ?
+              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
+              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
           }
-          
+
           if (_callProtocolVersion  ($hash, $socket, $readings)) {                           # Abruf protocolVersion
-              $block ? 
-              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
-              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));              
+              $block ?
+              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
+              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
           }
-          
+
           if (_callSoftwareVersion  ($hash, $socket, $readings)) {                           # Abruf softwareVersion
-              $block ? 
-              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
-              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));              
-          } 
-          
+              $block ?
+              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
+              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
+          }
+
           if (_callSystemParameters ($hash, $socket, $readings)) {                           # Abruf systemParameters
-              $block ? 
-              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
-              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));              
-          }       
-      }   
-               
-      if (_callAlarmInfo ($hash, $socket, $readings)) {                                      # Abruf alarmInfo             
-          $block ? 
-          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
-          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));          
-      }   
-      
+              $block ?
+              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
+              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
+          }
+      }
+
+      if (_callAlarmInfo ($hash, $socket, $readings)) {                                      # Abruf alarmInfo
+          $block ?
+          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
+          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
+      }
+
       if (_callChargeManagmentInfo ($hash, $socket, $readings)) {                            # Abruf chargeManagmentInfo
-          $block ? 
-          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
-          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));           
-      }      
-      
+          $block ?
+          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
+          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
+      }
+
       if (_callAnalogValue ($hash, $socket, $readings)) {                                    # Abruf analogValue
-          $block ? 
-          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
-          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));           
-      }       
-        
+          $block ?
+          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
+          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
+      }
+
       $success = 1;
   };  # eval
-    
+
   if ($@) {
       my $errtxt;
       if ($@ =~ /gatewaytimeout/xs) {
-          $errtxt = 'Timeout in communication to RS485 gateway';                         
+          $errtxt = 'Timeout in communication to RS485 gateway';
       }
       else {
-          $errtxt = $@; 
-      }        
-        
-      doOnError ({ hash     => $hash, 
-                   readings => $readings, 
+          $errtxt = $@;
+      }
+
+      doOnError ({ hash     => $hash,
+                   readings => $readings,
                    sock     => $socket,
                    state    => $errtxt,
                    verbose  => 3
                  }
-                );  
-                
-      $block ? 
-      return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) : 
+                );
+
+      $block ?
+      return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
       return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
   }
 
   ualarm(0);
   _closeSocket ($hash);
-  
+
   if ($block) {
       return ( encode_base64 (Serialize ({name => $name, success  => $success, readings => $readings}), "") );
-  }  
+  }
 
 return \&finishUpdate ( encode_base64 (Serialize ({name => $name, success  => $success, readings => $readings}), "") );
 }
@@ -616,25 +614,25 @@ return \&finishUpdate ( encode_base64 (Serialize ({name => $name, success  => $s
 ###############################################################
 sub finishUpdate {
   my $serial   = decode_base64 (shift);
-  
-  my $paref    = eval { thaw ($serial) };                                             # Deserialisierung  
+
+  my $paref    = eval { thaw ($serial) };                                             # Deserialisierung
   my $name     = $paref->{name};
-  my $success  = $paref->{success} // 0;  
+  my $success  = $paref->{success} // 0;
   my $readings = $paref->{readings};
   my $hash     = $defs{$name};
-  
+
   delete($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
-  
+
   if ($success) {
       Log3 ($name, 4, "$name - got data from battery number >$hash->{BATADDRESS}< successfully");
-        
+
       additionalReadings ($readings);                                                 # zusätzliche eigene Readings erstellen
       $readings->{state} = 'connected';
   }
   else {
-      deleteReadingspec ($hash); 
+      deleteReadingspec ($hash);
   }
-    
+
   createReadings ($hash, $success, $readings);                                                  # Readings erstellen
 
 return;
@@ -647,11 +645,11 @@ sub abortUpdate {
   my $hash   = shift;
   my $cause  = shift // "Timeout: process terminated";
   my $name   = $hash->{NAME};
-  
+
   delete($hash->{HELPER}{BKRUNNING});
 
   Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{BKRUNNING}{fn} pid:$hash->{HELPER}{BKRUNNING}{pid} aborted: $cause");
-  
+
   deleteReadingspec    ($hash);
   readingsSingleUpdate ($hash, 'state', 'Update (Child) process timed out', 1);
 
@@ -661,68 +659,68 @@ return;
 ###############################################################
 #       Socket erstellen
 ###############################################################
-sub _openSocket {               
-  my $hash     = shift; 
-  my $timeout  = shift;    
+sub _openSocket {
+  my $hash     = shift;
+  my $timeout  = shift;
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
-  
+
   my $socket   = $hash->{SOCKET};
-  
+
   if ($socket && !$socket->connected()) {
-      doOnError ({ hash     => $hash, 
+      doOnError ({ hash     => $hash,
                    readings => $readings,
-                   sock     => $socket,                         
+                   sock     => $socket,
                    state    => 'disconnected'
                  }
                 );
-      
+
       _closeSocket ($hash);
       undef $socket;
   }
-  
+
   if (!$socket) {
-      $socket = IO::Socket::INET->new( Proto    => 'tcp', 
-                                       PeerAddr => $hash->{HOST}, 
-                                       PeerPort => $hash->{PORT}, 
+      $socket = IO::Socket::INET->new( Proto    => 'tcp',
+                                       PeerAddr => $hash->{HOST},
+                                       PeerPort => $hash->{PORT},
                                        Timeout  => $timeout
-                                     ) 
-                or do { doOnError ({ hash     => $hash, 
-                                     readings => $readings, 
+                                     )
+                or do { doOnError ({ hash     => $hash,
+                                     readings => $readings,
                                      state    => 'no connection to RS485 gateway established',
                                      verbose  => 3
                                    }
-                                  );           
-                        return;                 
-                      };                                     
+                                  );
+                        return;
+                      };
   }
 
   IO::Socket::Timeout->enable_timeouts_on ($socket);                       # nur notwendig für read or write timeout
-    
+
   $socket->read_timeout  (0.5);                                            # Read/Writetimeout immer kleiner als Sockettimeout
   $socket->write_timeout (0.5);
   $socket->autoflush();
-  
+
   $hash->{SOCKET} = $socket;
-        
+
 return $socket;
 }
 
 ###############################################################
 #       Socket schließen und löschen
 ###############################################################
-sub _closeSocket {               
-  my $hash = shift; 
-  
+sub _closeSocket {
+  my $hash = shift;
+
   my $name   = $hash->{NAME};
   my $socket = $hash->{SOCKET};
-  
+
   if ($socket) {
       close ($socket);
       delete $hash->{SOCKET};
-      
+
       Log3 ($name, 4, "$name - Socket/Connection to the RS485 gateway was closed");
   }
-    
+
 return;
 }
 
@@ -731,33 +729,33 @@ return;
 ###############################################################
 sub _callSerialNumber {
   my $hash     = shift;
-  my $socket   = shift;    
+  my $socket   = shift;
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request ({ hash   => $hash, 
-                       socket => $socket, 
-                       cmd    => $hrsnb{$hash->{BATADDRESS}}{cmd}, 
+  my $res = Request ({ hash   => $hash,
+                       socket => $socket,
+                       cmd    => $hrsnb{$hash->{BATADDRESS}}{cmd},
                        cmdtxt => 'serialNumber'
                      }
                     );
 
   my $rtnerr = responseCheck ($res, $hrsnb{$hash->{BATADDRESS}}{mlen});
-  
+
   if ($rtnerr) {
-      doOnError ({ hash     => $hash, 
+      doOnError ({ hash     => $hash,
                    readings => $readings,
-                   sock     => $socket,                             
+                   sock     => $socket,
                    state    => $rtnerr
                  }
-                );                
+                );
       return $rtnerr;
   }
-  
+
   __resultLog ($hash, $res);
 
   my $sernum                = substr ($res, 15, 32);
   $readings->{serialNumber} = pack   ("H*", $sernum);
-    
+
 return;
 }
 
@@ -766,36 +764,36 @@ return;
 ###############################################################
 sub _callManufacturerInfo {
   my $hash     = shift;
-  my $socket   = shift;    
+  my $socket   = shift;
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request ({ hash   => $hash, 
-                       socket => $socket, 
-                       cmd    => $hrmfi{$hash->{BATADDRESS}}{cmd}, 
+  my $res = Request ({ hash   => $hash,
+                       socket => $socket,
+                       cmd    => $hrmfi{$hash->{BATADDRESS}}{cmd},
                        cmdtxt => 'manufacturerInfo'
                      }
                     );
-    
+
   my $rtnerr = responseCheck ($res, $hrmfi{$hash->{BATADDRESS}}{mlen});
-  
+
   if ($rtnerr) {
-      doOnError ({ hash     => $hash, 
+      doOnError ({ hash     => $hash,
                    readings => $readings,
-                   sock     => $socket,                             
+                   sock     => $socket,
                    state    => $rtnerr
                  }
-                );                
+                );
       return $rtnerr;
   }
-  
+
   __resultLog ($hash, $res);
 
-  my $BatteryHex               = substr ($res, 13, 20);                       
+  my $BatteryHex               = substr ($res, 13, 20);
   $readings->{batteryType}     = pack   ("H*", $BatteryHex);
-  $readings->{softwareVersion} = 'V'.hex (substr ($res, 33, 2)).'.'.hex (substr ($res, 35, 2));      # 
+  # $readings->{softwareVersion} = 'V'.hex (substr ($res, 33, 2)).'.'.hex (substr ($res, 35, 2));      # unklar 
   my $ManufacturerHex          = substr ($res, 37, 40);
   $readings->{Manufacturer}    = pack   ("H*", $ManufacturerHex);
-    
+
 return;
 }
 
@@ -804,32 +802,32 @@ return;
 ###############################################################
 sub _callProtocolVersion {
   my $hash     = shift;
-  my $socket   = shift;    
+  my $socket   = shift;
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request ({ hash   => $hash, 
-                       socket => $socket, 
-                       cmd    => $hrprt{$hash->{BATADDRESS}}{cmd}, 
+  my $res = Request ({ hash   => $hash,
+                       socket => $socket,
+                       cmd    => $hrprt{$hash->{BATADDRESS}}{cmd},
                        cmdtxt => 'protocolVersion'
                      }
                     );
-    
+
   my $rtnerr = responseCheck ($res, $hrprt{$hash->{BATADDRESS}}{mlen});
-  
+
   if ($rtnerr) {
-      doOnError ({ hash     => $hash, 
+      doOnError ({ hash     => $hash,
                    readings => $readings,
-                   sock     => $socket,                             
+                   sock     => $socket,
                    state    => $rtnerr
                  }
-                );                
+                );
       return $rtnerr;
   }
-  
+
   __resultLog ($hash, $res);
 
   $readings->{protocolVersion} = 'V'.hex (substr ($res, 1, 1)).'.'.hex (substr ($res, 2, 1));
-    
+
 return;
 }
 
@@ -838,33 +836,33 @@ return;
 ###############################################################
 sub _callSoftwareVersion {
   my $hash     = shift;
-  my $socket   = shift;    
+  my $socket   = shift;
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request ({ hash   => $hash, 
-                       socket => $socket, 
-                       cmd    => $hrswv{$hash->{BATADDRESS}}{cmd}, 
+  my $res = Request ({ hash   => $hash,
+                       socket => $socket,
+                       cmd    => $hrswv{$hash->{BATADDRESS}}{cmd},
                        cmdtxt => 'softwareVersion'
                      }
                     );
-    
+
   my $rtnerr = responseCheck ($res, $hrswv{$hash->{BATADDRESS}}{mlen});
-  
+
   if ($rtnerr) {
-      doOnError ({ hash     => $hash, 
+      doOnError ({ hash     => $hash,
                    readings => $readings,
-                   sock     => $socket,                             
+                   sock     => $socket,
                    state    => $rtnerr
                  }
-                );                
+                );
       return $rtnerr;
   }
-  
+
   __resultLog ($hash, $res);
 
-  $readings->{moduleSoftwareVersion_manufacture} = 'V'.hex (substr ($res, 15, 2)).'.'.hex (substr ($res, 17, 2)); 
+  $readings->{moduleSoftwareVersion_manufacture} = 'V'.hex (substr ($res, 15, 2)).'.'.hex (substr ($res, 17, 2));
   $readings->{moduleSoftwareVersion_mainline}    = 'V'.hex (substr ($res, 19, 2)).'.'.hex (substr ($res, 21, 2)).'.'.hex (substr ($res, 23, 2));
-  
+
 return;
 }
 
@@ -873,43 +871,43 @@ return;
 ###############################################################
 sub _callSystemParameters {
   my $hash     = shift;
-  my $socket   = shift;    
+  my $socket   = shift;
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request ({ hash   => $hash, 
-                       socket => $socket, 
-                       cmd    => $hrspm{$hash->{BATADDRESS}}{cmd}, 
+  my $res = Request ({ hash   => $hash,
+                       socket => $socket,
+                       cmd    => $hrspm{$hash->{BATADDRESS}}{cmd},
                        cmdtxt => 'systemParameters'
                      }
                     );
-    
+
   my $rtnerr = responseCheck ($res, $hrspm{$hash->{BATADDRESS}}{mlen});
-  
+
   if ($rtnerr) {
-      doOnError ({ hash     => $hash, 
+      doOnError ({ hash     => $hash,
                    readings => $readings,
-                   sock     => $socket,                             
+                   sock     => $socket,
                    state    => $rtnerr
                  }
-                );                
+                );
       return $rtnerr;
   }
-  
+
   __resultLog ($hash, $res);
 
   $readings->{paramCellHighVoltLimit}      = sprintf "%.3f", (hex substr  ($res, 15, 4)) / 1000;
   $readings->{paramCellLowVoltLimit}       = sprintf "%.3f", (hex substr  ($res, 19, 4)) / 1000;                   # Alarm Limit
   $readings->{paramCellUnderVoltLimit}     = sprintf "%.3f", (hex substr  ($res, 23, 4)) / 1000;                   # Schutz Limit
-  $readings->{paramChargeHighTempLimit}    = sprintf "%.1f", ((hex substr ($res, 27, 4)) - 2731) / 10; 
-  $readings->{paramChargeLowTempLimit}     = sprintf "%.1f", ((hex substr ($res, 31, 4)) - 2731) / 10; 
-  $readings->{paramChargeCurrentLimit}     = sprintf "%.3f", (hex substr  ($res, 35, 4)) * 100 / 1000; 
+  $readings->{paramChargeHighTempLimit}    = sprintf "%.1f", ((hex substr ($res, 27, 4)) - 2731) / 10;
+  $readings->{paramChargeLowTempLimit}     = sprintf "%.1f", ((hex substr ($res, 31, 4)) - 2731) / 10;
+  $readings->{paramChargeCurrentLimit}     = sprintf "%.3f", (hex substr  ($res, 35, 4)) * 100 / 1000;
   $readings->{paramModuleHighVoltLimit}    = sprintf "%.3f", (hex substr  ($res, 39, 4)) / 1000;
   $readings->{paramModuleLowVoltLimit}     = sprintf "%.3f", (hex substr  ($res, 43, 4)) / 1000;                   # Alarm Limit
   $readings->{paramModuleUnderVoltLimit}   = sprintf "%.3f", (hex substr  ($res, 47, 4)) / 1000;                   # Schutz Limit
   $readings->{paramDischargeHighTempLimit} = sprintf "%.1f", ((hex substr ($res, 51, 4)) - 2731) / 10;
   $readings->{paramDischargeLowTempLimit}  = sprintf "%.1f", ((hex substr ($res, 55, 4)) - 2731) / 10;
   $readings->{paramDischargeCurrentLimit}  = sprintf "%.3f", (65535 - (hex substr  ($res, 59, 4))) * 100 / 1000;   # mit Symbol (-)
-  
+
 return;
 }
 
@@ -918,42 +916,42 @@ return;
 ###############################################################
 sub _callAlarmInfo {
   my $hash     = shift;
-  my $socket   = shift;    
+  my $socket   = shift;
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request ({ hash   => $hash, 
-                       socket => $socket, 
-                       cmd    => $hralm{$hash->{BATADDRESS}}{cmd}, 
+  my $res = Request ({ hash   => $hash,
+                       socket => $socket,
+                       cmd    => $hralm{$hash->{BATADDRESS}}{cmd},
                        cmdtxt => 'alarmInfo'
                      }
                     );
-    
+
   my $rtnerr = responseCheck ($res, $hralm{$hash->{BATADDRESS}}{mlen});
-  
+
   if ($rtnerr) {
-      doOnError ({ hash     => $hash, 
+      doOnError ({ hash     => $hash,
                    readings => $readings,
-                   sock     => $socket,                             
+                   sock     => $socket,
                    state    => $rtnerr
                  }
-                );                
+                );
       return $rtnerr;
   }
-  
+
   __resultLog ($hash, $res);
 
   $readings->{packCellcount} = hex (substr($res, 17, 2));
 
-  if (substr($res, 19, 30) eq "000000000000000000000000000000" && 
-      substr($res, 51, 10) eq "0000000000"                     && 
-      substr($res, 67, 2)  eq "00"                             && 
+  if (substr($res, 19, 30) eq "000000000000000000000000000000" &&
+      substr($res, 51, 10) eq "0000000000"                     &&
+      substr($res, 67, 2)  eq "00"                             &&
       substr($res, 73, 4)  eq "0000") {
       $readings->{packAlarmInfo} = "ok";
   }
   else {
       $readings->{packAlarmInfo} = "failure";
   }
-        
+
 return;
 }
 
@@ -962,28 +960,28 @@ return;
 ###############################################################
 sub _callChargeManagmentInfo {
   my $hash     = shift;
-  my $socket   = shift;    
+  my $socket   = shift;
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request ({ hash   => $hash, 
-                       socket => $socket, 
-                       cmd    => $hrcmi{$hash->{BATADDRESS}}{cmd}, 
+  my $res = Request ({ hash   => $hash,
+                       socket => $socket,
+                       cmd    => $hrcmi{$hash->{BATADDRESS}}{cmd},
                        cmdtxt => 'chargeManagmentInfo'
                      }
                     );
-    
+
   my $rtnerr = responseCheck ($res, $hrcmi{$hash->{BATADDRESS}}{mlen});
-  
+
   if ($rtnerr) {
-      doOnError ({ hash     => $hash, 
+      doOnError ({ hash     => $hash,
                    readings => $readings,
-                   sock     => $socket,                             
+                   sock     => $socket,
                    state    => $rtnerr
                  }
-                );                
+                );
       return $rtnerr;
   }
-  
+
   __resultLog ($hash, $res);
 
   $readings->{chargeVoltageLimit}     = sprintf "%.3f", hex (substr ($res, 15, 4)) / 1000;        # Genauigkeit 3
@@ -997,7 +995,7 @@ sub _callChargeManagmentInfo {
   $readings->{chargeImmediatelySOC05} = substr ($cdstat, 2, 1) == 1 ? 'yes' : 'no';               # Bit 5 - SOC 5~9%  -> für Wechselrichter, die aktives Batteriemanagement bei gegebener DC-Spannungsfunktion haben oder Wechselrichter, der von sich aus einen niedrigen SOC/Spannungsgrenzwert hat
   $readings->{chargeImmediatelySOC09} = substr ($cdstat, 3, 1) == 1 ? 'yes' : 'no';               # Bit 4 - SOC 9~13% -> für Wechselrichter hat keine aktive Batterieabschaltung haben
   $readings->{chargeFullRequest}      = substr ($cdstat, 4, 1) == 1 ? 'yes' : 'no';               # Bit 3 - wenn SOC in 30 Tagen nie höher als 97% -> Flag = 1, wenn SOC-Wert ≥ 97% -> Flag = 0
-        
+
 return;
 }
 
@@ -1009,28 +1007,28 @@ return;
 #################################################################################
 sub _callAnalogValue {
   my $hash     = shift;
-  my $socket   = shift;    
+  my $socket   = shift;
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
-  my $res = Request ({ hash   => $hash, 
-                       socket => $socket, 
-                       cmd    => $hrcmn{$hash->{BATADDRESS}}{cmd}, 
+  my $res = Request ({ hash   => $hash,
+                       socket => $socket,
+                       cmd    => $hrcmn{$hash->{BATADDRESS}}{cmd},
                        cmdtxt => 'analogValue'
                      }
                     );
-    
+
   my $rtnerr = responseCheck ($res, $hrcmn{$hash->{BATADDRESS}}{mlen});
-  
+
   if ($rtnerr) {
-      doOnError ({ hash     => $hash, 
+      doOnError ({ hash     => $hash,
                    readings => $readings,
-                   sock     => $socket,                             
+                   sock     => $socket,
                    state    => $rtnerr
                  }
-                );                
+                );
       return $rtnerr;
   }
-  
+
   __resultLog ($hash, $res);
 
   $readings->{packCellcount}        = hex (substr($res, 17,  2));
@@ -1048,16 +1046,16 @@ sub _callAnalogValue {
   $readings->{cellVoltage_12}       = sprintf "%.3f", hex(substr($res,63,4)) / 1000;
   $readings->{cellVoltage_13}       = sprintf "%.3f", hex(substr($res,67,4)) / 1000;
   $readings->{cellVoltage_14}       = sprintf "%.3f", hex(substr($res,71,4)) / 1000;
-  $readings->{cellVoltage_15}       = sprintf "%.3f", hex(substr($res,75,4)) / 1000; 
+  $readings->{cellVoltage_15}       = sprintf "%.3f", hex(substr($res,75,4)) / 1000;
   # $readings->{numberOfTempPos}     =                 hex(substr($res,79,2));              # Anzahl der jetzt folgenden Teperaturpositionen -> 5
   $readings->{bmsTemperature}       = (hex (substr($res, 81,  4)) - 2731) / 10;             # 1
   $readings->{cellTemperature_0104} = (hex (substr($res, 85,  4)) - 2731) / 10;             # 2
   $readings->{cellTemperature_0508} = (hex (substr($res, 89,  4)) - 2731) / 10;             # 3
   $readings->{cellTemperature_0912} = (hex (substr($res, 93,  4)) - 2731) / 10;             # 4
   $readings->{cellTemperature_1315} = (hex (substr($res, 97,  4)) - 2731) / 10;             # 5
-  my $current                       =  hex (substr($res, 101, 4));     
+  my $current                       =  hex (substr($res, 101, 4));
   $readings->{packVolt}             = sprintf "%.3f", hex (substr($res, 105, 4)) / 1000;
-    
+
   if ($current & 0x8000) {
       $current = $current - 0x10000;
   }
@@ -1076,37 +1074,37 @@ sub _callAnalogValue {
   }
   else {
       my $err = 'wrong value retrieve analogValue -> user defined items: '.$udi;
-      doOnError ({ hash     => $hash, 
+      doOnError ({ hash     => $hash,
                    readings => $readings,
-                   sock     => $socket,                             
+                   sock     => $socket,
                    state    => $err
                  }
-                );                
+                );
       return $err;
   }
-        
+
 return;
 }
 
 ###############################################################
 #        Logausgabe Result
 ###############################################################
-sub __resultLog {           
+sub __resultLog {
   my $hash = shift;
   my $res  = shift;
 
   my $name = $hash->{NAME};
 
   Log3 ($name, 5, "$name - data returned raw: ".$res);
-  Log3 ($name, 5, "$name - data returned:\n"   .Hexdump ($res));              
-    
+  Log3 ($name, 5, "$name - data returned:\n"   .Hexdump ($res));
+
 return;
 }
 
 ###############################################################
 #                   Daten Serialisieren
 ###############################################################
-sub Serialize { 
+sub Serialize {
   my $data = shift;
   my $name = $data->{name};
 
@@ -1123,19 +1121,19 @@ return $serial;
 ###############################################################
 #                  PylonLowVoltage Request
 ###############################################################
-sub Request {    
+sub Request {
   my $paref = shift;
 
   my $hash   = $paref->{hash};
-  my $socket = $paref->{socket};  
+  my $socket = $paref->{socket};
   my $cmd    = $paref->{cmd};
   my $cmdtxt = $paref->{cmdtxt} // 'unspecified data';
-    
+
   my $name = $hash->{NAME};
-    
+
   Log3 ($name, 4, "$name - retrieve battery info: ".$cmdtxt);
   Log3 ($name, 4, "$name - request command (ASCII): ".$cmd);
-  Log3 ($name, 5, "$name - request command (HEX): ".unpack "H*", $cmd);  
+  Log3 ($name, 5, "$name - request command (HEX): ".unpack "H*", $cmd);
 
   printf $socket $cmd;
 
@@ -1152,7 +1150,7 @@ sub Reread {
     my $singlechar;
     my $res = q{};
 
-    do {        
+    do {
         $socket->read ($singlechar, 1);
 
         if (!$singlechar && (0+$! == ETIMEDOUT || 0+$! == EWOULDBLOCK)) {                # nur notwendig für read timeout
@@ -1162,7 +1160,7 @@ sub Reread {
         $res = $res . $singlechar if(length $singlechar != 0 && $singlechar =~ /[~A-Z0-9\r]+/xs);
 
     } while (length $singlechar == 0 || ord($singlechar) != 13);
-    
+
 return $res;
 }
 
@@ -1171,9 +1169,9 @@ return $res;
 ###############################################################
 sub Shutdown {
   my ($hash, $args) = @_;
-  
+
   RemoveInternalTimer ($hash);
-  _closeSocket        ($hash); 
+  _closeSocket        ($hash);
   BlockingKill        ($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
 
 return;
@@ -1184,7 +1182,7 @@ return;
 ###############################################################
 sub Hexdump {
   my $res = shift;
-  
+
   my $offset = 0;
   my $result = "";
 
@@ -1202,40 +1200,40 @@ return $result;
 ###############################################################
 #       Response Status ermitteln
 ###############################################################
-sub responseCheck {               
+sub responseCheck {
   my $res  = shift;
   my $mlen = shift // 0;                # Mindestlänge Antwortstring
 
   my $rtnerr = $hrtnc{99}{desc};
-  
+
   if(!$res || $res !~ /^[~A-Z0-9]+\r$/xs) {
       return $rtnerr;
   }
-  
+
   my $len = length($res);
-  
+
   if ($len < $mlen) {
       $rtnerr = $hrtnc{98}{desc};
       $rtnerr =~ s/<LEN>/$len/xs;
       $rtnerr =~ s/<MLEN>/$mlen/xs;
       return $rtnerr;
   }
-  
+
   my $rtn = q{_};
   $rtn    = substr($res,7,2) if($res && $len >= 10);
-    
+
   if(defined $hrtnc{$rtn}{desc} && substr($res, 0, 1) eq '~') {
       $rtnerr = $hrtnc{$rtn}{desc};
       return if($rtnerr eq 'normal');
   }
-    
+
 return $rtnerr;
 }
 
 ###############################################################
 #       Fehlerausstieg
 ###############################################################
-sub doOnError {           
+sub doOnError {
   my $paref = shift;
 
   my $hash     = $paref->{hash};
@@ -1243,68 +1241,68 @@ sub doOnError {
   my $state    = $paref->{state};
   my $socket   = $paref->{sock};
   my $verbose  = $paref->{verbose} // 4;
-  
+
   ualarm(0);
 
   my $name           = $hash->{NAME};
   $state             = (split "at ", $state)[0];
   $readings->{state} = $state;
   $verbose           = 3 if($readings->{state} =~ /error/xsi);
-  
+
   Log3 ($name, $verbose, "$name - ".$readings->{state});
-  
-  _closeSocket ($hash);                
-    
+
+  _closeSocket ($hash);
+
 return;
 }
 
 ###############################################################
 #       eigene zusaätzliche Werte erstellen
 ###############################################################
-sub additionalReadings {               
+sub additionalReadings {
     my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
     my ($vmax, $vmin);
-    
+
     $readings->{averageCellVolt} = sprintf "%.3f", $readings->{packVolt} / $readings->{packCellcount}                  if(defined $readings->{packCellcount});
     $readings->{packSOC}         = sprintf "%.2f", ($readings->{packCapacityRemain} / $readings->{packCapacity} * 100) if(defined $readings->{packCapacity});
     $readings->{packPower}       = sprintf "%.2f", $readings->{packCurrent} * $readings->{packVolt};
-    
+
     for (my $i=1; $i <= $readings->{packCellcount}; $i++) {
         $i    = sprintf "%02d", $i;
         $vmax = $readings->{'cellVoltage_'.$i} if(!$vmax || $vmax < $readings->{'cellVoltage_'.$i});
         $vmin = $readings->{'cellVoltage_'.$i} if(!$vmin || $vmin > $readings->{'cellVoltage_'.$i});
     }
-    
+
     if ($vmax && $vmin) {
         my $maxdf = $vmax - $vmin;
         $readings->{packImbalance} = sprintf "%.3f", 100 * $maxdf / $readings->{averageCellVolt};
     }
-    
+
     $readings->{packState} = $readings->{packCurrent} < 0 ? 'discharging' :
                              $readings->{packCurrent} > 0 ? 'charging'    :
                              'idle';
-    
+
 return;
 }
 
 ###############################################################
 #       Readings erstellen
 ###############################################################
-sub createReadings {               
+sub createReadings {
     my $hash     = shift;
     my $success  = shift;
     my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
 
     readingsBeginUpdate ($hash);
-    
+
     for my $rdg (keys %{$readings}) {
         next if(!defined $readings->{$rdg});
         readingsBulkUpdate ($hash, $rdg, $readings->{$rdg}) if($success || $rdg ~~ @blackl);
     }
 
     readingsEndUpdate  ($hash, 1);
-    
+
 return;
 }
 
@@ -1340,7 +1338,7 @@ return;
 <a id="PylonLowVoltage"></a>
 <h3>PylonLowVoltage</h3>
 <br>
-Module for integration of low voltage batteries with battery management system (BMS) of the manufacturer Pylontech via 
+Module for integration of low voltage batteries with battery management system (BMS) of the manufacturer Pylontech via
 RS485/Ethernet gateway. Communication to the RS485 gateway takes place exclusively via an Ethernet connection.<br>
 The module has been successfully used so far with Pylontech batteries of the following types: <br>
 
@@ -1356,7 +1354,7 @@ The following devices have been successfully used as RS485 Ethernet gateways to 
  <li> USR-TCP232-304 from the manufacturer USRiot </li>
  <li> Waveshare RS485 to Ethernet Converter       </li>
 </ul>
- 
+
 In principle, any other RS485/Ethernet gateway should also be compatible.
 <br><br>
 
@@ -1380,7 +1378,7 @@ This module requires the Perl modules:
   <li><b>port:</b><br>
      Port number of the port configured in the RS485/Ethernet gateway
   </li>
-  
+
   <li><b>bataddress:</b><br>
      Device address of the Pylontech battery. Up to 6 Pylontech batteries can be connected via a Pylontech-specific
      link connection.<br>
@@ -1393,8 +1391,8 @@ This module requires the Perl modules:
 
 <b>Mode of operation</b>
 <ul>
-Depending on the setting of the "Interval" attribute, the module cyclically reads values provided by the battery 
-management system via the RS485 interface. 
+Depending on the setting of the "Interval" attribute, the module cyclically reads values provided by the battery
+management system via the RS485 interface.
 </ul>
 
 <a id="PylonLowVoltage-get"></a>
@@ -1402,7 +1400,7 @@ management system via the RS485 interface.
 <br>
 <ul>
   <li><b>data</b><br>
-    The data query of the battery management system is executed. The timer of the cyclic query is reinitialized according 
+    The data query of the battery management system is executed. The timer of the cyclic query is reinitialized according
     to the set value of the "interval" attribute.
     <br>
   </li>
@@ -1421,19 +1419,19 @@ management system via the RS485 interface.
 
    <a id="PylonLowVoltage-attr-interval"></a>
    <li><b>interval &lt;seconds&gt;</b><br>
-     Interval of the data request from the battery in seconds. If "interval" is explicitly set to the value "0", there is 
+     Interval of the data request from the battery in seconds. If "interval" is explicitly set to the value "0", there is
      no automatic data request.<br>
      (default: 30)
    </li>
    <br>
-   
+
    <a id="PylonLowVoltage-attr-timeout"></a>
    <li><b>timeout &lt;seconds&gt;</b><br>
      Timeout for establishing the connection to the RS485 gateway. <br>
      (default: 0.5)
-     
+
      <br><br>
-     <b>Note</b>: If a timeout &gt;= 1 second is set, the module switches internally to the use of a parallel process 
+     <b>Note</b>: If a timeout &gt;= 1 second is set, the module switches internally to the use of a parallel process
      (BlockingCall) so that write or read delays on the RS485 interface do not lead to blocking states in FHEM.
    </li>
    <br>
@@ -1448,13 +1446,13 @@ management system via the RS485 interface.
 <li><b>cellTemperature_0508</b><br>   Temperature (°C) of cell packs 5 to 8                                              </li>
 <li><b>cellTemperature_0912</b><br>   Temperature (°C) of the cell packs 9 to 12                                         </li>
 <li><b>cellTemperature_1315</b><br>   Temperature (°C) of the cell packs 13 to 15                                        </li>
-<li><b>cellVoltage_XX</b><br>         Cell voltage (V) of the cell pack XX. In the battery module "packCellcount" 
-                                      cell packs are connected in series. Each cell pack consists of single cells 
+<li><b>cellVoltage_XX</b><br>         Cell voltage (V) of the cell pack XX. In the battery module "packCellcount"
+                                      cell packs are connected in series. Each cell pack consists of single cells
                                       connected in parallel.                                                             </li>
 <li><b>chargeCurrentLimit</b><br>     current limit value for the charging current (A)                                   </li>
 <li><b>chargeEnable</b><br>           current flag loading allowed                                                       </li>
 <li><b>chargeFullRequest</b><br>      current flag charge battery module fully (from the mains if necessary)             </li>
-<li><b>chargeImmediatelySOCXX</b><br> current flag charge battery module immediately 
+<li><b>chargeImmediatelySOCXX</b><br> current flag charge battery module immediately
                                       (05: SOC limit 5-9%, 09: SOC limit 9-13%)                                          </li>
 <li><b>chargeVoltageLimit</b><br>     current charge voltage limit (V) of the battery module                             </li>
 <li><b>dischargeCurrentLimit</b><br>  current limit value for the discharge current (A)                                  </li>
@@ -1463,23 +1461,23 @@ management system via the RS485 interface.
 
 <li><b>moduleSoftwareVersion_manufacture</b><br> Firmware version of the battery module                                  </li>
 
-<li><b>packAlarmInfo</b><br>          Alarm status (ok - battery module is OK, failure - there is a fault in the 
-                                      battery module)                                                                    </li>                                                                                                             
+<li><b>packAlarmInfo</b><br>          Alarm status (ok - battery module is OK, failure - there is a fault in the
+                                      battery module)                                                                    </li>
 <li><b>packCapacity</b><br>           nominal capacity (Ah) of the battery module                                        </li>
 <li><b>packCapacityRemain</b><br>     current capacity (Ah) of the battery module                                        </li>
 <li><b>packCellcount</b><br>          Number of cell packs in the battery module                                         </li>
 <li><b>packCurrent</b><br>            current charge current (+) or discharge current (-) of the battery module (A)      </li>
-<li><b>packCycles</b><br>             Number of full cycles - The number of cycles is, to some extent, a measure of the 
-                                      wear and tear of the battery. A complete charge and discharge is counted as one 
-                                      cycle. If the battery is discharged and recharged 50%, it only counts as one 
-                                      half cycle. Pylontech specifies a lifetime of several 1000 cycles 
+<li><b>packCycles</b><br>             Number of full cycles - The number of cycles is, to some extent, a measure of the
+                                      wear and tear of the battery. A complete charge and discharge is counted as one
+                                      cycle. If the battery is discharged and recharged 50%, it only counts as one
+                                      half cycle. Pylontech specifies a lifetime of several 1000 cycles
                                       (see data sheet).                                                                  </li>
-<li><b>packImbalance</b><br>          current imbalance of voltage between the single cells of the 
+<li><b>packImbalance</b><br>          current imbalance of voltage between the single cells of the
                                       battery module (%)                                                                 </li>
 <li><b>packPower</b><br>              current drawn (+) or delivered (-) power (W) of the battery module                 </li>
 <li><b>packSOC</b><br>                State of charge (%) of the battery module                                          </li>
 <li><b>packState</b><br>              current working status of the battery module                                       </li>
-<li><b>packVolt</b><br>               current voltage (V) of the battery module                                          </li>                                               
+<li><b>packVolt</b><br>               current voltage (V) of the battery module                                          </li>
 
 <li><b>paramCellHighVoltLimit</b><br>      System parameter upper voltage limit (V) of a cell                                 </li>
 <li><b>paramCellLowVoltLimit</b><br>       System parameter lower voltage limit (V) of a cell (alarm limit)                   </li>
@@ -1495,7 +1493,6 @@ management system via the RS485 interface.
 <li><b>paramModuleUnderVoltLimit</b><br>   System parameter undervoltage limit (V) of the battery module (protection limit)   </li>
 <li><b>protocolVersion</b><br>             PYLON low voltage RS485 protocol version                                           </li>
 <li><b>serialNumber</b><br>                Serial number                                                                      </li>
-<li><b>softwareVersion</b><br>             ---------                                                                          </li>
 </ul>
 <br><br>
 
@@ -1505,7 +1502,7 @@ management system via the RS485 interface.
 <a id="PylonLowVoltage"></a>
 <h3>PylonLowVoltage</h3>
 <br>
-Modul zur Einbindung von Niedervolt-Batterien mit Batteriemanagmentsystem (BMS) des Herstellers Pylontech über RS485 via 
+Modul zur Einbindung von Niedervolt-Batterien mit Batteriemanagmentsystem (BMS) des Herstellers Pylontech über RS485 via
 RS485/Ethernet-Gateway. Die Kommunikation zum RS485-Gateway erfolgt ausschließlich über eine Ethernet-Verbindung.<br>
 Das Modul wurde bisher erfolgreich mit Pylontech Batterien folgender Typen eingesetzt: <br>
 
@@ -1521,7 +1518,7 @@ Als RS485-Ethernet-Gateways wurden bisher folgende Geräte erfolgreich eingesetz
  <li> USR-TCP232-304 des Herstellers USRiot </li>
  <li> Waveshare RS485 to Ethernet Converter </li>
 </ul>
- 
+
 Prinzipiell sollte auch jedes andere RS485/Ethernet-Gateway kompatibel sein.
 <br><br>
 
@@ -1545,7 +1542,7 @@ Dieses Modul benötigt die Perl-Module:
   <li><b>port:</b><br>
      Port-Nummer des im RS485/Ethernet-Gateways konfigurierten Ports
   </li>
-  
+
   <li><b>bataddress:</b><br>
      Geräteadresse der Pylontech Batterie. Es können bis zu 6 Pylontech Batterien über eine Pylontech-spezifische
      Link-Verbindung verbunden werden.<br>
@@ -1558,8 +1555,8 @@ Dieses Modul benötigt die Perl-Module:
 
 <b>Arbeitsweise</b>
 <ul>
-Das Modul liest entsprechend der Einstellung des Attributes "interval" zyklisch Werte aus, die das 
-Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt. 
+Das Modul liest entsprechend der Einstellung des Attributes "interval" zyklisch Werte aus, die das
+Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
 </ul>
 
 <a id="PylonLowVoltage-get"></a>
@@ -1591,14 +1588,14 @@ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
      (default: 30)
    </li>
    <br>
-   
+
    <a id="PylonLowVoltage-attr-timeout"></a>
    <li><b>timeout &lt;Sekunden&gt;</b><br>
      Timeout für den Verbindungsaufbau zum RS485 Gateway. <br>
      (default: 0.5)
-     
+
      <br><br>
-     <b>Hinweis</b>: Wird ein Timeout &gt;= 1 Sekunde eingestellt, schaltet das Modul intern auf die Verwendung eines 
+     <b>Hinweis</b>: Wird ein Timeout &gt;= 1 Sekunde eingestellt, schaltet das Modul intern auf die Verwendung eines
      Parallelprozesses (BlockingCall) um damit Schreib- bzw. Leseverzögerungen auf dem RS485 Interface nicht zu
      blockierenden Zuständen in FHEM führen.
    </li>
@@ -1614,13 +1611,13 @@ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
 <li><b>cellTemperature_0508</b><br>   Temperatur (°C) der Zellenpacks 5 bis 8                                            </li>
 <li><b>cellTemperature_0912</b><br>   Temperatur (°C) der Zellenpacks 9 bis 12                                           </li>
 <li><b>cellTemperature_1315</b><br>   Temperatur (°C) der Zellenpacks 13 bis 15                                          </li>
-<li><b>cellVoltage_XX</b><br>         Zellenspannung (V) des Zellenpacks XX. In dem Batteriemodul sind "packCellcount" 
-                                      Zellenpacks in Serie geschaltet verbaut. Jedes Zellenpack besteht aus parallel 
+<li><b>cellVoltage_XX</b><br>         Zellenspannung (V) des Zellenpacks XX. In dem Batteriemodul sind "packCellcount"
+                                      Zellenpacks in Serie geschaltet verbaut. Jedes Zellenpack besteht aus parallel
                                       geschalten Einzelzellen.                                                           </li>
 <li><b>chargeCurrentLimit</b><br>     aktueller Grenzwert für den Ladestrom (A)                                          </li>
 <li><b>chargeEnable</b><br>           aktuelles Flag Laden erlaubt                                                       </li>
 <li><b>chargeFullRequest</b><br>      aktuelles Flag Batteriemodul voll laden (notfalls aus dem Netz)                    </li>
-<li><b>chargeImmediatelySOCXX</b><br> aktuelles Flag Batteriemodul sofort laden 
+<li><b>chargeImmediatelySOCXX</b><br> aktuelles Flag Batteriemodul sofort laden
                                       (05: SOC Grenze 5-9%, 09: SOC Grenze 9-13%)                                        </li>
 <li><b>chargeVoltageLimit</b><br>     aktuelle Ladespannungsgrenze (V) des Batteriemoduls                                </li>
 <li><b>dischargeCurrentLimit</b><br>  aktueller Grenzwert für den Entladestrom (A)                                       </li>
@@ -1629,23 +1626,23 @@ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
 
 <li><b>moduleSoftwareVersion_manufacture</b><br> Firmware Version des Batteriemoduls                                     </li>
 
-<li><b>packAlarmInfo</b><br>          Alarmstatus (ok - Batterienmodul ist in Ordnung, failure - im Batteriemodul liegt 
-                                      eine Störung vor)                                                                  </li>                                                                                                             
+<li><b>packAlarmInfo</b><br>          Alarmstatus (ok - Batterienmodul ist in Ordnung, failure - im Batteriemodul liegt
+                                      eine Störung vor)                                                                  </li>
 <li><b>packCapacity</b><br>           nominale Kapazität (Ah) des Batteriemoduls                                         </li>
 <li><b>packCapacityRemain</b><br>     aktuelle Kapazität (Ah) des Batteriemoduls                                         </li>
 <li><b>packCellcount</b><br>          Anzahl der Zellenpacks im Batteriemodul                                            </li>
 <li><b>packCurrent</b><br>            aktueller Ladestrom (+) bzw. Entladstrom (-) des Batteriemoduls (A)                </li>
-<li><b>packCycles</b><br>             Anzahl der Vollzyklen - Die Anzahl der Zyklen ist in gewisserweise ein Maß für den 
-                                      Verschleiß der Batterie. Eine komplettes Laden und Entladen wird als ein Zyklus 
-                                      gewertet. Wird die Batterie 50% entladen und wieder aufgeladen, zählt das nur als ein 
-                                      halber Zyklus. Pylontech gibt eine Lebensdauer von mehreren 1000 Zyklen an 
+<li><b>packCycles</b><br>             Anzahl der Vollzyklen - Die Anzahl der Zyklen ist in gewisserweise ein Maß für den
+                                      Verschleiß der Batterie. Eine komplettes Laden und Entladen wird als ein Zyklus
+                                      gewertet. Wird die Batterie 50% entladen und wieder aufgeladen, zählt das nur als ein
+                                      halber Zyklus. Pylontech gibt eine Lebensdauer von mehreren 1000 Zyklen an
                                       (siehe Datenblatt).                                                                </li>
-<li><b>packImbalance</b><br>          aktuelles Ungleichgewicht der Spannung zwischen den Einzelzellen des 
+<li><b>packImbalance</b><br>          aktuelles Ungleichgewicht der Spannung zwischen den Einzelzellen des
                                       Batteriemoduls (%)                                                                 </li>
 <li><b>packPower</b><br>              aktuell bezogene (+) bzw. gelieferte (-) Leistung (W) des Batteriemoduls           </li>
 <li><b>packSOC</b><br>                Ladezustand (%) des Batteriemoduls                                                 </li>
 <li><b>packState</b><br>              aktueller Arbeitsstatus des Batteriemoduls                                         </li>
-<li><b>packVolt</b><br>               aktuelle Spannung (V) des Batteriemoduls                                           </li>                                               
+<li><b>packVolt</b><br>               aktuelle Spannung (V) des Batteriemoduls                                           </li>
 
 <li><b>paramCellHighVoltLimit</b><br>      Systemparameter obere Spannungsgrenze (V) einer Zelle                         </li>
 <li><b>paramCellLowVoltLimit</b><br>       Systemparameter untere Spannungsgrenze (V) einer Zelle (Alarmgrenze)          </li>
@@ -1661,7 +1658,6 @@ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
 <li><b>paramModuleUnderVoltLimit</b><br>   Systemparameter Unterspannungsgrenze (V) des Batteriemoduls (Schutzgrenze)    </li>
 <li><b>protocolVersion</b><br>             PYLON low voltage RS485 Prokollversion                                        </li>
 <li><b>serialNumber</b><br>                Seriennummer                                                                  </li>
-<li><b>softwareVersion</b><br>             -----------------------------------                                           </li>
 </ul>
 <br><br>
 
