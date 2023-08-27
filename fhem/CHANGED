@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  48_MieleAtHome: fix warning
  - feature: configDB.pm: show version counter in "configDB saved. (xx)"
  - feature: 93_DbLog: possible use of alternative tables for SVG Plots 
                       Forum:134547, fix warnings

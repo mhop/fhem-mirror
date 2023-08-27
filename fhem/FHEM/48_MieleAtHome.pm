@@ -35,7 +35,7 @@ use Encode qw(encode_utf8);
 use List::Util qw[min max];
 use JSON;
 
-my $version = "2.1.0";
+my $version = "2.1.1";
 
 my $MAH_hasMimeBase64 = 1;
 
@@ -1645,7 +1645,8 @@ sub MAH_calculateETA($$$)
 sub MAH_formatTime(@)
 {
 	my ($hour, $minute) = @_;
-	return sprintf("%d:%02d", $hour, $minute);
+	return sprintf("%d:%02d", defined($hour)   ? $hour   : 0,
+	                          defined($minute) ? $minute : 0);
 }
 
 #------------------------------------------------------------------------------------------------------
