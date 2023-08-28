@@ -13171,7 +13171,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
         <b>Beispiel: </b> <br>
         set &lt;name&gt; modulePeakString Ostdach=5.1 Südgarage=2.0 S3=7.2 <br>
-        set &lt;name&gt; modulePeakString KI-based=5.65 <br>
+        set &lt;name&gt; modulePeakString KI-based=14.3 (bei KI basierender API)<br>
       </ul>
       </li>
     </ul>
@@ -13478,7 +13478,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
         <b>Beispiele: </b> <br>
-        set &lt;name&gt; vrmCredentials user=john@example.com pwd=somepassword idsite=XXXXXX <br>
+        set &lt;name&gt; vrmCredentials user=john@example.com pwd=somepassword idsite=212008 <br>
         set &lt;name&gt; vrmCredentials delete <br>
        </ul>      
       
