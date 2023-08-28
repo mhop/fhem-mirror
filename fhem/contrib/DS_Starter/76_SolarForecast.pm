@@ -51,7 +51,8 @@ use FHEM::SynoModules::SMUtils qw(
                                  );                                        # Hilfsroutinen Modul
 
 use Data::Dumper;
-use Storable 'dclone';
+use Storable qw(dclone freeze thaw); 
+use MIME::Base64;
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Run before module compilation
@@ -78,6 +79,7 @@ BEGIN {
           DoTrigger
           Debug
           fhemTimeLocal
+          fhemTimeGm
           fhem
           FileWrite
           FileRead
@@ -136,6 +138,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.81.00"=> "27.08.2023  development version for Victron VRM API, __Pv_Fc_Simple_Dnum_Hist changed, available setter ".
+                           "are now API specific, switch currentForecastDev to currentWeatherDev ".
+                           "affectRainfactorDamping default 0, affectRainfactorDamping default 0 ",
   "0.80.20"=> "15.08.2023  hange calculation in ___setSolCastAPIcallKeyData once again, fix some warnings ",
   "0.80.19"=> "10.08.2023  fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1283836 ",
   "0.80.18"=> "07.08.2023  change calculation of todayDoneAPIcalls in ___setSolCastAPIcallKeyData, add \$lagtime ".
@@ -411,6 +416,7 @@ my $whistrepeat    = 900;                                                       
 
 my $solapirepdef   = 3600;                                                          # default Abrufintervall SolCast API (s)
 my $forapirepdef   = 900;                                                           # default Abrufintervall ForecastSolar API (s)
+my $vrmapirepdef   = 300;                                                           # default Abrufintervall Victron VRM API Forecast
 my $apimaxreqdef   = 50;                                                            # max. täglich mögliche Requests SolCast API
 my $leadtime       = 3600;                                                          # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung                                                  
 my $lagtime        = 1800;                                                          # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
@@ -419,10 +425,10 @@ my $prdef          = 0.85;                                                      
 my $tempcoeffdef   = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
 my $tempmodinc     = 25;                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
 my $tempbasedef    = 25;                                                            # Temperatur Module bei Nominalleistung
-my $cldampdef      = 35;                                                            # Gewichtung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
+my $cldampdef      = 0;                                                             # Gewichtung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
 my $cloud_base     = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung
 
-my $rdampdef       = 10;                                                            # Gewichtung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
+my $rdampdef       = 0;                                                             # Gewichtung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
 my $rain_base      = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung
 
 my $maxconsumer    = 16;                                                            # maximale Anzahl der möglichen Consumer (Attribut)
@@ -485,7 +491,7 @@ my @dd           = qw( none
 
 my %hset = (                                                                # Hash der Set-Funktion
   consumerImmediatePlanning => { fn => \&_setconsumerImmediatePlanning },
-  currentForecastDev        => { fn => \&_setcurrentForecastDev        },
+  currentWeatherDev         => { fn => \&_setcurrentWeatherDev        },
   currentRadiationDev       => { fn => \&_setcurrentRadiationDev       },
   modulePeakString          => { fn => \&_setmodulePeakString          },
   inverterStrings           => { fn => \&_setinverterStrings           },
@@ -520,21 +526,22 @@ my %hset = (                                                                # Ha
   moduleTiltAngle           => { fn => \&_setmoduleTiltAngle           },
   moduleDirection           => { fn => \&_setmoduleDirection           },
   writeHistory              => { fn => \&_setwriteHistory              },
+  vrmCredentials            => { fn => \&_setVictronCredentials        },
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
-  data               => { fn => \&_getdata,                   needcred => 0 },
-  html               => { fn => \&_gethtml,                   needcred => 0 },
-  ftui               => { fn => \&_getftui,                   needcred => 0 },
-  valCurrent         => { fn => \&_getlistCurrent,            needcred => 0 },
-  valConsumerMaster  => { fn => \&_getlistvalConsumerMaster,  needcred => 0 },
-  plantConfigCheck   => { fn => \&_setplantConfiguration,     needcred => 0 },
-  pvHistory          => { fn => \&_getlistPVHistory,          needcred => 0 },
-  pvCircular         => { fn => \&_getlistPVCircular,         needcred => 0 },
-  forecastQualities  => { fn => \&_getForecastQualities,      needcred => 0 },
-  nextHours          => { fn => \&_getlistNextHours,          needcred => 0 },
-  rooftopData        => { fn => \&_getRoofTopData,            needcred => 0 },
-  solApiData         => { fn => \&_getlistSolCastData,        needcred => 0 },
+  data               => { fn => \&_getdata,                     needcred => 0 },
+  html               => { fn => \&_gethtml,                     needcred => 0 },
+  ftui               => { fn => \&_getftui,                     needcred => 0 },
+  valCurrent         => { fn => \&_getlistCurrent,              needcred => 0 },
+  valConsumerMaster  => { fn => \&_getlistvalConsumerMaster,    needcred => 0 },
+  plantConfigCheck   => { fn => \&_setplantConfiguration,       needcred => 0 },
+  pvHistory          => { fn => \&_getlistPVHistory,            needcred => 0 },
+  pvCircular         => { fn => \&_getlistPVCircular,           needcred => 0 },
+  forecastQualities  => { fn => \&_getForecastQualities,        needcred => 0 },
+  nextHours          => { fn => \&_getlistNextHours,            needcred => 0 },
+  rooftopData        => { fn => \&_getRoofTopData,              needcred => 0 },
+  solApiData         => { fn => \&_getlistSolCastData,          needcred => 0 },
 );
 
 my %hattr = (                                                                # Hash für Attr-Funktion
@@ -571,8 +578,8 @@ my %hff = (                                                                     
 );
 
 my %hqtxt = (                                                                                                 # Hash (Setup) Texte
-  cfd    => { EN => qq{Please select the Weather forecast device with "set LINK currentForecastDev"},
-              DE => qq{Bitte geben sie das Wettervorhersage Device mit "set LINK currentForecastDev" an}                    },
+  cfd    => { EN => qq{Please select the Weather forecast device with "set LINK currentWeatherDev"},
+              DE => qq{Bitte geben sie das Wettervorhersage Device mit "set LINK currentWeatherDev" an}                    },
   crd    => { EN => qq{Please select the radiation forecast service with "set LINK currentRadiationDev"},
               DE => qq{Bitte geben sie den Strahlungsvorhersage Dienst mit "set LINK currentRadiationDev" an}               },
   cid    => { EN => qq{Please specify the Inverter device with "set LINK currentInverterDev"},
@@ -584,15 +591,15 @@ my %hqtxt = (                                                                   
   mps    => { EN => qq{Please enter the DC peak power of each string with "set LINK modulePeakString"},
               DE => qq{Bitte geben sie die DC Spitzenleistung von jedem String mit "set LINK modulePeakString" an}          },
   mdr    => { EN => qq{Please specify the module direction with "set LINK moduleDirection"},
-              DE => qq{Bitte geben Sie die Modulausrichtung mit "set LINK moduleDirection" an}                              },
+              DE => qq{Bitte geben sie die Modulausrichtung mit "set LINK moduleDirection" an}                              },
   mta    => { EN => qq{Please specify the module tilt angle with "set LINK moduleTiltAngle"},
-              DE => qq{Bitte geben Sie den Modulneigungswinkel mit "set LINK moduleTiltAngle" an}                           },
+              DE => qq{Bitte geben sie den Modulneigungswinkel mit "set LINK moduleTiltAngle" an}                           },
   rip    => { EN => qq{Please specify at least one combination Rooftop-ID/SolCast-API with "set LINK roofIdentPair"},
               DE => qq{Bitte geben Sie mindestens eine Kombination Rooftop-ID/SolCast-API mit "set LINK roofIdentPair" an}  },
   mrt    => { EN => qq{Please set the assignment String / Rooftop identification with "set LINK moduleRoofTops"},
-              DE => qq{Bitte setzen Sie die Zuordnung String / Rooftop Identifikation mit "set LINK moduleRoofTops"}        },
+              DE => qq{Bitte setzen sie die Zuordnung String / Rooftop Identifikation mit "set LINK moduleRoofTops"}        },
   coord  => { EN => qq{Please set attributes 'latitude' and 'longitude' in global device},
-              DE => qq{Bitte setzen Sie die Attribute 'latitude' und 'longitude' im global Device}                          },
+              DE => qq{Bitte setzen sie die Attribute 'latitude' und 'longitude' im global Device}                          },
   cnsm   => { EN => qq{Consumer},
               DE => qq{Verbraucher}                                                                                         },
   eiau   => { EN => qq{Off/On},
@@ -643,7 +650,9 @@ my %hqtxt = (                                                                   
               DE => qq{sollte nicht leer sein, vielleicht haben Sie einen Bug gefunden}                                     }, 
   scnp   => { EN => qq{The scheduling of the consumer is not provided},
               DE => qq{Die Einplanung des Verbrauchers ist nicht vorgesehen}                                                },              
-  awd    => { EN => qq{LINK is waiting for solar forecast data ... <br><br>(The configuration can be checked with "set LINK plantConfiguration check".) },
+  vrmcr  => { EN => qq{Please set the Victron VRM Portal credentials with "set LINK vrmCredentials".},
+              DE => qq{Bitte setzen sie die Victron VRM Portal Zugangsdaten mit "set LINK vrmCredentials". }                },   
+  awd    => { EN => qq{LINK is waiting for solar forecast data ... <br><br>(The configuration can be checked with "set LINK plantConfiguration check".)},
               DE => qq{LINK wartet auf Solarvorhersagedaten ... <br><br>(Die Konfiguration kann mit "set LINK plantConfiguration check" gepr&uuml;ft werden.)} },
   strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please note any information (<I>).},
               DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise (<I>) beachten.}                   },
@@ -1131,7 +1140,7 @@ sub Set {
   my @re = qw( ConsumerMaster
                consumerPlanning
                currentBatteryDev
-               currentForecastDev
+               currentWeatherDev
                currentInverterDev
                currentMeterDev
                energyH4Trigger
@@ -1149,6 +1158,7 @@ sub Set {
 
   push @fcdevs, 'SolCast-API';
   push @fcdevs, 'ForecastSolar-API';
+  push @fcdevs, 'VictronKI-API';
   my $rdd = join ",", @fcdevs;
 
   for my $h (@chours) {
@@ -1162,10 +1172,12 @@ sub Set {
       push @condevs, $c if($c);
   }
   $coms = @condevs ? join ",", @condevs : 'noArg';
-
+  
+  ## allg. gültige Setter
+  #########################
   $setlist = "Unknown argument $opt, choose one of ".
              "consumerImmediatePlanning:$coms ".
-             "currentForecastDev:$fcd ".
+             "currentWeatherDev:$fcd ".
              "currentRadiationDev:$rdd ".
              "currentBatteryDev:textField-long ".
              "currentInverterDev:textField-long ".
@@ -1173,17 +1185,35 @@ sub Set {
              "energyH4Trigger:textField-long ".
              "inverterStrings ".
              "modulePeakString ".
-             "moduleTiltAngle ".
-             "moduleDirection ".
-             "moduleRoofTops ".
              "plantConfiguration:check,save,restore ".
              "powerTrigger:textField-long ".
              "pvCorrectionFactor_Auto:on_simple,on_complex,off ".
              "reset:$resets ".
-             "roofIdentPair ".
              "writeHistory:noArg ".
-             $cf
+             $cf." "
              ;
+             
+  ## API spezifische Setter
+  ###########################
+  if (isSolCastUsed ($hash)) {
+      $setlist .= "moduleRoofTops ".
+                  "roofIdentPair "
+                  ;
+  }
+  elsif (isForecastSolarUsed ($hash)) {
+      $setlist .= "moduleDirection ".
+                  "moduleTiltAngle "
+                  ;
+  }
+  elsif (isVictronKiUsed ($hash)) {
+      $setlist .= "vrmCredentials "
+                  ;
+  }
+  else {
+      $setlist .= "moduleDirection ".
+                  "moduleTiltAngle "
+                  ;
+  }
 
   my $params = {
       hash    => $hash,
@@ -1270,9 +1300,9 @@ return;
 }
 
 ################################################################
-#       Setter currentForecastDev (Wetterdaten)
+#       Setter currentWeatherDev (Wetterdaten)
 ################################################################
-sub _setcurrentForecastDev {              ## no critic "not used"
+sub _setcurrentWeatherDev {              ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -1282,7 +1312,7 @@ sub _setcurrentForecastDev {              ## no critic "not used"
       return qq{The device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};
   }
 
-  readingsSingleUpdate ($hash, "currentForecastDev", $prop, 1);
+  readingsSingleUpdate ($hash, "currentWeatherDev", $prop, 1);
   createAssociatedWith ($hash);
   writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
 
@@ -1318,7 +1348,11 @@ sub _setcurrentRadiationDev {              ## no critic "not used"
       
       my $dir = ReadingsVal ($name, 'moduleDirection', '');                          # Modul Ausrichtung für jeden Stringbezeichner
       return qq{Please complete command "set $name moduleDirection".} if(!$dir);
-  } 
+  }
+
+  if ($prop eq 'VictronVRM-API') {
+      
+  }  
   
   readingsSingleUpdate ($hash, "currentRadiationDev", $prop, 1);
   createAssociatedWith ($hash);
@@ -1365,6 +1399,52 @@ sub _setroofIdentPair {                 ## no critic "not used"
 
   my $msg = qq{The Roof identification pair "$pk" has been saved. }.
             qq{Repeat the command if you want to save more Roof identification pairs.};
+
+return $msg;
+}
+
+######################################################################
+#                      Setter victronCredentials
+# user, pwd,
+# idsite nach /installation// aus: 
+# https://vrm.victronenergy.com/installation/XXXXX/...
+######################################################################
+sub _setVictronCredentials {                 ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $arg   = $paref->{arg};
+  
+  my $type  = $hash->{TYPE};
+  
+  my $msg;
+
+  if(!$arg) {
+      return qq{The command "$opt" needs an argument !};
+  }
+
+  my ($a,$h) = parseParams ($arg);
+  
+  if ($a->[0] && $a->[0] eq 'delete') {
+      delete $data{$type}{$name}{solcastapi}{'?VRM'};
+      $msg = qq{Credentials for the Victron VRM API are deleted. };
+  }
+  else {
+      if(!$h->{user} || !$h->{pwd} || !$h->{idsite}) {
+          return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
+      }
+      
+      my $serial = eval { freeze ($h)
+                        }
+                        or do { return "Serialization ERROR: $@" };
+
+      $data{$type}{$name}{solcastapi}{'?VRM'}{'?API'}{credentials} = chew ($serial);
+      
+      $msg = qq{Credentials for the Victron VRM API has been saved.};
+  }
+
+  writeCacheToFile ($hash, "solcastapi", $scpicache.$name);                             # Cache File SolCast API Werte schreiben
 
 return $msg;
 }
@@ -1462,7 +1542,7 @@ sub _setinverterStrings {                ## no critic "not used"
   readingsSingleUpdate ($hash, "inverterStrings", $prop,    1);
   writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
 
-  return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
+  return if(_checkSetupNotComplete ($hash));                                       # keine Stringkonfiguration wenn Setup noch nicht komplett
 
   my $ret = qq{NOTE: After setting or changing "inverterStrings" please check }.
             qq{/ set all module parameter (e.g. moduleTiltAngle) again ! \n}.
@@ -1654,7 +1734,7 @@ sub _setmodulePeakString {               ## no critic "not used"
   }
 
   readingsSingleUpdate ($hash, "modulePeakString", $arg, 1);
-  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);                  # Anlagenkonfiguration File schreiben
+  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
 
   return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
 
@@ -2183,14 +2263,18 @@ sub Get {
       name  => $name,
       type  => $type,
       opt   => $opt,
-      arg   => $arg
+      arg   => $arg,
+      t     => time,
+      date  => (strftime "%Y-%m-%d", localtime(time)),
+      debug => getDebug ($hash),
+      lang  => getLang  ($hash)
   };
 
   if($hget{$opt} && defined &{$hget{$opt}{fn}}) {
       my $ret = q{};
 
       if (!$hash->{CREDENTIALS} && $hget{$opt}{needcred}) {
-          return qq{Credentials of $name are not set."};
+          return qq{Credentials for "$opt" are not set. Please save the the credentials with the appropriate Set command."};
       }
 
       $params->{force} = 1 if($opt eq 'rooftopData');                       # forcierter (manueller) Abruf SolCast API
@@ -2204,18 +2288,11 @@ return $getlist;
 
 ################################################################
 #                Getter roofTop data
-#
-# für Victron VRM API
-# https://vrmapi.victronenergy.com/v2/installations/<instalation id>/stats?type=forecast&interval=hours&start=<start date and time>&end=<end date and time> 
 ################################################################
 sub _getRoofTopData {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $hash->{NAME};
-     
-  $paref->{date}  = strftime "%Y-%m-%d", localtime(time);                    # aktuelles Datum
-  $paref->{debug} = getDebug ($hash); 
-  $paref->{lang}  = getLang  ($hash);
 
   if($hash->{MODEL} eq 'SolCastAPI') {
       __getSolCastData ($paref);
@@ -2229,8 +2306,12 @@ sub _getRoofTopData {
       my $ret = __getDWDSolarData ($paref);
       return $ret;
   }
+  elsif ($hash->{MODEL} eq 'VictronKiAPI') {
+      my $ret = __getVictronSolarData ($paref);
+      return $ret;
+  }
   
-return "$hash->{NAME} ist not model SolCastAPI or ForecastSolarAPI";
+return "$hash->{NAME} ist not model DWD, SolCastAPI or ForecastSolarAPI";
 }
 
 ################################################################
@@ -2266,7 +2347,7 @@ sub __getSolCastData {
   my %mx;
   my $maxcnt;
   
-   my $type = $hash->{TYPE};
+  my $type = $paref->{type};
   
   for my $pk (keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}}) {
       my $apikey = SolCastAPIVal ($hash, '?IdPair', $pk, 'apikey', '');
@@ -2295,7 +2376,7 @@ sub __getSolCastData {
           return qq{SolCast free daily limit is used up};
       }
 
-      my $date   = strftime "%Y-%m-%d", localtime($t);
+      my $date   = $paref->{date};
       my $srtime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunRise", '23:59').':59');
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
 
@@ -2380,6 +2461,7 @@ sub __solCast_ApiRequest {
       timeout    => 30,
       hash       => $hash,
       name       => $name,
+      type       => $paref->{type},
       debug      => $debug,
       caller     => \&$caller,
       stc        => [gettimeofday],
@@ -2390,6 +2472,10 @@ sub __solCast_ApiRequest {
       method     => "GET",
       callback   => \&__solCast_ApiResponse
   };
+  
+  if($debug =~ /apiCall/x) {
+      $param->{loglevel} = 1;
+  }
 
   HttpUtils_NonblockingGet ($param);
 
@@ -2412,8 +2498,7 @@ sub __solCast_ApiResponse {
   my $stc         = $paref->{stc};                                                                          # Startzeit API Abruf
   my $lang        = $paref->{lang};
   my $debug       = $paref->{debug};
-  
-  my $type        = $hash->{TYPE};
+  my $type        = $paref->{type};
   
   $paref->{t}     = time;
 
@@ -2562,6 +2647,7 @@ sub __solCast_ApiResponse {
   my $param = {
       hash       => $hash,
       name       => $name,
+      type       => $type,
       debug      => $debug,
       allstrings => $allstrings,
       lang       => $lang
@@ -2801,6 +2887,10 @@ sub __forecastSolar_ApiRequest {
       method     => "GET",
       callback   => \&__forecastSolar_ApiResponse
   };
+  
+  if($debug =~ /apiCall/x) {
+      $param->{loglevel} = 1;
+  }
 
   HttpUtils_NonblockingGet ($param);
 
@@ -3084,6 +3174,406 @@ sub __getDWDSolarData {
   }
   
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'success';
+
+return;
+}
+
+################################################################
+#                Abruf Victron VRM API Forecast
+################################################################
+sub __getVictronSolarData {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $force = $paref->{force} // 0;
+  my $t     = $paref->{t}     // time;
+  my $lang  = $paref->{lang};
+  
+  my $lrt    = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', 0);
+  my $apiitv = $vrmapirepdef;
+  
+  if (!$force) { 
+      if ($lrt && $t < $lrt + $apiitv) {
+          my $rt = $lrt + $apiitv - $t;
+          return qq{The waiting time to the next SolCast API call has not expired yet. The remaining waiting time is $rt seconds};
+      }
+  }
+  
+  readingsSingleUpdate ($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
+  
+  __VictronVRM_ApiRequestLogin ($paref);
+
+return;
+}
+
+################################################################
+#                Victron VRM API Login
+# https://vrm-api-docs.victronenergy.com/#/
+################################################################
+sub __VictronVRM_ApiRequestLogin {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $debug = $paref->{debug};
+  my $type  = $paref->{type};
+
+  my $url   = 'https://vrmapi.victronenergy.com/v2/auth/login';
+
+  debugLog ($paref, "apiProcess|apiCall", qq{Request VictronVRM API Login: $url});
+
+  my $caller = (caller(0))[3];                                                     # Rücksprungmarke
+
+  my ($user, $pwd, $idsite);
+
+  my $serial = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');
+
+  if ($serial) {
+      my $h   = eval { thaw (assemble ($serial)) };                                # Deserialisierung
+      $user   = $h->{user}   // q{};
+      $pwd    = $h->{pwd}    // q{};
+      $idsite = $h->{idsite} // q{};
+      
+      debugLog ($paref, "apiCall", qq{Used credentials for Login: user->$user, pwd->$pwd, idsite->$idsite});
+  }
+  else {
+      my $msg = "Victron VRM API credentials are not set or couldn't be decrypted. Use 'set $name vrmCredentials' to set it.";
+      Log3              ($name, 2, "$name - $msg");
+      singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+      
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $msg;
+      return;
+  }
+
+  my $param = {
+      url        => $url,
+      timeout    => 30,
+      hash       => $hash,
+      name       => $name,
+      type       => $paref->{type},
+      stc        => [gettimeofday],
+      debug      => $debug,
+      caller     => \&$caller,
+      lang       => $paref->{lang},
+      idsite     => $idsite,
+      header     => { "Content-Type" => "application/json" },
+      data       => qq({ "username": "$user",  "password": "$pwd" }),
+      method     => 'POST',
+      callback   => \&__VictronVRM_ApiResponseLogin
+  };
+  
+  if($debug =~ /apiCall/x) {
+      $param->{loglevel} = 1;
+  }
+
+  HttpUtils_NonblockingGet ($param);
+
+return;
+}
+
+###############################################################
+#                  Victron VRM API Login Response
+###############################################################
+sub __VictronVRM_ApiResponseLogin {
+  my $paref  = shift;
+  my $err    = shift;
+  my $myjson = shift;
+
+  my $hash   = $paref->{hash};
+  my $name   = $paref->{name};
+  my $type   = $paref->{type};
+  my $caller = $paref->{caller};
+  my $stc    = $paref->{stc}; 
+  my $lang   = $paref->{lang};
+  my $debug  = $paref->{debug};
+
+  my $msg;
+  my $t   = time;
+  my $sta = [gettimeofday];                                                                                # Start Response Verarbeitung
+
+  if ($err ne "") {
+      $msg = 'Victron VRM API error response: '.$err;
+      Log3              ($name, 2, "$name - $msg");
+      singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+      
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
+      $data{$type}{$name}{current}{runTimeLastAPIProc}                  = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+      $data{$type}{$name}{current}{runTimeLastAPIAnswer}                = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+
+      return;
+  }
+  elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
+      my ($success) = evaljson($hash, $myjson);
+
+      if(!$success) {
+          $msg = 'ERROR - invalid Victron VRM API response';
+          Log3              ($name, 2, "$name - $msg");
+          singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+          
+          $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+          $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+
+          return;
+      }
+
+      my $jdata = decode_json ($myjson);
+      
+      if (defined $jdata->{'error_code'}) {
+          $msg = 'Victron VRM API error_code response: '.$jdata->{'error_code'};
+          Log3              ($name, 3, "$name - $msg");
+          singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+          
+          $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+          $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+          
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}        = $jdata->{'error_code'};
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
+          
+          if($debug =~ /apiProcess|apiCall/x) {              
+              Log3 ($name, 1, "$name DEBUG> SolCast API Call - error_code: ".$jdata->{'error_code'});
+              Log3 ($name, 1, "$name DEBUG> SolCast API Call - errors: "    .$jdata->{'errors'});
+          }
+          
+          return;
+      }
+      else {
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}        = 'success';
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{idUser}                  = $jdata->{'idUser'};
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{verification_mode}       = $jdata->{'verification_mode'};
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];                # letzte Abrufzeit
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{token}                   = 'got successful at '.SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time', '-');;
+          
+          debugLog ($paref, "apiProcess", qq{Victron VRM API response Login:\n}. Dumper $jdata);
+          
+          $paref->{token} = $jdata->{'token'};
+          
+          __VictronVRM_ApiRequestForecast ($paref);
+      }
+  }
+
+return;
+}
+
+################################################################################################
+#                Victron VRM API Forecast Data
+# https://vrm-api-docs.victronenergy.com/#/
+# https://vrmapi.victronenergy.com/v2/installations/<instalation id>/stats?type=forecast&interval=hours&start=<start date and time>&end=<end date and time> 
+################################################################################################
+sub __VictronVRM_ApiRequestForecast {
+  my $paref  = shift;
+  
+  my $hash   = $paref->{hash};
+  my $name   = $paref->{name};
+  my $token  = $paref->{token};
+  my $debug  = $paref->{debug};
+  my $lang   = $paref->{lang};
+  my $idsite = $paref->{idsite};
+  
+  my $tstart = time;
+  my $tend   = time + 172800;
+
+  my $url = "https://vrmapi.victronenergy.com/v2/installations/$idsite/stats?type=forecast&interval=hours&start=$tstart&end=$tend";
+
+  debugLog ($paref, "apiProcess|apiCall", qq{Request VictronVRM API Forecast: $url});
+
+  my $caller = (caller(0))[3];                                                    # Rücksprungmarke  
+
+  my $param = {
+      url     => $url,
+      timeout => 30,
+      hash    => $hash,
+      name    => $name,
+      type    => $paref->{type},
+      stc     => [gettimeofday],
+      debug   => $debug,
+      token   => $token,
+      caller  => \&$caller,
+      lang    => $paref->{lang},
+      header  => { "Content-Type" => "application/json", "x-authorization" => "Bearer $token" },
+      method  => 'GET',
+      callback => \&__VictronVRM_ApiResponseForecast
+  };
+  
+  if($debug =~ /apiCall/x) {
+      $param->{loglevel} = 1;
+  }
+
+  HttpUtils_NonblockingGet ($param);
+
+return;
+}
+
+###############################################################
+#                  Victron VRM API Forecast Response
+###############################################################
+sub __VictronVRM_ApiResponseForecast {
+  my $paref  = shift;
+  my $err    = shift;
+  my $myjson = shift;
+
+  my $hash   = $paref->{hash};
+  my $name   = $paref->{name};
+  my $type   = $paref->{type};
+  my $caller = $paref->{caller};
+  my $stc    = $paref->{stc}; 
+  my $lang   = $paref->{lang};
+  my $debug  = $paref->{debug};
+
+  my $msg;
+  my $t   = time;
+  my $sta = [gettimeofday];                                                                                # Start Response Verarbeitung
+
+  if ($err ne "") {
+      $msg = 'Victron VRM API Forecast response: '.$err;
+      Log3              ($name, 2, "$name - $msg");
+      singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+      
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
+      $data{$type}{$name}{current}{runTimeLastAPIProc}                  = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+      $data{$type}{$name}{current}{runTimeLastAPIAnswer}                = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+
+      return;
+  }
+  elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
+      my ($success) = evaljson($hash, $myjson);
+
+      if(!$success) {
+          $msg = 'ERROR - invalid Victron VRM API Forecast response';
+          Log3              ($name, 2, "$name - $msg");
+          singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+          
+          $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+          $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+
+          return;
+      }
+
+      my $jdata = decode_json ($myjson);
+      
+      if (defined $jdata->{'error_code'}) {
+          $msg = 'Victron VRM API Forecast response: '.$jdata->{'error_code'};
+          Log3              ($name, 3, "$name - $msg");
+          singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+
+          $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+          $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}        = $jdata->{'error_code'};
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
+          
+          if($debug =~ /apiProcess|apiCall/x) {              
+              Log3 ($name, 1, "$name DEBUG> SolCast API Call - error_code: ".$jdata->{'error_code'});
+              Log3 ($name, 1, "$name DEBUG> SolCast API Call - errors: "    .$jdata->{'errors'});
+          }
+          
+          return;
+      }
+      else {
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}    += 1;
+          my $k = 0;
+          
+          while ($jdata->{'records'}{'solar_yield_forecast'}[$k]) {                                                               
+              my $starttmstr = $jdata->{'records'}{'solar_yield_forecast'}[$k][0];                                 # Millisekunden geliefert
+              my $val        = $jdata->{'records'}{'solar_yield_forecast'}[$k][1];
+              
+              $starttmstr    = (timestampToTimestring ($starttmstr, $lang))[3];
+              
+              debugLog ($paref, "apiProcess", "Victron VRM API - PV estimate: ".$starttmstr.' => '.$val.' Wh');
+              
+              if ($val) {
+                  $val = sprintf "%.0f", $val;
+                  
+                  my $string = ReadingsVal ($name, 'inverterStrings', '?');
+                  
+                  $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} = $val;
+              }
+
+              $k++;
+          }
+      }
+  }
+  
+  $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval  ($sta);                             # Verarbeitungszeit ermitteln
+  $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval ($stc) - tv_interval ($sta));       # API Laufzeit ermitteln
+
+  __VictronVRM_ApiRequestLogout ($paref);
+  
+return;
+}
+
+################################################################
+#                Victron VRM API Logout
+# https://vrm-api-docs.victronenergy.com/#/
+################################################################
+sub __VictronVRM_ApiRequestLogout {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $token = $paref->{token};
+  my $debug = $paref->{debug};
+
+  my $url = 'https://vrmapi.victronenergy.com/v2/auth/logout';
+
+  debugLog ($paref, "apiProcess|apiCall", qq{Request VictronVRM API Logout: $url});
+
+  my $caller = (caller(0))[3];                                                    # Rücksprungmarke
+  
+  my $param = {
+      url        => $url,
+      timeout    => 30,
+      hash       => $hash,
+      name       => $name,
+      type       => $paref->{type},
+      debug      => $debug,
+      caller     => \&$caller,
+      lang       => $paref->{lang},
+      header     => { "Content-Type" => "application/json", "x-authorization" => "Bearer $token" },
+      method     => 'GET',
+      callback   => \&__VictronVRM_ApiResponseLogout
+  };
+  
+  if($debug =~ /apiCall/x) {
+      $param->{loglevel} = 1;
+  }
+
+  HttpUtils_NonblockingGet ($param);
+
+return;
+}
+
+###############################################################
+#                  Victron VRM API Logout Response
+###############################################################
+sub __VictronVRM_ApiResponseLogout {
+  my $paref  = shift;
+  my $err    = shift;
+  my $myjson = shift;
+
+  my $hash   = $paref->{hash};
+  my $name   = $paref->{name};
+
+  my $msg;
+  
+  if ($err ne "") {
+      $msg = 'Victron VRM API error response: '.$err;
+      Log3 ($name, 2, "$name - $msg");
+      return;
+  }
+  elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
+      my ($success) = evaljson($hash, $myjson);
+
+      if(!$success) {
+          $msg = 'ERROR - invalid Victron VRM API response';
+          Log3 ($name, 2, "$name - $msg");
+          return;
+      }
+
+      my $jdata = decode_json ($myjson);
+      
+      debugLog ($paref, "apiCall", qq{Victron VRM API response Logout:\n}. Dumper $jdata);
+  }
 
 return;
 }
@@ -3756,7 +4246,7 @@ sub _savePlantConfig {
   my @aconfigs = qw(
                      pvCorrectionFactor_Auto
                      currentBatteryDev
-                     currentForecastDev
+                     currentWeatherDev
                      currentInverterDev
                      currentMeterDev
                      currentRadiationDev
@@ -3828,6 +4318,18 @@ sub centralTask {
           readingsSingleUpdate ($hash, 'pvCorrectionFactor_Auto', 'on_simple', 0);
       }
   }
+  
+  for my $k (sort keys %{$data{$type}{$name}{circular}}) {
+      my $val = $data{$type}{$name}{circular}{$k}{pvcorrf}{percentile};      
+      $data{$type}{$name}{circular}{$k}{pvcorrf}{percentile} = 1 if($val && $val >= 10);
+  }
+  
+  my $fcdev = ReadingsVal  ($name, "currentForecastDev",  undef);                  
+  
+  if ($fcdev) {
+      readingsSingleUpdate ($hash, "currentWeatherDev", $fcdev, 0);
+      deleteReadingspec    ($hash, "currentForecastDev");
+  }
 
   #deleteReadingspec ($hash, "CurrentHourPVforecast");
   #deleteReadingspec ($hash, "NextHours_Sum00_PVforecast");
@@ -3837,7 +4339,7 @@ sub centralTask {
   #delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todaySolCastAPIcalls};
   #delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls};
   #delete $data{$type}{$name}{circular}{99}{initgridfeedintotal};
-  delete $data{$type}{$name}{circular}{'00'}; 
+  #delete $data{$type}{$name}{circular}{'00'}; 
 
   #for my $n (1..24) {
   #    $n = sprintf "%02d", $n;
@@ -3849,7 +4351,6 @@ sub centralTask {
 
   if($init_done == 1) {
       my $interval = controlParams ($name);
-      
       setModel ($hash);                                                                            # Model setzen
       my @da;
 
@@ -3869,8 +4370,9 @@ sub centralTask {
 
       return if(IsDisabled($name));
 
-      if(!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                         # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
+      if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                         # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
           my $ret = createStringConfig ($hash);
+          
           if ($ret) {
               singleUpdateState ( {hash => $hash, state => $ret, evt => 1} );
               return;
@@ -3918,17 +4420,18 @@ sub centralTask {
 
       createReadingsFromArray ($hash, \@da, $evt);                                        # Readings erzeugen
 
-      if (isSolCastUsed ($hash)) {
-          __getSolCastData            ($centpars);                                        # SolCast API Strahlungswerte abrufen
-      }
-      elsif (isForecastSolarUsed ($hash)) {                                               # Forecast.Solar API abrufen
-          __getForecastSolarData      ($centpars);
-      }
-      else {
-          __getDWDSolarData           ($centpars);                                        # Strahlungswerte in solcastapi-Hash erstellen
-      }
+      #if (isSolCastUsed ($hash)) {
+      #    __getSolCastData        ($centpars);                                            # SolCast API Strahlungswerte abrufen
+      #}
+      #elsif (isForecastSolarUsed ($hash)) {                                               # Forecast.Solar API abrufen
+      #    __getForecastSolarData  ($centpars);
+      #}
+      #else {
+      #    __getDWDSolarData       ($centpars);                                            # Strahlungswerte in solcastapi-Hash erstellen
+      #}
       
-       _transferAPIRadiationValues ($centpars);                                           # Raw Erzeugungswerte aus solcastapi-Hash übertragen und Forecast mit/ohne Korrektur erstellen
+      _getRoofTopData             ($centpars);                                            # Strahlungswerte/Forecast-Werte in solcastapi-Hash erstellen                                     
+      _transferAPIRadiationValues ($centpars);                                            # Raw Erzeugungswerte aus solcastapi-Hash übertragen und Forecast mit/ohne Korrektur erstellen
 
       _calcMaxEstimateToday       ($centpars);                                            # heutigen Max PV Estimate & dessen Tageszeit ermitteln
       _transferInverterValues     ($centpars);                                            # WR Werte übertragen
@@ -4023,7 +4526,14 @@ sub createStringConfig {                 ## no critic "not used"
           }
       }
   }
-  else {                                                                                          # DWD Strahlungsquelle
+  elsif (isVictronKiUsed ($hash)) {
+      my $invs = ReadingsVal ($name, 'inverterStrings', '');
+      
+      if ($invs ne 'KI-based') {
+          return qq{You use a KI based model. Please set only "KI-based" as String with command "set $name inverterStrings".};
+      }
+  }
+  elsif (!isVictronKiUsed ($hash)) {                                                               
       my $tilt = ReadingsVal ($name, 'moduleTiltAngle', '');                                      # Modul Neigungswinkel für jeden Stringbezeichner
       return qq{Please complete command "set $name moduleTiltAngle".} if(!$tilt);
 
@@ -4240,6 +4750,12 @@ sub _specialActivities {
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIcalls};
+          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{solCastAPIcallMultiplier};
+          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayMaxAPIcalls};
+          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message};
+          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{idUser};
+          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{token};
+          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{verification_mode};
           
           delete $data{$type}{$name}{circular}{'99'}{initdayfeedin};
           delete $data{$type}{$name}{circular}{'99'}{initdaygcon};
@@ -4493,7 +5009,8 @@ sub __calcPVestimates {
   my $peaksum = 0;
   
   for my $string (sort keys %{$data{$type}{$name}{strings}}) {
-      my $peak = $data{$type}{$name}{strings}{$string}{peak};                                         # String Peak (kWp)
+      # my $peak = $data{$type}{$name}{strings}{$string}{peak};                                         # String Peak (kWp)
+      my $peak = StringVal ($hash, $string, 'peak', 0);                                               # String Peak (kWp)
 
       if ($acu =~ /on_complex/xs) {
           $paref->{peak}        = $peak;
@@ -4538,7 +5055,7 @@ sub __calcPVestimates {
 
   $data{$type}{$name}{current}{allstringspeak} = $peaksum;                                           # temperaturbedingte Korrektur der installierten Peakleistung in W
 
-  $pvsum  = $peaksum if($pvsum > $peaksum);                                                          # Vorhersage nicht größer als die Summe aller PV-Strings Peak
+  $pvsum  = $peaksum if($peaksum && $pvsum > $peaksum);                                              # Vorhersage nicht größer als die Summe aller PV-Strings Peak
 
   my $invcapacity = CurrentVal ($hash, 'invertercapacity', 0);                                       # Max. Leistung des Invertrs
 
@@ -4563,7 +5080,7 @@ sub __calcPVestimates {
           "Rainprob"                    => $rainprob,
           "Rainfactor"                  => $rcf,
           "RainFactorDamping"           => $raindamp." %",
-          "Use PV Correction"           => $acu,
+          "Use PV Correction"           => ($acu ? $acu : 'no'),
           "PV correction factor"        => $hc,
           "PV correction quality"       => $hq,
           "PV generation forecast"      => $pvsum." Wh ".$logao,
@@ -4826,7 +5343,7 @@ sub _transferWeatherValues {
   my $daref = $paref->{daref};
   my $date  = $paref->{date};                                                                   # aktuelles Datum
   
-  my $fcname = ReadingsVal($name, "currentForecastDev", "");                                    # Weather Forecast Device
+  my $fcname = ReadingsVal($name, 'currentWeatherDev', "");                                     # Weather Forecast Device
   return if(!$fcname || !$defs{$fcname});
 
   my $err         = checkdwdattr ($name,$fcname,\@dweattrmust);
@@ -7581,17 +8098,29 @@ sub _checkSetupNotComplete {
 
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
+  
+  ### nicht mehr benötigte Readings/Daten löschen - Bereich kann später wieder raus !!
+  ##########################################################################################
+  my $fcdev = ReadingsVal  ($name, "currentForecastDev",  undef);                  
+  
+  if ($fcdev) {
+      readingsSingleUpdate ($hash, "currentWeatherDev", $fcdev, 0);
+      deleteReadingspec    ($hash, "currentForecastDev");
+  }
+  ##########################################################################################
 
-  my $is    = ReadingsVal  ($name, "inverterStrings",          undef);                    # String Konfig
-  my $fcdev = ReadingsVal  ($name, "currentForecastDev",       undef);                    # Device Vorhersage Wetterdaten (Bewölkung etc.)
-  my $radev = ReadingsVal  ($name, "currentRadiationDev",      undef);                    # Device Strahlungsdaten Vorhersage
-  my $indev = ReadingsVal  ($name, "currentInverterDev",       undef);                    # Inverter Device
-  my $medev = ReadingsVal  ($name, "currentMeterDev",          undef);                    # Meter Device
+  my $is    = ReadingsVal   ($name, 'inverterStrings',          undef);                   # String Konfig
+  my $wedev = ReadingsVal   ($name, 'currentWeatherDev',        undef);                   # Device Vorhersage Wetterdaten (Bewölkung etc.)
+  my $radev = ReadingsVal   ($name, 'currentRadiationDev',      undef);                   # Device Strahlungsdaten Vorhersage
+  my $indev = ReadingsVal   ($name, 'currentInverterDev',       undef);                   # Inverter Device
+  my $medev = ReadingsVal   ($name, 'currentMeterDev',          undef);                   # Meter Device
 
-  my $peaks = ReadingsVal  ($name, "modulePeakString",         undef);                    # String Peak
-  my $dir   = ReadingsVal  ($name, "moduleDirection",          undef);                    # Modulausrichtung Konfig
-  my $ta    = ReadingsVal  ($name, "moduleTiltAngle",          undef);                    # Modul Neigungswinkel Konfig
-  my $mrt   = ReadingsVal  ($name, "moduleRoofTops",           undef);                    # RoofTop Konfiguration (SolCast API)
+  my $peaks = ReadingsVal   ($name, 'modulePeakString',         undef);                   # String Peak
+  my $dir   = ReadingsVal   ($name, 'moduleDirection',          undef);                   # Modulausrichtung Konfig (Azimut)
+  my $ta    = ReadingsVal   ($name, 'moduleTiltAngle',          undef);                   # Modul Neigungswinkel Konfig
+  my $mrt   = ReadingsVal   ($name, 'moduleRoofTops',           undef);                   # RoofTop Konfiguration (SolCast API)
+  
+  my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');                   # Victron VRM Credentials gesetzt
   
   my ($coset, $lat, $lon) = locCoordinates();                                             # Koordinaten im global device
   my $rip   = 1 if(exists $data{$type}{$name}{solcastapi}{'?IdPair'});                    # es existiert mindestens ein Paar RoofTop-ID / API-Key
@@ -7614,48 +8143,51 @@ sub _checkSetupNotComplete {
       return $ret;
   }
 
-  if(!$is || !$fcdev || !$radev || !$indev || !$medev || !$peaks   ||
-     (isSolCastUsed ($hash) ? (!$rip || !$mrt) : (!$dir || !$ta )) ||
-     (isForecastSolarUsed ($hash) ? !$coset : '')                  ||
+  if(!$is || !$wedev || !$radev || !$indev || !$medev || !$peaks                                       ||
+     (isSolCastUsed ($hash) ? (!$rip || !$mrt) : isVictronKiUsed ($hash) ? !$vrmcr : (!$dir || !$ta )) ||
+     (isForecastSolarUsed ($hash) ? !$coset : '')                                                      ||
      !defined $pv0) {
       $ret    .= "<table class='roomoverview'>";
       $ret    .= "<tr style='height:".$height."px'>";
       $ret    .= "<td>";
 
-      if(!$fcdev) {                                                                        ## no critic 'Cascading'
+      if (!$wedev) {                                                                        ## no critic 'Cascading'
           $ret .= $hqtxt{cfd}{$lang};
       }
-      elsif(!$radev) {
+      elsif (!$radev) {
           $ret .= $hqtxt{crd}{$lang};
       }
-      elsif(!$indev) {
+      elsif (!$indev) {
           $ret .= $hqtxt{cid}{$lang};
       }
-      elsif(!$medev) {
+      elsif (!$medev) {
           $ret .= $hqtxt{mid}{$lang};
       }
-      elsif(!$is) {
+      elsif (!$is) {
           $ret .= $hqtxt{ist}{$lang};
       }
-      elsif(!$peaks) {
+      elsif (!$peaks) {
           $ret .= $hqtxt{mps}{$lang};
       }
-      elsif(!$rip && isSolCastUsed ($hash)) {                       # Verwendung SolCast API
+      elsif (!$rip && isSolCastUsed ($hash)) {                       
           $ret .= $hqtxt{rip}{$lang};
       }
-      elsif(!$mrt && isSolCastUsed ($hash)) {                       # Verwendung SolCast API
+      elsif (!$mrt && isSolCastUsed ($hash)) {                                                  
           $ret .= $hqtxt{mrt}{$lang};
       }
-      elsif(!$dir && !isSolCastUsed ($hash))  {                     # Verwendung DWD / Forecast.Solar API Strahlungsdevice
+      elsif (!$dir && !isSolCastUsed ($hash) && !isVictronKiUsed ($hash)) {                    
           $ret .= $hqtxt{mdr}{$lang};
       }
-      elsif(!$ta && !isSolCastUsed ($hash))   {                     # Verwendung DWD / Forecast.Solar API Strahlungsdevice
+      elsif (!$ta && !isSolCastUsed ($hash) && !isVictronKiUsed ($hash)) {                     
           $ret .= $hqtxt{mta}{$lang};
       }
-      elsif (!$coset && isForecastSolarUsed ($hash)) {              # Verwendung Forecast.Solar API Strahlungsdevice
+      elsif (!$vrmcr && isVictronKiUsed ($hash)) {                     
+          $ret .= $hqtxt{vrmcr}{$lang};
+      }
+      elsif (!$coset && isForecastSolarUsed ($hash)) {              
           $ret .= $hqtxt{coord}{$lang};
       }
-      elsif(!defined $pv0) {
+      elsif (!defined $pv0) {
           $ret .= $hqtxt{awd}{$lang};
       }
 
@@ -7817,24 +8349,25 @@ sub _graphicHeader {
       ## Solare API  Sektion
       ########################
       my $api = isSolCastUsed ($hash)       ? 'SolCast:'        :
-                isForecastSolarUsed ($hash) ? 'Forecast.Solar:' :    
+                isForecastSolarUsed ($hash) ? 'Forecast.Solar:' :
+                isVictronKiUsed ($hash)     ? 'VictronVRM:'     :   
                 q{};
+                
+      my $nscc = ReadingsVal   ($name, 'nextSolCastCall', '?');
+      my $lrt  = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time', '-');
+      my $scrm = SolCastAPIVal ($hash, '?All', '?All', 'response_message', '-');
+      
+      if ($lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x) {
+          my ($sly, $slmo, $sld, $slt) = $lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
+          $lrt                         = "$sly-$slmo-$sld&nbsp;$slt";
+
+          if($lang eq "DE") {
+             $lrt = "$sld.$slmo.$sly&nbsp;$slt";
+          }
+      }
 
       if ($api eq 'SolCast:') {
-          my $nscc = ReadingsVal   ($name, 'nextSolCastCall', '?');
-          my $lrt  = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time', '-');
-
-          if ($lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x) {
-              my ($sly, $slmo, $sld, $slt) = $lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
-              $lrt                         = "$sly-$slmo-$sld&nbsp;$slt";
-
-              if($lang eq "DE") {
-                 $lrt = "$sld.$slmo.$sly&nbsp;$slt";
-              }
-          }
-
           $api    .= '&nbsp;'.$lrt;
-          my $scrm = SolCastAPIVal ($hash, '?All', '?All', 'response_message', '-');
 
           if ($scrm eq 'success') {
               $img = FW_makeImage ('10px-kreis-gruen.png', $htitles{scaresps}{$lang}.'&#10;'.$htitles{natc}{$lang}.' '.$nscc);
@@ -7864,20 +8397,7 @@ sub _graphicHeader {
           $api .= '</span>';
       }
       elsif ($api eq 'Forecast.Solar:') {
-          my $nscc = ReadingsVal   ($name, 'nextSolCastCall', '?');
-          my $lrt  = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time', '-');
-
-          if ($lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x) {
-              my ($sly, $slmo, $sld, $slt) = $lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
-              $lrt                         = "$sly-$slmo-$sld&nbsp;$slt";
-
-              if($lang eq "DE") {
-                 $lrt = "$sld.$slmo.$sly&nbsp;$slt";
-              }
-          }
-
           $api    .= '&nbsp;'.$lrt;
-          my $scrm = SolCastAPIVal ($hash, '?All', '?All', 'response_message', '-');
 
           if ($scrm eq 'success') {
               $img = FW_makeImage('10px-kreis-gruen.png', $htitles{scaresps}{$lang}.'&#10;'.$htitles{natc}{$lang}.' '.$nscc);
@@ -7900,6 +8420,26 @@ sub _graphicHeader {
           $api .= ')';
           $api .= '</span>';
       }
+      elsif ($api eq 'VictronVRM:') {
+          $api    .= '&nbsp;'.$lrt;
+
+          if ($scrm eq 'success') {
+              $img = FW_makeImage('10px-kreis-gruen.png', $htitles{scaresps}{$lang}.'&#10;'.$htitles{natc}{$lang}.' '.$nscc);
+          }
+          else {
+              $img = FW_makeImage('10px-kreis-rot.png', $htitles{scarespf}{$lang}.': '. $scrm);
+          }
+          
+          $scicon = "<a>$img</a>";
+
+          $api .= '&nbsp;&nbsp;'.$scicon;
+          $api .= '<span title="'.$htitles{dapic}{$lang}.'">';
+          $api .= '&nbsp;&nbsp;(';
+          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+          $api .= ')';
+          $api .= '</span>';
+      }
+      
 
       ## Qualitäts-Icon
       ######################
@@ -9444,31 +9984,22 @@ sub _calcCaQcomplex {
       my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), $range, 0);                   # bisher definierter Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
       $oldfac             = 1 if(1 * $oldfac == 0);
 
-      my $factor;
-      my ($usenhd) = __useNumHistDays ($name);                                                            # ist Attr affectNumHistDays gesetzt ?
-
-      if ($dnum) {                                                                                        # Werte in History vorhanden -> haben Prio !
-          $dnum   = $dnum + 1;
-          $pvre   = ($pvre + $pvhis) / $dnum;                                                             # Ertrag aktuelle Stunde berücksichtigen
-          $pvfc   = ($pvfc + $fchis) / $dnum;                                                             # Vorhersage aktuelle Stunde berücksichtigen
-          $factor = sprintf "%.2f", ($pvre / $pvfc);                                                      # Faktorberechnung: reale PV / Prognose
-      }
-      elsif ($oldfac && !$usenhd) {                                                                       # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr affectNumHistDays
-          $dnum   = 1;
-          $factor = sprintf "%.2f", ($pvre / $pvfc);
-          $factor = sprintf "%.2f", ($factor + $oldfac) / 2;
-      }
-      else {                                                                                              # ganz neuer Wert
-          $factor = sprintf "%.2f", ($pvre / $pvfc);
-          $dnum   = 1;
-      }
+      (my $factor, $dnum) = __calcNewFactor ({ name   => $name, 
+                                               oldfac => $oldfac, 
+                                               dnum   => $dnum, 
+                                               pvre   => $pvre, 
+                                               pvfc   => $pvfc, 
+                                               pvhis  => $pvhis,
+                                               fchis  => $fchis
+                                             } 
+                                            );
       
       if (abs($factor - $oldfac) > $maxvar) {
           $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
           Log3 ($name, 3, "$name - new correction factor calculated (limited by affectMaxDayVariance): $factor (old: $oldfac) for hour: $h");
       }
       else {
-          Log3 ($name, 3, "$name - new correction factor calculated: $factor (old: $oldfac) for hour: $h calculated") if($factor != $oldfac);
+          Log3 ($name, 3, "$name - new complex correction factor for hour $h calculated: $factor (old: $oldfac)") if($factor != $oldfac);
       }
       
       $pvre = sprintf "%.0f", $pvre;
@@ -9517,7 +10048,8 @@ sub __Pv_Fc_Complex_Dnum_Hist {
   $hour     = sprintf("%02d",$hour);
   my $pvhh  = $data{$type}{$name}{pvhist};
 
-  my ($usenhd, $calcd) = __useNumHistDays ($name);                                     # ist Attr affectNumHistDays gesetzt ? und welcher Wert
+  my ($dnum , $pvrl, $pvfc) = (0,0,0);
+  my ($usenhd, $calcd)      = __useNumHistDays ($name);                                # ist Attr affectNumHistDays gesetzt ? und welcher Wert
 
   my @k     = sort {$a<=>$b} keys %{$pvhh};
   my $ile   = $#k;                                                                     # Index letztes Arrayelement
@@ -9553,9 +10085,6 @@ sub __Pv_Fc_Complex_Dnum_Hist {
   }
 
   debugLog ($paref, 'pvCorrection', "Complex Corrf -> cloudiness range of day/hour $day/$hour is: $range");
-
-  my $dnum         = 0;
-  my ($pvrl,$pvfc) = (0,0);
 
   for my $dayfa (@efa) {
       my $histwcc = HistoryVal ($hash, $dayfa, $hour, "wcc", undef);                   # historische Wolkenbedeckung
@@ -9595,27 +10124,6 @@ return ($pvhis,$fchis,$dnum,$range);
 }
 
 ################################################################
-#       Ist Attribut 'affectNumHistDays' gesetzt ?
-#       $usenhd: 1 - ja, 0 - nein
-#       $nhd   : Anzahl der zu verwendenden HistDays
-################################################################
-sub __useNumHistDays {
-  my $name = shift;
-
-  my $usenhd = 0;
-  my $nhd    = AttrVal($name, 'affectNumHistDays', $calcmaxd+1);
-
-  if($nhd == $calcmaxd+1) {
-      $nhd = $calcmaxd;
-  }
-  else {
-      $usenhd = 1;
-  }
-
-return ($usenhd, $nhd);
-}
-
-################################################################
 # PV Ist/Forecast ermitteln und Korrekturfaktoren, Qualität 
 # ohne Nebenfaktoren errechnen und speichern (simple)
 ################################################################
@@ -9623,12 +10131,12 @@ sub _calcCaQsimple {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $chour = $paref->{chour};                        # aktuelle Stunde
+  my $chour = $paref->{chour};                                                   # aktuelle Stunde
   my $date  = $paref->{date};
   my $daref = $paref->{daref};
   my $acu   = $paref->{acu};
 
-  my $maxvar = AttrVal($name, 'affectMaxDayVariance', $defmaxvar);                                         # max. Korrekturvarianz
+  my $maxvar = AttrVal($name, 'affectMaxDayVariance', $defmaxvar);               # max. Korrekturvarianz
 
   for my $h (1..23) {
       next if(!$chour || $h > $chour);
@@ -9647,37 +10155,27 @@ sub _calcCaQsimple {
       next if(!$pvre);
 
       $paref->{hour}           = $h;
-      my ($pvhis,$fchis,$dnum) = __Pv_Fc_Simple_Dnum_Hist ($paref);                                        # historischen Percentilfaktor / Qualität ermitteln
+      my ($pvhis,$fchis,$dnum) = __Pv_Fc_Simple_Dnum_Hist ($paref);                                       # historischen Percentilfaktor / Qualität ermitteln
 
       my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), 'percentile', 0);               
-      $oldfac             = 1.0 if(1 * $oldfac == 0 || $oldfac >= 10);
+      $oldfac             = 1 if(1 * $oldfac == 0);
       
-      my $factor;
-      my ($usenhd) = __useNumHistDays ($name);                                                            # ist Attr affectNumHistDays gesetzt ?
-
-      if ($dnum) {                                                                                        # Werte in History vorhanden -> haben Prio !          
-          $dnum++;
-          $pvre   = ($pvre + $pvhis) / $dnum;                                                             # Ertrag aktuelle Stunde berücksichtigen
-          $pvfc   = ($pvfc + $fchis) / $dnum;                                                             # Vorhersage aktuelle Stunde berücksichtigen
-          $factor = sprintf "%.2f", ($pvre / $pvfc);                                                      # Faktorberechnung: reale PV / Prognose
-      }
-      elsif ($oldfac && !$usenhd) {                                                                       # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr affectNumHistDays         
-          $dnum   = 1;
-          $factor = sprintf "%.2f", ($pvre / $pvfc);
-          $factor = sprintf "%.2f", ($factor + $oldfac) / 2;
-      }
-      else {                                                                                              # ganz neuer Wert
-          $dnum   = 1;
-          $factor = sprintf "%.2f", ($pvre / $pvfc);
-          $oldfac = '-';
-      }
+      (my $factor, $dnum) = __calcNewFactor ({ name   => $name, 
+                                               oldfac => $oldfac, 
+                                               dnum   => $dnum, 
+                                               pvre   => $pvre, 
+                                               pvfc   => $pvfc, 
+                                               pvhis  => $pvhis,
+                                               fchis  => $fchis
+                                             } 
+                                            );
       
       if (abs($factor - $oldfac) > $maxvar) {
           $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
           Log3 ($name, 3, "$name - new correction factor calculated (limited by affectMaxDayVariance): $factor (old: $oldfac) for hour: $h");
       }
       else {
-          Log3 ($name, 3, "$name - new correction factor calculated: $factor (old: $oldfac) for hour: $h calculated") if($factor != $oldfac);
+          Log3 ($name, 3, "$name - new simple correction factor for hour $h calculated: $factor (old: $oldfac)") if($factor != $oldfac);
       }
       
       $pvre    = sprintf "%.0f", $pvre;
@@ -9718,14 +10216,15 @@ sub __Pv_Fc_Simple_Dnum_Hist {
 
   $hour     = sprintf("%02d",$hour);
   my $pvhh  = $data{$type}{$name}{pvhist};
-
-  my ($usenhd, $calcd) = __useNumHistDays ($name);                                        # ist Attr affectNumHistDays gesetzt ? und welcher Wert
+  
+  my ($dnum , $pvrl, $pvfc) = (0,0,0);
+  my ($usenhd, $calcd)      = __useNumHistDays ($name);                                   # ist Attr affectNumHistDays gesetzt ? und welcher Wert
 
   my @k     = sort {$a<=>$b} keys %{$pvhh};
   my $ile   = $#k;                                                                        # Index letztes Arrayelement
   my ($idx) = grep {$k[$_] eq "$day"} (0..@k-1);                                          # Index des aktuellen Tages
 
-  return if(!defined $idx);
+  return ($pvrl, $pvfc, $dnum) if(!defined $idx);
 
   my $ei = $idx-1;
   $ei    = $ei < 0 ? $ile : $ei;
@@ -9743,14 +10242,10 @@ sub __Pv_Fc_Simple_Dnum_Hist {
   }
   else {                                                                                  
       debugLog ($paref, "pvCorrection", "Simple Corrf -> Day $day has index $idx. Use only current day for average calc");
-      return 0;
+      return ($pvrl, $pvfc, $dnum);
   }
 
-  my $dnum         = 0;
-  my ($pvrl,$pvfc) = (0,0);
-
   for my $dayfa (@efa) {
-
       $pvrl  += HistoryVal ($hash, $dayfa, $hour, "pvrl", 0);
       $pvfc  += HistoryVal ($hash, $dayfa, $hour, "pvfc", 0);
       $dnum++;
@@ -9758,16 +10253,75 @@ sub __Pv_Fc_Simple_Dnum_Hist {
       debugLog ($paref, "pvCorrection", "Simple Corrf -> historical Day/hour $dayfa/$hour included -> PVreal: $pvrl, PVforecast: $pvfc");
       last if($dnum == $calcd);
   }
+  
+  $dnum = 0 if(!$pvrl && !$pvfc);                                                         # es gab keine gespeicherten Werte in pvHistory  
 
   if(!$dnum) {
       Log3 ($name, 5, "$name - PV History -> no historical PV data forecast and real found");
-      return 0;
+      return ($pvrl, $pvfc, $dnum);
   }
 
   my $pvhis = sprintf "%.2f", $pvrl;
   my $fchis = sprintf "%.2f", $pvfc;
       
 return ($pvhis, $fchis, $dnum);
+}
+
+################################################################
+#    den neuen Korrekturfaktur berechnen
+################################################################
+sub __calcNewFactor {
+  my $paref = shift;
+  
+  my $name   = $paref->{name};
+  my $oldfac = $paref->{oldfac};
+  my $dnum   = $paref->{dnum};
+  my $pvre   = $paref->{pvre};
+  my $pvfc   = $paref->{pvfc};
+  my $pvhis  = $paref->{pvhis};
+  my $fchis  = $paref->{fchis};
+
+  my $factor;
+  my ($usenhd) = __useNumHistDays ($name);                                                            # ist Attr affectNumHistDays gesetzt ?
+
+  if ($dnum) {                                                                                        # Werte in History vorhanden -> haben Prio !          
+      $dnum++;
+      $pvre   = ($pvre + $pvhis) / $dnum;                                                             # Ertrag aktuelle Stunde berücksichtigen
+      $pvfc   = ($pvfc + $fchis) / $dnum;                                                             # Vorhersage aktuelle Stunde berücksichtigen
+      $factor = sprintf "%.2f", ($pvre / $pvfc);                                                      # Faktorberechnung: reale PV / Prognose
+  }
+  elsif ($oldfac && !$usenhd) {                                                                       # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr affectNumHistDays         
+      $dnum   = 1;
+      $factor = sprintf "%.2f", ($pvre / $pvfc);
+      $factor = sprintf "%.2f", ($factor + $oldfac) / 2;
+  }
+  else {                                                                                              # ganz neuer Wert
+      $dnum   = 1;
+      $factor = sprintf "%.2f", ($pvre / $pvfc);
+  }
+
+return ($factor, $dnum);
+}
+
+################################################################
+#       Ist Attribut 'affectNumHistDays' gesetzt ?
+#       $usenhd: 1 - ja, 0 - nein
+#       $nhd   : Anzahl der zu verwendenden HistDays
+################################################################
+sub __useNumHistDays {
+  my $name = shift;
+
+  my $usenhd = 0;
+  my $nhd    = AttrVal($name, 'affectNumHistDays', $calcmaxd+1);
+
+  if($nhd == $calcmaxd+1) {
+      $nhd = $calcmaxd;
+  }
+  else {
+      $usenhd = 1;
+  }
+
+return ($usenhd, $nhd);
 }
 
 ################################################################
@@ -10510,10 +11064,16 @@ sub checkPlantConfig {
           $result->{'String Configuration'}{warn}    = 1;
       }
 
-      if (!isSolCastUsed ($hash)) {                                                             # Strahlungsdevice DWD
+      if (!isSolCastUsed ($hash) && !isVictronKiUsed ($hash)) {       
           if ($sp !~ /dir.*?peak.*?tilt/x) {
               $result->{'String Configuration'}{state}  = $nok;
               $result->{'String Configuration'}{fault}  = 1;                                    # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
+          }
+      }
+      elsif (isVictronKiUsed ($hash)) {                                                                                    
+          if($sp !~ /KI-based\s=>\speak/xs) {
+              $result->{'String Configuration'}{state}  = $nok;
+              $result->{'String Configuration'}{fault}  = 1;                                    
           }
       }
       else {                                                                                    # Strahlungsdevice SolCast-API
@@ -10523,12 +11083,12 @@ sub checkPlantConfig {
           }
       }
   }
-
+  
   $result->{'String Configuration'}{result} = $hqtxt{fulfd}{$lang} if(!$result->{'String Configuration'}{fault} && !$result->{'String Configuration'}{warn});
 
   ## Check Attribute DWD Wetterdevice
   #####################################
-  my $fcname = ReadingsVal($name, 'currentForecastDev', '');
+  my $fcname = ReadingsVal($name, 'currentWeatherDev', '');
 
   if (!$fcname || !$defs{$fcname}) {
       $result->{'DWD Weather Attributes'}{state}   = $nok;
@@ -10746,7 +11306,7 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
           $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
           $result->{'Common Settings'}{note}   .= qq{affectCloudfactorDamping, affectRainfactorDamping, ctrlSolCastAPIoptimizeReq <br>};
-          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading, ctrlLanguage, global language <br>};
+          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading, ctrlLanguage, global language, global dnsServer <br>};
       }
   }
 
@@ -10763,6 +11323,41 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
           $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading, ctrlLanguage, global language <br>};
+      }
+  }
+  
+  ## allg. Settings bei Nutzung VictronKI-API
+  #############################################
+  if (isVictronKiUsed ($hash)) {
+      my $gdn   = AttrVal       ('global', 'dnsServer', '');
+      my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');                   # Victron VRM Credentials gesetzt
+
+      if ($pcf && $pcf !~ /off/xs) {
+          $result->{'Common Settings'}{state}   = $warn;
+          $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
+          $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "off" is recommended because of this API is KI based.<br>};
+          $result->{'Common Settings'}{warn}    = 1;
+      }
+      
+      if (!$vrmcr) {
+          $result->{'API Access'}{state}        = $nok;
+          $result->{'API Access'}{result}      .= qq{The Victron VRM Portal credentials are not set. <br>};
+          $result->{'API Access'}{note}        .= qq{set the credentials with command "set $name vrmCredentials".<br>};
+          $result->{'API Access'}{fault}        = 1;
+      }
+
+      if (!$gdn) {
+          $result->{'API Access'}{state}        = $nok;
+          $result->{'API Access'}{result}      .= qq{Attribute dnsServer in global device is not set. <br>};
+          $result->{'API Access'}{note}        .= qq{set global attribute dnsServer to the IP Adresse of your DNS Server.<br>};
+          $result->{'API Access'}{fault}        = 1;
+      }
+
+      if (!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
+          $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
+          $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
+          $result->{'Common Settings'}{note}   .= qq{affectCloudfactorDamping, affectRainfactorDamping, global dnsServer, global language <br>};
+          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, vrmCredentials, event-on-change-reading, ctrlLanguage <br>};
       }
   }
 
@@ -10855,10 +11450,17 @@ return;
 
 ################################################################
 #              Timestrings berechnen
+#  gibt Zeitstring in lokaler Zeit zurück
 ################################################################
 sub timestampToTimestring {
   my $epoch = shift;
   my $lang  = shift;
+  
+  return if($epoch !~ /[0-9]/xs);
+  
+  if (length ($epoch) == 13) {                                                                     # Millisekunden
+      $epoch = $epoch / 1000; 
+  }
 
   my ($lyear,$lmonth,$lday,$lhour,$lmin,$lsec) = (localtime($epoch))[5,4,3,2,1,0];
   my $tm;
@@ -10897,6 +11499,21 @@ sub timestringToTimestamp {
   my $timestamp = fhemTimeLocal($s, $m, $h, $d, $mo-1, $y-1900);
 
 return $timestamp;
+}
+
+################################################################
+#  einen Zeitstring YYYY-MM-TT hh:mm:ss in einen Unix
+#  Timestamp GMT umwandeln
+################################################################
+sub timestringToTimestampGMT {
+  my $tstring = shift;
+
+  my($y, $mo, $d, $h, $m, $s) = $tstring =~ /([0-9]{4})-([0-9]{2})-([0-9]{2})\s([0-9]{2}):([0-9]{2}):([0-9]{2})/xs;
+  return if(!$mo || !$y);
+
+  my $tsgm = fhemTimeGm ($s, $m, $h, $d, $mo-1, $y-1900);
+
+return $tsgm;
 }
 
 ################################################################
@@ -10970,7 +11587,7 @@ sub debugLog {
   my $name  = $paref->{name};
   my $debug = $paref->{debug};
   
-  if($debug =~ /$dreg/x) {
+  if ($debug =~ /$dreg/x) {
       Log3 ($name, 1, "$name DEBUG> $dmsg");
   }
 
@@ -11008,7 +11625,7 @@ sub createAssociatedWith {
       my (@cd,@nd);
       my ($afc,$ara,$ain,$ame,$aba,$h);
 
-      my $fcdev = ReadingsVal($name, "currentForecastDev",  "");             # Weather forecast Device
+      my $fcdev = ReadingsVal($name, "currentWeatherDev",   "");             # Weather forecast Device
       ($afc,$h) = parseParams ($fcdev);
       $fcdev    = $afc->[0] // "";
 
@@ -11098,6 +11715,9 @@ sub setModel {
   }
   elsif ($api =~ /ForecastSolar/xs) {
       $hash->{MODEL} = 'ForecastSolarAPI';
+  }
+  elsif ($api =~ /VictronKI/xs) {
+      $hash->{MODEL} = 'VictronKiAPI';
   }
   else {
       $hash->{MODEL} = 'DWD';
@@ -11514,6 +12134,21 @@ return $ret;
 }
 
 ################################################################
+#  Prüfung auf Verwendung von Victron VRM API (KI basierend)
+################################################################
+sub isVictronKiUsed {
+  my $hash = shift;
+
+  my $ret = 0;
+
+  if ($hash->{MODEL} && $hash->{MODEL} eq 'VictronKiAPI') {
+      $ret = 1;
+  }
+
+return $ret;
+}
+
+################################################################
 #       welche PV Autokorrektur wird verwendet ?
 #       Standard bei nur "on" -> on_simple
 ################################################################
@@ -11677,7 +12312,7 @@ return $debug;
 } 
 
 ################################################################
-#  Namen des Consumerdivices und des zugeordneten
+#  Namen des Consumerdevices und des zugeordneten
 #  Switch Devices ermitteln
 ################################################################
 sub getCDnames {
@@ -11689,6 +12324,36 @@ sub getCDnames {
 
 
 return ($cname, $dswname);
+}
+
+###############################################################################
+#                    verscrambelt einen String
+###############################################################################
+sub chew { 
+  my $sstr = shift;
+  
+  $sstr    = encode_base64 ($sstr, '');
+  my @key  = qw(1 3 4 5 6 3 2 1 9);
+  my $len  = scalar @key;  
+  my $i    = 0;  
+  my $dstr = join "", map { $i = ($i + 1) % $len; chr((ord($_) + $key[$i]) % 256) } split //, $sstr;   ## no critic 'Map blocks';
+
+return $dstr;
+}
+
+###############################################################################
+#             entpackt einen mit _enscramble behandelten String
+###############################################################################
+sub assemble { 
+  my $sstr = shift;
+    
+  my @key  = qw(1 3 4 5 6 3 2 1 9); 
+  my $len  = scalar @key;  
+  my $i    = 0;  
+  my $dstr = join "", map { $i = ($i + 1) % $len; chr((ord($_) - $key[$i] + 256) % 256) } split //, $sstr;    ## no critic 'Map blocks';  
+  $dstr    = decode_base64 ($dstr);
+  
+return $dstr;
 }
 
 ################################################################
@@ -11836,7 +12501,7 @@ return $def;
 #    $q:      Qualität des Korrekturfaktors
 #
 #    $hod:    Stunde des Tages (01,02,...,24)
-#    $range:  Range Bewölkung (1...10)
+#    $range:  Range Bewölkung (1...100) oder "percentile"
 #    $def:    Defaultwert
 #
 ################################################################
@@ -11956,7 +12621,7 @@ return $def;
 ###################################################################################################
 # Wert des String Hash zurückliefern
 # Usage:
-# StringVal ($hash, $strg, $key, $def)
+# StringVal ($hash, $strg, $key, $def)                 
 #
 # $strg:        - Name des Strings aus modulePeakString 
 # $key:  peak   - Peakleistung aus modulePeakString
@@ -12138,7 +12803,7 @@ Zur Erstellung der solaren Vorhersage kann das Modul SolarForecast unterschiedli
   <br>
 
 Die Nutzung der erwähnten API's beschränkt sich auf die jeweils kostenlose Version des Dienstes. <br>
-In zugeordneten DWD_OpenData Device(s) ist die passende Wetterstation mit dem Setter "currentForecastDev"
+In zugeordneten DWD_OpenData Device(s) ist die passende Wetterstation mit dem Setter "currentWeatherDev"
 festzulegen um meteorologische Daten (Bewölkung, Sonnenaufgang, u.a.) bzw. eine Strahlungsprognose (falls Model DWD genutzt) 
 für den Anlagenstandort zu erhalten. <br><br>
 
@@ -12175,7 +12840,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>currentForecastDev</b>   </td><td>DWD_OpenData Device welches meteorologische Daten (z.B. Bewölkung) liefert     </td></tr>
+            <tr><td> <b>currentWeatherDev</b>    </td><td>DWD_OpenData Device welches meteorologische Daten (z.B. Bewölkung) liefert     </td></tr>
             <tr><td> <b>currentRadiationDev </b> </td><td>DWD_OpenData Device bzw. API zur Lieferung von Strahlungsdaten                 </td></tr>
             <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert                                       </td></tr>
             <tr><td> <b>currentMeterDev</b>      </td><td>Device welches Netz I/O-Daten liefert                                          </td></tr>
@@ -12298,8 +12963,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <br>
 
     <ul>
-      <a id="SolarForecast-set-currentForecastDev"></a>
-      <li><b>currentForecastDev </b> <br><br>
+      <a id="SolarForecast-set-currentWeatherDev"></a>
+      <li><b>currentWeatherDev </b> <br><br>
 
       Legt das Device (Typ DWD_OpenData) fest, welches die benötigten Wetterdaten (Bewölkung, Niederschlag,
       Sonnenauf- bzw. untergang usw.) liefert.
@@ -12422,6 +13087,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       das optimale Abfrageintervall in Abhängigkeit der konfigurierten Strings.
       <br><br>
       
+      <b>VictronKI-API</b> <br>
+      
+      Diese API kann durch Nutzer des Victron Energy VRM Portals angewendet werden. Diese API ist KI basierend.
+      Als String ist der Wert "KI-based" im Setup der <a href="#SolarForecast-set-inverterStrings">inverterStrings</a>  
+      einzutragen. <br>
+      Im Victron Energy VRM Portal ist als Voraussetzung der Standort der PV-Anlage anzugeben. <br>
+      Siehe dazu auch den Blog-Beitrag 
+      <a href="https://www.victronenergy.com/blog/2023/07/05/new-vrm-solar-production-forecast-feature/">Introducing Solar Production Forecast</a>.   
+      <br><br>
+      
       <b>DWD_OpenData Device</b> <br>      
       
       Der DWD-Dienst wird über ein FHEM Device vom Typ DWD_OpenData eingebunden.
@@ -12472,7 +13147,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <li><b>inverterStrings &lt;Stringname1&gt;[,&lt;Stringname2&gt;,&lt;Stringname3&gt;,...] </b> <br><br>
 
       Bezeichnungen der aktiven Strings. Diese Bezeichnungen werden als Schlüssel in den weiteren
-      Settings verwendet. <br><br>
+      Settings verwendet. <br>
+      Bei Nutzung einer KI basierenden API (z.B. VictronKI-API) ist nur "<b>KI-based</b>" einzutragen unabhängig davon 
+      welche realen Strings existieren. <br><br>
 
       <ul>
         <b>Beispiel: </b> <br>
@@ -12487,11 +13164,14 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <li><b>modulePeakString &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br>
 
       Die DC Peakleistung des Strings "StringnameX" in kWp. Der Stringname ist ein Schlüsselwert des
-      Readings <b>inverterStrings</b>. <br><br>
+      Readings <b>inverterStrings</b>. <br>
+      Bei Verwendung einer KI basierenden API (z.B. Model VictronKiAPI) sind die Peakleistungen aller vorhandenen
+      Strings als Summe dem Stringnamen <b>KI-based</b> zuzuordnen. <br><br>
 
       <ul>
         <b>Beispiel: </b> <br>
         set &lt;name&gt; modulePeakString Ostdach=5.1 Südgarage=2.0 S3=7.2 <br>
+        set &lt;name&gt; modulePeakString KI-based=5.65 <br>
       </ul>
       </li>
     </ul>
@@ -12681,6 +13361,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Bewölkung) durchgeführt.
       <br><br>
       
+      <b>Model VictronKiAPI:</b> <br>
+      Dises Model basiert auf einer KI gestützten Prognose. Eine zusätzliche Autokorrektur wird nicht empfohlen, d.h.
+      die empfohlene Autokorrekturmethode ist <b>off</b>. <br><br>
+      
       <b>Model DWD:</b> <br>
       Die empfohlene Autokorrekturmethode ist <b>on_complex</b>. <br><br>
     
@@ -12717,7 +13401,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td>Um die Daten nur eines Verbrauchers zu löschen verwendet man:                                                        </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Verbrauchernummer&gt; </ul>                                            </td></tr>
             <tr><td> <b>currentBatteryDev</b>  </td><td>löscht das eingestellte Batteriedevice und korrespondierende Daten                                                   </td></tr>
-            <tr><td> <b>currentForecastDev</b> </td><td>löscht das eingestellte Device für Wetterdaten                                                                       </td></tr>
+            <tr><td> <b>currentWeatherDev</b>  </td><td>löscht das eingestellte Device für Wetterdaten                                                                       </td></tr>
             <tr><td> <b>currentInverterDev</b> </td><td>löscht das eingestellte Inverterdevice und korrespondierende Daten                                                   </td></tr>
             <tr><td> <b>currentMeterDev</b>    </td><td>löscht das eingestellte Meterdevice und korrespondierende Daten                                                      </td></tr>
             <tr><td> <b>energyH4Trigger</b>    </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                           </td></tr>
@@ -12767,6 +13451,37 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </ul>
 
         <br>
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-set-vrmCredentials"></a>
+      <li><b>vrmCredentials user=&lt;Benutzer&gt; pwd=&lt;Paßwort&gt; idsite=&lt;idSite&gt; </b> <br>
+      (nur bei Verwendung Model VictronKiAPI) <br><br>
+
+       Wird die Victron VRM API genutzt, sind mit diesem set-Befehl die benötigten Zugangsdaten zu hinterlegen. <br><br>
+       
+      <ul>
+         <table>
+         <colgroup> <col width="10%"> <col width="90%"> </colgroup>
+            <tr><td> <b>user</b>   </td><td>Benutzername für das Victron VRM Portal                                           </td></tr>
+            <tr><td> <b>pwd</b>    </td><td>Paßwort für den Zugang zum Victron VRM Portal                                     </td></tr>
+            <tr><td> <b>idsite</b> </td><td>idSite ist der Bezeichner "XXXXXX" in der Victron VRM Portal Dashboard URL.       </td></tr>
+            <tr><td>               </td><td>URL des Victron VRM Dashboard ist:                                                    </td></tr>  
+            <tr><td>               </td><td>https://vrm.victronenergy.com/installation/<b>XXXXXX</b>/dashboard                </td></tr>            
+         </table>
+      </ul>
+      <br>
+      
+      Um die gespeicherten Credentials zu löschen, ist dem Kommando nur das Argument <b>delete</b> zu übergeben. <br><br>
+
+       <ul>
+        <b>Beispiele: </b> <br>
+        set &lt;name&gt; vrmCredentials user=john@example.com pwd=somepassword idsite=XXXXXX <br>
+        set &lt;name&gt; vrmCredentials delete <br>
+       </ul>      
+      
       </li>
     </ul>
     <br>
@@ -13048,7 +13763,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Prozentuale Mehrgewichtung des Bewölkungsfaktors bei der solaren Vorhersage. <br>
          Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag (Dämpfung der PV
          Prognose durch den Bewölkungsfaktor).<br>
-         (default: 35)
+         (default: 0)
        </li>
        <br>
        
@@ -13089,7 +13804,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Prozentuale Mehrgewichtung des Regenprognosefaktors bei der solaren Vorhersage. <br>
          Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag (Dämpfung der PV
          Prognose durch den Regenfaktor).<br>
-         (default: 10)
+         (default: 0)
        </li>
        <br>
        
@@ -13821,14 +14536,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "HttpUtils": 0,
         "JSON": 4.020,
         "FHEM::SynoModules::SMUtils": 1.0220,
-        "Time::HiRes": 0
+        "Time::HiRes": 0,
+        "MIME::Base64": 0,
+        "Storable": 0        
       },
       "recommends": {
         "FHEM::Meta": 0,
         "FHEM::Utility::CTZ": 1.00,
         "DateTime": 0,
         "DateTime::Format::Strptime": 0,
-        "Storable": 0,
         "Data::Dumper": 0
       },
       "suggests": {
