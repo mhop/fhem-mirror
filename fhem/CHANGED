@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  10_KNX: multiple changes, new features, see Forum #122582
  - bugfix:  48_MieleAtHome: fix warning
  - feature: configDB.pm: show version counter in "configDB saved. (xx)"
  - feature: 93_DbLog: possible use of alternative tables for SVG Plots 
