@@ -140,7 +140,8 @@ BEGIN {
 my %vNotesIntern = (
   "0.81.00"=> "27.08.2023  development version for Victron VRM API, __Pv_Fc_Simple_Dnum_Hist changed, available setter ".
                            "are now API specific, switch currentForecastDev to currentWeatherDev ".
-                           "affectRainfactorDamping default 0, affectRainfactorDamping default 0 ",
+                           "affectRainfactorDamping default 0, affectRainfactorDamping default 0 ".
+                           "call consumption forecast from Victron VRM API ",
   "0.80.20"=> "15.08.2023  hange calculation in ___setSolCastAPIcallKeyData once again, fix some warnings ",
   "0.80.19"=> "10.08.2023  fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1283836 ",
   "0.80.18"=> "07.08.2023  change calculation of todayDoneAPIcalls in ___setSolCastAPIcallKeyData, add \$lagtime ".
@@ -3472,12 +3473,11 @@ sub __VictronVRM_ApiResponseForecast {
       else {
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}    += 1;
-          my $k = 0;
           
+          my $k = 0; 
           while ($jdata->{'records'}{'solar_yield_forecast'}[$k]) {                                                               
               my $starttmstr = $jdata->{'records'}{'solar_yield_forecast'}[$k][0];                                 # Millisekunden geliefert
               my $val        = $jdata->{'records'}{'solar_yield_forecast'}[$k][1];
-              
               $starttmstr    = (timestampToTimestring ($starttmstr, $lang))[3];
               
               debugLog ($paref, "apiProcess", "Victron VRM API - PV estimate: ".$starttmstr.' => '.$val.' Wh');
@@ -3488,6 +3488,23 @@ sub __VictronVRM_ApiResponseForecast {
                   my $string = ReadingsVal ($name, 'inverterStrings', '?');
                   
                   $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} = $val;
+              }
+
+              $k++;
+          }
+          
+          $k = 0; 
+          while ($jdata->{'records'}{'vrm_consumption_fc'}[$k]) {                                                               
+              my $starttmstr = $jdata->{'records'}{'vrm_consumption_fc'}[$k][0];                                 # Millisekunden geliefert
+              my $val        = $jdata->{'records'}{'vrm_consumption_fc'}[$k][1];
+              $starttmstr    = (timestampToTimestring ($starttmstr, $lang))[3];
+              
+              if ($val) {
+                  $val = sprintf "%.2f", $val;
+                  
+                  my $string = ReadingsVal ($name, 'inverterStrings', '?');
+                  
+                  $data{$type}{$name}{solcastapi}{$string.'_co'}{$starttmstr}{co_estimate} = $val;
               }
 
               $k++;
