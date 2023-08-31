@@ -50,10 +50,25 @@ sub new {
 			$ok ||= any { sub{ my $a = shift; any { $a == $_ } (1, 3, 5, 7, 8, 10, 12) }->($_) } @{$self->{list_of_months}} if ($first == 31);
 			if (not $ok) {
 				$self->{error} = "day and month will never become true";
-				$self->log(2, '%s', $self->{error}) if $ENV{EXTENDED_DEBUG};
+				$self->log(2, '%s', $self->{error});
 				last VALIDATE;
 			}
 		}
+
+		if (exists($param->{holidays})) {
+			if (defined($param->{holidays}) and
+				ref($param->{holidays}) eq 'ARRAY' and
+				all {m/^[0-6]$/} @$param->{holidays}) {
+				@{$self->{config}->{holidays}} = sort { $a <=> $b } @$param->{holidays};
+			} else {
+				$self->{error} = "holidays must be a list with [0-6]";
+				$self->log(2, '%s', $self->{error});
+				last VALIDATE;
+			}
+		} else {
+			$self->{config}->{holidays} = [0,6]; #default weekend sun, sat
+		}
+
 	}
 	# $self->log(2, '%s', $self->{error}) if ($self->{error} and $ENV{EXTENDED_DEBUG}); 
 	return wantarray ? ($self, $self->{error}) : $self;
@@ -69,13 +84,17 @@ sub next {
 	if ($self->{error}) { return wantarray ? (undef, $self->{error}) : undef }; 
 
 	# validate input
-	my $from_date = substr($from, 0, 8);
-
-	
-
-	# internal method
-	return $self->_next($from);
-
+	my (@from_date, @from_time);
+	@from_date = ($from =~ m/^([0-9]{4})([0-9]{2})([0-9]{2})[0-9]{6}$/);
+	@from_time = ($from =~ m/^[0-9]{8}([0-9]{2})([0-9]{2})([0-9]{2})$/);
+	if (@from_date and $self->is_valid_date(@from_date) and
+		@from_time and $self->is_valid_time(@from_time)) {
+		# internal method
+		return $self->_next($from);
+	} else {
+		$self->log(2, 'wrong date or time spec in next call %s', $from);
+		return wantarray ? (undef, sprintf('wrong date or time spec in call to next() %s', $from)) : undef ; 
+	}
 }
 
 sub _next {
@@ -93,10 +112,17 @@ sub _next {
 	# If there is a discrepancy between from_date and working_date, we must first perform the next_date calculation. 
 	# Otherwise, this has already been done in previous rounds and can be skipped for efficiency and speed reasons.
 	if ($from_date ne $self->{working_date}) {
-		# reset pointer
-		undef $self->{month_ptr};
-		undef $self->{mday_ptr};
-		undef $self->{positional_date_cache};
+		# reset pointer / cache # can happen because of sleep, hybernate, clock shift 
+		$self->log(5, 'from_date:%s does not match working_date:%s -> clear cache ', $from_date, $self->{working_date}) if $ENV{EXTENDED_DEBUG};
+		# say "before: \n".join "\n", keys %{$self};
+		delete $self->{month_ptr};
+		delete $self->{weekday_month_ptr};
+		delete $self->{mday_ptr};
+		delete $self->{next_calender_date};
+		delete $self->{next_weekday_date};
+		delete $self->{next_positional_date};
+		delete $self->{positional_date_cache};
+		# say "after: \n".join "\n", keys %{$self};
 		$self->{working_date} = $next_date = $self->_next_date($from_date, 1); # inclusive, the from_date is possible
 	} else {
 		# load from cache
@@ -107,6 +133,7 @@ sub _next {
 	# ($from_date ne $next_date)) {
 	if ($from_time ne $self->{working_time}) {
 		# reset pointer
+		$self->log(5, 'from_time:%s does not match working_time:%s -> clear cache ', $from_time, $self->{working_time}) if $ENV{EXTENDED_DEBUG};
 		undef $self->{hour_ptr};
 		undef $self->{minute_ptr};
 	}
@@ -250,10 +277,18 @@ sub _parse_cron_text {
 		if (($mday ne '*' and $wday ne '*' ) or
 			($mday eq '*' and $wday ne '*' )) {
 			foreach my $item (@list) {
+				# to provide error glues if $item is malformed. $item may be modified below
+				my $item_txt = $item;
 				$self->log(5, 'about to parse wday item: %s', $item) if $ENV{EXTENDED_DEBUG};
+
 				# replace weekday abbreviation
-				my %w = (Sun => 0, Mon => 1, Tue => 2, Wed => 3, Thu => 4, Fr => 5, Sat => 6);
-				$item =~ s/(Sun|Mon|Tue|Wed|Thu|Sat)/$w{$1}/gie;
+				# my %w = (sun => 0, mon => 1, tue => 2, wed => 3, thu => 4, fri => 5, sat => 6);
+				my ($sep, $mod);
+				($item, $sep, $mod) = ($item =~ m/^([^#\/]*)([#\/]*)([^#\/]*)$/);
+				my %w = (sun => 0, mon => 1, tue => 2, wed => 3, thu => 4, fri => 5, sat => 6);
+				$item =~ s/(?<![a-z])(sun|mon|tue|wed|thu|fri|sat)(?![a-z])/$w{lc($1)}/gie;
+				$item .= $sep if defined($sep);
+				$item .= $mod if defined($mod);
 				
 				# RULE 4
 				$item =~ s/^&//s if ($mday eq '*' and $item =~ m/^&(?!&).*/s);
@@ -274,8 +309,8 @@ sub _parse_cron_text {
 				# $res &&= $self->_parse_wday_item($item, $href_and) if ($item =~ m/^[&].*/s);
 
 				if (not $res) {
-					$self->{error} = "syntax error in wday item: $item";
-					$self->log(5, 'syntax error in wday item: %s', $item) if $ENV{EXTENDED_DEBUG};
+					$self->{error} = "syntax error in wday item: $item_txt";
+					$self->log(5, 'syntax error in wday item: %s', $item_txt) if $ENV{EXTENDED_DEBUG};
 					return;
 				}
 			}
