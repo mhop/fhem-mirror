@@ -5607,6 +5607,8 @@ attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/dis_night_comm:.* dis_night_comm\
   BASE_ID/comm_disabled:.* comm_disabled\
   BASE_ID/comm_dis_ts:.* comm_dis_ts\
+  BASE_ID/sunrise:.* sunrise\
+  BASE_ID/sunset:.* sunset\
   BASE_ID/status:.* status\
   BASE_ID/total/P_AC:.* P_AC\
   BASE_ID/total/P_DC:.* P_DC\
@@ -5614,7 +5616,7 @@ attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/total/YieldTotal:.* YieldTotal
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_hub_bridge
-setreading DEVICE attrTemplateVersion 20230816
+setreading DEVICE attrTemplateVersion 20230820
 { AttrTemplate_Initialize() }
 #   "setup/set_time",
 #   "setup/sync_ntp
@@ -5656,11 +5658,16 @@ attr DEVICE readingList INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/ch0/Efficiency:.* Efficiency\
   INVERTERLONG_ID/ch0/YieldDay:.* {}\
   INVERTERLONG_ID/ch0/YieldTotal:.* {}\
+  INVERTERLONG_ID/ch0/BootloaderVersion:.* BootloaderVersion\
   INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
   INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
   INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
   INVERTERLONG_ID/ch0/FWBuildHourMinute:.* FWBuildHourMinute\
-  INVERTERLONG_ID/ch0/HWPartId:.* HWPartId\
+  INVERTERLONG_ID/ch0/BootloaderVersion:.* BootloaderVersion\
+  INVERTERLONG_ID/ch0/HWPartNumber:.* HWPartNumber\
+  INVERTERLONG_ID/ch0/HWVersion:.* HWVersion\
+  INVERTERLONG_ID/ch0/GridProfileCode:.* GridProfileCode\
+  INVERTERLONG_ID/ch0/GridProfileVersion:.* GridProfileVersion\
   INVERTERLONG_ID/ch0/active_PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC\
@@ -5691,11 +5698,15 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/Efficiency:.* Efficiency\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
+  INVERTERLONG_ID/ch0/BootloaderVersion:.* BootloaderVersion\
   INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
   INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
   INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
   INVERTERLONG_ID/ch0/FWBuildHourMinute:.* FWBuildHourMinute\
-  INVERTERLONG_ID/ch0/HWPartId:.* HWPartId\
+  INVERTERLONG_ID/ch0/HWPartNumber:.* HWPartNumber\
+  INVERTERLONG_ID/ch0/HWVersion:.* HWVersion\
+  INVERTERLONG_ID/ch0/GridProfileCode:.* GridProfileCode\
+  INVERTERLONG_ID/ch0/GridProfileVersion:.* GridProfileVersion\
   INVERTERLONG_ID/ch0/active_PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
@@ -5737,11 +5748,15 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/Temp:.* temperature\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
+  INVERTERLONG_ID/ch0/BootloaderVersion:.* BootloaderVersion\
   INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
   INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
   INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
   INVERTERLONG_ID/ch0/FWBuildHourMinute:.* FWBuildHourMinute\
-  INVERTERLONG_ID/ch0/HWPartId:.* HWPartId\
+  INVERTERLONG_ID/ch0/HWPartNumber:.* HWPartNumber\
+  INVERTERLONG_ID/ch0/HWVersion:.* HWVersion\
+  INVERTERLONG_ID/ch0/GridProfileCode:.* GridProfileCode\
+  INVERTERLONG_ID/ch0/GridProfileVersion:.* GridProfileVersion\
   INVERTERLONG_ID/ch0/active_PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
@@ -5798,11 +5813,15 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/Temp:.* temperature\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
+  INVERTERLONG_ID/ch0/BootloaderVersion:.* BootloaderVersion\
   INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
   INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
   INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
   INVERTERLONG_ID/ch0/FWBuildHourMinute:.* FWBuildHourMinute\
-  INVERTERLONG_ID/ch0/HWPartId:.* HWPartId\
+  INVERTERLONG_ID/ch0/HWPartNumber:.* HWPartNumber\
+  INVERTERLONG_ID/ch0/HWVersion:.* HWVersion\
+  INVERTERLONG_ID/ch0/GridProfileCode:.* GridProfileCode\
+  INVERTERLONG_ID/ch0/GridProfileVersion:.* GridProfileVersion\
   INVERTERLONG_ID/ch0/active_PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
@@ -5857,7 +5876,7 @@ attr DEVICE setList \
   limit_pct:slider,2,1,100 BASE_ID/ctrl/limit/INVERTER_NR $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20230816
+setreading DEVICE attrTemplateVersion 20230830
 
 # contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
 name:hoymiles_opendtu_hub_bridge
