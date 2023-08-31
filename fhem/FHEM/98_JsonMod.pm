@@ -27,6 +27,7 @@ use feature qw( lexical_subs );
 use strict;
 use warnings;
 use utf8;
+use FHEM::Scheduler::Cron;
 use HttpUtils;
 use List::Util qw( any );
 use Text::Balanced qw ( extract_codeblock extract_delimited extract_bracketed );
@@ -78,7 +79,7 @@ sub JsonMod_Define {
 	$hash->{'SVN'} = $cvsid;
 	$hash->{'CONFIG'}->{'IN_REQUEST'} = 0;
 	$hash->{'CONFIG'}->{'CRON'} = \'0 * * * *';
-	$hash->{'CRON'} = JsonMod::Cron->new();
+	# $hash->{'CRON'} = JsonMod::Cron->new();
 
 	return "no FUUID, is fhem up to date?" if (not $hash->{'FUUID'});
 	return "wrong source definition" if ($source !~ m/^(https:|http:|file:|system:)/);
@@ -115,6 +116,7 @@ sub JsonMod_Run {
 
 	my $cron = AttrVal($name, 'interval', '0 * * * *');
 	$hash->{'CONFIG'}->{'CRON'} = \$cron;
+	$hash->{'CRON'} = FHEM::Scheduler::Cron->new($cron);
 	JsonMod_StartTimer($hash);
 	JsonMod_ApiRequest($hash) if AttrVal($name, 'update-on-start', 0);
 	return;
@@ -161,14 +163,16 @@ sub JsonMod_Attr {
 		};
 		if ($attrName eq 'interval') {
 			if (split(/ /, $attrValue) == 5) {
-				if ($hash->{'CRON'}->validate($attrValue)) {
+				my $err;
+				($hash->{'CRON'}, $err) = FHEM::Scheduler::Cron->new($attrValue);
+				unless ($err) {
 					$hash->{'CONFIG'}->{'CRON'} = \$attrValue;
 					return if (!$init_done);
 					JsonMod_StopTimer($hash);
 					JsonMod_StartTimer($hash) unless IsDisabled($name);
 					return;
 				} else {
-					return "wrong interval expression (cron)"
+					return $err;
 				};
 			};
 			return "wrong interval expression";
@@ -558,10 +562,12 @@ sub JsonMod_StartTimer {
 	my @t = localtime(Time::HiRes::time());
 	$t[4] += 1;
 	$t[5] += 1900;
-	my @r = $hash->{'CRON'}->next($cron, @t);
-	my $ts = timelocal(0, $r[0], $r[1], $r[2], $r[3] -1, $r[4] -1900);
-	$hash->{'NEXT'} = sprintf('%04d-%02d-%02d %02d:%02d:%02d', $r[4], $r[3], $r[2], $r[1], $r[0], 0);
-	JsonMod_Logger($hash, 4, 'next request: %04d.%02d.%02d %02d:%02d:%02d', $r[4], $r[3], $r[2], $r[1], $r[0], 0);
+	my ($r, $err) = $hash->{'CRON'}->next(sprintf('%04d%02d%02d%02d%02d%02d', $t[5], $t[4], $t[3], $t[2], $t[1], $t[0]));
+	# todo check err
+	my @u = ($r =~ m/([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})/);
+	my $ts = timelocal($u[5], $u[4], $u[3], $u[2], $u[1] -1, $u[0] -1900);
+	$hash->{'NEXT'} = sprintf('%04d-%02d-%02d %02d:%02d:%02d', @u);
+	JsonMod_Logger($hash, 4, 'next request: %04d.%02d.%02d %02d:%02d:%02d', @u);
 	InternalTimer($ts, \&JsonMod_DoTimer, $hash);
 	return;
 };
@@ -1612,261 +1618,6 @@ sub filter {
 sub DESTROY {
 	my ($self) = @_;
 	delete $self->{'node'};
-};
-
-package JsonMod::Cron;
-
-use strict;
-use warnings;
-use utf8;
-use Time::Local qw ( timelocal );
-
-no warnings qw( experimental::lexical_subs );
-
-# static and helper
-sub normalizeTime {
-	my ($m, $h, $d) = @_;
-	$d //= 0;
-	if ($m > 59) { $h += int($m / 60); $m %= 60; };
-	if ($h > 23) { $d += int($h / 24); $h %= 24; };
-	return ($m, $h, $d);
-};
-
-sub normalizeDate {
-	my ($d, $m, $y, $o) = @_;
-	$o //= 0;
-	my $time = timelocal(0, 0, 12, $d, $m -1, $y -1900);
-	$time += $o * 86400;
-	my @t = localtime($time);
-	# plus DST, wday (SUN=0..6), yday (0..364|5)
-	return ($t[3], $t[4] +1, $t[5] +1900, $t[8], $t[6], $t[7]); 
-};
-
-# class
-sub new {
-	my ($class) = @_;
-	my $self = {};
-	
-	bless $self, $class;
-	return $self;
-};
-
-sub setCron {
-	my ($self, $cron) = @_;
-	@{$self->{'CRONLIST'}} = split / /, $cron //= '';
-	return if (scalar @{$self->{'CRONLIST'}} != 5);
-
-};
-
-sub parseMinuteEntry {
-	my ($self, $in, $now) = @_;
-	my ($res, $start, $stop, $step);
-
-	($step) = ($in =~ m/\/([0-9]|[0-5][0-9])$/);
-	($start, $stop) = ($in =~ m/^([*]|[0-9]|[0-5][0-9])(?:-([0-9]|[0-5][0-9]))?(?:\/(?:[0-9]|[0-5][0-9]))?$/);
-	return if (not defined($start) or ($start eq '*' and defined($stop))); # syntax error
-
-	$stop = (defined($step) or ($start eq '*'))?59:$start if (not defined($stop));
-	$start = 0 if $start eq '*';
-	return if ($start > $stop); # syntax error
-	return $start if ($now  < $start); # literal start
-
-	$res = $step //= 1;
-	$res = $res - (((($now - $start) % 60) + $res) % $res);
-	$res = $now + $res;
-	
-	return $start + 60 if ($res > $stop); # carry over
-	return $res; # regular next
-};
-
-sub parseHourEntry {
-	my ($self, $in, $now) = @_;
-	my ($res, $start, $stop, $step);
-
-	($step) = ($in =~ m/\/([0-9]|[0,1][0-9]|2[0-3])$/);
-	($start, $stop) = ($in =~ m/^([*]|[0-9]|[0,1][0-9]|2[0-3])(?:-([0-9]|[0,1][0-9]|2[0-3]))?(?:\/(?:[*]|[0-9]|[0,1][0-9]|2[0-3]))?$/);
-	return if (not defined($start) or ($start eq '*' and defined($stop))); # syntax error
-
-	$stop = (defined($step) or ($start eq '*'))?23:$start if (not defined($stop));
-	$start = 0 if $start eq '*';
-	return if ($start > $stop); # syntax error
-	return $start if ($now  < $start); # literal start
-	
-	$res = $step //= 1;
-	$res = ($now - $start) % $res;
-	
-	return $now if ($res == 0) and ($now <= $stop); # current hour
-	$res = $now + $step - $res;
-	return $start + 24 if ($res > $stop); # carry over
-	return $res; # regular next
-};
-
-sub parseDateEntry {
-	my ($self, $in, $now) = @_;
-	my ($res, $start, $stop, $step);
-
-	($step) = ($in =~ m/\/([0-9]|[0-2][0-9]|3[0,1])$/);
-	($start, $stop) = ($in =~ m/^([*]|[0-9]|[0-2][0-9]|3[0,1])(?:-([0-9]|[0-2][0-9]|3[0,1]))?(?:\/(?:[*]|[0-9]|[0-2][0-9]|3[0,1]))?$/);
-	return if (not defined($start) or ($start eq '*' and defined($stop))); # syntax error
-	
-	$stop = (defined($step) or ($start eq '*'))?31:$start if (not defined($stop));
-	$start = 1 if $start eq '*';
-	return if ($start > $stop); # syntax error
-	return $start if ($now  < $start); # literal start
-	
-	$res = $step //= 1;
-	$res = ($now - $start) % $res;
-
-	return $now if ($res == 0) and ($now <= $stop); # current
-	$res = $now + $step - $res;
-	return $start + 32 if ($res > $stop); # carry over
-	return $res; # regular next
-};
-
-sub next {
-	my ($self, $cron, @t) = @_;
-
-	my $inDay = sprintf('%04d%02d%02d', $t[5], $t[4], $t[3]);
-	my ($cronMin, $cronHour, $cronDay, $cronMonth, $cronWeekDay) = split / /, $cron;
-	my ($time, $dst, $weekday);
-
-	# m h d(carry)
-	$time = $self->nextTime($t[1], $t[2], $cronMin, $cronHour);
-	return if (not $time);
-	($t[3], $t[4], $t[5], $dst, $weekday) = normalizeDate($t[3], $t[4], $t[5], $time->[2]);
-	my $calcDay = sprintf('%04d%02d%02d', $t[5], $t[4], $t[3]);
-
-	# date unchanged and known
-	if ($calcDay eq $inDay) {
-		return ($time->[0], $time->[1], $t[3], $t[4], $t[5], $dst);
-	};
-
-	# m h d(carry)
-	$time = $self->nextTime(0, 0, $cronMin, $cronHour);
-	#($t[3], $t[4], $t[5], $dst, $weekday) = normalizeDate($t[3], $t[4], $t[5], $time->[2]);
-
-	# yyyy mm dd
-	my $date = $self->nextDate($t[3], $t[4], $t[5], $cronDay, $cronMonth);
-	return if (not $date);
-	($t[3], $t[4], $t[5], $dst, $weekday) = normalizeDate($date->[2], $date->[1], $date->[0]);
-
-	return ($time->[0], $time->[1], $t[3], $t[4], $t[5], $dst);
-};
-
-# test if valid cron expression
-sub validate {
-	my ($self, $cron) = @_;
-	my ($cronMin, $cronHour, $cronDay, $cronMonth, $cronWeekDay) = split / /, $cron;
-	my $time = $self->nextTime(0, 0, $cronMin, $cronHour);
-	my $date = $self->nextDate(2020, 1, 1, $cronDay, $cronMonth);
-	if (defined($time) and defined($date)) {
-		return 1;
-	} else {
-		return;
-	};
-};
-
-# min = time: actual minute
-# hour = time: actual hour
-sub nextTime {
-	my ($self, $min, $hour, $cronMin, $cronHour) = @_;
-
-	my $calcMin;
-	my $calcHour;
-	my $calcDay = 0;
-
-	foreach my $cronMinEntry (split /,/, $cronMin) {
-		my $e = $self->parseMinuteEntry($cronMinEntry, $min);
-		return if not defined($e); # syntax error
-		if ((not defined($calcMin) and defined($e)) or ($e < $calcMin)) {
-			$calcMin = $e;
-		};
-	};
-	($calcMin, $hour, $calcDay) = normalizeTime($calcMin, $hour, $calcDay);
-
-	foreach my $cronHourEntry (split /,/, $cronHour) {
-		my $e = $self->parseHourEntry($cronHourEntry, $hour);
-		return if not defined($e); # syntax error
-		if ((not defined($calcHour) and defined($e)) or ($e < $calcHour)) {
-			$calcHour = $e;
-		};
-	};
-	my (@time) = normalizeTime($calcMin, $calcHour, $calcDay);
-	return \@time;
-
-};
-
-sub nextDate {
-	my ($self, $day, $month, $year, $cronDay, $cronMonth) = @_;
-
-	my $dates = $self->listDates($day, $month, $year, $cronDay, $cronMonth);
-	my $result;
-	foreach (@{$dates}) {
-		if ((not defined($result) and defined($_)) or ($_ and ($_ < $result))) {
-			$result = $_;
-		};
-	};
-	return if (not defined($result));
-	my (@date) = ($result =~ m/^(\d{4})(\d{2})(\d{2})$/);
-	return \@date;
-};
-
-sub listDates {
-	my ($self, $day, $month, $year, $cronDay, $cronMonth) = @_;
-	my @result;
-
-	#return [] if ($self->{R}++ > 25);
-
-	# my sub daysOfMonth {
-	local *daysOfMonth = sub {
-		my ($m, $y) = @_;
-		my (@d) = (0,31,28,31,30,31,30,31,31,30,31,30,31);
-		# leapyear
-		$d[2] = 29 if (((($y % 4) == 0) and (($y % 100) != 0)) or (($y % 400) == 0));
-		return ($d[$m]);
-	};
-
-	foreach my $cronDayEntry (split /,/, $cronDay) {
-		foreach my $cronMonthEntry (split /,/, $cronMonth) {
-			# impossible cron would recurse forever: [31 2 * * *] / [31 9/2 * * *]
-			my $invalid = 1;
-			if ((my ($fuseDay) = ($cronDayEntry =~ m/^(\d{1,2})/)) and 
-				(my ($fuseMonth, $fuseMonthStep) = ($cronMonthEntry =~ m/^(\d{1,2})(?:\/(\d{1,2}))*/))) {
-				#print "FUSE $fuseDay, $fuseMonth, $fuseMonthStep\n";
-				for (my $i = $fuseMonth; $i <= 12 and $invalid; $i += $fuseMonthStep //= 12) {
-					$invalid = 0 if (daysOfMonth($fuseMonth, 2000) >= $fuseDay); # 2000 is leapyear
-				};
-				if ($invalid) {
-					push @result, ();
-					next;
-				};
-			};
-			my $calcDay = $self->parseDateEntry($cronDayEntry, $day);
-			my $calcMonth = $self->parseDateEntry($cronMonthEntry, $month);
-			my $calcYear = $year;
-			#printf "Test: D:%s, M:%s against %s-%s -> %s-%s-%s\n", $cronDayEntry, $cronMonthEntry, $day, $month, $calcDay, $calcMonth, $calcYear;
-			if (defined($calcDay) and defined($calcMonth)) {
-				#$doy = isValid($testM, $testMd);
-				if (($calcDay == $day) and ($calcMonth == $month)) {
-					#printf "RETURN: D:%s, M:%s against %s-%s-%s -> %s-%s-%s\n", $cronDayEntry, $cronMonthEntry, $day, $month, $year, $calcDay, $calcMonth, $calcYear;
-					push @result, sprintf('%04d%02d%02d', $calcYear, $calcMonth, $calcDay);
-				} else {
-					if ($calcMonth > 12) {
-						$calcMonth -= ($calcMonth == 13)?12:32;
-						$calcYear++;
-					};
-					if ($calcDay > daysOfMonth($calcMonth, $calcYear)) {
-						$calcMonth++ if ($calcMonth == $month);
-						$calcDay = 1;
-					};
-					push @result, @{ $self->listDates($calcDay, $calcMonth, $calcYear, $cronDayEntry, $cronMonthEntry) };
-				};
-			} else {
-				return []; # syntax error
-			};
-		};
-	};
-	return \@result;
 };
 
 1;
