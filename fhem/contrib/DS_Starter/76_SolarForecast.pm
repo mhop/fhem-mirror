@@ -30,18 +30,19 @@ package FHEM::SolarForecast;                              ## no critic 'package'
 use strict;
 use warnings;
 use POSIX;
-use GPUtils qw(GP_Import GP_Export);                                       # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+use GPUtils qw(GP_Import GP_Export);                                                 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday tv_interval);
 
-eval "use FHEM::Meta;1"                  or my $modMetaAbsent = 1;         ## no critic 'eval'
-eval "use FHEM::Utility::CTZ qw(:all);1" or my $ctzAbsent     = 1;         ## no critic 'eval'
+eval "use FHEM::Meta;1"                   or my $modMetaAbsent = 1;                  ## no critic 'eval'
+eval "use FHEM::Utility::CTZ qw(:all);1;" or my $ctzAbsent     = 1;                  ## no critic 'eval'
 
 use Encode;
 use Color;
 use utf8;
 use HttpUtils;
-eval "use JSON;1;"             or my $jsonabs = 'JSON';                    ## no critic 'eval' # Debian: apt-get install libjson-perl
-eval "use AI::DecisionTree;1;" or my $aidtabs = 'AI::DecisionTree';        ## no critic 'eval'
+eval "use JSON;1;"                           or my $jsonabs = 'JSON';                ## no critic 'eval' # Debian: sudo apt-get install libjson-perl
+eval "use AI::DecisionTree;1;"               or my $aidtabs = 'AI::DecisionTree';    ## no critic 'eval'
+eval "use Test2::Tools::Class qw(isa_ok);1;" or my $t2sabs  = 'Test2::Suite';        ## no critic 'eval' # Debian: sudo apt-get install libtest2-suite-perl
                            
 use FHEM::SynoModules::SMUtils qw(
                                    evaljson
@@ -49,12 +50,11 @@ use FHEM::SynoModules::SMUtils qw(
                                    delClHash
                                    moduleVersion
                                    trim
-                                 );                                        # Hilfsroutinen Modul
+                                 );                                                  # Hilfsroutinen Modul
 
 use Data::Dumper;
 use Storable qw(dclone freeze thaw nstore store retrieve); 
 use MIME::Base64;
-use Test2::Tools::Class qw(isa_ok);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Run before module compilation
@@ -649,8 +649,10 @@ my %hqtxt = (                                                                   
               DE => qq{KI Status:}                                                                                          },
   aimstt => { EN => qq{Perl module AI::DecisionTree is missing},
               DE => qq{Perl Modul AI::DecisionTree ist nicht vorhanden}                                                     },  
-  aiwook => { EN => qq{AI support works properly},
-              DE => qq{KI Unterst&uuml;tzung arbeitet einwandfrei}                                                          },  
+  aimmts => { EN => qq{Perl module Test2::Suite is missing},
+              DE => qq{Perl Modul Test2::Suite ist nicht vorhanden}                                                         },
+  aiwook => { EN => qq{AI support works properly, but does not provide a value for the current hour},
+              DE => qq{KI Unterst&uuml;tzung arbeitet einwandfrei, liefert jedoch keinen Wert f&uuml;r die aktuelle Stunde} },  
   nxtscc => { EN => qq{next SolCast call},
               DE => qq{n&auml;chste SolCast Abfrage}                                                                        },  
   fulfd  => { EN => qq{fulfilled},
@@ -4492,10 +4494,7 @@ sub centralTask {
       createReadingsFromArray ($hash, \@da, $evt);                                        # Readings erzeugen
       
       _getRoofTopData             ($centpars);                                            # Strahlungswerte/Forecast-Werte in solcastapi-Hash erstellen                                     
-      _transferAPIRadiationValues ($centpars);                                            # Raw Erzeugungswerte aus solcastapi-Hash übertragen und Forecast mit/ohne Korrektur erstellen
-
-      #aiGetResult ($centpars);
-      
+      _transferAPIRadiationValues ($centpars);                                            # Raw Erzeugungswerte aus solcastapi-Hash übertragen und Forecast mit/ohne Korrektur erstellen    
       _calcMaxEstimateToday       ($centpars);                                            # heutigen Max PV Estimate & dessen Tageszeit ermitteln
       _transferInverterValues     ($centpars);                                            # WR Werte übertragen
       _transferMeterValues        ($centpars);                                            # Energy Meter auswerten
@@ -4925,8 +4924,127 @@ return;
 }
 
 ################################################################
+#    Wetter Werte aus dem angebenen Wetterdevice extrahieren
+################################################################
+sub _transferWeatherValues {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $t     = $paref->{t};                                                                      # Epoche Zeit
+  my $chour = $paref->{chour};
+  my $daref = $paref->{daref};
+  my $date  = $paref->{date};                                                                   # aktuelles Datum
+  
+  my $fcname = ReadingsVal($name, 'currentWeatherDev', "");                                     # Weather Forecast Device
+  return if(!$fcname || !$defs{$fcname});
+
+  my $err         = checkdwdattr ($name,$fcname,\@dweattrmust);
+  $paref->{state} = $err if($err);
+
+  my $type  = $paref->{type};
+  
+  debugLog ($paref, "collectData", "collect Weather data - device: $fcname =>");
+  
+  my ($time_str);
+
+  my $fc0_SunRise = ReadingsVal($fcname, "fc0_SunRise", "23:59");                               # Sonnenaufgang heute
+  my $fc0_SunSet  = ReadingsVal($fcname, "fc0_SunSet",  "00:00");                               # Sonnenuntergang heute
+  my $fc1_SunRise = ReadingsVal($fcname, "fc1_SunRise", "23:59");                               # Sonnenaufgang morgen
+  my $fc1_SunSet  = ReadingsVal($fcname, "fc1_SunSet",  "00:00");                               # Sonnenuntergang morgen
+  
+  $data{$type}{$name}{current}{sunriseToday}   = $date.' '.$fc0_SunRise.':00';
+  $data{$type}{$name}{current}{sunriseTodayTs} = timestringToTimestamp ($date.' '.$fc0_SunRise.':00');
+  
+  $data{$type}{$name}{current}{sunsetToday}    = $date.' '.$fc0_SunSet.':00';
+  $data{$type}{$name}{current}{sunsetTodayTs}  = timestringToTimestamp ($date.' '.$fc0_SunSet.':00');
+  
+  debugLog ($paref, "collectData", "sunrise/sunset today: $fc0_SunRise / $fc0_SunSet, sunrise/sunset tomorrow: $fc1_SunRise / $fc1_SunSet");
+
+  push @$daref, "Today_SunRise<>".   $fc0_SunRise;
+  push @$daref, "Today_SunSet<>".    $fc0_SunSet;
+  push @$daref, "Tomorrow_SunRise<>".$fc1_SunRise;
+  push @$daref, "Tomorrow_SunSet<>". $fc1_SunSet;
+
+  my $fc0_SunRise_round = sprintf "%02d", (split ":", $fc0_SunRise)[0];
+  my $fc0_SunSet_round  = sprintf "%02d", (split ":", $fc0_SunSet)[0];
+  my $fc1_SunRise_round = sprintf "%02d", (split ":", $fc1_SunRise)[0];
+  my $fc1_SunSet_round  = sprintf "%02d", (split ":", $fc1_SunSet)[0];
+
+  for my $num (0..46) {
+      my ($fd,$fh) = _calcDayHourMove ($chour, $num);
+      last if($fd > 1);
+
+      my $fh1   = $fh+1;
+      my $fh2   = $fh1 == 24 ? 23 : $fh1;
+      my $wid   = ReadingsNum($fcname, "fc${fd}_${fh2}_ww",  -1);
+      my $neff  = ReadingsNum($fcname, "fc${fd}_${fh2}_Neff", 0);                              # Effektive Wolkendecke
+      my $r101  = ReadingsNum($fcname, "fc${fd}_${fh2}_R101", 0);                              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
+      my $temp  = ReadingsNum($fcname, "fc${fd}_${fh2}_TTT",  0);                              # Außentemperatur
+
+      my $don   = 1;                                                                           # es ist default "Tag"
+      my $fhstr = sprintf "%02d", $fh;                                                         # hier kann Tag/Nacht-Grenze verstellt werden
+
+      if($fd == 0 && ($fhstr lt $fc0_SunRise_round || $fhstr gt $fc0_SunSet_round)) {          # Zeit vor Sonnenaufgang oder nach Sonnenuntergang heute
+          $wid += 100;                                                                         # "1" der WeatherID voranstellen wenn Nacht
+          $don  = 0;
+      }
+      elsif ($fd == 1 && ($fhstr lt $fc1_SunRise_round || $fhstr gt $fc1_SunSet_round)) {      # Zeit vor Sonnenaufgang oder nach Sonnenuntergang morgen
+          $wid += 100;                                                                         # "1" der WeatherID voranstellen wenn Nacht
+          $don  = 0;
+      }
+
+      my $txt = ReadingsVal($fcname, "fc${fd}_${fh2}_wwd", '');
+
+      debugLog ($paref, "collectData", "wid: fc${fd}_${fh1}_ww, val: $wid, txt: $txt, cc: $neff, rp: $r101, temp: $temp");
+
+      $time_str                                             = "NextHour".sprintf "%02d", $num;
+      $data{$type}{$name}{nexthours}{$time_str}{weatherid}  = $wid;
+      $data{$type}{$name}{nexthours}{$time_str}{cloudcover} = $neff;
+      $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
+      $data{$type}{$name}{nexthours}{$time_str}{temp}       = $temp;
+      $data{$type}{$name}{nexthours}{$time_str}{DoN}        = $don;
+
+      if($num < 23 && $fh < 24) {                                                              # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherid}  = $wid;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weathertxt} = $txt;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wcc}        = $neff;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wrp}        = $r101;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{temp}       = $temp;
+
+          if($num == 0) {                                                                      # aktuelle Außentemperatur
+              $data{$type}{$name}{current}{temp} = $temp;
+          }
+      }
+
+      if($fd == 0 && $fh1) {                                                                   # Weather in pvhistory speichern
+          $paref->{wid}      = $wid;
+          $paref->{histname} = "weatherid";
+          $paref->{nhour}    = sprintf("%02d",$fh1);
+          setPVhistory ($paref);
+
+          $paref->{wcc}      = $neff;
+          $paref->{histname} = "weathercloudcover";
+          setPVhistory ($paref);
+
+          $paref->{wrp}      = $r101;
+          $paref->{histname} = "weatherrainprob";
+          setPVhistory ($paref);
+
+          $paref->{temp}     = $temp;
+          $paref->{histname} = "temperature";
+          setPVhistory ($paref);
+
+          delete $paref->{histname};
+      }
+  }
+
+return;
+}
+
+################################################################
 #  Strahlungsvorhersage Werte aus solcastapi-Hash
-#  übertragen und ggf. manipulieren
+#  übertragen und PV Vorhersage berechnen / in Nexthours 
+#  speichern
 ################################################################
 sub _transferAPIRadiationValues {
   my $paref = shift;
@@ -4957,7 +5075,7 @@ sub _transferAPIRadiationValues {
       my $wantts   = (timestringToTimestamp ($date.' '.$chour.':00:00')) + ($num * 3600);
       my $wantdt   = (timestampToTimestring ($wantts, $lang))[1];
 
-      my $time_str = "NextHour".sprintf "%02d", $num;
+      my $time_str = 'NextHour'.sprintf "%02d", $num;
       my ($hod)    = $wantdt =~ /\s(\d{2}):/xs;
       $hod         = sprintf "%02d", int $hod + 1;                                            # Stunde des Tages
       
@@ -4969,6 +5087,7 @@ sub _transferAPIRadiationValues {
           type    => $type,
           wantdt  => $wantdt,
           hod     => $hod,
+          nhidx   => $time_str,
           num     => $num,
           fh1     => $fh1,
           fd      => $fd,
@@ -4982,7 +5101,16 @@ sub _transferAPIRadiationValues {
       $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $wantdt;
       $data{$type}{$name}{nexthours}{$time_str}{hourofday}  = $hod;
       $data{$type}{$name}{nexthours}{$time_str}{today}      = $fd == 0 ? 1 : 0;
-      $data{$type}{$name}{nexthours}{$time_str}{rad1h}      = $rad;                    
+      $data{$type}{$name}{nexthours}{$time_str}{rad1h}      = $rad;
+
+      my ($err, $pvaifc) = aiGetResult ($params);                                             # KI Entscheidungen abfragen
+      if (!$err) {
+          $data{$type}{$name}{nexthours}{$time_str}{pvaifc} = $pvaifc;
+          $data{$type}{$name}{current}{aigetresult}         = 'ok';
+      }
+      else {
+          $data{$type}{$name}{current}{aigetresult} = $err;
+      }      
 
       if($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
           $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{pvfc} = $est;
@@ -5389,124 +5517,6 @@ sub _transferInverterValues {
   $paref->{histname}  = "pvrl";
   setPVhistory ($paref);
   delete $paref->{histname};
-
-return;
-}
-
-################################################################
-#    Wetter Werte aus dem angebenen Wetterdevice extrahieren
-################################################################
-sub _transferWeatherValues {
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $t     = $paref->{t};                                                                      # Epoche Zeit
-  my $chour = $paref->{chour};
-  my $daref = $paref->{daref};
-  my $date  = $paref->{date};                                                                   # aktuelles Datum
-  
-  my $fcname = ReadingsVal($name, 'currentWeatherDev', "");                                     # Weather Forecast Device
-  return if(!$fcname || !$defs{$fcname});
-
-  my $err         = checkdwdattr ($name,$fcname,\@dweattrmust);
-  $paref->{state} = $err if($err);
-
-  my $type  = $paref->{type};
-  
-  debugLog ($paref, "collectData", "collect Weather data - device: $fcname =>");
-  
-  my ($time_str);
-
-  my $fc0_SunRise = ReadingsVal($fcname, "fc0_SunRise", "23:59");                               # Sonnenaufgang heute
-  my $fc0_SunSet  = ReadingsVal($fcname, "fc0_SunSet",  "00:00");                               # Sonnenuntergang heute
-  my $fc1_SunRise = ReadingsVal($fcname, "fc1_SunRise", "23:59");                               # Sonnenaufgang morgen
-  my $fc1_SunSet  = ReadingsVal($fcname, "fc1_SunSet",  "00:00");                               # Sonnenuntergang morgen
-  
-  $data{$type}{$name}{current}{sunriseToday}   = $date.' '.$fc0_SunRise.':00';
-  $data{$type}{$name}{current}{sunriseTodayTs} = timestringToTimestamp ($date.' '.$fc0_SunRise.':00');
-  
-  $data{$type}{$name}{current}{sunsetToday}    = $date.' '.$fc0_SunSet.':00';
-  $data{$type}{$name}{current}{sunsetTodayTs}  = timestringToTimestamp ($date.' '.$fc0_SunSet.':00');
-  
-  debugLog ($paref, "collectData", "sunrise/sunset today: $fc0_SunRise / $fc0_SunSet, sunrise/sunset tomorrow: $fc1_SunRise / $fc1_SunSet");
-
-  push @$daref, "Today_SunRise<>".   $fc0_SunRise;
-  push @$daref, "Today_SunSet<>".    $fc0_SunSet;
-  push @$daref, "Tomorrow_SunRise<>".$fc1_SunRise;
-  push @$daref, "Tomorrow_SunSet<>". $fc1_SunSet;
-
-  my $fc0_SunRise_round = sprintf "%02d", (split ":", $fc0_SunRise)[0];
-  my $fc0_SunSet_round  = sprintf "%02d", (split ":", $fc0_SunSet)[0];
-  my $fc1_SunRise_round = sprintf "%02d", (split ":", $fc1_SunRise)[0];
-  my $fc1_SunSet_round  = sprintf "%02d", (split ":", $fc1_SunSet)[0];
-
-  for my $num (0..46) {
-      my ($fd,$fh) = _calcDayHourMove ($chour, $num);
-      last if($fd > 1);
-
-      my $fh1   = $fh+1;
-      my $fh2   = $fh1 == 24 ? 23 : $fh1;
-      my $wid   = ReadingsNum($fcname, "fc${fd}_${fh2}_ww",  -1);
-      my $neff  = ReadingsNum($fcname, "fc${fd}_${fh2}_Neff", 0);                              # Effektive Wolkendecke
-      my $r101  = ReadingsNum($fcname, "fc${fd}_${fh2}_R101", 0);                              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-      my $temp  = ReadingsNum($fcname, "fc${fd}_${fh2}_TTT",  0);                              # Außentemperatur
-
-      my $don   = 1;                                                                           # es ist default "Tag"
-      my $fhstr = sprintf "%02d", $fh;                                                         # hier kann Tag/Nacht-Grenze verstellt werden
-
-      if($fd == 0 && ($fhstr lt $fc0_SunRise_round || $fhstr gt $fc0_SunSet_round)) {          # Zeit vor Sonnenaufgang oder nach Sonnenuntergang heute
-          $wid += 100;                                                                         # "1" der WeatherID voranstellen wenn Nacht
-          $don  = 0;
-      }
-      elsif ($fd == 1 && ($fhstr lt $fc1_SunRise_round || $fhstr gt $fc1_SunSet_round)) {      # Zeit vor Sonnenaufgang oder nach Sonnenuntergang morgen
-          $wid += 100;                                                                         # "1" der WeatherID voranstellen wenn Nacht
-          $don  = 0;
-      }
-
-      my $txt = ReadingsVal($fcname, "fc${fd}_${fh2}_wwd", '');
-
-      debugLog ($paref, "collectData", "wid: fc${fd}_${fh1}_ww, val: $wid, txt: $txt, cc: $neff, rp: $r101, temp: $temp");
-
-      $time_str                                             = "NextHour".sprintf "%02d", $num;
-      $data{$type}{$name}{nexthours}{$time_str}{weatherid}  = $wid;
-      $data{$type}{$name}{nexthours}{$time_str}{cloudcover} = $neff;
-      $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
-      $data{$type}{$name}{nexthours}{$time_str}{temp}       = $temp;
-      $data{$type}{$name}{nexthours}{$time_str}{DoN}        = $don;
-
-      if($num < 23 && $fh < 24) {                                                              # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherid}  = $wid;
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weathertxt} = $txt;
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wcc}        = $neff;
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wrp}        = $r101;
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{temp}       = $temp;
-
-          if($num == 0) {                                                                      # aktuelle Außentemperatur
-              $data{$type}{$name}{current}{temp} = $temp;
-          }
-      }
-
-      if($fd == 0 && $fh1) {                                                                   # Weather in pvhistory speichern
-          $paref->{wid}      = $wid;
-          $paref->{histname} = "weatherid";
-          $paref->{nhour}    = sprintf("%02d",$fh1);
-          setPVhistory ($paref);
-
-          $paref->{wcc}      = $neff;
-          $paref->{histname} = "weathercloudcover";
-          setPVhistory ($paref);
-
-          $paref->{wrp}      = $r101;
-          $paref->{histname} = "weatherrainprob";
-          setPVhistory ($paref);
-
-          $paref->{temp}     = $temp;
-          $paref->{histname} = "temperature";
-          setPVhistory ($paref);
-
-          delete $paref->{histname};
-      }
-  }
 
 return;
 }
@@ -8526,15 +8536,17 @@ sub _graphicHeader {
       my $aitst = CurrentVal ($hash, 'aitrainstate', 'ok');
       my $aiast = CurrentVal ($hash, 'aiaddistate',  'ok');       
       
-      my $aitit = $aidtabs       ? $hqtxt{aimstt}{$lang} :    
+      my $aitit = $aidtabs       ? $hqtxt{aimstt}{$lang} :
+                  $t2sabs        ? $hqtxt{aimmts}{$lang} :   
                   $aiist ne 'ok' ? $hqtxt{ainuse}{$lang} :
                   q{};
       
-      my $aiimg  = $aidtabs       ? FW_makeImage ('--',                 $aitit) :    
+      my $aiimg  = $aidtabs       ? FW_makeImage ('--',                 $aitit) : 
+                   $t2sabs        ? FW_makeImage ('--',                 $aitit) :       
                    $aiist ne 'ok' ? FW_makeImage ('-',                  $aitit) :
                    $aitst ne 'ok' ? FW_makeImage ('10px-kreis-rot.png', $aitst) :
                    $aiast ne 'ok' ? FW_makeImage ('10px-kreis-rot.png', $aiast) :   
-                   FW_makeImage ('10px-kreis-gruen.png', $hqtxt{aiwook}{$lang});
+                   FW_makeImage ('10px-kreis-gelb.png', $hqtxt{aiwook}{$lang});
       
       my $aiicon = qq{<a title="$aitit">$aiimg</a>};
 
@@ -10568,6 +10580,8 @@ sub aiTrain {                   ## no critic "not used"
 return;
 }
 
+####################################################################################
+
 ################################################################
 #     AI Ergebnis für ermitteln
 ################################################################
@@ -10576,50 +10590,49 @@ sub aiGetResult {                   ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
+  my $hod   = $paref->{hod};
+  my $nhidx = $paref->{nhidx};
   
-  return if(!isDWDUsed ($hash));  
+  my $err   = 'no decition delivered';
   
-  my $err;
+  return $err if(!isDWDUsed ($hash) || !$hod || !$nhidx);  
+  
   my $dtree = AiDetreeVal ($hash, undef);
   
   if (!$dtree) {
       ($err, $dtree) = aiInit ($paref);
-      return if($err);
+      return $err if($err);
   }
   
-  for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
-      my $rad1h = NexthoursVal ($hash, $idx, "rad1h", undef);
-      next if(!defined $rad1h);
-      
-      my $hod  = NexthoursVal ($hash, $idx, "hourofday", undef);
-      next if(!defined $hod);
-      
-      my $wcc  = NexthoursVal ($hash, $idx, "cloudcover", 0);
-      my $wrp  = NexthoursVal ($hash, $idx, "rainprob",   0);
-      my $temp = NexthoursVal ($hash, $idx, "temp",       20);
-      
-      my $pvfc;
+  my $rad1h = NexthoursVal ($hash, $nhidx, "rad1h", undef);
+  return "no rad1h for hod: $hod" if(!defined $rad1h);
+  
+  my $wcc  = NexthoursVal ($hash, $nhidx, "cloudcover",  0);
+  my $wrp  = NexthoursVal ($hash, $nhidx, "rainprob",    0);
+  my $temp = NexthoursVal ($hash, $nhidx, "temp",       20);
+  
+  my $pvaifc;
                                      
-      eval { $pvfc = $dtree->get_result (attributes => { rad1h => $rad1h,
-                                                         temp  => $temp,
-                                                         wcc   => $wcc,
-                                                         wrp   => $wrp,
-                                                         hod   => $hod
-                                                       }
-                                        );
-                   };
+  eval { $pvaifc = $dtree->get_result (attributes => { rad1h => $rad1h,
+                                                       temp  => $temp,
+                                                       wcc   => $wcc,
+                                                       wrp   => $wrp,
+                                                       hod   => $hod
+                                                     }
+                                      );
+       };
                    
-      if ($@) {
-          Log3 ($name, 1, "$name - aiGetResult ERROR: $@");
-          return;
-      }
-                                      
-      if (defined $pvfc) {
-          debugLog ($paref, 'aiProcess', qq{result AI: pvfc: $pvfc (hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $wrp, temp: $temp)});
-      }
+  if ($@) {
+      Log3 ($name, 1, "$name - aiGetResult ERROR: $@");
+      return $@;
+  }
+                                  
+  if (defined $pvaifc) {
+      debugLog ($paref, 'aiData', qq{result AI: pvaifc: $pvaifc (hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $wrp, temp: $temp)});
+      return ('', $pvaifc);
   }
 
-return;
+return $err;
 }
 
 ################################################################
@@ -10633,8 +10646,9 @@ sub aiInit {                   ## no critic "not used"
 
   my $err;
   
-  if ($aidtabs) {
-      my $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "sudo apt-get install libai-decisiontree-perl" for AI support);
+  if ($aidtabs || $t2sabs) {
+      $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "sudo apt-get install libai-decisiontree-perl" for AI support) if($aidtabs);
+      $err = qq(The Perl module Test2::Suite is missing. Please install it with e.g. "sudo apt-get install libtest2-suite-perl")                        if($t2sabs);
       debugLog ($paref, 'aiProcess', $err);
       $data{$type}{$name}{current}{aiinitstate} = $err;
       return $err;      
@@ -11185,24 +11199,25 @@ sub listDataPool {
           return qq{NextHours cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $nhts    = NexthoursVal ($hash, $idx, "starttime",  "-");
-          my $hod     = NexthoursVal ($hash, $idx, "hourofday",  "-");
-          my $today   = NexthoursVal ($hash, $idx, "today",      "-");
-          my $pvfc    = NexthoursVal ($hash, $idx, "pvforecast", "-");
-          my $wid     = NexthoursVal ($hash, $idx, "weatherid",  "-");
-          my $neff    = NexthoursVal ($hash, $idx, "cloudcover", "-");
-          my $crange  = NexthoursVal ($hash, $idx, "cloudrange", "-");
-          my $r101    = NexthoursVal ($hash, $idx, "rainprob",   "-");
-          my $rad1h   = NexthoursVal ($hash, $idx, "rad1h",      "-");
-          my $pvcorrf = NexthoursVal ($hash, $idx, "pvcorrf",    "-");
-          my $temp    = NexthoursVal ($hash, $idx, "temp",       "-");
-          my $confc   = NexthoursVal ($hash, $idx, "confc",      "-");
-          my $confcex = NexthoursVal ($hash, $idx, "confcEx",    "-");
-          my $don     = NexthoursVal ($hash, $idx, "DoN",        "-");
+          my $nhts    = NexthoursVal ($hash, $idx, 'starttime',  "-");
+          my $hod     = NexthoursVal ($hash, $idx, 'hourofday',  "-");
+          my $today   = NexthoursVal ($hash, $idx, 'today',      "-");
+          my $pvfc    = NexthoursVal ($hash, $idx, 'pvforecast', "-");
+          my $pvaifc  = NexthoursVal ($hash, $idx, 'pvaifc',     "-");             # PV Forecast der KI
+          my $wid     = NexthoursVal ($hash, $idx, 'weatherid',  "-");
+          my $neff    = NexthoursVal ($hash, $idx, 'cloudcover', "-");
+          my $crange  = NexthoursVal ($hash, $idx, 'cloudrange', "-");
+          my $r101    = NexthoursVal ($hash, $idx, 'rainprob',   "-");
+          my $rad1h   = NexthoursVal ($hash, $idx, 'rad1h',      "-");
+          my $pvcorrf = NexthoursVal ($hash, $idx, 'pvcorrf',    "-");
+          my $temp    = NexthoursVal ($hash, $idx, 'temp',       "-");
+          my $confc   = NexthoursVal ($hash, $idx, 'confc',      "-");
+          my $confcex = NexthoursVal ($hash, $idx, 'confcEx',    "-");
+          my $don     = NexthoursVal ($hash, $idx, 'DoN',        "-");
           $sq        .= "\n" if($sq);
           $sq        .= $idx." => starttime: $nhts, hourofday: $hod, today: $today\n";
-          $sq        .= "              pvfc: $pvfc, confc: $confc, confcEx: $confcex, DoN: $don\n";
-          $sq        .= "              wid: $wid, wcc: $neff, wrp: $r101, temp=$temp\n";
+          $sq        .= "              pvfc: $pvfc, pvaifc: $pvaifc, confc: $confc, confcEx: $confcex\n";
+          $sq        .= "              DoN: $don, wid: $wid, wcc: $neff, wrp: $r101, temp=$temp\n";
           $sq        .= "              rad1h: $rad1h, crange: $crange, correff: $pvcorrf";
       }
   }
@@ -11613,6 +11628,13 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "sudo apt-get install libai-decisiontree-perl".<br>};
           $result->{'Common Settings'}{info}    = 1;         
       }
+      
+      if ($t2sabs) {
+          $result->{'Common Settings'}{state}   = $info;
+          $result->{'Common Settings'}{result} .= qq{The Perl module Test2::Suite is missing. <br>};
+          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "sudo apt-get install libtest2-suite-perl".<br>};
+          $result->{'Common Settings'}{info}    = 1;         
+      }
        
       if (!$pcf || $pcf !~ /on/xs) {          
           $result->{'Common Settings'}{state}   = $info;
@@ -11624,8 +11646,8 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
           $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading, ctrlLanguage, global language <br>};
-          $result->{'Common Settings'}{note}   .= qq{checked Perl module: <br>};
-          $result->{'Common Settings'}{note}   .= qq{AI::DecisionTree <br>};
+          $result->{'Common Settings'}{note}   .= qq{checked Perl modules: <br>};
+          $result->{'Common Settings'}{note}   .= qq{AI::DecisionTree, Test2::Suite <br>};
       }
   }
   
@@ -13932,8 +13954,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                  </td><td>Faktor/0..1 - Qualität der PV Prognose (1 = beste Qualität)                        </td></tr>
             <tr><td> <b>DoN</b>       </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                               </td></tr>
             <tr><td> <b>hourofday</b> </td><td>laufende Stunde des Tages                                                          </td></tr>
-            <tr><td> <b>pvfc</b>      </td><td>erwartete PV Erzeugung (Wh)                                                        </td></tr>
-            <tr><td> <b>today</b>     </td><td>"1" wenn Startdatum am aktuellen Tag                                               </td></tr>
+            <tr><td> <b>pvfc</b>      </td><td>erwartete PV Erzeugung (Wh) ohne KI Unterstützung                                  </td></tr>
+            <tr><td> <b>pvaifc</b>    </td><td>erwartete PV Erzeugung der KI (Wh)                                                 </td></tr>
+            <tr><td> <b>today</b>     </td><td>hat Wert '1' wenn Startdatum am aktuellen Tag                                      </td></tr>
             <tr><td> <b>rad1h</b>     </td><td>vorhergesagte Globalstrahlung                                                      </td></tr>
             <tr><td> <b>starttime</b> </td><td>Startzeit des Datensatzes                                                          </td></tr>
             <tr><td> <b>temp</b>      </td><td>vorhergesagte Außentemperatur                                                      </td></tr>
@@ -14881,7 +14904,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "Time::HiRes": 0,
         "MIME::Base64": 0,
         "Storable": 0,
-        "Test2::Tools::Class": 0        
+        "Test2::Suite": 0        
       },
       "recommends": {
         "FHEM::Meta": 0,
