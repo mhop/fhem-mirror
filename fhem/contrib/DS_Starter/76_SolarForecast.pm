@@ -10515,12 +10515,14 @@ sub aiAddInstance {                   ## no critic "not used"
           $wcc   = HistoryVal ($hash, $pvd, $hod, 'wcc',   0);
           $wrp   = HistoryVal ($hash, $pvd, $hod, 'wrp',   0);
           
-          my $tbin = temp2bin ($temp);
+          my $tbin = temp2bin  ($temp);
+          my $cbin = cloud2bin ($wcc);
+          my $rbin = rain2bin  ($wrp);
           
           eval { $dtree->add_instance (attributes => { rad1h => $rad1h,
                                                        temp  => $tbin,
-                                                       wcc   => $wcc,
-                                                       wrp   => $wrp,
+                                                       wcc   => $cbin,
+                                                       wrp   => $rbin,
                                                        hod   => $hod
                                                      },
                                                      result => $pvrl
@@ -10533,7 +10535,7 @@ sub aiAddInstance {                   ## no critic "not used"
           
           $data{$type}{$name}{current}{aiaddistate} = 'ok';
           
-          debugLog ($paref, 'aiProcess', qq{AI Instance added - day: $pvd, hod: $hod, rad1h: $rad1h, pvrl: $pvrl, wcc: $wcc, wrp: $wrp, temp: $tbin}); 
+          debugLog ($paref, 'aiProcess', qq{AI Instance added - day: $pvd, hod: $hod, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, wrp: $rbin, temp: $tbin}); 
       }
   }
   
@@ -10614,14 +10616,16 @@ sub aiGetResult {                   ## no critic "not used"
   my $wrp  = NexthoursVal ($hash, $nhidx, "rainprob",    0);
   my $temp = NexthoursVal ($hash, $nhidx, "temp",       20);
   
-  my $tbin = temp2bin ($temp);
+  my $tbin = temp2bin  ($temp);
+  my $cbin = cloud2bin ($wcc);
+  my $rbin = rain2bin  ($wrp);
   
   my $pvaifc;
                                      
   eval { $pvaifc = $dtree->get_result (attributes => { rad1h => $rad1h,
                                                        temp  => $tbin,
-                                                       wcc   => $wcc,
-                                                       wrp   => $wrp,
+                                                       wcc   => $cbin,
+                                                       wrp   => $rbin,
                                                        hod   => $hod
                                                      }
                                       );
@@ -10633,7 +10637,7 @@ sub aiGetResult {                   ## no critic "not used"
   }
                                   
   if (defined $pvaifc) {
-      debugLog ($paref, 'aiData', qq{result AI: pvaifc: $pvaifc (hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $wrp, temp: $tbin)});
+      debugLog ($paref, 'aiData', qq{result AI: pvaifc: $pvaifc (hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $rbin, temp: $tbin)});
       return ('', $pvaifc);
   }
 
@@ -12669,6 +12673,66 @@ sub temp2bin {
             $temp > 5  ? 'cool'    :
             $temp > 0  ? 'cold'    :
             'verycold';
+
+return $bin;
+}
+
+################################################################
+#  diskrete Bewölkung in "Bins" wandeln
+################################################################       
+sub cloud2bin {
+  my $wcc = shift;
+
+  my $bin = $wcc > 95 ? 'wcl95' :
+            $wcc > 90 ? 'wcl90' :
+            $wcc > 85 ? 'wcl85' :
+            $wcc > 80 ? 'wcl80' :
+            $wcc > 75 ? 'wcl75' :
+            $wcc > 70 ? 'wcl70' :
+            $wcc > 65 ? 'wcl65' :
+            $wcc > 60 ? 'wcl60' :
+            $wcc > 55 ? 'wcl55' :
+            $wcc > 50 ? 'wcl50' :
+            $wcc > 45 ? 'wcl45' :
+            $wcc > 40 ? 'wcl40' :
+            $wcc > 35 ? 'wcl35' :
+            $wcc > 30 ? 'wcl30' :
+            $wcc > 25 ? 'wcl25' :
+            $wcc > 20 ? 'wcl20' :
+            $wcc > 15 ? 'wcl15' :
+            $wcc > 10 ? 'wcl10' :
+            $wcc > 5  ? 'wcl05' :
+            'wcl00';
+
+return $bin;
+}
+
+################################################################
+#  diskrete Rain Prob in "Bins" wandeln
+################################################################       
+sub rain2bin {
+  my $wrp = shift;
+
+  my $bin = $wrp > 95 ? 'wrl95' :
+            $wrp > 90 ? 'wrl90' :
+            $wrp > 85 ? 'wrl85' :
+            $wrp > 80 ? 'wrl80' :
+            $wrp > 75 ? 'wrl75' :
+            $wrp > 70 ? 'wrl70' :
+            $wrp > 65 ? 'wrl65' :
+            $wrp > 60 ? 'wrl60' :
+            $wrp > 55 ? 'wrl55' :
+            $wrp > 50 ? 'wrl50' :
+            $wrp > 45 ? 'wrl45' :
+            $wrp > 40 ? 'wrl40' :
+            $wrp > 35 ? 'wrl35' :
+            $wrp > 30 ? 'wrl30' :
+            $wrp > 25 ? 'wrl25' :
+            $wrp > 20 ? 'wrl20' :
+            $wrp > 15 ? 'wrl15' :
+            $wrp > 10 ? 'wrl10' :
+            $wrp > 5  ? 'wrl05' :
+            'wrl00';
 
 return $bin;
 }
