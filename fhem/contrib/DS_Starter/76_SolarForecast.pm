@@ -1251,8 +1251,8 @@ sub Set {
                   ;
   }
   else {
-      $setlist .= "aiAddInstance:noArg ".
-                  "aiTrain:noArg ".
+      $setlist .= #"aiAddInstance:noArg ".
+                  #"aiTrain:noArg ".
                   "moduleDirection ".
                   "moduleTiltAngle "
                   ;
@@ -2069,11 +2069,12 @@ sub _setreset {                          ## no critic "not used"
   }
 
   if($prop eq 'aiData') {
+      my $err;
       my $dtree = AiDetreeVal ($hash, undef);
       
       if ($dtree) {
           delete $data{$type}{$name}{aidectree};
-          my $err = aiInit ($paref);
+          ($err, $dtree) = aiInit ($paref);
           return $err if($err);
       }
       
@@ -10473,13 +10474,12 @@ sub aiAddInstance {                   ## no critic "not used"
   
   return if(!isDWDUsed ($hash));
   
+  my $err;
   my $dtree = AiDetreeVal ($hash, undef);
   
   if (!$dtree) {
-      my $err = aiInit ($paref);
+      ($err, $dtree) = aiInit ($paref);
       return if($err);
-      
-      $dtree = AiDetreeVal ($hash, undef);
   }
    
   my ($pvrl, $temp, $wcc, $wrp, $rad1h);
@@ -10544,10 +10544,8 @@ sub aiTrain {                   ## no critic "not used"
   my $dtree = AiDetreeVal ($hash, undef);
   
   if (!$dtree) {
-      $err = aiInit ($paref);
+      ($err, $dtree) = aiInit ($paref);
       return if($err);
-      
-      $dtree = AiDetreeVal ($hash, undef);
   }
   
   eval { $dtree->train
@@ -10581,13 +10579,12 @@ sub aiGetResult {                   ## no critic "not used"
   
   return if(!isDWDUsed ($hash));  
   
+  my $err;
   my $dtree = AiDetreeVal ($hash, undef);
   
   if (!$dtree) {
-      my $err = aiInit ($paref);
+      ($err, $dtree) = aiInit ($paref);
       return if($err);
-      
-      $dtree = AiDetreeVal ($hash, undef);
   }
   
   for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
@@ -10634,19 +10631,23 @@ sub aiInit {                   ## no critic "not used"
   my $name  = $paref->{name};
   my $type  = $paref->{type};
 
+  my $err;
+  
   if ($aidtabs) {
-      my $msg = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "sudo apt-get install libai-decisiontree-perl" for AI support);
-      debugLog ($paref, 'aiProcess', $msg);
-      $data{$type}{$name}{current}{aiinitstate} = $msg;
-      return $msg;      
+      my $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "sudo apt-get install libai-decisiontree-perl" for AI support);
+      debugLog ($paref, 'aiProcess', $err);
+      $data{$type}{$name}{current}{aiinitstate} = $err;
+      return $err;      
   }
+  
+  my $dtree = new AI::DecisionTree ( verbose => 0, noise_mode => 'pick_best' );
                 
-  $data{$type}{$name}{aidectree}            = new AI::DecisionTree ( verbose => 0, noise_mode => 'pick_best' );
+  $data{$type}{$name}{aidectree}            = $dtree;
   $data{$type}{$name}{current}{aiinitstate} = 'ok';
   
   Log3 ($name, 3, "$name - AI::DecisionTree new initialized");
   
-return;
+return ($err, $dtree);
 }
 
 ################################################################
