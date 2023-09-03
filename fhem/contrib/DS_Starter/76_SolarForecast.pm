@@ -1130,6 +1130,7 @@ sub _readCacheFile {
       my ($err, $dtree) = fileRetrieve ($file);
       
       if (!$err && $dtree) {
+          return if($t2sabs);                                                     # Modul Test2::Suite ist nicht installiert
           my $valid = isa_ok($dtree, 'AI::DecisionTree');
           
           if ($valid == 1) {
@@ -10514,8 +10515,10 @@ sub aiAddInstance {                   ## no critic "not used"
           $wcc   = HistoryVal ($hash, $pvd, $hod, 'wcc',   0);
           $wrp   = HistoryVal ($hash, $pvd, $hod, 'wrp',   0);
           
+          my $tbin = temp2bin ($temp);
+          
           eval { $dtree->add_instance (attributes => { rad1h => $rad1h,
-                                                       temp  => $temp,
+                                                       temp  => $tbin,
                                                        wcc   => $wcc,
                                                        wrp   => $wrp,
                                                        hod   => $hod
@@ -10530,7 +10533,7 @@ sub aiAddInstance {                   ## no critic "not used"
           
           $data{$type}{$name}{current}{aiaddistate} = 'ok';
           
-          debugLog ($paref, 'aiProcess', qq{AI Instance added - day: $pvd, hod: $hod, rad1h: $rad1h, pvrl: $pvrl, wcc: $wcc, wrp: $wrp, temp: $temp}); 
+          debugLog ($paref, 'aiProcess', qq{AI Instance added - day: $pvd, hod: $hod, rad1h: $rad1h, pvrl: $pvrl, wcc: $wcc, wrp: $wrp, temp: $tbin}); 
       }
   }
   
@@ -10611,10 +10614,12 @@ sub aiGetResult {                   ## no critic "not used"
   my $wrp  = NexthoursVal ($hash, $nhidx, "rainprob",    0);
   my $temp = NexthoursVal ($hash, $nhidx, "temp",       20);
   
+  my $tbin = temp2bin ($temp);
+  
   my $pvaifc;
                                      
   eval { $pvaifc = $dtree->get_result (attributes => { rad1h => $rad1h,
-                                                       temp  => $temp,
+                                                       temp  => $tbin,
                                                        wcc   => $wcc,
                                                        wrp   => $wrp,
                                                        hod   => $hod
@@ -10628,7 +10633,7 @@ sub aiGetResult {                   ## no critic "not used"
   }
                                   
   if (defined $pvaifc) {
-      debugLog ($paref, 'aiData', qq{result AI: pvaifc: $pvaifc (hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $wrp, temp: $temp)});
+      debugLog ($paref, 'aiData', qq{result AI: pvaifc: $pvaifc (hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $wrp, temp: $tbin)});
       return ('', $pvaifc);
   }
 
@@ -12649,6 +12654,23 @@ sub getCDnames {
 
 
 return ($cname, $dswname);
+}
+
+################################################################
+#  diskrete Temperaturen in "Bins" wandeln
+################################################################       
+sub temp2bin {
+  my $temp = shift;
+
+  my $bin = $temp > 30 ? 'veryhot' :
+            $temp > 25 ? 'hot'     :   
+            $temp > 20 ? 'warm'    :
+            $temp > 10 ? 'medium'  :
+            $temp > 5  ? 'cool'    :
+            $temp > 0  ? 'cold'    :
+            'verycold';
+
+return $bin;
 }
 
 ###############################################################################
