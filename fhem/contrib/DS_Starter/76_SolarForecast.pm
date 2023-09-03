@@ -1251,8 +1251,8 @@ sub Set {
                   ;
   }
   else {
-      $setlist .= #"aiAddInstance:noArg ".
-                  #"aiTrain:noArg ".
+      $setlist .= "aiAddInstance:noArg ".
+                  "aiTrain:noArg ".
                   "moduleDirection ".
                   "moduleTiltAngle "
                   ;
@@ -2078,7 +2078,7 @@ sub _setreset {                          ## no critic "not used"
       }
       
       delete $data{$type}{$name}{current}{aitrainstate};
-      delete $data{$type}{$name}{current}{aiworkstate};
+      delete $data{$type}{$name}{current}{aiaddistate};
       
       return;
   }
@@ -8523,7 +8523,7 @@ sub _graphicHeader {
       ##############
       my $aiist = CurrentVal ($hash, 'aiinitstate',    '');
       my $aitst = CurrentVal ($hash, 'aitrainstate', 'ok');
-      my $aiwst = CurrentVal ($hash, 'aiworkstate',  'ok');       
+      my $aiast = CurrentVal ($hash, 'aiaddistate',  'ok');       
       
       my $aitit = $aidtabs       ? $hqtxt{aimstt}{$lang} :    
                   $aiist ne 'ok' ? $hqtxt{ainuse}{$lang} :
@@ -8532,7 +8532,7 @@ sub _graphicHeader {
       my $aiimg  = $aidtabs       ? FW_makeImage ('--',                 $aitit) :    
                    $aiist ne 'ok' ? FW_makeImage ('-',                  $aitit) :
                    $aitst ne 'ok' ? FW_makeImage ('10px-kreis-rot.png', $aitst) :
-                   $aiwst ne 'ok' ? FW_makeImage ('10px-kreis-rot.png', $aiwst) :   
+                   $aiast ne 'ok' ? FW_makeImage ('10px-kreis-rot.png', $aiast) :   
                    FW_makeImage ('10px-kreis-gruen.png', $hqtxt{aiwook}{$lang});
       
       my $aiicon = qq{<a title="$aitit">$aiimg</a>};
@@ -10478,6 +10478,8 @@ sub aiAddInstance {                   ## no critic "not used"
   if (!$dtree) {
       my $err = aiInit ($paref);
       return if($err);
+      
+      $dtree = AiDetreeVal ($hash, undef);
   }
    
   my ($pvrl, $temp, $wcc, $wrp, $rad1h);
@@ -10510,11 +10512,11 @@ sub aiAddInstance {                   ## no critic "not used"
                                       )
                }
                or do { Log3 ($name, 1, "$name - aiAddInstance ERROR: $@");
-                       $data{$type}{$name}{current}{aiworkstate} = $@;
+                       $data{$type}{$name}{current}{aiaddistate} = $@;
                        return;
                      };
           
-          $data{$type}{$name}{current}{aiworkstate} = 'ok';
+          $data{$type}{$name}{current}{aiaddistate} = 'ok';
           
           debugLog ($paref, 'aiProcess', qq{AI Instance added - day: $pvd, hod: $hod, rad1h: $rad1h, pvrl: $pvrl, wcc: $wcc, wrp: $wrp, temp: $temp}); 
       }
@@ -10544,6 +10546,8 @@ sub aiTrain {                   ## no critic "not used"
   if (!$dtree) {
       $err = aiInit ($paref);
       return if($err);
+      
+      $dtree = AiDetreeVal ($hash, undef);
   }
   
   eval { $dtree->train
@@ -10582,6 +10586,8 @@ sub aiGetResult {                   ## no critic "not used"
   if (!$dtree) {
       my $err = aiInit ($paref);
       return if($err);
+      
+      $dtree = AiDetreeVal ($hash, undef);
   }
   
   for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
@@ -10597,7 +10603,7 @@ sub aiGetResult {                   ## no critic "not used"
       
       my $pvfc;
                                      
-      $pvfc = eval { $dtree->get_result (attributes => { rad1h => $rad1h,
+      eval { $pvfc = $dtree->get_result (attributes => { rad1h => $rad1h,
                                                          temp  => $temp,
                                                          wcc   => $wcc,
                                                          wrp   => $wrp,
@@ -10608,12 +10614,10 @@ sub aiGetResult {                   ## no critic "not used"
                    
       if ($@) {
           Log3 ($name, 1, "$name - aiGetResult ERROR: $@");
-          $data{$type}{$name}{current}{aiworkstate} = $@;
           return;
       }
                                       
       if (defined $pvfc) {
-          $data{$type}{$name}{current}{aiworkstate} = 'ok';
           debugLog ($paref, 'aiProcess', qq{result AI: pvfc: $pvfc (hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $wrp, temp: $temp)});
       }
   }
@@ -10636,7 +10640,7 @@ sub aiInit {                   ## no critic "not used"
       $data{$type}{$name}{current}{aiinitstate} = $msg;
       return $msg;      
   }
-        
+                
   $data{$type}{$name}{aidectree}            = new AI::DecisionTree ( verbose => 0, noise_mode => 'pick_best' );
   $data{$type}{$name}{current}{aiinitstate} = 'ok';
   
@@ -12918,7 +12922,7 @@ return $def;
 # $key: generation           - aktuelle PV Erzeugung
 #       aiinitstate          - Initialisierungsstatus der KI
 #       aitrainstate         - Traisningsstatus der KI
-#       aiworkstate          - aktueller Arbeitstatus der KI
+#       aiaddistate          - Add Instanz Status der KI
 #       genslidereg          - Schieberegister PV Erzeugung (Array)
 #       h4fcslidereg         - Schieberegister 4h PV Forecast (Array)
 #       consumption          - aktueller Verbrauch (W)
