@@ -40,8 +40,9 @@ use Encode;
 use Color;
 use utf8;
 use HttpUtils;
-eval "use JSON;1;" or my $jsonabs = "JSON";                                ## no critic 'eval' # Debian: apt-get install libjson-perl
-
+eval "use JSON;1;"             or my $jsonabs = 'JSON';                    ## no critic 'eval' # Debian: apt-get install libjson-perl
+eval "use AI::DecisionTree;1;" or my $aidtabs = 'AI::DecisionTree';        ## no critic 'eval'
+                           
 use FHEM::SynoModules::SMUtils qw(
                                    evaljson
                                    getClHash
@@ -51,8 +52,9 @@ use FHEM::SynoModules::SMUtils qw(
                                  );                                        # Hilfsroutinen Modul
 
 use Data::Dumper;
-use Storable qw(dclone freeze thaw); 
+use Storable qw(dclone freeze thaw nstore store retrieve); 
 use MIME::Base64;
+use Test2::Tools::Class qw(isa_ok);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Run before module compilation
@@ -138,9 +140,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.81.00"=> "27.08.2023  development version for Victron VRM API, __Pv_Fc_Simple_Dnum_Hist changed, available setter ".
+  "0.82.0" => "02.09.2023  first implementation of DWD AI support, new ctrlDebug aiProcess aiData, reset aiData ",
+  "0.81.1" => "30.08.2023  show forecast qualities when pressing quality icon in forecast grafic, store rad1h (model DWD) in ".
+                           "pvhistory, removed: affectCloudfactorDamping, affectRainfactorDamping ",
+  "0.81.0" => "27.08.2023  development version for Victron VRM API, __Pv_Fc_Simple_Dnum_Hist changed, available setter ".
                            "are now API specific, switch currentForecastDev to currentWeatherDev ".
-                           "affectRainfactorDamping default 0, affectRainfactorDamping default 0 ".
+                           "affectCloudfactorDamping default 0, affectRainfactorDamping default 0 ".
                            "call consumption forecast from Victron VRM API ",
   "0.80.20"=> "15.08.2023  hange calculation in ___setSolCastAPIcallKeyData once again, fix some warnings ",
   "0.80.19"=> "10.08.2023  fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1283836 ",
@@ -303,7 +308,7 @@ my %vNotesIntern = (
   "0.54.3" => "11.07.2021  fix _flowGraphic because of Current_AutarkyRate with powerbatout ",
   "0.54.2" => "01.07.2021  fix Current_AutarkyRate with powerbatout ",
   "0.54.1" => "23.06.2021  better log in  __weatherOnBeam ",
-  "0.54.0" => "19.06.2021  new calcCorrAndQuality, new reset pvCorrection circular, behavior of attr 'numHistDays', fixes ",
+  "0.54.0" => "19.06.2021  new calcValueImproves, new reset pvCorrection circular, behavior of attr 'numHistDays', fixes ",
   "0.53.0" => "17.06.2021  Logic for preferential charging battery, attr preferredChargeBattery ",
   "0.52.5" => "16.06.2021  sub __weatherOnBeam ",
   "0.52.4" => "15.06.2021  minor fix, possible avoid implausible inverter values ",
@@ -341,7 +346,7 @@ my %vNotesIntern = (
   "0.40.0" => "25.04.2021  change checkdwdattr, new attr follow70percentRule ",
   "0.39.0" => "24.04.2021  new attr sameWeekdaysForConsfc, readings Current_SelfConsumption, Current_SelfConsumptionRate, ".
                            "Current_AutarkyRate ",
-  "0.38.3" => "21.04.2021  minor fixes in sub calcCorrAndQuality, Traffic light indicator for prediction quality, some more fixes ",
+  "0.38.3" => "21.04.2021  minor fixes in sub calcValueImproves, Traffic light indicator for prediction quality, some more fixes ",
   "0.38.2" => "20.04.2021  fix _estConsumptionForecast, add consumption values to graphic ",
   "0.38.1" => "19.04.2021  bug fixing ",
   "0.38.0" => "18.04.2021  consumption forecast for the next hours prepared ",
@@ -409,6 +414,7 @@ my $pvccache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_"
 my $plantcfg       = $attr{global}{modpath}."/FHEM/FhemUtils/PVCfg_SolarForecast_"; # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
 my $csmcache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVCsm_SolarForecast_"; # Filename-Fragment für Consumer Status (wird mit Devicename ergänzt)
 my $scpicache      = $attr{global}{modpath}."/FHEM/FhemUtils/ScApi_SolarForecast_"; # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
+my $aicache        = $attr{global}{modpath}."/FHEM/FhemUtils/AI_SolarForecast_";    # Filename-Fragment für AI Trainingsdaten (wird mit Devicename ergänzt)
 
 my $calcmaxd       = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
 my @dweattrmust    = qw(TTT Neff R101 ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
@@ -473,6 +479,8 @@ my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-siz
 
                                                                                   # mögliche Debug-Module
 my @dd           = qw( none
+                       aiProcess
+                       aiData                       
                        apiCall
                        apiProcess
                        collectData
@@ -528,6 +536,8 @@ my %hset = (                                                                # Ha
   moduleDirection           => { fn => \&_setmoduleDirection           },
   writeHistory              => { fn => \&_setwriteHistory              },
   vrmCredentials            => { fn => \&_setVictronCredentials        },
+  aiAddInstance             => { fn => \&_setaiAddInstance             },
+  aiTrain                   => { fn => \&aiTrain                       },
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
@@ -635,6 +645,12 @@ my %hqtxt = (                                                                   
               DE => qq{gestern}                                                                                             },
   after  => { EN => qq{after},
               DE => qq{nach}                                                                                                },
+  aihtxt => { EN => qq{AI state:},
+              DE => qq{KI Status:}                                                                                          },
+  aimstt => { EN => qq{Perl module AI::DecisionTree is missing},
+              DE => qq{Perl Modul AI::DecisionTree ist nicht vorhanden}                                                     },  
+  aiwook => { EN => qq{AI support works properly},
+              DE => qq{KI Unterst&uuml;tzung arbeitet einwandfrei}                                                          },  
   nxtscc => { EN => qq{next SolCast call},
               DE => qq{n&auml;chste SolCast Abfrage}                                                                        },  
   fulfd  => { EN => qq{fulfilled},
@@ -663,6 +679,8 @@ my %hqtxt = (                                                                   
               DE => qq{Oh nein &#128546;, die Anlagenkonfiguration ist fehlerhaft. Bitte überprüfen Sie die Einstellungen und Hinweise!}                       },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop><br>Remaining lock time:&nbsp;<RLT> seconds},
               DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop><br>verbleibende Sperrzeit:&nbsp;<RLT> Sekunden}                  },
+  ainuse => { EN => qq{AI Perl module is installed, but AI support is not initialized or is not used},
+              DE => qq{KI Perl Modul ist installiert, aber die KI Unterst&uuml;tzung ist nicht initialisiert bzw. wird nicht verwendet}                        },  
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
@@ -893,6 +911,7 @@ my %hcsr = (                                                                    
 # $data{$type}{$name}{consumers}                                                 # Consumer Hash
 # $data{$type}{$name}{strings}                                                   # Stringkonfiguration Hash
 # $data{$type}{$name}{solcastapi}                                                # Zwischenspeicher API-Daten
+# $data{$type}{$name}{aidectree}                                                 # AI Decision Tree Daten
 
 ################################################################
 #               Init Fn
@@ -927,12 +946,10 @@ sub Initialize {
   $hash->{NotifyFn}           = \&Notify;                                             
   $hash->{AttrList}           = "affect70percentRule:1,dynamic,0 ".
                                 "affectBatteryPreferredCharge:slider,0,1,100 ".
-                                "affectCloudfactorDamping:slider,0,1,100 ".
                                 "affectConsForecastIdentWeekdays:1,0 ".
                                 "affectConsForecastInPlanning:1,0 ".
                                 "affectMaxDayVariance ".
                                 "affectNumHistDays:slider,1,1,30 ".
-                                "affectRainfactorDamping:slider,0,1,100 ".
                                 "affectSolCastPercentile:select,10,50,90 ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
@@ -1056,6 +1073,8 @@ sub Define {
 
   my $params = {
       hash        => $hash,
+      name        => $hash->{NAME},
+      type        => $hash->{TYPE},
       notes       => \%vNotesIntern,
       useAPI      => 0,
       useSMUtils  => 1,
@@ -1066,21 +1085,25 @@ sub Define {
 
   createAssociatedWith ($hash);
 
-  $params->{file}       = $pvhcache.$name;                                         # Cache File PV History lesen wenn vorhanden
-  $params->{cachename}  = "pvhist";
+  $params->{file}       = $pvhcache.$name;                                         # Cache File PV History einlesen wenn vorhanden
+  $params->{cachename}  = 'pvhist';
   _readCacheFile ($params);
 
-  $params->{file}       = $pvccache.$name;                                         # Cache File PV Circular lesen wenn vorhanden
-  $params->{cachename}  = "circular";
+  $params->{file}       = $pvccache.$name;                                         # Cache File PV Circular einlesen wenn vorhanden
+  $params->{cachename}  = 'circular';
   _readCacheFile ($params);
 
-  $params->{file}       = $csmcache.$name;                                         # Cache File Consumer lesen wenn vorhanden
-  $params->{cachename}  = "consumers";
+  $params->{file}       = $csmcache.$name;                                         # Cache File Consumer einlesen wenn vorhanden
+  $params->{cachename}  = 'consumers';
   _readCacheFile ($params);
 
-  $params->{file}       = $scpicache.$name;                                        # Cache File SolCast API Werte lesen wenn vorhanden
-  $params->{cachename}  = "solcastapi";
+  $params->{file}       = $scpicache.$name;                                        # Cache File SolCast API Werte einlesen wenn vorhanden
+  $params->{cachename}  = 'solcastapi';
   _readCacheFile ($params);
+  
+  $params->{file}       = $aicache.$name;                                          # AI Cache File einlesen wenn vorhanden
+  $params->{cachename}  = 'aidectree';
+  _readCacheFile ($params); 
 
   singleUpdateState ( {hash => $hash, state => 'initialized', evt => 1} );
 
@@ -1096,10 +1119,26 @@ return;
 sub _readCacheFile {
   my $paref     = shift;
   my $hash      = $paref->{hash};
+  my $name      = $paref->{name};
+  my $type      = $paref->{type};
   my $file      = $paref->{file};
   my $cachename = $paref->{cachename};
+  
+  if ($cachename eq 'aidectree') {      
+      my ($err, $dtree) = fileRetrieve ($file);
+      
+      if (!$err && $dtree) {
+          my $valid = isa_ok($dtree, 'AI::DecisionTree');
+          
+          if ($valid == 1) {
+              $data{$type}{$name}{$cachename}           = $dtree;
+              $data{$type}{$name}{current}{aiinitstate} = 'ok';
+              Log3($name, 3, qq{$name - cached data "$cachename" restored}); 
+          }
+      }     
 
-  my $name      = $hash->{NAME};
+      return;      
+  }
 
   my ($error, @content) = FileRead ($file);
 
@@ -1109,7 +1148,7 @@ sub _readCacheFile {
 
       if($success) {
            $data{$hash->{TYPE}}{$name}{$cachename} = decode_json ($json);
-           Log3($name, 3, qq{$name - SolarForecast cache "$cachename" restored});
+           Log3($name, 3, qq{$name - cached data "$cachename" restored});
       }
       else {
           Log3($name, 2, qq{$name - WARNING - The content of file "$file" is not readable and may be corrupt});
@@ -1138,7 +1177,8 @@ sub Set {
   my ($setlist,@fcdevs,@cfs,@condevs);
   my ($fcd,$ind,$med,$cf,$sp,$coms) = ('','','','','','');
 
-  my @re = qw( ConsumerMaster
+  my @re = qw( aiData
+               consumerMaster
                consumerPlanning
                currentBatteryDev
                currentWeatherDev
@@ -1211,7 +1251,9 @@ sub Set {
                   ;
   }
   else {
-      $setlist .= "moduleDirection ".
+      $setlist .= #"aiAddInstance:noArg ".
+                  #"aiTrain:noArg ".
+                  "moduleDirection ".
                   "moduleTiltAngle "
                   ;
   }
@@ -1960,7 +2002,7 @@ sub _setreset {                          ## no critic "not used"
 
   my $type  = $hash->{TYPE};
 
-  if($prop eq "pvHistory") {
+  if($prop eq 'pvHistory') {
       my $dday  = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
       my $dhour = $paref->{prop2} // "";                                       # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
 
@@ -1987,7 +2029,7 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if($prop eq "pvCorrection") {
+  if($prop eq 'pvCorrection') {
       for my $n (1..24) {
           $n = sprintf "%02d", $n;
           deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
@@ -1996,7 +2038,7 @@ sub _setreset {                          ## no critic "not used"
       my $circ  = $paref->{prop1} // 'no';                                   # alle pvKorr-Werte aus Caches löschen ?
       my $circh = $paref->{prop2} // q{};                                    # pvKorr-Werte einer bestimmten Stunde aus Caches löschen ?
 
-      if ($circ eq "cached") {
+      if ($circ eq 'cached') {
           if ($circh) {
               delete $data{$type}{$name}{circular}{$circh}{pvcorrf};
               delete $data{$type}{$name}{circular}{$circh}{quality};
@@ -2026,19 +2068,34 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if($prop eq "powerTrigger") {
+  if($prop eq 'aiData') {
+      my $dtree = AiDetreeVal ($hash, undef);
+      
+      if ($dtree) {
+          delete $data{$type}{$name}{aidectree};
+          my $err = aiInit ($paref);
+          return $err if($err);
+      }
+      
+      delete $data{$type}{$name}{current}{aitrainstate};
+      delete $data{$type}{$name}{current}{aiworkstate};
+      
+      return;
+  }
+  
+  if($prop eq 'powerTrigger') {
       deleteReadingspec ($hash, "powerTrigger.*");
       writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
       return;
   }
 
-  if($prop eq "energyH4Trigger") {
+  if($prop eq 'energyH4Trigger') {
       deleteReadingspec ($hash, "energyH4Trigger.*");
       writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
       return;
   }
 
-  if($prop eq "moduleRoofTops") {
+  if($prop eq 'moduleRoofTops') {
       deleteReadingspec ($hash, "moduleRoofTops");
       writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
       return;
@@ -2046,8 +2103,8 @@ sub _setreset {                          ## no critic "not used"
 
   readingsDelete($hash, $prop);
 
-  if($prop eq "roofIdentPair") {
-      my $pk   = $paref->{prop1} // "";                                       # ein bestimmter PairKey angegeben ?
+  if($prop eq 'roofIdentPair') {
+      my $pk   = $paref->{prop1} // "";                                        # ein bestimmter PairKey angegeben ?
 
       if ($pk) {
           delete $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk};
@@ -2062,7 +2119,7 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if($prop eq "currentMeterDev") {
+  if($prop eq 'currentMeterDev') {
       readingsDelete($hash, "Current_GridConsumption");
       readingsDelete($hash, "Current_GridFeedIn");
       delete $data{$type}{$name}{circular}{'99'}{initdayfeedin};
@@ -2080,7 +2137,7 @@ sub _setreset {                          ## no critic "not used"
       writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
   }
 
-  if($prop eq "currentBatteryDev") {
+  if($prop eq 'currentBatteryDev') {
       readingsDelete($hash, "Current_PowerBatIn");
       readingsDelete($hash, "Current_PowerBatOut");
       readingsDelete($hash, "Current_BatCharge");
@@ -2095,13 +2152,13 @@ sub _setreset {                          ## no critic "not used"
       writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
   }
 
-  if($prop eq "currentInverterDev") {
+  if($prop eq 'currentInverterDev') {
       readingsDelete    ($hash, "Current_PV");
       deleteReadingspec ($hash, ".*_PVreal" );
       writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);                     # Anlagenkonfiguration File schreiben
   }
 
-  if($prop eq "consumerPlanning") {                                                  # Verbraucherplanung resetten
+  if($prop eq 'consumerPlanning') {                                                  # Verbraucherplanung resetten
       my $c = $paref->{prop1} // "";                                                 # bestimmten Verbraucher setzen falls angegeben
 
       if ($c) {
@@ -2113,10 +2170,10 @@ sub _setreset {                          ## no critic "not used"
           }
       }
 
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                         # Cache File Consumer schreiben
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                        # Cache File Consumer schreiben
   }
 
-  if($prop eq "consumerMaster") {                                                    # Verbraucherhash löschen
+  if($prop eq 'consumerMaster') {                                                    # Verbraucherhash löschen
       my $c = $paref->{prop1} // "";                                                 # bestimmten Verbraucher setzen falls angegeben
 
       if ($c) {
@@ -2207,6 +2264,17 @@ sub _setclientAction {                 ## no critic "not used"
 
   centralTask ($hash, $evt);                                     
 
+return;
+}
+
+################################################################
+#                      Setter aiAddInstance
+################################################################
+sub _setaiAddInstance {                   ## no critic "not used"
+  my $paref = shift;
+
+  aiAddInstance ($paref);
+  
 return;
 }
 
@@ -3670,8 +3738,13 @@ return $ret;
 sub _getForecastQualities {
   my $paref = shift;
   my $hash  = $paref->{hash};
+  my $arg   = $paref->{arg} // q{};
 
   my $ret   = listDataPool ($hash, 'qualities');
+  
+  if ($arg eq 'imgget') {                                # Ausgabe aus dem Grafikheader Qualitätsicon
+      $ret =~ s/\n/<br>/g;
+  }
 
 return $ret;
 }
@@ -4094,7 +4167,6 @@ return ($reading, $value, $unit);
 ################################################################
 sub Shutdown {
   my $hash = shift;
-
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
@@ -4102,7 +4174,11 @@ sub Shutdown {
   writeCacheToFile ($hash, "circular",    $pvccache.$name);             # Cache File für PV Circular schreiben
   writeCacheToFile ($hash, "consumers",   $csmcache.$name);             # Cache File Consumer schreiben
   writeCacheToFile ($hash, "solcastapi", $scpicache.$name);             # Cache File SolCast API Werte schreiben
-
+  
+  if (CurrentVal ($hash, 'aitrainstate', '') eq 'ok') {
+      writeCacheToFile ($hash, "aidectree", $aicache.$name);            # AI Cache schreiben  
+  }
+  
 return;
 }
 
@@ -4138,57 +4214,22 @@ sub Delete {
   my $hash  = shift;
   my $arg   = shift;
   my $name  = $hash->{NAME};
+  
+  my @ftd = ( $pvhcache.$name, 
+              $pvccache.$name,
+              $plantcfg.$name,
+              $csmcache.$name, 
+              $scpicache.$name,
+              $aicache.$name                
+            );
+              
+  for my $f (@ftd) {
+      my $err = FileDelete($f);
 
-  my $file  = $pvhcache.$name;                                                # Cache File PV History löschen
-  my $error = FileDelete($file);
-
-  if ($error) {
-      Log3 ($name, 1, qq{$name - ERROR deleting file "$file": $error});
+      if ($err) {
+          Log3 ($name, 1, qq{$name - Message while deleting file "$f": $err});
+      }    
   }
-
-  $error = qq{};
-  $file  = $pvccache.$name;                                                   # Cache File PV Circular löschen
-  $error = FileDelete($file);
-
-  if ($error) {
-      Log3 ($name, 1, qq{$name - ERROR deleting file "$file": $error});
-  }
-
-
-  $error = qq{};
-  $file  = $plantcfg.$name;                                                   # File Anlagenkonfiguration löschen
-  $error = FileDelete($file);
-
-  if ($error) {
-      Log3 ($name, 1, qq{$name - ERROR deleting file "$file": $error});
-  }
-
-  $error = qq{};
-  $file  = $csmcache.$name;                                                   # File Consumer löschen
-  $error = FileDelete($file);
-
-  if ($error) {
-      Log3 ($name, 1, qq{$name - ERROR deleting file "$file": $error});
-  }
-
-  $error = qq{};
-  $file  = $scpicache.$name;                                                  # File SolCast API Werte löschen
-  $error = FileDelete($file);
-
-  if ($error) {
-      Log3 ($name, 1, qq{$name - ERROR deleting file "$file": $error});
-  }
-
-  my $type = $hash->{TYPE};
-
-  delete $data{$type}{$name}{circular};                                       # Ringspeicher
-  delete $data{$type}{$name}{current};                                        # current values
-  delete $data{$type}{$name}{pvhist};                                         # historische Werte
-  delete $data{$type}{$name}{nexthours};                                      # NextHours Werte
-  delete $data{$type}{$name}{consumers};                                      # Consumer Hash
-  delete $data{$type}{$name}{strings};                                        # Stringkonfiguration
-  delete $data{$type}{$name}{solcastapi};                                     # Zwischenspeicher Vorhersagewerte SolCast API
-
 
 return;
 }
@@ -4223,10 +4264,30 @@ sub writeCacheToFile {
   my $type = $hash->{TYPE};
 
   my @data;
+  my ($error, $err, $lw);
+  
+  if ($cachename eq 'aidectree') {
+      return if(ref $data{$type}{$name}{$cachename} ne 'AI::DecisionTree');
+      
+      my $dtree = $data{$type}{$name}{$cachename};        
+      $error    = fileStore ($dtree, $file);
+      
+      if ($error) {
+          $err = qq{ERROR while writing AI data to file "$file": $error};
+          Log3 ($name, 1, "$name - $err");
+          return $err;
+      }
+      
+      $lw                 = gettimeofday();
+      $hash->{LCACHEFILE} = "last write time: ".FmtTime($lw)." File: $file";
+      singleUpdateState ( {hash => $hash, state => "wrote cachefile $cachename successfully", evt => 1} );
+     
+      return;      
+  }
 
-  if($cachename eq "plantconfig") {
+  if ($cachename eq 'plantconfig') {
       @data = _savePlantConfig ($hash);
-      return "Plant configuration is empty, no data has been written" if(!@data);
+      return 'Plant configuration is empty, no data where written' if(!@data);
   }
   else {
       return if(!$data{$type}{$name}{$cachename});
@@ -4234,19 +4295,17 @@ sub writeCacheToFile {
       push @data, $json;
   }
 
-  my $error = FileWrite($file, @data);
+  $error = FileWrite ($file, @data);
 
   if ($error) {
-      my $err = qq{ERROR writing cache file "$file": $error};
+      $err = qq{ERROR writing cache file "$file": $error};
       Log3 ($name, 1, "$name - $err");
-      singleUpdateState ( {hash => $hash, state => "ERROR writing cache file $file - $error", evt => 1} );
       return $err;
   }
-  else {
-      my $lw = gettimeofday();
-      $hash->{LCACHEFILE} = "last write time: ".FmtTime($lw)." File: $file";
-      singleUpdateState ( {hash => $hash, state => "wrote cachefile $cachename successfully", evt => 1} );
-  }
+
+  $lw                 = gettimeofday();
+  $hash->{LCACHEFILE} = "last write time: ".FmtTime($lw)." File: $file";
+  singleUpdateState ( {hash => $hash, state => "wrote cachefile $cachename successfully", evt => 1} );
 
 return;
 }
@@ -4315,10 +4374,9 @@ sub centralTask {
 
   ### nicht mehr benötigte Readings/Daten löschen - Bereich kann später wieder raus !!
   ##########################################################################################
-  #for my $i (keys %{$data{$type}{$name}{pvhist}}) {
-  #    delete $data{$type}{$name}{pvhist}{$i}{"00"};
-  #    delete $data{$type}{$name}{pvhist}{$i} if(!$i);                # evtl. vorhandene leere Schlüssel entfernen
-  #}
+  for my $i (keys %{$data{$type}{$name}{nexthours}}) {
+      delete $data{$type}{$name}{nexthours}{$i}{Rad1h};             
+  }
 
   for my $c (keys %{$data{$type}{$name}{consumers}}) {
       delete $data{$type}{$name}{consumers}{$c}{epiecEstart};      
@@ -4342,7 +4400,6 @@ sub centralTask {
   }
   
   my $fcdev = ReadingsVal  ($name, "currentForecastDev",  undef);                  
-  
   if ($fcdev) {
       readingsSingleUpdate ($hash, "currentWeatherDev", $fcdev, 0);
       deleteReadingspec    ($hash, "currentForecastDev");
@@ -4353,10 +4410,6 @@ sub centralTask {
   #deleteReadingspec ($hash, "nextPolltime");
   #delete $data{$type}{$name}{solcastapi}{'All'};
   #delete $data{$type}{$name}{solcastapi}{'#All'};
-  #delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todaySolCastAPIcalls};
-  #delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls};
-  #delete $data{$type}{$name}{circular}{99}{initgridfeedintotal};
-  #delete $data{$type}{$name}{circular}{'00'}; 
 
   #for my $n (1..24) {
   #    $n = sprintf "%02d", $n;
@@ -4436,20 +4489,12 @@ sub centralTask {
       _transferWeatherValues      ($centpars);                                            # Wetterwerte übertragen
 
       createReadingsFromArray ($hash, \@da, $evt);                                        # Readings erzeugen
-
-      #if (isSolCastUsed ($hash)) {
-      #    __getSolCastData        ($centpars);                                            # SolCast API Strahlungswerte abrufen
-      #}
-      #elsif (isForecastSolarUsed ($hash)) {                                               # Forecast.Solar API abrufen
-      #    __getForecastSolarData  ($centpars);
-      #}
-      #else {
-      #    __getDWDSolarData       ($centpars);                                            # Strahlungswerte in solcastapi-Hash erstellen
-      #}
       
       _getRoofTopData             ($centpars);                                            # Strahlungswerte/Forecast-Werte in solcastapi-Hash erstellen                                     
       _transferAPIRadiationValues ($centpars);                                            # Raw Erzeugungswerte aus solcastapi-Hash übertragen und Forecast mit/ohne Korrektur erstellen
 
+      #aiGetResult ($centpars);
+      
       _calcMaxEstimateToday       ($centpars);                                            # heutigen Max PV Estimate & dessen Tageszeit ermitteln
       _transferInverterValues     ($centpars);                                            # WR Werte übertragen
       _transferMeterValues        ($centpars);                                            # Energy Meter auswerten
@@ -4463,7 +4508,7 @@ sub centralTask {
 
       createReadingsFromArray     ($hash, \@da, $evt);                                    # Readings erzeugen
 
-      calcCorrAndQuality          ($centpars);                                            # neue Korrekturfaktor/Qualität berechnen und speichern
+      calcValueImproves           ($centpars);                                            # neue Korrekturfaktor/Qualität und berechnen und speichern, AI anreichern
 
       createReadingsFromArray     ($hash, \@da, $evt);                                    # Readings erzeugen
 
@@ -4757,6 +4802,7 @@ sub _specialActivities {
               
               deleteReadingspec ($hash, ".pvCorrectionFactor_${n}_cloudcover");               # verstecktes Reading löschen
               deleteReadingspec ($hash, ".pvCorrectionFactor_${n}_apipercentil");             # verstecktes Reading löschen
+              deleteReadingspec ($hash, ".signaldone_${n}");                                  # verstecktes Reading löschen
               
               if (ReadingsVal ($name, "pvCorrectionFactor_Auto", "off") =~ /on/xs) {
                   deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
@@ -4803,7 +4849,11 @@ sub _specialActivities {
 
           __createAdditionalEvents ($paref);                                                # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
           __delObsoleteAPIData     ($paref);                                                # Bereinigung obsoleter Daten im solcastapi Hash
-
+          
+          $paref->{taa} = 1;
+          aiAddInstance ($paref);                                                           # AI füllen, trainieren und sichern
+          delete $paref->{taa};
+          
           $hash->{HELPER}{H00DONE} = 1;
       }
   }
@@ -4910,7 +4960,7 @@ sub _transferAPIRadiationValues {
       my ($hod)    = $wantdt =~ /\s(\d{2}):/xs;
       $hod         = sprintf "%02d", int $hod + 1;                                            # Stunde des Tages
       
-      my $rad      = SolCastAPIVal ($hash, '?All', $wantdt, 'Rad1h', '-');
+      my $rad      = SolCastAPIVal ($hash, '?All', $wantdt, 'Rad1h', undef);
 
       my $params = {
           hash    => $hash,
@@ -4931,7 +4981,7 @@ sub _transferAPIRadiationValues {
       $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $wantdt;
       $data{$type}{$name}{nexthours}{$time_str}{hourofday}  = $hod;
       $data{$type}{$name}{nexthours}{$time_str}{today}      = $fd == 0 ? 1 : 0;
-      $data{$type}{$name}{nexthours}{$time_str}{Rad1h}      = $rad;                    
+      $data{$type}{$name}{nexthours}{$time_str}{rad1h}      = $rad;                    
 
       if($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
           $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{pvfc} = $est;
@@ -4942,10 +4992,16 @@ sub _transferAPIRadiationValues {
       }
 
       if($fd == 0 && $fh1) {
+          $paref->{nhour}    = sprintf "%02d", $fh1;
+          
           $paref->{calcpv}   = $est;
           $paref->{histname} = 'pvfc';
-          $paref->{nhour}    = sprintf "%02d", $fh1;
           setPVhistory ($paref);
+          
+          $paref->{rad1h}    = $rad;
+          $paref->{histname} = 'radiation';
+          setPVhistory ($paref);
+          
           delete $paref->{histname};
       }
   }
@@ -5005,16 +5061,9 @@ sub __calcPVestimates {
 
   my $reld    = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
 
-  my $clouddamp  = AttrVal($name, "affectCloudfactorDamping", $cldampdef);                            # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
-  my $raindamp   = AttrVal($name, "affectRainfactorDamping",   $rdampdef);                            # prozentuale Berücksichtigung des Regenkorrekturfaktors
-
   my $rainprob   = NexthoursVal ($hash, "NextHour".sprintf ("%02d", $num), "rainprob", 0);            # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-  my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $raindamp/100);                              # Rain Correction Faktor mit Steilheit
-
   my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf ("%02d", $num), "cloudcover", 0);          # effektive Wolkendecke nächste Stunde X
-  my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $clouddamp/100);                          # Cloud Correction Faktor mit Steilheit und Fußpunkt
-
-  my $temp       = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "temp", $tempbasedef);       # vorhergesagte Temperatur Stunde X
+  my $temp       = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num),  "temp", $tempbasedef);     # vorhergesagte Temperatur Stunde X
   my $acu        = isAutoCorrUsed ($name);
   
   $paref->{cloudcover}  = $cloudcover;                                                    
@@ -5026,7 +5075,6 @@ sub __calcPVestimates {
   my $peaksum = 0;
   
   for my $string (sort keys %{$data{$type}{$name}{strings}}) {
-      # my $peak = $data{$type}{$name}{strings}{$string}{peak};                                         # String Peak (kWp)
       my $peak = StringVal ($hash, $string, 'peak', 0);                                               # String Peak (kWp)
 
       if ($acu =~ /on_complex/xs) {
@@ -5044,7 +5092,7 @@ sub __calcPVestimates {
       
       $peak  *= 1000;
       my $est = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate50', 0) * $hc;                    # Korrekturfaktor anwenden
-      my $pv  = sprintf "%.1f", ($est * $ccf * $rcf);
+      my $pv  = sprintf "%.1f", $est;
 
       if ($debug =~ /radiationProcess/xs) {
           $lh = {                                                                                     # Log-Hash zur Ausgabe
@@ -5092,11 +5140,7 @@ sub __calcPVestimates {
           "Starttime"                   => $wantdt,
           "Forecasted temperature"      => $temp." &deg;C",
           "Cloudcover"                  => $cloudcover,
-          "CloudFactorDamping"          => $clouddamp." %",
-          "Cloudfactor"                 => $ccf,
           "Rainprob"                    => $rainprob,
-          "Rainfactor"                  => $rcf,
-          "RainFactorDamping"           => $raindamp." %",
           "Use PV Correction"           => ($acu ? $acu : 'no'),
           "PV correction factor"        => $hc,
           "PV correction quality"       => $hq,
@@ -8277,6 +8321,7 @@ sub _graphicHeader {
 
   my $lupt    = $hqtxt{lupt}{$lang};
   my $autoct  = $hqtxt{autoct}{$lang};
+  my $aihtxt  = $hqtxt{aihtxt}{$lang};
   my $lbpcq   = $hqtxt{lbpcq}{$lang};
   my $lblPv4h = $hqtxt{lblPvh}{$lang};
   my $lblPvRe = $hqtxt{lblPRe}{$lang};
@@ -8309,6 +8354,12 @@ sub _graphicHeader {
 
       if ($ftui eq 'ftui') {
           $cmdplchk = qq{"ftui.setFhemStatus('get $name plantConfigCheck')"};
+      }
+      
+      my $cmdfcqal = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name forecastQualities imgget', function(data){FW_okDialog(data)})"};
+
+      if ($ftui eq 'ftui') {
+          $cmdfcqal = qq{"ftui.setFhemStatus('get $name forecastQualities imgget')"};
       }
 
       my $upstate = ReadingsVal($name, 'state', '');
@@ -8457,16 +8508,34 @@ sub _graphicHeader {
           $api .= '</span>';
       }
       
-
       ## Qualitäts-Icon
       ######################
-      $pcq        =~ s/-/-1/xs;
-      my $pcqicon = $pcq < 0.00 ? FW_makeImage('15px-blank',          $pvcanz) :
-                    $pcq < 0.60 ? FW_makeImage('10px-kreis-rot.png',  $pvcanz) :
-                    $pcq < 0.80 ? FW_makeImage('10px-kreis-gelb.png', $pvcanz) :
-                    FW_makeImage('10px-kreis-gruen.png', $pvcanz);
+      $pcq       =~ s/-/-1/xs;
+      my $pcqimg = $pcq < 0.00 ? FW_makeImage ('15px-blank',          $pvcanz) :
+                   $pcq < 0.60 ? FW_makeImage ('10px-kreis-rot.png',  $pvcanz) :
+                   $pcq < 0.80 ? FW_makeImage ('10px-kreis-gelb.png', $pvcanz) :
+                   FW_makeImage ('10px-kreis-gruen.png', $pvcanz);
 
-      $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
+      $pcqimg     = "-" if(!$pvfc00 || $pcq == -1);
+      my $pcqicon = "<a onClick=$cmdfcqal>$pcqimg</a>";
+      
+      ## KI Status
+      ##############
+      my $aiist = CurrentVal ($hash, 'aiinitstate',    '');
+      my $aitst = CurrentVal ($hash, 'aitrainstate', 'ok');
+      my $aiwst = CurrentVal ($hash, 'aiworkstate',  'ok');       
+      
+      my $aitit = $aidtabs       ? $hqtxt{aimstt}{$lang} :    
+                  $aiist ne 'ok' ? $hqtxt{ainuse}{$lang} :
+                  q{};
+      
+      my $aiimg  = $aidtabs       ? FW_makeImage ('--',                 $aitit) :    
+                   $aiist ne 'ok' ? FW_makeImage ('-',                  $aitit) :
+                   $aitst ne 'ok' ? FW_makeImage ('10px-kreis-rot.png', $aitst) :
+                   $aiwst ne 'ok' ? FW_makeImage ('10px-kreis-rot.png', $aiwst) :   
+                   FW_makeImage ('10px-kreis-gruen.png', $hqtxt{aiwook}{$lang});
+      
+      my $aiicon = qq{<a title="$aitit">$aiimg</a>};
 
       ## Abweichung PV Prognose/Erzeugung
       #####################################
@@ -8506,8 +8575,8 @@ sub _graphicHeader {
       $header  .= qq{<td colspan="3" align="right" $dstyle>                   $api                       </td>};
       $header  .= qq{</tr>};
       $header  .= qq{<tr>};
-      $header  .= qq{<td colspan="3" align="left"  $dstyle> $sriseimg &nbsp; $srisetxt &nbsp;&nbsp;&nbsp; $ssetimg &nbsp; $ssettxt                   </td>};
-      $header  .= qq{<td colspan="3" align="left"  $dstyle> $autoct &nbsp;&nbsp; $acicon &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; $lbpcq&nbsp; &nbsp; $pcqicon </td>};
+      $header  .= qq{<td colspan="3" align="left"  $dstyle> $sriseimg &nbsp; $srisetxt &nbsp;&nbsp;&nbsp; $ssetimg &nbsp; $ssettxt  </td>};
+      $header  .= qq{<td colspan="3" align="left"  $dstyle> $autoct &nbsp;&nbsp; $acicon &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; $lbpcq &nbsp;&nbsp; $pcqicon &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; $aihtxt &nbsp;&nbsp; $aiicon </td>};
       $header  .= qq{<td colspan="3" align="right" $dstyle> $dvtntxt};
       $header  .= qq{<span title="$text_tdayDvtn">};
       $header  .= qq{$tdaytxt};
@@ -9916,9 +9985,9 @@ return ($badev, $a ,$h);
 
 ################################################################
 #  Korrekturen und Qualität berechnen / speichern
-#  bei isAutoCorrUsed
+#  sowie AI Instanzen hinzufügen
 ################################################################
-sub calcCorrAndQuality {
+sub calcValueImproves {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -9954,8 +10023,9 @@ sub calcCorrAndQuality {
 
   $paref->{acu} = $acu;
   
-  _calcCaQcomplex ($paref);                                               # Korrekturberechnung mit Bewölkung immer! duchführen/speichern
-  _calcCaQsimple  ($paref);                                               # einfache Korrekturberechnung immer! duchführen/speichern
+  _calcCaQcomplex    ($paref);                                            # Korrekturberechnung mit Bewölkung duchführen/speichern
+  _calcCaQsimple     ($paref);                                            # einfache Korrekturberechnung duchführen/speichern
+  _addHourAiInstance ($paref);                                            # AI Instanz hinzufügen
   
   delete $paref->{acu};
 
@@ -9980,21 +10050,19 @@ sub _calcCaQcomplex {
   for my $h (1..23) {
       next if(!$chour || $h > $chour);
       
-      my $cccalc = ReadingsVal ($name, ".pvCorrectionFactor_".sprintf("%02d",$h)."_cloudcover", "");
+      my $sr = ReadingsVal ($name, ".pvCorrectionFactor_".sprintf("%02d",$h)."_cloudcover", "");
       
-      if ($cccalc eq "done") {
-          #if($debug =~ /pvCorrection/x && $acu eq 'on_complex') {
-          #    Log3 ($name, 1, "$name DEBUG> Complex Corrf -> factor Hour: ".sprintf("%02d",$h)." already calculated");
-          #}
+      if ($sr eq "done") {
+          # Log3 ($name, 1, "$name DEBUG> Complex Corrf -> factor Hour: ".sprintf("%02d",$h)." already calculated");
           next;
       }
 
-      my $pvfc = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
-      next if(!$pvfc);
-
       my $pvre = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
       next if(!$pvre);
-
+            
+      my $pvfc = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
+      next if(!$pvfc);
+      
       $paref->{hour}                  = $h;
       my ($pvhis,$fchis,$dnum,$range) = __Pv_Fc_Complex_Dnum_Hist ($paref);                               # historische PV / Forecast Vergleichswerte ermitteln
 
@@ -10046,6 +10114,116 @@ sub _calcCaQcomplex {
       }
   }
 
+return;
+}
+
+################################################################
+# PV Ist/Forecast ermitteln und Korrekturfaktoren, Qualität 
+# ohne Nebenfaktoren errechnen und speichern (simple)
+################################################################
+sub _calcCaQsimple {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $chour = $paref->{chour};                                                   # aktuelle Stunde
+  my $date  = $paref->{date};
+  my $daref = $paref->{daref};
+  my $acu   = $paref->{acu};
+
+  my $maxvar = AttrVal($name, 'affectMaxDayVariance', $defmaxvar);               # max. Korrekturvarianz
+
+  for my $h (1..23) {
+      next if(!$chour || $h > $chour);
+      
+      my $sr = ReadingsVal ($name, ".pvCorrectionFactor_".sprintf("%02d",$h)."_apipercentil", "");
+
+      if($sr eq "done") {
+          # debugLog ($paref, 'pvCorrection', "Simple Corrf factor Hour: ".sprintf("%02d",$h)." already calculated");
+          next;
+      }
+      
+      my $pvfc = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
+      next if(!$pvfc);
+
+      my $pvre = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
+      next if(!$pvre);
+
+      $paref->{hour}           = $h;
+      my ($pvhis,$fchis,$dnum) = __Pv_Fc_Simple_Dnum_Hist ($paref);                                       # historischen Percentilfaktor / Qualität ermitteln
+
+      my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), 'percentile', 0);               
+      $oldfac             = 1 if(1 * $oldfac == 0);
+      
+      (my $factor, $dnum) = __calcNewFactor ({ name   => $name, 
+                                               oldfac => $oldfac, 
+                                               dnum   => $dnum, 
+                                               pvre   => $pvre, 
+                                               pvfc   => $pvfc, 
+                                               pvhis  => $pvhis,
+                                               fchis  => $fchis
+                                             } 
+                                            );
+      
+      if (abs($factor - $oldfac) > $maxvar) {
+          $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
+          Log3 ($name, 3, "$name - new correction factor calculated (limited by affectMaxDayVariance): $factor (old: $oldfac) for hour: $h");
+      }
+      else {
+          Log3 ($name, 3, "$name - new simple correction factor for hour $h calculated: $factor (old: $oldfac)") if($factor != $oldfac);
+      }
+      
+      $pvre    = sprintf "%.0f", $pvre;
+      $pvfc    = sprintf "%.0f", $pvfc;
+      my $qual = __calcFcQuality ($pvfc, $pvre);                                                         # Qualität der Vorhersage für die vergangene Stunde
+      
+      debugLog ($paref, 'pvCorrection',                "Simple Corrf -> determined values - average forecast: $pvfc, average real: $pvre, old corrf: $oldfac, new corrf: $factor, days: $dnum");
+      debugLog ($paref, 'pvCorrection|saveData2Cache', "Simple Corrf -> write percentile correction values into Circular - hour: $h, factor: $factor, quality: $qual");
+
+      my $type = $paref->{type};
+
+      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{percentile} = $factor;                  # Korrekturfaktor der jeweiligen Stunde als Datenquelle eintragen
+      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{percentile} = $qual;
+
+      push @$daref, ".pvCorrectionFactor_".sprintf("%02d",$h)."_apipercentil<>done";
+            
+      if ($acu =~ /on_simple/xs) {
+          push @$daref, "pvCorrectionFactor_".sprintf("%02d",$h). "<>".$factor." (automatic - old factor: $oldfac, average days: $dnum)";
+          push @$daref, "pvCorrectionFactor_".sprintf("%02d",$h). "_autocalc<>done";
+      }
+  }
+
+return;
+}
+
+################################################################
+#       AI Instanz für die abgeschlossene Stunde hinzufügen
+################################################################
+sub _addHourAiInstance {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $chour = $paref->{chour};
+  my $daref = $paref->{daref};
+
+  for my $h (1..23) {
+      next if(!$chour || $h > $chour);
+      
+      my $rho = sprintf "%02d", $h;
+      my $sr  = ReadingsVal ($name, ".signaldone_".$rho, "");
+      
+      next if($sr eq "done");
+      
+      $paref->{ood} = 1;
+      $paref->{rho} = $rho;
+      
+      aiAddInstance ($paref);                                                                             # AI Instanz hinzufügen
+      
+      delete $paref->{ood};
+      delete $paref->{rho};     
+  
+      push @$daref, ".signaldone_".sprintf("%02d",$h)."<>done";
+  }
+  
 return;
 }
 
@@ -10138,84 +10316,6 @@ sub __Pv_Fc_Complex_Dnum_Hist {
   debugLog ($paref, 'pvCorrection', "Complex Corrf -> Summary - cloudiness range: $range, days: $dnum, pvHist:$pvhis, fcHist:$fchis");
       
 return ($pvhis,$fchis,$dnum,$range);
-}
-
-################################################################
-# PV Ist/Forecast ermitteln und Korrekturfaktoren, Qualität 
-# ohne Nebenfaktoren errechnen und speichern (simple)
-################################################################
-sub _calcCaQsimple {
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $chour = $paref->{chour};                                                   # aktuelle Stunde
-  my $date  = $paref->{date};
-  my $daref = $paref->{daref};
-  my $acu   = $paref->{acu};
-
-  my $maxvar = AttrVal($name, 'affectMaxDayVariance', $defmaxvar);               # max. Korrekturvarianz
-
-  for my $h (1..23) {
-      next if(!$chour || $h > $chour);
-      
-      my $cdone = ReadingsVal ($name, ".pvCorrectionFactor_".sprintf("%02d",$h)."_apipercentil", "");
-
-      if($cdone eq "done") {
-          # debugLog ($paref, 'pvCorrection', "Simple Corrf factor Hour: ".sprintf("%02d",$h)." already calculated");
-          next;
-      }
-      
-      my $pvfc = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
-      next if(!$pvfc);
-
-      my $pvre = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
-      next if(!$pvre);
-
-      $paref->{hour}           = $h;
-      my ($pvhis,$fchis,$dnum) = __Pv_Fc_Simple_Dnum_Hist ($paref);                                       # historischen Percentilfaktor / Qualität ermitteln
-
-      my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), 'percentile', 0);               
-      $oldfac             = 1 if(1 * $oldfac == 0);
-      
-      (my $factor, $dnum) = __calcNewFactor ({ name   => $name, 
-                                               oldfac => $oldfac, 
-                                               dnum   => $dnum, 
-                                               pvre   => $pvre, 
-                                               pvfc   => $pvfc, 
-                                               pvhis  => $pvhis,
-                                               fchis  => $fchis
-                                             } 
-                                            );
-      
-      if (abs($factor - $oldfac) > $maxvar) {
-          $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
-          Log3 ($name, 3, "$name - new correction factor calculated (limited by affectMaxDayVariance): $factor (old: $oldfac) for hour: $h");
-      }
-      else {
-          Log3 ($name, 3, "$name - new simple correction factor for hour $h calculated: $factor (old: $oldfac)") if($factor != $oldfac);
-      }
-      
-      $pvre    = sprintf "%.0f", $pvre;
-      $pvfc    = sprintf "%.0f", $pvfc;
-      my $qual = __calcFcQuality ($pvfc, $pvre);                                                         # Qualität der Vorhersage für die vergangene Stunde
-      
-      debugLog ($paref, 'pvCorrection',                "Simple Corrf -> determined values - average forecast: $pvfc, average real: $pvre, old corrf: $oldfac, new corrf: $factor, days: $dnum");
-      debugLog ($paref, 'pvCorrection|saveData2Cache', "Simple Corrf -> write percentile correction values into Circular - hour: $h, factor: $factor, quality: $qual");
-
-      my $type = $paref->{type};
-
-      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{percentile} = $factor;                  # Korrekturfaktor der jeweiligen Stunde als Datenquelle eintragen
-      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{percentile} = $qual;
-
-      push @$daref, ".pvCorrectionFactor_".sprintf("%02d",$h)."_apipercentil<>done";
-            
-      if ($acu =~ /on_simple/xs) {
-          push @$daref, "pvCorrectionFactor_".sprintf("%02d",$h). "<>".$factor." (automatic - old factor: $oldfac, average days: $dnum)";
-          push @$daref, "pvCorrectionFactor_".sprintf("%02d",$h). "_autocalc<>done";
-      }
-  }
-
-return;
 }
 
 ################################################################
@@ -10360,6 +10460,192 @@ return $hdv;
 }
 
 ################################################################
+#     KI Instanz hinzufügen
+################################################################
+sub aiAddInstance {                   ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  my $ood   = $paref->{ood} // 0;     # only one (cuurent) day
+  my $rho   = $paref->{rho};          # only this hour of day
+  my $taa   = $paref->{taa};          # do train after add
+  
+  return if(!isDWDUsed ($hash));
+  
+  my $dtree = AiDetreeVal ($hash, undef);
+  
+  if (!$dtree) {
+      my $err = aiInit ($paref);
+      return if($err);
+  }
+   
+  my ($pvrl, $temp, $wcc, $wrp, $rad1h);
+  
+  for my $pvd (sort keys %{$data{$type}{$name}{pvhist}}) {
+      if ($ood) {
+          next if($pvd ne $paref->{day});
+      }
+      
+      for my $hod (sort keys %{$data{$type}{$name}{pvhist}{$pvd}}) {
+          next if($hod eq '99' || ($rho && $hod ne $rho));
+          
+          $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
+          next if(!defined $pvrl);
+          
+          $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
+          next if(!defined $rad1h);
+          
+          $temp  = HistoryVal ($hash, $pvd, $hod, 'temp', 20);
+          $wcc   = HistoryVal ($hash, $pvd, $hod, 'wcc',   0);
+          $wrp   = HistoryVal ($hash, $pvd, $hod, 'wrp',   0);
+          
+          eval { $dtree->add_instance (attributes => { rad1h => $rad1h,
+                                                       temp  => $temp,
+                                                       wcc   => $wcc,
+                                                       wrp   => $wrp,
+                                                       hod   => $hod
+                                                     },
+                                                     result => $pvrl
+                                      )
+               }
+               or do { Log3 ($name, 1, "$name - aiAddInstance ERROR: $@");
+                       $data{$type}{$name}{current}{aiworkstate} = $@;
+                       return;
+                     };
+          
+          $data{$type}{$name}{current}{aiworkstate} = 'ok';
+          
+          debugLog ($paref, 'aiProcess', qq{AI Instance added - day: $pvd, hod: $hod, rad1h: $rad1h, pvrl: $pvrl, wcc: $wcc, wrp: $wrp, temp: $temp}); 
+      }
+  }
+  
+  if ($taa) {
+      aiTrain ($paref);
+  }
+  
+return;
+}
+
+################################################################
+#     KI trainieren
+################################################################
+sub aiTrain {                   ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  
+  return if(!isDWDUsed ($hash));
+  
+  my $err;
+  my $dtree = AiDetreeVal ($hash, undef);
+  
+  if (!$dtree) {
+      $err = aiInit ($paref);
+      return if($err);
+  }
+  
+  eval { $dtree->train
+       }
+       or do { Log3 ($name, 1, "$name - aiTrain ERROR: $@");
+               $data{$type}{$name}{current}{aitrainstate} = $@;
+               return;
+             };
+  
+  debugLog ($paref, 'aiData', qq{AI trained: }.Dumper $data{$type}{$name}{aidectree});
+  
+  $err = writeCacheToFile ($hash, 'aidectree', $aicache.$name);                                 # AI Cache schreiben 
+  
+  if (!$err) {
+      debugLog ($paref, 'aiProcess', qq{AI trained and saved data into file: }.$aicache.$name);
+      debugLog ($paref, 'aiProcess', qq{Training instances and their associated information where purged from the AI object});
+      $data{$type}{$name}{current}{aitrainstate} = 'ok';
+  }
+  
+return;
+}
+
+################################################################
+#     AI Ergebnis für ermitteln
+################################################################
+sub aiGetResult {                   ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  
+  return if(!isDWDUsed ($hash));  
+  
+  my $dtree = AiDetreeVal ($hash, undef);
+  
+  if (!$dtree) {
+      my $err = aiInit ($paref);
+      return if($err);
+  }
+  
+  for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
+      my $rad1h = NexthoursVal ($hash, $idx, "rad1h", undef);
+      next if(!defined $rad1h);
+      
+      my $hod  = NexthoursVal ($hash, $idx, "hourofday", undef);
+      next if(!defined $hod);
+      
+      my $wcc  = NexthoursVal ($hash, $idx, "cloudcover", 0);
+      my $wrp  = NexthoursVal ($hash, $idx, "rainprob",   0);
+      my $temp = NexthoursVal ($hash, $idx, "temp",       20);
+      
+      my $pvfc;
+                                     
+      $pvfc = eval { $dtree->get_result (attributes => { rad1h => $rad1h,
+                                                         temp  => $temp,
+                                                         wcc   => $wcc,
+                                                         wrp   => $wrp,
+                                                         hod   => $hod
+                                                       }
+                                        );
+                   };
+                   
+      if ($@) {
+          Log3 ($name, 1, "$name - aiGetResult ERROR: $@");
+          $data{$type}{$name}{current}{aiworkstate} = $@;
+          return;
+      }
+                                      
+      if (defined $pvfc) {
+          $data{$type}{$name}{current}{aiworkstate} = 'ok';
+          debugLog ($paref, 'aiProcess', qq{result AI: pvfc: $pvfc (hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $wrp, temp: $temp)});
+      }
+  }
+
+return;
+}
+
+################################################################
+#     KI initialisieren
+################################################################
+sub aiInit {                   ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+
+  if ($aidtabs) {
+      my $msg = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "sudo apt-get install libai-decisiontree-perl" for AI support);
+      debugLog ($paref, 'aiProcess', $msg);
+      $data{$type}{$name}{current}{aiinitstate} = $msg;
+      return $msg;      
+  }
+        
+  $data{$type}{$name}{aidectree}            = new AI::DecisionTree ( verbose => 0, noise_mode => 'pick_best' );
+  $data{$type}{$name}{current}{aiinitstate} = 'ok';
+  
+  Log3 ($name, 3, "$name - AI::DecisionTree new initialized");
+  
+return;
+}
+
+################################################################
 #            Bewölkungs- bzw. Regenrange berechnen
 ################################################################
 sub calcRange {
@@ -10372,8 +10658,7 @@ return $range;
 }
 
 ################################################################
-#   PV und PV Forecast in History-Hash speichern zur
-#   Berechnung des Korrekturfaktors über mehrere Tage
+#   Werte in History-Hash speichern
 ################################################################
 sub setPVhistory {
   my $paref          = shift;
@@ -10402,7 +10687,7 @@ sub setPVhistory {
   my $pvcorrf        = $paref->{pvcorrf}       // "1.00/0";                # pvCorrectionFactor
   my $temp           = $paref->{temp};                                     # Außentemperatur
   my $val            = $paref->{val}           // qq{};                    # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
-  
+  my $rad1h          = $paref->{rad1h};                                    # Strahlungsdaten speichern
   my $reorg          = $paref->{reorg}         // 0;                       # Neuberechnung von Werten in Stunde "99" nach Löschen von Stunden eines Tages
   my $reorgday       = $paref->{reorgday}      // q{};                     # Tag der reorganisiert werden soll
   
@@ -10444,6 +10729,10 @@ sub setPVhistory {
           $pvrlsum += HistoryVal ($hash, $day, $k, "pvrl", 0);
       }
       $data{$type}{$name}{pvhist}{$day}{99}{pvrl} = $pvrlsum;
+  }
+  
+  if ($histname eq "radiation") {                                                                 # irradiation
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{rad1h} = $rad1h;
   }
 
   if ($histname eq "pvfc") {                                                                      # prognostizierter Energieertrag
@@ -10669,9 +10958,10 @@ sub listDataPool {
           my $batin   = HistoryVal ($hash, $day, $key, "batin",       "-");
           my $btotout = HistoryVal ($hash, $day, $key, "batouttotal", "-");
           my $batout  = HistoryVal ($hash, $day, $key, "batout",      "-");
+          my $rad1h   = HistoryVal ($hash, $day, $key, "rad1h",       "-");
 
           $ret .= "\n      " if($ret);
-          $ret .= $key." => etotal: $etotal, pvfc: $pvfc, pvrl: $pvrl";
+          $ret .= $key." => etotal: $etotal, pvfc: $pvfc, pvrl: $pvrl, rad1h: $rad1h";
           $ret .= "\n            ";
           $ret .= "confc: $confc, con: $con, gcon: $gcon, gfeedin: $gfeedin";
           $ret .= "\n            ";
@@ -10898,7 +11188,7 @@ sub listDataPool {
           my $neff    = NexthoursVal ($hash, $idx, "cloudcover", "-");
           my $crange  = NexthoursVal ($hash, $idx, "cloudrange", "-");
           my $r101    = NexthoursVal ($hash, $idx, "rainprob",   "-");
-          my $rad1h   = NexthoursVal ($hash, $idx, "Rad1h",      "-");
+          my $rad1h   = NexthoursVal ($hash, $idx, "rad1h",      "-");
           my $pvcorrf = NexthoursVal ($hash, $idx, "pvcorrf",    "-");
           my $temp    = NexthoursVal ($hash, $idx, "temp",       "-");
           my $confc   = NexthoursVal ($hash, $idx, "confc",      "-");
@@ -10908,7 +11198,7 @@ sub listDataPool {
           $sq        .= $idx." => starttime: $nhts, hourofday: $hod, today: $today\n";
           $sq        .= "              pvfc: $pvfc, confc: $confc, confcEx: $confcex, DoN: $don\n";
           $sq        .= "              wid: $wid, wcc: $neff, wrp: $r101, temp=$temp\n";
-          $sq        .= "              Rad1h: $rad1h, crange: $crange, correff: $pvcorrf";
+          $sq        .= "              rad1h: $rad1h, crange: $crange, correff: $pvcorrf";
       }
   }
 
@@ -11027,8 +11317,6 @@ sub checkPlantConfig {
   my $type = $hash->{TYPE};
   
   my $lang = AttrVal        ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang));
-  my $cfd  = AttrVal        ($name, 'affectCloudfactorDamping',  '');
-  my $rfd  = AttrVal        ($name, 'affectRainfactorDamping',   '');
   my $pcf  = ReadingsVal    ($name, 'pvCorrectionFactor_Auto',   '');
   my $acu  = isAutoCorrUsed ($name);
   
@@ -11228,23 +11516,7 @@ sub checkPlantConfig {
       $result->{'Common Settings'}{note}   .= qq{If the local attribute "ctrlLanguage" or the global attribute "language" is changed to "DE" most of the outputs are in German.<br>};
       $result->{'Common Settings'}{info}    = 1;
   }
-  
-  if ($acu =~ /on_complex/xs) {
-      if ($cfd) {
-          $result->{'Common Settings'}{state}   = $info;
-          $result->{'Common Settings'}{result} .= qq{Attribute affectCloudfactorDamping is set to "$cfd" <br>};
-          $result->{'Common Settings'}{note}   .= qq{Please remember that changing the attribute will affect the PV generation forecast.<br>};
-          $result->{'Common Settings'}{info}    = 1;
-     }
-
-      if ($rfd) {
-          $result->{'Common Settings'}{state}   = $info;
-          $result->{'Common Settings'}{result} .= qq{Attribute affectRainfactorDamping is set to "$rfd" <br>};
-          $result->{'Common Settings'}{note}   .= qq{Please remember that changing the attribute will affect the PV generation forecast.<br>};
-          $result->{'Common Settings'}{info}    = 1;
-      }
-  }
-  
+    
   ## allg. Settings bei Nutzung Forecast.Solar API
   #################################################
   if (isForecastSolarUsed ($hash)) {
@@ -11273,7 +11545,7 @@ sub checkPlantConfig {
       if (!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
           $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
           $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
-          $result->{'Common Settings'}{note}   .= qq{affectCloudfactorDamping, affectRainfactorDamping, global latitude, global longitude <br>};
+          $result->{'Common Settings'}{note}   .= qq{global latitude, global longitude <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto <br>};
       }
   }
@@ -11322,15 +11594,22 @@ sub checkPlantConfig {
       if (!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
           $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
           $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
-          $result->{'Common Settings'}{note}   .= qq{affectCloudfactorDamping, affectRainfactorDamping, ctrlSolCastAPIoptimizeReq <br>};
+          $result->{'Common Settings'}{note}   .= qq{ctrlSolCastAPIoptimizeReq <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading, ctrlLanguage, global language, global dnsServer <br>};
       }
   }
 
-  ## allg. Settings bei Nutzung DWD Radiation
-  #############################################
+  ## allg. Settings bei Nutzung DWD API
+  #######################################
   if (isDWDUsed ($hash)) {
-       if (!$pcf || $pcf !~ /on/xs) {          
+      if ($aidtabs) {
+          $result->{'Common Settings'}{state}   = $info;
+          $result->{'Common Settings'}{result} .= qq{The Perl module AI::DecisionTree is missing. <br>};
+          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "sudo apt-get install libai-decisiontree-perl".<br>};
+          $result->{'Common Settings'}{info}    = 1;         
+      }
+       
+      if (!$pcf || $pcf !~ /on/xs) {          
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
           $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on*" if an automatic adjustment of the prescaler data should be done.<br>};
@@ -11340,6 +11619,8 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
           $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading, ctrlLanguage, global language <br>};
+          $result->{'Common Settings'}{note}   .= qq{checked Perl module: <br>};
+          $result->{'Common Settings'}{note}   .= qq{AI::DecisionTree <br>};
       }
   }
   
@@ -11373,7 +11654,7 @@ sub checkPlantConfig {
       if (!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
           $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
           $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
-          $result->{'Common Settings'}{note}   .= qq{affectCloudfactorDamping, affectRainfactorDamping, global dnsServer, global language <br>};
+          $result->{'Common Settings'}{note}   .= qq{global dnsServer, global language <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, vrmCredentials, event-on-change-reading, ctrlLanguage <br>};
       }
   }
@@ -12359,7 +12640,7 @@ return $dstr;
 }
 
 ###############################################################################
-#             entpackt einen mit _enscramble behandelten String
+#             entpackt einen mit chew behandelten String
 ###############################################################################
 sub assemble { 
   my $sstr = shift;
@@ -12371,6 +12652,44 @@ sub assemble {
   $dstr    = decode_base64 ($dstr);
   
 return $dstr;
+}
+
+################################################################
+#  Funktion um mit Storable eine Struktur in ein File  
+#  zu schreiben
+################################################################
+sub fileStore {
+  my $obj  = shift;
+  my $file = shift;
+
+  my $err;
+  my $ret = eval { nstore ($obj, $file) };                            # !! nstore statt store benutzen, sonst Absturz nach reastore AI Daten !!
+  
+  if (!$ret || $@) {
+      $err = $@ ? $@ : 'I/O problems or other internal error';
+  } 
+
+return $err;
+}
+
+################################################################
+#  Funktion um mit Storable eine Struktur aus einem File  
+#  zu lesen
+################################################################
+sub fileRetrieve {
+  my $file = shift;
+     
+  my ($err, $obj);
+  
+  if (-e $file) {
+      eval { $obj = retrieve ($file) };
+      
+      if (!$obj || $@) {
+          $err = $@ ? $@ : 'I/O error while reading';
+      }
+  }  
+
+return ($err, $obj);
 }
 
 ################################################################
@@ -12564,7 +12883,7 @@ return ($pvcorrf, $quality);
 #       cloudcover - DWD Wolkendichte
 #       cloudrange - berechnete Bewölkungsrange
 #       rainprob   - DWD Regenwahrscheinlichkeit
-#       Rad1h      - Globalstrahlung (kJ/m2)
+#       rad1h      - Globalstrahlung (kJ/m2)
 #       confc      - prognostizierter Hausverbrauch (Wh)
 #       confcEx    - prognostizierter Hausverbrauch ohne registrierte Consumer (Wh)
 #       today      - 1 wenn heute
@@ -12597,6 +12916,9 @@ return $def;
 # CurrentVal ($hash, $key, $def)
 #
 # $key: generation           - aktuelle PV Erzeugung
+#       aiinitstate          - Initialisierungsstatus der KI
+#       aitrainstate         - Traisningsstatus der KI
+#       aiworkstate          - aktueller Arbeitstatus der KI
 #       genslidereg          - Schieberegister PV Erzeugung (Array)
 #       h4fcslidereg         - Schieberegister 4h PV Forecast (Array)
 #       consumption          - aktueller Verbrauch (W)
@@ -12662,6 +12984,28 @@ sub StringVal {
       defined $data{$type}{$name}{strings}{$strg}       && 
       defined $data{$type}{$name}{strings}{$strg}{$key}) {
       return  $data{$type}{$name}{strings}{$strg}{$key};
+  }
+
+return $def;
+}
+
+###################################################################################################
+# Wert AI::DecisionTree Objects zurückliefern
+# Usage:
+# AiDetreeVal ($hash, $def)                 
+#
+# $def:  Defaultwert
+#
+###################################################################################################
+sub AiDetreeVal {                   
+  my $hash = shift;
+  my $def  = shift;
+
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+
+  if (defined $data{$type}{$name}{aidectree}) {
+      return  $data{$type}{$name}{aidectree};
   }
 
 return $def;
@@ -12874,10 +13218,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
     Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturfaktoren manuell fest bzw. automatisiert 
     dynamisch angewendet werden.
-    Weiterhin kann mit den Attributen <a href="#SolarForecast-attr-affectCloudfactorDamping">affectCloudfactorDamping</a>
-    und <a href="#SolarForecast-attr-affectRainfactorDamping">affectRainfactorDamping</a> der Beeinflussungsgrad von
-    Bewölkungs- und Regenprognosen eingestellt werden.    
-
     <br><br>
   </ul>
 
@@ -13092,16 +13432,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       werden müssen.
       Ein Rooftop ist im SolarForecast-Kontext mit einem <a href="#SolarForecast-set-inverterStrings">inverterString</a>
       gleichzusetzen. <br>
-      Die konstenfreie API-Nutzung ist auf eine Tagesrate API-Anfragen begrenzt. Die Anzahl definierter Strings (Rooftops)
+      Die kostenfreie API-Nutzung ist auf eine Tagesrate API-Anfragen begrenzt. Die Anzahl definierter Strings (Rooftops)
       erhöht die Anzahl erforderlicher API-Anfragen. Das Modul optimiert die Abfragezyklen mit dem Attribut 
       <a href="#SolarForecast-attr-ctrlSolCastAPIoptimizeReq ">ctrlSolCastAPIoptimizeReq </a>.
       <br><br>
       
       <b>ForecastSolar-API</b> <br>
       
-      Die kostenfreie Nutzung der API erfordert keine Registrierung. Die API-Anfragen sind in der kostenfreien 
-      Version auf 12 innerhalb einer Stunde begrenzt. Ein Tageslimit gibt es dabei nicht. Das Modul ermittelt automatisch 
-      das optimale Abfrageintervall in Abhängigkeit der konfigurierten Strings.
+      Die kostenfreie Nutzung der <a href='https://doc.forecast.solar/start' target='_blank'>Forecast.Solar API</a> 
+      erfordert keine Registrierung. Die API-Anfragen sind in der kostenfreien Version auf 12 innerhalb einer Stunde 
+      begrenzt. Ein Tageslimit gibt es dabei nicht. Das Modul ermittelt automatisch das optimale Abfrageintervall 
+      in Abhängigkeit der konfigurierten Strings.
       <br><br>
       
       <b>VictronKI-API</b> <br>
@@ -13314,10 +13655,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       Schaltet die automatische Vorhersagekorrektur ein/aus.
       Die Wirkungsweise unterscheidet sich je nach gewählter Methode. 
-      Das Korrekturverhalten kann mit den Attributen <a href="#SolarForecast-attr-affectNumHistDays">affectNumHistDays</a>, 
-      <a href="#SolarForecast-attr-affectMaxDayVariance">affectMaxDayVariance</a> sowie 
-      <a href="#SolarForecast-attr-affectCloudfactorDamping">affectCloudfactorDamping</a> und
-      <a href="#SolarForecast-attr-affectRainfactorDamping">affectRainfactorDamping</a> beeinflusst werden. <br>
+      Das Korrekturverhalten kann mit den Attributen <a href="#SolarForecast-attr-affectNumHistDays">affectNumHistDays</a> und 
+      <a href="#SolarForecast-attr-affectMaxDayVariance">affectMaxDayVariance</a> beeinflusst werden. <br>
       (default: off)
                   
       <br><br>
@@ -13326,11 +13665,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Bei dieser Methode wird die stündlich vorhergesagte mit der real erzeugten Energiemenge verglichen und daraus ein 
       für die Zukunft verwendeter Korrekturfaktor für die jeweilige Stunde erstellt. Die von der gewählten API gelieferten
       Prognosedaten werden <b>nicht</b> zusätzlich mit weiteren Bedingungen wie den Bewölkungszustand oder Temperaturen in
-      Beziehung gesetzt. <br>
-      In diesem Korrekturmodus haben die Attribute
-      <a href="#SolarForecast-attr-affectCloudfactorDamping">affectCloudfactorDamping</a> und
-      <a href="#SolarForecast-attr-affectRainfactorDamping">affectRainfactorDamping</a> keinen Einfluß.
-      
+      Beziehung gesetzt.      
       <br><br>
       
       <b>on_complex:</b> <br>
@@ -13379,7 +13714,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <br><br>
       
       <b>Model VictronKiAPI:</b> <br>
-      Dises Model basiert auf einer KI gestützten Prognose. Eine zusätzliche Autokorrektur wird nicht empfohlen, d.h.
+      Dieses Model basiert auf einer KI gestützten Prognose. Eine zusätzliche Autokorrektur wird nicht empfohlen, d.h.
       die empfohlene Autokorrekturmethode ist <b>off</b>. <br><br>
       
       <b>Model DWD:</b> <br>
@@ -13410,6 +13745,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>aiData</b>             </td><td>löscht eine vorhandene KI Instanz inklusive aller Trainingsdaten und initialisiert sie neu                           </td></tr>
             <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                             </td></tr>
             <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                          </td></tr>
@@ -13439,7 +13775,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>roofIdentPair</b>      </td><td>löscht alle gespeicherten SolCast API Rooftop-ID / API-Key Paare                                                     </td></tr>
             <tr><td>                           </td><td>Um ein bestimmtes Paar zu löschen ist dessen Schlüssel &lt;pk&gt; anzugeben:                                         </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (z.B. set &lt;name&gt; reset roofIdentPair p1) </ul>           </td></tr>
-
          </table>
       </ul>
       </li>
@@ -13594,7 +13929,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>hourofday</b> </td><td>laufende Stunde des Tages                                                          </td></tr>
             <tr><td> <b>pvfc</b>      </td><td>erwartete PV Erzeugung (Wh)                                                        </td></tr>
             <tr><td> <b>today</b>     </td><td>"1" wenn Startdatum am aktuellen Tag                                               </td></tr>
-            <tr><td> <b>Rad1h</b>     </td><td>vorhergesagte Globalstrahlung                                                      </td></tr>
+            <tr><td> <b>rad1h</b>     </td><td>vorhergesagte Globalstrahlung                                                      </td></tr>
             <tr><td> <b>starttime</b> </td><td>Startzeit des Datensatzes                                                          </td></tr>
             <tr><td> <b>temp</b>      </td><td>vorhergesagte Außentemperatur                                                      </td></tr>
             <tr><td> <b>wrp</b>       </td><td>vorhergesagter Grad der Regenwahrscheinlichkeit                                    </td></tr>
@@ -13634,6 +13969,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>wcc</b>            </td><td>effektive Wolkenbedeckung                                                   </td></tr>
             <tr><td> <b>wrp</b>            </td><td>Wahrscheinlichkeit von Niederschlag > 0,1 mm während der jeweiligen Stunde  </td></tr>
             <tr><td> <b>pvcorrf</b>        </td><td>verwendeter Autokorrekturfaktor                                             </td></tr>
+            <tr><td> <b>rad1h</b>          </td><td>Globalstrahlung (kJ/m2)                                                     </td></tr>
             <tr><td> <b>csmtXX</b>         </td><td>Summe Energieverbrauch von ConsumerXX                                       </td></tr>
             <tr><td> <b>csmeXX</b>         </td><td>Anteil der jeweiligen Stunde des Tages am Energieverbrauch von ConsumerXX   </td></tr>
             <tr><td> <b>minutescsmXX</b>   </td><td>Summe Aktivminuten in der Stunde von ConsumerXX                             </td></tr>
@@ -13774,15 +14110,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          (default: 0)
        </li>
        <br>
-
-       <a id="SolarForecast-attr-affectCloudfactorDamping"></a>
-       <li><b>affectCloudfactorDamping </b><br>
-         Prozentuale Mehrgewichtung des Bewölkungsfaktors bei der solaren Vorhersage. <br>
-         Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag (Dämpfung der PV
-         Prognose durch den Bewölkungsfaktor).<br>
-         (default: 0)
-       </li>
-       <br>
        
        <a id="SolarForecast-attr-affectConsForecastInPlanning"></a>
        <li><b>affectConsForecastInPlanning </b><br>
@@ -13813,15 +14140,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Anzahl der in den Caches verfügbaren historischen Tage, die zur Berechnung der Autokorrekturwerte der
          PV Vorhersage verwendet werden sollen. <br>
          (default: alle verfügbaren Daten in pvHistory und pvCircular)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-affectRainfactorDamping"></a>
-       <li><b>affectRainfactorDamping </b><br>
-         Prozentuale Mehrgewichtung des Regenprognosefaktors bei der solaren Vorhersage. <br>
-         Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag (Dämpfung der PV
-         Prognose durch den Regenfaktor).<br>
-         (default: 0)
        </li>
        <br>
        
@@ -14051,6 +14369,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+            <tr><td> <b>aiProcess</b>            </td><td>Prozessablauf der KI Unterstützung                                               </td></tr>                                                                                                                                          
+            <tr><td> <b>aiData</b>               </td><td>KI Daten                                                                         </td></tr> 
             <tr><td> <b>apiCall</b>              </td><td>Abruf API Schnittstelle ohne Datenausgabe                                        </td></tr>
             <tr><td> <b>apiProcess</b>           </td><td>Abruf und Verarbeitung von API Daten                                             </td></tr>          
             <tr><td> <b>collectData</b>          </td><td>detailliierte Datensammlung                                                      </td></tr>
@@ -14555,13 +14875,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "FHEM::SynoModules::SMUtils": 1.0220,
         "Time::HiRes": 0,
         "MIME::Base64": 0,
-        "Storable": 0        
+        "Storable": 0,
+        "Test2::Tools::Class": 0        
       },
       "recommends": {
         "FHEM::Meta": 0,
         "FHEM::Utility::CTZ": 1.00,
         "DateTime": 0,
         "DateTime::Format::Strptime": 0,
+        "AI::DecisionTree": 0,
         "Data::Dumper": 0
       },
       "suggests": {
