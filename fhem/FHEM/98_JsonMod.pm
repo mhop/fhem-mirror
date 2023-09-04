@@ -466,11 +466,11 @@ sub JsonMod_DoReadings {
 
 			# my sub m1 {
 			local *m1 = sub {
-				my ($jsonPathExpression, $readingName, $readingValue) = @_;
+				my ($jsonPathExpression, $readingName, $readingValue, $defaultReading, $defaultValue) = @_;
 
 				$warnings = 1;
 
-				if (ref($resultSet) eq 'ARRAY') {
+				if (ref($resultSet) eq 'ARRAY' and scalar @$resultSet) {
 					foreach my $res (@{$resultSet}) {
 						$resultNode = $res->[0];
 						$resultObject = $res->[1]; # value
@@ -480,6 +480,11 @@ sub JsonMod_DoReadings {
 						eval 'm2'.$args; warn $@ if $@;
 						$index++;
 					};
+				} elsif($defaultReading) {
+					JsonMod_Logger($hash, 4, '%s is empty or missing: use defaults (%s:%s)', $jsonPathExpression, $defaultReading, $defaultValue);
+					sanitizedSetReading($defaultReading, $defaultValue);
+				} else {
+					JsonMod_Logger($hash, 4, '%s is empty or missing: discarded', $jsonPathExpression);
 				};
 			};
 
@@ -551,24 +556,20 @@ sub JsonMod_DoReadings {
 		};
 		# reading is not used anymore
 		foreach my $k (keys %{$oldReadings}) {
-			readingsDelete($hash, $k) if ($oldReadings->{$k} == 0 and any { $_ eq $k} @oldReadings);
+			if ($oldReadings->{$k} == 0 and any { $_ eq $k} @oldReadings) {
+				readingsDelete($hash, $k);
+				DoTrigger($name, ".readingsDelete $k");
+			};
 		};
 		readingsBulkUpdate($hash, '.computedReadings', join ',', @newReadings);
 		readingsEndUpdate($hash, 1);
 	} else {
-		# an empty answer received:
-		if (AttrVal($name, 'onEmptyResponse', undef) and AttrVal($name, 'onEmptyResponse', '') =~ m/^keep$/i) {
-			DoTrigger($name, '.computedReadingsKeep');
-		} elsif (AttrVal($name, 'onEmptyResponse', undef) and AttrVal($name, 'onEmptyResponse', '') =~ m/^set\s.*/) {
-			my ($r, $v) = (AttrVal($name, 'onEmptyResponse', '') =~ m/^set\s([A-Za-z0-9\/_\.-]+)(?:\s(.*))*/);
-			readingsSingleUpdate($hash, $r, $v // '', 1) if ($r);
-		# } else {
-		} elsif(0) {
-			# delete entire readings
-			readingsDelete($hash, $_) for (split ',', ReadingsVal($name, '.computedReadings', ''));
-			readingsDelete($hash,'.computedReadings');
-			DoTrigger($name, '.computedReadingsNone');
-		}
+		# in case all readings removed
+		for (split ',', ReadingsVal($name, '.computedReadings', '')) {
+			readingsDelete($hash, $_);
+			DoTrigger($name, ".readingsDelete $_");
+		};
+		readingsSingleUpdate($hash, '.computedReadings', '', 1);
 	};
 };
 
