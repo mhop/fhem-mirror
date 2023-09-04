@@ -1,4 +1,4 @@
-REV 27918
+REV 27927
 DIR unused
 UPD 2023-08-29_07:45:03 406588 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -504,7 +504,7 @@ UPD 2019-01-26_07:45:02 67684 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2020-01-13_07:45:03 188373 FHEM/98_Installer.pm
 UPD 2022-11-15_07:45:02 5006 FHEM/98_JsonList2.pm
-UPD 2023-09-01_07:45:02 49709 FHEM/98_JsonMod.pm
+UPD 2023-09-04_07:45:03 50993 FHEM/98_JsonMod.pm
 UPD 2023-07-14_07:45:03 1687 FHEM/98_KNX_scan.pm
 UPD 2020-01-09_07:45:02 43856 FHEM/98_MAX_Temperature.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
@@ -746,12 +746,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2023-08-30_07:45:09 4904705 docs/commandref.html
+UPD 2023-09-04_07:45:09 4905016 docs/commandref.html
 UPD 2023-08-25_07:45:12 2908676 docs/commandref_DE.html
 UPD 2023-08-25_07:45:03 86242 docs/commandref_frame.html
 UPD 2023-08-25_07:45:03 96940 docs/commandref_frame_DE.html
-UPD 2023-09-03_07:45:15 306219 docs/commandref_modular.html
-UPD 2023-09-03_07:45:16 318035 docs/commandref_modular_DE.html
+UPD 2023-09-04_07:45:13 306235 docs/commandref_modular.html
+UPD 2023-09-04_07:45:14 318051 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
