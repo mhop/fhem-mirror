@@ -1253,10 +1253,17 @@ sub Set {
                   ;
   }
   else {
-      $setlist .= "aiDecTree:addInstances,train ".
-                  "moduleDirection ".
+      $setlist .= "moduleDirection ".
                   "moduleTiltAngle "
                   ;
+  }
+  
+  ## KI spezifische Setter
+  ##########################
+  my $aiist = CurrentVal ($hash, 'aiinitstate', '');
+  
+  if ($aiist eq 'ok') {
+      $setlist .= "aiDecTree:addInstances,train ";
   }
 
   my $params = {
@@ -13380,6 +13387,24 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
   <a id="SolarForecast-set"></a>
   <b>Set</b>
   <ul>
+  
+    <ul>
+      <a id="SolarForecast-set-aiDecTree"></a>
+      <li><b>aiDecTree </b> <br><br>
+
+      Ist der KI Support im SolarForecast Device aktiviert, können mit verschiedene KI-Aktionen ausgeführt werden:
+      <br><br>
+
+      <ul>
+       <table>
+       <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+          <tr><td> <b>addInstances</b>  </td><td>Die KI wird mit den aktuell gespeicherten PV- und Wetterdaten angereichert.                                             </td></tr>
+          <tr><td> <b>train</b>         </td><td>Die KI wird mit neu hinzugefügten Daten trainiert. Bei Erfolg werden die Entscheidungsdaten im Filesystem gespeichert.  </td></tr>
+        </table>
+      </ul>
+    </li>
+    </ul>
+    <br>
 
     <ul>
       <a id="SolarForecast-set-consumerImmediatePlanning"></a>
@@ -13394,7 +13419,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         <b>Beispiel: </b> <br>
         set &lt;name&gt; consumerImmediatePlanning 01 <br>
       </ul>
-      </li>
+    </li>
     </ul>
     <br>
 
@@ -13437,7 +13462,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         # Device BatDummy liefert die aktuelle Batterieladung im Reading "BatVal" (W), die Batterieentladung im gleichen Reading mit negativen Vorzeichen, <br>
         # die summarische Ladung im Reading "intotal" (Wh), sowie die summarische Entladung im Reading "outtotal" (Wh)
       </ul>
-      </li>
+    </li>
     </ul>
     <br>
 
