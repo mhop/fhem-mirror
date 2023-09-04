@@ -536,8 +536,7 @@ my %hset = (                                                                # Ha
   moduleDirection           => { fn => \&_setmoduleDirection           },
   writeHistory              => { fn => \&_setwriteHistory              },
   vrmCredentials            => { fn => \&_setVictronCredentials        },
-  aiAddInstance             => { fn => \&_setaiAddInstance             },
-  aiTrain                   => { fn => \&aiTrain                       },
+  aiDecTree                 => { fn => \&_setaiDecTree                 },
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
@@ -1254,8 +1253,7 @@ sub Set {
                   ;
   }
   else {
-      $setlist .= #"aiAddInstance:noArg ".
-                  #"aiTrain:noArg ".
+      $setlist .= "aiDecTree:addInstances,train ".
                   "moduleDirection ".
                   "moduleTiltAngle "
                   ;
@@ -2272,12 +2270,21 @@ return;
 }
 
 ################################################################
-#                      Setter aiAddInstance
-################################################################
-sub _setaiAddInstance {                   ## no critic "not used"
+#                      Setter aiDecTree                              
+################################################################     
+sub _setaiDecTree {                   ## no critic "not used"
   my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop} // return;
 
-  aiAddInstance ($paref);
+  if($prop eq 'addInstances') {
+      aiAddInstance ($paref);
+  }
+
+  if($prop eq 'train') {
+      aiTrain ($paref);
+  }
   
 return;
 }
@@ -12666,13 +12673,15 @@ return ($cname, $dswname);
 sub temp2bin {
   my $temp = shift;
 
-  my $bin = $temp > 30 ? 'veryhot' :
-            $temp > 25 ? 'hot'     :   
-            $temp > 20 ? 'warm'    :
-            $temp > 10 ? 'medium'  :
-            $temp > 5  ? 'cool'    :
-            $temp > 0  ? 'cold'    :
-            'verycold';
+  my $bin = $temp > 35 ? '35' :
+            $temp > 30 ? '30' :
+            $temp > 25 ? '25' :   
+            $temp > 20 ? '20' :
+            $temp > 15 ? '15' :
+            $temp > 10 ? '10' :
+            $temp > 5  ? '05' :
+            $temp > 0  ? '00' :
+            '-05';
 
 return $bin;
 }
@@ -12683,26 +12692,26 @@ return $bin;
 sub cloud2bin {
   my $wcc = shift;
 
-  my $bin = $wcc > 95 ? 'wcl95' :
-            $wcc > 90 ? 'wcl90' :
-            $wcc > 85 ? 'wcl85' :
-            $wcc > 80 ? 'wcl80' :
-            $wcc > 75 ? 'wcl75' :
-            $wcc > 70 ? 'wcl70' :
-            $wcc > 65 ? 'wcl65' :
-            $wcc > 60 ? 'wcl60' :
-            $wcc > 55 ? 'wcl55' :
-            $wcc > 50 ? 'wcl50' :
-            $wcc > 45 ? 'wcl45' :
-            $wcc > 40 ? 'wcl40' :
-            $wcc > 35 ? 'wcl35' :
-            $wcc > 30 ? 'wcl30' :
-            $wcc > 25 ? 'wcl25' :
-            $wcc > 20 ? 'wcl20' :
-            $wcc > 15 ? 'wcl15' :
-            $wcc > 10 ? 'wcl10' :
-            $wcc > 5  ? 'wcl05' :
-            'wcl00';
+  my $bin = $wcc > 95 ? '95' :
+            $wcc > 90 ? '90' :
+            $wcc > 85 ? '85' :
+            $wcc > 80 ? '80' :
+            $wcc > 75 ? '75' :
+            $wcc > 70 ? '70' :
+            $wcc > 65 ? '65' :
+            $wcc > 60 ? '60' :
+            $wcc > 55 ? '55' :
+            $wcc > 50 ? '50' :
+            $wcc > 45 ? '45' :
+            $wcc > 40 ? '40' :
+            $wcc > 35 ? '35' :
+            $wcc > 30 ? '30' :
+            $wcc > 25 ? '25' :
+            $wcc > 20 ? '20' :
+            $wcc > 15 ? '15' :
+            $wcc > 10 ? '10' :
+            $wcc > 5  ? '05' :
+            '00';
 
 return $bin;
 }
@@ -12713,26 +12722,26 @@ return $bin;
 sub rain2bin {
   my $wrp = shift;
 
-  my $bin = $wrp > 95 ? 'wrl95' :
-            $wrp > 90 ? 'wrl90' :
-            $wrp > 85 ? 'wrl85' :
-            $wrp > 80 ? 'wrl80' :
-            $wrp > 75 ? 'wrl75' :
-            $wrp > 70 ? 'wrl70' :
-            $wrp > 65 ? 'wrl65' :
-            $wrp > 60 ? 'wrl60' :
-            $wrp > 55 ? 'wrl55' :
-            $wrp > 50 ? 'wrl50' :
-            $wrp > 45 ? 'wrl45' :
-            $wrp > 40 ? 'wrl40' :
-            $wrp > 35 ? 'wrl35' :
-            $wrp > 30 ? 'wrl30' :
-            $wrp > 25 ? 'wrl25' :
-            $wrp > 20 ? 'wrl20' :
-            $wrp > 15 ? 'wrl15' :
-            $wrp > 10 ? 'wrl10' :
-            $wrp > 5  ? 'wrl05' :
-            'wrl00';
+  my $bin = $wrp > 95 ? '95' :
+            $wrp > 90 ? '90' :
+            $wrp > 85 ? '85' :
+            $wrp > 80 ? '80' :
+            $wrp > 75 ? '75' :
+            $wrp > 70 ? '70' :
+            $wrp > 65 ? '65' :
+            $wrp > 60 ? '60' :
+            $wrp > 55 ? '55' :
+            $wrp > 50 ? '50' :
+            $wrp > 45 ? '45' :
+            $wrp > 40 ? '40' :
+            $wrp > 35 ? '35' :
+            $wrp > 30 ? '30' :
+            $wrp > 25 ? '25' :
+            $wrp > 20 ? '20' :
+            $wrp > 15 ? '15' :
+            $wrp > 10 ? '10' :
+            $wrp > 5  ? '05' :
+            '00';
 
 return $bin;
 }
