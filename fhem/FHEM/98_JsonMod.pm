@@ -569,6 +569,7 @@ sub JsonMod_DoReadings {
 			readingsDelete($hash, $_);
 			DoTrigger($name, ".readingsDelete $_");
 		};
+		DoTrigger($name, ".computedReadingsNone");
 		readingsSingleUpdate($hash, '.computedReadings', '', 1);
 	};
 };
