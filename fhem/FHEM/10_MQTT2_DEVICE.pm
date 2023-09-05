@@ -40,7 +40,7 @@ MQTT2_DEVICE_Initialize($)
     imageLink
     jsonMap:textField-long
     model
-    periodicCmd
+    periodicCmd:textField-long
     readingList:textField-long
     setExtensionsEvent:1,0
     setList:textField-long
