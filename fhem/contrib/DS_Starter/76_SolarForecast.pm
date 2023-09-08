@@ -916,8 +916,8 @@ my %hcsr = (                                                                    
 # $data{$type}{$name}{strings}                                                   # Stringkonfiguration Hash
 # $data{$type}{$name}{solcastapi}                                                # Zwischenspeicher API-Daten
 # $data{$type}{$name}{aidectree}{object}                                         # AI Decision Tree Object
-# $data{$type}{$name}{aidectree}{aitrained}                                      # AI Decision Tree trainierte Daten
-# $data{$type}{$name}{aidectree}{airaw}                                          # Rohdaten für AI Input = Raw Trainigsdaten
+#                    {aidectree}{aitrained}                                      # AI Decision Tree trainierte Daten
+#                    {aidectree}{airaw}                                          # Rohdaten für AI Input = Raw Trainigsdaten
 
 ################################################################
 #               Init Fn
@@ -1107,9 +1107,13 @@ sub Define {
   $params->{cachename}  = 'solcastapi';
   _readCacheFile ($params);
   
-  $params->{file}       = $aitrained.$name;                                          # AI Cache File einlesen wenn vorhanden
+  $params->{file}       = $aitrained.$name;                                        # AI Cache File einlesen wenn vorhanden
   $params->{cachename}  = 'aitrained';
   _readCacheFile ($params); 
+  
+  $params->{file}       = $airaw.$name;                                            # AI Rawdaten File einlesen wenn vorhanden
+  $params->{cachename}  = 'airaw';
+  _readCacheFile ($params);
 
   singleUpdateState ( {hash => $hash, state => 'initialized', evt => 1} );
 
@@ -1142,6 +1146,18 @@ sub _readCacheFile {
               $data{$type}{$name}{current}{aitrainstate} = 'ok';
               Log3($name, 3, qq{$name - cached data "$cachename" restored}); 
           }
+      }     
+
+      return;      
+  }
+  
+  if ($cachename eq 'airaw') {      
+      my ($err, $data) = fileRetrieve ($file);
+      
+      if (!$err && $data) {          
+          $data{$type}{$name}{aidectree}{airaw}     = $data;
+          $data{$type}{$name}{current}{aitrawstate} = 'ok';
+          Log3($name, 3, qq{$name - cached data "$cachename" restored}); 
       }     
 
       return;      
@@ -1264,12 +1280,10 @@ sub Set {
   }
   
   ## KI spezifische Setter
-  ##########################
-  my $aiist = CurrentVal ($hash, 'aiinitstate', '');
-  
-  #if ($aiist eq 'ok') {
+  ##########################  
+  if (isDWDUsed ($hash)) {
       $setlist .= "aiDecTree:addInstances,addRawData,train ";
-  #}
+  }
 
   my $params = {
       hash    => $hash,
@@ -2086,11 +2100,20 @@ sub _setreset {                          ## no critic "not used"
       delete $data{$type}{$name}{current}{aitrainstate};
       delete $data{$type}{$name}{current}{aiaddistate};
       delete $data{$type}{$name}{current}{aigetresult};
-      #my $dtree = AiDetreeVal ($hash, 'object', undef);
       
-      #if ($dtree) {
-          aiInit ($paref);
-      #}     
+      my @ftd = ( $airaw.$name,
+                  $aitrained.$name                
+                );
+                  
+      for my $f (@ftd) {
+          my $err = FileDelete($f);
+
+          if ($err) {
+              Log3 ($name, 1, qq{$name - Message while deleting file "$f": $err});
+          }    
+      }
+      
+      aiInit ($paref);    
       
       return;
   }
@@ -2352,9 +2375,9 @@ sub Get {
                 
   ## KI spezifische Getter
   ##########################
-  my $aiist = CurrentVal ($hash, 'aiinitstate', '');
+  my $airst = CurrentVal ($hash, 'aitrawstate', '');
   
-  if ($aiist eq 'ok') {
+  if ($airst eq 'ok') {
       $getlist .= "valDecTree:aiRawData ";
   }
 
@@ -4226,10 +4249,6 @@ sub Shutdown {
   writeCacheToFile ($hash, "consumers",   $csmcache.$name);             # Cache File Consumer schreiben
   writeCacheToFile ($hash, "solcastapi", $scpicache.$name);             # Cache File SolCast API Werte schreiben
   
-  if (CurrentVal ($hash, 'aitrainstate', '') eq 'ok') {
-      writeCacheToFile ($hash, "aidectree", $aitrained.$name);            # AI Cache schreiben  
-  }
-  
 return;
 }
 
@@ -4271,6 +4290,7 @@ sub Delete {
               $plantcfg.$name,
               $csmcache.$name, 
               $scpicache.$name,
+              $airaw.$name,
               $aitrained.$name                
             );
               
@@ -8600,7 +8620,7 @@ sub _graphicHeader {
       
       ## KI Status
       ##############
-      my $aiist = CurrentVal ($hash, 'aiinitstate',    '');
+      my $aiist = CurrentVal ($hash, 'aiinitstate',  'ok');
       my $aitst = CurrentVal ($hash, 'aitrainstate', 'ok');
       my $aiast = CurrentVal ($hash, 'aiaddistate',  'ok');       
       
@@ -10297,8 +10317,7 @@ sub _addHourAiInstance {
       $paref->{ood} = 1;
       $paref->{rho} = $rho;
       
-      aiAddInstance ($paref);                                                                             # AI Instanz hinzufügen
-      aiAddRawData  ($paref); 
+      aiAddRawData  ($paref);                                          # Raw Daten für AI hinzufügen und sichern
       
       delete $paref->{ood};
       delete $paref->{rho};     
@@ -10542,15 +10561,14 @@ return $hdv;
 }
 
 ################################################################
-#     KI Instanz hinzufügen
+#     KI Instanz(en) aus Raw Daten Hash
+#     $data{$type}{$name}{aidectree}{airaw} hinzufügen
 ################################################################
 sub aiAddInstance {                   ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
-  my $ood   = $paref->{ood} // 0;     # only one (cuurent) day
-  my $rho   = $paref->{rho};          # only this hour of day
   my $taa   = $paref->{taa};          # do train after add
   
   return if(!isDWDUsed ($hash));
@@ -10563,52 +10581,40 @@ sub aiAddInstance {                   ## no critic "not used"
       return if($err);
       $dtree = AiDetreeVal ($hash, 'object', undef);
   }
-   
-  my ($pvrl, $temp, $wcc, $wrp, $rad1h);
   
-  for my $pvd (sort keys %{$data{$type}{$name}{pvhist}}) {
-      next if(!$pvd);
-      if ($ood) {
-          next if($pvd ne $paref->{day});
-      }
+  for my $idx (sort keys %{$data{$type}{$name}{aidectree}{airaw}}) {
+      next if(!$idx);      
       
-      for my $hod (sort keys %{$data{$type}{$name}{pvhist}{$pvd}}) {
-          next if($hod eq '99' || ($rho && $hod ne $rho));
-          
-          $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
-          next if(!defined $pvrl);
-          
-          $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
-          next if(!defined $rad1h);
-          
-          $temp  = HistoryVal ($hash, $pvd, $hod, 'temp', 20);
-          $wcc   = HistoryVal ($hash, $pvd, $hod, 'wcc',   0);
-          $wrp   = HistoryVal ($hash, $pvd, $hod, 'wrp',   0);
-          
-          my $tbin = temp2bin  ($temp);
-          my $cbin = cloud2bin ($wcc);
-          my $rbin = rain2bin  ($wrp);
-          
-          eval { $dtree->add_instance (attributes => { rad1h => $rad1h,
-                                                       temp  => $tbin,
-                                                       wcc   => $cbin,
-                                                       wrp   => $rbin,
-                                                       hod   => $hod
-                                                     },
-                                                     result => $pvrl
-                                      )
-               }
-               or do { Log3 ($name, 1, "$name - aiAddInstance ERROR: $@");
-                       $data{$type}{$name}{current}{aiaddistate} = $@;
-                       return;
-                     };
-          
-          debugLog ($paref, 'aiProcess', qq{AI Instance added - day: $pvd, hod: $hod, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, wrp: $rbin, temp: $tbin}); 
-      }
+      my $pvrl = AiRawdataVal ($hash, $idx, 'pvrl', undef);
+      next if(!defined $pvrl);
       
-      $data{$type}{$name}{aidectree}{object}    = $dtree;
-      $data{$type}{$name}{current}{aiaddistate} = 'ok';
+      my $hod  = AiRawdataVal ($hash, $idx, 'hod', undef);
+      next if(!defined $hod);
+      
+      my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', 0);
+      my $temp  = AiRawdataVal ($hash, $idx, 'temp', 20);
+      my $wcc   = AiRawdataVal ($hash, $idx, 'wcc',   0);
+      my $wrp   = AiRawdataVal ($hash, $idx, 'wrp',   0);
+      
+      eval { $dtree->add_instance (attributes => { rad1h => $rad1h,
+                                                   temp  => $temp,
+                                                   wcc   => $wcc,
+                                                   wrp   => $wrp,
+                                                   hod   => $hod
+                                                 },
+                                                 result => $pvrl
+                                  )
+           }
+           or do { Log3 ($name, 1, "$name - aiAddInstance ERROR: $@");
+                   $data{$type}{$name}{current}{aiaddistate} = $@;
+                   return;
+                 };
+      
+      debugLog ($paref, 'aiProcess', qq{AI Instance added - hod: $hod, rad1h: $rad1h, pvrl: $pvrl, wcc: $wcc, wrp: $wrp, temp: $temp}); 
   }
+  
+  $data{$type}{$name}{aidectree}{object}    = $dtree;
+  $data{$type}{$name}{current}{aiaddistate} = 'ok';
   
   if ($taa) {
       aiTrain ($paref);
@@ -10645,7 +10651,7 @@ sub aiTrain {                   ## no critic "not used"
              };
   
   $data{$type}{$name}{aidectree}{aitrained} = $dtree;
-  $err                                      = writeCacheToFile ($hash, 'aitrained', $aitrained.$name);   # AI Cache schreiben 
+  $err                                      = writeCacheToFile ($hash, 'aitrained', $aitrained.$name); 
   
   if (!$err) {
       debugLog ($paref, 'aiData',    qq{AI trained: }.Dumper $data{$type}{$name}{aidectree}{aitrained});
@@ -10670,9 +10676,7 @@ sub aiGetResult {                   ## no critic "not used"
   my $hod   = $paref->{hod};
   my $nhidx = $paref->{nhidx};
   
-  my $err   = 'no decition delivered';
-  
-  return $err if(!isDWDUsed ($hash) || !$hod || !$nhidx);  
+  return 'no AI decition possible' if(!isDWDUsed ($hash) || !$hod || !$nhidx);  
   
   my $dtree = AiDetreeVal ($hash, 'aitrained', undef);
   
@@ -10712,7 +10716,7 @@ sub aiGetResult {                   ## no critic "not used"
       return ('', $pvaifc);
   }
 
-return $err;
+return 'no decition delivered';
 }
 
 ################################################################
@@ -10724,6 +10728,8 @@ sub aiInit {                   ## no critic "not used"
   my $name  = $paref->{name};
   my $type  = $paref->{type};
 
+  return if(!isDWDUsed ($hash));
+  
   my $err;
   
   if ($aidtabs || $t2sabs) {
@@ -10768,8 +10774,8 @@ sub aiAddRawData {                   ## no critic "not used"
   my $type  = $paref->{type};
   my $ood   = $paref->{ood} // 0;     # only one (cuurent) day
   my $rho   = $paref->{rho};          # only this hour of day
-   
-  my ($pvrl, $temp, $wcc, $wrp, $rad1h);
+  
+  delete $data{$type}{$name}{current}{aitrawstate};
   
   for my $pvd (sort keys %{$data{$type}{$name}{pvhist}}) {
       next if(!$pvd);
@@ -10782,15 +10788,15 @@ sub aiAddRawData {                   ## no critic "not used"
           
           my $ridx = aiMakeIdxRaw ($pvd, $hod);
           
-          $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
+          my $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
           next if(!$pvrl);
           
-          $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
+          my $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
           next if(!$rad1h);
           
-          $temp  = HistoryVal ($hash, $pvd, $hod, 'temp', 20);
-          $wcc   = HistoryVal ($hash, $pvd, $hod, 'wcc',   0);
-          $wrp   = HistoryVal ($hash, $pvd, $hod, 'wrp',   0);
+          my $temp  = HistoryVal ($hash, $pvd, $hod, 'temp', 20);
+          my $wcc   = HistoryVal ($hash, $pvd, $hod, 'wcc',   0);
+          my $wrp   = HistoryVal ($hash, $pvd, $hod, 'wrp',   0);
           
           my $tbin = temp2bin  ($temp);
           my $cbin = cloud2bin ($wcc);
@@ -10810,6 +10816,7 @@ sub aiAddRawData {                   ## no critic "not used"
   my $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
   
   if (!$err) {
+      $data{$type}{$name}{current}{aitrawstate} = 'ok';
       debugLog ($paref, 'aiProcess', qq{AI raw data saved into file: }.$airaw.$name);
   }
   
@@ -13586,14 +13593,18 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a id="SolarForecast-set-aiDecTree"></a>
       <li><b>aiDecTree </b> <br><br>
 
-      Ist der KI Support im SolarForecast Device aktiviert, können mit verschiedene KI-Aktionen ausgeführt werden:
+      Ist der KI Support im SolarForecast Device aktiviert, können verschiedene KI-Aktionen manuell ausgeführt werden.
+      Die manuelle Ausführung der KI Aktionen ist im Allgemeinen nicht notwendig, da die Abarbeitung aller nötigen Schritte 
+      bereits automatisch im Modul vorgenommen wird.
       <br><br>
 
       <ul>
        <table>
-       <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>addInstances</b>  </td><td>Die KI wird mit den aktuell gespeicherten PV- und Wetterdaten angereichert.                                             </td></tr>
-          <tr><td> <b>train</b>         </td><td>Die KI wird mit neu hinzugefügten Daten trainiert. Bei Erfolg werden die Entscheidungsdaten im Filesystem gespeichert.  </td></tr>
+       <colgroup> <col width="10%"> <col width="90%"> </colgroup>
+          <tr><td> <b>addInstances</b>  </td><td>- Die KI wird mit den aktuell vorhandenen PV-, Strahlungs- und Umweltdaten angereichert.                                  </td></tr>
+          <tr><td> <b>addRawData</b>    </td><td>- Relevante PV-, Strahlungs- und Umweltdaten werden extrahiert und für die spätere Verwendung gespeichert.                </td></tr>
+          <tr><td> <b>train</b>         </td><td>- Die KI wird mit den verfügbaren Daten trainiert.                                                                        </td></tr>
+          <tr><td>                      </td><td>&nbsp;&nbsp;Erfolgreich generierte Entscheidungsdaten werden im Filesystem gespeichert.                                   </td></tr>
         </table>
       </ul>
     </li>
@@ -14417,6 +14428,23 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <li><b>valCurrent </b> <br><br>
       Listet aktuelle Betriebsdaten, Kennzahlen und Status auf.
       </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-get-valDecTree"></a>
+      <li><b>valDecTree </b> <br><br>
+
+      Ist der KI Support im SolarForecast Device aktiviert, können verschiedene KI relevante Daten angezeigt werden:
+      <br><br>
+
+      <ul>
+       <table>
+       <colgroup> <col width="15%"> <col width="95%"> </colgroup>
+          <tr><td> <b>aiRawData</b>  </td><td>- Die aktuell für die KI gespeicherten PV-, Strahlungs- und Umweltdaten.  </td></tr>
+        </table>
+      </ul>
+    </li>
     </ul>
     <br>
 
