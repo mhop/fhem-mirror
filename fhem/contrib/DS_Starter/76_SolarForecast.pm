@@ -140,7 +140,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.82.1" => "08.09.2023  rebuild implementation of DWD AI support ",
+  "0.82.2" => "10.09.2023  activate implementation of DWD AI support ",
+  "0.82.1" => "08.09.2023  rebuild implementation of DWD AI support, some error fixing (FHEM restarts between 0 and 1) ",
   "0.82.0" => "02.09.2023  first implementation of DWD AI support, new ctrlDebug aiProcess aiData, reset aiData ",
   "0.81.1" => "30.08.2023  show forecast qualities when pressing quality icon in forecast grafic, store rad1h (model DWD) in ".
                            "pvhistory, removed: affectCloudfactorDamping, affectRainfactorDamping ",
@@ -434,11 +435,6 @@ my $prdef          = 0.85;                                                      
 my $tempcoeffdef   = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
 my $tempmodinc     = 25;                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
 my $tempbasedef    = 25;                                                            # Temperatur Module bei Nominalleistung
-my $cldampdef      = 0;                                                             # Gewichtung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
-my $cloud_base     = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung
-
-my $rdampdef       = 0;                                                             # Gewichtung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
-my $rain_base      = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung
 
 my $maxconsumer    = 16;                                                            # maximale Anzahl der möglichen Consumer (Attribut)
 my $epiecMaxCycles = 10;                                                            # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
@@ -655,6 +651,8 @@ my %hqtxt = (                                                                   
               DE => qq{Perl Modul Test2::Suite ist nicht vorhanden}                                                         },
   aiwook => { EN => qq{AI support works properly, but does not provide a value for the current hour},
               DE => qq{KI Unterst&uuml;tzung arbeitet einwandfrei, liefert jedoch keinen Wert f&uuml;r die aktuelle Stunde} },  
+  aiwhit => { EN => qq{the PV forecast value for the current hour is provided by the AI support},
+              DE => qq{der PV Vorhersagewert f&uuml;r die aktuelle Stunde wird von der KI Unterst&uuml;tzung geliefert}     },
   nxtscc => { EN => qq{next SolCast call},
               DE => qq{n&auml;chste SolCast Abfrage}                                                                        },  
   fulfd  => { EN => qq{fulfilled},
@@ -2378,7 +2376,7 @@ sub Get {
   my $airst = CurrentVal ($hash, 'aitrawstate', '');
   
   if ($airst eq 'ok') {
-      $getlist .= "valDecTree:aiRawData ";
+      $getlist .= "valDecTree:aiRawData,aiRuleStrings ";
   }
 
   return if(IsDisabled($name));
@@ -3856,8 +3854,42 @@ sub _getaiDecTree {                   ## no critic "not used"
   if($arg eq 'aiRawData') {
       $ret = listDataPool ($hash, 'aiRawData');  
   }
+  
+  if($arg eq 'aiRuleStrings') {
+      $ret = __getaiRuleStrings ($hash);  
+  }
 
 return $ret;
+}
+
+################################################################
+#  Gibt eine Liste von Zeichenketten zurück, die den AI 
+#  Entscheidungsbaum in Form von Regeln beschreiben
+################################################################
+sub __getaiRuleStrings {                 ## no critic "not used"
+  my $hash = shift;
+  
+  return 'no AI decition possible' if(!isPrepared4AI ($hash));  
+  
+  my $dtree = AiDetreeVal ($hash, 'aitrained', undef);
+  
+  if (!$dtree) {
+      return 'AI trained object is missed';
+  }
+  
+  my $rs = 'no rules delivered';
+  my @rsl;
+                                     
+  eval { @rsl = $dtree->rule_statements() 
+       }
+       or do { return $@;
+             };
+                   
+  if (@rsl) {
+      $rs = join "\n", @rsl;
+  }
+
+return $rs;
 }
 
 ################################################################
@@ -4963,8 +4995,8 @@ sub __createAdditionalEvents  {
   my $daref = $paref->{daref};
 
   for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
-      my $nhts = NexthoursVal ($hash, $idx, "starttime",  undef);
-      my $nhfc = NexthoursVal ($hash, $idx, "pvforecast", undef);
+      my $nhts = NexthoursVal ($hash, $idx, 'starttime', undef);
+      my $nhfc = NexthoursVal ($hash, $idx, 'pvfc',      undef);
       next if(!defined $nhts || !defined $nhfc);
 
       my ($dt, $h) = $nhts =~ /([\w-]+)\s(\d{2})/xs;
@@ -5185,33 +5217,45 @@ sub _transferAPIRadiationValues {
 
       my $est = __calcPVestimates ($params);
 
-      $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $est;
-      $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $wantdt;
-      $data{$type}{$name}{nexthours}{$time_str}{hourofday}  = $hod;
-      $data{$type}{$name}{nexthours}{$time_str}{today}      = $fd == 0 ? 1 : 0;
-      $data{$type}{$name}{nexthours}{$time_str}{rad1h}      = $rad;
+      $data{$type}{$name}{nexthours}{$time_str}{pvapifc}   = $est;                            # durch API gelieferte PV Forecast
+      $data{$type}{$name}{nexthours}{$time_str}{starttime} = $wantdt;
+      $data{$type}{$name}{nexthours}{$time_str}{hourofday} = $hod;
+      $data{$type}{$name}{nexthours}{$time_str}{today}     = $fd == 0 ? 1 : 0;
+      $data{$type}{$name}{nexthours}{$time_str}{rad1h}     = $rad;
 
       my ($err, $pvaifc) = aiGetResult ($params);                                             # KI Entscheidungen abfragen
+      my $pvfc;
+      
       if (!$err) {
-          $data{$type}{$name}{nexthours}{$time_str}{pvaifc} = $pvaifc;
-          $data{$type}{$name}{current}{aigetresult}         = 'ok';
+          $data{$type}{$name}{nexthours}{$time_str}{pvaifc} = $pvaifc;                        # durch AI gelieferte PV Forecast
+          $data{$type}{$name}{nexthours}{$time_str}{pvfc}   = $pvaifc;
+          $data{$type}{$name}{nexthours}{$time_str}{aihit}  = 1;
+          
+          $pvfc = $pvaifc;
       }
       else {
-          $data{$type}{$name}{current}{aigetresult} = $err;
-      }      
-
-      if($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-          $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{pvfc} = $est;
+          delete $data{$type}{$name}{nexthours}{$time_str}{pvaifc};
+          $data{$type}{$name}{nexthours}{$time_str}{pvfc}  = $est;
+          $data{$type}{$name}{nexthours}{$time_str}{aihit} = 0;
+          
+          $pvfc = $est;
       }
 
-      if($fd == 0 && int $est > 0) {                                                          # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
-          push @$daref, "Today_Hour".sprintf ("%02d",$fh1)."_PVforecast<>$est Wh";
+      if ($num < 23 && $fh < 24) {                                                            # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+          $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{pvapifc} = NexthoursVal ($hash, $time_str, 'pvapifc', undef);
+          $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{pvfc}    = $pvfc;
+          $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{pvaifc}  = NexthoursVal ($hash, $time_str, 'pvaifc',  undef);
+          $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{aihit}   = NexthoursVal ($hash, $time_str, 'aihit',       0);
+      }
+
+      if($fd == 0 && int $pvfc > 0) {                                                         # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
+          push @$daref, "Today_Hour".sprintf ("%02d",$fh1)."_PVforecast<>$pvfc Wh";
       }
 
       if($fd == 0 && $fh1) {
           $paref->{nhour}    = sprintf "%02d", $fh1;
           
-          $paref->{calcpv}   = $est;
+          $paref->{calcpv}   = $pvfc;
           $paref->{histname} = 'pvfc';
           setPVhistory ($paref);
           
@@ -5954,8 +5998,8 @@ sub _createSummaries {
   my $tdConFcTillSunset = 0;
   my $remainminutes     = 60 - $minute;                                                                # verbleibende Minuten der aktuellen Stunde
 
-  my $restofhourpvfc   = (NexthoursVal($hash, "NextHour00", "pvforecast", 0)) / 60 * $remainminutes;
-  my $restofhourconfc  = (NexthoursVal($hash, "NextHour00", "confc",      0)) / 60 * $remainminutes;
+  my $restofhourpvfc   = (NexthoursVal($hash, "NextHour00", 'pvfc',  0)) / 60 * $remainminutes;
+  my $restofhourconfc  = (NexthoursVal($hash, "NextHour00", 'confc', 0)) / 60 * $remainminutes;
 
   $next1HoursSum->{PV}          = $restofhourpvfc;
   $next2HoursSum->{PV}          = $restofhourpvfc;
@@ -5970,10 +6014,10 @@ sub _createSummaries {
   $restOfDaySum->{Consumption}  = $restofhourconfc;
 
   for my $h (1..47) {
-      my $pvfc  = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'pvforecast', 0);
-      my $confc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'confc',      0);
-      my $istdy = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'today',      0);
-      my $don   = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'DoN',        0);
+      my $pvfc  = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'pvfc',  0);
+      my $confc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'confc', 0);
+      my $istdy = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'today', 0);
+      my $don   = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'DoN',   0);
       $pvfc     = 0 if($pvfc  < 0);                                                         # PV Prognose darf nicht negativ sein
       $confc    = 0 if($confc < 0);                                                         # Verbrauchsprognose darf nicht negativ sein
       
@@ -6509,8 +6553,8 @@ sub __planSwitchTimes {
   ## max. Überschuß ermitteln
   #############################
   for my $idx (sort keys %{$nh}) {
-      my $pvfc    = NexthoursVal ($hash, $idx, "pvforecast", 0 );
-      my $confcex = NexthoursVal ($hash, $idx, "confcEx",    0 );                          # prognostizierter Verbrauch ohne registrierte Consumer
+      my $pvfc    = NexthoursVal ($hash, $idx, 'pvfc',    0);
+      my $confcex = NexthoursVal ($hash, $idx, 'confcEx', 0);                              # prognostizierter Verbrauch ohne registrierte Consumer
 
       my $spexp   = $pvfc - ($cicfip ? $confcex : 0);                                      # prognostizierter Energieüberschuß (kann negativ sein)
 
@@ -7573,7 +7617,7 @@ sub _calcReadingsTomorrowPVFc {
       next if($hods !~ /$h/xs);                                                    # diese Stunde des Tages soll nicht erzeugt werden
 
       my $st   = NexthoursVal ($hash, $idx, 'starttime', 'XXXX-XX-XX XX:XX:XX');   # Starttime
-      my $pvfc = NexthoursVal ($hash, $idx, 'pvforecast', 0);
+      my $pvfc = NexthoursVal ($hash, $idx, 'pvfc', 0);
 
       push @$daref, "Tomorrow_Hour".$h."_PVforecast<>".$pvfc." Wh";
   }
@@ -8285,7 +8329,7 @@ sub _checkSetupNotComplete {
   my ($coset, $lat, $lon) = locCoordinates();                                             # Koordinaten im global device
   my $rip   = 1 if(exists $data{$type}{$name}{solcastapi}{'?IdPair'});                    # es existiert mindestens ein Paar RoofTop-ID / API-Key
 
-  my $pv0   = NexthoursVal ($hash, "NextHour00", "pvforecast", undef);                    # der erste PV ForeCast Wert
+  my $pv0   = NexthoursVal ($hash, 'NextHour00', 'pvfc', undef);                          # der erste PV ForeCast Wert
 
   my $link   = qq{<a href="$FW_ME$FW_subdir?detail=$name">$name</a>};
   my $height = AttrNum ($name, 'graphicBeamHeight', 200);
@@ -8394,7 +8438,7 @@ sub _graphicHeader {
   my ($pcf,$pcq) = split "/", $pvcorrf00;
   my $pvcanz     = qq{factor: $pcf / quality: $pcq};                                              
   
-  my $pvfc00     =  NexthoursVal($hash, "NextHour00", "pvforecast", undef);
+  my $pvfc00     = NexthoursVal   ($hash, 'NextHour00', 'pvfc', undef);
   my $acu        = isAutoCorrUsed ($name);
 
   if ($kw eq 'kWh') {
@@ -8620,20 +8664,20 @@ sub _graphicHeader {
       
       ## KI Status
       ##############
-      my $aiist = CurrentVal ($hash, 'aiinitstate',  'ok');
-      my $aitst = CurrentVal ($hash, 'aitrainstate', 'ok');
-      my $aiast = CurrentVal ($hash, 'aiaddistate',  'ok');       
+      my $aicanuse = CurrentVal   ($hash, 'aicanuse',       '');
+      my $aitst    = CurrentVal   ($hash, 'aitrainstate', 'ok'); 
+      my $aihit    = NexthoursVal ($hash, 'NextHour00', 'aihit', 0);      
       
-      my $aitit = $aidtabs       ? $hqtxt{aimstt}{$lang} :
-                  $t2sabs        ? $hqtxt{aimmts}{$lang} :   
-                  $aiist ne 'ok' ? $hqtxt{ainuse}{$lang} :
+      my $aitit = $aidtabs          ? $hqtxt{aimstt}{$lang} :
+                  $t2sabs           ? $hqtxt{aimmts}{$lang} :   
+                  $aicanuse ne 'ok' ? $hqtxt{ainuse}{$lang} :
                   q{};
       
-      my $aiimg  = $aidtabs       ? FW_makeImage ('--',                 $aitit) : 
-                   $t2sabs        ? FW_makeImage ('--',                 $aitit) :       
-                   $aiist ne 'ok' ? FW_makeImage ('-',                  $aitit) :
-                   $aitst ne 'ok' ? FW_makeImage ('10px-kreis-rot.png', $aitst) :
-                   $aiast ne 'ok' ? FW_makeImage ('10px-kreis-rot.png', $aiast) :   
+      my $aiimg  = $aidtabs          ? FW_makeImage ('--',                 $aitit) : 
+                   $t2sabs           ? FW_makeImage ('--',                 $aitit) :       
+                   $aicanuse ne 'ok' ? FW_makeImage ('-',                  $aitit) :
+                   $aitst ne 'ok'    ? FW_makeImage ('10px-kreis-rot.png', $aitst) :
+                   $aihit            ? FW_makeImage ('10px-kreis-gruen.png', $hqtxt{aiwhit}{$lang}) :               
                    FW_makeImage ('10px-kreis-gelb.png', $hqtxt{aiwook}{$lang});
       
       my $aiicon = qq{<a title="$aitit">$aiimg</a>};
@@ -9056,20 +9100,20 @@ sub _beamGraphicFirstHour {
 
       $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time});
 
-      $val1 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "pvfc",  0);
-      $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "pvrl",  0);
-      $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "gcons", 0);
-      $val4 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "confc", 0);
+      $val1 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvfc',  0);
+      $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvrl',  0);
+      $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gcons', 0);
+      $val4 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'confc', 0);
 
       # $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, "weatherid", 999);
       $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'weatherid', 999);
       $hfcg->{0}{wcc}     = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'wcc',       '-');
   }
   else {
-      $val1 = CircularVal ($hash, $hfcg->{0}{time_str}, "pvfc",  0);
-      $val2 = CircularVal ($hash, $hfcg->{0}{time_str}, "pvrl",  0);
-      $val3 = CircularVal ($hash, $hfcg->{0}{time_str}, "gcons", 0);
-      $val4 = CircularVal ($hash, $hfcg->{0}{time_str}, "confc", 0);
+      $val1 = CircularVal ($hash, $hfcg->{0}{time_str}, 'pvfc',  0);
+      $val2 = CircularVal ($hash, $hfcg->{0}{time_str}, 'pvrl',  0);
+      $val3 = CircularVal ($hash, $hfcg->{0}{time_str}, 'gcons', 0);
+      $val4 = CircularVal ($hash, $hfcg->{0}{time_str}, 'confc', 0);
 
       $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, "weatherid", 999);
       #$val4   = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : 999;
@@ -9127,10 +9171,10 @@ sub _beamGraphicRemainingHours {
               # Sonderfall Mitternacht
               $ds   = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * (abs($offset-$i+1)))) if ($hfcg->{$i}{time} == 24);  # V0.49.4
 
-              $val1 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "pvfc",  0);
-              $val2 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "pvrl",  0);
-              $val3 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "gcons", 0);
-              $val4 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "confc", 0);
+              $val1 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'pvfc',  0);
+              $val2 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'pvrl',  0);
+              $val3 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'gcons', 0);
+              $val4 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'confc', 0);
 
               $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'weatherid', 999);
               $hfcg->{$i}{wcc}     = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
@@ -9144,9 +9188,9 @@ sub _beamGraphicRemainingHours {
       }
 
       if (defined($nh)) {
-          $val1                = NexthoursVal ($hash, 'NextHour'.$nh, "pvforecast",   0);
-          $val4                = NexthoursVal ($hash, 'NextHour'.$nh, "confc",        0);
-          $hfcg->{$i}{weather} = NexthoursVal ($hash, 'NextHour'.$nh, "weatherid",  999);
+          $val1                = NexthoursVal ($hash, 'NextHour'.$nh, 'pvfc',         0);
+          $val4                = NexthoursVal ($hash, 'NextHour'.$nh, 'confc',        0);
+          $hfcg->{$i}{weather} = NexthoursVal ($hash, 'NextHour'.$nh, 'weatherid',  999);
           $hfcg->{$i}{wcc}     = NexthoursVal ($hash, 'NextHour'.$nh, 'cloudcover', '-');
           #$val4   = (ReadingsVal($name,"NextHour".$ii."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
       }
@@ -10393,8 +10437,8 @@ sub __Pv_Fc_Complex_Dnum_Hist {
       $histwcc = calcRange ($histwcc);                                                 # V 0.50.1
 
       if($range == $histwcc) {
-          $pvrl  += HistoryVal ($hash, $dayfa, $hour, "pvrl", 0);
-          $pvfc  += HistoryVal ($hash, $dayfa, $hour, "pvfc", 0);
+          $pvrl  += HistoryVal ($hash, $dayfa, $hour, 'pvrl', 0);
+          $pvfc  += HistoryVal ($hash, $dayfa, $hour, 'pvfc', 0);
           $dnum++;
 
           debugLog ($paref, 'pvCorrection', "Complex Corrf -> historical Day/hour $dayfa/$hour included - cloudiness range: $range");
@@ -10464,8 +10508,8 @@ sub __Pv_Fc_Simple_Dnum_Hist {
   }
 
   for my $dayfa (@efa) {
-      $pvrl  += HistoryVal ($hash, $dayfa, $hour, "pvrl", 0);
-      $pvfc  += HistoryVal ($hash, $dayfa, $hour, "pvfc", 0);
+      $pvrl  += HistoryVal ($hash, $dayfa, $hour, 'pvrl', 0);
+      $pvfc  += HistoryVal ($hash, $dayfa, $hour, 'pvfc', 0);
       $dnum++;
 
       debugLog ($paref, "pvCorrection", "Simple Corrf -> historical Day/hour $dayfa/$hour included -> PVreal: $pvrl, PVforecast: $pvfc");
@@ -10571,7 +10615,7 @@ sub aiAddInstance {                   ## no critic "not used"
   my $type  = $paref->{type};
   my $taa   = $paref->{taa};          # do train after add
   
-  return if(!isDWDUsed ($hash));
+  return if(!isPrepared4AI ($hash));
   
   my $err;
   my $dtree = AiDetreeVal ($hash, 'object', undef);
@@ -10632,7 +10676,7 @@ sub aiTrain {                   ## no critic "not used"
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   
-  return if(!isDWDUsed ($hash));
+  return if(!isPrepared4AI ($hash));
   
   my $err;
   my $dtree = AiDetreeVal ($hash, 'object', undef);
@@ -10663,8 +10707,6 @@ sub aiTrain {                   ## no critic "not used"
 return;
 }
 
-####################################################################################
-
 ################################################################
 #     AI Ergebnis für ermitteln
 ################################################################
@@ -10676,7 +10718,7 @@ sub aiGetResult {                   ## no critic "not used"
   my $hod   = $paref->{hod};
   my $nhidx = $paref->{nhidx};
   
-  return 'no AI decition possible' if(!isDWDUsed ($hash) || !$hod || !$nhidx);  
+  return 'no AI decition possible' if(!isPrepared4AI ($hash) || !$hod || !$nhidx);  
   
   my $dtree = AiDetreeVal ($hash, 'aitrained', undef);
   
@@ -10727,15 +10769,12 @@ sub aiInit {                   ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
-
-  return if(!isDWDUsed ($hash));
   
-  my $err;
-  
-  if ($aidtabs || $t2sabs) {
-      $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "sudo apt-get install libai-decisiontree-perl" for AI support) if($aidtabs);
-      $err = qq(The Perl module Test2::Suite is missing. Please install it with e.g. "sudo apt-get install libtest2-suite-perl")                        if($t2sabs);
+  if (!isPrepared4AI ($hash)) {
+      my $err = CurrentVal ($hash, 'aicanuse', '');
+      
       debugLog ($paref, 'aiProcess', $err);
+      
       $data{$type}{$name}{current}{aiinitstate} = $err;
       return $err;      
   }
@@ -10747,7 +10786,7 @@ sub aiInit {                   ## no critic "not used"
   
   Log3 ($name, 3, "$name - AI::DecisionTree new initialized");
   
-return $err;
+return;
 }
 
 ################################################################
@@ -10776,6 +10815,8 @@ sub aiAddRawData {                   ## no critic "not used"
   my $rho   = $paref->{rho};          # only this hour of day
   
   delete $data{$type}{$name}{current}{aitrawstate};
+  
+  my ($err, $dosave);
   
   for my $pvd (sort keys %{$data{$type}{$name}{pvhist}}) {
       next if(!$pvd);
@@ -10809,11 +10850,15 @@ sub aiAddRawData {                   ## no critic "not used"
           $data{$type}{$name}{aidectree}{airaw}{$ridx}{hod}   = $hod;
           $data{$type}{$name}{aidectree}{airaw}{$ridx}{pvrl}  = $pvrl;
           
+          $dosave = 1;
+          
           debugLog ($paref, 'aiProcess', qq{AI Raw data added - idx: $ridx, day: $pvd, hod: $hod, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, wrp: $rbin, temp: $tbin}); 
       }
   }
   
-  my $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
+  if ($dosave) {
+      $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
+  }
   
   if (!$err) {
       $data{$type}{$name}{current}{aitrawstate} = 'ok';
@@ -10913,14 +10958,14 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{$nhour}{rad1h} = $rad1h;
   }
 
-  if ($histname eq "pvfc") {                                                                      # prognostizierter Energieertrag
+  if ($histname eq 'pvfc') {                                                                      # prognostizierter Energieertrag
       $val = $calcpv;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{pvfc} = $calcpv;
 
       my $pvfcsum = 0;
       for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
           next if($k eq "99");
-          $pvfcsum += HistoryVal ($hash, $day, $k, "pvfc", 0);
+          $pvfcsum += HistoryVal ($hash, $day, $k, 'pvfc', 0);
       }
       $data{$type}{$name}{pvhist}{$day}{99}{pvfc} = $pvfcsum;
   }
@@ -11072,14 +11117,14 @@ sub setPVhistory {
       for my $k (keys %{$data{$type}{$name}{pvhist}{$reorgday}}) {
           next if($k eq "99");
           
-          $r1 += HistoryVal ($hash, $reorgday, $k, "batin",   0);
-          $r2 += HistoryVal ($hash, $reorgday, $k, "batout",  0);
-          $r3 += HistoryVal ($hash, $reorgday, $k, "pvrl",    0);
-          $r4 += HistoryVal ($hash, $reorgday, $k, "pvfc",    0);
-          $r5 += HistoryVal ($hash, $reorgday, $k, "confc",   0);
-          $r6 += HistoryVal ($hash, $reorgday, $k, "gcons",   0);
-          $r7 += HistoryVal ($hash, $reorgday, $k, "gfeedin", 0);
-          $r8 += HistoryVal ($hash, $reorgday, $k, "con",     0);
+          $r1 += HistoryVal ($hash, $reorgday, $k, 'batin',   0);
+          $r2 += HistoryVal ($hash, $reorgday, $k, 'batout',  0);
+          $r3 += HistoryVal ($hash, $reorgday, $k, 'pvrl',    0);
+          $r4 += HistoryVal ($hash, $reorgday, $k, 'pvfc',    0);
+          $r5 += HistoryVal ($hash, $reorgday, $k, 'confc',   0);
+          $r6 += HistoryVal ($hash, $reorgday, $k, 'gcons',   0);
+          $r7 += HistoryVal ($hash, $reorgday, $k, 'gfeedin', 0);
+          $r8 += HistoryVal ($hash, $reorgday, $k, 'con',     0);
       }
       
       $data{$type}{$name}{pvhist}{$reorgday}{99}{batin}   = $r1;
@@ -11119,9 +11164,9 @@ sub listDataPool {
       my $day = shift;
       my $ret;
       for my $key (sort {$a<=>$b} keys %{$h->{$day}}) {
-          my $pvrl    = HistoryVal ($hash, $day, $key, "pvrl",        "-");
-          my $pvfc    = HistoryVal ($hash, $day, $key, "pvfc",        "-");
-          my $gcon    = HistoryVal ($hash, $day, $key, "gcons",       "-");
+          my $pvrl    = HistoryVal ($hash, $day, $key, 'pvrl',        "-");
+          my $pvfc    = HistoryVal ($hash, $day, $key, 'pvfc',        "-");
+          my $gcon    = HistoryVal ($hash, $day, $key, 'gcons',       "-");
           my $con     = HistoryVal ($hash, $day, $key, "con",         "-");
           my $confc   = HistoryVal ($hash, $day, $key, "confc",       "-");
           my $gfeedin = HistoryVal ($hash, $day, $key, "gfeedin",     "-");
@@ -11264,6 +11309,9 @@ sub listDataPool {
       }
       for my $idx (sort keys %{$h}) {
           my $pvfc     = CircularVal ($hash, $idx, "pvfc",             "-");
+          my $pvaifc   = CircularVal ($hash, $idx, "pvaifc",           "-");
+          my $pvapifc  = CircularVal ($hash, $idx, "pvapifc",          "-");
+          my $aihit    = CircularVal ($hash, $idx, "aihit",            "-");
           my $pvrl     = CircularVal ($hash, $idx, "pvrl",             "-");
           my $confc    = CircularVal ($hash, $idx, "confc",            "-");
           my $gcons    = CircularVal ($hash, $idx, "gcons",            "-");
@@ -11336,8 +11384,8 @@ sub listDataPool {
           $sq .= "\n" if($sq);
 
           if($idx != 99) {
-              $sq .= $idx." => pvfc: $pvfc, pvrl: $pvrl, batin: $batin, batout: $batout\n";
-              $sq .= "      confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, wrp: $wrprb\n";
+              $sq .= $idx." => pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl\n";
+              $sq .= "      batin: $batin, batout: $batout, confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, wrp: $wrprb\n";
               $sq .= "      temp: $temp, wid: $wid, wtxt: $wtxt\n";
               $sq .= "      corr: $pvcf\n";
               $sq .= "      quality: $cfq";
@@ -11361,8 +11409,10 @@ sub listDataPool {
           my $nhts    = NexthoursVal ($hash, $idx, 'starttime',  "-");
           my $hod     = NexthoursVal ($hash, $idx, 'hourofday',  "-");
           my $today   = NexthoursVal ($hash, $idx, 'today',      "-");
-          my $pvfc    = NexthoursVal ($hash, $idx, 'pvforecast', "-");
+          my $pvfc    = NexthoursVal ($hash, $idx, 'pvfc',       "-");
+          my $pvapifc = NexthoursVal ($hash, $idx, 'pvapifc',    "-");             # PV Forecast der API
           my $pvaifc  = NexthoursVal ($hash, $idx, 'pvaifc',     "-");             # PV Forecast der KI
+          my $aihit   = NexthoursVal ($hash, $idx, 'aihit',      "-");             # KI ForeCast Treffer Status
           my $wid     = NexthoursVal ($hash, $idx, 'weatherid',  "-");
           my $neff    = NexthoursVal ($hash, $idx, 'cloudcover', "-");
           my $crange  = NexthoursVal ($hash, $idx, 'cloudrange', "-");
@@ -11375,8 +11425,8 @@ sub listDataPool {
           my $don     = NexthoursVal ($hash, $idx, 'DoN',        "-");
           $sq        .= "\n" if($sq);
           $sq        .= $idx." => starttime: $nhts, hourofday: $hod, today: $today\n";
-          $sq        .= "              pvfc: $pvfc, pvaifc: $pvaifc, confc: $confc, confcEx: $confcex\n";
-          $sq        .= "              DoN: $don, wid: $wid, wcc: $neff, wrp: $r101, temp=$temp\n";
+          $sq        .= "              pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, confc: $confc\n";
+          $sq        .= "              confcEx: $confcex, DoN: $don, wid: $wid, wcc: $neff, wrp: $r101, temp=$temp\n";
           $sq        .= "              rad1h: $rad1h, crange: $crange, correff: $pvcorrf";
       }
   }
@@ -11387,12 +11437,12 @@ sub listDataPool {
           return qq{NextHours cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $nhfc    = NexthoursVal ($hash, $idx, "pvforecast", undef);
+          my $nhfc    = NexthoursVal ($hash, $idx, 'pvfc', undef);
           next if(!$nhfc);
-          my $nhts    = NexthoursVal ($hash, $idx, "starttime",  undef);
-          my $neff    = NexthoursVal ($hash, $idx, "cloudcover",   "-");
-          my $crange  = NexthoursVal ($hash, $idx, "cloudrange",   "-");
-          my $pvcorrf = NexthoursVal ($hash, $idx, "pvcorrf",    "-/-");
+          my $nhts    = NexthoursVal ($hash, $idx, 'starttime',  undef);
+          my $neff    = NexthoursVal ($hash, $idx, 'cloudcover',   "-");
+          my $crange  = NexthoursVal ($hash, $idx, 'cloudrange',   "-");
+          my $pvcorrf = NexthoursVal ($hash, $idx, 'pvcorrf',    "-/-");
           my ($f,$q)  = split "/", $pvcorrf;
           $sq        .= "\n" if($sq);
           $sq        .= "starttime: $nhts, wcc: $neff, crange: $crange, quality: $q, factor: $f";
@@ -12243,6 +12293,38 @@ sub setTimeTracking {
   $data{$type}{$name}{current}{$tkn} = sprintf "%.4f", tv_interval($st);
 
 return;
+}
+
+################################################################
+#  Voraussetzungen zur Nutzung der KI prüfen, Status setzen 
+#  und Prüfungsergebnis (0/1) zurückgeben
+################################################################
+sub isPrepared4AI {
+  my $hash = shift;
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+
+  my $err;
+
+  if(!isDWDUsed ($hash)) {
+      $err = qq(With the used SolarForecast model it's not possible to use the AI support);
+  }
+  elsif ($aidtabs) {
+      $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "sudo apt-get install libai-decisiontree-perl" for AI support);
+  }
+  elsif ($t2sabs) {
+      $err = qq(The Perl module Test2::Suite is missing. Please install it with e.g. "sudo apt-get install libtest2-suite-perl");   
+  }
+  
+  if ($err) {
+      $data{$type}{$name}{current}{aicanuse} = $err;
+      return 0;      
+  }
+ 
+  $data{$type}{$name}{current}{aicanuse} = 'ok';
+
+return 1;
 }
 
 ################################################################
@@ -13161,7 +13243,9 @@ return ($pvcorrf, $quality);
 # $nhr: nächste Stunde (NextHour00, NextHour01,...)
 # $key: starttime  - Startzeit der abgefragten nächsten Stunde
 #       hourofday  - Stunde des Tages
-#       pvforecast - PV Vorhersage in Wh
+#       pvfc - PV Vorhersage in Wh
+#       pvaifc 	   - erwartete PV Erzeugung der KI (Wh)
+#       aihit      - Trefferstatus KI
 #       weatherid  - DWD Wetter id
 #       cloudcover - DWD Wolkendichte
 #       cloudrange - berechnete Bewölkungsrange
@@ -14270,7 +14354,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
          <table>
-         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+         <colgroup> <col width="10%"> <col width="90%"> </colgroup>
             <tr><td> <b>confc</b>     </td><td>erwarteter Energieverbrauch inklusive der Anteile registrierter Verbraucher        </td></tr>
             <tr><td> <b>confcEx</b>   </td><td>erwarteter Energieverbrauch ohne der Anteile registrierter Verbraucher             </td></tr>
             <tr><td> <b>crange</b>    </td><td>berechneter Bewölkungsbereich                                                      </td></tr>
@@ -14279,8 +14363,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                  </td><td>Faktor/0..1 - Qualität der PV Prognose (1 = beste Qualität)                        </td></tr>
             <tr><td> <b>DoN</b>       </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                               </td></tr>
             <tr><td> <b>hourofday</b> </td><td>laufende Stunde des Tages                                                          </td></tr>
-            <tr><td> <b>pvfc</b>      </td><td>erwartete PV Erzeugung (Wh) ohne KI Unterstützung                                  </td></tr>
+            <tr><td> <b>pvapifc</b>   </td><td>erwartete PV Erzeugung (Wh) der verwendeten API                                    </td></tr>
             <tr><td> <b>pvaifc</b>    </td><td>erwartete PV Erzeugung der KI (Wh)                                                 </td></tr>
+            <tr><td> <b>pvfc</b>      </td><td>verwendete PV Erzeugungsprognose (Wh)                                              </td></tr>
+            <tr><td> <b>aihit</b>     </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)         </td></tr>  
             <tr><td> <b>today</b>     </td><td>hat Wert '1' wenn Startdatum am aktuellen Tag                                      </td></tr>
             <tr><td> <b>rad1h</b>     </td><td>vorhergesagte Globalstrahlung                                                      </td></tr>
             <tr><td> <b>starttime</b> </td><td>Startzeit des Datensatzes                                                          </td></tr>
@@ -14346,7 +14432,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>pvfc</b>             </td><td>PV Vorhersage für die nächsten 24h ab aktueller Stunde des Tages                                                          </td></tr>
+            <tr><td> <b>pvapifc</b>          </td><td>erwartete PV Erzeugung (Wh) der verwendeten API                                                                           </td></tr>
+            <tr><td> <b>pvaifc</b>           </td><td>PV Vorhersage (Wh) der KI für die nächsten 24h ab aktueller Stunde des Tages                                              </td></tr>
+            <tr><td> <b>pvfc</b>             </td><td>verwendete PV Prognose für die nächsten 24h ab aktueller Stunde des Tages                                                 </td></tr>            
+            <tr><td> <b>aihit</b>            </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)                                                </td></tr>
             <tr><td> <b>pvrl</b>             </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!)        </td></tr>
             <tr><td> <b>confc</b>            </td><td>erwarteter Energieverbrauch (Wh)                                                                                          </td></tr>
             <tr><td> <b>gcon</b>             </td><td>realer Leistungsbezug aus dem Stromnetz                                                                                   </td></tr>
@@ -14440,8 +14529,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
        <table>
-       <colgroup> <col width="15%"> <col width="95%"> </colgroup>
-          <tr><td> <b>aiRawData</b>  </td><td>- Die aktuell für die KI gespeicherten PV-, Strahlungs- und Umweltdaten.  </td></tr>
+       <colgroup> <col width="10%"> <col width="90%"> </colgroup>
+          <tr><td> <b>aiRawData</b>     </td><td>- Die aktuell für die KI gespeicherten PV-, Strahlungs- und Umweltdaten.                     </td></tr>
+          <tr><td> <b>aiRuleStrings</b> </td><td>- Gibt eine Liste zurück, die den Entscheidungsbaum der KI in Form von Regeln beschreiben.   </td></tr>
+          <tr><td>                      </td><td>&nbsp;&nbsp;<b>Hinweis:</b> Die Reihenfolge der Regeln ist zwar nicht vorhersehbar, die      </td></tr>
+          <tr><td>                      </td><td>&nbsp;&nbsp;Reihenfolge der Kriterien innerhalb jeder Regel spiegelt jedoch die Reihenfolge  </td></tr>
+          <tr><td>                      </td><td>&nbsp;&nbsp;wider, in der die Kriterien bei der Entscheidungsfindung geprüft werden.         </td></tr>
         </table>
       </ul>
     </li>
