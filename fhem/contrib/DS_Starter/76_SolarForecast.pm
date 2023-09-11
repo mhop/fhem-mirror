@@ -10636,7 +10636,9 @@ sub aiAddInstance {                   ## no critic "not used"
       my $hod  = AiRawdataVal ($hash, $idx, 'hod', undef);
       next if(!defined $hod);
       
-      my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', 0);
+      my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', undef);
+      next if(!$rad1h);
+      
       my $temp  = AiRawdataVal ($hash, $idx, 'temp', 20);
       my $wcc   = AiRawdataVal ($hash, $idx, 'wcc',   0);
       my $wrp   = AiRawdataVal ($hash, $idx, 'wrp',   0);
@@ -10732,7 +10734,7 @@ sub aiGetResult {                   ## no critic "not used"
   }
   
   my $rad1h = NexthoursVal ($hash, $nhidx, "rad1h", undef);
-  return "no rad1h for hod: $hod" if(!defined $rad1h);
+  return "no rad1h for hod: $hod" if(!$rad1h);
   
   my $wcc  = NexthoursVal ($hash, $nhidx, "cloudcover",  0);
   my $wrp  = NexthoursVal ($hash, $nhidx, "rainprob",    0);
