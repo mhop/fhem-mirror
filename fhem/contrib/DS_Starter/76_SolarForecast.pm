@@ -140,7 +140,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.82.2" => "10.09.2023  activate implementation of DWD AI support ",
+  "0.82.2" => "11.09.2023  activate implementation of DWD AI support, add runTimeTrainAI ",
   "0.82.1" => "08.09.2023  rebuild implementation of DWD AI support, some error fixing (FHEM restarts between 0 and 1) ",
   "0.82.0" => "02.09.2023  first implementation of DWD AI support, new ctrlDebug aiProcess aiData, reset aiData ",
   "0.81.1" => "30.08.2023  show forecast qualities when pressing quality icon in forecast grafic, store rad1h (model DWD) in ".
@@ -882,6 +882,7 @@ my %hcsr = (                                                                    
   todayRemainingAPIcalls      => { fnr => 1, fn => \&SolCastAPIVal, par => '',                  unit => '',     def => 'apimaxreq' },
   todayRemainingAPIrequests   => { fnr => 1, fn => \&SolCastAPIVal, par => '',                  unit => '',     def => 'apimaxreq' },
   runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
+  runTimeTrainAI              => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
   runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
   runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
   allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => 0           },
@@ -10678,6 +10679,8 @@ sub aiTrain {                   ## no critic "not used"
   
   return if(!isPrepared4AI ($hash));
   
+  my $cst = [gettimeofday];                                           # Zyklus-Startzeit
+  
   my $err;
   my $dtree = AiDetreeVal ($hash, 'object', undef);
   
@@ -10703,6 +10706,8 @@ sub aiTrain {                   ## no critic "not used"
       debugLog ($paref, 'aiProcess', qq{Training instances and their associated information where purged from the AI object});
       $data{$type}{$name}{current}{aitrainstate} = 'ok';
   }
+  
+  setTimeTracking ($hash, $cst, 'runTimeTrainAI');                   # Zyklus-Laufzeit ermitteln
   
 return;
 }
@@ -14927,6 +14932,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>lastretrieval_timestamp</b>    </td><td>der Timestamp der letzen Abrufzeitpunkt der API (nur Model SolCastAPI, ForecastSolarAPI)                        </td></tr>
             <tr><td> <b>response_message</b>           </td><td>die letzte Statusmeldung der API (nur Model SolCastAPI, ForecastSolarAPI)                                       </td></tr>
             <tr><td> <b>runTimeCentralTask</b>         </td><td>die Laufzeit des letzten SolarForecast Intervalls (Gesamtprozess) in Sekunden                                   </td></tr>
+            <tr><td> <b>runTimeTrainAI</b>             </td><td>die Laufzeit des letzten KI Trainingszyklus in Sekunden                                                         </td></tr>
             <tr><td> <b>runTimeLastAPIAnswer</b>       </td><td>die letzte Antwortzeit des API Abrufs auf einen Request in Sekunden (nur Model SolCastAPI, ForecastSolarAPI)    </td></tr>
             <tr><td> <b>runTimeLastAPIProc</b>         </td><td>die letzte Prozesszeit zur Verarbeitung der empfangenen API Daten (nur Model SolCastAPI, ForecastSolarAPI)      </td></tr>
             <tr><td> <b>SunMinutes_Remain</b>          </td><td>die verbleibenden Minuten bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
