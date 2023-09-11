@@ -10169,9 +10169,9 @@ sub calcValueImproves {
 
   $paref->{acu} = $acu;
   
-  _calcCaQcomplex    ($paref);                                            # Korrekturberechnung mit Bewölkung duchführen/speichern
-  _calcCaQsimple     ($paref);                                            # einfache Korrekturberechnung duchführen/speichern
-  _addHourAiInstance ($paref);                                            # AI Instanz hinzufügen
+  _calcCaQcomplex   ($paref);                                            # Korrekturberechnung mit Bewölkung duchführen/speichern
+  _calcCaQsimple    ($paref);                                            # einfache Korrekturberechnung duchführen/speichern
+  _addHourAiRawdata ($paref);                                            # AI Instanz hinzufügen
   
   delete $paref->{acu};
 
@@ -10344,7 +10344,7 @@ return;
 ################################################################
 #       AI Instanz für die abgeschlossene Stunde hinzufügen
 ################################################################
-sub _addHourAiInstance {
+sub _addHourAiRawdata {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -10733,8 +10733,8 @@ sub aiGetResult {                   ## no critic "not used"
       return 'AI trained object is missed';
   }
   
-  my $rad1h = NexthoursVal ($hash, $nhidx, "rad1h", undef);
-  return "no rad1h for hod: $hod" if(!$rad1h);
+  my $rad1h = NexthoursVal ($hash, $nhidx, "rad1h", 0);
+  return "no rad1h for hod: $hod" if($rad1h <= 0);
   
   my $wcc  = NexthoursVal ($hash, $nhidx, "cloudcover",  0);
   my $wrp  = NexthoursVal ($hash, $nhidx, "rainprob",    0);
