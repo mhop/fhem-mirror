@@ -1,6 +1,12 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.                 
- - bugfix: 14_SD_WS.pm: Corrected protocol 115 battery bit, 
+ - feature: 10_SD_GT.pm: repeats can be configured via attribute
+ - change:  00_SIGNALduino.pm: clone Protocol Object for every definition
+                               changed timer creation and deletion 
+                               use FHEM::Core::Timer::Helper
+ - bugfix:  00_SIGNALduino.pm: make SIGNALduino_IdList more robust
+                              use FHEM::Core::Utils::Math round function
+ - bugfix:  14_SD_WS.pm: Corrected protocol 115 battery bit, 
                         added batChange bit 
                          corrected calculation for negative temperatures
  - feature: 14_SD_WS.pm: add TFA 30.3151 (T/H-transmitter)

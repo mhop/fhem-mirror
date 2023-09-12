@@ -15,7 +15,7 @@ use warnings;
 use GPUtils qw(GP_Import GP_Export);
 use FHEM::Meta;
 
-our $VERSION = '1.0';
+our $VERSION = '1.1';
 
 # Export to main context with different name
 GP_Export(qw(
@@ -50,7 +50,7 @@ sub Initialize {
 	$hash->{SetFn}      = \&Set;
 	$hash->{ParseFn}    = \&Parse;
 	$hash->{Match}      = '^P49#[A-Fa-f0-9]+';
-	$hash->{AttrList}   = "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 $main::readingFnAttributes";
+	$hash->{AttrList}   = "IODev repeats:1,2,3,4,5,6,7,8,9,12,15 showtime:0,1 disableSetAllFunction:0,1 do_not_notify:0,1 ignore:0,1 showtime:0,1 $main::readingFnAttributes";
 	$hash->{AutoCreate} = {'SD_GT_LEARN' => {FILTER => '%NAME', autocreateThreshold => '5:180', GPLOT => q{}}};
 	return FHEM::Meta::InitMod( __FILE__, $hash );
 }
@@ -209,7 +209,7 @@ sub Set {
 	my $ret = undef;
 	my $EMPTY = q{};
 
-  if (not defined $cmd) { return "The command \"set $name\" requires at least one of the arguments: \"on\" or \"off\"" };
+	if (not defined $cmd) { return "The command \"set $name\" requires at least one of the arguments: \"on\" or \"off\"" };
 
 	if ($cmd eq q{?}) {
 		if ($hash->{DEF} ne 'LEARN') {
@@ -227,7 +227,7 @@ sub Set {
 	if ($cmd eq 'off') { $sendCodesStr = ReadingsVal($name, 'CodesOff', $EMPTY) };
 	@sendCodesAr = split /[,]/xms , $sendCodesStr;
 	$sendCodesCnt = scalar @sendCodesAr;
-  if ($sendCodesCnt < 1) { return "$name: No codes available for sending, please press buttons on your remote for learning." };
+	if ($sendCodesCnt < 1) { return "$name: No codes available for sending, please press buttons on your remote for learning." };
 	my ($index) = grep { $sendCodesAr[$_] eq $sendCode } (0 .. $sendCodesCnt - 1);
 	if (not defined $index) { $index = -1 };
 	$index++;
@@ -237,7 +237,7 @@ sub Set {
 	Log3 $name, 3, "$ioname: SD_GT set $name $cmd";
 	Log3 $name, 4, "$ioname: SD_GT_Set $name $cmd ($sendCodesCnt codes $sendCodesStr - send $sendCode)";
 
-	if ($hash->{DEF} =~ /_all$/xms) { # send button all
+	if ($hash->{DEF} =~ /_all$/xms && AttrVal($name,'disableSetAllFunction', 0) == 0) { # send button all 
 		my $systemCode = ReadingsVal($name, 'SystemCode', $EMPTY);
 		foreach my $d (keys %defs) { # sucht angelegte SD_GT mit gleichem Sytemcode 
 			if(defined($defs{$d}) && $defs{$d}{TYPE} eq 'SD_GT' && $defs{$d}{DEF} =~ /$systemCode/xms && $defs{$d}{DEF} =~ /[ABCD]$/xms && ReadingsVal($d, 'state', $EMPTY) ne $cmd) {
@@ -247,10 +247,10 @@ sub Set {
 		}
 	}
 
-	my $msg = 'P49#0x' . $sendCode . '#R4';
+	my $msg = 'P49#0x' . $sendCode . '#R' . $repeats;
 	Log3 $name, 5, "$ioname: $name SD_GT_Set first set sendMsg $msg";
 	IOWrite($hash, 'sendMsg', $msg);
-	$msg = 'P49.1#0x' . $sendCode . '#R4';
+	$msg = 'P49.1#0x' . $sendCode . '#R' . $repeats;
 	Log3 $name, 5, "$ioname: $name SD_GT_Set second set sendMsg $msg";
 	IOWrite($hash, 'sendMsg', $msg);
 
@@ -365,7 +365,7 @@ sub Parse {
 
 	if (defined $level) { Log3 $name, 4, "$ioname: SD_GT_Parse code $rawData, $name, button $level $state" };
 
-	if (defined $level && $level eq 'all') { # received button all
+	if (defined $level && $level eq 'all' && AttrVal($name,'disableSetAllFunction', 0) == 0) { # received button all
 		foreach my $d (keys %defs) { # sucht angelegte SD_GT mit gleichem Sytemcode 
 			if(defined($defs{$d}) && $defs{$d}{TYPE} eq 'SD_GT' && $defs{$d}{DEF} =~ /$systemCode/xms && $defs{$d}{DEF} =~ /[ABCD]$/xms && ReadingsVal($d, 'state', $EMPTY) ne $state) {
 				readingsSingleUpdate($defs{$d}, 'state' , $state , 1);
@@ -473,7 +473,7 @@ sub getSystemCodes {
 
 =begin html
 
-<a name="SD_GT"></a>
+<a id="SD_GT"></a>
 <h3>SD_GT</h3>
 <ul>
 	The SD_GT module decodes and sends messages using the GT-9000 protocol.
@@ -511,6 +511,30 @@ sub getSystemCodes {
 	If several remote controls are to be taught in, this process must be carried out separately for each remote control.
 	The "SD_GT_LEARN" device must be deleted before starting to learn a new remote control.
 	<br><br>
+
+	<a id="SD_GT-attr"></a>
+	<p><strong>Attribute:</strong></p>
+	<ul>
+		<a id="SD_GT-attr-IODev"></a>
+		<li><a href="#IODev">IODev - Sets the IO or physical device to be used to send signals to this logical device.</a></li>
+
+		<a id="SD_GT-attr-disableSetAllFunction"></a>
+		<li>disableSetAllFunction - Disables the function of the "all" button to switch all devices.</li>
+
+		<a id="SD_GT-attr-do_not_notify"></a>
+		<li><a href="#do_not_notify">do_not_notify - Disable FileLog/notify/inform notification for a device.</a></li>
+
+		<a id="SD_GT-attr-ignore"></a>
+		<li><a href="#ignore">ignore - Ignores the device, e.g. if it belongs to the neighbor. The device does not trigger FileLogs/Notifications.</a></li>
+
+		<a id="SD_GT-attr-repeats"></a>
+		<li>repeats - Number of repetitions of the send commands</li>
+
+		<a id="SD_GT-attr-showtime"></a>
+		<li><a href="#showtime">showtime - Used in the FHEMWEB to show the time of the last activity instead of the status in the overall view.</a></li>
+	</ul>
+	<br><br>
+
 	<p><strong>Readings:</strong></p>
 	<ul>
 		<li>CodesOff: one to four hexadecimal codes for "off" that have been taught and used for sending</li>
@@ -527,7 +551,7 @@ sub getSystemCodes {
 
 =begin html_DE
 
-<a name="SD_GT"></a>
+<a id="SD_GT"></a>
 <h3>SD_GT</h3>
 <ul>
 	Das SD_GT-Modul dekodiert und sendet Nachrichten unter Verwendung des Protokolls vom Typ GT-9000.
@@ -565,6 +589,30 @@ sub getSystemCodes {
 	Sollen mehrere Fernbedienungen angelernt werden, muss dieser Prozess für jede Fernbedienung getrennt durchgef&uuml;hrt werden.
 	Das Gerät "SD_GT_LEARN" muss jeweils vor Beginn des Anlernens einer neuen Fernbedienung gel&ouml;scht werden.
 	<br><br>
+
+	<a id="SD_GT-attr"></a>
+	<p><strong>Attribute:</strong></p>
+	<ul>
+		<a id="SD_GT-attr-IODev"></a>
+		<li><a href="#IODev">IODev - Setzt das IO oder das physische Device, welches zum Senden der Signale an dieses logische Device verwendet werden soll.</a></li>
+
+		<a id="SD_GT-attr-disableSetAllFunction"></a>
+		<li>disableSetAllFunction - Deaktiviert die Funktion der Taste "all" um alle Geräte zu schalten.</li>
+
+		<a id="SD_GT-attr-do_not_notify"></a>
+		<li><a href="#do_not_notify">do_not_notify - Deaktiviert die FileLog/Notify/Inform-Benachrichtigungen für ein Gerät.</a></li>
+
+		<a id="SD_GT-attr-ignore"></a>
+		<li><a href="#ignore">ignore - Ignoriert das Gerät, z.b. wenn es dem Nachbarn gehört. Das Gerät löst keine FileLogs/Benachrichtigungen aus.</a></li>
+
+		<a id="SD_GT-attr-repeats"></a>
+		<li>repeats - Anzahl Wiederholungen der Sendebefehle</li>
+
+		<a id="SD_GT-attr-showtime"></a>
+		<li><a href="#showtime">showtime - Wird im FHEMWEB verwendet, um die Zeit der letzten Aktivität anstelle des Status in der Gesamtansicht anzuzeigen.</a></li>
+	</ul>
+	<br><br>
+
 	<p><strong>Readings:</strong></p>
 	<ul>
 		<li>CodesOff: ein bis vier hexadezimale Codes f&uuml;r "off", die angelernt wurden und zum Senden verwendet werden</li>
@@ -580,28 +628,28 @@ sub getSystemCodes {
 =end html_DE
 =for :application/json;q=META.json 10_SD_GT.pm
 {
-  "abstract": "devices communicating using the ELV FS10 protocol",
+  "abstract": "The SD_GT module decodes and sends messages using the GT-9000 protocol.",
   "author": [
     "Sidey <>",
-	"elektron-bss <>"
+    "elektron-bbs <>"
   ],
   "x_fhem_maintainer": [
-  	"elektron-bss <>",
+    "elektron-bbs <>",
     "Sidey"
   ],
   "x_fhem_maintainer_github": [
     "Sidey79",
-	"HomeAutoUser",
-	"elektron-bbs"
+    "HomeAutoUser",
+    "elektron-bbs"
   ],
-  "description": "The FS10 module decrypts and sends FS10 messages, which are processed by the SIGNALduino",
+  "description": "The SD_GT module decodes and sends messages using the GT-9000 protocol, which are processed by the SIGNALduino",
   "dynamic_config": 1,
   "keywords": [
     "fhem-sonstige-systeme",
     "fhem-hausautomations-systeme",
     "fhem-mod",
     "signalduino",
-    "FS10"
+    "SD_GT"
   ],
   "license": [
     "GPL_2"
@@ -614,13 +662,13 @@ sub getSystemCodes {
   "prereqs": {
     "runtime": {
       "requires": {
-		"GPUtils" : "0"
+        "GPUtils" : "0"
       }
     },
     "develop": {
       "requires": {
-		"GPUtils" : "0"
-	  }
+        "GPUtils" : "0"
+      }
     }
   },
   "release_status": "stable",
