@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  
+ - bugfix:  14_SD_WS09.pm: wrong calculation of averagewindDirection
+
  - bugifix: 14_Hideki.pm:  winddirection fixed (#1099)
  - change:  14_Hideki.pm:  Update {Match} regex for Hideki Module (#1071)
  - feature: SD_ProtocolData.pm: Protocol 122 for Temola TM 40 thermometer

@@ -15,13 +15,14 @@
 # 20200127: Corrected line indents                                          @HomeAutoUser
 # 20200127: fix, WindDirAverage return undef --> return $windDirection_old  @HomeAutoUser
 # 20200127: revised commandref                                              @HomeAutoUser
-# 
+# 20230121  use round from package FHEM::Core::Utils::Math
 
 package main;
 
 use strict;
 use warnings;
 use FHEM::Meta;
+use FHEM::Core::Utils::Math;
 
 # werden benötigt, aber im Programm noch extra abgetestet 
 #use Digest::CRC qw(crc);
@@ -50,7 +51,7 @@ sub SD_WS09_Initialize {
 }
 
 #############################
-sub SD_WS09_Define($$) {
+sub SD_WS09_Define {
 	my ($hash, $def) = @_;
 	my @a = split("[ \t][ \t]*", $def);
 
@@ -72,7 +73,7 @@ sub SD_WS09_Define($$) {
 }
 
 #####################################
-sub SD_WS09_Undef($$) {
+sub SD_WS09_Undef {
 	my ($hash, $name) = @_;
 
 	delete($modules{SD_WS09}{defptr}{$hash->{CODE}})
@@ -82,7 +83,7 @@ sub SD_WS09_Undef($$) {
 }
 
 ###################################
-sub SD_WS09_Parse($$) {
+sub SD_WS09_Parse {
 	my ($iohash, $msg) = @_;
 	my $name = $iohash->{NAME};
 	my (undef ,$rawData) = split("#",$msg);
@@ -238,9 +239,9 @@ sub SD_WS09_Parse($$) {
 			$windDirection = SD_WS09_bin2dec(substr($sensdata,68,4));  
 			$windDirectionText = $winddir_name[$windDirection];
 			$windDirectionDegree = $windDirection * 360 / 16;
-			$windSpeed =  round((SD_WS09_bin2dec(substr($sensdata,32,8))* 34)/100,01);
+			$windSpeed =  FHEM::Core::Utils::Math::round((SD_WS09_bin2dec(substr($sensdata,32,8))* 34)/100,01);
 			Log3 $iohash, 4, "$name: SD_WS09_Parse_2 ".$model." id:$id, Windspeed bit: ".substr($sensdata,32,8)." Dec: " . $windSpeed ;
-			$windguest = round((SD_WS09_bin2dec(substr($sensdata,40,8)) * 34)/100,01);
+			$windguest = FHEM::Core::Utils::Math::round((SD_WS09_bin2dec(substr($sensdata,40,8)) * 34)/100,01);
 			Log3 $iohash, 4, "$name: SD_WS09_Parse_3 ".$model." id:$id, Windguest bit: ".substr($sensdata,40,8)." Dec: " . $windguest ;
 			$rain =  SD_WS09_bin2dec(substr($sensdata,52,12)) * 0.3;
 			Log3 $iohash, 4, "$name: SD_WS09_Parse_4 ".$model." id:$id, Rain bit: ".substr($sensdata,52,12)." Dec: " . $rain ;
@@ -312,11 +313,11 @@ sub SD_WS09_Parse($$) {
 			$windDirection = SD_WS09_bin2dec(substr($sensdata,66,4));  
 			$windDirectionText = $winddir_name[$windDirection];
 			$windDirectionDegree = $windDirection * 360 / 16;
-			$windSpeed =  round(SD_WS09_bin2dec(substr($sensdata,30,16))/240,01);
+			$windSpeed =  FHEM::Core::Utils::Math::round(SD_WS09_bin2dec(substr($sensdata,30,16))/240,01);
 			Log3 $iohash, 4, "$name: SD_WS09_Parse_15 ".$model." Windspeed bit: ".substr($sensdata,32,8)." Dec: " . $windSpeed ;
-			$windguest = round((SD_WS09_bin2dec(substr($sensdata,40,8)) * 34)/100,01);
+			$windguest = FHEM::Core::Utils::Math::round((SD_WS09_bin2dec(substr($sensdata,40,8)) * 34)/100,01);
 			Log3 $iohash, 4, "$name: SD_WS09_Parse_16 ".$model." Windguest bit: ".substr($sensdata,40,8)." Dec: " . $windguest ;
-			$rain =  round(SD_WS09_bin2dec(substr($sensdata,46,16)) * 0.3,01);
+			$rain = FHEM::Core::Utils::Math::round(SD_WS09_bin2dec(substr($sensdata,46,16)) * 0.3,01);
 			Log3 $iohash, 4, "$name: SD_WS09_Parse_17 ".$model." Rain bit: ".substr($sensdata,46,16)." Dec: " . $rain ;           
 		} else {
 			Log3 $iohash, 4, "$name: SD_WS09_Parse_18 CTW600 EXIT: msg=$bitData length:".length($bitData) ;
@@ -382,31 +383,31 @@ sub SD_WS09_Parse($$) {
 	Log3 $hash, 4, "SD_WS09_Wind $windstat[0] : Faktor:$wfaktor" ;
 
 	$wfaktor = $uowind_unit{"km/h"};
-	$windguest_kmh = round ($windguest * $wfaktor,01);
-	$windSpeed_kmh = round ($windSpeed * $wfaktor,01);
+	$windguest_kmh = FHEM::Core::Utils::Math::round ($windguest * $wfaktor,01);
+	$windSpeed_kmh = FHEM::Core::Utils::Math::round ($windSpeed * $wfaktor,01);
 	$windstat[1]= " Ws:$windSpeed_kmh  Wg:$windguest_kmh km/h";
 	Log3 $hash, 4, "SD_WS09_Wind $windstat[1] : Faktor:$wfaktor" ;
 
 	$wfaktor = $uowind_unit{"ft/s"};
-	$windguest_fts = round ($windguest * $wfaktor,01);
-	$windSpeed_fts = round ($windSpeed * $wfaktor,01);
+	$windguest_fts = FHEM::Core::Utils::Math::round ($windguest * $wfaktor,01);
+	$windSpeed_fts = FHEM::Core::Utils::Math::round ($windSpeed * $wfaktor,01);
 	$windstat[2]= " Ws:$windSpeed_fts  Wg:$windguest_fts ft/s";
 	Log3 $hash, 4, "SD_WS09_Wind $windstat[2] : Faktor:$wfaktor" ;
 
 	$wfaktor = $uowind_unit{"mph"};
-	$windguest_mph = round ($windguest * $wfaktor,01);
-	$windSpeed_mph = round ($windSpeed * $wfaktor,01);
+	$windguest_mph = FHEM::Core::Utils::Math::round ($windguest * $wfaktor,01);
+	$windSpeed_mph = FHEM::Core::Utils::Math::round ($windSpeed * $wfaktor,01);
 	$windstat[3]= " Ws:$windSpeed_mph  Wg:$windguest_mph mph";
 	Log3 $hash, 4, "SD_WS09_Wind $windstat[3] : Faktor:$wfaktor" ;
 
 	$wfaktor = $uowind_unit{"knot"};
-	$windguest_kn = round ($windguest * $wfaktor,01);
-	$windSpeed_kn = round ($windSpeed * $wfaktor,01);
+	$windguest_kn = FHEM::Core::Utils::Math::round ($windguest * $wfaktor,01);
+	$windSpeed_kn = FHEM::Core::Utils::Math::round ($windSpeed * $wfaktor,01);
 	$windstat[4]= " Ws:$windSpeed_kn  Wg:$windguest_kn kn" ;
 	Log3 $hash, 4, "SD_WS09_Wind $windstat[4] : Faktor:$wfaktor" ;
 
-	$windguest_bft = round(sqrt( 9 + (6 * $windguest)) - 3,0) ;
-	$windSpeed_bft = round(sqrt( 9 + (6 * $windSpeed)) - 3,0) ;
+	$windguest_bft = FHEM::Core::Utils::Math::round(sqrt( 9 + (6 * $windguest)) - 3,0) ;
+	$windSpeed_bft = FHEM::Core::Utils::Math::round(sqrt( 9 + (6 * $windSpeed)) - 3,0) ;
 	$windstat[5]= " Ws:$windSpeed_bft  Wg:$windguest_bft bft";
 	Log3 $hash, 4, "SD_WS09_Wind $windstat[5] " ;
 
@@ -477,7 +478,7 @@ sub SD_WS09_Parse($$) {
 }
 
 ###################################
-sub SD_WS09_Attr(@) {
+sub SD_WS09_Attr {
 	my @a = @_;
 	# Make possible to use the same code for different logical devices when they
 	# are received through different physical devices.
@@ -556,7 +557,7 @@ sub SD_WS09_WindDirAverage {
 	my $time = FmtDateTime($ctime);
 	my @new = ($ws,$wd,$time);
 
-	Log3 $hash, 4,"SD_WS09_WindDirAverage_01 $name :Speed=".$ws." DirR=".round($wd,2)." Time=".$time;
+	Log3 $hash, 4,"SD_WS09_WindDirAverage_01 $name :Speed=".$ws." DirR=".FHEM::Core::Utils::Math::round($wd,2)." Time=".$time;
 	Log3 $hash, 4,"SD_WS09_WindDirAverage_02 $name :avtime=".$avtime." decay=".$decay." minspeed=".$minspeed;
 
 	my $num;
@@ -578,16 +579,16 @@ sub SD_WS09_WindDirAverage {
 		$arr=\@{$hash->{helper}{history}};
 		my $stime = time_str2num($arr->[0][2]);       # Zeitpunkt des ältesten Eintrags
 		my $ltime = time_str2num($arr->[$num-1][2]);  # Zeitpunkt des letzten Eintrags
-		Log3 $hash,4,"SD_WS09_WindDirAverage_04 $name :Speed=".$ws." Dir=".round($wd,2)." Time=".$time." minspeed=".$minspeed." ctime=".$ctime." ltime=".$ltime." stime=".$stime." num=".$num;
+		Log3 $hash,4,"SD_WS09_WindDirAverage_04 $name :Speed=".$ws." Dir=".FHEM::Core::Utils::Math::round($wd,2)." Time=".$time." minspeed=".$minspeed." ctime=".$ctime." ltime=".$ltime." stime=".$stime." num=".$num;
 
 		if((($ctime - $ltime) > 10) || ($num == 0)) {
 			if(($num < 25) && (($ctime-$stime) < $avtime)){
-				Log3 $hash,4,"SD_WS09_WindDirAverage_05 $name :Speed=".$ws." Dir=".round($wd,2)." Time=".$time." minspeed=".$minspeed." num=".$num;
+				Log3 $hash,4,"SD_WS09_WindDirAverage_05 $name :Speed=".$ws." Dir=".FHEM::Core::Utils::Math::round($wd,2)." Time=".$time." minspeed=".$minspeed." num=".$num;
 				push(@{$hash->{helper}{history}},\@new);
 			} else {
 				shift(@{$hash->{helper}{history}});
 				push(@{$hash->{helper}{history}},\@new);
-				Log3 $hash,4,"SD_WS09_WindDirAverage_06 $name :Speed=".$ws." Dir=".round($wd,2)." Time=".$time." minspeed=".$minspeed." num=".$num;
+				Log3 $hash,4,"SD_WS09_WindDirAverage_06 $name :Speed=".$ws." Dir=".FHEM::Core::Utils::Math::round($wd,2)." Time=".$time." minspeed=".$minspeed." num=".$num;
 			}
 		} else {
 			return $windDirection_old; # old undef | different behavior dispatch <-> UnitTest´s ($ctime - $ltime)
@@ -603,7 +604,7 @@ sub SD_WS09_WindDirAverage {
 		$age = $ctime - time_str2num($time);
 		if (($time eq "") || ($age > $avtime)) {
 			#-- zu alte Einträge entfernen
-      		Log3 $hash,4,"SD_WS09_WindDirAverage_07 $name i=".$i." Speed=".round($ws,2)." Dir=".round($wd,2)." Time=".substr($time,11)." ctime=".$ctime." akt.=".time_str2num($time);
+      		Log3 $hash,4,"SD_WS09_WindDirAverage_07 $name i=".$i." Speed=".FHEM::Core::Utils::Math::round($ws,2)." Dir=".FHEM::Core::Utils::Math::round($wd,2)." Time=".substr($time,11)." ctime=".$ctime." akt.=".time_str2num($time);
       		shift(@{$hash->{helper}{history}});
       		$i--;
       		$num--;
@@ -618,11 +619,11 @@ sub SD_WS09_WindDirAverage {
 			$sumSin += sin($wd) * $ws * $weight;
 			$sumCos += cos($wd) * $ws * $weight;
 			$anz++;
-			Log3 $hash,4,"SD_WS09_WindDirAverage_08 $name i=".$i." Speed=".round($ws,2)." Dir=".round($wd,2)." Time=".substr($time,11)." vec=".round($sumSin,2)."/".round($sumCos,2)." age=".$age." ".round($weight,2);
+			Log3 $hash,4,"SD_WS09_WindDirAverage_08 $name i=".$i." Speed=".FHEM::Core::Utils::Math::round($ws,2)." Dir=".FHEM::Core::Utils::Math::round($wd,2)." Time=".substr($time,11)." vec=".FHEM::Core::Utils::Math::round($sumSin,2)."/".FHEM::Core::Utils::Math::round($sumCos,2)." age=".$age." ".FHEM::Core::Utils::Math::round($weight,2);
   		}
   	}
   	my $average = int((rad2deg(atan2($sumSin, $sumCos)) + 360) % 360);
-  	Log3 $hash,4,"SD_WS09_WindDirAverage_09 $name Mittelwert über $anz Werte ist $average, avspeed=".round($sumSpeed/$num,1) if ($num > 0);
+  	Log3 $hash,4,"SD_WS09_WindDirAverage_09 $name Mittelwert über $anz Werte ist $average, avspeed=".FHEM::Core::Utils::Math::round($sumSpeed/$num,1) if ($num > 0);
   
 	#-- undef zurückliefern, wenn die durchschnittliche Geschwindigkeit zu gering oder gar keine Werte verfügbar
   	return if (($anz == 0) || ($sanz == 0));
@@ -633,14 +634,14 @@ sub SD_WS09_WindDirAverage {
 }
 
 ###################################
-sub SD_WS09_bin2dec($) {
+sub SD_WS09_bin2dec {
 	my $h = shift;
 	my $int = unpack("N", pack("B32",substr("0" x 32 . $h, -32))); 
 	return sprintf("%d", $int); 
 }
 
 ###################################
-sub SD_WS09_binflip($) {
+sub SD_WS09_binflip {
 	my $h = shift;
 	my $hlen = length($h);
 	my $i = 0;
@@ -653,7 +654,7 @@ sub SD_WS09_binflip($) {
 }
 
 ###################################
-sub SD_WS09_BCD2bin($) {
+sub SD_WS09_BCD2bin {
 	my $binary = shift;
 	my $int = unpack("N", pack("B32", substr("0" x 32 . $binary, -32)));
 	my $BCD = sprintf("%x", $int );
@@ -661,7 +662,7 @@ sub SD_WS09_BCD2bin($) {
 }
 
 ###################################
-sub SD_WS09_SHIFT($$){
+sub SD_WS09_SHIFT{
 	my ($hash, $rawData) = @_;
 	my $name = $hash->{NAME};
 	my $hlen = length($rawData);
@@ -679,7 +680,7 @@ sub SD_WS09_SHIFT($$){
 }
 
 ###################################
-sub SD_WS09_CRCCHECK($) {
+sub SD_WS09_CRCCHECK {
 	my $rawData = shift;
 	my $datacheck1 = pack( 'H*', substr($rawData,2,length($rawData)-2) );
 	my $crcmein1 = Digest::CRC->new(width => 8, poly => 0x31);
