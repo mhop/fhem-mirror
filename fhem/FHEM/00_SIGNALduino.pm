@@ -1,5 +1,5 @@
 # $Id$
-# v3.5.4 - https://github.com/RFD-FHEM/RFFHEM/tree/master
+# v3.5.5 - https://github.com/RFD-FHEM/RFFHEM/tree/master
 # The module is inspired by the FHEMduino project and modified in serval ways for processing the incoming messages
 # see http://www.fhemwiki.de/wiki/SIGNALDuino
 # It was modified also to provide support for raw message handling which can be send from the SIGNALduino
@@ -15,7 +15,8 @@ package main;
 use strict;
 use warnings;
 use Storable qw(dclone); 
-#use version 0.77; our $VERSION = version->declare('v3.5.4');
+use FHEM::Core::Utils::Math;
+#use version 0.77; our $VERSION = version->declare('v3.5.5');
 
 my $missingModulSIGNALduino = ' ';
 
@@ -37,11 +38,11 @@ use List::Util qw(first);
 
 #$| = 1;    #Puffern abschalten, Hilfreich fuer PEARL WARNINGS Search
 
-#use Math::Round qw();
+
 
 
 use constant {
-  SDUINO_VERSION                  => '3.5.4',  # Datum wird automatisch bei jedem pull request aktualisiert
+  SDUINO_VERSION                  => '3.5.5',  # Datum wird automatisch bei jedem pull request aktualisiert
   SDUINO_INIT_WAIT_XQ             => 1.5,     # wait disable device
   SDUINO_INIT_WAIT                => 2,
   SDUINO_INIT_MAXRETRY            => 3,
@@ -253,7 +254,7 @@ my %matchListSIGNALduino = (
       '14:Dooya'            => '^P16#[A-Fa-f0-9]+',
       '15:SOMFY'            => '^Ys[0-9A-F]+',
       '16:SD_WS_Maverick'   => '^P47#[A-Fa-f0-9]+',
-      '17:SD_UT'            => '^P(?:14|20|24|26|29|30|34|46|56|68|69|76|78|81|83|86|90|91|91.1|92|93|95|97|99|104|105|114|118|121)#.*', # universal - more devices with different protocols
+      '17:SD_UT'            => '^P(?:14|20|24|26|29|30|34|46|56|68|69|76|78|81|83|86|90|91|91.1|92|93|95|97|99|104|105|114|118|121|127|128)#.*', # universal - more devices with different protocols
       '18:FLAMINGO'         => '^P13\.?1?#[A-Fa-f0-9]+',              # Flamingo Smoke
       '19:CUL_WS'           => '^K[A-Fa-f0-9]{5,}',
       '20:Revolt'           => '^r[A-Fa-f0-9]{22}',
@@ -323,7 +324,7 @@ sub SIGNALduino_Initialize {
             .' doubleMsgCheck_IDs'
             .' eventlogging:0,1'
             .' flashCommand'
-            .' hardware:ESP32,ESP32cc1101,ESP8266,ESP8266cc1101,MAPLEMINI_F103CB,MAPLEMINI_F103CBcc1101,nano328,nanoCC1101,miniculCC1101,promini,radinoCC1101'
+            .' hardware:esp32s,esp32cc1101,esp8266s,esp8266cc1101,MAPLEMINI_F103CBs,MAPLEMINI_F103CBcc1101,nano328,nanoCC1101,miniculCC1101,promini8cc1101,promini16cc1101,promini8s,promini16s,radinoCC1101'
             .' hexFile'
             .' initCommands'
             .' longids'
@@ -389,11 +390,6 @@ sub SIGNALduino_Define {
   DevIo_CloseDev($hash);
   my $name = $a[0];
 
-  if (!exists &round)
-  {
-    Log3 $name, 1, "$name: Define, Signalduino can't be activated (sub round not found). Please update Fhem via update command";
-    return ;
-  }
 
   my $dev = $a[2];
   #Debug "dev: $dev" if ($debug);
@@ -644,7 +640,7 @@ sub SIGNALduino_RemoveLaCrossePair {
 }
 
 ############################# package main, test exists
-sub SIGNALduino_Set($$@) {
+sub SIGNALduino_Set {
   my ($hash,$name, @a) = @_;
 
   return "\"set SIGNALduino\" needs at least one parameter" if(@a < 1);
@@ -843,14 +839,14 @@ sub SIGNALduino_Set_sendMsg {
   return "$hash->{NAME}: sendmsg, unknown protocol: $protocol" if (!$hash->{protocolObject}->protocolExists($protocol));
 
   $repeats //= 1 ;
-  if (InternalVal($hash->{NAME},'cc1101_available',0))
+  if ( InternalVal($hash->{NAME},'cc1101_available',0) == 1 )
   {
-    my $f=$hash->{protocolObject}->getProperty($protocol,'frequency');
-    if ( defined $f ) {
-      $frequency = q[F=].$hash->{protocolObject}->getProperty($protocol,'frequency'). q[;]
+    $frequency //= $hash->{protocolObject}->checkProperty($protocol,'frequency',q{});
+    if ( length $frequency > 0 ) {
+      $frequency = q[F=].$frequency.q[;];
     }
-  }
-  $frequency //= q{};
+  } else { $frequency = q{}; }
+  
   my %signalHash;
   my %patternHash;
   my $pattern='';
@@ -861,7 +857,7 @@ sub SIGNALduino_Set_sendMsg {
   if (defined($hash->{protocolObject}->getProperty($protocol,'format')) && $hash->{protocolObject}->getProperty($protocol,'format') eq 'manchester')
   {
     $clock += $_ for( @{$hash->{protocolObject}->getProperty($protocol,'clockrange')} );
-    $clock = round($clock/2,0);
+    $clock = FHEM::Core::Utils::Math::round($clock/2,0);
 
     my $intro;
     my $outro;
@@ -1007,9 +1003,8 @@ sub SIGNALduino_Set_LaCrossePairForSec {
 }
 
 ############################# package main, test exists
-sub SIGNALduino_Get($@) {
+sub SIGNALduino_Get {
   my ($hash,$name, @a) = @_;
-  #my $type = $hash->{TYPE};
 
   return "\"get SIGNALduino\" needs at least one parameter" if(@a < 1);
 
@@ -1219,7 +1214,7 @@ sub SIGNALduino_CheckccConfResponse {
 
   if ($msg2 !~ /Modulation:\sASK\/OOK/) {
     $msg2 .= ", Syncmod: ".$syncmod[($r{"12"})&7];                                                    #Syncmod    | Register 0x12
-    $msg2 .= ", Deviation: ".round((8+($r{"15"}&7))*(2**(($r{"15"}>>4)&7)) *26000/(2**17),2) .' kHz'; #Deviation  | Register 0x15
+    $msg2 .= ", Deviation: ".FHEM::Core::Utils::Math::round((8+($r{"15"}&7))*(2**(($r{"15"}>>4)&7)) *26000/(2**17),2) .' kHz'; #Deviation  | Register 0x15
   }
 
   readingsBeginUpdate($_[0]);
@@ -2102,7 +2097,7 @@ sub SIGNALduino_PatternExists {
 
 ############################# package main
 #SIGNALduino_MatchSignalPattern{$hash,@array, %hash, @array, $scalar}; not used >v3.1.3
-sub SIGNALduino_MatchSignalPattern($\@\%\@$){
+sub SIGNALduino_MatchSignalPattern {
   my ( $hash, $signalpattern,  $patternList,  $data_array, $idx) = @_;
     my $name = $hash->{NAME};
   #print Dumper($patternList);
@@ -2149,7 +2144,7 @@ sub SIGNALduino_Split_Message {
   my $clockabs;
   my $mcbitnum;
   my $rssi;
-
+  my $freqafc; ## for AFC cc1101 0x32 (0xF2): FREQEST – Frequency Offset Estimate from Demodulator
   my @msg_parts = SIGNALduino_splitMsg($rmsg,';');      ## Split message parts by ';'
   my %ret;
   my $debug = AttrVal($name,'debug',0);
@@ -2209,6 +2204,10 @@ sub SIGNALduino_Split_Message {
       $rssi = $_ ;
       Debug "$name: extracted RSSI $rssi \n" if ($debug);
       $ret{rssi} = $rssi;
+    } elsif ($_ =~ m/A=(-?[0-9]{0,3})/ ){
+      # uncoverable branch true
+      Debug qq[$name: extracted FREQEST $1 \n] if ($debug);
+      $ret{freqest} =  $1;
     }  else {
       Debug "$name: unknown Message part $_" if ($debug);;
     }
@@ -2221,7 +2220,7 @@ sub SIGNALduino_Split_Message {
 ############################# package main, test exists
 # Function which dispatches a message if needed.
 sub SIGNALduno_Dispatch {
-  my ($hash, $rmsg, $dmsg, $rssi, $id) = @_;
+  my ($hash, $rmsg, $dmsg, $rssi, $id, $freqafc) = @_;
   my $name = $hash->{NAME};
 
   if (!defined($dmsg))
@@ -2279,6 +2278,10 @@ sub SIGNALduno_Dispatch {
       else {
         $rssi = '';
       }
+      if(defined($freqafc)) { # AFC cc1101 0x32 (0xF2): FREQEST – Frequency Offset Estimate from Demodulator
+        $addvals{FREQAFC} = $freqafc;
+      }
+
       $dmsg = lc($dmsg) if ($id eq '74' or $id eq '74.1');    # 10_FS20.pm accepted only lower case hex
       $hash->{logMethod}->($name, SDUINO_DISPATCH_VERBOSE, "$name: Dispatch, $dmsg, $rssi dispatch");
       Dispatch($hash, $dmsg, \%addvals);  ## Dispatch to other Modules
@@ -2380,7 +2383,7 @@ sub SIGNALduino_Parse_MS {
     #Debug 'List of pattern:';
     my $clockabs= $msg_parts{pattern}{$msg_parts{clockidx}};
     return if ($clockabs == 0);
-    $patternList{$_} = round($msg_parts{pattern}{$_}/$clockabs,1) for keys %{$msg_parts{pattern}};
+    $patternList{$_} = FHEM::Core::Utils::Math::round($msg_parts{pattern}{$_}/$clockabs,1) for keys %{$msg_parts{pattern}};
 
     #Debug Dumper(\%patternList);
 
@@ -2527,7 +2530,7 @@ sub SIGNALduino_Parse_MS {
 ############################# package main
 ## //Todo: check list as reference
 # // Todo: Make this sub robust and use it
-sub SIGNALduino_padbits(\@$) {
+sub SIGNALduino_padbits {
   my $i=@{$_[0]} % $_[1];
   while (@{$_[0]} % $_[1] > 0)  ## will pad up full nibbles per default or full byte if specified in protocol
   {
@@ -2608,10 +2611,10 @@ sub SIGNALduino_Parse_MU {
           (my $count_changes,$rawData,my %patternListRaw_tmp) = $method->($name,$id,$rawData,%patternListRaw);
           use strict "refs";
 
-          %patternList = map { $_ => round($patternListRaw_tmp{$_}/$clockabs,1) } keys %patternListRaw_tmp;
+          %patternList = map { $_ => FHEM::Core::Utils::Math::round($patternListRaw_tmp{$_}/$clockabs,1) } keys %patternListRaw_tmp;
         }
       } else {
-        %patternList = map { $_ => round($patternListRaw{$_}/$clockabs,1) } keys %patternListRaw;
+        %patternList = map { $_ => FHEM::Core::Utils::Math::round($patternListRaw{$_}/$clockabs,1) } keys %patternListRaw;
       }
 
       Debug qq[Testing against protocol id $id -> ]. $hash->{protocolObject}->getProperty($id,'name')  if ($debug);
@@ -2899,7 +2902,7 @@ sub SIGNALduino_Parse_MN {
   my $hash = shift // return;   #return if no hash  is provided
   my $rmsg = shift // return;   #return if no rmsg is provided
  
-  if ($rmsg !~ /^MN;D=[0-9A-F]+;(?:R=[0-9]+;)?$/){
+  if ($rmsg !~ /^MN;D=[0-9A-F]+;(?:R=[0-9]+;)?(?:A=-?[0-9]{1,3};)?$/) { # AFC cc1101 0x32 (0xF2): FREQEST – Frequency Offset Estimate from Demodulator
     $hash->{logMethod}->($hash->{NAME}, 3, qq[$hash->{NAME}: Parse_MN, faulty msg: $rmsg]);
     return ; # Abort here if not successfull
   }
@@ -2911,10 +2914,15 @@ sub SIGNALduino_Parse_MN {
   my $rawData  = _limit_to_hex($msg_parts{rawData})     // $hash->{logMethod}->($hash->{NAME}, 3, qq[$hash->{NAME}: Parse_MN, faulty rawData D=: $msg_parts{rawData}]) //  return ;
   my $rssi;
   my $rssiStr= '';
-  if ( defined $msg_parts{rssi} ){
+  my $freqafc;
+  if ( exists $msg_parts{rssi} ){
      $rssi = _limit_to_number($msg_parts{rssi}) // $hash->{logMethod}->($hash->{NAME}, 3, qq[$hash->{NAME}: Parse_MN, faulty rssi R=: $msg_parts{rssi}]) //  return ;
     ($rssi,$rssiStr) = SIGNALduino_calcRSSI($rssi);
   };
+  if ( exists $msg_parts{freqest} ){ #AFC cc1101 0x32 (0xF2): FREQEST – Frequency Offset Estimate from Demodulator
+    $freqafc = $msg_parts{freqest};
+    $freqafc = FHEM::Core::Utils::Math::round((26000000 / 16384 * $freqafc / 1000),0);
+  }
   my $messagetype=$msg_parts{messagetype};
   my $name = $hash->{NAME};
 
@@ -2958,7 +2966,7 @@ sub SIGNALduino_Parse_MN {
     }
     $dmsg = sprintf('%s%s',$hash->{protocolObject}->checkProperty($id,'preamble',''),$methodReturn[0]);
     $hash->{logMethod}->($name, 5, qq[$name: Parse_MN, Decoded matched MN Protocol id $id dmsg=$dmsg $rssiStr]);
-    SIGNALduno_Dispatch($hash,$rmsg,$dmsg,$rssi,$id);
+    SIGNALduno_Dispatch($hash,$rmsg,$dmsg,$rssi,$id,$freqafc);
     $message_dispatched++;
     
   }
@@ -2966,7 +2974,7 @@ sub SIGNALduino_Parse_MN {
 }
 
 ############################# package main
-sub SIGNALduino_Parse($$$$@) {
+sub SIGNALduino_Parse {
   my ($hash, $iohash, $name, $rmsg, $initstr) = @_;
 
   #print Dumper(\%ProtocolListSIGNALduino);
@@ -3069,7 +3077,7 @@ sub SIGNALduino_WriteInit {
 }
 
 ############################# package main
-sub SIGNALduino_SimpleWrite(@) {
+sub SIGNALduino_SimpleWrite {
   my ($hash, $msg, $nonl) = @_;
   return if(!$hash);
   if($hash->{TYPE} eq 'SIGNALduino_RFR') {
@@ -3091,7 +3099,7 @@ sub SIGNALduino_SimpleWrite(@) {
 }
 
 ############################# package main
-sub SIGNALduino_Attr(@) {
+sub SIGNALduino_Attr {
   my ($cmd,$name,$aName,$aVal) = @_;
   my $hash = $defs{$name};
   my $debug = AttrVal($name,'debug',0);
@@ -3229,7 +3237,7 @@ sub SIGNALduino_Attr(@) {
 }
 
 ############################# package main
-sub SIGNALduino_FW_Detail($@) {
+sub SIGNALduino_FW_Detail {
   my ($FW_wname, $name, $room, $pageHash) = @_;
 
   my $hash = $defs{$name};
@@ -3342,7 +3350,7 @@ sub SIGNALduino_FW_saveWhitelist {
 }
 
 ############################# package main      - test is missing
-sub SIGNALduino_IdList($@) {
+sub SIGNALduino_IdList {
   my ($param, $aVal, $blacklist, $develop0) = @_;
   my (undef,$name) = split(':', $param);
 
@@ -3545,7 +3553,7 @@ sub SIGNALduino_callsub {
 # Will return  $count of ???,  modified $rawData , modified %patternListRaw,
 # =cut
 ############################# package main
-sub SIGNALduino_filterMC($$$%) {
+sub SIGNALduino_filterMC {
   ## Warema Implementierung : Todo variabel gestalten
   my ($name,$id,$rawData,%patternListRaw) = @_;
   my $hash=$defs{$name};
@@ -3614,7 +3622,7 @@ sub SIGNALduino_filterMC($$$%) {
 # Will return  $count of combined values,  modified $rawData , modified %patternListRaw,
 # =cut
 ############################# package main
-sub SIGNALduino_filterSign($$$%) {
+sub SIGNALduino_filterSign {
   my ($name,$id,$rawData,%patternListRaw) = @_;
   my $debug = AttrVal($name,'debug',0);
 
@@ -3683,7 +3691,7 @@ sub SIGNALduino_filterSign($$$%) {
 # Will return  $count of combined values,  modified $rawData , modified %patternListRaw,
 # =cut
 ############################# package main
-sub SIGNALduino_compPattern($$$%) {
+sub SIGNALduino_compPattern {
   my ($name,$id,$rawData,%patternListRaw) = @_;
   my $debug = AttrVal($name,'debug',0);
 
@@ -4181,7 +4189,7 @@ sub CalcDataRate {
   $DRATE_E = int($DRATE_E);
 
   my $DRATE_M = (($dr*1000) * (2**28) / (26000000 * (2**$DRATE_E))) - 256;
-  my $DRATE_Mr = main::round($DRATE_M,0);
+  my $DRATE_Mr = FHEM::Core::Utils::Math::round($DRATE_M,0);
   $DRATE_M = int($DRATE_M);
 
   my $datarate0 = ( ((256+$DRATE_M)*(2**($DRATE_E & 15 )))*26000000/(2**28) / 1000);
@@ -4531,6 +4539,8 @@ USB-connected devices (SIGNALduino):<br>
     <br>Example 4: <code>set sduino raw SN;R=3;D=9A46036AC8D3923EAEB470AB;</code>  sends a xFSK message of raw and repeated 3 times
     <ul><br>
       <b>note: The wrong use of the upcoming options can lead to malfunctions of the SIGNALduino!</b><br><br>
+      <li>CEA -> Switching on the automatic frequency control for FSK modulation and firmware version >= V 4.0.0 (config: AFC=1)</li>
+      <li>CDA -> Switching off the automatic frequency control for FSK modulation and firmware version >= V 4.0.0 (config: AFC=0)</li>
       <li>CER -> turn on data compression (config: Mred=1)</li>
       <li>CDR -> disable data compression (config: Mred=0)</li><br>
 
@@ -4734,32 +4744,37 @@ USB-connected devices (SIGNALduino):<br>
   <a name="SIGNALDuino_hardware"></a>
   <li>hardware<br>
     Currently, there are serval hardware options with different receiver options available.
-    The simple single wire option,  consists of a single wire connected receiver and a single wire connected transmitter which are connected over a single digital port with the microcontroller. The receiver only sends data and the transmitter receives only from the microcontroller.
+    The simple single wire option,  consists of a single wire connected receiver and a single wire connected transmitter which are connected over a single digital port with the microcontroller.
+    The receiver only sends data and the transmitter receives only from the microcontroller.
     The other option consists of the cc1101 (sub 1 GHZ) chip, which can transmit and receiver. It's a transceiver which is connected via spi.
-    ESP8266 hardware type, currently doesn't support flashing out of the modu and needs at leat 1 MB of flash.
+    ESP8266 hardware type, currently doesn't support flashing out of the module and needs at leat 1 MB of flash.
     <ul>
-      <li>ESP32: ESP32 with simple single wire receiver</li>
-      <li>ESP32cc1101: ESP32 with CC1101 (spi connected) receiver</li>
-      <li>ESP8266: ESP8266 with simple single wire receiver</li>
-      <li>ESP8266cc1101: ESP8266 with CC1101 (spi connected) receiver</li>
-      <li>MAPLEMINI_F103CB: MapleMini F103CB (STM32 family) with simple single wire receiver</li>
+      <li>esp32s: ESP32 with simple single wire receiver</li>
+      <li>esp32cc1101: ESP32 with CC1101 (spi connected) receiver</li>
+      <li>esp8266s: ESP8266 with simple single wire receiver</li>
+      <li>esp8266cc1101: ESP8266 with CC1101 (spi connected) receiver</li>
+      <li>MAPLEMINI_F103CBs: MapleMini F103CB (STM32 family) with simple single wire receiver</li>
       <li>MAPLEMINI_F103CBcc1101: MapleMini F103CB (STM32 family) with CC1101 (spi connected) receiver</li>
       <li>miniculCC1101: Arduino pro Mini with CC110x (spi connected) receiver and cables as a minicul</li>
-      <li>nano: Arduino Nano 328 with simple single wired receiver</li>
+      <li>nano328: Arduino Nano 328 with simple single wired receiver</li>
       <li>nanoCC1101: Arduino Nano 328 with CC110x (spi connected) receiver</li>
-      <li>promini: Arduino Pro Mini 328 with simple single receiver </li>
+      <li>promini8s: Arduino Pro Mini 328 8Mhz with simple single wired receiver</li>
+      <li>promini8cc1101: Arduino Pro Mini 328 8Mhz with CC110x (spi connected) receiver</li>
+      <li>promini16s: Arduino Pro Mini 328 16Mhz with simple single wired receiver</li>
+      <li>promini16cc1101: Arduino Pro Mini 328 16Mhz with CC110x (spi connected) receiver</li>
       <li>radinoCC1101: Arduino compatible radino with cc1101 (spi connected) receiver</li>
     </ul>
   </li><br>
   <a name="longids"></a>
   <li>longids<br>
     Comma separated list of device-types for SIGNALduino that should be handled using long IDs. This additional ID allows it to differentiate some weather sensors, if they are sending on the same channel. Therfor a random generated id is added. If you choose to use longids, then you'll have to define a different device after battery change.<br>
-    Default is to not to use long IDs for all devices.
     <br><br>
     Examples:<PRE>
+      # Default, use of long IDs is defined by logical modules. Mostly disabled except for OREGON:
+      deleteattr sduino longids 
       # Do not use any long IDs for any devices:
       attr sduino longids 0
-      # Use any long IDs for all devices (this is default):
+      # Use any long IDs for all devices:
       attr sduino longids 1
       # Use longids for BTHR918N devices.
       # Will generate devices names like BTHR918N_f3.
@@ -4817,6 +4832,10 @@ USB-connected devices (SIGNALduino):<br>
       <li>Fine_Offset_WH57_868<br>
         Modulation 2-FSK, Datarate=17.26 kbps, Sync Word=2DD4, Packet Length= Byte, Frequency 868.35 MHz
         <ul><small>Example: Thunder and lightning sensor Fine Offset WH57, Froggit DP60, Ambient Weather WH31L</small></ul>
+      </li>
+      <li>Inkbird_IBS-P01R<br>
+        Modulation 2-FSK, Datarate=10.00 kbps, Sync Word=2DD4, Packet Length=18 Byte, Frequency 433.92 MHz
+        <ul><small>Example: Inkbird IBS-P01R pool thermometer, ITH-20R thermometer/hygrometer</small></ul>
       </li>
       <li>KOPP_FC<br>
         modulation GFSK, Datarate=4.7855 kbps, Sync Word=AA54, frequency 868.3MHz
@@ -5118,6 +5137,8 @@ USB-connected devices (SIGNALduino):<br>
 
     <ul>
       <b>Hinweis: Die falsche Benutzung der kommenden Optionen kann zu Fehlfunktionen des SIGNALduinos f&uuml;hren!</b><br><br>
+      <li>CEA -> Einschalten der automatischen Frequenzkontrolle bei FSK-Modulation und Firmwareversion >= V 4.0.0 (config: AFC=1)</li>
+      <li>CDA -> Abschalten der automatischen Frequenzkontrolle bei FSK-Modulation und Firmwareversion >= V 4.0.0 (config: AFC=0)</li>
       <li>CER -> Einschalten der Datenkomprimierung (config: Mred=1)</li>
       <li>CDR -> Abschalten der Datenkomprimierung (config: Mred=0)</li><br>
       <u>Register Befehle bei einem CC1101</u>
@@ -5318,36 +5339,42 @@ USB-connected devices (SIGNALduino):<br>
   <a name="SIGNALDuino_hardware"></a>
   <li>hardware<br>
     Derzeit m&ouml;gliche Hardware Varianten mit verschiedenen Empfänger Optionen.
-    Die einfache Variante besteht aus einem Empf&auml;nger und einen Sender, die über je eine einzige digitale Signalleitung Datem mit dem Microcontroller austauschen. Der Empf&auml;nger sendet dabei und der Sender empf&auml;ngt dabei ausschließlich.
+    Die einfache Variante besteht aus einem Empf&auml;nger und einen Sender, die über je eine einzige digitale Signalleitung Datem mit dem Microcontroller austauschen.
+    Der Empf&auml;nger sendet dabei und der Sender empf&auml;ngt dabei ausschließlich.
     Weiterhin existiert der den sogenannten cc1101 (sub 1 GHZ) Chip, welche empfangen und senden kann. Dieser wird über die SPI Verbindung angebunden.
     ESP8266 Hardware Typen, unterstützen derzeit kein flashen aus dem Modul und ben&ouml;tigen mindestens 1 MB Flash Speicher.
     <ul>
-      <li>ESP32: ESP32 f&uuml;r einfachen eindraht Empf&auml;nger</li>
+      <li>ESP32s: ESP32 f&uuml;r einfachen eindraht Empf&auml;nger</li>
       <li>ESP32cc1101: ESP32 mit einem CC110x-Empf&auml;nger (SPI Verbindung)</li>
-      <li>ESP8266: ESP8266 f&uuml;r einfachen eindraht Empf&auml;nger</li>
+      <li>ESP8266s: ESP8266 f&uuml;r einfachen eindraht Empf&auml;nger</li>
       <li>ESP8266cc1101: ESP8266 mit einem CC110x-Empf&auml;nger (SPI Verbindung)</li>
-      <li>MAPLEMINI_F103CB: MapleMini F103CB (STM32) f&uuml;r einfachen eindraht Empf&auml;nger</li>
+      <li>MAPLEMINI_F103CBs: MapleMini F103CB (STM32) f&uuml;r einfachen eindraht Empf&auml;nger</li>
       <li>MAPLEMINI_F103CBcc1101: MapleMini F103CB (STM32) mit einem CC110x-Empf&auml;nger (SPI Verbindung)</li>
       <li>miniculCC1101: Arduino pro Mini mit einem CC110x-Empf&auml;nger (SPI Verbindung) entsprechend dem minicul verkabelt</li>
-      <li>nano: Arduino Nano 328 f&uuml;r einfachen eindraht Empf&auml;nger</li>
+      <li>nano328: Arduino Nano 328 f&uuml;r einfachen eindraht Empf&auml;nger</li>
       <li>nanoCC1101: Arduino Nano f&uuml;r einen CC110x-Empf&auml;nger (SPI Verbindung)</li>
-      <li>promini: Arduino Pro Mini 328 f&uuml;r einfachen eindraht Empf&auml;nger</li>
+      <li>promini8s: Arduino Pro Mini 328 8Mhz f&uuml;r einfachen eindraht Empf&auml;nger</li>
+      <li>promini8cc1101: Arduino Pro Mini 328 8Mhz f&uuml;r einen CC110x-Empf&auml;nger (SPI Verbindung)</li>
+      <li>promini16s: Arduino Pro Mini 328 16Mhz f&uuml;r einfachen eindraht Empf&auml;nger</li>
+      <li>promini16cc1101: Arduino Pro Mini 328 16Mhz f&uuml;r einen CC110x-Empf&auml;nger (SPI Verbindung)</li>
       <li>radinoCC1101: Ein Arduino kompatibler Radino mit CC110x-Empfänger (SPI Verbindung)</li>
     </ul><br>
     Notwendig f&uuml;r den Befehl <code>flash</code>. Hier sollten Sie angeben, welche Hardware Sie mit dem usbport verbunden haben. Andernfalls kann es zu Fehlfunktionen des Ger&auml;ts kommen. Wichtig ist auch das Attribut <code>updateChannelFW</code><br>
   </li><br>
   <a name="longids"></a>
   <li>longids<br>
-    Durch Komma getrennte Liste von Device-Typen f&uuml;r Empfang von langen IDs mit dem SIGNALduino. Diese zus&auml;tzliche ID erlaubt es Wettersensoren, welche auf dem gleichen Kanal senden zu unterscheiden. Hierzu wird eine zuf&auml;llig generierte ID hinzugef&uuml;gt. Wenn Sie longids verwenden, dann wird in den meisten F&auml;llen nach einem Batteriewechsel ein neuer Sensor angelegt. Standardm&auml;ßig werden keine langen IDs verwendet.<br>
+    Durch Komma getrennte Liste von Device-Typen f&uuml;r Empfang von langen IDs mit dem SIGNALduino. Diese zus&auml;tzliche ID erlaubt es Wettersensoren, welche auf dem gleichen Kanal senden zu unterscheiden. Hierzu wird eine zuf&auml;llig generierte ID hinzugef&uuml;gt. Wenn Sie longids verwenden, dann wird in den meisten F&auml;llen nach einem Batteriewechsel ein neuer Sensor angelegt.<br>
     Folgende Module verwenden diese Funktionalit&auml;t: 14_Hideki, 41_OREGON, 14_CUL_TCM97001, 14_SD_WS07.<br>
     Beispiele:<PRE>
-      # Keine langen IDs verwenden (Default Einstellung):
+      # Voreinstellung, Nutzung von langen IDs wird durch logische Module definiert. Meist deaktiviert, außer bei OREGON:
+      deleteattr sduino longids 
+      # Keine langen IDs verwenden:
       attr sduino longids 0
       # Immer lange IDs verwenden:
       attr sduino longids 1
       # Verwende lange IDs f&uuml;r SD_WS07 Devices.
-      # Device Namen sehen z.B. so aus: SD_WS07_TH_3.
-      attr sduino longids SD_WS07
+      # Device Namen sehen z.B. so aus: SD_WS07_TH_3
+      attr sduino longids SD_WS07_TH
     </PRE>
   </li>
   <a name="maxMuMsgRepeat"></a>
@@ -5399,6 +5426,18 @@ USB-connected devices (SIGNALduino):<br>
       <li>Fine_Offset_WH57_868<br>
         Modulation 2-FSK, Datenrate=17.26 kbps, Sync Word=2DD4, Packet Length=9 Byte, Frequenz 868.35 MHz
         <ul><small>Beispiel: Gewittersensor Fine Offset WH57, Froggit DP60, Ambient Weather WH31L</small></ul>
+      </li>
+      <li>Fine_Offset_WH31_868<br>
+        Modulation 2-FSK, Datenrate=17.26 kbps, Sync Word=2DD4, Packet Length=11 Byte, Frequenz 868.35 MHz
+        <ul><small>Beispiel: Temperatur-/Feuchtesensor Fine Offset WH31, Froggit DP50, Ambient Weather WH31e/b, Ecowitt wh31</small></ul>
+      </li>
+      <li>Fine_Offset_WH40_868<br>
+        Modulation 2-FSK, Datenrate=17.26 kbps, Sync Word=2DD4, Packet Length=14 Byte, Frequenz 868.35 MHz
+        <ul><small>Beispiel: Regensensor Fine Offset WH40, Ambient Weather WH40, Ecowitt WH40</small></ul>
+      </li>
+      <li>Inkbird_IBS-P01R<br>
+        Modulation 2-FSK, Datenrate=10.00 kbps, Sync Word=2DD4, Packet Length=18 Byte, Frequenz 433.92 MHz
+        <ul><small>Beispiel: Inkbird IBS-P01R Pool Thermometer, ITH-20R Thermo-/Hygrometer</small></ul>
       </li>
       <li>KOPP_FC<br>
         Modulation GFSK, Datenrate=4.7855 kbps, Sync Word=AA54, Frequenz 868.3MHz
@@ -5599,7 +5638,7 @@ USB-connected devices (SIGNALduino):<br>
       "web": "https://wiki.fhem.de/wiki/SIGNALduino"
     }
   },
-  "version": "v3.5.4"
+  "version": "v3.5.5"
 }
 =end :application/json;q=META.json
 =cut
