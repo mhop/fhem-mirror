@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: SD_ProtocolData.pm: Protocol 122 for Temola TM 40 thermometer
+                                Protocol 119 Basic funkbus suppors
+                                Protocol 85 new sensor TFA 30.3251.10
+                                new definition 20.1
+ - feature: SD_Protocols.pm: Updated to version 2.0.7 
  - change:  10_KNX: multiple changes, new features, see Forum #122582
  - bugfix:  48_MieleAtHome: fix warning
  - feature: configDB.pm: show version counter in "configDB saved. (xx)"

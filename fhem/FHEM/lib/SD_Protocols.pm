@@ -16,7 +16,7 @@ use Carp qw(croak carp);
 use constant HAS_DigestCRC => defined eval { require Digest::CRC; };
 use constant HAS_JSON => defined eval { require JSON; };
 
-our $VERSION = '2.06';
+our $VERSION = '2.07';
 use Storable qw(dclone);
 use Scalar::Util qw(blessed);
 
@@ -540,6 +540,46 @@ sub MCRAW {
   $self // carp 'Not called within an object';
 
   return (-1," message is to long") if ($mcbitnum > $self->checkProperty($id,"length_max",0) );
+  return(1,binStr2hexStr($bitData)); 
+}
+
+=item mcBit2Sainlogic()
+
+This function checks the Manchester signals from a Sainlogic weather sensor.
+It will check for length_max, length_min and return a hex string
+
+Input:  $object,$name,$bitData,$id,$mcbitnum
+Output:
+       array (1,hex string)
+    or array (-1,"Error message")
+    
+=cut
+
+sub mcBit2Sainlogic {
+  my ( $self, $name, $bitData, $id, $mcbitnum ) = @_;
+  $self // carp 'Not called within an object';
+
+  $self->_logging( "$name: lib/mcBit2Sainlogic, protocol $id, lenght $mcbitnum", 5 );
+  $self->_logging( "$name: lib/mcBit2Sainlogic, $bitData", 5 );
+
+  return (-1,' message is to long') if ($mcbitnum > $self->checkProperty($id,"length_max",0) );
+
+  if ($mcbitnum < 128) {
+    my $start = index($bitData, '010100');
+    $self->_logging( "$name: lib/mcBit2Sainlogic, protocol $id, start found at pos $start", 5 );
+    if ($start < 0 || $start > 10) {
+      $self->_logging( "$name: lib/mcBit2Sainlogic, protocol $id, start 010100 not found", 4 );
+      return (-1, "$name: lib/mcBit2Sainlogic, start 010100 not found");
+    }
+    while($start < 10) {
+      $bitData = q[1] . $bitData;
+      $start = index($bitData, '010100');
+    }
+    $bitData = substr($bitData, 0, 128);
+    $mcbitnum = length($bitData);
+  }
+  $self->_logging( "$name: lib/mcBit2Sainlogic, $bitData", 5 );
+  return (-1,' message is to short') if ($mcbitnum < $self->checkProperty($id,"length_min",0) );
   return(1,binStr2hexStr($bitData)); 
 }
 
