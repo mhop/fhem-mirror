@@ -64,7 +64,7 @@ sub OREGON_Initialize
 
 #####################################
 sub
-OREGON_Define($$)
+OREGON_Define
 {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
@@ -86,7 +86,7 @@ OREGON_Define($$)
 
 #####################################
 sub
-OREGON_Undef($$)
+OREGON_Undef
 {
   my ($hash, $name) = @_;
   delete($modules{OREGON}{defptr}{$name});
@@ -894,8 +894,7 @@ sub OREGON_raw {
 
 
 # -----------------------------
-sub
-OREGON_Parse($$)
+sub OREGON_Parse
 {
   my ($iohash, $msg) = @_;
 
