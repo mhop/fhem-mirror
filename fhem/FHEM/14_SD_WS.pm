@@ -6,6 +6,7 @@
 # Sidey79 & Ralf9   2016 - 2017
 # Joerg             2017
 # elektron-bbs      2018 -
+# sidey             2017 -
 #
 # 17.04.2017 WH2 (TFA 30.3157 nur Temp, Hum = 255),es wird das Perlmodul Digest:CRC benoetigt fuer CRC-Pruefung benoetigt
 # 29.05.2017 Test ob Digest::CRC installiert
@@ -46,6 +47,11 @@
 # 11.04.2022 Protokoll 85: neuer Sensor Windmesser TFA 30.3251.10 mit Windrichtung, Pruefung CRC8 eingearbeitet
 # 23.05.2022 neues Protokoll 120: Wetterstation TFA 35.1077.54.S2 mit 30.3151 (Thermo/Hygro-Sender), 30.3152 (Regenmesser), 30.3153 (Windmesser)
 # 11.06.2022 neues Protokoll 122: TM40, Wireless Grill-, Meat-, Roasting-Thermometer with 4 Temperature Sensors
+# 06.01.2023 neues Protokoll 123: Inkbird IBS-P01R Pool Thermometer, Inkbird ITH-20R (not tested)
+# 21.01.2023 use round from package FHEM::Core::Utils::Math;
+# 01.04.2023 Added protocol 125: ecowitt WH31 support
+# 06.05.2023 Added protocol 126: ecowitt WH40 support
+# 21.08.2023 neues Protokoll 129: Sainlogic weather station FT-0835
 
 package main;
 
@@ -55,6 +61,8 @@ use strict;
 use warnings;
 use Carp qw(carp);
 use FHEM::Meta;
+use FHEM::Core::Utils::Math;
+use constant HAS_DigestCRC => defined eval { require Digest::CRC; };
 
 # Forward declarations
 sub SD_WS_LFSR_digest8_reflect;
@@ -67,7 +75,8 @@ sub SD_WS_Initialize {
   my $hash = shift // return;
   $hash->{Match}    = '^W\d+x{0,1}#.*';
   $hash->{DefFn}    = \&SD_WS_Define;
-  $hash->{UndefFn}  = \&SD_WS_Undef;$hash->{SetFn}    = \&SD_WS_Set;
+  $hash->{UndefFn}  = \&SD_WS_Undef;
+  $hash->{SetFn}    = \&SD_WS_Set;
   $hash->{ParseFn}  = \&SD_WS_Parse;
   $hash->{AttrList} = "do_not_notify:1,0 ignore:0,1 showtime:1,0 " .
                       "model:E0001PA,S522,TFA_30.3251.10,TX-EZ6,other " .
@@ -95,7 +104,7 @@ sub SD_WS_Initialize {
     "SD_WS_85_THW_.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "4:120"},
     "SD_WS_89_TH.*"   => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "3:180"},
     "SD_WS_94_T.*"    => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4:Temp,", autocreateThreshold => "3:180"},
-    'SD_WS_107_H.*'   => { ATTR => 'event-min-interval:.*:300 event-on-change-reading:.*', FILTER => '%NAME', GPLOT => q{}, autocreateThreshold => '2:180'},
+    'SD_WS_107_H.*'   => { ATTR => 'event-min-interval:.*:300 event-on-change-reading:.*', FILTER => '%NAME', GPLOT => q{}, autocreateThreshold => '2:300'},
     'SD_WS_108.*'     => { ATTR => 'event-min-interval:.*:300 event-on-change-reading:.*', FILTER => '%NAME', GPLOT => 'temp4:Temp,', autocreateThreshold => '5:120'},
     'SD_WS_110_TR.*'  => { ATTR => 'event-min-interval:.*:300 event-on-change-reading:.*', FILTER => '%NAME', GPLOT => 'temp4:Temp,', autocreateThreshold => '3:180'},
     'SD_WS_111_TL.*'  => { ATTR => 'event-min-interval:.*:300 event-on-change-reading:.*', FILTER => '%NAME', GPLOT => 'temp4:Temp,', autocreateThreshold => '3:600'},
@@ -105,6 +114,10 @@ sub SD_WS_Initialize {
     'SD_WS_117.*'     => { ATTR => 'event-min-interval:.*:300 event-on-change-reading:.*', FILTER => '%NAME', GPLOT => 'temp4hum4:Temp/Hum,', autocreateThreshold => '5:120'},
     'SD_WS_120.*'     => { ATTR => 'event-min-interval:.*:300 event-on-change-reading:.*', FILTER => '%NAME', GPLOT => 'temp4hum4:Temp/Hum,', autocreateThreshold => '2:180'},
     'SD_WS_122_T.*'   => { ATTR => 'event-min-interval:.*:60 event-on-change-reading:.*', FILTER => '%NAME', GPLOT => 'temp4:Temp,', autocreateThreshold => '10:180'},
+    'SD_WS_123_T.*'   => { ATTR => 'event-min-interval:.*:300 event-on-change-reading:.*', FILTER => '%NAME', GPLOT => 'temp4:Temp,', autocreateThreshold => '2:180'},
+    'SD_WS_125_.*'    => { ATTR => 'event-min-interval:.*:300 event-on-change-reading:.*', FILTER => '%NAME', GPLOT => 'temp4hum4:Temp/Hum,', autocreateThreshold => '2:300'},
+    'SD_WS_126_R.*'    => { ATTR => 'event-min-interval:.*:300 event-on-change-reading:.*', FILTER => '%NAME', GPLOT => 'rain4:Rain,', autocreateThreshold => "2:180"},
+    'SD_WS_129.*'     => { ATTR => 'event-min-interval:.*:300 event-on-change-reading:.*', FILTER => '%NAME', GPLOT => 'temp4hum4:Temp/Hum,', autocreateThreshold => '3:180'},
   };
   return FHEM::Meta::InitMod( __FILE__, $hash );
 }
@@ -318,7 +331,7 @@ sub SD_WS_Parse {
                                 return 0;
                               }
                             } else {
-                              Log3 $name, 1, "$name: SD_WS_27 Parse msg $rawData - ERROR CRC not load, please install modul Digest::CRC";
+                              Log3 $name, 1, "$name: SD_WS_27 Parse msg $rawData - ERROR CRC not checked, please install module Digest::CRC";
                               return 0;
                             }  
                           }
@@ -383,7 +396,7 @@ sub SD_WS_Parse {
                       }
                     },
       id      => sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,0,9); },           # id
-      temp    => sub {my (undef,$bitData) = @_; return round(((SD_WS_binaryToNumber($bitData,22,25)*256 +  SD_WS_binaryToNumber($bitData,18,21)*16 + SD_WS_binaryToNumber($bitData,14,17)) - 1220) * 5 / 90.0 , 1); }, #temp
+      temp    => sub {my (undef,$bitData) = @_; return FHEM::Core::Utils::Math::round(((SD_WS_binaryToNumber($bitData,22,25)*256 +  SD_WS_binaryToNumber($bitData,18,21)*16 + SD_WS_binaryToNumber($bitData,14,17)) - 1220) * 5 / 90.0 , 1); }, #temp
       hum     => sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,30,33)*16 + SD_WS_binaryToNumber($bitData,26,29));  },           #hum
       channel => sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,12,13)+1 );  },   # channel
       bat     => sub {my (undef,$bitData) = @_; return substr($bitData,34,1) eq "0" ? "ok" : "low";},   # other or modul orginal
@@ -449,7 +462,7 @@ sub SD_WS_Parse {
         sendmode   => sub {my (undef,$bitData) = @_; return substr($bitData,12,1) eq "1" ? "manual" : "auto";},
         bat        => sub {my (undef,$bitData) = @_; return substr($bitData,13,1) eq "1" ? "low" : "ok";},
         trend      => sub {my (undef,$bitData) = @_; return ('consistent', 'rising', 'falling', 'unknown')[SD_WS_binaryToNumber($bitData,14,15)];},
-        temp       => sub {my (undef,$bitData) = @_; return round(((SD_WS_binaryToNumber($bitData,16,27)) - 1220) * 5 / 90.0 , 1); },
+        temp       => sub {my (undef,$bitData) = @_; return FHEM::Core::Utils::Math::round(((SD_WS_binaryToNumber($bitData,16,27)) - 1220) * 5 / 90.0 , 1); },
         hum        => sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,28,31) * 10) + (SD_WS_binaryToNumber($bitData,32,35));},
         channel    => sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,38,39) );},
       },
@@ -609,7 +622,7 @@ sub SD_WS_Parse {
         id         => sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,8,15); },                         # random id
         bat        => sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,16) eq "1" ? "low" : "ok";},      # bat?
         channel    => sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,17,19) + 1 ); },                 # channel
-        temp       => sub {my (undef,$bitData) = @_; return round((SD_WS_binaryToNumber($bitData,20,31)-720)*0.0556,1); },  # temp
+        temp       => sub {my (undef,$bitData) = @_; return FHEM::Core::Utils::Math::round((SD_WS_binaryToNumber($bitData,20,31)-720)*0.0556,1); },  # temp
         hum        => sub {my ($rawData,$bitData) = @_; return substr($rawData,1,1) eq "5" ? (SD_WS_binaryToNumber($bitData,32,39)) : 0;},  # hum
       } ,
     84 =>
@@ -694,7 +707,7 @@ sub SD_WS_Parse {
         winddir    => sub {my (undef,$bitData) = @_;
                             if (substr($bitData,30,2) eq "10") {    # message 2 winddirection
                               $winddir = SD_WS_binaryToNumber($bitData,44,55);
-                              return ($winddir * 1, $winddirtxtar[round(($winddir / 22.5),0)]);
+                              return ($winddir * 1, $winddirtxtar[FHEM::Core::Utils::Math::round(($winddir / 22.5),0)]);
                             } else {
                               return;
                             }
@@ -714,7 +727,7 @@ sub SD_WS_Parse {
                                 return 0;
                               }
                             } else {
-                              Log3 $name, 1, "$name: SD_WS_85 Parse msg $rawData - ERROR CRC not load, please install modul Digest::CRC";
+                              Log3 $name, 1, "$name: SD_WS_85 Parse msg $rawData - ERROR CRC not loaded, please install module Digest::CRC";
                               return 0;
                             }  
                             return 1;
@@ -795,7 +808,7 @@ sub SD_WS_Parse {
                             $rawTemp =  SD_WS_binaryToNumber($bitData,8,21);
                             my $tempFh = $rawTemp / 20 - 90; # Grad Fahrenheit
                             Log3 $name, 4, "$name: SD_WS_106_T tempraw = $rawTemp, temp = $tempFh Fahrenheit";
-                            return (round((($tempFh - 32) * 5 / 9) , 1)); # Grad Celsius
+                            return (FHEM::Core::Utils::Math::round((($tempFh - 32) * 5 / 9) , 1)); # Grad Celsius
                           },
         crcok      => sub {return 1;}, # CRC test method does not exist
     } ,
@@ -815,14 +828,14 @@ sub SD_WS_Parse {
         # MM:       Moisture percentage 0%-100% (0x00-0x64) MM = (AD - 70) / (450 - 70)
         # Z:        ? Fixed: leftmost 7 bit 1111 100
         # AAA:      9 bit AD value MSB byte[07] & 0x01, LSB byte[08] ??? 10 bit ??? WH51 Manual.pdf says: 100%AD setting range:0%AD+10~1000
-        # XXXXXX:   ? Fixed: 0xff 0xff 0xff
+        # XXXXXX:   ? Fixed: 0xff 0xff 0xff or 0x00 0x00 0x00
         # CC:       CRC of the preceding 12 bytes (Polynomial 0x31, Initial value 0x00, Input not reflected, Result not reflected)
         # SS:       Sum of the preceding 13 bytes % 256
         sensortype => 'WH51, DP100, MISOL/1',
         model      => 'SD_WS_107_H',
-        prematch   => sub { ($rawData,undef) = @_; return 1 if ($rawData =~ /^51[0-9A-F]{16}[F]{6}/); },
+        prematch   => sub { ($rawData,undef) = @_; return 1 if ($rawData =~ /^51[0-9A-F]{26}/); },
         id         => sub { my ($rawData,undef) = @_; return substr($rawData,2,6); },
-        batVoltage => sub { my (undef,$bitData) = @_; return round(SD_WS_binaryToNumber($bitData,35,39) / 10 , 1); },
+        batVoltage => sub { my (undef,$bitData) = @_; return FHEM::Core::Utils::Math::round(SD_WS_binaryToNumber($bitData,35,39) / 10 , 1); },
         adc        => sub { my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,62,71); },
         hum        => sub { my ($rawData,undef) = @_; return hex(substr($rawData,12,2)); },
         crcok      => sub { my $rawData = shift;
@@ -978,7 +991,7 @@ sub SD_WS_Parse {
                                   return ($rawRainCounterMessage + 10) * 0.1;
                                 }
                               },
-        temp           => sub { my (undef,$bitData) = @_; return round(((SD_WS_binaryToNumber($bitData,48,55) * 256 + SD_WS_binaryToNumber($bitData,40,47)) - 1220) * 5 / 90.0 , 1); },
+        temp           => sub { my (undef,$bitData) = @_; return FHEM::Core::Utils::Math::round(((SD_WS_binaryToNumber($bitData,48,55) * 256 + SD_WS_binaryToNumber($bitData,40,47)) - 1220) * 5 / 90.0 , 1); },
         crcok          => sub { my (undef,$bitData) = @_;
                                 my $sum = 0;
                                 for (my $n = 0; $n < 56; $n += 8) {
@@ -1053,13 +1066,13 @@ sub SD_WS_Parse {
                             $rawTemp =  SD_WS_binaryToNumber($bitData,12,13) * 256 + SD_WS_binaryToNumber($bitData,16,23);
                             my $tempFh = $rawTemp - 90; # Grad Fahrenheit
                             Log3 $name, 4, "$name: SD_WS_113_T tempraw1 = $rawTemp, temp1 = $tempFh Grad Fahrenheit";
-                            return (round((($tempFh - 32) * 5 / 9) , 0)); # Grad Celsius
+                            return (FHEM::Core::Utils::Math::round((($tempFh - 32) * 5 / 9) , 0)); # Grad Celsius
                           },
         temp2      => sub { my (undef,$bitData) = @_;
                             $rawTemp =  SD_WS_binaryToNumber($bitData,14,15) * 256 + SD_WS_binaryToNumber($bitData,24,31);
                             my $tempFh = $rawTemp - 90; # Grad Fahrenheit
                             Log3 $name, 4, "$name: SD_WS_113_T tempraw2 = $rawTemp, temp2 = $tempFh Grad Fahrenheit";
-                            return (round((($tempFh - 32) * 5 / 9) , 0)); # Grad Celsius
+                            return (FHEM::Core::Utils::Math::round((($tempFh - 32) * 5 / 9) , 0)); # Grad Celsius
                           },
         crcok      => sub {return 1;}, # Check could not be determined yet.
     } ,
@@ -1126,7 +1139,7 @@ sub SD_WS_Parse {
         winddir    => sub {my ($rawData,undef) = @_;
                             return if (substr($rawData,12,1) ne '1' || substr($rawData,20,3) !~ m/^\d+$/xms); # only weather station
                             $winddir = substr($rawData,20,3);
-                            return ($winddir * 1, $winddirtxtar[round(($winddir / 22.5),0)]);
+                            return ($winddir * 1, $winddirtxtar[FHEM::Core::Utils::Math::round(($winddir / 22.5),0)]);
                           },
         temp       => sub {my ($rawData,$bitData) = @_;
                             # uncoverable condition right
@@ -1139,7 +1152,7 @@ sub SD_WS_Parse {
                                 $rawTemp *= -1;  # Bresser 3in1
                               }
                             }
-                            return round($rawTemp,1);
+                            return FHEM::Core::Utils::Math::round($rawTemp,1);
                           },
         hum        => sub {my ($rawData,undef) = @_;
                             # uncoverable condition right
@@ -1235,6 +1248,7 @@ sub SD_WS_Parse {
                                 return 1;
                               }
     } ,
+
     117 => {
         # https://github.com/merbanan/rtl_433/blob/master/src/devices/bresser_7in1.c
         # The compact 7-in-1 multifunction outdoor sensor transmits the data on 868.3 MHz.
@@ -1273,7 +1287,7 @@ sub SD_WS_Parse {
         id         => sub {my ($rawData,undef) = @_; return substr($rawData,4,4); },
         winddir    => sub {my ($rawData,undef) = @_;
                             $winddir = substr($rawData,8,3);
-                            return ($winddir * 1, $winddirtxtar[round(($winddir / 22.5),0)]);
+                            return ($winddir * 1, $winddirtxtar[FHEM::Core::Utils::Math::round(($winddir / 22.5),0)]);
                           },
         batChange  => sub {my (undef,$bitData) = @_; return substr($bitData,52,1) eq '0' ? '1' : '0';},
         windgust   => sub {my ($rawData,undef) = @_; return substr($rawData,14,3) * 0.1;},
@@ -1332,11 +1346,11 @@ sub SD_WS_Parse {
                               },
         windspeed      => sub {my (undef,$bitData) = @_;
                                 return if (substr($bitData,19,1) eq '1');
-                                return round((SD_WS_binaryToNumber($bitData,39,46) / 3.0),1);
+                                return FHEM::Core::Utils::Math::round((SD_WS_binaryToNumber($bitData,39,46) / 3.0),1);
                               },
         windgust       => sub {my (undef,$bitData) = @_;
                                 return if (substr($bitData,19,1) eq '1');
-                                return round((SD_WS_binaryToNumber($bitData,47,54) / 3.0),1);
+                                return FHEM::Core::Utils::Math::round((SD_WS_binaryToNumber($bitData,47,54) / 3.0),1);
                               },
         rawRainCounter => sub {my (undef,$bitData) = @_;
                                 return if (substr($bitData,19,1) eq '1');
@@ -1415,6 +1429,217 @@ sub SD_WS_Parse {
         bat         => sub { my (undef,$bitData) = @_; return substr($bitData,88,1) eq "0" ? "ok" : "low"; },
         transmitter => sub { my (undef,$bitData) = @_; return substr($bitData,92,1) eq "0" ? "on" : "off"; },
         crcok      => sub {return 1;}, # Check could not be determined yet.
+    },
+    123 => {
+        # Inkbird IBS-P01R Pool Thermometer, Inkbird ITH-20R (not tested)
+        # ---------------------------------------------------------------
+        # Nibble   0    4    | 8    12   | 16   20   | 24   28   | 32  
+        #          D391 0F80 | 0301 005A | 0655 FA00 | 1405 1405 | 35F6 - IBS-P01R
+        #          D391 0F00 | 0103 0120 | 7E43 FF00 | 1405 3F02 | 5CCB - unknown sensor with humidity
+        #          SSSS LL33 | 4455 66BB | IIII TTTT | tttt HHHH | CCCC   
+        # S: 2 Byte, Sync 2 ???
+        # L: 1 Byte, Number of bytes from byte 3 to the end ???
+        # 3: 1 Byte, Flags, IBS-P01R always 0x80, in inkbird_ith20r.c - 00 - normal work , 40 - unlink sensor (button pressed 5s), 80 - battery replaced
+        # 4: 1 Byte, Flags, IBS-P01R always 0x03, in inkbird_ith20r.c - changes from 1 to 2 if external sensor present
+        # 5: 1 Byte, Flags, IBS-P01R always 0x01, in inkbird_ith20r.c - unknown (also seen 0201), sw version? Seen 0x0001 on IBS-P01R
+        # 6: 1 Byte, Flags, IBS-P01R always 0x00, in inkbird_ith20r.c - unknown (also seen 0201), sw version? Seen 0x0001 on IBS-P01R
+        # B: 1 Byte, Battery Percent, IBS-P01R (0, 30, 60, 90), in inkbird_ith20r.c - Battery % 0-100
+        # I: 2 Byte, Ident, always the same for a sensor but each sensor is different
+        # T: 2 Byte, Temperature in C * 10, little endian, so 0xD200 is 210, 21.0C
+        # t: 2 Byte, Temperature for the external sensor, 0x1405 if not connected
+        # H: 2 Byte, Relative humidity % * 10, little endian, so 0xC501 is 453 or 45.3%
+        # C: 2 Byte, CRC16 over bytes 0-15, poly=0x8005 (0xA001 reflected), init=0x2f61 (0x86F4 reflected)
+        # 0    4    | 8    12   | 16   20   | 24   28   | 32   36   | 40   44   | 48   52   | 56   60   | 64   68   | 72   76   | 80   84   | 88   92   | 96   100  | 104  108  | 112  116  | 120  128  | 132  136  | 140  144
+        # 1101 0011 | 1001 0001 | 0000 1111 | 1000 0000 | 0000 0011 | 0000 0001 | 0000 0000 | 0001 1110 | 0000 0110 | 0101 0101 | 0001 0100 | 0000 0001 | 0001 0100 | 0000 0101 | 0001 0100 | 0000 0101 | 0001 1100 | 0111 1011
+        # 1101 0011 | 1001 0001 | 0000 1111 | 0000 0000 | 0000 0001 | 0000 0011 | 0000 0011 | 0010 0001 | 0111 1110 | 0100 0011 | 1010 0101 | 0000 0000 | 0001 0100 | 0000 0101 | 0100 0110 | 0000 0010 | 0111 1111 | 0101 0001
+        # SSSS SSSS | SSSS SSSS | LLLL LLLL | 3333 3333 | 4444 4444 | 5555 5555 | 6666 6666 | BBBB BBBB | IIII IIII | IIII IIII | TTTT TTTT | TTTT TTTT | tttt tttt | tttt tttt | HHHH HHHH | HHHH HHHH | CCCC CCCC | CCCC CCCC
+        sensortype     => 'IBS-P01R, ITH-20R',
+        model          => 'SD_WS_123_T',
+        prematch       => sub { return 1; }, # no precheck known
+        batChange      => sub { my (undef,$bitData) = @_; return substr($bitData,24,1) eq '0' ? '1' : '0'; },
+        batteryPercent => sub { my ($rawData,undef) = @_; return hex(substr($rawData,14,2)); },
+        id             => sub { my ($rawData,undef) = @_; return substr($rawData,16,4); },
+        temp           => sub { my ($rawData,undef) = @_; return ((((hex(substr($rawData,20,2)) + hex(substr($rawData,22,2)) * 256) ^ 0x8000) - 0x8000) / 10); },
+        temp2          => sub { my ($rawData,undef) = @_;
+                                return if (substr($rawData,24,4) eq '1405');
+                                return ((((hex(substr($rawData,24,2)) + hex(substr($rawData,26,2)) * 256) ^ 0x8000) - 0x8000) / 10);
+                              },
+        hum            => sub { my ($rawData,undef) = @_;
+                                return if (substr($rawData,28,4) eq '1405');
+                                return ( (hex(substr($rawData,28,2)) + hex(substr($rawData,30,2)) * 256) / 10 );
+                              },
+        crcok          => sub { my ($rawData,undef) = @_;
+                                my $calcsum = SD_WS_crc16lsb(16, 0xA001, 0x86F4, $rawData);
+                                my $checksum = hex(substr($rawData,32,2)) + hex(substr($rawData,34,2)) * 256;
+                                if ($checksum == $calcsum) {
+                                  return 1;
+                                } else {
+                                  Log3 $name, 3, "$name: SD_WS_123 Parse msg $msg - ERROR CRC16 $checksum != $calcsum";
+                                  return 0;
+                                }
+                              },
+    },
+    125 => {
+        # Temperature and humidity sensor Fine Offset WH31, aka Ambient Weather, aka ecowitt
+        # ------------------------------------------------------------------------------------------
+        #          Byte: 00 01 02 03 04 05 06 07 08 09 10 
+        #        Nibble: 01 23 45 67 89 01 23 45 67 89 01 
+        # aa aa aa 2d d4 30 02 82 62 37 04 51 6C 00 02 00 
+        #          MN;D= 30 02 82 62 37 04 51 6C 00 02 00 ;R=63;   Temp: 21.0 C Hum: 55%, Battery: ok, ID: 0x02
+        #                FF II CT TT HH XX SS ?? ?? ?? ?? 
+        # FF:   Family code 0x31 = WH31e 0x37 = wh31b
+        # II:   ID (1 byte)
+        # C :   3bit Channel Number Bit 17-19, 1 Bit Battery bit 20
+        # TT:   10 bits Temperature in C, scaled by 10, offset 400. Start at Bit 22
+        # HH:   Humidity in percent as two diget hex
+        # XX:   CRC8 of the preceding 5 bytes (Polynomial 0x31, Initial value 0x00, Input not reflected, Result not reflected)
+        # SS:   Sum-8 of the preceding 5 bytes 
+        # ??:   Unknown Data
+        sensortype => 'WH31e, WH31b, DP50',
+        model      => 'SD_WS_125_TH',
+        prematch   => sub {my ($rawData,undef) = @_; return 1 if ($rawData =~ /^(30|37)/); },
+        id         => sub {my ($rawData,undef) = @_; return (substr($rawData,2,2));},
+		    channel    => sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,17,19) + 1);},
+        bat        => sub {my (undef,$bitData) = @_; return substr($bitData,20,1) eq '0' ? 'ok' : 'low';}, 
+        temp       => sub {my (undef,$bitData) = @_;
+                            my $temp = SD_WS_binaryToNumber($bitData,22,31);  
+                            return FHEM::Core::Utils::Math::round(($temp - 400) / 10, 1);
+						              },							
+        hum        => sub { my ($rawData,undef) = @_; return hex(substr($rawData,8,2)); },
+        crcok      => sub { my ($rawData,undef) = @_;
+                            if (HAS_DigestCRC) {
+                              my $calc_crc8 = Digest::CRC->new(width => 8, poly=>0x31);
+                              my $crc_digest = $calc_crc8->add( pack 'H*', substr( $rawData, 0, 12 ) )->digest;
+                              if ($crc_digest)
+                              {
+                                Log3 $name, 3, qq[$name: SD_WS_125 Parse msg $rawData - ERROR CRC8 $crc_digest shoud be 0];
+                                return 0;
+                              }
+                            } else {
+                              Log3 $name, 1, qq[$name: SD_WS_125 Parse msg $rawData - ERROR CRC not loaded, please install module Digest::CRC];
+                            }
+                            my $checksum = 0;
+                            for (my $i=0; $i < 11; $i += 2) {
+                              $checksum += hex(substr($rawData,$i,2));
+                            }
+                            $checksum -= hex(substr($rawData,12,2));
+                            $checksum &= 0xFF;
+                            if ($checksum) {
+                              Log3 $name, 3, qq[$name: SD_WS_125 Parse msg $rawData - ERROR checksum $checksum != 0];
+                              return 0;
+                            }
+
+                            return 1;
+                          }, 
+    },
+    126 => {
+        # rain gauge Fine Offset WH40, aka Ambient Weather, aka ecowitt
+        # ------------------------------------------------------------------------------------------
+        #          Byte: 00 01 02 03 04 05 06 07 08 09 10 11 12 13 
+        #        Nibble: 01 23 45 67 89 01 23 45 67 89 01 23 45 67 
+        # aa aa aa 2d d4 40 01 1C DF 8F 00 00 97 62 20 A6 80 28 01       -> ID  0x11cdf
+        #                40 01 3E 3C 90 00 00 10 5B A0 2A                -> ID: 0x13e3c
+        #                FF II II II BB RR RR XX AA ?? ?? ?? ?? ?? ?? ??
+        # FF:   Family code always 0x40
+        # II:   ID (1 byte)
+        # BB:   Voltage of battery is representey by last 5 bits; voltage / 10 => 0F = 15 = 1.5v    Not all models have battery reporting. Firest seen in late 2022
+        # RR:   the rain bucket tip count => 0.1mm increments
+        # XX:   CRC8 of the preceding 5 bytes (Polynomial 0x31, Initial value 0x00, Input not reflected, Result not reflected)
+        # SS:   Sum-8 of the preceding 5 bytes 
+        # ??:   Unknown Data
+        sensortype      => 'WH40',
+        model           => 'SD_WS_126_R',
+        prematch        => sub {my ($rawData,undef) = @_; return 1 if ($rawData =~ /^40/); },
+        id              => sub {my ($rawData,undef) = @_; return (substr($rawData,2,6));},
+        rain_total      => sub {my ($rawData,undef) = @_; return 0.1 * hex(substr($rawData,10,4)); },
+        rawRainCounter  => sub {my ($rawData,undef) = @_; return hex(substr($rawData,10,4)); },
+        bat             => sub {  my (undef,$bitData) = @_; 
+                                  my $v = oct(q[0b].substr($bitData,35,5)); 
+                                  return $v ne '0' ? $v > 11 ? 'ok' : 'low' : undef; },
+        batVoltage      => sub {  my (undef,$bitData) = @_; 
+                                  my $v = oct(q[0b].substr($bitData,35,5));
+                                  return $v ne '0' ? $v / 10 : undef; },
+        crcok           => sub { my ($rawData,undef) = @_; 
+                            if (HAS_DigestCRC) {
+                              my $calc_crc8 = Digest::CRC->new(width => 8, poly=>0x31);
+                              my $crc_digest = $calc_crc8->add( pack 'H*', substr( $rawData, 0, 16 ) )->digest;
+                              if ($crc_digest)
+                              {
+                                Log3 $name, 3, qq[$name: SD_WS_126 Parse msg $rawData - ERROR CRC8 $crc_digest shoud be 0];
+                                return 0;
+                              }
+                            } else {
+                              Log3 $name, 1, qq[$name: SD_WS_126 Parse msg $rawData - ERROR CRC not loaded, please install module Digest::CRC];
+                            }
+                            my $checksum = 0;
+                            for (my $i=0; $i < 15; $i += 2) {
+                              $checksum += hex(substr($rawData,$i,2));
+                            }
+                            $checksum -= hex(substr($rawData,16,2));
+                            $checksum &= 0xFF;
+                            if ($checksum) {
+                              Log3 $name, 3, qq[$name: SD_WS_126 Parse msg $rawData - ERROR checksum $checksum != 0];
+                              return 0;
+                            }
+
+                            return 1;
+                          }, 
+    },
+    129 => {
+        # Sainlogic weather station FT-0835
+        # ---------------------------------------------------------------
+        #          Byte: 00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 
+        #        Nibble: 01 23 45 67 89 01 23 45 67 89 01 23 45 67 89 01 
+        # aa aa aa 2d d4 FF D4 C0 E4 00 00 5F 00 00 83 FD 51 FF FB FB 6B
+        #                PP PP PI IF SS GG DD RR RR FT TT HH BB BB UU CC
+        # P: 20 bit Preamble always 0xFFD4C
+        # I:  8 bit Ident
+        # F:  4 bit Flags: battery, MSB wind direction, MSB wind gust, MSB wind speed
+        # S:  8 bit LSB wind speed, in 1/10 m/s, resolution 0.1
+        # G:  8 bit LSB wind gust, in 1/10 m/s, resolution 0.1
+        # D:  8 bit LSB wind direction, in degree
+        # R: 16 bit rain counter, in 1/10 l/m², resolution 0.1
+        # F:  4 bit Flags: Sensors with brightness MSB brightness, 3 bit unknown, sensors without brightness always 0x8
+        # I: 12 bit Temperature, unsigned fahrenheit, offset by 400 and scaled by 10
+        # D:  8 bit Humidity, in percent
+        # R: 16 bit Brightness, sensors without brightness always 0xFFFB
+        # U:  8 bit UV, sensors without brightness always 0xFB
+        # C:  8 bit CRC8 over all 16 bytes must be 0
+        sensortype => 'FT-0835, FT0300, FT-0310, FT020T, WS019T',
+        model      => 'SD_WS_129',
+        prematch   => sub {my ($rawData,undef) = @_; return 1 if ($rawData =~ /^FFD4/);},
+        id         => sub {my ($rawData,undef) = @_; return (substr($rawData,5,2));},
+        bat        => sub {my (undef,$bitData) = @_; return substr($bitData,28,1) eq "0" ? "ok" : "low";},
+        windspeed  => sub {my (undef,$bitData) = @_; return FHEM::Core::Utils::Math::round(((substr($bitData,31,1) * 256 + SD_WS_binaryToNumber($bitData,32,39)) / 10.0),1);},
+        windgust   => sub {my (undef,$bitData) = @_; return FHEM::Core::Utils::Math::round(((substr($bitData,30,1) * 256 + SD_WS_binaryToNumber($bitData,40,47)) / 10.0),1);},
+        winddir    => sub {my (undef,$bitData) = @_;
+                            $winddir = substr($bitData,29,1) * 256 + SD_WS_binaryToNumber($bitData,48,55);
+                            return ($winddir * 1, $winddirtxtar[FHEM::Core::Utils::Math::round(($winddir / 22.5),0)]);
+                          },
+        rain       => sub {my ($rawData,undef) = @_; return 0.1 * hex(substr($rawData,14,4));},
+        temp       => sub {my (undef,$bitData) = @_; return FHEM::Core::Utils::Math::round(((SD_WS_binaryToNumber($bitData,76,87)) -320 - 400) * 5 / 90.0 , 1);},
+        hum        => sub {my (undef,$bitData) = @_; return SD_WS_binaryToNumber($bitData,88,95);},
+        brightness => sub {my ($rawData,$bitData) = @_;
+                            return if (substr($rawData,28,2) eq 'FB');
+                            return (substr($bitData,72,1) * 65536 + SD_WS_binaryToNumber($bitData,96,111));
+                          },
+        uv         => sub {my ($rawData,undef) = @_;
+                            return if (substr($rawData,28,2) eq 'FB');
+                            return 0.1 * hex(substr($rawData,28,2));
+                          },
+        crcok      => sub { my ($rawData,undef) = @_; 
+                            if (HAS_DigestCRC) {
+                              my $calc_crc8 = Digest::CRC->new(width => 8, init=>0xC0, poly=>0x31);
+                              my $crc_digest = $calc_crc8->add( pack 'H*', substr( $rawData, 4, 28 ) )->digest;
+                              if ($crc_digest) {
+                                Log3 $name, 3, qq[$name: SD_WS_129 Parse msg $rawData - ERROR CRC8 $crc_digest shoud be 0];
+                                return 0;
+                              }
+                            } else {
+                              Log3 $name, 1, qq[$name: SD_WS_129 Parse msg - ERROR CRC not loaded, please install module Digest::CRC];
+                            }
+                            return 1;
+                          }, 
     },
   );
 
@@ -1835,7 +2060,6 @@ sub SD_WS_Parse {
     # temperature
     my $oldTemp = ReadingsVal($name, 'temperature', undef);
     if (defined $oldTemp && defined $temp) {
-      #my $oldTemp = ReadingsVal($name, "temperature", undef);
       my $maxdeviation = AttrVal($name, "max-deviation-temp", 1);       # default 1 K
       my $diffTemp = abs($temp - $oldTemp);
       $diffTemp = sprintf("%.1f", $diffTemp);       
@@ -1851,7 +2075,6 @@ sub SD_WS_Parse {
     # humidity
     my $oldHum = ReadingsVal($name, 'humidity', undef);
     if (defined $oldHum && defined $hum) {
-      #my $oldHum = ReadingsVal($name, "humidity", undef);
       my $maxdeviation = AttrVal($name, "max-deviation-hum", 1);        # default 1 %
       my $diffHum = abs($hum - $oldHum);
       $diffHum = sprintf("%.1f", $diffHum);       
@@ -1965,7 +2188,7 @@ sub SD_WS_Parse {
   readingsBulkUpdate($hash, "temperatureTrend", $trendTemp) if (defined($trendTemp) && length($trendTemp) > 0);
   readingsBulkUpdate($hash, "humidityTrend", $trendHum) if (defined($trendHum) && length($trendHum) > 0);
   readingsBulkUpdate($hash, "sendmode", $sendmode) if (defined($sendmode) && length($sendmode) > 0);
-  readingsBulkUpdate($hash, "type", $SensorTyp, 0)  if (defined($SensorTyp));
+  readingsBulkUpdateIfChanged($hash, "type", $SensorTyp, 0)  if (defined($SensorTyp));
   readingsBulkUpdate($hash, "beep", $beep)  if (defined($beep));
   readingsBulkUpdate($hash, "adc", $adc)  if (defined($adc));
   readingsBulkUpdate($hash, 'rain', $rain)  if (defined($rain));
@@ -2011,6 +2234,27 @@ sub SD_WS_LFSR_digest8_reflect {
   }
   $sum = $sum & 0xff;
   return $sum;
+}
+
+sub SD_WS_crc16lsb {
+  my ($nBytes, $polynomial, $init, $rawData) = @_;
+  carp "SD_WS_crc16lsb, too few arguments ($nBytes, $polynomial, $init, $rawData)" if @_ < 4;
+  my $remainder = $init;
+  my $byte;
+  my $bit;
+  my $data;
+    for ($byte = 0; $byte < $nBytes; ++$byte) {
+      $data = hex(substr($rawData, $byte * 2, 2));
+      $remainder ^= $data;
+      for ($bit = 0; $bit < 8; ++$bit) {
+        if ($remainder & 1) {
+          $remainder = ($remainder >> 1) ^ $polynomial;
+        } else {
+          $remainder = ($remainder >> 1);
+        }
+      }
+    }
+    return $remainder;
 }
 
 #############################
@@ -2080,13 +2324,17 @@ sub SD_WS_WH2SHIFT {
     <li>EuroChron EFTH-800, EFS-3110A (temperature and humidity sensor)</li>
     <li>Fine Offset WH51, aka ECOWITT WH51, aka Froggit DP100, aka MISOL/1 (soil moisture sensor)</li>
     <li>Fine Offset WH57, aka Froggit DP60, aka Ambient Weather WH31L (thunder and lightning sensor)</li>
+    <li>Fine Offset WH31, aka Ambient Weather WH31E, aka ecowitt WH31 (temperature and humidity sensor)</li>
+    <li>Fine Offset WH40, aka Ambient Weather WH40, aka ecowitt WH40 (Regen sensor)</li>
     <li>Fody E42 (temperature and humidity sensor)</li>
+    <li>Inkbird IBS-P01R pool thermometer, ITH-20R</li>
     <li>NC-3911, NC-3912 refrigerator thermometer</li>
     <li>Opus XT300</li>
     <li>PV-8644 infactory Poolthermometer</li>
     <li>Renkforce E0001PA</li>
     <li>Rain gauge DROP TFA 47.3005.01 with rain sensor TFA 30.3233.01</li>
     <li>TECVANCE TV-4848</li>
+    <li>Sainlogic Weather stations FT-0835, FT0300, FT-0310, FT020T, WS019T</li>
     <li>Thermometer FT007T, FT007TP, F007T, F007TP</li>
     <li>Thermo-Hygrometer FT007TH, F007TH</li>
     <li>TS-FT002 Water tank level monitor with temperature</li>
@@ -2220,13 +2468,17 @@ sub SD_WS_WH2SHIFT {
     <li>EuroChron EFTH-800, EFS-3110A (Temperatur- und Feuchtigkeitssensor)</li>
     <li>Fine Offset WH51, aka ECOWITT WH51, aka Froggit DP100, aka MISOL/1 (Bodenfeuchtesensor)</li>
     <li>Fine Offset WH57, aka Froggit DP60, aka Ambient Weather WH31L (Gewittersensor)</li>
+    <li>Fine Offset WH31, aka Ambient Weather WH31E Thermo-Hygrometer Sensor (Temperatur- und Feuchtemsser)</li>
+    <li>Fine Offset WH40, aka Ambient Weather WH40, aka ecowitt WH40 (rain sensor)</li>
     <li>Fody E42 (Temperatur- und Feuchtigkeitssensor)</li>
+    <li>Inkbird IBS-P01R Pool Thermometer, ITH-20R</li>
     <li>Kabelloses Grillthermometer, Modellname: GFGT 433 B1</li>
     <li>NC-3911, NC-3912 digitales Kuehl- und Gefrierschrank-Thermometer</li>
     <li>Opus XT300</li>
     <li>PV-8644 infactory Poolthermometer</li>
     <li>Regenmesser DROP TFA 47.3005.01 mit Regensensor TFA 30.3233.01</li>
     <li>Renkforce E0001PA</li>
+    <li>Sainlogic Wetterstationen FT-0835, FT0300, FT-0310, FT020T, WS019T</li>
     <li>TECVANCE TV-4848</li>
     <li>Temperatur-Sensor FT007T, FT007TP, F007T, F007TP</li>
     <li>Temperatur/Feuchte-Sensor FT007TH, F007TH</li>

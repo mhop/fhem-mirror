@@ -1,8 +1,16 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
-# Do not insert empty lines here, update check depends on it.
-  
+# Do not insert empty lines here, update check depends on it.                 
+ - bugfix: 14_SD_WS.pm: Corrected protocol 115 battery bit, 
+                        added batChange bit 
+                         corrected calculation for negative temperatures
+ - feature: 14_SD_WS.pm: add TFA 30.3151 (T/H-transmitter)
+                         TFA 30.3251.10
+                         30.3152 (rain gauge)
+                         30.3153 (anemometer) 
+ - feature: 14_SD_WS.pm: Protocol 115 for Bresser 6-in-1 Comfort Wetter Center
+ - feature: 14_SD_WS.pm: new set command replaceBatteryForSec
+ - feature: 14_SD_WS.pm: BRESSER 7-in-1 Weather Center
  - bugfix:  14_SD_WS09.pm: wrong calculation of averagewindDirection
-
  - bugifix: 14_Hideki.pm:  winddirection fixed (#1099)
  - change:  14_Hideki.pm:  Update {Match} regex for Hideki Module (#1071)
  - feature: SD_ProtocolData.pm: Protocol 122 for Temola TM 40 thermometer
