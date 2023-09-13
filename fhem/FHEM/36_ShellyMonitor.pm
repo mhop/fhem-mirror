@@ -234,6 +234,7 @@ my %DEVID_MODEL = (
     "SHCB-1"   => "shellybulb",
     "SHBLB-1"  => "shellybulb",
     "SHBDUO-1" => "shellybulb",
+	"SHEM-3"   => "shelly3em",
     "SHMOS-01" => "generic",
     "SHWT-1"   => "generic",
     "SHHT-1"   => "generic",
@@ -263,7 +264,8 @@ my %DEVID_PREFIX = (
     "SHBTN-2"  => "shelly_button",
     "SHIX3-1"  => "shelly_i3",
     "SHMOS-01" => "shelly_motion",
-	"SHTRV-01" => "shelly_trv"
+	"SHTRV-01" => "shelly_trv",
+	"SHEM-3"   => "shelly_em3"
 );
 
 # Mapping of DeviceId in Multicast to additional attributes on creation
