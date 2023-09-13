@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.                 
+ - bugfix:  72_FRITZBOX: Handling Pipe | Zeichen in FB Daten korrigiert
+            wakeUpCall Leerzeichen im Namen durch %20 repräsentiert
  - feature: 10_SD_GT.pm: repeats can be configured via attribute
  - change:  00_SIGNALduino.pm: clone Protocol Object for every definition
                                changed timer creation and deletion 
