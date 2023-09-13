@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.18";
+my $ModulVersion = "07.50.18a";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -1105,12 +1105,18 @@ sub FRITZBOX_Set($$@)
        return "wakeUpCall: 2nd Parameter must be 'off'" if $val[1] !~ /^(off)$/;
      } elsif (int @val > 2) {
        return "wakeUpCall: 2nd Parameter must be one of the alarm pages: alarm1,alarm2 or alarm3" if $val[0] !~ /^(alarm1|alarm2|alarm3)$/;
+
        my $device = "fd_" . $val[1];
        my $devname = "fdn_" . $val[1];
+
+       $devname =~ s/\|/&#0124/g;  # handling valid character | in FritzBox names
+       $devname =~ s/%20/ /g;      # handling spaces
+
        unless ($hash->{fhem}->{$device} || $hash->{fhem}->{$devname}) {
-         return "wakeUpCall: dect or fon Device name/number $val[1] not defined"; # unless $hash->{fhem}->{$device};
+         return "wakeUpCall: dect or fon Device name/number $val[1] not defined ($devname)"; # unless $hash->{fhem}->{$device};
        } elsif ($hash->{fhem}->{$devname}) {
          $val[1] = $hash->{fhem}->{$devname};
+         $val[1] =~ s/&#0124/\|/g;  # handling valid character | in FritzBox names
        }
      }
 
@@ -1735,7 +1741,7 @@ sub FRITZBOX_API_Check_Run($)
       $apiError .= " TR064:" . $response->code;
 
       # Ermitteln Box Model, FritzOS Verion, OEM aus TR064 Informationen
-      if ($response->is_success && $content =~ /<friendlyName>/) {
+      if ($response->is_success && $content =~ /<modelName>/) {
         FRITZBOX_Log $hash, 5-$myVerbose, "DEBUG: TR064 returned: $content";
 
         FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1)     if $content =~ /<modelName>(.*)<\/modelName>/;
@@ -2340,8 +2346,11 @@ sub FRITZBOX_Readout_Run_Web($)
              FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fon".$device."_device", $device ;
            }
 
+           $devname =~ s/\|/&#0124/g;
+
            my $fd_devname = "fdn_" . $devname;
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$fd_devname", $device;
+
            my $fd_device = "fd_" . $device;
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$fd_device", $devname;
          }
@@ -3752,6 +3761,7 @@ sub FRITZBOX_Readout_Done($)
    delete($hash->{helper}{READOUT_RUNNING_PID});
 
    $string2 = decode_base64($string2);
+
    FRITZBOX_Readout_Process ($hash, $string2);
 
 } # end FRITZBOX_Readout_Done
@@ -3824,6 +3834,9 @@ sub FRITZBOX_Readout_Process($$)
    # Fill all handed over readings
       my $x = 0;
       while (my ($rName, $rValue) = each(%values) ) {
+
+         $rValue =~ s/&#0124/\|/g;  # handling valid character | in FritzBox names
+
       #hash values
          if ($rName =~ /->/) {
          # 4 levels
@@ -3974,8 +3987,7 @@ sub FRITZBOX_Readout_Format($$$)
 
    $readout = "" unless defined $readout;
 
-   return $readout       unless defined( $format ) && $format ne "";
-# return $readout       unless $readout ne "" && $format ne "" ; #Funktioniert nicht bei $format "01"
+   return $readout unless defined( $format ) && $format ne "";
 
    if ($format eq "01" && $readout ne "1") {
       $readout = "0";
@@ -4076,6 +4088,9 @@ sub FRITZBOX_Readout_Format($$$)
 sub FRITZBOX_Readout_Add_Reading ($$$$@)
 {
    my ($hash, $roReadings, $rName, $rValue, $rFormat) = @_;
+
+   # Handling | as valid character in FritzBox names
+   $rValue =~ s/\|/&#0124/g;
 
    $rFormat = "" unless defined $rFormat;
    $rValue = FRITZBOX_Readout_Format ($hash, $rFormat, $rValue);
@@ -7409,6 +7424,8 @@ sub FRITZBOX_readPassword($)
          <br>
          Disables or sets the wake up call: alarm1, alarm2 or alarm3.
          <br>
+         If the device name is used, a space in the name must be replaced by %20.
+         <br>
          THe DeviceNumber can be found in the reading <b>dect</b><i>n</i><b>_device</b> or <b>fon</b><i>n</i><b>_device</b>
          <br>
          If you get "redundant name in FB" in a reading <b>dect</b><i>n</i> or <b>fon</b><i>n</i> than the device name can not be used.
@@ -8121,6 +8138,8 @@ sub FRITZBOX_readPassword($)
          <dt><code>set &lt;name&gt; wakeUpCall &lt;alarm1|alarm2|alarm3&gt; &lt;Device Nummer|Name&gt; &lt;per_day&gt; &lt;hh:mm&gt; &lt;mon:0|1 tue:0|1 wed:0|1 thu:0|1 fri:0|1 sat:0|1 sun:0|1&gt;</code></dt>
          <br>
          Inaktiviert oder stellt den Wecker: alarm1, alarm2, alarm3.
+         <br>
+         Wird der Device Name gentutzt, so ist ein Leerzeichen im Namen durch %20 zu ersetzen.
          <br>
          Die Device Nummer steht im Reading <b>dect</b><i>n</i><b>_device</b> or <b>fon</b><i>n</i><b>_device</b>
          <br>
