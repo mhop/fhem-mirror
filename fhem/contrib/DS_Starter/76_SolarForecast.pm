@@ -42,7 +42,6 @@ use utf8;
 use HttpUtils;
 eval "use JSON;1;"                           or my $jsonabs = 'JSON';                ## no critic 'eval' # Debian: sudo apt-get install libjson-perl
 eval "use AI::DecisionTree;1;"               or my $aidtabs = 'AI::DecisionTree';    ## no critic 'eval'
-eval "use Test2::Tools::Class qw(isa_ok);1;" or my $t2sabs  = 'Test2::Suite';        ## no critic 'eval' # Debian: sudo apt-get install libtest2-suite-perl
                            
 use FHEM::SynoModules::SMUtils qw(
                                    evaljson
@@ -140,6 +139,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.82.3" => "14.09.2023  more mouse over information in graphic header, ai support in autocorrection selectable ".
+                           "substitute use of Test2::Suite ",
   "0.82.2" => "11.09.2023  activate implementation of DWD AI support, add runTimeTrainAI ",
   "0.82.1" => "08.09.2023  rebuild implementation of DWD AI support, some error fixing (FHEM restarts between 0 and 1) ",
   "0.82.0" => "02.09.2023  first implementation of DWD AI support, new ctrlDebug aiProcess aiData, reset aiData ",
@@ -670,7 +671,7 @@ my %hqtxt = (                                                                   
   scnp   => { EN => qq{The scheduling of the consumer is not provided},
               DE => qq{Die Einplanung des Verbrauchers ist nicht vorgesehen}                                                },              
   vrmcr  => { EN => qq{Please set the Victron VRM Portal credentials with "set LINK vrmCredentials".},
-              DE => qq{Bitte setzen sie die Victron VRM Portal Zugangsdaten mit "set LINK vrmCredentials". }                },   
+              DE => qq{Bitte setzen sie die Victron VRM Portal Zugangsdaten mit "set LINK vrmCredentials". }                },              
   awd    => { EN => qq{LINK is waiting for solar forecast data ... <br><br>(The configuration can be checked with "set LINK plantConfiguration check".)},
               DE => qq{LINK wartet auf Solarvorhersagedaten ... <br><br>(Die Konfiguration kann mit "set LINK plantConfiguration check" gepr&uuml;ft werden.)} },
   strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please note any information (<I>).},
@@ -716,8 +717,8 @@ my %htitles = (                                                                 
                 DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung, Vorrangladen Batterie ist aktiv}     },
   connorec => { EN => qq{Consumption planning is outside current time\n(Click for immediate planning)},
                 DE => qq{Verbrauchsplanung liegt ausserhalb aktueller Zeit\n(Klick f&#252;r sofortige Einplanung)} },
-  akorron  => { EN => qq{Enable auto correction with:\nset <NAME> pvCorrectionFactor_Auto on*},
-                DE => qq{Einschalten Autokorrektur mit:\nset <NAME> pvCorrectionFactor_Auto on*}                   },
+  akorron  => { EN => qq{switched off\nenable auto correction with:\nset <NAME> pvCorrectionFactor_Auto on*},
+                DE => qq{ausgeschaltet\nAutokorrektur einschalten mit:\nset <NAME> pvCorrectionFactor_Auto on*}                   },
   splus    => { EN => qq{PV surplus sufficient},
                 DE => qq{PV-&#220;berschu&#223; ausreichend}                                                       },
   nosplus  => { EN => qq{PV surplus insufficient},
@@ -742,6 +743,8 @@ my %htitles = (                                                                 
                 DE => qq{API Schl&#252;ssel existiert nicht}                                                       },
   scrsdne  => { EN => qq{Rooftop site does not exist or is not accessible},
                 DE => qq{Rooftop ID existiert nicht oder ist nicht abrufbar}                                       },
+  norate   => { EN => qq{not rated},
+                DE => qq{nicht bewertet}                                                                           },
   pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\n\nOn:&nbsp;<start>\nOff:&nbsp;<stop>\nRemaining lock time:&nbsp;<RLT> seconds},
                 DE => qq{Planungsstatus:&nbsp;<pstate>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>\nverbleibende Sperrzeit:&nbsp;<RLT> Sekunden}     },
 );
@@ -1137,10 +1140,9 @@ sub _readCacheFile {
       my ($err, $dtree) = fileRetrieve ($file);
       
       if (!$err && $dtree) {
-          return if($t2sabs);                                                     # Modul Test2::Suite ist nicht installiert
-          my $valid = isa_ok($dtree, 'AI::DecisionTree');
+          my $valid = $dtree->isa('AI::DecisionTree');
           
-          if ($valid == 1) {
+          if ($valid) {
               $data{$type}{$name}{aidectree}{aitrained}  = $dtree;
               $data{$type}{$name}{current}{aitrainstate} = 'ok';
               Log3($name, 3, qq{$name - cached data "$cachename" restored}); 
@@ -1250,7 +1252,7 @@ sub Set {
              "modulePeakString ".
              "plantConfiguration:check,save,restore ".
              "powerTrigger:textField-long ".
-             "pvCorrectionFactor_Auto:on_simple,on_complex,off ".
+             "pvCorrectionFactor_Auto:on_simple,on_simple_ai,on_complex,on_complex_ai,off ".
              "reset:$resets ".
              "writeHistory:noArg ".
              $cf." "
@@ -8543,20 +8545,25 @@ sub _graphicHeader {
       
       ## Autokorrektur-Icon
       ######################
-      my $acicon;
+      my $aciimg;
+      my $acitit = q{};
+      
       if ($acu =~ /on/xs) {
-          $acicon = FW_makeImage('10px-kreis-gruen.png', $htitles{on}{$lang}." ($acu)");
+          $aciimg = FW_makeImage('10px-kreis-gruen.png', $htitles{on}{$lang}." ($acu)");
       }
       elsif ($acu =~ /standby/ixs) {
           my $pcfa    = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');
           my ($rtime) = $pcfa =~ /for (.*?) hours/x;
           $img        = FW_makeImage('10px-kreis-gelb.png', $htitles{dela}{$lang});
-          $acicon     = "$img&nbsp;(Start in ".$rtime." h)";
+          $aciimg     = "$img&nbsp;(Start in ".$rtime." h)";
       }
       else {
-          $htitles{akorron}{$lang} =~ s/<NAME>/$name/xs;
-          $acicon = FW_makeImage('-', $htitles{akorron}{$lang});
+          $acitit = $htitles{akorron}{$lang};
+          $acitit =~ s/<NAME>/$name/xs;
+          $aciimg = '-';
       }
+      
+      my $acicon = qq{<a title="$acitit">$aciimg</a>};
 
       ## Solare API  Sektion
       ########################
@@ -8659,9 +8666,15 @@ sub _graphicHeader {
                    $pcq < 0.60 ? FW_makeImage ('10px-kreis-rot.png',  $pvcanz) :
                    $pcq < 0.80 ? FW_makeImage ('10px-kreis-gelb.png', $pvcanz) :
                    FW_makeImage ('10px-kreis-gruen.png', $pvcanz);
-
-      $pcqimg     = "-" if(!$pvfc00 || $pcq == -1);
-      my $pcqicon = "<a onClick=$cmdfcqal>$pcqimg</a>";
+      
+      my $pcqtit = q();
+      
+      if(!$pvfc00 || $pcq == -1) {
+          $pcqimg = "-";
+          $pcqtit = $htitles{norate}{$lang};
+      }
+      
+      my $pcqicon = qq{<a title="$pcqtit", onClick=$cmdfcqal>$pcqimg</a>};
       
       ## KI Status
       ##############
@@ -8669,14 +8682,12 @@ sub _graphicHeader {
       my $aitst    = CurrentVal   ($hash, 'aitrainstate', 'ok'); 
       my $aihit    = NexthoursVal ($hash, 'NextHour00', 'aihit', 0);      
       
-      my $aitit = $aidtabs          ? $hqtxt{aimstt}{$lang} :
-                  $t2sabs           ? $hqtxt{aimmts}{$lang} :   
+      my $aitit = $aidtabs          ? $hqtxt{aimstt}{$lang} :   
                   $aicanuse ne 'ok' ? $hqtxt{ainuse}{$lang} :
                   q{};
       
-      my $aiimg  = $aidtabs          ? FW_makeImage ('--',                 $aitit) : 
-                   $t2sabs           ? FW_makeImage ('--',                 $aitit) :       
-                   $aicanuse ne 'ok' ? FW_makeImage ('-',                  $aitit) :
+      my $aiimg  = $aidtabs          ? '--' :    
+                   $aicanuse ne 'ok' ? '-'  :
                    $aitst ne 'ok'    ? FW_makeImage ('10px-kreis-rot.png', $aitst) :
                    $aihit            ? FW_makeImage ('10px-kreis-gruen.png', $hqtxt{aiwhit}{$lang}) :               
                    FW_makeImage ('10px-kreis-gelb.png', $hqtxt{aiwook}{$lang});
@@ -10636,8 +10647,8 @@ sub aiAddInstance {                   ## no critic "not used"
       my $hod  = AiRawdataVal ($hash, $idx, 'hod', undef);
       next if(!defined $hod);
       
-      my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', undef);
-      next if(!$rad1h);
+      my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', 0);
+      next if($rad1h <= 0);
       
       my $temp  = AiRawdataVal ($hash, $idx, 'temp', 20);
       my $wcc   = AiRawdataVal ($hash, $idx, 'wcc',   0);
@@ -10725,7 +10736,7 @@ sub aiGetResult {                   ## no critic "not used"
   my $hod   = $paref->{hod};
   my $nhidx = $paref->{nhidx};
   
-  return 'no AI decition possible' if(!isPrepared4AI ($hash) || !$hod || !$nhidx);  
+  return 'no AI decition possible' if(!isPrepared4AI ($hash) || !$hod || !$nhidx); 
   
   my $dtree = AiDetreeVal ($hash, 'aitrained', undef);
   
@@ -11571,7 +11582,7 @@ sub checkPlantConfig {
   my $type = $hash->{TYPE};
   
   my $lang = AttrVal        ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang));
-  my $pcf  = ReadingsVal    ($name, 'pvCorrectionFactor_Auto',   '');
+  my $pcf  = ReadingsVal    ($name, 'pvCorrectionFactor_Auto', '');
   my $acu  = isAutoCorrUsed ($name);
   
   my $cf   = 0;                                                                                     # config fault: 1 -> Konfig fehlerhaft, 0 -> Konfig ok
@@ -11862,13 +11873,6 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "sudo apt-get install libai-decisiontree-perl".<br>};
           $result->{'Common Settings'}{info}    = 1;         
       }
-      
-      if ($t2sabs) {
-          $result->{'Common Settings'}{state}   = $info;
-          $result->{'Common Settings'}{result} .= qq{The Perl module Test2::Suite is missing. <br>};
-          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "sudo apt-get install libtest2-suite-perl".<br>};
-          $result->{'Common Settings'}{info}    = 1;         
-      }
        
       if (!$pcf || $pcf !~ /on/xs) {          
           $result->{'Common Settings'}{state}   = $info;
@@ -11881,7 +11885,7 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading, ctrlLanguage, global language <br>};
           $result->{'Common Settings'}{note}   .= qq{checked Perl modules: <br>};
-          $result->{'Common Settings'}{note}   .= qq{AI::DecisionTree, Test2::Suite <br>};
+          $result->{'Common Settings'}{note}   .= qq{AI::DecisionTree <br>};
       }
   }
   
@@ -12311,18 +12315,19 @@ sub isPrepared4AI {
   
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
+  my $acu  = isAutoCorrUsed ($name);
 
   my $err;
 
   if(!isDWDUsed ($hash)) {
-      $err = qq(With the used SolarForecast model it's not possible to use the AI support);
+      $err = qq(The selected SolarForecast model cannot use the AI support);
   }
   elsif ($aidtabs) {
       $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "sudo apt-get install libai-decisiontree-perl" for AI support);
   }
-  elsif ($t2sabs) {
-      $err = qq(The Perl module Test2::Suite is missing. Please install it with e.g. "sudo apt-get install libtest2-suite-perl");   
-  }
+  elsif ($acu !~ /ai/xs) {
+      $err = 'the selected autocorrect mode does not contain AI support';
+  }  
   
   if ($err) {
       $data{$type}{$name}{current}{aicanuse} = $err;
@@ -12748,10 +12753,12 @@ sub isAutoCorrUsed {
 
   my $cauto = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');
 
-  my $ret = $cauto =~ /on_simple/xs  ? 'on_simple'  :
-            $cauto =~ /on_complex/xs ? 'on_complex' :
-            $cauto =~ /standby/xs    ? 'standby'    :
-            $cauto =~ /on/xs         ? 'on_simple'  :
+  my $ret = $cauto =~ /on_simple_ai/xs  ? 'on_simple_ai'  :
+            $cauto =~ /on_simple/xs     ? 'on_simple'     :
+            $cauto =~ /on_complex_ai/xs ? 'on_complex_ai' :
+            $cauto =~ /on_complex/xs    ? 'on_complex'    :
+            $cauto =~ /standby/xs       ? 'standby'       :
+            $cauto =~ /on/xs            ? 'on_simple'     :
             q{};
 
 return $ret;
@@ -14104,18 +14111,22 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
                   
       <br><br>
       
-      <b>on_simple:</b> <br>
+      <b>on_simple(_ai):</b> <br>
       Bei dieser Methode wird die stündlich vorhergesagte mit der real erzeugten Energiemenge verglichen und daraus ein 
       für die Zukunft verwendeter Korrekturfaktor für die jeweilige Stunde erstellt. Die von der gewählten API gelieferten
       Prognosedaten werden <b>nicht</b> zusätzlich mit weiteren Bedingungen wie den Bewölkungszustand oder Temperaturen in
-      Beziehung gesetzt.      
+      Beziehung gesetzt.<br>
+      Ist die KI-Unterstützung eingeschaltet (on_simple_ai) und wird durch die KI ein PV-Prognosewert geliefert, wird dieser Wert
+      anstatt des API-Wertes verwendet.
       <br><br>
       
-      <b>on_complex:</b> <br>
+      <b>on_complex(_ai):</b> <br>
       Bei dieser Methode wird die stündlich vorhergesagte mit der real erzeugten Energiemenge verglichen und daraus ein 
       für die Zukunft verwendeter Korrekturfaktor für die jeweilige Stunde erstellt. Die von der gewählten API gelieferten
       Prognosedaten werden außerdem zusätzlich mit weiteren Bedingungen wie den Bewölkungszustand oder Temperaturen 
-      verknüpft.
+      verknüpft.<br>
+      Ist die KI-Unterstützung eingeschaltet (on_complex_ai) und wird durch die KI ein PV-Prognosewert geliefert, wird dieser Wert
+      anstatt des API-Wertes verwendet.
       <br><br>
       
       <b>Hinweis:</b> Die automatische Vorhersagekorrektur ist lernend und benötigt Zeit um die Korrekturwerte zu optimieren.
@@ -14157,8 +14168,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <br><br>
       
       <b>Model VictronKiAPI:</b> <br>
-      Dieses Model basiert auf einer KI gestützten Prognose. Eine zusätzliche Autokorrektur wird nicht empfohlen, d.h.
-      die empfohlene Autokorrekturmethode ist <b>off</b>. <br><br>
+      Dieses Model basiert auf der KI gestützten API von Victron Energy. 
+      Eine zusätzliche Autokorrektur wird nicht empfohlen, d.h. die empfohlene Autokorrekturmethode ist <b>off</b>. <br><br>
       
       <b>Model DWD:</b> <br>
       Die empfohlene Autokorrekturmethode ist <b>on_complex</b>. <br><br>
@@ -14538,7 +14549,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <table>
        <colgroup> <col width="10%"> <col width="90%"> </colgroup>
           <tr><td> <b>aiRawData</b>     </td><td>- Die aktuell für die KI gespeicherten PV-, Strahlungs- und Umweltdaten.                     </td></tr>
-          <tr><td> <b>aiRuleStrings</b> </td><td>- Gibt eine Liste zurück, die den Entscheidungsbaum der KI in Form von Regeln beschreiben.   </td></tr>
+          <tr><td> <b>aiRuleStrings</b> </td><td>- Gibt eine Liste zurück, die den Entscheidungsbaum der KI in Form von Regeln beschreibt.    </td></tr>
           <tr><td>                      </td><td>&nbsp;&nbsp;<b>Hinweis:</b> Die Reihenfolge der Regeln ist zwar nicht vorhersehbar, die      </td></tr>
           <tr><td>                      </td><td>&nbsp;&nbsp;Reihenfolge der Kriterien innerhalb jeder Regel spiegelt jedoch die Reihenfolge  </td></tr>
           <tr><td>                      </td><td>&nbsp;&nbsp;wider, in der die Kriterien bei der Entscheidungsfindung geprüft werden.         </td></tr>
@@ -15346,8 +15357,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "FHEM::SynoModules::SMUtils": 1.0220,
         "Time::HiRes": 0,
         "MIME::Base64": 0,
-        "Storable": 0,
-        "Test2::Suite": 0        
+        "Storable": 0        
       },
       "recommends": {
         "FHEM::Meta": 0,
