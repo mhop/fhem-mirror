@@ -3889,7 +3889,10 @@ sub __getaiRuleStrings {                 ## no critic "not used"
              };
                    
   if (@rsl) {
-      $rs = join "\n", @rsl;
+      my $l = scalar @rsl;
+      $rs   = '<b>Number of rules: '.$l.'</b>';
+      $rs  .= '<br><br>';
+      $rs  .= join "\n", @rsl;
   }
 
 return $rs;
