@@ -3870,7 +3870,7 @@ return $ret;
 sub __getaiRuleStrings {                 ## no critic "not used"
   my $hash = shift;
   
-  return 'no AI decition possible' if(!isPrepared4AI ($hash));  
+  return 'the AI usage is not prepared' if(!isPrepared4AI ($hash));  
   
   my $dtree = AiDetreeVal ($hash, 'aitrained', undef);
   
@@ -8679,9 +8679,10 @@ sub _graphicHeader {
       
       ## KI Status
       ##############
-      my $aicanuse = CurrentVal   ($hash, 'aicanuse',       '');
-      my $aitst    = CurrentVal   ($hash, 'aitrainstate', 'ok'); 
-      my $aihit    = NexthoursVal ($hash, 'NextHour00', 'aihit', 0);      
+      my $aiprep   = isPrepared4AI ($hash, 'full');                      # isPrepared4AI full vor Abfrage 'aicanuse' ausführen !                  
+      my $aicanuse = CurrentVal    ($hash, 'aicanuse',       '');
+      my $aitst    = CurrentVal    ($hash, 'aitrainstate', 'ok'); 
+      my $aihit    = NexthoursVal  ($hash, 'NextHour00', 'aihit', 0);      
       
       my $aitit = $aidtabs          ? $htitles{aimstt}{$lang} :   
                   $aicanuse ne 'ok' ? $htitles{ainuse}{$lang} :
@@ -10738,7 +10739,7 @@ sub aiGetResult {                   ## no critic "not used"
   my $hod   = $paref->{hod};
   my $nhidx = $paref->{nhidx};
   
-  return 'no AI decition possible' if(!isPrepared4AI ($hash) || !$hod || !$nhidx); 
+  return 'the AI usage is not prepared' if(!isPrepared4AI ($hash, 'full')); 
   
   my $dtree = AiDetreeVal ($hash, 'aitrained', undef);
   
@@ -10847,13 +10848,13 @@ sub aiAddRawData {                   ## no critic "not used"
       for my $hod (sort keys %{$data{$type}{$name}{pvhist}{$pvd}}) {
           next if(!$hod || $hod eq '99' || ($rho && $hod ne $rho));
           
-          my $ridx = aiMakeIdxRaw ($pvd, $hod);
+          my $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
+          next if(!$rad1h);
           
           my $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
           next if(!$pvrl);
           
-          my $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
-          next if(!$rad1h);
+          my $ridx = aiMakeIdxRaw ($pvd, $hod);
           
           my $temp  = HistoryVal ($hash, $pvd, $hod, 'temp', 20);
           my $wcc   = HistoryVal ($hash, $pvd, $hod, 'wcc',   0);
@@ -11769,8 +11770,9 @@ sub checkPlantConfig {
 
   ## Allgemeine Settings
   ########################
-  my $eocr     = AttrVal    ($name, 'event-on-change-reading', '');
-  my $aicanuse = CurrentVal ($hash, 'aicanuse',                '');
+  my $eocr     = AttrVal       ($name, 'event-on-change-reading', '');
+  my $aiprep   = isPrepared4AI ($hash, 'full');
+  my $aiusemsg = CurrentVal    ($hash, 'aicanuse', '');
   my $einstds  = "";
 
   if (!$eocr || $eocr ne '.*') {
@@ -11788,10 +11790,10 @@ sub checkPlantConfig {
       $result->{'Common Settings'}{info}    = 1;
   }
 
-  if ($aicanuse ne 'ok') {
+  if (!$aiprep) {
       $result->{'Common Settings'}{state}   = $info;
-      $result->{'Common Settings'}{result} .= qq{The AI support is not usable. <br>};
-      $result->{'Common Settings'}{note}   .= qq{$aicanuse<br>};
+      $result->{'Common Settings'}{result} .= qq{The AI support is not used. <br>};
+      $result->{'Common Settings'}{note}   .= qq{$aiusemsg<br>};
       $result->{'Common Settings'}{info}    = 1;
   }  
     
@@ -12325,6 +12327,7 @@ return;
 ################################################################
 sub isPrepared4AI {
   my $hash = shift;
+  my $full = shift // q{};                   # wenn true -> auch Auswertung ob on_.*_ai gesetzt ist
   
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
@@ -12338,7 +12341,7 @@ sub isPrepared4AI {
   elsif ($aidtabs) {
       $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "sudo apt-get install libai-decisiontree-perl" for AI support);
   }
-  elsif ($acu !~ /ai/xs) {
+  elsif ($full && $acu !~ /ai/xs) {
       $err = 'The setting of pvCorrectionFactor_Auto does not contain AI support';
   }  
   
