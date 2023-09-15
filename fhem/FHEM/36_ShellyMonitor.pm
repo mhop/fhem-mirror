@@ -729,10 +729,17 @@ sub ShellyMonitor_DoRead
                 readingsBulkUpdateIfChanged($device, $rtype . $subs,
                    $defarr->{"unit"} eq "Wmin" ? int($svalue/6)/10 : $svalue);
               } elsif ($rtype eq "output") {
-                my $subs = ($shelly_models{$model}[0] ==1) ? "" : "_".$rno;
                 my $state = ( $svalue == 0 ? "off" : ( $svalue == 1 ? "on" : undef ));
-                if ($state) {
-                  readingsBulkUpdateIfChanged($device, "relay" . $subs, $state);
+                my $no_relais = $shelly_models{$model}[0];
+                if ($no_relais == 0) {
+                  readingsBulkUpdateIfChanged($device, "state", $state);
+                } else {
+                  if ($no_relais == 1) {
+                    readingsBulkUpdateIfChanged($device, "relay", $state);
+                  } else {
+                    my $sname = "relay_" . $rno;
+                    readingsBulkUpdateIfChanged($device, $sname, $state);
+                  }
                 }
               } elsif ($rtype eq "brightness") {
                 my $subs = ($shelly_models{$model}[3] ==1) ? "" : "_".$rno;
