@@ -645,9 +645,7 @@ my %hqtxt = (                                                                   
   after  => { EN => qq{after},
               DE => qq{nach}                                                                                                },
   aihtxt => { EN => qq{AI state:},
-              DE => qq{KI Status:}                                                                                          },
-  aimstt => { EN => qq{Perl module AI::DecisionTree is missing},
-              DE => qq{Perl Modul AI::DecisionTree ist nicht vorhanden}                                                     },  
+              DE => qq{KI Status:}                                                                                          },  
   aimmts => { EN => qq{Perl module Test2::Suite is missing},
               DE => qq{Perl Modul Test2::Suite ist nicht vorhanden}                                                         },
   aiwook => { EN => qq{AI support works properly, but does not provide a value for the current hour},
@@ -681,9 +679,7 @@ my %hqtxt = (                                                                   
   strnok => { EN => qq{Oh no &#128577;, the system configuration is incorrect. Please check the settings and notes!},
               DE => qq{Oh nein &#128546;, die Anlagenkonfiguration ist fehlerhaft. Bitte überprüfen Sie die Einstellungen und Hinweise!}                       },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop><br>Remaining lock time:&nbsp;<RLT> seconds},
-              DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop><br>verbleibende Sperrzeit:&nbsp;<RLT> Sekunden}                  },
-  ainuse => { EN => qq{AI Perl module is installed, but AI support is not initialized or is not used},
-              DE => qq{KI Perl Modul ist installiert, aber die KI Unterst&uuml;tzung ist nicht initialisiert bzw. wird nicht verwendet}                        },  
+              DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop><br>verbleibende Sperrzeit:&nbsp;<RLT> Sekunden}                  },  
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
@@ -745,8 +741,12 @@ my %htitles = (                                                                 
                 DE => qq{Rooftop ID existiert nicht oder ist nicht abrufbar}                                       },
   norate   => { EN => qq{not rated},
                 DE => qq{nicht bewertet}                                                                           },
+  aimstt   => { EN => qq{Perl module AI::DecisionTree is missing},
+                DE => qq{Perl Modul AI::DecisionTree ist nicht vorhanden}                                          },
   pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\n\nOn:&nbsp;<start>\nOff:&nbsp;<stop>\nRemaining lock time:&nbsp;<RLT> seconds},
-                DE => qq{Planungsstatus:&nbsp;<pstate>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>\nverbleibende Sperrzeit:&nbsp;<RLT> Sekunden}     },
+                DE => qq{Planungsstatus:&nbsp;<pstate>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>\nverbleibende Sperrzeit:&nbsp;<RLT> Sekunden}                                             },
+  ainuse   => { EN => qq{AI Perl module is installed, but the AI support is not used.\nRun 'set <NAME> plantConfiguration check' for hints.},
+                DE => qq{KI Perl Modul ist installiert, aber die KI Unterst&uuml;tzung wird nicht verwendet.\nPr&uuml;fen sie 'set <NAME> plantConfiguration check' f&uuml;r Hinweise.} },
 );
 
 my %weather_ids = (
@@ -1282,7 +1282,7 @@ sub Set {
   
   ## KI spezifische Setter
   ##########################  
-  if (isDWDUsed ($hash)) {
+  if (isPrepared4AI ($hash)) {
       $setlist .= "aiDecTree:addInstances,addRawData,train ";
   }
 
@@ -2376,10 +2376,8 @@ sub Get {
                 
   ## KI spezifische Getter
   ##########################
-  my $airst = CurrentVal ($hash, 'aitrawstate', '');
-  
-  if ($airst eq 'ok') {
-      $getlist .= "valDecTree:aiRawData,aiRuleStrings ";
+  if (isPrepared4AI ($hash)) {
+       $getlist .= "valDecTree:aiRawData,aiRuleStrings ";
   }
 
   return if(IsDisabled($name));
@@ -8685,9 +8683,10 @@ sub _graphicHeader {
       my $aitst    = CurrentVal   ($hash, 'aitrainstate', 'ok'); 
       my $aihit    = NexthoursVal ($hash, 'NextHour00', 'aihit', 0);      
       
-      my $aitit = $aidtabs          ? $hqtxt{aimstt}{$lang} :   
-                  $aicanuse ne 'ok' ? $hqtxt{ainuse}{$lang} :
+      my $aitit = $aidtabs          ? $htitles{aimstt}{$lang} :   
+                  $aicanuse ne 'ok' ? $htitles{ainuse}{$lang} :
                   q{};
+      $aitit   =~ s/<NAME>/$name/xs;
       
       my $aiimg  = $aidtabs          ? '--' :    
                    $aicanuse ne 'ok' ? '-'  :
@@ -10805,7 +10804,7 @@ sub aiInit {                   ## no critic "not used"
   $data{$type}{$name}{aidectree}{object}    = $dtree;
   $data{$type}{$name}{current}{aiinitstate} = 'ok';
   
-  Log3 ($name, 3, "$name - AI::DecisionTree new initialized");
+  Log3 ($name, 3, "$name - AI::DecisionTree initialized");
   
 return;
 }
@@ -10879,11 +10878,11 @@ sub aiAddRawData {                   ## no critic "not used"
   
   if ($dosave) {
       $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
-  }
-  
-  if (!$err) {
-      $data{$type}{$name}{current}{aitrawstate} = 'ok';
-      debugLog ($paref, 'aiProcess', qq{AI raw data saved into file: }.$airaw.$name);
+      
+      if (!$err) {
+          $data{$type}{$name}{current}{aitrawstate} = 'ok';
+          debugLog ($paref, 'aiProcess', qq{AI raw data saved into file: }.$airaw.$name);
+      }
   }
   
 return;
@@ -11534,10 +11533,13 @@ sub listDataPool {
   }
   
   if ($htol eq "aiRawData") {
-      $h = $data{$type}{$name}{aidectree}{airaw};
-      if (!keys %{$h}) {
+      $h         = $data{$type}{$name}{aidectree}{airaw};
+      my $maxcnt = keys %{$h};
+      if (!$maxcnt) {
           return qq{aiRawData values cache is empty.};
       }
+      
+      $sq = "<b>Number of datasets:</b> ".$maxcnt."\n";
       
       for my $idx (sort keys %{$h}) {
           my $hod   = AiRawdataVal ($hash, $idx, 'hod',   "-");
@@ -11546,7 +11548,7 @@ sub listDataPool {
           my $wrp   = AiRawdataVal ($hash, $idx, 'wrp',   "-");
           my $pvrl  = AiRawdataVal ($hash, $idx, 'pvrl',  "-");
           my $temp  = AiRawdataVal ($hash, $idx, 'temp',  "-");
-          $sq      .= "\n" if($sq);
+          $sq      .= "\n";
           $sq      .= "$idx => hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $wrp, pvrl: $pvrl, temp: $temp";
       }
   }
@@ -11767,8 +11769,9 @@ sub checkPlantConfig {
 
   ## Allgemeine Settings
   ########################
-  my $eocr    = AttrVal ($name, 'event-on-change-reading', '');
-  my $einstds = "";
+  my $eocr     = AttrVal    ($name, 'event-on-change-reading', '');
+  my $aicanuse = CurrentVal ($hash, 'aicanuse',                '');
+  my $einstds  = "";
 
   if (!$eocr || $eocr ne '.*') {
       $einstds                              = 'to .*' if($eocr ne '.*');
@@ -11784,6 +11787,13 @@ sub checkPlantConfig {
       $result->{'Common Settings'}{note}   .= qq{If the local attribute "ctrlLanguage" or the global attribute "language" is changed to "DE" most of the outputs are in German.<br>};
       $result->{'Common Settings'}{info}    = 1;
   }
+
+  if ($aicanuse ne 'ok') {
+      $result->{'Common Settings'}{state}   = $info;
+      $result->{'Common Settings'}{result} .= qq{The AI support is not usable. <br>};
+      $result->{'Common Settings'}{note}   .= qq{$aicanuse<br>};
+      $result->{'Common Settings'}{info}    = 1;
+  }  
     
   ## allg. Settings bei Nutzung Forecast.Solar API
   #################################################
@@ -12323,13 +12333,13 @@ sub isPrepared4AI {
   my $err;
 
   if(!isDWDUsed ($hash)) {
-      $err = qq(The selected SolarForecast model cannot use the AI support);
+      $err = qq(The selected SolarForecast model cannot use AI support);
   }
   elsif ($aidtabs) {
       $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "sudo apt-get install libai-decisiontree-perl" for AI support);
   }
   elsif ($acu !~ /ai/xs) {
-      $err = 'the selected autocorrect mode does not contain AI support';
+      $err = 'The setting of pvCorrectionFactor_Auto does not contain AI support';
   }  
   
   if ($err) {
