@@ -139,7 +139,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.82.4" => "16.09.2023  generate DWD API graphis header information and extend plant check for DWD API errors, minor fixes ",
+  "0.82.4" => "16.09.2023  generate DWD API graphics header information and extend plant check for DWD API errors, minor fixes ",
   "0.82.3" => "14.09.2023  more mouse over information in graphic header, ai support in autocorrection selectable ".
                            "substitute use of Test2::Suite ",
   "0.82.2" => "11.09.2023  activate implementation of DWD AI support, add runTimeTrainAI ",
@@ -5446,8 +5446,7 @@ sub ___readCandQ {
   my $cc    = $paref->{cloudcover};
 
   my $acu    = isAutoCorrUsed ($name);                                                                # Autokorrekturmodus
-  my $pvcorr = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh1), 1.00);                 # PV Korrekturfaktor (auto oder manuell)
-  my $hc     = $pvcorr;                                                                               # Voreinstellung RAW-Korrekturfaktor
+  my $hc     = ReadingsNum ($name, 'pvCorrectionFactor_'.sprintf("%02d",$fh1), 1.00);                 # Voreinstellung RAW-Korrekturfaktor
   my $hq     = '-';                                                                                   # keine Qualität definiert
 
   delete $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange};
@@ -10241,10 +10240,10 @@ sub _calcCaQcomplex {
           next;
       }
 
-      my $pvre = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
+      my $pvre = CircularVal ($hash, sprintf("%02d",$h), 'pvrl', 0);
       next if(!$pvre);
             
-      my $pvfc = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
+      my $pvfc = CircularVal ($hash, sprintf("%02d",$h), 'pvapifc', 0);
       next if(!$pvfc);
       
       $paref->{hour}                  = $h;
@@ -10326,11 +10325,11 @@ sub _calcCaQsimple {
           next;
       }
       
-      my $pvfc = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
-      next if(!$pvfc);
-
-      my $pvre = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
+      my $pvre = CircularVal ($hash, sprintf("%02d",$h), 'pvrl', 0);
       next if(!$pvre);
+            
+      my $pvfc = CircularVal ($hash, sprintf("%02d",$h), 'pvapifc', 0);
+      next if(!$pvfc);
 
       $paref->{hour}           = $h;
       my ($pvhis,$fchis,$dnum) = __Pv_Fc_Simple_Dnum_Hist ($paref);                                       # historischen Percentilfaktor / Qualität ermitteln
