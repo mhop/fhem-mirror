@@ -139,6 +139,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.82.4" => "16.09.2023  generate DWD API graphis header information and extend plant check for DWD API errors ",
   "0.82.3" => "14.09.2023  more mouse over information in graphic header, ai support in autocorrection selectable ".
                            "substitute use of Test2::Suite ",
   "0.82.2" => "11.09.2023  activate implementation of DWD AI support, add runTimeTrainAI ",
@@ -3251,10 +3252,12 @@ sub __getDWDSolarData {
   
   my $stime   = $date.' 00:00:00';                                                             # Startzeit Soll Übernahmedaten
   my $sts     = timestringToTimestamp ($stime);   
-  my @strings = sort keys %{$data{$type}{$name}{strings}}; 
+  my @strings = sort keys %{$data{$type}{$name}{strings}};
+  my $ret     = q{};  
 
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];                # letzte Abrufzeit
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;  
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests}   += 1;  
   
   debugLog ($paref, "apiCall", "DWD API - collect DWD Radiation data with start >$stime<- device: $raname =>");
   
@@ -3267,17 +3270,18 @@ sub __getDWDSolarData {
       
       my $stime = ReadingsVal ($raname, "fc${fd}_${runh}_time",      0);
       my $rad   = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", undef);
-      
-      if (!defined $rad) {
-          my $ret = "The reading >fc${fd}_${runh}_Rad1h< doesn't exist. Check the device $raname !";
-          debugLog ($paref, "apiCall", "DWD API - ERROR - got no data of starttime: $dateTime. The reading >fc${fd}_${runh}_Rad1h< doesn't exist. Check the device $raname !");
-          
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'reading fc${fd}_${runh}_Rad1h and/or device >$raname< problem';
-          
-          return $ret;
-      }
 
-      debugLog ($paref, "apiCall", "DWD API - got data -> starttime: $dateTime, reading: fc${fd}_${runh}_Rad1h, rad: $rad");
+      if (!defined $rad) {
+          $ret                                                              = "The reading 'fc${fd}_${runh}_Rad1h' doesn't exist. Check the device $raname!";         
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $ret;
+          
+          debugLog ($paref, "apiCall", "DWD API - ERROR - got no data of starttime: $dateTime. ".$ret);
+          
+          $rad = 0;
+      }
+      else {
+          debugLog ($paref, "apiCall", "DWD API - got data -> starttime: $dateTime, reading: fc${fd}_${runh}_Rad1h, rad: $rad");
+      }
       
       $data{$type}{$name}{solcastapi}{'?All'}{$dateTime}{Rad1h} = $rad;   
 
@@ -3294,10 +3298,9 @@ sub __getDWDSolarData {
           
           $data{$type}{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;
       }      
-      
   }
   
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'success';
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'success' if(!$ret);
 
 return;
 }
@@ -8566,16 +8569,17 @@ sub _graphicHeader {
       
       my $acicon = qq{<a title="$acitit">$aciimg</a>};
 
-      ## Solare API  Sektion
+      ## Solare API Sektion
       ########################
-      my $api = isSolCastUsed ($hash)       ? 'SolCast:'        :
+      my $api = isSolCastUsed       ($hash) ? 'SolCast:'        :
                 isForecastSolarUsed ($hash) ? 'Forecast.Solar:' :
-                isVictronKiUsed ($hash)     ? 'VictronVRM:'     :   
+                isVictronKiUsed     ($hash) ? 'VictronVRM:'     :
+                isDWDUsed           ($hash) ? 'DWD:'            :                 
                 q{};
                 
       my $nscc = ReadingsVal   ($name, 'nextSolCastCall', '?');
       my $lrt  = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time', '-');
-      my $scrm = SolCastAPIVal ($hash, '?All', '?All', 'response_message', '-');
+      my $scrm = SolCastAPIVal ($hash, '?All', '?All', 'response_message',   '-');
       
       if ($lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x) {
           my ($sly, $slmo, $sld, $slt) = $lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
@@ -8587,7 +8591,7 @@ sub _graphicHeader {
       }
 
       if ($api eq 'SolCast:') {
-          $api    .= '&nbsp;'.$lrt;
+          $api .= '&nbsp;'.$lrt;
 
           if ($scrm eq 'success') {
               $img = FW_makeImage ('10px-kreis-gruen.png', $htitles{scaresps}{$lang}.'&#10;'.$htitles{natc}{$lang}.' '.$nscc);
@@ -8617,7 +8621,7 @@ sub _graphicHeader {
           $api .= '</span>';
       }
       elsif ($api eq 'Forecast.Solar:') {
-          $api    .= '&nbsp;'.$lrt;
+          $api .= '&nbsp;'.$lrt;
 
           if ($scrm eq 'success') {
               $img = FW_makeImage('10px-kreis-gruen.png', $htitles{scaresps}{$lang}.'&#10;'.$htitles{natc}{$lang}.' '.$nscc);
@@ -8641,7 +8645,27 @@ sub _graphicHeader {
           $api .= '</span>';
       }
       elsif ($api eq 'VictronVRM:') {
-          $api    .= '&nbsp;'.$lrt;
+          $api .= '&nbsp;'.$lrt;
+
+          if ($scrm eq 'success') {
+              $img = FW_makeImage('10px-kreis-gruen.png', $htitles{scaresps}{$lang}.'&#10;'.$htitles{natc}{$lang}.' '.$nscc);
+          }
+          else {
+              $img = FW_makeImage('10px-kreis-rot.png', $htitles{scarespf}{$lang}.': '. $scrm);
+          }
+          
+          $scicon = "<a>$img</a>";
+
+          $api .= '&nbsp;&nbsp;'.$scicon;
+          $api .= '<span title="'.$htitles{dapic}{$lang}.'">';
+          $api .= '&nbsp;&nbsp;(';
+          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+          $api .= ')';
+          $api .= '</span>';
+      }
+      elsif ($api eq 'DWD:') {
+          $nscc = ReadingsVal ($name, 'nextCycletime', '?');
+          $api .= '&nbsp;'.$lrt;
 
           if ($scrm eq 'success') {
               $img = FW_makeImage('10px-kreis-gruen.png', $htitles{scaresps}{$lang}.'&#10;'.$htitles{natc}{$lang}.' '.$nscc);
@@ -11587,18 +11611,19 @@ sub checkPlantConfig {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  my $lang = AttrVal        ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang));
-  my $pcf  = ReadingsVal    ($name, 'pvCorrectionFactor_Auto', '');
-  my $acu  = isAutoCorrUsed ($name);
+  my $lang   = AttrVal        ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang));
+  my $pcf    = ReadingsVal    ($name, 'pvCorrectionFactor_Auto', '');
+  my $raname = ReadingsVal    ($name, 'currentRadiationDev',     '');
+  my $acu    = isAutoCorrUsed ($name);
   
-  my $cf   = 0;                                                                                     # config fault: 1 -> Konfig fehlerhaft, 0 -> Konfig ok
-  my $wn   = 0;                                                                                     # Warnung wenn 1
-  my $io   = 0;                                                                                     # Info wenn 1
+  my $cf     = 0;                                                                                     # config fault: 1 -> Konfig fehlerhaft, 0 -> Konfig ok
+  my $wn     = 0;                                                                                     # Warnung wenn 1
+  my $io     = 0;                                                                                     # Info wenn 1
   
-  my $ok   = FW_makeImage ('10px-kreis-gruen.png',     '');
-  my $nok  = FW_makeImage ('10px-kreis-rot.png',       '');
-  my $warn = FW_makeImage ('message_attention@orange', '');
-  my $info = FW_makeImage ('message_info',             '');
+  my $ok     = FW_makeImage ('10px-kreis-gruen.png',     '');
+  my $nok    = FW_makeImage ('10px-kreis-rot.png',       '');
+  my $warn   = FW_makeImage ('message_attention@orange', '');
+  my $info   = FW_makeImage ('message_info',             '');
 
   my $result = {                                                                                    # Ergebnishash
       'String Configuration'     => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
@@ -11692,8 +11717,6 @@ sub checkPlantConfig {
       $result->{'DWD Radiation Attributes'}{result} = '';
       $result->{'DWD Radiation Attributes'}{note}   = '';
       $result->{'DWD Radiation Attributes'}{fault}  = 0;
-
-      my $raname = ReadingsVal($name, 'currentRadiationDev', '');
 
       if (!$raname || !$defs{$raname}) {
           $result->{'DWD Radiation Attributes'}{state}   = $nok;
@@ -11882,6 +11905,8 @@ sub checkPlantConfig {
   ## allg. Settings bei Nutzung DWD API
   #######################################
   if (isDWDUsed ($hash)) {
+      my $lam = SolCastAPIVal ($hash, '?All', '?All', 'response_message', 'success');
+      
       if ($aidtabs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{The Perl module AI::DecisionTree is missing. <br>};
@@ -11893,6 +11918,15 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
           $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on*" if an automatic adjustment of the prescaler data should be done.<br>};
+      }
+      
+      if ($lam ne 'success') {
+          $result->{'API Access'}{state}        = $nok;
+          $result->{'API Access'}{result}      .= qq{DWD last message:<br>"$lam"<br>};
+          $result->{'API Access'}{note}        .= qq{Check the setup of the device "$raname". <br>};
+          $result->{'API Access'}{note}        .= qq{It is possible that not all readings are transmitted when "$raname" is newly set up. <br>};
+          $result->{'API Access'}{note}        .= qq{In this case, wait until tomorrow and check again.<br>};
+          $result->{'API Access'}{fault}        = 1;
       }
 
       if (!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
@@ -14188,7 +14222,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Eine zusätzliche Autokorrektur wird nicht empfohlen, d.h. die empfohlene Autokorrekturmethode ist <b>off</b>. <br><br>
       
       <b>Model DWD:</b> <br>
-      Die empfohlene Autokorrekturmethode ist <b>on_complex</b>. <br><br>
+      Die empfohlene Autokorrekturmethode ist <b>on_complex</b> bzw. <b>on_complex_ai</b>. <br><br>
     
       <b>Model ForecastSolarAPI:</b> <br>
       Die empfohlene Autokorrekturmethode ist <b>on_simple</b>.
