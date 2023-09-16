@@ -139,7 +139,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.82.4" => "16.09.2023  generate DWD API graphis header information and extend plant check for DWD API errors ",
+  "0.82.4" => "16.09.2023  generate DWD API graphis header information and extend plant check for DWD API errors, minor fixes ",
   "0.82.3" => "14.09.2023  more mouse over information in graphic header, ai support in autocorrection selectable ".
                            "substitute use of Test2::Suite ",
   "0.82.2" => "11.09.2023  activate implementation of DWD AI support, add runTimeTrainAI ",
@@ -8737,12 +8737,12 @@ sub _graphicHeader {
       my $ydaytxt  = $hqtxt{yday}{$lang}.':&nbsp;'."<b>".$ydayDvtn."</b>";
       
       my $text_tdayDvtn = $tdayDvtn =~ /^-[1-9]/? $hqtxt{pmtp}{$lang} :
-                          $tdayDvtn =~ /^0/     ? $hqtxt{petp}{$lang} :
+                          $tdayDvtn =~ /^-?0,/  ? $hqtxt{petp}{$lang} :
                           $tdayDvtn =~ /^[1-9]/ ? $hqtxt{pltp}{$lang} :
                           $hqtxt{wusond}{$lang};
 
       my $text_ydayDvtn = $ydayDvtn =~ /^-[1-9]/? $hqtxt{pmtp}{$lang} :
-                          $ydayDvtn =~ /^0/     ? $hqtxt{petp}{$lang} :
+                          $ydayDvtn =~ /^-?0,/  ? $hqtxt{petp}{$lang} :
                           $ydayDvtn =~ /^[1-9]/ ? $hqtxt{pltp}{$lang} :
                           $hqtxt{snbefb}{$lang};
 
