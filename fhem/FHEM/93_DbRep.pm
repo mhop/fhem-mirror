@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.52.11" => "17.09.2023  improve the markout in func DbRep_checkValidTimeSequence, Forum:#134973 ",
   "8.52.10" => "09.07.2023  fix wrong SQL syntax for PostgreSQL -> DbRep_createSelectSql, Forum:#134170 ",
   "8.52.9"  => "05.07.2023  fix wrong SQL syntax for PostgreSQL -> maxValue deleteOther, Forum:#134170 ",
   "8.52.8"  => "28.06.2023  fix check of DbRep_afterproc, DbRep_beforeproc if should exec PERL code ",
@@ -2390,7 +2391,7 @@ sub DbRep_Main {
  # Entkommentieren für Testroutine im Vordergrund
  # DbRep_testexit($hash);
 
- return if( ($hash->{HELPER}{RUNNING_BACKUP_CLIENT}   ||
+ return if (($hash->{HELPER}{RUNNING_BACKUP_CLIENT}   ||
              $hash->{HELPER}{RUNNING_BCKPREST_SERVER} ||
              $hash->{HELPER}{RUNNING_RESTORE}         ||
              $hash->{HELPER}{RUNNING_REPAIR}          ||
@@ -2411,23 +2412,23 @@ sub DbRep_Main {
          table   => "history"
      };
 
-     if($dbmodel =~ /MYSQL/) {
+     if ($dbmodel =~ /MYSQL/) {
          if ($prop eq "serverSide") {
              $hash->{HELPER}{RUNNING_BCKPREST_SERVER}           = BlockingCall("DbRep_mysql_DumpServerSide", $params, "DbRep_DumpDone", $to, "DbRep_DumpAborted", $hash);
              $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{loglevel} = 5 if(exists $hash->{HELPER}{RUNNING_BCKPREST_SERVER});
-             ReadingsSingleUpdateValue ($hash, "state", "serverSide Dump is running - be patient and see Logfile !", 1);
+             ReadingsSingleUpdateValue ($hash, 'state', 'serverSide Dump is running - be patient and see Logfile!', 1);
          }
          else {
              $hash->{HELPER}{RUNNING_BACKUP_CLIENT}           = BlockingCall("DbRep_mysql_DumpClientSide", $params, "DbRep_DumpDone", $to, "DbRep_DumpAborted", $hash);
              $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{loglevel} = 5 if(exists $hash->{HELPER}{RUNNING_BACKUP_CLIENT});
-             ReadingsSingleUpdateValue ($hash, "state", "clientSide Dump is running - be patient and see Logfile !", 1);
+             ReadingsSingleUpdateValue ($hash, 'state', 'clientSide Dump is running - be patient and see Logfile!', 1);
          }
      }
 
-     if($dbmodel =~ /SQLITE/) {
+     if ($dbmodel =~ /SQLITE/) {
          $hash->{HELPER}{RUNNING_BACKUP_CLIENT}           = BlockingCall("DbRep_sqlite_Dump", $params, "DbRep_DumpDone", $to, "DbRep_DumpAborted", $hash);
          $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{loglevel} = 5 if(exists $hash->{HELPER}{RUNNING_BACKUP_CLIENT});
-         ReadingsSingleUpdateValue ($hash, "state", "SQLite Dump is running - be patient and see Logfile !", 1);
+         ReadingsSingleUpdateValue ($hash, 'state', 'SQLite Dump is running - be patient and see Logfile!', 1);
      }
 
      return;
@@ -2443,19 +2444,19 @@ sub DbRep_Main {
          prop => $prop
      };
 
-     if($prop =~ /csv/) {
+     if ($prop =~ /csv/) {
          $hash->{HELPER}{RUNNING_RESTORE} = BlockingCall("DbRep_mysql_RestoreServerSide", $params, "DbRep_restoreDone", $to, "DbRep_restoreAborted", $hash);
      }
      elsif ($prop =~ /sql/) {
          $hash->{HELPER}{RUNNING_RESTORE} = BlockingCall("DbRep_mysql_RestoreClientSide", $params, "DbRep_restoreDone", $to, "DbRep_restoreAborted", $hash);
      }
      else {
-         ReadingsSingleUpdateValue ($hash, "state", "restore database error - unknown fileextension \"$prop\"", 1);
+         ReadingsSingleUpdateValue ($hash, 'state', qq{restore database error - unknown fileextension "$prop"}, 1);
      }
 
      $hash->{HELPER}{RUNNING_RESTORE}{loglevel} = 5 if(exists $hash->{HELPER}{RUNNING_RESTORE});
 
-     ReadingsSingleUpdateValue ($hash, "state", "restore database is running - be patient and see Logfile !", 1);
+     ReadingsSingleUpdateValue ($hash, 'state', 'restore database is running - be patient and see Logfile!', 1);
 
      return;
  }
@@ -2473,7 +2474,7 @@ sub DbRep_Main {
      $hash->{HELPER}{RUNNING_RESTORE}           = BlockingCall("DbRep_sqliteRestore", $params, "DbRep_restoreDone", $to, "DbRep_restoreAborted", $hash);
      $hash->{HELPER}{RUNNING_RESTORE}{loglevel} = 5 if(exists $hash->{HELPER}{RUNNING_RESTORE});
 
-     ReadingsSingleUpdateValue ($hash, "state", "database restore is running - be patient and see Logfile !", 1);
+     ReadingsSingleUpdateValue ($hash, 'state', 'database restore is running - be patient and see Logfile!', 1);
 
      return;
  }
@@ -2491,7 +2492,7 @@ sub DbRep_Main {
      $hash->{HELPER}{RUNNING_OPTIMIZE}           = BlockingCall("DbRep_optimizeTables", $params, "DbRep_OptimizeDone", $to, "DbRep_OptimizeAborted", $hash);
      $hash->{HELPER}{RUNNING_OPTIMIZE}{loglevel} = 5 if(exists $hash->{HELPER}{RUNNING_OPTIMIZE});
 
-     ReadingsSingleUpdateValue ($hash, "state", "optimize tables is running - be patient and see Logfile !", 1);
+     ReadingsSingleUpdateValue ($hash, 'state', 'optimize tables is running - be patient and see Logfile!', 1);
 
      return;
  }
@@ -2509,7 +2510,7 @@ sub DbRep_Main {
      $hash->{HELPER}{RUNNING_REPAIR}           = BlockingCall("DbRep_sqliteRepair", $params, "DbRep_RepairDone", $to, "DbRep_RepairAborted", $hash);
      $hash->{HELPER}{RUNNING_REPAIR}{loglevel} = 5 if(exists $hash->{HELPER}{RUNNING_REPAIR});
 
-     ReadingsSingleUpdateValue ($hash, "state", "repair database is running - be patient and see Logfile !", 1);
+     ReadingsSingleUpdateValue ($hash, 'state', 'repair database is running - be patient and see Logfile!', 1);
 
      return;
  }
@@ -2531,7 +2532,7 @@ sub DbRep_Main {
      $hash->{HELPER}{RUNNING_INDEX}           = BlockingCall("DbRep_Index", $params, "DbRep_IndexDone", $to, "DbRep_IndexAborted", $hash);
      $hash->{HELPER}{RUNNING_INDEX}{loglevel} = 5 if(exists $hash->{HELPER}{RUNNING_INDEX});  # Forum #77057
 
-     ReadingsSingleUpdateValue ($hash, "state", "index operation in database is running - be patient and see Logfile !", 1);
+     ReadingsSingleUpdateValue ($hash, 'state', 'index operation in database is running - be patient and see Logfile!', 1);
 
      return;
  }
@@ -2545,7 +2546,7 @@ sub DbRep_Main {
 
  # initiale Datenermittlung wie minimal Timestamp, Datenbankstrukturen, ...
  ############################################################################
- if(!$hash->{HELPER}{MINTS} or !$hash->{HELPER}{DBREPCOL}{COLSET}) {
+ if (!$hash->{HELPER}{MINTS} or !$hash->{HELPER}{DBREPCOL}{COLSET}) {
      my $dbname                 = $hash->{DATABASE};
      $hash->{HELPER}{IDRETRIES} = 3 if($hash->{HELPER}{IDRETRIES} < 0);
 
@@ -2562,14 +2563,14 @@ sub DbRep_Main {
  ##  Funktionsaufrufe
  ######################
 
- ReadingsSingleUpdateValue ($hash, "state", "running", 1);
+ ReadingsSingleUpdateValue ($hash, 'state', 'running', 1);
 
  Log3 ($name, 4, "DbRep $name - -------- New selection --------- ");
  Log3 ($name, 4, "DbRep $name - Command: $opt $prop");
 
  my ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next);
 
- if($dbrep_hmainf{$opt} && exists &{$dbrep_hmainf{$opt}{fn}}) {
+ if ($dbrep_hmainf{$opt} && exists &{$dbrep_hmainf{$opt}{fn}}) {
      $params = {
          hash    => $hash,
          name    => $name,
@@ -2580,11 +2581,11 @@ sub DbRep_Main {
          reading => $reading
      };
 
-     if($dbrep_hmainf{$opt}{timeset}) {                                                              # zentrales Timestamp-Array und Zeitgrenzen bereitstellen
-         my ($IsTimeSet, $IsAggrSet, $aggregation) = DbRep_checktimeaggr($hash);
+     if ($dbrep_hmainf{$opt}{timeset}) {                                                              # zentrales Timestamp-Array und Zeitgrenzen bereitstellen
+         my ($IsTimeSet, $IsAggrSet, $aggregation) = DbRep_checktimeaggr ($hash);
          my $ts                                    = "no_aggregation";                               # Dummy für eine Select-Schleife wenn != $IsTimeSet || $IsAggrSet
 
-         if($IsTimeSet || $IsAggrSet) {
+         if ($IsTimeSet || $IsAggrSet) {
              ($epoch_seconds_begin, $epoch_seconds_end, $runtime_string_first, $runtime_string_next, $ts) = DbRep_createTimeArray($hash, $aggregation, $opt);
          }
          else {
@@ -2599,7 +2600,7 @@ sub DbRep_Main {
          $params->{rsn} = $runtime_string_next;
      }
 
-     if(exists $dbrep_hmainf{$opt}{renmode}) {
+     if (exists $dbrep_hmainf{$opt}{renmode}) {
          $params->{renmode} = $dbrep_hmainf{$opt}{renmode};
      }
 
@@ -2607,7 +2608,7 @@ sub DbRep_Main {
          DbRep_checkValidTimeSequence ($hash, $runtime_string_first, $runtime_string_next) or return;
 
          if ($opt =~ /reduceLog/xi) {
-            ReadingsSingleUpdateValue ($hash, "state", "reduceLog database is running - be patient and see Logfile !", 1);
+            ReadingsSingleUpdateValue ($hash, 'state', 'reduceLog database is running - be patient and see Logfile!', 1);
          }
      }
 
@@ -2625,7 +2626,7 @@ sub DbRep_Main {
 
      delete $hash->{HELPER}{DELENTRIES};
 
-     if(exists $hash->{HELPER}{$dbrep_hmainf{$opt}{pk}}) {
+     if (exists $hash->{HELPER}{$dbrep_hmainf{$opt}{pk}}) {
          $hash->{HELPER}{$dbrep_hmainf{$opt}{pk}}{loglevel} = 5;                                             # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
          Log3 ($name, 5, qq{DbRep $name - BlockingCall with PID "$hash->{HELPER}{$dbrep_hmainf{$opt}{pk}}{pid}" started});
      }
@@ -13997,8 +13998,8 @@ sub DbRep_checkUsePK {
   $upkh   = 1 if(@pkh && @pkh ne "none");
   $upkc   = 1 if(@pkc && @pkc ne "none");
 
-  Log3 $hash->{NAME}, 5, "DbRep $name -> Primary Key used in $db.history: $upkh ($pkh)";
-  Log3 $hash->{NAME}, 5, "DbRep $name -> Primary Key used in $db.current: $upkc ($pkc)";
+  Log3 ($name, 5, "DbRep $name -> Primary Key used in $db.history: $upkh ($pkh)");
+  Log3 ($name, 5, "DbRep $name -> Primary Key used in $db.current: $upkc ($pkc)");
 
 return ($upkh,$upkc,$pkh,$pkc);
 }
@@ -14015,14 +14016,23 @@ sub DbRep_checkValidTimeSequence {
   my $valid = 1;
 
   return $valid if(!$runtime_string_first || !$runtime_string_next);
+  
+  my $mint = $hash->{HELPER}{MINTS} // '1970-01-01 01:00:00';              # Time des 1. Datensatzes in der DB
 
   my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = $runtime_string_first =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x;
   my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = $runtime_string_next  =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x;
+  my ($yyyy3, $mm3, $dd3, $hh3, $min3, $sec3) = $mint                 =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x;
+  
   my $nthants = fhemTimeLocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
   my $othants = fhemTimeLocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
+  my $mints   = fhemTimeLocal($sec3, $min3, $hh3, $dd3, $mm3-1, $yyyy3-1900);
 
-  if($nthants > $othants) {
-      ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
+  if ($mints > $othants) {
+      ReadingsSingleUpdateValue ($hash, 'state', 'No data found in specified time range', 1);
+      $valid = 0;
+  }
+  elsif ($nthants > $othants) {
+      ReadingsSingleUpdateValue ($hash, 'state', "ERROR - Wrong time limits. The 'nn' (days newer than) option must be greater than the 'no' (older than) one!", 1);
       $valid = 0;
   }
 
