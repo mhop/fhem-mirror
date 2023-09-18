@@ -101,11 +101,11 @@ my %models = (
 sub SD_BELL_Initialize {
   my ($hash) = @_;
   $hash->{Match}      = '^P(?:15|32|41|42|57|79|96|98|112)#.*';
-  $hash->{DefFn}      = 'SD_BELL::Define';
-  $hash->{UndefFn}    = 'SD_BELL::Undef';
-  $hash->{ParseFn}    = 'SD_BELL::Parse';
-  $hash->{SetFn}      = 'SD_BELL::Set';
-  $hash->{AttrFn}     = 'SD_BELL::Attr';
+  $hash->{DefFn}      = \&SD_BELL::Define;
+  $hash->{UndefFn}    = \&SD_BELL::Undef;
+  $hash->{ParseFn}    = \&SD_BELL::Parse;
+  $hash->{SetFn}      = \&SD_BELL::Set;
+  $hash->{AttrFn}     = \&SD_BELL::Attr;
   $hash->{AttrList}   = 'repeats:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,20,25,30 IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 model:'.join(',', sort keys %models) . " $main::readingFnAttributes";
   $hash->{AutoCreate} = {'SD_BELL.*' => {FILTER => '%NAME', autocreateThreshold => '4:180', GPLOT => ''}};
 
@@ -622,6 +622,12 @@ sub Attr {
     "bugtracker": {
       "web": "https://github.com/RFD-FHEM/RFFHEM/issues"
     },
+    "x_testData": [
+      {
+        "url": "https://raw.githubusercontent.com/RFD-FHEM/RFFHEM/master/t/FHEM/14_SD_BELL/testData.json",
+        "testname": "Testdata with SD_BELL sensors"
+      }
+    ],
     "repository": {
       "x_master": {
         "type": "git",
