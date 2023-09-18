@@ -403,6 +403,20 @@
 #     TC6861_3DC_1 ON    MU;P0=4372;P1=-689;P2=254;P3=575;P4=-368;D=0121213434212134343434213434342121213434343434342;CP=2;R=59;
 #}
 ###############################################################################################################################################################################
+# - Remote control with 14 buttons RCnoName127 for ceiling fan [Protocol 127]
+#{    elektron-bbs 2023-07-08
+#     RCnoName127_3603A fan_off       MU;P0=5271;P1=-379;P2=1096;P3=368;P4=-1108;P5=-5997;D=01213434213434212121212121213434342134212121343421343434212521213434213434212121212121213434342134212121343421343434212521213434213434212121212121213434342134212121343421343434212521213434213434212121212121213434342134212121343421343434212;CP=3;R=63;
+#     RCnoName127_3603A fan_1         MS;P1=-385;P2=1098;P3=372;P4=-1108;P5=-6710;D=352121343421343421212121212121343434213421212121213421343434;CP=3;SP=5;R=79;m2;
+#     RCnoName127_3603A light_on_off  MS;P1=-372;P2=1098;P3=376;P4=-1096;P5=-6712;D=352121343421343421212121212121343434213421342134212134213421;CP=3;SP=5;R=73;m2;
+#}
+###############################################################################################################################################################################
+# - Remote control with 12 buttons RCnoName128 for ceiling fan [Protocol 128]
+#{    elektron-bbs 2023-07-19
+#     RCnoName128_8A7F fan_slower      MU;P0=-420;P1=1207;P2=-1199;P3=424;P4=-10154;D=010101230123010123232323232323232323230123010143230101012301230101232323232323232323232301230101432301010123012301012323232323232323232323012301014323010101230123010123232323232323232323230123010143230101012301230101232323232323232323232301230101;CP=3;R=18;
+#     RCnoName128_8A7F fan_on_off      MS;P2=-424;P3=432;P4=1201;P5=-1197;P6=-10133;D=36353242424532453242453535353535353535353532453535;CP=3;SP=6;R=36;m1;
+#     RCnoName128_8A7F fan_direction   MS;P0=-10144;P4=434;P5=-415;P6=1215;P7=-1181;D=40474565656745674565674747474747474747474745656567;CP=4;SP=0;R=37;m2;
+#}
+###############################################################################################################################################################################
 # !!! ToDo´s !!!
 #     - LED lights, counter battery-h reading --> commandref hour_counter module
 #     -
@@ -415,7 +429,7 @@ use warnings;
 use FHEM::Meta;
 no warnings 'portable';  # Support for 64-bit ints required
 
-our $VERSION = '2022-09-13';
+our $VERSION = '2023-07-19';
 
 sub SD_UT_bin2tristate;
 sub SD_UT_tristate2bin;
@@ -793,6 +807,40 @@ my %models = (
                        Protocol   => 'P20',
                        Typ        => 'remote'
                      },
+  'RCnoName127' => { '00110111' => 'fan_off',
+                     '00001011' => 'fan_1',
+                     '00011011' => 'fan_2',
+                     '00101011' => 'fan_3',
+                     '00111011' => 'fan_4',
+                     '01001010' => 'fan_5',
+                     '01011010' => 'fan_6',
+                     '01101010' => 'fan_direction',
+                     '01111010' => 'fan_natural',
+                     '10100101' => 'light_on_off',
+                     '10110101' => 'time_1h',
+                     '11100100' => 'time_2h',
+                     '11000100' => 'time_4h',
+                     '01010110' => 'time_8h',
+                     hex_length => [8],
+                     Protocol   => 'P127',
+                     Typ        => 'remote'
+                   },
+  'RCnoName128' => { '11110111' => 'fan_on_off',
+                     '11110100' => 'fan_slower',
+                     '11111010' => 'fan_faster',
+                     '11111110' => 'button_left',
+                     '11111100' => 'button_right',
+                     '11111000' => 'paddle_left',
+                     '11110110' => 'paddle_right',
+                     '11110001' => 'fan_direction',
+                     '11110010' => 'time_1h',
+                     '11110000' => 'time_2h',
+                     '11101111' => 'time_4h',
+                     '11101101' => 'time_8h',
+                     hex_length => [6],
+                     Protocol   => 'P128',
+                     Typ        => 'remote'
+                   },
   'DC_1961_TG' => { '10100111' => 'fan_off',
                     '10100001' => 'fan_1',
                     '10100010' => 'fan_2',
@@ -959,7 +1007,7 @@ my %models = (
 #############################
 sub SD_UT_Initialize {
   my ($hash) = @_;
-  $hash->{Match}      = '^P(?:14|20|24|26|29|30|34|46|56|68|69|76|78|81|83|86|90|91|91\.1|92|93|95|97|99|104|105|114|118|121)#.*';
+  $hash->{Match}      = '^P(?:14|20|24|26|29|30|34|46|56|68|69|76|78|81|83|86|90|91|91\.1|92|93|95|97|99|104|105|114|118|121|127|128)#.*';
   $hash->{DefFn}      = \&SD_UT_Define;
   $hash->{UndefFn}    = \&SD_UT_Undef;
   $hash->{ParseFn}    = \&SD_UT_Parse;
@@ -1023,26 +1071,26 @@ sub SD_UT_Define {
   }
 
   ### [2] checks CAME_TOP_432EV & Novy_840029 & Novy_840039 & Unitec_47031 ###
-  # uncoverable condition true 
+  # uncoverable branch true 
   return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){2}" if (($a[2] eq 'CAME_TOP_432EV' || $a[2] eq 'Novy_840029' || $a[2] eq 'Novy_840039' || $a[2] eq 'Unitec_47031') && not $a[3] =~ /^[0-9a-fA-F]{2}/xms);
   ### [3] checks SA_434_1_mini | QUIGG_DMV | TR_502MSV | BeSmart_S4 ###
-  # uncoverable condition true 
+  # uncoverable branch true 
   return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short or long (must be 3 chars) or not HEX (0-9 | a-f | A-F){3}" if (($a[2] eq 'SA_434_1_mini' || $a[2] eq 'QUIGG_DMV' || $a[2] eq 'TR_502MSV' || $a[2] eq 'BeSmart_S4') && not $a[3] =~ /^[0-9a-fA-F]{3}/xms);    
-  ### [4 nibble] checks Neff SF01_01319004 & BOSCH SF01_01319004_Typ2 & Chilitec_22640 & ESTO KL_RF01 & RCnoName20 & RCnoName20_10 & DC-1961-TG & xavax & BF_301 & Meikee_xx ###
-  # uncoverable condition true 
-  return "Wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 4 chars) or not hex (0-9 | a-f | A-F) {4}" if (($a[2] eq 'SF01_01319004' || $a[2] eq 'SF01_01319004_Typ2' || $a[2] eq 'Chilitec_22640' || $a[2] eq 'KL_RF01' || $a[2] eq 'RCnoName20' || $a[2] eq 'RCnoName20_10' || $a[2] eq 'DC_1961_TG' || $a[2] eq 'xavax' || $a[2] eq 'BF_301' || $a[2] eq 'Meikee_21' || $a[2] eq 'Meikee_24') && not $a[3] =~ /^[0-9a-fA-F]{4}/xms);
+  ### [4 nibble] checks Neff SF01_01319004 & BOSCH SF01_01319004_Typ2 & Chilitec_22640 & ESTO KL_RF01 & RCnoName20 & RCnoName20_10 & RCnoName128 & DC-1961-TG & xavax & BF_301 & Meikee_xx ###
+  # uncoverable branch true 
+  return "Wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 4 chars) or not hex (0-9 | a-f | A-F) {4}" if (($a[2] eq 'SF01_01319004' || $a[2] eq 'SF01_01319004_Typ2' || $a[2] eq 'Chilitec_22640' || $a[2] eq 'KL_RF01' || $a[2] eq 'RCnoName20' || $a[2] eq 'RCnoName20_10' || $a[2] eq 'RCnoName128'  || $a[2] eq 'DC_1961_TG' || $a[2] eq 'xavax' || $a[2] eq 'BF_301' || $a[2] eq 'Meikee_21' || $a[2] eq 'Meikee_24') && not $a[3] =~ /^[0-9a-fA-F]{4}/xms);
+  ### [5 nibble] checks RCnoName127
+  # uncoverable branch true 
+  return "Wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 5 chars) or not hex (0-9 | a-f | A-F) {5}" if ($a[2] eq 'RCnoName127' && not $a[3] =~ /^[0-9a-fA-F]{5}/xms);
   ### [6] checks Manax | mumbi ###
-  # uncoverable condition true 
+  # uncoverable branch true 
   return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){4}_[ABCD]|[all]" if ($a[2] eq 'RC_10' && not $a[3] =~ /^[0-9a-fA-F]{4}_([ABCD]|all)$/xms) ;
-  
   ### [6] checks MD_2003R | MD_210R | MD_2018R | Navaris | AC114_01B | Visivo ###
-  # uncoverable condition true 
+  # uncoverable branch true 
   return "wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 6 chars) or not hex (0-9 | a-f | A-F){6}" if (($a[2] eq 'MD_2003R' || $a[2] eq 'MD_210R' || $a[2] eq 'MD_2018R' || $a[2] eq 'Navaris' || $a[2] eq 'AC114_01B' || $a[2] eq 'Visivo') && not $a[3] =~ /^[0-9a-fA-F]{6}/xms);
-  
   ### [7] checks Hoermann HSM4 | Krinner_LUMIX | Momento ###
   # uncoverable branch true 
   return "wrong HEX-Value! ($a[3]) $a[2]  Hex-value to short or long (must be 7 chars) or not hex (0-9 | a-f | A-F){7}" if (($a[2] eq 'HSM4' || $a[2] eq 'Krinner_LUMIX' || $a[2] eq 'Momento') && not $a[3] =~ /^[0-9a-fA-F]{7}/xms);
-
   ### [7] checks Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx (tristate code)###
   # uncoverable branch true 
   return "wrong tristate code! ($a[3]) $a[2] code to short or long (must be 7 chars) or values not 0, 1 or F" if (($a[2] eq 'Tedsen_SKX1xx' || $a[2] eq 'Tedsen_SKX2xx' || $a[2] eq 'Tedsen_SKX4xx' || $a[2] eq 'Tedsen_SKX6xx') && not $a[3] =~ /^[01fF]{7}$/xms);
@@ -1055,11 +1103,9 @@ sub SD_UT_Define {
   ### [14] checks LED_XM21_0 ###
   # uncoverable branch true 
   return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){14}" if ($a[2] eq 'LED_XM21_0' && not $a[3] =~ /^[0-9a-fA-F]{14}/xms);
-
   ### [3] checks TR401 (Well-Light) ###
   # uncoverable branch true 
   return "wrong devicecode! ($a[3]) $a[2] must be [0-9]_[1-4]" if ($a[2] eq 'TR401' && not $a[3] =~ /^[0-9]_[1-4]/xms);
-
   ### [3] checks TC6861 (Busch-Transcontrol HF) [P121] ###
   # uncoverable branch true 
   return "SD_UT model $a[2] wrong devicecode: ($a[3]) - must be 3 digit house code (hex 0-9 A-F) _ 1 digit channel (dec 1-3) - e.g. 3DC_1" if ($a[2] eq 'TC6861' && not $a[3] =~ /^[0-9A-F]{3}_[1-3]$/xms);  
@@ -1234,11 +1280,6 @@ sub SD_UT_Set {
     } elsif ($model eq 'OR28V') {
       $msg = $models{$model}{Protocol} . '#';
       $msgEnd .= '#R' . $repeats; # R1 wird vom SIGNALduino nicht als MS erkannt!
-    ############ RCnoName20 | RCnoName20_10 | DC-1961-TG ############
-    } elsif ($model eq 'RCnoName20' || $model eq 'RCnoName20_10' || $model eq 'DC_1961_TG') {
-      my $adr = sprintf( "%016b", hex($definition[1])); # argument 1 - adress to binary with 16 bits
-      $msg = $models{$model}{Protocol} . '#' . $adr;
-      $msgEnd = '#R' . $repeats;
     ############ Momento ############
     } elsif ($model eq 'Momento') {
       my $adr = sprintf( "%028b", hex($definition[1])); # argument 1 - adress to binary with 28 bits
@@ -1291,9 +1332,14 @@ sub SD_UT_Set {
     } elsif ($model eq 'TC6861') {
       $msg = $models{$model}{Protocol} . q{#P};
       $msgEnd = '#R' . $repeats;
-    ############ Meikee ############
-    } elsif ($model eq 'Meikee_21' || $model eq 'Meikee_24') {
+    ############ Meikee_21 | Meikee_24 | RCnoName128 | RCnoName20 | RCnoName20_10 | DC-1961-TG ############
+    } elsif ($model eq 'Meikee_21' || $model eq 'Meikee_24' || $model eq 'RCnoName128' || $model eq 'RCnoName20' || $model eq 'RCnoName20_10' || $model eq 'DC_1961_TG') {
       my $adr = sprintf '%016b' , hex $definition[1]; # argument 1 - adress to binary with 16 bits
+      $msg = $models{$model}{Protocol} . q{#} . $adr;
+      $msgEnd = '#R' . $repeats;
+    ############ RCnoName127 ############
+    } elsif ($model eq 'RCnoName127') {
+      my $adr = sprintf '%020b' , hex $definition[1]; # argument 1 - adress to binary with 20 bits
       $msg = $models{$model}{Protocol} . q{#} . $adr;
       $msgEnd = '#R' . $repeats;
     }
@@ -1418,6 +1464,12 @@ sub SD_UT_Set {
           $xor ^= oct('0b' . substr($msg, $n, 4));
         }
         $msg .= sprintf('%04b', $xor); # check
+        $msg .= $msgEnd;
+      ############ RCnoName127 [P127] ############
+      } elsif ($model eq 'RCnoName127') {
+        $msg .= $save; # button
+        $msg .= substr($save,2,1) eq '0' ? '1' : '0'; # bit 22 inverted
+        $msg .= substr($save,3,1) eq '0' ? '1' : '0'; # bit 23 inverted
         $msg .= $msgEnd;
       } else {
         $msg .= $save.$msgEnd;
@@ -1664,6 +1716,12 @@ sub SD_UT_Parse {
         return '';
       }
     }
+    if (!$def && $protocol == 128) {
+      ### Remote control RCnoName128 [P128] ###
+      $deviceCode = substr($rawData,0,4);
+      $devicedef = 'RCnoName128 ' . $deviceCode;
+      $def = $modules{SD_UT}{defptr}{$devicedef};
+    }
   }
 
   if ($hlen == 6 || $hlen == 7) {
@@ -1703,6 +1761,12 @@ sub SD_UT_Parse {
       ### Remote control Krinner_LUMIX [P92] ###
       $deviceCode = substr($rawData,0,7);
       $devicedef = 'Krinner_LUMIX ' . $deviceCode;
+      $def = $modules{SD_UT}{defptr}{$devicedef};
+    }
+    if (!$def && $protocol == 127) {
+      ### Remote control RCnoName127 [P127] ###
+      $deviceCode = substr($rawData,0,5);
+      $devicedef = 'RCnoName127 ' . $deviceCode;
       $def = $modules{SD_UT}{defptr}{$devicedef};
     }
   }
@@ -2180,6 +2244,14 @@ sub SD_UT_Parse {
   } elsif (($model eq 'Meikee_21' || $model eq 'Meikee_24') && $protocol == 118) {
     $state = substr $bitData,16,8;
     $deviceCode = substr $rawData,0,4;
+  ############ RCnoName127 [P127] ############
+  } elsif ($model eq 'RCnoName127') {
+    $state = substr($bitData,20,8);
+    $deviceCode = substr($rawData,0,5);
+  ############ RCnoName128 [P128] ############
+  } elsif ($model eq 'RCnoName128') {
+    $state = substr($bitData,16,8);
+    $deviceCode = substr($rawData,0,4);
 
   ############ unknown ############
   } else {
@@ -2396,10 +2468,15 @@ sub SD_UT_Attr {
           $deviceCode = substr($bitData,0,16);
           $deviceCode = sprintf("%04X", oct( "0b$deviceCode" ) );
           $devicename = $devicemodel.'_'.$deviceCode;
-        ############ RCnoName20 ############
-        } elsif ($attrValue eq 'RCnoName20' || $attrValue eq 'RCnoName20_10' || $attrValue eq 'DC_1961_TG') {
+        ############ RCnoName20 or RCnoName20_10 or RCnoName128 or DC_1961_TG ############
+        } elsif ($attrValue eq 'RCnoName20' || $attrValue eq 'RCnoName20_10' || $attrValue eq 'RCnoName128' || $attrValue eq 'DC_1961_TG') {
           $deviceCode = substr($bitData,0,16);
           $deviceCode = sprintf("%04X", oct( "0b$deviceCode" ) );
+          $devicename = $devicemodel.'_'.$deviceCode;
+        ############ RCnoName127 ############
+        } elsif ($attrValue eq 'RCnoName127') {
+          $deviceCode = substr $bitData,0,20;
+          $deviceCode = sprintf("%05X", oct( "0b$deviceCode" ) );
           $devicename = $devicemodel.'_'.$deviceCode;
         ############ unknown ############
         } else {
@@ -2504,6 +2581,8 @@ sub SD_UT_tristate2bin {
     <li>ESTO ceiling lamp&nbsp;&nbsp;&nbsp;<small>(module model: KL_RF01, protocol 93)</small></li>
     <li>Remote control with 4 buttons for diesel heating&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName20, protocol 20)</small></li>
     <li>Remote control with 10 buttons for Leroy ceiling fan&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName20_10, protocol 20)</small></li>
+    <li>Remote control with 12 buttons for ceiling fan&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName128, protocol 128)</small></li>
+    <li>Remote control with 14 buttons for ceiling fan&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName127, protocol 127)</small></li>
     <li>Hoermann HS1-868-BS&nbsp;&nbsp;&nbsp;<small>(module model: HS1_868_BS, protocol 69)</small></li>
     <li>Hoermann HSM4&nbsp;&nbsp;&nbsp;<small>(module model: HSM4, protocol 69)</small></li>
     <li>Krinner LUMIX X-Mas light string&nbsp;&nbsp;&nbsp;<small>(module model: Krinner_LUMIX, protocol 92)</small></li>
@@ -2731,6 +2810,8 @@ sub SD_UT_tristate2bin {
     <li>ESTO Deckenlampe&nbsp;&nbsp;&nbsp;<small>(Modulmodel: KL_RF01, Protokoll 93)</small></li>
     <li>Fernbedienung mit 4 Tasten f&uuml;r Diesel-Heizung &nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName20, Protokoll 20)</small></li>
     <li>Fernbedienung mit 10 Tasten f&uuml;r Leroy Deckenventilator&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName20_10, Protokoll 20)</small></li>
+    <li>Fernbedienung mit 12 Tasten f&uuml;r Deckenventilator&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName128, Protokoll 128)</small></li>
+    <li>Fernbedienung mit 14 Tasten f&uuml;r Deckenventilator&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName127, Protokoll 127)</small></li>
     <li>Hoermann HS1-868-BS&nbsp;&nbsp;&nbsp;<small>(Modulmodel: HS1_868_BS, Protokoll 69)</small></li>
     <li>Hoermann HSM4&nbsp;&nbsp;&nbsp;<small>(Modulmodel: HSM4, Protokoll 69)</small></li>
     <li>Krinner LUMIX Christbaumkerzen&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Krinner_LUMIX, Protokol 92)</small></li>
