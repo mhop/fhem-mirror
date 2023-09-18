@@ -234,6 +234,7 @@ my %DEVID_MODEL = (
     "SHCB-1"   => "shellybulb",
     "SHBLB-1"  => "shellybulb",
     "SHBDUO-1" => "shellybulb",
+	"SHEM"     => "shellyem",
 	"SHEM-3"   => "shelly3em",
     "SHMOS-01" => "generic",
     "SHWT-1"   => "generic",
@@ -265,6 +266,7 @@ my %DEVID_PREFIX = (
     "SHIX3-1"  => "shelly_i3",
     "SHMOS-01" => "shelly_motion",
 	"SHTRV-01" => "shelly_trv",
+	"SHEM"     => "shelly_em",
 	"SHEM-3"   => "shelly_em3"
 );
 
@@ -325,8 +327,8 @@ sub ShellyMonitor_Initialize
   # Check which models are available in Mod_Shelly
   LoadModule "Shelly";
   my $fn = $modules{"Shelly"}{"AttrList"};
-  if($fn && $fn=~/ model:([^ ]+)( |$)/) {
-    map { $shelly_models_by_mod_shelly{$_} = 1 } split (/,/, $1);
+  if($fn && $fn=~/(^| )model:([^ ]+)( |$)/) {
+    map { $shelly_models_by_mod_shelly{$_} = 1 } split (/,/, $2);
     Log3 $hash->{NAME}, 2, "Shelly-Module loaded supports models: " . join(',', keys %shelly_models_by_mod_shelly);
   }
 }
@@ -1007,6 +1009,8 @@ sub ShellyMonitor_Set
       CommandAttr ( undef, $dname . ' model ' . $model);
     } elsif ($shelly_models_by_mod_shelly{"shellygeneric"}) {
       CommandAttr ( undef, $dname . ' model shellygeneric');
+    } elsif ($shelly_models_by_mod_shelly{"generic"}) {
+      CommandAttr ( undef, $dname . ' model generic');
     }
     return "Creation of device '$dname' failed" unless ($defs{$dname});
 
