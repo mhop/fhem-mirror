@@ -52,6 +52,7 @@ use FHEM::SynoModules::SMUtils qw(
                                  );                                                  # Hilfsroutinen Modul
 
 use Data::Dumper;
+use Blocking;
 use Storable qw(dclone freeze thaw nstore store retrieve); 
 use MIME::Base64;
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
@@ -67,6 +68,8 @@ BEGIN {
           AnalyzeCommandChain
           AttrVal
           AttrNum
+          BlockingCall
+          BlockingKill
           CommandAttr
           CommandGet
           CommandSet
@@ -139,6 +142,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.83.0" => "17.09.2023  add manageTrain for AI Training in parallel process ",
   "0.82.4" => "16.09.2023  generate DWD API graphics header information and extend plant check for DWD API errors, minor fixes ",
   "0.82.3" => "14.09.2023  more mouse over information in graphic header, ai support in autocorrection selectable ".
                            "substitute use of Test2::Suite ",
@@ -420,6 +424,9 @@ my $csmcache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVCsm_SolarForecast
 my $scpicache      = $attr{global}{modpath}."/FHEM/FhemUtils/ScApi_SolarForecast_"; # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
 my $aitrained      = $attr{global}{modpath}."/FHEM/FhemUtils/AItra_SolarForecast_"; # Filename-Fragment für AI Trainingsdaten (wird mit Devicename ergänzt)
 my $airaw          = $attr{global}{modpath}."/FHEM/FhemUtils/AIraw_SolarForecast_"; # Filename-Fragment für AI Input Daten = Raw Trainigsdaten
+
+my $aitrblto       = 7200;                                                          # KI Training BlockingCall Timeout
+my $aibcthhld      = 0.2;                                                           # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
 
 my $calcmaxd       = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
 my @dweattrmust    = qw(TTT Neff R101 ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
@@ -886,7 +893,6 @@ my %hcsr = (                                                                    
   todayRemainingAPIcalls      => { fnr => 1, fn => \&SolCastAPIVal, par => '',                  unit => '',     def => 'apimaxreq' },
   todayRemainingAPIrequests   => { fnr => 1, fn => \&SolCastAPIVal, par => '',                  unit => '',     def => 'apimaxreq' },
   runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
-  runTimeTrainAI              => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
   runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
   runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
   allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => 0           },
@@ -898,6 +904,7 @@ my %hcsr = (                                                                    
   todayGridConsumption        => { fnr => 3, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
   todayBatIn                  => { fnr => 3, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
   todayBatOut                 => { fnr => 3, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
+  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,   par => 99,                  unit => '',     def => '-'         },
 );
 
   for my $csr (1..$maxconsumer) {
@@ -1507,7 +1514,7 @@ sub _setVictronCredentials {                 ## no critic "not used"
           return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
       }
       
-      my $serial = eval { freeze ($h)
+      my $serial = eval { freeze ($h) 
                         }
                         or do { return "Serialization ERROR: $@" };
 
@@ -2314,7 +2321,7 @@ sub _setaiDecTree {                   ## no critic "not used"
   my $prop  = $paref->{prop} // return;
 
   if($prop eq 'addInstances') {
-      aiAddInstance ($paref);  
+      aiAddInstance ($paref);    
   }
   
   if($prop eq 'addRawData') {
@@ -2322,7 +2329,7 @@ sub _setaiDecTree {                   ## no critic "not used"
   }
 
   if($prop eq 'train') {
-      aiTrain ($paref);
+      manageTrain ($paref);
   }
   
 return;
@@ -3761,7 +3768,8 @@ sub _getlistPVHistory {
   my $hash  = $paref->{hash};
   my $arg   = $paref->{arg};
 
-  my $ret   = listDataPool ($hash, 'pvhist', $arg);
+  my $ret = listDataPool   ($hash, 'pvhist', $arg);
+  $ret   .= lineFromSpaces ($ret, 20);
 
 return $ret;
 }
@@ -3773,7 +3781,8 @@ sub _getlistPVCircular {
   my $paref = shift;
   my $hash  = $paref->{hash};
 
-  my $ret   = listDataPool ($hash, 'circular');
+  my $ret = listDataPool   ($hash, 'circular');
+  $ret   .= lineFromSpaces ($ret, 15);
 
 return $ret;
 }
@@ -3785,7 +3794,8 @@ sub _getlistNextHours {
   my $paref = shift;
   my $hash  = $paref->{hash};
 
-  my $ret   = listDataPool ($hash, 'nexthours');
+  my $ret = listDataPool   ($hash, 'nexthours');
+  $ret   .= lineFromSpaces ($ret, 10);
 
 return $ret;
 }
@@ -3814,7 +3824,8 @@ sub _getlistCurrent {
   my $paref = shift;
   my $hash  = $paref->{hash};
 
-  my $ret   = listDataPool ($hash, 'current');
+  my $ret = listDataPool   ($hash, 'current');
+  $ret   .= lineFromSpaces ($ret, 5);
 
 return $ret;
 }
@@ -3827,7 +3838,8 @@ sub _getlistvalConsumerMaster {
   my $hash  = $paref->{hash};
   my $arg   = $paref->{arg};
 
-  my $ret   = listDataPool ($hash, 'consumer', $arg);
+  my $ret = listDataPool   ($hash, 'consumer', $arg);
+  $ret   .= lineFromSpaces ($ret, 10);
 
 return $ret;
 }
@@ -3839,7 +3851,8 @@ sub _getlistSolCastData {
   my $paref = shift;
   my $hash  = $paref->{hash};
 
-  my $ret   = listDataPool ($hash, 'solApiData');
+  my $ret = listDataPool   ($hash, 'solApiData');
+  $ret   .= lineFromSpaces ($ret, 10);
 
 return $ret;
 }
@@ -3856,12 +3869,14 @@ sub _getaiDecTree {                   ## no critic "not used"
   my $ret;
 
   if($arg eq 'aiRawData') {
-      $ret = listDataPool ($hash, 'aiRawData');  
+      $ret = listDataPool   ($hash, 'aiRawData');   
   }
   
   if($arg eq 'aiRuleStrings') {
       $ret = __getaiRuleStrings ($hash);  
   }
+  
+  $ret .= lineFromSpaces ($ret, 5);
 
 return $ret;
 }
@@ -3891,8 +3906,8 @@ sub __getaiRuleStrings {                 ## no critic "not used"
                    
   if (@rsl) {
       my $l = scalar @rsl;
-      $rs   = '<b>Number of rules: '.$l.'</b>';
-      $rs  .= '<br><br>';
+      $rs   = "<b>Number of rules: ".$l."</b>";
+      $rs  .= "\n\n";
       $rs  .= join "\n", @rsl;
   }
 
@@ -4246,7 +4261,7 @@ sub Notify {
                   Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - start centralTask by Notify device: $devName, reading: $reading, value: $value});
               }
               
-              centralTask ($myHash, 0);                                                  # keine Events in SolarForeCast außer 'state'
+              centralTask ($myHash, 0);                                                  # keine Events in SolarForecast außer 'state'
           }
       }
   }
@@ -7794,6 +7809,12 @@ sub genStatisticReadings {
               push @$daref, 'statistic_'.$kpi.'<>'. sprintf "%.0f", $smr;              
           }
           
+          if ($kpi eq 'runTimeTrainAI') {
+              my $rtaitr = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $kpi, $def); 
+              
+              push @$daref, 'statistic_'.$kpi.'<>'. $rtaitr;
+          }
+          
           if ($kpi eq 'todayGridFeedIn') {
               my $idfi = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdayfeedin', $def);         # initialer Tagesstartwert
               my $cfi  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'feedintotal',   $def);         # aktuelles total Feed In            
@@ -10399,7 +10420,7 @@ sub _addHourAiRawdata {
       $paref->{ood} = 1;
       $paref->{rho} = $rho;
       
-      aiAddRawData  ($paref);                                          # Raw Daten für AI hinzufügen und sichern
+      aiAddRawData ($paref);                                          # Raw Daten für AI hinzufügen und sichern
       
       delete $paref->{ood};
       delete $paref->{rho};     
@@ -10642,6 +10663,101 @@ sub __calcFcQuality {
 return $hdv;
 }
 
+###############################################################
+#    Eintritt in den KI Train Prozess normal/Blocking
+###############################################################
+sub manageTrain {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+
+  if (CircularVal ($hash, 99, 'runTimeTrainAI', 0) < $aibcthhld) {                                            
+      BlockingKill ($hash->{HELPER}{AIBLOCKRUNNING}) if(defined $hash->{HELPER}{AIBLOCKRUNNING});
+      debugLog     ($paref, 'aiProcess', qq{AI Training is started in main process});
+      aiTrain      ($paref);  
+  }
+  else {
+     delete $hash->{HELPER}{AIBLOCKRUNNING} if(defined $hash->{HELPER}{AIBLOCKRUNNING}{pid} && $hash->{HELPER}{AIBLOCKRUNNING}{pid} =~ /DEAD/xs);
+
+     if (defined $hash->{HELPER}{AIBLOCKRUNNING}{pid}) {
+         Log3 ($name, 3, qq{$name - another AI Training with PID "$hash->{HELPER}{AIBLOCKRUNNING}{pid}" is already running ... start Training aborted});
+         return;
+     }
+
+     $paref->{block} = 1;
+     
+     $hash->{HELPER}{AIBLOCKRUNNING} = BlockingCall ( "FHEM::SolarForecast::aiTrain",
+                                                      $paref,
+                                                      "FHEM::SolarForecast::finishTrain",
+                                                      $aitrblto,
+                                                      "FHEM::SolarForecast::abortTrain",
+                                                      $hash
+                                                    );
+
+
+     if (defined $hash->{HELPER}{AIBLOCKRUNNING}) {
+         $hash->{HELPER}{AIBLOCKRUNNING}{loglevel} = 3;                                                       # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
+
+         debugLog ($paref, 'aiProcess', qq{AI Training BlockingCall PID "$hash->{HELPER}{AIBLOCKRUNNING}{pid}" with Timeout "$aitrblto" started});
+     }
+  }
+
+return;
+}
+
+###############################################################
+#    Restaufgaben nach Update
+###############################################################
+sub finishTrain {
+  my $serial = decode_base64 (shift);
+
+  my $paref = eval { thaw ($serial) };                                             # Deserialisierung  
+  my $name  = $paref->{name};
+  my $hash  = $defs{$name};
+  my $type  = $hash->{TYPE};
+  
+  delete($hash->{HELPER}{AIBLOCKRUNNING}) if(defined $hash->{HELPER}{AIBLOCKRUNNING});
+  
+  my $aicanuse       = $paref->{aicanuse};
+  my $aiinitstate    = $paref->{aiinitstate};
+  my $aitrainstate   = $paref->{aitrainstate};
+  my $runTimeTrainAI = $paref->{runTimeTrainAI};
+  
+  $data{$type}{$name}{current}{aicanuse}            = $aicanuse       if(defined $aicanuse);
+  $data{$type}{$name}{current}{aiinitstate}         = $aiinitstate    if(defined $aiinitstate);
+  $data{$type}{$name}{circular}{99}{runTimeTrainAI} = $runTimeTrainAI if(defined $runTimeTrainAI);  # !! in Circular speichern um zu persistieren, setTimeTracking speichert zunächst in Current !!
+  
+  if ($aitrainstate eq 'ok') {
+      _readCacheFile ({ hash      => $hash,
+                        name      => $name,
+                        type      => $type,
+                        file      => $aitrained.$name,
+                        cachename => 'aitrained'
+                      }
+                     );
+  }
+
+return;
+}
+
+####################################################################################################
+#                    Abbruchroutine BlockingCall Timeout
+####################################################################################################
+sub abortTrain {
+  my $hash   = shift;
+  my $cause  = shift // "Timeout: process terminated";
+  my $name   = $hash->{NAME};
+  my $type   = $hash->{TYPE};
+
+  Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{AIBLOCKRUNNING}{fn} pid:$hash->{HELPER}{AIBLOCKRUNNING}{pid} aborted: $cause");
+  
+  delete($hash->{HELPER}{AIBLOCKRUNNING});
+  
+  $data{$type}{$name}{current}{aitrainstate} = 'Traing (Child) process timed out';
+
+return;
+}
+
 ################################################################
 #     KI Instanz(en) aus Raw Daten Hash
 #     $data{$type}{$name}{aidectree}{airaw} hinzufügen
@@ -10701,7 +10817,7 @@ sub aiAddInstance {                   ## no critic "not used"
   $data{$type}{$name}{current}{aiaddistate} = 'ok';
   
   if ($taa) {
-      aiTrain ($paref);
+      manageTrain ($paref);
   }
   
 return;
@@ -10715,8 +10831,15 @@ sub aiTrain {                   ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
+  my $block = $paref->{block} // 0;
   
-  return if(!isPrepared4AI ($hash));
+  my $serial;
+  
+  if (!isPrepared4AI ($hash)) {
+      my $err = CurrentVal ($hash, 'aicanuse', '');
+      $serial = encode_base64 (Serialize ( {name => $name, aicanuse => $err} ), "");
+      $block ? return ($serial) : return \&finishTrain ($serial);
+  }
   
   my $cst = [gettimeofday];                                           # Zyklus-Startzeit
   
@@ -10725,7 +10848,12 @@ sub aiTrain {                   ## no critic "not used"
   
   if (!$dtree) {
       $err = aiInit ($paref);
-      return if($err);
+      
+      if ($err) {      
+          $serial = encode_base64 (Serialize ( {name => $name, aiinitstate => $err} ), "");
+          $block ? return ($serial) : return \&finishTrain ($serial);
+      }
+      
       $dtree = AiDetreeVal ($hash, 'object', undef);
   }
   
@@ -10733,7 +10861,8 @@ sub aiTrain {                   ## no critic "not used"
        }
        or do { Log3 ($name, 1, "$name - aiTrain ERROR: $@");
                $data{$type}{$name}{current}{aitrainstate} = $@;
-               return;
+               $serial = encode_base64 (Serialize ( {name => $name, aitrainstate => $@} ), "");
+               $block ? return ($serial) : return \&finishTrain ($serial);
              };
   
   $data{$type}{$name}{aidectree}{aitrained} = $dtree;
@@ -10747,6 +10876,17 @@ sub aiTrain {                   ## no critic "not used"
   }
   
   setTimeTracking ($hash, $cst, 'runTimeTrainAI');                   # Zyklus-Laufzeit ermitteln
+  
+  $serial = encode_base64 (Serialize ( {name           => $name, 
+                                        aitrainstate   => CurrentVal ($hash, 'aitrainstate',   ''),
+                                        runTimeTrainAI => CurrentVal ($hash, 'runTimeTrainAI', '')
+                                       } 
+                                     )
+                                     , "");
+
+  delete $data{$type}{$name}{current}{runTimeTrainAI};                                    
+                                     
+  $block ? return ($serial) : return \&finishTrain ($serial);
   
 return;
 }
@@ -10834,28 +10974,14 @@ return;
 }
 
 ################################################################
-#  den Index für AI raw Daten erzeugen
-################################################################
-sub aiMakeIdxRaw {
-  my $t   = time;
-  my $day = shift // strftime "%d", localtime($t); 
-  my $hod = shift;
-
-  my $ridx = strftime "%Y%m", localtime($t);
-  $ridx   .= $day.$hod;
-
-return $ridx;
-}
-
-################################################################
-#    Daten in die Raw Datensammlung hinzufügen
+#    Daten der Raw Datensammlung hinzufügen
 ################################################################
 sub aiAddRawData {                   ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
-  my $ood   = $paref->{ood} // 0;     # only one (cuurent) day
+  my $ood   = $paref->{ood} // 0;     # only one (current) day
   my $rho   = $paref->{rho};          # only this hour of day
   
   delete $data{$type}{$name}{current}{aitrawstate};
@@ -10877,11 +11003,11 @@ sub aiAddRawData {                   ## no critic "not used"
           my $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
           next if(!$pvrl);
           
-          my $ridx = aiMakeIdxRaw ($pvd, $hod);
+          my $ridx = _aiMakeIdxRaw ($pvd, $hod);
           
-          my $temp  = HistoryVal ($hash, $pvd, $hod, 'temp', 20);
-          my $wcc   = HistoryVal ($hash, $pvd, $hod, 'wcc',   0);
-          my $wrp   = HistoryVal ($hash, $pvd, $hod, 'wrp',   0);
+          my $temp = HistoryVal ($hash, $pvd, $hod, 'temp', 20);
+          my $wcc  = HistoryVal ($hash, $pvd, $hod, 'wcc',   0);
+          my $wrp  = HistoryVal ($hash, $pvd, $hod, 'wrp',   0);
           
           my $tbin = temp2bin  ($temp);
           my $cbin = cloud2bin ($wcc);
@@ -10910,6 +11036,20 @@ sub aiAddRawData {                   ## no critic "not used"
   }
   
 return;
+}
+
+################################################################
+#  den Index für AI raw Daten erzeugen
+################################################################
+sub _aiMakeIdxRaw {
+  my $t   = time;
+  my $day = shift // strftime "%d", localtime($t); 
+  my $hod = shift;
+
+  my $ridx = strftime "%Y%m", localtime($t);
+  $ridx   .= $day.$hod;
+
+return $ridx;
 }
 
 ################################################################
@@ -11379,6 +11519,7 @@ sub listDataPool {
           my $bitot    = CircularVal ($hash, $idx, "batintot",         "-");
           my $idbotot  = CircularVal ($hash, $idx, "initdaybatouttot", "-");
           my $botot    = CircularVal ($hash, $idx, "batouttot",        "-");
+          my $rtaitr   = CircularVal ($hash, $idx, "runTimeTrainAI",   "-");
 
           no warnings 'numeric';
           
@@ -11439,7 +11580,8 @@ sub listDataPool {
               $sq .= "      feedintotal: $fitot, initdayfeedin: $idfi\n";
               $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon\n";
               $sq .= "      batintot: $bitot, initdaybatintot: $idbitot\n";
-              $sq .= "      batouttot: $botot, initdaybatouttot: $idbotot\n";
+              $sq .= "      batouttot: $botot, initdaybatouttot: $idbotot\n";   
+              $sq .= "      runTimeTrainAI: $rtaitr\n";
           }
       }
   }
@@ -13082,6 +13224,22 @@ sub assemble {
 return $dstr;
 }
 
+###############################################################
+#                   Daten Serialisieren
+###############################################################
+sub Serialize {
+  my $data = shift;
+  my $name = $data->{name};
+
+  my $serial = eval { freeze ($data)
+                    }
+                    or do { Log3 ($name, 2, "$name - Serialization ERROR: $@");
+                            return;
+                          };
+
+return $serial;
+}
+
 ################################################################
 #  Funktion um mit Storable eine Struktur in ein File  
 #  zu schreiben
@@ -13091,7 +13249,7 @@ sub fileStore {
   my $file = shift;
 
   my $err;
-  my $ret = eval { nstore ($obj, $file) };                            # !! nstore statt store benutzen, sonst Absturz nach reastore AI Daten !!
+  my $ret = eval { nstore ($obj, $file) };                            
   
   if (!$ret || $@) {
       $err = $@ ? $@ : 'I/O problems or other internal error';
@@ -13118,6 +13276,29 @@ sub fileRetrieve {
   }  
 
 return ($err, $obj);
+}
+
+###############################################################
+#  erzeugt eine Zeile Leerzeichen. Die Anzahl der 
+#  Leerzeichen ist etwas größer als die Zeichenzahl des 
+#  längsten Teilstrings (Trenner \n)
+###############################################################
+sub lineFromSpaces {                      
+  my $str = shift // return;
+  my $an  = shift // 5;
+        
+  my @sps = split "\n", $str;
+  my $mlen = 1;
+  
+  for my $s (@sps) {
+      my $len = length (trim $s);
+      $mlen   = $len if($len && $len > $mlen);
+  }
+  
+  my $ret = "\n";
+  $ret   .= "&nbsp;" x ($mlen + $an); 
+
+return $ret;
 }
 
 ################################################################
@@ -14499,33 +14680,34 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>aihit</b>            </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)                                                </td></tr>
+            <tr><td> <b>batin</b>            </td><td>Batterieladung (Wh)                                                                                                       </td></tr>
+            <tr><td> <b>batout</b>           </td><td>Batterieentladung (Wh)                                                                                                    </td></tr>
+            <tr><td> <b>batouttot</b>        </td><td>total aus der Batterie entnommene Energie (Wh)                                                                            </td></tr>
+            <tr><td> <b>batintot</b>         </td><td>total in die Batterie geladene Energie (Wh)                                                                               </td></tr> 
+            <tr><td> <b>confc</b>            </td><td>erwarteter Energieverbrauch (Wh)                                                                                          </td></tr>
+            <tr><td> <b>corr</b>             </td><td>Autokorrekturfaktoren für die Stunde des Tages, wobei "percentile" der einfache (simple) Korrekturfaktor ist.             </td></tr>
+            <tr><td> <b>feedintotal</b>      </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                                </td></tr>
+            <tr><td> <b>gcon</b>             </td><td>realer Leistungsbezug aus dem Stromnetz                                                                                   </td></tr>
+            <tr><td> <b>gfeedin</b>          </td><td>reale Leistungseinspeisung in das Stromnetz                                                                               </td></tr>
+            <tr><td> <b>gridcontotal</b>     </td><td>vom öffentlichen Netz total bezogene Energie (Wh)                                                                         </td></tr>
+            <tr><td> <b>initdayfeedin</b>    </td><td>initialer PV Einspeisewert zu Beginn des aktuellen Tages (Wh)                                                             </td></tr>
+            <tr><td> <b>initdaygcon</b>      </td><td>initialer Netzbezugswert zu Beginn des aktuellen Tages (Wh)                                                               </td></tr>
+            <tr><td> <b>initdaybatintot</b>  </td><td>initialer Wert der total in die Batterie geladenen Energie zu Beginn des aktuellen Tages (Wh)                             </td></tr>
+            <tr><td> <b>initdaybatouttot</b> </td><td>initialer Wert der total aus der Batterie entnommenen Energie zu Beginn des aktuellen Tages (Wh)                          </td></tr>
             <tr><td> <b>pvapifc</b>          </td><td>erwartete PV Erzeugung (Wh) der verwendeten API                                                                           </td></tr>
             <tr><td> <b>pvaifc</b>           </td><td>PV Vorhersage (Wh) der KI für die nächsten 24h ab aktueller Stunde des Tages                                              </td></tr>
             <tr><td> <b>pvfc</b>             </td><td>verwendete PV Prognose für die nächsten 24h ab aktueller Stunde des Tages                                                 </td></tr>            
-            <tr><td> <b>aihit</b>            </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)                                                </td></tr>
             <tr><td> <b>pvrl</b>             </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!)        </td></tr>
-            <tr><td> <b>confc</b>            </td><td>erwarteter Energieverbrauch (Wh)                                                                                          </td></tr>
-            <tr><td> <b>gcon</b>             </td><td>realer Leistungsbezug aus dem Stromnetz                                                                                   </td></tr>
-            <tr><td> <b>gfeedin</b>          </td><td>reale Leistungseinspeisung in das Stromnetz                                                                               </td></tr>
-            <tr><td> <b>batin</b>            </td><td>Batterieladung (Wh)                                                                                                       </td></tr>
-            <tr><td> <b>batout</b>           </td><td>Batterieentladung (Wh)                                                                                                    </td></tr>
+            <tr><td> <b>quality</b>          </td><td>Qualität der Autokorrekturfaktoren (0..1), wobei "percentile" die Qualität des einfachen (simple) Korrekturfaktors ist.   </td></tr>
+            <tr><td> <b>runTimeTrainAI</b>   </td><td>Laufzeit des letzten KI Trainings                                                                                         </td></tr>            
+            <tr><td> <b>tdayDvtn</b>         </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                             </td></tr>
+            <tr><td> <b>temp</b>             </td><td>Außentemperatur                                                                                                           </td></tr>
             <tr><td> <b>wcc</b>              </td><td>Grad der Wolkenüberdeckung                                                                                                </td></tr>
             <tr><td> <b>wrp</b>              </td><td>Grad der Regenwahrscheinlichkeit                                                                                          </td></tr>
-            <tr><td> <b>temp</b>             </td><td>Außentemperatur                                                                                                           </td></tr>
             <tr><td> <b>wid</b>              </td><td>ID des vorhergesagten Wetters                                                                                             </td></tr>
             <tr><td> <b>wtxt</b>             </td><td>Beschreibung des vorhergesagten Wetters                                                                                   </td></tr>
-            <tr><td> <b>corr</b>             </td><td>Autokorrekturfaktoren für die Stunde des Tages, wobei "percentile" der einfache (simple) Korrekturfaktor ist.             </td></tr>
-            <tr><td> <b>quality</b>          </td><td>Qualität der Autokorrekturfaktoren (0..1), wobei "percentile" die Qualität des einfachen (simple) Korrekturfaktors ist.   </td></tr>
-            <tr><td> <b>tdayDvtn</b>         </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                             </td></tr>
             <tr><td> <b>ydayDvtn</b>         </td><td>gestrige Abweichung PV Prognose/Erzeugung in %                                                                            </td></tr>
-            <tr><td> <b>feedintotal</b>      </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                                </td></tr>
-            <tr><td> <b>initdayfeedin</b>    </td><td>initialer PV Einspeisewert zu Beginn des aktuellen Tages (Wh)                                                             </td></tr>
-            <tr><td> <b>gridcontotal</b>     </td><td>vom öffentlichen Netz total bezogene Energie (Wh)                                                                         </td></tr>
-            <tr><td> <b>initdaygcon</b>      </td><td>initialer Netzbezugswert zu Beginn des aktuellen Tages (Wh)                                                               </td></tr>
-            <tr><td> <b>initdaybatintot</b>  </td><td>initialer Wert der total in die Batterie geladenen Energie zu Beginn des aktuellen Tages (Wh)                             </td></tr>
-            <tr><td> <b>batintot</b>         </td><td>total in die Batterie geladene Energie (Wh)                                                                               </td></tr> 
-            <tr><td> <b>initdaybatouttot</b> </td><td>initialer Wert der total aus der Batterie entnommenen Energie zu Beginn des aktuellen Tages (Wh)                          </td></tr>
-            <tr><td> <b>batouttot</b>        </td><td>total aus der Batterie entnommene Energie (Wh)                                                                            </td></tr>
          </table>
       </ul>
 
@@ -15399,6 +15581,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "POSIX": 0,
         "GPUtils": 0,
         "Encode": 0,
+        "Blocking": 0,
         "Color": 0,
         "utf8": 0,
         "HttpUtils": 0,
