@@ -142,7 +142,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.83.0" => "17.09.2023  add manageTrain for AI Training in parallel process ",
+  "0.83.0" => "19.09.2023  add manageTrain for AI Training in parallel process ",
   "0.82.4" => "16.09.2023  generate DWD API graphics header information and extend plant check for DWD API errors, minor fixes ",
   "0.82.3" => "14.09.2023  more mouse over information in graphic header, ai support in autocorrection selectable ".
                            "substitute use of Test2::Suite ",
@@ -1248,6 +1248,7 @@ sub Set {
   
   ## allg. gültige Setter
   #########################
+  my $ipai = isPrepared4AI ($hash);
   $setlist = "Unknown argument $opt, choose one of ".
              "consumerImmediatePlanning:$coms ".
              "currentWeatherDev:$fcd ".
@@ -1260,7 +1261,7 @@ sub Set {
              "modulePeakString ".
              "plantConfiguration:check,save,restore ".
              "powerTrigger:textField-long ".
-             "pvCorrectionFactor_Auto:on_simple,on_simple_ai,on_complex,on_complex_ai,off ".
+             "pvCorrectionFactor_Auto:on_simple".($ipai ? ',on_simple_ai,' : ',')."on_complex".($ipai ? ',on_complex_ai,' : ',')."off ".
              "reset:$resets ".
              "writeHistory:noArg ".
              $cf." "
@@ -1290,7 +1291,7 @@ sub Set {
   
   ## KI spezifische Setter
   ##########################  
-  if (isPrepared4AI ($hash)) {
+  if ($ipai) {
       $setlist .= "aiDecTree:addInstances,addRawData,train ";
   }
 
@@ -3782,7 +3783,7 @@ sub _getlistPVCircular {
   my $hash  = $paref->{hash};
 
   my $ret = listDataPool   ($hash, 'circular');
-  $ret   .= lineFromSpaces ($ret, 15);
+  $ret   .= lineFromSpaces ($ret, 20);
 
 return $ret;
 }
@@ -10998,10 +10999,10 @@ sub aiAddRawData {                   ## no critic "not used"
           next if(!$hod || $hod eq '99' || ($rho && $hod ne $rho));
           
           my $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
-          next if(!$rad1h);
+          next if(!$rad1h || $rad1h <= 0);
           
           my $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
-          next if(!$pvrl);
+          next if(!$pvrl || $pvrl <= 0);
           
           my $ridx = _aiMakeIdxRaw ($pvd, $hod);
           
