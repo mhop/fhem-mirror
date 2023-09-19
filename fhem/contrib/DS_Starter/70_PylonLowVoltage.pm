@@ -122,6 +122,8 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.1.6"  => "19.09.2023 rework of _callAnalogValue, support of more than 15 cells ",
+  "0.1.5"  => "19.09.2023 internal code change ",
   "0.1.4"  => "24.08.2023 Serialize and deserialize data for update entry, usage of BlockingCall in case of long timeout ",
   "0.1.3"  => "22.08.2023 improve responseCheck and others ",
   "0.1.2"  => "20.08.2023 commandref revised, analogValue -> use 'user defined items', refactoring according PBP ",
@@ -153,6 +155,20 @@ my %hrtnc = (                                                        # RTN Codes
   '91' => { desc => 'Communication error between Master and Slave Pack'                                  },
   '98' => { desc => 'insufficient response length <LEN> of minimum length <MLEN> received ... discarded' },
   '99' => { desc => 'invalid data received ... discarded'                                                },
+);
+
+my %fns1 = (                                                                  # Abrufklasse statische Werte: 
+  1 => { fn => \&_callSerialNumber     },                                     #   serialNumber
+  2 => { fn => \&_callManufacturerInfo },                                     #   manufacturerInfo
+  3 => { fn => \&_callProtocolVersion  },                                     #   protocolVersion
+  4 => { fn => \&_callSoftwareVersion  },                                     #   softwareVersion
+  5 => { fn => \&_callSystemParameters },                                     #   systemParameters
+);
+
+my %fns2 = (                                                                  # Abrufklasse dynamische Werte: 
+  1 => { fn => \&_callAlarmInfo           },                                  #   alarmInfo
+  2 => { fn => \&_callChargeManagmentInfo },                                  #   chargeManagmentInfo
+  3 => { fn => \&_callAnalogValue         },                                  #   analogValue
 );
 
 ##################################################################################################################################################################
@@ -463,7 +479,8 @@ sub manageUpdate {
 
   if ($timeout < 1.0) {
       BlockingKill ($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
-      startUpdate  (Serialize ( { name => $name, timeout => $timeout, readings => $readings} ));
+      Log3 ($name, 4, qq{$name - Cycle started in main process});
+      startUpdate  ( { name => $name, timeout => $timeout, readings => $readings} );
   }
   else {
      delete $hash->{HELPER}{BKRUNNING} if(defined $hash->{HELPER}{BKRUNNING} && $hash->{HELPER}{BKRUNNING}{pid} =~ /DEAD/xs);
@@ -477,7 +494,7 @@ sub manageUpdate {
      my $blto = sprintf "%.0f", ($timeout + 10);
 
      $hash->{HELPER}{BKRUNNING} = BlockingCall ( "FHEM::PylonLowVoltage::startUpdate",
-                                                 Serialize ( { block => 1, name => $name, timeout => $timeout, readings => $readings} ),
+                                                 { block => 1, name => $name, timeout => $timeout, readings => $readings},
                                                  "FHEM::PylonLowVoltage::finishUpdate",
                                                  $blto,                                                  # Blocking Timeout höher als INET-Timeout!
                                                  "FHEM::PylonLowVoltage::abortUpdate",
@@ -488,7 +505,7 @@ sub manageUpdate {
      if (defined $hash->{HELPER}{BKRUNNING}) {
          $hash->{HELPER}{BKRUNNING}{loglevel} = 3;                                                       # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
 
-         Log3 ($name, 4, qq{$name - BlockingCall PID "$hash->{HELPER}{BKRUNNING}{pid}" with Blocking Timeout "$blto" started});
+         Log3 ($name, 4, qq{$name - Cycle BlockingCall PID "$hash->{HELPER}{BKRUNNING}{pid}" with timeout "$blto" started});
      }
   }
 
@@ -499,9 +516,7 @@ return;
 #                  PylonLowVoltage startUpdate
 ###############################################################
 sub startUpdate {
-  my $serial   = shift;
-
-  my $paref    = eval { thaw ($serial) };                              # Deserialisierung
+  my $paref    = shift;
 
   my $name     = $paref->{name};
   my $timeout  = $paref->{timeout};
@@ -511,67 +526,33 @@ sub startUpdate {
   my $hash     = $defs{$name};
   my $success  = 0;
 
-  my ($socket);
+  my ($socket, $serial);
 
-  eval {                                                                                     ## no critic 'eval'
+  eval {                                                                                              ## no critic 'eval'
       local $SIG{ALRM} = sub { croak 'gatewaytimeout' };
-      ualarm ($timeout * 1000000);                                                           # ualarm in Mikrosekunden
+      ualarm ($timeout * 1000000);                                                                    # ualarm in Mikrosekunden
 
       $socket = _openSocket ($hash, $timeout, $readings);
+      
       if (!$socket) {
-          $block ?
-          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
-          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
+          $serial = encode_base64 (Serialize ( {name => $name, readings => $readings} ), "");
+          $block ? return ($serial) : return \&finishUpdate ($serial);
       }
 
-      if (ReadingsAge ($name, "serialNumber", 601) >= 60) {                                  # statische Werte abrufen
-          if (_callSerialNumber ($hash, $socket, $readings)) {                               # Abruf serialNumber
-              $block ?
-              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
-              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
-          }
-
-          if (_callManufacturerInfo ($hash, $socket, $readings)) {                           # Abruf manufacturerInfo
-              $block ?
-              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
-              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
-          }
-
-          if (_callProtocolVersion  ($hash, $socket, $readings)) {                           # Abruf protocolVersion
-              $block ?
-              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
-              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
-          }
-
-          if (_callSoftwareVersion  ($hash, $socket, $readings)) {                           # Abruf softwareVersion
-              $block ?
-              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
-              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
-          }
-
-          if (_callSystemParameters ($hash, $socket, $readings)) {                           # Abruf systemParameters
-              $block ?
-              return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
-              return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
+      if (ReadingsAge ($name, "serialNumber", 601) >= 60) {                                           # Abrufklasse statische Werte                     
+          for my $idx (sort keys %fns1) {
+              if (&{$fns1{$idx}{fn}} ($hash, $socket, $readings)) {                                                    
+                  $serial = encode_base64 (Serialize ( {name => $name, readings => $readings} ), "");
+                  $block ? return ($serial) : return \&finishUpdate ($serial);
+              }          
           }
       }
-
-      if (_callAlarmInfo ($hash, $socket, $readings)) {                                      # Abruf alarmInfo
-          $block ?
-          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
-          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
-      }
-
-      if (_callChargeManagmentInfo ($hash, $socket, $readings)) {                            # Abruf chargeManagmentInfo
-          $block ?
-          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
-          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
-      }
-
-      if (_callAnalogValue ($hash, $socket, $readings)) {                                    # Abruf analogValue
-          $block ?
-          return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
-          return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
+                   
+      for my $idx (sort keys %fns2) {                                                                 # Abrufklasse dynamische Werte    
+          if (&{$fns2{$idx}{fn}} ($hash, $socket, $readings)) {                                                    
+              $serial = encode_base64 (Serialize ( {name => $name, readings => $readings} ), "");
+              $block ? return ($serial) : return \&finishUpdate ($serial);
+          }          
       }
 
       $success = 1;
@@ -594,19 +575,20 @@ sub startUpdate {
                  }
                 );
 
-      $block ?
-      return                ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), "")) :
-      return \&finishUpdate ( encode_base64 (Serialize ( {name => $name, readings => $readings} ), ""));
+      $serial = encode_base64 (Serialize ( {name => $name, readings => $readings} ), "");
+      $block ? return ($serial) : return \&finishUpdate ($serial);
   }
 
   ualarm(0);
   _closeSocket ($hash);
+  
+  $serial = encode_base64 (Serialize ({name => $name, success  => $success, readings => $readings}), "");
 
   if ($block) {
-      return ( encode_base64 (Serialize ({name => $name, success  => $success, readings => $readings}), "") );
+      return ($serial);
   }
 
-return \&finishUpdate ( encode_base64 (Serialize ({name => $name, success  => $success, readings => $readings}), "") );
+return \&finishUpdate ($serial);
 }
 
 ###############################################################
@@ -646,10 +628,10 @@ sub abortUpdate {
   my $cause  = shift // "Timeout: process terminated";
   my $name   = $hash->{NAME};
 
-  delete($hash->{HELPER}{BKRUNNING});
-
   Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{BKRUNNING}{fn} pid:$hash->{HELPER}{BKRUNNING}{pid} aborted: $cause");
-
+  
+  delete($hash->{HELPER}{BKRUNNING});
+  
   deleteReadingspec    ($hash);
   readingsSingleUpdate ($hash, 'state', 'Update (Child) process timed out', 1);
 
@@ -1009,6 +991,7 @@ sub _callAnalogValue {
   my $hash     = shift;
   my $socket   = shift;
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
+  my $name     = $hash->{NAME};
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
@@ -1031,46 +1014,71 @@ sub _callAnalogValue {
 
   __resultLog ($hash, $res);
 
-  $readings->{packCellcount}        = hex (substr($res, 17,  2));
-  $readings->{cellVoltage_01}       = sprintf "%.3f", hex(substr($res,19,4)) / 1000;
-  $readings->{cellVoltage_02}       = sprintf "%.3f", hex(substr($res,23,4)) / 1000;
-  $readings->{cellVoltage_03}       = sprintf "%.3f", hex(substr($res,27,4)) / 1000;
-  $readings->{cellVoltage_04}       = sprintf "%.3f", hex(substr($res,31,4)) / 1000;
-  $readings->{cellVoltage_05}       = sprintf "%.3f", hex(substr($res,35,4)) / 1000;
-  $readings->{cellVoltage_06}       = sprintf "%.3f", hex(substr($res,39,4)) / 1000;
-  $readings->{cellVoltage_07}       = sprintf "%.3f", hex(substr($res,43,4)) / 1000;
-  $readings->{cellVoltage_08}       = sprintf "%.3f", hex(substr($res,47,4)) / 1000;
-  $readings->{cellVoltage_09}       = sprintf "%.3f", hex(substr($res,51,4)) / 1000;
-  $readings->{cellVoltage_10}       = sprintf "%.3f", hex(substr($res,55,4)) / 1000;
-  $readings->{cellVoltage_11}       = sprintf "%.3f", hex(substr($res,59,4)) / 1000;
-  $readings->{cellVoltage_12}       = sprintf "%.3f", hex(substr($res,63,4)) / 1000;
-  $readings->{cellVoltage_13}       = sprintf "%.3f", hex(substr($res,67,4)) / 1000;
-  $readings->{cellVoltage_14}       = sprintf "%.3f", hex(substr($res,71,4)) / 1000;
-  $readings->{cellVoltage_15}       = sprintf "%.3f", hex(substr($res,75,4)) / 1000;
-  # $readings->{numberOfTempPos}     =                 hex(substr($res,79,2));              # Anzahl der jetzt folgenden Teperaturpositionen -> 5
-  $readings->{bmsTemperature}       = (hex (substr($res, 81,  4)) - 2731) / 10;             # 1
-  $readings->{cellTemperature_0104} = (hex (substr($res, 85,  4)) - 2731) / 10;             # 2
-  $readings->{cellTemperature_0508} = (hex (substr($res, 89,  4)) - 2731) / 10;             # 3
-  $readings->{cellTemperature_0912} = (hex (substr($res, 93,  4)) - 2731) / 10;             # 4
-  $readings->{cellTemperature_1315} = (hex (substr($res, 97,  4)) - 2731) / 10;             # 5
-  my $current                       =  hex (substr($res, 101, 4));
-  $readings->{packVolt}             = sprintf "%.3f", hex (substr($res, 105, 4)) / 1000;
+  my $bpos = 17;                                                                                 # Startposition
+  my $pcc  = hex (substr($res, $bpos, 2));                                                       # Anzahl Zellen (15 od. 16)
+  $bpos   += 2;                                                                                  # Pos 19
+  
+  $readings->{packCellcount} = $pcc;
+  
+  for my $z (0..$pcc-1) {
+      my $fz                          = sprintf "%02d", ($z + 1);                                # formatierter Zähler
+      my $pos                         = $bpos + ($z * 4);                                        # Startposition      
+      $readings->{'cellVoltage_'.$fz} = sprintf "%.3f", hex(substr($res, $pos, 4)) / 1000;       # Pos 19 - 75 bei 15 Zellen
+  }   
+      
+  $bpos += $pcc * 4;                                                                             # Pos 79 bei 15 Zellen, Pos 83 bei 16 Zellen    
+                  
+  $readings->{numberTempPos}             = hex(substr($res, $bpos, 2));                          # Anzahl der jetzt folgenden Teperaturpositionen -> 5
+  $bpos  += 2; 
+  
+  $readings->{bmsTemperature}            = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 81 bei 15 Zellen
+  $bpos += 4;                                                                                 
+  
+  $readings->{cellTemperature_0104}      = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 85
+  $bpos += 4;
+  
+  $readings->{cellTemperature_0508}      = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 89
+  $bpos += 4;
+  
+  $readings->{cellTemperature_0912}      = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 93
+  $bpos += 4;
+  
+  $readings->{'cellTemperature_13'.$pcc} = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 97
+  $bpos += 4;
+  
+  my $current                            =  hex (substr($res, $bpos, 4));                        # Pos 101
+  $bpos += 4;
+  
+  $readings->{packVolt}                  = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 105
+  $bpos += 4;
 
-  if ($current & 0x8000) {
-      $current = $current - 0x10000;
-  }
-
-  $readings->{packCurrent} = sprintf "%.3f", $current / 10;
-  my $udi                  = hex substr($res, 113, 2);                                      # user defined item=Entscheidungskriterium -> 2: Batterien <= 65Ah, 4: Batterien > 65Ah
-  $readings->{packCycles}  = hex substr($res, 119, 4);
-
+  my $remcap1                            = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 109
+  $bpos += 4;
+  
+  my $udi                                = hex substr($res, 113, 2);                             # Pos 113, user defined item=Entscheidungskriterium -> 2: Batterien <= 65Ah, 4: Batterien > 65Ah
+  $bpos += 2;
+  
+  my $totcap1                            = sprintf "%.3f", hex (substr($res, 115, 4)) / 1000;    # Pos 115
+  $bpos += 4;
+  
+  $readings->{packCycles}                = hex substr($res, 119, 4);                             # Pos 119
+  $bpos += 4;
+  
+  my $remcap2                            = sprintf "%.3f", hex (substr($res, 123, 6)) / 1000;    # Pos 123
+  $bpos += 6;
+  
+  my $totcap2                            = sprintf "%.3f", hex (substr($res, 129, 6)) / 1000;    # Pos 129
+  $bpos += 6;
+  
+  # kalkulierte Werte generieren
+  ################################
   if ($udi == 2) {
-      $readings->{packCapacityRemain} = sprintf "%.3f", hex (substr($res, 109, 4)) / 1000;
-      $readings->{packCapacity}       = sprintf "%.3f", hex (substr($res, 115, 4)) / 1000;
+      $readings->{packCapacityRemain} = $remcap1;
+      $readings->{packCapacity}       = $totcap1;
   }
   elsif ($udi == 4) {
-      $readings->{packCapacityRemain} = sprintf "%.3f", hex (substr($res, 123, 6)) / 1000;
-      $readings->{packCapacity}       = sprintf "%.3f", hex (substr($res, 129, 6)) / 1000;
+      $readings->{packCapacityRemain} = $remcap2;
+      $readings->{packCapacity}       = $totcap2;
   }
   else {
       my $err = 'wrong value retrieve analogValue -> user defined items: '.$udi;
@@ -1082,6 +1090,12 @@ sub _callAnalogValue {
                 );
       return $err;
   }
+  
+  if ($current & 0x8000) {
+      $current = $current - 0x10000;
+  }
+  
+  $readings->{packCurrent} = sprintf "%.3f", $current / 10; 
 
 return;
 }
@@ -1110,8 +1124,7 @@ sub Serialize {
 
   my $serial = eval { freeze ($data)
                     }
-                    or do { my $err = $@;
-                            Log3 ($name, 2, "$name - Serialization ERROR: $err");
+                    or do { Log3 ($name, 2, "$name - Serialization ERROR: $@");
                             return;
                           };
 
@@ -1206,7 +1219,7 @@ sub responseCheck {
 
   my $rtnerr = $hrtnc{99}{desc};
 
-  if(!$res || $res !~ /^[~A-Z0-9]+\r$/xs) {
+  if(!$res || $res !~ /^[~A-Fa-f0-9]+\r$/xs || $res =~ tr/~// != 1) {                
       return $rtnerr;
   }
 
@@ -1344,6 +1357,7 @@ The module has been successfully used so far with Pylontech batteries of the fol
 
 <ul>
  <li> US2000 </li>
+ <li> US2000C </li>
  <li> US2000plus </li>
  <li> US3000 </li>
  <li> US3000C </li>
@@ -1508,6 +1522,7 @@ Das Modul wurde bisher erfolgreich mit Pylontech Batterien folgender Typen einge
 
 <ul>
  <li> US2000 </li>
+ <li> US2000C </li>
  <li> US2000plus </li>
  <li> US3000 </li>
  <li> US3000C </li>
