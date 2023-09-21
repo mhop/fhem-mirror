@@ -192,7 +192,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	},
 	'SWITCH' => {
 		F => 3, S => 'STATE', C => 'STATE', V => 'on:true,off:false', P => 2
-	},
+	},	
 	'SWITCH_PANIC' => {
 		F => 3, S => 'STATE', C => 'STATE', V => 'on:true,off:false', P => 2
 	},
@@ -314,7 +314,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'^([0-9]{1,2}\.)?ACTUAL_HUMIDITY$:+humidity'
 );
 
-######################################################################
+#######################################################################################
 # Set commands related to channel role
 #   Role => { Command-Definition, ... }
 # Command-Defintion:
@@ -325,11 +325,12 @@ $HMCCU_CONFIG_VERSION = '5.0';
 # Function:
 #   A Perl function name
 # Datapoint-Def:
-#   Paramset:Datapoints:[Parameter=]FixedValue
-#   Paramset:Datapoints:?Parameter
-#   Paramset:Datapoints:?Parameter=Default-Value
-#   Paramset:Datapoints:#Parameter[=FixedValue,[...]]
-#   Paramset:Datapoints:*Parameter=Default-Value
+#   No parameters:                   Paramset:Datapoints:[Parameter=]FixedValue[,...]
+#   Toggle command:                  Paramset:Datapoints
+#   One parameter:                   Paramset:Datapoints:?Parameter
+#   Optional parameter with default: Paramset:Datapoints:?Parameter=Default-Value
+#   List of values:                  Paramset:Datapoints:#Parameter[=FixedValue[,...]]
+#   Internal value (paramset "I"):   Paramset:Datapoints:*Parameter=Default-Value
 # Paramset:
 #   V=VALUES, M=MASTER (channel), D=MASTER (device), I=INTERNAL
 # Datapoints:
@@ -340,6 +341,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 #       parameter set description. Otherwise a list of values must
 #       be specified after '='.
 #   * = internal value $hash->{hmccu}{values}{parameterName}
+#       See also paramset "I"
 # FixedValue: Parameter values are detected in the following order:
 #   1. If command parameter name is identical with controldatapoint,
 #   option values are taken from controldatapoint definition {V}. The
@@ -351,7 +353,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 #   3. As a fallback command options and option values are identical.
 # If Default-Value is preceeded by + or -, value is added to or 
 # subtracted from current datapoint value
-######################################################################
+#######################################################################################
 
 %HMCCU_ROLECMDS = (
 	'ALARM_SWITCH_VIRTUAL_RECEIVER' => {

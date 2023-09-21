@@ -30,7 +30,7 @@ sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
 
-my $HMCCUCHN_VERSION = '5.0 222930908';
+my $HMCCUCHN_VERSION = '5.0 232641921';
 
 ######################################################################
 # Initialize module
@@ -51,7 +51,7 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = 'IODev ccucalculate '.
-		'ccuflags:multiple-strict,hideStdReadings,replaceStdReadings,noBoundsChecking,ackState,logCommand,noReadings,trace,simulate,showMasterReadings,showLinkReadings,showDeviceReadings,showServiceReadings '.
+		'ccuflags:multiple-strict,hideStdReadings,replaceStdReadings,noBoundsChecking,ackState,logCommand,noAutoSubstitute,noReadings,trace,simulate,showMasterReadings,showLinkReadings,showDeviceReadings,showServiceReadings '.
 		'ccureadingfilter:textField-long statedatapoint controldatapoint '.
 		'ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc '.
 		'ccureadingname:textField-long ccuSetOnChange ccuReadingPrefix '.
@@ -765,6 +765,7 @@ sub HMCCUCHN_Get ($@)
 		replaceStdReadings: Replace original readings like 'ACTUAL_TEMPERATURE' by standard readings like 'measured-temp' instead of adding standard readings<br/>
       	logCommand: Write get and set commands to FHEM log with verbose level 3.<br/>
 		noBoundsChecking: Datapoint values are not checked for min/max boundaries<br/>
+			noAutoSubstitute - Do not substitute reading values by names. This local flag affects only the current device. You can turn off all substitutes by setting this flag in I/O device.<br/>
       	noReadings: Do not update readings<br/>
 		simulate: Do not execute set datapoint commands. Use this flag together with 'trace'<br/>
       	showDeviceReadings: Show readings of device and channel 0.<br/>

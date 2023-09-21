@@ -8,7 +8,7 @@
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
-#  (c) 2022 by zap (zap01 <at> t-online <dot> de)
+#  (c) 2023 by zap (zap01 <at> t-online <dot> de)
 #
 ##############################################################################
 #
@@ -39,7 +39,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '5.0 222930908';
+my $HMCCURPCPROC_VERSION = '5.0 232641921';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -446,7 +446,7 @@ sub HMCCURPCPROC_InitDevice ($$)
 			$devHash->{hmccu}{rpc}{methods} =~ /(system\.multicall)/i)
 		{
 			$devHash->{hmccu}{rpc}{multicall} = $1;
-			HMCCU_Log ($devHash, 2, "CCU interface $ifname supports RPC multicalls");
+			HMCCU_Log ($devHash, 5, "CCU interface $ifname supports RPC multicalls");
 		}
 		else {
 			HMCCU_Log ($devHash, 2, "CCU interface $ifname doesn't support RPC multicalls");
@@ -461,6 +461,7 @@ sub HMCCURPCPROC_InitDevice ($$)
 	# Set some attributes
 	if ($init_done) {
 		$attr{$name}{stateFormat} = 'rpcstate/state';
+		$attr{$name}{room}        = 'Homematic';
 		$attr{$name}{verbose} = 2;
 	}
 	
@@ -1381,13 +1382,14 @@ sub HMCCURPCPROC_RegisterCallback ($$)
 		if ($force == 2 && !HMCCU_TCPConnect ($hash->{host}, $port));
 
 	my $cburl = HMCCU_GetRPCCallbackURL ($ioHash, $localaddr, $hash->{hmccu}{rpc}{cbport}, $clkey, $port);
-	my $clurl = HMCCU_BuildURL ($ioHash, $port);
+	my ($clurl, $auth) = HMCCU_BuildURL ($ioHash, $port);
 	my ($rpctype) = HMCCU_GetRPCServerInfo ($ioHash, $port, 'type');
 	return (0, "Can't get RPC parameters for ID $clkey")
 		if (!defined($cburl) || !defined($clurl) || !defined($rpctype));
 	
 	$hash->{hmccu}{rpc}{port}  = $port;
 	$hash->{hmccu}{rpc}{clurl} = $clurl;
+	$hash->{hmccu}{rpc}{auth}  = $auth;
 	$hash->{hmccu}{rpc}{cburl} = $cburl;
 
 	HMCCU_Log ($hash, 2, "Registering callback $cburl of type $rpctype with ID $clkey at $clurl");
@@ -1416,6 +1418,7 @@ sub HMCCURPCPROC_DeRegisterCallback ($$)
 	my $localaddr = $hash->{hmccu}{localaddr};
 	my $cburl = '';
 	my $clurl = '';
+	my $auth = '';
 	my $rpchash = \%{$hash->{hmccu}{rpc}};
 
 	return (0, "RPC server $clkey not in state registered or running")
@@ -1423,8 +1426,9 @@ sub HMCCURPCPROC_DeRegisterCallback ($$)
 
 	$cburl = $rpchash->{cburl} if (exists($rpchash->{cburl}));
 	$clurl = $rpchash->{clurl} if (exists($rpchash->{clurl}));
+	$auth  = $rpchash->{auth}  if (exists($rpchash->{auth}));
 	$cburl = HMCCU_GetRPCCallbackURL ($ioHash, $localaddr, $rpchash->{cbport}, $clkey, $port) if ($cburl eq '');
-	$clurl = HMCCU_BuildURL ($ioHash, $port) if ($clurl eq '');
+	($clurl, $auth) = HMCCU_BuildURL ($ioHash, $port) if ($clurl eq '');
 	return (0, "Can't get RPC parameters for ID $clkey") if ($cburl eq '' || $clurl eq '');
 
 	HMCCU_Log ($hash, 1, "Deregistering RPC server $cburl with ID $clkey at $clurl");
@@ -1440,6 +1444,7 @@ sub HMCCURPCPROC_DeRegisterCallback ($$)
 
 			$rpchash->{cburl}  = '';
 			$rpchash->{clurl}  = '';
+			$rpchash->{auth}   = '';
 			$rpchash->{cbport} = 0;
 		
 			return (1, 'working');
@@ -1926,20 +1931,24 @@ sub HMCCURPCPROC_Connect ($;$)
 
 	if (HMCCU_IsRPCType ($ioHash, $hash->{rpcport}, 'A')) {
 		# Build the request URL
-		my $clurl = HMCCU_BuildURL ($ioHash, $hash->{rpcport});
-		return HMCCU_Log ($hash, 2, "Can't get RPC client URL for port $hash->{rpcport}", 0) if (!defined($clurl));
+		my ($clurl, $auth) = HMCCU_BuildURL ($ioHash, $hash->{rpcport});
+		HMCCU_Log ($hash, 5, "Connecting to " . $clurl);
+		return HMCCU_Log ($hash, 1, "Can't get RPC client URL for port $hash->{rpcport}", 0) if (!defined($clurl));
 
 		my $header = HTTP::Headers->new ('Connection' => 'Keep-Alive');
+		$header->header('Authorization' => "Basic $auth") if ($auth) ne '';
 		$hash->{hmccu}{rpc}{connection} = RPC::XML::Client->new ($clurl,
 			useragent => [
-				ssl_opts => { verify_hostname => 0, SSL_verify_mode => 0 },
-				default_headers => $header
+				ssl_opts => { verify_hostname => 0, SSL_verify_mode => 0 }
 			]
 		);
+		$hash->{hmccu}{rpc}{connection}->useragent->default_headers($header);
+		$hash->{hmccu}{rpc}{clurl} = $clurl;
+		$hash->{hmccu}{rpc}{auth} = $auth;
 	}
 	elsif (HMCCU_IsRPCType ($ioHash, $hash->{rpcport}, 'B')) {
 		my ($serveraddr) = HMCCU_GetRPCServerInfo ($ioHash, $hash->{rpcport}, 'host');
-		return HMCCU_Log ($ioHash, 2, "Can't get server address for port $hash->{rpcport}", 0) if (!defined($serveraddr));
+		return HMCCU_Log ($ioHash, 1, "Can't get server address for port $hash->{rpcport}", 0) if (!defined($serveraddr));
 
 		$hash->{hmccu}{rpc}{connection} = IO::Socket::INET->new (
 			PeerHost => $serveraddr, PeerPort => $hash->{rpcport}, Proto => 'tcp', Timeout => 3
@@ -1950,7 +1959,7 @@ sub HMCCURPCPROC_Connect ($;$)
 		}
 	}
 
-	return HMCCU_Log ($hash, 2, "Can't connect to RPC interface", 0) if (!defined($hash->{hmccu}{rpc}{connection}));
+	return HMCCU_Log ($hash, 1, "Can't connect to RPC interface", 0) if (!defined($hash->{hmccu}{rpc}{connection}));
 
 	return 1;
 }
@@ -1972,6 +1981,8 @@ sub HMCCURPCPROC_Disconnect ($;$)
 	}
 
 	delete $hash->{hmccu}{rpc}{connection};
+	$hash->{hmccu}{rpc}{clurl} = '';
+	$hash->{hmccu}{rpc}{auth} = '';
 }
 
 ######################################################################
@@ -2171,12 +2182,13 @@ sub HMCCURPCPROC_SendXMLRequest ($@)
 	my $re = ':('.join('|', keys(%BINRPC_TYPE_MAPPING)).')';
 
 	# Build the request URL
-	my $clurl = HMCCU_BuildURL ($ioHash, $port);
-	if (!defined($clurl)) {
-		HMCCU_Log ($hash, 2, "Can't get RPC client URL for port $port");
-		return (undef, "Can't get RPC client URL for port $port");
-	}	
-	HMCCU_Log ($hash, 4, "Send ASCII XML RPC request $request to $clurl");
+	# my $clurl = HMCCU_BuildURL ($ioHash, $port);
+	# if (!defined($clurl)) {
+	# 	HMCCU_Log ($hash, 2, "Can't get RPC client URL for port $port");
+	# 	return (undef, "Can't get RPC client URL for port $port");
+	# }	
+#	HMCCU_Log ($hash, 1, stacktraceAsString(undef));
+#	HMCCU_Log ($hash, 1, "Send ASCII XML RPC request $request to " . $hash->{hmccu}{rpc}{clurl});
 
 #	my $rpcclient = RPC::XML::Client->new ($clurl, useragent => [
 #		ssl_opts => { verify_hostname => 0, SSL_verify_mode => 0 }
@@ -2185,6 +2197,7 @@ sub HMCCURPCPROC_SendXMLRequest ($@)
 	my @rpcParam = map { HMCCURPCPROC_XMLEncValue ($_) } @param;
 
 	# Submit RPC request
+#	HMCCU_Log($hash, 2, Dumper($hash->{hmccu}{rpc}{connection}));
 	my $resp = $hash->{hmccu}{rpc}{connection}->simple_request ($request, @rpcParam);
 	if (!defined($resp)) {
 		HMCCU_Log ($hash, 2, "RPC request $request failed: ".$RPC::XML::ERROR);
@@ -2216,6 +2229,8 @@ sub HMCCURPCPROC_SendBINRequest ($@)
 #		HMCCU_Log ($ioHash, 2, "Can't get server address for port $port");
 #		return (undef, "Can't get server address for port $port");
 #	}
+
+#	HMCCU_Log ($hash, 1, "Send BIN XML RPC request $request");
 
 	my $timeoutRead  = AttrVal ($name, 'rpcReadTimeout',  $HMCCURPCPROC_TIMEOUT_READ);
 	my $timeoutWrite = AttrVal ($name, 'rpcWriteTimeout',  $HMCCURPCPROC_TIMEOUT_WRITE);	
