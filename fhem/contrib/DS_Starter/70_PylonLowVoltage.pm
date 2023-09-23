@@ -122,6 +122,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.1.8"  => "23.09.2023 new Attr userBatterytype, change manufacturerInfo command hash to LENID=0 ",
   "0.1.7"  => "20.09.2023 extend possible number of bats from 6 to 8 ",
   "0.1.6"  => "19.09.2023 rework of _callAnalogValue, support of more than 15 cells ",
   "0.1.5"  => "19.09.2023 internal code change ",
@@ -141,6 +142,7 @@ my $invalid     = 'unknown';                                         # default v
 my $definterval = 30;                                                # default Abrufintervall der Batteriewerte
 my $defto       = 0.5;                                               # default connection Timeout zum RS485 Gateway
 my @blackl      = qw(state nextCycletime);                           # Ausnahmeliste deleteReadingspec
+my $age1def     = 60;                                                # default Zyklus Abrufklasse statische Werte (s)
 
 # Steuerhashes
 ###############
@@ -212,23 +214,24 @@ my %hrsnb = (                                                        # Codierung
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
 # CID1: Kommando spezifisch, hier 46H
 # CID2: Kommando spezifisch, hier 51H
-# LENGTH: LENID + LCHKSUM -> Pylon LFP V2.8 Doku
-# INFO: muß hier mit ADR übereinstimmen
-# CHKSUM: 32+30+30+32+34+36+35+31+45+30+30+32+30+32 = 02CDH -> modulo 65536 = 02CDH -> bitweise invert = 1111 1101 0011 0010 -> +1 = 1111 1101 0011 0011 -> FD33H
+# LENGTH: LENID + LCHKSUM -> Pylon LFP V3.3 Doku
+# LENID = 0 -> LENID = 0000B + 0000B + 0000B = 0000B -> modulo 16 -> 0000B -> bitweise invert = 1111 -> +1 = 0001 0000 -> LCHKSUM = 0000B -> LENGTH = 0000 0000 0000 0000 -> 0000H
+# wenn LENID = 0, dann ist INFO empty (Doku LFP V3.3 S.8)
+# CHKSUM: 32+30+30+33+34+36+35+31+30+30+30+30 = 0255H -> modulo 65536 = 0255H -> bitweise invert = 1111 1101 1010 1010 -> +1 = 1111 1101 1010 1011 -> FDABH
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH    INFO     CHKSUM
-#  ~    20    02      46    51     E0    02    02      FD   33
-# 7E  32 30  30 32  34 36 35 31  45 30 30 32  30 32  46 44 32 44
+#  ~    20    02      46    51     00    00   empty    FD   AC
+# 7E  32 30  30 33  34 36 35 31  30 30 30 30   - -   46 44 41 43
 #
 my %hrmfi = (                                                        # Codierung Abruf manufacturerInfo, mlen = Mindestlänge Antwortstring
-  1 => { cmd => "~20024651E00202FD33\x{0d}", mlen => 82 },
-  2 => { cmd => "~20034651E00203FD31\x{0d}", mlen => 82 },
-  3 => { cmd => "~20044651E00204FD2F\x{0d}", mlen => 82 },
-  4 => { cmd => "~20054651E00205FD2D\x{0d}", mlen => 82 },
-  5 => { cmd => "~20064651E00206FD2B\x{0d}", mlen => 82 },
-  6 => { cmd => "~20074651E00207FD29\x{0d}", mlen => 82 },
-  7 => { cmd => "~20084651E00208FD27\x{0d}", mlen => 82 },
-  8 => { cmd => "~20094651E00209FD25\x{0d}", mlen => 82 },
+  1 => { cmd => "~200246510000FDAC\x{0d}", mlen => 82 },
+  2 => { cmd => "~200346510000FDAB\x{0d}", mlen => 82 },
+  3 => { cmd => "~200446510000FDAA\x{0d}", mlen => 82 },
+  4 => { cmd => "~200546510000FDA9\x{0d}", mlen => 82 },
+  5 => { cmd => "~200646510000FDA8\x{0d}", mlen => 82 },
+  6 => { cmd => "~200746510000FDA7\x{0d}", mlen => 82 },
+  7 => { cmd => "~200846510000FDA6\x{0d}", mlen => 82 },
+  8 => { cmd => "~200946510000FDA5\x{0d}", mlen => 82 },
 );
 
 # request command für '1': ~20024651E00202FD33 + CR
@@ -326,6 +329,7 @@ sub Initialize {
   $hash->{AttrList}   = "disable:1,0 ".
                         "interval ".
                         "timeout ".
+                        "userBatterytype ".
                         $readingFnAttributes;
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
@@ -443,15 +447,20 @@ sub Attr {
       }
   }
 
-  if ($aName eq "interval") {
+  if ($aName eq 'interval') {
       if (!looks_like_number($aVal)) {
           return qq{The value for $aName is invalid, it must be numeric!};
       }
 
       InternalTimer(gettimeofday()+1.0, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
   }
+  
+  if ($aName eq 'userBatterytype') {
+      $hash->{HELPER}{AGE1} = 0;
+      InternalTimer(gettimeofday()+1.0, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
+  }
 
-  if ($aName eq "timeout") {
+  if ($aName eq 'timeout') {
       if (!looks_like_number($aVal)) {
           return qq{The value for $aName is invalid, it must be numeric!};
       }
@@ -465,7 +474,9 @@ return;
 ###############################################################
 sub manageUpdate {
   my $hash = shift;
+  
   my $name = $hash->{NAME};
+  my $age1 = delete $hash->{HELPER}{AGE1} // $age1def;
 
   RemoveInternalTimer ($hash);
 
@@ -497,7 +508,7 @@ sub manageUpdate {
   if ($timeout < 1.0) {
       BlockingKill ($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
       Log3 ($name, 4, qq{$name - Cycle started in main process});
-      startUpdate  ({ name => $name, timeout => $timeout, readings => $readings});
+      startUpdate  ({name => $name, timeout => $timeout, readings => $readings, age1 => $age1});
   }
   else {
      delete $hash->{HELPER}{BKRUNNING} if(defined $hash->{HELPER}{BKRUNNING} && $hash->{HELPER}{BKRUNNING}{pid} =~ /DEAD/xs);
@@ -511,7 +522,7 @@ sub manageUpdate {
      my $blto = sprintf "%.0f", ($timeout + 10);
 
      $hash->{HELPER}{BKRUNNING} = BlockingCall ( "FHEM::PylonLowVoltage::startUpdate",
-                                                 {block => 1, name => $name, timeout => $timeout, readings => $readings},
+                                                 {name => $name, timeout => $timeout, readings => $readings, age1 => $age1, block => 1},
                                                  "FHEM::PylonLowVoltage::finishUpdate",
                                                  $blto,                                                  # Blocking Timeout höher als INET-Timeout!
                                                  "FHEM::PylonLowVoltage::abortUpdate",
@@ -539,6 +550,7 @@ sub startUpdate {
   my $timeout  = $paref->{timeout};
   my $readings = $paref->{readings};
   my $block    = $paref->{block} // 0;
+  my $age1     = $paref->{age1};
 
   my $hash     = $defs{$name};
   my $success  = 0;
@@ -556,7 +568,7 @@ sub startUpdate {
           $block ? return ($serial) : return \&finishUpdate ($serial);
       }
 
-      if (ReadingsAge ($name, "serialNumber", 601) >= 60) {                                           # Abrufklasse statische Werte
+      if (ReadingsAge ($name, "serialNumber", 6000) >= $age1) {                                       # Abrufklasse statische Werte
           for my $idx (sort keys %fns1) {
               if (&{$fns1{$idx}{fn}} ($hash, $socket, $readings)) {
                   $serial = encode_base64 (Serialize ( {name => $name, readings => $readings} ), "");
@@ -786,13 +798,15 @@ sub _callManufacturerInfo {
   }
 
   __resultLog ($hash, $res);
-
-  my $BatteryHex            = substr ($res, 13, 20);
+  
+  my $name                  = $hash->{NAME};
+  my $ubtt                  = AttrVal ($name, 'userBatterytype', '');                               # evtl. Batterietyp manuell überschreiben
+  my $BatteryHex            = substr  ($res, 13, 20);
   # my $softwareVersion       = 'V'.hex (substr ($res, 33, 2)).'.'.hex (substr ($res, 35, 2));      # unklare Bedeutung
-  my $ManufacturerHex       = substr ($res, 37, 40);
+  my $ManufacturerHex       = substr  ($res, 37, 40);
     
-  $readings->{batteryType}  = pack   ("H*", $BatteryHex);
-  $readings->{Manufacturer} = pack   ("H*", $ManufacturerHex);
+  $readings->{batteryType}  = $ubtt ? $ubtt.' (adapted)' : pack ("H*", $BatteryHex);
+  $readings->{Manufacturer} = pack ("H*", $ManufacturerHex);
 
 return;
 }
@@ -906,7 +920,7 @@ sub _callSystemParameters {
   $readings->{paramModuleUnderVoltLimit}   = sprintf "%.3f", (hex substr  ($res, 47, 4)) / 1000;                   # Schutz Limit
   $readings->{paramDischargeHighTempLimit} = sprintf "%.1f", ((hex substr ($res, 51, 4)) - 2731) / 10;
   $readings->{paramDischargeLowTempLimit}  = sprintf "%.1f", ((hex substr ($res, 55, 4)) - 2731) / 10;
-  $readings->{paramDischargeCurrentLimit}  = sprintf "%.3f", (65535 - (hex substr  ($res, 59, 4))) * 100 / 1000;   # mit Symbol (-)
+  $readings->{paramDischargeCurrentLimit}  = sprintf "%.3f", (65535 - (hex substr ($res, 59, 4))) * 100 / 1000;    # mit Symbol (-)
 
 return;
 }
@@ -1036,18 +1050,14 @@ sub _callAnalogValue {
   my $pcc  = hex (substr($res, $bpos, 2));                                                       # Anzahl Zellen (15 od. 16)
   $bpos   += 2;                                                                                  # Pos 19
 
-  $readings->{packCellcount} = $pcc;
-
-  for my $z (0..$pcc-1) {
-      my $fz                          = sprintf "%02d", ($z + 1);                                # formatierter Zähler
-      my $pos                         = $bpos + ($z * 4);                                        # Startposition
-      $readings->{'cellVoltage_'.$fz} = sprintf "%.3f", hex(substr($res, $pos, 4)) / 1000;       # Pos 19 - 75 bei 15 Zellen
+  for my $z (1..$pcc) {
+      my $fz                          = sprintf "%02d", $z;                                      # formatierter Zähler
+      $readings->{'cellVoltage_'.$fz} = sprintf "%.3f", hex(substr($res, $bpos, 4)) / 1000;      # Pos 19 - 75 bei 15 Zellen
+      $bpos += 4;                                                                                # letzter Durchlauf: Pos 79 bei 15 Zellen, Pos 83 bei 16 Zellen
   }
 
-  $bpos += $pcc * 4;                                                                             # Pos 79 bei 15 Zellen, Pos 83 bei 16 Zellen
-
   $readings->{numberTempPos}             = hex(substr($res, $bpos, 2));                          # Anzahl der jetzt folgenden Teperaturpositionen -> 5
-  $bpos  += 2;
+  $bpos += 2;
 
   $readings->{bmsTemperature}            = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 81 bei 15 Zellen
   $bpos += 4;
@@ -1112,8 +1122,9 @@ sub _callAnalogValue {
   if ($current & 0x8000) {
       $current = $current - 0x10000;
   }
-
-  $readings->{packCurrent} = sprintf "%.3f", $current / 10;
+  
+  $readings->{packCellcount} = $pcc;
+  $readings->{packCurrent}   = sprintf "%.3f", $current / 10;
 
 return;
 }
@@ -1472,6 +1483,12 @@ management system via the RS485 interface.
      (BlockingCall) so that write or read delays on the RS485 interface do not lead to blocking states in FHEM.
    </li>
    <br>
+   
+   <a id="PylonLowVoltage-attr-userBatterytype"></a>
+   <li><b>userBatterytype</b><br>
+     The automatically determined battery type (Reading batteryType) is replaced by the specified string.
+   </li>
+   <br>
 </ul>
 
 <a id="PylonLowVoltage-readings"></a>
@@ -1641,6 +1658,12 @@ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
      <b>Hinweis</b>: Wird ein Timeout &gt;= 1 Sekunde eingestellt, schaltet das Modul intern auf die Verwendung eines
      Parallelprozesses (BlockingCall) um damit Schreib- bzw. Leseverzögerungen auf dem RS485 Interface nicht zu
      blockierenden Zuständen in FHEM führen.
+   </li>
+   <br>
+   
+   <a id="PylonLowVoltage-attr-userBatterytype"></a>
+   <li><b>userBatterytype</b><br>
+     Der automatisch ermittelte Batterietyp (Reading batteryType) durch die angegebene Zeichenfolge ersetzt.
    </li>
    <br>
 </ul>
