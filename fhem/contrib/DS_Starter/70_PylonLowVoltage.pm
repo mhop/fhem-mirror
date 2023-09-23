@@ -185,8 +185,6 @@ my %fns2 = (                                                                  # 
 # Pylontech Dokus: https://github.com/Interster/PylonTechBattery
 ##################################################################################################################################################################
 #
-# request command für '1': ~20024693E00202FD2D + CR
-# command (HEX):           7e 32 30 30 32 34 36 39 33 45 30 30 32 30 32, 46 44 32 44 0d
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
 # CID1: Kommando spezifisch, hier 46H
 # CID2: Kommando spezifisch, hier 93H
@@ -209,19 +207,17 @@ my %hrsnb = (                                                        # Codierung
   8 => { cmd => "~20094693E00209FD1F\x{0d}", mlen => 52 },
 );
 
-# request command für '1': ~20024651E00202FD33 + CR
-# command (HEX):           7e 32 30 30 32 34 36 35 31 45 30 30 32 30 32 46 44 33 33 0d
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
 # CID1: Kommando spezifisch, hier 46H
 # CID2: Kommando spezifisch, hier 51H
 # LENGTH: LENID + LCHKSUM -> Pylon LFP V3.3 Doku
 # LENID = 0 -> LENID = 0000B + 0000B + 0000B = 0000B -> modulo 16 -> 0000B -> bitweise invert = 1111 -> +1 = 0001 0000 -> LCHKSUM = 0000B -> LENGTH = 0000 0000 0000 0000 -> 0000H
 # wenn LENID = 0, dann ist INFO empty (Doku LFP V3.3 S.8)
-# CHKSUM: 32+30+30+33+34+36+35+31+30+30+30+30 = 0255H -> modulo 65536 = 0255H -> bitweise invert = 1111 1101 1010 1010 -> +1 = 1111 1101 1010 1011 -> FDABH
+# CHKSUM: 32+30+30+32+34+36+35+31+30+30+30+30 = 0254H -> modulo 65536 = 0254H -> bitweise invert = 1111 1101 1010 1011 -> +1 = 1111 1101 1010 1100 -> FDACH
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH    INFO     CHKSUM
 #  ~    20    02      46    51     00    00   empty    FD   AC
-# 7E  32 30  30 33  34 36 35 31  30 30 30 30   - -   46 44 41 43
+# 7E  32 30  30 32  34 36 35 31  30 30 30 30   - -   46 44 41 43
 #
 my %hrmfi = (                                                        # Codierung Abruf manufacturerInfo, mlen = Mindestlänge Antwortstring
   1 => { cmd => "~200246510000FDAC\x{0d}", mlen => 82 },
@@ -234,28 +230,27 @@ my %hrmfi = (                                                        # Codierung
   8 => { cmd => "~200946510000FDA5\x{0d}", mlen => 82 },
 );
 
-# request command für '1': ~20024651E00202FD33 + CR
-# command (HEX):
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
 # CID1: Kommando spezifisch, hier 46H
 # CID2: Kommando spezifisch, hier 4FH
-# LENGTH: LENID + LCHKSUM -> Pylon LFP V2.8 Doku
-# INFO: muß hier mit ADR übereinstimmen
-# CHKSUM: 30+30+30+33+34+36+34+46+45+30+30+32+30+33 = 02E1H -> modulo 65536 = 02E1H -> bitweise invert = 1111 1101 0001 1110 -> +1 = 1111 1101 0001 1111 -> FD1FH
+# LENGTH: LENID + LCHKSUM -> Pylon LFP V3.3 Doku
+# LENID = 0 -> LENID = 0000B + 0000B + 0000B = 0000B -> modulo 16 -> 0000B -> bitweise invert = 1111 -> +1 = 0001 0000 -> LCHKSUM = 0000B -> LENGTH = 0000 0000 0000 0000 -> 0000H
+# wenn LENID = 0, dann ist INFO empty (Doku LFP V3.3 S.8)
+# CHKSUM: 30+30+30+32+34+36+34+46+30+30+30+30 = 0266H -> modulo 65536 = 0266H -> bitweise invert = 1111 1101 1001 1001 -> +1 = 1111 1101 1001 1010 -> FD9AH
 #
 # SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
-#  ~    00    02      46    4F      E0    02    02      FD   21
-# 7E  30 30  30 32  34 36  34 46  45 30 30 32  30 32  46 44 31 46
+#  ~    00    02      46    4F      00    00   empty    FD   9A
+# 7E  30 30  30 32  34 36  34 46  30 30 30 30   - -   46 44 31 46
 #
 my %hrprt = (                                                        # Codierung Abruf protocolVersion, mlen = Mindestlänge Antwortstring
-  1 => { cmd => "~0002464FE00202FD21\x{0d}", mlen => 18 },
-  2 => { cmd => "~0003464FE00203FD1F\x{0d}", mlen => 18 },
-  3 => { cmd => "~0004464FE00204FD1D\x{0d}", mlen => 18 },
-  4 => { cmd => "~0005464FE00205FD1B\x{0d}", mlen => 18 },
-  5 => { cmd => "~0006464FE00206FD19\x{0d}", mlen => 18 },
-  6 => { cmd => "~0007464FE00207FD17\x{0d}", mlen => 18 },
-  7 => { cmd => "~0008464FE00208FD15\x{0d}", mlen => 18 },
-  8 => { cmd => "~0009464FE00209FD13\x{0d}", mlen => 18 },
+  1 => { cmd => "~0002464F0000FD9A\x{0d}", mlen => 18 },
+  2 => { cmd => "~0003464F0000FD99\x{0d}", mlen => 18 },
+  3 => { cmd => "~0004464F0000FD98\x{0d}", mlen => 18 },
+  4 => { cmd => "~0005464F0000FD97\x{0d}", mlen => 18 },
+  5 => { cmd => "~0006464F0000FD96\x{0d}", mlen => 18 },
+  6 => { cmd => "~0007464F0000FD95\x{0d}", mlen => 18 },
+  7 => { cmd => "~0008464F0000FD94\x{0d}", mlen => 18 },
+  8 => { cmd => "~0009464F0000FD93\x{0d}", mlen => 18 },
 );
 
 
@@ -303,6 +298,18 @@ my %hrcmi = (                                                        # Codierung
   8 => { cmd => "~20094692E00209FD20\x{0d}", mlen => 38 },
 );
 
+# ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
+# CID1: Kommando spezifisch, hier 46H
+# CID2: Kommando spezifisch, hier 42H                                                                                                              LCHK|    LENID
+# LENGTH: LENID + LCHKSUM -> Pylon LFP V3.3 Doku                                                                                                   ---- --------------
+# LENID = 02H -> LENID = 0000B + 0000B + 0010B = 0010B -> modulo 16 -> 0010B -> bitweise invert = 1101 -> +1 = 1110 -> LCHKSUM = 1110B -> LENGTH = 1110 0000 0000 0010 -> E002H
+# wenn LENID = 0, dann ist INFO empty (Doku LFP V3.3 S.8)
+# CHKSUM: 32+30+30+32+34+36+34+32+45+30+30+32+30+32 = 02CDH -> modulo 65536 = 02CDH -> bitweise invert = 1111 1101 0011 0010 -> +1 = 1111 1101 0011 0011 -> FD33H
+#
+# SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
+#  ~    20    02     46     42      E0    02    02      FD   33
+# 7E  32 30  30 32  34 36  34 32  45 30 30 32  30 32  46 44 33 33
+#
 my %hrcmn = (                                                        # Codierung Abruf analogValue
   1 => { cmd => "~20024642E00202FD33\x{0d}", mlen => 128 },
   2 => { cmd => "~20034642E00203FD31\x{0d}", mlen => 128 },
