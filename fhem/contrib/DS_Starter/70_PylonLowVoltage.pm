@@ -122,7 +122,8 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
-  "0.1.8"  => "23.09.2023 new Attr userBatterytype, change manufacturerInfo command hash to LENID=0 ",
+  "0.1.9"  => "25.09.2023 fix possible bat adresses ",
+  "0.1.8"  => "23.09.2023 new Attr userBatterytype, change manufacturerInfo, protocolVersion command hash to LENID=0 ",
   "0.1.7"  => "20.09.2023 extend possible number of bats from 6 to 8 ",
   "0.1.6"  => "19.09.2023 rework of _callAnalogValue, support of more than 15 cells ",
   "0.1.5"  => "19.09.2023 internal code change ",
@@ -374,8 +375,8 @@ sub Define {
   ($hash->{HOST}, $hash->{PORT}) = split ":", $args[2];
   $hash->{BATADDRESS}            = $args[3] // 1;
 
-  if ($hash->{BATADDRESS} !~ /[123456]/xs) {
-      return "Define: bataddress must be a value between 1 and 6";
+  if ($hash->{BATADDRESS} !~ /[12345678]/xs) {
+      return "Define: bataddress must be a value between 1 and 8";
   }
 
   my $params = {
@@ -1670,7 +1671,7 @@ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
    
    <a id="PylonLowVoltage-attr-userBatterytype"></a>
    <li><b>userBatterytype</b><br>
-     Der automatisch ermittelte Batterietyp (Reading batteryType) durch die angegebene Zeichenfolge ersetzt.
+     Der automatisch ermittelte Batterietyp (Reading batteryType) wird durch die angegebene Zeichenfolge ersetzt.
    </li>
    <br>
 </ul>
