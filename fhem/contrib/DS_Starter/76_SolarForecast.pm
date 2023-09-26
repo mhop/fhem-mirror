@@ -142,6 +142,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.83.2" => "26.09.2023  setter reset consumption ",
   "0.83.1" => "26.09.2023  change currentRadiationDev to currentRadiationAPI, new attr ctrlAIdataStorageDuration ".
                            "new elements todayConsumptionForecast, conForecastTillNextSunrise for attr ctrlStatisticReadings ".
                            "add entry text in guided procedure ",
@@ -1231,6 +1232,7 @@ sub Set {
   my @re = qw( aiData
                consumerMaster
                consumerPlanning
+               consumption
                currentBatteryDev
                currentWeatherDev
                currentInverterDev
@@ -2065,7 +2067,7 @@ sub _setreset {                          ## no critic "not used"
       if ($dday) {
           if ($dhour) {
               delete $data{$type}{$name}{pvhist}{$dday}{$dhour};
-              Log3 ($name, 3, qq{$name - Hour "$dhour" of day "$dday" deleted in pvHistory});
+              Log3 ($name, 3, qq{$name - Day "$dday" hour "$dhour" deleted from pvHistory});
               
               $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
               $paref->{reorgday} = $dday;
@@ -2075,13 +2077,50 @@ sub _setreset {                          ## no critic "not used"
           }
           else {
               delete $data{$type}{$name}{pvhist}{$dday};
-              Log3 ($name, 3, qq{$name - Day "$dday" deleted in pvHistory});
+              Log3 ($name, 3, qq{$name - Day "$dday" deleted from pvHistory});
           }
       }
       else {
           delete $data{$type}{$name}{pvhist};
-          Log3 ($name, 3, qq{$name - all days of pvHistory deleted});
+          Log3 ($name, 3, qq{$name - all days deleted from pvHistory});
       }
+      
+      return;
+  }
+  
+  if($prop eq 'consumption') {
+      my $dday  = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
+      my $dhour = $paref->{prop2} // "";                                       # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
+
+      if ($dday) {
+          if ($dhour) {
+              delete $data{$type}{$name}{pvhist}{$dday}{$dhour}{con};
+              Log3 ($name, 3, qq{$name - consumption day "$dday" hour "$dhour" deleted from pvHistory});
+              
+              $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
+              $paref->{reorgday} = $dday;
+              setPVhistory ($paref);
+              delete $paref->{reorg};
+              delete $paref->{reorgday};
+          }
+          else {
+              for my $hr (sort keys %{$data{$type}{$name}{pvhist}{$dday}}) {
+                  delete $data{$type}{$name}{pvhist}{$dday}{$hr}{con};               
+              }
+              
+              Log3 ($name, 3, qq{$name - consumption day "$dday" deleted from pvHistory});   
+          }
+      }
+      else {
+          for my $dy (sort keys %{$data{$type}{$name}{pvhist}}) {
+              for my $hr (sort keys %{$data{$type}{$name}{pvhist}{$dy}}) {
+                  delete $data{$type}{$name}{pvhist}{$dy}{$hr}{con};  
+              }              
+          }          
+          
+          Log3 ($name, 3, qq{$name - all saved consumption deleted from pvHistory});
+      }
+      
       return;
   }
 
@@ -7471,7 +7510,7 @@ sub _estConsumptionForecast {
           next if(!$hdn || $hdn ne $tomorrow);
       }
 
-      my $dcon = HistoryVal ($hash, $n, 99, "con", 0);
+      my $dcon = HistoryVal ($hash, $n, 99, 'con', 0);
       next if(!$dcon);
       
       debugLog ($paref, "consumption", "History Consumption day >$n<: $dcon");
@@ -7781,7 +7820,7 @@ sub saveEnergyConsumption {
 
   $paref->{con}      = $con;
   $paref->{nhour}    = sprintf "%02d", $shr;
-  $paref->{histname} = "con";
+  $paref->{histname} = 'con';
   setPVhistory ($paref);
   delete $paref->{histname};
 
@@ -11197,7 +11236,7 @@ return $range;
 }
 
 ################################################################
-#   Werte in History-Hash speichern
+#   History-Hash verwalten
 ################################################################
 sub setPVhistory {
   my $paref          = shift;
@@ -14561,36 +14600,41 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aiData</b>             </td><td>löscht eine vorhandene KI Instanz inklusive aller Trainingsdaten und initialisiert sie neu                           </td></tr>
-            <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                             </td></tr>
-            <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                          </td></tr>
-            <tr><td>                           </td><td>Das Modul führt eine automatische Neuplanung der Verbraucherschaltung durch.                                         </td></tr>
-            <tr><td> <b>consumerMaster</b>     </td><td>löscht die Daten aller registrierten Verbraucher aus dem Speicher                                                    </td></tr>
-            <tr><td>                           </td><td>Um die Daten nur eines Verbrauchers zu löschen verwendet man:                                                        </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Verbrauchernummer&gt; </ul>                                            </td></tr>
-            <tr><td> <b>currentBatteryDev</b>  </td><td>löscht das eingestellte Batteriedevice und korrespondierende Daten                                                   </td></tr>
-            <tr><td> <b>currentWeatherDev</b>  </td><td>löscht das eingestellte Device für Wetterdaten                                                                       </td></tr>
-            <tr><td> <b>currentInverterDev</b> </td><td>löscht das eingestellte Inverterdevice und korrespondierende Daten                                                   </td></tr>
-            <tr><td> <b>currentMeterDev</b>    </td><td>löscht das eingestellte Meterdevice und korrespondierende Daten                                                      </td></tr>
-            <tr><td> <b>energyH4Trigger</b>    </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                           </td></tr>
-            <tr><td> <b>inverterStrings</b>    </td><td>löscht die Stringkonfiguration der Anlage                                                                            </td></tr>
-            <tr><td> <b>powerTrigger</b>       </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                      </td></tr>
-            <tr><td> <b>pvCorrection</b>       </td><td>löscht die Readings pvCorrectionFactor*                                                                              </td></tr>
-            <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus den Caches zu löschen:                                         </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                 </td></tr>
-            <tr><td>                           </td><td>Um gespeicherte PV Korrekturfaktoren einer bestimmten Stunde aus den Caches zu löschen:                              </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Stunde&gt;  </ul>                                                 </td></tr>
-            <tr><td>                           </td><td><ul>(z.B. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                 </td></tr>
-            <tr><td> <b>pvHistory</b>          </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                                                              </td></tr>
-            <tr><td>                           </td><td>Um einen bestimmten historischen Tag zu löschen:                                                                     </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08) </ul>                  </td></tr>
-            <tr><td>                           </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                                        </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </ul> </td></tr>
-            <tr><td> <b>moduleRoofTops</b>     </td><td>löscht die SolCast API Rooftops                                                                                      </td></tr>
-            <tr><td> <b>roofIdentPair</b>      </td><td>löscht alle gespeicherten SolCast API Rooftop-ID / API-Key Paare                                                     </td></tr>
-            <tr><td>                           </td><td>Um ein bestimmtes Paar zu löschen ist dessen Schlüssel &lt;pk&gt; anzugeben:                                         </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (z.B. set &lt;name&gt; reset roofIdentPair p1) </ul>           </td></tr>
+            <tr><td> <b>aiData</b>             </td><td>löscht eine vorhandene KI Instanz inklusive aller Trainingsdaten und initialisiert sie neu                              </td></tr>
+            <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                                </td></tr>
+            <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                   </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                             </td></tr>
+            <tr><td>                           </td><td>Das Modul führt eine automatische Neuplanung der Verbraucherschaltung durch.                                            </td></tr>
+            <tr><td> <b>consumerMaster</b>     </td><td>löscht die Daten aller registrierten Verbraucher aus dem Speicher                                                       </td></tr>
+            <tr><td>                           </td><td>Um die Daten nur eines Verbrauchers zu löschen verwendet man:                                                           </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Verbrauchernummer&gt; </ul>                                               </td></tr>
+            <tr><td> <b>consumption</b>        </td><td>löscht die gespeicherten Verbrauchswerte des Hauses                                                                     </td></tr>
+            <tr><td>                           </td><td>Um die Verbrauchswerte eines bestimmten Tages zu löschen:                                                               </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumption 08) </ul>                 </td></tr>
+            <tr><td>                           </td><td>Um die Verbrauchswerte einer bestimmten Stunde eines Tages zu löschen:                                                  </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumption 08 10) </ul> </td></tr>
+            <tr><td> <b>currentBatteryDev</b>  </td><td>löscht das eingestellte Batteriedevice und korrespondierende Daten                                                      </td></tr>
+            <tr><td> <b>currentWeatherDev</b>  </td><td>löscht das eingestellte Device für Wetterdaten                                                                          </td></tr>
+            <tr><td> <b>currentInverterDev</b> </td><td>löscht das eingestellte Inverterdevice und korrespondierende Daten                                                      </td></tr>
+            <tr><td> <b>currentMeterDev</b>    </td><td>löscht das eingestellte Meterdevice und korrespondierende Daten                                                         </td></tr>
+            <tr><td> <b>energyH4Trigger</b>    </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                              </td></tr>
+            <tr><td> <b>inverterStrings</b>    </td><td>löscht die Stringkonfiguration der Anlage                                                                               </td></tr>
+            <tr><td> <b>powerTrigger</b>       </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                         </td></tr>
+            <tr><td> <b>pvCorrection</b>       </td><td>löscht die Readings pvCorrectionFactor*                                                                                 </td></tr>
+            <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus den Caches zu löschen:                                            </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                    </td></tr>
+            <tr><td>                           </td><td>Um gespeicherte PV Korrekturfaktoren einer bestimmten Stunde aus den Caches zu löschen:                                 </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Stunde&gt;  </ul>                                                    </td></tr>
+            <tr><td>                           </td><td><ul>(z.B. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                    </td></tr>
+            <tr><td> <b>pvHistory</b>          </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                                                                 </td></tr>
+            <tr><td>                           </td><td>Um einen bestimmten historischen Tag zu löschen:                                                                        </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08) </ul>                     </td></tr>
+            <tr><td>                           </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                                           </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </ul>    </td></tr>
+            <tr><td> <b>moduleRoofTops</b>     </td><td>löscht die SolCast API Rooftops                                                                                         </td></tr>
+            <tr><td> <b>roofIdentPair</b>      </td><td>löscht alle gespeicherten SolCast API Rooftop-ID / API-Key Paare                                                        </td></tr>
+            <tr><td>                           </td><td>Um ein bestimmtes Paar zu löschen ist dessen Schlüssel &lt;pk&gt; anzugeben:                                            </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (z.B. set &lt;name&gt; reset roofIdentPair p1) </ul>              </td></tr>
          </table>
       </ul>
       </li>
