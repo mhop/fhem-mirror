@@ -142,7 +142,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.83.1" => "25.09.2023  change currentRadiationDev to currentRadiationAPI, new attr ctrlAIdataStorageDuration ".
+  "0.83.1" => "26.09.2023  change currentRadiationDev to currentRadiationAPI, new attr ctrlAIdataStorageDuration ".
                            "new elements todayConsumptionForecast, conForecastTillNextSunrise for attr ctrlStatisticReadings ".
                            "add entry text in guided procedure ",
   "0.83.0" => "19.09.2023  add manageTrain for AI Training in parallel process ",
@@ -913,21 +913,21 @@ my %hcsr = (                                                                    
   runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
   allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => 0           },
   todayConForecastTillSunset  => { fnr => 2, fn => \&CurrentVal,    par => 'tdConFcTillSunset', unit => ' Wh',  def => 0           },
-  SunHours_Remain             => { fnr => 3, fn => \&CurrentVal,    par => '',                  unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
-  SunMinutes_Remain           => { fnr => 3, fn => \&CurrentVal,    par => '',                  unit => '',     def => 0           },
-  dayAfterTomorrowPVforecast  => { fnr => 3, fn => \&SolCastAPIVal, par => 'pv_estimate50',     unit => '',     def => 0           },
-  todayGridFeedIn             => { fnr => 3, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
-  todayGridConsumption        => { fnr => 3, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
-  todayBatIn                  => { fnr => 3, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
-  todayBatOut                 => { fnr => 3, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
   runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,   par => 99,                  unit => '',     def => '-'         },
-  todayConsumptionForecast    => { fnr => 3, fn => \&NexthoursVal,  par => 'confc',             unit => ' Wh',  def => '-'         },
-  conForecastTillNextSunrise  => { fnr => 3, fn => \&NexthoursVal,  par => 'confc',             unit => ' Wh',  def => 0           },
+  SunHours_Remain             => { fnr => 4, fn => \&CurrentVal,    par => '',                  unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
+  SunMinutes_Remain           => { fnr => 4, fn => \&CurrentVal,    par => '',                  unit => '',     def => 0           },
+  dayAfterTomorrowPVforecast  => { fnr => 4, fn => \&SolCastAPIVal, par => 'pv_estimate50',     unit => '',     def => 0           },
+  todayGridFeedIn             => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
+  todayGridConsumption        => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
+  todayBatIn                  => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
+  todayBatOut                 => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
+  todayConsumptionForecast    => { fnr => 4, fn => \&NexthoursVal,  par => 'confc',             unit => ' Wh',  def => '-'         },
+  conForecastTillNextSunrise  => { fnr => 4, fn => \&NexthoursVal,  par => 'confc',             unit => ' Wh',  def => 0           },
 );
 
   for my $csr (1..$maxconsumer) {
       $csr                                       = sprintf "%02d", $csr;
-      $hcsr{'currentRunMtsConsumer_'.$csr}{fnr}  = 3;
+      $hcsr{'currentRunMtsConsumer_'.$csr}{fnr}  = 4;
       $hcsr{'currentRunMtsConsumer_'.$csr}{fn}   = \&ConsumerVal;
       $hcsr{'currentRunMtsConsumer_'.$csr}{par}  = 'cycleTime';
       $hcsr{'currentRunMtsConsumer_'.$csr}{unit} = ' min';
@@ -7827,7 +7827,11 @@ sub genStatisticReadings {
           push @$daref, 'statistic_'.$kpi.'<>'. &{$hcsr{$kpi}{fn}} ($hash, $par, $def).$hcsr{$kpi}{unit};
       }
       
-      if ($hcsr{$kpi}{fnr} == 3) {
+      if ($hcsr{$kpi}{fnr} == 3) {          
+          push @$daref, 'statistic_'.$kpi.'<>'. &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $kpi, $def).$hcsr{$kpi}{unit};      
+      }
+      
+      if ($hcsr{$kpi}{fnr} == 4) {
           if ($kpi eq 'SunHours_Remain') {
               my $ss  = &{$hcsr{$kpi}{fn}} ($hash, 'sunsetTodayTs',  $def);
               my $shr = ($ss - $t) / 3600; 
@@ -7939,35 +7943,21 @@ sub genStatisticReadings {
           }
           
           if ($kpi eq 'conForecastTillNextSunrise') {
-             my $type       = $paref->{type};
-             my $confc      = 0;             
-             my $tdhodsrise = (split ":", ReadingsVal ($name, 'Today_SunRise',    '00:00'))[0];      # 06:59
-             my $tmhodsrise = (split ":", ReadingsVal ($name, 'Tomorrow_SunRise', '00:00'))[0];      # 07:01
-             $tdhodsrise++;
-             $tmhodsrise++;
-             
-             my $hodold  = '01';
-             my $hodrise = $tdhodsrise;
+             my $type  = $paref->{type};
+             my $confc = 0;             
+             my $dono  = 1;
              
              for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
-                 my $today = NexthoursVal ($hash, $idx, 'today',        0);
-                 my $hod   = NexthoursVal ($hash, $idx, 'hourofday', '01'); 
-                 
-                 if (int $hod >= int $hodold) {
-                     $confc += &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);
-                 }
-                 
-                 $hodold = $hod;
-                 
-                 if ($hodold eq '24') {
-                     $hodold  = '01';
-                     $hodrise = $tmhodsrise;
-                 }
-                 
-                 if (!$today && $hod eq $hodrise) {
+                 my $don = NexthoursVal ($hash, $idx, 'DoN', 2);                     # Wechsel von 0 -> 1 relevant
+                 last if($don == 2);
+                  
+                 $confc += &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);
+    
+                 if ($dono == 0 && $don == 1) {
                      last;
                  }
-                  
+                 
+                 $dono = $don;
              }
              
              push @$daref, 'statistic_'.$kpi.'<>'. ($confc ? $confc.$hcsr{$kpi}{unit} : '-');             
