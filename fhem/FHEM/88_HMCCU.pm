@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 232641921';
+my $HMCCU_VERSION = '5.0 232691829';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -10539,12 +10539,25 @@ sub HMCCU_GetDutyCycle ($)
 	
 	my $dc = 0;
 	my $interfaces = HMCCU_GetRPCInterfaceList ($hash);
-	my %readings;
+	my %readings = ();
 	
 	foreach my $port (values %$interfaces) {
 		next if ($port != 2001 && $port != 2010);
-		my ($url, $auth) = HMCCU_BuildURL ($hash, $port) // next;
-		my $rpcclient = RPC::XML::Client->new ($url);
+		my ($url, $auth) = HMCCU_BuildURL ($hash, $port);
+		if ($url eq '') {
+			HMCCU_Log ($hash, 2, "Cannot get RPC URL for port $port");
+			next;
+		}
+
+		my $header = HTTP::Headers->new ('Connection' => 'Keep-Alive');
+		$header->header('Authorization' => "Basic $auth") if ($auth) ne '';
+		my $rpcclient = RPC::XML::Client->new ($url,
+			useragent => [
+				ssl_opts => { verify_hostname => 0, SSL_verify_mode => 0 }
+			]
+		);
+		$rpcclient->useragent->default_headers($header);
+
 		my $response = $rpcclient->simple_request ('listBidcosInterfaces');
 		next if (!defined($response) || ref($response) ne 'ARRAY');
 		foreach my $iface (@$response) {
