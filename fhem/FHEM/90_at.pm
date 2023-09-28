@@ -68,6 +68,8 @@ at_Define($$)
     $abstime = $tspec;
 
   } elsif($tspec =~ m/^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)$/) {
+    return "relative(+) or repeat(*) flag with absolute timespec"
+      if($rel || $rep);
     my ($y,$m,$d,$h,$m2,$s) = ($1,$2,$3,$4,$5,$6);
     $abstime = mktime($s,$m2,$h,$d,$m-1,$y-1900, 0,0,-1);
 
