@@ -142,6 +142,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.83.3" => "28.09.2023  fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1288032 ".
+                           "delete AllPVforecastsToEvent after event generation ",
   "0.83.2" => "26.09.2023  setter reset consumption ",
   "0.83.1" => "26.09.2023  change currentRadiationDev to currentRadiationAPI, new attr ctrlAIdataStorageDuration ".
                            "new elements todayConsumptionForecast, conForecastTillNextSunrise for attr ctrlStatisticReadings ".
@@ -2223,8 +2225,8 @@ sub _setreset {                          ## no critic "not used"
   }
 
   if($prop eq 'currentMeterDev') {
-      readingsDelete($hash, "Current_GridConsumption");
-      readingsDelete($hash, "Current_GridFeedIn");
+      readingsDelete ($hash, "Current_GridConsumption");
+      readingsDelete ($hash, "Current_GridFeedIn");
       delete $data{$type}{$name}{circular}{'99'}{initdayfeedin};
       delete $data{$type}{$name}{circular}{'99'}{gridcontotal};
       delete $data{$type}{$name}{circular}{'99'}{initdaygcon};
@@ -2241,9 +2243,9 @@ sub _setreset {                          ## no critic "not used"
   }
 
   if($prop eq 'currentBatteryDev') {
-      readingsDelete($hash, "Current_PowerBatIn");
-      readingsDelete($hash, "Current_PowerBatOut");
-      readingsDelete($hash, "Current_BatCharge");
+      readingsDelete ($hash, "Current_PowerBatIn");
+      readingsDelete ($hash, "Current_PowerBatOut");
+      readingsDelete ($hash, "Current_BatCharge");
       delete $data{$type}{$name}{circular}{'99'}{initdaybatintot};
       delete $data{$type}{$name}{circular}{'99'}{initdaybatouttot};
       delete $data{$type}{$name}{circular}{'99'}{batintot};
@@ -4705,7 +4707,8 @@ sub centralTask {
       _specialActivities          ($centpars);                                            # zusätzliche Events generieren + Sonderaufgaben
       _transferWeatherValues      ($centpars);                                            # Wetterwerte übertragen
 
-      createReadingsFromArray ($hash, \@da, $evt);                                        # Readings erzeugen
+      createReadingsFromArray     ($hash, \@da, $evt);                                    # Readings erzeugen
+      readingsDelete              ($hash, 'AllPVforecastsToEvent');
       
       _getRoofTopData             ($centpars);                                            # Strahlungswerte/Forecast-Werte in solcastapi-Hash erstellen                                     
       _transferAPIRadiationValues ($centpars);                                            # Raw Erzeugungswerte aus solcastapi-Hash übertragen und Forecast mit/ohne Korrektur erstellen    
@@ -6175,8 +6178,9 @@ sub _createSummaries {
 
   my $selfconsumptionrate = 0;
   my $autarkyrate         = 0;
-  $selfconsumptionrate    = sprintf "%.0f", $selfconsumption / $pvgen * 100                                           if($pvgen * 1 > 0);
-  $autarkyrate            = sprintf "%.0f", ($selfconsumption + $batout) / ($selfconsumption + $batout + $gcon) * 100 if($selfconsumption + $batout);
+  my $divi                = $selfconsumption + $batout + $gcon;
+  $selfconsumptionrate    = sprintf "%.0f", $selfconsumption / $pvgen * 100            if($pvgen * 1 > 0);
+  $autarkyrate            = sprintf "%.0f", ($selfconsumption + $batout) / $divi * 100 if($divi);       # vermeide Illegal division by zero
 
   $data{$type}{$name}{current}{consumption}         = $consumption;
   $data{$type}{$name}{current}{selfconsumption}     = $selfconsumption;
@@ -12529,7 +12533,7 @@ sub deleteReadingspec {
   my $readingspec = '^'.$spec.'$';
 
   for my $reading ( grep { /$readingspec/x } keys %{$hash->{READINGS}} ) {
-      readingsDelete($hash, $reading);
+      readingsDelete ($hash, $reading);
   }
 
 return;
