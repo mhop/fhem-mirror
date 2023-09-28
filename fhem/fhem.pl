@@ -4661,7 +4661,7 @@ OldReadingsNum($$$;$)
   my $val = OldReadingsVal($d,$n,$default);
   return undef if(!defined($val));
   $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
-  $val =~ s/^(-?)0*([0-9])/$1$2/; # Forum #135120, dont want octal numbers
+  $val =~ s/^(-?)0+([1-9])/$1$2/; # Forum #135120, dont want octal numbers
   return $default if($val eq "");
   $val = round($val,$round) if(defined $round);
   return $val;
@@ -4709,7 +4709,7 @@ ReadingsNum($$$;$)
   my $val = ReadingsVal($d,$n,$default);
   return undef if(!defined($val));
   $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
-  $val =~ s/^(-?)0*([0-9])/$1$2/; # Forum #135120, dont want octal numbers
+  $val =~ s/^(-?)0+([1-9])/$1$2/; # Forum #135120, dont want octal numbers
   return $default if($val eq "");
   $val = round($val,$round) if(defined $round);
   return $val;
