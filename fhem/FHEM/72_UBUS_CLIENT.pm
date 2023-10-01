@@ -340,7 +340,7 @@ sub Write
 	return if IsDisabled($name);
 
 	my $dev = shift // return; # Logical device name
-	my $method = shift // q{}; # Mehod (list, call, subscribe...)
+	my $method = shift // q{}; # Method (list, call, subscribe...)
 	my $id = "$dev:$method:" . (++$hash->{lastid});
 	my $rpcparam;
 
@@ -432,7 +432,10 @@ sub Write
 
 	Log3($name, 5, "UBUS ($name) - sent: $json");
 
-	$hash->{rpc}{$id} = $request;
+	if($dev eq $name)
+	{
+		$hash->{rpc}{$id} = $request;
+	}
 
 	if($hash->{method} eq 'websocket')
 	{
