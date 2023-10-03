@@ -2534,7 +2534,7 @@ sub EnOcean_Set($@) {
       $cmd = $switchCmd;
       if ((!defined($switchCmd)) || (!defined($EnO_switch_00Btn{$switchCmd}))) {
         # check values
-        $cmdList .= join(":noArg ", keys %EnO_switch_00Btn);
+        $cmdList .= join(":noArg ", keys %EnO_switch_00Btn) . ':noArg';
         return SetExtensions($hash, $cmdList, $name, @a);
       } elsif ($switchCmd eq "teachIn") {
         ($err, $rorg, $data) = EnOcean_sndUTE(undef, $hash, AttrVal($name, "comMode", "uniDir"),
@@ -6104,12 +6104,12 @@ sub EnOcean_Set($@) {
           return "Usage: argument needed.";
         }
       } elsif ($cmd eq "cryptTest") {
-        my $dataOut = EnOcean_sec_VAES('01020304', 'E50880CF67790D5D66AA7F3B7AD77A3F', 'D1000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D', 1);
+        my $dataOut = EnOcean_sec_VAES($hash, '01020304', 'E50880CF67790D5D66AA7F3B7AD77A3F', 'D1000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D', 1);
         my $dataCheck = $dataOut eq 'BB17C17A05CAF5575DE208302FB572A0FD3A4434A41096F102E60DC20D777A' ? 'ok' : 'error';
-        Log3 undef, 3, "EnOcean_sec_VAES: encypt dataCheck: $dataCheck dataOut: $dataOut";
-        $dataOut = EnOcean_sec_VAES('01020304', 'E50880CF67790D5D66AA7F3B7AD77A3F', 'BB17C17A05CAF5575DE208302FB572A0FD3A4434A41096F102E60DC20D777A', 1);
+        Log3 $name, 3, "EnOcean $name EnOcean_sec_VAES encypt dataCheck: $dataCheck dataOut: $dataOut";
+        $dataOut = EnOcean_sec_VAES($hash, '01020304', 'E50880CF67790D5D66AA7F3B7AD77A3F', 'BB17C17A05CAF5575DE208302FB572A0FD3A4434A41096F102E60DC20D777A', 1);
         $dataCheck = $dataOut eq 'D1000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D' ? 'ok' : 'error';
-        Log3 undef, 3, "EnOcean_sec_VAES: decrypt dataCheck: $dataCheck dataOut: $dataOut";
+        Log3 $name, 3, "EnOcean $name EnOcean_sec_VAES decrypt dataCheck: $dataCheck dataOut: $dataOut";
       } else {
         $cmdList .= "block:lock,unlock cryptTest";
         return "Unknown argument $cmd, choose one of $cmdList";
@@ -7966,7 +7966,7 @@ sub EnOcean_Parse($$) {
   if (AttrVal($name, "secLevel", "off") =~ m/^encapsulation|encryption$/ &&
       AttrVal($name, "secMode", "") =~ m/^rcv|biDir$/) {
     if ($rorg eq "30" || $rorg eq "31") {
-      Log3 $name, 5, "EnOcean $name secure data RORG: $rorg DATA: $data SenderID: $senderID STATUS: $status";
+      Log3 $name, 5, "EnOcean $name crypted data RORG-S: $rorg DATA: $data SenderID: $senderID STATUS: $status";
       ($err, $rorg, $data) = EnOcean_sec_convertToNonsecure($hash, $rorg, $data);
       if (defined $err) {
         Log3 $name, 2, "EnOcean $name security ERROR: $err";
@@ -13674,10 +13674,10 @@ sub EnOcean_Parse($$) {
     # Secure Teach-In
     ($err, $msg) = EnOcean_sec_parseTeachIn($hash, $data, $subDef, $destinationID);
     if (defined $err) {
-      Log3 $name, 2, "EnOcean $name secure teach-in ERROR: $err";
+      Log3 $name, 2, "EnOcean $name secure Teach-In ERROR: $err";
       return "";
     }
-    Log3 $name, 3, "EnOcean $name secure teach-in $msg";
+    Log3 $name, 3, "EnOcean $name secure Teach-In $msg";
     EnOcean_CommandSave(undef, undef);
     return "";
 
@@ -18258,7 +18258,7 @@ sub EnOcean_sec_parseTeachIn($$$$) {
 
     $hash->{helper}{teachInSTE} = $cnt - 1;
     # Ok we got a lots of infos and the first part of the private key
-    return (undef, "part 1 received Rlc: $rlc Key1: $key1");
+    return (undef, "part 1 received RLC: $rlc PK1: $key1");
 
   } elsif ($idx == 1 && exists($hash->{helper}{teachInSTE})) {
     # Second part of the teach-in telegrams
@@ -18279,7 +18279,7 @@ sub EnOcean_sec_parseTeachIn($$$$) {
     if (defined $attr{$name}{psk}) {
       # RLC and PK must be encrypted with PSK
       my $pskData = $attr{$name}{rlcRcv} . $attr{$name}{keyRcv};
-      $pskData = EnOcean_sec_VAES('0000', $attr{$name}{psk}, $pskData, 1);
+      $pskData = EnOcean_sec_VAES($hash, '0000', $attr{$name}{psk}, $pskData, 1);
       $pskData =~ /^(.*)(.{32})$/;
       $attr{$name}{keyRcv} = $2;
       readingsSingleUpdate($hash, ".rlcRcv", $1, 0);
@@ -18306,7 +18306,7 @@ sub EnOcean_sec_parseTeachIn($$$$) {
       }
     }
   delete $hash->{helper}{teachInSTE};
-  return (undef, "part 2 received Key2: $key2");
+  return (undef, "part 2 received PK2: $key2");
   }
 
   # Sequence error?
@@ -18314,20 +18314,21 @@ sub EnOcean_sec_parseTeachIn($$$$) {
 }
 
 # VAES encryption or decryption
-sub EnOcean_sec_VAES($$$$) {
+sub EnOcean_sec_VAES($$$$$) {
   # $rlc: rolling code, hex string, variable length, max 16 bytes
   # $privateKey: private key, hex string 16 bytes
   # $dataIn: input data with hex string variable length
   # $cryptMode: 0 = decrypt, 1 = encrypt
   # $dataOut: encrypted or decrypted output data with hex string variable length
-  my ($rlc, $privateKey, $dataIn, $cryptMode) = @_;
+  my ($hash, $rlc, $privateKey, $dataIn, $cryptMode) = @_;
+  my $name = $hash->{NAME};
   my @aesIn;
   my @aesOut;
   my @dataIn;
   my $dataInCount = 0;
   my $dataLength = length($dataIn);
   my @dataOut;
-  Log3 undef, 3, "EnOcean_sec_VAES: RLC: $rlc KEY: $dataIn";
+  Log3 $name, 5, "EnOcean $name EnOcean_sec_VAES RLC: $rlc PK: $privateKey DATA: $dataIn";
   # split dataIn
   while ($dataLength > 0) {
     if ($dataLength > 32) {
@@ -18341,7 +18342,7 @@ sub EnOcean_sec_VAES($$$$) {
       last;
     }
   }
-  Log3 undef, 3, "EnOcean_sec_VAES: RLC KEY array IN: $dataIn[0] $dataIn[1]";
+  Log3 $name, 5, "EnOcean $name EnOcean_sec_VAES dataIn array: $dataIn[0] $dataIn[1]";
   $dataInCount = 1;
   # EnOcean public key
   my $publicKey = pack('H32', '3410de8f1aba3eff9f5a117172eacabd');
@@ -18350,7 +18351,7 @@ sub EnOcean_sec_VAES($$$$) {
   $privateKey = pack('H32', $privateKey);
   # variable init vector, first input for all VAES
   $aesIn[0] = $publicKey ^ $rlc;
-  Log3 undef, 3, "EnOcean_sec_VAES: RLC " . unpack('H32', $rlc) . " aesIn0: " . unpack('H32', $aesIn[0]);
+  Log3 $name, 5, "EnOcean $name EnOcean_sec_VAES RLC: " . unpack('H32', $rlc) . " aesIn0: " . unpack('H32', $aesIn[0]);
   my $cipher = Crypt::Rijndael->new($privateKey);
   # encryption or decryption vector 1
   if ($cryptMode) {
@@ -18358,7 +18359,7 @@ sub EnOcean_sec_VAES($$$$) {
   } else {
     $aesOut[0] = $cipher->decrypt($aesIn[0]);
   }
-  Log3 undef, 3, "EnOcean_sec_VAES: RLC " . unpack('H32', $rlc) . " aesOut0: " . unpack('H32', $aesOut[0]);
+  Log3 $name, 5, "EnOcean $name EnOcean_sec_VAES RLC: " . unpack('H32', $rlc) . " aesOut0: " . unpack('H32', $aesOut[0]);
   # data out 1
   $dataLength = length($dataIn[0]);
   #$dataIn[0] = pack('H32', $dataIn[0] . '0' x (32 - $dataLength));
@@ -18383,7 +18384,7 @@ sub EnOcean_sec_VAES($$$$) {
     $dataOut[$dataInCount] = substr(unpack('H32', $dataOut[$dataInCount]), 0, $dataLength);
     $dataInCount ++;
   }
-  Log3 undef, 3, "EnOcean_sec_VAES: RLC KEY array OUT: $dataOut[0] $dataOut[1]";
+  Log3 $name, 5, "EnOcean $name EnOcean_sec_VAES dataOut array: $dataOut[0] $dataOut[1]";
   return uc(join('', @dataOut));
 }
 
@@ -18450,7 +18451,7 @@ sub EnOcean_sec_getRLC($$$$) {
 	    $old_rlc = $attr{$name}{$rlcVar};
 	  }
 	}
-	Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC old: $old_rlc " . hex($old_rlc);
+	Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC current RLC: $old_rlc";
 
 	# Advance RLC by one
 	my $new_rlc = hex($old_rlc) + 1;
@@ -18485,7 +18486,7 @@ sub EnOcean_sec_getRLC($$$$) {
 		$attr{$name}{$rlcVar} = sprintf("%08X", $new_rlc);
 	}
 
-	Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC new: $attr{$name}{$rlcVar} $new_rlc";
+	Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC next RLC: $attr{$name}{$rlcVar}";
 	return $old_rlc;
 }
 
@@ -18500,14 +18501,12 @@ sub EnOcean_sec_getRLC($$$$) {
 # This function currently supports data with lentgh of less then 16bytes,
 # MAC for longer data is untested but specified
 #
-sub EnOcean_sec_generateMAC($$$) {
-	my $private_key = $_[0];
-	my $data = $_[1];
-	my $cmac_len = $_[2];
-
+sub EnOcean_sec_generateMAC($$$$) {
+	my ($hash, $private_key, $data, $cmac_len) = @_;
+        my $name = $hash->{NAME};
 	#print "Calculating MAC for data $data\n";
-        Log3 undef, 5, "EnOcean_sec_generateMAC Calculating MAC for data $data";
-	Log3 undef, 5, "EnOcean_sec_generateMAC private key ".unpack('H32', $private_key);
+        Log3 $name, 5, "EnOcean $name EnOcean_sec_generateMAC DATA: " . uc($data);
+	Log3 $name, 5, "EnOcean $name EnOcean_sec_generateMAC PK: " . uc(unpack('H32', $private_key));
 
 	# Pack data to 16byte byte string, padd with 10..0 binary
 	my $data_expanded = pack('H32', $data.'80');
@@ -18567,14 +18566,12 @@ sub EnOcean_sec_generateMAC($$$) {
 
 	# Encrypt data
 	my $cmac = $cipher->encrypt($data_expanded);
-
-	#print "CMAC ".unpack('H32', $cmac)."\n";
-        Log3 undef, 5, "EnOcean_sec_generateMAC CMAC ".unpack('H32', $cmac);
+        Log3 $name, 5, "EnOcean $name EnOcean_sec_generateMAC CMAC: " . uc(unpack('H32', $cmac));
 
 	# Extract specified len of MAC
 	my $cmac_pattern = '^(.{'.($cmac_len * 2).'})';
 	unpack('H32', $cmac) =~ /$cmac_pattern/;
-	Log3 undef, 5, "EnOcean_sec_generateMAC cutted CMAC ".unpack('H32', $1);
+	Log3 $name, 5, "EnOcean $name EnOcean_sec_generateMAC cutted CMAC: " . uc($1);
 
 	# Return MAC in hexadecimal format
 	return uc($1);
@@ -18647,15 +18644,14 @@ sub EnOcean_sec_convertToNonsecure($$$) {
     $mac = $2;
   }
   my $old_rlc = $rlc;
-  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure RORG: $rorg DATA_ENC: $data_enc";
+  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure RORG-S: $rorg crypted DATA: $data_enc";
   if ($expect_rlc == 1) {
-    Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure RLC: $rlc";
+    Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure received RLC: $rlc";
   };
-  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure MAC: $mac";
+  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure received MAC: $mac";
 
   # Maximum RLC search window is 128
   foreach my $rlc_window (0..128) {
-    #print "Trying RLC offset $rlc_window\n";
     # Fetch stored RLC
     $rlc = EnOcean_sec_getRLC($hash, "rlcRcv", $expect_rlc, $rlc);
     # Fetch private Key for VAES
@@ -18666,12 +18662,11 @@ sub EnOcean_sec_convertToNonsecure($$$) {
     }
 
     # Generate and check MAC over RORG+DATA+RLC fields
-    if ($mac eq EnOcean_sec_generateMAC($private_key, $rorg . $data_enc . $rlc, $mac_len)) {
-      #print "RLC verfified\n";
-      # Expand RLC to 16byte
+    if ($mac eq EnOcean_sec_generateMAC($hash, $private_key, $rorg . $data_enc . $rlc, $mac_len)) {
+      # Expand RLC to 16 byte
       my $rlc_expanded = pack('H32', $rlc);
 
-      # Expand data to 16byte
+      # Expand data to 16 byte
       my $data_expanded = pack('H32', $data_enc);
 
       # Decode data using VAES
@@ -18764,24 +18759,31 @@ sub EnOcean_sec_createTeachIn($$$$$$$$$$$) {
     # RLC and PK must be decrypted with PSK
     $info |= 8;
     my $pskData = $attr{$name}{rlcSnd} . $attr{$name}{keySnd};
-    $pskData = EnOcean_sec_VAES('0000', $attr{$name}{psk}, $pskData, 1);
+    $pskData = EnOcean_sec_VAES($hash, '0000', $attr{$name}{psk}, $pskData, 1);
     $pskData =~ /^(.*)(.{32})$/;
     $pKey = $2;
     $rlc = $1;
   }
-  Log3 $hash->{NAME}, 3, "EnOcean_sec_createTeachIn: send Info0: " . sprintf("%02X", $info) . " SLF: " . sprintf("%02X", $slf) . " RLC: $rlc pKey: $pKey";
+  # secure teach-in chaining, first data length max. 11 bytes
+  # bisher wurden x byte rlc und fest 10 bytes pKey1 gesendet!
+  my $pKey1Length = 24 - length($rlc);
+  $pKey =~ /^(.{$pKey1Length})(.*)$/;
+  my $pKey1 = $1;
+  my $pKey2 = $2;
+
+  Log3 $hash->{NAME}, 3, "EnOcean $hash->{NAME} send secure Teach-In INFO: " . sprintf("%02X", $info) . " SLF: " . sprintf("%02X", $slf) . " RLC: $rlc PK: $pKey";
 
   #RORG = 35, TEACH_IN_INFO_1, KEY, ID, STATUS as defined in Security_of_EnOcean_Radio_Networks.pdf page 17
-  #data 1: info slf rlc k1 k2 k3 k4 k5
-  $data = sprintf("%02X%02X", $info, $slf) . $rlc . substr($pKey, 0, 5*2);
+  #data 1: info slf rlc pKey1
+  $data = sprintf("%02X%02X", $info, $slf) . $rlc . $pKey1;
   EnOcean_SndCdm(undef, $hash, 1, "35", $data, $subDef, "00", $destinationID);
   #EnOcean_SndCdm <> EnOcean_SndRadio
 
   # prepare 2nd telegram
   #set TEACH_IN_INFO = 40 -> 0100.0000 -> IDX =1, CNT = 0, PSK = 0, TYPE = 0, INFO = 0
-  #sent 2nd 11 bytes of private key
-  #data 2: 40 k6 k7 k8 k9 k10 k11 k12 k13 k14 k15 k16
-  $data = "40" . substr($pKey, 10, 11*2);
+  #sent 2nd part private key
+  #data 2: 40 pKey2
+  $data = "40" . $pKey2;
   EnOcean_SndCdm(undef, $hash, 1, "35", $data, $subDef, "00", $destinationID);
   #EnOcean_SndCdm <> EnOcean_SndRadio
   return (undef, "secure teach-in", 2);
@@ -18799,16 +18801,17 @@ sub EnOcean_sec_convertToSecure($$$$) {
   return ($err, $rorg, $data, $response, 5) if ($rorg =~ m/^F6|35|D0$/ || $secLevel !~ m/^encapsulation|encryption$/ || $subType eq "STE" || $subTypeSet eq "switch");
   return ("Cryptographic functions are not available", undef, undef, $response, 2) if ($cryptFunc == 0);
   my $dataEnc = AttrVal($name, "dataEnc", undef);
+  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToSecure RORG: $rorg DATA: $data";
 
-  #Get and update RLC
+  #get and update RLC
   my $rlc = EnOcean_sec_getRLC($hash, "rlcSnd", 0, undef);
-  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToSecure: Got actual RLC: $rlc";
+  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToSecure RLC: $rlc";
   my $rlc_expanded = pack('H32', $rlc);
 
   #Get key of device
   my $pKey = AttrVal($name, "keySnd", undef);
   return("private key not defined", $rorg, $data, $response, 2) if (!defined($pKey));
-  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToSecure: key: $pKey";
+  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToSecure PK: $pKey";
   $pKey = pack('H32', $pKey);
   #prepare data
   if ($subType eq "switch.00" || $subType eq "windowHandle.10") {
@@ -18837,18 +18840,18 @@ sub EnOcean_sec_convertToSecure($$$$) {
     $data_end =~ /^.(.)/;
     $data_end = "0$1";
   }
-  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToSecure: RORG-S: $rorgs Crypted Data: $data_end";
+  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToSecure RORG-S: $rorgs crypted DATA: ". uc($data_end);
   # calc MAC
   my $macAlgo = AttrVal($name, "macAlgo", undef);
   return("MAC Algorithm not defined", $rorgs, $data, $response, 2) if (!defined($macAlgo));
-  my $mac = EnOcean_sec_generateMAC($pKey, $rorgs . $data_end . $rlc, $macAlgo);
+  my $mac = EnOcean_sec_generateMAC($hash, $pKey, $rorgs . $data_end . $rlc, $macAlgo);
   # combine message
   if (AttrVal($name, 'rlcTX', 'false') eq 'true') {
     $data = uc($data_end . $rlc . $mac);
   } else {
     $data = uc($data_end . $mac);
   }
-  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToSecure: RORG-S: $rorgs Crypted Payload: $data";
+  Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToSecure RORG-S: $rorgs crypted Payload: $data";
   return(undef, $rorgs, $data, $response, 5);
 }
 
