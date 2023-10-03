@@ -3,9 +3,6 @@
 #and various extension to the GPIO4 Module by members of the FHEM forum
 #and RoBue to access 1-Wire-Clones with ID: 28 53 44 54 xx xx xx 
 
-#Possible Extensions:
-#Writing to the switches is not supported (but I also don't have the HW to test that)
-
 package main;
 use strict;
 use warnings;
@@ -75,16 +72,6 @@ sub RPI_1Wire_Notify {
 sub RPI_1Wire_Define {			#
 	my ($hash, $def) = @_;
 	Log3 $hash->{NAME}, 2, $hash->{NAME}." Define: $def";
-	$hash->{setList}	= {
-		"update" => "noArg",
-		"scan" => "noArg",
-		"precision" => "9,10,11,12",
-		"conv_time" => "textField",
-		"therm_bulk_read" => "on,off",
-	};
-	$hash->{getList}= {
-		"udev"      => "noArg",
-	};
 	
 	$hash->{NOTIFYDEV} = "global";
 		if ($init_done) {
@@ -106,6 +93,11 @@ sub RPI_1Wire_Init {				#
 	}
 
 	my @a = split("[ \t]+", $args);
+	my $force=0;
+	if (@a==2) {
+		$force=1 if ($a[1] eq "force");
+		pop @a;
+	}
 	if (@a!=1)	{
 		return "syntax: define <name> RPI_1Wire <id>|BUSMASTER|DHT11-<gpio>|DHT22-<gpio>";
 	}
@@ -124,7 +116,7 @@ sub RPI_1Wire_Init {				#
 		$id=abs($2) if defined $2; #abs to get rid of the "-"
 		if (! -e $ms_path.$id) {
 			readingsSingleUpdate($hash,"failreason","Device not found",0);
-			return "Device $device $id does not exist";
+			return "Device $device $id does not exist" if $force==0;
 		}
 	} elsif ($arg =~ /DHT(11|22)-(\d+)/) {
 		return "Module RPi::DHT missing (see https://github.com/bublath/rpi-dht)" if defined $DHT_missing;
@@ -132,7 +124,7 @@ sub RPI_1Wire_Init {				#
 		$family="DHT".$1;
 		$device=$family;
 	} else {
-		return "Device $arg does not exist" if (! -e "$w1_path/$arg" and $check==1); #Only quit if coming from interactive define
+		return "Device $arg does not exist" if (! -e "$w1_path/$arg" and $check==1 and $force==0); #Only quit if coming from interactive define
 		($family, $id) = split('-',$arg);
 		return "Unknown device family $family" if !defined $RPI_1Wire_Devices{$family};
 		$device=$RPI_1Wire_Devices{$family}{name};
@@ -142,31 +134,19 @@ sub RPI_1Wire_Init {				#
 	$hash->{family}=$family;
 	my $type=$RPI_1Wire_Devices{$family}{type};
 	
-	if ($type ne "temperature") {
-		delete($hash->{setList}{precision});
-		delete($hash->{setList}{conv_time});
-	} else {
-		if (!(-w "$w1_path/$arg/conv_time")) {
-			delete($hash->{setList}{conv_time});
-			$hash->{helper}{write}.="conv_time " if (-e "$w1_path/$arg/conv_time"); 
+	# Check existance and write permissions to print udev hint
+	if ($type eq "temperature") {
+		if (-e "$w1_path/$arg/conv_time" && !-w "$w1_path/$arg/conv_time") {
+			$hash->{helper}{write}.="conv_time "; 
 		}
-		if (!(-w "$w1_path/$arg/resolution")) {
-			delete($hash->{setList}{precision});
-			$hash->{helper}{write}.="resolution " if (-e "$w1_path/$arg/resolution") ;
+		if (-e "$w1_path/$arg/resolution" && !-w "$w1_path/$arg/resolution") {
+			$hash->{helper}{write}.="resolution ";
 		}
 	}
-	#remove set commands that make no sense
-	if ($device ne "BUSMASTER") {
-		delete($hash->{setList}{scan});
-		delete($hash->{setList}{therm_bulk_read});
-	} else {
-		my $bulk=ReadingsVal($name,"therm_bulk_read","off");
-		if (! -w $ms_path.$id."/therm_bulk_read") {
-			delete($hash->{setList}{therm_bulk_read});
-			delete($hash->{setList}{update});
-			readingsSingleUpdate($hash, 'therm_bulk_read', "off",0);
-		} elsif ($bulk eq "on") {
-			$hash->{setList}{update}="noArg"; #Restore set command in case it was deleted previously
+	if ($device eq "BUSMASTER") {
+		if (!-w "$w1_path/$arg/therm_bulk_read") {
+			readingsSingleUpdate($hash, 'therm_bulk_read', "off",0); 
+			$hash->{helper}{write}.="therm_bulk_read " if (-e $ms_path.$id."/therm_bulk_read" )
 		}
 	}
 	RPI_1Wire_Set($hash, $name, "setfromreading");
@@ -210,6 +190,7 @@ sub RPI_1Wire_GetDevices {
 		close($fh);
 	}
 	$hash->{devices}=join(" ",@devices);
+	$hash->{devcnt}=scalar(@devices);
 	return;
 }
 
@@ -306,32 +287,97 @@ sub RPI_1Wire_SetConversion {
 	return;
 }
 
+sub RPI_1Wire_Switch {
+	my ($hash,$switch)= @_;
+	Log3 $hash->{NAME}, 3, $hash->{NAME}.": Switching $hash->{DEF} to $switch";
+	my $fh;
+	my $path="$w1_path/$hash->{DEF}/output";
+	if (open($fh, ">", $path)) {
+		print $fh pack("C",$switch);
+		close($fh);
+	} else {
+		return "Error writing to $w1_path/$hash->{DEF}/output";
+	}
+	#After setting switch, read back to set readings correctly
+	my $ret=RPI_1Wire_Poll($hash);
+	RPI_1Wire_FinishFn($ret);
+	return;
+	
+}
+
 sub RPI_1Wire_Set {
 
 	my ( $hash, $name, @args ) = @_;
-	return unless defined $hash->{setList};
-	my %sets=%{$hash->{setList}};
 	### Check Args
 	my $numberOfArgs  = int(@args);
 	return "RPI_1Wire_Set: No cmd specified for set" if ( $numberOfArgs < 1 );
 	my $device=$hash->{DEF};
+	my $family=$hash->{family};
+	my $id=$hash->{id};
+	my $type=$RPI_1Wire_Devices{$family}{type};
 
 	my $cmd = shift @args;
-	if (!exists($sets{$cmd}))  {
-		my @cList;
-		foreach my $k (keys %sets) {
-			my $opts = undef;
-			$opts = $sets{$k};
+	my $sets="";
+	if ($type eq "temperature") {
+		if (-w "$w1_path/$device/conv_time") {
+			$sets.="conv_time:textField ";
+		}
+		if (-w "$w1_path/$device/resolution") {
+			$sets.="precision:9,10,11,12 ";
+		}
+	}
+	if ($type eq "switch" or $type eq "2p-switch") {
+		$sets.="pioa:on,off piob:on,off ";
+	}
+	if ($type eq "8p-switch") {
+		for my $i ((0..7)) {
+		$sets.="pio".$i.":on,off ";
+		}
+	}
+	if ($device =~ /(BUSMASTER)(-\d)?$/) {
+		$sets.="scan:noArg ";
+		if (-w $ms_path.$id."/therm_bulk_read") {
+			$sets.="therm_bulk_read:on,off ";
+			my $bulk=ReadingsVal($name,"therm_bulk_read","off");
+			$sets.="update:noArg " if ($bulk eq "on");
+		}
+	} else {
+		$sets.="update:noArg clear:noArg ";
+	}
 
-			if (defined($opts)) {
-				push(@cList,$k . ':' . $opts);
+	if ( $cmd eq "?" ) {
+		return "RPI_1Wire_Set: Unknown argument $cmd, choose one of " . $sets;
+	} 
+	if ($cmd =~ /^pio(a|b)/ and @args==1) {
+		my $val=shift @args;
+		Log3 $name, 3, $name." set pio $1 $val\n";
+		my $set=0;
+		if ($cmd eq "pioa") {
+			$set=ReadingsVal($name,"piob","0")*2+($val eq "on"?1:0);
+		} else {
+			$set=ReadingsVal($name,"pioa","0")+($val eq "on"?1:0)*2;
+		}
+		if ($type eq "2p-switch") {
+			$set=($set^3); #bits are inverted on DS2413
+		}
+		return RPI_1Wire_Switch($hash,$set);
+	}
+	if ($cmd =~ /^pio(\d)/ and @args==1) {
+		my $val=shift @args;
+		Log3 $name, 3, $name." set pio $1 $val\n";
+		my $id=$1;
+		my $set=0;
+		for my $i (0..7) {
+			my $bit=2**$i;
+			if ($i==$id) {
+				$set+=($val eq "on"?1:0)*$bit;
 			} else {
-				push (@cList,$k);
+				$set+=ReadingsVal($name,"pio".$i,"0")*$bit;
 			}
 		}
-		return "RPI_1Wire_Set: Unknown argument $cmd, choose one of " . join(" ", @cList);
-	} # error unknown cmd handling
-
+		return RPI_1Wire_Switch($hash,$set);
+	}
+	
 	if ($cmd eq "precision" and @args==1) {
 		my $ret=RPI_1Wire_SetPrecision($hash,$args[0]);
 		return $ret if defined $ret;
@@ -339,6 +385,9 @@ sub RPI_1Wire_Set {
 	} elsif ($cmd eq "scan") {
 		RPI_1Wire_GetDevices($hash);
 		return;
+	} elsif ($cmd eq "clear") {
+		readingsSingleUpdate($hash, 'failreason', "cleared",0);
+		readingsSingleUpdate($hash, 'failures', "0",0);
 	} elsif ($cmd eq "update") {
 		RPI_1Wire_GetConfig($hash);
 		return RPI_1Wire_DeviceUpdate($hash);
@@ -346,6 +395,8 @@ sub RPI_1Wire_Set {
 		my $ret=RPI_1Wire_SetConversion($hash,$args[0]);
 		return $ret if defined $ret;
 		RPI_1Wire_GetConfig($hash);
+	} elsif ($cmd eq "switch" and @args==1) {
+		return RPI_1Wire_Switch($hash,$args[0]);
 	} elsif ($cmd eq "therm_bulk_read" and @args==1) {
 		if ($args[0] eq "on") {
 			readingsSingleUpdate($hash, 'therm_bulk_read', "on",1);
@@ -353,38 +404,22 @@ sub RPI_1Wire_Set {
 		} else {
 			readingsSingleUpdate($hash, 'therm_bulk_read', "off",1);
 		}
+	} else {
+		return "RPI_1Wire_Set: Unknown argument $cmd, choose one of " . $sets;
 	}
 	return;
 }
 
 sub RPI_1Wire_Get {
 	my ($hash, $name, @args) = @_;
-	return unless defined $hash->{getList};
 	my $family=$hash->{family};
 	return unless defined $family;
 	my $type=$RPI_1Wire_Devices{$family}{type};
-	return unless $type eq "temperature";
 	return unless $hash->{helper}{write} ne "";
-	my %gets=%{$hash->{getList}};
 	my $numberOfArgs  = int(@args);
 	return "RPI_1Wire_Get: No cmd specified for get" if ( $numberOfArgs < 1 );
 
 	my $cmd = shift @args;
-
-	if (!exists($gets{$cmd}))  {
-		my @cList;
-		foreach my $k (keys %gets) {
-			my $opts = undef;
-			$opts = $gets{$k};
-
-			if (defined($opts)) {
-				push(@cList,$k . ':' . $opts);
-			} else {
-				push (@cList,$k);
-			}
-		}
-		return "RPI_1Wire_Get: Unknown argument $cmd, choose one of " . join(" ", @cList);
-	} # error unknown cmd handling
 
 	if ($cmd eq "udev") {
 		my $ret= "In order to be able to use some functionality , write access to certain devices is required\n";
@@ -400,7 +435,7 @@ sub RPI_1Wire_Get {
 		
 		return $ret.$script;
 	}
-	return;
+	return "RPI_1Wire_Get: Unknown argument $cmd, choose one of udev:noArg";
 }
 
 sub RPI_1Wire_GetConfig {
@@ -432,23 +467,26 @@ sub RPI_1Wire_GetConfig {
 sub RPI_1Wire_Poll {
 	my $start = [gettimeofday];
 	my ($hash) = @_;
-	my $device=$hash->{DEF};
 	my $family=$hash->{family};
 	my $type=$RPI_1Wire_Devices{$family}{type};
 	my @path=split(",",$RPI_1Wire_Devices{$family}{path});
 	my $id=$hash->{id};
 	my $name=$hash->{NAME};
+	my $device=$family."-".$id;
 	my $temperature;
 	my $humidity;
 	my @counter;
 	
-	return if ($device eq "BUSMASTER");
+	return if ($family eq "BUSMASTER");
 	
 	my $retval=$name;
 	my $file="";
 	my @data;
 	foreach (@path) {
 		$file="$w1_path/$device/$_";
+		#if ($type =~ /switch/) {
+		#	$file="/home/pi/state";
+		#}
 		if ($family =~ /DHT(11|22)/) { 
 			my $env = RPi::DHT->new($id,$1,1);
 			Log3 $name, 4 , $name.": Using RPi::DHT for $id DHT-$1";
@@ -530,19 +568,23 @@ sub RPI_1Wire_Poll {
 	
 	##################### UNTESTED ####################
 	if ($type =~ /switch/) {
-		my $pins=unpack("c",$data[0]); # Binary bits
+		my $pins=unpack("C",$data[0]); # Binary bits
 		my $data_bin=sprintf("%008b", $pins);
-		my @pio=split("",$data_bin);
+		my @pio=reverse(split("",$data_bin)); #Array order is backwards from bit order
+		Log3 $hash->{NAME}, 5, $hash->{NAME}.": Switch state:".join(",",@pio);
 		if ($type eq "8p-switch") {
-			my $pin=7;
+			my $pin=0;
 			foreach (@pio) {
-				$retval.=" pio".$pin."=".$_;
+				$retval.=" pio".$pin++."=".$_;
 			}
 		} else {
-			$retval.= " pioa=".$pio[0];
 			if ($type eq "2p-switch") {
-				$retval.= " piob=".$pio[2];
+				$retval.= " pioa=".($pio[0]^1);
+				$retval.= " latcha=".($pio[1]^1);
+				$retval.= " piob=".($pio[2]^1);
+				$retval.= " latchb=".($pio[3]^1);
 			} else {
+				$retval.= " pioa=".$pio[0];
 				$retval.= " piob=".$pio[1];
 			}
 		}	
@@ -669,14 +711,14 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/RPI_1Wire">Wiki<
 <ul>
 		provides an interface to devices connected through the standard Raspberry 1-Wire interface (GPIO4) and is aware of the following devices:<br><br>
 		<li>Family 0x10 (DS18S20) temperature</li>
-		<li>Family 0x12 (DS2406) adressable 2 port switch (read only, untested)</li>
+		<li>Family 0x12 (DS2406) adressable 2 port switch (untested)</li>
 		<li>Family 0x19 (DS28E17) i2c bridge (unsupported)</li>
 		<li>Family 0x1c (DS28E04) eeprom memory (unsupported)</li>
 		<li>Family 0x1d (DS2423) dual counter</li>
 		<li>Family 0x26 (DS2438) a/d converter with temperature support</li>
 		<li>Family 0x28 (DS18B20) temperature</li>
-		<li>Family 0x29 (DS2408) 8 port switch (read only, untested)</li>
-		<li>Family 0x3a (DS2413) adressable 2 port switch (read only, untested)</li>
+		<li>Family 0x29 (DS2408) 8 port switch (untested)</li>
+		<li>Family 0x3a (DS2413) adressable 2 port switch</li>
 		<li>Family 0x3b (DS1825) temperature</li>
 		<li>Family 0x42 (DS28EA00) temperature</li>
 		<li>DHT11/DHT22 sensors (adressable GPIO) temperature, humidity</li>
@@ -691,6 +733,7 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/RPI_1Wire">Wiki<
 		Having a BUSMASTER is not required unless you like to use autocreate or the therm_bulk_read feature.<br>
 		The internal reading "devices" will list all the device IDs associated with the BUSMASTER.<br>
 		In case you defined more than one w1_bus_master in your system, you can use "BUSMASTER-x", where "x" is the number of w1_bus_master<b>x</b> in the sysfs, to explicitly define it. Default is always to use "1".<br>
+		Note: To define a FHEM device for a device that is physically not present, provide "force" as second argument to override the check.<br>
 		</li>
 		<li>ff-xxxxxxxxxxxx is the id of a 1-Wire device as shown in sysfs tree where ff is the family. To use 1-Wire sensors call "sudo raspi-config" and enable the "1-Wire Interface" under "Interface options".</li>
 		<li>DHT11|12-&lt;gpio&gt defines a DHT11 or DHT22 sensor where gpio is the number of the used GPIO. This requires an additional Perl module which can be aquired <a href="https://github.com/bublath/rpi-dht">here</a>. Make sure to define the right type, since DHT11 and DHT22 sensors are similar, but require different algorithms to read. Also note that these are not 1-Wire (GPIO4) sensors and should be attached to GPIOs different to 4 and require one GPIO each.</li>
@@ -728,6 +771,22 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/RPI_1Wire">Wiki<
 		Only available for BUSMASTER: Trigger a bulk read (in non-blocking mode) for ALL temperature sensors at once. The next read from the temperature sensors will return immediately, so it will be safe to set them to "blocking" mode, if the pollingInterval for BUSMASTER is smaller than the lowest pollingInterval for all sensors.<br>
 		Requires Linux Kernel 5.10+ (Raspbian Buster) and write permissions to sysfs (see "get udev")<br>
 		<b>Note:</b> There seems to be a Kernel bug, that breaks this feature if there are other 1-Wire devices on GPIO4 than temperature sensors using w1_therm driver.<br>
+		</li>
+		<li><b>set clear</b><br>
+		<a id="RPI_1Wire-set-clear"></a>
+		Clears the failures counter.
+		</li>
+		<li><b>set pioa on|off</b><br>
+		<a id="RPI_1Wire-set-pioa"></a>
+		Sets the pioa of a 2 port switch to on or off.
+		</li>
+		<li><b>set piob on|off</b><br>
+		<a id="RPI_1Wire-set-piob"></a>
+		Sets the piob of a 2 port switch to on or off.
+		</li>
+		<li><b>set pio(0-7) on|off</b><br>
+		<a id="RPI_1Wire-set-pio0"></a>
+		Sets the according pio of a 8 port switch (0-7) to on or off. (untested)
 		</li>
 	</ul>
 
@@ -786,12 +845,14 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/RPI_1Wire">Wiki<
 	<ul>
 		<br>
 		<li><b>failures</b></li>
-		Counts the failed read attempts (due to unavaible devices, empty data or CRC failures)<br>
+		Counts the failed read attempts (due to unavaible devices, empty data or CRC failures).<br>
+		Use "set clear" to reset this counter (e.g. after a hardware issue was resolved)<br>
 		<li><b>failreason</b></li>
 		Reason for the last seen failure:
 		<li>crc: data could be read, but there was a checksum failure. If that happens too often, check you cabling quality</li>
 		<li>no_data: The device could be opened, but no data was received</li>
 		<li>open_device: The device could not be opened. Likely it was disconnected</li>
+		<li>cleared: The counter has just been cleared with "set clear"</li>
 		<li><b>duration</b></li>
 		Duration of the last read out. In modes blocking and timer a warning is put into failreason if this get more than 0.5s<br>
 		<li><b>conv_time</b></li>
@@ -808,6 +869,8 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/RPI_1Wire">Wiki<
 		Voltage readings from the device (DS2438)<br>
 		<li><b>pioa/piob</b></li>
 		Switch states for dual port switches<br>
+		<li><b>latcha/latchb</b></li>
+		Latch states for DS2413. This device differentiates between the actual state of the switch and the the state of the current request (latch).<br>
 		<li><b>pio1 ... pio8</b></li>
 		Switch states for 8 port switches<br>
 	</ul>

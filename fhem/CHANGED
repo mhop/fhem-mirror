@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it. 
+ - change   58_RPI_1Wire: Added: Support for setting switches, clear command
  - new:     76_SolarForecast: solar predictions of PV systems/Consumer control
  - new:     70_PylonLowVoltage: new module for Pylontech low volt batteries
  - change:  88_HMCCU: Fixed bug in GetDutyCycle
