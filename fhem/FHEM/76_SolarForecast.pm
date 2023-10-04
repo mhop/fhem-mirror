@@ -144,6 +144,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.0.1"  => "03.10.2023  fixes in comRef, bug fix Forum: https://forum.fhem.de/index.php?msg=1288637 ",
   "1.0.0"  => "01.10.2023  preparation for check in ",
   "0.83.3" => "28.09.2023  fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1288032 ".
                            "delete AllPVforecastsToEvent after event generation ",
@@ -3671,6 +3672,8 @@ sub __VictronVRM_ApiResponseForecast {
 
           my $k = 0;
           while ($jdata->{'records'}{'solar_yield_forecast'}[$k]) {
+              next if(ref $jdata->{'records'}{'solar_yield_forecast'}[$k] ne "ARRAY");                             # Forum: https://forum.fhem.de/index.php?msg=1288637
+              
               my $starttmstr = $jdata->{'records'}{'solar_yield_forecast'}[$k][0];                                 # Millisekunden geliefert
               my $val        = $jdata->{'records'}{'solar_yield_forecast'}[$k][1];
               $starttmstr    = (timestampToTimestring ($starttmstr, $lang))[3];
@@ -3690,6 +3693,8 @@ sub __VictronVRM_ApiResponseForecast {
 
           $k = 0;
           while ($jdata->{'records'}{'vrm_consumption_fc'}[$k]) {
+              next if(ref $jdata->{'records'}{'vrm_consumption_fc'}[$k] ne "ARRAY");                             # Forum: https://forum.fhem.de/index.php?msg=1288637
+              
               my $starttmstr = $jdata->{'records'}{'vrm_consumption_fc'}[$k][0];                                 # Millisekunden geliefert
               my $val        = $jdata->{'records'}{'vrm_consumption_fc'}[$k][1];
               $starttmstr    = (timestampToTimestring ($starttmstr, $lang))[3];
@@ -14768,7 +14773,7 @@ to ensure that the system configuration is correct.
             <tr><td>                  </td><td>factor/0..1 - quality of the PV forecast (1 = best quality)                     </td></tr>
             <tr><td> <b>DoN</b>       </td><td>sunrise and sunset status (0 - night, 1 - day)                                  </td></tr>
             <tr><td> <b>hourofday</b> </td><td>current hour of the day                                                         </td></tr>
-            <tr><td> <b>pvapifc</b>   </td><td>expected PV generation (Wh) of the API used                                     </td></tr>
+            <tr><td> <b>pvapifc</b>   </td><td>expected PV generation (Wh) of the used API incl. a possible correction         </td></tr>
             <tr><td> <b>pvaifc</b>    </td><td>expected PV generation of the AI (Wh)                                           </td></tr>
             <tr><td> <b>pvfc</b>      </td><td>PV generation forecast used (Wh)                                                </td></tr>
             <tr><td> <b>aihit</b>     </td><td>delivery status of the AI for the PV forecast (0-no delivery, 1-delivery)       </td></tr>
@@ -16531,7 +16536,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                  </td><td>Faktor/0..1 - Qualität der PV Prognose (1 = beste Qualität)                        </td></tr>
             <tr><td> <b>DoN</b>       </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                               </td></tr>
             <tr><td> <b>hourofday</b> </td><td>laufende Stunde des Tages                                                          </td></tr>
-            <tr><td> <b>pvapifc</b>   </td><td>erwartete PV Erzeugung (Wh) der verwendeten API                                    </td></tr>
+            <tr><td> <b>pvapifc</b>   </td><td>erwartete PV Erzeugung (Wh) der verwendeten API inkl. einer eventuellen Korrektur  </td></tr>
             <tr><td> <b>pvaifc</b>    </td><td>erwartete PV Erzeugung der KI (Wh)                                                 </td></tr>
             <tr><td> <b>pvfc</b>      </td><td>verwendete PV Erzeugungsprognose (Wh)                                              </td></tr>
             <tr><td> <b>aihit</b>     </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)         </td></tr>
