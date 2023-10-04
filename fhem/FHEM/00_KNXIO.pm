@@ -60,6 +60,9 @@
 # 13/07/2023 cleanup
 #            moved KNX_scan function to KNX-Module, KNX_scan cmdline cmd into new Module 98_KNX_scan.pm
 # 25/08/2023 reorg opendev for mode X
+# 02/10/2023 Rate limit for write (set/get-cmd) from KNX-Modul
+#            remove unused imports...
+#            add $readingFnAttributes to AttrList
 
 
 package KNXIO; ## no critic 'package'
@@ -72,7 +75,7 @@ use Time::HiRes qw(gettimeofday);
 use DevIo qw(DevIo_OpenDev DevIo_SimpleWrite DevIo_SimpleRead DevIo_CloseDev DevIo_Disconnected DevIo_IsOpen);
 use TcpServerUtils qw(TcpServer_Open TcpServer_SetLoopbackMode TcpServer_MCastAdd TcpServer_MCastRemove 
     TcpServer_MCastSend TcpServer_MCastRecv TcpServer_Close);
-use HttpUtils qw(HttpUtils_gethostbyname HttpUtils_gethostbyname ip2str);
+use HttpUtils qw(HttpUtils_gethostbyname ip2str);
 use feature qw(switch);
 no if $] >= 5.017011, warnings => 'experimental';
 use GPUtils qw(GP_Import GP_Export); # Package Helper Fn
@@ -91,23 +94,25 @@ use GPUtils qw(GP_Import GP_Export); # Package Helper Fn
 BEGIN {
     # Import from main context
     GP_Import(
-        qw(readingsSingleUpdate readingsBulkUpdate readingsBulkUpdateIfChanged readingsBeginUpdate readingsEndUpdate
+        qw(readingsSingleUpdate readingsBeginUpdate readingsEndUpdate
+          readingsBulkUpdate readingsBulkUpdateIfChanged
           Log3
           AttrVal AttrNum ReadingsVal ReadingsNum
+          readingFnAttributes
           AssignIoPort IOWrite
-          CommandDefine CommandDelete CommandModify CommandDefMod
           DoTrigger
           Dispatch
-          defs modules attr cmds
-          readingFnAttributes
+          defs attr
           selectlist readyfnlist 
           InternalTimer RemoveInternalTimer
           init_done
           IsDisabled IsDummy IsDevice
           devspec2array
-          AnalyzePerlCommand EvalSpecials
           TimeNow)
     );
+#          CommandDefine CommandDelete CommandModify CommandDefMod
+#          AnalyzePerlCommand EvalSpecials
+#          modules cmds
 }
 
 # export to main context
@@ -134,7 +139,7 @@ sub Initialize {
 	$hash->{UndefFn}    = \&KNXIO_Undef;
 	$hash->{ShutdownFn} = \&KNXIO_Shutdown;
 
-	$hash->{AttrList}   = 'disable:1 verbose:1,2,3,4,5 enableKNXscan:0,1,2';
+	$hash->{AttrList}   = 'disable:1 verbose:1,2,3,4,5 enableKNXscan:0,1,2 ' . $readingFnAttributes;
 	$hash->{Clients}    = 'KNX';
 	$hash->{MatchList}  = { '1:KNX' => '^C.*' };
 
@@ -160,7 +165,7 @@ sub KNXIO_Define {
 	$hash->{model} = $mode; # use it also for fheminfo statistics
 
 	# handle mode X for FHEM2FHEM configs
-	return InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDevX,$hash) if ($mode eq q{X});
+	return InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDev,$hash) if ($mode eq q{X});
 
 	return q{KNXIO-define syntax: "define <name> KNXIO <H|M|T> <ip-address|hostname>:<port> <phy-adress>" } . "\n" . 
 	       q{         or          "define <name> KNXIO S <pathToUnixSocket> <phy-address>" } if (scalar(@arg) < 5);
@@ -256,8 +261,6 @@ sub KNXIO_Read {
 	my $name = $hash->{NAME};
 	my $mode = $hash->{model};
 
-#	return if IsDisabled($name); # move after read function 8/2023
-
 	my $buf = undef;
 	if ($mode eq 'M') {
 		my ($rhost,$rport) = ::TcpServer_MCastRecv($hash, $buf, 1024);
@@ -270,7 +273,7 @@ sub KNXIO_Read {
 		return;
 	}
 
-	return if IsDisabled($name);
+	return if IsDisabled($name); # moved after read function 8/2023
 
 	KNXIO_Log ($name, 5, 'buf=' . unpack('H*',$buf));
 
@@ -419,7 +422,7 @@ sub KNXIO_ReadH {
 				return;
 			}
 			KNXIO_Log ($name, 4, q{TunnelRequest received - send Ack and decode. } .
-                              qq{seqcntrRx= $hash->{KNXIOhelper}->{SEQUENCECNTR}} ) if (! defined($discardFrame));
+			          qq{seqcntrRx= $hash->{KNXIOhelper}->{SEQUENCECNTR}} ) if (! defined($discardFrame));
 			my $tacksend = pack('nnnCCCC',0x0610,0x0421,10,4,$ccid,$hash->{KNXIOhelper}->{SEQUENCECNTR},0); # send ack
 			$hash->{KNXIOhelper}->{SEQUENCECNTR}++;
 			$hash->{KNXIOhelper}->{SEQUENCECNTR} = 0 if ($hash->{KNXIOhelper}->{SEQUENCECNTR} > 255);
@@ -456,7 +459,7 @@ sub KNXIO_ReadH {
 			RemoveInternalTimer($hash,\&KNXIO_keepAlive);
 			if ($errcode > 0) {
 				KNXIO_Log ($name, 3, q{ConnectionResponse received } .
-                                      qq{CCID= $hash->{KNXIOhelper}->{CCID} Status=} . KNXIO_errCodes($errcode));
+				          qq{CCID= $hash->{KNXIOhelper}->{CCID} Status=} . KNXIO_errCodes($errcode));
 				KNXIO_disconnect($hash,2);
 				return;
 			}
@@ -464,7 +467,6 @@ sub KNXIO_ReadH {
 			$hash->{PhyAddr} = KNXIO_addr2hex($phyaddr,2); # correct Phyaddr.
 
 			KNXIO_handleConn($hash);
-			KNXIO_Log ($name, 3, q{connected});
 			$hash->{KNXIOhelper}->{SEQUENCECNTR} = 0;
 			return InternalTimer(gettimeofday() + 60, \&KNXIO_keepAlive, $hash); # start keepalive
 		}
@@ -561,24 +563,51 @@ sub KNXIO_Write {
 		}
 		elsif ($mode eq 'M') {
 			$completemsg = pack('nnnnnnnCCC*',0x0610,0x0530,$datasize + 16,0x2900,0xBCE0,$src,$dst,$datasize,0,@data); # use src addr
-			$ret = ::TcpServer_MCastSend($hash,$completemsg);
 		}
 		else { # $mode eq 'H'
 			# total length= $size+20 - include 2900BCEO,src,dst,size,0
 			$completemsg = pack('nnnCC',0x0610,0x0420,$datasize + 20,4,$hash->{KNXIOhelper}->{CCID}) .
 			               pack('CCnn',$hash->{KNXIOhelper}->{SEQUENCECNTR_W},0,0x1100,0xBCE0) .
 			               pack('nnCCC*',$src,$dst,$datasize,0,@data); # send TunnelInd
-
-			# Timeout function - expect TunnelAck within 1 sec! - but if fhem has a delay....
-			$hash->{KNXIOhelper}->{LASTSENTMSG} = unpack('H*',$completemsg); # save msg for resend in case of TO
-			InternalTimer(gettimeofday() + 1.5, \&KNXIO_TunnelRequestTO, $hash);
 		}
 
-		$ret = ::DevIo_SimpleWrite($hash,$completemsg,0) if ($mode ne 'M');
-		KNXIO_Log ($name, 4, qq{Mode= $mode buf=} . unpack('H*',$completemsg) . qq{ rc= $ret});
-		return;
+		## rate limit
+		push(@{$hash->{KNXIOhelper}->{FIFOW}},$mode,$completemsg);
+		return KNXIO_Write2($hash);
 	}
 	KNXIO_Log ($name, 2, qq{Could not send message $msg});
+	return;
+}
+
+### handle send que and send control msg-rate
+sub KNXIO_Write2 {
+	my $hash = shift;
+
+	my $timenow = gettimeofday();
+	my $lastwrite = $hash->{KNXIOhelper}->{lastWrite} // $timenow;
+	my $adddelay = (scalar(@{$hash->{KNXIOhelper}->{FIFOW}}) - 2) * 0.1;
+	if ($lastwrite > $timenow) {
+		KNXIO_Log ($hash->{NAME}, 3, q{frequent IO-write cmd - delayed});
+		InternalTimer($lastwrite + $adddelay, \&KNXIO_Write2,$hash);
+		return;
+	}
+	$hash->{KNXIOhelper}->{lastWrite} = $timenow + 0.2; # add delay
+	my $mode        = shift(@{$hash->{KNXIOhelper}->{FIFOW}});
+	my $completemsg = shift(@{$hash->{KNXIOhelper}->{FIFOW}});
+
+	my $ret = q{};
+	if ($mode eq 'M') {
+		$ret = ::TcpServer_MCastSend($hash,$completemsg);
+	}
+	else {
+		$ret = ::DevIo_SimpleWrite($hash,$completemsg,0);
+		if ($mode eq 'H') {
+			# Timeout function - expect TunnelAck within 1 sec! - but if fhem has a delay....
+			$hash->{KNXIOhelper}->{LASTSENTMSG} = unpack('H*',$completemsg); # save msg for resend in case of TO
+			InternalTimer($timenow + 1.5, \&KNXIO_TunnelRequestTO, $hash);
+		}
+	}
+	KNXIO_Log ($hash->{NAME}, 4, qq{Mode= $mode buf=} . unpack('H*',$completemsg) . qq{ rc= $ret});
 	return;
 }
 
@@ -678,22 +707,7 @@ sub KNXIO_openDev {
 
 	return if (IsDisabled($name) == 1);
 
-=pod
-	# handle mode X first
-	if ($mode eq 'X') {
-		my @f2flist = devspec2array('TYPE=FHEM2FHEM'); # get F2F devices
-		foreach my $f2fdev (@f2flist) {
-			next if (IsDevice($f2fdev) == 0); # no F2Fdevice found
-			my $rawdev = $defs{$f2fdev}->{rawDevice};
-			next if (IsDevice($rawdev,'KNXIO') == 0);
-			next if ($rawdev ne $name);
-			KNXIO_init($hash);
-			return;
-		}
-		readingsSingleUpdate($hash, 'state', 'disconnected', 1);
-		return qq{KNXIO_openDev ($name): open failed};
-	}
-=cut
+	return KNXIO_openDevX($hash) if ($mode eq q{X});
 
 	if (exists $hash->{DNSWAIT}) {
 		$hash->{DNSWAIT} += 1;
@@ -789,8 +803,6 @@ sub KNXIO_openDevX {
 	my $hash = shift;
 	my $name = $hash->{NAME};
 
-	return if (IsDisabled($name) == 1);
-
 	my @f2flist = devspec2array('TYPE=FHEM2FHEM'); # get F2F devices
 	foreach my $f2fdev (@f2flist) {
 		next if (IsDevice($f2fdev) == 0); # no F2Fdevice found
@@ -823,7 +835,6 @@ sub KNXIO_init {
 	# state 'connected' is set in decode_EMI (model ST) or in readH (model H)  
 	else {
 		KNXIO_handleConn($hash);
-		KNXIO_Log ($name, 3, q{connected});
 	}
 
 	return;
@@ -837,6 +848,7 @@ sub KNXIO_handleConn {
 	my $name = $hash->{NAME};
 
 	if (exists($hash->{KNXIOhelper}->{startdone})) {
+		KNXIO_Log ($name, 3, q{connected});
 		readingsSingleUpdate($hash, 'state', 'connected', 1);
 		main::KNX_scan('TYPE=KNX:FILTER=IODev=' . $name) if (AttrNum($name,'enableKNXscan',0) >= 2); # on every connect
 	}
@@ -1041,7 +1053,6 @@ sub KNXIO_decodeEMI {
 		if ($id == 0x0026) {
 			KNXIO_Log ($name, 4, 'OpenGrpCon response received');
 			KNXIO_handleConn($hash);
-			KNXIO_Log ($name, 3, q{connected});
 		}
 		else {
 			KNXIO_Log ($name, 3, 'invalid message code ' . sprintf('%04x',$id));
@@ -1215,7 +1226,7 @@ sub KNXIO_TunnelRequestTO {
 	# send disco request
 	my $hpai = pack('nCCCCn',(0x0801,0,0,0,0,0));
 	my $msg = pack('nnnCC',(0x0610,0x0209,16,$hash->{KNXIOhelper}->{CCID},0)) . $hpai;
-	::DevIo_SimpleWrite($hash,$msg,0); #  send disconn requ
+	::DevIo_SimpleWrite($hash,$msg,0);
 	return;
 }
 
