@@ -15708,7 +15708,8 @@ to ensure that the system configuration is correct.
        <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt; &lt;Label&gt;:&lt;Reading&gt; ... </b><br>
          Display of any reading values of the device. The values to be displayed are separated by spaces.
          Each value is to be defined by a label and the corresponding reading connected by ":".
-         The input can be multiline. Spaces in the label are to be inserted by "&amp;nbsp;".
+         The input can be multiline. Spaces in the label are to be inserted by "&amp;nbsp;", a line break
+         by "&lt;br&gt;".
          <br><br>
 
        <ul>
@@ -17493,7 +17494,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt; &lt;Label&gt;:&lt;Reading&gt; ... </b><br>
          Anzeige beliebiger Readingswerte des Devices. Die anzuzeigenden Werte werden durch Leerzeichen getrennt.
          Jeder Wert ist jeweils durch ein Label und das dazugehörige Reading verbunden durch ":" zu definieren.
-         Die Eingabe kann mehrzeilig erfolgen. Leerzeichen im Label sind durch "&amp;nbsp;" einzufügen.
+         Die Eingabe kann mehrzeilig erfolgen. Leerzeichen im Label sind durch "&amp;nbsp;" einzufügen, ein Zeilenumbruch
+         durch "&lt;br&gt;".
          <br><br>
 
        <ul>
