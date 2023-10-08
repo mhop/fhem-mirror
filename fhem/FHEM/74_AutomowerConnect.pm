@@ -167,6 +167,10 @@ __END__
       <code>set &lt;name&gt; Start &lt;number of minutes&gt;</code><br>
       Starts immediately for &lt;number of minutes&gt;</li>
 
+    <li><a id='AutomowerConnect-set-StartInWorkArea'>StartInWorkArea</a><br>
+      <code>set &lt;name&gt; StartInWorkArea &lt;workAreaId&gt; [&lt;number of minutes&gt;]</code><br>
+      Starts immediately in &lt;workAreaId&gt; for &lt;number of minutes&gt;</li>
+
     <li><a id='AutomowerConnect-set-chargingStationPositionToAttribute'>chargingStationPositionToAttribute</a><br>
       <code>set &lt;name&gt; chargingStationPositionToAttribute</code><br>
       Sets the calculated charging station coordinates to the corresponding attributes.</li>
@@ -204,7 +208,7 @@ __END__
       Load the command reference example into the attribute mapZones.</li>
 
     <li><a id='AutomowerConnect-set-defaultDesignAttributesToAttribute'>defaultDesignAttributesToAttribute</a><br>
-      <code>set &lt;name&gt; mapZonesTemplateToAttribute</code><br>
+      <code>set &lt;name&gt; defaultDesignAttributesToAttribute</code><br>
       Load default design attributes.</li>
     <br><br>
   </ul>
@@ -223,7 +227,7 @@ __END__
 
     <li><a id='AutomowerConnect-get-MowerData'>MowerData</a><br>
       <code>get &lt;name&gt; MowerData</code><br>
-      Lists all mower data with its hash path exept positon array. The hash path can be used for generating userReadings. The trigger is <i>connected</i>.<br>
+      Lists all mower data with its hash path exept positon array. The hash path can be used for generating userReadings. The trigger is e.g. <i>device_state: connected</i> or <i>mower_wsEvent: &lt;status-event|positions-event|settings-event&gt;</i>.<br>
       Example: created reading <code>serialnumber</code> with hash path <code>$hash->{helper}{mower}{attributes}{system}{serialNumber}</code><br><br>
       <code>attr &lt;name&gt; userReadings serialnumber:connected {$defs{$name}->{helper}{mower}{attributes}{system}{serialNumber}}</code></li>
 
@@ -526,6 +530,10 @@ __END__
       <code>set &lt;name&gt; Start &lt;number of minutes&gt;</code><br>
       Startet sofort für &lt;number of minutes&gt;</li>
 
+    <li><a id='AutomowerConnect-set-StartInWorkArea'>StartInWorkArea</a><br>
+      <code>set &lt;name&gt; StartInWorkArea &lt;workAreaId&gt; [&lt;number of minutes&gt;]</code><br>
+      Startet sofort in &lt;workAreaId&gt; für &lt;number of minutes&gt;</li>
+
     <li><a id='AutomowerConnect-set-chargingStationPositionToAttribute'>chargingStationPositionToAttribute</a><br>
       <code>set &lt;name&gt; chargingStationPositionToAttribute</code><br>
       Setzt die berechneten Koordinaten der LS in das entsprechende Attribut.</li>
@@ -563,7 +571,7 @@ __END__
       Läd das Beispiel aus der Befehlsreferenz in das Attribut mapZones.</li>
 
      <li><a id='AutomowerConnect-set-defaultDesignAttributesToAttribute'>defaultDesignAttributesToAttribute</a><br>
-      <code>set &lt;name&gt; mapZonesTemplateToAttribute</code><br>
+      <code>set &lt;name&gt; defaultDesignAttributesToAttribute</code><br>
       Läd die Standartdesignattribute.</li>
       <br>
   </ul>
@@ -586,7 +594,7 @@ __END__
 
     <li><a id='AutomowerConnect-get-MowerData'>MowerData</a><br>
       <code>get &lt;name&gt; MowerData</code><br>
-      Listet alle Daten des Mähers einschließlich Hashpfad auf ausgenommen das Positonsarray. Der Hashpfad kann zur Erzeugung von userReadings genutzt werden, getriggert wird durch <i>connected</i>.<br>
+      Listet alle Daten des Mähers einschließlich Hashpfad auf ausgenommen das Positonsarray. Der Hashpfad kann zur Erzeugung von userReadings genutzt werden, getriggert wird durch e.g. <i>device_state: connected</i> oder <i>mower_wsEvent: &lt;status-event|positions-event|settings-event&gt;</i>.<br>
       Beispiel: erzeugen des Reading <code>serialnumber</code> mit dem Hashpfad <code>$hash->{helper}{mower}{attributes}{system}{serialNumber}</code><br><br>
       <code>attr &lt;name&gt; userReadings serialnumber:connected {$defs{$name}->{helper}{mower}{attributes}{system}{serialNumber}}</code></li>
 
