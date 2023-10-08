@@ -32,6 +32,7 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.23.6" => "24.09.2023  add BAT_P_Charge/Discarge",
   "2.23.5" => "25.06.2023  buxfix line 1267",
   "2.23.4" => "20.06.2023  buxfix DC-Power 2.0",
   "2.23.3" => "19.06.2023  buxfix DC-Power",
@@ -704,6 +705,7 @@ sub SMAInverter_getstatusDoParse($) {
 	 $sup_BatteryInfo_IDC,
 	 $sup_BatteryInfo_Capacity,
 	 $sup_BatteryInfo_Capac,
+	 $sup_BatteryInfo_Charge,
      $sup_SpotGridFrequency,
      $sup_TypeLabel,
      $sup_OperationTime,
@@ -743,6 +745,7 @@ sub SMAInverter_getstatusDoParse($) {
 	 $inv_SPOT_CosPhi,
      $inv_BAT_UDC, $inv_BAT_UDC_A, $inv_BAT_UDC_B, $inv_BAT_UDC_C, 
      $inv_BAT_IDC, $inv_BAT_IDC_A, $inv_BAT_IDC_B, $inv_BAT_IDC_C,
+	 $inv_BAT_P_Charge, $inv_BAT_P_Discharge,
      $inv_BAT_CYCLES, $inv_BAT_CYCLES_A, $inv_BAT_CYCLES_B, $inv_BAT_CYCLES_C,
      $inv_BAT_TEMP, $inv_BAT_TEMP_A, $inv_BAT_TEMP_B, $inv_BAT_TEMP_C,
      $inv_BAT_LOADTODAY, $inv_BAT_LOADTOTAL, $inv_BAT_CAPACITY,$inv_BAT_UNLOADTODAY,$inv_BAT_UNLOADTOTAL,
@@ -926,6 +929,7 @@ sub SMAInverter_getstatusDoParse($) {
 		 elsif ($INVTYPE_NAME =~ /SBS(1\.5|2\.0|2\.5)/xs || $INVCLASS eq "8009")
 		 {
 			push(@commands, "sup_BatteryInfo_2");     # Check BatteryInfo Voltage
+			push(@commands, "sup_BatteryInfo_Charge");
 		 }
 		 elsif($INVCLASS eq "8009" || $INVCLASS eq "8007")
 		 {
@@ -957,7 +961,7 @@ sub SMAInverter_getstatusDoParse($) {
 		    push(@commands, "sup_BatteryInfo_Capacity") if($readParameter == 1);  # Check BatteryInfo capacity
 			#push(@commands, "sup_BatteryInfo_3");     
 			push(@commands, "sup_BatteryInfo_4") if($readParameter == 1);   # Check BatteryInfo rated apacity 
-			#push(@commands, "sup_BatteryInfo_5");  
+			#push(@commands, "sup_BatteryInfo_5");    
 		  }
 		  
 		  #push(@commands, "sup_Insulation_1");  # Isolationsüberwachung
@@ -1042,6 +1046,10 @@ sub SMAInverter_getstatusDoParse($) {
 			 elsif ($i eq "sup_BatteryInfo_IDC") {
 				 Log3 $name, 5, "$name -> sup_BatteryInfo_IDC";
                  ($sup_BatteryInfo_IDC,$inv_BAT_IDC,$inv_BAT_IDC_A,$inv_BAT_IDC_B,$inv_BAT_IDC_C,$inv_susyid,$inv_serial)     = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00495D00, 0x00495D10);
+		     }
+			 elsif ($i eq "sup_BatteryInfo_Charge") {
+				 Log3 $name, 5, "$name -> sup_BatteryInfo_Charge";
+                 ($sup_BatteryInfo_Charge,$inv_BAT_P_Charge,$inv_BAT_P_Discharge,$inv_susyid,$inv_serial)     = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00496900, 0x00496AFF);
 		     }
              elsif ($i eq "sup_BatteryInfo_Capacity") {
 				 Log3 $name, 5, "$name -> sup_BatteryInfo_Capacity";
@@ -1141,7 +1149,7 @@ sub SMAInverter_getstatusDoParse($) {
              }
 			 elsif ($i eq "sup_Insulation_1") {
 			     Log3 ($name, 4, "$name -> sup_Insulation_1");
-                 ($sup_Insulation_1,$inv_DC_Residual_Current,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51020200, 0x40254E00, 0x40254EFF);
+                 ($sup_Insulation_1,$inv_DC_Residual_Current,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51020200, 0x40254E00, 0x40254FFF);
              }
 			 elsif ($i eq "sup_Insulation_2") {
 			     Log3 ($name, 4, "$name -> sup_Insulation_2");
@@ -1362,6 +1370,10 @@ sub SMAInverter_getstatusDoParse($) {
 				 if($sup_BatteryInfo_Capacity) {
                      push(@row_array, "bat_capacity ".$inv_BAT_CAPACITY."\n"); #TTT
 				 }
+				 if($sup_BatteryInfo_Charge) {
+                     push(@row_array, "bat_p_charge ".($inv_BAT_P_Charge/1000)."\n"); #TTT
+                     push(@row_array, "bat_p_discharge ".($inv_BAT_P_Discharge/1000)."\n"); #TTT
+				 }
              }
 
              if($detail_level > 1) {
@@ -1573,6 +1585,11 @@ sub SMAInverter_getstatusDoParse($) {
 				 if($sup_BatteryInfo_Capacity) {
 					push(@row_array, "BAT_CAPACITY ".$inv_BAT_CAPACITY."\n") if ($inv_BAT_CAPACITY ne "-"); #TTT
 			     }
+				 
+				 if($sup_BatteryInfo_Charge) {
+                     push(@row_array, "BAT_P_CHARGE ".$inv_BAT_P_Charge."\n"); #TTT
+                     push(@row_array, "BAT_P_DISCHARGE ".$inv_BAT_P_Discharge."\n"); #TTT
+				 }
              }
 
              if($detail_level > 1) {
@@ -1790,6 +1807,7 @@ sub SMAInverter_SMAcommand($$$$$) {
 	 $inv_SPOT_CosPhi,
      $inv_BAT_UDC, $inv_BAT_UDC_A, $inv_BAT_UDC_B, $inv_BAT_UDC_C, 
      $inv_BAT_IDC, $inv_BAT_IDC_A, $inv_BAT_IDC_B, $inv_BAT_IDC_C,
+	 $inv_BAT_P_Charge, $inv_BAT_P_Discharge,
      $inv_BAT_CYCLES, $inv_BAT_CYCLES_A, $inv_BAT_CYCLES_B, $inv_BAT_CYCLES_C,
      $inv_BAT_TEMP, $inv_BAT_TEMP_A, $inv_BAT_TEMP_B, $inv_BAT_TEMP_C,
      $inv_BAT_LOADTODAY, $inv_BAT_LOADTOTAL, $inv_BAT_CAPACITY,$inv_BAT_UNLOADTODAY,$inv_BAT_UNLOADTOTAL,
@@ -2334,7 +2352,16 @@ sub SMAInverter_SMAcommand($$$$$) {
      return (1,$inv_BAT_rated_capacity,$inv_susyid,$inv_serial);
  }
  
-  if ($data_ID eq 0x495B && $INVTYPE_NAME =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs) {
+ if ($data_ID eq 0x4969) {
+
+     $inv_BAT_P_Charge   	= unpack("V*", substr $data, 62, 4);
+     $inv_BAT_P_Discharge   = unpack("V*", substr $data, 90, 4);
+	 
+     Log3 $name, 5, "$name - Found Data inv_BAT_P_Charge=$inv_BAT_P_Charge and inv_BAT_P_Discharge=$inv_BAT_P_Discharge";
+     return (1,$inv_BAT_P_Charge,$inv_BAT_P_Discharge,$inv_susyid,$inv_serial);
+ }
+ 
+ if ($data_ID eq 0x495B && $INVTYPE_NAME =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs) {
 
      $inv_BAT_TEMP   = unpack("V*", substr $data, 62, 4) / 10;
      $inv_BAT_UDC    = unpack("V*", substr $data, 90, 4) / 100;
@@ -3106,7 +3133,9 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 <li><b>BAT_IDC [A,B,C] / bat_idc [A,B,C]</b>        :  Battery Current [A,B,C]</li>
 <li><b>BAT_TEMP [A,B,C] / bat_temp [A,B,C]</b>      :  Battery temperature [A,B,C]</li>
 <li><b>BAT_UDC [A,B,C] / bat_udc [A,B,C]</b>        :  Battery Voltage [A,B,C]</li>
-<li><b>BAT_PDC / bat_pdc</b>       					:  Battery power (only Hybrid-Inverter)</li>
+<li><b>BAT_PDC / bat_pdc</b>       					:  Battery power (only Hybrid-Inverter), calculated from I and U</li>
+<li><b>BAT_P_CHARGE / bat_p_charge</b> 				:  Battery chargepower (only Hybrid-Inverter)</li>
+<li><b>BAT_P_DISCHARGE / bat_p_discharge</b> 		:  Battery dischargepower (only Hybrid-Inverter)</li>
 <li><b>ChargeStatus / chargestatus</b>      		:  Battery Charge status </li>
 <li><b>BAT_CAPACITY / bat_capacity</b>              :  Battery (remaining) Capacity (SOH)</li>
 <li><b>BAT_RATED_CAPACITY / bat_rated_capacity</b>  :  Battery reted Capacity Wh/kWh</li>
@@ -3378,7 +3407,9 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <li><b>BAT_IDC [A,B,C] / bat_idc [A,B,C]</b>        :  Akku Strom [A,B,C]</li>
 <li><b>BAT_TEMP [A,B,C] / bat_temp [A,B,C]</b>      :  Akku Temperatur [A,B,C]</li>
 <li><b>BAT_UDC [A,B,C] / bat_udc [A,B,C]</b>        :  Akku Spannung [A,B,C]</li>
-<li><b>BAT_PDC / bat_pdc</b> 						:  Akku Leistung (bei Hybridwechselrichtern)</li>
+<li><b>BAT_PDC / bat_pdc</b> 						:  Akku Leistung (bei Hybridwechselrichtern), berechneter Wert aus Strom und Spannung</li>
+<li><b>BAT_P_CHARGE / bat_p_charge</b> 				:  Akku Ladeleistung (bei Hybridwechselrichtern)</li>
+<li><b>BAT_P_DISCHARGE / bat_p_discharge</b> 		:  Akku Entladeleistung (bei Hybridwechselrichtern)</li>
 <li><b>ChargeStatus / chargestatus</b>      		:  Akku Ladestand </li>
 <li><b>BAT_CAPACITY / bat_capacity</b>         		:  Battery (verbleibende) Kapazität (SOH)</li>
 <li><b>BAT_RATED_CAPACITY / bat_rated_capacity</b>  :  Battery Nennkapazität Wh/kWh</li>
@@ -3476,7 +3507,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.23.5",
+  "version": "v2.23.6",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
