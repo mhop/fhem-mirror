@@ -144,6 +144,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.0.3"  => "08.10.2023  change graphic header PV/CO detail, new attr graphicHeaderOwnspec, internal code changes ".
+                           "fix isAddSwitchOffCond 0 Forum: https://forum.fhem.de/index.php?msg=1288877 ".
+                           "change calcValueImproves and subroutines ",
   "1.0.2"  => "05.10.2023  replace calcRange by cloud2bin ",
   "1.0.1"  => "03.10.2023  fixes in comRef, bug fix Forum: https://forum.fhem.de/index.php?msg=1288637 ",
   "1.0.0"  => "01.10.2023  preparation for check in ",
@@ -670,6 +673,10 @@ my %hqtxt = (                                                                   
               DE => qq{ab <WT> Minuten vor dem kommenden Sonnenaufgang}                                                     },
   dvtn   => { EN => qq{Deviation},
               DE => qq{Abweichung}                                                                                          },
+  pvgen  => { EN => qq{Generation},
+              DE => qq{Erzeugung}                                                                                           },
+  conspt => { EN => qq{Consumption},
+              DE => qq{Verbrauch}                                                                                           },
   tday   => { EN => qq{today},
               DE => qq{heute}                                                                                               },
   yday   => { EN => qq{yesterday},
@@ -1028,7 +1035,8 @@ sub Initialize {
                                 "graphicBeam2FontColor:colorpicker,RGB ".
                                 "graphicBeam1MaxVal ".
                                 "graphicEnergyUnit:Wh,kWh ".
-                                "graphicHeaderDetail:all,co,pv,pvco,statusLink ".
+                                "graphicHeaderOwnspec:textField-long ".
+                                "graphicHeaderDetail:multiple-strict,all,co,pv,own,status ".
                                 "graphicHeaderShow:1,0 ".
                                 "graphicHistoryHour:slider,0,1,23 ".
                                 "graphicHourCount:slider,4,1,24 ".
@@ -7152,7 +7160,7 @@ sub ___switchConsumerOn {
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - current Context is switching "on" => }.
                       qq{swoncond: $swoncond, on-command: $oncom }
            );
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOnCond Info: $infon}) if($swoncond && $infon);
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOnCond Info: $infon})   if($swoncond && $infon);
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOffCond Info: $infoff}) if($swoffcond && $infoff);
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - device >$dswname< is used as switching device});
 
@@ -8280,38 +8288,38 @@ sub entryGraphic {
       modulo         => 1,
       dstyle         => qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'},     # TD-Style
       offset         => $offset,
-      hourstyle      => AttrVal ($name,    'graphicHourStyle',                  ''),
-      colorb1        => AttrVal ($name,    'graphicBeam1Color',          $b1coldef),
-      colorb2        => AttrVal ($name,    'graphicBeam2Color',          $b2coldef),
-      fcolor1        => AttrVal ($name,    'graphicBeam1FontColor',  $b1fontcoldef),
-      fcolor2        => AttrVal ($name,    'graphicBeam2FontColor',  $b2fontcoldef),
-      beam1cont      => AttrVal ($name,    'graphicBeam1Content',         'pvReal'),
-      beam2cont      => AttrVal ($name,    'graphicBeam2Content',     'pvForecast'),
-      caicon         => AttrVal ($name,    'consumerAdviceIcon',        $caicondef),            # Consumer AdviceIcon
-      clegend        => AttrVal ($name,    'consumerLegend',            'icon_top'),            # Lage und Art Cunsumer Legende
-      clink          => AttrVal ($name,    'consumerLink'  ,                     1),            # Detail-Link zum Verbraucher
-      lotype         => AttrVal ($name,    'graphicLayoutType',           'double'),
-      kw             => AttrVal ($name,    'graphicEnergyUnit',               'Wh'),
-      height         => AttrNum ($name,    'graphicBeamHeight',                200),
+      hourstyle      => AttrVal ($name, 'graphicHourStyle',                  ''),
+      colorb1        => AttrVal ($name, 'graphicBeam1Color',          $b1coldef),
+      colorb2        => AttrVal ($name, 'graphicBeam2Color',          $b2coldef),
+      fcolor1        => AttrVal ($name, 'graphicBeam1FontColor',  $b1fontcoldef),
+      fcolor2        => AttrVal ($name, 'graphicBeam2FontColor',  $b2fontcoldef),
+      beam1cont      => AttrVal ($name, 'graphicBeam1Content',         'pvReal'),
+      beam2cont      => AttrVal ($name, 'graphicBeam2Content',     'pvForecast'),
+      caicon         => AttrVal ($name, 'consumerAdviceIcon',        $caicondef),                # Consumer AdviceIcon
+      clegend        => AttrVal ($name, 'consumerLegend',            'icon_top'),                # Lage und Art Cunsumer Legende
+      clink          => AttrVal ($name, 'consumerLink'  ,                     1),                # Detail-Link zum Verbraucher
+      lotype         => AttrVal ($name, 'graphicLayoutType',           'double'),
+      kw             => AttrVal ($name, 'graphicEnergyUnit',               'Wh'),
+      height         => AttrNum ($name, 'graphicBeamHeight',                200),
       width          => $width,
-      fsize          => AttrNum ($name,    'graphicSpaceSize',                  24),
-      maxVal         => AttrNum ($name,    'graphicBeam1MaxVal',                 0),            # dyn. Anpassung der Balkenhöhe oder statisch ?
-      show_night     => AttrNum ($name,    'graphicShowNight',                   0),            # alle Balken (Spalten) anzeigen ?
-      show_diff      => AttrVal ($name,    'graphicShowDiff',                 'no'),            # zusätzliche Anzeige $di{} in allen Typen
-      weather        => AttrNum ($name,    'graphicShowWeather',                 1),
-      colorw         => AttrVal ($name,    'graphicWeatherColor',      $wthcolddef),            # Wetter Icon Farbe Tag
-      colorwn        => AttrVal ($name,    'graphicWeatherColorNight', $wthcolndef),            # Wetter Icon Farbe Nacht
-      wlalias        => AttrVal ($name,    'alias',                          $name),
-      sheader        => AttrNum ($name,    'graphicHeaderShow',                  1),            # Anzeigen des Grafik Headers
-      hdrDetail      => AttrVal ($name,    'graphicHeaderDetail',            'all'),            # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
-      flowgsize      => AttrVal ($name,    'flowGraphicSize',        $flowGSizedef),            # Größe Energieflußgrafik
-      flowgani       => AttrVal ($name,    'flowGraphicAnimate',                 0),            # Animation Energieflußgrafik
-      flowgcons      => AttrVal ($name,    'flowGraphicShowConsumer',            1),            # Verbraucher in der Energieflußgrafik anzeigen
-      flowgconX      => AttrVal ($name,    'flowGraphicShowConsumerDummy',       1),            # Dummyverbraucher in der Energieflußgrafik anzeigen
-      flowgconsPower => AttrVal ($name,    'flowGraphicShowConsumerPower'     ,  1),            # Verbraucher Leistung in der Energieflußgrafik anzeigen
-      flowgconsTime  => AttrVal ($name,    'flowGraphicShowConsumerRemainTime',  1),            # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
-      flowgconsDist  => AttrVal ($name,    'flowGraphicConsumerDistance', $fgCDdef),            # Abstand Verbrauchericons zueinander
-      css            => AttrVal ($name,    'flowGraphicCss',               $cssdef),            # flowGraphicCss Styles
+      fsize          => AttrNum ($name, 'graphicSpaceSize',                  24),
+      maxVal         => AttrNum ($name, 'graphicBeam1MaxVal',                 0),                # dyn. Anpassung der Balkenhöhe oder statisch ?
+      show_night     => AttrNum ($name, 'graphicShowNight',                   0),                # alle Balken (Spalten) anzeigen ?
+      show_diff      => AttrVal ($name, 'graphicShowDiff',                 'no'),                # zusätzliche Anzeige $di{} in allen Typen
+      weather        => AttrNum ($name, 'graphicShowWeather',                 1),
+      colorw         => AttrVal ($name, 'graphicWeatherColor',      $wthcolddef),                # Wetter Icon Farbe Tag
+      colorwn        => AttrVal ($name, 'graphicWeatherColorNight', $wthcolndef),                # Wetter Icon Farbe Nacht
+      wlalias        => AttrVal ($name, 'alias',                          $name),
+      sheader        => AttrNum ($name, 'graphicHeaderShow',                  1),                # Anzeigen des Grafik Headers
+      hdrDetail      => AttrVal ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
+      flowgsize      => AttrVal ($name, 'flowGraphicSize',        $flowGSizedef),                # Größe Energieflußgrafik
+      flowgani       => AttrVal ($name, 'flowGraphicAnimate',                 0),                # Animation Energieflußgrafik
+      flowgcons      => AttrVal ($name, 'flowGraphicShowConsumer',            1),                # Verbraucher in der Energieflußgrafik anzeigen
+      flowgconX      => AttrVal ($name, 'flowGraphicShowConsumerDummy',       1),                # Dummyverbraucher in der Energieflußgrafik anzeigen
+      flowgconsPower => AttrVal ($name, 'flowGraphicShowConsumerPower'     ,  1),                # Verbraucher Leistung in der Energieflußgrafik anzeigen
+      flowgconsTime  => AttrVal ($name, 'flowGraphicShowConsumerRemainTime',  1),                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
+      flowgconsDist  => AttrVal ($name, 'flowGraphicConsumerDistance', $fgCDdef),                # Abstand Verbrauchericons zueinander
+      css            => AttrVal ($name, 'flowGraphicCss',               $cssdef),                # flowGraphicCss Styles
       lang           => AttrVal ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang)),
       debug          => getDebug ($hash),                                                        # Debug Module
   };
@@ -8585,13 +8593,6 @@ sub _graphicHeader {
   my $pvTo      = ReadingsNum ($name, "Tomorrow_PVforecast",                 0);
   my $pvCu      = ReadingsNum ($name, "Current_PV",                          0);
 
-  my $pvcorrf00  = NexthoursVal($hash, "NextHour00", "pvcorrf", "-/-");
-  my ($pcf,$pcq) = split "/", $pvcorrf00;
-  my $pvcanz     = qq{factor: $pcf / quality: $pcq};
-
-  my $pvfc00     = NexthoursVal   ($hash, 'NextHour00', 'pvfc', undef);
-  my $acu        = isAutoCorrUsed ($name);
-
   if ($kw eq 'kWh') {
       $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
       $coRe = sprintf("%.1f" , $coRe/1000)."&nbsp;kWh";
@@ -8628,8 +8629,8 @@ sub _graphicHeader {
 
   # Header Link + Status + Update Button
   #########################################
-  if($hdrDetail eq "all" || $hdrDetail eq "statusLink") {
-      my ($upicon,$scicon,$img);
+  if ($hdrDetail =~ /all|status/xs) {
+      my ($scicon,$img);
 
       my ($year, $month, $day, $time) = $lup =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
       $lup                            = "$year-$month-$day&nbsp;$time";
@@ -8638,25 +8639,11 @@ sub _graphicHeader {
          $lup = "$day.$month.$year&nbsp;$time";
       }
 
-      my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction - 0 get $name data')"};                               # Update Button generieren
-
-      if ($ftui eq 'ftui') {
-          $cmdupdate = qq{"ftui.setFhemStatus('set $name clientAction - 0 get $name data')"};
-      }
-
       my $cmdplchk = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name plantConfigCheck', function(data){FW_okDialog(data)})"};          # Plant Check Button generieren
 
       if ($ftui eq 'ftui') {
           $cmdplchk = qq{"ftui.setFhemStatus('get $name plantConfigCheck')"};
       }
-
-      my $cmdfcqal = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name forecastQualities imgget', function(data){FW_okDialog(data)})"};
-
-      if ($ftui eq 'ftui') {
-          $cmdfcqal = qq{"ftui.setFhemStatus('get $name forecastQualities imgget')"};
-      }
-
-      my $upstate = ReadingsVal($name, 'state', '');
 
       ## Anlagen Check-Icon
       #######################
@@ -8665,24 +8652,8 @@ sub _graphicHeader {
       my $chktitle = $htitles{plchk}{$lang};
 
       ## Update-Icon
-      ################
-      my $naup = ReadingsVal ($name, 'nextCycletime', '');
-      if ($upstate =~ /updated|successfully|switched/ix) {
-          $img    = FW_makeImage('10px-kreis-gruen.png', $htitles{upd}{$lang}.'&#10;'.$htitles{natc}{$lang}.' '.$naup.'');
-          $upicon = "<a onClick=$cmdupdate>$img</a>";
-      }
-      elsif ($upstate =~ /running/ix) {
-          $img    = FW_makeImage('10px-kreis-gelb.png', 'running');
-          $upicon = "<a>$img</a>";
-      }
-      elsif ($upstate =~ /initialized/ix) {
-          $img    = FW_makeImage('1px-spacer.png', 'initialized');
-          $upicon = "<a>$img</a>";
-      }
-      else {
-          $img    = FW_makeImage('10px-kreis-rot.png', $htitles{upd}{$lang}.' ('.$htitles{natc}{$lang}.' '.$naup.')');
-          $upicon = "<a onClick=$cmdupdate>$img</a>";
-      }
+      ################      
+      my $upicon =  __createUpdateIcon ($paref); 
 
       ## Sonnenauf- und untergang
       ############################
@@ -8693,25 +8664,7 @@ sub _graphicHeader {
 
       ## Autokorrektur-Icon
       ######################
-      my $aciimg;
-      my $acitit = q{};
-
-      if ($acu =~ /on/xs) {
-          $aciimg = FW_makeImage('10px-kreis-gruen.png', $htitles{on}{$lang}." ($acu)");
-      }
-      elsif ($acu =~ /standby/ixs) {
-          my $pcfa    = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');
-          my ($rtime) = $pcfa =~ /for (.*?) hours/x;
-          $img        = FW_makeImage('10px-kreis-gelb.png', $htitles{dela}{$lang});
-          $aciimg     = "$img&nbsp;(Start in ".$rtime." h)";
-      }
-      else {
-          $acitit = $htitles{akorron}{$lang};
-          $acitit =~ s/<NAME>/$name/xs;
-          $aciimg = '-';
-      }
-
-      my $acicon = qq{<a title="$acitit">$aciimg</a>};
+      my $acicon = __createAutokorrIcon ($paref);
 
       ## Solare API Sektion
       ########################
@@ -8830,40 +8783,11 @@ sub _graphicHeader {
 
       ## Qualitäts-Icon
       ######################
-      $pcq       =~ s/-/-1/xs;
-      my $pcqimg = $pcq < 0.00 ? FW_makeImage ('15px-blank',          $pvcanz) :
-                   $pcq < 0.60 ? FW_makeImage ('10px-kreis-rot.png',  $pvcanz) :
-                   $pcq < 0.80 ? FW_makeImage ('10px-kreis-gelb.png', $pvcanz) :
-                   FW_makeImage ('10px-kreis-gruen.png', $pvcanz);
-
-      my $pcqtit = q();
-
-      if(!$pvfc00 || $pcq == -1) {
-          $pcqimg = "-";
-          $pcqtit = $htitles{norate}{$lang};
-      }
-
-      my $pcqicon = qq{<a title="$pcqtit", onClick=$cmdfcqal>$pcqimg</a>};
+      my $pcqicon = __createQuaIcon ($paref);
 
       ## KI Status
       ##############
-      my $aiprep   = isPrepared4AI ($hash, 'full');                      # isPrepared4AI full vor Abfrage 'aicanuse' ausführen !
-      my $aicanuse = CurrentVal    ($hash, 'aicanuse',       '');
-      my $aitst    = CurrentVal    ($hash, 'aitrainstate', 'ok');
-      my $aihit    = NexthoursVal  ($hash, 'NextHour00', 'aihit', 0);
-
-      my $aitit = $aidtabs          ? $htitles{aimstt}{$lang} :
-                  $aicanuse ne 'ok' ? $htitles{ainuse}{$lang} :
-                  q{};
-      $aitit   =~ s/<NAME>/$name/xs;
-
-      my $aiimg  = $aidtabs          ? '--' :
-                   $aicanuse ne 'ok' ? '-'  :
-                   $aitst ne 'ok'    ? FW_makeImage ('10px-kreis-rot.png', $aitst) :
-                   $aihit            ? FW_makeImage ('10px-kreis-gruen.png', $hqtxt{aiwhit}{$lang}) :
-                   FW_makeImage ('10px-kreis-gelb.png', $hqtxt{aiwook}{$lang});
-
-      my $aiicon = qq{<a title="$aitit">$aiimg</a>};
+      my $aiicon = __createAIicon ($paref);
 
       ## Abweichung PV Prognose/Erzeugung
       #####################################
@@ -8922,9 +8846,9 @@ sub _graphicHeader {
 
   # Header Information pv
   ########################
-  if($hdrDetail eq "all" || $hdrDetail eq "pv" || $hdrDetail eq "pvco") {
+  if ($hdrDetail =~ /all|pv/xs) {
       $header .= "<tr>";
-      $header .= "<td $dstyle><b>PV&nbsp;=></b></td>";
+      $header .= "<td $dstyle><b>".$hqtxt{pvgen}{$lang}."&nbsp;</b></td>";
       $header .= "<td $dstyle><b>$lblPvCu</b></td> <td align=right $dstyle>$pvCu</td>";
       $header .= "<td $dstyle><b>$lblPv4h</b></td> <td align=right $dstyle>$pv4h</td>";
       $header .= "<td $dstyle><b>$lblPvRe</b></td> <td align=right $dstyle>$pvRe</td>";
@@ -8934,10 +8858,10 @@ sub _graphicHeader {
 
 
   # Header Information co
-  ########################
-  if($hdrDetail eq "all" || $hdrDetail eq "co" || $hdrDetail eq "pvco") {
+  #########################
+  if ($hdrDetail =~ /all|co/xs) {
       $header .= "<tr>";
-      $header .= "<td $dstyle><b>CO&nbsp;=></b></td>";
+      $header .= "<td $dstyle><b>".$hqtxt{conspt}{$lang}."&nbsp;</b></td>";
       $header .= "<td $dstyle><b>$lblPvCu</b></td><td align=right $dstyle>$coCu</td>";
       $header .= "<td $dstyle><b>$lblPv4h</b></td><td align=right $dstyle>$co4h</td>";
       $header .= "<td $dstyle><b>$lblPvRe</b></td><td align=right $dstyle>$coRe</td>";
@@ -8945,13 +8869,213 @@ sub _graphicHeader {
       $header .= "</tr>";
   }
 
-  $header .= qq{<tr>};
-  $header .= qq{<td colspan="9" align="left" $dstyle><hr></td>};
-  $header .= qq{</tr>};
+  if ($hdrDetail =~ /all|pv|co/xs) {
+      $header .= qq{<tr>};
+      $header .= qq{<td colspan="9" align="left" $dstyle><hr></td>};
+      $header .= qq{</tr>};
+  }
+  
+  # Header User Spezifikation
+  #############################
+  my $ownv = __createOwnSpec ($paref);
+  $header .= $ownv if($ownv);
 
   $header .= qq{</table>};
 
 return $header;
+}
+
+################################################################
+#    erstelle Update-Icon
+################################################################
+sub __createUpdateIcon {
+  my $paref = shift;
+  
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $lang  = $paref->{lang};
+  my $ftui  = $paref->{ftui};
+  
+  my $upstate = ReadingsVal ($name, 'state',         '');
+  my $naup    = ReadingsVal ($name, 'nextCycletime', '');
+  
+  my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction - 0 get $name data')"};                               # Update Button generieren
+
+  if ($ftui eq 'ftui') {
+      $cmdupdate = qq{"ftui.setFhemStatus('set $name clientAction - 0 get $name data')"};
+  }
+  
+  my ($img, $upicon);
+  
+  if ($upstate =~ /updated|successfully|switched/ix) {
+      $img    = FW_makeImage('10px-kreis-gruen.png', $htitles{upd}{$lang}.'&#10;'.$htitles{natc}{$lang}.' '.$naup.'');
+      $upicon = "<a onClick=$cmdupdate>$img</a>";
+  }
+  elsif ($upstate =~ /running/ix) {
+      $img    = FW_makeImage('10px-kreis-gelb.png', 'running');
+      $upicon = "<a>$img</a>";
+  }
+  elsif ($upstate =~ /initialized/ix) {
+      $img    = FW_makeImage('1px-spacer.png', 'initialized');
+      $upicon = "<a>$img</a>";
+  }
+  else {
+      $img    = FW_makeImage('10px-kreis-rot.png', $htitles{upd}{$lang}.' ('.$htitles{natc}{$lang}.' '.$naup.')');
+      $upicon = "<a onClick=$cmdupdate>$img</a>";
+  }
+
+return $upicon;
+}
+
+################################################################
+#    erstelle Autokorrektur-Icon
+################################################################
+sub __createAutokorrIcon {
+  my $paref = shift;
+  
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $lang  = $paref->{lang};
+  
+  my $aciimg;
+  my $acitit = q{};
+  my $acu    = isAutoCorrUsed ($name);
+
+  if ($acu =~ /on/xs) {
+      $aciimg = FW_makeImage ('10px-kreis-gruen.png', $htitles{on}{$lang}." ($acu)");
+  }
+  elsif ($acu =~ /standby/ixs) {
+      my $pcfa    = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');
+      my ($rtime) = $pcfa =~ /for (.*?) hours/x;
+      my $img     = FW_makeImage ('10px-kreis-gelb.png', $htitles{dela}{$lang});
+      $aciimg     = "$img&nbsp;(Start in ".$rtime." h)";
+  }
+  else {
+      $acitit = $htitles{akorron}{$lang};
+      $acitit =~ s/<NAME>/$name/xs;
+      $aciimg = '-';
+  }
+
+  my $acicon = qq{<a title="$acitit">$aciimg</a>};
+
+return $acicon;
+}
+
+################################################################
+#    erstelle Qualitäts-Icon
+################################################################     
+sub __createQuaIcon {
+  my $paref = shift;
+  
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $lang  = $paref->{lang};
+  my $ftui  = $paref->{ftui};
+  
+  my $pvfc00     = NexthoursVal ($hash, 'NextHour00', 'pvfc',    undef);
+  my $pvcorrf00  = NexthoursVal ($hash, "NextHour00", "pvcorrf", "-/-");
+  my ($pcf,$pcq) = split "/", $pvcorrf00;
+  my $pvcanz     = qq{factor: $pcf / quality: $pcq};
+  
+  my $cmdfcqal = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name forecastQualities imgget', function(data){FW_okDialog(data)})"};
+
+  if ($ftui eq 'ftui') {
+      $cmdfcqal = qq{"ftui.setFhemStatus('get $name forecastQualities imgget')"};
+  }
+
+  $pcq       =~ s/-/-1/xs;
+  my $pcqimg = $pcq < 0.00 ? FW_makeImage ('15px-blank',          $pvcanz) :
+               $pcq < 0.60 ? FW_makeImage ('10px-kreis-rot.png',  $pvcanz) :
+               $pcq < 0.80 ? FW_makeImage ('10px-kreis-gelb.png', $pvcanz) :
+               FW_makeImage ('10px-kreis-gruen.png', $pvcanz);
+
+  my $pcqtit = q();
+
+  if(!$pvfc00 || $pcq == -1) {
+      $pcqimg = "-";
+      $pcqtit = $htitles{norate}{$lang};
+  }
+
+  my $pcqicon = qq{<a title="$pcqtit", onClick=$cmdfcqal>$pcqimg</a>};
+
+return $pcqicon;
+}
+
+################################################################
+#    erstelle KI Icon
+################################################################
+sub __createAIicon {
+  my $paref    = shift;
+  
+  my $hash     = $paref->{hash};
+  my $name     = $paref->{name};
+  my $lang     = $paref->{lang};
+
+  my $aiprep   = isPrepared4AI ($hash, 'full');                      # isPrepared4AI full vor Abfrage 'aicanuse' ausführen !
+  my $aicanuse = CurrentVal    ($hash, 'aicanuse',       '');
+  my $aitst    = CurrentVal    ($hash, 'aitrainstate', 'ok');
+  my $aihit    = NexthoursVal  ($hash, 'NextHour00', 'aihit', 0);
+
+  my $aitit = $aidtabs          ? $htitles{aimstt}{$lang} :
+              $aicanuse ne 'ok' ? $htitles{ainuse}{$lang} :
+              q{};
+  $aitit   =~ s/<NAME>/$name/xs;
+
+  my $aiimg  = $aidtabs          ? '--' :
+               $aicanuse ne 'ok' ? '-'  :
+               $aitst ne 'ok'    ? FW_makeImage ('10px-kreis-rot.png', $aitst) :
+               $aihit            ? FW_makeImage ('10px-kreis-gruen.png', $hqtxt{aiwhit}{$lang}) :
+               FW_makeImage ('10px-kreis-gelb.png', $hqtxt{aiwook}{$lang});
+
+  my $aiicon = qq{<a title="$aitit">$aiimg</a>};
+
+return $aiicon;
+}
+
+################################################################
+#    erstelle Übersicht eigener Readings
+################################################################    
+sub __createOwnSpec {
+  my $paref     = shift;
+  
+  my $hash      = $paref->{hash};
+  my $name      = $paref->{name};
+  my $dstyle    = $paref->{dstyle};                                       # TD-Style
+  my $hdrDetail = $paref->{hdrDetail};
+  
+  my $vinr = 4;                                                           # Spezifikationen in einer Zeile 
+  my $spec = AttrVal ($name, 'graphicHeaderOwnspec', '');
+  my $show = $hdrDetail =~ /all|own/xs ? 1 : 0;
+  
+  return if(!$spec || !$show);
+  
+  my $ownv; 
+  my @vals = split (/\s+/sx, $spec);   
+  my $rows = ceil  (scalar(@vals) / $vinr);
+  my $col  = 0;
+  
+  for (my $i = 1 ; $i <= $rows; $i++) {
+      my $h; 
+      
+      for (my $k = 0 ; $k < $vinr; $k++) {
+          ($h->{$k}{label}, $h->{$k}{rdg}) = split ":", $vals[$col] if($vals[$col]);
+          $col++;
+      }
+      
+      $ownv .= "<tr>";
+      $ownv .= "<td $dstyle></td>";
+      $ownv .= "<td $dstyle><b>".$h->{0}{label}.":</b></td> <td align=right $dstyle>".ReadingsVal ($name,$h->{0}{rdg},'')."</td>" if(exists $h->{0}{label});
+      $ownv .= "<td $dstyle><b>".$h->{1}{label}.":</b></td> <td align=right $dstyle>".ReadingsVal ($name,$h->{1}{rdg},'')."</td>" if(exists $h->{1}{label});
+      $ownv .= "<td $dstyle><b>".$h->{2}{label}.":</b></td> <td align=right $dstyle>".ReadingsVal ($name,$h->{2}{rdg},'')."</td>" if(exists $h->{2}{label});
+      $ownv .= "<td $dstyle><b>".$h->{3}{label}.":</b></td> <td align=right $dstyle>".ReadingsVal ($name,$h->{3}{rdg},'')."</td>" if(exists $h->{3}{label});
+      $ownv .= "</tr>";
+  }
+  
+  $ownv .= qq{<tr>};
+  $ownv .= qq{<td colspan="9" align="left" $dstyle><hr></td>};
+  $ownv .= qq{</tr>};
+
+return $ownv;
 }
 
 ################################################################
@@ -9061,7 +9185,7 @@ sub _graphicConsumerLegend {
   $ctable   .= qq{<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>};
 
   my $cnum   = @consumers;
-  if($cnum > 1) {
+  if ($cnum > 1) {
       $ctable .= qq{<td style='text-align:left' $dstyle> $hqtxt{cnsm}{$lang}  </td>};
       $ctable .= qq{<td>                                                      </td>};
       $ctable .= qq{<td>                                                      </td>};
@@ -10315,6 +10439,7 @@ sub calcValueImproves {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $chour = $paref->{chour};
   my $t     = $paref->{t};                                                           # aktuelle Unix-Zeit
 
   my $idts = ReadingsTimestamp ($name, "currentInverterDev", "");                     # Definitionstimestamp des Inverterdevice
@@ -10346,11 +10471,18 @@ sub calcValueImproves {
   Log3 ($name, 4, "$name - INFO - The correction factors are now calculated and stored proactively independent of the autocorrection usage");
 
   $paref->{acu} = $acu;
-
-  _calcCaQcomplex   ($paref);                                            # Korrekturberechnung mit Bewölkung duchführen/speichern
-  _calcCaQsimple    ($paref);                                            # einfache Korrekturberechnung duchführen/speichern
-  _addHourAiRawdata ($paref);                                            # AI Instanz hinzufügen
-
+  
+  for my $h (1..23) {
+      next if(!$chour || $h > $chour);
+      $paref->{h} = $h;
+      
+      _calcCaQcomplex   ($paref);                                            # Korrekturberechnung mit Bewölkung duchführen/speichern
+      _calcCaQsimple    ($paref);                                            # einfache Korrekturberechnung duchführen/speichern
+      _addHourAiRawdata ($paref);                                            # AI Instanz hinzufügen
+      
+      delete $paref->{h};
+  }
+  
   delete $paref->{acu};
 
 return;
@@ -10364,78 +10496,77 @@ sub _calcCaQcomplex {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $chour = $paref->{chour};
   my $daref = $paref->{daref};
   my $debug = $paref->{debug};
   my $acu   = $paref->{acu};
+  my $h     = $paref->{h};
 
-  my $maxvar = AttrVal ($name, 'affectMaxDayVariance', $defmaxvar);                                       # max. Korrekturvarianz
+  my $maxvar = AttrVal     ($name, 'affectMaxDayVariance', $defmaxvar);                                   # max. Korrekturvarianz
+  my $sr     = ReadingsVal ($name, ".pvCorrectionFactor_".sprintf("%02d",$h)."_cloudcover", "");
 
-  for my $h (1..23) {
-      next if(!$chour || $h > $chour);
+  if ($sr eq "done") {
+      # Log3 ($name, 1, "$name DEBUG> Complex Corrf -> factor Hour: ".sprintf("%02d",$h)." already calculated");
+      return;
+  }
+  
+  debugLog ($paref, 'pvCorrection', "start calculation complex correction factor for hour: $h");
 
-      my $sr = ReadingsVal ($name, ".pvCorrectionFactor_".sprintf("%02d",$h)."_cloudcover", "");
+  my $pvre = CircularVal ($hash, sprintf("%02d",$h), 'pvrl',    0);
+  my $pvfc = CircularVal ($hash, sprintf("%02d",$h), 'pvapifc', 0);
+  
+  if (!$pvre || !$pvfc) {
+      push @$daref, ".pvCorrectionFactor_".sprintf("%02d",$h)."_cloudcover<>done";
+      return;      
+  }
 
-      if ($sr eq "done") {
-          # Log3 ($name, 1, "$name DEBUG> Complex Corrf -> factor Hour: ".sprintf("%02d",$h)." already calculated");
-          next;
-      }
+  $paref->{hour}                  = $h;
+  my ($pvhis,$fchis,$dnum,$range) = __Pv_Fc_Complex_Dnum_Hist ($paref);                               # historische PV / Forecast Vergleichswerte ermitteln
 
-      my $pvre = CircularVal ($hash, sprintf("%02d",$h), 'pvrl', 0);
-      next if(!$pvre);
+  my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), $range, 0);                   # bisher definierter Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
+  $oldfac             = 1 if(1 * $oldfac == 0);
 
-      my $pvfc = CircularVal ($hash, sprintf("%02d",$h), 'pvapifc', 0);
-      next if(!$pvfc);
+  (my $factor, $dnum) = __calcNewFactor ({ name   => $name,
+                                           oldfac => $oldfac,
+                                           dnum   => $dnum,
+                                           pvre   => $pvre,
+                                           pvfc   => $pvfc,
+                                           pvhis  => $pvhis,
+                                           fchis  => $fchis
+                                         }
+                                        );
 
-      $paref->{hour}                  = $h;
-      my ($pvhis,$fchis,$dnum,$range) = __Pv_Fc_Complex_Dnum_Hist ($paref);                               # historische PV / Forecast Vergleichswerte ermitteln
+  if (abs($factor - $oldfac) > $maxvar) {
+      $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
+      Log3 ($name, 3, "$name - new complex correction factor calculated (limited by affectMaxDayVariance): $factor (old: $oldfac) for hour: $h");
+  }
+  else {
+      Log3 ($name, 3, "$name - new complex correction factor for hour $h calculated: $factor (old: $oldfac)") if($factor != $oldfac);
+  }
 
-      my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), $range, 0);                   # bisher definierter Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
-      $oldfac             = 1 if(1 * $oldfac == 0);
+  $pvre = sprintf "%.0f", $pvre;
+  $pvfc = sprintf "%.0f", $pvfc;
 
-      (my $factor, $dnum) = __calcNewFactor ({ name   => $name,
-                                               oldfac => $oldfac,
-                                               dnum   => $dnum,
-                                               pvre   => $pvre,
-                                               pvfc   => $pvfc,
-                                               pvhis  => $pvhis,
-                                               fchis  => $fchis
-                                             }
-                                            );
+  debugLog ($paref, 'pvCorrection', "Complex Corrf -> determined values - hour: $h, cloudiness range: $range, average forecast: $pvfc, average real: $pvre, old corrf: $oldfac, new corrf: $factor, days: $dnum");
 
-      if (abs($factor - $oldfac) > $maxvar) {
-          $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
-          Log3 ($name, 3, "$name - new correction factor calculated (limited by affectMaxDayVariance): $factor (old: $oldfac) for hour: $h");
-      }
-      else {
-          Log3 ($name, 3, "$name - new complex correction factor for hour $h calculated: $factor (old: $oldfac)") if($factor != $oldfac);
-      }
+  if (defined $range) {
+      my $type = $paref->{type};
 
-      $pvre = sprintf "%.0f", $pvre;
-      $pvfc = sprintf "%.0f", $pvfc;
+      my $qual = __calcFcQuality ($pvfc, $pvre);                                                               # Qualität der Vorhersage für die vergangene Stunde
 
-      debugLog ($paref, 'pvCorrection', "Complex Corrf -> determined values - hour: $h, cloudiness range: $range, average forecast: $pvfc, average real: $pvre, old corrf: $oldfac, new corrf: $factor, days: $dnum");
+      debugLog ($paref, 'pvCorrection|saveData2Cache', "Complex Corrf -> write range correction values into Circular: hour: $h, cloudiness range: $range, factor: $factor, quality: $qual");
 
-      if (defined $range) {
-          my $type = $paref->{type};
+      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$range} = $factor;                            # Korrekturfaktor für Bewölkung der jeweiligen Stunde als Datenquelle eintragen
+      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{$range} = $qual;
 
-          my $qual = __calcFcQuality ($pvfc, $pvre);                                                               # Qualität der Vorhersage für die vergangene Stunde
+      push @$daref, ".pvCorrectionFactor_".sprintf("%02d",$h)."_cloudcover<>done";
+  }
+  else {
+      $range = "";
+  }
 
-          debugLog ($paref, 'pvCorrection|saveData2Cache', "Complex Corrf -> write range correction values into Circular: hour: $h, cloudiness range: $range, factor: $factor, quality: $qual");
-
-          $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$range} = $factor;                            # Korrekturfaktor für Bewölkung der jeweiligen Stunde als Datenquelle eintragen
-          $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{$range} = $qual;
-
-          push @$daref, ".pvCorrectionFactor_".sprintf("%02d",$h)."_cloudcover<>done";
-      }
-      else {
-          $range = "";
-      }
-
-      if ($acu =~ /on_complex/xs) {
-          push @$daref, "pvCorrectionFactor_". sprintf("%02d",$h)."<>".$factor." (automatic - old factor: $oldfac, cloudiness range: $range, days in range: $dnum)";
-          push @$daref, "pvCorrectionFactor_". sprintf("%02d",$h)."_autocalc<>done";
-      }
+  if ($acu =~ /on_complex/xs) {
+      push @$daref, "pvCorrectionFactor_". sprintf("%02d",$h)."<>".$factor." (automatic - old factor: $oldfac, cloudiness range: $range, days in range: $dnum)";
+      push @$daref, "pvCorrectionFactor_". sprintf("%02d",$h)."_autocalc<>done";
   }
 
 return;
@@ -10449,71 +10580,71 @@ sub _calcCaQsimple {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $chour = $paref->{chour};                                                   # aktuelle Stunde
   my $date  = $paref->{date};
   my $daref = $paref->{daref};
   my $acu   = $paref->{acu};
+  my $h     = $paref->{h};
+  
+  my $maxvar = AttrVal($name, 'affectMaxDayVariance', $defmaxvar);                                    # max. Korrekturvarianz
+  my $sr     = ReadingsVal ($name, ".pvCorrectionFactor_".sprintf("%02d",$h)."_apipercentil", "");
 
-  my $maxvar = AttrVal($name, 'affectMaxDayVariance', $defmaxvar);               # max. Korrekturvarianz
+  if($sr eq "done") {
+      # debugLog ($paref, 'pvCorrection', "Simple Corrf factor Hour: ".sprintf("%02d",$h)." already calculated");
+      return;
+  }
+  
+  debugLog ($paref, 'pvCorrection', "start calculation simple correction factor for hour: $h");
 
-  for my $h (1..23) {
-      next if(!$chour || $h > $chour);
-
-      my $sr = ReadingsVal ($name, ".pvCorrectionFactor_".sprintf("%02d",$h)."_apipercentil", "");
-
-      if($sr eq "done") {
-          # debugLog ($paref, 'pvCorrection', "Simple Corrf factor Hour: ".sprintf("%02d",$h)." already calculated");
-          next;
-      }
-
-      my $pvre = CircularVal ($hash, sprintf("%02d",$h), 'pvrl', 0);
-      next if(!$pvre);
-
-      my $pvfc = CircularVal ($hash, sprintf("%02d",$h), 'pvapifc', 0);
-      next if(!$pvfc);
-
-      $paref->{hour}           = $h;
-      my ($pvhis,$fchis,$dnum) = __Pv_Fc_Simple_Dnum_Hist ($paref);                                       # historischen Percentilfaktor / Qualität ermitteln
-
-      my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), 'percentile', 0);
-      $oldfac             = 1 if(1 * $oldfac == 0);
-
-      (my $factor, $dnum) = __calcNewFactor ({ name   => $name,
-                                               oldfac => $oldfac,
-                                               dnum   => $dnum,
-                                               pvre   => $pvre,
-                                               pvfc   => $pvfc,
-                                               pvhis  => $pvhis,
-                                               fchis  => $fchis
-                                             }
-                                            );
-
-      if (abs($factor - $oldfac) > $maxvar) {
-          $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
-          Log3 ($name, 3, "$name - new correction factor calculated (limited by affectMaxDayVariance): $factor (old: $oldfac) for hour: $h");
-      }
-      else {
-          Log3 ($name, 3, "$name - new simple correction factor for hour $h calculated: $factor (old: $oldfac)") if($factor != $oldfac);
-      }
-
-      $pvre    = sprintf "%.0f", $pvre;
-      $pvfc    = sprintf "%.0f", $pvfc;
-      my $qual = __calcFcQuality ($pvfc, $pvre);                                                         # Qualität der Vorhersage für die vergangene Stunde
-
-      debugLog ($paref, 'pvCorrection',                "Simple Corrf -> determined values - average forecast: $pvfc, average real: $pvre, old corrf: $oldfac, new corrf: $factor, days: $dnum");
-      debugLog ($paref, 'pvCorrection|saveData2Cache', "Simple Corrf -> write percentile correction values into Circular - hour: $h, factor: $factor, quality: $qual");
-
-      my $type = $paref->{type};
-
-      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{percentile} = $factor;                  # Korrekturfaktor der jeweiligen Stunde als Datenquelle eintragen
-      $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{percentile} = $qual;
-
+  my $pvre = CircularVal ($hash, sprintf("%02d",$h), 'pvrl',    0);
+  my $pvfc = CircularVal ($hash, sprintf("%02d",$h), 'pvapifc', 0);
+  
+  if (!$pvre || !$pvfc) {
       push @$daref, ".pvCorrectionFactor_".sprintf("%02d",$h)."_apipercentil<>done";
+      return;      
+  }
 
-      if ($acu =~ /on_simple/xs) {
-          push @$daref, "pvCorrectionFactor_".sprintf("%02d",$h). "<>".$factor." (automatic - old factor: $oldfac, average days: $dnum)";
-          push @$daref, "pvCorrectionFactor_".sprintf("%02d",$h). "_autocalc<>done";
-      }
+  $paref->{hour}           = $h;
+  my ($pvhis,$fchis,$dnum) = __Pv_Fc_Simple_Dnum_Hist ($paref);                                       # historischen Percentilfaktor / Qualität ermitteln
+
+  my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), 'percentile', 0);
+  $oldfac             = 1 if(1 * $oldfac == 0);
+
+  (my $factor, $dnum) = __calcNewFactor ({ name   => $name,
+                                           oldfac => $oldfac,
+                                           dnum   => $dnum,
+                                           pvre   => $pvre,
+                                           pvfc   => $pvfc,
+                                           pvhis  => $pvhis,
+                                           fchis  => $fchis
+                                         }
+                                        );
+
+  if (abs($factor - $oldfac) > $maxvar) {
+      $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
+      Log3 ($name, 3, "$name - new simple correction factor calculated (limited by affectMaxDayVariance): $factor (old: $oldfac) for hour: $h");
+  }
+  else {
+      Log3 ($name, 3, "$name - new simple correction factor for hour $h calculated: $factor (old: $oldfac)") if($factor != $oldfac);
+  }
+
+  $pvre    = sprintf "%.0f", $pvre;
+  $pvfc    = sprintf "%.0f", $pvfc;
+  
+  my $qual = __calcFcQuality ($pvfc, $pvre);                                                         # Qualität der Vorhersage für die vergangene Stunde
+
+  debugLog ($paref, 'pvCorrection',                "Simple Corrf -> determined values - average forecast: $pvfc, average real: $pvre, old corrf: $oldfac, new corrf: $factor, days: $dnum");
+  debugLog ($paref, 'pvCorrection|saveData2Cache', "Simple Corrf -> write percentile correction values into Circular - hour: $h, factor: $factor, quality: $qual");
+
+  my $type = $paref->{type};
+
+  $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{percentile} = $factor;                  # Korrekturfaktor der jeweiligen Stunde als Datenquelle eintragen
+  $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{percentile} = $qual;
+
+  push @$daref, ".pvCorrectionFactor_".sprintf("%02d",$h)."_apipercentil<>done";
+
+  if ($acu =~ /on_simple/xs) {
+      push @$daref, "pvCorrectionFactor_".sprintf("%02d",$h). "<>".$factor." (automatic - old factor: $oldfac, average days: $dnum)";
+      push @$daref, "pvCorrectionFactor_".sprintf("%02d",$h). "_autocalc<>done";
   }
 
 return;
@@ -10526,27 +10657,25 @@ sub _addHourAiRawdata {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $chour = $paref->{chour};
   my $daref = $paref->{daref};
+  my $h     = $paref->{h};
 
-  for my $h (1..23) {
-      next if(!$chour || $h > $chour);
+  my $rho = sprintf "%02d", $h;
+  my $sr  = ReadingsVal ($name, ".signaldone_".$rho, "");
 
-      my $rho = sprintf "%02d", $h;
-      my $sr  = ReadingsVal ($name, ".signaldone_".$rho, "");
+  return if($sr eq "done");
+  
+  debugLog ($paref, 'aiProcess', "start add AI raw data for hour: $h");
 
-      next if($sr eq "done");
+  $paref->{ood} = 1;
+  $paref->{rho} = $rho;
 
-      $paref->{ood} = 1;
-      $paref->{rho} = $rho;
+  aiAddRawData ($paref);                                          # Raw Daten für AI hinzufügen und sichern
 
-      aiAddRawData ($paref);                                          # Raw Daten für AI hinzufügen und sichern
+  delete $paref->{ood};
+  delete $paref->{rho};
 
-      delete $paref->{ood};
-      delete $paref->{rho};
-
-      push @$daref, ".signaldone_".sprintf("%02d",$h)."<>done";
-  }
+  push @$daref, ".signaldone_".sprintf("%02d",$h)."<>done";
 
 return;
 }
@@ -10595,7 +10724,7 @@ sub __Pv_Fc_Complex_Dnum_Hist {
 
   my $range = cloud2bin ($chwcc);
 
-  if(scalar(@efa)) {
+  if (scalar(@efa)) {
       debugLog ($paref, 'pvCorrection', "Complex Corrf -> Raw Days ($calcd) for average check: ".join " ",@efa);
   }
   else {
@@ -10772,7 +10901,7 @@ sub __calcFcQuality {
   my $pvfc = shift;                                                        # PV Vorhersagewert
   my $pvre = shift;                                                        # PV reale Erzeugung
 
-  return '-' if(!$pvre);
+  return if(!$pvfc || !$pvre);
 
   my $diff = $pvfc - $pvre;
   my $hdv  = 1 - abs ($diff / $pvre);                                      # Abweichung der Stunde, 1 = bestmöglicher Wert
@@ -12851,23 +12980,26 @@ sub isAddSwitchOffCond {
       $swoffcondregex = ConsumerVal ($hash, $c, 'swoffcondregex', '');
   }
 
-  if($dswoffcond && !$defs{$dswoffcond}) {
+  if ($dswoffcond && !$defs{$dswoffcond}) {
       $err = qq{ERROR - the device "$dswoffcond" doesn't exist! Check the key "swoffcond" or "interruptable" in attribute "consumer${c}"};
       return (0, $info, $err);
   }
 
-  my $condval = ReadingsVal ($dswoffcond, $rswoffcond, "");
+  my $condval = ReadingsVal ($dswoffcond, $rswoffcond, undef);
 
-  if ($hyst && isNumeric ($condval)) {                                            # Hysterese berücksichtigen
+  if ($hyst && defined $condval && isNumeric ($condval)) {                        # Hysterese berücksichtigen
       $condval -= $hyst;
   }
 
-  if ($condval && $condval =~ m/^$swoffcondregex$/x) {
+  if (defined $condval && $condval =~ m/^$swoffcondregex$/x) {
       $info = qq{value "$condval" (hysteresis = $hyst) match the Regex "$swoffcondregex" \n}.
               qq{-> Switch-off condition or interrupt in the "switch-off context", DO NOT switch on or DO NOT continue in the "switch-on context"\n}
               ;
+      
       return (1, $info, $err);
   }
+  
+  $condval //= 'undef';
 
   $info = qq{device: "$dswoffcond", reading: "$rswoffcond" , value: "$condval" (hysteresis = $hyst) doesn't match Regex: "$swoffcondregex" \n}.
           qq{-> DO NOT Switch-off or DO NOT interrupt in the "switch-off context", Switching on or continuing in the "switch-on" context\n}
@@ -15556,19 +15688,42 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-graphicHeaderDetail"></a>
        <li><b>graphicHeaderDetail </b><br>
-         Level of detail of the graphic header. <br>
+         Selection of the zones of the graphic header to be displayed. <br>
          (default: all)
 
          <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>all</b>        </td><td>Display generation (PV), consumption (CO), link to detail display + update time (default).        </td></tr>
-            <tr><td> <b>co</b>         </td><td>Consumption only (CO)                                                                             </td></tr>
-            <tr><td> <b>pv</b>         </td><td>Generation only (PV)                                                                              </td></tr>
-            <tr><td> <b>pvco</b>       </td><td>Generation (PV) and consumption (CO)                                                              </td></tr>
-            <tr><td> <b>statusLink</b> </td><td>Link to detail display + status information                                                       </td></tr>
+            <tr><td> <b>all</b>        </td><td>all zones of the head area (default)        </td></tr>
+            <tr><td> <b>co</b>         </td><td>show consumption range                      </td></tr>
+            <tr><td> <b>pv</b>         </td><td>show creation area                          </td></tr>
+            <tr><td> <b>own</b>        </td><td>user zone (see <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a>)   </td></tr>
+            <tr><td> <b>status</b>     </td><td>status information area                     </td></tr>
          </table>
          </ul>
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
+       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt; &lt;Label&gt;:&lt;Reading&gt; ... </b><br>
+         Display of any reading values of the device. The values to be displayed are separated by spaces.
+         Each value is to be defined by a label and the corresponding reading connected by ":".
+         The input can be multiline. Spaces in the label are to be inserted by "&amp;nbsp;".
+         <br><br>
+
+       <ul>
+         <b>Example: </b> <br>
+         <table>
+         <colgroup> <col width="30%"> <col width="70%"> </colgroup>
+            <tr><td> attr &lt;name&gt; graphicHeaderOwnspec  </td><td>AutarkyRate:Current_AutarkyRate                                                                     </td></tr>
+            <tr><td>                                         </td><td>Surplus:Current_Surplus                                                                             </td></tr>
+            <tr><td>                                         </td><td>current&amp;nbsp;Gridconsumption:Current_GridConsumption                                            </td></tr>
+            <tr><td>                                         </td><td>CO&amp;nbsp;until&amp;nbsp;sunset:statistic_todayConForecastTillSunset                              </td></tr>
+            <tr><td>                                         </td><td>PV&amp;nbsp;the&amp;nbsp;day&amp;nbsp;after&amp;nbsp;tomorrow:statistic_dayAfterTomorrowPVforecast  </td></tr>
+            <tr><td>                                         </td><td>BAT&amp;nbsp;in&amp;nbsp;today:statistic_todayBatIn                                                 </td></tr>
+            <tr><td>                                         </td><td>BAT&amp;nbsp;out&amp;nbsp;today:statistic_todayBatOut                                               </td></tr>
+         </table>
+       </ul>
        </li>
        <br>
 
@@ -17318,19 +17473,42 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicHeaderDetail"></a>
        <li><b>graphicHeaderDetail </b><br>
-         Detaillierungsgrad des Grafik Kopfbereiches. <br>
+         Auswahl der anzuzeigenden Zonen des Grafik Kopfbereiches. <br>
          (default: all)
 
          <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>all</b>        </td><td>Anzeige Erzeugung (PV), Verbrauch (CO), Link zur Detailanzeige + Aktualisierungszeit (default)        </td></tr>
-            <tr><td> <b>co</b>         </td><td>nur Verbrauch (CO)                                                                                    </td></tr>
-            <tr><td> <b>pv</b>         </td><td>nur Erzeugung (PV)                                                                                    </td></tr>
-            <tr><td> <b>pvco</b>       </td><td>Erzeugung (PV) und Verbrauch (CO)                                                                     </td></tr>
-            <tr><td> <b>statusLink</b> </td><td>Link zur Detailanzeige + Statusinformationen                                                          </td></tr>
+            <tr><td> <b>all</b>        </td><td>alle Zonen des Kopfbereiches (default)        </td></tr>
+            <tr><td> <b>co</b>         </td><td>Verbrauchsbereich anzeigen                    </td></tr>
+            <tr><td> <b>pv</b>         </td><td>Erzeugungsbereich anzeigen                    </td></tr>
+            <tr><td> <b>own</b>        </td><td>Nutzerzone (siehe <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a>)   </td></tr>
+            <tr><td> <b>status</b>     </td><td>Bereich der Statusinformationen               </td></tr>
          </table>
          </ul>
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
+       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt; &lt;Label&gt;:&lt;Reading&gt; ... </b><br>
+         Anzeige beliebiger Readingswerte des Devices. Die anzuzeigenden Werte werden durch Leerzeichen getrennt.
+         Jeder Wert ist jeweils durch ein Label und das dazugehörige Reading verbunden durch ":" zu definieren.
+         Die Eingabe kann mehrzeilig erfolgen. Leerzeichen im Label sind durch "&amp;nbsp;" einzufügen.
+         <br><br>
+
+       <ul>
+         <b>Beispiel: </b> <br>
+         <table>
+         <colgroup> <col width="35%"> <col width="65%"> </colgroup>
+            <tr><td> attr &lt;name&gt; graphicHeaderOwnspec  </td><td>AutarkyRate:Current_AutarkyRate                                               </td></tr>
+            <tr><td>                                         </td><td>Überschuß:Current_Surplus                                                     </td></tr>
+            <tr><td>                                         </td><td>aktueller&amp;nbsp;Netzbezug:Current_GridConsumption                          </td></tr>
+            <tr><td>                                         </td><td>CO&amp;nbsp;bis&amp;nbsp;Sonnenuntergang:statistic_todayConForecastTillSunset </td></tr>
+            <tr><td>                                         </td><td>PV&amp;nbsp;Übermorgen:statistic_dayAfterTomorrowPVforecast                   </td></tr>
+            <tr><td>                                         </td><td>BAT&amp;nbsp;in&amp;nbsp;heute:statistic_todayBatIn                           </td></tr>
+            <tr><td>                                         </td><td>BAT&amp;nbsp;out&amp;nbsp;heute:statistic_todayBatOut                         </td></tr>
+         </table>
+       </ul>
        </li>
        <br>
 
