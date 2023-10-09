@@ -1,6 +1,6 @@
-############################################################################################################################################
+##############################################################################################################################
 # $Id$
-#
+##############################################################################################################################
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
 # e-mail: omega at online dot de
@@ -12,12 +12,29 @@
 # e-mail: heiko dot maaz at t-online dot de
 #
 # reduceLog() created by Claudiu Schuster (rapster) adapted by DS_Starter
+#       
+# This script is part of fhem.
 #
-############################################################################################################################################
+# Fhem is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# Fhem is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+# This copyright notice MUST APPEAR in all copies of the script!
+#
+##############################################################################################################################
 #
 #  Leerzeichen entfernen: sed -i 's/[[:space:]]*$//' 93_DbLog.pm
 #
-############################################################################################################################################
+##############################################################################################################################
 
 package main;
 use strict;
@@ -39,6 +56,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.9.2"   => "09.10.2023 edit commandref, Forum: https://forum.fhem.de/index.php?msg=1288840 ",
   "5.9.1"   => "15.08.2023 possible use of alternative tables in _DbLog_plotData Forum:134547, fix warnings in ".
                            "_DbLog_SBP_onRun_LogSequential Forum:https://forum.fhem.de/index.php?msg=1284228 ",
   "5.9.0"   => "16.05.2023 Server shutdown -> write cachefile if database connect can't be done during delayed shutdown ". 
@@ -8796,12 +8814,9 @@ return;
     <br>
 
   For the connection to the database a <b>configuration file</b> is used.
-  The configuration is stored in a separate file to avoid storing the password in the main configuration file and to have it
-  visible in the output of the <a href="https://fhem.de/commandref.html#list">list</a> command.
+  The configuration file is copied e.g. to /opt/fhem and has the structure shown below.
+  The specifications are to be adapted according to the used environment (uncomment and change corresponding lines): 
   <br><br>
-
-  The <b>configuration file</b> should be copied e.g. to /opt/fhem and has the following structure you have to customize
-  suitable to your conditions (decomment the appropriate raws and adjust it): <br><br>
 
     <pre>
     ####################################################################################
@@ -8816,6 +8831,8 @@ return;
     ####################################################################################
     #%dbconfig= (
     #    connection => "mysql:database=fhem;host=&lt;database host&gt;;port=3306",
+    #    # if want communication over socket-file instead of TCP/IP transport, use:
+    #    # connection => "mysql:database=fhem;mysql_socket=&lt;/patch/socket-file&gt;",
     #    user => "fhemuser",
     #    password => "fhempassword",
     #    # optional enable(1) / disable(0) UTF-8 support
@@ -10656,13 +10673,9 @@ attr SMA_Energymeter DbLogValueFn
   enthalten. <br><br>
 
   Für die Verbindung zur Datenbank wird eine <b>Konfigurationsdatei</b> verwendet.
-  Die Konfiguration ist in einer sparaten Datei abgelegt um das Datenbankpasswort nicht in Klartext in der
-  FHEM-Haupt-Konfigurationsdatei speichern zu müssen.
-  Ansonsten wäre es mittels des <a href="https://fhem.de/commandref_DE.html#list">list</a> Befehls einfach auslesbar.
+  Die Konfigurationsdatei wird z.B. nach /opt/fhem kopiert und hat den nachfolgend dargestellten Aufbau.
+  Die Angaben sind entsprechend der verwendeten Umgebung anzupassen (entsprechende Zeilen entkommentieren und ändern): 
   <br><br>
-
-  Die <b>Konfigurationsdatei</b> wird z.B. nach /opt/fhem kopiert und hat folgenden Aufbau, den man an seine Umgebung
-  anpassen muß (entsprechende Zeilen entkommentieren und anpassen): <br><br>
 
     <pre>
     ####################################################################################
@@ -10677,6 +10690,8 @@ attr SMA_Energymeter DbLogValueFn
     ####################################################################################
     #%dbconfig= (
     #    connection => "mysql:database=fhem;host=&lt;database host&gt;;port=3306",
+    #    # if want communication over socket-file instead of TCP/IP transport, use:
+    #    # connection => "mysql:database=fhem;mysql_socket=&lt;/patch/socket-file&gt;",
     #    user => "fhemuser",
     #    password => "fhempassword",
     #    # optional enable(1) / disable(0) UTF-8 support

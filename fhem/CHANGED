@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbLog: edit Commandref Forum:#135204
  - feature: 76_SolarForecast: new Attr graphicHeaderOwnspec, minor fixes
  - change:  76_SMAInverter: add BAT_P_Charge/Discarge
  - change:  74_AutomowerConnect: Commandref update
