@@ -1,7 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
  - feature: 72_FRITZBOX - Log3 handling
- - feature: 72_CALLMONITOR - Log3 handling
+ - feature: 72_FB_CALLMONITOR - Log3 handling
  - change:  93_DbLog: edit Commandref Forum:#135204
  - feature: 76_SolarForecast: new Attr graphicHeaderOwnspec, minor fixes
  - change:  76_SMAInverter: add BAT_P_Charge/Discarge
