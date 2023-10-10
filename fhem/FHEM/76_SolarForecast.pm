@@ -144,6 +144,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.0.4"  => "10.10.2023  fix: print always Log in _calcCaQ* subroutines even if calaculated factors are equal ".
+                           "new consumer attr key 'noshow' ",
   "1.0.3"  => "08.10.2023  change graphic header PV/CO detail, new attr graphicHeaderOwnspec, internal code changes ".
                            "fix isAddSwitchOffCond 0 Forum: https://forum.fhem.de/index.php?msg=1288877 ".
                            "change calcValueImproves and subroutines ",
@@ -969,7 +971,7 @@ sub Initialize {
   my $hash = shift;
 
   my $fwd  = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
-  my $hod  = join ",", map { sprintf "%02d", $_} (01..24);
+  my $hod  = join ",", map { sprintf "%02d", $_} (1..24);
   my $srd  = join ",", sort keys (%hcsr);
 
   my ($consumer,@allc);
@@ -1444,7 +1446,7 @@ sub _setcurrentRadiationAPI {              ## no critic "not used"
   my $name  = $paref->{name};
   my $prop  = $paref->{prop} // return qq{no radiation device specified};
 
-  if($prop !~ /-API$/ && (!$defs{$prop} || $defs{$prop}{TYPE} ne "DWD_OpenData")) {
+  if($prop !~ /-API$/x && (!$defs{$prop} || $defs{$prop}{TYPE} ne "DWD_OpenData")) {
       return qq{The device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};
   }
 
@@ -2073,7 +2075,7 @@ sub _setreset {                          ## no critic "not used"
 
   my $type  = $hash->{TYPE};
 
-  if($prop eq 'pvHistory') {
+  if ($prop eq 'pvHistory') {
       my $dday  = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
       my $dhour = $paref->{prop2} // "";                                       # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
 
@@ -2101,7 +2103,7 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if($prop eq 'consumption') {
+  if ($prop eq 'consumption') {
       my $dday  = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
       my $dhour = $paref->{prop2} // "";                                       # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
 
@@ -2137,7 +2139,7 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if($prop eq 'pvCorrection') {
+  if ($prop eq 'pvCorrection') {
       for my $n (1..24) {
           $n = sprintf "%02d", $n;
           deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
@@ -2176,7 +2178,7 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if($prop eq 'aiData') {
+  if ($prop eq 'aiData') {
       delete $data{$type}{$name}{current}{aiinitstate};
       delete $data{$type}{$name}{current}{aitrainstate};
       delete $data{$type}{$name}{current}{aiaddistate};
@@ -2199,27 +2201,27 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if($prop eq 'powerTrigger') {
+  if ($prop eq 'powerTrigger') {
       deleteReadingspec ($hash, "powerTrigger.*");
       writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
       return;
   }
 
-  if($prop eq 'energyH4Trigger') {
+  if ($prop eq 'energyH4Trigger') {
       deleteReadingspec ($hash, "energyH4Trigger.*");
       writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
       return;
   }
 
-  if($prop eq 'moduleRoofTops') {
+  if ($prop eq 'moduleRoofTops') {
       deleteReadingspec ($hash, "moduleRoofTops");
       writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
       return;
   }
 
-  readingsDelete($hash, $prop);
+  readingsDelete ($hash, $prop);
 
-  if($prop eq 'roofIdentPair') {
+  if ($prop eq 'roofIdentPair') {
       my $pk   = $paref->{prop1} // "";                                        # ein bestimmter PairKey angegeben ?
 
       if ($pk) {
@@ -2235,7 +2237,7 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if($prop eq 'currentMeterDev') {
+  if ($prop eq 'currentMeterDev') {
       readingsDelete ($hash, "Current_GridConsumption");
       readingsDelete ($hash, "Current_GridFeedIn");
       delete $data{$type}{$name}{circular}{'99'}{initdayfeedin};
@@ -2253,7 +2255,7 @@ sub _setreset {                          ## no critic "not used"
       writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
   }
 
-  if($prop eq 'currentBatteryDev') {
+  if ($prop eq 'currentBatteryDev') {
       readingsDelete ($hash, "Current_PowerBatIn");
       readingsDelete ($hash, "Current_PowerBatOut");
       readingsDelete ($hash, "Current_BatCharge");
@@ -2268,13 +2270,13 @@ sub _setreset {                          ## no critic "not used"
       writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
   }
 
-  if($prop eq 'currentInverterDev') {
+  if ($prop eq 'currentInverterDev') {
       readingsDelete    ($hash, "Current_PV");
       deleteReadingspec ($hash, ".*_PVreal" );
       writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);                     # Anlagenkonfiguration File schreiben
   }
 
-  if($prop eq 'consumerPlanning') {                                                  # Verbraucherplanung resetten
+  if ($prop eq 'consumerPlanning') {                                                  # Verbraucherplanung resetten
       my $c = $paref->{prop1} // "";                                                 # bestimmten Verbraucher setzen falls angegeben
 
       if ($c) {
@@ -2289,7 +2291,7 @@ sub _setreset {                          ## no critic "not used"
       writeCacheToFile ($hash, "consumers", $csmcache.$name);                        # Cache File Consumer schreiben
   }
 
-  if($prop eq 'consumerMaster') {                                                    # Verbraucherhash löschen
+  if ($prop eq 'consumerMaster') {                                                   # Verbraucherhash löschen
       my $c = $paref->{prop1} // "";                                                 # bestimmten Verbraucher setzen falls angegeben
 
       if ($c) {
@@ -2547,7 +2549,6 @@ sub __getSolCastData {
   ## statische SolCast API Kennzahlen
   ## (solCastAPIcallMultiplier, todayMaxAPIcalls) berechnen
   ##########################################################
-  my %seen;
   my %mx;
   my $maxcnt;
 
@@ -5857,7 +5858,7 @@ sub _transferMeterValues {
   if ($docon) {
       my $gctotthishour = int ($gctotal - ($gcdaypast + CircularVal ($hash, 99, 'initdaygcon', 0)));
 
-      if($gctotthishour < 0) {
+      if ($gctotthishour < 0) {
           $gctotthishour = 0;
       }
 
@@ -5892,7 +5893,7 @@ sub _transferMeterValues {
   if ($dofeed) {
       my $gftotthishour = int ($fitotal - ($gfdaypast + CircularVal ($hash, 99, 'initdayfeedin', 0)));
 
-      if($gftotthishour < 0) {
+      if ($gftotthishour < 0) {
           $gftotthishour = 0;
       }
 
@@ -8074,6 +8075,11 @@ sub collectAllRegConsumers {
       if(exists $hc->{asynchron}) {
           $asynchron = $hc->{asynchron};
       }
+      
+      my $noshow;
+      if(exists $hc->{noshow}) {                                                                  # Consumer ausblenden in Grafik
+          $noshow = $hc->{noshow};
+      }
 
       my ($rswstate,$onreg,$offreg);
       if(exists $hc->{swstate}) {
@@ -8124,7 +8130,7 @@ sub collectAllRegConsumers {
       my $rauto     = $hc->{auto} // q{};
       my $ctype     = $hc->{type} // $defctype;
       my $auto      = 1;
-      $auto         = ReadingsVal ($consumer, $rauto, 1) if($rauto);                                   # Reading für Ready-Bit -> Einschalten möglich ?
+      $auto         = ReadingsVal ($consumer, $rauto, 1) if($rauto);                                    # Reading für Ready-Bit -> Einschalten möglich ?
 
       $data{$type}{$name}{consumers}{$c}{name}              = $consumer;                                # Name des Verbrauchers (Device)
       $data{$type}{$name}{consumers}{$c}{alias}             = $alias;                                   # Alias des Verbrauchers (Device)
@@ -8149,6 +8155,7 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{notafter}          = $hc->{notafter}     // q{};               # nicht einschalten nach Stunde in 24h Format (00-23)
       $data{$type}{$name}{consumers}{$c}{rswstate}          = $rswstate           // 'state';           # Schaltstatus Reading
       $data{$type}{$name}{consumers}{$c}{asynchron}         = $asynchron          // 0;                 # Arbeitsweise FHEM Consumer Device
+      $data{$type}{$name}{consumers}{$c}{noshow}            = $noshow             // 0;                 # ausblenden in Grafik
       $data{$type}{$name}{consumers}{$c}{locktime}          = $clt                // '0:0';             # Sperrzeit im Automatikmodus ('offlt:onlt')
       $data{$type}{$name}{consumers}{$c}{onreg}             = $onreg              // 'on';              # Regex für 'ein'
       $data{$type}{$name}{consumers}{$c}{offreg}            = $offreg             // 'off';             # Regex für 'aus'
@@ -8474,7 +8481,8 @@ sub _checkSetupNotComplete {
   my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');                   # Victron VRM Credentials gesetzt
 
   my ($coset, $lat, $lon) = locCoordinates();                                             # Koordinaten im global device
-  my $rip   = 1 if(exists $data{$type}{$name}{solcastapi}{'?IdPair'});                    # es existiert mindestens ein Paar RoofTop-ID / API-Key
+  my $rip;
+  $rip      = 1 if(exists $data{$type}{$name}{solcastapi}{'?IdPair'});                    # es existiert mindestens ein Paar RoofTop-ID / API-Key
 
   my $pv0   = NexthoursVal ($hash, 'NextHour00', 'pvfc', undef);                          # der erste PV ForeCast Wert
 
@@ -9153,13 +9161,13 @@ sub _graphicConsumerLegend {
   my $paref                    = shift;
   my $hash                     = $paref->{hash};
   my $name                     = $paref->{name};                                                    # Consumer AdviceIcon
-  my ($clegendstyle, $clegend) = split('_', $paref->{clegend});
+  my ($clegendstyle, $clegend) = split '_', $paref->{clegend};
   my $clink                    = $paref->{clink};
 
   my $type                     = $paref->{type};
   my @consumers                = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};              # definierte Verbraucher ermitteln
 
-  $clegend                     = '' if(($clegendstyle eq 'none') || (!int(@consumers)));
+  $clegend                     = '' if($clegendstyle eq 'none' || !int @consumers);
   $paref->{clegend}            = $clegend;
 
   return if(!$clegend );
@@ -9185,6 +9193,7 @@ sub _graphicConsumerLegend {
   $ctable   .= qq{<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>};
 
   my $cnum   = @consumers;
+  
   if ($cnum > 1) {
       $ctable .= qq{<td style='text-align:left' $dstyle> $hqtxt{cnsm}{$lang}  </td>};
       $ctable .= qq{<td>                                                      </td>};
@@ -9211,14 +9220,16 @@ sub _graphicConsumerLegend {
   my $tro    = 0;
 
   for my $c (@consumers) {
+      next if(isConsumerNoshow ($hash, $c));                                                        # Consumer ausblenden
+      
       my $caicon            = $paref->{caicon};                                                     # Consumer AdviceIcon
       my ($cname, $dswname) = getCDnames  ($hash, $c);                                              # Consumer und Switch Device Name
-      my $calias            = ConsumerVal ($hash, $c, "alias",   $cname);                           # Alias des Consumerdevices
-      my $cicon             = ConsumerVal ($hash, $c, "icon",        "");                           # Icon des Consumerdevices
-      my $oncom             = ConsumerVal ($hash, $c, "oncom",       "");                           # Consumer Einschaltkommando
-      my $offcom            = ConsumerVal ($hash, $c, "offcom",      "");                           # Consumer Ausschaltkommando
-      my $autord            = ConsumerVal ($hash, $c, "autoreading", "");                           # Readingname f. Automatiksteuerung
-      my $auto              = ConsumerVal ($hash, $c, "auto",         1);                           # Automatic Mode
+      my $calias            = ConsumerVal ($hash, $c, 'alias',   $cname);                           # Alias des Consumerdevices
+      my $cicon             = ConsumerVal ($hash, $c, 'icon',        '');                           # Icon des Consumerdevices
+      my $oncom             = ConsumerVal ($hash, $c, 'oncom',       '');                           # Consumer Einschaltkommando
+      my $offcom            = ConsumerVal ($hash, $c, 'offcom',      '');                           # Consumer Ausschaltkommando
+      my $autord            = ConsumerVal ($hash, $c, 'autoreading', '');                           # Readingname f. Automatiksteuerung
+      my $auto              = ConsumerVal ($hash, $c, 'auto',         1);                           # Automatic Mode
 
       my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 set $dswname $oncom')"};
       my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 set $dswname $offcom')"};
@@ -9269,7 +9280,7 @@ sub _graphicConsumerLegend {
               else {
                   $isricon = "<a title='$htitles{conrec}{$lang}\n\n$surplusinfo\n$pstate' onClick=$implan>".FW_makeImage($caicon, '')." </a>";
                   if($planstate =~ /priority/xs) {
-                      my (undef,$color) = split('@', $caicon);
+                      my (undef,$color) = split '@', $caicon;
                       $color            = $color ? '@'.$color : '';
                       $isricon          = "<a title='$htitles{conrecba}{$lang}\n\n$surplusinfo\n$pstate' onClick=$implan>".FW_makeImage('batterie'.$color, '')." </a>";
                   }
@@ -9280,7 +9291,7 @@ sub _graphicConsumerLegend {
                   $isricon =  $pstate.'<br>'.$surplusinfo;
               }
               else {
-                  ($caicon) = split('@', $caicon);
+                  ($caicon) = split '@', $caicon;
                   $isricon  = "<a title='$htitles{connorec}{$lang}\n\n$surplusinfo\n$pstate' onClick=$implan>".FW_makeImage($caicon.'@grey', '')." </a>";
               }
           }
@@ -9332,7 +9343,7 @@ sub _graphicConsumerLegend {
           $ctable .= "<td style='text-align:center'                    $dstyle>$auicon       </td>";
       }
       else {
-          my (undef,$co) = split('@', $cicon);
+          my (undef,$co) = split '@', $cicon;
           $co      = '' if (!$co);
           $ctable .= "<td style='text-align:left'   $dstyle><font color='$co'>$calias </font></td>";
           $ctable .= "<td>                                                                   </td>";
@@ -9974,7 +9985,7 @@ sub _flowGraphic {
       }
   }
 
-  my $batout_direction  =  'M902,305 L730,510';                                                # Batterientladung aus Netz
+  my $batout_direction = 'M902,305 L730,510';                                                  # Batterientladung aus Netz
 
   if($batin) {
       my $gbi = $batin - $cpv;
@@ -10038,8 +10049,8 @@ sub _flowGraphic {
       </g>
 END0
 
-  ## get consumer list and display it in Graphics
-  ################################################
+  ## get consumer list and display in Graphics
+  ##############################################
   my $pos_left       = 0;
   my $consumercount  = 0;
   my $consumer_start = 0;
@@ -10058,16 +10069,17 @@ END0
           $consumer_start = 350 - (($consDist / 2) * ($consumercount-1));
       }
 
-      #$consumer_start = 0 if $consumer_start < 0;
-      $pos_left       = $consumer_start + 15;
+      $pos_left = $consumer_start + 15;
 
-      for my $c0 (@consumers) {
-          my $calias      = ConsumerVal         ($hash, $c0, "alias", "");                          # Name des Consumerdevices
-          $currentPower   = ReadingsNum         ($name, "consumer${c0}_currentPower", 0);
-          my $cicon       = __substConsumerIcon ($hash, $c0, $currentPower);                        # Icon des Consumerdevices
-          $cc_dummy      -= $currentPower;
+      for my $c (@consumers) {
+          next if(isConsumerNoshow ($hash, $c));                                                  # Consumer ausblenden
+          
+          my $calias     = ConsumerVal         ($hash, $c, "alias", "");                          # Name des Consumerdevices
+          $currentPower  = ReadingsNum         ($name, "consumer${c}_currentPower", 0);
+          my $cicon      = __substConsumerIcon ($hash, $c, $currentPower);                        # Icon des Consumerdevices
+          $cc_dummy     -= $currentPower;
 
-          $ret .= '<g id="consumer_'.$c0.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
+          $ret .= '<g id="consumer_'.$c.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
           $ret .= "<title>$calias</title>".FW_makeImage($cicon, '');
           $ret .= '</g> ';
 
@@ -10137,12 +10149,14 @@ END3
           $pos_left_start = 700 - ((($distance ) / 2) * ($consumercount-1));
       }
 
-      for my $c1 (@consumers) {
-          my $power          = ConsumerVal ($hash, $c1, "power",   0);
-          my $rpcurr         = ConsumerVal ($hash, $c1, "rpcurr", "");                              # Reading für akt. Verbrauch angegeben ?
-          $currentPower      = ReadingsNum ($name, "consumer${c1}_currentPower", 0);
+      for my $c (@consumers) {
+          next if(isConsumerNoshow ($hash, $c));                                                   # Consumer ausblenden
+          
+          my $power     = ConsumerVal ($hash, $c, "power",   0);
+          my $rpcurr    = ConsumerVal ($hash, $c, "rpcurr", "");                                   # Reading für akt. Verbrauch angegeben ?
+          $currentPower = ReadingsNum ($name, "consumer${c}_currentPower", 0);
 
-          if (!$rpcurr && isConsumerPhysOn($hash, $c1)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
+          if (!$rpcurr && isConsumerPhysOn($hash, $c)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
               $currentPower = $power;
           }
 
@@ -10158,8 +10172,7 @@ END3
               #$chain_color  = 'style="stroke: #DF0101;"';
           }
 
-          $ret            .= qq{<path id="home-consumer_$c1" class="$consumer_style" $chain_color d="M$pos_left_start,700 L$pos_left,850" />};   # Design Consumer Laufkette
-
+          $ret            .= qq{<path id="home-consumer_$c" class="$consumer_style" $chain_color d="M$pos_left_start,700 L$pos_left,850" />};   # Design Consumer Laufkette
           $pos_left       += ($consDist * 2);
           $pos_left_start += $distance;
       }
@@ -10171,7 +10184,6 @@ END3
 
   ## Textangaben an Grafikelementen
   ###################################
-
   $ret .= qq{<text class="flowg text" id="pv-txt"        x="800"  y="15"  style="text-anchor: start;">$cpv</text>}        if ($cpv);
   $ret .= qq{<text class="flowg text" id="bat-txt"       x="1110" y="300" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                        # Lage Ladungs Text
   $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="730"  y="300" style="text-anchor: start;">$csc</text>}        if ($csc && $cpv);
@@ -10187,21 +10199,23 @@ END3
   if ($flowgcons) {
       $pos_left = ($consumer_start * 2) - 50;                                                         # -XX -> Start Lage Consumer Beschriftung
 
-      for my $c2 (@consumers) {
-          $currentPower    = sprintf "%.1f", ReadingsNum($name, "consumer${c2}_currentPower", 0);
+      for my $c (@consumers) {
+          next if(isConsumerNoshow ($hash, $c));                                                      # Consumer ausblenden
+          
+          $currentPower    = sprintf "%.1f", ReadingsNum($name, "consumer${c}_currentPower", 0);
           $currentPower    =~ s/\.0$// if (int($currentPower) > 0);                                   # .0 am Ende interessiert nicht
-          my $consumerTime = ConsumerVal ($hash, $c2, "remainTime", "");                              # Restlaufzeit
-          my $rpcurr       = ConsumerVal ($hash, $c2, "rpcurr",     "");                              # Readingname f. current Power
+          my $consumerTime = ConsumerVal ($hash, $c, "remainTime", "");                               # Restlaufzeit
+          my $rpcurr       = ConsumerVal ($hash, $c, "rpcurr",     "");                               # Readingname f. current Power
 
           if (!$rpcurr) {                                                                             # Workaround wenn Verbraucher ohne Leistungsmessung
-              $currentPower = isConsumerPhysOn($hash, $c2) ? 'on' : 'off';
+              $currentPower = isConsumerPhysOn($hash, $c) ? 'on' : 'off';
           }
 
-          #$ret .= qq{<text class="flowg text" id="consumer-txt_$c2"      x="$pos_left" y="1110" style="text-anchor: start;">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
-          #$ret .= qq{<text class="flowg text" id="consumer-txt_time_$c2" x="$pos_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
+          #$ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$pos_left" y="1110" style="text-anchor: start;">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
+          #$ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$pos_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
-          # Hackeritis - geht mit Sicherheit auch einfacher/sinnvoller
+          ##################################################################################
           if (length($currentPower) >= 5) {
                $pos_left -= 40;
           }
@@ -10218,11 +10232,11 @@ END3
               $pos_left += 25;
           }
 
-          $ret .= qq{<text class="flowg text" id="consumer-txt_$c2"      x="$pos_left" y="1110">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
-          $ret .= qq{<text class="flowg text" id="consumer-txt_time_$c2" x="$pos_left" y="1170">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
+          $ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$pos_left" y="1110">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
+          $ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$pos_left" y="1170">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl abhängig von der Größe entsprechend auf der x-Achse wieder zurück an den Ursprungspunkt
-          # Hackeritis - geht mit Sicherheit auch einfacher/sinnvoller
+          #########################################################################################################
           if (length($currentPower) >= 5) {
               $pos_left += 40;
           }
@@ -10540,7 +10554,7 @@ sub _calcCaQcomplex {
       Log3 ($name, 3, "$name - new complex correction factor calculated (limited by affectMaxDayVariance): $factor (old: $oldfac) for hour: $h");
   }
   else {
-      Log3 ($name, 3, "$name - new complex correction factor for hour $h calculated: $factor (old: $oldfac)") if($factor != $oldfac);
+      Log3 ($name, 3, "$name - new complex correction factor for hour $h calculated: $factor (old: $oldfac)");
   }
 
   $pvre = sprintf "%.0f", $pvre;
@@ -10624,7 +10638,7 @@ sub _calcCaQsimple {
       Log3 ($name, 3, "$name - new simple correction factor calculated (limited by affectMaxDayVariance): $factor (old: $oldfac) for hour: $h");
   }
   else {
-      Log3 ($name, 3, "$name - new simple correction factor for hour $h calculated: $factor (old: $oldfac)") if($factor != $oldfac);
+      Log3 ($name, 3, "$name - new simple correction factor for hour $h calculated: $factor (old: $oldfac)");
   }
 
   $pvre    = sprintf "%.0f", $pvre;
@@ -12914,6 +12928,30 @@ return 0;
 }
 
 ################################################################
+#  Consumer $c in Grafik ausblenden (1) oder nicht (0)
+#  default: $noshow=0 
+################################################################       isConsumerNoshow ($hash, $c);
+sub isConsumerNoshow {
+  my $hash = shift;
+  my $c    = shift;
+
+  my $noshow = ConsumerVal ($hash, $c, 'noshow', 0);                                 # Schalter "Ausblenden"
+  
+  if (!isNumeric ($noshow)) {                                                        # Key "noshow" enthält Signalreading
+      my $rdg             = $noshow;
+      my ($dev, $dswname) = getCDnames ($hash, $c);                                  # Consumer und Switch Device Name
+      
+      if ($noshow =~ /:/xs) {
+          ($dev, $rdg) = split ":", $noshow;
+      }
+      
+      $noshow = ReadingsNum ($dev, $rdg, 0);
+  }
+     
+return $noshow;     
+}
+
+################################################################
 #  Funktion liefert "1" wenn die zusätzliche Einschaltbedingung
 #  aus dem Schlüssel "swoncond" im Consumer Attribut wahr ist
 #
@@ -13317,7 +13355,8 @@ sub lastConsumerSwitchtime {
 
   my $rswstate = ConsumerVal           ($hash, $c, 'rswstate', 'state');       # Reading mit Schaltstatus
   my $swtime   = ReadingsTimestamp     ($dswname, $rswstate,        '');       # Zeitstempel im Format 2016-02-16 19:34:24
-  my $swtimets = timestringToTimestamp ($swtime) if($swtime);                  # Unix Timestamp Format erzeugen
+  my $swtimets;
+  $swtimets    = timestringToTimestamp ($swtime) if($swtime);                  # Unix Timestamp Format erzeugen
 
 return ($swtime, $swtimets);
 }
@@ -13602,10 +13641,7 @@ sub userExit {
   return if(!$uefn);
 
   $uefn =~ s/\s*#.*//g;                                             # Kommentare entfernen
-
-  my $r;
-
-  $uefn    =  join ' ', split(/\s+/sx, $uefn);                      # Funktion aus Attr ctrlUserExitFn serialisieren
+  $uefn =  join ' ', split(/\s+/sx, $uefn);                         # Funktion aus Attr ctrlUserExitFn serialisieren
 
   if ($uefn =~ m/^\s*(\{.*\})\s*$/xs) {                             # unnamed Funktion direkt in ctrlUserExitFn mit {...}
       $uefn = $1;
@@ -15196,7 +15232,7 @@ to ensure that the system configuration is correct.
                          [notbefore=&lt;Hour&gt;] [notafter=&lt;Hour&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]<br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Unit&gt;[:&lt;Threshold&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Threshold&gt]] <br>
                          [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] <br>
-                         [interruptable=&lt;Option&gt] </b><br>
+                         [interruptable=&lt;Option&gt] [noshow=&lt;Option&gt] </b><br>
                          <br>
 
         Registers a consumer &lt;Device Name&gt; with the SolarForecast Device. In this case, &lt;Device Name&gt;
@@ -15245,17 +15281,22 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>noSchedule</b>     - there is no scheduling or automatic switching for the consumer.                                                        </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                                                     Display functions or manual switching are available.                                                                                           </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>power</b>          </td><td>nominal power consumption of the consumer (see data sheet) in W                                                                                </td></tr>
             <tr><td>                       </td><td>(can be set to "0")                                                                                                                            </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>switchdev</b>      </td><td>The specified &lt;device&gt; is assigned to the consumer as a switch device (optional). Switching operations are performed with this device.   </td></tr>
             <tr><td>                       </td><td>The key is useful for consumers where energy measurement and switching is carried out with different devices                                   </td></tr>
             <tr><td>                       </td><td>e.g. Homematic or readingsProxy. If switchdev is specified, the keys on, off, swstate and asynchronous refer to this device.                   </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>mode</b>           </td><td>Consumer planning mode (optional). Allowed are:                                                                                                </td></tr>
             <tr><td>                       </td><td><b>can</b>  - Scheduling takes place at the time when there is probably enough PV surplus available (default).                                 </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The consumer is not started at the time of planning if the PV surplus is insufficient.        </td></tr>
             <tr><td>                       </td><td><b>must</b> - The consumer is optimally planned, even if there will probably not be enough PV surplus.                                         </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The consumer is started even if there is insufficient PV surplus.                 </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>icon</b>           </td><td>Icon to represent the consumer in the overview graphic (optional)                                                                              </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>mintime</b>        </td><td>Scheduling duration (minutes or "SunPath") of the consumer. (optional)                                                                         </td></tr>
             <tr><td>                       </td><td>By specifying <b>SunPath</b>, planning is done according to sunrise and sunset.                                                                </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
@@ -15273,36 +15314,48 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>- other: 60 minutes                                                                                                                            </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>on</b>             </td><td>Set command for switching on the consumer (optional)                                                                                           </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>off</b>            </td><td>Set command for switching off the consumer (optional)                                                                                          </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>swstate</b>        </td><td>Reading which indicates the switching status of the consumer (default: 'state').                                                               </td></tr>
             <tr><td>                       </td><td><b>on-Regex</b> - regular expression for the state 'on' (default: 'on')                                                                        </td></tr>
             <tr><td>                       </td><td><b>off-Regex</b> - regular expression for the state 'off' (default: 'off')                                                                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>asynchron</b>      </td><td>the type of switching status determination in the consumer device. The status of the consumer is only determined after a switching command     </td></tr>.
             <tr><td>                       </td><td>by polling within a data collection interval (synchronous) or additionally by event processing (asynchronous).                                 </td></tr>
             <tr><td>                       </td><td><b>0</b> - only synchronous processing of switching states (default)                                                                           </td></tr>
             <tr><td>                       </td><td><b>1</b> - additional asynchronous processing of switching states through event processing                                                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>notbefore</b>      </td><td>Schedule start time consumer not before specified hour (01..23) (optional)                                                                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>notafter</b>       </td><td>Schedule start time consumer not after specified hour (01..23) (optional)                                                                      </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>auto</b>           </td><td>Reading in the consumer device which enables or blocks the switching of the consumer (optional)                                                </td></tr>
             <tr><td>                       </td><td>Reading value = 1 - switching enabled (default), 0: switching blocked                                                                          </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>pcurr</b>          </td><td>Reading:Unit (W/kW) which provides the current energy consumption (optional)                                                                   </td></tr>
             <tr><td>                       </td><td>:&lt;Threshold&gt; (W) - From this power reference on, the consumer is considered active. The specification is optional (default: 0)           </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>etotal</b>         </td><td>Reading:Unit (Wh/kWh) of the consumer device that supplies the sum of the consumed energy (optional)                                           </td></tr>
             <tr><td>                       </td><td>:&lt;Threshold&gt (Wh) - From this energy consumption per hour, the consumption is considered valid. Optional specification (default: 0)       </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>swoncond</b>       </td><td>Condition that must also be fulfilled in order to switch on the consumer (optional). The scheduled cycle is started.                           </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device to supply the additional switch-on condition                                                                            </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading for delivery of the additional switch-on condition                                                                    </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>swoffcond</b>      </td><td>priority condition to switch off the consumer (optional). The scheduled cycle is stopped.                                                      </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device to supply the priority switch-off condition                                                                             </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading for the delivery of the priority switch-off condition                                                                 </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>spignorecond</b>   </td><td>Condition to ignore a missing PV surplus (optional). If the condition is fulfilled, the load is switched on according to                       </td></tr>
             <tr><td>                       </td><td>the planning even if there is no PV surplus at the time.                                                                                       </td></tr>
             <tr><td>                       </td><td><b>CAUTION:</b> Using both keys <I>spignorecond</I> and <I>interruptable</I> can lead to undesired behaviour!                                  </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device to deliver the condition                                                                                                </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading which contains the condition                                                                                          </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>interruptable</b>  </td><td>defines the possible interruption options for the consumer after it has been started (optional)                                                </td></tr>
             <tr><td>                       </td><td><b>0</b> - Load is not temporarily switched off even if the PV surplus falls below the required energy (default)                               </td></tr>
             <tr><td>                       </td><td><b>1</b> - Load is temporarily switched off if the PV surplus falls below the required energy                                                  </td></tr>
@@ -15312,11 +15365,19 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>PV surplus provided (if power is not 0).                                                                                                       </td></tr>
             <tr><td>                       </td><td>The optional hysteresis is a numerical value by which the switch-off point                                                                     </td></tr>
             <tr><td>                       </td><td>is raised if the evaluated reading value is also numeric. (default: 0)                                                                         </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>locktime</b>       </td><td>Blocking times in seconds for switching the consumer (optional).                                                                               </td></tr>
             <tr><td>                       </td><td><b>offlt</b> - Blocking time in seconds after the consumer has been switched off or interrupted                                                </td></tr>
             <tr><td>                       </td><td><b>onlt</b> - Blocking time in seconds after the consumer has been switched on or continued                                                    </td></tr>
             <tr><td>                       </td><td>The consumer is only switched again when the corresponding blocking time has elapsed.                                                          </td></tr>
             <tr><td>                       </td><td><b>Note:</b> The 'locktime' switch is only effective in automatic mode.                                                                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
+            <tr><td> <b>noshow</b>         </td><td>Hide or show consumers in graphic (optional).                                                                                                  </td></tr>
+            <tr><td>                       </td><td><b>0</b> - the consumer is displayed (default)                                                                                                 </td></tr>
+            <tr><td>                       </td><td><b>1</b> - the consumer is hidden                                                                                                              </td></tr>
+            <tr><td>                       </td><td><b>[Device:]Reading</b> - Reading in the consumer or optionally an alternative device.                                                         </td></tr>
+            <tr><td>                       </td><td>If the reading has the value "0" or is not present, the consumer is displayed.                                                                 </td></tr>        
+            <tr><td>                       </td><td>If the reading has the value "1", the consumer is hidden.                                                                                      </td></tr>        
          </table>
          </ul>
        <br>
@@ -15329,7 +15390,7 @@ to ensure that the system configuration is correct.
          <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
          <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                          <br>
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                                  <br>
-         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1                                                                                                 <br>
+         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=noShow                                                                                   <br>
        </ul>
        </li>
        <br>
@@ -16982,7 +17043,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
                          [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]<br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] <br>
                          [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] <br>
-                         [interruptable=&lt;Option&gt] </b><br>
+                         [interruptable=&lt;Option&gt] [noshow=&lt;Option&gt] </b><br>
                          <br>
 
         Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
@@ -17030,17 +17091,22 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>noSchedule</b>     - für den Verbraucher erfolgt keine Einplanung oder automatische Schaltung.                                              </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                                                     Anzeigefunktionen oder manuelle Schaltungen sind verfügbar.                                                                                    </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>power</b>          </td><td>nominale Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                                            </td></tr>
             <tr><td>                       </td><td>(kann auf "0" gesetzt werden)                                                                                                                  </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>switchdev</b>      </td><td>Das angegebene &lt;device&gt; wird als Schalter Device dem Verbraucher zugeordnet (optional). Schaltvorgänge werden mit diesem Gerät           </td></tr>
             <tr><td>                       </td><td>ausgeführt. Der Schlüssel ist für Verbraucher nützlich bei denen Energiemessung und Schaltung mit verschiedenen Geräten vorgenommen            </td></tr>
             <tr><td>                       </td><td>wird, z.B. Homematic oder readingsProxy. Ist switchdev angegeben, beziehen sich die Schlüssel on, off, swstate und asynchron auf dieses Gerät. </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>mode</b>           </td><td>Planungsmodus des Verbrauchers (optional). Erlaubt sind:                                                                                       </td></tr>
             <tr><td>                       </td><td><b>can</b>  - Die Einplanung erfolgt zum Zeitpunkt mit wahrscheinlich genügend verfügbaren PV Überschuß (default)                              </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers zum Planungszeitpunkt unterbleibt bei ungenügendem PV-Überschuß.   </td></tr>
             <tr><td>                       </td><td><b>must</b> - der Verbraucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird               </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß.            </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>icon</b>           </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                                       </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>mintime</b>        </td><td>Einplanungsdauer (Minuten oder "SunPath") des Verbrauchers. (optional)                                                                         </td></tr>
             <tr><td>                       </td><td>Mit der Angabe von <b>SunPath</b> erfolgt die Planung entsprechend des Sonnenauf- und untergangs.                                              </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
@@ -17058,36 +17124,48 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>- other: 60 Minuten                                                                                                                            </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>on</b>             </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                                       </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>off</b>            </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                                       </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>swstate</b>        </td><td>Reading welches den Schaltzustand des Verbrauchers anzeigt (default: 'state').                                                                 </td></tr>
             <tr><td>                       </td><td><b>on-Regex</b> - regulärer Ausdruck für den Zustand 'ein' (default: 'on')                                                                     </td></tr>
             <tr><td>                       </td><td><b>off-Regex</b> - regulärer Ausdruck für den Zustand 'aus' (default: 'off')                                                                   </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>asynchron</b>      </td><td>die Art der Schaltstatus Ermittlung im Verbraucher Device. Die Statusermittlung des Verbrauchers nach einem Schaltbefehl erfolgt nur           </td></tr>
             <tr><td>                       </td><td>durch Abfrage innerhalb eines Datensammelintervals (synchron) oder zusätzlich durch Eventverarbeitung (asynchron).                             </td></tr>
             <tr><td>                       </td><td><b>0</b> - ausschließlich synchrone Verarbeitung von Schaltzuständen  (default)                                                                </td></tr>
             <tr><td>                       </td><td><b>1</b> - zusätzlich asynchrone Verarbeitung von Schaltzuständen durch Eventverarbeitung                                                      </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>notbefore</b>      </td><td>Startzeitpunkt Verbraucher nicht vor angegebener Stunde (01..23) einplanen (optional)                                                          </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>notafter</b>       </td><td>Startzeitpunkt Verbraucher nicht nach angegebener Stunde (01..23) einplanen (optional)                                                         </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>auto</b>           </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                                          </td></tr>
             <tr><td>                       </td><td>Readingwert = 1 - Schalten freigegeben (default),  0: Schalten blockiert                                                                       </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>pcurr</b>          </td><td>Reading:Einheit (W/kW) welches den aktuellen Energieverbrauch liefert (optional)                                                               </td></tr>
             <tr><td>                       </td><td>:&lt;Schwellenwert&gt; (W) - Ab diesem Leistungsbezug wird der Verbraucher als aktiv gewertet. Die Angabe ist optional (default: 0)            </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>etotal</b>         </td><td>Reading:Einheit (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert (optional)                                    </td></tr>
             <tr><td>                       </td><td>:&lt;Schwellenwert&gt (Wh) - Ab diesem Energieverbrauch pro Stunde wird der Verbrauch als gültig gewertet. Optionale Angabe (default: 0)       </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>swoncond</b>       </td><td>Bedingung die zusätzlich erfüllt sein muß um den Verbraucher einzuschalten (optional). Der geplante Zyklus wird gestartet.                     </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der zusätzlichen Einschaltbedingung                                                                       </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der zusätzlichen Einschaltbedingung                                                                     </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für eine 'wahre' Bedingung erfüllt sein muß                                                              </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>swoffcond</b>      </td><td>vorrangige Bedingung um den Verbraucher auszuschalten (optional). Der geplante Zyklus wird gestoppt.                                           </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der vorrangigen Ausschaltbedingung                                                                        </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der vorrangigen Ausschaltbedingung                                                                      </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für eine 'wahre' Bedingung erfüllt sein muß                                                              </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>spignorecond</b>   </td><td>Bedingung um einen fehlenden PV Überschuß zu ignorieren (optional). Bei erfüllter Bedingung wird der Verbraucher entsprechend                  </td></tr>
             <tr><td>                       </td><td>der Planung eingeschaltet auch wenn zu dem Zeitpunkt kein PV Überschuß vorliegt.                                                               </td></tr>
             <tr><td>                       </td><td><b>ACHTUNG:</b> Die Verwendung beider Schlüssel <I>spignorecond</I> und <I>interruptable</I> kann zu einem unerwünschten Verhalten führen!     </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der Bedingung                                                                                             </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading welches die Bedingung enthält                                                                                         </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für eine 'wahre' Bedingung erfüllt sein muß                                                              </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>interruptable</b>  </td><td>definiert die möglichen Unterbrechungsoptionen für den Verbraucher nachdem er gestartet wurde (optional)                                       </td></tr>
             <tr><td>                       </td><td><b>0</b> - Verbraucher wird nicht temporär ausgeschaltet auch wenn der PV Überschuß die benötigte Energie unterschreitet (default)             </td></tr>
             <tr><td>                       </td><td><b>1</b> - Verbraucher wird temporär ausgeschaltet falls der PV Überschuß die benötigte Energie unterschreitet                                 </td></tr>
@@ -17097,11 +17175,19 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>PV Überschuß (wenn power ungleich 0) vorliegt.                                                                                                 </td></tr>
             <tr><td>                       </td><td>Die optionale Hysterese ist ein numerischer Wert um den der Ausschaltpunkt gegenüber dem Soll-Einschaltpunkt                                   </td></tr>
             <tr><td>                       </td><td>angehoben wird sofern der ausgewertete Readingwert ebenfalls numerisch ist. (default: 0)                                                       </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>locktime</b>       </td><td>Sperrzeiten in Sekunden für die Schaltung des Verbrauchers (optional).                                                                         </td></tr>
             <tr><td>                       </td><td><b>offlt</b> - Sperrzeit in Sekunden nachdem der Verbraucher ausgeschaltet oder unterbrochen wurde                                             </td></tr>
             <tr><td>                       </td><td><b>onlt</b> - Sperrzeit in Sekunden nachdem der Verbraucher eingeschaltet oder fortgesetzt wurde                                               </td></tr>
             <tr><td>                       </td><td>Der Verbraucher wird erst wieder geschaltet wenn die entsprechende Sperrzeit abgelaufen ist.                                                   </td></tr>
             <tr><td>                       </td><td><b>Hinweis:</b> Der Schalter 'locktime' ist nur im Automatik-Modus wirksam.                                                                    </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
+            <tr><td> <b>noshow</b>         </td><td>Verbraucher in Grafik ausblenden oder einblenden (optional).                                                                                   </td></tr>
+            <tr><td>                       </td><td><b>0</b> - der Verbraucher wird eingeblendet (default)                                                                                         </td></tr>
+            <tr><td>                       </td><td><b>1</b> - der Verbraucher wird ausgeblendet                                                                                                   </td></tr>
+            <tr><td>                       </td><td><b>[Device:]Reading</b> - Reading im Verbraucher oder optional einem alternativen Device.                                                    </td></tr>
+            <tr><td>                       </td><td>Hat das Reading den Wert "0" oder ist nicht vorhanden, wird der Verbraucher eingeblendet.                                                      </td></tr>        
+            <tr><td>                       </td><td>Hat das Reading den Wert "1", wird der Verbraucher ausgeblendet.                                                                               </td></tr>        
          </table>
          </ul>
        <br>
@@ -17114,7 +17200,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
          <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                          <br>
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                                  <br>
-         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1                                                                                                 <br>
+         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=noShow                                                                                   <br>
        </ul>
        </li>
        <br>
