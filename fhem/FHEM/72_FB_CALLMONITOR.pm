@@ -40,7 +40,7 @@ use HttpUtils;
 use DevIo;
 use FritzBoxUtils;
 
-my $ModulVersion = "07.50.3d";
+my $ModulVersion = "07.50.3e";
 my %tellows = ();
 my %connection_type = (
      0 => "FON1",
@@ -79,27 +79,38 @@ my %connection_type = (
      44 => "Answering_Machine_5"
 );
 
+my %LOG_Text = (
+   0 => "SERVER: ",
+   1 => "EMERGENCY: ",
+   2 => "ERROR: ",
+   3 => "EVENT: ",
+   4 => "INFO: ",
+   5 => "DEBUG: "
+); 
 
 #######################################################################
 sub FB_CALLMONITOR_Log($$$)
 {
    my ( $hash, $loglevel, $text ) = @_;
+
+   my $instHash = ( ref($hash) eq "HASH" ) ? $hash : $defs{$hash};
+   my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $hash;
+   
+   if ($instHash->{helper}{FhemLog3Std}) {
+      Log3 $hash, $loglevel, $instName . ": " . $text;
+      return undef;
+   }
+
    my $xline       = ( caller(0) )[2];
 
    my $xsubroutine = ( caller(1) )[3];
    my $sub         = ( split( ':', $xsubroutine ) )[2];
-   $sub =~ s/FB_CALLMONITOR_//;
+   $sub =~ s/FB_CALLMONITOR_// if ( defined $sub );
+   $sub ||= 'no-subroutine-specified';
 
-   if ($loglevel <= 2) {
-      $text = "ERROR: " . $text;
-   } elsif ($loglevel >= 5) {
-       $text = "DEBUG: " . $text;
-   } else {
-       $text = "INFO: " . $text;
-   }
+   $text = $LOG_Text{$loglevel} . $text;
 
-   my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $hash;
-   Log3 $hash, $loglevel, "FB_CALLMONITOR [$instName: $sub.$xline] - " . $text;
+   Log3 $hash, $loglevel, "[$instName | $sub.$xline] - " . $text;
 }
 # End FB_CALLMONITOR_Log
 
@@ -122,6 +133,7 @@ sub FB_CALLMONITOR_Initialize($)
     $hash->{AttrList}  = "do_not_notify:0,1 ".
                          "disable:0,1 ".
                          "disabledForIntervals ".
+                         "FhemLog3Std:0,1 ".
                          "unique-call-ids:0,1 ".
                          "local-area-code ".
                          "country-code ".
@@ -166,6 +178,7 @@ sub FB_CALLMONITOR_Define($$)
 
    $hash->{NAME}    = $name;
    $hash->{VERSION} = $ModulVersion;
+   $hash->{helper}{FhemLog3Std} = AttrVal($name, "FhemLog3Std", 0);
 
    $hash->{NOTIFYDEV} = "global";
 
@@ -232,11 +245,13 @@ sub FB_CALLMONITOR_Rename($$)
 sub FB_CALLMONITOR_Get($@)
 {
     my ($hash, @arguments) = @_;
+    my $name = $hash->{NAME};
 
     return "argument missing" if(int(@arguments) < 2);
 
     if($arguments[1] eq "search" and int(@arguments) >= 3)
     {
+        FB_CALLMONITOR_Log $name, 3, "get $name $arguments[1] " . join ' ', @arguments[2..$#arguments];
         my $number = FB_CALLMONITOR_normalizePhoneNumber($hash, join '', @arguments[2..$#arguments]);
         my $result = FB_CALLMONITOR_reverseSearch($hash, $number, 1);
 
@@ -245,6 +260,7 @@ sub FB_CALLMONITOR_Get($@)
     }
     elsif($arguments[1] eq "showPhonebookIds" and exists($hash->{helper}{PHONEBOOK_NAMES}))
     {
+        FB_CALLMONITOR_Log $name, 3, "get $name $arguments[1] " . join ' ', @arguments[2..$#arguments];
         my $table = "";
         my $head = "Id    Name";
         my $width = 10;
@@ -260,6 +276,7 @@ sub FB_CALLMONITOR_Get($@)
     }
     elsif($arguments[1] eq "showPhonebookEntries" and (exists($hash->{helper}{PHONEBOOK}) or exists($hash->{helper}{PHONEBOOKS})) and int(@arguments) <= 3)
     {
+        FB_CALLMONITOR_Log $name, 3, "get $name $arguments[1] " . join ' ', @arguments[2..$#arguments];
         return "given argument is not a valid phonebook id: ".$arguments[2] if(int(@arguments) == 3 and ($arguments[2] !~ /^\d+$/ or !exists($hash->{helper}{PHONEBOOKS}{$arguments[2]}) ) );
 
         my $return = "";
@@ -322,6 +339,7 @@ sub FB_CALLMONITOR_Get($@)
     }
     elsif($arguments[1] eq "showCacheEntries" and exists($hash->{helper}{CACHE}))
     {
+        FB_CALLMONITOR_Log $name, 3, "get $name $arguments[1] " . join ' ', @arguments[2..$#arguments];
         my $table = "";
 
         my $number_width = 0;
@@ -345,6 +363,7 @@ sub FB_CALLMONITOR_Get($@)
     }
     elsif($arguments[1] eq "showTextfileEntries" and exists($hash->{helper}{TEXTFILE}))
     {
+        FB_CALLMONITOR_Log $name, 3, "get $name $arguments[1] " . join ' ', @arguments[2..$#arguments];
         my $table = "";
 
         my $number_width = 0;
@@ -368,7 +387,7 @@ sub FB_CALLMONITOR_Get($@)
     }
     else
     {
-        return "unknown argument ".$arguments[1].", choose one of search".(exists($hash->{helper}{PHONEBOOK_NAMES}) ? " showPhonebookIds:noArg" : "").
+        return "unknown argument " . $arguments[1].", choose one of search".(exists($hash->{helper}{PHONEBOOK_NAMES}) ? " showPhonebookIds:noArg" : "").
                                                                           ((exists($hash->{helper}{PHONEBOOK}) or exists($hash->{helper}{PHONEBOOKS})) ? " showPhonebookEntries" : "").
                                                                           (exists($hash->{helper}{CACHE}) ? " showCacheEntries:noArg" : "").
                                                                           (exists($hash->{helper}{TEXTFILE}) ? " showTextfileEntries:noArg" : "");
@@ -390,31 +409,36 @@ sub FB_CALLMONITOR_Set($@)
     push @sets, "password" if($hash->{helper}{PWD_NEEDED});
     push @sets, "reopen:noArg" if($hash->{FD});
 
-    $usage = "Unknown argument ".$a[1].", choose one of ".join(" ", @sets) if(scalar @sets > 0);
+    $usage = "Unknown argument " . $a[1] . ", choose one of " . join(" ", @sets) if(scalar @sets > 0);
 
     if($a[1] eq "rereadPhonebook")
     {
+        FB_CALLMONITOR_Log $name, 3, "set $name $a[1]";
         FB_CALLMONITOR_readPhonebook($hash);
         return undef;
     }
     elsif($a[1] eq "rereadCache")
     {
+        FB_CALLMONITOR_Log $name, 3, "set $name $a[1]";
         FB_CALLMONITOR_loadCacheFile($hash);
         return undef;
     }
     elsif($a[1] eq "rereadTextfile")
     {
+        FB_CALLMONITOR_Log $name, 3, "set $name $a[1]";
         FB_CALLMONITOR_loadTextFile($hash);
         return undef;
     }
     elsif($a[1] eq "password")
     {
+        FB_CALLMONITOR_Log $name, 3, "set $name $a[1]";
         return FB_CALLMONITOR_storePassword($hash, $a[2]) if($hash->{helper}{PWD_NEEDED});
-        FB_CALLMONITOR_Log $name, 2, "SOMEONE UNWANTED TRIED TO SET A NEW FRITZBOX PASSWORD!!!";
+        FB_CALLMONITOR_Log $name, 1, "SOMEONE UNWANTED TRIED TO SET A NEW FRITZBOX PASSWORD!!!";
         return "I didn't ask for a password, so go away!!!"
     }
     elsif($a[1] eq "reopen")
     {
+        FB_CALLMONITOR_Log $name, 3, "set $name $a[1]";
         DevIo_CloseDev($hash);
         DevIo_OpenDev($hash, 0, undef, \&FB_CALLMONITOR_DevIoCallback);
         return undef;
@@ -489,7 +513,7 @@ sub FB_CALLMONITOR_Read($)
                 }
                 elsif($area_code !~ /^0[1-9]\d+$/)
                 {
-                    FB_CALLMONITOR_Log $name, 2, "given local area code '$area_code' is not an area code. therefore will be ignored";
+                    FB_CALLMONITOR_Log $name, 4, "given local area code '$area_code' is not an area code. therefore will be ignored";
                 }
             }
 
@@ -637,7 +661,7 @@ sub FB_CALLMONITOR_DevIoCallback($$)
 
     if($err)
     {
-        FB_CALLMONITOR_Log $name, 4, "unable to connect to Fritz!Box: $err";
+        FB_CALLMONITOR_Log $name, 3, "unable to connect to Fritz!Box: $err";
     }
 }
 
@@ -685,6 +709,10 @@ sub FB_CALLMONITOR_Attr($@)
              $attr{$name}{$attrib} = $value;
              return FB_CALLMONITOR_readPhonebook($hash);
            }
+        }
+
+        if($attrib eq "FhemLog3Std") {
+           $hash->{helper}{FhemLog3Std} = $value;
         }
 
         if($attrib eq "reverse-search-cache-file")
@@ -737,6 +765,10 @@ sub FB_CALLMONITOR_Attr($@)
            foreach (keys %{ $hash->{READINGS} }) {
               readingsDelete($hash, $_) if $_ =~ /^tellows_/ && defined $hash->{READINGS}{$_}{VAL};
            }
+        }
+
+        if($attrib eq "FhemLog3Std") {
+           $hash->{helper}{FhemLog3Std} = 0;
         }
 
         if($attrib eq "reverse-search-cache")
@@ -919,7 +951,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                   }
                   elsif($result =~ /wir konnten keine Treffer finden/)
                   {
-                     FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from dasoertliche.de. Please contact the FHEM community.";
+                     FB_CALLMONITOR_Log $name, 4, "the reverse search result for $number could not be extracted from dasoertliche.de. Please contact the FHEM community.";
                   } 
                   
                   $status = "unknown";
@@ -960,7 +992,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                   }
                   elsif(not $result =~ /Leider nichts gefunden/i)
                   {
-                     FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from 11880.com. Please contact the FHEM community.";
+                     FB_CALLMONITOR_Log $name, 4, "the reverse search result for $number could not be extracted from 11880.com. Please contact the FHEM community.";
                   }
 
                   $status = "unknown";
@@ -979,10 +1011,10 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                my $api_key = AttrVal($name, "apiKeySearchCh", undef);
 
                unless(defined($api_key)) {
-                  FB_CALLMONITOR_Log $name, 1, "WARNING! no API key for swiss.ch configured. Please obtain an API key from https://tel.search.ch/api/getkey and set attribute apiKeySearchCh with your key";
+                  FB_CALLMONITOR_Log $name, 3, "no API key for swiss.ch configured. Please obtain an API key from https://tel.search.ch/api/getkey and set attribute apiKeySearchCh with your key";
 
                   # use old key
-                  FB_CALLMONITOR_Log $name, 1, "using generic API key for reverse search via search.ch. WILL BE REMOVED IN A FUTURE RELEASE";
+                  FB_CALLMONITOR_Log $name, 3, "using generic API key for reverse search via search.ch. WILL BE REMOVED IN A FUTURE RELEASE";
                   $api_key = "b0b1207cb7c9d0048867de887aa9a4fd";
                }
 
@@ -1057,7 +1089,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                   }
                   elsif(not $result =~ /Ihre Suche nach .* war erfolglos/)
                   {
-                     FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from dasschnelle.at. Please contact the FHEM community.";
+                     FB_CALLMONITOR_Log $name, 4, "the reverse search result for $number could not be extracted from dasschnelle.at. Please contact the FHEM community.";
                   }
                   $status = "unknown";
                }
@@ -1093,7 +1125,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
                   }
                   elsif($result !~ /Wir konnten zu den eingegebenen Suchkriterien keine Ergebnisse finden/)
                   {
-                     FB_CALLMONITOR_Log $name, 3, "the reverse search result for $number could not be extracted from herold.at. Please contact the FHEM community.";
+                     FB_CALLMONITOR_Log $name, 4, "the reverse search result for $number could not be extracted from herold.at. Please contact the FHEM community.";
                   }
                   $status = "unknown";
                }
@@ -1101,7 +1133,7 @@ sub FB_CALLMONITOR_reverseSearch($$$) {
          }
          else
          {
-            FB_CALLMONITOR_Log $name, 3, "unknown reverse search method $method" if ($method ne "tellows.de");
+            FB_CALLMONITOR_Log $name, 4, "unknown reverse search method $method" if ($method ne "tellows.de");
          }
       }
     }
@@ -1418,7 +1450,7 @@ sub FB_CALLMONITOR_readPhonebook($;$)
 
         $phonebook = join("", @lines);
 
-        FB_CALLMONITOR_Log $name, 2, "found FritzBox phonebook $phonebook_file";
+        FB_CALLMONITOR_Log $name, 4, "found FritzBox phonebook $phonebook_file";
 
         ($err, $count_contacts, $pb_hash) = FB_CALLMONITOR_parsePhonebook($hash, $phonebook);
 
@@ -1430,7 +1462,7 @@ sub FB_CALLMONITOR_readPhonebook($;$)
         else
         {
             $hash->{helper}{PHONEBOOK} = $pb_hash;
-            FB_CALLMONITOR_Log $name, 2, "read $count_contacts contact".($count_contacts == 1 ? "" : "s")." from $phonebook_file";
+            FB_CALLMONITOR_Log $name, 4, "read $count_contacts contact".($count_contacts == 1 ? "" : "s")." from $phonebook_file";
         }
 	}
     else
@@ -1481,7 +1513,7 @@ sub FB_CALLMONITOR_parsePhonebook($$)
                             $number = FB_CALLMONITOR_normalizePhoneNumber($hash, $2);
 
                             $count_contacts++;
-                            FB_CALLMONITOR_Log $name, 4, "found $contact_name with number $number";
+                            FB_CALLMONITOR_Log $name, 5, "found $contact_name with number $number";
                             $out->{$number} = FB_CALLMONITOR_html2txt($contact_name);
 
                             if($imageURL)
@@ -1525,7 +1557,7 @@ sub FB_CALLMONITOR_loadCacheFile($;$)
     {
         delete($hash->{helper}{CACHE});
 
-        FB_CALLMONITOR_Log $hash->{NAME}, 3, "loading cache file $file";
+        FB_CALLMONITOR_Log $hash->{NAME}, 4, "loading cache file $file";
 
         ($err, @cachefile) = FileRead($file);
 
@@ -1546,7 +1578,7 @@ sub FB_CALLMONITOR_loadCacheFile($;$)
             }
 
             $count_contacts = scalar keys %{$hash->{helper}{CACHE}};
-            FB_CALLMONITOR_Log $name, 3, "read ".($count_contacts > 0 ? $count_contacts : "no")." contact".($count_contacts == 1 ? "" : "s")." from Cache";
+            FB_CALLMONITOR_Log $name, 4, "read ".($count_contacts > 0 ? $count_contacts : "no")." contact".($count_contacts == 1 ? "" : "s")." from Cache";
         }
         else
         {
@@ -1576,7 +1608,7 @@ sub FB_CALLMONITOR_loadTextFile($;$)
     {
         delete($hash->{helper}{TEXTFILE});
 
-        FB_CALLMONITOR_Log $hash->{NAME}, 3, "loading textfile $file";
+        FB_CALLMONITOR_Log $hash->{NAME}, 4, "loading textfile $file";
 
         ($err, @file) = FileRead({FileName => $file, ForceType => "file"});
 
@@ -1599,7 +1631,7 @@ sub FB_CALLMONITOR_loadTextFile($;$)
             }
 
             $count_contacts = scalar keys %{$hash->{helper}{TEXTFILE}};
-            FB_CALLMONITOR_Log $name, 3, "read ".($count_contacts > 0 ? $count_contacts : "no")." contact".($count_contacts == 1 ? "" : "s")." from textfile";
+            FB_CALLMONITOR_Log $name, 4, "read ".($count_contacts > 0 ? $count_contacts : "no")." contact".($count_contacts == 1 ? "" : "s")." from textfile";
         }
         else
         {
@@ -1723,7 +1755,7 @@ sub FB_CALLMONITOR_readRemotePhonebookViaTelnet($;$)
     }
     else
     {
-    	FB_CALLMONITOR_Log $name, 3, "Getting phonebook from FritzBox: $phonebook_file";
+    	FB_CALLMONITOR_Log $name, 4, "Getting phonebook from FritzBox: $phonebook_file";
     }
 
     $telnet->print('exit');
@@ -1788,7 +1820,7 @@ sub FB_CALLMONITOR_requestHTTPviaTR064($$$$;$$)
 
         if($err ne "")
         {
-            FB_CALLMONITOR_Log $name, 3, "error while requesting security port: $err";
+            FB_CALLMONITOR_Log $name, 2, "error while requesting security port: $err";
             return "error while requesting phonebooks: $err";
         }
 
@@ -1798,7 +1830,7 @@ sub FB_CALLMONITOR_requestHTTPviaTR064($$$$;$$)
             return  "received no data after requesting security port via TR-064";
         }
 
-        FB_CALLMONITOR_Log $name, 5, "received TR-064 method GetSecurityPort response:\n$response";
+        FB_CALLMONITOR_Log $name, 4, "received TR-064 method GetSecurityPort response:\n$response";
 
         if($response =~ /<NewSecurityPort>(\d+)<\/NewSecurityPort>/)
         {
@@ -1837,7 +1869,7 @@ sub FB_CALLMONITOR_requestHTTPviaTR064($$$$;$$)
         }
         else
         {
-            FB_CALLMONITOR_Log $name, 3, "error while requesting TR-064 URL $url: $err";
+            FB_CALLMONITOR_Log $name, 2, "error while requesting TR-064 URL $url: $err";
             return "error while requesting TR-064 URL $url: $err";
         }
     }
@@ -1850,11 +1882,11 @@ sub FB_CALLMONITOR_requestHTTPviaTR064($$$$;$$)
 
     if($param->{httpheader} =~ m,^Content-Type:\s*text,mi)
     {
-        FB_CALLMONITOR_Log $name, 5, "received TR-064 response for URL $url:\n$response";
+        FB_CALLMONITOR_Log $name, 4, "received TR-064 response for URL $url:\n$response";
     }
     else
     {
-        FB_CALLMONITOR_Log $name, 5, "received TR-064 response for URL $url";
+        FB_CALLMONITOR_Log $name, 4, "received TR-064 response for URL $url";
     }
 
     return (undef, $response, $param);
@@ -1900,7 +1932,7 @@ sub FB_CALLMONITOR_identifyPhoneBooksViaTR064($;$)
     if($data =~ m,<NewPhonebookList>(.+?)</NewPhonebookList>,si)
     {
         @phonebooks = split(",",$1);
-        FB_CALLMONITOR_Log $name, 3, "found ".scalar @phonebooks." phonebooks";
+        FB_CALLMONITOR_Log $name, 4, "found ".scalar @phonebooks." phonebooks";
     }
     else
     {
@@ -1951,7 +1983,7 @@ sub FB_CALLMONITOR_identifyPhoneBooksViaTR064($;$)
 
     delete($hash->{helper}{DEFLECTIONS});
 
-    FB_CALLMONITOR_Log $name, 5, "requesting deflection list";
+    FB_CALLMONITOR_Log $name, 4, "requesting deflection list";
     ($err, $data) = FB_CALLMONITOR_requestTR064($hash, "/upnp/control/x_contact", "GetDeflections", "urn:dslforum-org:service:X_AVM-DE_OnTel:1",undef, $testPassword);
 
     if ($err)
@@ -1977,7 +2009,7 @@ sub FB_CALLMONITOR_identifyPhoneBooksViaTR064($;$)
         $hash->{helper}{DEFLECTIONS}{$values{DeflectionId}} = \%values;
     }
 
-	FB_CALLMONITOR_Log $name, 3, "found ".(scalar keys %{$hash->{helper}{DEFLECTIONS}})." blocking rules (deflections)" if(exists($hash->{helper}{DEFLECTIONS}));
+	FB_CALLMONITOR_Log $name, 4, "found ".(scalar keys %{$hash->{helper}{DEFLECTIONS}})." blocking rules (deflections)" if(exists($hash->{helper}{DEFLECTIONS}));
 
     delete($hash->{helper}{PWD_NEEDED});
 
@@ -2109,7 +2141,7 @@ sub FB_CALLMONITOR_downloadImageURLs($$)
             }
         }
 
-        FB_CALLMONITOR_Log $name, 2, "downloaded ".(scalar keys %{$hash->{helper}{IMAGE_URLS}})." contact images from all phonebooks";
+        FB_CALLMONITOR_Log $name, 4, "downloaded ".(scalar keys %{$hash->{helper}{IMAGE_URLS}})." contact images from all phonebooks";
 
     }
 }
@@ -2187,7 +2219,7 @@ sub FB_CALLMONITOR_identifyPhoneBooksViaWeb($;$)
 
     if($data eq "" and exists($param->{code}))
     {
-        FB_CALLMONITOR_Log $name, 3, "received http code ".$param->{code}." without any data after requesting available phonebooks";
+        FB_CALLMONITOR_Log $name, 4, "received http code ".$param->{code}." without any data after requesting available phonebooks";
         return  "received no data after requesting available phonebooks";
     }
 
@@ -2206,7 +2238,7 @@ sub FB_CALLMONITOR_identifyPhoneBooksViaWeb($;$)
         FB_CALLMONITOR_Log $name, 4, "found phonebook: $2";
     }
 
-    FB_CALLMONITOR_Log $name, 3, "phonebooks found: ".join(", ", map { $hash->{helper}{PHONEBOOK_NAMES}{$_}." (id: $_)" } sort keys %{$hash->{helper}{PHONEBOOK_NAMES}}) if(exists($hash->{helper}{PHONEBOOK_NAMES}));
+    FB_CALLMONITOR_Log $name, 4, "phonebooks found: ".join(", ", map { $hash->{helper}{PHONEBOOK_NAMES}{$_}." (id: $_)" } sort keys %{$hash->{helper}{PHONEBOOK_NAMES}}) if(exists($hash->{helper}{PHONEBOOK_NAMES}));
 
     delete($hash->{helper}{PWD_NEEDED});
 
@@ -2327,7 +2359,7 @@ sub FB_CALLMONITOR_readPassword($;$)
    $sub ||= 'no-subroutine-specified';
 
    if ($sub !~ /readRemotePhonebookViaTelnet|requestHTTPviaTR064|identifyPhoneBooksViaWeb|readRemotePhonebookViaWeb/) {
-     FB_CALLMONITOR_Log $hash, 2, "EMERGENCY: unauthorized call for reading password from: $sub";
+     FB_CALLMONITOR_Log $hash, 1, "unauthorized call for reading password from: $sub";
      $hash->{EMERGENCY} = "Unauthorized call for reading password from: [$sub]";
      return undef;
    }
@@ -2348,7 +2380,7 @@ sub FB_CALLMONITOR_readPassword($;$)
         if(defined($err))
         {
            $hash->{helper}{PWD_NEEDED} = 1;
-           FB_CALLMONITOR_Log $name, 4, "unable to read FritzBox password from file: $err";
+           FB_CALLMONITOR_Log $name, 3, "unable to read FritzBox password from file: $err";
            return undef;
         }
     }
