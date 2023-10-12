@@ -144,6 +144,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.0.5"  => "11.10.2023  new sub _aiGetTpanResult for estimate AI results stepwise, allow key 'noshow' values 0,1,2,3 ",
   "1.0.4"  => "10.10.2023  fix: print always Log in _calcCaQ* subroutines even if calaculated factors are equal ".
                            "new consumer attr key 'noshow' ",
   "1.0.3"  => "08.10.2023  change graphic header PV/CO detail, new attr graphicHeaderOwnspec, internal code changes ".
@@ -9220,7 +9221,7 @@ sub _graphicConsumerLegend {
   my $tro    = 0;
 
   for my $c (@consumers) {
-      next if(isConsumerNoshow ($hash, $c));                                                        # Consumer ausblenden
+      next if(isConsumerNoshow ($hash, $c) =~ /^[12]$/xs);                                          # Consumer ausblenden
       
       my $caicon            = $paref->{caicon};                                                     # Consumer AdviceIcon
       my ($cname, $dswname) = getCDnames  ($hash, $c);                                              # Consumer und Switch Device Name
@@ -10059,7 +10060,12 @@ END0
 
   if ($flowgcons) {
       my $type       = $paref->{type};
-      @consumers     = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};                        # definierte Verbraucher ermitteln
+            
+      for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {                            # definierte Verbraucher ermitteln
+          next if(isConsumerNoshow ($hash, $c) =~ /^[13]$/xs);                                      # ausgeblendete Consumer nicht berücksichtigen
+          push @consumers, $c;						               
+      }
+      
       $consumercount = scalar @consumers;
 
       if ($consumercount % 2) {
@@ -10072,11 +10078,9 @@ END0
       $pos_left = $consumer_start + 15;
 
       for my $c (@consumers) {
-          next if(isConsumerNoshow ($hash, $c));                                                  # Consumer ausblenden
-          
-          my $calias     = ConsumerVal         ($hash, $c, "alias", "");                          # Name des Consumerdevices
+          my $calias     = ConsumerVal         ($hash, $c, "alias", "");                           # Name des Consumerdevices
           $currentPower  = ReadingsNum         ($name, "consumer${c}_currentPower", 0);
-          my $cicon      = __substConsumerIcon ($hash, $c, $currentPower);                        # Icon des Consumerdevices
+          my $cicon      = __substConsumerIcon ($hash, $c, $currentPower);                         # Icon des Consumerdevices
           $cc_dummy     -= $currentPower;
 
           $ret .= '<g id="consumer_'.$c.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
@@ -10150,8 +10154,6 @@ END3
       }
 
       for my $c (@consumers) {
-          next if(isConsumerNoshow ($hash, $c));                                                   # Consumer ausblenden
-          
           my $power     = ConsumerVal ($hash, $c, "power",   0);
           my $rpcurr    = ConsumerVal ($hash, $c, "rpcurr", "");                                   # Reading für akt. Verbrauch angegeben ?
           $currentPower = ReadingsNum ($name, "consumer${c}_currentPower", 0);
@@ -10200,8 +10202,6 @@ END3
       $pos_left = ($consumer_start * 2) - 50;                                                         # -XX -> Start Lage Consumer Beschriftung
 
       for my $c (@consumers) {
-          next if(isConsumerNoshow ($hash, $c));                                                      # Consumer ausblenden
-          
           $currentPower    = sprintf "%.1f", ReadingsNum($name, "consumer${c}_currentPower", 0);
           $currentPower    =~ s/\.0$// if (int($currentPower) > 0);                                   # .0 am Ende interessiert nicht
           my $consumerTime = ConsumerVal ($hash, $c, "remainTime", "");                               # Restlaufzeit
@@ -11194,14 +11194,109 @@ sub aiGetResult {                   ## no critic "not used"
                                                      }
                                       );
        };
-
-  if ($@) {
+       
+  if ($@) { 
       Log3 ($name, 1, "$name - aiGetResult ERROR: $@");
       return $@;
   }
 
   if (defined $pvaifc) {
-      debugLog ($paref, 'aiData', qq{result AI: pvaifc: $pvaifc (hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $rbin, temp: $tbin)});
+      debugLog ($paref, 'aiData', qq{accurate result AI: pvaifc: $pvaifc (hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $rbin, temp: $tbin)});
+      return ('', $pvaifc);
+  }
+  
+  my $msg = 'no decition delivered'; 
+  
+  ($msg, $pvaifc) = _aiGetTpanResult ( { hash  => $hash,
+                                         name  => $name,
+                                         type  => $type,
+                                         rad1h => $rad1h, 
+                                         temp  => $tbin,
+                                         wcc   => $cbin,
+                                         wrp   => $rbin,
+                                         hod   => $hod,
+                                         dtree => $dtree,
+                                         debug => $paref->{debug}
+                                       } 
+                                     );
+                                      
+  if (defined $pvaifc) {
+      return ('', $pvaifc);
+  }
+
+return $msg;
+}
+
+################################################################
+#  AI Ergebnis aus einer positiven und negativen 
+#  rad1h-Abweichung schätzen
+################################################################
+sub _aiGetTpanResult {
+  my $paref = shift;
+  my $rad1h = $paref->{rad1h};
+  my $temp  = $paref->{temp};
+  my $wcc   = $paref->{wcc};
+  my $wrp   = $paref->{wrp};
+  my $hod   = $paref->{hod};
+  my $dtree = $paref->{dtree};
+
+  my $dtn  = 50;                               # positive und negative rad1h Abweichung testen mit Schrittweite "$step"
+  my $step = 10;
+  
+  my ($pos, $neg, $p, $n);
+
+  debugLog ($paref, 'aiData', qq{no accurate result AI found with initial value "$rad1h"});
+  debugLog ($paref, 'aiData', qq{test AI estimation with variance "$dtn", positive/negative step "$step"});
+
+  for ($p = $rad1h; $p <= $rad1h + $dtn; $p += $step) {
+      $p = sprintf "%.2f", $p;  
+      
+      eval { $pos = $dtree->get_result (attributes => { rad1h => $p,
+                                                        temp  => $temp,
+                                                        wcc   => $wcc,
+                                                        wrp   => $wrp,
+                                                        hod   => $hod
+                                                      }
+                                          );
+           };
+ 
+      if ($@) {
+          return $@;
+      }
+            
+      if ($pos) {
+          debugLog ($paref, 'aiData', qq{AI estimation with test value "$p": $pos});
+          last;
+      } 
+  }
+  
+  for ($n = $rad1h; $n >= $rad1h - $dtn; $n -= $step) {
+      last if($n <= 0);
+      $n = sprintf "%.2f", $n; 
+      
+      eval { $neg = $dtree->get_result (attributes => { rad1h => $n,
+                                                        temp  => $temp,
+                                                        wcc   => $wcc,
+                                                        wrp   => $wrp,
+                                                        hod   => $hod
+                                                      }
+                                          );
+           };
+
+      if ($@) {
+          return $@;
+      }
+      
+      if ($neg) {
+          debugLog ($paref, 'aiData', qq{AI estimation with test value "$n": $neg});
+          last;
+      } 
+  }
+  
+  my $pvaifc = $pos && $neg ? sprintf "%.0f", (($pos + $neg) / 2) : undef;
+
+  if (defined $pvaifc) {
+      debugLog ($paref, 'aiData', qq{appreciated result AI: pvaifc: $pvaifc (hod: $hod, wcc: $wcc, wrp: $wrp, temp: $temp)});
       return ('', $pvaifc);
   }
 
@@ -12929,8 +13024,11 @@ return 0;
 
 ################################################################
 #  Consumer $c in Grafik ausblenden (1) oder nicht (0)
-#  default: $noshow=0 
-################################################################       isConsumerNoshow ($hash, $c);
+#  0 - nicht aublenden (default)
+#  1 - ausblenden
+#  2 - nur in Consumerlegende ausblenden
+#  3 - nur in Flowgrafik ausblenden
+################################################################      
 sub isConsumerNoshow {
   my $hash = shift;
   my $c    = shift;
@@ -12947,7 +13045,11 @@ sub isConsumerNoshow {
       
       $noshow = ReadingsNum ($dev, $rdg, 0);
   }
-     
+  
+  if ($noshow !~ /^[0123]$/xs) {                                                    # nue Ergebnisse 0..3 zulassen
+      $noshow = 0;
+  }
+  
 return $noshow;     
 }
 
@@ -14720,7 +14822,7 @@ to ensure that the system configuration is correct.
       The recommended autocorrection method is <b>on_complex</b> or <b>on_complex_ai</b>. <br><br>
 
       <b>Model ForecastSolarAPI:</b> <br>
-      The recommended autocorrection method is <b>on_simple</b>.
+      The recommended autocorrection method is <b>on_complex</b>.
     </ul>
     <br>
 
@@ -15375,9 +15477,11 @@ to ensure that the system configuration is correct.
             <tr><td> <b>noshow</b>         </td><td>Hide or show consumers in graphic (optional).                                                                                                  </td></tr>
             <tr><td>                       </td><td><b>0</b> - the consumer is displayed (default)                                                                                                 </td></tr>
             <tr><td>                       </td><td><b>1</b> - the consumer is hidden                                                                                                              </td></tr>
+            <tr><td>                       </td><td><b>2</b> - the consumer is hidden in the consumer legend                                                                                       </td></tr>
+            <tr><td>                       </td><td><b>3</b> - the consumer is hidden in the flow chart                                                                                            </td></tr>
             <tr><td>                       </td><td><b>[Device:]Reading</b> - Reading in the consumer or optionally an alternative device.                                                         </td></tr>
-            <tr><td>                       </td><td>If the reading has the value "0" or is not present, the consumer is displayed.                                                                 </td></tr>        
-            <tr><td>                       </td><td>If the reading has the value "1", the consumer is hidden.                                                                                      </td></tr>        
+            <tr><td>                       </td><td>If the reading has the value 0 or is not present, the consumer is displayed.                                                                   </td></tr>        
+            <tr><td>                       </td><td>The effect of the possible reading values 1, 2 and 3 is as described.                                                                          </td></tr>        
          </table>
          </ul>
        <br>
@@ -16533,7 +16637,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Die empfohlene Autokorrekturmethode ist <b>on_complex</b> bzw. <b>on_complex_ai</b>. <br><br>
 
       <b>Model ForecastSolarAPI:</b> <br>
-      Die empfohlene Autokorrekturmethode ist <b>on_simple</b>.
+      Die empfohlene Autokorrekturmethode ist <b>on_complex</b>.
     </ul>
     <br>
 
@@ -17185,9 +17289,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>noshow</b>         </td><td>Verbraucher in Grafik ausblenden oder einblenden (optional).                                                                                   </td></tr>
             <tr><td>                       </td><td><b>0</b> - der Verbraucher wird eingeblendet (default)                                                                                         </td></tr>
             <tr><td>                       </td><td><b>1</b> - der Verbraucher wird ausgeblendet                                                                                                   </td></tr>
-            <tr><td>                       </td><td><b>[Device:]Reading</b> - Reading im Verbraucher oder optional einem alternativen Device.                                                    </td></tr>
-            <tr><td>                       </td><td>Hat das Reading den Wert "0" oder ist nicht vorhanden, wird der Verbraucher eingeblendet.                                                      </td></tr>        
-            <tr><td>                       </td><td>Hat das Reading den Wert "1", wird der Verbraucher ausgeblendet.                                                                               </td></tr>        
+            <tr><td>                       </td><td><b>2</b> - der Verbraucher wird in der Verbraucherlegende ausgeblendet                                                                         </td></tr>
+            <tr><td>                       </td><td><b>3</b> - der Verbraucher wird in der Flußgrafik ausgeblendet                                                                                 </td></tr>
+            <tr><td>                       </td><td><b>[Device:]Reading</b> - Reading im Verbraucher oder optional einem alternativen Device.                                                      </td></tr>
+            <tr><td>                       </td><td>Hat das Reading den Wert 0 oder ist nicht vorhanden, wird der Verbraucher eingeblendet.                                                        </td></tr>        
+            <tr><td>                       </td><td>Die Wirkung der möglichen Readingwerte 1, 2 und 3 ist wie beschrieben.                                                                         </td></tr>        
          </table>
          </ul>
        <br>
