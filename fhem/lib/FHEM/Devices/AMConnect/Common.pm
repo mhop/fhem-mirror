@@ -1053,6 +1053,7 @@ sub CMD {
   my $type = $hash->{TYPE};
   my $iam = "$type $name CMD:";
   my $timeout = AttrVal( $name, 'timeoutCMD', $hash->{helper}->{timeout_cmd} );
+  my $method = 'POST';
   $hash->{helper}{mower_commandSend} = $cmd[ 0 ] . ' ' . ( $cmd[ 1 ] ? $cmd[ 1 ] : '' );
 
   if ( IsDisabled( $name ) ) {
@@ -1073,15 +1074,21 @@ sub CMD {
 
 my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nAuthorization: Bearer " . $token . "\r\nAuthorization-Provider: " . $provider . "\r\nContent-Type: application/vnd.api+json";
 
-  if      ($cmd[0] eq "ParkUntilFurtherNotice")     { $json = '{"data":{"type":"'.$cmd[0].'"}}'; $post = 'actions' }
-  elsif   ($cmd[0] eq "ParkUntilNextSchedule")      { $json = '{"data": {"type":"'.$cmd[0].'"}}'; $post = 'actions' }
-  elsif   ($cmd[0] eq "ResumeSchedule")  { $json = '{"data": {"type":"'.$cmd[0].'"}}'; $post = 'actions' }
-  elsif   ($cmd[0] eq "Pause")           { $json = '{"data": {"type":"'.$cmd[0].'"}}'; $post = 'actions' }
-  elsif   ($cmd[0] eq "Park")            { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"duration":'.$cmd[1].'}}}'; $post = 'actions' }
-  elsif   ($cmd[0] eq "Start")           { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"duration":'.$cmd[1].'}}}'; $post = 'actions' }
-  elsif   ($cmd[0] eq "headlight")       { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": {"mode": "'.$cmd[1].'"}}}}'; $post = 'settings' }
-  elsif   ($cmd[0] eq "cuttingHeight")   { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": '.$cmd[1].'}}}'; $post = 'settings' }
-  elsif   ($cmd[0] eq "sendScheduleFromAttributeToMower" && AttrVal( $name, 'mowerSchedule', '')) {
+  if    ($cmd[0] eq "ParkUntilFurtherNotice")     { $json = '{"data":{"type":"'.$cmd[0].'"}}'; $post = 'actions' }
+  elsif ($cmd[0] eq "ParkUntilNextSchedule")      { $json = '{"data": {"type":"'.$cmd[0].'"}}'; $post = 'actions' }
+  elsif ($cmd[0] eq "ResumeSchedule")  { $json = '{"data": {"type":"'.$cmd[0].'"}}'; $post = 'actions' }
+  elsif ($cmd[0] eq "Pause")           { $json = '{"data": {"type":"'.$cmd[0].'"}}'; $post = 'actions' }
+  elsif ($cmd[0] eq "Park")            { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"duration":'.$cmd[1].'}}}'; $post = 'actions' }
+  elsif ($cmd[0] eq "Start")           { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"duration":'.$cmd[1].'}}}'; $post = 'actions' }
+  elsif ($cmd[0] eq "StartInWorkArea" && $cmd[2])
+                                       { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"workAreaId":'.$cmd[1].',"duration":'.$cmd[2].'}}}'; $post = 'actions' }
+  elsif ($cmd[0] eq "StartInWorkArea" && !$cmd[2])
+                                       { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"workAreaId":'.$cmd[1].'}}}'; $post = 'actions' }
+  elsif ($cmd[0] eq "headlight")       { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": {"mode": "'.$cmd[1].'"}}}}'; $post = 'settings' }
+  elsif ($cmd[0] eq "cuttingHeight")   { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": '.$cmd[1].'}}}'; $post = 'settings' }
+  elsif ($cmd[0] eq "stayOutZone_enable")   { $json = '{"data": {"type":"stayOutZone","id":"'.$cmd[1].'","attributes":{"enable": true}}}'; $post = 'stayOutZones/' . $cmd[1]; $method = 'PATCH' }
+  elsif ($cmd[0] eq "stayOutZone_disable")   { $json = '{"data": {"type":"stayOutZone","id":"'.$cmd[1].'","attributes":{"enable": false}}}'; $post = 'stayOutZones/' . $cmd[1]; $method = 'PATCH' }
+  elsif ($cmd[0] eq "sendScheduleFromAttributeToMower" && AttrVal( $name, 'mowerSchedule', '')) {
 
     my $perl = eval { decode_json (AttrVal( $name, 'mowerSchedule', '')) };
     if ($@) {
@@ -1102,7 +1109,7 @@ my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nA
     url           => APIURL . "/mowers/". $mower_id . "/".$post,
     timeout       => $timeout,
     hash          => $hash,
-    method        => "POST",
+    method        => $method,
     header        => $header,
     data          => $json,
     callback      => \&CMDResponse,
@@ -1121,7 +1128,7 @@ sub CMDResponse {
   my $iam = "$type $name CMDResponse:";
 
   Log3 $name, 1, "$iam response time ". sprintf( "%.2f", ( gettimeofday() - $param->{t_begin} ) ) . ' s' if ( $param->{timeout} == 60 );
-  Log3 $name, 1, "\ndebug $iam \n\$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}" if ( AttrVal($name, 'debug', '') );
+  Log3 $name, 1, "\ndebug $iam \n\$statuscode >$statuscode<\n\$err >$err<,\n \$data >$data< \n\$param->url $param->{url}" if ( AttrVal($name, 'debug', '') );
 
   if( !$err && $statuscode == 202 && $data ) {
 
@@ -1168,7 +1175,7 @@ sub CMDResponse {
 
   readingsEndUpdate($hash, 1);
 
-  Log3 $name, 2, "\n$iam \n\$statuscode [$statuscode]\n\$err [$err],\n\$data [$data]\n\$param->url $param->{url}";
+  Log3 $name, 2, "\n$iam \n\$statuscode >$statuscode<\n\$err >$err<,\n\$data >$data<\n\$param->url $param->{url}";
   return undef;
 }
 
@@ -1271,10 +1278,40 @@ sub Set {
     CMD($hash,$setName);
     return undef;
 
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^(StartInWorkArea)$/ && AttrVal( $name, 'testing', '' ) ) {
+
+    my $id = undef;
+    $id = name2id( $hash, $setVal, 'workAreas' ) if ( $setVal !~ /^(\d+)$/ );
+    $setVal = $id // $setVal;
+    if ( $setVal =~ /^(\d+)$/ && ( $setVal2 =~ /^(\d+)$/ or !$setVal2 ) ) { #  && $hash->{helper}{mower}{attributes}{capabilities}{workAreas}
+
+      CMD($hash ,$setName, $setVal, $setVal2);
+      return undef;
+
+    }
+
+    Log3 $name, 2, "$iam $setName : no valid Id or zone name for $setVal .";
+
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^stayOutZone_(enable|disable)$/ && AttrVal( $name, 'testing', '' ) ) {
+
+    my $id = undef;
+    $id = name2id( $hash, $setVal, 'stayOutZones' ) if ( $setVal !~ /\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b/ );
+    $setVal = $id // $setVal;
+    if ( $setVal =~ /\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b/ ) { #  && $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones}
+
+      CMD($hash ,$setName, $setVal);
+      return undef;
+
+    }
+
+    Log3 $name, 2, "$iam $setName : no valid Id or zone name for $setVal .";
+
   }
   my $ret = " getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,60,60,600,0,lin Park:selectnumbers,60,60,600,0,lin ResumeSchedule:noArg getUpdate:noArg client_secret ";
   $ret .= "chargingStationPositionToAttribute:noArg headlight:ALWAYS_OFF,ALWAYS_ON,EVENING_ONLY,EVENING_AND_NIGHT cuttingHeight:1,2,3,4,5,6,7,8,9 mowerScheduleToAttribute:noArg ";
   $ret .= "sendScheduleFromAttributeToMower:noArg defaultDesignAttributesToAttribute:noArg mapZonesTemplateToAttribute:noArg ";
+  $ret .= "StartInWorkArea " if ( $hash->{helper}{mower}{attributes}{capabilities}{workAreas} && AttrVal( $name, 'testing', '' ) );
+  $ret .= "stayOutZone_enable stayOutZone_disable " if ( $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones} && AttrVal( $name, 'testing', '' ) );
   return "Unknown argument $setName, choose one of".$ret;
   
 }
@@ -1423,10 +1460,10 @@ sub Attr {
   ##########
   } elsif ( $attrName eq 'numberOfWayPointsToDisplay' ) {
 
-    return "$iam $attrVal is invalid, min value is 100." if ( $attrVal < 100 );
     my $icurr = scalar @{$hash->{helper}{areapos}};
     if( $cmd eq "set" && $attrVal =~ /\d+/ ) {
 
+      return "$iam $attrVal is invalid, min value is 100." if ( $attrVal < 100 );
       # reduce array
       $hash->{helper}{MOWING}{maxLength} = $attrVal;
       for ( my $i = $icurr; $i > $attrVal; $i-- ) {
@@ -1582,6 +1619,36 @@ sub Attr {
       Log3 $name, 3, "$iam $cmd $attrName";
 
     }
+  }
+  return undef;
+}
+
+#########################
+sub name2id {
+  my ( $hash, $zname, $ztype ) = @_;
+  $ztype = $ztype // 'workAreas';
+  if ( $ztype eq 'workAreas' && defined ( $hash->{helper}{mower}{attributes}{workAreas} ) ) {
+
+    my @ar = @{ $hash->{helper}{mower}{attributes}{workAreas} };
+    for ( @ar ) {
+
+      return $_->{workAreaId} if ( $_->{name} eq $zname );
+
+    }
+
+  } elsif ( $ztype eq 'stayOutZones' && defined( $hash->{helper}{mower}{attributes}{stayOutZones} ) && defined ( $hash->{helper}{mower}{attributes}{stayOutZones}{zones} ) ) {
+
+    if (  defined( $hash->{helper}{mower}{attributes}{stayOutZones}{dirty} ) && $hash->{helper}{mower}{attributes}{stayOutZones}{dirty} == 0) {
+
+      my @ar = @{ $hash->{helper}{mower}{attributes}{stayOutZones}{zones} };
+      for ( @ar ) {
+
+        return $_->{Id} if ( $_->{name} eq $zname );
+
+      }
+
+    }
+
   }
   return undef;
 }
@@ -2251,7 +2318,8 @@ sub listStatisticsData {
     $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{<b>numberOfCollisions</b>} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions} . ' </td><td>  </td></tr>';
     $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{<b>totalChargingTime</b>} &emsp;</td><td> ' . sprintf( "%.0f", $hash->{helper}{mower}{attributes}{statistics}{totalChargingTime} / 3600 ) . ' </td><td> h </td></tr>';
     $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{<b>totalCuttingTime</b>} &emsp;</td><td> ' . sprintf( "%.0f", $hash->{helper}{mower}{attributes}{statistics}{totalCuttingTime} / 3600 ) . ' </td><td> h </td></tr>';
-    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{<b>totalRunningTime</b>} &emsp;</td><td> ' . sprintf( "%.0f", $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} / 3600 ) . '<sup>1</sup> </td><td> h </td></tr>';
+    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{<b>totalDriveDistance</b>} &emsp;</td><td> ' . sprintf( "%.0f", $hash->{helper}{mower}{attributes}{statistics}{totalDriveDistance} / 1000 ) . '<sup>1</sup> </td><td> km </td></tr>';
+    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{<b>totalRunningTime</b>} &emsp;</td><td> ' . sprintf( "%.0f", $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} / 3600 ) . '<sup>2</sup> </td><td> h </td></tr>';
     $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{<b>totalSearchingTime</b>} &emsp;</td><td> ' . sprintf( "%.0f", $hash->{helper}{mower}{attributes}{statistics}{totalSearchingTime} / 3600 ) . ' </td><td> h </td></tr>';
 
     my $prop = '';
@@ -2299,7 +2367,8 @@ sub listStatisticsData {
     }
 
     $ret .= '</tbody></table>';
-    $ret .= '<p><sup>1</sup> totalRunningTime = totalCuttingTime + totalSearchingTime';
+    $ret .= '<p><sup>1</sup> totalDriveDistance = totalRunningTime * '. sprintf( "%.2f", $hash->{helper}{mower}{attributes}{statistics}{totalDriveDistance} / $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} ) if ( $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} );
+    $ret .= '<p><sup>2</sup> totalRunningTime = totalCuttingTime + totalSearchingTime';
     $ret .= '</html>';
 
     return $ret;
@@ -2352,11 +2421,17 @@ sub listMowerData {
     $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions} . ' </td><td>  </td></tr>';
     $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalChargingTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalChargingTime} . ' </td><td> s </td></tr>';
     $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalCuttingTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalCuttingTime} . ' </td><td> s </td></tr>';
-    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} . '<sup>1</sup> </td><td> s </td></tr>';
+    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalDriveDistance} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalDriveDistance} . '<sup>1</sup></td><td> m </td></tr>';
+    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} . '<sup>2</sup> </td><td> s </td></tr>';
     $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalSearchingTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalSearchingTime} . ' </td><td> s </td></tr>';
+    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{capabilities}{headlights} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{capabilities}{headlights} . ' </td><td>  </td></tr>';
+    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones} . ' </td><td>  </td></tr>';
+    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{capabilities}{workAreas} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{capabilities}{workAreas} . ' </td><td>  </td></tr>';
+    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{capabilities}{position} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{capabilities}{position} . ' </td><td>  </td></tr>';
 
     $ret .= '</tbody></table>';
-    $ret .= '<p><sup>1</sup> totalRunningTime = totalCuttingTime + totalSearchingTime';
+    $ret .= '<p><sup>1</sup> totalDriveDistance = totalRunningTime * '. sprintf( "%.2f", $hash->{helper}{mower}{attributes}{statistics}{totalDriveDistance} / $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} ) if ( $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} );
+    $ret .= '<p><sup>2</sup> totalRunningTime = totalCuttingTime + totalSearchingTime';
     $ret .= '</html>';
 
     return $ret;

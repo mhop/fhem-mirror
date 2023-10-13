@@ -168,8 +168,9 @@ __END__
       Starts immediately for &lt;number of minutes&gt;</li>
 
     <li><a id='AutomowerConnect-set-StartInWorkArea'>StartInWorkArea</a><br>
-      <code>set &lt;name&gt; StartInWorkArea &lt;workAreaId&gt; [&lt;number of minutes&gt;]</code><br>
-      Starts immediately in &lt;workAreaId&gt; for &lt;number of minutes&gt;</li>
+      <code>set &lt;name&gt; StartInWorkArea &lt;workAreaId|name&gt; [&lt;number of minutes&gt;]</code><br>
+      Testing: Starts immediately in &lt;workAreaId|name&gt; for &lt;number of minutes&gt;<br>
+       Zone name must not include space.</li>
 
     <li><a id='AutomowerConnect-set-chargingStationPositionToAttribute'>chargingStationPositionToAttribute</a><br>
       <code>set &lt;name&gt; chargingStationPositionToAttribute</code><br>
@@ -182,6 +183,14 @@ __END__
     <li><a id='AutomowerConnect-set-cuttingHeight'>cuttingHeight</a><br>
       <code>set &lt;name&gt; cuttingHeight &lt;1..9&gt;</code><br>
       Sets the cutting height. NOTE: Do not use for 550 EPOS and Ceora.</li>
+
+    <li><a id='AutomowerConnect-set-stayOutZone_enable'>stayOutZone_enable</a><br>
+      <code>set &lt;name&gt; stayOutZone_enable &lt;Id|name&gt;</code><br>
+      Testing: Enables stay out zone by Id or zone name. Zone name must not include space and contain at least one alphabetic character.</li>
+
+    <li><a id='AutomowerConnect-set-stayOutZone_disable'>stayOutZone_disable</a><br>
+      <code>set &lt;name&gt; stayOutZone_disable &lt;Id|name&gt;</code><br>
+      Testing: Disables stay out zone by Id or zone name. Zone name must not include space and contain at least one alphabetic character.</li>
 
     <li><a id='AutomowerConnect-set-getNewAccessToken'>getNewAccessToken</a><br>
       <code>set &lt;name&gt; getNewAccessToken</code><br>
@@ -418,6 +427,10 @@ __END__
       Set timeout for API call, default 5 s. </li><br>
   The response time is meassured and logged if a timeout ist set to 60 s.
 
+    <li><a id='AutomowerConnect-attr-testing'>testing</a><br>
+      <code>attr &lt;name&gt; testing 1</code><br>
+     Enables commands taged as Testing</li><br>
+
     <br><br>
   </ul>
 
@@ -531,8 +544,9 @@ __END__
       Startet sofort für &lt;number of minutes&gt;</li>
 
     <li><a id='AutomowerConnect-set-StartInWorkArea'>StartInWorkArea</a><br>
-      <code>set &lt;name&gt; StartInWorkArea &lt;workAreaId&gt; [&lt;number of minutes&gt;]</code><br>
-      Startet sofort in &lt;workAreaId&gt; für &lt;number of minutes&gt;</li>
+      <code>set &lt;name&gt; StartInWorkArea &lt;workAreaId|zone name&gt; [&lt;number of minutes&gt;]</code><br>
+      Testing: Startet sofort in &lt;workAreaId|name&gt; für &lt;number of minutes&gt;<br>
+      Der Name der Zone darf keine Leerzeichen beinhalten und muss mindestens einen Buchstaben enthalten.</li>
 
     <li><a id='AutomowerConnect-set-chargingStationPositionToAttribute'>chargingStationPositionToAttribute</a><br>
       <code>set &lt;name&gt; chargingStationPositionToAttribute</code><br>
@@ -545,6 +559,14 @@ __END__
      <li><a id='AutomowerConnect-set-cuttingHeight'>cuttingHeight</a><br>
       <code>set &lt;name&gt; cuttingHeight &lt;1..9&gt;</code><br>
       Setzt die Schnitthöhe. HINWEIS: Nicht für 550 EPOS und Ceora geeignet.</li>
+
+    <li><a id='AutomowerConnect-set-stayOutZone_enable'>stayOutZone_enable</a><br>
+      <code>set &lt;name&gt; stayOutZone_enable &lt;Id|zone name&gt;</code><br>
+      Testing: Enabled stayOutZone für die Id oder den Namen der Zone, er darf keine Leerzeichen beinhalten und muss mindestens einen Buchstaben enthalten.</li>
+
+    <li><a id='AutomowerConnect-set-stayOutZone_disable'>stayOutZone_disable</a><br>
+      <code>set &lt;name&gt; stayOutZone_disable &lt;Id|zone name&gt;</code><br>
+      Testing: Disabled stayOutZone für die Id oder den Namen der Zone, er darf keine Leerzeichen beinhalten und muss mindestens einen Buchstaben enthalten.</li>
 
      <li><a id='AutomowerConnect-set-getNewAccessToken'>getNewAccessToken</a><br>
       <code>set &lt;name&gt; getNewAccessToken</code><br>
@@ -784,6 +806,10 @@ __END__
       <code>attr &lt;name&gt; timeoutCMD &lt;[6 to 60]&gt;</code><br>
       Setzt den Timeout für Befehl senden, default 15 s. </li><br>
   Wird ein Timeout auf 60 s gesetzt, wird die Antwortzeit gemessen und geloggt.
+
+    <li><a id='AutomowerConnect-attr-testing'>testing</a><br>
+      <code>attr &lt;name&gt; testing 1</code><br>
+     Macht Befehle verfügbar, die mit Testing markiert sind.</li><br>
 
     <br><br>
   </ul>

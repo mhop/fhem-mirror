@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 74_AutomowerConnect: Commandref update, add Setter for work zone
+            start and stay out zone enabling/disabling.
+            Zone handling is for TESTING purpose
  - feature: 76_SolarForecast: new consumer attr key 'noshow', minor fixes
  - feature: 72_FRITZBOX - Log3 handling
  - feature: 72_FB_CALLMONITOR - Log3 handling
