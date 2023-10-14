@@ -15,14 +15,16 @@ class Arlo:
             'platform': 'linux',
             'mobile': False
         }
-        self._session = cloudscraper.create_scraper(browser=browser)
+        self._session = cloudscraper.create_scraper(ecdhCurve='secp384r1')
         self._baseUrl = "https://ocapi-app.arlo.com/api/"
 
         self._headers  = {
             'Access-Control-Request-Headers': 'content-type,source,x-user-device-id,x-user-device-name,x-user-device-type',
             'Access-Control-Request-Method': 'POST',
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
             "Referer": "https://my.arlo.com",
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36 Edg/114.0.1823.58',
         }
         self._session.options(self._baseUrl + "auth", headers=self._headers)
 
@@ -30,10 +32,12 @@ class Arlo:
             "DNT": "1",
             "schemaVersion": "1",
             "Auth-Version": "2",
+            "Cache-Control": "no-cache",
             "Content-Type": "application/json; charset=UTF-8",
             "Origin": "https://my.arlo.com",
+            "Pragma": "no-cache",
             "Referer": "https://my.arlo.com/",
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36 Edg/114.0.1823.58',
             "Source": "arloCamWeb"
         }
         self._token = None
