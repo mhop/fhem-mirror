@@ -24,7 +24,7 @@ use strict;
 use warnings;
 use POSIX;
 use FHEM::Meta;
-
+use Carp;
 
 eval {use Data::Dumper qw(Dumper);1};
 #use Data::Dumper;
