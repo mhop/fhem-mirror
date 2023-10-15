@@ -144,9 +144,10 @@ sub RPI_1Wire_Init {				#
 		}
 	}
 	if ($device eq "BUSMASTER") {
-		if (!-w "$w1_path/$arg/therm_bulk_read") {
+		if (-e "$w1_path/$arg/therm_bulk_read") {
+			$hash->{helper}{write}.="therm_bulk_read " if (!-w "$w1_path/$arg/therm_bulk_read");
+		} else {
 			readingsSingleUpdate($hash, 'therm_bulk_read', "off",0); 
-			$hash->{helper}{write}.="therm_bulk_read " if (-e $ms_path.$id."/therm_bulk_read" )
 		}
 	}
 	RPI_1Wire_Set($hash, $name, "setfromreading");
