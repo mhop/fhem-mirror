@@ -15,7 +15,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = '1.5.9';
+my $HOMEMODE_version = '1.5.10';
 my $HOMEMODE_Daytimes = '05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night';
 my $HOMEMODE_Seasons = '03.01|spring 06.01|summer 09.01|autumn 12.01|winter';
 my $HOMEMODE_UserModes = 'gotosleep,awoken,asleep';
@@ -3446,9 +3446,8 @@ sub HOMEMODE_checkIP($)
   my ($hash) = @_;
   return if ($hash->{helper}{RUNNING_IPCHECK});
   $hash->{helper}{RUNNING_IPCHECK} = 1;
-  my $name = $hash->{NAME};
   my $param = {
-    url        => 'http://icanhazip.com/',
+    url        => 'https://icanhazip.com/',
     timeout    => 5,
     hash       => $hash,
     callback   => \&HOMEMODE_setIP
