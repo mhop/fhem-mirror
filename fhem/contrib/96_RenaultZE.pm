@@ -1,6 +1,6 @@
 ###############################################################################
 #
-# $Id: 96_RenaultZE.pm  2023-01-13 plin $
+# $Id: 96_RenaultZE.pm  2023-10-15 plin $
 # 96_RenaultZE.pm
 #
 # Forum : https://forum.fhem.de/index.php/topic,116273.0.html
@@ -38,6 +38,7 @@
 
 ############################################################################################################################
 # Version History
+# v 1.10 addedd attribute brand, 'Dacia' will allow start/stop charge, additional readings after issueing get vehicles
 # v 1.09 fixed problem with readingsBulkUpdate/readingsSingleUpdate in lines 1002ff
 # v 1.08 new KAMERON API key
 # v 1.07 adjusting to new output  format from charges
@@ -101,7 +102,7 @@ use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
 
-my $RenaultZE_version ="V1.09 / 15.06.2023";
+my $RenaultZE_version ="V1.10 / 16.10.2023";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -134,6 +135,7 @@ sub RenaultZE_Initialize($) {
     $hash->{AsyncOutputFn} = 'RenaultZE_AsyncOutput';
 
     $hash->{AttrList} = "ze_phase:1,2 ".
+			"ze_brand:Renault,Dacia ".
     			"ze_user ".
 			"ze_country ".
 			"ze_latitude ".
@@ -482,6 +484,7 @@ sub RenaultZE_Main3($) {
         {
 	      #my $res = RenaultZE_getData_Step1($hash);
               my $res = RenaultZE_gData_Step1($hash,'battery-status');
+	      my $model = $hash->{READINGS}{vehicleDetails_model_label}{VAL};
               Log3 $name, 5, "RenaultZE_gData_Step1 - battery-status - RC=".$res;
 	      InternalTimer( gettimeofday() + 1, sub() { my $a = 1; 
                  $res = RenaultZE_gData_Step1($hash,'cockpit');
@@ -496,8 +499,8 @@ sub RenaultZE_Main3($) {
                  Log3 $name, 5, "RenaultZE_gData_Step1 - hvac-status - RC=".$res		if ($phase eq "1");
 	      }, undef);
 	      InternalTimer( gettimeofday() + 4, sub() { my $a = 1; 
-                 $res = RenaultZE_gData_Step1($hash,'charge-mode');
-                 Log3 $name, 5, "RenaultZE_gData_Step1 - charge-mode - RC=".$res;
+                 $res = RenaultZE_gData_Step1($hash,'charge-mode')			if ($model ne "SPRING");
+                 Log3 $name, 5, "RenaultZE_gData_Step1 - charge-mode - RC=".$res	if ($model ne "SPRING");
 	      }, undef);
 	}
 
@@ -1072,6 +1075,70 @@ sub RenaultZE_gData_Step2($)
     				readingsSingleUpdate($hash,"img_".$size."_img",$link,1)   if (AttrVal($name,"ze_showimage","1") eq 2 and $size =~ /LARGE/ );
                         }
                 }
+                my $detail = $item->{vehicleDetails}->{family}->{code};
+		readingsSingleUpdate($hash,"vehicleDetails_family_code",$detail,1);
+                $detail = $item->{vehicleDetails}->{family}->{label};
+		readingsSingleUpdate($hash,"vehicleDetails_family_label",$detail,1);
+                $detail = $item->{vehicleDetails}->{family}->{group};
+		readingsSingleUpdate($hash,"vehicleDetails_family_group",$detail,1);
+		#
+                $detail = $item->{vehicleDetails}->{engineEnergyType};
+		readingsSingleUpdate($hash,"vehicleDetails_engineEnergyType",$detail,1);
+		#
+                $detail = $item->{vehicleDetails}->{navigationAssistanceLevel}->{code};
+		readingsSingleUpdate($hash,"vehicleDetails_navigationAssistanceLevel_code",$detail,1);
+                $detail = $item->{vehicleDetails}->{navigationAssistanceLevel}->{label};
+		readingsSingleUpdate($hash,"vehicleDetails_navigationAssistanceLevel_label",$detail,1);
+                $detail = $item->{vehicleDetails}->{navigationAssistanceLevel}->{group};
+		readingsSingleUpdate($hash,"vehicleDetails_navigationAssistanceLevel_group",$detail,1);
+		#
+                $detail = $item->{vehicleDetails}->{version}->{code};
+		readingsSingleUpdate($hash,"vehicleDetails_version_code",$detail,1);
+		#
+                $detail = $item->{vehicleDetails}->{gearbox}->{code};
+                readingsSingleUpdate($hash,"vehicleDetails_gearbox_code",$detail,1);
+                $detail = $item->{vehicleDetails}->{gearbox}->{label};
+                readingsSingleUpdate($hash,"vehicleDetails_gearbox_label",$detail,1);
+                $detail = $item->{vehicleDetails}->{gearbox}->{group};
+                readingsSingleUpdate($hash,"vehicleDetails_gearbox_group",$detail,1);
+		#
+                $detail = $item->{vehicleDetails}->{radioType}->{code};
+                readingsSingleUpdate($hash,"vehicleDetails_radioType_code",$detail,1);
+                $detail = $item->{vehicleDetails}->{radioType}->{label};
+                readingsSingleUpdate($hash,"vehicleDetails_radioType_label",$detail,1);
+                $detail = $item->{vehicleDetails}->{radioType}->{group};
+                readingsSingleUpdate($hash,"vehicleDetails_radioType_group",$detail,1);
+		#
+                $detail = $item->{vehicleDetails}->{tcu}->{code};
+                readingsSingleUpdate($hash,"vehicleDetails_tcu_code",$detail,1);
+                $detail = $item->{vehicleDetails}->{tcu}->{label};
+                readingsSingleUpdate($hash,"vehicleDetails_tcu_label",$detail,1);
+                $detail = $item->{vehicleDetails}->{tcu}->{group};
+                readingsSingleUpdate($hash,"vehicleDetails_tcu_group",$detail,1);
+		#
+                $detail = $item->{vehicleDetails}->{model}->{code};
+                readingsSingleUpdate($hash,"vehicleDetails_model_code",$detail,1);
+                $detail = $item->{vehicleDetails}->{model}->{label};
+                readingsSingleUpdate($hash,"vehicleDetails_model_label",$detail,1);
+                $detail = $item->{vehicleDetails}->{model}->{group};
+                readingsSingleUpdate($hash,"vehicleDetails_model_group",$detail,1);
+		#
+                $detail = $item->{vehicleDetails}->{engineType};
+                readingsSingleUpdate($hash,"vehicleDetails_engineType",$detail,1);
+		#
+                $detail = $item->{vehicleDetails}->{modelSCR};
+                readingsSingleUpdate($hash,"vehicleDetails_modelSCR",$detail,1);
+		#
+                $detail = $item->{vehicleDetails}->{battery}->{code};
+                readingsSingleUpdate($hash,"vehicleDetails_battery_code",$detail,1);
+                $detail = $item->{vehicleDetails}->{battery}->{label};
+                readingsSingleUpdate($hash,"vehicleDetails_battery_label",$detail,1);
+                $detail = $item->{vehicleDetails}->{battery}->{group};
+                readingsSingleUpdate($hash,"vehicleDetails_battery_group",$detail,1);
+		#
+                $detail = $item->{vehicleDetails}->{brand}->{label};
+                readingsSingleUpdate($hash,"vehicleDetails_brand_label",$detail,1);
+
         }
 
         asyncOutput( $hash->{curCL}, $output );
@@ -1395,13 +1462,30 @@ sub RenaultZE_Charge_Step1($)
     Log3 $name, 5, "RenaultZE_Charge_Step1 - Data".$step1;
     my $jsonData = "empty";
     my $url= "empty";
+    my $brand = AttrVal($name,"ze_brand","Renault");
     if ( $value eq "start" )
     {
-       $jsonData = '{"data":{"type":"ChargingStart","attributes":{"action":"start"}}}';
-       $url = "https://api-wired-prod-1-euw1.wrd-aws.com/commerce/v1/accounts/".$accId."/kamereon/kca/car-adapter/v1/cars/".$vin."/actions/charging-start?country=".$country;
+       if ( $brand eq "Renault" )
+       {
+          $jsonData = '{"data":{"type":"ChargingStart","attributes":{"action":"start"}}}';
+          $url = "https://api-wired-prod-1-euw1.wrd-aws.com/commerce/v1/accounts/".$accId."/kamereon/kca/car-adapter/v1/cars/".$vin."/actions/charging-start?country=".$country;
+       }
+       if ( $brand eq "Dacia" )
+       {
+          $jsonData = '{"data":{"type":"ChargePauseResume","attributes":{"action":"resume"}}}';
+          $url = "https://api-wired-prod-1-euw1.wrd-aws.com/commerce/v1/accounts/".$accId."/kamereon/kcm/v1/vehicles/".$vin."/charge/pause-resume?country=".$country;
+       }
     } else {
-       $jsonData = '{"data":{"type":"ChargingStart","attributes":{"action":"stop"}}}';
-       $url = "https://api-wired-prod-1-euw1.wrd-aws.com/commerce/v1/accounts/".$accId."/kamereon/kca/car-adapter/v1/cars/".$vin."/actions/charging-start?country=".$country;
+       if ( $brand eq "Renault" )
+       {
+          $jsonData = '{"data":{"type":"ChargingStart","attributes":{"action":"stop"}}}';
+          $url = "https://api-wired-prod-1-euw1.wrd-aws.com/commerce/v1/accounts/".$accId."/kamereon/kca/car-adapter/v1/cars/".$vin."/actions/charging-start?country=".$country;
+       }
+       if ( $brand eq "Dacia" )
+       {
+          $jsonData = '{"data":{"type":"ChargePauseResume","attributes":{"action":"pause"}}}';
+          $url = "https://api-wired-prod-1-euw1.wrd-aws.com/commerce/v1/accounts/".$accId."/kamereon/kcm/v1/vehicles/".$vin."/charge/pause-resume?country=".$country;
+       }
     }
     Log3 $name, 5, "RenaultZE_Charge_Step1 - URL ".$url;
     Log3 $name, 5, "RenaultZE_Charge_Step1 - jsonData ".$jsonData;
@@ -1755,7 +1839,7 @@ sub RenaultZE_EpochFromDateTime($) {
               <li><a name="update"></a><i>update</i><br>
                   force update of the current readings (battery-status, cockpit, location, hvac-status, charge-mode)</li>
               <li><a name="vehicles"></a><i>vehicles</i><br>
-	          get a list of your vehicles with details, set the readings for the images<br>
+	          get a list of your vehicles with details, set the readings for the images and some technical details<br>
 		  if the attribute ze_showimage is set you get readings with the cars images</li>
               <li><a name="zTest"></a><i>zTest</i><br>
                   Option to test new API functions which might be implemented one day ...<br>
@@ -1781,6 +1865,9 @@ sub RenaultZE_EpochFromDateTime($) {
         <br><br>
         Attributes:
         <ul>
+            <li><i>ze_brand</i> Renault|Dacia<br>
+                Car brand, default is Renault
+            </li>
             <li><i>ze_phase</i> 1|2<br>
                 The phase of ZE technology, either 1 or 2, right now only phase 2 is supported
             </li>
