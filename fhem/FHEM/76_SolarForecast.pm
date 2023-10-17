@@ -144,7 +144,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.0.5"  => "11.10.2023  new sub _aiGetSpread for estimate AI results stepwise, allow key 'noshow' values 0,1,2,3 ",
+  "1.0.5"  => "11.10.2023  new sub _aiGetSpread for estimate AI results stepwise, allow key 'noshow' values 0,1,2,3 ".
+                           "calculate conForecastTillNextSunrise accurate to the minute ",
   "1.0.4"  => "10.10.2023  fix: print always Log in _calcCaQ* subroutines even if calaculated factors are equal ".
                            "new consumer attr key 'noshow' ",
   "1.0.3"  => "08.10.2023  change graphic header PV/CO detail, new attr graphicHeaderOwnspec, internal code changes ".
@@ -7994,12 +7995,16 @@ sub genStatisticReadings {
              my $type  = $paref->{type};
              my $confc = 0;
              my $dono  = 1;
+             my $hrs   = 0;
+             my $sttm  = '';
 
              for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
                  my $don = NexthoursVal ($hash, $idx, 'DoN', 2);                     # Wechsel von 0 -> 1 relevant
                  last if($don == 2);
 
                  $confc += &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);
+                 $sttm   = NexthoursVal ($hash, $idx, 'starttime', '');
+                 $hrs++;                                                             # Anzahl berücksichtigte Stunden
 
                  if ($dono == 0 && $don == 1) {
                      last;
@@ -8007,8 +8012,15 @@ sub genStatisticReadings {
 
                  $dono = $don;
              }
+             
+             my $sttmp = timestringToTimestamp ($sttm) // return;
+             $sttmp   += 3600;                                                       # Beginnzeitstempel auf volle Stunde ergänzen 
+             my $mhrs  = $hrs * 60;                                                  # berücksichtigte volle Minuten
+             my $mtsr  = ($sttmp - $t) / 60;                                         # Minuten bis nächsten Sonnenaufgang (gerundet)
 
-             push @$daref, 'statistic_'.$kpi.'<>'. ($confc ? $confc.$hcsr{$kpi}{unit} : '-');
+             $confc    = $confc / $mhrs * $mtsr;
+             
+             push @$daref, 'statistic_'.$kpi.'<>'. ($confc ? (sprintf "%.0f", $confc).$hcsr{$kpi}{unit} : '-');
           }
       }
   }
