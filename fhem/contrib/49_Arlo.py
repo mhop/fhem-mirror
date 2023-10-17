@@ -15,7 +15,7 @@ class Arlo:
             'platform': 'linux',
             'mobile': False
         }
-        self._session = cloudscraper.create_scraper(ecdhCurve='secp384r1')
+        self._session = cloudscraper.create_scraper(browser=browser)
         self._baseUrl = "https://ocapi-app.arlo.com/api/"
 
         self._headers  = {
