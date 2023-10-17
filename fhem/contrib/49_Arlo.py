@@ -165,6 +165,9 @@ class TfaMailCheck:
         res, ids = self._imap.search(None, "FROM", "do_not_reply@arlo.com")
         for msg_id in ids[0].split():
             self._determine_code_and_delete_mail(msg_id)
+        if res.lower() == "ok" and len(ids) > 0:
+            self._imap.close()
+            res, status = self._imap.select()
         if res.lower() != "ok":
             return False
 
