@@ -144,7 +144,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.0.5"  => "11.10.2023  new sub _aiGetTpanResult for estimate AI results stepwise, allow key 'noshow' values 0,1,2,3 ",
+  "1.0.6"  => "19.10.2023  new attr ctrlGenPVdeviation ",
+  "1.0.5"  => "11.10.2023  new sub _aiGetSpread for estimate AI results stepwise, allow key 'noshow' values 0,1,2,3 ".
+                           "calculate conForecastTillNextSunrise accurate to the minute ",
   "1.0.4"  => "10.10.2023  fix: print always Log in _calcCaQ* subroutines even if calaculated factors are equal ".
                            "new consumer attr key 'noshow' ",
   "1.0.3"  => "08.10.2023  change graphic header PV/CO detail, new attr graphicHeaderOwnspec, internal code changes ".
@@ -682,6 +684,8 @@ my %hqtxt = (                                                                   
               DE => qq{Verbrauch}                                                                                           },
   tday   => { EN => qq{today},
               DE => qq{heute}                                                                                               },
+  ctnsly => { EN => qq{continuously},
+              DE => qq{fortlaufend}                                                                                         },
   yday   => { EN => qq{yesterday},
               DE => qq{gestern}                                                                                             },
   after  => { EN => qq{after},
@@ -1011,6 +1015,7 @@ sub Initialize {
                                 "ctrlAutoRefreshFW:$fwd ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm ".
+                                "ctrlGenPVdeviation:daily,continuously ".
                                 "ctrlInterval ".
                                 "ctrlLanguage:DE,EN ".
                                 "ctrlNextDayForecastReadings:multiple-strict,$hod ".
@@ -3998,6 +4003,7 @@ sub Attr {
   my $name  = shift;
   my $aName = shift;
   my $aVal  = shift;
+  
   my $hash  = $defs{$name};
 
   my ($do,$val);
@@ -4020,11 +4026,17 @@ sub Attr {
       delete $hash->{AUTOREFRESH};
   }
 
-  if($aName eq "ctrlNextDayForecastReadings") {
+  if($aName eq 'ctrlNextDayForecastReadings') {
       deleteReadingspec ($hash, "Tomorrow_Hour.*");
   }
+  
+  if($aName eq 'ctrlGenPVdeviation' && $aVal eq 'daily') {
+      my $type = $hash->{TYPE};
+      deleteReadingspec ($hash, 'Today_PVdeviation');
+      delete $data{$type}{$name}{circular}{99}{tdayDvtn};
+  }
 
-  if ($cmd eq "set") {
+  if ($cmd eq 'set') {
       if ($aName eq 'ctrlInterval') {
           unless ($aVal =~ /^[0-9]+$/x) {
               return qq{The value for $aName is not valid. Use only figures 0-9 !};
@@ -4073,7 +4085,7 @@ sub Attr {
       aVal  => $aVal
   };
 
-  $aName = "consumer" if($aName =~ /consumer?(\d+)$/xs);
+  $aName = 'consumer' if($aName =~ /consumer?(\d+)$/xs);
 
   if($hattr{$aName} && defined &{$hattr{$aName}{fn}}) {
       my $ret = q{};
@@ -5718,12 +5730,11 @@ sub _transferInverterValues {
   debugLog ($paref, "collectData", "collect Inverter data - device: $indev =>");
   debugLog ($paref, "collectData", "pv: $pv W, etotal: $etotal Wh");
 
-  my $nhour  = $chour+1;
-
+  my $nhour    = $chour + 1;
   my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "etotal", 0);               # etotal zu Beginn einer Stunde
 
   my $ethishour;
-  if (!$histetot) {                                                                            # etotal der aktuelle Stunde gesetzt ?
+  if (!$histetot) {                                                                           # etotal der aktuelle Stunde gesetzt ?
       $paref->{etotal}   = $etotal;
       $paref->{nhour}    = sprintf("%02d",$nhour);
       $paref->{histname} = "etotal";
@@ -6160,8 +6171,8 @@ sub _createSummaries {
   }
 
   for my $th (1..24) {
-      $todaySumFc->{PV} += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);
-      $todaySumRe->{PV} += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVreal",     0);
+      $todaySumFc->{PV} += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);
+      $todaySumRe->{PV} += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$th)."_PVreal",     0);
   }
 
   push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
@@ -6207,7 +6218,7 @@ sub _createSummaries {
   push @$daref, "RestOfDayPVforecast<>".         (int $restOfDaySum->{PV}). " Wh";
   push @$daref, "Tomorrow_PVforecast<>".         (int $tomorrowSum->{PV}).  " Wh";
   push @$daref, "Today_PVforecast<>".            (int $todaySumFc->{PV}).   " Wh";
-  push @$daref, "Today_PVreal<>".                (int $todaySumRe->{PV}).   " Wh"  if(int $todaySumRe->{PV} > ReadingsNum($name, 'Today_PVreal', 0));
+  push @$daref, "Today_PVreal<>".                (int $todaySumRe->{PV}).   " Wh"  if(int $todaySumRe->{PV} > ReadingsNum ($name, 'Today_PVreal', 0));
 
   push @$daref, "Tomorrow_ConsumptionForecast<>".           $tconsum.                          " Wh" if(defined $tconsum);
   push @$daref, "NextHours_Sum04_ConsumptionForecast<>".   (int $next4HoursSum->{Consumption})." Wh";
@@ -7729,7 +7740,7 @@ return;
 }
 
 ################################################################
-#  Kerrektur von Today_PVreal +
+#  Korrektur von Today_PVreal +
 #  berechnet die prozentuale Abweichung von Today_PVforecast
 #  und Today_PVreal
 ################################################################
@@ -7743,30 +7754,39 @@ sub _calcTodayPVdeviation {
   my $day   = $paref->{day};
   my $daref = $paref->{daref};
 
-  my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '22:00').':00');
-
-  return if($t < $sstime);
-
   my $pvfc = ReadingsNum ($name, 'Today_PVforecast', 0);
   my $pvre = ReadingsNum ($name, 'Today_PVreal',     0);
 
-  my $hsr  = (split ":", ReadingsVal ($name, 'Today_SunRise', '03:00'))[0];                   # die Stunde des Sonnenaufgangs
-  my $ehsr = HistoryVal ($hash, $day, $hsr, 'etotal', 0);                                     # gespeichertes etotal vor Sonnenaufgang
+  #my $hsr  = (split ":", ReadingsVal ($name, 'Today_SunRise', '03:00'))[0];                   # die Stunde des Sonnenaufgangs
+  #my $ehsr = HistoryVal ($hash, $day, $hsr, 'etotal', 0);                                     # gespeichertes etotal vor Sonnenaufgang
 
-  if ($ehsr) {
-      my $esset = CurrentVal ($hash, 'etotal', 0);                                            # Erzeugung total (Wh) nach Sonnenuntergang
-      $pvre     = $esset - $ehsr;
+  #if ($ehsr) {
+  #    my $esset = CurrentVal ($hash, 'etotal', 0);                                            # Erzeugung total (Wh) nach Sonnenuntergang
+  #    $pvre     = $esset - $ehsr;
+  #    $pvre     = 0 if($pvre <= 0);
+  #}
+  
+  return if(!$pvre);
+  
+  my $dp;
+  
+  if (AttrVal($name, 'ctrlGenPVdeviation', 'daily') eq 'daily') {
+      my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet",  '22:00').':00');
+      return if($t < $sstime);
+      
+      my $diff = $pvfc - $pvre;
+      $dp      = sprintf "%.2f" , (100 * $diff / $pvre);
   }
-
-  my $diff = $pvfc - $pvre;
-
-  if($pvre) {
-      my $dp                                      = sprintf "%.2f" , (100 * $diff / $pvre);
-      $data{$type}{$name}{circular}{99}{tdayDvtn} = $dp;
-
-      push @$daref, "Today_PVdeviation<>". $dp.  " %";
-      push @$daref, "Today_PVreal<>".      $pvre." Wh";
+  else {
+      my $rodfc = ReadingsNum ($name, 'RestOfDayPVforecast', 0);
+      my $dayfc = $pvre + $rodfc;                                            # laufende Tagesprognose aus PVreal + Prognose Resttag
+      $dp       = sprintf "%.2f", (100 * ($pvfc - $dayfc) / $dayfc);
   }
+  
+  $data{$type}{$name}{circular}{99}{tdayDvtn} = $dp;
+
+  push @$daref, "Today_PVdeviation<>". $dp.' %';
+  push @$daref, "Today_PVreal<>".      (sprintf "%.0f", $pvre).' Wh'; 
 
 return;
 }
@@ -7847,7 +7867,7 @@ sub genStatisticReadings {
   my $t     = $paref->{t};              # aktueller UNIX Timestamp
 
   my @srd = sort keys (%hcsr);
-  my @csr = split ',', AttrVal($name, 'ctrlStatisticReadings', '');
+  my @csr = split ',', AttrVal ($name, 'ctrlStatisticReadings', '');
 
   for my $item (@srd) {
       next if($item ~~ @csr);
@@ -7994,12 +8014,16 @@ sub genStatisticReadings {
              my $type  = $paref->{type};
              my $confc = 0;
              my $dono  = 1;
+             my $hrs   = 0;
+             my $sttm  = '';
 
              for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
                  my $don = NexthoursVal ($hash, $idx, 'DoN', 2);                     # Wechsel von 0 -> 1 relevant
                  last if($don == 2);
 
                  $confc += &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);
+                 $sttm   = NexthoursVal ($hash, $idx, 'starttime', '');
+                 $hrs++;                                                             # Anzahl berücksichtigte Stunden
 
                  if ($dono == 0 && $don == 1) {
                      last;
@@ -8007,8 +8031,15 @@ sub genStatisticReadings {
 
                  $dono = $don;
              }
+             
+             my $sttmp = timestringToTimestamp ($sttm) // return;
+             $sttmp   += 3600;                                                       # Beginnzeitstempel auf volle Stunde ergänzen 
+             my $mhrs  = $hrs * 60;                                                  # berücksichtigte volle Minuten
+             my $mtsr  = ($sttmp - $t) / 60;                                         # Minuten bis nächsten Sonnenaufgang (gerundet)
 
-             push @$daref, 'statistic_'.$kpi.'<>'. ($confc ? $confc.$hcsr{$kpi}{unit} : '-');
+             $confc    = $confc / $mhrs * $mtsr;
+             
+             push @$daref, 'statistic_'.$kpi.'<>'. ($confc ? (sprintf "%.0f", $confc).$hcsr{$kpi}{unit} : '-');
           }
       }
   }
@@ -8328,6 +8359,7 @@ sub entryGraphic {
       flowgconsTime  => AttrVal ($name, 'flowGraphicShowConsumerRemainTime',  1),                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
       flowgconsDist  => AttrVal ($name, 'flowGraphicConsumerDistance', $fgCDdef),                # Abstand Verbrauchericons zueinander
       css            => AttrVal ($name, 'flowGraphicCss',               $cssdef),                # flowGraphicCss Styles
+      genpvdva       => AttrVal ($name, 'ctrlGenPVdeviation',           'daily'),                # Methode der Abweichungsberechnung
       lang           => AttrVal ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang)),
       debug          => getDebug ($hash),                                                        # Debug Module
   };
@@ -8586,7 +8618,7 @@ sub _graphicHeader {
   my $hdrDetail = $paref->{hdrDetail};                     # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
   my $ftui      = $paref->{ftui};
   my $lang      = $paref->{lang};
-  my $name      = $paref->{name};
+  my $name      = $paref->{name};                         
   my $hash      = $paref->{hash};
   my $kw        = $paref->{kw};
   my $dstyle    = $paref->{dstyle};                        # TD-Style
@@ -8603,14 +8635,14 @@ sub _graphicHeader {
   my $pvCu      = ReadingsNum ($name, "Current_PV",                          0);
 
   if ($kw eq 'kWh') {
-      $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
-      $coRe = sprintf("%.1f" , $coRe/1000)."&nbsp;kWh";
-      $coTo = sprintf("%.1f" , $coTo/1000)."&nbsp;kWh";
-      $coCu = sprintf("%.1f" , $coCu/1000)."&nbsp;kW";
-      $pv4h = sprintf("%.1f" , $pv4h/1000)."&nbsp;kWh";
-      $pvRe = sprintf("%.1f" , $pvRe/1000)."&nbsp;kWh";
-      $pvTo = sprintf("%.1f" , $pvTo/1000)."&nbsp;kWh";
-      $pvCu = sprintf("%.1f" , $pvCu/1000)."&nbsp;kW";
+      $co4h = sprintf ("%.1f", $co4h/1000)."&nbsp;kWh";
+      $coRe = sprintf ("%.1f", $coRe/1000)."&nbsp;kWh";
+      $coTo = sprintf ("%.1f", $coTo/1000)."&nbsp;kWh";
+      $coCu = sprintf ("%.1f", $coCu/1000)."&nbsp;kW";
+      $pv4h = sprintf ("%.1f", $pv4h/1000)."&nbsp;kWh";
+      $pvRe = sprintf ("%.1f", $pvRe/1000)."&nbsp;kWh";
+      $pvTo = sprintf ("%.1f", $pvTo/1000)."&nbsp;kWh";
+      $pvCu = sprintf ("%.1f", $pvCu/1000)."&nbsp;kW";
   }
   else {
       $co4h .= "&nbsp;Wh";
@@ -8808,9 +8840,11 @@ sub _graphicHeader {
       $tdayDvtn    =~ s/\,0//;
       $ydayDvtn    =~ s/\./,/;
       $ydayDvtn    =~ s/,0//;
+      
+      my $genpvdva = $paref->{genpvdva};
 
       my $dvtntxt  = $hqtxt{dvtn}{$lang}.'&nbsp;';
-      my $tdaytxt  = $hqtxt{tday}{$lang}.':&nbsp;'."<b>".$tdayDvtn."</b>";
+      my $tdaytxt  = ($genpvdva eq 'daily' ? $hqtxt{tday}{$lang} : $hqtxt{ctnsly}{$lang}).':&nbsp;'."<b>".$tdayDvtn."</b>";     
       my $ydaytxt  = $hqtxt{yday}{$lang}.':&nbsp;'."<b>".$ydayDvtn."</b>";
 
       my $text_tdayDvtn = $tdayDvtn =~ /^-[1-9]/? $hqtxt{pmtp}{$lang} :
@@ -11207,18 +11241,18 @@ sub aiGetResult {                   ## no critic "not used"
   
   my $msg = 'no decition delivered'; 
   
-  ($msg, $pvaifc) = _aiGetTpanResult ( { hash  => $hash,
-                                         name  => $name,
-                                         type  => $type,
-                                         rad1h => $rad1h, 
-                                         temp  => $tbin,
-                                         wcc   => $cbin,
-                                         wrp   => $rbin,
-                                         hod   => $hod,
-                                         dtree => $dtree,
-                                         debug => $paref->{debug}
-                                       } 
-                                     );
+  ($msg, $pvaifc) = _aiGetSpread ( { hash  => $hash,
+                                     name  => $name,
+                                     type  => $type,
+                                     rad1h => $rad1h, 
+                                     temp  => $tbin,
+                                     wcc   => $cbin,
+                                     wrp   => $rbin,
+                                     hod   => $hod,
+                                     dtree => $dtree,
+                                     debug => $paref->{debug}
+                                   } 
+                                 );
                                       
   if (defined $pvaifc) {
       return ('', $pvaifc);
@@ -11231,7 +11265,7 @@ return $msg;
 #  AI Ergebnis aus einer positiven und negativen 
 #  rad1h-Abweichung schätzen
 ################################################################
-sub _aiGetTpanResult {
+sub _aiGetSpread {
   my $paref = shift;
   my $rad1h = $paref->{rad1h};
   my $temp  = $paref->{temp};
@@ -15539,7 +15573,7 @@ to ensure that the system configuration is correct.
 
          <ul>
          <table>
-         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+         <colgroup> <col width="23%"> <col width="77%"> </colgroup>
             <tr><td> <b>aiProcess</b>            </td><td>Process flow of AI support                                                       </td></tr>
             <tr><td> <b>aiData</b>               </td><td>AI data                                                                          </td></tr>
             <tr><td> <b>apiCall</b>              </td><td>Retrieval API interface without data output                                      </td></tr>
@@ -15558,6 +15592,20 @@ to ensure that the system configuration is correct.
          </ul>
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-ctrlGenPVdeviation"></a>
+       <li><b>ctrlGenPVdeviation </b><br>
+         Specifies the method for calculating the deviation between predicted and real PV generation.
+         The Reading <b>Today_PVdeviation</b> is created depending on this setting. <br><br>
+
+         <ul>
+         <table>
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+            <tr><td> <b>daily</b>         </td><td>Calculation and creation of Today_PVdeviation is done after sunset (default) </td></tr>
+            <tr><td> <b>continuously</b>  </td><td>Calculation and creation of Today_PVdeviation is done continuously           </td></tr>
+         </table>
+         </ul>
+       </li><br>
 
        <a id="SolarForecast-attr-ctrlInterval"></a>
        <li><b>ctrlInterval &lt;Sekunden&gt; </b><br>
@@ -15626,7 +15674,7 @@ to ensure that the system configuration is correct.
 
          <ul>
          <table>
-         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
             <tr><td> <b>allStringsFullfilled</b>       </td><td>Fulfillment status of error-free generation of all strings                                                           </td></tr>
             <tr><td> <b>conForecastTillNextSunrise</b> </td><td>Consumption forecast from current hour to the coming sunrise                                                         </td></tr>
             <tr><td> <b>currentAPIinterval</b>         </td><td>the current call interval of the SolCast API (only model SolCastAPI) in seconds                                      </td></tr>
@@ -17351,7 +17399,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
          <ul>
          <table>
-         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+         <colgroup> <col width="23%"> <col width="77%"> </colgroup>
             <tr><td> <b>aiProcess</b>            </td><td>Prozessablauf der KI Unterstützung                                               </td></tr>
             <tr><td> <b>aiData</b>               </td><td>KI Daten                                                                         </td></tr>
             <tr><td> <b>apiCall</b>              </td><td>Abruf API Schnittstelle ohne Datenausgabe                                        </td></tr>
@@ -17370,6 +17418,20 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          </ul>
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-ctrlGenPVdeviation"></a>
+       <li><b>ctrlGenPVdeviation </b><br>
+         Legt die Methode zur Berechnung der Abweichung von prognostizierter und realer PV Erzeugung fest.
+         Das Reading <b>Today_PVdeviation</b> wird in Abhängigkeit dieser Einstellung erstellt. <br><br>
+
+         <ul>
+         <table>
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+            <tr><td> <b>daily</b>         </td><td>Berechnung und Erstellung von Today_PVdeviation erfolgt nach Sonnenuntergang (default) </td></tr>
+            <tr><td> <b>continuously</b>  </td><td>Berechnung und Erstellung von Today_PVdeviation erfolgt fortlaufend                    </td></tr>
+         </table>
+         </ul>
+       </li><br>
 
        <a id="SolarForecast-attr-ctrlInterval"></a>
        <li><b>ctrlInterval &lt;Sekunden&gt; </b><br>
@@ -17438,7 +17500,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
          <ul>
          <table>
-         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
             <tr><td> <b>allStringsFullfilled</b>       </td><td>Erfüllungsstatus der fehlerfreien Generierung aller Strings                                                     </td></tr>
             <tr><td> <b>conForecastTillNextSunrise</b> </td><td>Verbrauchsprognose von aktueller Stunde bis zum kommenden Sonnenaufgang                                         </td></tr>
             <tr><td> <b>currentAPIinterval</b>         </td><td>das aktuelle Abrufintervall der SolCast API (nur Model SolCastAPI) in Sekunden                                  </td></tr>
