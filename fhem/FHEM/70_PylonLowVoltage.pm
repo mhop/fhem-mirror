@@ -122,6 +122,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.1.10" => "18.10.2023 new function pseudoHexToText in _callManufacturerInfo for translate battery name and Manufactorer ",
   "0.1.9"  => "25.09.2023 fix possible bat adresses ",
   "0.1.8"  => "23.09.2023 new Attr userBatterytype, change manufacturerInfo, protocolVersion command hash to LENID=0 ",
   "0.1.7"  => "20.09.2023 extend possible number of bats from 6 to 8 ",
@@ -813,8 +814,8 @@ sub _callManufacturerInfo {
   # my $softwareVersion       = 'V'.hex (substr ($res, 33, 2)).'.'.hex (substr ($res, 35, 2));      # unklare Bedeutung
   my $ManufacturerHex       = substr  ($res, 37, 40);
 
-  $readings->{batteryType}  = $ubtt ? $ubtt.' (adapted)' : pack ("H*", $BatteryHex);
-  $readings->{Manufacturer} = pack ("H*", $ManufacturerHex);
+  $readings->{batteryType}  = $ubtt ? $ubtt.' (adapted)' : pseudoHexToText ($BatteryHex); 
+  $readings->{Manufacturer} = pseudoHexToText ($ManufacturerHex);
 
 return;
 }
@@ -1278,6 +1279,25 @@ sub responseCheck {
   }
 
 return $rtnerr;
+}
+
+###############################################################
+#  Hex-Zeichenkette in ASCII-Zeichenkette einzeln umwandeln
+###############################################################
+sub pseudoHexToText {
+   my $string = shift;
+   
+   my $charcode;
+   my $text;
+   
+   for (my $i = 0; $i < length($string); $i = $i + 2) {
+      $charcode = hex substr ($string, $i, 2);                  # charcode = aquivalente Dezimalzahl der angegebenen Hexadezimalzahl
+      next if($charcode == 45);                                 # Hyphen '-' ausblenden 
+      
+      $text = $text.chr ($charcode);
+   }
+   
+return $text;
 }
 
 ###############################################################
