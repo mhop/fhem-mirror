@@ -6174,6 +6174,8 @@ sub _createSummaries {
       $todaySumFc->{PV} += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);
       $todaySumRe->{PV} += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$th)."_PVreal",     0);
   }
+  
+  my $pvre = int $todaySumRe->{PV};
 
   push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
   limitArray ($data{$type}{$name}{current}{h4fcslidereg}, $defslidenum);
@@ -6210,6 +6212,7 @@ sub _createSummaries {
   push @$daref, "Current_SelfConsumptionRate<>". $selfconsumptionrate.      " %";
   push @$daref, "Current_Surplus<>".             $surplus.                  " W";
   push @$daref, "Current_AutarkyRate<>".         $autarkyrate.              " %";
+  push @$daref, "Today_PVreal<>".                $pvre.                     " Wh"  if($pvre > ReadingsNum ($name, 'Today_PVreal', 0));
 
   push @$daref, "NextHours_Sum01_PVforecast<>".  (int $next1HoursSum->{PV})." Wh";
   push @$daref, "NextHours_Sum02_PVforecast<>".  (int $next2HoursSum->{PV})." Wh";
@@ -6218,7 +6221,6 @@ sub _createSummaries {
   push @$daref, "RestOfDayPVforecast<>".         (int $restOfDaySum->{PV}). " Wh";
   push @$daref, "Tomorrow_PVforecast<>".         (int $tomorrowSum->{PV}).  " Wh";
   push @$daref, "Today_PVforecast<>".            (int $todaySumFc->{PV}).   " Wh";
-  push @$daref, "Today_PVreal<>".                (int $todaySumRe->{PV}).   " Wh"  if(int $todaySumRe->{PV} > ReadingsNum ($name, 'Today_PVreal', 0));
 
   push @$daref, "Tomorrow_ConsumptionForecast<>".           $tconsum.                          " Wh" if(defined $tconsum);
   push @$daref, "NextHours_Sum04_ConsumptionForecast<>".   (int $next4HoursSum->{Consumption})." Wh";
@@ -7786,7 +7788,7 @@ sub _calcTodayPVdeviation {
   $data{$type}{$name}{circular}{99}{tdayDvtn} = $dp;
 
   push @$daref, "Today_PVdeviation<>". $dp.' %';
-  push @$daref, "Today_PVreal<>".      (sprintf "%.0f", $pvre).' Wh'; 
+  #push @$daref, "Today_PVreal<>".      $pvre.' Wh'; 
 
 return;
 }
