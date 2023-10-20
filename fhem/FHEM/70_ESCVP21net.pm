@@ -43,6 +43,7 @@
 #    1.01.22  added "on" and "off" as direct set commands
 #    1.01.23  adding some default attributes on Define (icon, webCmd, cmdIcon,stateFormat)
 #    1.01.24  optimize help text
+#    1.01.25  add reading stateP to indicate on/off
 #
 ################################################################################
 #
@@ -76,7 +77,7 @@ use POSIX;
 
 #use JSON::XS qw (encode_json decode_json);
 
-my $version = "1.01.24";
+my $version = "1.01.25";
 my $missingModul = "";
 
 eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS ";
@@ -745,7 +746,7 @@ sub ESCVP21net_Define {
     $attr{$name}{cmdIcon} = "on:remotecontrol/black_btn_GREEN off:remotecontrol/black_btn_RED GetStatus:remotecontrol/black_btn_STATUS GetAll:remotecontrol/black_btn_INFO" if (!defined ($attr{$name}{cmdIcon}));
     #$attr{$name}{eventMap} = "/PWR on:PWRon/PWR off:PWRoff/" if (!defined ($attr{$name}{eventMap}));
     $attr{$name}{icon} = "it_camera" if (!defined ($attr{$name}{icon}));
-    $attr{$name}{stateFormat} = "PWR" if (!defined ($attr{$name}{stateFormat}));
+    $attr{$name}{stateFormat} = "stateP" if (!defined ($attr{$name}{stateFormat}));
     #$attr{$name}{webCmd} = "PWRon:PWRoff:GetStatus:GetAll" if (!defined ($attr{$name}{webCmd}));
     $attr{$name}{webCmd} = "on:off:GetStatus:GetAll" if (!defined ($attr{$name}{webCmd}));
  	}
@@ -793,7 +794,7 @@ sub ESCVP21net_Initialize {
     #$hash->{DelayedShutdownFn} = \&ESCVP21net_DelayedShutdown;
     
     $hash->{AttrList} =
-          "Manufacturer:Epson,other connectionCheck:off,1,15,30,60,120,300,600,3600 AdditionalSettings statusCheckCmd statusCheckInterval:off,1,5,10,15,30,60,300,600,3600 statusOfflineMsg debug:0,1 disable:0,1 cyclicConnect:off,10,15,30,60,120,300,600,3600 "
+          "Manufacturer:Epson,other connectionCheck:off,1,15,30,60,120,300,600,3600 AdditionalSettings statusCheckCmd statusCheckInterval:off,1,5,10,15,30,60,300,600,3600 statusOfflineMsg statusPOfflineMsg debug:0,1 disable:0,1 cyclicConnect:off,10,15,30,60,120,300,600,3600 PwrQueryDelay "
         . $readingFnAttributes;
 }
 
@@ -885,6 +886,7 @@ sub ESCVP21net_Notify($$) {
     delete $hash->{helper}{nextConnectionCheck} if ( defined( $hash->{helper}{nextConnectionCheck} ) );
     delete $hash->{helper}{nextStatusCheck} if ( defined( $hash->{helper}{nextStatusCheck} ) );
     readingsSingleUpdate( $hash, "PWR", "offline", 1);
+    readingsSingleUpdate( $hash, "stateP", "offline", 1);
     main::Log3 $name, 5, "[$name]: Notify: got DISCONNECTED, force PWR to offline";
     BlockingKill( $hash->{helper}{RUNNING_PID} ) if ( defined( $hash->{helper}{RUNNING_PID} ) );        
   }
@@ -1001,7 +1003,7 @@ sub ESCVP21net_Attr {
         ESCVP21net_setTypeCmds($hash);
         main::Log3 $name, 5, "[$name]: setTypeCmds: deleted debug sets";        
       }        
-    }        
+    }      
   }
   elsif($cmd eq "del"){
     if($attr_name eq "Manufacturer") {
@@ -1114,11 +1116,14 @@ sub ESCVP21net_Callback($){
   my $name = $hash->{NAME};
   my $rv;
   my $offlineMsg;
+  my $offlineMsgStatusP;
   
   if ($error){
     main::Log3 $name, 3, "[$name] DevIo callback error: $error";
     $offlineMsg = AttrVal($name, "statusOfflineMsg", "offline");
+    $offlineMsgStatusP = AttrVal($name, "statusPOfflineMsg", "off");
     $rv = readingsSingleUpdate($hash, "PWR", $offlineMsg, 1);
+    $rv = readingsSingleUpdate( $hash, "stateP", "$offlineMsgStatusP", 1);
     main::Log3 $name, 3, "[$name] DevIo callback error: force PWR to $offlineMsg";
   }
   my $status = DevIo_getState($hash);
@@ -1137,11 +1142,13 @@ sub ESCVP21net_Callback($){
     my $checkInterval = AttrVal($name, "statusCheckInterval", "300");
     my $checkcmd = AttrVal($name, "statusCheckCmd", "PWR");
     $offlineMsg = AttrVal($name, "statusOfflineMsg", "offline");
+    $offlineMsgStatusP = AttrVal($name, "statusPOfflineMsg", "off");
 
     if ($checkInterval ne "off"){
       # update reading for $checkcmd with $offlineMsg
       #$rv = readingsSingleUpdate($hash, $checkcmd, $offlineMsg, 1);
       $rv = readingsSingleUpdate($hash, "PWR", $offlineMsg, 1);
+      $rv = readingsSingleUpdate( $hash, "stateP", "$offlineMsgStatusP", 1);
       main::Log3 $name, 5,"[$name]: DevIo callback: $checkcmd set to $offlineMsg";
       return ;
     }      
@@ -1304,11 +1311,28 @@ sub ESCVP21net_Set {
     return undef;
   }
 ##### end of debug options
-  
+  # special handling of PWR ON/OFF, since get after set won't work for this - timeout problems in projector
+  # so define a timer running PWR? after 15 seconds
+
+  if (($opt eq "on" || $opt eq "off") || ($opt eq "PWR" && ($value eq "on" || $value eq "off"))) {
+    # after PWR ON/OFF, projector will not respond immediately with Power status.
+    # so get after set will not work
+    # therefore, we start a timer here
+    #my $rearg = $name."|".$cmd."|"."?";
+    #RemoveInternalTimer($rearg, "ESCVP21net_rescheduleSet");
+    #my $retime = 12;
+
+    my $retime = AttrVal($name, "PwrQueryDelay", "12");   
+    my $renext = gettimeofday() + $retime;
+    Log3 $name, 5, "[$name]: Set: opt is $opt, reschedulePWR in $retime s (at $renext)";
+    InternalTimer($renext, "ESCVP21net_reschedulePWR", $hash);    
+  }
+
   # everything fine so far, so construct $arg to pass by blockingFn  
   my $arg = $name."|".$opt."|".$value;
   # store latest command to helper
-  $hash->{helper}{lastCommand} = $opt;  
+  $hash->{helper}{lastCommand} = $opt;
+  $hash->{helper}{lastCommandValue} = $value;  
   
   if ( !( exists( $hash->{helper}{RUNNING_PID} ) ) ) {
     $hash->{helper}{RUNNING_PID} = BlockingCall( $blockingFn, $arg, $finishFn, $timeout, $abortFn, $hash );
@@ -1455,7 +1479,13 @@ sub ESCVP21net_setValue($){
 
         # replace CR and LF in result by space
         $result =~ s/[\r\n]/ /g;
-        
+                    #my $rearg = $name."|".$cmd."|"."?";
+            #RemoveInternalTimer($rearg, "ESCVP21net_rescheduleSet");
+            
+            #my $retime = 15;   
+            #my $renext = gettimeofday() + $retime;
+            #Log3 $name, 5, "[$name]: setValue: cmd is PWR, val is $val, reschedule at $renext";
+            #InternalTimer($renext, "ESCVP21net_reschedulePWR", $hash);
         # check for error
         if ($result =~ "ERR") {
           $result = "ERROR!";
@@ -1521,33 +1551,39 @@ sub ESCVP21net_setValue($){
         # return of ":" means OK, no value returned, i.e. we have tried to set an value
         elsif ($result eq ":") {
           # after set done, read current value
-          # does not work fpr PWR!
+          # does not work for PWR!
           if ($cmd eq "PWR"){
             # need error handling - not critical, will just run in non-blocking timeout
-            # seems to happen on toggle PWR only, i.e. PWR get - set - get
-            # OK for all other toggles
-            # OK for PWR on, i.e. PWR set - get
+            # reason: timeout problems in projector
+            # seems to happen for PWR only, i.e. PWR get - set - get
+            # so we avoid "get after set" for PWR completely
+            # InternalTimer and readingsUpdate does not work in BlockingFN!
+            # solution: We start a timer outside BLockingFN, i.e. in "ESCVP21net_Set" directly
+            # and ignore PWR result here.
+            # i.e. do nothing...
+            }
+          else {
+            $data = "$cmd?\r\n";
+            $encdata = encode("utf8",$data);
+
+            # strip CR, LF, non-ASCII just for logging - there might be a more elegant way to do this...
+            my $encdatastripped = $encdata;
+            $encdatastripped =~ s/[\r\n\x00-\x19]//g;
+            main::Log3 $name, 5, "[$name]: setValue: get after set: sending raw data: $encdatastripped";
+
+            # finally, get after set = send command and receive result          
+            send($sock , $encdata , 0);
+            recv($sock, $result, 1024, 0);
+
+            # strip CR, LF, non-ASCII just for logging - there might be a more elegant way to do this...
+            $result =~ s/[\r\n]/ /g;
+            my $resultstripped = $result;
+            $resultstripped =~ s/[\r\n\x00-\x19]//g;
+            main::Log3 $name, 5, "[$name]: setValue: get after set: received raw data: $resultstripped";
+
+            # calcResult will get nicer text from ESCVP21net_calcResult
+            $result = ESCVP21net_calcResult($hash, $result, $cmd, $datakey, $volfactor);
           }
-          $data = "$cmd?\r\n";
-          $encdata = encode("utf8",$data);
-
-          # strip CR, LF, non-ASCII just for logging - there might be a more elegant way to do this...
-          my $encdatastripped = $encdata;
-          $encdatastripped =~ s/[\r\n\x00-\x19]//g;
-          main::Log3 $name, 5, "[$name]: setValue: get after set: sending raw data: $encdatastripped";
-
-          # finally, get after set = send command and receive result          
-          send($sock , $encdata , 0);
-          recv($sock, $result, 1024, 0);
-
-          # strip CR, LF, non-ASCII just for logging - there might be a more elegant way to do this...
-          $result =~ s/[\r\n]/ /g;
-          my $resultstripped = $result;
-          $resultstripped =~ s/[\r\n\x00-\x19]//g;
-          main::Log3 $name, 5, "[$name]: setValue: get after set: received raw data: $resultstripped";
-
-          # calcResult will get nicer text from ESCVP21net_calcResult
-          $result = ESCVP21net_calcResult($hash, $result, $cmd, $datakey, $volfactor);
         }  
         else {
           # we got neither "ERR" nor ":" but an interpretable value
@@ -1623,6 +1659,7 @@ sub ESCVP21net_setValueDone {
   main::Log3 $name, 5, "[$name]: setValueDone says: result is: $result, resultarray: @resultarr";
 
   my $offlineMsg = AttrVal($name, "statusOfflineMsg", "offline");
+  my $offlineMsgStatusP = AttrVal($name, "statusPOfflineMsg", "off");
   
   readingsBeginUpdate($hash);  
   
@@ -1639,10 +1676,28 @@ sub ESCVP21net_setValueDone {
       $getcmds .="init failed,";
       $rv = $result;
       readingsBulkUpdate($hash, "PWR", $offlineMsg, 1);
+      readingsBulkUpdate($hash, "stateP", $offlineMsgStatusP, 1);
       main::Log3 $name, 5, "[$name]: setValueDone says: force PWR to $offlineMsg since init failed";
     }
     else{
       $rv = readingsBulkUpdate($hash, $cmd, $result, 1);
+      if ($cmd eq "PWR"){
+        # PWR informs us if projector is on or off - we set stateP accordingly
+        # "Lamp on" / "Warmup" mean that projector is "on"
+        # "Cooldown" can be interpreted as "off"
+        if ($result eq "Lamp on" || $result eq "Warmup"){
+          readingsBulkUpdate($hash, "stateP", "on", 1);
+          main::Log3 $name, 5, "[$name]: setValueDone: PWR gave $result (Lamp on or Warmup), so set stateP to on";
+        }
+        elsif ($result eq "") {
+          # do nothing, ":" just means command was executed, but result is not given
+          main::Log3 $name, 5, "[$name]: setValueDone: PWR gave nothing, so do nothing";
+        }
+        else {
+          readingsBulkUpdate($hash, "stateP", "off", 1);
+          main::Log3 $name, 5, "[$name]: setValueDone: PWR gave $result (NOT Lamp on or Warmup or empty), so set stateP to off";
+        }
+      }
       # if cmd was originally XXXset, we also have to set XXXset
       if ($hash->{helper}{lastCommand} =~ /set$/){
         $rv = readingsBulkUpdate($hash, $hash->{helper}{lastCommand}, "set to $result", 1);
@@ -1658,7 +1713,7 @@ sub ESCVP21net_setValueDone {
   # strip last ","
   $getcmds = substr $getcmds, 0, -1;
 
-  # additinally, set GetStatus or GestAll to the command set
+  # additionally, set GetStatus or GestAll to the command set
   if ($hash->{helper}{lastCommand} eq "GetStatus"){
     readingsBulkUpdate($hash, "GetStatus", $getcmds, 1);
     main::Log3 $name, 5, "[$name]: setValueDone: additionally, set GetStatus to $getcmds";
@@ -1674,7 +1729,9 @@ sub ESCVP21net_setValueDone {
 sub ESCVP21net_setValueError {
    my ($hash) = @_;
    my $name = $hash->{NAME};
-   main::Log3 $name, 3, "[$name]: setValue error";
+   my $opt = $hash->{helper}{lastCommand};
+   my $value = $hash->{helper}{lastCommandValue}; 
+   main::Log3 $name, 3, "[$name]: setValue error for $opt $value";
    delete($hash->{helper}{RUNNING_PID});
 }
 
@@ -2033,7 +2090,7 @@ sub ESCVP21net_setTypeCmds ($){
 }
 
 sub ESCVP21net_rescheduleSet($){
-   # set command give too fast or toggle required, will be buffered and rescheduled
+   # set command given too fast or toggle required, will be buffered and rescheduled
    my ($arg) = @_;
    my ( $name, $cmd, $result ) = split( "\\|", $arg );
    my $hash = $defs{$name};
@@ -2042,6 +2099,21 @@ sub ESCVP21net_rescheduleSet($){
    RemoveInternalTimer($arg, "ESCVP21net_rescheduleSet");
    ESCVP21net_Set($hash, $name, $cmd, $result);
    main::Log3 $name, 5, "[$name]: rescheduleSet: send rescheduled command $cmd $result";
+}
+
+sub ESCVP21net_reschedulePWR($){
+   # set PWR too fast, will be buffered and rescheduled
+   #my ($arg) = @_;
+   #my ( $name, $cmd, $result ) = split( "\\|", $arg );
+   #my $hash = $defs{$name};
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+   my $cmd = "PWR";
+   my $result = "get";
+   main::Log3 $name, 5, "[$name]: reschedulePWR: got hash: $hash; set cmd: $cmd, result: $result";
+   #RemoveInternalTimer($hash, "ESCVP21net_reschedulePWR");
+   ESCVP21net_Set($hash, $name, $cmd, $result);
+   main::Log3 $name, 5, "[$name]: reschedulePWR: send rescheduled command $cmd $result";
 }
 
 sub ESCVP21net_scheduleToggle($){
@@ -2237,16 +2309,19 @@ sub ESCVP21net_openDevice{
     <a id="ESCVP21net-set-PWR"></a>
     <li>PWR
       <br><i>on</i> or <i>off</i> to switch power, <i>get</i> to query current value.
+      <br>(due to projector timeout on PWR, status reading update after issuing on/off will be delayed by ca 12s)
     </li>
     <br>
     <a id="ESCVP21net-set-on"></a>
     <li>on
       <br>Hm, what could that mean ... OK, shortcut to switch your projector on - give it a try!
+      <br>(due to projector timeout on PWR, status reading update will be delayed by ca 12s)
     </li>
     <br>
     <a id="ESCVP21net-set-off"></a>
     <li>off
       <br>Wohoo ... want to switch it off again? Then use this command.
+      <br>(due to projector timeout on PWR, status reading update will be delayed by ca 12s)
     </li>
     <br>
     <a id="ESCVP21net-set-ASPECT"></a>
@@ -2485,11 +2560,6 @@ sub ESCVP21net_openDevice{
   <b>Attributes</b>
   <br>
   <ul>
-    <a id="ESCVP21net-attr-Manufacturer"></a>
-    <li>Manufacturer
-      <br><i>Epson|default</i> - is not used currently.
-    </li>
-    <br>
     <a id="ESCVP21net-attr-AdditionalSettings"></a>
     <li>AdditionalSettings
       <br><i>cmd1:val_1,...,val_n cmd2:val_1,...,val_n</i>
@@ -2501,6 +2571,20 @@ sub ESCVP21net_openDevice{
       <br>Might need a restart to be recognized, or use "reRead" setting. 
     </li>
     <br>
+    <a id="ESCVP21net-attr-Manufacturer"></a>
+    <li>Manufacturer
+      <br><i>Epson|default</i> - is not used currently.
+    </li>
+    <br>
+    <a id="ESCVP21net-attr-PwrQueryDelay"></a>
+    <li>PwrQueryDelay
+      <br><i>(value in seconds)</i>
+      <br>After setting PWR on/off, the projector needs some timeout before an PWR status query ("PWR get") can be sent.<br><i>value</i> defines the intervall in seconds to wait.
+      <br>The perfect moment for a query depends (as many things in life do...), in this case on your projector.
+      <br>I <b>strongly</b> recommend to use a value greater than 10 seconds to avoid race conditions. Lower values might work ... might. Feel free to test, but don't blame the module if you experience nice crashes. 
+      <br>Default value is 12 seconds.
+    </li>
+    <br>
     <a id="ESCVP21net-attr-connectionCheck"></a>
     <li>connectionCheck
       <br><i>off|(value in seconds)</i>
@@ -2508,26 +2592,6 @@ sub ESCVP21net_openDevice{
       <br>Default value is 60 seconds.
     </li>
     <br>            
-    <a id="ESCVP21net-attr-statusCheckInterval"></a>
-    <li>statusCheckInterval
-      <br><i>off|(value in seconds)</i>
-      <br><i>value</i> defines the intervall in seconds to perform an status check. Each <i>interval</i> the projector is queried with the command defined by <i>statusCheckCmd</i> (default: PWR to get power status).
-      <br>Default value is 60 seconds.
-    </li>
-    <br>
-    <a id="ESCVP21net-attr-statusCheckCmd"></a>
-    <li>statusCheckCmd
-      <br><i>(any command(s) you set)</i>
-      <br>Defines the command(s) used by statusCheckInterval. Multiple commands can specified, e.g. <i>PWR LAMP</i>. Default: PWR to get power status.
-      <br>Wrong commands or commands without a <i>get</i> will be ignored.
-    </li>
-    <br>            
-    <a id="ESCVP21net-attr-statusOfflineMsg"></a>
-    <li>statusOfflineMsg
-      <br><i>(any message text you set)</i>
-      <br>Defines the message to set in the Reading related to <i>statusCheckCmd</i> when the device goes offline. Status of device will be checked after each <i>statusCheckInterval</i> (default: 60s), querying the <i>statusCheckCmd</i> command (default: PWR), and if STATE is <i>disconnected</i> the Reading of <i>statusCheckCmd</i> will be set to this message. Default: offline.
-    </li>
-    <br>
     <a id="ESCVP21net-attr-cyclicConnect"></a>
     <li>cyclicConnect
       <br><i>off|(value in seconds)</i>
@@ -2541,6 +2605,34 @@ sub ESCVP21net_openDevice{
       <br>debug will reveal some more set commands, namely <i>encode, decode, reread</i>. They will store the currents sets and results in json format to hidden readings <i>(encode)</i> or restore them <i>(decode)</i>. <i>reread</i> will just restore the available set commands for your projector type in case they got "lost". Don't use the other debug commands - unnless you know what you do...
       <br>Default is 0, of course.
     </li>
+    <br>
+    <a id="ESCVP21net-attr-statusCheckCmd"></a>
+    <li>statusCheckCmd
+      <br><i>(any command(s) you set)</i>
+      <br>Defines the command(s) used by statusCheckInterval. Multiple commands can specified, e.g. <i>PWR LAMP</i>. Default: PWR to get power status. Please pay also attention to the helpful remarks at "statusCheckInterval".
+      <br>Wrong commands or commands without a <i>get</i> will be ignored.
+    </li>
+    <br>            
+    <a id="ESCVP21net-attr-statusCheckInterval"></a>
+    <li>statusCheckInterval
+      <br><i>off|(value in seconds)</i>
+      <br><i>value</i> defines the intervall in seconds to perform an status check. Each <i>interval</i> the projector is queried with the command defined by <i>statusCheckCmd</i> (default: PWR to get power status).
+      <br>Attention: statusCheck is disabled - i.e. will NOT be done - when the projector is detected to be offline / unreachable. It does not make sense to poll an unreachable projector, doesn't it? If you want to query your projector regularly regardlessly, use the magic "cyclicConnect" attribute. Setting this will query the projector in the intervall you define, and update the settings "PWR" and "statusP" accordingly. This will e.g. help you to show "off" as status when the projector power was shut off outside fhem (who the hell wants to do that if you can do it infhem? Anyway...) instead of only standby (shutting power of, btw, is what I recommend, since it saves power, money and the environment)
+      <br>Default value is 60 seconds.
+    </li>
+    <br>
+    <a id="ESCVP21net-attr-statusOfflineMsg"></a>
+    <li>statusOfflineMsg
+      <br><i>(any message text you set)</i>
+      <br>Defines the message to set in the Reading related to <i>statusCheckCmd</i> when the device goes offline. Status of device will be checked after each <i>statusCheckInterval</i> (default: 60s), querying the <i>statusCheckCmd</i> command (default: PWR), and if STATE is <i>disconnected</i> the Reading of <i>statusCheckCmd</i> will be set to this message. Default: offline.
+    </li>
+    <br>            
+    <a id="ESCVP21net-attr-statusPOfflineMsg"></a>
+    <li>statusPOfflineMsg
+      <br><i>(any message text you set)</i>
+      <br>The "P" makes the difference here ... Defines the message to set in "statusP" when the device is offline or unreachable. Status of device will be checked after each <i>statusCheckInterval</i> (default: 60s), querying the <i>statusCheckCmd</i> command (default: PWR), and if STATE is <i>disconnected</i> the Reading "statusP" will be set to this message. Default: off.
+    </li>
+    <br>
   </ul>
 </ul>
 =end html
