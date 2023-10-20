@@ -1,4 +1,4 @@
-REV 28065
+REV 28068
 DIR unused
 UPD 2023-10-18_07:45:02 409796 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -356,7 +356,7 @@ UPD 2016-03-11_07:45:12 7152 FHEM/70_PushNotifier.pm
 UPD 2015-10-31_07:45:12 23797 FHEM/70_Pushbullet.pm
 UPD 2023-04-21_07:45:04 76328 FHEM/70_Pushover.pm
 UPD 2020-02-08_07:45:04 25433 FHEM/70_Pushsafer.pm
-UPD 2023-10-01_07:45:03 76138 FHEM/70_PylonLowVoltage.pm
+UPD 2023-10-20_07:45:03 76895 FHEM/70_PylonLowVoltage.pm
 UPD 2015-07-28_14:05:31 7500 FHEM/70_SCIVT.pm
 UPD 2021-10-02_07:45:03 20117 FHEM/70_SISPM.pm
 UPD 2016-01-29_07:45:11 16312 FHEM/70_SML.pm
@@ -752,8 +752,8 @@ UPD 2023-10-18_07:45:08 5047308 docs/commandref.html
 UPD 2023-10-18_07:45:12 3053142 docs/commandref_DE.html
 UPD 2023-08-25_07:45:03 86242 docs/commandref_frame.html
 UPD 2023-08-25_07:45:03 96940 docs/commandref_frame_DE.html
-UPD 2023-10-19_07:45:15 310659 docs/commandref_modular.html
-UPD 2023-10-19_07:45:16 322487 docs/commandref_modular_DE.html
+UPD 2023-10-20_07:45:14 310659 docs/commandref_modular.html
+UPD 2023-10-20_07:45:15 322487 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
