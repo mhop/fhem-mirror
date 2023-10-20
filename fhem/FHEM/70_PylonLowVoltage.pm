@@ -1288,7 +1288,7 @@ sub pseudoHexToText {
    my $string = shift;
    
    my $charcode;
-   my $text;
+   my $text = '';
    
    for (my $i = 0; $i < length($string); $i = $i + 2) {
       $charcode = hex substr ($string, $i, 2);                  # charcode = aquivalente Dezimalzahl der angegebenen Hexadezimalzahl
