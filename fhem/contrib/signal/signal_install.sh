@@ -1,13 +1,13 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.20"
+SCRIPTVERSION="3.21"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
 SIGNALPATH=/opt
 SIGNALUSER=signal-cli
 LIBPATH=/usr/lib
-SIGNALVERSION="0.12.2"
+SIGNALVERSION="0.12.3"
 #Check for latest valid version at https://github.com/AsamK/signal-cli/releases
 LIBRARYVERSION="0.32.1"
 #Check for latest valid version at https://github.com/exquo/signal-libs-build/releases
@@ -396,10 +396,11 @@ if [ $NEEDINSTALL = 1 ]; then
 	cd /tmp
 	echo -n "Downloading signal-cli $SIGNALVERSION..."
 	wget -qN https://github.com/AsamK/signal-cli/releases/download/v$SIGNALVERSION/signal-cli-$SIGNALVERSION-Linux.tar.gz -O signal-cli-$SIGNALVERSION.tar.gz
-	if ! [ -e signal-cli-$SIGNALVERSION.tar.gz ]; then
-		echo "failed"
-		exit
-	else
+	if [ ! -s signal-cli-$SIGNALVERSION.tar.gz ]; then
+		#Try alternative name used in 0.12.3
+		wget -qN https://github.com/AsamK/signal-cli/releases/download/v$SIGNALVERSION/signal-cli-$SIGNALVERSION.tar.gz -O signal-cli-$SIGNALVERSION.tar.gz
+	fi
+	if [ -s signal-cli-$SIGNALVERSION.tar.gz ]; then
 		echo "done"
 		echo "Unpacking ..."
 		cd $SIGNALPATH
@@ -416,6 +417,9 @@ if [ $NEEDINSTALL = 1 ]; then
 		echo "done"
 		rm -f /tmp/signal-cli-$SIGNALVERSION.tar.gz
 		rm -f /tmp/$LIBSIG
+	else 
+		echo "failed"
+		exit
 	fi
 fi
 
