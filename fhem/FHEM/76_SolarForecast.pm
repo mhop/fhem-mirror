@@ -144,6 +144,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.0.7"  => "21.10.2023  more design options for graphicHeaderOwnspec and a possible line title ",
   "1.0.6"  => "19.10.2023  new attr ctrlGenPVdeviation ",
   "1.0.5"  => "11.10.2023  new sub _aiGetSpread for estimate AI results stepwise, allow key 'noshow' values 0,1,2,3 ".
                            "calculate conForecastTillNextSunrise accurate to the minute ",
@@ -9084,9 +9085,21 @@ sub __createOwnSpec {
   
   return if(!$spec || !$show);
   
+  my @fields = split (/\s+/sx, $spec); 
+  
+  my (@cats, @vals);
+  
+  for my $f (@fields) {
+      if ($f =~ /^\#(.*)/xs) {
+          push @cats, $1;
+          next;
+      }
+      
+      push @vals, $f;
+  }
+  
   my $ownv; 
-  my @vals = split (/\s+/sx, $spec);   
-  my $rows = ceil  (scalar(@vals) / $vinr);
+  my $rows = ceil (scalar(@vals) / $vinr);
   my $col  = 0;
   
   for (my $i = 1 ; $i <= $rows; $i++) {
@@ -9098,7 +9111,7 @@ sub __createOwnSpec {
       }
       
       $ownv .= "<tr>";
-      $ownv .= "<td $dstyle></td>";
+      $ownv .= "<td $dstyle>".($cats[$i-1] ? '<b>'.$cats[$i-1].'</b>' : '')."</td>";
       $ownv .= "<td $dstyle><b>".$h->{0}{label}.":</b></td> <td align=right $dstyle>".ReadingsVal ($name,$h->{0}{rdg},'')."</td>" if($h->{0}{label});
       $ownv .= "<td $dstyle><b>".$h->{1}{label}.":</b></td> <td align=right $dstyle>".ReadingsVal ($name,$h->{1}{rdg},'')."</td>" if($h->{1}{label});
       $ownv .= "<td $dstyle><b>".$h->{2}{label}.":</b></td> <td align=right $dstyle>".ReadingsVal ($name,$h->{2}{rdg},'')."</td>" if($h->{2}{label});
@@ -15911,23 +15924,34 @@ to ensure that the system configuration is correct.
        
        <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
        <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt; &lt;Label&gt;:&lt;Reading&gt; ... </b><br>
-         Display of any reading values of the device. The values to be displayed are separated by spaces.
-         Each value is to be defined by a label and the corresponding reading connected by ":".
-         The input can be multiline. Spaces in the label are to be inserted by "&amp;nbsp;", a line break
-         by "&lt;br&gt;".
+         Display of any reading values of the device. <br>
+         The values to be displayed are separated by spaces. 
+         Four values (fields) are displayed per line. <br>
+         The input can be made in multiple lines. <br><br>
+         
+         Each value is to be defined by a label and the corresponding reading connected by ":". <br>
+         Spaces in the label are to be inserted by "&amp;nbsp;", a line break by "&lt;br&gt;". <br>
+         An empty field in a line is created by ":". <br>
+         A line title can be inserted by specifying "#:&lt;Text&gt;", an empty title by entering "#".
          <br><br>
 
        <ul>
          <b>Example: </b> <br>
          <table>
-         <colgroup> <col width="30%"> <col width="70%"> </colgroup>
-            <tr><td> attr &lt;name&gt; graphicHeaderOwnspec  </td><td>AutarkyRate:Current_AutarkyRate                                                                     </td></tr>
-            <tr><td>                                         </td><td>Surplus:Current_Surplus                                                                             </td></tr>
-            <tr><td>                                         </td><td>current&amp;nbsp;Gridconsumption:Current_GridConsumption                                            </td></tr>
-            <tr><td>                                         </td><td>CO&amp;nbsp;until&amp;nbsp;sunset:statistic_todayConForecastTillSunset                              </td></tr>
-            <tr><td>                                         </td><td>PV&amp;nbsp;the&amp;nbsp;day&amp;nbsp;after&amp;nbsp;tomorrow:statistic_dayAfterTomorrowPVforecast  </td></tr>
-            <tr><td>                                         </td><td>BAT&amp;nbsp;in&amp;nbsp;today:statistic_todayBatIn                                                 </td></tr>
-            <tr><td>                                         </td><td>BAT&amp;nbsp;out&amp;nbsp;today:statistic_todayBatOut                                               </td></tr>
+         <colgroup> <col width="33%"> <col width="67%"> </colgroup>
+            <tr><td> attr &lt;name&gt; graphicHeaderOwnspec  </td><td>#                                                                                       </td></tr>
+            <tr><td>                                         </td><td>AutarkyRate:Current_AutarkyRate                                                         </td></tr>
+            <tr><td>                                         </td><td>Surplus:Current_Surplus                                                                 </td></tr>
+            <tr><td>                                         </td><td>current&amp;nbsp;Gridconsumption:Current_GridConsumption                                </td></tr>
+            <tr><td>                                         </td><td>:                                                                                       </td></tr>
+            <tr><td>                                         </td><td>#                                                                                       </td></tr>
+            <tr><td>                                         </td><td>CO&amp;nbsp;until&amp;nbsp;sunset:statistic_todayConForecastTillSunset                  </td></tr>
+            <tr><td>                                         </td><td>PV&amp;nbsp;Day&amp;nbsp;after&amp;nbsp;tomorrow:statistic_dayAfterTomorrowPVforecast   </td></tr>
+            <tr><td>                                         </td><td>:                                                                                       </td></tr>
+            <tr><td>                                         </td><td>:                                                                                       </td></tr>
+            <tr><td>                                         </td><td>#Battery                                                                                </td></tr>
+            <tr><td>                                         </td><td>in&amp;nbsp;today:statistic_todayBatIn                                                  </td></tr>
+            <tr><td>                                         </td><td>out&amp;nbsp;today:statistic_todayBatOut                                                </td></tr>
          </table>
        </ul>
        </li>
@@ -17738,23 +17762,34 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        
        <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
        <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt; &lt;Label&gt;:&lt;Reading&gt; ... </b><br>
-         Anzeige beliebiger Readingswerte des Devices. Die anzuzeigenden Werte werden durch Leerzeichen getrennt.
-         Jeder Wert ist jeweils durch ein Label und das dazugehörige Reading verbunden durch ":" zu definieren.
-         Die Eingabe kann mehrzeilig erfolgen. Leerzeichen im Label sind durch "&amp;nbsp;" einzufügen, ein Zeilenumbruch
-         durch "&lt;br&gt;".
+         Anzeige beliebiger Readingswerte des Devices. <br>
+         Die anzuzeigenden Werte werden durch Leerzeichen getrennt. 
+         Es werden vier Werte (Felder) pro Zeile dargestellt. <br>
+         Die Eingabe kann mehrzeilig erfolgen. <br><br>
+         
+         Jeder Wert ist jeweils durch ein Label und das dazugehörige Reading verbunden durch ":" zu definieren. <br>
+         Leerzeichen im Label sind durch "&amp;nbsp;" einzufügen, ein Zeilenumbruch durch "&lt;br&gt;". <br>
+         Ein leeres Feld in einer Zeile wird durch ":" erzeugt. <br>
+         Ein Zeilentitel kann durch Angabe von "#:&lt;Text&gt;" eingefügt werden, ein leerer Titel durch die Eingabe von "#".
          <br><br>
 
        <ul>
          <b>Beispiel: </b> <br>
          <table>
          <colgroup> <col width="35%"> <col width="65%"> </colgroup>
-            <tr><td> attr &lt;name&gt; graphicHeaderOwnspec  </td><td>AutarkyRate:Current_AutarkyRate                                               </td></tr>
+            <tr><td> attr &lt;name&gt; graphicHeaderOwnspec  </td><td>#                                                                             </td></tr>
+            <tr><td>                                         </td><td>AutarkyRate:Current_AutarkyRate                                               </td></tr>
             <tr><td>                                         </td><td>Überschuß:Current_Surplus                                                     </td></tr>
             <tr><td>                                         </td><td>aktueller&amp;nbsp;Netzbezug:Current_GridConsumption                          </td></tr>
+            <tr><td>                                         </td><td>:                                                                             </td></tr>
+            <tr><td>                                         </td><td>#                                                                             </td></tr>
             <tr><td>                                         </td><td>CO&amp;nbsp;bis&amp;nbsp;Sonnenuntergang:statistic_todayConForecastTillSunset </td></tr>
             <tr><td>                                         </td><td>PV&amp;nbsp;Übermorgen:statistic_dayAfterTomorrowPVforecast                   </td></tr>
-            <tr><td>                                         </td><td>BAT&amp;nbsp;in&amp;nbsp;heute:statistic_todayBatIn                           </td></tr>
-            <tr><td>                                         </td><td>BAT&amp;nbsp;out&amp;nbsp;heute:statistic_todayBatOut                         </td></tr>
+            <tr><td>                                         </td><td>:                                                                             </td></tr>
+            <tr><td>                                         </td><td>:                                                                             </td></tr>
+            <tr><td>                                         </td><td>#Batterie                                                                     </td></tr>
+            <tr><td>                                         </td><td>in&amp;nbsp;heute:statistic_todayBatIn                                        </td></tr>
+            <tr><td>                                         </td><td>out&amp;nbsp;heute:statistic_todayBatOut                                      </td></tr>
          </table>
        </ul>
        </li>

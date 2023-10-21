@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 76_SolarForecast: design options for graphicHeaderOwnspec
  - feature: 76_SolarForecast: new attr ctrlGenPVdeviation
  - feature: 70_ESCVP21net: add reading stateP for on/off
  - feature: 76_SolarForecast: allow key 'noshow' more values, KI improves
