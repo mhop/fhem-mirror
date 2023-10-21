@@ -591,6 +591,7 @@ sub _FillSelfHashWithWeatherResponseForWeatherCurrent {
         'wind_direction' => $data->{wind}->{deg},
         'cloudCover'     => $data->{clouds}->{all},
         'code'           => $codes{ $data->{weather}->[0]->{id} },
+        'owmAPICode'     => $data->{weather}->[0]->{id},
         'iconAPI'        => $data->{weather}->[0]->{icon},
         'sunsetTime'     => _strftimeWrapper(
             "%a, %e %b %Y %H:%M",
@@ -670,8 +671,9 @@ sub _FillSelfHashWithWeatherResponseForForecastHourly {
                 ),
                 'cloudCover' => $data->{list}->[$i]->{clouds}->{all},
                 'code' => $codes{ $data->{list}->[$i]->{weather}->[0]->{id} },
-                'iconAPI' => $data->{list}->[$i]->{weather}->[0]->{icon},
-                'rain1h'  => (
+                'owmAPICode' => $data->{list}->[$i]->{weather}->[0]->{id},
+                'iconAPI'    => $data->{list}->[$i]->{weather}->[0]->{icon},
+                'rain1h'     => (
                       $data->{list}->[$i]->{rain}->{'1h'}
                     ? $data->{list}->[$i]->{rain}->{'1h'}
                     : 0
@@ -732,6 +734,7 @@ sub _FillSelfHashWithWeatherResponseForOnecallCurrent {
         'rain_1h'    => ( $data->{rain}->{'1h'} ? $data->{rain}->{'1h'} : 0 ),
         'cloudCover' => $data->{current}->{clouds},
         'code'       => $codes{ $data->{current}->{weather}->[0]->{id} },
+        'owmAPICode' => $data->{current}->{weather}->[0]->{id},
         'iconAPI'    => $data->{current}->{weather}->[0]->{icon},
         'condition'  =>
           encode_utf8( $data->{current}->{weather}->[0]->{description} ),
@@ -834,8 +837,9 @@ sub _FillSelfHashWithWeatherResponseForOnecallDaily {
                     $data->{daily}->[$i]->{weather}->[0]->{description}
                 ),
                 'code' => $codes{ $data->{daily}->[$i]->{weather}->[0]->{id} },
-                'iconAPI'  => $data->{daily}->[$i]->{weather}->[0]->{icon},
-                'pressure' => int(
+                'owmAPICode' => $data->{daily}->[$i]->{weather}->[0]->{id},
+                'iconAPI'    => $data->{daily}->[$i]->{weather}->[0]->{icon},
+                'pressure'   => int(
                     sprintf( "%.1f", $data->{daily}->[$i]->{pressure} ) + 0.5
                 ),
                 'wind' => int(
@@ -854,8 +858,7 @@ sub _FillSelfHashWithWeatherResponseForOnecallDaily {
                     sprintf( "%.1f", ( $data->{daily}->[$i]->{wind_deg} ) )
                 ),
                 'cloudCover' => $data->{daily}->[$i]->{clouds},
-                'code' => $codes{ $data->{daily}->[$i]->{weather}->[0]->{id} },
-                'rain' => (
+                'rain'       => (
                     $data->{daily}->[$i]->{rain} ? $data->{daily}->[$i]->{rain}
                     : 0
                 ),
@@ -921,8 +924,9 @@ sub _FillSelfHashWithWeatherResponseForOnecallHourly {
                 'wind_direction' => $data->{hourly}->[$i]->{wind_deg},
                 'cloudCover'     => $data->{hourly}->[$i]->{clouds},
                 'code' => $codes{ $data->{hourly}->[$i]->{weather}->[0]->{id} },
-                'iconAPI' => $data->{hourly}->[$i]->{weather}->[0]->{icon},
-                'rain1h'  => (
+                'owmAPICode' => $data->{hourly}->[$i]->{weather}->[0]->{id},
+                'iconAPI'    => $data->{hourly}->[$i]->{weather}->[0]->{icon},
+                'rain1h'     => (
                       $data->{hourly}->[$i]->{rain}->{'1h'}
                     ? $data->{hourly}->[$i]->{rain}->{'1h'}
                     : 0
