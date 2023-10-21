@@ -46,6 +46,10 @@ foreach my $file (`find $ARGV[0] -name \\*.xml`) {
   while(my $l = <FH>) {
     next if($l =~ m/^<\?xml/);
     chomp($l);
+    if($l =~ m/<Product.*/ && $l !~ m/xmlns/ && $l !~ m/sourceFile/) { #128444
+      $l .= <FH>;
+      chomp($l);
+    }
     $l =~ s/<!--.*-->//g;
     $l =~ s/^(.*)<Product.*xmlns.*/$1<Product sourceFile="$name">/;
     $l =~ s/\r//g;
