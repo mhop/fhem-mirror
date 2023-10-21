@@ -51,6 +51,7 @@ my @filelist2 = (
   "FHEM/lib/MP3/Tag/.*",
   "FHEM/lib/UPnP/.*",
   "FHEM/lib/AttrTemplate/.*.template",
+  "FHEM/lib/EnOcean/.*",
   "FHEM/holiday/.*.holiday",
   "contrib/commandref_join.pl.txt",
   "contrib/commandref_modular.pl.txt",
