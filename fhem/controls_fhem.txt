@@ -1,6 +1,6 @@
-REV 28074
+REV 28081
 DIR unused
-UPD 2023-10-21_07:45:03 409854 ./CHANGED
+UPD 2023-10-22_07:45:02 409924 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2023-10-11_07:45:03 46958 ./MAINTAINER.txt
 UPD 2023-08-24_07:45:03 46886 ./configDB.pm
@@ -419,7 +419,7 @@ UPD 2016-08-22_07:45:11 9037 FHEM/76_MSGFile.pm
 UPD 2016-12-08_07:45:12 17663 FHEM/76_MSGMail.pm
 UPD 2022-11-02_07:45:02 77314 FHEM/76_SMAEVCharger.pm
 UPD 2023-10-09_07:45:02 174526 FHEM/76_SMAInverter.pm
-UPD 2023-10-21_07:45:03 906622 FHEM/76_SolarForecast.pm
+UPD 2023-10-22_07:45:02 909406 FHEM/76_SolarForecast.pm
 UPD 2022-05-31_07:45:03 43244 FHEM/76_msgDialog.pm
 UPD 2021-10-29_07:45:03 57317 FHEM/77_SMAEM.pm
 UPD 2016-07-19_07:45:16 23026 FHEM/77_SMASTP.pm
@@ -724,7 +724,7 @@ UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
 UPD 2023-07-11_07:45:03 42704 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
-UPD 2023-01-03_07:45:03 730724 FHEM/lib/openzwave_deviceconfig.xml.gz
+UPD 2023-10-22_07:45:02 730362 FHEM/lib/openzwave_deviceconfig.xml.gz
 UPD 2023-07-11_07:45:03 174071 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2023-01-03_07:45:03 39700 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
@@ -748,19 +748,19 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2023-10-21_07:45:09 5050335 docs/commandref.html
-UPD 2023-10-21_07:45:12 3053911 docs/commandref_DE.html
+UPD 2023-10-22_07:45:08 5051541 docs/commandref.html
+UPD 2023-10-22_07:45:12 3055172 docs/commandref_DE.html
 UPD 2023-08-25_07:45:03 86242 docs/commandref_frame.html
 UPD 2023-08-25_07:45:03 96940 docs/commandref_frame_DE.html
-UPD 2023-10-21_07:45:13 310761 docs/commandref_modular.html
-UPD 2023-10-21_07:45:15 322589 docs/commandref_modular_DE.html
+UPD 2023-10-22_07:45:13 310761 docs/commandref_modular.html
+UPD 2023-10-22_07:45:14 322589 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
 UPD 2015-07-28_14:05:35 178876 docs/forum_22336.jpg
 UPD 2015-07-28_14:05:35 160143 docs/tirreG.jpg
 UPD 2023-01-30_07:45:05 50154 lib/FHEM/APIs/Weather/DarkSkyAPI.pm
-UPD 2023-06-07_07:45:02 33543 lib/FHEM/APIs/Weather/OpenWeatherMapAPI.pm
+UPD 2023-10-22_07:45:02 33834 lib/FHEM/APIs/Weather/OpenWeatherMapAPI.pm
 UPD 2023-06-02_07:45:03 36663 lib/FHEM/APIs/Weather/wundergroundAPI.pm
 UPD 2023-01-04_07:45:04 76671 lib/FHEM/Automation/ShuttersControl.pm
 UPD 2023-01-04_07:45:04 2735 lib/FHEM/Automation/ShuttersControl/Dev.pm
