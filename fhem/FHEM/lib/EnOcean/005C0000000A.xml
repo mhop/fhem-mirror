@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Enocean_Devices xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" schemaVersion="1.0"
+   xsi:noNamespaceSchemaLocation="./ReCom_Device_Description_Schema.xsd">
+  <Device Product_ID="0x005C0000000A">
+	<Version>0.0.0.1</Version>
+    <Name>Fenstergriff FR-400</Name>
+    <Description>Fenstergriff FR-400, Rastung 90°, eckige Form </Description>
+    <Frequency>868</Frequency>
+    <TX>
+     <ChipIDBased>
+     	<EEP>
+     		<Rorg>0xD2</Rorg>
+     		<Func>0x06</Func>
+     		<Type>0x40</Type>
+     	</EEP>
+     </ChipIDBased>
+    </TX>
+  </Device>
+</Enocean_Devices>
