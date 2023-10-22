@@ -152,6 +152,7 @@ sub statistics_Initialize($)
                    ."specialDeltaPeriods "
                    ."singularReadings:textField-long "
                    ."tendencyReadings "
+                   ."limitDecimals "
                    .$readingFnAttributes;
 }
 
@@ -200,9 +201,10 @@ sub statistics_Undefine($$)
 ########################################
 sub statistics_Set($$@)
 {
-  my ($hash, $name, $cmd, $val) = @_;
+  my ($hash, $name, $cmd, @values) = @_;
   my $resultStr = "";
   
+  my $val=$values[0];
    if ($cmd eq 'resetStatistics') {
      if ($val ne "") {
          Log3 $name, 3, "statistics: set $name $cmd $val";
@@ -229,9 +231,12 @@ sub statistics_Set($$@)
       Log3 $name, 3, "statistics: set $name $cmd";
       statistics_DoStatisticsAll($hash,0);
       return undef;
+   } elsif ($cmd eq 'setStatistics') {
+      Log3 $name, 3, "statistics: set $name $cmd @values";
+	  return statistics_setStats($hash,@values);
    }
   my $list = "resetStatistics:all" . statistics_getStoredDevices($hash);
-    $list .= " doStatistics:noArg";
+    $list .= " doStatistics:noArg setStatistics:textField";
   return "Unknown argument $cmd, choose one of $list";
 }
 
@@ -576,7 +581,17 @@ sub statistics_doStatisticMinMaxSingle ($$$$$$)
       if ($value > $stat[5]) { $stat[5]=$value; } # Max
    }
    
-   my $decPlaces = statistics_maxDecPlaces($value, $hidden[11]);
+   my $decPlaces = int(statistics_maxDecPlaces($value, $hidden[11]));
+   #30.3.2023 Adimarantis limit the maximum decimals for a reading with list of readings:decimals in attr limitDecimals
+   my @limits = split / /, AttrVal($name, "limitDecimals", "");
+   my $limitDecPlaces=undef;
+   foreach my $limit (@limits) {
+     if ($limit =~ /^$readingName:(\d+)/) {
+		$limitDecPlaces=int($1);
+	 }
+   }
+  #Only apply maximum if greater than current to avoid trailing zeroes
+  $decPlaces = $limitDecPlaces if defined $limitDecPlaces && $decPlaces>$limitDecPlaces; 
 
   # Prepare new current reading
    $result = sprintf( "Min: %.".$decPlaces."f Avg: %.".$decPlaces."f Max: %.".$decPlaces."f", $stat[1], $stat[3], $stat[5]);
@@ -688,6 +703,62 @@ sub statistics_doStatisticTendency ($$$)
    return ;
 }
 
+sub statistics_setStats ($@) {
+	my ($hash, @values) = @_;
+	
+	my $devname=shift @values;
+	print $devname."\n";
+	my $readingName=shift @values;
+	print $readingName."\n";
+	my $type=shift @values;
+	print $type."\n";
+	my $value=shift @values;
+	print $value."\n";
+
+	my $name = $hash->{NAME};
+	
+	statistics_Log $hash, 5, "setStats $devname"; #:$readingName:$type:$value";	
+
+	return "Invalid type - must be one of Hour,Day,Month,Year" if not defined $type;
+	return "Invalid value" if not defined $value;
+	my $dev=$defs{$devname};
+	return "Invalid device" if not defined $dev;
+	return "Invalid reading" if not exists ($dev->{READINGS}{$readingName});
+
+	my $statReadingName = $hash->{PREFIX};
+	$statReadingName .= ucfirst($readingName);
+
+   my $hiddenReadingName = ".".$dev->{NAME}.":".$readingName;
+   
+	my @hidden;
+	@hidden = split / /, $hash->{READINGS}{$hiddenReadingName}{VAL}; # Internal values
+
+	my $showDate = $hidden[3];
+	my $decPlaces = int(statistics_maxDecPlaces($value, $hidden[5]));
+
+	my @stat;
+	@stat = split / /, $dev->{READINGS}{$statReadingName}{VAL};
+	  
+	$type = ucfirst($type);
+
+	if ($type eq "Hour") {
+	  $stat[1] = $value;
+	} elsif ($type eq "Day") {
+	  $stat[3] = $value;
+	} elsif ($type eq "Month") {
+	  $stat[5] = $value;
+	} elsif ($type eq "Year") {
+	  $stat[7] = $value;
+	} else { return "Invalid type - must be one of Hour,Day,Month,Year"; }
+
+	# Store visible statistic readings (delta values)
+	my $result = sprintf "Hour: %.".$decPlaces."f Day: %.".$decPlaces."f Month: %.".$decPlaces."f Year: %.".$decPlaces."f", $stat[1], $stat[3], $stat[5], $stat[7];
+	if ( $showDate >=2 ) { $result .= " (since: $stat[9] )"; }
+	readingsSingleUpdate($dev,$statReadingName,$result, 1);
+	statistics_Log $hash, 5, "Set '$statReadingName'='$result'";
+
+}
+
 # Calculates deltas for day, month and year
 ######################################## 
 sub statistics_doStatisticDelta ($$$$) 
@@ -727,7 +798,18 @@ sub statistics_doStatisticDelta ($$$$)
       @stat = split / /, $dev->{READINGS}{$statReadingName}{VAL};
       @hidden = split / /, $hash->{READINGS}{$hiddenReadingName}{VAL}; # Internal values
       $showDate = $hidden[3];
-      $decPlaces = statistics_maxDecPlaces($value, $hidden[5]);
+      $decPlaces = int(statistics_maxDecPlaces($value, $hidden[5]));
+	  #30.3.2023 Adimarantis limit the maximum decimals for a reading with list of readings:decimals in attr limitDecimals
+	  my @limits = split / /, AttrVal($name, "limitDecimals", "");
+	  my $limitDecPlaces=undef;
+	  foreach my $limit (@limits) {
+		if ($limit =~ /^$readingName:(\d+)/) {
+			$limitDecPlaces=int($1);
+		}
+	  }
+	  #Only apply maximum if greater than current to avoid trailing zeroes
+      $decPlaces = $limitDecPlaces if defined $limitDecPlaces && $decPlaces>$limitDecPlaces; 
+
       if (exists ($dev->{READINGS}{$statReadingName."Last"})) { 
          @last = split / /,  $dev->{READINGS}{$statReadingName."Last"}{VAL};
       } 
@@ -735,6 +817,8 @@ sub statistics_doStatisticDelta ($$$$)
          @last = split / /,  "Hour: - Day: - Month: - Year: -";
       }
       my $deltaValue = $value - $hidden[1];
+      #Adimarantis 30.3.2023: Round to the previous number of decimalplaces to avoid issue with floating point precision adding a lot of decimals
+      $deltaValue=int($deltaValue*(10**$decPlaces)+0.5)/(10**$decPlaces);
       
     # Do statistic
       $stat[1] += $deltaValue;
@@ -1237,6 +1321,10 @@ __END__
       <a id="statistics-set-doStatistics"></a><li><code>doStatistics</code>
       <br>
       Calculates the current statistic values of all monitored devices.
+      </li><br>
+	  <a id="statistics-set-setStatistics"></a><li><code>setStatistics  &lt;device&gt;  &lt;reading&gt;  &lt;period&gt;  &lt;value&gt;</code>
+      <br>
+      Sets a statistic value to a fixed value. Period is one of Hour, Day, Month, Year.
       </li>
   </ul>
 
