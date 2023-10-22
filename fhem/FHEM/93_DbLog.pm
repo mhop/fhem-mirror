@@ -56,6 +56,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.9.3"   => "09.10.2023 new attribute colType ",
   "5.9.2"   => "09.10.2023 edit commandref, Forum: https://forum.fhem.de/index.php?msg=1288840 ",
   "5.9.1"   => "15.08.2023 possible use of alternative tables in _DbLog_plotData Forum:134547, fix warnings in ".
                            "_DbLog_SBP_onRun_LogSequential Forum:https://forum.fhem.de/index.php?msg=1284228 ",
@@ -211,6 +212,7 @@ sub DbLog_Initialize {
                                "cacheOverflowThreshold ".
                                "colEvent ".
                                "colReading ".
+                               "colType ".
                                "colValue ".
                                "convertTimezone:UTC,none ".
                                "DbLogSelectionMode:Exclude,Include,Exclude/Include ".
@@ -484,12 +486,12 @@ sub DbLog_Attr {
       }
   }
 
-  if($aName eq "colEvent" || $aName eq "colReading" || $aName eq "colValue") {
+  if($aName =~ /^col[ERTV]/xs) {
       if ($cmd eq "set" && $aVal) {
           unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 !";}
       }
       
-      if ($init_done == 1) {
+      if ($init_done) {
           InternalTimer(gettimeofday()+0.8, "DbLog_setinternalcols", $hash, 0);
       }
   }
@@ -1508,7 +1510,7 @@ sub DbLog_Log {
                   }
 
                   # Daten auf maximale Länge beschneiden
-                  ($dev_name,$dev_type,$event,$reading,$value,$unit) = DbLog_cutCol($hash,$dev_name,$dev_type,$event,$reading,$value,$unit);
+                  ($dev_name,$dev_type,$event,$reading,$value,$unit) = DbLog_cutCol ($hash, $dev_name, $dev_type, $event, $reading, $value, $unit);
 
                   my $row = $timestamp."|".$dev_name."|".$dev_type."|".$event."|".$reading."|".$value."|".$unit;
 
@@ -7446,11 +7448,11 @@ sub DbLog_configcheck {
           $rec .= "UNIT: $DbLog_columns{UNIT} <br><br>";
           $rec .= "You can change the column width in database by a statement like <b>'alter table $history modify VALUE varchar(128);</b>' (example for changing field 'VALUE'). ";
           $rec .= "You can do it for example by executing 'sqlCmd' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
-          $rec .= "Alternatively the field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
+          $rec .= "Alternatively the field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colType', 'colValue'. (pls. refer to commandref)";
       }
       else {
           $rec  = "WARNING - The relation between column width in table $history and the field width used by device $name should be equal but it differs.";
-          $rec .= "The field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
+          $rec .= "The field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colType', 'colValue'. (pls. refer to commandref)";
           $rec .= "Because you use SQLite this is only a warning. Normally the database can handle these differences. ";
       }
   }
@@ -7548,11 +7550,11 @@ sub DbLog_configcheck {
           $rec .= "UNIT: $DbLog_columns{UNIT} <br><br>";
           $rec .= "You can change the column width in database by a statement like <b>'alter table $current modify VALUE varchar(128);</b>' (example for changing field 'VALUE'). ";
           $rec .= "You can do it for example by executing 'sqlCmd' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
-          $rec .= "Alternatively the field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
+          $rec .= "Alternatively the field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colType', 'colValue'. (pls. refer to commandref)";
       }
       else {
           $rec  = "WARNING - The relation between column width in table $current and the field width used by device $name should be equal but it differs. ";
-          $rec .= "The field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
+          $rec .= "The field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colType', 'colValue'. (pls. refer to commandref)";
           $rec .= "Because you use SQLite this is only a warning. Normally the database can handle these differences. ";
       }
   }
@@ -8113,7 +8115,7 @@ sub DbLog_AddLog {
           }
 
           # Daten auf maximale Länge beschneiden
-          ($dev_name,$dev_type,$event,$dev_reading,$read_val,$ut) = DbLog_cutCol($hash,$dev_name,$dev_type,$event,$dev_reading,$read_val,$ut);
+          ($dev_name,$dev_type,$event,$dev_reading,$read_val,$ut) = DbLog_cutCol ($hash, $dev_name, $dev_type, $event, $dev_reading, $read_val, $ut);
 
           if (AttrVal($name, 'useCharfilter', 0)) {
               $dev_reading = DbLog_charfilter($dev_reading);
@@ -8227,7 +8229,7 @@ sub DbLog_addCacheLine {
   }
 
   no warnings 'uninitialized';                                                      # Daten auf maximale Länge beschneiden
-  ($i_dev,$i_type,$i_evt,$i_reading,$i_val,$i_unit) = DbLog_cutCol ($hash,$i_dev,$i_type,$i_evt,$i_reading,$i_val,$i_unit);
+  ($i_dev,$i_type,$i_evt,$i_reading,$i_val,$i_unit) = DbLog_cutCol ($hash, $i_dev, $i_type, $i_evt, $i_reading, $i_val, $i_unit);
 
   my $row = $i_timestamp."|".$i_dev."|".$i_type."|".$i_evt."|".$i_reading."|".$i_val."|".$i_unit;
   $row    = DbLog_charfilter($row) if(AttrVal($name, "useCharfilter",0));
@@ -8254,12 +8256,14 @@ return;
 #########################################################################################
 sub DbLog_cutCol {
   my ($hash,$dn,$dt,$evt,$rd,$val,$unit) = @_;
+  
   my $name       = $hash->{NAME};
-  my $colevent   = AttrVal($name, 'colEvent',   undef);
-  my $colreading = AttrVal($name, 'colReading', undef);
-  my $colvalue   = AttrVal($name, 'colValue',   undef);
+  my $colevent   = AttrVal ($name, 'colEvent',   undef);
+  my $colreading = AttrVal ($name, 'colReading', undef);
+  my $coltype    = AttrVal ($name, 'colType',    undef);
+  my $colvalue   = AttrVal ($name, 'colValue',   undef);
 
-  if ($hash->{MODEL} ne 'SQLITE' || defined($colevent) || defined($colreading) || defined($colvalue) ) {
+  if ($hash->{MODEL} ne 'SQLITE' || defined($colevent) || defined($colreading) || defined($coltype) || defined($colvalue) ) {
       $dn   = substr($dn,  0, $hash->{HELPER}{DEVICECOL});
       $dt   = substr($dt,  0, $hash->{HELPER}{TYPECOL});
       $evt  = substr($evt, 0, $hash->{HELPER}{EVENTCOL});
@@ -8348,18 +8352,16 @@ return @v;
 ################################################################
 sub DbLog_setinternalcols {
   my $hash = shift;
-  
   my $name = $hash->{NAME};
 
   $hash->{HELPER}{DEVICECOL}   = $DbLog_columns{DEVICE};
-  $hash->{HELPER}{TYPECOL}     = $DbLog_columns{TYPE};
-  $hash->{HELPER}{EVENTCOL}    = AttrVal($name, "colEvent",   $DbLog_columns{EVENT}  );
-  $hash->{HELPER}{READINGCOL}  = AttrVal($name, "colReading", $DbLog_columns{READING});
-  $hash->{HELPER}{VALUECOL}    = AttrVal($name, "colValue",   $DbLog_columns{VALUE}  );
+  $hash->{HELPER}{TYPECOL}     = AttrVal($name, 'colType',       $DbLog_columns{TYPE});
+  $hash->{HELPER}{EVENTCOL}    = AttrVal($name, 'colEvent',     $DbLog_columns{EVENT});
+  $hash->{HELPER}{READINGCOL}  = AttrVal($name, 'colReading', $DbLog_columns{READING});
+  $hash->{HELPER}{VALUECOL}    = AttrVal($name, 'colValue',     $DbLog_columns{VALUE});
   $hash->{HELPER}{UNITCOL}     = $DbLog_columns{UNIT};
 
-  $hash->{COLUMNS} = "field length used for Device: $hash->{HELPER}{DEVICECOL}, Type: $hash->{HELPER}{TYPECOL}, Event: $hash->{HELPER}{EVENTCOL}, Reading: $hash->{HELPER}{READINGCOL}, Value: $hash->{HELPER}{VALUECOL}, Unit: $hash->{HELPER}{UNITCOL} ";
-
+  $hash->{COLUMNS}        = "field length used for Device: $hash->{HELPER}{DEVICECOL}, Type: $hash->{HELPER}{TYPECOL}, Event: $hash->{HELPER}{EVENTCOL}, Reading: $hash->{HELPER}{READINGCOL}, Value: $hash->{HELPER}{VALUECOL}, Unit: $hash->{HELPER}{UNITCOL} ";
   $hash->{HELPER}{COLSET} = 1;                                        # Statusbit "Columns sind gesetzt"
 
 return;
@@ -9907,11 +9909,11 @@ return;
      <li><b>colEvent &lt;n&gt; </b> <br><br>
      <ul>
 
-       The field length of database field EVENT will be adjusted. By this attribute the default value in the DbLog-device can be
-       adjusted if the field length in the databse was changed nanually. If colEvent=0 is set, the database field
-       EVENT won't be filled . <br>
+       The field length of database field EVENT is adapted user-specifically. The attribute can be used to change the 
+       default value in the module if the field length in the database was changed manually. 
+       With colEvent=0 the database field EVENT is not filled. <br>
        <b>Note:</b> <br>
-       If the attribute is set, all of the field length limits are valid also for SQLite databases as noticed in Internal COLUMNS !  <br>
+       With set attribute all field length limits are also valid for SQLite DB as shown in Internal COLUMNS! <br>
      </ul>
      </li>
   </ul>
@@ -9922,11 +9924,26 @@ return;
      <li><b>colReading &lt;n&gt; </b> <br><br>
      <ul>
 
-       The field length of database field READING will be adjusted. By this attribute the default value in the DbLog-device can be
-       adjusted if the field length in the databse was changed nanually. If colReading=0 is set, the database field
-       READING won't be filled . <br>
+       The field length of database field READING is adapted user-specifically. BThe attribute can be used to change the 
+       default value in the module if the field length in the database was changed manually. 
+       With colReading=0 the database field READING is not filled. <br>
        <b>Note:</b> <br>
-       If the attribute is set, all of the field length limits are valid also for SQLite databases as noticed in Internal COLUMNS !  <br>
+       With set attribute all field length limits are also valid for SQLite DB as shown in Internal COLUMNS! <br>
+     </ul>
+     </li>
+  </ul>
+  <br>
+  
+  <ul>
+     <a id="DbLog-attr-colType"></a>
+     <li><b>colType &lt;n&gt; </b> <br><br>
+
+     <ul>
+       The field length for the database field TYPE is adapted user-specifically. The attribute can be used to change the 
+       default value in the module if the field length in the database was changed manually. 
+       With colType=0 the database field TYPE is not filled. <br>
+       <b>Note:</b> <br>
+       With set attribute all field length limits are also valid for SQLite DB as shown in Internal COLUMNS! <br>
      </ul>
      </li>
   </ul>
@@ -9937,11 +9954,11 @@ return;
      <li><b>colValue &lt;n&gt; </b> <br><br>
      <ul>
 
-       The field length of database field VALUE will be adjusted. By this attribute the default value in the DbLog-device can be
-       adjusted if the field length in the databse was changed nanually. If colEvent=0 is set, the database field
-       VALUE won't be filled . <br>
+       The field length of database field VALUE is adapted user-specifically. The attribute can be used to change the 
+       default value in the module if the field length in the database was changed manually. 
+       With colValue=0 the database field VALUE is not filled. <br>
        <b>Note:</b> <br>
-       If the attribute is set, all of the field length limits are valid also for SQLite databases as noticed in Internal COLUMNS !  <br>
+       With set attribute all field length limits are also valid for SQLite DB as shown in Internal COLUMNS! <br>
      </ul>
      </li>
   </ul>
@@ -11784,10 +11801,10 @@ attr SMA_Energymeter DbLogValueFn
 
      <ul>
        Die Feldlänge für das DB-Feld EVENT wird userspezifisch angepasst. Mit dem Attribut kann der Default-Wert im Modul
-       verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. Mit colEvent=0 wird das Datenbankfeld
-       EVENT nicht gefüllt. <br>
+       verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. 
+       Mit colEvent=0 wird das Datenbankfeld EVENT nicht gefüllt. <br>
        <b>Hinweis:</b> <br>
-       Mit gesetztem Attribut gelten alle Feldlängenbegrenzungen auch für SQLite DB wie im Internal COLUMNS angezeigt !  <br>
+       Mit gesetztem Attribut gelten alle Feldlängenbegrenzungen auch für SQLite DB wie im Internal COLUMNS angezeigt!  <br>
      </ul>
      </li>
   </ul>
@@ -11799,10 +11816,25 @@ attr SMA_Energymeter DbLogValueFn
 
      <ul>
        Die Feldlänge für das DB-Feld READING wird userspezifisch angepasst. Mit dem Attribut kann der Default-Wert im Modul
-       verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. Mit colReading=0 wird das Datenbankfeld
-       READING nicht gefüllt. <br>
+       verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. 
+       Mit colReading=0 wird das Datenbankfeld READING nicht gefüllt. <br>
        <b>Hinweis:</b> <br>
-       Mit gesetztem Attribut gelten alle Feldlängenbegrenzungen auch für SQLite DB wie im Internal COLUMNS angezeigt !  <br>
+       Mit gesetztem Attribut gelten alle Feldlängenbegrenzungen auch für SQLite DB wie im Internal COLUMNS angezeigt!  <br>
+     </ul>
+     </li>
+  </ul>
+  <br>
+  
+  <ul>
+     <a id="DbLog-attr-colType"></a>
+     <li><b>colType &lt;n&gt; </b> <br><br>
+
+     <ul>
+       Die Feldlänge für das DB-Feld TYPE wird userspezifisch angepasst. Mit dem Attribut kann der Default-Wert im Modul
+       verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. 
+       Mit colType=0 wird das Datenbankfeld TYPE nicht gefüllt. <br>
+       <b>Hinweis:</b> <br>
+       Mit gesetztem Attribut gelten alle Feldlängenbegrenzungen auch für SQLite DB wie im Internal COLUMNS angezeigt!  <br>
      </ul>
      </li>
   </ul>
@@ -11814,10 +11846,10 @@ attr SMA_Energymeter DbLogValueFn
 
      <ul>
        Die Feldlänge für das DB-Feld VALUE wird userspezifisch angepasst. Mit dem Attribut kann der Default-Wert im Modul
-       verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. Mit colValue=0 wird das Datenbankfeld
-       VALUE nicht gefüllt. <br>
+       verändert werden wenn die Feldlänge in der Datenbank manuell geändert wurde. 
+       Mit colValue=0 wird das Datenbankfeld VALUE nicht gefüllt. <br>
        <b>Hinweis:</b> <br>
-       Mit gesetztem Attribut gelten alle Feldlängenbegrenzungen auch für SQLite DB wie im Internal COLUMNS angezeigt !  <br>
+       Mit gesetztem Attribut gelten alle Feldlängenbegrenzungen auch für SQLite DB wie im Internal COLUMNS angezeigt!  <br>
      </ul>
      </li>
   </ul>
