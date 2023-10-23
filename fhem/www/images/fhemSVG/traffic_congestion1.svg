@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   version="1.0"
+   width="200"
+   height="200"
+   id="svg2"
+   inkscape:version="0.91 r13725"
+   sodipodi:docname="traffic_congestion1.svg"
+   inkscape:export-filename="V:\www\images\default\MySVGs\traffic_congestion3.png"
+   inkscape:export-xdpi="6.1100001"
+   inkscape:export-ydpi="6.1100001"
+   viewBox="330 250 430 450">
+  <metadata
+     id="metadata16">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1920"
+     inkscape:window-height="1017"
+     id="namedview14"
+     showgrid="false"
+     inkscape:zoom="1.405766"
+     inkscape:cx="-224.25789"
+     inkscape:cy="62.222398"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <defs
+     id="defs11" />
+  <g
+     id="g3350"
+     transform="matrix(2.3572331,0,0,2.9432231,-583.62386,-1008.9435)">
+    <path
+       id="Car"
+       style="fill:#000000;fill-rule:evenodd;stroke:none"
+       d="m 389.91014,514.87887 c -0.43931,-32.38288 -2.19652,-4.51855 17.32107,-52.52804 14.12044,-32.6339 -0.18827,-23.84786 72.86146,-25.04024 65.01678,1.3179 51.90046,-8.09573 66.83675,26.54642 18.70173,44.36956 17.25831,21.14928 17.13279,50.08049 -0.69033,31.75527 11.04533,23.59684 -87.35844,24.66369 -97.65068,-1.31789 -86.1033,6.96612 -86.79363,-23.72232 z m 19.7686,-31.25324 13.36736,-30.8767 c 2.49402,-5.48469 1.69832,-4.67505 7.5309,-4.70681 l 93.45755,-0.0101 c 5.05934,0.0186 4.31709,-0.30991 6.40125,4.51853 l 13.29298,30.6985 -134.05004,0.37655 z m -9.56004,58.51786 24.9984,-0.0558 c -0.0767,31.38575 2.52425,29.63553 -11.10808,29.83773 -16.23328,-0.0628 -13.66719,1.5759 -13.89032,-29.78195 z m 128.73656,0.22315 25.04024,0 c -0.16736,31.43453 2.11981,29.28685 -12.04945,29.37052 -14.65039,-0.19526 -12.78858,2.11979 -12.99079,-29.37052 z"
+       inkscape:connector-curvature="0" />
+  </g>
+</svg>
