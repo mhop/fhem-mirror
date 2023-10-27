@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2023.10.27 v0.2.23
+# - BUG:     Logeinträge bei set "speak" entfernt
+#
 # 2023.10.27 v0.2.22
 # - CHANGE:  voice_reading auf neue API umgestellt
 # - FEATURE  voice_person (Zeigt wer das letzte Voice Command gesagt hat, wenn eingerichtet)
@@ -507,7 +510,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.22";
+my $ModulVersion     = "0.2.23";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -2136,9 +2139,9 @@ sub echodevice_SendCommand($$$) {
 				
 		if($SpeakVolume > 0){
 		#if(ReadingsVal($name , "volume", 50) < ReadingsVal($name , "volume_alarm", 50)) {
-			Log3 $name, 3, "[$name] [SpeakVolume] send...";
+			#Log3 $name, 3, "[$name] [SpeakVolume] send...";
 			$SendData = '{"behaviorId":"PREVIEW","sequenceJson":"{\"@type\":\"com.amazon.alexa.behaviors.model.Sequence\",\"startNode\":{\"@type\":\"com.amazon.alexa.behaviors.model.SerialNode\",\"nodesToExecute\":[{\"@type\":\"com.amazon.alexa.behaviors.model.OpaquePayloadOperationNode\",\"type\":\"Alexa.DeviceControls.Volume\",\"operationPayload\":{\"deviceSerialNumber\":\"' . $hash->{helper}{".SERIAL"} . '\",\"customerId\":\"' . $hash->{IODev}->{helper}{".CUSTOMER"} .'\",\"locale\":\"de-DE\",\"value\":\"'.$SpeakVolume.'\",\"deviceType\":\"' . $hash->{helper}{DEVICETYPE} . '\"}},{\"@type\":\"com.amazon.alexa.behaviors.model.OpaquePayloadOperationNode\",\"type\":\"Alexa.Speak\",\"operationPayload\":{\"locale\":\"de-DE\",\"deviceSerialNumber\":\"' . $hash->{helper}{".SERIAL"} . '\",\"customerId\":\"' . $hash->{IODev}->{helper}{".CUSTOMER"} .'\",\"deviceType\":\"' . $hash->{helper}{DEVICETYPE} . '\",\"textToSpeak\":\"'.$SendData.'\"}},{\"@type\":\"com.amazon.alexa.behaviors.model.OpaquePayloadOperationNode\",\"type\":\"Alexa.DeviceControls.Volume\",\"operationPayload\":{\"deviceSerialNumber\":\"' . $hash->{helper}{".SERIAL"} . '\",\"customerId\":\"' . $hash->{IODev}->{helper}{".CUSTOMER"} .'\",\"locale\":\"de-DE\",\"value\":\"'.ReadingsVal($name , "volume", 50).'\",\"deviceType\":\"' . $hash->{helper}{DEVICETYPE} . '\"}}]}}","status":"ENABLED"}';
-			Log3 $name, 3, "[$name] [SpeakVolume] send... $SendData";
+			#Log3 $name, 3, "[$name] [SpeakVolume] send... $SendData";
 		}
 		else {
 			$SendData = echodevice_getsequenceJson($hash,$type,$SendData);
