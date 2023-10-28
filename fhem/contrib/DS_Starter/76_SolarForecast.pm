@@ -9101,11 +9101,24 @@ sub __createOwnSpec {
       ($v->{2}, $u->{2}) = split /\s+/, ReadingsVal ($name, $h->{2}{rdg}, '');
       ($v->{3}, $u->{3}) = split /\s+/, ReadingsVal ($name, $h->{3}{rdg}, '');
       
-      if ($uatr eq 'kWh') {
+      if ($uatr eq 'kWh') {          
           for (my $r = 0 ; $r < $vinr; $r++) {
-              if ($u->{$r} && $u->{$r} =~ /Wh/xs) {                                        
+              next if(!$u->{$r});
+              
+              if ($u->{$r} =~ /^Wh/xs) {                                        
                   $v->{$r} = sprintf "%.1f",($v->{$r} / 1000);
                   $u->{$r} = 'kWh';
+              }
+          }
+      }
+      
+      if ($uatr eq 'Wh') {
+          for (my $r = 0 ; $r < $vinr; $r++) {
+              next if(!$u->{$r});
+              
+              if ($u->{$r} =~ /^kWh/xs) {                                        
+                  $v->{$r} = sprintf "%.0f",($v->{$r} * 1000);
+                  $u->{$r} = 'Wh';
               }
           }
       }
