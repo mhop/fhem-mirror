@@ -122,6 +122,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.1.11" => "28.10.2023 add needed data format to commandref ",
   "0.1.10" => "18.10.2023 new function pseudoHexToText in _callManufacturerInfo for translate battery name and Manufactorer ",
   "0.1.9"  => "25.09.2023 fix possible bat adresses ",
   "0.1.8"  => "23.09.2023 new Attr userBatterytype, change manufacturerInfo, protocolVersion command hash to LENID=0 ",
@@ -1438,6 +1439,20 @@ This module requires the Perl modules:
     <li>IO::Socket::Timeout (Installation e.g. via the CPAN shell or the FHEM Installer module)    </li>
 </ul>
 
+The data format must be set on the RS485 gateway as follows:
+<br>
+
+  <ul>
+     <table>
+     <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+        <tr><td> Start Bit </td><td>- 1 Bit          </td></tr>
+        <tr><td> Data Bit  </td><td>- 8 Bit          </td></tr>
+        <tr><td> Stop Bit  </td><td>- 1 Bit          </td></tr>
+        <tr><td> Parity    </td><td>- without Parity </td></tr>
+     </table>
+  </ul>
+  <br>
+
 <b>Limitations</b>
 <br>
 The module currently supports a maximum of 8 batteries (master + 7 slaves) in one group.
@@ -1614,6 +1629,20 @@ Dieses Modul benötigt die Perl-Module:
     <li>IO::Socket::INET    (apt-get install libio-socket-multicast-perl)                          </li>
     <li>IO::Socket::Timeout (Installation z.B. über die CPAN-Shell oder das FHEM Installer Modul)  </li>
 </ul>
+
+Das Datenformat muß auf dem RS485 Gateway wie folgt eingestellt werden:
+<br>
+
+  <ul>
+     <table>
+     <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+        <tr><td> Start Bit </td><td>- 1 Bit          </td></tr>
+        <tr><td> Data Bit  </td><td>- 8 Bit          </td></tr>
+        <tr><td> Stop Bit  </td><td>- 1 Bit          </td></tr>
+        <tr><td> Parity    </td><td>- ohne Parität   </td></tr>
+     </table>
+  </ul>
+  <br>
 
 <b>Einschränkungen</b>
 <br>
