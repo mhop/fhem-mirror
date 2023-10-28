@@ -797,6 +797,7 @@ FW_closeConn($)
                      $FW_userAgent =~ m/(iPhone|iPad|iPod)/);
     if(!$FW_httpheader{Connection} || $cc) {
       TcpServer_Close($hash, 1, !$hash->{inform});
+      delete $FW_svgData{$hash->{NAME}};
     }
   }
 
