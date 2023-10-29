@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  36_Shelly: see Forum msg #1291182
  - feature: 76_SolarForecast: see Forum:#?msg=1291035
  - change:  70_PylonLowVoltage: add needed data format to commandref
  - feature: 98_statistics: Limit number of decimals
