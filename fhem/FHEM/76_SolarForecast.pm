@@ -144,6 +144,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.0.9"  => "29.10.2023  _aiGetSpread: set spread from 50 to 20 ",
   "1.0.8"  => "22.10.2023  codechange: add central readings store array, new function storeReading, writeCacheToFile ".
                            "solcastapi in sub __delObsoleteAPIData, save freespace if flowGraphicShowConsumer=0 is set ".
                            "pay attention to attr graphicEnergyUnit in __createOwnSpec ",
@@ -11292,7 +11293,7 @@ sub _aiGetSpread {
   my $hod   = $paref->{hod};
   my $dtree = $paref->{dtree};
 
-  my $dtn  = 50;                               # positive und negative rad1h Abweichung testen mit Schrittweite "$step"
+  my $dtn  = 20;                               # positive und negative rad1h Abweichung testen mit Schrittweite "$step"
   my $step = 10;
 
   my ($pos, $neg, $p, $n);
