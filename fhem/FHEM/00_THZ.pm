@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 08/2023
-my $thzversion = "0.208";
+# by immi 10/2023
+my $thzversion = "0.209";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -399,7 +399,7 @@ my %parsinghash = (
 # 
 ########################################################################################
 
-my %sets439technician =(
+my %setsX39technician =(
 #   "zResetLast10errors"		=> {cmd2=>"D1",     argMin =>   "0",	argMax =>  "0",	type =>"0clean",  unit =>""},
    "zResetLast10errors"		=> {cmd2=>"D1",     argMin =>   "0",	argMax =>  "0",	type =>"D1last",  unit =>""},
 #  "zPassiveCoolingtrigger"	=> {cmd2=>"0A0597", argMin =>   "0",	argMax =>  "50",	type =>"1clean",  unit =>""},
@@ -944,7 +944,7 @@ sub THZ_Initialize($) {
 		    ."interval_sBoostHCTotal:0,3600,7200,28800,43200,86400 "
 		    ."interval_sFlowRate:0,3600,7200,28800,43200,86400 "
 		    ."interval_sDisplay:0,60,120,180,300 "
-		    ."firmware:4.39,2.06,2.14,2.14j,5.39,4.39technician "
+		    ."firmware:4.39,2.06,2.14,2.14j,5.39,4.39technician,5.39technician "
 		    ."interval_sDewPointHC1:0,60,120,180,300 "
 		    ."simpleReadTimeout:0.25,0.5,0.75,1,2,4,6 " #standard has been 0.75 since msg468515 If blocking attribut is NOT enabled then set the timeout value to a maximum value of 0.75 sec.
 		    ."nonblocking:0,1 "
@@ -2001,7 +2001,7 @@ sub THZ_Attr(@) {
             %sets = (%sets206, %setsonly214);
             %gets = (%getsonly2xx, %getsonly214, %sets206);
         }
-	elsif ($attrVal eq "2.14j") {
+        elsif ($attrVal eq "2.14j") {
             %sets = (%sets206, %setsonly214);
             %gets = (%getsonly2xx, %getsonly214j, %sets206);
         }
@@ -2009,8 +2009,12 @@ sub THZ_Attr(@) {
             %sets=(%sets439539common, %sets539only);
             %gets=(%getsonly539, %sets);
         }
+        elsif ($attrVal eq "5.39technician") {
+            %sets=(%sets439539common, %sets539only, %setsX39technician);
+            %gets=(%getsonly539, %sets);
+        }
         elsif ($attrVal eq "4.39technician") {
-            %sets=(%sets439539common, %sets439only, %sets439technician);
+            %sets=(%sets439539common, %sets439only, %setsX39technician);
             %gets=(%getsonly439, %sets);
         }
         else { #in all other cases I assume $attrVal eq "4.39" cambiato nella v0140
