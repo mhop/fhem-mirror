@@ -31,6 +31,9 @@
 #           added wifi data to Gen.1 devices
 #           Bug Fix: inttemp for ShellyPro2
 # 5.02      Bug Fix: on/off-for-timer for ShellyPlus2 temporarely taken out
+# 5.03      Bug Fix: Refresh: removed fixed name of FHEMWEB device
+#           Bug Fix: Gen.2: on/off-for-timer
+#           Bug Fix: update interval of GetStatus call
 
 package main;
 
@@ -45,7 +48,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "5.02 30.10.2023";
+my $version = "5.03 31.10.2023";
 
 #-- support differtent readings-names for energy & power metering
 my %mapping = (
@@ -655,7 +658,7 @@ sub Shelly_Define($$) {
   InternalTimer(time()+5, "Shelly_get_model", $hash,0);
   
   #-- perform status update in a minute or so
-  InternalTimer(time()+10, "Shelly_status", $hash,0); #Debug $hash->{NAME}."646 calling Timer Shelly_status in 14 sec"; #14
+  InternalTimer(time()+10, "Shelly_status", $hash,0);
   InternalTimer(time()+12, "Shelly_EMData", $hash,0);
   InternalTimer(time()+14, "Shelly_shelly", $hash,0);
      
@@ -900,7 +903,7 @@ sub Shelly_get_model {
 }
 
 sub Refresh {
-    fhem("trigger WEB JS:location.reload(true)");  # try a browser refresh ??
+    fhem("trigger $FW_wname JS:location.reload(true)");  # try a browser refresh ??
 }
 
 #######################################################################################
@@ -1222,7 +1225,7 @@ sub Shelly_Attr(@) {
       return $error;
     }
     # perform an update of the position related readings
-    RemoveInternalTimer($hash,"Shelly_status"); #Debug "$name 1207 removed Timer Shelly_status, now calling in 1 sec";
+    RemoveInternalTimer($hash,"Shelly_status");
     InternalTimer(gettimeofday()+1, "Shelly_status", $hash);  ##ü      
     
   #---------------------------------------        
@@ -1405,7 +1408,7 @@ sub Shelly_Attr(@) {
       $hash->{INTERVAL}=60;
     }
     if ($init_done) {
-      RemoveInternalTimer($hash,"Shelly_status"); #Debug "$name 1389 removed Timer Shelly_status, now calling in Intv sec";
+      RemoveInternalTimer($hash,"Shelly_status");
       InternalTimer(gettimeofday()+$hash->{INTERVAL}, "Shelly_status", $hash, 0)
         if( $hash->{INTERVAL} != 0 );
     } 
@@ -1597,7 +1600,7 @@ sub Shelly_Set ($@) {
       }elsif( $model =~ /shelly(rgbw|bulb).*/ && $mode eq "color" ){
           $newkeys .= " ".join(" ", sort keys %setsrgbwc) ;
       }       
- if( $shelly_models{$model}[0]>0 && $shelly_models{$model}[4]==1 ){
+ if(0 && $shelly_models{$model}[0]>0 && $shelly_models{$model}[4]==1 ){
  # xx-for-timer does not work 
             $newkeys =~ s/on-for-timer//;
             $newkeys  =~ s/off-for-timer//;
@@ -1616,15 +1619,15 @@ sub Shelly_Set ($@) {
     my $isWhat=$2;
     my $subs;
     Log3 $name,3,"[Shelly_Set] calling for device $name with command $cmd".( defined($value)?" and channel $value":", without channel" );
-    readingsBeginUpdate($hash); #Debug "$name $signal $mode";
+    readingsBeginUpdate($hash);
     if( $signal eq "out" && $mode eq "relay"){ #change of device output
           $subs = ($shelly_models{$model}[0] == 1) ? "" : "_".$value;
-          readingsBulkUpdateMonitored($hash,"relay$subs",$isWhat);  #Debug "relay$subs";
+          readingsBulkUpdateMonitored($hash,"relay$subs",$isWhat);
           readingsBulkUpdateMonitored($hash,"state",$isWhat)
                       if( $shelly_models{$model}[0]==1 );      ## do not set state on multichannel-devices
     }elsif( $signal eq "out" && $mode eq "white"){ #change of bulb device output
           $subs = ($shelly_models{$model}[2] == 1) ? "" : "_".$value;  # no of dimmers
-          readingsBulkUpdateMonitored($hash,"state$subs",$isWhat);#Debug "state$subs";
+          readingsBulkUpdateMonitored($hash,"state$subs",$isWhat);
     }elsif( $signal eq "out" && !$value ){ #change of single channel device output
           #$subs = "";
           readingsBulkUpdateMonitored($hash,"state",$isWhat);
@@ -2440,7 +2443,7 @@ sub Shelly_status {
           #-- get status of component (relay, roller, input, EM, ...); we need to submit the call several times
           for( $id=0; $id<$chn; $id++){
               #$url  = $url_."?id=".$id;
-              Log3 $name,4,"[Shelly_status] issue a non-blocking call to $url$id, callback to proc2G for comp=$comp";
+              Log3 $name,4,"[Shelly_status] issue a non-blocking call to $url$id, callback to proc2G for comp=$comp";  #4
               HttpUtils_NonblockingGet({
                 url      => $url.$id,
                 timeout  => $timeout,
@@ -2473,7 +2476,8 @@ sub Shelly_status {
   }else{
       $next=Shelly_proc2G($hash,$comp,$jhash);
   }
-  Log3 $name,4,"[Shelly_status] $name: proc.G returned next update in $next seconds ($comp)";
+  Log3 $name,4,"[Shelly_status] $name: proc.G returned with value=$next for comp $comp"; #4
+  return undef if( $next == -1 );  
   
   #-- cyclic update (or update close to on/off-for-timer command)
   
@@ -2483,8 +2487,8 @@ sub Shelly_status {
       $next = 0.75*$hash->{INTERVAL};
   }
   
-return undef if( $next == 125 ); 
-  Log3 $name,4,"[Shelly_status] $name: next update in $next seconds ";
+
+  Log3 $name,4,"[Shelly_status] $name: next update for comp=$comp in $next seconds "; #4
   RemoveInternalTimer($hash,"Shelly_status"); 
   InternalTimer(gettimeofday()+$next, "Shelly_status", $hash, 1)
               if( $hash->{INTERVAL} != 0 );
@@ -2502,7 +2506,7 @@ return undef if( $next == 125 );
 #
 ########################################################################################
   
-sub Shelly_shelly {#Debug "aborting Shelly_shelly";return undef;
+sub Shelly_shelly {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $state = $hash->{READINGS}{state}{VAL};
@@ -2518,12 +2522,12 @@ sub Shelly_shelly {#Debug "aborting Shelly_shelly";return undef;
       Log3 $name,4,"[Shelly_shelly] intentionally aborting, $name is not 2nd Gen";  
       return undef ;
   }
-#if( $model eq "shellyplusi4" ){Debug "aborting";return undef;}
+
     my $url_ = $url."/rpc/";
 
     #-- get status of Shelly (updates, status, ...)
     $url  = $url_."Shelly.GetStatus";
-    Log3 $name,4,"[Shelly_shelly] issue a non-blocking call to ".$url;  
+    Log3 $name,4,"[Shelly_shelly] issue a non-blocking call to ".$url;  #4
     HttpUtils_NonblockingGet({
         url      => $url,
         timeout  => $timeout,
@@ -2532,7 +2536,7 @@ sub Shelly_shelly {#Debug "aborting Shelly_shelly";return undef;
       
     #-- get config of Shelly -
     $url  = $url_."Shelly.GetConfig";
-    Log3 $name,4,"[Shelly_shelly] issue a non-blocking call to ".$url;  
+    Log3 $name,4,"[Shelly_shelly] issue a non-blocking call to ".$url;  #4
     HttpUtils_NonblockingGet({
         url      => $url,
         timeout  => $timeout,
@@ -2541,7 +2545,7 @@ sub Shelly_shelly {#Debug "aborting Shelly_shelly";return undef;
    
     #-- get device info of Shelly
     $url  = $url_."Shelly.GetDeviceInfo";
-    Log3 $name,4,"[Shelly_shelly] issue a non-blocking call to ".$url;  
+    Log3 $name,4,"[Shelly_shelly] issue a non-blocking call to ".$url;  #4
     HttpUtils_NonblockingGet({
         url      => $url,
         timeout  => $timeout,
@@ -2556,14 +2560,14 @@ sub Shelly_shelly {#Debug "aborting Shelly_shelly";return undef;
     return undef
         if( $hash->{INTERVAL} == 0 ); 
         
-    my $offset = $hash->{INTERVAL};
+    my $offset = 120; #$hash->{INTERVAL};
     if( $model eq "shellypro3em" ){ 
         # updates at every multiple of 60 seconds
         $offset = $hash->{INTERVAL}<=60 ? 60 : int($hash->{INTERVAL}/60)*60 ;
         # adjust to get readings 2sec after full minute
         $offset = $offset + 2 - gettimeofday() % 60;
     }
-    Log3 $name,5,"[Shelly_shelly] $name: long update in $offset seconds, Timer is Shelly_shelly";  #4
+    Log3 $name,4,"[Shelly_shelly] $name: long update in $offset seconds, Timer is Shelly_shelly";  #4
     InternalTimer(gettimeofday()+$offset, "Shelly_shelly", $hash, 1);  
     return undef;
 }
@@ -3024,6 +3028,7 @@ sub Shelly_proc2G {
   my $meters   = $shelly_models{$model}[3];
  
   my ($subs,$ison,$overpower,$voltage,$current,$power,$energy,$pfactor,$freq,$minutes,$errors);  ##R  minutes errors
+  my $timer = $hash->{INTERVAL};
 
   # check we have a second gen device
   if( $shelly_models{$model}[4]!=1 ){
@@ -3044,10 +3049,10 @@ sub Shelly_proc2G {
         $ison = $jhash->{'output'};
         $ison =~ s/0|(false)/off/;
         $ison =~ s/1|(true)/on/;
-        readingsBulkUpdateMonitored($hash,"relay".$subs,$ison);#Debug "$name 2ndGen relay >$ison\<";
+        readingsBulkUpdateMonitored($hash,"relay".$subs,$ison);
         # Switch Reason: Trigger for switching
         # --> init, http <-fhemWEB, WS_in, timer, loopback (=schedule?), HTTP <-Shelly-App
-        readingsBulkUpdateMonitored($hash,"reason".$subs,$jhash->{'source'});
+        readingsBulkUpdateMonitored($hash,"source".$subs,$jhash->{'source'});
         
         readingsBulkUpdateMonitored($hash,"state",($shelly_models{$model}[0] == 1)?$ison:"OK");
 
@@ -3401,7 +3406,7 @@ if(0){    # check calculation of reactive power!
         # Energy consumption by minute (in Milliwatt-hours) for the last minute
         $minutes = shelly_energy_fmt($hash,$jhash->{'aenergy'}{'by_minute'}[0],"mWh");
       
-        Log3 $name,4,"[Shelly_proc2G] $name $comp voltage$subs=$voltage, current$subs=$current, power$subs=$power";
+        Log3 $name,4,"[Shelly_proc2G] $name $comp voltage$subs=$voltage, current$subs=$current, power$subs=$power";  #4
        
         readingsBulkUpdateMonitored($hash,"voltage".$subs,$voltage);  
         readingsBulkUpdateMonitored($hash,"current".$subs,$current);  
@@ -3424,13 +3429,25 @@ if(0){    # check calculation of reactive power!
       }elsif( defined($jhash->{'temperature:0'}{'tC'}) ){
             readingsBulkUpdateMonitored($hash,"inttemp",$jhash->{'temperature:0'}{'tC'}.$si_units{tempC}[$hash->{units}]);
       }
+      # processing timers
+      if( $jhash->{'timer_started_at'} ){
+         if( $jhash->{'timer_remaining'} ){         
+            $timer = $jhash->{'timer_remaining'};
+         }else{
+            $timer =  $jhash->{'timer_started_at'} + $jhash->{'timer_duration'} - time();
+            $timer =  round($timer,1);
+         }
+         readingsBulkUpdateMonitored($hash,"timer".$subs,$timer.$si_units{time}[$hash->{units}]); 
+      }elsif(ReadingsVal($name,"timer$subs",undef) ){
+         readingsBulkUpdateMonitored($hash,"timer".$subs,'-');
+      }
     }
     readingsEndUpdate($hash,1);
     
     if ($comp eq "status" || $comp eq "config" || $comp eq "info"){
-       return 125;
+       return -1;
     }else{
-       return $hash->{INTERVAL};
+       return $timer;
     }
   }
 
@@ -3869,7 +3886,7 @@ sub shelly_energy_fmt {
   readingsEndUpdate($hash,1);
   
   #-- Call status after switch.
-  RemoveInternalTimer($hash,"Shelly_status");   #Debug "$name 3683 removed Timer Shelly_status, now calling in 0.5 sec";
+  RemoveInternalTimer($hash,"Shelly_status");
   InternalTimer(gettimeofday()+0.5, "Shelly_status", $hash,0);
 
   return undef;
@@ -3951,14 +3968,14 @@ if(0){
         #-- after 1 second call power measurement
         InternalTimer(gettimeofday()+1, "Shelly_updown2", $hash,1);
     }else{   #2Gen
-        Log3 $name,5,"[Shelly_updown] calling Shelly_status for Metering of Gen2-Device"; #Debug "$name 3765 calling Timer Shelly_status";
+        Log3 $name,5,"[Shelly_updown] calling Shelly_status for Metering of Gen2-Device";
         InternalTimer(gettimeofday()+1, "Shelly_status", $hash);
     }
 }else{
   #-- perform two updates: after starting of drive, after expected stopping of drive
   if( $hash->{INTERVAL}>0 ){
       $hash->{DURATION} = 5 if( !$hash->{DURATION} );    # duration not provided by Gen2
-      RemoveInternalTimer($hash,"Shelly_status"); #Debug "$name 3772 removed Timer Shelly_status, now calling in 0.5 sec";
+      RemoveInternalTimer($hash,"Shelly_status");
       InternalTimer(gettimeofday()+0.5, "Shelly_status", $hash); # after that: next update in reduced interval sec
       InternalTimer(gettimeofday()+$hash->{DURATION}+0.5, "Shelly_interval", $hash,1); # reset interval
   }
@@ -3994,9 +4011,9 @@ sub Shelly_interval($){
   my $state = $hash->{READINGS}{state}{VAL};
   my $net   = $hash->{READINGS}{network}{VAL};
   
-     Log3 $name,6,"[Shelly_onoff] try to execute command $cmd channel $channel for device $name ($state, $net)"; 
+  Log3 $name,6,"[Shelly_onoff] try to execute command $cmd channel $channel for device $name ($state, $net)"; 
   return "Unsuccessful: Network Error for device $name, try device get status " 
-    if( !$net || $net !~ /connected to/ ); 
+                  if( !$net || $net !~ /connected to/ ); 
   
   my $model = AttrVal($name,"model","generic");
   my $timeout = AttrVal($name,"timeout",4);
@@ -4007,7 +4024,7 @@ sub Shelly_interval($){
      my $url     = "http://$creds".$hash->{TCPIP};
 if(1){
      $url .= "/relay/$channel$cmd";
-     $callback=$cmd;
+     $callback="/relay/$channel$cmd";
 }else{
      $cmd =~ /(id=\d)/;
      $callback= $url."/rpc/Switch.GetStatus?$1";
@@ -4026,7 +4043,7 @@ if(1){
   }
   
   #processing incoming data
-  Log3 $name,5,"[Shelly_onoff] device $name has returned data $data";
+  Log3 $name,5,"[Shelly_onoff:callback] device $name has returned data \n$data";
     
   my $json = JSON->new->utf8;
   my $jhash = eval{ $json->decode( $data ) };
@@ -4041,64 +4058,59 @@ if(1){
     return;
   }
   
-###  if($shelly_models{$model}[4] < 2){
     my $ison        = $jhash->{'ison'};
-    my $hastimer    = $jhash->{'has_timer'};
-    my $onofftimer  = $jhash->{'timer_remaining'};
+    my $hastimer    = undef;
+    my $onofftimer  = 0;
+    my $timerstr    = "-";
     my $source      = $jhash->{'source'};
     my $overpower   = $jhash->{'overpower'};
   
     $ison =~ s/0|(false)/off/;
     $ison =~ s/1|(true)/on/;
-  
+    
+    if( $jhash->{'has_timer'} ){
+        $hastimer    = $jhash->{'has_timer'};
+        $onofftimer  = $jhash->{'timer_remaining'};
+        $timerstr    = $onofftimer.$si_units{time}[$hash->{units}];
+    }
+    
     # check on successful execution
-    $cmd =~ /\?turn=(on|off)(\&timer=)?(\d+)?/;
+    $cmd =~ /\/relay\/(\d)\?turn=(on|off)(\&timer=)?(\d+)?/;
+    $channel = $1;
 
-    Log3 $name,1,"[Shelly_onoff] returns with problem for device $name, timer not set"   if( $3 && $hastimer ne "1");
-    Log3 $name,1,"[Shelly_onoff] returns without success for device $name, cmd=$cmd but ison=$ison" if( $ison ne $1 );
+    Log3 $name,1,"[Shelly_onoff] returns with problem for device $name, timer not set"   if( $4 && $hastimer ne "1");
+    Log3 $name,1,"[Shelly_onoff] returns without success for device $name, cmd=$cmd but ison=$ison" if( $ison ne $2 );
 
     if( defined($overpower) && $overpower eq "1") {
       Log3 $name,1,"[Shelly_onoff] device $name switched off automatically because of overpower signal";
     }
-if(0){###  }else{
-    Log3 $name,4,"[Shelly_onoff] $name returns with command $cmd ";
-    # $jhash->{'was_on'}; #receiving this message means success
-    if( !$jhash ){
-        Log3 $name,1,"[Shelly_onoff] returns without success for device $name, cmd=$cmd ";
-    }else{ # on success we are requesting full status
-      #Log3 $name,0,$cmd;
-      fhem("sleep 0.75");
-      HttpUtils_NonblockingGet({
-        url      => $cmd,
-        timeout  => $timeout,
-        callback => sub($$$){ Shelly_status($hash,"relay",$_[1],$_[2]) }  # "relay"
-     });
-    }    
-  }
-  #-- 
+  
   my $subs = ($shelly_models{$model}[0] == 1) ? "" : "_".$channel;
 
-if(0){  #my ($onofftimer,$source,$ison,$overpower);  ##need this my... only for testing
-  Log3 $name,0,"$name $onofftimer $source ison:$ison\<";
+  Log3 $name,4,"[Shelly_onoff:callback] received callback from $name channel $channel is switched $ison, "
+           .($hastimer?"timer is set to $onofftimer sec":"no timer set");
   readingsBeginUpdate($hash);  
-  readingsBulkUpdateMonitored($hash,"timer",$onofftimer);
-  readingsBulkUpdateMonitored($hash,"source",$source); 
+  readingsBulkUpdateMonitored($hash,"timer".$subs,$timerstr);
+  readingsBulkUpdateMonitored($hash,"source".$subs,$source); 
 
   if( $shelly_models{$model}[0] == 1 ){
     readingsBulkUpdateMonitored($hash,"state",$ison);
   }else{
     readingsBulkUpdateMonitored($hash,"state","OK");
   }
-  readingsBulkUpdateMonitored($hash,"relay".$subs,$ison);#Debug "$name if 0 proc";
+  readingsBulkUpdateMonitored($hash,"relay".$subs,$ison);
 
   readingsBulkUpdateMonitored($hash,"overpower".$subs,$overpower)
-    if( $shelly_models{$model}[3]>0 && $model ne "shelly1" );
+                       if( $shelly_models{$model}[3]>0 && $model ne "shelly1" );
   readingsEndUpdate($hash,1);
-}else{
-  #-- Call status after switch.     
-  RemoveInternalTimer($hash,"Shelly_status"); #Debug "$name 3882 removed Timer Shelly_status, now calling in 0.5 sec";
-  InternalTimer(gettimeofday()+0.5, "Shelly_status", $hash,0);
-}
+
+  #-- Call status after switch.    
+  if( $hash->{INTERVAL}>0 ){
+      $onofftimer = ($onofftimer % $hash->{INTERVAL}) + 0.5; #modulus
+  }
+  RemoveInternalTimer($hash,"Shelly_status");
+  InternalTimer(gettimeofday()+$onofftimer, "Shelly_status", $hash,0);
+
   return undef;
 }
 
