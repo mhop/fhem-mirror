@@ -25,6 +25,13 @@
 #
 ########################################################################################
 
+# 5.01      attr defchannel for single mode devices with multiple relays (eg Shelly4Pro)
+#           improved support for wall display
+#           Bug Fix: Shelly_onoff (causing delays)
+#           added wifi data to Gen.1 devices
+#           Bug Fix: inttemp for ShellyPro2
+# 5.02      Bug Fix: on/off-for-timer for ShellyPlus2 temporarely taken out
+
 package main;
 
 use strict;
@@ -38,7 +45,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "5.00 26.10.2023";
+my $version = "5.02 30.10.2023";
 
 #-- support differtent readings-names for energy & power metering
 my %mapping = (
@@ -320,7 +327,7 @@ my %shelly_vendor_ids = (
     "SNSW-001P8EU"    => "shellyplus1pm", # Shelly Plus 1 PM Mini
     "SNPM-001PCEU16"  => "shellypluspm",   # Shelly Plus PM Mini
     # Misc
-    "SAWD1"           => "walldisplay1"
+    "SAWD-0A1XX10EU1" => "walldisplay1"
     );
 
 
@@ -358,7 +365,7 @@ my %shelly_models = (
     "shellyproem50" => [1,0,0, 1,1,0],    # has two single-phase meter and one relay
     "shellypro3em"  => [0,0,0, 1,1,0],    # has one (1) three-phase meter
     "shellyprodual" => [0,2,0, 4,1,4],
-    "walldisplay1"  => [1,0,0, 1,1,1]     # similar to ShellyPlus1PM
+    "walldisplay1"  => [1,0,0, 0,1,1]     # similar to ShellyPlus1PM
     );
     
 my %shelly_events = (	# events, that can be used by webhooks; key is mode, value is shelly-event 
@@ -577,6 +584,7 @@ my %si_units = (
      "tempC"         => [""," °C"],    # Celsius
      "relHumidity"   => [""," %"],
      "pct"           => [""," %"],
+     "illum"         => [""," lux"],   # illuminace eg WallDisplay
      "ct"            => [""," K"],     # color temperature / Kelvin
      "rssi"          => [""," dB"]
      );
@@ -686,9 +694,9 @@ sub Shelly_get_model {
        return;
   }
   if( $hash && !$err && !$data ){
-    my $creds = Shelly_pwd($hash); # Log3 $hash->{NAME},2,$creds; 
-   
+    my $creds = Shelly_pwd($hash); 
     #-- try to get type/model and profile/mode of Shelly -  first gen
+    Log3 $name,5,"[Shelly_get_model] try to get model for device $name as first gen";
     HttpUtils_NonblockingGet({
         url      => "http://$creds".$hash->{TCPIP}."/settings",
         timeout  => 4,
@@ -696,6 +704,7 @@ sub Shelly_get_model {
     });
     $count++;
     #-- try to get type/model and profile/mode of Shelly -  second gen
+    Log3 $name,5,"[Shelly_get_model] try to get model for device $name as second gen";
     HttpUtils_NonblockingGet({
         url      => "http://$creds".$hash->{TCPIP}."/rpc/Shelly.GetDeviceInfo",
         timeout  => 4,
@@ -713,7 +722,8 @@ sub Shelly_get_model {
   
   my ($json,$jhash);  
   if( $hash && $data ){
-    Log3 $name,5,"[Shelly_get_model] $name: received ".length($data)." byte of data from device";
+    Log3 $name,4,"[Shelly_get_model] $name: received ".length($data)." byte of data from device";
+    Log3 $name,5,"[Shelly_get_model] $name: received data is: \n$data ";
   
     if( $data eq "Not Found" ){         
       # when checking out Shellies software generation, this is intentionally no error
@@ -803,7 +813,10 @@ sub Shelly_get_model {
 
   if( defined($attr{$name}{model}) ){
         my $model_old = $attr{$name}{model};
-        if( AttrVal($name,"model",undef) ne $model ){
+        if( $model_old eq "generic" && $model ne "generic" ){
+            Log3 $name,2,"[Shelly_get_model] the model of device $name is already defined as generic, and will be redefined as \'$model\' ";    
+            $attr{$hash->{NAME}}{model} = $model;
+        }else{
             Log3 $name,2,"[Shelly_get_model] the model of device $name is already defined as \'$model_old\' ";
             readingsSingleUpdate($hash,"state","model already defined as \'$model_old\', might be $model",1);
         }
@@ -849,7 +862,7 @@ sub Shelly_get_model {
 
         if( $shelly_models{$model}[3]==0  ){  #no metering, eg. shellyi3  
           $AttrList  =~ s/$attributes{'metering'}/""/e;
-          if( $model eq "shellyuni" ){
+          if( $model eq "shellyuni" || $model =~ /walldisplay/ ){
               $AttrList  =~ s/$attributes{'showunits'}/" showunits:none,original"/e;  # shellyuni measures voltage
           }else{
               $AttrList  =~ s/$attributes{'showunits'}/""/e;  
@@ -861,8 +874,8 @@ sub Shelly_get_model {
           $AttrList  =~ s/$attributes{'input'}/""/e;
         }
 
-        if( !$mode ){ 
-            # delete 'defchannel' from attribute list
+        if( !$mode && $shelly_models{$model}[0]<2 ){ 
+            # delete 'defchannel' from attribute list for single-mode devices with less than 2 relays
             $AttrList  =~ s/\sdefchannel//;
         }elsif( ($mode ne "roller" && $shelly_models{$model}[0]>1) ||     #more than one relay
                 ($mode ne "relay"  && $shelly_models{$model}[1]>1) ||     #more than one roller
@@ -876,7 +889,7 @@ sub Shelly_get_model {
         if( $shelly_models{$model}[4]==0 && $model ne "shellybulb" ){  # 1st Gen 
             $AttrList  =~ s/webhook(\S*?)\s//g;
         }
-
+ 
         $hash->{'.AttrList'} = $AttrList;
 
     ##readingsSingleUpdate($hash,"state","Model \"$model\" identified",1);
@@ -1583,7 +1596,13 @@ sub Shelly_Set ($@) {
           $newkeys .= " ".join(" ", sort keys %setsbulbw) ;
       }elsif( $model =~ /shelly(rgbw|bulb).*/ && $mode eq "color" ){
           $newkeys .= " ".join(" ", sort keys %setsrgbwc) ;
-      }
+      }       
+ if( $shelly_models{$model}[0]>0 && $shelly_models{$model}[4]==1 ){
+ # xx-for-timer does not work 
+            $newkeys =~ s/on-for-timer//;
+            $newkeys  =~ s/off-for-timer//;
+ }
+
       $msg = "unknown argument $cmd choose one of $newkeys";
       ###Log3 "YY",5,"[Shelly_Set] $name model=$model: $msg";
       return $msg;
@@ -1947,8 +1966,8 @@ sub Shelly_Set ($@) {
     
     Log3 $name,4,"[Shelly_Set] switching channel $channel for device $name with command $cmd, FF=$ff";
     if( $ff==0 ){    
-        if( $shelly_models{$model}[4] == 0 ){
-            $cmd = "/relay/$channel?turn=$cmd";
+        if( $shelly_models{$model}[4] < 2 ){
+            $cmd = "?turn=$cmd";  ##"/relay/$channel?turn=$cmd";
         }else{
             $cmd =~ s/on/true/;
             $cmd =~ s/off/false/;
@@ -2454,7 +2473,7 @@ sub Shelly_status {
   }else{
       $next=Shelly_proc2G($hash,$comp,$jhash);
   }
-  Log3 $name,5,"[Shelly_status] $name: proc.G returned next update in $next seconds ";
+  Log3 $name,4,"[Shelly_status] $name: proc.G returned next update in $next seconds ($comp)";
   
   #-- cyclic update (or update close to on/off-for-timer command)
   
@@ -2465,7 +2484,7 @@ sub Shelly_status {
   }
   
 return undef if( $next == 125 ); 
-  Log3 $name,3,"[Shelly_status] $name: next update in $next seconds ";
+  Log3 $name,4,"[Shelly_status] $name: next update in $next seconds ";
   RemoveInternalTimer($hash,"Shelly_status"); 
   InternalTimer(gettimeofday()+$next, "Shelly_status", $hash, 1)
               if( $hash->{INTERVAL} != 0 );
@@ -2544,7 +2563,7 @@ sub Shelly_shelly {#Debug "aborting Shelly_shelly";return undef;
         # adjust to get readings 2sec after full minute
         $offset = $offset + 2 - gettimeofday() % 60;
     }
-    Log3 $name,3,"[Shelly_shelly] $name: long update in $offset seconds, Timer is Shelly_shelly";  #4
+    Log3 $name,5,"[Shelly_shelly] $name: long update in $offset seconds, Timer is Shelly_shelly";  #4
     InternalTimer(gettimeofday()+$offset, "Shelly_shelly", $hash, 1);  
     return undef;
 }
@@ -2578,7 +2597,11 @@ sub Shelly_proc1G {
   my $intervalN=$hash->{INTERVAL};   # next update interval
   
   readingsBeginUpdate($hash);
-  Shelly_readingsBulkUpdate($hash,"network","<html>connected to <a href=\"http://".$hash->{TCPIP}."\">".$hash->{TCPIP}."</a></html>",1);
+  Shelly_readingsBulkUpdate($hash,"network","<html>connected to <a href=\"http://".$hash->{TCPIP}."\">".$hash->{TCPIP}."</a></html>",1); 
+  readingsBulkUpdateMonitored($hash,"network_rssi",$jhash->{'wifi_sta'}{'rssi'} ) 
+                                                                      if( $jhash->{'wifi_sta'}{'rssi'} ); 
+  readingsBulkUpdateMonitored($hash,"network_ssid",$jhash->{'wifi_sta'}{'ssid'} ) 
+                                                                      if( $jhash->{'wifi_sta'}{'ssid'} );
   
   #-- for all models set internal temperature reading and status
   if ($jhash->{'temperature'}) {
@@ -3021,12 +3044,13 @@ sub Shelly_proc2G {
         $ison = $jhash->{'output'};
         $ison =~ s/0|(false)/off/;
         $ison =~ s/1|(true)/on/;
-        readingsBulkUpdateMonitored($hash,"relay".$subs,$ison);#Debug "$name 2ndGen relay";
+        readingsBulkUpdateMonitored($hash,"relay".$subs,$ison);#Debug "$name 2ndGen relay >$ison\<";
         # Switch Reason: Trigger for switching
         # --> init, http <-fhemWEB, WS_in, timer, loopback (=schedule?), HTTP <-Shelly-App
         readingsBulkUpdateMonitored($hash,"reason".$subs,$jhash->{'source'});
         
         readingsBulkUpdateMonitored($hash,"state",($shelly_models{$model}[0] == 1)?$ison:"OK");
+
 
   ############retrieving the roller state and position
   }elsif( $rollers>0 && $comp eq "roller") {
@@ -3272,6 +3296,18 @@ if(0){    # check calculation of reactive power!
       }
       readingsBulkUpdateMonitored($hash,"state","OK") if( $model eq "shellyplusi4" );
     }
+    
+    #********
+    if( $model =~ /walldisplay/ ){
+            $subs ="";
+            # readings supported by the /Shelly.GetStatus call or by individual calls eg /Temperature.GetStatus
+            readingsBulkUpdateMonitored($hash,"temperature" .$subs,$jhash->{'temperature:0'}{'tC'}.$si_units{tempC}[$hash->{units}] );
+            readingsBulkUpdateMonitored($hash,"humidity"    .$subs,$jhash->{'humidity:0'}{'rh'}.$si_units{relHumidity}[$hash->{units}] );
+            readingsBulkUpdateMonitored($hash,"illuminance" .$subs,$jhash->{'illuminance:0'}{'lux'}.$si_units{illum}[$hash->{units}] );
+            readingsBulkUpdateMonitored($hash,"illumination".$subs,$jhash->{'illuminance:0'}{'illumination'} );        
+    }
+    #********
+    
     ################ Shelly.GetConfig
     }elsif ($comp eq "config"){
         Log3 $name,4,"[Shelly_proc2G:config] $name: processing the answer rpc/Shelly.GetConfig from Shelly_shelly()";
@@ -3380,13 +3416,14 @@ if(0){    # check calculation of reactive power!
         readingsBulkUpdateMonitored($hash,"energy" .$subs,$energy);  
         readingsBulkUpdateMonitored($hash,"energy_lastMinute".$subs,$minutes); 
         readingsBulkUpdateMonitored($hash,"protection".$subs,$errors);
-        # temperature not provided by all devices
-        if( defined($jhash->{'temperature'}{'tC'}) ){
+        
+      }  
+      # temperature not provided by all devices
+      if( defined($jhash->{'temperature'}{'tC'}) ){
             readingsBulkUpdateMonitored($hash,"inttemp",$jhash->{'temperature'}{'tC'}.$si_units{tempC}[$hash->{units}]);
-        }elsif( defined($jhash->{'temperature:0'}{'tC'}) ){
+      }elsif( defined($jhash->{'temperature:0'}{'tC'}) ){
             readingsBulkUpdateMonitored($hash,"inttemp",$jhash->{'temperature:0'}{'tC'}.$si_units{tempC}[$hash->{units}]);
-        }
-       }  
+      }
     }
     readingsEndUpdate($hash,1);
     
@@ -3644,7 +3681,7 @@ if(0){        # calculate the suppliers meter value
         my $dst = fhem('{$isdst}'); # is daylight saving time (Sommerzeit) ?   gets a log entry {$isdst} at level 3
         foreach my $TP (@TPs)
         {
-           Log3 $name,3,"[Shelly__proc2G:status] calling shelly_delta_energy for period \'$TP\' ";
+           Log3 $name,5,"[Shelly__proc2G:status] calling shelly_delta_energy for period \'$TP\' ";
            shelly_delta_energy($hash,"Total_Energy_S_",    $TP,$timestamp,$active_energy-$return_energy,$TimeStamp,$dst);
            shelly_delta_energy($hash,"Purchased_Energy_S_",$TP,$timestamp,$active_energy,$TimeStamp,$dst);
            shelly_delta_energy($hash,"Returned_Energy_S_", $TP,$timestamp,$return_energy,$TimeStamp,$dst);
@@ -3966,10 +4003,16 @@ sub Shelly_interval($){
   my $creds = Shelly_pwd($hash);
     
   if ( $hash && !$err && !$data ){
+     my $callback;
      my $url     = "http://$creds".$hash->{TCPIP};
+if(1){
+     $url .= "/relay/$channel$cmd";
+     $callback=$cmd;
+}else{
      $cmd =~ /(id=\d)/;
-     my $callback= $url."/rpc/Switch.GetStatus?$1";
+     $callback= $url."/rpc/Switch.GetStatus?$1";
      $url .= $cmd;
+}
      Log3 $name,4,"[Shelly_onoff] issue a non-blocking call to $url; callback to Shelly_onoff with command $callback";  
      HttpUtils_NonblockingGet({
         url      => $url,
@@ -3998,7 +4041,7 @@ sub Shelly_interval($){
     return;
   }
   
-  if($shelly_models{$model}[4] == 0){
+###  if($shelly_models{$model}[4] < 2){
     my $ison        = $jhash->{'ison'};
     my $hastimer    = $jhash->{'has_timer'};
     my $onofftimer  = $jhash->{'timer_remaining'};
@@ -4017,7 +4060,7 @@ sub Shelly_interval($){
     if( defined($overpower) && $overpower eq "1") {
       Log3 $name,1,"[Shelly_onoff] device $name switched off automatically because of overpower signal";
     }
-  }else{
+if(0){###  }else{
     Log3 $name,4,"[Shelly_onoff] $name returns with command $cmd ";
     # $jhash->{'was_on'}; #receiving this message means success
     if( !$jhash ){
@@ -4035,7 +4078,8 @@ sub Shelly_interval($){
   #-- 
   my $subs = ($shelly_models{$model}[0] == 1) ? "" : "_".$channel;
 
-if(0){  my ($onofftimer,$source,$ison,$overpower);  ##need this my... only for testing
+if(0){  #my ($onofftimer,$source,$ison,$overpower);  ##need this my... only for testing
+  Log3 $name,0,"$name $onofftimer $source ison:$ison\<";
   readingsBeginUpdate($hash);  
   readingsBulkUpdateMonitored($hash,"timer",$onofftimer);
   readingsBulkUpdateMonitored($hash,"source",$source); 
@@ -4050,7 +4094,7 @@ if(0){  my ($onofftimer,$source,$ison,$overpower);  ##need this my... only for t
   readingsBulkUpdateMonitored($hash,"overpower".$subs,$overpower)
     if( $shelly_models{$model}[3]>0 && $model ne "shelly1" );
   readingsEndUpdate($hash,1);
-}elsif(0){
+}else{
   #-- Call status after switch.     
   RemoveInternalTimer($hash,"Shelly_status"); #Debug "$name 3882 removed Timer Shelly_status, now calling in 0.5 sec";
   InternalTimer(gettimeofday()+0.5, "Shelly_status", $hash,0);
@@ -4089,9 +4133,9 @@ if(0){  my ($onofftimer,$source,$ison,$overpower);  ##need this my... only for t
     Log3 $name,6,"[Shelly_webhook] was called for device $name, but without command (Create..., Update, Delete, List)";
     $cmd = $hash->{CMD};
     return if( !$cmd);
-    Log3 $name,3,"[Shelly_webhook] proceeding with command \'$cmd\' for device $name";
+    #Log3 $name,3,"[Shelly_webhook] Proceeding with command \'$cmd\' for device $name";
   }
-    Log3 $name,3,"[Shelly_webhook] proceeding with command \'$cmd\' for device $name";
+  Log3 $name,5,"[Shelly_webhook] proceeding with command \'$cmd\' for device $name";
 
   my $model = AttrVal($name,"model","generic");
   my $gen   = $shelly_models{$model}[4]; # 0 is Gen1,  1 is Gen2
@@ -4099,7 +4143,7 @@ if(0){  my ($onofftimer,$source,$ison,$overpower);  ##need this my... only for t
   my $timeout = AttrVal($name,"timeout",4);
   my $mode  = AttrVal($name,"mode","relay");  # we need mode=relay for Shelly*1-devices
   
-  Log3 $name,4,"[Shelly_webhook] device $name was called with command=$cmd";
+  Log3 $name,5,"[Shelly_webhook] device $name was called with command=$cmd";
   
   # Calling as callable program: check if err and data are empty      
   if ( $hash && !$err && !$data ){
@@ -4124,7 +4168,7 @@ if(0){  my ($onofftimer,$source,$ison,$overpower);  ##need this my... only for t
 
    #---------CHECK, UPDATE, DELETE Webhooks-------------
    if( $cmd ne "Create" ){  #Check, Count, Update, Delete
-             Log3 $name,4,"[Shelly_webhook] issue a non-blocking call to $URL, callback with command \'$cmd\' ";  
+             Log3 $name,5,"[Shelly_webhook] issue a non-blocking call to $URL, callback with command \'$cmd\' ";  
              HttpUtils_NonblockingGet({
                  url      => $URL,
                  timeout  => $timeout,
@@ -4143,7 +4187,7 @@ if(0){  my ($onofftimer,$source,$ison,$overpower);  ##need this my... only for t
 
     my ($component,$element);
     foreach $component ( $mode, "input", "emeter" ){
-       Log3 $name,4,"[Shelly_webhook] $name: check number of components for component=$component";
+       Log3 $name,5,"[Shelly_webhook] $name: check number of components for component=$component";
        if( $component eq "relay" ){
           $compCount   = $shelly_models{$model}[0];
        }elsif( $component eq "roller" ){
@@ -4159,10 +4203,10 @@ if(0){  my ($onofftimer,$source,$ison,$overpower);  ##need this my... only for t
        }else{
           $compCount   = 0 ;
        }
-       Log3 $name,4,"[Shelly_webhook] $name: the number of \'$component\' is compCount=$compCount";
+       Log3 $name,5,"[Shelly_webhook] $name: the number of \'$component\' is compCount=$compCount";
        
        for( my $c=0;$c<$compCount;$c++ ){
-             Log3 $name,4,"[Shelly_webhook] $name: processing component $c of $component";
+             Log3 $name,5,"[Shelly_webhook] $name: processing component $c of $component";
           if( $component eq "input"){ 
              my $subs= $compCount>1 ? "_$c\_mode" : "_mode" ;
              $element = ReadingsVal($name,"input$subs","none"); #input type: switch or button
@@ -4170,7 +4214,7 @@ if(0){  my ($onofftimer,$source,$ison,$overpower);  ##need this my... only for t
                  Log3 $name,3,"[Shelly_webhook] $name: Error: Reading \'input.*mode\' not found";
                  return;
              }
-             Log3 $name,4,"[Shelly_webhook] $name: input mode no $c is \'$element\' ";
+             Log3 $name,5,"[Shelly_webhook] $name: input mode no $c is \'$element\' ";
              $element =~ /(\S+?)\s.*/;  # get only characters from first string of reading
              $element = $1;
           }elsif( $component eq "emeter"){
@@ -4181,7 +4225,7 @@ if(0){  my ($onofftimer,$source,$ison,$overpower);  ##need this my... only for t
              $element = $component;
           }
           $eventsCount = $#{$shelly_events{$element}};   #  $#{...} gives highest index of array
-             Log3 $name,4,"[Shelly_webhook] $name: processing evtsCnt=$eventsCount events for \'$element\'";
+             Log3 $name,5,"[Shelly_webhook] $name: processing evtsCnt=$eventsCount events for \'$element\'";
           
           for( my $e=0; $e<=$eventsCount; $e++ ){
              if( $cmd eq "Create" ){
@@ -4205,8 +4249,8 @@ if(0){  my ($onofftimer,$source,$ison,$overpower);  ##need this my... only for t
                      $URL =~ s/enable\=true/enable\=false/  if( $e > 0 ); 
                   }
              }
-             Log3 $name,4,"[Shelly_webhook] $name $cmd component=$element  count=$c   event=$e";
-             Log3 $name,4,"[Shelly_webhook] issue a non-blocking call to \n$URL$urls";  
+             Log3 $name,5,"[Shelly_webhook] $name $cmd component=$element  count=$c   event=$e";
+             Log3 $name,5,"[Shelly_webhook] issue a non-blocking call to \n$URL$urls";  
              HttpUtils_NonblockingGet({
                  url      => $URL.$urls,
                  timeout  => $timeout,
@@ -4240,7 +4284,7 @@ if(0){  my ($onofftimer,$source,$ison,$overpower);  ##need this my... only for t
   my $hooksCount = ( defined($jhash->{'hooks'}) ? @{$jhash->{'hooks'}} : ReadingsVal($name,"webhook_cnt",0) );
  
   #processing the webhook data for the different commands
-  Log3 $name,4,"[Shelly_webhook] processing the webhook data for command=$cmd";
+  Log3 $name,5,"[Shelly_webhook] processing the webhook data for command=$cmd";
   
   #---------------------Read number of webhooks from 'List' 
   if( $cmd eq "Count" ){
@@ -4256,7 +4300,7 @@ if(1){    # first of all, get number of webhooks
        #return if ($hooksCount == 0);
        $hooksCount = 0;
     }
-    Log3 $name,4,"[Shelly_webhook] our counter says $hooksCount webhooks on shelly";  
+    Log3 $name,5,"[Shelly_webhook] our counter says $hooksCount webhooks on shelly";  
 }
    
     # parsing all webhooks and check for csrf-token  
@@ -4266,8 +4310,8 @@ if(1){    # first of all, get number of webhooks
     my ($current_url_part1, $current_url_command);
     my $urls;   # the new urls string
     
-
-    if( !AttrVal($name,"webhook",undef) || AttrVal($name,"webhook",undef) eq "none" ){
+    # are there webhooks on the shelly we don't know about?
+    if( (!AttrVal($name,"webhook",undef) || AttrVal($name,"webhook",undef) eq "none" ) && $jhash->{'hooks'}[0]{'urls'}[0] ){
         $current_url = $jhash->{'hooks'}[0]{'urls'}[0]; # get the first webhook url from shelly
         $current_url =~ m/.*:([0-9]*)\/.*/;
         my $fhemwebport = $1; 
@@ -4277,7 +4321,7 @@ if(1){    # first of all, get number of webhooks
 
     
     my ($webhook_url_pre, $webhook_url_part1, $webhook_url_command,$webhook_url_post) = Shelly_webhookurl($hash,"",0,0,0);  # a 'status' call    
-    Log3 $name,4,"[Shelly_webhook] $name: webhook shall be: pre=$webhook_url_pre,  part1=$webhook_url_part1, command=$webhook_url_command,  post=$webhook_url_post"; 
+    Log3 $name,5,"[Shelly_webhook] $name: webhook shall be: pre=$webhook_url_pre,  part1=$webhook_url_part1, command=$webhook_url_command,  post=$webhook_url_post"; 
     
     # preparing the calling-url, we need this when looping        
     my $URL = "http://$creds".$hash->{TCPIP}."/rpc/Webhook.Update?";
@@ -4285,12 +4329,12 @@ if(1){    # first of all, get number of webhooks
     my $host_ip =  qx("\"hostname -I\"");   # local
     $host_ip =~ m/(\d\d?\d?\.\d\d?\d?\.\d\d?\d?\.\d\d?\d?).*/; #extract ipv4-address
     $host_ip = $1;
-    Log3 $name,4,"[Shelly_webhook] looking for webhooks forwarding to $host_ip"; 
+    Log3 $name,5,"[Shelly_webhook] looking for webhooks forwarding to $host_ip"; 
     
     for (my $i=0;$i<$hooksCount;$i++){
         $current_url = $jhash->{'hooks'}[$i]{'urls'}[0]; # get the url from shelly
         $current_url =~ s/\%/\%25/g;    # to make it compareable to webhook_url 
-        Log3 $name,4,"[Shelly_webhook] shellies $name webhook $i is $current_url";   
+        Log3 $name,5,"[Shelly_webhook] shellies $name webhook $i is $current_url";   
         if($current_url !~ /$host_ip/ ){  #skip this hook when refering to another host
              Log3 $name,5,"[Shelly_webhook] shellies $name webhook $i is refering to another host $current_url -> skipping";
              next;
@@ -4311,17 +4355,17 @@ if(1){    # first of all, get number of webhooks
         Log3 $name,5,"[Shelly_webhook] $i checking part1 of url: \n$current_url_part1    against\n$webhook_url_part1\n   command is: \"$current_url_command\" ";
         
         if ($current_url_part1 ne $webhook_url_part1 ){
-            Log3 $name,4,"[Shelly_webhook] $i we have to update $current_url_part1 to $webhook_url_part1";
+            Log3 $name,5,"[Shelly_webhook] $i we have to update $current_url_part1 to $webhook_url_part1";
             $urls = "urls=[%22$webhook_url_part1$current_url_command%22]&";  # %22 = "
             $urls = $URL.$urls."id=$current_id";  # will be issued
-            Log3 $name,4,"[Shelly_webhook] $name: $i issue a non-blocking call with callback-command \"Updated\":\n$urls";  
+            Log3 $name,5,"[Shelly_webhook] $name: $i issue a non-blocking call with callback-command \"Updated\":\n$urls";  
             HttpUtils_NonblockingGet({
               url      => $urls,
               timeout  => $timeout,
               callback => sub($$$){ Shelly_webhook($hash,"Updated",$_[1],$_[2]) }
             });
         }else{
-        Log3 $name,4,"[Shelly_webhook] $i check is OK, nothing to do";
+        Log3 $name,5,"[Shelly_webhook] $i check is OK, nothing to do";
         }
     }  
     
@@ -4336,9 +4380,9 @@ if(1){    # first of all, get number of webhooks
         $h_id = $jhash->{'hooks'}[$i]{'id'};
         $h_urls0 = $jhash->{'hooks'}[$i]{'urls'}[0]; # we need this, when checking for forward ip-adress
         
-        Log3 $name,4,"[Shelly_webhook] ++++ $name: checking webhook id=$h_id $h_name for deleting+++++++++++";  
+        Log3 $name,5,"[Shelly_webhook] ++++ $name: checking webhook id=$h_id $h_name for deleting+++++++++++";  
         if( $h_name =~ /^_/ ){
-            Log3 $name,4,"[Shelly_webhook] ++++ $name: deleting webhook $h_name +++++++++++"; 
+            Log3 $name,5,"[Shelly_webhook] ++++ $name: deleting webhook $h_name +++++++++++"; 
             my $url_ = "http://$creds".$hash->{TCPIP}."/rpc/Webhook.Delete?id=$h_id"; 
             Log3 $name,5,"[Shelly_webhook] url: $url_";
             HttpUtils_NonblockingGet({
@@ -4365,7 +4409,7 @@ if(1){    # first of all, get number of webhooks
        #retrieving webhook id 
        my $webhook_id = $jhash->{'id'};
        $hooksCount++;
-       Log3 $name,4,"[Shelly_webhook] $name hook created with id=".($webhook_id?$webhook_id:"").($webhook_v?", version is $webhook_v":"");
+       Log3 $name,5,"[Shelly_webhook] $name hook created with id=".($webhook_id?$webhook_id:"").($webhook_v?", version is $webhook_v":"");
     }else{
        my $error = "Error ".$jhash->{'code'}." occured: ".$jhash->{'message'};
        Log3 $name,1,"[Shelly_webhook] $name: $error" if $error;
@@ -4375,7 +4419,7 @@ if(1){    # first of all, get number of webhooks
   readingsBulkUpdateMonitored($hash,"webhook_ver",$webhook_v);
   readingsBulkUpdateMonitored($hash,"webhook_cnt",$hooksCount);    
   readingsEndUpdate($hash,1);   
-  Log3 $name,4,"[Shelly_webhook] shelly $name has $hooksCount webhooks".($webhook_v?", latest rev is $webhook_v":"");  # No of hooks in Shelly-device
+  Log3 $name,5,"[Shelly_webhook] shelly $name has $hooksCount webhooks".($webhook_v?", latest rev is $webhook_v":"");  # No of hooks in Shelly-device
 
   return undef;  
 }
@@ -4404,7 +4448,7 @@ sub Shelly_webhookurl ($@) {
   my $channel = shift @a;
   my $noe     = shift @a; # number of event of entity
   
-  my $V = 4;
+  my $V = 5;
   Log3 $name,$V,"[Shelly_webhookurl] calling url-builder with args: $name $cmd $entity ch:$channel noe:$noe";
   							
   my $host_ip =  qx("\"hostname -I\"");   # local
@@ -4522,9 +4566,9 @@ sub Shelly_error_handling {
     }else{
         $err = "Error"; 
     }
-    
+    Log3 $name,1,"[Shelly_error_handling] Device $name has Error \'$err\' ";
     readingsBulkUpdate($hash,"network_disconnects",ReadingsNum($name,"network_disconnects",0)+1)   if( ReadingsVal($name,"state","") ne $err );
-    readingsBulkUpdateMonitored($hash,"state",$err,1);
+    readingsBulkUpdateMonitored($hash,"state",$err, 1 );
     readingsEndUpdate($hash,1);
   return undef;  
 }
@@ -4552,6 +4596,7 @@ readingsBulkUpdateMonitored($$$@) # derived from fhem.pl readingsBulkUpdateIfCha
   my ($hash,$reading,$value,$changed)= @_;
   my $MaxAge=AttrVal($hash->{NAME},"maxAge",21600);  # default 6h
   if( ReadingsAge($hash->{NAME},$reading,$MaxAge)>=$MaxAge || $value ne ReadingsVal($hash->{NAME},$reading,"") ){  
+       Log3 $hash->{NAME},6,"$reading: maxAge=$MaxAge ReadingsAge=".ReadingsAge($hash->{NAME},$reading,0)." value=$value ? ".ReadingsVal($hash->{NAME},$reading,"");
        return readingsBulkUpdate($hash,$reading,$value,$changed);
   }else{
        return undef;
