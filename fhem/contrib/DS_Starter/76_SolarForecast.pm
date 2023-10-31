@@ -144,6 +144,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.0.10" => "31.10.2023  fix warnings, edit comref ",
+  "1.0.9"  => "29.10.2023  _aiGetSpread: set spread from 50 to 20 ",
   "1.0.8"  => "22.10.2023  codechange: add central readings store array, new function storeReading, writeCacheToFile ".
                            "solcastapi in sub __delObsoleteAPIData, save freespace if flowGraphicShowConsumer=0 is set ".
                            "pay attention to attr graphicEnergyUnit in __createOwnSpec ",
@@ -3588,7 +3590,7 @@ sub __VictronVRM_ApiRequestForecast {
   my $idsite = $paref->{idsite};
 
   my $tstart = time;
-  my $tend   = time + 259200;                                                     # 172800 = 2 Tage 
+  my $tend   = time + 259200;                                                     # 172800 = 2 Tage
 
   my $url = "https://vrmapi.victronenergy.com/v2/installations/$idsite/stats?type=forecast&interval=hours&start=$tstart&end=$tend";
 
@@ -3694,7 +3696,7 @@ sub __VictronVRM_ApiResponseForecast {
           my $k = 0;
           while ($jdata->{'records'}{'solar_yield_forecast'}[$k]) {
               next if(ref $jdata->{'records'}{'solar_yield_forecast'}[$k] ne "ARRAY");                             # Forum: https://forum.fhem.de/index.php?msg=1288637
-              
+
               my $starttmstr = $jdata->{'records'}{'solar_yield_forecast'}[$k][0];                                 # Millisekunden geliefert
               my $val        = $jdata->{'records'}{'solar_yield_forecast'}[$k][1];
               $starttmstr    = (timestampToTimestring ($starttmstr, $lang))[3];
@@ -3715,7 +3717,7 @@ sub __VictronVRM_ApiResponseForecast {
           $k = 0;
           while ($jdata->{'records'}{'vrm_consumption_fc'}[$k]) {
               next if(ref $jdata->{'records'}{'vrm_consumption_fc'}[$k] ne "ARRAY");                             # Forum: https://forum.fhem.de/index.php?msg=1288637
-              
+
               my $starttmstr = $jdata->{'records'}{'vrm_consumption_fc'}[$k][0];                                 # Millisekunden geliefert
               my $val        = $jdata->{'records'}{'vrm_consumption_fc'}[$k][1];
               $starttmstr    = (timestampToTimestring ($starttmstr, $lang))[3];
@@ -4008,7 +4010,7 @@ sub Attr {
   my $name  = shift;
   my $aName = shift;
   my $aVal  = shift;
-  
+
   my $hash  = $defs{$name};
 
   my ($do,$val);
@@ -4034,7 +4036,7 @@ sub Attr {
   if($aName eq 'ctrlNextDayForecastReadings') {
       deleteReadingspec ($hash, "Tomorrow_Hour.*");
   }
-  
+
   if($aName eq 'ctrlGenPVdeviation' && $aVal eq 'daily') {
       my $type = $hash->{TYPE};
       deleteReadingspec ($hash, 'Today_PVdeviation');
@@ -4752,9 +4754,9 @@ sub centralTask {
       saveEnergyConsumption       ($centpars);                                            # Energie Hausverbrauch speichern
       genStatisticReadings        ($centpars);                                            # optionale Statistikreadings erstellen
 
-      userExit                    ($centpars);                                            # User spezifische Funktionen ausführen    
+      userExit                    ($centpars);                                            # User spezifische Funktionen ausführen
       setTimeTracking             ($hash, $cst, 'runTimeCentralTask');                    # Zyklus-Laufzeit ermitteln
-      
+
       createReadingsFromArray     ($hash, $evt);                                          # Readings erzeugen
 
       if ($evt) {
@@ -5013,7 +5015,7 @@ sub _specialActivities {
 
           $pvfc = ReadingsNum ($name, "Today_Hour24_PVforecast", 0);
           storeReading ('LastHourPVforecast', "$pvfc Wh", $ts);
- 
+
           $pvrl = ReadingsNum ($name, "Today_Hour24_PVreal", 0);
           storeReading ('LastHourPVreal', "$pvrl Wh", $ts);
 
@@ -5142,7 +5144,7 @@ sub __delObsoleteAPIData {
           delete $data{$type}{$name}{solcastapi}{$idx}{$scd} if ($ds && $ds < $refts);
       }
   }
-  
+
   writeCacheToFile ($hash, "solcastapi", $scpicache.$name);                            # Cache File SolCast API Werte schreiben
 
   my @as = split ",", ReadingsVal($name, 'inverterStrings', '');
@@ -5380,7 +5382,7 @@ sub _transferAPIRadiationValues {
           delete $paref->{histname};
       }
   }
-                                             
+
   storeReading ('.lastupdateForecastValues', $t);                                             # Statusreading letzter update
 
 return;
@@ -6168,7 +6170,7 @@ sub _createSummaries {
       $todaySumFc->{PV} += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);
       $todaySumRe->{PV} += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$th)."_PVreal",     0);
   }
-  
+
   my $pvre = int $todaySumRe->{PV};
 
   push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
@@ -6208,7 +6210,7 @@ sub _createSummaries {
   storeReading ('Current_AutarkyRate',          $autarkyrate.         ' %');
   storeReading ('Today_PVreal',                 $pvre.               ' Wh') if($pvre > ReadingsNum ($name, 'Today_PVreal', 0));
   storeReading ('Tomorrow_ConsumptionForecast', $tconsum.            ' Wh') if(defined $tconsum);
-  
+
   storeReading ('NextHours_Sum01_PVforecast',          (int $next1HoursSum->{PV}).         ' Wh');
   storeReading ('NextHours_Sum02_PVforecast',          (int $next2HoursSum->{PV}).         ' Wh');
   storeReading ('NextHours_Sum03_PVforecast',          (int $next3HoursSum->{PV}).         ' Wh');
@@ -6402,9 +6404,9 @@ sub _manageConsumerData {
       my ($iilt,$rlt)                           = isInLocktime ($paref);                                          # Sperrzeit Status ermitteln
       my $constate                              = "name='$alias' state='$costate' planningstate='$pstate'";
       $constate                                .= " remainLockTime='$rlt'" if($rlt);
-                                                     
-      storeReading ("consumer${c}",                $constate);                                                    # Consumer Infos                                 
-      storeReading ("consumer${c}_planned_start", $starttime) if($starttime);                                     # Consumer Start geplant                                   
+
+      storeReading ("consumer${c}",                $constate);                                                    # Consumer Infos
+      storeReading ("consumer${c}_planned_start", $starttime) if($starttime);                                     # Consumer Start geplant
       storeReading ("consumer${c}_planned_stop",   $stoptime) if($stoptime);                                      # Consumer Stop geplant
   }
 
@@ -7745,15 +7747,15 @@ sub _calcTodayPVdeviation {
 
   my $pvfc = ReadingsNum ($name, 'Today_PVforecast', 0);
   my $pvre = ReadingsNum ($name, 'Today_PVreal',     0);
-  
+
   return if(!$pvre);
-  
+
   my $dp;
-  
+
   if (AttrVal($name, 'ctrlGenPVdeviation', 'daily') eq 'daily') {
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet",  '22:00').':00');
       return if($t < $sstime);
-      
+
       my $diff = $pvfc - $pvre;
       $dp      = sprintf "%.2f" , (100 * $diff / $pvre);
   }
@@ -7762,7 +7764,7 @@ sub _calcTodayPVdeviation {
       my $dayfc = $pvre + $rodfc;                                            # laufende Tagesprognose aus PVreal + Prognose Resttag
       $dp       = sprintf "%.2f", (100 * ($pvfc - $dayfc) / $dayfc);
   }
-  
+
   $data{$type}{$name}{circular}{99}{tdayDvtn} = $dp;
 
   storeReading ('Today_PVdeviation', $dp.' %');
@@ -8009,14 +8011,14 @@ sub genStatisticReadings {
 
                  $dono = $don;
              }
-             
+
              my $sttmp = timestringToTimestamp ($sttm) // return;
-             $sttmp   += 3600;                                                       # Beginnzeitstempel auf volle Stunde ergänzen 
+             $sttmp   += 3600;                                                       # Beginnzeitstempel auf volle Stunde ergänzen
              my $mhrs  = $hrs * 60;                                                  # berücksichtigte volle Minuten
              my $mtsr  = ($sttmp - $t) / 60;                                         # Minuten bis nächsten Sonnenaufgang (gerundet)
 
              $confc    = $confc / $mhrs * $mtsr;
-             
+
              storeReading ('statistic_'.$kpi, ($confc ? (sprintf "%.0f", $confc).$hcsr{$kpi}{unit} : '-'));
           }
       }
@@ -8085,7 +8087,7 @@ sub collectAllRegConsumers {
       if(exists $hc->{asynchron}) {
           $asynchron = $hc->{asynchron};
       }
-      
+
       my $noshow;
       if(exists $hc->{noshow}) {                                                                  # Consumer ausblenden in Grafik
           $noshow = $hc->{noshow};
@@ -8596,7 +8598,7 @@ sub _graphicHeader {
   my $hdrDetail = $paref->{hdrDetail};                     # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
   my $ftui      = $paref->{ftui};
   my $lang      = $paref->{lang};
-  my $name      = $paref->{name};                         
+  my $name      = $paref->{name};
   my $hash      = $paref->{hash};
   my $kw        = $paref->{kw};
   my $dstyle    = $paref->{dstyle};                        # TD-Style
@@ -8671,8 +8673,8 @@ sub _graphicHeader {
       my $chktitle = $htitles{plchk}{$lang};
 
       ## Update-Icon
-      ################      
-      my $upicon =  __createUpdateIcon ($paref); 
+      ################
+      my $upicon =  __createUpdateIcon ($paref);
 
       ## Sonnenauf- und untergang
       ############################
@@ -8818,11 +8820,11 @@ sub _graphicHeader {
       $tdayDvtn    =~ s/\,0//;
       $ydayDvtn    =~ s/\./,/;
       $ydayDvtn    =~ s/,0//;
-      
+
       my $genpvdva = $paref->{genpvdva};
 
       my $dvtntxt  = $hqtxt{dvtn}{$lang}.'&nbsp;';
-      my $tdaytxt  = ($genpvdva eq 'daily' ? $hqtxt{tday}{$lang} : $hqtxt{ctnsly}{$lang}).':&nbsp;'."<b>".$tdayDvtn."</b>";     
+      my $tdaytxt  = ($genpvdva eq 'daily' ? $hqtxt{tday}{$lang} : $hqtxt{ctnsly}{$lang}).':&nbsp;'."<b>".$tdayDvtn."</b>";
       my $ydaytxt  = $hqtxt{yday}{$lang}.':&nbsp;'."<b>".$ydayDvtn."</b>";
 
       my $text_tdayDvtn = $tdayDvtn =~ /^-[1-9]/? $hqtxt{pmtp}{$lang} :
@@ -8895,7 +8897,7 @@ sub _graphicHeader {
       $header .= qq{<td colspan="9" align="left" $dstyle><hr></td>};
       $header .= qq{</tr>};
   }
-  
+
   # Header User Spezifikation
   #############################
   my $ownv = __createOwnSpec ($paref);
@@ -8911,23 +8913,23 @@ return $header;
 ################################################################
 sub __createUpdateIcon {
   my $paref = shift;
-  
+
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $lang  = $paref->{lang};
   my $ftui  = $paref->{ftui};
-  
+
   my $upstate = ReadingsVal ($name, 'state',         '');
   my $naup    = ReadingsVal ($name, 'nextCycletime', '');
-  
+
   my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction - 0 get $name data')"};                               # Update Button generieren
 
   if ($ftui eq 'ftui') {
       $cmdupdate = qq{"ftui.setFhemStatus('set $name clientAction - 0 get $name data')"};
   }
-  
+
   my ($img, $upicon);
-  
+
   if ($upstate =~ /updated|successfully|switched/ix) {
       $img    = FW_makeImage('10px-kreis-gruen.png', $htitles{upd}{$lang}.'&#10;'.$htitles{natc}{$lang}.' '.$naup.'');
       $upicon = "<a onClick=$cmdupdate>$img</a>";
@@ -8953,11 +8955,11 @@ return $upicon;
 ################################################################
 sub __createAutokorrIcon {
   my $paref = shift;
-  
+
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $lang  = $paref->{lang};
-  
+
   my $aciimg;
   my $acitit = q{};
   my $acu    = isAutoCorrUsed ($name);
@@ -8984,20 +8986,20 @@ return $acicon;
 
 ################################################################
 #    erstelle Qualitäts-Icon
-################################################################     
+################################################################
 sub __createQuaIcon {
   my $paref = shift;
-  
+
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $lang  = $paref->{lang};
   my $ftui  = $paref->{ftui};
-  
+
   my $pvfc00     = NexthoursVal ($hash, 'NextHour00', 'pvfc',    undef);
   my $pvcorrf00  = NexthoursVal ($hash, "NextHour00", "pvcorrf", "-/-");
   my ($pcf,$pcq) = split "/", $pvcorrf00;
   my $pvcanz     = qq{factor: $pcf / quality: $pcq};
-  
+
   my $cmdfcqal = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name forecastQualities imgget', function(data){FW_okDialog(data)})"};
 
   if ($ftui eq 'ftui') {
@@ -9027,7 +9029,7 @@ return $pcqicon;
 ################################################################
 sub __createAIicon {
   my $paref    = shift;
-  
+
   my $hash     = $paref->{hash};
   my $name     = $paref->{name};
   my $lang     = $paref->{lang};
@@ -9055,83 +9057,85 @@ return $aiicon;
 
 ################################################################
 #    erstelle Übersicht eigener Readings
-################################################################    
+################################################################
 sub __createOwnSpec {
   my $paref     = shift;
-  
+
   my $hash      = $paref->{hash};
   my $name      = $paref->{name};
   my $dstyle    = $paref->{dstyle};                                       # TD-Style
   my $hdrDetail = $paref->{hdrDetail};
-  
-  my $vinr = 4;                                                           # Spezifikationen in einer Zeile 
+
+  my $vinr = 4;                                                           # Spezifikationen in einer Zeile
   my $spec = AttrVal ($name, 'graphicHeaderOwnspec', '');
   my $uatr = AttrVal ($name, 'graphicEnergyUnit',  'Wh');
   my $show = $hdrDetail =~ /all|own/xs ? 1 : 0;
-  
+
   return if(!$spec || !$show);
-  
-  my @fields = split (/\s+/sx, $spec); 
-  
+
+  my @fields = split (/\s+/sx, $spec);
+
   my (@cats, @vals);
-  
+
   for my $f (@fields) {
       if ($f =~ /^\#(.*)/xs) {
           push @cats, $1;
           next;
       }
-      
+
       push @vals, $f;
   }
-  
-  my $ownv; 
+
+  my $ownv;
   my $rows = ceil (scalar(@vals) / $vinr);
   my $col  = 0;
-  
+
   for (my $i = 1 ; $i <= $rows; $i++) {
-      my ($h, $v, $u); 
-      
+      my ($h, $v, $u);
+
       for (my $k = 0 ; $k < $vinr; $k++) {
           ($h->{$k}{label}, $h->{$k}{rdg}) = split ":", $vals[$col] if($vals[$col]);
           $col++;
+          
+          if (!$h->{$k}{label}) {
+              undef $h->{$k}{label};
+              next;
+          }
+          
+          ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($name, $h->{$k}{rdg}, '');
       }
-      
-      ($v->{0}, $u->{0}) = split /\s+/, ReadingsVal ($name, $h->{0}{rdg}, '');
-      ($v->{1}, $u->{1}) = split /\s+/, ReadingsVal ($name, $h->{1}{rdg}, '');
-      ($v->{2}, $u->{2}) = split /\s+/, ReadingsVal ($name, $h->{2}{rdg}, '');
-      ($v->{3}, $u->{3}) = split /\s+/, ReadingsVal ($name, $h->{3}{rdg}, '');
-      
-      if ($uatr eq 'kWh') {          
+
+      if ($uatr eq 'kWh') {
           for (my $r = 0 ; $r < $vinr; $r++) {
               next if(!$u->{$r});
-              
-              if ($u->{$r} =~ /^Wh/xs) {                                        
+
+              if ($u->{$r} =~ /^Wh/xs) {
                   $v->{$r} = sprintf "%.1f",($v->{$r} / 1000);
                   $u->{$r} = 'kWh';
               }
           }
       }
-      
+
       if ($uatr eq 'Wh') {
           for (my $r = 0 ; $r < $vinr; $r++) {
               next if(!$u->{$r});
-              
-              if ($u->{$r} =~ /^kWh/xs) {                                        
+
+              if ($u->{$r} =~ /^kWh/xs) {
                   $v->{$r} = sprintf "%.0f",($v->{$r} * 1000);
                   $u->{$r} = 'Wh';
               }
           }
       }
-      
+
       $ownv .= "<tr>";
       $ownv .= "<td $dstyle>".($cats[$i-1] ? '<b>'.$cats[$i-1].'</b>' : '')."</td>";
-      $ownv .= "<td $dstyle><b>".$h->{0}{label}.":</b></td> <td align=right $dstyle>".$v->{0}." ".$u->{0}."</td>" if($h->{0}{label});
-      $ownv .= "<td $dstyle><b>".$h->{1}{label}.":</b></td> <td align=right $dstyle>".$v->{1}." ".$u->{1}."</td>" if($h->{1}{label});
-      $ownv .= "<td $dstyle><b>".$h->{2}{label}.":</b></td> <td align=right $dstyle>".$v->{2}." ".$u->{2}."</td>" if($h->{2}{label});
-      $ownv .= "<td $dstyle><b>".$h->{3}{label}.":</b></td> <td align=right $dstyle>".$v->{3}." ".$u->{3}."</td>" if($h->{3}{label});
+      $ownv .= "<td $dstyle><b>".$h->{0}{label}.":</b></td> <td align=right $dstyle>".$v->{0}." ".$u->{0}."</td>" if(defined $h->{0}{label});
+      $ownv .= "<td $dstyle><b>".$h->{1}{label}.":</b></td> <td align=right $dstyle>".$v->{1}." ".$u->{1}."</td>" if(defined $h->{1}{label});
+      $ownv .= "<td $dstyle><b>".$h->{2}{label}.":</b></td> <td align=right $dstyle>".$v->{2}." ".$u->{2}."</td>" if(defined $h->{2}{label});
+      $ownv .= "<td $dstyle><b>".$h->{3}{label}.":</b></td> <td align=right $dstyle>".$v->{3}." ".$u->{3}."</td>" if(defined $h->{3}{label});
       $ownv .= "</tr>";
   }
-  
+
   $ownv .= qq{<tr>};
   $ownv .= qq{<td colspan="9" align="left" $dstyle><hr></td>};
   $ownv .= qq{</tr>};
@@ -9246,7 +9250,7 @@ sub _graphicConsumerLegend {
   $ctable   .= qq{<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>};
 
   my $cnum   = @consumers;
-  
+
   if ($cnum > 1) {
       $ctable .= qq{<td style='text-align:left' $dstyle> $hqtxt{cnsm}{$lang}  </td>};
       $ctable .= qq{<td>                                                      </td>};
@@ -9274,7 +9278,7 @@ sub _graphicConsumerLegend {
 
   for my $c (@consumers) {
       next if(isConsumerNoshow ($hash, $c) =~ /^[12]$/xs);                                          # Consumer ausblenden
-      
+
       my $caicon            = $paref->{caicon};                                                     # Consumer AdviceIcon
       my ($cname, $dswname) = getCDnames  ($hash, $c);                                              # Consumer und Switch Device Name
       my $calias            = ConsumerVal ($hash, $c, 'alias',   $cname);                           # Alias des Consumerdevices
@@ -10055,10 +10059,10 @@ sub _flowGraphic {
   my $batin_style  = $batin        ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
   my $csc_style    = $csc && $cpv  ? 'flowg active_out'              : 'flowg inactive_out';
   my $cgfi_style   = $cgfi         ? 'flowg active_out'              : 'flowg inactive_out';
-  
-  my $vbox_default = !$flowgcons    ? '5 -25 800 480' :
-                      $flowgconTime ? '5 -25 800 700' : 
-                      '5 -25 800 680';
+
+  my $vbox_default = !$flowgcons   ? '5 -25 800 480' :
+                     $flowgconTime ? '5 -25 800 700' :
+                     '5 -25 800 680';
 
   my $ret = << "END0";
       <style>
@@ -10115,12 +10119,12 @@ END0
 
   if ($flowgcons) {
       my $type       = $paref->{type};
-            
+
       for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {                            # definierte Verbraucher ermitteln
           next if(isConsumerNoshow ($hash, $c) =~ /^[13]$/xs);                                      # ausgeblendete Consumer nicht berücksichtigen
-          push @consumers, $c;						               
+          push @consumers, $c;
       }
-      
+
       $consumercount = scalar @consumers;
 
       if ($consumercount % 2) {
@@ -10540,18 +10544,18 @@ sub calcValueImproves {
   Log3 ($name, 4, "$name - INFO - The correction factors are now calculated and stored proactively independent of the autocorrection usage");
 
   $paref->{acu} = $acu;
-  
+
   for my $h (1..23) {
       next if(!$chour || $h > $chour);
       $paref->{h} = $h;
-      
+
       _calcCaQcomplex   ($paref);                                            # Korrekturberechnung mit Bewölkung duchführen/speichern
       _calcCaQsimple    ($paref);                                            # einfache Korrekturberechnung duchführen/speichern
       _addHourAiRawdata ($paref);                                            # AI Instanz hinzufügen
-      
+
       delete $paref->{h};
   }
-  
+
   delete $paref->{acu};
 
 return;
@@ -10576,15 +10580,15 @@ sub _calcCaQcomplex {
       # Log3 ($name, 1, "$name DEBUG> Complex Corrf -> factor Hour: ".sprintf("%02d",$h)." already calculated");
       return;
   }
-  
+
   debugLog ($paref, 'pvCorrection', "start calculation complex correction factor for hour: $h");
 
   my $pvre = CircularVal ($hash, sprintf("%02d",$h), 'pvrl',    0);
   my $pvfc = CircularVal ($hash, sprintf("%02d",$h), 'pvapifc', 0);
-  
+
   if (!$pvre || !$pvfc) {
       storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', 'done');
-      return;      
+      return;
   }
 
   $paref->{hour}                  = $h;
@@ -10651,7 +10655,7 @@ sub _calcCaQsimple {
   my $date  = $paref->{date};
   my $acu   = $paref->{acu};
   my $h     = $paref->{h};
-  
+
   my $maxvar = AttrVal($name, 'affectMaxDayVariance', $defmaxvar);                                    # max. Korrekturvarianz
   my $sr     = ReadingsVal ($name, ".pvCorrectionFactor_".sprintf("%02d",$h)."_apipercentil", "");
 
@@ -10659,15 +10663,15 @@ sub _calcCaQsimple {
       # debugLog ($paref, 'pvCorrection', "Simple Corrf factor Hour: ".sprintf("%02d",$h)." already calculated");
       return;
   }
-  
+
   debugLog ($paref, 'pvCorrection', "start calculation simple correction factor for hour: $h");
 
   my $pvre = CircularVal ($hash, sprintf("%02d",$h), 'pvrl',    0);
   my $pvfc = CircularVal ($hash, sprintf("%02d",$h), 'pvapifc', 0);
-  
+
   if (!$pvre || !$pvfc) {
       storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', 'done');
-      return;      
+      return;
   }
 
   $paref->{hour}           = $h;
@@ -10696,7 +10700,7 @@ sub _calcCaQsimple {
 
   $pvre    = sprintf "%.0f", $pvre;
   $pvfc    = sprintf "%.0f", $pvfc;
-  
+
   my $qual = __calcFcQuality ($pvfc, $pvre);                                                         # Qualität der Vorhersage für die vergangene Stunde
 
   debugLog ($paref, 'pvCorrection',                "Simple Corrf -> determined values - average forecast: $pvfc, average real: $pvre, old corrf: $oldfac, new corrf: $factor, days: $dnum");
@@ -10730,7 +10734,7 @@ sub _addHourAiRawdata {
   my $sr  = ReadingsVal ($name, ".signaldone_".$rho, "");
 
   return if($sr eq "done");
-  
+
   debugLog ($paref, 'aiProcess', "start add AI raw data for hour: $h");
 
   $paref->{ood} = 1;
@@ -11246,8 +11250,8 @@ sub aiGetResult {                   ## no critic "not used"
                                                      }
                                       );
        };
-       
-  if ($@) { 
+
+  if ($@) {
       Log3 ($name, 1, "$name - aiGetResult ERROR: $@");
       return $@;
   }
@@ -11256,22 +11260,22 @@ sub aiGetResult {                   ## no critic "not used"
       debugLog ($paref, 'aiData', qq{accurate result AI: pvaifc: $pvaifc (hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $rbin, temp: $tbin)});
       return ('', $pvaifc);
   }
-  
-  my $msg = 'no decition delivered'; 
-  
+
+  my $msg = 'no decition delivered';
+
   ($msg, $pvaifc) = _aiGetSpread ( { hash  => $hash,
                                      name  => $name,
                                      type  => $type,
-                                     rad1h => $rad1h, 
+                                     rad1h => $rad1h,
                                      temp  => $tbin,
                                      wcc   => $cbin,
                                      wrp   => $rbin,
                                      hod   => $hod,
                                      dtree => $dtree,
                                      debug => $paref->{debug}
-                                   } 
+                                   }
                                  );
-                                      
+
   if (defined $pvaifc) {
       return ('', $pvaifc);
   }
@@ -11280,7 +11284,7 @@ return $msg;
 }
 
 ################################################################
-#  AI Ergebnis aus einer positiven und negativen 
+#  AI Ergebnis aus einer positiven und negativen
 #  rad1h-Abweichung schätzen
 ################################################################
 sub _aiGetSpread {
@@ -11292,17 +11296,17 @@ sub _aiGetSpread {
   my $hod   = $paref->{hod};
   my $dtree = $paref->{dtree};
 
-  my $dtn  = 50;                               # positive und negative rad1h Abweichung testen mit Schrittweite "$step"
+  my $dtn  = 20;                               # positive und negative rad1h Abweichung testen mit Schrittweite "$step"
   my $step = 10;
-  
+
   my ($pos, $neg, $p, $n);
 
   debugLog ($paref, 'aiData', qq{no accurate result AI found with initial value "$rad1h"});
   debugLog ($paref, 'aiData', qq{test AI estimation with variance "$dtn", positive/negative step "$step"});
 
   for ($p = $rad1h; $p <= $rad1h + $dtn; $p += $step) {
-      $p = sprintf "%.2f", $p;  
-      
+      $p = sprintf "%.2f", $p;
+
       eval { $pos = $dtree->get_result (attributes => { rad1h => $p,
                                                         temp  => $temp,
                                                         wcc   => $wcc,
@@ -11311,21 +11315,21 @@ sub _aiGetSpread {
                                                       }
                                           );
            };
- 
+
       if ($@) {
           return $@;
       }
-            
+
       if ($pos) {
           debugLog ($paref, 'aiData', qq{AI estimation with test value "$p": $pos});
           last;
-      } 
+      }
   }
-  
+
   for ($n = $rad1h; $n >= $rad1h - $dtn; $n -= $step) {
       last if($n <= 0);
-      $n = sprintf "%.2f", $n; 
-      
+      $n = sprintf "%.2f", $n;
+
       eval { $neg = $dtree->get_result (attributes => { rad1h => $n,
                                                         temp  => $temp,
                                                         wcc   => $wcc,
@@ -11338,13 +11342,13 @@ sub _aiGetSpread {
       if ($@) {
           return $@;
       }
-      
+
       if ($neg) {
           debugLog ($paref, 'aiData', qq{AI estimation with test value "$n": $neg});
           last;
-      } 
+      }
   }
-  
+
   my $pvaifc = $pos && $neg ? sprintf "%.0f", (($pos + $neg) / 2) : undef;
 
   if (defined $pvaifc) {
@@ -12730,15 +12734,15 @@ return $tstring;
 
 ################################################################
 # Speichern Readings, Wert, Zeit in zentralen Readings Store
-################################################################    
+################################################################
 sub storeReading {
   my $rdg = shift;
   my $val = shift;
   my $ts1 = shift;
-  
+
   my $cmps = $rdg.'<>'.$val;
   $cmps   .= '<>'.$ts1 if(defined $ts1);
-  
+
   push @da, $cmps;
 
 return;
@@ -12761,7 +12765,7 @@ sub createReadingsFromArray {
 
   for my $elem (@da) {
       my ($rn,$rval,$ts) = split "<>", $elem, 3;
-      
+
       readingsBulkUpdate ($hash, $rn, $rval, undef, $ts);
   }
 
@@ -13094,29 +13098,29 @@ return 0;
 #  1 - ausblenden
 #  2 - nur in Consumerlegende ausblenden
 #  3 - nur in Flowgrafik ausblenden
-################################################################      
+################################################################
 sub isConsumerNoshow {
   my $hash = shift;
   my $c    = shift;
 
   my $noshow = ConsumerVal ($hash, $c, 'noshow', 0);                                 # Schalter "Ausblenden"
-  
+
   if (!isNumeric ($noshow)) {                                                        # Key "noshow" enthält Signalreading
       my $rdg             = $noshow;
       my ($dev, $dswname) = getCDnames ($hash, $c);                                  # Consumer und Switch Device Name
-      
+
       if ($noshow =~ /:/xs) {
           ($dev, $rdg) = split ":", $noshow;
       }
-      
+
       $noshow = ReadingsNum ($dev, $rdg, 0);
   }
-  
+
   if ($noshow !~ /^[0123]$/xs) {                                                    # nue Ergebnisse 0..3 zulassen
       $noshow = 0;
   }
-  
-return $noshow;     
+
+return $noshow;
 }
 
 ################################################################
@@ -13201,10 +13205,10 @@ sub isAddSwitchOffCond {
       $info = qq{value "$condval" (hysteresis = $hyst) match the Regex "$swoffcondregex" \n}.
               qq{-> Switch-off condition or interrupt in the "switch-off context", DO NOT switch on or DO NOT continue in the "switch-on context"\n}
               ;
-      
+
       return (1, $info, $err);
   }
-  
+
   $condval //= 'undef';
 
   $info = qq{device: "$dswoffcond", reading: "$rswoffcond" , value: "$condval" (hysteresis = $hyst) doesn't match Regex: "$swoffcondregex" \n}.
@@ -15547,8 +15551,8 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>2</b> - the consumer is hidden in the consumer legend                                                                                       </td></tr>
             <tr><td>                       </td><td><b>3</b> - the consumer is hidden in the flow chart                                                                                            </td></tr>
             <tr><td>                       </td><td><b>[Device:]Reading</b> - Reading in the consumer or optionally an alternative device.                                                         </td></tr>
-            <tr><td>                       </td><td>If the reading has the value 0 or is not present, the consumer is displayed.                                                                   </td></tr>        
-            <tr><td>                       </td><td>The effect of the possible reading values 1, 2 and 3 is as described.                                                                          </td></tr>        
+            <tr><td>                       </td><td>If the reading has the value 0 or is not present, the consumer is displayed.                                                                   </td></tr>
+            <tr><td>                       </td><td>The effect of the possible reading values 1, 2 and 3 is as described.                                                                          </td></tr>
          </table>
          </ul>
        <br>
@@ -15625,7 +15629,7 @@ to ensure that the system configuration is correct.
          </ul>
        </li>
        <br>
-       
+
        <a id="SolarForecast-attr-ctrlGenPVdeviation"></a>
        <li><b>ctrlGenPVdeviation </b><br>
          Specifies the method for calculating the deviation between predicted and real PV generation.
@@ -15742,11 +15746,11 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-ctrlUserExitFn"></a>
        <li><b>ctrlUserExitFn {&lt;Code&gt;} </b><br>
-         After each cycle (see the <a href="#SolarForecast-attr-ctrlInterval">ctrlInterval </a> attribute), the code given 
+         After each cycle (see the <a href="#SolarForecast-attr-ctrlInterval">ctrlInterval </a> attribute), the code given
          in this attribute is executed. The code is to be enclosed in curly brackets {...}. <br>
-         The code is passed the variables <b>$name</b> and <b>$hash</b>, which contain the name of the SolarForecast 
+         The code is passed the variables <b>$name</b> and <b>$hash</b>, which contain the name of the SolarForecast
          device and its hash. <br>
-         In the SolarForecast Device, readings can be created and modified using the <b>storeReading</b> function. 
+         In the SolarForecast Device, readings can be created and modified using the <b>storeReading</b> function.
          <br>
          <br>
 
@@ -15928,7 +15932,7 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-graphicEnergyUnit"></a>
        <li><b>graphicEnergyUnit &lt;Wh | kWh&gt; </b><br>
-         Defines the unit for displaying the electrical power in the graph. The value is rounded to one
+         Defines the unit for displaying the electrical power in the graph. The kilowatt hour is rounded to one
          decimal place. <br>
          (default: Wh)
        </li>
@@ -15951,14 +15955,16 @@ to ensure that the system configuration is correct.
          </ul>
        </li>
        <br>
-       
+
        <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
        <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt; &lt;Label&gt;:&lt;Reading&gt; ... </b><br>
          Display of any reading values of the device. <br>
-         The values to be displayed are separated by spaces. 
+         The values to be displayed are separated by spaces.
          Four values (fields) are displayed per line. <br>
-         The input can be made in multiple lines. <br><br>
-         
+         The input can be made in multiple lines. Values with the units "Wh" or "kWh" are converted according to the
+         setting of the attribute <a href="#SolarForecast-attr-graphicEnergyUnit">graphicEnergyUnit</a>.
+         <br><br>
+
          Each value is to be defined by a label and the corresponding reading connected by ":". <br>
          Spaces in the label are to be inserted by "&amp;nbsp;", a line break by "&lt;br&gt;". <br>
          An empty field in a line is created by ":". <br>
@@ -17386,8 +17392,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>2</b> - der Verbraucher wird in der Verbraucherlegende ausgeblendet                                                                         </td></tr>
             <tr><td>                       </td><td><b>3</b> - der Verbraucher wird in der Flußgrafik ausgeblendet                                                                                 </td></tr>
             <tr><td>                       </td><td><b>[Device:]Reading</b> - Reading im Verbraucher oder optional einem alternativen Device.                                                      </td></tr>
-            <tr><td>                       </td><td>Hat das Reading den Wert 0 oder ist nicht vorhanden, wird der Verbraucher eingeblendet.                                                        </td></tr>        
-            <tr><td>                       </td><td>Die Wirkung der möglichen Readingwerte 1, 2 und 3 ist wie beschrieben.                                                                         </td></tr>        
+            <tr><td>                       </td><td>Hat das Reading den Wert 0 oder ist nicht vorhanden, wird der Verbraucher eingeblendet.                                                        </td></tr>
+            <tr><td>                       </td><td>Die Wirkung der möglichen Readingwerte 1, 2 und 3 ist wie beschrieben.                                                                         </td></tr>
          </table>
          </ul>
        <br>
@@ -17464,7 +17470,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          </ul>
        </li>
        <br>
-       
+
        <a id="SolarForecast-attr-ctrlGenPVdeviation"></a>
        <li><b>ctrlGenPVdeviation </b><br>
          Legt die Methode zur Berechnung der Abweichung von prognostizierter und realer PV Erzeugung fest.
@@ -17583,9 +17589,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>ctrlUserExitFn {&lt;Code&gt;} </b><br>
          Nach jedem Zyklus (siehe Attribut <a href="#SolarForecast-attr-ctrlInterval ">ctrlInterval </a>) wird der in diesem
          Attribut abgegebene Code ausgeführt. Der Code ist in geschweifte Klammern {...} einzuschließen. <br>
-         Dem Code werden die Variablen <b>$name</b> und <b>$hash</b> übergeben, die den Namen des SolarForecast Device und 
+         Dem Code werden die Variablen <b>$name</b> und <b>$hash</b> übergeben, die den Namen des SolarForecast Device und
          dessen Hash enthalten. <br>
-         Im SolarForecast Device können Readings über die Funktion <b>storeReading</b> erzeugt und geändert werden. 
+         Im SolarForecast Device können Readings über die Funktion <b>storeReading</b> erzeugt und geändert werden.
          <br>
          <br>
 
@@ -17767,7 +17773,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicEnergyUnit"></a>
        <li><b>graphicEnergyUnit &lt;Wh | kWh&gt; </b><br>
-         Definiert die Einheit zur Anzeige der elektrischen Leistung in der Grafik. Der Wert wird auf eine
+         Definiert die Einheit zur Anzeige der elektrischen Leistung in der Grafik. Die Kilowattstunde wird auf eine
          Nachkommastelle gerundet. <br>
          (default: Wh)
        </li>
@@ -17790,14 +17796,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          </ul>
        </li>
        <br>
-       
+
        <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
        <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt; &lt;Label&gt;:&lt;Reading&gt; ... </b><br>
          Anzeige beliebiger Readingswerte des Devices. <br>
-         Die anzuzeigenden Werte werden durch Leerzeichen getrennt. 
+         Die anzuzeigenden Werte werden durch Leerzeichen getrennt.
          Es werden vier Werte (Felder) pro Zeile dargestellt. <br>
-         Die Eingabe kann mehrzeilig erfolgen. <br><br>
-         
+         Die Eingabe kann mehrzeilig erfolgen. Werte mit den Einheiten "Wh" bzw. "kWh" werden entsprechend der Einstellung
+         des Attributs <a href="#SolarForecast-attr-graphicEnergyUnit">graphicEnergyUnit</a> umgerechnet.
+         <br><br>
+
          Jeder Wert ist jeweils durch ein Label und das dazugehörige Reading verbunden durch ":" zu definieren. <br>
          Leerzeichen im Label sind durch "&amp;nbsp;" einzufügen, ein Zeilenumbruch durch "&lt;br&gt;". <br>
          Ein leeres Feld in einer Zeile wird durch ":" erzeugt. <br>
