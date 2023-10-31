@@ -38,6 +38,8 @@
 
 ############################################################################################################################
 # Version History
+# v 1.12 implemented new Attribute ze_homeRadius
+# v 1.11 implemented new function GET checkAPIkeys
 # v 1.10 addedd attribute brand, 'Dacia' will allow start/stop charge, additional readings after issueing get vehicles
 # v 1.09 fixed problem with readingsBulkUpdate/readingsSingleUpdate in lines 1002ff
 # v 1.08 new KAMERON API key
@@ -86,9 +88,10 @@
 # - https://github.com/jamesremuscat/pyze
 # - https://gist.github.com/mountbatt/772e4512089802a2aa2622058dd1ded7
 # API keys
-# - https://renault-wrd-prod-1-euw1-myrapp-one.s3-eu-west-1.amazonaws.com/configuration/android/config_en_DE.json
+# - https://renault-wrd-prod-1-euw1-myrapp-one.s3-eu-west-1.amazonaws.com/configuration/android/config_de_DE.json
 #  KAMEREON_API -> "wiredProd" -> apikey
 #  GIGYA_API    -> "gigyaProd" -> apikey
+#  oder https://renault-wrd-prod-1-euw1-myrapp-one.s3-eu-west-1.amazonaws.com/configuration/iOS/config_de_DE.json ???
 ############################################################################################################################
 
 # lock-status
@@ -102,7 +105,7 @@ use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
 
-my $RenaultZE_version ="V1.10 / 16.10.2023";
+my $RenaultZE_version ="V1.12 / 30.10.2023";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -120,6 +123,7 @@ my %RenaultZE_gets = (
 	"notification-settings:noArg"       => "",
 	"update:noArg"                      => "",
 	"vehicles:noArg"                    => "",
+	"checkAPIkeys:noArg"                => "",
 	"zTest"                             => ""
 );
 
@@ -140,6 +144,7 @@ sub RenaultZE_Initialize($) {
 			"ze_country ".
 			"ze_latitude ".
 			"ze_longitude ".
+			"ze_homeRadius ".
 			"ze_showaddress:0,1 ".
 			"ze_showimage:0,1,2 ".
 			"disabled:0,1 ".
@@ -163,7 +168,9 @@ sub RenaultZE_Define($$) {
     $hash->{GIGYA_API}    = '3_7PLksOyBRkHv126x5WhHb-5pqC1qFR8pQjxSeLB6nhAnPERTUlwnYoznHSxwX668';
     #$hash->{KAMEREON_API} = 'Ae9FDWugRxZQAGm3Sxgk7uJn6Q4CGEA2';
     #$hash->{KAMEREON_API} = 'VAX7XYKGfa92yMvXculCkEFyfZbuM7Ss';
+    #$hash->{KAMEREON_API} = 'YjkKtHmGfaceeuExUDKGxrLZGGvtVS0J';
     $hash->{KAMEREON_API} = 'YjkKtHmGfaceeuExUDKGxrLZGGvtVS0J';
+    #$hash->{KAMEREON_API} = 'oF09WnKqvBDcrQzcW1rJNpjIuy7KdGaB';
     $hash->{VERSION}      = $RenaultZE_version;
 
     readingsSingleUpdate($hash,"ze_Gigya_JWT_lastCall","0",1) unless (ReadingsVal($name,"ze_Gigya_JWT_lastCall","empty") ne "empty");
@@ -283,6 +290,12 @@ sub RenaultZE_Get($@) {
         {
 	   readingsSingleUpdate($hash,"ze_Step","getNotificationSettings",1);
 	   RenaultZE_Main1($hash, @param);
+        }
+
+        elsif ($opt eq "checkAPIkeys")
+        {
+	   readingsSingleUpdate($hash,"ze_Step","getcheckAPIkeys",1);
+	   RenaultZE_checkAPIkeys1($hash);
         }
 
         elsif ($opt eq "zTest")
@@ -1651,11 +1664,12 @@ sub RenaultZE_distanceFromHome($$$)
     my $dim = "km";
     my $homeinfo = "";
     my $homestate = "away";
+    my $homeRadius  = AttrVal( $name, "ze_homeRadius", 20 );
 
     if ($distance < 1) {
             $distance = $distance * 1000;
             $dim = "m";
-            if ($distance < 20) {
+            if ($distance < $homeRadius) {
 		    $homeinfo = "home";
 		    $homestate = "home";
 	    } 
@@ -1722,6 +1736,82 @@ sub RenaultZE_gAddress2($)
     readingsSingleUpdate($hash,"homeInfo",$newinfo,1);
 
     Log3 $name, 5, "RenaultZE_gAddress2 - Out";
+}
+
+sub RenaultZE_checkAPIkeys1($)
+{
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    my $value = $hash->{PARMVALUE};
+    Log3 $name, 5, "RenaultZE_checkAPIkeys_Step1 - In ".$hash."/".$name;
+    readingsSingleUpdate($hash,"ze_Step","RenaultZE_checkAPIkeys1",1);
+    my $kamereon_api = $hash->{KAMEREON_API};
+    my $id_token = $hash->{READINGS}{ze_Gigya_JWT_Token}{VAL};
+    my $country = AttrVal($name,"ze_country","DE");
+
+    my $step1= {
+        'Content-type'      => 'application/vnd.api+json'
+    };
+
+    my $url= "https://renault-wrd-prod-1-euw1-myrapp-one.s3-eu-west-1.amazonaws.com/configuration/android/config_de_DE.json";
+    my $jsonData = "empty";
+    Log3 $name, 5, "RenaultZE_checkAPIkeys1 ".$url;
+    my $param = {
+                    url        => $url,
+                    header     => $step1,
+                    hash       => $hash,
+                    timeout    => 15,
+                    method     => "GET",
+                    data       => $jsonData,
+                    callback   => \&RenaultZE_checkAPIkeys2
+                };
+
+    HttpUtils_NonblockingGet($param);                                                                                    # Starten der HTTP Abfrage. Es gibt keinen Return-Code.
+    Log3 $name, 5, "RenaultZE_checkAPIkeys1 - Out";
+    return undef;
+}
+
+sub RenaultZE_checkAPIkeys2($)
+{
+    my ($param, $err, $data) = @_;
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
+    my $kamereon_api = $hash->{KAMEREON_API};
+    my $gigya_api = $hash->{GIGYA_API};
+
+    Log3 $name, 5, "RenaultZE_checkAPIkeys2 - In ".$hash."/".$name;
+    readingsSingleUpdate($hash,"ze_Step","RenaultZE_checkAPIkeys2",1);
+
+    RenaultZE_Error_err($hash,"RenaultZE_checkAPIkeys2",$param->{url},$err,$data)                     if($err ne "");
+    RenaultZE_Log_Data($hash,"RenaultZE_checkAPIkeys2",$param->{url},$err,$data)                      if($data ne "");
+    RenaultZE_Error_errorCode2($hash,"RenaultZE_checkAPIkeys2",$param->{url},$err,$data)              if($data =~ /error/);
+
+    my $lastErr = $hash->{READINGS}{ze_lastErr}{VAL};
+    return undef                    if ($lastErr ne "");
+
+    return undef                                                                                 if (RenaultZE_CheckJson($hash,$data));
+    my $decode_json = from_json($data);
+    Log3 $name, 5, "RenaultZE_checkAPIkeys2 - returned".$decode_json;
+    #my $kameronkey = $decode_jmson->{data}->{servers}->{wiredProd}->{apikey};
+    #my $gigyakey = $decode_json->{data}->{servers}->{gigyaProd}->{apikey};
+    my $kameronkey = $decode_json->{servers}->{wiredProd}->{apikey};
+    my $gigyakey = $decode_json->{servers}->{gigyaProd}->{apikey};
+    Log3 $name, 5, "RenaultZE_checkAPIkeys2 KAMERON: ".$kameronkey;
+    Log3 $name, 5, "RenaultZE_checkAPIkeys2 GIGYA".$gigyakey;
+    Log3 $name, 5, "RenaultZE_checkAPIkeys2 Out";
+    my $message = "";
+    if ($kameronkey ne $kamereon_api) {
+	    $message = "Neuer KAMERON API Key: \nIst: ".$kamereon_api."\nNeu: ".$kameronkey."\n\n";
+    } else {
+	    $message = "KAMERON API Key ist OK: \nIst: ".$kamereon_api."\nNeu: ".$kameronkey."\n\n";
+    }
+    if ($gigyakey ne $gigya_api) {
+	    $message = $message."Neuer GIGYA API Key: \nIst: ".$gigya_api."\nNeu: ".$gigyakey."\n";
+    } else {
+	    $message = $message."GIGYA API Key ist OK: \nIst: ".$gigya_api."\nNeu: ".$gigyakey."\n";
+    }
+    asyncOutput( $hash->{curCL}, $message );
+    return undef;
 }
 
 sub RenaultZE_CheckJson($$)
@@ -1838,6 +1928,8 @@ sub RenaultZE_EpochFromDateTime($) {
               </li>
               <li><a name="update"></a><i>update</i><br>
                   force update of the current readings (battery-status, cockpit, location, hvac-status, charge-mode)</li>
+              <li><a name="checkAPIkeys"></a><i>checkAPIkeys</i><br>
+	          check if the API are uptodate<br>
               <li><a name="vehicles"></a><i>vehicles</i><br>
 	          get a list of your vehicles with details, set the readings for the images and some technical details<br>
 		  if the attribute ze_showimage is set you get readings with the cars images</li>
