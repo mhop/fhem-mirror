@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  36_Shelly: undefinded values on restart
  - bugfix:  36_Shelly: Refresh: removed fixed name of FHEMWEB device
             Gen.2: on/off-for-timer
             update interval of GetStatus call

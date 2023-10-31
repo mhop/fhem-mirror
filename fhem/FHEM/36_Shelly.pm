@@ -34,6 +34,8 @@
 # 5.03      Bug Fix: Refresh: removed fixed name of FHEMWEB device
 #           Bug Fix: Gen.2: on/off-for-timer
 #           Bug Fix: update interval of GetStatus call
+# 5.04      Bug Fix: undefined values on restart
+#           Energymeter activated
 
 package main;
 
@@ -48,7 +50,10 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "5.03 31.10.2023";
+my $version = "5.04 01.11.2023";
+
+my $defaultINTERVAL = 60;
+my $secndIntervalMulti = 4;  # Multiplier for 'long update'
 
 #-- support differtent readings-names for energy & power metering
 my %mapping = (
@@ -394,7 +399,8 @@ my %shelly_events = (	# events, that can be used by webhooks; key is mode, value
     "roller"  => ["cover.stopped","cover.opening","cover.closing","cover.open","cover.closed"],
     "switch"  => ["input.toggle_on","input.toggle_off"],    # for input instances of type switch
     "button"  => ["input.button_push","input.button_longpush","input.button_doublepush","input.button_triplepush"],    # for input instances of type button
-    "emeter"  => ["em.active_power_change","em.voltage_change","em.current_change"]
+    "emeter"  => ["em.active_power_change","em.voltage_change","em.current_change"],
+    "touch"   => ["input.touch_swipe_up","input.touch_swipe_down","input.touch_multi_touch"]
 );
        
 my %fhem_events = (	# events, that can be used by webhooks; key is shelly-event, value is event 
@@ -432,22 +438,32 @@ my %fhem_events = (	# events, that can be used by webhooks; key is shelly-event,
         "btn2_longpush_url"  => "long_push 1",
         
 	#Gen 2
+	#relay
 	"switch.on"     => "out_on", 
 	"switch.off"    => "out_off",
+	#roller
 	"cover.stopped" => "stopped",
 	"cover.opening" => "opening",
 	"cover.closing" => "closing",
 	"cover.open"    => "is_open",
 	"cover.closed"  => "is_closed", 
+	#switch
 	"input.toggle_on"         => "button_on",
 	"input.toggle_off"        => "button_off",
+	#button
         "input.button_push"       => "single_push",
         "input.button_longpush"   => "long_push",
         "input.button_doublepush" => "double_push",
         "input.button_triplepush" => "triple_push",
+        #touch
+        "input.touch_swipe_up"    => "swipe_up",
+        "input.touch_swipe_down"  => "swipe_down",
+        "input.touch_multi_touch" => "multi_touch",
+        #emeter
         "em.active_power_change"  => "Active_Power",
         "em.voltage_change"       => "Voltage",
         "em.current_change"       => "Current",
+        # translations
         "S"       => "single_push",
         "L"       => "long_push",
         "SS"      => "double_push",
@@ -645,7 +661,7 @@ sub Shelly_Define($$) {
   
   my $dev = $a[2];
   $hash->{TCPIP} = $dev;
-  $hash->{INTERVAL} = AttrVal($hash->{NAME},"interval",60); # Updates each minute, if not set as attribute
+  $hash->{INTERVAL} = AttrVal($hash->{NAME},"interval",$defaultINTERVAL); # Updates each minute, if not set as attribute
   
   $modules{Shelly}{defptr}{$a[0]} = $hash;
 
@@ -877,16 +893,14 @@ sub Shelly_get_model {
           $AttrList  =~ s/$attributes{'input'}/""/e;
         }
 
-        if( !$mode && $shelly_models{$model}[0]<2 ){ 
-            # delete 'defchannel' from attribute list for single-mode devices with less than 2 relays
-            $AttrList  =~ s/\sdefchannel//;
-        }elsif( ($mode ne "roller" && $shelly_models{$model}[0]>1) ||     #more than one relay
-                ($mode ne "relay"  && $shelly_models{$model}[1]>1) ||     #more than one roller
-                ($mode eq "white"  && $shelly_models{$model}[2]>1)    ){  #more than one dimmer
-                # we have multiple channel and need attribute 'defchannel'
+        if(     defined($mode) && $mode eq "relay"  && $shelly_models{$model}[0]>1 ){  #more than one relay
+        }elsif( defined($mode) && $mode eq "roller" && $shelly_models{$model}[1]>1 ){  #more than one roller
+        }elsif( defined($mode) && $mode eq "white"  && $shelly_models{$model}[2]>1 ){  #more than one dimmer
+        }elsif( $shelly_models{$model}[0]>1 || $shelly_models{$model}[1]>1 || $shelly_models{$model}[2]>1 ){ # we have single mode but multiple channel
         }else{
             # delete 'defchannel' from attribute list
             $AttrList  =~ s/\sdefchannel//;
+            Log3 $name,4,"[Shelly_get_model] deleted defchannel from device $name: model=$model, mode=". (!$mode?"not defined":$mode);
         }
 
         if( $shelly_models{$model}[4]==0 && $model ne "shellybulb" ){  # 1st Gen 
@@ -1707,7 +1721,7 @@ sub Shelly_Set ($@) {
       if( IsInt($value) && $value >= 0){  # see 99_Utils.pm
           $hash->{INTERVAL}=int($value);
       }elsif( $value == -1 ){
-          $value=AttrVal($name,"interval",60);
+          $value=AttrVal($name,"interval",$defaultINTERVAL);
           $hash->{INTERVAL}=$value;
       }else{
           my $msg = "Value is not an positve integer";
@@ -1721,7 +1735,7 @@ sub Shelly_Set ($@) {
         RemoveInternalTimer($hash,"Shelly_status");
         InternalTimer(gettimeofday()+$hash->{INTERVAL}, "Shelly_status", $hash, 0);
         RemoveInternalTimer($hash,"Shelly_shelly");
-        InternalTimer(gettimeofday()+120, "Shelly_shelly", $hash,0);
+        InternalTimer(gettimeofday()+$defaultINTERVAL*$secndIntervalMulti, "Shelly_shelly", $hash,0);
         if( $model eq "shellypro3em" ){
           RemoveInternalTimer($hash,"Shelly_EMData");
           InternalTimer(int((gettimeofday()+60)/60)*60+1, "Shelly_EMData", $hash,0);
@@ -1738,7 +1752,7 @@ sub Shelly_Set ($@) {
         RemoveInternalTimer($hash,"Shelly_status");
         InternalTimer(gettimeofday()+$hash->{INTERVAL}, "Shelly_status", $hash, 0);
         RemoveInternalTimer($hash,"Shelly_shelly");
-        InternalTimer(gettimeofday()+120, "Shelly_shelly", $hash,0);
+        InternalTimer(gettimeofday()+$defaultINTERVAL*$secndIntervalMulti, "Shelly_shelly", $hash,0);
         RemoveInternalTimer($hash,"Shelly_EMData");
         InternalTimer(int((gettimeofday()+60)/60)*60+1, "Shelly_EMData", $hash,0);
       }else{
@@ -2376,6 +2390,7 @@ sub Shelly_status {
   my $state = $hash->{READINGS}{state}{VAL};
   
   my $model = AttrVal($name,"model","generic");
+  
   my $creds = Shelly_pwd($hash);
   my $url     = "http://$creds".$hash->{TCPIP};
   my $timeout = AttrVal($name,"timeout",4);
@@ -2384,7 +2399,7 @@ sub Shelly_status {
   if ( $hash && $err && $hash->{INTERVAL} != 0 ){   ## ($err || $data )
       #-- cyclic update nevertheless
       RemoveInternalTimer($hash,"Shelly_status"); 
-      my $interval=minNum(120,$hash->{INTERVAL});
+      my $interval=minNum($hash->{INTERVAL},$defaultINTERVAL*$secndIntervalMulti);
       Log3 $name,3,"[Shelly_status] $name: Error in callback, update in $interval seconds";
       InternalTimer(gettimeofday()+$interval, "Shelly_status", $hash, 1);
   }
@@ -2469,14 +2484,14 @@ sub Shelly_status {
     readingsBulkUpdateIfChanged($hash,"network","<html>connected to <a href=\"http://".$hash->{TCPIP}."\">".$hash->{TCPIP}."</a></html>",1);
     readingsEndUpdate($hash,1);  
   }
-  
+
   my $next;  # Time offset in seconds for next update
   if( !$is2G ){
       $next=Shelly_proc1G($hash,$jhash);
   }else{
       $next=Shelly_proc2G($hash,$comp,$jhash);
   }
-  Log3 $name,4,"[Shelly_status] $name: proc.G returned with value=$next for comp $comp"; #4
+  Log3 $name,4,"[Shelly_status] $name: proc.G returned with value=$next for comp ".(defined($comp)?$comp:"none"); #4
   return undef if( $next == -1 );  
   
   #-- cyclic update (or update close to on/off-for-timer command)
@@ -2487,8 +2502,7 @@ sub Shelly_status {
       $next = 0.75*$hash->{INTERVAL};
   }
   
-
-  Log3 $name,4,"[Shelly_status] $name: next update for comp=$comp in $next seconds "; #4
+  Log3 $name,4,"[Shelly_status] $name: next update in $next seconds".(defined($comp)?" for Comp=$comp":""); #4
   RemoveInternalTimer($hash,"Shelly_status"); 
   InternalTimer(gettimeofday()+$next, "Shelly_status", $hash, 1)
               if( $hash->{INTERVAL} != 0 );
@@ -2560,7 +2574,7 @@ sub Shelly_shelly {
     return undef
         if( $hash->{INTERVAL} == 0 ); 
         
-    my $offset = 120; #$hash->{INTERVAL};
+    my $offset = maxNum($hash->{INTERVAL},$defaultINTERVAL)*$secndIntervalMulti; #$hash->{INTERVAL};
     if( $model eq "shellypro3em" ){ 
         # updates at every multiple of 60 seconds
         $offset = $hash->{INTERVAL}<=60 ? 60 : int($hash->{INTERVAL}/60)*60 ;
@@ -3646,7 +3660,7 @@ sub Shelly_EMData {
         $hash->{helper}{Energymeter_F}=$active_energy_i-$return_energy_i;
  
      
-if(0){        # calculate the suppliers meter value
+if(1){        # calculate the suppliers meter value
         foreach my $EM ( "F","P","R" ){
           if( defined(AttrVal($name,"Energymeter_$EM",undef)) ){
             $reading = "Total_Energymeter_$EM";
@@ -3987,7 +4001,7 @@ if(0){
 
 sub Shelly_interval($){
   my ($hash) =@_;
-  $hash->{INTERVAL} = AttrVal($hash->{name},"interval",60);
+  $hash->{INTERVAL} = AttrVal($hash->{NAME},"interval",$defaultINTERVAL);
   Log3 $hash->{NAME},3,"[Shelly_interval] interval reset to ".$hash->{INTERVAL};
   Shelly_status($hash);
 }
@@ -4198,7 +4212,7 @@ if(1){
     my $eventsCount=0;   #  number of events 
 
     my ($component,$element);
-    foreach $component ( $mode, "input", "emeter" ){
+    foreach $component ( $mode, "input", "emeter", "touch" ){
        Log3 $name,5,"[Shelly_webhook] $name: check number of components for component=$component";
        if( $component eq "relay" ){
           $compCount   = $shelly_models{$model}[0];
@@ -4209,6 +4223,8 @@ if(1){
           # We don't care, because we can use actions on 'opening' and 'closing'
           $compCount   = abs($shelly_models{$model}[5]);  # number of inputs on ShellyPlug is -1, because it's a button, not an wired input
        }elsif( $component eq "emeter" && $model eq "shellypro3em" ){
+          $compCount   = 1;
+       }elsif( $component eq "touch" && $model =~ /walldisplay/ ){
           $compCount   = 1;
        }elsif( $component eq "white" && $model eq "shellybulb" ){
           $compCount   = 1;
@@ -4260,14 +4276,14 @@ if(1){
                                   # only first emeter-action (activ power) is enabled
                      $URL =~ s/enable\=true/enable\=false/  if( $e > 0 ); 
                   }
-             }
+             }                  if($name eq "Y199"){Debug $URL.$urls;}else{
              Log3 $name,5,"[Shelly_webhook] $name $cmd component=$element  count=$c   event=$e";
              Log3 $name,5,"[Shelly_webhook] issue a non-blocking call to \n$URL$urls";  
              HttpUtils_NonblockingGet({
                  url      => $URL.$urls,
                  timeout  => $timeout,
                  callback => sub($$$){ Shelly_webhook($hash,$cmd,$_[1],$_[2]) }
-             });
+             });                 }
           }
        }
     }
@@ -4327,7 +4343,7 @@ if(1){    # first of all, get number of webhooks
         $current_url = $jhash->{'hooks'}[0]{'urls'}[0]; # get the first webhook url from shelly
         $current_url =~ m/.*:([0-9]*)\/.*/;
         my $fhemwebport = $1; 
-        Log3 $name,1,"[Shelly_webhook] We have found a webhook with port no $fhemwebport on $name, but the webhook attribute is none or not set";
+        Log3 $name,4,"[Shelly_webhook] We have found a webhook with port no $fhemwebport on $name, but the webhook attribute is none or not set";
         return;
     }
 
@@ -4555,7 +4571,7 @@ sub Shelly_error_handling {
   my ($hash, $func, $err) = @_;
   my $name  = $hash->{NAME};
     readingsBeginUpdate($hash);
-    Log3 $name,1,"[$func] device $name has error \"$err\" ";
+    Log3 $name,2,"[$func] device $name has error \"$err\" ";
     if( $err =~ /timed out/ ){
         if( $err =~ /read/ ){
             $err = "Error: Timeout reading";
@@ -4578,7 +4594,7 @@ sub Shelly_error_handling {
     }else{
         $err = "Error"; 
     }
-    Log3 $name,1,"[Shelly_error_handling] Device $name has Error \'$err\' ";
+    Log3 $name,1,"[$func] Device $name has Error \'$err\' ";
     readingsBulkUpdate($hash,"network_disconnects",ReadingsNum($name,"network_disconnects",0)+1)   if( ReadingsVal($name,"state","") ne $err );
     readingsBulkUpdateMonitored($hash,"state",$err, 1 );
     readingsEndUpdate($hash,1);
