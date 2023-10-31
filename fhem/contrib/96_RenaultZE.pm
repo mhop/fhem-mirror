@@ -38,6 +38,7 @@
 
 ############################################################################################################################
 # Version History
+# v 1.13 recalculation of varius readings distance/home during update
 # v 1.12 implemented new Attribute ze_homeRadius
 # v 1.11 implemented new function GET checkAPIkeys
 # v 1.10 addedd attribute brand, 'Dacia' will allow start/stop charge, additional readings after issueing get vehicles
@@ -105,7 +106,7 @@ use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
 
-my $RenaultZE_version ="V1.12 / 30.10.2023";
+my $RenaultZE_version ="V1.13 / 31.10.2023";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -515,6 +516,10 @@ sub RenaultZE_Main3($) {
                  $res = RenaultZE_gData_Step1($hash,'charge-mode')			if ($model ne "SPRING");
                  Log3 $name, 5, "RenaultZE_gData_Step1 - charge-mode - RC=".$res	if ($model ne "SPRING");
 	      }, undef);
+      	      # recalc distance from home an update home info & status
+	      my $gpsLatitude  = ReadingsVal($name,"gpsLatitude","empty");
+	      my $gpsLongitude = ReadingsVal($name,"gpsLongitude","empty");
+	      RenaultZE_distanceFromHome($hash,$gpsLatitude,$gpsLongitude);	
 	}
 
         if ($key eq "GET_vehicles")
@@ -596,7 +601,7 @@ sub RenaultZE_Attr(@) {
 	my ($cmd,$name,$attrName,$attrVal) = @_;
 	my $hash  = $defs{$name};
 	if($cmd eq "set") {
-	    if (substr($attrName ,0,4) eq "ze_")
+	    if (substr($attrName ,0,3) eq "ze_")
 	    {
 	        $_[3] = $attrVal;
 	        $hash->{".reset"} = 1 if defined($hash->{LPID});
@@ -1666,7 +1671,7 @@ sub RenaultZE_distanceFromHome($$$)
     my $homestate = "away";
     my $homeRadius  = AttrVal( $name, "ze_homeRadius", 20 );
 
-    if ($distance < 1) {
+    if ($distance < $homeRadius) {
             $distance = $distance * 1000;
             $dim = "m";
             if ($distance < $homeRadius) {
@@ -1965,6 +1970,9 @@ sub RenaultZE_EpochFromDateTime($) {
             </li>
             <li><i>ze_country</i><br>
                 2 letter country code, e.g. DE ot GB
+            </li>
+            <li><i>ze_homeRadius</i><br>
+                allowed distance of car from home in m that is still considered 'home'
             </li>
             <li><i>ze_user</i><br>
                 The user-id that you used to register at Renault 
