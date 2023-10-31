@@ -144,6 +144,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.0.10" => "31.10.2023  fix warnings, edit comref ",
   "1.0.9"  => "29.10.2023  _aiGetSpread: set spread from 50 to 20 ",
   "1.0.8"  => "22.10.2023  codechange: add central readings store array, new function storeReading, writeCacheToFile ".
                            "solcastapi in sub __delObsoleteAPIData, save freespace if flowGraphicShowConsumer=0 is set ".
@@ -9095,12 +9096,14 @@ sub __createOwnSpec {
       for (my $k = 0 ; $k < $vinr; $k++) {
           ($h->{$k}{label}, $h->{$k}{rdg}) = split ":", $vals[$col] if($vals[$col]);
           $col++;
+          
+          if (!$h->{$k}{label}) {
+              undef $h->{$k}{label};
+              next;
+          }
+          
+          ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($name, $h->{$k}{rdg}, '');
       }
-
-      ($v->{0}, $u->{0}) = split /\s+/, ReadingsVal ($name, $h->{0}{rdg}, '');
-      ($v->{1}, $u->{1}) = split /\s+/, ReadingsVal ($name, $h->{1}{rdg}, '');
-      ($v->{2}, $u->{2}) = split /\s+/, ReadingsVal ($name, $h->{2}{rdg}, '');
-      ($v->{3}, $u->{3}) = split /\s+/, ReadingsVal ($name, $h->{3}{rdg}, '');
 
       if ($uatr eq 'kWh') {
           for (my $r = 0 ; $r < $vinr; $r++) {
@@ -9126,10 +9129,10 @@ sub __createOwnSpec {
 
       $ownv .= "<tr>";
       $ownv .= "<td $dstyle>".($cats[$i-1] ? '<b>'.$cats[$i-1].'</b>' : '')."</td>";
-      $ownv .= "<td $dstyle><b>".$h->{0}{label}.":</b></td> <td align=right $dstyle>".$v->{0}." ".$u->{0}."</td>" if($h->{0}{label});
-      $ownv .= "<td $dstyle><b>".$h->{1}{label}.":</b></td> <td align=right $dstyle>".$v->{1}." ".$u->{1}."</td>" if($h->{1}{label});
-      $ownv .= "<td $dstyle><b>".$h->{2}{label}.":</b></td> <td align=right $dstyle>".$v->{2}." ".$u->{2}."</td>" if($h->{2}{label});
-      $ownv .= "<td $dstyle><b>".$h->{3}{label}.":</b></td> <td align=right $dstyle>".$v->{3}." ".$u->{3}."</td>" if($h->{3}{label});
+      $ownv .= "<td $dstyle><b>".$h->{0}{label}.":</b></td> <td align=right $dstyle>".$v->{0}." ".$u->{0}."</td>" if(defined $h->{0}{label});
+      $ownv .= "<td $dstyle><b>".$h->{1}{label}.":</b></td> <td align=right $dstyle>".$v->{1}." ".$u->{1}."</td>" if(defined $h->{1}{label});
+      $ownv .= "<td $dstyle><b>".$h->{2}{label}.":</b></td> <td align=right $dstyle>".$v->{2}." ".$u->{2}."</td>" if(defined $h->{2}{label});
+      $ownv .= "<td $dstyle><b>".$h->{3}{label}.":</b></td> <td align=right $dstyle>".$v->{3}." ".$u->{3}."</td>" if(defined $h->{3}{label});
       $ownv .= "</tr>";
   }
 
@@ -14626,8 +14629,12 @@ to ensure that the system configuration is correct.
       The DWD service is integrated via a FHEM device of type DWD_OpenData.
       If there is no device of type DWD_OpenData yet, it must be defined in advance
       (look at <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
-      To obtain a good radiation forecast, a DWD station located near the plant site should be used.
-      Unfortunately, not all DWD stations provide the required Rad1h values. <br>
+      To obtain a good radiation forecast, a DWD station located near the plant site should be used. <br>
+      Unfortunately, not all 
+      <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/statliste/statlex_html.html;jsessionid=EC5F572A52EB69684D552DCF6198F290.live31092?view=nasPublication&nn=16102">DWD stations</a> 
+      provide the required Rad1h values. <br>
+      Explanations of the stations are listed in 
+      <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/stationsliste.html">Stationslexikon</a>. <br>
       At least the following attributes must be set in the selected DWD_OpenData Device: <br><br>
 
       <ul>
@@ -16469,7 +16476,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Ist noch kein Device des Typs DWD_OpenData vorhanden, muß es vorab definiert werden
       (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
       Um eine gute Strahlungsprognose zu erhalten, sollte eine nahe dem Anlagenstandort gelegene DWD-Station genutzt
-      werden. Leider liefern nicht alle DWD-Station die benötigten Rad1h-Werte. <br>
+      werden. <br>
+      Leider liefern nicht alle 
+      <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/statliste/statlex_html.html;jsessionid=EC5F572A52EB69684D552DCF6198F290.live31092?view=nasPublication&nn=16102">DWD-Stationen</a> 
+      die benötigten Rad1h-Werte. <br>
+      Erläuterungen zu den Stationen sind im 
+      <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/stationsliste.html">Stationslexikon</a> aufgeführt. <br>
       Im ausgewählten DWD_OpenData Device müssen mindestens die folgenden Attribute gesetzt sein: <br><br>
 
       <ul>
