@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2023.10.31 v0.2.24
+# - CHANGE:  voice_reading TTS Antworten rausfiltern
+#
 # 2023.10.27 v0.2.23
 # - BUG:     Logeinträge bei set "speak" entfernt
 #
@@ -510,7 +513,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.23";
+my $ModulVersion     = "0.2.24";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -2829,7 +2832,7 @@ sub echodevice_Parse($$$) {
 					my @recordKeys = split("#",$recordKey->{recordKey});
 					$sourceDeviceIds = @recordKeys[3];
 					$Person = 0;
-					if ($recordKey->{utteranceType} ne "WAKE_WORD_ONLY" and $recordKey->{utteranceType} ne "DEVICE_ARBITRATION") {
+					if ($recordKey->{utteranceType} eq "GENERAL") {
 					
 						if(defined($modules{$hash->{TYPE}}{defptr}{$sourceDeviceIds})) {
 							
