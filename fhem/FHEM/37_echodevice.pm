@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2023.10.31 v0.2.25
+# - FEATURE: Unterstützung ASQZWP4GPYUT7 Echo Plus 2 Gen2
+#
 # 2023.10.31 v0.2.24
 # - CHANGE:  voice_reading TTS Antworten rausfiltern
 #
@@ -513,7 +516,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.24";
+my $ModulVersion     = "0.2.25";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -4509,6 +4512,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A2M35JJZWCQOMZ" || $ModelNumber eq "Echo Plus")				{return "Echo Plus";}
 	elsif($ModelNumber eq "A1JJ0KFC4ZPNJ3" || $ModelNumber eq "Echo Input")				{return "Echo Input";}
 	elsif($ModelNumber eq "A18O6U1UQFJ0XK" || $ModelNumber eq "Echo Plus 2")			{return "Echo Plus 2";}
+	elsif($ModelNumber eq "ASQZWP4GPYUT7"  || $ModelNumber eq "Echo Plus 2 gen2")		{return "Echo Plus 2";}
 	elsif($ModelNumber eq "A3VRME03NAXFUB" || $ModelNumber eq "Echo Flex")				{return "Echo Flex";}
 	elsif($ModelNumber eq "A3FX4UWTP28V1P" || $ModelNumber eq "Echo")					{return "Echo Gen3";}
 	elsif($ModelNumber eq "A30YDR2MK8HMRV" || $ModelNumber eq "Echo")					{return "Echo Gen3";}
