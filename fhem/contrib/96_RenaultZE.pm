@@ -38,6 +38,7 @@
 
 ############################################################################################################################
 # Version History
+# v 1.14 changed code for automatic update of readings distance/home during 
 # v 1.13 recalculation of varius readings distance/home during update
 # v 1.12 implemented new Attribute ze_homeRadius
 # v 1.11 implemented new function GET checkAPIkeys
@@ -106,7 +107,7 @@ use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
 
-my $RenaultZE_version ="V1.13 / 31.10.2023";
+my $RenaultZE_version ="V1.14 / 1.11.2023";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -516,10 +517,6 @@ sub RenaultZE_Main3($) {
                  $res = RenaultZE_gData_Step1($hash,'charge-mode')			if ($model ne "SPRING");
                  Log3 $name, 5, "RenaultZE_gData_Step1 - charge-mode - RC=".$res	if ($model ne "SPRING");
 	      }, undef);
-      	      # recalc distance from home an update home info & status
-	      my $gpsLatitude  = ReadingsVal($name,"gpsLatitude","empty");
-	      my $gpsLongitude = ReadingsVal($name,"gpsLongitude","empty");
-	      RenaultZE_distanceFromHome($hash,$gpsLatitude,$gpsLongitude);	
 	}
 
         if ($key eq "GET_vehicles")
@@ -606,7 +603,7 @@ sub RenaultZE_Attr(@) {
 	        $_[3] = $attrVal;
 	        $hash->{".reset"} = 1 if defined($hash->{LPID});
 	    }	
-	    elsif (($attrName eq "disabled") && ($attrVal == 1))
+	    if (($attrName eq "disabled") && ($attrVal == 1))
             {
                 readingsSingleUpdate($hash,"state","disabled",1);
 	        readingsSingleUpdate($hash,"ze_Step","RenaultZE ($name) is disabled",1);
@@ -643,6 +640,16 @@ sub RenaultZE_Attr(@) {
     		$hash->{TRIGGERTIME_FMT} = FmtDateTime($firstTrigger);
                 InternalTimer($firstTrigger, "RenaultZE_UpdateTimer", $hash, 0);
            }
+        }
+        if ($attrName eq "ze_homeRadius")
+        {
+                my $gpsLatitude  = ReadingsVal($name,"gpsLatitude","empty");
+                my $gpsLongitude = ReadingsVal($name,"gpsLongitude","empty");
+		my $homeRadius = 20;							# defule radius
+		$homeRadius = $attrVal							if ( $cmd eq "set" );
+		$homeRadius = 20							if ( $homeRadius eq "" );	# just in case
+		#Log3 $name, 5, "pre RenaultZE_distanceFromHome - In ".$cmd."/".$gpsLatitude." ".$gpsLongitude."/".$homeRadius;
+                RenaultZE_distanceFromHome($hash,$gpsLatitude,$gpsLongitude,$homeRadius);
         }
 
 	return undef;
@@ -1062,7 +1069,7 @@ sub RenaultZE_gData_Step2($)
         my $link = "<html><a href=\"https://www.google.com/maps/place/".$gpsLatitude.",".$gpsLongitude."\" target=\”_blank\”>Google Maps</a></html>";
 	if ( $oldlat != $gpsLatitude or $oldlong != $gpsLongitude ) {
             Log3 $name, 5, "RenaultZE_gData_Step2 - GPS ".$oldlat."/".$gpsLatitude." ".$oldlong."/".$gpsLongitude;
-  	    RenaultZE_distanceFromHome($hash,$gpsLatitude,$gpsLongitude);
+  	    RenaultZE_distanceFromHome($hash,$gpsLatitude,$gpsLongitude,"auto");
     	}
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"gpsLatitude",$gpsLatitude);
@@ -1644,10 +1651,11 @@ sub RenaultZE_pp_err($$)
     }
     return $output;
 }
-sub RenaultZE_distanceFromHome($$$)
+sub RenaultZE_distanceFromHome($$$$)
 {
-    my ($hash, $lat, $long) = @_;
+    my ($hash, $lat, $long, $homeRadius) = @_;
     my $name = $hash->{NAME};
+    Log3 $name, 5, "RenaultZE_distanceFromHome - In ".$hash."/".$lat." ".$long."/".$homeRadius;
     my $hlong = AttrVal( $name, "ze_longitude", AttrVal( "global", "longitude", 0.0 ) );
     my $hlat  = AttrVal( $name, "ze_latitude",  AttrVal( "global", "latitude",  0.0 ) );
 
@@ -1669,7 +1677,8 @@ sub RenaultZE_distanceFromHome($$$)
     my $dim = "km";
     my $homeinfo = "";
     my $homestate = "away";
-    my $homeRadius  = AttrVal( $name, "ze_homeRadius", 20 );
+    $homeRadius  = AttrVal( $name, "ze_homeRadius", 20 )	if ( $homeRadius eq "auto");
+    Log3 $name, 5, "RenaultZE_distanceFromHome - Check ".$hash."/".$lat." ".$long."/".$homeRadius;
 
     if ($distance < $homeRadius) {
             $distance = $distance * 1000;
