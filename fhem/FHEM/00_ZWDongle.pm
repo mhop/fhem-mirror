@@ -52,6 +52,7 @@ my %sets = (
   "sendNIF"          => { cmd => "12%02x05@" },# ZW_SEND_NODE_INFORMATION
   "setNIF"           => { cmd => "03%02x%02x%02x%02x" },
                                               # SERIAL_API_APPL_NODE_INFORMATION
+  "softReset"        => { cmd => "08"},       # Forum 128022
   "sucNodeId"        => { cmd => "54%02x%02x00%02x@"},
                                               # ZW_SET_SUC_NODE_ID
   "sucRequestUpdate" => { cmd => "53%02x@"},  # ZW_REQUEST_NETWORK_UPDATE
