@@ -81,7 +81,7 @@ CommandUpdate($$)
   return "An update is already running" if($upd_running);
   $upd_running = 1;
   if($updateInBackground) {
-    CallFn($cl->{NAME}, "ActivateInformFn", $cl, "log");
+    CallFn($cl->{NAME}, "ActivateInformFn", $cl, "log") if($cl);
     sub updDone(@) { $upd_running=0 }
     BlockingCall("doUpdateInBackground", {src=>$src,arg=>$arg}, "updDone");
     return "Executing the update the background.";
