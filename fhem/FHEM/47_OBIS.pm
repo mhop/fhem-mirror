@@ -112,7 +112,7 @@ sub OBIS_Initialize($)
   $hash->{SetFn} = "OBIS_Set";
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off extChannels:on,off,auto unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both resetAfterNoDataTime createPreValues:on,off httpAuthorization ".
+  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off extChannels:on,off,auto unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both resetAfterNoDataTime createPreValues:on,off httpAuthorization nohacks ".
   					  $readingFnAttributes;
 }
 
@@ -500,7 +500,7 @@ sub OBIS_Parse_List
   }
   my $line = $result[0] . "(" . $result[5] . ($result[3] eq "" ? "" : "*".$result[3]) . ")\r\n";
   if ($line=~/^1-0:96\.50\.1\*.*\((DZG|HLY)/) {
-    $hash->{helper}{$1 . "HACK"} = 1;
+    $hash->{helper}{$1 . "HACK"} = ! defined $hash->{helper}{NOHACKS};
   }
   $_[1] .= $line;
   return undef;
@@ -890,6 +890,9 @@ Log3 $name, 3, "OBIS ($name) - Attr $aName Val $aVal, dopoll = $dopoll";
 				if ($aVal!~/^\w+:.*$/);
 			$hash->{helper}{HTTPAUTH} = "Authorization: Basic " . encode_base64($aVal);
 		}			
+		if ($aName eq "nohacks") {
+			$hash->{helper}{NOHACKS} = $aVal;
+		}			
 	}
 	return undef;
 }
@@ -1061,11 +1064,16 @@ sub OBIS_CRC16($$) {
    <code>resetAfterNoDataTime</code><br>
       If on a TCP-connection no data was received for the given time, the connection is
       closed and reopened
-      </li>
+      </li><li>  
    <code>httpAuthorization</code><br>
       If the SML data is fetched by HTTP (Usecase: e.g. Tibber Pulse), this attribute is
       used to authenticate the HTTP-request. The format must be
       <username>:<password>, e.g. for Tibber Pulse something like "admin:<Password near QR-Code on the bridge>"
+      </li><li>  
+   <code>nohacks</code><br>
+      For DZG- and HOLY-Meters a workaround was implemented to avoid certain bugs in encoding.
+      Latest DZG meters seem to have fixed the bug. By setting "nohacks" to "1", the workarounds are disabled.
+      </li>
   <br>
 </ul></ul>
 
@@ -1158,6 +1166,11 @@ sub OBIS_CRC16($$) {
       Werden die SML-Daten per HTTP abgefragt (Usecase: Tibber Pulse z.B.), wird hiermit
       die Authentifizierung für den HTTP-Request gesetzt. Das Format muss
       <username>:<passwort> sein, also für den Tibber Pulse i.d.R. "admin:<Passwort bei QR-Code auf der Bridge>"
+      </li><li>  
+   <code>nohacks</code><br>
+      Für DZG- und HOLY-Zähler wurden jeweils Workarounds für Bugs im SML-Encoding implementiert.
+      Für neue DZG-Zähler scheint der Bug behoben zu sein. Mit "nohacks" auf "1" werden die Workarounds
+      abgeschaltet.
       </li>
   <br>
 </ul></ul>
