@@ -846,12 +846,14 @@ while (1) {
     next if(!$h);                 # due to rereadcfg / delete
     next if($h->{NEXT_OPEN} && gettimeofday() < $h->{NEXT_OPEN});
 
+    $h->{_readyKey} = $p; # Endless-Loop-Debugging #111959
     if(CallFn($h->{NAME}, "ReadyFn", $h)) {
       if($readyfnlist{$p}) {                    # delete itself inside ReadyFn
         CallFn($h->{NAME}, "ReadFn", $h);
       }
-
     }
+    delete($h->{_readyKey});
+
   }
 
 }

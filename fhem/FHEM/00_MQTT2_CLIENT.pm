@@ -116,6 +116,10 @@ MQTT2_CLIENT_connect($;$)
   if($mc ne -1 && $hash->{nrFailedConnects} >= $mc) {
     Log3 $me, 2, "maxFailedConnects ($mc) reached, no more reconnect attemtps";
     delete($readyfnlist{"$me.".$hash->{DeviceName}}); # Source of retry
+    if("$me.".$hash->{DeviceName} ne $hash->{_readyKey}) { #111959
+      Log3 $me, 2, "RFN ERROR: $me.$hash->{DeviceName} ne $hash->{_readyKey}";
+      delete($readyfnlist{$hash->{_readyKey}});
+    }
     return;
   }
 
