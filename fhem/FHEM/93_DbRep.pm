@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.52.13" => "07.11.2023  dumpMySQL clientSide: add create database to dump file ",
   "8.52.12" => "05.11.2023  dumpMySQL clientSide: change the dump file to stricter rights ",
   "8.52.11" => "17.09.2023  improve the markout in func DbRep_checkValidTimeSequence, Forum:#134973 ",
   "8.52.10" => "09.07.2023  fix wrong SQL syntax for PostgreSQL -> DbRep_createSelectSql, Forum:#134170 ",
@@ -8245,404 +8246,475 @@ return;
 # nicht blockierende Dump-Routine für MySQL (clientSide)
 ####################################################################################################
 sub DbRep_mysql_DumpClientSide {
- my $paref                      = shift;
- my $hash                       = $paref->{hash};
- my $name                       = $paref->{name};
-
- my $dbname                     = $hash->{DATABASE};
- my $dump_path                  = AttrVal($name, "dumpDirLocal", $dbrep_dump_path_def);
- $dump_path                     = $dump_path."/" unless($dump_path =~ m/\/$/);
-
- my $optimize_tables_beforedump = AttrVal($name, "optimizeTablesBeforeDump", 0);
- my $memory_limit               = AttrVal($name, "dumpMemlimit",        100000);
- my $my_comment                 = AttrVal($name, "dumpComment",             "");
- my $dumpspeed                  = AttrVal($name, "dumpSpeed",            10000);
- my $ebd                        = AttrVal($name, "executeBeforeProc",    undef);
- my $ead                        = AttrVal($name, "executeAfterProc",     undef);
-
- my $mysql_commentstring        = "-- ";
- my $character_set              = "utf8";
- my $repver                     = $hash->{HELPER}{VERSION};
- my $sql_text                   = '';
- my $sql_file                   = '';
- my $dbpraefix                  = "";
-
- my ($sth,$tablename,$sql_create,$rct,$insert,$first_insert,$backupfile,$drc,$drh,$e,
-     $sql_daten,$inhalt,$filesize,$totalrecords,$status_start,$status_end);
- my (@ar,@tablerecords,@tablenames,@tables,@ergebnis);
- my (%db_tables);
-
- my $bst = [gettimeofday];                                                        # Background-Startzeit
-
- Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname'");
-
- #####################  Beginn Dump  ########################
- ############################################################
-
- undef(%db_tables);
-
- # Startzeit ermitteln
- my ($Sekunden, $Minuten, $Stunden, $Monatstag, $Monat, $Jahr, $Wochentag, $Jahrestag, $Sommerzeit) = localtime(time);
-
- $Jahr           += 1900;
- $Monat          += 1;
- $Jahrestag      += 1;
- my $CTIME_String = strftime "%Y-%m-%d %T", localtime(time);
- my $time_stamp   = $Jahr."_".sprintf("%02d",$Monat)."_".sprintf("%02d",$Monatstag)."_".sprintf("%02d",$Stunden)."_".sprintf("%02d",$Minuten);
- my $starttime    = sprintf("%02d",$Monatstag).".".sprintf("%02d",$Monat).".".$Jahr."  ".sprintf("%02d",$Stunden).":".sprintf("%02d",$Minuten);
-
- my $fieldlist = "";
-
- my ($err, $dbh, $dbmodel) = DbRep_dbConnect($name, 0);
- return "$name|$err" if ($err);
-
- $dbh->{mysql_enable_utf8} = 0;                                                    # Dump Performance !!! Forum: https://forum.fhem.de/index.php/topic,53584.msg1204535.html#msg1204535
-
- my $st = [gettimeofday];                                                          # SQL-Startzeit
-
- ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SELECT VERSION()");       # Mysql-Version ermitteln
- return "$name|$err" if ($err);
-
- my @mysql_version = $sth->fetchrow;
- my @v             = split(/\./,$mysql_version[0]);
-
- if($v[0] >= 5 || ($v[0] >= 4 && $v[1] >= 1) ) {                                                       # mysql Version >= 4.1
-     ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SET NAMES '".$character_set."'");         # get standard encoding of MySQl-Server
-     return "$name|$err" if ($err);
-
-     ($err, $sth)   = DbRep_prepareExecuteQuery ($name, $dbh, "SHOW VARIABLES LIKE 'character_set_connection'");
-     return "$name|$err" if ($err);
-
-     @ar            = $sth->fetchrow;
-     $character_set = $ar[1];
- }
- else {                                                                                                # mysql Version < 4.1 -> no SET NAMES available
-     ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SHOW VARIABLES LIKE 'character_set'");    # get standard encoding of MySQl-Server
-     return "$name|$err" if ($err);
-
-     @ar          = $sth->fetchrow;
-
-     if (defined($ar[1])) {
-         $character_set = $ar[1];
-     }
- }
-
- Log3 ($name, 3, "DbRep $name - Characterset of collection set to $character_set. ");
-
- undef(@tables);
- undef(@tablerecords);
- my %db_tables_views;
- my $t      = 0;
- my $r      = 0;
- my $st_e   = "\n";
- my $value  = 0;
- my $engine = '';
- my $query  ="SHOW TABLE STATUS FROM `$dbname`";                                  # Eigenschaften der vorhandenen Tabellen ermitteln (SHOW TABLE STATUS -> Rows sind nicht exakt !!)
-
- if ($dbpraefix ne "") {
-     $query.=" LIKE '$dbpraefix%'";
-     Log3 ($name, 3, "DbRep $name - Searching for tables inside database $dbname with prefix $dbpraefix....");
- }
- else {
-     Log3 ($name, 3, "DbRep $name - Searching for tables inside database $dbname....");
- }
-
- ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
- return "$name|$err" if ($err);
-
- while ( $value = $sth->fetchrow_hashref()) {
-     $value->{skip_data} = 0;                                                      #defaut -> backup data of table
-
-     Log3 ($name, 5, "DbRep $name - ......... Table definition found: .........");
-
-     for my $tk (sort(keys(%$value))) {
-         Log3 ($name, 5, "DbRep $name - $tk: $value->{$tk}") if(defined($value->{$tk}) && $tk ne "Rows");
-     }
-
-     Log3 ($name, 5, "DbRep $name - ......... Table definition END ............");
-
-     # decide if we need to skip the data while dumping (VIEWs and MEMORY)
-     # check for old MySQL3-Syntax Type=xxx
-
-     if (defined $value->{Type}) {                                                         # port old index type to index engine, so we can use the index Engine in the rest of the script
-         $value->{Engine} = $value->{Type};
-         $engine          = uc($value->{Type});
-
-         if ($engine eq "MEMORY") {
-             $value->{skip_data} = 1;
-         }
-     }
-
-     if (defined $value->{Engine}) {                                                       # check for > MySQL3 Engine = xxx
-         $engine = uc($value->{Engine});
-
-         if ($engine eq "MEMORY") {
-             $value->{skip_data} = 1;
-         }
-     }
-
-     if (defined $value->{Comment} && uc(substr($value->{Comment},0,4)) eq 'VIEW') {       # check for Views - if it is a view the comment starts with "VIEW"
-         $value->{skip_data}   = 1;
-         $value->{Engine}      = 'VIEW';
-         $value->{Update_time} = '';
-         $db_tables_views{$value->{Name}} = $value;
-     }
-     else {
-         $db_tables{$value->{Name}} = $value;
-     }
-
-     $value->{Rows}         += 0;                                                         # cast indexes to int, cause they are used for builing the statusline
-     $value->{Data_length}  += 0;
-     $value->{Index_length} += 0;
- }
-
- $sth->finish;
-
- @tablenames = sort(keys(%db_tables));
-
- @tablenames = (@tablenames,sort(keys(%db_tables_views)));                                # add VIEW at the end as they need all tables to be created before
- %db_tables  = (%db_tables,%db_tables_views);
- $tablename  = '';
-
- if (@tablenames < 1) {
-     $err = "There are no tables inside database $dbname ! It doesn't make sense to backup an empty database. Skipping this one.";
-     Log3 ($name, 2, "DbRep $name - $err");
-     $err = encode_base64($@,"");
-     $dbh->disconnect;
-     return "$name|$err";
- }
-
- if($optimize_tables_beforedump) {                                                        # Tabellen optimieren vor dem Dump
-     $hash->{HELPER}{DBTABLES} = \%db_tables;
-
-     my $opars = {
-         hash   => $hash,
-         dbh    => $dbh,
-         omode  => "execute",
-         tables => \@tablenames
-     };
-
-     ($err) = _DbRep_mysqlOptimizeTables ($opars);
-     return $err if($err);
- }
-
- $st_e .= "-- TABLE-INFO\n";                                                             # Tabelleneigenschaften für SQL-File ermitteln
-
- for $tablename (@tablenames) {
-     my $dump_table = 1;
-
-     if ($dbpraefix ne "") {
-         if (substr ($tablename, 0, length($dbpraefix)) ne $dbpraefix) {                 # exclude table from backup because it doesn't fit to praefix
-             $dump_table = 0;
-         }
-     }
-
-     if ($dump_table == 1) {                                                             # how many rows
-         $sql_create = "SELECT count(*) FROM `$tablename`";
-
-         ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql_create);
-         return "$name|$err" if ($err);
-
-         $db_tables{$tablename}{Rows} = $sth->fetchrow;
-         $sth->finish;
-
-         $r += $db_tables{$tablename}{Rows};
-         push(@tables,$db_tables{$tablename}{Name});                                     # add tablename to backuped tables
-         $t++;
-
-         if (!defined $db_tables{$tablename}{Update_time}) {
-             $db_tables{$tablename}{Update_time} = 0;
-         }
-
-         $st_e .= $mysql_commentstring."TABLE: $db_tables{$tablename}{Name} | Rows: $db_tables{$tablename}{Rows} | Length: ".($db_tables{$tablename}{Data_length}+$db_tables{$tablename}{Index_length})." | Engine: $db_tables{$tablename}{Engine}\n";
-
-         if($db_tables{$tablename}{Name} eq "current") {
-             $drc = $db_tables{$tablename}{Rows};
-         }
-
-         if($db_tables{$tablename}{Name} eq "history") {
-             $drh = $db_tables{$tablename}{Rows};
-         }
-     }
- }
-
- $st_e .= "-- EOF TABLE-INFO";
-
- Log3 ($name, 3, "DbRep $name - Found ".(@tables)." tables with $r records.");
-
- # AUFBAU der Statuszeile in SQL-File:
- # -- Status | tabellenzahl | datensaetze | Datenbankname | Kommentar | MySQLVersion | Charset | EXTINFO
- #
- $status_start = $mysql_commentstring."Status | Tables: $t | Rows: $r ";
- $status_end   = "| DB: $dbname | Comment: $my_comment | MySQL-Version: $mysql_version[0] ";
- $status_end  .= "| Charset: $character_set $st_e\n".
-                 $mysql_commentstring."Dump created on $CTIME_String by DbRep-Version $repver\n".$mysql_commentstring;
-
- $sql_text = $status_start.$status_end;
-
- # neues SQL-Ausgabefile anlegen
- ($err, $sql_text, $first_insert, $sql_file, $backupfile) = DbRep_NewDumpFilename ( { sql_text      => $sql_text, 
-                                                                                      dump_path     => $dump_path, 
-                                                                                      dbname        => $dbname, 
-                                                                                      time_stamp    => $time_stamp, 
-                                                                                      character_set => $character_set
-                                                                                    } 
-                                                                                  );
- if ($err) {
-     Log3 ($name, 2, "DbRep $name - $err");
-     $err = encode_base64 ($err, "");
-     return "$name|$err";
- }
- else {
-     Log3 ($name, 5, "DbRep $name - New dump file $sql_file was created");
- }
-
- #####################  jede einzelne Tabelle dumpen  ########################
-
- $totalrecords = 0;
-
- for $tablename (@tables) {                                                       # first get CREATE TABLE Statement
-     if($dbpraefix eq "" || ($dbpraefix ne "" && substr($tablename,0,length($dbpraefix)) eq $dbpraefix)) {
-         Log3 ($name, 3, "DbRep $name - Dumping table $tablename (Type ".$db_tables{$tablename}{Engine}."):");
-
-         $a = "\n\n$mysql_commentstring\n$mysql_commentstring"."Table structure for table `$tablename`\n$mysql_commentstring\n";
-
-         if ($db_tables{$tablename}{Engine} ne 'VIEW' ) {
-             $a .= "DROP TABLE IF EXISTS `$tablename`;\n";
-         }
-         else {
-             $a .= "DROP VIEW IF EXISTS `$tablename`;\n";
-         }
-
-         $sql_text  .= $a;
-         $sql_create = "SHOW CREATE TABLE `$tablename`";
-
-         ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql_create);
-         return "$name|$err" if ($err);
-
-         @ergebnis = $sth->fetchrow;
-         $sth->finish;
-         $a = $ergebnis[1].";\n";
-
-         if (length($a) < 10) {
-             $err = "Fatal error! Couldn't read CREATE-Statement of table `$tablename`! This backup might be incomplete! Check your database for errors. MySQL-Error: ".$DBI::errstr;
-             Log3 ($name, 2, "DbRep $name - $err");
-         }
-         else {
-             $sql_text .= $a;
-             Log3 ($name, 5, "DbRep $name - Create-SQL found:\n$a");
-         }
-
-         if ($db_tables{$tablename}{skip_data} == 0) {
-             $sql_text .= "\n$mysql_commentstring\n$mysql_commentstring"."Dumping data for table `$tablename`\n$mysql_commentstring\n";
-             $sql_text .= "/*!40000 ALTER TABLE `$tablename` DISABLE KEYS */;";
-
-             DbRep_WriteToDumpFile($sql_text, $sql_file);
-             $sql_text = "";
-
-             $fieldlist  = "(";
-             $sql_create = "SHOW FIELDS FROM `$tablename`";                                       # build fieldlist
-
-             ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql_create);
-             return "$name|$err" if ($err);
-
-             while (@ar = $sth->fetchrow) {
-                 $fieldlist .= "`".$ar[0]."`,";
-             }
-
-             $sth->finish;
-
-             Log3 ($name, 5, "DbRep $name - Fieldlist found: $fieldlist");
-
-             $fieldlist = substr($fieldlist, 0, length($fieldlist)-1).")";                        # remove trailing ',' and add ')'
-
-             $rct = $db_tables{$tablename}{Rows};                                                 # how many rows
-
-             Log3 ($name, 5, "DbRep $name - Number entries of table $tablename: $rct");
-
-             for (my $ttt = 0; $ttt < $rct; $ttt += $dumpspeed) {                                 # create insert Statements
-                 $insert       = "INSERT INTO `$tablename` $fieldlist VALUES (";                  # default beginning for INSERT-String
-                 $first_insert = 0;
-
-                 $sql_daten = "SELECT * FROM `$tablename` LIMIT ".$ttt.",".$dumpspeed.";";        # get rows (parts)
-
-                 ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql_daten);
-                 return "$name|$err" if ($err);
-
-                 while ( @ar = $sth->fetchrow) {                                                  # Start the insert
-                     if($first_insert == 0) {
-                         $a = "\n$insert";
-                     }
-                     else {
-                         $a = "\n(";
-                     }
-
-                     for $inhalt(@ar) {                                                           # quote all values
-                         $a .= $dbh->quote($inhalt).",";
-                     }
-
-                     $a         = substr($a,0, length($a)-1).");";                                # remove trailing ',' and add end-sql
-                     $sql_text .= $a;
-
-                     if($memory_limit > 0 && length($sql_text) > $memory_limit) {
-                         ($err, $filesize) = DbRep_WriteToDumpFile($sql_text, $sql_file);
-                         # Log3 ($name, 5, "DbRep $name - Memory limit '$memory_limit' exceeded. Wrote to '$sql_file'. Filesize: '"._DbRep_byteOutput($filesize)."'");
-                         $sql_text = "";
-                     }
-                 }
-                 $sth->finish;
-             }
-             $sql_text .= "\n/*!40000 ALTER TABLE `$tablename` ENABLE KEYS */;\n";
-         }
-
-         ($err, $filesize) = DbRep_WriteToDumpFile($sql_text, $sql_file);                        # write sql commands to file
-         $sql_text = "";
-
-         if ($db_tables{$tablename}{skip_data} == 0) {
-             Log3 ($name, 3, "DbRep $name - $rct records inserted (size of backupfile: "._DbRep_byteOutput($filesize).")") if($filesize);
-             $totalrecords += $rct;
-         }
-         else {
-             Log3 ($name, 3, "DbRep $name - Dumping structure of $tablename (Type ".$db_tables{$tablename}{Engine}." ) (size of backupfile: "._DbRep_byteOutput($filesize).")");
-         }
-     }
- }
-
- # end
- DbRep_WriteToDumpFile("\nSET FOREIGN_KEY_CHECKS=1;\n", $sql_file);
- ($err, $filesize) = DbRep_WriteToDumpFile($mysql_commentstring."EOB\n", $sql_file);
-
- # Datenbankverbindung schliessen
- $sth->finish();
- $dbh->disconnect();
-
- my $rt = tv_interval($st);                                                                       # SQL-Laufzeit ermitteln
-
- my $compress = AttrVal($name, "dumpCompress", 0);                                                # Dumpfile komprimieren wenn dumpCompress=1
- if($compress) {
-     ($err, $backupfile, $filesize) = DbRep_dumpCompress($hash, $backupfile);
- }
-
- my ($ftperr,$ftpmsg,@ftpfd) = DbRep_sendftp($hash,$backupfile);                         # Dumpfile per FTP senden und versionieren
- my $ftp = $ftperr ? encode_base64($ftperr,"") :
-           $ftpmsg ? encode_base64($ftpmsg,"") :
-           0;
-
- my $ffd   = join ", ", @ftpfd;
- $ffd      = $ffd ? encode_base64($ffd,"") : 0;
-
- my @fd    = DbRep_deldumpfiles($hash,$backupfile);                                        # alte Dumpfiles löschen
- my $bfd   = join ", ", @fd;
- $bfd      = $bfd ? encode_base64($bfd,"") : 0;
-
- my $brt   = tv_interval($bst);                                                            # Background-Laufzeit ermitteln
- $rt       = $rt.",".$brt;
-
- my $fsize = _DbRep_byteOutput($filesize);
- $fsize    = encode_base64    ($fsize,"");
- $err      = q{};
-
- Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
+  my $paref                      = shift;
+  my $hash                       = $paref->{hash};
+  my $name                       = $paref->{name};
+
+  my $dump_path                  = AttrVal ($name, "dumpDirLocal",             $dbrep_dump_path_def);
+  my $optimize_tables_beforedump = AttrVal ($name, "optimizeTablesBeforeDump",                    0);
+  my $memory_limit               = AttrVal ($name, "dumpMemlimit",                           100000);
+  my $my_comment                 = AttrVal ($name, "dumpComment",                                "");
+  my $dumpspeed                  = AttrVal ($name, "dumpSpeed",                               10000);
+  my $ebd                        = AttrVal ($name, "executeBeforeProc",                       undef);
+  my $ead                        = AttrVal ($name, "executeAfterProc",                        undef);
+
+  my $mysql_commentstring        = "-- ";
+  my $repver                     = $hash->{HELPER}{VERSION};
+  my $dbname                     = $hash->{DATABASE};
+  $dump_path                     = $dump_path."/" unless($dump_path =~ m/\/$/);
+
+  my ($sth,$tablename,$rct,$insert,$backupfile,$drc,$drh,$filesize,$totalrecords);
+  my (@ar,@tablenames,@tables,@ctab);
+  my (%db_tables, %db_tables_views);
+
+  my $bst = [gettimeofday];                                                        # Background-Startzeit
+
+  Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname'");
+
+  #####################  Beginn Dump  ########################
+  ############################################################
+
+  undef %db_tables;
+
+  # Startzeit ermitteln
+  my ($Sekunden, $Minuten, $Stunden, $Monatstag, $Monat, $Jahr, $Wochentag, $Jahrestag, $Sommerzeit) = localtime(time);
+
+  $Jahr           += 1900;
+  $Monat          += 1;
+  $Jahrestag      += 1;
+  my $CTIME_String = strftime "%Y-%m-%d %T", localtime(time);
+  my $time_stamp   = $Jahr."_".sprintf("%02d",$Monat)."_".sprintf("%02d",$Monatstag)."_".sprintf("%02d",$Stunden)."_".sprintf("%02d",$Minuten);
+  my $starttime    = sprintf("%02d",$Monatstag).".".sprintf("%02d",$Monat).".".$Jahr."  ".sprintf("%02d",$Stunden).":".sprintf("%02d",$Minuten);
+
+  my $fieldlist = "";
+
+  my ($err, $dbh, $dbmodel) = DbRep_dbConnect($name, 0);
+  return "$name|$err" if($err);
+
+  $dbh->{mysql_enable_utf8} = 0;                                                                             # Dump Performance !!! Forum: https://forum.fhem.de/index.php/topic,53584.msg1204535.html#msg1204535
+
+  my $st = [gettimeofday];                                                                                   # SQL-Startzeit
+
+  ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SELECT VERSION()");                                # Mysql-Version ermitteln
+  return "$name|$err" if($err);
+
+  my @mysql_version = $sth->fetchrow;
+  my @v             = split(/\./,$mysql_version[0]);
+  my $collation     = '';
+  my $dbcharset     = '';
+
+  if ($v[0] >= 5 || ($v[0] >= 4 && $v[1] >= 1) ) {                                                           # mysql Version >= 4.1      
+      ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, qq(SHOW VARIABLES LIKE 'collation_database'));
+      return "$name|$err" if($err); 
+
+      @ar = $sth->fetchrow;
+     
+      if ($ar[1]) {
+          $collation = $ar[1];
+          $dbcharset = (split '_', $collation, 2)[0];  
+         
+          ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, qq(SET NAMES "$dbcharset" COLLATE "$collation"));   
+          return "$name|$err" if($err); 
+      }     
+  }
+  else {                                                                                                     # mysql Version < 4.1 -> no SET NAMES available
+      ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SHOW VARIABLES LIKE 'dbcharset'");             # get standard encoding of MySQl-Server
+      return "$name|$err" if($err);
+
+      @ar = $sth->fetchrow;
+     
+      if ($ar[1]) {
+          $dbcharset = $ar[1];
+      }
+  }
+
+  Log3 ($name, 3, "DbRep $name - Characterset of collection set to $dbcharset. ");
+ 
+  my $t         = 0;
+  my $r         = 0;
+  my $value     = 0;
+  my $engine    = '';
+  my $dbpraefix = '';
+  my $query     = "SHOW TABLE STATUS FROM `$dbname`";                                                   # Eigenschaften der vorhandenen Tabellen ermitteln (SHOW TABLE STATUS -> Rows sind nicht exakt !!)
+
+  if ($dbpraefix ne "") {
+      $query .= " LIKE '$dbpraefix%'";
+     
+      Log3 ($name, 3, "DbRep $name - Searching for tables inside database $dbname with prefix $dbpraefix....");
+  }
+  else {
+      Log3 ($name, 3, "DbRep $name - Searching for tables inside database $dbname....");
+  }
+
+  ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
+  return "$name|$err" if($err);
+
+  while ( $value = $sth->fetchrow_hashref()) {
+      $value->{skip_data} = 0;                                                                          # default -> backup data of table
+
+      Log3 ($name, 5, "DbRep $name - ......... Table definition found: .........");
+
+      for my $tk (sort(keys(%$value))) {
+          Log3 ($name, 5, "DbRep $name - $tk: $value->{$tk}") if(defined($value->{$tk}) && $tk ne "Rows");
+      }
+
+      Log3 ($name, 5, "DbRep $name - ......... Table definition END ............");
+
+      # decide if we need to skip the data while dumping (VIEWs and MEMORY)
+      # check for old MySQL3-Syntax Type=xxx
+
+      if (defined $value->{Type}) {                                                                    # port old index type to index engine, so we can use the index Engine in the rest of the script
+          $value->{Engine} = $value->{Type};
+          $engine          = uc($value->{Type});
+
+          if ($engine eq "MEMORY") {
+              $value->{skip_data} = 1;
+          }
+      }
+
+      if (defined $value->{Engine}) {                                                                  # check for > MySQL3 Engine = xxx
+          $engine = uc($value->{Engine});
+
+          if ($engine eq "MEMORY") {
+              $value->{skip_data} = 1;
+          }
+      }
+
+      if (defined $value->{Comment} && uc(substr($value->{Comment},0,4)) eq 'VIEW') {                  # check for Views - if it is a view the comment starts with "VIEW"
+          $value->{skip_data}   = 1;
+          $value->{Engine}      = 'VIEW';
+          $value->{Update_time} = '';
+          $db_tables_views{$value->{Name}} = $value;
+      }
+      else {
+          $db_tables{$value->{Name}} = $value;
+      }
+
+      $value->{Rows}         += 0;                                                                     # cast indexes to int, cause they are used for builing the statusline
+      $value->{Data_length}  += 0;
+      $value->{Index_length} += 0;
+  }
+
+  $sth->finish;
+
+  @tablenames = sort(keys(%db_tables));
+
+  @tablenames = (@tablenames,sort(keys(%db_tables_views)));                                            # add VIEW at the end as they need all tables to be created before
+  %db_tables  = (%db_tables,%db_tables_views);
+  $tablename  = '';
+
+  if (@tablenames < 1) {
+      $err = "There are no tables inside database $dbname ! It doesn't make sense to backup an empty database. Skipping this one.";
+      Log3 ($name, 2, "DbRep $name - $err");
+      $err = encode_base64($@,"");
+      $dbh->disconnect;
+      return "$name|$err";
+  }
+
+  if ($optimize_tables_beforedump) {                                                                   # Tabellen optimieren vor dem Dump
+      $hash->{HELPER}{DBTABLES} = \%db_tables;
+
+      my $opars = {
+          hash   => $hash,
+          dbh    => $dbh,
+          omode  => "execute",
+          tables => \@tablenames
+      };
+
+      ($err) = _DbRep_mysqlOptimizeTables ($opars);
+      return $err if($err);
+  }
+
+  my $part = '';                                                                                       # Tabelleneigenschaften für SQL-File ermitteln
+
+  for $tablename (@tablenames) {
+      my $dump_table = 1;
+
+      if ($dbpraefix ne "") {
+          if (substr ($tablename, 0, length($dbpraefix)) ne $dbpraefix) {                              # exclude table from backup because it doesn't fit to praefix
+              $dump_table = 0;
+          }
+      }
+
+      if ($dump_table == 1) {                                                                          
+
+          ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, qq(SELECT count(*) FROM `$tablename`));
+          return "$name|$err" if($err);
+
+          $db_tables{$tablename}{Rows} = $sth->fetchrow;                                               # how many rows
+          $sth->finish;
+
+          $r += $db_tables{$tablename}{Rows};
+          push @tables, $db_tables{$tablename}{Name};                                                  # add tablename to backuped tables
+          $t++;
+ 
+          if (!defined $db_tables{$tablename}{Update_time}) {
+              $db_tables{$tablename}{Update_time} = 0;
+          }
+
+          $part .= $mysql_commentstring;
+          $part .= "TABLE: $db_tables{$tablename}{Name} | ";
+          $part .= "Rows: $db_tables{$tablename}{Rows} | ";
+          $part .= "Length: ".($db_tables{$tablename}{Data_length} + $db_tables{$tablename}{Index_length})." | ";
+          $part .= "Engine: $db_tables{$tablename}{Engine}";
+          $part .= "\n";
+
+          if ($db_tables{$tablename}{Name} eq "current") {
+              $drc = $db_tables{$tablename}{Rows};
+          }
+
+          if ($db_tables{$tablename}{Name} eq "history") {
+              $drh = $db_tables{$tablename}{Rows};
+          }
+      }
+  }
+  
+  $part .= $mysql_commentstring."EOF TABLE-INFO";
+
+  Log3 ($name, 3, "DbRep $name - Found ".(@tables)." tables with $r records.");
+
+  ## Headerzeilen aufbauen
+  ##########################
+  my $sql_text = $mysql_commentstring."DB Name: $dbname";
+  $sql_text   .= "\n";
+  $sql_text   .= $mysql_commentstring."DB Character set: $dbcharset";
+  $sql_text   .= "\n";
+  $sql_text   .= $mysql_commentstring."MySQL Version: $mysql_version[0]";
+  $sql_text   .= "\n";
+  $sql_text   .= $mysql_commentstring."Dump created on $CTIME_String by DbRep-Version $repver";
+  $sql_text   .= "\n";
+  $sql_text   .= $mysql_commentstring."Comment: $my_comment";
+  $sql_text   .= "\n";
+  $sql_text   .= $mysql_commentstring."TABLE-INFO";
+  $sql_text   .= "\n";
+  $sql_text   .= $mysql_commentstring."TABLES: $t, Rows: $r";
+  $sql_text   .= "\n";
+  $sql_text   .= $part;
+  $sql_text   .= "\n\n";
+
+  ## neues SQL Ausgabefile mit Header anlegen
+  #############################################
+  my $sql_file = '';
+  
+  ($err, $sql_file, $backupfile) = DbRep_NewDumpFilename ( { sql_text   => $sql_text, 
+                                                             dump_path  => $dump_path, 
+                                                             dbname     => $dbname, 
+                                                             time_stamp => $time_stamp
+                                                           } 
+                                                         );
+                                                         
+  if ($err) {
+      Log3 ($name, 2, "DbRep $name - $err");
+      $err = encode_base64 ($err, "");
+      return "$name|$err";
+  }
+  else {
+      Log3 ($name, 5, "DbRep $name - New dump file $sql_file was created");
+  }
+  
+  my $first_insert = 0;
+  
+  ## DB Einstellungen 
+  #####################
+  
+  $sql_text  = "/*!40101 SET NAMES '".$dbcharset."' */;";
+  $sql_text .= "\n";
+  $sql_text .= "SET FOREIGN_KEY_CHECKS=0;";
+  $sql_text .= "\n\n";
+  
+  DbRep_WriteToDumpFile ($sql_text, $sql_file);
+
+  ## DB Create Statement einfügen  
+  ################################# 
+  ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, qq(SHOW CREATE DATABASE IF NOT EXISTS $dbname));
+  return "$name|$err" if($err);
+
+  my $db_create = $sth->fetchrow;
+  $sth->finish;
+ 
+  $sql_text  = $mysql_commentstring;
+  $sql_text .= "\n";
+  $sql_text .= $mysql_commentstring;
+  $sql_text .= "Create database";
+  $sql_text .= "\n";
+  $sql_text .= $mysql_commentstring;
+  $sql_text .= "\n";
+ 
+  $sql_text .= $db_create.';';
+  $sql_text .= "\n";
+  $sql_text .= "USE `$dbname`;";
+  $sql_text .= "\n\n";
+ 
+  DbRep_WriteToDumpFile ($sql_text, $sql_file);
+ 
+  ## jede einzelne Tabelle dumpen  
+  #################################
+  $totalrecords = 0;
+  $sql_text     = "";
+
+  for $tablename (@tables) {                                                                                    # first get CREATE TABLE Statement
+      if ($dbpraefix eq "" || ($dbpraefix ne "" && substr($tablename, 0, length($dbpraefix)) eq $dbpraefix)) {
+          Log3 ($name, 3, "DbRep $name - Dumping table $tablename (Type ".$db_tables{$tablename}{Engine}."):");
+
+          $part  = $mysql_commentstring;
+          $part .= "\n";
+          $part .= $mysql_commentstring;
+          $part .= "Table structure of table `$tablename`";
+          $part .= "\n";
+          $part .= $mysql_commentstring;
+          $part .= "\n";
+
+          if ($db_tables{$tablename}{Engine} ne 'VIEW' ) {
+              $part .= "DROP TABLE IF EXISTS `$tablename`;";
+          } 
+          else {
+              $part .= "DROP VIEW IF EXISTS `$tablename`;";
+          }
+          
+          $sql_text .= $part;
+          $sql_text .= "\n";
+
+          ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, qq(SHOW CREATE TABLE `$tablename`));
+          return "$name|$err" if($err);
+
+          @ctab = $sth->fetchrow;
+          $sth->finish;
+         
+          $part  = $ctab[1].";";
+          $part .= "\n";
+
+          if (length($part) < 10) {
+              $err = "Fatal error! Couldn't read CREATE-Statement for table `$tablename`! This backup might be incomplete! Check your database for errors. MySQL-Error: ".$DBI::errstr;
+              
+              Log3 ($name, 2, "DbRep $name - $err");
+              
+              return "$name|$err";
+          }
+          else {
+              $sql_text .= $part;
+          }
+          
+          Log3 ($name, 5, "DbRep $name - Create-SQL found:\n$part");
+
+          if ($db_tables{$tablename}{skip_data} == 0) {
+              $sql_text .= "\n";
+              $sql_text .= "$mysql_commentstring\n";
+              $sql_text .= "$mysql_commentstring";
+              $sql_text .= "Dumping data of table `$tablename`\n";
+              $sql_text .= "$mysql_commentstring\n";
+             
+              $sql_text .= "/*!40000 ALTER TABLE `$tablename` DISABLE KEYS */;";
+
+              DbRep_WriteToDumpFile ($sql_text, $sql_file);
+              
+              $sql_text = "";                                  
+
+              ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, qq(SHOW FIELDS FROM `$tablename`));  
+              return "$name|$err" if($err);
+              
+              $fieldlist = "(";   
+
+              while (@ar = $sth->fetchrow) {                                                       # build fieldlist
+                  $fieldlist .= "`".$ar[0]."`,";
+              }
+
+              $sth->finish;
+
+              Log3 ($name, 5, "DbRep $name - Fieldlist found: $fieldlist");
+
+              $fieldlist = substr ($fieldlist, 0, length($fieldlist)-1).")";                       # remove trailing ',' and add ')'
+
+              $rct = $db_tables{$tablename}{Rows};                                                 # how many rows
+
+              Log3 ($name, 5, "DbRep $name - Number entries of table $tablename: $rct");
+
+              for (my $ttt = 0; $ttt < $rct; $ttt += $dumpspeed) {                                 # create insert Statements
+                  $insert       = "INSERT INTO `$tablename` $fieldlist VALUES (";                  # default beginning for INSERT-String
+                  $first_insert = 0;
+
+                  my $sql_daten = "SELECT * FROM `$tablename` LIMIT ".$ttt.",".$dumpspeed.";";     # get rows (parts)
+
+                  ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql_daten);
+                  return "$name|$err" if($err);
+
+                  while ( @ar = $sth->fetchrow) {                                                  # Start the insert
+                      if ($first_insert == 0) {
+                          $part = "\n$insert";
+                      }
+                      else {
+                          $part = "\n(";
+                      }
+
+                      for my $cont (@ar) {                                                         # quote all values
+                          $part .= $dbh->quote($cont).",";
+                      }
+
+                      $part      = substr ($part, 0, length($part)-1).");";                        # remove trailing ',' and add end-sql
+                      $sql_text .= $part;
+
+                      if ($memory_limit > 0 && length($sql_text) > $memory_limit) {
+                          ($err, $filesize) = DbRep_WriteToDumpFile ($sql_text, $sql_file);
+                          # Log3 ($name, 5, "DbRep $name - Memory limit '$memory_limit' exceeded. Wrote to '$sql_file'. Filesize: '"._DbRep_byteOutput($filesize)."'");
+                          $sql_text = "";
+                      }
+                  }
+                 
+                  $sth->finish;
+              }
+             
+              $sql_text .= "\n/*!40000 ALTER TABLE `$tablename` ENABLE KEYS */;\n";
+          }
+
+          ($err, $filesize) = DbRep_WriteToDumpFile ($sql_text, $sql_file);                       # write sql commands to file
+          
+          $sql_text = "";
+
+          if ($db_tables{$tablename}{skip_data} == 0) {
+              Log3 ($name, 3, "DbRep $name - $rct records inserted (size of backupfile: "._DbRep_byteOutput ($filesize).")") if($filesize);
+              $totalrecords += $rct;
+          }
+          else {
+              Log3 ($name, 3, "DbRep $name - Dumping structure of $tablename (Type ".$db_tables{$tablename}{Engine}." ) (size of backupfile: "._DbRep_byteOutput($filesize).")");
+          }
+      }
+  }
+
+  # end
+ 
+  DbRep_WriteToDumpFile("\nSET FOREIGN_KEY_CHECKS=1;\n", $sql_file);
+  ($err, $filesize) = DbRep_WriteToDumpFile ($mysql_commentstring."EOB\n", $sql_file);
+
+  $sth->finish();
+  $dbh->disconnect();
+
+  my $rt = tv_interval($st);                                                                       # SQL-Laufzeit ermitteln
+
+  my $compress = AttrVal ($name, "dumpCompress", 0);                                               # Dumpfile komprimieren wenn dumpCompress=1
+ 
+  if ($compress) {
+      ($err, $backupfile, $filesize) = DbRep_dumpCompress ($hash, $backupfile);
+  }
+
+  my ($ftperr,$ftpmsg,@ftpfd) = DbRep_sendftp ($hash,$backupfile);                                 # Dumpfile per FTP senden und versionieren
+  my $ftp = $ftperr ? encode_base64($ftperr,"") :
+            $ftpmsg ? encode_base64($ftpmsg,"") :
+            0;
+
+  my $ffd   = join ", ", @ftpfd;
+  $ffd      = $ffd ? encode_base64($ffd,"") : 0;
+
+  my @fd    = DbRep_deldumpfiles ($hash,$backupfile);                                              # alte Dumpfiles löschen
+  my $bfd   = join ", ", @fd;
+  $bfd      = $bfd ? encode_base64($bfd,"") : 0;
+
+  my $brt   = tv_interval($bst);                                                                   # Background-Laufzeit ermitteln
+  $rt       = $rt.",".$brt;
+
+  my $fsize = _DbRep_byteOutput($filesize);
+  $fsize    = encode_base64    ($fsize,"");
+  $err      = q{};
+
+  Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
 
 return "$name|$err|$rt|$dump_path$backupfile|$drc|$drh|$fsize|$ftp|$bfd|$ffd";
 }
@@ -9193,35 +9265,36 @@ sub DbRep_mysql_RestoreClientSide {
   my $bfile  = $paref->{prop};
 
   my $dbname    = $hash->{DATABASE};
-  my $i_max     = AttrVal($name, "dumpMemlimit", 100000);                     # max. Anzahl der Blockinserts
+  my $i_max     = AttrVal($name, "dumpMemlimit", 100000);                      # max. Anzahl der Blockinserts
   my $dump_path = AttrVal($name, "dumpDirLocal", $dbrep_dump_path_def);
   $dump_path    = $dump_path."/" if($dump_path !~ /.*\/$/);
 
   my ($v1,$v2,$e);
 
-  my $bst = [gettimeofday];                                                   # Background-Startzeit
+  my $bst = [gettimeofday];                                                    # Background-Startzeit
 
-  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
-  return "$name|$err" if ($err);
+  my ($err,$dbh,$dbmodel) = DbRep_dbConnect ($name, 0);
+  return "$name|$err" if($err);
 
-  $dbh->{mysql_enable_utf8} = 0;                                              # identisch zu DbRep_mysql_DumpClientSide setzen !
+  $dbh->{mysql_enable_utf8} = 0;                                               # identisch zu DbRep_mysql_DumpClientSide setzen !
 
- my @row_ary;
- my $sql         = "show variables like 'max_allowed_packet'";                # maximal mögliche Packetgröße ermitteln (in Bits) -> Umrechnen in max. Zeichen
- eval {@row_ary  = $dbh->selectrow_array($sql);};
- my $max_packets = $row_ary[1];                                               # Bits
- $i_max          = ($max_packets/8)-500;                                      # Characters mit Sicherheitszuschlag
+  my @row_ary;
+  my $sql         = "show variables like 'max_allowed_packet'";                # maximal mögliche Packetgröße ermitteln (in Bits) -> Umrechnen in max. Zeichen
+  eval {@row_ary  = $dbh->selectrow_array($sql);};
+  my $max_packets = $row_ary[1];                                               # Bits
+  $i_max          = ($max_packets/8)-500;                                      # Characters mit Sicherheitszuschlag
 
- if($bfile =~ m/.*.gzip$/) {                                                  # Dumpfile dekomprimieren wenn gzip
-     ($err,$bfile) = DbRep_dumpUnCompress($hash,$bfile);
-     if ($err) {
-         $err = encode_base64($err,"");
-         $dbh->disconnect;
-         return "$name|$err";
-     }
- }
+  if ($bfile =~ m/.*.gzip$/) {                                                 # Dumpfile dekomprimieren wenn gzip
+      ($err,$bfile) = DbRep_dumpUnCompress($hash,$bfile);
+      
+      if ($err) {
+          $err = encode_base64($err,"");
+          $dbh->disconnect;
+          return "$name|$err";
+      }
+  }
 
- if(!open(FH, "<$dump_path$bfile")) {
+ if (!open(FH, "<$dump_path$bfile")) {
      $err = encode_base64("could not open ".$dump_path.$bfile.": ".$!,"");
      return "$name|$err";
  }
@@ -9240,35 +9313,39 @@ sub DbRep_mysql_RestoreClientSide {
  my $base_query = '';
  my $query      = '';
 
- while(<FH>) {
+ while (<FH>) {
      $tmp = $_;
-     chomp($tmp);
+     chomp $tmp;
 
-     if(!$tmp || substr($tmp,0,2) eq "--") {
+     if (!$tmp || substr($tmp, 0, 2) eq "--") {
          next;
      }
 
      $line .= $tmp;
 
-     if(substr($line,-1) eq ";") {
-         if($line !~ /^INSERT INTO.*$/) {
-             eval {$dbh->do($line);
+     if (substr($line,-1) eq ";") {
+         if ($line !~ /^INSERT INTO.*$/) {
+             Log3 ($name, 4, "DbRep $name - do query: $line");
+             
+             eval { $dbh->do($line);
+                  }
+                  or do {
+                      $e   = $@;
+                      $err = encode_base64($e,"");
+                      close(FH);
+                      $dbh->disconnect;
+                      
+                      Log3 ($name, 1, "DbRep $name - last query: $line");
+                      Log3 ($name, 1, "DbRep $name - $e");
+                      
+                      return "$name|$err";
                   };
-             if ($@) {
-                 $e   = $@;
-                 $err = encode_base64($e,"");
-                 Log3 ($name, 1, "DbRep $name - last query: $line");
-                 Log3 ($name, 1, "DbRep $name - $e");
-                 close(FH);
-                 $dbh->disconnect;
-                 return "$name|$err";
-             }
 
              $line = '';
              next;
          }
 
-         if(!$base_query) {
+         if (!$base_query) {
              $line =~ /INSERT INTO (.*) VALUES \((.*)\);/;
              $v1   = $1;
              $v2   = $2;
@@ -9286,7 +9363,7 @@ sub DbRep_mysql_RestoreClientSide {
              $v2    = $2;
              my $ln = qq{INSERT INTO $v1 VALUES };
 
-             if($base_query eq $ln) {
+             if ($base_query eq $ln) {
                  $nc++ if($base_query =~ /INSERT INTO `current`.*/);
                  $nh++ if($base_query =~ /INSERT INTO `history`.*/);
                  $query .= "," if($i);
@@ -9296,17 +9373,19 @@ sub DbRep_mysql_RestoreClientSide {
              else {
                  $query = $query.";";
 
-                 eval {$dbh->do($query);
+                 eval { $dbh->do($query);
+                      }
+                      or do {
+                          $e = $@;
+                          $err = encode_base64($e,"");
+                          close(FH);
+                          $dbh->disconnect;
+                         
+                          Log3 ($name, 1, "DbRep $name - last query: $query");
+                          Log3 ($name, 1, "DbRep $name - $e");
+                         
+                          return "$name|$err";
                       };
-                 if ($@) {
-                     $e = $@;
-                     $err = encode_base64($e,"");
-                     Log3 ($name, 1, "DbRep $name - last query: $query");
-                     Log3 ($name, 1, "DbRep $name - $e");
-                     close(FH);
-                     $dbh->disconnect;
-                     return "$name|$err";
-                 }
 
                  $i          = 0;
                  $line       =~ /INSERT INTO (.*) VALUES \((.*)\);/;
@@ -9321,19 +9400,22 @@ sub DbRep_mysql_RestoreClientSide {
              }
          }
 
-         if(length($query) >= $i_max) {
+         if (length($query) >= $i_max) {
              $query = $query.";";
-             eval {$dbh->do($query);
+             
+             eval { $dbh->do($query);
+                  }
+                  or do {
+                      $e   = $@;
+                      $err = encode_base64($e,"");
+                      close(FH);
+                      $dbh->disconnect;
+                     
+                      Log3 ($name, 1, "DbRep $name - last query: $query");
+                      Log3 ($name, 1, "DbRep $name - $e");
+                     
+                      return "$name|$err";
                   };
-             if ($@) {
-                 $e   = $@;
-                 $err = encode_base64($e,"");
-                 Log3 ($name, 1, "DbRep $name - last query: $query");
-                 Log3 ($name, 1, "DbRep $name - $e");
-                 close(FH);
-                 $dbh->disconnect;
-                 return "$name|$err";
-             }
 
              $i          = 0;
              $query      = '';
@@ -9345,16 +9427,18 @@ sub DbRep_mysql_RestoreClientSide {
  }
 
  eval { $dbh->do($query) if($i);
+      }
+      or do {
+          $e = $@;
+          $err = encode_base64($e,"");
+          close(FH);
+          $dbh->disconnect;
+         
+          Log3 ($name, 1, "DbRep $name - last query: $query");
+          Log3 ($name, 1, "DbRep $name - $e");
+         
+          return "$name|$err";
       };
- if ($@) {
-     $e = $@;
-     $err = encode_base64($e,"");
-     Log3 ($name, 1, "DbRep $name - last query: $query");
-     Log3 ($name, 1, "DbRep $name - $e");
-     close(FH);
-     $dbh->disconnect;
-     return "$name|$err";
- }
 
  $dbh->disconnect;
  close(FH);
@@ -11557,9 +11641,9 @@ sub DbRep_dbConnect {
   my $err = q{};
 
   if($uac) {
-      my ($success,$admusername,$admpassword) = DbRep_getcredentials($hash, "adminCredentials");
+      my ($success,$admusername,$admpassword) = DbRep_getcredentials ($hash, "adminCredentials");
 
-      if($success) {
+      if ($success) {
           $dbuser     = $admusername;
           $dbpassword = $admpassword;
       }
@@ -11584,8 +11668,8 @@ sub DbRep_dbConnect {
                return $err;
              };
 
-  if($utf8) {
-      if($dbmodel eq "MYSQL") {
+  if ($utf8) {
+      if ($dbmodel eq "MYSQL") {
           $dbh->{mysql_enable_utf8} = 1;
 
           ($err, my @se) = DbRep_prepareExec2Array ($name, $dbh, "SHOW VARIABLES LIKE 'collation_database'");
@@ -11604,7 +11688,7 @@ sub DbRep_dbConnect {
           }
       }
 
-      if($dbmodel eq "SQLITE") {
+      if ($dbmodel eq "SQLITE") {
         $dbh->do('PRAGMA encoding="UTF-8"');
       }
   }
@@ -12691,24 +12775,17 @@ sub DbRep_NewDumpFilename {
   my $dump_path     = $paref->{dump_path};
   my $dbname        = $paref->{dbname};
   my $time_stamp    = $paref->{time_stamp};
-  my $character_set = $paref->{character_set};
   
   my $part       = "";
   my $sql_file   = $dump_path.$dbname."_".$time_stamp.$part.".sql";
   my $backupfile = $dbname."_".$time_stamp.$part.".sql";
 
-  $sql_text .= "/*!40101 SET NAMES '".$character_set."' */;\n";
-  $sql_text .= "SET FOREIGN_KEY_CHECKS=0;\n";
-
-  my ($err, $filesize) = DbRep_WriteToDumpFile($sql_text, $sql_file);
+  my ($err, $filesize) = DbRep_WriteToDumpFile ($sql_text, $sql_file);
   return $err if($err);
 
   chmod (0664, $sql_file);
 
-  $sql_text        = "";
-  my $first_insert = 0;
-
-return ($err, $sql_text, $first_insert, $sql_file, $backupfile);
+return ($err, $sql_file, $backupfile);
 }
 
 ####################################################################################################
