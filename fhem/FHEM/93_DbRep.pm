@@ -8509,7 +8509,7 @@ sub DbRep_mysql_DumpClientSide {
       return "$name|$err";
   }
   else {
-      Log3 ($name, 5, "DbRep $name - New dump file $sql_file was created");
+      Log3 ($name, 3, "DbRep $name - New dump file $sql_file was created");
   }
   
   my $first_insert = 0;
