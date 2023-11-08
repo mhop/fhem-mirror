@@ -4,7 +4,7 @@
 #
 # net4home Busconnector Device
 #
-# (c) 2014-2018 Oliver Koerber <koerber@net4home.de>
+# (c) 2014-2023 Oliver Koerber <koerber@net4home.de>
 #
 # $Id$
 #
@@ -22,7 +22,7 @@ sub N4HMODULE_Get ($$@);
 sub N4HMODULE_Update($@);
 sub N4HMODULE_DbLog_splitFn($$);
 
-my $n4hmodule_Version = "1.0.3.0 - 29.10.2023";
+my $n4hmodule_Version = "1.0.4.0 - 07.11.2023";
 
 my %OT_devices = (
 	"1" 	=> {"name" => "leer", "OTcanSet" => "false", "OTcanReq" => "false", "fields" => [] },
@@ -184,6 +184,9 @@ sub N4HMODULE_Define($$) {
 	
     $attr{$name}{room} = "net4home" if( !defined($attr{$name}{room}) );
 
+    my $state_format;
+	my $icon;
+
 		# Timer zum regelmäßigem aktualisieren auf dem Bus starten
 	if (($ot ==  24) or #Temperatur
         ($ot ==  25) or #Licht
@@ -194,9 +197,7 @@ sub N4HMODULE_Define($$) {
 		($ot == 246) or #Luftdruck-Tendenz
 	    ($ot == 245)) { #Regenmenge l/h
 
-        my $state_format;
-		my $icon;
-		
+	
         if( $ot == 24 ) { 
           $state_format .= " " if( $state_format );
           $state_format .= "T: temperature";
@@ -204,6 +205,7 @@ sub N4HMODULE_Define($$) {
         } elsif( $ot == 25 ) {
           $state_format .= " " if( $state_format );
           $state_format .= "L: brightness";
+		  $icon 		 = "weather_light_meter";
         } elsif( $ot == 26 ) {
           $state_format .= " " if( $state_format );
           $state_format .= "H: humidity";
@@ -235,6 +237,16 @@ sub N4HMODULE_Define($$) {
 	} elsif (( $ot ==  34 ) or # TLH
 			(  $ot ==   3 ) or # Aktor, Relais
 			(  $ot ==   5)) {  # Aktor, Dimmer
+		
+
+        if( $ot == 5 ) { 
+		  $icon 		 = "light_control";
+        } elsif( $ot == 34 ) {
+		  $icon 		 = "temp_control";
+        }
+
+        $attr{$name}{icon} = $icon if( !defined($attr{$name}{icon}) && defined($icon) );
+			
 		# get initial value from bus after first start
 		Log3 $hash, 3, "N4HMODULE Define (get) -> $name ($ot)";
 		InternalTimer( gettimeofday() + int(rand(10)) , "N4HMODULE_Start", $hash, 0 );
@@ -353,8 +365,6 @@ sub N4HMODULE_Parse($$) {
 	
 	# 0c 6100 ff7f d817 05 65 09 05 01 67 4004000001ff4004000001f8403600c000000659
 	
-#	Log3 "xx", 1, "(DECOMP2): T8($type8) - MI$ipsrc DST-> $ipdst SRC<-$objsrc";
-	
 	if ( length($msg) <= $pos ) {
 		return undef;
 	}
@@ -371,7 +381,6 @@ sub N4HMODULE_Parse($$) {
 	}
 
 	my $hash = $modules{N4HMODULE}{defptr}{$object};
-    Log3 $hash, 5, "N4HMODULE (parse): $msg";
 	
 	if (!$hash) {
 		$object = $objsrc;
@@ -379,13 +388,17 @@ sub N4HMODULE_Parse($$) {
 		}
 
 	if(!$hash) {
-		my $ret = "Undefined ObjectAddress ($object)";
+		my $ret = "Undefined ObjectAddress (MI$ipsrc) ($object) ($ipdst) ($ddata) ";
+		Log3 $hash, 5, "N4HMODULE (parse): $ret - $msg";
 		return undef;
 	}	
 		
 		my $devtype = $hash->{OT};
 
 		N4HMODULE_ParsePayload($hash, $devtype, $ipsrc, $objsrc, $ddata);
+
+		my $ret = "(MI$ipsrc) ($object) ($ipdst) ($ddata) ";
+		Log3 $hash, 5, "N4HMODULE (parse): $ret - $msg";
 		return $hash->{NAME};
 
 }
@@ -739,7 +752,7 @@ sub N4HMODULE_paramToText($@) {
 	
 # 	+++++++++++++++++++ Licht analog - IN_HW_NR_IS_LICHT_ANALOG
 	if (hex(substr($ddata,2,2)) == 5 ){
-		$rettype = "Brightness";
+		$rettype = "brightness";
 	}	
 
 # 	+++++++++++++++++++ Uhrzeit - IN_HW_NR_IS_CLOCK
@@ -849,7 +862,7 @@ sub N4HMODULE_Set($@) {
     my $cmd  = shift(@a);
 	my $ext  = shift(@a);
 	
-#	Log3 $hash, 5, "N4HMODULE (set): (Name: $name) (CMD: $cmd) (ext: $ext)";
+	Log3 $hash, 5, "N4HMODULE (set): (Name: $name) (CMD: $cmd) (ext: $ext)";
 
 	my $ot 			= $hash->{OT};
 	my $ipdst		= $hash->{OBJADR};
@@ -985,9 +998,6 @@ sub N4HMODULE_Get($$@) {
 	my $ipdst		= $hash->{OBJADR};
 	my $ddata 		= "";
 	my $fieldcmd	= "";
-	my $list 	    = "";
-
-	my $list = "desired-temperature:noArg";
 
 	return "\"get $name\" needs at least one argument" unless(defined($opt));
 
