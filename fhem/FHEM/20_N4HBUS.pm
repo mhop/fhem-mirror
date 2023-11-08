@@ -18,7 +18,7 @@ use DevIo;
 use POSIX;
 use Data::Dumper;
 
-my $n4hbus_Version = "1.0.3.0 - 29.10.2023";
+my $n4hbus_Version = "1.0.4.0 - 07.11.2023";
 
 sub N4HBUS_Read($@);
 sub N4HBUS_Write($$$$);
@@ -29,6 +29,7 @@ sub N4HBUS_CompressSection($$);
 sub N4HBUS_Initialize($)
 {
 	my ($hash) = @_;
+
 # Provider
 	$hash->{ReadFn}		= "N4HBUS_Read";
 	$hash->{WriteFn}	= "N4HBUS_Write";
@@ -304,8 +305,10 @@ sub N4HBUS_Write($$$$) {
 
 	# payload type
 	$sendbus = "A10F0000";
+	
 	# payload len0
 	$sendbus = $sendbus."4E000000";
+	
 	#??
 	$sendbus = $sendbus."00";
 
@@ -448,7 +451,7 @@ sub N4HBUS_Ready($) {
   <a name="N4HBUS_Readings"></a>
   <b>Readings</b>
   <ul>
-    <li>state - current state of the Bus connection</li>
+    <li>state - current state of the connection to net4home bus connector</li>
   </ul><br />
   
   <a name="N4HBUS_Attr"></a>
