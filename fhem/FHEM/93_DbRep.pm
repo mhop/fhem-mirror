@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.52.14" => "08.11.2023  fix period calculation when using attr timeYearPeriod ",
   "8.52.13" => "07.11.2023  dumpMySQL clientSide: add create database to dump file ",
   "8.52.12" => "05.11.2023  dumpMySQL clientSide: change the dump file to stricter rights ",
   "8.52.11" => "17.09.2023  improve the markout in func DbRep_checkValidTimeSequence, Forum:#134973 ",
@@ -1441,7 +1442,7 @@ sub DbRep_Get {
       $ret  = "<html>";
 
       # Hints
-      if(!$prop || $prop =~ /hints/ || $prop =~ /[\d]+/) {
+      if (!$prop || $prop =~ /hints/ || $prop =~ /[\d]+/) {
           $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
           $ret .= "<table class=\"block wide internals\">";
           $ret .= "<tbody>";
@@ -1486,7 +1487,7 @@ sub DbRep_Get {
           $ret .= "</div>";
       }
 
-      if(!$prop || $prop =~ /rel/) {                                                                      # Notes
+      if (!$prop || $prop =~ /rel/) {                                                                     # Notes
           $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
           $ret .= "<table class=\"block wide internals\">";
           $ret .= "<tbody>";
@@ -1729,39 +1730,44 @@ sub DbRep_Attr {
             }
         }
 
-        if ($aName eq "timeYearPeriod") {
-            # 06-01 02-28
+        if ($aName eq "timeYearPeriod") {                                                         # z.Bsp: 06-01 02-28
             unless ($aVal =~ /^(\d{2})-(\d{2})\s(\d{2})-(\d{2})$/x ) {
                 return "The Value of \"$aName\" isn't valid. Set the account period as \"MM-DD MM-DD\".";
             }
 
             my ($mm1, $dd1, $mm2, $dd2) = ($aVal =~ /^(\d{2})-(\d{2}) (\d{2})-(\d{2})$/);
-            my (undef,undef,undef,$mday,$mon,$year1,undef,undef,undef) = localtime(time);     # Istzeit Ableitung
-            my $year2 = $year1;
-            # a  b   c  d
-            # 06-01 02-28 , wenn c < a && $mon < a -> Jahr(a)-1, sonst Jahr(c)+1
-            my $c = ($mon+1).$mday;
-            my $e = $mm2.$dd2;
-
-            if ($mm2 <= $mm1 && $c <= $e) {
-                $year1--;
+            my (undef,undef,undef,$mday,$mon,$year,undef,undef,undef) = localtime (time);         # Istzeit Ableitung
+            my ($ybp, $yep);
+            
+            $year += 1900;
+            $mon++;
+            
+            my $bdval = $mm1 * 30 + int $dd1;
+            my $adval = $mon * 30 + int $mday;
+            
+            if ($adval >= $bdval) {
+                $ybp = $year;
+                $yep = $year++;
             }
             else {
-                $year2++;
+                $ybp = $year--;
+                $yep = $year;                
             }
 
-            eval { my $t1 = timelocal(00, 00, 00, $dd1, $mm1-1, $year1-1900);
-                   my $t2 = timelocal(00, 00, 00, $dd2, $mm2-1, $year2-1900); };
-            if ($@) {
-                my @l = split (/at/, $@);
-                return " The Value of $aName is out of range - $l[0]";
-            }
+            eval { my $t1 = timelocal(00, 00, 00, $dd1, $mm1-1, $ybp-1900);
+                   my $t2 = timelocal(00, 00, 00, $dd2, $mm2-1, $yep-1900); 
+                 }
+                 or do {
+                     return " The Value of $aName is out of range";
+                 }; 
+            
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
             delete($attr{$name}{timestamp_end})   if ($attr{$name}{timestamp_end});
             delete($attr{$name}{timeDiffToNow})   if ($attr{$name}{timeDiffToNow});
             delete($attr{$name}{timeOlderThan})   if ($attr{$name}{timeOlderThan});
             return;
         }
+        
         if ($aName eq "timestamp_begin" || $aName eq "timestamp_end") {
             my @dtas = qw(current_year_begin
                           current_year_end
@@ -1931,7 +1937,7 @@ sub DbRep_Notify {
              $dblog_hash->{DEF}    =~ s/$evl[1]/$evl[2]/;
              $dblog_hash->{REGEXP} =~ s/$evl[1]/$evl[2]/;
 
-             $strucChanged = 1;                                        # Definitionsänderung wurde vorgenommen
+             $strucChanged = 1;                                                         # Definitionsänderung wurde vorgenommen
 
              Log3 ($myName, 3, "DbRep Agent $myName - $dblog_name substituted in DEF, old: \"$evl[1]\", new: \"$evl[2]\" ");
          }
@@ -1941,9 +1947,10 @@ sub DbRep_Notify {
          $own_hash->{HELPER}{OLDDEV}  = $evl[1];
          $own_hash->{HELPER}{NEWDEV}  = $evl[2];
          $own_hash->{HELPER}{RENMODE} = "devren";
+         
          DbRep_Main($own_hash, "deviceRename");
 
-         for my $repname (devspec2array("TYPE=DbRep")) {                      # die Attribute "device" in allen DbRep-Devices mit der Datenbank = DB des Agenten von alten Device in neues Device ändern
+         for my $repname (devspec2array("TYPE=DbRep")) {                                # die Attribute "device" in allen DbRep-Devices mit der Datenbank = DB des Agenten von alten Device in neues Device ändern
              next if($repname eq $myName);
 
              my $repattrdevice = $attr{$repname}{device};
@@ -1953,7 +1960,7 @@ sub DbRep_Notify {
              if ($repattrdevice eq $evl[1] && $repdb eq $own_hash->{DATABASE}) {
                  $attr{$repname}{device} = $evl[2];
 
-                 $strucChanged = 1;                                  # Definitionsänderung wurde vorgenommen
+                 $strucChanged = 1;                                                     # Definitionsänderung wurde vorgenommen
 
                  Log3 ($myName, 3, "DbRep Agent $myName - $repname attr device changed, old: \"$evl[1]\", new: \"$evl[2]\" ");
              }
@@ -2661,29 +2668,34 @@ sub DbRep_createTimeArray {
  }
 
  my $mints = $hash->{HELPER}{MINTS} // "1970-01-01 01:00:00";  # Timestamp des 1. Datensatzes verwenden falls ermittelt
- $tsbegin  = AttrVal($name, "timestamp_begin", $mints);
+ $tsbegin  = AttrVal ($name, "timestamp_begin", $mints);
  $tsbegin  = DbRep_formatpicker($tsbegin);
- $tsend    = AttrVal($name, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time));
+ $tsend    = AttrVal ($name, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time));
  $tsend    = DbRep_formatpicker($tsend);
 
- if (my $tap = AttrVal($name, "timeYearPeriod", undef)) {
-     # a  b   c  d
-     # 06-01 02-28 , wenn c < a && $mon < a -> Jahr(a)-1, sonst Jahr(c)+1
-     my $ybp = $year+1900;
-     my $yep = $year+1900;
+ if (my $tap = AttrVal ($name, 'timeYearPeriod', undef)) {
+     my ($ybp, $yep);
+     my (undef,undef,undef,$mday,$mon,$year,undef,undef,undef) = localtime (time);         # Istzeit Ableitung
+          
      $tap    =~ qr/^(\d{2})-(\d{2}) (\d{2})-(\d{2})$/p;
      my $mbp = $1;
      my $dbp = $2;
      my $mep = $3;
      my $dep = $4;
-     my $c   = ($mon+1).$mday;
-     my $e   = $mep.$dep;
+     
+     $year += 1900;
+     $mon++;
+     
+     my $bdval = $mbp * 30 + int $dbp;
+     my $adval = $mon * 30 + int $mday;
 
-     if ($mep <= $mbp && $c <= $e) {
-         $ybp--;
+     if ($adval >= $bdval) {
+         $ybp = $year;
+         $yep = $year + 1;
      }
      else {
-         $yep++;
+         $ybp = $year - 1;
+         $yep = $year;                
      }
 
      $tsbegin = "$ybp-$mbp-$dbp 00:00:00";
@@ -2692,47 +2704,47 @@ sub DbRep_createTimeArray {
 
  if (AttrVal($name,"timestamp_begin","") eq "current_year_begin" ||
           AttrVal($name,"timestamp_end","") eq "current_year_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($name,"timestamp_begin","") eq "current_year_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($name,"timestamp_end","")   eq "current_year_begin");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($name,"timestamp_begin","") eq "current_year_begin");
+     $tsend   = strftime "%Y-%m-%d %T" ,localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($name,"timestamp_end","")   eq "current_year_begin");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "current_year_end" ||
           AttrVal($name, "timestamp_end", "") eq "current_year_end") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year)) if(AttrVal($name,"timestamp_begin","") eq "current_year_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year)) if(AttrVal($name,"timestamp_end","")   eq "current_year_end");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,31,11,$year)) if(AttrVal($name,"timestamp_begin","") eq "current_year_end");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,31,11,$year)) if(AttrVal($name,"timestamp_end","")   eq "current_year_end");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "previous_year_begin" ||
           AttrVal($name, "timestamp_end", "") eq "previous_year_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year-1)) if(AttrVal($name, "timestamp_begin", "") eq "previous_year_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year-1)) if(AttrVal($name, "timestamp_end", "")   eq "previous_year_begin");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,1,0,$year-1)) if(AttrVal($name, "timestamp_begin", "") eq "previous_year_begin");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,1,0,$year-1)) if(AttrVal($name, "timestamp_end", "")   eq "previous_year_begin");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "previous_year_end" ||
           AttrVal($name, "timestamp_end", "") eq "previous_year_end") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year-1)) if(AttrVal($name, "timestamp_begin", "") eq "previous_year_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year-1)) if(AttrVal($name, "timestamp_end", "")   eq "previous_year_end");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,31,11,$year-1)) if(AttrVal($name, "timestamp_begin", "") eq "previous_year_end");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,31,11,$year-1)) if(AttrVal($name, "timestamp_end", "")   eq "previous_year_end");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "current_month_begin" ||
           AttrVal($name, "timestamp_end", "") eq "current_month_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_month_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_month_begin");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,1,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_month_begin");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,1,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_month_begin");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "current_month_end" ||
           AttrVal($name, "timestamp_end", "") eq "current_month_end") {
-     $dim     = $mon-1?30+(($mon+1)*3%7<4):28+!($year%4||$year%400*!($year%100));
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_month_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_month_end");
+     $dim     = $mon-1 ? 30+(($mon+1)*3%7<4) : 28+!($year%4||$year%400*!($year%100));
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,$dim,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_month_end");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,$dim,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_month_end");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "previous_month_begin" ||
           AttrVal($name, "timestamp_end", "") eq "previous_month_begin") {
      $ryear   = ($mon-1<0)?$year-1:$year;
      $rmon    = ($mon-1<0)?11:$mon-1;
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_month_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_month_begin");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_month_begin");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_month_begin");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "previous_month_end" ||
@@ -2740,8 +2752,8 @@ sub DbRep_createTimeArray {
      $ryear   = ($mon-1<0)?$year-1:$year;
      $rmon    = ($mon-1<0)?11:$mon-1;
      $dim     = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_month_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_month_end");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_month_end");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_month_end");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "current_week_begin" ||
@@ -2753,9 +2765,10 @@ sub DbRep_createTimeArray {
      $tsub = 345600 if($wday == 5);       # wenn Start am "Fr" dann Korrektur -4 Tage
      $tsub = 432000 if($wday == 6);       # wenn Start am "Sa" dann Korrektur -5 Tage
      $tsub = 518400 if($wday == 0);       # wenn Start am "So" dann Korrektur -6 Tage
+     
      ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time-$tsub);
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "current_week_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "current_week_begin");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "current_week_begin");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "current_week_begin");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "current_week_end" ||
@@ -2767,9 +2780,10 @@ sub DbRep_createTimeArray {
      $tadd = 172800 if($wday == 5);       # wenn Start am "Fr" dann Korrektur +2 Tage
      $tadd = 86400  if($wday == 6);       # wenn Start am "Sa" dann Korrektur +1 Tage
      $tadd = 0 if($wday == 0);            # wenn Start am "So" keine Korrektur
+     
      ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time+$tadd);
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "current_week_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "current_week_end");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "current_week_end");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "current_week_end");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "previous_week_begin" ||
@@ -2781,9 +2795,10 @@ sub DbRep_createTimeArray {
      $tsub = 950400  if($wday == 5);      # wenn Start am "Fr" dann Korrektur -11 Tage
      $tsub = 1036800 if($wday == 6);      # wenn Start am "Sa" dann Korrektur -12 Tage
      $tsub = 1123200 if($wday == 0);      # wenn Start am "So" dann Korrektur -13 Tage
+     
      ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time-$tsub);
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_week_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_week_begin");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_week_begin");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_week_begin");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "previous_week_end" ||
@@ -2795,35 +2810,36 @@ sub DbRep_createTimeArray {
      $tsub = 432000 if($wday == 5);       # wenn Start am "Fr" dann Korrektur -5 Tage
      $tsub = 518400 if($wday == 6);       # wenn Start am "Sa" dann Korrektur -6 Tage
      $tsub = 604800 if($wday == 0);       # wenn Start am "So" dann Korrektur -7 Tage
+     
      ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time-$tsub);
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_week_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_week_end");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_week_end");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_week_end");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "current_day_begin" ||
           AttrVal($name, "timestamp_end", "") eq "current_day_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_day_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_day_begin");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_day_begin");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_day_begin");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "current_day_end" ||
           AttrVal($name, "timestamp_end", "") eq "current_day_end") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_day_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_day_end");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_day_end");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_day_end");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "next_day_begin" ||
           AttrVal($name, "timestamp_end", "") eq "next_day_begin") {
      ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time+86400);                    # Istzeit + 1 Tag
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "next_day_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "next_day_begin");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "next_day_begin");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "next_day_begin");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "next_day_end" ||
           AttrVal($name, "timestamp_end", "") eq "next_day_end") {
      ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time+86400);                    # Istzeit + 1 Tag
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "next_day_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "next_day_end");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "next_day_end");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "next_day_end");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "previous_day_begin" ||
@@ -2839,8 +2855,8 @@ sub DbRep_createTimeArray {
          }
          $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
      }
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_day_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_day_begin");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_day_begin");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_day_begin");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "previous_day_end" ||
@@ -2856,20 +2872,20 @@ sub DbRep_createTimeArray {
          }
          $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
      }
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_day_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_day_end");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_day_end");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_day_end");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "current_hour_begin" ||
           AttrVal($name, "timestamp_end", "") eq "current_hour_begin") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_hour_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_hour_begin");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_hour_begin");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_hour_begin");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "current_hour_end" ||
           AttrVal($name, "timestamp_end", "") eq "current_hour_end") {
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_hour_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_hour_end");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_hour_end");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_hour_end");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "previous_hour_begin" ||
@@ -2890,8 +2906,8 @@ sub DbRep_createTimeArray {
              $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
          }
      }
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_hour_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_hour_begin");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_hour_begin");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_hour_begin");
  }
 
  if (AttrVal($name, "timestamp_begin", "") eq "previous_hour_end" || AttrVal($name, "timestamp_end", "") eq "previous_hour_end") {
@@ -2913,8 +2929,8 @@ sub DbRep_createTimeArray {
          }
      }
 
-     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_hour_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_hour_end");
+     $tsbegin = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_hour_end");
+     $tsend   = strftime "%Y-%m-%d %T", localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_hour_end");
  }
 
  my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = $tsbegin =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x;      # extrahieren der Einzelwerte von Datum/Zeit Beginn
@@ -12006,64 +12022,70 @@ return ("$hh:$mm:$ss");
 #    Return "1" wenn Bedingung erfüllt, sonst "0"
 ####################################################################################################
 sub DbRep_checktimeaggr {
- my $hash        = shift // return;
- my $name        = $hash->{NAME};
- my $IsTimeSet   = 0;
- my $IsAggrSet   = 0;
- my $aggregation = AttrVal($name,"aggregation","no");
+  my $hash        = shift // return;
+  my $name        = $hash->{NAME};
+  my $IsTimeSet   = 0;
+  my $IsAggrSet   = 0;
+  my $aggregation = AttrVal($name,"aggregation","no");
 
- my @a;
- @a = @{$hash->{HELPER}{REDUCELOG}}  if($hash->{HELPER}{REDUCELOG});
- @a = @{$hash->{HELPER}{DELENTRIES}} if($hash->{HELPER}{DELENTRIES});
+  my @a;
+  @a = @{$hash->{HELPER}{REDUCELOG}}  if($hash->{HELPER}{REDUCELOG});
+  @a = @{$hash->{HELPER}{DELENTRIES}} if($hash->{HELPER}{DELENTRIES});
 
- my $timeoption = 0;
+  my $timeoption = 0;
 
- for my $elem (@a) {                                                     # evtl. Relativzeiten bei "reduceLog" oder "deleteEntries" berücksichtigen
-     $timeoption = 1 if($elem =~ /\b\d+(:\d+)?\b/);
- }
+  for my $elem (@a) {                                                     # evtl. Relativzeiten bei "reduceLog" oder "deleteEntries" berücksichtigen
+      $timeoption = 1 if($elem =~ /\b\d+(:\d+)?\b/);
+  }
 
- if (AttrVal ($name,"timestamp_begin", undef) ||
-     AttrVal ($name,"timestamp_end",   undef) ||
-     AttrVal ($name,"timeDiffToNow",   undef) ||
-     AttrVal ($name,"timeOlderThan",   undef) ||
-     AttrVal ($name,"timeYearPeriod",  undef) || $timeoption ) {
-     $IsTimeSet = 1;
- }
+  if (AttrVal ($name,"timestamp_begin", undef) ||
+      AttrVal ($name,"timestamp_end",   undef) ||
+      AttrVal ($name,"timeDiffToNow",   undef) ||
+      AttrVal ($name,"timeOlderThan",   undef) ||
+      AttrVal ($name,"timeYearPeriod",  undef) || $timeoption ) {
+      $IsTimeSet = 1;
+  }
 
- if ($aggregation ne "no") {
-     $IsAggrSet = 1;
- }
- if($hash->{LASTCMD} =~ /delSeqDoublets|delDoublets/) {
-     $aggregation = ($aggregation eq "no") ? "day" : $aggregation;       # wenn Aggregation "no", für delSeqDoublets immer "day" setzen
-     $IsAggrSet   = 1;
- }
- if($hash->{LASTCMD} =~ /averageValue/ && AttrVal($name, "averageCalcForm", "avgArithmeticMean") =~ /avgDailyMeanGWS/x) {
-     $aggregation = "day";                                               # für Tagesmittelwertberechnung des deutschen Wetterdienstes immer "day"
-     $IsAggrSet   = 1;
- }
- if($hash->{LASTCMD} =~ /^sql|delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup|reduceLog|\breadingsDifferenceByTimeDelta\b/) {
-     $IsAggrSet   = 0;
-     $aggregation = "no";
- }
- if($hash->{LASTCMD} =~ /deviceRename|readingRename/) {
-     $IsTimeSet = 0;
- }
- if($hash->{LASTCMD} =~ /changeValue/) {
-     if($hash->{HELPER}{COMPLEX}) {
-         $IsAggrSet   = 1;
-         $aggregation = "day";
-     }
-     else {
-         $IsAggrSet   = 0;
-         $aggregation = "no";
-     }
- }
- if($hash->{LASTCMD} =~ /syncStandby/ ) {
-     if($aggregation !~ /minute|hour|day|week/) {
-         $aggregation = "day";
-         $IsAggrSet   = 1;
-     }
- }
+  if ($aggregation ne "no") {
+      $IsAggrSet = 1;
+  }
+  
+  if($hash->{LASTCMD} =~ /delSeqDoublets|delDoublets/) {
+      $aggregation = ($aggregation eq "no") ? "day" : $aggregation;       # wenn Aggregation "no", für delSeqDoublets immer "day" setzen
+      $IsAggrSet   = 1;
+  }
+  
+  if($hash->{LASTCMD} =~ /averageValue/ && AttrVal($name, "averageCalcForm", "avgArithmeticMean") =~ /avgDailyMeanGWS/x) {
+      $aggregation = "day";                                               # für Tagesmittelwertberechnung des deutschen Wetterdienstes immer "day"
+      $IsAggrSet   = 1;
+  }
+  
+  if($hash->{LASTCMD} =~ /^sql|delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup|reduceLog|\breadingsDifferenceByTimeDelta\b/) {
+      $IsAggrSet   = 0;
+      $aggregation = "no";
+  }
+  
+  if($hash->{LASTCMD} =~ /deviceRename|readingRename/) {
+      $IsTimeSet = 0;
+  }
+  
+  if($hash->{LASTCMD} =~ /changeValue/) {
+      if($hash->{HELPER}{COMPLEX}) {
+          $IsAggrSet   = 1;
+          $aggregation = "day";
+      }
+      else {
+          $IsAggrSet   = 0;
+          $aggregation = "no";
+      }
+  }
+  
+  if($hash->{LASTCMD} =~ /syncStandby/ ) {
+      if($aggregation !~ /minute|hour|day|week/) {
+          $aggregation = "day";
+          $IsAggrSet   = 1;
+      }
+  }
 
 return ($IsTimeSet,$IsAggrSet,$aggregation);
 }
@@ -17106,23 +17128,25 @@ sub bdump {
         </li>
 
   <a id="DbRep-attr-timeYearPeriod"></a>
-  <li><b>timeYearPeriod </b> - By this attribute an annual time period will be determined for database data selection.
-                               The time limits are calculated dynamically during execution time. Every time an annual period is determined.
-                               Periods of less than a year are not possible to set. <br>
-                               This attribute is particularly intended to make reports synchronous to an account period, e.g. of an energy- or gas provider.
-                               <br><br>
+  <li><b>timeYearPeriod &lt;Month&gt;-&lt;Day&gt; &lt;Month&gt;-&lt;Day&gt;</b> <br>
+  An annual period is determined for the database selection.
+  The annual period is calculated dynamically at execution time. 
+  It is not possible to provide information during the year. <br>
+  This attribute is primarily intended to create evaluations synchronized with a billing period, e.g. that of an energy or 
+  gas supplier.
+  <br><br>
 
-                               <ul>
-                               <b>Example:</b> <br><br>
-                               attr &lt;name&gt; timeYearPeriod 06-25 06-24 <br><br>
+  <ul>
+    <b>Example:</b> <br><br>
+    attr &lt;name&gt; timeYearPeriod 06-25 06-24 <br><br>
 
-                               # evaluates the database within the time limits 25. june AAAA and 24. june BBBB. <br>
-                               # The year AAAA respectively year BBBB is calculated dynamically depending of the current date. <br>
-                               # If the current date >= 25. june and =< 31. december, than AAAA = current year and BBBB = current year+1 <br>
-                               # If the current date >= 01. january und =< 24. june, than AAAA = current year-1 and BBBB = current year
-                               </ul>
-                               <br><br>
-                               </li>
+    Evaluates the database in the time limits June 25 AAAA to June 24 BBBB. <br>
+    The year AAAA or BBBB is calculated depending on the current date. <br>
+    If the current date is >= June 25 and <= December 31, then AAAA = current year and BBBB = current year+1 <br>
+    If the current date is >= January 01 and <= June 24, then AAAA = current year-1 and BBBB = current year
+  </ul>
+  <br><br>
+  </li>
 
   <a id="DbRep-attr-timestamp_begin"></a>
   <li><b>timestamp_begin </b> - begin of data selection  <br>
@@ -20162,24 +20186,25 @@ sub bdump {
         </li>
 
   <a id="DbRep-attr-timeYearPeriod"></a>
-  <li><b>timeYearPeriod </b> - Mit Hilfe dieses Attributes wird eine jährliche Zeitperiode für die Datenbankselektion bestimmt.
-                               Die Zeitgrenzen werden zur Ausführungszeit dynamisch berechnet. Es wird immer eine Jahresperiode
-                               bestimmt. Eine unterjährige Angabe ist nicht möglich. <br>
-                               Dieses Attribut ist vor allem dazu gedacht Auswertungen synchron zu einer Abrechnungsperiode, z.B. der eines
-                               Energie- oder Gaslieferanten, anzufertigen.
-                               <br><br>
+  <li><b>timeYearPeriod &lt;Monat&gt;-&lt;Tag&gt; &lt;Monat&gt;-&lt;Tag&gt;</b> <br>
+  Es wird eine jährliche Periode für die Datenbankselektion bestimmt.
+  Die Jahresperiode wird dynamisch zur Ausführungszeit berechnet. 
+  Eine unterjährige Angabe ist nicht möglich. <br>
+  Dieses Attribut ist vor allem dazu gedacht Auswertungen synchron zu einer Abrechnungsperiode, z.B. der eines
+  Energie- oder Gaslieferanten, anzufertigen.
+  <br><br>
 
-                               <ul>
-                               <b>Beispiel:</b> <br><br>
-                               attr &lt;name&gt; timeYearPeriod 06-25 06-24 <br><br>
+  <ul>
+    <b>Beispiel:</b> <br><br>
+    attr &lt;name&gt; timeYearPeriod 06-25 06-24 <br><br>
 
-                               # wertet die Datenbank in den Zeitgrenzen 25. Juni AAAA bis 24. Juni BBBB aus. <br>
-                               # Das Jahr AAAA bzw. BBBB wird in Abhängigkeit des aktuellen Datums errechnet. <br>
-                               # Ist das aktuelle Datum >= 25. Juni und =< 31. Dezember, dann ist AAAA = aktuelles Jahr und BBBB = aktuelles Jahr+1 <br>
-                               # Ist das aktuelle Datum >= 01. Januar und =< 24. Juni, dann ist AAAA = aktuelles Jahr-1 und BBBB = aktuelles Jahr
-                               </ul>
-                               <br><br>
-                               </li>
+    Wertet die Datenbank in den Zeitgrenzen 25. Juni AAAA bis 24. Juni BBBB aus. <br>
+    Das Jahr AAAA bzw. BBBB wird in Abhängigkeit des aktuellen Datums errechnet. <br>
+    Ist das aktuelle Datum >= 25. Juni und <= 31. Dezember, dann ist AAAA = aktuelles Jahr und BBBB = aktuelles Jahr+1 <br>
+    Ist das aktuelle Datum >= 01. Januar und <= 24. Juni, dann ist AAAA = aktuelles Jahr-1 und BBBB = aktuelles Jahr
+  </ul>
+  <br><br>
+  </li>
 
   <a id="DbRep-attr-timestamp_begin"></a>
   <li><b>timestamp_begin </b> - der zeitliche Beginn für die Datenselektion  <br>
