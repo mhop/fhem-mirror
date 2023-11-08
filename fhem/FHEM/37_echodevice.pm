@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2023.11.08 v0.2.26
+# - BUG:     User-Agent https://forum.fhem.de/index.php?topic=82631.msg1292057#msg1292057
+#
 # 2023.10.31 v0.2.25
 # - FEATURE: Unterstützung ASQZWP4GPYUT7 Echo Plus 2 Gen2
 #
@@ -516,7 +519,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.25";
+my $ModulVersion     = "0.2.26";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -1728,6 +1731,11 @@ sub echodevice_SendCommand($$$) {
         $SendUrl   .= "/api/bluetooth?cached=true&_=".int(time);
 	}
 	
+	elsif ($type eq "endpoints") {
+		$SendUrl    = "https://alexa.amazon.de/api/endpoints";
+		$SendMetode = "GET";
+	}
+	
 	elsif ($type eq "notifications") {
         $SendUrl   .= "/api/notifications?cached=true&_=".int(time);
 	}
@@ -2493,7 +2501,7 @@ sub echodevice_SendLoginCommand($$$) {
 	
 	if ($type eq "cookielogin6" ) {
 		$param->{url}         = "https://".$hash->{helper}{SERVER}."/api/bootstrap";
-		$param->{header}      = 'Cookie: '.$hash->{helper}{".COOKIE"};
+		$param->{header}      = "User-Agent: ".$UserAgent."\r\nCookie: ".$hash->{helper}{'.COOKIE'};
 		$param->{callback}    = \&echodevice_ParseAuth;
 		$param->{noshutdown}  = 1;
 		$param->{keepalive}   = 1;
@@ -2732,6 +2740,10 @@ sub echodevice_Parse($$$) {
 		readingsSingleUpdate ($hash, "COOKIE_STATE", "OK" ,0);
 		echodevice_SendCommand($hash,"devices","");
 		return;
+	}
+	
+	if ($msgtype eq "endpoints") {
+		#Log3 $name, 3, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] $data";
 	}
 	
 	if($msgtype eq "notifications_delete" || $msgtype eq "alarm_on" || $msgtype eq "alarm_off" || $msgtype eq "reminderitem") {
@@ -4149,6 +4161,7 @@ sub echodevice_GetSettings($) {
 	if ($ConnectState eq "connected") {
 
 		if($hash->{model} eq "ACCOUNT") {
+			echodevice_SendCommand($hash,"endpoints","");
 			echodevice_SendCommand($hash,"getnotifications","");
 			echodevice_SendCommand($hash,"alarmvolume","");
 			echodevice_SendCommand($hash,"bluetoothstate","");
@@ -4274,7 +4287,7 @@ sub echodevice_FirstStart($) {
 		if (index($hash->{helper}{".COOKIE"}, "{") != -1) { 
 			# NPM Login erkannt
 			readingsSingleUpdate ($hash, "COOKIE_TYPE", "READING_NPM" ,0);
-			$hash->{helper}{".COOKIE"} =~ /"localCookie":".*session-id=(.*)","?/;
+			$hash->{helper}{".COOKIE"} =~ /"localCookie":".*session-id=(.*?)","?/;
 			$hash->{helper}{".COOKIE"} = "session-id=" . $1;
 			$hash->{helper}{".COOKIE"} =~ /csrf=([-\w]+)[;\s]?(.*)?$/ if(defined($hash->{helper}{".COOKIE"}));
 			$hash->{helper}{".CSRF"}   = $1  if(defined($hash->{helper}{".COOKIE"}));
@@ -5247,7 +5260,7 @@ sub echodevice_NPMWaitForCookie($){
 				readingsSingleUpdate( $hash, "COOKIE_TYPE", "NPM_Login",1 );
 
 				$hash->{helper}{".COOKIE"} = $CookieResult;
-				$hash->{helper}{".COOKIE"} =~ /"localCookie":".*session-id=(.*)","?/;
+				$hash->{helper}{".COOKIE"} =~ /"localCookie":".*session-id=(.*?)","?/;
 				$hash->{helper}{".COOKIE"} = "session-id=" . $1;
 				$hash->{helper}{".COOKIE"} =~ /csrf=([-\w]+)[;\s]?(.*)?$/ if(defined($hash->{helper}{".COOKIE"}));
 				$hash->{helper}{".CSRF"}   = $1  if(defined($hash->{helper}{".COOKIE"}));
