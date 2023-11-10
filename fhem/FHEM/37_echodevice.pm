@@ -2,6 +2,11 @@
 #
 ##############################################
 #
+# 2023.11.10 v0.2.27
+# - FEATURE: Unterstützung A1WZKXFLI43K86 Fire TV Stick 4K Max
+#            Unterstützung A11QM4H9HGV71H Echo Show 5
+# - CHANGE:  Verbose Settings für HttpUtils
+#
 # 2023.11.08 v0.2.26
 # - BUG:     User-Agent https://forum.fhem.de/index.php?topic=82631.msg1292057#msg1292057
 #
@@ -519,7 +524,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.26";
+my $ModulVersion     = "0.2.27";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -2300,6 +2305,7 @@ sub echodevice_HandleCmdQueue($) {
 					   type            => $param->{type},
 					   httpversion     => $param->{httpversion},
 					   queuenumber     => $QueueNumber,
+					   NAME            => $name,
                        callback        => \&echodevice_Parse
                       };
   
@@ -2348,6 +2354,9 @@ sub echodevice_SendLoginCommand($$$) {
 
 	readingsSingleUpdate ($hash, "BrowserUserAgent", $UserAgent ,0);
 	readingsSingleUpdate ($hash, "BrowserLanguage", $HeaderLanguage ,0);
+
+	# This allows HttpUtils to use the 'verbose' setting of the device
+	$param->{NAME} = $name;
 	
 	# COOKIE LOGIN
 	if ($type eq "cookielogin1" ) {
@@ -4102,6 +4111,7 @@ sub echodevice_Parse($$$) {
 						   hash            => $hash,
 						   type            => $MP3Filename,
 						   httpversion     => $param->{httpversion},
+						   NAME            => $name,
 						   callback        => \&echodevice_AmazonVoiceMP3
 						};
 
@@ -4518,6 +4528,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "AIPK7MM90V7TB"  || $ModelNumber eq "Echo Show")				{return "Echo Show Gen3";}
 	elsif($ModelNumber eq "A4ZP7ZC4PI6TO"  || $ModelNumber eq "Echo Show 5")            {return "Echo Show 5";}
 	elsif($ModelNumber eq "A1XWJRHALS1REP" || $ModelNumber eq "Echo Show 5")            {return "Echo Show 5 Gen2";}
+	elsif($ModelNumber eq "A11QM4H9HGV71H" || $ModelNumber eq "Echo Show 5")            {return "Echo Show 5 Gen3";}
 	elsif($ModelNumber eq "A4ZXE0RM7LQ7A"  || $ModelNumber eq "Echo Show 5")            {return "Echo Show 5 Gen5";}
 	elsif($ModelNumber eq "A1Z88NGR2BK6A2" || $ModelNumber eq "Echo Show 8")            {return "Echo Show 8";}
 	elsif($ModelNumber eq "A15996VY63BQ2D" || $ModelNumber eq "Echo Show 8")			{return "Echo Show 8 Gen2";}
@@ -4554,6 +4565,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A265XOI9586NML" || $ModelNumber eq "Fire TV Stick 4K")		{return "Fire TV Stick 4K";}
 	elsif($ModelNumber eq "A3EVMLQTU6WL1W" || $ModelNumber eq "Fire TV Stick 4K Max")	{return "Fire TV Stick 4K Max";}
 	elsif($ModelNumber eq "A31DTMEEVDDOIV" || $ModelNumber eq "Fire TV Stick 4K")		{return "Fire TV";}
+	elsif($ModelNumber eq "A1WZKXFLI43K86" || $ModelNumber eq "Fire TV Stick 4K Max")   {return "Fire TV Stick 4K Max Gen2";}
 	elsif($ModelNumber eq "A2JKHJ0PX4J3L3" || $ModelNumber eq "ECHO FireTv Cube 4K")	{return "ECHO FireTv Cube 4K";}
 	elsif($ModelNumber eq "A10L5JEZTKKCZ8" || $ModelNumber eq "VOBOT")           		{return "VOBOT";}
 	elsif($ModelNumber eq "A37SHHQ3NUL7B5" || $ModelNumber eq "Bose Home Speaker 500")	{return "Bose Home Speaker 500";}
@@ -5499,6 +5511,7 @@ sub echodevice_Amazon($$$) {
 		data            => '{"OutputFormat": "' . $AWS_Format . '","Text": "' . $parameter .'","TextType": "text","VoiceId": "' . @VoiceName[2] . '"}',
         hash            => $hash,
 		type            => $type,
+		NAME            => $name,
         callback        => \&echodevice_ParseTTSMP3
     };
 	
@@ -5534,6 +5547,7 @@ sub echodevice_Google($$$) {
 		method          => "GET",
         hash            => $hash,
 		type            => $type,
+		NAME            => $name,
         callback        => \&echodevice_ParseTTSMP3
     };
 
