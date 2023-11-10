@@ -503,6 +503,7 @@ FHEM/98_ComfoAir.pm          StefanStrobel        Sonstiges
 FHEM/98_configdb.pm          betateilchen         Sonstiges
 FHEM/98_copy.pm              justme1968           Sonstiges
 FHEM/98_count.pm             betateilchen         Sonstiges
+FHEM/98_CDCOpenData.pm       JoWiemann            Regenmenge aus DWD-Radolan Daten einlesen https://forum.fhem.de/index.php?topic=134588.0
 FHEM/98_CULflash.pm          rudolfkoenig         Sonstiges
 FHEM/98_CustomReadings.pm    HCS                  Unterstützende Dienste
 FHEM/98_dewpoint.pm          hotbso               Automatisierung
