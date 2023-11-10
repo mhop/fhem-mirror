@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     98_CDCOpenData: Tägliche Regenmenge aus DWD-Radolan Daten einlesen
  - change:  36_Shelly: model of ShellyPMmini to shellypmmini
  - bugfix:  93_DbRep: fix period calculation when using attr timeYearPeriod
  - change:  93_DbRep: dumpMySQL clientSide: add create database to dump file
