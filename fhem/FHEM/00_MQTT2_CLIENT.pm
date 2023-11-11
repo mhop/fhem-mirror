@@ -452,7 +452,7 @@ MQTT2_CLIENT_Set($@)
   if($a[0] eq "publish") {
     shift(@a);
     my $retain;
-    if(@a>2 && $a[0] eq "-r") {
+    if(@a>0 && $a[0] eq "-r") {
       $retain = 1;
       shift(@a);
     }
