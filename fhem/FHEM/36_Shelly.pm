@@ -39,6 +39,7 @@
 # 5.05      Bug Fix: Begin/End-Update in sub () 
 # 5.06      Bug Fix: undefined value for ShellyPMmini and others
 #           Change: Model of ShellyPMmini changed to shellypmmini
+# 5.07      BugFix: shellyrgbw (white mode): set ... toggle 
 
 package main;
 
@@ -53,7 +54,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "5.06 09.11.2023";
+my $version = "5.07 12.11.2023";
 
 my $defaultINTERVAL = 60;
 my $secndIntervalMulti = 4;  # Multiplier for 'long update'
@@ -609,7 +610,7 @@ my %si_units = (
      "pct"           => [""," %"],
      "illum"         => [""," lux"],   # illuminace eg WallDisplay
      "ct"            => [""," K"],     # color temperature / Kelvin
-     "rssi"          => [""," dB"]
+     "rssi"          => [""," dBm"]    # deziBel Miniwatt
      );
      
 ########################################################################################
@@ -1578,34 +1579,26 @@ sub Shelly_Get ($@) {
 
 sub Shelly_Set ($@) {
   my ($hash, @a) = @_;
-  my $name = shift @a;
+  my $name  = shift @a;
+  my $cmd   = shift @a;
   
-  my ($newkeys,$cmd,$value,$v,$msg);
+  my $parameters=( scalar(@a)?" and ".scalar(@a)." parameters: ".join(" ",@a) : ", no parameters" );
+  Log3 $name,4,"[Shelly_Set] calling for device $name with command \'$cmd\'$parameters"  if($cmd ne "?");
+  
+  my $value = shift @a;
 
-  $cmd      = shift @a;
-  $value    = shift @a; 
-  
   #-- when Shelly_Set is called by 'Shelly_Set($hash)' arguments are not handed over
-  if( !defined($cmd) ){
-     $cmd = $hash->{CMD};
-  }  
-  if( !defined($name) ){
-     $name = $hash->{NAME};
-  }
+  $name = $hash->{NAME}   if( !defined($name) );
+  $cmd  = $hash->{CMD}    if( !defined($cmd) );
   
   my $model =  AttrVal($name,"model","generic");   # formerly: shelly1
   my $mode  =  AttrVal($name,"mode","");
-  my ($channel,$time);
-  if(defined($value)){
-      Log3 $name,5,"[Shelly_Set] calling for device $name with command $cmd and value $value";
-  }else{
-      Log3 $name,5,"[Shelly_Set] calling for device $name with command $cmd (without value)";
-  } 
+  my ($v,$msg,$channel,$time);
 
 
   #-- WEB asking for command list 
   if( $cmd eq "?" ) { 
-      $newkeys = join(" ", sort keys %setsshelly);  # all models and generic
+      my $newkeys = join(" ", sort keys %setsshelly);  # all models and generic
       if( $mode eq "relay" || ($shelly_models{$model}[0]>0 && $shelly_models{$model}[1]==0) ){
           $newkeys .= " ".join(" ", sort keys %setssw)
                        if( $shelly_models{$model}[0]>0 );
@@ -1621,16 +1614,8 @@ sub Shelly_Set ($@) {
           $newkeys .= " ".join(" ", sort keys %setsbulbw) ;
       }elsif( $model =~ /shelly(rgbw|bulb).*/ && $mode eq "color" ){
           $newkeys .= " ".join(" ", sort keys %setsrgbwc) ;
-      }       
- if(0 && $shelly_models{$model}[0]>0 && $shelly_models{$model}[4]>=1 ){
- # xx-for-timer does not work 
-            $newkeys =~ s/on-for-timer//;
-            $newkeys  =~ s/off-for-timer//;
- }
-
-      $msg = "unknown argument $cmd choose one of $newkeys";
-      ###Log3 "YY",5,"[Shelly_Set] $name model=$model: $msg";
-      return $msg;
+      }
+      return "unknown argument $cmd choose one of $newkeys";
   }
      
   #-- following commands do not occur in command list, eg. out_on, input_on, single_push
@@ -1664,7 +1649,7 @@ sub Shelly_Set ($@) {
           $subs = (abs($shelly_models{$model}[5]) == 1) ? "" : "_".$value;
           readingsBulkUpdateMonitored($hash, "input$subs", "ON", 1 );
           readingsBulkUpdateMonitored($hash, "input$subs\_action", $cmd, 1 );
-          readingsBulkUpdateMonitored($hash, "input$subs\_actionS",$fhem_events{$cmd}, 0 );
+          readingsBulkUpdateMonitored($hash, "input$subs\_actionS",$fhem_events{$cmd}, 1 );
           # after a second, the pushbuttons state is back to OFF resp. 'unknown', call status of inputs
           RemoveInternalTimer($hash,"Shelly_inputstatus"); 
           InternalTimer(gettimeofday()+1.4, "Shelly_inputstatus", $hash,1); 
@@ -1718,8 +1703,6 @@ sub Shelly_Set ($@) {
       RemoveInternalTimer($hash,"Shelly_status"); Log3 $name,6,"shelly_set 1715 removed Timer Shelly_status, now calling in 1.5 sec";
       InternalTimer(gettimeofday()+1.5, "Shelly_status", $hash);
     }
-  }else{
-    Log3 $name,3,"[Shelly_Set] calling for device $name with command $cmd";
   }
   
   #-- commands independent of Shelly type: password, reboot, update
@@ -1774,7 +1757,7 @@ sub Shelly_Set ($@) {
       }else{
         Log3 $name,2,"[Shelly_Set] No timer started for $name";
       }
-      return undef;
+      return "started";#undef;
 
       
   }elsif( $cmd eq "reboot" ){
@@ -1788,6 +1771,7 @@ sub Shelly_Set ($@) {
       Shelly_configure($hash,$cmd);
       return undef;
 
+  # renaming the Shelly, spaces in name are allowed
   }elsif( $cmd eq "name") {   #ShellyName
       my $newname;
       if( defined $value ){
@@ -1801,8 +1785,9 @@ sub Shelly_Set ($@) {
           return $msg;
       }
       readingsSingleUpdate($hash,"name",$newname,1);
-      $newname =~ s/ /%20/g;  #spaces not allowed in urls   
-      Log3 $name,1,"[Shelly_Set] Renaming $name to $newname";
+      $msg = "The Shelly linked to $name is named to \'$newname\'";  
+      Log3 $name,1,"[Shelly_Set] $msg";
+      $newname =~ s/ /%20/g;  #spaces not allowed in urls 
       if( $shelly_models{$model}[4]>=1 ){
         $cmd="rpc/Sys.SetConfig?config={%22device%22:{%22name%22:%22$newname%22}}" ;
         #                                {"device"   :{"  name"  :   "arg"}}
@@ -1810,7 +1795,7 @@ sub Shelly_Set ($@) {
         $cmd="settings?name=$newname";
       }
       Shelly_configure($hash,$cmd);
-      return undef;
+      return $msg;
    
   #-- command config largely independent of Shelly type 
   }elsif($cmd eq "config") {
@@ -1855,29 +1840,29 @@ sub Shelly_Set ($@) {
           # set the devStateIcon-attribute when the devStateIcon attribute is not set yet     
           $attr{$hash->{NAME}}{devStateIcon} = $v;
           Log3 $name,5,"[Shelly_Get] the attribute \'devStateIcon\' of device $name is set to \'$v\' ";
-          $v = "devStateIcon attribute is set";
+          $msg = "devStateIcon attribute is set";
       }else{
-          $v = "attribute \'devStateIcon\' is already defined";
+          $msg = "attribute \'devStateIcon\' is already defined";
       }
-      $v .= "\n";
+      $msg .= "\n";
       if(  !AttrVal($name,"webCmd",undef) ){ 
           # set the webCmd-attribute when the webCmd attribute is not set yet     
           $attr{$hash->{NAME}}{webCmd} = $predefAttrs{'roller_webCmd'};
           Log3 $name,5,"[Shelly_Get] the attribute \'webCmd\' of device $name is set  ";
-          $v .= "webCmd attribute is set";
+          $msg .= "webCmd attribute is set";
       }else{
-          $v .= "attribute \'webCmd\' is already defined";
+          $msg .= "attribute \'webCmd\' is already defined";
       }
-      $v .= "\n";
+      $msg .= "\n";
       if(  !AttrVal($name,"cmdIcon",undef) ){ 
           # set the cmdIcon-attribute when the cmdIcon attribute is not set yet     
           $attr{$hash->{NAME}}{cmdIcon} = $predefAttrs{'roller_cmdIcon'};
           Log3 $name,5,"[Shelly_Get] the attribute \'cmdIcon\' of device $name is set  ";
-          $v .= "cmdIcon attribute is set";
+          $msg .= "cmdIcon attribute is set";
       }else{
-          $v .= "attribute \'cmdIcon\' is already defined";
+          $msg .= "attribute \'cmdIcon\' is already defined";
       }
-      $v .= "\n";
+      $msg .= "\n";
       if(  !AttrVal($name,"eventMap",undef) ){ 
           # set the eventMap-attribute when the eventMap attribute is not set yet   
           if( AttrVal($name, "pct100", "closed") eq "closed" ){
@@ -1886,13 +1871,13 @@ sub Shelly_Set ($@) {
                 $attr{$hash->{NAME}}{eventMap} = $predefAttrs{'roller_eventMap_open100'};
           }
           Log3 $name,5,"[Shelly_Get] the attribute \'eventMap\' of device $name is set  ";
-          $v .= "eventMap attribute is set";
+          $msg .= "eventMap attribute is set";
       }else{
-          $v .= "attribute \'eventMap\' is already defined";
+          $msg .= "attribute \'eventMap\' is already defined";
       }
-      $v .= "\n\n to see the changes, browser refresh is necessary";
-      return $v;
-  }  
+      $msg .= "\n\n to see the changes, browser refresh is necessary";
+      return $msg;
+  } 
 
 
   
@@ -1961,18 +1946,18 @@ sub Shelly_Set ($@) {
 
   #-- transfer toggle command to an on-off-command
   if( $cmd eq "toggle" ){ #  && $shelly_models{$model}[0]<2 && $shelly_models{$model}[2]<2 ){ #select devices with less than 2 channels 
-       my $subs = ""; 
        if( ($shelly_models{$model}[0]>1 && $mode ne "roller") || ($shelly_models{$model}[2]>1 && $mode eq "white") ){
           # we have a multi-channel device
           # toggle named channel of switch type device   or   RGBW-device
-          $subs = "_".$channel; # channel;
-          $cmd = (ReadingsVal($name,"relay".$subs,ReadingsVal($name,"state".$subs,"off")) eq "on") ? "off" : "on";
+          my $subs = "_".$channel; # channel;
+          $cmd = (ReadingsVal($name,"relay".$subs,
+                  ReadingsVal($name,"light".$subs,
+                  ReadingsVal($name,"state".$subs,"off"))) eq "on") ? "off" : "on";
        }else{
           $cmd = (ReadingsVal($name,"state","off") eq "on") ? "off" : "on";
        }
        Log3 $name,5,"[Shelly_Set] transfer \'toggle\' to command \'$cmd\'";
   }
-  
 
   #- - on and off
   if( $cmd =~ /^((on)|(off)).*/ ){
@@ -2062,7 +2047,8 @@ sub Shelly_Set ($@) {
         }
     }
     return $msg if( $msg );
-  
+
+  # create readingsProxy devices
   }elsif( $cmd eq "xtrachannels" ){
        Log3 $name,3,"[Shelly_Set] readingsProxy devices for $name requested";   
        if( $shelly_models{$model}[$ff]>1){
@@ -2080,12 +2066,12 @@ sub Shelly_Set ($@) {
            }
            Log3 $name,1,"[Shelly_Set] readingsProxy device ".$name."_$i created";   
          }
-         return "$i devices for $name created";
+         $msg = "$i devices for $name created";
       }else{
          $msg = "No separate channel device created for device $name, only one channel present";
          Log3 $name,1,"[Shelly_Set] ".$msg;
-         return $msg;
       }
+      return $msg;
   }
 
   #-- commands strongly dependent on Shelly type
