@@ -94,6 +94,9 @@ BEGIN {
           FmtDateTime
           FW_makeImage
           getKeyValue
+          getAllAttr
+          getAllGets
+          getAllSets
           HttpUtils_NonblockingGet
           init_done
           InternalTimer
@@ -119,8 +122,10 @@ BEGIN {
           FW_directNotify
           FW_ME
           FW_subdir
+          FW_pH
           FW_room
           FW_detail
+          FW_widgetFallbackFn
           FW_wname
         )
   );
@@ -144,6 +149,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.0.11" => "13.11.2023  graphicHeaderOwnspec: add possible set/attr commands ",
   "1.0.10" => "31.10.2023  fix warnings, edit comref ",
   "1.0.9"  => "29.10.2023  _aiGetSpread: set spread from 50 to 20 ",
   "1.0.8"  => "22.10.2023  codechange: add central readings store array, new function storeReading, writeCacheToFile ".
@@ -442,6 +448,7 @@ my $kJtokWh        = 0.00027778;                                                
 my $defmaxvar      = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
 my $definterval    = 70;                                                            # Standard Abfrageintervall
 my $defslidenum    = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
+my $webCmdFn       = 'FW_widgetFallbackFn';                                         # FHEMWEB Widgets Funktion
 
 my $pvhcache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $pvccache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
@@ -528,6 +535,8 @@ my @dd    = qw( none
                 radiationProcess
                 saveData2Cache
               );
+              
+my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select|bitfield|widgetList';
 
 # Steuerhashes
 ###############
@@ -3860,7 +3869,8 @@ sub _getlistPVHistory {
 
   my $ret = listDataPool   ($hash, 'pvhist', $arg);
   $ret   .= lineFromSpaces ($ret, 20);
-
+  $ret    =~ s/\n/<br>/g;
+  
 return $ret;
 }
 
@@ -3886,7 +3896,7 @@ sub _getlistNextHours {
 
   my $ret = listDataPool   ($hash, 'nexthours');
   $ret   .= lineFromSpaces ($ret, 10);
-
+  
 return $ret;
 }
 
@@ -9072,6 +9082,9 @@ sub __createOwnSpec {
   my $show = $hdrDetail =~ /all|own/xs ? 1 : 0;
 
   return if(!$spec || !$show);
+  
+  my $allsets  = getAllSets ($name);
+  my $allattrs = getAllAttr ($name);
 
   my @fields = split (/\s+/sx, $spec);
 
@@ -9102,27 +9115,37 @@ sub __createOwnSpec {
               next;
           }
           
-          ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($name, $h->{$k}{rdg}, '');
-      }
-
-      if ($uatr eq 'kWh') {
-          for (my $r = 0 ; $r < $vinr; $r++) {
-              next if(!$u->{$r});
-
-              if ($u->{$r} =~ /^Wh/xs) {
-                  $v->{$r} = sprintf "%.1f",($v->{$r} / 1000);
-                  $u->{$r} = 'kWh';
+          my $setcmd = ___getFWwidget ($name, $h->{$k}{rdg}, $allsets, 'set');
+          
+          if ($setcmd) {
+              $v->{$k} = $setcmd;
+              $u->{$k} = q{};
+              next;
+          }
+          
+          my $attrcmd = ___getFWwidget ($name, $h->{$k}{rdg}, $allattrs, 'attr');
+          
+          if ($attrcmd) {
+              $v->{$k} = $attrcmd;
+              $u->{$k} = q{};
+              next;
+          }
+          
+          ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($name, $h->{$k}{rdg}, ' ');
+          
+          next if(!$u->{$k});
+          
+          if ($uatr eq 'kWh') {
+              if ($u->{$k} =~ /^Wh/xs) {
+                  $v->{$k} = sprintf "%.1f",($v->{$k} / 1000);
+                  $u->{$k} = 'kWh';
               }
           }
-      }
 
-      if ($uatr eq 'Wh') {
-          for (my $r = 0 ; $r < $vinr; $r++) {
-              next if(!$u->{$r});
-
-              if ($u->{$r} =~ /^kWh/xs) {
-                  $v->{$r} = sprintf "%.0f",($v->{$r} * 1000);
-                  $u->{$r} = 'Wh';
+          if ($uatr eq 'Wh') {
+              if ($u->{$k} =~ /^kWh/xs) {
+                  $v->{$k} = sprintf "%.0f",($v->{$k} * 1000);
+                  $u->{$k} = 'Wh';
               }
           }
       }
@@ -9141,6 +9164,40 @@ sub __createOwnSpec {
   $ownv .= qq{</tr>};
 
 return $ownv;
+}
+
+################################################################
+#  liefert ein FHEMWEB set/attr Widget zurück
+################################################################  
+sub ___getFWwidget {
+  my $name = shift;
+  my $elm  = shift;                         # Element
+  my $allc = shift;                         # Kommandovorrat -> ist Element enthalten?
+  my $ctyp = shift // 'set';                # Kommandotyp: set/get
+
+  my $widget = '';
+  
+  if ($allc =~ /$elm:(.*?)\s+/xs) {
+      my $arg = $1;
+      
+      if ($arg !~ /^\#/xs && $arg !~ /^$allwidgets/xs) {
+          $arg = '#,'.$arg;         
+      }
+      
+      no strict "refs";                                                                    ## no critic 'NoStrict'
+      $widget = &{$webCmdFn} ($FW_wname, $name, "", $elm, $arg);
+      use strict "refs";
+
+      if ($widget) {
+          $widget =~ s,^<td[^>]*>(.*)</td>$,$1,x;
+          $widget =~ s,></div>, type='$ctyp'></div>,x;
+      }
+      else {
+          $widget = FW_pH ("cmd=$ctyp $name $elm imgget", $elm, 0, "", 1, 1);
+      }
+  }
+
+return $widget;
 }
 
 ################################################################
@@ -9942,7 +9999,9 @@ sub __weatherOnBeam {
       last if ($ii > $maxhours);
                                                                                                              # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
       if (exists($hfcg->{$i}{weather}) && defined($hfcg->{$i}{weather})) {
-          my ($icon_name, $title) = $hfcg->{$i}{weather} > 100                     ?
+          debugLog ($paref, 'graphic', "weather id beam (from left) number >$i<: ".$hfcg->{$i}{weather});
+          
+          my ($icon_name, $title) = $hfcg->{$i}{weather} > 100                            ?
                                     weather_icon ($name, $lang, $hfcg->{$i}{weather}-100) :
                                     weather_icon ($name, $lang, $hfcg->{$i}{weather});
 
@@ -10454,7 +10513,7 @@ sub weather_icon {
       return $weather_ids{$id}{icon}, encode("utf8", $weather_ids{$id}{$txt});
   }
 
-return 'unknown','';
+return ('unknown','');
 }
 
 ################################################################
@@ -14629,8 +14688,12 @@ to ensure that the system configuration is correct.
       The DWD service is integrated via a FHEM device of type DWD_OpenData.
       If there is no device of type DWD_OpenData yet, it must be defined in advance
       (look at <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
-      To obtain a good radiation forecast, a DWD station located near the plant site should be used.
-      Unfortunately, not all DWD stations provide the required Rad1h values. <br>
+      To obtain a good radiation forecast, a DWD station located near the plant site should be used. <br>
+      Unfortunately, not all 
+      <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/statliste/statlex_html.html;jsessionid=EC5F572A52EB69684D552DCF6198F290.live31092?view=nasPublication&nn=16102">DWD stations</a> 
+      provide the required Rad1h values. <br>
+      Explanations of the stations are listed in 
+      <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/stationsliste.html">Stationslexikon</a>. <br>
       At least the following attributes must be set in the selected DWD_OpenData Device: <br><br>
 
       <ul>
@@ -16472,7 +16535,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Ist noch kein Device des Typs DWD_OpenData vorhanden, muß es vorab definiert werden
       (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
       Um eine gute Strahlungsprognose zu erhalten, sollte eine nahe dem Anlagenstandort gelegene DWD-Station genutzt
-      werden. Leider liefern nicht alle DWD-Station die benötigten Rad1h-Werte. <br>
+      werden. <br>
+      Leider liefern nicht alle 
+      <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/statliste/statlex_html.html;jsessionid=EC5F572A52EB69684D552DCF6198F290.live31092?view=nasPublication&nn=16102">DWD-Stationen</a> 
+      die benötigten Rad1h-Werte. <br>
+      Erläuterungen zu den Stationen sind im 
+      <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/stationsliste.html">Stationslexikon</a> aufgeführt. <br>
       Im ausgewählten DWD_OpenData Device müssen mindestens die folgenden Attribute gesetzt sein: <br><br>
 
       <ul>
