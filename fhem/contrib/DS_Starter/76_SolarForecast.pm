@@ -10042,8 +10042,9 @@ sub __weatherOnBeam {
       last if (!exists ($hfcg->{$i}{weather}));   
       
       $hfcg->{$i}{weather} = 999 if(!defined $hfcg->{$i}{weather});
+      my $wcc              = $hfcg->{$i}{wcc} // "-";                                                        # Bewölkungsgrad ergänzen
       
-      debugLog ($paref, 'graphic', "weather id beam number >$i< (start hour $hfcg->{$i}{time_str}): $hfcg->{$i}{weather}") if($ii < $maxhours);
+      debugLog ($paref, 'graphic', "weather id beam number >$i< (start hour $hfcg->{$i}{time_str}): wid $hfcg->{$i}{weather} / wcc $wcc") if($ii < $maxhours);
       
       if (!$show_night && $hfcg->{$i}{weather} > 99
                        && !$hfcg->{$i}{beam1}
@@ -10057,32 +10058,30 @@ sub __weatherOnBeam {
       last if($ii > $maxhours);
                                                                                                              # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können      
       #if (defined $hfcg->{$i}{weather}) {        
-          my ($icon_name, $title) = $hfcg->{$i}{weather} > 100                            ?
-                                    weather_icon ($name, $lang, $hfcg->{$i}{weather}-100) :
-                                    weather_icon ($name, $lang, $hfcg->{$i}{weather});
+      my ($icon_name, $title) = $hfcg->{$i}{weather} > 100                            ?
+                                weather_icon ($name, $lang, $hfcg->{$i}{weather}-100) :
+                                weather_icon ($name, $lang, $hfcg->{$i}{weather});
 
-          my $wcc = $hfcg->{$i}{wcc} // "-";                                                                 # Bewölkungsgrad ergänzen
+      if (isNumeric ($wcc)) {                                                                                # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661
+          $wcc += 0;
+      }
 
-          if (isNumeric ($wcc)) {                                                                            # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661
-              $wcc += 0;
-          }
+      $title .= ': '.$wcc;
 
-          $title .= ': '.$wcc;
+      if ($icon_name eq 'unknown') {
+          debugLog ($paref, "graphic", "unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer");
+      }
 
-          if ($icon_name eq 'unknown') {
-              debugLog ($paref, "graphic", "unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer");
-          }
+      $icon_name .= $hfcg->{$i}{weather} < 100 ? '@'.$colorw  : '@'.$colorwn;
+      my $val     = FW_makeImage ($icon_name) // q{};
 
-          $icon_name .= $hfcg->{$i}{weather} < 100 ? '@'.$colorw  : '@'.$colorwn;
-          my $val     = FW_makeImage ($icon_name) // q{};
+      if ($val eq $icon_name) {                                                                              # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
+          $val = '<b>???<b/>';
 
-          if ($val eq $icon_name) {                                                                          # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
-              $val = '<b>???<b/>';
+          debugLog ($paref, "graphic", qq{the icon "$weather_ids{$hfcg->{$i}{weather}}{icon}" not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
+      }
 
-              debugLog ($paref, "graphic", qq{the icon "$weather_ids{$hfcg->{$i}{weather}}{icon}" not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
-          }
-
-          $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";
+      $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";
       #}
       #else {                                                                                                 # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
       #    $ret .= "<td></td>";
