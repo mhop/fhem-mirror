@@ -149,7 +149,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.1.0"  => "14.11.2023  graphicHeaderOwnspec: possible add set/attr commands ",
+  "1.1.0"  => "14.11.2023  graphicHeaderOwnspec: possible add set/attr commands, new setter consumerNewPlanning ",
   "1.0.10" => "31.10.2023  fix warnings, edit comref ",
   "1.0.9"  => "29.10.2023  _aiGetSpread: set spread from 50 to 20 ",
   "1.0.8"  => "22.10.2023  codechange: add central readings store array, new function storeReading, writeCacheToFile ".
@@ -449,6 +449,7 @@ my $defmaxvar      = 0.5;                                                       
 my $definterval    = 70;                                                            # Standard Abfrageintervall
 my $defslidenum    = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
 my $webCmdFn       = 'FW_widgetFallbackFn';                                         # FHEMWEB Widgets Funktion
+my @attrreadings   = ();                                                            # Array der Hilfsreadings als Attributspeicher
 
 my $pvhcache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $pvccache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
@@ -543,6 +544,7 @@ my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select
 
 my %hset = (                                                                # Hash der Set-Funktion
   consumerImmediatePlanning => { fn => \&_setconsumerImmediatePlanning },
+  consumerNewPlanning       => { fn => \&_setconsumerNewPlanning       },
   currentWeatherDev         => { fn => \&_setcurrentWeatherDev         },
   currentRadiationAPI       => { fn => \&_setcurrentRadiationAPI       },
   modulePeakString          => { fn => \&_setmodulePeakString          },
@@ -1311,6 +1313,7 @@ sub Set {
   my $ipai = isPrepared4AI ($hash);
   $setlist = "Unknown argument $opt, choose one of ".
              "consumerImmediatePlanning:$coms ".
+             "consumerNewPlanning:$coms ".
              "currentWeatherDev:$fcd ".
              "currentRadiationAPI:$rdd ".
              "currentBatteryDev:textField-long ".
@@ -1388,7 +1391,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $type    = $paref->{type};
   my $opt     = $paref->{opt};
   my $c       = $paref->{prop};
-  my $evt     = $paref->{prop1} // 0;                                                          # geändert V 1.0.11 - 1 -> 0
+  my $evt     = $paref->{prop1} // 0;                                                          # geändert V 1.1.0 - 1 -> 0
 
   return qq{no consumer number specified} if(!$c);
   return qq{no valid consumer id "$c"}    if(!ConsumerVal ($hash, $c, "name", ""));
@@ -1433,6 +1436,29 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   writeCacheToFile ($hash, "consumers", $csmcache.$name);                             # Cache File Consumer schreiben
 
   Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate}) if($planstate);
+
+  centralTask ($hash, $evt);
+
+return;
+}
+
+################################################################
+#         Setter consumerNewPlanning
+################################################################
+sub _setconsumerNewPlanning {            ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $c       = $paref->{prop};
+  my $evt     = $paref->{prop1} // 0;                                                          # geändert V 1.1.0 - 1 -> 0
+
+  return qq{no consumer number specified} if(!$c);
+  return qq{no valid consumer id "$c"}    if(!ConsumerVal ($hash, $c, 'name', ''));
+
+  if ($c) {
+      deleteConsumerPlanning ($hash, $c);
+      writeCacheToFile       ($hash, 'consumers', $csmcache.$name);                            # Cache File Consumer schreiben
+  }
 
   centralTask ($hash, $evt);
 
@@ -2289,7 +2315,7 @@ sub _setreset {                          ## no critic "not used"
       delete $data{$type}{$name}{current}{powerbatin};
       delete $data{$type}{$name}{current}{batcharge};
 
-      writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
+      writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                      # Anlagenkonfiguration File schreiben
   }
 
   if ($prop eq 'currentInverterDev') {
@@ -2298,7 +2324,7 @@ sub _setreset {                          ## no critic "not used"
       writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);                     # Anlagenkonfiguration File schreiben
   }
 
-  if ($prop eq 'consumerPlanning') {                                                  # Verbraucherplanung resetten
+  if ($prop eq 'consumerPlanning') {                                                 # Verbraucherplanung resetten
       my $c = $paref->{prop1} // "";                                                 # bestimmten Verbraucher setzen falls angegeben
 
       if ($c) {
@@ -2329,7 +2355,7 @@ sub _setreset {                          ## no critic "not used"
           }
       }
 
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                         # Cache File Consumer schreiben
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                       # Cache File Consumer schreiben
   }
 
   createAssociatedWith ($hash);
@@ -5041,7 +5067,10 @@ sub _specialActivities {
           deleteReadingspec ($hash, "Today_MaxPVforecast.*");
           deleteReadingspec ($hash, "Today_PVdeviation");
           deleteReadingspec ($hash, "Today_PVreal");
-
+          
+          for my $atr (@attrreadings) {
+              deleteReadingspec ($hash, $atr);
+          }
 
           for my $n (1..24) {
               $n = sprintf "%02d", $n;
@@ -9191,6 +9220,7 @@ sub ___getFWwidget {
           $current = AttrVal ($name, $elm, '');
           $reading = '.'.$elm;
           
+          push @attrreadings, $reading;
           readingsSingleUpdate ($defs{$name}, $reading, $current, 0);
       }
       
@@ -9632,7 +9662,7 @@ sub _beamGraphicRemainingHours {
               $hfcg->{$i}{wcc}     = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
           }
           else {
-              $nh = sprintf('%02d', $i+$offset);
+              $nh = sprintf('%02d', $i + $offset);
           }
       }
       else {
@@ -9717,9 +9747,9 @@ sub _beamGraphic {
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";
       my $ii;
       for my $i (0..($maxhours*2)-1) {                                                                           # gleiche Bedingung wie oben
-          next if (!$show_night && ($hfcg->{$i}{weather} > 99)
-                                && !$hfcg->{$i}{beam1}
-                                && !$hfcg->{$i}{beam2});
+          next if(!$show_night && $hfcg->{$i}{weather} > 99
+                               && !$hfcg->{$i}{beam1}
+                               && !$hfcg->{$i}{beam2});
           $ii++;                                                                                                 # wieviele Stunden haben wir bisher angezeigt ?
 
           last if ($ii > $maxhours);                                                                             # vorzeitiger Abbruch
@@ -9741,11 +9771,11 @@ sub _beamGraphic {
 
   my $ii = 0;
 
-  for my $i (0..($maxhours*2)-1) {                                                                               # gleiche Bedingung wie oben
-      next if (!$show_night && defined($hfcg->{$i}{weather})
-                            && ($hfcg->{$i}{weather} > 99)
-                            && !$hfcg->{$i}{beam1}
-                            && !$hfcg->{$i}{beam2});
+  for my $i (0..($maxhours * 2) - 1) {                                                                               # gleiche Bedingung wie oben
+      next if(!$show_night && defined($hfcg->{$i}{weather})
+                           && ($hfcg->{$i}{weather} > 99)
+                           && !$hfcg->{$i}{beam1}
+                           && !$hfcg->{$i}{beam2});
       $ii++;
       last if ($ii > $maxhours);
 
@@ -10014,22 +10044,19 @@ sub __weatherOnBeam {
       
       $hfcg->{$i}{weather} = 999 if(!defined $hfcg->{$i}{weather});
       
-      debugLog ($paref, 'graphic', "check weather id beam (from left) number >$i< ...") if($ii < $maxhours);
+      debugLog ($paref, 'graphic', "weather id beam (from left) number >$i<: $hfcg->{$i}{weather}") if($ii < $maxhours);
       
-      if (!$show_night  && $hfcg->{$i}{weather} > 99
-                        && !$hfcg->{$i}{beam1}
-                        && !$hfcg->{$i}{beam2}) { 
+      if (!$show_night && $hfcg->{$i}{weather} > 99
+                       && !$hfcg->{$i}{beam1}
+                       && !$hfcg->{$i}{beam2}) { 
           
-          debugLog ($paref, 'graphic', "weather id >$i<: don't show night condition ... check next") if($ii < $maxhours);
+          debugLog ($paref, 'graphic', "weather id >$i< don't show night condition ... is skipped") if($ii < $maxhours);
           next;
       };
                                                                                                              # Lässt Nachticons aber noch durch wenn es einen Wert gibt , ToDo : klären ob die Nacht richtig gesetzt wurde
       $ii++;                                                                                                 # wieviele Stunden Icons haben wir bisher beechnet  ?
       last if($ii > $maxhours);
-                                                                                                             # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
-      debugLog ($paref, 'graphic', "weather id >$i<: ".
-               (defined $hfcg->{$i}{weather} ? $hfcg->{$i}{weather} : 'undefined') );
-      
+                                                                                                             # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können      
       #if (defined $hfcg->{$i}{weather}) {        
           my ($icon_name, $title) = $hfcg->{$i}{weather} > 100                            ?
                                     weather_icon ($name, $lang, $hfcg->{$i}{weather}-100) :
