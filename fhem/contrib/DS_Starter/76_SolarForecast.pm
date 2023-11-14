@@ -1064,7 +1064,7 @@ sub Initialize {
                                 "graphicHeaderOwnspec:textField-long ".
                                 "graphicHeaderDetail:multiple-strict,all,co,pv,own,status ".
                                 "graphicHeaderShow:1,0 ".
-                                "graphicHistoryHour:slider,0,1,23 ".
+                                "graphicHistoryHour:selectnumbers,0,1,23,0,lin ".
                                 "graphicHourCount:slider,4,1,24 ".
                                 "graphicHourStyle ".
                                 "graphicLayoutType:single,double,diff ".
@@ -16129,8 +16129,8 @@ to ensure that the system configuration is correct.
             <tr><td>                                         </td><td>:                                                                                       </td></tr>            
             <tr><td>                                         </td><td>#Settings                                                                               </td></tr>
             <tr><td>                                         </td><td>Autocorrection:pvCorrectionFactor_Auto : : :                                            </td></tr>
-            <tr><td>                                         </td><td>Consumer<br>Replanning:consumerNewPlanning : : :                                        </td></tr>
-            <tr><td>                                         </td><td>Consumer<br>Quickstart:consumerImmediatePlanning : : :                                  </td></tr>
+            <tr><td>                                         </td><td>Consumer&lt;br&gt;Replanning:consumerNewPlanning : : :                                  </td></tr>
+            <tr><td>                                         </td><td>Consumer&lt;br&gt;Quickstart:consumerImmediatePlanning : : :                            </td></tr>
             <tr><td>                                         </td><td>Weather:graphicShowWeather : : :                                                        </td></tr>
             <tr><td>                                         </td><td>History:graphicHistoryHour : : :                                                        </td></tr>
             <tr><td>                                         </td><td>GraphicSize:flowGraphicSize : : :                                                       </td></tr>
@@ -18002,8 +18002,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                         </td><td>:                                                                             </td></tr>            
             <tr><td>                                         </td><td>#Settings                                                                     </td></tr>
             <tr><td>                                         </td><td>Autokorrektur:pvCorrectionFactor_Auto : : :                                   </td></tr>
-            <tr><td>                                         </td><td>Consumer<br>Neuplanung:consumerNewPlanning : : :                              </td></tr>
-            <tr><td>                                         </td><td>Consumer<br>Sofortstart:consumerImmediatePlanning : : :                       </td></tr>
+            <tr><td>                                         </td><td>Consumer&lt;br&gt;Neuplanung:consumerNewPlanning : : :                        </td></tr>
+            <tr><td>                                         </td><td>Consumer&lt;br&gt;Sofortstart:consumerImmediatePlanning : : :                 </td></tr>
             <tr><td>                                         </td><td>Wetter:graphicShowWeather : : :                                               </td></tr>
             <tr><td>                                         </td><td>History:graphicHistoryHour : : :                                              </td></tr>
             <tr><td>                                         </td><td>GraphicSize:flowGraphicSize : : :                                             </td></tr>
