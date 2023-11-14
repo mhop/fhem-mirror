@@ -52,7 +52,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.10b";
+my $ModulVersion = "01.10c";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
@@ -286,7 +286,7 @@ sub CDCOpenData_Rename($$)
    if (my $dLog = AttrVal($new, "RainRadarFileLog", undef)) {
      return undef unless defined $defs{$dLog};
 
-     my $dMod  = 'defmod ' . $dLog . ' FileLog ./log/' . $new . '-%Y-%m.log ' . $new . ':Home_rain_radar:.*';
+     my $dMod  = 'defmod ' . $dLog . ' FileLog ./log/' . $new . '-%Y-%m.log ' . $new . ':Home_rain_radar/.*';
      fhem($dMod, 1);
 
      $dMod = 'attr ' . $dLog . ' -silent outputFormat { return $1 . " " . $NAME ." " . $EVENT . "\n" if $EVENT =~ /radar:(\d\d\d\d-\d\d-\d\d_\d\d:\d\d:\d\d)/;; return $TIMESTAMP . " " . $NAME ." " . $EVENT . "\n";; }';
