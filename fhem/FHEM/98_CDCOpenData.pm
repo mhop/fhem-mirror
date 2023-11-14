@@ -52,7 +52,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.10a";
+my $ModulVersion = "01.10b";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
@@ -1236,7 +1236,7 @@ sub CDCOpenData_Readout_Run_Rain_Since_Midnight ($@) {
 
    # calculate index of rainfall data for the given geo position:
      my $index = CDCOpenData_index_for_geo_position( (split(/,/,$location))[0], (split(/,/,$location))[1], "" );
-     my $regenmenge = -1;
+     my $regenmenge = 0;
 	
      # extract amount of rain from today's files:
      foreach my $file (@files_today) {	
