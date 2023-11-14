@@ -9556,8 +9556,8 @@ sub _beamGraphicFirstHour {
 
   my $day;
 
-  my $t                                = NexthoursVal ($hash, "NextHour00", "starttime", '0000-00-00 24');
-  my ($year,$month,$day_str,$thishour) = $t =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+  my $stt                              = NexthoursVal ($hash, "NextHour00", "starttime", '0000-00-00 24');
+  my ($year,$month,$day_str,$thishour) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
   my ($val1,$val2,$val3,$val4)         = (0,0,0,0);
 
   $thishour++;
@@ -9597,7 +9597,7 @@ sub _beamGraphicFirstHour {
       $val3 = CircularVal ($hash, $hfcg->{0}{time_str}, 'gcons', 0);
       $val4 = CircularVal ($hash, $hfcg->{0}{time_str}, 'confc', 0);
 
-      $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, "weatherid", 999);
+      $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, 'weatherid', 999);
       #$val4   = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : 999;
   }
 
@@ -9662,14 +9662,14 @@ sub _beamGraphicRemainingHours {
               $hfcg->{$i}{wcc}     = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
           }
           else {
-              $nh = sprintf('%02d', $i + $offset);
+              $nh = sprintf '%02d', $i + $offset;
           }
       }
       else {
-          $nh = sprintf('%02d', $i);
+          $nh = sprintf '%02d', $i;
       }
 
-      if (defined($nh)) {
+      if (defined $nh) {
           $val1                = NexthoursVal ($hash, 'NextHour'.$nh, 'pvfc',         0);
           $val4                = NexthoursVal ($hash, 'NextHour'.$nh, 'confc',        0);
           $hfcg->{$i}{weather} = NexthoursVal ($hash, 'NextHour'.$nh, 'weatherid',  999);
@@ -9746,7 +9746,7 @@ sub _beamGraphic {
   if($show_diff eq 'top') {                                                                                      # Zusätzliche Zeile Ertrag - Verbrauch
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";
       my $ii;
-      for my $i (0..($maxhours*2)-1) {                                                                           # gleiche Bedingung wie oben
+      for my $i (0..($maxhours * 2) - 1) {                                                                       # gleiche Bedingung wie oben
           next if(!$show_night && $hfcg->{$i}{weather} > 99
                                && !$hfcg->{$i}{beam1}
                                && !$hfcg->{$i}{beam2});
@@ -9754,7 +9754,7 @@ sub _beamGraphic {
 
           last if ($ii > $maxhours);                                                                             # vorzeitiger Abbruch
 
-          $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
+          $val  = formatVal6 ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather});
 
           if ($val ne '&nbsp;') {                                                                                # Forum: https://forum.fhem.de/index.php/topic,117864.msg1166215.html#msg1166215
           $val  = $hfcg->{$i}{diff} < 0 ? '<b>'.$val.'<b/>' :
@@ -9771,9 +9771,8 @@ sub _beamGraphic {
 
   my $ii = 0;
 
-  for my $i (0..($maxhours * 2) - 1) {                                                                               # gleiche Bedingung wie oben
-      next if(!$show_night && defined($hfcg->{$i}{weather})
-                           && ($hfcg->{$i}{weather} > 99)
+  for my $i (0..($maxhours * 2) - 1) {                                                                           # gleiche Bedingung wie oben
+      next if(!$show_night && $hfcg->{$i}{weather} > 99
                            && !$hfcg->{$i}{beam1}
                            && !$hfcg->{$i}{beam2});
       $ii++;
@@ -9876,7 +9875,7 @@ sub _beamGraphic {
       $ret .="<td style='text-align: center; padding-left:1px; padding-right:1px; margin:0px; vertical-align:bottom; padding-top:0px'>\n";
 
       if ($lotype eq 'single') {
-          $val = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
+          $val = formatVal6 ($hfcg->{$i}{beam1}, $kw, $hfcg->{$i}{weather});
 
           $ret .="<table width='100%' height='100%'>";                                                           # mit width=100% etwas bessere Füllung der Balken
           $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'>";
@@ -9901,32 +9900,32 @@ sub _beamGraphic {
 
       if ($lotype eq 'double') {
           my ($color1, $color2, $style1, $style2, $v);
-          my $style =  "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
+          my $style = "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
 
           $ret .="<table width='100%' height='100%'>\n";                                                         # mit width=100% etwas bessere Füllung der Balken
                                                                                                                  # der Freiraum oben kann beim größten Balken ganz entfallen
-          $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'><td class='solarfc'></td></tr>" if ($he);
+          $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'><td class='solarfc'></td></tr>" if($he);
 
-          if($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                          # wer ist oben, Beam2 oder Beam1 ? Wert und Farbe für Zone 2 & 3 vorbesetzen
-              $val     = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
+          if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                         # wer ist oben, Beam2 oder Beam1 ? Wert und Farbe für Zone 2 & 3 vorbesetzen
+              $val     = formatVal6 ($hfcg->{$i}{beam1}, $kw, $hfcg->{$i}{weather});
               $color1  = $colorb1;
               $style1  = $style." background-color:#$color1; color:#$fcolor1;'";
 
               if ($z3) {                                                                                         # die Zuweisung können wir uns sparen wenn Zone 3 nachher eh nicht ausgegeben wird
-                  $v       = formatVal6($hfcg->{$i}{beam2},$kw,$hfcg->{$i}{weather});
+                  $v       = formatVal6 ($hfcg->{$i}{beam2}, $kw, $hfcg->{$i}{weather});
                   $color2  = $colorb2;
                   $style2  = $style." background-color:#$color2; color:#$fcolor2;'";
               }
           }
           else {
-              $val     = formatVal6($hfcg->{$i}{beam2},$kw,$hfcg->{$i}{weather});
-              $color1  = $colorb2;
-              $style1  = $style." background-color:#$color1; color:#$fcolor2;'";
+              $val    = formatVal6 ($hfcg->{$i}{beam2}, $kw, $hfcg->{$i}{weather});
+              $color1 = $colorb2;
+              $style1 = $style." background-color:#$color1; color:#$fcolor2;'";
 
               if ($z3) {
-                  $v       = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
-                  $color2  = $colorb1;
-                  $style2  = $style." background-color:#$color2; color:#$fcolor1;'";
+                  $v      = formatVal6 ($hfcg->{$i}{beam1}, $kw, $hfcg->{$i}{weather});
+                  $color2 = $colorb1;
+                  $style2 = $style." background-color:#$color2; color:#$fcolor1;'";
               }
           }
 
@@ -9949,7 +9948,7 @@ sub _beamGraphic {
           my $style = "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
           $ret .= "<table width='100%' border='0'>\n";                                                           # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
 
-          $val = ($hfcg->{$i}{diff} > 0) ? formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather}) : '';
+          $val = ($hfcg->{$i}{diff} > 0) ? formatVal6 ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather}) : '';
           $val = '&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;' if ($hfcg->{$i}{diff} == 0);                                  # Sonderfall , hier wird die 0 gebraucht !
 
           if ($val) {
@@ -9983,14 +9982,14 @@ sub _beamGraphic {
           }
 
           if($z4) {                                                                                              # kann entfallen wenn auch z3 0 ist
-              $val  = ($hfcg->{$i}{diff} < 0) ? formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather}) : '&nbsp;';
+              $val  = ($hfcg->{$i}{diff} < 0) ? formatVal6 ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather}) : '&nbsp;';
               $ret .= "<tr class='$htr{$m}{cl}' style='height:".$z4."px'>";
               $ret .= "<td class='solarfc' style='vertical-align:top'>".$val."</td></tr>";
           }
       }
 
       if ($show_diff eq 'bottom') {                                                                                                      # zusätzliche diff Anzeige
-          $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
+          $val  = formatVal6 ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather});
           $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val > 0 ) ? '+'.$val : $val if ($val ne '&nbsp;');                    # negative Zahlen in Fettschrift, 0 aber ohne +
           $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td></tr>";
       }
@@ -10040,11 +10039,11 @@ sub __weatherOnBeam {
 
   my $ii = 0;
   for my $i (0..($maxhours * 2) - 1) {
-      last if (!exists ($hfcg->{$i}{weather}));
+      last if (!exists ($hfcg->{$i}{weather}));   
       
       $hfcg->{$i}{weather} = 999 if(!defined $hfcg->{$i}{weather});
       
-      debugLog ($paref, 'graphic', "weather id beam (from left) number >$i<: $hfcg->{$i}{weather}") if($ii < $maxhours);
+      debugLog ($paref, 'graphic', "weather id beam number >$i< (start hour $hfcg->{$i}{time_str}): $hfcg->{$i}{weather}") if($ii < $maxhours);
       
       if (!$show_night && $hfcg->{$i}{weather} > 99
                        && !$hfcg->{$i}{beam1}
@@ -10064,7 +10063,7 @@ sub __weatherOnBeam {
 
           my $wcc = $hfcg->{$i}{wcc} // "-";                                                                 # Bewölkungsgrad ergänzen
 
-          if (isNumeric ($wcc)) {                                                                             # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661
+          if (isNumeric ($wcc)) {                                                                            # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661
               $wcc += 0;
           }
 
@@ -10507,23 +10506,26 @@ return $ret;
 #
 ###############################################################################
 sub formatVal6 {
-  my ($v,$kw,$w) = @_;
-  my $n          = '&nbsp;';                                # positive Zahl
+  my $v  = shift;
+  my $kw = shift;
+  my $w  = shift;
+  
+  my $n = '&nbsp;';                                         # positive Zahl
 
-  if($v < 0) {
+  if ($v < 0) {
       $n = '-';                                             # negatives Vorzeichen merken
       $v = abs($v);
   }
 
-  if($kw eq 'kWh') {                                        # bei Anzeige in kWh muss weniger aufgefüllt werden
-      $v  = sprintf "%.1f",($v/1000);
+  if ($kw eq 'kWh') {                                       # bei Anzeige in kWh muss weniger aufgefüllt werden
+      $v  = sprintf "%.1f",($v / 1000);
       $v  += 0;                                             # keine 0.0 oder 6.0 etc
 
-      return ($n eq '-') ? ($v*-1) : $v if defined($w) ;
+      return ($n eq '-') ? ($v * -1) : $v if(defined $w);
 
       my $t = $v - int($v);                                 # Nachkommstelle ?
 
-      if(!$t) {                                             # glatte Zahl ohne Nachkommastelle
+      if (!$t) {                                            # glatte Zahl ohne Nachkommastelle
           if(!$v) {
               return '&nbsp;';                              # 0 nicht anzeigen, passt eigentlich immer bis auf einen Fall im Typ diff
           }
@@ -10544,7 +10546,7 @@ sub formatVal6 {
       }
   }
 
-  return ($n eq '-') ? ($v*-1) : $v if defined($w);
+  return ($n eq '-') ? ($v * -1) : $v if(defined $w);
 
   # Werte bleiben in Watt
   if    (!$v)         { return '&nbsp;'; }                            ## no critic "Cascading" # keine Anzeige bei Null
@@ -14545,6 +14547,22 @@ to ensure that the system configuration is correct.
     </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-set-consumerNewPlanning"></a>
+      <li><b>consumerNewPlanning &lt;Consumer number&gt; </b> <br><br>
+
+      The existing planning of the specified consumer is deleted. <br>
+      The new planning is carried out immediately, taking into account the parameters set in the consumerXX attribute.
+      <br><br>
+
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; consumerNewPlanning 01 <br>
+      </ul>
+    </li>
+    </ul>
+    <br>
 
     <ul>
       <a id="SolarForecast-set-consumerImmediatePlanning"></a>
@@ -16385,6 +16403,22 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
           <tr><td> <b>train</b>         </td><td>- Die KI wird mit den verfügbaren Daten trainiert.                                                                        </td></tr>
           <tr><td>                      </td><td>&nbsp;&nbsp;Erfolgreich generierte Entscheidungsdaten werden im Filesystem gespeichert.                                   </td></tr>
         </table>
+      </ul>
+    </li>
+    </ul>
+    <br>
+
+    <ul>
+      <a id="SolarForecast-set-consumerNewPlanning"></a>
+      <li><b>consumerNewPlanning &lt;Verbrauchernummer&gt; </b> <br><br>
+
+      Es wird die vorhandene Planung des angegebenen Verbrauchers gelöscht. <br>
+      Die Neuplanung wird unter Berücksichtigung der im consumerXX Attribut gesetzten Parameter sofort vorgenommen.
+      <br><br>
+
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; consumerNewPlanning 01 <br>
       </ul>
     </li>
     </ul>
