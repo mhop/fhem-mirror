@@ -149,7 +149,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.0.11" => "13.11.2023  graphicHeaderOwnspec: add possible set/attr commands ",
+  "1.1.0"  => "14.11.2023  graphicHeaderOwnspec: possible add set/attr commands ",
   "1.0.10" => "31.10.2023  fix warnings, edit comref ",
   "1.0.9"  => "29.10.2023  _aiGetSpread: set spread from 50 to 20 ",
   "1.0.8"  => "22.10.2023  codechange: add central readings store array, new function storeReading, writeCacheToFile ".
@@ -536,7 +536,7 @@ my @dd    = qw( none
                 saveData2Cache
               );
               
-my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select|bitfield|widgetList';
+my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select|bitfield|widgetList|colorpicker';
 
 # Steuerhashes
 ###############
@@ -1388,7 +1388,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $type    = $paref->{type};
   my $opt     = $paref->{opt};
   my $c       = $paref->{prop};
-  my $evt     = $paref->{prop1} // 1;
+  my $evt     = $paref->{prop1} // 0;                                                          # geändert V 1.0.11 - 1 -> 0
 
   return qq{no consumer number specified} if(!$c);
   return qq{no valid consumer id "$c"}    if(!ConsumerVal ($hash, $c, "name", ""));
@@ -9173,15 +9173,25 @@ sub ___getFWwidget {
   my $name = shift;
   my $elm  = shift;                         # Element
   my $allc = shift;                         # Kommandovorrat -> ist Element enthalten?
-  my $ctyp = shift // 'set';                # Kommandotyp: set/get
+  my $ctyp = shift // 'set';                # Kommandotyp: set/attr
 
   my $widget = '';
   
-  if ($allc =~ /$elm:(.*?)\s+/xs) {
+  my ($current, $reading);
+
+  if ($allc =~ /$elm:?(.*?)\s/xs) {
       my $arg = $1;
+      $arg    = 'textFieldNL' if(!$arg);
       
       if ($arg !~ /^\#/xs && $arg !~ /^$allwidgets/xs) {
           $arg = '#,'.$arg;         
+      }
+      
+      if ($ctyp eq 'attr') {
+          $current = AttrVal ($name, $elm, '');
+          $reading = '.'.$elm;
+          
+          readingsSingleUpdate ($defs{$name}, $reading, $current, 0);
       }
       
       no strict "refs";                                                                    ## no critic 'NoStrict'
@@ -9193,10 +9203,21 @@ sub ___getFWwidget {
           $widget =~ s,></div>, type='$ctyp'></div>,x;
       }
       else {
-          $widget = FW_pH ("cmd=$ctyp $name $elm imgget", $elm, 0, "", 1, 1);
+          $widget = FW_pH ("cmd=$ctyp $name $elm", $elm, 0, "", 1, 1);
+      }
+      
+      if ($ctyp eq 'attr') {
+          my ($sc)    = $widget =~ /current='(.*?)'/xs;
+          my ($sr)    = $widget =~ /reading='(.*?)'/xs;
+          $widget     =~ s/$sc/$current/ if(defined $sc);
+          $widget     =~ s/$sr/$reading/ if(defined $sr);
+      }
+      
+      if ($arg eq 'textField' || $arg eq 'textField-long') {                              # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
+          $widget =~ s/arg='textField/arg='textFieldNL/xs;                                   
       }
   }
-
+  
 return $widget;
 }
 
@@ -9987,38 +10008,47 @@ sub __weatherOnBeam {
 
   $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                              # freier Platz am Anfang
 
-  my $ii;
-  for my $i (0..($maxhours*2)-1) {
-      last if (!exists($hfcg->{$i}{weather}));
-      next if (!$show_night  && defined($hfcg->{$i}{weather})
-                             && ($hfcg->{$i}{weather} > 99)
-                             && !$hfcg->{$i}{beam1}
-                             && !$hfcg->{$i}{beam2});
+  my $ii = 0;
+  for my $i (0..($maxhours * 2) - 1) {
+      last if (!exists ($hfcg->{$i}{weather}));
+      
+      $hfcg->{$i}{weather} = 999 if(!defined $hfcg->{$i}{weather});
+      
+      debugLog ($paref, 'graphic', "check weather id beam (from left) number >$i< ...") if($ii < $maxhours);
+      
+      if (!$show_night  && $hfcg->{$i}{weather} > 99
+                        && !$hfcg->{$i}{beam1}
+                        && !$hfcg->{$i}{beam2}) { 
+          
+          debugLog ($paref, 'graphic', "weather id >$i<: don't show night condition ... check next") if($ii < $maxhours);
+          next;
+      };
                                                                                                              # Lässt Nachticons aber noch durch wenn es einen Wert gibt , ToDo : klären ob die Nacht richtig gesetzt wurde
       $ii++;                                                                                                 # wieviele Stunden Icons haben wir bisher beechnet  ?
-      last if ($ii > $maxhours);
+      last if($ii > $maxhours);
                                                                                                              # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
-      if (exists($hfcg->{$i}{weather}) && defined($hfcg->{$i}{weather})) {
-          debugLog ($paref, 'graphic', "weather id beam (from left) number >$i<: ".$hfcg->{$i}{weather});
-          
+      debugLog ($paref, 'graphic', "weather id >$i<: ".
+               (defined $hfcg->{$i}{weather} ? $hfcg->{$i}{weather} : 'undefined') );
+      
+      #if (defined $hfcg->{$i}{weather}) {        
           my ($icon_name, $title) = $hfcg->{$i}{weather} > 100                            ?
                                     weather_icon ($name, $lang, $hfcg->{$i}{weather}-100) :
                                     weather_icon ($name, $lang, $hfcg->{$i}{weather});
 
           my $wcc = $hfcg->{$i}{wcc} // "-";                                                                 # Bewölkungsgrad ergänzen
 
-          if(isNumeric ($wcc)) {                                                                             # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661
+          if (isNumeric ($wcc)) {                                                                             # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661
               $wcc += 0;
           }
 
           $title .= ': '.$wcc;
 
-          if($icon_name eq 'unknown') {
+          if ($icon_name eq 'unknown') {
               debugLog ($paref, "graphic", "unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer");
           }
 
           $icon_name .= $hfcg->{$i}{weather} < 100 ? '@'.$colorw  : '@'.$colorwn;
-          my $val     = FW_makeImage($icon_name) // q{};
+          my $val     = FW_makeImage ($icon_name) // q{};
 
           if ($val eq $icon_name) {                                                                          # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
               $val = '<b>???<b/>';
@@ -10027,11 +10057,11 @@ sub __weatherOnBeam {
           }
 
           $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";
-      }
-      else {                                                                                                 # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
-          $ret .= "<td></td>";
-          $hfcg->{$i}{weather} = undef;                                                                      # ToDo : prüfen ob noch nötig
-      }
+      #}
+      #else {                                                                                                 # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
+      #    $ret .= "<td></td>";
+      #    $hfcg->{$i}{weather} = undef;                                                                      # ToDo : prüfen ob noch nötig
+      #}
   }
 
   $ret .= "<td class='solarfc'></td></tr>";                                                                  # freier Platz am Ende der Icon Zeile
