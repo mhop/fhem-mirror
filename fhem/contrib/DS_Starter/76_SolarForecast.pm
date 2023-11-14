@@ -10083,9 +10083,9 @@ sub __weatherOnBeam {
 
       $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";
       #}
-      #else {                                                                                                 # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
+      #else {                                                                                                # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
       #    $ret .= "<td></td>";
-      #    $hfcg->{$i}{weather} = undef;                                                                      # ToDo : prüfen ob noch nötig
+      #    $hfcg->{$i}{weather} = undef;                                                                     # ToDo : prüfen ob noch nötig
       #}
   }
 
@@ -16095,7 +16095,7 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
        <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt; &lt;Label&gt;:&lt;Reading&gt; ... </b><br>
-         Display of any reading values of the device. <br>
+         Display of any readings, set commands and attributes of the device in the graphic header. <br>
          The values to be displayed are separated by spaces.
          Four values (fields) are displayed per line. <br>
          The input can be made in multiple lines. Values with the units "Wh" or "kWh" are converted according to the
@@ -16125,6 +16125,17 @@ to ensure that the system configuration is correct.
             <tr><td>                                         </td><td>#Battery                                                                                </td></tr>
             <tr><td>                                         </td><td>in&amp;nbsp;today:statistic_todayBatIn                                                  </td></tr>
             <tr><td>                                         </td><td>out&amp;nbsp;today:statistic_todayBatOut                                                </td></tr>
+            <tr><td>                                         </td><td>:                                                                                       </td></tr>
+            <tr><td>                                         </td><td>:                                                                                       </td></tr>            
+            <tr><td>                                         </td><td>#Settings                                                                               </td></tr>
+            <tr><td>                                         </td><td>Autocorrection:pvCorrectionFactor_Auto : : :                                            </td></tr>
+            <tr><td>                                         </td><td>Consumer<br>Replanning:consumerNewPlanning : : :                                        </td></tr>
+            <tr><td>                                         </td><td>Consumer<br>Quickstart:consumerImmediatePlanning : : :                                  </td></tr>
+            <tr><td>                                         </td><td>Weather:graphicShowWeather : : :                                                        </td></tr>
+            <tr><td>                                         </td><td>History:graphicHistoryHour : : :                                                        </td></tr>
+            <tr><td>                                         </td><td>GraphicSize:flowGraphicSize : : :                                                       </td></tr>
+            <tr><td>                                         </td><td>ShowNight:graphicShowNight : : :                                                        </td></tr>
+            <tr><td>                                         </td><td>Debug:ctrlDebug : : :                                                                   </td></tr>     
          </table>
        </ul>
        </li>
@@ -17957,7 +17968,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
        <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt; &lt;Label&gt;:&lt;Reading&gt; ... </b><br>
-         Anzeige beliebiger Readingswerte des Devices. <br>
+         Anzeige beliebiger Readings, Set-Kommandos und Attribute des Devices im Grafikkopf. <br>
          Die anzuzeigenden Werte werden durch Leerzeichen getrennt.
          Es werden vier Werte (Felder) pro Zeile dargestellt. <br>
          Die Eingabe kann mehrzeilig erfolgen. Werte mit den Einheiten "Wh" bzw. "kWh" werden entsprechend der Einstellung
@@ -17987,6 +17998,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                         </td><td>#Batterie                                                                     </td></tr>
             <tr><td>                                         </td><td>in&amp;nbsp;heute:statistic_todayBatIn                                        </td></tr>
             <tr><td>                                         </td><td>out&amp;nbsp;heute:statistic_todayBatOut                                      </td></tr>
+            <tr><td>                                         </td><td>:                                                                             </td></tr>
+            <tr><td>                                         </td><td>:                                                                             </td></tr>            
+            <tr><td>                                         </td><td>#Settings                                                                     </td></tr>
+            <tr><td>                                         </td><td>Autokorrektur:pvCorrectionFactor_Auto : : :                                   </td></tr>
+            <tr><td>                                         </td><td>Consumer<br>Neuplanung:consumerNewPlanning : : :                              </td></tr>
+            <tr><td>                                         </td><td>Consumer<br>Sofortstart:consumerImmediatePlanning : : :                       </td></tr>
+            <tr><td>                                         </td><td>Wetter:graphicShowWeather : : :                                               </td></tr>
+            <tr><td>                                         </td><td>History:graphicHistoryHour : : :                                              </td></tr>
+            <tr><td>                                         </td><td>GraphicSize:flowGraphicSize : : :                                             </td></tr>
+            <tr><td>                                         </td><td>ShowNight:graphicShowNight : : :                                              </td></tr>
+            <tr><td>                                         </td><td>Debug:ctrlDebug : : :                                                         </td></tr>
          </table>
        </ul>
        </li>
