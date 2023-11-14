@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  98_CDCOpenData: Regenmenge bei _rain_since_midnight korrigiert
  - bugfix:  98_CDCOpenData: Cron Timer bei Systemstart nicht korrekt
  - new:     98_CDCOpenData: Tägliche Regenmenge aus DWD-Radolan Daten einlesen
  - change:  36_Shelly: model of ShellyPMmini to shellypmmini
