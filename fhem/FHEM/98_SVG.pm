@@ -1405,6 +1405,7 @@ sub
 SVG_escape($)
 {
   my ($txt) = @_;
+  return $1 if($txt =~ m,^<html>(.*)</html>$,);
   $txt =~ s/&/&amp;/g;
   $txt =~ s/</&lt;/g;
   $txt =~ s/>/&gt;/g;
