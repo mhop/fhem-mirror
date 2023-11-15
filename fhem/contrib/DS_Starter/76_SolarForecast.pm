@@ -10033,16 +10033,16 @@ sub __weatherOnBeam {
 
   return $ret if(!$weather);
 
-  my $m = $paref->{modulo} % 2;
+  my $m  = $paref->{modulo} % 2;
+  my $ii = 0;
 
   $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                              # freier Platz am Anfang
 
-  my $ii = 0;
   for my $i (0..($maxhours * 2) - 1) {
       last if (!exists ($hfcg->{$i}{weather}));   
       
       $hfcg->{$i}{weather} = 999 if(!defined $hfcg->{$i}{weather});
-      my $wcc              = $hfcg->{$i}{wcc} // "-";                                                        # Bewölkungsgrad ergänzen
+      my $wcc              = $hfcg->{$i}{wcc} // '-';                                                        # Bewölkungsgrad ergänzen
       
       debugLog ($paref, 'graphic', "weather id beam number >$i< (start hour $hfcg->{$i}{time_str}): wid $hfcg->{$i}{weather} / wcc $wcc") if($ii < $maxhours);
       
@@ -10056,16 +10056,12 @@ sub __weatherOnBeam {
                                                                                                              # Lässt Nachticons aber noch durch wenn es einen Wert gibt , ToDo : klären ob die Nacht richtig gesetzt wurde
       $ii++;                                                                                                 # wieviele Stunden Icons haben wir bisher beechnet  ?
       last if($ii > $maxhours);
-                                                                                                             # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können      
-      #if (defined $hfcg->{$i}{weather}) {        
+                                                                                                             # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können             
       my ($icon_name, $title) = $hfcg->{$i}{weather} > 100                            ?
                                 weather_icon ($name, $lang, $hfcg->{$i}{weather}-100) :
                                 weather_icon ($name, $lang, $hfcg->{$i}{weather});
 
-      if (isNumeric ($wcc)) {                                                                                # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661
-          $wcc += 0;
-      }
-
+      $wcc   += 0 if(isNumeric ($wcc));                                                                      # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661
       $title .= ': '.$wcc;
 
       if ($icon_name eq 'unknown') {
@@ -10075,18 +10071,12 @@ sub __weatherOnBeam {
       $icon_name .= $hfcg->{$i}{weather} < 100 ? '@'.$colorw  : '@'.$colorwn;
       my $val     = FW_makeImage ($icon_name) // q{};
 
-      if ($val eq $icon_name) {                                                                              # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
+      if ($val =~ /title="$icon_name"/xs) {                                                                  # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
           $val = '<b>???<b/>';
-
-          debugLog ($paref, "graphic", qq{the icon "$weather_ids{$hfcg->{$i}{weather}}{icon}" not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
+          debugLog ($paref, "graphic", qq{ERROR - the icon "$weather_ids{$hfcg->{$i}{weather}}{icon}.svg" not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
       }
 
       $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";
-      #}
-      #else {                                                                                                # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
-      #    $ret .= "<td></td>";
-      #    $hfcg->{$i}{weather} = undef;                                                                     # ToDo : prüfen ob noch nötig
-      #}
   }
 
   $ret .= "<td class='solarfc'></td></tr>";                                                                  # freier Platz am Ende der Icon Zeile
