@@ -40,6 +40,11 @@
 # 5.06      Bug Fix: undefined value for ShellyPMmini and others
 #           Change: Model of ShellyPMmini changed to shellypmmini
 # 5.07      BugFix: shellyrgbw (white mode): set ... toggle 
+# 5.08      Add: set ... ON and OFF to switch all channels of a multichannel device
+#           Change: set default of MaxAge to 600 hrs
+#           Change: remove attribute 'ShellyName', use 'set ... name' instead
+#           Bug Fix: misc. 'undefined value' 
+#           internal Optimization of Shelly_Set()
 
 package main;
 
@@ -52,9 +57,10 @@ use HttpUtils;
 use vars qw{%attr %defs};
 
 sub Log($$);
+sub Shelly_Set ($@);
 
 #-- globals on start
-my $version = "5.07 12.11.2023";
+my $version = "5.08 15.11.2023";
 
 my $defaultINTERVAL = 60;
 my $secndIntervalMulti = 4;  # Multiplier for 'long update'
@@ -187,80 +193,6 @@ my %periods = (
    "Week"   => [-342000,-338400,604800]    # offset=-4x24x3600 + 3600 + $isdst x 3600
 );
 
-#-- these we may get on request
-my %gets = (
-  "status:noArg"     => "S",
-  "shelly_status:noArg"     => "X",
-  "registers:noArg"  => "R",
-  "config"           => "C",
-  "version:noArg"    => "V",
-  "model:noArg"      => "M"
-);
-
-#-- these we may set
-my %setsshelly = (      #general settings for all devices 
-# "name"          => "N",    #ShellyName
-  "config"        => "K",
-  "interval"      => "I",
-  "password"      => "P",
-  "update:noArg"  => "U",
-  "reboot:noArg"  => "R"
-); 
-
-my %setssw = (       #general settings for all on-off-devices 
-  "on"            => "O",
-  "off"           => "F",
-  "toggle"        => "T",
-  "on-for-timer"  => "X",
-  "off-for-timer" => "E"#,
-#  "xtrachannels:noArg"  => "C"   # is only setable on devices with multiple outputs
-);
-
-my %setsrol = (
-  "closed"        => "C",
-  "open"          => "O",
-  "stop:noArg"    => "S",
-  "pct:slider,0,1,100"  => "B",
-  "delta"         => "B2",  #make settings pct +i possible
-  "zero:noArg"    => "Z",
-  "predefAttr:noArg" => "I"
-); 
-
-my %setsrgbww = (
-  "on"            => "O",
-  "off"           => "F",
-  "toggle"        => "T",
-  "on-for-timer"  => "X",
-  "off-for-timer" => "E",
-  "pct"           => "B",
-); 
-
-my %setsbulbw = (
-  "on:noArg"      => "O",
-  "off:noArg"     => "F",
-  "toggle:noArg"  => "T",
-  "on-for-timer"  => "X",
-  "off-for-timer" => "E",
-  "ct:colorpicker,CT,3000,10,6500" => "R",
-  "pct:slider,0,1,100" => "W"
-); 
-
-my %setsrgbwc = (
-  "on:noArg"      => "O",
-  "off:noArg"     => "F",
-  "toggle:noArg"  => "T",
-  "on-for-timer"  => "X",
-  "off-for-timer" => "E",
-  "rgbw"          => "A",
-  "hsv"           => "H",
-#  "hsv:colorpicker,HSV"  => "R", #test
-  "rgb:colorpicker,HSV"  => "R",
-#  "rgb:colorpicker,RGB"  => "R",  #test
-  "white:slider,0,1,100" => "W",  #slider wird erst mit set übernommen
-#  "white:colorpicker,BRI,0,1,255"  => "R" #test  colorpicker wird sofort übernommen
-  "gain:slider,0,1,100"  => "V"
-); 
-
 my %attributes = (
   "multichannel"  => " defchannel",
   "roller"        => " pct100:open,closed maxtime maxtime_close maxtime_open",
@@ -271,6 +203,23 @@ my %attributes = (
   "metering"      => " maxpower",
   "showunits"     => " showunits:none,original,normal,normal2,ISO"
 );  
+
+my %shelly_dropdowns = (
+#-- these we may get on request
+    "Gets"  => "status:noArg shelly_status:noArg registers:noArg config version:noArg model:noArg",
+#-- these we may set
+    "Shelly"=> "config interval password reboot:noArg update:noArg name",
+    "Onoff" => " on off toggle on-for-timer off-for-timer",
+    "Multi" => " ON:noArg OFF:noArg xtrachannels:noArg",
+    "Rol"   => " closed open stop:noArg pct:slider,0,1,100 delta zero:noArg predefAttr:noArg",
+    "RgbwW" => " pct",
+    "BulbW" => " ct:colorpicker,CT,3000,10,6500 pct:slider,0,1,100",
+    "RgbwC" => " rgbw rgb:colorpicker,HSV hsv white:slider,0,1,100 gain:slider,0,1,100"
+);
+## may be used for RgbwC:
+##  "hsv:colorpicker,HSV" 
+##  "rgb:colorpicker,RGB"
+##  "white:colorpicker,BRI,0,1,255"
 
 # Device model by https://kb.shelly.cloud/knowledge-base/
 my %shelly_vendor_ids = (
@@ -346,39 +295,39 @@ my %shelly_vendor_ids = (
 my %shelly_models = (
     #(   0      1       2         3    4    5      6    7)
     #(relays,rollers,dimmers,  meters, NG,inputs,res.,color)
-    "generic"       => [0,0,0, 0,0,0],
-    "shellyi3"      => [0,0,0, 0,0,3],    # 3 inputs
-    "shelly1"       => [1,0,0, 0,0,1],    # not metering, only a power constant in older fw
-    "shelly1L"      => [1,0,0, 1,0,1],
-    "shelly1pm"     => [1,0,0, 1,0,1],
-    "shelly2"       => [2,1,0, 1,0,2],    # relay mode, roller mode 
-    "shelly2.5"     => [2,1,0, 2,0,2],    # relay mode, roller mode
-    "shellyplug"    => [1,0,0, 1,0,-1],   # shellyplug & shellyplugS;   no input, but a button which is only reachable via Action
-    "shelly4"       => [4,0,0, 4,0,0],    # shelly4pro;  inputs not provided by fw v1.6.6
-    "shellyrgbw"    => [0,0,4, 4,0,1, 0,1],    # shellyrgbw2:  color mode, white mode; metering col 1 channel, white 4 channels
-    "shellydimmer"  => [0,0,1, 1,0,2],
-    "shellyem"      => [1,0,0, 2,0,0],    # with one control-relay, consumed energy in Wh
-    "shelly3em"     => [1,0,0, 3,0,0],    # with one control-relay, consumed energy in Wh
-    "shellybulb"    => [0,0,1, 1,0,0, 0,1],    # shellybulb & shellybulbrgbw:  color mode, white mode;  metering is in any case 1 channel
-    "shellyuni"     => [2,0,0, 0,0,2],    # + analog dc voltage metering
+    "generic"       => [0,0,0, 0,0,0,  0,0],
+    "shellyi3"      => [0,0,0, 0,0,3,  0,0],    # 3 inputs
+    "shelly1"       => [1,0,0, 0,0,1,  0,0],    # not metering, only a power constant in older fw
+    "shelly1L"      => [1,0,0, 1,0,1,  0,0],
+    "shelly1pm"     => [1,0,0, 1,0,1,  0,0],
+    "shelly2"       => [2,1,0, 1,0,2,  0,0],    # relay mode, roller mode 
+    "shelly2.5"     => [2,1,0, 2,0,2,  0,0],    # relay mode, roller mode
+    "shellyplug"    => [1,0,0, 1,0,-1, 0,0],   # shellyplug & shellyplugS;   no input, but a button which is only reachable via Action
+    "shelly4"       => [4,0,0, 4,0,0,  0,0],    # shelly4pro;  inputs not provided by fw v1.6.6
+    "shellyrgbw"    => [0,0,4, 4,0,1,  0,1],    # shellyrgbw2:  color mode, white mode; metering col 1 channel, white 4 channels
+    "shellydimmer"  => [0,0,1, 1,0,2,  0,0],
+    "shellyem"      => [1,0,0, 2,0,0,  0,0],    # with one control-relay, consumed energy in Wh
+    "shelly3em"     => [1,0,0, 3,0,0,  0,0],    # with one control-relay, consumed energy in Wh
+    "shellybulb"    => [0,0,1, 1,0,0,  0,1],    # shellybulb & shellybulbrgbw:  color mode, white mode;  metering is in any case 1 channel
+    "shellyuni"     => [2,0,0, 0,0,2,  0,0],    # + analog dc voltage metering
     #-- 2nd generation devices
-    "shellyplusplug"=> [1,0,0, 1,1,-1],
-    "shellypluspm"  => [0,0,0, 1,1,0],
-    "shellyplus1"   => [1,0,0, 0,1,1],
-    "shellyplus1pm" => [1,0,0, 1,1,1],
-    "shellyplus2pm" => [2,1,0, 2,1,2],    # switch profile, cover profile
-    "shellyplusi4"  => [0,0,0, 0,1,4],
-    "shellypro1"    => [1,0,0, 0,1,2],
-    "shellypro1pm"  => [1,0,0, 1,1,2],
-    "shellypro2"    => [2,0,0, 0,1,2],
-    "shellypro2pm"  => [2,1,0, 2,1,2],    # switch profile, cover profile
-    "shellypro3"    => [3,0,0, 0,1,3],    # 3 potential free contacts
-    "shellypro4pm"  => [4,0,0, 4,1,4],
-    "shellyproem50" => [1,0,0, 1,1,0],    # has two single-phase meter and one relay
-    "shellypro3em"  => [0,0,0, 1,1,0],    # has one (1) three-phase meter
-    "shellyprodual" => [0,2,0, 4,1,4],
-    "shellypmmini"  => [0,0,0, 1,1,0],    # similar to ShellyPlusPM
-    "walldisplay1"  => [1,0,0, 0,2,1]     # similar to ShellyPlus1PM
+    "shellyplusplug"=> [1,0,0, 1,1,-1, 0,0],
+    "shellypluspm"  => [0,0,0, 1,1,0,  0,0],
+    "shellyplus1"   => [1,0,0, 0,1,1,  0,0],
+    "shellyplus1pm" => [1,0,0, 1,1,1,  0,0],
+    "shellyplus2pm" => [2,1,0, 2,1,2,  0,0],    # switch profile, cover profile
+    "shellyplusi4"  => [0,0,0, 0,1,4,  0,0],
+    "shellypro1"    => [1,0,0, 0,1,2,  0,0],
+    "shellypro1pm"  => [1,0,0, 1,1,2,  0,0],
+    "shellypro2"    => [2,0,0, 0,1,2,  0,0],
+    "shellypro2pm"  => [2,1,0, 2,1,2,  0,0],    # switch profile, cover profile
+    "shellypro3"    => [3,0,0, 0,1,3,  0,0],    # 3 potential free contacts
+    "shellypro4pm"  => [4,0,0, 4,1,4,  0,0],
+    "shellyproem50" => [1,0,0, 1,1,0,  0,0],    # has two single-phase meter and one relay
+    "shellypro3em"  => [0,0,0, 1,1,0,  0,0],    # has one (1) three-phase meter
+    "shellyprodual" => [0,2,0, 4,1,4,  0,0],
+    "shellypmmini"  => [0,0,0, 1,1,0,  0,0],    # similar to ShellyPlusPM
+    "walldisplay1"  => [1,0,0, 0,2,1,  0,0]     # similar to ShellyPlus1PM
     );
     
 my %shelly_events = (	# events, that can be used by webhooks; key is mode, value is shelly-event 
@@ -475,6 +424,7 @@ my %fhem_events = (	# events, that can be used by webhooks; key is shelly-event,
         "SSS"     => "triple_push",
         "SL"      => "short_long_push",
         "LS"      => "long_short_push",
+        "short_push"  => "S",
         "single_push" => "S",
         "long_push"   => "L",
         "double_push" => "SS",
@@ -634,7 +584,7 @@ sub Shelly_Initialize ($) {
 
   $hash->{AttrList}= "model:".join(",",(sort keys %shelly_models)).
                      " maxAge".
-                     " ShellyName".
+         #            " ShellyName".
                      " mode:relay,roller,white,color".
                      " interval timeout shellyuser verbose:0,1,2,3,4,5".
                      $attributes{'multichannel'}.
@@ -692,8 +642,15 @@ sub Shelly_Define($$) {
   $hash->{helper}{a_Active_Power}=0;
   $hash->{helper}{b_Active_Power}=0;
   $hash->{helper}{c_Active_Power}=0;
+  
+  my $name=$hash->{NAME};
+  if( defined(AttrVal($name,"ShellyName",undef)) ){
+      fhem("deleteattr $name ShellyName");
+      Log3 $hash->{NAME},1,"[Shelly_Define] $name: Attribut \'ShellyName\' removed. Use \'set $name <Name>\' instead";
+  }
+  
   return undef;
-}
+} # end Shelly_Define()
 
 
 
@@ -775,7 +732,7 @@ sub Shelly_get_model {
       }
     }
   }
-  
+if(0){  
   # get Shellies Name either from the /settings call or from the /rpc/Shelly.GetDeviceInfo call
   if( defined($jhash->{'name'}) ){ #ShellyName
       ##fhem("set $name name " . $jhash->{'name'} );
@@ -785,7 +742,7 @@ sub Shelly_get_model {
       ##fhem("set $name name " . $name ); 
       $attr{$hash->{NAME}}{ShellyName} = $name; 
   }    
-        
+}        
   my ($model,$mode);
        
   #-- for all 1st gen models get type (vendor_id) and mode from the /settings call  
@@ -921,7 +878,7 @@ sub Shelly_get_model {
     return undef;  #successful
 }
 
-sub Refresh {
+sub Refresh {    ##see also forum topic 48736.0
     fhem("trigger $FW_wname JS:location.reload(true)");  # try a browser refresh ??
 }
 
@@ -1167,7 +1124,7 @@ sub Shelly_Attr(@) {
  
 
   #---------------------------------------  
-  }elsif ( ($cmd eq "set" ) && ($attrName =~ /ShellyName/) ) {  
+  }elsif(0&& ($cmd eq "set" ) && ($attrName =~ /ShellyName/) ) {  
     #$attrVal="" if( $cmd eq "del" ); #cannot set name to empty string
     if ( $attrVal =~ " " ){ #spaces not allowed in urls
         $attrVal =~ s/ /%20/g;
@@ -1558,7 +1515,7 @@ sub Shelly_Get ($@) {
     
   #-- else
   }else{
-    my $newkeys = join(" ", sort keys %gets);
+    my $newkeys = $shelly_dropdowns{Gets};   ## join(" ", sort keys %gets);
     $newkeys    =~  s/:noArg//g
       if( $a[1] ne "?");
     my $msg = "unknown argument ".$a[1].", choose one of $newkeys";
@@ -1585,11 +1542,21 @@ sub Shelly_Set ($@) {
   my $parameters=( scalar(@a)?" and ".scalar(@a)." parameters: ".join(" ",@a) : ", no parameters" );
   Log3 $name,4,"[Shelly_Set] calling for device $name with command \'$cmd\'$parameters"  if($cmd ne "?");
   
-  my $value = shift @a;
+  my $value = shift @a;  # 1st parameter
 
-  #-- when Shelly_Set is called by 'Shelly_Set($hash)' arguments are not handed over
   $name = $hash->{NAME}   if( !defined($name) );
-  $cmd  = $hash->{CMD}    if( !defined($cmd) );
+  
+  #-- when Shelly_Set is called by 'Shelly_Set($hash)' arguments are not handed over, look for an termporarely stored command in internals
+  if( !defined($cmd) ){
+      if( defined($hash->{CMD}) ){
+          $cmd  = $hash->{CMD};
+          Log3 $name,4,"[Shelly_Set] get command \'$cmd\' from internal";
+          delete $hash->{CMD};
+      }else{
+          Log3 $name,5,"[Shelly_Set] no command given";
+          return "no command given, choose one from ".$hash->{helper}{Sets};
+      }
+  }
   
   my $model =  AttrVal($name,"model","generic");   # formerly: shelly1
   my $mode  =  AttrVal($name,"mode","");
@@ -1597,25 +1564,29 @@ sub Shelly_Set ($@) {
 
 
   #-- WEB asking for command list 
-  if( $cmd eq "?" ) { 
-      my $newkeys = join(" ", sort keys %setsshelly);  # all models and generic
-      if( $mode eq "relay" || ($shelly_models{$model}[0]>0 && $shelly_models{$model}[1]==0) ){
-          $newkeys .= " ".join(" ", sort keys %setssw)
-                       if( $shelly_models{$model}[0]>0 );
-          $newkeys .= " xtrachannels:noArg"
-                       if( $shelly_models{$model}[0]>1 );
-      }elsif( $mode eq "roller" || ($shelly_models{$model}[0]==0 && $shelly_models{$model}[1]>0)){
-          $newkeys .= " ".join(" ", sort keys %setsrol);
+  if( $cmd eq "?" ){
+    if( !defined($hash->{helper}{Sets}) ){
+      # all models and generic
+      my $newkeys = $shelly_dropdowns{Shelly};
+      # most of devices, except roller, metering
+      $newkeys   .= $shelly_dropdowns{Onoff} 
+                                    if( ($mode ne "roller" && $shelly_models{$model}[0]>0) ||  $shelly_models{$model}[2]>0 || $shelly_models{$model}[7]>0 );
+      # multichannel devices
+      $newkeys   .= $shelly_dropdowns{Multi} if( ($mode ne "roller" && $shelly_models{$model}[0]>1) || ($shelly_models{$model}[2]>1 && $mode eq "white") );
+      if( $mode eq "roller" || ($shelly_models{$model}[0]==0 && $shelly_models{$model}[1]>0)){
+          $newkeys .= $shelly_dropdowns{Rol};
       }elsif( $model =~ /shellydimmer/ || ($model =~ /shellyrgbw.*/ && $mode eq "white")  ){
-          $newkeys .= " ".join(" ", sort keys %setsrgbww) ;
-          $newkeys .= " xtrachannels:noArg"
-                        if( $mode eq "white" && $shelly_models{$model}[2]>1);  
+          $newkeys .= $shelly_dropdowns{RgbwW};
       }elsif( $model =~ /shellybulb.*/ &&  $mode eq "white" ){
-          $newkeys .= " ".join(" ", sort keys %setsbulbw) ;
+          $newkeys .= $shelly_dropdowns{BulbW};
       }elsif( $model =~ /shelly(rgbw|bulb).*/ && $mode eq "color" ){
-          $newkeys .= " ".join(" ", sort keys %setsrgbwc) ;
+          $newkeys .= $shelly_dropdowns{RgbwC};
       }
-      return "unknown argument $cmd choose one of $newkeys";
+      $hash->{helper}{Sets}=$newkeys; #Debug "$name: helper set to $newkeys";
+    }
+    
+      # ':noArg' will be stripped off by calling instance
+      return "$model $mode: unknown argument $cmd choose one of ".$hash->{helper}{Sets};#$newkeys";
   }
      
   #-- following commands do not occur in command list, eg. out_on, input_on, single_push
@@ -1689,23 +1660,372 @@ sub Shelly_Set ($@) {
           }
           readingsBulkUpdateMonitored($hash,$reading,$value );
 
-    }elsif( $signal =~ /^(stopped|opening|closing)/ ){
-          # do nothing 
+    #-- commands from shelly actions: opening, closing, stopped, is_closed, is_open
+    }elsif( $signal eq "opening" ){
+          $hash->{MOVING} = "drive-up";
+    }elsif( $signal eq "closing" ){
+          $hash->{MOVING} = "drive-down";
+    }elsif( $signal eq "stopped" ){
+          $hash->{MOVING} = "stopped";
     }elsif( $signal =~ /is/ ){
-    	$cmd = "stopped";
+          $hash->{MOVING} = "stopped";
+          $cmd = "stopped";
     }else{
           Log3 $name,1,"[Shelly_Set] $name: Wrong detail on action command $cmd $value". (defined($mode)?", mode is $mode":", no mode given");
           return;
     }
+    readingsBulkUpdateMonitored($hash,"state",$hash->{MOVING}) if( defined($hash->{MOVING}) );
     readingsEndUpdate($hash,1);
       #-- Call status after switch.n
     if( $signal !~ /^(Active_Power|Voltage|Current)/ ){      
       RemoveInternalTimer($hash,"Shelly_status"); Log3 $name,6,"shelly_set 1715 removed Timer Shelly_status, now calling in 1.5 sec";
       InternalTimer(gettimeofday()+1.5, "Shelly_status", $hash);
     }
+    return undef;
+  }
+
+  
+  #-- real commands 
+  my $ff=-1;  # Function-Family, correspondends to row in %shelly_models{model}[]
+  
+  #-- we have a switch type device
+  if( $shelly_models{$model}[0]>0 && $mode ne "roller" ){
+      $ff = 0;
+  #-- we have a Shelly 2 / 2.5 or a Shelly(Plus/Pro)2pm roller type device
+  }elsif( $shelly_models{$model}[1]>0 && $mode ne "relay" ){
+      $ff = 1;
+  #-- we have a dimable device:  Shelly dimmer or Shelly RGBW in white mode
+  }elsif( ($model =~ /shellydimmer/) || (($model =~ /shellyrgbw.*/) && ($mode eq "white")) ){
+      $ff = 2;
+  #-- we have a ShellyBulbDuo
+  }elsif( ($model =~ /shellybulb.*/) && ($mode eq "white") ){
+      $ff = 2;
+  #-- we have a color type device (Bulb or Shelly RGBW, and color mode)
+  }elsif( ($model =~ /shelly(rgbw|bulb).*/) && ($mode eq "color")){
+      $ff = 7;
+  }else{
+      $ff = -1;
+  }  
+
+  #-- get channel parameter
+  if( $cmd eq "toggle" || $cmd eq "on" || $cmd eq "off" ){
+        $channel = $value; 
+  }elsif( $cmd =~ /(on|off)-for-timer/ || ($cmd eq"pct" && $ff!=1 )|| $cmd eq "brightness" || $cmd eq "ct" ){
+        $channel = shift @a;
+  } 
+  
+  #-- check channel
+  if( $cmd =~ /^(toggle|on|off|pct|brightness)/ && $ff != 1){   # not for rollers
+     if( $ff != 0 && $ff !=2 && $ff !=7 ){
+          $msg = "Error: forbidden command  \'$cmd\' for device $name";
+          Log3 $name,1,"[Shelly_Set] ".$msg;
+          return $msg;
+     }
+     if( !defined($channel) ){
+        $channel = AttrVal($name,"defchannel",undef);
+     }elsif( $channel =~ /\D/ ){ #anything else than a digit
+        $msg = "Error: wrong channel \'$channel\' for device $name, must be <integer>";
+        Log3 $name,1,"[Shelly_Set] ".$msg;
+        return $msg;
+     }
+     $msg = (defined($channel))?$channel:"undefined";
+     Log3 $name,4,"[Shelly_Set] $name precheck: channel is $msg";
+
+     if( !defined($channel) ){
+           if( $shelly_models{$model}[$ff] > 1 ){
+              $msg = "$name Error: no channel given and defchannel attribute not set properly";
+              Log3 $name,1,"[Shelly_Set] $msg";
+              return $msg;
+            }elsif( $shelly_models{$model}[$ff]==1 ){
+              $channel = 0;
+            }
+     }elsif( $channel >= $shelly_models{$model}[$ff] ){
+              $msg = "$name Error: Wrong channel number \'$channel\', must be 0 ";
+              $msg .= "or omitted" if( $shelly_models{$model}[$ff]==1 );
+              $msg .= "... ".($shelly_models{$model}[$ff]-1) if( $shelly_models{$model}[$ff]>1 );
+              Log3 $name,1,"[Shelly_Set] $msg";
+              return $msg;
+     }
+  }
+
+  #-- transfer toggle command to an on-off-command
+  if( $cmd eq "toggle" ){ #  && $shelly_models{$model}[0]<2 && $shelly_models{$model}[2]<2 ){ #select devices with less than 2 channels 
+       if( ($shelly_models{$model}[0]>1 && $mode ne "roller") || ($shelly_models{$model}[2]>1 && $mode eq "white") ){
+          # we have a multi-channel device
+          # toggle named channel of switch type device   or   RGBW-device
+          my $subs = "_".$channel; # channel;
+          $cmd = (ReadingsVal($name,"relay".$subs,
+                  ReadingsVal($name,"light".$subs,
+                  ReadingsVal($name,"state".$subs,"off"))) eq "on") ? "off" : "on";
+       }else{
+          $cmd = (ReadingsVal($name,"state","off") eq "on") ? "off" : "on";
+       }
+       Log3 $name,5,"[Shelly_Set] transfer \'toggle\' to command \'$cmd\'";
+  }
+
+  #- - on and off, on-for-timer and off-for-timer
+  if( $cmd =~ /^((on)|(off)).*/ ){
+    #-- check timer command
+    if( $cmd =~ /(.*)-for-timer/ ){
+        $time = $value;
+        $cmd = $1;
+        if( $time =~ /\D+/ ){ #anything else than digits
+          $msg = "Error: wrong time spec \'$time\' for device $name, must be <integer>";
+          Log3 $name,1,"[Shelly_Set] ".$msg;
+          return $msg;
+        }elsif( $time > 100000000 ){ # more than three years
+          $msg = "given time to high for device $name, must be less than one year";
+          Log3 $name,1,"[Shelly_Set] ".$msg;
+          return $msg;
+        }elsif( $time < 1){ # to low
+          $msg = "given time to low for device $name";
+          Log3 $name,1,"[Shelly_Set] ".$msg;
+          return $msg;
+        }
+        $cmd = $cmd."&timer=$time";
+    }
+    # $cmd = is 'on' or 'off'  or  'on&timer=...' or 'off&timer=....'
+    
+    Log3 $name,4,"[Shelly_Set] switching channel $channel for device $name with command $cmd, FF=$ff";
+    if( $ff==0 ){    
+        if( $shelly_models{$model}[4]<2 ){
+            $cmd = "?turn=$cmd";  ##"/relay/$channel?turn=$cmd";
+        }else{
+            $cmd =~ s/on/true/;
+            $cmd =~ s/off/false/;
+            $cmd =~ s/timer/toggle_after/;
+            $cmd = "/rpc/Switch.Set?id=$channel&on=$cmd";#. ($cmd=~/on/?"true":"false");
+        }
+        $msg = Shelly_onoff($hash,$channel,$cmd); 
+    }elsif( $ff==2 ){
+        if( $model =~ /shellydimmer/ ){
+            $channel = "light/$channel"; 
+        }elsif( $model =~ /shellybulb/ && $mode eq "white" ){ 
+            $channel = "light/$channel";
+        }elsif( $model =~ /shellyrgbw/ && $mode eq "white" ){
+            $channel = "white/$channel";
+        }
+        $msg = Shelly_dim($hash,$channel,"?turn=$cmd");
+    }elsif($ff==7 ){
+        $msg = Shelly_dim($hash,"color/$channel","?turn=$cmd");
+    }
+    return $msg if( $msg );
+    return;
+    
+  #- - ON and OFF  -  switch all channels of a multichannel switch-device
+  }elsif( $cmd =~ /^((ON)|(OFF))/ ){
+    $cmd = lc($1);
+    for(my $i=0;$i<$shelly_models{$model}[$ff];$i++){
+        Shelly_Set($hash,$name,$cmd,$i);
+    }
+    return;
+  }
+    
+  #- - pct, brightness - set percentage volume of dimmable device (no rollers)  eg. shellydimmer or shellyrgbw in white mode
+  if( ($cmd eq "pct" || $cmd eq "brightness") && $ff != 1 ){
+    if( $ff !=2 ){
+          $msg = "Error: forbidden command  \'$cmd\' for device $name";
+          Log3 $name,1,"[Shelly_Set] ".$msg;
+          return $msg;
+    }
+     # check value
+     if( !defined($value) ){
+            $msg = "Error: no $cmd value \'$value\' given for device $name";
+            Log3 $name,1,"[Shelly_Set] ".$msg;
+            return $msg;
+     }elsif( $value =~ /\D+/ ){    #anything else than a digit
+            $msg = "Error: wrong $cmd value \'$value\' for device $name, must be <integer>";
+            Log3 $name,1,"[Shelly_Set] ".$msg;
+            return $msg;
+     }elsif( $value<0  || $value>100 ){
+            $msg = "$name Error: wrong $cmd value \'$value\' given, must be 0 ... 100 ";
+            Log3 $name,1,"[Shelly_Set] ".$msg;
+            return $msg;
+     } 
+    $cmd = "?brightness=".$value;
+    Log3 $name,4,"[Shelly_Set] setting brightness for device $name to $value";
+    if( $ff==2 ){
+        if( $model =~ /shellydimmer/ ){
+            $channel = "light/$channel"; 
+        }elsif( $model =~ /shellybulb/ && $mode eq "white" ){ 
+            $channel = "light/$channel";
+        }elsif( $model =~ /shellyrgbw/ && $mode eq "white" ){
+            $channel = "white/$channel";
+        } 
+        $msg = Shelly_dim($hash,$channel,$cmd);
+        if( !$msg ){
+            $cmd="?turn=off" if( $value == 0 );
+            $cmd="?turn=on"  if( $value > 0 ); 
+            return Shelly_dim($hash,$channel,$cmd);
+        }
+    }
+    return $msg if( $msg );
+  }
+
+  #-- commands strongly dependent on Shelly type -------------------------------------------------------
+  #-- we have a roller type device / roller mode
+  if( $cmd =~ /^(stop|closed|open|pct|delta|zero)/ && $shelly_models{$model}[1]>0 && $mode ne "relay" ){
+    $ff = 1;
+    Log3 $name,4,"[Shelly_Set] $name: we have a $model ($mode mode) and command is $cmd";
+    #x   my $channel = $value;
+    
+    my $max=AttrVal($name,"maxtime",30);
+    my $maxopen =AttrVal($name,"maxtime_open",30);
+    my $maxclose=AttrVal($name,"maxtime_close",30);
+    
+    #-- open 100% or 0% ?
+    my $pctnormal = (AttrVal($name,"pct100","open") eq "open");
+    
+    #-- stop, and stay stopped  
+    if( $cmd eq "stop"  || 
+            $hash->{MOVING} eq "drive-down" &&  $cmd eq "closed"  ||
+            $hash->{MOVING} eq "drive-up"   &&  $cmd eq "open"    ||
+            $hash->{MOVING} =~ /drive/      &&  $cmd eq "pct"     ||
+            $hash->{MOVING} =~ /drive/      &&  $cmd eq "delta"   ){
+         # -- estimate pos here ???
+         $hash->{DURATION} = 0;
+         $cmd = "?go=stop";
+         
+    #-- in some cases we stop movement and start again in reverse direction
+    }elsif(
+            $hash->{MOVING} eq "drive-down" &&  $cmd eq "open"  ||
+            $hash->{MOVING} eq "drive-up"   &&  $cmd eq "closed"||
+            $hash->{MOVING} ne "stopped"    &&  $cmd eq "zero"     ){
+         Log3 $name,1,"[Shelly_Set] stopping roller and starting after delay with command \'$cmd\'";
+         # -- estimate pos here ???
+         $hash->{DURATION} = 0;
+         $hash->{CMD}=$cmd;
+         RemoveInternalTimer($hash,"Shelly_Set");
+         InternalTimer(gettimeofday()+1.0, "Shelly_Set", $hash, 1);         
+         $cmd = "?go=stop";
+        
+    #-- is moving !!!
+    }elsif(  $hash->{MOVING}  ne "stopped"  ){
+         Log3 $name,1,"[Shelly_Set] Error: received command \'$cmd\', but $name is still moving";   
+              
+    #-- is not moving 
+    }elsif(  $hash->{MOVING}  eq "stopped" && $cmd eq "zero" ){
+         # calibration of roller device
+         return "comand zero deactivated";
+         return Shelly_configure($hash,"rc");
+                
+    #--any other cases: no movement and commands: open, closed, pct, delta    
+    }elsif( $cmd =~ /(closed)|(open)/ ){
+        if( $cmd eq "closed" ){
+          $hash->{DURATION} = (defined($value))?$value:$maxclose;
+          $hash->{MOVING} = "drive-down";
+          $hash->{TARGETPCT} = $pctnormal ? 0 : 100;
+          $cmd = "?go=close";
+        }else{
+          $hash->{DURATION} = (defined($value))?$value:$maxopen;
+          $hash->{MOVING} = "drive-up";
+          $hash->{TARGETPCT} = $pctnormal ? 100 : 0;
+          $cmd ="?go=open";
+        }
+        $cmd .= "&duration=$value"    if(defined($value));
+        
+    }elsif( $cmd eq "pct" || $cmd eq "delta" ){
+          my $targetpct = $value;
+          my $pos  = ReadingsVal($name,"position","");
+          my $pct  = ReadingsVal($name,"pct",undef);  
+             #if( "$value" =~ /[\+-]\d*/ ){
+             #  $targetpct = eval($pct."$value"); 
+             #}
+        #-- check for sign
+        if( $cmd eq "delta" ){
+           if( $value =~ /[\+-]\d*/ ){
+               $targetpct += $pct;
+           }else{
+               Log3 $name,1,"[Shelly_Set] $name: Wrong format, must consist of a plus or minus sign followed by an integer value";
+               return;
+           }
+        }
+        if( $targetpct<0 ){
+              $targetpct = 0;
+              Log3 $name,1,"[Shelly_Set] $name: Target Pos limited to 0";
+        }elsif( $targetpct>100 ){
+              $targetpct = 100;
+              Log3 $name,1,"[Shelly_Set] $name: Target Pos limited to 100";
+        }elsif( abs($targetpct-$pct)<1 ){
+              Log3 $name,1,"[Shelly_Set] $name: already on Target Pos, aborting";
+              return;
+        }
+
+        if( !$maxopen || !$maxclose ){
+              Log3 $name,1,"[Shelly_Set] please set the maxtime_open/closed attributes for proper operation of device $name";
+              $maxopen = $maxclose = ( $max ? $max : 20 );
+        }
+        
+        if( ($pctnormal && $targetpct > $pct) || (!$pctnormal && $targetpct < $pct) ){
+            $hash->{MOVING} = "drive-up";
+            $max = $maxopen;
+        }else{
+            $hash->{MOVING} = "drive-down";
+            $max = $maxclose;
+        }
+        
+        #$time           = int(abs($targetpct-$pct)/100*$max);
+        #$hash->{MOVING} = $pctnormal ? (($targetpct > $pct) ? "drive-up" : "drive-down") : (($targetpct > $pct) ? "drive-down" : "drive-up");
+
+        $hash->{TARGETPCT} = $targetpct;
+        $hash->{DURATION}  = abs($targetpct-$pct)/100*$max;
+        $cmd = "?go=to_pos&roller_pos=" . ($pctnormal ? $targetpct : 100 - $targetpct);
+    }  
+  Log3 $name,4,"[Shelly_Set] $name: calling Shelly_updown with comand $cmd, duration=".$hash->{DURATION};
+  # Shelly_updown performs one status update after start, and one at expected time of stop
+  return Shelly_updown($hash,$cmd);
+
+  ################################################################################################################
+  #-- we have a ShellyBulbDuo (it's a bulb in white mode) $ff=2
+  }elsif( $cmd eq "ct" ){
+      $channel = shift @a;
+      return Shelly_dim($hash,"light/0","?temp=".$value);
+    
+  ################################################################################################################    
+  #-- we have a Shelly rgbw type device in color mode
+  #-- commands: hsv, rgb, rgbw, white, gain
+  }elsif( ($model =~ /shelly(rgbw|bulb).*/) && ($mode eq "color")){
+    $ff = 7;
+    my $channel = $value;  
+    
+    if( $cmd eq "hsv" ){
+      my($hue,$saturation,$value)=split(',',$value);
+      #-- rescale 
+      if( $hue>1 ){
+        $hue = $hue/360;
+      } 
+      my ($red,$green,$blue)=Color::hsv2rgb($hue,$saturation,$value);
+      $cmd=sprintf("red=%d&green=%d&blue=%d",int($red*255+0.5),int($green*255+0.5),int($blue*255+0.5));
+      if ($model eq "shellybulb"){
+          $cmd .= "&gain=100";
+      }else{
+          $cmd .= sprintf("&gain=%d",$value*100);  #new
+      }
+      return Shelly_dim($hash,"color/0","?".$cmd);
+      
+    }elsif( $cmd =~ /rgb/ ){
+      my $red  = hex(substr($value,0,2));  # convert hexadecimal number into decimal
+      my $green= hex(substr($value,2,2));
+      my $blue = hex(substr($value,4,2));
+      if( $cmd eq "rgbw" ){
+          my $white= hex(substr($value,6,2));
+          $cmd     = sprintf("white=%d",$white);
+      }
+      $cmd    .= sprintf("&red=%d&green=%d&blue=%d",$red,$green,$blue);
+      $cmd    .= "&gain=100";
+      return Shelly_dim($hash,"color/0","?".$cmd);
+      
+    }elsif( $cmd eq "white" ){  # value 0 ... 100
+      $cmd=sprintf("white=%d",$value*2.55);
+      return Shelly_dim($hash,"color/0","?".$cmd);
+    }elsif( $cmd eq "gain" ){  # value 0 ... 100
+      $cmd=sprintf("gain=%d",$value);
+      return Shelly_dim($hash,"color/0","?".$cmd);
+    }
   }
   
-  #-- commands independent of Shelly type: password, reboot, update
+  ###########################################################################
+  #-- commands independent of Shelly type: password, interval, reboot, update
   if( $cmd eq "password" ){
     my $user = AttrVal($name, "shellyuser", 'admin');
     if(!$user && $shelly_models{$model}[4]==0 ){
@@ -1720,14 +2040,13 @@ sub Shelly_Set ($@) {
       if( IsInt($value) && $value >= 0){  # see 99_Utils.pm
           $hash->{INTERVAL}=int($value);
       }elsif( $value == -1 ){
-          $value=AttrVal($name,"interval",$defaultINTERVAL);
-          $hash->{INTERVAL}=$value;
+          $hash->{INTERVAL}=AttrVal($name,"interval",$defaultINTERVAL);
       }else{
           my $msg = "Value is not an positve integer";
           Log3 $name,1,"[Shelly_Set] ".$msg;
           return $msg;
       }
-      Log3 $name,1,"[Shelly_Set] Setting interval of $name to $value";
+      Log3 $name,1,"[Shelly_Set] Setting interval of $name to ".$hash->{INTERVAL};
      #### Shelly_Set($hash->{NAME},"startTimer");
       if( $hash->{INTERVAL} ){
         Log3 $name,2,"[Shelly_Set] Starting cyclic timers for $name ($model)";
@@ -1758,7 +2077,6 @@ sub Shelly_Set ($@) {
         Log3 $name,2,"[Shelly_Set] No timer started for $name";
       }
       return "started";#undef;
-
       
   }elsif( $cmd eq "reboot" ){
       Log3 $name,1,"[Shelly_Set] Rebooting $name";
@@ -1771,7 +2089,7 @@ sub Shelly_Set ($@) {
       Shelly_configure($hash,$cmd);
       return undef;
 
-  # renaming the Shelly, spaces in name are allowed
+  #-- renaming the Shelly, spaces in name are allowed
   }elsif( $cmd eq "name") {   #ShellyName
       my $newname;
       if( defined $value ){
@@ -1877,178 +2195,8 @@ sub Shelly_Set ($@) {
       }
       $msg .= "\n\n to see the changes, browser refresh is necessary";
       return $msg;
-  } 
-
-
-  
-  #-- real commands 
-  my $ff=-1;  # Function-Family, correspondends to row in %shelly_models{model}[]
-  
-  #-- we have a switch type device
-  if( $shelly_models{$model}[0]>0 && $mode ne "roller" ){
-      $ff = 0;
-  #-- we have a Shelly 2 / 2.5 or a Shelly(Plus/Pro)2pm roller type device
-  }elsif( $shelly_models{$model}[1]>0 && $mode ne "relay" ){
-      $ff = 1;
-  #-- we have a dimable device:  Shelly dimmer or Shelly RGBW in white mode
-  }elsif( ($model =~ /shellydimmer/) || (($model =~ /shellyrgbw.*/) && ($mode eq "white")) ){
-      $ff = 2;
-  #-- we have a ShellyBulbDuo
-  }elsif( ($model =~ /shellybulb.*/) && ($mode eq "white") ){
-      $ff = 2;
-  #-- we have a color type device (Bulb or Shelly RGBW, and color mode)
-  }elsif( ($model =~ /shelly(rgbw|bulb).*/) && ($mode eq "color")){
-      $ff = 7;
-  }else{
-      $ff = -1;
-  }  
-
-  #-- get channel parameter
-  if( $cmd eq "toggle" || $cmd eq "on" || $cmd eq "off" ){
-        $channel = $value; 
-  }elsif( $cmd =~ /(on|off)-for-timer/ || ($cmd eq"pct" && $ff!=1 )|| $cmd eq "brightness" || $cmd eq "ct" ){
-        $channel = shift @a;
-  } 
-  
-  #-- check channel
-  if( $cmd =~ /^(toggle|on|off|pct|brightness)/ && $ff != 1){   # not for rollers
-     if( $ff != 0 && $ff !=2 && $ff !=7 ){
-          $msg = "Error: forbidden command  \'$cmd\' for device $name";
-          Log3 $name,1,"[Shelly_Set] ".$msg;
-          return $msg;
-     }
-     if( !defined($channel) ){
-        $channel = AttrVal($name,"defchannel",undef);
-     }elsif( $channel =~ /\D/ ){ #anything else than a digit
-        $msg = "Error: wrong channel \'$channel\' for device $name, must be <integer>";
-        Log3 $name,1,"[Shelly_Set] ".$msg;
-        return $msg;
-     }
-     $msg = (defined($channel))?$channel:"undefined";
-     Log3 $name,4,"[Shelly_Set] $name precheck: channel is $msg";
-
-     if( !defined($channel) ){
-           if( $shelly_models{$model}[$ff] > 1 ){
-              $msg = "$name Error: no channel given and defchannel attribute not set properly";
-              Log3 $name,1,"[Shelly_Set] $msg";
-              return $msg;
-            }elsif( $shelly_models{$model}[$ff]==1 ){
-              $channel = 0;
-            }
-     }elsif( $channel >= $shelly_models{$model}[$ff] ){
-              $msg = "$name Error: Wrong channel number \'$channel\', must be 0 ";
-              $msg .= "or omitted" if( $shelly_models{$model}[$ff]==1 );
-              $msg .= "... ".($shelly_models{$model}[$ff]-1) if( $shelly_models{$model}[$ff]>1 );
-              Log3 $name,1,"[Shelly_Set] $msg";
-              return $msg;
-     }
-  }
-
-  #-- transfer toggle command to an on-off-command
-  if( $cmd eq "toggle" ){ #  && $shelly_models{$model}[0]<2 && $shelly_models{$model}[2]<2 ){ #select devices with less than 2 channels 
-       if( ($shelly_models{$model}[0]>1 && $mode ne "roller") || ($shelly_models{$model}[2]>1 && $mode eq "white") ){
-          # we have a multi-channel device
-          # toggle named channel of switch type device   or   RGBW-device
-          my $subs = "_".$channel; # channel;
-          $cmd = (ReadingsVal($name,"relay".$subs,
-                  ReadingsVal($name,"light".$subs,
-                  ReadingsVal($name,"state".$subs,"off"))) eq "on") ? "off" : "on";
-       }else{
-          $cmd = (ReadingsVal($name,"state","off") eq "on") ? "off" : "on";
-       }
-       Log3 $name,5,"[Shelly_Set] transfer \'toggle\' to command \'$cmd\'";
-  }
-
-  #- - on and off
-  if( $cmd =~ /^((on)|(off)).*/ ){
-    #-- check timer command
-    if( $cmd =~ /(.*)-for-timer/ ){
-        $time = $value;
-        $cmd = $1;
-        if( $time =~ /\D+/ ){ #anything else than digits
-          $msg = "Error: wrong time spec \'$time\' for device $name, must be <integer>";
-          Log3 $name,1,"[Shelly_Set] ".$msg;
-          return $msg;
-        }elsif( $time > 100000000 ){ # more than three years
-          $msg = "given time to high for device $name, must be less than one year";
-          Log3 $name,1,"[Shelly_Set] ".$msg;
-          return $msg;
-        }elsif( $time < 1){ # to low
-          $msg = "given time to low for device $name";
-          Log3 $name,1,"[Shelly_Set] ".$msg;
-          return $msg;
-        }
-        $cmd = $cmd."&timer=$time";
-    }
-    # $cmd = is 'on' or 'off'  or  'on&timer=...' or 'off&timer=....'
-    
-    Log3 $name,4,"[Shelly_Set] switching channel $channel for device $name with command $cmd, FF=$ff";
-    if( $ff==0 ){    
-        if( $shelly_models{$model}[4]<2 ){
-            $cmd = "?turn=$cmd";  ##"/relay/$channel?turn=$cmd";
-        }else{
-            $cmd =~ s/on/true/;
-            $cmd =~ s/off/false/;
-            $cmd =~ s/timer/toggle_after/;
-            $cmd = "/rpc/Switch.Set?id=$channel&on=$cmd";#. ($cmd=~/on/?"true":"false");
-        }
-        $msg = Shelly_onoff($hash,$channel,$cmd); 
-    }elsif( $ff==2 ){
-        if( $model =~ /shellydimmer/ ){
-            $channel = "light/$channel"; 
-        }elsif( $model =~ /shellybulb/ && $mode eq "white" ){ 
-            $channel = "light/$channel";
-        }elsif( $model =~ /shellyrgbw/ && $mode eq "white" ){
-            $channel = "white/$channel";
-        }
-        $msg = Shelly_dim($hash,$channel,"?turn=$cmd");
-    }elsif($ff==7 ){
-        $msg = Shelly_dim($hash,"color/$channel","?turn=$cmd");
-    }
-    return $msg if( $msg );
-    return;
-  }
-  
-  if( ($cmd eq "pct" || $cmd eq "brightness") && $ff != 1 ){  #not for rollers
-    if( $ff !=2 ){
-          $msg = "Error: forbidden command  \'$cmd\' for device $name";
-          Log3 $name,1,"[Shelly_Set] ".$msg;
-          return $msg;
-    }
-     # check value
-     if( !defined($value) ){
-            $msg = "Error: no $cmd value \'$value\' given for device $name";
-            Log3 $name,1,"[Shelly_Set] ".$msg;
-            return $msg;
-     }elsif( $value =~ /\D+/ ){    #anything else than a digit
-            $msg = "Error: wrong $cmd value \'$value\' for device $name, must be <integer>";
-            Log3 $name,1,"[Shelly_Set] ".$msg;
-            return $msg;
-     }elsif( $value<0  || $value>100 ){
-            $msg = "$name Error: wrong $cmd value \'$value\' given, must be 0 ... 100 ";
-            Log3 $name,1,"[Shelly_Set] ".$msg;
-            return $msg;
-     } 
-    $cmd = "?brightness=".$value;
-    Log3 $name,4,"[Shelly_Set] setting brightness for device $name to $value";
-    if( $ff==2 ){
-        if( $model =~ /shellydimmer/ ){
-            $channel = "light/$channel"; 
-        }elsif( $model =~ /shellybulb/ && $mode eq "white" ){ 
-            $channel = "light/$channel";
-        }elsif( $model =~ /shellyrgbw/ && $mode eq "white" ){
-            $channel = "white/$channel";
-        } 
-        $msg = Shelly_dim($hash,$channel,$cmd);
-        if( !$msg ){
-            $cmd="?turn=off" if( $value == 0 );
-            $cmd="?turn=on"  if( $value > 0 ); 
-            $msg = Shelly_dim($hash,$channel,$cmd);
-        }
-    }
-    return $msg if( $msg );
-
-  # create readingsProxy devices
+      
+  #-- create readingsProxy devices
   }elsif( $cmd eq "xtrachannels" ){
        Log3 $name,3,"[Shelly_Set] readingsProxy devices for $name requested";   
        if( $shelly_models{$model}[$ff]>1){
@@ -2072,190 +2220,9 @@ sub Shelly_Set ($@) {
          Log3 $name,1,"[Shelly_Set] ".$msg;
       }
       return $msg;
-  }
-
-  #-- commands strongly dependent on Shelly type
-  ################################################################################################################ 
-  #-- we have a switch type device / relay mode
-  if( $shelly_models{$model}[0]>0 && $mode ne "roller" ){
-    $ff = 0;
-    Log3 $name,4,"[Shelly_Set] $name is a $model ". ($mode?"($mode mode)":"(switch type device)")."FF=$ff";
-
-  ################################################################################################################  
-  #-- we have a roller type device / roller mode
-  }elsif( $shelly_models{$model}[1]>0 && $mode ne "relay" ){
-    $ff = 1;
-    Log3 $name,5,"[Shelly_Set] $name: we have a $model ($mode mode) and command is $cmd";
- #x   my $channel = $value;
-    
-    my $max=AttrVal($name,"maxtime",undef);
-    my $maxopen =AttrVal($name,"maxtime_open",undef);
-    my $maxclose=AttrVal($name,"maxtime_close",undef);
-    
-    #-- open 100% or 0% ?
-    my $pctnormal = (AttrVal($name,"pct100","open") eq "open");
-    my $reverse_delay=0;
-    
-    #-- commands from shelly actions
-    if( $cmd eq "opening" ){
-           $hash->{MOVING} = "drive-up";
-    }elsif( $cmd eq "closing" ){
-           $hash->{MOVING} = "drive-down";
-    }elsif( $cmd eq "stopped" ){
-           $hash->{MOVING} = "stopped";
-    
-    #-- stop, and stay stopped  
-    }elsif( $cmd eq "stop"  ||  
-            $cmd eq "zero"  ||
-            $hash->{MOVING} eq "drive-down" &&  $cmd eq "closed"  ||
-            $hash->{MOVING} eq "drive-up"   &&  $cmd eq "open"    ||
-            $hash->{MOVING} =~ /drive/      &&  $cmd eq "pct"     ||
-            $hash->{MOVING} =~ /drive/      &&  $cmd eq "delta"   ){
-         Shelly_updown($hash,"?go=stop");
-         # -- estimate pos here ???
-         $hash->{DURATION} = 0;
-         # calibration of roller device
-         Shelly_configure($hash,"rc")   if( $cmd eq "zero" ) ;
-         
-    #-- in some cases we stop movement and start again in reverse direction
-    }elsif(
-            $hash->{MOVING} eq "drive-down" &&  $cmd eq "open"  ||
-            $hash->{MOVING} eq "drive-up"   &&  $cmd eq "closed"   ){
-         Log3 $name,1,"[Shelly_Set] stopping roller and starting after delay with command \'$cmd\'";
-         Shelly_updown($hash,"?go=stop");
-         # -- estimate pos here ???
-         $hash->{DURATION} = 0;
-         $reverse_delay=1.5;  # half of a second
-         $hash->{CMD}=$cmd;
-         RemoveInternalTimer($hash,"Shelly_Set");
-         InternalTimer(gettimeofday()+$reverse_delay, "Shelly_Set", $hash, 1);
-        
-    #-- is moving !!!
-    }elsif(  $hash->{MOVING}  ne "stopped"  ){
-         Log3 $name,1,"[Shelly_Set] Error: received command \'$cmd\', but $name is still moving";
-                
-    #--any other cases: no movement and commands: open, closed, pct, delta    
-    }else{
-      if( $cmd =~ /(closed)|(open)/ ){
-        if( $cmd eq "closed" ){
-          $hash->{DURATION} = (defined($value))?$value:$maxclose;
-          $hash->{MOVING} = "drive-down";
-          $hash->{TARGETPCT} = $pctnormal ? 0 : 100;
-          $cmd = "?go=close";
-        }else{
-          $hash->{DURATION} = (defined($value))?$value:$maxopen;
-          $hash->{MOVING} = "drive-up";
-          $hash->{TARGETPCT} = $pctnormal ? 100 : 0;
-          $cmd ="?go=open";
-        }
-        $cmd .= "&duration=$value"
-          if(defined($value));
-      #  Shelly_updown($hash,$cmd);
-      }elsif( $cmd eq "pct" || $cmd eq "delta" ){
-          my $targetpct = $value;
-          my $pos  = ReadingsVal($name,"position","");
-          my $pct  = ReadingsVal($name,"pct",undef);  
-             #if( "$value" =~ /[\+-]\d*/ ){
-             #  $targetpct = eval($pct."$value"); 
-             #}
-        #-- check for sign
-        if( $cmd eq "delta" ){
-           if( $value =~ /[\+-]\d*/ ){
-               $targetpct += $pct;
-           }else{
-               Log3 $name,1,"[Shelly_Set] $name: Wrong format, must consist of a plus or minus sign followed by an integer value";
-               return;
-           }
-        }
-        if( $targetpct<0 ){
-              $targetpct = 0;
-              Log3 $name,1,"[Shelly_Set] $name: Target Pos limited to 0";
-        }elsif( $targetpct>100 ){
-              $targetpct = 100;
-              Log3 $name,1,"[Shelly_Set] $name: Target Pos limited to 100";
-        }elsif( abs($targetpct-$pct)<1 ){
-              Log3 $name,1,"[Shelly_Set] $name: already on Target Pos, aborting";
-              return;
-        }
-
-        if( !$maxopen || !$maxclose ){
-              Log3 $name,1,"[Shelly_Set] please set the maxtime_open/closed attributes for proper operation of device $name";
-              $maxopen = $maxclose = ( $max ? $max : 20 );
-        }
-        
-        if( ($pctnormal && $targetpct > $pct) || (!$pctnormal && $targetpct < $pct) ){
-            $hash->{MOVING} = "drive-up";
-            $max = $maxopen;
-        }else{
-            $hash->{MOVING} = "drive-down";
-            $max = $maxclose;
-        }
-        
-        #$time           = int(abs($targetpct-$pct)/100*$max);
-        #$hash->{MOVING} = $pctnormal ? (($targetpct > $pct) ? "drive-up" : "drive-down") : (($targetpct > $pct) ? "drive-down" : "drive-up");
-
-        $hash->{TARGETPCT} = $targetpct;
-        $hash->{DURATION}  = abs($targetpct-$pct)/100*$max;
-        $cmd = "?go=to_pos&roller_pos=" . ($pctnormal ? $targetpct : 100 - $targetpct);
-      }
-      Shelly_updown($hash,$cmd);
-    }    
-  ################################################################################################################    
-  #-- we have a Shelly dimmer type device or rgbw type device in white mode
-  }elsif( ($model =~ /shellydimmer/) || (($model =~ /shellyrgbw.*/) && ($mode eq "white")) ){
-    $ff = 2;
-    
-    
-  ################################################################################################################
-  #-- we have a Shelly dimmer type device or rgbw type device in white mode, or a ShellyBulbDuo
-  }elsif( ($model =~ /shellybulb.*/) && ($mode eq "white") ){
-    $ff = 2;
-    
-    if( $cmd eq "ct" ){
-      $channel = shift @a;
-      Shelly_dim($hash,"light/0","?temp=".$value);
-    }
-  ################################################################################################################    
-  #-- we have a Shelly rgbw type device in color mode
-  }elsif( ($model =~ /shelly(rgbw|bulb).*/) && ($mode eq "color")){
-    $ff = 7;
-    my $channel = $value;  
-    
-    if( $cmd eq "hsv" ){
-      my($hue,$saturation,$value)=split(',',$value);
-      #-- rescale 
-      if( $hue>1 ){
-        $hue = $hue/360;
-      } 
-      my ($red,$green,$blue)=Color::hsv2rgb($hue,$saturation,$value);
-      $cmd=sprintf("red=%d&green=%d&blue=%d",int($red*255+0.5),int($green*255+0.5),int($blue*255+0.5));
-      if ($model eq "shellybulb"){
-          $cmd .= "&gain=100";
-      }else{
-          $cmd .= sprintf("&gain=%d",$value*100);  #new
-      }
-      Shelly_dim($hash,"color/0","?".$cmd);
-      
-    }elsif( $cmd =~ /rgb/ ){
-      my $red  = hex(substr($value,0,2));  # convert hexadecimal number into decimal
-      my $green= hex(substr($value,2,2));
-      my $blue = hex(substr($value,4,2));
-      if( $cmd eq "rgbw" ){
-          my $white= hex(substr($value,6,2));
-          $cmd     = sprintf("white=%d",$white);
-      }
-      $cmd    .= sprintf("&red=%d&green=%d&blue=%d",$red,$green,$blue);
-      $cmd    .= "&gain=100";
-      Shelly_dim($hash,"color/0","?".$cmd);
-      
-    }elsif( $cmd eq "white" ){  # value 0 ... 100
-      $cmd=sprintf("white=%d",$value*2.55);
-      Shelly_dim($hash,"color/0","?".$cmd);
-    }elsif( $cmd eq "gain" ){  # value 0 ... 100
-      $cmd=sprintf("gain=%d",$value);
-      Shelly_dim($hash,"color/0","?".$cmd);
-    }
-  }
+  }else{
+      return "$model $mode: unknown argument $cmd choose one of ".$hash->{helper}{Sets};
+  } 
   return undef;
 }
 
@@ -2489,10 +2456,26 @@ sub Shelly_status {
            Shelly_error_handling($hash,"Shelly_status","invalid JSON data");
            return;
 #  }elsif(ReadingsVal($name,"network","") !~ /connected to/){
-  }elsif(0){
-    # as we have received a valid JSON, we know network is connected: we dont need this here
+  }elsif(1){
     readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged($hash,"network","<html>connected to <a href=\"http://".$hash->{TCPIP}."\">".$hash->{TCPIP}."</a></html>",1);
+    # as we have received a valid JSON, we know network is connected: we dont need this here
+    #readingsBulkUpdateIfChanged($hash,"network","<html>connected to <a href=\"http://".$hash->{TCPIP}."\">".$hash->{TCPIP}."</a></html>",1);
+    #transition
+    if( $jhash->{'lights'}[0]{'transition'} ){
+        my $chn = $shelly_models{$model}[2];
+        $chn = 1 if( AttrVal($name,"mode", "color") eq "color" );
+        my $subs;
+        my $transition;
+        for( my $i=0;$i<$chn;$i++){
+            $transition  = $jhash->{'lights'}[$i]{'transition'};  # 0 .... 5000
+            $subs = ($chn>1 ? "_$i" : "" );
+            Shelly_readingsBulkUpdate($hash,"transition$subs",$transition.$si_units{time_ms}[$hash->{units}]); 
+        }
+    } 
+    #-- look for transition time (bulbs only); time in milli-seconds
+    if(0&&$jhash->{'transition'}) {
+        readingsBulkUpdateMonitored($hash,"transition", $jhash->{'transition'}.$si_units{time_ms}[$hash->{units}]);
+    }
     readingsEndUpdate($hash,1);  
   }
 
@@ -2785,7 +2768,7 @@ sub Shelly_proc1G {
       my $ct     = $jhash->{'lights'}[$i]{'temp'};
       readingsBulkUpdateMonitored($hash,"state".$subs,$ison);
       readingsBulkUpdateMonitored($hash,"pct".$subs,$bri.$si_units{pct}[$hash->{units}]);
-      readingsBulkUpdateMonitored($hash,"ct".$subs, $ct.$si_units{ct}[$hash->{units}]);  
+      readingsBulkUpdateMonitored($hash,"ct".$subs, $ct.$si_units{ct}[$hash->{units}]);
       
       readingsBulkUpdateMonitored($hash,"timer",$jhash->{'lights'}[$i]{'timer_remaining'}.$si_units{time}[$hash->{units}]);
       if( $jhash->{'lights'}[$i]{'timer_remaining'}>0 ){
@@ -2817,10 +2800,6 @@ sub Shelly_proc1G {
       $red   = round($red*$gain/100.0  ,0);
       $blue  = round($blue*$gain/100.0 ,0);
       $green = round($green*$gain/100.0,0);
-    }
-    if(0){  # not supported by /status - call
-    my $transition  = $jhash->{'lights'}[0]{'transition'};  # 0 .... 5000
-    Shelly_readingsBulkUpdate($hash,"transition",$transition.$si_units{transition}[$hash->{units}]); 
     }
     Shelly_readingsBulkUpdate($hash,"L-red",$red);
     Shelly_readingsBulkUpdate($hash,"L-green",$green);
@@ -3032,9 +3011,9 @@ sub Shelly_proc1G {
     }
   }
   #-- look if name of Shelly has been changed
-  if( defined($jhash->{'name'}) && AttrVal($name,"ShellyName","") ne $jhash->{'name'} ){ #ShellyName  we don't have this reading here!
-     ##readingsBulkUpdateIfChanged($hash,"name",$jhash->{'name'} );
-     $attr{$hash->{NAME}}{ShellyName} = $jhash->{'name'};
+  if( defined($jhash->{'name'}) ){#&& AttrVal($name,"ShellyName","") ne $jhash->{'name'} ){ #ShellyName  we don't have this reading here!
+     readingsBulkUpdateIfChanged($hash,"name",$jhash->{'name'} );
+     #$attr{$hash->{NAME}}{ShellyName} = $jhash->{'name'};
   }
   readingsEndUpdate($hash,1);
   
@@ -3122,7 +3101,7 @@ sub Shelly_proc2G {
       readingsBulkUpdateMonitored($hash,"last_dir".$subs,$rlastdir)  if ($rlastdir ne "unknown");
       $hash->{MOVING}   = $rstate; 
       $hash->{DURATION} = 0;
-      Log3 $name,5,"[Shelly_proc2G] Roller id=$id  action=$raction  state=$rstate  Last dir=$rlastdir";
+      Log3 $name,4,"[Shelly_proc2G] Roller id=$id  action=$raction  state=$rstate  Last dir=$rlastdir";
 
       #-- for roller devices store last power & current value (otherwise you mostly see nothing)
       if( $mode eq "roller" ){
@@ -3162,6 +3141,7 @@ sub Shelly_proc2G {
           $rstate = "Error: position";
       }
 
+      Log3 $name,4,"[Shelly_proc2G] Roller id=$id  position is $position $pct";
       readingsBulkUpdateMonitored($hash,"pct".$subs,$pct);
       readingsBulkUpdateMonitored($hash,"position".$subs,$position);
       readingsBulkUpdateMonitored($hash,"state".$subs,$rstate);
@@ -3356,13 +3336,11 @@ if(0){    # check calculation of reactive power!
         }elsif(ReadingsVal($name,"cloud","none") !~ /enabled/){
              readingsBulkUpdateIfChanged($hash,"cloud","enabled");
         }
-        #Wifi roaming
-        if( $jhash->{'wifi'}{'roam'}{'rssi_thr'} ){
+        #show Wifi roaming threshold only when connected via wifi
+        if( $jhash->{'wifi'}{'roam'}{'rssi_thr'} && ReadingsVal($name,"network_ssid","-") ne "-"){
              readingsBulkUpdateIfChanged($hash,"network_threshold",$jhash->{'wifi'}{'roam'}{'rssi_thr'}.$si_units{rssi}[$hash->{units}]);
-        }else{
-             # eg WallDisplay
-             readingsBulkUpdateIfChanged($hash,"network_threshold","-");
         }
+
         #Inputs: settings regarding the input 
         if( AttrVal($name,"showinputs","show") eq "show" && $shelly_models{$model}[5]>0 ){
           my $profile = $jhash->{'sys'}{'device'}{'profile'};  # switch, cover
@@ -3415,22 +3393,25 @@ if(0){    # check calculation of reactive power!
        }else{
           Log3 $name,4,"[Shelly_proc2G:info] $name: new firmware information read from Shelly: $fw_shelly";  
           readingsBulkUpdateIfChanged($hash,"firmware","v$fw_shelly");
-       }
-       if( defined($jhash->{'name'}) && AttrVal($name,"ShellyName","") ne $jhash->{'name'}) {  #ShellyName 
-           ##readingsBulkUpdateIfChanged($hash,"name",$jhash->{'name'} );
-           $attr{$hash->{NAME}}{ShellyName} = $jhash->{'name'}; 
+       } #Debug $name."--".$jhash->{'name'};
+       if( defined($jhash->{'name'}) ){##&& AttrVal($name,"ShellyName","") ne $jhash->{'name'}) {  #ShellyName 
+           readingsBulkUpdateIfChanged($hash,"name",$jhash->{'name'} );
+       #    $attr{$hash->{NAME}}{ShellyName} = $jhash->{'name'}; 
        }else{ 
            # if Shelly is not named, set name of Shelly equal to name of Fhem-device
            ##fhem("set $name name " . $name ); 
-           $attr{$hash->{NAME}}{ShellyName} = $name;  #set ShellyName as attribute
+       #    $attr{$hash->{NAME}}{ShellyName} = $name;  #set ShellyName as attribute
        }
     ################ /settings          
     }elsif ($comp eq "settings"){
       Log3 $name,4,"[Shelly_proc2G:settings] $name: processing the answer /settings from Shelly_shelly()";#4
            readingsBulkUpdateIfChanged($hash,"coiot",defined($jhash->{'coiot'}{'enabled'})?"enabled":"disabled"); 
-           readingsBulkUpdateIfChanged($hash,"coiot_period",defined($jhash->{'coiot'}{'update_period'})?$jhash->{'coiot'}{'update_period'}." sec":"disabled");
-           readingsBulkUpdateIfChanged($hash,"network_threshold",
-                 (defined($jhash->{'ap_roaming'}{'threshold'})?$jhash->{'ap_roaming'}{'threshold'}.$si_units{rssi}[$hash->{units}]:"-")  );
+           readingsBulkUpdateIfChanged($hash,"coiot_period",
+                       defined($jhash->{'coiot'}{'update_period'})?$jhash->{'coiot'}{'update_period'}.$si_units{time}[$hash->{units}]:"disabled");
+           readingsBulkUpdateIfChanged($hash,"network_threshold",$jhash->{'ap_roaming'}{'threshold'}.$si_units{rssi}[$hash->{units}])
+                                               if( defined($jhash->{'ap_roaming'}{'threshold'}) );
+      
+           readingsBulkUpdateIfChanged($hash,"name",$jhash->{'name'} ) if( defined($jhash->{'name'}) );  # ShellyName 
     }
     #############################################################################################################################
     #-- common to roller and relay, also ShellyPMmini energymeter
@@ -3661,8 +3642,7 @@ sub Shelly_EMData {
         
       ### 3. calculate a power value by integration of single power values
       ### calculate purchased and returned Energy out of integration of positive and negative power values
-      my $mypower=0;
-      my ($mypowerPos,$mypowerNeg);
+      my ($mypower,$mypowerPos,$mypowerNeg)=(0,0,0);
       my ($active_energy_i,$return_energy_i);
       if( $hash->{helper}{powerCnt} ){   # don't divide by zero
          $mypower = sprintf("%4.1f %s (%d values)", $hash->{helper}{power}/$hash->{helper}{powerCnt},
@@ -3675,10 +3655,11 @@ sub Shelly_EMData {
          Log3 $name,6,"[a] integrated Energy= $active_energy_i   $return_energy_i   in Watthours";
          $mypowerPos = sprintf("%4.1f %s (%d Ws = %5.2f Wh)", $mypowerPos,$si_units{power}[$hash->{units}],$mypowerPos*60,$mypowerPos/60 );
          $mypowerNeg = sprintf("%4.1f %s (%d Ws = %5.2f Wh)", $mypowerNeg,$si_units{power}[$hash->{units}],$mypowerNeg*60,$mypowerNeg/60);
-      } 
-      readingsBulkUpdateMonitored($hash,$pr.$mapping{E1}{act_integrated},$mypower);
-      readingsBulkUpdateMonitored($hash,$pr.$mapping{E1}{act_integratedPos},$mypowerPos);
-      readingsBulkUpdateMonitored($hash,$pr.$mapping{E1}{act_integratedNeg},$mypowerNeg);
+         # don't write out when not calculated
+         readingsBulkUpdateMonitored($hash,$pr.$mapping{E1}{act_integrated},$mypower);
+         readingsBulkUpdateMonitored($hash,$pr.$mapping{E1}{act_integratedPos},$mypowerPos);
+         readingsBulkUpdateMonitored($hash,$pr.$mapping{E1}{act_integratedNeg},$mypowerNeg);
+      }else{Debug "skipping power calculation";}
       # reset helper values. They will be set while cyclic update of power values. A small update interval is necessary!
       $hash->{helper}{power} = 0;
       $hash->{helper}{powerPos} = 0;
@@ -3693,7 +3674,6 @@ sub Shelly_EMData {
         $hash->{helper}{Energymeter_R}=$return_energy_i;
         $hash->{helper}{Energymeter_F}=$active_energy_i-$return_energy_i;
  
-     
 if(1){        # calculate the suppliers meter value
         foreach my $EM ( "F","P","R" ){
           if( defined(AttrVal($name,"Energymeter_$EM",undef)) ){
@@ -3717,9 +3697,7 @@ if(1){        # calculate the suppliers meter value
         readingsBulkUpdateMonitored($hash,"Purchased_Energy_T",shelly_energy_fmt($hash,$active_energy_i,"Wh"));
         readingsBulkUpdateMonitored($hash,"Returned_Energy_T", shelly_energy_fmt($hash,$return_energy_i,"Wh"));
         readingsBulkUpdateMonitored($hash,"Total_Energy_T",    shelly_energy_fmt($hash,$active_energy_i-$return_energy_i,"Wh"));
-        
-      
-        
+
      ### 5. calculate Energy-differences for a set of different periods
         #prepare the list of periods
         my @TPs=split(/,/x, AttrVal($name,"Periods", "") );
@@ -3754,11 +3732,8 @@ if(1){        # calculate the suppliers meter value
            shelly_delta_energy($hash,"Total_Energy_T_",    $TP,$timestamp,$active_energy_i-$return_energy_i,$TimeStamp,$dst); # $return_energy is positive
            shelly_delta_energy($hash,"Purchased_Energy_T_",$TP,$timestamp,$active_energy_i,$TimeStamp,$dst);
            shelly_delta_energy($hash,"Returned_Energy_T_", $TP,$timestamp,$return_energy_i,$TimeStamp,$dst);
-        }    
-       
-      
+        } 
     }
-    
     readingsEndUpdate($hash,1);
     return undef;
 }
@@ -3936,6 +3911,8 @@ sub shelly_energy_fmt {
   #-- Call status after switch.
   RemoveInternalTimer($hash,"Shelly_status");
   InternalTimer(gettimeofday()+0.5, "Shelly_status", $hash,0);
+  my $duration=ReadingsNum($name,"transition",10000)/1000;
+  InternalTimer(gettimeofday()+$duration, "Shelly_status2", $hash,0);
 
   return undef;
 }
@@ -3986,7 +3963,7 @@ sub shelly_energy_fmt {
   my $json = JSON->new->utf8;
   my $jhash = eval{ $json->decode( $data ) };
   if( !$jhash ){
-    if( ($model =~ /shelly(plus|pro)?2.*/) && ($data =~ /Device mode is not roller!/) ){  ##R
+    if( ($model =~ /shelly(plus|pro)?2.*/) && ($data =~ /Device mode is not roller!/) ){
       Shelly_error_handling($hash,"Shelly_updown","is not in roller mode");
     }else{
       Shelly_error_handling($hash,"Shelly_updown","invalid JSON data");
@@ -4011,32 +3988,19 @@ sub shelly_energy_fmt {
     readingsBulkUpdateMonitored($hash,"pct",$targetpct);
     readingsBulkUpdateMonitored($hash,"position",$targetposition);
     readingsEndUpdate($hash,1);
-if(0){  
-    if( $shelly_models{$model}[4]==0){  # 1Gen
-        #-- after 1 second call power measurement
-        InternalTimer(gettimeofday()+1, "Shelly_updown2", $hash,1);
-    }else{   #2Gen
-        Log3 $name,5,"[Shelly_updown] calling Shelly_status for Metering of Gen2-Device";
-        InternalTimer(gettimeofday()+1, "Shelly_status", $hash);
-    }
-}else{
-  #-- perform two updates: after starting of drive, after expected stopping of drive
-  if( $hash->{INTERVAL}>0 ){
-      $hash->{DURATION} = 5 if( !$hash->{DURATION} );    # duration not provided by Gen2
-      RemoveInternalTimer($hash,"Shelly_status");
-      InternalTimer(gettimeofday()+0.5, "Shelly_status", $hash); # after that: next update in reduced interval sec
-      InternalTimer(gettimeofday()+$hash->{DURATION}+0.5, "Shelly_interval", $hash,1); # reset interval
-  }
-}
+
+    #-- perform first update after starting of drive
+    $hash->{DURATION} = 5 if( !$hash->{DURATION} );    # duration not provided by Gen2
+    RemoveInternalTimer($hash,"Shelly_status");
+    InternalTimer(gettimeofday()+0.5, "Shelly_status", $hash); # update after starting 
+    # next update after expected stopping of drive + offset (at least 1 sec)
+    InternalTimer(gettimeofday()+$hash->{DURATION}+1.5, "Shelly_status2", $hash,1); 
   }
   return undef;
 }
 
-
-sub Shelly_interval($){
+sub Shelly_status2($){
   my ($hash) =@_;
-  $hash->{INTERVAL} = AttrVal($hash->{NAME},"interval",$defaultINTERVAL);
-  Log3 $hash->{NAME},3,"[Shelly_interval] interval reset to ".$hash->{INTERVAL};
   Shelly_status($hash);
 }
 
@@ -4142,7 +4106,7 @@ if($shelly_models{$model}[4]<2){
            .($hastimer?"timer is set to $onofftimer sec":"no timer set");
   readingsBeginUpdate($hash);  
   readingsBulkUpdateMonitored($hash,"timer".$subs,$timerstr);
-  readingsBulkUpdateMonitored($hash,"source".$subs,$source); 
+  readingsBulkUpdateMonitored($hash,"source".$subs,$source)     if( $model ne "shelly4" ); # not supported/old fw
 
   if( $shelly_models{$model}[0] == 1 ){
     readingsBulkUpdateMonitored($hash,"state",$ison);
@@ -4635,7 +4599,7 @@ sub Shelly_error_handling {
     if( $err =~ /timed out/ ){
         if( $err =~ /read/ ){
             $errN = "Error: Timeout reading";
-        }elsif( $err =~ /connect/ ){
+        }elsif( $err =~ /connect/ ){ 
             $errN = "Error: Timeout connecting"; 
         }else{
             $errN = "Error: Timeout";
@@ -4657,7 +4621,7 @@ sub Shelly_error_handling {
     }else{
         $errS = "Error"; 
     }
-    Log3 $name,$verbose,"[$func] Device $name has Error \'$errN\', state is set to \'$errS\' ";
+    Log3 $name,$verbose,"[$func] Device $name has Error \'$errN\', state is set to \'$errS\'";# \nfull text=>$err";
     readingsBulkUpdate($hash,"network_disconnects",ReadingsNum($name,"network_disconnects",0)+1)   if( ReadingsVal($name,"state","") ne $errS );
     readingsBulkUpdateMonitored($hash,"state",$errS, 1 );
     if( $flag==0 ){
@@ -4688,7 +4652,8 @@ readingsBulkUpdateMonitored($$$@) # derived from fhem.pl readingsBulkUpdateIfCha
 {
   my ($hash,$reading,$value,$changed)= @_;
   #$changed=0 if( $changed eq undef );
-  my $MaxAge=AttrVal($hash->{NAME},"maxAge",21600);  # default 6h
+  my $MaxAge=AttrVal($hash->{NAME},"maxAge",2160000);  # default 600h
+  if( !defined($value) ){Log3 $hash->{NAME},1,$hash->{NAME}.": undefinded value for $reading";}
   if( ReadingsAge($hash->{NAME},$reading,$MaxAge)>=$MaxAge || $value ne ReadingsVal($hash->{NAME},$reading,"")  ){  #|| $changed>=1
 ##       Log3 $hash->{NAME},6,"$reading: maxAge=$MaxAge ReadingsAge="
 ##                        .ReadingsAge($hash->{NAME},$reading,0)." new value=$value vs old="
@@ -4724,7 +4689,7 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
   }elsif($readingsProfile eq "update" ){                  # no change ->  set actual TS and sent event, like readingsBulkUpdate()
       return readingsBulkUpdate($hash,$reading,$value,$changed);
   }elsif($readingsProfile eq "maxAge" ){                  # no change ->  like above, but only when readings is more than maxAge old
-      my $MaxAge=AttrVal($hash->{NAME},"maxAge",21600);  # default 6h
+      my $MaxAge=AttrVal($hash->{NAME},"maxAge",2160000);  # default 600h
       return readingsBulkUpdate($hash,$reading,$value,$changed)  if( ReadingsAge($hash->{NAME},$reading,$MaxAge)>=$MaxAge );
   }elsif($readingsProfile eq "hold" ){                    # no change ->  sent event, but dont change timestamp 
        return readingsBulkUpdate($hash,$reading,$value,$changed,ReadingsTimestamp($hash->{NAME},$reading,undef));
@@ -4973,7 +4938,7 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
              <li>
                 <a id="Shelly-attr-maxAge"></a>
                 <code>attr &lt;name&gt; maxAge &lt;seconds&gt;</code>
-                <br/>Maximum age of readings in seconds. The default is 21600 seconds = 6 hours, minimum value is 'interval'.
+                <br/>Maximum age of readings in seconds. The default is 2160000 seconds = 600 hours, minimum value is 'interval'.
                 <br/>
                 </li>
              <li>
@@ -5309,11 +5274,11 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
         <li>
                 <a id="Shelly-set-name"></a>
                 <code>set &lt;name&gt; name &lt;ShellyName&gt;</code>
-                <br />Name des Shelly Gerätes. Wenn der Shelly noch keinen Namen erhalten hat wird der Shelly nach dem FHEM-Device benannt.
+                <br />Name des Shelly Gerätes. <!--Wenn der Shelly noch keinen Namen erhalten hat wird der Shelly nach dem FHEM-Device benannt.-->
                 Der Shellyname darf Leerzeichen enthalten.
                 </li>
                 Hinweis: Leere Zeichenkentten werden nicht akzeptiert. 
-                Nach dem Löschen eines Shelly Namens (auf Shellies-Website) wird der Shelly Name auf den Namen des FHEM Devices gesetzt.
+                <!--Nach dem Löschen eines Shelly Namens (auf Shellies-Website) wird der Shelly Name auf den Namen des FHEM Devices gesetzt.-->
         <li>
             <a id="Shelly-set-config"></a>
             <code>set &lt;name&gt; config &lt;registername&gt; &lt;value&gt; [&lt;channel&gt;] </code>
@@ -5364,15 +5329,21 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
         <br/>Für Shelly Rollladentreiber (model=shelly2/2.5/plus2/pro2 und mode=roller)  
         <ul>
             <li><a id="Shelly-set-open"></a><a id="Shelly-set-closed"></a>
-                <code>set &lt;name&gt; open|closed|stop [&lt;duration&gt;]</code>
-                <br />Fährt den Rollladen zu den Positionen open (offen), closed (geschlossen) oder beendet die Fahrbewegung (stop). 
-                      Bei den Befehle open (öffnen) und closed (schließen) kann ein optionaler Parameter für die Fahrzeit in Sekunden mit übergeben werden
+                <code>set &lt;name&gt; open|closed [&lt;duration&gt;]</code>
+                <br />Fährt den Rollladen aufwärts zur Position offen (open) bzw. abwärts zur Position geschlossen (closed). 
+                      Es kann ein optionaler Parameter für die Fahrzeit in Sekunden mit übergeben werden
                       </li>      
-            <li>
+            
+            <li><a id="Shelly-set-stop"></a>
+                <code>set &lt;name&gt; stop</code>
+                <br />Beendet die Fahrbewegung (stop).
+                      </li>
+                        
+            <li><a id="Shelly-set-pct"></a>
                 <code>set &lt;name&gt; pct &lt;integer percent value&gt; </code>
                 <br />Fährt den Rollladen zu einer Zwischenstellung (normalerweise gilt 100=offen, 0=geschlossen, siehe Attribut 'pct100'). 
-                Wenn dem Wert für die Zwischenstellung ein Plus (+) oder Minus (-) - Zeichen vorangestellt wird, 
-                wird der Wert auf den aktuellen Positionswert hinzugezählt.
+                <s>Wenn dem Wert für die Zwischenstellung ein Plus (+) oder Minus (-) - Zeichen vorangestellt wird, 
+                wird der Wert auf den aktuellen Positionswert hinzugezählt.</s>
                 </li>    
             
             <li><a id="Shelly-set-delta"></a>
@@ -5512,7 +5483,7 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
                 <code>attr &lt;name&gt; maxAge &lt;seconds&gt;</code>
                 <br/>Mit diesem Attribut kann bei einigen Readings die Auslösung eines Events bei Aktualisierung des Readings erzwungen werden, 
                            auch wenn sich das Reading nicht geändert hat. 
-                Der Standardwert ist 21600 Sekunden = 6 Stunden, Minimalwert ist das Pollingintervall.
+                Der Standardwert ist 2160000 Sekunden = 600 Stunden, Minimalwert ist das Pollingintervall.
                 <br/>
                 </li>
              <li>
