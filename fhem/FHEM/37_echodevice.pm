@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2023.11.15 v0.2.29
+# - FEATURE: Unterstützung A1D6RDUOWH31HF JLR Incontrol
+#
 # 2023.11.12 v0.2.28
 # - FEATURE: Unterstützung A347N36W21919O Yamaha ATS-2090 Soundbar
 #
@@ -527,7 +530,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.28";
+my $ModulVersion     = "0.2.29";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -4607,6 +4610,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A23FPV4BT7FH68" || $ModelNumber eq "Yamaha YAS-209 Soundbar")	{return "Yamaha YAS-209 Soundbar";}
 	elsif($ModelNumber eq "A347N36W21919O" || $ModelNumber eq "Yamaha ATS-2090 Soundbar")	{return "Yamaha ATS-2090 Soundbar";}
 	elsif($ModelNumber eq "A39Y3UG1XLEJLZ" || $ModelNumber eq "Fitbit Sense")				{return "Fitbit Sense";}
+	elsif($ModelNumber eq "A1D6RDUOWH31HF" || $ModelNumber eq "JLR Incontrol")				{return "JLR Incontrol";}
 	elsif($ModelNumber eq "AQCGW9PSYWRF"   || $ModelNumber eq "Polk React Soundbar")		{return "Polk React Soundbar";}
 
 	elsif($ModelNumber eq "")               {return "";}
