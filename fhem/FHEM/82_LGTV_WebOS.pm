@@ -7,6 +7,7 @@
 #
 #   Special thanks goes to comitters:
 #       - Vitolinker / Commandref
+#       - ska- / SSL_startHandshake - SSL Port 3001 Support
 #
 #
 #  This script is free software; you can redistribute it and/or modify

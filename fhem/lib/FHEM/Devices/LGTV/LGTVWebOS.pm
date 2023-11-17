@@ -61,6 +61,7 @@ my $missingModul = "";
 
 eval { require MIME::Base64;     1 } or $missingModul .= 'MIME::Base64 ';
 eval { require IO::Socket::INET; 1 } or $missingModul .= 'IO::Socket::INET ';
+eval { use IO::Socket::SSL;      1 } or $missingModul .= 'IO::Socket::SSL ';
 
 ## no critic (Conditional "use" statement. Use "require" to conditionally include a module (Modules::ProhibitConditionalUseStatements))
 eval { use Digest::SHA qw /sha1_hex/; 1 } or $missingModul .= 'Digest::SHA ';
@@ -648,7 +649,21 @@ sub Open {
 
     ::Log3( $name, 4, "LGTV_WebOS ($name) - Baue Socket Verbindung auf" );
 
-    my $socket = IO::Socket::INET->new(
+ #  create a connecting socket
+ #  SSL_startHandshake is dependent on the protocol: this lets us use one socket
+ #  to work with either SSL or non-SSL sockets.
+    my $socket = IO::Socket::SSL->new(
+        PeerHost           => $host,
+        PeerPort           => 3001,
+        Proto              => 'tcp',
+        SSL_startHandshake => 1,                 #( $proto eq 'wss' ? 1 : 0 ),
+        SSL_verify_mode    => SSL_VERIFY_NONE,
+
+        # Blocking                   => 1
+        KeepAlive => 1,
+        Timeout   => $timeout
+      )
+      || IO::Socket::INET->new(
         PeerHost  => $host,
         PeerPort  => $port,
         Proto     => 'tcp',
@@ -656,7 +671,8 @@ sub Open {
         Timeout   => $timeout
       )
       or return ::Log3( $name, 4,
-        "LGTV_WebOS ($name) Couldn't connect to $host:$port" );    # open Socket
+        "LGTV_WebOS ($name) Couldn't connect to $host:$port/3001" )
+      ;    # open Socket
 
     $hash->{FD} = $socket->fileno();
     $hash->{CD} = $socket;             # sysread / close won't work on fileno
