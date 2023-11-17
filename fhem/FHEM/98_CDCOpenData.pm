@@ -52,7 +52,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.10c";
+my $ModulVersion = "01.10e";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
@@ -176,12 +176,15 @@ sub CDCOpenData_Define($$)
       return $msg;
    }
 
-   $hash->{STATE}              = "Initializing";
-   $hash->{INTERVAL}           = 300;
-   $hash->{TIMEOUT}            = 55;
-   $hash->{TMPDIR}             = "temp_radolan_data_" . $name;
-   $hash->{DWDHOST}            = "opendata.dwd.de";
-   $hash->{fhem}{UPDATE}       = 0;
+   $hash->{NAME}    = $name;
+   $hash->{VERSION} = $ModulVersion;
+
+   $hash->{STATE}        = "Initializing";
+   $hash->{INTERVAL}     = 300;
+   $hash->{TIMEOUT}      = 55;
+   $hash->{TMPDIR}       = "temp_radolan_data_" . $name;
+   $hash->{DWDHOST}      = "opendata.dwd.de";
+   $hash->{fhem}{UPDATE} = 0;
 
    $hash->{helper}{TimerReadout} = $name . ".Readout";
    $hash->{helper}{TimerCmd}     = $name . ".Cmd";
@@ -319,7 +322,7 @@ sub CDCOpenData_Attr($@)
      if ($aName eq "locations") {
        foreach my $location (split / /, $aVal) {
          $location =~ s/.*?://;
-         CDCOpenData_Log $hash, 2, "la,lo -> $location";
+         CDCOpenData_Log $hash, 4, "la,lo -> $location";
          return "The location attribute is a space-separated list of locations in the format latitude,longitude." if $location !~ /[0-9]*\.[0-9]*,[0-9]*\.[0-9]*/;
        }
      }
@@ -489,7 +492,7 @@ sub CDCOpenData_Attr($@)
 
        } else {
 
-         my $dMod  = 'defmod ' . $aVal . ' FileLog ./log/' . $name . '-%Y-%m.log ' . $name . ':.*?_rain_radar:.*';
+         my $dMod  = 'defmod ' . $aVal . ' FileLog ./log/' . $name . '-%Y-%m.log ' . $name . ':.*?_rain_radar/..:.*';
          fhem($dMod, 1);
 
          $dMod  = 'attr -silent ' . $aVal . ' outputFormat { return $TIMESTAMP." ".$NAME." ".$1." ".$2."\n" if $EVENT =~ /(.*?)\/.*?:\s(.*)/}';
@@ -1086,8 +1089,9 @@ sub CDCOpenData_get_RegenRadar_atLocations($$$$) {
      close $uncompressed_fh;
 
    }
-   $ftp->quit;
+
    close $remote_tar_bz2_file_handle;
+   $ftp->quit;
 
    CDCOpenData_Log $name, 5, "################ End get_RegenRadar_atLocations ################";
 
