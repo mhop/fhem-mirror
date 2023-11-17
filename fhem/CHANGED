@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it. 
+ - bugfix:  98_CDCOpenData: falsche RegEx für FileLog
  - change:  36_Shelly: removed attr ShellyName, use 'set <name> <ShellyName>' 
  - feature: 36_Shelly: set <name> ON and OFF for multichannel devices
  - bugfix:  36_Shelly: misc. 'undefinded value'
