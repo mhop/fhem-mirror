@@ -45,6 +45,8 @@
 #           Change: remove attribute 'ShellyName', use 'set ... name' instead
 #           Bug Fix: misc. 'undefined value' 
 #           internal Optimization of Shelly_Set()
+# 5.09      Bug Fix (dimmer-devices): set..pct will not turn on or off
+#           Add (dimmer-devices): set..dim will turn on or off
 
 package main;
 
@@ -60,7 +62,7 @@ sub Log($$);
 sub Shelly_Set ($@);
 
 #-- globals on start
-my $version = "5.08 15.11.2023";
+my $version = "5.09 19.11.2023";
 
 my $defaultINTERVAL = 60;
 my $secndIntervalMulti = 4;  # Multiplier for 'long update'
@@ -212,7 +214,7 @@ my %shelly_dropdowns = (
     "Onoff" => " on off toggle on-for-timer off-for-timer",
     "Multi" => " ON:noArg OFF:noArg xtrachannels:noArg",
     "Rol"   => " closed open stop:noArg pct:slider,0,1,100 delta zero:noArg predefAttr:noArg",
-    "RgbwW" => " pct",
+    "RgbwW" => " dim pct",
     "BulbW" => " ct:colorpicker,CT,3000,10,6500 pct:slider,0,1,100",
     "RgbwC" => " rgbw rgb:colorpicker,HSV hsv white:slider,0,1,100 gain:slider,0,1,100"
 );
@@ -584,7 +586,7 @@ sub Shelly_Initialize ($) {
 
   $hash->{AttrList}= "model:".join(",",(sort keys %shelly_models)).
                      " maxAge".
-         #            " ShellyName".
+                     " ShellyName".
                      " mode:relay,roller,white,color".
                      " interval timeout shellyuser verbose:0,1,2,3,4,5".
                      $attributes{'multichannel'}.
@@ -1710,12 +1712,13 @@ sub Shelly_Set ($@) {
   #-- get channel parameter
   if( $cmd eq "toggle" || $cmd eq "on" || $cmd eq "off" ){
         $channel = $value; 
-  }elsif( $cmd =~ /(on|off)-for-timer/ || ($cmd eq"pct" && $ff!=1 )|| $cmd eq "brightness" || $cmd eq "ct" ){
+  }elsif( $cmd =~ /(on|off)-for-timer/ || ($cmd eq"pct" && $ff!=1 ) || $cmd eq "dim" || $cmd eq "brightness" || $cmd eq "ct" ){
         $channel = shift @a;
+        $channel = shift @a if( $channel eq "%" ); # skip %-sign coming from dropdown (units=1)
   } 
   
   #-- check channel
-  if( $cmd =~ /^(toggle|on|off|pct|brightness)/ && $ff != 1){   # not for rollers
+  if( $cmd =~ /^(toggle|on|off|pct|dim|brightness)/ && $ff != 1){   # not for rollers
      if( $ff != 0 && $ff !=2 && $ff !=7 ){
           $msg = "Error: forbidden command  \'$cmd\' for device $name";
           Log3 $name,1,"[Shelly_Set] ".$msg;
@@ -1821,8 +1824,8 @@ sub Shelly_Set ($@) {
     return;
   }
     
-  #- - pct, brightness - set percentage volume of dimmable device (no rollers)  eg. shellydimmer or shellyrgbw in white mode
-  if( ($cmd eq "pct" || $cmd eq "brightness") && $ff != 1 ){
+  #- - pct, brightness, dim - set percentage volume of dimmable device (no rollers)  eg. shellydimmer or shellyrgbw in white mode
+  if( ($cmd eq "pct" || $cmd eq "brightness" || $cmd eq "dim") && $ff != 1 ){
     if( $ff !=2 ){
           $msg = "Error: forbidden command  \'$cmd\' for device $name";
           Log3 $name,1,"[Shelly_Set] ".$msg;
@@ -1837,27 +1840,31 @@ sub Shelly_Set ($@) {
             $msg = "Error: wrong $cmd value \'$value\' for device $name, must be <integer>";
             Log3 $name,1,"[Shelly_Set] ".$msg;
             return $msg;
+     }elsif( $value == 0 && $cmd eq "pct" ){
+            $msg = "$name Error: wrong $cmd value \'$value\' given, must be 1 ... 100 ";
+            Log3 $name,1,"[Shelly_Set] ".$msg;
+            return $msg;
      }elsif( $value<0  || $value>100 ){
             $msg = "$name Error: wrong $cmd value \'$value\' given, must be 0 ... 100 ";
             Log3 $name,1,"[Shelly_Set] ".$msg;
             return $msg;
      } 
-    $cmd = "?brightness=".$value;
+    #$cmd = "?brightness=".$value;
     Log3 $name,4,"[Shelly_Set] setting brightness for device $name to $value";
     if( $ff==2 ){
-        if( $model =~ /shellydimmer/ ){
-            $channel = "light/$channel"; 
-        }elsif( $model =~ /shellybulb/ && $mode eq "white" ){ 
-            $channel = "light/$channel";
-        }elsif( $model =~ /shellyrgbw/ && $mode eq "white" ){
+        if( $model =~ /shellyrgbw/ && $mode eq "white" ){
             $channel = "white/$channel";
+        }else{ 
+            $channel = "light/$channel";
         } 
-        $msg = Shelly_dim($hash,$channel,$cmd);
-        if( !$msg ){
-            $cmd="?turn=off" if( $value == 0 );
-            $cmd="?turn=on"  if( $value > 0 ); 
-            return Shelly_dim($hash,$channel,$cmd);
+        if( $value == 0 ){  # dim-command
+            $cmd="?turn=off" ;
+        }elsif($cmd eq "pct" ){
+            $cmd="?brightness=$value";
+        }else{
+            $cmd="?brightness=$value\&turn=on"; 
         }
+        return Shelly_dim($hash,$channel,$cmd);
     }
     return $msg if( $msg );
   }
@@ -4264,13 +4271,17 @@ if($shelly_models{$model}[4]<2){
                  $urls .= "&name=%22_". uc($event) ."_%22" if( $gen == 1 );   # name of the weblink (Gen2 only)                    
                  $urls .= ($gen?"&event=%22$event%22":"&name=$event"); 
                  $urls .= ($gen?"&enable=true":"&enabled=true");
-                 
+if(1){                 
                  ($urls_pre,$urls_part1,$fhemcmd,$urls_post) = Shelly_webhookurl($hash,$cmd,$element,$c,$e);  # creating the &urls= command
                  $urls .= $urls_pre; 
                  $urls .= $urls_part1;
                  $urls .= $fhemcmd; 
                  $urls .= $urls_post;
-
+}else{
+                 my( $WebHook,$error ) = Shelly_webhookurl2($hash,$element,$c,$e);  # creating the &urls= command
+                 return if($error);
+                 $urls .= $WebHook;
+}
                  if( $component eq "emeter" ){
                                   # shall we have conditions?
                      $urls .= "&condition=%22ev.act_power%20%3c%20-200%22" if( 0 && $e==0 );   #  %3c  <
@@ -4279,8 +4290,8 @@ if($shelly_models{$model}[4]<2){
                      $URL =~ s/enable\=true/enable\=false/  if( $e > 0 ); 
                   }
              }
-             Log3 $name,5,"[Shelly_webhook] $name $cmd component=$element  count=$c   event=$e";
-             Log3 $name,5,"[Shelly_webhook] issue a non-blocking call to \n$URL$urls";  
+             Log3 $name,1,"[Shelly_webhook] $name $cmd component=$element  count=$c   event=$e";
+             Log3 $name,1,"[Shelly_webhook] issue a non-blocking call to \n$URL$urls";  
              HttpUtils_NonblockingGet({
                  url      => $URL.$urls,
                  timeout  => $timeout,
@@ -4557,6 +4568,85 @@ sub Shelly_webhookurl ($@) {
   Log3 $name,$V,"[Shelly_webhookurl] $name: $urls_pre$fhemcmd$urls_post";
   ##########
   return ($urls_pre,$urls_part1,$fhemcmd,$urls_post);
+}
+###################################################################################################################  
+sub Shelly_webhookurl2 ($@) {
+  my ($hash, @a) = @_ ;
+  my $comp    = shift @a; # shelly component
+  my $channel = shift @a;
+  my $noe     = shift @a; # number of event of component
+  
+  my $V = 1;
+  my $msg;
+  my $name = $hash->{NAME};
+  Log3 $name,$V,"[Shelly_webhookurl2] calling url-builder with args: $name $comp ch:$channel noe:$noe";
+
+  my $model = AttrVal($name,"model","generic");
+  my $gen = $shelly_models{$model}[4]; # 0 is Gen1,  1 is Gen2
+  #my $webhook = ($gen>=1?"&urls=[%22":"&urls[]="); # Gen2 : Gen1
+  my $webhook = ($gen>=1?"urls=[\"":"urls[]="); # Gen2 : Gen1
+  							
+  my $host_ip =  qx("\"hostname -I\"");   # local
+  $host_ip =~ m/(\d\d?\d?\.\d\d?\d?\.\d\d?\d?\.\d\d?\d?).*/; #extract ipv4-address
+  $host_ip = $1;
+  Log3 $name,6,"[Shelly_webhookurl2] the host-ip of $name is: $host_ip";
+  $webhook  .= "http://".$host_ip;
+  
+  my $fhemweb = AttrVal($name,"webhook","none"); 
+  if($fhemweb eq "none"){
+     $msg = "FHEMweb-device for $name is \'none\' or undefined)";
+     Log3 $name,$V,"[Shelly_webhookurl2] $msg";
+     return(undef,"Error: FHEMweb-device for $name is \'none\' or undefined");
+  }
+
+  my $port    = InternalVal($fhemweb,"PORT",undef);
+  if (!$port ){
+     $msg = "FHEMweb device without port-number";
+     Log3 $name,$V,"[Shelly_webhookurl2] $msg";
+     return(undef,"Error: $msg");
+  }
+  $webhook .= ":".$port;
+  
+  my $webname = AttrVal($fhemweb,"webname","fhem");
+  Log3 $name,6,"[Shelly_webhookurl2] FHEMweb-device \"$fhemweb\" has port \"$port\" and webname \"$webname\"";
+  $webhook .= "\/".$webname;
+
+  $webhook .= "?cmd=";    # set%2520".$name;
+
+  $comp = "status" if (!$comp );
+  if ( $comp eq "status" || length($shelly_events{$comp}[$noe])==0 ){
+      $webhook .= "get $name status";
+  }else{
+      $comp  = $shelly_events{$comp}[$noe];
+      $comp  = $fhem_events{$comp};
+      $webhook .= "set $name $comp";
+      if( $comp eq "Active_Power" ){        
+          $webhook .= "_%24%7bev.phase%7d %24%7bev.act_power%7d" ;
+      }elsif( $comp eq "Current" ){      
+          $webhook .= "_%24%7bev.phase%7d %24%7bev.current%7d" ;
+      }elsif( $comp eq "Voltage" ){      
+          $webhook .= "_%24%7bev.phase%7d %24%7bev.voltage%7d" ;
+      }else{
+          $webhook .= " $channel";
+      } 
+  }
+  $webhook =~ s/\s/\%2520/g;    # substitute '&' by '%2520', that will result in '%20'
+
+  $webhook .= "&XHR=1"    if(1);
+
+  # check, if CSRF is defined in according FHEMWEB
+  my $token   = InternalVal($fhemweb,"CSRFTOKEN",undef);
+  $webhook .= "&fwcsrf=".$token  if (defined $token);
+
+  #$webhook .= ($gen>=1?"%22]":"");
+  $webhook .= ($gen>=1?"\"]":"");
+  
+  $webhook =~ s/\&/\%26/g;    # substitute & by %26
+  $webhook = "&".$webhook;
+
+  Log3 $name,$V,"[Shelly_webhookurl2] $name: $webhook";
+  ##########
+  return ($webhook);#,undef);
 }
 
 
@@ -5344,6 +5434,9 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
                 <br />Fährt den Rollladen zu einer Zwischenstellung (normalerweise gilt 100=offen, 0=geschlossen, siehe Attribut 'pct100'). 
                 <s>Wenn dem Wert für die Zwischenstellung ein Plus (+) oder Minus (-) - Zeichen vorangestellt wird, 
                 wird der Wert auf den aktuellen Positionswert hinzugezählt.</s>
+                <br />
+                <code>set &lt;name&gt; pct &lt;1...100&gt; [&lt;channel&gt;] </code>
+                <br />Prozentualer Wert für die Helligkeit (brightness). Es wird nur der Helligkeitswert gesetzt ohne das Gerät ein- oder aus zu schalten.
                 </li>    
             
             <li><a id="Shelly-set-delta"></a>
@@ -5366,17 +5459,25 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
         <ul>
             <li>
                <code>set &lt;name&gt; on|off|toggle  [&lt;channel&gt;] </code>
-                <br />schaltet Kanal &lt;channel&gt; on oder off. Kanalnummern sind 0..3 für model=shellyrgbw. 
-                    Wird keine Kanalnummer angegeben, wird der mit dem Attribut 'defchannel' definierte Kanal geschaltet.</li>
+                <br />schaltet Kanal &lt;channel&gt; on oder off. </li>
             <li>
                 <code>set &lt;name&gt; on-for-timer|off-for-timer &lt;time&gt; [&lt;channel&gt;] </code>
-                <br />schaltet Kanal &lt;channel&gt; on oder off für &lt;time&gt; Sekunden. Kanalnummern sind 0..3 for model=shellyrgbw.
-                      Wird keine Kanalnummer angegeben, wird der mit dem Attribut 'defchannel' definierte Kanal geschaltet.</li>  
-            <li>
-                <code>set &lt;name&gt; pct &lt;0..100&gt; [&lt;channel&gt;] </code>
-                <br />Prozentualer Wert für die Helligkeit (brightness). Kanalnummern sind 0..3 für model=shellyrgbw.
-                      Wird keine Kanalnummer angegeben, wird der mit dem Attribut 'defchannel' definierte Kanal geschaltet.</li> 
+                <br />schaltet Kanal &lt;channel&gt; on oder off für &lt;time&gt; Sekunden. </li>
+                      
+            <li><a id="Shelly-set-pct"></a>
+                <code>set &lt;name&gt; pct &lt;1...100&gt; [&lt;channel&gt;] </code>
+                <br />Prozentualer Wert für die Helligkeit (brightness). Es wird nur der Helligkeitswert gesetzt ohne das Gerät ein- oder aus zu schalten.
+                      </li> 
+                                            
+            <li><a id="Shelly-set-dim"></a>
+                <code>set &lt;name&gt; dim &lt;0...100&gt; [&lt;channel&gt;] </code>
+                <br />Prozentualer Wert für die Helligkeit (brightness). Es wird nur der Helligkeitswert gesetzt und eingeschaltet. 
+                      Bei einem Helligkeitswert gleich 0 (Null) wird ausgeschaltet, der im Shelly gespeicherte Helligkeitswert bleibt unverändert.
+                      </li> 
         </ul>
+        Hinweis für ShellyRGBW (white-Mode): Kanalnummern sind 0..3.
+                      Wird keine Kanalnummer angegeben, wird der mit dem Attribut 'defchannel' definierte Kanal geschaltet.
+        <br/>              
         <br/>Für Shelly RGBW Devices (model=shellyrgbw und mode=color)
         <ul>
             <li>

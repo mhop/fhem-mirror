@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
-# Do not insert empty lines here, update check depends on it. 
+# Do not insert empty lines here, update check depends on it.
+ - bugfix:  36_Shelly:dimmer-devices: set..pct will not turn on or off
+ - feature: 36_Shelly:dimmer-devices: set..dim will turn on or off  
  - bugfix:  76_SolarForecast: attr graphicHeaderOwnspec minor fix
  - bugfix:  82_LGTV_WebOS: fix connection problem / add SSL Support
  - bugfix:  98_CDCOpenData: falsche RegEx für FileLog
