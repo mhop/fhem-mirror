@@ -149,6 +149,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.1.1"  => "19.11.2023  graphicHeaderOwnspec: fix ignoring the last element of allsets/allattr ",
   "1.1.0"  => "14.11.2023  graphicHeaderOwnspec: possible add set/attr commands, new setter consumerNewPlanning ",
   "1.0.10" => "31.10.2023  fix warnings, edit comref ",
   "1.0.9"  => "29.10.2023  _aiGetSpread: set spread from 50 to 20 ",
@@ -9112,8 +9113,8 @@ sub __createOwnSpec {
 
   return if(!$spec || !$show);
   
-  my $allsets  = getAllSets ($name);
-  my $allattrs = getAllAttr ($name);
+  my $allsets  = getAllSets ($name)." ";
+  my $allattrs = getAllAttr ($name)." ";                                  # Leerzeichen am Ende wichtig für Regexvergleich
 
   my @fields = split (/\s+/sx, $spec);
 
@@ -9200,7 +9201,7 @@ return $ownv;
 ################################################################  
 sub ___getFWwidget {
   my $name = shift;
-  my $elm  = shift;                         # Element
+  my $elm  = shift;                         # zu prüfendes Element
   my $allc = shift;                         # Kommandovorrat -> ist Element enthalten?
   my $ctyp = shift // 'set';                # Kommandotyp: set/attr
 
@@ -9219,7 +9220,7 @@ sub ___getFWwidget {
       if ($ctyp eq 'attr') {
           $current = AttrVal ($name, $elm, '');
           $reading = '.'.$elm;
-          
+
           push @attrreadings, $reading;
           readingsSingleUpdate ($defs{$name}, $reading, $current, 0);
       }
