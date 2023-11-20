@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  72_FRITZBOX set <name> lockLandevice für FritzOS >= 7.50
+ - feature: 72_FRITZBOX set <name> lockLandevice Parameter rt (realtime)
  - bugfix:  36_Shelly:dimmer-devices: set..pct will not turn on or off
  - feature: 36_Shelly:dimmer-devices: set..dim will turn on or off  
  - bugfix:  76_SolarForecast: attr graphicHeaderOwnspec minor fix
