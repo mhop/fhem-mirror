@@ -1643,7 +1643,7 @@ FW_queryValue(cmd, el)
 function
 FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
 {
-  if(vArr.length > 2 ||
+  if(vArr.length > 3 ||
      (vArr[0] != "textField" && 
       vArr[0] != "textFieldNL" &&
       vArr[0] != "textField-long" &&
@@ -1656,13 +1656,14 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
   var newEl = $("<div style='display:inline-block'>").get(0);
   if(set && set != "state" && vArr[0].indexOf("NL") < 0)
     $(newEl).append(set+":");
-  $(newEl).append('<input type="text" size="30">');
+  var iSize = (vArr.length >= 3 ? vArr[2]: 30);
+  $(newEl).append('<input type="text" size="'+iSize+'">');
   var inp = $(newEl).find("input").get(0);
   if(elName)
     $(inp).attr('name', elName);
   if(currVal != undefined)
     $(inp).val(currVal);
-  if(vArr.length == 2 && !is_long)
+  if(vArr.length >= 2 && !is_long)
     $(inp).attr("placeholder", vArr[1]);
 
   function addBlur() { if(cmd) $(inp).blur(function() { cmd($(inp).val()) }); };
@@ -2417,14 +2418,16 @@ FW_rescueClient(pid, key)
   <li>noArg - show no input field.</li>
   <li>time - show a JavaScript driven timepicker.<br>
       Example: attr FS20dev widgetOverride on-till:time</li>
-  <li>textField[,placeholder] - show an input field.<br>
+  <li>textField[,placeholder,tfsize] - show an input field. tfsize is the size
+      attribute for the input field, defaults to 30. <br>
       Example: attr WEB widgetOverride room:textField</li>
-  <li>textFieldNL[,placeholder] - show the input field and hide the label.</li>
-  <li>textField-long[,sizePct] - show an input-field, but upon
+  <li>textFieldNL[,placeholder,tfsize] - show the input field and hide the
+      label.</li>
+  <li>textField-long[,sizePct,tfsize] - show an input-field, but upon
       clicking on the input field open a textArea.
       sizePct specifies the size of the dialog relative to the screen, in
       percent. Default is 75</li>
-  <li>textFieldNL-long[,sizePct] - the behaviour is the same
+  <li>textFieldNL-long[,sizePct,tfsize] - the behaviour is the same
       as :textField-long, but no label is displayed.</li>
   <li>slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1] - show
       a JavaScript driven slider. The optional ,1 at the end
