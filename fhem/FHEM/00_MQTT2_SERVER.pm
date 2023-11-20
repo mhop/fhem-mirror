@@ -156,7 +156,7 @@ MQTT2_SERVER_Attr(@)
 {
   my ($type, $devName, $attrName, @param) = @_;
   my $hash = $defs{$devName};
-  if($type eq "set" && $attrName eq "SSL") {
+  if($type eq "set" && $attrName eq "SSL" && $param[0]) {
     InternalTimer(1, "TcpServer_SetSSL", $hash, 0); # Wait for sslCertPrefix
   }
 
@@ -921,8 +921,8 @@ MQTT2_SERVER_ReadDebug($$)
 
     <a id="MQTT2_SERVER-attr-SSL"></a>
     <li>SSL<br>
-      Enable SSL (i.e. TLS). Note: after deleting this attribute FHEM must be
-      restarted.
+      Enable SSL (i.e. TLS). Note: after deleting or zeroing this attribute
+      FHEM must be restarted.
       </li><br>
 
     <a id="MQTT2_SERVER-attr-sslVersion"></a>
