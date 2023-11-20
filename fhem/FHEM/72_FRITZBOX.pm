@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.21";
+my $ModulVersion = "07.57.00";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -1451,7 +1451,7 @@ sub FRITZBOX_Set($$@)
 
       if (int @val == 2) {
 
-         $val[0] = FRITZBOX_Proof_Params($hash, $name, $cmd, "^(on|off)\$", @val);
+         $val[0] = FRITZBOX_Proof_Params($hash, $name, $cmd, "^(on|off|rt)\$", @val);
 
          return $val[0] if($val[0] =~ /ERROR/);
 
@@ -5941,10 +5941,6 @@ sub FRITZBOX_Run_lockLandevice($)
    my $returnStr;
 
    push @webCmdArray, "xhr" => "1";
-#   if ($val[1] eq "on") {
-#     push @webCmdArray, "kisi_profile" => "filtprof1";
-#   }
-
    push @webCmdArray, "dev"       => $val[0];
    push @webCmdArray, "lang"      => "de";
 
@@ -5965,6 +5961,8 @@ sub FRITZBOX_Run_lockLandevice($)
    } else {
      if($val[1] eq "on") {
        push @webCmdArray, "internetdetail" => "blocked";
+     } elsif($val[1] eq "rt") {
+       push @webCmdArray, "internetdetail" => "realtime";
      } else {
        push @webCmdArray, "internetdetail" => "unlimited";
      }
@@ -5973,11 +5971,13 @@ sub FRITZBOX_Run_lockLandevice($)
      push @webCmdArray, "dev_name"  => "$dev_name";
    }
 
-   FRITZBOX_Log $hash, 5, "get $name $cmd " . join(" ", @webCmdArray);
-
    my $lock_res = FRITZBOX_Lan_Device_Info( $hash, $val[0], "lockLandevice");
 
-   unless (($lock_res =~ /blocked/ && $val[1] eq "on") || ($lock_res =~ /unlimited/ && $val[1] eq "off")) {
+   # FRITZBOX_Log $hash, 3, "Lan_Device_Info $name $cmd " . $lock_res;
+
+   unless (($lock_res =~ /blocked/ && $val[1] eq "on") || ($lock_res =~ /unlimited|limited/ && $val[1] eq "off") || ($lock_res =~ /realtime/ && $val[1] eq "rt")) {
+
+     FRITZBOX_Log $hash, 5, "get $name $cmd " . join(" ", @webCmdArray);
 
      my $result = FRITZBOX_Function_Lua($hash, "data", \@webCmdArray);
 
@@ -5987,13 +5987,14 @@ sub FRITZBOX_Run_lockLandevice($)
      } else {
 
        $lock_res = FRITZBOX_Lan_Device_Info( $hash, $val[0], "lockLandevice");
+       # FRITZBOX_Log $hash, 3, "Lan_Device_Info $name $cmd " . $lock_res;
 
        if ($lock_res =~ /ERROR/) {
           FRITZBOX_Log $hash, 2, "setting locklandevice: " . substr($lock_res, 7);
           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "retStat_lockLandevice", $val[0] . "->ERROR:" . substr($lock_res, 7);
        } else {
 
-         unless (($lock_res =~ /blocked/ && $val[1] eq "on") || ($lock_res =~ /unlimited/ && $val[1] eq "off")) {
+         unless (($lock_res =~ /blocked/ && $val[1] eq "on") || ($lock_res =~ /unlimited|limited/ && $val[1] eq "off") || ($lock_res =~ /realtime/ && $val[1] eq "rt")) {
            FRITZBOX_Log $hash, 2, "setting locklandevice: " . $val[0];
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "retStat_lockLandevice", $val[0] . "->ERROR: setting locklandevice " . $val[1];
          } else {
@@ -6004,7 +6005,7 @@ sub FRITZBOX_Run_lockLandevice($)
      }
    } else {
      FRITZBOX_Log $hash, 4, "" . $lock_res . " -> $name $cmd $val[1]";
-     FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "retStat_lockLandevice", $val[0] . "->" . $val[1];
+     FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "retStat_lockLandevice", $val[0] . " locked is " . $val[1];
    }
 
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid} if $result->{sid};
@@ -8547,10 +8548,10 @@ sub FRITZBOX_readPassword($)
       </li><br>
 
       <li><a name="lockLandevice"></a>
-         <dt><code>set &lt;name&gt; lockLandevice &lt;number&gt; &lt;on|off&gt;</code></dt>
+         <dt><code>set &lt;name&gt; lockLandevice &lt;number&gt; &lt;on|off|rt&gt;</code></dt>
          <br>
          &lt;number&gt; is the ID from landevice<i>n..n</i> or its MAC<br>
-         Switches the landevice on or off.<br>
+         Switches the landevice blocking to on (blocked), off (unlimited) or to rt (realtime).<br>
          Execution is non-blocking. The feedback takes place in the reading: retStat_lockLandevice<br>
          Needs FRITZ!OS 7.21 or higher
       </li><br>
@@ -9332,10 +9333,10 @@ sub FRITZBOX_readPassword($)
       </li><br>
 
       <li><a name="lockLandevice"></a>
-         <dt><code>set &lt;name&gt; lockLandevice &lt;number&gt; &lt;on|off&gt;</code></dt>
+         <dt><code>set &lt;name&gt; lockLandevice &lt;number&gt; &lt;on|off|rt&gt;</code></dt>
          <br>
          &lt;number&gt; ist die ID des landevice<i>n..n</i> oder dessen MAC.<br>
-         Schaltet das Netzger&auml;t an oder aus.<br>
+         Schaltet das Blockieren des Netzger&auml;t on(blocked), off(unlimited) oder rt(realtime).<br>
          Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_lockLandevice <br>
          Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
       </li><br>
