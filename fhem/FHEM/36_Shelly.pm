@@ -47,6 +47,8 @@
 #           internal Optimization of Shelly_Set()
 # 5.09      Bug Fix (dimmer-devices): set..pct will not turn on or off
 #           Add (dimmer-devices): set..dim will turn on or off
+# 5.10      Add (dimmer-devices): set..dimup / dimdown 
+#           Add (sensor-addon): temperatures
 
 package main;
 
@@ -198,6 +200,7 @@ my %periods = (
 my %attributes = (
   "multichannel"  => " defchannel",
   "roller"        => " pct100:open,closed maxtime maxtime_close maxtime_open",
+  "dimmer"        => " dimstep",
   "input"         => " showinputs:show,hide",
   "emeter"        => " Energymeter_F Energymeter_P Energymeter_R EMchannels:ABC_,L123_,_ABC,_L123".
                      " Periods:multiple-strict,Week,day,dayT,dayQ,hour,hourQ,min".                 # @keys = keys %periods
@@ -214,7 +217,7 @@ my %shelly_dropdowns = (
     "Onoff" => " on off toggle on-for-timer off-for-timer",
     "Multi" => " ON:noArg OFF:noArg xtrachannels:noArg",
     "Rol"   => " closed open stop:noArg pct:slider,0,1,100 delta zero:noArg predefAttr:noArg",
-    "RgbwW" => " dim pct",
+    "RgbwW" => " dim dimup dimdown pct",
     "BulbW" => " ct:colorpicker,CT,3000,10,6500 pct:slider,0,1,100",
     "RgbwC" => " rgbw rgb:colorpicker,HSV hsv white:slider,0,1,100 gain:slider,0,1,100"
 );
@@ -591,6 +594,7 @@ sub Shelly_Initialize ($) {
                      " interval timeout shellyuser verbose:0,1,2,3,4,5".
                      $attributes{'multichannel'}.
                      $attributes{'roller'}.
+                     $attributes{'dimmer'}.
                      $attributes{'input'}.
                      $attributes{'metering'}.
                      $attributes{'showunits'}.
@@ -1045,7 +1049,11 @@ sub Shelly_Attr(@) {
     if( $shelly_models{$model}[5]==0 ){  # no inputs, eg. shellyplug
         $old =~ s/ showinputs:show,hide//;
     }
-    
+ 
+    if( $shelly_models{$model}[2]==0 ){  # no dimmer
+        $old =~ s/ dimstep//;
+    }
+   
     
     if( $model eq "shellypro3em" ){  
         $old =~ s/ webhook//;  # Shelly actions do not work properly (fw v0.14.1)
@@ -1584,7 +1592,7 @@ sub Shelly_Set ($@) {
       }elsif( $model =~ /shelly(rgbw|bulb).*/ && $mode eq "color" ){
           $newkeys .= $shelly_dropdowns{RgbwC};
       }
-      $hash->{helper}{Sets}=$newkeys; #Debug "$name: helper set to $newkeys";
+      $hash->{helper}{Sets}=$newkeys;
     }
     
       # ':noArg' will be stripped off by calling instance
@@ -1712,7 +1720,7 @@ sub Shelly_Set ($@) {
   #-- get channel parameter
   if( $cmd eq "toggle" || $cmd eq "on" || $cmd eq "off" ){
         $channel = $value; 
-  }elsif( $cmd =~ /(on|off)-for-timer/ || ($cmd eq"pct" && $ff!=1 ) || $cmd eq "dim" || $cmd eq "brightness" || $cmd eq "ct" ){
+  }elsif( $cmd =~ /(on|off)-for-timer/ || ($cmd eq"pct" && $ff!=1 ) || $cmd =~ /dim/ || $cmd eq "brightness" || $cmd eq "ct" ){
         $channel = shift @a;
         $channel = shift @a if( $channel eq "%" ); # skip %-sign coming from dropdown (units=1)
   } 
@@ -1825,14 +1833,16 @@ sub Shelly_Set ($@) {
   }
     
   #- - pct, brightness, dim - set percentage volume of dimmable device (no rollers)  eg. shellydimmer or shellyrgbw in white mode
-  if( ($cmd eq "pct" || $cmd eq "brightness" || $cmd eq "dim") && $ff != 1 ){
+  if( ($cmd eq "pct" || $cmd eq "brightness" || $cmd =~ /^(dim)/ ) && $ff != 1 ){
     if( $ff !=2 ){
           $msg = "Error: forbidden command  \'$cmd\' for device $name";
           Log3 $name,1,"[Shelly_Set] ".$msg;
           return $msg;
     }
      # check value
-     if( !defined($value) ){
+     if( !defined($value) && $cmd =~ /up|down/ ){
+            $value = AttrVal($name,"dimstep",10) if(!defined($value));     
+     }elsif( !defined($value) ){
             $msg = "Error: no $cmd value \'$value\' given for device $name";
             Log3 $name,1,"[Shelly_Set] ".$msg;
             return $msg;
@@ -1840,7 +1850,7 @@ sub Shelly_Set ($@) {
             $msg = "Error: wrong $cmd value \'$value\' for device $name, must be <integer>";
             Log3 $name,1,"[Shelly_Set] ".$msg;
             return $msg;
-     }elsif( $value == 0 && $cmd eq "pct" ){
+     }elsif( $value == 0 && $cmd =~ /(pct)|(dimup)|(dimdown)/ ){
             $msg = "$name Error: wrong $cmd value \'$value\' given, must be 1 ... 100 ";
             Log3 $name,1,"[Shelly_Set] ".$msg;
             return $msg;
@@ -1861,6 +1871,8 @@ sub Shelly_Set ($@) {
             $cmd="?turn=off" ;
         }elsif($cmd eq "pct" ){
             $cmd="?brightness=$value";
+        }elsif($cmd =~ /dim(up|down)/ ){
+            $cmd="?dim=$1"."\&step=$value";    
         }else{
             $cmd="?brightness=$value\&turn=on"; 
         }
@@ -3330,6 +3342,13 @@ if(0){    # check calculation of reactive power!
             readingsBulkUpdateMonitored($hash,"illumination".$subs,$jhash->{'illuminance:0'}{'illumination'} );        
     }
     # ********
+    # look for sensor addon
+    my $t=100;
+    while( $jhash->{"temperature:$t"}{id} ){
+       $subs = "_".($jhash->{"temperature:$t"}{id}-100);
+       readingsBulkUpdateMonitored($hash,"temperature" .$subs,$jhash->{"temperature:$t"}{'tC'}.$si_units{tempC}[$hash->{units}] );
+       $t++;
+    }
     
     ################ Shelly.GetConfig
     }elsif ($comp eq "config"){
@@ -3382,6 +3401,12 @@ if(0){    # check calculation of reactive power!
             $i++;
           }
         }
+        # look if an addon is present: 
+        if( $jhash->{'sys'}{'device'}{'addon_type'} ){
+            readingsBulkUpdateMonitored($hash,"addon",$jhash->{'sys'}{'device'}{'addon_type'} );
+        }elsif(ReadingsVal($name,"addon",undef)){
+            fhem("deletereading $name addon");
+        }
 
     ################ Shelly.GetDeviceInfo          
     }elsif ($comp eq "info"){
@@ -3400,7 +3425,7 @@ if(0){    # check calculation of reactive power!
        }else{
           Log3 $name,4,"[Shelly_proc2G:info] $name: new firmware information read from Shelly: $fw_shelly";  
           readingsBulkUpdateIfChanged($hash,"firmware","v$fw_shelly");
-       } #Debug $name."--".$jhash->{'name'};
+       } 
        if( defined($jhash->{'name'}) ){##&& AttrVal($name,"ShellyName","") ne $jhash->{'name'}) {  #ShellyName 
            readingsBulkUpdateIfChanged($hash,"name",$jhash->{'name'} );
        #    $attr{$hash->{NAME}}{ShellyName} = $jhash->{'name'}; 
@@ -3666,7 +3691,7 @@ sub Shelly_EMData {
          readingsBulkUpdateMonitored($hash,$pr.$mapping{E1}{act_integrated},$mypower);
          readingsBulkUpdateMonitored($hash,$pr.$mapping{E1}{act_integratedPos},$mypowerPos);
          readingsBulkUpdateMonitored($hash,$pr.$mapping{E1}{act_integratedNeg},$mypowerNeg);
-      }else{Debug "skipping power calculation";}
+      }else{Log3 $name,6,"[b] skipping power calculation";}
       # reset helper values. They will be set while cyclic update of power values. A small update interval is necessary!
       $hash->{helper}{power} = 0;
       $hash->{helper}{powerPos} = 0;
@@ -5473,6 +5498,21 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
                 <code>set &lt;name&gt; dim &lt;0...100&gt; [&lt;channel&gt;] </code>
                 <br />Prozentualer Wert für die Helligkeit (brightness). Es wird nur der Helligkeitswert gesetzt und eingeschaltet. 
                       Bei einem Helligkeitswert gleich 0 (Null) wird ausgeschaltet, der im Shelly gespeicherte Helligkeitswert bleibt unverändert.
+                      </li> 
+                                                                  
+            <li><a id="Shelly-set-dimup"></a>
+                <code>set &lt;name&gt; dimup [&lt;1...100&gt;] [&lt;channel&gt;] </code>
+                <br />Prozentualer Wert für die Vergrößerung der Helligkeit.
+                Ist kein Wert angegeben, wird das Attribut dimstep ausgewertet. 
+                Der größte erreichbare Helligkeitswert ist 100.
+                Ist das Gerät aus, ergibt sich der neue Helligkeitswert aus dem angegebenen Wert und das Gerät wird eingeschaltet. 
+                      </li>
+
+            <li><a id="Shelly-set-dimdown"></a>
+                <code>set &lt;name&gt; dimdown [&lt;1...100&gt;] [&lt;channel&gt;] </code>
+                <br />Prozentualer Wert für die Verringerung der Helligkeit. 
+                Ist kein Wert angegeben, wird das Attribut dimstep ausgewertet.
+                Der kleinste erreichbare Helligkeitswert ist der im Shelly gespeicherte Wert für "minimum brightness".                       
                       </li> 
         </ul>
         Hinweis für ShellyRGBW (white-Mode): Kanalnummern sind 0..3.
