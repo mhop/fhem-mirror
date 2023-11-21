@@ -39,11 +39,11 @@
 ##############################################################################
 # defmod DWD_Regen CDCOpenData
 # attr DWD_Regen INTERVAL 3600
-# attr DWD_Regen datetimeInReadingName 1
 # attr DWD_Regen disable 0
 # attr DWD_Regen locations Bad_Soden:50.1461,8.4986
 #
 ##############################################################################
+# eval "use Net::SSLGlue::FTP;1"                   or $missingModul .= "Net::SSLGlue::FTP install: sudo apt-get install libnet-sslglue-perl ";
 
 package main;
 
@@ -52,7 +52,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.10e";
+my $ModulVersion = "01.10f";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
@@ -60,11 +60,10 @@ sub CDCOpenData_Initialize($);
 sub CDCOpenData_Readout_Add_Reading ($$$$@);
 sub CDCOpenData_Readout_Process($$);
 
-#eval "use Net::FTP;1"      or $missingModul .= "Net::FTP ";
+use Net::FTP;
 eval "use IO::Uncompress::Gunzip qw(gunzip);1"   or $missingModul .= "IO::Uncompress::Gunzip install: sudo apt-get install libio-compress-perl ";
 eval "use IO::Uncompress::Bunzip2 qw(bunzip2);1" or $missingModul .= "IO::Uncompress::Bunzip2 install: sudo apt-get install libio-compress-perl ";
 eval "use Archive::Tar;1"                        or $missingModul .= "Archive::Tar install: sudo apt-get install libarchive-extract-perl ";
-eval "use Net::SSLGlue::FTP;1"                   or $missingModul .= "Net::SSLGlue::FTP install: sudo apt-get install libnet-sslglue-perl ";
 eval "use POSIX;1"                               or $missingModul .= "POSIX install: sudo apt-get install libtemplate-plugin-posix-perl ";
 eval "use File::Path;1"                          or $missingModul .= "File::Path not available ";
 eval "use FHEM::Scheduler::Cron;1"               or $missingModul .= "FHEM::Scheduler::Cron: update Fhem ";
@@ -128,7 +127,6 @@ sub CDCOpenData_Initialize($)
                     ."nonblockingTimeOut:50,75,100,125 "
                     ."locations "
                     ."numberOfDays:1,2,3,4,5,6,7,8,9,10 "
-                    ."datetimeInReadingName:0,1 "
                     ."tmpRadolanData "
                     ."disable:0,1 "
                     ."FhemLog3Std:0,1 "
@@ -136,6 +134,7 @@ sub CDCOpenData_Initialize($)
                     ."enableDWDdata:multiple-strict,rainByDay,rainSinceMidnight,rainRadarbyLocation "
                     ."clearRadarFileLog "
                     ."RainRadarFileLog "
+#                    ."ownRadarFileLog "
                     .$readingFnAttributes;
 
 } # end CDCOpenData_Initialize
@@ -242,6 +241,10 @@ sub CDCOpenData_Delete ($$)
    #setKeyValue($index, undef);
 
    if (my $dLog = AttrVal($name, "RainRadarFileLog", undef)) {
+     fhem('delete ' . $dLog, 1) if defined $defs{$dLog};
+   }
+
+   if (my $dLog = AttrVal($name, "ownRadarFileLog", undef)) {
      fhem('delete ' . $dLog, 1) if defined $defs{$dLog};
    }
 
@@ -479,6 +482,19 @@ sub CDCOpenData_Attr($@)
      }
    }
 
+   if ($aName eq "ownRadarFileLog") {
+     if ($cmd eq "set") {
+
+     }
+
+     if ($cmd eq "del") {
+       if (my $dLog = AttrVal($name, $aName, undef)) {
+         return "FileLog Device: $dLog not defined." unless defined $defs{$dLog};
+         fhem('delete ' . $dLog, 1);
+       }
+     }
+   } # end ownRadarFileLog
+
    if ($aName eq "RainRadarFileLog") {
      if ($cmd eq "set") {
 
@@ -536,25 +552,6 @@ sub CDCOpenData_Attr($@)
        return "updateOnStart: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
      }
    }
-
-   if ($aName eq "datetimeInReadingName") {
-     if ($cmd eq "set") {
-
-       return "datetimeInReadingName is depreciated";
-       return "datetimeInReadingName: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
-       if ($aVal == 1) {
-         fhem( "deletereading $name .*amount-of-rain.*", 1 );
-       } else {
-         fhem( "deletereading $name .*_day_rain:.*", 1 );
-         fhem( "deletereading $name .*_since_midnight:.*", 1 );
-         fhem( "deletereading $name .*_rain_radar:.*", 1 );
-       }
-     }
-
-     if ($cmd eq "del") {
-       fhem( "deletereading $name .*amount-of-rain.*", 1 );
-     }
-   } # end datetimeInReadingName
 
    # Stop the sub if FHEM is not initialized yet
    unless ($init_done) {
@@ -988,7 +985,6 @@ sub CDCOpenData_get_RegenRadar_atLocations($$$$) {
      CDCOpenData_Log $name, 5, "geoRefsAttr: " . $geoRef;
    }
 
-   my $dtReading = AttrVal($name, "datetimeInReadingName", 1);
    my $geoCnt = 0;
    my $geoName = "";
 
@@ -1218,7 +1214,6 @@ sub CDCOpenData_Readout_Run_Rain_Since_Midnight ($@) {
      CDCOpenData_Log $name, 5, "geoRefsAttr: " . $geoRef;
    }
 
-   my $dtReading = AttrVal($name, "datetimeInReadingName", 1);
    my $geoCnt = 0;
    my $geoName = "";
    my $regenmenge = -1;
@@ -1448,7 +1443,6 @@ sub CDCOpenData_Readout_Run_getRain($@)
 
    CDCOpenData_Log $name, 5, "geoRefsAttr: " . $geoRef;
 
-   my $dtReading = AttrVal($name, "datetimeInReadingName", 1);
    my $geoCnt = 0;
    my $geoName = "";
    my $regenmenge = -1;
@@ -2224,14 +2218,6 @@ sub CDCOpenData_mk_subdirs{
         Default is one hour. 			
       </li>
 
-      <li><a name="datetimeInReadingName"></a>
-         <dt><code>attr &lt;name&gt; datetimeInReadingName &lt;0 | 1&gt;</code></dt>
-         <br>
-         this Attribute is depreciated.<br><br>
-         Default: set<br>
-         If set, then the time of the rain amount is stored in the reading name.<br>
-      </li><br>
-
       <li><a name="enableDWDdata"></a>
          <dt><code>attr &lt;name&gt; enableDWDdata &lt;rainByDay, rainSinceMidnight, rainRadarbyLocation&gt;</code></dt>
          <br>
@@ -2371,14 +2357,6 @@ sub CDCOpenData_mk_subdirs{
         CRON Regel. Wenn gesetzt, dann wird die Ausführung über diese Regel gesteuert.<br>
         Standard ist jede Stunde. 			
       </li>
-
-      <li><a name="datetimeInReadingName"></a>
-         <dt><code>attr &lt;name&gt; datetimeInReadingName &lt;0 | 1&gt;</code></dt>
-         <br>
-         Dieses Attribut wird nicht mehr unterstützt.<br><br>
-         Standard: gesetzt<br>
-         Wenn gesetzt, dann wird der Zeitpunkt der Regenmenge im Readingsnamen hinterlegt.
-      </li><br>
 
       <li><a name="enableDWDdata"></a>
          <dt><code>attr &lt;name&gt; enableDWDdata &lt;rainByDay, rainSinceMidnight, rainRadarbyLocation&gt;</code></dt>
