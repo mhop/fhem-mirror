@@ -2047,8 +2047,11 @@ FW_createMultiple(elName, devName, vArr, currVal, set, params, cmd)
   if(vArr.length < 2 || (vArr[0]!="multiple" && vArr[0]!="multiple-strict") ||
      (params && params.length))
     return undefined;
+  var iSize = 30;
+  if(vArr[vArr.length-1].charAt(0) == "#")
+    iSize = vArr.pop().substr(1);
   
-  var newEl = $('<input type="text" size="30" readonly>').get(0);
+  var newEl = $('<input type="text" size="'+iSize+'" readonly>').get(0);
   if(currVal)
     $(newEl).val(currVal);
   if(elName)
@@ -2418,25 +2421,25 @@ FW_rescueClient(pid, key)
   <li>noArg - show no input field.</li>
   <li>time - show a JavaScript driven timepicker.<br>
       Example: attr FS20dev widgetOverride on-till:time</li>
-  <li>textField[,placeholder,tfsize] - show an input field. tfsize is the size
-      attribute for the input field, defaults to 30. <br>
-      Example: attr WEB widgetOverride room:textField</li>
-  <li>textFieldNL[,placeholder,tfsize] - show the input field and hide the
+  <li>textField[,placeholder,inputSize] - show an input field.<br>
+      inputSize is the size attribute for the input field, defaults to 30. <br>
+      Example: attr WEB widgetOverride room:textField,Name_Of_The_Room,20</li>
+  <li>textFieldNL[,placeholder,inputSize] - show the input field and hide the
       label.</li>
-  <li>textField-long[,sizePct,tfsize] - show an input-field, but upon
+  <li>textField-long[,sizePct,inputSize] - show an input-field, but upon
       clicking on the input field open a textArea.
       sizePct specifies the size of the dialog relative to the screen, in
       percent. Default is 75</li>
-  <li>textFieldNL-long[,sizePct,tfsize] - the behaviour is the same
+  <li>textFieldNL-long[,sizePct,inputSize] - the behaviour is the same
       as :textField-long, but no label is displayed.</li>
   <li>slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1] - show
       a JavaScript driven slider. The optional ,1 at the end
       avoids the rounding of floating-point numbers.</li>
-  <li>multiple,&lt;val1&gt;,&lt;val2&gt;,..." - present a
+  <li>multiple,&lt;val1&gt;,&lt;val2&gt;,...[,#inputSize]" - present a
       multiple-value-selector with an additional textfield. The result is
       comman separated.</li>
-  <li>multiple-strict,&lt;val1&gt;,&lt;val2&gt;,... - like :multiple, but
-      without the textfield.</li>
+  <li>multiple-strict,&lt;val1&gt;,&lt;val2&gt;,...[,#inputSize]
+      - like multiple, but without the textfield.</li>
   <li>selectnumbers,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;number of
       digits after decimal point&gt;,lin|log10" - display a select widget
       generated with values from min to max with step.<br>
