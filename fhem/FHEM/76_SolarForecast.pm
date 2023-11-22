@@ -126,6 +126,7 @@ BEGIN {
           FW_room
           FW_detail
           FW_widgetFallbackFn
+          FW_widgetOverride
           FW_wname
         )
   );
@@ -149,6 +150,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.1.2"  => "20.11.2023  ctrlDebug Adjustment of column width, must have new fhemweb.js Forum:#135850 ",
   "1.1.1"  => "19.11.2023  graphicHeaderOwnspec: fix ignoring the last element of allsets/allattr ",
   "1.1.0"  => "14.11.2023  graphicHeaderOwnspec: possible add set/attr commands, new setter consumerNewPlanning ",
   "1.0.10" => "31.10.2023  fix warnings, edit comref ",
@@ -1033,7 +1035,7 @@ sub Initialize {
                                 "ctrlAutoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "ctrlAutoRefreshFW:$fwd ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
-                                "ctrlDebug:multiple-strict,$dm ".
+                                "ctrlDebug:multiple-strict,$dm,#14 ".
                                 "ctrlGenPVdeviation:daily,continuously ".
                                 "ctrlInterval ".
                                 "ctrlLanguage:DE,EN ".
@@ -9113,8 +9115,8 @@ sub __createOwnSpec {
 
   return if(!$spec || !$show);
   
-  my $allsets  = getAllSets ($name)." ";
-  my $allattrs = getAllAttr ($name)." ";                                  # Leerzeichen am Ende wichtig für Regexvergleich
+  my $allsets  = FW_widgetOverride($name, getAllSets ($name), "set")." ";  
+  my $allattrs = FW_widgetOverride($name, getAllAttr ($name), "set")." ";              # Leerzeichen am Ende wichtig für Regexvergleich
 
   my @fields = split (/\s+/sx, $spec);
 
@@ -9253,6 +9255,7 @@ sub ___getFWwidget {
           $widget =~ s/arg='(.*?)'/arg='selectnumbers,$min,$step,$max,0,lin'/xs;    
       }
   }
+  #Log3 ($name, 1, qq{$name - widget: $widget});
   
 return $widget;
 }
