@@ -2463,27 +2463,29 @@ FW_rescueClient(pid, key)
   <li>noArg - es wird kein weiteres Eingabefeld angezeigt.</li>
   <li>time - zeigt ein Zeitauswahlmen&uuml;.
       Beispiel: attr FS20dev widgetOverride on-till:time</li>
-  <li>textField[,placeholder] - zeigt ein Eingabefeld.<br>
-      Beispiel: attr WEB widgetOverride room:textField</li>
-  <li>textFieldNL[,placeholder] - Eingabefeld ohne Label.</li>
-  <li>textField-long[,sizePct] - ist wie textField, aber beim Click im
-      Eingabefeld wird ein Dialog mit einer HTML textarea wird
+  <li>textField[,placeholder,inputSize] - zeigt ein Eingabefeld. Mit inputSize
+      kann man die Breite des Eingabefeldes definieren, die Voreinstellung ist
+      30.<br>
+      Beispiel: attr WEB widgetOverride room:textField,Raumname,20</li>
+  <li>textFieldNL[,placeholder,inputSize] - Eingabefeld ohne Label.</li>
+  <li>textField-long[,sizePct,inputSize] - ist wie textField, aber beim Click im
+      Eingabefeld wird ein Dialog mit einer HTML textarea
       ge&ouml;ffnet.  sizePct ist die relative Gr&ouml;&szlig;e des Dialogs,
       die Voreinstellung ist 75.</li>
-  <li>textFieldNL-long[,sizePct] - wi textField-long, aber kein Label wir
-      angezeigt.</li>
+  <li>textFieldNL-long[,sizePct,inputSize] - wie textField-long, aber kein
+      Label wird angezeigt.</li>
   <li>slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1] - zeigt einen
       Schieberegler. Das optionale 1 (isFloat) vermeidet eine Rundung der
       Fliesskommazahlen.</li>
-  <li>multiple,&lt;val1&gt;,&lt;val2&gt;,... - zeigt eine Mehrfachauswahl mit
-      einem zus&auml;tzlichen Eingabefeld. Das Ergebnis ist Komma
-      separiert.</li>
-  <li>multiple-strict,&lt;val1&gt;,&lt;val2&gt;,... - ist wie :multiple,
-      blo&szlig; ohne Eingabefeld.</li>
+  <li>multiple,&lt;val1&gt;,&lt;val2&gt;,...[,#inputSize] - zeigt ein Dialog
+      mit Mehrfachauswahl und Eingabefeld. Das Ergebnis ist Komma separiert.
+      inputSize ist die Breite des Anzeigefeldes, die Voreinstellung ist
+      30.</li>
+  <li>multiple-strict,&lt;val1&gt;,&lt;val2&gt;,...[,#inputSize] - ist wie
+      :multiple, blo&szlig; ohne Eingabefeld im Dialog.</li>
   <li>selectnumbers,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;number of
       digits after decimal point&gt;,lin|log10" zeigt ein HTML-select mit einer
-      Zahlenreihe vom Wert min bis Wert max mit Schritten von step
-      angezeigt.<br>
+      Zahlenreihe vom Wert min bis Wert max mit Schritten von step.<br>
       Die Angabe lin erzeugt eine konstant ansteigende Reihe.  Die Angabe
       log10 erzeugt eine exponentiell ansteigende Reihe zur Basis 10,
       step bezieht sich auf den Exponenten, z.B. 0.0625.</li>
@@ -2491,8 +2493,9 @@ FW_rescueClient(pid, key)
       Werten. <b>Achtung</b>: so ein Widget wird auch dann angezeigt, falls
       kein passender Modifier gefunden wurde.</li>
   <li>bitfield,&lt;size&gt;,&lt;mask&gt; - zeigt eine Tabelle von
-      Kontrollk&auml;stchen (8 pro Zeile), um einzelne Bits setzen zu koennen.
-      Die Voreinstellung fuer size ist 8 und fuer mask 2^32-1.</li>
+      Kontrollk&auml;stchen (8 pro Zeile), um einzelne Bits setzen zu
+      k&ouml;nnen.  Die Voreinstellung f&uuml;r size ist 8 und f&uuml;r mask
+      2^32-1.</li>
   <li>widgetList,... - zeigt eine Liste von Widgets. Die Argumente aller
       widgets sind durch die L&auml;ngenangabe der jeweiligen Argumentliste
       getrennt.<br>
