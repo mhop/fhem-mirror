@@ -1,4 +1,4 @@
-REV 28196
+REV 28199
 DIR unused
 UPD 2023-11-22_07:45:02 412033 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -419,7 +419,7 @@ UPD 2016-08-22_07:45:11 9037 FHEM/76_MSGFile.pm
 UPD 2016-12-08_07:45:12 17663 FHEM/76_MSGMail.pm
 UPD 2022-11-02_07:45:02 77314 FHEM/76_SMAEVCharger.pm
 UPD 2023-10-09_07:45:02 174526 FHEM/76_SMAInverter.pm
-UPD 2023-11-20_07:45:03 920866 FHEM/76_SolarForecast.pm
+UPD 2023-11-23_07:45:03 921102 FHEM/76_SolarForecast.pm
 UPD 2022-05-31_07:45:03 43244 FHEM/76_msgDialog.pm
 UPD 2021-10-29_07:45:03 57317 FHEM/77_SMAEM.pm
 UPD 2016-07-19_07:45:16 23026 FHEM/77_SMASTP.pm
@@ -757,11 +757,11 @@ UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
 UPD 2023-11-22_07:45:09 5086961 docs/commandref.html
-UPD 2023-11-22_07:45:12 3104219 docs/commandref_DE.html
+UPD 2023-11-23_07:45:13 3104473 docs/commandref_DE.html
 UPD 2023-08-25_07:45:03 86242 docs/commandref_frame.html
 UPD 2023-08-25_07:45:03 96940 docs/commandref_frame_DE.html
-UPD 2023-11-22_07:45:13 312446 docs/commandref_modular.html
-UPD 2023-11-22_07:45:14 324291 docs/commandref_modular_DE.html
+UPD 2023-11-23_07:45:14 312446 docs/commandref_modular.html
+UPD 2023-11-23_07:45:15 324291 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2445,7 +2445,7 @@ UPD 2021-05-15_07:45:04 1960 www/pgm2/doif.js
 UPD 2023-05-16_07:45:03 32349 www/pgm2/f18.js
 UPD 2022-08-24_07:45:03 10106 www/pgm2/f18style.css
 UPD 2023-03-18_07:45:02 8651 www/pgm2/fhemdoc_modular.js
-UPD 2023-11-22_07:45:02 74450 www/pgm2/fhemweb.js
+UPD 2023-11-23_07:45:03 74704 www/pgm2/fhemweb.js
 UPD 2022-03-14_07:45:13 14080 www/pgm2/fhemweb_colorpicker.js
 UPD 2020-01-19_07:45:03 4252 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
