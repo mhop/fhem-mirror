@@ -150,6 +150,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.1.3"  => "24.11.2023  rename reset arguments according possible adjustable textField width ",
   "1.1.2"  => "20.11.2023  ctrlDebug Adjustment of column width, must have new fhemweb.js Forum:#135850 ",
   "1.1.1"  => "19.11.2023  graphicHeaderOwnspec: fix ignoring the last element of allsets/allattr ",
   "1.1.0"  => "14.11.2023  graphicHeaderOwnspec: possible add set/attr commands, new setter consumerNewPlanning ",
@@ -1277,14 +1278,13 @@ sub Set {
                consumerMaster
                consumerPlanning
                consumption
-               currentBatteryDev
-               currentWeatherDev
-               currentInverterDev
-               currentMeterDev
-               energyH4Trigger
-               inverterStrings
-               moduleRoofTops
-               powerTrigger
+               currentBatterySet
+               currentInverterSet
+               currentMeterSet
+               energyH4TriggerSet
+               inverterStringSet
+               moduleRoofTopSet
+               powerTriggerSet
                pvCorrection
                roofIdentPair
                pvHistory
@@ -2252,21 +2252,21 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if ($prop eq 'powerTrigger') {
+  if ($prop eq 'powerTriggerSet') {
       deleteReadingspec ($hash, "powerTrigger.*");
-      writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
+      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);               # Anlagenkonfiguration File schreiben
       return;
   }
 
-  if ($prop eq 'energyH4Trigger') {
+  if ($prop eq 'energyH4TriggerSet') {
       deleteReadingspec ($hash, "energyH4Trigger.*");
-      writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
+      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);               
       return;
   }
 
-  if ($prop eq 'moduleRoofTops') {
+  if ($prop eq 'moduleRoofTopSet') {
       deleteReadingspec ($hash, "moduleRoofTops");
-      writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
+      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);               
       return;
   }
 
@@ -2288,7 +2288,7 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if ($prop eq 'currentMeterDev') {
+  if ($prop eq 'currentMeterSet') {
       readingsDelete ($hash, "Current_GridConsumption");
       readingsDelete ($hash, "Current_GridFeedIn");
       delete $data{$type}{$name}{circular}{'99'}{initdayfeedin};
@@ -2306,7 +2306,7 @@ sub _setreset {                          ## no critic "not used"
       writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
   }
 
-  if ($prop eq 'currentBatteryDev') {
+  if ($prop eq 'currentBatterySet') {
       readingsDelete ($hash, "Current_PowerBatIn");
       readingsDelete ($hash, "Current_PowerBatOut");
       readingsDelete ($hash, "Current_BatCharge");
@@ -2321,7 +2321,7 @@ sub _setreset {                          ## no critic "not used"
       writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                      # Anlagenkonfiguration File schreiben
   }
 
-  if ($prop eq 'currentInverterDev') {
+  if ($prop eq 'currentInverterSet') {
       readingsDelete    ($hash, "Current_PV");
       deleteReadingspec ($hash, ".*_PVreal" );
       writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);                     # Anlagenkonfiguration File schreiben
@@ -15066,13 +15066,12 @@ to ensure that the system configuration is correct.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Day&gt;   (e.g. set &lt;name&gt; reset consumption 08) </ul>                 </td></tr>
             <tr><td>                           </td><td>To delete the consumption values of a specific hour of a day:                                                           </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumption 08 10) </ul>   </td></tr>
-            <tr><td> <b>currentBatteryDev</b>  </td><td>deletes the set battery device and corresponding data.                                                                  </td></tr>
-            <tr><td> <b>currentWeatherDev</b>  </td><td>deletes the set device for weather data                                                                                 </td></tr>
-            <tr><td> <b>currentInverterDev</b> </td><td>deletes the set inverter device and corresponding data.                                                                 </td></tr>
-            <tr><td> <b>currentMeterDev</b>    </td><td>deletes the set meter device and corresponding data.                                                                    </td></tr>
-            <tr><td> <b>energyH4Trigger</b>    </td><td>deletes the 4-hour energy trigger points                                                                                </td></tr>
-            <tr><td> <b>inverterStrings</b>    </td><td>deletes the string configuration of the installation                                                                    </td></tr>
-            <tr><td> <b>powerTrigger</b>       </td><td>deletes the trigger points for PV generation values                                                                     </td></tr>
+            <tr><td> <b>currentBatterySet</b>  </td><td>deletes the set battery device and corresponding data.                                                                  </td></tr>
+            <tr><td> <b>currentInverterSet</b> </td><td>deletes the set inverter device and corresponding data.                                                                 </td></tr>
+            <tr><td> <b>currentMeterSet</b>    </td><td>deletes the set meter device and corresponding data.                                                                    </td></tr>
+            <tr><td> <b>energyH4TriggerSet</b> </td><td>deletes the 4-hour energy trigger points                                                                                </td></tr>
+            <tr><td> <b>inverterStringSet</b>  </td><td>deletes the string configuration of the installation                                                                    </td></tr>
+            <tr><td> <b>powerTriggerSet</b>    </td><td>deletes the trigger points for PV generation values                                                                     </td></tr>
             <tr><td> <b>pvCorrection</b>       </td><td>deletes the readings pvCorrectionFactor*                                                                                </td></tr>
             <tr><td>                           </td><td>To delete all previously stored PV correction factors from the caches:                                                  </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                    </td></tr>
@@ -15084,7 +15083,7 @@ to ensure that the system configuration is correct.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset pvHistory 08) </ul>                     </td></tr>
             <tr><td>                           </td><td>To delete a specific hour of a historical day:                                                                          </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt; &lt;Hour&gt;  (e.g. set &lt;name&gt; reset pvHistory 08 10) </ul>      </td></tr>
-            <tr><td> <b>moduleRoofTops</b>     </td><td>deletes the SolCast API Rooftops                                                                                        </td></tr>
+            <tr><td> <b>moduleRoofTopSet</b>   </td><td>deletes the SolCast API Rooftops                                                                                        </td></tr>
             <tr><td> <b>roofIdentPair</b>      </td><td>deletes all saved SolCast API Rooftop ID / API Key pairs.                                                               </td></tr>
             <tr><td>                           </td><td>To delete a specific pair, specify its key &lt;pk&gt;:                                                                  </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (e.g. set &lt;name&gt; reset roofIdentPair p1) </ul>              </td></tr>
@@ -16942,13 +16941,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumption 08) </ul>                 </td></tr>
             <tr><td>                           </td><td>Um die Verbrauchswerte einer bestimmten Stunde eines Tages zu löschen:                                                  </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumption 08 10) </ul> </td></tr>
-            <tr><td> <b>currentBatteryDev</b>  </td><td>löscht das eingestellte Batteriedevice und korrespondierende Daten                                                      </td></tr>
-            <tr><td> <b>currentWeatherDev</b>  </td><td>löscht das eingestellte Device für Wetterdaten                                                                          </td></tr>
-            <tr><td> <b>currentInverterDev</b> </td><td>löscht das eingestellte Inverterdevice und korrespondierende Daten                                                      </td></tr>
-            <tr><td> <b>currentMeterDev</b>    </td><td>löscht das eingestellte Meterdevice und korrespondierende Daten                                                         </td></tr>
-            <tr><td> <b>energyH4Trigger</b>    </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                              </td></tr>
-            <tr><td> <b>inverterStrings</b>    </td><td>löscht die Stringkonfiguration der Anlage                                                                               </td></tr>
-            <tr><td> <b>powerTrigger</b>       </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                         </td></tr>
+            <tr><td> <b>currentBatterySet</b>  </td><td>löscht das eingestellte Batteriedevice und korrespondierende Daten                                                      </td></tr>
+            <tr><td> <b>currentInverterSet</b> </td><td>löscht das eingestellte Inverterdevice und korrespondierende Daten                                                      </td></tr>
+            <tr><td> <b>currentMeterSet</b>    </td><td>löscht das eingestellte Meterdevice und korrespondierende Daten                                                         </td></tr>
+            <tr><td> <b>energyH4TriggerSet</b> </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                              </td></tr>
+            <tr><td> <b>inverterStringSet</b>  </td><td>löscht die Stringkonfiguration der Anlage                                                                               </td></tr>
+            <tr><td> <b>powerTriggerSet</b>    </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                         </td></tr>
             <tr><td> <b>pvCorrection</b>       </td><td>löscht die Readings pvCorrectionFactor*                                                                                 </td></tr>
             <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus den Caches zu löschen:                                            </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                    </td></tr>
@@ -16960,7 +16958,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08) </ul>                     </td></tr>
             <tr><td>                           </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                                           </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </ul>    </td></tr>
-            <tr><td> <b>moduleRoofTops</b>     </td><td>löscht die SolCast API Rooftops                                                                                         </td></tr>
+            <tr><td> <b>moduleRoofTopSet</b>   </td><td>löscht die SolCast API Rooftops                                                                                         </td></tr>
             <tr><td> <b>roofIdentPair</b>      </td><td>löscht alle gespeicherten SolCast API Rooftop-ID / API-Key Paare                                                        </td></tr>
             <tr><td>                           </td><td>Um ein bestimmtes Paar zu löschen ist dessen Schlüssel &lt;pk&gt; anzugeben:                                            </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (z.B. set &lt;name&gt; reset roofIdentPair p1) </ul>              </td></tr>
