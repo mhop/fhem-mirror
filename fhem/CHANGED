@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 76_SolarForecast: graphicHeaderOwnspec: show readings of other devs
+                              new set/reset batteryTrigger command
  - bugfix:  98_CDCOpenData: warning Net::FTP bei Fhem Start
  - bugfix:  72_FRITZBOX set <name> lockLandevice für FritzOS >= 7.50
  - feature: 72_FRITZBOX set <name> lockLandevice Parameter rt (realtime)

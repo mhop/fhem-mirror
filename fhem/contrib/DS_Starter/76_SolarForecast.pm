@@ -126,6 +126,7 @@ BEGIN {
           FW_room
           FW_detail
           FW_widgetFallbackFn
+          FW_widgetOverride
           FW_wname
         )
   );
@@ -149,6 +150,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.2.0"  => "25.11.2023  graphicHeaderOwnspec: show readings of other devs by <reaging>@<dev>, Set/reset batteryTrigger ",
+  "1.1.3"  => "24.11.2023  rename reset arguments according possible adjustable textField width ",
+  "1.1.2"  => "20.11.2023  ctrlDebug Adjustment of column width, must have new fhemweb.js Forum:#135850 ",
+  "1.1.1"  => "19.11.2023  graphicHeaderOwnspec: fix ignoring the last element of allsets/allattr ",
   "1.1.0"  => "14.11.2023  graphicHeaderOwnspec: possible add set/attr commands, new setter consumerNewPlanning ",
   "1.0.10" => "31.10.2023  fix warnings, edit comref ",
   "1.0.9"  => "29.10.2023  _aiGetSpread: set spread from 50 to 20 ",
@@ -553,9 +558,10 @@ my %hset = (                                                                # Ha
   currentInverterDev        => { fn => \&_setinverterDevice            },
   currentMeterDev           => { fn => \&_setmeterDevice               },
   currentBatteryDev         => { fn => \&_setbatteryDevice             },
-  energyH4Trigger           => { fn => \&_setenergyH4Trigger           },
+  energyH4Trigger           => { fn => \&_setTrigger                   },
   plantConfiguration        => { fn => \&_setplantConfiguration        },
-  powerTrigger              => { fn => \&_setpowerTrigger              },
+  batteryTrigger            => { fn => \&_setTrigger                   },
+  powerTrigger              => { fn => \&_setTrigger                   },
   pvCorrectionFactor_05     => { fn => \&_setpvCorrectionFactor        },
   pvCorrectionFactor_06     => { fn => \&_setpvCorrectionFactor        },
   pvCorrectionFactor_07     => { fn => \&_setpvCorrectionFactor        },
@@ -1032,7 +1038,7 @@ sub Initialize {
                                 "ctrlAutoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "ctrlAutoRefreshFW:$fwd ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
-                                "ctrlDebug:multiple-strict,$dm ".
+                                "ctrlDebug:multiple-strict,$dm,#14 ".
                                 "ctrlGenPVdeviation:daily,continuously ".
                                 "ctrlInterval ".
                                 "ctrlLanguage:DE,EN ".
@@ -1064,7 +1070,7 @@ sub Initialize {
                                 "graphicHeaderOwnspec:textField-long ".
                                 "graphicHeaderDetail:multiple-strict,all,co,pv,own,status ".
                                 "graphicHeaderShow:1,0 ".
-                                "graphicHistoryHour:selectnumbers,0,1,23,0,lin ".
+                                "graphicHistoryHour:slider,0,1,23 ".
                                 "graphicHourCount:slider,4,1,24 ".
                                 "graphicHourStyle ".
                                 "graphicLayoutType:single,double,diff ".
@@ -1271,17 +1277,17 @@ sub Set {
   my ($fcd,$ind,$med,$cf,$sp,$coms) = ('','','','','','');
 
   my @re = qw( aiData
+               batteryTriggerSet
                consumerMaster
                consumerPlanning
                consumption
-               currentBatteryDev
-               currentWeatherDev
-               currentInverterDev
-               currentMeterDev
-               energyH4Trigger
-               inverterStrings
-               moduleRoofTops
-               powerTrigger
+               currentBatterySet
+               currentInverterSet
+               currentMeterSet
+               energyH4TriggerSet
+               inverterStringSet
+               moduleRoofTopSet
+               powerTriggerSet
                pvCorrection
                roofIdentPair
                pvHistory
@@ -1356,6 +1362,12 @@ sub Set {
   ##########################
   if ($ipai) {
       $setlist .= "aiDecTree:addInstances,addRawData,train ";
+  }
+  
+  ## Batterie spezifische Setter
+  ################################
+  if (isBatteryUsed ($name)) {
+      $setlist .= "batteryTrigger:textField-long ";  
   }
 
   my $params = {
@@ -1706,7 +1718,7 @@ sub _setinverterStrings {                ## no critic "not used"
   }
 
   readingsSingleUpdate ($hash, "inverterStrings", $prop,    1);
-  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
+  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);                    # Anlagenkonfiguration File schreiben
 
   return if(_checkSetupNotComplete ($hash));                                       # keine Stringkonfiguration wenn Setup noch nicht komplett
 
@@ -1811,9 +1823,9 @@ return;
 }
 
 ################################################################
-#                      Setter powerTrigger
+#     Setter powerTrigger / batterytrigger / energyH4Trigger
 ################################################################
-sub _setpowerTrigger {                    ## no critic "not used"
+sub _setTrigger {                        ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -1836,40 +1848,20 @@ sub _setpowerTrigger {                    ## no critic "not used"
       }
   }
 
-  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
-  readingsSingleUpdate ($hash, "powerTrigger", $arg, 1);
-
-return;
-}
-
-################################################################
-#                      Setter energyH4Trigger
-################################################################
-sub _setenergyH4Trigger {                ## no critic "not used"
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $opt   = $paref->{opt};
-  my $arg   = $paref->{arg};
-
-  if(!$arg) {
-      return qq{The command "$opt" needs an argument !};
+  if ($opt eq 'powerTrigger') {
+      deleteReadingspec    ($hash, 'powerTrigger.*');
+      readingsSingleUpdate ($hash, 'powerTrigger',    $arg, 1);
   }
-
-  my ($a,$h) = parseParams ($arg);
-
-  if(!$h) {
-      return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
+  elsif ($opt eq 'batteryTrigger') {
+      deleteReadingspec    ($hash, 'batteryTrigger.*');
+      readingsSingleUpdate ($hash, 'batteryTrigger',  $arg, 1);
+  }  
+  elsif ($opt eq 'energyH4Trigger') {
+      deleteReadingspec    ($hash, 'energyH4Trigger.*');
+      readingsSingleUpdate ($hash, 'energyH4Trigger', $arg, 1);
   }
-
-  for my $key (keys %{$h}) {
-      if($key !~ /^[0-9]+(?:on|off)$/x || $h->{$key} !~ /^[0-9]+$/x) {
-          return qq{The key "$key" is invalid. Please consider the commandref.};
-      }
-  }
-
-  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
-  readingsSingleUpdate ($hash, "energyH4Trigger", $arg, 1);
+  
+  writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                              # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -2249,21 +2241,27 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if ($prop eq 'powerTrigger') {
+  if ($prop eq 'powerTriggerSet') {
       deleteReadingspec ($hash, "powerTrigger.*");
-      writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
+      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);               # Anlagenkonfiguration File schreiben
+      return;
+  }
+  
+  if ($prop eq 'batteryTriggerSet') {
+      deleteReadingspec ($hash, "batteryTrigger.*");
+      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);               
       return;
   }
 
-  if ($prop eq 'energyH4Trigger') {
+  if ($prop eq 'energyH4TriggerSet') {
       deleteReadingspec ($hash, "energyH4Trigger.*");
-      writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
+      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);               
       return;
   }
 
-  if ($prop eq 'moduleRoofTops') {
+  if ($prop eq 'moduleRoofTopSet') {
       deleteReadingspec ($hash, "moduleRoofTops");
-      writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
+      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);               
       return;
   }
 
@@ -2285,7 +2283,7 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if ($prop eq 'currentMeterDev') {
+  if ($prop eq 'currentMeterSet') {
       readingsDelete ($hash, "Current_GridConsumption");
       readingsDelete ($hash, "Current_GridFeedIn");
       delete $data{$type}{$name}{circular}{'99'}{initdayfeedin};
@@ -2303,10 +2301,11 @@ sub _setreset {                          ## no critic "not used"
       writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
   }
 
-  if ($prop eq 'currentBatteryDev') {
+  if ($prop eq 'currentBatterySet') {
       readingsDelete ($hash, "Current_PowerBatIn");
       readingsDelete ($hash, "Current_PowerBatOut");
       readingsDelete ($hash, "Current_BatCharge");
+      undef @{$data{$type}{$name}{current}{socslidereg}};
       delete $data{$type}{$name}{circular}{'99'}{initdaybatintot};
       delete $data{$type}{$name}{circular}{'99'}{initdaybatouttot};
       delete $data{$type}{$name}{circular}{'99'}{batintot};
@@ -2318,7 +2317,8 @@ sub _setreset {                          ## no critic "not used"
       writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                      # Anlagenkonfiguration File schreiben
   }
 
-  if ($prop eq 'currentInverterDev') {
+  if ($prop eq 'currentInverterSet') {
+      undef @{$data{$type}{$name}{current}{genslidereg}};
       readingsDelete    ($hash, "Current_PV");
       deleteReadingspec ($hash, ".*_PVreal" );
       writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);                     # Anlagenkonfiguration File schreiben
@@ -5970,7 +5970,7 @@ sub _transferBatteryValues {
   my $chour = $paref->{chour};
   my $day   = $paref->{day};
 
-  my ($badev,$a,$h) = useBattery ($name);
+  my ($badev,$a,$h) = isBatteryUsed ($name);
   return if(!$badev);
 
   my $type = $paref->{type};
@@ -6104,7 +6104,7 @@ sub _transferBatteryValues {
   setPVhistory ($paref);
   delete $paref->{histname};
 
-######
+  ######
 
   storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_BatIn', $batinthishour.' Wh');
   storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_BatOut', $batoutthishour.' Wh');
@@ -6115,6 +6115,9 @@ sub _transferBatteryValues {
   $data{$type}{$name}{current}{powerbatin}  = int $pbi;                                       # Hilfshash Wert aktuelle Batterieladung
   $data{$type}{$name}{current}{powerbatout} = int $pbo;                                       # Hilfshash Wert aktuelle Batterieentladung
   $data{$type}{$name}{current}{batcharge}   = $soc;                                           # aktuelle Batterieladung
+  
+  push @{$data{$type}{$name}{current}{socslidereg}}, $soc;                                    # Schieberegister Batterie SOC
+  limitArray ($data{$type}{$name}{current}{socslidereg}, $defslidenum);
 
 return;
 }
@@ -7489,7 +7492,7 @@ sub ___enableSwitchByBatPrioCharge {
 
   my $ena     = 1;
   my $pcb     = AttrVal ($name, 'affectBatteryPreferredCharge', 0);          # Vorrangladung Batterie zu X%
-  my ($badev) = useBattery ($name);
+  my ($badev) = isBatteryUsed ($name);
 
   return $ena if(!$pcb || !$badev);                                          # Freigabe Schalten Consumer wenn kein Prefered Battery/Soll-Ladung 0 oder keine Batterie installiert
 
@@ -7665,38 +7668,35 @@ sub _evaluateThresholds {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
 
-  my $pt    = ReadingsVal($name, "powerTrigger", "");
-  my $eh4t  = ReadingsVal($name, "energyH4Trigger", "");
-
+  my $bt    = ReadingsVal($name, 'batteryTrigger',  '');
+  my $pt    = ReadingsVal($name, 'powerTrigger',    '');
+  my $eh4t  = ReadingsVal($name, 'energyH4Trigger', '');
+  
+  if ($bt) {
+      $paref->{cobj}   = 'socslidereg';
+      $paref->{tname}  = 'batteryTrigger';
+      $paref->{tholds} = $bt;
+      
+      __evaluateArray ($paref);
+  }
+  
   if ($pt) {
-      my $aaref = CurrentVal ($hash, "genslidereg", "");
-      my @aa    = ();
-      @aa       = @{$aaref} if (ref $aaref eq "ARRAY");
-
-      if (scalar @aa >= $defslidenum) {
-          $paref->{taref}  = \@aa;
-          $paref->{tname}  = "powerTrigger";
-          $paref->{tholds} = $pt;
-
-          __evaluateArray ($paref);
-      }
+      $paref->{cobj}   = 'genslidereg';
+      $paref->{tname}  = 'powerTrigger';
+      $paref->{tholds} = $pt;
+      
+      __evaluateArray ($paref);
   }
-
+  
   if ($eh4t) {
-      my $aaref = CurrentVal ($hash, "h4fcslidereg", "");
-      my @aa    = ();
-      @aa       = @{$aaref} if (ref $aaref eq "ARRAY");
+      $paref->{cobj}   = 'h4fcslidereg';
+      $paref->{tname}  = 'energyH4Trigger';
+      $paref->{tholds} = $eh4t;
+      
+      __evaluateArray ($paref);
+  } 
 
-      if (scalar @aa >= $defslidenum) {
-          $paref->{taref}  = \@aa;
-          $paref->{tname}  = "energyH4Trigger";
-          $paref->{tholds} = $eh4t;
-
-          __evaluateArray ($paref);
-      }
-  }
-
-  delete $paref->{taref};
+  delete $paref->{cobj};
   delete $paref->{tname};
   delete $paref->{tholds};
 
@@ -7708,14 +7708,22 @@ return;
 ################################################################
 sub __evaluateArray {
   my $paref  = shift;
+  
+  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
-  my $taref  = $paref->{taref};          # Referenz zum Threshold-Array
+  my $cobj   = $paref->{cobj};           # das CurrentVal Objekt, z.B. genslidereg
   my $tname  = $paref->{tname};          # Thresholdname, z.B. powerTrigger
   my $tholds = $paref->{tholds};         # Triggervorgaben, z.B. aus Reading powerTrigger
+  
+  my $aaref = CurrentVal ($hash, $cobj, '');
+  my @aa    = ();
+  @aa       = @{$aaref} if (ref $aaref eq 'ARRAY');
+  
+  return if(scalar @aa < $defslidenum);
 
-  my $gen1   = @$taref[0];
-  my $gen2   = @$taref[1];
-  my $gen3   = @$taref[2];
+  my $gen1   = @aa[0];
+  my $gen2   = @aa[1];
+  my $gen3   = @aa[2];
 
   my ($a,$h) = parseParams ($tholds);
 
@@ -9112,8 +9120,8 @@ sub __createOwnSpec {
 
   return if(!$spec || !$show);
   
-  my $allsets  = getAllSets ($name);
-  my $allattrs = getAllAttr ($name);
+  my $allsets  = FW_widgetOverride($name, getAllSets ($name), "set")." ";  
+  my $allattrs = FW_widgetOverride($name, getAllAttr ($name), "set")." ";              # Leerzeichen am Ende wichtig für Regexvergleich
 
   my @fields = split (/\s+/sx, $spec);
 
@@ -9135,8 +9143,8 @@ sub __createOwnSpec {
   for (my $i = 1 ; $i <= $rows; $i++) {
       my ($h, $v, $u);
 
-      for (my $k = 0 ; $k < $vinr; $k++) {
-          ($h->{$k}{label}, $h->{$k}{rdg}) = split ":", $vals[$col] if($vals[$col]);
+      for (my $k = 0 ; $k < $vinr; $k++) {          
+          ($h->{$k}{label}, $h->{$k}{elm}) = split ":", $vals[$col] if($vals[$col]);
           $col++;
           
           if (!$h->{$k}{label}) {
@@ -9144,23 +9152,31 @@ sub __createOwnSpec {
               next;
           }
           
-          my $setcmd = ___getFWwidget ($name, $h->{$k}{rdg}, $allsets, 'set');
-          
-          if ($setcmd) {
-              $v->{$k} = $setcmd;
-              $u->{$k} = q{};
-              next;
+          if ($h->{$k}{elm} !~ /@/xs) {
+              my $setcmd = ___getFWwidget ($name, $h->{$k}{elm}, $allsets, 'set');
+              
+              if ($setcmd) {
+                  $v->{$k} = $setcmd;
+                  $u->{$k} = q{};
+                  next;
+              }
+              
+              my $attrcmd = ___getFWwidget ($name, $h->{$k}{elm}, $allattrs, 'attr');
+              
+              if ($attrcmd) {
+                  $v->{$k} = $attrcmd;
+                  $u->{$k} = q{};
+                  next;
+              }
           }
           
-          my $attrcmd = ___getFWwidget ($name, $h->{$k}{rdg}, $allattrs, 'attr');
+          my ($rdg, $dev) = split "@", $h->{$k}{elm};
+          $dev          //= $name;
           
-          if ($attrcmd) {
-              $v->{$k} = $attrcmd;
-              $u->{$k} = q{};
-              next;
-          }
+          ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $rdg, '');
           
-          ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($name, $h->{$k}{rdg}, ' ');
+          $v->{$k} //= q{};
+          $u->{$k} //= q{};
           
           next if(!$u->{$k});
           
@@ -9200,7 +9216,7 @@ return $ownv;
 ################################################################  
 sub ___getFWwidget {
   my $name = shift;
-  my $elm  = shift;                         # Element
+  my $elm  = shift;                         # zu prüfendes Element
   my $allc = shift;                         # Kommandovorrat -> ist Element enthalten?
   my $ctyp = shift // 'set';                # Kommandotyp: set/attr
 
@@ -9219,7 +9235,7 @@ sub ___getFWwidget {
       if ($ctyp eq 'attr') {
           $current = AttrVal ($name, $elm, '');
           $reading = '.'.$elm;
-          
+
           push @attrreadings, $reading;
           readingsSingleUpdate ($defs{$name}, $reading, $current, 0);
       }
@@ -9237,16 +9253,22 @@ sub ___getFWwidget {
       }
       
       if ($ctyp eq 'attr') {
-          my ($sc)    = $widget =~ /current='(.*?)'/xs;
-          my ($sr)    = $widget =~ /reading='(.*?)'/xs;
-          $widget     =~ s/$sc/$current/ if(defined $sc);
-          $widget     =~ s/$sr/$reading/ if(defined $sr);
+          my ($sc) = $widget =~ /current='(.*?)'/xs;
+          my ($sr) = $widget =~ /reading='(.*?)'/xs;
+          $widget  =~ s/$sc/$current/ if(defined $sc);
+          $widget  =~ s/$sr/$reading/ if(defined $sr);
       }
       
       if ($arg eq 'textField' || $arg eq 'textField-long') {                              # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
           $widget =~ s/arg='textField/arg='textFieldNL/xs;                                   
       }
+      
+      if ($arg =~ 'slider') {                                                             # Widget slider in selectnumbers für Kopfgrafik umsetzen
+          my ($wid, $min, $step, $max, $float) = split ",", $arg; 
+          $widget =~ s/arg='(.*?)'/arg='selectnumbers,$min,$step,$max,0,lin'/xs;    
+      }
   }
+  #Log3 ($name, 1, qq{$name - widget: $widget});
   
 return $widget;
 }
@@ -10597,30 +10619,15 @@ return $err;
 }
 
 ################################################################
-#       ist Batterie installiert ?
-#       1 - ja, 0 - nein
-################################################################
-sub useBattery {
-  my $name   = shift;
-
-  my $badev  = ReadingsVal($name, "currentBatteryDev", "");                  # aktuelles Meter device für Batteriewerte
-  my ($a,$h) = parseParams ($badev);
-  $badev     = $a->[0] // "";
-  return if(!$badev || !$defs{$badev});
-
-return ($badev, $a ,$h);
-}
-
-################################################################
 #  Korrekturen und Qualität berechnen / speichern
-#  sowie AI Instanzen hinzufügen
+#  sowie AI Quellen Daten hinzufügen
 ################################################################
 sub calcValueImproves {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
-  my $t     = $paref->{t};                                                           # aktuelle Unix-Zeit
+  my $t     = $paref->{t};                                                            # aktuelle Unix-Zeit
 
   my $idts = ReadingsTimestamp ($name, "currentInverterDev", "");                     # Definitionstimestamp des Inverterdevice
   return if(!$idts);
@@ -10658,7 +10665,7 @@ sub calcValueImproves {
 
       _calcCaQcomplex   ($paref);                                            # Korrekturberechnung mit Bewölkung duchführen/speichern
       _calcCaQsimple    ($paref);                                            # einfache Korrekturberechnung duchführen/speichern
-      _addHourAiRawdata ($paref);                                            # AI Instanz hinzufügen
+      _addHourAiRawdata ($paref);                                            # AI Raw Data hinzufügen
 
       delete $paref->{h};
   }
@@ -10829,7 +10836,7 @@ return;
 }
 
 ################################################################
-#       AI Instanz für die abgeschlossene Stunde hinzufügen
+#       AI Daten für die abgeschlossene Stunde hinzufügen
 ################################################################
 sub _addHourAiRawdata {
   my $paref = shift;
@@ -10844,7 +10851,7 @@ sub _addHourAiRawdata {
 
   debugLog ($paref, 'aiProcess', "start add AI raw data for hour: $h");
 
-  $paref->{ood} = 1;
+  $paref->{ood} = 1;                                              # Only One Day
   $paref->{rho} = $rho;
 
   aiAddRawData ($paref);                                          # Raw Daten für AI hinzufügen und sichern
@@ -13427,6 +13434,22 @@ return ConsumerVal ($hash, $c, 'isConsumptionRecommended', 0);
 }
 
 ################################################################
+#       ist Batterie installiert ?
+#       1 - ja, 0 - nein
+################################################################
+sub isBatteryUsed {
+  my $name   = shift;
+
+  my $badev  = ReadingsVal($name, "currentBatteryDev", "");                  # aktuelles Meter device für Batteriewerte
+  my ($a,$h) = parseParams ($badev);
+  $badev     = $a->[0] // "";
+  
+  return if(!$badev || !$defs{$badev});
+
+return ($badev, $a ,$h);
+}
+
+################################################################
 #  ist Consumer $c unterbrechbar (1|2) oder nicht (0|3)
 ################################################################
 sub isInterruptable {
@@ -14135,6 +14158,7 @@ return $def;
 #       aiaddistate          - Add Instanz Status der KI
 #       genslidereg          - Schieberegister PV Erzeugung (Array)
 #       h4fcslidereg         - Schieberegister 4h PV Forecast (Array)
+#       socslidereg          - Schieberegister Batterie SOC (Array)
 #       consumption          - aktueller Verbrauch (W)
 #       consumerdevs         - alle registrierten Consumerdevices (Array)
 #       gridconsumption      - aktueller Netzbezug
@@ -15045,6 +15069,7 @@ to ensure that the system configuration is correct.
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
             <tr><td> <b>aiData</b>             </td><td>deletes an existing AI instance including all training data and reinitialises it                                        </td></tr>
+            <tr><td> <b>batteryTriggerSet</b>  </td><td>deletes the trigger points of the battery storage                                                                       </td></tr>
             <tr><td> <b>consumerPlanning</b>   </td><td>deletes the planning data of all registered consumers                                                                   </td></tr>
             <tr><td>                           </td><td>To delete the planning data of only one consumer, use:                                                                  </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Consumer number&gt; </ul>                                               </td></tr>
@@ -15057,13 +15082,12 @@ to ensure that the system configuration is correct.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Day&gt;   (e.g. set &lt;name&gt; reset consumption 08) </ul>                 </td></tr>
             <tr><td>                           </td><td>To delete the consumption values of a specific hour of a day:                                                           </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumption 08 10) </ul>   </td></tr>
-            <tr><td> <b>currentBatteryDev</b>  </td><td>deletes the set battery device and corresponding data.                                                                  </td></tr>
-            <tr><td> <b>currentWeatherDev</b>  </td><td>deletes the set device for weather data                                                                                 </td></tr>
-            <tr><td> <b>currentInverterDev</b> </td><td>deletes the set inverter device and corresponding data.                                                                 </td></tr>
-            <tr><td> <b>currentMeterDev</b>    </td><td>deletes the set meter device and corresponding data.                                                                    </td></tr>
-            <tr><td> <b>energyH4Trigger</b>    </td><td>deletes the 4-hour energy trigger points                                                                                </td></tr>
-            <tr><td> <b>inverterStrings</b>    </td><td>deletes the string configuration of the installation                                                                    </td></tr>
-            <tr><td> <b>powerTrigger</b>       </td><td>deletes the trigger points for PV generation values                                                                     </td></tr>
+            <tr><td> <b>currentBatterySet</b>  </td><td>deletes the set battery device and corresponding data.                                                                  </td></tr>
+            <tr><td> <b>currentInverterSet</b> </td><td>deletes the set inverter device and corresponding data.                                                                 </td></tr>
+            <tr><td> <b>currentMeterSet</b>    </td><td>deletes the set meter device and corresponding data.                                                                    </td></tr>
+            <tr><td> <b>energyH4TriggerSet</b> </td><td>deletes the 4-hour energy trigger points                                                                                </td></tr>
+            <tr><td> <b>inverterStringSet</b>  </td><td>deletes the string configuration of the installation                                                                    </td></tr>
+            <tr><td> <b>powerTriggerSet</b>    </td><td>deletes the trigger points for PV generation values                                                                     </td></tr>
             <tr><td> <b>pvCorrection</b>       </td><td>deletes the readings pvCorrectionFactor*                                                                                </td></tr>
             <tr><td>                           </td><td>To delete all previously stored PV correction factors from the caches:                                                  </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                    </td></tr>
@@ -15075,7 +15099,7 @@ to ensure that the system configuration is correct.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset pvHistory 08) </ul>                     </td></tr>
             <tr><td>                           </td><td>To delete a specific hour of a historical day:                                                                          </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt; &lt;Hour&gt;  (e.g. set &lt;name&gt; reset pvHistory 08 10) </ul>      </td></tr>
-            <tr><td> <b>moduleRoofTops</b>     </td><td>deletes the SolCast API Rooftops                                                                                        </td></tr>
+            <tr><td> <b>moduleRoofTopSet</b>   </td><td>deletes the SolCast API Rooftops                                                                                        </td></tr>
             <tr><td> <b>roofIdentPair</b>      </td><td>deletes all saved SolCast API Rooftop ID / API Key pairs.                                                               </td></tr>
             <tr><td>                           </td><td>To delete a specific pair, specify its key &lt;pk&gt;:                                                                  </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (e.g. set &lt;name&gt; reset roofIdentPair p1) </ul>              </td></tr>
@@ -15395,7 +15419,7 @@ to ensure that the system configuration is correct.
       <a id="SolarForecast-get-valDecTree"></a>
       <li><b>valDecTree </b> <br><br>
 
-      If AI support is activated in the SolarForecast Device, various AI-relevant data can be displayed:
+      If AI support is activated in the SolarForecast Device, various AI-relevant data can be displayed                      :
       <br><br>
 
       <ul>
@@ -16407,6 +16431,27 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-set-batteryTrigger"></a>
+      <li><b>batteryTrigger &lt;1on&gt;=&lt;Wert&gt; &lt;1off&gt;=&lt;Wert&gt; [&lt;2on&gt;=&lt;Wert&gt; &lt;2off&gt;=&lt;Wert&gt; ...] </b> <br><br>
+
+      Generiert Trigger bei Über- bzw. Unterschreitung bestimmter Batterieladungswerte (SOC in %). <br>
+      Überschreiten die letzten drei SOC-Messungen eine definierte <b>Xon-Bedingung</b>, wird das Reading
+      <b>batteryTrigger_X = on</b> erstellt/gesetzt.
+      Unterschreiten die letzten drei SOC-Messungen eine definierte <b>Xoff-Bedingung</b>, wird das Reading
+      <b>batteryTrigger_X = off</b> erstellt/gesetzt. <br>
+      Es kann eine beliebige Anzahl von Triggerbedingungen angegeben werden. Xon/Xoff-Bedingungen müssen nicht zwingend paarweise
+      definiert werden. <br>
+      <br>
+
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; batteryTrigger 1on=30 1off=10 2on=70 2off=20 3on=15 4off=90<br>
+      </ul>
+      </li>
+    </ul>
+    <br>
 
     <ul>
       <a id="SolarForecast-set-consumerNewPlanning"></a>
@@ -16921,6 +16966,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
             <tr><td> <b>aiData</b>             </td><td>löscht eine vorhandene KI Instanz inklusive aller Trainingsdaten und initialisiert sie neu                              </td></tr>
+            <tr><td> <b>batteryTriggerSet</b>  </td><td>löscht die Triggerpunkte des Batteriespeichers                                                                          </td></tr>
             <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                                </td></tr>
             <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                   </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                             </td></tr>
@@ -16933,13 +16979,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumption 08) </ul>                 </td></tr>
             <tr><td>                           </td><td>Um die Verbrauchswerte einer bestimmten Stunde eines Tages zu löschen:                                                  </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumption 08 10) </ul> </td></tr>
-            <tr><td> <b>currentBatteryDev</b>  </td><td>löscht das eingestellte Batteriedevice und korrespondierende Daten                                                      </td></tr>
-            <tr><td> <b>currentWeatherDev</b>  </td><td>löscht das eingestellte Device für Wetterdaten                                                                          </td></tr>
-            <tr><td> <b>currentInverterDev</b> </td><td>löscht das eingestellte Inverterdevice und korrespondierende Daten                                                      </td></tr>
-            <tr><td> <b>currentMeterDev</b>    </td><td>löscht das eingestellte Meterdevice und korrespondierende Daten                                                         </td></tr>
-            <tr><td> <b>energyH4Trigger</b>    </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                              </td></tr>
-            <tr><td> <b>inverterStrings</b>    </td><td>löscht die Stringkonfiguration der Anlage                                                                               </td></tr>
-            <tr><td> <b>powerTrigger</b>       </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                         </td></tr>
+            <tr><td> <b>currentBatterySet</b>  </td><td>löscht das eingestellte Batteriedevice und korrespondierende Daten                                                      </td></tr>
+            <tr><td> <b>currentInverterSet</b> </td><td>löscht das eingestellte Inverterdevice und korrespondierende Daten                                                      </td></tr>
+            <tr><td> <b>currentMeterSet</b>    </td><td>löscht das eingestellte Meterdevice und korrespondierende Daten                                                         </td></tr>
+            <tr><td> <b>energyH4TriggerSet</b> </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                              </td></tr>
+            <tr><td> <b>inverterStringSet</b>  </td><td>löscht die Stringkonfiguration der Anlage                                                                               </td></tr>
+            <tr><td> <b>powerTriggerSet</b>    </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                         </td></tr>
             <tr><td> <b>pvCorrection</b>       </td><td>löscht die Readings pvCorrectionFactor*                                                                                 </td></tr>
             <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus den Caches zu löschen:                                            </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                    </td></tr>
@@ -16951,7 +16996,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08) </ul>                     </td></tr>
             <tr><td>                           </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                                           </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </ul>    </td></tr>
-            <tr><td> <b>moduleRoofTops</b>     </td><td>löscht die SolCast API Rooftops                                                                                         </td></tr>
+            <tr><td> <b>moduleRoofTopSet</b>   </td><td>löscht die SolCast API Rooftops                                                                                         </td></tr>
             <tr><td> <b>roofIdentPair</b>      </td><td>löscht alle gespeicherten SolCast API Rooftop-ID / API-Key Paare                                                        </td></tr>
             <tr><td>                           </td><td>Um ein bestimmtes Paar zu löschen ist dessen Schlüssel &lt;pk&gt; anzugeben:                                            </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (z.B. set &lt;name&gt; reset roofIdentPair p1) </ul>              </td></tr>
@@ -17269,7 +17314,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a id="SolarForecast-get-valDecTree"></a>
       <li><b>valDecTree </b> <br><br>
 
-      Ist der KI Support im SolarForecast Device aktiviert, können verschiedene KI relevante Daten angezeigt werden:
+      Ist der KI Support im SolarForecast Device aktiviert, können verschiedene KI relevante Daten angezeigt werden                  :
       <br><br>
 
       <ul>
@@ -17957,8 +18002,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
-       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt; &lt;Label&gt;:&lt;Reading&gt; ... </b><br>
-         Anzeige beliebiger Readings, Set-Kommandos und Attribute des Devices im Grafikkopf. <br>
+       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading[@Device]&gt; &lt;Label&gt;:&lt;Reading[@Device]&gt; ... </b><br>
+         Anzeige beliebiger Readings, Set-Kommandos und Attribute des SolarForecast Devices im Grafikkopf. <br>
+         Durch Angabe des optionalen [@Device] können Readings anderer Devices angezeigt werden. <br>
          Die anzuzeigenden Werte werden durch Leerzeichen getrennt.
          Es werden vier Werte (Felder) pro Zeile dargestellt. <br>
          Die Eingabe kann mehrzeilig erfolgen. Werte mit den Einheiten "Wh" bzw. "kWh" werden entsprechend der Einstellung
@@ -17983,7 +18029,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                         </td><td>#                                                                             </td></tr>
             <tr><td>                                         </td><td>CO&amp;nbsp;bis&amp;nbsp;Sonnenuntergang:statistic_todayConForecastTillSunset </td></tr>
             <tr><td>                                         </td><td>PV&amp;nbsp;Übermorgen:statistic_dayAfterTomorrowPVforecast                   </td></tr>
-            <tr><td>                                         </td><td>:                                                                             </td></tr>
+            <tr><td>                                         </td><td>InverterRelay:gridrelay_status@MySTP_5000                                     </td></tr>
             <tr><td>                                         </td><td>:                                                                             </td></tr>
             <tr><td>                                         </td><td>#Batterie                                                                     </td></tr>
             <tr><td>                                         </td><td>in&amp;nbsp;heute:statistic_todayBatIn                                        </td></tr>
