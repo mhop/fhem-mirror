@@ -9173,7 +9173,8 @@ sub __createOwnSpec {
           my ($rdg, $dev) = split "@", $h->{$k}{elm};
           $dev          //= $name;
           
-          ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $rdg, '');
+          $v->{$k}             = ReadingsVal ($dev, $rdg, '');
+          ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $rdg, '') if($v->{$k} =~ /(Wh|kWh)$/xs);
           
           $v->{$k} //= q{};
           $u->{$k} //= q{};
