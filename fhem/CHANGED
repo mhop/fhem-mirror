@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  10_KNX.pm: minor changes, see Forum #122582
+ - change:  00_KNXIO.pm: minor changes, see Forum #127792
  - feature: 76_SolarForecast: graphicHeaderOwnspec: show readings of other devs
                               new set/reset batteryTrigger command
  - bugfix:  98_CDCOpenData: warning Net::FTP bei Fhem Start
