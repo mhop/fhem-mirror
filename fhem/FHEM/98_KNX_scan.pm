@@ -1,10 +1,11 @@
-## no critic (Modules::RequireVersionVar)
+## no critic (Modules::RequireVersionVar,Policy::CodeLayout::RequireTidyCode) ##
 # $Id$
 # CommandModule for KNX utilities
 # executing functions and detailed cmd-ref are defined in KNX-module. 
 ################################################################################
 ### changelog:
 # 2023/07/xx initial version
+# 2023/11/21 PBP Lvl 1 changes
 
 
 package main;
@@ -14,10 +15,10 @@ use warnings;
 ### perlcritic parameters
 ## no critic (ControlStructures::ProhibitPostfixControls)
 ## no critic (Documentation::RequirePodSections)
+## no critic (NamingConventions::Capitalization)
 
 sub KNX_scan_Initialize {
-
-	$cmds{KNX_scan} = { Fn  => 'CommandKNX_scan', 
+	$cmds{KNX_scan} = { Fn  => 'CommandKNX_scan',
 	                    Hlp => '[<devspec>] request values from KNX-Hardware. Use "help KNX_scan" for more help'};
 	return;
 }
@@ -30,7 +31,7 @@ sub CommandKNX_scan {
 	$devs = 'TYPE=KNX' if (! defined($devs) || $devs eq q{}); # select all if nothing defined
 	if (exists($modules{KNX}->{LOADED})) { # check for KNX-module ready
 		main::KNX_scan($devs);
-	} 
+	}
 	else {
 		Log3 undef, 2, "KNX_scan for $devs aborted - KNX-module not loaded!";
 	}
@@ -38,6 +39,7 @@ sub CommandKNX_scan {
 }
 
 1;
+__END__
 
 =pod
 
