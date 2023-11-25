@@ -124,6 +124,7 @@ sub RPI_1Wire_Init {				#
 		$family="DHT".$1;
 		$device=$family;
 	} else {
+	    #testing - comment next line to create devices without HW check
 		return "Device $arg does not exist" if (! -e "$w1_path/$arg" and $check==1 and $force==0); #Only quit if coming from interactive define
 		($family, $id) = split('-',$arg);
 		return "Unknown device family $family" if !defined $RPI_1Wire_Devices{$family};
@@ -141,6 +142,11 @@ sub RPI_1Wire_Init {				#
 		}
 		if (-e "$w1_path/$arg/resolution" && !-w "$w1_path/$arg/resolution") {
 			$hash->{helper}{write}.="resolution ";
+		}
+	}
+	if ($type eq "switch") {
+		if (-e "$w1_path/$arg/output" && !-w "$w1_path/$arg/output") {
+			$hash->{helper}{write}.="output "; 
 		}
 	}
 	if ($device eq "BUSMASTER") {
@@ -289,10 +295,12 @@ sub RPI_1Wire_SetConversion {
 }
 
 sub RPI_1Wire_Switch {
-	my ($hash,$switch)= @_;
-	Log3 $hash->{NAME}, 3, $hash->{NAME}.": Switching $hash->{DEF} to $switch";
+	my ($hash,$switch,$pio,$cmd,$duration)= @_;
+	Log3 $hash->{NAME}, 3, $hash->{NAME}.": Switching $hash->{DEF} to $switch ($pio $cmd) for ($duration)";
 	my $fh;
 	my $path="$w1_path/$hash->{DEF}/output";
+	#testing - uncomment to test with a normal file
+	#my $path="/home/pi/state";
 	if (open($fh, ">", $path)) {
 		print $fh pack("C",$switch);
 		close($fh);
@@ -302,6 +310,12 @@ sub RPI_1Wire_Switch {
 	#After setting switch, read back to set readings correctly
 	my $ret=RPI_1Wire_Poll($hash);
 	RPI_1Wire_FinishFn($ret);
+	if ($cmd =~ /-for-timer$/) {
+		$cmd=( $cmd =~ /^on/?"off":"on"); #Revert condition to be executed after timer
+		return "Invalid duration $duration" if (!looks_like_number($duration));
+		Log3 $hash->{NAME}, 4, $hash->{NAME}.": Setting time for switching $hash->{DEF} $pio to $cmd in $duration s";
+		InternalTimer(gettimeofday()+$duration, sub { RPI_1Wire_Set($hash, $hash->{NAME},($pio,$cmd)); },0);
+	}
 	return;
 	
 }
@@ -328,11 +342,11 @@ sub RPI_1Wire_Set {
 		}
 	}
 	if ($type eq "switch" or $type eq "2p-switch") {
-		$sets.="pioa:on,off piob:on,off ";
+		$sets.="pioa:widgetList,5,select,on,off,on-for-timer,off-for-timer,1,textField piob:widgetList,5,select,on,off,on-for-timer,off-for-timer,1,textField ";
 	}
 	if ($type eq "8p-switch") {
 		for my $i ((0..7)) {
-		$sets.="pio".$i.":on,off ";
+		$sets.="pio".$i.":widgetList,5,select,on,off,on-for-timer,off-for-timer,1,textField ";
 		}
 	}
 	if ($device =~ /(BUSMASTER)(-\d)?$/) {
@@ -348,35 +362,41 @@ sub RPI_1Wire_Set {
 
 	if ( $cmd eq "?" ) {
 		return "RPI_1Wire_Set: Unknown argument $cmd, choose one of " . $sets;
-	} 
-	if ($cmd =~ /^pio(a|b)/ and @args==1) {
-		my $val=shift @args;
-		Log3 $name, 3, $name." set pio $1 $val\n";
+	}
+	my @cm;
+	if (@args>0) {
+		@cm=split(",",$args[0]);
+		push @cm,$args[1] if (@args>1);
+		push @cm,"-" if (@cm==1);
+	}
+	if ($cmd =~ /^pio(a|b)/ and @cm>0) {
+		Log3 $name, 3, $name." set pio $1 $cm[0] $cm[1]\n";
 		my $set=0;
 		if ($cmd eq "pioa") {
-			$set=ReadingsVal($name,"piob","0")*2+($val eq "on"?1:0);
+			$set=ReadingsVal($name,"piob","0")*2+($cm[0] =~ /^on/?1:0);
 		} else {
-			$set=ReadingsVal($name,"pioa","0")+($val eq "on"?1:0)*2;
+			$set=ReadingsVal($name,"pioa","0")+($cm[0] =~ /^on/?1:0)*2;
 		}
 		if ($type eq "2p-switch") {
 			$set=($set^3); #bits are inverted on DS2413
 		}
-		return RPI_1Wire_Switch($hash,$set);
+		return RPI_1Wire_Switch($hash,$set,$cmd, $cm[0],$cm[1]);
 	}
-	if ($cmd =~ /^pio(\d)/ and @args==1) {
-		my $val=shift @args;
-		Log3 $name, 3, $name." set pio $1 $val\n";
+	if ($cmd =~ /^pio(\d)/ and @cm>0) {
+		my $pio=$1;
+		Log3 $name, 3, $name." set pio $pio $cm[0] $cm[1]\n";
 		my $id=$1;
 		my $set=0;
 		for my $i (0..7) {
 			my $bit=2**$i;
 			if ($i==$id) {
-				$set+=($val eq "on"?1:0)*$bit;
+				$set+=($cm[0] =~ /^on/?1:0)*$bit;
 			} else {
 				$set+=ReadingsVal($name,"pio".$i,"0")*$bit;
 			}
 		}
-		return RPI_1Wire_Switch($hash,$set);
+		$set=($set^255); # invert bits
+		return RPI_1Wire_Switch($hash,$set,$cmd, $cm[0],$cm[1]);
 	}
 	
 	if ($cmd eq "precision" and @args==1) {
@@ -433,6 +453,7 @@ sub RPI_1Wire_Get {
 		$script .= "chmod g+w /sys/devices/w1_bus_master*/therm_bulk_read;\\\n";
 		$script .= "chmod g+w /sys/devices/w1_bus_master*/*/resolution;\\\n";
 		$script .= "chmod g+w /sys/devices/w1_bus_master*/*/conv_time;\\ \'\"\n";
+		$script .= "chmod g+w /sys/devices/w1_bus_master*/*/output;\\ \'\"\n";
 		
 		return $ret.$script;
 	}
@@ -485,9 +506,11 @@ sub RPI_1Wire_Poll {
 	my @data;
 	foreach (@path) {
 		$file="$w1_path/$device/$_";
+		#testing - uncomment to test with a normal file
 		#if ($type =~ /switch/) {
 		#	$file="/home/pi/state";
 		#}
+		#testing
 		if ($family =~ /DHT(11|22)/) { 
 			my $env = RPi::DHT->new($id,$1,1);
 			Log3 $name, 4 , $name.": Using RPi::DHT for $id DHT-$1";
@@ -576,7 +599,7 @@ sub RPI_1Wire_Poll {
 		if ($type eq "8p-switch") {
 			my $pin=0;
 			foreach (@pio) {
-				$retval.=" pio".$pin++."=".$_;
+				$retval.=" pio".$pin++."=".($_^1);
 			}
 		} else {
 			if ($type eq "2p-switch") {
@@ -718,7 +741,7 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/RPI_1Wire">Wiki<
 		<li>Family 0x1d (DS2423) dual counter</li>
 		<li>Family 0x26 (DS2438) a/d converter with temperature support</li>
 		<li>Family 0x28 (DS18B20) temperature</li>
-		<li>Family 0x29 (DS2408) 8 port switch (untested)</li>
+		<li>Family 0x29 (DS2408) 8 port switch</li>
 		<li>Family 0x3a (DS2413) adressable 2 port switch</li>
 		<li>Family 0x3b (DS1825) temperature</li>
 		<li>Family 0x42 (DS28EA00) temperature</li>
@@ -777,17 +800,20 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/RPI_1Wire">Wiki<
 		<a id="RPI_1Wire-set-clear"></a>
 		Clears the failures counter.
 		</li>
-		<li><b>set pioa on|off</b><br>
+		<li><b>set pioa on|off &ltduration&gt</b><br>
 		<a id="RPI_1Wire-set-pioa"></a>
-		Sets the pioa of a 2 port switch to on or off.
+		Sets the pioa of a 2 port switch to on or off.<br>
+		The optional duration switches the pio back after a given number of seconds. The alternative options "on-for-timer" and "off-for-timer" work identically and are only provided to find this functionality more easily.
 		</li>
-		<li><b>set piob on|off</b><br>
+		<li><b>set piob on|off &ltduration&gt</b><br>
 		<a id="RPI_1Wire-set-piob"></a>
-		Sets the piob of a 2 port switch to on or off.
+		Sets the piob of a 2 port switch to on or off.<br>
+		The optional duration switches the pio back after a given number of seconds. The alternative options "on-for-timer" and "off-for-timer" work identically and are only provided to find this functionality more easily.
 		</li>
-		<li><b>set pio(0-7) on|off</b><br>
+		<li><b>set pio(0-7) on|off &ltduration&gt</b><br>
 		<a id="RPI_1Wire-set-pio0"></a>
-		Sets the according pio of a 8 port switch (0-7) to on or off. (untested)
+		Sets the according pio of a 8 port switch (0-7) to on or off.<br>
+		The optional duration switches the pio back after a given number of seconds. The alternative options "on-for-timer" and "off-for-timer" work identically and are only provided to find this functionality more easily.
 		</li>
 	</ul>
 
