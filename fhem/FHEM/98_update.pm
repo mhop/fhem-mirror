@@ -312,7 +312,7 @@ doUpdate($$$$)
     $canJoin = 1;
   }
 
-  my @excl = split(" ", AttrVal("global", "exclude_from_update", ""));
+  my @excl = split(/[\s,]+/, AttrVal("global", "exclude_from_update", ""));
   my $noSzCheck = AttrVal("global", "updateNoFileCheck", configDBUsed());
   my $hideExcl = AttrVal("global", "hideExcludedUpdates", 0); #Forum #124670
 
@@ -672,10 +672,11 @@ upd_writeFile($$$$)
 
     <a id="update-attr-exclude_from_update"></a>
     <li>exclude_from_update<br>
-        Contains a space separated list of fileNames (regexps) which will be
-        excluded by an update. The special value commandref will disable calling
-        commandref_join at the end, i.e commandref.html will be out of date.
-        The module-only documentation is not affected and is up-to-date.<br>
+        Contains a space or comma separated list of fileNames (regexps) which
+        will be excluded by an update. The special value commandref will
+        disable calling commandref_join at the end, i.e commandref.html will be
+        out of date.  The module-only documentation is not affected and is
+        up-to-date.<br>
         Example:<br>
         <ul>
           attr global exclude_from_update 21_OWTEMP.pm FS20.off.png
@@ -782,11 +783,12 @@ upd_writeFile($$$$)
 
     <a id="update-attr-exclude_from_update"></a>
     <li>exclude_from_update<br>
-        Enth&auml;lt eine Liste durch Leerzeichen getrennter Dateinamen
-        (Regexp), welche nicht beim update ber&uuml;cksichtigt werden.<br>
-        Falls der Wert commandref enth&auml;lt, dann wird commandref_join.pl
-        nach dem update nicht aufgerufen, d.h. die Gesamtdokumentation ist
-        nicht mehr aktuell. Die Moduldokumentation bleibt weiterhin aktuell.
+        Enth&auml;lt eine durch Leerzeichen oder Komma getrennte Liste von
+        Dateinamen (Regexp), welche beim update nicht ber&uuml;cksichtigt
+        werden.<br> Falls der Wert commandref enth&auml;lt, dann wird
+        commandref_join.pl nach dem update nicht aufgerufen, d.h. die
+        Gesamtdokumentation ist nicht mehr aktuell. Die Moduldokumentation
+        bleibt weiterhin aktuell.
         <br>
         Beispiel:<br>
         <ul>
