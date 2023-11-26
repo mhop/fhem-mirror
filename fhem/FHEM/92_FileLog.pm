@@ -711,6 +711,11 @@ FileLog_logWrapper($)
     return 0;
   }
 
+  if($file =~ m,.*/.*([^/]+$),) { # 135959
+    Log 1, "ERROR: FileLog_logWrapper: / not allowed in filename ($file)";
+    return 0;
+  }
+
   if(defined($type) && $type eq "text") {
     $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
     my $path = "$1/$file";
