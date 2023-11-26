@@ -844,8 +844,9 @@ sub
 FBDECT_Undef($$)
 {
   my ($hash, $arg) = @_;
-  my $homeId = $hash->{homeId};
+  my $iodev = $hash->{IODev};
   my $id = $hash->{id};
+  delete $modules{FBDECT}{defptr}{"$iodev->{NAME}:$id"} if($iodev && ref($iodev) eq "HASH");
   delete $modules{FBDECT}{defptr}{$id};
   return undef;
 }
