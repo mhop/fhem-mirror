@@ -105,6 +105,7 @@ BEGIN {
           Log3
           modules
           parseParams
+          perlSyntaxCheck
           readingsSingleUpdate
           readingsBulkUpdate
           readingsBulkUpdateIfChanged
@@ -150,6 +151,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.3.0"  => "27.11.2023  new Attr graphicHeaderOwnspecValForm ",
   "1.2.0"  => "25.11.2023  graphicHeaderOwnspec: show readings of other devs by <reaging>@<dev>, Set/reset batteryTrigger ",
   "1.1.3"  => "24.11.2023  rename reset arguments according possible adjustable textField width ",
   "1.1.2"  => "20.11.2023  ctrlDebug Adjustment of column width, must have new fhemweb.js Forum:#135850 ",
@@ -992,6 +994,7 @@ my %hcsr = (                                                                    
 # $data{$type}{$name}{aidectree}{object}                                         # AI Decision Tree Object
 # $data{$type}{$name}{aidectree}{aitrained}                                      # AI Decision Tree trainierte Daten
 # $data{$type}{$name}{aidectree}{airaw}                                          # Rohdaten für AI Input = Raw Trainigsdaten
+# $data{$type}{$name}{func}                                                      # interne Funktionen
 
 ################################################################
 #               Init Fn
@@ -1068,6 +1071,7 @@ sub Initialize {
                                 "graphicBeam1MaxVal ".
                                 "graphicEnergyUnit:Wh,kWh ".
                                 "graphicHeaderOwnspec:textField-long ".
+                                "graphicHeaderOwnspecValForm:textField-long ".
                                 "graphicHeaderDetail:multiple-strict,all,co,pv,own,status ".
                                 "graphicHeaderShow:1,0 ".
                                 "graphicHistoryHour:slider,0,1,23 ".
@@ -4048,6 +4052,7 @@ sub Attr {
   my $aVal  = shift;
 
   my $hash  = $defs{$name};
+  my $type  = $hash->{TYPE};
 
   my ($do,$val);
 
@@ -4078,6 +4083,38 @@ sub Attr {
       deleteReadingspec ($hash, 'Today_PVdeviation');
       delete $data{$type}{$name}{circular}{99}{tdayDvtn};
   }
+  
+  if ($aName eq 'graphicHeaderOwnspecValForm') {
+      if ($cmd ne 'set') {
+          delete $data{$type}{$name}{func}{ghoValForm};
+          return;
+      }
+      
+      if(!$aVal || $aVal !~ m/^\s*\{.*\}\s*$/xs) {
+          return "Usage of $aName is wrong. The function has to be specified as \"{<your own code>}\" ";
+      }
+
+      my $attrVal  = $aVal;
+      my %specials = ( "%DEVICE"  => $name,
+                       "%READING" => $name,
+                       "%VALUE"   => 1,
+                       "%UNIT"    => 'kW',
+                     );
+
+      my $err = perlSyntaxCheck($attrVal, %specials);
+      return $err if($err);
+
+      if ($attrVal =~ m/^\{.*\}$/xs && $attrVal =~ m/=>/ && $attrVal !~ m/\$/ ) {           # Attr wurde als Hash definiert          
+          my $av = eval $attrVal;
+          
+          return $@ if($@);
+                    
+          $av      = eval $attrVal;
+          $attrVal = $av if(ref $av eq "HASH");
+      }
+      
+      $data{$type}{$name}{func}{ghoValForm} = $attrVal;
+  }
 
   if ($cmd eq 'set') {
       if ($aName eq 'ctrlInterval') {
@@ -4106,16 +4143,14 @@ sub Attr {
           }
       }
 
-      if ($aName eq 'ctrlUserExitFn') {
-          if($cmd eq "set" && $init_done) {
-              if(!$aVal || $aVal !~ m/^\s*(\{.*\})\s*$/xs) {
-                  return "Usage of $aName is wrong. The function has to be specified as \"{<your own code>}\" ";
-              }
-
-              $aVal = $1;
-              eval $aVal;
-              return $@ if ($@);
+      if ($aName eq 'ctrlUserExitFn' && $init_done) {
+          if(!$aVal || $aVal !~ m/^\s*(\{.*\})\s*$/xs) {
+              return "Usage of $aName is wrong. The function has to be specified as \"{<your own code>}\" ";
           }
+
+          $aVal = $1;
+          eval $aVal;
+          return $@ if($@);
       }
   }
 
@@ -4690,7 +4725,7 @@ sub centralTask {
       deleteReadingspec    ($hash, "currentForecastDev");
   }
 
-  my $rdev = ReadingsVal  ($name, "currentRadiationDev",  undef);
+  my $rdev = ReadingsVal   ($name, "currentRadiationDev",  undef);
   if ($rdev) {
       readingsSingleUpdate ($hash, "currentRadiationAPI", $rdev, 0);
       deleteReadingspec    ($hash, "currentRadiationDev");
@@ -5236,10 +5271,10 @@ sub _transferWeatherValues {
 
   debugLog ($paref, "collectData", "sunrise/sunset today: $fc0_SunRise / $fc0_SunSet, sunrise/sunset tomorrow: $fc1_SunRise / $fc1_SunSet");
 
-  storeReading ('Today_SunRise', $fc0_SunRise);
-  storeReading ('Today_SunSet', $fc0_SunSet);
+  storeReading ('Today_SunRise',    $fc0_SunRise);
+  storeReading ('Today_SunSet',     $fc0_SunSet);
   storeReading ('Tomorrow_SunRise', $fc1_SunRise);
-  storeReading ('Tomorrow_SunSet', $fc1_SunSet);
+  storeReading ('Tomorrow_SunSet',  $fc1_SunSet);
 
   my $fc0_SunRise_round = sprintf "%02d", (split ":", $fc0_SunRise)[0];
   my $fc0_SunSet_round  = sprintf "%02d", (split ":", $fc0_SunSet)[0];
@@ -7721,9 +7756,9 @@ sub __evaluateArray {
   
   return if(scalar @aa < $defslidenum);
 
-  my $gen1   = @aa[0];
-  my $gen2   = @aa[1];
-  my $gen3   = @aa[2];
+  my $gen1   = $aa[0];
+  my $gen2   = $aa[1];
+  my $gen3   = $aa[2];
 
   my ($a,$h) = parseParams ($tholds);
 
@@ -9110,10 +9145,10 @@ sub __createOwnSpec {
 
   my $hash      = $paref->{hash};
   my $name      = $paref->{name};
-  my $dstyle    = $paref->{dstyle};                                       # TD-Style
+  my $dstyle    = $paref->{dstyle};                                                    # TD-Style
   my $hdrDetail = $paref->{hdrDetail};
 
-  my $vinr = 4;                                                           # Spezifikationen in einer Zeile
+  my $vinr = 4;                                                                        # Spezifikationen in einer Zeile
   my $spec = AttrVal ($name, 'graphicHeaderOwnspec', '');
   my $uatr = AttrVal ($name, 'graphicEnergyUnit',  'Wh');
   my $show = $hdrDetail =~ /all|own/xs ? 1 : 0;
@@ -9170,13 +9205,28 @@ sub __createOwnSpec {
               }
           }
           
-          my ($rdg, $dev) = split "@", $h->{$k}{elm};
-          $dev          //= $name;
+          my ($rdg, $dev)   = split "@", $h->{$k}{elm};
+          $dev            //= $name;
+          $v->{$k}          = ReadingsVal ($dev, $rdg, '');
           
-          ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $rdg, '');
+          if ($v->{$k} =~ /(-?\d+(\.\d+)?)/xs) {
+              ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $rdg, '');       # Value und Unit trennen wenn Value numerisch
+          }
           
           $v->{$k} //= q{};
           $u->{$k} //= q{};
+          
+          $paref->{dev}  = $dev; 
+          $paref->{rdg}  = $rdg;
+          $paref->{val}  = $v->{$k};
+          $paref->{unit} = $u->{$k};
+          
+          ($v->{$k}, $u->{$k}) = ___ghoValForm ($paref);
+          
+          delete $paref->{dev};
+          delete $paref->{rdg};
+          delete $paref->{val};
+          delete $paref->{unit};
           
           next if(!$u->{$k});
           
@@ -9186,7 +9236,7 @@ sub __createOwnSpec {
                   $u->{$k} = 'kWh';
               }
           }
-
+          
           if ($uatr eq 'Wh') {
               if ($u->{$k} =~ /^kWh/xs) {
                   $v->{$k} = sprintf "%.0f",($v->{$k} * 1000);
@@ -9253,10 +9303,12 @@ sub ___getFWwidget {
       }
       
       if ($ctyp eq 'attr') {
-          my ($sc) = $widget =~ /current='(.*?)'/xs;
-          my ($sr) = $widget =~ /reading='(.*?)'/xs;
-          $widget  =~ s/$sc/$current/ if(defined $sc);
-          $widget  =~ s/$sr/$reading/ if(defined $sr);
+          eval {
+              my ($sc) = $widget =~ /current='(.*?)'/xs;
+              my ($sr) = $widget =~ /reading='(.*?)'/xs;
+              $widget  =~ s/$sc/$current/ if(defined $sc);
+              $widget  =~ s/$sr/$reading/ if(defined $sr);
+          };
       }
       
       if ($arg eq 'textField' || $arg eq 'textField-long') {                              # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
@@ -9268,9 +9320,86 @@ sub ___getFWwidget {
           $widget =~ s/arg='(.*?)'/arg='selectnumbers,$min,$step,$max,0,lin'/xs;    
       }
   }
-  #Log3 ($name, 1, qq{$name - widget: $widget});
   
 return $widget;
+}
+
+################################################################
+#      ownHeader ValueFormat 
+################################################################
+sub ___ghoValForm {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $dev   = $paref->{dev};
+  my $rdg   = $paref->{rdg};
+  my $val   = $paref->{val};
+  my $unit  = $paref->{unit};
+  my $type  = $paref->{type};
+  
+  my $fn = $data{$type}{$name}{func}{ghoValForm};
+  return ($val, $unit) if(!$fn || !$dev || !$rdg || !defined $val);
+
+  my $DEVICE  = $dev;
+  my $READING = $rdg;
+  my $VALUE   = $val;
+  my $UNIT    = $unit;
+  my $err;
+      
+  if (!ref $fn && $fn =~ m/^\{.*\}$/xs) {                                       # normale Funktionen    
+      my $efn = eval $fn;
+    
+      if ($@) {
+          Log3 ($name, 2, "$name - ERROR in execute graphicHeaderOwnspecValForm: ".$@);
+          $err = $@;
+      } 
+      else {
+          if (ref $efn ne 'HASH') {
+              $val  = $VALUE;
+              $unit = $UNIT;
+          }
+          else {
+              $fn = $efn; 
+          }
+      }
+  }
+  
+  if (ref $fn eq 'HASH') {                                                     # Funktionshash
+      my $vf = "";
+      $vf = $fn->{$rdg}             if(exists $fn->{$rdg});
+      $vf = $fn->{"$dev.$rdg"}      if(exists $fn->{"$dev.$rdg"});
+      $vf = $fn->{"$rdg.$val"}      if(exists $fn->{"$rdg.$val"});
+      $vf = $fn->{"$dev.$rdg.$val"} if(exists $fn->{"$dev.$rdg.$val"});
+      $fn = $vf;
+      
+      if ($fn =~ m/^%/xs) {
+          $val = sprintf $fn, $val;
+      } 
+      elsif ($fn ne "") {
+          my $vnew = eval $fn;
+          
+          if ($@) {
+              Log3 ($name, 2, "$name - ERROR in execute graphicHeaderOwnspecValForm: ".$@);
+              $err = $@;
+          } 
+          else {
+              $val = $vnew;
+          }
+      }
+  }
+  
+  if ($val =~ /(-?\d+(\.\d+)?)/xs) {
+      ($val, my $u1) = split /\s+/, $val;                              # Value und Unit trennen
+      $unit          = $u1 ? $u1 : $unit;
+  }
+  
+  if ($err) {
+      $err            = (split "at", $err)[0];
+      $paref->{state} = 'ERROR - graphicHeaderOwnspecValForm: '.$err;
+      singleUpdateState ($paref);
+  }
+
+return ($val, $unit);
 }
 
 ################################################################
@@ -16154,6 +16283,61 @@ to ensure that the system configuration is correct.
        </ul>
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-graphicHeaderOwnspecValForm"></a>
+       <li><b>graphicHeaderOwnspecValForm </b><br>
+         The readings to be displayed with the attribute 
+         <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a> can be manipulated with sprintf and 
+         other Perl operations.  <br>
+         There are two basic notation options that cannot be combined with each other. <br>
+         The notations are always specified within two curly brackets {...}.         
+         <br><br> 
+
+         <b>Notation 1: </b> <br>
+         A simple formatting of readings of your own device with sprintf is carried out as shown in line 
+         'Current_AutarkyRate' or 'Current_GridConsumption'. <br>
+         Other Perl operations are to be bracketed with (). The respective readings values and units are available via
+         the variables $VALUE and $UNIT. <br>
+         Readings of other devices are specified by '&lt;Device&gt;.&lt;Reading&gt;'. 
+         <br><br>
+         
+         <ul>
+         <table>
+         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td>{                                        </td><td>                                               </td></tr>
+            <tr><td> 'Current_AutarkyRate'                   </td><td> => "%.1f %%",                                 </td></tr>
+            <tr><td> 'Current_GridConsumption'               </td><td> => "%.2f $UNIT",                              </td></tr>
+            <tr><td> 'SMA_Energymeter.Cover_RealPower'       </td><td> => q/($VALUE)." W"/,                          </td></tr>
+            <tr><td> 'SMA_Energymeter.L2_Cover_RealPower'    </td><td> => "($VALUE).' W'",                           </td></tr>
+            <tr><td> 'SMA_Energymeter.L1_Cover_RealPower'    </td><td> => '(sprintf "%.2f", ($VALUE / 1000))." kW"', </td></tr>
+            <tr><td>}                                        </td><td>                                               </td></tr>
+         </table>
+         </ul>
+         <br>
+       
+         <b>Notation 2: </b> <br>
+         The manipulation of reading values and units is done via Perl If ... else structures. <br>
+         The device, reading, reading value and unit are available to the structure with the variables $DEVICE, $READING, 
+         $VALUE and $UNIT. <br>
+         If the variables are changed, the new values are transferred to the display accordingly.
+         <br><br>  
+
+         <ul>
+         <table>
+         <colgroup> <col width="5%"> <col width="95%"> </colgroup>
+            <tr><td>{ </td><td>                                                   </td></tr>
+            <tr><td>  </td><td> if ($READING eq 'Current_AutarkyRate') {          </td></tr>
+            <tr><td>  </td><td> &nbsp;&nbsp; $VALUE = sprintf "%.1f", $VALUE;     </td></tr>
+            <tr><td>  </td><td> &nbsp;&nbsp; $UNIT  = "%";                        </td></tr>
+            <tr><td>  </td><td> }                                                 </td></tr>
+            <tr><td>  </td><td> elsif ($READING eq 'Current_GridConsumption') {   </td></tr>
+            <tr><td>  </td><td> &nbsp;&nbsp; ...                                  </td></tr>
+            <tr><td>  </td><td> }                                                 </td></tr>
+            <tr><td>} </td><td>                                                   </td></tr>
+         </table>
+         </ul>               
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-graphicHeaderShow"></a>
        <li><b>graphicHeaderShow </b><br>
@@ -18047,6 +18231,60 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                         </td><td>Debug:ctrlDebug : : :                                                         </td></tr>
          </table>
        </ul>
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicHeaderOwnspecValForm"></a>
+       <li><b>graphicHeaderOwnspecValForm </b><br>
+         Die mit dem Attribut <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a> anzuzeigenden 
+         Readings können mit sprintf und anderen Perl Operationen manipuliert werden. <br>
+         Es stehen zwei grundsätzliche, miteinander nicht kombinierbare Möglichkeiten der Notation zur Verfügung. <br>
+         Die Angabe der Notationen erfolgt grundsätzlich innerhalb von zwei geschweiften Klammern {...}.         
+         <br><br> 
+
+         <b>Notation 1: </b> <br>
+         Eine einfache Formatierung von Readings des eigenen Devices mit sprintf erfolgt wie in Zeile 
+         'Current_AutarkyRate' bzw. 'Current_GridConsumption' angegeben. <br>
+         Andere Perl Operationen sind mit () zu klammern. Die jeweiligen Readingswerte und Einheiten stehen über
+         die Variablen $VALUE und $UNIT zur Verfügung. <br>
+         Readings anderer Devices werden durch die Angabe '&lt;Device&gt;.&lt;Reading&gt;' spezifiziert. 
+         <br><br>
+         
+         <ul>
+         <table>
+         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td>{                                        </td><td>                                               </td></tr>
+            <tr><td> 'Current_AutarkyRate'                   </td><td> => "%.1f %%",                                 </td></tr>
+            <tr><td> 'Current_GridConsumption'               </td><td> => "%.2f $UNIT",                              </td></tr>
+            <tr><td> 'SMA_Energymeter.Cover_RealPower'       </td><td> => q/($VALUE)." W"/,                          </td></tr>
+            <tr><td> 'SMA_Energymeter.L2_Cover_RealPower'    </td><td> => "($VALUE).' W'",                           </td></tr>
+            <tr><td> 'SMA_Energymeter.L1_Cover_RealPower'    </td><td> => '(sprintf "%.2f", ($VALUE / 1000))." kW"', </td></tr>
+            <tr><td>}                                        </td><td>                                               </td></tr>
+         </table>
+         </ul>
+         <br>
+       
+         <b>Notation 2: </b> <br>
+         Die Manipulation von Readingwerten und Einheiten erfolgt über Perl If ... else Strukturen. <br>
+         Der Struktur stehen Device, Reading, Readingwert und Einheit mit den Variablen $DEVICE, $READING, $VALUE und 
+         $UNIT zur Verfügung. <br>
+         Bei Änderung der Variablen werden die neuen Werte entsprechend in die Anzeige übernommen.
+         <br><br>  
+
+         <ul>
+         <table>
+         <colgroup> <col width="5%"> <col width="95%"> </colgroup>
+            <tr><td>{ </td><td>                                                   </td></tr>
+            <tr><td>  </td><td> if ($READING eq 'Current_AutarkyRate') {          </td></tr>
+            <tr><td>  </td><td> &nbsp;&nbsp; $VALUE = sprintf "%.1f", $VALUE;     </td></tr>
+            <tr><td>  </td><td> &nbsp;&nbsp; $UNIT  = "%";                        </td></tr>
+            <tr><td>  </td><td> }                                                 </td></tr>
+            <tr><td>  </td><td> elsif ($READING eq 'Current_GridConsumption') {   </td></tr>
+            <tr><td>  </td><td> &nbsp;&nbsp; ...                                  </td></tr>
+            <tr><td>  </td><td> }                                                 </td></tr>
+            <tr><td>} </td><td>                                                   </td></tr>
+         </table>
+         </ul>               
        </li>
        <br>
 
