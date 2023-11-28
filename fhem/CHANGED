@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 98_CDCOpenData: spezielles Debug-Log bei verbose 5
+                siehe auch commandRef
+ - feature: 98_CDCOpenData: neues Attribut ownRadarFileLog
+                siehe auch commandRef
+ - feature: 98_CDCOpenData: neues  <name> htmlBarAsStateFormat <on|off>
+                siehe auch commandRef
  - bugfix:  73_GardenaSmartBridge: multiple bugfixes,
                 changed published gateway informations
  - feature: 76_SolarForecast: new Attr graphicHeaderOwnspecValForm
