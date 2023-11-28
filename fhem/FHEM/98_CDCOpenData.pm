@@ -7,6 +7,8 @@
 # 
 #  (c) 2023 basic works for getting and decoding data from DWD by F. Ahlers https://forum.fhem.de/index.php?action=profile;u=3346
 #  (c) herrmannj (https://forum.fhem.de/index.php?action=profile;u=769) Original work for cron functions taken from 98_JsonMod.pm
+#  (c) Jamo (https://forum.fhem.de/index.php?msg=1292677) basierend auf den html bars der älteren Module '59_RainTMC.pm' und '59_Buienradar.pm',
+#                                                         und adaptiert für CDCOpenData rain_radar
 # 
 #  The module extracts data for daily rainfall from binary files supplied 
 #  by DWD's (German weather service) open data server. The data are based on rain radar data which 
@@ -52,10 +54,12 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.10f";
+my $ModulVersion = "01.11";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
+sub CDCOpenData_DebugLog($$$$;$);
+sub CDCOpenData_dbgLogInit($@);
 sub CDCOpenData_Initialize($);
 sub CDCOpenData_Readout_Add_Reading ($$$$@);
 sub CDCOpenData_Readout_Process($$);
@@ -74,12 +78,12 @@ my @cmdBuffer=();
 my $cmdBufferTimeout=0;
 
 my %LOG_Text = (
-   0 => "SERVER: ",
-   1 => "EMERGENCY: ",
-   2 => "ERROR: ",
-   3 => "EVENT: ",
-   4 => "INFO: ",
-   5 => "DEBUG: "
+   0 => "SERVER:",
+   1 => "ERROR:",
+   2 => "SIGNIFICANT:",
+   3 => "BASIC:",
+   4 => "EXPANDED:",
+   5 => "DEBUG:"
 ); 
 
 #######################################################################
@@ -104,10 +108,148 @@ sub CDCOpenData_Log($$$)
    $sub ||= 'no-subroutine-specified';
 
    $text = $LOG_Text{$loglevel} . $text;
+   $text = "[$instName | $sub.$xline] - " . $text;
 
-   Log3 $hash, $loglevel, "[$instName | $sub.$xline] - " . $text;
+   if ( $instHash->{helper}{logDebug} ) {
+     CDCOpenData_DebugLog $instHash, $instHash->{helper}{debugLog} . "-%Y-%m.dlog", $loglevel, $text;
+   } else {
+     Log3 $hash, $loglevel, $text;
+   }
 
 } # End CDCOpenData_Log
+
+#######################################################################
+sub CDCOpenData_DebugLog($$$$;$) {
+
+  my ($hash, $filename, $loglevel, $text, $timestamp) = @_;
+  my $name = $hash->{'NAME'};
+  my $tim;
+
+  $loglevel  .= ":" if ($loglevel);
+  $loglevel ||= "";
+
+  my $dirdef = AttrVal('global', 'logdir', $attr{global}{modpath}.'/log/');
+
+  my ($seconds, $microseconds) = gettimeofday();
+  my @t = localtime($seconds);
+  my $nfile = $dirdef . ResolveDateWildcards($filename, @t);
+  my $fh;
+
+  unless ($timestamp) {
+
+    $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d", $t[5] * 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
+
+    if ($attr{global}{mseclog}) {
+      $tim .= sprintf(".%03d", $microseconds / 1000);
+    }
+
+    $tim .= " ";
+    open($fh, '>>', $nfile);
+
+  } elsif ( $timestamp eq "no") {
+
+    $tim = "";
+    open($fh, '>', $nfile);
+
+  } else {
+
+    $tim = $timestamp . " ";
+    open($fh, '>>', $nfile);
+  }
+
+  print $fh "$tim$loglevel$text\n";
+  close $fh;
+
+  return undef;
+
+} # end CDCOpenData__DebugLog
+
+#######################################################################
+sub CDCOpenData_dbgLogInit($@) {
+
+   my ($hash, $cmd, $aName, $aVal) = @_;
+   my $name = $hash->{NAME};
+
+   if ($cmd eq "init" ) {
+     $hash->{DEBUGLOG}             = "OFF";
+     $hash->{helper}{debugLog}     = $name . "_debugLog";
+     $hash->{helper}{logDebug}     = AttrVal($name, "verbose", 0) == 5;
+   }
+
+   return if $aVal && $aVal == -1; 
+
+   my $dirdef     = AttrVal('global', 'logdir', $attr{global}{modpath}.'/log/');
+   my $dbgLogFile = $dirdef . $hash->{helper}{debugLog} . '-%Y-%m.dlog';
+
+   if ($cmd eq "set" || $cmd eq "init") {
+     
+     if($aVal == 5) {
+       my $dMod  = 'defmod ' . $hash->{helper}{debugLog} . ' FileLog ' . $dbgLogFile . ' FakeLog readonly';
+
+       fhem($dMod, 1);
+
+       if (my $dRoom = AttrVal($name, "room", undef)) {
+         $dMod = 'attr -silent ' . $hash->{helper}{debugLog} . ' room ' . $dRoom;
+         fhem($dMod, 1);
+       }
+
+       if (my $dGroup = AttrVal($name, "group", undef)) {
+         $dMod = 'attr -silent ' . $hash->{helper}{debugLog} . ' group ' . $dGroup;
+         fhem($dMod, 1);
+       }
+
+       CDCOpenData_Log $name, 3, "redirection debugLog: $dbgLogFile started";
+
+       $hash->{helper}{logDebug} = 1;
+
+       CDCOpenData_Log $name, 3, "redirection debugLog: $dbgLogFile started";
+
+       my ($seconds, $microseconds) = gettimeofday();
+       my @t = localtime($seconds);
+       my $nfile = ResolveDateWildcards($hash->{helper}{debugLog} . '-%Y-%m.dlog', @t);
+
+       $hash->{DEBUGLOG}      = '<html>'
+                              . '<a href="/fhem/FileLog_logWrapper&amp;dev='
+                              . $hash->{helper}{debugLog}
+                              . '&amp;type=text&amp;file='
+                              . $nfile
+                              . '">DEBUG Log kann hier eingesehen werden</a>'
+                              . '</html>';
+
+     } elsif($aVal < 5 && $hash->{helper}{logDebug}) {
+       fhem("delete " . $hash->{helper}{debugLog}, 1);
+
+       CDCOpenData_Log $name, 3, "redirection debugLog: $hash->{helper}{debugLog} deleted";
+
+       $hash->{helper}{logDebug} = 0;
+       $hash->{DEBUGLOG}         = "OFF";
+
+       CDCOpenData_Log $name, 3, "redirection debugLog: $dbgLogFile stopped";
+
+#       unless (unlink glob($dirdef . $hash->{helper}{debugLog} . '*.dlog')) {
+#         return "Temporary debug file: " . $dirdef . $hash->{helper}{debugLog} . "*.dlog could not be removed: $!";
+#       }
+     }
+   }
+
+   if ($cmd eq "del" ) {
+     fhem("delete " . $hash->{helper}{debugLog}, 1) if $hash->{helper}{logDebug};
+
+     CDCOpenData_Log $name, 3, "redirection debugLog: $hash->{helper}{debugLog} deleted";
+
+     $hash->{helper}{logDebug} = 0;
+     $hash->{DEBUGLOG}         = "OFF";
+
+     CDCOpenData_Log $name, 3, "redirection debugLog: $dbgLogFile stopped";
+
+     unless (unlink glob($dirdef . $hash->{helper}{debugLog} . '*.dlog')) {
+       CDCOpenData_Log $name, 3, "Temporary debug file: " . $dirdef . $hash->{helper}{debugLog} . "*.dlog could not be removed: $!";
+     }
+
+   }
+
+} # end CDCOpenData_dbgLogInit
+
 
 #######################################################################
 sub CDCOpenData_Initialize($)
@@ -134,7 +276,7 @@ sub CDCOpenData_Initialize($)
                     ."enableDWDdata:multiple-strict,rainByDay,rainSinceMidnight,rainRadarbyLocation "
                     ."clearRadarFileLog "
                     ."RainRadarFileLog "
-#                    ."ownRadarFileLog "
+                    ."ownRadarFileLog:0,1 "
                     .$readingFnAttributes;
 
 } # end CDCOpenData_Initialize
@@ -166,7 +308,11 @@ sub CDCOpenData_Define($$)
       $hash->{LOCATION} = $location;
    }
    
-# stop if certain perl moduls are missing
+   # initialize DEGUB Log function
+   CDCOpenData_dbgLogInit($hash, "init", "verbose", AttrVal($name, "verbose", -1));
+   # end initialize DEGUB Log function
+
+   # stop if certain perl moduls are missing
    my $msg;
    if ( $missingModul ) {
       $msg = "ERROR: Cannot define a CDCOpenData device. Perl modul $missingModul is missing.";
@@ -175,14 +321,15 @@ sub CDCOpenData_Define($$)
       return $msg;
    }
 
-   $hash->{NAME}    = $name;
-   $hash->{VERSION} = $ModulVersion;
+   $hash->{NAME}         = $name;
+   $hash->{VERSION}      = $ModulVersion;
 
    $hash->{STATE}        = "Initializing";
    $hash->{INTERVAL}     = 300;
    $hash->{TIMEOUT}      = 55;
    $hash->{TMPDIR}       = "temp_radolan_data_" . $name;
    $hash->{DWDHOST}      = "opendata.dwd.de";
+
    $hash->{fhem}{UPDATE} = 0;
 
    $hash->{helper}{TimerReadout} = $name . ".Readout";
@@ -190,6 +337,7 @@ sub CDCOpenData_Define($$)
    $hash->{helper}{baseTMPDIR}   = "temp_radolan_data_" . $name;
    $hash->{helper}{FhemLog3Std}  = AttrVal($name, "FhemLog3Std", 0);
    $hash->{helper}{CronTime}     = AttrVal($name, "cronTime", 0) ? 1 : 0;
+   $hash->{helper}{rainLog}      = $name . "_rainLog";
 
    eval {File::Path::make_path($hash->{helper}{baseTMPDIR}) };
 
@@ -312,6 +460,22 @@ sub CDCOpenData_Attr($@)
 
    my $hash = $defs{$name};
 
+   if ($aName eq "verbose") {
+     CDCOpenData_dbgLogInit($hash, $cmd, $aName, $aVal) if !$hash->{helper}{FhemLog3Std};
+   }
+   
+   if($aName eq "FhemLog3Std") {
+     if ($cmd eq "set") {
+       return "FhemLog3Std: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
+       return "special debug log ist activated." if $hash->{helper}{logDebug};
+       $hash->{helper}{FhemLog3Std} = $aVal;
+       CDCOpenData_dbgLogInit($hash, "set", "verbose", 5) if AttrVal($name, "verbose", 0) == 5 && $aVal == 0;
+     } else {
+       $hash->{helper}{FhemLog3Std} = 0;
+       CDCOpenData_dbgLogInit($hash, "set", "verbose", 5) if AttrVal($name, "verbose", 0) == 5;
+     }
+   }
+
    if ($cmd eq "set") {
 
      if ($aName eq "INTERVAL") {
@@ -330,26 +494,16 @@ sub CDCOpenData_Attr($@)
        }
      }
 
-     if ($aName eq "numberOfDays") {
-       return "number of days: $aVal for which data is fetched in the past. Default is 5 days." if $aVal !~ /[1-9]|1[0]/;
-       fhem( "deletereading $name .*_day_rain:.*", 1 );
-     }
-
-     if($aName eq "FhemLog3Std") {
-       $hash->{helper}{FhemLog3Std} = $aVal;
-     }
-
      if($aName eq "clearRadarFileLog" && $init_done) {
        return "no FileLog device: $aVal defined." unless defined $defs{$aVal};
      }
    }
 
-   if ($cmd eq "del") {
-     if($aName eq "FhemLog3Std") {
-       $hash->{helper}{FhemLog3Std} = 0;
-     }
-
-     if ($aName eq "numberOfDays") {
+   if ($aName eq "numberOfDays") {
+     if ($cmd eq "set") {
+       return "number of days: $aVal for which data is fetched in the past. Default is 5 days." if $aVal !~ /[1-9]|1[0]/;
+       fhem( "deletereading $name .*_day_rain:.*", 1 );
+     } else {
        fhem( "deletereading $name .*_day_rain:.*", 1 );
      }
    }
@@ -385,7 +539,7 @@ sub CDCOpenData_Attr($@)
        $hash->{helper}{CronTime} = 0;
      }
    }
-   
+
    if ($aName eq "tmpRadolanData") {
 
      return undef if $aVal eq $hash->{TMPDIR};
@@ -483,15 +637,28 @@ sub CDCOpenData_Attr($@)
    }
 
    if ($aName eq "ownRadarFileLog") {
+     my $dirdef   = AttrVal('global', 'logdir', $attr{global}{modpath}.'/log/');
+     my $rLogFile = $dirdef . $hash->{helper}{rainLog} . '.log';
+
      if ($cmd eq "set") {
+       return "ownRadarFileLog: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
 
-     }
+       my $dMod  = 'defmod ' . $hash->{helper}{rainLog} . ' FileLog ' . $rLogFile . ' FakeLog readonly';
 
-     if ($cmd eq "del") {
-       if (my $dLog = AttrVal($name, $aName, undef)) {
-         return "FileLog Device: $dLog not defined." unless defined $defs{$dLog};
-         fhem('delete ' . $dLog, 1);
+       fhem($dMod, 1);
+
+       if (my $dRoom = AttrVal($name, "room", undef)) {
+         $dMod = 'attr -silent ' . $hash->{helper}{rainLog} . ' room ' . $dRoom;
+         fhem($dMod, 1);
        }
+
+       if (my $dGroup = AttrVal($name, "group", undef)) {
+         $dMod = 'attr -silent ' . $hash->{helper}{rainLog} . ' group ' . $dGroup;
+         fhem($dMod, 1);
+       }
+     }
+     if ($cmd eq "del") {
+       fhem("delete " . $hash->{helper}{rainLog});
      }
    } # end ownRadarFileLog
 
@@ -632,7 +799,8 @@ sub CDCOpenData_Set($$@)
    my ($hash, $name, $cmd, @val) = @_;
    my $resultStr = "";
 
-   my $list =  " update:noArg";
+   my $list =  " update:noArg"
+            .  " htmlBarAsStateFormat:on,off";
 
    if ( lc $cmd eq 'update' ) {
       CDCOpenData_Log $hash, 3, "set $name $cmd " . join(" ", @val);
@@ -640,6 +808,17 @@ sub CDCOpenData_Set($$@)
       CDCOpenData_Readout_Start($hash->{helper}{TimerReadout});
       $hash->{fhem}{UPDATE} = 0;
       return undef;
+   }
+
+   elsif ( lc $cmd eq 'htmlbarasstateformat' ) {
+      return "wrong parameter" if int @val != 1 || $val[0] !~ /on|off/;
+      if ($val[0] eq "on") {
+        fhem("attr $name stateFormat {CDCOpenData_radar2html('" . $name . "','Home_rain_radar',0)}");
+      } else {
+        fhem("deleteattr -silent $name stateFormat");
+        $hash->{STATE} = ReadingsVal($name, "state", "");
+      }
+      return 'please save the change in the stateFormat attribute by clicking on “Save config”';
    }
 
    return "Unknown argument $cmd or wrong parameter(s), choose one of $list";
@@ -1065,7 +1244,7 @@ sub CDCOpenData_get_RegenRadar_atLocations($$$$) {
 
            if ($rain_forecast == 2500) {
              $rain_forecast = -1 ;
-             CDCOpenData_Log $name, 3, "Regen Radar: " . $rName . ": error in value";
+             CDCOpenData_Log $name, 4, "Regen Radar: " . $rName . ": error in value";
            } else {
              $rain_forecast *= 0.01;
            }
@@ -1256,9 +1435,9 @@ sub CDCOpenData_Readout_Run_Rain_Since_Midnight ($@) {
 
            # use this handle to unzip the remote file 'on-the-fly':
            if (my $status = gunzip $retr_fh => $tmpDir . $localname, AutoClose => 1) {
-             Log3 $name, 4,  "Rain_Since_Midnight - Loaded new local file $tmpDir$localname: $status";
+             CDCOpenData_Log $name, 4,  "Rain_Since_Midnight - Loaded new local file $tmpDir$localname: $status";
            } else {
-             Log3 $name, 3, "Rain_Since_Midnight - $GunzipError";
+             CDCOpenData_Log $name, 3, "Rain_Since_Midnight - $GunzipError";
            }
          }
 
@@ -1272,7 +1451,7 @@ sub CDCOpenData_Readout_Run_Rain_Since_Midnight ($@) {
          # It is reset to -1 in order to keep the y-axis scale small when plotting.
 
          if ($upMenge == 2500) {
-           CDCOpenData_Log $name, 3, "Rain_Since_Midnight: error in value";
+           CDCOpenData_Log $name, 4, "Rain_Since_Midnight: error in value";
          } else {
            $regenmenge += 0.1 * $upMenge;
          }
@@ -1421,9 +1600,9 @@ sub CDCOpenData_Readout_Run_getRain($@)
 
      # use this handle to unzip the remote file 'on-the-fly':
      if (my $status = gunzip $retr_fh => $tmpDir . $localname, AutoClose => 1) {
-       Log3 $name, 4,  "getRain - Loaded new local file $tmpDir$localname: $status";
+       CDCOpenData_Log $name, 4,  "getRain - Loaded new local file $tmpDir$localname: $status";
      } else {
-       Log3 $name, 3, "getRain - $GunzipError";
+       CDCOpenData_Log $name, 3, "getRain - $GunzipError";
      }
 
      # close ftp session:
@@ -1479,7 +1658,7 @@ sub CDCOpenData_Readout_Run_getRain($@)
      # It is reset to -1 in order to keep the y-axis scale small when plotting.
      if ($regenmenge == 2500) {
        $regenmenge = -1 ;
-       CDCOpenData_Log $name, 3, "day rain: " . $tmpDir . $localname . ": error in rain value";
+       CDCOpenData_Log $name, 4, "day rain: " . $tmpDir . $localname . ": error in rain value";
      } else {
        $regenmenge *= 0.1;
      }
@@ -1557,6 +1736,11 @@ sub CDCOpenData_Readout_Process($$)
    my $counter = 0;
    my $offset  = 0;
    my $dayRainCnt = 0;
+   my $ownRadarFLog = AttrVal($name, "ownRadarFileLog", 0);
+   my $dirdef   = AttrVal('global', 'logdir', $attr{global}{modpath}.'/log/');
+   my $rLogFile = $dirdef . $hash->{helper}{rainLog} . '.log';
+
+   my $textRadarLog = "";
 
    readingsBeginUpdate($hash);
 
@@ -1575,6 +1759,7 @@ sub CDCOpenData_Readout_Process($$)
          if (exists $hash->{READINGS}{$_}{VAL}) {
            delete $hash->{READINGS}{$_};
            CDCOpenData_Log $hash, 4, "delete old readings: $_";
+#           unlink $rLogFile if $ownRadarFLog;
          }
        }
      }
@@ -1638,6 +1823,13 @@ sub CDCOpenData_Readout_Process($$)
            $newName .= "/" . substr("00" . $counter, -2);
            $newName =~ s/://;
            readingsBulkUpdate($hash, $newName, $rValue, undef, $TS);
+
+           my $text = $newName;
+           $text =~ s/\/\d+//;
+           $TS =~ s/ /_/;
+           
+           $textRadarLog .= $TS . " " . $name . " " . $text. ": " . $rValue . "\n";
+
            $offset += 5;
 
          }
@@ -1659,6 +1851,8 @@ sub CDCOpenData_Readout_Process($$)
           }
        }
      }
+
+     CDCOpenData_DebugLog($hash, $hash->{helper}{rainLog} . '.log', undef, $textRadarLog, "no") if $ownRadarFLog;
 
      my $msg = keys( %values ) . " values captured in " . $values{readoutTime} . " s";
      readingsBulkUpdate( $hash, "retStat_lastReadout", $msg );
@@ -2048,54 +2242,13 @@ sub CDCOpenData_DoTimer {
 
 } # end CDCOpenData_DoTimer
 
-# 
 ############################################
-sub CDCOpenData_RainRadar_Log($$$$;$) {
-
-  my ($hash, $filename, $loglevel, $text, $timestamp) = @_;
-  my $name = $hash->{'NAME'};
-  my $tim;
-
-  $loglevel .= ":" if ($loglevel);
-  $loglevel ||= "";
-
-#  return if ( $loglevel > AttrVal($name, "verbose", AttrVal("global", "verbose", 3)) );
-
-  my $dirdef = AttrVal('global', 'logdir', $attr{global}{modpath}.'/log/');
-
-  my ($seconds, $microseconds) = gettimeofday();
-  my @t = localtime($seconds);
-  my $nfile = $dirdef . ResolveDateWildcards($filename, @t);
-
-  unless ($timestamp) {
-
-#    CDCOpenData_Log $hash, 3, "rainDataLog: " . $nfile;
-
-    $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d", $t[5] * 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
-
-    if ($attr{global}{mseclog}) {
-      $tim .= sprintf(".%03d", $microseconds / 1000);
-    }
-  } else {
-    $tim = $timestamp;
-  }
-
-  open(my $fh, '>>', $nfile);
-  print $fh "$tim $loglevel$text\n";
-  close $fh;
-
-  return undef;
-
-} # end CDCOpenData__RainRadar_Log
-
-
-###############################
 # Unterverzeichnisse erstellen
 # Parameter
 # Directory ... z.B. ../test/test1/test2
 # Rechte im oktalen Format
 # http://www.hidemail.de/blog/mkdir-perl.shtml
-#######################################
+############################################
 sub CDCOpenData_mk_subdirs{
    my $dir    = shift;
    my $rights = shift;
@@ -2119,6 +2272,93 @@ sub CDCOpenData_mk_subdirs{
    return 1;                            # OK, alles ging gut!!!
 
 } # end CDCOpenData_mk_subdirs
+
+############################################
+# This is for htmlCode {radar2html('CDC','loc0_rain_radar')} Niederschlagsvorhersage (CDCOpenData)
+# to create a HTML bar table with raincolors for the radarvalues
+sub CDCOpenData_radar2html {
+
+  my $name           = shift // 'CDC';                # return "Error, sub color2html: we need name as parameter!";
+  my $reading        = shift // 'loc0_rain_radar';    # return "Error, sub color2html: we need reading as parameter!";
+  my $headline       = shift // 1;
+
+  my $as_htmlBarhead = '<tr style="font-size:x-small">';
+  my $as_htmlTitel   = '';
+  my $as_htmlBar     = '';
+  my $count          = 1;
+  my $num            = 25;
+  my $i2;
+
+  for (my $i = 0; $i < $num; $i++) {
+    if ($i <= 9) {
+      $i2 = '0'.$i
+    } else { 
+      $i2 = $i
+    }
+    my $radarvalue = ReadingsNum ($name,$reading.'/'.$i2,'-1');
+    my $timestamp  = substr(ReadingsTimestamp($name,$reading.'/'.$i2,'2000-01-01 00:00:00'),11,5);
+    my $color      = CDCOpenData_myColor2RGB($radarvalue);
+
+    #Log 3, "[radar2html] i2=$i2, radarvalue=$radarvalue, color=$color, count=$count, timestamp=$timestamp"; #starttime=$starttime,
+
+    if ($count > 1) {
+      if ( ( ($count+2) % 4 ) == 0 || $i == 24) {
+        $as_htmlBarhead .= '<td style="padding-left: 0; padding-right: 0">' . $timestamp . '</td>';
+      } else {
+        $as_htmlBarhead .= '<td style="padding-left: 0; padding-right: 0">&nbsp;&nbsp;&nbsp;&nbsp;</td>';
+      }
+      $as_htmlBar .= '<td style="padding-left: 0; padding-right: 0" bgcolor="' . $color . '">&nbsp;&nbsp;&nbsp;</td>';
+    }
+    $count++;
+  }
+
+  my $location  = '<b>' . AttrVal($name,'alias','MeineLocation') . '</b>'; # "<font color='red'>" . $body. "</font>"
+
+  $as_htmlTitel = "Niederschlagsvorhersage f&uuml;r $location (<a href=./fhem?detail=$name>$name</a>)<br>" if $headline;
+  $as_htmlBar = $as_htmlTitel . "<table>" . $as_htmlBarhead . "</tr><tr style='border:2pt solid black'>" . $as_htmlBar . '</tr></table>';
+
+  return $as_htmlBar;
+
+} # end CDCOpenData_radar2html
+
+
+############################################
+sub CDCOpenData_myColor2RGB {
+
+  my $value = shift // return "Error, sub CDCOpenData_myColor2RGB: we need value as parameter!";
+  my $a     = $value*4;
+  my $b     = ($value-int($value))*2;
+  my $RGB1  = CDCOpenData_myCalcColor($a);
+  my $RGB2  = CDCOpenData_myCalcColor($b);
+  return $RGB1.$RGB2.$RGB1.$RGB2.'FF';
+
+} # end CDCOpenData_myColor2RGB
+
+############################################
+sub CDCOpenData_myCalcColor {
+
+  my $a = shift // return "Error, sub CDCOpenData_myCalcColor: we need a as parameter!";
+  if    ($a == 0)      {return 'F'} #transparent
+  elsif ($a <= 0.0625) {return 'E'} #transparent
+  elsif ($a <= 0.125)  {return 'D'}
+  elsif ($a <= 0.1875) {return 'C'}
+  elsif ($a <= 0.25)   {return 'B'}
+  elsif ($a <= 0.3125) {return 'A'}
+  elsif ($a <= 0.375)  {return '9'}
+  elsif ($a <= 0.4375) {return '8'}
+  elsif ($a <= 0.5)    {return '7'}
+  elsif ($a <= 0.5625) {return '6'}
+  elsif ($a <= 0.625)  {return '5'}
+  elsif ($a <= 0.6875) {return '4'}
+  elsif ($a <= 0.75)   {return '3'}
+  elsif ($a <= 0.8125) {return '2'}
+  elsif ($a <= 0.875)  {return '1'}
+  elsif ($a <= 0.9375) {return '0'}
+  else                 {return '0'}
+
+} # end CDCOpenData_myCalcColor
+
+###############################################################################
 
 1;
 
@@ -2155,17 +2395,27 @@ sub CDCOpenData_mk_subdirs{
    <a name="CDCOpenDataset"></a>
    <b>Set</b>
    <ul>
+
       <li><a name="update"></a>
          <dt><code>set &lt;name&gt; update</code></dt>
          <br>
          Starts an update of the data.
       </li><br>
+
+      <li><a name="htmlBarAsStateFormat"></a>
+         <dt><code>set &lt;name&gt; htmlBarAsStateFormat &lt;on|off&gt;</code></dt>
+         <br>
+         Defines an HTML bar to display the rain radar in the stateFormat attribute.<br>
+         In order to persist the change, it must be saved by clicking on 'Save config'.<br>
+         The generation function can also be used to define a weblink device.
+         <dt><code>defmod &lt;barName&gt; weblink htmlCode {CDCOpenData_radar2html('&lt;nameCDCDevice&gt;', '&lt;readingName_rain_radar&gt;')}</code></dt>
+      </li><br>
+
    </ul>
 
    <a name="CDCOpenDataget"></a>
    <b>Get</b>
    <ul>
-      <br>
 
       <li><a name="rainbyLatLongDate"></a>
          <dt><code>get &lt;name&gt; rainbyLatLongDate [latitude,longitude] [date]</code></dt>
@@ -2199,24 +2449,42 @@ sub CDCOpenData_mk_subdirs{
          If the attribut cronTime is set, INTERVAL will be deactivated.
       </li><br>
 
+      <li><a name="verbose"></a>
+        <dt><code>attr &lt;name&gt; verbose &lt;0 .. 5&gt;</code></dt>
+        If verbose is set to the value 5, all log data will be saved in its own log file.<br>
+        Log file name:deviceName_debugLog.dlog<br>
+        In the INTERNAL Reading DEBUGLOG there is a link &lt;DEBUG log can be viewed here&gt;<br>
+        for direct viewing of the log.<br>
+        Furthermore, a FileLog device:deviceName_debugLog is created in the same room and the same group as the CDCOpenData device.<br>
+        If verbose is set to less than 5, the FileLog device is deleted and the log file is retained.
+        If verbose is deleted, the FileLog device and the log file are deleted.
+      </li><br>
+
       <li><a name="clearRadarFileLog"></a>
         <dt><code>attr &lt;name&gt; clearRadarFileLog &ltname of FileLog device&gt;</code></dt>
         If set, the FileLog of the FileLog Device will be emptied when the Regen Radar is updated.<br>
         Only makes sense for FileLogs that use the Regen Radar data for a graphic.<br>
-      </li>
+      </li><br>
 
       <li><a name="RainRadarFileLog"></a>
         <dt><code>attr &lt;name&gt; RainRadarFileLog &ltname of FileLog device&gt;</code></dt>
         If set, a FileLog device will be created.<br>
         The FileLog of the FileLog Device will be emptied when the Regen Radar is updated.<br>
         Only makes sense for FileLogs that use the Regen Radar data for a graphic.<br>
-      </li>
+      </li><br>
+
+      <li><a name="ownRadarFileLog"></a>
+        <dt><code>attr &lt;name&gt; ownRadarFileLog &lt0 | 1&gt;</code></dt>
+        If set, a log file: deviceName_rainLog.log will be generated directly via the module.<br>
+        The log file always only contains the current values.<br>
+        Additionally, a FileLog device with the name deviceName_rainLog is created in the same room and the same group.<br>
+      </li><br>
 
       <li><a name="cronTime"></a>
         <dt><code>attr &lt;name&gt; cronTime &lt;* * * * *&gt;</code></dt>
         CRON Expression. If set, then execution is controlled via the CRON expression.<br>
         Default is one hour. 			
-      </li>
+      </li><br>
 
       <li><a name="enableDWDdata"></a>
          <dt><code>attr &lt;name&gt; enableDWDdata &lt;rainByDay, rainSinceMidnight, rainRadarbyLocation&gt;</code></dt>
@@ -2295,17 +2563,27 @@ sub CDCOpenData_mk_subdirs{
    <a name="CDCOpenDataset"></a>
    <b>Set</b>
    <ul>
+
       <li><a name="update"></a>
          <dt><code>set &lt;name&gt; update</code></dt>
          <br>
          Startet eine Aktualisierung der Daten.
       </li><br>
+
+      <li><a name="htmlBarAsStateFormat"></a>
+         <dt><code>set &lt;name&gt; htmlBarAsStateFormat &lt;on|off&gt;</code></dt>
+         <br>
+         Definiert eine HTML Bar zur Anzeige des Regen Radars im Attribut stateFormat.<br>
+         Um die Änderung zu persistieren muss sie durch klicken auf 'Save config' gesichert werden.<br>
+         Die Funktion zur Generierung kann auch für die Defintion eines weblink Device genutzt werden.
+         <dt><code>defmod &lt;barName&gt; weblink htmlCode {CDCOpenData_radar2html('&lt;nameCDCDevice&gt;', '&lt;readingName_rain_radar&gt;')}</code></dt>
+      </li><br>
+
    </ul>
 
    <a name="CDCOpenDataget"></a>
    <b>Get</b>
    <ul>
-      <br>
 
       <li><a name="rainbyLatLongDate"></a>
          <dt><code>get &lt;name&gt; rainbyLatLongDate [latitude,longitude] [date]</code></dt>
@@ -2339,24 +2617,42 @@ sub CDCOpenData_mk_subdirs{
          Wird das Attribut cronTime gesetzt, dann ist INTERVAL deaktiviert.
       </li><br>
 
+      <li><a name="verbose"></a>
+        <dt><code>attr &lt;name&gt; verbose &lt;0 .. 5&gt;</code></dt>
+        Wird verbose auf den Wert 5 gesetzt, so werden alle Log-Daten in eine eigene Log-Datei geschrieben.<br>
+        Name der Log-Datei:deviceName_debugLog.dlog<br>
+        Im INTERNAL Reading DEBUGLOG wird ein Link &lt;DEBUG Log kann hier eingesehen werden&gt;<br>
+        zur direkten Ansicht des Logs angezeigt.<br>
+        Weiterhin wird ein FileLog Device:deviceName_debugLog im selben Raum und der selben Gruppe wie das CDCOpenData Device erzeugt.<br>
+        Wird verbose auf kleiner 5 gesetzt, so wird das FileLog Device gelöscht, die Log-Datei bleibt erhalten.
+        Wird verbose gelöscht, so werden das FileLog Device und die Log-Datei gelöscht.
+      </li><br>
+
       <li><a name="clearRadarFileLog"></a>
         <dt><code>attr &lt;name&gt; clearRadarFileLog &ltname of FileLog device&gt;</code></dt>
         Wenn gesetzt wird das FileLog des FileLog Device bei einem Update Regen Radar geleert.<br>
         Macht nur Sinn für FileLogs, die die Daten des Regen Radars für eine Grafik verwenden.<br>
-      </li>
+      </li><br>
 
       <li><a name="RainRadarFileLog"></a>
         <dt><code>attr &lt;name&gt; RainRadarFileLog &ltname of FileLog device&gt;</code></dt>
         Wenn gesetzt, wird ein FileLog Device angelegt.<br>
         Das FileLog des FileLog Device wird bei jedem Update Regen Radar geleert.<br>
         Macht nur Sinn für FileLogs, die die Daten des Regen Radars für eine Grafik verwenden.<br>
-      </li>
+      </li><br>
+
+      <li><a name="ownRadarFileLog"></a>
+        <dt><code>attr &lt;name&gt; ownRadarFileLog &lt0 | 1&gt;</code></dt>
+        Wenn gesetzt, wird eine Log Datei: deviceName_rainLog.log direkt über das Modul erzeugt.<br>
+        Die Log Datei beinhaltet immer nur die aktuellen Werte.<br>
+        Zusätzlich wird ein FileLog Device mit dem Namen deviceName_rainLog im selben Raum und der selben Gruppe erzeugt.<br>
+      </li><br>
 
       <li><a name="cronTime"></a>
         <dt><code>attr &lt;name&gt; cronTime &lt;* * * * *&gt;</code></dt>
         CRON Regel. Wenn gesetzt, dann wird die Ausführung über diese Regel gesteuert.<br>
         Standard ist jede Stunde. 			
-      </li>
+      </li><br>
 
       <li><a name="enableDWDdata"></a>
          <dt><code>attr &lt;name&gt; enableDWDdata &lt;rainByDay, rainSinceMidnight, rainRadarbyLocation&gt;</code></dt>
