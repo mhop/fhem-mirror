@@ -43,6 +43,8 @@ my %hueModels = (
                                                  gamut => 'C',                      icon => 'hue_filled_white_and_color_e27_b22', },
   LCT024 => {name => 'Hue Play'                 ,type => 'Extended color light'    ,subType => 'extcolordimmer',
                                                  gamut => 'C',                      icon => 'hue_filled_play', },
+  LCX016 => {name => 'Festavia string lights'   ,type => 'Extended color light'    ,subType => 'extcolordimmer',
+                                                 gamut => 'C',                      icon => 'hue2023_string_light', },
   LLC001 => {name => 'Living Colors G2'         ,type => 'Color light'             ,subType => 'colordimmer',
                                                  gamut => 'A',                      icon => 'hue_filled_iris', },
   LLC005 => {name => 'Living Colors Bloom'      ,type => 'Color light'             ,subType => 'colordimmer',
