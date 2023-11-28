@@ -144,8 +144,9 @@ sub RPI_1Wire_Init {				#
 			$hash->{helper}{write}.="resolution ";
 		}
 	}
-	if ($type eq "switch") {
+	if ($type =~ /switch/) {
 		if (-e "$w1_path/$arg/output" && !-w "$w1_path/$arg/output") {
+		#if (-e "/opt/fhem/output" && !-w "/opt/fhem/output") {
 			$hash->{helper}{write}.="output "; 
 		}
 	}
@@ -452,7 +453,7 @@ sub RPI_1Wire_Get {
 		$script .= "chown -R root:gpio /sys/devices/w1*;\\\n";
 		$script .= "chmod g+w /sys/devices/w1_bus_master*/therm_bulk_read;\\\n";
 		$script .= "chmod g+w /sys/devices/w1_bus_master*/*/resolution;\\\n";
-		$script .= "chmod g+w /sys/devices/w1_bus_master*/*/conv_time;\\ \'\"\n";
+		$script .= "chmod g+w /sys/devices/w1_bus_master*/*/conv_time;\\\n";
 		$script .= "chmod g+w /sys/devices/w1_bus_master*/*/output;\\ \'\"\n";
 		
 		return $ret.$script;
@@ -803,17 +804,17 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/RPI_1Wire">Wiki<
 		<li><b>set pioa on|off &ltduration&gt</b><br>
 		<a id="RPI_1Wire-set-pioa"></a>
 		Sets the pioa of a 2 port switch to on or off.<br>
-		The optional duration switches the pio back after a given number of seconds. The alternative options "on-for-timer" and "off-for-timer" work identically and are only provided to find this functionality more easily.
+		The optional duration switches the pio back after a given number of seconds when using "on-for-timer" or "off-for-timer"
 		</li>
 		<li><b>set piob on|off &ltduration&gt</b><br>
 		<a id="RPI_1Wire-set-piob"></a>
 		Sets the piob of a 2 port switch to on or off.<br>
-		The optional duration switches the pio back after a given number of seconds. The alternative options "on-for-timer" and "off-for-timer" work identically and are only provided to find this functionality more easily.
+		The optional duration switches the pio back after a given number of seconds when using "on-for-timer" or "off-for-timer"
 		</li>
 		<li><b>set pio(0-7) on|off &ltduration&gt</b><br>
 		<a id="RPI_1Wire-set-pio0"></a>
 		Sets the according pio of a 8 port switch (0-7) to on or off.<br>
-		The optional duration switches the pio back after a given number of seconds. The alternative options "on-for-timer" and "off-for-timer" work identically and are only provided to find this functionality more easily.
+		The optional duration switches the pio back after a given number of seconds when using "on-for-timer" or "off-for-timer"
 		</li>
 	</ul>
 
