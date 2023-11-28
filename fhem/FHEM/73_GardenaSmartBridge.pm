@@ -75,9 +75,9 @@ eval { use IO::Socket::SSL; 1 }
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
 eval {
-    require JSON::MaybeXS;
-    import JSON::MaybeXS qw( decode_json encode_json );
-    1;
+  require JSON::MaybeXS;
+  import JSON::MaybeXS qw( decode_json encode_json );
+  1;
 } or do {
 
     # try to use JSON wrapper
@@ -166,7 +166,7 @@ BEGIN {
 GP_Export(
     qw(
       Initialize
-      )
+    )
 );
 
 sub Initialize {
@@ -437,12 +437,14 @@ sub Set {
 
         DeletePassword($hash);
     }
-    elsif ( lc $cmd eq 'debughelper') {
-      return "usage: $cmd" if ( scalar( @{$aArg} ) != 2 );
-      my $new_helper = $aArg->[0];
-      my $new_helper_value = $aArg->[1];
-      Log3( $name, 5, "[DEBUG] - GardenaSmartBridge ($name) - override helper $new_helper with $new_helper_value");
-      $hash->{helper}{$new_helper} = $new_helper_value;
+    elsif ( lc $cmd eq 'debughelper' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) != 2 );
+        my $new_helper       = $aArg->[0];
+        my $new_helper_value = $aArg->[1];
+        Log3( $name, 5,
+"[DEBUG] - GardenaSmartBridge ($name) - override helper $new_helper with $new_helper_value"
+        );
+        $hash->{helper}{$new_helper} = $new_helper_value;
     }
     else {
 
@@ -488,8 +490,8 @@ sub Write {
 "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: secret!, DATA: secret!, METHOD: $method"
     );
 
-  # Log3($name, 3,
-  #     "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: $header, DATA: $payload, METHOD: $method");
+# Log3($name, 3,
+#     "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: $header, DATA: $payload, METHOD: $method");
 
     return;
 }
@@ -611,8 +613,7 @@ sub ErrorHandling {
     }
 
     if (
-        $data =~ /Error/
-        && $data !~ /lastLonaErrorCode/
+        $data =~ /Error/ && $data !~ /lastLonaErrorCode/
         || (   defined($decode_json)
             && ref($decode_json) eq 'HASH'
             && defined( $decode_json->{errors} ) )
@@ -627,26 +628,32 @@ sub ErrorHandling {
         if ( $param->{code} == 400 ) {
             if ($decode_json) {
                 if ( ref( $decode_json->{errors} ) eq "ARRAY"
-                    && defined( $decode_json->{errors} ) )
+                    && exists( $decode_json->{errors} ) )
+                    # replace defined with exists
+                    # && defined( $decode_json->{errors} ) )
                 {
-                    readingsBulkUpdate(
+                    # $decode_json->{errors} -> ARRAY
+                    # $decode_json->{errors}[0] -> HASH
+                    if (exists ($decode_json->{errors}[0]{error}) ) {
+                      readingsBulkUpdate(
                         $dhash,
                         "state",
                         $decode_json->{errors}[0]{error} . ' '
                           . $decode_json->{errors}[0]{attribute},
                         1
-                    );
-                    readingsBulkUpdate(
-                        $dhash,
-                        "lastRequestState",
-                        $decode_json->{errors}[0]{error} . ' '
-                          . $decode_json->{errors}[0]{attribute},
-                        1
-                    );
-                    Log3 $dname, 5,
-                        "GardenaSmartBridge ($dname) - RequestERROR: "
-                      . $decode_json->{errors}[0]{error} . " "
-                      . $decode_json->{errors}[0]{attribute};
+                      );
+                      readingsBulkUpdate(
+                          $dhash,
+                          "lastRequestState",
+                          $decode_json->{errors}[0]{error} . ' '
+                            . $decode_json->{errors}[0]{attribute},
+                          1
+                      );
+                      Log3 $dname, 5,
+                          "GardenaSmartBridge ($dname) - RequestERROR: "
+                        . $decode_json->{errors}[0]{error} . " "
+                        . $decode_json->{errors}[0]{attribute};
+                  } # fi exists error
                 }
             }
             else {
@@ -737,7 +744,7 @@ sub ErrorHandling {
         my $i = 0;
         for my $dev_settings ( @{ $devJson->{settings} } ) {
             $output .= "[" . $i++ . "]id: $dev_settings->{id} \n";
-            $output .= "name: $dev_settings->{name} ";
+            $output .= "name: $dev_settings->{name} \n";
             if (   ref( $dev_settings->{value} ) eq 'ARRAY'
                 || ref( $dev_settings->{value} ) eq 'HASH' )
             {
@@ -753,16 +760,7 @@ sub ErrorHandling {
 
         for my $dev_settings ( @{ $devJson->{abilities} } ) {
             $output .= "[" . $i++ . "]id: $dev_settings->{id} \n";
-            $output .= "name: $dev_settings->{name} ";
-
-            if (   ref( $dev_settings->{value} ) eq 'ARRAY'
-                || ref( $dev_settings->{value} ) eq 'HASH' )
-            {
-                $output .= 'N/A \n';
-            }
-            else {
-                $output .= "value: $dev_settings->{value} \n";
-            }
+            $output .= "name: $dev_settings->{name} \n";
         }
 
         $hash->{helper}{debug_device_output} = $output;
@@ -1078,36 +1076,16 @@ sub WriteReadings {
                         )
                         && ref($v) eq 'HASH'
                       )
-                    {
-                        if ( $decode_json->{abilities}[0]{properties}
-                            [$properties]{name} eq 'ethernet_status' )
-                        {
-                            readingsBulkUpdateIfChanged( $hash,
-                                'ethernet_status-mac', $v->{mac} );
-                            readingsBulkUpdateIfChanged( $hash,
-                                'ethernet_status-ip', $v->{ip} )
-                              if ( ref( $v->{ip} ) ne 'HASH' );
-                            readingsBulkUpdateIfChanged( $hash,
-                                'ethernet_status-isconnected',
-                                $v->{isConnected} );
+                      {
+                        if ($v->{is_connected} ) {
+                          readingsBulkUpdateIfChanged( $hash,
+                            $decode_json->{abilities}[0]{properties}[$properties]{name}.'-ip', $v->{ip} )
+                            if ( ref( $v->{ip} ) ne 'HASH' );
+                          readingsBulkUpdateIfChanged( $hash,
+                            $decode_json->{abilities}[0]{properties}[$properties]{name}.'-isconnected', $v->{is_connected} )
+                            if ( $v->{is_connected} );
                         }
-                        elsif ( $decode_json->{abilities}[0]{properties}
-                            [$properties]{name} eq 'wifi_status' )
-                        {
-                            readingsBulkUpdateIfChanged( $hash,
-                                'wifi_status-ssid', $v->{ssid} )
-                              if ( ref( $v->{ssid} ) ne 'HASH' );
-                            readingsBulkUpdateIfChanged( $hash,
-                                'wifi_status-mac', $v->{mac} );
-                            readingsBulkUpdateIfChanged( $hash,
-                                'wifi_status-ip', $v->{ip} )
-                              if ( ref( $v->{ip} ) ne 'HASH' );
-                            readingsBulkUpdateIfChanged( $hash,
-                                'wifi_status-isconnected', $v->{isConnected} );
-                            readingsBulkUpdateIfChanged( $hash,
-                                'wifi_status-signal', $v->{signal} );
-                        }
-                    }
+                      } # fi ethernet and wifi
                 }
                 $properties--;
 
@@ -1583,7 +1561,7 @@ sub DeletePassword {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.5.2",
+  "version": "v2.6.1",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
