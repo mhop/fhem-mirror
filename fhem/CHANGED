@@ -1,5 +1,15 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 72_FRITZBOX: neue set <name> 
+       energyMode <default|eco>
+       ledSetting <led:on|off> und/oder <bright:1..3> und/oder <env:on|off>
+       energyMode <default|eco>
+ - feature: 72_FRITZBOX: neue get <name> luaInfo ledSettings, globalFilters
+ - feature: 72_FRITZBOX: neu attr <name> FhemLog3Std <0 | 1>
+                         neu attr <name> enableBoxReadings <liste>
+ - feature: 72_FRITZBOX: spezielles Log bei attr <name> verbose 5
+                siehe auch commandRef 
+ - feature: 98_CDCOpenData: commandRef für attr <name> FhemLog3Std <0 | 1>
  - feature: 98_CDCOpenData: spezielles Debug-Log bei verbose 5
                 siehe auch commandRef
  - feature: 98_CDCOpenData: neues Attribut ownRadarFileLog
