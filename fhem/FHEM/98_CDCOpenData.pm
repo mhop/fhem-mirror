@@ -54,7 +54,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.11";
+my $ModulVersion = "01.12";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
@@ -467,9 +467,12 @@ sub CDCOpenData_Attr($@)
    if($aName eq "FhemLog3Std") {
      if ($cmd eq "set") {
        return "FhemLog3Std: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
-       return "special debug log ist activated." if $hash->{helper}{logDebug};
        $hash->{helper}{FhemLog3Std} = $aVal;
-       CDCOpenData_dbgLogInit($hash, "set", "verbose", 5) if AttrVal($name, "verbose", 0) == 5 && $aVal == 0;
+       if ($aVal) {
+         CDCOpenData_dbgLogInit($hash, "del", "verbose", 0) if AttrVal($name, "verbose", 0) == 5;
+       } else {
+         CDCOpenData_dbgLogInit($hash, "set", "verbose", 5) if AttrVal($name, "verbose", 0) == 5 && $aVal == 0;
+       }
      } else {
        $hash->{helper}{FhemLog3Std} = 0;
        CDCOpenData_dbgLogInit($hash, "set", "verbose", 5) if AttrVal($name, "verbose", 0) == 5;
@@ -2453,11 +2456,20 @@ sub CDCOpenData_myCalcColor {
         <dt><code>attr &lt;name&gt; verbose &lt;0 .. 5&gt;</code></dt>
         If verbose is set to the value 5, all log data will be saved in its own log file.<br>
         Log file name:deviceName_debugLog.dlog<br>
-        In the INTERNAL Reading DEBUGLOG there is a link &lt;DEBUG log can be viewed here&gt;<br>
-        for direct viewing of the log.<br>
+        In the INTERNAL Reading DEBUGLOG there is a link &lt;DEBUG log can be viewed here&gt; for direct viewing of the log.<br>
         Furthermore, a FileLog device:deviceName_debugLog is created in the same room and the same group as the CDCOpenData device.<br>
         If verbose is set to less than 5, the FileLog device is deleted and the log file is retained.
         If verbose is deleted, the FileLog device and the log file are deleted.
+      </li><br>
+
+      <li><a name="FhemLog3Std"></a>
+        <dt><code>attr &lt;name&gt; FhemLog3Std &lt0 | 1&gt;</code></dt>
+        If set, the log information will be written in standard Fhem format.<br>
+        If the output to a separate log file was activated by a verbose 5, this will be ended.<br>
+        The separate log file and the associated FileLog device are deleted.<br>
+        If the attribute is set to 0 or deleted and the device verbose is set to 5, all log data will be written to a separate log file.<br>
+        Log file name: deviceName_debugLog.dlog<br>
+        In the INTERNAL Reading DEBUGLOG there is a link &lt;DEBUG log can be viewed here&gt; for direct viewing of the log.<br>
       </li><br>
 
       <li><a name="clearRadarFileLog"></a>
@@ -2621,11 +2633,20 @@ sub CDCOpenData_myCalcColor {
         <dt><code>attr &lt;name&gt; verbose &lt;0 .. 5&gt;</code></dt>
         Wird verbose auf den Wert 5 gesetzt, so werden alle Log-Daten in eine eigene Log-Datei geschrieben.<br>
         Name der Log-Datei:deviceName_debugLog.dlog<br>
-        Im INTERNAL Reading DEBUGLOG wird ein Link &lt;DEBUG Log kann hier eingesehen werden&gt;<br>
-        zur direkten Ansicht des Logs angezeigt.<br>
+        Im INTERNAL Reading DEBUGLOG wird ein Link &lt;DEBUG Log kann hier eingesehen werden&gt; zur direkten Ansicht des Logs angezeigt.<br>
         Weiterhin wird ein FileLog Device:deviceName_debugLog im selben Raum und der selben Gruppe wie das CDCOpenData Device erzeugt.<br>
         Wird verbose auf kleiner 5 gesetzt, so wird das FileLog Device gelöscht, die Log-Datei bleibt erhalten.
         Wird verbose gelöscht, so werden das FileLog Device und die Log-Datei gelöscht.
+      </li><br>
+
+      <li><a name="FhemLog3Std"></a>
+        <dt><code>attr &lt;name&gt; FhemLog3Std &lt0 | 1&gt;</code></dt>
+        Wenn gesetzt, werden die Log Informationen im Standard Fhem Format geschrieben.<br>
+        Sofern durch ein verbose 5 die Ausgabe in eine seperate Log-Datei aktiviert wurde, wird diese beendet.<br>
+        Die seperate Log-Datei und das zugehörige FileLog Device werden gelöscht.<br>
+        Wird das Attribut auf 0 gesetzt oder gelöscht und ist das Device verbose auf 5 gesetzt, so werden alle Log-Daten in eine eigene Log-Datei geschrieben.<br>
+        Name der Log-Datei:deviceName_debugLog.dlog<br>
+        Im INTERNAL Reading DEBUGLOG wird ein Link &lt;DEBUG Log kann hier eingesehen werden&gt; zur direkten Ansicht des Logs angezeigt.<br>
       </li><br>
 
       <li><a name="clearRadarFileLog"></a>
