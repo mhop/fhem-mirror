@@ -3612,7 +3612,9 @@ FW_widgetFallbackFn()
   # noArg is needed for fhem.cfg.demo / Cinema
   return "" if(!$values || $values eq "noArg");
 
-  my($reading) = split( ' ', $cmd, 2 );
+  ($cmd, my $reading) = split( ' ', $cmd, 2 );
+  $reading = $cmd if(!defined($reading));
+
   my $current;
   if($cmd eq "desired-temp" || $cmd eq "desiredTemperature") {
     $current = ReadingsVal($d, $cmd, 20);
