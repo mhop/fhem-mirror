@@ -342,7 +342,7 @@ TcpServer_Accept($$)
 
   my $cname = "${name}_${caddr}_${port}";
   my %nhash;
-  $nhash{NR}    = $devcount++;
+  $nhash{NR}    = $devcountTemp++;
   $nhash{NAME}  = $cname;
   $nhash{PEER}  = $caddr;
   $nhash{PORT}  = $port;
