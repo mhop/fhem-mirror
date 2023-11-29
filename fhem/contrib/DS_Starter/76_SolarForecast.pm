@@ -151,6 +151,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.4.0"  => "29.11.2023  graphicHeaderOwnspec: can manage attr / sets of other devs by <attr|set>@<dev> ",
   "1.3.0"  => "27.11.2023  new Attr graphicHeaderOwnspecValForm ",
   "1.2.0"  => "25.11.2023  graphicHeaderOwnspec: show readings of other devs by <reaging>@<dev>, Set/reset batteryTrigger ",
   "1.1.3"  => "24.11.2023  rename reset arguments according possible adjustable textField width ",
@@ -456,7 +457,7 @@ my $defmaxvar      = 0.5;                                                       
 my $definterval    = 70;                                                            # Standard Abfrageintervall
 my $defslidenum    = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
 my $webCmdFn       = 'FW_widgetFallbackFn';                                         # FHEMWEB Widgets Funktion
-my @attrreadings   = ();                                                            # Array der Hilfsreadings als Attributspeicher
+my @widgetreadings = ();                                                            # Array der Hilfsreadings als Attributspeicher
 
 my $pvhcache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $pvccache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
@@ -5103,8 +5104,8 @@ sub _specialActivities {
           deleteReadingspec ($hash, "Today_PVdeviation");
           deleteReadingspec ($hash, "Today_PVreal");
           
-          for my $atr (@attrreadings) {
-              deleteReadingspec ($hash, $atr);
+          for my $wdr (@widgetreadings) {
+              deleteReadingspec ($hash, $wdr);
           }
 
           for my $n (1..24) {
@@ -9142,7 +9143,6 @@ return $aiicon;
 ################################################################
 sub __createOwnSpec {
   my $paref     = shift;
-
   my $hash      = $paref->{hash};
   my $name      = $paref->{name};
   my $dstyle    = $paref->{dstyle};                                                    # TD-Style
@@ -9155,8 +9155,8 @@ sub __createOwnSpec {
 
   return if(!$spec || !$show);
   
-  my $allsets  = FW_widgetOverride($name, getAllSets ($name), "set")." ";  
-  my $allattrs = FW_widgetOverride($name, getAllAttr ($name), "set")." ";              # Leerzeichen am Ende wichtig für Regexvergleich
+  my $allsets  = FW_widgetOverride ($name, getAllSets ($name),  'set')." ";  
+  my $allattrs = FW_widgetOverride ($name, getAllAttr ($name), 'attr')." ";             # Leerzeichen am Ende wichtig für Regexvergleich
 
   my @fields = split (/\s+/sx, $spec);
 
@@ -9179,7 +9179,12 @@ sub __createOwnSpec {
       my ($h, $v, $u);
 
       for (my $k = 0 ; $k < $vinr; $k++) {          
-          ($h->{$k}{label}, $h->{$k}{elm}) = split ":", $vals[$col] if($vals[$col]);
+          ($h->{$k}{label}, $h->{$k}{elm}) = split ":", $vals[$col] if($vals[$col]);  # Label und darzustellendes Element
+          
+          $h->{$k}{elm}   //= '';
+          my ($elm, $dev)   = split "@", $h->{$k}{elm};                               # evtl. anderes Devices
+          $dev            //= $name;
+          
           $col++;
           
           if (!$h->{$k}{label}) {
@@ -9187,37 +9192,37 @@ sub __createOwnSpec {
               next;
           }
           
-          if ($h->{$k}{elm} !~ /@/xs) {
-              my $setcmd = ___getFWwidget ($name, $h->{$k}{elm}, $allsets, 'set');
+          my $setcmd = ___getFWwidget ($name, $dev, $elm, $allsets, 'set');           # Set-Kommandos identifizieren
+          
+          if ($setcmd) {
+              $v->{$k} = $setcmd;
+              $u->{$k} = q{};
               
-              if ($setcmd) {
-                  $v->{$k} = $setcmd;
-                  $u->{$k} = q{};
-                  next;
-              }
-              
-              my $attrcmd = ___getFWwidget ($name, $h->{$k}{elm}, $allattrs, 'attr');
-              
-              if ($attrcmd) {
-                  $v->{$k} = $attrcmd;
-                  $u->{$k} = q{};
-                  next;
-              }
+              debugLog ($paref, 'graphic', "graphicHeaderOwnspec - set-command genereated:\n$setcmd");
+              next;
           }
           
-          my ($rdg, $dev)   = split "@", $h->{$k}{elm};
-          $dev            //= $name;
-          $v->{$k}          = ReadingsVal ($dev, $rdg, '');
+          my $attrcmd = ___getFWwidget ($name, $dev, $elm, $allattrs, 'attr');        # Attr-Kommandos identifizieren
           
-          if ($v->{$k} =~ /(-?\d+(\.\d+)?)/xs) {
-              ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $rdg, '');       # Value und Unit trennen wenn Value numerisch
+          if ($attrcmd) {
+              $v->{$k} = $attrcmd;
+              $u->{$k} = q{};
+              
+              debugLog ($paref, 'graphic', "graphicHeaderOwnspec - attr-command genereated:\n$attrcmd");
+              next;
+          }
+          
+          $v->{$k} = ReadingsVal ($dev, $elm, '');
+          
+          if ($v->{$k} =~ /^\s*(-?\d+(\.\d+)?)/xs) {
+              ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $elm, '');       # Value und Unit trennen wenn Value numerisch
           }
           
           $v->{$k} //= q{};
           $u->{$k} //= q{};
           
           $paref->{dev}  = $dev; 
-          $paref->{rdg}  = $rdg;
+          $paref->{rdg}  = $elm;
           $paref->{val}  = $v->{$k};
           $paref->{unit} = $u->{$k};
           
@@ -9266,15 +9271,26 @@ return $ownv;
 ################################################################  
 sub ___getFWwidget {
   my $name = shift;
+  my $dev  = shift // $name;                # Device des Elements, default=$name
   my $elm  = shift;                         # zu prüfendes Element
   my $allc = shift;                         # Kommandovorrat -> ist Element enthalten?
   my $ctyp = shift // 'set';                # Kommandotyp: set/attr
 
-  my $widget = '';
+  return if(!$elm);
   
+  my $widget = '';
   my ($current, $reading);
+  
+  if ($dev ne $name) {                                                                   # Element eines anderen Devices verarbeiten
+      if ($ctyp eq 'set') {
+          $allc = FW_widgetOverride ($dev, getAllSets($dev), 'set')." ";                 # Leerzeichen am Ende wichtig für Regexvergleich
+      }
+      elsif ($ctyp eq 'attr') {
+          $allc = FW_widgetOverride ($dev, getAllAttr($dev), 'attr')." ";               
+      }
+  }
 
-  if ($allc =~ /$elm:?(.*?)\s/xs) {
+  if ($allc =~ /$elm:?(.*?)\s/xs) {                                                      # Element in allen Sets oder Attr enthalten
       my $arg = $1;
       $arg    = 'textFieldNL' if(!$arg);
       
@@ -9282,40 +9298,51 @@ sub ___getFWwidget {
           $arg = '#,'.$arg;         
       }
       
-      if ($ctyp eq 'attr') {
-          $current = AttrVal ($name, $elm, '');
-          $reading = '.'.$elm;
-
-          push @attrreadings, $reading;
+      if ($ctyp eq 'attr') {                                                             # Attributwerte als verstecktes Reading abbilden
+          $current = AttrVal ($dev, $elm, '');
+          $reading = '.'.$dev.'_'.$elm;
+      }
+      else {                                                                             # leeren Dummy-Wert als verstecktes Reading abbilden wenn Set-Kommando nicht als gleichnamiges Reading existiert
+          $current = ReadingsVal ($dev, $elm, '');
+          $reading = '.'.$dev.'_'.$elm if(!$current);
+      }
+      
+      if ($reading && $reading =~ /^\./xs) {                                             # verstecktes Reading für spätere Löschung merken
+          push @widgetreadings, $reading;
           readingsSingleUpdate ($defs{$name}, $reading, $current, 0);
       }
       
-      no strict "refs";                                                                    ## no critic 'NoStrict'
-      $widget = &{$webCmdFn} ($FW_wname, $name, "", $elm, $arg);
+      no strict "refs";                                                                  ## no critic 'NoStrict'
+      $widget = &{$webCmdFn} ($FW_wname, $dev, "",$elm, $arg);
       use strict "refs";
 
       if ($widget) {
-          $widget =~ s,^<td[^>]*>(.*)</td>$,$1,x;
-          $widget =~ s,></div>, type='$ctyp'></div>,x;
+          my ($wc) = $widget =~ /current='((<td|<div|<\/div>).*?)'/xs;                   # Eleminierung von störenden HTML Elementen aus aktuellem Readingwert 
+          
+          if ($wc) {
+              $widget  = (split "current=", $widget)[0];
+              $widget .= qq{ current='^ESC^'></div></td>};
+          }
+          
+          $widget =~ s,^<td[^>]*>(.*)</td>$,$1,xs;
+          $widget =~ s,></div>, type='$ctyp'></div>,xs;
       }
       else {
-          $widget = FW_pH ("cmd=$ctyp $name $elm", $elm, 0, "", 1, 1);
+          $widget = FW_pH ("cmd=$ctyp $dev $elm", $elm, 0, "", 1, 1);
       }
       
-      if ($ctyp eq 'attr') {
-          eval {
-              my ($sc) = $widget =~ /current='(.*?)'/xs;
-              my ($sr) = $widget =~ /reading='(.*?)'/xs;
-              $widget  =~ s/$sc/$current/ if(defined $sc);
-              $widget  =~ s/$sr/$reading/ if(defined $sr);
-          };
-      }
+      eval {                                                                             # Vorbelegung der Anzeige korrigieren/sublimieren
+          my ($sc) = $widget =~ /current='(.*?)'/xs;
+          my ($sr) = $widget =~ /reading='(.*?)'/xs;
+          $widget  =~ s/$sc/$current/ if(defined $sc && defined $current);
+          $widget  =~ s/$sr/$reading/ if(defined $sr && defined $reading);
+      };
       
-      if ($arg eq 'textField' || $arg eq 'textField-long') {                              # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
+      if ($arg eq 'textField' || $arg eq 'textField-long') {                             # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
           $widget =~ s/arg='textField/arg='textFieldNL/xs;                                   
       }
       
-      if ($arg =~ 'slider') {                                                             # Widget slider in selectnumbers für Kopfgrafik umsetzen
+      if ($arg =~ 'slider') {                                                            # Widget slider in selectnumbers für Kopfgrafik umsetzen
           my ($wid, $min, $step, $max, $float) = split ",", $arg; 
           $widget =~ s/arg='(.*?)'/arg='selectnumbers,$min,$step,$max,0,lin'/xs;    
       }
@@ -9388,8 +9415,8 @@ sub ___ghoValForm {
       }
   }
   
-  if ($val =~ /(-?\d+(\.\d+)?)/xs) {
-      ($val, my $u1) = split /\s+/, $val;                              # Value und Unit trennen
+  if ($val =~ /^\s*(-?\d+(\.\d+)?)/xs) {                                       # Value und Unit numerischer Werte trennen
+      ($val, my $u1) = split /\s+/, $val;                              
       $unit          = $u1 ? $u1 : $unit;
   }
   
@@ -16237,8 +16264,9 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
-       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt; &lt;Label&gt;:&lt;Reading&gt; ... </b><br>
+       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b><br>
          Display of any readings, set commands and attributes of the device in the graphic header. <br>
+         Readings, set commands and attributes of other devices can be displayed by specifying the optional [@Device]. <br>
          The values to be displayed are separated by spaces.
          Four values (fields) are displayed per line. <br>
          The input can be made in multiple lines. Values with the units "Wh" or "kWh" are converted according to the
@@ -18186,9 +18214,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
-       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading[@Device]&gt; &lt;Label&gt;:&lt;Reading[@Device]&gt; ... </b><br>
+       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b><br>
          Anzeige beliebiger Readings, Set-Kommandos und Attribute des SolarForecast Devices im Grafikkopf. <br>
-         Durch Angabe des optionalen [@Device] können Readings anderer Devices angezeigt werden. <br>
+         Durch Angabe des optionalen [@Device] können Readings, Set-Kommandos und Attribute anderer Devices angezeigt werden. <br>
          Die anzuzeigenden Werte werden durch Leerzeichen getrennt.
          Es werden vier Werte (Felder) pro Zeile dargestellt. <br>
          Die Eingabe kann mehrzeilig erfolgen. Werte mit den Einheiten "Wh" bzw. "kWh" werden entsprechend der Einstellung
