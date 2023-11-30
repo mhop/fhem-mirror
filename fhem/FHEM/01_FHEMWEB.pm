@@ -3612,7 +3612,8 @@ FW_widgetFallbackFn()
   # noArg is needed for fhem.cfg.demo / Cinema
   return "" if(!$values || $values eq "noArg");
 
-  ($cmd, my $reading) = split( ' ', $cmd, 2 );
+  my $reading;
+  ($cmd, $reading) = split(' ', $cmd, 2) if($values !~ m/^colorpicker,/);
   $reading = $cmd if(!defined($reading));
 
   my $current;
