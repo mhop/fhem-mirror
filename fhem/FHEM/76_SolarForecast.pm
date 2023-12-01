@@ -151,6 +151,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.4.1"  => "01.12.2023  ___getFWwidget: adjust for FHEMWEB feature forum:#136019 ",
   "1.4.0"  => "29.11.2023  graphicHeaderOwnspec: can manage attr / sets of other devs by <attr|set>@<dev> ",
   "1.3.0"  => "27.11.2023  new Attr graphicHeaderOwnspecValForm ",
   "1.2.0"  => "25.11.2023  graphicHeaderOwnspec: show readings of other devs by <reaging>@<dev>, Set/reset batteryTrigger ",
@@ -1096,49 +1097,9 @@ sub Initialize {
   # $hash->{FW_addDetailToSummary} = 1;
   # $hash->{FW_atPageEnd} = 1;                         # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 
- $hash->{AttrRenameMap} = { "beam1Color"         => "graphicBeam1Color",
-                            "beam1Content"       => "graphicBeam1Content",
-                            "beam1FontColor"     => "graphicBeam1FontColor",
-                            "beam2Color"         => "graphicBeam2Color",
-                            "beam2Content"       => "graphicBeam2Content",
-                            "beam2FontColor"     => "graphicBeam2FontColor",
-                            "beamHeight"         => "graphicBeamHeight",
-                            "beamWidth"          => "graphicBeamWidth",
-                            "historyHour"        => "graphicHistoryHour",
-                            "hourCount"          => "graphicHourCount",
-                            "hourStyle"          => "graphicHourStyle",
-                            "layoutType"         => "graphicLayoutType",
-                            "maxValBeam"         => "graphicBeam1MaxVal",
-                            "showDiff"           => "graphicShowDiff",
-                            "showNight"          => "graphicShowNight",
-                            "showWeather"        => "graphicShowWeather",
-                            "spaceSize"          => "graphicSpaceSize",
-                            "weatherColor"       => "graphicWeatherColor",
-                            "weatherColorNight"  => "graphicWeatherColorNight",
-                            "htmlStart"          => "graphicStartHtml",
-                            "htmlEnd"            => "graphicEndHtml",
-                            "showHeader"         => "headerShow",
-                            "headerDetail"       => "graphicHeaderDetail",
-                            "headerShow"         => "graphicHeaderShow",
-                            "cloudFactorDamping" => "affectCloudfactorDamping",
-                            "rainFactorDamping"  => "affectRainfactorDamping",
-                            "numHistDays"        => "affectNumHistDays",
-                            "maxVariancePerDay"  => "affectMaxDayVariance",
-                            "follow70percentRule"=> "affect70percentRule",
-                            "Wh_kWh"             => "graphicEnergyUnit",
-                            "autoRefreshFW"      => "ctrlAutoRefreshFW",
-                            "autoRefresh"        => "ctrlAutoRefresh",
-                            "showLink"           => "ctrlShowLink",
-                            "debug"              => "ctrlDebug",
-                            "optimizeSolCastAPIreqInterval" => "ctrlOptimizeSolCastInterval",
-                            "interval"                      => "ctrlInterval",
-                            "createStatisticReadings"       => "ctrlStatisticReadings",
-                            "createConsumptionRecReadings"  => "ctrlConsRecommendReadings",
-                            "createTomorrowPVFcReadings"    => "ctrlNextDayForecastReadings",
-                            "preferredChargeBattery"        => "affectBatteryPreferredCharge",
-                            "sameWeekdaysForConsfc"         => "affectConsForecastIdentWeekdays",
-                            "ctrlOptimizeSolCastInterval"   => "ctrlSolCastAPIoptimizeReq",
-                          };
+  # $hash->{AttrRenameMap} = { "beam1Color"         => "graphicBeam1Color",
+  #                            "beam1Content"       => "graphicBeam1Content",
+  #                          };
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
 
@@ -9155,8 +9116,8 @@ sub __createOwnSpec {
 
   return if(!$spec || !$show);
   
-  my $allsets  = FW_widgetOverride ($name, getAllSets ($name),  'set')." ";  
-  my $allattrs = FW_widgetOverride ($name, getAllAttr ($name), 'attr')." ";             # Leerzeichen am Ende wichtig für Regexvergleich
+  my $allsets  = ' '.FW_widgetOverride ($name, getAllSets ($name),  'set').' ';  
+  my $allattrs = ' '.FW_widgetOverride ($name, getAllAttr ($name), 'attr').' ';        # Leerzeichen wichtig für Regexvergleich
 
   my @fields = split (/\s+/sx, $spec);
 
@@ -9283,14 +9244,14 @@ sub ___getFWwidget {
   
   if ($dev ne $name) {                                                                   # Element eines anderen Devices verarbeiten
       if ($ctyp eq 'set') {
-          $allc = FW_widgetOverride ($dev, getAllSets($dev), 'set')." ";                 # Leerzeichen am Ende wichtig für Regexvergleich
+          $allc = ' '.FW_widgetOverride ($dev, getAllSets($dev), 'set').' ';             # Leerzeichen wichtig für Regexvergleich
       }
       elsif ($ctyp eq 'attr') {
-          $allc = FW_widgetOverride ($dev, getAllAttr($dev), 'attr')." ";               
+          $allc = ' '.FW_widgetOverride ($dev, getAllAttr($dev), 'attr').' ';               
       }
   }
 
-  if ($allc =~ /$elm:?(.*?)\s/xs) {                                                      # Element in allen Sets oder Attr enthalten
+  if ($allc =~ /\s$elm:?(.*?)\s/xs) {                                                      # Element in allen Sets oder Attr enthalten
       my $arg = $1;
       $arg    = 'textFieldNL' if(!$arg);
       
@@ -9302,9 +9263,14 @@ sub ___getFWwidget {
           $current = AttrVal ($dev, $elm, '');
           $reading = '.'.$dev.'_'.$elm;
       }
-      else {                                                                             # leeren Dummy-Wert als verstecktes Reading abbilden wenn Set-Kommando nicht als gleichnamiges Reading existiert
+      else {                                                                             
           $current = ReadingsVal ($dev, $elm, '');
-          $reading = '.'.$dev.'_'.$elm if(!$current);
+          if($dev ne $name) {
+              $reading = '.'.$dev.'_'.$elm;                                              # verstecktes Reading in SolCast abbilden wenn Set-Kommando aus fremden Device
+          }
+          else {
+              $reading = $elm;
+          }
       }
       
       if ($reading && $reading =~ /^\./xs) {                                             # verstecktes Reading für spätere Löschung merken
@@ -9313,7 +9279,7 @@ sub ___getFWwidget {
       }
       
       no strict "refs";                                                                  ## no critic 'NoStrict'
-      $widget = &{$webCmdFn} ($FW_wname, $dev, "",$elm, $arg);
+      $widget = &{$webCmdFn} ($FW_wname, $name, '',$elm.' '.$reading, $arg);
       use strict "refs";
 
       if ($widget) {
@@ -9331,12 +9297,8 @@ sub ___getFWwidget {
           $widget = FW_pH ("cmd=$ctyp $dev $elm", $elm, 0, "", 1, 1);
       }
       
-      eval {                                                                             # Vorbelegung der Anzeige korrigieren/sublimieren
-          my ($sc) = $widget =~ /current='(.*?)'/xs;
-          my ($sr) = $widget =~ /reading='(.*?)'/xs;
-          $widget  =~ s/$sc/$current/ if(defined $sc && defined $current);
-          $widget  =~ s/$sr/$reading/ if(defined $sr && defined $reading);
-      };
+      my ($sc) = $widget =~ /dev='(.*?)'/xs;                                             # Device in Widget korrigieren/sublimieren
+      $widget  =~ s/$sc/$dev/ if(defined $sc);
       
       if ($arg eq 'textField' || $arg eq 'textField-long') {                             # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
           $widget =~ s/arg='textField/arg='textFieldNL/xs;                                   
