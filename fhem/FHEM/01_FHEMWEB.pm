@@ -3612,25 +3612,22 @@ FW_widgetFallbackFn()
   # noArg is needed for fhem.cfg.demo / Cinema
   return "" if(!$values || $values eq "noArg");
 
-  my $reading;
-  ($cmd, $reading) = split(' ', $cmd, 2) if($values !~ m/^colorpicker,/);
-  $reading = $cmd if(!defined($reading));
-
+  my($source) = split(' ', $cmd, 2); # cmd part only, #136049
   my $current;
   if($cmd eq "desired-temp" || $cmd eq "desiredTemperature") {
     $current = ReadingsVal($d, $cmd, 20);
     $current =~ s/ .*//;        # Cut off Celsius
     $current = sprintf("%2.1f", int(2*$current)/2) if($current =~ m/[0-9.-]/);
   } else {
-    $current = ReadingsVal($d, $reading, undef);
+    $current = ReadingsVal($d, $source, undef);
     if( !defined($current) ) {
-      $reading = 'state';
+      $source = 'state';
       $current = Value($d);
     }
     $current =~ s/$cmd //;
     $current = ReplaceEventMap($d, $current, 1);
   }
-  return "<td><div class='fhemWidget' cmd='$cmd' reading='$reading' ".
+  return "<td><div class='fhemWidget' cmd='$cmd' reading='$source' ".
                 "dev='$d' arg='$values' current='$current'></div></td>";
 }
 # Widgets END
