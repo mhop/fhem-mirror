@@ -140,17 +140,19 @@ BEGIN {
 };
 
 # Standardvariablen
-my $splitdef    = ":";                                                      # Standard Character für split ...
-
-my $carpnohash  = "got no hash value";
-my $carpnoname  = "got no name value";
-my $carpnoctyp  = "got no Credentials type code";
-my $carpnoapir  = "got no API Hash reference";
-my $carpnotfn   = "got no function name";
-my $carpnotfarg = "got no Timer function argument";
-my $carpnoaddr  = "got no server address from hash";
-my $carpnoport  = "got no server port from hash";
-my $carpnoprot  = "got no protocol from hash";
+my $splitdef     = ':';                                                      # Standard Character für split ...
+my $carpnohash   = 'got no hash value';
+my $carpnoname   = 'got no name value';
+my $carpnoctyp   = 'got no Credentials type code';
+my $carpnoapir   = 'got no API Hash reference';
+my $carpnotfn    = 'got no function name';
+my $carpnotfarg  = 'got no Timer function argument';
+my $carpnoaddr   = 'got no server address from hash';
+my $carpnoport   = 'got no server port from hash';
+my $carpnoprot   = 'got no protocol from hash';
+my $carpnomod    = 'Got no module for check its update status.';
+my $carpnocofile = 'Got no update control file.';
+my $carprecom    = 'Program Error in module. Inform the Maintainer.';
 
 my %hasqhandler = (                                                         # Hash addSendqueue Handler
   SSCal     => { fn => \&_addSendqueueSimple,   },                     
@@ -1998,10 +2000,9 @@ return;
 #  return:  0|1 (Err-State), 0-kein Update nötig od. feststellbar/ 1-Update nötig, Message, Recommendation
 ############################################################################################################
 sub checkModVer {
-  my $src  = "https://fhem.de/fhemupdate/controls_fhem.txt";
-  my $cmsg = 'got no module to check its update status';
-  my $name = shift // carp $carpnoname && return;
-  my $mod  = shift // carp $cmsg && return (1, 0, $cmsg, '');
+  my $name = shift // carp $carpnoname   && return;
+  my $mod  = shift // carp $carpnomod    && return (1, 0, $carpnomod,    $carprecom);
+  my $src  = shift // carp $carpnocofile && return (1, 0, $carpnocofile, $carprecom);
 
   my $msg  = q{};
   my $rec  = q{};
