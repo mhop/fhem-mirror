@@ -2046,12 +2046,21 @@ sub checkModVer {
   Log3 ($name, 4, "$name - got local $ctrlFileName with ".int(@locList)." entries.");
 
   my %lh;
+  my $found = 0;
 
   for my $l (@locList) {
       my @l = split " ", $l, 4;
       next if($l[0] ne "UPD" || $l[3] !~ /$mod/);
+      
       $lh{$l[3]}{TS}  = $l[1];
       $lh{$l[3]}{LEN} = $l[2];
+      $found          = 1;
+  }
+  
+  if (!$found) {
+      $msg = "The $mod file does not appear to exist in your system.";
+      $rec = "You should do a complete FHEM update first. Inform the Maintainer if it seems to be a permanent problem.";
+      return (1, 0, $msg, $rec);      
   }
 
   for my $rem (@remList) {
