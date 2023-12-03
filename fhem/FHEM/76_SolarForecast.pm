@@ -46,6 +46,7 @@ eval "use JSON;1;"                        or my $jsonabs = 'JSON';              
 eval "use AI::DecisionTree;1;"            or my $aidtabs = 'AI::DecisionTree';       ## no critic 'eval'
 
 use FHEM::SynoModules::SMUtils qw(
+                                   checkModVer
                                    evaljson
                                    getClHash
                                    delClHash
@@ -151,6 +152,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.4.3"  => "03.12.2023  hidden set or attr commands in user specific header area when called by 'get ... html' ".
+                           "plantConfig: check module update in repo ",
   "1.4.2"  => "02.12.2023  ___getFWwidget: codechange ___getFWwidget using __widgetFallback function ",
   "1.4.1"  => "01.12.2023  ___getFWwidget: adjust for FHEMWEB feature forum:#136019 ",
   "1.4.0"  => "29.11.2023  graphicHeaderOwnspec: can manage attr / sets of other devs by <attr|set>@<dev> ",
@@ -8299,7 +8302,7 @@ sub pageAsHtml {
   my $gsel = shift // "";                                                                  # direkte Auswahl welche Grafik zurück gegeben werden soll (both, flow, forecast)
 
   my $ret = "<html>";
-  $ret   .= entryGraphic ($name, $ftui, $gsel);
+  $ret   .= entryGraphic ($name, $ftui, $gsel, 1);
   $ret   .= "</html>";
 
 return $ret;
@@ -8312,6 +8315,7 @@ sub entryGraphic {
   my $name = shift;
   my $ftui = shift // "";
   my $gsel = shift // "";                                                                  # direkte Auswahl welche Grafik zurück gegeben werden soll (both, flow, forecast)
+  my $pah  = shift // 0;                                                                   # 1 wenn durch pageAsHtml aufgerufen
 
   my $hash = $defs{$name};
 
@@ -8346,6 +8350,7 @@ sub entryGraphic {
       name           => $name,
       type           => $hash->{TYPE},
       ftui           => $ftui,
+      pah            => $pah,
       maxhours       => $maxhours,
       t              => time,
       modulo         => 1,
@@ -9108,6 +9113,7 @@ sub __createOwnSpec {
   my $name      = $paref->{name};
   my $dstyle    = $paref->{dstyle};                                                    # TD-Style
   my $hdrDetail = $paref->{hdrDetail};
+  my $pah       = $paref->{pah};                                                       # 1 wenn durch pageAsHtml abgerufen
 
   my $vinr = 4;                                                                        # Spezifikationen in einer Zeile
   my $spec = AttrVal ($name, 'graphicHeaderOwnspec', '');
@@ -9156,6 +9162,11 @@ sub __createOwnSpec {
           my $setcmd = ___getFWwidget ($name, $dev, $elm, $allsets, 'set');           # Set-Kommandos identifizieren
           
           if ($setcmd) {
+              if ($pah) {                                                             # bei get pageAsHtml setter/attr nicht anzeigen (js Fehler)
+                  undef $h->{$k}{label};
+                  $setcmd = '<hidden by pageAsHtml>';
+              }
+              
               $v->{$k} = $setcmd;
               $u->{$k} = q{};
               
@@ -9166,6 +9177,11 @@ sub __createOwnSpec {
           my $attrcmd = ___getFWwidget ($name, $dev, $elm, $allattrs, 'attr');        # Attr-Kommandos identifizieren
           
           if ($attrcmd) {
+              if ($pah) {                                                             # bei get pageAsHtml setter/attr nicht anzeigen (js Fehler)
+                  undef $h->{$k}{label};
+                  $attrcmd = '<hidden by pageAsHtml>';
+              }              
+                            
               $v->{$k} = $attrcmd;
               $u->{$k} = q{};
               
@@ -9321,6 +9337,7 @@ sub ___widgetFallback {
   
   if (!defined $current) {
       $reading = 'state';
+      $current = ' ';
   }
   
   if ($current =~ /((<td|<div|<\/div>).*?)/xs) {                   # Eleminierung von störenden HTML Elementen aus aktuellem Readingwert 
@@ -12639,7 +12656,7 @@ sub checkPlantConfig {
   my $aiprep   = isPrepared4AI ($hash, 'full');
   my $aiusemsg = CurrentVal    ($hash, 'aicanuse', '');
   my $einstds  = "";
-
+  
   if (!$eocr || $eocr ne '.*') {
       $einstds                              = 'to .*' if($eocr ne '.*');
       $result->{'Common Settings'}{state}   = $info;
@@ -12658,7 +12675,29 @@ sub checkPlantConfig {
   if (!$aiprep) {
       $result->{'Common Settings'}{state}   = $info;
       $result->{'Common Settings'}{result} .= qq{The AI support is not used. <br>};
-      $result->{'Common Settings'}{note}   .= qq{$aiusemsg<br>};
+      $result->{'Common Settings'}{note}   .= qq{$aiusemsg.<br>};
+      $result->{'Common Settings'}{info}    = 1;
+  }
+  
+  my ($cmerr, $cmupd, $cmmsg, $cmrec) = checkModVer ($name, '76_SolarForecast', 'https://fhem.de/fhemupdate/controls_fhem.txt');
+  
+  if (!$cmerr && !$cmupd) {
+      $result->{'Common Settings'}{note}   .= qq{$cmmsg<br> $cmrec<br>};
+      $result->{'Common Settings'}{note}   .= qq{checked module: <br>};
+      $result->{'Common Settings'}{note}   .= qq{76_SolarForecast <br>};
+  }
+  
+  if ($cmerr) {
+      $result->{'Common Settings'}{state}   = $warn;
+      $result->{'Common Settings'}{result} .= qq{$cmmsg <br>};
+      $result->{'Common Settings'}{note}   .= qq{$cmrec <br>};
+      $result->{'Common Settings'}{warn}    = 1;
+  }
+  
+  if ($cmupd) {
+      $result->{'Common Settings'}{state}   = $info;
+      $result->{'Common Settings'}{result} .= qq{$cmmsg <br>};
+      $result->{'Common Settings'}{note}   .= qq{$cmrec <br>};
       $result->{'Common Settings'}{info}    = 1;
   }
 
@@ -15343,8 +15382,12 @@ to ensure that the system configuration is correct.
     <ul>
       <a id="SolarForecast-get-html"></a>
       <li><b>html </b> <br><br>
-      The solar graphic is retrieved and rendered as HTML code. One of the following selections can be given as an
-      argument to the command: <br><br>
+      The SolarForecast graphic is retrieved and displayed as HTML code. <br>
+      <b>Note:</b> By the attribute <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a>
+      generated set or attribute commands in the user-specific area of the header are generally hidden for technical 
+      reasons. <br>
+      One of the following selections can be given as an argument to the command: 
+      <br><br>
 
       <ul>
         <table>
@@ -17295,8 +17338,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-get-html"></a>
       <li><b>html </b> <br><br>
-      Die Solar Grafik wird als HTML-Code abgerufen und wiedergegeben. Als Argument kann dem Befehl eine der folgenden
-      Selektionen mitgegeben werden: <br><br>
+      Die SolarForecast Grafik wird als HTML-Code abgerufen und wiedergegeben. <br>
+      <b>Hinweis:</b> Durch das Attribut <a href="#SolarForecast-attr-graphicHeaderOwnspec ">graphicHeaderOwnspec</a>
+      generierte set-Kommandos oder Attribut-Befehle im Anwender spezifischen Bereich des Headers werden aus technischen 
+      Gründen generell ausgeblendet. <br>
+      Als Argument kann dem Befehl eine der folgenden Selektionen mitgegeben werden: 
+      <br><br>
 
       <ul>
         <table>
@@ -18476,7 +18523,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "utf8": 0,
         "HttpUtils": 0,
         "JSON": 4.020,
-        "FHEM::SynoModules::SMUtils": 1.0220,
+        "FHEM::SynoModules::SMUtils": 1.0270,
         "Time::HiRes": 0,
         "MIME::Base64": 0,
         "Storable": 0

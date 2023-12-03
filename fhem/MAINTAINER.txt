@@ -639,9 +639,8 @@ FHEM/lib/UPnP/*              Reinerlein           Multimedia
 
 lib/FHEM/Core/Timer/Helper.pm    sidey79          FHEM Development
 lib/FHEM/Core/Timer/Register.pm  Beta-User        FHEM Development
-lib/FHEM/SynoModules/API.pm      DS_Starter       Sonstiges
-lib/FHEM/SynoModules/SMUtils.pm  DS_Starter       Sonstiges
-lib/FHEM/SynoModules/ErrCodes.pm DS_Starter       Sonstiges
+lib/FHEM/SynoModules/*           DS_Starter       Sonstiges
+lib/FHEM/SolarForecast/*         DS_Starter       Solaranlagen
 lib/FHEM/Text/Unicode.pm         Adimarantis      FHEM Development
 lib/FHEM/Utility/CTZ.pm          DS_Starter       Sonstiges
 
