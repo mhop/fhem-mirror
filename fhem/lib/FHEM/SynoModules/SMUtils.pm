@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.27.0  03.12.2023  new function checkModVer
 # 1.26.0  08.04.2023  add postid to _addSendqueueExtended
 # 1.25.0              new sub timestampToDateTime
 # 1.24.2              fix evalDecodeJSON return
@@ -56,7 +57,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version 0.77; our $VERSION = version->declare('1.26.0');
+use version 0.77; our $VERSION = version->declare('1.27.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -64,6 +65,7 @@ our @EXPORT_OK = qw(
                      delClHash
                      delReadings
                      createReadingsFromArray
+                     checkModVer
                      addCHANGED
                      trim
                      slurpFile
@@ -131,6 +133,7 @@ BEGIN {
 		  readingsBulkUpdateIfChanged
           readingsEndUpdate
           readingsDelete
+          HttpUtils_BlockingGet
           HttpUtils_NonblockingGet
         )
   );  
@@ -165,7 +168,7 @@ sub getClHash {
   my $name  = $hash->{NAME};
   my $ret;
   
-  if($nobgd) {                                                      # nur übergebenen CL-Hash speichern, keine Hintergrundverarbeitung bzw. synthetische Erstellung CL-Hash
+  if ($nobgd) {                                                      # nur übergebenen CL-Hash speichern, keine Hintergrundverarbeitung bzw. synthetische Erstellung CL-Hash
       $hash->{HELPER}{CL}{1} = $hash->{CL};
       return;
   }
@@ -236,7 +239,7 @@ sub delReadings {
   
   my @allrds = keys%{$defs{$name}{READINGS}};
   for my $key(@allrds) {
-      if($respts) {
+      if ($respts) {
           $lu  = $data{$type}{$name}{lastUpdate};
           $rts = ReadingsTimestamp($name, $key, $lu);
           next if($rts eq $lu);
@@ -275,7 +278,7 @@ sub slurpFile {
                                                        close ($fh) if($fh);
                                                        $errorcode = 9002;                                    
                                                      };
-  if(!$errorcode) {
+  if (!$errorcode) {
       local $/ = undef;                              # enable slurp mode, locally
       $content = <$fh>;
        
@@ -315,7 +318,7 @@ sub timestampToDateTime {
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($uts);
   my ($date, $time);
   
-  if(AttrVal('global', 'language', 'EN') eq "DE") {
+  if (AttrVal('global', 'language', 'EN') eq "DE") {
       $date = sprintf "%02d.%02d.%04d", $mday , $mon+=1 ,$year+=1900; 
       $time = sprintf "%02d:%02d:%02d", $hour , $min , $sec; 
   } 
@@ -360,14 +363,14 @@ sub addCHANGED {
   my $val  = shift // carp "got no value for event trigger"     && return;
   my $ts   = shift // carp "got no timestamp for event trigger" && return;
   
-  if($hash->{CHANGED}) {
+  if ($hash->{CHANGED}) {
       push @{$hash->{CHANGED}}, $val;
   } 
   else {
       $hash->{CHANGED}[0] = $val;
   }
   
-  if($hash->{CHANGETIME}) {
+  if ($hash->{CHANGETIME}) {
       push @{$hash->{CHANGETIME}}, $ts;
   } 
   else {
@@ -417,10 +420,10 @@ sub moduleVersion {
   $hash->{HELPER}{VERSION} = $v;
   $hash->{HELPER}{PACKAGE} = $package;
   
-  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {          # META-Daten sind vorhanden
+  if ($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {          # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                           # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{<TYPE>}{META}}
       
-      if($modules{$type}{META}{x_version}) {                                             # {x_version} nur gesetzt wenn $Id$ im Kopf komplett! vorhanden
+      if ($modules{$type}{META}{x_version}) {                                             # {x_version} nur gesetzt wenn $Id$ im Kopf komplett! vorhanden
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } 
       else {
@@ -433,7 +436,7 @@ sub moduleVersion {
       $hash->{VERSION} = $v;                                                             # Internal VERSION setzen
   }
   
-  if($package =~ /FHEM::$type/x || $package eq $type) {                                  # es wird mit Packages gearbeitet -> mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+  if ($package =~ /FHEM::$type/x || $package eq $type) {                                  # es wird mit Packages gearbeitet -> mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
       return $v;         
   }
   
@@ -456,7 +459,7 @@ sub sortVersion {
             sort
             map {pack "C*", split /\./x} @versions;
   
-  if($sseq eq "desc") {
+  if ($sseq eq "desc") {
       @sorted = reverse @sorted;
   }
   
@@ -553,17 +556,17 @@ sub showModuleInfo {
   $ret = "<html>";
   
   # Hints
-  if(!$arg || $arg =~ /hints/x || $arg =~ /[\d]+/x) {
+  if (!$arg || $arg =~ /hints/x || $arg =~ /[\d]+/x) {
       $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
       $ret .= "<table class=\"block wide internals\">";
       $ret .= "<tbody>";
       $ret .= "<tr class=\"even\">";  
       
-      if($arg && $arg =~ /[\d]+/x) {
+      if ($arg && $arg =~ /[\d]+/x) {
           my @hints = split ",", $arg;
           
           for my $hint (@hints) {
-              if(AttrVal("global","language","EN") eq "DE") {
+              if (AttrVal("global","language","EN") eq "DE") {
                   $hs{$hint} = $vHintsExt_de->{$hint};
               } 
               else {
@@ -572,7 +575,7 @@ sub showModuleInfo {
           }                      
       } 
       else {
-          if(AttrVal("global","language","EN") eq "DE") {
+          if (AttrVal("global","language","EN") eq "DE") {
               %hs = %{$vHintsExt_de};
           } 
           else {
@@ -601,7 +604,7 @@ sub showModuleInfo {
   }
   
   # Notes
-  if(!$arg || $arg =~ /rel/x) {
+  if (!$arg || $arg =~ /rel/x) {
       $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
       $ret .= "<table class=\"block wide internals\">";
       $ret .= "<tbody>";
@@ -648,7 +651,7 @@ sub jboolmap {
   
   my $is_boolean = JSON::is_bool($bool);
   
-  if($is_boolean) {
+  if ($is_boolean) {
       $bool = $bool ? $true : $false;
   }
   
@@ -697,9 +700,9 @@ sub plotPngToFile {
     my $zoom    = $options[1];
     my $offset  = $options[2];
     
-    if(!$defs{$svgdev}) {
+    if (!$defs{$svgdev}) {
         $err = qq{SVG device "$svgdev" doesn't exist};
-        Log3($name, 1, "$name - ERROR - $err !");
+        Log3 ($name, 1, "$name - ERROR - $err !");
         
         setReadingErrorState ($hash, $err);
         return $err;
@@ -707,7 +710,7 @@ sub plotPngToFile {
     
     open (my $FILE, ">", "$path/$file") or do {
                                                 $err = qq{>PlotToFile< can't open $path/$file for write access};
-                                                Log3($name, 1, "$name - ERROR - $err !");
+                                                Log3 ($name, 1, "$name - ERROR - $err !");
                                                 setReadingErrorState ($hash, $err);
                                                 return $err;
                                               };
@@ -777,7 +780,7 @@ sub ApiVal {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  if(defined ($apihash)      &&
+  if (defined ($apihash)      &&
      defined ($apihash->{$key})) {
      return  $apihash->{$key};
   }
@@ -843,7 +846,7 @@ sub setCredentials {
     my $pass = shift;
     my $sep  = shift // $splitdef;
     
-    if(!$pass && $ctc ne "botToken") {                                              # botToken hat kein Paßwort
+    if (!$pass && $ctc ne "botToken") {                                              # botToken hat kein Paßwort
          carp "got no password";           
          return;
     }    
@@ -853,7 +856,7 @@ sub setCredentials {
     
     my ($success,$credstr);
     
-    if($ctc eq "botToken") {
+    if ($ctc eq "botToken") {
         $credstr = _enscramble( encode_base64 ($cred) );    
     }
     else {
@@ -864,7 +867,7 @@ sub setCredentials {
     my $retcode = setKeyValue($index, $credstr);
     
     if ($retcode) { 
-        Log3($name, 2, "$name - Error while saving the Credentials or Token - $retcode");
+        Log3 ($name, 2, "$name - Error while saving the Credentials or Token - $retcode");
         $success = 0;
     } 
     else {
@@ -914,7 +917,7 @@ sub showStoredCredentials {
   my $dosmtp  = int( ($coc-($dotok*$tokval))                    /$smtpval );
   my $docred  = int( ($coc-($dotok*$tokval)-($dosmtp*$smtpval)) /$credval );
   
-  if($docred) {
+  if ($docred) {
       my ($success, $username, $passwd) = getCredentials($hash, 0, "credentials", $splitstr);               # Credentials
 
       my $cd = $success ? 
@@ -926,7 +929,7 @@ sub showStoredCredentials {
                "$cd \n";
   }
   
-  if($dosmtp) {
+  if ($dosmtp) {
       my ($smtpsuccess, $smtpuname, $smtpword) = getCredentials($hash, 0 , "SMTPcredentials", $splitstr);   # SMTP-Credentials
       
       my $csmtp = $smtpsuccess ? 
@@ -939,7 +942,7 @@ sub showStoredCredentials {
                   "$csmtp \n";
   }
   
-  if($dotok) {
+  if ($dotok) {
       my ($toksuccess, $token) = getCredentials($hash, 0 ,"botToken");                                      # Token 
       
       my $ctok  = $toksuccess ? 
@@ -997,16 +1000,16 @@ sub _readCredOnBoot {
   my $index           = $type."_".$name."_".$ctc;
   my ($err, $credstr) = getKeyValue($index);
     
-  if($err) {
-      Log3($name, 2, "$name - ERROR - Unable to read $ctc from file: $err");
+  if ($err) {
+      Log3 ($name, 2, "$name - ERROR - Unable to read $ctc from file: $err");
       return;
   }
     
-  if(!$credstr) {
+  if (!$credstr) {
      return;
   }
     
-  if($ctc eq "botToken") {                                                          # beim Boot scrambled botToken in den RAM laden
+  if ($ctc eq "botToken") {                                                          # beim Boot scrambled botToken in den RAM laden
       $hash->{HELPER}{TOKEN} = $credstr;
       $hash->{TOKEN}         = "Set";
       return 1;
@@ -1014,14 +1017,14 @@ sub _readCredOnBoot {
    
   my ($username, $passwd) = split "$sep", decode_base64( _descramble($credstr) ), 2;
    
-  if(!$username || !$passwd) {
+  if (!$username || !$passwd) {
       ($err,$sc) = _getCredentialsFromHash ($hash, $ctc);                           # nur Error und Credetials Shortcut lesen !
       $err       = $err ? $err : qq{possible problem in splitting with separator "$sep"};
-      Log3($name, 2, "$name - ERROR - ".$sc." not successfully decoded: $err");
+      Log3 ($name, 2, "$name - ERROR - ".$sc." not successfully decoded: $err");
       return;
   }
 
-  if($ctc eq "credentials") {                                                       # beim Boot scrambled Credentials in den RAM laden
+  if ($ctc eq "credentials") {                                                       # beim Boot scrambled Credentials in den RAM laden
       $hash->{HELPER}{CREDENTIALS} = $credstr;
       $hash->{CREDENTIALS}         = "Set";                                         # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung          
   } 
@@ -1030,7 +1033,7 @@ sub _readCredOnBoot {
       $hash->{SMTPCREDENTIALS}         = "Set";                                     # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung                
   }
   else {
-      Log3($name, 2, "$name - ERROR - no shortcut found for Credential type code: $ctc");
+      Log3 ($name, 2, "$name - ERROR - no shortcut found for Credential type code: $ctc");
       return;
   }
     
@@ -1055,31 +1058,31 @@ sub _readCredFromCache {
     
   my ($err,$sc,$credstr) = _getCredentialsFromHash ($hash, $ctc);
     
-  if($err) {
-      Log3($name, 2, "$name - ERROR - ".$sc." not set in RAM ! $err");
+  if ($err) {
+      Log3 ($name, 2, "$name - ERROR - ".$sc." not set in RAM ! $err");
       return;
   }
     
-  if(!$credstr) {
+  if (!$credstr) {
       return;
   }       
     
-  if($ctc eq "botToken") {
+  if ($ctc eq "botToken") {
       my $token  = decode_base64( _descramble($credstr) );
       my $logtok = AttrVal($name, "showTokenInLog", "0") == 1 ? $token : "********";
     
-      Log3($name, 4, "$name - botToken read from RAM: $logtok");
+      Log3 ($name, 4, "$name - botToken read from RAM: $logtok");
       
       return (1, $token);
   }
 
   my ($username, $passwd) = split "$sep", decode_base64( _descramble($credstr) ), 2;
     
-  if(!$username || !$passwd) {
+  if (!$username || !$passwd) {
       $err = qq{possible problem in splitting with separator "$sep"};
-      Log3($name, 2, "$name - ERROR - ".$sc." not successfully decoded ! $err");
+      Log3 ($name, 2, "$name - ERROR - ".$sc." not successfully decoded ! $err");
         
-      if($ctc eq "credentials") {
+      if ($ctc eq "credentials") {
           delete $hash->{CREDENTIALS};
       }
         
@@ -1088,7 +1091,7 @@ sub _readCredFromCache {
     
   my $logpw = AttrVal($name, "showPassInLog", 0) ? $passwd // "" : "********";
 
-  Log3($name, 4, "$name - ".$sc." read from RAM: $username $logpw");
+  Log3 ($name, 4, "$name - ".$sc." read from RAM: $username $logpw");
   
   $passwd = encodeSpecChars ($passwd);
 
@@ -1156,8 +1159,8 @@ sub _getCredentialsFromHash {
       $credstr = $hash->{HELPER}{TOKEN};
   }
 
-  if($found && !$credstr) {
-      Log3($name, 5, qq{$name - The stored value of $ctc is empty});
+  if ($found && !$credstr) {
+      Log3 ($name, 5, qq{$name - The stored value of $ctc is empty});
   }
         
 return ($err,$sc,$credstr);
@@ -1174,16 +1177,16 @@ sub evaljson {
   
   my $success = 1;
   
-  if($nojsonmod) {
+  if ($nojsonmod) {
       $success = 0;
-      Log3($name, 1, "$name - ERROR: Perl module 'JSON' is missing. You need to install it.");
+      Log3 ($name, 1, "$name - ERROR: Perl module 'JSON' is missing. You need to install it.");
       return ($success,$myjson);
   }
   
   eval {decode_json($myjson)
        } 
        or do {                                                            
-          if( ($hash->{HELPER}{RUNVIEW} && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) || 
+          if (($hash->{HELPER}{RUNVIEW} && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) || 
                   $OpMode =~ m/^.*_hls$/x ) {                                                        # SSCam: HLS aktivate/deaktivate bringt kein JSON wenn bereits aktiviert/deaktiviert
               Log3 ($name, 5, "$name - HLS-activation data return: $myjson");
               
@@ -1197,7 +1200,7 @@ sub evaljson {
               my $errorcode = "9000";         
               my $error     = expErrors($hash, $errorcode);                                         # Fehlertext zum Errorcode ermitteln
               
-              if($error) {          
+              if ($error) {          
                   setReadingErrorState ($hash, $error, $errorcode);
               }
               else {
@@ -1223,18 +1226,18 @@ sub evalDecodeJSON {
   my $success = 1;
   my $decoded = q{};
   
-  if($nojsonmod) {
+  if ($nojsonmod) {
       $success = 0;
-      Log3($name, 1, "$name - ERROR: Perl module 'JSON' is missing. You need to install it.");
+      Log3 ($name, 1, "$name - ERROR: Perl module 'JSON' is missing. You need to install it.");
       return ($success,$myjson);
   }
   
   eval {$decoded = decode_json($myjson)
        } 
        or do {
-          if( ($hash->{HELPER}{RUNVIEW} && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) || 
+          if (($hash->{HELPER}{RUNVIEW} && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) || 
                   $OpMode =~ m/^.*_hls$/x ) {                                                        # SSCam: HLS aktivate/deaktivate bringt kein JSON wenn bereits aktiviert/deaktiviert
-              Log3($name, 5, "$name - HLS-activation data return: $myjson");
+              Log3 ($name, 5, "$name - HLS-activation data return: $myjson");
               
               if ($myjson =~ m/{"success":true}/x) {
                   $success = 1;
@@ -1249,7 +1252,7 @@ sub evalDecodeJSON {
               my $errorcode = "9000";         
               my $error     = expErrors($hash,$errorcode);                                          # Fehlertext zum Errorcode ermitteln
                 
-              if($error) {          
+              if ($error) {          
                   setReadingErrorState ($hash, $error, $errorcode);
               }
               else {
@@ -1288,21 +1291,21 @@ sub login {
   
   delete $hash->{HELPER}{SID};
     
-  Log3($name, 4, "$name - --- Begin Function login ---");
+  Log3 ($name, 4, "$name - --- Begin Function login ---");
   
   my ($success, $username, $password) = getCredentials($hash,0,"credentials",$sep);                      # Credentials abrufen
     
   if (!$success) {
-      Log3($name, 2, qq{$name - Credentials couldn't be retrieved successfully - make sure you've set it with "set $name credentials <username> <password>"});
+      Log3 ($name, 2, qq{$name - Credentials couldn't be retrieved successfully - make sure you've set it with "set $name credentials <username> <password>"});
       delActiveToken($hash) if($type eq "SSCam");      
       return;
   }
   
   my $lrt = AttrVal($name,"loginRetries",3);
   
-  if($hash->{HELPER}{LOGINRETRIES} >= $lrt) {                                               # Max Versuche erreicht -> login wird abgebrochen, Freigabe Funktionstoken
+  if ($hash->{HELPER}{LOGINRETRIES} >= $lrt) {                                               # Max Versuche erreicht -> login wird abgebrochen, Freigabe Funktionstoken
       delActiveToken($hash) if($type eq "SSCam");  
-      Log3($name, 2, "$name - ERROR - Login or privilege of user $username unsuccessful"); 
+      Log3 ($name, 2, "$name - ERROR - Login or privilege of user $username unsuccessful"); 
       return;
   }
 
@@ -1310,7 +1313,7 @@ sub login {
   my $httptimeout = AttrVal($name,"httptimeout",$timeout);
   $httptimeout    = 60 if($httptimeout < 60);
   
-  Log3($name, 4, "$name - HTTP-Call login will be done with httptimeout-Value: $httptimeout s");                                                                             
+  Log3 ($name, 4, "$name - HTTP-Call login will be done with httptimeout-Value: $httptimeout s");                                                                             
   
   my $sid = AttrVal($name, "noQuotesForSID", 0) ? "sid" : qq{"sid"};                        # sid in Quotes einschliessen oder nicht -> bei Problemen mit 402 - Permission denied
   
@@ -1325,7 +1328,7 @@ sub login {
   
   my $printurl = AttrVal($name, "showPassInLog", 0) ? $url : $urlwopw;
   
-  Log3($name, 4, "$name - Call-Out now: $printurl");
+  Log3 ($name, 4, "$name - Call-Out now: $printurl");
   $hash->{HELPER}{LOGINRETRIES}++;
   
   $param = {
@@ -1364,7 +1367,7 @@ sub _loginReturn {
   my $success; 
 
   if ($err ne "") {                                                                # ein Fehler bei der HTTP Abfrage ist aufgetreten
-      Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
+      Log3 ($name, 2, "$name - error while requesting ".$param->{url}." - $err");
         
       readingsSingleUpdate($hash, "Error", $err, 1);                               
         
@@ -1374,14 +1377,14 @@ sub _loginReturn {
         ($success) = evaljson($hash,$myjson);                                      # Evaluiere ob Daten im JSON-Format empfangen wurden
         
         if (!$success) {
-            Log3($name, 4, "$name - no JSON-Data returned: ".$myjson);
+            Log3 ($name, 4, "$name - no JSON-Data returned: ".$myjson);
             delActiveToken($hash) if($type eq "SSCam");
             return;
         }
         
         my $data = decode_json($myjson);
         
-        Log3($name, 5, "$name - JSON decoded: ". Dumper $data);
+        Log3 ($name, 5, "$name - JSON decoded: ". Dumper $data);
    
         $success = $data->{'success'};
         
@@ -1395,7 +1398,7 @@ sub _loginReturn {
             readingsBulkUpdate  ($hash, "Error",     "none");
             readingsEndUpdate   ($hash, 1);
        
-            Log3($name, 4, "$name - Login of User $username successful - SID: $sid");
+            Log3 ($name, 4, "$name - Login of User $username successful - SID: $sid");
             
             return &$fret($fretarg);
         } 
@@ -1409,7 +1412,7 @@ sub _loginReturn {
             readingsBulkUpdate  ($hash, "state",     "login Error");
             readingsEndUpdate   ($hash, 1);
        
-            Log3($name, 3, "$name - Login of User $username unsuccessful. Code: $errorcode - $error - try again"); 
+            Log3 ($name, 3, "$name - Login of User $username unsuccessful. Code: $errorcode - $error - try again"); 
              
             return login($hash,$apiref,$fret,$fretarg,$sep);
        }
@@ -1442,13 +1445,13 @@ sub logout {
    
    my $url;
      
-   Log3($name, 4, "$name - --- Start Synology logout ---");
+   Log3 ($name, 4, "$name - --- Start Synology logout ---");
    
    my ($success, $username) = getCredentials($hash,0,"credentials",$sep);
    
-   if(!$sid) {
-       if($username) {
-           Log3($name, 2, qq{$name - User "$username" has no valid session, logout is cancelled});
+   if (!$sid) {
+       if ($username) {
+           Log3 ($name, 2, qq{$name - User "$username" has no valid session, logout is cancelled});
        }
 
        readingsBeginUpdate ($hash);
@@ -1464,7 +1467,7 @@ sub logout {
     
    my $timeout = AttrVal($name,"timeout",60);
    $timeout    = 60 if($timeout < 60);
-   Log3($name, 5, "$name - Call logout will be done with timeout value: $timeout s");
+   Log3 ($name, 5, "$name - Call logout will be done with timeout value: $timeout s");
   
    if (AttrVal($name,"session","DSM") eq "DSM") {
        $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Logout&_sid=$sid";    
@@ -1501,23 +1504,23 @@ sub _logoutReturn {
    my $type     = $hash->{TYPE};
   
    if ($err ne "") {                                                                                          # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
-       Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err"); 
+       Log3 ($name, 2, "$name - error while requesting ".$param->{url}." - $err"); 
        readingsSingleUpdate($hash, "Error", $err, 1);                                             
    
    } elsif ($myjson ne "") {                                                                                  # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
-       Log3($name, 4, "$name - URL-Call: ".$param->{url});
+       Log3 ($name, 4, "$name - URL-Call: ".$param->{url});
         
        my ($success) = evaljson($hash,$myjson);                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
         
        if (!$success) {
-           Log3($name, 4, "$name - Data returned: ".$myjson);
+           Log3 ($name, 4, "$name - Data returned: ".$myjson);
            delActiveToken ($hash) if($type eq "SSCam");
            return;
        }
         
        my $data = decode_json($myjson);
        
-       Log3($name, 4, "$name - JSON returned: ". Dumper $data);                   
+       Log3 ($name, 4, "$name - JSON returned: ". Dumper $data);                   
    
        $success = $data->{'success'};
 
@@ -1528,13 +1531,13 @@ sub _logoutReturn {
            readingsBulkUpdate  ($hash, "state",     "logout done");
            readingsEndUpdate   ($hash, 1);
            
-           Log3($name, 2, qq{$name - Session of User "$username" terminated - session ID "$sid" deleted});      
+           Log3 ($name, 2, qq{$name - Session of User "$username" terminated - session ID "$sid" deleted});      
        } 
        else {
            my $errorcode = $data->{'error'}->{'code'};                                                        # Errorcode aus JSON ermitteln
            my $error     = expErrorsAuth($hash,$errorcode);                                                   # Fehlertext zum Errorcode ermitteln
 
-           Log3($name, 2, qq{$name - ERROR - Logout of User $username was not successful, however SID: "$sid" has been deleted. Errorcode: $errorcode - $error});
+           Log3 ($name, 2, qq{$name - ERROR - Logout of User $username was not successful, however SID: "$sid" has been deleted. Errorcode: $errorcode - $error});
        }
    }
    
@@ -1554,7 +1557,7 @@ sub setActiveToken {
    $hash->{HELPER}{ACTIVE} = "on";
    
    if (AttrVal($name,"debugactivetoken",0)) {
-       Log3($name, 1, "$name - Active-Token set by OPMODE: $hash->{OPMODE}");
+       Log3 ($name, 1, "$name - Active-Token set by OPMODE: $hash->{OPMODE}");
    } 
    
 return;
@@ -1572,7 +1575,7 @@ sub delActiveToken {
    delCallParts ($hash);
    
    if (AttrVal($name,"debugactivetoken",0)) {
-       Log3($name, 1, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
+       Log3 ($name, 1, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
    }  
    
 return;
@@ -1638,12 +1641,12 @@ sub addSendqueue {
    my $hash  = $defs{$name};
    my $type  = $hash->{TYPE}; 
 
-   if($hasqhandler{$type}) {
+   if ($hasqhandler{$type}) {
        &{$hasqhandler{$type}{fn}} ($paref);
        return;
    }   
       
-   Log3($name, 1, qq{$name - ERROR - no module specific add Sendqueue handler for type "$type" found});
+   Log3 ($name, 1, qq{$name - ERROR - no module specific add Sendqueue handler for type "$type" found});
    
 return;
 }
@@ -1727,9 +1730,9 @@ sub _addSendqueueExtended {
     my $attachment = $paref->{attachment};
     my $postid     = $paref->{postid};
     
-    if(!$text && $opmode !~ /chatUserlist|chatChannellist|apiInfo|delPostId/x) {
+    if (!$text && $opmode !~ /chatUserlist|chatChannellist|apiInfo|delPostId/x) {
         my $err = qq{can't add message to queue: "text" is empty};
-        Log3($name, 2, "$name - ERROR - $err");
+        Log3 ($name, 2, "$name - ERROR - $err");
         
         setReadingErrorState ($hash, $err);      
 
@@ -1766,7 +1769,7 @@ sub __addSendqueueEntry {
   $data{$type}{$name}{sendqueue}{index}++;
   my $index = $data{$type}{$name}{sendqueue}{index};
     
-  Log3($name, 5, "$name - Add Item to queue - Index $index: \n".Dumper $entry);
+  Log3 ($name, 5, "$name - Add Item to queue - Index $index: \n".Dumper $entry);
                       
   $data{$type}{$name}{sendqueue}{entries}{$index} = $entry;  
 
@@ -1853,20 +1856,20 @@ sub checkSendRetry {
                       1401 1402 1403 1404 1405 1800 1801 1802 1803 1804 1805 2000 2001    
                       2002 9002);                                                         # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
   
-  if(!keys %{$data{$type}{$name}{sendqueue}{entries}}) {
-      Log3($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
+  if (!keys %{$data{$type}{$name}{sendqueue}{entries}}) {
+      Log3 ($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
       updQueueLength ($hash);
       return;  
   } 
   
-  if(!$retry) {                                                                           # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
+  if (!$retry) {                                                                           # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
       delete $hash->{OPIDX};
       delete $data{$type}{$name}{sendqueue}{entries}{$idx};
-      Log3($name, 4, qq{$name - Opmode "$opmode" finished successfully, Sendqueue index "$idx" deleted.});
+      Log3 ($name, 4, qq{$name - Opmode "$opmode" finished successfully, Sendqueue index "$idx" deleted.});
       updQueueLength ($hash);
       
-      if(keys %{$data{$type}{$name}{sendqueue}{entries}}) {
-          Log3($name, 4, "$name - Start next SendQueue entry..."); 
+      if (keys %{$data{$type}{$name}{sendqueue}{entries}}) {
+          Log3 ($name, 4, "$name - Start next SendQueue entry..."); 
           return &$startfnref ($name);                                                    # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer)
       }  
   } 
@@ -1876,15 +1879,15 @@ sub checkSendRetry {
   
       my $errorcode = ReadingsVal($name, "Errorcode", 0);
       
-      if($errorcode =~ /119/x) {                                                          # Session wird neu requestet und Queue-Eintrag wiederholt
+      if ($errorcode =~ /119/x) {                                                          # Session wird neu requestet und Queue-Eintrag wiederholt
           delete $hash->{HELPER}{SID};
       }
       
-      if(grep { $_ eq $errorcode } @forbidlist) {                              
+      if (grep { $_ eq $errorcode } @forbidlist) {                              
           $forbidSend = expErrors($hash,$errorcode);                                      # Fehlertext zum Errorcode ermitteln
           $data{$type}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
           
-          Log3($name, 2, qq{$name - ERROR - "$opmode" SendQueue index "$idx" not executed. It seems to be a permanent error. Exclude it from new send attempt !});
+          Log3 ($name, 2, qq{$name - ERROR - "$opmode" SendQueue index "$idx" not executed. It seems to be a permanent error. Exclude it from new send attempt !});
           
           delete $hash->{OPIDX};
           
@@ -1893,7 +1896,7 @@ sub checkSendRetry {
           return &$startfnref ($name);                                                    # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer);
       }
       
-      if(!$forbidSend) {
+      if (!$forbidSend) {
           my $rs = 0;
           $rs = $rc <= 1 ? 5 
               : $rc <  3 ? 20
@@ -1903,7 +1906,7 @@ sub checkSendRetry {
               : 86400
               ;
           
-          Log3($name, 2, qq{$name - ERROR - "$opmode" SendQueue index "$idx" not executed. Restart SendQueue in $rs s (retryCount $rc).});
+          Log3 ($name, 2, qq{$name - ERROR - "$opmode" SendQueue index "$idx" not executed. Restart SendQueue in $rs s (retryCount $rc).});
           
           my $rst = gettimeofday()+$rs;                                                  # resend Timer 
           updQueueLength       ($hash, $rst);                                            # updaten Länge der Sendequeue mit resend Timer
@@ -1926,16 +1929,16 @@ sub purgeSendqueue {
   my $type  = $hash->{TYPE};
   my $ret   = q{};
   
-  if($prop eq "-all-") {
+  if ($prop eq "-all-") {
       delete $hash->{OPIDX};
       delete $data{$type}{$name}{sendqueue}{entries};
       $data{$type}{$name}{sendqueue}{index} = 0;
       $ret = "All entries of SendQueue are deleted";
   } 
-  elsif($prop eq "-permError-") {
+  elsif ($prop eq "-permError-") {
       for my $idx (keys %{$data{$type}{$name}{sendqueue}{entries}}) { 
           delete $data{$type}{$name}{sendqueue}{entries}{$idx} 
-              if($data{$type}{$name}{sendqueue}{entries}{$idx}{forbidSend});            
+              if ($data{$type}{$name}{sendqueue}{entries}{$idx}{forbidSend});            
       }
       $ret = qq{All entries with state "permanent send error" are deleted};
   } 
@@ -1988,6 +1991,120 @@ sub updQueueLength {
   $hash->{RESEND} = $rst ? $head." ".FmtDateTime($rst) : $head." immediately by next entry";
 
 return;
+}
+
+############################################################################################################
+#                  check Modul Aktualität fhem.de <-> local
+#  return:  0|1 (Err-State), 0-kein Update nötig od. feststellbar/ 1-Update nötig, Message, Recommendation
+############################################################################################################
+sub checkModVer {
+  my $src  = "https://fhem.de/fhemupdate/controls_fhem.txt";
+  my $cmsg = 'got no module to check its update status';
+  my $name = shift // carp $carpnoname && return;
+  my $mod  = shift // carp $cmsg && return (1, 0, $cmsg, '');
+
+  my $msg  = q{};
+  my $rec  = q{};
+
+  if ($src !~ m,^(.*)/([^/]*)$,) {
+      $msg = "Cannot parse $src, probably not a valid http control file.";
+      $rec = "Please inform the $mod Maintainer about the Error Message.";
+      return (1, 0, $msg, $rec);
+  }
+
+  my $basePath     = $1;
+  my $ctrlFileName = $2;
+
+  my ($err, $remCtrlFile) = _updGetUrl($name, $src);
+
+  if ($err) {
+      $msg = "Check of SVN $mod version not possible: $err.";
+      $rec = "Try to execute the configCheck later again. Inform the $mod Maintainer if it seems to be a permanent problem.";
+      return (1, 0, $msg, $rec);
+  }
+
+  if (!$remCtrlFile) {
+      $msg = "Check of SVN $mod version not possible due to no valid SVN control file available.";
+      $rec = "Try to execute the configCheck later again. Inform the $mod Maintainer if it seems to be a permanent problem.";
+      return (1, 0, $msg, $rec);
+  }
+
+  my @remList = split /\R/, $remCtrlFile;
+  my $root    = $attr{global}{modpath};
+
+  Log3 ($name, 4, "$name - got SVN $ctrlFileName with ".int(@remList)." entries.");
+
+  open (FD, "$root/FHEM/$ctrlFileName") or do { $msg = "Automatic check of SVN $mod version not possible: $!.";
+                                                $rec = "Try to solve the problem that has occurred. Compare your local $mod version with the public version manually.";
+                                                return (1, 0, $msg, $rec);
+                                              };
+
+  my @locList = map { $_ =~ s/[\r\n]//; $_ } <FD>;
+  close(FD);
+
+  Log3 ($name, 4, "$name - got local $ctrlFileName with ".int(@locList)." entries.");
+
+  my %lh;
+
+  for my $l (@locList) {
+      my @l = split " ", $l, 4;
+      next if($l[0] ne "UPD" || $l[3] !~ /$mod/);
+      $lh{$l[3]}{TS}  = $l[1];
+      $lh{$l[3]}{LEN} = $l[2];
+  }
+
+  for my $rem (@remList) {
+      my @r = split " ", $rem, 4;
+      next if($r[0] ne "UPD" || $r[3] !~ /$mod/);
+
+      my $fName  = $r[3];
+      my $fPath  = "$root/$fName";
+      my $fileOk = ($lh{$fName} && $lh{$fName}{TS} eq $r[1] && $lh{$fName}{LEN} eq $r[2]);
+
+      if (!$fileOk) {
+          $msg = "A new $fName version is available on SVN (creation time: $r[1], size: $r[2] Bytes).";
+          $rec = "You should update FHEM to get the recent $fName version from Repository.";
+          return (0, 1, $msg, $rec);
+      }
+
+      my $sz = -s $fPath;
+
+      if ($fileOk && defined $sz && $sz ne $r[2]) {
+          $msg = "Your local $mod module is modified ($sz Bytes). The SVN version of $fName has creation time: $r[1] ($r[2] Bytes).";
+          $rec = "You should update FHEM to get the recent $mod version from Repository.";
+          return (0, 1, $msg, $rec);
+      }
+
+      last;
+  }
+
+  $msg = "Your local $mod module is up to date.";
+  $rec = "Update of $mod is not needed.";
+
+return (0, 0, $msg, $rec);
+}
+
+sub _updGetUrl {
+  my $name = shift;
+  my $url  = shift;
+
+  my %upd_connecthash;
+
+  $url                        =~ s/%/%25/g;
+  $upd_connecthash{url}       = $url;
+  $upd_connecthash{keepalive} = $url =~ m/localUpdate/ ? 0 : 1;                                   # Forum #49798
+
+  my ($err, $data) = HttpUtils_BlockingGet(\%upd_connecthash);
+
+  if ($err) {
+      return ($err, "");
+  }
+
+  if (!$data) {
+      return ("$url -> empty file received", "");
+  }
+
+return ("", $data);
 }
 
 1;
