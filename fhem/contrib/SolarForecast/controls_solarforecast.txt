@@ -1,2 +1,2 @@
-UPD  2023-12-04_11:34:56 65 ftui_forecast.css
-UPD  2023-12-04_11:34:56 3413 widget_forecast.js 
+UPD 2023-12-04_11:34:56 65 contrib/SolarForecast/ftui_forecast.css
+UPD 2023-12-04_11:34:56 3413 contrib/SolarForecast/widget_forecast.js
