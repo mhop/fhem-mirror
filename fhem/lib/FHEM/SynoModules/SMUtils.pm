@@ -2076,7 +2076,7 @@ sub checkModVer {
       if (!$fileOk) {
           $msg = "A new $fName version is available on SVN (creation time: $r[1], size: $r[2] Bytes).";
           $rec = "You should update FHEM to get the recent $fName version from Repository.";
-          return (0, 1, $msg, $rec);
+          return (0, 1, $msg, $rec, $fName, $r[2]);
       }
 
       my $sz = -s $fPath;
@@ -2084,7 +2084,7 @@ sub checkModVer {
       if (!defined $sz) {
           $msg = "The local $mod file is not installed or not reachable.";
           $rec = "You should update FHEM to get the recent $mod version from Repository.";
-          return (0, 1, $msg, $rec);
+          return (0, 1, $msg, $rec, $fName, $r[2]);
       }      
       
       Log3 ($name, 4, "$name - compare file $fName -> local: TS >$lh{$fName}{TS}<, LEN >$sz< | remote: TS >$r[1]<, LEN >$r[2]<");
@@ -2092,7 +2092,7 @@ sub checkModVer {
       if ($fileOk && $sz ne $r[2]) {
           $msg = "Your local $mod module is modified ($sz Bytes). The SVN version of $fName has creation time: $r[1] ($r[2] Bytes).";
           $rec = "You should update FHEM to get the recent $mod version from Repository.";
-          return (0, 1, $msg, $rec);
+          return (0, 1, $msg, $rec, $fName, $r[2]);
       }
 
       last;
