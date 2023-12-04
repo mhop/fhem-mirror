@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.27.1  04.12.2023  change checkModVer
 # 1.27.0  03.12.2023  new function checkModVer
 # 1.26.0  08.04.2023  add postid to _addSendqueueExtended
 # 1.25.0              new sub timestampToDateTime
@@ -57,7 +58,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version 0.77; our $VERSION = version->declare('1.27.0');
+use version 0.77; our $VERSION = version->declare('1.27.1');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -2014,7 +2015,7 @@ sub checkModVer {
   }
 
   my $basePath     = $1;
-  my $ctrlFileName = $2;
+  my $ctrlFileName = (split /\?/, $2)[0];
 
   my ($err, $remCtrlFile) = _updGetUrl($name, $src);
 
@@ -2029,11 +2030,12 @@ sub checkModVer {
       $rec = "Try to execute the configCheck later again. Inform the $mod Maintainer if it seems to be a permanent problem.";
       return (1, 0, $msg, $rec);
   }
-
+  
   my @remList = split /\R/, $remCtrlFile;
   my $root    = $attr{global}{modpath};
 
   Log3 ($name, 4, "$name - got SVN $ctrlFileName with ".int(@remList)." entries.");
+  Log3 ($name, 5, "$name - content of remote control file:\n$remCtrlFile");
 
   open (FD, "$root/FHEM/$ctrlFileName") or do { $msg = "Automatic check of SVN $mod version not possible: $!.";
                                                 $rec = "Try to solve the problem that has occurred. Compare your local $mod version with the public version manually.";
@@ -2078,8 +2080,16 @@ sub checkModVer {
       }
 
       my $sz = -s $fPath;
+      
+      if (!defined $sz) {
+          $msg = "The local $mod file is not installed or not reachable.";
+          $rec = "You should update FHEM to get the recent $mod version from Repository.";
+          return (0, 1, $msg, $rec);
+      }      
+      
+      Log3 ($name, 4, "$name - compare file $fName -> local: TS >$lh{$fName}{TS}<, LEN >$sz< | remote: TS >$r[1]<, LEN >$r[2]<");
 
-      if ($fileOk && defined $sz && $sz ne $r[2]) {
+      if ($fileOk && $sz ne $r[2]) {
           $msg = "Your local $mod module is modified ($sz Bytes). The SVN version of $fName has creation time: $r[1] ($r[2] Bytes).";
           $rec = "You should update FHEM to get the recent $mod version from Repository.";
           return (0, 1, $msg, $rec);
