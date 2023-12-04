@@ -640,7 +640,6 @@ FHEM/lib/UPnP/*              Reinerlein           Multimedia
 lib/FHEM/Core/Timer/Helper.pm    sidey79          FHEM Development
 lib/FHEM/Core/Timer/Register.pm  Beta-User        FHEM Development
 lib/FHEM/SynoModules/*           DS_Starter       Sonstiges
-lib/FHEM/SolarForecast/*         DS_Starter       Solaranlagen
 lib/FHEM/Text/Unicode.pm         Adimarantis      FHEM Development
 lib/FHEM/Utility/CTZ.pm          DS_Starter       Sonstiges
 
@@ -670,6 +669,7 @@ contrib/PRESENCE             markusbloch/orphan   Unterstützende Dienste
 contrib/PRESENCE/lepresenced PatrickR             Unterstützende Dienste
 contrib/RHASSPY/*            drhirn/Beta-User     Frontends/Sprachsteuerung
 contrib/SIP/*                Wzut                 Sonstiges
+contrib/SolarForecast/*      DS_Starter           Solaranlagen
 contrib/WebViewControl/*     Dirk                 Mobile Devices
 contrib/Widgets/DateTimePicker* Matscher          Frontends
 contrib/Wzut/*		     Wzut		  MAX
