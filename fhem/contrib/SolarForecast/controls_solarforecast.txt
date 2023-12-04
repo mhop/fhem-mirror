@@ -1,3 +1,5 @@
-DIR contrib/SolarForecast
-UPD 2023-12-04_11:34:56 65 contrib/SolarForecast/ftui_forecast.css
-UPD 2023-12-04_11:34:56 3413 contrib/SolarForecast/widget_forecast.js
+DIR www/tablet
+DIR www/tablet/css
+DIR www/tablet/js
+UPD 2023-12-04_11:34:56 65 www/tablet/css/ftui_forecast.css
+UPD 2023-12-04_11:34:56 3413 www/tablet/js/widget_forecast.js
