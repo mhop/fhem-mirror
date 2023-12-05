@@ -2057,12 +2057,7 @@ sub checkModVer {
       $lh{$l[3]}{TS}  = $l[1];
       $lh{$l[3]}{LEN} = $l[2];
       $found          = 1;
-  }
-  
-  if (!$found) {
-      $msg = "The $mod file does not appear to exist in your system.";
-      $rec = "You should do a complete FHEM update first. Inform the Maintainer if it seems to be a permanent problem.";
-      return (1, 0, $msg, $rec);      
+      last;
   }
 
   for my $rem (@remList) {
@@ -2072,6 +2067,12 @@ sub checkModVer {
       my $fName  = $r[3];
       my $fPath  = "$root/$fName";
       my $fileOk = ($lh{$fName} && $lh{$fName}{TS} eq $r[1] && $lh{$fName}{LEN} eq $r[2]);
+      
+      if (!$found) {                                                                           # nicht in lokalem control file
+          $msg = "The $mod file does not appear to exist in your system.";
+          $rec = "You should do a complete FHEM update first. Inform the Maintainer if it seems to be a permanent problem.";
+          return (0, 1, $msg, $rec, $fName, $r[2]);      
+      }
 
       if (!$fileOk) {
           $msg = "A new $fName version is available on SVN (creation time: $r[1], size: $r[2] Bytes).";

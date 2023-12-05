@@ -99,6 +99,7 @@ BEGIN {
           getAllGets
           getAllSets
           HttpUtils_NonblockingGet
+          HttpUtils_BlockingGet
           init_done
           InternalTimer
           IsDisabled
@@ -152,6 +153,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.5.0"  => "05.12.2023  new getter ftuiFramefiles ",
   "1.4.3"  => "03.12.2023  hidden set or attr commands in user specific header area when called by 'get ... html' ".
                            "plantConfig: check module update in repo ",
   "1.4.2"  => "02.12.2023  ___getFWwidget: codechange ___getFWwidget using __widgetFallback function ",
@@ -611,6 +613,7 @@ my %hget = (                                                                # Ha
   rooftopData        => { fn => \&_getRoofTopData,              needcred => 0 },
   solApiData         => { fn => \&_getlistSolCastData,          needcred => 0 },
   valDecTree         => { fn => \&_getaiDecTree,                needcred => 0 },
+  ftuiFramefiles     => { fn => \&_ftuiFramefiles,              needcred => 0 },
 );
 
 my %hattr = (                                                                # Hash für Attr-Funktion
@@ -2464,6 +2467,7 @@ sub Get {
                 "valConsumerMaster:#,$cml ".
                 "data:noArg ".
                 "forecastQualities:noArg ".
+                "ftuiFramefiles:noArg ".
                 "html:$hol ".
                 "nextHours:noArg ".
                 "pvCircular:noArg ".
@@ -4007,6 +4011,228 @@ sub __getaiRuleStrings {                 ## no critic "not used"
   }
 
 return $rs;
+}
+
+###############################################################
+#                       Getter ftuiFramefiles
+# hole Dateien aus dem online Verzeichnis 
+# /fhem/contrib/SolarForecast/
+# Ablage entsprechend Definition in controls_solarforecast.txt
+###############################################################
+sub _ftuiFramefiles {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  
+  my $ret;
+  my $upddo = 0;
+  my $root  = $attr{global}{modpath};
+  my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';
+  my $pPath = '?format=txt';
+  my $cfile = 'controls_solarforecast.txt';
+  my $cfurl = $bPath.$cfile.$pPath;
+  
+  my @fs = qw( ftui_forecast.css 
+               widget_forecast.js
+               ftui_smaportalspg.css
+               widget_smaportalspg.js
+             );
+  
+  for my $file (@fs) {
+      my $lencheck = 1;
+      
+      my ($cmerr, $cmupd, $cmmsg, $cmrec, $cmfile, $cmlen) = checkModVer ($name, $file, $cfurl);
+
+      if ($cmerr && $cmmsg =~ /Automatic\scheck/xs && $cmrec =~ /Compare\syour\slocal/xs) {        # lokales control file ist noch nicht vorhanden -> update ohne Längencheck
+          $cmfile   = 'FHEM/'.$cfile;
+          $file     = $cfile; 
+          $lencheck = 0; 
+          $cmerr    = 0;
+          $cmupd    = 1;   
+
+          Log3 ($name, 3, "$name - automatic install local control file $root/$cmfile");           
+      }
+      
+      if ($cmerr) {
+          $ret = "$cmmsg<br>$cmrec";
+          return $ret; 
+      }
+      
+      if ($cmupd) {
+          $upddo = 1;
+          $ret = __updPreFile ( { name     => $name,
+                                  root     => $root,
+                                  cmfile   => $cmfile,
+                                  cmlen    => $cmlen,
+                                  bPath    => $bPath,
+                                  file     => $file,
+                                  pPath    => $pPath,
+                                  lencheck => $lencheck
+                                }
+                              );
+                             
+          return $ret if($ret);          
+      }
+  }
+  
+  ## finales Update control File
+  ################################          
+  $ret = __updPreFile ( { name     => $name,
+                          root     => $root,
+                          cmfile   => 'FHEM/'.$cfile,
+                          cmlen    => 0,
+                          bPath    => $bPath,
+                          file     => $cfile,
+                          pPath    => $pPath,
+                          lencheck => 0,
+                          finalupd => 1
+                        }
+                      );
+                     
+  return $ret if($ret);
+  
+  if (!$upddo) {
+      return 'SolarForecast FTUI files are already up to date'; 
+  }
+
+return 'SolarForecast FTUI files updated';
+}
+
+###############################################################
+#    File zum Abruf von url vorbereiten und in das 
+#    Zielverzeichnis schreiben
+###############################################################
+sub __updPreFile {
+  my $pars = shift;
+  
+  my $name     = $pars->{name};
+  my $root     = $pars->{root};
+  my $cmfile   = $pars->{cmfile};
+  my $cmlen    = $pars->{cmlen};
+  my $bPath    = $pars->{bPath};
+  my $file     = $pars->{file};
+  my $pPath    = $pars->{pPath};
+  my $lencheck = $pars->{lencheck};
+  my $finalupd = $pars->{finalupd} // 0;
+  
+  my $err;
+  
+  my $dir = $cmfile;
+  $dir    =~ m,^(.*)/([^/]*)$,;
+  $dir    = $1;
+  $dir    = "" if(!defined $dir);                                                          # file in .
+  
+  my @p = split "/", $dir;
+  
+  for (my $i = 0; $i < int @p; $i++) {
+      my $path = "$root/".join ("/", @p[0..$i]);
+       
+      if (!-d $path) {
+          $err  = "The FTUI does not appear to be installed.<br>";
+          $err .= "Please check whether the path $path is present and accessible.<br>";
+          $err .= "After installing FTUI, come back and execute the get command again.";
+          return $err;  
+          
+          #my $ok = mkdir $path;
+          
+          #if (!$ok) {
+          #    $err = "MKDIR ERROR: $!";
+          #    Log3 ($name, 2, "$name - $err");
+          #    return $err;                      
+          #}
+          #else {
+          #    Log3 ($name, 3, "$name - MKDIR $path");  
+          #}
+      }
+  }
+  
+  ($err, my $remFile) = __updGetUrl ($name, $bPath.$file.$pPath);
+  
+  if ($err) {
+      Log3 ($name, 2, "$name - $err");
+      return $err;
+  }
+  
+  if ($lencheck && length $remFile ne $cmlen) {
+      $err = "update ERROR: length of $file is not $cmlen Bytes";
+      Log3 ($name, 2, "$name - $err"); 
+      return $err;
+  }
+  
+  $err = __updWriteFile ($root, $cmfile, $remFile);
+   
+  if ($err) {
+      Log3 ($name, 2, "$name - $err");
+      return $err;
+  }
+  
+  Log3 ($name, 3, "$name - update done $file to $root/$cmfile ".($cmlen ? "(length: $cmlen Bytes)" : '')); 
+  
+  if(!$lencheck && !$finalupd) {
+      return 'SolarForecast update control file installed. Please retry the get command to update FTUI files.';  
+  } 
+
+return;
+}
+
+###############################################################
+#                     File von url holen
+###############################################################
+sub __updGetUrl {
+  my $name = shift;
+  my $url  = shift;
+  
+  $url =~ s/%/%25/g;
+  my %upd_connecthash;
+  my $unicodeEncoding = 1;
+  
+  $upd_connecthash{url}           = $url;
+  $upd_connecthash{keepalive}     = ($url =~ m/localUpdate/ ? 0 : 1);                        # Forum #49798
+  $upd_connecthash{forceEncoding} = '' if($unicodeEncoding);
+  
+  my ($err, $data) = HttpUtils_BlockingGet (\%upd_connecthash);
+  
+  if ($err) {
+      $err = "update ERROR: $err"; 
+      return ($err, '');
+  }
+  
+  if (!$data) {
+      $err = 'update ERROR: empty file received';
+      return ($err, '');
+  }
+  
+return ('', $data);
+}
+
+###############################################################
+#               Updated File schreiben
+###############################################################
+sub __updWriteFile {       
+  my $root    = shift;
+  my $fName   = shift;
+  my $content = shift;
+  
+  my $fPath = "$root/$fName";
+  my $err;
+  
+  if (!open(FD, ">$fPath")) {
+      $err = "update ERROR open $fPath failed: $!";    
+      return $err;
+  }
+  
+  binmode(FD);
+  print FD $content;
+  close(FD);
+
+  my $written = -s "$fPath";
+  
+  if ($written != length $content) {
+      $err = "update ERROR writing $fPath failed: $!";    
+      return $err;
+  }
+
+return;
 }
 
 ################################################################
@@ -12548,7 +12774,7 @@ sub checkPlantConfig {
 
   ## Check Attribute DWD Wetterdevice
   #####################################
-  my $fcname = ReadingsVal($name, 'currentWeatherDev', '');
+  my $fcname = ReadingsVal ($name, 'currentWeatherDev', '');
 
   if (!$fcname || !$defs{$fcname}) {
       $result->{'DWD Weather Attributes'}{state}   = $nok;
@@ -12682,7 +12908,7 @@ sub checkPlantConfig {
   my ($cmerr, $cmupd, $cmmsg, $cmrec) = checkModVer ($name, '76_SolarForecast', 'https://fhem.de/fhemupdate/controls_fhem.txt');
   
   if (!$cmerr && !$cmupd) {
-      $result->{'Common Settings'}{note}   .= qq{$cmmsg<br> $cmrec<br>};
+      $result->{'Common Settings'}{note}   .= qq{$cmmsg<br>};
       $result->{'Common Settings'}{note}   .= qq{checked module: <br>};
       $result->{'Common Settings'}{note}   .= qq{76_SolarForecast <br>};
   }
@@ -15378,6 +15604,19 @@ to ensure that the system configuration is correct.
       </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-get-ftuiFramefiles"></a>
+      <li><b>ftuiFramefiles </b> <br><br>
+      SolarForecast provides widgets for 
+      <a href='https://wiki.fhem.de/wiki/FHEM_Tablet_UI' target='_blank'>FHEM Tablet UI v2 (FTUI2)</a>. <br>
+      If FTUI2 is installed on the system, the files for the framework can be loaded into the FTUI directory structure 
+      with this command. <br>
+      The setup and use of the widgets is described in Wiki
+      <a href='https://wiki.fhem.de/wiki/SolarForecast_FTUI_Widget' target='_blank'>SolarForecast FTUI Widget</a>.
+      </li>
+    </ul>
+    <br>   
 
     <ul>
       <a id="SolarForecast-get-html"></a>
@@ -17334,6 +17573,20 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-get-ftuiFramefiles"></a>
+      <li><b>ftuiFramefiles </b> <br><br>
+      SolarForecast stellt Widgets für 
+      <a href='https://wiki.fhem.de/wiki/FHEM_Tablet_UI' target='_blank'>FHEM Tablet UI v2 (FTUI2)</a> zur Verfügung. <br>
+      Ist FTUI2 auf dem System installiert, können die Dateien für das Framework mit diesem Kommando in die
+      FTUI-Verzeichnisstruktur geladen werden. <br>
+      Die Einrichtung und Verwendung der Widgets ist im Wiki
+      <a href='https://wiki.fhem.de/wiki/SolarForecast_FTUI_Widget' target='_blank'>SolarForecast FTUI Widget</a> 
+      beschrieben.
+      </li>
+    </ul>
+    <br> 
 
     <ul>
       <a id="SolarForecast-get-html"></a>
