@@ -2,4 +2,6 @@ DIR www/tablet
 DIR www/tablet/css
 DIR www/tablet/js
 UPD 2023-12-04_11:34:56 65 www/tablet/css/ftui_forecast.css
+UPD 2019-06-28_22:09:14 69 www/tablet/css/ftui_smaportalspg.css
 UPD 2023-12-04_11:34:56 3413 www/tablet/js/widget_forecast.js
+UPD 2019-07-02_23:42:41 3096 www/tablet/js/widget_smaportalspg.js
