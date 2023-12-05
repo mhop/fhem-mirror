@@ -1,8 +1,8 @@
-REV 28242
+REV 28252
 DIR unused
 UPD 2023-12-04_07:45:03 413617 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
-UPD 2023-12-04_07:45:03 47040 ./MAINTAINER.txt
+UPD 2023-12-05_07:45:03 47040 ./MAINTAINER.txt
 UPD 2023-08-24_07:45:03 46886 ./configDB.pm
 UPD 2023-05-29_07:45:03 21936 ./fhem.cfg.demo
 UPD 2023-11-30_07:45:14 174049 ./fhem.pl
@@ -760,8 +760,8 @@ UPD 2023-12-04_07:45:09 5118690 docs/commandref.html
 UPD 2023-12-04_07:45:12 3144317 docs/commandref_DE.html
 UPD 2023-08-25_07:45:03 86242 docs/commandref_frame.html
 UPD 2023-08-25_07:45:03 96940 docs/commandref_frame_DE.html
-UPD 2023-12-04_07:45:13 313901 docs/commandref_modular.html
-UPD 2023-12-04_07:45:14 325747 docs/commandref_modular_DE.html
+UPD 2023-12-05_07:45:14 313901 docs/commandref_modular.html
+UPD 2023-12-05_07:45:15 325747 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -801,7 +801,7 @@ UPD 2022-06-01_07:45:03 11892 lib/FHEM/Modbus/TestUtils.pm
 UPD 2023-09-01_07:45:02 35044 lib/FHEM/Scheduler/Cron.pm
 UPD 2023-04-09_07:45:03 10123 lib/FHEM/SynoModules/API.pm
 UPD 2023-04-09_07:45:03 15445 lib/FHEM/SynoModules/ErrCodes.pm
-UPD 2023-12-04_07:45:03 81660 lib/FHEM/SynoModules/SMUtils.pm
+UPD 2023-12-05_07:45:03 82213 lib/FHEM/SynoModules/SMUtils.pm
 UPD 2022-02-07_07:45:02 5876 lib/FHEM/Text/Unicode.pm
 UPD 2022-10-09_07:45:02 6074 lib/FHEM/Utility/CTZ.pm
 UPD 2022-02-11_07:45:02 7870 lib/FHEM/Utility/MQTT2_Dispatcher.pm
