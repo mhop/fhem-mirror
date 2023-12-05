@@ -3517,6 +3517,7 @@ attr DEVICE setList \
   valve_min_percent:slider,0,1,100,1 $\DEVICETOPIC/thermostat/0/command/valve_min_percent $EVTPART1\
   boost:on,off {my $val=$EVTPART1 eq 'on'?5:0; qq($\DEVICETOPIC/thermostat/0/command/boost_minutes $val)}\
   boost_minutes $\DEVICETOPIC/thermostat/0/command/boost_minutes $EVTPART1\
+  window:open,close {my $val=$EVTPART1 eq 'open'?1:0; qq($DEVICETOPIC/thermostat/0/command/window_open $val)}\
   set_boost_minutes $\DEVICETOPIC/thermostat/0/command/set_boost_minutes $EVTPART1
 attr DEVICE jsonMap bat:0 bat_value:batteryPercent bat_voltage:batteryVoltage target_t_value:desired-temp thermostats_1_tmp_value:temperature thermostats_1_valve_min_percent:valve_min_percent thermostats_1_target_t_accelerated_heating:accelerated_heating thermostats_1_schedule:mode thermostats_1_pos:valve
 attr DEVICE stateFormat Measured: temperature Battery: batteryPercent %
@@ -3526,7 +3527,7 @@ attr DEVICE setStateList on off
 attr DEVICE model shelly_TRV
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20221106
+setreading DEVICE attrTemplateVersion 20231205
 
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
@@ -5586,14 +5587,14 @@ setreading DEVICE attrTemplateVersion 20210804
 ###########################################
 name:hoymiles_microinverter_hub_bridge
 filter:TYPE=MQTT2_DEVICE
-desc:Early version! Use this with "ahoy" firmware for ESP8266+nRF24L01+. For further details visit https://github.com/grindylow/ahoy and https://www.mikrocontroller.net/topic/525778. Resulting <b>device represents the interfacing ESP-MCU</b>, all inverters will be forwarded into own MQTT2_DEVICE instances.
+desc:Early version! Use this with "ahoy" firmware for ESP8266+nRF24L01+. For further details visit https://github.com/lumapu/ahoy and https://www.mikrocontroller.net/topic/525778. Resulting <b>device represents the interfacing ESP-MCU</b>, all inverters will be forwarded into own MQTT2_DEVICE instances.
 order:W_06
 farewell:template has been applied successfully. <br>Note: In case you use an external MQTT server or not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like "|devcontrol/[0-8]+/[0-8]+". For the single microinverters, please be patient, until the Readings concerning the AC will have been sent in.
 par:BASE_ID;BASE_ID as set on the esp;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)/version:, ? $1 : undef }
 par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
 attr DEVICE icon ICON
 attr DEVICE bridgeRegexp BASE_ID/([^/]+)/ch[0-9]+/.*:.* "BASE_ID_$1"\
-  BASE_ID/([^/]+)/(available|last_success|ack_pwr_limit|alarm/.*):.* "BASE_ID_$1"
+  BASE_ID/([^/]+)/(available|last_success|ack_pwr_limit|alarm|radio_stat|dis_night_comm/.*):.* "BASE_ID_$1"
 attr DEVICE autocreate 1
 attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/free_heap:.* free_heap\
@@ -5616,7 +5617,7 @@ attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/total/YieldTotal:.* YieldTotal
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_hub_bridge
-setreading DEVICE attrTemplateVersion 20230820
+setreading DEVICE attrTemplateVersion 20231205
 { AttrTemplate_Initialize() }
 #   "setup/set_time",
 #   "setup/sync_ntp
@@ -5643,6 +5644,8 @@ option:{ RADIO_SINGLE }
 attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name,1)}
 attr DEVICE readingList INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/last_success:.* last_success\
+  INVERTERLONG_ID/radio_stat:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  INVERTERLONG_ID/dis_night_comm:.* dis_night_comm\
   INVERTERLONG_ID/ch0/active_PowerLimit:.* active_PowerLimit\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
@@ -5683,6 +5686,8 @@ attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name,2)}
 attr DEVICE readingList \
   INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/last_success:.* last_success\
+  INVERTERLONG_ID/radio_stat:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  INVERTERLONG_ID/dis_night_comm:.* dis_night_comm\
   INVERTERLONG_ID/ch0/active_PowerLimit:.* active_PowerLimit\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
@@ -5730,6 +5735,8 @@ attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name)}
 attr DEVICE readingList \
   INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/last_success:.* last_success\
+  INVERTERLONG_ID/radio_stat:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  INVERTERLONG_ID/dis_night_comm:.* dis_night_comm\
   INVERTERLONG_ID/ch0/active_PowerLimit:.* active_PowerLimit\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
@@ -5795,6 +5802,8 @@ attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name,6)}
 attr DEVICE readingList \
   INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/last_success:.* last_success\
+  INVERTERLONG_ID/radio_stat:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  INVERTERLONG_ID/dis_night_comm:.* dis_night_comm\
   INVERTERLONG_ID/ch0/active_PowerLimit:.* active_PowerLimit\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
@@ -5876,7 +5885,7 @@ attr DEVICE setList \
   limit_pct:slider,2,1,100 BASE_ID/ctrl/limit/INVERTER_NR $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20230830
+setreading DEVICE attrTemplateVersion 20231205
 
 # contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
 name:hoymiles_opendtu_hub_bridge

@@ -56,28 +56,46 @@ sub devStateIcon {
   $avail = $avail > 1 ? '10px-kreis-gruen' : isday() ? '10px-kreis-rot' :'10px-kreis-gelb'; 
   $ret .= FW_makeImage($avail, 'edit_settings');
   $ret .= ' ';
-  $ret .= ReadingsNum($devname,'P_AC',0);
-  $ret .= ' W / ';
-  $ret .= ReadingsNum($devname,'YieldDay',0);
-  $ret .= ' Wh';
 
-  my $total = ReadingsNum($devname,'YieldTotal',0,1);
-  if ( $total > 0 ) {
-    $ret .= ' / ';
-    $ret .= $total;
-    $ret .= ' kWh';
-  }
-  
-  for (1..$panels) {
-    $ret .= '<br>';
-    $col = substr(Color::pahColor(0,50,100,ReadingsNum($devname,"Irradiation$_",0),$colors),0,6);
+  if ( $panels > 1 ) {
+    $ret .= ReadingsNum($devname,'P_AC',0);
+    $ret .= ' W / ';
+    $ret .= ReadingsNum($devname,'YieldDay',0);
+    $ret .= ' Wh';
+
+    my $total = ReadingsNum($devname,'YieldTotal',0,1);
+    if ( $total > 0 ) {
+      $ret .= ' / ';
+      $ret .= $total;
+      $ret .= ' kWh';
+    }
+
+    for (1..$panels) {
+      $ret .= '<br>';
+      $col = substr(Color::pahColor(0,50,100,ReadingsNum($devname,"Irradiation$_",0),$colors),0,6);
+      $ret .= FW_makeImage("solar\@$col",'file_unknown@grey');
+      $ret .= ' ';
+      $ret .= ReadingsNum($devname,"P_DC$_",0);
+      $ret .= ' W / ';
+      $ret .= ReadingsNum($devname,"YieldDay$_",0);
+      $ret .= ' Wh';
+      $total = ReadingsNum($devname,"YieldTotal$_",0,1);
+      if ( $total > 0 ) {
+        $ret .= ' / ';
+        $ret .= $total;
+        $ret .= ' kWh';
+      }
+    }
+  } else {
+    $col = substr(Color::pahColor(0,50,100,ReadingsNum($devname,"Irradiation1",0),$colors),0,6);
     $ret .= FW_makeImage("solar\@$col",'file_unknown@grey');
     $ret .= ' ';
-    $ret .= ReadingsNum($devname,"P_DC$_",0);
+    $ret .= ReadingsNum($devname,'P_AC',0);
     $ret .= ' W / ';
-    $ret .= ReadingsNum($devname,"YieldDay$_",0);
+    $ret .= ReadingsNum($devname,'YieldDay',0);
     $ret .= ' Wh';
-    $total = ReadingsNum($devname,"YieldTotal$_",0,1);
+
+    my $total = ReadingsNum($devname,'YieldTotal',0,1);
     if ( $total > 0 ) {
       $ret .= ' / ';
       $ret .= $total;
