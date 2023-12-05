@@ -152,7 +152,8 @@ attr DEVICE readingList\
   $\DEVICETOPIC/bridge/info:.* info\
   $\DEVICETOPIC/bridge/groups:.* groups\
   $\DEVICETOPIC/bridge/event:.* { json2nameValue($EVENT) }\
-  $\DEVICETOPIC/bridge/extensions:.* extensions
+  $\DEVICETOPIC/bridge/extensions:.* extensions\
+  $\DEVICETOPIC/bridge/response/permit_join:.* { json2nameValue($EVENT) }
 attr DEVICE setList\
   log_level:debug,info,warn,error $\DEVICETOPIC/bridge/config/log_level $EVTPART1\
   permit_join:true,false $\DEVICETOPIC/bridge/request/permit_join $EVTPART1\
@@ -178,7 +179,7 @@ attr DEVICE comment To check for new updates of the deamon software, you might w
 #set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
 set DEVICE attrTemplate do_general_mqtt_cleanup
 attr DEVICE model zigbee2mqtt_bridge
-setreading DEVICE attrTemplateVersion 20220328
+setreading DEVICE attrTemplateVersion 20231205
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371
 
 
@@ -3368,7 +3369,7 @@ par:DEVNAME;name of this shelly;{ AttrVal('DEVICE','readingList','') =~ m,shelli
 par:ICON;ICON as set, defaults to motion_detector;{ AttrVal('DEVICE','icon','motion_detector') }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'true'?'10px-kreis-gruen':'10px-kreis-rot'; \
-my $moti = ReadingsVal($name,"motion","false") eq "true"?"people_sensor":"message_presence"; \
+my $moti = ReadingsVal($name,"status_motion","false") eq "true"?"people_sensor":"message_presence"; \
 "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($moti)."</a>"}
 attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/sensor/status:.* { json2nameValue($EVENT) }\
@@ -3377,7 +3378,7 @@ attr DEVICE readingList shellies/DEVNAME/online:.* online\
 attr DEVICE setList x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 attr DEVICE model shellymotion
-setreading DEVICE attrTemplateVersion 20210324
+setreading DEVICE attrTemplateVersion 20231205
 
 
 # shellyht using original firmware
