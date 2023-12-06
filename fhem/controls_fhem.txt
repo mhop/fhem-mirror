@@ -1,6 +1,6 @@
-REV 28252
+REV 28257
 DIR unused
-UPD 2023-12-04_07:45:03 413617 ./CHANGED
+UPD 2023-12-06_07:45:03 413678 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2023-12-05_07:45:03 47040 ./MAINTAINER.txt
 UPD 2023-08-24_07:45:03 46886 ./configDB.pm
@@ -419,7 +419,7 @@ UPD 2016-08-22_07:45:11 9037 FHEM/76_MSGFile.pm
 UPD 2016-12-08_07:45:12 17663 FHEM/76_MSGMail.pm
 UPD 2022-11-02_07:45:02 77314 FHEM/76_SMAEVCharger.pm
 UPD 2023-10-09_07:45:02 174526 FHEM/76_SMAInverter.pm
-UPD 2023-12-04_07:45:03 936638 FHEM/76_SolarForecast.pm
+UPD 2023-12-06_07:45:03 944653 FHEM/76_SolarForecast.pm
 UPD 2022-05-31_07:45:03 43244 FHEM/76_msgDialog.pm
 UPD 2021-10-29_07:45:03 57317 FHEM/77_SMAEM.pm
 UPD 2016-07-19_07:45:16 23026 FHEM/77_SMASTP.pm
@@ -658,7 +658,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2022-01-15_07:45:03 10338 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2023-09-27_07:45:03 426990 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2023-12-06_07:45:03 427702 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2022-12-13_07:45:02 11263 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -756,12 +756,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2023-12-04_07:45:09 5118690 docs/commandref.html
-UPD 2023-12-04_07:45:12 3144317 docs/commandref_DE.html
+UPD 2023-12-06_07:45:09 5119308 docs/commandref.html
+UPD 2023-12-06_07:45:12 3144979 docs/commandref_DE.html
 UPD 2023-08-25_07:45:03 86242 docs/commandref_frame.html
 UPD 2023-08-25_07:45:03 96940 docs/commandref_frame_DE.html
-UPD 2023-12-05_07:45:14 313901 docs/commandref_modular.html
-UPD 2023-12-05_07:45:15 325747 docs/commandref_modular_DE.html
+UPD 2023-12-06_07:45:13 313934 docs/commandref_modular.html
+UPD 2023-12-06_07:45:15 325780 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -801,7 +801,7 @@ UPD 2022-06-01_07:45:03 11892 lib/FHEM/Modbus/TestUtils.pm
 UPD 2023-09-01_07:45:02 35044 lib/FHEM/Scheduler/Cron.pm
 UPD 2023-04-09_07:45:03 10123 lib/FHEM/SynoModules/API.pm
 UPD 2023-04-09_07:45:03 15445 lib/FHEM/SynoModules/ErrCodes.pm
-UPD 2023-12-05_07:45:03 82213 lib/FHEM/SynoModules/SMUtils.pm
+UPD 2023-12-06_07:45:03 82370 lib/FHEM/SynoModules/SMUtils.pm
 UPD 2022-02-07_07:45:02 5876 lib/FHEM/Text/Unicode.pm
 UPD 2022-10-09_07:45:02 6074 lib/FHEM/Utility/CTZ.pm
 UPD 2022-02-11_07:45:02 7870 lib/FHEM/Utility/MQTT2_Dispatcher.pm
