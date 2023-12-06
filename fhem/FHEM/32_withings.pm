@@ -389,8 +389,8 @@ my %sleep_readings = (  'asleepduration' => { name => "Manual Sleep", reading =>
                         'hr_zone_1' => { name => "HR Zone 1", reading => "heartrateZoneModerate", unit => "s", },
                         'hr_zone_2' => { name => "HR Zone 2", reading => "heartrateZoneIntense", unit => "s", },
                         'hr_zone_3' => { name => "HR Zone 3", reading => "heartrateZonePeak", unit => "s", },
-                        'device_startdate' => { name => "Start", reading => "deviceStartDate", unit => "m", },
-                        'device_enddate' => { name => "End", reading => "deviceEndDate", unit => "m", },
+                        'device_startdate' => { name => "Start", reading => "deviceStartDate", unit => 0, },
+                        'device_enddate' => { name => "End", reading => "deviceEndDate", unit => 0, },
                          );
 
 my %alarm_sound = (  0 => "Unknown",

@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 27 / 2023-07-14
+# Release 29 / 2023-12-06
 
 package main;
 
@@ -449,7 +449,9 @@ netatmo_Define($$)
     $hash->{helper}{password} = $password;
     $hash->{helper}{client_id} = $client_id;
     $hash->{helper}{client_secret} = $client_secret;
-    $hash->{helper}{refresh_token} = $refresh_token;
+    $hash->{refresh_token} = $refresh_token;
+    $hash->{helper}{refresh_token} = $hash->{refresh_token};
+    $hash->{helper}{refresh_token} = $refresh_token if(!$hash->{helper}{refresh_token});
 
     $hash->{helper}{INTERVAL} = 60*60 if( !$hash->{helper}{INTERVAL} );
     $attr{$name}{room} = "netatmo" if( !defined($attr{$name}{room}) && defined($name));
@@ -509,6 +511,7 @@ sub netatmo_InitWait($) {
 
   RemoveInternalTimer($hash);
 
+  return undef if(IsDisabled($name) || !defined($name));
 
   if( $init_done ) {
     netatmo_connect($hash) if( $hash->{SUBTYPE} eq "ACCOUNT" );
@@ -755,7 +758,7 @@ netatmo_getAuth($)
   my $webhookurl = AttrVal($name,"webhookURL",'https://webhook.local');
 
   my $callurl = "https://".$hash->{helper}{apiserver}."/oauth2/authorize";
-  $callurl .= "?client_id=".$hash->{helper}{client_id}."&redirect_uri=".$webhookurl."&scope=read_station read_thermostat write_thermostat read_camera write_camera access_camera read_presence write_presence access_presence read_homecoach read_doorbell access_doorbell read_smokedetector&state=auth".int(rand(100));
+  $callurl .= "?client_id=".$hash->{helper}{client_id}."&redirect_uri=".$webhookurl."&scope=read_thermostat write_thermostat read_camera write_camera access_camera read_doorbell access_doorbell read_presence write_presence access_presence read_homecoach read_carbonmonoxidedetector read_smokedetector read_station&state=auth".int(rand(100));
   return $callurl;
 }
 
@@ -764,6 +767,8 @@ netatmo_getToken($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+
+  return undef if(IsDisabled($name) || !defined($name));
 
   return Log3 $name, 1, "$name: No refresh token was found! (getToken)\nYou will need to generate one at https://dev.netatmo.com/apps/" if(!defined($hash->{helper}{refresh_token}));
   return undef;
@@ -777,7 +782,7 @@ netatmo_getToken($)
     url => "https://".$hash->{helper}{apiserver}."/oauth2/token",
     timeout => 5,
     noshutdown => 1,
-    data => {grant_type => 'authorization_code', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, code => $hash->{helper}{access_code}, redirect_uri => $webhookurl, scope => 'read_station read_thermostat write_thermostat read_camera write_camera access_camera read_presence write_presence access_presence read_homecoach read_smokedetector'},
+    data => {grant_type => 'authorization_code', client_id => $hash->{helper}{client_id},  client_secret=> $hash->{helper}{client_secret}, code => $hash->{helper}{access_code}, redirect_uri => $webhookurl, scope => 'read_thermostat write_thermostat read_camera write_camera access_camera read_doorbell access_doorbell read_presence write_presence access_presence read_homecoach read_carbonmonoxidedetector read_smokedetector read_station'},
   });
 
   netatmo_dispatch( {hash=>$hash,type=>'token'},$err,$data );
@@ -790,19 +795,19 @@ netatmo_getAppToken($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
+  return undef if(IsDisabled($name) || !defined($name));
+
   return Log3 $name, 1, "$name: No username was found! (getAppToken)" if(!defined($hash->{helper}{username}));
   return Log3 $name, 1, "$name: No password was found! (getAppToken)" if(!defined($hash->{helper}{password}));
 
-  my $auth = "QXV0aG9yaXphdGlvbjogQmFzaWMgYm1GZlkyeHBaVzUwWDJsdmN6bzFObU5qTmpSaU56azBOak5oT1RrMU9HSTNOREF4TkRjeVpEbGxNREUxT0E9PQ==";
-  $auth = decode_base64($auth);
 
   my($err,$data) = HttpUtils_BlockingGet({
     url => "https://app.netatmo.net/oauth2/token",
     method => "POST",
     timeout => 5,
     noshutdown => 1,
-    header => "$auth",
-    data => {app_identifier=>'com.netatmo.camera', grant_type => 'password', password => netatmo_decrypt($hash->{helper}{password}), scope => 'write_camera read_camera access_camera read_presence write_presence access_presence read_station read_smokedetector', username => netatmo_decrypt($hash->{helper}{username})},
+    header => "Content-Type: application/x-www-form-urlencoded; charset=utf-8\r\nUser-Agent: NetatmoSecurity/5.0.13 (com.netatmo.camera; build:809; iOS 13.5.0) Alamofire/5.6.4",
+    data => {grant_type => 'password', client_secret => '8ab584d62ca2a77e37ccc6b2c7e4f29e', username => netatmo_decrypt($hash->{helper}{username}), password => netatmo_decrypt($hash->{helper}{password}), scope => 'security_scopes read_station', client_id => 'na_client_ios_welcome'},
   });
 
 
@@ -890,16 +895,14 @@ netatmo_refreshAppToken($;$)
   delete($hash->{csrf_token});
   Log3 $name, 3, "$name: refreshing app token";
 
-  my $auth = "QXV0aG9yaXphdGlvbjogQmFzaWMgYm1GZlkyeHBaVzUwWDJsdmN6bzFObU5qTmpSaU56azBOak5oT1RrMU9HSTNOREF4TkRjeVpEbGxNREUxT0E9PQ==";
-  $auth = decode_base64($auth);
 
   if( $nonblocking ) {
     HttpUtils_NonblockingGet({
       url => "https://app.netatmo.net/oauth2/token",
       timeout => 30,
       noshutdown => 1,
-      header => "$auth",
-      data => {grant_type => 'refresh_token', refresh_token => $hash->{refresh_token_app}},
+      header => "Content-Type: application/x-www-form-urlencoded; charset=utf-8\r\nUser-Agent: NetatmoSecurity/5.0.13 (com.netatmo.camera; build:809; iOS 13.5.0) Alamofire/5.6.4",
+      data => {refresh_token => $hash->{refresh_token_app}, scope => 'security_scopes read_station', grant_type => 'refresh_token', client_id => 'na_client_ios_welcome', client_secret => '8ab584d62ca2a77e37ccc6b2c7e4f29e'},
       hash => $hash,
       type => 'apptoken',
       callback => \&netatmo_dispatch,
@@ -909,8 +912,8 @@ netatmo_refreshAppToken($;$)
       url => "https://app.netatmo.net/oauth2/token",
       timeout => 5,
       noshutdown => 1,
-      header => "$auth",
-      data => {grant_type => 'refresh_token', refresh_token => $hash->{refresh_token_app}},
+      header => "Content-Type: application/x-www-form-urlencoded; charset=utf-8\r\nUser-Agent: NetatmoSecurity/5.0.13 (com.netatmo.camera; build:809; iOS 13.5.0) Alamofire/5.6.4",
+      data => {refresh_token => $hash->{refresh_token_app}, scope => 'security_scopes read_station', grant_type => 'refresh_token', client_id => 'na_client_ios_welcome', client_secret => '8ab584d62ca2a77e37ccc6b2c7e4f29e'},
     });
 
     netatmo_dispatch( {hash=>$hash,type=>'apptoken'},$err,$data );
@@ -1035,6 +1038,9 @@ sub
 netatmo_connect($)
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  return undef if(IsDisabled($name) || !defined($name));
 
   netatmo_getToken($hash);
   #netatmo_getAppToken($hash);
@@ -1256,6 +1262,8 @@ netatmo_initDevice($)
     readingsSingleUpdate($hash, "active", "disabled", 1);
     return undef;
   }
+
+  return undef if(defined($hash->{IODev}->{NAME}) && IsDisabled($hash->{IODev}->{NAME}) || !defined($name));
 
   my $device;
   if( $hash->{Module} ) {
@@ -3300,16 +3308,28 @@ netatmo_parseToken($$)
   my $name = $hash->{NAME};
 
   my $had_token = $hash->{access_token};
+  my $old_refresh = $hash->{refresh_token};
+  if( $json->{access_token} ) {
 
-  $hash->{access_token} = $json->{access_token};
-  $hash->{refresh_token} = $json->{refresh_token};
+    $hash->{access_token} = $json->{access_token};
+    $hash->{refresh_token} = $json->{refresh_token};
+    $hash->{helper}{refresh_token} = $json->{refresh_token};
+    my $new_refresh = $json->{refresh_token};
 
-  if( $hash->{access_token} ) {
     $hash->{STATE} = "Connected";
     $hash->{network} = "ok";
 
     $hash->{expires_at} = int(gettimeofday());
     $hash->{expires_at} += int($json->{expires_in}*0.8);
+
+    if($old_refresh ne $hash->{refresh_token}){
+      if($hash->{DEF} =~ /ACCOUNT/){
+        my @defarray = split(/ /, $hash->{DEF});
+        pop(@defarray);
+        push(@defarray, $json->{refresh_token});
+        $hash->{DEF} = join(' ', @defarray);
+      }
+    }
 
     netatmo_getDevices($hash) if( !$had_token );
 
@@ -6713,7 +6733,7 @@ sub netatmo_weatherIcon()
   Notes:
   <ul>
     <li>JSON has to be installed on the FHEM host.</li>
-    <li>You need to create an app <u><a href="https://dev.netatmo.com/dev/createanapp">here</a></u> to get your <i>client_id / client_secret</i>.<br />Request the full access scope including cameras and thermostats and generate a refresh token.</li>
+    <li>You need to create an app <u><a href="https://dev.netatmo.com/apps/">here</a></u> to get your <i>client_id / client_secret</i>.<br />Request the full access scope including cameras and thermostats and generate a refresh token on the dev.netatmo.com page.</li>
   </ul><br>
 
   <a name="netatmo_Define"></a>
