@@ -1834,7 +1834,7 @@ par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readi
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 par:SETCHANNELINFO;Set this to 0 to not set channelinfo;{ 1 }
-par:ICON;ICON as set, defaults to taster;{ AttrVal("DEVICE","icon","taster") }
+par:ICON;ICON as set, defaults to taster;{ AttrVal('DEVICE','icon','taster') }
 par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 # autoconfigure device
 option:{RADIO_NO_TEMPLATE}
@@ -1897,7 +1897,7 @@ par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal('DEVICE','readi
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 par:SETCHANNELINFO;Set this to 0 to not set channelinfo;{ 1 }
-par:ICON;ICON as set, defaults to taster;{ AttrVal('DEVICE','icon",'taster') }
+par:ICON;ICON as set, defaults to taster;{ AttrVal('DEVICE','icon','taster') }
 par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 # autoconfigure device
 option:{RADIO_NO_TEMPLATE}
@@ -1937,7 +1937,7 @@ option:{SETCHANNELINFO}
 set DEVICE attrTemplate set_associatedWith \CHANNELS=4
 option:global
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 model tasmota_shelly_i4
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20230817
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20231206
 
 
 # sonoff 4 channel device flashed with Tasmota.
