@@ -153,6 +153,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.5.1"  => "07.12.2023  function _getftui can now process arguments (compatibility to new ftui widgets), plant check ".
+                           "reviews SolarForecast widget files ",
   "1.5.0"  => "05.12.2023  new getter ftuiFramefiles ",
   "1.4.3"  => "03.12.2023  hidden set or attr commands in user specific header area when called by 'get ... html' ".
                            "plantConfig: check module update in repo ",
@@ -550,6 +552,12 @@ my @dd    = qw( none
                 radiationProcess
                 saveData2Cache
               );
+                                                                                 # FTUI V2 Widget Files
+  my @fs  = qw( ftui_forecast.css 
+                widget_forecast.js
+                ftui_smaportalspg.css
+                widget_smaportalspg.js
+              );
               
 my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select|bitfield|widgetList|colorpicker';
 
@@ -736,6 +744,12 @@ my %hqtxt = (                                                                   
               DE => qq{n&auml;chste SolCast Abfrage}                                                                        },
   fulfd  => { EN => qq{fulfilled},
               DE => qq{erf&uuml;llt}                                                                                        },
+  widok  => { EN => qq{The FHEM Tablet UI widget Files are up to date.},
+              DE => qq{Die FHEM Tablet UI Widget-Dateien sind aktuell.}                                                     },  
+  widnup => { EN => qq{The SolarForecast FHEM Tablet UI widget files are not up to date.},
+              DE => qq{Die FHEM Tablet UI Widget-Dateien sind nicht aktuell.}                                               },
+  widerr => { EN => qq{The FHEM Tablet UI V2 is installed but the update status of widget Files can't be checked.},
+              DE => qq{FTUI V2 ist installiert, der Aktualisierungsstatus der Widgets kann nicht gepr&uuml;ft werden.}      }, 
   pmtp   => { EN => qq{produced more than predicted :-D},
               DE => qq{mehr produziert als vorhergesagt :-D}                                                                },
   petp   => { EN => qq{produced same as predicted :-)},
@@ -3854,8 +3868,9 @@ return pageAsHtml ($name, '-', $arg);
 sub _getftui {
   my $paref = shift;
   my $name  = $paref->{name};
+  my $arg   = $paref->{arg} // '';
 
-return pageAsHtml ($name, "ftui");
+return pageAsHtml ($name, 'ftui', $arg);
 }
 
 ###############################################################
@@ -4031,13 +4046,7 @@ sub _ftuiFramefiles {
   my $pPath = '?format=txt';
   my $cfile = 'controls_solarforecast.txt';
   my $cfurl = $bPath.$cfile.$pPath;
-  
-  my @fs = qw( ftui_forecast.css 
-               widget_forecast.js
-               ftui_smaportalspg.css
-               widget_smaportalspg.js
-             );
-  
+    
   for my $file (@fs) {
       my $lencheck = 1;
       
@@ -8524,8 +8533,8 @@ return;
 ################################################################
 sub pageAsHtml {
   my $name = shift;
-  my $ftui = shift // "";
-  my $gsel = shift // "";                                                                  # direkte Auswahl welche Grafik zurück gegeben werden soll (both, flow, forecast)
+  my $ftui = shift // '';
+  my $gsel = shift // '';                                                                  # direkte Auswahl welche Grafik zurück gegeben werden soll (both, flow, forecast)
 
   my $ret = "<html>";
   $ret   .= entryGraphic ($name, $ftui, $gsel, 1);
@@ -8539,8 +8548,8 @@ return $ret;
 ################################################################
 sub entryGraphic {
   my $name = shift;
-  my $ftui = shift // "";
-  my $gsel = shift // "";                                                                  # direkte Auswahl welche Grafik zurück gegeben werden soll (both, flow, forecast)
+  my $ftui = shift // '';
+  my $gsel = shift // '';                                                                  # direkte Auswahl welche Grafik zurück gegeben werden soll (both, flow, forecast)
   my $pah  = shift // 0;                                                                   # 1 wenn durch pageAsHtml aufgerufen
 
   my $hash = $defs{$name};
@@ -8570,7 +8579,7 @@ sub entryGraphic {
   if (!$gsel) {
       $gsel = AttrVal ($name, 'graphicSelect', 'both');                                    # Auswahl der anzuzeigenden Grafiken
   }
-
+  
   my $paref = {
       hash           => $hash,
       name           => $name,
@@ -8664,7 +8673,8 @@ sub entryGraphic {
   if ($legendtxt && ($clegend eq 'top')) {
       $ret .= "<tr class='$htr{$m}{cl}'>";
       $ret .= "<td colspan='".($maxhours+2)."' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
-      $ret .= "$legendtxt</td>";
+      $ret .= $legendtxt;
+      $ret .= "</td>";
       $ret .= "</tr>";
 
       $paref->{modulo}++;
@@ -9938,7 +9948,7 @@ sub _graphicConsumerLegend {
   $ctable .= qq{</tr>} if($tro);
 
   if ($clegend ne 'bottom') {
-       $ctable .= qq{<tr><td colspan="12"><hr></td></tr>};
+       $ctable .= qq{<tr><td colspan='12'><hr></td></tr>};
   }
 
   $ctable .= qq{</table>};
@@ -12714,6 +12724,7 @@ sub checkPlantConfig {
       'String Configuration'     => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'DWD Weather Attributes'   => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'Common Settings'          => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'FTUI Widget Files'        => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
   };
 
   my $sub = sub {
@@ -12921,10 +12932,10 @@ sub checkPlantConfig {
   }
   
   if ($cmupd) {
-      $result->{'Common Settings'}{state}   = $info;
+      $result->{'Common Settings'}{state}   = $warn;
       $result->{'Common Settings'}{result} .= qq{$cmmsg <br>};
       $result->{'Common Settings'}{note}   .= qq{$cmrec <br>};
-      $result->{'Common Settings'}{info}    = 1;
+      $result->{'Common Settings'}{warn}    = 1;
   }
 
   ## allg. Settings bei Nutzung Forecast.Solar API
@@ -13078,6 +13089,54 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{note}   .= qq{global dnsServer, global language <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, vrmCredentials, event-on-change-reading, ctrlLanguage <br>};
       }
+  }
+  
+  ## FTUI Widget Support
+  ########################
+  my $root  = $attr{global}{modpath};
+  my $tpath = "$root/www/tablet/css";
+  my $upd   = 0;
+  $err      = 0;
+
+  if (!-d $tpath) {
+      $result->{'FTUI Widget Files'}{result}  .= qq{The FHEM Tablet UI V2 does not appear to be installed. <br>};
+      $result->{'FTUI Widget Files'}{note}    .= qq{There is no need to install SolarForecast FTUI widgets.<br>};
+  }
+  else {
+      my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';
+      my $pPath = '?format=txt';
+      my $cfile = 'controls_solarforecast.txt';
+      my $cfurl = $bPath.$cfile.$pPath;  
+      
+      for my $file (@fs) {      
+          my ($cmerr, $cmupd) = checkModVer ($name, $file, $cfurl);
+
+          $err = 1 if($cmerr);
+          $upd = 1 if($cmupd);
+      }      
+     
+      if ($err) {
+          $result->{'FTUI Widget Files'}{state}   = $warn;
+          $result->{'FTUI Widget Files'}{result} .= $hqtxt{widerr}{$lang};
+          $result->{'FTUI Widget Files'}{note}   .= qq{Try the test again later. If the error is permanent, please inform the maintainer.<br>};         
+          $result->{'FTUI Widget Files'}{warn}    = 1;
+          
+          $upd = 0;
+      }
+
+      if ($upd) {
+          $result->{'FTUI Widget Files'}{state}   = $warn;
+          $result->{'FTUI Widget Files'}{result} .= $hqtxt{widnup}{$lang};
+          $result->{'FTUI Widget Files'}{note}   .= qq{Update the FHEM Tablet UI Widget Files with the command:  <br>};  
+          $result->{'FTUI Widget Files'}{note}   .= qq{"get $name ftuiFramefiles".  <br>};          
+          $result->{'FTUI Widget Files'}{warn}    = 1;         
+      }     
+      
+      if (!$result->{'FTUI Widget Files'}{fault} && !$result->{'FTUI Widget Files'}{warn} && !$result->{'FTUI Widget Files'}{info}) {
+          $result->{'FTUI Widget Files'}{result}  .= $hqtxt{widok}{$lang};
+          $result->{'FTUI Widget Files'}{note}    .= qq{checked Files: <br>};
+          $result->{'FTUI Widget Files'}{note}    .= (join ', ', @fs).qq{ <br>};
+      }      
   }
 
   ## Ausgabe

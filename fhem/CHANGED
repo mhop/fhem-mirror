@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 76_SolarForecast: plant check reviews SolarForecast widget files
  - bugfix:  38_netatmo: fixed login problems by adapting to latest auth changes
  - feature: 76_SolarForecast: new get ftuiFramefiles command
  - feature: 76_SolarForecast: plantConfig: check module update in repo
