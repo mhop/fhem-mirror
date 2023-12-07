@@ -20,7 +20,7 @@
  *
  *
  * Versions:
- *
+ *  1.0.1	07.12.2023	get=state,html=both as default, compatibility to SolarForecast V.1.5.1 DS_Starter
  *  1.0.0	30.11.2023	initial version		stefanru
 */
 
@@ -43,8 +43,8 @@ function depends_forecast (){
 var Modul_forecast = function () {
 
     function init_attr(elem) {
-        elem.initData('get', 'parentState');
-		elem.initData('html', elem.data('html'));
+        elem.initData('get', 'state');
+		elem.initData('html', 'both');
         elem.initData('max-update', 2);
 
         me.addReading(elem, 'get');
@@ -72,7 +72,7 @@ var Modul_forecast = function () {
                     if (lUpdate === null) {
                         //console.log('forecast DO update' );
                         elem.data('lastUpdate', dNow);
-                        var cmd = [ 'get', elem.data('device'), "html " + elem.data('html') ].join(' ');
+                        var cmd = [ 'get', elem.data('device'), 'ftui ' + elem.data('html') ].join(' ');
                         ftui.log('forecast update', dev, ' - ', cmd);
                         
                         ftui.sendFhemCommand(cmd)

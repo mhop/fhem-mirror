@@ -16,6 +16,7 @@
 
 /* Versionen:
  *
+ *  1.0.1	07.12.2023	get=state as default, compatibility to SolarForecast V.1.5.1
  *  1.0.0	02.07.2019	initial version
 */
 
@@ -39,7 +40,7 @@ function depends_smaportalspg (){
 var Modul_smaportalspg = function () {
 
     function init_attr(elem) {
-        elem.initData('get', 'parentState');
+        elem.initData('get', 'state');
         elem.initData('max-update', 2);
 
         me.addReading(elem, 'get');
@@ -68,7 +69,7 @@ var Modul_smaportalspg = function () {
                         //console.log('smaportalspg DO update' );
                         elem.data('lastUpdate', dNow);
 
-                        var cmd = [ 'get', elem.data('device'), "ftui" ].join(' ');
+                        var cmd = [ 'get', elem.data('device'), 'ftui' ].join(' ');
                         ftui.log('smaportalspg update', dev, ' - ', cmd);
                         
                         ftui.sendFhemCommand(cmd)
