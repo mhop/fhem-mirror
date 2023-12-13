@@ -6,8 +6,8 @@
 #
 # A FHEM module to read BMS values from Pylontech Low Voltage LiFePo04 batteries.
 #
-# This module is based on 70_Pylontech.pm written 2019 by Harald Schmitz.
-# Code further development and extensions (c) 2023 by Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
+# This module uses the idea and informations from 70_Pylontech.pm written 2019 by Harald Schmitz.
+# Further code development and extensions by Heiko Maaz (c) 2023 e-mail: Heiko dot Maaz at t-online dot de
 #
 # Credits to FHEM user: satprofi, Audi_Coupe_S, abc2006
 #
@@ -122,6 +122,9 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.1.12" => "13.12.2023 extend possible number of bats from 9 to 12 ",
+  "0.1.11" => "28.10.2023 add needed data format to commandref ",
+  "0.1.10" => "18.10.2023 new function pseudoHexToText in _callManufacturerInfo for translate battery name and Manufactorer ",
   "0.1.9"  => "25.09.2023 fix possible bat adresses ",
   "0.1.8"  => "23.09.2023 new Attr userBatterytype, change manufacturerInfo, protocolVersion command hash to LENID=0 ",
   "0.1.7"  => "20.09.2023 extend possible number of bats from 6 to 8 ",
@@ -191,11 +194,11 @@ my %fns2 = (                                                                  # 
 # CID2: Kommando spezifisch, hier 93H
 # LENGTH: LENID + LCHKSUM -> Pylon LFP V2.8 Doku
 # INFO: muß hier mit ADR übereinstimmen
-# CHKSUM: 32+30+30+32+34+36+39+33+45+30+30+32+30+32 = 02D3H -> modulo 65536 = 02D3H -> bitweise invert = 1111 1101 0010 1100 -> +1 = 1111 1101 0010 1101 -> FD2DH
+# CHKSUM: 32+30+30+42+34+36+39+33+45+30+30+32+30+42 = 01E5H -> modulo 65536 = 01E5H -> bitweise invert = 1111 1110 0001 1010 -> +1 = 1111 1110 0001 1011 -> FE1BH
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
-#  ~    20    02      46    93     E0    02    02      FD   2D
-# 7E  32 30  30 32  34 36 39 33  45 30 30 32  30 32  46 44 32 44
+#  ~    20    0B      46    93     E0    02    0B      FE   1B
+# 7E  32 30  30 42  34 36 39 33  45 30 30 32  30 42  
 #
 my %hrsnb = (                                                        # Codierung Abruf serialNumber, mlen = Mindestlänge Antwortstring
   1 => { cmd => "~20024693E00202FD2D\x{0d}", mlen => 52 },
@@ -205,7 +208,11 @@ my %hrsnb = (                                                        # Codierung
   5 => { cmd => "~20064693E00206FD25\x{0d}", mlen => 52 },
   6 => { cmd => "~20074693E00207FD23\x{0d}", mlen => 52 },
   7 => { cmd => "~20084693E00208FD21\x{0d}", mlen => 52 },
-  8 => { cmd => "~20094693E00209FD1F\x{0d}", mlen => 52 },
+  8 => { cmd => "~20094693E00209FD1F\x{0d}", mlen => 52 },           
+  9 => { cmd => "~200A4693E0020AFE1D\x{0d}", mlen => 52 },
+ 10 => { cmd => "~200B4693E0020BFE1B\x{0d}", mlen => 52 },
+ 11 => { cmd => "~200C4693E0020CFE19\x{0d}", mlen => 52 },
+ 12 => { cmd => "~200D4693E0020DFE17\x{0d}", mlen => 52 },
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -214,11 +221,11 @@ my %hrsnb = (                                                        # Codierung
 # LENGTH: LENID + LCHKSUM -> Pylon LFP V3.3 Doku
 # LENID = 0 -> LENID = 0000B + 0000B + 0000B = 0000B -> modulo 16 -> 0000B -> bitweise invert = 1111 -> +1 = 0001 0000 -> LCHKSUM = 0000B -> LENGTH = 0000 0000 0000 0000 -> 0000H
 # wenn LENID = 0, dann ist INFO empty (Doku LFP V3.3 S.8)
-# CHKSUM: 32+30+30+32+34+36+35+31+30+30+30+30 = 0254H -> modulo 65536 = 0254H -> bitweise invert = 1111 1101 1010 1011 -> +1 = 1111 1101 1010 1100 -> FDACH
+# CHKSUM: 32+30+30+41+34+36+35+31+30+30+30+30 = 0185H -> modulo 65536 = 0185H -> bitweise invert = 1111 1110 0111 1010 -> +1 = 1111 1110 0111 1011 -> FE7BH
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH    INFO     CHKSUM
-#  ~    20    02      46    51     00    00   empty    FD   AC
-# 7E  32 30  30 32  34 36 35 31  30 30 30 30   - -   46 44 41 43
+#  ~    20    0A      46    51     00    00   empty    FE   7B
+# 7E  32 30  30 41  34 36 35 31  30 30 30 30   - -   
 #
 my %hrmfi = (                                                        # Codierung Abruf manufacturerInfo, mlen = Mindestlänge Antwortstring
   1 => { cmd => "~200246510000FDAC\x{0d}", mlen => 82 },
@@ -229,6 +236,10 @@ my %hrmfi = (                                                        # Codierung
   6 => { cmd => "~200746510000FDA7\x{0d}", mlen => 82 },
   7 => { cmd => "~200846510000FDA6\x{0d}", mlen => 82 },
   8 => { cmd => "~200946510000FDA5\x{0d}", mlen => 82 },
+  9 => { cmd => "~200A46510000FE7B\x{0d}", mlen => 82 },
+ 10 => { cmd => "~200B46510000FE7A\x{0d}", mlen => 82 },
+ 11 => { cmd => "~200C46510000FE79\x{0d}", mlen => 82 },
+ 12 => { cmd => "~200D46510000FE78\x{0d}", mlen => 82 },
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -237,11 +248,11 @@ my %hrmfi = (                                                        # Codierung
 # LENGTH: LENID + LCHKSUM -> Pylon LFP V3.3 Doku
 # LENID = 0 -> LENID = 0000B + 0000B + 0000B = 0000B -> modulo 16 -> 0000B -> bitweise invert = 1111 -> +1 = 0001 0000 -> LCHKSUM = 0000B -> LENGTH = 0000 0000 0000 0000 -> 0000H
 # wenn LENID = 0, dann ist INFO empty (Doku LFP V3.3 S.8)
-# CHKSUM: 30+30+30+32+34+36+34+46+30+30+30+30 = 0266H -> modulo 65536 = 0266H -> bitweise invert = 1111 1101 1001 1001 -> +1 = 1111 1101 1001 1010 -> FD9AH
+# CHKSUM: 30+30+30+41+34+36+34+46+30+30+30+30 = 0191H -> modulo 65536 = 0191H -> bitweise invert = 1111 1110 0110 1110 -> +1 = 1111 1110 0110 1111 -> FE6FH
 #
 # SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
-#  ~    00    02      46    4F      00    00   empty    FD   9A
-# 7E  30 30  30 32  34 36  34 46  30 30 30 30   - -   46 44 31 46
+#  ~    00    0A      46    4F      00    00   empty    FD   9A
+# 7E  30 30  30 41  34 36  34 46  30 30 30 30   - -   
 #
 my %hrprt = (                                                        # Codierung Abruf protocolVersion, mlen = Mindestlänge Antwortstring
   1 => { cmd => "~0002464F0000FD9A\x{0d}", mlen => 18 },
@@ -252,8 +263,18 @@ my %hrprt = (                                                        # Codierung
   6 => { cmd => "~0007464F0000FD95\x{0d}", mlen => 18 },
   7 => { cmd => "~0008464F0000FD94\x{0d}", mlen => 18 },
   8 => { cmd => "~0009464F0000FD93\x{0d}", mlen => 18 },
+  9 => { cmd => "~000A464F0000FE6F\x{0d}", mlen => 18 },
+ 10 => { cmd => "~000B464F0000FE6E\x{0d}", mlen => 18 },
+ 11 => { cmd => "~000C464F0000FE6D\x{0d}", mlen => 18 },
+ 12 => { cmd => "~000D464F0000FE6C\x{0d}", mlen => 18 },
 );
 
+# CHKSUM: 32+30+30+41+34+36+39+36+45+30+30+32+30+41 = 01E6H -> modulo 65536 = 01E6H -> bitweise invert = 1111 1110 0001 1001 -> +1 = 1111 1110 0001 1010 -> FE1AH
+#
+# SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
+#  ~    20    0A      46    96     E0    02    0A      FE   1A
+# 7E  32 30  30 41  34 36 39 36  45 30 30 32  30 41  
+#
 
 my %hrswv = (                                                        # Codierung Abruf softwareVersion
   1 => { cmd => "~20024696E00202FD2A\x{0d}", mlen => 30 },
@@ -264,7 +285,18 @@ my %hrswv = (                                                        # Codierung
   6 => { cmd => "~20074696E00207FD20\x{0d}", mlen => 30 },
   7 => { cmd => "~20084696E00208FD1E\x{0d}", mlen => 30 },
   8 => { cmd => "~20094696E00209FD1C\x{0d}", mlen => 30 },
+  9 => { cmd => "~200A4696E0020AFE1A\x{0d}", mlen => 30 },
+ 10 => { cmd => "~200B4696E0020BFE18\x{0d}", mlen => 30 },
+ 11 => { cmd => "~200C4696E0020CFE16\x{0d}", mlen => 30 },
+ 12 => { cmd => "~200D4696E0020DFE14\x{0d}", mlen => 30 },
 );
+
+# CHKSUM: 32+30+30+41+34+36+34+34+45+30+30+32+30+41 = 01DFH -> modulo 65536 = 01DFH -> bitweise invert = 1111 1110 0010 0000 -> +1 = 1111 1110 0010 0001 -> FE21H
+#
+# SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
+#  ~    20    0A      46    44     E0    02    0A      FE   21
+# 7E  32 30  30 41  34 36 34 34  45 30 30 32  30 41  
+#
 
 my %hralm = (                                                        # Codierung Abruf alarmInfo
   1 => { cmd => "~20024644E00202FD31\x{0d}", mlen => 82 },
@@ -275,7 +307,18 @@ my %hralm = (                                                        # Codierung
   6 => { cmd => "~20074644E00207FD27\x{0d}", mlen => 82 },
   7 => { cmd => "~20084644E00208FD25\x{0d}", mlen => 82 },
   8 => { cmd => "~20094644E00209FD23\x{0d}", mlen => 82 },
+  9 => { cmd => "~200A4644E0020AFE21\x{0d}", mlen => 82 },
+ 10 => { cmd => "~200B4644E0020BFE1F\x{0d}", mlen => 82 },
+ 11 => { cmd => "~200C4644E0020CFE1D\x{0d}", mlen => 82 },
+ 12 => { cmd => "~200D4644E0020DFE1B\x{0d}", mlen => 82 },
 );
+
+# CHKSUM: 32+30+30+41+34+36+34+37+45+30+30+32+30+41 = 01E2H -> modulo 65536 = 01E2H -> bitweise invert = 1111 1110 0001 1101 -> +1 = 1111 1110 0001 1110 -> FE1EH
+#
+# SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
+#  ~    20    0A      46    47     E0    02    0A      FE   1E
+# 7E  32 30  30 41  34 36 34 37  45 30 30 32  30 41  
+#
 
 my %hrspm = (                                                        # Codierung Abruf Systemparameter
   1 => { cmd => "~20024647E00202FD2E\x{0d}", mlen => 68 },
@@ -286,7 +329,18 @@ my %hrspm = (                                                        # Codierung
   6 => { cmd => "~20074647E00207FD24\x{0d}", mlen => 68 },
   7 => { cmd => "~20084647E00208FD22\x{0d}", mlen => 68 },
   8 => { cmd => "~20094647E00209FD20\x{0d}", mlen => 68 },
+  9 => { cmd => "~200A4647E0020AFE1E\x{0d}", mlen => 68 },
+ 10 => { cmd => "~200B4647E0020BFE1C\x{0d}", mlen => 68 },
+ 11 => { cmd => "~200C4647E0020CFE1A\x{0d}", mlen => 68 },
+ 12 => { cmd => "~200D4647E0020DFE18\x{0d}", mlen => 68 },
 );
+
+# CHKSUM: 32+30+30+41+34+36+39+32+45+30+30+32+30+41 = 01E2H -> modulo 65536 = 01E2H -> bitweise invert = 1111 1110 0001 1101 -> +1 = 1111 1110 0001 1110 -> FE1EH
+#
+# SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
+#  ~    20    0A      46    92     E0    02    0A      FE   1E
+# 7E  32 30  30 41  34 36 39 32  45 30 30 32  30 41  
+#
 
 my %hrcmi = (                                                        # Codierung Abruf chargeManagmentInfo
   1 => { cmd => "~20024692E00202FD2E\x{0d}", mlen => 38 },
@@ -297,6 +351,10 @@ my %hrcmi = (                                                        # Codierung
   6 => { cmd => "~20074692E00207FD24\x{0d}", mlen => 38 },
   7 => { cmd => "~20084692E00208FD22\x{0d}", mlen => 38 },
   8 => { cmd => "~20094692E00209FD20\x{0d}", mlen => 38 },
+  9 => { cmd => "~200A4692E0020AFE1E\x{0d}", mlen => 38 },
+ 10 => { cmd => "~200B4692E0020BFE1C\x{0d}", mlen => 38 },
+ 11 => { cmd => "~200C4692E0020CFE1A\x{0d}", mlen => 38 },
+ 12 => { cmd => "~200D4692E0020DFE18\x{0d}", mlen => 38 },
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -305,11 +363,11 @@ my %hrcmi = (                                                        # Codierung
 # LENGTH: LENID + LCHKSUM -> Pylon LFP V3.3 Doku                                                                                                   ---- --------------
 # LENID = 02H -> LENID = 0000B + 0000B + 0010B = 0010B -> modulo 16 -> 0010B -> bitweise invert = 1101 -> +1 = 1110 -> LCHKSUM = 1110B -> LENGTH = 1110 0000 0000 0010 -> E002H
 # wenn LENID = 0, dann ist INFO empty (Doku LFP V3.3 S.8)
-# CHKSUM: 32+30+30+32+34+36+34+32+45+30+30+32+30+32 = 02CDH -> modulo 65536 = 02CDH -> bitweise invert = 1111 1101 0011 0010 -> +1 = 1111 1101 0011 0011 -> FD33H
+# CHKSUM: 32+30+30+41+34+36+34+32+45+30+30+32+30+41 = 01DDH -> modulo 65536 = 01DDH -> bitweise invert = 1111 1110 0010 0010 -> +1 = 1111 1110 0010 0011 -> FE23H
 #
 # SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
-#  ~    20    02     46     42      E0    02    02      FD   33
-# 7E  32 30  30 32  34 36  34 32  45 30 30 32  30 32  46 44 33 33
+#  ~    20    0A     46     42      E0    02    0A      FE   23
+# 7E  32 30  30 41  34 36  34 32  45 30 30 32  30 41  
 #
 my %hrcmn = (                                                        # Codierung Abruf analogValue
   1 => { cmd => "~20024642E00202FD33\x{0d}", mlen => 128 },
@@ -320,6 +378,10 @@ my %hrcmn = (                                                        # Codierung
   6 => { cmd => "~20074642E00207FD29\x{0d}", mlen => 128 },
   7 => { cmd => "~20084642E00208FD27\x{0d}", mlen => 128 },
   8 => { cmd => "~20094642E00209FD25\x{0d}", mlen => 128 },
+  9 => { cmd => "~200A4642E0020AFE23\x{0d}", mlen => 128 },
+ 10 => { cmd => "~200B4642E0020BFE21\x{0d}", mlen => 128 },
+ 11 => { cmd => "~200C4642E0020CFE1F\x{0d}", mlen => 128 },
+ 12 => { cmd => "~200D4642E0020DFE1D\x{0d}", mlen => 128 },
 );
 
 
@@ -462,7 +524,7 @@ sub Attr {
 
       InternalTimer(gettimeofday()+1.0, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
   }
-  
+
   if ($aName eq 'userBatterytype') {
       $hash->{HELPER}{AGE1} = 0;
       InternalTimer(gettimeofday()+1.0, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
@@ -482,7 +544,7 @@ return;
 ###############################################################
 sub manageUpdate {
   my $hash = shift;
-  
+
   my $name = $hash->{NAME};
   my $age1 = delete $hash->{HELPER}{AGE1} // $age1def;
 
@@ -806,15 +868,15 @@ sub _callManufacturerInfo {
   }
 
   __resultLog ($hash, $res);
-  
+
   my $name                  = $hash->{NAME};
   my $ubtt                  = AttrVal ($name, 'userBatterytype', '');                               # evtl. Batterietyp manuell überschreiben
   my $BatteryHex            = substr  ($res, 13, 20);
   # my $softwareVersion       = 'V'.hex (substr ($res, 33, 2)).'.'.hex (substr ($res, 35, 2));      # unklare Bedeutung
   my $ManufacturerHex       = substr  ($res, 37, 40);
-    
-  $readings->{batteryType}  = $ubtt ? $ubtt.' (adapted)' : pack ("H*", $BatteryHex);
-  $readings->{Manufacturer} = pack ("H*", $ManufacturerHex);
+
+  $readings->{batteryType}  = $ubtt ? $ubtt.' (adapted)' : pseudoHexToText ($BatteryHex); 
+  $readings->{Manufacturer} = pseudoHexToText ($ManufacturerHex);
 
 return;
 }
@@ -1130,7 +1192,7 @@ sub _callAnalogValue {
   if ($current & 0x8000) {
       $current = $current - 0x10000;
   }
-  
+
   $readings->{packCellcount} = $pcc;
   $readings->{packCurrent}   = sprintf "%.3f", $current / 10;
 
@@ -1281,6 +1343,25 @@ return $rtnerr;
 }
 
 ###############################################################
+#  Hex-Zeichenkette in ASCII-Zeichenkette einzeln umwandeln
+###############################################################
+sub pseudoHexToText {
+   my $string = shift;
+   
+   my $charcode;
+   my $text = '';
+   
+   for (my $i = 0; $i < length($string); $i = $i + 2) {
+      $charcode = hex substr ($string, $i, 2);                  # charcode = aquivalente Dezimalzahl der angegebenen Hexadezimalzahl
+      next if($charcode == 45);                                 # Hyphen '-' ausblenden 
+      
+      $text = $text.chr ($charcode);
+   }
+   
+return $text;
+}
+
+###############################################################
 #       Fehlerausstieg
 ###############################################################
 sub doOnError {
@@ -1380,8 +1461,8 @@ return;
 
 =pod
 =item device
-=item summary Integration of Pylontech LiFePo4 low voltage batteries (incl. BMS) over RS485 via ethernet gateway (ethernet interface)
-=item summary_DE Integration von Pylontech Niedervolt Batterien (mit BMS) über RS485 via Ethernet-Gateway (Ethernet Interface)
+=item summary Integration of Pylontech low voltage batteries via RS485 ethernet gateway
+=item summary_DE Integration von Pylontech Niederspannungsbatterien über RS485-Ethernet-Gateway
 
 =begin html
 
@@ -1393,11 +1474,12 @@ RS485/Ethernet gateway. Communication to the RS485 gateway takes place exclusive
 The module has been successfully used so far with Pylontech batteries of the following types: <br>
 
 <ul>
- <li> US2000 </li>
- <li> US2000C </li>
- <li> US2000plus </li>
- <li> US3000 </li>
- <li> US3000C </li>
+ <li> US2000        </li>
+ <li> US2000B Plus  </li>
+ <li> US2000C       </li>
+ <li> US2000 Plus   </li>
+ <li> US3000        </li>
+ <li> US3000C       </li>
 </ul>
 
 The following devices have been successfully used as RS485 Ethernet gateways to date: <br>
@@ -1416,6 +1498,20 @@ This module requires the Perl modules:
     <li>IO::Socket::INET    (apt-get install libio-socket-multicast-perl)                          </li>
     <li>IO::Socket::Timeout (Installation e.g. via the CPAN shell or the FHEM Installer module)    </li>
 </ul>
+
+The data format must be set on the RS485 gateway as follows:
+<br>
+
+  <ul>
+     <table>
+     <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+        <tr><td> Start Bit </td><td>- 1 Bit          </td></tr>
+        <tr><td> Data Bit  </td><td>- 8 Bit          </td></tr>
+        <tr><td> Stop Bit  </td><td>- 1 Bit          </td></tr>
+        <tr><td> Parity    </td><td>- without Parity </td></tr>
+     </table>
+  </ul>
+  <br>
 
 <b>Limitations</b>
 <br>
@@ -1438,7 +1534,7 @@ The module currently supports a maximum of 8 batteries (master + 7 slaves) in on
   <li><b>bataddress:</b><br>
      Device address of the Pylontech battery. Several Pylontech batteries can be connected via a Pylontech-specific
      Link connection. The permissible number can be found in the respective Pylontech documentation. <br>
-     The master battery in the network (with open link port 0 or to which the RS485 connection is connected) has the 
+     The master battery in the network (with open link port 0 or to which the RS485 connection is connected) has the
      address 1, the next battery then has address 2 and so on.
      If no device address is specified, address 1 is used.
   </li>
@@ -1491,7 +1587,7 @@ management system via the RS485 interface.
      (BlockingCall) so that write or read delays on the RS485 interface do not lead to blocking states in FHEM.
    </li>
    <br>
-   
+
    <a id="PylonLowVoltage-attr-userBatterytype"></a>
    <li><b>userBatterytype</b><br>
      The automatically determined battery type (Reading batteryType) is replaced by the specified string.
@@ -1569,11 +1665,12 @@ RS485/Ethernet-Gateway. Die Kommunikation zum RS485-Gateway erfolgt ausschließl
 Das Modul wurde bisher erfolgreich mit Pylontech Batterien folgender Typen eingesetzt: <br>
 
 <ul>
- <li> US2000 </li>
- <li> US2000C </li>
- <li> US2000plus </li>
- <li> US3000 </li>
- <li> US3000C </li>
+ <li> US2000        </li>
+ <li> US2000B Plus  </li>
+ <li> US2000C       </li>
+ <li> US2000 Plus   </li>
+ <li> US3000        </li>
+ <li> US3000C       </li>
 </ul>
 
 Als RS485-Ethernet-Gateways wurden bisher folgende Geräte erfolgreich eingesetzt: <br>
@@ -1592,6 +1689,20 @@ Dieses Modul benötigt die Perl-Module:
     <li>IO::Socket::INET    (apt-get install libio-socket-multicast-perl)                          </li>
     <li>IO::Socket::Timeout (Installation z.B. über die CPAN-Shell oder das FHEM Installer Modul)  </li>
 </ul>
+
+Das Datenformat muß auf dem RS485 Gateway wie folgt eingestellt werden:
+<br>
+
+  <ul>
+     <table>
+     <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+        <tr><td> Start Bit </td><td>- 1 Bit          </td></tr>
+        <tr><td> Data Bit  </td><td>- 8 Bit          </td></tr>
+        <tr><td> Stop Bit  </td><td>- 1 Bit          </td></tr>
+        <tr><td> Parity    </td><td>- ohne Parität   </td></tr>
+     </table>
+  </ul>
+  <br>
 
 <b>Einschränkungen</b>
 <br>
@@ -1614,7 +1725,7 @@ Das Modul unterstützt zur Zeit maximal 8 Batterien (Master + 7 Slaves) in einer
   <li><b>bataddress:</b><br>
      Geräteadresse der Pylontech Batterie. Es können mehrere Pylontech Batterien über eine Pylontech-spezifische
      Link-Verbindung verbunden werden. Die zulässige Anzahl ist der jeweiligen Pylontech Dokumentation zu entnehmen. <br>
-     Die Master Batterie im Verbund (mit offenem Link Port 0 bzw. an der die RS485-Verbindung angeschlossen ist) hat die 
+     Die Master Batterie im Verbund (mit offenem Link Port 0 bzw. an der die RS485-Verbindung angeschlossen ist) hat die
      Adresse 1, die nächste Batterie hat dann die Adresse 2 und so weiter.
      Ist keine Geräteadresse angegeben, wird die Adresse 1 verwendet.
   </li>
@@ -1668,7 +1779,7 @@ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
      blockierenden Zuständen in FHEM führen.
    </li>
    <br>
-   
+
    <a id="PylonLowVoltage-attr-userBatterytype"></a>
    <li><b>userBatterytype</b><br>
      Der automatisch ermittelte Batterietyp (Reading batteryType) wird durch die angegebene Zeichenfolge ersetzt.
