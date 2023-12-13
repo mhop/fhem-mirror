@@ -46,6 +46,7 @@ eval "use JSON;1;"                        or my $jsonabs = 'JSON';              
 eval "use AI::DecisionTree;1;"            or my $aidtabs = 'AI::DecisionTree';       ## no critic 'eval'
 
 use FHEM::SynoModules::SMUtils qw(
+                                   checkModVer
                                    evaljson
                                    getClHash
                                    delClHash
@@ -98,6 +99,7 @@ BEGIN {
           getAllGets
           getAllSets
           HttpUtils_NonblockingGet
+          HttpUtils_BlockingGet
           init_done
           InternalTimer
           IsDisabled
@@ -151,6 +153,14 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.6.0"  => "12.12.2023  store daily batmaxsoc in pvHistory, new attr ctrlBatSocManagement, reading Battery_OptimumTargetSoC ".
+                           "currentBatteryDev: new optional key 'cap', adapt cloud2bin,temp2bin,rain2bin ".
+                           "minor internal changes, isAddSwitchOffCond: change hysteresis algo ",
+  "1.5.1"  => "07.12.2023  function _getftui can now process arguments (compatibility to new ftui widgets), plant check ".
+                           "reviews SolarForecast widget files ",
+  "1.5.0"  => "05.12.2023  new getter ftuiFramefiles ",
+  "1.4.3"  => "03.12.2023  hidden set or attr commands in user specific header area when called by 'get ... html' ".
+                           "plantConfig: check module update in repo ",
   "1.4.2"  => "02.12.2023  ___getFWwidget: codechange ___getFWwidget using __widgetFallback function ",
   "1.4.1"  => "01.12.2023  ___getFWwidget: adjust for FHEMWEB feature forum:#136019 ",
   "1.4.0"  => "29.11.2023  graphicHeaderOwnspec: can manage attr / sets of other devs by <attr|set>@<dev> ",
@@ -449,8 +459,8 @@ my %vNotesIntern = (
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
-## Konstanten
-###############
+## default Variablen
+######################
 my @da;                                                                             # Readings-Store
 my $deflang        = 'EN';                                                          # default Sprache wenn nicht konfiguriert
 my @chours         = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten
@@ -458,6 +468,9 @@ my $kJtokWh        = 0.00027778;                                                
 my $defmaxvar      = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
 my $definterval    = 70;                                                            # Standard Abfrageintervall
 my $defslidenum    = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
+my $maxSoCdef      = 95;                                                            # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt 
+my $carecycledef   = 30;                                                            # max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
+my $batSocChgDay   = 5;                                                             # prozentuale SoC Änderung pro Tag
 my @widgetreadings = ();                                                            # Array der Hilfsreadings als Attributspeicher
 
 my $pvhcache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
@@ -545,6 +558,12 @@ my @dd    = qw( none
                 radiationProcess
                 saveData2Cache
               );
+                                                                                 # FTUI V2 Widget Files
+  my @fs  = qw( ftui_forecast.css 
+                widget_forecast.js
+                ftui_smaportalspg.css
+                widget_smaportalspg.js
+              );
               
 my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select|bitfield|widgetList|colorpicker';
 
@@ -608,6 +627,7 @@ my %hget = (                                                                # Ha
   rooftopData        => { fn => \&_getRoofTopData,              needcred => 0 },
   solApiData         => { fn => \&_getlistSolCastData,          needcred => 0 },
   valDecTree         => { fn => \&_getaiDecTree,                needcred => 0 },
+  ftuiFramefiles     => { fn => \&_ftuiFramefiles,              needcred => 0 },
 );
 
 my %hattr = (                                                                # Hash für Attr-Funktion
@@ -730,6 +750,14 @@ my %hqtxt = (                                                                   
               DE => qq{n&auml;chste SolCast Abfrage}                                                                        },
   fulfd  => { EN => qq{fulfilled},
               DE => qq{erf&uuml;llt}                                                                                        },
+  widnin => { EN => qq{FHEM Tablet UI V2 is not installed.},
+              DE => qq{FHEM Tablet UI V2 ist nicht installiert.}                                                            },
+  widok  => { EN => qq{The FHEM Tablet UI widget Files are up to date.},
+              DE => qq{Die FHEM Tablet UI Widget-Dateien sind aktuell.}                                                     },               
+  widnup => { EN => qq{The SolarForecast FHEM Tablet UI widget files are not up to date.},
+              DE => qq{Die FHEM Tablet UI Widget-Dateien sind nicht aktuell.}                                               },
+  widerr => { EN => qq{The FHEM Tablet UI V2 is installed but the update status of widget Files can't be checked.},
+              DE => qq{FTUI V2 ist installiert, der Aktualisierungsstatus der Widgets kann nicht gepr&uuml;ft werden.}      }, 
   pmtp   => { EN => qq{produced more than predicted :-D},
               DE => qq{mehr produziert als vorhergesagt :-D}                                                                },
   petp   => { EN => qq{produced same as predicted :-)},
@@ -1042,6 +1070,7 @@ sub Initialize {
                                 "ctrlAIdataStorageDuration ".
                                 "ctrlAutoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "ctrlAutoRefreshFW:$fwd ".
+                                "ctrlBatSocManagement:textField-long ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#14 ".
                                 "ctrlGenPVdeviation:daily,continuously ".
@@ -2268,10 +2297,13 @@ sub _setreset {                          ## no critic "not used"
   }
 
   if ($prop eq 'currentBatterySet') {
-      readingsDelete ($hash, "Current_PowerBatIn");
-      readingsDelete ($hash, "Current_PowerBatOut");
-      readingsDelete ($hash, "Current_BatCharge");
+      readingsDelete ($hash, 'Current_PowerBatIn');
+      readingsDelete ($hash, 'Current_PowerBatOut');
+      readingsDelete ($hash, 'Current_BatCharge');
+      readingsDelete ($hash, 'Battery_OptimumTargetSoC');
       undef @{$data{$type}{$name}{current}{socslidereg}};
+      delete $data{$type}{$name}{circular}{'99'}{lastTsMaxSocRchd};
+      delete $data{$type}{$name}{circular}{'99'}{nextTsMaxSocChge};
       delete $data{$type}{$name}{circular}{'99'}{initdaybatintot};
       delete $data{$type}{$name}{circular}{'99'}{initdaybatouttot};
       delete $data{$type}{$name}{circular}{'99'}{batintot};
@@ -2461,6 +2493,7 @@ sub Get {
                 "valConsumerMaster:#,$cml ".
                 "data:noArg ".
                 "forecastQualities:noArg ".
+                "ftuiFramefiles:noArg ".
                 "html:$hol ".
                 "nextHours:noArg ".
                 "pvCircular:noArg ".
@@ -3847,8 +3880,9 @@ return pageAsHtml ($name, '-', $arg);
 sub _getftui {
   my $paref = shift;
   my $name  = $paref->{name};
+  my $arg   = $paref->{arg} // '';
 
-return pageAsHtml ($name, "ftui");
+return pageAsHtml ($name, 'ftui', $arg);
 }
 
 ###############################################################
@@ -4006,6 +4040,222 @@ sub __getaiRuleStrings {                 ## no critic "not used"
 return $rs;
 }
 
+###############################################################
+#                       Getter ftuiFramefiles
+# hole Dateien aus dem online Verzeichnis 
+# /fhem/contrib/SolarForecast/
+# Ablage entsprechend Definition in controls_solarforecast.txt
+###############################################################
+sub _ftuiFramefiles {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  
+  my $ret;
+  my $upddo = 0;
+  my $root  = $attr{global}{modpath};
+  my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';
+  my $pPath = '?format=txt';
+  my $cfile = 'controls_solarforecast.txt';
+  my $cfurl = $bPath.$cfile.$pPath;
+    
+  for my $file (@fs) {
+      my $lencheck = 1;
+      
+      my ($cmerr, $cmupd, $cmmsg, $cmrec, $cmfile, $cmlen) = checkModVer ($name, $file, $cfurl);
+
+      if ($cmerr && $cmmsg =~ /Automatic\scheck/xs && $cmrec =~ /Compare\syour\slocal/xs) {        # lokales control file ist noch nicht vorhanden -> update ohne Längencheck
+          $cmfile   = 'FHEM/'.$cfile;
+          $file     = $cfile; 
+          $lencheck = 0; 
+          $cmerr    = 0;
+          $cmupd    = 1;   
+
+          Log3 ($name, 3, "$name - automatic install local control file $root/$cmfile");           
+      }
+      
+      if ($cmerr) {
+          $ret = "$cmmsg<br>$cmrec";
+          return $ret; 
+      }
+      
+      if ($cmupd) {
+          $upddo = 1;
+          $ret = __updPreFile ( { name     => $name,
+                                  root     => $root,
+                                  cmfile   => $cmfile,
+                                  cmlen    => $cmlen,
+                                  bPath    => $bPath,
+                                  file     => $file,
+                                  pPath    => $pPath,
+                                  lencheck => $lencheck
+                                }
+                              );
+                             
+          return $ret if($ret);          
+      }
+  }
+  
+  ## finales Update control File
+  ################################          
+  $ret = __updPreFile ( { name     => $name,
+                          root     => $root,
+                          cmfile   => 'FHEM/'.$cfile,
+                          cmlen    => 0,
+                          bPath    => $bPath,
+                          file     => $cfile,
+                          pPath    => $pPath,
+                          lencheck => 0,
+                          finalupd => 1
+                        }
+                      );
+                     
+  return $ret if($ret);
+  
+  if (!$upddo) {
+      return 'SolarForecast FTUI files are already up to date'; 
+  }
+
+return 'SolarForecast FTUI files updated';
+}
+
+###############################################################
+#    File zum Abruf von url vorbereiten und in das 
+#    Zielverzeichnis schreiben
+###############################################################
+sub __updPreFile {
+  my $pars = shift;
+  
+  my $name     = $pars->{name};
+  my $root     = $pars->{root};
+  my $cmfile   = $pars->{cmfile};
+  my $cmlen    = $pars->{cmlen};
+  my $bPath    = $pars->{bPath};
+  my $file     = $pars->{file};
+  my $pPath    = $pars->{pPath};
+  my $lencheck = $pars->{lencheck};
+  my $finalupd = $pars->{finalupd} // 0;
+  
+  my $err;
+  
+  my $dir = $cmfile;
+  $dir    =~ m,^(.*)/([^/]*)$,;
+  $dir    = $1;
+  $dir    = "" if(!defined $dir);                                                          # file in .
+  
+  my @p = split "/", $dir;
+  
+  for (my $i = 0; $i < int @p; $i++) {
+      my $path = "$root/".join ("/", @p[0..$i]);
+       
+      if (!-d $path) {
+          $err  = "The FTUI does not appear to be installed.<br>";
+          $err .= "Please check whether the path $path is present and accessible.<br>";
+          $err .= "After installing FTUI, come back and execute the get command again.";
+          return $err;  
+          
+          #my $ok = mkdir $path;
+          
+          #if (!$ok) {
+          #    $err = "MKDIR ERROR: $!";
+          #    Log3 ($name, 2, "$name - $err");
+          #    return $err;                      
+          #}
+          #else {
+          #    Log3 ($name, 3, "$name - MKDIR $path");  
+          #}
+      }
+  }
+  
+  ($err, my $remFile) = __updGetUrl ($name, $bPath.$file.$pPath);
+  
+  if ($err) {
+      Log3 ($name, 2, "$name - $err");
+      return $err;
+  }
+  
+  if ($lencheck && length $remFile ne $cmlen) {
+      $err = "update ERROR: length of $file is not $cmlen Bytes";
+      Log3 ($name, 2, "$name - $err"); 
+      return $err;
+  }
+  
+  $err = __updWriteFile ($root, $cmfile, $remFile);
+   
+  if ($err) {
+      Log3 ($name, 2, "$name - $err");
+      return $err;
+  }
+  
+  Log3 ($name, 3, "$name - update done $file to $root/$cmfile ".($cmlen ? "(length: $cmlen Bytes)" : '')); 
+  
+  if(!$lencheck && !$finalupd) {
+      return 'SolarForecast update control file installed. Please retry the get command to update FTUI files.';  
+  } 
+
+return;
+}
+
+###############################################################
+#                     File von url holen
+###############################################################
+sub __updGetUrl {
+  my $name = shift;
+  my $url  = shift;
+  
+  $url =~ s/%/%25/g;
+  my %upd_connecthash;
+  my $unicodeEncoding = 1;
+  
+  $upd_connecthash{url}           = $url;
+  $upd_connecthash{keepalive}     = ($url =~ m/localUpdate/ ? 0 : 1);                        # Forum #49798
+  $upd_connecthash{forceEncoding} = '' if($unicodeEncoding);
+  
+  my ($err, $data) = HttpUtils_BlockingGet (\%upd_connecthash);
+  
+  if ($err) {
+      $err = "update ERROR: $err"; 
+      return ($err, '');
+  }
+  
+  if (!$data) {
+      $err = 'update ERROR: empty file received';
+      return ($err, '');
+  }
+  
+return ('', $data);
+}
+
+###############################################################
+#               Updated File schreiben
+###############################################################
+sub __updWriteFile {       
+  my $root    = shift;
+  my $fName   = shift;
+  my $content = shift;
+  
+  my $fPath = "$root/$fName";
+  my $err;
+  
+  if (!open(FD, ">$fPath")) {
+      $err = "update ERROR open $fPath failed: $!";    
+      return $err;
+  }
+  
+  binmode(FD);
+  print FD $content;
+  close(FD);
+
+  my $written = -s "$fPath";
+  
+  if ($written != length $content) {
+      $err = "update ERROR writing $fPath failed: $!";    
+      return $err;
+  }
+
+return;
+}
+
 ################################################################
 sub Attr {
   my $cmd   = shift;
@@ -4038,6 +4288,24 @@ sub Attr {
 
   if($aName eq 'ctrlNextDayForecastReadings') {
       deleteReadingspec ($hash, "Tomorrow_Hour.*");
+  }
+  
+  if($aName eq 'ctrlBatSocManagement' && $init_done) {
+      if ($cmd eq 'set') {
+          return qq{Define the key "cap" with "set $name currentBatteryDev" before this attribute.} 
+                 if(ReadingsVal ($name, 'currentBatteryDev', '') !~ /\s+cap=/xs);
+          
+          my ($lowSoc, $upSoc, $maxsoc, $careCycle) = __parseAttrBatSoc ($name, $aVal);
+       
+          return 'The attribute syntax is wrong' if(!$lowSoc || !$upSoc || $lowSoc !~ /[0-9]+$/xs);
+          
+          if (!($lowSoc > 0 && $lowSoc < $upSoc && $upSoc < $maxsoc && $maxsoc <= 100)) {
+              return 'The specified values are not plausible. Compare the attribute help.';
+          }
+      }
+      else {
+          deleteReadingspec ($hash, 'Battery_OptimumTargetSoC');
+      }
   }
 
   if($aName eq 'ctrlGenPVdeviation' && $aVal eq 'daily') {
@@ -4771,6 +5039,7 @@ sub centralTask {
       _transferInverterValues     ($centpars);                                            # WR Werte übertragen
       _transferMeterValues        ($centpars);                                            # Energy Meter auswerten
       _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
+      _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
       _createSummaries            ($centpars);                                            # Zusammenfassungen erstellen
       _manageConsumerData         ($centpars);                                            # Consumerdaten sammeln und planen
       _estConsumptionForecast     ($centpars);                                            # Verbrauchsprognose erstellen
@@ -5274,6 +5543,7 @@ sub _transferWeatherValues {
       $data{$type}{$name}{nexthours}{$time_str}{weatherid}  = $wid;
       $data{$type}{$name}{nexthours}{$time_str}{cloudcover} = $neff;
       $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
+      $data{$type}{$name}{nexthours}{$time_str}{rainrange}  = rain2bin ($r101);
       $data{$type}{$name}{nexthours}{$time_str}{temp}       = $temp;
       $data{$type}{$name}{nexthours}{$time_str}{DoN}        = $don;
 
@@ -5977,6 +6247,7 @@ sub _transferBatteryValues {
   my ($bin,$binunit)   = split ":", $h->{intotal}  // "-:-";                                  # Readingname/Unit der total in die Batterie eingespeisten Energie (Zähler)
   my ($bout,$boutunit) = split ":", $h->{outtotal} // "-:-";                                  # Readingname/Unit der total aus der Batterie entnommenen Energie (Zähler)
   my $batchr           = $h->{charge} // "";                                                  # Readingname Ladezustand Batterie
+  my $instcap          = $h->{cap};                                                           # numerischer Wert (Wh) oder Readingname installierte Batteriekapazität
 
   return if(!$pin || !$pou);
 
@@ -5995,6 +6266,13 @@ sub _transferBatteryValues {
   my $btotout   = ReadingsNum ($badev, $bout,   0) * $boutuf;                                  # totale Batterieentladung (Wh)
   my $btotin    = ReadingsNum ($badev, $bin,    0) * $binuf;                                   # totale Batterieladung (Wh)
   my $soc       = ReadingsNum ($badev, $batchr, 0);
+  
+  if($instcap && !isNumeric ($instcap)) {                                                      # wenn $instcap Reading Wert abfragen 
+      my ($bcapr,$bcapunit) = split ':', $instcap;
+      $bcapunit           //= 'Wh';
+      $instcap              = ReadingsNum ($badev, $bcapr, 0);                                 
+      $instcap              = $instcap * ($bcapunit =~ /^kWh$/xi ? 1000 : 1);
+  }
 
   my $debug = $paref->{debug};
   if($debug =~ /collectData/x) {
@@ -6047,7 +6325,7 @@ sub _transferBatteryValues {
   if (!defined $histbatintot) {                                                                # totale Batterieladung der aktuelle Stunde gesetzt ?
       $paref->{batintotal} = $btotin;
       $paref->{nhour}      = sprintf("%02d",$nhour);
-      $paref->{histname}   = "batintotal";
+      $paref->{histname}   = 'batintotal';
       setPVhistory ($paref);
       delete $paref->{histname};
 
@@ -6066,23 +6344,23 @@ sub _transferBatteryValues {
 
   $paref->{batinthishour} = $batinthishour;
   $paref->{nhour}         = sprintf "%02d", $nhour;
-  $paref->{histname}      = "batinthishour";
+  $paref->{histname}      = 'batinthishour';
   setPVhistory ($paref);
   delete $paref->{histname};
 
   # Batterieentladung aktuelle Stunde in pvHistory speichern
   ############################################################
-  my $histbatouttot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "batouttotal", undef);   # totale Betterieladung zu Beginn einer Stunde
+  my $histbatouttot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'batouttotal', undef);   # totale Betterieladung zu Beginn einer Stunde
 
   my $batoutthishour;
   if(!defined $histbatouttot) {                                                                 # totale Betterieladung der aktuelle Stunde gesetzt ?
       $paref->{batouttotal} = $btotout;
       $paref->{nhour}       = sprintf("%02d",$nhour);
-      $paref->{histname}    = "batouttotal";
+      $paref->{histname}    = 'batouttotal';
       setPVhistory ($paref);
       delete $paref->{histname};
 
-      my $botot       = CurrentVal ($hash, "batouttotal", $btotout);
+      my $botot       = CurrentVal ($hash, 'batouttotal', $btotout);
       $batoutthishour = int ($btotout - $botot);
   }
   else {
@@ -6097,10 +6375,22 @@ sub _transferBatteryValues {
 
   $paref->{batoutthishour} = $batoutthishour;
   $paref->{nhour}          = sprintf("%02d",$nhour);
-  $paref->{histname}       = "batoutthishour";
+  $paref->{histname}       = 'batoutthishour';
   setPVhistory ($paref);
   delete $paref->{histname};
 
+  # täglichen max. SOC in pvHistory speichern
+  #############################################
+  my $batmaxsoc = HistoryVal ($hash, $day, 99, 'batmaxsoc', 0);                               # gespeicherter max. SOC des Tages
+  
+  if ($soc >= $batmaxsoc) {
+      $paref->{batmaxsoc} = $soc;
+      $paref->{nhour}     = 99;
+      $paref->{histname}  = 'batmaxsoc';
+      setPVhistory ($paref);
+      delete $paref->{histname};      
+  }
+  
   ######
 
   storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_BatIn', $batinthishour.' Wh');
@@ -6112,10 +6402,127 @@ sub _transferBatteryValues {
   $data{$type}{$name}{current}{powerbatin}  = int $pbi;                                       # Hilfshash Wert aktuelle Batterieladung
   $data{$type}{$name}{current}{powerbatout} = int $pbo;                                       # Hilfshash Wert aktuelle Batterieentladung
   $data{$type}{$name}{current}{batcharge}   = $soc;                                           # aktuelle Batterieladung
+  $data{$type}{$name}{current}{batinstcap}  = $instcap;                                       # installierte Batteriekapazität
   
   push @{$data{$type}{$name}{current}{socslidereg}}, $soc;                                    # Schieberegister Batterie SOC
   limitArray ($data{$type}{$name}{current}{socslidereg}, $defslidenum);
 
+return;
+}
+
+################################################################
+#          Batterie SOC optimalen Sollwert berechnen
+################################################################
+sub _batSocTarget {
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $type    = $paref->{type};
+  my $t       = $paref->{t};                                                  # aktuelle Zeit
+  
+  return if(!isBatteryUsed ($name));
+
+  my $oldd2care = CircularVal ($hash, 99, 'days2care', 0);
+  my $ltsmsr    = CircularVal ($hash, 99, 'lastTsMaxSocRchd', undef);
+  my $batcharge = CurrentVal  ($hash, 'batcharge', 0);                        # aktuelle Ladung in %
+
+  __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $batcharge >= $maxSoCdef || $oldd2care < 0);                         
+  
+  my $cgbt                                  = AttrVal ($name, 'ctrlBatSocManagement', undef);
+  my ($lowSoc, $upSoc, $maxsoc, $careCycle) = __parseAttrBatSoc ($name, $cgbt);
+  return if(!$lowSoc ||!$upSoc);
+  
+  $paref->{careCycle} = $careCycle;
+  __batSaveSocKeyFigures ($paref) if($batcharge >= $maxsoc);
+  delete $paref->{careCycle};
+  
+  my $target     = $lowSoc;
+  my $yday       = strftime "%d", localtime($t - 86400);                      # Vortag  (range 01 to 31)
+  my $batymaxsoc = HistoryVal ($hash, $yday, 99, 'batmaxsoc',       0);       # gespeicherter max. SOC des Vortages
+  my $batysetsoc = HistoryVal ($hash, $yday, 99, 'batsetsoc', $lowSoc);       # gespeicherter SOC Sollwert des Vortages
+
+  $target = $batymaxsoc <  $maxsoc ? $batysetsoc + $batSocChgDay :
+            $batymaxsoc >= $maxsoc ? $batysetsoc - $batSocChgDay :
+            $batysetsoc;                                                      # neuer Min SOC für den laufenden Tag
+            
+  ## Aufladewahrscheinlichkeit beachten
+  #######################################
+  my $pvfctm     = ReadingsNum ($name, 'Tomorrow_PVforecast', 0);             # PV Prognose morgen
+  my $pvfctd     = ReadingsNum ($name, 'RestOfDayPVforecast', 0);             # PV Prognose Rest heute
+  my $pvexpect   = $pvfctm > $pvfctd ? $pvfctm : $pvfctm;
+  
+  my $batinstcap = CurrentVal ($hash, 'batinstcap', 0);                       # installierte Batteriekapazität Wh
+  my $needcharge = $batinstcap - ($batinstcap / 100 * $batcharge);            # vorläufige benötigte Ladeenergie (Wh) bis 100% SOC
+  my $cancharge  = $pvexpect > $needcharge ? $pvexpect : $needcharge;         # resultierende benötigte Ladeenergie (Wh)
+  my $cantarget  = 100 - ($cancharge / ($batinstcap / 100));                  # berechneter möglicher Min SOC nach Berücksichtigung Ladewahrscheinlichkeit
+  
+  $target        = $cantarget < $target ? $cantarget : $target;               # Abgleich möglicher Min SOC gg. berechneten Min SOC
+  
+  ## low/up-Grenzen beachten
+  ############################
+  $target = $target > $upSoc  ? $upSoc  :                                    
+            $target < $lowSoc ? $lowSoc :
+            $target;
+            
+  ## Pflege-SoC (Soll SoC $maxSoCdef bei $batSocChgDay % Steigerung p. Tag)      
+  ###########################################################################
+  my $ntsmsc    = CircularVal ($hash, 99, 'nextTsMaxSocChge', $t);
+  my $days2care = ceil        (($ntsmsc - $t) / 86400);                       # verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll
+  
+  $paref->{days2care} = $days2care;
+  __batSaveSocKeyFigures ($paref);
+  delete $paref->{days2care};
+  
+  my $careSoc = $maxsoc - ($days2care * $batSocChgDay);                       # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
+  $target     = $careSoc < $target ? $target : $careSoc;                      # resultierender Target-SoC unter Berücksichtigung $caresoc 
+  
+  ## pvHistory/Readings schreiben
+  #################################
+  $paref->{batsetsoc} = $target;
+  $paref->{nhour}     = 99;
+  $paref->{histname}  = 'batsetsoc';
+  setPVhistory ($paref);
+  delete $paref->{histname};
+  
+  storeReading ('Battery_OptimumTargetSoC', $target.' %');
+            
+return;
+}
+
+################################################################
+#                Parse ctrlBatSocManagement
+################################################################
+sub __parseAttrBatSoc {                                            
+  my $name = shift;
+  my $cgbt = shift // return;
+  
+  my ($pa,$ph)  = parseParams ($cgbt); 
+  my $lowSoc    = $ph->{lowSoc};                                                
+  my $upSoc     = $ph->{upSoC};                                              
+  my $maxsoc    = $ph->{maxSoC}    // $maxSoCdef;                            # optional (default: $maxSoCdef)                    
+  my $careCycle = $ph->{careCycle} // $carecycledef;                         # Ladungszyklus (Maintenance) für maxSoC in Tagen
+         
+return ($lowSoc, $upSoc, $maxsoc, $careCycle);
+}
+
+################################################################
+#          Batterie Kennzahlen speichern  
+################################################################
+sub __batSaveSocKeyFigures {
+  my $paref     = shift;
+  my $name      = $paref->{name};
+  my $type      = $paref->{type};
+  my $t         = $paref->{t};                                                               # aktuelle Zeit
+  my $careCycle = $paref->{careCycle} // $carecycledef;
+  
+  if (defined $paref->{days2care}) {
+      $data{$type}{$name}{circular}{99}{days2care} = $paref->{days2care};                     # verbleibende Tage bis zum Pflege-SoC erreicht werden soll                     
+      return;
+  }
+  
+  $data{$type}{$name}{circular}{99}{lastTsMaxSocRchd} = $t;                                   # Timestamp des letzten Erreichens von >= maxSoC
+  $data{$type}{$name}{circular}{99}{nextTsMaxSocChge} = $t + (86400 * $careCycle);            # Timestamp bis zu dem die Batterie mindestens einmal maxSoC erreichen soll
+            
 return;
 }
 
@@ -7204,7 +7611,7 @@ sub ___switchConsumerOn {
                       qq{planstate: $pstate, starttime: }.($startts ? (timestampToTimestring ($startts, $lang))[0] : "undef")
            );
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isInLocktime: $iilt}.($rlt ? ", remainLockTime: $rlt seconds" : ''));
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - current Context is switching "on" => }.
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - current Context is >switch on< => }.
                       qq{swoncond: $swoncond, on-command: $oncom }
            );
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOnCond Info: $infon})   if($swoncond && $infon);
@@ -7214,6 +7621,8 @@ sub ___switchConsumerOn {
       if (simplifyCstate($pstate) =~ /planned|priority|starting/xs && isInTimeframe ($hash, $c) && $iilt) {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - switching on postponed by >isInLocktime<});
       }
+      
+      isInterruptable ($hash, $c, 0, 1);                                                          # Interruptable Info ausgeben
   }
 
   if ($auto && $oncom && $swoncond && !$swoffcond && !$iilt &&                                    # kein Einschalten wenn zusätzliche Switch off Bedingung oder Sperrzeit zutrifft
@@ -7301,14 +7710,17 @@ sub ___switchConsumerOff {
   my ($iilt,$rlt) = isInLocktime ($paref);                                                        # Sperrzeit Status ermitteln
 
   if ($debug =~ /consumerSwitching/x) {                                                           # nur für Debugging
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - current Context is switching "off" => }.
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - current Context is >switch off< => }.
                       qq{swoffcond: $swoffcond, off-command: $offcom}
            );
+      
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOffCond Info: $infoff}) if($swoffcond && $infoff);
 
       if ($stopts && $t >= $stopts && $iilt) {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - switching off postponed by >isInLocktime<});
       }
+      
+      isInterruptable ($hash, $c, $hyst, 1);                                                      # Interruptable Info ausgeben
   }
 
   if(($swoffcond || ($stopts && $t >= $stopts)) && !$iilt &&
@@ -8295,11 +8707,11 @@ return;
 ################################################################
 sub pageAsHtml {
   my $name = shift;
-  my $ftui = shift // "";
-  my $gsel = shift // "";                                                                  # direkte Auswahl welche Grafik zurück gegeben werden soll (both, flow, forecast)
+  my $ftui = shift // '';
+  my $gsel = shift // '';                                                                  # direkte Auswahl welche Grafik zurück gegeben werden soll (both, flow, forecast)
 
   my $ret = "<html>";
-  $ret   .= entryGraphic ($name, $ftui, $gsel);
+  $ret   .= entryGraphic ($name, $ftui, $gsel, 1);
   $ret   .= "</html>";
 
 return $ret;
@@ -8310,8 +8722,9 @@ return $ret;
 ################################################################
 sub entryGraphic {
   my $name = shift;
-  my $ftui = shift // "";
-  my $gsel = shift // "";                                                                  # direkte Auswahl welche Grafik zurück gegeben werden soll (both, flow, forecast)
+  my $ftui = shift // '';
+  my $gsel = shift // '';                                                                  # direkte Auswahl welche Grafik zurück gegeben werden soll (both, flow, forecast)
+  my $pah  = shift // 0;                                                                   # 1 wenn durch pageAsHtml aufgerufen
 
   my $hash = $defs{$name};
 
@@ -8340,12 +8753,13 @@ sub entryGraphic {
   if (!$gsel) {
       $gsel = AttrVal ($name, 'graphicSelect', 'both');                                    # Auswahl der anzuzeigenden Grafiken
   }
-
+  
   my $paref = {
       hash           => $hash,
       name           => $name,
       type           => $hash->{TYPE},
       ftui           => $ftui,
+      pah            => $pah,
       maxhours       => $maxhours,
       t              => time,
       modulo         => 1,
@@ -8433,7 +8847,8 @@ sub entryGraphic {
   if ($legendtxt && ($clegend eq 'top')) {
       $ret .= "<tr class='$htr{$m}{cl}'>";
       $ret .= "<td colspan='".($maxhours+2)."' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
-      $ret .= "$legendtxt</td>";
+      $ret .= $legendtxt;
+      $ret .= "</td>";
       $ret .= "</tr>";
 
       $paref->{modulo}++;
@@ -9108,6 +9523,7 @@ sub __createOwnSpec {
   my $name      = $paref->{name};
   my $dstyle    = $paref->{dstyle};                                                    # TD-Style
   my $hdrDetail = $paref->{hdrDetail};
+  my $pah       = $paref->{pah};                                                       # 1 wenn durch pageAsHtml abgerufen
 
   my $vinr = 4;                                                                        # Spezifikationen in einer Zeile
   my $spec = AttrVal ($name, 'graphicHeaderOwnspec', '');
@@ -9156,6 +9572,11 @@ sub __createOwnSpec {
           my $setcmd = ___getFWwidget ($name, $dev, $elm, $allsets, 'set');           # Set-Kommandos identifizieren
           
           if ($setcmd) {
+              if ($pah) {                                                             # bei get pageAsHtml setter/attr nicht anzeigen (js Fehler)
+                  undef $h->{$k}{label};
+                  $setcmd = '<hidden by pageAsHtml>';
+              }
+              
               $v->{$k} = $setcmd;
               $u->{$k} = q{};
               
@@ -9166,6 +9587,11 @@ sub __createOwnSpec {
           my $attrcmd = ___getFWwidget ($name, $dev, $elm, $allattrs, 'attr');        # Attr-Kommandos identifizieren
           
           if ($attrcmd) {
+              if ($pah) {                                                             # bei get pageAsHtml setter/attr nicht anzeigen (js Fehler)
+                  undef $h->{$k}{label};
+                  $attrcmd = '<hidden by pageAsHtml>';
+              }              
+                            
               $v->{$k} = $attrcmd;
               $u->{$k} = q{};
               
@@ -9321,6 +9747,7 @@ sub ___widgetFallback {
   
   if (!defined $current) {
       $reading = 'state';
+      $current = ' ';
   }
   
   if ($current =~ /((<td|<div|<\/div>).*?)/xs) {                   # Eleminierung von störenden HTML Elementen aus aktuellem Readingwert 
@@ -9695,7 +10122,7 @@ sub _graphicConsumerLegend {
   $ctable .= qq{</tr>} if($tro);
 
   if ($clegend ne 'bottom') {
-       $ctable .= qq{<tr><td colspan="12"><hr></td></tr>};
+       $ctable .= qq{<tr><td colspan='12'><hr></td></tr>};
   }
 
   $ctable .= qq{</table>};
@@ -11783,6 +12210,8 @@ sub setPVhistory {
   my $btotin         = $paref->{batintotal};                               # totale Batterieladung
   my $batoutthishour = $paref->{batoutthishour};                           # Batterieentladung in Stunde
   my $btotout        = $paref->{batouttotal};                              # totale Batterieentladung
+  my $batmaxsoc      = $paref->{batmaxsoc};                                # max. erreichter SOC des Tages
+  my $batsetsoc      = $paref->{batsetsoc};                                # berechneter optimaler SOC für den laufenden Tag
   my $calcpv         = $paref->{calcpv}        // 0;
   my $gcthishour     = $paref->{gctotthishour} // 0;                       # Netzbezug
   my $fithishour     = $paref->{gftotthishour} // 0;                       # Netzeinspeisung
@@ -11825,6 +12254,16 @@ sub setPVhistory {
           $batoutsum += HistoryVal ($hash, $day, $k, "batout", 0);
       }
       $data{$type}{$name}{pvhist}{$day}{99}{batout} = $batoutsum;
+  }
+  
+  if ($histname eq "batmaxsoc") {                                                                 # max. erreichter SOC des Tages
+      $val = $batmaxsoc;
+      $data{$type}{$name}{pvhist}{$day}{99}{batmaxsoc} = $batmaxsoc;
+  }
+
+  if ($histname eq "batsetsoc") {                                                                 # optimaler SOC für den Tages
+      $val = $batsetsoc;
+      $data{$type}{$name}{pvhist}{$day}{99}{batsetsoc} = $batsetsoc;
   }
 
   if ($histname eq "pvrl") {                                                                      # realer Energieertrag
@@ -12049,24 +12488,26 @@ sub listDataPool {
       my $day = shift;
       my $ret;
       for my $key (sort {$a<=>$b} keys %{$h->{$day}}) {
-          my $pvrl    = HistoryVal ($hash, $day, $key, 'pvrl',        "-");
-          my $pvfc    = HistoryVal ($hash, $day, $key, 'pvfc',        "-");
-          my $gcon    = HistoryVal ($hash, $day, $key, 'gcons',       "-");
-          my $con     = HistoryVal ($hash, $day, $key, "con",         "-");
-          my $confc   = HistoryVal ($hash, $day, $key, "confc",       "-");
-          my $gfeedin = HistoryVal ($hash, $day, $key, "gfeedin",     "-");
-          my $wid     = HistoryVal ($hash, $day, $key, "weatherid",   "-");
-          my $wcc     = HistoryVal ($hash, $day, $key, "wcc",         "-");
-          my $wrp     = HistoryVal ($hash, $day, $key, "wrp",         "-");
-          my $temp    = HistoryVal ($hash, $day, $key, "temp",      undef);
-          my $pvcorrf = HistoryVal ($hash, $day, $key, "pvcorrf",     "-");
-          my $dayname = HistoryVal ($hash, $day, $key, "dayname",   undef);
-          my $etotal  = HistoryVal ($hash, $day, $key, "etotal",      "-");
-          my $btotin  = HistoryVal ($hash, $day, $key, "batintotal",  "-");
-          my $batin   = HistoryVal ($hash, $day, $key, "batin",       "-");
-          my $btotout = HistoryVal ($hash, $day, $key, "batouttotal", "-");
-          my $batout  = HistoryVal ($hash, $day, $key, "batout",      "-");
-          my $rad1h   = HistoryVal ($hash, $day, $key, "rad1h",       "-");
+          my $pvrl    = HistoryVal ($hash, $day, $key, 'pvrl',        '-');
+          my $pvfc    = HistoryVal ($hash, $day, $key, 'pvfc',        '-');
+          my $gcon    = HistoryVal ($hash, $day, $key, 'gcons',       '-');
+          my $con     = HistoryVal ($hash, $day, $key, 'con',         '-');
+          my $confc   = HistoryVal ($hash, $day, $key, 'confc',       '-');
+          my $gfeedin = HistoryVal ($hash, $day, $key, 'gfeedin',     '-');
+          my $wid     = HistoryVal ($hash, $day, $key, 'weatherid',   '-');
+          my $wcc     = HistoryVal ($hash, $day, $key, 'wcc',         '-');
+          my $wrp     = HistoryVal ($hash, $day, $key, 'wrp',         '-');
+          my $temp    = HistoryVal ($hash, $day, $key, 'temp',      undef);
+          my $pvcorrf = HistoryVal ($hash, $day, $key, 'pvcorrf',     '-');
+          my $dayname = HistoryVal ($hash, $day, $key, 'dayname',   undef);
+          my $etotal  = HistoryVal ($hash, $day, $key, 'etotal',      '-');
+          my $btotin  = HistoryVal ($hash, $day, $key, 'batintotal',  '-');
+          my $batin   = HistoryVal ($hash, $day, $key, 'batin',       '-');
+          my $btotout = HistoryVal ($hash, $day, $key, 'batouttotal', '-');
+          my $batout  = HistoryVal ($hash, $day, $key, 'batout',      '-');
+          my $batmsoc = HistoryVal ($hash, $day, $key, 'batmaxsoc',   '-');
+          my $batssoc = HistoryVal ($hash, $day, $key, 'batsetsoc',   '-');
+          my $rad1h   = HistoryVal ($hash, $day, $key, 'rad1h',       '-');
 
           $ret .= "\n      " if($ret);
           $ret .= $key." => etotal: $etotal, pvfc: $pvfc, pvrl: $pvrl, rad1h: $rad1h";
@@ -12074,6 +12515,8 @@ sub listDataPool {
           $ret .= "confc: $confc, con: $con, gcon: $gcon, gfeedin: $gfeedin";
           $ret .= "\n            ";
           $ret .= "batintotal: $btotin, batin: $batin, batouttotal: $btotout, batout: $batout";
+          $ret .= "\n            ";
+          $ret .= "batmaxsoc: $batmsoc, batsetsoc: $batssoc";
           $ret .= "\n            ";
           $ret .= "wid: $wid";
           $ret .= ", wcc: $wcc";
@@ -12193,34 +12636,37 @@ sub listDataPool {
           return qq{Circular cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $pvfc     = CircularVal ($hash, $idx, "pvfc",             "-");
-          my $pvaifc   = CircularVal ($hash, $idx, "pvaifc",           "-");
-          my $pvapifc  = CircularVal ($hash, $idx, "pvapifc",          "-");
-          my $aihit    = CircularVal ($hash, $idx, "aihit",            "-");
-          my $pvrl     = CircularVal ($hash, $idx, "pvrl",             "-");
-          my $confc    = CircularVal ($hash, $idx, "confc",            "-");
-          my $gcons    = CircularVal ($hash, $idx, "gcons",            "-");
-          my $gfeedin  = CircularVal ($hash, $idx, "gfeedin",          "-");
-          my $wid      = CircularVal ($hash, $idx, "weatherid",        "-");
-          my $wtxt     = CircularVal ($hash, $idx, "weathertxt",       "-");
-          my $wccv     = CircularVal ($hash, $idx, "wcc",              "-");
-          my $wrprb    = CircularVal ($hash, $idx, "wrp",              "-");
-          my $temp     = CircularVal ($hash, $idx, "temp",             "-");
-          my $pvcorrf  = CircularVal ($hash, $idx, "pvcorrf",          "-");
-          my $quality  = CircularVal ($hash, $idx, "quality",          "-");
-          my $batin    = CircularVal ($hash, $idx, "batin",            "-");
-          my $batout   = CircularVal ($hash, $idx, "batout",           "-");
-          my $tdayDvtn = CircularVal ($hash, $idx, "tdayDvtn",         "-");
-          my $ydayDvtn = CircularVal ($hash, $idx, "ydayDvtn",         "-");
-          my $fitot    = CircularVal ($hash, $idx, "feedintotal",      "-");
-          my $idfi     = CircularVal ($hash, $idx, "initdayfeedin",    "-");
-          my $gcontot  = CircularVal ($hash, $idx, "gridcontotal",     "-");
-          my $idgcon   = CircularVal ($hash, $idx, "initdaygcon",      "-");
-          my $idbitot  = CircularVal ($hash, $idx, "initdaybatintot",  "-");
-          my $bitot    = CircularVal ($hash, $idx, "batintot",         "-");
-          my $idbotot  = CircularVal ($hash, $idx, "initdaybatouttot", "-");
-          my $botot    = CircularVal ($hash, $idx, "batouttot",        "-");
-          my $rtaitr   = CircularVal ($hash, $idx, "runTimeTrainAI",   "-");
+          my $pvfc     = CircularVal ($hash, $idx, "pvfc",                '-');
+          my $pvaifc   = CircularVal ($hash, $idx, "pvaifc",              '-');
+          my $pvapifc  = CircularVal ($hash, $idx, "pvapifc",             '-');
+          my $aihit    = CircularVal ($hash, $idx, "aihit",               '-');
+          my $pvrl     = CircularVal ($hash, $idx, "pvrl",                '-');
+          my $confc    = CircularVal ($hash, $idx, "confc",               '-');
+          my $gcons    = CircularVal ($hash, $idx, "gcons",               '-');
+          my $gfeedin  = CircularVal ($hash, $idx, "gfeedin",             '-');
+          my $wid      = CircularVal ($hash, $idx, "weatherid",           '-');
+          my $wtxt     = CircularVal ($hash, $idx, "weathertxt",          '-');
+          my $wccv     = CircularVal ($hash, $idx, "wcc",                 '-');
+          my $wrprb    = CircularVal ($hash, $idx, "wrp",                 '-');
+          my $temp     = CircularVal ($hash, $idx, "temp",                '-');
+          my $pvcorrf  = CircularVal ($hash, $idx, "pvcorrf",             '-');
+          my $quality  = CircularVal ($hash, $idx, "quality",             '-');
+          my $batin    = CircularVal ($hash, $idx, "batin",               '-');
+          my $batout   = CircularVal ($hash, $idx, "batout",              '-');
+          my $tdayDvtn = CircularVal ($hash, $idx, "tdayDvtn",            '-');
+          my $ydayDvtn = CircularVal ($hash, $idx, "ydayDvtn",            '-');
+          my $ltsmsr   = CircularVal ($hash, $idx, 'lastTsMaxSocRchd',    '-');
+          my $ntsmsc   = CircularVal ($hash, $idx, 'nextTsMaxSocChge',    '-');
+          my $dtocare  = CircularVal ($hash, $idx, 'days2care',           '-');
+          my $fitot    = CircularVal ($hash, $idx, "feedintotal",         '-');
+          my $idfi     = CircularVal ($hash, $idx, "initdayfeedin",       '-');
+          my $gcontot  = CircularVal ($hash, $idx, "gridcontotal",        '-');
+          my $idgcon   = CircularVal ($hash, $idx, "initdaygcon",         '-');
+          my $idbitot  = CircularVal ($hash, $idx, "initdaybatintot",     '-');
+          my $bitot    = CircularVal ($hash, $idx, "batintot",            '-');
+          my $idbotot  = CircularVal ($hash, $idx, "initdaybatouttot",    '-');
+          my $botot    = CircularVal ($hash, $idx, "batouttot",           '-');
+          my $rtaitr   = CircularVal ($hash, $idx, "runTimeTrainAI",      '-');
 
           no warnings 'numeric';
 
@@ -12282,6 +12728,7 @@ sub listDataPool {
               $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon\n";
               $sq .= "      batintot: $bitot, initdaybatintot: $idbitot\n";
               $sq .= "      batouttot: $botot, initdaybatouttot: $idbotot\n";
+              $sq .= "      lastTsMaxSocRchd: $ltsmsr, nextTsMaxSocChge: $ntsmsc, days2care:$dtocare \n";
               $sq .= "      runTimeTrainAI: $rtaitr\n";
           }
       }
@@ -12293,28 +12740,29 @@ sub listDataPool {
           return qq{NextHours cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $nhts    = NexthoursVal ($hash, $idx, 'starttime',  "-");
-          my $hod     = NexthoursVal ($hash, $idx, 'hourofday',  "-");
-          my $today   = NexthoursVal ($hash, $idx, 'today',      "-");
-          my $pvfc    = NexthoursVal ($hash, $idx, 'pvfc',       "-");
-          my $pvapifc = NexthoursVal ($hash, $idx, 'pvapifc',    "-");             # PV Forecast der API
-          my $pvaifc  = NexthoursVal ($hash, $idx, 'pvaifc',     "-");             # PV Forecast der KI
-          my $aihit   = NexthoursVal ($hash, $idx, 'aihit',      "-");             # KI ForeCast Treffer Status
-          my $wid     = NexthoursVal ($hash, $idx, 'weatherid',  "-");
-          my $neff    = NexthoursVal ($hash, $idx, 'cloudcover', "-");
-          my $crange  = NexthoursVal ($hash, $idx, 'cloudrange', "-");
-          my $r101    = NexthoursVal ($hash, $idx, 'rainprob',   "-");
-          my $rad1h   = NexthoursVal ($hash, $idx, 'rad1h',      "-");
-          my $pvcorrf = NexthoursVal ($hash, $idx, 'pvcorrf',    "-");
-          my $temp    = NexthoursVal ($hash, $idx, 'temp',       "-");
-          my $confc   = NexthoursVal ($hash, $idx, 'confc',      "-");
-          my $confcex = NexthoursVal ($hash, $idx, 'confcEx',    "-");
-          my $don     = NexthoursVal ($hash, $idx, 'DoN',        "-");
+          my $nhts    = NexthoursVal ($hash, $idx, 'starttime',  '-');
+          my $hod     = NexthoursVal ($hash, $idx, 'hourofday',  '-');
+          my $today   = NexthoursVal ($hash, $idx, 'today',      '-');
+          my $pvfc    = NexthoursVal ($hash, $idx, 'pvfc',       '-');
+          my $pvapifc = NexthoursVal ($hash, $idx, 'pvapifc',    '-');             # PV Forecast der API
+          my $pvaifc  = NexthoursVal ($hash, $idx, 'pvaifc',     '-');             # PV Forecast der KI
+          my $aihit   = NexthoursVal ($hash, $idx, 'aihit',      '-');             # KI ForeCast Treffer Status
+          my $wid     = NexthoursVal ($hash, $idx, 'weatherid',  '-');
+          my $neff    = NexthoursVal ($hash, $idx, 'cloudcover', '-');
+          my $crange  = NexthoursVal ($hash, $idx, 'cloudrange', '-');
+          my $r101    = NexthoursVal ($hash, $idx, 'rainprob',   '-');
+          my $rrange  = NexthoursVal ($hash, $idx, 'rainrange',  '-');
+          my $rad1h   = NexthoursVal ($hash, $idx, 'rad1h',      '-');
+          my $pvcorrf = NexthoursVal ($hash, $idx, 'pvcorrf',    '-');
+          my $temp    = NexthoursVal ($hash, $idx, 'temp',       '-');
+          my $confc   = NexthoursVal ($hash, $idx, 'confc',      '-');
+          my $confcex = NexthoursVal ($hash, $idx, 'confcEx',    '-');
+          my $don     = NexthoursVal ($hash, $idx, 'DoN',        '-');
           $sq        .= "\n" if($sq);
           $sq        .= $idx." => starttime: $nhts, hourofday: $hod, today: $today\n";
           $sq        .= "              pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, confc: $confc\n";
           $sq        .= "              confcEx: $confcex, DoN: $don, wid: $wid, wcc: $neff, wrp: $r101, temp=$temp\n";
-          $sq        .= "              rad1h: $rad1h, crange: $crange, correff: $pvcorrf";
+          $sq        .= "              rad1h: $rad1h, rrange: $rrange, crange: $crange, correff: $pvcorrf";
       }
   }
 
@@ -12327,12 +12775,14 @@ sub listDataPool {
           my $nhfc    = NexthoursVal ($hash, $idx, 'pvfc', undef);
           next if(!$nhfc);
           my $nhts    = NexthoursVal ($hash, $idx, 'starttime',  undef);
-          my $neff    = NexthoursVal ($hash, $idx, 'cloudcover',   "-");
-          my $crange  = NexthoursVal ($hash, $idx, 'cloudrange',   "-");
-          my $pvcorrf = NexthoursVal ($hash, $idx, 'pvcorrf',    "-/-");
+          my $neff    = NexthoursVal ($hash, $idx, 'cloudcover',   '-');
+          my $crange  = NexthoursVal ($hash, $idx, 'cloudrange',   '-');
+          my $r101    = NexthoursVal ($hash, $idx, 'rainprob',     '-');
+          my $rrange  = NexthoursVal ($hash, $idx, 'rainrange',    '-');
+          my $pvcorrf = NexthoursVal ($hash, $idx, 'pvcorrf',    '-/-');
           my ($f,$q)  = split "/", $pvcorrf;
           $sq        .= "\n" if($sq);
-          $sq        .= "starttime: $nhts, wcc: $neff, crange: $crange, quality: $q, factor: $f";
+          $sq        .= "starttime: $nhts, wrp: $r101, rrange: $rrange, wcc: $neff, crange: $crange, quality: $q, factor: $f";
       }
   }
 
@@ -12409,12 +12859,12 @@ sub listDataPool {
       $sq = "<b>Number of datasets:</b> ".$maxcnt."\n";
 
       for my $idx (sort keys %{$h}) {
-          my $hod   = AiRawdataVal ($hash, $idx, 'hod',   "-");
-          my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', "-");
-          my $wcc   = AiRawdataVal ($hash, $idx, 'wcc',   "-");
-          my $wrp   = AiRawdataVal ($hash, $idx, 'wrp',   "-");
-          my $pvrl  = AiRawdataVal ($hash, $idx, 'pvrl',  "-");
-          my $temp  = AiRawdataVal ($hash, $idx, 'temp',  "-");
+          my $hod   = AiRawdataVal ($hash, $idx, 'hod',   '-');
+          my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', '-');
+          my $wcc   = AiRawdataVal ($hash, $idx, 'wcc',   '-');
+          my $wrp   = AiRawdataVal ($hash, $idx, 'wrp',   '-');
+          my $pvrl  = AiRawdataVal ($hash, $idx, 'pvrl',  '-');
+          my $temp  = AiRawdataVal ($hash, $idx, 'temp',  '-');
           $sq      .= "\n";
           $sq      .= "$idx => hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $wrp, pvrl: $pvrl, temp: $temp";
       }
@@ -12471,6 +12921,7 @@ sub checkPlantConfig {
       'String Configuration'     => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'DWD Weather Attributes'   => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'Common Settings'          => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'FTUI Widget Files'        => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
   };
 
   my $sub = sub {
@@ -12531,7 +12982,7 @@ sub checkPlantConfig {
 
   ## Check Attribute DWD Wetterdevice
   #####################################
-  my $fcname = ReadingsVal($name, 'currentWeatherDev', '');
+  my $fcname = ReadingsVal ($name, 'currentWeatherDev', '');
 
   if (!$fcname || !$defs{$fcname}) {
       $result->{'DWD Weather Attributes'}{state}   = $nok;
@@ -12639,7 +13090,7 @@ sub checkPlantConfig {
   my $aiprep   = isPrepared4AI ($hash, 'full');
   my $aiusemsg = CurrentVal    ($hash, 'aicanuse', '');
   my $einstds  = "";
-
+  
   if (!$eocr || $eocr ne '.*') {
       $einstds                              = 'to .*' if($eocr ne '.*');
       $result->{'Common Settings'}{state}   = $info;
@@ -12658,8 +13109,30 @@ sub checkPlantConfig {
   if (!$aiprep) {
       $result->{'Common Settings'}{state}   = $info;
       $result->{'Common Settings'}{result} .= qq{The AI support is not used. <br>};
-      $result->{'Common Settings'}{note}   .= qq{$aiusemsg<br>};
+      $result->{'Common Settings'}{note}   .= qq{$aiusemsg.<br>};
       $result->{'Common Settings'}{info}    = 1;
+  }
+  
+  my ($cmerr, $cmupd, $cmmsg, $cmrec) = checkModVer ($name, '76_SolarForecast', 'https://fhem.de/fhemupdate/controls_fhem.txt');
+  
+  if (!$cmerr && !$cmupd) {
+      $result->{'Common Settings'}{note}   .= qq{$cmmsg<br>};
+      $result->{'Common Settings'}{note}   .= qq{checked module: <br>};
+      $result->{'Common Settings'}{note}   .= qq{76_SolarForecast <br>};
+  }
+  
+  if ($cmerr) {
+      $result->{'Common Settings'}{state}   = $warn;
+      $result->{'Common Settings'}{result} .= qq{$cmmsg <br>};
+      $result->{'Common Settings'}{note}   .= qq{$cmrec <br>};
+      $result->{'Common Settings'}{warn}    = 1;
+  }
+  
+  if ($cmupd) {
+      $result->{'Common Settings'}{state}   = $warn;
+      $result->{'Common Settings'}{result} .= qq{$cmmsg <br>};
+      $result->{'Common Settings'}{note}   .= qq{$cmrec <br>};
+      $result->{'Common Settings'}{warn}    = 1;
   }
 
   ## allg. Settings bei Nutzung Forecast.Solar API
@@ -12813,6 +13286,54 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{note}   .= qq{global dnsServer, global language <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, vrmCredentials, event-on-change-reading, ctrlLanguage <br>};
       }
+  }
+  
+  ## FTUI Widget Support
+  ########################
+  my $root  = $attr{global}{modpath};
+  my $tpath = "$root/www/tablet/css";
+  my $upd   = 0;
+  $err      = 0;
+
+  if (!-d $tpath) {
+      $result->{'FTUI Widget Files'}{result}  .= $hqtxt{widnin}{$lang};  
+      $result->{'FTUI Widget Files'}{note}    .= qq{There is no need to install SolarForecast FTUI widgets.<br>};
+  }
+  else {
+      my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';
+      my $pPath = '?format=txt';
+      my $cfile = 'controls_solarforecast.txt';
+      my $cfurl = $bPath.$cfile.$pPath;  
+      
+      for my $file (@fs) {      
+          my ($cmerr, $cmupd) = checkModVer ($name, $file, $cfurl);
+
+          $err = 1 if($cmerr);
+          $upd = 1 if($cmupd);
+      }      
+     
+      if ($err) {
+          $result->{'FTUI Widget Files'}{state}   = $warn;
+          $result->{'FTUI Widget Files'}{result} .= $hqtxt{widerr}{$lang};
+          $result->{'FTUI Widget Files'}{note}   .= qq{Try the test again later. If the error is permanent, please inform the maintainer.<br>};         
+          $result->{'FTUI Widget Files'}{warn}    = 1;
+          
+          $upd = 0;
+      }
+
+      if ($upd) {
+          $result->{'FTUI Widget Files'}{state}   = $warn;
+          $result->{'FTUI Widget Files'}{result} .= $hqtxt{widnup}{$lang};
+          $result->{'FTUI Widget Files'}{note}   .= qq{Update the FHEM Tablet UI Widget Files with the command:  <br>};  
+          $result->{'FTUI Widget Files'}{note}   .= qq{"get $name ftuiFramefiles".  <br>};          
+          $result->{'FTUI Widget Files'}{warn}    = 1;         
+      }     
+      
+      if (!$result->{'FTUI Widget Files'}{fault} && !$result->{'FTUI Widget Files'}{warn} && !$result->{'FTUI Widget Files'}{info}) {
+          $result->{'FTUI Widget Files'}{result}  .= $hqtxt{widok}{$lang};
+          $result->{'FTUI Widget Files'}{note}    .= qq{checked Files: <br>};
+          $result->{'FTUI Widget Files'}{note}    .= (join ', ', @fs).qq{ <br>};
+      }      
   }
 
   ## Ausgabe
@@ -13427,7 +13948,8 @@ sub isAddSwitchOffCond {
   my $c    = shift;
   my $cond = shift // q{};
   my $hyst = shift // 0;                                                          # Hysterese
-
+  
+  my $swoff          = 0;
   my $info           = q{};
   my $err            = q{};
   my $dswoffcond     = q{};                                                       # Device zur Lieferung einer Ausschaltbedingung
@@ -13435,7 +13957,7 @@ sub isAddSwitchOffCond {
   my $swoffcondregex = q{};                                                       # Regex der Ausschaltbedingung (wenn wahr)
 
   if ($cond) {
-      ($dswoffcond,$rswoffcond,$swoffcondregex) = split ":", $cond;
+      ($dswoffcond, $rswoffcond, $swoffcondregex) = split ":", $cond;
   }
   else {
       $dswoffcond     = ConsumerVal ($hash, $c, 'dswoffcond',     '');
@@ -13450,25 +13972,35 @@ sub isAddSwitchOffCond {
 
   my $condval = ReadingsVal ($dswoffcond, $rswoffcond, undef);
 
-  if ($hyst && defined $condval && isNumeric ($condval)) {                        # Hysterese berücksichtigen
-      $condval -= $hyst;
-  }
+  if (defined $condval) {
+      if ($condval =~ m/^$swoffcondregex$/x) {
+          $info   = qq{value "$condval" matches the Regex "$swoffcondregex" \n};
+          $info  .= "-> !Interrupt! ";
+          $swoff  = 1;
+      }
+      else {
+          $info  = qq{value "$condval" doesn't match the Regex "$swoffcondregex" \n};     
+          $swoff = 0;
+      }
 
-  if (defined $condval && $condval =~ m/^$swoffcondregex$/x) {
-      $info = qq{value "$condval" (hysteresis = $hyst) match the Regex "$swoffcondregex" \n}.
-              qq{-> Switch-off condition or interrupt in the "switch-off context", DO NOT switch on or DO NOT continue in the "switch-on context"\n}
-              ;
+      if ($hyst && isNumeric ($condval)) {                                                              # Hysterese berücksichtigen
+          $condval -= $hyst;
+          
+          if ($condval =~ m/^$swoffcondregex$/x) {
+              $info   = qq{value "$condval" (included hysteresis = $hyst) matches the Regex "$swoffcondregex" \n};
+              $info  .= "-> !Interrupt! ";
+              $swoff  = 1;                      
+          }
+          else {
+              $info  = qq{device: "$dswoffcond", reading: "$rswoffcond" , value: "$condval" (included hysteresis = $hyst) doesn't match Regex: "$swoffcondregex" \n};
+              $swoff = 0;               
+          }
+      }
+      
+      $info .= qq{-> the effect depends on the switch context\n};     
+  } 
 
-      return (1, $info, $err);
-  }
-
-  $condval //= 'undef';
-
-  $info = qq{device: "$dswoffcond", reading: "$rswoffcond" , value: "$condval" (hysteresis = $hyst) doesn't match Regex: "$swoffcondregex" \n}.
-          qq{-> DO NOT Switch-off or DO NOT interrupt in the "switch-off context", Switching on or continuing in the "switch-on" context\n}
-          ;
-
-return (0, $info, $err);
+return ($swoff, $info, $err);
 }
 
 ################################################################
@@ -13579,7 +14111,7 @@ return ConsumerVal ($hash, $c, 'isConsumptionRecommended', 0);
 sub isBatteryUsed {
   my $name   = shift;
 
-  my $badev  = ReadingsVal($name, "currentBatteryDev", "");                  # aktuelles Meter device für Batteriewerte
+  my $badev  = ReadingsVal($name, 'currentBatteryDev', '');                  # aktuelles Meter device für Batteriewerte
   my ($a,$h) = parseParams ($badev);
   $badev     = $a->[0] // "";
   
@@ -13592,9 +14124,10 @@ return ($badev, $a ,$h);
 #  ist Consumer $c unterbrechbar (1|2) oder nicht (0|3)
 ################################################################
 sub isInterruptable {
-  my $hash = shift;
-  my $c    = shift;
-  my $hyst = shift // 0;
+  my $hash  = shift;
+  my $c     = shift;
+  my $hyst  = shift // 0;
+  my $print = shift // 0;                                                   # Print out Debug Info
 
   my $name    = $hash->{NAME};
   my $intable = ConsumerVal ($hash, $c, 'interruptable', 0);
@@ -13611,8 +14144,8 @@ sub isInterruptable {
   my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c, $intable, $hyst);
   Log3 ($name, 1, "$name - $err") if($err);
 
-  if ($debug =~ /consumerSwitching/x) {
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isInterruptable Info: $info});
+  if ($print && $debug =~ /consumerSwitching/x) {
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Interrupt Info: $info});
   }
 
   if ($swoffcond) {
@@ -13888,12 +14421,19 @@ sub temp2bin {
   my $temp = shift;
 
   my $bin = $temp > 35 ? '35' :
+            $temp > 32 ? '35' :
             $temp > 30 ? '30' :
+            $temp > 27 ? '30' :
             $temp > 25 ? '25' :
+            $temp > 22 ? '25' :
             $temp > 20 ? '20' :
+            $temp > 17 ? '20' :
             $temp > 15 ? '15' :
+            $temp > 12 ? '15' :
             $temp > 10 ? '10' :
+            $temp > 7  ? '10' :
             $temp > 5  ? '05' :
+            $temp > 2  ? '05' :
             $temp > 0  ? '00' :
             '-05';
 
@@ -13907,25 +14447,45 @@ sub cloud2bin {
   my $wcc = shift;
 
   my $bin = $wcc == 100 ? '100' :
+            $wcc >  97  ? '100' :
             $wcc >  95  ? '95'  :
+            $wcc >  92  ? '95'  :
             $wcc >  90  ? '90'  :
+            $wcc >  87  ? '90'  :
             $wcc >  85  ? '85'  :
+            $wcc >  82  ? '85'  :
             $wcc >  80  ? '80'  :
+            $wcc >  77  ? '80'  :
             $wcc >  75  ? '75'  :
+            $wcc >  72  ? '75'  :
             $wcc >  70  ? '70'  :
+            $wcc >  67  ? '70'  :
             $wcc >  65  ? '65'  :
+            $wcc >  62  ? '65'  :
             $wcc >  60  ? '60'  :
+            $wcc >  57  ? '60'  :
             $wcc >  55  ? '55'  :
+            $wcc >  52  ? '55'  :
             $wcc >  50  ? '50'  :
+            $wcc >  47  ? '50'  :
             $wcc >  45  ? '45'  :
+            $wcc >  42  ? '45'  :
             $wcc >  40  ? '40'  :
+            $wcc >  37  ? '40'  :
             $wcc >  35  ? '35'  :
+            $wcc >  32  ? '35'  :
             $wcc >  30  ? '30'  :
+            $wcc >  27  ? '30'  :
             $wcc >  25  ? '25'  :
+            $wcc >  22  ? '25'  :
             $wcc >  20  ? '20'  :
+            $wcc >  17  ? '20'  :
             $wcc >  15  ? '15'  :
+            $wcc >  12  ? '15'  :
             $wcc >  10  ? '10'  :
+            $wcc >  7   ? '10'  :
             $wcc >  5   ? '05'  :
+            $wcc >  2   ? '05'  :
             '00';
 
 return $bin;
@@ -13938,25 +14498,45 @@ sub rain2bin {
   my $wrp = shift;
 
   my $bin = $wrp == 100 ? '100' :
+            $wrp >  97  ? '100' :
             $wrp >  95  ? '95'  :
+            $wrp >  92  ? '95'  :
             $wrp >  90  ? '90'  :
+            $wrp >  87  ? '90'  :
             $wrp >  85  ? '85'  :
+            $wrp >  82  ? '85'  :
             $wrp >  80  ? '80'  :
+            $wrp >  77  ? '80'  :
             $wrp >  75  ? '75'  :
+            $wrp >  72  ? '75'  :
             $wrp >  70  ? '70'  :
+            $wrp >  67  ? '70'  :
             $wrp >  65  ? '65'  :
+            $wrp >  62  ? '65'  :
             $wrp >  60  ? '60'  :
+            $wrp >  57  ? '60'  :
             $wrp >  55  ? '55'  :
+            $wrp >  52  ? '55'  :
             $wrp >  50  ? '50'  :
+            $wrp >  47  ? '50'  :
             $wrp >  45  ? '45'  :
+            $wrp >  42  ? '45'  :
             $wrp >  40  ? '40'  :
+            $wrp >  37  ? '40'  :
             $wrp >  35  ? '35'  :
+            $wrp >  32  ? '35'  :
             $wrp >  30  ? '30'  :
+            $wrp >  27  ? '30'  :
             $wrp >  25  ? '25'  :
+            $wrp >  22  ? '25'  :
             $wrp >  20  ? '20'  :
+            $wrp >  17  ? '20'  :
             $wrp >  15  ? '15'  :
+            $wrp >  12  ? '15'  :
             $wrp >  10  ? '10'  :
+            $wrp >  7   ? '10'  :
             $wrp >  5   ? '05'  :
+            $wrp >  2   ? '05'  :
             '00';
 
 return $bin;
@@ -14114,6 +14694,8 @@ return;
 #             batin       - Batterieladung der Stunde (Wh)
 #             batouttotal - totale Batterieentladung (Wh)
 #             batout      - Batterieentladung der Stunde (Wh)
+#             batmsoc     - max. SOC des Tages (%) 
+#             batsetsoc   - optimaler (berechneter) SOC (%) für den Tag
 #             weatherid   - Wetter ID
 #             wcc         - Grad der Bewölkung
 #             temp        - Außentemperatur
@@ -14154,20 +14736,22 @@ return $def;
 #    CircularVal ($hash, $hod, $key, $def)
 #
 #    $hod: Stunde des Tages (01,02,...,24) bzw. 99 (besondere Verwendung)
-#    $key:    pvrl       - realer PV Ertrag
-#             pvfc       - PV Vorhersage
-#             confc      - Vorhersage Hausverbrauch (Wh)
-#             gcons      - realer Netzbezug
-#             gfeedin    - reale Netzeinspeisung
-#             batin      - Batterieladung (Wh)
-#             batout     - Batterieentladung (Wh)
-#             weatherid  - DWD Wetter id
-#             weathertxt - DWD Wetter Text
-#             wcc        - DWD Wolkendichte
-#             wrp        - DWD Regenwahrscheinlichkeit
-#             temp       - Außentemperatur
-#             pvcorrf    - PV Autokorrekturfaktoren (HASH)
-#
+#    $key:    pvrl             - realer PV Ertrag
+#             pvfc             - PV Vorhersage
+#             confc            - Vorhersage Hausverbrauch (Wh)
+#             gcons            - realer Netzbezug
+#             gfeedin          - reale Netzeinspeisung
+#             batin            - Batterieladung (Wh)
+#             batout           - Batterieentladung (Wh)
+#             weatherid        - DWD Wetter id
+#             weathertxt       - DWD Wetter Text
+#             wcc              - DWD Wolkendichte
+#             wrp              - DWD Regenwahrscheinlichkeit
+#             temp             - Außentemperatur
+#             pvcorrf          - PV Autokorrekturfaktoren (HASH)
+#             lastTsMaxSocRchd - Timestamp des letzten Erreichens von SoC >= maxSoC
+#             nextTsMaxSocChge - Timestamp bis zu dem die Batterie mindestens einmal maxSoC erreichen soll
+#             days2care        - verbleibende Tage bis der Batterie Pflege-SoC (default $maxSoCdef) erreicht sein soll                
 #             tdayDvtn         - heutige Abweichung PV Prognose/Erzeugung in %
 #             ydayDvtn         - gestrige Abweichung PV Prognose/Erzeugung in %
 #             initdayfeedin    - initialer Wert für "gridfeedin" zu Beginn des Tages (Wh)
@@ -14295,6 +14879,8 @@ return $def;
 #       aiinitstate          - Initialisierungsstatus der KI
 #       aitrainstate         - Traisningsstatus der KI
 #       aiaddistate          - Add Instanz Status der KI
+#       batcharge            - Bat SOC in %
+#       batinstcap           - installierte Batteriekapazität in Wh
 #       genslidereg          - Schieberegister PV Erzeugung (Array)
 #       h4fcslidereg         - Schieberegister 4h PV Forecast (Array)
 #       socslidereg          - Schieberegister Batterie SOC (Array)
@@ -14734,7 +15320,9 @@ to ensure that the system configuration is correct.
 
     <ul>
       <a id="SolarForecast-set-currentBatteryDev"></a>
-      <li><b>currentBatteryDev &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt; [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;] [charge=&lt;Readingname&gt;]  </b> <br><br>
+      <li><b>currentBatteryDev &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt; 
+                               [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;] 
+                               [cap=&lt;Option&gt;] [charge=&lt;Readingname&gt;]  </b> <br><br>
 
       Specifies an arbitrary Device and its Readings to deliver the battery performance data.
       The module assumes that the numerical value of the readings is always positive.
@@ -14744,12 +15332,15 @@ to ensure that the system configuration is correct.
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>pin</b>       </td><td>Reading which provides the current battery charging power                                 </td></tr>
-          <tr><td> <b>pout</b>      </td><td>Reading which provides the current battery discharge rate                                 </td></tr>
-          <tr><td> <b>intotal</b>   </td><td>Reading which provides the total battery charge as a continuous counter (optional)        </td></tr>
-          <tr><td> <b>outtotal</b>  </td><td>Reading which provides the total battery discharge as a continuous counter (optional)     </td></tr>
-          <tr><td> <b>charge</b>    </td><td>Reading which provides the current state of charge (SOC in percent) (optional)            </td></tr>
-          <tr><td> <b>Unit</b>      </td><td>the respective unit (W,Wh,kW,kWh)                                                         </td></tr>
+          <tr><td> <b>pin</b>       </td><td>Reading which provides the current battery charging power                                         </td></tr>
+          <tr><td> <b>pout</b>      </td><td>Reading which provides the current battery discharge rate                                         </td></tr>
+          <tr><td> <b>intotal</b>   </td><td>Reading which provides the total battery charge as a continuous counter (optional)                </td></tr>
+          <tr><td> <b>outtotal</b>  </td><td>Reading which provides the total battery discharge as a continuous counter (optional)             </td></tr>
+          <tr><td> <b>cap</b>       </td><td>installed battery capacity (optional). Option can be:                                             </td></tr>
+          <tr><td>                  </td><td><b>numerical value</b> - direct indication of the battery capacity in Wh                          </td></tr>
+          <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;unit&gt;</b> - Reading which provides the capacity and unit (Wh, kWh)  </td></tr>          
+          <tr><td> <b>charge</b>    </td><td>Reading which provides the current state of charge (SOC in percent) (optional)                    </td></tr>
+          <tr><td> <b>Unit</b>      </td><td>the respective unit (W,Wh,kW,kWh)                                                                 </td></tr>
         </table>
       </ul>
       <br>
@@ -14766,7 +15357,7 @@ to ensure that the system configuration is correct.
 
       <ul>
         <b>Example: </b> <br>
-        set &lt;name&gt; currentBatteryDev BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh  <br>
+        set &lt;name&gt; currentBatteryDev BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh <br>
         <br>
         # Device BatDummy returns the current battery charge in the reading "BatVal" (W), the battery discharge in the same reading with negative sign, <br>
         # the summary charge in the reading "intotal" (Wh), as well as the summary discharge in the reading "outtotal". (Wh)
@@ -15339,12 +15930,29 @@ to ensure that the system configuration is correct.
       </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-get-ftuiFramefiles"></a>
+      <li><b>ftuiFramefiles </b> <br><br>
+      SolarForecast provides widgets for 
+      <a href='https://wiki.fhem.de/wiki/FHEM_Tablet_UI' target='_blank'>FHEM Tablet UI v2 (FTUI2)</a>. <br>
+      If FTUI2 is installed on the system, the files for the framework can be loaded into the FTUI directory structure 
+      with this command. <br>
+      The setup and use of the widgets is described in Wiki
+      <a href='https://wiki.fhem.de/wiki/SolarForecast_FTUI_Widget' target='_blank'>SolarForecast FTUI Widget</a>.
+      </li>
+    </ul>
+    <br>   
 
     <ul>
       <a id="SolarForecast-get-html"></a>
       <li><b>html </b> <br><br>
-      The solar graphic is retrieved and rendered as HTML code. One of the following selections can be given as an
-      argument to the command: <br><br>
+      The SolarForecast graphic is retrieved and displayed as HTML code. <br>
+      <b>Note:</b> By the attribute <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a>
+      generated set or attribute commands in the user-specific area of the header are generally hidden for technical 
+      reasons. <br>
+      One of the following selections can be given as an argument to the command: 
+      <br><br>
 
       <ul>
         <table>
@@ -15387,6 +15995,7 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="10%"> <col width="90%"> </colgroup>
+            <tr><td> <b>aihit</b>     </td><td>delivery status of the AI for the PV forecast (0-no delivery, 1-delivery)       </td></tr>
             <tr><td> <b>confc</b>     </td><td>expected energy consumption including the shares of registered consumers        </td></tr>
             <tr><td> <b>confcEx</b>   </td><td>expected energy consumption without the shares of registered consumers          </td></tr>
             <tr><td> <b>crange</b>    </td><td>calculated cloud area                                                           </td></tr>
@@ -15398,11 +16007,11 @@ to ensure that the system configuration is correct.
             <tr><td> <b>pvapifc</b>   </td><td>expected PV generation (Wh) of the used API incl. a possible correction         </td></tr>
             <tr><td> <b>pvaifc</b>    </td><td>expected PV generation of the AI (Wh)                                           </td></tr>
             <tr><td> <b>pvfc</b>      </td><td>PV generation forecast used (Wh)                                                </td></tr>
-            <tr><td> <b>aihit</b>     </td><td>delivery status of the AI for the PV forecast (0-no delivery, 1-delivery)       </td></tr>
-            <tr><td> <b>today</b>     </td><td>has value '1' if start date on current day                                      </td></tr>
             <tr><td> <b>rad1h</b>     </td><td>predicted global radiation                                                      </td></tr>
+            <tr><td> <b>rrange</b>    </td><td>calculated range of rain probability                                            </td></tr>
             <tr><td> <b>starttime</b> </td><td>start time of the record                                                        </td></tr>
             <tr><td> <b>temp</b>      </td><td>predicted outdoor temperature                                                   </td></tr>
+            <tr><td> <b>today</b>     </td><td>has value '1' if start date on current day                                      </td></tr>
             <tr><td> <b>wrp</b>       </td><td>predicted degree of rain probability                                            </td></tr>
             <tr><td> <b>wid</b>       </td><td>ID of the predicted weather                                                     </td></tr>
             <tr><td> <b>wcc</b>       </td><td>predicted degree of cloudiness                                                  </td></tr>
@@ -15425,27 +16034,29 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>etotal</b>         </td><td>total energy yield (Wh) at the beginning of the hour                                                </td></tr>
-            <tr><td> <b>pvfc</b>           </td><td>the predicted PV yield (Wh)                                                             </td></tr>
-            <tr><td> <b>pvrl</b>           </td><td>real PV generation (Wh)                                                                        </td></tr>
-            <tr><td> <b>gcon</b>           </td><td>real power consumption (Wh) from the electricity grid                                                   </td></tr>
-            <tr><td> <b>confc</b>          </td><td>expected energy consumption (Wh)                                                               </td></tr>
-            <tr><td> <b>con</b>            </td><td>real energy consumption (Wh) of the house                                                        </td></tr>
-            <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                        </td></tr>
-            <tr><td> <b>batintotal</b>     </td><td>total battery charge (Wh) at the beginning of the hour                                                </td></tr>
-            <tr><td> <b>batin</b>          </td><td>Hour battery charge (Wh)                                                                 </td></tr>
-            <tr><td> <b>batouttotal</b>    </td><td>total battery discharge (Wh) at the beginning of the hour                                             </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>total energy yield (Wh) at the beginning of the hour                                            </td></tr>
+            <tr><td> <b>pvfc</b>           </td><td>the predicted PV yield (Wh)                                                                     </td></tr>
+            <tr><td> <b>pvrl</b>           </td><td>real PV generation (Wh)                                                                         </td></tr>
+            <tr><td> <b>gcon</b>           </td><td>real power consumption (Wh) from the electricity grid                                           </td></tr>
+            <tr><td> <b>confc</b>          </td><td>expected energy consumption (Wh)                                                                </td></tr>
+            <tr><td> <b>con</b>            </td><td>real energy consumption (Wh) of the house                                                       </td></tr>
+            <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                     </td></tr>
+            <tr><td> <b>batintotal</b>     </td><td>total battery charge (Wh) at the beginning of the hour                                          </td></tr>
+            <tr><td> <b>batin</b>          </td><td>Hour battery charge (Wh)                                                                        </td></tr>
+            <tr><td> <b>batouttotal</b>    </td><td>total battery discharge (Wh) at the beginning of the hour                                       </td></tr>
             <tr><td> <b>batout</b>         </td><td>Battery discharge of the hour (Wh)                                                              </td></tr>
-            <tr><td> <b>wid</b>            </td><td>Weather identification number                                                              </td></tr>
-            <tr><td> <b>wcc</b>            </td><td>effective cloud cover                                                                      </td></tr>
-            <tr><td> <b>wrp</b>            </td><td>Probability of precipitation > 0.1 mm during the respective hour                     </td></tr>
-            <tr><td> <b>pvcorrf</b>        </td><td>Autocorrection factor used / forecast quality achieved                                   </td></tr>
+            <tr><td> <b>batmaxsoc</b>      </td><td>maximum SOC (%) of the day                                                                      </td></tr>
+            <tr><td> <b>batsetsoc</b>      </td><td>optimum SOC setpoint (%) for the day                                                            </td></tr>
+            <tr><td> <b>wid</b>            </td><td>Weather identification number                                                                   </td></tr>
+            <tr><td> <b>wcc</b>            </td><td>effective cloud cover                                                                           </td></tr>
+            <tr><td> <b>wrp</b>            </td><td>Probability of precipitation > 0.1 mm during the respective hour                                </td></tr>
+            <tr><td> <b>pvcorrf</b>        </td><td>Autocorrection factor used / forecast quality achieved                                          </td></tr>
             <tr><td> <b>rad1h</b>          </td><td>global radiation (kJ/m2)                                                                        </td></tr>
             <tr><td> <b>csmtXX</b>         </td><td>total energy consumption of ConsumerXX                                                          </td></tr>
             <tr><td> <b>csmeXX</b>         </td><td>Energy consumption of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)    </td></tr>
-            <tr><td> <b>minutescsmXX</b>   </td><td>total active minutes in the hour of ConsumerXX                                                </td></tr>
-            <tr><td> <b>hourscsmeXX</b>    </td><td>average hours of an active cycle of ConsumerXX of the day                           </td></tr>
-            <tr><td> <b>cyclescsmXX</b>    </td><td>Number of active cycles of ConsumerXX of the day                                                  </td></tr>
+            <tr><td> <b>minutescsmXX</b>   </td><td>total active minutes in the hour of ConsumerXX                                                  </td></tr>
+            <tr><td> <b>hourscsmeXX</b>    </td><td>average hours of an active cycle of ConsumerXX of the day                                       </td></tr>
+            <tr><td> <b>cyclescsmXX</b>    </td><td>Number of active cycles of ConsumerXX of the day                                                </td></tr>
          </table>
       </ul>
       </li>
@@ -15471,6 +16082,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batintot</b>         </td><td>total energy charged into the battery (Wh)                                                                            </td></tr>
             <tr><td> <b>confc</b>            </td><td>expected energy consumption (Wh)                                                                                      </td></tr>
             <tr><td> <b>corr</b>             </td><td>Autocorrection factors for the hour of the day, where "percentile" is the simple correction factor.                   </td></tr>
+            <tr><td> <b>days2care</b>        </td><td>remaining days until the battery maintenance SoC (default 95%) is reached                                             </td></tr>
             <tr><td> <b>feedintotal</b>      </td><td>total PV energy fed into the public grid (Wh)                                                                         </td></tr>
             <tr><td> <b>gcon</b>             </td><td>real power drawn from the electricity grid                                                                            </td></tr>
             <tr><td> <b>gfeedin</b>          </td><td>real power feed-in to the electricity grid                                                                            </td></tr>
@@ -15479,6 +16091,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>initdaygcon</b>      </td><td>initial grid reference value at the beginning of the current day (Wh)                                                 </td></tr>
             <tr><td> <b>initdaybatintot</b>  </td><td>initial value of the total energy charged into the battery at the beginning of the current day. (Wh)                  </td></tr>
             <tr><td> <b>initdaybatouttot</b> </td><td>initial value of the total energy drawn from the battery at the beginning of the current day. (Wh)                    </td></tr>
+            <tr><td> <b>lastTsMaxSocRchd</b> </td><td>Timestamp of last achievement of battery SoC >= maxSoC (default 95%)                                                  </td></tr>
+            <tr><td> <b>nextTsMaxSocChge</b> </td><td>Timestamp by which the battery should reach maxSoC at least once                                                      </td></tr>
             <tr><td> <b>pvapifc</b>          </td><td>expected PV generation (Wh) of the API used                                                                           </td></tr>
             <tr><td> <b>pvaifc</b>           </td><td>PV forecast (Wh) of the AI for the next 24h from the current hour of the day                                          </td></tr>
             <tr><td> <b>pvfc</b>             </td><td>PV forecast used for the next 24h from the current hour of the day                                                    </td></tr>
@@ -15491,7 +16105,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>wrp</b>              </td><td>Degree of probability of rain                                                                                         </td></tr>
             <tr><td> <b>wid</b>              </td><td>ID of the predicted weather                                                                                           </td></tr>
             <tr><td> <b>wtxt</b>             </td><td>Description of the predicted weather                                                                                  </td></tr>
-            <tr><td> <b>ydayDvtn</b>         </td><td>Yesterday's deviation PV forecast/generation in %.                                                                    </td></tr>
+            <tr><td> <b>ydayDvtn</b>         </td><td>Deviation PV forecast/generation in % on the previous day                                                             </td></tr>
          </table>
       </ul>
 
@@ -15826,8 +16440,9 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>Device:Readings match on the regex or if is insufficient PV surplus (if power not equal to 0).                                                 </td></tr>
             <tr><td>                       </td><td>If the value no longer matches, the interrupted load is switched on again if there is sufficient                                               </td></tr>
             <tr><td>                       </td><td>PV surplus provided (if power is not 0).                                                                                                       </td></tr>
-            <tr><td>                       </td><td>The optional hysteresis is a numerical value by which the switch-off point                                                                     </td></tr>
-            <tr><td>                       </td><td>is raised if the evaluated reading value is also numeric. (default: 0)                                                                         </td></tr>
+            <tr><td>                       </td><td>If the optional <b>hysteresis</b> is specified, the hysteresis value is subtracted from the reading value and the regex is then applied.       </td></tr>
+            <tr><td>                       </td><td>If this and the original reading value match, the consumer is temporarily interrupted.                                                         </td></tr>
+            <tr><td>                       </td><td>The consumer is continued if both the original and the subtracted readings value do not (or no longer) match.                                  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>locktime</b>       </td><td>Blocking times in seconds for switching the consumer (optional).                                                                               </td></tr>
             <tr><td>                       </td><td><b>offlt</b> - Blocking time in seconds after the consumer has been switched off or interrupted                                                </td></tr>
@@ -16683,7 +17298,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
     <ul>
       <a id="SolarForecast-set-currentBatteryDev"></a>
-      <li><b>currentBatteryDev &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt; [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [charge=&lt;Readingname&gt;]  </b> <br><br>
+      <li><b>currentBatteryDev &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt; 
+                               [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;] 
+                               [cap=&lt;Option&gt;] [charge=&lt;Readingname&gt;]  </b> <br><br>
 
       Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest.
       Das Modul geht davon aus, dass der numerische Wert der Readings immer positiv ist.
@@ -16693,12 +17310,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>pin</b>       </td><td>Reading welches die aktuelle Batterieladeleistung liefert                                </td></tr>
-          <tr><td> <b>pout</b>      </td><td>Reading welches die aktuelle Batterieentladeleistung liefert                             </td></tr>
-          <tr><td> <b>intotal</b>   </td><td>Reading welches die totale Batterieladung als fortlaufenden Zähler liefert (optional)    </td></tr>
-          <tr><td> <b>outtotal</b>  </td><td>Reading welches die totale Batterieentladung als fortlaufenden Zähler liefert (optional) </td></tr>
-          <tr><td> <b>charge</b>    </td><td>Reading welches den aktuellen Ladezustand (SOC in Prozent) liefert (optional)            </td></tr>
-          <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                                      </td></tr>
+          <tr><td> <b>pin</b>       </td><td>Reading welches die aktuelle Batterieladeleistung liefert                                                </td></tr>
+          <tr><td> <b>pout</b>      </td><td>Reading welches die aktuelle Batterieentladeleistung liefert                                             </td></tr>
+          <tr><td> <b>intotal</b>   </td><td>Reading welches die totale Batterieladung als fortlaufenden Zähler liefert (optional)                    </td></tr>
+          <tr><td> <b>outtotal</b>  </td><td>Reading welches die totale Batterieentladung als fortlaufenden Zähler liefert (optional)                 </td></tr>
+          <tr><td> <b>cap</b>       </td><td>installierte Batteriekapazität (optional). Option kann sein:                                             </td></tr>
+          <tr><td>                  </td><td><b>numerischer Wert</b> - direkte Angabe der Batteriekapazität in Wh                                     </td></tr>
+          <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;Einheit&gt;</b> - Reading welches die Kapazität liefert und Einheit (Wh, kWh) </td></tr>
+          <tr><td> <b>charge</b>    </td><td>Reading welches den aktuellen Ladezustand (SOC in Prozent) liefert (optional)                            </td></tr>
+          <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                                                      </td></tr>
         </table>
       </ul>
       <br>
@@ -16715,7 +17335,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; currentBatteryDev BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh  <br>
+        set &lt;name&gt; currentBatteryDev BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh <br>
         <br>
         # Device BatDummy liefert die aktuelle Batterieladung im Reading "BatVal" (W), die Batterieentladung im gleichen Reading mit negativen Vorzeichen, <br>
         # die summarische Ladung im Reading "intotal" (Wh), sowie die summarische Entladung im Reading "outtotal" (Wh)
@@ -17291,12 +17911,30 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-get-ftuiFramefiles"></a>
+      <li><b>ftuiFramefiles </b> <br><br>
+      SolarForecast stellt Widgets für 
+      <a href='https://wiki.fhem.de/wiki/FHEM_Tablet_UI' target='_blank'>FHEM Tablet UI v2 (FTUI2)</a> zur Verfügung. <br>
+      Ist FTUI2 auf dem System installiert, können die Dateien für das Framework mit diesem Kommando in die
+      FTUI-Verzeichnisstruktur geladen werden. <br>
+      Die Einrichtung und Verwendung der Widgets ist im Wiki
+      <a href='https://wiki.fhem.de/wiki/SolarForecast_FTUI_Widget' target='_blank'>SolarForecast FTUI Widget</a> 
+      beschrieben.
+      </li>
+    </ul>
+    <br> 
 
     <ul>
       <a id="SolarForecast-get-html"></a>
       <li><b>html </b> <br><br>
-      Die Solar Grafik wird als HTML-Code abgerufen und wiedergegeben. Als Argument kann dem Befehl eine der folgenden
-      Selektionen mitgegeben werden: <br><br>
+      Die SolarForecast Grafik wird als HTML-Code abgerufen und wiedergegeben. <br>
+      <b>Hinweis:</b> Durch das Attribut <a href="#SolarForecast-attr-graphicHeaderOwnspec ">graphicHeaderOwnspec</a>
+      generierte set-Kommandos oder Attribut-Befehle im Anwender spezifischen Bereich des Headers werden aus technischen 
+      Gründen generell ausgeblendet. <br>
+      Als Argument kann dem Befehl eine der folgenden Selektionen mitgegeben werden: 
+      <br><br>
 
       <ul>
         <table>
@@ -17339,6 +17977,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="10%"> <col width="90%"> </colgroup>
+            <tr><td> <b>aihit</b>     </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)         </td></tr>
             <tr><td> <b>confc</b>     </td><td>erwarteter Energieverbrauch inklusive der Anteile registrierter Verbraucher        </td></tr>
             <tr><td> <b>confcEx</b>   </td><td>erwarteter Energieverbrauch ohne der Anteile registrierter Verbraucher             </td></tr>
             <tr><td> <b>crange</b>    </td><td>berechneter Bewölkungsbereich                                                      </td></tr>
@@ -17350,11 +17989,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>pvapifc</b>   </td><td>erwartete PV Erzeugung (Wh) der verwendeten API inkl. einer eventuellen Korrektur  </td></tr>
             <tr><td> <b>pvaifc</b>    </td><td>erwartete PV Erzeugung der KI (Wh)                                                 </td></tr>
             <tr><td> <b>pvfc</b>      </td><td>verwendete PV Erzeugungsprognose (Wh)                                              </td></tr>
-            <tr><td> <b>aihit</b>     </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)         </td></tr>
-            <tr><td> <b>today</b>     </td><td>hat Wert '1' wenn Startdatum am aktuellen Tag                                      </td></tr>
             <tr><td> <b>rad1h</b>     </td><td>vorhergesagte Globalstrahlung                                                      </td></tr>
+            <tr><td> <b>rrange</b>    </td><td>berechneter Bereich der Regenwahrscheinlichkeit                                    </td></tr>
             <tr><td> <b>starttime</b> </td><td>Startzeit des Datensatzes                                                          </td></tr>
             <tr><td> <b>temp</b>      </td><td>vorhergesagte Außentemperatur                                                      </td></tr>
+            <tr><td> <b>today</b>     </td><td>hat Wert '1' wenn Startdatum am aktuellen Tag                                      </td></tr>
             <tr><td> <b>wrp</b>       </td><td>vorhergesagter Grad der Regenwahrscheinlichkeit                                    </td></tr>
             <tr><td> <b>wid</b>       </td><td>ID des vorhergesagten Wetters                                                      </td></tr>
             <tr><td> <b>wcc</b>       </td><td>vorhergesagter Grad der Bewölkung                                                  </td></tr>
@@ -17388,6 +18027,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batin</b>          </td><td>Batterieladung der Stunde (Wh)                                                                 </td></tr>
             <tr><td> <b>batouttotal</b>    </td><td>totale Batterieentladung (Wh) zu Beginn der Stunde                                             </td></tr>
             <tr><td> <b>batout</b>         </td><td>Batterieentladung der Stunde (Wh)                                                              </td></tr>
+            <tr><td> <b>batmaxsoc</b>      </td><td>maximaler SOC (%) des Tages                                                                    </td></tr>
+            <tr><td> <b>batsetsoc</b>      </td><td>optimaler SOC Sollwert (%) für den Tag                                                         </td></tr>
             <tr><td> <b>wid</b>            </td><td>Identifikationsnummer des Wetters                                                              </td></tr>
             <tr><td> <b>wcc</b>            </td><td>effektive Wolkenbedeckung                                                                      </td></tr>
             <tr><td> <b>wrp</b>            </td><td>Wahrscheinlichkeit von Niederschlag > 0,1 mm während der jeweiligen Stunde                     </td></tr>
@@ -17423,6 +18064,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batintot</b>         </td><td>total in die Batterie geladene Energie (Wh)                                                                               </td></tr>
             <tr><td> <b>confc</b>            </td><td>erwarteter Energieverbrauch (Wh)                                                                                          </td></tr>
             <tr><td> <b>corr</b>             </td><td>Autokorrekturfaktoren für die Stunde des Tages, wobei "percentile" der einfache (simple) Korrekturfaktor ist.             </td></tr>
+            <tr><td> <b>days2care</b>        </td><td>verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll                                            </td></tr>
             <tr><td> <b>feedintotal</b>      </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                                </td></tr>
             <tr><td> <b>gcon</b>             </td><td>realer Leistungsbezug aus dem Stromnetz                                                                                   </td></tr>
             <tr><td> <b>gfeedin</b>          </td><td>reale Leistungseinspeisung in das Stromnetz                                                                               </td></tr>
@@ -17431,6 +18073,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>initdaygcon</b>      </td><td>initialer Netzbezugswert zu Beginn des aktuellen Tages (Wh)                                                               </td></tr>
             <tr><td> <b>initdaybatintot</b>  </td><td>initialer Wert der total in die Batterie geladenen Energie zu Beginn des aktuellen Tages (Wh)                             </td></tr>
             <tr><td> <b>initdaybatouttot</b> </td><td>initialer Wert der total aus der Batterie entnommenen Energie zu Beginn des aktuellen Tages (Wh)                          </td></tr>
+            <tr><td> <b>lastTsMaxSocRchd</b> </td><td>Timestamp des letzten Erreichens von Batterie SoC >= maxSoC (default 95%)                                                 </td></tr>
+            <tr><td> <b>nextTsMaxSocChge</b> </td><td>Timestamp bis zu dem die Batterie mindestens einmal maxSoC erreichen soll                                                 </td></tr>
             <tr><td> <b>pvapifc</b>          </td><td>erwartete PV Erzeugung (Wh) der verwendeten API                                                                           </td></tr>
             <tr><td> <b>pvaifc</b>           </td><td>PV Vorhersage (Wh) der KI für die nächsten 24h ab aktueller Stunde des Tages                                              </td></tr>
             <tr><td> <b>pvfc</b>             </td><td>verwendete PV Prognose für die nächsten 24h ab aktueller Stunde des Tages                                                 </td></tr>
@@ -17443,7 +18087,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>wrp</b>              </td><td>Grad der Regenwahrscheinlichkeit                                                                                          </td></tr>
             <tr><td> <b>wid</b>              </td><td>ID des vorhergesagten Wetters                                                                                             </td></tr>
             <tr><td> <b>wtxt</b>             </td><td>Beschreibung des vorhergesagten Wetters                                                                                   </td></tr>
-            <tr><td> <b>ydayDvtn</b>         </td><td>gestrige Abweichung PV Prognose/Erzeugung in %                                                                            </td></tr>
+            <tr><td> <b>ydayDvtn</b>         </td><td>Abweichung PV Prognose/Erzeugung in % am Vortag                                                                           </td></tr>
          </table>
       </ul>
 
@@ -17776,8 +18420,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>Device:Readings auf den Regex matched oder unzureichender PV Überschuß (wenn power ungleich 0) vorliegt.                                       </td></tr>
             <tr><td>                       </td><td>Matched der Wert nicht mehr, wird der unterbrochene Verbraucher wieder eingeschaltet sofern ausreichender                                      </td></tr>
             <tr><td>                       </td><td>PV Überschuß (wenn power ungleich 0) vorliegt.                                                                                                 </td></tr>
-            <tr><td>                       </td><td>Die optionale Hysterese ist ein numerischer Wert um den der Ausschaltpunkt gegenüber dem Soll-Einschaltpunkt                                   </td></tr>
-            <tr><td>                       </td><td>angehoben wird sofern der ausgewertete Readingwert ebenfalls numerisch ist. (default: 0)                                                       </td></tr>
+            <tr><td>                       </td><td>Ist die optionale <b>Hysterese</b> angegeben, wird der Hysteresewert vom Readingswert subtrahiert und danach der Regex angewendet.             </td></tr>
+            <tr><td>                       </td><td>Matched dieser und der originale Readingswert, wird der Verbraucher temporär unterbrochen.                                                     </td></tr>
+            <tr><td>                       </td><td>Der Verbraucher wird fortgesetzt, wenn sowohl der originale als auch der substrahierte Readingswert nicht (mehr) matchen.                      </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>locktime</b>       </td><td>Sperrzeiten in Sekunden für die Schaltung des Verbrauchers (optional).                                                                         </td></tr>
             <tr><td>                       </td><td><b>offlt</b> - Sperrzeit in Sekunden nachdem der Verbraucher ausgeschaltet oder unterbrochen wurde                                             </td></tr>
@@ -17832,7 +18477,55 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          regelmäßig neu geladen werden sollen.
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-ctrlBatSocManagement"></a>
+       <li><b>ctrlBatSocManagement lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] </b><br>
+         Sofern ein Batterie Device (currentBatteryDev) installiert ist, aktiviert dieses Attribut das Batterie 
+         SoC-Management.
+         Dadurch wird das Reading <b>Battery_OptimumTargetSoC</b> erstellt. <br>
+         Dieses Reading kann zur Steuerung des SoC (State of Charge) im Batterie Device verwendet werden. <br>
+         
+         Anzugeben sind: <br><br>
+         
+         <ul>
+         <table>
+         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>lowSoc</b>    </td><td>unterer Mindest-SoC, die Batterie wird nicht tiefer als dieser Wert entladen (> 0)        </td></tr>
+            <tr><td> <b>upSoC</b>     </td><td>oberer Mindest-SoC, der übliche Wert des optimalen SoC bewegt sich zwischen 'lowSoC'      </td></tr>
+            <tr><td>                  </td><td>und diesem Wert.                                                                          </td></tr>
+            <tr><td> <b>maxSoC</b>    </td><td>maximaler Mindest-SoC, SoC Wert der mindestens im Abstand von 'careCycle' Tagen erreicht  </td></tr>         
+            <tr><td>                  </td><td>werden muß um den Ladungsausgleich im Speicherverbund auszuführen.                        </td></tr>
+            <tr><td>                  </td><td>Die Angabe ist optional (&lt;= 100, default: 95)                                      </td></tr>
+            <tr><td> <b>careCycle</b> </td><td>maximaler Abstand in Tagen, der zwischen zwei Ladungszuständen von mindestens 'maxSoC'    </td></tr>
+            <tr><td>                  </td><td>auftreten darf. Die Angabe ist optional (default: 30)                                     </td></tr>
+         </table>
+         </ul>  
+         <br>         
+         
+         Alle Werte sind ganze Zahlen in %. Dabei gilt: 'lowSoc' &lt; 'upSoC' &lt; 'maxSoC'. <br>
+         Die Ermittlung des optimalen SoC erfolgt nach folgendem Schema: <br><br>
+         
+         <table>
+         <colgroup> <col width="2%"> <col width="98%"> </colgroup>
+            <tr><td> 1. </td><td>Ausgehend von 'lowSoc' wird der Mindest-SoC am folgenden Tag um 5%, aber nicht höher als                               </td></tr>
+            <tr><td>    </td><td>'upSoC' inkrementiert, sofern am laufenden Tag 'maxSoC' nicht erreicht wurde.                                          </td></tr>
+            <tr><td> 2. </td><td>Wird am laufenden Tag 'maxSoC' (wieder) erreicht, wird Mindest-SoC um 5%, aber nicht tiefer als 'lowSoc', verringert.  </td></tr>
+            <tr><td> 3. </td><td>Mindest-SoC wird soweit verringert, dass die prognostizierte PV Energie des aktuellen bzw. des folgenden Tages         </td></tr> 
+            <tr><td>    </td><td>von der Batterie aufgenommen werden kann. Mindest-SoC wird nicht tiefer als 'lowSoc' verringert.                       </td></tr>
+            <tr><td> 4. </td><td>Das Modul erfasst den letzten Zeitpunkt am 'maxSoC'-Level, um eine Ladung auf 'maxSoC' mindestens alle 'careCycle'     </td></tr>   
+            <tr><td>    </td><td>Tage zu realisieren. Zu diesem Zweck wird der optimierte SoC in Abhängigkeit der Resttage bis zum nächsten             </td></tr>   
+            <tr><td>    </td><td>'careCycle' Zeitpunkt derart verändert, dass durch eine tägliche 5% SoC-Steigerung 'maxSoC' am 'careCycle' Punkt       </td></tr> 
+            <tr><td>    </td><td>rechnerisch erreicht wird. Wird zwischenzeitlich 'maxSoC' erreicht, beginnt der 'careCycle' Zeitraum erneut.           </td></tr>               
+         </table>
+         <br>
 
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; ctrlBatSocManagement lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 <br>
+       </ul>         
+       </li>
+       <br>    
+       
        <a id="SolarForecast-attr-ctrlConsRecommendReadings"></a>
        <li><b>ctrlConsRecommendReadings </b><br>
          Für die ausgewählten Consumer (Nummer) werden Readings der Form <b>consumerXX_ConsumptionRecommended</b> erstellt. <br>
@@ -18476,7 +19169,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "utf8": 0,
         "HttpUtils": 0,
         "JSON": 4.020,
-        "FHEM::SynoModules::SMUtils": 1.0220,
+        "FHEM::SynoModules::SMUtils": 1.0270,
         "Time::HiRes": 0,
         "MIME::Base64": 0,
         "Storable": 0
