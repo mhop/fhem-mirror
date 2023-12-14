@@ -437,8 +437,8 @@ sub Define {
   ($hash->{HOST}, $hash->{PORT}) = split ":", $args[2];
   $hash->{BATADDRESS}            = $args[3] // 1;
 
-  if ($hash->{BATADDRESS} !~ /[12345678]/xs) {
-      return "Define: bataddress must be a value between 1 and 8";
+  if ($hash->{BATADDRESS} !~ /[1-9]|1[0-2]$/xs) {
+      return "Define: bataddress must be a value between 1 and 12";
   }
 
   my $params = {
