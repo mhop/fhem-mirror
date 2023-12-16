@@ -6449,7 +6449,7 @@ sub _batSocTarget {
   #######################################
   my $pvfctm     = ReadingsNum ($name, 'Tomorrow_PVforecast', 0);             # PV Prognose morgen
   my $pvfctd     = ReadingsNum ($name, 'RestOfDayPVforecast', 0);             # PV Prognose Rest heute
-  my $pvexpect   = $pvfctm > $pvfctd ? $pvfctm : $pvfctm;
+  my $pvexpect   = $pvfctm > $pvfctd ? $pvfctm : $pvfctd;
   
   my $batinstcap = CurrentVal ($hash, 'batinstcap', 0);                       # installierte Batteriekapazität Wh
   my $needcharge = $batinstcap - ($batinstcap / 100 * $batcharge);            # vorläufige benötigte Ladeenergie (Wh) bis 100% SOC
@@ -6475,6 +6475,7 @@ sub _batSocTarget {
   
   my $careSoc = $maxsoc - ($days2care * $batSocChgDay);                       # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
   $target     = $careSoc < $target ? $target : $careSoc;                      # resultierender Target-SoC unter Berücksichtigung $caresoc 
+  $target     = sprintf "%.0f", $target;
   
   ## pvHistory/Readings schreiben
   #################################

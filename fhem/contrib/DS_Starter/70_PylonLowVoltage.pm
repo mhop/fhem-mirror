@@ -122,7 +122,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
-  "0.1.12" => "13.12.2023 extend possible number of bats from 9 to 12 ",
+  "0.2.0"  => "15.12.2023 extend possible number of batteries up to 14 ",
   "0.1.11" => "28.10.2023 add needed data format to commandref ",
   "0.1.10" => "18.10.2023 new function pseudoHexToText in _callManufacturerInfo for translate battery name and Manufactorer ",
   "0.1.9"  => "25.09.2023 fix possible bat adresses ",
@@ -176,6 +176,7 @@ my %fns2 = (                                                                  # 
   1 => { fn => \&_callAlarmInfo           },                                  #   alarmInfo
   2 => { fn => \&_callChargeManagmentInfo },                                  #   chargeManagmentInfo
   3 => { fn => \&_callAnalogValue         },                                  #   analogValue
+  
 );
 
 ##################################################################################################################################################################
@@ -194,11 +195,11 @@ my %fns2 = (                                                                  # 
 # CID2: Kommando spezifisch, hier 93H
 # LENGTH: LENID + LCHKSUM -> Pylon LFP V2.8 Doku
 # INFO: muß hier mit ADR übereinstimmen
-# CHKSUM: 32+30+30+42+34+36+39+33+45+30+30+32+30+42 = 01E5H -> modulo 65536 = 01E5H -> bitweise invert = 1111 1110 0001 1010 -> +1 = 1111 1110 0001 1011 -> FE1BH
+# CHKSUM (als HEX! addieren): 32+30+30+41+34+36+39+33+45+30+30+32+30+41 = 02F1H -> modulo 65536 = 02F1H -> bitweise invert = 1111 1101 0000 1110 -> +1 = 1111 1101 0000 1111 -> FD0FH
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
-#  ~    20    0B      46    93     E0    02    0B      FE   1B
-# 7E  32 30  30 42  34 36 39 33  45 30 30 32  30 42  
+#  ~    20    0A      46    93     E0    02    0A      FD   0F
+# 7E  32 30  30 41  34 36 39 33  45 30 30 32  30 41  
 #
 my %hrsnb = (                                                        # Codierung Abruf serialNumber, mlen = Mindestlänge Antwortstring
   1 => { cmd => "~20024693E00202FD2D\x{0d}", mlen => 52 },
@@ -209,10 +210,13 @@ my %hrsnb = (                                                        # Codierung
   6 => { cmd => "~20074693E00207FD23\x{0d}", mlen => 52 },
   7 => { cmd => "~20084693E00208FD21\x{0d}", mlen => 52 },
   8 => { cmd => "~20094693E00209FD1F\x{0d}", mlen => 52 },           
-  9 => { cmd => "~200A4693E0020AFE1D\x{0d}", mlen => 52 },
- 10 => { cmd => "~200B4693E0020BFE1B\x{0d}", mlen => 52 },
- 11 => { cmd => "~200C4693E0020CFE19\x{0d}", mlen => 52 },
- 12 => { cmd => "~200D4693E0020DFE17\x{0d}", mlen => 52 },
+  9 => { cmd => "~200A4693E0020AFD0F\x{0d}", mlen => 52 },
+ 10 => { cmd => "~200B4693E0020BFD0D\x{0d}", mlen => 52 },
+ 11 => { cmd => "~200C4693E0020CFD0B\x{0d}", mlen => 52 },
+ 12 => { cmd => "~200D4693E0020DFD09\x{0d}", mlen => 52 },
+ 13 => { cmd => "~200E4693E0020EFD07\x{0d}", mlen => 52 },
+ 14 => { cmd => "~200F4693E0020FFD05\x{0d}", mlen => 52 },
+ 
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -221,10 +225,10 @@ my %hrsnb = (                                                        # Codierung
 # LENGTH: LENID + LCHKSUM -> Pylon LFP V3.3 Doku
 # LENID = 0 -> LENID = 0000B + 0000B + 0000B = 0000B -> modulo 16 -> 0000B -> bitweise invert = 1111 -> +1 = 0001 0000 -> LCHKSUM = 0000B -> LENGTH = 0000 0000 0000 0000 -> 0000H
 # wenn LENID = 0, dann ist INFO empty (Doku LFP V3.3 S.8)
-# CHKSUM: 32+30+30+41+34+36+35+31+30+30+30+30 = 0185H -> modulo 65536 = 0185H -> bitweise invert = 1111 1110 0111 1010 -> +1 = 1111 1110 0111 1011 -> FE7BH
+# CHKSUM (als HEX! addieren): 32+30+30+41+34+36+35+31+30+30+30+30 = 0263H -> modulo 65536 = 0263H -> bitweise invert = 1111 1101 1001 1100 -> +1 = 1111 1101 1001 1101  = FD9DH
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH    INFO     CHKSUM
-#  ~    20    0A      46    51     00    00   empty    FE   7B
+#  ~    20    0A      46    51     00    00   empty    FD  9D
 # 7E  32 30  30 41  34 36 35 31  30 30 30 30   - -   
 #
 my %hrmfi = (                                                        # Codierung Abruf manufacturerInfo, mlen = Mindestlänge Antwortstring
@@ -236,10 +240,12 @@ my %hrmfi = (                                                        # Codierung
   6 => { cmd => "~200746510000FDA7\x{0d}", mlen => 82 },
   7 => { cmd => "~200846510000FDA6\x{0d}", mlen => 82 },
   8 => { cmd => "~200946510000FDA5\x{0d}", mlen => 82 },
-  9 => { cmd => "~200A46510000FE7B\x{0d}", mlen => 82 },
- 10 => { cmd => "~200B46510000FE7A\x{0d}", mlen => 82 },
- 11 => { cmd => "~200C46510000FE79\x{0d}", mlen => 82 },
- 12 => { cmd => "~200D46510000FE78\x{0d}", mlen => 82 },
+  9 => { cmd => "~200A46510000FD9D\x{0d}", mlen => 82 },
+ 10 => { cmd => "~200B46510000FD9C\x{0d}", mlen => 82 },
+ 11 => { cmd => "~200C46510000FD9B\x{0d}", mlen => 82 },
+ 12 => { cmd => "~200D46510000FD9A\x{0d}", mlen => 82 },
+ 13 => { cmd => "~200E46510000FD8F\x{0d}", mlen => 82 },
+ 14 => { cmd => "~200F46510000FD8E\x{0d}", mlen => 82 },
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -248,10 +254,10 @@ my %hrmfi = (                                                        # Codierung
 # LENGTH: LENID + LCHKSUM -> Pylon LFP V3.3 Doku
 # LENID = 0 -> LENID = 0000B + 0000B + 0000B = 0000B -> modulo 16 -> 0000B -> bitweise invert = 1111 -> +1 = 0001 0000 -> LCHKSUM = 0000B -> LENGTH = 0000 0000 0000 0000 -> 0000H
 # wenn LENID = 0, dann ist INFO empty (Doku LFP V3.3 S.8)
-# CHKSUM: 30+30+30+41+34+36+34+46+30+30+30+30 = 0191H -> modulo 65536 = 0191H -> bitweise invert = 1111 1110 0110 1110 -> +1 = 1111 1110 0110 1111 -> FE6FH
+# CHKSUM (als HEX! addieren): 30+30+30+41+34+36+34+46+30+30+30+30 = 0275H -> modulo 65536 = 0275H -> bitweise invert = 1111 1101 1000 1010 -> +1 = 1111 1101 1000 1011 -> FD8BH
 #
 # SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
-#  ~    00    0A      46    4F      00    00   empty    FD   9A
+#  ~    00    0A      46    4F      00    00   empty    FD  8B
 # 7E  30 30  30 41  34 36  34 46  30 30 30 30   - -   
 #
 my %hrprt = (                                                        # Codierung Abruf protocolVersion, mlen = Mindestlänge Antwortstring
@@ -263,16 +269,18 @@ my %hrprt = (                                                        # Codierung
   6 => { cmd => "~0007464F0000FD95\x{0d}", mlen => 18 },
   7 => { cmd => "~0008464F0000FD94\x{0d}", mlen => 18 },
   8 => { cmd => "~0009464F0000FD93\x{0d}", mlen => 18 },
-  9 => { cmd => "~000A464F0000FE6F\x{0d}", mlen => 18 },
- 10 => { cmd => "~000B464F0000FE6E\x{0d}", mlen => 18 },
- 11 => { cmd => "~000C464F0000FE6D\x{0d}", mlen => 18 },
- 12 => { cmd => "~000D464F0000FE6C\x{0d}", mlen => 18 },
+  9 => { cmd => "~000A464F0000FD8B\x{0d}", mlen => 18 },
+ 10 => { cmd => "~000B464F0000FD8A\x{0d}", mlen => 18 },
+ 11 => { cmd => "~000C464F0000FD89\x{0d}", mlen => 18 },
+ 12 => { cmd => "~000D464F0000FD88\x{0d}", mlen => 18 },
+ 13 => { cmd => "~000E464F0000FD87\x{0d}", mlen => 18 },
+ 14 => { cmd => "~000F464F0000FD86\x{0d}", mlen => 18 },
 );
 
-# CHKSUM: 32+30+30+41+34+36+39+36+45+30+30+32+30+41 = 01E6H -> modulo 65536 = 01E6H -> bitweise invert = 1111 1110 0001 1001 -> +1 = 1111 1110 0001 1010 -> FE1AH
+# CHKSUM (als HEX! addieren): 32+30+30+41+34+36+39+36+45+30+30+32+30+41 = 02F4H -> modulo 65536 = 02F4H -> bitweise invert = 1111 1101 0000 1011 -> +1 1111 1101 0000 1100 = FD0CH
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
-#  ~    20    0A      46    96     E0    02    0A      FE   1A
+#  ~    20    0A      46    96     E0    02    0A      FD  0C
 # 7E  32 30  30 41  34 36 39 36  45 30 30 32  30 41  
 #
 
@@ -285,16 +293,18 @@ my %hrswv = (                                                        # Codierung
   6 => { cmd => "~20074696E00207FD20\x{0d}", mlen => 30 },
   7 => { cmd => "~20084696E00208FD1E\x{0d}", mlen => 30 },
   8 => { cmd => "~20094696E00209FD1C\x{0d}", mlen => 30 },
-  9 => { cmd => "~200A4696E0020AFE1A\x{0d}", mlen => 30 },
- 10 => { cmd => "~200B4696E0020BFE18\x{0d}", mlen => 30 },
- 11 => { cmd => "~200C4696E0020CFE16\x{0d}", mlen => 30 },
- 12 => { cmd => "~200D4696E0020DFE14\x{0d}", mlen => 30 },
+  9 => { cmd => "~200A4696E0020AFD0C\x{0d}", mlen => 30 },
+ 10 => { cmd => "~200B4696E0020BFD0A\x{0d}", mlen => 30 },
+ 11 => { cmd => "~200C4696E0020CFD08\x{0d}", mlen => 30 },
+ 12 => { cmd => "~200D4696E0020DFD06\x{0d}", mlen => 30 },
+ 13 => { cmd => "~200E4696E0020EFD04\x{0d}", mlen => 30 },
+ 14 => { cmd => "~200F4696E0020FFD02\x{0d}", mlen => 30 },
 );
 
-# CHKSUM: 32+30+30+41+34+36+34+34+45+30+30+32+30+41 = 01DFH -> modulo 65536 = 01DFH -> bitweise invert = 1111 1110 0010 0000 -> +1 = 1111 1110 0010 0001 -> FE21H
+# CHKSUM (als HEX! addieren): 32+30+30+41+34+36+34+34+45+30+30+32+30+41 = 02EDH -> modulo 65536 = 02EDH -> bitweise invert = 1111 1101 0001 0010 -> +1 1111 1101 0001 0011 = FD13H
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
-#  ~    20    0A      46    44     E0    02    0A      FE   21
+#  ~    20    0A      46    44     E0    02    0A      FD  13
 # 7E  32 30  30 41  34 36 34 34  45 30 30 32  30 41  
 #
 
@@ -307,16 +317,18 @@ my %hralm = (                                                        # Codierung
   6 => { cmd => "~20074644E00207FD27\x{0d}", mlen => 82 },
   7 => { cmd => "~20084644E00208FD25\x{0d}", mlen => 82 },
   8 => { cmd => "~20094644E00209FD23\x{0d}", mlen => 82 },
-  9 => { cmd => "~200A4644E0020AFE21\x{0d}", mlen => 82 },
- 10 => { cmd => "~200B4644E0020BFE1F\x{0d}", mlen => 82 },
- 11 => { cmd => "~200C4644E0020CFE1D\x{0d}", mlen => 82 },
- 12 => { cmd => "~200D4644E0020DFE1B\x{0d}", mlen => 82 },
+  9 => { cmd => "~200A4644E0020AFD13\x{0d}", mlen => 82 },
+ 10 => { cmd => "~200B4644E0020BFD11\x{0d}", mlen => 82 },
+ 11 => { cmd => "~200C4644E0020CFD0F\x{0d}", mlen => 82 },
+ 12 => { cmd => "~200D4644E0020DFD0D\x{0d}", mlen => 82 },
+ 13 => { cmd => "~200E4644E0020EFD0B\x{0d}", mlen => 82 },
+ 14 => { cmd => "~200F4644E0020FFCFE\x{0d}", mlen => 82 },
 );
 
-# CHKSUM: 32+30+30+41+34+36+34+37+45+30+30+32+30+41 = 01E2H -> modulo 65536 = 01E2H -> bitweise invert = 1111 1110 0001 1101 -> +1 = 1111 1110 0001 1110 -> FE1EH
+# CHKSUM (als HEX! addieren): 32+30+30+41+34+36+34+37+45+30+30+32+30+41 = 02F0H -> modulo 65536 = 02F0H -> bitweise invert = 1111 1101 0000 1111 -> +1 1111 1101 0001 0000 = FD10H
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
-#  ~    20    0A      46    47     E0    02    0A      FE   1E
+#  ~    20    0A      46    47     E0    02    0A      FD  10
 # 7E  32 30  30 41  34 36 34 37  45 30 30 32  30 41  
 #
 
@@ -329,16 +341,18 @@ my %hrspm = (                                                        # Codierung
   6 => { cmd => "~20074647E00207FD24\x{0d}", mlen => 68 },
   7 => { cmd => "~20084647E00208FD22\x{0d}", mlen => 68 },
   8 => { cmd => "~20094647E00209FD20\x{0d}", mlen => 68 },
-  9 => { cmd => "~200A4647E0020AFE1E\x{0d}", mlen => 68 },
- 10 => { cmd => "~200B4647E0020BFE1C\x{0d}", mlen => 68 },
- 11 => { cmd => "~200C4647E0020CFE1A\x{0d}", mlen => 68 },
- 12 => { cmd => "~200D4647E0020DFE18\x{0d}", mlen => 68 },
+  9 => { cmd => "~200A4647E0020AFD10\x{0d}", mlen => 68 },
+ 10 => { cmd => "~200B4647E0020BFD0E\x{0d}", mlen => 68 },
+ 11 => { cmd => "~200C4647E0020CFD0C\x{0d}", mlen => 68 },
+ 12 => { cmd => "~200D4647E0020DFD0A\x{0d}", mlen => 68 },
+ 13 => { cmd => "~200E4647E0020EFD08\x{0d}", mlen => 68 },
+ 14 => { cmd => "~200F4647E0020FFD06\x{0d}", mlen => 68 },
 );
 
-# CHKSUM: 32+30+30+41+34+36+39+32+45+30+30+32+30+41 = 01E2H -> modulo 65536 = 01E2H -> bitweise invert = 1111 1110 0001 1101 -> +1 = 1111 1110 0001 1110 -> FE1EH
+# CHKSUM (als HEX! addieren): 32+30+30+41+34+36+39+32+45+30+30+32+30+41 = 02F0H -> modulo 65536 = 02F0H -> bitweise invert = 1111 1101 0000 1111 -> +1 1111 1101 0001 0000 = FD10H
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
-#  ~    20    0A      46    92     E0    02    0A      FE   1E
+#  ~    20    0A      46    92     E0    02    0A      FD  10
 # 7E  32 30  30 41  34 36 39 32  45 30 30 32  30 41  
 #
 
@@ -351,10 +365,12 @@ my %hrcmi = (                                                        # Codierung
   6 => { cmd => "~20074692E00207FD24\x{0d}", mlen => 38 },
   7 => { cmd => "~20084692E00208FD22\x{0d}", mlen => 38 },
   8 => { cmd => "~20094692E00209FD20\x{0d}", mlen => 38 },
-  9 => { cmd => "~200A4692E0020AFE1E\x{0d}", mlen => 38 },
- 10 => { cmd => "~200B4692E0020BFE1C\x{0d}", mlen => 38 },
- 11 => { cmd => "~200C4692E0020CFE1A\x{0d}", mlen => 38 },
- 12 => { cmd => "~200D4692E0020DFE18\x{0d}", mlen => 38 },
+  9 => { cmd => "~200A4692E0020AFD10\x{0d}", mlen => 38 },
+ 10 => { cmd => "~200B4692E0020BFD0E\x{0d}", mlen => 38 },
+ 11 => { cmd => "~200C4692E0020CFD0C\x{0d}", mlen => 38 },
+ 12 => { cmd => "~200D4692E0020DFD0A\x{0d}", mlen => 38 },
+ 13 => { cmd => "~200E4692E0020EFD08\x{0d}", mlen => 38 },
+ 14 => { cmd => "~200F4692E0020FFD06\x{0d}", mlen => 38 },
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -363,10 +379,10 @@ my %hrcmi = (                                                        # Codierung
 # LENGTH: LENID + LCHKSUM -> Pylon LFP V3.3 Doku                                                                                                   ---- --------------
 # LENID = 02H -> LENID = 0000B + 0000B + 0010B = 0010B -> modulo 16 -> 0010B -> bitweise invert = 1101 -> +1 = 1110 -> LCHKSUM = 1110B -> LENGTH = 1110 0000 0000 0010 -> E002H
 # wenn LENID = 0, dann ist INFO empty (Doku LFP V3.3 S.8)
-# CHKSUM: 32+30+30+41+34+36+34+32+45+30+30+32+30+41 = 01DDH -> modulo 65536 = 01DDH -> bitweise invert = 1111 1110 0010 0010 -> +1 = 1111 1110 0010 0011 -> FE23H
+# CHKSUM (als HEX! addieren): 32+30+30+41+34+36+34+32+45+30+30+32+30+41 = 02EBH -> modulo 65536 = 02EBH -> bitweise invert = 1111 1101 0001 0100 -> +1 1111 1101 0001 0101 = FD15H
 #
 # SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
-#  ~    20    0A     46     42      E0    02    0A      FE   23
+#  ~    20    0A     46     42      E0    02    0A      FD  15
 # 7E  32 30  30 41  34 36  34 32  45 30 30 32  30 41  
 #
 my %hrcmn = (                                                        # Codierung Abruf analogValue
@@ -378,10 +394,12 @@ my %hrcmn = (                                                        # Codierung
   6 => { cmd => "~20074642E00207FD29\x{0d}", mlen => 128 },
   7 => { cmd => "~20084642E00208FD27\x{0d}", mlen => 128 },
   8 => { cmd => "~20094642E00209FD25\x{0d}", mlen => 128 },
-  9 => { cmd => "~200A4642E0020AFE23\x{0d}", mlen => 128 },
- 10 => { cmd => "~200B4642E0020BFE21\x{0d}", mlen => 128 },
- 11 => { cmd => "~200C4642E0020CFE1F\x{0d}", mlen => 128 },
- 12 => { cmd => "~200D4642E0020DFE1D\x{0d}", mlen => 128 },
+  9 => { cmd => "~200A4642E0020AFD15\x{0d}", mlen => 128 },
+ 10 => { cmd => "~200B4642E0020BFD13\x{0d}", mlen => 128 },
+ 11 => { cmd => "~200C4642E0020CFD11\x{0d}", mlen => 128 },
+ 12 => { cmd => "~200D4642E0020DFD0F\x{0d}", mlen => 128 },
+ 13 => { cmd => "~200E4642E0020EFD0D\x{0d}", mlen => 128 },
+ 14 => { cmd => "~200F4642E0020FFD0B\x{0d}", mlen => 128 },
 );
 
 
@@ -437,8 +455,8 @@ sub Define {
   ($hash->{HOST}, $hash->{PORT}) = split ":", $args[2];
   $hash->{BATADDRESS}            = $args[3] // 1;
 
-  if ($hash->{BATADDRESS} !~ /[1-9]|1[0-2]$/xs) {
-      return "Define: bataddress must be a value between 1 and 12";
+  if ($hash->{BATADDRESS} !~ /^([1-9]{1}|1[0-4])$/xs) {
+      return "Define: bataddress must be a value between 1 and 14";
   }
 
   my $params = {
@@ -1515,7 +1533,7 @@ The data format must be set on the RS485 gateway as follows:
 
 <b>Limitations</b>
 <br>
-The module currently supports a maximum of 8 batteries (master + 7 slaves) in one group.
+The module currently supports a maximum of 14 batteries (master + 13 slaves) in one group.
 <br><br>
 
 <a id="PylonLowVoltage-define"></a>
@@ -1535,7 +1553,7 @@ The module currently supports a maximum of 8 batteries (master + 7 slaves) in on
      Device address of the Pylontech battery. Several Pylontech batteries can be connected via a Pylontech-specific
      Link connection. The permissible number can be found in the respective Pylontech documentation. <br>
      The master battery in the network (with open link port 0 or to which the RS485 connection is connected) has the
-     address 1, the next battery then has address 2 and so on.
+     address 2, the next battery then has address 3 and so on.
      If no device address is specified, address 1 is used.
   </li>
   <br>
@@ -1706,7 +1724,7 @@ Das Datenformat muß auf dem RS485 Gateway wie folgt eingestellt werden:
 
 <b>Einschränkungen</b>
 <br>
-Das Modul unterstützt zur Zeit maximal 8 Batterien (Master + 7 Slaves) in einer Gruppe.
+Das Modul unterstützt zur Zeit maximal 14 Batterien (Master + 13 Slaves) in einer Gruppe.
 <br><br>
 
 <a id="PylonLowVoltage-define"></a>
@@ -1726,7 +1744,7 @@ Das Modul unterstützt zur Zeit maximal 8 Batterien (Master + 7 Slaves) in einer
      Geräteadresse der Pylontech Batterie. Es können mehrere Pylontech Batterien über eine Pylontech-spezifische
      Link-Verbindung verbunden werden. Die zulässige Anzahl ist der jeweiligen Pylontech Dokumentation zu entnehmen. <br>
      Die Master Batterie im Verbund (mit offenem Link Port 0 bzw. an der die RS485-Verbindung angeschlossen ist) hat die
-     Adresse 1, die nächste Batterie hat dann die Adresse 2 und so weiter.
+     Adresse 2, die nächste Batterie hat dann die Adresse 3 und so weiter.
      Ist keine Geräteadresse angegeben, wird die Adresse 1 verwendet.
   </li>
   <br>
