@@ -417,7 +417,7 @@ FHEM/74_UnifiSwitch.pm       wuehler              Automatisierung
 FHEM/74_UnifiClient.pm       wuehler              Automatisierung
 FHEM/74_UnifiProtect.pm      justme1968           Sonstiges
 FHEM/74_UnifiVideo.pm        justme1968           Sonstiges
-FHEM/74_XiaomiBTLESens       CoolTux              Sonstige Systeme
+FHEM/74_XiaomiBTLESens.pm    CoolTux              Sonstige Systeme
 FHEM/75_AutomowerConnectDevice.pm  Ellert         Sonstige Systeme https://forum.fhem.de/index.php/topic,131661.0.html
 FHEM/75_MSG.pm               loredo               Automatisierung
 FHEM/75_msgConfig.pm         loredo               Automatisierung
