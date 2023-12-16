@@ -155,7 +155,7 @@ BEGIN {
 my %vNotesIntern = (
   "1.6.0"  => "12.12.2023  store daily batmaxsoc in pvHistory, new attr ctrlBatSocManagement, reading Battery_OptimumTargetSoC ".
                            "currentBatteryDev: new optional key 'cap', adapt cloud2bin,temp2bin,rain2bin ".
-                           "minor internal changes, isAddSwitchOffCond: change hysteresis algo, ctrlDebug: new entry batterieManagement ",
+                           "minor internal changes, isAddSwitchOffCond: change hysteresis algo, ctrlDebug: new entry batteryManagement ",
   "1.5.1"  => "07.12.2023  function _getftui can now process arguments (compatibility to new ftui widgets), plant check ".
                            "reviews SolarForecast widget files ",
   "1.5.0"  => "05.12.2023  new getter ftuiFramefiles ",
@@ -552,7 +552,7 @@ my @dd    = qw( none
                 aiData
                 apiCall
                 apiProcess
-                batterieManagement
+                batteryManagement
                 collectData
                 consumerPlanning
                 consumerSwitching
@@ -6447,7 +6447,7 @@ sub _batSocTarget {
             $batymaxsoc >= $maxsoc ? $batysetsoc - $batSocChgDay :
             $batysetsoc;                                                      # neuer Min SOC für den laufenden Tag
             
-  debugLog ($paref, 'batterieManagement', "SoC calc Step1 - compare with SoC history -> Target: $target %");
+  debugLog ($paref, 'batteryManagement', "SoC calc Step1 - compare with SoC history -> Target: $target %");
             
   ## Aufladewahrscheinlichkeit beachten
   #######################################
@@ -6462,7 +6462,7 @@ sub _batSocTarget {
   
   $target        = $cantarget < $target ? $cantarget : $target;               # Abgleich möglicher Min SOC gg. berechneten Min SOC
   
-  debugLog ($paref, 'batterieManagement', "SoC calc Step2 - note charging probability -> Target: $target %");
+  debugLog ($paref, 'batteryManagement', "SoC calc Step2 - note charging probability -> Target: $target %");
   
   ## low/up-Grenzen beachten
   ############################
@@ -6470,7 +6470,7 @@ sub _batSocTarget {
             $target < $lowSoc ? $lowSoc :
             $target;
             
-  debugLog ($paref, 'batterieManagement', "SoC calc Step3 - observe low/up limits -> Target: $target %");
+  debugLog ($paref, 'batteryManagement', "SoC calc Step3 - observe low/up limits -> Target: $target %");
             
   ## Pflege-SoC (Soll SoC $maxSoCdef bei $batSocChgDay % Steigerung p. Tag)      
   ###########################################################################
@@ -6485,7 +6485,7 @@ sub _batSocTarget {
   $target     = $careSoc < $target ? $target : $careSoc;                      # resultierender Target-SoC unter Berücksichtigung $caresoc 
   $target     = sprintf "%.0f", $target;
   
-  debugLog ($paref, 'batterieManagement', "SoC calc Step4 - note remaining days until care SoC -> Target: $target %");
+  debugLog ($paref, 'batteryManagement', "SoC calc Step4 - note remaining days until care SoC -> Target: $target %");
   
   ## pvHistory/Readings schreiben
   #################################
@@ -13323,7 +13323,9 @@ sub checkPlantConfig {
           $result->{'FTUI Widget Files'}{state}   = $warn;
           $result->{'FTUI Widget Files'}{result} .= $hqtxt{widerr}{$lang}.'<br>';
           $result->{'FTUI Widget Files'}{result} .= $cmmsg.'<br>';
-          $result->{'FTUI Widget Files'}{note}   .= qq{Try the test again later. If the error is permanent, please inform the maintainer.<br>};         
+          $result->{'FTUI Widget Files'}{note}   .= qq{Update the FHEM Tablet UI Widget Files with the command:  <br>};  
+          $result->{'FTUI Widget Files'}{note}   .= qq{"get $name ftuiFramefiles".  <br>};
+          $result->{'FTUI Widget Files'}{note}   .= qq{After that do the test again. If the error is permanent, please inform the maintainer.<br>};         
           $result->{'FTUI Widget Files'}{warn}    = 1;
           
           $upd = 0;
@@ -16528,7 +16530,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>aiData</b>               </td><td>AI data                                                                          </td></tr>
             <tr><td> <b>apiCall</b>              </td><td>Retrieval API interface without data output                                      </td></tr>
             <tr><td> <b>apiProcess</b>           </td><td>API data retrieval and processing                                                </td></tr>
-            <tr><td> <b>batterieManagement</b>   </td><td>Battery management control values (SoC)                                          </td></tr>
+            <tr><td> <b>batteryManagement</b>    </td><td>Battery management control values (SoC)                                          </td></tr>
             <tr><td> <b>collectData</b>          </td><td>detailed data collection                                                         </td></tr>
             <tr><td> <b>consumerPlanning</b>     </td><td>Consumer scheduling processes                                                    </td></tr>
             <tr><td> <b>consumerSwitching</b>    </td><td>Operations of the internal consumer switching module                             </td></tr>
@@ -18557,7 +18559,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>aiData</b>               </td><td>KI Daten                                                                         </td></tr>
             <tr><td> <b>apiCall</b>              </td><td>Abruf API Schnittstelle ohne Datenausgabe                                        </td></tr>
             <tr><td> <b>apiProcess</b>           </td><td>Abruf und Verarbeitung von API Daten                                             </td></tr>
-            <tr><td> <b>batterieManagement</b>   </td><td>Steuerungswerte des Batterie Managements (SoC)                                   </td></tr>
+            <tr><td> <b>batteryManagement</b>    </td><td>Steuerungswerte des Batterie Managements (SoC)                                   </td></tr>
             <tr><td> <b>collectData</b>          </td><td>detailliierte Datensammlung                                                      </td></tr>
             <tr><td> <b>consumerPlanning</b>     </td><td>Consumer Einplanungsprozesse                                                     </td></tr>
             <tr><td> <b>consumerSwitching</b>    </td><td>Operationen des internen Consumer Schaltmodul                                    </td></tr>
