@@ -155,7 +155,7 @@ BEGIN {
 my %vNotesIntern = (
   "1.6.0"  => "12.12.2023  store daily batmaxsoc in pvHistory, new attr ctrlBatSocManagement, reading Battery_OptimumTargetSoC ".
                            "currentBatteryDev: new optional key 'cap', adapt cloud2bin,temp2bin,rain2bin ".
-                           "minor internal changes, isAddSwitchOffCond: change hysteresis algo ",
+                           "minor internal changes, isAddSwitchOffCond: change hysteresis algo, ctrlDebug: new entry batterieManagement ",
   "1.5.1"  => "07.12.2023  function _getftui can now process arguments (compatibility to new ftui widgets), plant check ".
                            "reviews SolarForecast widget files ",
   "1.5.0"  => "05.12.2023  new getter ftuiFramefiles ",
@@ -473,13 +473,14 @@ my $carecycledef   = 30;                                                        
 my $batSocChgDay   = 5;                                                             # prozentuale SoC Änderung pro Tag
 my @widgetreadings = ();                                                            # Array der Hilfsreadings als Attributspeicher
 
-my $pvhcache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
-my $pvccache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
-my $plantcfg       = $attr{global}{modpath}."/FHEM/FhemUtils/PVCfg_SolarForecast_"; # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
-my $csmcache       = $attr{global}{modpath}."/FHEM/FhemUtils/PVCsm_SolarForecast_"; # Filename-Fragment für Consumer Status (wird mit Devicename ergänzt)
-my $scpicache      = $attr{global}{modpath}."/FHEM/FhemUtils/ScApi_SolarForecast_"; # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
-my $aitrained      = $attr{global}{modpath}."/FHEM/FhemUtils/AItra_SolarForecast_"; # Filename-Fragment für AI Trainingsdaten (wird mit Devicename ergänzt)
-my $airaw          = $attr{global}{modpath}."/FHEM/FhemUtils/AIraw_SolarForecast_"; # Filename-Fragment für AI Input Daten = Raw Trainigsdaten
+my $root           = $attr{global}{modpath};                                        # Pfad zu dem Verzeichnis der FHEM Module
+my $pvhcache       = $root."/FHEM/FhemUtils/PVH_SolarForecast_";                    # Filename-Fragment für PV History (wird mit Devicename ergänzt)
+my $pvccache       = $root."/FHEM/FhemUtils/PVC_SolarForecast_";                    # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
+my $plantcfg       = $root."/FHEM/FhemUtils/PVCfg_SolarForecast_";                  # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
+my $csmcache       = $root."/FHEM/FhemUtils/PVCsm_SolarForecast_";                  # Filename-Fragment für Consumer Status (wird mit Devicename ergänzt)
+my $scpicache      = $root."/FHEM/FhemUtils/ScApi_SolarForecast_";                  # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
+my $aitrained      = $root."/FHEM/FhemUtils/AItra_SolarForecast_";                  # Filename-Fragment für AI Trainingsdaten (wird mit Devicename ergänzt)
+my $airaw          = $root."/FHEM/FhemUtils/AIraw_SolarForecast_";                  # Filename-Fragment für AI Input Daten = Raw Trainigsdaten
 
 my $aitrblto       = 7200;                                                          # KI Training BlockingCall Timeout
 my $aibcthhld      = 0.2;                                                           # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
@@ -523,6 +524,10 @@ my $b2coldef       = 'C4C4A7';                                                  
 my $b2fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 2
 my $fgCDdef        = 130;                                                           # Abstand Verbrauchericons zueinander
 
+my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
+my $pPath = '?format=txt';                                                          # Download Format
+my $cfile = 'controls_solarforecast.txt';                                           # Name des Conrrolfiles
+
                                                                                     # default CSS-Style
 my $cssdef = qq{.flowg.text           { stroke: none; fill: gray; font-size: 60px; }                                     \n}.
              qq{.flowg.sun_active     { stroke: orange; fill: orange; }                                                  \n}.
@@ -547,6 +552,7 @@ my @dd    = qw( none
                 aiData
                 apiCall
                 apiProcess
+                batterieManagement
                 collectData
                 consumerPlanning
                 consumerSwitching
@@ -4053,10 +4059,6 @@ sub _ftuiFramefiles {
   
   my $ret;
   my $upddo = 0;
-  my $root  = $attr{global}{modpath};
-  my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';
-  my $pPath = '?format=txt';
-  my $cfile = 'controls_solarforecast.txt';
   my $cfurl = $bPath.$cfile.$pPath;
     
   for my $file (@fs) {
@@ -6445,6 +6447,8 @@ sub _batSocTarget {
             $batymaxsoc >= $maxsoc ? $batysetsoc - $batSocChgDay :
             $batysetsoc;                                                      # neuer Min SOC für den laufenden Tag
             
+  debugLog ($paref, 'batterieManagement', "SoC calc Step1 - compare with SoC history -> Target: $target %");
+            
   ## Aufladewahrscheinlichkeit beachten
   #######################################
   my $pvfctm     = ReadingsNum ($name, 'Tomorrow_PVforecast', 0);             # PV Prognose morgen
@@ -6458,11 +6462,15 @@ sub _batSocTarget {
   
   $target        = $cantarget < $target ? $cantarget : $target;               # Abgleich möglicher Min SOC gg. berechneten Min SOC
   
+  debugLog ($paref, 'batterieManagement', "SoC calc Step2 - note charging probability -> Target: $target %");
+  
   ## low/up-Grenzen beachten
   ############################
   $target = $target > $upSoc  ? $upSoc  :                                    
             $target < $lowSoc ? $lowSoc :
             $target;
+            
+  debugLog ($paref, 'batterieManagement', "SoC calc Step3 - observe low/up limits -> Target: $target %");
             
   ## Pflege-SoC (Soll SoC $maxSoCdef bei $batSocChgDay % Steigerung p. Tag)      
   ###########################################################################
@@ -6476,6 +6484,8 @@ sub _batSocTarget {
   my $careSoc = $maxsoc - ($days2care * $batSocChgDay);                       # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
   $target     = $careSoc < $target ? $target : $careSoc;                      # resultierender Target-SoC unter Berücksichtigung $caresoc 
   $target     = sprintf "%.0f", $target;
+  
+  debugLog ($paref, 'batterieManagement', "SoC calc Step4 - note remaining days until care SoC -> Target: $target %");
   
   ## pvHistory/Readings schreiben
   #################################
@@ -13291,7 +13301,6 @@ sub checkPlantConfig {
   
   ## FTUI Widget Support
   ########################
-  my $root  = $attr{global}{modpath};
   my $tpath = "$root/www/tablet/css";
   my $upd   = 0;
   $err      = 0;
@@ -13301,13 +13310,10 @@ sub checkPlantConfig {
       $result->{'FTUI Widget Files'}{note}    .= qq{There is no need to install SolarForecast FTUI widgets.<br>};
   }
   else {
-      my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';
-      my $pPath = '?format=txt';
-      my $cfile = 'controls_solarforecast.txt';
       my $cfurl = $bPath.$cfile.$pPath;  
       
       for my $file (@fs) {      
-          my ($cmerr, $cmupd) = checkModVer ($name, $file, $cfurl);
+          ($cmerr, $cmupd, $cmmsg, $cmrec) = checkModVer ($name, $file, $cfurl);
 
           $err = 1 if($cmerr);
           $upd = 1 if($cmupd);
@@ -13315,7 +13321,8 @@ sub checkPlantConfig {
      
       if ($err) {
           $result->{'FTUI Widget Files'}{state}   = $warn;
-          $result->{'FTUI Widget Files'}{result} .= $hqtxt{widerr}{$lang};
+          $result->{'FTUI Widget Files'}{result} .= $hqtxt{widerr}{$lang}.'<br>';
+          $result->{'FTUI Widget Files'}{result} .= $cmmsg.'<br>';
           $result->{'FTUI Widget Files'}{note}   .= qq{Try the test again later. If the error is permanent, please inform the maintainer.<br>};         
           $result->{'FTUI Widget Files'}{warn}    = 1;
           
@@ -16521,6 +16528,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>aiData</b>               </td><td>AI data                                                                          </td></tr>
             <tr><td> <b>apiCall</b>              </td><td>Retrieval API interface without data output                                      </td></tr>
             <tr><td> <b>apiProcess</b>           </td><td>API data retrieval and processing                                                </td></tr>
+            <tr><td> <b>batterieManagement</b>   </td><td>Battery management control values (SoC)                                          </td></tr>
             <tr><td> <b>collectData</b>          </td><td>detailed data collection                                                         </td></tr>
             <tr><td> <b>consumerPlanning</b>     </td><td>Consumer scheduling processes                                                    </td></tr>
             <tr><td> <b>consumerSwitching</b>    </td><td>Operations of the internal consumer switching module                             </td></tr>
@@ -18549,6 +18557,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>aiData</b>               </td><td>KI Daten                                                                         </td></tr>
             <tr><td> <b>apiCall</b>              </td><td>Abruf API Schnittstelle ohne Datenausgabe                                        </td></tr>
             <tr><td> <b>apiProcess</b>           </td><td>Abruf und Verarbeitung von API Daten                                             </td></tr>
+            <tr><td> <b>batterieManagement</b>   </td><td>Steuerungswerte des Batterie Managements (SoC)                                   </td></tr>
             <tr><td> <b>collectData</b>          </td><td>detailliierte Datensammlung                                                      </td></tr>
             <tr><td> <b>consumerPlanning</b>     </td><td>Consumer Einplanungsprozesse                                                     </td></tr>
             <tr><td> <b>consumerSwitching</b>    </td><td>Operationen des internen Consumer Schaltmodul                                    </td></tr>
