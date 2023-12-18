@@ -54,7 +54,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.12";
+my $ModulVersion = "01.12b";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
@@ -1173,6 +1173,19 @@ sub CDCOpenData_get_RegenRadar_atLocations($$$$) {
    # get handle to the remote file "DE1200_RV_LATEST.tar.bz2":
    my $remote_tar_bz2_file_handle = $ftp->retr("DE1200_RV_LATEST.tar.bz2");
 
+   unless( $remote_tar_bz2_file_handle ) {
+     if ($fromGet) {
+       $ftp->quit;
+       $returnStr = "ERROR: reading 'DE1200_RV_LATEST.tar.bz2' failed";
+       return $returnStr;
+     } else {
+       $ftp->quit;
+       $returnStr = "Error|reading 'DE1200_RV_LATEST.tar.bz2' failed";
+       $returnStr .= "|" . join('|', @roReadings ) if int @roReadings;
+       return $returnStr;
+     }
+   }
+
    # uncompress tar file in-memory and get handle to the in-memory file:
    my $uncompressed_fh;
    unless ( $uncompressed_fh = IO::Uncompress::Bunzip2->new($remote_tar_bz2_file_handle) ) {
@@ -1357,7 +1370,13 @@ sub CDCOpenData_Readout_Run_Rain_Since_Midnight ($@) {
    # select only files with minute=50 in their filename:
    # Hourly files are provided every 10 minutes, but only the ones taken at 00:50 are used.
    # They fit without overlap to the 00:50 time boundaries provided by radolan's daily data files
-   my @files = grep /10000.........50/, $ftp->ls();						 
+   my @files = grep /10000.........50/, $ftp->ls();
+
+   if (! @files) {
+     $returnStr = "Error|grep received no files";
+     $returnStr .= "|" . join('|', @roReadings ) if int @roReadings;
+     return $returnStr;
+   }
 
    my $remotename; 
    my $filetime;
