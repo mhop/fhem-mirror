@@ -153,7 +153,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.6.0"  => "12.12.2023  store daily batmaxsoc in pvHistory, new attr ctrlBatSocManagement, reading Battery_OptimumTargetSoC ".
+  "1.6.0"  => "18.12.2023  store daily batmaxsoc in pvHistory, new attr ctrlBatSocManagement, reading Battery_OptimumTargetSoC ".
                            "currentBatteryDev: new optional key 'cap', adapt cloud2bin,temp2bin,rain2bin ".
                            "minor internal changes, isAddSwitchOffCond: change hysteresis algo, ctrlDebug: new entry batteryManagement ",
   "1.5.1"  => "07.12.2023  function _getftui can now process arguments (compatibility to new ftui widgets), plant check ".
@@ -712,6 +712,14 @@ my %hqtxt = (                                                                   
               DE => qq{Auto}                                                                                                },
   lupt   => { EN => qq{last&nbsp;update:},
               DE => qq{Stand:}                                                                                              },
+  object => { EN => qq{Object},
+              DE => qq{Pr&uuml;fobjekt}                                                                                     },
+  state  => { EN => qq{Status},
+              DE => qq{Status}                                                                                              }, 
+  result => { EN => qq{Result},
+              DE => qq{Ergebnis}                                                                                            },  
+  note   => { EN => qq{Note},
+              DE => qq{Hinweis}                                                                                             },
   wfmdcf => { EN => qq{Wait for more days with a consumption figure},
               DE => qq{Warte auf weitere Tage mit einer Verbrauchszahl}                                                     },
   autoct => { EN => qq{Autocorrection:},
@@ -1005,6 +1013,7 @@ my %hcsr = (                                                                    
   todayGridConsumption        => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
   todayBatIn                  => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
   todayBatOut                 => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
+  daysUntilBatteryCare        => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => '-'         },
   todayConsumptionForecast    => { fnr => 4, fn => \&NexthoursVal,  par => 'confc',             unit => ' Wh',  def => '-'         },
   conForecastTillNextSunrise  => { fnr => 4, fn => \&NexthoursVal,  par => 'confc',             unit => ' Wh',  def => 0           },
 );
@@ -2603,7 +2612,7 @@ sub __getSolCastData {
   ## (solCastAPIcallMultiplier, todayMaxAPIcalls) berechnen
   ##########################################################
   my %mx;
-  my $maxcnt;
+  my $maxcnt = 1;
 
   my $type = $paref->{type};
 
@@ -2617,7 +2626,7 @@ sub __getSolCastData {
 
   my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
   my $madc      = sprintf "%.0f", ($apimaxreq / $maxcnt);                                          # max. tägliche Anzahl API Calls
-  my $mpk       = $maxcnt // 1;                                                                    # Requestmultiplikator
+  my $mpk       = $maxcnt;                                                                         # Requestmultiplikator
 
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{solCastAPIcallMultiplier}  = $mpk;
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayMaxAPIcalls}          = $madc;
@@ -5873,13 +5882,15 @@ sub ___readCandQ {
       ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), $range, undef);                  # Korrekturfaktor/Qualität der Stunde des Tages (complex)
       $hq      //= '-';
       $hc      //= 1;                                                                                 # Korrekturfaktor = 1 (keine Korrektur)                                                                                                        # keine Qualität definiert
-
+      $hc        = 1 if(1 * $hc == 0);                                                                # 0.0-Werte ignorieren (Schleifengefahr)
+      
       $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange} = $range;
   }
   elsif ($acu =~ /on_simple/xs) {
       ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), 'percentile', undef);            # Korrekturfaktor/Qualität der Stunde des Tages (simple)
       $hq      //= '-';
       $hc      //= 1;                                                                                 # Korrekturfaktor = 1
+      $hc        = 1 if(1 * $hc == 0);                                                                # 0.0-Werte ignorieren (Schleifengefahr)
   }
   else {                                                                                              # keine Autokorrektur
       ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), 'percentile', undef);            # Korrekturfaktor/Qualität der Stunde des Tages (simple)
@@ -6424,9 +6435,9 @@ sub _batSocTarget {
   
   return if(!isBatteryUsed ($name));
 
-  my $oldd2care = CircularVal ($hash, 99, 'days2care', 0);
+  my $oldd2care = CircularVal ($hash, 99, 'days2care',            0);
   my $ltsmsr    = CircularVal ($hash, 99, 'lastTsMaxSocRchd', undef);
-  my $batcharge = CurrentVal  ($hash, 'batcharge', 0);                        # aktuelle Ladung in %
+  my $batcharge = CurrentVal  ($hash, 'batcharge',                0);         # aktuelle Ladung in %
 
   __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $batcharge >= $maxSoCdef || $oldd2care < 0);                         
   
@@ -6483,9 +6494,17 @@ sub _batSocTarget {
   
   my $careSoc = $maxsoc - ($days2care * $batSocChgDay);                       # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
   $target     = $careSoc < $target ? $target : $careSoc;                      # resultierender Target-SoC unter Berücksichtigung $caresoc 
-  $target     = sprintf "%.0f", $target;
   
-  debugLog ($paref, 'batteryManagement', "SoC calc Step4 - note remaining days until care SoC -> Target: $target %");
+  debugLog ($paref, 'batteryManagement', "SoC calc Step4 - note remaining days >$days2care< until care SoC -> Target: $target %");
+  
+  ## auf 5er Schritte anpassen (40,45,50,...)
+  #############################################
+  my $flo = floor ($target / 5);
+  my $rmn = $target - ($flo * 5);
+  my $add = $rmn <= 2.5 ? 0 : 5;
+  $target = ($flo * 5) + $add;
+  
+  debugLog ($paref, 'batteryManagement', "SoC calc Step5 - rounding the SoC to steps of 5 -> Target: $target %");
   
   ## pvHistory/Readings schreiben
   #################################
@@ -8367,6 +8386,12 @@ sub genStatisticReadings {
               my $rtaitr = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $kpi, $def);
 
               storeReading ('statistic_'.$kpi, $rtaitr);
+          }
+          
+          if ($kpi eq 'daysUntilBatteryCare') {
+              my $d2c = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'days2care', $def);
+
+              storeReading ('statistic_'.$kpi, $d2c);
           }
 
           if ($kpi eq 'todayGridFeedIn') {
@@ -13348,18 +13373,17 @@ sub checkPlantConfig {
 
   ## Ausgabe
   ############
-
   my $out  = qq{<html>};
   $out    .= qq{<b>}.$hqtxt{plntck}{$lang}.qq{</b> <br><br>};
 
   $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
   $out    .= qq{<tr style="font-weight:bold;">};
-  $out    .= qq{<td style="text-decoration:underline; padding: 5px;"> Object </td>};
-  $out    .= qq{<td style="text-decoration:underline;"> State </td>};
+  $out    .= qq{<td style="text-decoration:underline; padding: 5px;"> $hqtxt{object}{$lang} </td>};
+  $out    .= qq{<td style="text-decoration:underline;"> $hqtxt{state}{$lang} </td>};
   $out    .= qq{<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>};
-  $out    .= qq{<td style="text-decoration:underline;"> Result </td>};
+  $out    .= qq{<td style="text-decoration:underline;"> $hqtxt{result}{$lang} </td>};
   $out    .= qq{<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>};
-  $out    .= qq{<td style="text-decoration:underline;"> Note </td>};
+  $out    .= qq{<td style="text-decoration:underline;"> $hqtxt{note}{$lang} </td>};
   $out    .= qq{</tr>};
   $out    .= qq{<tr></tr>};
 
@@ -16623,7 +16647,8 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-ctrlStatisticReadings"></a>
        <li><b>ctrlStatisticReadings </b><br>
-         Readings are created for the selected key figures and indicators. <br><br>
+         Readings are created for the selected key figures and indicators with the 
+         naming scheme 'statistic_&lt;indicator&gt;'. Selectable key figures / indicators are: <br><br>
 
          <ul>
          <table>
@@ -16633,6 +16658,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>currentAPIinterval</b>         </td><td>the current call interval of the SolCast API (only model SolCastAPI) in seconds                                      </td></tr>
             <tr><td> <b>currentRunMtsConsumer_XX</b>   </td><td>the running time (minutes) of the consumer "XX" since the last switch-on. (0 - consumer is off)                      </td></tr>
             <tr><td> <b>dayAfterTomorrowPVforecast</b> </td><td>provides the forecast of PV generation for the day after tomorrow (if available) without autocorrection (raw data)   </td></tr>
+            <tr><td> <b>daysUntilBatteryCare</b>       </td><td>Days until the next battery maintenance (reaching the charge 'maxSoC' from attribute ctrlBatSocManagement)           </td></tr>
             <tr><td> <b>lastretrieval_time</b>         </td><td>the last call time of the API (only Model SolCastAPI, ForecastSolarAPI)                                              </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>    </td><td>the timestamp of the last call time of the API (only Model SolCastAPI, ForecastSolarAPI)                             </td></tr>
             <tr><td> <b>response_message</b>           </td><td>the last status message of the API (only Model SolCastAPI, ForecastSolarAPI)                                         </td></tr>
@@ -18652,7 +18678,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-ctrlStatisticReadings"></a>
        <li><b>ctrlStatisticReadings </b><br>
-         Für die ausgewählten Kennzahlen und Indikatoren werden Readings erstellt. <br><br>
+         Für die ausgewählten Kennzahlen und Indikatoren werden Readings mit dem 
+         Namensschema 'statistic_&lt;Indikator&gt;' erstellt. Auswählbare Kennzahlen / Indikatoren sind: <br><br>
 
          <ul>
          <table>
@@ -18662,6 +18689,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>currentAPIinterval</b>         </td><td>das aktuelle Abrufintervall der SolCast API (nur Model SolCastAPI) in Sekunden                                  </td></tr>
             <tr><td> <b>currentRunMtsConsumer_XX</b>   </td><td>die Laufzeit (Minuten) des Verbrauchers "XX" seit dem letzten Einschalten. (0 - Verbraucher ist aus)            </td></tr>
             <tr><td> <b>dayAfterTomorrowPVforecast</b> </td><td>liefert die Vorhersage der PV Erzeugung für Übermorgen (sofern verfügbar) ohne Autokorrektur (Rohdaten).        </td></tr>
+            <tr><td> <b>daysUntilBatteryCare</b>       </td><td>Tage bis zur nächsten Batteriepflege (Erreichen der Ladung 'maxSoC' aus Attribut ctrlBatSocManagement)          </td></tr>     
             <tr><td> <b>lastretrieval_time</b>         </td><td>der letzte Abrufzeitpunkt der API (nur Model SolCastAPI, ForecastSolarAPI)                                      </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>    </td><td>der Timestamp der letzen Abrufzeitpunkt der API (nur Model SolCastAPI, ForecastSolarAPI)                        </td></tr>
             <tr><td> <b>response_message</b>           </td><td>die letzte Statusmeldung der API (nur Model SolCastAPI, ForecastSolarAPI)                                       </td></tr>
