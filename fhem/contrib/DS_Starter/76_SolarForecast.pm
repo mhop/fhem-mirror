@@ -11655,6 +11655,8 @@ sub __calcNewFactor {
       $dnum   = 1;
       $factor = sprintf "%.2f", ($pvre / $pvfc);
   }
+  
+  $factor = 1.00 if(1 * $factor == 0);
 
 return ($factor, $dnum);
 }
