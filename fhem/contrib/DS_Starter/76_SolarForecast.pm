@@ -122,6 +122,8 @@ BEGIN {
           readingFnAttributes
           setKeyValue
           sortTopicNum
+          sunrise_abs_dat
+          sunset_abs_dat
           FW_cmd
           FW_directNotify
           FW_ME
@@ -153,9 +155,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.6.0"  => "18.12.2023  store daily batmaxsoc in pvHistory, new attr ctrlBatSocManagement, reading Battery_OptimumTargetSoC ".
+  "1.6.0"  => "20.12.2023  store daily batmaxsoc in pvHistory, new attr ctrlBatSocManagement, reading Battery_OptimumTargetSoC ".
                            "currentBatteryDev: new optional key 'cap', adapt cloud2bin,temp2bin,rain2bin ".
-                           "minor internal changes, isAddSwitchOffCond: change hysteresis algo, ctrlDebug: new entry batteryManagement ",
+                           "minor internal changes, isAddSwitchOffCond: change hysteresis algo, ctrlDebug: new entry batteryManagement ".
+                           "check longitude, latitude in general audit, use coordinates (if set) for sun calc ",
   "1.5.1"  => "07.12.2023  function _getftui can now process arguments (compatibility to new ftui widgets), plant check ".
                            "reviews SolarForecast widget files ",
   "1.5.0"  => "05.12.2023  new getter ftuiFramefiles ",
@@ -4930,8 +4933,8 @@ sub centralTask {
   my $type = $hash->{TYPE};
   my $cst  = [gettimeofday];                                           # Zyklus-Startzeit
 
-  RemoveInternalTimer($hash, "FHEM::SolarForecast::centralTask");
-  RemoveInternalTimer($hash, "FHEM::SolarForecast::singleUpdateState");
+  RemoveInternalTimer ($hash, 'FHEM::SolarForecast::centralTask');
+  RemoveInternalTimer ($hash, 'FHEM::SolarForecast::singleUpdateState');
 
   ### nicht mehr benötigte Readings/Daten löschen - Bereich kann später wieder raus !!
   ##########################################################################################
@@ -5500,28 +5503,36 @@ sub _transferWeatherValues {
 
   my ($time_str);
 
-  my $fc0_SunRise = ReadingsVal ($fcname, "fc0_SunRise", "23:59");                              # Sonnenaufgang heute
-  my $fc0_SunSet  = ReadingsVal ($fcname, "fc0_SunSet",  "00:00");                              # Sonnenuntergang heute
-  my $fc1_SunRise = ReadingsVal ($fcname, "fc1_SunRise", "23:59");                              # Sonnenaufgang morgen
-  my $fc1_SunSet  = ReadingsVal ($fcname, "fc1_SunSet",  "00:00");                              # Sonnenuntergang morgen
+  my $fc0_sr = ReadingsVal ($fcname, "fc0_SunRise", "23:59");                                  # Sonnenaufgang heute
+  my $fc0_ss = ReadingsVal ($fcname, "fc0_SunSet",  "00:00");                                  # Sonnenuntergang heute
+  my $fc1_sr = ReadingsVal ($fcname, "fc1_SunRise", "23:59");                                  # Sonnenaufgang morgen
+  my $fc1_ss = ReadingsVal ($fcname, "fc1_SunSet",  "00:00");                                  # Sonnenuntergang morgen
+  
+  ($fc0_sr, $fc0_ss, $fc1_sr, $fc1_ss) = __sunRSbyCoordinates ( { fc0_sr => $fc0_sr,           # mehr Genauigkeit wenn latitude/longitude Koordinaten gesetzt
+                                                                  fc0_ss => $fc0_ss,
+                                                                  fc1_sr => $fc1_sr,
+                                                                  fc1_ss => $fc1_ss,
+                                                                  t      => $t
+                                                                }
+                                                              );
+  
+  $data{$type}{$name}{current}{sunriseToday}   = $date.' '.$fc0_sr.':00';
+  $data{$type}{$name}{current}{sunriseTodayTs} = timestringToTimestamp ($date.' '.$fc0_sr.':00');
 
-  $data{$type}{$name}{current}{sunriseToday}   = $date.' '.$fc0_SunRise.':00';
-  $data{$type}{$name}{current}{sunriseTodayTs} = timestringToTimestamp ($date.' '.$fc0_SunRise.':00');
+  $data{$type}{$name}{current}{sunsetToday}    = $date.' '.$fc0_ss.':00';
+  $data{$type}{$name}{current}{sunsetTodayTs}  = timestringToTimestamp ($date.' '.$fc0_ss.':00');
 
-  $data{$type}{$name}{current}{sunsetToday}    = $date.' '.$fc0_SunSet.':00';
-  $data{$type}{$name}{current}{sunsetTodayTs}  = timestringToTimestamp ($date.' '.$fc0_SunSet.':00');
+  debugLog ($paref, "collectData", "sunrise/sunset today: $fc0_sr / $fc0_ss, sunrise/sunset tomorrow: $fc1_sr / $fc1_ss");
 
-  debugLog ($paref, "collectData", "sunrise/sunset today: $fc0_SunRise / $fc0_SunSet, sunrise/sunset tomorrow: $fc1_SunRise / $fc1_SunSet");
+  storeReading ('Today_SunRise',    $fc0_sr);
+  storeReading ('Today_SunSet',     $fc0_ss);
+  storeReading ('Tomorrow_SunRise', $fc1_sr);
+  storeReading ('Tomorrow_SunSet',  $fc1_ss);
 
-  storeReading ('Today_SunRise',    $fc0_SunRise);
-  storeReading ('Today_SunSet',     $fc0_SunSet);
-  storeReading ('Tomorrow_SunRise', $fc1_SunRise);
-  storeReading ('Tomorrow_SunSet',  $fc1_SunSet);
-
-  my $fc0_SunRise_round = sprintf "%02d", (split ":", $fc0_SunRise)[0];
-  my $fc0_SunSet_round  = sprintf "%02d", (split ":", $fc0_SunSet)[0];
-  my $fc1_SunRise_round = sprintf "%02d", (split ":", $fc1_SunRise)[0];
-  my $fc1_SunSet_round  = sprintf "%02d", (split ":", $fc1_SunSet)[0];
+  my $fc0_sr_round = sprintf "%02d", (split ":", $fc0_sr)[0];
+  my $fc0_ss_round = sprintf "%02d", (split ":", $fc0_ss)[0];
+  my $fc1_sr_round = sprintf "%02d", (split ":", $fc1_sr)[0];
+  my $fc1_ss_round = sprintf "%02d", (split ":", $fc1_ss)[0];
 
   for my $num (0..46) {
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
@@ -5537,11 +5548,11 @@ sub _transferWeatherValues {
       my $don   = 1;                                                                           # es ist default "Tag"
       my $fhstr = sprintf "%02d", $fh;                                                         # hier kann Tag/Nacht-Grenze verstellt werden
 
-      if($fd == 0 && ($fhstr lt $fc0_SunRise_round || $fhstr gt $fc0_SunSet_round)) {          # Zeit vor Sonnenaufgang oder nach Sonnenuntergang heute
+      if($fd == 0 && ($fhstr lt $fc0_sr_round || $fhstr gt $fc0_ss_round)) {                   # Zeit vor Sonnenaufgang oder nach Sonnenuntergang heute
           $wid += 100;                                                                         # "1" der WeatherID voranstellen wenn Nacht
           $don  = 0;
       }
-      elsif ($fd == 1 && ($fhstr lt $fc1_SunRise_round || $fhstr gt $fc1_SunSet_round)) {      # Zeit vor Sonnenaufgang oder nach Sonnenuntergang morgen
+      elsif ($fd == 1 && ($fhstr lt $fc1_sr_round || $fhstr gt $fc1_ss_round)) {               # Zeit vor Sonnenaufgang oder nach Sonnenuntergang morgen
           $wid += 100;                                                                         # "1" der WeatherID voranstellen wenn Nacht
           $don  = 0;
       }
@@ -5593,6 +5604,30 @@ sub _transferWeatherValues {
   }
 
 return;
+}
+
+################################################################
+#   Sonnenauf- und untergang bei gesetzten global 
+#   latitude/longitude Koordinaten berechnen
+################################################################
+sub __sunRSbyCoordinates {
+  my $paref   = shift;
+  my $fc0_sr  = $paref->{fc0_sr};
+  my $fc0_ss  = $paref->{fc0_ss};
+  my $fc1_sr  = $paref->{fc1_sr};
+  my $fc1_ss  = $paref->{fc1_ss};
+  my $t       = $paref->{t};                                                  # aktuelle Zeit
+  
+  my ($cset, $lat, $lon) = locCoordinates();
+  
+  return ($fc0_sr, $fc0_ss, $fc1_sr, $fc1_ss) if(!$t || !$cset);              # keine global latitude/longitude gesetzt
+
+  $fc0_sr = substr (sunrise_abs_dat ($t, 'REAL'),         0, 5);              # SunRise heute
+  $fc0_ss = substr (sunset_abs_dat  ($t, 'REAL'),         0, 5);              # SunSet heute
+  $fc1_sr = substr (sunrise_abs_dat ($t + 86400, 'REAL'), 0, 5);              # SunRise morgen
+  $fc1_ss = substr (sunset_abs_dat  ($t + 86400, 'REAL'), 0, 5);              # SunSet morgen
+  
+return ($fc0_sr, $fc0_ss, $fc1_sr, $fc1_ss);
 }
 
 ################################################################
@@ -6462,18 +6497,34 @@ sub _batSocTarget {
             
   ## Aufladewahrscheinlichkeit beachten
   #######################################
-  my $pvfctm     = ReadingsNum ($name, 'Tomorrow_PVforecast', 0);             # PV Prognose morgen
-  my $pvfctd     = ReadingsNum ($name, 'RestOfDayPVforecast', 0);             # PV Prognose Rest heute
+  my $pvfctm     = ReadingsNum ($name, 'Tomorrow_PVforecast',            0);  # PV Prognose morgen
+  my $pvfctd     = ReadingsNum ($name, 'RestOfDayPVforecast',            0);  # PV Prognose Rest heute
+  my $csopt      = ReadingsNum ($name, 'Battery_OptimumTargetSoC', $lowSoc);  # aktuelles SoC Optimum
   my $pvexpect   = $pvfctm > $pvfctd ? $pvfctm : $pvfctd;
   
   my $batinstcap = CurrentVal ($hash, 'batinstcap', 0);                       # installierte Batteriekapazität Wh
   my $needcharge = $batinstcap - ($batinstcap / 100 * $batcharge);            # vorläufige benötigte Ladeenergie (Wh) bis 100% SOC
-  my $cancharge  = $pvexpect > $needcharge ? $pvexpect : $needcharge;         # resultierende benötigte Ladeenergie (Wh)
+  my $cancharge  = $pvexpect > $needcharge ? $needcharge : $pvexpect;         # resultierende benötigte Ladeenergie (Wh)
   my $cantarget  = 100 - ($cancharge / ($batinstcap / 100));                  # berechneter möglicher Min SOC nach Berücksichtigung Ladewahrscheinlichkeit
   
-  $target        = $cantarget < $target ? $cantarget : $target;               # Abgleich möglicher Min SOC gg. berechneten Min SOC
+  my $newtarget  = $cantarget < $target ? $cantarget : $target;               # Abgleich möglicher Min SOC gg. berechneten Min SOC
+  my $logadd     = '';
+  my $sunset     = CurrentVal ($hash, 'sunsetTodayTs', $t);
   
-  debugLog ($paref, 'batteryManagement', "SoC calc Step2 - note charging probability -> Target: $target %");
+  if ($newtarget > $csopt && $t > $sunset) {                                  # Erhöhung des SoC erst ab Sonnenuntergang anwenden
+      $target = $newtarget;
+      $logadd = "(new target > $csopt % and Sunset has passed)";
+  }
+  elsif ($newtarget < $csopt) {                                               # Targetminderung sofort umsetzen -> Freiplatz für Ladeprognose
+      $target = $newtarget;
+      $logadd = "(new target < $csopt)";
+  }
+  else {                                                                      # bisheriges OPtimum bleibt vorerst
+      $target = $csopt;
+      $logadd = "(new target $newtarget % is only activated after sunset)";
+  }
+  
+  debugLog ($paref, 'batteryManagement', "SoC calc Step2 - note charging probability -> Target: $target % ".$logadd);
   
   ## low/up-Grenzen beachten
   ############################
@@ -6485,17 +6536,22 @@ sub _batSocTarget {
             
   ## Pflege-SoC (Soll SoC $maxSoCdef bei $batSocChgDay % Steigerung p. Tag)      
   ###########################################################################
-  my $ntsmsc    = CircularVal ($hash, 99, 'nextTsMaxSocChge', $t);
-  my $days2care = ceil        (($ntsmsc - $t) / 86400);                       # verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll
-  
-  $paref->{days2care} = $days2care;
-  __batSaveSocKeyFigures ($paref);
-  delete $paref->{days2care};
-  
-  my $careSoc = $maxsoc - ($days2care * $batSocChgDay);                       # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
-  $target     = $careSoc < $target ? $target : $careSoc;                      # resultierender Target-SoC unter Berücksichtigung $caresoc 
-  
-  debugLog ($paref, 'batteryManagement', "SoC calc Step4 - note remaining days >$days2care< until care SoC -> Target: $target %");
+  if ($t > $sunset) {                                                             # Pflege-SoC erst ab Sonnenuntergang berechnen/anwenden
+      my $ntsmsc    = CircularVal ($hash, 99, 'nextTsMaxSocChge', $t);
+      my $days2care = ceil        (($ntsmsc - $t) / 86400);                       # verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll
+      
+      $paref->{days2care} = $days2care;
+      __batSaveSocKeyFigures ($paref);
+      delete $paref->{days2care};
+      
+      my $careSoc = $maxsoc - ($days2care * $batSocChgDay);                       # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
+      $target     = $careSoc < $target ? $target : $careSoc;                      # resultierender Target-SoC unter Berücksichtigung $caresoc 
+      
+      debugLog ($paref, 'batteryManagement', "SoC calc Step4 - note remaining days >$days2care< until care SoC -> Target: $target %");
+  }
+  else {
+      debugLog ($paref, 'batteryManagement', "SoC calc Step4 - calculation & activation of the care SoC postponed until after sunset ");
+  }
   
   ## auf 5er Schritte anpassen (40,45,50,...)
   #############################################
@@ -6504,7 +6560,7 @@ sub _batSocTarget {
   my $add = $rmn <= 2.5 ? 0 : 5;
   $target = ($flo * 5) + $add;
   
-  debugLog ($paref, 'batteryManagement', "SoC calc Step5 - rounding the SoC to steps of 5 -> Target: $target %");
+  debugLog ($paref, 'batteryManagement', "SoC calc Step5 - (final step) rounding the SoC to steps of 5 -> Target: $target %");
   
   ## pvHistory/Readings schreiben
   #################################
@@ -11656,7 +11712,7 @@ sub __calcNewFactor {
       $factor = sprintf "%.2f", ($pvre / $pvfc);
   }
   
-  $factor = 1.00 if(1 * $factor == 0);
+  $factor = 1.00 if(1 * $factor == 0);                                                                # 0.00-Werte ignorieren (Schleifengefahr)
 
 return ($factor, $dnum);
 }
@@ -13124,10 +13180,11 @@ sub checkPlantConfig {
 
   ## Allgemeine Settings
   ########################
-  my $eocr     = AttrVal       ($name, 'event-on-change-reading', '');
-  my $aiprep   = isPrepared4AI ($hash, 'full');
-  my $aiusemsg = CurrentVal    ($hash, 'aicanuse', '');
-  my $einstds  = "";
+  my $eocr               = AttrVal       ($name, 'event-on-change-reading', '');
+  my $aiprep             = isPrepared4AI ($hash, 'full');
+  my $aiusemsg           = CurrentVal    ($hash, 'aicanuse', '');
+  my ($cset, $lat, $lon) = locCoordinates();
+  my $einstds            = "";
   
   if (!$eocr || $eocr ne '.*') {
       $einstds                              = 'to .*' if($eocr ne '.*');
@@ -13142,6 +13199,20 @@ sub checkPlantConfig {
       $result->{'Common Settings'}{result} .= qq{The language is set to '$lang'. <br>};
       $result->{'Common Settings'}{note}   .= qq{If the local attribute "ctrlLanguage" or the global attribute "language" is changed to "DE" most of the outputs are in German.<br>};
       $result->{'Common Settings'}{info}    = 1;
+  }
+  
+  if (!$lat) {
+      $result->{'Common Settings'}{state}   = $warn;
+      $result->{'Common Settings'}{result} .= qq{Attribute latitude in global device is not set. <br>};
+      $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in the latitude attribute of the global device.<br>};
+      $result->{'Common Settings'}{warn}    = 1;
+  }
+
+  if (!$lon) {
+      $result->{'Common Settings'}{state}   = $warn;
+      $result->{'Common Settings'}{result} .= qq{Attribute longitude in global device is not set. <br>};
+      $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in the longitude attribute of the global device.<br>};
+      $result->{'Common Settings'}{warn}    = 1;
   }
 
   if (!$aiprep) {
@@ -13176,8 +13247,6 @@ sub checkPlantConfig {
   ## allg. Settings bei Nutzung Forecast.Solar API
   #################################################
   if (isForecastSolarUsed ($hash)) {
-      my ($cset, $lat, $lon) = locCoordinates();
-
       if (!$pcf || $pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
