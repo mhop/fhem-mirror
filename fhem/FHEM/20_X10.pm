@@ -23,7 +23,7 @@
 #
 ################################################################
 # $Id$
-
+# 2023-12-19 mgmino
 
 #
 # Internals introduced in this module:
@@ -94,12 +94,16 @@ my %functions_set = ( "on" => 0,
                       "dimup" => 1,
                       "dimdown" => 1,
                       "dimto" => 1,
-                      "on-till" => 1,
-                      "on-for-timer" => 1,
                       "all_units_off" => 0,
                       "all_units_on" => 0,
                       "all_lights_off" => 0,
                       "all_lights_on" => 0,
+                      'off-till' => 10,
+                      'on-till' => 11,
+                      'off-till-overnight' => 20,
+                      'on-till-overnight' => 21,
+                      'off-for-timer' => 30,
+                      'on-for-timer' => 31,
                     );
 
 my %models = (
@@ -230,60 +234,6 @@ X10_LevelToDims($)
   return $dim;
 }
 
-
-#############################
-sub
-X10_Do_On_Till($@)
-{
-  my ($hash, @a) = @_;
-  return "Timespec (HH:MM[:SS]) needed for the on-till command" if(@a != 3);
-
-  my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($a[2]);
-  return $err if($err);
-
-  my @lt = localtime;
-  my $hms_till = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
-  my $hms_now = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
-  if($hms_now ge $hms_till) {
-    Log3 $hash, 4, "on-till: won't switch as now ($hms_now) is later than $hms_till";
-    return "";
-  }
-
-  if($modules{X10}{ldata}{$a[0]}) {
-    CommandDelete(undef, $a[0] . "_timer");
-    delete $modules{FS20}{ldata}{$a[0]};
-  }
-  $modules{X10}{ldata}{$a[0]} = "$hms_till";
-
-  my @b = ($a[0], "on");
-  X10_Set($hash, @b);
-  CommandDefine(undef, $hash->{NAME} . "_timer at $hms_till set $a[0] off");
-
-}
-#############################
-sub
-X10_Do_On_For_Timer($@)
-{
-  my ($hash, @a) = @_;
-  return "Timespec (HH:MM[:SS]) needed for the on-for-timer command" if(@a != 3);
-
-  my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($a[2]);
-  return $err if($err);
-
-  my $hms_for_timer = sprintf("+%02d:%02d:%02d", $hr, $min, $sec);
-
-  if($modules{X10}{ldata}{$a[0]}) {
-    CommandDelete(undef, $a[0] . "_timer");
-    delete $modules{FS20}{ldata}{$a[0]};
-  }
-  $modules{X10}{ldata}{$a[0]} = "$hms_for_timer";
-
-  my @b = ($a[0], "on");
-  X10_Set($hash, @b);
-  CommandDefine(undef, $hash->{NAME} . "_timer at $hms_for_timer set $a[0] off");
-
-}
-
 ###################################
 
 sub
@@ -323,26 +273,55 @@ sub
 X10_Set($@)
 {
   my ($hash, @a) = @_;
-  my $ret = undef;
   my $na = int(@a);
-
-  # initialization and sanity checks
-  return "no set value specified" if($na < 2);
-
   my $name= $hash->{NAME};
   my $function= $a[1];
+
+  # initialization and sanity checks
+  return "$name $function -> no set value specified" if($na < 2);
+
   my $nrparams= $functions_set{$function};
-  return "Unknown argument $function, choose one of " .
-          join(" ", sort keys %functions_set) if(!defined($nrparams));
-  return "Wrong number of parameters"  if($na != 2+$nrparams);
+  return "$name $function -> Unknown argument, choose one of " .
+          join(' ', sort keys %functions_set) if(!defined($nrparams));
 
-  # special for on-till
-  return X10_Do_On_Till($hash, @a) if($function eq "on-till");
+  if ($nrparams > 9) { # -till or -for-timer
+	return "$name $function -> Timespec (HH:MM[:SS]) missing"  if($na != 3);
 
-  # special for on-for-timer
-  return X10_Do_On_For_Timer($hash, @a) if($function eq "on-for-timer");
+	my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($a[2]);
+	my $hms_spec;
+	if($err) { # not a time spec
+	  if($a[2] =~ m/^\d+$/ and $nrparams > 21) { #if for-timer and natural number interpret as seconds
+		$hms_spec = sprintf("%02d:%02d:%02d", $a[2]/3600, $a[2]/60%60, $a[2]%60);
+	  } else {
+		return "$name $function $a[2] -> Not timespec HH:MM[:SS] or {perlcode}";
+	  }
+	} else {
+	  $hms_spec = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
+	}
 
+	my @lt = localtime;
+	my $hms_now = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
+	if($nrparams < 20 and $hms_now ge $hms_spec) { #only test for -till
+	  Log3 $hash, 4, "$name $function $hms_spec aborted -> before current time ($hms_now)";
+	  return undef;
+	}
 
+	if($modules{X10}{ldata}{$a[0]}) {
+		CommandDelete(undef, $a[0] . '_timer');
+		delete $modules{X10}{ldata}{$a[0]};
+	}
+	$modules{X10}{ldata}{$a[0]} = $hms_spec;
+
+	my $cond = $nrparams % 2 ? 'on' : 'off';
+	my @b = ($a[0], $cond);
+	X10_Set($hash, @b);
+	my $notCond = $nrparams % 2 ? 'off' : 'on';
+	my $forTimer = $nrparams > 21 ? '+' : ''; #only for-timer
+	CommandDefine(undef, "${name}_timer at $forTimer$hms_spec set $a[0] $notCond");
+	return undef;
+  }
+
+  return "$name $function -> Incorrect number of parameters"  if($na != 2+$nrparams);
 
   # argument evaluation
   my $model= $hash->{MODEL};
@@ -351,8 +330,8 @@ X10_Set($@)
   if($function =~ m/^dim/) {
     return "Cannot dim $name (model $model)" if($models{$model} ne "dimmer");
     my $arg= $a[2];
-    return "Wrong argument $arg, use 0..100" if($arg !~ m/^[0-9]{1,3}$/);
-    return "Wrong argument $arg, use 0..100" if($arg>100);
+    return "Incorrect argument $arg, use 0..100" if($arg !~ m/^[0-9]{1,3}$/);
+    return "Incorrect argument $arg, use 0..100" if($arg>100);
     if($function eq "dimto") {
       # translate dimmer command to dimup/dimdown command
       my $bright= 210;
@@ -595,12 +574,16 @@ __END__
     <br><br>
     where <code>value</code> is one of:<br>
     <pre>
-    dimdown           # requires argument, see the note
-    dimup             # requires argument, see the note
+    dimdown            # requires argument, see the note
+    dimup              # requires argument, see the note
     off
     on
-    on-till           # Special, see the note
-    on-for-timer      # Special, see the note
+    on-till            # Special, see the note
+    on-till-overnight  # Special, see the note
+    off-till           # Special, see the note
+    off-till-overnight # Special, see the note
+    on-for-timer       # Special, see the note
+    off-for-timer      # Special, see the note
     </pre>
     Examples:
     <ul>
@@ -609,6 +592,7 @@ __END__
       <code>set pump off</code><br>
       <code>set lamp2 on-till 19:59</code><br>
       <code>set lamp2 on-for-timer 00:02:30</code><br>
+      <code>set lamp2 on-for-timer 150</code><br>
     </ul>
     <br>
     Notes:
@@ -634,16 +618,17 @@ __END__
           have unexpected results. This seems to be a feature of the X10
           devices.</li>
       <li><code>on-till</code> requires an absolute time in the "at" format
-          (HH:MM:SS, HH:MM) or { &lt;perl code&gt; }, where the perl code
+          (HH:MM[:SS]) or { &lt;perl code&gt; }, where the perl code
           returns a time specification).
           If the current time is greater than the specified time, then the
           command is ignored, else an "on" command is generated, and for the
           given "till-time" an off command is scheduleld via the at command.
-          </li>
-      <li><code>on-for-timer</code> requires a relative time in the "at" format
-          (HH:MM:SS, HH:MM) or { &lt;perl code&gt; }, where the perl code
-          returns a time specification).
-          </li>
+          <code>off-till</code> invert the conditions above.</li>
+      <li><code>on-till-overnight</code> or <code>off-till-overnight</code>
+          the specified time is not compared to the current time.</li>
+      <li><code>on-for-timer</code> or <code>off-for-timer</code> requires a
+           relative time in the "at" format (HH:MM[:SS]) or { &lt;perl code&gt; },
+           where the perl code returns a time specification) or seconds.</li>
     </ul>
   </ul>
   <br>
