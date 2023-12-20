@@ -5621,11 +5621,12 @@ sub __sunRSbyCoordinates {
   my ($cset, $lat, $lon) = locCoordinates();
   
   return ($fc0_sr, $fc0_ss, $fc1_sr, $fc1_ss) if(!$t || !$cset);              # keine global latitude/longitude gesetzt
-
-  $fc0_sr = substr (sunrise_abs_dat ($t, 'REAL'),         0, 5);              # SunRise heute
-  $fc0_ss = substr (sunset_abs_dat  ($t, 'REAL'),         0, 5);              # SunSet heute
-  $fc1_sr = substr (sunrise_abs_dat ($t + 86400, 'REAL'), 0, 5);              # SunRise morgen
-  $fc1_ss = substr (sunset_abs_dat  ($t + 86400, 'REAL'), 0, 5);              # SunSet morgen
+  
+  my $alt = 'HORIZON=-0.833';                                                 # default from https://metacpan.org/release/JFORGET/DateTime-Event-Sunrise-0.0505/view/lib/DateTime/Event/Sunrise.pm
+  $fc0_sr = substr (sunrise_abs_dat ($t, $alt),         0, 5);                # SunRise heute
+  $fc0_ss = substr (sunset_abs_dat  ($t, $alt),         0, 5);                # SunSet heute
+  $fc1_sr = substr (sunrise_abs_dat ($t + 86400, $alt), 0, 5);                # SunRise morgen
+  $fc1_ss = substr (sunset_abs_dat  ($t + 86400, $alt), 0, 5);                # SunSet morgen
   
 return ($fc0_sr, $fc0_ss, $fc1_sr, $fc1_ss);
 }
