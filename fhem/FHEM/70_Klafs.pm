@@ -69,6 +69,7 @@ BEGIN {
     ReadingsVal
     HttpUtils_NonblockingGet
     HttpUtils_BlockingGet
+    readingsDelete
   ))
 };
 
@@ -253,13 +254,16 @@ sub Klafs_Auth{
         my $reconnect = time() + 300;
         $hash->{Klafs}->{reconnect} = $reconnect;
         my $header = "Content-Type: application/x-www-form-urlencoded\r\n".
-                     "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.71 Safari/537.36";
-        my $datauser   = "UserName=$username&Password=$password";
+                     "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n".
+                     "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7r\n".
+                     "Accept-Encoding: gzip, deflate, br\r\n".
+                     "Accept-Language: de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7";
+        my $datauser   = "UserName=$username&Password=$password&RememberMe=false";
 
         if ($hash->{Klafs}->{LoginFailures} eq "0"){
 
           HttpUtils_NonblockingGet({
-              url                          => "https://sauna-app.klafs.com/Account/Login",
+              url                          => "https://sauna-app-19.klafs.com/Account/Login",
               ignoreredirects        => 1,
               timeout                      => 5,
               hash                        => $hash,
@@ -300,7 +304,7 @@ sub Klafs_AuthResponse {
    }else{
      readingsBulkUpdate( $hash, 'LoginFailures', 0, 0);
      $hash->{Klafs}->{LoginFailures} =0;
-     for my $cookie ($header =~ m/set-cookie: ?(.*)/gi) {
+     for my $cookie ($header =~ m/Set-Cookie: ?(.*)/gi) {
          $cookie =~ /([^,; ]+)=([^,;\s\v]+)[;,\s\v]*([^\v]*)/;
          my $aspxauth  = $1 . "=" .$2 .";";
          $hash->{Klafs}->{cookie}    = $aspxauth;
@@ -347,28 +351,36 @@ sub klafs_getStatus{
     my $aspxauth = $hash->{Klafs}->{cookie};
     my $saunaid  = $hash->{Klafs}->{saunaid};
 
-      my $header_gs = "Content-Type: application/json\r\n".
-                      "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.71 Safari/537.36\r\n".
+      my $header_gs = "Content-Type: application/json; charset=utf-8\r\n".
+                      "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n".
+                      "Accept: text/plain, */*; q=0.01r\n".
+                      "Accept-Encoding: gzip, deflate, br\r\n".
+                      "Accept-Language: de,en;q=0.7,en-US;q=0.3\r\n".
                       "Cookie: $aspxauth";
       my $datauser_gs = '{"saunaId":"'.$saunaid.'"}';
 
       HttpUtils_NonblockingGet({
-          url                => "https://sauna-app.klafs.com/Control/GetSaunaStatus",
+          url                => "https://sauna-app-19.klafs.com/SaunaApp/GetData?id=$saunaid",
           timeout            => 5,
           hash               => $hash,
-          method             => "POST",
+          method             => "GET",
           header             => $header_gs,  
-          data                 => $datauser_gs,
+          data               => $datauser_gs,
           callback           => \&klafs_getStatusResponse,
       });
       
       #Name Vorname Mail Benutzername
       #GET Anfrage mit ASPXAUTH
-      my $header_user = "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.71 Safari/537.36\r\n".
+      my $header_user = "Content-Type: application/json; charset=utf-8\r\n".
+                        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n".
+                        "Accept: text/plain, */*; q=0.01r\n".
+                        "Accept-Encoding: gzip, deflate, br\r\n".
+                        "Accept-Language: de,en;q=0.7,en-US;q=0.3\r\n".
                         "Cookie: $aspxauth";
 
+
       HttpUtils_NonblockingGet({
-          url                => "https://sauna-app.klafs.com/Account/ChangeProfile",
+          url                => "https://sauna-app-19.klafs.com/Account/ChangeProfile",
           timeout            => 5,
           hash               => $hash,
           method             => "GET",
@@ -376,11 +388,15 @@ sub klafs_getStatus{
           callback           => \&Klafs_GETProfile,
       });
       
-      my $header_set = "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.71 Safari/537.36\r\n".
-                       "Cookie: $aspxauth";
+      my $header_set = "Content-Type: application/json; charset=utf-8\r\n".
+                        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n".
+                        "Accept: text/plain, */*; q=0.01r\n".
+                        "Accept-Encoding: gzip, deflate, br\r\n".
+                        "Accept-Language: de,en;q=0.7,en-US;q=0.3\r\n".
+                        "Cookie: $aspxauth";
 
       HttpUtils_NonblockingGet({
-          url                => "https://sauna-app.klafs.com/Control/ChangeSettings",
+          url                => "https://sauna-app-19.klafs.com/SaunaApp/ChangeSettings",
           timeout            => 5,
           hash               => $hash,
           method             => "GET",
@@ -444,6 +460,8 @@ sub klafs_getStatusResponse {
         readingsBulkUpdate($hash, $key, $new);
       }
     }
+    ## unset ErrorMessageHeader. Dort steht "Fehler" drin. Wert wird mitgeliefert auch wenn ErrorMessage leer ist. Bei Fehler wird Reading last_errormsg gesetzt
+    readingsDelete($hash, "ErrorMessageHeader");
     
     Klafs_CONNECTED($hash,'connected');
     readingsEndUpdate($hash, 1);
@@ -469,8 +487,8 @@ sub Klafs_GETProfile {
     # Wenn in $data eine Anmeldung verlangt wird und kein json kommt, darf es nicht weitergehen.
     # Connect darf es hier nicht geben. Das darf nur an einer Stelle kommen. Sonst macht perl mehrere connects gleichzeitig- bei 3 Fehlversuchen wäre der Account gesperrt
      readingsBeginUpdate ($hash);
-     if($data=~/<input class="ksa-iw-hidden" id="UserName" name="UserName" type="text" value=\"/) {
-       for my $output ($data =~ m /<input class="ksa-iw-hidden" id="UserName" name="UserName" type="text" value=\"?(.*)\"/) {
+     if($data=~/<input id="UserName" name="UserName" type="hidden" value=\"/) {
+       for my $output ($data =~ m /<input id="UserName" name="UserName" type="hidden" value=\"?(.*)\"/) {
          my $usercloud    = ReadingsVal( $name, "username", "" );
          if($usercloud eq "" || $usercloud ne $1){
            readingsBulkUpdate( $hash, "username", "$1", 0 );
@@ -478,8 +496,8 @@ sub Klafs_GETProfile {
        }
      }
      
-     if($data=~/<input class="ksa-iw-change-profile-input-text" id="Email" name="Email" type="text" value=\"/) {
-       for my $output ($data =~ m /<input class="ksa-iw-change-profile-input-text" id="Email" name="Email" type="text" value=\"?(.*)\"/) {
+     if($data=~/<input class="col-7 form-control-lg iw-input-field text-box single-line" id="Email" name="Email" type="email" value=\"/) {
+       for my $output ($data =~ m /<input class="col-7 form-control-lg iw-input-field text-box single-line" id="Email" name="Email" type="email" value=\"?(.*)\"/) {
          my $mailcloud    = ReadingsVal( $name, "mail", "" );
          if($mailcloud eq "" || $mailcloud ne $1){
            readingsBulkUpdate( $hash, "mail", "$1", 0 );
@@ -487,8 +505,8 @@ sub Klafs_GETProfile {
        }
      }
      
-     if($data=~/<input class="ksa-iw-change-profile-input-text" id="FirstName" name="FirstName" type="text" value=\"/) {
-       for my $output ($data =~ m /<input class="ksa-iw-change-profile-input-text" id="FirstName" name="FirstName" type="text" value=\"?(.*)\"/) {
+     if($data=~/<input class="col-7 form-control-lg iw-input-field text-box single-line" id="FirstName" name="FirstName" type="text" value=\"/) {
+       for my $output ($data =~ m /<input class="col-7 form-control-lg iw-input-field text-box single-line" id="FirstName" name="FirstName" type="text" value=\"?(.*)\"/) {
          my $fnamecloud    = ReadingsVal( $name, "firstname", "" );
          if($fnamecloud eq "" || $fnamecloud ne $1){
            readingsBulkUpdate( $hash, "firstname", "$1", 0 );
@@ -496,8 +514,8 @@ sub Klafs_GETProfile {
        }
      }
      
-     if($data=~/<input class="ksa-iw-change-profile-input-text" id="LastName" name="LastName" type="text" value=\"/) {
-       for my $output ($data =~ m /<input class="ksa-iw-change-profile-input-text" id="LastName" name="LastName" type="text" value=\"?(.*)\"/) {
+     if($data=~/<input class="col-7 form-control-lg iw-input-field text-box single-line" id="LastName" name="LastName" type="text" value=\"/) {
+       for my $output ($data =~ m /<input class="col-7 form-control-lg iw-input-field text-box single-line" id="LastName" name="LastName" type="text" value=\"?(.*)\"/) {
          my $lnamecloud    = ReadingsVal( $name, "lastname", "" );
          if($lnamecloud eq "" || $lnamecloud ne $1){
            readingsBulkUpdate( $hash, "lastname", "$1", 0 );
@@ -591,13 +609,12 @@ sub _Klafs_help {
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
 | Set Parameter                                                                                                                                            |
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
-|on                 | ohne Parameter -> Default Sauna 90 Grad                                                                                              |
+|on                 | ohne Parameter -> Starten mit zuletzt verwendeten Werten                                                                             |
 |                   | set "name" on Sauna 90 - 3 Parameter: Sauna mit Temperatur [10-100]; Optional Uhrzeit [19:30]                                        |
 |                   | set "name" on Saunarium 65 5 - 4 Parameter: Sanarium mit Temperatur [40-75]; Optional HumidtyLevel [0-10] und Uhrzeit [19:30]        |
-|                   | set "name" on Infrared 30 5 - 4 Parameter: Infrarot mit Temperatur [20-40] und IR Level [0-10]; Optional Uhrzeit [19:30]             |
 |                   | Infrarot ist nicht supported, da keine Testumgebung verfuegbar.                                                                      |
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
-|off                | Schaltet die Sauna|Sanarium|Infrarot aus - ohne Parameter.                                                                           |
+|off                | Schaltet die Sauna|Sanarium aus - ohne Parameter.                                                                           |
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
 |ResetLoginFailures | Bei fehlerhaftem Login wird das Reading LoginFailures auf 1 gesetzt. Damit ist der automatische Login vom diesem Modul gesperrt.     |
 |                   | Klafs sperrt den Account nach 3 Fehlversuchen. Damit nicht automatisch 3 falsche Logins hintereinander gemacht werden.               |
@@ -620,12 +637,15 @@ sub Klafs_GetSaunaIDs_Send{
     my ($name,$self) = ($hash->{NAME},Klafs_Whoami());
     my $aspxauth = $hash->{Klafs}->{cookie};
     return if $hash->{Klafs}->{LoginFailures} > 0;
-    Log3 ($name, 5, "$name ($self) - executed.");
+    Log3 ($name, 5, "$name ($self) - GetSauna ID start.");
     
-    my $header = "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.71 Safari/537.36\r\n".
-                   "Cookie: $aspxauth";
+    my $header = "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n".
+                 "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7\r\n".
+		 "Accept-Encoding: gzip, deflate, br\r\n".
+		 "Accept-Language: de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7\r\n".
+                 "Cookie: $aspxauth";
       HttpUtils_NonblockingGet({
-          url                => "http://sauna-app.klafs.com/Control",
+          url                => "https://sauna-app-19.klafs.com/SaunaApp/ChangeSettings",
           timeout            => 5,
           hash               => $hash,
           method             => "GET",
@@ -638,9 +658,10 @@ sub Klafs_GetSaunaIDs_Send{
 sub Klafs_GetSaunaIDs_Receive {
     my ($param, $err, $data) = @_;
     my ($name,$self,$hash) = ($param->{hash}->{NAME},Klafs_Whoami(),$param->{hash});
-    my $returnwerte;
+    my $returnwert1;
+    my $returnwert2;
 
-    Log3 ($name, 5, "$name ($self) - executed.");
+    Log3 ($name, 5, "$name ($self) - GetSauna ID Ende.");
     
     if ($err ne "") {
         Log3 ($name, 4, "$name ($self) - error.");
@@ -650,15 +671,16 @@ sub Klafs_GetSaunaIDs_Receive {
         if($data !~/Account\/Login/) {
           # Wenn in $data eine Anmeldung verlangt wird und keine Daten, darf es nicht weitergehen.
           # Connect darf es hier nicht geben. Das darf nur an einer Stelle kommen. Sonst macht perl mehrere connects gleichzeitig - bei 3 Fehlversuchen wäre der Account gesperrt
-           $returnwerte = "";       
-           if($data=~/<tr class="ksa-iw-sauna-webgrid-row-style">/) {
-             for my $output ($data =~ m /<tr class="ksa-iw-sauna-webgrid-row-style">(.*?)<\/tr>/gis) {
-               $output=~ m/<span id="lbldeviceName">(.*?)<\/span>/g;
-               $returnwerte .= $1.": ";
-               $output=~ m/<div class="ksa-iw-sauna-status" id=\"(.*?)\"/g;
-               $returnwerte .= $1."\n";
+           $returnwert1 = "";
+           $returnwert2 = "";
+           if($data=~/<tr class="iw-sauna-webgrid-row-style">/) {
+             for my $output ($data =~ m /<tr class="iw-sauna-webgrid-row-style">(.*?)<\/tr>/gis) {
+               $output=~ m/<label id="lblsaunaId">(.*?)<\/label>/g;
+               $returnwert1 .= $1."\n";
+               $output=~ m/<span id="lbldeviceName" class="iw-label">(.*?)<\/span>/g;
+               $returnwert2 .= $1.": ";
              }
-             $hash->{Klafs}->{GetSaunaIDs} = $returnwerte;
+             $hash->{Klafs}->{GetSaunaIDs} = $returnwert2.$returnwert1;
            }
         }
         }
@@ -680,7 +702,7 @@ sub _Klafs_saunaid {
 ###################################
 sub Set {
     my ( $hash, $name, $cmd, @args ) = @_;
-    return if $hash->{Klafs}->{LoginFailures} > 0 and !$cmd;
+    return if $hash->{Klafs}->{LoginFailures} > 0 && !$cmd;
 
 
     if (Klafs_CONNECTED($hash) eq 'disabled' && $cmd !~ /clear/) {
@@ -697,7 +719,7 @@ sub Set {
     my $FIFTEEN_MINS = (15 * 60);
     my $now = time;
     if (my $diff = $now % $FIFTEEN_MINS) {
-   $now += $FIFTEEN_MINS - $diff;
+      $now += $FIFTEEN_MINS - $diff;
     }
     my $next = scalar localtime $now;
     # doppelte Leerzeichen bei einstelligen Datumsangaben entfernen
@@ -706,6 +728,8 @@ sub Set {
     my @Uhrzeit = split(/:/,$Zeit[3]);
     my $std = $Uhrzeit[0];
     my $min = $Uhrzeit[1];
+    my $timesel = 0;
+    my $timeselect = '';
     # print "Decoded Zeit:\n".Dumper(@Zeit);
     #Decoded Zeit:
     #$VAR1 = 'Mon';
@@ -731,34 +755,20 @@ sub Set {
        Log3 ($name, 2, "Klafs set $name " . $cmd);
         
        klafs_getStatus($hash);
-       my $mode        = shift @args;
+       my $mode      = "0";
+       $mode        = shift @args;
+       
        my $aspxauth    = $hash->{Klafs}->{cookie};
        
        my $pin         = $hash->{Klafs}->{pin};
        my $saunaid     = $hash->{Klafs}->{saunaid};
-       my $selectedSaunaTemperature = ReadingsVal( $name, "selectedSaunaTemperature", "90" );
-       my $selectedSanariumTemperature = ReadingsVal( $name, "selectedSanariumTemperature", "65" );
-       my $selectedIrTemperature = ReadingsVal( $name, "selectedIrTemperature", "0" );
-       my $selectedHumLevel = ReadingsVal( $name, "selectedHumLevel", "5" );
-       my $selectedIrLevel = ReadingsVal( $name, "selectedIrLevel", "0" );
-       my $isConnected = ReadingsVal( $name, "isConnected", "true" );
-       my $isPoweredOn = ReadingsVal( $name, "isPoweredOn", "false" );
-       my $isReadyForUse = ReadingsVal( $name, "isReadyForUse", "false" );
-       my $currentTemperature = ReadingsVal( $name, "currentTemperature", "141" );
-       if($currentTemperature eq "0"){
-         $currentTemperature = "141";
-       }
-       my $currentHumidity = ReadingsVal( $name, "currentHumidity", "0" );
-       my $statusCode = ReadingsVal( $name, "statusCode", "0" );
-       my $statusMessage = ReadingsVal( $name, "statusMessage", "" );
-       if($statusMessage eq ""){
-         $statusMessage = 'null';
-       }
-       my $showBathingHour = ReadingsVal( $name, "showBathingHour", "false" );
-       my $bathingHours = ReadingsVal( $name, "bathingHours", "0" );
-       my $bathingMinutes = ReadingsVal( $name, "bathingMinutes", "0" );
-       my $currentHumidityStatus = ReadingsVal( $name, "currentHumidityStatus", "0" );
-       my $currentTemperatureStatus = ReadingsVal( $name, "currentTemperatureStatus", "0" );
+       
+       my $header_on = "Content-Type: application/json; charset=utf-8\r\n".
+                       "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n".
+                       "Accept: application/json, text/javascript, */*; q=0.01\r\n".
+                       "Accept-Encoding: gzip, deflate, br\r\n".
+                       "Accept-Language: de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7\r\n".
+                       "Cookie: $aspxauth";
 
        if ( $pin eq "") {
             my $msg = "Missing attribute: attr $name pin <pin>";
@@ -770,7 +780,24 @@ sub Set {
                return $msg;
        }else{
          my $datauser_cv = "";
+         
          if ( $mode eq "Sauna"){
+         
+           # Sauna Modus wechseln
+           my $datauser_mode = '{"id":"'.$saunaid.'","selected_mode":1}';
+           Log3 ($name, 4, "$name - JSON_MODE: $datauser_mode");
+
+           HttpUtils_BlockingGet({
+               url                => "https://sauna-app-19.klafs.com/SaunaApp/SetMode",
+               timeout            => 5,
+               hash               => $hash,
+               method             => "POST",
+               header             => $header_on,
+               data               => $datauser_mode,
+           });
+
+         
+           
            # Sauna hat 1 Parameter: Temperatur
            #return "Zu wenig Argumente: Temperatur fehlt" if ( @args < 1 );
            my $temperature = shift @args;
@@ -787,6 +814,22 @@ sub Set {
                $temperature = 90;
              }
            }
+           
+           # Sauna Temperatur wechseln
+           my $datauser_temp = '{"id":"'.$saunaid.'","temperature":"'.$temperature.'"}';
+           Log3 ($name, 4, "$name - JSON_TEMP: $datauser_temp");
+
+           HttpUtils_BlockingGet({
+               url                => "https://sauna-app-19.klafs.com/SaunaApp/ChangeTemperature",
+               timeout            => 5,
+               hash               => $hash,
+               method             => "POST",
+               header             => $header_on,
+               data               => $datauser_temp,
+           }); 
+           
+           
+           
            my $Time;
            $Time  = shift @args;
            
@@ -809,12 +852,40 @@ sub Set {
                    $min = substr($min,1,1);
                  }
                }
+               $timesel = 1;
            }
            if ($std <0 || $std >23 || $min <0 || $min >59){
            return "Checken Sie das Zeitformat $std:$min\n";
            }
-           $datauser_cv = '{"changedData":{"saunaId":"'.$saunaid.'","saunaSelected":true,"sanariumSelected":false,"irSelected":false,"selectedSaunaTemperature":'.$temperature.',"selectedSanariumTemperature":'.$selectedSanariumTemperature.',"selectedIrTemperature":'.$selectedIrTemperature.',"selectedHumLevel":'.$selectedHumLevel.',"selectedIrLevel":'.$selectedIrLevel.',"selectedHour":'.$std.',"selectedMinute":'.$min.',"isConnected":'.$isConnected.',"isPoweredOn":'.$isPoweredOn.',"isReadyForUse":'.$isReadyForUse.',"currentTemperature":'.$currentTemperature.',"currentHumidity":'.$currentHumidity.',"statusCode":'.$statusCode.',"statusMessage":'.$statusMessage.',"showBathingHour":'.$showBathingHour.',"bathingHours":'.$bathingHours.',"bathingMinutes":'.$bathingMinutes.',"currentHumidityStatus":'.$currentHumidityStatus.',"currentTemperatureStatus":'.$currentTemperatureStatus.'}}';
+           # Sauna Zeit wechseln
+           my $datauser_zeit = '{"id":"'.$saunaid.'","time_set":true,"hours":'.$std.',"minutes":'.$min.'}';
+           Log3 ($name, 4, "$name - JSON_ZEIT: $datauser_zeit");
+
+           HttpUtils_BlockingGet({
+               url                => "https://sauna-app-19.klafs.com/SaunaApp/SetSelectedTime",
+               timeout            => 5,
+               hash               => $hash,
+               method             => "POST",
+               header             => $header_on,
+               data               => $datauser_zeit,
+           }); 
+           
+           
          }elsif ( $mode eq "Sanarium" ) {
+         
+           # Sanarium Modus wechseln
+           my $datauser_mode = '{"id":"'.$saunaid.'","selected_mode":2}';
+           Log3 ($name, 4, "$name - JSON_MODE: $datauser_mode");
+
+           HttpUtils_BlockingGet({
+               url                => "https://sauna-app-19.klafs.com/SaunaApp/SetMode",
+               timeout            => 5,
+               hash               => $hash,
+               method             => "POST",
+               header             => $header_on,
+               data               => $datauser_mode,
+           });
+           
            my $temperature = shift @args;
            
 
@@ -829,8 +900,21 @@ sub Set {
              if ($temperature eq "" || $temperature eq 0){
                $temperature = 65;
              }
-             
            }
+
+           # Sanarium Temperatur wechseln
+           my $datauser_temp = '{"id":"'.$saunaid.'","temperature":"'.$temperature.'"}';
+           Log3 ($name, 4, "$name - JSON_TEMP: $datauser_temp");
+
+           HttpUtils_BlockingGet({
+               url                => "https://sauna-app-19.klafs.com/SaunaApp/ChangeTemperature",
+               timeout            => 5,
+               hash               => $hash,
+               method             => "POST",
+               header             => $header_on,
+               data               => $datauser_temp,
+           });            
+           
            my $Time;
            my $level;
            $level = shift @args;
@@ -871,11 +955,24 @@ sub Set {
                    $min = substr($min,1,1);
                  }
                }
+               $timesel = 1;
              }
            }
            if ($std <0 || $std >23 || $min <0 || $min >59){
            return "Checken Sie das Zeitformat $std:$min\n";
            }
+           # Sanarium Zeit wechseln
+           my $datauser_zeit = '{"id":"'.$saunaid.'","time_set":true,"hours":'.$std.',"minutes":'.$min.'}';
+           Log3 ($name, 4, "$name - JSON_ZEIT: $datauser_zeit");
+
+           HttpUtils_BlockingGet({
+               url                => "https://sauna-app-19.klafs.com/SaunaApp/SetSelectedTime",
+               timeout            => 5,
+               hash               => $hash,
+               method             => "POST",
+               header             => $header_on,
+               data               => $datauser_zeit,
+           }); 
            
            # Auf volle 10 Minuten runden
            #if( substr($min,-1,1) > 0){
@@ -898,178 +995,72 @@ sub Set {
              if ($level eq ""){
                $level = 5;
              }
-             
            }
-           $datauser_cv = '{"changedData":{"saunaId":"'.$saunaid.'","saunaSelected":false,"sanariumSelected":true,"irSelected":false,"selectedSaunaTemperature":'.$selectedSaunaTemperature.',"selectedSanariumTemperature":'.$temperature.',"selectedIrTemperature":'.$selectedIrTemperature.',"selectedHumLevel":'.$level.',"selectedIrLevel":'.$selectedIrLevel.',"selectedHour":'.$std.',"selectedMinute":'.$min.',"isConnected":'.$isConnected.',"isPoweredOn":'.$isPoweredOn.',"isReadyForUse":'.$isReadyForUse.',"currentTemperature":'.$currentTemperature.',"currentHumidity":'.$currentHumidity.',"statusCode":'.$statusCode.',"statusMessage":'.$statusMessage.',"showBathingHour":'.$showBathingHour.',"bathingHours":'.$bathingHours.',"bathingMinutes":'.$bathingMinutes.',"currentHumidityStatus":'.$currentHumidityStatus.',"currentTemperatureStatus":'.$currentTemperatureStatus.'}}';
-         }elsif ( $mode eq "Infrared" ) {
-           my $temperature = shift @args;
-           if(!looks_like_number($temperature)){
-            return "Geben Sie einen nummerischen Wert  fuer <temperatur> ein";
-           }
-           if ($temperature >= 20 && $temperature <=40 && $temperature ne ""){
-             $temperature = $temperature;
-           }else{
-            # Letzer Wert oder Standardtemperatur
-             $temperature    = ReadingsVal( $name, "selectedIrTemperature", "" );
-             if ($temperature eq "" || $temperature eq 0){
-               $temperature = 35;
-             }
-           }
-           my $Time;
-           my $level;
-           $level = shift @args;
-           $Time  = shift @args;
-           
-           if(!defined($Time)){
-            $Time ="$Uhrzeit[0]:$Uhrzeit[1]";
-           }
+           # Sanarium Feuchtigkeit wechseln
+           my $datauser_hlevel = '{"id":"'.$saunaid.'","level":"'.$level.'"}';
+           Log3 ($name, 4, "$name - JSON_HUM_LEVEL: $datauser_hlevel");
 
-           # Parameter level ist optional. Wird in der ersten Variable eine anstelle des Levels eine Uhrzeit gefunden, dann level auf "" setzen und $std,$min setzen
-           if($level =~ /:/ || $Time =~ /:/){
-             if($level =~ /:/){
-               my @Timer = split(/:/,$level);
-            $std = $Timer[0];
-               $min = $Timer[1];
-               if($std < 10){
-                 if(substr($std,0,1) eq "0"){
-                   $std = substr($std,1,1);
-                 }
-               }
-               if($min < 10){
-                 if(substr($min,0,1) eq "0"){
-                   $min = substr($min,1,1);
-                 }
-               }
-               $level = "";
-             }else{
-               my @Timer = split(/:/,$Time);
-               $std = $Timer[0];
-               $min = $Timer[1];
-               if($std < 10){
-                 if(substr($std,0,1) eq "0"){
-                   $std = substr($std,1,1);
-                 }
-               }
-               if($min < 10){
-                 if(substr($min,0,1) eq "0"){
-                   $min = substr($min,1,1);
-                 }
-               }
-             }
-           }
-           if ($std <0 || $std >23 || $min <0 || $min >59){
-           return "Checken Sie das Zeitformat $std:$min\n";
-           }
+           HttpUtils_BlockingGet({
+               url                => "https://sauna-app-19.klafs.com/SaunaApp/ChangeHumLevel",
+               timeout            => 5,
+               hash               => $hash,
+               method             => "POST",
+               header             => $header_on,
+               data               => $datauser_hlevel,
+           }); 
            
-           if ($level >= 0 && $level <=10 && $level ne "" ){
-             $level = $level;
-           }else{
-             # Letzer Wert oder Standardlevel
-             $level    = ReadingsVal( $name, "selectedIrLevel", "" );
-             if ($level eq ""){
-               $level = 5;
-             }
-           }
-           $datauser_cv = '{"changedData":{"saunaId":"'.$saunaid.'","saunaSelected":false,"sanariumSelected":false,"irSelected":true,"selectedSaunaTemperature":'.$selectedSaunaTemperature.',"selectedSanariumTemperature":'.$selectedSanariumTemperature.',"selectedIrTemperature":'.$temperature.',"selectedHumLevel":'.$selectedHumLevel.',"selectedIrLevel":'.$level.',"selectedHour":'.$std.',"selectedMinute":'.$min.',"isConnected":'.$isConnected.',"isPoweredOn":'.$isPoweredOn.',"isReadyForUse":'.$isReadyForUse.',"currentTemperature":'.$currentTemperature.',"currentHumidity":'.$currentHumidity.',"statusCode":'.$statusCode.',"statusMessage":'.$statusMessage.',"showBathingHour":'.$showBathingHour.',"bathingHours":'.$bathingHours.',"bathingMinutes":'.$bathingMinutes.',"currentHumidityStatus":'.$currentHumidityStatus.',"currentTemperatureStatus":'.$currentTemperatureStatus.'}}';
-           
-         }else{
-           $datauser_cv = '{"changedData":{"saunaId":"'.$saunaid.'","saunaSelected":true,"sanariumSelected":false,"irSelected":false,"selectedSaunaTemperature":90,"selectedSanariumTemperature":'.$selectedSanariumTemperature.',"selectedIrTemperature":'.$selectedIrTemperature.',"selectedHumLevel":'.$selectedHumLevel.',"selectedIrLevel":'.$selectedIrLevel.',"selectedHour":'.$std.',"selectedMinute":'.$min.',"isConnected":'.$isConnected.',"isPoweredOn":'.$isPoweredOn.',"isReadyForUse":'.$isReadyForUse.',"currentTemperature":'.$currentTemperature.',"currentHumidity":'.$currentHumidity.',"statusCode":'.$statusCode.',"statusMessage":'.$statusMessage.',"showBathingHour":'.$showBathingHour.',"bathingHours":'.$bathingHours.',"bathingMinutes":'.$bathingMinutes.',"currentHumidityStatus":'.$currentHumidityStatus.',"currentTemperatureStatus":'.$currentTemperatureStatus.'}}';
          }
- 
-         Log3 ($name, 4, "$name - JSON ON: $datauser_cv");
-                                                  # 1) Werte aendern
-                                                  #print "Mode: ". $mode . " Temperature: ". $temperature . " Level: " .$level ."\n$datauser_cv\n\n";
-                                                  my $header_cv = "Content-Type: application/json\r\n".
-                                                                  "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.71 Safari/537.36\r\n".
-                                                                  "Cookie: $aspxauth";
-                                                  HttpUtils_BlockingGet({
-                                                      url       => "https://sauna-app.klafs.com//Control/PostConfigChange",
-                                                      timeout   => 5,
-                                                      hash      => $hash,
-                                                      method    => "POST",
-                                                      header    => $header_cv,  
-                                                      data         => $datauser_cv,
-                                                  });
-         
-         
-         my $state_onoff = ReadingsVal( $name, "isPoweredOn", "false" );
-         
+
+         my $state_onoff = ReadingsVal( $name, "power", "off" );
          # Einschalten, wenn Sauna aus ist.
-         if($state_onoff eq "false"){
-         my $header_af = "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.71 Safari/537.36\r\n".
-                         "Cookie: $aspxauth";
-         my $datauser_af = "s=$saunaid";
-         # 2 Steps: 2) Antiforgery erzeugen; 3) Einschalten
-         HttpUtils_NonblockingGet({
-                             url                => "https://sauna-app.klafs.com/Control/EnterPin",
-                             timeout            => 5,
-                             hash               => $hash,
-                             method             => "POST",
-                             header             => $header_af,  
-                             data                 => $datauser_af,
-                             callback=>sub($$$){
-                                                  my ($param, $err, $data) = @_;
-                                                  my $hash = $param->{hash};
-                                                  my $name = $hash->{NAME};
-                                                  my $header = $param->{httpheader};
-                                                  Log3 ($name, 5, "header: $header");
-                                                  Log3 ($name, 5, "Data: $data");
-                                                  Log3 ($name, 5, "Error: $err");
-                                                  readingsBeginUpdate ($hash);
-                                                  for my $cookie ($header =~ m/set-cookie: ?(.*)/gi) {
-                                                      $cookie =~ /([^,; ]+)=([^,;\s\v]+)[;,\s\v]*([^\v]*)/;
-                                                      my $antiforgery  = $1 . "=" .$2 .";";
-                                                      my $antiforgery_date = strftime("%Y-%m-%d %H:%M:%S", localtime(time()));
-                                                      readingsBulkUpdate( $hash, "antiforgery_date", "$antiforgery_date", 1 );
-                                                      Log3 ($name, 5, "$name: Antiforgery found: $antiforgery");
-                                                      $hash->{Klafs}->{antiforgery}    = $antiforgery;
-                                                  }
-                                                  readingsEndUpdate($hash, 1);
-
-                                                  # 2) Einschalten
-                                                  my $headeron = "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.71 Safari/537.36\r\n".
-                                                                 "Cookie: $aspxauth";
-                                                  my $antiforgery = $hash->{Klafs}->{antiforgery};
-                                                  my $datauseron = "$antiforgery&Pin=$pin&saunaId=$saunaid";
-                                                  HttpUtils_NonblockingGet({
-                                                       url        => "https://sauna-app.klafs.com/Control/EnterPin",
-                                                       timeout  => 5,
-                                                       hash     => $hash,
-                                                       method   => "POST",
-                                                       header   => $headeron,
-                                                       data        => $datauseron,
-                                                       callback        => sub($$$){
-                                                                             my ($param, $err, $data) = @_;
-                                                                             my $hash = $param->{hash};
-                                                                             my $name = $hash->{NAME};
-                                                                             Log3 ($name, 5, "header: $header");
-                                                                             Log3 ($name, 5, "Data: $data");
-                                                                             Log3 ($name, 5, "Error: $err");
-                                                                             if($data=~/<div class="validation-summary-errors" data-valmsg-summary="true"><ul><li>/) {
-                                                                               readingsBeginUpdate ($hash);
-                                                                               for my $err ($data =~ m /<div class="validation-summary-errors" data-valmsg-summary="true"><ul><li> ?(.*)<\/li>/) {
-                                                                                 my %umlaute = ("&#228;" => "ae", "&#252;" => "ue", "&#196;" => "Ae", "&#214;" => "Oe", "&#246;" => "oe", "&#220;" => "Ue", "&#223;" => "ss");
-                                                                                 my $umlautkeys = join ("|", keys(%umlaute));
-                                                                                 $err=~ s/($umlautkeys)/$umlaute{$1}/g;
-                                                                                 Log3 ($name, 1, "Klafs $name: $err");
-                                                                                 readingsBulkUpdate( $hash, "last_errormsg", "$err", 1 );
-                                                                               }
-                                                                               readingsEndUpdate($hash, 1);
-                                                                              }else{
-                                                                               $power    = "on";
-                                                                               Log3 ($name, 3, "Sauna on");
-                                                                               readingsBeginUpdate ($hash);
-                                                                               readingsBulkUpdate( $hash, "power", $power, 1 );
-                                                                               readingsBulkUpdate( $hash, "last_errormsg", "0", 1 );
-                                                                               readingsEndUpdate($hash, 1);
-                                                                               klafs_getStatus($hash);
-                                                                             }                                                   
-                                                                           }
-                                                                          }); 
-                                               }
-                                 });
-         }
-       }
+         Log3 ($name, 5, "$name - SaunaState : $state_onoff");
+         if($state_onoff eq "off"){
+           # Einschalten
+           if($timesel eq 1){
+             $timeselect = 'true';
+           }else{
+             $timeselect = 'false';
+           }
+           my $datauser_start = '{"id":"'.$saunaid.'","pin":"'.$pin.'","time_selected":'.$timeselect.',"sel_hour":'.$std.',"sel_min":'.$min.'}';
+           Log3 ($name, 5, "$name - Start JSON : $datauser_start");
+           HttpUtils_NonblockingGet({
+               url                => "https://sauna-app-19.klafs.com/SaunaApp/StartCabin",
+               timeout            => 5,
+               hash               => $hash,
+               method             => "POST",
+               header             => $header_on,
+               data               => $datauser_start,
+               callback           => sub($$$){
+                                        my ($param, $err, $data) = @_;
+                                        my $hash = $param->{hash};
+                                        my $name = $hash->{NAME};
+                                        my $header = $param->{httpheader};
+                                        Log3 ($name, 4, "header: $header");
+                                        Log3 ($name, 4, "Data: $data");
+                                        Log3 ($name, 4, "Error: $err");
+                                          if($data=~/"Success":false/) {
+                                            readingsBeginUpdate ($hash);
+                                            for my $err ($data =~ m /ErrorMessage":"?(.*)"/) {
+                                              my %umlaute = ("&#228;" => "ae", "&#252;" => "ue", "&#196;" => "Ae", "&#214;" => "Oe", "&#246;" => "oe", "&#220;" => "Ue", "&#223;" => "ss");
+                                              my $umlautkeys = join ("|", keys(%umlaute));
+                                              $err=~ s/($umlautkeys)/$umlaute{$1}/g;
+                                              Log3 ($name, 1, "Klafs $name: $err");
+                                              readingsBulkUpdate( $hash, "last_errormsg", "$err", 1 );
+                                            }
+                                            readingsEndUpdate($hash, 1);
+                                          }else{
+                                            $power    = "on";
+                                            Log3 ($name, 3, "Sauna on");
+                                            readingsBeginUpdate ($hash);
+                                            readingsBulkUpdate( $hash, "power", $power, 1 );
+                                            readingsBulkUpdate( $hash, "last_errormsg", "0", 1 );
+                                            readingsEndUpdate($hash, 1);
+                                            klafs_getStatus($hash);
+                                          }                                                   
+	                             }
+           }); 
+         } ## Ende Wenn Sauna aus ist
+       } ## Ende PIN / SAUNAID vorhanden
     
     # sauna off
     }elsif ( $cmd eq "off" ) {
@@ -1077,54 +1068,26 @@ sub Set {
        klafs_getStatus($hash);
 
        my $aspxauth = $hash->{Klafs}->{cookie};
-       
        my $saunaid     = $hash->{Klafs}->{saunaid};
-       my $saunaSelected = ReadingsVal( $name, "saunaSelected", "true" );
-       my $sanariumSelected = ReadingsVal( $name, "sanariumSelected", "false" );
-       my $irSelected = ReadingsVal( $name, "irSelected", "false" );
-       
-       my $selectedSaunaTemperature = ReadingsVal( $name, "selectedSaunaTemperature", "90" );
-       my $selectedSanariumTemperature = ReadingsVal( $name, "selectedSanariumTemperature", "65" );
-       my $selectedIrTemperature = ReadingsVal( $name, "selectedIrTemperature", "0" );
-       my $selectedHumLevel = ReadingsVal( $name, "selectedHumLevel", "5" );
-       my $selectedIrLevel = ReadingsVal( $name, "selectedIrLevel", "0" );
-       my $selectedHour = ReadingsVal( $name, "selectedHour", "0" );
-       my $selectedMinute = ReadingsVal( $name, "selectedMinute", "0" );
-       
-       my $isConnected = ReadingsVal( $name, "isConnected", "true" );
-       my $isPoweredOn = ReadingsVal( $name, "isPoweredOn", "false" );
-       my $isReadyForUse = ReadingsVal( $name, "isReadyForUse", "false" );
-       my $currentTemperature = ReadingsVal( $name, "currentTemperature", "141" );
-       if($currentTemperature eq "0"){
-         $currentTemperature = "141";
-       }
-       my $currentHumidity = ReadingsVal( $name, "currentHumidity", "0" );
-       my $statusCode = ReadingsVal( $name, "statusCode", "0" );
-       my $statusMessage = ReadingsVal( $name, "statusMessage", "" );
-       if($statusMessage eq ""){
-         $statusMessage = 'null';
-       }
-       my $showBathingHour = ReadingsVal( $name, "showBathingHour", "false" );
-       my $bathingHours = ReadingsVal( $name, "bathingHours", "0" );
-       my $bathingMinutes = ReadingsVal( $name, "bathingMinutes", "0" );
-       my $currentHumidityStatus = ReadingsVal( $name, "currentHumidityStatus", "0" );
-       my $currentTemperatureStatus = ReadingsVal( $name, "currentTemperatureStatus", "0" );
-       
+      
        if ($saunaid eq ""){
          my $msg = "Missing attribute: attr $name saunaid <saunaid>";
          Log3 ($name, 1, $msg);
          return $msg;
        }else{
 
-         my $header = "Content-Type: application/json\r\n".
-                      "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.71 Safari/537.36\r\n".
+         my $header = "Content-Type: application/json; charset=utf-8\r\n".
+                      "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n".
+                      "Accept: application/json, text/javascript, */*; q=0.01\r\n".
+                      "Accept-Encoding: gzip, deflate, br\r\n".
+                      "Accept-Language: de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7\r\n".
                       "Cookie: $aspxauth";
 
-         my $datauser_end = '{"changedData":{"saunaId":"'.$saunaid.'","saunaSelected":'.$saunaSelected.',"sanariumSelected":'.$sanariumSelected.',"irSelected":'.$irSelected.',"selectedSaunaTemperature":'.$selectedSaunaTemperature.',"selectedSanariumTemperature":'.$selectedSanariumTemperature.',"selectedIrTemperature":'.$selectedIrTemperature.',"selectedHumLevel":'.$selectedHumLevel.',"selectedIrLevel":'.$selectedIrLevel.',"selectedHour":'.$selectedHour.',"selectedMinute":'.$selectedMinute.',"isConnected":'.$isConnected.',"isPoweredOn":'.$isPoweredOn.',"isReadyForUse":'.$isReadyForUse.',"currentTemperature":'.$currentTemperature.',"currentHumidity":'.$currentHumidity.',"statusCode":'.$statusCode.',"statusMessage":'.$statusMessage.',"showBathingHour":'.$showBathingHour.',"bathingHours":'.$bathingHours.',"bathingMinutes":'.$bathingMinutes.',"currentHumidityStatus":'.$currentHumidityStatus.',"currentTemperatureStatus":'.$currentTemperatureStatus.'}}';
+         my $datauser_end = '{"id":"'.$saunaid.'"}';
          Log3 ($name, 4, "$name - JSON_OFF: $datauser_end");
 
          HttpUtils_BlockingGet({
-             url                => "https://sauna-app.klafs.com/Control/PostPowerOff",
+             url                => "https://sauna-app-19.klafs.com/SaunaApp/StopCabin",
              timeout            => 5,
              hash               => $hash,
              method             => "POST",
@@ -1132,14 +1095,6 @@ sub Set {
              data         => $datauser_end,
          });
          
-         HttpUtils_BlockingGet({
-             url       => "https://sauna-app.klafs.com//Control/PostConfigChange",
-             timeout   => 5,
-             hash      => $hash,
-             method    => "POST",
-             header    => $header,  
-             data         => $datauser_end,
-         });
          $power    = "off";
          readingsBeginUpdate ($hash);
          readingsBulkUpdate( $hash, "power", $power, 1 );
@@ -1297,16 +1252,15 @@ __END__
          </tr>
          <tr>
             <td><b>off</b></td>
-            <td>Turns off the sauna|sanarium|infrared - without parameters.</td>
+            <td>Turns off the sauna|sanarium - without parameters.</td>
          </tr>
          <tr>
             <td><b>on</b></td>
             <td>
-            <code>set &lt;name&gt; on</code> without parameters - default sauna 90 degrees<br>
+            <code>set &lt;name&gt; on</code> without parameters - start with last used values<br>
             <code>set &lt;name&gt; on Sauna 90</code> -  3 parameters possible: "Sauna" with temperature [10-100]; Optional time [19:30].<br>
             <code>set &lt;name&gt; on Saunarium 65 5</code> - 4 parameters possible: "Sanarium" with temperature [40-75]; Optional HumidtyLevel [0-10] and time [19:30].<br>
-            <code>set &lt;name&gt; on Infrared 30 5</code> - 4 parameters possible: "Infrared" with temperature [20-40] and IR Level [0-10]; Optional time [19:30].<br>
-            Infrared works, but is not supported because no test environment is available.
+            Infrared is not supported because no test environment is available.
             </td>
          </tr>
          <tr>
@@ -1347,7 +1301,7 @@ __END__
          </colgroup>
          <tr>
             <td><b>Mode</b></td>
-            <td> Sauna, Sanarium or Infrared</td>
+            <td> Sauna, Sanarium</td>
          </tr>
          <tr>
             <td><b>LoginFailures</b></td>
@@ -1563,16 +1517,15 @@ __END__
          </tr>
          <tr>
             <td><b>off</b></td>
-            <td>Schaltet die Sauna|Sanarium|Infrared aus - ohne Parameter.</td>
+            <td>Schaltet die Sauna|Sanarium aus - ohne Parameter.</td>
          </tr>
          <tr>
             <td><b>on</b></td>
             <td>
-            <code>set &lt;name&gt; on</code> ohne Parameter - Default Sauna 90 Grad<br>
+            <code>set &lt;name&gt; on</code> ohne Parameter - Starten mit zuletzt verwendeten Werten<br>
             <code>set &lt;name&gt; on Sauna 90</code> - 3 Parameter m&ouml;glich: "Sauna" mit Temperatur [10-100]; Optional Uhrzeit [19:30]<br>
             <code>set &lt;name&gt; on Saunarium 65 5</code> - 4 Parameter m&ouml;glich: "Sanarium" mit Temperatur [40-75]; Optional HumidtyLevel [0-10] und Uhrzeit [19:30]<br>
-            <code>set &lt;name&gt; on Infrared 30 5</code> - 4 Parameter m&ouml;glich: "Infrarot" mit Temperatur [20-40] und IR Level [0-10]; Optional Uhrzeit [19:30]<br>
-            Infrarot funktioniert, ist aber nicht supported, da keine Testumgebung verf&uuml;gbar.
+            Infrarot ist aber nicht supported, da keine Testumgebung verf&uuml;gbar.
             </td>
          </tr>
          <tr>
@@ -1613,7 +1566,7 @@ __END__
          </colgroup>
          <tr>
             <td><b>Mode</b></td>
-            <td> Sauna, Sanarium oder Infrared</td>
+            <td> Sauna oder Sauna</td>
          </tr>
          <tr>
             <td><b>LoginFailures</b></td>
