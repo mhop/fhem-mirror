@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  00_KNXIO: fix problem IO-write queing (high load), Forum #127792 
  - feature: Update to new version, see Forum #127701
  - feature: 20_X10: added SetExtensions, see Forum #136278
  - bugfix: 98_CDCOpenData: Fehlerbehandlung SFTP
