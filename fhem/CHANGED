@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  36_Shelly: store newkeys in helper after init
+ - feature: 36_Shelly: Add Gen3 Mini devices (fw gen2 compatibility)
+                       Roller devices: use 'set ... pos' equivalent to 'pct'
+                       dimmer-devices: set ... dim-for-timer 
  - feature: 76_SolarForecast: attr ctrlBatSocManagement for battery management,
                               currentBatteryDev: new optional key 'cap' and 
                               some more improvents/fixes
