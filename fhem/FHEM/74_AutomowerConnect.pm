@@ -498,8 +498,8 @@ __END__
   <u><b>Anforderungen</b></u>
   <br><br>
   <ul>
-    <li>Für den Zugriff auf die API muss eine Application angelegt werden, im <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>angelegt und mit der Automower Connect API verbunden werden.</li>
-    <li>Währenddessen wird ein Application Key (client_id) und ein Application Secret (client secret) bereitgestellt. Diese sind für dieses Modul zu nutzen.</li>
+    <li>Für den Zugriff auf die API muss eine Application im <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a> angelegt und mit der Automower Connect API verbunden werden.</li>
+    <li>Währenddessen wird ein Application Key (client_id) und ein Application Secret (client secret) bereitgestellt. Diese Angaben sind im Zusammenhang mit der Definition eines Gerätes erforderlich.</li>
     <li>Das Modul nutzt Client Credentials als Granttype zur Authorisierung.</li>
   <br>
   </ul>
@@ -511,7 +511,7 @@ __END__
     Beispiel:<br>
     <code>define myMower AutomowerConnect 123456789012345678901234567890123456</code> Erstes Gerät: die Defaultmähernummer ist 0.<br>
     Es muss ein <b>client_secret</b> gesetzt werden. Es ist das Application Secret vom <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.<br>
-    <code>set myMower &lt;client secret&gt;</code><br>
+    <code>set myMower client_secret &lt;client secret&gt;</code><br>
     <br>
   </ul>
   <br>
@@ -537,7 +537,7 @@ __END__
 
     <li><a id='AutomowerConnect-set-ResumeSchedule'>ResumeSchedule</a><br>
       <code>set &lt;name&gt; ResumeSchedule</code><br>
-      Startet im geplanten Interval den Mäher sofort, sonst zum nächsten geplanten Zeitpunkt</li>
+      Startet im geplanten Intervall den Mäher sofort, sonst zum nächsten geplanten Zeitpunkt</li>
 
     <li><a id='AutomowerConnect-set-Start'>Start</a><br>
       <code>set &lt;name&gt; Start &lt;number of minutes&gt;</code><br>
@@ -582,7 +582,7 @@ __END__
 
      <li><a id='AutomowerConnect-set-mowerScheduleToAttribute'>mowerScheduleToAttribute</a><br>
       <code>set &lt;name&gt; mowerScheduleToAttribute</code><br>
-      Schreibt den Mähplan  ins Attribut <code>moverSchedule</code>.</li>
+      Schreibt den Mähplan ins Attribut <code>mowerSchedule</code>.</li>
 
      <li><a id='AutomowerConnect-set-sendScheduleFromAttributeToMower'>sendScheduleFromAttributeToMower</a><br>
       <code>set &lt;name&gt; sendScheduleFromAttributeToMower</code><br>
@@ -616,7 +616,7 @@ __END__
 
     <li><a id='AutomowerConnect-get-MowerData'>MowerData</a><br>
       <code>get &lt;name&gt; MowerData</code><br>
-      Listet alle Daten des Mähers einschließlich Hashpfad auf ausgenommen das Positonsarray. Der Hashpfad kann zur Erzeugung von userReadings genutzt werden, getriggert wird durch e.g. <i>device_state: connected</i> oder <i>mower_wsEvent: &lt;status-event|positions-event|settings-event&gt;</i>.<br>
+      Listet alle Daten des Mähers einschließlich Hashpfad auf, ausgenommen das Positonsarray. Der Hashpfad kann zur Erzeugung von userReadings genutzt werden, getriggert wird durch e.g. <i>device_state: connected</i> oder <i>mower_wsEvent: &lt;status-event|positions-event|settings-event&gt;</i>.<br>
       Beispiel: erzeugen des Reading <code>serialnumber</code> mit dem Hashpfad <code>$hash->{helper}{mower}{attributes}{system}{serialNumber}</code><br><br>
       <code>attr &lt;name&gt; userReadings serialnumber:connected {$defs{$name}->{helper}{mower}{attributes}{system}{serialNumber}}</code></li>
 
@@ -668,13 +668,13 @@ __END__
 
     <li><a id='AutomowerConnect-attr-mapImageCoordinatesToRegister'>mapImageCoordinatesToRegister</a><br>
       <code>attr &lt;name&gt; mapImageCoordinatesToRegister &lt;upper left longitude&gt;&lt;space&gt;&lt;upper left latitude&gt;&lt;line feed&gt;&lt;lower right longitude&gt;&lt;space&gt;&lt;lower right latitude&gt;</code><br>
-      Obere linke und untere rechte Ecke der Fläche auf der Erde, die durch das Bild dargestellt wird um das Bild auf der Fläche zu registrieren (oder einzupassen).<br>
+      Obere linke und untere rechte Ecke der Fläche auf der Erde, die durch das Bild dargestellt wird, um das Bild auf der Fläche zu registrieren (oder einzupassen).<br>
       Format: Zeilenweise Paare von Longitude- u. Latitudewerten getrennt durch 1 Leerzeichen. Die Zeilen werden aufgeteilt durch (<code>/\s|\R$/</code>).<br>
       Angabe der WGS84 (GPS) Koordinaten muss als Dezimalgrad erfolgen.</li>
 
     <li><a id='AutomowerConnect-attr-mapImageCoordinatesUTM'>mapImageCoordinatesUTM</a><br>
       <code>attr &lt;name&gt; mapImageCoordinatesUTM &lt;upper left longitude&gt;&lt;space&gt;&lt;upper left latitude&gt;&lt;line feed&gt;&lt;lower right longitude&gt;&lt;space&gt;&lt;lower right latitude&gt;</code><br>
-      Obere linke und untere rechte Ecke der Fläche auf der Erde, die durch das Bild dargestellt wird um das Bild auf der Fläche zu registrieren (oder einzupassen).<br>
+      Obere linke und untere rechte Ecke der Fläche auf der Erde, die durch das Bild dargestellt wird, um das Bild auf der Fläche zu registrieren (oder einzupassen).<br>
       Format: Zeilenweise Paare von Longitude- u. Latitudewerten getrennt durch 1 Leerzeichen. Die Zeilen werden aufgeteilt durch (<code>/\s|\R$/</code>).<br>
       Die Angabe der UTM Koordinaten muss als Dezimalzahl in Meter erfolgen.<br>
       Das Attribut muss nach dem Attribut mapImageCoordinatesToRegister gesetzt werden.<br>
