@@ -1,6 +1,6 @@
-REV 28308
+REV 28310
 DIR unused
-UPD 2023-12-23_07:45:03 414711 ./CHANGED
+UPD 2023-12-25_07:45:03 414839 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2023-12-17_07:45:03 47040 ./MAINTAINER.txt
 UPD 2023-08-24_07:45:03 46886 ./configDB.pm
@@ -400,7 +400,7 @@ UPD 2019-12-20_07:45:03 89496 FHEM/73_PRESENCE.pm
 UPD 2022-11-14_07:45:07 130714 FHEM/73_WaterCalculator.pm
 UPD 2022-12-14_07:45:02 2562316 FHEM/73_km200.pm
 UPD 2023-04-11_07:45:03 69312 FHEM/74_AMADDevice.pm
-UPD 2023-10-14_07:45:03 55639 FHEM/74_AutomowerConnect.pm
+UPD 2023-12-25_07:45:03 55683 FHEM/74_AutomowerConnect.pm
 UPD 2023-11-29_07:45:02 126448 FHEM/74_GardenaSmartDevice.pm
 UPD 2018-03-22_07:45:04 41340 FHEM/74_HOMBOT.pm
 UPD 2019-04-17_07:45:02 34049 FHEM/74_HusqvarnaAutomower.pm
@@ -757,11 +757,11 @@ UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
 UPD 2023-12-23_07:45:09 5125955 docs/commandref.html
-UPD 2023-12-23_07:45:13 3152165 docs/commandref_DE.html
+UPD 2023-12-25_07:45:12 3152209 docs/commandref_DE.html
 UPD 2023-08-25_07:45:03 86242 docs/commandref_frame.html
 UPD 2023-08-25_07:45:03 96940 docs/commandref_frame_DE.html
-UPD 2023-12-24_07:45:13 314016 docs/commandref_modular.html
-UPD 2023-12-24_07:45:15 325862 docs/commandref_modular_DE.html
+UPD 2023-12-25_07:45:13 314016 docs/commandref_modular.html
+UPD 2023-12-25_07:45:14 325862 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -791,7 +791,7 @@ UPD 2021-05-26_07:45:02 6647 lib/FHEM/Core/Timer/Register.pm
 UPD 2021-04-26_07:45:03 8936 lib/FHEM/Core/Utils/FHEMbackup.pm
 UPD 2023-01-18_07:45:03 1432 lib/FHEM/Core/Utils/Math.pm
 UPD 2023-02-06_07:45:02 34302 lib/FHEM/Core/Weather.pm
-UPD 2023-10-14_07:45:03 115731 lib/FHEM/Devices/AMConnect/Common.pm
+UPD 2023-12-25_07:45:03 116254 lib/FHEM/Devices/AMConnect/Common.pm
 UPD 2023-11-18_07:45:02 56183 lib/FHEM/Devices/LGTV/LGTVWebOS.pm
 UPD 2022-09-27_07:45:03 42814 lib/FHEM/Devices/Nuki/Bridge.pm
 UPD 2021-12-18_07:45:03 16385 lib/FHEM/Devices/Nuki/Device.pm
