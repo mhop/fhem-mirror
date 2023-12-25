@@ -67,11 +67,13 @@
 #            replace GP_export function
 #            PBP cleanup -1
 #            change regex's (unnecessary i)
-# xx/12/2023 modify KNXIO_Ready fn
-#            fix problem in _write2
+# 22/12/2023 modify KNXIO_Ready fn
+#            fix high load problem in _write2
 #            add recovery on open Timeout - mode H
 #            modify dipatch2/ processFIFO
 #            new Attr KNXIOdebug - special debugging on Loglvl 1
+# xx/12/2023 optimize write queue handling - high load
+#            new: write flooding detection
 
 
 package KNXIO; ## no critic 'package'
@@ -604,7 +606,7 @@ sub KNXIO_Write {
 		}
 
 		## rate limit
-		push(@{$hash->{KNXIOhelper}->{FIFOW}},qq{$mode $completemsg});
+		push(@{$hash->{KNXIOhelper}->{FIFOW}}, $completemsg);
 		return KNXIO_Write2($hash);
 	}
 	KNXIO_Log ($name, 2, qq{Could not send message $msg});
@@ -615,43 +617,65 @@ sub KNXIO_Write {
 sub KNXIO_Write2 {
 	my $hash = shift;
 
-	my $name = $hash->{NAME};
-	my $timenow = gettimeofday();
-	my $nextwrite = $hash->{KNXIOhelper}->{nextWrite} // $timenow;
 	my $count = scalar(@{$hash->{KNXIOhelper}->{FIFOW}});
 	RemoveInternalTimer($hash, \&KNXIO_Write2);
 	return if($count == 0);
 
+	my $name = $hash->{NAME};
+	my $timenow = gettimeofday();
+	my $nextwrite = $hash->{KNXIOhelper}->{nextWrite} // $timenow;
+	my $adddelay = 0.07;
+
 	if ($nextwrite > $timenow) {
-		my $adddelay = $count * 0.07;
 		KNXIO_Log ($name, 4, qq{frequent IO-write - Nr.msg= $count});
 		KNXIO_Log ($name, 1, qq{DEBUG1>>frequent IO-write - Nr.msg= $count}) if (AttrVal($name,'KNXIOdebug',0) == 1);
 		InternalTimer($nextwrite + $adddelay, \&KNXIO_Write2,$hash);
+		InternalTimer($timenow + 30.0, \&KNXIO_Flooding,$hash) if ($count == 1);
 		return;
 	}
-	$hash->{KNXIOhelper}->{nextWrite} = $timenow + 0.07; # add delay
-	my ($mode,$completemsg) = split(/\s/xms,shift(@{$hash->{KNXIOhelper}->{FIFOW}}),2);
+
+	$hash->{KNXIOhelper}->{nextWrite} = $timenow + $adddelay;
+	my $msg = shift(@{$hash->{KNXIOhelper}->{FIFOW}});
 
 	my $ret = 0;
+	my $mode = $hash->{model};
 	if ($mode eq 'M') {
-		$ret = ::TcpServer_MCastSend($hash,$completemsg);
+		$ret = ::TcpServer_MCastSend($hash,$msg);
 	}
 	else {
-		$ret = ::DevIo_SimpleWrite($hash,$completemsg,0);
+		$ret = ::DevIo_SimpleWrite($hash,$msg,0);
 		if ($mode eq 'H') {
 			# Timeout function - expect TunnelAck within 1 sec! - but if fhem has a delay....
-			$hash->{KNXIOhelper}->{LASTSENTMSG} = unpack('H*',$completemsg); # save msg for resend in case of TO
+			$hash->{KNXIOhelper}->{LASTSENTMSG} = unpack('H*',$msg); # save msg for resend in case of TO
 			InternalTimer($timenow + 1.5, \&KNXIO_TunnelRequestTO, $hash);
 		}
 	}
 
 	$count--;
-	InternalTimer($timenow + 0.07, \&KNXIO_Write2,$hash) if ($count > 0);
-	KNXIO_Log ($name, 5, qq{Mode= $mode buf=} . unpack('H*',$completemsg) . qq{ rc= $ret});
+	if ($count > 0) {
+		InternalTimer($timenow + $adddelay, \&KNXIO_Write2,$hash);
+	}
+	else {
+		RemoveInternalTimer($hash, \&KNXIO_Flooding);
+	}
+	KNXIO_Log ($name, 5, qq{Mode= $mode buf=} . unpack('H*',$msg) . qq{ rc= $ret});
 	KNXIO_Log ($name, 1, qq{DEBUG1>>IO-write processed- Nr.msg remain= $count}) if (AttrVal($name,'KNXIOdebug',0) == 1);
 	return;
 }
 
+
+## called by _write2 via timer when number of write cmds exceed limits 
+sub KNXIO_Flooding {
+	my $hash = shift;
+
+	my $name = $hash->{NAME};
+	my $count = scalar(@{$hash->{KNXIOhelper}->{FIFOW}});
+	KNXIO_Log ($name, 1, q{number of write cmds exceed limits of KNX-Bus});
+# consequence ?
+#	KNXIO_Log ($name, 1, q{number of write cmds exceed limits of KNX-Bus: } . qq{$count messages deleted});
+#	$hash->{KNXIOhelper}->{FIFOW} = []; # ?
+	return;
+}
 #####################################
 ## a FHEM-rename changes the internal IODev of KNX-dev's,
 ## but NOT the reading IODev & attr IODev
@@ -969,17 +993,13 @@ sub KNXIO_dispatch2 {
 	my $hash = shift;
 	my $buf  = shift;
 
-#	my $buf = $hash->{KNXIOhelper}->{FIFOMSG};
 	my $name = $hash->{NAME};
-#	$hash->{KNXIOhelper}->{FIFOTIMER} = 0;
 
 	$hash->{'msg_count'}++;
 	$hash->{'msg_time'} = TimeNow();
 
 	Dispatch($hash, $buf);
 
-#	$hash->{KNXIOhelper}->{FIFOTIMER} = 0;
-#	RemoveInternalTimer($hash,\&KNXIO_dispatch2);
 	KNXIO_processFIFO($hash);
 	return;
 }
@@ -990,13 +1010,6 @@ sub KNXIO_processFIFO {
 	my $name = $hash->{NAME};
 
 	RemoveInternalTimer($hash,\&KNXIO_processFIFO);
-
-#	if ($hash->{KNXIOhelper}->{FIFOTIMER} != 0) { # dispatch still running, do a wait loop
-#		KNXIO_Log ($name, 5, q{dispatch not complete, waiting});
-#		InternalTimer(gettimeofday() + 0.1, \&KNXIO_processFIFO, $hash);
-#		$hash->{KNXIOhelper}->{FIFOTIMER} = 0;
-#		return;
-#	}
 
 	my @que = @{$hash->{KNXIOhelper}->{FIFO}};
 	my $queentries = scalar(@que);
@@ -1009,17 +1022,12 @@ sub KNXIO_processFIFO {
 	}
 
 	if ($queentries > 0) { # process timer is not running & fifo not empty
-#		$hash->{KNXIOhelper}->{FIFOMSG} = shift (@que);
 		my $msg = shift (@que);
 		@{$hash->{KNXIOhelper}->{FIFO}} = @que;
-#		$hash->{KNXIOhelper}->{FIFOTIMER} = 1;
-#		KNXIO_Log ($name, 4, qq{buf=$hash->{KNXIOhelper}->{FIFOMSG} Nr_msgs=$queentries});
-#		InternalTimer(gettimeofday() + 0.05, \&KNXIO_dispatch2, $hash); # allow time for duplicate msgs to be read
 		KNXIO_Log ($name, 4, qq{dispatching buf=$msg Nr_msgs=$queentries});
 		KNXIO_dispatch2($hash, $msg);
 		if ($queentries > 1) {
 			InternalTimer(gettimeofday() + 0.05, \&KNXIO_processFIFO, $hash); # allow time for new/duplicate msgs to be read
-#			$hash->{KNXIOhelper}->{FIFOTIMER} = 1;
 		}
 		return;
 	}
