@@ -157,11 +157,14 @@
 #              dpt9, dpt14: deny use of comma as dec-separator...
 #              fix replacebyregex
 #              rework KNX_scan
-# MH 202311xx  replace GP_export function
+# MH 20231125  replace GP_export function
 #              PBP cleanup -1
 #              correct cmdref links for DbLog attr Fn's
 #              modified limit Log msg
 #              dpttypes optimisation (no variable case regex for numbers)
+# MH 202312xx  code optimisation KNX_scan, doKNX_scan
+#              adapt cmds ref set/get cmd's (new KNXIO feature - send queing)
+#              additional dpts 14.xxx - see cmdref
 #
 # todo         replace cascading if..elsif with given
 # todo-11/2023 final removal of attr answerReading conversion
@@ -424,21 +427,38 @@ my %dpttypes = (
 	'dpt14.011' => {CODE=>'dpt14', UNIT=>q{F},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # capacitance
 	'dpt14.012' => {CODE=>'dpt14', UNIT=>q{C/m²},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # charge density surface
 	'dpt14.013' => {CODE=>'dpt14', UNIT=>q{C/m³},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # charge density volume
-	'dpt14.014' => {CODE=>'dpt14', UNIT=>q{m²N-1},  PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # compressibility
+	'dpt14.014' => {CODE=>'dpt14', UNIT=>q{m²/N},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # compressibility
 	'dpt14.015' => {CODE=>'dpt14', UNIT=>q{S},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # conductance 1/Ohm
 	'dpt14.016' => {CODE=>'dpt14', UNIT=>q{S/m},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # electrical conductivity
 	'dpt14.017' => {CODE=>'dpt14', UNIT=>q{kg/m²},  PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # density
 	'dpt14.018' => {CODE=>'dpt14', UNIT=>q{C},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # electric charge
 	'dpt14.019' => {CODE=>'dpt14', UNIT=>q{A},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
 	'dpt14.027' => {CODE=>'dpt14', UNIT=>q{V},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
+	'dpt14.031' => {CODE=>'dpt14', UNIT=>q{J},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # energy
+	'dpt14.032' => {CODE=>'dpt14', UNIT=>q{N},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # force
 	'dpt14.033' => {CODE=>'dpt14', UNIT=>q{Hz},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
+	'dpt14.034' => {CODE=>'dpt14', UNIT=>q{rad/s},  PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
 	'dpt14.038' => {CODE=>'dpt14', UNIT=>qq{\xCE\xA9}, ## no critic (ValuesAndExpressions::ProhibitEscapedCharacters)
-	                                                PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # OHM
+	                                                PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # Impedance OHM
 	'dpt14.039' => {CODE=>'dpt14', UNIT=>q{m},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
 	'dpt14.056' => {CODE=>'dpt14', UNIT=>q{W},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.057' => {CODE=>'dpt14', UNIT=>q{cosφ},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
+	'dpt14.057' => {CODE=>'dpt14', UNIT=>q{cosφ},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # power factor
+	'dpt14.058' => {CODE=>'dpt14', UNIT=>q{Pa},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
+	'dpt14.059' => {CODE=>'dpt14', UNIT=>qq{\xCE\xA9}, ## no critic (ValuesAndExpressions::ProhibitEscapedCharacters)
+	                                                PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # Reactance OHM
+	'dpt14.060' => {CODE=>'dpt14', UNIT=>qq{\xCE\xA9}, ## no critic (ValuesAndExpressions::ProhibitEscapedCharacters)
+	                                                PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # Resistance OHM
+	'dpt14.065' => {CODE=>'dpt14', UNIT=>q{m/s},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
 	'dpt14.068' => {CODE=>'dpt14', UNIT=>q{°C},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
+	'dpt14.069' => {CODE=>'dpt14', UNIT=>q{K},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
+	'dpt14.070' => {CODE=>'dpt14', UNIT=>q{K},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
+	'dpt14.074' => {CODE=>'dpt14', UNIT=>q{s},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
+	'dpt14.075' => {CODE=>'dpt14', UNIT=>q{Nm},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
 	'dpt14.076' => {CODE=>'dpt14', UNIT=>q{m³},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
+	'dpt14.077' => {CODE=>'dpt14', UNIT=>q{m³/s},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # volume flow
+	'dpt14.078' => {CODE=>'dpt14', UNIT=>q{N},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # weight
+	'dpt14.079' => {CODE=>'dpt14', UNIT=>q{J},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # work
+	'dpt14.080' => {CODE=>'dpt14', UNIT=>q{VA},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # apparent power
 
 	# Access data - receive only
 	'dpt15'     => {CODE=>'dpt15', UNIT=>q{}, PATTERN=>qr/noset/ixms, MIN=>undef, MAX=>undef, SETLIST=>'noset',
@@ -578,6 +598,7 @@ sub KNX_Define2 {
 	# Add pulldown for attr IODev
 	my $attrList = $modules{KNX}->{AttrList}; #get Attrlist from Module def
 	my $IODevs = KNX_chkIODev($hash); # get list of valid IO's
+#	$attrList =~ s/\bIODev(?:[:])?(\S+)?/IODev:select,$IODevs/xms;
 	$attrList =~ s/\bIODev\b([:]\S+)?/IODev:select,$IODevs/xms;
 	$modules{KNX}->{AttrList} = $attrList;
 
@@ -2074,7 +2095,7 @@ sub main::KNX_scan {
 			my $option = $devhash->{GADDETAILS}->{$key}->{OPTION};
 			next if (defined($option) && $option =~ /(?:set|listenonly)/ixms);
 			$k++;
-			push (@{$iohash->{Helper}->{knxscan}}, $knxdef, $key);
+			push (@{$iohash->{Helper}->{knxscan}}, qq{$knxdef $key});
 		}
 		$j++ if ($k > $k0);
 	}
@@ -2101,12 +2122,11 @@ sub KNX_chkIO {
 sub doKNX_scan {
 	my $iohash = shift // return;
 
-	my $count = scalar(@{$iohash->{Helper}->{knxscan}}); # / 2
+	my $count = scalar(@{$iohash->{Helper}->{knxscan}});
 	if ($count > 0 ) {
-		my $devName = shift(@{$iohash->{Helper}->{knxscan}});
-		my $gadName = shift(@{$iohash->{Helper}->{knxscan}});
+		my ($devName,$gadName) = split(/\s/xms, shift(@{$iohash->{Helper}->{knxscan}}),2);
 		KNX_Get ($defs{$devName}, $devName, $gadName);
-		my $delay = ($count % 20 == 0)?2:0.3; # extra delay on each 10th request
+		my $delay = ($count % 10 == 0)?1:0.35; # extra delay on each 10th request
 		return InternalTimer(gettimeofday() + $delay,\&doKNX_scan,$iohash);
 	}
 	delete $iohash->{Helper}->{knxscan};
@@ -2254,6 +2274,8 @@ Examples&colon;
  All DPTs&colon; allowed values or range of values are specified here&colon; <a href="#KNX-dpt">KNX-dpt</a><br/> 
  After successful sending, the value is stored in readings &lt;setName&gt; and state.<br>
  Do not use wildcards for &lt;deviceName&gt;, the KNX-GW/Bus might be not perfomant enough to handle that. 
+ The last sentence is not true for definitions that use module KNXIO as IO-device. The KNXIO Module implements a queing
+ mechanism to prevent KNX-bus overload.   
 </p>
 <pre>
 Examples&colon;
@@ -2280,8 +2302,9 @@ Examples&colon;
  this might not be supported by the target KNX-device.<br/> 
  If the GAD is restricted in the definition with "set" or "listenonly", the execution will be refused.<br/> 
  The answer from the bus-device updates the readings &lt;getName&gt; and state.<br>
- Do not use wildcards for &lt;deviceName&gt;, the KNX-GW/Bus might be not perfomant enough to handle that,
- use <a href="#KNX-utilities">KNX_scan</a> cmd instead.
+ Do not use wildcards for &lt;deviceName&gt;, the KNX-GW/Bus might be not perfomant enough to handle that.
+ The last sentence is not true for definitions that use module KNXIO as IO-device. The KNXIO Module implements a queing
+ mechanism to prevent KNX-bus overload, but you can also use <a href="#KNX-utilities">KNX_scan</a> cmd instead.
 </p>
 </li>
 
@@ -2528,20 +2551,35 @@ Examples&colon;
 <li><b>dpt14.011</b>  -1.4e-45..+1.7e+38 F</li>
 <li><b>dpt14.012</b>  -1.4e-45..+1.7e+38 C/m&sup2;</li>
 <li><b>dpt14.013</b>  -1.4e-45..+1.7e+38 C/m&sup3;</li>
-<li><b>dpt14.014</b>  -1.4e-45..+1.7e+38 m&sup2;N-1</li>
+<li><b>dpt14.014</b>  -1.4e-45..+1.7e+38 m&sup2;/N</li>
 <li><b>dpt14.015</b>  -1.4e-45..+1.7e+38 S</li>
 <li><b>dpt14.016</b>  -1.4e-45..+1.7e+38 S/m</li>
 <li><b>dpt14.017</b>  -1.4e-45..+1.7e+38 kg/m&sup3;</li>
 <li><b>dpt14.018</b>  -1.4e-45..+1.7e+38 C</li>
 <li><b>dpt14.019</b>  -1.4e-45..+1.7e+38 A</li>
 <li><b>dpt14.027</b>  -1.4e-45..+1.7e+38 V</li>
+<li><b>dpt14.031</b>  -1.4e-45..+1.7e+38 J</li>
+<li><b>dpt14.032</b>  -1.4e-45..+1.7e+38 N</li>
 <li><b>dpt14.033</b>  -1.4e-45..+1.7e+38 Hz</li>
+<li><b>dpt14.034</b>  -1.4e-45..+1.7e+38 rad/s</li>
 <li><b>dpt14.038</b>  -1.4e-45..+1.7e+38 &Omega;</li>
 <li><b>dpt14.039</b>  -1.4e-45..+1.7e+38 m</li>
 <li><b>dpt14.056</b>  -1.4e-45..+1.7e+38 W</li>
 <li><b>dpt14.057</b>  -1.4e-45..+1.7e+38 cos&phi;</li>
+<li><b>dpt14.058</b>  -1.4e-45..+1.7e+38 Pa</li>
+<li><b>dpt14.059</b>  -1.4e-45..+1.7e+38 &Omega;</li>
+<li><b>dpt14.060</b>  -1.4e-45..+1.7e+38 &Omega;</li>
+<li><b>dpt14.065</b>  -1.4e-45..+1.7e+38 m/s</li>
 <li><b>dpt14.068</b>  -1.4e-45..+1.7e+38 &deg;C</li>
+<li><b>dpt14.069</b>  -1.4e-45..+1.7e+38 K</li>
+<li><b>dpt14.070</b>  -1.4e-45..+1.7e+38 K</li>
+<li><b>dpt14.074</b>  -1.4e-45..+1.7e+38 s</li>
+<li><b>dpt14.075</b>  -1.4e-45..+1.7e+38 Nm</li>
 <li><b>dpt14.076</b>  -1.4e-45..+1.7e+38 m&sup3;</li>
+<li><b>dpt14.077</b>  -1.4e-45..+1.7e+38 m³/s</li>
+<li><b>dpt14.078</b>  -1.4e-45..+1.7e+38 N</li>
+<li><b>dpt14.079</b>  -1.4e-45..+1.7e+38 J</li>
+<li><b>dpt14.080</b>  -1.4e-45..+1.7e+38 VA</li>
 <li><b>dpt15.000</b>  Access-code (readonly)</li>
 <li><b>dpt16    </b>  14 char ASCII string</li>
 <li><b>dpt16.000</b>  14 char ASCII string</li>
