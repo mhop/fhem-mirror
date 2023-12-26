@@ -4990,7 +4990,7 @@ FW_log($$)
         server-key.pem
         </ul>
         Diese Befehle werden beim Setzen des Attributes automatisch
-        ausgef&uuml;rht, falls kein Zertifikat gefunden wurde. Deswegen, falls
+        ausgef&uuml;hrt, falls kein Zertifikat gefunden wurde. Deswegen, falls
         n&ouml;tig, sslCertPrefix vorher setzen.
       <br>
     </li>
