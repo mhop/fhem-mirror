@@ -419,7 +419,7 @@ my $acmd = shift // return 'error';
 #
 # syntax:
 # set SonosBridge listalarms
-# set Speaker alarm enable|disable|update all|id[,id]|json
+# set Speaker alarm enable|disable|update all|id[,id]|json [volume=xx]
 #
 #######
 sub sonos2mqtt_alarm 
@@ -457,8 +457,14 @@ if ($NAME eq $bridge) {
 my @arr = split(' ',$EVENT);
 my $cmd = lc shift @arr;
 if ($cmd eq 'alarm') {
+   my $annex = "";
+   $arr[-1] =~ /^[Vv]olume.([0-9]+)$/;
+   if (defined($1)) {
+      $annex .= ',"Volume":'.$1;
+      pop @arr;
+   }
    my $acmd = lc shift @arr;
-   my $ids = shift @arr //return 'all|id[,id]|json missing, usage alarm enable|disable|update all|id[,id]|json';
+   my $ids = shift @arr //return 'all|id[,id]|json missing, usage alarm enable|disable|update all|id[,id]|json [volume=xx]';
    my %t=('enable'=>'true','disable'=>'false');
    if ($acmd eq 'update') {
       fhem(qq(set $bridge setalarm $ids));
@@ -466,11 +472,11 @@ if ($cmd eq 'alarm') {
    } elsif ($acmd eq 'enable' or $acmd eq 'disable') {
        if ($ids eq "all") { $ids = ReadingsVal($NAME,"AlarmListIDs","")}
        for (split ',',$ids) {
-         fhem(qq(set $bridge setalarm {"ID":$_,"Enabled":$t{$acmd}}));
+         fhem(qq(set $bridge setalarm {"ID":$_,"Enabled":$t{$acmd}$annex}));
        }
      return '';
    }
- } else {return 'usage alarm enable|disable|update all|id[,id]|json'}
+} else {return 'usage alarm enable|disable|update all|id[,id]|json [volume=xx]'}
 }
 
 sub sonos2mqtt_reading
