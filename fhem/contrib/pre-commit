@@ -12,7 +12,7 @@ my $svnlook='/usr/bin/svnlook';
 my $repos=$ARGV[0];
 my $txn=$ARGV[1];
 my $arg="-t $txn";
-#my $arg="-r $txn";      # local testing
+#my $arg="-r $txn";      # local testing: perl pre-commit /var/svn/fhem 28315
 my @lang = ("EN", "DE");
 my $exitCode = 0;
 use constant TAGS => qw{ul li code b i u table tr td div h4 h3};
@@ -172,6 +172,17 @@ foreach my $row (split("\n", $fList)) {
         if($tagcount{$tag});
     }
   }
+
+  # Check if the file is in the MAINTAINER.txt, #136270
+  open(MAINT, "$svnlook $arg cat $repos /trunk/fhem/MAINTAINER.txt|") ||
+        die("Cant svnlook cat MAINTAINER.txt:$!\n");
+  my $fnd = 0;
+  while(my $l = <MAINT>) {
+    $fnd = 1 if($l =~ m,^FHEM/${modNum}_${modName}.pm,)
+  }
+  close(MAINT);
+  err $fName, "FHEM/${modNum}_${modName}.pm not found in MAINTAINER.txt"
+    if(!$fnd);
 }
 
 exit($exitCode);
