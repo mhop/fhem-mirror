@@ -1,5 +1,5 @@
 ##############################################################################################################################
-# $Id: 93_DbLog.pm 28036 2023-10-09 14:35:59Z DS_Starter $
+# $Id: 93_DbLog.pm 28085 2023-10-22 14:22:29Z DS_Starter $
 ##############################################################################################################################
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -56,6 +56,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.9.4"   => "27.12.2023 make EVENT writable ",
   "5.9.3"   => "09.10.2023 new attribute colType ",
   "5.9.2"   => "09.10.2023 edit commandref, Forum: https://forum.fhem.de/index.php?msg=1288840 ",
   "5.9.1"   => "15.08.2023 possible use of alternative tables in _DbLog_plotData Forum:134547, fix warnings in ".
@@ -1437,7 +1438,7 @@ sub DbLog_Log {
                           Log3 ($name, 2, "$name - error device \"$dev_name\" specific DbLogValueFn: ".$@);
                       }
 
-                      if($IGNORE) {                                                                                        # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
+                      if ($IGNORE) {                                                                                       # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
                           $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME}  = $lastt if($lastt);                     # patch Forum:#111423
                           $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE} = $lastv if(defined $lastv);
 
@@ -1464,6 +1465,7 @@ sub DbLog_Log {
                   }
 
                   if($value_fn ne '') {                                                                                 # zentrale valueFn im DbLog-Device abarbeiten
+                      my $NAME          = $name;
                       my $TIMESTAMP     = $timestamp;
                       my $LASTTIMESTAMP = $lastt // 0;                                                                  # patch Forum:#111423
                       my $DEVICE        = $dev_name;
@@ -1477,11 +1479,11 @@ sub DbLog_Log {
                       my $CN            = " ";
 
                       eval $value_fn;
-                      if($@) {
+                      if ($@) {
                           Log3 ($name, 2, "$name - error valueFn: ".$@);
                       }
 
-                      if($IGNORE) {                                                                                     # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
+                      if ($IGNORE) {                                                                                    # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
                           $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME}  = $lastt if($lastt);                  # patch Forum:#111423
                           $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE} = $lastv if(defined $lastv);
 
@@ -1507,6 +1509,7 @@ sub DbLog_Log {
                       $reading   = $READING    if($READING ne '');
                       $value     = $VALUE      if(defined $VALUE);
                       $unit      = $UNIT       if(defined $UNIT);
+                      $event     = $EVENT      if(defined $EVENT);
                   }
 
                   # Daten auf maximale Länge beschneiden
@@ -8074,7 +8077,8 @@ sub DbLog_AddLog {
           if($value_fn ne '') {                                                                  # Anwender spezifische Funktion anwenden
               my $lastt         = $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$name}{TIME};    # patch Forum:#111423
               my $lastv         = $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$name}{VALUE};
-
+              
+              my $NAME          = $name;
               my $TIMESTAMP     = $ts;
               my $LASTTIMESTAMP = $lastt // 0;                                                   # patch Forum:#111423
               my $DEVICE        = $dev_name;
@@ -8112,6 +8116,7 @@ sub DbLog_AddLog {
               $dev_reading  = $READING    if($READING ne '');
               $read_val     = $VALUE      if(defined $VALUE);
               $ut           = $UNIT       if(defined $UNIT);
+              $event        = $EVENT      if(defined $EVENT);
           }
 
           # Daten auf maximale Länge beschneiden
@@ -8187,6 +8192,7 @@ sub DbLog_addCacheLine {
           $lastv = $defs{$i_dev}{Helper}{DBLOG}{$i_reading}{$name}{VALUE};
       }
 
+      my $NAME          = $name;
       my $TIMESTAMP     = $i_timestamp;
       my $LASTTIMESTAMP = $lastt // 0;                       # patch Forum:#111423
       my $DEVICE        = $i_dev;
@@ -8226,6 +8232,7 @@ sub DbLog_addCacheLine {
       $i_reading = $READING    if($READING ne '');
       $i_val     = $VALUE      if(defined $VALUE);
       $i_unit    = $UNIT       if(defined $UNIT);
+      $i_evt     = $EVENT      if(defined $EVENT);
   }
 
   no warnings 'uninitialized';                                                      # Daten auf maximale Länge beschneiden
@@ -8478,6 +8485,7 @@ sub DbLog_checkSyntaxValueFn {
   }
 
   my %specials= (
+     "%NAME"          => $name,
      "%TIMESTAMP"     => $name,
      "%LASTTIMESTAMP" => $name,
      "%DEVICE"        => $name,
@@ -8687,13 +8695,13 @@ sub DbLog_setVersionInfo {
 
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 28036 2023-10-09 14:35:59Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 28085 2023-10-22 14:22:29Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/xsg;
       }
       else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 28036 2023-10-09 14:35:59Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 28085 2023-10-22 14:22:29Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -10533,9 +10541,9 @@ attr SMA_Energymeter DbLogValueFn
       This attribute is set in the <b>DbLog device</b> and allows to modify the values before logging
       or exclude the record from logging. <br><br>
 
-      It is possible to access the variables $TIMESTAMP, $DEVICE (source device), $DEVICETYPE, $READING, $VALUE (reading value) and
-      $UNIT (unit of reading value) can be accessed and modified before logging to the database. <br>
-      Read access exists to $EVENT, $LASTTIMESTAMP and $LASTVALUE. <br><br>
+      It is possible to access the variables $TIMESTAMP, $DEVICE (source device), $DEVICETYPE, $EVENT, $READING, 
+      $VALUE (reading value) and $UNIT (unit of reading value) can be accessed and modified before logging to the database. <br>
+      Read only access exists to $LASTTIMESTAMP, $LASTVALUE and $NAME (Name of the DbLog Device). <br><br>
 
       The variables $LASTTIMESTAMP and $LASTVALUE contain time and value of the last logged record of
       $DEVICE / $READING. <br>
@@ -12065,8 +12073,8 @@ attr SMA_Energymeter DbLogValueFn
        oder den Ausschluß des Datensatzes vom Logging. <br><br>
 
        Es kann auf die Variablen $TIMESTAMP, $READING, $VALUE (Wert des Readings) und $UNIT (Einheit des Readingswert)
-       zugegriffen werden und diese vor dem Loggen in die Datenbank verändern. <br>
-       Lesezugriff besteht auf $DEVICE (den Namen des Quellengeräts), $EVENT, $LASTTIMESTAMP und $LASTVALUE. <br><br>
+       zugegriffen und diese vor dem Loggen in die Datenbank verändert werden. <br>
+       Nur Lesezugriff besteht auf $DEVICE (den Namen des Quellengeräts), $EVENT, $LASTTIMESTAMP und $LASTVALUE. <br><br>
 
        Die Variablen $LASTTIMESTAMP und $LASTVALUE enthalten Zeit und Wert des zuletzt protokollierten Datensatzes von
        $DEVICE / $READING. <br>
@@ -12448,9 +12456,10 @@ attr SMA_Energymeter DbLogValueFn
        Dieses Attribut wird im <b>DbLog-Device</b> gesetzt und erlaubt die Veränderung der Werte vor dem Logging
        oder den Ausschluß des Datensatzes vom Logging. <br><br>
 
-       Es kann auf die Variablen $TIMESTAMP, $DEVICE (Quellendevice), $DEVICETYPE, $READING, $VALUE (Wert des Readings) und
-       $UNIT (Einheit des Readingswert) zugegriffen werden und diese vor dem Loggen in die Datenbank verändern. <br>
-       Lesezugriff besteht auf $EVENT, $LASTTIMESTAMP und $LASTVALUE. <br><br>
+       Es kann auf die Variablen $TIMESTAMP, $DEVICE (Quellendevice), $DEVICETYPE, $EVENT, $READING, $VALUE 
+       (Wert des Readings) und $UNIT (Einheit des Readingswert) zugegriffen und diese vor dem Loggen in die Datenbank 
+       verändert werden. <br>
+       Nur Lesezugriff besteht auf $LASTTIMESTAMP, $LASTVALUE und $NAME (Name des DbLog Devices). <br><br>
 
        Die Variablen $LASTTIMESTAMP und $LASTVALUE enthalten Zeit und Wert des zuletzt protokollierten Datensatzes von
        $DEVICE / $READING. <br>
