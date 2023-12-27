@@ -440,7 +440,7 @@ sub klafs_getStatusResponse {
 
      $entries->{statusMessage} //= '';
      $entries->{currentTemperature} = '0' if $entries->{currentTemperature} eq '141';
-     $entries->{RemainTime} = sprintf("%2.2d:%2.2d" , $entries->{bathingHours}, $entries->{bathingMinutes});
+     $entries->{RemainTime} = sprintf("%2.2d:%2.2d" , $entries->{remainingBathingHours}, $entries->{remainingBathingMinutes});
      my $modus = $entries->{saunaSelected} eq q{true}     ? 'Sauna' 
                 : $entries->{sanariumSelected} eq q{true} ? 'Sanarium'
                 : $entries->{irSelected} eq q{true}       ? 'Infrared'
@@ -1309,18 +1309,18 @@ __END__
          </tr>
          <tr>
             <td><b>Restzeit</b></td>
-            <td>Remaining bathing time. Value from bathingHours and bathingMinutes</td>
+            <td>Remaining bathing time. Value from remainingBathingHours and remainingBathingMinutes</td>
          </tr>
          <tr>
             <td><b>antiforgery_date</b>        </td>
             <td>Date of the antiforgery cookie. This is generated when the program is switched on.</td>
          </tr>
          <tr>
-            <td><b>bathingHours</b>        </td>
+            <td><b>remainingBathingHours</b>        </td>
             <td>Hour of remaining bath time</td>
          </tr>
          <tr>
-            <td><b>bathingMinutes</b></td>
+            <td><b>remainingBathingMinutes</b></td>
             <td>Minute of remaining bath time</td>
          </tr>
          <tr>
@@ -1574,18 +1574,18 @@ __END__
          </tr>
          <tr>
             <td><b>Restzeit</b></td>
-            <td>Restliche Badezeit. Wert aus bathingHours und bathingMinutes</td>
+            <td>Restliche Badezeit. Wert aus remainingBathingHours und remainingBathingMinutes</td>
          </tr>
          <tr>
             <td><b>antiforgery_date</b>        </td>
             <td>Datum des Antiforgery Cookies. Dieses wird beim Einschalten erzeugt.</td>
          </tr>
          <tr>
-            <td><b>bathingHours</b>        </td>
+            <td><b>remainingBathingHours</b>        </td>
             <td>Stunde der Restbadezeit</td>
          </tr>
          <tr>
-            <td><b>bathingMinutes</b></td>
+            <td><b>remainingBathingMinutes</b></td>
             <td>Minute der Restbadezeit</td>
          </tr>
          <tr>
