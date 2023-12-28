@@ -42,7 +42,7 @@ my %RPI_1Wire_Devices =
 	'1d' => {"name"=>"DS2423", "type"=>"counter", "path"=>"w1_slave"},
 	'26' => {"name"=>"DS2438", "type"=>"voltage", "path"=>"temperature,vdd,vad"},
 	'28' => {"name"=>"DS18B20", "type"=>"temperature", "path"=>"w1_slave"},
-	'29' => {"name"=>"DS2408", "type"=>"8p-switch", "path"=>"output"},
+	'29' => {"name"=>"DS2408", "type"=>"8p-switch", "path"=>"state"},
 	'3a' => {"name"=>"DS2413", "type"=>"2p-switch", "path"=>"state"}, # not supported by old module
 	'3b' => {"name"=>"DS1825", "type"=>"temperature", "path"=>"w1_slave"},
 	'42' => {"name"=>"DS28EA00", "type"=>"temperature", "path"=>"w1_slave"},
@@ -297,7 +297,8 @@ sub RPI_1Wire_SetConversion {
 
 sub RPI_1Wire_Switch {
 	my ($hash,$switch,$pio,$cmd,$duration)= @_;
-	Log3 $hash->{NAME}, 3, $hash->{NAME}.": Switching $hash->{DEF} to $switch ($pio $cmd) for ($duration)";
+	my $swstr=sprintf("%08b",$switch);
+	Log3 $hash->{NAME}, 3, $hash->{NAME}.": Switching $hash->{DEF} to $swstr ($pio $cmd) for ($duration)";
 	my $fh;
 	my $path="$w1_path/$hash->{DEF}/output";
 	#testing - uncomment to test with a normal file
@@ -306,7 +307,8 @@ sub RPI_1Wire_Switch {
 		print $fh pack("C",$switch);
 		close($fh);
 	} else {
-		return "Error writing to $w1_path/$hash->{DEF}/output";
+		$hash->{STATE}="Error writing to $w1_path/$hash->{DEF}/output";
+		return $hash->{STATE};
 	}
 	#After setting switch, read back to set readings correctly
 	my $ret=RPI_1Wire_Poll($hash);
@@ -315,7 +317,7 @@ sub RPI_1Wire_Switch {
 		$cmd=( $cmd =~ /^on/?"off":"on"); #Revert condition to be executed after timer
 		return "Invalid duration $duration" if (!looks_like_number($duration));
 		Log3 $hash->{NAME}, 4, $hash->{NAME}.": Setting time for switching $hash->{DEF} $pio to $cmd in $duration s";
-		InternalTimer(gettimeofday()+$duration, sub { RPI_1Wire_Set($hash, $hash->{NAME},($pio,$cmd)); },0);
+		InternalTimer(gettimeofday()+$duration, sub { RPI_1Wire_Set($hash, $hash->{NAME},($pio,$cmd.",fromTimer")); },0);
 	}
 	return;
 	
@@ -371,7 +373,7 @@ sub RPI_1Wire_Set {
 		push @cm,"-" if (@cm==1);
 	}
 	if ($cmd =~ /^pio(a|b)/ and @cm>0) {
-		Log3 $name, 3, $name." set pio $1 $cm[0] $cm[1]\n";
+		Log3 $name, 3, $name." set pio $1 $cm[0] $cm[1]";
 		my $set=0;
 		if ($cmd eq "pioa") {
 			$set=ReadingsVal($name,"piob","0")*2+($cm[0] =~ /^on/?1:0);
@@ -385,7 +387,7 @@ sub RPI_1Wire_Set {
 	}
 	if ($cmd =~ /^pio(\d)/ and @cm>0) {
 		my $pio=$1;
-		Log3 $name, 3, $name." set pio $pio $cm[0] $cm[1]\n";
+		Log3 $name, 3, $name.": set pio $pio $cm[0] $cm[1]";
 		my $id=$1;
 		my $set=0;
 		for my $i (0..7) {
@@ -591,7 +593,6 @@ sub RPI_1Wire_Poll {
 		}
 	}
 	
-	##################### UNTESTED ####################
 	if ($type =~ /switch/) {
 		my $pins=unpack("C",$data[0]); # Binary bits
 		my $data_bin=sprintf("%008b", $pins);
@@ -664,6 +665,7 @@ sub RPI_1Wire_FinishFn {
 				readingsBulkUpdate($hash,"failreason","Read>0.5s - nonblocking mode recommended");
 			}	
 		} elsif ($par eq "error") {
+			$state="Error:$val";
 			readingsBulkUpdate($hash,"failures",ReadingsVal($name,"failures",0)+1);
 			readingsBulkUpdate($hash,"failreason",$val);
 		} else {
@@ -671,7 +673,7 @@ sub RPI_1Wire_FinishFn {
 			$state.="$par:$val ";
 		}
 	}
-	readingsBulkUpdate($hash,"state",$state) unless $state eq ""; #Don't update state if nothing to update
+	$hash->{STATE}=$state;
 	readingsEndUpdate($hash,1);			
 }
 
@@ -705,7 +707,7 @@ sub RPI_1Wire_Attr {					#
 
 sub RPI_1Wire_Undef {
 	my ($hash) = @_;
-	Log 4, "GPIO4: RPI_1Wire_Undef($hash->{NAME})";
+	Log3 $hash->{NAME}, 5, $hash->{NAME}.": Undef";
     BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
 	RemoveInternalTimer($hash);
 	return;
