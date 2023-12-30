@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  36_Shelly: devices gen2 in roller mode: metering readings are single
+ - feature: 36_Shelly: new 'set ... reset <counter>' command
  - bugfix:  36_Shelly: handling of attr 'shellyuser' for gen2 devices
  - bugfix:  70_Klafs: minor bugfix for Reading RemainTime
  - feature: 10_KNX: additional dpt14 subtypes, Forum #122582 

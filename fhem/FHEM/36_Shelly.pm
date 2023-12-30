@@ -53,6 +53,13 @@
 #           internal optimization of webhook handling
 #           Bug Fix: dimmer: settings call set to lights
 #           Feature: ShellyPro3EM attribute Balancing
+# 5.12      Add Gen3 Mini devices (fw gen2 compatibility)
+#           Add: Roller devices: use 'set ... pos' equivalent to 'pct'
+#           Add (dimmer-devices): set..dim-for-timer 
+#           Bug Fix: store newkeys in helper after init
+# 5.13      Bug Fix: handling of attr 'shellyuser' for gen2 devices
+# 5.14      Add: set ... reset to set counters to zero
+#           Bug Fix: rollers (gen2 only): number of power related readings
 
 package main;
 
@@ -70,7 +77,7 @@ sub Log($$);
 sub Shelly_Set ($@);
 
 #-- globals on start
-my $version = "5.11 14.12.2023";
+my $version = "5.14 30.12.2023";
 
 my $defaultINTERVAL = 60;
 my $secndIntervalMulti = 4;  # Multiplier for 'long update'
@@ -219,10 +226,10 @@ my %shelly_dropdowns = (
 #-- these we may get on request
     "Gets"  => "status:noArg shelly_status:noArg registers:noArg config version:noArg model:noArg",
 #-- these we may set
-    "Shelly"=> "config interval password reboot:noArg update:noArg name",
+    "Shelly"=> "config interval password reboot:noArg update:noArg name reset:disconnects,energy",
     "Onoff" => " on off toggle on-for-timer off-for-timer",
     "Multi" => " ON:noArg OFF:noArg xtrachannels:noArg",
-    "Rol"   => " closed open stop:noArg pct:slider,0,1,100 delta zero:noArg predefAttr:noArg",
+    "Rol"   => " closed open stop:noArg pos:slider,0,1,100 delta zero:noArg predefAttr:noArg", #pct is deprecated
     "RgbwW" => " pct dim dimup dimdown dim-for-timer",
     "BulbW" => " ct:colorpicker,CT,3000,10,6500 pct:slider,0,1,100",
     "RgbwC" => " rgbw rgb:colorpicker,HSV hsv white:slider,0,1,100 gain:slider,0,1,100"
@@ -298,6 +305,10 @@ my %shelly_vendor_ids = (
     "SNSW-001X8EU"    => "shellyplus1",   # Shelly Plus 1 Mini
     "SNSW-001P8EU"    => "shellyplus1pm", # Shelly Plus 1 PM Mini
     "SNPM-001PCEU16"  => "shellypmmini",  # Shelly Plus PM Mini
+    # Gen3 Devices
+    "S3SW-001X8EU"    => "shellyplus1",   # Shelly 1 Mini Gen3
+    "S3SW-001P8EU"    => "shellyplus1pm", # Shelly 1 PM Mini Gen3
+    "S3PM-001PCEU16"  => "shellypmmini",  # Shelly PM Mini Gen3
     # Misc
     "SAWD-0A1XX10EU1" => "walldisplay1"
     );
@@ -527,9 +538,9 @@ my %shelly_regs = (
                   );
 
 my %predefAttrs = (
-      "roller_webCmd"    => "open:up:down:closed:half:stop:pct",
-      "roller_eventMap_closed100"  => "/delta -15:up/delta +15:down/pct 50:half/",
-      "roller_eventMap_open100"    => "/delta +15:up/delta -15:down/pct 50:half/",
+      "roller_webCmd"    => "open:up:down:closed:half:stop:pos",
+      "roller_eventMap_closed100"  => "/delta -15:up/delta +15:down/pos 50:half/",
+      "roller_eventMap_open100"    => "/delta +15:up/delta -15:down/pos 50:half/",
       "roller_cmdIcon"   => "open:control_arrow_upward\@blue up:control_arrow_up\@blue down:control_arrow_down\@blue closed:control_arrow_downward\@blue".
                             " stop:rc_STOP\@blue half:fts_shutter_50\@blue",
       "roller_open100"   => "open:fts_shutter_100:closed". 
@@ -750,7 +761,7 @@ sub Shelly_get_model {
       if( !$jhash ){
           Shelly_error_handling($hash,"Shelly_get_model","relaxed decoding: invalid JSON data, try to call /shelly");
           HttpUtils_NonblockingGet({
-              url      => "http://".$hash->{TCPIP}."/shelly",
+              url      => "http://".Shelly_pwd($hash).$hash->{TCPIP}."/shelly",
               timeout  => 4,
               callback => sub($$$$){ Shelly_get_model($hash,$count,$_[1],$_[2]) }
           });
@@ -843,7 +854,7 @@ if(0){
     #fhem("trigger WEB JS:location.reload(true)");  # try a browser refresh ??
     InternalTimer(time()+10, "Refresh", $hash,0);
     return undef;  #successful
-}
+} #end Shelly_get_model
 
 sub Refresh {    ##see also forum topic 48736.0
     fhem("trigger $FW_wname JS:location.reload(true)");  # try a browser refresh ??
@@ -979,7 +990,7 @@ sub Shelly_Attr(@) {
           $hash->{'.AttrList'} =~ s/ dimstep//;
     }
 
-    if( $attrVal eq "shellypro3em" ){  
+    if( $attrVal eq "shellypro3em" ){
           $hash->{'.AttrList'} =~ s/\smaxpower//;
     ##    $hash->{'.AttrList'} =~ s/ webhook:(\S+?)\s//;  # Shelly actions do not work properly (fw v0.14.1)
     ##      $hash->{'.AttrList'} .= " Energymeter_F Energymeter_P Energymeter_R EMchannels:ABC_,L123_,_ABC,_L123";
@@ -1013,6 +1024,10 @@ sub Shelly_Attr(@) {
 
     if( $shelly_models{$attrVal}[5] <= 0 ){  #no inputs, but buttons, eg. shellyplug 
           $hash->{'.AttrList'} =~ s/$attributes{'input'}/""/e;
+    }
+    
+    if( $shelly_models{$attrVal}[4] > 0 ){  # Gen 2 devices. Shellyuser is "admin" by default 
+          $hash->{'.AttrList'} =~ s/shellyuser/""/e;
     }
 
     if(     defined($mode) && $mode eq "relay"  && $shelly_models{$attrVal}[0]>1 ){  #more than one relay
@@ -1483,7 +1498,7 @@ sub Shelly_Attr(@) {
         my @teiler=(1,2,3,4,5,6,10,12,15,20,30,60);
         my @filter = grep { $_ >= $attrVal } @teiler ;
         $attrVal = ($attrVal >60 ? int($attrVal/60)*60 : $filter[0]);
-        $_[3] = $attrVal 
+        $_[3] = $attrVal; 
       }
       $hash->{INTERVAL} = int($attrVal);
     }elsif( $cmd eq "del" ){
@@ -1505,7 +1520,18 @@ sub Shelly_Attr(@) {
         $error="The value of \"$attrName\" must be a positive integer";
         Log3 $name,1,"[Shelly_Attr] $name\: $error ";
         return $error;
+    } 
+  #---------------------------------------  
+  }elsif( $attrName eq "webCmd" ){
+    if( $shelly_models{$model}[1] > 0 && $mode ne "relay" && $attrVal =~ /pct/ ){
+        $error="$name\: use of \'pct\' in attribute \"$attrName\" is deprecated, use \'pos\' instead";
+        Log3 $name,1,"[Shelly_Attr] $error ";
+        #$_[3] = $attrVal;
+        #return "\n$error"; # print message on start screen
     }
+  #---------------------------------------  
+  }elsif( $attrName eq "shellyuser" ){
+        Log3 $name,5,"[Shelly_Attr] $name: shellyuser is set to $attrVal";
   }
   #--------------------------------------- 
   return undef;
@@ -1666,33 +1692,44 @@ sub Shelly_Set ($@) {
   
   my $model =  AttrVal($name,"model","generic");   # formerly: shelly1
   my $mode  =  AttrVal($name,"mode","");
-  my ($v,$msg,$channel,$time);
+  my ($v,$msg,$channel,$time,$brightness);
 
 
   #-- WEB asking for command list 
   if( $cmd eq "?" ){
+    my $newkeys;
     if( !defined($hash->{helper}{Sets}) ){
       # all models and generic
-      my $newkeys = $shelly_dropdowns{Shelly};
+      $newkeys = $shelly_dropdowns{Shelly};
       # most of devices, except roller, metering
-      $newkeys   .= $shelly_dropdowns{Onoff} 
+      $newkeys .= $shelly_dropdowns{Onoff} 
                                     if( ($mode ne "roller" && $shelly_models{$model}[0]>0) ||  $shelly_models{$model}[2]>0 || $shelly_models{$model}[7]>0 );
       # multichannel devices
-      $newkeys   .= $shelly_dropdowns{Multi} if( ($mode ne "roller" && $shelly_models{$model}[0]>1) || ($shelly_models{$model}[2]>1 && $mode eq "white") );
+      $newkeys .= $shelly_dropdowns{Multi} if( ($mode ne "roller" && $shelly_models{$model}[0]>1) || ($shelly_models{$model}[2]>1 && $mode eq "white") );
       if( $mode eq "roller" || ($shelly_models{$model}[0]==0 && $shelly_models{$model}[1]>0)){
           $newkeys .= $shelly_dropdowns{Rol};
       }elsif( $model =~ /shellydimmer/ || ($model =~ /shellyrgbw.*/ && $mode eq "white")  ){
           $newkeys .= $shelly_dropdowns{RgbwW};
       }elsif( $model =~ /shellybulb.*/ &&  $mode eq "white" ){
-          $newkeys .= $shelly_dropdowns{BulbW};
+          $newkeys .= " dim-for-timer".$shelly_dropdowns{BulbW};
       }elsif( $model =~ /shelly(rgbw|bulb).*/ && $mode eq "color" ){
           $newkeys .= $shelly_dropdowns{RgbwC};
       }
-      $hash->{helper}{Sets}=$newkeys;
+      if( $shelly_models{$model}[4]==0 || $shelly_models{$model}[3]==0 ){
+          $newkeys =~ s/,energy//; # remove 'energy' from dropdown-list
+      }
+      if( $init_done ){
+        $hash->{helper}{Sets}=$newkeys;
+        Log3 $name,2,"[Shelly_Set] stored keys for device $name \"$newkeys\" in helper";
+      }
+    }else{
+      $newkeys = $hash->{helper}{Sets};
     }
     
-      # ':noArg' will be stripped off by calling instance
-      return "$model $mode: unknown argument $cmd choose one of ".$hash->{helper}{Sets};#$newkeys";
+    Log3 $name,5,"[Shelly_Set] FhemWeb is requesting set-commands for device $name"; #4
+    #$hash->{'.FWR'}=$hash->{'.FWR'}+1;
+    # ':noArg' will be stripped off by calling instance
+    return "$model $mode: unknown argument $cmd choose one of $newkeys";
   }
      
   #-- following commands do not occur in command list, eg. out_on, input_on, single_push
@@ -1822,14 +1859,19 @@ sub Shelly_Set ($@) {
   }elsif( $cmd =~ /(on|off)-for-timer/ ){
         $time = $value;
         $channel = shift @a;
+  }elsif( $cmd =~ /dim-for-timer/ ){
+        $brightness = $value;
+        if( $brightness  > 100 ){ 
+          $msg = "given brightness \'$brightness\' to high for device $name, must not exceed 100";
+          Log3 $name,1,"[Shelly_Set] ".$msg;  
+          return $msg;
+        }
+        $time = shift @a;
+        $channel = shift @a;
   }elsif( ($cmd eq"pct" && $ff!=1 ) || $cmd =~ /dim/ || $cmd eq "brightness" || $cmd eq "ct" ){
       #  $pct = $value;
         $channel = shift @a;
         $channel = shift @a if(  $channel eq "%" ); # skip %-sign coming from dropdown (units=1)
-  }elsif( $cmd =~ /dim-for-timer/ ){
-      #  $pct = $value;
-        $time = shift @a;
-        $channel = shift @a;
   }   
   
   #-- check channel
@@ -1882,21 +1924,22 @@ sub Shelly_Set ($@) {
   }
 
   #- - on and off, on-for-timer and off-for-timer
-  if( $cmd =~ /^((on)|(off)|(xdim))/ && $cmd!~/(till)/ ){  # on-till, on-till-overnight
+  if( $cmd =~ /^((on)|(off)|(dim))/ && $cmd!~/(till)/ ){  # on-till, on-till-overnight
     #-- check timer command
     if( $cmd =~ /(.*)-for-timer/ ){
         $cmd = $1;
-        if( $cmd eq "dim" ){
-           my $dim = $value;
+        if( $cmd eq "dim" ){ # dim-for-timer
+           #my $brightness = shift @a;  
+           $cmd = "?brightness=$brightness&turn=on";
         }
-        $time = $value;
+        #$time = $value;
         if( $time =~ /\D+/ ){ #anything else than digits
           $msg = "Error: wrong time spec \'$time\' for device $name, must be <integer>";
           Log3 $name,1,"[Shelly_Set] ".$msg;
           return $msg;
         }elsif( $time > 100000000 ){ # more than three years
           $msg = "given time to high for device $name, must be less than one year";
-          Log3 $name,1,"[Shelly_Set] ".$msg;
+          Log3 $name,1,"[Shelly_Set] ".$msg;  
           return $msg;
         }elsif( $time < 1){ # to low
           $msg = "given time to low for device $name";
@@ -1905,12 +1948,13 @@ sub Shelly_Set ($@) {
         }
         $cmd = $cmd."&timer=$time";
     }
-    # $cmd = is 'on' or 'off'  or  'on&timer=...' or 'off&timer=....'
+    # $cmd = is 'on' or 'off'  or  'on&timer=...' or 'off&timer=....' or 'dim&timer=....'
     
-    Log3 $name,4,"[Shelly_Set] switching channel $channel for device $name with command $cmd, FF=$ff";
+    Log3 $name,4,"[Shelly_Set] switching channel $channel for device $name with command $cmd, FF=$ff";#4
     if( $ff==0 ){    
         if( $shelly_models{$model}[4]<2 ){
-            $cmd = "?turn=$cmd";  ##"/relay/$channel?turn=$cmd";
+            $cmd = "?turn=$cmd"   ##"/relay/$channel?turn=$cmd";
+                  if( $cmd !~ "brightness" );
         }else{
             $cmd =~ s/on/true/;
             $cmd =~ s/off/false/;
@@ -1926,7 +1970,8 @@ sub Shelly_Set ($@) {
         }elsif( $model =~ /shellyrgbw/ && $mode eq "white" ){
             $channel = "white/$channel";
         }
-        $msg = Shelly_dim($hash,$channel,"?turn=$cmd");
+        $cmd = "?turn=$cmd"      if( $cmd !~ "brightness" );
+        $msg = Shelly_dim($hash,$channel,$cmd);
     }elsif($ff==7 ){
         $msg = Shelly_dim($hash,"color/$channel","?turn=$cmd");
     }
@@ -1993,7 +2038,7 @@ sub Shelly_Set ($@) {
 
   #-- commands strongly dependent on Shelly type -------------------------------------------------------
   #-- we have a roller type device / roller mode
-  if( $cmd =~ /^(stop|closed|open|pct|delta|zero)/ && $shelly_models{$model}[1]>0 && $mode ne "relay" ){
+  if( $cmd =~ /^(stop|closed|open|pct|pos|delta|zero)/ && $shelly_models{$model}[1]>0 && $mode ne "relay" ){
     $ff = 1;
     Log3 $name,4,"[Shelly_Set] $name: we have a $model ($mode mode) and command is $cmd";
     #x   my $channel = $value;
@@ -2010,6 +2055,7 @@ sub Shelly_Set ($@) {
             $hash->{MOVING} eq "drive-down" &&  $cmd eq "closed"  ||
             $hash->{MOVING} eq "drive-up"   &&  $cmd eq "open"    ||
             $hash->{MOVING} =~ /drive/      &&  $cmd eq "pct"     ||
+            $hash->{MOVING} =~ /drive/      &&  $cmd eq "pos"     ||
             $hash->{MOVING} =~ /drive/      &&  $cmd eq "delta"   ){
          # -- estimate pos here ???
          $hash->{DURATION} = 0;
@@ -2038,7 +2084,7 @@ sub Shelly_Set ($@) {
          return "comand zero deactivated";
          return Shelly_configure($hash,"rc");
                 
-    #--any other cases: no movement and commands: open, closed, pct, delta    
+    #--any other cases: no movement and commands: open, closed, pct, pos, delta    
     }elsif( $cmd =~ /(closed)|(open)/ ){
         if( $cmd eq "closed" ){
           $hash->{DURATION} = (defined($value))?$value:$maxclose;
@@ -2053,10 +2099,11 @@ sub Shelly_Set ($@) {
         }
         $cmd .= "&duration=$value"    if(defined($value));
         
-    }elsif( $cmd eq "pct" || $cmd eq "delta" ){
-          my $targetpct = $value;
-          my $pos  = ReadingsVal($name,"position","");
-          my $pct  = ReadingsVal($name,"pct",undef);  
+    }elsif( $cmd eq "pct" || $cmd eq "pos" || $cmd eq "delta" ){
+        Log3 $name,1,"[Shelly_Set] $name: use of \'set ... pct\' is deprecated, use \'set ... pos\' instead" if($cmd eq "pct");
+        my $targetpct = $value;
+        my $pos  = ReadingsVal($name,"position","");
+        my $pct  = ReadingsVal($name,"pct",undef);  
              #if( "$value" =~ /[\+-]\d*/ ){
              #  $targetpct = eval($pct."$value"); 
              #}
@@ -2101,6 +2148,7 @@ sub Shelly_Set ($@) {
         $cmd = "?go=to_pos&roller_pos=" . ($pctnormal ? $targetpct : 100 - $targetpct);
     }  
   Log3 $name,4,"[Shelly_Set] $name: calling Shelly_updown with comand $cmd, duration=".$hash->{DURATION};
+  
   # Shelly_updown performs one status update after start, and one at expected time of stop
   return Shelly_updown($hash,$cmd);
 
@@ -2156,7 +2204,7 @@ sub Shelly_Set ($@) {
   ###########################################################################
   #-- commands independent of Shelly type: password, interval, reboot, update
   if( $cmd eq "password" ){
-    my $user = AttrVal($name, "shellyuser", 'admin');
+    my $user = AttrVal($name,"shellyuser",undef);
     if(!$user && $shelly_models{$model}[4]==0 ){
       my $msg = "Error: password can be set only if attribute \'shellyuser\' is set";
       Log3 $name,1,"[Shelly_Set] ".$msg;
@@ -2216,6 +2264,39 @@ sub Shelly_Set ($@) {
       Log3 $name,1,"[Shelly_Set] Updating $name";
    #  if( $shelly_models{$model}[4]==0 ){$cmd ="ota/update";} # Gen1 only
       Shelly_configure($hash,$cmd);
+      return undef;
+      
+  }elsif( $cmd eq "reset" ){
+      my $doreset = $value;
+      Log3 $name,4,"[Shelly_Set] Resetting counter \'$doreset\' of device $name";
+      if( $doreset eq "disconnects" ){
+         readingsSingleUpdate($hash,"network_disconnects",0,1);
+      }elsif( $doreset eq "energy" ){
+         if( ReadingsVal($name,"firmware","") =~ /(v0|v1.0)/ ){
+              my $err = "firmware must be at least v1.1.0";
+              Shelly_error_handling($hash,"Shelly_Set:reset",$err);
+              return $err;
+         }
+         my $numC;
+         if( $shelly_models{$model}[0]>0 && $mode ne "roller" ){
+            $cmd = "Switch";
+            $numC = $shelly_models{$model}[0];
+         }elsif( $shelly_models{$model}[1]>0 && $mode ne "relay" ){
+            $cmd = "Cover";
+            $numC = $shelly_models{$model}[1];
+         }elsif( $shelly_models{$model}[3]>0 && !$mode ){
+            $cmd = "PM1";
+            $numC = $shelly_models{$model}[3];
+         }else{ 
+            Log3 $name,1,"[Shelly_configure] Wrong command $cmd";
+            return;
+         }
+         for( my $id=0; $id<$numC; $id++ ){
+            Shelly_configure($hash,"rpc/$cmd\.ResetCounters?id=$id&type=[\"aenergy\"]");
+            #readingsSingleUpdate($hash,"energy_$id","-",1) if( ReadingsNum($name,"energy_$id",undef) );
+            Shelly_status($hash);
+         }
+      }
       return undef;
 
   #-- renaming the Shelly, spaces in name are allowed
@@ -2279,7 +2360,8 @@ sub Shelly_Set ($@) {
       return "keine Kopiervorlage verfügbar" if( $mode ne "roller" );
       
       return "Set the attribute\'pct100\' first"   if( !AttrVal($name,"pct100",undef) );
-
+      $msg = "$name:\n";
+      my $changes = 0;
       if(  !AttrVal($name,"devStateIcon",undef) ){ 
           if( AttrVal($name, "pct100", "closed") eq "closed" ){
               $v = $predefAttrs{'roller_closed100'};
@@ -2289,9 +2371,10 @@ sub Shelly_Set ($@) {
           # set the devStateIcon-attribute when the devStateIcon attribute is not set yet     
           $attr{$hash->{NAME}}{devStateIcon} = $v;
           Log3 $name,5,"[Shelly_Get] the attribute \'devStateIcon\' of device $name is set to \'$v\' ";
-          $msg = "devStateIcon attribute is set";
+          $msg .= "devStateIcon attribute is set";
+          $changes++;
       }else{
-          $msg = "attribute \'devStateIcon\' is already defined";
+          $msg .= "attribute \'devStateIcon\' is already defined";
       }
       $msg .= "\n";
       if(  !AttrVal($name,"webCmd",undef) ){ 
@@ -2299,6 +2382,7 @@ sub Shelly_Set ($@) {
           $attr{$hash->{NAME}}{webCmd} = $predefAttrs{'roller_webCmd'};
           Log3 $name,5,"[Shelly_Get] the attribute \'webCmd\' of device $name is set  ";
           $msg .= "webCmd attribute is set";
+          $changes++;
       }else{
           $msg .= "attribute \'webCmd\' is already defined";
       }
@@ -2308,6 +2392,7 @@ sub Shelly_Set ($@) {
           $attr{$hash->{NAME}}{cmdIcon} = $predefAttrs{'roller_cmdIcon'};
           Log3 $name,5,"[Shelly_Get] the attribute \'cmdIcon\' of device $name is set  ";
           $msg .= "cmdIcon attribute is set";
+          $changes++;
       }else{
           $msg .= "attribute \'cmdIcon\' is already defined";
       }
@@ -2321,10 +2406,11 @@ sub Shelly_Set ($@) {
           }
           Log3 $name,5,"[Shelly_Get] the attribute \'eventMap\' of device $name is set  ";
           $msg .= "eventMap attribute is set";
+          $changes++;
       }else{
           $msg .= "attribute \'eventMap\' is already defined";
       }
-      $msg .= "\n\n to see the changes, browser refresh is necessary";
+      $msg .= "\n\n to see the changes, browser refresh is necessary" if( $changes );
       return $msg;
       
   #-- create readingsProxy devices
@@ -2373,11 +2459,13 @@ return SetExtensions($hash,$hash->{helper}{Sets},$name,$cmd,@args);
 sub Shelly_pwd($){
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  my $user = AttrVal($name, "shellyuser", '');
+  # username is set by default for Shelly Gen2
+  my $user = $shelly_models{AttrVal($name,"model","generic")}[4]>=1 ? 'admin' : AttrVal($name,"shellyuser",undef);
   return "" if(!$user);
 
   my ($err, $pw) = getKeyValue("SHELLY_PASSWORD_$name");
-  return $user.":".$pw."@";
+  return "" if(!$pw);
+  return "$user:$pw\@";
 }
 
 ########################################################################################
@@ -2396,10 +2484,10 @@ sub Shelly_pwd($){
   my $state = $hash->{READINGS}{state}{VAL};
   my $net   = $hash->{READINGS}{network}{VAL};
   return "no network information" if( !defined $net );
-  return "E: 1612 device not connected" 
+  return "device not connected" 
     if( $net =~ /not connected/ );
 
-  my $model =  AttrVal($name,"model","generic");
+  my $model = AttrVal($name,"model","generic");
   my $creds = Shelly_pwd($hash);
   
   ##2ndGen    devices will answer with "null\R"
@@ -2415,6 +2503,9 @@ sub Shelly_pwd($){
     }else{
       $cmd="reboot";
     }
+  }elsif( $cmd =~ /ResetCounters/ ){
+      Log3 $name,5,"[Shelly_configure] resetting energy-counter for device $name ($cmd)";
+    
   }elsif( $cmd eq "rc" || $cmd eq "calibrate" ){
     if( $shelly_models{$model}[4]>=1 ){
       $cmd="rpc/Cover.Calibrate?id=0" ;  #Gen2
@@ -2428,12 +2519,11 @@ sub Shelly_pwd($){
   Log3 $name,5,"[Shelly_configure] $name: received command=$cmd";
 
   if( $hash && !$err && !$data ){
-     my $url     = "http://$creds".$hash->{TCPIP}."/".$cmd;
-     my $timeout = AttrVal($name,"timeout",4);
+     my $url = "http://$creds".$hash->{TCPIP}."/".$cmd;
      Log3 $name,4,"[Shelly_configure] issue a non-blocking call to $url";
      HttpUtils_NonblockingGet({
         url      => $url,
-        timeout  => $timeout,
+        timeout  => AttrVal($name,"timeout",4),
         callback => sub($$$){ Shelly_configure($hash,$cmd,$_[1],$_[2]) }
      });
      return undef;
@@ -2447,6 +2537,8 @@ sub Shelly_pwd($){
   if( $shelly_models{$model}[4]>=1 ){
          if( $data =~ /null/ ){           #\R ? perl 5.10.0, in older versions: \r or \n 
               readingsSingleUpdate($hash,"config","successful",1);
+         }elsif( $data =~ /energy/ ){    
+              readingsSingleUpdate($hash,"config","counter set to 0",1);
          }else{
               Log3 $name,1,"[Shelly_configure] $name: Error while processing \'$cmd\'";
               Shelly_error_handling($hash,"Shelly_configure","Error");
@@ -2456,6 +2548,7 @@ sub Shelly_pwd($){
   
   # proceed only on Gen 1 devices
     
+  # extracting json from data
   my $json = JSON->new->utf8;
   my $jhash = eval{ $json->decode( $data ) };
   if( !$jhash ){
@@ -2539,15 +2632,15 @@ sub Shelly_status {
   }
 
   #-- check if 2nd generation device
-  my $is2G = ($shelly_models{$model}[4]>=1);
+  my $is2G = ($shelly_models{$model}[4]>=1 ? 1 : 0 );#Log3 $name,0,"$model $is2G";
 #3G {  
-  # preparing NonBlockingGet #--------------------------------------------------  
+  # preparing Non Blocking Get #--------------------------------------------------  
 
   if( $hash && !$err && !$data ){
       #-- for 1G devices status is received in one single call
       if( !$is2G ){
          $url     .= "/status";
-         Log3 $name,4,"[Shelly_status(1G)] issue a non-blocking call to $url";  
+         Log3 $name,4,"[Shelly_status(1G)] issue a non-blocking call to $url";  #4
          HttpUtils_NonblockingGet({
             url      => $url,
             timeout  => $timeout,
@@ -2599,6 +2692,7 @@ sub Shelly_status {
   
   # processing incoming data #--------------------------------------------------
   Log3 $name,5,"[Shelly_status] device $name of model $model has returned data \n$data";
+  
   # extracting json from data
   my $json = JSON->new->utf8;
   my $jhash = eval{ $json->decode( $data ) };  
@@ -2633,10 +2727,11 @@ sub Shelly_status {
   my $next;  # Time offset in seconds for next update
   if( !$is2G && !$comp ){
       $next=Shelly_proc1G($hash,$jhash);
+      Log3 $name,4,"[Shelly_status] $name: proc1G returned with value=$next";
   }else{
       $next=Shelly_proc2G($hash,$comp,$jhash);
+      Log3 $name,4,"[Shelly_status] $name: proc2G returned with value=$next for comp $comp"; #4
   }
-  Log3 $name,4,"[Shelly_status] $name: proc.G returned with value=$next for comp ".(defined($comp)?$comp:"none"); #4
   return undef if( $next == -1 );  
   
   #-- cyclic update (or update close to on/off-for-timer command)
@@ -2764,11 +2859,11 @@ sub Shelly_proc1G {
   my $model = AttrVal($name,"model","generic");
     
 
-  my $mode     =  AttrVal($name,"mode","");
+  my $mode     = AttrVal($name,"mode","");
   my $channels = $shelly_models{$model}[0];
   my $rollers  = $shelly_models{$model}[1];
   my $dimmers  = $shelly_models{$model}[2];
-  my $meters   = $shelly_models{$model}[3];
+  my $meters   = $mode eq "roller" ?  $shelly_models{$model}[1] : $shelly_models{$model}[3];
  
   my ($subs,$ison,$source,$rstate,$rstopreason,$rcurrpos,$position,$rlastdir,$pct,$pctnormal);
   my ($overpower,$power,$energy);
@@ -2935,7 +3030,7 @@ sub Shelly_proc1G {
       readingsBulkUpdateMonitored($hash,"source",$source); 
     }
     readingsBulkUpdateMonitored($hash,"state","OK")
-      if($dimmers > 1);
+      if($dimmers > 1);#Log3 $name,0,"bulb dimmers $dimmers";
   #############################################################################################################################  
   #-- we have a shellyrgbw color device
   }elsif( $model =~ /shelly(rgbw|bulb)/ && $mode eq "color" ){ 
@@ -3196,7 +3291,9 @@ sub Shelly_proc2G {
      $channel  = $jhash->{'id'}  if( $comp eq "relay" || $comp eq "roller" || $comp eq "input" );
   my $rollers  = $shelly_models{$model}[1];
   my $dimmers  = $shelly_models{$model}[2];
-  my $meters   = $shelly_models{$model}[3];
+  
+  my $meters   = $mode eq "roller" ?  $shelly_models{$model}[1] : $shelly_models{$model}[3];
+ # my $meters   = $shelly_models{$model}[3];
  
   my ($subs,$ison,$overpower,$voltage,$current,$power,$energy,$pfactor,$freq,$minutes,$errors);  ##R  minutes errors
   my $timer = $hash->{INTERVAL};
@@ -3587,7 +3684,7 @@ if(0){    # check calculation of reactive power!
     #-- common to roller and relay, also ShellyPMmini energymeter
     if($comp eq "roller" || $comp eq "relay" || $comp eq "pm1" ){
       my $id  = $jhash->{'id'};
-      $subs = $shelly_models{$model}[3]==1?"":"_$id";
+      $subs = ( $mode eq "roller" ? $shelly_models{$model}[1] : $shelly_models{$model}[3])==1?"":"_$id";
       Log3 $name,4,"[Shelly_proc2G] $name: Processing metering channel$subs";
       if( $meters > 0 ){
         #checking for errors (if present)
@@ -3691,7 +3788,7 @@ sub Shelly_EMData {
     }
     # my $url     = "http://".Shelly_pwd($hash).$hash->{TCPIP}."/rpc/$comp.GetStatus?id=0";
     my $url     = "http://".Shelly_pwd($hash).$hash->{TCPIP}."/rpc/Shelly.GetStatus";   # all data in one loop
-    Log3 $name,4,"[Shelly_status] issue a non-blocking call to $url";
+    Log3 $name,4,"[Shelly_EMData] issue a non-blocking call to $url";
     HttpUtils_NonblockingGet({
         url      => $url,
         timeout  => AttrVal($name,"timeout",4),
@@ -3716,6 +3813,7 @@ sub Shelly_EMData {
 
   Log3 $name,5,"[Shelly_EMData] device $name has returned data $data";
   
+  # extracting json from data
   readingsBeginUpdate($hash);    
   my $json = JSON->new->utf8;
   my $jhash = eval{ $json->decode( $data ) };
@@ -3806,7 +3904,7 @@ sub Shelly_EMData {
         $deltaAge = $unixtime - $hash->{helper}{timestamp_last};
         $hash->{helper}{timestamp_last} = $unixtime;
         
-        $deltaEnergy  = $active_energy - $return_energy - $hash->{helper}{Total_Energy_S};#Debug "$deltaAge ::: $deltaEnergy";
+        $deltaEnergy  = $active_energy - $return_energy - $hash->{helper}{Total_Energy_S};
         $hash->{helper}{Total_Energy_S} =$active_energy-$return_energy;
              
         $reading = $pr.$mapping{E1}{"act_calculated"}; # Active_Power_calculated
@@ -4040,20 +4138,20 @@ sub shelly_energy_fmt {
     
   if( $hash && !$err && !$data ){
      my $url     = "http://$creds".$hash->{TCPIP}."/$channel$cmd";
-     my $timeout = AttrVal($name,"timeout",4);
-     Log3 $name,4,"[Shelly_dim] issue a non-blocking call to $url";  
+     Log3 $name,4,"[Shelly_dim] issue a non-blocking call to $url";  #4
      HttpUtils_NonblockingGet({
         url      => $url,
-        timeout  => $timeout,
+        timeout  => AttrVal($name,"timeout",4),
         callback => sub($$$){ Shelly_dim($hash,$channel,$cmd,$_[1],$_[2]) }
      });
      return undef;
-  }elsif( $hash && $err ){
+  }elsif( $hash && $err ){  
     Shelly_error_handling($hash,"Shelly_dim",$err);
     return;
   }
-  Log3 $name,5,"[Shelly_dim] device $name has returned data $data";
-    
+  Log3 $name,5,"[Shelly_dim] device $name has returned data $data";  
+
+  # extracting json from data    
   my $json = JSON->new->utf8;
   my $jhash = eval{ $json->decode( $data ) };
   if( !$jhash ){
@@ -4086,10 +4184,10 @@ sub shelly_energy_fmt {
     if( $ison ne $cmd2 ) {
       Log3 $name,1,"[Shelly_dim] returns without success for device $name, cmd=$cmd but ison=$ison";
     }
-  }elsif( $cmd  =~ /\?brightness=(.*)/){
+  }elsif( $cmd  =~ /\?brightness=(\d*)/){
     my $cmd2 = $1;
     if( $bright ne $cmd2 ) {
-      Log3 $name,1,"[Shelly_dim] returns without success for device $name, desired brightness $cmd, but device brightness=$bright";
+      Log3 $name,1,"[Shelly_dim] returns without success for device $name, desired brightness $cmd2, but device brightness=$bright";
     }
   } 
   
@@ -4141,11 +4239,10 @@ sub shelly_energy_fmt {
     
   if( $hash && !$err && !$data ){
      my $url     = "http://$creds".$hash->{TCPIP}."/roller/0".$cmd;
-     my $timeout = AttrVal($name,"timeout",4);
      Log3 $name,4,"[Shelly_updown] issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
-        timeout  => $timeout,
+        timeout  => AttrVal($name,"timeout",4),
         callback => sub($$$){ Shelly_updown($hash,$cmd,$_[1],$_[2]) }
      });
      return undef;
@@ -4223,7 +4320,6 @@ sub Shelly_status2($){
                   if( !$net || $net !~ /connected to/ ); 
   
   my $model = AttrVal($name,"model","generic");
-  my $timeout = AttrVal($name,"timeout",4);
   my $creds = Shelly_pwd($hash);
     
   if( $hash && !$err && !$data ){
@@ -4240,7 +4336,7 @@ if($shelly_models{$model}[4]<2){
      Log3 $name,4,"[Shelly_onoff] issue a non-blocking call to $url; callback to Shelly_onoff with command $callback";  
      HttpUtils_NonblockingGet({
         url      => $url,
-        timeout  => $timeout,
+        timeout  => AttrVal($name,"timeout",4),
         callback => sub($$$){ Shelly_onoff($hash,$channel,$callback,$_[1],$_[2]) }
      });
      return undef;
@@ -4251,7 +4347,8 @@ if($shelly_models{$model}[4]<2){
   
   #processing incoming data
   Log3 $name,5,"[Shelly_onoff:callback] device $name has returned data \n$data";
-    
+
+  # extracting json from data
   my $json = JSON->new->utf8;
   my $jhash = eval{ $json->decode( $data ) };
   if( !$jhash ){
@@ -4499,7 +4596,8 @@ if($shelly_models{$model}[4]<2){
   ################################################# $hash && $data
   # Answer: processing the received webhook data
   Log3 $name,5,"[Shelly_webhook] device $name called by Webhook.$cmd has returned data $data";
-    
+
+  # extracting json from data
   my $json = JSON->new->utf8;
   my $jhash = eval{ $json->decode( $data ) };
   if( !$jhash ){
@@ -4605,7 +4703,7 @@ if(1){    # first of all, get number of webhooks
               url      => $urls,
               timeout  => $timeout,
               callback => sub($$$){ Shelly_webhook($hash,"Updated",$_[1],$_[2]) }
-            }) if(1);
+            });
         }else{
         Log3 $name,5,"[Shelly_webhook] $name: $i check is OK, nothing to do"; #5
         }
@@ -4682,8 +4780,8 @@ if(1){    # first of all, get number of webhooks
 # result:  get <name> status
 #          set <name> out_on|out_off|button_on|button_off|single_push, ... channel
 #
-# returning string like: &urls=["http://129.168.178.100:8083/fhem?cmd=get $name status&XHR=1&fwcsrf=csrf_1234567890"]
-#
+# returning string like: &urls=["http://129.168.178.100:8083/fhem?cmd=get $name status&fwcsrf=csrf_1234567890"]
+# &XHR=1 removed from string
 ########################################################################################
 sub Shelly_actionWebhook ($@) {
   my ($hash, @a) = @_ ;
@@ -4831,6 +4929,9 @@ sub Shelly_error_handling {
         $errN = $err;
         readingsBulkUpdateIfChanged($hash,"network",$errN,1);
         $errS = "Error: JSON"; 
+    }elsif( $err =~ /wrong/ || $err =~ /401/ ){ #401 Unauthorized
+        $errN = "wrong authentication"; 
+        $errS = "Error: Authentication"; 
     }else{
         $errN = $err;
         $errS = "Error"; 
@@ -4980,12 +5081,18 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
         <li>
             <a id="Shelly-set-password"></a>
             <code>set &lt;name&gt; password &lt;password&gt;</code>
-            <br>This is the only way to set the password for the Shelly web interface
+            <br>This is the only way to set the password for the Shelly web interface.
             </li>
+            For Shelly devices first gen, the attribute 'shellyuser' must be defined
         <li>
             <a id="Shelly-set-reboot"></a>
             <code>set &lt;name&gt; reboot</code>
             <br>Reboot the Shelly 
+            </li>
+        <li>
+            <a id="Shelly-set-reset"></a>
+            <code>set &lt;name&gt; reset &lt;counter&gt;</code>
+            <br>Resetting the counters to zero 
             </li>
         <li>
             <a id="Shelly-set-update"></a>
@@ -5018,9 +5125,14 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
                 <br />drives the roller blind open, closed or to a stop. 
                       The commands open and closed take an optional parameter that determines the drive time in seconds</li>      
             <li>
+            <a id="Shelly-set-pos"></a>
+                <code>set &lt;name&gt; pos &lt;integer percent value&gt; </code>
+                <br/>drives the roller blind to a partially closed position (normally 100=open, 0=closed, see attribute pct100). If the integer percent value
+                carries a sign + or - the following number will be added to the current value of the position to acquire the target value. 
+                <br/>                 
                 <code>set &lt;name&gt; pct &lt;integer percent value&gt; </code>
-                <br />drives the roller blind to a partially closed position (normally 100=open, 0=closed, see attribute pct100). If the integer percent value
-                carries a sign + or - the following number will be added to the current value of the position to acquire the target value. </li>    
+                <br/>same as <code>set &lt;name&gt; pos &lt;integer percent value&gt; </code> <font color="red">deprecated</font> 
+                </li>
             
             <li><a id="Shelly-set-delta"></a>
                 <code>set &lt;name&gt; delta +|-&lt;percentage&gt;</code>
@@ -5127,6 +5239,7 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
                 <a id="Shelly-attr-shellyuser"></a>
                 <code>attr &lt;name&gt; shellyuser &lt;shellyuser&gt;</code>
                 <br />username for addressing the Shelly web interface. Set the password with the set command.</li>
+                Applicable only for Shellies first gen. 
             <li>
                 <a id="Shelly-attr-model"></a>
                 <code>attr &lt;name&gt; model generic|shelly1|shelly1pm|shelly2|shelly2.5|
@@ -5517,6 +5630,11 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
             <br>Neustarten des Shelly 
             </li>
         <li>
+            <a id="Shelly-set-reset"></a>
+            <code>set &lt;name&gt; reset &lt;counter&gt;</code>
+            <br>Setzen der Zähler auf Null 
+            </li>
+        <li>
             <a id="Shelly-set-update"></a>
             <code>set &lt;name&gt; update</code>
             <br>Aktualisieren der Shelly Firmware zur aktuellen stabilen Version 
@@ -5540,7 +5658,7 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
                 <br />Erstellen von <i>readingsProxy</i> Devices für Shellies mit mehr als einem Relais</li>           
    
         </ul>
-        <br/>Für Shelly Rollladentreiber (model=shelly2/2.5/plus2/pro2 und mode=roller)  
+        <br/>Für Shelly Rollladenaktoren (model=shelly2/2.5/plus2/pro2 und mode=roller)  
         <ul>
             <li><a id="Shelly-set-open"></a><a id="Shelly-set-closed"></a>
                 <code>set &lt;name&gt; open|closed [&lt;duration&gt;]</code>
@@ -5552,17 +5670,18 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
                 <code>set &lt;name&gt; stop</code>
                 <br />Beendet die Fahrbewegung (stop).
                       </li>
-                        
-            <li><a id="Shelly-set-pct"></a>
-                <code>set &lt;name&gt; pct &lt;integer percent value&gt; </code>
+                       
+            <li><a id="Shelly-set-pos"></a>
+                <code>set &lt;name&gt; pos &lt;integer percent value&gt; </code>
                 <br />Fährt den Rollladen zu einer Zwischenstellung (normalerweise gilt 100=offen, 0=geschlossen, siehe Attribut 'pct100'). 
                 <s>Wenn dem Wert für die Zwischenstellung ein Plus (+) oder Minus (-) - Zeichen vorangestellt wird, 
                 wird der Wert auf den aktuellen Positionswert hinzugezählt.</s>
                 <br />
-                <code>set &lt;name&gt; pct &lt;1...100&gt; [&lt;channel&gt;] </code>
-                <br />Prozentualer Wert für die Helligkeit (brightness). Es wird nur der Helligkeitswert gesetzt ohne das Gerät ein- oder aus zu schalten.
-                </li>    
-            
+                
+                äquivalent zu <code>set &lt;name&gt; pct &lt;integer percent value&gt; </code>   <font color="red">nicht mehr verwenden</font>
+                <br />
+                      </li>
+
             <li><a id="Shelly-set-delta"></a>
                 <code>set &lt;name&gt; delta +|-&lt;percentage&gt;</code>
                 <br />Fährt den Rollladen einen gegebenen Prozentwert auf oder ab. 
@@ -5585,12 +5704,16 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
                <code>set &lt;name&gt; on|off|toggle  [&lt;channel&gt;] </code>
                 <br />schaltet Kanal &lt;channel&gt; on oder off. </li>
             <li>
+               <a id="Shelly-set-blink"></a>
+               <code>set &lt;name&gt; blink &lt;count&gt; &lt;time&gt;  [&lt;channel&gt;] </code>
+                <br />schaltet Kanal &lt;channel&gt; entsprechend Anzahl 'count' für Zeit 'time' ein und aus. </li>
+            <li>
                 <code>set &lt;name&gt; on-for-timer|off-for-timer &lt;time&gt; [&lt;channel&gt;] </code>
                 <br />schaltet Kanal &lt;channel&gt; on oder off für &lt;time&gt; Sekunden. </li>
                       
             <li><a id="Shelly-set-pct"></a>
                 <code>set &lt;name&gt; pct &lt;1...100&gt; [&lt;channel&gt;] </code>
-                <br />Prozentualer Wert für die Helligkeit (brightness). Es wird nur der Helligkeitswert gesetzt ohne das Gerät ein- oder aus zu schalten.
+                <br />Prozentualer Wert für die Helligkeit (brightness). Es wird nur der Helligkeitswert gesetzt ohne das Gerät ein oder aus zu schalten.
                       </li> 
                                             
             <li><a id="Shelly-set-dim"></a>
@@ -5612,6 +5735,11 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
                 <br />Prozentualer Wert für die Verringerung der Helligkeit. 
                 Ist kein Wert angegeben, wird das Attribut dimstep ausgewertet.
                 Der kleinste erreichbare Helligkeitswert ist der im Shelly gespeicherte Wert für "minimum brightness".                       
+                      </li> 
+                      
+            <li><a id="Shelly-set-dim-for-timer"></a>
+                <code>set &lt;name&gt; dim-for-timer &lt;brightness&gt; &lt;time&gt; [&lt;channel&gt;] </code>
+                <br />Prozentualer Wert für die Helligkeit. Nach Ablauf der Zeit 'time' wird ausgeschaltet.                       
                       </li> 
         </ul>
         Hinweis für ShellyRGBW (white-Mode): Kanalnummern sind 0..3.
@@ -5692,8 +5820,9 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
             <li>
                 <a id="Shelly-attr-shellyuser"></a>
                 <code>attr &lt;name&gt; shellyuser &lt;shellyuser&gt;</code>
-                <br />Benutername für den Zugang zur Website des Shelly.
+                <br />Benutzername für den Zugang zur Website des Shelly.
                 Das Passwort wird mit dem 'set ... password'-Befehl gesetzt.</li>
+                Nur bei Shellies der 1. Gen anwendbar.
             <li>
                 <a id="Shelly-attr-model"></a>
                 <code>attr &lt;name&gt; model generic|shelly1|shelly1pm|shelly2|shelly2.5|
