@@ -3518,7 +3518,7 @@ attr DEVICE setList \
   valve_min_percent:slider,0,1,100,1 $\DEVICETOPIC/thermostat/0/command/valve_min_percent $EVTPART1\
   boost:on,off {my $val=$EVTPART1 eq 'on'?5:0; qq($\DEVICETOPIC/thermostat/0/command/boost_minutes $val)}\
   boost_minutes $\DEVICETOPIC/thermostat/0/command/boost_minutes $EVTPART1\
-  window:open,close {my $val=$EVTPART1 eq 'open'?1:0; qq($DEVICETOPIC/thermostat/0/command/window_open $val)}\
+  window:open,close {my $val=$EVTPART1 eq 'open'?1:0; qq($\DEVICETOPIC/thermostat/0/command/window_open $val)}\
   set_boost_minutes $\DEVICETOPIC/thermostat/0/command/set_boost_minutes $EVTPART1
 attr DEVICE jsonMap bat:0 bat_value:batteryPercent bat_voltage:batteryVoltage target_t_value:desired-temp thermostats_1_tmp_value:temperature thermostats_1_valve_min_percent:valve_min_percent thermostats_1_target_t_accelerated_heating:accelerated_heating thermostats_1_schedule:mode thermostats_1_pos:valve
 attr DEVICE stateFormat Measured: temperature Battery: batteryPercent %
@@ -3528,7 +3528,7 @@ attr DEVICE setStateList on off
 attr DEVICE model shelly_TRV
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20231205
+setreading DEVICE attrTemplateVersion 20231230
 
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
@@ -3800,6 +3800,41 @@ attr DEVICE setStateList open close half stop pct
 set DEVICE attrTemplate speechcontrol_type_blind
 attr DEVICE model shellyPlus_2pm_roller_invert_0
 setreading DEVICE attrTemplateVersion 20220623
+
+# contributed by mahil, https://forum.fhem.de/index.php?msg=1297932
+name:shellyPlus_2pm_roller_invert_1
+filter:TYPE=MQTT2_DEVICE
+desc:Template for second generation shelly devices (names with "plus", with power measurement). NOTE: requires to activate generic status update in firmware settings (if not available: reset device to factory defaults) and activation of the roller mode.<br>NOTE: Please wait some seconds to allow Shelly device to complete reboot.
+order:A_20c1b
+par:DEV_TPC;Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+|shellyp(lus|ro4pm)[^/:_]{4,}+)> ? $1 : undef }
+par:ICON;ICON as set, defaults to fts_shutter;{ AttrVal('DEVICE','icon','fts_shutter') }
+attr DEVICE icon ICON
+attr DEVICE devicetopic DEV_TPC
+attr DEVICE comment Shelly Plus 2 PM in Roller-Mode. 0=opened / 100=closed
+attr DEVICE readingList $\DEVICETOPIC/online:.* online\
+  $\DEVICETOPIC/status/mqtt:.* { json2nameValue($EVENT, 'mqtt_', $JSONMAP) }\
+  $\DEVICETOPIC/status/sys:.* { json2nameValue($EVENT, 'sys_', $JSONMAP) }\
+  $\DEVICETOPIC/status/cover_0:.* {if ($EVENT =~ /"current_pos":(\d+)/) {my $pct = 100 - $1; $EVENT =~ s/"current_pos":$1/"current_pos":$pct/} json2nameValue($EVENT, 'status_', $JSONMAP) }\
+  fhem2shelly/rpc:.* {}
+attr DEVICE setList open:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Cover.Open","params": {"id":0}}\
+  close:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Cover.Close","params": {"id":0}}\
+  half:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Cover.GoToPosition","params": {"id":0,"pos":50}}\
+  stop:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Cover.Stop","params": {"id":0}}\
+  pct:slider,0,1,100 {my $pct = 100 - $EVTPART1; return $\DEVICETOPIC . '/rpc {"id":0,"src":"fhem2shelly","method":"Cover.GoToPosition","params": {"id":0,"pos":' . $pct . '}}';}\
+  x_update:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Shelly.Update","params": {"stage":"stable"}}\
+  x_reboot:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Shelly.Reboot"}\
+  x_eco:true,false $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Sys.SetConfig","params": {"config": {"device": {"eco_mode": $EVTPART1}}}}
+attr DEVICE jsonMap status_state:state status_current_pos:pct status_temperature_tC:temperature
+attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red true:10px-kreis-gruen false:10px-kreis-rot 100:fts_shutter_100 \d:fts_shutter_10 1\d:fts_shutter_10 2\d:fts_shutter_20 3\d:fts_shutter_30 4\d:fts_shutter_40 5\d:fts_shutter_50 6\d:fts_shutter_60 7\d:fts_shutter_70 8\d:fts_shutter_80 9\d:fts_shutter_90 set_.*:fts_shutter_updown
+attr DEVICE stateFormat online\
+pct
+attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
+attr DEVICE webCmd :open:close:half:stop:pct
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE setStateList open close half stop pct
+set DEVICE attrTemplate speechcontrol_type_blind
+attr DEVICE model shellyPlus_2pm_roller_invert_1
+setreading DEVICE attrTemplateVersion 20231227
 
 
 name:shellypro4pm

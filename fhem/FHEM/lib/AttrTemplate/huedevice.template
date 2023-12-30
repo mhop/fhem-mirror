@@ -40,6 +40,7 @@ par:ICON;ICON as set, defaults to max_heizungsthermostat;{ AttrVal('DEVICE','ico
 attr DEVICE configList /mode (.*)/:{"mode":"$1"}\
 /heatsetpoint (.*)/:perl:{'{"heatsetpoint":' . $VALUE1 * 100 . '}'}\
 /displayflipped (.*)/:{"displayflipped": $1 }\
+/offset (.*)/:{"offset": $1 }\
 lock:{"locked": true }\
 unlock:{"locked": false }
 attr DEVICE widgetOverride mode:auto,heat,off displayflipped:true,false heatsetpoint:16,16.5,17,17.5,18,18.5,19,19.5,20,20.5,21,21.5,22
