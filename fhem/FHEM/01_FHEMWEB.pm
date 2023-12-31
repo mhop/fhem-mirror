@@ -1829,7 +1829,9 @@ FW_roomOverview($)
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       next if(!$list1[$idx]);
       my $sel = ($list1[$idx] eq $FW_room ? " selected=\"selected\""  : "");
-      FW_pO "<option value='$list2[$idx]'$sel>$list1[$idx]</option>";
+      my $v = $list2[$idx];
+      $v .= $FW_CSRF if($v =~ m/cmd=/);
+      FW_pO "<option value='$v'$sel>$list1[$idx]</option>";
     }
     FW_pO "</select></td>";
     FW_pO "</tr>";
