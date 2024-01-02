@@ -26,7 +26,8 @@ sub decode_j {
   use JSON qw(decode_json);
   my $maybe_json = shift;
   my $data;
-  if ( eval { $data = decode_json($maybe_json); 1 } ) { return $data }
+  # from message https://forum.fhem.de/index.php?msg=1297370
+  if ( eval { $data = JSON->new->utf8->decode(encode('UTF-8', $maybe_json)); 1 } ) { return $data }
   Log3(undef, 1, "JSON decoding error, >$maybe_json< seems not to be valid JSON data: $@");
   return q{}
 }
