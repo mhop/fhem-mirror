@@ -2591,6 +2591,7 @@ sub CDCOpenData_myCalcColor {
    <b>Readings</b>
    <br>
    <ul>
+      The value -1 indicates an incorrect value on the part of the DWD.<br>
       <li>name | loc<i>0..n</i>_day_rain:timestamp - Rainfall of the location <i>name | n</i></li>
       <li>name | loc<i>0..n</i>_since_midnight:timestamp - Rainfall of the location <i>name | n</i></li>
       <li>name | loc<i>0..n</i>_rain_radar:timestamp - Rainfall of the location <i>name | n</i></li>
@@ -2768,6 +2769,7 @@ sub CDCOpenData_myCalcColor {
    <b>Readings</b>
    <br>
    <ul>
+      Der Wert -1 kennzeichnet einen fehlerhaften Wert seitens des DWD<br>
       <li>name | loc<i>0..n</i>_day_rain/nn - Regenmenge der Lokation <i>name | n</i></li>
       <li>name | loc<i>0..n</i>_since_midnight - Regenmenge der Lokation <i>name | n</i></li>
       <li>name | loc<i>0..n</i>_rain_radar/nn - Regenmenge der Lokation <i>name | n</i></li>
