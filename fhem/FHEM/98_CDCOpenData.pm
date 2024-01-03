@@ -137,7 +137,7 @@ sub CDCOpenData_DebugLog($$$$;$) {
 
   unless ($timestamp) {
 
-    $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d", $t[5] * 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
+    $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
 
     if ($attr{global}{mseclog}) {
       $tim .= sprintf(".%03d", $microseconds / 1000);
