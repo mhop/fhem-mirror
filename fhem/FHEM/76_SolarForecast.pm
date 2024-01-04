@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
-#       (c) 2020-2023 by Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
+#       (c) 2020-2024 by Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This script is part of fhem.
 #
@@ -155,6 +155,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.6.1"  => "04.01.2024  new sub __setPhysSwState, edit ___setConsumerPlanningState, boost performance of collectAllRegConsumers ".
+                           "CurrentVal ctrunning - Central Task running Statusbit, edit comref ",
   "1.6.0"  => "22.12.2023  store daily batmaxsoc in pvHistory, new attr ctrlBatSocManagement, reading Battery_OptimumTargetSoC ".
                            "currentBatteryDev: new optional key 'cap', adapt cloud2bin,temp2bin,rain2bin ".
                            "minor internal changes, isAddSwitchOffCond: change hysteresis algo, ctrlDebug: new entry batteryManagement ".
@@ -258,207 +260,6 @@ my %vNotesIntern = (
   "0.75.0" => "16.02.2023  new attribute ctrlSolCastAPImaxReq, rename attr ctrlOptimizeSolCastInterval to ctrlSolCastAPIoptimizeReq ",
   "0.74.8" => "11.02.2023  change description of 'mintime', mintime with SunPath value possible ",
   "0.74.7" => "23.01.2023  fix evaljson evaluation ",
-  "0.74.6" => "22.11.2022  bugfix consumerLegend tooltip start/end time if language is set to english ",
-  "0.74.5" => "21.11.2022  new Attr affectSolCastPercentile ",
-  "0.74.4" => "19.11.2022  calculate Today_PVreal from the etotal daily difference after sunset ",
-  "0.74.3" => "16.11.2022  writeCacheToFile 'solcastapi' after every SolCast API Call cycle is finished ",
-  "0.74.2" => "15.11.2022  sunrise and sunset in graphic header ",
-  "0.74.1" => "15.11.2022  ___planMust -> half -> ceil to floor changed , Model SolCast: first call from 60 minutes before sunrise ".
-                           "Model SolCast: release planning only after the first API retrieval ".
-                           "Model DWD: release planning from one hour before sunrise ",
-  "0.74.0" => "13.11.2022  new attribute affectConsForecastInPlanning ",
-  "0.73.0" => "12.11.2022  save Ehodpieces (___saveEhodpieces), use debug modules, revise comref,typos , maxconsumer 12 ".
-                           "attr ctrlLanguage for local language support, bugfix MODE is set to Manual after restart if ".
-                           "attr ctrlInterval is not set, new attr consumerLink, graphic tooltips and formatting ",
-  "0.72.5" => "08.11.2022  calculate percentile correction factor instead of best percentile, exploit all available API requests ".
-                           "graphicBeamWidth more values, add moduleTiltAngle: 5,15,35,55,65,75,85 , ".
-                           "fix _estConsumptionForecast, delete Setter pvSolCastPercentile_XX ",
-  "0.72.4" => "06.11.2022  change __solCast_ApiResponse -> special processing first dataset of current hour ",
-  "0.72.3" => "05.11.2022  new status bit CurrentVal allStringsFullfilled ",
-  "0.72.2" => "05.11.2022  minor changes in header, rename more attributes, edit commandref, associatedWith is working again ",
-  "0.72.1" => "31.10.2022  fix 'connection lost ...' issue again, global language check in checkPlantConfig ",
-  "0.72.0" => "30.10.2022  rename some graphic attributes ",
-  "0.71.4" => "29.10.2022  flowgraphic some changes (https://forum.fhem.de/index.php/topic,117864.msg1241836.html#msg1241836) ",
-  "0.71.3" => "28.10.2022  new circular keys tdayDvtn, ydayDvtn for calculation PV forecast/generation in header ",
-  "0.71.2" => "27.10.2022  fix 'connection lost ...' issue ",
-  "0.71.1" => "26.10.2022  save no datasets with pv_estimate = 0 (__solCast_ApiResponse) to save time/space ".
-                           "changed some graphic default settings, typo todayRemaingAPIcalls, input check currentBatteryDev ".
-                           "change attr Css to flowGraphicCss ",
-  "0.71.0" => "25.10.2022  new attribute ctrlStatisticReadings, changed some default settings and commandref ",
-  "0.70.10"=> "24.10.2022  write best percentil in pvHistory (_calcCaQsimple instead of ___readCorrfSimple) ".
-                           "add global dnsServer to checkPlantConfig ",
-  "0.70.9 "=> "24.10.2022  create additional percentile only for pvCorrectionFactor_Auto on, changed __solCast_ApiResponse ".
-                           "changed _calcCaQsimple ",
-  "0.70.8 "=> "23.10.2022  change average calculation in _calcCaQsimple, unuse Notify/createAssociatedWith ".
-                           "extend Delete func, extend plantconfig check, revise commandref, change set reset pvCorrection ".
-                           "rename runTimeCycleSummary to runTimeCentralTask ",
-  "0.70.7 "=> "22.10.2022  minor changes (Display is/whereabouts Solacast Requests, SolCast Forecast Quality, setup procedure) ",
-  "0.70.6 "=> "19.10.2022  fix  ___setSolCastAPIcallKeyData ",
-  "0.70.5 "=> "18.10.2022  new hidden getter plantConfigCheck ",
-  "0.70.4 "=> "16.10.2022  change attr historyHour to positive numbers, plantconfig check changed ",
-  "0.70.3 "=> "15.10.2022  check event-on-change-reading in plantConfiguration check ",
-  "0.70.2 "=> "15.10.2022  average calculation in _calcCaQsimple, delete reduce by temp in __calcPVestimates ",
-  "0.70.1 "=> "14.10.2022  new function setTimeTracking ",
-  "0.70.0 "=> "13.10.2022  delete Attr solCastPercentile, new manual Setter pvSolCastPercentile_XX ",
-  "0.69.0 "=> "12.10.2022  Autocorrection function for model SolCast-API, __solCast_ApiRequest: request only 48 hours ",
-  "0.68.7 "=> "07.10.2022  new function _calcCaQsimple, check missed modules in _getRoofTopData ",
-  "0.68.6 "=> "06.10.2022  new attribute solCastPercentile, change _calcMaxEstimateToday ",
-  "0.68.5 "=> "03.10.2022  extent plant configuration check ",
-  "0.68.4 "=> "03.10.2022  do ___setSolCastAPIcallKeyData if response_status, generate events of Today_MaxPVforecast.* in every cycle ".
-                           "add SolCast section in _graphicHeader, change default colors and settings, new reading Today_PVreal ".
-                           "fix sub __setConsRcmdState ",
-  "0.68.3 "=> "19.09.2022  fix calculation of currentAPIinterval ",
-  "0.68.2 "=> "18.09.2022  fix function _setpvCorrectionFactorAuto, new attr optimizeSolCastAPIreqInterval, change createReadingsFromArray ",
-  "0.68.1 "=> "17.09.2022  new readings Today_MaxPVforecast, Today_MaxPVforecastTime ",
-  "0.68.0 "=> "15.09.2022  integrate SolCast API, change attribute Wh/kWh to Wh_kWh, rename Reading nextPolltime to ".
-                           "nextCycletime, rework plant config check, minor (bug)fixes ",
-  "0.67.6 "=> "02.09.2022  add ___setPlanningDeleteMeth, consumer can be planned across daily boundaries ".
-                           "fix JS Fehler (__weatherOnBeam) Forum: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661 ",
-  "0.67.5 "=> "28.08.2022  add checkRegex ",
-  "0.67.4 "=> "28.08.2022  ___switchConsumerOn -> no switch on if additional switch off condition is true ".
-                           "__setConsRcmdState -> Consumer can be switched on in case of missing PV power if key power=0 is set ".
-                           "new process and additional split for hysteresis ",
-  "0.67.3 "=> "22.08.2022  show cloudcover in weather __weatherOnBeam ",
-  "0.67.2 "=> "11.08.2022  fix no disabled Link after restart and disable=1 ",
-  "0.67.1 "=> "10.08.2022  fix warning, Forum: https://forum.fhem.de/index.php/topic,117864.msg1231050.html#msg1231050 ",
-  "0.67.0 "=> "31.07.2022  change _gethtml, _getftui ",
-  "0.66.0 "=> "24.07.2022  insert function ___calcPeaklossByTemp to calculate peak power reduction by temperature ",
-  "0.65.8 "=> "23.07.2022  change calculation of cloud cover in calcRange function ",
-  "0.65.7 "=> "20.07.2022  change performance ratio in __calcDWDEstimates_old to 0.85 ",
-  "0.65.6 "=> "20.07.2022  change __calcEnergyPieces for consumer types with \$hef{\$cotype}{f} == 1 ",
-  "0.65.5 "=> "13.07.2022  extend isInterruptable and isAddSwitchOffCond ",
-  "0.65.4 "=> "11.07.2022  new function isConsumerLogOn, minor fixes ",
-  "0.65.3 "=> "10.07.2022  consumer with mode=must are now interruptable, change hourscsme ",
-  "0.65.2 "=> "08.07.2022  change avgenergy to W p. hour ",
-  "0.65.1 "=> "07.07.2022  change logic of __calcEnergyPieces function and the \%hef hash ",
-  "0.65.0 "=> "03.07.2022  feature key interruptable for consumer ",
-  "0.64.2 "=> "23.06.2022  fix switch off by switch off condition in ___switchConsumerOff ",
-  "0.64.1 "=> "07.06.2022  fixing simplifyCstate, sub ___setConsumerSwitchingState to improve safe consumer switching ",
-  "0.64.0 "=> "04.06.2022  consumer type charger added, new attr ctrlConsRecommendReadings ",
-  "0.63.2 "=> "21.05.2022  changed isConsumptionRecommended to isIntimeframe, renewed isConsumptionRecommended ",
-  "0.63.1 "=> "19.05.2022  code review __switchConsumer ",
-  "0.63.0 "=> "18.05.2022  new attr flowGraphicConsumerDistance ",
-  "0.62.0 "=> "16.05.2022  new key 'swoffcond' in consumer attributes ",
-  "0.61.0 "=> "15.05.2022  limit PV forecast to inverter capacity ",
-  "0.60.1 "=> "15.05.2022  consumerHash -> new key avgruntime, don't modify mintime by avgruntime by default anymore ".
-                           "debug switch conditions ",
-  "0.60.0 "=> "14.05.2022  new key 'swoncond' in consumer attributes ",
-  "0.59.0 "=> "01.05.2022  new attr createTomorrowPVFcReadings ",
-  "0.58.0 "=> "20.04.2022  new setter consumerImmediatePlanning, functions isConsumerPhysOn isConsumerPhysOff ",
-  "0.57.3 "=> "10.04.2022  some fixes (\$eavg in ___csmSpecificEpieces, isAutoCorrUsed switch to regex) ",
-  "0.57.2 "=> "03.04.2022  area factor for 25° added ",
-  "0.57.1 "=> "28.02.2022  new attr flowGraphicShowConsumerPower and flowGraphicShowConsumerRemainTime (Consumer remainTime in flowGraphic)",
-  "0.56.11"=> "01.12.2021  comment: 'next if(\$surplus <= 0);' to resolve consumer planning problem if 'mode = must' and the ".
-                           "current doesn't have suplus ",
-  "0.56.10"=> "14.11.2021  change sub _flowGraphic (Max), https://forum.fhem.de/index.php/topic,117864.msg1186970.html#msg1186970, new reset consumerMaster ",
-  "0.56.9" => "27.10.2021  change sub _flowGraphic (Max) ",
-  "0.56.8" => "25.10.2021  change func  ___csmSpecificEpieces as proposed from Max : https://forum.fhem.de/index.php/topic,117864.msg1180452.html#msg1180452 ",
-  "0.56.7" => "18.10.2021  new attr flowGraphicShowConsumerDummy ",
-  "0.56.6" => "19.09.2021  bug fix ",
-  "0.56.5" => "16.09.2021  fix sub ___csmSpecificEpieces (rows 2924-2927) ",
-  "0.56.4" => "16.09.2021  new sub ___csmSpecificEpieces ",
-  "0.56.3" => "15.09.2021  extent __calcEnergyPieces by MadMax calc (first test implementation) ",
-  "0.56.2" => "14.09.2021  some fixes, new calculation of hourscsmeXX, new key minutescsmXX ",
-  "0.56.1" => "12.09.2021  some fixes ",
-  "0.56.0" => "11.09.2021  new Attr flowGraphicShowConsumer, extend calc consumer power consumption ",
-  "0.55.3" => "08.09.2021  add energythreshold to etotal key ",
-  "0.55.2" => "08.09.2021  minor fixes, use Color ",
-  "0.55.1" => "05.09.2021  delete invalid consumer index, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219 ",
-  "0.55.0" => "04.09.2021  new key pcurr for attr customerXX ",
-  "0.54.5" => "29.08.2021  change metadata ",
-  "0.54.4" => "12.07.2021  round Current_PV in _transferInverterValues ",
-  "0.54.3" => "11.07.2021  fix _flowGraphic because of Current_AutarkyRate with powerbatout ",
-  "0.54.2" => "01.07.2021  fix Current_AutarkyRate with powerbatout ",
-  "0.54.1" => "23.06.2021  better log in  __weatherOnBeam ",
-  "0.54.0" => "19.06.2021  new calcValueImproves, new reset pvCorrection circular, behavior of attr 'numHistDays', fixes ",
-  "0.53.0" => "17.06.2021  Logic for preferential charging battery, attr preferredChargeBattery ",
-  "0.52.5" => "16.06.2021  sub __weatherOnBeam ",
-  "0.52.4" => "15.06.2021  minor fix, possible avoid implausible inverter values ",
-  "0.52.3" => "14.06.2021  consumer on/off icon gray if no on/off command is defined, more consumer debug log ",
-  "0.52.2" => "13.06.2021  attr consumerAdviceIcon can be 'none', new attr debug, minor fixes, write consumers cachefile ",
-  "0.52.1" => "12.06.2021  change Attr Css behavior, new attr consumerAdviceIcon ",
-  "0.52.0" => "12.06.2021  new Attr Css ",
-  "0.51.3" => "10.06.2021  more refactoring, add 'none' to graphicSelect ",
-  "0.51.2" => "05.06.2021  minor fixes ",
-  "0.51.1" => "04.06.2021  minor fixes ",
-  "0.51.0" => "03.06.2021  some bugfixing, Calculation of PV correction factors refined, new setter plantConfiguration ".
-                           "delete getter stringConfig ",
-  "0.50.2" => "02.06.2021  more refactoring, delete attr headerAlignment, consumerlegend as table ",
-  "0.50.1" => "02.06.2021  switch to mathematical rounding of cloudiness range ",
-  "0.50.0" => "01.06.2021  real switch off time in consumerXX_planned_stop when finished, change key 'ready' to 'auto' ".
-                           "consider switch on Time limits (consumer keys notbefore/notafter) ",
-  "0.49.5" => "01.06.2021  change pv correction factor to 1 if no historical factors found (only with automatic correction) ",
-  "0.49.4" => "01.06.2021  fix wrong display at month change and using historyHour ",
-  "0.49.3" => "31.05.2021  improve __calcDWDEstimates_old pvcorrfactor for multistring configuration ",
-  "0.49.2" => "31.05.2021  fix time calc in sub forecastGraphic ",
-  "0.49.1" => "30.05.2021  no consumer check during start Forum: https://forum.fhem.de/index.php/topic,117864.msg1159959.html#msg1159959  ",
-  "0.49.0" => "29.05.2021  consumer legend, attr consumerLegend, no negative val Current_SelfConsumption, Current_PV ",
-  "0.48.0" => "28.05.2021  new optional key ready in consumer attribute ",
-  "0.47.0" => "28.05.2021  add flowGraphic, attr flowGraphicSize, graphicSelect, flowGraphicAnimate ",
-  "0.46.1" => "21.05.2021  set <> reset pvHistory <day> <hour> ",
-  "0.46.0" => "16.05.2021  integrate intotal, outtotal to currentBatteryDev, set maxconsumer to 9 ",
-  "0.45.1" => "13.05.2021  change the calc of etotal at the beginning of every hour in _transferInverterValues ".
-                           "fix createAssociatedWith for currentBatteryDev ",
-  "0.45.0" => "12.05.2021  integrate consumptionForecast to graphic, change beamXContent to pvForecast, pvReal ",
-  "0.44.0" => "10.05.2021  consumptionForecast for attr beamXContent, consumer are switched on/off ",
-  "0.43.0" => "08.05.2021  plan Consumers ",
-  "0.42.0" => "01.05.2021  new attr consumerXX, currentMeterDev is mandatory, new getter valConsumerMaster ".
-                           "new commandref ancor syntax ",
-  "0.41.0" => "28.04.2021  _estConsumptionForecast: implement Smoothing difference ",
-  "0.40.0" => "25.04.2021  change checkdwdattr, new attr follow70percentRule ",
-  "0.39.0" => "24.04.2021  new attr sameWeekdaysForConsfc, readings Current_SelfConsumption, Current_SelfConsumptionRate, ".
-                           "Current_AutarkyRate ",
-  "0.38.3" => "21.04.2021  minor fixes in sub calcValueImproves, Traffic light indicator for prediction quality, some more fixes ",
-  "0.38.2" => "20.04.2021  fix _estConsumptionForecast, add consumption values to graphic ",
-  "0.38.1" => "19.04.2021  bug fixing ",
-  "0.38.0" => "18.04.2021  consumption forecast for the next hours prepared ",
-  "0.37.0" => "17.04.2021  _estConsumptionForecast, new getter forecastQualities, new setter currentRadiationDev ".
-                           "language sensitive setup hints ",
-  "0.36.1" => "14.04.2021  add dayname to pvHistory ",
-  "0.36.0" => "14.04.2021  add con to pvHistory, add quality info to pvCircular, new reading nextPolltime ",
-  "0.35.0" => "12.04.2021  create additional PVforecast events - PV forecast until the end of the coming day ",
-  "0.34.1" => "11.04.2021  further improvement of cloud dependent calculation autocorrection ",
-  "0.34.0" => "10.04.2021  only hours with the same cloud cover range are considered for pvCorrection, some fixes ",
-  "0.33.0" => "09.04.2021  new setter currentBatteryDev, bugfix in _transferMeterValues ",
-  "0.32.0" => "09.04.2021  currentMeterDev can have: gcon=-gfeedin ",
-  "0.31.1" => "07.04.2021  write new values to pvhistory, change CO to Current_Consumption in graphic ",
-  "0.31.0" => "06.04.2021  extend currentMeterDev by gfeedin, feedtotal ",
-  "0.30.0" => "05.04.2021  estimate readings to the minute in sub _createSummaries, new setter energyH4Trigger ",
-  "0.29.0" => "03.04.2021  new setter powerTrigger ",
-  "0.28.0" => "03.04.2021  new attributes beam1FontColor, beam2FontColor, rename/new some readings ",
-  "0.27.0" => "02.04.2021  additional readings ",
-  "0.26.0" => "02.04.2021  rename attr maxPV to maxValBeam, bugfix in _specialActivities ",
-  "0.25.0" => "28.03.2021  changes regarding perlcritic, new getter valCurrent ",
-  "0.24.0" => "26.03.2021  the language setting of the system is taken into account in the weather texts ".
-                           "rename weatherColor_night to weatherColorNight, history_hour to historyHour ",
-  "0.23.0" => "25.03.2021  change attr layoutType, fix calc reading Today_PVforecast ",
-  "0.22.0" => "25.03.2021  event management, move DWD values one hour to the future, some more corrections ",
-  "0.21.0" => "24.03.2021  event management ",
-  "0.20.0" => "23.03.2021  new sub CircularVal, NexthoursVal, some fixes ",
-  "0.19.0" => "22.03.2021  new sub HistoryVal, some fixes ",
-  "0.18.0" => "21.03.2021  implement sub forecastGraphic from Wzut ",
-  "0.17.1" => "21.03.2021  bug fixes, delete Helper->NextHour ",
-  "0.17.0" => "20.03.2021  new attr cloudFactorDamping / rainFactorDamping, fixes in Graphic sub ",
-  "0.16.0" => "19.03.2021  new getter nextHours, some fixes ",
-  "0.15.3" => "19.03.2021  corrected weather consideration for call __calcDWDEstimates_old ",
-  "0.15.2" => "19.03.2021  some bug fixing ",
-  "0.15.1" => "18.03.2021  replace ThisHour_ by NextHour00_ ",
-  "0.15.0" => "18.03.2021  delete overhanging readings in sub _transferDWDRadiationValues_old ",
-  "0.14.0" => "17.03.2021  new getter PVReal, weatherData, consumption total in currentMeterdev ",
-  "0.13.0" => "16.03.2021  changed sub forecastGraphic from Wzut ",
-  "0.12.0" => "16.03.2021  switch etoday to etotal ",
-  "0.11.0" => "14.03.2021  new attr history_hour, beam1Content, beam2Content, implement sub forecastGraphic from Wzut, ".
-                           "rename attr beamColor, beamColor2 , more fixes ",
-  "0.10.0" => "13.03.2021  hour shifter in sub _transferMeterValues, lot of fixes ",
-  "0.9.0"  => "13.03.2021  more helper hashes Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251 ".
-                           "cachefile pvhist is persistent ",
-  "0.8.0"  => "07.03.2021  helper hash Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350 ",
-  "0.7.0"  => "01.03.2021  add function DbLog_splitFn ",
-  "0.6.0"  => "27.01.2021  change __calcDWDEstimates_old from formula 1 to formula 2 ",
-  "0.5.0"  => "25.01.2021  add multistring support, add reset inverterStrings ",
-  "0.4.0"  => "24.01.2021  setter moduleDirection, add Area factor to __calcDWDEstimates_old, add reset pvCorrection ",
-  "0.3.0"  => "21.01.2021  add cloud correction, add rain correction, add reset pvHistory, setter writeHistory ",
-  "0.2.0"  => "20.01.2021  use SMUtils, JSON, implement getter data,html,pvHistory, correct the 'disable' problem ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -791,14 +592,16 @@ my %hqtxt = (                                                                   
               DE => qq{Bitte setzen sie die Victron VRM Portal Zugangsdaten mit "set LINK vrmCredentials". }                },
   awd    => { EN => qq{LINK is waiting for solar forecast data ... <br>},
               DE => qq{LINK wartet auf Solarvorhersagedaten ... <br>}                                                       },
+  wexso  => { EN => qq{switched externally},
+              DE => qq{von extern umgeschaltet}                                                                             }, 
   strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please note any information (<I>).},
               DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise (<I>) beachten.}                   },
   strwn  => { EN => qq{Looks quite good &#128528;, the system configuration is basically OK. Please note the warnings (<W>).},
               DE => qq{Sieht ganz gut aus &#128528;, die Anlagenkonfiguration ist prinzipiell in Ordnung. Bitte beachten Sie die Warnungen (<W>).}             },
   strnok => { EN => qq{Oh no &#128577;, the system configuration is incorrect. Please check the settings and notes!},
               DE => qq{Oh nein &#128546;, die Anlagenkonfiguration ist fehlerhaft. Bitte überprüfen Sie die Einstellungen und Hinweise!}                       },
-  pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop><br>Remaining lock time:&nbsp;<RLT> seconds},
-              DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop><br>verbleibende Sperrzeit:&nbsp;<RLT> Sekunden}                  },
+  pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>Info:&nbsp;<supplmnt><br>On:&nbsp;<start><br>Off:&nbsp;<stop><br>Remaining lock time:&nbsp;<RLT> seconds},
+              DE => qq{Planungsstatus:&nbsp;<pstate><br>Info:&nbsp;<supplmnt><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop><br>verbleibende Sperrzeit:&nbsp;<RLT> Sekunden}    },
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
@@ -862,8 +665,8 @@ my %htitles = (                                                                 
                 DE => qq{nicht bewertet}                                                                           },
   aimstt   => { EN => qq{Perl module AI::DecisionTree is missing},
                 DE => qq{Perl Modul AI::DecisionTree ist nicht vorhanden}                                          },
-  pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\n\nOn:&nbsp;<start>\nOff:&nbsp;<stop>\nRemaining lock time:&nbsp;<RLT> seconds},
-                DE => qq{Planungsstatus:&nbsp;<pstate>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>\nverbleibende Sperrzeit:&nbsp;<RLT> Sekunden}                                             },
+  pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\nInfo:&nbsp;<supplmnt>\n\nOn:&nbsp;<start>\nOff:&nbsp;<stop>\nRemaining lock time:&nbsp;<RLT> seconds},
+                DE => qq{Planungsstatus:&nbsp;<pstate>\nInfo:&nbsp;<supplmnt>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>\nverbleibende Sperrzeit:&nbsp;<RLT> Sekunden}                      },
   ainuse   => { EN => qq{AI Perl module is installed, but the AI support is not used.\nRun 'set <NAME> plantConfiguration check' for hints.},
                 DE => qq{KI Perl Modul ist installiert, aber die KI Unterst&uuml;tzung wird nicht verwendet.\nPr&uuml;fen sie 'set <NAME> plantConfiguration check' f&uuml;r Hinweise.} },
 );
@@ -1233,7 +1036,7 @@ sub _readCacheFile {
           if ($valid) {
               $data{$type}{$name}{aidectree}{aitrained}  = $dtree;
               $data{$type}{$name}{current}{aitrainstate} = 'ok';
-              Log3($name, 3, qq{$name - cached data "$cachename" restored});
+              Log3 ($name, 3, qq{$name - cached data "$cachename" restored});
           }
       }
 
@@ -1246,7 +1049,7 @@ sub _readCacheFile {
       if (!$err && $data) {
           $data{$type}{$name}{aidectree}{airaw}     = $data;
           $data{$type}{$name}{current}{aitrawstate} = 'ok';
-          Log3($name, 3, qq{$name - cached data "$cachename" restored});
+          Log3 ($name, 3, qq{$name - cached data "$cachename" restored});
       }
 
       return;
@@ -1260,10 +1063,10 @@ sub _readCacheFile {
 
       if($success) {
            $data{$hash->{TYPE}}{$name}{$cachename} = decode_json ($json);
-           Log3($name, 3, qq{$name - cached data "$cachename" restored});
+           Log3 ($name, 3, qq{$name - cached data "$cachename" restored});
       }
       else {
-          Log3($name, 2, qq{$name - WARNING - The content of file "$file" is not readable and may be corrupt});
+          Log3 ($name, 1, qq{$name - WARNING - The content of file "$file" is not readable and may be corrupt});
       }
   }
 
@@ -1448,17 +1251,17 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
 
   $paref->{consumer} = $c;
   $paref->{ps}       = "planned:";
-  $paref->{startts}  = $startts;                                                      # Unix Timestamp für geplanten Switch on
-  $paref->{stopts}   = $stopts;                                                       # Unix Timestamp für geplanten Switch off
+  $paref->{startts}  = $startts;                                                               # Unix Timestamp für geplanten Switch on
+  $paref->{stopts}   = $stopts;                                                                # Unix Timestamp für geplanten Switch off
 
   ___setConsumerPlanningState ($paref);
   ___saveEhodpieces           ($paref);
   ___setPlanningDeleteMeth    ($paref);
 
-  my $planstate = ConsumerVal ($hash, $c, "planstate", "");
-  my $calias    = ConsumerVal ($hash, $c, "alias",     "");
-
-  writeCacheToFile ($hash, "consumers", $csmcache.$name);                             # Cache File Consumer schreiben
+  my $planstate = ConsumerVal ($hash, $c, 'planstate', '');
+  my $calias    = ConsumerVal ($hash, $c, 'alias',     '');
+  
+  writeCacheToFile ($hash, "consumers", $csmcache.$name);                                      # Cache File Consumer schreiben
 
   Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate}) if($planstate);
 
@@ -2602,14 +2405,14 @@ sub __getSolCastData {
   my $msg;
   if($ctzAbsent) {
       $msg = qq{The library FHEM::Utility::CTZ is missing. Please update FHEM completely.};
-      Log3 ($name, 2, "$name - ERROR - $msg");
+      Log3 ($name, 1, "$name - ERROR - $msg");
       return $msg;
   }
 
   my $rmf = reqModFail();
   if($rmf) {
       $msg = "You have to install the required perl module: ".$rmf;
-      Log3 ($name, 2, "$name - ERROR - $msg");
+      Log3 ($name, 1, "$name - ERROR - $msg");
       return $msg;
   }
 
@@ -2781,7 +2584,7 @@ sub __solCast_ApiResponse {
   if ($err ne "") {
       $msg = 'SolCast API server response: '.$err;
 
-      Log3 ($name, 2, "$name - $msg");
+      Log3 ($name, 1, "$name - $msg");
 
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
 
@@ -2797,7 +2600,7 @@ sub __solCast_ApiResponse {
       if(!$success) {
           $msg = 'ERROR - invalid SolCast API server response';
 
-          Log3 ($name, 2, "$name - $msg");
+          Log3 ($name, 1, "$name - $msg");
 
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
           $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
@@ -2859,7 +2662,7 @@ sub __solCast_ApiResponse {
           ($err, $starttmstr) = ___convPendToPstart ($name, $lang, $petstr);
 
           if ($err) {
-              Log3 ($name, 2, "$name - $err");
+              Log3 ($name, 1, "$name - $err");
 
               singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
               return;
@@ -3197,7 +3000,7 @@ sub __forecastSolar_ApiResponse {
   if ($err ne "") {
       $msg = 'ForecastSolar API server response: '.$err;
 
-      Log3 ($name, 2, "$name - $msg");
+      Log3 ($name, 1, "$name - $msg");
 
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
 
@@ -3213,7 +3016,7 @@ sub __forecastSolar_ApiResponse {
       if(!$success) {
           $msg = 'ERROR - invalid ForecastSolar API server response';
 
-          Log3 ($name, 2, "$name - $msg");
+          Log3 ($name, 1, "$name - $msg");
 
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
           $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
@@ -3565,7 +3368,7 @@ sub __VictronVRM_ApiResponseLogin {
 
   if ($err ne "") {
       $msg = 'Victron VRM API error response: '.$err;
-      Log3              ($name, 2, "$name - $msg");
+      Log3              ($name, 1, "$name - $msg");
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
@@ -3579,7 +3382,7 @@ sub __VictronVRM_ApiResponseLogin {
 
       if(!$success) {
           $msg = 'ERROR - invalid Victron VRM API response';
-          Log3              ($name, 2, "$name - $msg");
+          Log3              ($name, 1, "$name - $msg");
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
           $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
@@ -3699,7 +3502,7 @@ sub __VictronVRM_ApiResponseForecast {
 
   if ($err ne "") {
       $msg = 'Victron VRM API Forecast response: '.$err;
-      Log3              ($name, 2, "$name - $msg");
+      Log3              ($name, 1, "$name - $msg");
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
@@ -3713,7 +3516,7 @@ sub __VictronVRM_ApiResponseForecast {
 
       if(!$success) {
           $msg = 'ERROR - invalid Victron VRM API Forecast response';
-          Log3              ($name, 2, "$name - $msg");
+          Log3              ($name, 1, "$name - $msg");
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
           $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
@@ -3852,7 +3655,7 @@ sub __VictronVRM_ApiResponseLogout {
 
   if ($err ne "") {
       $msg = 'Victron VRM API error response: '.$err;
-      Log3 ($name, 2, "$name - $msg");
+      Log3 ($name, 1, "$name - $msg");
       return;
   }
   elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
@@ -3860,7 +3663,7 @@ sub __VictronVRM_ApiResponseLogout {
 
       if(!$success) {
           $msg = 'ERROR - invalid Victron VRM API response';
-          Log3 ($name, 2, "$name - $msg");
+          Log3 ($name, 1, "$name - $msg");
           return;
       }
 
@@ -3878,7 +3681,7 @@ return;
 sub _getdata {
   my $paref = shift;
   my $hash  = $paref->{hash};
-
+  
 return centralTask ($hash);
 }
 
@@ -4174,7 +3977,7 @@ sub __updPreFile {
 
           #if (!$ok) {
           #    $err = "MKDIR ERROR: $!";
-          #    Log3 ($name, 2, "$name - $err");
+          #    Log3 ($name, 1, "$name - $err");
           #    return $err;
           #}
           #else {
@@ -4186,20 +3989,20 @@ sub __updPreFile {
   ($err, my $remFile) = __updGetUrl ($name, $bPath.$file.$pPath);
 
   if ($err) {
-      Log3 ($name, 2, "$name - $err");
+      Log3 ($name, 1, "$name - $err");
       return $err;
   }
 
   if ($lencheck && length $remFile ne $cmlen) {
       $err = "update ERROR: length of $file is not $cmlen Bytes";
-      Log3 ($name, 2, "$name - $err");
+      Log3 ($name, 1, "$name - $err");
       return $err;
   }
 
   $err = __updWriteFile ($root, $cmfile, $remFile);
 
   if ($err) {
-      Log3 ($name, 2, "$name - $err");
+      Log3 ($name, 1, "$name - $err");
       return $err;
   }
 
@@ -4430,6 +4233,7 @@ sub _attrconsumer {                      ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $aName = $paref->{aName};
   my $aVal  = $paref->{aVal};
   my $cmd   = $paref->{cmd};
@@ -4516,7 +4320,6 @@ sub _attrconsumer {                      ## no critic "not used"
   }
   else {
       my $day  = strftime "%d", localtime(time);                                                   # aktueller Tag  (range 01 to 31)
-      my $type = $hash->{TYPE};
       my ($c)  = $aName =~ /consumer([0-9]+)/xs;
 
       deleteReadingspec ($hash, "consumer${c}.*");
@@ -4532,7 +4335,9 @@ sub _attrconsumer {                      ## no critic "not used"
   }
 
   writeCacheToFile ($hash, "consumers", $csmcache.$name);                                          # Cache File Consumer schreiben
-
+  
+  $data{$type}{$name}{current}{consumerCollected} = 0;                                             # Consumer neu sammeln
+  
   InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask',          [$name, 0], 0);
   InternalTimer (gettimeofday()+2,   'FHEM::SolarForecast::createAssociatedWith', $hash,      0);
 
@@ -4580,8 +4385,6 @@ sub _attrcreateStatisticRdgs {           ## no critic "not used"
       }
   }
 
-  # deleteReadingspec ($hash, "statistic_.*");
-
 return;
 }
 
@@ -4592,8 +4395,6 @@ return;
 sub Notify {
   # Es werden nur die Events von Geräten verarbeitet die im Hash $hash->{NOTIFYDEV} gelistet sind (wenn definiert).
   # Dadurch kann die Menge der Events verringert werden. In sub DbRep_Define angeben.
-
-  #return;         # nicht genutzt zur Zeit
 
   my $myHash   = shift;
   my $dev_hash = shift;
@@ -4990,13 +4791,19 @@ sub centralTask {
           }
       }
 
-      return if(IsDisabled($name));
+      return if(IsDisabled($name));    
+      
+      if (CurrentVal ($hash, 'ctrunning', 0)) {
+          Log3 ($name, 3, "$name - INFO - central task was called when it was already running ... end this call");
+          $data{$type}{$name}{current}{ctrunning} = 0;
+          return;
+      }
 
-      if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                         # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
+      if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
           my $ret = createStringConfig ($hash);
 
           if ($ret) {
-              singleUpdateState ( {hash => $hash, state => $ret, evt => 1} );
+              singleUpdateState ( {hash => $hash, state => $ret, evt => 1} );                                                                    # Central Task running Statusbit
               return;
           }
       }
@@ -5008,7 +4815,9 @@ sub centralTask {
       my $day     = strftime "%d",       localtime($t);                                            # aktueller Tag  (range 01 to 31)
       my $dayname = strftime "%a",       localtime($t);                                            # aktueller Wochentagsname
       my $debug   = getDebug ($hash);                                                              # Debug Module
-
+      
+      $data{$type}{$name}{current}{ctrunning} = 1;                                                 # Central Task running Statusbit             
+      
       my $centpars = {
           hash    => $hash,
           name    => $name,
@@ -5078,6 +4887,8 @@ sub centralTask {
           $centpars->{evt} = 1;
           singleUpdateState ($centpars);
       }
+      
+      $data{$type}{$name}{current}{ctrunning} = 0;
   }
   else {
       InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::centralTask", $hash, 0);
@@ -5304,14 +5115,14 @@ sub _specialActivities {
       next if(ConsumerVal ($hash, $c, "plandelete", "regular") eq "regular");
 
       my $planswitchoff = ConsumerVal    ($hash, $c, "planswitchoff", $t);
-      my $pstate        = simplifyCstate (ConsumerVal ($hash, $c, "planstate", ""));
+      my $simpCstat     = simplifyCstate (ConsumerVal ($hash, $c, "planstate", ""));
 
-      if ($t > $planswitchoff && $pstate =~ /planned|finished|unknown/xs) {
+      if ($t > $planswitchoff && $simpCstat =~ /planned|finished|unknown/xs) {
           deleteConsumerPlanning ($hash, $c);
 
           $data{$type}{$name}{consumers}{$c}{minutesOn}       = 0;
           $data{$type}{$name}{consumers}{$c}{numberDayStarts} = 0;
-          $data{$type}{$name}{consumers}{$c}{onoff}           = "off";
+          $data{$type}{$name}{consumers}{$c}{onoff}           = 'off';
       }
   }
 
@@ -5392,7 +5203,7 @@ sub _specialActivities {
 
               $data{$type}{$name}{consumers}{$c}{minutesOn}       = 0;
               $data{$type}{$name}{consumers}{$c}{numberDayStarts} = 0;
-              $data{$type}{$name}{consumers}{$c}{onoff}           = "off";
+              $data{$type}{$name}{consumers}{$c}{onoff}           = 'off';
           }
 
           writeCacheToFile ($hash, "consumers", $csmcache.$name);                           # Cache File Consumer schreiben
@@ -6934,6 +6745,7 @@ sub _manageConsumerData {
       __setConsRcmdState   ($paref);                                                                              # Consumption Recommended Status setzen
       __switchConsumer     ($paref);                                                                              # Consumer schalten
       __remainConsumerTime ($paref);                                                                              # Restlaufzeit Verbraucher ermitteln
+      __setPhysSwState     ($paref);                                                                              # physischen Schaltzustand festhalten   
 
       ## Consumer Schaltstatus und Schaltzeit für Readings ermitteln
       ################################################################
@@ -6943,10 +6755,11 @@ sub _manageConsumerData {
 
       $data{$type}{$name}{consumers}{$c}{state} = $costate;
 
-      my ($pstate,$starttime,$stoptime)         = __getPlanningStateAndTimes ($paref);
-      my ($iilt,$rlt)                           = isInLocktime ($paref);                                          # Sperrzeit Status ermitteln
-      my $constate                              = "name='$alias' state='$costate' planningstate='$pstate'";
-      $constate                                .= " remainLockTime='$rlt'" if($rlt);
+      my ($pstate,$starttime,$stoptime,$supplmnt) = __getPlanningStateAndTimes ($paref);
+      my ($iilt,$rlt)                             = isInLocktime ($paref);                                        # Sperrzeit Status ermitteln
+      my $constate                                = "name='$alias' state='$costate' planningstate='$pstate'";
+      $constate                                  .= " remainLockTime='$rlt'" if($rlt);
+      $constate                                  .= " info='$supplmnt'"      if($supplmnt);
 
       storeReading ("consumer${c}",                $constate);                                                    # Consumer Infos
       storeReading ("consumer${c}_planned_start", $starttime) if($starttime);                                     # Consumer Start geplant
@@ -7238,7 +7051,7 @@ sub __planSwitchTimes {
   my $epiece1 = (~0 >> 1);
   my $epieces = ConsumerVal ($hash, $c, "epieces", "");
 
-  if(ref $epieces eq "HASH") {
+  if (ref $epieces eq "HASH") {
       $epiece1 = $data{$type}{$name}{consumers}{$c}{epieces}{1};
   }
   else {
@@ -7259,7 +7072,7 @@ sub __planSwitchTimes {
                                    (CurrentVal ($hash, 'sunriseTodayTs', 0) + $riseshift);
       $mintime                   = $tdiff / 60;
 
-      if($debug =~ /consumerPlanning/x) {
+      if ($debug =~ /consumerPlanning/x) {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Sunrise is shifted by >}.($riseshift / 60).'< minutes');
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Sunset is shifted by >}. ($setshift /  60).'< minutes');
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - mintime calculated: }.$mintime.' minutes');
@@ -7271,8 +7084,8 @@ sub __planSwitchTimes {
   $paref->{mintime}  = $mintime;
   $paref->{stopdiff} = $stopdiff;
 
-  if($mode eq "can") {                                                                                 # Verbraucher kann geplant werden
-      if($debug =~ /consumerPlanning/x) {
+  if ($mode eq "can") {                                                                                # Verbraucher kann geplant werden
+      if ($debug =~ /consumerPlanning/x) {
           for my $m (sort{$a<=>$b} keys %mtimes) {
               Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - surplus expected: $mtimes{$m}{spexp}, }.
                               qq{starttime: }.$mtimes{$m}{starttime}.", ".
@@ -7281,7 +7094,7 @@ sub __planSwitchTimes {
       }
 
       for my $ts (sort{$a<=>$b} keys %mtimes) {
-          if($mtimes{$ts}{spexp} >= $epiece1) {                                                        # die früheste Startzeit sofern Überschuß größer als Bedarf
+          if ($mtimes{$ts}{spexp} >= $epiece1) {                                                       # die früheste Startzeit sofern Überschuß größer als Bedarf
               my $starttime       = $mtimes{$ts}{starttime};
 
               $paref->{starttime} = $starttime;
@@ -7313,7 +7126,7 @@ sub __planSwitchTimes {
       }
   }
   else {                                                                                               # Verbraucher _muß_ geplant werden
-      if($debug =~ /consumerPlanning/x) {
+      if ($debug =~ /consumerPlanning/x) {
           for my $o (sort{$a<=>$b} keys %max) {
               Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - surplus: $max{$o}{spexp}, }.
                               qq{starttime: }.$max{$o}{starttime}.", ".
@@ -7328,7 +7141,7 @@ sub __planSwitchTimes {
           last;
       }
 
-      if(!ConsumerVal ($hash, $c, "planstate", undef)) {                                               # es konnte keine Planung mit max für den aktuellen Tag erstellt werden -> Zwangsplanung mit ersten Wert
+      if (!ConsumerVal ($hash, $c, "planstate", undef)) {                                              # es konnte keine Planung mit max für den aktuellen Tag erstellt werden -> Zwangsplanung mit ersten Wert
               my $p = (sort{$a<=>$b} keys %max)[0];
               $paref->{elem} = $p;
               ___planMust ($paref);
@@ -7337,11 +7150,11 @@ sub __planSwitchTimes {
 
   my $planstate = ConsumerVal ($hash, $c, "planstate", "");
 
-  if($planstate) {
+  if ($planstate) {
       Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate});
   }
 
-  writeCacheToFile ($hash, "consumers", $csmcache.$name);                                               # Cache File Consumer schreiben
+  writeCacheToFile ($hash, "consumers", $csmcache.$name);                                              # Cache File Consumer schreiben
 
   ___setPlanningDeleteMeth ($paref);
 
@@ -7430,12 +7243,17 @@ sub ___setConsumerPlanningState {
   my $type      = $paref->{type};
   my $c         = $paref->{consumer};
   my $ps        = $paref->{ps};                    # Planstatus
+  my $supplmnt  = $paref->{supplement} // '';
   my $startts   = $paref->{startts};               # Unix Timestamp für geplanten Switch on
   my $stopts    = $paref->{stopts};                # Unix Timestamp für geplanten Switch off
   my $lonts     = $paref->{lastAutoOnTs};          # Timestamp des letzten On-Schaltens bzw. letzter Fortsetzung im Automatikmodus
   my $loffts    = $paref->{lastAutoOffTs};         # Timestamp des letzten Off-Schaltens bzw. letzter Unterbrechnung im Automatikmodus
   my $lang      = $paref->{lang};
-
+  
+  $data{$type}{$name}{consumers}{$c}{planSupplement} = $supplmnt;
+  
+  return if(!$ps);                                                
+  
   my ($starttime,$stoptime);
 
   if (defined $lonts) {
@@ -7456,10 +7274,10 @@ sub ___setConsumerPlanningState {
       $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts;
   }
 
-  $ps .= " "              if ($starttime || $stoptime);
-  $ps .= $starttime       if ($starttime);
-  $ps .= $stoptime        if (!$starttime && $stoptime);
-  $ps .= " - ".$stoptime  if ($starttime  && $stoptime);
+  $ps .= " "              if($starttime || $stoptime);
+  $ps .= $starttime       if($starttime);
+  $ps .= $stoptime        if(!$starttime && $stoptime);
+  $ps .= " - ".$stoptime  if($starttime  && $stoptime);
 
   $data{$type}{$name}{consumers}{$c}{planstate} = $ps;
 
@@ -7616,7 +7434,7 @@ sub __setConsRcmdState {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
-  my $c     = $paref->{consumer};                                                         # aktueller Unix Timestamp
+  my $c     = $paref->{consumer};                                                         
   my $debug = $paref->{debug};
 
   my $surplus    = CurrentVal  ($hash, 'surplus',                    0);                  # aktueller Energieüberschuß
@@ -7865,11 +7683,8 @@ return $state;
 }
 
 ################################################################
-#     Consumer aktuelle Schaltzustände ermitteln & setzen
-#     Consumer "on" setzen wenn physisch ein und alter Status
-#     "starting"
-#     Consumer "off" setzen wenn physisch aus und alter Status
-#     "stopping"
+#     Consumer aktuelle Schaltzustände ermitteln & 
+#     logische Zustände ableiten/setzen
 ################################################################
 sub ___setConsumerSwitchingState {
   my $paref = shift;
@@ -7880,13 +7695,15 @@ sub ___setConsumerSwitchingState {
   my $t     = $paref->{t};
   my $state = $paref->{state};
 
-  my $pstate = simplifyCstate (ConsumerVal ($hash, $c, "planstate", ""));
-  my $calias = ConsumerVal    ($hash, $c, "alias", "");                                            # Consumer Device Alias
-  my $auto   = ConsumerVal    ($hash, $c, "auto",   1);
+  my $simpCstat = simplifyCstate (ConsumerVal ($hash, $c, 'planstate', ''));
+  my $calias    = ConsumerVal    ($hash, $c, 'alias',                   '');                       # Consumer Device Alias
+  my $auto      = ConsumerVal    ($hash, $c, 'auto',                     1);
+  my $oldpsw    = ConsumerVal    ($hash, $c, 'physoffon',            'off');                       # gespeicherter physischer Schaltzustand
+  my $dowri     = 0;
+  
+  debugLog ($paref, "consumerSwitching", qq{consumer "$c" - current planning state: $simpCstat \n});
 
-  debugLog ($paref, "consumerSwitching", qq{consumer "$c" - current planning state: $pstate \n});
-
-  if ($pstate eq 'starting' && isConsumerPhysOn ($hash, $c)) {
+  if (isConsumerPhysOn ($hash, $c) && $simpCstat eq 'starting') {
       my $mintime = ConsumerVal ($hash, $c, "mintime", $defmintime);
 
       if (isSunPath ($hash, $c)) {                                                                 # SunPath ist in mintime gesetzt
@@ -7909,12 +7726,9 @@ sub ___setConsumerSwitchingState {
       delete $paref->{stopts};
 
       $state = qq{Consumer '$calias' switched on};
-
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                      # Cache File Consumer schreiben
-
-      Log3 ($name, 2, "$name - $state");
+      $dowri = 1;
   }
-  elsif ($pstate eq 'stopping' && isConsumerPhysOff ($hash, $c)) {
+  elsif (isConsumerPhysOff ($hash, $c) && $simpCstat eq 'stopping') {
       $paref->{ps}            = "switched off:";
       $paref->{stopts}        = $t;
       $paref->{lastAutoOffTs} = $t;
@@ -7926,12 +7740,9 @@ sub ___setConsumerSwitchingState {
       delete $paref->{lastAutoOffTs};
 
       $state = qq{Consumer '$calias' switched off};
-
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
-
-      Log3 ($name, 2, "$name - $state");
+      $dowri = 1;
   }
-  elsif ($pstate eq 'continuing' && isConsumerPhysOn ($hash, $c)) {
+  elsif (isConsumerPhysOn ($hash, $c) && $simpCstat eq 'continuing') {
       $paref->{ps} = "continued:";
       $paref->{lastAutoOnTs} = $t;
 
@@ -7941,12 +7752,9 @@ sub ___setConsumerSwitchingState {
       delete $paref->{lastAutoOnTs};
 
       $state = qq{Consumer '$calias' switched on (continued)};
-
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
-
-      Log3 ($name, 2, "$name - $state");
+      $dowri = 1;
   }
-  elsif ($pstate eq 'interrupting' && isConsumerPhysOff ($hash, $c)) {
+  elsif (isConsumerPhysOff ($hash, $c) && $simpCstat eq 'interrupting') {
       $paref->{ps}            = "interrupted:";
       $paref->{lastAutoOffTs} = $t;
 
@@ -7956,9 +7764,31 @@ sub ___setConsumerSwitchingState {
       delete $paref->{lastAutoOffTs};
 
       $state = qq{Consumer '$calias' switched off (interrupted)};
+      $dowri = 1;  
+  }
+  elsif ($oldpsw eq 'off' && isConsumerPhysOn ($hash, $c)){
+      $paref->{supplement} = "$hqtxt{wexso}{$paref->{lang}}";
 
+      ___setConsumerPlanningState ($paref);
+
+      delete $paref->{supplement};
+
+      $state = qq{Consumer '$calias' was external switched on};
+      $dowri = 1;
+  }
+  elsif ($oldpsw eq 'on' && isConsumerPhysOff ($hash, $c)) {
+      $paref->{supplement} = "$hqtxt{wexso}{$paref->{lang}}";
+
+      ___setConsumerPlanningState ($paref);
+
+      delete $paref->{supplement};
+
+      $state = qq{Consumer '$calias' was external switched off};
+      $dowri = 1;
+  }
+  
+  if ($dowri) {
       writeCacheToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
-
       Log3 ($name, 2, "$name - $state");
   }
 
@@ -7985,6 +7815,23 @@ sub __remainConsumerTime {
       my $remainTime                                 = $stopts - $t ;
       $data{$type}{$name}{consumers}{$c}{remainTime} = sprintf "%.0f", ($remainTime / 60) if($remainTime > 0);
   }
+
+return;
+}
+
+################################################################
+#   Consumer physischen Schaltstatus setzen
+################################################################
+sub __setPhysSwState {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  my $c     = $paref->{consumer};
+
+  my $pon = isConsumerPhysOn ($hash, $c) ? 'on' : 'off';                       
+  
+  $data{$type}{$name}{consumers}{$c}{physoffon} = $pon;
 
 return;
 }
@@ -8021,18 +7868,17 @@ sub __getPlanningStateAndTimes {
   my $c     = $paref->{consumer};
   my $lang  = $paref->{lang};
 
-  my $pstate  = ConsumerVal    ($hash, $c, "planstate", "");
-  $pstate     = simplifyCstate ($pstate);
-
-  my $startts = ConsumerVal ($hash, $c, "planswitchon",  "");
-  my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", "");
+  my $simpCstat = simplifyCstate (ConsumerVal ($hash, $c, 'planstate', ''));
+  my $supplmnt  = ConsumerVal ($hash, $c, 'planSupplement', '');
+  my $startts   = ConsumerVal ($hash, $c, 'planswitchon',   '');
+  my $stopts    = ConsumerVal ($hash, $c, 'planswitchoff',  '');
 
   my $starttime = '';
   my $stoptime  = '';
   $starttime    = (timestampToTimestring ($startts, $lang))[0] if($startts);
   $stoptime     = (timestampToTimestring ($stopts, $lang))[0]  if($stopts);
 
-return ($pstate, $starttime, $stoptime);
+return ($simpCstat, $starttime, $stoptime, $supplmnt);
 }
 
 ################################################################
@@ -8598,6 +8444,8 @@ sub collectAllRegConsumers {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
+  
+  return if(CurrentVal ($hash, 'consumerCollected', 0));                                          # Abbruch wenn Consumer bereits gesammelt
 
   delete $data{$type}{$name}{current}{consumerdevs};
 
@@ -8609,7 +8457,7 @@ sub collectAllRegConsumers {
       my ($ac,$hc) = parseParams ($consumer);
       $consumer    = $ac->[0] // "";
 
-      if(!$consumer || !$defs{$consumer}) {
+      if (!$consumer || !$defs{$consumer}) {
           my $err = qq{ERROR - the device "$consumer" doesn't exist anymore! Delete or change the attribute "consumer${c}".};
           Log3 ($name, 1, "$name - $err");
           next;
@@ -8620,7 +8468,7 @@ sub collectAllRegConsumers {
       my $dswitch = $hc->{switchdev};                                                             # alternatives Schaltdevice
 
       if ($dswitch) {
-          if(!$defs{$dswitch}) {
+          if (!$defs{$dswitch}) {
               my $err = qq{ERROR - the device "$dswitch" doesn't exist anymore! Delete or change the attribute "consumer${c}".};
               Log3 ($name, 1, "$name - $err");
               next;
@@ -8635,24 +8483,24 @@ sub collectAllRegConsumers {
       my $alias = AttrVal ($consumer, "alias", $consumer);
 
       my ($rtot,$utot,$ethreshold);
-      if(exists $hc->{etotal}) {
+      if (exists $hc->{etotal}) {
           my $etotal                = $hc->{etotal};
           ($rtot,$utot,$ethreshold) = split ":", $etotal;
       }
 
       my ($rpcurr,$upcurr,$pthreshold);
-      if(exists $hc->{pcurr}) {
+      if (exists $hc->{pcurr}) {
           my $pcurr                     = $hc->{pcurr};
           ($rpcurr,$upcurr,$pthreshold) = split ":", $pcurr;
       }
 
       my $asynchron;
-      if(exists $hc->{asynchron}) {
+      if (exists $hc->{asynchron}) {
           $asynchron = $hc->{asynchron};
       }
 
       my $noshow;
-      if(exists $hc->{noshow}) {                                                                  # Consumer ausblenden in Grafik
+      if (exists $hc->{noshow}) {                                                                  # Consumer ausblenden in Grafik
           $noshow = $hc->{noshow};
       }
 
@@ -8662,12 +8510,12 @@ sub collectAllRegConsumers {
       }
 
       my ($dswoncond,$rswoncond,$swoncondregex);
-      if(exists $hc->{swoncond}) {                                                                # zusätzliche Einschaltbedingung
+      if (exists $hc->{swoncond}) {                                                                # zusätzliche Einschaltbedingung
           ($dswoncond,$rswoncond,$swoncondregex) = split ":", $hc->{swoncond};
       }
 
       my ($dswoffcond,$rswoffcond,$swoffcondregex);
-      if(exists $hc->{swoffcond}) {                                                               # vorrangige Ausschaltbedingung
+      if (exists $hc->{swoffcond}) {                                                               # vorrangige Ausschaltbedingung
           ($dswoffcond,$rswoffcond,$swoffcondregex) = split ":", $hc->{swoffcond};
       }
 
@@ -8678,7 +8526,7 @@ sub collectAllRegConsumers {
 
       my $interruptable = 0;
       my ($hyst);
-      if(exists $hc->{interruptable} && $hc->{interruptable} ne '0') {
+      if (exists $hc->{interruptable} && $hc->{interruptable} ne '0') {
           $interruptable         = $hc->{interruptable};
           ($interruptable,$hyst) = $interruptable =~ /(.*):(.*)$/xs if($interruptable ne '1');
       }
@@ -8748,8 +8596,10 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{sunriseshift}      = $riseshift if(defined $riseshift);        # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
       $data{$type}{$name}{consumers}{$c}{sunsetshift}       = $setshift  if(defined $setshift);         # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
   }
+  
+  $data{$type}{$name}{current}{consumerCollected} = 1;
 
-  # Log3 ($name, 5, "$name - all registered consumers:\n".Dumper $data{$type}{$name}{consumers});
+  Log3 ($name, 3, "$name - all registered consumers collected");
 
 return;
 }
@@ -9894,7 +9744,7 @@ sub ___ghoValForm {
       my $efn = eval $fn;
 
       if ($@) {
-          Log3 ($name, 2, "$name - ERROR in execute graphicHeaderOwnspecValForm: ".$@);
+          Log3 ($name, 1, "$name - ERROR in execute graphicHeaderOwnspecValForm: ".$@);
           $err = $@;
       }
       else {
@@ -9923,7 +9773,7 @@ sub ___ghoValForm {
           my $vnew = eval $fn;
 
           if ($@) {
-              Log3 ($name, 2, "$name - ERROR in execute graphicHeaderOwnspecValForm: ".$@);
+              Log3 ($name, 1, "$name - ERROR in execute graphicHeaderOwnspecValForm: ".$@);
               $err = $@;
           }
           else {
@@ -10116,13 +9966,15 @@ sub _graphicConsumerLegend {
 
       $paref->{consumer} = $c;
 
-      my ($planstate,$starttime,$stoptime) = __getPlanningStateAndTimes ($paref);
-      my ($iilt,$rlt)                      = isInLocktime ($paref);                                   # Sperrzeit Status ermitteln
+      my ($planstate,$starttime,$stoptime,$supplmnt) = __getPlanningStateAndTimes ($paref);
+      $supplmnt                                      = '-' if(!$supplmnt);
+      my ($iilt,$rlt)                                = isInLocktime ($paref);                         # Sperrzeit Status ermitteln
 
-      my $pstate                           = $caicon eq "times"    ? $hqtxt{pstate}{$lang}  : $htitles{pstate}{$lang};
-      my $surplusinfo                      = isConsRcmd($hash, $c) ? $htitles{splus}{$lang} : $htitles{nosplus}{$lang};
+      my $pstate      = $caicon eq "times"    ? $hqtxt{pstate}{$lang}  : $htitles{pstate}{$lang};
+      my $surplusinfo = isConsRcmd($hash, $c) ? $htitles{splus}{$lang} : $htitles{nosplus}{$lang};
 
       $pstate =~ s/<pstate>/$planstate/xs;
+      $pstate =~ s/<supplmnt>/$supplmnt/xs;
       $pstate =~ s/<start>/$starttime/xs;
       $pstate =~ s/<stop>/$stoptime/xs;
       $pstate =~ s/<RLT>/$rlt/xs;
@@ -11286,7 +11138,7 @@ sub checkdwdattr {
       $err .= qq{ERROR - device "$dwddev" -> attribute "forecastResolution" must be set to "1"};
   }
 
-  Log3 ($name, 2, "$name - $err") if($err);
+  Log3 ($name, 1, "$name - $err") if($err);
 
 return $err;
 }
@@ -12734,7 +12586,7 @@ sub listDataPool {
                   $cret .= $ckey." => ".ConsumerVal ($hash, $idx, $ckey, "")."\n      ";
               }
           }
-
+          
           $sq .= $idx." => ".$cret."\n";
       }
   }
@@ -13799,6 +13651,7 @@ sub deleteConsumerPlanning {
   my $calias = ConsumerVal ($hash, $c, "alias", "");
 
   delete $data{$type}{$name}{consumers}{$c}{planstate};
+  delete $data{$type}{$name}{consumers}{$c}{planSupplement};
   delete $data{$type}{$name}{consumers}{$c}{planswitchon};
   delete $data{$type}{$name}{consumers}{$c}{planswitchoff};
   delete $data{$type}{$name}{consumers}{$c}{plandelete};
@@ -14701,7 +14554,7 @@ sub Serialize {
 
   my $serial = eval { freeze ($data)
                     }
-                    or do { Log3 ($name, 2, "$name - Serialization ERROR: $@");
+                    or do { Log3 ($name, 1, "$name - Serialization ERROR: $@");
                             return;
                           };
 
@@ -15001,11 +14854,13 @@ return $def;
 #       aiaddistate          - Add Instanz Status der KI
 #       batcharge            - Bat SOC in %
 #       batinstcap           - installierte Batteriekapazität in Wh
+#       ctrunning            - aktueller Ausführungsstatus des Central Task
 #       genslidereg          - Schieberegister PV Erzeugung (Array)
 #       h4fcslidereg         - Schieberegister 4h PV Forecast (Array)
 #       socslidereg          - Schieberegister Batterie SOC (Array)
 #       consumption          - aktueller Verbrauch (W)
 #       consumerdevs         - alle registrierten Consumerdevices (Array)
+#       consumerCollected    - Statusbit Consumer Attr gesammelt und ausgewertet
 #       gridconsumption      - aktueller Netzbezug
 #       powerbatin           - Batterie Ladeleistung
 #       powerbatout          - Batterie Entladeleistung
@@ -15159,6 +15014,7 @@ return $def;
 #       offreg          - Regex für phys. Zustand "aus"
 #       oncom           - Einschaltkommando
 #       offcom          - Ausschaltkommando
+#       physoffon       - physischer Schaltzustand ein/aus
 #       onoff           - logischer ein/aus Zustand des am Consumer angeschlossenen Endverbrauchers
 #       asynchron       - Arbeitsweise des FHEM Consumer Devices
 #       retotal         - Reading der Leistungsmessung
@@ -15172,6 +15028,8 @@ return $def;
 #       epieces         - prognostizierte Energiescheiben (Hash)
 #       ehodpieces      - geplante Energiescheiben nach Tagesstunde (hour of day) (Hash)
 #       dswoncond       - Device zur Lieferung einer zusätzliche Einschaltbedingung
+#       planstate       - Planungsstatus
+#       planSupplement  - Ergänzung zum Planungsstatus
 #       rswoncond       - Reading zur Lieferung einer zusätzliche Einschaltbedingung
 #       swoncondregex   - Regex einer zusätzliche Einschaltbedingung
 #       dswoffcond      - Device zur Lieferung einer vorrangige Ausschaltbedingung
@@ -15403,6 +15261,27 @@ to ensure that the system configuration is correct.
         </table>
       </ul>
     </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-set-batteryTrigger"></a>
+      <li><b>batteryTrigger &lt;1on&gt;=&lt;Value&gt; &lt;1off&gt;=&lt;Value&gt; [&lt;2on&gt;=&lt;Value&gt; &lt;2off&gt;=&lt;Value&gt; ...] </b> <br><br>
+
+      Generates triggers when the battery charge exceeds or falls below certain values (SoC in %). <br>
+      If the last three SoC measurements exceed a defined <b>Xon-Bedingung</b>, the reading <b>batteryTrigger_X = on</b> 
+      is created/set. <br>
+      If the last three SoC measurements fall below a defined <b>Xoff-Bedingung</b>, the reading 
+      <b>batteryTrigger_X = off</b> is created/set. <br>
+      Any number of trigger conditions can be specified. Xon/Xoff conditions do not necessarily have to be defined in pairs.
+      <br>
+      <br>
+
+      <ul>
+        <b>Example: </b> <br>
+        set &lt;name&gt; batteryTrigger 1on=30 1off=10 2on=70 2off=20 3on=15 4off=90<br>
+      </ul>
+      </li>
     </ul>
     <br>
 
@@ -17418,10 +17297,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a id="SolarForecast-set-batteryTrigger"></a>
       <li><b>batteryTrigger &lt;1on&gt;=&lt;Wert&gt; &lt;1off&gt;=&lt;Wert&gt; [&lt;2on&gt;=&lt;Wert&gt; &lt;2off&gt;=&lt;Wert&gt; ...] </b> <br><br>
 
-      Generiert Trigger bei Über- bzw. Unterschreitung bestimmter Batterieladungswerte (SOC in %). <br>
-      Überschreiten die letzten drei SOC-Messungen eine definierte <b>Xon-Bedingung</b>, wird das Reading
-      <b>batteryTrigger_X = on</b> erstellt/gesetzt.
-      Unterschreiten die letzten drei SOC-Messungen eine definierte <b>Xoff-Bedingung</b>, wird das Reading
+      Generiert Trigger bei Über- bzw. Unterschreitung bestimmter Batterieladungswerte (SoC in %). <br>
+      Überschreiten die letzten drei SoC-Messungen eine definierte <b>Xon-Bedingung</b>, wird das Reading
+      <b>batteryTrigger_X = on</b> erstellt/gesetzt. <br>
+      Unterschreiten die letzten drei SoC-Messungen eine definierte <b>Xoff-Bedingung</b>, wird das Reading
       <b>batteryTrigger_X = off</b> erstellt/gesetzt. <br>
       Es kann eine beliebige Anzahl von Triggerbedingungen angegeben werden. Xon/Xoff-Bedingungen müssen nicht zwingend paarweise
       definiert werden. <br>

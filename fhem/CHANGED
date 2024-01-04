@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 76_SolarForecast: externally caused switching of consumers is 
+                              detected
  - feature: 10_IT: bei AttrList nicht benötigte Einträge unit und group entf
                    bei einem modify der DEF wird nun die alte DEF gelöscht
                    Anpassungen für TSCUL
