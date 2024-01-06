@@ -831,7 +831,7 @@ sub DbRep_Set {
       return;
   }
 
-  if ($opt eq "index") {
+  if ($opt eq 'index') {
        DbRep_setLastCmd (@a);
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###                    New Index operation                   ###");
@@ -843,7 +843,7 @@ sub DbRep_Set {
        return;
   }
 
-  if ($opt eq "adminCredentials" && $hash->{ROLE} ne "Agent") {
+  if ($opt eq 'adminCredentials' && $hash->{ROLE} ne "Agent") {
       return "Credentials are incomplete, use username password" if (!$prop || !$prop1);
       my $success = DbRep_setcredentials($hash, "adminCredentials", $prop, $prop1);
 
@@ -855,7 +855,7 @@ sub DbRep_Set {
       }
   }
 
-  if ($opt =~ /countEntries/ && $hash->{ROLE} ne "Agent") {
+  if ($opt eq 'countEntries' && $hash->{ROLE} ne "Agent") {
       my $table = $prop // "history";
 
       DbRep_setLastCmd ($name, $opt, $table);
@@ -863,7 +863,8 @@ sub DbRep_Set {
 
       return;
   }
-  elsif ($opt =~ /fetchrows/ && $hash->{ROLE} ne "Agent") {
+  
+  if ($opt eq 'fetchrows' && $hash->{ROLE} ne "Agent") {
       my $table = $prop // "history";
 
       DbRep_setLastCmd ($name, $opt, $table);
@@ -2562,7 +2563,7 @@ sub DbRep_Main {
 
  my ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next);
 
- if ($dbrep_hmainf{$opt} && exists &{$dbrep_hmainf{$opt}{fn}}) {
+ if (defined $dbrep_hmainf{$opt} && defined &{$dbrep_hmainf{$opt}{fn}}) {
      $params = {
          hash    => $hash,
          name    => $name,
@@ -12980,6 +12981,10 @@ sub DbRep_nextMultiCmd {
   for my $ma (@mattr) {
       CommandDeleteAttr (undef, "-silent $name $ma") if(defined AttrVal($name, $ma, undef));
   }
+  
+  my $ok  = 0;
+  my $cmd = '';
+  my $la  = '';
 
   for my $k (sort{$a<=>$b} keys %{$data{DbRep}{$name}{multicmd}}) {
       my $mcmd = delete $data{DbRep}{$name}{multicmd}{$k};
@@ -12992,12 +12997,29 @@ sub DbRep_nextMultiCmd {
       CommandAttr (undef, "-silent $name device $mcmd->{device}")                   if($mcmd->{device});
       CommandAttr (undef, "-silent $name reading $mcmd->{reading}")                 if($mcmd->{reading});
 
-      Log3 ($name, 4, "DbRep $name - Start multiCmd index >$k<");
+      $cmd = (split " ", $mcmd->{cmd})[0];
+      
+      if (defined $dbrep_hmainf{$cmd}) {
+          $cmd = $mcmd->{cmd};
+          $la  = 'start';
+          $ok  = 1;
+      }
+      else {
+          $la = "don't contain a valid command -> skip $cmd";
+      }
+      
+      Log3 ($name, 4, "DbRep $name - multiCmd index >$k< $la");
 
-      CommandSet (undef, "$name $mcmd->{cmd}");
       last;                                                             # immer nur den ersten verbliebenen Eintrag abarbeiten
   }
-
+  
+  if ($ok) {
+      CommandSet (undef, "$name $cmd");
+  }
+  else {
+      DbRep_nextMultiCmd ($name);                                       # nächsten Eintrag abarbeiten falls Kommando ungültig
+  }
+  
 return;
 }
 
