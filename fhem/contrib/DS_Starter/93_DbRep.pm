@@ -12982,9 +12982,10 @@ sub DbRep_nextMultiCmd {
       CommandDeleteAttr (undef, "-silent $name $ma") if(defined AttrVal($name, $ma, undef));
   }
   
-  my $ok  = 0;
-  my $cmd = '';
-  my $la  = '';
+  my $ok   = 0;
+  my $verb = 4;
+  my $cmd  = '';
+  my $la   = '';
 
   for my $k (sort{$a<=>$b} keys %{$data{DbRep}{$name}{multicmd}}) {
       my $mcmd = delete $data{DbRep}{$name}{multicmd}{$k};
@@ -13005,10 +13006,11 @@ sub DbRep_nextMultiCmd {
           $ok  = 1;
       }
       else {
-          $la = "don't contain a valid command -> skip $cmd";
+          $verb = 1;
+          $la   = "don't contain a valid command -> skip $cmd";
       }
       
-      Log3 ($name, 4, "DbRep $name - multiCmd index >$k< $la");
+      Log3 ($name, $verb, "DbRep $name - multiCmd index >$k< $la");
 
       last;                                                             # immer nur den ersten verbliebenen Eintrag abarbeiten
   }
