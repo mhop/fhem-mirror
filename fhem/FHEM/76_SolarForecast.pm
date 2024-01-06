@@ -155,6 +155,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.6.2"  => "07.01.2024  optimize batterymanagement ",
   "1.6.1"  => "04.01.2024  new sub __setPhysSwState, edit ___setConsumerPlanningState, boost performance of collectAllRegConsumers ".
                            "CurrentVal ctrunning - Central Task running Statusbit, edit comref ",
   "1.6.0"  => "22.12.2023  store daily batmaxsoc in pvHistory, new attr ctrlBatSocManagement, reading Battery_OptimumTargetSoC ".
@@ -6309,7 +6310,7 @@ sub _batSocTarget {
 
   my $batinstcap = CurrentVal ($hash, 'batinstcap', 0);                       # installierte Batteriekapazität Wh
   my $needcharge = $batinstcap - ($batinstcap / 100 * $batcharge);            # vorläufige benötigte Ladeenergie (Wh) bis 100% SOC
-  my $cancharge  = $pvexpect > $needcharge ? $needcharge : $pvexpect;         # resultierende benötigte Ladeenergie (Wh)
+  my $cancharge  = $pvexpect > $needcharge ? $pvexpect : $needcharge;         # resultierende benötigte Ladeenergie (Wh)
   my $cantarget  = 100 - ($cancharge / ($batinstcap / 100));                  # berechneter möglicher Min SOC nach Berücksichtigung Ladewahrscheinlichkeit
 
   my $newtarget  = $cantarget < $target ? $cantarget : $target;               # Abgleich möglicher Min SOC gg. berechneten Min SOC
