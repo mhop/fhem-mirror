@@ -155,7 +155,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.6.2"  => "07.01.2024  optimize batterymanagement ",
+  "1.6.3"  => "08.01.2024  optimize battery management once more ",
+  "1.6.2"  => "07.01.2024  optimize battery management ",
   "1.6.1"  => "04.01.2024  new sub __setPhysSwState, edit ___setConsumerPlanningState, boost performance of collectAllRegConsumers ".
                            "CurrentVal ctrunning - Central Task running Statusbit, edit comref ",
   "1.6.0"  => "22.12.2023  store daily batmaxsoc in pvHistory, new attr ctrlBatSocManagement, reading Battery_OptimumTargetSoC ".
@@ -6289,65 +6290,24 @@ sub _batSocTarget {
   delete $paref->{careCycle};
 
   my $nt;
-  my $chargereq  = 0;                                                         # Ladeanforedrung wenn SoC unter Minimum SoC gefallen ist
+  my $chargereq  = 0;                                                             # Ladeanforedrung wenn SoC unter Minimum SoC gefallen ist
   my $target     = $lowSoc;
-  my $yday       = strftime "%d", localtime($t - 86400);                      # Vortag  (range 01 to 31)
-  my $batymaxsoc = HistoryVal ($hash, $yday, 99, 'batmaxsoc',       0);       # gespeicherter max. SOC des Vortages
-  my $batysetsoc = HistoryVal ($hash, $yday, 99, 'batsetsoc', $lowSoc);       # gespeicherter SOC Sollwert des Vortages
+  my $yday       = strftime "%d", localtime($t - 86400);                          # Vortag  (range 01 to 31)
+  my $batymaxsoc = HistoryVal ($hash, $yday, 99, 'batmaxsoc',       0);           # gespeicherter max. SOC des Vortages
+  my $batysetsoc = HistoryVal ($hash, $yday, 99, 'batsetsoc', $lowSoc);           # gespeicherter SOC Sollwert des Vortages
 
   $target = $batymaxsoc <  $maxsoc ? $batysetsoc + $batSocChgDay :
             $batymaxsoc >= $maxsoc ? $batysetsoc - $batSocChgDay :
-            $batysetsoc;                                                      # neuer Min SOC für den laufenden Tag
+            $batysetsoc;                                                          # neuer Min SOC für den laufenden Tag
 
   debugLog ($paref, 'batteryManagement', "SoC calc Step1 - compare with SoC history -> Target: $target %");
-
-  ## Aufladewahrscheinlichkeit beachten
-  #######################################
-  my $pvfctm     = ReadingsNum ($name, 'Tomorrow_PVforecast',            0);  # PV Prognose morgen
-  my $pvfctd     = ReadingsNum ($name, 'RestOfDayPVforecast',            0);  # PV Prognose Rest heute
-  my $csopt      = ReadingsNum ($name, 'Battery_OptimumTargetSoC', $lowSoc);  # aktuelles SoC Optimum
-  my $pvexpect   = $pvfctm > $pvfctd ? $pvfctm : $pvfctd;
-
-  my $batinstcap = CurrentVal ($hash, 'batinstcap', 0);                       # installierte Batteriekapazität Wh
-  my $needcharge = $batinstcap - ($batinstcap / 100 * $batcharge);            # vorläufige benötigte Ladeenergie (Wh) bis 100% SOC
-  my $cancharge  = $pvexpect > $needcharge ? $pvexpect : $needcharge;         # resultierende benötigte Ladeenergie (Wh)
-  my $cantarget  = 100 - ($cancharge / ($batinstcap / 100));                  # berechneter möglicher Min SOC nach Berücksichtigung Ladewahrscheinlichkeit
-
-  my $newtarget  = $cantarget < $target ? $cantarget : $target;               # Abgleich möglicher Min SOC gg. berechneten Min SOC
-  my $logadd     = '';
-  my $sunset     = CurrentVal ($hash, 'sunsetTodayTs', $t);
-  my $delayts    = $sunset - 5400;                                            # Pflege-SoC/Erhöhung SoC erst ab 1,5 h vor Sonnenuntergang berechnen/anwenden
-
-  if ($newtarget > $csopt && $t > $delayts) {                                 # Erhöhung des SoC erst ab Sonnenuntergang anwenden
-      $target = $newtarget;
-      $logadd = "(new target > $csopt % and Sunset has passed)";
-  }
-  elsif ($newtarget > $csopt && $t <= $delayts) {                             # bisheriges Optimum bleibt vorerst
-      $target = $csopt;
-      $nt     = (timestampToTimestring ($delayts, $paref->{lang}))[0];
-      $logadd = "(new target $newtarget % is only activated after $nt)";
-  }
-  elsif ($newtarget < $csopt) {                                               # Targetminderung sofort umsetzen -> Freiplatz für Ladeprognose
-      $target = $newtarget;
-      $logadd = "(new target < $csopt)";
-  }
-  else {                                                                      # bisheriges Optimum bleibt
-      $target = $newtarget;
-      $logadd = "(no change)";
-  }
-
-  debugLog ($paref, 'batteryManagement', "SoC calc Step2 - note charging probability -> Target: $target % ".$logadd);
-
-  ## low/up-Grenzen beachten
-  ############################
-  $target = $target > $upSoc  ? $upSoc  :
-            $target < $lowSoc ? $lowSoc :
-            $target;
-
-  debugLog ($paref, 'batteryManagement', "SoC calc Step3 - observe low/up limits -> Target: $target %");
-
+  
   ## Pflege-SoC (Soll SoC $maxSoCdef bei $batSocChgDay % Steigerung p. Tag)
   ###########################################################################
+  my $sunset  = CurrentVal ($hash, 'sunsetTodayTs', $t);
+  my $delayts = $sunset - 5400;                                                   # Pflege-SoC/Erhöhung SoC erst ab 1,5 h vor Sonnenuntergang berechnen/anwenden
+  my $la      = '';
+  
   if ($t > $delayts) {                                                            
       my $ntsmsc    = CircularVal ($hash, 99, 'nextTsMaxSocChge', $t);
       my $days2care = ceil        (($ntsmsc - $t) / 86400);                       # verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll
@@ -6356,15 +6316,59 @@ sub _batSocTarget {
       __batSaveSocKeyFigures ($paref);
       delete $paref->{days2care};
 
-      my $careSoc = $maxsoc - ($days2care * $batSocChgDay);                       # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
-      $target     = $careSoc < $target ? $target : $careSoc;                      # resultierender Target-SoC unter Berücksichtigung $caresoc
-
-      debugLog ($paref, 'batteryManagement', "SoC calc Step4 - note remaining days >$days2care< until care SoC -> Target: $target %");
+      my $careSoc = $maxsoc - ($days2care * $batSocChgDay);                                     # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
+      $target     = $careSoc < $target ? $target : $careSoc;                                    # resultierender Target-SoC unter Berücksichtigung $caresoc
+      $la         = "note remaining days until care SoC ($days2care days) -> Target: $target %";
   }
   else {
       $nt = (timestampToTimestring ($delayts, $paref->{lang}))[0];
-      debugLog ($paref, 'batteryManagement', "SoC calc Step4 - calculation & activation of the care SoC postponed to after $nt");
+      $la = "note remaining days until care SoC -> calculation & activation postponed to after $nt";
   }
+  
+  debugLog ($paref, 'batteryManagement', "SoC calc Step2 - $la");
+
+  ## Aufladewahrscheinlichkeit beachten
+  #######################################
+  my $pvfctm     = ReadingsNum ($name, 'Tomorrow_PVforecast',            0);       # PV Prognose morgen
+  my $pvfctd     = ReadingsNum ($name, 'RestOfDayPVforecast',            0);       # PV Prognose Rest heute
+  my $csopt      = ReadingsNum ($name, 'Battery_OptimumTargetSoC', $lowSoc);       # aktuelles SoC Optimum
+  my $pvexpect   = $pvfctm > $pvfctd ? $pvfctm : $pvfctd;
+
+  my $batinstcap = CurrentVal ($hash, 'batinstcap', 0);                            # installierte Batteriekapazität Wh
+  my $needcharge = $batinstcap - ($batinstcap / 100 * $batcharge);                 # vorläufige benötigte Ladeenergie (Wh) bis 100% SOC
+  my $cancharge  = $pvexpect > $needcharge ? $pvexpect : $needcharge;              # resultierende benötigte Ladeenergie (Wh)
+  my $cantarget  = 100 - (100 / $batinstcap) * $cancharge;                         # berechneter möglicher Min SOC nach Berücksichtigung Ladewahrscheinlichkeit
+
+  my $newtarget  = sprintf "%.0f", ($cantarget < $target ? $cantarget : $target);  # Abgleich möglicher Min SOC gg. berechneten Min SOC
+  my $logadd     = '';
+
+  if ($newtarget > $csopt && $t > $delayts) {                                      # Erhöhung des SoC erst ab Sonnenuntergang anwenden
+      $target = $newtarget;
+      $logadd = "(new target > $csopt % and Sunset has passed)";
+  }
+  elsif ($newtarget > $csopt && $t <= $delayts) {                                  # bisheriges Optimum bleibt vorerst
+      $target = $csopt;
+      $nt     = (timestampToTimestring ($delayts, $paref->{lang}))[0];
+      $logadd = "(new target $newtarget % is only activated after $nt)";
+  }
+  elsif ($newtarget < $csopt) {                                                    # Targetminderung sofort umsetzen -> Freiplatz für Ladeprognose
+      $target = $newtarget;
+      $logadd = "(new target < current Target SoC $csopt)";
+  }
+  else {                                                                           # bisheriges Optimum bleibt
+      $target = $newtarget;
+      $logadd = "(no change)";
+  }
+
+  debugLog ($paref, 'batteryManagement', "SoC calc Step3 - note charging probability -> Target: $target % ".$logadd);
+
+  ## low/up-Grenzen beachten
+  ############################
+  $target = $target > $upSoc  ? $upSoc  :
+            $target < $lowSoc ? $lowSoc :
+            $target;
+
+  debugLog ($paref, 'batteryManagement', "SoC calc Step4 - observe low/up limits -> Target: $target %");
 
   ## auf 5er Schritte anpassen (40,45,50,...)
   #############################################
@@ -6381,7 +6385,7 @@ sub _batSocTarget {
       $chargereq = 1;
   }
   
-  debugLog ($paref, 'batteryManagement', "SoC calc Step6 - (final step) forced charging request: ".
+  debugLog ($paref, 'batteryManagement', "SoC calc Step6 - force charging request: ".
                     ($chargereq ? 'yes (battery charge is below minimum SoC)' : 'no (sufficient battery charge)'));
 
   ## pvHistory/Readings schreiben
