@@ -59,7 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.53.0"  => "05.01.2024  new setter multiCmd ",
+  "8.53.0"  => "05.01.2024  new setter multiCmd, change DbRep_autoForward ",
   "8.52.15" => "08.12.2023  fix use fhem default variables in attr executeBeforeProc/executeAfterProc ".
                             "forum: https://forum.fhem.de/index.php?msg=1296146 ",
   "8.52.14" => "08.11.2023  fix period calculation when using attr timeYearPeriod ",
@@ -340,35 +340,36 @@ my %DbRep_vHintsExt_de = (
 # dobp    = executeBeforeProc auswerten
 ###################################################################
 my %dbrep_hmainf = (
-    sumValue           => { fn => "DbRep_sumval",        fndone => "DbRep_sumvalDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
-    countEntries       => { fn => "DbRep_count",         fndone => "DbRep_countDone",         fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1                     },
-    sqlCmd             => { fn => "DbRep_sqlCmd",        fndone => "DbRep_sqlCmdDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1                     },
-    sqlCmdHistory      => { fn => "DbRep_sqlCmd",        fndone => "DbRep_sqlCmdDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1                     },
-    sqlSpecial         => { fn => "DbRep_sqlCmd",        fndone => "DbRep_sqlCmdDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1                     },
-    averageValue       => { fn => "DbRep_averval",       fndone => "DbRep_avervalDone",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
-    fetchrows          => { fn => "DbRep_fetchrows",     fndone => "DbRep_fetchrowsDone",     fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1                     },
-    maxValue           => { fn => "DbRep_maxval",        fndone => "DbRep_maxvalDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
-    minValue           => { fn => "DbRep_minval",        fndone => "DbRep_minvalDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
-    exportToFile       => { fn => "DbRep_expfile",       fndone => "DbRep_expfile_Done",      fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
-    importFromFile     => { fn => "DbRep_impfile",       fndone => "DbRep_impfile_Done",      fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
-    tableCurrentFillup => { fn => "DbRep_currentfillup", fndone => "DbRep_currentfillupDone", fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "current" },
-    diffValue          => { fn => "DbRep_diffval",       fndone => "DbRep_diffvalDone",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
-    delEntries         => { fn => "DbRep_del",           fndone => "DbRep_del_Done",          fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
-    syncStandby        => { fn => "DbRep_syncStandby",   fndone => "DbRep_syncStandbyDone",   fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
-    delSeqDoublets     => { fn => "DbRep_delseqdoubl",   fndone => "DbRep_deldoubl_Done",     fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
-    delDoublets        => { fn => "DbRep_deldoublets",   fndone => "DbRep_deldoubl_Done",     fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
-    reduceLog          => { fn => "DbRep_reduceLog",     fndone => "DbRep_reduceLogDone",     fnabort => "DbRep_reduceLogAborted", pk => "RUNNING_REDUCELOG", timeset => 1, dobp => 1, table => "history" },
-    tableCurrentPurge  => { fn => "DbRep_del",           fndone => "DbRep_del_Done",          fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 1, table => "current" },
-    dbvars             => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 0                     },
-    dbstatus           => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 0                     },
-    tableinfo          => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 0                     },
-    procinfo           => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 0                     },
-    svrinfo            => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 0                     },
-    insert             => { fn => "DbRep_insert",        fndone => "DbRep_insertDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 1, table => "history" },
-    deviceRename       => { fn => "DbRep_changeDevRead", fndone => "DbRep_changeDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 1, table => "history", renmode => "devren"    },
-    readingRename      => { fn => "DbRep_changeDevRead", fndone => "DbRep_changeDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 1, table => "history", renmode => "readren"   },
-    changeValue        => { fn => "DbRep_changeVal",     fndone => "DbRep_changeDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history", renmode => "changeval" },
-    migrateCollation   => { fn => "DbRep_migCollation",  fndone => "DbRep_migCollation_Done", fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 1                     },
+    eraseReadings      => { fn => 'DbRep_delread',       fndone => '',                        fnabort => '',                       pk => '',                  timeset => 0, dobp => 0, table => ''        },
+    sumValue           => { fn => 'DbRep_sumval',        fndone => 'DbRep_sumvalDone',        fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1, table => 'history' },
+    countEntries       => { fn => 'DbRep_count',         fndone => 'DbRep_countDone',         fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1                     },
+    sqlCmd             => { fn => 'DbRep_sqlCmd',        fndone => 'DbRep_sqlCmdDone',        fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1                     },
+    sqlCmdHistory      => { fn => 'DbRep_sqlCmd',        fndone => 'DbRep_sqlCmdDone',        fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1                     },
+    sqlSpecial         => { fn => 'DbRep_sqlCmd',        fndone => 'DbRep_sqlCmdDone',        fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1                     },
+    averageValue       => { fn => 'DbRep_averval',       fndone => 'DbRep_avervalDone',       fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1, table => 'history' },
+    fetchrows          => { fn => 'DbRep_fetchrows',     fndone => 'DbRep_fetchrowsDone',     fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1                     },
+    maxValue           => { fn => 'DbRep_maxval',        fndone => 'DbRep_maxvalDone',        fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1, table => 'history' },
+    minValue           => { fn => 'DbRep_minval',        fndone => 'DbRep_minvalDone',        fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1, table => 'history' },
+    exportToFile       => { fn => 'DbRep_expfile',       fndone => 'DbRep_expfile_Done',      fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1, table => 'history' },
+    importFromFile     => { fn => 'DbRep_impfile',       fndone => 'DbRep_impfile_Done',      fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1, table => 'history' },
+    tableCurrentFillup => { fn => 'DbRep_currentfillup', fndone => 'DbRep_currentfillupDone', fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1, table => 'current' },
+    diffValue          => { fn => 'DbRep_diffval',       fndone => 'DbRep_diffvalDone',       fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1, table => 'history' },
+    delEntries         => { fn => 'DbRep_del',           fndone => 'DbRep_del_Done',          fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1, table => 'history' },
+    syncStandby        => { fn => 'DbRep_syncStandby',   fndone => 'DbRep_syncStandbyDone',   fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1, table => 'history' },
+    delSeqDoublets     => { fn => 'DbRep_delseqdoubl',   fndone => 'DbRep_deldoubl_Done',     fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1, table => 'history' },
+    delDoublets        => { fn => 'DbRep_deldoublets',   fndone => 'DbRep_deldoubl_Done',     fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1, table => 'history' },
+    reduceLog          => { fn => 'DbRep_reduceLog',     fndone => 'DbRep_reduceLogDone',     fnabort => 'DbRep_reduceLogAborted', pk => 'RUNNING_REDUCELOG', timeset => 1, dobp => 1, table => 'history' },
+    tableCurrentPurge  => { fn => 'DbRep_del',           fndone => 'DbRep_del_Done',          fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 0, dobp => 1, table => 'current' },
+    dbvars             => { fn => 'DbRep_dbmeta',        fndone => 'DbRep_dbmeta_Done',       fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 0, dobp => 0                     },
+    dbstatus           => { fn => 'DbRep_dbmeta',        fndone => 'DbRep_dbmeta_Done',       fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 0, dobp => 0                     },
+    tableinfo          => { fn => 'DbRep_dbmeta',        fndone => 'DbRep_dbmeta_Done',       fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 0, dobp => 0                     },
+    procinfo           => { fn => 'DbRep_dbmeta',        fndone => 'DbRep_dbmeta_Done',       fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 0, dobp => 0                     },
+    svrinfo            => { fn => 'DbRep_dbmeta',        fndone => 'DbRep_dbmeta_Done',       fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 0, dobp => 0                     },
+    insert             => { fn => 'DbRep_insert',        fndone => 'DbRep_insertDone',        fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 0, dobp => 1, table => 'history' },
+    deviceRename       => { fn => 'DbRep_changeDevRead', fndone => 'DbRep_changeDone',        fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 0, dobp => 1, table => 'history', renmode => 'devren'    },
+    readingRename      => { fn => 'DbRep_changeDevRead', fndone => 'DbRep_changeDone',        fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 0, dobp => 1, table => 'history', renmode => 'readren'   },
+    changeValue        => { fn => 'DbRep_changeVal',     fndone => 'DbRep_changeDone',        fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 1, dobp => 1, table => 'history', renmode => 'changeval' },
+    migrateCollation   => { fn => 'DbRep_migCollation',  fndone => 'DbRep_migCollation_Done', fnabort => 'DbRep_ParseAborted',     pk => 'RUNNING_PID',       timeset => 0, dobp => 1                     },
 );
 
 my %dbrep_havgfn = (                                                                   # Schemafunktionen von averageValue
@@ -643,9 +644,13 @@ sub DbRep_Set {
 
   return if(IsDisabled($name));
 
-  if ($opt =~ /eraseReadings/) {
+  if ($opt eq 'eraseReadings') {
        DbRep_setLastCmd (@a);
-       DbRep_delread    ($hash);                                            # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
+       
+       no strict 'refs';
+       $dbrep_hmainf{$opt}{fn} ($hash);                                   # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
+       use strict;
+       
        return;
   }
 
@@ -1575,13 +1580,9 @@ sub DbRep_Attr {
         }
     }
 
-    if ($aName eq "readingPreventFromDel") {
-        if($cmd eq "set") {
-            if($aVal =~ / /) {return "Usage of $aName is wrong. Use a comma separated list of readings which are should prevent from deletion when a new selection starts.";}
-            $hash->{HELPER}{RDPFDEL} = $aVal;
-        }
-        else {
-            delete $hash->{HELPER}{RDPFDEL} if($hash->{HELPER}{RDPFDEL});
+    if ($aName eq 'readingPreventFromDel' && $cmd eq 'set') {
+        if ($aVal =~ / /) {
+            return "Usage of $aName is wrong. Use a comma separated list of readings which are should prevent from deletion when a new selection starts.";
         }
     }
 
@@ -5043,6 +5044,7 @@ sub DbRep_sumvalDone {
   readingsBeginUpdate ($hash);
 
   my @arr = split("\\|", $arrstr);
+  
   for my $row (@arr) {
       my @a              = split("#", $row);
       my $runtime_string = $a[0];
@@ -12275,17 +12277,19 @@ return;
 #   autoForward Attribut:
 #
 #   {
-#     "<source-reading> => "<dest.device>" [=> <dest.-reading>]",
-#     "<source-reading> => "<dest.device>" [=> <dest.-reading>]",
+#     "<source-reading>" => "<dest.device>" [=> <dest.-reading>]",
+#     "<source-reading>" => "<dest.device>" [=> <dest.-reading>]",
 #     ....
 #   }
 ####################################################################################################
 sub DbRep_autoForward {
-  my ($name,$reading,$value) = @_;
+  my $name    = shift;
+  my $reading = shift;
+  my $value   = shift;
+  
   my $hash = $defs{$name};
-  my $av   = AttrVal($name, "autoForward", "");
-  my ($sr,$af);
-
+  my $av   = AttrVal ($name, 'autoForward', '');
+  
   return if(!$av);
 
   $av =~ m/^\{(.*)\}/s;
@@ -12294,16 +12298,19 @@ sub DbRep_autoForward {
 
   my @a = split ",", $av;
   $av   = "{ ";
+  
   my $i = 0;
-
-  for (@a) {
-      $av .= "\"$i\" => \"$_\",";
+  for my $elm (@a) {
+      $av .= qq("$i" => "$elm",);
       $i++;
   }
 
   $av .= " }";
 
+  my ($sr,$af);
+  
   $af = eval $av;
+  
   if($@ || ref($af) ne "HASH") {
       Log3($name, 2, "$name - Values specified in attribute \"autoForward\" are not defined as HASH ... exiting !") if(ref($af) ne "HASH");
       Log3($name, 2, "$name - Error while evaluate: ".$@) if($@);
@@ -12311,11 +12318,12 @@ sub DbRep_autoForward {
   }
 
   for my $key (keys %{$af}) {
-      my ($srr,$ddev,$dr) = split("=>", $af->{$key});
-      $srr  = DbRep_trim($srr)  if($srr);
-      $ddev = DbRep_trim($ddev) if($ddev);
-      $dr   = DbRep_trim($dr)   if($dr);
+      my ($srr, $ddev, $dr) = split("=>", $af->{$key});
+      $ddev                 = DbRep_trim ($ddev) if($ddev);
       next if(!$ddev);
+      
+      $srr  = DbRep_trim ($srr) if($srr);
+      $dr   = DbRep_trim ($dr)  if($dr);
 
       if(!$defs{$ddev}) {                                                          # Vorhandensein Destination Device prüfen
           Log3($name, 2, "$name - WARNING - Forward reading \"$reading\" not possible, device \"$ddev\" doesn't exist");
@@ -12323,13 +12331,14 @@ sub DbRep_autoForward {
       }
 
       if(!$srr || $reading !~ /^$srr$/) {
-          # Log3($name, 4, "$name - Reading \"$reading\" doesn't match autoForward-Regex: ".($srr?$srr:"")." - no forward to \"$ddev\" ");
+          # Log3 ($name, 4, "$name - Reading \"$reading\" doesn't match autoForward-Regex: ".($srr?$srr:"")." - no forward to \"$ddev\" ");
           next;
       }
 
       eval { $sr = $srr };
-      $dr = $dr ? $dr : ($sr ne ".*") ? $sr : $reading;                            # Destination Reading = Source Reading wenn Destination Reading nicht angegeben
-      $dr = makeReadingName($dr);                                                  # Destination Readingname validieren / entfernt aus dem übergebenen Readingname alle ungültigen Zeichen und ersetzt diese durch einen Unterstrich "_"
+      $dr = $dr ? $dr : ($sr !~ /\.\*/xs) ? $sr : $reading;                        # Destination Reading = Source Reading wenn Destination Reading nicht angegeben
+      $dr = makeReadingName ($dr);                                                 # Destination Readingname validieren / entfernt aus dem übergebenen Readingname alle ungültigen Zeichen und ersetzt diese durch einen Unterstrich "_"
+      
       Log3($name, 4, "$name - Forward reading \"$reading\" to \"$ddev:$dr\" ");
 
       CommandSetReading(undef, "$ddev $dr $value");
@@ -12817,15 +12826,17 @@ return;
 # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
 ####################################################################################################
 sub DbRep_delread {
-  my ($hash,$shutdown) = @_;
+  my $hash         = shift;
+  my $shutdown     = shift;
+  
   my $name         = $hash->{NAME};
   my @allrds       = keys%{$defs{$name}{READINGS}};
-  my $featurelevel = AttrVal("global","featurelevel",99.99);
+  my $featurelevel = AttrVal ('global', 'featurelevel', 99.99);
 
   if($shutdown) {
       my $do = 0;
 
-      for my $key(@allrds) {                                                   # Highlighted Readings löschen und save statefile wegen Inkompatibilitär beim Restart
+      for my $key(@allrds) {                                                       # Highlighted Readings löschen und save statefile wegen Inkompatibilitär beim Restart
           if($key =~ /<html><span/) {
               $do = 1;
               readingsDelete($hash,$key);
@@ -12841,15 +12852,14 @@ sub DbRep_delread {
       return;
   }
 
-  my @rdpfdel;
-  @rdpfdel = split(",", $hash->{HELPER}{RDPFDEL}) if($hash->{HELPER}{RDPFDEL});
+  my @rdpfdel = split ",", AttrVal ($name, 'readingPreventFromDel', '');
 
   if(@rdpfdel) {
       for my $key(@allrds) {
           my $dodel = 1;
 
           for my $rdpfdel(@rdpfdel) {
-              if($key =~ /$rdpfdel/ || $key =~ /\bstate\b|\bassociatedWith\b/) {
+              if($key =~ /^$rdpfdel$/xs || $key =~ /\bstate\b|\bassociatedWith\b/) {
                   $dodel = 0;
               }
           }
@@ -12968,19 +12978,25 @@ sub DbRep_nextMultiCmd {
 
   return if(!defined $data{DbRep}{$name}{multicmd} || !scalar keys %{$data{DbRep}{$name}{multicmd}});
 
-  my @mattr = qw(timestamp_begin
+  my @mattr = qw(aggregation
+                 autoForward
+                 averageCalcForm
+                 timestamp_begin
                  timestamp_end
                  timeDiffToNow
                  timeOlderThan
                  timeYearPeriod
                  device
                  reading
+                 readingNameMap
                  optimizeTablesBeforeDump
                 );
 
-  for my $ma (@mattr) {
-      CommandDeleteAttr (undef, "-silent $name $ma") if(defined AttrVal($name, $ma, undef));
+  for my $da (@mattr) {
+      CommandDeleteAttr (undef, "-silent $name $da") if(defined AttrVal($name, $da, undef));
   }
+  
+  pop (@mattr);                                                          # optimizeTablesBeforeDump aus Liste entfernen -> Attr darf nicht gesetzt werden!
   
   my $ok   = 0;
   my $verb = 4;
@@ -12990,13 +13006,11 @@ sub DbRep_nextMultiCmd {
   for my $k (sort{$a<=>$b} keys %{$data{DbRep}{$name}{multicmd}}) {
       my $mcmd = delete $data{DbRep}{$name}{multicmd}{$k};
 
-      CommandAttr (undef, "-silent $name timestamp_begin $mcmd->{timestamp_begin}") if($mcmd->{timestamp_begin});
-      CommandAttr (undef, "-silent $name timestamp_end $mcmd->{timestamp_end}")     if($mcmd->{timestamp_end});
-      CommandAttr (undef, "-silent $name timeDiffToNow $mcmd->{timeDiffToNow}")     if($mcmd->{timeDiffToNow});
-      CommandAttr (undef, "-silent $name timeOlderThan $mcmd->{timeOlderThan}")     if($mcmd->{timeOlderThan});
-      CommandAttr (undef, "-silent $name timeYearPeriod $mcmd->{timeYearPeriod}")   if($mcmd->{timeYearPeriod});
-      CommandAttr (undef, "-silent $name device $mcmd->{device}")                   if($mcmd->{device});
-      CommandAttr (undef, "-silent $name reading $mcmd->{reading}")                 if($mcmd->{reading});
+      for my $sa (@mattr) {
+          next if(!defined $mcmd->{$sa});
+          
+          CommandAttr (undef, "-silent $name $sa $mcmd->{$sa}");
+      }
 
       $cmd = (split " ", $mcmd->{cmd})[0];
       
@@ -13007,7 +13021,7 @@ sub DbRep_nextMultiCmd {
       }
       else {
           $verb = 1;
-          $la   = "don't contain a valid command -> skip $cmd";
+          $la   = "don't contain a valid command -> skip '$cmd'";
       }
       
       Log3 ($name, $verb, "DbRep $name - multiCmd index >$k< $la");
@@ -15833,9 +15847,11 @@ return;
     hash.
     <br><br>
 
-    Attributes that can be defined in the hash are: <br>
+    Attribute keys that can be defined in the hash are: <br>
 
     <ul>
+      <a href="#DbRep-attr-autoForward">autoForward</a>,
+      <a href="#DbRep-attr-averageCalcForm">averageCalcForm</a>,
       <a href="#DbRep-attr-timestamp_begin">timestamp_begin</a>,
       <a href="#DbRep-attr-timestamp_end">timestamp_end</a>,
       <a href="#DbRep-attr-timeDiffToNow">timeDiffToNow</a>,
@@ -15843,6 +15859,7 @@ return;
       <a href="#DbRep-attr-timeYearPeriod">timeYearPeriod</a>,
       <a href="#DbRep-attr-device">device</a>,
       <a href="#DbRep-attr-reading">reading</a>,
+      <a href="#DbRep-attr-reading">readingNameMap</a>,
     </ul>
     <br>
 
@@ -15851,24 +15868,33 @@ return;
     <ul>
       <pre>
         {
-          1  => { timestamp_begin => '2023-12-17 00:00:00',
-                  timestamp_end   => '2023-12-17 01:00:00',
-                  device          => 'SMA_Energymeter',
-                  reading         => 'Einspeisung_Wirkleistung_Zaehler',
+          1  => { timestamp_begin => '2023-12-17 00:00:00', 
+                  timestamp_end   => '2023-12-17 01:00:00', 
+                  device          => 'SMA_Energymeter', 
+                  reading         => 'Einspeisung_Wirkleistung_Zaehler', 
                   cmd             => 'countEntries history'
                 },
-          2  => { timestamp_begin => '2023-12-15 11:00:00',
-                  timestamp_end   => 'previous_day_end',
-                  device          => 'SMA_Energymeter',
-                  reading         => 'Einspeisung_Wirkleistung_Zaehler',
-                  cmd             => 'countEntries'
+          2  => { timestamp_begin => '2023-12-15 11:00:00', 
+                  timestamp_end   => 'previous_day_end', 
+                  device          => 'SMA_Energymeter', 
+                  reading         => 'Einspeisung_Wirkleistung_Zaehler', 
+                  cmd             => 'countEntries' 
                 },
           3  => { timeDiffToNow   => 'd:2',
+                  readingNameMap  => 'COUNT',
+                  autoForward     => '{ ".*COUNT.*" => "Dum.Rep.All" }',
                   device          => 'SMA_%,MySTP.*',
-                  reading         => 'etotal,etoday,Ein% EXCLUDE=%Wirkleistung',
-                  cmd             => 'countEntries history'
+                  reading         => 'etotal,etoday,Ein% EXCLUDE=%Wirkleistung', 
+                  cmd             => 'countEntries history' 
                 },
-          4  => { cmd             => 'sqlCmd select count(*) from current'
+          4  => { timeDiffToNow   => 'd:2',
+                  readingNameMap  => 'SUM',
+                  autoForward     => '{ ".*SUM.*" => "Dum.Rep.All" }',
+                  device          => 'SMA_%,MySTP.*',
+                  reading         => 'etotal,etoday,Ein% EXCLUDE=%Wirkleistung', 
+                  cmd             => 'sumValue' 
+                },
+          5  => { cmd             => 'sqlCmd select count(*) from current'
                 },
         }
       </pre>
@@ -16731,42 +16757,61 @@ sub dbval {
 
   <ul><ul>
   <a id="DbRep-attr-aggregation"></a>
-  <li><b>aggregation </b>     - Aggregation of Device/Reading-selections. Possible values are hour, day, week, month, year and "no".
-                                Delivers e.g. the count of database entries for a day (countEntries), Summation of
-                                difference values of a reading (sumValue) and so on. Using aggregation "no" (default) an
-                                aggregation don't happens but the output contains all values of Device/Reading in the selected time period.  </li> <br>
-
+  <li><b>aggregation </b> <br><br>
+  
+  Creation of the function results in time slices within the selection period. 
+  <br><br>
+  
+  <ul>
+    <table>
+    <colgroup> <col width=10%> <col width=90%> </colgroup>
+        <tr><td> no      </td><td>- No aggregation (default)                                  </td></tr>
+        <tr><td> minute  </td><td>- the function results are summarized per minute            </td></tr>
+        <tr><td> hour    </td><td>- the function results are summarized per hour              </td></tr>
+        <tr><td> day     </td><td>- the function results are summarized per calendar day      </td></tr>
+        <tr><td> week    </td><td>- the function results are summarized per calendar week     </td></tr>
+        <tr><td> month   </td><td>- the function results are summarized per calendar month    </td></tr>
+        <tr><td> year    </td><td>- the functional results are summarized per calendar year   </td></tr>
+    </table>
+  </ul>
+  </li> 
+  <br>
+  
   <a id="DbRep-attr-allowDeletion"></a>
-  <li><b>allowDeletion </b>   - unlocks the delete-function  </li> <br>
+  <li><b>allowDeletion </b> <br><br>
+  
+  Enables the delete function of the module.
+  </li> 
+  <br>
 
-  <li><b>autoForward </b>   - if activated, the result threads of a function are transferred to one or more devices. <br>
-                              The definition takes the form: <br>
+  <a id="DbRep-attr-autoForward"></a>
+  <li><b>autoForward </b> <br><br>
+  If activated, the result threads of a function are transferred to one or more devices. <br>
+  The definition takes the form: <br>
 
-                              <pre>
-{
-  "&lt;source-reading&gt; => "&lt;dest.device&gt; [=> &lt;dest.-reading&gt;]",
-  "&lt;source-reading&gt; => "&lt;dest.device&gt; [=> &lt;dest.-reading&gt;]",
-  ...
-}
-                              </pre>
+  <pre>
+  {
+   "&lt;source-reading&gt;" => "&lt;dest.device&gt; [=> &lt;dest.-reading&gt;]",
+   "&lt;source-reading&gt;" => "&lt;dest.device&gt; [=> &lt;dest.-reading&gt;]",
+   ...
+  }
+  </pre>
 
-                              Wildcards (.*) are permitted in the specification <b>&lt;source-reading&gt;</b>. <br><br>
+  Wildcards (.*) are permitted in the specification <b>&lt;source-reading&gt;</b>. <br><br>
 
-                              <ul>
-                                <b>Example:</b>
-                                <pre>
-{
-  ".*"        => "Dum.Rep.All",
-  ".*AVGAM.*" => "Dum.Rep     => average",
-  ".*SUM.*"   => "Dum.Rep.Sum => summary",
-}
-# all readings are transferred to device "Dum.Rep.All", reading name remains in the target
-# readings with "AVGAM" in the name are transferred to the "Dum.Rep" device in the reading "average"
-# readings with "SUM" in the name are transferred to the device "Dum.Rep.Sum" in the reading "summary"
-                              </pre>
-
-                              </ul>
-                              </li> <br>
+  <b>Example:</b>
+  <pre>
+  {
+    ".*"        => "Dum.Rep.All",
+    ".*AVGAM.*" => "Dum.Rep     => average",
+    ".*SUM.*"   => "Dum.Rep.Sum => summary",
+  }
+  # All readings are transferred to device "Dum.Rep.All", reading name remains in the target
+  # readings with "AVGAM" in the name are transferred to the "Dum.Rep" device in the reading "average"
+  # readings with "SUM" in the name are transferred to the device "Dum.Rep.Sum" in the reading "summary"
+  </pre>
+  </li> 
+  <br>
 
   <a id="DbRep-attr-averageCalcForm"></a>
   <li><b>averageCalcForm </b> <br><br>
@@ -16798,9 +16843,12 @@ sub dbval {
  <br>
 
   <a id="DbRep-attr-countEntriesDetail"></a>
-  <li><b>countEntriesDetail </b>   - If set, the function countEntries creates a detailed report of counted datasets of
-                                     every reading. By default only the summary of counted datasets is reported.
-                                     </li> <br>
+  <li><b>countEntriesDetail </b> <br><br>
+  
+  If set, the function countEntries creates a detailed report of counted datasets of
+  every reading. By default only the summary of counted datasets is reported.
+  </li> 
+  <br>
 
   <a id="DbRep-attr-device"></a>
   <li><b>device </b>          - Selection of particular or several devices. <br>
@@ -17141,18 +17189,35 @@ sub bdump {
                                 </li>
 
   <a id="DbRep-attr-readingNameMap"></a>
-  <li><b>readingNameMap </b>  - A part of the created reading name will be replaced by the specified string  </li> <br>
+  <li><b>readingNameMap </b> <br><br>
+  
+  The part between the first and last double underscore ('__') of the created reading name is replaced with the 
+  specified string.   
+  </li> 
+  <br>
 
   <a id="DbRep-attr-role"></a>
-  <li><b>role </b>            - the role of the DbRep-device. Standard role is "Client". <br>
-
-                                The role "Agent" is described in section <a href="#DbRep-attr-autorename">DbRep-Agent</a>.
-
-                                </li> <br>
+  <li><b>role </b> <br><br>
+  
+  The role of the DbRep-device. Standard role is "Client". <br>
+  The role "Agent" is described in section <a href="#DbRep-attr-autorename">DbRep-Agent</a>.
+  </li> 
+  <br>
 
   <a id="DbRep-attr-readingPreventFromDel"></a>
-  <li><b>readingPreventFromDel </b>  - comma separated list of readings which are should prevent from deletion when a
-                                       new operation starts  </li> <br>
+  <li><b>readingPreventFromDel </b> <br><br>
+  
+  Comma separated list of readings which are should prevent from deletion when a new operation starts. <br>
+  The readings can be specified as a regular expression. <br>
+  (default: state)
+  <br><br>
+  
+  <ul>
+    <b>Example:</b> <br>
+    attr &lt;name&gt; readingPreventFromDel .*Count.*,.*Summary1.*,.*Summary2.*
+  </ul>
+  </li> 
+  <br>
 
   <a id="DbRep-attr-seqDoubletsVariance"></a>
   <li><b>seqDoubletsVariance  &lt;positive variance [negative variance] [EDGE=negative|positive]&gt; </b> <br><br>
@@ -18914,9 +18979,11 @@ return;
     Hash.
     <br><br>
 
-    Im Hash definierbare Attribute sind: <br>
+    Im Hash definierbare Attributschlüssel sind: <br>
 
     <ul>
+      <a href="#DbRep-attr-autoForward">autoForward</a>,
+      <a href="#DbRep-attr-averageCalcForm">averageCalcForm</a>,
       <a href="#DbRep-attr-timestamp_begin">timestamp_begin</a>,
       <a href="#DbRep-attr-timestamp_end">timestamp_end</a>,
       <a href="#DbRep-attr-timeDiffToNow">timeDiffToNow</a>,
@@ -18924,6 +18991,7 @@ return;
       <a href="#DbRep-attr-timeYearPeriod">timeYearPeriod</a>,
       <a href="#DbRep-attr-device">device</a>,
       <a href="#DbRep-attr-reading">reading</a>,
+      <a href="#DbRep-attr-reading">readingNameMap</a>,
     </ul>
     <br>
 
@@ -18932,24 +19000,33 @@ return;
     <ul>
       <pre>
         {
-          1  => { timestamp_begin => '2023-12-17 00:00:00',
-                  timestamp_end   => '2023-12-17 01:00:00',
-                  device          => 'SMA_Energymeter',
-                  reading         => 'Einspeisung_Wirkleistung_Zaehler',
+          1  => { timestamp_begin => '2023-12-17 00:00:00', 
+                  timestamp_end   => '2023-12-17 01:00:00', 
+                  device          => 'SMA_Energymeter', 
+                  reading         => 'Einspeisung_Wirkleistung_Zaehler', 
                   cmd             => 'countEntries history'
                 },
-          2  => { timestamp_begin => '2023-12-15 11:00:00',
-                  timestamp_end   => 'previous_day_end',
-                  device          => 'SMA_Energymeter',
-                  reading         => 'Einspeisung_Wirkleistung_Zaehler',
-                  cmd             => 'countEntries'
+          2  => { timestamp_begin => '2023-12-15 11:00:00', 
+                  timestamp_end   => 'previous_day_end', 
+                  device          => 'SMA_Energymeter', 
+                  reading         => 'Einspeisung_Wirkleistung_Zaehler', 
+                  cmd             => 'countEntries' 
                 },
           3  => { timeDiffToNow   => 'd:2',
+                  readingNameMap  => 'COUNT',
+                  autoForward     => '{ ".*COUNT.*" => "Dum.Rep.All" }',
                   device          => 'SMA_%,MySTP.*',
-                  reading         => 'etotal,etoday,Ein% EXCLUDE=%Wirkleistung',
-                  cmd             => 'countEntries history'
+                  reading         => 'etotal,etoday,Ein% EXCLUDE=%Wirkleistung', 
+                  cmd             => 'countEntries history' 
                 },
-          4  => { cmd             => 'sqlCmd select count(*) from current'
+          4  => { timeDiffToNow   => 'd:2',
+                  readingNameMap  => 'SUM',
+                  autoForward     => '{ ".*SUM.*" => "Dum.Rep.All" }',
+                  device          => 'SMA_%,MySTP.*',
+                  reading         => 'etotal,etoday,Ein% EXCLUDE=%Wirkleistung', 
+                  cmd             => 'sumValue' 
+                },
+          5  => { cmd             => 'sqlCmd select count(*) from current'
                 },
         }
       </pre>
@@ -19825,46 +19902,62 @@ sub dbval {
 
   <ul><ul>
   <a id="DbRep-attr-aggregation"></a>
-  <li><b>aggregation </b>     - Zusammenfassung der Device/Reading-Selektionen in Stunden, Tagen, Kalenderwochen, Kalendermonaten, Kalenderjahren
-                                oder "no". <br>
-                                Liefert z.B. die Anzahl der DB-Einträge am Tag (countEntries) oder die Summierung von
-                                Differenzwerten eines Readings (sumValue) usw. <br>
-                                Mit Aggregation "no" (default) wird das Ergebnis aus allen Werten einer Device/Reading-Kombination im
-                                selektierten Zeitraum ermittelt.  </li> <br>
+  <li><b>aggregation </b> <br><br>
+  
+  Erstellung der Funktionsergebnisse in Zeitscheiben innerhalb des Selektionszeitraumes. 
+  <br><br>
+  
+  <ul>
+    <table>
+    <colgroup> <col width=10%> <col width=90%> </colgroup>
+        <tr><td> no      </td><td>- keine Aggregation (default)                                       </td></tr>
+        <tr><td> minute  </td><td>- die Funktionsergebnisse werden pro Minute zusammengefasst         </td></tr>
+        <tr><td> hour    </td><td>- die Funktionsergebnisse werden pro Stunde zusammengefasst         </td></tr>
+        <tr><td> day     </td><td>- die Funktionsergebnisse werden pro Kalendertag zusammengefasst    </td></tr>
+        <tr><td> week    </td><td>- die Funktionsergebnisse werden pro Kalenderwoche zusammengefasst  </td></tr>
+        <tr><td> month   </td><td>- die Funktionsergebnisse werden pro Kalendermonat zusammengefasst  </td></tr>
+        <tr><td> year    </td><td>- die Funktionsergebnisse werden pro Kalenderjahr zusammengefasst   </td></tr>
+    </table>
+  </ul>
+  </li> 
+  <br>
 
   <a id="DbRep-attr-allowDeletion"></a>
-  <li><b>allowDeletion </b>   - schaltet die Löschfunktion des Moduls frei   </li> <br>
+  <li><b>allowDeletion </b> <br><br>
+  
+  Schaltet die Löschfunktion des Moduls frei.
+  </li> 
+  <br>
 
   <a id="DbRep-attr-autoForward"></a>
-  <li><b>autoForward </b>   - wenn aktiviert, werden die Ergebnisreadings einer Funktion in ein oder mehrere Devices
-                              übertragen. <br>
-                              Die Definition erfolgt in der Form: <br>
+  <li><b>autoForward </b> <br><br>
+  Wenn aktiviert, werden die Ergebnisreadings einer Funktion in ein oder mehrere Devices
+  übertragen. <br>
+  Die Definition erfolgt in der Form: <br>
 
-                              <pre>
-{
-  "&lt;source-reading&gt; => "&lt;dest.device&gt; [=> &lt;dest.-reading&gt;]",
-  "&lt;source-reading&gt; => "&lt;dest.device&gt; [=> &lt;dest.-reading&gt;]",
-  ...
-}
-                              </pre>
+  <pre>
+   {
+    "&lt;source-reading&gt;" => "&lt;dest.device&gt; [=> &lt;dest.-reading&gt;]",
+    "&lt;source-reading&gt;" => "&lt;dest.device&gt; [=> &lt;dest.-reading&gt;]",
+    ...
+   }
+  </pre>
 
-                              In der Angabe <b>&lt;source-reading&gt;</b> sind Wildcards (.*) erlaubt. <br><br>
+  In der Angabe <b>&lt;source-reading&gt;</b> sind Wildcards (.*) erlaubt. <br><br>
 
-                              <ul>
-                                <b>Beispiel:</b>
-                                <pre>
-{
-  ".*"        => "Dum.Rep.All",
-  ".*AVGAM.*" => "Dum.Rep     => average",
-  ".*SUM.*"   => "Dum.Rep.Sum => summary",
-}
-# alle Readings werden zum Device "Dum.Rep.All" übertragen, Readingname bleibt im Ziel erhalten
-# Readings mit "AVGAM" im Namen werden zum Device "Dum.Rep" in das Reading "average" übertragen
-# Readings mit "SUM" im Namen werden zum Device "Dum.Rep.Sum" in das Reading "summary" übertragen
-                              </pre>
-
-                              </ul>
-                              </li> <br>
+  <b>Beispiel:</b>
+  <pre>
+   {
+    ".*"        => "Dum.Rep.All",
+    ".*AVGAM.*" => "Dum.Rep     => average",
+    ".*SUM.*"   => "Dum.Rep.Sum => summary",
+   }
+   # alle Readings werden zum Device "Dum.Rep.All" übertragen, Readingname bleibt im Ziel erhalten
+   # Readings mit "AVGAM" im Namen werden zum Device "Dum.Rep" in das Reading "average" übertragen
+   # Readings mit "SUM" im Namen werden zum Device "Dum.Rep.Sum" in das Reading "summary" übertragen
+  </pre>
+  </li> 
+  <br>
 
   <a id="DbRep-attr-averageCalcForm"></a>
   <li><b>averageCalcForm </b> <br><br>
@@ -19897,10 +19990,13 @@ sub dbval {
   <br>
 
   <a id="DbRep-attr-countEntriesDetail"></a>
-  <li><b>countEntriesDetail </b>   - Wenn gesetzt, erstellt die Funktion "countEntries" eine detallierte Ausgabe der Datensatzzahl
-                                     pro Reading und Zeitintervall.
-                                     Standardmäßig wird nur die Summe aller selektierten Datensätze ausgegeben.
-                                     </li> <br>
+  <li><b>countEntriesDetail </b> <br><br>
+  
+  Wenn gesetzt, erstellt die Funktion "countEntries" eine detallierte Ausgabe der Datensatzzahl
+  pro Reading und Zeitintervall.
+  Standardmäßig wird nur die Summe aller selektierten Datensätze ausgegeben.
+  </li> 
+  <br>
 
  <a id="DbRep-attr-device"></a>
  <li><b>device </b>           - Abgrenzung der DB-Selektionen auf ein bestimmtes oder mehrere Devices. <br>
@@ -20264,17 +20360,35 @@ sub bdump {
                                 </li>
 
   <a id="DbRep-attr-readingNameMap"></a>
-  <li><b>readingNameMap </b>  - ein Teil des erstellten Readingnamens wird mit dem angegebenen String ersetzt.  </li> <br>
+  <li><b>readingNameMap </b> <br><br>
+  
+  Der Teil zwischen dem ersten und letzten doppelten Unterstrich ('__') des erstellten Readingnamens wird mit dem 
+  angegebenen String ersetzt.  
+  </li> 
+  <br>
 
   <a id="DbRep-attr-readingPreventFromDel"></a>
-  <li><b>readingPreventFromDel </b>  - Komma separierte Liste von Readings die vor einer neuen Operation nicht gelöscht
-                                werden sollen  </li> <br>
+  <li><b>readingPreventFromDel </b> <br><br>
+  
+  Komma separierte Liste von Readings die vor einer neuen Operation nicht gelöscht werden sollen. <br>
+  Die Readings können als regulärer Ausdruck angegeben werden. <br>
+  (default: state)
+  <br><br>
+  
+  <ul>
+    <b>Beispiel:</b> <br>
+    attr &lt;name&gt; readingPreventFromDel .*Count.*,.*Summary1.*,.*Summary2.*
+  </ul>
+  </li> 
+  <br>
 
   <a id="DbRep-attr-role"></a>
-  <li><b>role </b>            - die Rolle des DbRep-Device. Standard ist "Client". Die Rolle "Agent" ist im Abschnitt
-                                "DbRep-Agent" beschrieben. <br>
-                                Siehe auch Abschnitt <a href="#DbRep-autorename">DbRep-Agent</a>.
-                                </li> <br>
+  <li><b>role </b> <br><br>
+  
+  Die Rolle des DbRep-Device. Standard ist "Client". 
+  Die Rolle "Agent" ist im Abschnitt <a href="#DbRep-autorename">DbRep-Agent</a> beschrieben. <br>
+  </li> 
+  <br>
 
   <a id="DbRep-attr-seqDoubletsVariance"></a>
   <li><b>seqDoubletsVariance  &lt;positive Abweichung [negative Abweichung] [EDGE=negative|positive]&gt; </b> <br><br>
