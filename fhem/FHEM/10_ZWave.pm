@@ -3034,7 +3034,8 @@ ZWave_configParseModel($;$)
   }
 
   $zwave_modelConfig{$cfg} = \%mc;
-  Log 3, "ZWave got config for $cfg from $fn" if($ret);
+  Log 3, "ZWave got config for $cfg from $fn, found ".keys(%hash)." commands"
+    if($ret);
   return $ret;
 }
 
