@@ -59,7 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.53.0"  => "05.01.2024  new setter multiCmd, change DbRep_autoForward ",
+  "8.53.0"  => "05.01.2024  new setter multiCmd, change DbRep_autoForward, fix reducelog Hash management ",
   "8.52.15" => "08.12.2023  fix use fhem default variables in attr executeBeforeProc/executeAfterProc ".
                             "forum: https://forum.fhem.de/index.php?msg=1296146 ",
   "8.52.14" => "08.11.2023  fix period calculation when using attr timeYearPeriod ",
@@ -575,6 +575,7 @@ sub DbRep_Set {
   my $cj = @bkps ? join(",",reverse(sort @bkps)) : " ";
 
   my (undef, $hl) = DbRep_listSQLcmdCache ($name);                     # Drop-Down Liste bisherige Befehle in "sqlCmd" erstellen
+  
   if (AttrVal($name, "sqlCmdHistoryLength", 0)) {
       $hl .= "___purge_sqlhistory___";
       $hl .= ",___list_sqlhistory___";
@@ -760,6 +761,8 @@ sub DbRep_Set {
   }
 
   if ($opt =~ m/reduceLog/ && $hash->{ROLE} ne "Agent") {
+      delete $hash->{HELPER}{REDUCELOG};
+      
       if ($hash->{HELPER}{$dbrep_hmainf{reduceLog}{pk}} && $hash->{HELPER}{$dbrep_hmainf{reduceLog}{pk}}{pid} !~ m/DEAD/) {
           return "reduceLog already in progress. Please wait for the current process to finish.";
       }
@@ -922,7 +925,7 @@ sub DbRep_Set {
       shift @a;
       $hash->{HELPER}{DELENTRIES} = \@a if(@a);
 
-      DbRep_Main       ($hash,$opt);
+      DbRep_Main ($hash,$opt);
   }
   elsif ($opt eq "deviceRename") {
       shift @a;
@@ -2618,6 +2621,7 @@ sub DbRep_Main {
                                                               $hash
                                                              );
 
+     delete $hash->{HELPER}{REDUCELOG};
      delete $hash->{HELPER}{DELENTRIES};
 
      if (exists $hash->{HELPER}{$dbrep_hmainf{$opt}{pk}}) {
@@ -4011,26 +4015,26 @@ sub DbRep_countDone {
 
   no warnings 'uninitialized';
 
-  readingsBeginUpdate($hash);
+  readingsBeginUpdate ($hash);
 
   my @arr = split("\\|", $arrstr);
   for my $row (@arr) {
-      my @a               = split("#", $row);
-      my $runtime_string  = $a[0];
-      my $reading         = $a[1];
-      $reading            =~ s/[^A-Za-z\/\d_\.-]/\//g;
-      my $c               = $a[2];
-      my $rsf             = $a[3]."__";
+      my @a              = split("#", $row);
+      my $runtime_string = $a[0];
+      my $reading        = $a[1];
+      $reading           =~ s/[^A-Za-z\/\d_\.-]/\//g;
+      my $c              = $a[2];
+      my $rsf            = $a[3]."__";
 
-      if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
-          $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$runtime_string;
+      if (AttrVal($name, 'readingNameMap', '')) {
+          $reading_runtime_string = $rsf.AttrVal($name, 'readingNameMap', '')."__".$runtime_string;
       }
       else {
           my ($ds,$rds) = ("","");
           $ds           = $device."__"  if ($device);
           $rds          = $reading."__" if ($reading);
 
-          if(AttrVal($name,"countEntriesDetail",0)) {
+          if (AttrVal($name, 'countEntriesDetail', 0)) {
               $reading_runtime_string = $rsf.$rds."COUNT_".$table."__".$runtime_string;
           }
           else {
@@ -10622,7 +10626,6 @@ sub DbRep_reduceLogDone {
   my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
 
   delete $hash->{HELPER}{RUNNING_REDUCELOG};
-  delete $hash->{HELPER}{REDUCELOG};
 
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
@@ -10853,7 +10856,6 @@ sub DbRep_reduceLogAborted {
   Log3 ($name, 2, "DbRep $name - Database reduceLog aborted: \"$cause\" ");
 
   delete($hash->{HELPER}{RUNNING_REDUCELOG});
-  delete $hash->{HELPER}{REDUCELOG};
 
   DbRep_nextMultiCmd ($name);                                                    # nächstes multiCmd ausführen falls gesetzt
 
