@@ -6789,9 +6789,7 @@ sub __getAutomaticState {
   my $type  = $paref->{type};
   my $c     = $paref->{consumer};
 
-  my $consumer  = AttrVal ($name, "consumer${c}", "");
-  my ($ac,$hc)  = parseParams ($consumer);
-  $consumer     = $ac->[0] // "";
+  my $consumer = ConsumerVal ($hash, $c, 'name', '');                                  # Name Consumer Device
   
   if (!$consumer || !$defs{$consumer}) {
       my $err = qq{ERROR - the device "$consumer" doesn't exist anymore! Delete or change the attribute "consumer${c}".};
@@ -6799,7 +6797,7 @@ sub __getAutomaticState {
       return;
   }
   
-  my $dswitch = $hc->{switchdev};                                                       # alternatives Schaltdevice
+  my $dswitch = ConsumerVal ($hash, $c, 'dswitch', '');                                # alternatives Schaltdevice
 
   if ($dswitch) {
       if (!$defs{$dswitch}) {
@@ -6812,9 +6810,9 @@ sub __getAutomaticState {
       $dswitch = $consumer;
   }
   
-  my $rauto     = $hc->{auto} // q{};
-  my $auto      = 1;
-  $auto         = ReadingsVal ($dswitch, $rauto, 1) if($rauto);                        # Reading für Ready-Bit -> Einschalten möglich ?
+  my $autord = ConsumerVal ($hash, $c, 'autoreading', '');                             # Readingname f. Automatiksteuerung
+  my $auto   = 1;
+  $auto      = ReadingsVal ($dswitch, $autord, 1) if($autord);                         # Reading für Ready-Bit -> Einschalten möglich ?
 
   $data{$type}{$name}{consumers}{$c}{auto} = $auto;                                    # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus
 
@@ -8600,10 +8598,8 @@ sub collectAllRegConsumers {
           $clt = $hc->{locktime};
       }
 
-      my $rauto     = $hc->{auto} // q{};
-      my $ctype     = $hc->{type} // $defctype;
-      my $auto      = 1;
-      $auto         = ReadingsVal ($consumer, $rauto, 1) if($rauto);                                    # Reading für Ready-Bit -> Einschalten möglich ?
+      my $rauto = $hc->{auto} // q{};
+      my $ctype = $hc->{type} // $defctype;
 
       $data{$type}{$name}{consumers}{$c}{name}              = $consumer;                                # Name des Verbrauchers (Device)
       $data{$type}{$name}{consumers}{$c}{alias}             = $alias;                                   # Alias des Verbrauchers (Device)
@@ -8617,7 +8613,6 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{offcom}            = $hc->{off}          // q{};               # Setter Ausschaltkommando
       $data{$type}{$name}{consumers}{$c}{dswitch}           = $dswitch;                                 # Switchdevice zur Kommandoausführung
       $data{$type}{$name}{consumers}{$c}{autoreading}       = $rauto;                                   # Readingname zur Automatiksteuerung
-      $data{$type}{$name}{consumers}{$c}{auto}              = $auto;                                    # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus
       $data{$type}{$name}{consumers}{$c}{retotal}           = $rtot               // q{};               # Reading der Leistungsmessung
       $data{$type}{$name}{consumers}{$c}{uetotal}           = $utot               // q{};               # Unit der Leistungsmessung
       $data{$type}{$name}{consumers}{$c}{rpcurr}            = $rpcurr             // q{};               # Reading der aktuellen Leistungsaufnahme
@@ -15054,6 +15049,7 @@ return $def;
 # $co:  Consumer Nummer (01,02,03,...)
 # $key: name            - Name des Verbrauchers (Device)
 #       alias           - Alias des Verbrauchers (Device)
+#       autoreading     - Readingname f. Automatiksteuerung
 #       type            - Typ des Verbrauchers
 #       state           - Schaltstatus des Consumers
 #       power           - nominale Leistungsaufnahme des Verbrauchers in W
@@ -15097,7 +15093,7 @@ return $def;
 #
 ####################################################################################################################
 sub ConsumerVal {
-  my $hash = shift;
+  my $hash = shift;   
   my $co   = shift;
   my $key  = shift;
   my $def  = shift;
