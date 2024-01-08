@@ -208,7 +208,7 @@ FHEM/36_LaCrosseGateway.pm   HCS                  Sonstige Systeme
 FHEM/36_Level.pm             HCS                  Sonstige Systeme
 FHEM/36_PCA301.pm            justme1968           Sonstige Systeme
 FHEM/36_PrecipitationSensor.pm HCS                Sonstige Systeme
-FHEM/36_Shelly.pm            pahenning            Sonstige Systeme
+FHEM/36_Shelly.pm            Starkstrombastler    Sonstige Systeme
 FHEM/36_ShellyMonitor.pm     gvzdus               Sonstige Systeme
 FHEM/36_Vallox.pm            Skjall               Sonstige Systeme http://forum.fhem.de/index.php/topic,71325.0.html
 FHEM/36_WMBUS.pm             kaihs                Sonstige Systeme
