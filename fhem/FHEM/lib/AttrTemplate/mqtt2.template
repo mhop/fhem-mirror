@@ -221,11 +221,11 @@ attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT); $ret-
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":$EVTPART1}
 attr DEVICE setStateList on off
 set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_dimmer
-setreading DEVICE attrTemplateVersion 20221201
+setreading DEVICE attrTemplateVersion 20240108
 
 # A dimmable color light connected via zigbee2mqtt
 name:zigbee2mqtt_light_cct
@@ -242,13 +242,13 @@ attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSO
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  ct:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"color_temp":"$EVTPART1"}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":$EVTPART1}\
+  ct:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"color_temp":$EVTPART1}\
   ct_startup:coolest,cool,neutral,warmest,previous $\DEVICETOPIC/set {"color_temp_startup":"$EVTPART1"}
 attr DEVICE jsonMap color_temp:ct color_temp_startup:ct_startup
 set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_cct
-setreading DEVICE attrTemplateVersion 20221201
+setreading DEVICE attrTemplateVersion 20240108
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgb_hex
@@ -266,12 +266,12 @@ attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT); $ret-
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":$EVTPART1}\
   hex:colorpicker,HEX,0,15,255 $\DEVICETOPIC/set {"color":{"$EVTPART0":"#$EVTPART1"}}
 attr DEVICE userReadings hex:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_x',0),ReadingsVal($name,'color_y',0),ReadingsVal($name,'brightness',254))}
 set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_rgb_hex
-setreading DEVICE attrTemplateVersion 20221201
+setreading DEVICE attrTemplateVersion 20240108
 
 name:zigbee2mqtt_light_rgb_rgb
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
@@ -288,11 +288,11 @@ attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT); $ret-
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":$EVTPART1}\
   color:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
 set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_rgb_rgb
-setreading DEVICE attrTemplateVersion 20221201
+setreading DEVICE attrTemplateVersion 20240108
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgbw_hex
@@ -312,14 +312,14 @@ attr DEVICE setList \
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
   warm:noArg $\DEVICETOPIC/set {"brightness": 200 , "color_temp": 360}\
   white:noArg $\DEVICETOPIC/set {"brightness": 254, "color_temp": 250}\
-  ct:colorpicker,CT,250,1,454 $\DEVICETOPIC/set {"color_temp":"$EVTPART1"}\
-  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  ct:colorpicker,CT,250,1,454 $\DEVICETOPIC/set {"color_temp":$EVTPART1}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":$EVTPART1}\
   hex:colorpicker,HEX,0,15,255 $\DEVICETOPIC/set {"color":{"$EVTPART0":"#$EVTPART1"}}
 attr DEVICE userReadings hex:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_x',0),ReadingsVal($name,'color_y',0),ReadingsVal($name,'brightness',254))}
 attr DEVICE jsonMap color_temp:ct
 set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_rgbw_hex
-setreading DEVICE attrTemplateVersion 20221201
+setreading DEVICE attrTemplateVersion 20240108
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgbw_rgb
@@ -338,11 +338,11 @@ attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
   white:noArg $\DEVICETOPIC/set {"color_temp": 154 , "color_temp": 500}\
-  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":$EVTPART1}\
   color:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
 set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_rgbw_rgb
-setreading DEVICE attrTemplateVersion 20221201
+setreading DEVICE attrTemplateVersion 20240108
 
 #source post: https://forum.fhem.de/index.php/topic,96985.msg902627.html#msg902627
 name:zigbee2mqtt_light_rgbcct_hex
@@ -360,13 +360,13 @@ attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSO
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  ct:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"color_temp":"$EVTPART1"}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":$EVTPART1}\
+  ct:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"color_temp":$EVTPART1}\
   hex:colorpicker,HEX,0,15,255 $\DEVICETOPIC/set {"color":{"$EVTPART0":"#$EVTPART1"}}
 set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE jsonMap color_temp:ct
 attr DEVICE model zigbee2mqtt_light_rgbcct_hex
-setreading DEVICE attrTemplateVersion 20221201
+setreading DEVICE attrTemplateVersion 20240108
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgbcct_rgb
@@ -391,8 +391,8 @@ attr DEVICE getList power_on_behavior:noArg power_on_behavior $\DEVICETOPIC/get 
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"brightness": BRIGHTNESS , "state":"ON", "color_temp": CTVALUE}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  ct:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"color_temp":"$EVTPART1"}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":$EVTPART1}\
+  ct:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"color_temp":$EVTPART1}\
   warm:noArg $\DEVICETOPIC/set {"brightness": BRIGHTNESS , "color_temp": CTWARMVALUE}\
   white:noArg $\DEVICETOPIC/set {"brightness": BRIGHTNESS, "color_temp": CTWHITEVALUE}\
   rgb:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}\
@@ -401,7 +401,7 @@ attr DEVICE userReadings rgb:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_
 attr DEVICE comment The specified ct and brightness values in on and warm etc. commands ​​can be adjusted at any time via the setList attribute
 set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
-setreading DEVICE attrTemplateVersion 20230410
+setreading DEVICE attrTemplateVersion 20240108
 
 # zigbee2mqtt 2 channel dimmer device
 name:zigbee2mqtt_2channel_dimmer_split
@@ -419,7 +419,7 @@ attr DEVICE setList \
   on:noArg $\DEVICETOPIC/l1/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/l1/set {"state":"OFF"}\
   toggle:noArg $\DEVICETOPIC/l1/set {"state":"TOGGLE"}\
-  brightness:colorpicker,BRI,0,1,254 $\DEVICETOPIC/l1/set {"state":"ON","$EVTPART0":"$EVTPART1"}
+  brightness:colorpicker,BRI,0,1,254 $\DEVICETOPIC/l1/set {"state":"ON","$EVTPART0":$EVTPART1}
 attr DEVICE setStateList on off toggle
 attr DEVICE webCmd brightness
 deletereading -q DEVICE (?!associatedWith|IODev).*
@@ -428,13 +428,13 @@ attr DEVICE_CH2 setList \
   on:noArg $\DEVICETOPIC/l2/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/l2/set {"state":"OFF"}\
   toggle:noArg $\DEVICETOPIC/l2/set {"state":"TOGGLE"}\
-  brightness:colorpicker,BRI,0,1,254 $\DEVICETOPIC/l2/set {"state":"ON","$EVTPART0":"$EVTPART1"}
+  brightness:colorpicker,BRI,0,1,254 $\DEVICETOPIC/l2/set {"state":"ON","$EVTPART0":$EVTPART1}
 attr DEVICE_CH2 setStateList on off toggle
 deletereading -q DEVICE_CH2 (?!associatedWith|IODev).*
 attr DEVICE_CH2 jsonMap state_l1:0 state_l2:state state:0 consumption:0 linkquality:0 power:0 temperature:0 brightness_l1:0 brightness_l2:brightness
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_light_254
 attr DEVICE,DEVICE_CH2 model zigbee2mqtt_2channel_dimmer_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20221201
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20240108
 
 # zigbee2mqtt air purifier
 name:zigbee2mqtt_air_purifier
@@ -680,12 +680,12 @@ attr DEVICE setList \
   open:noArg $\DEVICETOPIC/set {"state":"OPEN"}\
   close:noArg $\DEVICETOPIC/set {"state":"CLOSE"}\
   stop:noArg $\DEVICETOPIC/set {"state":"STOP"}\
-  pct:slider,0,1,100 $\DEVICETOPIC/set {"position":"$EVTPART1"}\
-  speed:colorpicker,BRI,0,1,255 $\DEVICETOPIC/set {"options": {"motor_speed":"$EVTPART1"}}
+  pct:slider,0,1,100 $\DEVICETOPIC/set {"position":$EVTPART1}\
+  speed:colorpicker,BRI,0,1,255 $\DEVICETOPIC/set {"options": {"motor_speed":$EVTPART1}}
 attr DEVICE stateFormat pct
 set DEVICE attrTemplate speechcontrol_type_blind
 attr DEVICE model zigbee2mqtt_blind_drive
-setreading DEVICE attrTemplateVersion 20211113
+setreading DEVICE attrTemplateVersion 20240108
 
 # Aqara Curtain Driver E1
 # contributed by drhirn, https://forum.fhem.de/index.php/topic,94495.msg1241895.html#msg1241895
@@ -702,14 +702,14 @@ attr DEVICE event-on-change-reading .*
 attr DEVICE setList open:noArg $\DEVICETOPIC/set {"state": "OPEN"}\
   close:noArg $\DEVICETOPIC/set {"state": "CLOSE"}\
   stop:noArg $\DEVICETOPIC/set {"state": "STOP"}\
-  pct:slider,0,1,100 $\DEVICETOPIC/set {"position": "$EVTPART1"}
+  pct:slider,0,1,100 $\DEVICETOPIC/set {"position": $EVTPART1}
 attr DEVICE jsonMap position:pct
 attr DEVICE stateFormat pct
 attr DEVICE devStateIcon 0:fts_shutter_100 (\d|1\d):fts_shutter_90 2\d:fts_shutter_80 3\d:fts_shutter_70 4\d:fts_shutter_60 5\d:fts_shutter_50 6\d:fts_shutter_40 7\d:fts_shutter:30 8\d:fts_shutter_20 9\d:fts_shutter_10 100:fts_window_2w
 attr DEVICE webCmd open:close:stop:pct
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model zigbee2mqtt_curtain_driver
-setreading DEVICE attrTemplateVersion 20221101
+setreading DEVICE attrTemplateVersion 20240108
 
 
 name:zigbee2mqtt_ContactSensor
@@ -1137,7 +1137,7 @@ attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList \
-  desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": "$EVTPART1"}\
+  desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": $EVTPART1}\
   btnLock:LOCK,UNLOCK $\DEVICETOPIC/set {"child_lock": "$EVTPART1"}\
   mode:heat,auto,off $\DEVICETOPIC/set {"system_mode": "$EVTPART1"}\
   away:ON,OFF $\DEVICETOPIC/set {"away_mode": "$EVTPART1"}\
@@ -1152,7 +1152,7 @@ attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_
 attr DEVICE model zigbee2mqtt_thermostat_without_weekrofile
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20220110
+setreading DEVICE attrTemplateVersion 20240108
 
 ###########################################
 # TASMOTA
@@ -5630,7 +5630,7 @@ par:BASE_ID;BASE_ID as set on the esp;{ AttrVal('DEVICE','readingList','') =~ m,
 par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
 attr DEVICE icon ICON
 attr DEVICE bridgeRegexp BASE_ID/([^/]+)/ch[0-9]+/.*:.* "BASE_ID_$1"\
-  BASE_ID/([^/]+)/(available|last_success|ack_pwr_limit|alarm|radio_stat|dis_night_comm/.*):.* "BASE_ID_$1"
+  BASE_ID/([^/]+)/(available|last_success|ack_pwr_limit|alarm/\d+|radio_stat|dis_night_comm):.* "BASE_ID_$1"
 attr DEVICE autocreate 1
 attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/free_heap:.* free_heap\
@@ -5653,7 +5653,7 @@ attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/total/YieldTotal:.* YieldTotal
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_hub_bridge
-setreading DEVICE attrTemplateVersion 20231205
+setreading DEVICE attrTemplateVersion 20240108
 { AttrTemplate_Initialize() }
 #   "setup/set_time",
 #   "setup/sync_ntp
@@ -5716,7 +5716,7 @@ attr DEVICE readingList INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal\
   INVERTERLONG_ID/ch0/MaxPower:.* MaxPower\
   INVERTERLONG_ID/alarm/cnt:.* alarmCnt\
-  INVERTERLONG_ID/alarm/[\d]+/[^:]+:.* { $TOPIC =~ m,alarm/([\d]+)/([^:]+),; { "alarm_${1}_$2"=>$EVENT } }
+  INVERTERLONG_ID/alarm/[\d]+:.* { $TOPIC =~ m,alarm/([\d]+),; { "alarm_${1}_$2"=>$EVENT } }
 option:{ RADIO_DOUBLE }
 attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name,2)}
 attr DEVICE readingList \
@@ -5765,7 +5765,7 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch1/MaxPower:.* MaxPower1\
   INVERTERLONG_ID/ch2/MaxPower:.* MaxPower2\
   INVERTERLONG_ID/alarm/cnt:.* alarmCnt\
-  INVERTERLONG_ID/alarm/[\d]+/[^:]+:.* { $TOPIC =~ m,alarm/([\d]+)/([^:]+),; { "alarm_${1}_$2"=>$EVENT } }
+  INVERTERLONG_ID/alarm/[\d]+:.* { $TOPIC =~ m,alarm/([\d]+),; { "alarm_${1}_$2"=>$EVENT } }
 option:{ RADIO_QUATTRO }
 attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name)}
 attr DEVICE readingList \
@@ -5832,7 +5832,7 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch3/MaxPower:.* MaxPower3\
   INVERTERLONG_ID/ch4/MaxPower:.* MaxPower4\
   INVERTERLONG_ID/alarm/cnt:.* alarmCnt\
-  INVERTERLONG_ID/alarm/[\d]+/[^:]+:.* { $TOPIC =~ m,alarm/([\d]+)/([^:]+),; { "alarm_${1}_$2"=>$EVENT } }
+  INVERTERLONG_ID/alarm/[\d]+:.* { $TOPIC =~ m,alarm/([\d]+),; { "alarm_${1}_$2"=>$EVENT } }
 option:{ RADIO_SIXCH }
 attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name,6)}
 attr DEVICE readingList \
@@ -5913,7 +5913,7 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch4/MaxPower:.* MaxPower5\
   INVERTERLONG_ID/ch5/MaxPower:.* MaxPower6\
   INVERTERLONG_ID/alarm/cnt:.* alarmCnt\
-  INVERTERLONG_ID/alarm/[\d]+/[^:]+:.* { $TOPIC =~ m,alarm/([\d]+)/([^:]+),; { "alarm_${1}_$2"=>$EVENT } }
+  INVERTERLONG_ID/alarm/[\d]+:.* { $TOPIC =~ m,alarm/([\d]+),; { "alarm_${1}_$2"=>$EVENT } }
 option:global
 attr DEVICE setList \
   reboot:noArg BASE_ID/ctrl/restart/INVERTER_NR\
@@ -5921,7 +5921,7 @@ attr DEVICE setList \
   limit_pct:slider,2,1,100 BASE_ID/ctrl/limit/INVERTER_NR $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20231205
+setreading DEVICE attrTemplateVersion 20240108
 
 # contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
 name:hoymiles_opendtu_hub_bridge
