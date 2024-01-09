@@ -547,7 +547,7 @@ sub DbRep_Set {
   my $dbmodel     = $dbloghash->{MODEL};
   my $dbname      = $hash->{DATABASE};
 
-  my $sd ="";
+  my $sd = "";
 
   my (@bkps,$dir);
   $dir = AttrVal ($name, "dumpDirLocal", $dbrep_dump_path_def);     # 'dumpDirRemote' (Backup-Verz. auf dem MySQL-Server) muß gemountet sein und in 'dumpDirLocal' eingetragen sein
@@ -2602,7 +2602,11 @@ sub DbRep_Main {
      }
 
      if ($opt eq "delEntries" || $opt =~ /reduceLog/xi) {                                                                              # Forum:#113202
-         DbRep_checkValidTimeSequence ($hash, $runtime_string_first, $runtime_string_next) or return;
+         my ($valid, $cause) = DbRep_checkValidTimeSequence ($hash, $runtime_string_first, $runtime_string_next);
+         if (!$valid) {
+             Log3 ($name, 2, "DbRep $name - ERROR - $cause");
+             return;
+         }
 
          if ($opt =~ /reduceLog/xi) {
             ReadingsSingleUpdateValue ($hash, 'state', 'reduceLog database is running - be patient and see Logfile!', 1);
@@ -14277,6 +14281,7 @@ sub DbRep_checkValidTimeSequence {
   my $runtime_string_next  = shift;
 
   my $valid = 1;
+  my $cause = '';
 
   return $valid if(!$runtime_string_first || !$runtime_string_next);
 
@@ -14291,15 +14296,17 @@ sub DbRep_checkValidTimeSequence {
   my $mints   = fhemTimeLocal($sec3, $min3, $hh3, $dd3, $mm3-1, $yyyy3-1900);
 
   if ($mints > $othants) {
-      ReadingsSingleUpdateValue ($hash, 'state', 'No data found in specified time range', 1);
+      ReadingsSingleUpdateValue ($hash, 'state', 'The Timestamp of the oldest dataset is newer than the specified time range', 1);
       $valid = 0;
+      $cause = "The Timestamp of the oldest dataset ($mints) is newer than specified end time ($othants)";
   }
   elsif ($nthants > $othants) {
       ReadingsSingleUpdateValue ($hash, 'state', "ERROR - Wrong time limits. The 'nn' (days newer than) option must be greater than the 'no' (older than) one!", 1);
       $valid = 0;
+      $cause = "Wrong time limits. The time stamps for start and end are logically wrong for each other.";
   }
 
-return $valid;
+return ($valid, $cause);
 }
 
 ################################################################
