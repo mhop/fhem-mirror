@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 28267 2023-12-08 21:52:20Z DS_Starter $
+# $Id: 93_DbRep.pm 28267 2024-01-09 21:52:20Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -59,7 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.53.0"  => "05.01.2024  new setter multiCmd, change DbRep_autoForward, fix reducelog Hash management ",
+  "8.53.0"  => "09.01.2024  new setter multiCmd, change DbRep_autoForward, fix reducelog Hash management ",
   "8.52.15" => "08.12.2023  fix use fhem default variables in attr executeBeforeProc/executeAfterProc ".
                             "forum: https://forum.fhem.de/index.php?msg=1296146 ",
   "8.52.14" => "08.11.2023  fix period calculation when using attr timeYearPeriod ",
@@ -2384,17 +2384,22 @@ sub DbRep_Main {
  my $dbmodel   = $dbloghash->{MODEL};
 
  my $params;
+ 
+ my $rdltag = delete $hash->{HELPER}{REDUCELOG};
+ my $deetag = delete $hash->{HELPER}{DELENTRIES};
 
  # Entkommentieren für Testroutine im Vordergrund
  # DbRep_testexit($hash);
 
- return if (($hash->{HELPER}{RUNNING_BACKUP_CLIENT}   ||
-             $hash->{HELPER}{RUNNING_BCKPREST_SERVER} ||
-             $hash->{HELPER}{RUNNING_RESTORE}         ||
-             $hash->{HELPER}{RUNNING_REPAIR}          ||
-             $hash->{HELPER}{RUNNING_REDUCELOG}       ||
-             $hash->{HELPER}{RUNNING_OPTIMIZE})       &&
-             $opt !~ /dumpMySQL|restoreMySQL|dumpSQLite|restoreSQLite|optimizeTables|vacuum|repairSQLite/ );
+ if (($hash->{HELPER}{RUNNING_BACKUP_CLIENT}   ||
+      $hash->{HELPER}{RUNNING_BCKPREST_SERVER} ||
+      $hash->{HELPER}{RUNNING_RESTORE}         ||
+      $hash->{HELPER}{RUNNING_REPAIR}          ||
+      $hash->{HELPER}{RUNNING_REDUCELOG}       ||
+      $hash->{HELPER}{RUNNING_OPTIMIZE})       &&
+      $opt !~ /dumpMySQL|restoreMySQL|dumpSQLite|restoreSQLite|optimizeTables|vacuum|repairSQLite/ ) {
+     return;
+ }
 
  DbRep_delread($hash);                                      # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
 
@@ -2537,15 +2542,19 @@ sub DbRep_Main {
  ## eventuell bereits laufenden BlockingCall beenden
  #####################################################
  if (exists($hash->{HELPER}{$dbrep_hmainf{$opt}{pk}}) && $hash->{ROLE} ne "Agent") {
+     
      Log3 ($name, 3, "DbRep $name - WARNING - running process $hash->{HELPER}{$dbrep_hmainf{$opt}{pk}}{pid} will be killed now to start a new operation");
+     
      BlockingKill($hash->{HELPER}{$dbrep_hmainf{$opt}{pk}});
  }
 
  # initiale Datenermittlung wie minimal Timestamp, Datenbankstrukturen, ...
  ############################################################################
  if (!$hash->{HELPER}{MINTS} or !$hash->{HELPER}{DBREPCOL}{COLSET}) {
-     my $dbname                 = $hash->{DATABASE};
-     $hash->{HELPER}{IDRETRIES} = 3 if($hash->{HELPER}{IDRETRIES} < 0);
+     my $dbname                  = $hash->{DATABASE};
+     $hash->{HELPER}{IDRETRIES}  = 3       if($hash->{HELPER}{IDRETRIES} < 0);
+     $hash->{HELPER}{REDUCELOG}  = $rdltag if($rdltag);
+     $hash->{HELPER}{DELENTRIES} = $deetag if($deetag);
 
      Log3 ($name, 3, "DbRep $name - get initial structure information of database \"$dbname\", remaining attempts: ".$hash->{HELPER}{IDRETRIES});
 
@@ -2566,6 +2575,9 @@ sub DbRep_Main {
  Log3 ($name, 4, "DbRep $name - Command: $opt $prop");
 
  my ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next);
+ 
+ $hash->{HELPER}{REDUCELOG}  = $rdltag if($rdltag);
+ $hash->{HELPER}{DELENTRIES} = $deetag if($deetag);
 
  if (defined $dbrep_hmainf{$opt} && defined &{$dbrep_hmainf{$opt}{fn}}) {
      $params = {
@@ -2603,8 +2615,13 @@ sub DbRep_Main {
 
      if ($opt eq "delEntries" || $opt =~ /reduceLog/xi) {                                                                              # Forum:#113202
          my ($valid, $cause) = DbRep_checkValidTimeSequence ($hash, $runtime_string_first, $runtime_string_next);
+         
          if (!$valid) {
              Log3 ($name, 2, "DbRep $name - ERROR - $cause");
+      
+             delete $hash->{HELPER}{REDUCELOG};
+             delete $hash->{HELPER}{DELENTRIES};
+     
              return;
          }
 
