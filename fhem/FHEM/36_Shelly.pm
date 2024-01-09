@@ -2014,7 +2014,7 @@ sub Shelly_Set ($@) {
        #
         $msg = Shelly_dim($hash,$channel,$cmd);
     }elsif($ff==7 ){
-        $msg = Shelly_dim($hash,"color/$channel","?turn=$cmd");
+        $msg = Shelly_dim($hash,"color/$channel",$cmd); #"?turn=$cmd"
     }
     return $msg if( $msg );
     return;
