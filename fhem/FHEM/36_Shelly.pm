@@ -62,6 +62,8 @@
 #           Bug Fix: rollers (gen2 only): numberof power related readings
 # 5.15      change cmdref to attr ... model
 # 5.16      Bug Fix: function of dimmer
+# 5.17      Add: Roller devices: 'set ... position' equivalent to 'pct'
+# 5.18      Bug Fix: function of all Gen1 relay devices 
 
 package main;
 
@@ -79,7 +81,7 @@ sub Log($$);
 sub Shelly_Set ($@);
 
 #-- globals on start
-my $version = "5.16 08.01.2024";
+my $version = "5.18 10.01.2024";
 
 my $defaultINTERVAL = 60;
 my $secndIntervalMulti = 4;  # Multiplier for 'long update'
@@ -542,7 +544,7 @@ my %shelly_regs = (
                   );
 
 my %predefAttrs = (
-      "roller_webCmd"    => "open:up:down:closed:half:stop:pos",
+      "roller_webCmd"    => "open:up:down:closed:half:stop:position",
       "roller_eventMap_closed100"  => "/delta -15:up/delta +15:down/pos 50:half/",
       "roller_eventMap_open100"    => "/delta +15:up/delta -15:down/pos 50:half/",
       "roller_cmdIcon"   => "open:control_arrow_upward\@blue up:control_arrow_up\@blue down:control_arrow_down\@blue closed:control_arrow_downward\@blue".
@@ -1688,7 +1690,7 @@ sub Shelly_Set ($@) {
   my $cmd   = shift @a;  my @args=@a;
   
   my $parameters=( scalar(@a)?" and ".scalar(@a)." parameters: ".join(" ",@a) : ", no parameters" );
-  Log3 $name,4,"[Shelly_Set] calling for device $name with command \'$cmd\'$parameters"  if($cmd ne "?");#4
+  Log3 $name,3,"[Shelly_Set] calling for device $name with command \'$cmd\'$parameters"  if($cmd ne "?");#4
   
   my $value = shift @a;  # 1st parameter
 
@@ -1957,13 +1959,13 @@ sub Shelly_Set ($@) {
 
   #- - on and off, on-for-timer and off-for-timer
   if( $cmd =~ /^((on)|(off)|(dim))/ && $cmd!~/(till)/ ){  # on-till, on-till-overnight
-    if( $cmd eq "dim" ){ # dim or dim-for-timer
-           #my $brightness = shift @a;  
+    if( $cmd eq "dim" ){
+           # 
            $cmd = "?brightness=$brightness&turn=on";
     }
     #-- check timer command
     elsif( $cmd =~ /for-timer/ ){
-        #$time = $value;
+        #
         if( $time =~ /\D+/ ){ #anything else than digits
           $msg = "Error: wrong time spec \'$time\' for device $name, must be <integer>";
           Log3 $name,1,"[Shelly_Set] ".$msg;
@@ -1991,14 +1993,14 @@ sub Shelly_Set ($@) {
     
     Log3 $name,4,"[Shelly_Set] switching channel $channel for device $name with command $cmd, FF=$ff";#4
     if( $ff==0 ){    
-        if( $shelly_models{$model}[4]<2 ){
-            $cmd = "?turn=$cmd"   ##"/relay/$channel?turn=$cmd";
-                  if( $cmd !~ "brightness" );
-        }else{
-            $cmd =~ s/on/true/;
-            $cmd =~ s/off/false/;
+        if( $shelly_models{$model}[4]==2 ){
+##            $cmd = "?turn=$cmd"   ##"/relay/$channel?turn=$cmd";
+##                  if( $cmd !~ "brightness" );
+##        }else{
+            $cmd =~ s/\?turn=on/true/;
+            $cmd =~ s/\?turn=off/false/;
             $cmd =~ s/timer/toggle_after/;
-            $cmd = "/rpc/Switch.Set?id=$channel&on=$cmd";#. ($cmd=~/on/?"true":"false");
+            $cmd = "/rpc/Switch.Set?id=$channel&on=$cmd";
         }
         $msg = Shelly_onoff($hash,$channel,$cmd); 
     }elsif( $ff==2 ){
@@ -2009,7 +2011,7 @@ sub Shelly_Set ($@) {
         }elsif( $model =~ /shellyrgbw/ && $mode eq "white" ){
             $channel = "white/$channel";
         }
-       # $cmd = "?turn=$cmd"      if( $cmd !~ "brightness" );
+       #
         $msg = Shelly_dim($hash,$channel,$cmd);
     }elsif($ff==7 ){
         $msg = Shelly_dim($hash,"color/$channel","?turn=$cmd");
@@ -2094,7 +2096,7 @@ sub Shelly_Set ($@) {
             $hash->{MOVING} eq "drive-down" &&  $cmd eq "closed"  ||
             $hash->{MOVING} eq "drive-up"   &&  $cmd eq "open"    ||
             $hash->{MOVING} =~ /drive/      &&  $cmd eq "pct"     ||
-            $hash->{MOVING} =~ /drive/      &&  $cmd eq "pos"     ||
+            $hash->{MOVING} =~ /drive/      &&  $cmd =~ /pos/     ||
             $hash->{MOVING} =~ /drive/      &&  $cmd eq "delta"   ){
          # -- estimate pos here ???
          $hash->{DURATION} = 0;
@@ -2138,8 +2140,8 @@ sub Shelly_Set ($@) {
         }
         $cmd .= "&duration=$value"    if(defined($value));
         
-    }elsif( $cmd eq "pct" || $cmd eq "pos" || $cmd eq "delta" ){
-        Log3 $name,1,"[Shelly_Set] $name: use of \'set ... pct\' is deprecated, use \'set ... pos\' instead" if($cmd eq "pct");
+    }elsif( $cmd eq "pct" || $cmd =~ /pos/ || $cmd eq "delta" ){
+        Log3 $name,1,"[Shelly_Set] $name: use of \'set ... pct\' is deprecated, use \'set ... pos[ition]\' instead" if($cmd eq "pct");
         my $targetpct = $value;
         my $pos  = ReadingsVal($name,"position","");
         my $pct  = ReadingsVal($name,"pct",undef);  
