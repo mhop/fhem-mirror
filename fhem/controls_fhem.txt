@@ -1,4 +1,4 @@
-REV 28360
+REV 28366
 DIR unused
 UPD 2024-01-09_07:45:04 415885 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -200,7 +200,7 @@ UPD 2020-04-14_07:45:03 33518 FHEM/36_LaCrosseGateway.pm
 UPD 2019-07-01_07:45:03 7519 FHEM/36_Level.pm
 UPD 2016-08-23_07:45:12 9997 FHEM/36_PCA301.pm
 UPD 2019-01-06_07:45:02 17434 FHEM/36_PrecipitationSensor.pm
-UPD 2024-01-09_07:45:04 296955 FHEM/36_Shelly.pm
+UPD 2024-01-10_07:45:03 296974 FHEM/36_Shelly.pm
 UPD 2023-09-19_07:45:03 46853 FHEM/36_ShellyMonitor.pm
 UPD 2020-03-09_07:45:03 71778 FHEM/36_Vallox.pm
 UPD 2021-11-02_07:45:02 29717 FHEM/36_WMBUS.pm
@@ -760,8 +760,8 @@ UPD 2024-01-09_07:45:11 5128829 docs/commandref.html
 UPD 2024-01-09_07:45:14 3153849 docs/commandref_DE.html
 UPD 2023-08-25_07:45:03 86242 docs/commandref_frame.html
 UPD 2023-08-25_07:45:03 96940 docs/commandref_frame_DE.html
-UPD 2024-01-09_07:45:15 314090 docs/commandref_modular.html
-UPD 2024-01-09_07:45:16 325936 docs/commandref_modular_DE.html
+UPD 2024-01-10_07:45:14 314090 docs/commandref_modular.html
+UPD 2024-01-10_07:45:15 325936 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1338,6 +1338,7 @@ UPD 2021-11-13_07:45:02 24275 www/images/fhemSVG/Abfalltonne-Recycling-Logo.svg
 UPD 2021-11-13_07:45:02 19686 www/images/fhemSVG/Abfalltonne.svg
 UPD 2019-02-09_07:45:03 59586 www/images/fhemSVG/Botvac_VR200.svg
 UPD 2017-11-26_07:45:02 58372 www/images/fhemSVG/DIN_rail_housing.svg
+UPD 2024-01-10_07:45:03 10805 www/images/fhemSVG/ESP_Easy.svg
 UPD 2021-11-13_07:45:02 54547 www/images/fhemSVG/Gartenabfall.svg
 UPD 2020-11-24_07:45:03 9685 www/images/fhemSVG/HomeMatic.svg
 UPD 2020-11-24_07:45:03 16258 www/images/fhemSVG/HomeMatic_Schrift.svg
@@ -1575,6 +1576,7 @@ UPD 2019-12-12_07:45:03 1763 www/images/fhemSVG/hue_smartbutton_v1.svg
 UPD 2019-12-12_07:45:03 1154 www/images/fhemSVG/hue_smartbutton_v2.svg
 UPD 2015-07-28_14:05:32 4224 www/images/fhemSVG/humidity.svg
 UPD 2020-11-26_07:45:03 5531 www/images/fhemSVG/ibutton.svg
+UPD 2024-01-10_07:45:03 4924 www/images/fhemSVG/influxdb.svg
 UPD 2019-09-05_07:45:02 1678 www/images/fhemSVG/inverter.svg
 UPD 2017-09-07_07:45:02 3979 www/images/fhemSVG/ios_off_fill.svg
 UPD 2017-09-07_07:45:02 4302 www/images/fhemSVG/ios_off_fortimer_fill.svg
@@ -1632,6 +1634,8 @@ UPD 2019-11-07_07:45:03 12089 www/images/fhemSVG/mqtt_bridge_1.svg
 UPD 2019-11-07_07:45:03 9563 www/images/fhemSVG/mqtt_bridge_2.svg
 UPD 2018-01-11_07:45:02 8635 www/images/fhemSVG/mqtt_broker.svg
 UPD 2018-01-11_07:45:02 7248 www/images/fhemSVG/mqtt_device.svg
+UPD 2024-01-10_07:45:03 968 www/images/fhemSVG/mqtt_logo.svg
+UPD 2024-01-10_07:45:03 2456 www/images/fhemSVG/mqtt_text.svg
 UPD 2017-11-26_07:45:02 3630 www/images/fhemSVG/muelltonne.svg
 UPD 2019-02-14_07:45:03 759 www/images/fhemSVG/nginx.svg
 UPD 2019-02-14_07:45:03 5212 www/images/fhemSVG/nmap.svg
@@ -1766,6 +1770,8 @@ UPD 2015-07-28_14:05:32 2132 www/images/fhemSVG/security.svg
 UPD 2015-07-28_14:05:32 3640 www/images/fhemSVG/security_password.svg
 UPD 2020-07-26_07:45:03 10065 www/images/fhemSVG/senseo_icon.svg
 UPD 2019-02-14_07:45:03 1921 www/images/fhemSVG/sketchup-layout.svg
+UPD 2024-01-10_07:45:03 3162 www/images/fhemSVG/smartlock_locked.svg
+UPD 2024-01-10_07:45:03 3153 www/images/fhemSVG/smartlock_unlocked.svg
 UPD 2015-07-28_14:05:32 5746 www/images/fhemSVG/socket_timer.svg
 UPD 2022-04-07_07:45:02 1776 www/images/fhemSVG/solar_icon.svg
 UPD 2018-01-28_07:45:02 2742 www/images/fhemSVG/sonos_play1.svg
