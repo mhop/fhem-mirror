@@ -4516,13 +4516,14 @@ sub runCtHourly {
   
   return if(InternalVal($name, 'MODE', '') =~ /Manual/xs || CurrentVal ($hash, 'ctrunning', 0));
   
+  my $debug;
   my $t      = time;
   my $second = int (strftime "%S", localtime(time));                                   # aktuelle Sekunde (00-61)
-  my $minute = int (strftime "%M", localtime($t));                                     # aktuelle Minute (00-59)
-  my $debug  = getDebug ($hash); 
+  my $minute = int (strftime "%M", localtime($t));                                     # aktuelle Minute (00-59) 
   
   if ($minute == 59 && $second > 48 && $second < 58) {                                 
       if (!exists $hash->{HELPER}{S58DONE}) {
+          $debug                   = getDebug ($hash);
           $hash->{HELPER}{S58DONE} = 1;
           
           if ($debug =~ /collectData/x) {
@@ -4537,7 +4538,8 @@ sub runCtHourly {
   }
   
   if ($minute == 0 && $second > 3 && $second < 20) {
-      if (!exists $hash->{HELPER}{S20DONE}) {                                      
+      if (!exists $hash->{HELPER}{S20DONE}) {
+          $debug                   = getDebug ($hash);          
           $hash->{HELPER}{S20DONE} = 1;
           
           if ($debug =~ /collectData/x) {
