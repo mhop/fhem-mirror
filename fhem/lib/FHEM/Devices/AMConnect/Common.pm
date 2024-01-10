@@ -457,7 +457,7 @@ sub FW_detailFn {
   my ($FW_wname, $name, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$name};
   my $type = $hash->{TYPE};
-  return '' if( AttrVal($name, 'disable', 0) || !AttrVal($name, 'showMap', 1) || !$::init_done );
+  return '' if( AttrVal($name, 'disable', 0) || !AttrVal($name, 'showMap', 1) || !$::init_done || !$FW_ME );
 
   my $img = "$FW_ME/$type/$name/map";
   my $zoom=AttrVal( $name,"mapImageZoom", 0.7 );
