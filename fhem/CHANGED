@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_DbRep: new setter multiCmd, change autoForward
+                      bugfix: reducelog problem Forum:#136581
  - bugfix:  76_SolarForecast: fix get Automatic State
  - change:  76_SolarForecast: optimize battery management once more
  - change:  76_SolarForecast: optimize batterymanagement
