@@ -102,6 +102,7 @@ BEGIN {
           HttpUtils_BlockingGet
           init_done
           InternalTimer
+          InternalVal
           IsDisabled
           Log
           Log3
@@ -133,6 +134,7 @@ BEGIN {
           FW_detail
           FW_widgetOverride
           FW_wname
+          readyfnlist
         )
   );
 
@@ -155,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.6.5"  => "10.01.2024  new function runCtHourly in ReadyFn to run centralTask definitely at end/begin of an hour ",
   "1.6.4"  => "09.01.2024  fix get Automatic State, use key switchdev for auto-Reading if switchdev is set in consumer attr ",
   "1.6.3"  => "08.01.2024  optimize battery management once more ",
   "1.6.2"  => "07.01.2024  optimize battery management ",
@@ -881,6 +884,7 @@ sub Initialize {
   $hash->{DbLog_splitFn}      = \&DbLogSplit;
   $hash->{AttrFn}             = \&Attr;
   $hash->{NotifyFn}           = \&Notify;
+  $hash->{ReadyFn}            = \&runCtHourly;
   $hash->{AttrList}           = "affect70percentRule:1,dynamic,0 ".
                                 "affectBatteryPreferredCharge:slider,0,1,100 ".
                                 "affectConsForecastIdentWeekdays:1,0 ".
@@ -986,7 +990,9 @@ sub Define {
   use version 0.77; our $VERSION = moduleVersion ($params);                        # Versionsinformationen setzen
 
   createAssociatedWith ($hash);
-
+  
+  $readyfnlist{$name}   = $hash;
+  
   $params->{file}       = $pvhcache.$name;                                         # Cache File PV History einlesen wenn vorhanden
   $params->{cachename}  = 'pvhist';
   _readCacheFile ($params);
@@ -1081,7 +1087,7 @@ return;
 ###############################################################
 sub Set {
   my ($hash, @a) = @_;
-  return "\"set X\" needs at least an argument" if ( @a < 2 );
+  return qq{"set X" needs at least an argument} if(@a < 2);
   my $name  = shift @a;
   my $opt   = shift @a;
   my @args  = @a;
@@ -4497,6 +4503,57 @@ sub Notify {
 return;
 }
 
+################################################################
+#  centralTask kurz vor und kurz nach einer vollen Stunde 
+#  starten um möglichst genaue Stundenwerte zu ermitteln
+################################################################
+sub runCtHourly {
+  my $hash = shift;
+  
+  return if(!$init_done);
+  
+  my $name = $hash->{NAME};
+  
+  return if(InternalVal($name, 'MODE', '') =~ /Manual/xs || CurrentVal ($hash, 'ctrunning', 0));
+  
+  my $t      = time;
+  my $second = int (strftime "%S", localtime(time));                                   # aktuelle Sekunde (00-61)
+  my $minute = int (strftime "%M", localtime($t));                                     # aktuelle Minute (00-59)
+  my $debug  = getDebug ($hash); 
+  
+  if ($minute == 59 && $second > 48 && $second < 58) {                                 
+      if (!exists $hash->{HELPER}{S58DONE}) {
+          $hash->{HELPER}{S58DONE} = 1;
+          
+          if ($debug =~ /collectData/x) {
+              Log3 ($name, 1, "$name DEBUG> Start of unscheduled data collection at the end of an hour");
+          }
+          
+          centralTask ($hash, 1);
+      }
+  }
+  else {
+      delete $hash->{HELPER}{S58DONE};
+  }
+  
+  if ($minute == 0 && $second > 3 && $second < 20) {
+      if (!exists $hash->{HELPER}{S20DONE}) {                                      
+          $hash->{HELPER}{S20DONE} = 1;
+          
+          if ($debug =~ /collectData/x) {
+              Log3 ($name, 1, "$name DEBUG> Start of unscheduled data collection at the beginning of an hour");
+          }
+          
+          centralTask ($hash, 1);
+      }
+  }
+  else {
+      delete $hash->{HELPER}{S20DONE};
+  }
+
+return;
+}
+
 ###############################################################
 #                  DbLog_splitFn
 ###############################################################
@@ -4545,9 +4602,10 @@ return;
 ################################################################
 sub Undef {
  my $hash = shift;
- my $arg  = shift;
+ my $name = shift;
 
  RemoveInternalTimer($hash);
+ delete $readyfnlist{$name};
 
 return;
 }
@@ -4778,10 +4836,11 @@ sub centralTask {
 
   if ($init_done == 1) {
       my $interval = controlParams ($name);
+      
       setModel ($hash);                                                                            # Model setzen
 
       if (!$interval) {
-          $hash->{MODE} = "Manual";
+          $hash->{MODE} = 'Manual';
           storeReading ('nextCycletime', 'Manual');
       }
       else {
@@ -4810,11 +4869,11 @@ sub centralTask {
               return;
           }
       }
-
+      
       my $t       = time;                                                                          # aktuelle Unix-Zeit
       my $date    = strftime "%Y-%m-%d", localtime($t);                                            # aktuelles Datum
       my $chour   = strftime "%H",       localtime($t);                                            # aktuelle Stunde in 24h format (00-23)
-      my $minute  = strftime "%M",       localtime($t);                                            # aktuelle Minute
+      my $minute  = strftime "%M",       localtime($t);                                            # aktuelle Minute (00-59)
       my $day     = strftime "%d",       localtime($t);                                            # aktueller Tag  (range 01 to 31)
       my $dayname = strftime "%a",       localtime($t);                                            # aktueller Wochentagsname
       my $debug   = getDebug ($hash);                                                              # Debug Module
@@ -5078,7 +5137,7 @@ return $az;
 ################################################################
 sub controlParams {
   my $name = shift;
-
+  
   my $interval = AttrVal ($name, 'ctrlInterval', $definterval);            # 0 wenn manuell gesteuert
 
 return $interval;
@@ -6121,7 +6180,7 @@ sub _transferBatteryValues {
   my $btotin    = ReadingsNum ($badev, $bin,    0) * $binuf;                                   # totale Batterieladung (Wh)
   my $soc       = ReadingsNum ($badev, $batchr, 0);
 
-  if($instcap && !isNumeric ($instcap)) {                                                      # wenn $instcap Reading Wert abfragen
+  if ($instcap && !isNumeric ($instcap)) {                                                     # wenn $instcap Reading Wert abfragen
       my ($bcapr,$bcapunit) = split ':', $instcap;
       $bcapunit           //= 'Wh';
       $instcap              = ReadingsNum ($badev, $bcapr, 0);
@@ -6129,14 +6188,14 @@ sub _transferBatteryValues {
   }
 
   my $debug = $paref->{debug};
-  if($debug =~ /collectData/x) {
+  if ($debug =~ /collectData/x) {
       Log3 ($name, 1, "$name DEBUG> collect Battery data: device=$badev =>");
       Log3 ($name, 1, "$name DEBUG> pin=$pbi W, pout=$pbo W, totalin: $btotin Wh, totalout: $btotout Wh, soc: $soc");
   }
 
   my $params;
 
-  if ($pin eq "-pout") {                                                                       # Spezialfall pin bei neg. pout
+  if ($pin eq "-pout") {                                                                      # Spezialfall pin bei neg. pout
       $params = {
           dev  => $badev,
           rdg  => $pou,
@@ -16647,9 +16706,11 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-ctrlInterval"></a>
        <li><b>ctrlInterval &lt;Sekunden&gt; </b><br>
-         Time interval of data collection. <br>
-         If ctrlInterval is explicitly set to "0", no automatic data collection takes place and must be done manually with
-         "get &lt;name&gt; data". <br>
+         Repetition interval of the data collection. <br>
+         Regardless of the set interval, data is collected automatically a few seconds before the end and after the start 
+         of a full hour. <br>
+         If ctrlInterval is explicitly set to "0", no automatic data collection takes place and must be carried out 
+         externally with "get &lt;name&gt; data". <br>
          (default: 70)
        </li><br>
 
@@ -18682,9 +18743,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-ctrlInterval"></a>
        <li><b>ctrlInterval &lt;Sekunden&gt; </b><br>
-         Zeitintervall der Datensammlung. <br>
-         Ist ctrlInterval explizit auf "0" gesetzt, erfolgt keine automatische Datensammlung und muss mit
-         "get &lt;name&gt; data" manuell erfolgen. <br>
+         Wiederholungsintervall der Datensammlung. <br>
+         Unabhängig vom eingestellten Intervall erfolgt einige Sekunden vor dem Ende sowie nach dem Beginn einer 
+         vollen Stunde eine automatische Datensammlung. <br> 
+         Ist ctrlInterval explizit auf "0" gesetzt, erfolgt keinerlei automatische Datensammlung und muss mit
+         "get &lt;name&gt; data" extern erfolgen. <br>
          (default: 70)
        </li><br>
 
