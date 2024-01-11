@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  36_Shelly: 'set ... pos' instead of 'set ... pct' is undone
  - feature: 76_SolarForecast: run collection definitely at end/start of an hour
  - feature: 93_DbRep: new setter multiCmd, change autoForward
                       bugfix: reducelog problem Forum:#136581

@@ -64,6 +64,8 @@
 # 5.16      Bug Fix: function of dimmer
 # 5.17      Add: Roller devices: 'set ... position' equivalent to 'pct'
 # 5.18      Bug Fix: function of all Gen1 relay devices 
+# 5.19      change back: roller devices: use 'set ... pct' as command 
+
 
 package main;
 
@@ -81,7 +83,7 @@ sub Log($$);
 sub Shelly_Set ($@);
 
 #-- globals on start
-my $version = "5.18 10.01.2024";
+my $version = "5.19 11.01.2024";
 
 my $defaultINTERVAL = 60;
 my $secndIntervalMulti = 4;  # Multiplier for 'long update'
@@ -233,7 +235,7 @@ my %shelly_dropdowns = (
     "Shelly"=> "config interval password reboot:noArg update:noArg name reset:disconnects,energy",
     "Onoff" => " on off toggle on-for-timer off-for-timer",
     "Multi" => " ON:noArg OFF:noArg xtrachannels:noArg",
-    "Rol"   => " closed open stop:noArg pos:slider,0,1,100 delta zero:noArg predefAttr:noArg", #pct is deprecated
+    "Rol"   => " closed open stop:noArg pct:slider,0,1,100 delta zero:noArg predefAttr:noArg",
     "RgbwW" => " pct dim dimup dimdown dim-for-timer",
     "BulbW" => " ct:colorpicker,CT,3000,10,6500 pct:slider,0,1,100",
     "RgbwC" => " rgbw rgb:colorpicker,HSV hsv white:slider,0,1,100 gain:slider,0,1,100"
@@ -1541,12 +1543,7 @@ sub Shelly_Attr(@) {
     } 
   #---------------------------------------  
   }elsif( $attrName eq "webCmd" ){
-    if( $shelly_models{$model}[1] > 0 && $mode ne "relay" && $attrVal =~ /pct/ ){
-        $error="$name\: use of \'pct\' in attribute \"$attrName\" is deprecated, use \'pos\' instead";
-        Log3 $name,1,"[Shelly_Attr] $error ";
-        #$_[3] = $attrVal;
-        #return "\n$error"; # print message on start screen
-    }
+        Log3 $name,5,"[Shelly_Attr] $name: webCmd is set to $attrVal";
   #---------------------------------------  
   }elsif( $attrName eq "shellyuser" ){
         Log3 $name,5,"[Shelly_Attr] $name: shellyuser is set to $attrVal";
@@ -2141,19 +2138,18 @@ sub Shelly_Set ($@) {
         $cmd .= "&duration=$value"    if(defined($value));
         
     }elsif( $cmd eq "pct" || $cmd =~ /pos/ || $cmd eq "delta" ){
-        Log3 $name,1,"[Shelly_Set] $name: use of \'set ... pct\' is deprecated, use \'set ... pos[ition]\' instead" if($cmd eq "pct");
         my $targetpct = $value;
         my $pos  = ReadingsVal($name,"position","");
         my $pct  = ReadingsVal($name,"pct",undef);  
-             #if( "$value" =~ /[\+-]\d*/ ){
-             #  $targetpct = eval($pct."$value"); 
-             #}
+             if( $cmd eq "pct" &&  "$value" =~ /[\+-]\d*/ ){
+               $targetpct = eval($pct."$value"); 
+             }
         #-- check for sign
         if( $cmd eq "delta" ){
            if( $value =~ /[\+-]\d*/ ){
                $targetpct += $pct;
            }else{
-               Log3 $name,1,"[Shelly_Set] $name: Wrong format, must consist of a plus or minus sign followed by an integer value";
+               Log3 $name,1,"[Shelly_Set] $name: Wrong format of comand \'$cmd\', must consist of a plus or minus sign followed by an integer value";
                return;
            }
         }
@@ -2405,10 +2401,10 @@ sub Shelly_Set ($@) {
       my $devStateIcon;
       my $changes = 0;
       if(  !AttrVal($name,"devStateIcon",undef) ){ 
-          if( AttrVal($name, "pct100", "closed") eq "closed" ){
-              $devStateIcon = $predefAttrs{'roller_closed100'};
-          }else{
+          if( AttrVal($name,"pct100","open") eq "open" ){
               $devStateIcon = $predefAttrs{'roller_open100'};
+          }else{
+              $devStateIcon = $predefAttrs{'roller_closed100'};
           }
           # set the devStateIcon-attribute when the devStateIcon attribute is not set yet     
           $attr{$hash->{NAME}}{devStateIcon} = $devStateIcon;
@@ -2441,10 +2437,10 @@ sub Shelly_Set ($@) {
       $msg .= "\n";
       if(  !AttrVal($name,"eventMap",undef) ){ 
           # set the eventMap-attribute when the eventMap attribute is not set yet   
-          if( AttrVal($name, "pct100", "closed") eq "closed" ){
-                $attr{$hash->{NAME}}{eventMap} = $predefAttrs{'roller_eventMap_closed100'};
-          }else{
+          if( AttrVal($name,"pct100","open") eq "open" ){
                 $attr{$hash->{NAME}}{eventMap} = $predefAttrs{'roller_eventMap_open100'};
+          }else{
+                $attr{$hash->{NAME}}{eventMap} = $predefAttrs{'roller_eventMap_closed100'};
           }
           Log3 $name,5,"[Shelly_Get] the attribute \'eventMap\' of device $name is set  ";
           $msg .= "eventMap attribute is set";
@@ -5176,7 +5172,7 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
                 carries a sign + or - the following number will be added to the current value of the position to acquire the target value. 
                 <br/>                 
                 <code>set &lt;name&gt; pct &lt;integer percent value&gt; </code>
-                <br/>same as <code>set &lt;name&gt; pos &lt;integer percent value&gt; </code> <font color="red">deprecated</font> 
+                <br/>same as <code>set &lt;name&gt; pos &lt;integer percent value&gt; </code>  
                 </li>
             
             <li><a id="Shelly-set-delta"></a>
@@ -5723,7 +5719,7 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
                 wird der Wert auf den aktuellen Positionswert hinzugezählt.</s>
                 <br />
                 
-                äquivalent zu <code>set &lt;name&gt; pct &lt;integer percent value&gt; </code>   <font color="red">nicht mehr verwenden</font>
+                äquivalent zu <code>set &lt;name&gt; pct &lt;integer percent value&gt; </code> 
                 <br />
                       </li>
 
@@ -5988,7 +5984,7 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
             <li>
                 <a id="Shelly-attr-pct100"></a>
                 <code>attr &lt;name&gt; pct100 open|closed (default:open) </code>
-                <br/>Festlegen der 100%-Endlage für Rollladen offen (pct100=open) oder Rolladen geschlossen (pct100=closed)</li>
+                <br/>Festlegen der 100%-Endlage für Rollladen offen (pct100=open) oder Rollladen geschlossen (pct100=closed)</li>
         </ul>
         <br/>Für Energiemeter ShellyPro3EM
         <ul>
