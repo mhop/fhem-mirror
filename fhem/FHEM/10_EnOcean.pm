@@ -535,6 +535,18 @@ my %EnO_mscRefID = (
   "0000043E" => {model => "Eltako_FRM60", teachIn => "FFF80D80", version => "0100", attr => {eep => "I5.3F.7F"}}
 );
 
+my %EnO_productID = (
+  "00D" => {"0000041A" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0103", attr => {eep => "J5.38.08"}},
+            "0000041B" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0102", attr => {eep => "J5.38.08"}},
+            "00000492" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0204", attr => {eep => "J5.38.08"}},
+            "00000493" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0203", attr => {eep => "J5.38.08"}},
+            "000004D0" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0304", attr => {eep => "J5.38.08"}},
+            "000004DD" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0303", attr => {eep => "J5.38.08"}},
+            "0000045C" => {model => "Eltako_F4CT55", version => "0101", attr => {eep => "G6.02.01"}},
+            "0000043E" => {model => "Eltako_FRM60", teachIn => "FFF80D80", version => "0100", attr => {eep => "I5.3F.7F"}}},
+  "05C" => {"0000000A" => {model => "Hoppe_eHandle", version => "00", attr => {eep => "D2.06.40", subType =>"multisensor.40"}}}
+);
+
 my @EnO_defaultChannel = ("all", "input", 0..29);
 
 my %wakeUpCycle = (
@@ -8357,7 +8369,8 @@ sub EnOcean_Parse($$) {
                 $attr{$name}{destinationID} = "unicast";
                 ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "biDir");
                 # teach-in response
-                EnOcean_SndRadio(undef, $hash, $packetType, $rorg, "800FFFF0", $subDef, "00", $hash->{DEF});
+                #EnOcean_SndRadio(undef, $hash, $packetType, $rorg, "800FFFF0", $subDef, "00", $hash->{DEF});
+                EnOcean_SndRadio(undef, $hash, $packetType, $rorg, substr($data, 0, 6) . "F0", $subDef, "00", $hash->{DEF});
                 Log3 $name, 2, "EnOcean $name 4BS teach-in response sent to " . $hash->{DEF};
                 readingsSingleUpdate($hash, 'operationMode', 'setpointTemp', 0);
 
@@ -17011,7 +17024,7 @@ sub EnOcean_SndCdm($$$$$$$$) {
     "PacketType: $packetType RORG: $rorg DATA: undef STATUS: $status";
     return;
   }
-  # DATA payload max: RADIO = 14, RADIO ADT = 9
+  # DATA payload max: RADIO = 14 byte, RADIO ADT = 9 byte
   my ($seq, $idx, $len, $dataPart, $dataPartLen, $dataPartMask) = (1, 0, length($data), '', $destinationID eq "FFFFFFFF" ? 28 : 18, undef);
   if (exists $ioHash->{helper}{cdmSeq}) {
     if ($ioHash->{helper}{cdmSeq} < 3) {
@@ -18731,6 +18744,8 @@ sub EnOcean_sec_createTeachIn($$$$$$$$$$$) {
   my %rlcAlgo = ('2++' => 'H4', '3++' => 'H6', '4++' => 'H8');
   my $rlcSize = exists($rlcAlgo{$attr{$name}{rlcAlgo}}) ? $rlcAlgo{$attr{$name}{rlcAlgo}} : 'H4';
   my $rlc = ReadingsVal($name, ".rlcSnd", uc(unpack($rlcSize, pack('L', makerandom(Size => 32, Strength => 1)))));
+  # RLC = 0
+  # my $rlc = ReadingsVal($name, ".rlcSnd", uc(unpack($rlcSize, pack('L', 0))));
   readingsSingleUpdate($hash, ".rlcSnd", $rlc, 0);
   $attr{$name}{rlcSnd} = $rlc;
   # prepare 1st telegram with teach-in info, slf, rlc and get first 5 bytes of private key
@@ -18786,6 +18801,11 @@ sub EnOcean_sec_createTeachIn($$$$$$$$$$$) {
   $data = "40" . $pKey2;
   EnOcean_SndCdm(undef, $hash, 1, "35", $data, $subDef, "00", $destinationID);
   #EnOcean_SndCdm <> EnOcean_SndRadio
+
+  #get and update RLC
+  #$rlc = EnOcean_sec_getRLC($hash, "rlcSnd", 0, undef);
+  #Log3 $name, 3, "EnOcean $name EnOcean_sec_createTeachIn current rlcSnd: $rlc incremented";
+
   return (undef, "secure teach-in", 2);
 }
 
