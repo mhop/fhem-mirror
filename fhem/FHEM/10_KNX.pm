@@ -162,9 +162,13 @@
 #              correct cmdref links for DbLog attr Fn's
 #              modified limit Log msg
 #              dpttypes optimisation (no variable case regex for numbers)
-# MH 202312xx  code optimisation KNX_scan, doKNX_scan
+# MH 20231226  code optimisation KNX_scan, doKNX_scan
 #              adapt cmds ref set/get cmd's (new KNXIO feature - send queing)
 #              additional dpts 14.xxx - see cmdref
+# MH 20240114  correct unit for dpt9.026
+#              additional dpts 14.xxx - see cmdref
+#              fix dpt14 min/max values
+#              performance tuning in define
 #
 # todo         replace cascading if..elsif with given
 # todo-11/2023 final removal of attr answerReading conversion
@@ -374,7 +378,7 @@ my %dpttypes = (
 	'dpt9.023' => {CODE=>'dpt9', UNIT=>q{K/%},   PATTERN=>qr/[-+]?(?:\d*[.])?\d+/xms, MIN=>-671088.64, MAX=>670433.28},
 	'dpt9.024' => {CODE=>'dpt9', UNIT=>q{kW},    PATTERN=>qr/[-+]?(?:\d*[.])?\d+/xms, MIN=>-671088.64, MAX=>670433.28},
 	'dpt9.025' => {CODE=>'dpt9', UNIT=>q{l/h},   PATTERN=>qr/[-+]?(?:\d*[.])?\d+/xms, MIN=>-671088.64, MAX=>670433.28},
-	'dpt9.026' => {CODE=>'dpt9', UNIT=>q{l/h},   PATTERN=>qr/[-+]?(?:\d*[.])?\d+/xms, MIN=>-671088.64, MAX=>670433.28},
+	'dpt9.026' => {CODE=>'dpt9', UNIT=>q{l/m²},  PATTERN=>qr/[-+]?(?:\d*[.])?\d+/xms, MIN=>-671088.64, MAX=>670433.28},
 	'dpt9.027' => {CODE=>'dpt9', UNIT=>q{°F},    PATTERN=>qr/[-+]?(?:\d*[.])?\d+/xms, MIN=>-459.6, MAX=>670433.28},
 	'dpt9.028' => {CODE=>'dpt9', UNIT=>q{km/h},  PATTERN=>qr/[-+]?(?:\d*[.])?\d+/xms, MIN=>0, MAX=>670433.28},
 	'dpt9.029' => {CODE=>'dpt9', UNIT=>q{g/m³},  PATTERN=>qr/[-+]?(?:\d*[.])?\d+/xms, MIN=>0, MAX=>670433.28}, # Abs. Luftfeuchte
@@ -411,54 +415,59 @@ my %dpttypes = (
 	'dpt13.100' => {CODE=>'dpt13', UNIT=>q{s},     PATTERN=>qr/[+-]?\d{1,10}/xms, MIN=>-2147483648, MAX=>2147483647},
 
 	# 4-Octet single precision float
-	'dpt14'     => {CODE=>'dpt14', UNIT=>q{},       PATTERN=>qr/[+-]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.17e38,
+	'dpt14'     => {CODE=>'dpt14', UNIT=>q{},       PATTERN=>qr/[+-]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38,
                         DEC=>\&dec_dpt14,ENC=>\&enc_dpt14,},
-	'dpt14.000' => {CODE=>'dpt14', UNIT=>q{m/s²},   PATTERN=>qr/[+-]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # acceleration superscr - = alt8315
-	'dpt14.001' => {CODE=>'dpt14', UNIT=>q{rad/s²}, PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # acceleration angular
-	'dpt14.002' => {CODE=>'dpt14', UNIT=>q{J/mol},  PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # activation energy
-	'dpt14.003' => {CODE=>'dpt14', UNIT=>q{1/s},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # activity (radioactive)
-	'dpt14.004' => {CODE=>'dpt14', UNIT=>q{mol},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.005' => {CODE=>'dpt14', UNIT=>q{ },      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # Amplitude
-	'dpt14.006' => {CODE=>'dpt14', UNIT=>q{rad},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.007' => {CODE=>'dpt14', UNIT=>q{°},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.008' => {CODE=>'dpt14', UNIT=>q{Js},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # Angular Momentum
-	'dpt14.009' => {CODE=>'dpt14', UNIT=>q{rad/s},  PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # Angular velocity
-	'dpt14.010' => {CODE=>'dpt14', UNIT=>q{m²},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.011' => {CODE=>'dpt14', UNIT=>q{F},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # capacitance
-	'dpt14.012' => {CODE=>'dpt14', UNIT=>q{C/m²},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # charge density surface
-	'dpt14.013' => {CODE=>'dpt14', UNIT=>q{C/m³},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # charge density volume
-	'dpt14.014' => {CODE=>'dpt14', UNIT=>q{m²/N},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # compressibility
-	'dpt14.015' => {CODE=>'dpt14', UNIT=>q{S},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # conductance 1/Ohm
-	'dpt14.016' => {CODE=>'dpt14', UNIT=>q{S/m},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # electrical conductivity
-	'dpt14.017' => {CODE=>'dpt14', UNIT=>q{kg/m²},  PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # density
-	'dpt14.018' => {CODE=>'dpt14', UNIT=>q{C},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # electric charge
-	'dpt14.019' => {CODE=>'dpt14', UNIT=>q{A},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.027' => {CODE=>'dpt14', UNIT=>q{V},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.031' => {CODE=>'dpt14', UNIT=>q{J},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # energy
-	'dpt14.032' => {CODE=>'dpt14', UNIT=>q{N},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # force
-	'dpt14.033' => {CODE=>'dpt14', UNIT=>q{Hz},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.034' => {CODE=>'dpt14', UNIT=>q{rad/s},  PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
+	'dpt14.000' => {CODE=>'dpt14', UNIT=>q{m/s²},   PATTERN=>qr/[+-]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # acceleration superscr - = alt8315
+	'dpt14.001' => {CODE=>'dpt14', UNIT=>q{rad/s²}, PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # acceleration angular
+	'dpt14.002' => {CODE=>'dpt14', UNIT=>q{J/mol},  PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # activation energy
+	'dpt14.003' => {CODE=>'dpt14', UNIT=>q{1/s},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # activity (radioactive)
+	'dpt14.004' => {CODE=>'dpt14', UNIT=>q{mol},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # amount of substance
+	'dpt14.005' => {CODE=>'dpt14', UNIT=>q{ },      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # Amplitude
+	'dpt14.006' => {CODE=>'dpt14', UNIT=>q{rad},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # angle, radiant
+	'dpt14.007' => {CODE=>'dpt14', UNIT=>q{°},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # angle, degree
+	'dpt14.008' => {CODE=>'dpt14', UNIT=>q{Js},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # Angular Momentum
+	'dpt14.009' => {CODE=>'dpt14', UNIT=>q{rad/s},  PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # Angular velocity
+	'dpt14.010' => {CODE=>'dpt14', UNIT=>q{m²},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # area
+	'dpt14.011' => {CODE=>'dpt14', UNIT=>q{F},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # capacitance
+	'dpt14.012' => {CODE=>'dpt14', UNIT=>q{C/m²},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # charge density surface
+	'dpt14.013' => {CODE=>'dpt14', UNIT=>q{C/m³},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # charge density volume
+	'dpt14.014' => {CODE=>'dpt14', UNIT=>q{m²/N},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # compressibility
+	'dpt14.015' => {CODE=>'dpt14', UNIT=>q{S},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # conductance 1/Ohm
+	'dpt14.016' => {CODE=>'dpt14', UNIT=>q{S/m},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electrical conductivity
+	'dpt14.017' => {CODE=>'dpt14', UNIT=>q{kg/m²},  PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # density
+	'dpt14.018' => {CODE=>'dpt14', UNIT=>q{C},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electric charge
+	'dpt14.019' => {CODE=>'dpt14', UNIT=>q{A},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electric current
+	'dpt14.027' => {CODE=>'dpt14', UNIT=>q{V},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electric potential
+	'dpt14.031' => {CODE=>'dpt14', UNIT=>q{J},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # energy
+	'dpt14.032' => {CODE=>'dpt14', UNIT=>q{N},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # force
+	'dpt14.033' => {CODE=>'dpt14', UNIT=>q{Hz},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # frequency
+	'dpt14.034' => {CODE=>'dpt14', UNIT=>q{rad/s},  PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # frequency, angular
 	'dpt14.038' => {CODE=>'dpt14', UNIT=>qq{\xCE\xA9}, ## no critic (ValuesAndExpressions::ProhibitEscapedCharacters)
-	                                                PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # Impedance OHM
-	'dpt14.039' => {CODE=>'dpt14', UNIT=>q{m},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.056' => {CODE=>'dpt14', UNIT=>q{W},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.057' => {CODE=>'dpt14', UNIT=>q{cosφ},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # power factor
-	'dpt14.058' => {CODE=>'dpt14', UNIT=>q{Pa},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
+	                                                PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # Impedance OHM
+	'dpt14.039' => {CODE=>'dpt14', UNIT=>q{m},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # length
+	'dpt14.051' => {CODE=>'dpt14', UNIT=>q{kg},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # mass
+	'dpt14.052' => {CODE=>'dpt14', UNIT=>q{kg/s},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # mass flux
+	'dpt14.053' => {CODE=>'dpt14', UNIT=>q{N/s},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # momentum
+	'dpt14.054' => {CODE=>'dpt14', UNIT=>q{rad},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # phase angle, radiant
+	'dpt14.055' => {CODE=>'dpt14', UNIT=>q{°},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # phase angle, degrees
+	'dpt14.056' => {CODE=>'dpt14', UNIT=>q{W},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # power
+	'dpt14.057' => {CODE=>'dpt14', UNIT=>q{cosφ},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # power factor
+	'dpt14.058' => {CODE=>'dpt14', UNIT=>q{Pa},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # pressure
 	'dpt14.059' => {CODE=>'dpt14', UNIT=>qq{\xCE\xA9}, ## no critic (ValuesAndExpressions::ProhibitEscapedCharacters)
-	                                                PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # Reactance OHM
+	                                                PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # Reactance OHM
 	'dpt14.060' => {CODE=>'dpt14', UNIT=>qq{\xCE\xA9}, ## no critic (ValuesAndExpressions::ProhibitEscapedCharacters)
-	                                                PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # Resistance OHM
-	'dpt14.065' => {CODE=>'dpt14', UNIT=>q{m/s},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.068' => {CODE=>'dpt14', UNIT=>q{°C},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.069' => {CODE=>'dpt14', UNIT=>q{K},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.070' => {CODE=>'dpt14', UNIT=>q{K},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.074' => {CODE=>'dpt14', UNIT=>q{s},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.075' => {CODE=>'dpt14', UNIT=>q{Nm},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.076' => {CODE=>'dpt14', UNIT=>q{m³},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38},
-	'dpt14.077' => {CODE=>'dpt14', UNIT=>q{m³/s},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # volume flow
-	'dpt14.078' => {CODE=>'dpt14', UNIT=>q{N},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # weight
-	'dpt14.079' => {CODE=>'dpt14', UNIT=>q{J},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # work
-	'dpt14.080' => {CODE=>'dpt14', UNIT=>q{VA},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-1.4e-45, MAX=>1.7e38}, # apparent power
+	                                                PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # Resistance OHM
+	'dpt14.065' => {CODE=>'dpt14', UNIT=>q{m/s},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # speed
+	'dpt14.068' => {CODE=>'dpt14', UNIT=>q{°C},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # temperature, common
+	'dpt14.069' => {CODE=>'dpt14', UNIT=>q{K},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # temperature (absolute)
+	'dpt14.070' => {CODE=>'dpt14', UNIT=>q{K},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # temperature difference
+	'dpt14.074' => {CODE=>'dpt14', UNIT=>q{s},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # time
+	'dpt14.075' => {CODE=>'dpt14', UNIT=>q{Nm},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # torque
+	'dpt14.076' => {CODE=>'dpt14', UNIT=>q{m³},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # volume
+	'dpt14.077' => {CODE=>'dpt14', UNIT=>q{m³/s},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # volume flow
+	'dpt14.078' => {CODE=>'dpt14', UNIT=>q{N},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # weight
+	'dpt14.079' => {CODE=>'dpt14', UNIT=>q{J},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # work
+	'dpt14.080' => {CODE=>'dpt14', UNIT=>q{VA},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # apparent power
 
 	# Access data - receive only
 	'dpt15'     => {CODE=>'dpt15', UNIT=>q{}, PATTERN=>qr/noset/ixms, MIN=>undef, MAX=>undef, SETLIST=>'noset',
@@ -580,7 +589,7 @@ sub KNX_Define {
 		       q{[<group:model[:GAD-name][:set|get|listenonly][:nosuffix]>]"});
 	}
 
-	$hash->{'.DEFLINE'} = join(q{ },@a); # temp store defs for define2...
+	$hash->{'.DEFLINE'} = join(q{ },@a[2 .. $#a]); # temp store defs for define2...
 	return InternalTimer(gettimeofday() + 3.0,\&KNX_Define2,$hash) if (! $init_done);
 	return KNX_Define2($hash);
 }
@@ -590,15 +599,13 @@ sub KNX_Define2 {
 	my $hash = shift // return;
 
 	my $name = $hash->{NAME};
-	my $def  = $hash->{'.DEFLINE'};
+	my @a = split(/\s+/xms, $hash->{'.DEFLINE'});
 	delete $hash->{'.DEFLINE'};
-	my @a = split(/\s+/xms, $def);
 	RemoveInternalTimer($hash);
 
 	# Add pulldown for attr IODev
 	my $attrList = $modules{KNX}->{AttrList}; #get Attrlist from Module def
 	my $IODevs = KNX_chkIODev($hash); # get list of valid IO's
-#	$attrList =~ s/\bIODev(?:[:])?(\S+)?/IODev:select,$IODevs/xms;
 	$attrList =~ s/\bIODev\b([:]\S+)?/IODev:select,$IODevs/xms;
 	$modules{KNX}->{AttrList} = $attrList;
 
@@ -616,7 +623,7 @@ sub KNX_Define2 {
 	my @logarr;          # sum of logtxt...
 	my $setString = q{}; # placeholder for setstring
 
-	foreach my $gaddef (@a[2 .. $#a]) {
+	foreach my $gaddef (@a) {
 		my $gadCode = undef;
 		my $gadOption = undef;
 		my $gadNoSuffix = undef;
@@ -789,7 +796,7 @@ sub KNX_Get {
 
 	KNX_Log ($name, 5, qq{request value for GAD: $group GAD-NAME: $gadName});
 
-	delete $hash->{'.noreplyflag'}->{$gadName}; # allow events for groupValueResponse when triggerd by fhem 9/2023
+	delete $hash->{GADDETAILS}->{$gadName}->{noreplyflag}; # allow events for groupValueResponse when triggerd by fhem 9/2023
 
 	IOWrite($hash, $KNXID, 'r' . $groupc); #send read-request to the bus
 
@@ -1054,17 +1061,15 @@ sub KNX_Attr {
 	}
 
 	if ($cmd eq 'set' && $init_done) {
+		# check valid IODev
+		if ($aName eq 'IODev') { return KNX_chkIODev($hash,$aVal); }
+
 		if ($aName eq 'KNX_toggle') { # validate device/reading
 			my ($srcDev,$srcReading) = split(qr/:/xms,$aVal); # format: <device>:<reading>
 			$srcDev = $name if ($srcDev eq '$self'); ## no critic (Policy::ValuesAndExpressions::RequireInterpolationOfMetachars)
 			return 'no valid device for attr: KNX_toggle' if (!IsDevice($srcDev));
 			$value = ReadingsVal($srcDev,$srcReading,undef) if (defined($srcReading)); #test for value  
 			return 'no valid device/reading value for attr: KNX_toggle' if (!defined($value) );
-		}
-
-		# check valid IODev
-		elsif ($aName eq 'IODev') {
-			return KNX_chkIODev($hash,$aVal);
 		}
 
 		elsif ($aName =~ /(?:stateCmd|putCmd)/xms ) { # test for syntax errors
@@ -1177,10 +1182,10 @@ sub KNX_Parse {
 =begin comment
 		#GroupValueResponse messages when not triggered by read from fhem
 		# special experiment for Amenophis86
-		if ($cmd =~ /[p]/ixms && exists($deviceHash->{'.noreplyflag'}->{$gadName})) {
-			my $nrts = $deviceHash->{'.noreplyflag'}->{$gadName};
+		if ($cmd =~ /[p]/ixms && exists($deviceHash->{GADDETAILS}->{$gadName}->{noreplyflag};
+			my $nrts = $deviceHash->{GADDETAILS}->{$gadName}->{noreplyflag};
 			if (gettimeofday() > $nrts) {
-				delete $deviceHash->{'.noreplyflag'}->{$gadName};
+				delete $deviceHash->{GADDETAILS}->{$gadName}->{noreplyflag};
 			}
 			else {
 				KNX_Log ($deviceName, 4, qq{reply msg for $deviceName $gadName will not trigger events});
@@ -1210,15 +1215,16 @@ sub KNX_Parse {
 			my $cmdAttr = AttrVal($deviceName, 'putCmd', undef);
 			next if (! defined($cmdAttr) || $cmdAttr eq q{});
 =begin comment
+# replaced by block below !!
 			# special experiment for Amenophis86
 			if ($cmdAttr eq 'noReply') {
 				if ($iohash->{PhyAddr} eq KNX_hexToName2($src)) { # match src-address with phy of IOdev
 					# from fhem - delete ignore reply flag
-					delete $deviceHash->{'.noreplyflag'}->{$gadName}; # allow when sent from fhem
+					delete $deviceHash->{GADDETAILS}->{$gadName}->{noreplyflag}; # allow when sent from fhem
 				}
 				else {
 					KNX_Log ($deviceName, 4, q{read msg from } . KNX_hexToName2($src) . qq{ for $deviceName $gadName IODev= $iohash->{PhyAddr}});
-					$deviceHash->{'.noreplyflag'}->{$gadName} = gettimeofday() + 2;
+					$deviceHash->{GADDETAILS}->{$gadName}->{noreplyflag} = gettimeofday() + 2;
 				}
 				next; # cannot use putCmd logic!
 			}
@@ -1235,6 +1241,21 @@ sub KNX_Parse {
 				KNX_Log ($deviceName, 2, qq{putCmd eval error gadName=$gadName - no reply sent!});
 				next; # dont send!
 			}
+## special experiment for Amenophis86
+			elsif ($value eq 'noReply') {
+				if ($iohash->{PhyAddr} eq KNX_hexToName2($src)) { # match src-address with phy of IOdev
+					# from fhem - delete ignore reply flag
+					delete $deviceHash->{GADDETAILS}->{$gadName}->{noreplyflag}; # allow when sent from fhem
+				}
+				else {
+					KNX_Log ($deviceName, 4, q{read msg from } . KNX_hexToName2($src) .
+					                         qq{ for $deviceName $gadName IODev= $iohash->{PhyAddr}});
+					$deviceHash->{GADDETAILS}->{$gadName}->{noreplyflag} = gettimeofday() + 2;
+				}
+				next; # cannot use putCmd !
+			}
+## end special experiment for Amenophis86
+
 			KNX_Log ($deviceName, 5, qq{replaced by Attr putCmd=$cmdAttr VALUE=$value});
 
 			#send transval
@@ -2513,7 +2534,7 @@ Examples&colon;
 <li><b>dpt9.023 </b>  -671088.64..+670433.28 K/%</li>
 <li><b>dpt9.024 </b>  -671088.64..+670433.28 kW</li>
 <li><b>dpt9.025 </b>  -671088.64..+670433.28 l/h</li>
-<li><b>dpt9.026 </b>  -671088.64..+670433.28 l/h</li>
+<li><b>dpt9.026 </b>  -671088.64..+670433.28 l/m&sup2;</li>
 <li><b>dpt9.027 </b>  -459.6..+670433.28 &deg;F</li>
 <li><b>dpt9.028 </b>  0..+670433.28 km/h</li>
 <li><b>dpt9.029 </b>  0..+670433.28 g/m&sup3;</li>
@@ -2564,6 +2585,11 @@ Examples&colon;
 <li><b>dpt14.034</b>  -1.4e-45..+1.7e+38 rad/s</li>
 <li><b>dpt14.038</b>  -1.4e-45..+1.7e+38 &Omega;</li>
 <li><b>dpt14.039</b>  -1.4e-45..+1.7e+38 m</li>
+<li><b>dpt14.051</b>  -1.4e-45..+1.7e+38 kg</li>
+<li><b>dpt14.052</b>  -1.4e-45..+1.7e+38 kg/s</li>
+<li><b>dpt14.053</b>  -1.4e-45..+1.7e+38 N/s</li>
+<li><b>dpt14.054</b>  -1.4e-45..+1.7e+38 rad</li>
+<li><b>dpt14.055</b>  -1.4e-45..+1.7e+38 &deg;</li>
 <li><b>dpt14.056</b>  -1.4e-45..+1.7e+38 W</li>
 <li><b>dpt14.057</b>  -1.4e-45..+1.7e+38 cos&phi;</li>
 <li><b>dpt14.058</b>  -1.4e-45..+1.7e+38 Pa</li>
