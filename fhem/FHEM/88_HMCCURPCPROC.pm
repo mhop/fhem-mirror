@@ -39,7 +39,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '5.0 232691829';
+my $HMCCURPCPROC_VERSION = '5.0 240121821';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -114,6 +114,7 @@ my $BINRPC_ERROR          = 0x42696EFF;
 my %BINRPC_TYPE_MAPPING = (
 	'BOOL'    => $BINRPC_BOOL,
 	'INTEGER' => $BINRPC_INTEGER,
+	'ENUM'    => $BINRPC_INTEGER,
 	'STRING'  => $BINRPC_STRING,
 	'FLOAT'   => $BINRPC_DOUBLE,
 	'DOUBLE'  => $BINRPC_DOUBLE,
