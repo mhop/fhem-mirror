@@ -5,6 +5,7 @@ import cloudscraper
 import email
 import imaplib
 import re
+import uuid;
 from html.parser import HTMLParser
 
 class Arlo:
@@ -28,17 +29,21 @@ class Arlo:
         }
         self._session.options(self._baseUrl + "auth", headers=self._headers)
 
+        self._user_device_id = str(uuid.uuid4())
         self._headers = {
+            "Accept": "application/json, text/plain, */*",
             "DNT": "1",
             "schemaVersion": "1",
             "Auth-Version": "2",
             "Cache-Control": "no-cache",
             "Content-Type": "application/json; charset=UTF-8",
             "Origin": "https://my.arlo.com",
-            "Pragma": "no-cache",
             "Referer": "https://my.arlo.com/",
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36 Edg/114.0.1823.58',
-            "Source": "arloCamWeb"
+            "Source": "arloCamWeb",
+            "X-User-Device-Automation-name": "QlJPV1NFUg==",
+            "X-User-Device-Id": self._user_device_id,
+            "X-User-Device-Type": "BROWSER",
         }
         self._token = None
 
@@ -57,6 +62,9 @@ class Arlo:
                     return
                 if r.status_code == 400:
                     error("Bad auth request - probably the credentials are wrong.")
+                    return
+                if r.status_code == 403:
+                    error("Unauthorized - probably the credentials are wrong.")
                     return
             except Exception as e:
                 log(e)
