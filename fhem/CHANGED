@@ -1,5 +1,14 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  72_FRITZBOX: fast alle Sub in der Namensgebung vereinheitlich
+            um das Modul wartbarer zu machen.
+            die Fehlerbehandlung vereinheitlicht und hoffentlich besser
+            Strukturiert.
+ - feature: 72_FRITZBOX: bei einem Aufruf luaData kann ein ; durch #x003B
+            maskiert werden.
+            bei get ... luaData optionaler Parameter [json] für die Rückgabe
+            des Ergebnisses als json.
+            neues Attribut: maxSIDrenewErrCnt
  - bugfix:  10_KNX: fix dpt14 min/max values
  - change:  36_Shelly: 'set ... pos' instead of 'set ... pct' is undone
  - feature: 76_SolarForecast: run collection definitely at end/start of an hour
