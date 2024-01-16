@@ -180,7 +180,6 @@ sub RPI_1Wire_GetDevices {
 	my ($hash) = @_;
 	Log3 $hash->{NAME}, 3 , $hash->{NAME}.": GetDevices";
 	my @devices;
-	print $ms_path.$hash->{id}."/w1_master_slaves"."\n";
 	if (open(my $fh, "<", $ms_path.$hash->{id}."/w1_master_slaves")) {
 		while (my $device = <$fh>) {
 			chomp $device; #remove \n
