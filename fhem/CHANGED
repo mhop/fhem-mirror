@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 76_SolarForecast: Consumer planning can now react dynamically to 
+                              changing or time-shifting PV generation,
+                              some more minor changes
  - bugfix:  72_FRITZBOX: fast alle Sub in der Namensgebung vereinheitlich
             um das Modul wartbarer zu machen.
             die Fehlerbehandlung vereinheitlicht und hoffentlich besser
