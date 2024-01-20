@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.7.1"  => "20.01.2024  optimize battery management ",
   "1.7.0"  => "18.01.2024  Changeover Start centralTask completely to runCentralTask, ".
                            "aiAddRawData: Weekday from pvHistory not taken into account greater than current day  ".
                            "__reviewSwitchTime: new function for review consumer planning state ".
@@ -6358,7 +6359,7 @@ sub _batSocTarget {
   delete $paref->{careCycle};
 
   my $nt;
-  my $chargereq  = 0;                                                             # Ladeanforedrung wenn SoC unter Minimum SoC gefallen ist
+  my $chargereq  = 0;                                                             # Ladeanforderung wenn SoC unter Minimum SoC gefallen ist
   my $target     = $lowSoc;
   my $yday       = strftime "%d", localtime($t - 86400);                          # Vortag  (range 01 to 31)
   my $batymaxsoc = HistoryVal ($hash, $yday, 99, 'batmaxsoc',       0);           # gespeicherter max. SOC des Vortages
@@ -6368,12 +6369,12 @@ sub _batSocTarget {
             $batymaxsoc >= $maxsoc ? $batysetsoc - $batSocChgDay :
             $batysetsoc;                                                          # neuer Min SOC für den laufenden Tag
 
-  debugLog ($paref, 'batteryManagement', "SoC calc Step1 - compare with SoC history -> Target: $target %");
+  debugLog ($paref, 'batteryManagement', "SoC calc Step1 - compare with SoC history -> new Target: $target %");
   
   ## Pflege-SoC (Soll SoC $maxSoCdef bei $batSocChgDay % Steigerung p. Tag)
   ###########################################################################
   my $sunset  = CurrentVal ($hash, 'sunsetTodayTs', $t);
-  my $delayts = $sunset - 5400;                                                   # Pflege-SoC/Erhöhung SoC erst ab 1,5 h vor Sonnenuntergang berechnen/anwenden
+  my $delayts = $sunset - 5400;                                                   # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
   my $la      = '';
   
   if ($t > $delayts) {                                                            
@@ -6403,21 +6404,19 @@ sub _batSocTarget {
   my $pvexpect   = $pvfctm > $pvfctd ? $pvfctm : $pvfctd;
 
   my $batinstcap = CurrentVal ($hash, 'batinstcap', 0);                            # installierte Batteriekapazität Wh
-  my $needcharge = $batinstcap - ($batinstcap / 100 * $batcharge);                 # vorläufige benötigte Ladeenergie (Wh) bis 100% SOC
-  my $cancharge  = $pvexpect > $needcharge ? $pvexpect : $needcharge;              # resultierende benötigte Ladeenergie (Wh)
-  my $cantarget  = 100 - (100 / $batinstcap) * $cancharge;                         # berechneter möglicher Min SOC nach Berücksichtigung Ladewahrscheinlichkeit
-
+  my $cantarget  = 100 - (100 / $batinstcap) * $pvexpect;                          # berechneter möglicher Min SOC nach Berücksichtigung Ladewahrscheinlichkeit
+  
   my $newtarget  = sprintf "%.0f", ($cantarget < $target ? $cantarget : $target);  # Abgleich möglicher Min SOC gg. berechneten Min SOC
   my $logadd     = '';
 
-  if ($newtarget > $csopt && $t > $delayts) {                                      # Erhöhung des SoC erst ab Sonnenuntergang anwenden
+  if ($newtarget > $csopt && $t > $delayts) {                                      # Erhöhung des SoC (wird ab Sonnenuntergang angewendet)
       $target = $newtarget;
       $logadd = "(new target > $csopt % and Sunset has passed)";
   }
   elsif ($newtarget > $csopt && $t <= $delayts) {                                  # bisheriges Optimum bleibt vorerst
       $target = $csopt;
       $nt     = (timestampToTimestring ($delayts, $paref->{lang}))[0];
-      $logadd = "(new target $newtarget % is only activated after $nt)";
+      $logadd = "(calculated new target $newtarget % is only activated after $nt)";
   }
   elsif ($newtarget < $csopt) {                                                    # Targetminderung sofort umsetzen -> Freiplatz für Ladeprognose
       $target = $newtarget;
@@ -6454,7 +6453,7 @@ sub _batSocTarget {
   }
   
   debugLog ($paref, 'batteryManagement', "SoC calc Step6 - force charging request: ".
-                    ($chargereq ? 'yes (battery charge is below minimum SoC)' : 'no (sufficient battery charge)'));
+                    ($chargereq ? 'yes (battery charge is below minimum SoC)' : 'no (Battery is sufficiently charged)'));
 
   ## pvHistory/Readings schreiben
   #################################
@@ -16448,6 +16447,8 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-affectMaxDayVariance"></a>
        <li><b>affectMaxDayVariance &lt;Zahl&gt; </b><br>
          Maximum change size of the PV prediction factor (Reading pvCorrectionFactor_XX) per day. <br>
+         This setting has no influence on the learning and forecasting behavior of any AI support used 
+         (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>). <br>
          (default: 0.5)
        </li>
        <br>
@@ -18485,6 +18486,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-affectMaxDayVariance"></a>
        <li><b>affectMaxDayVariance &lt;Zahl&gt; </b><br>
          Maximale Änderungsgröße des PV Vorhersagefaktors (Reading pvCorrectionFactor_XX) pro Tag. <br>
+         Auf das Lern- und Prognoseverhalten einer eventuell verwendeten KI-Unterstützung 
+         (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>) hat diese Einstellung keinen 
+         Einfluß. <br>
          (default: 0.5)
        </li>
        <br>
