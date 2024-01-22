@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.57.02";
+my $ModulVersion = "07.57.10";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -4704,8 +4704,8 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "->HINWEIS", "");
 
    # Ende und Rückkehr zum Hauptprozess
+
    push @roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
-   return FRITZBOX_Readout_Response($hash, $resultData, \@roReadings, 0, $sidNew);
 
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid} if $result->{sid};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
@@ -4747,7 +4747,6 @@ sub FRITZBOX_Readout_Response($$$@)
     FRITZBOX_Log $hash, 2, "" . $result->{Error};
     $returnStr = "Error|" . $result->{Error};
     $returnStr .= "|";
-
   }
 
   elsif ( defined $result->{AuthorizationRequired} ) {
@@ -4759,7 +4758,7 @@ sub FRITZBOX_Readout_Response($$$@)
   } 
 
   else {
-    FRITZBOX_Log $hash, 2, "undefined situation";
+    FRITZBOX_Log $hash, 4, "undefined situation\n"; # . Dumper $result;
 
     $returnStr = "Error|undefined situation";
     $returnStr .= "|";
@@ -5533,7 +5532,7 @@ sub FRITZBOX_Set_check_APIs($)
 
       $apiError .= " TR064:" . $response->code;
 
-      # Ermitteln Box Model, FritzOS Verion, OEM aus TR064 Informationen
+      # Ermitteln Box Model, FritzOS Version, OEM aus TR064 Informationen
       if ($response->is_success && $content =~ /<modelName>/) {
         FRITZBOX_Log $hash, 5-$myVerbose, "TR064 returned: $content";
 
@@ -8713,15 +8712,15 @@ sub FRITZBOX_open_Web_Connection ($)
    }
 
    my $avmModel = InternalVal($name, "MODEL", $hash->{boxModel});
-   my $user = "";
-   $user = AttrVal( $name, "boxUser", undef ) if $avmModel =~ "Box";
-   unless (defined $user) {
+   my $user = AttrVal( $name, "boxUser", "" );
+
+   if ($user eq "" && $avmModel =~ "Box") {
       FRITZBOX_Log $hash, 2, "No boxUser set. Please define it (once) with 'attr $name boxUser YourBoxUser'";
       %retHash = ( "Error" => "No attr boxUser set", "ResetSID" => "1" ) ;
       return \%retHash;
    }
 
-   FRITZBOX_Log $hash, 4, "Open Web connection to $host : $user";
+   FRITZBOX_Log $hash, 4, "Open Web connection to $host:" . $user ne "" ? $user : "user not defined";
    FRITZBOX_Log $hash, 4, "getting new SID";
    $sid = (FB_doCheckPW($host, $user, $pwd));
 
