@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  72_FRITZBOX: Fehler bei Anmeldung an Fritz!Repeater
+            behoben.
+            Fehler bei auslesen der FritzBox bei selten auftretender
+            Abfolge behoben z.B Fritz!Repeater 450E.
  - change:  76_SolarForecast: optimize battery management once more
  - feature: 00_KNXIO: set-cmds: connect, disconnect, restart
  - feature: 76_SolarForecast: Consumer planning can now react dynamically to 
