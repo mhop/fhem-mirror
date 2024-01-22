@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 76_SolarForecast: 'noLearning' Option for pvCorrectionFactor_Auto
  - bugfix:  72_FRITZBOX: Fehler bei Anmeldung an Fritz!Repeater
             behoben.
             Fehler bei auslesen der FritzBox bei selten auftretender

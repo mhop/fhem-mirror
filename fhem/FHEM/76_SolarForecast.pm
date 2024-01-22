@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.8.0"  => "22.01.2024  add 'noLearning' Option to Setter pvCorrectionFactor_Auto ",
   "1.7.1"  => "20.01.2024  optimize battery management ",
   "1.7.0"  => "18.01.2024  Changeover Start centralTask completely to runCentralTask, ".
                            "aiAddRawData: Weekday from pvHistory not taken into account greater than current day  ".
@@ -1160,7 +1161,7 @@ sub Set {
              "modulePeakString ".
              "plantConfiguration:check,save,restore ".
              "powerTrigger:textField-long ".
-             "pvCorrectionFactor_Auto:on_simple".($ipai ? ',on_simple_ai,' : ',')."on_complex".($ipai ? ',on_complex_ai,' : ',')."off ".
+             "pvCorrectionFactor_Auto:noLearning,on_simple".($ipai ? ',on_simple_ai,' : ',')."on_complex".($ipai ? ',on_complex_ai,' : ',')."off ".
              "reset:$resets ".
              "writeHistory:noArg ".
              $cf." "
@@ -1518,7 +1519,7 @@ sub _setinverterDevice {                 ## no critic "not used"
       return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
   }
 
-  readingsSingleUpdate ($hash, "currentInverterDev", $arg, 1);
+  readingsSingleUpdate ($hash, 'currentInverterDev', $arg, 1);
   createAssociatedWith ($hash);
   writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
@@ -1918,10 +1919,15 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
   my $prop  = $paref->{prop} // return qq{no correction value specified};
+  
+  if ($prop eq 'noLearning') {
+      my $pfa = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');           # aktuelle Autokorrektureinstellung
+      $prop   = $pfa.' '.$prop;
+  }
 
-  readingsSingleUpdate($hash, "pvCorrectionFactor_Auto", $prop, 1);
+  readingsSingleUpdate($hash, 'pvCorrectionFactor_Auto', $prop, 1);
 
-  if($prop eq "off") {
+  if ($prop eq 'off') {
       for my $n (1..24) {
           $n     = sprintf "%02d", $n;
           my $rv = ReadingsVal ($name, "pvCorrectionFactor_${n}", "");
@@ -1931,7 +1937,7 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
       deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
   }
 
-   writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                    # Anlagenkonfiguration sichern
+   writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                    # Anlagenkonfiguration sichern
 
 return;
 }
@@ -2157,7 +2163,7 @@ sub _setreset {                          ## no critic "not used"
   if ($prop eq 'currentInverterSet') {
       undef @{$data{$type}{$name}{current}{genslidereg}};
       readingsDelete    ($hash, "Current_PV");
-      readingsDelete    ($hash, 'currentInverterDev');
+      readingsDelete    ($hash, "currentInverterDev");
       deleteReadingspec ($hash, ".*_PVreal" );
       writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);                     # Anlagenkonfiguration File schreiben
   }
@@ -5664,10 +5670,10 @@ sub __calcPVestimates {
 
   my $reld    = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
 
-  my $rainprob   = NexthoursVal ($hash, "NextHour".sprintf ("%02d", $num), "rainprob", 0);            # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-  my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf ("%02d", $num), "cloudcover", 0);          # effektive Wolkendecke nächste Stunde X
-  my $temp       = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num),  "temp", $tempbasedef);     # vorhergesagte Temperatur Stunde X
-  my $acu        = isAutoCorrUsed ($name);
+  my $rainprob    = NexthoursVal ($hash, "NextHour".sprintf ("%02d", $num), "rainprob", 0);           # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
+  my $cloudcover  = NexthoursVal ($hash, "NextHour".sprintf ("%02d", $num), "cloudcover", 0);         # effektive Wolkendecke nächste Stunde X
+  my $temp        = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num),  "temp", $tempbasedef);    # vorhergesagte Temperatur Stunde X
+  my ($acu, $aln) = isAutoCorrUsed ($name);
 
   $paref->{cloudcover}  = $cloudcover;
   my ($hc, $hq)         = ___readCandQ ($paref);                                                      # liest den anzuwendenden Korrekturfaktor
@@ -5780,9 +5786,9 @@ sub ___readCandQ {
   my $fd    = $paref->{fd};
   my $cc    = $paref->{cloudcover};
 
-  my $acu    = isAutoCorrUsed ($name);                                                                # Autokorrekturmodus
-  my $hc     = ReadingsNum ($name, 'pvCorrectionFactor_'.sprintf("%02d",$fh1), 1.00);                 # Voreinstellung RAW-Korrekturfaktor
-  my $hq     = '-';                                                                                   # keine Qualität definiert
+  my ($acu, $aln) = isAutoCorrUsed ($name);                                                           # Autokorrekturmodus
+  my $hc          = ReadingsNum ($name, 'pvCorrectionFactor_'.sprintf("%02d",$fh1), 1.00);            # Voreinstellung RAW-Korrekturfaktor
+  my $hq          = '-';                                                                              # keine Qualität definiert
 
   delete $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange};
 
@@ -5927,7 +5933,7 @@ sub _transferInverterValues {
   my $chour = $paref->{chour};
   my $day   = $paref->{day};
 
-  my $indev  = ReadingsVal($name, "currentInverterDev", "");
+  my $indev  = ReadingsVal($name, 'currentInverterDev', '');
   my ($a,$h) = parseParams ($indev);
   $indev     = $a->[0] // "";
   return if(!$indev || !$defs{$indev});
@@ -5964,8 +5970,10 @@ sub _transferInverterValues {
   if (!$histetot) {                                                                           # etotal der aktuelle Stunde gesetzt ?
       $paref->{etotal}   = $etotal;
       $paref->{nhour}    = sprintf("%02d",$nhour);
-      $paref->{histname} = "etotal";
+      $paref->{histname} = 'etotal';
+      
       setPVhistory ($paref);
+      
       delete $paref->{histname};
 
       my $etot   = CurrentVal ($hash, "etotal", $etotal);
@@ -5983,11 +5991,17 @@ sub _transferInverterValues {
 
   storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_PVreal', $ethishour.' Wh');
   $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishour;                   # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-
+  
+  my ($acu, $aln) = isAutoCorrUsed ($name);
+  
   $paref->{ethishour} = $ethishour;
-  $paref->{nhour}     = sprintf("%02d",$nhour);
-  $paref->{histname}  = "pvrl";
+  $paref->{nhour}     = sprintf "%02d", $nhour;
+  $paref->{histname}  = 'pvrl';
+  $paref->{pvrlvd}    = $aln;                                                                 # 1: beim Learning berücksichtigen, 0: nicht
+  
   setPVhistory ($paref);
+  
+  delete $paref->{pvrlvd};
   delete $paref->{histname};
 
 return;
@@ -9097,16 +9111,16 @@ sub _checkSetupNotComplete {
   #}
   ##########################################################################################
 
-  my $is    = ReadingsVal   ($name, 'inverterStrings',          undef);                   # String Konfig
-  my $wedev = ReadingsVal   ($name, 'currentWeatherDev',        undef);                   # Device Vorhersage Wetterdaten (Bewölkung etc.)
-  my $radev = ReadingsVal   ($name, 'currentRadiationAPI',      undef);                   # Device Strahlungsdaten Vorhersage
-  my $indev = ReadingsVal   ($name, 'currentInverterDev',       undef);                   # Inverter Device
-  my $medev = ReadingsVal   ($name, 'currentMeterDev',          undef);                   # Meter Device
+  my $is    = ReadingsVal   ($name, 'inverterStrings',     undef);                        # String Konfig
+  my $wedev = ReadingsVal   ($name, 'currentWeatherDev',   undef);                        # Device Vorhersage Wetterdaten (Bewölkung etc.)
+  my $radev = ReadingsVal   ($name, 'currentRadiationAPI', undef);                        # Device Strahlungsdaten Vorhersage
+  my $indev = ReadingsVal   ($name, 'currentInverterDev',  undef);                        # Inverter Device
+  my $medev = ReadingsVal   ($name, 'currentMeterDev',     undef);                        # Meter Device
 
-  my $peaks = ReadingsVal   ($name, 'modulePeakString',         undef);                   # String Peak
-  my $dir   = ReadingsVal   ($name, 'moduleDirection',          undef);                   # Modulausrichtung Konfig (Azimut)
-  my $ta    = ReadingsVal   ($name, 'moduleTiltAngle',          undef);                   # Modul Neigungswinkel Konfig
-  my $mrt   = ReadingsVal   ($name, 'moduleRoofTops',           undef);                   # RoofTop Konfiguration (SolCast API)
+  my $peaks = ReadingsVal   ($name, 'modulePeakString',    undef);                        # String Peak
+  my $dir   = ReadingsVal   ($name, 'moduleDirection',     undef);                        # Modulausrichtung Konfig (Azimut)
+  my $ta    = ReadingsVal   ($name, 'moduleTiltAngle',     undef);                        # Modul Neigungswinkel Konfig
+  my $mrt   = ReadingsVal   ($name, 'moduleRoofTops',      undef);                        # RoofTop Konfiguration (SolCast API)
 
   my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');                   # Victron VRM Credentials gesetzt
 
@@ -9578,8 +9592,8 @@ sub __createAutokorrIcon {
   my $lang  = $paref->{lang};
 
   my $aciimg;
-  my $acitit = q{};
-  my $acu    = isAutoCorrUsed ($name);
+  my $acitit      = q{};
+  my ($acu, $aln) = isAutoCorrUsed ($name);
 
   if ($acu =~ /on/xs) {
       $aciimg = FW_makeImage ('10px-kreis-gruen.png', $htitles{on}{$lang}." ($acu)");
@@ -11355,35 +11369,37 @@ sub calcValueImproves {
   my $chour = $paref->{chour};
   my $t     = $paref->{t};                                                            # aktuelle Unix-Zeit
 
-  my $idts = ReadingsTimestamp ($name, "currentInverterDev", "");                     # Definitionstimestamp des Inverterdevice
+  my $idts = ReadingsTimestamp ($name, 'currentInverterDev', '');                     # Definitionstimestamp des Inverterdevice
   return if(!$idts);
 
-  my $acu = isAutoCorrUsed ($name);
+  my ($acu, $aln) = isAutoCorrUsed ($name);
 
   if ($acu) {
       $idts = timestringToTimestamp ($idts);
-      readingsSingleUpdate ($hash, ".pvCorrectionFactor_Auto_Soll", $acu, 0) if($acu =~ /on/xs);
+      
+      readingsSingleUpdate ($hash, '.pvCorrectionFactor_Auto_Soll', ($aln ? $acu : $acu.' noLearning'), 0) if($acu =~ /on/xs);
 
       if ($t - $idts < 7200) {
           my $rmh = sprintf "%.1f", ((7200 - ($t - $idts)) / 3600);
+          readingsSingleUpdate ($hash, 'pvCorrectionFactor_Auto', "standby (remains in standby for $rmh hours)", 0);
 
           Log3 ($name, 4, "$name - Correction usage is in standby. It starts in $rmh hours.");
 
-          readingsSingleUpdate ($hash, "pvCorrectionFactor_Auto", "standby (remains in standby for $rmh hours)", 0);
           return;
       }
       else {
-          my $acuset = ReadingsVal ($name, ".pvCorrectionFactor_Auto_Soll", 'on_simple');
-          readingsSingleUpdate ($hash, 'pvCorrectionFactor_Auto', $acuset, 0);
+          my $acuset = ReadingsVal ($name, '.pvCorrectionFactor_Auto_Soll', 'on_simple');
+          readingsSingleUpdate     ($hash, 'pvCorrectionFactor_Auto', $acuset, 0);
       }
   }
   else {
-      readingsSingleUpdate ($hash, ".pvCorrectionFactor_Auto_Soll", "off", 0);
+      readingsSingleUpdate ($hash, '.pvCorrectionFactor_Auto_Soll', 'off', 0);
   }
 
   Log3 ($name, 4, "$name - INFO - The correction factors are now calculated and stored proactively independent of the autocorrection usage");
 
   $paref->{acu} = $acu;
+  $paref->{aln} = $aln;
 
   for my $h (1..23) {
       next if(!$chour || $h > $chour);
@@ -11396,6 +11412,7 @@ sub calcValueImproves {
       delete $paref->{h};
   }
 
+  delete $paref->{aln};
   delete $paref->{acu};
 
 return;
@@ -11411,13 +11428,20 @@ sub _calcCaQcomplex {
   my $name  = $paref->{name};
   my $debug = $paref->{debug};
   my $acu   = $paref->{acu};
+  my $aln   = $paref->{aln};                                                                          # Autolearning
   my $h     = $paref->{h};
 
-  my $maxvar = AttrVal     ($name, 'affectMaxDayVariance', $defmaxvar);                                   # max. Korrekturvarianz
-  my $sr     = ReadingsVal ($name, ".pvCorrectionFactor_".sprintf("%02d",$h)."_cloudcover", "");
+  my $maxvar = AttrVal     ($name, 'affectMaxDayVariance', $defmaxvar);                               # max. Korrekturvarianz
+  my $sr     = ReadingsVal ($name, '.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', '');
 
-  if ($sr eq "done") {
+  if ($sr eq 'done') {
       # Log3 ($name, 1, "$name DEBUG> Complex Corrf -> factor Hour: ".sprintf("%02d",$h)." already calculated");
+      return;
+  }
+  
+  if (!$aln) {
+      storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', 'done');
+      debugLog     ($paref, 'pvCorrection', "Autolearning is switched off for hour: $h -> skip the recalculation of the complex correction factor");
       return;
   }
 
@@ -11494,13 +11518,20 @@ sub _calcCaQsimple {
   my $name  = $paref->{name};
   my $date  = $paref->{date};
   my $acu   = $paref->{acu};
+  my $aln   = $paref->{aln};                                                                          # Autolearning
   my $h     = $paref->{h};
 
   my $maxvar = AttrVal($name, 'affectMaxDayVariance', $defmaxvar);                                    # max. Korrekturvarianz
-  my $sr     = ReadingsVal ($name, ".pvCorrectionFactor_".sprintf("%02d",$h)."_apipercentil", "");
+  my $sr     = ReadingsVal ($name, '.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', '');
 
   if($sr eq "done") {
       # debugLog ($paref, 'pvCorrection', "Simple Corrf factor Hour: ".sprintf("%02d",$h)." already calculated");
+      return;
+  }
+  
+  if (!$aln) {
+      storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', 'done');
+      debugLog     ($paref, 'pvCorrection', "Autolearning is switched off for hour: $h -> skip the recalculation of the simple correction factor");
       return;
   }
 
@@ -11568,12 +11599,19 @@ sub _addHourAiRawdata {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $aln   = $paref->{aln};                                                                          # Autolearning
   my $h     = $paref->{h};
 
   my $rho = sprintf "%02d", $h;
   my $sr  = ReadingsVal ($name, ".signaldone_".$rho, "");
 
   return if($sr eq "done");
+  
+  if (!$aln) {
+      storeReading ('.signaldone_'.sprintf("%02d",$h), 'done');
+      debugLog     ($paref, 'pvCorrection', "Autolearning is switched off for hour: $h -> skip add AI raw data");
+      return;
+  }
 
   debugLog ($paref, 'aiProcess', "start add AI raw data for hour: $h");
 
@@ -11664,7 +11702,7 @@ sub __Pv_Fc_Complex_Dnum_Hist {
           last if( $dnum == $calcd);
       }
       else {
-          debugLog ($paref, 'pvCorrection', "Complex Corrf -> cloudiness range different: $range/$histwcc (current/historical) -> ignore stored $dayfa/$hour (Day/hour)");
+          debugLog ($paref, 'pvCorrection', "Complex Corrf -> cloudiness range different: $range/$histwcc (current/historical) -> ignore stored Day:$dayfa, hour:$hour");
       }
   }
 
@@ -12256,13 +12294,20 @@ sub aiAddRawData {
 
       for my $hod (sort keys %{$data{$type}{$name}{pvhist}{$pvd}}) {
           next if(!$hod || $hod eq '99' || ($rho && $hod ne $rho));
-
+          
+          my $pvrlvd = HistoryVal ($hash, $pvd, $hod, 'pvrlvd', 1);
+          
+          if (!$pvrlvd) {                                                        # Datensatz ignorieren wenn als invalid gekennzeichnet
+              debugLog ($paref, 'aiProcess', qq{AI raw data is marked as invalid and is ignored - day: $pvd, hod: $hod});
+              next;                                                              
+          }
+          
           my $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
           next if(!$rad1h || $rad1h <= 0);
 
           my $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
           next if(!$pvrl || $pvrl <= 0);
-
+          
           my $ridx = _aiMakeIdxRaw ($pvd, $hod);
 
           my $temp = HistoryVal ($hash, $pvd, $hod, 'temp', 20);
@@ -12282,7 +12327,7 @@ sub aiAddRawData {
 
           $dosave = 1;
 
-          debugLog ($paref, 'aiProcess', qq{AI Raw data added - idx: $ridx, day: $pvd, hod: $hod, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, wrp: $rbin, temp: $tbin});
+          debugLog ($paref, 'aiProcess', qq{AI raw data added - idx: $ridx, day: $pvd, hod: $hod, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, wrp: $rbin, temp: $tbin});
       }
   }
 
@@ -12370,6 +12415,7 @@ sub setPVhistory {
   my $day            = $paref->{day};
   my $dayname        = $paref->{dayname};                                  # aktueller Wochentagsname
   my $histname       = $paref->{histname}      // qq{};
+  my $pvrlvd         = $paref->{pvrlvd};                                   # 1: Eintrag 'pvrl' wird im Lernprozess berücksichtigt
   my $ethishour      = $paref->{ethishour}     // 0;
   my $etotal         = $paref->{etotal};
   my $batinthishour  = $paref->{batinthishour};                            # Batterieladung in Stunde
@@ -12432,14 +12478,15 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{batsetsoc} = $batsetsoc;
   }
 
-  if ($histname eq "pvrl") {                                                                      # realer Energieertrag
+  if ($histname eq 'pvrl') {                                                                      # realer Energieertrag
       $val = $ethishour;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl}   = $ethishour;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrlvd} = $pvrlvd;
 
       my $pvrlsum = 0;
       for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
           next if($k eq "99");
-          $pvrlsum += HistoryVal ($hash, $day, $k, "pvrl", 0);
+          $pvrlsum += HistoryVal ($hash, $day, $k, 'pvrl', 0);
       }
       $data{$type}{$name}{pvhist}{$day}{99}{pvrl} = $pvrlsum;
   }
@@ -12655,6 +12702,7 @@ sub listDataPool {
       my $ret;
       for my $key (sort {$a<=>$b} keys %{$h->{$day}}) {
           my $pvrl    = HistoryVal ($hash, $day, $key, 'pvrl',        '-');
+          my $pvrlvd  = HistoryVal ($hash, $day, $key, 'pvrlvd',      '-');
           my $pvfc    = HistoryVal ($hash, $day, $key, 'pvfc',        '-');
           my $gcon    = HistoryVal ($hash, $day, $key, 'gcons',       '-');
           my $con     = HistoryVal ($hash, $day, $key, 'con',         '-');
@@ -12676,7 +12724,7 @@ sub listDataPool {
           my $rad1h   = HistoryVal ($hash, $day, $key, 'rad1h',       '-');
 
           $ret .= "\n      " if($ret);
-          $ret .= $key." => etotal: $etotal, pvfc: $pvfc, pvrl: $pvrl, rad1h: $rad1h";
+          $ret .= $key." => etotal: $etotal, pvfc: $pvfc, pvrl: $pvrl, pvrlvd: $pvrlvd, rad1h: $rad1h";
           $ret .= "\n            ";
           $ret .= "confc: $confc, con: $con, gcon: $gcon, gfeedin: $gfeedin";
           $ret .= "\n            ";
@@ -12806,7 +12854,7 @@ sub listDataPool {
           my $pvaifc   = CircularVal ($hash, $idx, "pvaifc",              '-');
           my $pvapifc  = CircularVal ($hash, $idx, "pvapifc",             '-');
           my $aihit    = CircularVal ($hash, $idx, "aihit",               '-');
-          my $pvrl     = CircularVal ($hash, $idx, "pvrl",                '-');
+          my $pvrl     = CircularVal ($hash, $idx, 'pvrl',                '-');
           my $confc    = CircularVal ($hash, $idx, "confc",               '-');
           my $gcons    = CircularVal ($hash, $idx, "gcons",               '-');
           my $gfeedin  = CircularVal ($hash, $idx, "gfeedin",             '-');
@@ -13069,10 +13117,10 @@ sub checkPlantConfig {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  my $lang   = AttrVal        ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang));
-  my $pcf    = ReadingsVal    ($name, 'pvCorrectionFactor_Auto', '');
-  my $raname = ReadingsVal    ($name, 'currentRadiationAPI',     '');
-  my $acu    = isAutoCorrUsed ($name);
+  my $lang        = AttrVal        ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang));
+  my $pcf         = ReadingsVal    ($name, 'pvCorrectionFactor_Auto', '');
+  my $raname      = ReadingsVal    ($name, 'currentRadiationAPI',     '');
+  my ($acu, $aln) = isAutoCorrUsed ($name);
 
   my $cf     = 0;                                                                                     # config fault: 1 -> Konfig fehlerhaft, 0 -> Konfig ok
   my $wn     = 0;                                                                                     # Warnung wenn 1
@@ -13791,23 +13839,23 @@ sub createAssociatedWith {
       my (@cd,@nd);
       my ($afc,$ara,$ain,$ame,$aba,$h);
 
-      my $fcdev = ReadingsVal($name, "currentWeatherDev",   "");             # Weather forecast Device
+      my $fcdev = ReadingsVal($name, 'currentWeatherDev',   '');             # Weather forecast Device
       ($afc,$h) = parseParams ($fcdev);
       $fcdev    = $afc->[0] // "";
 
-      my $radev = ReadingsVal($name, "currentRadiationAPI", "");             # Radiation forecast Device
+      my $radev = ReadingsVal($name, 'currentRadiationAPI', '');             # Radiation forecast Device
       ($ara,$h) = parseParams ($radev);
       $radev    = $ara->[0] // "";
 
-      my $indev = ReadingsVal($name, "currentInverterDev",  "");             # Inverter Device
+      my $indev = ReadingsVal($name, 'currentInverterDev',  '');             # Inverter Device
       ($ain,$h) = parseParams ($indev);
       $indev    = $ain->[0] // "";
 
-      my $medev = ReadingsVal($name, "currentMeterDev",     "");             # Meter Device
+      my $medev = ReadingsVal($name, 'currentMeterDev',     '');             # Meter Device
       ($ame,$h) = parseParams ($medev);
       $medev    = $ame->[0] // "";
 
-      my $badev = ReadingsVal($name, "currentBatteryDev",   "");             # Battery Device
+      my $badev = ReadingsVal($name, 'currentBatteryDev',   '');             # Battery Device
       ($aba,$h) = parseParams ($badev);
       $badev    = $aba->[0] // "";
 
@@ -13918,9 +13966,9 @@ sub isPrepared4AI {
   my $hash = shift;
   my $full = shift // q{};                   # wenn true -> auch Auswertung ob on_.*_ai gesetzt ist
 
-  my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};
-  my $acu  = isAutoCorrUsed ($name);
+  my $name        = $hash->{NAME};
+  my $type        = $hash->{TYPE};
+  my ($acu, $aln) = isAutoCorrUsed ($name);
 
   my $err;
 
@@ -14414,21 +14462,25 @@ return $ret;
 ################################################################
 #       welche PV Autokorrektur wird verwendet ?
 #       Standard bei nur "on" -> on_simple
+#       $aln: 1 - Lernen aktiviert (default)
+#             0 - Lernen deaktiviert
 ################################################################
 sub isAutoCorrUsed {
   my $name = shift;
 
   my $cauto = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');
 
-  my $ret = $cauto =~ /on_simple_ai/xs  ? 'on_simple_ai'  :
+  my $acu = $cauto =~ /on_simple_ai/xs  ? 'on_simple_ai'  :
             $cauto =~ /on_simple/xs     ? 'on_simple'     :
             $cauto =~ /on_complex_ai/xs ? 'on_complex_ai' :
             $cauto =~ /on_complex/xs    ? 'on_complex'    :
             $cauto =~ /standby/xs       ? 'standby'       :
             $cauto =~ /on/xs            ? 'on_simple'     :
             q{};
+            
+  my $aln = $cauto =~ /noLearning/xs ? 0 : 1;
 
-return $ret;
+return ($acu, $aln);
 }
 
 ################################################################
@@ -15765,8 +15817,9 @@ to ensure that the system configuration is correct.
       which real strings exist. <br><br>
 
       <ul>
-        <b>Example: </b> <br>
+        <b>Examples: </b> <br>
         set &lt;name&gt; inverterStrings eastroof,southgarage,S3 <br>
+        set &lt;name&gt; inverterStrings KI-based <br>
       </ul>
       </li>
     </ul>
@@ -15782,7 +15835,7 @@ to ensure that the system configuration is correct.
       a sum to the string name <b>KI-based</b>. <br><br>
 
       <ul>
-        <b>Example: </b> <br>
+        <b>Examples: </b> <br>
         set &lt;name&gt; modulePeakString eastroof=5.1 southgarage=2.0 S3=7.2 <br>
         set &lt;name&gt; modulePeakString KI-based=14.3 (for AI based API)<br>
       </ul>
@@ -16239,29 +16292,30 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>etotal</b>         </td><td>total energy yield (Wh) at the beginning of the hour                                            </td></tr>
-            <tr><td> <b>pvfc</b>           </td><td>the predicted PV yield (Wh)                                                                     </td></tr>
-            <tr><td> <b>pvrl</b>           </td><td>real PV generation (Wh)                                                                         </td></tr>
-            <tr><td> <b>gcon</b>           </td><td>real power consumption (Wh) from the electricity grid                                           </td></tr>
-            <tr><td> <b>confc</b>          </td><td>expected energy consumption (Wh)                                                                </td></tr>
-            <tr><td> <b>con</b>            </td><td>real energy consumption (Wh) of the house                                                       </td></tr>
-            <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                     </td></tr>
-            <tr><td> <b>batintotal</b>     </td><td>total battery charge (Wh) at the beginning of the hour                                          </td></tr>
-            <tr><td> <b>batin</b>          </td><td>Hour battery charge (Wh)                                                                        </td></tr>
-            <tr><td> <b>batouttotal</b>    </td><td>total battery discharge (Wh) at the beginning of the hour                                       </td></tr>
-            <tr><td> <b>batout</b>         </td><td>Battery discharge of the hour (Wh)                                                              </td></tr>
-            <tr><td> <b>batmaxsoc</b>      </td><td>maximum SOC (%) of the day                                                                      </td></tr>
-            <tr><td> <b>batsetsoc</b>      </td><td>optimum SOC setpoint (%) for the day                                                            </td></tr>
-            <tr><td> <b>wid</b>            </td><td>Weather identification number                                                                   </td></tr>
-            <tr><td> <b>wcc</b>            </td><td>effective cloud cover                                                                           </td></tr>
-            <tr><td> <b>wrp</b>            </td><td>Probability of precipitation > 0.1 mm during the respective hour                                </td></tr>
-            <tr><td> <b>pvcorrf</b>        </td><td>Autocorrection factor used / forecast quality achieved                                          </td></tr>
-            <tr><td> <b>rad1h</b>          </td><td>global radiation (kJ/m2)                                                                        </td></tr>
-            <tr><td> <b>csmtXX</b>         </td><td>total energy consumption of ConsumerXX                                                          </td></tr>
-            <tr><td> <b>csmeXX</b>         </td><td>Energy consumption of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)    </td></tr>
-            <tr><td> <b>minutescsmXX</b>   </td><td>total active minutes in the hour of ConsumerXX                                                  </td></tr>
-            <tr><td> <b>hourscsmeXX</b>    </td><td>average hours of an active cycle of ConsumerXX of the day                                       </td></tr>
-            <tr><td> <b>cyclescsmXX</b>    </td><td>Number of active cycles of ConsumerXX of the day                                                </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>total energy yield (Wh) at the beginning of the hour                                                  </td></tr>
+            <tr><td> <b>pvfc</b>           </td><td>the predicted PV yield (Wh)                                                                           </td></tr>
+            <tr><td> <b>pvrl</b>           </td><td>real PV generation (Wh)                                                                               </td></tr>
+            <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' is valid and is taken into account in the learning process, 0-'pvrl' is assessed as abnormal </td></tr>
+            <tr><td> <b>gcon</b>           </td><td>real power consumption (Wh) from the electricity grid                                                 </td></tr>
+            <tr><td> <b>confc</b>          </td><td>expected energy consumption (Wh)                                                                      </td></tr>
+            <tr><td> <b>con</b>            </td><td>real energy consumption (Wh) of the house                                                             </td></tr>
+            <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                           </td></tr>
+            <tr><td> <b>batintotal</b>     </td><td>total battery charge (Wh) at the beginning of the hour                                                </td></tr>
+            <tr><td> <b>batin</b>          </td><td>Hour battery charge (Wh)                                                                              </td></tr>
+            <tr><td> <b>batouttotal</b>    </td><td>total battery discharge (Wh) at the beginning of the hour                                             </td></tr>
+            <tr><td> <b>batout</b>         </td><td>Battery discharge of the hour (Wh)                                                                    </td></tr>
+            <tr><td> <b>batmaxsoc</b>      </td><td>maximum SOC (%) of the day                                                                            </td></tr>
+            <tr><td> <b>batsetsoc</b>      </td><td>optimum SOC setpoint (%) for the day                                                                  </td></tr>
+            <tr><td> <b>wid</b>            </td><td>Weather identification number                                                                         </td></tr>
+            <tr><td> <b>wcc</b>            </td><td>effective cloud cover                                                                                 </td></tr>
+            <tr><td> <b>wrp</b>            </td><td>Probability of precipitation > 0.1 mm during the respective hour                                      </td></tr>
+            <tr><td> <b>pvcorrf</b>        </td><td>Autocorrection factor used / forecast quality achieved                                                </td></tr>
+            <tr><td> <b>rad1h</b>          </td><td>global radiation (kJ/m2)                                                                              </td></tr>
+            <tr><td> <b>csmtXX</b>         </td><td>total energy consumption of ConsumerXX                                                                </td></tr>
+            <tr><td> <b>csmeXX</b>         </td><td>Energy consumption of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)          </td></tr>
+            <tr><td> <b>minutescsmXX</b>   </td><td>total active minutes in the hour of ConsumerXX                                                        </td></tr>
+            <tr><td> <b>hourscsmeXX</b>    </td><td>average hours of an active cycle of ConsumerXX of the day                                             </td></tr>
+            <tr><td> <b>cyclescsmXX</b>    </td><td>Number of active cycles of ConsumerXX of the day                                                      </td></tr>
          </table>
       </ul>
       </li>
@@ -17803,8 +17857,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       welche realen Strings existieren. <br><br>
 
       <ul>
-        <b>Beispiel: </b> <br>
+        <b>Beispiele: </b> <br>
         set &lt;name&gt; inverterStrings Ostdach,Südgarage,S3 <br>
+        set &lt;name&gt; inverterStrings KI-based <br>
       </ul>
       </li>
     </ul>
@@ -17820,7 +17875,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Strings als Summe dem Stringnamen <b>KI-based</b> zuzuordnen. <br><br>
 
       <ul>
-        <b>Beispiel: </b> <br>
+        <b>Beispiele: </b> <br>
         set &lt;name&gt; modulePeakString Ostdach=5.1 Südgarage=2.0 S3=7.2 <br>
         set &lt;name&gt; modulePeakString KI-based=14.3 (bei KI basierender API)<br>
       </ul>
@@ -17948,11 +18003,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <li><b>pvCorrectionFactor_Auto </b> <br><br>
 
       Schaltet die automatische Vorhersagekorrektur ein/aus.
-      Die Wirkungsweise unterscheidet sich je nach gewählter Methode.
+      Die Wirkungsweise unterscheidet sich je nach gewählter Methode. <br>
       Das Korrekturverhalten kann mit den Attributen <a href="#SolarForecast-attr-affectNumHistDays">affectNumHistDays</a> und
       <a href="#SolarForecast-attr-affectMaxDayVariance">affectMaxDayVariance</a> beeinflusst werden. <br>
       (default: off)
 
+      <br><br>
+      
+      <b>noLearning:</b> <br>
+      Mit dieser Option wird die erzeugte PV Energie der aktuellen Stunde vom Lernprozess (Korrekturfaktoren 
+      sowie KI) ausgeschlossen. <br>
+      Die zuvor eingestellte Autokorrekturmethode wird weiterhin angewendet. 
       <br><br>
 
       <b>on_simple(_ai):</b> <br>
@@ -18282,6 +18343,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>etotal</b>         </td><td>totaler Energieertrag (Wh) zu Beginn der Stunde                                                </td></tr>
             <tr><td> <b>pvfc</b>           </td><td>der prognostizierte PV Ertrag (Wh)                                                             </td></tr>
             <tr><td> <b>pvrl</b>           </td><td>reale PV Erzeugung (Wh)                                                                        </td></tr>
+            <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' ist gültig und wird im Lernprozess berücksichtigt, 0-'pvrl' ist als abnormal bewertet </td></tr>
             <tr><td> <b>gcon</b>           </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                                   </td></tr>
             <tr><td> <b>confc</b>          </td><td>erwarteter Energieverbrauch (Wh)                                                               </td></tr>
             <tr><td> <b>con</b>            </td><td>realer Energieverbrauch (Wh) des Hauses                                                        </td></tr>
