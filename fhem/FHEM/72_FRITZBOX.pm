@@ -9690,7 +9690,7 @@ sub FRITZBOX_Helper_Url_Regex {
       </li><br>
 
       <li><a name="inActive"></a>
-         <dt><code>set &lt;name&gt; active &lt;on|off&gt;</code></dt>
+         <dt><code>set &lt;name&gt; inActive &lt;on|off&gt;</code></dt>
          <br>
          Temporarily deactivates the internal timer.
          <br>
@@ -10542,7 +10542,7 @@ sub FRITZBOX_Helper_Url_Regex {
       </li><br>
 
       <li><a name="inActive"></a>
-         <dt><code>set &lt;name&gt; active &lt;on|off&gt;</code></dt>
+         <dt><code>set &lt;name&gt; inActive &lt;on|off&gt;</code></dt>
          <br>
          Deaktiviert temporär den intern Timer.
          <br>
