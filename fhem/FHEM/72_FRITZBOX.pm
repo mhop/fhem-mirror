@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.57.10";
+my $ModulVersion = "07.57.10a";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -8384,6 +8384,8 @@ sub FRITZBOX_SOAP_Test_Request($$$$)
    my ($box,$control_url,$service_type,$service_command) = @_;
    my $hash = $defs{$box};
 
+   use Data::Dumper;
+
    return Dumper FRITZBOX_SOAP_Request($hash, $control_url, $service_type, $service_command);
 
 } # end of FRITZBOX_SOAP_Test_Request
@@ -8714,7 +8716,7 @@ sub FRITZBOX_open_Web_Connection ($)
    my $avmModel = InternalVal($name, "MODEL", $hash->{boxModel});
    my $user = AttrVal( $name, "boxUser", "" );
 
-   if ($user eq "" && $avmModel =~ "Box") {
+   if ($user eq "" && $avmModel && $avmModel =~ "Box") {
       FRITZBOX_Log $hash, 2, "No boxUser set. Please define it (once) with 'attr $name boxUser YourBoxUser'";
       %retHash = ( "Error" => "No attr boxUser set", "ResetSID" => "1" ) ;
       return \%retHash;
