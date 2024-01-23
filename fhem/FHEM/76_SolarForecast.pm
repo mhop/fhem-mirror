@@ -18009,7 +18009,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <li><b>operationMode  </b> <br><br>
       Mit <b>inactive</b> wird das SolarForecast Gerät deaktiviert. Die <b>active</b> Option aktiviert das Gerät wieder.
       Das Verhalten entspricht dem "disable"-Attribut, eignet sich aber vor allem zum Einsatz in Perl-Skripten da 
-      gegenüber dem "disable"-Attribut disable keine Speicherung der Gerätekonfiguration nötig ist.
+      gegenüber dem "disable"-Attribut keine Speicherung der Gerätekonfiguration nötig ist.
     </li>
     </ul>
     <br>
