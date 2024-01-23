@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.57.10a";
+my $ModulVersion = "07.57.10b";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -612,19 +612,20 @@ sub FRITZBOX_Define($$)
    }
 
    # INTERNALS
-   $hash->{STATE}                = "Initializing";
-   $hash->{INTERVAL}             = 300;
-   $hash->{TIMEOUT}              = 55;
-   $hash->{SID_RENEW_ERR_CNT}    = 0;
-   $hash->{SID_RENEW_CNT}        = 0;
-   $hash->{_BETA}                = 0;
+   $hash->{STATE}                 = "Initializing";
+   $hash->{INTERVAL}              = 300;
+   $hash->{TIMEOUT}               = 55;
+   $hash->{SID_RENEW_ERR_CNT}     = 0;
+   $hash->{SID_RENEW_CNT}         = 0;
+   $hash->{_BETA}                 = 0;
 
-   $hash->{fhem}{LOCAL}          = 0;
-   $hash->{fhem}{is_double_wlan} = -1;
+   $hash->{fhem}{LOCAL}           = 0;
+   $hash->{fhem}{is_double_wlan}  = -1;
 
-   $hash->{helper}{TimerReadout} = $name.".Readout";
-   $hash->{helper}{TimerCmd}     = $name.".Cmd";
-   $hash->{helper}{FhemLog3Std}  = AttrVal($name, "FhemLog3Std", 0);
+   $hash->{helper}{TimerReadout}  = $name.".Readout";
+   $hash->{helper}{TimerCmd}      = $name.".Cmd";
+   $hash->{helper}{FhemLog3Std}   = AttrVal($name, "FhemLog3Std", 0);
+   $hash->{helper}{timerInActive} = 0;
 
    # my $tr064Port = FRITZBOX_init_TR064 ($hash);
    # $hash->{SECPORT} = $tr064Port    if $tr064Port;
@@ -959,7 +960,8 @@ sub FRITZBOX_Set($$@)
 
    my $list =  " checkAPIs:noArg"
             .  " password"
-            .  " update:noArg";
+            .  " update:noArg"
+            .  " inActive:on,off";
 
 # set abhängig von TR064
    $list    .= " reboot"
@@ -1014,7 +1016,25 @@ sub FRITZBOX_Set($$@)
             .  " wlanLogExtended:on,off"
             if ($hash->{LUADATA} == 1);
 
-   if ( lc $cmd eq 'call' && $mesh eq "master") {
+   if ( lc $cmd eq 'inactive') {
+      return "ERROR: for active arguments. Required on|off" if (int @val != 1) || $val[0] != /on|off/;
+
+      if ($val[0] eq "on") {
+        $hash->{helper}{timerInActive} = 1;
+      } else {
+        $hash->{helper}{timerInActive} = 0;
+        FRITZBOX_Log $hash, 4, "set $name $cmd -> Neustart internal Timer";
+        $hash->{APICHECKED} = 0;
+        RemoveInternalTimer($hash->{helper}{TimerReadout});
+        InternalTimer(gettimeofday()+1, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
+      }
+
+      FRITZBOX_Log $hash, 3, "set $name $cmd " . join(" ", @val);
+      return undef;
+
+   } #end active
+
+   elsif ( lc $cmd eq 'call' && $mesh eq "master") {
       if (int @val >= 0 && int @val <= 2) {
          FRITZBOX_Log $hash, 3, "set $name $cmd " . join(" ", @val);
          push @cmdBuffer, "call " . join(" ", @val);
@@ -2598,6 +2618,12 @@ sub FRITZBOX_Readout_Start($)
       FRITZBOX_Log $hash, 2, "stopped while to many authentication errors";
       RemoveInternalTimer($hash->{helper}{TimerReadout});
       readingsSingleUpdate( $hash, "state", "stopped while to many authentication errors", 1 );
+      return undef;
+   }
+
+   if( $hash->{helper}{timerInActive} && $hash->{fhem}{LOCAL} != 1) {
+      RemoveInternalTimer($hash->{helper}{TimerReadout});
+      readingsSingleUpdate( $hash, "state", "inactive", 1 );
       return undef;
    }
 
@@ -9663,6 +9689,13 @@ sub FRITZBOX_Helper_Url_Regex {
          Switches the guest WLAN on or off. The guest password must be set. If necessary, the normal WLAN is also switched on.
       </li><br>
 
+      <li><a name="inActive"></a>
+         <dt><code>set &lt;name&gt; active &lt;on|off&gt;</code></dt>
+         <br>
+         Temporarily deactivates the internal timer.
+         <br>
+      </li><br>
+
       <li><a name="ledSetting"></a>
          <dt><code>set &lt;name&gt; ledSetting &lt;led:on|off&gt; and/or &lt;bright:1..3&gt; and/or &lt;env:on|off&gt;</code></dt>
          <br>
@@ -10506,6 +10539,13 @@ sub FRITZBOX_Helper_Url_Regex {
          <dt><code>set &lt;name&gt; guestWlan &lt;on|off&gt;</code></dt>
          <br>
          Schaltet das G&auml;ste-WLAN an oder aus. Das G&auml;ste-Passwort muss gesetzt sein. Wenn notwendig wird auch das normale WLAN angeschaltet.
+      </li><br>
+
+      <li><a name="inActive"></a>
+         <dt><code>set &lt;name&gt; active &lt;on|off&gt;</code></dt>
+         <br>
+         Deaktiviert temporär den intern Timer.
+         <br>
       </li><br>
 
       <li><a name="ledSetting"></a>
