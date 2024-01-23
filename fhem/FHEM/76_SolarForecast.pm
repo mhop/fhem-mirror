@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.9.0"  => "23.01.2024  modify disable, add operationMode: active/inactive ",
   "1.8.0"  => "22.01.2024  add 'noLearning' Option to Setter pvCorrectionFactor_Auto ",
   "1.7.1"  => "20.01.2024  optimize battery management ",
   "1.7.0"  => "18.01.2024  Changeover Start centralTask completely to runCentralTask, ".
@@ -408,6 +409,7 @@ my %hset = (                                                                # Ha
   energyH4Trigger           => { fn => \&_setTrigger                   },
   plantConfiguration        => { fn => \&_setplantConfiguration        },
   batteryTrigger            => { fn => \&_setTrigger                   },
+  operationMode             => { fn => \&_setoperationMode             },
   powerTrigger              => { fn => \&_setTrigger                   },
   pvCorrectionFactor_05     => { fn => \&_setpvCorrectionFactor        },
   pvCorrectionFactor_06     => { fn => \&_setpvCorrectionFactor        },
@@ -1102,7 +1104,7 @@ sub Set {
   my $prop1 = shift @a;
   my $prop2 = shift @a;
 
-  return if(IsDisabled($name));
+  return if((controlParams($name))[1]);
 
   my ($setlist,@fcdevs,@cfs,@condevs);
   my ($fcd,$ind,$med,$cf,$sp,$coms) = ('','','','','','');
@@ -1144,10 +1146,11 @@ sub Set {
       push @condevs, $c if($c);
   }
   $coms = @condevs ? join ",", @condevs : 'noArg';
+  
+  my $ipai = isPrepared4AI ($hash);
 
   ## allg. gültige Setter
   #########################
-  my $ipai = isPrepared4AI ($hash);
   $setlist = "Unknown argument $opt, choose one of ".
              "consumerImmediatePlanning:$coms ".
              "consumerNewPlanning:$coms ".
@@ -1159,6 +1162,7 @@ sub Set {
              "energyH4Trigger:textField-long ".
              "inverterStrings ".
              "modulePeakString ".
+             "operationMode:active,inactive ".
              "plantConfiguration:check,save,restore ".
              "powerTrigger:textField-long ".
              "pvCorrectionFactor_Auto:noLearning,on_simple".($ipai ? ',on_simple_ai,' : ',')."on_complex".($ipai ? ',on_complex_ai,' : ',')."off ".
@@ -1199,6 +1203,12 @@ sub Set {
   ################################
   if (isBatteryUsed ($name)) {
       $setlist .= "batteryTrigger:textField-long ";
+  }
+  
+  ## inactive (Setter überschreiben)
+  ####################################
+  if ((controlParams($name))[2]) {
+      $setlist = "operationMode:active,inactive ";
   }
 
   my $params = {
@@ -1651,6 +1661,20 @@ sub _setbatteryDevice {                  ## no critic "not used"
   readingsSingleUpdate ($hash, "currentBatteryDev", $arg, 1);
   createAssociatedWith ($hash);
   writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+
+return;
+}
+
+################################################################
+#       Setter operationMode
+################################################################
+sub _setoperationMode {                  ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop} // return qq{no mode specified};
+
+  singleUpdateState ( {hash => $hash, state => $prop, evt => 1} );
 
 return;
 }
@@ -2355,7 +2379,7 @@ sub Get {
        $getlist .= "valDecTree:aiRawData,aiRuleStrings ";
   }
 
-  return if(IsDisabled($name));
+  return if((controlParams($name))[1] || (controlParams($name))[2]);
 
   my $params = {
       hash  => $hash,
@@ -4422,7 +4446,7 @@ sub Notify {
   my $myName   = $myHash->{NAME};                                                         # Name des eigenen Devices
   my $devName  = $dev_hash->{NAME};                                                       # Device welches Events erzeugt hat
 
-  return if(IsDisabled($myName) || !$myHash->{NOTIFYDEV});
+  return if((controlParams($myName))[1] || !$myHash->{NOTIFYDEV});
 
   my $events = deviceEvents($dev_hash, 1);
   return if(!$events);
@@ -4616,7 +4640,7 @@ sub periodicWriteCachefiles {
   RemoveInternalTimer($hash, "FHEM::SolarForecast::periodicWriteCachefiles");
   InternalTimer      (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteCachefiles", $hash, 0);
 
-  return if(IsDisabled($name));
+  return if((controlParams($name))[1] || (controlParams($name))[2]);
 
   writeCacheToFile ($hash, "circular", $pvccache.$name);                      # Cache File PV Circular schreiben
   writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);                      # Cache File PV History schreiben
@@ -4751,22 +4775,31 @@ sub runCentralTask {
   
   my $debug;
   my $t        = time;
-  my $second   = int (strftime "%S", localtime($t));                                     # aktuelle Sekunde (00-61)
-  my $minute   = int (strftime "%M", localtime($t));                                     # aktuelle Minute (00-59) 
-  my $interval = controlParams ($name);
+  my $second   = int (strftime "%S", localtime($t));                                 # aktuelle Sekunde (00-61)
+  my $minute   = int (strftime "%M", localtime($t));                                 # aktuelle Minute (00-59) 
+  my $interval = (controlParams ($name))[0];                                         # Interval
 
   if (!$interval) {
       $hash->{MODE} = 'Manual';
       storeReading ('nextCycletime', 'Manual');
-       
+      return;
+  }
+  
+  if ((controlParams($name))[1]) {
+      $hash->{MODE} = 'disabled';
+      return;
+  }
+  
+  if ((controlParams($name))[2]) {
+      $hash->{MODE} = 'inactive';
       return;
   }
 
   my $nct = CurrentVal ($hash, 'nextCycleTime', 0);                                  # gespeicherte nächste CyleTime
 
-  if(!IsDisabled($name) && $t >= $nct) {
+  if ($t >= $nct) {
       my $new       = $t + $interval;                                                # nächste Wiederholungszeit
-      $hash->{MODE} = "Automatic - next Cycletime: ".FmtTime($new);
+      $hash->{MODE} = 'Automatic - next Cycletime: '.FmtTime($new);
       
       $data{$type}{$name}{current}{nextCycleTime} = $new;
       
@@ -4872,7 +4905,7 @@ sub centralTask {
   
   setModel ($hash);                                                                            # Model setzen
 
-  return if(IsDisabled($name));    
+  return if((controlParams($name))[1] || (controlParams($name))[2]);                           # disabled / inactive
   
   if (CurrentVal ($hash, 'ctrunning', 0)) {
       Log3 ($name, 3, "$name - INFO - central task was called when it was already running ... end this call");
@@ -5153,9 +5186,12 @@ return $az;
 sub controlParams {
   my $name = shift;
   
-  my $interval = AttrVal ($name, 'ctrlInterval', $definterval);            # 0 wenn manuell gesteuert
+  my $interval = AttrVal    ($name, 'ctrlInterval', $definterval);            # 0 wenn manuell gesteuert
+  my $idval    = IsDisabled ($name);
+  my $disabled = $idval == 1 ? 1 : 0;
+  my $inactive = $idval == 3 ? 1 : 0;
 
-return $interval;
+return ($interval, $disabled, $inactive);
 }
 
 ################################################################
@@ -9134,11 +9170,11 @@ sub _checkSetupNotComplete {
   my $height = AttrNum ($name, 'graphicBeamHeight', 200);
   my $lang   = getLang ($hash);
 
-  if(IsDisabled($name)) {
+  if ((controlParams($name))[1] || (controlParams($name))[2]) {
       $ret .= "<table class='roomoverview'>";
       $ret .= "<tr style='height:".$height."px'>";
       $ret .= "<td>";
-      $ret .= qq{SolarForecast device $link is disabled};
+      $ret .= qq{SolarForecast device $link is disabled or inactive};
       $ret .= "</td>";
       $ret .= "</tr>";
       $ret .= "</table>";
@@ -9153,7 +9189,7 @@ sub _checkSetupNotComplete {
   my $chkicon  = "<a onClick=$cmdplchk>$img</a>";
   my $chktitle = $htitles{plchk}{$lang};
 
-  if(!$is || !$wedev || !$radev || !$indev || !$medev || !$peaks                                       ||
+  if (!$is || !$wedev || !$radev || !$indev || !$medev || !$peaks                                       ||
      (isSolCastUsed ($hash) ? (!$rip || !$mrt) : isVictronKiUsed ($hash) ? !$vrmcr : (!$dir || !$ta )) ||
      (isForecastSolarUsed ($hash) ? !$coset : '')                                                      ||
      !defined $pv0) {
@@ -15917,6 +15953,16 @@ to ensure that the system configuration is correct.
       </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-set-operationMode"></a>
+      <li><b>operationMode  </b> <br><br>
+      The SolarForecast device is deactivated with <b>inactive</b>. The <b>active</b> option reactivates the device.
+      The behavior corresponds to the "disable" attribute, but is particularly suitable for use in Perl scripts as 
+      compared to the "disable" attribute, it is not necessary to save the device configuration.
+    </li>
+    </ul>
+    <br>
 
     <ul>
       <a id="SolarForecast-set-plantConfiguration"></a>
@@ -17955,6 +18001,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         set &lt;name&gt; moduleTiltAngle Ostdach=40 Südgarage=60 S3=30 <br>
       </ul>
       </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-set-operationMode"></a>
+      <li><b>operationMode  </b> <br><br>
+      Mit <b>inactive</b> wird das SolarForecast Gerät deaktiviert. Die <b>active</b> Option aktiviert das Gerät wieder.
+      Das Verhalten entspricht dem "disable"-Attribut, eignet sich aber vor allem zum Einsatz in Perl-Skripten da 
+      gegenüber dem "disable"-Attribut disable keine Speicherung der Gerätekonfiguration nötig ist.
+    </li>
     </ul>
     <br>
 
