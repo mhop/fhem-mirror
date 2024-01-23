@@ -1095,8 +1095,9 @@ my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nA
                                        { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"workAreaId":'.$cmd[1].'}}}'; $post = 'actions' }
   elsif ($cmd[0] eq "headlight")       { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": {"mode": "'.$cmd[1].'"}}}}'; $post = 'settings' }
   elsif ($cmd[0] eq "cuttingHeight")   { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": '.$cmd[1].'}}}'; $post = 'settings' }
-  elsif ($cmd[0] eq "stayOutZone_enable")   { $json = '{"data": {"type":"stayOutZone","id":"'.$cmd[1].'","attributes":{"enable": true}}}'; $post = 'stayOutZones/' . $cmd[1]; $method = 'PATCH' }
-  elsif ($cmd[0] eq "stayOutZone_disable")   { $json = '{"data": {"type":"stayOutZone","id":"'.$cmd[1].'","attributes":{"enable": false}}}'; $post = 'stayOutZones/' . $cmd[1]; $method = 'PATCH' }
+  elsif ($cmd[0] eq "stayOutZone_enable")  { $json = '{"data": {"type":"stayOutZone","id":"'.$cmd[1].'","attributes":{"enable": true}}}'; $post = 'stayOutZones/' . $cmd[1]; $method = 'PATCH' }
+  elsif ($cmd[0] eq "stayOutZone_disable") { $json = '{"data": {"type":"stayOutZone","id":"'.$cmd[1].'","attributes":{"enable": false}}}'; $post = 'stayOutZones/' . $cmd[1]; $method = 'PATCH' }
+  elsif ($cmd[0] eq "confirmError")    { $json = '{}'; $post = 'errors/confirm' }
   elsif ($cmd[0] eq "sendScheduleFromAttributeToMower" && AttrVal( $name, 'mowerSchedule', '')) {
 
     my $perl = eval { decode_json (AttrVal( $name, 'mowerSchedule', '')) };
@@ -1282,7 +1283,12 @@ sub Set {
       APIAuth($hash);
       return undef;
 
-  } elsif (ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /ParkUntilFurtherNotice|ParkUntilNextSchedule|Pause|ResumeSchedule|sendScheduleFromAttributeToMower/) {
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /ParkUntilFurtherNotice|ParkUntilNextSchedule|Pause|ResumeSchedule|sendScheduleFromAttributeToMower/ ) {
+
+    CMD($hash,$setName);
+    return undef;
+
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /confirmError/ && AttrVal( $name, 'testing', '' ) ) {
 
     CMD($hash,$setName);
     return undef;
@@ -1320,6 +1326,7 @@ sub Set {
   $ret .= "chargingStationPositionToAttribute:noArg headlight:ALWAYS_OFF,ALWAYS_ON,EVENING_ONLY,EVENING_AND_NIGHT cuttingHeight:1,2,3,4,5,6,7,8,9 mowerScheduleToAttribute:noArg ";
   $ret .= "sendScheduleFromAttributeToMower:noArg defaultDesignAttributesToAttribute:noArg mapZonesTemplateToAttribute:noArg ";
   $ret .= "StartInWorkArea " if ( $hash->{helper}{mower}{attributes}{capabilities}{workAreas} && AttrVal( $name, 'testing', '' ) );
+  $ret .= "confirmError:noArg " if ( AttrVal( $name, 'testing', '' ) );
   $ret .= "stayOutZone_enable stayOutZone_disable " if ( $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones} && AttrVal( $name, 'testing', '' ) );
   return "Unknown argument $setName, choose one of".$ret;
   

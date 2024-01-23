@@ -167,10 +167,14 @@ __END__
       <code>set &lt;name&gt; Start &lt;number of minutes&gt;</code><br>
       Starts immediately for &lt;number of minutes&gt;</li>
 
+    <li><a id='AutomowerConnect-set-confirmError'>confirmError</a><br>
+      <code>set &lt;name&gt; confirmError</code><br>
+      Testing: Confirm current error on the mower. Will only work if current error is considered confirmable by the mower. Available for models 405X, 415X, 435X AWD and 535 AWD. Also available on all Ceora, EPOS and NERA models.</li>
+
     <li><a id='AutomowerConnect-set-StartInWorkArea'>StartInWorkArea</a><br>
       <code>set &lt;name&gt; StartInWorkArea &lt;workAreaId|name&gt; [&lt;number of minutes&gt;]</code><br>
       Testing: Starts immediately in &lt;workAreaId|name&gt; for &lt;number of minutes&gt;<br>
-       Zone name must not include space.</li>
+       Work area name must not include space.</li>
 
     <li><a id='AutomowerConnect-set-chargingStationPositionToAttribute'>chargingStationPositionToAttribute</a><br>
       <code>set &lt;name&gt; chargingStationPositionToAttribute</code><br>
@@ -345,6 +349,7 @@ __END__
 
     <li><a id='AutomowerConnect-attr-mapZones'>mapZones</a><br>
       <code>attr &lt;name&gt; mapZones &lt;valid perl condition to separate Zones&gt;</code><br>
+      These Zones are provided by the Modul and are not related to Husqvarnas work areas.<br>
       Provide the zones with conditions as JSON-String:<br>
       The waypoints are accessable by the variables $longitude und $latitude.<br>
       Zones have have to be separated by conditions in alphabetical order of their names.<br>
@@ -546,7 +551,7 @@ __END__
     <li><a id='AutomowerConnect-set-StartInWorkArea'>StartInWorkArea</a><br>
       <code>set &lt;name&gt; StartInWorkArea &lt;workAreaId|zone name&gt; [&lt;number of minutes&gt;]</code><br>
       Testing: Startet sofort in &lt;workAreaId|name&gt; für &lt;number of minutes&gt;<br>
-      Der Name der Zone darf keine Leerzeichen beinhalten und muss mindestens einen Buchstaben enthalten.</li>
+      Der Name der WorkArea darf keine Leerzeichen beinhalten und muss mindestens einen Buchstaben enthalten.</li>
 
     <li><a id='AutomowerConnect-set-chargingStationPositionToAttribute'>chargingStationPositionToAttribute</a><br>
       <code>set &lt;name&gt; chargingStationPositionToAttribute</code><br>
@@ -567,6 +572,10 @@ __END__
     <li><a id='AutomowerConnect-set-stayOutZone_disable'>stayOutZone_disable</a><br>
       <code>set &lt;name&gt; stayOutZone_disable &lt;Id|zone name&gt;</code><br>
       Testing: Disabled stayOutZone für die Id oder den Namen der Zone, er darf keine Leerzeichen beinhalten und muss mindestens einen Buchstaben enthalten.</li>
+
+    <li><a id='AutomowerConnect-set-confirmError'>confirmError</a><br>
+      <code>set &lt;name&gt; confirmError</code><br>
+      Testing: Bestätigt den letzten Fehler im Mäher, wenn der Mäher es zulässt. Verfügbar für 405X, 415X, 435X AWD and 535 AWD und alle Ceora, EPOS and NERA.</li>
 
      <li><a id='AutomowerConnect-set-getNewAccessToken'>getNewAccessToken</a><br>
       <code>set &lt;name&gt; getNewAccessToken</code><br>
@@ -724,6 +733,7 @@ __END__
 
     <li><a id='AutomowerConnect-attr-mapZones'>mapZones</a><br>
       <code>attr &lt;name&gt; mapZones &lt;JSON string with zone names in alpabetical order and valid perl condition to seperate the zones&gt;</code><br>
+      Die Zonen werden vom Modul bereit gestellt, sie stehen in keinem Zusammenhang mit Husquvarnas Work Areas<br>
       Die Wegpunkte stehen über die Perlvariablen $longitude und $latitude zur Verfügung.<br>
       Die Zonennamen und Bedingungen müssen als JSON-String angegeben werden.<br>
       Die Zonennamen müssen in alphabetischer Reihenfolge durch Bedingungen abgegrenzt werden.<br>
