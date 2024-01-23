@@ -4,6 +4,7 @@
  - bugfix:  72_FRITZBOX: fehlen von Data::Dumper in einer debuf sub 
             behoben.
             FehlerLog bei Erstanmeldung an Fritz!... behoben.
+ - feature: 72_FRITZBOX: set <name> <inActive on|off>
  - feature: 76_SolarForecast: 'noLearning' Option for pvCorrectionFactor_Auto
  - bugfix:  72_FRITZBOX: Fehler bei Anmeldung an Fritz!Repeater
             behoben.
