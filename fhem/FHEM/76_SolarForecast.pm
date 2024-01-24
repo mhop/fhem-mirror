@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.10.0" => "24.01.2024  consumerXX: notbefore, notafter format extended to hh[:mm], new sub __checkcode, __checkhhmm ",
   "1.9.0"  => "23.01.2024  modify disable, add operationMode: active/inactive ",
   "1.8.0"  => "22.01.2024  add 'noLearning' Option to Setter pvCorrectionFactor_Auto ",
   "1.7.1"  => "20.01.2024  optimize battery management ",
@@ -1104,7 +1105,7 @@ sub Set {
   my $prop1 = shift @a;
   my $prop2 = shift @a;
 
-  return if((controlParams($name))[1]);
+  return if((controller($name))[1]);
 
   my ($setlist,@fcdevs,@cfs,@condevs);
   my ($fcd,$ind,$med,$cf,$sp,$coms) = ('','','','','','');
@@ -1207,7 +1208,7 @@ sub Set {
   
   ## inactive (Setter überschreiben)
   ####################################
-  if ((controlParams($name))[2]) {
+  if ((controller($name))[2]) {
       $setlist = "operationMode:active,inactive ";
   }
 
@@ -2379,7 +2380,7 @@ sub Get {
        $getlist .= "valDecTree:aiRawData,aiRuleStrings ";
   }
 
-  return if((controlParams($name))[1] || (controlParams($name))[2]);
+  return if((controller($name))[1] || (controller($name))[2]);
 
   my $params = {
       hash  => $hash,
@@ -4188,31 +4189,13 @@ sub Attr {
           delete $data{$type}{$name}{func}{ghoValForm};
           return;
       }
-
-      if(!$aVal || $aVal !~ m/^\s*\{.*\}\s*$/xs) {
-          return "Usage of $aName is wrong. The function has to be specified as \"{<your own code>}\" ";
-      }
-
-      my $attrVal  = $aVal;
-      my %specials = ( "%DEVICE"  => $name,
-                       "%READING" => $name,
-                       "%VALUE"   => 1,
-                       "%UNIT"    => 'kW',
-                     );
-
-      my $err = perlSyntaxCheck($attrVal, %specials);
+      
+      my $err;
+      my $code      = $aVal;
+      ($err, $code) = __checkcode ($name, $code);
       return $err if($err);
-
-      if ($attrVal =~ m/^\{.*\}$/xs && $attrVal =~ m/=>/ && $attrVal !~ m/\$/ ) {           # Attr wurde als Hash definiert
-          my $av = eval $attrVal;
-
-          return $@ if($@);
-
-          $av      = eval $attrVal;
-          $attrVal = $av if(ref $av eq "HASH");
-      }
-
-      $data{$type}{$name}{func}{ghoValForm} = $attrVal;
+      
+      $data{$type}{$name}{func}{ghoValForm} = $code;
   }
 
   if ($cmd eq 'set') {
@@ -4240,7 +4223,7 @@ sub Attr {
           }
       }
 
-      if ($aName eq 'ctrlUserExitFn' && $init_done) {
+      if ($aName eq 'ctrlUserExitFn' && $init_done) {          
           if(!$aVal || $aVal !~ m/^\s*(\{.*\})\s*$/xs) {
               return "Usage of $aName is wrong. The function has to be specified as \"{<your own code>}\" ";
           }
@@ -4317,7 +4300,17 @@ sub _attrconsumer {                      ## no critic "not used"
       }
 
       if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
-          return qq{The mode "$h->{mode}" isn't allowed!}
+          return qq{The mode "$h->{mode}" isn't allowed!};
+      }
+      
+      if (exists $h->{notbefore}) {          
+          my $valid = __checkhhmm ($h->{notbefore});          
+          return qq{The syntax "$h->{notbefore}" is wrong!} if(!$valid);
+      }
+      
+      if (exists $h->{notafter}) {          
+          my $valid = __checkhhmm ($h->{notafter});          
+          return qq{The syntax "$h->{notafter}" is wrong!} if(!$valid);
       }
 
       if (exists $h->{interruptable}) {                                                            # Check Regex/Hysterese
@@ -4390,6 +4383,53 @@ return;
 }
 
 ################################################################
+#                 prüfen Angabe hh[:mm]
+################################################################
+sub __checkhhmm {
+  my $val = shift;
+  
+  my $valid = 0;
+  
+  if ($val =~ /^([0-9]{1,2})(:[0-5]{1}[0-9]{1})?$/xs) {
+      $valid = 1 if(int $1 < 24);
+  }
+          
+return $valid;
+}
+
+################################################################
+#          prüfen validen Code in $val          
+################################################################
+sub __checkcode {
+  my $name = shift;
+  my $val  = shift;
+  
+  if (!$val || $val !~ m/^\s*\{.*\}\s*$/xs) {
+      return qq{Usage of $name is wrong. The function has to be specified as "{<your own code>}"};
+  }
+
+  my %specials = ( "%DEVICE"  => $name,
+                   "%READING" => $name,
+                   "%VALUE"   => 1,
+                   "%UNIT"    => 'kW',
+                 );
+
+  my $err = perlSyntaxCheck ($val, %specials);
+  return $err if($err);
+
+  if ($val =~ m/^\{.*\}$/xs && $val =~ m/=>/ && $val !~ m/\$/ ) {           # Attr wurde als Hash definiert
+      my $av = eval $val;
+
+      return $@ if($@);
+
+      $av  = eval $val;
+      $val = $av if(ref $av eq "HASH");
+  }
+          
+return ('', $val);
+}
+
+################################################################
 #               Attr ctrlConsRecommendReadings
 ################################################################
 sub _attrcreateConsRecRdgs {             ## no critic "not used"
@@ -4446,7 +4486,7 @@ sub Notify {
   my $myName   = $myHash->{NAME};                                                         # Name des eigenen Devices
   my $devName  = $dev_hash->{NAME};                                                       # Device welches Events erzeugt hat
 
-  return if((controlParams($myName))[1] || !$myHash->{NOTIFYDEV});
+  return if((controller($myName))[1] || !$myHash->{NOTIFYDEV});
 
   my $events = deviceEvents($dev_hash, 1);
   return if(!$events);
@@ -4640,7 +4680,7 @@ sub periodicWriteCachefiles {
   RemoveInternalTimer($hash, "FHEM::SolarForecast::periodicWriteCachefiles");
   InternalTimer      (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteCachefiles", $hash, 0);
 
-  return if((controlParams($name))[1] || (controlParams($name))[2]);
+  return if((controller($name))[1] || (controller($name))[2]);
 
   writeCacheToFile ($hash, "circular", $pvccache.$name);                      # Cache File PV Circular schreiben
   writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);                      # Cache File PV History schreiben
@@ -4777,7 +4817,7 @@ sub runCentralTask {
   my $t        = time;
   my $second   = int (strftime "%S", localtime($t));                                 # aktuelle Sekunde (00-61)
   my $minute   = int (strftime "%M", localtime($t));                                 # aktuelle Minute (00-59) 
-  my $interval = (controlParams ($name))[0];                                         # Interval
+  my $interval = (controller ($name))[0];                                            # Interval
 
   if (!$interval) {
       $hash->{MODE} = 'Manual';
@@ -4785,12 +4825,12 @@ sub runCentralTask {
       return;
   }
   
-  if ((controlParams($name))[1]) {
+  if ((controller($name))[1]) {
       $hash->{MODE} = 'disabled';
       return;
   }
   
-  if ((controlParams($name))[2]) {
+  if ((controller($name))[2]) {
       $hash->{MODE} = 'inactive';
       return;
   }
@@ -4905,7 +4945,7 @@ sub centralTask {
   
   setModel ($hash);                                                                            # Model setzen
 
-  return if((controlParams($name))[1] || (controlParams($name))[2]);                           # disabled / inactive
+  return if((controller($name))[1] || (controller($name))[2]);                                 # disabled / inactive
   
   if (CurrentVal ($hash, 'ctrunning', 0)) {
       Log3 ($name, 3, "$name - INFO - central task was called when it was already running ... end this call");
@@ -5183,7 +5223,7 @@ return $az;
 ################################################################
 #             Steuerparameter berechnen / festlegen
 ################################################################
-sub controlParams {
+sub controller {
   my $name = shift;
   
   my $interval = AttrVal    ($name, 'ctrlInterval', $definterval);            # 0 wenn manuell gesteuert
@@ -7566,6 +7606,7 @@ return;
 ################################################################
 #   Einschaltgrenzen berücksichtigen und Korrektur
 #   zurück liefern
+#   notbefore, notafter muß in der Form "hh[:mm]" vorliegen
 ################################################################
 sub ___switchonTimelimits {
   my $paref     = shift;
@@ -7587,10 +7628,17 @@ sub ___switchonTimelimits {
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - starttime is set to >$starttime< due to >SunPath< is used});
   }
   
-  my $origtime    = $starttime;
-  my $notbefore   = ConsumerVal ($hash, $c, "notbefore", 0);
-  my $notafter    = ConsumerVal ($hash, $c, "notafter",  0);
-
+  my $origtime  = $starttime;
+  my $notbefore = ConsumerVal ($hash, $c, "notbefore", '00:00');
+  my $notafter  = ConsumerVal ($hash, $c, "notafter",  '00:00');
+  
+  my ($nbfhh, $nbfmm) = split ":", $notbefore;
+  my ($nafhh, $nafmm) = split ":", $notafter;
+  $nbfmm            //= '00';
+  $nafmm            //= '00';
+  $notbefore          = (int $nbfhh) . $nbfmm;
+  $notafter           = (int $nafhh) . $nbfmm;
+  
   my $change = q{};
   
   if ($t > timestringToTimestamp ($starttime)) {
@@ -7598,17 +7646,18 @@ sub ___switchonTimelimits {
       $change      = 'current time';
   }
   
-  my ($starthour) = $starttime =~ /\s(\d{2}):/xs;
+  my ($starthour, $startminute) = $starttime =~ /\s(\d{2}):(\d{2}):/xs;
+  my $start = (int $starthour) . $startminute;
 
-  if ($notbefore && int $starthour < int $notbefore) {
-      $starthour = sprintf("%02d", $notbefore);
-      $starttime =~ s/\s(\d{2}):/ $starthour:/x;
+  if ($notbefore && $start < $notbefore) {
+      $nbfhh     = sprintf "%02d", $nbfhh;
+      $starttime =~ s/\s(\d{2}):(\d{2}):/ $nbfhh:$nbfmm:/x;
       $change    = 'notbefore';
   }
 
-  if ($notafter && int $starthour > int $notafter) {
-      $starthour = sprintf("%02d", $notafter);
-      $starttime =~ s/\s(\d{2}):/ $starthour:/x;
+  if ($notafter && $start > $notafter) {
+      $nafhh     = sprintf "%02d", $nafhh;
+      $starttime =~ s/\s(\d{2}):(\d{2}):/ $nafhh:$nafmm:/x;
       $change    = 'notafter';
   }
 
@@ -9170,7 +9219,7 @@ sub _checkSetupNotComplete {
   my $height = AttrNum ($name, 'graphicBeamHeight', 200);
   my $lang   = getLang ($hash);
 
-  if ((controlParams($name))[1] || (controlParams($name))[2]) {
+  if ((controller($name))[1] || (controller($name))[2]) {
       $ret .= "<table class='roomoverview'>";
       $ret .= "<tr style='height:".$height."px'>";
       $ret .= "<td>";
@@ -16612,8 +16661,8 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]<br>
                          [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]              <br>
-                         [on=&lt;command&gt;] [off=&lt;command&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]  <br>
-                         [notbefore=&lt;Hour&gt;] [notafter=&lt;Hour&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]<br>
+                         [on=&lt;command&gt;] [off=&lt;command&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]    <br>
+                         [notbefore=&lt;hour&gt;[:&lt;minute&gt;]] [notafter=&lt;hour&gt;[:&lt;minute&gt;]] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]              <br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Unit&gt;[:&lt;Threshold&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Threshold&gt]] <br>
                          [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] <br>
                          [interruptable=&lt;Option&gt] [noshow=&lt;Option&gt] </b><br>
@@ -16711,9 +16760,9 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>0</b> - only synchronous processing of switching states (default)                                                                           </td></tr>
             <tr><td>                       </td><td><b>1</b> - additional asynchronous processing of switching states through event processing                                                     </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>notbefore</b>      </td><td>Schedule start time consumer not before specified hour (01..23) (optional)                                                                     </td></tr>
+            <tr><td> <b>notbefore</b>      </td><td>Schedule start time consumer not before specified time hh[:mm] (optional)                                                                      </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>notafter</b>       </td><td>Schedule start time consumer not after specified hour (01..23) (optional)                                                                      </td></tr>
+            <tr><td> <b>notafter</b>       </td><td>Schedule start time consumer not after specified time hh[:mm] (optional)                                                                       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>auto</b>           </td><td>Reading in the consumer device which enables or blocks the switching of the consumer (optional)                                                </td></tr>
             <tr><td>                       </td><td>If the key switchdev is given, the reading is set and evaluated in this device.                                                                </td></tr>
@@ -16777,8 +16826,8 @@ to ensure that the system configuration is correct.
          <b>attr &lt;name&gt; consumer02</b> WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12 auto=automatic                     <br>
          <b>attr &lt;name&gt; consumer03</b> Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:-?([1-7][0-9]|[0-9]) swoffcond:EcoFlow:data_data_socSum:100 <br>
          <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
-         <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                          <br>
-         <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                                  <br>
+         <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                       <br>
+         <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:05 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                              <br>
          <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=noShow                                                                                   <br>
        </ul>
        </li>
@@ -18671,7 +18720,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]<br>
                          [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]              <br>
                          [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]  <br>
-                         [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]<br>
+                         [notbefore=&lt;Stunde&gt;[:&lt;Minute&gt;]] [notafter=&lt;Stunde&gt;[:&lt;Minute&gt;]] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]          <br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] <br>
                          [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] <br>
                          [interruptable=&lt;Option&gt] [noshow=&lt;Option&gt] </b><br>
@@ -18768,9 +18817,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>0</b> - ausschließlich synchrone Verarbeitung von Schaltzuständen  (default)                                                                    </td></tr>
             <tr><td>                       </td><td><b>1</b> - zusätzlich asynchrone Verarbeitung von Schaltzuständen durch Eventverarbeitung                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>notbefore</b>      </td><td>Startzeitpunkt Verbraucher nicht vor angegebener Stunde (01..23) einplanen (optional)                                                              </td></tr>
+            <tr><td> <b>notbefore</b>      </td><td>Startzeitpunkt Verbraucher nicht vor angegebener Zeit hh[:mm] einplanen (optional)                                                                 </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>notafter</b>       </td><td>Startzeitpunkt Verbraucher nicht nach angegebener Stunde (01..23) einplanen (optional)                                                             </td></tr>
+            <tr><td> <b>notafter</b>       </td><td>Startzeitpunkt Verbraucher nicht nach angegebener Zeit hh[:mm] einplanen (optional)                                                                </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>auto</b>           </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                                              </td></tr>
             <tr><td>                       </td><td>Ist der Schlüssel switchdev angegeben, wird das Reading in diesem Device gesetzt und ausgewertet.                                                  </td></tr>
@@ -18834,8 +18883,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <b>attr &lt;name&gt; consumer02</b> WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12 auto=automatic                     <br>
          <b>attr &lt;name&gt; consumer03</b> Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:-?([1-7][0-9]|[0-9]) swoffcond:EcoFlow:data_data_socSum:100 <br>
          <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
-         <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                          <br>
-         <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                                  <br>
+         <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                       <br>
+         <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:20 notafter=20 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                              <br>
          <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=noShow                                                                                   <br>
        </ul>
        </li>
