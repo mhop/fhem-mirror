@@ -65,6 +65,7 @@
 # 5.17      Add: Roller devices: 'set ... position' equivalent to 'pct'
 # 5.18      Bug Fix: function of all Gen1 relay devices 
 # 5.19      change back: roller devices: use 'set ... pct' as command 
+# 5.20      Bug Fix: suppress status calls for disabled devices
 
 
 package main;
@@ -83,7 +84,7 @@ sub Log($$);
 sub Shelly_Set ($@);
 
 #-- globals on start
-my $version = "5.19 11.01.2024";
+my $version = "5.20 24.01.2024";
 
 my $defaultINTERVAL = 60;
 my $secndIntervalMulti = 4;  # Multiplier for 'long update'
@@ -610,6 +611,17 @@ my %si_units = (
      "ISO"        => [ "kJ", 3.6,   0 ]
      );
      
+my %peripherals = (
+ # Peripheral type   =>  Component Type
+  "analog_in"   => "input",
+  "digital_in"  => "input",
+  "dht22"       => "humidity",
+  "ds18b20"     => "temperature",
+  "voltmeter"   => "voltmeter"
+);  
+
+
+     
 ########################################################################################
 #
 # Shelly_Initialize
@@ -868,7 +880,7 @@ if(0){
   ######################################################################################
 
     readingsSingleUpdate($hash,"state","initialized",1);
-    InternalTimer(gettimeofday()+6, "Refresh", $hash);
+    InternalTimer(time()+6, "Refresh", $hash);
     delete($attr{$hash->{NAME}}{mode}) if( $shelly_models{$model}[8]<2 );  # no multi-mode device 
     delete($hash->{helper}{Sets}); # build up the sets-dropdown with next refresh
     return;
@@ -1331,10 +1343,11 @@ sub Shelly_Attr(@) {
       Log3 $name,1,"[Shelly_Attr] $name\: $error model=shelly2/2.5/plus2/pro2 and mode=roller";  ##R
       return $error;
     }
-    # perform an update of the position related readings
-    RemoveInternalTimer($hash,"Shelly_status");
-    InternalTimer(gettimeofday()+1, "Shelly_status", $hash);  ##ü      
-    
+    if($init_done){
+      # perform an update of the position related readings
+      RemoveInternalTimer($hash,"Shelly_status");
+      InternalTimer(time()+1, "Shelly_status", $hash);  ##ü      
+    }
   #---------------------------------------        
   }elsif( $attrName =~ /Energymeter/ ){
     if($cmd eq "set" ){
@@ -1498,12 +1511,12 @@ sub Shelly_Attr(@) {
          $hash->{CMD}="Check";  
        }
      }
-     # calling Shelly_webhook() via timer, otherwise settings are not available
-     Log3 $name,3,"[Shelly_Attr:webhook] we will call Shelly_webhook for device $name, command is ".$hash->{CMD}; 
-     RemoveInternalTimer($hash,"Shelly_webhook"); 
-     InternalTimer(gettimeofday()+3, "Shelly_webhook", $hash, 0);
-       
- 
+     if( $hash->{INTERVAL} != 0 ){    
+       # calling Shelly_webhook() via timer, otherwise settings are not available
+       Log3 $name,3,"[Shelly_Attr:webhook] we will call Shelly_webhook for device $name, command is ".$hash->{CMD}; 
+       RemoveInternalTimer($hash,"Shelly_webhook"); 
+       InternalTimer(time()+3, "Shelly_webhook", $hash, 0);
+     }
   #---------------------------------------  
   }elsif( $attrName eq "interval" ){
     if( $cmd eq "set" ){
@@ -1511,7 +1524,7 @@ sub Shelly_Attr(@) {
       if( $model eq "shellypro3em" && $attrVal > 0 ){ 
         # restart the 2nd timer (only when stopped)
         # adjust the timer to one second after the full minute
-        InternalTimer(int((gettimeofday()+60)/60)*60+1, "Shelly_shelly", $hash, 1)
+        InternalTimer(int((time()+60)/60)*60+1, "Shelly_shelly", $hash, 1)
                  if( AttrVal($name,"interval",-1) == 0 ); 
         
         # adjust the 1st timer to 60 
@@ -1524,9 +1537,9 @@ sub Shelly_Attr(@) {
     }elsif( $cmd eq "del" ){
       $hash->{INTERVAL}=60;
     }
-    if($init_done) {
+    if($init_done){
       RemoveInternalTimer($hash,"Shelly_status");
-      InternalTimer(gettimeofday()+$hash->{INTERVAL}, "Shelly_status", $hash, 0)
+      InternalTimer(time()+$hash->{INTERVAL}, "Shelly_status", $hash, 0)
         if( $hash->{INTERVAL} != 0 );
     } 
   #---------------------------------------  
@@ -1781,7 +1794,7 @@ sub Shelly_Set ($@) {
           readingsBulkUpdateMonitored($hash, "input$subs\_actionS",$fhem_events{$cmd}, 1 );
           # after a second, the pushbuttons state is back to OFF resp. 'unknown', call status of inputs
           RemoveInternalTimer($hash,"Shelly_inputstatus"); 
-          InternalTimer(gettimeofday()+1.4, "Shelly_inputstatus", $hash,1); 
+          InternalTimer(time()+1.4, "Shelly_inputstatus", $hash,1); 
     }elsif( $signal eq "touch" ){    # devices with an touch-display
           #$subs = ($shelly_models{$model}[5] == 1) ? "" : "_".$value;
           readingsBulkUpdateMonitored($hash, "touch", $isWhat, 1 );
@@ -1840,7 +1853,7 @@ sub Shelly_Set ($@) {
       #-- Call status after switch.n
     if( $signal !~ /^(Active_Power|Voltage|Current|apower|voltage|current)/ ){      
       RemoveInternalTimer($hash,"Shelly_status"); Log3 $name,6,"shelly_set 1715 removed Timer Shelly_status, now calling in 1.5 sec";
-      InternalTimer(gettimeofday()+1.5, "Shelly_status", $hash);
+      InternalTimer(time()+1.5, "Shelly_status", $hash);
     }
     return undef;
   }
@@ -2109,7 +2122,7 @@ sub Shelly_Set ($@) {
          $hash->{DURATION} = 0;
          $hash->{CMD}=$cmd;
          RemoveInternalTimer($hash,"Shelly_Set");
-         InternalTimer(gettimeofday()+1.0, "Shelly_Set", $hash, 1);         
+         InternalTimer(time()+1.0, "Shelly_Set", $hash, 1);         
          $cmd = "?go=stop";
         
     #-- is moving !!!
@@ -2265,12 +2278,12 @@ sub Shelly_Set ($@) {
       if( $hash->{INTERVAL} ){
         Log3 $name,2,"[Shelly_Set] Starting cyclic timers for $name ($model)";
         RemoveInternalTimer($hash,"Shelly_status");
-        InternalTimer(gettimeofday()+$hash->{INTERVAL}, "Shelly_status", $hash, 0);
+        InternalTimer(time()+$hash->{INTERVAL}, "Shelly_status", $hash, 0);
         RemoveInternalTimer($hash,"Shelly_shelly");
-        InternalTimer(gettimeofday()+$defaultINTERVAL*$secndIntervalMulti, "Shelly_shelly", $hash,0);
+        InternalTimer(time()+$defaultINTERVAL*$secndIntervalMulti, "Shelly_shelly", $hash,0);
         if( $model eq "shellypro3em" ){
           RemoveInternalTimer($hash,"Shelly_EMData");
-          InternalTimer(int((gettimeofday()+60)/60)*60+1, "Shelly_EMData", $hash,0);
+          InternalTimer(int((time()+60)/60)*60+1, "Shelly_EMData", $hash,0);
           Log3 $name,2,"[Shelly_Set] Starting cyclic EM-Data timers for $name";
         }
       }else{
@@ -2282,11 +2295,11 @@ sub Shelly_Set ($@) {
       if( $hash->{INTERVAL} ){
         Log3 $name,2,"[Shelly_Set] Starting cyclic timers for $name";
         RemoveInternalTimer($hash,"Shelly_status");
-        InternalTimer(gettimeofday()+$hash->{INTERVAL}, "Shelly_status", $hash, 0);
+        InternalTimer(time()+$hash->{INTERVAL}, "Shelly_status", $hash, 0);
         RemoveInternalTimer($hash,"Shelly_shelly");
-        InternalTimer(gettimeofday()+$defaultINTERVAL*$secndIntervalMulti, "Shelly_shelly", $hash,0);
+        InternalTimer(time()+$defaultINTERVAL*$secndIntervalMulti, "Shelly_shelly", $hash,0);
         RemoveInternalTimer($hash,"Shelly_EMData");
-        InternalTimer(int((gettimeofday()+60)/60)*60+1, "Shelly_EMData", $hash,0);
+        InternalTimer(int((time()+60)/60)*60+1, "Shelly_EMData", $hash,0);
       }else{
         Log3 $name,2,"[Shelly_Set] No timer started for $name";
       }
@@ -2646,6 +2659,7 @@ sub Shelly_inputstatus {
 sub Shelly_status {
   my ($hash, $comp, $err, $data) = @_;
   my $name = $hash->{NAME};
+return if( $hash->{INTERVAL} == 0 ); 
   my $state = $hash->{READINGS}{state}{VAL};
   
   my $model = AttrVal($name,"model","generic");
@@ -2660,7 +2674,7 @@ sub Shelly_status {
       RemoveInternalTimer($hash,"Shelly_status"); 
       my $interval=minNum($hash->{INTERVAL},$defaultINTERVAL*$secndIntervalMulti);
       Log3 $name,3,"[Shelly_status] $name: Error in callback, update in $interval seconds";
-      InternalTimer(gettimeofday()+$interval, "Shelly_status", $hash, 1);
+      InternalTimer(time()+$interval, "Shelly_status", $hash, 1);
   }
   
   # in any cases check for error in non blocking call
@@ -2782,7 +2796,7 @@ sub Shelly_status {
   
   Log3 $name,4,"[Shelly_status] $name: next update in $next seconds".(defined($comp)?" for Comp=$comp":""); #4
   RemoveInternalTimer($hash,"Shelly_status"); 
-  InternalTimer(gettimeofday()+$next, "Shelly_status", $hash, 1)
+  InternalTimer(time()+$next, "Shelly_status", $hash, 1)
               if( $hash->{INTERVAL} != 0 );
   return undef;
 }
@@ -2802,7 +2816,7 @@ sub Shelly_shelly {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $state = $hash->{READINGS}{state}{VAL};
-  
+return if( $hash->{INTERVAL} == 0 ); 
   my $model = AttrVal($name,"model","generic");
   my $creds = Shelly_pwd($hash);
   my $url     = "http://$creds".$hash->{TCPIP};
@@ -2866,10 +2880,10 @@ sub Shelly_shelly {
         # updates at every multiple of 60 seconds
         $offset = $hash->{INTERVAL}<=60 ? 60 : int($hash->{INTERVAL}/60)*60 ;
         # adjust to get readings 2sec after full minute
-        $offset = $offset + 2 - gettimeofday() % 60;
+        $offset = $offset + 2 - time() % 60;
     }
     Log3 $name,4,"[Shelly_shelly] $name: long update in $offset seconds, Timer is Shelly_shelly";  #4
-    InternalTimer(gettimeofday()+$offset, "Shelly_shelly", $hash, 1);  
+    InternalTimer(time()+$offset, "Shelly_shelly", $hash, 1);  
     return undef;
 }
 
@@ -3837,7 +3851,7 @@ sub Shelly_EMData {
     #-- cyclic update nevertheless
     RemoveInternalTimer($hash,"Shelly_EMData"); 
     # adjust timer to one second after full minute
-    my $Tupdate = int((gettimeofday()+60)/60)*60+1;
+    my $Tupdate = int((time()+60)/60)*60+1;
     Log3 $name,4,"[Shelly_EMData] $name: next EMData update at $Tupdate = ".strftime("%H:%M:%S",localtime($Tupdate) )." Timer is Shelly_EMdata";
     InternalTimer($Tupdate, "Shelly_EMData", $hash, 1)
       if( $hash->{INTERVAL} != 0 );
@@ -4241,9 +4255,9 @@ sub shelly_energy_fmt {
   
   #-- Call status after switch.
   RemoveInternalTimer($hash,"Shelly_status");
-  InternalTimer(gettimeofday()+0.5, "Shelly_status", $hash,0);
+  InternalTimer(time()+0.5, "Shelly_status", $hash,0);
   my $duration=ReadingsNum($name,"transition",10000)/1000;
-  InternalTimer(gettimeofday()+$duration, "Shelly_status2", $hash,0);
+  InternalTimer(time()+$duration, "Shelly_status2", $hash,0);
 
   return undef;
 }
@@ -4322,9 +4336,9 @@ sub shelly_energy_fmt {
     #-- perform first update after starting of drive
     $hash->{DURATION} = 5 if( !$hash->{DURATION} );    # duration not provided by Gen2
     RemoveInternalTimer($hash,"Shelly_status");
-    InternalTimer(gettimeofday()+0.5, "Shelly_status", $hash); # update after starting 
+    InternalTimer(time()+0.5, "Shelly_status", $hash); # update after starting 
     # next update after expected stopping of drive + offset (at least 1 sec)
-    InternalTimer(gettimeofday()+$hash->{DURATION}+1.5, "Shelly_status2", $hash,1); 
+    InternalTimer(time()+$hash->{DURATION}+1.5, "Shelly_status2", $hash,1); 
   }
   return undef;
 }
@@ -4363,14 +4377,14 @@ sub Shelly_status2($){
   if( $hash && !$err && !$data ){
      my $callback;
      my $url     = "http://$creds".$hash->{TCPIP};
-if($shelly_models{$model}[4]<2){
-     $url .= "/relay/$channel$cmd";
-     $callback="/relay/$channel$cmd";
-}else{   # eg Wall-Display
-     $cmd =~ /\?id=(\d)/;
-     $callback = $url."/rpc/Switch.GetStatus?id=".$1;
-     $url .= $cmd;
-}
+     if($shelly_models{$model}[4]<2){
+         $url .= "/relay/$channel$cmd";
+         $callback="/relay/$channel$cmd";
+     }else{   # eg Wall-Display
+         $cmd =~ /\?id=(\d)/;
+         $callback = $url."/rpc/Switch.GetStatus?id=".$1;
+         $url .= $cmd;
+     }
      Log3 $name,4,"[Shelly_onoff] issue a non-blocking call to $url; callback to Shelly_onoff with command $callback";  
      HttpUtils_NonblockingGet({
         url      => $url,
@@ -4455,7 +4469,7 @@ if($shelly_models{$model}[4]<2){
       $onofftimer = ($onofftimer % $hash->{INTERVAL}) + 0.5; #modulus
   }
   RemoveInternalTimer($hash,"Shelly_status");
-  InternalTimer(gettimeofday()+$onofftimer, "Shelly_status", $hash,0);
+  InternalTimer(time()+$onofftimer, "Shelly_status", $hash,0);
 
   return undef;
 }
@@ -4475,6 +4489,7 @@ if($shelly_models{$model}[4]<2){
  sub Shelly_webhook {
   my ($hash, $cmd, $err, $data) = @_;
   my $name  = $hash->{NAME};
+return if( $hash->{INTERVAL} == 0 ); 
   my $state = $hash->{READINGS}{state}{VAL};
   my $net   = $hash->{READINGS}{network}{VAL};
   
@@ -5055,6 +5070,7 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
   return undef;
 }
 
+
 #
 
 
@@ -5125,6 +5141,8 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
             <br>This is the only way to set the password for the Shelly web interface.
             </li>
             For Shelly devices first gen, the attribute 'shellyuser' must be defined
+            To remove a password, use: 
+            <code>set &lt;name&gt; password </code>
         <li>
             <a id="Shelly-set-reboot"></a>
             <code>set &lt;name&gt; reboot</code>
@@ -5664,6 +5682,9 @@ Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChang
             <code>set &lt;name&gt; password &lt;password&gt;</code>
             <br>Setzen des Passwortes für das Shelly Web Interface
             </li>
+            Bei Shelly-Geräten der 1. Generation muss zuvor das Attribut 'shellyuser' gesetzt sein. 
+            Ein in Fhem gespeichertes Passwort wird durch Aufruf ohne Parameter entfernt: 
+            <code>set &lt;name&gt; password </code>
             Hinweis: Beim Umbenennen des Devices mit 'rename' geht das Passwort verloren
         <li>
             <a id="Shelly-set-reboot"></a>
