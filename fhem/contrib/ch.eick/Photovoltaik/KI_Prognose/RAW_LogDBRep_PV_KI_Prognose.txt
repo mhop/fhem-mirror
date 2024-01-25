@@ -1,0 +1,16 @@
+defmod LogDBRep_PV_KI_Prognose DbRep LogDB
+attr LogDBRep_PV_KI_Prognose DbLogExclude .*
+attr LogDBRep_PV_KI_Prognose comment Version 2023.02.23 12:00\
+\
+Hier wird die Vorbereitung für die KI PV-Leistungsprognose durchgeführt\
+\
+sqlCmd call dwd_load(curdate(),'none');;\
+[none|show] zum Anzeigen des Ergebnisses\
+\
+executeAfterProc:\
+<absoluter Skript Name> <DbLog IP-Adresse> <FHEM IP-Adresse> <DbRep Name> <Wechselricher Name> <Prefix Reading Name>
+attr LogDBRep_PV_KI_Prognose executeAfterProc "/opt/fhem/python/bin/PV_KI_Prognose.py 192.168.178.40 192.168.178.40 LogDBRep_PV_KI_Prognose WR_ctl Yield_fc"
+attr LogDBRep_PV_KI_Prognose room System
+attr LogDBRep_PV_KI_Prognose verbose 3
+
+setstate LogDBRep_PV_KI_Prognose 2024-01-25 14:07:24 sqlCmd call dwd_load(curdate(),'none');;

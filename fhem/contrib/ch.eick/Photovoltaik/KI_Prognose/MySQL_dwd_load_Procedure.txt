@@ -1,0 +1,1123 @@
+CREATE DEFINER=`fhemuser`@`%` PROCEDURE `dwd_load`(IN var_date DATE, IN display char(10))
+BEGIN
+
+SET @date:= var_date;
+-- die alte Tabelle löschen
+DROP TABLE IF EXISTS dwdfull;
+
+-- eine neue Tabelle anlegen
+CREATE TABLE IF NOT EXISTS `dwdfull` (
+  `TIMESTAMP` datetime NOT NULL,
+  `year`   int NOT NULL,
+  `month`  int NOT NULL,
+  `day`    int NOT NULL,
+  `hour`   int NOT NULL,
+  `TTT`    float  NOT NULL DEFAULT 0,
+  `DD`     float  NOT NULL DEFAULT 0,
+  `VV`     float  NOT NULL DEFAULT 0,
+  `N`      float  NOT NULL DEFAULT 0,
+  `Neff`   float  NOT NULL DEFAULT 0,
+  `R101`   float  NOT NULL DEFAULT 0,
+  `RRS1c`  float  NOT NULL DEFAULT 0,
+  `SunD1`  float  NOT NULL DEFAULT 0,
+  `Rad1h`  float  NOT NULL DEFAULT 0,
+  `SunAz`  float  NOT NULL DEFAULT 0,
+  `SunAlt` float  NOT NULL DEFAULT 0,
+  `yield`  float  DEFAULT 0,
+  `yield_max`  float  DEFAULT 0,
+  `forecast`  float  NOT NULL DEFAULT 0,
+  PRIMARY KEY (`TIMESTAMP`),
+  INDEX (`TIMESTAMP`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='DWD Forecast';
+
+-- als erstes die Grundlegenden Daten mit Zeitstempeln erzeugen
+-- Rad1h wird als erstes eingetragen
+INSERT INTO dwdfull (TIMESTAMP, year, month ,day ,hour ,Rad1h)
+   SELECT concat(t1.DATE, " ", LPAD(t1.HOUR, 2, 0), ":00:00") AS TIMESTAMP,
+          year(t1.DATE) AS year,
+          month(t1.DATE) AS month,
+          day(t1.DATE) AS day,
+          t1.HOUR AS hour,
+          t1.Rad1h
+   FROM
+     ( -- fc0 Rad1h ältere Werte eintragen
+      SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+             x1.DATE,
+             x1.HOUR,
+             h.VALUE AS Rad1h
+      FROM history h
+      INNER JOIN
+        (SELECT date(TIMESTAMP) AS DATE,
+                LPAD(REGEXP_SUBSTR(READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0) AS HOUR,
+                max(TIMESTAMP) AS TIMESTAMP,
+                READING
+         FROM history
+         WHERE DEVICE = 'DWD_Forecast'
+           AND READING REGEXP 'fc0_([6-9]|1[0-9]|2[0-1])_Rad1h'
+           AND (      TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+                OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+                  AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+                OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+                  AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY)
+	 	       )
+         GROUP BY READING,DATE,HOUR
+	    ) x1 USING(TIMESTAMP,READING)
+      ) t1
+ON DUPLICATE KEY UPDATE
+   Rad1h = t1.Rad1h
+;
+
+INSERT INTO dwdfull (TIMESTAMP, year, month ,day ,hour ,Rad1h)
+   SELECT concat(t1.DATE, " ", LPAD(t1.HOUR, 2, 0), ":00:00") AS TIMESTAMP,
+          year(t1.DATE) AS year,
+          month(t1.DATE) AS month,
+          day(t1.DATE) AS day,
+          t1.HOUR AS hour,
+          t1.Rad1h
+   FROM
+     ( -- fc1 Rad1h Werte von morgen eintragen
+      SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+             x1.DATE,
+             x1.HOUR,
+             h.VALUE AS Rad1h
+      FROM history h
+      INNER JOIN
+        (SELECT date(DATE_ADD(TIMESTAMP,INTERVAL +1 DAY)) AS DATE,
+                LPAD(REGEXP_SUBSTR(READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0) AS HOUR,
+                max(TIMESTAMP) AS TIMESTAMP,
+                READING
+         FROM history
+         WHERE DEVICE = 'DWD_Forecast'
+           AND READING REGEXP 'fc1_([6-9]|1[0-9]|2[0-1])_Rad1h'
+           AND TIMESTAMP >= @date
+         GROUP BY READING,DATE,HOUR
+	    ) x1 USING(TIMESTAMP,READING)
+      ) t1
+ON DUPLICATE KEY UPDATE
+   Rad1h = t1.Rad1h
+;
+
+-- Mit update alle weiteren Spalten füllen
+UPDATE dwdfull tt
+JOIN
+  ( -- SunAz
+   SELECT concat(x1.DATE, " ", LPAD(x1.HOUR, 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS SunAz
+   FROM history h
+   INNER JOIN
+     (SELECT date(TIMESTAMP) AS DATE,
+             hour(TIMESTAMP) AS HOUR,
+             min(TIMESTAMP)  AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'Astro'
+        AND READING = 'SunAz'
+        AND (      TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY)
+			)
+        AND hour(TIMESTAMP) >= 6
+        AND hour(TIMESTAMP) <= 21
+      GROUP BY READING,DATE,HOUR
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t2  USING(TIMESTAMP)
+SET tt.SunAz = t2.SunAz
+;
+
+UPDATE dwdfull tt
+JOIN
+  ( -- fc0 SunAz
+  SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS SunAz
+   FROM history h
+   INNER JOIN
+     (SELECT date(TIMESTAMP) AS DATE,
+             max(TIMESTAMP)  AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'Astro'
+        AND READING REGEXP 'fc0_([6-9]|1[0-9]|2[0-1])_SunAz'
+        AND TIMESTAMP >= @date
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t3  USING(TIMESTAMP)
+SET tt.SunAz = t3.SunAz
+;
+
+UPDATE dwdfull tt
+JOIN
+  ( -- fc1 SunAz
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS SunAz
+   FROM history h
+   INNER JOIN
+     (SELECT date(DATE_ADD(TIMESTAMP,INTERVAL +1 DAY)) AS DATE,
+             max(TIMESTAMP) AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'Astro'
+        AND READING REGEXP 'fc1_([6-9]|1[0-9]|2[0-1])_SunAz'
+        AND TIMESTAMP >= @date
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t3  USING(TIMESTAMP)
+SET tt.SunAz = t3.SunAz
+;
+UPDATE dwdfull tt
+JOIN
+  ( -- SunAlt
+   SELECT concat(x1.DATE, " ", LPAD(x1.HOUR, 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS SunAlt
+   FROM history h
+   INNER JOIN
+     (SELECT date(TIMESTAMP) AS DATE,
+             hour(TIMESTAMP) AS HOUR,
+             min(TIMESTAMP)  AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'Astro'
+        AND READING = 'SunAlt'
+        AND (      TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY)
+			)
+        AND hour(TIMESTAMP) >= 6
+        AND hour(TIMESTAMP) <= 21
+      GROUP BY READING,DATE,HOUR
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t3  USING(TIMESTAMP)
+SET tt.SunAlt = t3.SunAlt
+;
+
+UPDATE dwdfull tt
+JOIN
+  ( -- fc0 SunAlt
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS SunAlt
+   FROM history h
+   INNER JOIN
+     (SELECT date(TIMESTAMP) AS DATE,
+             max(TIMESTAMP)  AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'Astro'
+        AND READING REGEXP 'fc0_([6-9]|1[0-9]|2[0-1])_SunAlt'
+        AND TIMESTAMP >= @date
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t3  USING(TIMESTAMP)
+SET tt.SunAlt = t3.SunAlt
+;
+
+UPDATE dwdfull tt
+JOIN
+  ( -- fc1 SunAlt
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS SunAlt
+   FROM history h
+   INNER JOIN
+     (SELECT date(DATE_ADD(TIMESTAMP,INTERVAL +1 DAY)) AS DATE,
+             max(TIMESTAMP) AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'Astro'
+        AND READING REGEXP 'fc1_([6-9]|1[0-9]|2[0-1])_SunAlt'
+        AND TIMESTAMP >= @date
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t3  USING(TIMESTAMP)
+SET tt.SunAlt = t3.SunAlt
+;
+
+UPDATE dwdfull tt
+JOIN
+  ( -- fc0 SunD1
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS SunD1
+   FROM history h
+   INNER JOIN
+     (SELECT date(TIMESTAMP) AS DATE,
+             max(TIMESTAMP)  AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc0_([6-9]|1[0-9]|2[0-1])_SunD1'
+        AND (      TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY)
+			)
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t4 USING(TIMESTAMP)
+SET tt.SunD1 = t4.SunD1
+;
+
+UPDATE dwdfull tt
+JOIN
+  ( -- fc1 SunD1
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS SunD1
+   FROM history h
+   INNER JOIN
+     (SELECT date(DATE_ADD(TIMESTAMP,INTERVAL +1 DAY)) AS DATE,
+             max(TIMESTAMP) AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc1_([6-9]|1[0-9]|2[0-1])_SunD1'
+        AND TIMESTAMP >= @date
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t4 USING(TIMESTAMP)
+SET tt.SunD1 = t4.SunD1
+;
+
+UPDATE dwdfull tt
+JOIN
+  ( -- fc0 Neff
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS Neff
+   FROM history h
+   INNER JOIN
+     (SELECT date(TIMESTAMP) AS DATE,
+             max(TIMESTAMP)  AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc0_([6-9]|1[0-9]|2[0-1])_Neff'
+        AND (      TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY)
+			)
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t5 USING(TIMESTAMP)
+SET tt.Neff = t5.Neff
+;
+   
+UPDATE dwdfull tt
+JOIN
+  ( -- fc1 Neff
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS Neff
+   FROM history h
+   INNER JOIN
+     (SELECT date(DATE_ADD(TIMESTAMP,INTERVAL +1 DAY)) AS DATE,
+             max(TIMESTAMP) AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc1_([6-9]|1[0-9]|2[0-1])_Neff'
+        AND TIMESTAMP >= @date
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t5 USING(TIMESTAMP)
+SET tt.Neff = t5.Neff
+;
+   
+UPDATE dwdfull tt
+JOIN
+  ( -- fc0 VV
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS VV
+   FROM history h
+   INNER JOIN
+     (SELECT date(TIMESTAMP) AS DATE,
+             max(TIMESTAMP)  AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc0_([6-9]|1[0-9]|2[0-1])_VV'
+        AND (      TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY)
+			)
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t6 USING(TIMESTAMP)
+SET tt.VV = t6.VV
+;
+
+UPDATE dwdfull tt
+JOIN
+  ( -- fc1 VV
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS VV
+   FROM history h
+   INNER JOIN
+     (SELECT date(DATE_ADD(TIMESTAMP,INTERVAL +1 DAY)) AS DATE,
+             max(TIMESTAMP) AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc1_([6-9]|1[0-9]|2[0-1])_VV'
+        AND TIMESTAMP >= @date
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t5 USING(TIMESTAMP)
+SET tt.VV = t5.VV
+;
+ 
+UPDATE dwdfull tt
+JOIN
+  ( -- fc0 DD
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS DD
+   FROM history h
+   INNER JOIN
+     (SELECT date(TIMESTAMP) AS DATE,
+             max(TIMESTAMP)  AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc0_([6-9]|1[0-9]|2[0-1])_DD'
+        AND (      TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY)
+			)
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t7 USING(TIMESTAMP)
+SET tt.DD = t7.DD
+;
+
+UPDATE dwdfull tt
+JOIN
+  ( -- fc1 DD
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS DD
+   FROM history h
+   INNER JOIN
+     (SELECT date(DATE_ADD(TIMESTAMP,INTERVAL +1 DAY)) AS DATE,
+             max(TIMESTAMP) AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc1_([6-9]|1[0-9]|2[0-1])_DD'
+        AND TIMESTAMP >= @date
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t5 USING(TIMESTAMP)
+SET tt.DD = t5.DD
+;
+ 
+UPDATE dwdfull tt
+JOIN
+  ( -- fc0 TTT
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS TTT
+   FROM history h
+   INNER JOIN
+     (SELECT date(TIMESTAMP) AS DATE,
+             max(TIMESTAMP)  AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc0_([6-9]|1[0-9]|2[0-1])_TTT'
+        AND (      TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY)
+			)
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t8 USING(TIMESTAMP)
+SET tt.TTT = t8.TTT
+;
+
+UPDATE dwdfull tt
+JOIN
+  ( -- fc1 TTT
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS TTT
+   FROM history h
+   INNER JOIN
+     (SELECT date(DATE_ADD(TIMESTAMP,INTERVAL +1 DAY)) AS DATE,
+             max(TIMESTAMP) AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc1_([6-9]|1[0-9]|2[0-1])_TTT'
+        AND TIMESTAMP >= @date
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t5 USING(TIMESTAMP)
+SET tt.TTT = t5.TTT
+;
+ 
+UPDATE dwdfull tt
+JOIN
+  ( -- fc0 R101
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS R101
+   FROM history h
+   INNER JOIN
+     (SELECT date(TIMESTAMP) AS DATE,
+             max(TIMESTAMP)  AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc0_([6-9]|1[0-9]|2[0-1])_R101'
+        AND (      TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY)
+			)
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t9 USING(TIMESTAMP)
+SET tt.R101 = t9.R101
+;
+
+UPDATE dwdfull tt
+JOIN
+  ( -- fc1 R101
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS R101
+   FROM history h
+   INNER JOIN
+     (SELECT date(DATE_ADD(TIMESTAMP,INTERVAL +1 DAY)) AS DATE,
+             max(TIMESTAMP) AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc1_([6-9]|1[0-9]|2[0-1])_R101'
+        AND TIMESTAMP >= @date
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t5 USING(TIMESTAMP)
+SET tt.R101 = t5.R101
+;
+ 
+UPDATE dwdfull tt
+JOIN
+  ( -- fc0 N
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS N
+   FROM history h
+   INNER JOIN
+     (SELECT date(TIMESTAMP) AS DATE,
+             max(TIMESTAMP)  AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc0_([6-9]|1[0-9]|2[0-1])_N'
+        AND (      TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY)
+			)
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t10 USING(TIMESTAMP)
+SET tt.N = t10.N
+;
+
+UPDATE dwdfull tt
+JOIN
+  ( -- fc1 N
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS N
+   FROM history h
+   INNER JOIN
+     (SELECT date(DATE_ADD(TIMESTAMP,INTERVAL +1 DAY)) AS DATE,
+             max(TIMESTAMP) AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc1_([6-9]|1[0-9]|2[0-1])_N'
+        AND TIMESTAMP >= @date
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t5 USING(TIMESTAMP)
+SET tt.N = t5.N
+;
+ 
+UPDATE dwdfull tt
+JOIN
+  ( -- fc0 RRS1c
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS RRS1c
+   FROM history h
+   INNER JOIN
+     (SELECT date(TIMESTAMP) AS DATE,
+             max(TIMESTAMP)  AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc0_([6-9]|1[0-9]|2[0-1])_RRS1c'
+        AND (      TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+             OR    TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+               AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY)
+			)
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t11 USING(TIMESTAMP)
+SET tt.RRS1c = t11.RRS1c
+;
+
+UPDATE dwdfull tt
+JOIN
+  ( -- fc1 RRS1c
+   SELECT concat(x1.DATE, " ", LPAD(REGEXP_SUBSTR(h.READING, '[6-9]|1[0-9]|2[0-1]'), 2, 0), ":00:00") AS TIMESTAMP,
+          h.VALUE AS RRS1c
+   FROM history h
+   INNER JOIN
+     (SELECT date(DATE_ADD(TIMESTAMP,INTERVAL +1 DAY)) AS DATE,
+             max(TIMESTAMP) AS TIMESTAMP,
+             READING
+      FROM history
+      WHERE DEVICE = 'DWD_Forecast'
+        AND READING REGEXP 'fc1_([6-9]|1[0-9]|2[0-1])_RRS1c'
+        AND TIMESTAMP >= @date
+      GROUP BY READING,DATE
+	 ) x1 USING(TIMESTAMP,READING)
+   ) t5 USING(TIMESTAMP)
+SET tt.RRS1c = t5.RRS1c
+;
+ 
+UPDATE dwdfull tt
+JOIN
+  ( -- yield from Plenticore with Accu
+   -- start left join
+   SELECT TIMESTAMP, 
+          WR.yield       AS WR,
+          Speicher.yield AS Speicher,
+          cast( -- validate yield
+               if((Speicher.yield IS NULL),
+                   WR.yield,
+                   if((WR.yield IS NULL),Speicher.yield,WR.yield + Speicher.yield)
+                 )
+			AS DECIMAL(6)) AS yield
+   FROM
+     ( -- WR
+        SELECT TIMESTAMP,
+               if(t1.DELTA > 6,0,t1.DIFF) AS yield
+        FROM
+          (SELECT TIMESTAMP,READING,VALUE,
+                  if(@diff = 0,0, cast((VALUE-@diff) AS DECIMAL(10))) AS DIFF,
+                  @diff:=VALUE                                        AS curr_V,
+                  TIMESTAMPDIFF(HOUR,@delta,TIMESTAMP)                AS DELTA,
+                  @delta:=TIMESTAMP                                   AS curr_T
+           FROM
+             (SELECT concat(x1.DATE, " ", LPAD(x1.HOUR, 2, 0), ":00:00") AS TIMESTAMP,
+                     x1.DATE,
+                     x1.HOUR,
+      	              h.READING,
+                     h.VALUE,
+      			      @diff:=0,@delta:=NULL
+              FROM history h
+               INNER JOIN
+                (SELECT date(TIMESTAMP) AS DATE,
+                        hour(TIMESTAMP) AS HOUR,
+                        max(TIMESTAMP)  AS TIMESTAMP,
+                        READING
+                 FROM history
+                 WHERE DEVICE = 'WR_1'
+                   AND READING = 'SW_Yield_Daily'
+                   AND (    TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+                        OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+                        AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+                        OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+                        AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY)
+           	        )
+                 GROUP BY READING,DATE,HOUR
+                ) x1
+               USING(TIMESTAMP,READING)
+              WHERE    x1.HOUR >= 6
+                   AND x1.HOUR <= 21
+             ) x2
+          ) t1 
+     ) WR
+    left JOIN
+     ( -- Speicher full join from DCto and DCfrom
+      SELECT TIMESTAMP, DCto, DCfrom,
+             cast(
+      		      if((DCfrom IS NULL),
+                      DCto,
+                      if((DCto IS NULL), DCfrom * -1, DCto - DCfrom)
+      			    )*0.85 AS DECIMAL(6)
+                 ) AS yield
+      FROM
+        (SELECT TIMESTAMP, y1.DCto, y2.DCfrom
+         FROM
+           (-- DCto
+            SELECT TIMESTAMP,
+                   if(t2.DELTA > 6, 0, t2.DIFF) AS DCto,
+                   t2.DELTA
+            FROM
+              (SELECT TIMESTAMP,
+                      READING,
+                      VALUE,
+                      if(@diff = 0, 0, cast((VALUE-@diff) AS DECIMAL(10))) AS DIFF,
+                      @diff:=VALUE AS curr_V,
+                      TIMESTAMPDIFF(HOUR, @delta,TIMESTAMP) AS DELTA,
+                      @delta:=TIMESTAMP AS curr_T
+               FROM
+                 (SELECT concat(x3.DATE, " ", LPAD(x3.HOUR, 2, 0), ":00:00") AS TIMESTAMP,
+                         x3.DATE,
+                         x3.HOUR,
+                         h.READING,
+                         h.VALUE,
+                         @diff:=0, @delta:=NULL
+                  FROM history h
+                   INNER JOIN
+                    (SELECT date(TIMESTAMP) AS DATE,
+                            hour(TIMESTAMP) AS HOUR,
+                            max(TIMESTAMP)  AS TIMESTAMP,
+                            READING
+                     FROM history
+                     WHERE DEVICE = 'WR_1'
+                       AND READING = 'Battery_Total_DC_ChargeEnergy_DCsideToBattery'
+                       AND (    TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+                            OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+                            AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+                            OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+                            AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY))
+                     GROUP BY READING,DATE,HOUR
+                    ) x3
+                   USING(TIMESTAMP,READING)
+                  WHERE x3.HOUR >= 6
+                    AND x3.HOUR <= 21 
+      		      ) x4
+      		   ) t2
+           ) y1 -- DCto
+          LEFT JOIN
+           (-- DCfrom
+            SELECT TIMESTAMP,
+                   if(t2.DELTA > 6, 0, t2.DIFF) AS DCfrom,
+                   t2.DELTA
+            FROM
+              (SELECT TIMESTAMP,
+                      READING,
+                      VALUE,
+                      if(@diff = 0, 0, cast((VALUE-@diff) AS DECIMAL(10))) AS DIFF,
+                      @diff:=VALUE AS curr_V,
+                      TIMESTAMPDIFF(HOUR, @delta,TIMESTAMP) AS DELTA,
+                      @delta:=TIMESTAMP AS curr_T
+               FROM
+                 (SELECT concat(x3.DATE, " ", LPAD(x3.HOUR, 2, 0), ":00:00") AS TIMESTAMP,
+                         x3.DATE,
+                         x3.HOUR,
+                         h.READING,
+                         h.VALUE, @diff:=0,@delta:=NULL
+                  FROM history h
+                   INNER JOIN
+                    (SELECT date(TIMESTAMP) AS DATE,
+                            hour(TIMESTAMP) AS HOUR,
+                            max(TIMESTAMP) AS TIMESTAMP,
+                            READING
+                     FROM history
+                     WHERE DEVICE = 'WR_1'
+                       AND READING = 'Battery_Total_DC_DischargeEnergy_DCsideFromBattery'
+                       AND (    TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+                            OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+                            AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+                            OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+                            AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY))
+                     GROUP BY READING,DATE,HOUR
+      			     ) x3
+                   USING(TIMESTAMP,READING)
+                  WHERE x3.HOUR >= 6
+                    AND x3.HOUR <= 21
+                 ) x4
+              ) t2
+          	) y2 -- DCfrom
+          USING(TIMESTAMP) -- LEFT JOIN
+         
+       UNION
+         
+         SELECT TIMESTAMP, y1.DCto, y2.DCfrom
+         FROM
+           (-- DCto
+            SELECT TIMESTAMP,
+                   if(t2.DELTA > 6, 0, t2.DIFF) AS DCto,
+                   t2.DELTA
+            FROM
+              (SELECT TIMESTAMP,
+                      READING,
+      			    VALUE,
+                      if(@diff = 0, 0, cast((VALUE-@diff) AS DECIMAL(10))) AS DIFF,
+                      @diff:=VALUE AS curr_V,
+                      TIMESTAMPDIFF(HOUR, @delta,TIMESTAMP) AS DELTA,
+                      @delta:=TIMESTAMP AS curr_T
+               FROM
+                 (SELECT concat(x3.DATE, " ", LPAD(x3.HOUR, 2, 0), ":00:00") AS TIMESTAMP,
+                         x3.DATE,
+                         x3.HOUR,
+                         h.READING,
+                         h.VALUE,
+                         @diff:=0,@delta:=NULL
+                  FROM history h
+                   INNER JOIN
+                    (SELECT date(TIMESTAMP) AS DATE,
+                            hour(TIMESTAMP) AS HOUR,
+                            max(TIMESTAMP)  AS TIMESTAMP,
+                            READING
+                     FROM history
+                     WHERE DEVICE = 'WR_1'
+                       AND READING = 'Battery_Total_DC_ChargeEnergy_DCsideToBattery'
+                       AND (    TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+                            OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+                            AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+                            OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+                            AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY))
+                     GROUP BY READING,DATE,HOUR
+      			  ) x3
+                   USING(TIMESTAMP,READING)
+                  WHERE x3.HOUR >= 6
+                    AND x3.HOUR <= 21
+      		   ) x4
+      		) t2
+            ) y1 -- DCto
+          RIGHT JOIN
+            (-- DCfrom
+             SELECT TIMESTAMP,
+                    if(t2.DELTA > 6, 0, t2.DIFF) AS DCfrom,
+                    t2.DELTA
+             FROM
+               (SELECT TIMESTAMP,
+                       READING,
+                       VALUE,
+                       if(@diff = 0, 0, cast((VALUE-@diff) AS DECIMAL(10))) AS DIFF,
+                       @diff:=VALUE AS curr_V,
+                       TIMESTAMPDIFF(HOUR, @delta,TIMESTAMP) AS DELTA,
+                       @delta:=TIMESTAMP AS curr_T
+                FROM
+                  (SELECT concat(x3.DATE, " ", LPAD(x3.HOUR, 2, 0), ":00:00") AS TIMESTAMP,
+                          x3.DATE,
+                          x3.HOUR,
+                          h.READING,
+                          h.VALUE,
+                          @diff:=0,@delta:=NULL
+                   FROM history h
+                    INNER JOIN
+                     (SELECT date(TIMESTAMP) AS DATE,
+                             hour(TIMESTAMP) AS HOUR,
+                             max(TIMESTAMP)  AS TIMESTAMP,
+                             READING
+                      FROM history
+                      WHERE DEVICE = 'WR_1'
+                        AND READING = 'Battery_Total_DC_DischargeEnergy_DCsideFromBattery'
+                        AND (    TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+                             OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+                             AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+                             OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+                             AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY))
+                      GROUP BY READING,DATE,HOUR
+        		       ) x3
+                    USING(TIMESTAMP,READING)
+                   WHERE x3.HOUR >= 6
+                     AND x3.HOUR <= 21
+        	        ) x4
+               ) t2
+            ) y2 -- DCfrom
+          USING(TIMESTAMP) -- RIGHT JOIN
+       ) y3
+      
+     ) Speicher -- full join
+     USING(TIMESTAMP)
+   -- end left join
+   
+   UNION  -- for left and right join
+
+   -- start right join
+   SELECT TIMESTAMP, 
+          WR.yield       AS WR,
+          Speicher.yield AS Speicher,
+          cast( -- validate yield
+               if((Speicher.yield IS NULL),
+                   WR.yield,
+                   if((WR.yield IS NULL),Speicher.yield,WR.yield + Speicher.yield)
+                 )
+			AS DECIMAL(6)) AS yield
+   FROM
+     ( -- WR
+        SELECT TIMESTAMP,
+               if(t1.DELTA > 6,0,t1.DIFF) AS yield
+        FROM
+          (SELECT TIMESTAMP,READING,VALUE,
+                  if(@diff = 0,0, cast((VALUE-@diff) AS DECIMAL(10))) AS DIFF,
+                  @diff:=VALUE                                        AS curr_V,
+                  TIMESTAMPDIFF(HOUR,@delta,TIMESTAMP)                AS DELTA,
+                  @delta:=TIMESTAMP                                   AS curr_T
+           FROM
+             (SELECT concat(x1.DATE, " ", LPAD(x1.HOUR, 2, 0), ":00:00") AS TIMESTAMP,
+                     x1.DATE,
+                     x1.HOUR,
+      	              h.READING,
+                     h.VALUE,
+      			      @diff:=0,@delta:=NULL
+              FROM history h
+               INNER JOIN
+                (SELECT date(TIMESTAMP) AS DATE,
+                        hour(TIMESTAMP) AS HOUR,
+                        max(TIMESTAMP)  AS TIMESTAMP,
+                        READING
+                 FROM history
+                 WHERE DEVICE = 'WR_1'
+                   AND READING = 'SW_Yield_Daily'
+                   AND (    TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+                        OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+                        AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+                        OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+                        AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY)
+           	        )
+                 GROUP BY READING,DATE,HOUR
+                ) x1
+               USING(TIMESTAMP,READING)
+              WHERE    x1.HOUR >= 6
+                   AND x1.HOUR <= 21
+             ) x2
+          ) t1 
+     ) WR
+    right JOIN
+     ( -- Speicher full join from DCto and DCfrom
+      SELECT TIMESTAMP, DCto, DCfrom,
+             cast(
+      		      if((DCfrom IS NULL),
+                      DCto,
+                      if((DCto IS NULL), DCfrom * -1, DCto - DCfrom)
+      			    )*0.85 AS DECIMAL(6)
+                 ) AS yield
+      FROM
+        (SELECT TIMESTAMP, y1.DCto, y2.DCfrom
+         FROM
+           (-- DCto
+            SELECT TIMESTAMP,
+                   if(t2.DELTA > 6, 0, t2.DIFF) AS DCto,
+                   t2.DELTA
+            FROM
+              (SELECT TIMESTAMP,
+                      READING,
+                      VALUE,
+                      if(@diff = 0, 0, cast((VALUE-@diff) AS DECIMAL(10))) AS DIFF,
+                      @diff:=VALUE AS curr_V,
+                      TIMESTAMPDIFF(HOUR, @delta,TIMESTAMP) AS DELTA,
+                      @delta:=TIMESTAMP AS curr_T
+               FROM
+                 (SELECT concat(x3.DATE, " ", LPAD(x3.HOUR, 2, 0), ":00:00") AS TIMESTAMP,
+                         x3.DATE,
+                         x3.HOUR,
+                         h.READING,
+                         h.VALUE,
+                         @diff:=0, @delta:=NULL
+                  FROM history h
+                   INNER JOIN
+                    (SELECT date(TIMESTAMP) AS DATE,
+                            hour(TIMESTAMP) AS HOUR,
+                            max(TIMESTAMP)  AS TIMESTAMP,
+                            READING
+                     FROM history
+                     WHERE DEVICE = 'WR_1'
+                       AND READING = 'Battery_Total_DC_ChargeEnergy_DCsideToBattery'
+                       AND (    TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+                            OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+                            AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+                            OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+                            AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY))
+                     GROUP BY READING,DATE,HOUR
+                    ) x3
+                   USING(TIMESTAMP,READING)
+                  WHERE x3.HOUR >= 6
+                    AND x3.HOUR <= 21 
+      		      ) x4
+      		   ) t2
+           ) y1 -- DCto
+          LEFT JOIN
+           (-- DCfrom
+            SELECT TIMESTAMP,
+                   if(t2.DELTA > 6, 0, t2.DIFF) AS DCfrom,
+                   t2.DELTA
+            FROM
+              (SELECT TIMESTAMP,
+                      READING,
+                      VALUE,
+                      if(@diff = 0, 0, cast((VALUE-@diff) AS DECIMAL(10))) AS DIFF,
+                      @diff:=VALUE AS curr_V,
+                      TIMESTAMPDIFF(HOUR, @delta,TIMESTAMP) AS DELTA,
+                      @delta:=TIMESTAMP AS curr_T
+               FROM
+                 (SELECT concat(x3.DATE, " ", LPAD(x3.HOUR, 2, 0), ":00:00") AS TIMESTAMP,
+                         x3.DATE,
+                         x3.HOUR,
+                         h.READING,
+                         h.VALUE, @diff:=0,@delta:=NULL
+                  FROM history h
+                   INNER JOIN
+                    (SELECT date(TIMESTAMP) AS DATE,
+                            hour(TIMESTAMP) AS HOUR,
+                            max(TIMESTAMP) AS TIMESTAMP,
+                            READING
+                     FROM history
+                     WHERE DEVICE = 'WR_1'
+                       AND READING = 'Battery_Total_DC_DischargeEnergy_DCsideFromBattery'
+                       AND (    TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+                            OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+                            AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+                            OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+                            AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY))
+                     GROUP BY READING,DATE,HOUR
+      			     ) x3
+                   USING(TIMESTAMP,READING)
+                  WHERE x3.HOUR >= 6
+                    AND x3.HOUR <= 21
+                 ) x4
+              ) t2
+          	) y2 -- DCfrom
+          USING(TIMESTAMP) -- LEFT JOIN
+         
+       UNION
+         
+         SELECT TIMESTAMP, y1.DCto, y2.DCfrom
+         FROM
+           (-- DCto
+            SELECT TIMESTAMP,
+                   if(t2.DELTA > 6, 0, t2.DIFF) AS DCto,
+                   t2.DELTA
+            FROM
+              (SELECT TIMESTAMP,
+                      READING,
+      			    VALUE,
+                      if(@diff = 0, 0, cast((VALUE-@diff) AS DECIMAL(10))) AS DIFF,
+                      @diff:=VALUE AS curr_V,
+                      TIMESTAMPDIFF(HOUR, @delta,TIMESTAMP) AS DELTA,
+                      @delta:=TIMESTAMP AS curr_T
+               FROM
+                 (SELECT concat(x3.DATE, " ", LPAD(x3.HOUR, 2, 0), ":00:00") AS TIMESTAMP,
+                         x3.DATE,
+                         x3.HOUR,
+                         h.READING,
+                         h.VALUE,
+                         @diff:=0,@delta:=NULL
+                  FROM history h
+                   INNER JOIN
+                    (SELECT date(TIMESTAMP) AS DATE,
+                            hour(TIMESTAMP) AS HOUR,
+                            max(TIMESTAMP)  AS TIMESTAMP,
+                            READING
+                     FROM history
+                     WHERE DEVICE = 'WR_1'
+                       AND READING = 'Battery_Total_DC_ChargeEnergy_DCsideToBattery'
+                       AND (    TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+                            OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+                            AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+                            OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+                            AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY))
+                     GROUP BY READING,DATE,HOUR
+      			  ) x3
+                   USING(TIMESTAMP,READING)
+                  WHERE x3.HOUR >= 6
+                    AND x3.HOUR <= 21
+      		   ) x4
+      		) t2
+            ) y1 -- DCto
+          RIGHT JOIN
+            (-- DCfrom
+             SELECT TIMESTAMP,
+                    if(t2.DELTA > 6, 0, t2.DIFF) AS DCfrom,
+                    t2.DELTA
+             FROM
+               (SELECT TIMESTAMP,
+                       READING,
+                       VALUE,
+                       if(@diff = 0, 0, cast((VALUE-@diff) AS DECIMAL(10))) AS DIFF,
+                       @diff:=VALUE AS curr_V,
+                       TIMESTAMPDIFF(HOUR, @delta,TIMESTAMP) AS DELTA,
+                       @delta:=TIMESTAMP AS curr_T
+                FROM
+                  (SELECT concat(x3.DATE, " ", LPAD(x3.HOUR, 2, 0), ":00:00") AS TIMESTAMP,
+                          x3.DATE,
+                          x3.HOUR,
+                          h.READING,
+                          h.VALUE,
+                          @diff:=0,@delta:=NULL
+                   FROM history h
+                    INNER JOIN
+                     (SELECT date(TIMESTAMP) AS DATE,
+                             hour(TIMESTAMP) AS HOUR,
+                             max(TIMESTAMP)  AS TIMESTAMP,
+                             READING
+                      FROM history
+                      WHERE DEVICE = 'WR_1'
+                        AND READING = 'Battery_Total_DC_DischargeEnergy_DCsideFromBattery'
+                        AND (    TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+                             OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(365+30) DAY)
+                             AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(365-30) DAY)
+                             OR  TIMESTAMP > DATE_ADD(@date,INTERVAL -(2*365+30) DAY)
+                             AND TIMESTAMP < DATE_ADD(@date,INTERVAL -(2*365-30) DAY))
+                      GROUP BY READING,DATE,HOUR
+        		       ) x3
+                    USING(TIMESTAMP,READING)
+                   WHERE x3.HOUR >= 6
+                     AND x3.HOUR <= 21
+        	        ) x4
+               ) t2
+            ) y2 -- DCfrom
+          USING(TIMESTAMP) -- RIGHT JOIN
+       ) y3
+      
+     ) Speicher -- full join
+     USING(TIMESTAMP)
+   -- end right join
+   
+   -- UNION end
+   
+  ) t12 USING(TIMESTAMP)
+SET tt.yield = t12.yield
+;
+
+-- Ermittle Ertrags Maximum der letzten 30 Tage um die Prognose zu limitieren
+UPDATE dwdfull tt
+JOIN
+  ( -- yield_max und Schnee Begrenzung
+      SELECT hour -1 AS hour,
+             if(yield_min > yield_max*0.04, yield_max, yield_min) AS yield_max
+      FROM (
+        SELECT hour,
+             -- Ist der letzte Tag 90% kleiner als der Durchschnitt der letzten Tage,
+             -- dann liegt Schnee auf den Modulen
+               cast(max(if(yield > 0,yield,0)) AS DECIMAL(6)) AS yield_max
+        FROM dwdfull
+        WHERE TIMESTAMP > DATE_ADD(@date,INTERVAL -30 DAY)
+        GROUP BY hour ) x1
+	  INNER JOIN
+        -- Wie waren die letzten Tag? Extrem kleine Werte bedeuten abgedeckte Module,
+        -- was die Ki_Prognose nicht so schnell lernen kann.
+        (SELECT hour,
+               cast(min(if(yield > 0,yield,0)) AS DECIMAL(6)) AS yield_min
+        FROM dwdfull
+        WHERE TIMESTAMP > DATE_ADD(@date,INTERVAL -1 DAY)
+          AND TIMESTAMP < @date
+        GROUP BY hour 
+        ) X2 USING(hour)
+   ) t2  USING(hour)
+SET tt.yield_max = t2.yield_max
+WHERE TIMESTAMP > @date
+;
+
+IF display = 'show' THEN 
+  select * from dwdfull LIMIT 3000;
+ELSE
+  select now();
+END IF
+;
+
+END

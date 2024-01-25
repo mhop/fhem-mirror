@@ -1,0 +1,268 @@
+use strict;
+use warnings;
+
+use UConv;    # used for wunderground conversion
+
+use Blocking; # for sendmail
+
+sub
+MyUtils_Initialize($$)
+{
+ my ($hash) = @_;
+}
+
+# Enter your functions below _this_ line.
+###################################################
+
+
+############################################################################################################
+########           DbRep readings separieren und erstellen   
+############################################################################################################
+sub splitReading {
+ my ($name,$reading,$value) = @_;
+ my $hash = $defs{$name};
+ 
+ if($reading =~ /^.*SqlResultRow_.*$/ and
+    $value   =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)\|(.*)\|(.*)/ ) {
+
+     my $TIMESTAMP = "$1-$2-$3 $4:$5:$6";
+     my $READING   = "$7";
+     my $VALUE     = "$8";
+
+     setReadingsVal($hash,$READING,$VALUE,$TIMESTAMP);
+ }
+return;
+}
+
+
+###########################################################
+## Kostal Plenticore Autentifizierung PV_Anlage_1
+###########################################################
+
+use Encode qw(decode encode);
+use PBKDF2::Tiny qw/derive verify/;
+use Digest::SHA qw(sha256 hmac_sha256);
+use Crypt::URandom qw( urandom );
+use Crypt::AuthEnc::GCM;
+
+######################################################
+# {KeyValue("read|store","PW_PV_Anlage_1_API_user","<passwort>")}
+######################################################
+sub KeyValue {
+    my ($step, $index, $value) = @_;
+    my $key = getUniqueId().$index;
+    my $e_value = "";
+    my $error;
+
+    if (eval "use Digest::MD5;1") {
+      $key    = Digest::MD5::md5_hex(unpack "H*", $key);
+      $key   .= Digest::MD5::md5_hex($key);
+    }
+    
+    if ($step eq "read") {
+      ($error, $value) = getKeyValue($index);
+ 
+      if ( defined($error) ) {
+        Log3 $index,3, "$index, can't read key from FhemUtils/uniqueID: $error";
+        return undef;
+      }  
+ 
+      if ( defined($value) ) {
+        my $dec_value = '';
+ 
+        for my $char (map { pack('C', hex($_)) } ($value =~ /(..)/g)) {
+          my $decode  = chop($key);
+          $dec_value .= chr(ord($char)^ord($decode));
+          $key        = $decode.$key;
+        }
+        return $dec_value;
+      }
+      else {
+        Log3 $index,3,"$index, no key found in FhemUtils/uniqueID";
+        return undef;
+      }
+    }
+
+    if ($step eq "store") {    
+      for my $char (split //, $value) {
+        my $encode = chop($key);
+        $e_value  .= sprintf("%.2x",ord($char)^ord($encode));
+        $key       = $encode.$key;
+      }
+      $error = setKeyValue($index, $e_value);
+      return "error while saving key : $error" if(defined($error));
+      return "Key successfully saved in FhemUtils/uniqueID Key $index";
+    }
+}; 
+
+
+###########################################################
+# {plenticore_auth("WR_1_API","[user|master]","auth_randomString64","auth_nonce","auth_salt","auth_rounds","auth_token","auth_transactionId")}
+# {plenticore_auth("start|finish|session","user","WR_1_API","TESMUWZnwkJZbnpF","TE2MUWZnwkJZbnpFQ5ulCfolNNdAD0vT","DbAC0R85jwF0rh+r","29000","1376720346bea40cdf770a8f84b5975cfeb20c5e6ac6d89b7862df3ca9695e43","acafc66c0e1975293d35512a1e4bcceea55840b3109a703514e75b5ebce9b7c5")}
+###########################################################
+sub plenticore_auth {
+   my ($step, $user, $logdevice, $randomString, $nonce, $salt, $rounds, $transactionId, $token) = @_;
+
+   my $verbose     = AttrVal($logdevice,"verbose",0) ;
+
+   my $PASSWD = KeyValue("read","PW_".$logdevice."_".$user);
+
+   if ($verbose >= 3) {
+     Log3 $logdevice,3,"====Start plenticore_auth==============================";
+     Log3 $logdevice,3,"auth_step         : ".$step;
+     Log3 $logdevice,3,"auth_user         : ".$user;
+     Log3 $logdevice,3,"auth_device       : ".$logdevice;
+     Log3 $logdevice,3,"auth_KeyValue read: PW_".$logdevice."_".$user;
+   };
+
+   if($step eq "start")
+    {
+     my @chars = ('0'..'9', 'A'..'Z', 'a'..'z');
+     my $len = 12;
+     my $string;
+
+     if ($verbose >= 3) {
+       Log3 $logdevice,3,"====End arguments======================================";
+     };
+
+     while($len--){ $string .= $chars[rand @chars] };
+     $string = encode("UTF-8", $string);
+     $string = decode("UTF-8", $string);
+     my $u = encode_base64($string);
+     $u =~ s/\n$//g;
+
+     my $message = '{"nonce": "'.$u.'","username": "'.$user.'"}';
+
+     if ($verbose >= 3) {
+       Log3 $logdevice,3,"auth_nonce        : ".$u;
+       Log3 $logdevice,3,"auth_return       : ".$message;
+       Log3 $logdevice,3,"====End output=========================================";
+     };
+     
+     CommandSetReading(undef, $logdevice." auth_randomString64 ".$u) ;
+
+     return $message;
+    }
+
+   ######### This code is identical for finish and session #################
+   my $bitSalt = decode_base64($salt);
+   my $r = derive( 'SHA-256', $PASSWD, $bitSalt, $rounds );
+   my $ck = encode('UTF-8', "Client Key");
+   my $s = hmac_sha256($ck, $r);
+   my $underscore = sha256($s);
+   my $d = "n=".$user.",r=".$randomString.",r=".$nonce.",s=".$salt.",i=".$rounds.",c=biws,r=".$nonce;
+
+   if ($verbose >= 3) {
+     Log3 $logdevice,3,"auth_randomString : ".$randomString;
+     Log3 $logdevice,3,"auth_nonce        : ".$nonce;
+     Log3 $logdevice,3,"auth_salt         : ".$salt;
+     Log3 $logdevice,3,"auth_rounds       : ".$rounds;
+     Log3 $logdevice,3,"auth_transactionId: ".$transactionId;
+   };
+   
+   if($step eq "finish")
+    {
+     Log3 $logdevice,3,"====End arguments======================================";
+
+     my $sk = encode('UTF-8', "Server Key");
+     my $c = hmac_sha256($sk, $r);
+     my $pd = encode('UTF-8', $d);
+     my $p = hmac_sha256($pd, $c);
+     my $gd = encode('UTF-8', $d);
+     my $g = hmac_sha256($gd, $underscore);
+     my $f = "";
+     my $g1 = "";
+     my $s1 = "";
+     my $f1 = "";
+     my $j = 0;
+     for($j=0; $j<length($g); $j++) {
+        $g1 = substr($g,$j,1);
+        $s1 = substr($s,$j,1);
+        $f1 = $s1 ^ $g1 ;
+        $f = $f.$f1;
+     }
+     my $pe = encode_base64($f);
+     $pe =~ s/\n$//g;                        # Korrektur: \n am Ende des Strings entfernen, Ursache unbekannt
+     my $proof = decode('UTF-8', $pe);
+
+     my $message = '{"transactionId": "'.$transactionId.'", "proof": "'.$proof.'"}';
+
+     if ($verbose >= 3) {
+       Log3 $logdevice,3,"auth_proof        : ".$proof;
+       Log3 $logdevice,3,"auth_return       : ".$message;
+       Log3 $logdevice,3,"====End output=========================================";
+     };
+   
+     return $message;
+    }
+
+   if($step eq "session")
+    {
+     Log3 $logdevice,3,"auth_token        : ".$token;
+     Log3 $logdevice,3,"====End arguments======================================";
+
+     my $sk = encode('UTF-8', "Session Key");
+     my $dd = encode('UTF-8', $d);
+     my $protocol_key = hmac_sha256($sk, $dd, $s, $underscore);
+
+## Test only     my $t = "7244ba6f73c8cdc47b232e1311451939";
+     my $t = $token;
+     $t =~ s/([a-fA-F0-9][a-fA-F0-9])/chr(hex($1))/eg;
+     my $e2 = Crypt::AuthEnc::GCM->new("AES", $protocol_key, $t);
+
+     my $tt = encode('UTF-8', $token);
+     if($user eq "master")
+      {
+       $PASSWD = KeyValue("read","PW_".$logdevice."_".$user."_Service"); ## Das ist der Service Key
+       $tt = encode('UTF-8', $token.":".$PASSWD);
+       if ($verbose >= 3) {
+         Log3 $logdevice,3,"using master      : PW_".$logdevice."_".$user."_Service";
+       }
+      }
+
+     my $e2ct = $e2->encrypt_add($tt);
+     my $authtag = $e2->encrypt_done();
+
+     $tt = encode_base64($t);
+     $tt =~ s/\n$//g;                        # Korrektur: \n am Ende des Strings entfernen, Ursache unbekannt
+     my $iv = decode('UTF-8', $tt);
+
+     my $aa = encode_base64($authtag);
+     $aa =~ s/\n$//g;                        # Korrektur: \n am Ende des Strings entfernen, Ursache unbekannt
+     $authtag = decode('UTF-8', $aa);
+
+     my $pp = encode_base64($e2ct);
+     $pp =~ s/\n//g;                         # Korrektur: \n am Ende des Strings entfernen, Ursache unbekannt
+     my $payload = decode('UTF-8', $pp);
+
+     my $message = '{"transactionId": "'.$transactionId.'", "iv": "'.$iv.'", "tag": "'.$authtag.'", "payload": "'.$payload.'"}';
+
+     if ($verbose >= 3) {
+       Log3 $logdevice,3,"auth_iv           : ".$iv;
+       Log3 $logdevice,3,"auth_authtag      : ".$authtag;
+       Log3 $logdevice,3,"auth_payload      : ".$payload;
+       Log3 $logdevice,3,"auth_return       : ".$message;
+       Log3 $logdevice,3,"====End output=========================================";
+     };
+     
+     return $message;
+    }
+};
+
+
+#### Log-abriss vermeiden
+sub
+addLog($$$) {
+  my ($logdb, $logdevice, $reading) = @_; # device and reading to be used
+  my $logentry = ReadingsVal($logdevice,$reading,"invalid reading");
+  my $timestamp = strftime "%Y-%m-%d %H:%M:%S", localtime;
+
+#  if ($reading =~ m,state,i) {
+  if ($reading eq 'state') {
+     fhem "set ".$logdb." addCacheLine ".$timestamp."|".$logdevice."|addlog|".$logentry."|".$reading."|".$logentry."|";
+  } else {
+     fhem "set ".$logdb." addCacheLine ".$timestamp."|".$logdevice."|addlog|".$reading.": ".$logentry."|".$reading."|".$logentry."|";
+  }
+}
+
+1;
