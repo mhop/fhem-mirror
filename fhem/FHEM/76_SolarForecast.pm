@@ -157,7 +157,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.10.0" => "24.01.2024  consumerXX: notbefore, notafter format extended to hh[:mm], new sub __checkcode, __checkhhmm ",
+  "1.11.0" => "25.01.2024  consumerXX: notbefore, notafter format extended to possible perl code {...} ",
+  "1.10.0" => "24.01.2024  consumerXX: notbefore, notafter format extended to hh[:mm], new sub __checkCode, __checkhhmm ",
   "1.9.0"  => "23.01.2024  modify disable, add operationMode: active/inactive ",
   "1.8.0"  => "22.01.2024  add 'noLearning' Option to Setter pvCorrectionFactor_Auto ",
   "1.7.1"  => "20.01.2024  optimize battery management ",
@@ -4133,7 +4134,7 @@ sub Attr {
   my $hash  = $defs{$name};
   my $type  = $hash->{TYPE};
 
-  my ($do,$val);
+  my ($do,$val, $err);
 
   # $cmd can be "del" or "set"
   # $name is device name
@@ -4190,9 +4191,8 @@ sub Attr {
           return;
       }
       
-      my $err;
       my $code      = $aVal;
-      ($err, $code) = __checkcode ($name, $code);
+      ($err, $code) = __checkCode ($name, $code);
       return $err if($err);
       
       $data{$type}{$name}{func}{ghoValForm} = $code;
@@ -4223,14 +4223,9 @@ sub Attr {
           }
       }
 
-      if ($aName eq 'ctrlUserExitFn' && $init_done) {          
-          if(!$aVal || $aVal !~ m/^\s*(\{.*\})\s*$/xs) {
-              return "Usage of $aName is wrong. The function has to be specified as \"{<your own code>}\" ";
-          }
-
-          $aVal = $1;
-          eval $aVal;
-          return $@ if($@);
+      if ($aName eq 'ctrlUserExitFn' && $init_done) {
+          ($err) = __checkCode ($name, $aVal, 'cc1');
+          return $err if($err);
       }
   }
 
@@ -4268,7 +4263,7 @@ sub _attrconsumer {                      ## no critic "not used"
 
   return if(!$init_done);                                                                  # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159959.html#msg1159959
 
-  my $err;
+  my ($err, $valid);
 
   if ($cmd eq "set") {
       my ($a,$h) = parseParams ($aVal);
@@ -4303,14 +4298,26 @@ sub _attrconsumer {                      ## no critic "not used"
           return qq{The mode "$h->{mode}" isn't allowed!};
       }
       
-      if (exists $h->{notbefore}) {          
-          my $valid = __checkhhmm ($h->{notbefore});          
-          return qq{The syntax "$h->{notbefore}" is wrong!} if(!$valid);
+      if (exists $h->{notbefore}) {
+          if ($h->{notbefore} =~ m/^\s*\{.*\}\s*$/xs) {
+              ($err) = __checkCode ($name, $h->{notbefore}, 'cc1');
+              return $err if($err);
+          }
+          else {          
+              $valid = __checkhhmm ($h->{notbefore});          
+              return qq{The syntax "notbefore=$h->{notbefore}" is wrong!} if(!$valid);
+          }
       }
       
-      if (exists $h->{notafter}) {          
-          my $valid = __checkhhmm ($h->{notafter});          
-          return qq{The syntax "$h->{notafter}" is wrong!} if(!$valid);
+      if (exists $h->{notafter}) {
+          if ($h->{notafter} =~ m/^\s*\{.*\}\s*$/xs) {
+              ($err) = __checkCode ($name, $h->{notafter}, 'cc1');
+              return $err if($err);
+          }
+          else {
+              $valid = __checkhhmm ($h->{notafter});          
+              return qq{The syntax "notafter=$h->{notafter}" is wrong!} if(!$valid);
+          }
       }
 
       if (exists $h->{interruptable}) {                                                            # Check Regex/Hysterese
@@ -4400,12 +4407,20 @@ return $valid;
 ################################################################
 #          prüfen validen Code in $val          
 ################################################################
-sub __checkcode {
+sub __checkCode {
   my $name = shift;
   my $val  = shift;
+  my $cc1  = shift // 0;                                 # wenn 1 __checkCode1 ausführen
+  
+  my $err;
   
   if (!$val || $val !~ m/^\s*\{.*\}\s*$/xs) {
       return qq{Usage of $name is wrong. The function has to be specified as "{<your own code>}"};
+  }
+  
+  if ($cc1) {
+      ($err, $val) = ___checkCode1 ($name, $val);
+      return ($err, $val);
   }
 
   my %specials = ( "%DEVICE"  => $name,
@@ -4414,7 +4429,7 @@ sub __checkcode {
                    "%UNIT"    => 'kW',
                  );
 
-  my $err = perlSyntaxCheck ($val, %specials);
+  $err = perlSyntaxCheck ($val, %specials);
   return $err if($err);
 
   if ($val =~ m/^\{.*\}$/xs && $val =~ m/=>/ && $val !~ m/\$/ ) {           # Attr wurde als Hash definiert
@@ -4426,6 +4441,23 @@ sub __checkcode {
       $val = $av if(ref $av eq "HASH");
   }
           
+return ('', $val);
+}
+
+################################################################
+#          prüfen validen Code in $val          
+################################################################
+sub ___checkCode1 {
+  my $name = shift;
+  my $val  = shift;
+  
+  my $hash = $defs{$name};
+
+  $val =~ m/^\s*(\{.*\})\s*$/xs;
+  $val = $1;
+  $val = eval $val;
+  return $@ if($@);
+
 return ('', $val);
 }
 
@@ -7629,15 +7661,49 @@ sub ___switchonTimelimits {
   }
   
   my $origtime  = $starttime;
-  my $notbefore = ConsumerVal ($hash, $c, "notbefore", '00:00');
-  my $notafter  = ConsumerVal ($hash, $c, "notafter",  '00:00');
+  my $notbefore = ConsumerVal ($hash, $c, "notbefore", 0);
+  my $notafter  = ConsumerVal ($hash, $c, "notafter",  0);
   
-  my ($nbfhh, $nbfmm) = split ":", $notbefore;
-  my ($nafhh, $nafmm) = split ":", $notafter;
-  $nbfmm            //= '00';
-  $nafmm            //= '00';
-  $notbefore          = (int $nbfhh) . $nbfmm;
-  $notafter           = (int $nafhh) . $nbfmm;
+  my ($err, $val);
+  
+  if ($notbefore =~ m/^\s*\{.*\}\s*$/xs) {                                          # notbefore als Perl-Code definiert
+      ($err, $val) = __checkCode ($name, $notbefore, 'cc1');
+      if (!$err && __checkhhmm ($val)) {
+          $notbefore = $val;
+      }
+      else {
+          Log3 ($name, 1, "$name - ERROR - the result of the Perl code in 'notbefore' is incorrect: $val");
+          $notbefore = 0;
+      }
+  }
+  
+  if ($notafter =~ m/^\s*(\{.*\})\s*$/xs) {                                           # notafter als Perl-Code definiert
+      ($err, $val) = __checkCode ($name, $notafter, 'cc1');
+      if (!$err && __checkhhmm ($val)) {
+          $notafter = $val;
+      }
+      else {
+          Log3 ($name, 1, "$name - ERROR - the result of the Perl code in the 'notafter' key is incorrect: $val");
+          $notafter = 0;
+      }  
+  }
+  
+  my ($nbfhh, $nbfmm, $nafhh, $nafmm);
+  
+  if ($notbefore) {
+      ($nbfhh, $nbfmm) = split ":", $notbefore;
+      $nbfmm         //= '00';
+      $notbefore       = (int $nbfhh) . $nbfmm;
+  }
+  
+  if ($notafter) {
+      ($nafhh, $nafmm) = split ":", $notafter;
+      $nafmm         //= '00';
+      $notafter        = (int $nafhh) . $nbfmm; 
+  }
+  
+  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - used 'notbefore' term: }.(defined $notbefore ? $notbefore : ''));
+  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - used 'notafter' term: } .(defined $notafter  ? $notafter  : ''));
   
   my $change = q{};
   
@@ -16660,9 +16726,9 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]<br>
-                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]              <br>
-                         [on=&lt;command&gt;] [off=&lt;command&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]    <br>
-                         [notbefore=&lt;hour&gt;[:&lt;minute&gt;]] [notafter=&lt;hour&gt;[:&lt;minute&gt;]] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]              <br>
+                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]                             <br>
+                         [on=&lt;command&gt;] [off=&lt;command&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]                   <br>
+                         [notbefore=&lt;Expression&gt;] [notafter=&lt;Expression&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                   <br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Unit&gt;[:&lt;Threshold&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Threshold&gt]] <br>
                          [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] <br>
                          [interruptable=&lt;Option&gt] [noshow=&lt;Option&gt] </b><br>
@@ -16760,9 +16826,11 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>0</b> - only synchronous processing of switching states (default)                                                                           </td></tr>
             <tr><td>                       </td><td><b>1</b> - additional asynchronous processing of switching states through event processing                                                     </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>notbefore</b>      </td><td>Schedule start time consumer not before specified time hh[:mm] (optional)                                                                      </td></tr>
+            <tr><td> <b>notbefore</b>      </td><td>Schedule start time consumer not before specified time 'hour[:minute]' (optional)                                                              </td></tr>
+            <tr><td>                       </td><td>The &lt;Expression&gt; has the format hh[:mm] or is Perl code enclosed in {...} that returns hh[:mm].                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>notafter</b>       </td><td>Schedule start time consumer not after specified time hh[:mm] (optional)                                                                       </td></tr>
+            <tr><td> <b>notafter</b>       </td><td>Schedule start time consumer not after specified time 'hour[:minute]' (optional)                                                               </td></tr>
+            <tr><td>                       </td><td>The &lt;Expression&gt; has the format hh[:mm] or is Perl code enclosed in {...} that returns hh[:mm].                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>auto</b>           </td><td>Reading in the consumer device which enables or blocks the switching of the consumer (optional)                                                </td></tr>
             <tr><td>                       </td><td>If the key switchdev is given, the reading is set and evaluated in this device.                                                                </td></tr>
@@ -18718,10 +18786,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]<br>
-                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]              <br>
-                         [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]  <br>
-                         [notbefore=&lt;Stunde&gt;[:&lt;Minute&gt;]] [notafter=&lt;Stunde&gt;[:&lt;Minute&gt;]] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]          <br>
-                         [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] <br>
+                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]                                                <br>
+                         [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]                                    <br>
+                         [notbefore=&lt;Ausdruck&gt;] [notafter=&lt;Ausdruck&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                          <br>
+                         [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]]         <br>
                          [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] <br>
                          [interruptable=&lt;Option&gt] [noshow=&lt;Option&gt] </b><br>
                          <br>
@@ -18817,9 +18885,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>0</b> - ausschließlich synchrone Verarbeitung von Schaltzuständen  (default)                                                                    </td></tr>
             <tr><td>                       </td><td><b>1</b> - zusätzlich asynchrone Verarbeitung von Schaltzuständen durch Eventverarbeitung                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>notbefore</b>      </td><td>Startzeitpunkt Verbraucher nicht vor angegebener Zeit hh[:mm] einplanen (optional)                                                                 </td></tr>
+            <tr><td> <b>notbefore</b>      </td><td>Startzeitpunkt Verbraucher nicht vor angegebener Zeit 'Stunde[:Minute]' einplanen (optional)                                                       </td></tr>
+            <tr><td>                       </td><td>Der &lt;Ausdruck&gt; hat das Format hh[:mm] oder ist in {...} eingeschlossener Perl-Code der hh[:mm] zurückgibt.                                   </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>notafter</b>       </td><td>Startzeitpunkt Verbraucher nicht nach angegebener Zeit hh[:mm] einplanen (optional)                                                                </td></tr>
+            <tr><td> <b>notafter</b>       </td><td>Startzeitpunkt Verbraucher nicht nach angegebener Zeit 'Stunde[:Minute]' einplanen (optional)                                                      </td></tr>
+            <tr><td>                       </td><td>Der &lt;Ausdruck&gt; hat das Format hh[:mm] oder ist in {...} eingeschlossener Perl-Code der hh[:mm] zurückgibt.                                   </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>auto</b>           </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                                              </td></tr>
             <tr><td>                       </td><td>Ist der Schlüssel switchdev angegeben, wird das Reading in diesem Device gesetzt und ausgewertet.                                                  </td></tr>
