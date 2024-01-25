@@ -1,0 +1,191 @@
+defmod EVU_aWATTar_connect HTTPMOD https://api.awattar.de/v1/marketdata/current.yaml 0
+attr EVU_aWATTar_connect DbLogExclude .*
+attr EVU_aWATTar_connect comment Version 2024.01.23 13:00\
+\
+Achtung, momentan werden nur die Börsenpreise ohne die fix Kosten dargestellt.\
+\
+https://api.awattar.de/v1/marketdata
+attr EVU_aWATTar_connect enableControlSet 1
+attr EVU_aWATTar_connect get01-15Name fc_max
+attr EVU_aWATTar_connect get01-15OExpr round(($val+$val*0.03+1.785)*1.19,2)
+attr EVU_aWATTar_connect get01-1Name current_date
+attr EVU_aWATTar_connect get01-22Name fc_med
+attr EVU_aWATTar_connect get01-22OExpr round(($val+$val*0.03+1.785)*1.19,2)
+attr EVU_aWATTar_connect get01-29Name fc_avg
+attr EVU_aWATTar_connect get01-29OExpr round(($val+$val*0.03+1.785)*1.19,2)
+attr EVU_aWATTar_connect get01-36Name current_price
+attr EVU_aWATTar_connect get01-36OExpr round(($val+$val*0.03+1.785)*1.19,2)
+attr EVU_aWATTar_connect get01-8Name fc_min
+attr EVU_aWATTar_connect get01-8OExpr round(($val+$val*0.03+1.785)*1.19,2)
+attr EVU_aWATTar_connect get01Name 01_priceInfo
+attr EVU_aWATTar_connect get01RegOpt g
+attr EVU_aWATTar_connect get01Regex date_now: (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})|price_low: ([0-9]+[0-9\.]+)|price_high: ([0-9]+[0-9\.]+)|price_median: ([0-9]+[0-9\.]+)|price_average: ([0-9]+[0-9\.]+)|price_current: ([0-9]+[0-9\.]+)
+attr EVU_aWATTar_connect get01URL https://api.awattar.de/v1/marketdata/current.yaml
+attr EVU_aWATTar_connect get02-10Name fc0_09_total
+attr EVU_aWATTar_connect get02-10OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-11Name fc0_10_total
+attr EVU_aWATTar_connect get02-11OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-12Name fc0_11_total
+attr EVU_aWATTar_connect get02-12OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-13Name fc0_12_total
+attr EVU_aWATTar_connect get02-13OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-14Name fc0_13_total
+attr EVU_aWATTar_connect get02-14OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-15Name fc0_14_total
+attr EVU_aWATTar_connect get02-15OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-16Name fc0_15_total
+attr EVU_aWATTar_connect get02-16OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-17Name fc0_16_total
+attr EVU_aWATTar_connect get02-17OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-18Name fc0_17_total
+attr EVU_aWATTar_connect get02-18OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-19Name fc0_18_total
+attr EVU_aWATTar_connect get02-19OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-1Name fc0_00_total
+attr EVU_aWATTar_connect get02-1OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-20Name fc0_19_total
+attr EVU_aWATTar_connect get02-20OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-21Name fc0_20_total
+attr EVU_aWATTar_connect get02-21OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-22Name fc0_21_total
+attr EVU_aWATTar_connect get02-22OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-23Name fc0_22_total
+attr EVU_aWATTar_connect get02-23OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-24Name fc0_23_total
+attr EVU_aWATTar_connect get02-24OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-2Name fc0_01_total
+attr EVU_aWATTar_connect get02-2OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-3Name fc0_02_total
+attr EVU_aWATTar_connect get02-3OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-4Name fc0_03_total
+attr EVU_aWATTar_connect get02-4OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-5Name fc0_04_total
+attr EVU_aWATTar_connect get02-5OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-6Name fc0_05_total
+attr EVU_aWATTar_connect get02-6OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-7Name fc0_06_total
+attr EVU_aWATTar_connect get02-7OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-8Name fc0_07_total
+attr EVU_aWATTar_connect get02-8OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02-9Name fc0_08_total
+attr EVU_aWATTar_connect get02-9OExpr round(($val+$val*0.03+1.785)*1.19/100,4)
+attr EVU_aWATTar_connect get02FollowGet 01_priceInfo
+attr EVU_aWATTar_connect get02Name 02_priceDay
+attr EVU_aWATTar_connect get02RegOpt g
+attr EVU_aWATTar_connect get02Regex (?<=abs_[0-9]{2}_amount: )([0-9]+[0-9\.]+)
+attr EVU_aWATTar_connect get02URL https://api.awattar.de/v1/marketdata/current.yaml
+attr EVU_aWATTar_connect get03-1Name fc3_00_startsAt
+attr EVU_aWATTar_connect get03-1OExpr POSIX::strftime("%Y-%m-%d %H:%M:%S",localtime(substr($val,0,10)))
+attr EVU_aWATTar_connect get03-4Name fc3_00_total
+attr EVU_aWATTar_connect get03-4OExpr round($val/1000,4)
+attr EVU_aWATTar_connect get03Name 02_priceAll
+attr EVU_aWATTar_connect get03RegOpt g
+attr EVU_aWATTar_connect get03Regex "start_timestamp": (\d{10})|"marketprice": (\d*\.\d*)
+attr EVU_aWATTar_connect get03URL https://api.awattar.de/v1/marketdata?start=1701990000000&end=1702159200000
+attr EVU_aWATTar_connect group PV Steuerung EVU
+attr EVU_aWATTar_connect icon sani_pump
+attr EVU_aWATTar_connect room Strom->Boerse
+attr EVU_aWATTar_connect sortby 213
+attr EVU_aWATTar_connect userReadings fc_trigger_price:fc_avg.* {\
+## fc_trigger_price:[fc_avg|compensation_grid].* {\\
+  my $fc_avg = ReadingsVal("$NAME","fc_avg",0);;\
+  my $fc_min = ReadingsVal("$NAME","fc_min",0);;\
+\
+  # Berechnung eines Default Schwellwertes als täglicher Niedrigpreis\
+  my $price_level = round( ($fc_avg - $fc_min)/2 + $fc_min , 1);;\
+ \
+  # Abschätzung von Wirtschaftlichkeit beim Speicher Laden, falls Tibber zu teuer wird\
+  if ( ReadingsVal("$NAME","compensation_grid",0) != 0 ) {\
+    my $price_level_battery = round( ($fc_avg - ReadingsVal("$NAME","compensation_grid",0)) *0.85 , 1) ;;\
+    if ( $price_level > $price_level_battery ) {\
+      $price_level = $price_level_battery;;\
+    }\
+  }\
+  $price_level;;\
+},\
+\
+fc0_trigger_start:fc_trigger_price.* {\
+  my $fc_trigger_price = ReadingsVal("$NAME","fc_trigger_price",0) /100;;\
+\
+  # Ermitteln des nächsten Trigger Fensters\
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my $fc_total = 0;;\
+\
+    for (my $loop_hour = $hour;; $loop_hour <= 23;; $loop_hour++) {\
+      $fc_total = ReadingsVal("$NAME","fc0_".sprintf("%02d",$loop_hour)."_total",0);;\
+      if ( $fc_total < $fc_trigger_price ) {\
+        return(sprintf("%02d:00",$loop_hour)) ;;\
+      }\
+    } # end  for loop_hour\
+\
+  return("null");;\
+},\
+\
+fc0_trigger_stop:fc0_trigger_start.* {\
+  my $fc = 0;;\
+  my $loop_hour = 0;;\
+  my $fc_trigger_price = ReadingsVal("$NAME","fc_trigger_price",0) /100;;\
+\
+  # Ermitteln des nächsten Trigger Fensters\
+  my $fc_trigger_start = ReadingsVal("$NAME","fc0_trigger_start","null");;\
+  my $fc_trigger_stop = $fc_trigger_start;;\
+\
+  if ( $fc_trigger_start ne "null" ) {\
+    $fc_trigger_start =~ /(\d\d):/;; $fc_trigger_start = $1 ;;\
+    my $fc_total = 0;;\
+\
+    for ($loop_hour = $fc_trigger_start;; $loop_hour <= 23;; $loop_hour++) {\
+      $fc_total = ReadingsVal("$NAME","fc".$fc."_".sprintf("%02d",$loop_hour)."_total",0);;\
+      if ( $fc_total < $fc_trigger_price ) {\
+        $fc_trigger_stop = sprintf("%02d:00",$loop_hour) ;;\
+      } else {\
+        return(sprintf("%02d:00",$loop_hour));;\
+      }\
+\
+     # wechsel zum nächsten Tag\
+     if ( $loop_hour == 23 and $fc == 0 ) {\
+       $fc = 1;;\
+       $loop_hour = -1;;\
+     }\
+\
+    } # end for loop_hour\
+  }\
+ \
+  return($fc_trigger_stop);;\
+},\
+\
+fc0_trigger:fc0_trigger_stop.* {\
+\
+  # Setzen des Triggers für die aktuelle Stunde\
+  if ( ReadingsVal("$NAME","current_price",100)  < ReadingsVal("$NAME","fc_trigger_price",0) ) {\
+    return("on")\
+  } else {\
+    return("off")\
+  }\
+},\
+\
+fc_DbLog:fc0_00_total.* {\
+my ($timestamp,$date,$hour,$value,$loop_fc_next) = 5x0;;\
+\
+for (my $loop_fc = 0;; $loop_fc <= 1;; $loop_fc++) {\
+  $loop_fc_next = $loop_fc +1;;\
+  $date = ReadingsVal("$NAME","current_date","null");;\
+  if ($date ne "null") {\
+    $date =~ /([\d+-]+)/;; $date = $1 ;;\
+    for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
+      $hour = sprintf("%02d",$loop_hour);;\
+      $timestamp = $date." ".$hour.":00:00";;\
+      $value = ReadingsVal("$NAME","fc".$loop_fc."_".$hour."_total","null");;\
+      ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+                        INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                          VALUES('".$timestamp."','$NAME','Tibber','fc".$loop_fc."_total','".$value."')\
+                        ON DUPLICATE KEY UPDATE\
+                          VALUE='".$value."';;") ;;\
+    }\
+  } else {\
+      fhem("deletereading $NAME fc1_.*");;\
+  }\
+}\
+ReadingsVal("$NAME","current_date","null");;\
+}
+attr EVU_aWATTar_connect verbose 0

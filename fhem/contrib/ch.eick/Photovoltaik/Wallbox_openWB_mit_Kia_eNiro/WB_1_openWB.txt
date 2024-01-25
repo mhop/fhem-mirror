@@ -1,0 +1,263 @@
+defmod WB_1 MQTT2_DEVICE WB_1_MQTT2
+attr WB_1 DbLogExclude .*
+attr WB_1 DbLogInclude lp_.*_.*,.*AllChargePoints.*,ChargeMode
+attr WB_1 IODev WB_1_MQTT2
+attr WB_1 alias WB_1
+attr WB_1 autocreate 0
+attr WB_1 comment Die openWB besteht aus zwei Ladepunkten.
+attr WB_1 devicetopic openWB
+attr WB_1 disable 0
+attr WB_1 event-on-change-reading lp_.*_.*,.*AllChargePoints.*,ChargeMode,bool70.*
+attr WB_1 event-on-update-reading lp_2_kWhChargedSincePlugged_RFID
+attr WB_1 group PV Eigenverbrauch-Steuerung
+attr WB_1 icon fuel
+attr WB_1 readingList $DEVICETOPIC/global/WHouseConsumption:.* WHouseConsumption\
+$DEVICETOPIC/global/WAllChargePoints:.* WAllChargePoints\
+$DEVICETOPIC/global/ChargeMode:.* {my %h=(0=>'SofortLaden',1=>'MinPV',2=>'NurPV',3=>'Stop',4=>'Standby');; return {ChargeMode=>$h{$EVENT}}}\
+\
+$DEVICETOPIC/global/awattar/boolAwattarEnabled:.* boolAwattarEnabled\
+$DEVICETOPIC/global/awattar/ActualPriceForCharging:.* ActualPriceForCharging\
+$DEVICETOPIC/global/awattar/MaxPriceForCharging:.* MaxPriceForCharging\
+$DEVICETOPIC/global/boolRse:.* boolRse\
+$DEVICETOPIC/global/DailyYieldAllChargePointsKwh:.* DailyYieldAllChargePointsKwh\
+$DEVICETOPIC/global/rfidConfigured:.* rfidConfigured\
+$DEVICETOPIC/global/kWhCounterAllChargePoints:.* kWhCounterAllChargePoints\
+$DEVICETOPIC/global/strLastmanagementActive:.* strLastmanagementActive\
+$DEVICETOPIC/global/ETProvider/modulePath:.* modulePath\
+$DEVICETOPIC/global/cpuTemp:.* cpuTemp\
+\
+$DEVICETOPIC/system/Uptime:.* Uptime\
+$DEVICETOPIC/system/Date:.* Date\
+$DEVICETOPIC/system/Timestamp:.* Timestamp\
+$DEVICETOPIC/system/Version:.* Version\
+$DEVICETOPIC/system/IpAddress:.* IpAddress\
+$DEVICETOPIC/system/lastRfId:.* lastRfId\
+$DEVICETOPIC/system/updateInProgress:.* updateInProgress\
+$DEVICETOPIC/system/ConfiguredChargePoints:.* ConfiguredChargePoints\
+$DEVICETOPIC/system/lastlivevalues:.* lastlivevalues\
+$DEVICETOPIC/system/randomSleep:.* randomSleep\
+$DEVICETOPIC/system/wizzardDone:.* wizzardDone\
+$DEVICETOPIC/system/priceForKWh:.* priceForKWh\
+$DEVICETOPIC/system/reloadDisplay:.* reloadDisplay\
+\
+$DEVICETOPIC/evu/ASchieflast:.* ASchieflast\
+\
+$DEVICETOPIC/lp/1/P%Soc:.* lp_1_Pct_Soc\
+$DEVICETOPIC/lp/1/%Soc:.* lp_1_current_Soc\
+$DEVICETOPIC/lp/1/\x25Soc:.* lp_1__Soc\
+\
+$DEVICETOPIC/lp/1/countPhasesInUse:.* lp_1_countPhasesInUse\
+$DEVICETOPIC/lp/1/ChargePointEnabled:.* lp_1_ChargePointEnabled\
+$DEVICETOPIC/lp/1/ChargeStatus:.* lp_1_ChargeStatus\
+\
+$DEVICETOPIC/lp/1/kWhDailyCharged:.* lp_1_kWhDailyCharged\
+$DEVICETOPIC/lp/1/kWhCounter:.* lp_1_kWhCounter\
+$DEVICETOPIC/lp/1/kWhActualCharged:.* lp_1_kWhActualCharged\
+$DEVICETOPIC/lp/1/kWhChargedSincePlugged:.* lp_1_kWhChargedSincePlugged\
+$DEVICETOPIC/lp/1/energyConsumptionPer100km:.* lp_1_energyConsumptionPer100km\
+$DEVICETOPIC/lp/1/kmCharged:.* lp_1_kmCharged\
+\
+$DEVICETOPIC/lp/1/strChargePointName:.* lp_1_strChargePointName\
+$DEVICETOPIC/lp/1/TimeRemaining:.* lp_1_TimeRemaining\
+\
+$DEVICETOPIC/lp/1/PfPhase2:.* lp_1_PfPhase2\
+$DEVICETOPIC/lp/1/PfPhase3:.* lp_1_PfPhase3\
+$DEVICETOPIC/lp/1/PfPhase1:.* lp_1_PfPhase1\
+$DEVICETOPIC/lp/1/W:.* lp_1_W\
+\
+$DEVICETOPIC/lp/1/boolPlugStat:.* {my %h=(0=>'no Plug',1=>'Plugged in');; return {lp_1_PlugStat=>$h{$EVENT}}}\
+$DEVICETOPIC/lp/1/boolChargeStat:.* {my %h=(0=>'not loading',1=>'loading');; return {lp_1_ChargeStat=>$h{$EVENT}}}\
+$DEVICETOPIC/lp/1/AConfigured:.* lp_1_AConfigured\
+\
+$DEVICETOPIC/lp/1/boolChargePointConfigured:.* lp_1_boolChargePointConfigured\
+$DEVICETOPIC/lp/1/boolSocConfigured:.* lp_1_boolSocConfigured\
+$DEVICETOPIC/lp/1/boolDirectModeChargekWh:.* lp_1_boolDirectModeChargekWh\
+$DEVICETOPIC/lp/1/boolDirectChargeModeSoc:.* lp_1_boolDirectChargeModeSoc\
+$DEVICETOPIC/lp/1/boolFinishAtTimeChargeActive:.* lp_1_boolFinishAtTimeChargeActive\
+$DEVICETOPIC/lp/1/boolChargeAtNight:.* lp_1_boolChargeAtNight\
+$DEVICETOPIC/lp/1/boolSocManual:.* lp_1_boolSocManual\
+\
+$DEVICETOPIC/lp/1/AutolockStatus:.* lp_1_AutolockStatus\
+$DEVICETOPIC/lp/1/AutolockConfigured:.* lp_1_AutolockConfigured\
+\
+$DEVICETOPIC/lp/1/lastRfId:.* lp_1_lastRfId\
+$DEVICETOPIC/lp/1/pluggedladungakt:.* lp_1_pluggedladungakt\
+$DEVICETOPIC/lp/1/plugStartkWh:.* lp_1_plugStartkWh\
+$DEVICETOPIC/lp/1/MeterSerialNumber:.* lp_1_MeterSerialNumber\
+\
+\
+$DEVICETOPIC/lp/2/P%Soc:.* lp_2_Pct_Soc\
+$DEVICETOPIC/lp/2/%Soc:.* lp_2_current_Soc\
+$DEVICETOPIC/lp/2/\x25Soc:.* lp_2__Soc\
+\
+$DEVICETOPIC/lp/2/countPhasesInUse:.* lp_2_countPhasesInUse\
+$DEVICETOPIC/lp/2/ChargePointEnabled:.* lp_2_ChargePointEnabled\
+$DEVICETOPIC/lp/2/ChargeStatus:.* lp_2_ChargeStatus\
+\
+$DEVICETOPIC/lp/2/kWhDailyCharged:.* lp_2_kWhDailyCharged\
+$DEVICETOPIC/lp/2/kWhCounter:.* lp_2_kWhCounter\
+$DEVICETOPIC/lp/2/kWhActualCharged:.* lp_2_kWhActualCharged\
+$DEVICETOPIC/lp/2/kWhChargedSincePlugged:.* lp_2_kWhChargedSincePlugged\
+$DEVICETOPIC/lp/2/energyConsumptionPer100km:.* lp_2_energyConsumptionPer100km\
+$DEVICETOPIC/lp/2/kmCharged:.* lp_2_kmCharged\
+\
+$DEVICETOPIC/lp/2/strChargePointName:.* lp_2_strChargePointName\
+$DEVICETOPIC/lp/2/TimeRemaining:.* lp_2_TimeRemaining\
+\
+$DEVICETOPIC/lp/2/W:.* lp_2_W\
+\
+$DEVICETOPIC/lp/2/boolPlugStat:.* {my %h=(0=>'no Plug',1=>'Plugged in');; return {lp_2_PlugStat=>$h{$EVENT}}}\
+$DEVICETOPIC/lp/2/boolChargeStat:.* {my %h=(0=>'not loading',1=>'loading');; return {lp_2_ChargeStat=>$h{$EVENT}}}\
+$DEVICETOPIC/lp/2/AConfigured:.* lp_2_AConfigured\
+\
+$DEVICETOPIC/lp/2/boolChargePointConfigured:.* lp_2_boolChargePointConfigured\
+$DEVICETOPIC/lp/2/boolSocConfigured:.* lp_2_boolSocConfigured\
+$DEVICETOPIC/lp/2/boolDirectModeChargekWh:.* lp_2_boolDirectModeChargekWh\
+$DEVICETOPIC/lp/2/boolDirectChargeModeSoc:.* lp_2_boolDirectChargeModeSoc\
+$DEVICETOPIC/lp/2/boolFinishAtTimeChargeActive:.* lp_2_boolFinishAtTimeChargeActive\
+$DEVICETOPIC/lp/2/boolChargeAtNight:.* lp_2_boolChargeAtNight\
+$DEVICETOPIC/lp/2/boolSocManual:.* lp_2_boolSocManual\
+\
+$DEVICETOPIC/lp/2/AutolockStatus:.* lp_2_AutolockStatus\
+$DEVICETOPIC/lp/2/AutolockConfigured:.* lp_2_AutolockConfigured\
+\
+$DEVICETOPIC/lp/2/lastRfId:.* lp_2_lastRfId\
+$DEVICETOPIC/lp/2/pluggedladungakt:.* lp_2_pluggedladungakt\
+$DEVICETOPIC/lp/2/plugStartkWh:.* lp_2_plugStartkWh\
+$DEVICETOPIC/lp/2/MeterSerialNumber:.* lp_2_MeterSerialNumber\
+\
+\
+$DEVICETOPIC/boolChargeAtNight_direct:.* boolChargeAtNight_direct\
+$DEVICETOPIC/boolChargeAtNight_nurpv:.* boolChargeAtNight_nurpv\
+$DEVICETOPIC/boolChargeAtNight_minpv:.* boolChargeAtNight_minpv\
+$DEVICETOPIC/boolDisplayHouseConsumption:.* boolDisplayHouseConsumption\
+$DEVICETOPIC/boolDisplayDailyCharged:.* boolDisplayDailyCharged\
+$DEVICETOPIC/boolEvuSmoothedActive:.* boolEvuSmoothedActive\
+$DEVICETOPIC/pv/bool70PVDynActive:.* bool70PVDynActive\
+$DEVICETOPIC/pv/W70PVDyn:.* W70PVDyn\
+$DEVICETOPIC/pv/bool70PVDynStatus:.* bool70PVDynStatus\
+$DEVICETOPIC/pv/CounterTillStartPvCharging:.* CounterTillStartPvCharging\
+$DEVICETOPIC/pv/W:.* W\
+$DEVICETOPIC/config/get/pv/nurpv70dynact:.* nurpv70dynact\
+$DEVICETOPIC/config/get/pv/nurpv70dynw:.* nurpv70dynw\
+\
+$DEVICETOPIC/config/get/pv/priorityModeEVBattery:.* priorityModeEVBattery\
+$DEVICETOPIC/config/get/pv/lp/1/minSocAlwaysToChargeTo:.* lp_1_minSocAlwaysToChargeTo\
+$DEVICETOPIC/config/get/pv/lp/1/maxSoc:.* lp_1_maxSoc\
+$DEVICETOPIC/config/get/pv/lp/1/minSocAlwaysToChargeToCurrent:.* lp_1_minSocAlwaysToChargeToCurrent\
+$DEVICETOPIC/config/get/pv/lp/1/maxSocToChargeTo:.* lp_1_maxSocToChargeTo\
+$DEVICETOPIC/config/get/pv/lp/1/minCurrent:.* lp_1_minCurrent\
+$DEVICETOPIC/config/get/pv/lp/1/socLimitation:.* lp_1_socLimitation\
+$DEVICETOPIC/config/get/pv/lp/2/minCurrent:.* lp_2_minCurrent\
+$DEVICETOPIC/config/get/pv/lp/2/maxSoc:.* lp_2_maxSoc\
+$DEVICETOPIC/config/get/pv/lp/2/socLimitation:.* lp_2_socLimitation\
+$DEVICETOPIC/config/get/pv/socStopChargeAtMinPv:.* socStopChargeAtMinPv\
+$DEVICETOPIC/config/get/pv/regulationPoint:.* regulationPoint\
+$DEVICETOPIC/config/get/pv/minBatteryDischargeSocAtBattPriority:.* minBatteryDischargeSocAtBattPriority\
+$DEVICETOPIC/config/get/pv/minBatteryChargePowerAtEvPriority:.* minBatteryChargePowerAtEvPriority\
+$DEVICETOPIC/config/get/pv/minFeedinPowerBeforeStart:.* minFeedinPowerBeforeStart\
+$DEVICETOPIC/config/get/pv/boolAdaptiveCharging:.* boolAdaptiveCharging\
+$DEVICETOPIC/config/get/pv/adaptiveChargingFactor:.* adaptiveChargingFactor\
+$DEVICETOPIC/config/get/pv/batteryDischargePowerAtBattPriority:.* batteryDischargePowerAtBattPriority\
+$DEVICETOPIC/config/get/pv/boolShowPriorityIconInTheme:.* boolShowPriorityIconInTheme\
+$DEVICETOPIC/config/get/pv/maxPowerConsumptionBeforeStop:.* maxPowerConsumptionBeforeStop\
+$DEVICETOPIC/config/get/pv/stopDelay:.* stopDelay\
+$DEVICETOPIC/config/get/pv/chargeSubmode:.* chargeSubmode\
+$DEVICETOPIC/config/get/pv/minCurrentMinPv:.* minCurrentMinPv\
+$DEVICETOPIC/config/get/pv/socStartChargeAtMinPv:.* socStartChargeAtMinPv\
+$DEVICETOPIC/config/get/pv/startDelay:.* startDelay\
+$DEVICETOPIC/config/get/sofort/lp/2/energyToCharge:.* lp_2_energyToCharge\
+$DEVICETOPIC/config/get/sofort/lp/2/chargeLimitation:.* lp_2_chargeLimitation\
+$DEVICETOPIC/config/get/sofort/lp/2/socToChargeTo:.* lp_2_socToChargeTo\
+$DEVICETOPIC/config/get/sofort/lp/2/current:.* lp_2_current\
+\
+$DEVICETOPIC/config/get/sofort/lp/1/socToChargeTo:.* lp_1_socToChargeTo\
+\
+$DEVICETOPIC/config/get/sofort/lp/1/energyToCharge:.* lp_1_energyToCharge\
+$DEVICETOPIC/config/get/sofort/lp/1/chargeLimitation:.* lp_1_chargeLimitation\
+$DEVICETOPIC/config/get/sofort/lp/1/current:.* lp_1_current\
+$DEVICETOPIC/config/get/global/minEVSECurrentAllowed:.* minEVSECurrentAllowed\
+$DEVICETOPIC/config/get/global/maxEVSECurrentAllowed:.* maxEVSECurrentAllowed\
+$DEVICETOPIC/config/get/global/dataProtectionAcknoledged:.* dataProtectionAcknoledged\
+$DEVICETOPIC/config/get/global/slaveMode:.* slaveMode\
+$DEVICETOPIC/config/get/u1p3p/standbyPhases:.* standbyPhases\
+$DEVICETOPIC/config/get/u1p3p/sofortPhases:.* sofortPhases\
+$DEVICETOPIC/config/get/u1p3p/nachtPhases:.* nachtPhases\
+$DEVICETOPIC/config/get/u1p3p/minundpvPhases:.* minundpvPhases\
+$DEVICETOPIC/config/get/u1p3p/nurpvPhases:.* nurpvPhases\
+$DEVICETOPIC/config/get/u1p3p/isConfigured:.* isConfigured\
+$DEVICETOPIC/boolChargeAtNight_standby:.* boolChargeAtNight_standby\
+$DEVICETOPIC/set/system/reloadDisplay:.* reloadDisplay\
+$DEVICETOPIC/set/system/topicSender:.* topicSender\
+$DEVICETOPIC/set/lp/2/ChargePointEnabled:.* lp_2_ChargePointEnabled\
+\
+
+attr WB_1 room 2_PV_Steuerung,MQTT2_DEVICE,Strom->Photovoltaik
+attr WB_1 setList Lademodus:SofortLaden,MinPV,NurPV,Stop,Standby { my %h=(SofortLaden=>'0','MinPV'=>'1',NurPV=>'2',Stop=>'3',Standby=>'4');;qq($DEVICETOPIC/set/ChargeMode $h{$EVTPART1}) }\
+DirectChargeSubMode:Aus,kWh_Laden,SoC_Laden { my %h=(Aus=>'0',kWh_Laden=>'1',SoC_Laden=>'2');;qq($DEVICETOPIC/set/lp1/DirectChargeSubMode $h{$EVTPART1}) }\
+lp_1_socToChargeTo:50,60,70,80,90,100 { qq($DEVICETOPIC/config/set/sofort/lp/1/socToChargeTo $EVTPART1) }\
+priorityModeEVBattery:0,1 { qq($DEVICETOPIC/config/set/pv/priorityModeEVBattery $EVTPART1) }\
+\
+nurpv70dynact:0,1 { qq($DEVICETOPIC/config/set/pv/nurpv70dynact $EVTPART1) }\
+nurpv70dynw { qq($DEVICETOPIC/config/set/pv/nurpv70dynw $EVTPART1) }\
+\
+NurPV70Status:0,1 { qq($DEVICETOPIC/set/pv/NurPV70Status $EVTPART1) }\
+\
+lp_1_current:10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32 { qq($DEVICETOPIC/config/set/sofort/lp/1/current $EVTPART1) }\
+lp_2_current:10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32 { qq($DEVICETOPIC/config/set/sofort/lp/2/current $EVTPART1) }
+attr WB_1 sortby 403
+attr WB_1 stateFormat {\
+ my $MonthBefore='LogDBRep_Statistic_previous_Month';;\
+ my $YearBefore='LogDBRep_Statistic_previous_Year';;\
+ my $DUMMY  = "";;\
+ my $date = POSIX::strftime("%Y-%m-%d",localtime(time_str2num(ReadingsTimestamp($name, "lastlivevalues",0))));;\
+\
+ my $ChargeMode          = ReadingsVal($name,"ChargeMode","n/a");;\
+    $ChargeMode          = ($ChargeMode eq "SofortLaden")? "<span style='color:red'>SofortLaden</span>" : ($ChargeMode eq "MinPV")?  "<span style='color:orange'>Min+PV</span>" : ($ChargeMode eq "NurPV")?  "<span style='color:green'>NurPV</span>" : $ChargeMode;;\
+ \
+ my $lp_1_Name           = ReadingsVal($name,"lp_1_strChargePointName","n/a");;\
+ my $lp_1_Power          = ReadingsVal($name,"lp_1_W",0)." W";;\
+ my $lp_1_Power_1        = ReadingsVal($name,"lp_1_countPhasesInUse",0)."P ".ReadingsVal($name,"lp_1_AConfigured",0)."A";;\
+ my $lp_1_Status_1       = ReadingsVal($name,"lp_1_PlugStat","n/a")."<br>".ReadingsVal($name,"lp_1_ChargeStat","n/a");;\
+ my $lp_1_Status_2       = ReadingsVal($name,"lp_1_TimeRemaining","n/a");;\
+\
+ my $lp_1_Power_d        = sprintf("%5.2f / %5.2f",ReadingsVal($name,"lp_1_kWhDailyCharged",0),ReadingsVal($name,"lp_1_kWhChargedSincePlugged",0));;\
+ my $lp_1_Power_m        = sprintf("%03d / %03d",ReadingsVal($name,"lp_1_kWhCounter_Month",0),ReadingsVal($MonthBefore,$name."_lp_1_kWhCounter_Month",0));;\
+ my $lp_1_Power_j        = sprintf("%04d / %04d",ReadingsVal($name,"lp_1_kWhCounter_Year",0),ReadingsVal($YearBefore,$name."_lp_1_kWhCounter_Year",0));;\
+ my $lp_1_Power_t        = round(ReadingsVal($name,"lp_1_kWhCounter",0),0);;\
+\
+ my $lp_2_Name           = ReadingsVal($name,"lp_2_strChargePointName","n/a");;\
+ my $lp_2_Power          = ReadingsVal($name,"lp_2_W",0)." W";;\
+ my $lp_2_Power_1        = ReadingsVal($name,"lp_2_countPhasesInUse",0)."P ".ReadingsVal($name,"lp_2_AConfigured",0)."A";;\
+ my $lp_2_Status_1       = ReadingsVal($name,"lp_2_PlugStat","n/a")."<br>".ReadingsVal($name,"lp_2_ChargeStat","n/a");;\
+ my $lp_2_Status_2       = "<br>".ReadingsVal($name,"lp_2_TimeRemaining","n/a");;\
+\
+ my $lp_2_Power_d        = sprintf("%5.2f / %5.2f",ReadingsVal($name,"lp_2_kWhDailyCharged",0),ReadingsVal($name,"lp_2_kWhChargedSincePlugged",0));;\
+ my $lp_2_Power_m        = sprintf("%03d / %03d",ReadingsVal($name,"lp_2_kWhCounter_Month",0),ReadingsVal($MonthBefore,$name."_lp_2_kWhCounter_Month",0));;\
+ my $lp_2_Power_j        = sprintf("%04d / %04d",ReadingsVal($name,"lp_2_kWhCounter_Year",0),ReadingsVal($YearBefore,$name."_lp_2_kWhCounter_Year",0));;\
+ my $lp_2_Power_t        = round(ReadingsVal($name,"lp_2_kWhCounter",0),0);;\
+\
+"<html><table border=2 bordercolor='darkgreen' cellspacing=0 style='width: 100%'>\
+ <colgroup>\
+   <col span='1' style='width: 52%;;'>\
+   <col span='1' style='width: 12%;;'>\
+   <col span='1' style='width: 12%;;'>\
+   <col span='1' style='width: 12%;;'>\
+   <col span='1' style='width: 12%;;'>\
+ </colgroup>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;font-weight:bold'>Wallbox</td><td style='padding-right:5px;;padding-left:5px;;font-weight:bold;;text-align:center'>$ChargeMode</td><td style='padding-right:5px;;padding-left:5px;;font-weight:bold;;text-align:center'>Status</td><td style='padding-right:5px;;padding-left:5px;;text-align:center;;font-weight:bold'>Restladezeit</td><td style='padding-right:5px;;padding-left:5px;;text-align:center;;font-weight:bold'>Leistung</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>&nbsp;;&nbsp;;".$lp_1_Name."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$DUMMY."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$lp_1_Status_1."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$lp_1_Status_2."<br></td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$lp_1_Power_1."<br>".$lp_1_Power."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>&nbsp;;&nbsp;;".$lp_2_Name."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$DUMMY."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$lp_2_Status_1."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$lp_2_Status_2."<br></td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$lp_2_Power_1."<br>".$lp_2_Power."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;font-weight:bold'>Statistik vom $date im kWh</td><td style='padding-right:5px;;padding-left:5px;;font-weight:bold;;text-align:center'>aktuell</td><td style='padding-right:5px;;padding-left:5px;;font-weight:bold;;text-align:center'>Heute / letztes</td><td style='padding-right:5px;;padding-left:5px;;font-weight:bold;;text-align:center'>Monat/Vormonat</td><td style='padding-right:5px;;padding-left:5px;;font-weight:bold;;text-align:center'>Jahr/Vorjahr</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>&nbsp;;&nbsp;;".$lp_1_Name."<td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$lp_1_Power."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$lp_1_Power_d."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$lp_1_Power_m."<br></td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$lp_1_Power_j."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>&nbsp;;&nbsp;;".$lp_2_Name."<td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$lp_2_Power."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$lp_2_Power_d."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$lp_2_Power_m."<br></td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$lp_2_Power_j."</td></tr>\
+ </table>\
+</html>"\
+}
+attr WB_1 userReadings lp_1_kWhCounter_Month:lp_1_kWhCounter.* {  round(ReadingsVal("$NAME","lp_1_kWhCounter",0) - ReadingsVal("$NAME","lp_1_kWhCounter_init_Month",0),0) },\
+lp_1_kWhCounter_Year:lp_1_kWhCounter.* {  round(ReadingsVal("$NAME","lp_1_kWhCounter",0) - ReadingsVal("$NAME","lp_1_kWhCounter_init_Year",0),0)  },\
+\
+lp_2_kWhCounter_Month:lp_2_kWhCounter.* {  round(ReadingsVal("$NAME","lp_2_kWhCounter",0) - ReadingsVal("$NAME","lp_2_kWhCounter_init_Month",0),0) },\
+lp_2_kWhCounter_Year:lp_2_kWhCounter.* {  round(ReadingsVal("$NAME","lp_2_kWhCounter",0) - ReadingsVal("$NAME","lp_2_kWhCounter_init_Year",0),0)  },\
+\
+lp_2_kWhChargedSincePlugged_RFID:lp_2_PlugStat.* { (ReadingsVal("$NAME","lp_2_PlugStat",'NULL') eq 'Plugged in')?'Wer lädt gerade?':'NULL' }

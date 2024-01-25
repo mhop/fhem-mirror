@@ -1,0 +1,782 @@
+defmod Kia_eNiro DOIF ################################################################################################################\
+## 1 Kia Connect Status Abfrage erfolgt mit MQTT2 ==> node-ret ==> Kia Connect\
+##\
+1_Status_getAll\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and [Kia_connect:req_active] eq "idle"\
+     and\
+     (\
+	   (\
+         (    [+00:15]                                                   ## alle 15 Minuten\
+          and ([Kia_connect:atHomeStanding] eq "true"                    ##   wenn das Auto zuhause ist\
+          and  [Kia_connect:charging]       eq "true"                    ##   und es geladen wird\
+          or  [WB_1:lp_1_ChargeStat]        eq "loading")                ## Oder es ist bereits an der WB_1_lp_1\
+          or  [:58] and [?07:00-20:00]                                   ## ansonsten nur jede Stunde\
+         )\
+         or\
+         (\
+              [WB_1:lp_1_PlugStat]         eq "Plugged in"               ## Auto scheint da zu sein, es fehlt jedoch der Status\
+          and [Kia_connect:atHomeStanding] eq "false"\
+         )\
+       )\
+                                                                       ## Es darf kein loop sein\
+      and ::time_str2num(::ReadingsTimestamp("Kia_connect","req_active",0)) - ::time_str2num(::ReadingsTimestamp("Kia_connect","req_received",0)) > 5\
+      and [Kia_connect:bat12v]      >  40                              ## aber die 12V Batterie sollte noch genÃ¼gend Ladung haben\
+      and [Heizung:opModeHotWater] ne "Aus"                            ## Wir sind nicht im Urlaub\
+     )\
+      or [$SELF:cmd_event]    eq "set_cmd_1"                           ## Das reagiert auf den Aufruf mit "set <Device> cmd_*"\
+      or [$SELF:ui_command_1] eq "Status_getAll"                       ## Hier wird das uiTable select ausgewertet\
+   ) {\
+    if( [$SELF:ui_command_1] eq "Status_getAll" ) {                    ## Hier wurde manuell eingeschaltet\
+      set_Reading("ui_command_before_1",[$SELF:ui_command_1]);;\
+    }\
+\
+    fhem_set("Kia_connect getAll");;                                    ## beliebige Kommandos fÃ¼r diesen Block\
+\
+    set_Reading("ui_command_1","---");;                                 ## Hier wird das uiTable select wieder zurÃ¼ckgesetzt, ansonsten\
+                                                                       ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+2_Klima\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and [?Kia_connect:req_active] eq "idle"\
+     and\
+     (   [$SELF:ui_command_2] eq "stopClimate"                         ## Hier wird das uiTable select ausgewertet\
+      or [$SELF:ui_command_2] eq "startHeating"\
+      or [$SELF:ui_command_2] eq "startCooling"\
+      or [WB_1:lp_1_PlugStat] eq "no Plug"                             ## Das Auto wurde von der WallBox getrennt\
+     )\
+   ) {\
+\
+    if (    [$SELF:ui_command_before_2]  eq "startHeating"             ## Das Auto sollte nur geheizt werden\
+        and\
+         (\
+           (    [$SELF:ui_command_2]         eq "stopClimate"          ## Das Heizen soll beendet werden\
+            and [WB_1:lp_1_PlugStat]         eq "Plugged in"    \
+            and [Kia_connect:atHomeStanding] eq "true"\
+           )\
+          or [WB_1:lp_1_PlugStat] eq "no Plug"                         ## Das Auto wurde von der WallBox getrennt\
+         )\
+       ) {\
+\
+      fhem_set("WB_1 Lademodus Stop");;                                 ## Die Wallbox wieder abschalte\
+      if (AttrVal("$SELF","verbose",0) >= 3)\
+        {Log 3, "$SELF 02_Klima       : Lademodus Stop"};;\
+    }\
+\
+\
+    set_Reading("ui_command_before_2",[$SELF:ui_command_2]);;           ## Die jetzige Auswahl merken\
+\
+    if ([$SELF:ui_command_2] eq "startHeating") {                      ## Das Auto soll geheizt werden\
+      my $airTemp_value = [Kia_connect:status_airTemp_value_target_Winter];;\
+\
+      if (    [WB_1:lp_1_PlugStat]         eq "Plugged in"             ## Ist ein Auto angeschlossen\
+          and [Kia_connect:atHomeStanding] eq "true") {                ## Ist es unser Auto\
+        fhem_set("WB_1 Lademodus SofortLaden");;                        ## Es ist besser für's Heizen die Wallbox zu aktivieren\
+        if (AttrVal("$SELF","verbose",0) >= 3)\
+           {Log 3, "$SELF 02_Klima       : Lademodus SofortLaden"};;\
+      }\
+\
+      fhem_set('Kia_connect startClimate {"defrost": true, "windscreenHeating": true, "temperature": '.$airTemp_value.' , "unit": "C"}');;\
+      if (AttrVal("$SELF","verbose",0) >= 0)\
+         {Log 3, "$SELF 02_Klima       : startHeating $airTemp_value"};;\
+    }\
+    if ([$SELF:ui_command_2] eq "startCooling") {                      ## Das Auto soll gekühlt werden\
+      my $airTemp_value = [Kia_connect:status_airTemp_value_target_Sommer];;\
+\
+      if (    [WB_1:lp_1_PlugStat]         eq "Plugged in"             ## Ist ein Auto angeschlossen\
+          and [Kia_connect:atHomeStanding] eq "true") {                ## Ist es unser Auto\
+        fhem_set("WB_1 Lademodus NurPV");;                              ## Im Sommer nur mit PV Überschuss kühlen\
+        if (AttrVal("$SELF","verbose",0) >= 3)\
+           {Log 3, "$SELF 02_Klima       : Lademodus NurPV"};;\
+      }\
+\
+      fhem_set('Kia_connect startClimate {"defrost": false, "windscreenHeating": false, "temperature": '.$airTemp_value.' , "unit": "C"}');;\
+      if (AttrVal("$SELF","verbose",0) >= 0)\
+         {Log 3, "$SELF 02_Klima       : startCooling $airTemp_value"};;\
+    }\
+    if ([$SELF:ui_command_2] eq "stopClimate") {                       ## Die Klimatisierung manuell beenden\
+      fhem_set("Kia_connect ".[$SELF:ui_command_2]);;                   ##    Die Wallbox wurde bereits weiter oben abgeschaltet\
+      if (AttrVal("$SELF","verbose",0) >= 0)\
+         {Log 3, "$SELF 02_Klima       : stopClimate"};;\
+    }\
+    fhem_set("Abfall update");;                                         ## Den Kalender für weitere Klimatisierungen abfragen\
+\
+    set_Exec("wait_Status",20,'fhem_set("Kia_connect getAll")');;       ## Starte Status Abfrage etwas verzögert\
+\
+    set_Reading("ui_command_2","---");;                                 ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                       ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+3_Laden\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and [Kia_connect:req_active] eq "idle"\
+     and\
+     (   [$SELF:ui_command_3] eq "setChargeTargetSoc"                  ## Hier wird das uiTable select ausgewertet\
+      or [$SELF:ui_command_3] eq "startCharge"\
+      or [$SELF:ui_command_3] eq "stopCharge"\
+     )\
+   ) {\
+    set_Reading("ui_command_before_3",[$SELF:ui_command_3]);;\
+\
+    if ([$SELF:ui_command_3] eq "setChargeTargetSoc") {\
+      my $targetSOClist_1_targetSOClevel = [Kia_connect:status_evStatus_reservChargeInfos_targetSOClist_1_targetSOClevel_target];;\
+      my $targetSOClist_2_targetSOClevel = [Kia_connect:status_evStatus_reservChargeInfos_targetSOClist_2_targetSOClevel_target];;\
+      fhem_set("Kia_connect setChargeTargetSoc {\"fast\": ".$targetSOClist_1_targetSOClevel.", \"slow\": ".$targetSOClist_2_targetSOClevel."}");;\
+    } else {\
+      fhem_set("Kia_connect ".[$SELF:ui_command_3]);;                   ## beliebige Kommandos fÃ¼r diesen Block\
+    }\
+    set_Exec("wait_Status",5,'fhem_set("Kia_connect getAll")');;        ## Starte Status Abfrage etwas verzÃ¶gert\
+    set_Reading("ui_command_3","---");;                                 ## Hier wird das uiTable select wieder zurÃ¼ckgesetzt, ansonsten\
+                                                                       ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+4_Klima_timer_heizen\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and\
+     (\
+       (    [[Abfall_Abfuhr:Kiaheizen_connect_time]]                   ## PrÃ¼fe den Kalender Eintrag\
+        and [Abfall_Abfuhr:Kiaheizen_connect_date] eq $ymd             ##   ist es heute?\
+       )\
+       or\
+       (    [$SELF:ui_timer_mode] eq "heizen"                          ## Timer zum Heizen aktiv?\
+        and [[$SELF:ui_timer_Start]]                                   ##   ist es soweit?\
+       )\
+     )\
+   ) {\
+\
+    if (AttrVal("$SELF","verbose",0) >= 0)\
+       {Log 3, "$SELF 04_Klima_timer : startHeating"};;\
+    set_Reading("ui_timer_mode","Aus");;                                ## Schalte die Timer Funktion ab\
+    set_Reading("ui_command_2","startHeating");;                        ## Es soll geheizt werden\
+    fhem_set("$SELF 2_Klima");;                                         ## Aktiviere das Heizen\
+\
+  }\
+}\
+\
+5_Klima_timer_kuehlen\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and\
+     (\
+       (    [[Abfall_Abfuhr:Kiakuehlen_connect_time]]                  ## PrÃ¼fe den Kalender Eintrag\
+        and [Abfall_Abfuhr:Kiakuehlen_connect_date] eq $ymd            ##   ist es heute?\
+       )\
+       or\
+       (    [$SELF:ui_timer_mode] eq "kuehlen"                         ## Timer zum KÃ¼hler aktiv?\
+        and [[$SELF:ui_timer_Start]]                                   ##   ist es soweit?\
+       )\
+     )\
+   ) {\
+\
+    if (AttrVal("$SELF","verbose",0) >= 0)\
+       {Log 3, "$SELF 05_Klima_timer : startCooling"};;\
+    set_Reading("ui_timer_mode","Aus");;                                ## Schalte die Timer Funktion ab\
+    set_Reading("ui_command_2","startCooling");;                        ## Es soll gekÃ¼hlt werden\
+    fhem_set("$SELF 2_Klima");;                                         ## Aktiviere das KÃ¼hlen\
+\
+  }\
+}\
+\
+6_Auf_Zu\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and [Kia_connect:req_active] eq "idle"\
+     and\
+     (   [$SELF:ui_command_1] eq "car_lock"                            ## Hier wird das uiTable select ausgewertet\
+      or [$SELF:ui_command_1] eq "car_unlock"\
+     )\
+   ) {\
+    set_Reading("ui_command_before_1",[$SELF:ui_command_1]);;\
+\
+    fhem_set("Kia_connect ".[$SELF:ui_command_1]);;\
+    if (AttrVal("$SELF","verbose",0) >= 0)\
+       {Log 3, "$SELF 06_Auf_Zu      : ".[$SELF:ui_command_1]};;\
+\
+    set_Exec("wait_Status",20,'fhem_set("Kia_connect getAll")');;       ## Starte Status Abfrage etwas verzÃ¶gert\
+\
+    set_Reading("ui_command_1","---");;                                 ## Hier wird das uiTable select wieder zurÃ¼ckgesetzt, ansonsten\
+                                                                       ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+7_WB_1_lp_1\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and\
+     (   [$SELF:ui_command_4] eq "SofortLaden"                         ## Hier wird das uiTable select ausgewertet\
+      or [$SELF:ui_command_4] eq "MinPV"\
+      or [$SELF:ui_command_4] eq "NurPV"\
+      or [$SELF:ui_command_4] eq "Stop"\
+      or [$SELF:ui_command_4] eq "Standby"\
+      or [$SELF:ui_command_4] eq "Vorrang_EV"\
+      or [$SELF:ui_command_4] eq "Vorrang_Bat"\
+      or [$SELF:WB_1_lp_1_current_soll]\
+     )\
+     and [$SELF:ui_command_4] ne "12_WB_1_lp_1_Sofortladen_ende_limit"\
+     and [$SELF:ui_command_4] ne "12_WB_1_Backup"\
+     and [$SELF:ui_command_4] ne "10_70_beachten"\
+     and [$SELF:ui_command_4] ne "10_70_beachten_ende"\
+     and [$SELF:ui_command_4] ne "11_Ladebasis_berechnen"\
+     and [$SELF:ui_command_4] ne "12_Stromboerse"\
+\
+   ) {\
+    set_Reading("ui_command_before_4",[?$SELF:ui_command_4]);;\
+\
+    ## Die Ladebegrenzung für's SofortLaden wurde geÃ¤ndert\
+    if ( [?$SELF:ui_command_4] eq "---" or [?$SELF:ui_command_4] eq "SofortLaden") {\
+      fhem_set("WB_1 lp_1_current ".[?$SELF:WB_1_lp_1_current_soll]);;   ## setze den neuen Sollwert\
+      set_Reading("ui_command_before_4","Ladebegrenzung");;\
+      set_Reading("ui_command_4","SofortLaden");;                       ## starte als nächstes das SofortLaden\
+#      if (AttrVal("$SELF","verbose",0) >= 0)\
+#         {Log 3, "$SELF 07_WB_1_lp_1            : lp_1_current ".[?$SELF:WB_1_lp_1_current_soll]};;\
+    }\
+    if ([?$SELF:ui_command_4] eq "NurPV" or [?$SELF:ui_command_4] eq "Stop") {\
+      set_Reading("WB_1_lp_1_current_soll","32");;                      ## reset des Leistungsbegrenzung\
+      fhem_set("WB_1 lp_1_current ".[?$SELF:WB_1_lp_1_current_soll]);;   ## setze den neuen Sollwert\
+#      if (AttrVal("$SELF","verbose",0) >= 0)\
+#         {Log 3, "$SELF 07_WB_1_lp_1            : lp_1_current ".[?$SELF:WB_1_lp_1_current_soll]};;\
+    }\
+    if ([?$SELF:ui_command_4] eq "Vorrang_Bat" or [?$SELF:ui_command_4] eq "Vorrang_EV") {\
+      if ([$SELF:ui_command_4] eq "Vorrang_EV") {\
+        fhem_set("WB_1 priorityModeEVBattery 1");;\
+      } else {\
+        fhem_set("WB_1 priorityModeEVBattery 0");;\
+      }\
+      if (AttrVal("$SELF","verbose",0) >= 0)\
+         {Log 3, "$SELF 07_WB_1_lp_1            : ".[?$SELF:ui_command_4]};;\
+    } else {\
+      fhem_set("WB_1 Lademodus ".[?$SELF:ui_command_4]);;\
+      if (AttrVal("$SELF","verbose",0) >= 0)\
+         {Log 3, "$SELF 07_WB_1_lp_1            : Lademodus ".[?$SELF:ui_command_4]};;\
+    }\
+\
+    set_Reading("ui_command_4","---");;                                 ## Hier wird das uiTable select wieder zurÃ¼ckgesetzt, ansonsten\
+                                                                       ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+12_WB_1_lp_1_Sofortladen_ende_limit\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and\
+     ( (    [WB_1:ChargeMode] eq "SofortLaden"                         ## LP1 ist im Sofortladen und Limitiert\
+        and [$SELF:WB_1_lp_1_current_soll] < 32\
+        and [WR_1:Total_Active_P_EM] > 500                             ## Hier beginnt der Netzbezug\
+       )\
+        or [$SELF:ui_command_4] eq "12_WB_1_lp_1_Sofortladen_ende_limit"\
+     )\
+   ) {\
+    fhem_set("WB_1 Lademodus NurPV");;                                  ## Das limitierte SofortLaden beenden und mit NurPV weiter laden\
+    set_Reading("WB_1_lp_1_current_soll","32");;                        ## reset der Ladebegrenzung, damit es nicht vergessen wird\
+    fhem_set("WB_1 lp_1_current ".[$SELF:WB_1_lp_1_current_soll]);;     ## setze den neuen Sollwert\
+\
+    if (AttrVal("$SELF","verbose",0) >= 0)\
+       {Log 3, "$SELF 12_WB_1_lp_1           : Lademodus NurPV"};;\
+\
+    set_Reading("ui_command_4","---");;                                 ## Hier wird das uiTable select wieder zurÃ¼ckgesetzt, ansonsten\
+                                                                       ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+9_WB_1_Zaehler_Statistiken\
+{if( !([$SELF:state] eq "off") and                                     ## DOIF enabled\
+     [00:01]\
+   ) {\
+    fhem("setreading WB_1 lp_1_kWhCounter_init_Day ".[WB_1:lp_1_kWhCounter]);;\
+    fhem("setreading WB_1 lp_2_kWhCounter_init_Day ".[WB_1:lp_2_kWhCounter]);;\
+\
+    if ($mday eq 1)\
+     {\
+      fhem("setreading WB_1 lp_1_kWhCounter_init_Month ".[WB_1:lp_1_kWhCounter]);;\
+      fhem("setreading WB_1 lp_2_kWhCounter_init_Month ".[WB_1:lp_2_kWhCounter]);;\
+\
+      if ($yday eq 0)\
+        {\
+         fhem("setreading WB_1 lp_1_kWhCounter_init_Year ".[WB_1:lp_1_kWhCounter]);;\
+         fhem("setreading WB_1 lp_2_kWhCounter_init_Year ".[WB_1:lp_2_kWhCounter]);;\
+        }\
+     }\
+  }\
+}\
+\
+10_70_beachten\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and\
+     (\
+       (     [$SELF:ui_70_basis]  eq "70%_An"                           ## Es soll im Mittagshoch geladen werden\
+        and  [[WR_ctl:Yield_fc0_middayhigh_start]-[WR_ctl:Yield_fc0_middayhigh_stop]]   ## Innerhalb diese Zeitraums\
+        and\
+        (    \
+              [WB_1:ChargeMode]    eq "Stop"                            ## Noch ist kein Lademodus definiert\
+         and  [WB_1:lp_1_PlugStat] eq "Plugged in"                      ## Das Auto ist verbunden\
+\
+        or\
+         (\
+               [WB_1:ChargeMode]      eq "NurPV"                         ## Noch ist kein Lademodus definiert\
+          and\
+           (   [WB_1:lp_1_ChargeStat] eq "loading"                       ## Das Auto ist verbunden\
+            or [WB_1:lp_1_PlugStat] eq "Plugged in"\
+           )\
+          and                                                            ## Wenn ein stark Verbraucher lÃ¤uft\
+           (   [StromZaehler_Heizung:SMAEM1901401955_Bezug_Wirkleistung] ## LWWP\
+            or [shelly02:power_0]                                        ## Pool \
+            or [shelly05:power_0]                                        ## Brunnen\
+            or [shelly03:power]                                          ## Waschmaschine\
+           )\
+         )\
+        )\
+        and [$SELF:ui_command_4] eq "---"     \
+       )\
+       or\
+        [$SELF:ui_command_4] eq "10_70_beachten"                       ## 70 % beachten neu berechnen\
+     )\
+   ) {\
+\
+    my $Starkverbraucher =   ::round(\
+                             ReadingsVal("StromZaehler_Heizung","SMAEM1901401955_Bezug_Wirkleistung",0)\
+                           + ReadingsVal("shelly02","power_0",0)\
+                           + ReadingsVal("shelly05","power_0",0)\
+                           + ReadingsVal("shelly03","power",0)   ,0) ;;\
+\
+      if (AttrVal("$SELF","verbose",0) >= 0)\
+         {Log 3, "$SELF 70 % berechnen         : Starkverbraucher $Starkverbraucher"};;\
+\
+    if ($Starkverbraucher < 200) {\
+      $Starkverbraucher = 0;;\
+      Log 3, "$SELF 70 % berechnen         : Starkverbraucher $Starkverbraucher";;\
+    } ;;\
+\
+    my $tmp = ::round( ([?$SELF:WB_1_nurpv70dynw_soll] - $Starkverbraucher ) /100 ,0) *100 ;;\
+\
+    if ($tmp < [?$SELF:WB_1_nurpv70dynw_soll]) {\
+#      $tmp = [?$SELF:WB_1_nurpv70dynw_soll];;\
+      if (AttrVal("$SELF","verbose",4) >= 0)\
+         {Log 3, "$SELF 70 % berechnen         : Starkverbraucher laufen, dynamische Basis reduziert auf $tmp"};;\
+    } ;;\
+\
+    set_Reading("WB_1_nurpv70dynw",$tmp);;                             ## Momentanen Wert merken\
+    fhem("set WB_1 nurpv70dynw ".$tmp);;                                ## 70% Basis in der WB setzen\
+\
+    if (AttrVal("$SELF","verbose",0) >= 0) {\
+      Log 3, "$SELF 70 % berechnen         : basis ".[?$SELF:WB_1_nurpv70dynw_soll]." dynw  $tmp";;\
+    };;\
+\
+    if ( ReadingsVal("$SELF","ui_70_basis","") eq "70%_An"             ## Soll 70%_beachten verwendet werden?\
+        and\
+         (   ReadingsVal("WB_1","bool70PVDynStatus",0) eq "0"          ## 70% beachten ist aus\
+          or ReadingsVal("WB_1","nurpv70dynact",0)     eq "0" )        ## 70% Konfiguration ist nicht aktiv\
+        ) {\
+\
+      fhem("set WB_1 nurpv70dynact 1");;                                ## 70% beachten in der Konfiguration aktivieren\
+      fhem("set WB_1 NurPV70Status 1");;                                ## 70% beachten einschalten\
+      fhem("set WB_1 Lademodus NurPV");;                                ## Das wird nur im PV Laden Modus verwendet\
+      fhem_set("WB_1 priorityModeEVBattery 1");;                        ## Das EV soll vor dem Speicher bevorzugt werden\
+\
+      if (AttrVal("$SELF","verbose",0) >= 0)\
+         {Log 3, "$SELF 70 % berechnen         : aktiviert"};;\
+    } ;;\
+\
+    if ([?$SELF:ui_command_4] eq "10_70_beachten")\
+      {set_Reading("ui_command_4","---")};;                             ## Hier wird das uiTable select wieder zurÃ¼ckgesetzt, ansonsten\
+                                                                       ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+\
+10_70_beachten_auto\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and\
+     (\
+       (    [$SELF:ui_70_basis] eq "70%_Aus"                           ## Es soll im Mittagshoch geladen werden\
+        and [WR_ctl:Yield_fc0_middayhigh] == 1                         ## Es gibt noch ein Mittagshoch\
+        and [WB_1:ChargeMode]    eq "Stop"                             ## Noch ist kein Lademodus definiert\
+        and [WB_1:lp_1_PlugStat] eq "Plugged in"                       ## Das Auto ist verbunden\
+##        and ::round((time - ::time_str2num(::ReadingsTimestamp("$SELF","ui_70_basis",""))) /3600 ,0) > 12   ## gestern war es auch aktiviert\
+        and time +2 <                                                  ## und jetzt sind noch 2 h möglich\
+            ::time_str2num(POSIX::strftime("%Y-%m-%d",localtime(time))." ".[WR_ctl:Yield_fc0_middayhigh_stop].":00")\
+        and [$SELF:ui_command_4] eq "---"     \
+       )\
+       or\
+        [$SELF:ui_command_4] eq "10_70_beachten_auto"                  ## 70 % beachten nochmal aktivieren\
+     )\
+   ) {\
+\
+    if (AttrVal("$SELF","verbose",0) >= 0)\
+       {Log 3, "$SELF 70%_beachten_auto      : automatische Aktivierung";;\
+        Log 3, "$SELF 70%_beachten_auto      : bisher ".[$SELF:ui_70_basis];;\
+        Log 3, "$SELF 70%_beachten_auto      : letzter Lauf vor ".::round((time - ::time_str2num(::ReadingsTimestamp("$SELF","ui_70_basis",""))) /3600 ,0)." h";;\
+        Log 3, "$SELF 70%_beachten_auto      : bleibt noch auf ".[WB_1:ChargeMode];;\
+       };;\
+##    set_Reading("ui_70_basis","70%_An");;                               ## Die 70% Regelung aktivieren\
+    fhem("setreading $SELF ui_70_basis 70%_An");;\
+\
+    if ([?$SELF:ui_command_4] eq "10_70_beachten_auto")\
+      {set_Reading("ui_command_4","---")};;                             ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                       ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+\
+10_70_beachten_ende\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and\
+     (\
+      (    [$SELF:ui_70_basis]         eq "70%_An"                     ## Es soll im Mittagshoch geladen werden\
+       and\
+           [[WR_ctl:Yield_fc0_middayhigh_stop]-00:00]                  ## Die Ladezeit ist rum, oder nicht gesetzt\
+       and [$SELF:ui_command_4]        eq "---"     \
+      )\
+      or\
+       [$SELF:ui_command_4] eq "10_70_beachten_ende"                   ## 70 % beachten manuell beenden\
+     )\
+   ) {\
+\
+    if (AttrVal("$SELF","verbose",0) >= 0)\
+       {Log 3, "$SELF 70%_beachten_ende      : deaktiviert";;\
+        Log 3, "$SELF 70%_beachten_ende      : ".[$SELF:ui_70_basis];;\
+        Log 3, "$SELF 70%_beachten_ende      : ".[WR_ctl:Yield_fc0_middayhigh];;\
+        Log 3, "$SELF 70%_beachten_ende      : ".[WR_ctl:Yield_fc0_middayhigh_stop];;\
+        Log 3, "$SELF 70%_beachten_ende      : ".[WB_1:ChargeMode];;\
+        Log 3, "$SELF 70%_beachten_ende      : ".[WB_1:lp_1_ChargeStat];;\
+        Log 3, "$SELF 70%_beachten_ende      : ".[$SELF:ui_command_4];;\
+       };;\
+    set_Reading("ui_70_basis","70%_Aus");;                              ## Den Button zurück setzen\
+\
+    if ([?$SELF:ui_command_4] eq "10_70_beachten_ende") {              ## wenn es manuell umgeschaltet wurde\
+      fhem("set WB_1 Lademodus NurPV")                                 ##      auf NurPV zurückfallen\
+      }\
+    else {                                                             ## geschiet es automatisch, ist die Ladezeit abgelaufen\
+      fhem("set WB_1 Lademodus Stop")                                  ##      dann auf Stop gehen (und bis morgen warten)\
+      };;\
+    fhem("set WB_1 NurPV70Status 0");;                                  ## 70% beachten abschalten\
+    fhem_set("WB_1 priorityModeEVBattery 0");;                          ## Wieder den Hausspeicher bevorzugen\
+\
+    if ([?$SELF:ui_command_4] eq "10_70_beachten_ende")\
+      {set_Reading("ui_command_4","---")};;                             ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                       ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+11_Ladebasis_berechnen\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and\
+     (\
+        [06:00]                                                        ## jeden Morgen einmal berechnen\
+      or\
+        [$SELF:ui_70_basis]  eq "70%_Aus"                              ## oder wenn es abgeschaltet wurde\
+     )\
+      or\
+        [$SELF:ui_command_4] eq "11_Ladebasis_berechnen"               ## \
+   ) {\
+\
+    if (time < ::time_str2num(POSIX::strftime("%Y-%m-%d",localtime(time))." ".[?WR_ctl:Yield_fc0_middayhigh_start].":00") ) {\
+      if (AttrVal("$SELF","verbose",0) >= 0) {Log 3, "$SELF Ladebasis_berechnen     : Ladezeit noch nicht erreicht"}\
+    } else {\
+      if (time < ::time_str2num(POSIX::strftime("%Y-%m-%d",localtime(time))." ".[?WR_ctl:Yield_fc0_middayhigh_stop].":00") ) {\
+        if (AttrVal("$SELF","verbose",0) >= 0) {Log 3, "$SELF Ladebasis_berechnen     : Ladezeit läuft"}\
+      } else {\
+        if (AttrVal("$SELF","verbose",0) >= 0) {Log 3, "$SELF Ladebasis_berechnen     : Ladezeit beendet"}\
+      }\
+    }\
+\
+    if (    [?$SELF:ui_70_basis]  eq "70%_An"\
+        and [?$SELF:ui_command_4] ne "11_Ladebasis_berechnen") {         ## Nicht beenden, wenn es manuell geprüft wird\
+      fhem("set WB_1 NurPV70Status  0");;                                 ## Das 70%_beachten erstmal stoppen\
+      set_Reading("ui_70_basis","70%_Aus");;                              ## Den Button zurück setzen\
+      if (AttrVal("$SELF","verbose",0) >= 0)\
+         {Log 3, "$SELF Ladebasis_berechnen     : deaktiviert"};;\
+    }\
+\
+    ## Wieviel kWh würden ins E-Auto rein gehen\
+    my $delta_wh = ::round( (64 * ([?Kia_connect:targetSOC] - [?Kia_connect:batSOC]) / 100 *1000 *[?$SELF:WB_1_nurpv70dynw_Faktor]) , 0) ;;\
+\
+    if (AttrVal("$SELF","verbose",0) >= 0)\
+       {Log 3, "$SELF Ladebasis_berechnen     : delta_wh        $delta_wh"};;\
+\
+    if ([?WR_ctl:Yield_fc0_middayhigh] == 1) {\
+      ## Wieviele Stunden ist das Mittagshoch\
+      my $Mittagshoch_h = (  ::time_str2num(POSIX::strftime("%Y-%m-%d",localtime(time))." ".[?WR_ctl:Yield_fc0_middayhigh_stop].":00")\
+                           - ::time_str2num(POSIX::strftime("%Y-%m-%d",localtime(time))." ".[?WR_ctl:Yield_fc0_middayhigh_start].":00")) / 3600 ;;\
+      if (AttrVal("$SELF","verbose",0) >= 0)\
+         {Log 3, "$SELF Ladebasis_berechnen     : Mittagshoch_h   $Mittagshoch_h"};;\
+      ## Wie wÃ¤re die durchschnittliche Ladeleistung\
+      my $charge_Power_wh = ::round( $delta_wh / $Mittagshoch_h ,0);;                         ## Ca. Leistung pro Stunde als Mittelwert\
+      if (AttrVal("$SELF","verbose",0) >= 0)\
+         {Log 3, "$SELF Ladebasis_berechnen     : charge_Power_wh $charge_Power_wh"};;\
+\
+      my $fc_Power_wh = 0;;\
+      my $start = substr([?WR_ctl:Yield_fc0_middayhigh_start],0,2);;			     ## Start Stunde als Zähler\
+\
+      for (my $i = $start;; $i < $start+$Mittagshoch_h;; $i++) {\
+        $fc_Power_wh += ReadingsVal("WR_ctl","Yield_fc0_".sprintf("%02d",$i),0);;             ## Summe der Prognose Leistungen\
+      }\
+\
+      Log 3, "$SELF Ladebasis_berechnen     : fc_Power_wh     $fc_Power_wh";;                 ## Leistungsprognose\
+      my $base_70 = ::round(($fc_Power_wh/$Mittagshoch_h - $charge_Power_wh) /100 ,0) *100;;  ## Nur volle 100 Watt\
+\
+      if ( $base_70 > 10000 ) {\
+        $base_70 = ::round((9000 - $charge_Power_wh) /100 ,0) *100;;\
+        if (AttrVal("$SELF","verbose",0) >= 0)\
+          {Log 3, "$SELF Ladebasis_berechnen     : Der Forecast Übersteigt die maximale 70% Regelung"};;\
+       }\
+\
+      if ($base_70 < 2000) {                                                                 ## das ist das openWB minimum\
+#        $base_70 = [?$SELF:WB_1_nurpv70dynw_soll];;\
+        $base_70 = 2000;;\
+        if (AttrVal("$SELF","verbose",0) >= 0)\
+          {Log 3, "$SELF Ladebasis_berechnen     : Das Auto kann an diesem Tag nicht mit 70% Regelung voll geladen werden"};;\
+      }\
+\
+      set_Reading("WB_1_nurpv70dynw_soll",$base_70);;                   ## 70 % Basis für die Wallbox\
+\
+      if (AttrVal("$SELF","verbose",0) >= 0)\
+        {Log 3, "$SELF Ladebasis_berechnen     : 70% Basis       $base_70"};;\
+    }\
+\
+    if ([?$SELF:ui_command_4] eq "11_Ladebasis_berechnen")\
+      {set_Reading("ui_command_4","---")};;                             ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                       ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+################################################################################################################\
+## 12 Stromboerse\
+##\
+12_Stromboerse\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+     and\
+      ((   [WR_ctl:Yield_fc0_day] < [WR_1_Speicher_1_ExternControl:SpeicherMinSOC_fc1_Limit]  ## Im Herbst/Winter ist wenig zu erwarten\
+       and [WB_1:lp_1_PlugStat]         eq "Plugged in"    \
+#       and [Kia_connect:atHomeStanding] eq "true"                        ##   wenn das Auto zuhause ist\
+\
+       and [$SELF:SpeicherStromboerse]  eq "Tibber"                      ## Soll Tibber verwendet werden?\
+       and [EVU_Tibber_connect:fc0_trigger]                              ## Wurde der Trigger geändert\
+       )\
+       or [$SELF:ui_command_4] eq "12_Stromboerse"                       ## Hier wird das uiTable select ausgewertet\
+      )\
+   ) {\
+\
+    if ([?EVU_Tibber_connect:fc0_trigger] eq "on") {\
+      set_Reading("SpeicherTriggerLaden","An");;\
+\
+      fhem_set("WB_1 Lademodus SofortLaden");;\
+      if (AttrVal("$SELF","verbose",0) >= 3)\
+         {Log 3, "$SELF 12_Stromboerse          : Lademodus SofortLaden"};;\
+\
+    } else {\
+      set_Reading("SpeicherTriggerLaden","Aus");;\
+\
+      fhem_set("WB_1 Lademodus Stop");;\
+      if (AttrVal("$SELF","verbose",0) >= 3)\
+         {Log 3, "$SELF 12_Stromboerse          : Lademodus Stop"};;\
+\
+    }\
+\
+   if (AttrVal("$SELF","verbose",0) >=3)\
+     {Log 3, "$SELF 12_Stromboerse          : ".[EVU_Tibber_connect:fc0_trigger]." by ".[$SELF:SpeicherStromboerse]};;\
+\
+   set_Reading("ui_command_4","---");;                                    ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+################################################################################################################\
+## 13 WB_1_Backup\
+##\
+13_WB_1_Backup\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and\
+     (    [02:30]\
+      and $mday == 1                                                   ## \
+     )\
+      or\
+        [$SELF:ui_command_4] eq "13_WB_1_Backup"                       ## \
+   ) {\
+     fhem("setreading $SELF backup running");;\
+     my $openwbBackupURL = AttrVal("$SELF", "openWB_lp1_Url", "http://openwb") . "/openWB/web/settings/backup.php";;\
+     ::HttpUtils_NonblockingGet( { \
+       url=>$openwbBackupURL, timeout=>120, callback=>sub() {\
+         my ($hash, $err, $ret) = @_;;\
+         if ($err || ($ret !~ "Backup-Datei backup.tar.gz erfolgreich erstellt.")) {\
+           fhem("setreading $SELF backup error creating backup: $err $ret");;\
+         } else {\
+           fhem("setreading $SELF backup downloading");;			\
+           my $openwbDownloadURL = AttrVal("$SELF", "openWB_lp1_Url", "http://openwb") . "/openWB/web/backup/backup.tar.gz";;\
+           my $BackupDir = AttrVal("$SELF", "openWB_BackupDir", "././www");;\
+           ::HttpUtils_NonblockingGet({ \
+             url=>$openwbDownloadURL, timeout=>120, callback=>sub() {\
+               my ($hash, $err, $data) = @_;;\
+               my $filename  = "$BackupDir/".sprintf("%d%02d%02d",$year,$month,$mday)."_openwb_lp1_backup.tar.gz";;\
+               if(open(FH, ">$filename")) {\
+                 print FH $data;;\
+                 close(FH);;							\
+                 fhem("setreading $SELF backup $filename");;\
+               } else {\
+                 fhem("setreading $SELF backup error downloading $filename");;\
+               }\
+             } # End URL=>\
+           });; # End HttpUtils_NonblockingGet\
+         }\
+       } # End URL=>\
+     });; # End HttpUtils_NonblockingGet\
+\
+     if ([?$SELF:ui_command_4] eq "12_WB_1_Backup")\
+       {set_Reading("ui_command_4","---")};;                             ## Hier wird das uiTable select wieder zurÃ¼ckgesetzt, ansonsten\
+                                                                        ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+
+attr Kia_eNiro userattr openWB_lp1_Url openWB_lp2_Url openWB_BackupDir
+attr Kia_eNiro DbLogExclude .*
+attr Kia_eNiro disable 0
+attr Kia_eNiro group PV Eigenverbrauch-Steuerung
+attr Kia_eNiro icon car
+attr Kia_eNiro openWB_BackupDir ./backup
+attr Kia_eNiro openWB_lp1_Url http://192.168.178.61
+attr Kia_eNiro openWB_lp2_Url http://192.168.178.62
+attr Kia_eNiro room 2_PV_Steuerung,Strom->Photovoltaik
+attr Kia_eNiro sortby 401
+attr Kia_eNiro uiTable {\
+package ui_Table;;\
+##  $TR{0} = "style='color:yellow;;text-align:left;;font-weight:bold;;font-size:18px'";;                                                         ## Reihe 0 für Überschrift\
+  $TABLE = "style='width:100%;;'";;\
+\
+  $TD{0..9}{0}     = "align='center' style='font-size:16px;;border-right-style:solid;;border-color:darkgreen;;border-right-width:2px;;width:26%'";;\
+\
+  $TD{0..9}{1} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:36%;;font-weight:bold;;'";;\
+  $TD{0..9}{2..4} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
+  $TD{0..9}{5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
+\
+sub FUNC_batt {\
+    my($val)=@_;;\
+    my $ret="position:absolute;;left:".(90*$val/100)."px;;width:90px;;height:20px;;background:linear-gradient( to right,#F8F8E0 ".(90-(90*$val/100))."px,rgba(0,0,0,0) ".(90-(90*$val/100))."px);;";;\
+    return $ret;;\
+  }\
+sub FUNC_Status {\
+    my($value, $min, $colorMin,  $statusMin,  $colorMiddel, $statusMiddle, $max, $colorMax, $statusMax)=@_;;\
+    my $ret = ($value < $min)? '<span style="color:'.$colorMin.'">'.$statusMin.'</span>' : ($value > $max)? '<span style="color:'.$colorMax.'">'.$statusMax.'</span>' : '<span style="color:'.$colorMiddel.'">'.$statusMiddle.'</span>';;\
+    return $ret;;\
+  }\
+sub FUNC_Status_Laden {\
+   my($car)=@_;;\
+   my $charge = (::ReadingsVal($car,"charging","false") eq "true");;\
+   my $athome = (::ReadingsVal($car,"atHomeStanding","false") eq "true");;\
+   my $chargeathome = ($charge && $athome);;\
+   my $connectedathome = ($athome && ::ReadingsVal($car,"connected","false") eq "true");;\
+\
+   my $ret = ($chargeathome ? "lädt zu Hause" : ($connectedathome ? "angeschlossen zu Hause" : ($athome ? "zu Hause" : ($charge ? "Lädt auswärts" : "unterwegs"))));;\
+   return $ret;;\
+  }\
+sub FUNC_tire {\
+   my($car)=@_;;\
+   my $ret = '<span style="color:green">Reifendruck okay</span>';;\
+\
+   if (::ReadingsVal($car,"status_tirePressureLamp_tirePressureLampAll","1") != 0) {\
+     my $VL = (::ReadingsVal($car,"status_tirePressureLamp_tirePressureLampFL","1") eq "0")?0:1;;\
+     my $HL = (::ReadingsVal($car,"status_tirePressureLamp_tirePressureLampRL","1") eq "0")?0:1;;\
+     my $VR = (::ReadingsVal($car,"status_tirePressureLamp_tirePressureLampFR","1") eq "0")?0:1;;\
+     my $HR = (::ReadingsVal($car,"status_tirePressureLamp_tirePressureLampRR","1") eq "0")?0:1;;\
+     $ret = '<span style="color:red">Reifen Störung<br>';;\
+     if ($VL == 1){$ret.=' /VL'};;\
+     if ($VR == 1){$ret.=' /VR'};;\
+     if ($HL == 1){$ret.=' /HL'};;\
+     if ($HR == 1){$ret.=' /HR'};;\
+     $ret = $ret.'</span>';;\
+   }\
+   return $ret;;\
+  }\
+sub FUNC_door {\
+   my($car)=@_;;\
+   my $ret = '<span style="color:green">Türen okay<br></span>';;\
+\
+   if (::ReadingsVal($car,"status_doorLock","false") ne "true") {\
+     my $VL = (::ReadingsVal($car,"status_doorOpen_frontLeft",1) == 0)?0:1;;\
+     my $HL = (::ReadingsVal($car,"status_doorOpen_backLeft",1) == 0)?0:1;;\
+     my $VR = (::ReadingsVal($car,"status_doorOpen_frontRight",1) == 0)?0:1;;\
+     my $HR = (::ReadingsVal($car,"status_doorOpen_backRight",1) == 0)?0:1;;\
+     $ret = '<span style="color:red">Tür offen<br>';;\
+     if ($VL == 1){$ret.=' /VL'};;\
+     if ($VR == 1){$ret.=' /VR'};;\
+     if ($HL == 1){$ret.=' /HL'};;\
+     if ($HR == 1){$ret.=' /HR'};;\
+     $ret = $ret.'</span>';;\
+   }\
+   if (::ReadingsVal($car,"status_trunkOpen","true") eq "true") {\
+     $ret.='<span style="color:red"> Kofferraum offen</span>';;\
+   }\
+   if (::ReadingsVal($car,"status_hoodOpen","true") eq "true") {\
+     $ret.='<span style="color:red"> Motorhaube offen</span>';;\
+   }\
+   return $ret;;\
+  }\
+\
+}\
+\
+"$SELF"|\
+"Kommando ".::ReadingsTimestamp("Kia_connect","status_time","")."<dd>Auswahl / Kommunikation / Tacho / Info Status</dd>"|\
+widget([$SELF:ui_command_1],"uzsuDropDown,---,Status_getAll,car_lock,car_unlock")|\
+(([Kia_connect:req_active] eq "idle")?'<span style="color:green">idle</span>' : '<span style="color:red">'.[Kia_connect:req_active].'</span>')|\
+(([Kia_connect:odometer_value] > [$SELF:ui_Inspektion] - 2000)?'<span style="color:red">Inspektion <br>'. ::round([Kia_connect:odometer_value],0).' km</span>' : ::round([Kia_connect:odometer_value],0)." km")|\
+FUNC_Status_Laden("Kia_connect")\
+\
+|\
+"Strombörse<dd>Auswahl / Ladefenster / Trigger Status </dd>" |\
+widget([$SELF:SpeicherStromboerse],"uzsuDropDown,Aus,Tibber") | \
+"<span style=font-weight:bold>Trigger fc0</span><br><br>".Format("trigger_0")|\
+"<span style=font-weight:bold>Trigger fc1</span><br><br>".Format("trigger_1")|\
+[EVU_Tibber_connect:fc0_trigger] \
+\
+|\
+"Accu<dd>Steuerung / Target Soc / Accu Status</dd>"|\
+widget([$SELF:ui_command_3],"uzsuDropDown,---,setChargeTargetSoc,stopCharge,startCharge")|\
+widget([Kia_connect:status_evStatus_reservChargeInfos_targetSOClist_2_targetSOClevel_target],"selectnumbers,50,10,100,0,lin")." % AC<br>".widget([Kia_connect:status_evStatus_reservChargeInfos_targetSOClist_1_targetSOClevel_target],"selectnumbers,50,10,100,0,lin")." % DC"|\
+""|\
+FUNC_Status([Kia_connect:range],150,"red",[Kia_connect:range],"orange",[Kia_connect:range],250,"green",[Kia_connect:range])." km"."<div style='border-width:2px;;border-style:solid;;border-color:gray;;position:relative;;width:90px;;height:20px;;background:linear-gradient( to right, red 0px,yellow 30px,green 50px);;'>".STY(" ",FUNC_batt([Kia_connect:batSOC])).STY(::round([Kia_connect:batSOC],0)."%","font-size:16px;;position:absolute;;top:2px;;left:30px")."</div>"\
+\
+|"Komfort<dd>Timer / Klima / Reifen / Türen / Accu Status 12V</dd>"|\
+widget([$SELF:ui_timer_mode],"uzsuDropDown,Aus,heizen,kuehlen").widget([$SELF:ui_timer_Start],"time")|\
+((::ReadingsVal("Abfall_Abfuhr","Kiaheizen_days",0) != 0)?"Klimatisierung<br>".[Abfall_Abfuhr:Kiaheizen_connect_date]." ".[Abfall_Abfuhr:Kiaheizen_connect_time]:(([$SELF:ui_timer_mode] ne "Aus")?"Klimatisierung<br>".[$SELF:timer_04_c04]:""))|\
+(FUNC_tire("Kia_connect")."<br>".FUNC_door("Kia_connect"))|\
+"12 V<div style='border-width:2px;;border-style:solid;;border-color:gray;;position:relative;;width:90px;;height:20px;;background:linear-gradient( to right, red 0px,yellow 30px,green 50px);;'>".STY(" ",FUNC_batt([Kia_connect:bat12v])).STY(::round([Kia_connect:bat12v],0)."%","font-size:16px;;position:absolute;;top:2px;;left:30px")."</div>"\
+\
+|"<dd> Auswahl / Temperatur / Klima Status / Temperatur innen</dd>"|\
+widget([$SELF:ui_command_2],"uzsuDropDown,---,stopClimate,startHeating,startCooling")|\
+"Heat".widget([Kia_connect:status_airTemp_value_target_Winter],"selectnumbers,20,1,27,0,lin")."°C<br>Cool".widget([Kia_connect:status_airTemp_value_target_Sommer],"selectnumbers,16,1,25,0,lin")."°C"|\
+(([Kia_connect:status_airCtrlOn] eq "true")?'<span style="color:red">Klima läuft</span>':'<span style="color:green">Klima aus</span>')."<br>".(([Kia_connect:status_defrost] eq "true")?'Defrost ein':'Defrost aus')|\
+"Aktuell<br>".[Kia_connect:status_airTemp_value]."°C"\
+\
+"<a href='http://".::ReadingsVal("WB_1","IpAddress","0.0.0.0")."/openWB/'>Link: WB_1_lp1</a>"|\
+"WallBox <dd>Lademodus / Lade Limits / Info Status / Leistung & Ladezeit</dd>"|\
+[WB_1:ChargeMode]."<br>". widget([$SELF:ui_command_4],"uzsuDropDown,---,SofortLaden,MinPV,NurPV,Stop,Standby,Vorrang_EV,Vorrang_Bat,10_70_beachten,10_70_beachten_auto,10_70_beachten_ende,11_Ladebasis_berechnen,12_WB_1_lp_1_Sofortladen_ende_limit,12_Stromboerse,13_WB_1_Backup"). widget([$SELF:ui_70_basis],"uzsuToggle,70%_Aus,70%_An")|\
+"SofortLaden<br>limit".widget([$SELF:WB_1_lp_1_current_soll],"selectnumbers,6,1,32,0,lin")."A<br>70%_fkt ".widget([$SELF:WB_1_nurpv70dynw_Faktor],"select,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5")."<br>".(([WR_ctl:Yield_fc0_middayhigh] == 0)? "Heute kein 70% Laden möglich":([$SELF:e_Kia_eNiro_PV_ui_command_4] eq "Stop" and [$SELF:ui_70_basis] eq "70%_An")?"70%_Base ".[$SELF:WB_1_nurpv70dynw_soll]." W<br>".[?WR_ctl:Yield_fc0_middayhigh_start]." - ".[?WR_ctl:Yield_fc0_middayhigh_stop]:([$SELF:ui_70_basis] eq "70%_An")?"70%_Base ".[$SELF:WB_1_nurpv70dynw_soll]."<br>sofort - ".[?WR_ctl:Yield_fc0_middayhigh_stop]:"70% Laden<br>heute - ".[?WR_ctl:Yield_fc0_middayhigh_stop])|\
+[WB_1:lp_1_PlugStat]." ".[WB_1:lp_1_ChargeStat]|\
+[WB_1:lp_1_countPhasesInUse]."P ".[WB_1:lp_1_AConfigured]."A<br>".[WB_1:lp_1_W]." W<br>".[WB_1:lp_1_TimeRemaining]\
+\
+|\
+"Statistik <dd>Ladeleistung inklusive externe Ladung</dd>"|\
+""|\
+"heute/letztes<br>".sprintf("%5.2f / %5.2f",::ReadingsVal("WB_1","lp_1_kWhDailyCharged",0),::ReadingsVal("WB_1","lp_1_kWhChargedSincePlugged",0))|\
+"Monat/Vormonat<br>".sprintf("%03d / %03d",::round(::ReadingsVal("WB_1","lp_1_kWhCounter_Month",0)+::ReadingsVal("WB_0","Kia_eNiro_kWhCounter_Month",0),0),::ReadingsVal("LogDBRep_Statistic_previous_Month","WB_1_lp_1_kWhCounter_Month",0)+::ReadingsVal("LogDBRep_Statistic_previous_Month","WB_0_Kia_eNiro_kWhCounter_Month",0))|\
+"Jahr/Vorjahr<br>".sprintf("%04d / %04d",::ReadingsVal("WB_1","lp_1_kWhCounter_Year",0)+::ReadingsVal("WB_0","Kia_eNiro_kWhCounter_Year",0),::ReadingsVal("LogDBRep_Statistic_previous_Year","WB_1_lp_1_kWhCounter_Year",0)+::ReadingsVal("LogDBRep_Statistic_previous_Year","WB_0_Kia_eNiro_kWhCounter_Year",0))
+attr Kia_eNiro verbose 3
+
+setstate Kia_eNiro 2024-01-15 18:37:57 SpeicherStromboerse Aus
+setstate Kia_eNiro 2024-01-15 18:37:24 SpeicherTriggerLaden Aus
+setstate Kia_eNiro 2024-01-19 16:29:55 WB_1_lp_1_current_soll 32
+setstate Kia_eNiro 2023-09-25 15:57:51 WB_1_nurpv70dynw 1100
+setstate Kia_eNiro 2023-09-11 17:03:42 WB_1_nurpv70dynw_Faktor 1
+setstate Kia_eNiro 2023-10-01 06:00:00 WB_1_nurpv70dynw_soll 8700
+setstate Kia_eNiro 2022-03-22 13:28:12 WR_1_Speicher_1_ExternControl_smart_laden_before ---
+setstate Kia_eNiro 2023-09-25 16:00:00 ui_70_basis 70%_Aus
+setstate Kia_eNiro 2023-08-14 11:40:13 ui_Inspektion 41500
+setstate Kia_eNiro 2024-01-24 15:58:00 ui_command_1 ---
+setstate Kia_eNiro 2024-01-20 09:38:30 ui_command_2 ---
+setstate Kia_eNiro 2024-01-19 16:29:40 ui_command_3 ---
+setstate Kia_eNiro 2024-01-19 19:55:43 ui_command_4 ---
+setstate Kia_eNiro 2024-01-20 20:12:20 ui_command_before_1 ---
+setstate Kia_eNiro 2024-01-20 09:38:30 ui_command_before_2 ---
+setstate Kia_eNiro 2024-01-19 16:29:40 ui_command_before_3 ---
+setstate Kia_eNiro 2024-01-19 19:55:43 ui_command_before_4 ---
+setstate Kia_eNiro 2024-01-17 12:15:42 ui_timer_Start 12:50
+setstate Kia_eNiro 2024-01-17 17:49:46 ui_timer_mode Aus

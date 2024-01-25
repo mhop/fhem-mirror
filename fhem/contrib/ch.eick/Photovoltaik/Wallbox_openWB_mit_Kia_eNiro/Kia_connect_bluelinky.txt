@@ -1,0 +1,39 @@
+defmod Kia_connect MQTT2_DEVICE
+attr Kia_connect DbLogExclude .*
+attr Kia_connect DbLogInclude .*
+attr Kia_connect IODev MQTT2_FHEM_Server
+attr Kia_connect alias Kia_connect
+attr Kia_connect autocreate 1
+attr Kia_connect devicetopic bluelinky
+attr Kia_connect disable 0
+attr Kia_connect group PV Eigenverbrauch-Steuerung
+attr Kia_connect icon car
+attr Kia_connect readingList $DEVICETOPIC/status:.* { json2nameValue($EVENT) }\
+$DEVICETOPIC/location.* { json2nameValue($EVENT) }\
+$DEVICETOPIC/odometer:.* { json2nameValue($EVENT) }\
+$DEVICETOPIC/tripinfo:.* { json2nameValue($EVENT) }\
+$DEVICETOPIC/req_received:.* req_received\
+$DEVICETOPIC/req_active:.* req_active
+attr Kia_connect room MQTT2_DEVICE,Strom->Photovoltaik
+attr Kia_connect setList getOdometer req/$DEVICETOPIC/get_odometer get_odometer\
+getStatus req/$DEVICETOPIC/get_status get_status\
+getLocation req/$DEVICETOPIC/get_location get_location\
+getTripinfo req/$DEVICETOPIC/get_tripinfo\
+getAll req/$DEVICETOPIC/get_all get_all\
+setChargeTargetSoc req/$DEVICETOPIC/set_chargetargets\
+startCharge req/$DEVICETOPIC/start_charging start_charging\
+stopCharge req/$DEVICETOPIC/stop_charging stop_charging\
+stopClimate req/$DEVICETOPIC/stop_climate stop_climate\
+startClimate req/$DEVICETOPIC/start_climate\
+car_lock req/$DEVICETOPIC/car_lock car_lock\
+car_unlock req/$DEVICETOPIC/car_unlock car_unlock
+attr Kia_connect sortby 402
+attr Kia_connect stateFormat req_active
+attr Kia_connect userReadings atHomeStanding:location.* { ((abs(AttrVal("global","latitude",49.85) - ReadingsVal($NAME,"location_coord_lat",0)) <= 0.001) && (abs(AttrVal("global","longitude",8.49) - ReadingsVal($NAME,"location_coord_lon",0)) <= 0.001) && (ReadingsVal($NAME,"location_speed_value",1) == 0)) ? 'true' : 'false';;;; },\
+batSOC:status.* { ReadingsVal($NAME,"status_evStatus_batteryStatus",0);;;;},\
+connected:status.* { (ReadingsVal($NAME,"status_evStatus_batteryPlugin",0) != 0) ? 'true' : 'false';;;;},\
+charging:status.* { ReadingsVal($NAME,"status_evStatus_batteryCharge",'false');;;;},\
+targetSOC:status.* { ReadingsVal($NAME,"status_evStatus_reservChargeInfos_targetSOClist_2_targetSOClevel",0);;;;},\
+time2targetSOC:status.* { my $t = ReadingsVal($NAME,"status_evStatus_remainTime2_atc_value",1);;;; sprintf("%02d:%02d", $t/60%60, $t%60);;},\
+range:status.* { ReadingsVal($NAME,"status_evStatus_drvDistance_1_rangeByFuel_totalAvailableRange_value",0);;;;},\
+bat12v:status.* { ReadingsVal($NAME,"status_battery_batSoc",0);;;;}

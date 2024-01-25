@@ -1,0 +1,854 @@
+defmod WR_1_API HTTPMOD http://%IP-WR%/api/v1/auth/me 0
+attr WR_1_API userattr get25-1Name get25JSON get25Regex
+attr WR_1_API DbLogExclude .*
+attr WR_1_API DbLogInclude Statistic_Autarky.*,Statistic_Energy.*,Statistic_Own.*,Statistic_Total.*,Statistic_Yield.*,SW_.*
+attr WR_1_API authRetries 1
+attr WR_1_API comment Version 2022.03.29 09:00\
+Passworte für die Abfrage des WR_1_API werden im storeKeyValue abgelegt:\
+   {KeyValue("[read|store]","PW_<Device Name>_<Benutzer Name>","<passwort>")}\
+   {KeyValue("store","PW_WR_1_API_user","<passwort>")}
+attr WR_1_API disable 0
+attr WR_1_API dontRequeueAfterAuth 0
+attr WR_1_API enableControlSet 0
+attr WR_1_API enableCookies 1
+attr WR_1_API event-on-change-reading Battery_.*,DigitalOutputs_ConfigurationFlags
+attr WR_1_API event-on-update-reading auth_.*,Statistic_Autarky.*,Statistic_EnergyFeedIn.*,Statistic_EnergyHome.*,Statistic_EnergyPv[1|2].*,Statistic_.*Consumption.*,Statistic_Energy.*_Total,Statistic_Yield.*,SW_.*
+attr WR_1_API get01Data %START%
+attr WR_1_API get01Name 01_auth_start
+attr WR_1_API get01URL http://%IP-WR%/api/v1/auth/start
+attr WR_1_API get02Data %FINISH%
+attr WR_1_API get02Name 02_auth_finish
+attr WR_1_API get02URL http://%IP-WR%/api/v1/auth/finish
+attr WR_1_API get03Data %SESSION%
+attr WR_1_API get03Name 03_auth_create_session
+attr WR_1_API get03URL http://%IP-WR%/api/v1/auth/create_session
+attr WR_1_API get04-1Name auth_me_active
+attr WR_1_API get04-2Name auth_me_locked
+attr WR_1_API get04-3Name auth_me_authenticated
+attr WR_1_API get04-4Name auth_me_anonymous
+attr WR_1_API get04-5Name auth_me_role
+attr WR_1_API get04-6Name auth_me_permissions
+attr WR_1_API get04Header authorization: Session %auth_sessionId%
+attr WR_1_API get04JSON .
+attr WR_1_API get04Name 04_auth_me
+attr WR_1_API get04URL http://%IP-WR%/api/v1/auth/me
+attr WR_1_API get05-1Name info_api_version
+attr WR_1_API get05-2Name info_hostname
+attr WR_1_API get05-3Name info_name
+attr WR_1_API get05-4Name info_sw_version
+attr WR_1_API get05JSON .
+attr WR_1_API get05Name 05_info_version
+attr WR_1_API get05URL http://%IP-WR%/api/v1/info/version
+attr WR_1_API get20-10Format %.2f
+attr WR_1_API get20-10Name Statistic_EnergyChargeGrid_Month
+attr WR_1_API get20-11Format %.2f
+attr WR_1_API get20-11Name Statistic_EnergyChargeGrid_Total
+attr WR_1_API get20-12Format %.2f
+attr WR_1_API get20-12Name Statistic_EnergyChargeGrid_Year
+attr WR_1_API get20-13Format %.2f
+attr WR_1_API get20-13Name Statistic_EnergyChargeInvIn_Day
+attr WR_1_API get20-14Format %.2f
+attr WR_1_API get20-14Name Statistic_EnergyChargeInvIn_Month
+attr WR_1_API get20-15Format %.2f
+attr WR_1_API get20-15Name Statistic_EnergyChargeInvIn_Total
+attr WR_1_API get20-16Format %.2f
+attr WR_1_API get20-16Name Statistic_EnergyChargeInvIn_Year
+attr WR_1_API get20-17Format %.2f
+attr WR_1_API get20-17Name Statistic_EnergyChargePv_Day
+attr WR_1_API get20-18Format %.2f
+attr WR_1_API get20-18Name Statistic_EnergyChargePv_Month
+attr WR_1_API get20-19Format %.2f
+attr WR_1_API get20-19Name Statistic_EnergyChargePv_Total
+attr WR_1_API get20-1Format %.2f
+attr WR_1_API get20-1Name Statistic_Autarky_Day
+attr WR_1_API get20-20Format %.2f
+attr WR_1_API get20-20Name Statistic_EnergyChargePv_Year
+attr WR_1_API get20-21Format %.2f
+attr WR_1_API get20-21Name Statistic_EnergyDischarge_Day
+attr WR_1_API get20-22Format %.2f
+attr WR_1_API get20-22Name Statistic_EnergyDischarge_Month
+attr WR_1_API get20-23Format %.2f
+attr WR_1_API get20-23Name Statistic_EnergyDischarge_Total
+attr WR_1_API get20-24Format %.2f
+attr WR_1_API get20-24Name Statistic_EnergyDischarge_Year
+attr WR_1_API get20-25Format %.2f
+attr WR_1_API get20-25Name Statistic_EnergyDischargeGrid_Day
+attr WR_1_API get20-26Format %.2f
+attr WR_1_API get20-26Name Statistic_EnergyDischargeGrid_Month
+attr WR_1_API get20-27Format %.2f
+attr WR_1_API get20-27Name Statistic_EnergyDischargeGrid_Total
+attr WR_1_API get20-28Format %.2f
+attr WR_1_API get20-28Name Statistic_EnergyDischargeGrid_Year
+attr WR_1_API get20-29Format %.2f
+attr WR_1_API get20-29Name Statistic_EnergyHome_Day
+attr WR_1_API get20-2Format %.2f
+attr WR_1_API get20-2Name Statistic_Autarky_Month
+attr WR_1_API get20-30Format %.2f
+attr WR_1_API get20-30Name Statistic_EnergyHome_Month
+attr WR_1_API get20-31Format %.2f
+attr WR_1_API get20-31Name Statistic_EnergyHome_Total
+attr WR_1_API get20-32Format %.2f
+attr WR_1_API get20-32Name Statistic_EnergyHome_Year
+attr WR_1_API get20-33Format %.2f
+attr WR_1_API get20-33Name Statistic_EnergyHomeBat_Day
+attr WR_1_API get20-34Format %.2f
+attr WR_1_API get20-34Name Statistic_EnergyHomeBat_Month
+attr WR_1_API get20-35Format %.2f
+attr WR_1_API get20-35Name Statistic_EnergyHomeBat_Total
+attr WR_1_API get20-36Format %.2f
+attr WR_1_API get20-36Name Statistic_EnergyHomeBat_Year
+attr WR_1_API get20-37Format %.2f
+attr WR_1_API get20-37Name Statistic_EnergyHomeGrid_Day
+attr WR_1_API get20-38Format %.2f
+attr WR_1_API get20-38Name Statistic_EnergyHomeGrid_Month
+attr WR_1_API get20-39Format %.2f
+attr WR_1_API get20-39Name Statistic_EnergyHomeGrid_Total
+attr WR_1_API get20-3Format %.2f
+attr WR_1_API get20-3Name Statistic_Autarky_Total
+attr WR_1_API get20-40Format %.2f
+attr WR_1_API get20-40Name Statistic_EnergyHomeGrid_Year
+attr WR_1_API get20-41Format %.2f
+attr WR_1_API get20-41Name Statistic_EnergyHomeOwn_Total
+attr WR_1_API get20-42Format %.2f
+attr WR_1_API get20-42Name Statistic_EnergyHomePv_Day
+attr WR_1_API get20-43Format %.2f
+attr WR_1_API get20-43Name Statistic_EnergyHomePv_Month
+attr WR_1_API get20-44Format %.2f
+attr WR_1_API get20-44Name Statistic_EnergyHomePv_Total
+attr WR_1_API get20-45Format %.2f
+attr WR_1_API get20-45Name Statistic_EnergyHomePv_Year
+attr WR_1_API get20-46Format %.2f
+attr WR_1_API get20-46Name Statistic_EnergyPv1_Day
+attr WR_1_API get20-47Format %.2f
+attr WR_1_API get20-47Name Statistic_EnergyPv1_Month
+attr WR_1_API get20-48Format %.2f
+attr WR_1_API get20-48Name Statistic_EnergyPv1_Total
+attr WR_1_API get20-49Format %.2f
+attr WR_1_API get20-49Name Statistic_EnergyPv1_Year
+attr WR_1_API get20-4Format %.2f
+attr WR_1_API get20-4Name Statistic_Autarky_Year
+attr WR_1_API get20-50Format %.2f
+attr WR_1_API get20-50Name Statistic_EnergyPv2_Day
+attr WR_1_API get20-51Format %.2f
+attr WR_1_API get20-51Name Statistic_EnergyPv2_Month
+attr WR_1_API get20-52Format %.2f
+attr WR_1_API get20-52Name Statistic_EnergyPv2_Total
+attr WR_1_API get20-53Format %.2f
+attr WR_1_API get20-53Name Statistic_EnergyPv2_Year
+attr WR_1_API get20-54Format %.2f
+attr WR_1_API get20-54Name Statistic_EnergyPv3_Day
+attr WR_1_API get20-55Format %.2f
+attr WR_1_API get20-55Name Statistic_EnergyPv3_Month
+attr WR_1_API get20-56Format %.2f
+attr WR_1_API get20-56Name Statistic_EnergyPv3_Total
+attr WR_1_API get20-57Format %.2f
+attr WR_1_API get20-57Name Statistic_EnergyPv3_Year
+attr WR_1_API get20-58Format %.2f
+attr WR_1_API get20-58Name Statistic_OwnConsumptionRate_Day
+attr WR_1_API get20-59Format %.2f
+attr WR_1_API get20-59Name Statistic_OwnConsumptionRate_Month
+attr WR_1_API get20-5Format %.2f
+attr WR_1_API get20-5Name Statistic_CO2Saving_Day
+attr WR_1_API get20-60Format %.2f
+attr WR_1_API get20-60Name Statistic_OwnConsumptionRate_Total
+attr WR_1_API get20-61Format %.2f
+attr WR_1_API get20-61Name Statistic_OwnConsumptionRate_Year
+attr WR_1_API get20-62Format %.2f
+attr WR_1_API get20-62Name Statistic_Yield_Day
+attr WR_1_API get20-63Format %.2f
+attr WR_1_API get20-63Name Statistic_Yield_Month
+attr WR_1_API get20-64Format %.2f
+attr WR_1_API get20-64Name Statistic_Yield_Total
+attr WR_1_API get20-65Format %.2f
+attr WR_1_API get20-65Name Statistic_Yield_Year
+attr WR_1_API get20-6Format %.2f
+attr WR_1_API get20-6Name Statistic_CO2Saving_Month
+attr WR_1_API get20-7Format %.2f
+attr WR_1_API get20-7Name Statistic_CO2Saving_Total
+attr WR_1_API get20-8Format %.2f
+attr WR_1_API get20-8Name Statistic_CO2Saving_Year
+attr WR_1_API get20-9Format %.2f
+attr WR_1_API get20-9Name Statistic_EnergyChargeGrid_Day
+attr WR_1_API get20Header authorization: Session %auth_sessionId%
+attr WR_1_API get20JSON 01_processdata_.._value
+attr WR_1_API get20Name 20_Statistic_EnergyFlow
+attr WR_1_API get20URL http://%IP-WR%/api/v1/processdata/scb:statistic:EnergyFlow
+attr WR_1_API get21-1Name Battery_Info_Cycles
+attr WR_1_API get21-2Name Battery_Info_FullChargeCap_E
+attr WR_1_API get21-3Name Battery_Info_SoC
+attr WR_1_API get21-4Format %d
+attr WR_1_API get21-4Name Battery_Info_WorkCapacity
+attr WR_1_API get21Header01 authorization: Session %auth_sessionId%
+attr WR_1_API get21Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API get21JSON .._processdata_.._value
+attr WR_1_API get21Name 21_Battery_Information
+attr WR_1_API get21URL http://%IP-WR%/api/v1/processdata/devices:local:battery/Cycles,FullChargeCap_E,SoC,WorkCapacity
+attr WR_1_API get22-1Name Battery_InternControl_DynamicSoc_Enable
+attr WR_1_API get22-2Name Battery_Control
+attr WR_1_API get22-3Format %d
+attr WR_1_API get22-3Name Battery_InternControl_MinHomeConsumption
+attr WR_1_API get22-4Name Battery_InternControl_MinSoc
+attr WR_1_API get22-5Name Battery_InternControl_SmartBatteryControl_Enable
+attr WR_1_API get22-6Name Battery_InternControl_Strategy
+attr WR_1_API get22-7Name Battery_InternControl_Type
+attr WR_1_API get22Header01 authorization: Session %auth_sessionId%
+attr WR_1_API get22Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API get22JSON .._value
+attr WR_1_API get22Name 22_Battery_InternControl
+attr WR_1_API get22URL http://%IP-WR%/api/v1/settings/devices:local/Battery:ExternControl,Battery:Type,Battery:MinHomeComsumption,Battery:Strategy,Battery:MinSoc,Battery:SmartBatteryControl:Enable,Battery:DynamicSoc:Enable,Battery:Type
+attr WR_1_API get23-10Format %d
+attr WR_1_API get23-10Name Battery_ExternControl_MaxChargePowerAbs
+attr WR_1_API get23-11Format %d
+attr WR_1_API get23-11Name Battery_ExternControl_MaxDischargePowerAbs
+attr WR_1_API get23-12Format %d
+attr WR_1_API get23-12Name Battery_ExternControl_MaxSocRel
+attr WR_1_API get23-13Format %d
+attr WR_1_API get23-13Name Battery_ExternControl_MinSocRel
+attr WR_1_API get23-1Name Battery_ComMonitor_Enable
+attr WR_1_API get23-2Format %d
+attr WR_1_API get23-2Name Battery_ComMonitor_Time
+attr WR_1_API get23-3Name Battery_Control
+attr WR_1_API get23-4Format %.2f
+attr WR_1_API get23-4Name Battery_ExternControl_AcPowerAbs
+attr WR_1_API get23-5Format %.2f
+attr WR_1_API get23-5Name Battery_ExternControl_AcPowerRel
+attr WR_1_API get23-6Format %.2f
+attr WR_1_API get23-6Name Battery_ExternControl_DcCurrentAbs
+attr WR_1_API get23-7Format %.2f
+attr WR_1_API get23-7Name Battery_ExternControl_DcCurrentRel
+attr WR_1_API get23-8Format %.2f
+attr WR_1_API get23-8Name Battery_ExternControl_DcPowerAbs
+attr WR_1_API get23-9Format %.2f
+attr WR_1_API get23-9Name Battery_ExternControl_DcPowerRel
+attr WR_1_API get23Header01 authorization: Session %auth_sessionId%
+attr WR_1_API get23Header02 Content-type: application/json, Accept: application/json, Connection: keep-alive
+attr WR_1_API get23JSON .._value
+attr WR_1_API get23Name 23_Battery_ExternControl
+attr WR_1_API get23URL http://%IP-WR%/api/v1/settings/devices:local/Battery:ComMonitor:Enable,Battery:ComMonitor:Time,Battery:ExternControl,Battery:ExternControl:AcPowerAbs,Battery:ExternControl:AcPowerRel,Battery:ExternControl:DcCurrentAbs,Battery:ExternControl:DcCurrentRel,Battery:ExternControl:DcPowerAbs,Battery:ExternControl:DcPowerRel,Battery:ExternControl:MaxChargePowerAbs,Battery:ExternControl:MaxDischargePowerAbs,Battery:ExternControl:MaxSocRel,Battery:ExternControl:MinSocRel
+attr WR_1_API get24-1Name Battery_TimeControl_5
+attr WR_1_API get24-1OExpr my @x = ( $val =~ m/.{4}/g );; my $x = $x[0];;for(my $i = 1;;$i < @x;;$i++) { $x = $x." ".$x[$i]};; $x
+attr WR_1_API get24-2Name Battery_TimeControl_1
+attr WR_1_API get24-2OExpr my @x = ( $val =~ m/.{4}/g );; my $x = $x[0];;for(my $i = 1;;$i < @x;;$i++) { $x = $x." ".$x[$i]};; $x
+attr WR_1_API get24-3Name Battery_TimeControl_6
+attr WR_1_API get24-3OExpr my @x = ( $val =~ m/.{4}/g );; my $x = $x[0];;for(my $i = 1;;$i < @x;;$i++) { $x = $x." ".$x[$i]};; $x
+attr WR_1_API get24-4Name Battery_TimeControl_0
+attr WR_1_API get24-4OExpr my @x = ( $val =~ m/.{4}/g );; my $x = $x[0];;for(my $i = 1;;$i < @x;;$i++) { $x = $x." ".$x[$i]};; $x
+attr WR_1_API get24-5Name Battery_TimeControl_4
+attr WR_1_API get24-5OExpr my @x = ( $val =~ m/.{4}/g );; my $x = $x[0];;for(my $i = 1;;$i < @x;;$i++) { $x = $x." ".$x[$i]};; $x
+attr WR_1_API get24-6Name Battery_TimeControl_2
+attr WR_1_API get24-6OExpr my @x = ( $val =~ m/.{4}/g );; my $x = $x[0];;for(my $i = 1;;$i < @x;;$i++) { $x = $x." ".$x[$i]};; $x
+attr WR_1_API get24-7Name Battery_TimeControl_3
+attr WR_1_API get24-7OExpr my @x = ( $val =~ m/.{4}/g );; my $x = $x[0];;for(my $i = 1;;$i < @x;;$i++) { $x = $x." ".$x[$i]};; $x
+attr WR_1_API get24-8Name Battery_TimeControl
+attr WR_1_API get24Header01 authorization: Session %auth_sessionId%
+attr WR_1_API get24Header02 Content-type: application/json, Accept: application/json, Connection: keep-alive
+attr WR_1_API get24JSON .._value
+attr WR_1_API get24Name 24_Battery_TimeControl
+attr WR_1_API get24URL http://%IP-WR%/api/v1/settings/devices:local/Battery:TimeControl:Enable,Battery:TimeControl:ConfMon,Battery:TimeControl:ConfTue,Battery:TimeControl:ConfWed,Battery:TimeControl:ConfThu,Battery:TimeControl:ConfFri,Battery:TimeControl:ConfSat,Battery:TimeControl:ConfSun
+attr WR_1_API get25Header01 authorization: Session %auth_sessionId%
+attr WR_1_API get25Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API get25Name 25_Battery_EM_State
+attr WR_1_API get25URL http://%IP-WR%/api/v1/processdata/devices:local/EM_State
+attr WR_1_API get40-1Name EnergyMgmt_AcStorage
+attr WR_1_API get40-2Name Generator_ShadowMgmt
+attr WR_1_API get40Header01 authorization: Session %auth_sessionId%
+attr WR_1_API get40Header02 Content-type: application/json, Accept: application/json, Connection: keep-alive
+attr WR_1_API get40JSON .._value
+attr WR_1_API get40Name 40_Generator_und_EnergieMgmt
+attr WR_1_API get40URL http://%IP-WR%/api/v1/settings/devices:local/Generator:ShadowMgmt:Enable,EnergyMgmt:AcStorage
+attr WR_1_API get41-1Name DigitalOutputs_ConfigurationFlags
+attr WR_1_API get41-2Name DigitalOutputs_DelayTime
+attr WR_1_API get41-3Name DigitalOutputs_PowerMode_OffPowerThreshold
+attr WR_1_API get41-4Name DigitalOutputs_PowerMode_OnPowerThreshold
+attr WR_1_API get41-5Name DigitalOutputs_SwitchOffDuration
+attr WR_1_API get41-6Name DigitalOutputs_TimeMode_MaxNoOfSwitchingCyclesPerDay
+attr WR_1_API get41-7Name DigitalOutputs_TimeMode_PowerThreshold
+attr WR_1_API get41-8Name DigitalOutputs_TimeMode_RunTime
+attr WR_1_API get41-9Name DigitalOutputs_TimeMode_StableTime
+attr WR_1_API get41Header01 authorization: Session %auth_sessionId%
+attr WR_1_API get41Header02 Content-type: application/json, Accept: application/json, Connection: keep-alive
+attr WR_1_API get41JSON .._value
+attr WR_1_API get41Name 41_DigitalOutputs
+attr WR_1_API get41URL http://%IP-WR%/api/v1/settings/devices:local/DigitalOutputs:Customer:ConfigurationFlags,DigitalOutputs:Customer:DelayTime,DigitalOutputs:Customer:PowerMode:OffPowerThreshold,DigitalOutputs:Customer:PowerMode:OnPowerThreshold,DigitalOutputs:Customer:SwitchOffDuration,DigitalOutputs:Customer:TimeMode:MaxNoOfSwitchingCyclesPerDay,DigitalOutputs:Customer:TimeMode:PowerThreshold,DigitalOutputs:Customer:TimeMode:RunTime,DigitalOutputs:Customer:TimeMode:StableTime
+attr WR_1_API get51Name 51_modules_list
+attr WR_1_API get51URL http://%IP-WR%/api/v1/modules
+attr WR_1_API get59Data {"end":"%end_date%","begin":"%begin_date%"}
+attr WR_1_API get59Header01 authorization: Session %auth_sessionId%
+attr WR_1_API get59Header02 Content-type: application/json, Accept: application/json, Connection: keep-alive
+attr WR_1_API get59Name 59_logdata_download
+attr WR_1_API get59URL http://%IP-WR%/api/v1/logdata/download
+attr WR_1_API get60Header authorization: Session %auth_sessionId%
+attr WR_1_API get60Name 60_update_status
+attr WR_1_API get60URL http://%IP-WR%/api/v1/update/status
+attr WR_1_API getHeader01 Accept-Encoding: gzip,deflate
+attr WR_1_API getHeader02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API group PV Eigenverbrauch
+attr WR_1_API icon sani_solar
+attr WR_1_API reAuthRegex "authenticated":false|"processdata":\[\]|wrong credentials|Not authorized
+attr WR_1_API reading0101JSON nonce
+attr WR_1_API reading0101Name auth_nonce
+attr WR_1_API reading0102JSON rounds
+attr WR_1_API reading0102Name auth_rounds
+attr WR_1_API reading0103JSON salt
+attr WR_1_API reading0103Name auth_salt
+attr WR_1_API reading0104JSON transactionId
+attr WR_1_API reading0104Name auth_transactionId
+attr WR_1_API reading0201JSON signature
+attr WR_1_API reading0201Name auth_signature
+attr WR_1_API reading0202JSON token
+attr WR_1_API reading0202Name auth_token
+attr WR_1_API reading0301JSON message
+attr WR_1_API reading0301Name info_message
+attr WR_1_API reading0302JSON error
+attr WR_1_API reading0302Name info_error
+attr WR_1_API reading03JSON sessionId
+attr WR_1_API reading03Name auth_sessionId
+attr WR_1_API reading25Name Battery_EM_State
+attr WR_1_API reading25OMap 0:Normal,8:Ruhe1,16:Ruhe2,32:Ausgleichsladung,64:Tiefentladeschutz,256:externe Batteriesteuerung
+attr WR_1_API reading25Regex EM_State.*value":(\d+)
+attr WR_1_API reading40Name Generator_ShadowMgmt
+attr WR_1_API reading40Regex Generator:ShadowMgmt.*value":"(\d+)
+attr WR_1_API replacement01Mode text
+attr WR_1_API replacement01Regex %IP-WR%
+attr WR_1_API replacement01Value 192.168.178.18
+attr WR_1_API replacement02Mode expression
+attr WR_1_API replacement02Regex %START%
+attr WR_1_API replacement02Value {my $NAME="WR_1_API";; plenticore_auth("start","user","$NAME")}
+attr WR_1_API replacement04Mode expression
+attr WR_1_API replacement04Regex %FINISH%
+attr WR_1_API replacement04Value {my $NAME="WR_1_API";; plenticore_auth("finish","user","$NAME",ReadingsVal("$NAME","auth_randomString64","missed"),ReadingsVal("$NAME","auth_nonce","missed"),ReadingsVal("$NAME","auth_salt","missed"),ReadingsVal("$NAME","auth_rounds","missed"),ReadingsVal("$NAME","auth_transactionId","missed"))}
+attr WR_1_API replacement05Mode expression
+attr WR_1_API replacement05Regex %SESSION%
+attr WR_1_API replacement05Value {my $NAME="WR_1_API";; plenticore_auth("session","user","$NAME",ReadingsVal("$NAME","auth_randomString64","missed"),ReadingsVal("$NAME","auth_nonce","missed"),ReadingsVal("$NAME","auth_salt","missed"),ReadingsVal("$NAME","auth_rounds","missed"),ReadingsVal("$NAME","auth_transactionId","missed"),ReadingsVal("$NAME","auth_token","missed"))}
+attr WR_1_API replacement06Mode reading
+attr WR_1_API replacement06Regex %auth_signature%
+attr WR_1_API replacement06Value auth_signature
+attr WR_1_API replacement07Mode reading
+attr WR_1_API replacement07Regex %auth_sessionId%
+attr WR_1_API replacement07Value auth_sessionId
+attr WR_1_API replacement08Mode expression
+attr WR_1_API replacement08Regex %begin_date%
+attr WR_1_API replacement08Value {POSIX::strftime("%Y-%m-%d",localtime(time))}
+attr WR_1_API replacement09Mode expression
+attr WR_1_API replacement09Regex %end_date%
+attr WR_1_API replacement09Value {POSIX::strftime("%Y-%m-%d",localtime(time))}
+attr WR_1_API room Strom->Photovoltaik
+attr WR_1_API set06Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set06Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set06Method POST
+attr WR_1_API set06Name 06_auth_logout
+attr WR_1_API set06NoArg 1
+attr WR_1_API set06URL http://%IP-WR%/api/v1/auth/logout
+attr WR_1_API set2201Data [{"moduleid":"devices:local","settings":[{"id":"Battery:DynamicSoc:Enable","value":"$val"}]}]
+attr WR_1_API set2201FollowGet 22_Battery_InternControl
+attr WR_1_API set2201Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2201Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2201Hint 0,1
+attr WR_1_API set2201Method PUT
+attr WR_1_API set2201Name 22_01_Battery_DynamicSoc_Enable
+attr WR_1_API set2201URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2203Data [{"moduleid":"devices:local","settings":[{"id":"Battery:MinHomeComsumption","value":"$val"}]}]
+attr WR_1_API set2203FollowGet 22_Battery_InternControl
+attr WR_1_API set2203Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2203Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2203Hint slider,50,50,8000
+attr WR_1_API set2203Method PUT
+attr WR_1_API set2203Name 22_03_Battery_MinHomeConsumption
+attr WR_1_API set2203URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2204Data [{"moduleid":"devices:local","settings":[{"id":"Battery:MinSoc","value":"$val"}]}]
+attr WR_1_API set2204FollowGet 22_Battery_InternControl
+attr WR_1_API set2204Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2204Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2204Hint slider,5,5,100
+attr WR_1_API set2204Method PUT
+attr WR_1_API set2204Name 22_04_Battery_MinSoc
+attr WR_1_API set2204URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2205Data [{"moduleid":"devices:local","settings":[{"id":"Battery:SmartBatteryControl:Enable","value":"$val"}]}]
+attr WR_1_API set2205FollowGet 22_Battery_InternControl
+attr WR_1_API set2205Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2205Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2205Hint 0,1
+attr WR_1_API set2205Method PUT
+attr WR_1_API set2205Name 22_05_Battery_SmartBatteryControl_Enable
+attr WR_1_API set2205URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2206Data [{"moduleid":"devices:local","settings":[{"id":"Battery:Strategy","value":"$val"}]}]
+attr WR_1_API set2206FollowGet 22_Battery_InternControl
+attr WR_1_API set2206Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2206Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2206Hint 1,2
+attr WR_1_API set2206Method PUT
+attr WR_1_API set2206Name 22_06_Battery_Strategy
+attr WR_1_API set2206URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2207Data [{"moduleid":"devices:local","settings":[{"id":"Battery:Type","value":"$val"}]}]
+attr WR_1_API set2207FollowGet 22_Battery_InternControl
+attr WR_1_API set2207Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2207Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2207Hint 0,4
+attr WR_1_API set2207Method PUT
+attr WR_1_API set2207Name 22_07_Battery_Type
+attr WR_1_API set2207URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2300Data [{"moduleid":"devices:local","settings":[{"id":"Battery:ExternControl","value":"$val"}]}]
+attr WR_1_API set2300FollowGet 23_Battery_ExternControl
+attr WR_1_API set2300Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2300Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2300Hint 0,1,2
+attr WR_1_API set2300Method PUT
+attr WR_1_API set2300Name 23_00_Battery_ExternControl
+attr WR_1_API set2300URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2301Data [{"moduleid":"devices:local","settings":[{"id":"Battery:ExternControl:AcPowerAbs","value":"$val"}]}]
+attr WR_1_API set2301FollowGet 23_Battery_ExternControl
+attr WR_1_API set2301Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2301Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2301Method PUT
+attr WR_1_API set2301Name 23_01_Battery_ExternControl_AcPowerAbs
+attr WR_1_API set2301URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2302Data [{"moduleid":"devices:local","settings":[{"id":"Battery:ExternControl:AcPowerRel","value":"$val"}]}]
+attr WR_1_API set2302FollowGet 23_Battery_ExternControl
+attr WR_1_API set2302Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2302Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2302Method PUT
+attr WR_1_API set2302Name 23_02_Battery_ExternControl_AcPowerRel
+attr WR_1_API set2302URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2303Data [{"moduleid":"devices:local","settings":[{"id":"Battery:ExternControl:DcCurrentAbs","value":"$val"}]}]
+attr WR_1_API set2303FollowGet 23_Battery_ExternControl
+attr WR_1_API set2303Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2303Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2303Method PUT
+attr WR_1_API set2303Name 23_03_Battery_ExternControl_DcCurrentAbs
+attr WR_1_API set2303URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2304Data [{"moduleid":"devices:local","settings":[{"id":"Battery:ExternControl:DcCurrentRel","value":"$val"}]}]
+attr WR_1_API set2304FollowGet 23_Battery_ExternControl
+attr WR_1_API set2304Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2304Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2304Method PUT
+attr WR_1_API set2304Name 23_04_Battery_ExternControl_DcCurrentRel
+attr WR_1_API set2304URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2305Data [{"moduleid":"devices:local","settings":[{"id":"Battery:ExternControl:DcPowerAbs","value":"$val"}]}]
+attr WR_1_API set2305FollowGet 23_Battery_ExternControl
+attr WR_1_API set2305Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2305Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2305Method PUT
+attr WR_1_API set2305Name 23_05_Battery_ExternControl_DcPowerAbs
+attr WR_1_API set2305URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2306Data [{"moduleid":"devices:local","settings":[{"id":"Battery:ExternControl:DcPowerRel","value":"$val"}]}]
+attr WR_1_API set2306FollowGet 23_Battery_ExternControl
+attr WR_1_API set2306Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2306Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2306Method PUT
+attr WR_1_API set2306Name 23_06_Battery_ExternControl_DcPowerRel
+attr WR_1_API set2306URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2307Data [{"moduleid":"devices:local","settings":[{"id":"Battery:ExternControl:MaxChargePowerAbs","value":"$val"}]}]
+attr WR_1_API set2307FollowGet 23_Battery_ExternControl
+attr WR_1_API set2307Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2307Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2307Method PUT
+attr WR_1_API set2307Name 23_07_Battery_ExternControl_MaxChargePowerAbs
+attr WR_1_API set2307URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2308Data [{"moduleid":"devices:local","settings":[{"id":"Battery:ExternControl:MaxDischargePowerAbs","value":"$val"}]}]
+attr WR_1_API set2308FollowGet 23_Battery_ExternControl
+attr WR_1_API set2308Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2308Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2308Method PUT
+attr WR_1_API set2308Name 23_08_Battery_ExternControl_MaxDischargePowerAbs
+attr WR_1_API set2308URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2309Data [{"moduleid":"devices:local","settings":[{"id":"Battery:ExternControl:MaxSocRel","value":"$val"}]}]
+attr WR_1_API set2309FollowGet 23_Battery_ExternControl
+attr WR_1_API set2309Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2309Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2309Hint slider,30,5,100
+attr WR_1_API set2309Method PUT
+attr WR_1_API set2309Name 23_09_Battery_ExternControl_MaxSocRel
+attr WR_1_API set2309URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2310Data [{"moduleid":"devices:local","settings":[{"id":"Battery:ExternControl:MinSocRel","value":"$val"}]}]
+attr WR_1_API set2310FollowGet 23_Battery_ExternControl
+attr WR_1_API set2310Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2310Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2310Hint slider,0,5,100
+attr WR_1_API set2310Method PUT
+attr WR_1_API set2310Name 23_10_Battery_ExternControl_MinSocRel
+attr WR_1_API set2310URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2311Data [{"moduleid":"devices:local","settings":[{"id":"Battery:ComMonitor:Enable","value":"$val"}]}]
+attr WR_1_API set2311FollowGet 23_Battery_ExternControl
+attr WR_1_API set2311Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2311Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2311Hint 0,1
+attr WR_1_API set2311Method PUT
+attr WR_1_API set2311Name 23_11_Battery_ComMonitor_Enable
+attr WR_1_API set2311URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2312Data [{"moduleid":"devices:local","settings":[{"id":"Battery:ComMonitor:Time","value":"$val"}]}]
+attr WR_1_API set2312FollowGet 23_Battery_ExternControl
+attr WR_1_API set2312Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2312Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2312Hint slider,0,10,600
+attr WR_1_API set2312Method PUT
+attr WR_1_API set2312Name 23_12_Battery_ComMonitor_Time
+attr WR_1_API set2312URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2400Data [{"moduleid":"devices:local","settings":[{"id":"Battery:TimeControl:Enable","value":"$val"}]}]
+attr WR_1_API set2400FollowGet 24_Battery_TimeControl
+attr WR_1_API set2400Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2400Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2400Hint 0,1
+attr WR_1_API set2400Method PUT
+attr WR_1_API set2400Name 24_00_Battery_TimeControl
+attr WR_1_API set2400URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2401Data [{"moduleid":"devices:local","settings":[{"id":"Battery:TimeControl:ConfSun","value":"$val"}]}]
+attr WR_1_API set2401FollowGet 24_Battery_TimeControl
+attr WR_1_API set2401Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2401Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2401Hint 0,1,2,Battery_TimeControl_0_So
+attr WR_1_API set2401IExpr my $x = ReadingsVal($name,$val,"null");; $x=~s/\s//gs;; ($val =~ /^-?\d+$/)? $val x96 : ($x =~ /^-?\d+$/)? $x : 0 x96
+attr WR_1_API set2401Method PUT
+attr WR_1_API set2401Name 24__0_Battery_TimeControl_So
+attr WR_1_API set2401URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2402Data [{"moduleid":"devices:local","settings":[{"id":"Battery:TimeControl:ConfMon","value":"$val"}]}]
+attr WR_1_API set2402FollowGet 24_Battery_TimeControl
+attr WR_1_API set2402Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2402Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2402Hint 0,1,2,Battery_TimeControl_1_Mo
+attr WR_1_API set2402IExpr my $x = ReadingsVal($name,$val,"null");; $x=~s/\s//gs;; ($val =~ /^-?\d+$/)? $val x96 : ($x =~ /^-?\d+$/)? $x : 0 x96
+attr WR_1_API set2402Method PUT
+attr WR_1_API set2402Name 24__1_Battery_TimeControl_Mo
+attr WR_1_API set2402URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2403Data [{"moduleid":"devices:local","settings":[{"id":"Battery:TimeControl:ConfTue","value":"$val"}]}]
+attr WR_1_API set2403FollowGet 24_Battery_TimeControl
+attr WR_1_API set2403Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2403Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2403Hint 0,1,2,Battery_TimeControl_2_Di
+attr WR_1_API set2403IExpr my $x = ReadingsVal($name,$val,"null");; $x=~s/\s//gs;; ($val =~ /^-?\d+$/)? $val x96 : ($x =~ /^-?\d+$/)? $x : 0 x96
+attr WR_1_API set2403Method PUT
+attr WR_1_API set2403Name 24__2_Battery_TimeControl_Di
+attr WR_1_API set2403TextArg 1
+attr WR_1_API set2403URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2404Data [{"moduleid":"devices:local","settings":[{"id":"Battery:TimeControl:ConfWed","value":"$val"}]}]
+attr WR_1_API set2404FollowGet 24_Battery_TimeControl
+attr WR_1_API set2404Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2404Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2404Hint 0,1,2,Battery_TimeControl_3_Mi
+attr WR_1_API set2404IExpr my $x = ReadingsVal($name,$val,"null");; $x=~s/\s//gs;; ($val =~ /^-?\d+$/)? $val x96 : ($x =~ /^-?\d+$/)? $x : 0 x96
+attr WR_1_API set2404Method PUT
+attr WR_1_API set2404Name 24__3_Battery_TimeControl_Mi
+attr WR_1_API set2404TextArg 1
+attr WR_1_API set2404URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2405Data [{"moduleid":"devices:local","settings":[{"id":"Battery:TimeControl:ConfThu","value":"$val"}]}]
+attr WR_1_API set2405FollowGet 24_Battery_TimeControl
+attr WR_1_API set2405Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2405Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2405Hint 0,1,2,Battery_TimeControl_4_Do
+attr WR_1_API set2405IExpr my $x = ReadingsVal($name,$val,"null");; $x=~s/\s//gs;; ($val =~ /^-?\d+$/)? $val x96 : ($x =~ /^-?\d+$/)? $x : 0 x96
+attr WR_1_API set2405Method PUT
+attr WR_1_API set2405Name 24__4_Battery_TimeControl_Do
+attr WR_1_API set2405URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2406Data [{"moduleid":"devices:local","settings":[{"id":"Battery:TimeControl:ConfFri","value":"$val"}]}]
+attr WR_1_API set2406FollowGet 24_Battery_TimeControl
+attr WR_1_API set2406Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2406Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2406Hint 0,1,2,Battery_TimeControl_5_Fr
+attr WR_1_API set2406IExpr my $x = ReadingsVal($name,$val,"null");; $x=~s/\s//gs;; ($val =~ /^-?\d+$/)? $val x96 : ($x =~ /^-?\d+$/)? $x : 0 x96
+attr WR_1_API set2406Method PUT
+attr WR_1_API set2406Name 24__5_Battery_TimeControl_Fr
+attr WR_1_API set2406URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set2407Data [{"moduleid":"devices:local","settings":[{"id":"Battery:TimeControl:ConfSat","value":"$val"}]}]
+attr WR_1_API set2407Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set2407Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set2407Hint 0,1,2,Battery_TimeControl_6_Sa
+attr WR_1_API set2407IExpr my $x = ReadingsVal($name,$val,"null");; $x=~s/\s//gs;; ($val =~ /^-?\d+$/)? $val x96 : ($x =~ /^-?\d+$/)? $x : 0 x96
+attr WR_1_API set2407Method PUT
+attr WR_1_API set2407Name 24__6_Battery_TimeControl_Sa
+attr WR_1_API set2407URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set4002Data [{"moduleid":"devices:local","settings":[{"id":"Generator:ShadowMgmt:Enable","value":"$val"}]}]
+attr WR_1_API set4002FollowGet 40_Generator_und_EnergieMgmt
+attr WR_1_API set4002Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set4002Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set4002Hint slider,0,1,3
+attr WR_1_API set4002Method PUT
+attr WR_1_API set4002Name 40_02_Generator_ShadowMgmt
+attr WR_1_API set4002URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set4101Data [{"moduleid":"devices:local","settings":[{"id":"DigitalOutputs:Customer:ConfigurationFlags","value":"$val"},{"id":"DigitalOutputs:Customer:DelayTime","value":"5"},{"id":"DigitalOutputs:Customer:PowerMode:OnPowerThreshold","value":"100000"},{"id":"DigitalOutputs:Customer:TimeMode:MaxNoOfSwitchingCyclesPerDay","value":"24"},{"id":"DigitalOutputs:Customer:TimeMode:PowerThreshold","value":"1"},{"id":"DigitalOutputs:Customer:TimeMode:RunTime","value":"1440"},{"id":"DigitalOutputs:Customer:TimeMode:StableTime","value":"1"}]}]
+attr WR_1_API set4101FollowGet 41_DigitalOutputs
+attr WR_1_API set4101Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set4101Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set4101Hint 0,9,13,14
+attr WR_1_API set4101Method PUT
+attr WR_1_API set4101Name 41_01_DigitalOutputs
+attr WR_1_API set4101URL http://%IP-WR%/api/v1/settings
+attr WR_1_API set50-10Name Event_02_code
+attr WR_1_API set50-11Name Event_02_description
+attr WR_1_API set50-12Name Event_02_end_time
+attr WR_1_API set50-13Name Event_02_group
+attr WR_1_API set50-14Name Event_02_is_active
+attr WR_1_API set50-15Name Event_02_long_description
+attr WR_1_API set50-16Name Event_02_start_time
+attr WR_1_API set50-17Name Event_03_category
+attr WR_1_API set50-18Name Event_03_code
+attr WR_1_API set50-19Name Event_03_description
+attr WR_1_API set50-1Name Event_01_category
+attr WR_1_API set50-20Name Event_03_end_time
+attr WR_1_API set50-21Name Event_03_group
+attr WR_1_API set50-22Name Event_03_is_active
+attr WR_1_API set50-23Name Event_03_long_description
+attr WR_1_API set50-24Name Event_03_start_time
+attr WR_1_API set50-25Name Event_04_category
+attr WR_1_API set50-26Name Event_04_code
+attr WR_1_API set50-27Name Event_04_description
+attr WR_1_API set50-28Name Event_04_end_time
+attr WR_1_API set50-29Name Event_04_group
+attr WR_1_API set50-2Name Event_01_code
+attr WR_1_API set50-30Name Event_04_is_active
+attr WR_1_API set50-31Name Event_04_long_description
+attr WR_1_API set50-32Name Event_04_start_time
+attr WR_1_API set50-33Name Event_05_category
+attr WR_1_API set50-34Name Event_05_code
+attr WR_1_API set50-35Name Event_05_description
+attr WR_1_API set50-36Name Event_05_end_time
+attr WR_1_API set50-37Name Event_05_group
+attr WR_1_API set50-38Name Event_05_is_active
+attr WR_1_API set50-39Name Event_05_long_description
+attr WR_1_API set50-3Name Event_01_description
+attr WR_1_API set50-40Name Event_05_start_time
+attr WR_1_API set50-4Name Event_01_end_time
+attr WR_1_API set50-5Name Event_01_group
+attr WR_1_API set50-6Name Event_01_is_active
+attr WR_1_API set50-7Name Event_01_long_description
+attr WR_1_API set50-8Name Event_01_start_time
+attr WR_1_API set50-9Name Event_02_category
+attr WR_1_API set50Data {"max":5,"language":"$val"}
+attr WR_1_API set50Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set50Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set50Hint en-gb,de-de
+attr WR_1_API set50JSON .
+attr WR_1_API set50Name 50_events_latest_5
+attr WR_1_API set50ParseResponse 1
+attr WR_1_API set50TextArg 1
+attr WR_1_API set50URL http://%IP-WR%/api/v1/events/latest
+attr WR_1_API set6001Header01 authorization: Session %auth_sessionId%
+attr WR_1_API set6001Header02 Content-type:application/json, Accept:application/json, Connection:keep-alive
+attr WR_1_API set6001Method POST
+attr WR_1_API set6001Name 60_01_Reset_Wechselrichter
+attr WR_1_API set6001NoArg 1
+attr WR_1_API set6001URL http://%IP-WR%/api/v1/system/reboot
+attr WR_1_API showBody 1
+attr WR_1_API showError 1
+attr WR_1_API sid01Data %START%
+attr WR_1_API sid01ParseResponse 1
+attr WR_1_API sid01URL http://%IP-WR%/api/v1/auth/start
+attr WR_1_API sid02Data %FINISH%
+attr WR_1_API sid02ParseResponse 1
+attr WR_1_API sid02URL http://%IP-WR%/api/v1/auth/finish
+attr WR_1_API sid03Data %SESSION%
+attr WR_1_API sid03ParseResponse 1
+attr WR_1_API sid03URL http://%IP-WR%/api/v1/auth/create_session
+attr WR_1_API sidHeader01 Accept-Encoding: gzip,deflate
+attr WR_1_API sidHeader02 Content-type: application/json, Accept: application/json, Connection: keep-alive
+attr WR_1_API sortby 112
+attr WR_1_API stateFormat {\
+if (AttrVal("$name","verbose",0) >=3) {\
+ my $calcVal = 0;;\
+ my $WR      = "WR_1";;\
+ my $YearBefore      = "LogDBRep_Statistic_previous_Year";;\
+ my $YearPrevious    = ReadingsTimestamp("$YearBefore","SW_Statistic_Yield_Year","null");;\
+   $YearPrevious = ($YearPrevious ne "null") ? POSIX::strftime("%Y",localtime(time_str2num(ReadingsTimestamp("$YearBefore","SW_Statistic_Yield_Year","null")))) : "null";;\
+\
+ my $QuarterBefore   = "LogDBRep_Statistic_previous_Quarter";;\
+ my $QuarterPrevious = "null";;\
+ foreach my $i (1,2,3,4) {if (ReadingsVal("$QuarterBefore","Q".$i,0) eq "previous"){ $QuarterPrevious = "Q".$i }};;\
+\
+ my $pvt   = sprintf("%04d W",ReadingsVal($WR,"SW_Total_AC_Active_P",0) );;\
+ my $pvtd  = sprintf("%04d",ReadingsVal("$name","SW_Statistic_Yield_Day",0)/1000 );;\
+ my $pvtm  = sprintf("%04d",ReadingsVal("$name","SW_Statistic_Yield_Month",0)/1000 );;\
+    $pvtm .= ($QuarterPrevious ne "null") ? sprintf(" / %04d", ReadingsVal("$QuarterBefore",$QuarterPrevious."_SW_Statistic_Yield",0) ) : "";;\
+ my $pvty  = sprintf("%05d",ReadingsVal("$name","SW_Statistic_Yield_Year",0)/1000 );;\
+    $pvty .= ($YearPrevious ne "null") ? sprintf(" / %05d", ReadingsVal("$YearBefore","SW_Statistic_Yield_Year",0) ) : "";;\
+\
+ my $pv    = sprintf("%04d W",ReadingsVal($WR,"SW_Home_own_consumption_from_Battery",0)+ReadingsVal($WR,"SW_Home_own_consumption_from_PV",0) );;\
+ my $pvd   = sprintf("%04d",ReadingsVal("$name","SW_Statistic_EnergyHomePv_Day",0)/1000 );;\
+ my $pvm   = sprintf("%04d",ReadingsVal("$name","SW_Statistic_EnergyHomePv_Month",0)/1000 );;\
+    $pvm  .= ($QuarterPrevious ne "null") ? sprintf(" / %04d", ReadingsVal("$QuarterBefore",$QuarterPrevious."_SW_Statistic_EnergyHomePv",0) ) : "";;\
+ my $pvy   = sprintf("%05d",ReadingsVal("$name","SW_Statistic_EnergyHomePv_Year",0)/1000 );;\
+    $pvy  .= ($YearPrevious ne "null") ? sprintf(" / %05d", ReadingsVal("$YearBefore","SW_Statistic_EnergyHomePv_Year",0) ) : "";;\
+		   \
+ my $gfi   =  sprintf("%04d W",(ReadingsVal($WR,"Total_Active_P_EM",0)<=0 ? abs(round(ReadingsVal($WR,"Total_Active_P_EM",0),0)):  0) );;\
+ my $gfid  = sprintf("%04d",ReadingsVal("$name","SW_Statistic_EnergyHomeFeedInGrid_Day",0)/1000 );;\
+ my $gfim  = sprintf("%04d",ReadingsVal("$name","SW_Statistic_EnergyHomeFeedInGrid_Month",0)/1000 );;\
+    $gfim .= ($QuarterPrevious ne "null") ? sprintf(" / %04d", ReadingsVal("$QuarterBefore",$QuarterPrevious."_SW_Statistic_EnergyHomeFeedInGrid",0) ) : "";;\
+ my $gfiy  = sprintf("%05d",ReadingsVal("$name","SW_Statistic_EnergyHomeFeedInGrid_Year",0)/1000 );;\
+    $gfiy .= ($YearPrevious ne "null") ? sprintf(" / %05d", ReadingsVal("$YearBefore","SW_Statistic_EnergyHomeFeedInGrid_Year",0) ) : "";;\
+		   \
+ my $eb    = sprintf("%04d W",(ReadingsVal($WR,"Total_Active_P_EM",0)>=0 ? round(ReadingsVal($WR,"Total_Active_P_EM",0),0) : 0) );;\
+ my $ebd   = sprintf("%04d",ReadingsVal("$name","SW_Statistic_EnergyHomeGrid_Day",0)/1000 );;\
+ my $ebm   = sprintf("%04d",ReadingsVal("$name","SW_Statistic_EnergyHomeGrid_Month",0)/1000 );;\
+    $ebm  .= ($QuarterPrevious ne "null") ? sprintf(" / %04d", ReadingsVal("$QuarterBefore",$QuarterPrevious."_SW_Statistic_EnergyHomeGrid",0) ) : "";;\
+ my $eby   = sprintf("%05d",ReadingsVal("$name","SW_Statistic_EnergyHomeGrid_Year",0)/1000 );;\
+    $eby  .= ($YearPrevious ne "null") ? sprintf(" / %05d", ReadingsVal("$YearBefore","SW_Statistic_EnergyHomeGrid_Year",0) ) : "";;\
+\
+ my $pvb   = sprintf("%04d W",ReadingsVal($WR,"SW_Home_own_consumption_from_Battery",0));;\
+ my $pvbd  = sprintf("%04d",ReadingsVal("$name","Statistic_EnergyHomeBat_Day",0)/1000 );;\
+ my $pvbm  = sprintf("%04d",ReadingsVal("$name","Statistic_EnergyHomeBat_Month",0)/1000 );;\
+    $pvbm .= ($QuarterPrevious ne "null") ? sprintf(" / %04d", ReadingsVal("$QuarterBefore",$QuarterPrevious."_Statistic_EnergyHomeBat",0) ) : "";;\
+ my $pvby  = sprintf("%05d",ReadingsVal("$name","Statistic_EnergyHomeBat_Year",0)/1000 );;\
+    $pvby .= ($YearPrevious ne "null") ? sprintf(" / %05d", ReadingsVal("$YearBefore","Statistic_EnergyHomeBat_Year",0) ) : "";;\
+\
+ my $et    = sprintf("%04d W",(ReadingsVal($WR,"SW_Home_own_consumption_from_PV",0)+ReadingsVal($WR,"SW_Home_own_consumption_from_Battery",0)+ReadingsVal($WR,"SW_Home_own_consumption_from_grid",0)) );;\
+ my $etd   = sprintf("%04d",ReadingsVal("$name","SW_Statistic_TotalConsumption_Day",0)/1000 );;\
+ my $etm   = sprintf("%04d",ReadingsVal("$name","SW_Statistic_TotalConsumption_Month",0)/1000 );;\
+    $etm  .= ($QuarterPrevious ne "null") ? sprintf(" / %04d", ReadingsVal("$QuarterBefore",$QuarterPrevious."_SW_Statistic_TotalConsumption",0) ) : "";;\
+ my $ety   = sprintf("%05d",ReadingsVal("$name","SW_Statistic_TotalConsumption_Year",0)/1000 );;\
+    $ety  .= ($YearPrevious ne "null") ? sprintf(" / %05d", ReadingsVal("$YearBefore","SW_Statistic_TotalConsumption_Year",0) ) : "";;\
+\
+ my $valA  = ReadingsVal($WR, "SW_Total_AC_Active_P",0)-ReadingsVal($WR, "SW_Home_own_consumption_from_grid",0);;\
+    $calcVal = ($valA > 0) ? round($valA /($valA + ReadingsVal($WR, "SW_Home_own_consumption_from_grid",""))*100 ,0) : 0;;\
+ my $aq    = sprintf("%4d %%",(($calcVal > 100) ? 100 : $calcVal) );;\
+ \
+ my $aqd   = sprintf("%3d %%",ReadingsVal("$name","SW_Statistic_Autarky_Day",0) );;\
+ my $aqm   = sprintf("%3d %%",ReadingsVal("$name","SW_Statistic_Autarky_Month",0) );;\
+ my $aqy   = sprintf("%3d %%",ReadingsVal("$name","SW_Statistic_Autarky_Year",0) );;\
+    $aqy  .= ($YearPrevious ne "null") ? sprintf(" / %3d %%", ReadingsVal("$YearBefore","SW_Statistic_Autarky_Year",0) ) : "";;\
+		   \
+ my $valS  = ReadingsVal($WR,"SW_Total_AC_Active_P",0);;\
+    $calcVal = ($valS > 0) ? round((ReadingsVal($WR,"SW_Home_own_consumption_from_PV",0) + ReadingsVal($WR,"SW_Home_own_consumption_from_Battery",0)) / $valS * 100 ,0) : 0;;\
+ my $sq    =  sprintf("%4d %%",(($calcVal > 100) ? 100 : $calcVal) );;\
+\
+ my $sqd   = sprintf("%4d %%",ReadingsVal("$name","SW_Statistic_OwnConsumptionRate_Day",0) );;\
+ my $sqm   = sprintf("%4d %%",ReadingsVal("$name","SW_Statistic_OwnConsumptionRate_Month",0) );;\
+ my $sqy   = sprintf("%4d %%",ReadingsVal("$name","SW_Statistic_OwnConsumptionRate_Year",0) );;\
+    $sqy  .= ($YearPrevious ne "null") ? sprintf(" / %3d %%", ReadingsVal("$YearBefore","SW_Statistic_OwnConsumptionRate_Year",0) ) : "";;\
+		   \
+ my $date  = POSIX::strftime("%Y-%m-%d",localtime(time_str2num(ReadingsTimestamp($name, "auth_me_authenticated",0))));;\
+ my $md    = POSIX::strftime("%H:%M",localtime(time_str2num(ReadingsTimestamp($name, "auth_me_authenticated",0))));;\
+ my $cd    = POSIX::strftime("%H:%M",localtime(time_str2num(ReadingsTimestamp($name, "SW_Statistic_Autarky_Day",0))));;\
+ my $cm    = POSIX::strftime("%H:%M",localtime(time_str2num(ReadingsTimestamp($name, "SW_Statistic_Autarky_Month",0))));;\
+    $cm   .= ($QuarterPrevious ne "null") ? " / ".POSIX::strftime("%d.%m",localtime(time_str2num(ReadingsTimestamp("$QuarterBefore","$QuarterPrevious",0) ))) : "";;\
+ my $cy    = POSIX::strftime("%H:%M",localtime(time_str2num(ReadingsTimestamp($name, "SW_Statistic_Autarky_Year",0))));;\
+    $cy   .= ($YearPrevious ne "null") ? " / ".$YearPrevious : "";;\
+\
+"<html><table border=2 bordercolor='darkgreen' cellspacing=0 style='width: 100%'>\
+ <colgroup>\
+   <col span='1' style='width: 52%;;'>\
+   <col span='1' style='width: 12%;;'>\
+   <col span='1' style='width: 12%;;'>\
+   <col span='1' style='width: 12%;;'>\
+   <col span='1' style='width: 12%;;'>\
+ </colgroup>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;font-weight:bold'>Statistik vom $date in kWh</td><td style='padding-right:5px;;padding-left:5px;;font-weight:bold;;text-align:center'>aktuell</td><td style='padding-right:5px;;padding-left:5px;;font-weight:bold;;text-align:center'>Heute</td><td style='padding-right:5px;;padding-left:5px;;font-weight:bold;;text-align:center'>Monat".(($QuarterPrevious ne "null") ? " / ".$QuarterPrevious : "")."</td><td style='padding-right:5px;;padding-left:5px;;font-weight:bold;;text-align:center'>Jahr".(($YearPrevious ne "0") ? " / Vorjahr" : "")."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>Erzeugung PV-Total</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$pvt."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$pvtd."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$pvtm."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$pvty."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>Bezug von PV</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$pv."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$pvd."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$pvm."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$pvy."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>Bezug von Batterie</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$pvb."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$pvbd."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$pvbm."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$pvby."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>Bezug ins Haus (Energieverbrauch)</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$et."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$etd."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$etm."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$ety."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>Bezug vom Netz</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$eb."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$ebd."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$ebm."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$eby."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>Einspeisung ins Netz</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$gfi."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$gfid."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$gfim."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$gfiy."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>Autarkiequote</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$aq."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$aqd."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$aqm."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$aqy."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>Eigenverbrauchsquote</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$sq."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$sqd."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$sqm."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$sqy."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>Berechnet um</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$md."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$cd."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$cm."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$cy."</td></tr>\
+ </table></html>"\
+}\
+}\
+
+attr WR_1_API timeout 7
+attr WR_1_API userReadings Statistic_EnergyHomePvSum_Day:Statistic_EnergyHomePv_Day.* {round( (ReadingsVal("$NAME","Statistic_EnergyHomeBat_Day", "0")+ReadingsVal("$NAME","Statistic_EnergyHomePv_Day", "0")) ,2)},\
+\
+Statistic_EnergyHomePvSum_Month:Statistic_EnergyHomePv_Month.* {round( (ReadingsVal("$NAME","Statistic_EnergyHomeBat_Month", "0")+ReadingsVal("$NAME","Statistic_EnergyHomePv_Month", "0")) ,2)},\
+\
+Statistic_EnergyHomePvSum_Year:Statistic_EnergyHomePv_Year.* {round( (ReadingsVal("$NAME","Statistic_EnergyHomeBat_Year", "0")+ReadingsVal("$NAME","Statistic_EnergyHomePv_Year", "0")) ,2)},\
+\
+\
+Statistic_EnergyFeedInGrid_Day:Statistic_Yield_Day.* {round((ReadingsVal("$NAME","Statistic_Yield_Day", "")-ReadingsVal("$NAME","Statistic_EnergyHomeBat_Day", "0")-ReadingsVal("$NAME","Statistic_EnergyHomePv_Day", "0")),2)},\
+\
+Statistic_EnergyFeedInGrid_Month:Statistic_Yield_Month.* {round((ReadingsVal("$NAME","Statistic_Yield_Month", "")-ReadingsVal("$NAME","Statistic_EnergyHomeBat_Month", "0")-ReadingsVal("$NAME","Statistic_EnergyHomePv_Month", "0")),2)},\
+\
+Statistic_EnergyFeedInGrid_Year:Statistic_Yield_Year.* {round((ReadingsVal("$NAME","Statistic_Yield_Year", "")-ReadingsVal("$NAME","Statistic_EnergyHomeBat_Year", "0")-ReadingsVal("$NAME","Statistic_EnergyHomePv_Year", "0")),2)},\
+\
+\
+Statistic_TotalConsumption_Day:Statistic_EnergyHomePv_Day.* { round((ReadingsVal("$NAME","Statistic_EnergyHomePv_Day","0")+ReadingsVal("$NAME","Statistic_EnergyHomeBat_Day","0")+ReadingsVal("$NAME","Statistic_EnergyHomeGrid_Day","0") ) ,2) },\
+\
+Statistic_TotalConsumption_Month:Statistic_EnergyHomePv_Month.* { round((ReadingsVal("$NAME","Statistic_EnergyHomePv_Month","0")+ReadingsVal("$NAME","Statistic_EnergyHomeBat_Month","0")+ReadingsVal("$NAME","Statistic_EnergyHomeGrid_Month","0") ) ,2) },\
+\
+Statistic_TotalConsumption_Year:Statistic_EnergyHomePv_Year.* { round( (ReadingsVal("$NAME","Statistic_EnergyHomePv_Year","0")+ReadingsVal("$NAME","Statistic_EnergyHomeBat_Year","0")+ReadingsVal("$NAME","Statistic_EnergyHomeGrid_Year","0") ),2) },\
+\
+\
+Statistic_Yield_NoBat_Day:Statistic_Yield_Day.* { round((ReadingsVal("$NAME","Statistic_Yield_Day",0)-ReadingsVal("$NAME","Statistic_EnergyHomeBat_Day",0)),0) },\
+Statistic_Yield_NoBat_Month:Statistic_Yield_Month.* { round((ReadingsVal("$NAME","Statistic_Yield_Month",0)-ReadingsVal("$NAME","Statistic_EnergyHomeBat_Month",0)),0) },\
+Statistic_Yield_NoBat_Year:Statistic_Yield_Year.* { round((ReadingsVal("$NAME","Statistic_Yield_Year",0)-ReadingsVal("$NAME","Statistic_EnergyHomeBat_Year",0)),0) },\
+\
+\
+SW_Statistic_EnergyPv1_Day:Statistic_EnergyPv1_Day.* { round(ReadingsVal("$NAME","Statistic_EnergyPv1_Day",0),0)},\
+SW_Statistic_EnergyPv1_Month:Statistic_EnergyPv1_Month.* { round(ReadingsVal("$NAME","Statistic_EnergyPv1_Month",0),0)},\
+SW_Statistic_EnergyPv1_Total:Statistic_EnergyPv1_Total.* monotonic { round(ReadingsVal("$NAME","Statistic_EnergyPv1_Total",0),0)},\
+SW_Statistic_EnergyPv1_Year:Statistic_EnergyPv1_Year.* { round(ReadingsVal("$NAME","Statistic_EnergyPv1_Year",0),0)},\
+SW_Statistic_EnergyPv2_Day:Statistic_EnergyPv2_Day.* { round(ReadingsVal("$NAME","Statistic_EnergyPv2_Day",0),0)},\
+SW_Statistic_EnergyPv2_Month:Statistic_EnergyPv2_Month.* { round(ReadingsVal("$NAME","Statistic_EnergyPv2_Month",0),0)},\
+SW_Statistic_EnergyPv2_Total:Statistic_EnergyPv2_Total.* monotonic { round(ReadingsVal("$NAME","Statistic_EnergyPv2_Total",0),0)},\
+SW_Statistic_EnergyPv2_Year:Statistic_EnergyPv2_Year.* { round(ReadingsVal("$NAME","Statistic_EnergyPv2_Year",0),0)},\
+SW_Statistic_EnergyPv3_Day:Statistic_EnergyPv3_Day.* { round(ReadingsVal("$NAME","Statistic_EnergyPv3_Day",0),0)},\
+SW_Statistic_EnergyPv3_Month:Statistic_EnergyPv3_Month.* { round(ReadingsVal("$NAME","Statistic_EnergyPv3_Month",0),0)},\
+SW_Statistic_EnergyPv3_Total:Statistic_EnergyPv3_Total.* monotonic { round(ReadingsVal("$NAME","Statistic_EnergyPv3_Total",0),0)},\
+SW_Statistic_EnergyPv3_Year:Statistic_EnergyPv3_Year.* { round(ReadingsVal("$NAME","Statistic_EnergyPv3_Year",0),0)},\
+\
+SW_Statistic_EnergyPv4_Day:Statistic_EnergyPv1_Day.* { round(ReadingsVal("WR_2_API","Statistic_EnergyPv1_Day",0),0)},\
+SW_Statistic_EnergyPv4_Month:Statistic_EnergyPv1_Month.* { round(ReadingsVal("WR_2_API","Statistic_EnergyPv1_Month",0),0)},\
+SW_Statistic_EnergyPv4_Total:Statistic_EnergyPv1_Total.* monotonic { round(ReadingsVal("WR_2_API","Statistic_EnergyPv1_Total",0),0)},\
+SW_Statistic_EnergyPv4_Year:Statistic_EnergyPv1_Year.* { round(ReadingsVal("WR_2_API","Statistic_EnergyPv1_Year",0),0)},\
+SW_Statistic_EnergyPv5_Day:Statistic_EnergyPv2_Day.* { round(ReadingsVal("WR_2_API","Statistic_EnergyPv2_Day",0),0)},\
+SW_Statistic_EnergyPv5_Month:Statistic_EnergyPv2_Month.* { round(ReadingsVal("WR_2_API","Statistic_EnergyPv2_Month",0),0)},\
+SW_Statistic_EnergyPv5_Total:Statistic_EnergyPv2_Total.* monotonic { round(ReadingsVal("WR_2_API","Statistic_EnergyPv2_Total",0),0)},\
+SW_Statistic_EnergyPv5_Year:Statistic_EnergyPv2_Year.* { round(ReadingsVal("WR_2_API","Statistic_EnergyPv2_Year",0),0)},\
+SW_Statistic_EnergyPv6_Day:Statistic_EnergyPv3_Day.* { round(ReadingsVal("WR_2_API","Statistic_EnergyPv3_Day",0),0)},\
+SW_Statistic_EnergyPv6_Month:Statistic_EnergyPv3_Month.* { round(ReadingsVal("WR_2_API","Statistic_EnergyPv3_Month",0),0)},\
+SW_Statistic_EnergyPv6_Total:Statistic_EnergyPv3_Total.* monotonic { round(ReadingsVal("WR_2_API","Statistic_EnergyPv3_Total",0),0)},\
+SW_Statistic_EnergyPv6_Year:Statistic_EnergyPv3_Year.* { round(ReadingsVal("WR_2_API","Statistic_EnergyPv3_Year",0),0)},\
+\
+SW_Statistic_Yield_Day:Statistic_Yield_Day.* { round(ReadingsVal("$NAME","Statistic_Yield_Day",0)+ReadingsVal("WR_2_API","Statistic_Yield_Day",0),0)},\
+SW_Statistic_Yield_Month:Statistic_Yield_Month.* { round(ReadingsVal("$NAME","Statistic_Yield_Month",0)+ReadingsVal("WR_2_API","Statistic_Yield_Month",0),0)},\
+SW_Statistic_Yield_Total:Statistic_Yield_Total.* monotonic { round(ReadingsVal("$NAME","Statistic_Yield_Total",0)+ReadingsVal("WR_2_API","Statistic_Yield_Total",0),0)},\
+SW_Statistic_Yield_Year:Statistic_Yield_Year.* { round(ReadingsVal("$NAME","Statistic_Yield_Year",0)+ReadingsVal("WR_2_API","Statistic_Yield_Year",0),0)},\
+\
+SW_Statistic_Yield_NoBat_Day:Statistic_Yield_Day.* { round((ReadingsVal("$NAME","SW_Statistic_Yield_Day",0)-ReadingsVal("$NAME","Statistic_EnergyHomeBat_Day",0)),0)},\
+SW_Statistic_Yield_NoBat_Month:Statistic_Yield_Month.* { round((ReadingsVal("$NAME","SW_Statistic_Yield_Month",0)-ReadingsVal("$NAME","Statistic_EnergyHomeBat_Month",0)),0)},\
+SW_Statistic_Yield_NoBat_Year:Statistic_Yield_Year.* { round((ReadingsVal("$NAME","SW_Statistic_Yield_Year",0)-ReadingsVal("$NAME","Statistic_EnergyHomeBat_Year",0)),0)},\
+\
+SW_Statistic_EnergyHomeFeedInGrid_Day:SW_Statistic_Yield_Day.* { (ReadingsVal("WR_0_KSEM","Active_energy-",0) - ReadingsVal("$NAME","SW_Meter_init_FeedInGrid_Day",0)) * 1000 },\
+SW_Statistic_EnergyHomeFeedInGrid_Month:SW_Statistic_Yield_Month.* { (ReadingsVal("WR_0_KSEM","Active_energy-",0) - ReadingsVal("$NAME","SW_Meter_init_FeedInGrid_Month",0)) * 1000 },\
+SW_Statistic_EnergyHomeFeedInGrid_Year:SW_Statistic_Yield_Year.* { (ReadingsVal("WR_0_KSEM","Active_energy-",0) - ReadingsVal("$NAME","SW_Meter_init_FeedInGrid_Year",0)) * 1000 },\
+\
+SW_Statistic_EnergyHomeGrid_Day:SW_Statistic_Yield_Day.* { (ReadingsVal("WR_0_KSEM","Active_energy+",0) - ReadingsVal("$NAME","SW_Meter_init_Grid_Day",0)) * 1000 },\
+SW_Statistic_EnergyHomeGrid_Month:SW_Statistic_Yield_Month.* { (ReadingsVal("WR_0_KSEM","Active_energy+",0) - ReadingsVal("$NAME","SW_Meter_init_Grid_Month",0)) * 1000 },\
+SW_Statistic_EnergyHomeGrid_Year:SW_Statistic_Yield_Year.* { (ReadingsVal("WR_0_KSEM","Active_energy+",0) - ReadingsVal("$NAME","SW_Meter_init_Grid_Year",0)) * 1000 },\
+\
+SW_Statistic_EnergyHomePv_Day:SW_Statistic_EnergyHomeFeedInGrid_Day.* { round(ReadingsVal("$NAME","SW_Statistic_Yield_Day",0) - ReadingsVal("$NAME","SW_Statistic_EnergyHomeFeedInGrid_Day",0) - ReadingsVal("$NAME","Statistic_EnergyHomeBat_Day",0),0) },\
+SW_Statistic_EnergyHomePv_Month:SW_Statistic_EnergyHomeFeedInGrid_Month.* { round(ReadingsVal("$NAME","SW_Statistic_Yield_Month",0) - ReadingsVal("$NAME","SW_Statistic_EnergyHomeFeedInGrid_Month",0) - ReadingsVal("$NAME","Statistic_EnergyHomeBat_Month",0),0) },\
+SW_Statistic_EnergyHomePv_Year:SW_Statistic_EnergyHomeFeedInGrid_Year.* { round(ReadingsVal("$NAME","SW_Statistic_Yield_Year",0) - ReadingsVal("$NAME","SW_Statistic_EnergyHomeFeedInGrid_Year",0) - ReadingsVal("$NAME","Statistic_EnergyHomeBat_Year",0),0) },\
+\
+SW_Statistic_EnergyHomePvSum_Day:SW_Statistic_EnergyHomeFeedInGrid_Day.* { round(ReadingsVal("$NAME","SW_Statistic_Yield_Day",0) - ReadingsVal("$NAME","SW_Statistic_EnergyHomeFeedInGrid_Day",0),0) },\
+SW_Statistic_EnergyHomePvSum_Month:SW_Statistic_EnergyHomeFeedInGrid_Month.* { round(ReadingsVal("$NAME","SW_Statistic_Yield_Month",0) - ReadingsVal("$NAME","SW_Statistic_EnergyHomeFeedInGrid_Month",0),0) },\
+SW_Statistic_EnergyHomePvSum_Year:SW_Statistic_EnergyHomeFeedInGrid_Year.* { round(ReadingsVal("$NAME","SW_Statistic_Yield_Year",0) - ReadingsVal("$NAME","SW_Statistic_EnergyHomeFeedInGrid_Year",0),0) },\
+\
+SW_Statistic_EnergyHome_Day:SW_Statistic_EnergyHomeFeedInGrid_Day.* { ReadingsVal("$NAME","SW_Statistic_Yield_Day",0) + ReadingsVal("$NAME","SW_Statistic_EnergyHomeGrid_Day",0) - ReadingsVal("$NAME","SW_Statistic_EnergyHomeFeedInGrid_Day"  ,0) },\
+SW_Statistic_EnergyHome_Month:SW_Statistic_EnergyHomeFeedInGrid_Month.* { ReadingsVal("$NAME","SW_Statistic_Yield_Month",0) + ReadingsVal("$NAME","SW_Statistic_EnergyHomeGrid_Month",0) - ReadingsVal("$NAME","SW_Statistic_EnergyHomeFeedInGrid_Month",0) },\
+SW_Statistic_EnergyHome_Year:SW_Statistic_EnergyHomeFeedInGrid_Year.* { ReadingsVal("$NAME","SW_Statistic_Yield_Year",0) + ReadingsVal("$NAME","SW_Statistic_EnergyHomeGrid_Year",0) - ReadingsVal("$NAME","SW_Statistic_EnergyHomeFeedInGrid_Year",0) },\
+\
+SW_Statistic_TotalConsumption_Day:SW_Statistic_EnergyHomePv_Day.* { round( (ReadingsVal("$NAME","SW_Statistic_EnergyHomePv_Day",0)+ReadingsVal("$NAME","Statistic_EnergyHomeBat_Day",0)+ReadingsVal("$NAME","SW_Statistic_EnergyHomeGrid_Day",0) ) ,0) },\
+SW_Statistic_TotalConsumption_Month:SW_Statistic_EnergyHomePv_Month.* { round( (ReadingsVal("$NAME","SW_Statistic_EnergyHomePv_Month",0)+ReadingsVal("$NAME","Statistic_EnergyHomeBat_Month",0) +ReadingsVal("$NAME","SW_Statistic_EnergyHomeGrid_Month",0) ),0) },\
+SW_Statistic_TotalConsumption_Year:SW_Statistic_EnergyHomePv_Year.* { round( (ReadingsVal("$NAME","SW_Statistic_EnergyHomePv_Year",0)+ReadingsVal("$NAME","Statistic_EnergyHomeBat_Year",0) +ReadingsVal("$NAME","SW_Statistic_EnergyHomeGrid_Year",0) ),0) },\
+\
+SW_Statistic_Autarky_Day:SW_Statistic_EnergyHomePvSum_Day.* { my $SW_Statistic_EnergyHome_Day = ReadingsVal("$NAME","SW_Statistic_EnergyHome_Day",0) ;;;; ($SW_Statistic_EnergyHome_Day eq 0)? 0 : round(ReadingsVal("$NAME","SW_Statistic_EnergyHomePvSum_Day",0) / $SW_Statistic_EnergyHome_Day *100,0) },\
+\
+SW_Statistic_Autarky_Month:SW_Statistic_EnergyHomePvSum_Month.* { round(ReadingsVal("$NAME","SW_Statistic_EnergyHomePvSum_Month",0) / ReadingsVal("$NAME","SW_Statistic_EnergyHome_Month",0) *100,0) },\
+SW_Statistic_Autarky_Year:SW_Statistic_EnergyHomePvSum_Year.* { round(ReadingsVal("$NAME","SW_Statistic_EnergyHomePvSum_Year",0) / ReadingsVal("$NAME","SW_Statistic_EnergyHome_Year",0) *100,0) },\
+\
+SW_Statistic_OwnConsumptionRate_Day:SW_Statistic_EnergyHomePvSum_Day.* {my $SW_Statistic_Yield_Day = ReadingsVal("$NAME","SW_Statistic_Yield_Day",0) ;;;; ($SW_Statistic_Yield_Day eq 0)? 0 : round(ReadingsVal("$NAME","SW_Statistic_EnergyHomePvSum_Day"  ,0) / $SW_Statistic_Yield_Day*100,0) },\
+SW_Statistic_OwnConsumptionRate_Month:SW_Statistic_EnergyHomePvSum_Month.* {my $SW_Statistic_Yield_Month = ReadingsVal("$NAME","SW_Statistic_Yield_Month",0) ;;;; ($SW_Statistic_Yield_Month eq 0)? 0 : round(ReadingsVal("$NAME","SW_Statistic_EnergyHomePvSum_Month"  ,0) / $SW_Statistic_Yield_Month*100,0) },\
+SW_Statistic_OwnConsumptionRate_Year:SW_Statistic_EnergyHomePvSum_Year.* {my $SW_Statistic_Yield_Year = ReadingsVal("$NAME","SW_Statistic_Yield_Year",0) ;;;; ($SW_Statistic_Yield_Year eq 0)? 0 : round(ReadingsVal("$NAME","SW_Statistic_EnergyHomePvSum_Year"  ,0) / $SW_Statistic_Yield_Year*100,0) },\
+\
+SW_Statistic_EnergyChargeGrid_Total:Statistic_EnergyChargeGrid_Total.* monotonic { round(ReadingsVal("$NAME","Statistic_EnergyChargeGrid_Total",0),0)},\
+SW_Statistic_EnergyChargeInvIn_Total:Statistic_EnergyChargeInvIn_Total.* monotonic { round(ReadingsVal("$NAME","Statistic_EnergyChargeInvIn_Total",0),0)},\
+SW_Statistic_EnergyChargePv_Total:Statistic_EnergyChargePv_Total.* monotonic { round(ReadingsVal("$NAME","Statistic_EnergyChargePv_Total",0),0)},\
+SW_Statistic_EnergyDischargeGrid_Total:Statistic_EnergyDischargeGrid_Total.* monotonic { round(ReadingsVal("$NAME","Statistic_EnergyDischargeGrid_Total",0),0)},\
+SW_Statistic_EnergyDischarge_Total:Statistic_EnergyDischarge_Total.* monotonic { round(ReadingsVal("$NAME","Statistic_EnergyDischarge_Total",0),0)},\
+SW_Statistic_EnergyHomeBat_Total:Statistic_EnergyHomeBat_Total.* monotonic { round(ReadingsVal("$NAME","Statistic_EnergyHomeBat_Total",0),0)},\
+SW_Statistic_EnergyHomeGrid_Total:Statistic_EnergyHomeGrid_Total.* monotonic { round(ReadingsVal("$NAME","Statistic_EnergyHomeGrid_Total",0),0)},\
+SW_Statistic_EnergyHomeOwn_Total:Statistic_EnergyHomeOwn_Total.* monotonic { round(ReadingsVal("$NAME","Statistic_EnergyHomeOwn_Total",0),0)},\
+SW_Statistic_EnergyHomePv_Total:Statistic_EnergyHomePv_Total.* monotonic { round(ReadingsVal("$NAME","Statistic_EnergyHomePv_Total",0),0)},\
+SW_Statistic_EnergyHome_Total:Statistic_EnergyHome_Total.* monotonic { round(ReadingsVal("$NAME","Statistic_EnergyHome_Total",0),0)},\
+\
+SW_Statistic_Autarky_Total:SW_Statistic_EnergyHomePv_Total.* { round(ReadingsVal("$NAME","SW_Statistic_EnergyHomePv_Total",0) / ReadingsVal("$NAME","SW_Statistic_EnergyHome_Total",0) *100,0) },\
+\
+SW_Statistic_OwnConsumptionRate_Total:SW_Statistic_EnergyHomePv_Total.* {my $SW_Statistic_Yield_Total = ReadingsVal("$NAME","SW_Statistic_Yield_Total",0) ;;;; ($SW_Statistic_Yield_Total eq 0)? 0 : round(ReadingsVal("$NAME","SW_Statistic_EnergyHomePv_Total" ,0) / $SW_Statistic_Yield_Total*100,0) }
+attr WR_1_API verbose 0

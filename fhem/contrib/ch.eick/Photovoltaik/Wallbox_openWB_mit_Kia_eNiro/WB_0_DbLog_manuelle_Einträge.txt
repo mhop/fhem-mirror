@@ -1,0 +1,413 @@
+defmod WB_0 DOIF ################################################################################################################\
+## 1_add fügt einen neuen Eintrag in die Datenbank ein\
+##\
+1_add\
+{if( !([$SELF:state] eq "off")                                      ## DOIF enabled\
+     and\
+     ([$SELF:ui_command_1] eq "add"                                 ## Hier wird das uiTable select ausgewertet\
+     )\
+   ) {\
+    my $logdbrep  =  "LogDBRep_WB_0_SQL";;\
+    my $BEV       =  ::ReadingsVal("$SELF","BEV","---");;\
+    my $TIMESTAMP =  ::ReadingsVal("$SELF","BEV_DateTime","0000-00-00 00:00").":00";;\
+       $TIMESTAMP =~ s/_/ /;;\
+    my $year = substr($TIMESTAMP,0,4);;\
+    my $month = substr($TIMESTAMP,5,2);;\
+#    print("$year.$month \n");;\
+    my $TYPE      =  ::ReadingsVal("$SELF","BEV_TYPE","none");;\
+    my $READING   =  $BEV."_kWhActualCharged";;\
+    my $VALUE     =  ::ReadingsVal("$SELF","BEV_kWhActualCharged","0");;\
+    my $ret       =  0;;\
+\
+    if ($TYPE eq "kostenfrei") {\
+      set_Reading("BEV_kWhActualCost","0") ;;\
+    }\
+\
+    if(    $BEV       ne "---"\
+       and $TIMESTAMP ne "00-00-00 00:00:00"\
+       and ($VALUE     ne "0" or $TYPE eq "kostenfrei")\
+      ) {\
+\
+       ## Eintragen der Ladeleistung\
+# print("1 $TIMESTAMP $SELF $TYPE $READING $VALUE \n");;\
+       $ret = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                  INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                    VALUES('".$TIMESTAMP."','$SELF','".$TYPE."','".$READING."','".$VALUE."')\
+                  ON DUPLICATE KEY UPDATE\
+                    TYPE='".$TYPE."',\
+                    VALUE='".$VALUE."';;") ;;\
+\
+       if (AttrVal("$SELF","verbose",0) >=3 and $ret > 1) {\
+         Log 3, "$SELF 1_1   : ".$ret;;\
+       }\
+\
+       ## Eintragen der Ladekosten\
+       $READING   =  $BEV."_kWhActualCost";;\
+       $VALUE     =  ::ReadingsVal("$SELF","BEV_kWhActualCost","0");;\
+# print("2 $TIMESTAMP $SELF $TYPE $READING $VALUE \n");;\
+\
+       $ret = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                  INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                    VALUES('".$TIMESTAMP."','$SELF','".$TYPE."','".$READING."','".$VALUE."')\
+                  ON DUPLICATE KEY UPDATE\
+                    TYPE='".$TYPE."',\
+                    VALUE='".$VALUE."';;") ;;\
+\
+       if (AttrVal("$SELF","verbose",0) >=3 and $ret > 1) {\
+         Log 3, "$SELF 1_2   : ".$ret;;\
+       }\
+\
+       ## Berechnung des Monats Wertes\
+       $READING   =  $BEV."_kWhCounter_Month";;\
+# print("3 $TIMESTAMP $SELF $TYPE $READING $VALUE \n");;\
+       $ret = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                  INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                    SELECT TIMESTAMP,DEVICE,TYPE,READING,VALUE\
+                    FROM\
+                     (SELECT\
+                        concat(last_day('".$TIMESTAMP."'), ' 23:59:00') AS TIMESTAMP,\
+                        DEVICE,\
+                        'manuell' AS TYPE,\
+                        '".$READING."' AS READING,\
+                        sum(VALUE) AS VALUE\
+                      FROM history\
+                      WHERE DEVICE='$SELF'\
+                      AND READING          = '".$BEV."_kWhActualCharged'\
+                      AND YEAR(TIMESTAMP)  = YEAR('".$TIMESTAMP."')\
+                      AND MONTH(TIMESTAMP) = MONTH('".$TIMESTAMP."')\
+                     ) t1\
+                  ON DUPLICATE KEY UPDATE\
+                    VALUE = t1.VALUE ;;") ;;\
+\
+       if (AttrVal("$SELF","verbose",0) >=3 and $ret > 2) {\
+         Log 3, "$SELF 1_3   : ".$ret;;\
+       }\
+\
+       ## Setzen des Monats Wertes als reading\
+# print("4 $TIMESTAMP $SELF $TYPE $READING $VALUE \n");;\
+       $ret = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                  SELECT VALUE FROM history\
+                  WHERE DEVICE='$SELF'\
+                    AND READING='".$READING."'\
+                    AND YEAR(TIMESTAMP) = YEAR(curdate())\
+                    AND MONTH(TIMESTAMP) = MONTH(curdate()) ;;") ;;\
+       set_Reading($READING,$ret) ;;\
+\
+       ## Berechnung des Jahres Wertes\
+       $READING   =  $BEV."_kWhCounter_Year";;\
+       $ret = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                  INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                    SELECT TIMESTAMP,DEVICE,TYPE,READING,VALUE\
+                    FROM\
+                     (SELECT\
+                        concat(last_day('".$TIMESTAMP."'), ' 23:59:00') AS TIMESTAMP,\
+                        DEVICE,\
+                        'manuell' AS TYPE,\
+                        '".$READING."' AS READING,\
+                        sum(VALUE) AS VALUE\
+                      FROM history\
+                      WHERE DEVICE='$SELF'\
+                      AND READING          = '".$BEV."_kWhActualCharged'\
+                      AND YEAR(TIMESTAMP)  =  YEAR('".$TIMESTAMP."')\
+                      AND MONTH(TIMESTAMP) <= MONTH('".$TIMESTAMP."')\
+                     ) t1\
+                  ON DUPLICATE KEY UPDATE\
+                    VALUE = t1.VALUE ;;") ;;\
+\
+       if (AttrVal("$SELF","verbose",0) >=3 and $ret > 2) {\
+         Log 3, "$SELF 1_4   : ".$ret;;\
+       }\
+\
+       ## Setzen des Jahres Wertes als reading\
+# print("5 $TIMESTAMP $SELF $TYPE $READING $VALUE \n");;\
+       $ret = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                  SELECT VALUE FROM history\
+                  WHERE DEVICE='$SELF'\
+                    AND READING='".$READING."'\
+                    AND MONTH(TIMESTAMP) <= MONTH(curdate())\
+                  ORDER BY TIMESTAMP DESC\
+                  LIMIT 1 ;;") ;;\
+       set_Reading($READING,$ret) ;;\
+\
+       ## Anzeigen der bisherigen Einträge\
+       my $report = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                        SELECT TIMESTAMP,DEVICE,TYPE,READING,VALUE FROM history\
+                        WHERE DEVICE = '$SELF'\
+                          AND TYPE  != 'manuell'\
+                          AND TIMESTAMP>DATE_ADD('".$TIMESTAMP."',INTERVAL -1 MONTH)\
+                          AND TIMESTAMP<DATE_ADD('".$TIMESTAMP."',INTERVAL +1 MONTH)\
+                        ORDER BY TIMESTAMP DESC, READING;;") ;;\
+       if ($report ne "1") {\
+         $report =~ s/\n/<br>/g;;\
+         $report =~ s/\|/ \| /g;;\
+         set_Reading("BEV_last",$report);;\
+       }\
+\
+       if (AttrVal("$SELF","verbose",0) >=3) {\
+         Log 3, "$SELF 1_5   : add    line ".$TIMESTAMP." $SELF Kia_eNiro_kWhCounter*";;\
+       }\
+      }\
+\
+    set_Reading("ui_command_1","---");;                                 ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                       ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+2_delete\
+{if( !([$SELF:state] eq "off")                                      ## DOIF enabled\
+     and\
+     ([$SELF:ui_command_1] eq "delete"                                 ## Hier wird das uiTable select ausgewertet\
+     )\
+   ) {\
+    my $logdbrep  =  "LogDBRep_WB_0_SQL";;\
+    my $BEV       =  ::ReadingsVal("$SELF","BEV","---");;\
+    my $TIMESTAMP =  ::ReadingsVal("$SELF","BEV_DateTime","0000-00-00 00:00").":00";;\
+       $TIMESTAMP =~ s/_/ /;;\
+    my $TYPE      =  ::ReadingsVal("$SELF","BEV_TYPE","none");;\
+    my $READING   =  $BEV."_kWhActual%";;\
+    my $ret       =  0;;\
+    if(    $BEV       ne "---"\
+       and $TYPE      ne "none"\
+       and $TIMESTAMP ne "00-00-00 00:00:00"\
+      ) {\
+\
+       ## Löschen der Ladeleistung\
+       $ret = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                  DELETE FROM history\
+                  WHERE TIMESTAMP  = '".$TIMESTAMP."'\
+                    AND DEVICE     = '$SELF'\
+                    AND TYPE       = '".$TYPE."'\
+                    AND READING LIKE '".$READING."';;") ;;\
+\
+       if (AttrVal("$SELF","verbose",0) >=3 and $ret > 2) {\
+         Log 3, "$SELF 2_1   : ".$ret;;\
+       }\
+\
+       ## Berechnung des Monats Wertes\
+       $READING   =  $BEV."_kWhCounter_Month";;\
+       $ret = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                  INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                    SELECT TIMESTAMP,DEVICE,TYPE,READING,VALUE\
+                    FROM\
+                      (SELECT\
+                         concat(last_day('".$TIMESTAMP."'), ' 23:59:00') AS TIMESTAMP,\
+                        '$SELF' AS DEVICE,\
+                        'manuell' AS TYPE,\
+                        '".$READING."' AS READING,\
+                        sum(VALUE) AS VALUE\
+                      FROM\
+                       (SELECT VALUE\
+                        FROM history\
+                        WHERE DEVICE='$SELF'\
+                          AND READING          = '".$BEV."_kWhActualCharged'\
+                          AND YEAR(TIMESTAMP)  = YEAR('".$TIMESTAMP."')\
+                          AND MONTH(TIMESTAMP) = MONTH('".$TIMESTAMP."')\
+                        UNION\
+                        SELECT 0 AS VALUE\
+                       ) t1\
+                     ) t2\
+                  ON DUPLICATE KEY UPDATE\
+                    VALUE = t2.VALUE ;;") ;;\
+\
+       if (AttrVal("$SELF","verbose",0) >=3 and $ret > 2) {\
+         Log 3, "$SELF 2_2   : ".$ret;;\
+       }\
+\
+       ## Setzen des Monats Wertes als reading\
+       $ret = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                  SELECT VALUE FROM history\
+                  WHERE DEVICE='$SELF'\
+                    AND READING='".$READING."'\
+                    AND MONTH(TIMESTAMP) = MONTH('".$TIMESTAMP."') ;;") ;;\
+       set_Reading($READING,$ret) ;;\
+\
+       ## Berechnung des Jahres Wertes\
+       $READING   =  $BEV."_kWhCounter_Year";;\
+       $ret = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                  INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                    SELECT TIMESTAMP,DEVICE,TYPE,READING,VALUE\
+                    FROM\
+                     (SELECT\
+                        concat(last_day('".$TIMESTAMP."'), ' 23:59:00') AS TIMESTAMP,\
+                        DEVICE,\
+                        'manuell' AS TYPE,\
+                        '".$READING."' AS READING,\
+                        sum(VALUE) AS VALUE\
+                      FROM history\
+                      WHERE DEVICE='$SELF'\
+                      AND READING          = '".$BEV."_kWhActualCharged'\
+                      AND YEAR(TIMESTAMP)  =  YEAR('".$TIMESTAMP."')\
+                      AND MONTH(TIMESTAMP) <= MONTH('".$TIMESTAMP."')\
+                     ) t1\
+                  ON DUPLICATE KEY UPDATE\
+                    VALUE = t1.VALUE ;;") ;;\
+\
+       if (AttrVal("$SELF","verbose",0) >=3 and $ret > 2) {\
+         Log 3, "$SELF 2_3   : ".$ret;;\
+       }\
+\
+       ## Setzen des Jahres Wertes als reading\
+       $ret = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                  SELECT VALUE FROM history\
+                  WHERE DEVICE='$SELF'\
+                    AND READING='".$READING."'\
+                    AND MONTH(TIMESTAMP) <= MONTH(curdate())\
+                  ORDER BY TIMESTAMP DESC\
+                  LIMIT 1 ;;") ;;\
+       set_Reading($READING,$ret) ;;\
+\
+       ## Anzeigen der bisherigen Einträge\
+       my $report = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                        SELECT TIMESTAMP,DEVICE,TYPE,READING,VALUE FROM history\
+                        WHERE DEVICE = '$SELF'\
+                          AND TYPE  != 'manuell'\
+                          AND TIMESTAMP>DATE_ADD('".$TIMESTAMP."',INTERVAL -1 MONTH)\
+                          AND TIMESTAMP<DATE_ADD('".$TIMESTAMP."',INTERVAL +1 MONTH)\
+                        ORDER BY TIMESTAMP DESC, READING;;") ;;\
+       if ($report ne "1" and $report ne "") {\
+         $report =~ s/\n/<br>/g;;\
+         $report =~ s/\|/ \| /g;;\
+         set_Reading("BEV_last",$report);;\
+       } else {\
+         set_Reading("BEV_last","---");;\
+       }\
+\
+       if (AttrVal("$SELF","verbose",0) >=3) {\
+         Log 3, "$SELF 2_5   : delete line ".$TIMESTAMP." $SELF ".$BEV."_kWhActualCharged";;\
+       }\
+    }\
+\
+    set_Reading("ui_command_1","---");;                                 ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                       ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+################################################################################################################\
+## 3_report erzeugt eine Liste von 30 Einträgen vor dem angegebenen Datum\
+##\
+3_report\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and\
+     ([$SELF:ui_command_1] eq "report"                                 ## Hier wird das uiTable select ausgewertet\
+     )\
+   ) {\
+    my $logdbrep  =  "LogDBRep_WB_0_SQL";;\
+    my $BEV       =  ::ReadingsVal("$SELF","BEV","---");;\
+    my $TIMESTAMP =  ::ReadingsVal("$SELF","BEV_DateTime","0000-00-00 00:00").":00";;\
+       $TIMESTAMP =~ s/_/ /;;\
+    my $ret       =  0;;\
+    if(    $BEV       ne "---"\
+       and $TIMESTAMP ne "00-00-00 00:00:00"\
+      ) {\
+\
+       my $report = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                        SELECT TIMESTAMP,DEVICE,TYPE,READING,VALUE FROM history\
+                        WHERE DEVICE    = '$SELF'\
+                          AND TIMESTAMP < LAST_DAY('".$TIMESTAMP."') + INTERVAL 1 DAY\
+                        ORDER BY TIMESTAMP DESC, READING\
+                        LIMIT 24;;") ;;\
+       if ($report ne "1") {\
+         $report =~ s/\n/<br>/g;;\
+##         $report =~ s/\|/&#9;;/g;;\
+##         $report = "<pre>".$report."</pre>";;\
+         $report =~ s/\|/ \| /g;;\
+         set_Reading("BEV_last",$report);;\
+       }\
+\
+      }\
+\
+    set_Reading("ui_command_1","---");;                                 ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                       ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+################################################################################################################\
+## 3_report erzeugt eine Liste von 30 Einträgen vor dem angegebenen Datum\
+##\
+3_report_clear\
+{if( !([$SELF:state] eq "off")                                         ## DOIF enabled\
+     and\
+     ([$SELF:ui_command_1] eq "report_clear"                           ## Hier wird das uiTable select ausgewertet\
+     )\
+   ) {\
+\
+    set_Reading("BEV_last","Kein Report abgerufen");;\
+\
+    set_Reading("ui_command_1","---");;                                 ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                       ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}
+attr WB_0 DbLogExclude .*
+attr WB_0 disable 0
+attr WB_0 group PV Eigenverbrauch-Steuerung
+attr WB_0 icon car
+attr WB_0 room Strom->Photovoltaik
+attr WB_0 sortby 404
+attr WB_0 uiTable {\
+package ui_Table;;\
+##  $TR{0} = "style='color:yellow;;text-align:left;;font-weight:bold;;font-size:18px'";;                                                         ## Reihe 0 für Überschrift\
+  $TABLE = "style='width:100%;;'";;\
+\
+  $TD{0..3}{0} = "align='center' style='font-size:16px;;border-right-style:solid;;border-color:darkgreen;;border-right-width:2px;;width:26%'";;\
+\
+  $TD{0..3}{1} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:36%;;font-weight:bold;;'";;\
+  $TD{0..3}{2..4} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
+  $TD{0..3}{5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
+\
+  $TD{4}{0} = "align='center' style='font-size:16px;;border-right-style:solid;;border-color:darkgreen;;border-right-width:2px;;width:26%'";;\
+  $TD{4}{1} = "style='border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-bottom-width:2px;;border-right-width:1px;;width:69%;;font-weight:bold;;'";;\
+\
+}\
+\
+"$SELF"|"" |""|""|""|""\
+\
+"" |\
+widget([$SELF:BEV_DateTime],"datetime,step:15,inline:true,format:Y-m-d_H:i") |\
+widget([$SELF:BEV],"uzsuDropDown,---,Kia_eNiro,Gast")."<br>".widget([$SELF:BEV_TYPE],"uzsuDropDown,---,Karte_1,privat,kostenfrei") | widget([$SELF:BEV_kWhActualCharged],"selectnumbers,0,1,100,0,lin")."kWh" |\
+widget([$SELF:BEV_kWhActualCost],"selectnumbers,0,0.1,100,2,lin")."Eur" |\
+widget([$SELF:ui_command_1],"uzsuDropDown,---,add,delete,report,report_clear")\
+\
+"" |\
+[$SELF:BEV_DateTime].":00" |\
+[$SELF:BEV] |\
+[$SELF:BEV_kWhActualCharged]." kWh" |\
+[$SELF:BEV_kWhActualCost]." Eur" |\
+[$SELF:BEV_TYPE]\
+\
+|"Statistik Ladeleistung<dd>lp_1<br>lp_2</dd>"|\
+"<br>Kia_eNiro<br>Gast"|\
+|\
+"Monat/Vormonat<br>".sprintf("%03d / %03d",::ReadingsVal("$SELF","Kia_eNiro_kWhCounter_Month",0),::ReadingsVal("LogDBRep_Statistic_previous_Month","$SELF_Kia_eNiro_kWhCounter_Month",0))."<br>".sprintf("%03d / %03d",::ReadingsVal("$SELF","Gast_kWhCounter_Month",0),::ReadingsVal("LogDBRep_Statistic_previous_Month","$SELF_Gast_kWhCounter_Month",0))|\
+"Jahr/Vorjahr<br>".sprintf("%04d / %04d",::ReadingsVal("$SELF","Kia_eNiro_kWhCounter_Year",0),::ReadingsVal("LogDBRep_Statistic_previous_Year","$SELF_Kia_eNiro_kWhCounter_Year",0))."<br>".sprintf("%04d / %04d",::ReadingsVal("$SELF","Gast_kWhCounter_Year",0),::ReadingsVal("LogDBRep_Statistic_previous_Year","$SELF_Gast_kWhCounter_Year",0))<\
+\
+""|\
+[$SELF:BEV_last]
+attr WB_0 userReadings BEV_last:BEV_DateTime|BEV_TYPE|BEV.*   {\
+  my $logdbrep  =  "LogDBRep_WB_0_SQL";;\
+  my $BEV       =  ::ReadingsVal("$NAME","BEV","---");;\
+  my $TYPE     =   ::ReadingsVal("$NAME","BEV_TYPE","---");;\
+  my $TIMESTAMP =  ::ReadingsVal("$NAME","BEV_DateTime","0000-00-00 00:00").":00";;\
+       $TIMESTAMP =~ s/_/ /;;\
+  my $report = ::CommandGet(undef, $logdbrep." sqlCmdBlocking\
+                        SELECT TIMESTAMP,DEVICE,TYPE,READING,VALUE FROM history\
+                        WHERE DEVICE = '$NAME'\
+                          AND TYPE = '".$TYPE."'\
+                          AND READING  LIKE '".$BEV."%'\
+                          AND TIMESTAMP='".$TIMESTAMP."';;") ;;\
+       if ($report ne "") {\
+         $report =~ s/\n/<br>/g;;\
+         $report =~ s/\|/ \| /g;;\
+       } else {\
+         $report = "---";;\
+       };;\
+  $report;;\
+}
+attr WB_0 verbose 3
+
+setstate WB_0 2023-01-20 19:25:31 BEV Kia_eNiro
+setstate WB_0 2024-01-12 17:40:57 BEV_DateTime 2024-01-12_19:00
+setstate WB_0 2023-12-15 19:33:25 BEV_TYPE privat
+setstate WB_0 2023-12-31 09:59:36 BEV_kWhActualCharged 40
+setstate WB_0 2023-12-31 10:00:53 BEV_kWhActualCost 27.70
+setstate WB_0 2024-01-12 17:40:57 BEV_last ---
+setstate WB_0 2024-01-01 11:39:15 ui_command_1 ---

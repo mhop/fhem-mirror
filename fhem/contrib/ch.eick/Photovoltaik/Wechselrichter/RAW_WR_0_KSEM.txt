@@ -1,0 +1,181 @@
+defmod WR_0_KSEM ModbusAttr 1 60 192.168.178.17:502 TCP
+attr WR_0_KSEM DbLogExclude .*
+attr WR_0_KSEM DbLogInclude Active_energy.*
+attr WR_0_KSEM alias WR_0_KSEM
+attr WR_0_KSEM comment Version 2021.04.07 12:00\
+Der KSEM ermittelt nicht alle Werte, welche in der SunSpec spezifiziert sind.\
+Alle nicht unterstützen Werte sind mit 0x8000 gekennzeichnet.\
+Für die nicht unterstützten Zählerstände wird die 0x800000000 ausgegeben.\
+\
+Der Summenstrom M_AC_Current (sum of active phases) kann aber durch den Endanwender selber\
+berechnet werden aus der Summe der Einzelwerte (Phase A AC current, Phase B AC current Phase C AC current)\
+\
+Die einzelnen Spannungen zwischen den Phasen können nicht gemessen werden und werden deshalb nicht ausgegeben.
+attr WR_0_KSEM dev-h-defPoll 1
+attr WR_0_KSEM dev-type-INT16-len 1
+attr WR_0_KSEM dev-type-INT16-unpack s>
+attr WR_0_KSEM dev-type-INT16_Current-expr $val * (10 ** ReadingsNum("$name" ,"M_AC_Current_SF",0))
+attr WR_0_KSEM dev-type-INT16_Current-format %.2f
+attr WR_0_KSEM dev-type-INT16_Current-len 1
+attr WR_0_KSEM dev-type-INT16_Current-unpack s>
+attr WR_0_KSEM dev-type-INT16_Freq-expr $val * (10 ** ReadingsNum("$name" ,"M_AC_Freq_SF",0))
+attr WR_0_KSEM dev-type-INT16_Freq-format %.2f
+attr WR_0_KSEM dev-type-INT16_Freq-len 1
+attr WR_0_KSEM dev-type-INT16_Freq-unpack s>
+attr WR_0_KSEM dev-type-INT16_PF-expr $val * (10 ** ReadingsNum("$name" ,"M_AC_PF_SF",0))
+attr WR_0_KSEM dev-type-INT16_PF-format %.2f
+attr WR_0_KSEM dev-type-INT16_PF-len 1
+attr WR_0_KSEM dev-type-INT16_PF-unpack s>
+attr WR_0_KSEM dev-type-INT16_Power-expr $val * (10 ** ReadingsNum("$name" ,"M_AC_Power_SF",0))
+attr WR_0_KSEM dev-type-INT16_Power-format %.2f
+attr WR_0_KSEM dev-type-INT16_Power-len 1
+attr WR_0_KSEM dev-type-INT16_Power-unpack s>
+attr WR_0_KSEM dev-type-INT16_VA-expr $val * (10 ** ReadingsNum("$name" ,"M_AC_VA_SF",0))
+attr WR_0_KSEM dev-type-INT16_VA-format %.2f
+attr WR_0_KSEM dev-type-INT16_VA-len 1
+attr WR_0_KSEM dev-type-INT16_VA-unpack s>
+attr WR_0_KSEM dev-type-INT16_VAR-expr $val * (10 ** ReadingsNum("$name" ,"M_AC_VAR_SF",0))
+attr WR_0_KSEM dev-type-INT16_VAR-format %.2f
+attr WR_0_KSEM dev-type-INT16_VAR-len 1
+attr WR_0_KSEM dev-type-INT16_VAR-unpack s>
+attr WR_0_KSEM dev-type-INT16_Voltage-expr $val * (10 ** ReadingsNum("$name" ,"M_AC_Voltage_SF",0))
+attr WR_0_KSEM dev-type-INT16_Voltage-format %.2f
+attr WR_0_KSEM dev-type-INT16_Voltage-len 1
+attr WR_0_KSEM dev-type-INT16_Voltage-unpack s>
+attr WR_0_KSEM dev-type-STR32-expr $val =~ s/[\00]+//gr
+attr WR_0_KSEM dev-type-STR32-format %s
+attr WR_0_KSEM dev-type-STR32-len 16
+attr WR_0_KSEM dev-type-STR32-unpack a*
+attr WR_0_KSEM dev-type-UINT16-format %s
+attr WR_0_KSEM dev-type-UINT16-len 1
+attr WR_0_KSEM dev-type-UINT32-format %s
+attr WR_0_KSEM dev-type-UINT32-len 2
+attr WR_0_KSEM dev-type-UINT64-expr $val/10000
+attr WR_0_KSEM dev-type-UINT64-format %s
+attr WR_0_KSEM dev-type-UINT64-len 4
+attr WR_0_KSEM dev-type-UINT64-unpack Q>
+attr WR_0_KSEM disable 0
+attr WR_0_KSEM event-on-change-reading Active_energy.*,M_AC_Current_.*,M_AC_Power
+attr WR_0_KSEM group PV Eigenverbrauch
+attr WR_0_KSEM icon measure_power
+attr WR_0_KSEM obj-h40072-reading M_AC_Current_A
+attr WR_0_KSEM obj-h40072-type INT16_Current
+attr WR_0_KSEM obj-h40073-reading M_AC_Current_B
+attr WR_0_KSEM obj-h40073-type INT16_Current
+attr WR_0_KSEM obj-h40074-reading M_AC_Current_C
+attr WR_0_KSEM obj-h40074-type INT16_Current
+attr WR_0_KSEM obj-h40075-reading M_AC_Current_SF
+attr WR_0_KSEM obj-h40075-type INT16
+attr WR_0_KSEM obj-h40077-reading M_AC_Voltage_AN
+attr WR_0_KSEM obj-h40077-type INT16_Voltage
+attr WR_0_KSEM obj-h40078-reading M_AC_Voltage_BN
+attr WR_0_KSEM obj-h40078-type INT16_Voltage
+attr WR_0_KSEM obj-h40079-reading M_AC_Voltage_CN
+attr WR_0_KSEM obj-h40079-type INT16_Voltage
+attr WR_0_KSEM obj-h40084-reading M_AC_Voltage_SF
+attr WR_0_KSEM obj-h40084-type INT16
+attr WR_0_KSEM obj-h40085-reading M_AC_Freq
+attr WR_0_KSEM obj-h40085-type INT16_Freq
+attr WR_0_KSEM obj-h40086-reading M_AC_Freq_SF
+attr WR_0_KSEM obj-h40086-type INT16
+attr WR_0_KSEM obj-h40087-format %.0f
+attr WR_0_KSEM obj-h40087-reading M_AC_Power
+attr WR_0_KSEM obj-h40087-type INT16_Power
+attr WR_0_KSEM obj-h40088-reading M_AC_Power_A
+attr WR_0_KSEM obj-h40088-type INT16_Power
+attr WR_0_KSEM obj-h40089-reading M_AC_Power_B
+attr WR_0_KSEM obj-h40089-type INT16_Power
+attr WR_0_KSEM obj-h40090-reading M_AC_Power_C
+attr WR_0_KSEM obj-h40090-type INT16_Power
+attr WR_0_KSEM obj-h40091-reading M_AC_Power_SF
+attr WR_0_KSEM obj-h40091-type INT16
+attr WR_0_KSEM obj-h40092-reading M_AC_VA
+attr WR_0_KSEM obj-h40092-type INT16_VA
+attr WR_0_KSEM obj-h40093-reading M_AC_VA_A
+attr WR_0_KSEM obj-h40093-type INT16_VA
+attr WR_0_KSEM obj-h40094-reading M_AC_VA_B
+attr WR_0_KSEM obj-h40094-type INT16_VA
+attr WR_0_KSEM obj-h40095-reading M_AC_VA_C
+attr WR_0_KSEM obj-h40095-type INT16_VA
+attr WR_0_KSEM obj-h40096-reading M_AC_VA_SF
+attr WR_0_KSEM obj-h40096-type INT16
+attr WR_0_KSEM obj-h40097-reading M_AC_VAR
+attr WR_0_KSEM obj-h40097-type INT16_VAR
+attr WR_0_KSEM obj-h40098-reading M_AC_VAR_A
+attr WR_0_KSEM obj-h40098-type INT16_VAR
+attr WR_0_KSEM obj-h40099-reading M_AC_VAR_B
+attr WR_0_KSEM obj-h40099-type INT16_VAR
+attr WR_0_KSEM obj-h40100-reading M_AC_VAR_C
+attr WR_0_KSEM obj-h40100-type INT16_VAR
+attr WR_0_KSEM obj-h40101-reading M_AC_VAR_SF
+attr WR_0_KSEM obj-h40101-type INT16
+attr WR_0_KSEM obj-h40102-reading M_AC_PF
+attr WR_0_KSEM obj-h40102-type INT16_PF
+attr WR_0_KSEM obj-h40103-reading M_AC_PF_A
+attr WR_0_KSEM obj-h40103-type INT16_PF
+attr WR_0_KSEM obj-h40104-reading M_AC_PF_B
+attr WR_0_KSEM obj-h40104-type INT16_PF
+attr WR_0_KSEM obj-h40105-reading M_AC_PF_C
+attr WR_0_KSEM obj-h40105-type INT16_PF
+attr WR_0_KSEM obj-h40106-reading M_AC_PF_SF
+attr WR_0_KSEM obj-h40106-type INT16
+attr WR_0_KSEM obj-h40108-reading M_Exported
+attr WR_0_KSEM obj-h40108-type UINT32
+attr WR_0_KSEM obj-h40110-reading M_Exported_A
+attr WR_0_KSEM obj-h40110-type UINT32
+attr WR_0_KSEM obj-h40112-reading M_Exported_B
+attr WR_0_KSEM obj-h40112-type UINT32
+attr WR_0_KSEM obj-h40114-reading M_Exported_C
+attr WR_0_KSEM obj-h40114-type UINT32
+attr WR_0_KSEM obj-h40116-reading M_Imported
+attr WR_0_KSEM obj-h40116-type UINT32
+attr WR_0_KSEM obj-h40118-reading M_Imported_A
+attr WR_0_KSEM obj-h40118-type UINT32
+attr WR_0_KSEM obj-h40120-reading M_Imported_B
+attr WR_0_KSEM obj-h40120-type UINT32
+attr WR_0_KSEM obj-h40122-reading M_Imported_C
+attr WR_0_KSEM obj-h40122-type UINT32
+attr WR_0_KSEM obj-h40125-reading M_Exported_VA
+attr WR_0_KSEM obj-h40125-type UINT32
+attr WR_0_KSEM obj-h40127-reading M_Exported_VA_A
+attr WR_0_KSEM obj-h40127-type UINT32
+attr WR_0_KSEM obj-h40129-reading M_Exported_VA_B
+attr WR_0_KSEM obj-h40129-type UINT32
+attr WR_0_KSEM obj-h40131-reading M_Exported_VA_C
+attr WR_0_KSEM obj-h40131-type UINT32
+attr WR_0_KSEM obj-h40133-reading M_Imported_VA
+attr WR_0_KSEM obj-h40133-type UINT32
+attr WR_0_KSEM obj-h40135-reading M_Imported_VA_A
+attr WR_0_KSEM obj-h40135-type UINT32
+attr WR_0_KSEM obj-h40137-reading M_Imported_VA_B
+attr WR_0_KSEM obj-h40137-type UINT32
+attr WR_0_KSEM obj-h40139-reading M_Imported_VA_C
+attr WR_0_KSEM obj-h40139-type UINT32
+attr WR_0_KSEM obj-h40982-reading Home_consumption
+attr WR_0_KSEM obj-h40982-type INT32
+attr WR_0_KSEM obj-h512-format %.0f
+attr WR_0_KSEM obj-h512-reading Active_energy+
+attr WR_0_KSEM obj-h512-type UINT64
+attr WR_0_KSEM obj-h516-format %.0f
+attr WR_0_KSEM obj-h516-reading Active_energy-
+attr WR_0_KSEM obj-h516-type UINT64
+attr WR_0_KSEM obj-h8192-reading ManufacturerID
+attr WR_0_KSEM obj-h8192-type UINT16
+attr WR_0_KSEM obj-h8193-reading ProductID
+attr WR_0_KSEM obj-h8193-type UINT16
+attr WR_0_KSEM obj-h8194-reading ProductVersion
+attr WR_0_KSEM obj-h8194-type UINT16
+attr WR_0_KSEM obj-h8195-reading FirmwareVersion
+attr WR_0_KSEM obj-h8195-type UINT16
+attr WR_0_KSEM obj-h8196-reading VendorName
+attr WR_0_KSEM obj-h8196-type STR32
+attr WR_0_KSEM obj-h8212-reading Productname
+attr WR_0_KSEM obj-h8212-type STR32
+attr WR_0_KSEM obj-h8228-reading SerialNumber
+attr WR_0_KSEM obj-h8228-type STR32
+attr WR_0_KSEM obj-h8244-reading MeasuringInterval
+attr WR_0_KSEM obj-h8244-type UINT16
+attr WR_0_KSEM room Strom->Photovoltaik
+attr WR_0_KSEM sortby 140
+attr WR_0_KSEM userReadings M_AC_Current:M_AC_Current_.* { ReadingsVal($NAME,"M_AC_Current_A",0) + ReadingsVal($NAME,"M_AC_Current_B",0) + ReadingsVal($NAME,"M_AC_Current_C",0) }
+attr WR_0_KSEM verbose 0

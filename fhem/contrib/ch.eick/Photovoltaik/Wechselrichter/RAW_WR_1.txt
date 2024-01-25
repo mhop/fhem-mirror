@@ -1,0 +1,353 @@
+defmod WR_1 ModbusAttr 71 60 192.168.178.18:1502 TCP
+attr WR_1 userattr obj-h208-format obj-h512-len obj-h515-len
+attr WR_1 DbLogExclude .*
+attr WR_1 DbLogInclude Act_state_of_charge,Actual_Battery_charge_-minus_or_discharge_-plus_P,Actual_Battery_charge_usable_P,Battery_Total.*,Battery_charge.*,Battery_gross.*,Battery_temperature,Battery_MaxChargePowerLimitAbs,Battery_.*SOC,P_DC1,P_DC2,Total_.*,Solar_Calculation,Solar_Calculation_fc0_4h,Solar_Calculation_fc0_day,Solar_Calculation_fc0_rest,Solar_Correction.*,Solar_Cloud,Solar_East_Covered,Solar_Rain,Solar_SolarRadiation,Solar_Temp,Solar_WR_.*,Solar_middayhigh.*,SW_.*,P_limit_from_EVU.*
+attr WR_1 alias WR_1
+attr WR_1 alignTime 00:00
+attr WR_1 comment Version 2022.12.30 10:00\
+Kostal Plenticore 10 Plus mit BYD Speicher
+attr WR_1 dev-h-combine 8
+attr WR_1 dev-h-defFormat %.2f
+attr WR_1 dev-h-defLen 2
+attr WR_1 dev-h-defPoll 1
+attr WR_1 dev-h-defRevRegs 1
+attr WR_1 dev-h-defUnpack f>
+attr WR_1 dev-type-STR-format %s
+attr WR_1 dev-type-STR-len 8
+attr WR_1 dev-type-STR-revRegs 0
+attr WR_1 dev-type-STR-unpack a*
+attr WR_1 disable 0
+attr WR_1 event-on-change-reading Act_state_of_charge,Actual_Battery_charge_-minus_or_discharge_-plus_I,Actual_Battery_charge_-minus_or_discharge_-plus_P,Actual_Battery_charge_usable_P,Battery_Total.*,Battery_charge.*,Battery_gross.*,Battery_temperature,Battery_MaxChargePowerLimitAbs,Battery_.*SOC,Home_own_consumption.*,P_DC1,P_DC2,Solar_.*,Total_.*,SW_.*,.*_yield,Inverter_state.*,Inverter_Generation_P_Actual.*,Solar_Calculation_fc.*_day
+attr WR_1 event-on-update-reading P_limit_from_EVU.*
+attr WR_1 group PV Eigenverbrauch
+attr WR_1 icon sani_solar
+attr WR_1 obj-h100-reading Total_DC_P
+attr WR_1 obj-h1024-len 1
+attr WR_1 obj-h1024-reading Battery_Charge_AC_P_Setpoint
+attr WR_1 obj-h1024-set 1
+attr WR_1 obj-h1024-unpack n
+attr WR_1 obj-h1025-len 1
+attr WR_1 obj-h1025-reading Battery_P_ScaleFactor
+attr WR_1 obj-h1025-unpack n
+attr WR_1 obj-h1026-reading Battery_Charge_AC_P_SetpointAbs
+attr WR_1 obj-h1026-set 1
+attr WR_1 obj-h1028-reading Battery_Charge_DC_I_SetpointRel
+attr WR_1 obj-h1028-set 1
+attr WR_1 obj-h1030-reading Battery_Charge_AC_P_SetpointRel
+attr WR_1 obj-h1030-set 1
+attr WR_1 obj-h1032-reading Battery_Charge_DC_I_SetpointAbs
+attr WR_1 obj-h1032-set 1
+attr WR_1 obj-h1034-reading Battery_Charge_DC_P_SetpointAbs
+attr WR_1 obj-h1034-set 1
+attr WR_1 obj-h1036-reading Battery_Charge_DC_P_SetpointRel
+attr WR_1 obj-h1036-set 1
+attr WR_1 obj-h1038-reading Battery_MaxChargePowerLimitAbs
+attr WR_1 obj-h1038-set 1
+attr WR_1 obj-h104-format %s
+attr WR_1 obj-h104-map 0:Normal,8:Ruhe1,16:Ruhe2,32:Ausgleichsladung,64:Tiefentladeschutz,256:externe Batteriesteuerung
+attr WR_1 obj-h104-reading State_of_EM
+attr WR_1 obj-h104-revRegs 0
+attr WR_1 obj-h104-unpack N
+attr WR_1 obj-h1040-reading Battery_MaxDischargePowerLimitAbs
+attr WR_1 obj-h1040-set 1
+attr WR_1 obj-h1042-reading Battery_MinSOC
+attr WR_1 obj-h1042-set 1
+attr WR_1 obj-h1044-reading Battery_MaxSOC
+attr WR_1 obj-h1044-set 1
+attr WR_1 obj-h1046-reading Battery_Total_DC_ChargeEnergy_DCsideToBattery
+attr WR_1 obj-h1048-reading Battery_Total_DC_DischargeEnergy_DCsideFromBattery
+attr WR_1 obj-h1050-reading Battery_Total_AC_ChargeEnergy_ACsideToBattery
+attr WR_1 obj-h1052-reading Battery_Total_AC_DischargeEnergy_BatteryToGrid
+attr WR_1 obj-h1054-reading Battery_Total_AC_ChargeEnergy_gridToBattery
+attr WR_1 obj-h1056-reading Total_DC_PV_Energy_sumOfAllPVInputs
+attr WR_1 obj-h1058-reading Total_DC_Energy_From_PV1
+attr WR_1 obj-h106-reading Home_own_consumption_from_Battery
+attr WR_1 obj-h1060-reading Total_DC_Energy_From_PV2
+attr WR_1 obj-h1062-reading Total_DC_Energy_From_PV3
+attr WR_1 obj-h1064-reading Total_AC_Energy_ACsideToGrid
+attr WR_1 obj-h1066-reading Total_DC_P_sumOfAllPVInputs
+attr WR_1 obj-h1068-reading Battery_work_capacity
+attr WR_1 obj-h1070-reading Battery_serial_number
+attr WR_1 obj-h1072-reading Battery_Reserved_1072
+attr WR_1 obj-h1074-reading Battery_Reserved_1074
+attr WR_1 obj-h1076-reading Battery_Maximum_ChargePLimit_read-outFromBattery
+attr WR_1 obj-h1078-reading Battery_Maximum_DischargePLimit_read-outFromBattery
+attr WR_1 obj-h108-reading Home_own_consumption_from_grid
+attr WR_1 obj-h1080-reading Battery_management_mode
+attr WR_1 obj-h1080-set 1
+attr WR_1 obj-h1081-reading Battery_Reserved_1081
+attr WR_1 obj-h1082-reading Installed_sensor_type
+attr WR_1 obj-h110-reading Total_home_consumption_Battery
+attr WR_1 obj-h112-reading Total_home_consumption_Grid
+attr WR_1 obj-h114-reading Total_home_consumption_PV
+attr WR_1 obj-h116-reading Home_own_consumption_from_PV
+attr WR_1 obj-h118-reading Total_home_consumption
+attr WR_1 obj-h120-reading Isolation_resistance
+attr WR_1 obj-h122-reading P_limit_from_EVU
+attr WR_1 obj-h124-reading Total_home_consumption_rate
+attr WR_1 obj-h14-reading Inverter_serial_number
+attr WR_1 obj-h14-type STR
+attr WR_1 obj-h144-reading Worktime
+attr WR_1 obj-h150-reading Actual_cos_phi
+attr WR_1 obj-h152-reading Grid_frequency
+attr WR_1 obj-h154-reading I_L1
+attr WR_1 obj-h156-reading Active_P_L1
+attr WR_1 obj-h158-reading U_L1
+attr WR_1 obj-h160-reading I_L2
+attr WR_1 obj-h162-reading Active_P_L2
+attr WR_1 obj-h164-reading U_L2
+attr WR_1 obj-h166-reading I_L3
+attr WR_1 obj-h168-reading Active_P_L3
+attr WR_1 obj-h170-reading U_L3
+attr WR_1 obj-h172-reading Total_AC_Active_P
+attr WR_1 obj-h174-reading Total_AC_Reactive_P
+attr WR_1 obj-h178-reading Total_AC_Apparent_P
+attr WR_1 obj-h190-reading Battery_charge_current
+attr WR_1 obj-h194-format %.0f
+attr WR_1 obj-h194-reading Number_of_Battery_cycles
+attr WR_1 obj-h200-reading Actual_Battery_charge_-minus_or_discharge_-plus_I
+attr WR_1 obj-h202-reading PSSB_fuse_state
+attr WR_1 obj-h208-reading Battery_ready_flag
+attr WR_1 obj-h210-reading Act_state_of_charge
+attr WR_1 obj-h212-reading Battery_state
+attr WR_1 obj-h214-reading Battery_temperature
+attr WR_1 obj-h216-reading Battery_voltage
+attr WR_1 obj-h218-reading Cos_phi_EM
+attr WR_1 obj-h220-reading Frequency_EM
+attr WR_1 obj-h222-reading I_L1_EM
+attr WR_1 obj-h224-reading Active_P_L1_EM
+attr WR_1 obj-h226-reading Reactive_P_L1_EM
+attr WR_1 obj-h228-reading Apparent_P_L1_EM
+attr WR_1 obj-h230-reading U_L1_EM
+attr WR_1 obj-h232-reading I_L2_EM
+attr WR_1 obj-h234-reading Active_P_L2_EM
+attr WR_1 obj-h236-reading Reactive_P_L2_EM
+attr WR_1 obj-h238-reading Apparent_P_L2_EM
+attr WR_1 obj-h240-reading U_L2_EM
+attr WR_1 obj-h242-reading I_L3_EM
+attr WR_1 obj-h244-reading Active_P_L3_EM
+attr WR_1 obj-h246-reading Reactive_P_L3_EM
+attr WR_1 obj-h248-reading Apparent_P_L3_EM
+attr WR_1 obj-h250-reading U_L3_EM
+attr WR_1 obj-h252-reading Total_Active_P_EM
+attr WR_1 obj-h254-reading Total_Reactive_P_EM
+attr WR_1 obj-h256-reading Total_Apparent_P_EM
+attr WR_1 obj-h258-reading I_DC1
+attr WR_1 obj-h260-reading P_DC1
+attr WR_1 obj-h266-reading U_DC1
+attr WR_1 obj-h268-reading I_DC2
+attr WR_1 obj-h270-reading P_DC2
+attr WR_1 obj-h276-reading U_DC2
+attr WR_1 obj-h278-reading I_DC3
+attr WR_1 obj-h280-reading P_DC3
+attr WR_1 obj-h286-reading U_DC3
+attr WR_1 obj-h320-reading Total_yield
+attr WR_1 obj-h322-reading Daily_yield
+attr WR_1 obj-h324-reading Yearly_yield
+attr WR_1 obj-h326-reading Monthly_yield
+attr WR_1 obj-h38-reading Software-Version_Maincontroller_MC
+attr WR_1 obj-h38-type STR
+attr WR_1 obj-h384-len 16
+attr WR_1 obj-h384-reading Inverter_network_name
+attr WR_1 obj-h384-type STR
+attr WR_1 obj-h4-format %.0f
+attr WR_1 obj-h4-len 1
+attr WR_1 obj-h4-reading MODBUS_Unit-ID
+attr WR_1 obj-h4-revRegs 1
+attr WR_1 obj-h4-unpack N
+attr WR_1 obj-h420-reading IP-address
+attr WR_1 obj-h420-type STR
+attr WR_1 obj-h428-reading IP-subnetmask
+attr WR_1 obj-h428-type STR
+attr WR_1 obj-h436-reading IP-gateway
+attr WR_1 obj-h436-type STR
+attr WR_1 obj-h446-reading IP-DNS1
+attr WR_1 obj-h446-type STR
+attr WR_1 obj-h454-reading IP-DNS2
+attr WR_1 obj-h454-type STR
+attr WR_1 obj-h46-reading Software-Version_IO-Controller_IOC
+attr WR_1 obj-h46-type STR
+attr WR_1 obj-h5-format %.0f
+attr WR_1 obj-h5-len 1
+attr WR_1 obj-h5-reading MODBUS_Byte_Order_Note
+attr WR_1 obj-h5-revRegs 1
+attr WR_1 obj-h5-unpack N
+attr WR_1 obj-h512-format %s
+attr WR_1 obj-h512-reading Battery_gross_capacity
+attr WR_1 obj-h512-unpack N
+attr WR_1 obj-h514-len 1
+attr WR_1 obj-h514-reading Battery_Actual_SOC
+attr WR_1 obj-h514-unpack n
+attr WR_1 obj-h515-format %s
+attr WR_1 obj-h515-reading Battery_Maincontroller_MC
+attr WR_1 obj-h515-unpack N
+attr WR_1 obj-h517-reading Battery_Manufacturer
+attr WR_1 obj-h517-type STR
+attr WR_1 obj-h525-format %s
+attr WR_1 obj-h525-reading Battery_Model_ID
+attr WR_1 obj-h525-unpack N
+attr WR_1 obj-h527-format %s
+attr WR_1 obj-h527-reading Battery_Serial_Number
+attr WR_1 obj-h527-unpack N
+attr WR_1 obj-h529-len 4
+attr WR_1 obj-h529-reading Work_Capacity
+attr WR_1 obj-h529-unpack N
+attr WR_1 obj-h531-format %.0f
+attr WR_1 obj-h531-reading Inverter_Max_P
+attr WR_1 obj-h531-unpack N
+attr WR_1 obj-h56-format %.0f
+attr WR_1 obj-h56-reading Inverter_state
+attr WR_1 obj-h56-unpack N
+attr WR_1 obj-h575-reading Inverter_Generation_P_Actual
+attr WR_1 obj-h575-unpack N
+attr WR_1 obj-h577-reading Generation_Energy
+attr WR_1 obj-h577-unpack N
+attr WR_1 obj-h578-reading Total_energy
+attr WR_1 obj-h582-reading Actual_Battery_charge-discharge_P
+attr WR_1 obj-h586-format %s
+attr WR_1 obj-h586-reading Battery_Firmware
+attr WR_1 obj-h586-unpack N
+attr WR_1 obj-h6-reading Inverter_Article_number
+attr WR_1 obj-h6-type STR
+attr WR_1 obj-h768-len 32
+attr WR_1 obj-h768-reading Productname
+attr WR_1 obj-h768-type STR
+attr WR_1 obj-h800-len 32
+attr WR_1 obj-h800-reading Power_class
+attr WR_1 obj-h800-type STR
+attr WR_1 room Strom->Photovoltaik
+attr WR_1 sortby 111
+attr WR_1 stateFormat {\
+if (AttrVal("$name","verbose",0) >=3) {\
+ my $DUMMY  = "";;\
+\
+ my $Power          = ReadingsVal($name,"Actual_Battery_charge_-minus_or_discharge_-plus_P",0);;\
+ my $StatusSpeicher = ($Power < -10) ? "<span style='color:green'>Laden</span>" : ($Power > 15)?  "<span style='color:red'>Entladen</span>"  : "<span style='color:orange'>Standby</span>";;\
+    $StatusSpeicher = $StatusSpeicher."<br>".ReadingsVal($name,"State_of_EM","n/a");;\
+    $Power          = $Power." W";;\
+\
+\
+ my $Battery_temperature                  = sprintf("%.1f °C",ReadingsVal($name,"Battery_temperature",0));;\
+    $Battery_temperature                  = ((ReadingsVal("WR_1_API","DigitalOutputs_ConfigurationFlags",0) == 9) ? "<span style='color:green'>Lüfter An </span><br>" : "<br>").$Battery_temperature;;\
+\
+ my $Actual_Battery_charge_usable_P       = sprintf("%d Wh",ReadingsVal($name,"Actual_Battery_charge_usable_P",0));;\
+								         \
+ my $Act_state_of_charge                  = sprintf("%d %%",ReadingsVal($name,"Act_state_of_charge","0"));;\
+ my $SW_Total_DC_P_sumOfAllPVInputs       = sprintf("%d W",ReadingsVal($name,"SW_Total_DC_P_sumOfAllPVInputs","0"));;\
+ my $SW_Total_PV_P_reserve                = sprintf("%d W",ReadingsVal($name,"SW_Total_PV_P_reserve","0"));;\
+\
+ my $SW_Home_own_consumption_from_PV      = sprintf("%d",ReadingsVal($name,"SW_Home_own_consumption_from_PV",0));;\
+    $SW_Home_own_consumption_from_PV = ($SW_Home_own_consumption_from_PV >= 0) ? $SW_Home_own_consumption_from_PV." W" : "0 W";;\
+ my $SW_Home_own_consumption_from_Battery = sprintf("%d W",ReadingsVal($name,"SW_Home_own_consumption_from_Battery",0));;\
+ my $SW_Home_own_consumption_from_grid    = sprintf("%d W",ReadingsVal($name,"SW_Home_own_consumption_from_grid",0));;\
+ my $SW_Home_own_consumption              = sprintf("%d W",ReadingsVal($name,"SW_Home_own_consumption",0));;\
+\
+ my $Total_Active_P_EM  = sprintf("%d",ReadingsVal($name,"Total_Active_P_EM",0));;\
+ my $StatusNetz         = ($Total_Active_P_EM < -10) ? "<span style='color:green'>Einspeisen</span>" : ($Total_Active_P_EM > 15)?  "<span style='color:red'>Netzbezug</span>"  : "<span style='color:orange'>Standby</span>";;\
+    $Total_Active_P_EM  = $Total_Active_P_EM." W";;\
+	 \
+ my $SW_Yield_Daily   = sprintf("%d kWh",round(ReadingsVal($name,"SW_Yield_Daily",0)/1000 ,0));;\
+ my $SW_Yield_Monthly = sprintf("%d kWh",round(ReadingsVal($name,"SW_Yield_Monthly",0)/1000 ,0));;\
+ my $SW_Yield_Yearly  = sprintf("%d kWh",round(ReadingsVal($name,"SW_Yield_Yearly",0)/1000 ,0));;\
+ my $SW_Yield_Total   = sprintf("%d MWh",round(ReadingsVal($name,"SW_Yield_Total",0)/1000/1000 ,0));;\
+\
+ my $Solar_Calculation_fc0_4h   = sprintf("%d kWh",round(ReadingsVal($name,"Solar_Calculation_fc0_4h",0)/1000 ,0));;\
+ my $Solar_Calculation_fc0_day  = sprintf("%d kWh",round(ReadingsVal($name,"Solar_Calculation_fc0_day",0)/1000 ,0));;\
+ my $Solar_Calculation_fc0_rest = sprintf("%d kWh",round(ReadingsVal($name,"Solar_Calculation_fc0_rest",0)/1000 ,0));;\
+\
+"<html><table border=2 bordercolor='darkgreen' cellspacing=0 style='width: 100%'>\
+ <colgroup>\
+   <col span='1' style='width: 52%;;'>\
+   <col span='1' style='width: 12%;;'>\
+   <col span='1' style='width: 12%;;'>\
+   <col span='1' style='width: 12%;;'>\
+   <col span='1' style='width: 12%;;'>\
+ </colgroup>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;font-weight:bold'> </td><td style='padding-right:5px;;padding-left:5px;;font-weight:bold'></td><td style='padding-right:5px;;padding-left:5px;;font-weight:bold'></td><td style='padding-right:5px;;padding-left:5px;;text-align:center;;font-weight:bold'></td><td style='padding-right:5px;;padding-left:5px;;text-align:center;;font-weight:bold'></td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>Wechselrichter / KSEM<dd>Max DC / PV Reserve / Netz Leistung</dd></td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$SW_Total_DC_P_sumOfAllPVInputs."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$SW_Total_PV_P_reserve."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$StatusNetz."<br></td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$Total_Active_P_EM."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>Leistung<dd>von PV / von Batterie / vom Netz / ins Haus</dd></td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$SW_Home_own_consumption_from_PV."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$SW_Home_own_consumption_from_Battery."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$SW_Home_own_consumption_from_grid."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$SW_Home_own_consumption."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>Ertrag<dd>Tag / Monat / Jahr / Total</dd></td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$SW_Yield_Daily."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$SW_Yield_Monthly."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$SW_Yield_Yearly."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$SW_Yield_Total."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>Prognose<dd>Tag / 4 Stunden / Resttag</dd></td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$Solar_Calculation_fc0_day."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$Solar_Calculation_fc0_4h."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$Solar_Calculation_fc0_rest."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$DUMMY."</td></tr>\
+ <tr><td style='padding-right:5px;;padding-left:5px;;text-align:left;;font-weight:bold'>Speicher<dd>Temperatur / nutzbare Ladung / Status / Leistung / akt. SOC</dd></td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$Battery_temperature."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'><br>".$Actual_Battery_charge_usable_P."</td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$StatusSpeicher."<br></td><td style='padding-right:5px;;padding-left:5px;;text-align:center'>".$Power."<br>".$Act_state_of_charge."</td></tr>\
+ </table>\
+</html>"\
+}\
+}
+attr WR_1 userReadings Total_PV_P_reserve:Total_DC_P.* {my $reserve = ReadingsVal($NAME,"Total_DC_P_sumOfAllPVInputs",0) * 0.90 - ReadingsVal($NAME,"Home_own_consumption_from_PV",0);;;; ($reserve lt 0)? 0 : round($reserve,0)  },\
+\
+Actual_Battery_charge_-minus_or_discharge_-plus_P:[Battery_voltage|Actual_Battery_charge_-minus_or_discharge_-plus_I].* {round((ReadingsVal($NAME,"Actual_Battery_charge_-minus_or_discharge_-plus_I",0)*ReadingsVal($NAME,"Battery_voltage",0)),0)},\
+\
+Total_DC_P_Max:[Total_DC_P_sumOfAllPVInputs|Actual_Battery_charge_-minus_or_discharge_-plus_P].* { my $Bat_P = ReadingsVal($NAME,"Actual_Battery_charge_-minus_or_discharge_-plus_P",0);;;; ($Bat_P gt 0)? round(ReadingsVal($NAME,"Total_DC_P_sumOfAllPVInputs",0) + $Bat_P,0) : round(ReadingsVal($NAME,"Total_DC_P_sumOfAllPVInputs",0),0) },\
+\
+Actual_Battery_charge_usable_P:[Act_state_of_charge|Battery_MinSOC].* {my $x = (ReadingsVal($NAME,"Battery_work_capacity",0)*(ReadingsVal($NAME,"Act_state_of_charge",0)-ReadingsVal($NAME,"Battery_MinSOC",0))/100);;;; ($x lt 0)? 0 : round($x,0) },\
+\
+SW_Inverter_Generation_P_Actual:Inverter_Generation_P_Actual.* {round(ReadingsVal($NAME,"Inverter_Generation_P_Actual",0)+ReadingsVal("WR_2","Inverter_Generation_P_Actual",0),0) },\
+\
+SW_Home_own_consumption:[Total_Active_P_EM:|Total_AC_Active_P:].* {round(ReadingsVal($NAME,"Total_Active_P_EM",0)+ReadingsVal($NAME,"Total_AC_Active_P",0)+ReadingsVal("WR_2","Total_AC_Active_P",0),0)},\
+SW_Total_AC_Active_P:Total_AC_Active_P:.*  {round(ReadingsVal($NAME,"Total_AC_Active_P",0)+ReadingsVal("WR_2","Total_AC_Active_P",0),0)},\
+\
+\
+SW_Total_DC_P:Total_DC_P:.* {round(ReadingsVal($NAME,"Total_DC_P",0)+ReadingsVal("WR_2","Total_DC_P",0),0) },\
+\
+SW_Total_DC_P_sumOfAllPVInputs:Total_DC_P_sumOfAllPVInputs.* {round(ReadingsVal($NAME,"Total_DC_P_sumOfAllPVInputs",0)+ReadingsVal("WR_2","Total_DC_P_sumOfAllPVInputs",0),0) },\
+\
+SW_Total_PV_P_reserve:SW_Total_DC_P_sumOfAllPVInputs.* {my $reserve = ReadingsVal($NAME,"SW_Total_DC_P_sumOfAllPVInputs",0) * 0.90 - ReadingsVal($NAME,"SW_Home_own_consumption",0);;;; ($reserve lt 0)? 0 : round($reserve,0)  },\
+\
+SW_Total_DC_P_Max:SW_Total_DC_P_sumOfAllPVInputs.* { my $Bat_out = (ReadingsVal($NAME,"Actual_Battery_charge_-minus_or_discharge_-plus_I",0)*ReadingsVal($NAME,"Battery_voltage",0));;;; ($Bat_out gt 0)? round(ReadingsVal($NAME,"SW_Total_DC_P_sumOfAllPVInputs",0) + $Bat_out,0) : round(ReadingsVal($NAME,"SW_Total_DC_P_sumOfAllPVInputs",0),0) },\
+\
+SW_Yield_Daily:Daily_yield.* { round(ReadingsVal($NAME,"Daily_yield",0)+ReadingsVal("WR_2","Daily_yield",0),0) },\
+SW_Yield_Monthly:Monthly_yield.* { round(ReadingsVal($NAME,"Monthly_yield",0)+ReadingsVal("WR_2","Monthly_yield",0),0) },\
+SW_Yield_Yearly:Yearly_yield.* { round(ReadingsVal($NAME,"Yearly_yield",0)+ReadingsVal("WR_2","Yearly_yield",0),0) },\
+SW_Yield_Total:Total_yield.* monotonic { round(ReadingsVal($NAME,"Total_yield",0)+ReadingsVal("WR_2","Total_yield",0),0) },\
+\
+SW_Home_own_consumption_from_PV:[Total_Active_P_EM|SW_Home_own_consumption:|Home_own_consumption_from_grid|Home_own_consumption_from_Battery].* { (ReadingsVal($NAME,"Total_Active_P_EM",0) ge 0) ? ReadingsVal($NAME,"SW_Home_own_consumption",0) - ReadingsVal($NAME,"Home_own_consumption_from_grid",0) - ReadingsVal($NAME,"Home_own_consumption_from_Battery",0) :  ReadingsVal($NAME,"SW_Home_own_consumption",0) - ReadingsVal($NAME,"Home_own_consumption_from_Battery",0);;;; },\
+\
+SW_Home_own_consumption_from_Battery:[SW_Home_own_consumption_from_PV|Home_own_consumption_from_Battery].* { ReadingsVal($NAME,"Home_own_consumption_from_Battery",0) },\
+SW_Home_own_consumption_from_grid:[SW_Home_own_consumption_from_PV|Home_own_consumption_from_grid].* { ReadingsVal($NAME,"Home_own_consumption_from_grid",0) },\
+\
+\
+SW_Battery_Total_AC_ChargeEnergy_ACsideToBattery:Battery_Total_AC_ChargeEnergy_ACsideToBattery.* monotonic { round(ReadingsVal($NAME,"Battery_Total_AC_ChargeEnergy_ACsideToBattery",0),0) },\
+SW_Battery_Total_AC_ChargeEnergy_gridToBattery:Battery_Total_AC_ChargeEnergy_gridToBattery.* monotonic { round(ReadingsVal($NAME,"Battery_Total_AC_ChargeEnergy_gridToBattery",0),0) },\
+SW_Battery_Total_AC_DischargeEnergy_BatteryToGrid:Battery_Total_AC_DischargeEnergy_BatteryToGrid.* monotonic { round(ReadingsVal($NAME,"Battery_Total_AC_DischargeEnergy_BatteryToGrid",0),0) },\
+SW_Battery_Total_DC_ChargeEnergy_DCsideToBattery:Battery_Total_DC_ChargeEnergy_DCsideToBattery.* monotonic { round(ReadingsVal($NAME,"Battery_Total_DC_ChargeEnergy_DCsideToBattery",0),0) },\
+SW_Battery_Total_DC_DischargeEnergy_DCsideFromBattery:Battery_Total_DC_DischargeEnergy_DCsideFromBattery.* monotonic { round(ReadingsVal($NAME,"Battery_Total_DC_DischargeEnergy_DCsideFromBattery",0),0) },\
+\
+SW_Total_AC_Energy_ACsideToGrid:Total_AC_Energy_ACsideToGrid.* monotonic { round(ReadingsVal($NAME,"Total_AC_Energy_ACsideToGrid",0)+ReadingsVal("WR_2","Total_AC_Energy_ACsideToGrid",0),0) },\
+\
+SW_Total_DC_Energy_From_PV1:Total_DC_Energy_From_PV1.* monotonic { round(ReadingsVal($NAME,"Total_DC_Energy_From_PV1",0),0) },\
+SW_Total_DC_Energy_From_PV2:Total_DC_Energy_From_PV2.* monotonic { round(ReadingsVal($NAME,"Total_DC_Energy_From_PV2",0),0) },\
+SW_Total_DC_Energy_From_PV3:Total_DC_Energy_From_PV3.* monotonic { round(ReadingsVal($NAME,"Total_DC_Energy_From_PV3",0),0) },\
+SW_Total_DC_Energy_From_PV4:Total_DC_Energy_From_PV1.* monotonic { round(ReadingsVal("WR_2","Total_DC_Energy_From_PV1",0),0) },\
+SW_Total_DC_Energy_From_PV5:Total_DC_Energy_From_PV2.* monotonic { round(ReadingsVal("WR_2","Total_DC_Energy_From_PV2",0),0) },\
+SW_Total_DC_Energy_From_PV6:Total_DC_Energy_From_PV3.* monotonic { round(ReadingsVal("WR_2","Total_DC_Energy_From_PV3",0),0) },\
+SW_Total_DC_PV_Energy_sumOfAllPVInputs:Total_DC_PV_Energy_sumOfAllPVInputs.* monotonic { round(ReadingsVal($NAME,"Total_DC_PV_Energy_sumOfAllPVInputs",0)+ReadingsVal("WR_2","Total_DC_PV_Energy_sumOfAllPVInputs",0),0) },\
+SW_Total_home_consumption_Battery:Total_home_consumption_Battery.* monotonic { round(ReadingsVal($NAME,"Total_home_consumption_Battery",0),0) },\
+SW_Total_home_consumption_Grid:Total_home_consumption_Grid.* monotonic { round(ReadingsVal($NAME,"Total_home_consumption_Grid",0),0) },\
+SW_Total_home_consumption_PV:Total_home_consumption_PV.* monotonic { round(ReadingsVal($NAME,"Total_home_consumption_PV",0),0) },\
+\
+string_1_covered_snow:SW_Total_DC_Energy_From_PV1.* {\
+   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);;;; $year += 1900;;;; $mon += 1 ;;;;\
+   (($mon <= 2 or $mon >= 11) and\
+    ($hour >= 9 and $hour <= 16) and\
+    ReadingsVal($NAME,"P_DC1","10000") < 100 and\
+    ReadingsVal("Heizung","ambientTemperature",100) < 10)? "Schnee" : "frei";;;; },\
+string_2_covered_snow:SW_Total_DC_Energy_From_PV2.* {\
+   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);;;; $year += 1900;;;; $mon += 1 ;;;;\
+   (($mon <= 2 or $mon >= 11) and\
+    ($hour >= 9 and $hour <= 16) and\
+    ReadingsVal($NAME,"P_DC2","10000") < 100 and\
+    ReadingsVal("Heizung","ambientTemperature",100) < 10)? "Schnee" : "frei";;;; },\
+string_4_covered_snow:SW_Total_DC_Energy_From_PV4.* {\
+   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);;;; $year += 1900;;;; $mon += 1 ;;;;\
+   (($mon <= 2 or $mon >= 11) and\
+    ($hour >= 9 and $hour <= 16) and\
+    ReadingsVal("WR_2","P_DC1","10000") < 200 and\
+    ReadingsVal("Heizung","ambientTemperature",100) < 10)? "Schnee" : "frei";;;; },\
+string_5_covered_snow:SW_Total_DC_Energy_From_PV5.* {\
+   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);;;; $year += 1900;;;; $mon += 1 ;;;;\
+   (($mon <= 2 or $mon >= 11) and\
+    ($hour >= 9 and $hour <= 16) and\
+    ReadingsVal("WR_2","P_DC2","10000") < 100 and\
+    ReadingsVal("Heizung","ambientTemperature",100) < 10)? "Schnee" : "frei";;;; }\
+
+attr WR_1 verbose 0

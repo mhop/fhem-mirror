@@ -1,0 +1,264 @@
+defmod EVU_Tibber DOIF ## Startup Befehle für den WebSocket vom EVU_Tibber_connect\
+init\
+{ \
+  Log(0, "$SELF 0   init       : ▶️  EVU_Tibber init");;\
+  fhem("setreading EVU_Tibber_connect ws_cmd connect");; \
+  if (AttrVal("$SELF","verbose",0) >=3) {\
+      Log 3, "$SELF 0   WebSocket  : ▶️  EVU_Tibber_connect start Websocket";;\
+  }\
+  Log(0, "$SELF 0   init       : 🏁 EVU_Tibber init done");;\
+}\
+\
+################################################################################################################\
+## EVU_Tibber_connect start/stop WebSocket\
+EVU_Tibber_connect_ws\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+#    or  [$SELF:ui_command_2]                                             ## Hier wird das uiTable select ausgewertet\
+    and [$SELF:ui_command_2] ne "---"\
+   ) {\
+\
+    fhem("setreading EVU_Tibber_connect ws_cmd ".[?$SELF:ui_command_2]);; \
+\
+    set_Reading("ui_command_2","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+################################################################################################################\
+## 1 Scheduling für das Abholen von Tibber Daten\
+1_EVU_Tibber_PriceInfo\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    (     [:03]                                                          ## Kurz nach jeder vollen Stunde\
+    )\
+    or [$SELF:ui_command_1] eq "1_EVU_Tibber_PriceInfo"                  ## Hier wird das uiTable select ausgewertet\
+   ) {\
+\
+  ::CommandGet(undef, "EVU_Tibber_connect 01_priceInfo");;                ## Preis für die aktuelle Stunde\
+  ::CommandGet(undef, "EVU_Tibber_connect 03_consumption_hour");;         ## Kosten der letzen drei Stunden\
+  if (AttrVal("$SELF","verbose",0) >=3) {\
+      Log 3, "$SELF 1   PriceInfo  : Abfrage von Tibber";;\
+    }\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+################################################################################################################\
+## 2 Scheduling für das Abholen der Tibber Preise\
+2_EVU_Tibber_PriceAll\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    ([00:03] or [14:03]                                                  ## Ab 14:00 Uhr gibt es die Preise für den nächsten Tag\
+    )\
+    or [$SELF:ui_command_1] eq "2_EVU_Tibber_PriceAll"                   ## Hier wird das uiTable select ausgewertet\
+   ) {\
+\
+  ::CommandGet(undef, "EVU_Tibber_connect 02_priceAll");;\
+  if (AttrVal("$SELF","verbose",0) >=3) {\
+      Log 3, "$SELF 2   priceAll   : Abfrage von Tibber für den nächsten Tag";;\
+    }\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+################################################################################################################\
+## 2 Erstellen des Diagramms im uiTable\
+3_EVU_Tibber_Diagramm\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    (     [00:05] or [14:05]                                             ## Kurz nach Mitternacht\
+    )\
+    or [$SELF:ui_command_1] eq "3_EVU_Tibber_Diagramm"                   ## Hier wird das uiTable select ausgewertet\
+   ) {\
+\
+  my (@out) = ("") x 2;;\
+  my $timestamp;;\
+\
+  for (my $j=0;;$j<=1;;$j++){\
+\
+    if (ReadingsVal("EVU_Tibber_connect",sprintf("fc%d_00_startsAt",$j),"null") eq "null") {       ## Der nächste Tag ist noch nicht da\
+      if (AttrVal("$SELF","verbose",0) >=3) {\
+        Log 3, "$SELF 3   Diagramm   : Tibber Daten für fc".$j." sind noch nicht da";;\
+      }\
+\
+      $timestamp = POSIX::strftime("%Y-%m-%d",localtime(time+86400));;    ## Setze das Datum auf morgen\
+      for (my $k=0;;$k<=24;;$k++) {\
+        $out[$j] .= sprintf("%s_%02d:00:00 0.0\n", $timestamp, $k);;      ## Die Daten mit 0 ergänzen\
+      }\
+      $j = 2;;                                                            ## Aus der Schleife springen\
+\
+    } else {\
+\
+      for (my $i=0;;$i<=23;;$i++){\
+        $timestamp = ReadingsVal("EVU_Tibber_connect",sprintf("fc%d_%02d_startsAt",$j,$i),"");;\
+        $timestamp =~ s/ /_/g;;\
+        $out[$j] .=$timestamp." ".::round(ReadingsVal("EVU_Tibber_connect",sprintf("fc%d_%02d_total",$j, $i),0)*100,1)."\n";;\
+      } # End $i\
+\
+    } # End if\
+  } # End $j\
+  \
+  if (AttrVal("$SELF","verbose",0) >=3) {\
+      Log 3, "$SELF 3   Diagramm   : Werte für das Diagramm";;\
+      print($out[0]);;\
+      print($out[1]);;\
+    }\
+  ## Die readings current_price und current_level dienen hier nur als Trigger Events, und müssen für\
+  ## jedes Diagramm unterschiedlich sein, die Daten werden über $out[] bereit gestellt !!\
+  ::DOIF_modify_card_data("EVU_Tibber","EVU_Tibber_connect","current_price","bar1day",0,$out[0]);;\
+  ::DOIF_modify_card_data("EVU_Tibber","EVU_Tibber_connect","current_level","bar1day",-86400,$out[1]);;\
+  ## Mit der Abfrage 03_consumption_hour werden die Trigger erneut ausgelöst\
+  ::CommandGet(undef, "EVU_Tibber_connect 01_priceInfo");;                ## Kosten der letzen drei Stunden\
+##  fhem("get EVU_Tibber_connect 01_priceInfo");;                           ## Kosten der letzen drei Stunden\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+
+attr EVU_Tibber DbLogExclude .*
+attr EVU_Tibber comment Version 2023.12.06 13:00 \
+Dieses Device benötigt EVU_Tibber_connect als Verbindung zu Tibber.
+attr EVU_Tibber disable 0
+attr EVU_Tibber group PV Steuerung EVU
+attr EVU_Tibber icon stromzaehler_icon
+attr EVU_Tibber room Strom->Boerse
+attr EVU_Tibber sortby 315
+attr EVU_Tibber uiState {\
+package ui_Table;;\
+  $TABLE = "style='width:100%;;'";;\
+\
+  $TD{0..6}{0} = "style='border-top-style:solid;;border-bottom-style:solid;;border-left-style:solid;;border-left-width:2px;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:36%;;font-weight:bold;;'";;\
+  $TD{0..6}{1..4} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
+  $TD{0..6}{5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
+\
+}\
+\
+"Kommando<dd>Auswahl</dd>" |widget([$SELF:ui_command_1],"uzsuDropDown,---,1_EVU_Tibber_PriceInfo,2_EVU_Tibber_PriceAll,3_EVU_Tibber_Diagramm") |"LiveMessurement <br>".widget([$SELF:ui_command_2],"uzsuDropDown,---,connect,disconnect")|""|[EVU_Tibber_connect:ws_cmd]\
+\
+"Strompreis<br>".card([EVU_Tibber_connect:current_price:bar1day],undef,undef,0,60,90,0,"fc0  ".::ReadingsVal(Device(),"current_currency",""),undef,"1","130,,,,,,220").card([EVU_Tibber_connect:current_level:bar1day],undef,undef,0,60,90,0,"fc1  ".::ReadingsVal(Device(),"current_currency",""),undef,"1","130,,,,,,220")|\
+"<span style=font-weight:bold>nächste 3h</span><br><br>".Price(1)."<br>".Price(2)."<br>".Price(3)|"<span style=font-weight:bold>Statistik fc0</span><br><br>".::ReadingsVal(Device(),"fc_min",0)." min<br>".::ReadingsVal(Device(),"fc_avg",0)." avg<br>".::ReadingsVal(Device(),"fc_med",0)." med<br>".::ReadingsVal(Device(),"fc_max",0)." max"|\
+"<span style=font-weight:bold>Trigger fc0</span><br>Basis ".widget([EVU_Tibber_connect:compensation_grid],"selectnumbers,0,0.1,12,1,lin")."<br>".Format("trigger_0")|\
+"<span style=font-weight:bold>Trigger fc1</span><br><br>".Format("trigger_1")
+attr EVU_Tibber uiTable {\
+package ui_Table;;\
+  $TABLE = "style='width:100%;;'";;\
+\
+   $TD{0..18}{0} = "style='border-top-style:solid;;border-bottom-style:solid;;border-left-style:solid;;border-left-width:2px;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:36%;;font-weight:bold;;'";;\
+  $TD{0..18}{1..5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
+  $TD{0..18}{6} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
+\
+sub FUNC_Status {\
+    my($value, $min, $colorMin,  $statusMin,  $colorMiddel, $statusMiddle, $max, $colorMax, $statusMax)=@_;;\
+    my $ret = ($value < $min)? '<span style="color:'.$colorMin.'">'.$statusMin.'</span>' : ($value > $max)? '<span style="color:'.$colorMax.'">'.$statusMax.'</span>' : '<span style="color:'.$colorMiddel.'">'.$statusMiddle.'</span>';;\
+    return $ret;;\
+  }\
+\
+sub Device {\
+    return "$SELF"."_connect";;\
+  }\
+\
+sub Cost {\
+  my($i)=@_;;\
+  my $currency = (::ReadingsVal(Device(),"current_currency","") eq "EUR")? " €" : "";;\
+\
+  return ::ReadingsVal(Device(),"total_cost_".$i,0).$currency;;\
+}\
+\
+sub Price {\
+  my($i)=@_;;\
+  my $j;;\
+  my $value;;\
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+\
+  if ($i == 0) {\
+    $value = ::ReadingsVal(Device(),"current_price",0);;\
+    $value = ( ::ReadingsVal(Device(),"fc0_trigger","off") eq "on" ) ?\
+         "<span style='color:green'>".$value."</span>" :\
+         "<span style='color:red'>".$value."</span>" ;;\
+    $value .= " ct/kWh";;\
+  } else {\
+    $j       = $i+$hour;;\
+    if ($j < 24) {\
+      $value = ::round(::ReadingsVal(Device(),"fc0_".sprintf("%02d",$j)."_total",0)*100,1);;\
+    } else {\
+      $j = $j - 24;;\
+      $value = ::round(::ReadingsVal(Device(),"fc1_".sprintf("%02d",$j)."_total",0)*100,1);;\
+    }\
+    $value = ( ::ReadingsVal(Device(),"fc_trigger_price","0") > $value ) ?\
+         "<span style='color:green'>".$value."</span>" :\
+         "<span style='color:red'>".$value."</span>" ;;\
+    $value = sprintf("%02d",$j)." :  ".$value ;;\
+  }\
+  return  $value;;\
+ }\
+\
+sub Format {\
+  my($i)=@_;;\
+\
+  my $MonthBefore   = "LogDBRep_Statistic_previous_Month";;\
+  my $MonthPrevious = ::ReadingsTimestamp("$MonthBefore",Device()."_nodes_consumption_month","null");;\
+       $MonthPrevious = ($MonthPrevious ne "null") ?    POSIX::strftime("%Y",localtime(::time_str2num(::ReadingsTimestamp("$MonthBefore",Device()."_nodes_consumption_month","null")))) : "null";;\
+\
+  my $YearBefore   = "LogDBRep_Statistic_previous_Year";;\
+  my $YearPrevious = ::ReadingsTimestamp("$YearBefore",Device()."_nodes_consumption_year","null");;\
+       $YearPrevious = ($YearPrevious ne "null") ? POSIX::strftime("%Y",localtime(::time_str2num(::ReadingsTimestamp("$YearBefore",Device()."_nodes_consumption_year","null")))) : "null";;\
+\
+  if ($i eq "day") {\
+      return sprintf("%04d",::ReadingsVal(Device(),"nodes_consumption_day",0));;\
+    } elsif ($i eq "month") {\
+      my $evu_em = sprintf("%04d",::ReadingsVal(Device(),"nodes_consumption_month",0));;\
+      $evu_em .= ($MonthPrevious ne "null") ? sprintf(" / %04d", ::ReadingsVal("$MonthBefore",Device()."_nodes_consumption_month",0) ) : "";;\
+      return $evu_em;;\
+    } elsif ($i eq "year") {\
+      my $evu_ey = sprintf("%04d",::ReadingsVal(Device(),"nodes_consumption_year",0));;\
+      $evu_ey .= ($YearPrevious ne "null") ? sprintf(" / %04d", ::ReadingsVal("$YearBefore",Device()."_nodes_consumption_month",0) ) : "";;\
+      return $evu_ey;;\
+    } elsif ($i eq "trigger_0") {\
+      return ((::ReadingsVal(Device(),"fc0_trigger_start","") eq "null" ) ?\
+            "<span style='color:red'>Heute kein Trigger <br>mehr unter ".\
+                 ::ReadingsVal(Device(),"fc_trigger_price","null")." ct</span>" :\
+            "<span style='color:green'>Trigger von<br>".\
+                 ::ReadingsVal(Device(),"fc0_trigger_start","00:00")." bis ".::ReadingsVal(Device(),"fc0_trigger_stop","00:00")."<br>unter ".\
+                 ::ReadingsVal(Device(),"fc_trigger_price","null")." ct</span>" );;\
+    } elsif ($i eq "trigger_1") {\
+      if (::ReadingsVal(Device(),"fc1_00_startsAt","null") ne "null") {\
+        return ((::ReadingsVal(Device(),"fc1_trigger_start","null") eq "null" ) ?\
+              "<span style='color:red'>Morgen kein Trigger <br>mehr unter ".\
+                   ::ReadingsVal(Device(),"fc_trigger_price","null")." ct</span>" :\
+              "<span style='color:green'>Morgen ein Trigger von<br>".\
+                   ::ReadingsVal(Device(),"fc1_trigger_start","00:00")." bis ".::ReadingsVal(Device(),"fc1_trigger_stop","00:00")."<br>unter ".\
+                   ::ReadingsVal(Device(),"fc_trigger_price","null")." ct</span>" );;\
+      } else {\
+        return "Morgen noch kein Trigger vorhanden";;\
+      }\
+    }\
+  return "null";;\
+}\
+\
+}\
+\
+"Statistiken ".::ReadingsVal(Device(),"current_date",0)." in kWh"|"<span style=font-weight:bold>aktuell</span>"|"<span style=font-weight:bold>heute</span>"|"<span style=font-weight:bold>Monat</span>"|"<span style=font-weight:bold>Jahr</span>"\
+\
+"Strom<dd>Preis / Kosten</dd>"|Price(0)|Cost("day")|Cost("month")|Cost("year")\
+\
+## Wenn man das liveMessurment von Tibber verwendet\
+"Bezug vom Netz"|\
+sprintf("%04d W",([EVU_Tibber_connect:payload_data_liveMeasurement_power]  >= 0 ? ::ReadingsVal("EVU_Tibber_connect","payload_data_liveMeasurement_power",0) : 0))|\
+Format("day")|Format("month")|Format("year")\
+\
+"Einspeisung ins Netz"|\
+sprintf("%04d W",([EVU_Tibber_connect:payload_data_liveMeasurement_powerProduction]  >= 0 ? ::ReadingsVal("EVU_Tibber_connect","payload_data_liveMeasurement_powerProduction",0) : 0))|\
+""|""|""\
+\
+## Wenn man einen eigenes SmartMeter verwendet\
+## "Bezug vom Netz"|sprintf("%04d W",([WR_0_KSEM:M_AC_Power] >= 0 ? ::round(::ReadingsVal("WR_0_KSEM","M_AC_Power",0),0) : 0) )|Format("day")|Format("month")|Format("year")\
+## "Einspeisung ins Netz"|sprintf("%04d W",([WR_0_KSEM:M_AC_Power] <= 0 ? abs(::round(::ReadingsVal("WR_0_KSEM","M_AC_Power",0),0)) :  0) )|""|""|""
+attr EVU_Tibber verbose 3
+
+setstate EVU_Tibber 2024-01-23 10:03:00 ui_command_1 ---
+setstate EVU_Tibber 2024-01-20 17:40:53 ui_command_2 ---

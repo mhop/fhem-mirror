@@ -1,0 +1,495 @@
+defmod WR_ctl DOIF ################################################################################################################\
+## 1 Scheduling für das Abholen der Wechselrichter Statistiken\
+##   Umschaltung des Schattenmanagements\
+##\
+20_Statistic_EnergyFlow\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    (     [:57]                                                          ## Kurz vor jeder vollen Stunde\
+    )\
+    or [$SELF:ui_command_2] eq "20_Statistic_EnergyFlow"                 ## Hier wird das uiTable select ausgewertet\
+   ) {\
+\
+  ::CommandGet(undef, "WR_2_API 20_Statistic_EnergyFlow");;                                ## Zuerst WR_2 und anschließend\
+  set_Exec("wait_Statistic",2,'::CommandGet(undef, "WR_1_API 20_Statistic_EnergyFlow")');; ## WR_1, damit die Schwarm Werte stimmen\
+\
+   ## Schattenmanagement \
+   if ($hour == 9)   {\
+     ::CommandSet(undef, "WR_1_API 40_02_Generator_ShadowMgmt 0");;       ## Komplett aus\
+   }\
+   if ($hour == 16) {\
+     ::CommandSet(undef, "WR_1_API 40_02_Generator_ShadowMgmt 2");;       ## Im Westen unten einschalten\
+   }\
+   if ($hour == 21) {\
+     ::CommandSet(undef, "WR_1_API 40_02_Generator_ShadowMgmt 1");;       ## Schattenmanagement für den Osten vorbereiten\
+   }\
+\
+  if (AttrVal("$SELF","verbose",0) >=3) {\
+      Log 3, "$SELF cmd_1  : Abfrage der Statistiken";;\
+    }\
+\
+    set_Reading("ui_command_2","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+################################################################################################################\
+## 2 Start der KI Prognose\
+## Der Reading Name und das Device werden in LogDBRep_PV_KI_Prognose im executeAfterProc eingestellt\
+##  "/opt/fhem/python/bin/PV_KI_Prognose.py 192.168.178.40 192.168.178.40 LogDBRep_PV_KI_Prognose WR_1_ctl Yield_fc"\
+##\
+2_KI_Prognose\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+      ReadingsVal("LogDBRep_PV_KI_Prognose","PV_KI_Prognose","null") eq "done"  ## Die Prognose darf nicht gerade laufen !!!\
+    and\
+  (\
+    ([05:00-22:00] and [:03]                                             ## In der PV-Zeit jede Stunde aktualisieren\
+    )\
+    or [$SELF:ui_command_1] eq "2_KI_Prognose"                           ## Hier wird das uiTable select ausgewertet\
+  )\
+   ) {\
+\
+  ::CommandSet(undef, "LogDBRep_PV_KI_Prognose sqlCmd call dwd_load(curdate(),'none')");;\
+\
+  if (AttrVal("$SELF","verbose",0) >=3) {\
+      Log 3, "$SELF 2_KI_Prognose : Start KI Prognose";;\
+    }\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+################################################################################################################\
+## 2 Erstellen des Diagramms im uiTable\
+3_WR_ctl_Diagramm\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and [$SELF:Yield_fc0_06]                                             ## Wenn die Prognose aktualisiert wurde\
+    or  [$SELF:ui_command_1] eq "3_WR_ctl_Diagramm"                      ## Hier wird das uiTable select ausgewertet\
+   ) {\
+\
+  my (@out) = ("") x 2;;                                                  ## Es wird für jedes Diagramm ein Array benötigt\
+  my $timestamp;;\
+\
+  for (my $j=0;;$j<=1;;$j++){                                              ## loop fc0 und fc1\
+    for (my $i=5;;$i<=21;;$i++){                                           ## loop für die PV-Zeit\
+      $timestamp = sprintf("%s_%02d:00:00", POSIX::strftime("%Y-%m-%d",localtime(time)), $i);;\
+      $out[$j]  .= $timestamp." ".::round(::ReadingsVal("$SELF",sprintf("Yield_fc%d_%02d",$j, $i),0)/1000,2)."\n";;\
+    } # End $i\
+  } # End $j\
+  if (AttrVal("$SELF","verbose",0) >=3) {\
+      Log 3, "$SELF 3_WR_ctl_Diagramm : Werte für das Diagramm";;\
+      print($out[0]."\n\n");;\
+      print($out[1]."\n");;\
+    }\
+  ## Yield_fc*_current dient nur als Trigger für die card Diagramme, damit diese im uiTable aktualisiert werden.\
+  ::DOIF_modify_card_data("$SELF","$SELF","Yield_fc0_current","bar1day",0,$out[0]);;      ## Der fc1 wird verschoben, da card nicht\
+  ::DOIF_modify_card_data("$SELF","$SELF","Yield_fc1_current","bar1day",-86400,$out[1]);; ## den nächsten Tag anzeigen kann\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+################################################################################################################\
+## 4 WR_1_API setzen der init Werte für die Berechnung des Hausverbrauches. Bei Fehlern in der Verbrauchsanzeige\
+##   muss man die ersten Werte des Tages gegen 00:01 aus der DB setzen. \
+4_WR_1_API_init_Werte\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+       [00:01]\
+    or [$SELF:ui_command_2] eq "4_WR_1_API_init_Werte"                   ## Hier wird das uiTable select ausgewertet\
+   ) {\
+    if ($hour > 0) {\
+      ## Achtung, der init Wert muss auf den ersten Wert des Tages korrigiert werden, dieser ist in der DB\
+\
+      ## Korrektur der Tages Werte\
+      my $Active_energy = ::CommandGet(undef, "LogDBRep_$SELF_SQL sqlCmdBlocking\
+           SELECT VALUE FROM history\
+           WHERE DEVICE='WR_0_KSEM'\
+             AND READING='Active_energy-'\
+             AND TIMESTAMP > curdate() - interval 1 month\
+             AND TIMESTAMP <= concat(curdate(),' 00:01')\
+           ORDER BY TIMESTAMP desc\
+           LIMIT 1;;") ;;\
+      fhem("setreading WR_1_API SW_Meter_init_FeedInGrid_Day $Active_energy");;\
+\
+      $Active_energy = ::CommandGet(undef, "LogDBRep_$SELF_SQL sqlCmdBlocking\
+           SELECT VALUE FROM history\
+           WHERE DEVICE='WR_0_KSEM'\
+             AND READING='Active_energy+'\
+             AND TIMESTAMP > curdate() - interval 1 month\
+             AND TIMESTAMP <= concat(curdate(),' 00:01')\
+           ORDER BY TIMESTAMP desc\
+           LIMIT 1;;") ;;\
+      fhem("setreading WR_1_API SW_Meter_init_Grid_Day $Active_energy");;\
+\
+      ## Korrektur der Monats Werte\
+      $Active_energy = ::CommandGet(undef, "LogDBRep_$SELF_SQL sqlCmdBlocking\
+      SELECT VALUE FROM history\
+           WHERE DEVICE='WR_0_KSEM'\
+             AND READING='Active_energy-'\
+             AND TIMESTAMP > curdate() - interval 1 month\
+             AND TIMESTAMP <= subdate(curdate(), (day(curdate())-1))\
+           ORDER BY TIMESTAMP desc\
+           LIMIT 1;;") ;;\
+      fhem("setreading WR_1_API SW_Meter_init_FeedInGrid_Month $Active_energy");;\
+\
+      $Active_energy = ::CommandGet(undef, "LogDBRep_$SELF_SQL sqlCmdBlocking\
+      SELECT VALUE FROM history\
+           WHERE DEVICE='WR_0_KSEM'\
+             AND READING='Active_energy+'\
+             AND TIMESTAMP > curdate() - interval 1 month\
+             AND TIMESTAMP <= LAST_DAY(SUBDATE(curdate(), INTERVAL 1 MONTH))\
+           ORDER BY TIMESTAMP desc\
+           LIMIT 1;;") ;;\
+      fhem("setreading WR_1_API SW_Meter_init_Grid_Month $Active_energy");;\
+\
+      ::CommandGet(undef, "WR_2_API 20_Statistic_EnergyFlow");;           ## Zuerst WR_2 und anschließend\
+      ::CommandGet(undef, "WR_1_API 20_Statistic_EnergyFlow");;           ## WR_1, damit die Schwarm Werte stimmen\
+\
+    } else {\
+      fhem("setreading WR_1_API SW_Meter_init_FeedInGrid_Day ".[?WR_0_KSEM:Active_energy-]);;\
+      fhem("setreading WR_1_API SW_Meter_init_Grid_Day ".[?WR_0_KSEM:Active_energy+]);;\
+    }\
+\
+    if ($mday eq 1) {\
+      fhem("setreading WR_1_API SW_Meter_init_FeedInGrid_Month ".[?WR_0_KSEM:Active_energy-]);;\
+      fhem("setreading WR_1_API SW_Meter_init_Grid_Month ".[?WR_0_KSEM:Active_energy+]);;\
+\
+      if ($yday eq 0) {\
+        fhem("setreading WR_1_API SW_Meter_init_FeedInGrid_Year ".[?WR_0_KSEM:Active_energy-]);;\
+        fhem("setreading WR_1_API SW_Meter_init_Grid_Year ".[?WR_0_KSEM:Active_energy+]);;\
+      }\
+    }\
+\
+    if (AttrVal("$SELF","verbose",0) >=3) {\
+        Log 3, "$SELF 4_WR_1_API_init_Werte : init Werte gesetzt";;\
+    }\
+\
+    set_Reading("ui_command_2","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+
+attr WR_ctl DbLogExclude .*
+attr WR_ctl DbLogInclude Yield_fc0_day,Yield_fc0_middayhigh.*
+attr WR_ctl comment Version 2023.06.21 12:00 \
+\
+Die readings Yield_fc* werden direkt vom KI Prognose Skript in die Datenbank geschrieben und müssen hier nicht extra gelogged werden.
+attr WR_ctl disable 0
+attr WR_ctl group PV Eigenverbrauch
+attr WR_ctl icon sani_solar
+attr WR_ctl room 2_PV_Steuerung,Strom->Photovoltaik
+attr WR_ctl sortby 11
+attr WR_ctl uiState {\
+package ui_Table;;\
+  $TABLE = "style='width:100%;;'";;\
+\
+  $TD{0..6}{0} = "style='border-top-style:solid;;border-bottom-style:solid;;border-left-style:solid;;border-left-width:2px;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:36%;;font-weight:bold;;'";;\
+  $TD{0..6}{1..4} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
+  $TD{0..6}{5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
+\
+}\
+\
+"KI Prognose Kommando Auswahl<dd>Mittags Limit Inverter_Max_Power / KI Status</dd>"|\
+widget([$SELF:ui_command_1],"uzsuDropDown,---,2_KI_Prognose,3_WR_ctl_Diagramm") |\
+""|\
+""|\
+"MySQL ".[LogDBRep_PV_KI_Prognose:state]."<br> KI ".([LogDBRep_PV_KI_Prognose:state] ne "done") ? "waiting" : [LogDBRep_PV_KI_Prognose:PV_KI_Prognose]\
+\
+"Statistiken"|\
+Yield(0)|\
+Yield('Tag')|\
+Yield('4h')|\
+Yield('Rest')\
+\
+card([$SELF:Yield_fc0_current:bar1day],undef,undef,0,17,90,0,"fc0  kWh",undef,"2","130,,,,,,220").card([$SELF:Yield_fc1_current:bar1day],undef,undef,0,17,90,0,"fc1  kWh",undef,"2","130,,,,,,220")|\
+"<span style=font-weight:bold>nächste 3h</span><br><br>".Yield(1)."<br>".Yield(2)."<br>".Yield(3)|\
+"<span style=font-weight:bold>Vor- / Nachmittag</span><br><br>".Yield('Vormittag')."<br>".Yield('Nachmittag')|\
+"<span style=font-weight:bold>Maximum</span><br><br><br>".Yield("max")."<br>".Yield("max_time")|\
+"<span style=font-weight:bold>Mittagshoch</span><br><br><br>fc0 ".[$SELF:Yield_fc0_middayhigh_start]." - ".[$SELF:Yield_fc0_middayhigh_stop]."<br>fc1 ".[$SELF:Yield_fc1_middayhigh_start]." - ".[$SELF:Yield_fc1_middayhigh_stop]\
+\
+"WR_1 / KSEM<dd> / PV Reserve / Netz Leistung</dd>"|\
+""|\
+sprintf("%d W",[WR_1:SW_Total_PV_P_reserve])|\
+(::ReadingsVal("WR_1","Total_Active_P_EM",0) < -10) ? "<span style='color:green'>Einspeisen</span>" : (::ReadingsVal("WR_1","Total_Active_P_EM",0) > 15)?  "<span style='color:red'>Netzbezug</span>"  : "<span style='color:orange'>Standby</span>"|\
+sprintf("%d W",[WR_1:Total_Active_P_EM])\
+\
+"Ertrag aktuell<dd> / Tag / Monat / Jahr</dd>"|\
+""|\
+sprintf("%d kWh",::round([WR_1:SW_Yield_Daily]/1000 ,0))|\
+sprintf("%d kWh",::round([WR_1:SW_Yield_Monthly]/1000 ,0))|\
+sprintf("%d kWh",::round([WR_1:SW_Yield_Yearly]/1000 ,0))\
+\
+"Speicher<dd>Temperatur / nutzbare Ladung / Status / Leistung / akt. SOC</dd>"|\
+(::ReadingsVal("WR_1_API","DigitalOutputs_ConfigurationFlags",0) == 9) ? "<span style='color:green'>Lüfter An </span><br>" : "<br>".sprintf("%.1f °C",::ReadingsVal("WR_1","Battery_temperature",0))|\
+sprintf("%d Wh",::ReadingsVal("WR_1","Actual_Battery_charge_usable_P",0))|\
+Status_Speicher()|\
+[WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P]." W<br>".sprintf("%d %%",[WR_1:Act_state_of_charge])\
+\
+"WR_1_API<dd>Kommando Auswahl</dd>"|\
+widget([$SELF:ui_command_2],"uzsuDropDown,---,20_Statistic_EnergyFlow,4_WR_1_API_init_Werte") |\
+""|\
+""|\
+""
+attr WR_ctl uiTable {\
+package ui_Table;;\
+  $TABLE = "style='width:100%;;'";;\
+\
+   $TD{0..18}{0} = "style='border-top-style:solid;;border-bottom-style:solid;;border-left-style:solid;;border-left-width:2px;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:36%;;font-weight:bold;;'";;\
+  $TD{0..18}{1..5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
+  $TD{0..18}{6} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
+\
+sub FUNC_Status {\
+    my($value, $min, $colorMin,  $statusMin,  $colorMiddel, $statusMiddle, $max, $colorMax, $statusMax)=@_;;\
+    my $ret = ($value < $min)? '<span style="color:'.$colorMin.'">'.$statusMin.'</span>' : ($value > $max)? '<span style="color:'.$colorMax.'">'.$statusMax.'</span>' : '<span style="color:'.$colorMiddel.'">'.$statusMiddle.'</span>';;\
+    return $ret;;\
+  }\
+\
+sub Status_Speicher {\
+  if (::ReadingsVal("WR_1","Actual_Battery_charge_-minus_or_discharge_-plus_P",0) < -10) {\
+    return "<span style='color:green'>Laden</span><br>".::ReadingsVal("WR_1","State_of_EM","n/a")\
+  } elsif (::ReadingsVal("WR_1","Actual_Battery_charge_-minus_or_discharge_-plus_P",0) >  15) {\
+    return  "<span style='color:red'>Entladen</span><br>".::ReadingsVal("WR_1","State_of_EM","n/a")\
+  } else {\
+    return "<span style='color:orange'>Standby</span>"."<br>".::ReadingsVal("WR_1","State_of_EM","n/a")\
+  }\
+}\
+sub Yield {\
+  my($i)=@_;;\
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+\
+  if ($i eq "4h") {\
+      return sprintf("%05d 4h",::ReadingsVal("$SELF","Yield_fc0_4h",0));;\
+    } elsif ($i eq "Tag") {\
+      return sprintf("%05d Tag",::ReadingsVal("$SELF","Yield_fc0_day",0));;\
+    } elsif ($i eq "Rest") {\
+      return sprintf("%05d Rest",::ReadingsVal("$SELF","Yield_fc0_rest",0));;\
+    } elsif ($i eq "max") {\
+      return sprintf("%05d Wh",::ReadingsVal("$SELF","Yield_fc0_max",0));;\
+    } elsif ($i eq "max_time") {\
+      return ::ReadingsVal("$SELF","Yield_fc0_max_time","null");;\
+    } elsif ($i eq "Vormittag") {\
+      return sprintf("%05d Wh",::ReadingsVal("$SELF","Yield_fc0_morning",0));;\
+    } elsif ($i eq "Nachmittag") {\
+      return sprintf("%05d Wh",::ReadingsVal("$SELF","Yield_fc0_afternoon",0));;\
+    }\
+  my $j = $i + $hour;;\
+  if ($j > 23) {\
+    if     ($j == 24) {$j = 0}\
+    elsif ($j == 25) {$j = 1}\
+    elsif ($j == 26) {$j = 2}\
+  }\
+  return sprintf("%02d : %05d Wh",$j,::ReadingsVal("$SELF","Yield_fc0_".sprintf("%02d",$j),0));;\
+ }\
+\
+sub WR_ctl_Format {\
+  my($period,$device,$reading)=@_;;\
+  my $value = 0;;\
+\
+  my $DayBefore   = "LogDBRep_Statistic_previous_Day";;\
+  my $DayPrevious = ::ReadingsTimestamp("$DayBefore",$device."_".$reading."_Day","null");;\
+       $DayPrevious = ($DayPrevious ne "null") ?    POSIX::strftime("%Y",localtime(::time_str2num(::ReadingsTimestamp("$DayBefore",$device."_".$reading."_Day","null")))) : "null";;\
+\
+  if ($period eq "_Dx") {\
+    if ($DayPrevious ne "null") {\
+      return " / gestern";;\
+    }\
+  }\
+\
+  my $MonthBefore   = "LogDBRep_Statistic_previous_Month";;\
+  my $MonthPrevious = ::ReadingsTimestamp("$MonthBefore",$device."_".$reading."_Month","null");;\
+       $MonthPrevious = ($MonthPrevious ne "null") ?    POSIX::strftime("%Y",localtime(::time_str2num(::ReadingsTimestamp("$MonthBefore",$device."_".$reading."_Month","null")))) : "null";;\
+\
+  if ($period eq "_Mx") {\
+    if ($MonthPrevious ne "null") {\
+      return " / Vormonat";;\
+    }\
+  }\
+\
+  my $QuarterBefore   = "LogDBRep_Statistic_previous_Quarter";;\
+  my $QuarterPrevious = "null";;\
+  if ($period eq "_Qx" or $period eq "_Quarter" or $period eq "time_Quarter") {\
+    foreach my $loop (1,2,3,4) {\
+       if (::ReadingsVal("$QuarterBefore","Q".$loop,0) eq "previous") { \
+         $QuarterPrevious = "Q".$loop \
+       }\
+    }\
+    if ($period eq "_Qx") {\
+      return $QuarterPrevious;;\
+    }\
+  }\
+\
+  my $YearBefore   = "LogDBRep_Statistic_previous_Year";;\
+  my $YearPrevious = ::ReadingsTimestamp($YearBefore,$reading."_Year","null");;\
+       $YearPrevious = ($YearPrevious ne "null") ? POSIX::strftime("%Y",localtime(::time_str2num(::ReadingsTimestamp("$YearBefore",$reading."_Year","null")))) : "null";;\
+\
+  if ($period eq "_Yx") {\
+    if ($YearPrevious ne "null") {\
+      return " / Vorjahr";;\
+    }\
+  }\
+\
+  if ($period eq "_Year") {\
+    $YearPrevious = ::ReadingsTimestamp($YearBefore,$reading.$period,"null");;\
+    $YearPrevious = ($YearPrevious ne "null") ? POSIX::strftime("%Y",localtime(::time_str2num(::ReadingsTimestamp($YearBefore,$reading.$period,"null")))) : "null";;\
+  }\
+\
+   if ($period eq "actual" and $reading eq "Autarky") {\
+     my $valA     = ::ReadingsVal($device, "SW_Total_AC_Active_P",0) - ::ReadingsVal($device, "SW_Home_own_consumption_from_grid",0);;\
+     my $calcVal = ($valA > 0) ? ::round($valA /($valA + ::ReadingsVal($device, "SW_Home_own_consumption_from_grid",0))*100 ,0) : 0;;\
+     return sprintf("%3d %%",(($calcVal > 100) ? 100 : $calcVal) );;\
+   }\
+\
+   if ($period eq "actual" and $reading eq "OwnConsumptionRate") {\
+     my $valS     = ::ReadingsVal($device,"SW_Total_AC_Active_P",0);;\
+     my $calcVal = ($valS > 0) ? ::round((::ReadingsVal($device,"SW_Home_own_consumption_from_PV",0) +\
+                                                           ::ReadingsVal($device,"SW_Home_own_consumption_from_Battery",0)) / $valS * 100 ,0) : 0;;\
+     return sprintf("%3d %%",(($calcVal > 100) ? 100 : $calcVal) );;\
+   }\
+\
+   if ($period eq "time_Day" and $reading eq "SW_Statistic_Autarky") {\
+    return POSIX::strftime("%H:%M",localtime(::time_str2num(::ReadingsTimestamp($device, $reading."_Day",0))))\
+   }\
+\
+   if ($period eq "time_Month" and $reading eq "SW_Statistic_Autarky") {\
+    return POSIX::strftime("%H:%M",localtime(::time_str2num(::ReadingsTimestamp($device, $reading."_Month",0))));;\
+   }\
+\
+   if ($period eq "time_Quarter") {\
+     if ($QuarterPrevious ne "null") {\
+       return POSIX::strftime("%Y-%m-%d",localtime(::time_str2num(::ReadingsTimestamp($QuarterBefore, $QuarterPrevious,0))));;\
+     }\
+   }\
+\
+   if ($period eq "time_Year" and $reading eq "SW_Statistic_Autarky") {\
+     my $cy    = POSIX::strftime("%H:%M",localtime(::time_str2num(::ReadingsTimestamp($device, $reading."_Year",0))));;\
+          $cy   .= ($YearPrevious ne "null") ? " / ".$YearPrevious : "";;\
+     return $cy;;\
+   }\
+\
+   if ($period eq "Autarky_Year" or $period eq "OwnConsumptionRate_Year") {\
+      $value  = sprintf("%3d %%",::ReadingsVal($device,$reading."_Year",0));;\
+      $value .= ($YearPrevious ne "null") ? sprintf(" / %3d %%", ::ReadingsVal($YearBefore,$reading."_Year",0) ) : "";;\
+      return $value;;\
+    } elsif ($period eq "_Day") {\
+      if ($reading eq "SW_Statistic_Autarky" or $reading eq "SW_Statistic_OwnConsumptionRate") {\
+        $value  = sprintf("%3d %%",::ReadingsVal($device,$reading.$period,0) );;\
+        $value .= ($DayPrevious ne "null") ? sprintf(" / %3d %%", ::ReadingsVal($DayBefore,$device."_".$reading.$period,0) ) : "";;\
+      } else {\
+        $value  = sprintf("%04d",::ReadingsVal($device,$reading.$period,0)/1000);;\
+        $value .= ($DayPrevious ne "null") ? sprintf(" / %04d", ::ReadingsVal($DayBefore,$device."_".$reading.$period,0) ) : "";;\
+      }\
+      return $value;;\
+    } elsif ($period eq "_Month") {\
+      if ($reading eq "SW_Statistic_Autarky" or $reading eq "SW_Statistic_OwnConsumptionRate") {\
+        $value  = sprintf("%3d %%",::ReadingsVal($device,$reading.$period,0) );;\
+        $value .= ($MonthPrevious ne "null") ? sprintf(" / %3d %%", ::ReadingsVal($MonthBefore,$device."_".$reading.$period,0) ) : "";;\
+      } else {\
+        $value  = sprintf("%04d",::ReadingsVal($device,$reading.$period,0)/1000);;\
+        $value .= ($MonthPrevious ne "null") ? sprintf(" / %04d", ::ReadingsVal($MonthBefore,$device."_".$reading.$period,0) ) : "";;\
+      }\
+      return $value;;\
+    } elsif ($period eq "_Quarter") {\
+      $value  = ($QuarterPrevious ne "null") ? sprintf("%04d", ::ReadingsVal($QuarterBefore,$QuarterPrevious."_".$reading,0) ) : "";;\
+      return $value;;\
+    } elsif ($period eq "_Year") {\
+      $value  = sprintf("%05d",::ReadingsVal($device,$reading.$period,0)/1000);;\
+      $value .= ($YearPrevious ne "null") ? sprintf(" / %05d", ::ReadingsVal($YearBefore,$reading.$period,0) ) : "";;\
+      return $value;;\
+    }\
+  return " / null";;\
+}\
+\
+}\
+\
+\
+"Statistiken ".::POSIX::strftime("%Y-%m-%d",localtime(::time_str2num(::ReadingsTimestamp("WR_1_API", "auth_me_authenticated",0))))." in kWh"|\
+"<span style=font-weight:bold>aktuell</span>"|\
+"<span style=font-weight:bold>heute".WR_ctl_Format("_Dx","WR_1_API","SW_Statistic_Yield")."</span>"|\
+|\
+"<span style=font-weight:bold>Monat".WR_ctl_Format("_Mx","WR_1_API","SW_Statistic_Yield")."</span>"|\
+"<span style=font-weight:bold>".WR_ctl_Format("_Qx","none","none")."</span>"|\
+"<span style=font-weight:bold>Jahr".WR_ctl_Format("_Yx","none","SW_Statistic_Yield")."</span>"\
+\
+"Erzeugung PV-Total"|\
+sprintf("%04d W",[WR_1:SW_Total_AC_Active_P])|\
+WR_ctl_Format("_Day","WR_1_API","SW_Statistic_Yield")|\
+|\
+WR_ctl_Format("_Month","WR_1_API","SW_Statistic_Yield")|\
+WR_ctl_Format("_Quarter","WR_1_API","SW_Statistic_Yield")|\
+WR_ctl_Format("_Year","WR_1_API","SW_Statistic_Yield")\
+\
+"Bezug von PV"|\
+sprintf("%04d W",[WR_1:SW_Home_own_consumption_from_Battery]+[WR_1:SW_Home_own_consumption_from_PV])|\
+WR_ctl_Format("_Day","WR_1_API","SW_Statistic_EnergyHomePv")|\
+|\
+WR_ctl_Format("_Month","WR_1_API","SW_Statistic_EnergyHomePv")|\
+WR_ctl_Format("_Quarter","WR_1_API","SW_Statistic_EnergyHomePv")|\
+WR_ctl_Format("_Year","WR_1_API","SW_Statistic_EnergyHomePv")\
+\
+"Bezug von Batterie"|\
+sprintf("%04d W",[WR_1:SW_Home_own_consumption_from_Battery])|\
+WR_ctl_Format("_Day","WR_1_API","Statistic_EnergyHomeBat")|\
+|\
+WR_ctl_Format("_Month","WR_1_API","Statistic_EnergyHomeBat")|\
+WR_ctl_Format("_Quarter","WR_1_API","Statistic_EnergyHomeBat")|\
+WR_ctl_Format("_Year","WR_1_API","Statistic_EnergyHomeBat")\
+\
+"Bezug vom Netz"|\
+sprintf("%04d W",([WR_1:Total_Active_P_EM] >= 0 ? ::round(::ReadingsVal("WR_1","Total_Active_P_EM",0),0) : 0) )|\
+WR_ctl_Format("_Day","WR_1_API","SW_Statistic_EnergyHomeGrid")|\
+|\
+WR_ctl_Format("_Month","WR_1_API","SW_Statistic_EnergyHomeGrid")|\
+WR_ctl_Format("_Quarter","WR_1_API","SW_Statistic_EnergyHomeGrid")|\
+WR_ctl_Format("_Year","WR_1_API","SW_Statistic_EnergyHomeGrid")\
+\
+"Bezug ins Haus (Energieverbrauch)"|\
+sprintf("%04d W",[WR_1:SW_Home_own_consumption_from_PV]+[WR_1:SW_Home_own_consumption_from_Battery]+[WR_1:SW_Home_own_consumption_from_grid])|\
+WR_ctl_Format("_Day","WR_1_API","SW_Statistic_TotalConsumption")|\
+|\
+WR_ctl_Format("_Month","WR_1_API","SW_Statistic_TotalConsumption")|\
+WR_ctl_Format("_Quarter","WR_1_API","SW_Statistic_TotalConsumption")|\
+WR_ctl_Format("_Year","WR_1_API","SW_Statistic_TotalConsumption")\
+\
+"Einspeisung ins Netz"|\
+sprintf("%04d W",([WR_1:Total_Active_P_EM] <= 0 ? abs(::round(::ReadingsVal("WR_1","Total_Active_P_EM",0),0)) :  0) )|\
+WR_ctl_Format("_Day","WR_1_API","SW_Statistic_EnergyHomeFeedInGrid")|\
+|\
+WR_ctl_Format("_Month","WR_1_API","SW_Statistic_EnergyHomeFeedInGrid")|\
+WR_ctl_Format("_Quarter","WR_1_API","SW_Statistic_EnergyHomeFeedInGrid")|\
+WR_ctl_Format("_Year","WR_1_API","SW_Statistic_EnergyHomeFeedInGrid")\
+\
+"Autarkiequote"|\
+WR_ctl_Format("actual","WR_1","Autarky")|\
+WR_ctl_Format("_Day","WR_1_API","SW_Statistic_Autarky")|\
+|\
+WR_ctl_Format("_Month","WR_1_API","SW_Statistic_Autarky")|\
+|\
+WR_ctl_Format("Autarky_Year","WR_1_API","SW_Statistic_Autarky")\
+\
+"Eigenverbrauchsquote"|\
+WR_ctl_Format("actual","WR_1","OwnConsumptionRate")|\
+WR_ctl_Format("_Day","WR_1_API","SW_Statistic_OwnConsumptionRate")|\
+|\
+WR_ctl_Format("_Month","WR_1_API","SW_Statistic_OwnConsumptionRate")|\
+|\
+WR_ctl_Format("OwnConsumptionRate_Year","WR_1_API","SW_Statistic_OwnConsumptionRate")\
+\
+"Berechnet um"|\
+|\
+WR_ctl_Format("time_Day","WR_1_API","SW_Statistic_Autarky")|\
+|\
+WR_ctl_Format("time_Month","WR_1_API","SW_Statistic_Autarky")|\
+WR_ctl_Format("time_Quarter","WR_1_API","")|\
+WR_ctl_Format("time_Year","WR_1_API","SW_Statistic_Autarky")\
+
+attr WR_ctl userReadings Yield_fc0_current:Yield_fc0_18.* { my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;; ::ReadingsVal("$NAME","Yield_fc0_".sprintf("%02d",$hour),0)/1000 },\
+Yield_fc1_current:Yield_fc1_18.* { my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;; ::ReadingsVal("$NAME","Yield_fc1_".sprintf("%02d",$hour),0)/1000 }
+attr WR_ctl verbose 3
+
+setstate WR_ctl 2023-06-21 11:33:15 SpeicherMidday_Inverter_Max_Power 9000
+setstate WR_ctl 2024-01-24 16:03:00 ui_command_1 ---
+setstate WR_ctl 2024-01-24 15:57:00 ui_command_2 ---

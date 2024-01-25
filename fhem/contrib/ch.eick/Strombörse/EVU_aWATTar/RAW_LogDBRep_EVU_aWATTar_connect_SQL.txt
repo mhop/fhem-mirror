@@ -1,0 +1,5 @@
+defmod LogDBRep_EVU_aWATTar_connect_SQL DbRep LogDB
+attr LogDBRep_EVU_aWATTar_connect_SQL DbLogExclude .*
+attr LogDBRep_EVU_aWATTar_connect_SQL room System
+attr LogDBRep_EVU_aWATTar_connect_SQL sqlCmdHistoryLength 5
+attr LogDBRep_EVU_aWATTar_connect_SQL timeout 20
