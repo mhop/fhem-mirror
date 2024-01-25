@@ -687,6 +687,33 @@ set DEVICE attrTemplate speechcontrol_type_blind
 attr DEVICE model zigbee2mqtt_blind_drive
 setreading DEVICE attrTemplateVersion 20240108
 
+# Blind controller Lonsonho QS-Zigbee-C01 and QS-Zigbee-C03 connected via zigbee2mqtt
+#contributed by dadoc based on zigbee2mqtt_blind_drive by barneybaer
+name:zigbee2mqtt_blind_controller
+desc: A blind controller connected via zigbee2mqtt <br>Tested with: Lonsonho QS-Zigbee-C01 and QS-Zigbee-C03
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_05f0
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to fts_shutter_100;{ AttrVal("DEVICE","icon","fts_shutter_100") }
+attr DEVICE icon ICON
+attr DEVICE devStateIcon 0:fts_shutter_100 100:fts_shutter_10 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 0\d.*:fts_shutter_100
+attr DEVICE webCmd open:close:stop:pct
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE jsonMap position:pct
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE setList \
+  open:noArg $\DEVICETOPIC/set {"state":"OPEN"}\
+  close:noArg $\DEVICETOPIC/set {"state":"CLOSE"}\
+  stop:noArg $\DEVICETOPIC/set {"state":"STOP"}\
+  pct:slider,0,1,100 $\DEVICETOPIC/set {"position":$EVTPART1}
+  motor_reversal:ON,OFF $\DEVICETOPIC/set {"motor_reversal": "$EVTPART1"}
+  calibration:ON,OFF $\DEVICETOPIC/set {"calibration": "$EVTPART1"}
+attr DEVICE stateFormat pct
+set DEVICE attrTemplate speechcontrol_type_blind
+attr DEVICE model zigbee2mqtt_blind_controller
+setreading DEVICE attrTemplateVersion 20240104
+
 # Aqara Curtain Driver E1
 # contributed by drhirn, https://forum.fhem.de/index.php/topic,94495.msg1241895.html#msg1241895
 name:zigbee2mqtt_curtain_driver
@@ -5304,7 +5331,7 @@ setreading DEVICE attrTemplateVersion 20200628
 # source: https://forum.fhem.de/index.php/topic,105222.0.html
 name:wallpanel_app
 filter:TYPE=MQTT2_DEVICE
-desc:For use with Android-App WallPanel (https://thanksmister.com/wallpanel-android/)<br>NOTE: Early version, might still be buggy, please provide feedback!
+desc:For use with Android-App WallPanel (https://wallpanel.app/)<br>NOTE: Early version, might still be buggy, please provide feedback!
 order:X_15
 par:DEVNAME;name of this wallpanel;{ AttrVal("DEVICE","readingList","") =~ m,wallpanel/([^/]+)/, ? $1 : undef }
 par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","kindle") }
@@ -5312,9 +5339,11 @@ attr DEVICE icon ICON
 attr DEVICE event-on-change-reading .*
 attr DEVICE jsonMap MOTION_value:motion FACE_value:face
 attr DEVICE readingList wallpanel/DEVNAME/state:.* { json2nameValue($EVENT) }\
-  wallpanel/DEVNAME/sensor/battery:.* { json2nameValue($EVENT) }\
+  wallpanel/DEVNAME/sensor/battery:.* { json2nameValue($EVENT, 'BATTERY_', $JSONMAP) }\
   wallpanel/DEVNAME/sensor/motion:.* { json2nameValue($EVENT, 'MOTION_', $JSONMAP) }\
-  wallpanel/DEVNAME/sensor/face:.* { json2nameValue($EVENT, 'FACE_', $JSONMAP) }
+  wallpanel/DEVNAME/sensor/face:.* { json2nameValue($EVENT, 'FACE_', $JSONMAP) }\
+  wallpanel/DEVNAME/sensor/light:.* { json2nameValue($EVENT,'LIGHT_', $JSONMAP) }\
+  wallpanel/DEVNAME/sensor/magneticField:.* { json2nameValue($EVENT,'MAGNET_', $JSONMAP) }
 attr DEVICE setList alert:textField wallpanel/DEVNAME/command {"eval": "alert('$EVTPART1');;"}\
   audio:textField wallpanel/DEVNAME/command {"$EVTPART0": "$EVTPART1"}\
   brightness:colorpicker,BRI,0,1,255 wallpanel/DEVNAME/command {"$EVTPART0": $EVTPART1}\
@@ -5328,10 +5357,10 @@ attr DEVICE setList alert:textField wallpanel/DEVNAME/command {"eval": "alert('$
   speak:textField {"wallpanel/DEVNAME/command {'$EVTPART0': '".substr($EVENT,5)."'}"}\
   url:textField wallpanel/DEVNAME/command {"$EVTPART0": "$EVTPART1"}\
   volume:slider,0,1,100 wallpanel/DEVNAME/command {"$EVTPART0": $EVTPART1}
-attr DEVICE comment For further info on configuration and available commands see <a href="https://thanksmister.com/wallpanel-android/">project page</a>.
-farewell:template has been applied successfully. For further info on configuration and available commands see the project page (https://thanksmister.com/wallpanel-android/).
+attr DEVICE comment For further info on configuration and available commands see <a href="https://wallpanel.app/">project page</a>.
+farewell:template has been applied successfully. For further info on configuration and available commands see the project page (https://wallpanel.app/).
 attr DEVICE model wallpanel_app
-setreading DEVICE attrTemplateVersion 20200921
+setreading DEVICE attrTemplateVersion 20240111
 
 name:weewx_weather_station
 filter:TYPE=MQTT2_DEVICE
