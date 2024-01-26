@@ -2605,7 +2605,7 @@ sub echodevice_Parse($$$) {
 	}
 
 	if ($msgtype eq "csrfPageUrl") {
-		Log3 $name, 3, "[$name] [echodevice_Parse] [$msgtype] search csrf-token";	
+		#Log3 $name, 3, "[$name] [echodevice_Parse] [$msgtype] search csrf-token";	
 
 		readingsBeginUpdate($hash);
 		
