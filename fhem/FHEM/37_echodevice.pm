@@ -4,6 +4,7 @@
 #
 # 2024.01.26 v0.2.30
 # - CHANGE:  voice_reading auf neue API umgestellt
+# - FEATURE: Unterstützung A2UONLFQW0PADH Echo Show 8 Gen3
 #
 # 2023.11.15 v0.2.29
 # - FEATURE: Unterstützung A1D6RDUOWH31HF JLR Incontrol
@@ -4576,6 +4577,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A4ZXE0RM7LQ7A"  || $ModelNumber eq "Echo Show 5")				{return "Echo Show 5 Gen5";}
 	elsif($ModelNumber eq "A1Z88NGR2BK6A2" || $ModelNumber eq "Echo Show 8")				{return "Echo Show 8";}
 	elsif($ModelNumber eq "A15996VY63BQ2D" || $ModelNumber eq "Echo Show 8")				{return "Echo Show 8 Gen2";}
+	elsif($ModelNumber eq "A2UONLFQW0PADH" || $ModelNumber eq "Echo Show 8")				{return "Echo Show 8 Gen3";}
 	elsif($ModelNumber eq "A1EIANJ7PNB0Q7" || $ModelNumber eq "Echo Show 15")				{return "Echo Show 15 Gen1";}
 	elsif($ModelNumber eq "A2M35JJZWCQOMZ" || $ModelNumber eq "Echo Plus")					{return "Echo Plus";}
 	elsif($ModelNumber eq "A1JJ0KFC4ZPNJ3" || $ModelNumber eq "Echo Input")					{return "Echo Input";}
