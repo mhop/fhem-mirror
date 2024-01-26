@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.12.0" => "26.01.2024  create backup files and delete old generations of them ",
   "1.11.1" => "26.01.2024  fix ___switchonTimelimits ",
   "1.11.0" => "25.01.2024  consumerXX: notbefore, notafter format extended to possible perl code {...} ",
   "1.10.0" => "24.01.2024  consumerXX: notbefore, notafter format extended to hh[:mm], new sub checkCode, checkhhmm ",
@@ -296,6 +297,7 @@ my $batSocChgDay   = 5;                                                         
 my @widgetreadings = ();                                                            # Array der Hilfsreadings als Attributspeicher
 
 my $root           = $attr{global}{modpath};                                        # Pfad zu dem Verzeichnis der FHEM Module
+my $cachedir       = $root."/FHEM/FhemUtils";                                       # Directory für Cachefiles
 my $pvhcache       = $root."/FHEM/FhemUtils/PVH_SolarForecast_";                    # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $pvccache       = $root."/FHEM/FhemUtils/PVC_SolarForecast_";                    # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
 my $plantcfg       = $root."/FHEM/FhemUtils/PVCfg_SolarForecast_";                  # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
@@ -4640,8 +4642,8 @@ sub periodicWriteCachefiles {
   
   my $name = $hash->{NAME};
 
-  RemoveInternalTimer($hash, "FHEM::SolarForecast::periodicWriteCachefiles");
-  InternalTimer      (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteCachefiles", $hash, 0);
+  RemoveInternalTimer ($hash, "FHEM::SolarForecast::periodicWriteCachefiles");
+  InternalTimer       (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteCachefiles", $hash, 0);
 
   return if((controller($name))[1] || (controller($name))[2]);
 
@@ -4651,7 +4653,56 @@ sub periodicWriteCachefiles {
   if ($bckp) {
       my $tstr = (timestampToTimestring (0))[2];
       $tstr    =~ s/[-: ]/_/g;
-      #Log3 ($name, 1, "$name - tstr: $tstr");
+      
+      writeCacheToFile ($hash, "circular", $pvccache.$name.'_'.$tstr);        # Cache File PV Circular Sicherung schreiben
+      writeCacheToFile ($hash, "pvhist",   $pvhcache.$name.'_'.$tstr);        # Cache File PV History Sicherung schreiben
+      
+      deleteOldBckpFiles ($name, 'PVH_SolarForecast_'.$name);                 # alte Backup Files löschen
+      deleteOldBckpFiles ($name, 'PVC_SolarForecast_'.$name);
+  }
+
+return;
+}
+
+################################################################
+#                       Backupfiles löschen                      
+################################################################
+sub deleteOldBckpFiles {
+  my $name = shift;
+  my $file = shift;
+  
+  my $dfk    = AttrVal ($name, 'ctrlBackupFilesKeep', 3);
+  my $bfform = $file.'_.*';
+
+  if (!opendir (DH, $cachedir)) {
+      Log3 ($name, 1, "$name - ERROR - Can't open path '$cachedir'");
+      return;
+  }
+  
+  my @files = sort grep {/^$bfform$/} readdir(DH);
+  return if(!@files);
+  
+  my $fref = stat ("$cachedir/$file");
+
+  if ($fref) {
+      if ($fref =~ /ARRAY/) {
+          @files = sort { (@{stat "$cachedir/$a"})[9] cmp (@{stat "$cachedir/$b"})[9] } @files;
+      } 
+      else {
+          @files = sort { (stat "$cachedir/$a")[9] cmp (stat "$cachedir/$b")[9] } @files;
+      }
+  }
+
+  closedir (DH);
+
+  Log3 ($name, 4, "$name - Backup files were found in '$cachedir' directory: ".join(', ',@files));
+
+  my $max = int @files - $dfk;
+
+  for (my $i = 0; $i < $max; $i++) {
+      unlink "$cachedir/$files[$i]";
+      
+      Log3 ($name, 3, "$name - old backup file '$cachedir/$files[$i]' deleted");
   }
 
 return;
@@ -5249,9 +5300,7 @@ sub _specialActivities {
   }
 
   ## bestimmte einmalige Aktionen
-  ##################################
-  periodicWriteCachefiles ($hash, 'bckp');
-  
+  ##################################  
   my $tlim = "00";
   if ($chour =~ /^($tlim)$/x) {
       if (!exists $hash->{HELPER}{H00DONE}) {
@@ -5339,6 +5388,8 @@ sub _specialActivities {
           aiAddInstance ($paref);                                                           # AI füllen, trainieren und sichern
           delete $paref->{taa};
 
+          periodicWriteCachefiles ($hash, 'bckp');                                          # Backup Files erstellen und alte Versionen löschen
+          
           $hash->{HELPER}{H00DONE} = 1;
       }
   }
