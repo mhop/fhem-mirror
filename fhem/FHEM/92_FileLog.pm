@@ -1523,10 +1523,10 @@ FileLog_regexpFn($$)
     <a id="FileLog-attr-addLog"></a>
     <li>addLog<br>
         This attribute takes a comma-separated list of
-        devspec:reading:maxInterval triples.  You may use regular expressions
-        for reading. The last value of the reading will be written to the
-        logfile, if after maxInterval seconds no event for this device/reading
-        has arrived.
+        devspec:reading:maxInterval triples. The value for reading is treated
+        as a regular expression. The last value of the reading will be written
+        to the logfile, when after maxInterval seconds no event for this
+        device/reading has arrived.
         </li><br>
 
     <a id="FileLog-attr-archivedir"></a>
@@ -1853,9 +1853,9 @@ FileLog_regexpFn($$)
     <a id="FileLog-attr-addLog"></a>
     <li>addLog<br>
         Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
-        "devspec:readings:maxInterval" Tripel. readings kann ein regexp sein.
-        Falls nach maxInterval (Sekunden) kein passendes Event eingetroffen ist,
-        wird der letzte Wert zum Logfile hinzugefuegt.
+        "devspec:readings:maxInterval" Tripel. readings wird als Regexp
+        ausgewertet.  Falls nach maxInterval Sekunden kein passendes Event
+        eingetroffen ist, wird der letzte Wert zum Logfile hinzugef&uuml;gt.
         </li><br>
 
     <a id="FileLog-attr-archivedir"></a>
