@@ -2313,7 +2313,7 @@ sub echodevice_HandleCmdQueue($) {
 #	if($hash->{model} eq "ACCOUNT") {$AmazonHeader = "Cookie: ".$hash->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
 #	else 							{$AmazonHeader = "Cookie: ".$hash->{IODev}->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{IODev}->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
 
-	if($hash->{model} eq "ACCOUNT") {$AmazonHeader = "User-Agent: ". $UserAgent ."\r\nAccept-Language: " . $HeaderLanguage ."\r\nanti-csrftoken-a2z: " . ReadingsVal($name ,'csrf-token',"")  . "\r\nDNT: 1\r\nConnection: keep-alive\r\nUpgrade-Insecure-Requests: 1\r\nCookie:".$hash->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
+	if($hash->{model} eq "ACCOUNT") {$AmazonHeader = "User-Agent: ". $UserAgent ."\r\nAccept-Language: " . $HeaderLanguage ."\r\nanti-csrftoken-a2z: " . ReadingsVal($name ,'.csrf-token',"")  . "\r\nDNT: 1\r\nConnection: keep-alive\r\nUpgrade-Insecure-Requests: 1\r\nCookie:".$hash->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
 	else 							{$AmazonHeader = "User-Agent: ". $UserAgent ."\r\nAccept-Language: " . $HeaderLanguage . "\r\nDNT: 1\r\nConnection: keep-alive\r\nUpgrade-Insecure-Requests: 1\r\nCookie:".$hash->{IODev}->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{IODev}->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
 	
     if(not($hash->{helper}{RUNNING_REQUEST}) and @{$hash->{helper}{CMD_QUEUE}})
