@@ -157,8 +157,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.11.1" => "26.01.2024  fix ___switchonTimelimits ",
   "1.11.0" => "25.01.2024  consumerXX: notbefore, notafter format extended to possible perl code {...} ",
-  "1.10.0" => "24.01.2024  consumerXX: notbefore, notafter format extended to hh[:mm], new sub __checkCode, __checkhhmm ",
+  "1.10.0" => "24.01.2024  consumerXX: notbefore, notafter format extended to hh[:mm], new sub checkCode, checkhhmm ",
   "1.9.0"  => "23.01.2024  modify disable, add operationMode: active/inactive ",
   "1.8.0"  => "22.01.2024  add 'noLearning' Option to Setter pvCorrectionFactor_Auto ",
   "1.7.1"  => "20.01.2024  optimize battery management ",
@@ -4192,7 +4193,7 @@ sub Attr {
       }
       
       my $code      = $aVal;
-      ($err, $code) = __checkCode ($name, $code);
+      ($err, $code) = checkCode ($name, $code);
       return $err if($err);
       
       $data{$type}{$name}{func}{ghoValForm} = $code;
@@ -4224,7 +4225,7 @@ sub Attr {
       }
 
       if ($aName eq 'ctrlUserExitFn' && $init_done) {
-          ($err) = __checkCode ($name, $aVal, 'cc1');
+          ($err) = checkCode ($name, $aVal, 'cc1');
           return $err if($err);
       }
   }
@@ -4300,22 +4301,22 @@ sub _attrconsumer {                      ## no critic "not used"
       
       if (exists $h->{notbefore}) {
           if ($h->{notbefore} =~ m/^\s*\{.*\}\s*$/xs) {
-              ($err) = __checkCode ($name, $h->{notbefore}, 'cc1');
+              ($err) = checkCode ($name, $h->{notbefore}, 'cc1');
               return $err if($err);
           }
           else {          
-              $valid = __checkhhmm ($h->{notbefore});          
+              $valid = checkhhmm ($h->{notbefore});          
               return qq{The syntax "notbefore=$h->{notbefore}" is wrong!} if(!$valid);
           }
       }
       
       if (exists $h->{notafter}) {
           if ($h->{notafter} =~ m/^\s*\{.*\}\s*$/xs) {
-              ($err) = __checkCode ($name, $h->{notafter}, 'cc1');
+              ($err) = checkCode ($name, $h->{notafter}, 'cc1');
               return $err if($err);
           }
           else {
-              $valid = __checkhhmm ($h->{notafter});          
+              $valid = checkhhmm ($h->{notafter});          
               return qq{The syntax "notafter=$h->{notafter}" is wrong!} if(!$valid);
           }
       }
@@ -4387,78 +4388,6 @@ sub _attrconsumer {                      ## no critic "not used"
   InternalTimer (gettimeofday()+2,   'FHEM::SolarForecast::createAssociatedWith', $hash,      0);
 
 return;
-}
-
-################################################################
-#                 prüfen Angabe hh[:mm]
-################################################################
-sub __checkhhmm {
-  my $val = shift;
-  
-  my $valid = 0;
-  
-  if ($val =~ /^([0-9]{1,2})(:[0-5]{1}[0-9]{1})?$/xs) {
-      $valid = 1 if(int $1 < 24);
-  }
-          
-return $valid;
-}
-
-################################################################
-#          prüfen validen Code in $val          
-################################################################
-sub __checkCode {
-  my $name = shift;
-  my $val  = shift;
-  my $cc1  = shift // 0;                                 # wenn 1 __checkCode1 ausführen
-  
-  my $err;
-  
-  if (!$val || $val !~ m/^\s*\{.*\}\s*$/xs) {
-      return qq{Usage of $name is wrong. The function has to be specified as "{<your own code>}"};
-  }
-  
-  if ($cc1) {
-      ($err, $val) = ___checkCode1 ($name, $val);
-      return ($err, $val);
-  }
-
-  my %specials = ( "%DEVICE"  => $name,
-                   "%READING" => $name,
-                   "%VALUE"   => 1,
-                   "%UNIT"    => 'kW',
-                 );
-
-  $err = perlSyntaxCheck ($val, %specials);
-  return $err if($err);
-
-  if ($val =~ m/^\{.*\}$/xs && $val =~ m/=>/ && $val !~ m/\$/ ) {           # Attr wurde als Hash definiert
-      my $av = eval $val;
-
-      return $@ if($@);
-
-      $av  = eval $val;
-      $val = $av if(ref $av eq "HASH");
-  }
-          
-return ('', $val);
-}
-
-################################################################
-#          prüfen validen Code in $val          
-################################################################
-sub ___checkCode1 {
-  my $name = shift;
-  my $val  = shift;
-  
-  my $hash = $defs{$name};
-
-  $val =~ m/^\s*(\{.*\})\s*$/xs;
-  $val = $1;
-  $val = eval $val;
-  return $@ if($@);
-
-return ('', $val);
 }
 
 ################################################################
@@ -4703,10 +4632,12 @@ return;
 }
 
 ################################################################
-#        Timer für Cache File Daten schreiben
+#        Timer für Cache File Daten schreiben                        
 ################################################################
 sub periodicWriteCachefiles {
   my $hash = shift;
+  my $bckp = shift // '';
+  
   my $name = $hash->{NAME};
 
   RemoveInternalTimer($hash, "FHEM::SolarForecast::periodicWriteCachefiles");
@@ -4716,6 +4647,12 @@ sub periodicWriteCachefiles {
 
   writeCacheToFile ($hash, "circular", $pvccache.$name);                      # Cache File PV Circular schreiben
   writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);                      # Cache File PV History schreiben
+  
+  if ($bckp) {
+      my $tstr = (timestampToTimestring (0))[2];
+      $tstr    =~ s/[-: ]/_/g;
+      #Log3 ($name, 1, "$name - tstr: $tstr");
+  }
 
 return;
 }
@@ -5313,7 +5250,8 @@ sub _specialActivities {
 
   ## bestimmte einmalige Aktionen
   ##################################
-
+  periodicWriteCachefiles ($hash, 'bckp');
+  
   my $tlim = "00";
   if ($chour =~ /^($tlim)$/x) {
       if (!exists $hash->{HELPER}{H00DONE}) {
@@ -7664,26 +7602,28 @@ sub ___switchonTimelimits {
   my $notbefore = ConsumerVal ($hash, $c, "notbefore", 0);
   my $notafter  = ConsumerVal ($hash, $c, "notafter",  0);
   
-  my ($err, $val);
+  my ($err, $vala, $valb);
   
   if ($notbefore =~ m/^\s*\{.*\}\s*$/xs) {                                          # notbefore als Perl-Code definiert
-      ($err, $val) = __checkCode ($name, $notbefore, 'cc1');
-      if (!$err && __checkhhmm ($val)) {
-          $notbefore = $val;
+      ($err, $valb) = checkCode ($name, $notbefore, 'cc1');
+      if (!$err && checkhhmm ($valb)) {
+          $notbefore = $valb;
+          debugLog ($paref, "consumerPlanning", qq{consumer "$c" - got 'notbefore' function result: $valb});
       }
       else {
-          Log3 ($name, 1, "$name - ERROR - the result of the Perl code in 'notbefore' is incorrect: $val");
+          Log3 ($name, 1, "$name - ERROR - the result of the Perl code in 'notbefore' is incorrect: $valb");
           $notbefore = 0;
       }
   }
   
   if ($notafter =~ m/^\s*(\{.*\})\s*$/xs) {                                           # notafter als Perl-Code definiert
-      ($err, $val) = __checkCode ($name, $notafter, 'cc1');
-      if (!$err && __checkhhmm ($val)) {
-          $notafter = $val;
+      ($err, $vala) = checkCode ($name, $notafter, 'cc1');
+      if (!$err && checkhhmm ($vala)) {
+          $notafter = $vala;
+          debugLog ($paref, "consumerPlanning", qq{consumer "$c" - got 'notafter' function result: $vala})
       }
       else {
-          Log3 ($name, 1, "$name - ERROR - the result of the Perl code in the 'notafter' key is incorrect: $val");
+          Log3 ($name, 1, "$name - ERROR - the result of the Perl code in the 'notafter' key is incorrect: $vala");
           $notafter = 0;
       }  
   }
@@ -7699,7 +7639,7 @@ sub ___switchonTimelimits {
   if ($notafter) {
       ($nafhh, $nafmm) = split ":", $notafter;
       $nafmm         //= '00';
-      $notafter        = (int $nafhh) . $nbfmm; 
+      $notafter        = (int $nafhh) . $nafmm; 
   }
   
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - used 'notbefore' term: }.(defined $notbefore ? $notbefore : ''));
@@ -13805,7 +13745,7 @@ return;
 ################################################################
 sub timestampToTimestring {
   my $epoch = shift;
-  my $lang  = shift;
+  my $lang  = shift // '';
 
   return if($epoch !~ /[0-9]/xs);
 
@@ -14754,6 +14694,78 @@ sub checkRegex {
              };
 
 return;
+}
+
+################################################################
+#                 prüfen Angabe hh[:mm]
+################################################################
+sub checkhhmm {
+  my $val = shift;
+  
+  my $valid = 0;
+  
+  if ($val =~ /^([0-9]{1,2})(:[0-5]{1}[0-9]{1})?$/xs) {
+      $valid = 1 if(int $1 < 24);
+  }
+          
+return $valid;
+}
+
+################################################################
+#          prüfen validen Code in $val          
+################################################################
+sub checkCode {
+  my $name = shift;
+  my $val  = shift;
+  my $cc1  = shift // 0;                                 # wenn 1 checkCode1 ausführen
+  
+  my $err;
+  
+  if (!$val || $val !~ m/^\s*\{.*\}\s*$/xs) {
+      return qq{Usage of $name is wrong. The function has to be specified as "{<your own code>}"};
+  }
+  
+  if ($cc1) {
+      ($err, $val) = checkCode1 ($name, $val);
+      return ($err, $val);
+  }
+
+  my %specials = ( "%DEVICE"  => $name,
+                   "%READING" => $name,
+                   "%VALUE"   => 1,
+                   "%UNIT"    => 'kW',
+                 );
+
+  $err = perlSyntaxCheck ($val, %specials);
+  return $err if($err);
+
+  if ($val =~ m/^\{.*\}$/xs && $val =~ m/=>/ && $val !~ m/\$/ ) {           # Attr wurde als Hash definiert
+      my $av = eval $val;
+
+      return $@ if($@);
+
+      $av  = eval $val;
+      $val = $av if(ref $av eq "HASH");
+  }
+          
+return ('', $val);
+}
+
+################################################################
+#          prüfen validen Code in $val          
+################################################################
+sub checkCode1 {
+  my $name = shift;
+  my $val  = shift;
+  
+  my $hash = $defs{$name};
+
+  $val =~ m/^\s*(\{.*\})\s*$/xs;
+  $val = $1;
+  $val = eval $val;
+  return $@ if($@);
+
+return ('', $val);
 }
 
 ################################################################
