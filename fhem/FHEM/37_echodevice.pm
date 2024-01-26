@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2024.01.26 v0.2.30
+# - CHANGE:  voice_reading auf neue API umgestellt
+#
 # 2023.11.15 v0.2.29
 # - FEATURE: Unterstützung A1D6RDUOWH31HF JLR Incontrol
 #
@@ -530,7 +533,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.29";
+my $ModulVersion     = "0.2.30";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -1776,11 +1779,18 @@ sub echodevice_SendCommand($$$) {
 	}
 
 	elsif ($type eq "activities") {
-		$SendUrl    = "https://www.amazon.de/alexa-privacy/apd/rvh/customer-history-records/?startTime=0&endTime=2005090388459&recordType=VOICE_HISTORY&maxRecordSize=100";
+		#$SendUrl    = "https://www.amazon.de/alexa-privacy/apd/rvh/customer-history-records/?startTime=0&endTime=2005090388459&recordType=VOICE_HISTORY&maxRecordSize=100";
+		$SendUrl    = "https://www.amazon.de/alexa-privacy/apd/rvh/customer-history-records-v2/?startTime=0&endTime=2005090388459&pageType=VOICE_HISTORY";
+		$SendMetode = "POST";
+		$SendDataL  = '{"previousRequestToken": null}';
+		$SendData   = '{"previousRequestToken": null}';
+	}
+
+	elsif ($type eq "csrfPageUrl") {
+		$SendUrl = "https://www.amazon.de/alexa-privacy/apd/activity?ref=activityHistory";
 		$SendMetode = "GET";
 		$SendDataL  = "" ;
-		$SendData   = "";
-		
+		$SendData   = "";	
 	}
 
 	elsif ($type eq "activities1") {
@@ -2219,6 +2229,16 @@ sub echodevice_SendCommand($$$) {
 		$SendDataL = $SendData;
 	}
 	
+	elsif ($type eq "getsmarthome" ) {
+		$SendUrl   .= "/api/phoenix/state";
+		$SendMetode = "POST";	
+		
+		$SendData = '{"stateRequests":[{"entityId":"AlexaBridge_'.$hash->{helper}{".SERIAL"}.'@'.$hash->{helper}{DEVICETYPE}.'_'.$hash->{helper}{".SERIAL"}.'","entityType": "APPLIANCE"}]}';
+		
+		$SendDataL = $SendData;	
+	
+	}
+	
 	else {
 		return;
 	}
@@ -2292,7 +2312,7 @@ sub echodevice_HandleCmdQueue($) {
 #	if($hash->{model} eq "ACCOUNT") {$AmazonHeader = "Cookie: ".$hash->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
 #	else 							{$AmazonHeader = "Cookie: ".$hash->{IODev}->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{IODev}->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
 
-	if($hash->{model} eq "ACCOUNT") {$AmazonHeader = "User-Agent: ". $UserAgent ."\r\nAccept-Language: " . $HeaderLanguage . "\r\nDNT: 1\r\nConnection: keep-alive\r\nUpgrade-Insecure-Requests: 1\r\nCookie:".$hash->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
+	if($hash->{model} eq "ACCOUNT") {$AmazonHeader = "User-Agent: ". $UserAgent ."\r\nAccept-Language: " . $HeaderLanguage ."\r\nanti-csrftoken-a2z: " . ReadingsVal($name ,'csrf-token',"")  . "\r\nDNT: 1\r\nConnection: keep-alive\r\nUpgrade-Insecure-Requests: 1\r\nCookie:".$hash->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
 	else 							{$AmazonHeader = "User-Agent: ". $UserAgent ."\r\nAccept-Language: " . $HeaderLanguage . "\r\nDNT: 1\r\nConnection: keep-alive\r\nUpgrade-Insecure-Requests: 1\r\nCookie:".$hash->{IODev}->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{IODev}->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
 	
     if(not($hash->{helper}{RUNNING_REQUEST}) and @{$hash->{helper}{CMD_QUEUE}})
@@ -2581,6 +2601,22 @@ sub echodevice_Parse($$$) {
 		print FH $param->{httpheader};
 		close(FH);
 	
+	}
+
+	if ($msgtype eq "csrfPageUrl") {
+		Log3 $name, 3, "[$name] [echodevice_Parse] [$msgtype] search csrf-token";	
+
+		readingsBeginUpdate($hash);
+		
+		my $regex = qr/meta name="csrf-token" content="([^"]+)"/;
+
+		while ($data =~ /$regex/g) {
+			my $csrf_token = $1;
+			readingsBulkUpdate($hash, ".csrf-token", $1, 1);
+		}
+	
+		readingsEndUpdate($hash,1);
+		
 	}
 	
 	# COOKIE LOGIN Part
@@ -4177,6 +4213,7 @@ sub echodevice_GetSettings($) {
 	if ($ConnectState eq "connected") {
 
 		if($hash->{model} eq "ACCOUNT") {
+			echodevice_SendCommand($hash,"csrfPageUrl","");
 			echodevice_SendCommand($hash,"endpoints","");
 			echodevice_SendCommand($hash,"getnotifications","");
 			echodevice_SendCommand($hash,"alarmvolume","");
@@ -4244,6 +4281,7 @@ sub echodevice_GetSettings($) {
 				if ($hash->{IODev}{STATE} eq "connected") {
 					echodevice_SendCommand($hash,"player","");
 					echodevice_SendCommand($hash,"media","");
+					echodevice_SendCommand($hash,"getsmarthome","");
 				}
 				else {
 					$nextupdate = 10;
