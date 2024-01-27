@@ -157,6 +157,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.13.0" => "27.01.2024  minor change of deleteOldBckpFiles, Setter writeHistory replaced by operatingMemory ".
+                           "save, backup and recover in-memory operating data ",
   "1.12.0" => "26.01.2024  create backup files and delete old generations of them ",
   "1.11.1" => "26.01.2024  fix ___switchonTimelimits ",
   "1.11.0" => "25.01.2024  consumerXX: notbefore, notafter format extended to possible perl code {...} ",
@@ -439,7 +441,7 @@ my %hset = (                                                                # Ha
   moduleRoofTops            => { fn => \&_setmoduleRoofTops            },
   moduleTiltAngle           => { fn => \&_setmoduleTiltAngle           },
   moduleDirection           => { fn => \&_setmoduleDirection           },
-  writeHistory              => { fn => \&_setwriteHistory              },
+  operatingMemory           => { fn => \&_setoperatingMemory           },
   vrmCredentials            => { fn => \&_setVictronCredentials        },
   aiDecTree                 => { fn => \&_setaiDecTree                 },
 );
@@ -614,7 +616,7 @@ my %hqtxt = (                                                                   
   awd    => { EN => qq{LINK is waiting for solar forecast data ... <br>},
               DE => qq{LINK wartet auf Solarvorhersagedaten ... <br>}                                                       },
   wexso  => { EN => qq{switched externally},
-              DE => qq{von extern umgeschaltet}                                                                             }, 
+              DE => qq{von extern umgeschaltet}                                                                             },
   strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please note any information (<I>).},
               DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise (<I>) beachten.}                   },
   strwn  => { EN => qq{Looks quite good &#128528;, the system configuration is basically OK. Please note the warnings (<W>).},
@@ -913,6 +915,7 @@ sub Initialize {
                                 "ctrlAIdataStorageDuration ".
                                 "ctrlAutoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "ctrlAutoRefreshFW:$fwd ".
+                                "ctrlBackupFilesKeep:select,1,2,3,4,5,6,7,8,9,10 ".
                                 "ctrlBatSocManagement:textField-long ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#14 ".
@@ -1005,29 +1008,35 @@ sub Define {
   use version 0.77; our $VERSION = moduleVersion ($params);                                              # Versionsinformationen setzen
 
   createAssociatedWith ($hash);
-  
+
   $params->{file}      = $pvhcache.$name;                                                                # Cache File PV History einlesen wenn vorhanden
   $params->{cachename} = 'pvhist';
+  $params->{title}     = 'pvHistory';
   _readCacheFile ($params);
 
   $params->{file}      = $pvccache.$name;                                                                # Cache File PV Circular einlesen wenn vorhanden
   $params->{cachename} = 'circular';
+  $params->{title}     = 'pvCircular';
   _readCacheFile ($params);
 
   $params->{file}      = $csmcache.$name;                                                                # Cache File Consumer einlesen wenn vorhanden
   $params->{cachename} = 'consumers';
+  $params->{title}     = 'consumerMaster';
   _readCacheFile ($params);
 
   $params->{file}      = $scpicache.$name;                                                               # Cache File SolCast API Werte einlesen wenn vorhanden
   $params->{cachename} = 'solcastapi';
+  $params->{title}     = 'solApiData';
   _readCacheFile ($params);
 
   $params->{file}      = $aitrained.$name;                                                               # AI Cache File einlesen wenn vorhanden
   $params->{cachename} = 'aitrained';
+  $params->{title}     = 'aiTrainedData';
   _readCacheFile ($params);
 
   $params->{file}      = $airaw.$name;                                                                   # AI Rawdaten File einlesen wenn vorhanden
   $params->{cachename} = 'airaw';
+  $params->{title}     = 'aiRawData';
   _readCacheFile ($params);
 
   singleUpdateState ( {hash => $hash, state => 'initialized', evt => 1} );
@@ -1048,6 +1057,7 @@ sub _readCacheFile {
   my $type      = $paref->{type};
   my $file      = $paref->{file};
   my $cachename = $paref->{cachename};
+  my $title     = $paref->{title};
 
   if ($cachename eq 'aitrained') {
       my ($err, $dtree) = fileRetrieve ($file);
@@ -1058,7 +1068,7 @@ sub _readCacheFile {
           if ($valid) {
               $data{$type}{$name}{aidectree}{aitrained}  = $dtree;
               $data{$type}{$name}{current}{aitrainstate} = 'ok';
-              Log3 ($name, 3, qq{$name - cached data "$cachename" restored});
+              Log3 ($name, 3, qq{$name - cached data "$title" restored});
           }
       }
 
@@ -1071,7 +1081,7 @@ sub _readCacheFile {
       if (!$err && $data) {
           $data{$type}{$name}{aidectree}{airaw}     = $data;
           $data{$type}{$name}{current}{aitrawstate} = 'ok';
-          Log3 ($name, 3, qq{$name - cached data "$cachename" restored});
+          Log3 ($name, 3, qq{$name - cached data "$title" restored});
       }
 
       return;
@@ -1079,16 +1089,16 @@ sub _readCacheFile {
 
   my ($error, @content) = FileRead ($file);
 
-  if(!$error) {
+  if (!$error) {
       my $json      = join "", @content;
       my ($success) = evaljson ($hash, $json);
 
-      if($success) {
+      if ($success) {
            $data{$hash->{TYPE}}{$name}{$cachename} = decode_json ($json);
-           Log3 ($name, 3, qq{$name - cached data "$cachename" restored});
+           Log3 ($name, 3, qq{$name - cached data "$title" restored});
       }
       else {
-          Log3 ($name, 1, qq{$name - WARNING - The content of file "$file" is not readable and may be corrupt});
+          Log3 ($name, 1, qq{$name - WARNING - The content of file "$file" is not readable or may be corrupt});
       }
   }
 
@@ -1111,8 +1121,9 @@ sub Set {
 
   return if((controller($name))[1]);
 
-  my ($setlist,@fcdevs,@cfs,@condevs);
+  my ($setlist,@fcdevs,@cfs,@condevs,@bkps);
   my ($fcd,$ind,$med,$cf,$sp,$coms) = ('','','','','','');
+  my $type = $hash->{TYPE};
 
   my @re = qw( aiData
                batteryTriggerSet
@@ -1138,6 +1149,7 @@ sub Set {
   push @fcdevs, 'SolCast-API';
   push @fcdevs, 'ForecastSolar-API';
   push @fcdevs, 'VictronKI-API';
+
   my $rdd = join ",", @fcdevs;
 
   for my $h (@chours) {
@@ -1145,14 +1157,24 @@ sub Set {
   }
   $cf = join " ", @cfs;
 
-  my $type  = $hash->{TYPE};
-
   for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {
       push @condevs, $c if($c);
   }
-  $coms = @condevs ? join ",", @condevs : 'noArg';
-  
+
+  $coms    = @condevs ? join ",", @condevs : 'noArg';
   my $ipai = isPrepared4AI ($hash);
+
+  opendir (DIR, $cachedir);
+
+  while (my $file = readdir (DIR)) {
+      next unless (-f "$cachedir/$file");
+      next unless ($file =~ /_${name}_/);
+      next unless ($file =~ /_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}$/);
+      push @bkps, 'recover-'.$file;
+  }
+
+  closedir (DIR);
+  my $rf = @bkps ? ','.join ",", reverse sort @bkps : '';
 
   ## allg. gültige Setter
   #########################
@@ -1167,12 +1189,12 @@ sub Set {
              "energyH4Trigger:textField-long ".
              "inverterStrings ".
              "modulePeakString ".
+             "operatingMemory:backup,save".$rf." ".
              "operationMode:active,inactive ".
              "plantConfiguration:check,save,restore ".
              "powerTrigger:textField-long ".
              "pvCorrectionFactor_Auto:noLearning,on_simple".($ipai ? ',on_simple_ai,' : ',')."on_complex".($ipai ? ',on_complex_ai,' : ',')."off ".
              "reset:$resets ".
-             "writeHistory:noArg ".
              $cf." "
              ;
 
@@ -1209,7 +1231,7 @@ sub Set {
   if (isBatteryUsed ($name)) {
       $setlist .= "batteryTrigger:textField-long ";
   }
-  
+
   ## inactive (Setter überschreiben)
   ####################################
   if ((controller($name))[2]) {
@@ -1290,7 +1312,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
 
   my $planstate = ConsumerVal ($hash, $c, 'planstate', '');
   my $calias    = ConsumerVal ($hash, $c, 'alias',     '');
-  
+
   writeCacheToFile ($hash, "consumers", $csmcache.$name);                                      # Cache File Consumer schreiben
 
   Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate}) if($planstate);
@@ -1848,7 +1870,7 @@ sub _setplantConfiguration {             ## no critic "not used"
 
   $arg = 'check' if (!$arg);
 
-  if($arg eq "check") {
+  if ($arg eq "check") {
       my $out = checkPlantConfig ($hash);
       $out    = qq{<html>$out</html>};
 
@@ -1861,9 +1883,9 @@ sub _setplantConfiguration {             ## no critic "not used"
       return $out;
   }
 
-  if($arg eq "save") {
-      $err = writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
-      if($err) {
+  if ($arg eq "save") {
+      $err = writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+      if ($err) {
           return $err;
       }
       else {
@@ -1871,11 +1893,12 @@ sub _setplantConfiguration {             ## no critic "not used"
       }
   }
 
-  if($arg eq "restore") {
+  if ($arg eq "restore") {
       ($err, @pvconf) = FileRead ($plantcfg.$name);
 
-      if(!$err) {
+      if (!$err) {
           my $rbit = 0;
+
           for my $elem (@pvconf) {
               my ($reading, $val) = split "<>", $elem;
               next if(!$reading || !defined $val);
@@ -1883,7 +1906,7 @@ sub _setplantConfiguration {             ## no critic "not used"
               $rbit = 1;
           }
 
-          if($rbit) {
+          if ($rbit) {
               return qq{Plant Configuration restored from file "}.$plantcfg.$name.qq{"};
           }
           else {
@@ -1948,7 +1971,7 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
   my $prop  = $paref->{prop} // return qq{no correction value specified};
-  
+
   if ($prop eq 'noLearning') {
       my $pfa = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');           # aktuelle Autokorrektureinstellung
       $prop   = $pfa.' '.$prop;
@@ -2237,19 +2260,47 @@ return;
 }
 
 ################################################################
-#                      Setter writeHistory
+#                Setter operatingMemory
+#          (Ersatz für Setter writeHistory)
 ################################################################
-sub _setwriteHistory {                   ## no critic "not used"
+sub _setoperatingMemory {                ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $prop  = $paref->{prop} // return qq{no operation specified for command};
 
-  my $ret = writeCacheToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
-  return $ret if($ret);
+  if ($prop eq 'save') {
+      periodicWriteCachefiles ($hash);                                         # Cache File für PV History, PV Circular schreiben
+  }
 
-  $ret    = writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
+  if ($prop eq 'backup') {
+      periodicWriteCachefiles ($hash, 'bckp');                                 # Backup Files erstellen und alte Versionen löschen
+  }
 
-return $ret;
+  if ($prop =~ /^recover-/xs) {                                                # Sicherung wiederherstellen
+      my $file = (split "-", $prop)[1];
+
+      Log3 ($name, 3, "$name - recover saved cache file: $file");
+
+      if ($file =~ /^PVH_/xs) {                                                # Cache File PV History einlesen
+          $paref->{cachename} = 'pvhist';
+          $paref->{title}     = 'pvHistory';
+      }
+
+      if ($file =~ /^PVC_/xs) {                                                # Cache File PV Circular einlesen
+          $paref->{cachename} = 'circular';
+          $paref->{title}     = 'pvCircular';
+      }
+
+      $paref->{file} = "$cachedir/$file";
+      _readCacheFile ($paref);
+
+      delete $paref->{file};
+      delete $paref->{cachename};
+      delete $paref->{title};
+  }
+
+return;
 }
 
 ################################################################
@@ -2276,7 +2327,7 @@ sub _setclientAction {                 ## no critic "not used"
   my $cname    = shift @args;                                                 # Consumername
   my $tail     = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @args;     ## no critic 'Map blocks' # restliche Befehlsargumente
 
-  Log3($name, 4, qq{$name - Client Action received / execute: "$action $cname $tail"});
+  Log3 ($name, 4, qq{$name - Client Action received / execute: "$action $cname $tail"});
 
   if($action eq 'set') {
       CommandSet (undef, "$cname $tail");
@@ -3733,7 +3784,7 @@ return;
 sub _getdata {
   my $paref = shift;
   my $hash  = $paref->{hash};
-  
+
 return centralTask ($hash);
 }
 
@@ -4193,11 +4244,11 @@ sub Attr {
           delete $data{$type}{$name}{func}{ghoValForm};
           return;
       }
-      
+
       my $code      = $aVal;
       ($err, $code) = checkCode ($name, $code);
       return $err if($err);
-      
+
       $data{$type}{$name}{func}{ghoValForm} = $code;
   }
 
@@ -4300,25 +4351,25 @@ sub _attrconsumer {                      ## no critic "not used"
       if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
           return qq{The mode "$h->{mode}" isn't allowed!};
       }
-      
+
       if (exists $h->{notbefore}) {
           if ($h->{notbefore} =~ m/^\s*\{.*\}\s*$/xs) {
               ($err) = checkCode ($name, $h->{notbefore}, 'cc1');
               return $err if($err);
           }
-          else {          
-              $valid = checkhhmm ($h->{notbefore});          
+          else {
+              $valid = checkhhmm ($h->{notbefore});
               return qq{The syntax "notbefore=$h->{notbefore}" is wrong!} if(!$valid);
           }
       }
-      
+
       if (exists $h->{notafter}) {
           if ($h->{notafter} =~ m/^\s*\{.*\}\s*$/xs) {
               ($err) = checkCode ($name, $h->{notafter}, 'cc1');
               return $err if($err);
           }
           else {
-              $valid = checkhhmm ($h->{notafter});          
+              $valid = checkhhmm ($h->{notafter});
               return qq{The syntax "notafter=$h->{notafter}" is wrong!} if(!$valid);
           }
       }
@@ -4383,9 +4434,9 @@ sub _attrconsumer {                      ## no critic "not used"
   }
 
   writeCacheToFile ($hash, "consumers", $csmcache.$name);                                          # Cache File Consumer schreiben
-  
+
   $data{$type}{$name}{current}{consumerCollected} = 0;                                             # Consumer neu sammeln
-  
+
   InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask',          [$name, 0], 0);
   InternalTimer (gettimeofday()+2,   'FHEM::SolarForecast::createAssociatedWith', $hash,      0);
 
@@ -4634,12 +4685,12 @@ return;
 }
 
 ################################################################
-#        Timer für Cache File Daten schreiben                        
+#        Timer für Cache File Daten schreiben
 ################################################################
 sub periodicWriteCachefiles {
   my $hash = shift;
   my $bckp = shift // '';
-  
+
   my $name = $hash->{NAME};
 
   RemoveInternalTimer ($hash, "FHEM::SolarForecast::periodicWriteCachefiles");
@@ -4649,14 +4700,14 @@ sub periodicWriteCachefiles {
 
   writeCacheToFile ($hash, "circular", $pvccache.$name);                      # Cache File PV Circular schreiben
   writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);                      # Cache File PV History schreiben
-  
+
   if ($bckp) {
       my $tstr = (timestampToTimestring (0))[2];
       $tstr    =~ s/[-: ]/_/g;
-      
+
       writeCacheToFile ($hash, "circular", $pvccache.$name.'_'.$tstr);        # Cache File PV Circular Sicherung schreiben
       writeCacheToFile ($hash, "pvhist",   $pvhcache.$name.'_'.$tstr);        # Cache File PV History Sicherung schreiben
-      
+
       deleteOldBckpFiles ($name, 'PVH_SolarForecast_'.$name);                 # alte Backup Files löschen
       deleteOldBckpFiles ($name, 'PVC_SolarForecast_'.$name);
   }
@@ -4665,12 +4716,12 @@ return;
 }
 
 ################################################################
-#                       Backupfiles löschen                      
+#                       Backupfiles löschen
 ################################################################
 sub deleteOldBckpFiles {
   my $name = shift;
   my $file = shift;
-  
+
   my $dfk    = AttrVal ($name, 'ctrlBackupFilesKeep', 3);
   my $bfform = $file.'_.*';
 
@@ -4678,16 +4729,16 @@ sub deleteOldBckpFiles {
       Log3 ($name, 1, "$name - ERROR - Can't open path '$cachedir'");
       return;
   }
-  
+
   my @files = sort grep {/^$bfform$/} readdir(DH);
   return if(!@files);
-  
+
   my $fref = stat ("$cachedir/$file");
 
   if ($fref) {
       if ($fref =~ /ARRAY/) {
           @files = sort { (@{stat "$cachedir/$a"})[9] cmp (@{stat "$cachedir/$b"})[9] } @files;
-      } 
+      }
       else {
           @files = sort { (stat "$cachedir/$a")[9] cmp (stat "$cachedir/$b")[9] } @files;
       }
@@ -4700,9 +4751,12 @@ sub deleteOldBckpFiles {
   my $max = int @files - $dfk;
 
   for (my $i = 0; $i < $max; $i++) {
-      unlink "$cachedir/$files[$i]";
-      
-      Log3 ($name, 3, "$name - old backup file '$cachedir/$files[$i]' deleted");
+      my $done = 1;
+      unlink "$cachedir/$files[$i]" or do { Log3 ($name, 1, "$name - WARNING - Could not delete '$cachedir/$files[$i]': $!");
+                                            $done = 0;
+                                          };
+
+      Log3 ($name, 3, "$name - old backup file '$cachedir/$files[$i]' deleted") if($done);
   }
 
 return;
@@ -4825,18 +4879,18 @@ return @pvconf;
 ################################################################
 sub runCentralTask {
   my $hash = shift;
-  
+
   return if(!$init_done);
-  
+
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  
+
   return if(CurrentVal ($hash, 'ctrunning', 0));
-  
+
   my $debug;
   my $t        = time;
   my $second   = int (strftime "%S", localtime($t));                                 # aktuelle Sekunde (00-61)
-  my $minute   = int (strftime "%M", localtime($t));                                 # aktuelle Minute (00-59) 
+  my $minute   = int (strftime "%M", localtime($t));                                 # aktuelle Minute (00-59)
   my $interval = (controller ($name))[0];                                            # Interval
 
   if (!$interval) {
@@ -4844,12 +4898,12 @@ sub runCentralTask {
       storeReading ('nextCycletime', 'Manual');
       return;
   }
-  
+
   if ((controller($name))[1]) {
       $hash->{MODE} = 'disabled';
       return;
   }
-  
+
   if ((controller($name))[2]) {
       $hash->{MODE} = 'inactive';
       return;
@@ -4860,38 +4914,38 @@ sub runCentralTask {
   if ($t >= $nct) {
       my $new       = $t + $interval;                                                # nächste Wiederholungszeit
       $hash->{MODE} = 'Automatic - next Cycletime: '.FmtTime($new);
-      
+
       $data{$type}{$name}{current}{nextCycleTime} = $new;
-      
+
       storeReading ('nextCycletime', FmtTime($new));
       centralTask  ($hash, 1);
   }
-  
-  if ($minute == 59 && $second > 48 && $second < 58) {                                 
+
+  if ($minute == 59 && $second > 48 && $second < 58) {
       if (!exists $hash->{HELPER}{S58DONE}) {
           $debug                   = getDebug ($hash);
           $hash->{HELPER}{S58DONE} = 1;
-          
+
           if ($debug =~ /collectData/x) {
               Log3 ($name, 1, "$name DEBUG> Start of unscheduled data collection at the end of an hour");
           }
-          
+
           centralTask ($hash, 1);
       }
   }
   else {
       delete $hash->{HELPER}{S58DONE};
   }
-  
+
   if ($minute == 0 && $second > 3 && $second < 20) {
       if (!exists $hash->{HELPER}{S20DONE}) {
-          $debug                   = getDebug ($hash);          
+          $debug                   = getDebug ($hash);
           $hash->{HELPER}{S20DONE} = 1;
-          
+
           if ($debug =~ /collectData/x) {
               Log3 ($name, 1, "$name DEBUG> Start of unscheduled data collection at the beginning of an hour");
           }
-          
+
           centralTask ($hash, 1);
       }
   }
@@ -4962,11 +5016,11 @@ sub centralTask {
   ############################################################################################
 
   return if(!$init_done);
-  
+
   setModel ($hash);                                                                            # Model setzen
 
   return if((controller($name))[1] || (controller($name))[2]);                                 # disabled / inactive
-  
+
   if (CurrentVal ($hash, 'ctrunning', 0)) {
       Log3 ($name, 3, "$name - INFO - central task was called when it was already running ... end this call");
       $data{$type}{$name}{current}{ctrunning} = 0;
@@ -4981,7 +5035,7 @@ sub centralTask {
           return;
       }
   }
-  
+
   my $t       = time;                                                                          # aktuelle Unix-Zeit
   my $date    = strftime "%Y-%m-%d", localtime($t);                                            # aktuelles Datum
   my $chour   = strftime "%H",       localtime($t);                                            # aktuelle Stunde in 24h format (00-23)
@@ -4989,9 +5043,9 @@ sub centralTask {
   my $day     = strftime "%d",       localtime($t);                                            # aktueller Tag  (range 01 to 31)
   my $dayname = strftime "%a",       localtime($t);                                            # aktueller Wochentagsname
   my $debug   = getDebug ($hash);                                                              # Debug Module
-  
-  $data{$type}{$name}{current}{ctrunning} = 1;                                                 # Central Task running Statusbit             
-  
+
+  $data{$type}{$name}{current}{ctrunning} = 1;                                                 # Central Task running Statusbit
+
   my $centpars = {
       hash    => $hash,
       name    => $name,
@@ -5061,7 +5115,7 @@ sub centralTask {
       $centpars->{evt} = 1;
       singleUpdateState ($centpars);
   }
-  
+
   $data{$type}{$name}{current}{ctrunning} = 0;
 
 return;
@@ -5245,7 +5299,7 @@ return $az;
 ################################################################
 sub controller {
   my $name = shift;
-  
+
   my $interval = AttrVal    ($name, 'ctrlInterval', $definterval);            # 0 wenn manuell gesteuert
   my $idval    = IsDisabled ($name);
   my $disabled = $idval == 1 ? 1 : 0;
@@ -5300,7 +5354,7 @@ sub _specialActivities {
   }
 
   ## bestimmte einmalige Aktionen
-  ##################################  
+  ##################################
   my $tlim = "00";
   if ($chour =~ /^($tlim)$/x) {
       if (!exists $hash->{HELPER}{H00DONE}) {
@@ -5389,7 +5443,7 @@ sub _specialActivities {
           delete $paref->{taa};
 
           periodicWriteCachefiles ($hash, 'bckp');                                          # Backup Files erstellen und alte Versionen löschen
-          
+
           $hash->{HELPER}{H00DONE} = 1;
       }
   }
@@ -6068,9 +6122,9 @@ sub _transferInverterValues {
       $paref->{etotal}   = $etotal;
       $paref->{nhour}    = sprintf("%02d",$nhour);
       $paref->{histname} = 'etotal';
-      
+
       setPVhistory ($paref);
-      
+
       delete $paref->{histname};
 
       my $etot   = CurrentVal ($hash, "etotal", $etotal);
@@ -6088,16 +6142,16 @@ sub _transferInverterValues {
 
   storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_PVreal', $ethishour.' Wh');
   $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishour;                   # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-  
+
   my ($acu, $aln) = isAutoCorrUsed ($name);
-  
+
   $paref->{ethishour} = $ethishour;
   $paref->{nhour}     = sprintf "%02d", $nhour;
   $paref->{histname}  = 'pvrl';
   $paref->{pvrlvd}    = $aln;                                                                 # 1: beim Learning berücksichtigen, 0: nicht
-  
+
   setPVhistory ($paref);
-  
+
   delete $paref->{pvrlvd};
   delete $paref->{histname};
 
@@ -6481,14 +6535,14 @@ sub _batSocTarget {
             $batysetsoc;                                                          # neuer Min SOC für den laufenden Tag
 
   debugLog ($paref, 'batteryManagement', "SoC calc Step1 - compare with SoC history -> new Target: $target %");
-  
+
   ## Pflege-SoC (Soll SoC $maxSoCdef bei $batSocChgDay % Steigerung p. Tag)
   ###########################################################################
   my $sunset  = CurrentVal ($hash, 'sunsetTodayTs', $t);
   my $delayts = $sunset - 5400;                                                   # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
   my $la      = '';
-  
-  if ($t > $delayts) {                                                            
+
+  if ($t > $delayts) {
       my $ntsmsc    = CircularVal ($hash, 99, 'nextTsMaxSocChge', $t);
       my $days2care = ceil        (($ntsmsc - $t) / 86400);                       # verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll
 
@@ -6504,7 +6558,7 @@ sub _batSocTarget {
       $nt = (timestampToTimestring ($delayts, $paref->{lang}))[0];
       $la = "note remaining days until care SoC -> calculation & activation postponed to after $nt";
   }
-  
+
   debugLog ($paref, 'batteryManagement', "SoC calc Step2 - $la");
 
   ## Aufladewahrscheinlichkeit beachten
@@ -6516,7 +6570,7 @@ sub _batSocTarget {
 
   my $batinstcap = CurrentVal ($hash, 'batinstcap', 0);                            # installierte Batteriekapazität Wh
   my $cantarget  = 100 - (100 / $batinstcap) * $pvexpect;                          # berechneter möglicher Min SOC nach Berücksichtigung Ladewahrscheinlichkeit
-  
+
   my $newtarget  = sprintf "%.0f", ($cantarget < $target ? $cantarget : $target);  # Abgleich möglicher Min SOC gg. berechneten Min SOC
   my $logadd     = '';
 
@@ -6554,7 +6608,7 @@ sub _batSocTarget {
   my $rmn = $target - ($flo * 5);
   my $add = $rmn <= 2.5 ? 0 : 5;
   $target = ($flo * 5) + $add;
-  
+
   debugLog ($paref, 'batteryManagement', "SoC calc Step5 - rounding the SoC to steps of 5 -> Target: $target %");
 
   ## Zwangsladeanforderung
@@ -6562,7 +6616,7 @@ sub _batSocTarget {
   if ($batcharge < $target) {
       $chargereq = 1;
   }
-  
+
   debugLog ($paref, 'batteryManagement', "SoC calc Step6 - force charging request: ".
                     ($chargereq ? 'yes (battery charge is below minimum SoC)' : 'no (Battery is sufficiently charged)'));
 
@@ -6921,7 +6975,7 @@ sub _manageConsumerData {
       }
 
       $paref->{consumer} = $c;
-      
+
       __getAutomaticState     ($paref);                                                                           # Automatic Status des Consumers abfragen
       __calcEnergyPieces      ($paref);                                                                           # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
       __planInitialSwitchTime ($paref);                                                                           # Consumer Switch Zeiten planen
@@ -6930,7 +6984,7 @@ sub _manageConsumerData {
       __switchConsumer        ($paref);                                                                           # Consumer schalten
       __reviewSwitchTime      ($paref);                                                                           # Planungsdaten überprüfen und ggf. neu planen
       __remainConsumerTime    ($paref);                                                                           # Restlaufzeit Verbraucher ermitteln
-      __setPhysSwState        ($paref);                                                                           # physischen Schaltzustand festhalten   
+      __setPhysSwState        ($paref);                                                                           # physischen Schaltzustand festhalten
 
       ## Consumer Schaltstatus und Schaltzeit für Readings ermitteln
       ################################################################
@@ -6959,7 +7013,7 @@ return;
 }
 
 ################################################################
-#   Consumer Status Automatic Modus abfragen und im 
+#   Consumer Status Automatic Modus abfragen und im
 #   Hash consumers aktualisieren
 ################################################################
 sub __getAutomaticState {
@@ -6970,13 +7024,13 @@ sub __getAutomaticState {
   my $c     = $paref->{consumer};
 
   my $consumer = ConsumerVal ($hash, $c, 'name', '');                                  # Name Consumer Device
-  
+
   if (!$consumer || !$defs{$consumer}) {
       my $err = qq{ERROR - the device "$consumer" doesn't exist anymore! Delete or change the attribute "consumer${c}".};
       Log3 ($name, 1, "$name - $err");
       return;
   }
-  
+
   my $dswitch = ConsumerVal ($hash, $c, 'dswitch', '');                                # alternatives Schaltdevice
 
   if ($dswitch) {
@@ -6989,7 +7043,7 @@ sub __getAutomaticState {
   else {
       $dswitch = $consumer;
   }
-  
+
   my $autord = ConsumerVal ($hash, $c, 'autoreading', '');                             # Readingname f. Automatiksteuerung
   my $auto   = 1;
   $auto      = ReadingsVal ($dswitch, $autord, 1) if($autord);                         # Reading für Ready-Bit -> Einschalten möglich ?
@@ -7197,7 +7251,7 @@ return;
 ###################################################################
 sub __planInitialSwitchTime {
   my $paref = shift;
-  
+
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
@@ -7211,7 +7265,7 @@ sub __planInitialSwitchTime {
                           qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
           Log3 ($name, 4, qq{$name DEBUG> Planning consumer "$c" - $dnp});
       }
-      
+
       return;
   }
 
@@ -7268,30 +7322,30 @@ return $dnp;
 }
 
 ###################################################################
-#    Consumer Review Schaltzeiten und neu planen wenn der 
+#    Consumer Review Schaltzeiten und neu planen wenn der
 #    Consumer noch nicht in Operation oder finished ist
 #    (nach Consumer Schaltung)
 ###################################################################
 sub __reviewSwitchTime {
   my $paref = shift;
-  
+
   my $hash      = $paref->{hash};
   my $c         = $paref->{consumer};
   my $pstate    = ConsumerVal    ($hash, $c, 'planstate',   '');
   my $plswon    = ConsumerVal    ($hash, $c, 'planswitchon', 0);                      # bisher geplante Switch on Zeit
-  my $simpCstat = simplifyCstate ($pstate); 
+  my $simpCstat = simplifyCstate ($pstate);
   my $t         = $paref->{t};
-  
-  if ($simpCstat =~ /planned|suspended/xs) {  
+
+  if ($simpCstat =~ /planned|suspended/xs) {
       if ($t < $plswon || $t > $plswon + 300) {                                       # geplante Switch-On Zeit ist 5 Min überschritten und immer noch "planned"
           my $minute = $paref->{minute};
-          
+
           for my $m (qw(15 45)) {
               if (int $minute >= $m) {
                   if (!exists $hash->{HELPER}{$c.'M'.$m.'DONE'}) {
                       my $name                          = $paref->{name};
                       $hash->{HELPER}{$c.'M'.$m.'DONE'} = 1;
-                      
+
                       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - Review switch time planning name: }.ConsumerVal ($hash, $c, 'name', '').
                                                             qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
 
@@ -7300,7 +7354,7 @@ sub __reviewSwitchTime {
               }
               else {
                   delete $hash->{HELPER}{$c.'M'.$m.'DONE'};
-              }      
+              }
           }
       }
   }
@@ -7317,7 +7371,7 @@ return;
 ###################################################################
 sub ___doPlanning {
   my $paref = shift;
-  
+
   my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $c      = $paref->{consumer};
@@ -7348,7 +7402,7 @@ sub ___doPlanning {
   my $order = 1;
   for my $k (reverse sort{$a<=>$b} keys %max) {
       my $ts                  = timestringToTimestamp ($max{$k}{starttime});
-      
+
       $max{$order}{spexp}     = $k;
       $max{$order}{ts}        = $ts;
       $max{$order}{starttime} = $max{$k}{starttime};
@@ -7411,7 +7465,7 @@ sub ___doPlanning {
       }
 
       for my $ts (sort{$a<=>$b} keys %mtimes) {
-          
+
           if ($mtimes{$ts}{spexp} >= $epiece1) {                                                       # die früheste Startzeit sofern Überschuß größer als Bedarf
               my $starttime       = $mtimes{$ts}{starttime};
 
@@ -7453,21 +7507,21 @@ sub ___doPlanning {
                               qq{nexthour: $max{$o}{nexthour}, today: $max{$o}{today}});
           }
       }
-      
+
       my $done;
-      
+
       for my $o (sort{$a<=>$b} keys %max) {
           next if(!$max{$o}{today});                                                                   # der max-Wert von heute ist auszuwählen
-          
+
           $paref->{elem} = $o;
           ___planMust ($paref);
           delete $paref->{elem};
-          
+
           $done = 1;
-          
+
           last;
       }
-      
+
       if (!$done) {
           $paref->{supplement} = 'no max surplus found for current day';
           $paref->{ps}         = 'suspended:';
@@ -7548,11 +7602,11 @@ sub ___setConsumerPlanningState {
   my $lonts     = $paref->{lastAutoOnTs};          # Timestamp des letzten On-Schaltens bzw. letzter Fortsetzung im Automatikmodus
   my $loffts    = $paref->{lastAutoOffTs};         # Timestamp des letzten Off-Schaltens bzw. letzter Unterbrechnung im Automatikmodus
   my $lang      = $paref->{lang};
-  
+
   $data{$type}{$name}{consumers}{$c}{planSupplement} = $supplmnt;
-  
-  return if(!$ps);                                                
-  
+
+  return if(!$ps);
+
   my ($starttime,$stoptime);
 
   if (defined $lonts) {
@@ -7640,7 +7694,7 @@ sub ___switchonTimelimits {
   my $t         = $paref->{t};
 
   my $startts;
-  
+
   if (isSunPath ($hash, $c)) {                                                        # SunPath ist in mintime gesetzt
       my ($riseshift, $setshift) = sunShift   ($hash, $c);
       $startts                   = CurrentVal ($hash, 'sunriseTodayTs', 0) + $riseshift;
@@ -7648,13 +7702,13 @@ sub ___switchonTimelimits {
 
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - starttime is set to >$starttime< due to >SunPath< is used});
   }
-  
+
   my $origtime  = $starttime;
   my $notbefore = ConsumerVal ($hash, $c, "notbefore", 0);
   my $notafter  = ConsumerVal ($hash, $c, "notafter",  0);
-  
+
   my ($err, $vala, $valb);
-  
+
   if ($notbefore =~ m/^\s*\{.*\}\s*$/xs) {                                          # notbefore als Perl-Code definiert
       ($err, $valb) = checkCode ($name, $notbefore, 'cc1');
       if (!$err && checkhhmm ($valb)) {
@@ -7666,7 +7720,7 @@ sub ___switchonTimelimits {
           $notbefore = 0;
       }
   }
-  
+
   if ($notafter =~ m/^\s*(\{.*\})\s*$/xs) {                                           # notafter als Perl-Code definiert
       ($err, $vala) = checkCode ($name, $notafter, 'cc1');
       if (!$err && checkhhmm ($vala)) {
@@ -7676,33 +7730,33 @@ sub ___switchonTimelimits {
       else {
           Log3 ($name, 1, "$name - ERROR - the result of the Perl code in the 'notafter' key is incorrect: $vala");
           $notafter = 0;
-      }  
+      }
   }
-  
+
   my ($nbfhh, $nbfmm, $nafhh, $nafmm);
-  
+
   if ($notbefore) {
       ($nbfhh, $nbfmm) = split ":", $notbefore;
       $nbfmm         //= '00';
       $notbefore       = (int $nbfhh) . $nbfmm;
   }
-  
+
   if ($notafter) {
       ($nafhh, $nafmm) = split ":", $notafter;
       $nafmm         //= '00';
-      $notafter        = (int $nafhh) . $nafmm; 
+      $notafter        = (int $nafhh) . $nafmm;
   }
-  
+
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - used 'notbefore' term: }.(defined $notbefore ? $notbefore : ''));
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - used 'notafter' term: } .(defined $notafter  ? $notafter  : ''));
-  
+
   my $change = q{};
-  
+
   if ($t > timestringToTimestamp ($starttime)) {
       $starttime   = (timestampToTimestring ($t, $lang))[3];
       $change      = 'current time';
   }
-  
+
   my ($starthour, $startminute) = $starttime =~ /\s(\d{2}):(\d{2}):/xs;
   my $start = (int $starthour) . $startminute;
 
@@ -7786,7 +7840,7 @@ sub __setConsRcmdState {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
-  my $c     = $paref->{consumer};                                                         
+  my $c     = $paref->{consumer};
   my $debug = $paref->{debug};
 
   my $surplus    = CurrentVal  ($hash, 'surplus',                    0);                  # aktueller Energieüberschuß
@@ -7851,7 +7905,7 @@ sub ___switchConsumerOn {
       Log3 ($name, 1, "$name - $state");
       return $state;
   }
-  
+
   my $pstate    = ConsumerVal ($hash, $c, 'planstate',        '');
   my $startts   = ConsumerVal ($hash, $c, 'planswitchon',  undef);                                # geplante Unix Startzeit
   my $oncom     = ConsumerVal ($hash, $c, 'oncom',            '');                                # Set Command für "on"
@@ -7859,9 +7913,9 @@ sub ___switchConsumerOn {
   my $calias    = ConsumerVal ($hash, $c, 'alias',        $cname);                                # Consumer Device Alias
   my $simpCstat = simplifyCstate ($pstate);
   my $isInTime  = isInTimeframe  ($hash, $c);
-  
+
   my ($swoncond,$swoffcond,$infon,$infoff,$err);
-  
+
   ($swoncond,$infon,$err) = isAddSwitchOnCond ($hash, $c);                                        # zusätzliche Switch on Bedingung
   Log3 ($name, 1, "$name - $err") if($err);
 
@@ -7893,25 +7947,25 @@ sub ___switchConsumerOn {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - switching on postponed by >isInLocktime<});
       }
   }
-  
+
   my $isintable  = isInterruptable ($hash, $c, 0, 1);                                             # mit Ausgabe Interruptable Info im Debug
   my $isConsRcmd = isConsRcmd      ($hash, $c);
-  
+
   $paref->{supplement} = 'swoncond not met' if(!$swoncond);
   $paref->{supplement} = 'swoffcond met'    if($swoffcond);
-  
+
   if ($paref->{supplement}) {
       ___setConsumerPlanningState ($paref);
       delete $paref->{supplement};
   }
-  
+
   if ($auto && $oncom && $swoncond && !$swoffcond && !$iilt &&                                    # kein Einschalten wenn zusätzliche Switch off Bedingung oder Sperrzeit zutrifft
       $simpCstat =~ /planned|priority|starting/xs && $isInTime) {                                 # Verbraucher Start ist geplant && Startzeit überschritten
       my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                                   # Consumer Planungsmode
       my $enable  = ___enableSwitchByBatPrioCharge ($paref);                                      # Vorrangladung Batterie ?
 
       debugLog ($paref, "consumerSwitching", qq{$name DEBUG> Consumer switch enable by battery state: $enable});
-      
+
       if ($mode eq "can" && !$enable) {                                                           # Batterieladung - keine Verbraucher "Einschalten" Freigabe
           $paref->{ps} = "priority charging battery";
 
@@ -7941,7 +7995,7 @@ sub ___switchConsumerOn {
          $simpCstat =~ /interrupted|interrupting/xs) {
 
       CommandSet(undef,"$dswname $oncom");
-      
+
       $paref->{ps} = "continuing:";
 
       ___setConsumerPlanningState ($paref);
@@ -8043,7 +8097,7 @@ return $state;
 }
 
 ################################################################
-#     Consumer aktuelle Schaltzustände ermitteln & 
+#     Consumer aktuelle Schaltzustände ermitteln &
 #     logische Zustände ableiten/setzen
 ################################################################
 sub ___setConsumerSwitchingState {
@@ -8060,7 +8114,7 @@ sub ___setConsumerSwitchingState {
   my $auto      = ConsumerVal    ($hash, $c, 'auto',                     1);
   my $oldpsw    = ConsumerVal    ($hash, $c, 'physoffon',            'off');                       # gespeicherter physischer Schaltzustand
   my $dowri     = 0;
-  
+
   debugLog ($paref, "consumerSwitching", qq{consumer "$c" - current planning state: $simpCstat \n});
 
   if (isConsumerPhysOn ($hash, $c) && $simpCstat eq 'starting') {
@@ -8124,7 +8178,7 @@ sub ___setConsumerSwitchingState {
       delete $paref->{lastAutoOffTs};
 
       $state = qq{Consumer '$calias' switched off (interrupted)};
-      $dowri = 1;  
+      $dowri = 1;
   }
   elsif ($oldpsw eq 'off' && isConsumerPhysOn ($hash, $c)){
       $paref->{supplement} = "$hqtxt{wexso}{$paref->{lang}}";
@@ -8146,7 +8200,7 @@ sub ___setConsumerSwitchingState {
       $state = qq{Consumer '$calias' was external switched off};
       $dowri = 1;
   }
-  
+
   if ($dowri) {
       writeCacheToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
       Log3 ($name, 2, "$name - $state");
@@ -8189,8 +8243,8 @@ sub __setPhysSwState {
   my $type  = $paref->{type};
   my $c     = $paref->{consumer};
 
-  my $pon = isConsumerPhysOn ($hash, $c) ? 'on' : 'off';                       
-  
+  my $pon = isConsumerPhysOn ($hash, $c) ? 'on' : 'off';
+
   $data{$type}{$name}{consumers}{$c}{physoffon} = $pon;
 
 return;
@@ -8804,7 +8858,7 @@ sub collectAllRegConsumers {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
-  
+
   return if(CurrentVal ($hash, 'consumerCollected', 0));                                          # Abbruch wenn Consumer bereits gesammelt
 
   delete $data{$type}{$name}{current}{consumerdevs};
@@ -8953,7 +9007,7 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{sunriseshift}      = $riseshift if(defined $riseshift);        # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
       $data{$type}{$name}{consumers}{$c}{sunsetshift}       = $setshift  if(defined $setshift);         # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
   }
-  
+
   $data{$type}{$name}{current}{consumerCollected} = 1;
 
   Log3 ($name, 3, "$name - all registered consumers collected");
@@ -11518,7 +11572,7 @@ sub calcValueImproves {
 
   if ($acu) {
       $idts = timestringToTimestamp ($idts);
-      
+
       readingsSingleUpdate ($hash, '.pvCorrectionFactor_Auto_Soll', ($aln ? $acu : $acu.' noLearning'), 0) if($acu =~ /on/xs);
 
       if ($t - $idts < 7200) {
@@ -11580,7 +11634,7 @@ sub _calcCaQcomplex {
       # Log3 ($name, 1, "$name DEBUG> Complex Corrf -> factor Hour: ".sprintf("%02d",$h)." already calculated");
       return;
   }
-  
+
   if (!$aln) {
       storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', 'done');
       debugLog     ($paref, 'pvCorrection', "Autolearning is switched off for hour: $h -> skip the recalculation of the complex correction factor");
@@ -11670,7 +11724,7 @@ sub _calcCaQsimple {
       # debugLog ($paref, 'pvCorrection', "Simple Corrf factor Hour: ".sprintf("%02d",$h)." already calculated");
       return;
   }
-  
+
   if (!$aln) {
       storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', 'done');
       debugLog     ($paref, 'pvCorrection', "Autolearning is switched off for hour: $h -> skip the recalculation of the simple correction factor");
@@ -11748,7 +11802,7 @@ sub _addHourAiRawdata {
   my $sr  = ReadingsVal ($name, ".signaldone_".$rho, "");
 
   return if($sr eq "done");
-  
+
   if (!$aln) {
       storeReading ('.signaldone_'.sprintf("%02d",$h), 'done');
       debugLog     ($paref, 'pvCorrection', "Autolearning is switched off for hour: $h -> skip add AI raw data");
@@ -12073,7 +12127,8 @@ sub finishTrain {
                         name      => $name,
                         type      => $type,
                         file      => $aitrained.$name,
-                        cachename => 'aitrained'
+                        cachename => 'aitrained',
+                        title     => 'aiTrainedData'
                       }
                      );
   }
@@ -12427,29 +12482,29 @@ sub aiAddRawData {
 
   for my $pvd (sort keys %{$data{$type}{$name}{pvhist}}) {
       next if(!$pvd);
-      
+
       if ($ood) {
           next if($pvd ne $paref->{day});
       }
-      
+
       last if(int $pvd > int $day);
 
       for my $hod (sort keys %{$data{$type}{$name}{pvhist}{$pvd}}) {
           next if(!$hod || $hod eq '99' || ($rho && $hod ne $rho));
-          
+
           my $pvrlvd = HistoryVal ($hash, $pvd, $hod, 'pvrlvd', 1);
-          
+
           if (!$pvrlvd) {                                                        # Datensatz ignorieren wenn als invalid gekennzeichnet
               debugLog ($paref, 'aiProcess', qq{AI raw data is marked as invalid and is ignored - day: $pvd, hod: $hod});
-              next;                                                              
+              next;
           }
-          
+
           my $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
           next if(!$rad1h || $rad1h <= 0);
 
           my $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
           next if(!$pvrl || $pvrl <= 0);
-          
+
           my $ridx = _aiMakeIdxRaw ($pvd, $hod);
 
           my $temp = HistoryVal ($hash, $pvd, $hod, 'temp', 20);
@@ -12981,7 +13036,7 @@ sub listDataPool {
                   $cret .= $ckey." => ".ConsumerVal ($hash, $idx, $ckey, "")."\n      ";
               }
           }
-          
+
           $sq .= $idx." => ".$cret."\n";
       }
   }
@@ -14619,7 +14674,7 @@ sub isAutoCorrUsed {
             $cauto =~ /standby/xs       ? 'standby'       :
             $cauto =~ /on/xs            ? 'on_simple'     :
             q{};
-            
+
   my $aln = $cauto =~ /noLearning/xs ? 0 : 1;
 
 return ($acu, $aln);
@@ -14752,30 +14807,30 @@ return;
 ################################################################
 sub checkhhmm {
   my $val = shift;
-  
+
   my $valid = 0;
-  
+
   if ($val =~ /^([0-9]{1,2})(:[0-5]{1}[0-9]{1})?$/xs) {
       $valid = 1 if(int $1 < 24);
   }
-          
+
 return $valid;
 }
 
 ################################################################
-#          prüfen validen Code in $val          
+#          prüfen validen Code in $val
 ################################################################
 sub checkCode {
   my $name = shift;
   my $val  = shift;
   my $cc1  = shift // 0;                                 # wenn 1 checkCode1 ausführen
-  
+
   my $err;
-  
+
   if (!$val || $val !~ m/^\s*\{.*\}\s*$/xs) {
       return qq{Usage of $name is wrong. The function has to be specified as "{<your own code>}"};
   }
-  
+
   if ($cc1) {
       ($err, $val) = checkCode1 ($name, $val);
       return ($err, $val);
@@ -14798,17 +14853,17 @@ sub checkCode {
       $av  = eval $val;
       $val = $av if(ref $av eq "HASH");
   }
-          
+
 return ('', $val);
 }
 
 ################################################################
-#          prüfen validen Code in $val          
+#          prüfen validen Code in $val
 ################################################################
 sub checkCode1 {
   my $name = shift;
   my $val  = shift;
-  
+
   my $hash = $defs{$name};
 
   $val =~ m/^\s*(\{.*\})\s*$/xs;
@@ -15519,7 +15574,7 @@ return $def;
 #
 ####################################################################################################################
 sub ConsumerVal {
-  my $hash = shift;   
+  my $hash = shift;
   my $co   = shift;
   my $key  = shift;
   my $def  = shift;
@@ -15735,15 +15790,15 @@ to ensure that the system configuration is correct.
     </li>
     </ul>
     <br>
-    
+
     <ul>
       <a id="SolarForecast-set-batteryTrigger"></a>
       <li><b>batteryTrigger &lt;1on&gt;=&lt;Value&gt; &lt;1off&gt;=&lt;Value&gt; [&lt;2on&gt;=&lt;Value&gt; &lt;2off&gt;=&lt;Value&gt; ...] </b> <br><br>
 
       Generates triggers when the battery charge exceeds or falls below certain values (SoC in %). <br>
-      If the last three SoC measurements exceed a defined <b>Xon-Bedingung</b>, the reading <b>batteryTrigger_X = on</b> 
+      If the last three SoC measurements exceed a defined <b>Xon-Bedingung</b>, the reading <b>batteryTrigger_X = on</b>
       is created/set. <br>
-      If the last three SoC measurements fall below a defined <b>Xoff-Bedingung</b>, the reading 
+      If the last three SoC measurements fall below a defined <b>Xoff-Bedingung</b>, the reading
       <b>batteryTrigger_X = off</b> is created/set. <br>
       Any number of trigger conditions can be specified. Xon/Xoff conditions do not necessarily have to be defined in pairs.
       <br>
@@ -16131,12 +16186,39 @@ to ensure that the system configuration is correct.
       </li>
     </ul>
     <br>
-    
+
+    <ul>
+      <a id="SolarForecast-set-operatingMemory"></a>
+      <li><b>operatingMemory backup | save | recover-&lt;File&gt; </b> <br><br>
+
+      The pvHistory (PVH) and pvCircular (PVC) components of the internal cache database are stored in the file system. <br>
+      The target directory is "../FHEM/FhemUtils". This process is carried out regularly by the module in the background.  <br><br>
+
+      <ul>
+         <table>
+         <colgroup> <col width="17%"> <col width="83%"> </colgroup>
+            <tr><td> <b>backup</b>               </td><td>Saves the active in-memory structures with the current timestamp.                                                                          </td></tr>
+            <tr><td>                             </td><td><a href="#SolarForecast-attr-ctrlBackupFilesKeep">ctrlBackupFilesKeep</a> generations of the files are saved. Older versions are deleted.  </td></tr>
+            <tr><td>                             </td><td>Files: PVH_SolarForecast_&lt;name&gt;_&lt;Timestamp&gt;, PVC_SolarForecast_&lt;name&gt;_&lt;Timestamp&gt;                                  </td></tr>
+            <tr><td>                             </td><td>                                                                                                                                           </td></tr>
+            <tr><td> <b>save</b>                 </td><td>The active in-memory structures are saved.                                                                                                 </td></tr>
+            <tr><td>                             </td><td>Files: PVH_SolarForecast_&lt;name&gt;, PVC_SolarForecast_&lt;name&gt;                                                                      </td></tr>
+            <tr><td>                             </td><td>                                                                                                                                           </td></tr>
+            <tr><td> <b>recover-&lt;File&gt;</b> </td><td>Restores the data of the selected backup file as an active in-memory structure.                                                            </td></tr>
+            <tr><td>                             </td><td>To avoid inconsistencies, the PVH.* and PVC.* files should be restored in pairs                                                            </td></tr>
+            <tr><td>                             </td><td>with the same time stamp.                                                                                                                  </td></tr>
+         </table>
+      </ul>
+      <br>
+    </ul>
+    </li>
+    <br>
+
     <ul>
       <a id="SolarForecast-set-operationMode"></a>
       <li><b>operationMode  </b> <br><br>
       The SolarForecast device is deactivated with <b>inactive</b>. The <b>active</b> option reactivates the device.
-      The behavior corresponds to the "disable" attribute, but is particularly suitable for use in Perl scripts as 
+      The behavior corresponds to the "disable" attribute, but is particularly suitable for use in Perl scripts as
       compared to the "disable" attribute, it is not necessary to save the device configuration.
     </li>
     </ul>
@@ -16375,17 +16457,6 @@ to ensure that the system configuration is correct.
         set &lt;name&gt; vrmCredentials delete <br>
        </ul>
 
-      </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-writeHistory"></a>
-      <li><b>writeHistory </b> <br><br>
-
-       The internal cache database is stored in the file system. By default, this process is
-       regularly in the background. In the internal "LCACHEFILE", the last file written and the time
-       of the last storage is documented. <br>
       </li>
     </ul>
     <br>
@@ -16725,7 +16796,7 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-affectMaxDayVariance"></a>
        <li><b>affectMaxDayVariance &lt;Zahl&gt; </b><br>
          Maximum change size of the PV prediction factor (Reading pvCorrectionFactor_XX) per day. <br>
-         This setting has no influence on the learning and forecasting behavior of any AI support used 
+         This setting has no influence on the learning and forecasting behavior of any AI support used
          (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>). <br>
          (default: 0.5)
        </li>
@@ -16855,7 +16926,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>can</b>  - Scheduling takes place at the time when there is probably enough PV surplus available (default).                                 </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The consumer is not started at the time of planning if the PV surplus is insufficient.        </td></tr>
             <tr><td>                       </td><td><b>must</b> - The consumer is optimally planned, even if there will probably not be enough PV surplus.                                         </td></tr>
-            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The load is started even if there is insufficient PV surplus, provided that 
+            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The load is started even if there is insufficient PV surplus, provided that
                                                     a set "swoncond" condition is met and "swoffcond" is not met.                                                                                  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>icon</b>           </td><td>Icon to represent the consumer in the overview graphic (optional)                                                                              </td></tr>
@@ -16986,14 +17057,22 @@ to ensure that the system configuration is correct.
          should be regularly reloaded.
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-ctrlBackupFilesKeep"></a>
+       <li><b>ctrlBackupFilesKeep</b><br>
+         Defines the number of generations of backup files 
+         (see also <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>). <br>
+         (default: 3)
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-ctrlBatSocManagement"></a>
-       <li><b>ctrlBatSocManagement lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] </b><br>
+       <li><b>ctrlBatSocManagement lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] </b> <br><br>
          If a battery device (currentBatteryDev) is installed, this attribute activates the battery SoC management. <br>
          The <b>Battery_OptimumTargetSoC</b> reading contains the optimum minimum SoC calculated by the module. <br>
          The <b>Battery_ChargeRequest</b> reading is set to '1' if the current SoC has fallen below the minimum SoC. <br>
          In this case, the battery should be forcibly charged, possibly with mains power. <br>
-         The readings can be used to control the SoC (State of Charge) and to control the charging current used for the 
+         The readings can be used to control the SoC (State of Charge) and to control the charging current used for the
          battery. <br>
          The module itself does not control the battery. <br><br>
 
@@ -17091,9 +17170,9 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-ctrlInterval"></a>
        <li><b>ctrlInterval &lt;Sekunden&gt; </b><br>
          Repetition interval of the data collection. <br>
-         Regardless of the set interval, data is collected automatically a few seconds before the end and after the start 
+         Regardless of the set interval, data is collected automatically a few seconds before the end and after the start
          of a full hour. <br>
-         If ctrlInterval is explicitly set to "0", no automatic data collection takes place and must be carried out 
+         If ctrlInterval is explicitly set to "0", no automatic data collection takes place and must be carried out
          externally with "get &lt;name&gt; data". <br>
          (default: 70)
        </li><br>
@@ -18183,12 +18262,39 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       </li>
     </ul>
     <br>
-    
+
+    <ul>
+      <a id="SolarForecast-set-operatingMemory"></a>
+      <li><b>operatingMemory backup | save | recover-&lt;Datei&gt; </b> <br><br>
+
+      Die Komponenten pvHistory (PVH) und pvCircular (PVC) der internen Cache Datenbank werden im Filesystem gespeichert. <br>
+      Das Zielverzeichnis ist "../FHEM/FhemUtils". Dieser Vorgang wird vom Modul regelmäßig im Hintergrund ausgeführt.  <br><br>
+
+      <ul>
+         <table>
+         <colgroup> <col width="17%"> <col width="83%"> </colgroup>
+            <tr><td> <b>backup</b>                </td><td>Sichert die aktiven In-Memory Strukturen mit dem aktuellen Zeitstempel.                                                                                      </td></tr>
+            <tr><td>                              </td><td>Es werden <a href="#SolarForecast-attr-ctrlBackupFilesKeep">ctrlBackupFilesKeep</a> Generationen der Dateien gespeichert. Ältere Versionen werden gelöscht.  </td></tr>
+            <tr><td>                              </td><td>Dateien: PVH_SolarForecast_&lt;name&gt;_&lt;Zeitstempel&gt;, PVC_SolarForecast_&lt;name&gt;_&lt;Zeitstempel&gt;                                              </td></tr>
+            <tr><td>                              </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>save</b>                  </td><td>Die aktiven In-Memory Strukturen werden gespeichert.                                                                                                         </td></tr>
+            <tr><td>                              </td><td>Dateien: PVH_SolarForecast_&lt;name&gt;, PVC_SolarForecast_&lt;name&gt;                                                                                      </td></tr>
+            <tr><td>                              </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>recover-&lt;Datei&gt;</b> </td><td>Stellt die Daten der ausgewählten Sicherungsdatei als aktive In-Memory Struktur wieder her.                                                                  </td></tr>
+            <tr><td>                              </td><td>Um Inkonsistenzen zu vermeiden, sollten die Dateien PVH.* und PVC.* mit dem gleichen                                                                         </td></tr>
+            <tr><td>                              </td><td>Zeitstempel paarweise recovert werden.                                                                                                                       </td></tr>
+         </table>
+      </ul>
+      <br>
+    </ul>
+    </li>
+    <br>
+
     <ul>
       <a id="SolarForecast-set-operationMode"></a>
       <li><b>operationMode  </b> <br><br>
       Mit <b>inactive</b> wird das SolarForecast Gerät deaktiviert. Die <b>active</b> Option aktiviert das Gerät wieder.
-      Das Verhalten entspricht dem "disable"-Attribut, eignet sich aber vor allem zum Einsatz in Perl-Skripten da 
+      Das Verhalten entspricht dem "disable"-Attribut, eignet sich aber vor allem zum Einsatz in Perl-Skripten da
       gegenüber dem "disable"-Attribut keine Speicherung der Gerätekonfiguration nötig ist.
     </li>
     </ul>
@@ -18245,11 +18351,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       (default: off)
 
       <br><br>
-      
+
       <b>noLearning:</b> <br>
-      Mit dieser Option wird die erzeugte PV Energie der aktuellen Stunde vom Lernprozess (Korrekturfaktoren 
+      Mit dieser Option wird die erzeugte PV Energie der aktuellen Stunde vom Lernprozess (Korrekturfaktoren
       sowie KI) ausgeschlossen. <br>
-      Die zuvor eingestellte Autokorrekturmethode wird weiterhin angewendet. 
+      Die zuvor eingestellte Autokorrekturmethode wird weiterhin angewendet.
       <br><br>
 
       <b>on_simple(_ai):</b> <br>
@@ -18420,7 +18526,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>user</b>   </td><td>Benutzername für das Victron VRM Portal                                           </td></tr>
             <tr><td> <b>pwd</b>    </td><td>Paßwort für den Zugang zum Victron VRM Portal                                     </td></tr>
             <tr><td> <b>idsite</b> </td><td>idSite ist der Bezeichner "XXXXXX" in der Victron VRM Portal Dashboard URL.       </td></tr>
-            <tr><td>               </td><td>URL des Victron VRM Dashboard ist:                                                    </td></tr>
+            <tr><td>               </td><td>URL des Victron VRM Dashboard ist:                                                </td></tr>
             <tr><td>               </td><td>https://vrm.victronenergy.com/installation/<b>XXXXXX</b>/dashboard                </td></tr>
          </table>
       </ul>
@@ -18434,17 +18540,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         set &lt;name&gt; vrmCredentials delete <br>
        </ul>
 
-      </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-writeHistory"></a>
-      <li><b>writeHistory </b> <br><br>
-
-       Die interne Cache Datenbank wird im Filesystem gespeichert. Dieser Vorgang wird per default
-       regelmäßig im Hintergrund ausgeführt. Im Internal "LCACHEFILE" wird die letzte geschriebene Datei und der Zeitpunkt
-       der letzten Speicherung dokumentiert. <br>
       </li>
     </ul>
     <br>
@@ -18784,8 +18879,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-affectMaxDayVariance"></a>
        <li><b>affectMaxDayVariance &lt;Zahl&gt; </b><br>
          Maximale Änderungsgröße des PV Vorhersagefaktors (Reading pvCorrectionFactor_XX) pro Tag. <br>
-         Auf das Lern- und Prognoseverhalten einer eventuell verwendeten KI-Unterstützung 
-         (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>) hat diese Einstellung keinen 
+         Auf das Lern- und Prognoseverhalten einer eventuell verwendeten KI-Unterstützung
+         (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>) hat diese Einstellung keinen
          Einfluß. <br>
          (default: 0.5)
        </li>
@@ -19045,16 +19140,24 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          regelmäßig neu geladen werden sollen.
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-ctrlBackupFilesKeep"></a>
+       <li><b>ctrlBackupFilesKeep</b><br>
+         Legt die Anzahl der Generationen von Sicherungsdateien 
+         (siehe <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>) fest. <br>
+         (default: 3)
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-ctrlBatSocManagement"></a>
-       <li><b>ctrlBatSocManagement lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] </b><br>
+       <li><b>ctrlBatSocManagement lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] </b> <br><br>
          Sofern ein Batterie Device (currentBatteryDev) installiert ist, aktiviert dieses Attribut das Batterie
          SoC-Management. <br>
          Das Reading <b>Battery_OptimumTargetSoC</b> enthält den vom Modul berechneten optimalen Mindest-SoC. <br>
          Das Reading <b>Battery_ChargeRequest</b> wird auf '1' gesetzt, wenn der aktuelle SoC unter den Mindest-SoC gefallen
          ist. <br>
          In diesem Fall sollte die Batterie, unter Umständen mit Netzstrom, zwangsgeladen werden. <br>
-         Die Readings können zur Steuerung des SoC (State of Charge) sowie zur Steuerung des verwendeten Ladestroms 
+         Die Readings können zur Steuerung des SoC (State of Charge) sowie zur Steuerung des verwendeten Ladestroms
          der Batterie verwendet werden. <br>
          Durch das Modul selbst findet keine Steuerung der Batterie statt. <br><br>
 
@@ -19152,8 +19255,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-ctrlInterval"></a>
        <li><b>ctrlInterval &lt;Sekunden&gt; </b><br>
          Wiederholungsintervall der Datensammlung. <br>
-         Unabhängig vom eingestellten Intervall erfolgt einige Sekunden vor dem Ende sowie nach dem Beginn einer 
-         vollen Stunde eine automatische Datensammlung. <br> 
+         Unabhängig vom eingestellten Intervall erfolgt einige Sekunden vor dem Ende sowie nach dem Beginn einer
+         vollen Stunde eine automatische Datensammlung. <br>
          Ist ctrlInterval explizit auf "0" gesetzt, erfolgt keinerlei automatische Datensammlung und muss mit
          "get &lt;name&gt; data" extern erfolgen. <br>
          (default: 70)
