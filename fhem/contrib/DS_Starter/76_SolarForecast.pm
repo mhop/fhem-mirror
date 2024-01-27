@@ -915,7 +915,7 @@ sub Initialize {
                                 "ctrlAIdataStorageDuration ".
                                 "ctrlAutoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "ctrlAutoRefreshFW:$fwd ".
-                                "ctrlBackupFilesKeep:select,1,2,3,4,5,6,7,8,9,10 ".
+                                "ctrlBackupFilesKeep ".
                                 "ctrlBatSocManagement:textField-long ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#14 ".
@@ -4253,13 +4253,7 @@ sub Attr {
   }
 
   if ($cmd eq 'set') {
-      if ($aName eq 'ctrlInterval') {
-          unless ($aVal =~ /^[0-9]+$/x) {
-              return qq{The value for $aName is not valid. Use only figures 0-9 !};
-          }
-      }
-
-      if ($aName eq 'ctrlAIdataStorageDuration') {
+      if ($aName eq 'ctrlInterval' || $aName eq 'ctrlBackupFilesKeep' || $aName eq 'ctrlAIdataStorageDuration') {
           unless ($aVal =~ /^[0-9]+$/x) {
               return qq{The value for $aName is not valid. Use only figures 0-9 !};
           }
