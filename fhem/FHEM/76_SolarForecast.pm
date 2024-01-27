@@ -17053,7 +17053,7 @@ to ensure that the system configuration is correct.
        <br>
        
        <a id="SolarForecast-attr-ctrlBackupFilesKeep"></a>
-       <li><b>ctrlBackupFilesKeep</b><br>
+       <li><b>ctrlBackupFilesKeep &lt;Integer&gt; </b><br>
          Defines the number of generations of backup files 
          (see also <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>). <br>
          (default: 3)
@@ -19136,7 +19136,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
        
        <a id="SolarForecast-attr-ctrlBackupFilesKeep"></a>
-       <li><b>ctrlBackupFilesKeep</b><br>
+       <li><b>ctrlBackupFilesKeep &lt;Ganzzahl&gt;</b><br>
          Legt die Anzahl der Generationen von Sicherungsdateien 
          (siehe <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>) fest. <br>
          (default: 3)
