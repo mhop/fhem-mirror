@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 6.2 released
+
+- 2024-01-28 (6.2)
  - feature: 76_SolarForecast: Setter writeHistory replaced by operatingMemory
                               save, backup and recover in-memory operating data
  - feature: 76_SolarForecast: generate plant backup files

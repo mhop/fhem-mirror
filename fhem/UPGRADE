@@ -55,3 +55,6 @@ enable the old feature.
 
 - 2023-01-14 (6.2) 
   - MQTT2_SERVER: respectRetain is 0 (i.e. false) by default from now on.
+
+- 2024-01-28 (6.3) 
+  - no known changes
