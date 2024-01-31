@@ -1030,6 +1030,7 @@ RESCAN:
           }
           $h->{last1} = $fld[$col];
           $h->{last3} = $ld;
+          $h->{last4} = $fld[0];
         }
         $h->{last2} = $fld[$col];
         $lastdate{$i} = $fld[0];
@@ -1115,10 +1116,10 @@ RESCAN:
     my $h = $d[$i];
     my $hd = $h->{didx};
     if($hd && $lastdate{$i}) {
-      my $val = defined($h->{last1}) ? $h->{last2}-$h->{last1} : 0;
+      my $val = $h->{last2} - $h->{last1};
       $min[$i] = $val if($min[$i] ==  999999);
       $max[$i] = $val if($max[$i] == -999999);
-      $lastv[$i] = $val if(!$lastv[$i]);
+      $lastv[$i]=$val if(!defined($lastv[$i]) || $h->{last4} ne $lastdate{$i});
       $sum[$i] = ($sum[$i] ? $sum[$i] + $val : $val);
       $cnt[$i]++;
 
