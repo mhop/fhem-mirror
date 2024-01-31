@@ -8715,19 +8715,16 @@ sub _calcCaQcomplex {
   
   my $chwcc           = HistoryVal ($hash, $day, sprintf("%02d",$h), 'wcc', 0);                      # Wolkenbedeckung Heute & abgefragte Stunde
   my $range           = cloud2bin  ($chwcc);
-  my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), $range, 0);                  # bisher definierter Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
   
   $paref->{pvrl}   = $pvrl; 
   $paref->{pvfc}   = $pvfc;
-  $paref->{oldfac} = $oldfac; 
   $paref->{range}  = $range; 
   $paref->{calc}   = 'Complex';
   
-  my ($factor, $dnum) = __calcNewFactor ($paref);
+  my ($oldfac, $factor, $dnum) = __calcNewFactor ($paref);
                                                
   delete $paref->{pvrl}; 
-  delete $paref->{pvfc};
-  delete $paref->{oldfac}; 
+  delete $paref->{pvfc}; 
   delete $paref->{range}; 
   delete $paref->{calc};
 
@@ -8775,20 +8772,16 @@ sub _calcCaQsimple {
       storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', 'done');
       return;
   }
-  
-  my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), 'percentile', 0);
 
   $paref->{pvrl}   = $pvrl; 
   $paref->{pvfc}   = $pvfc;
-  $paref->{oldfac} = $oldfac; 
   $paref->{range}  = 'percentile'; 
   $paref->{calc}   = 'Simple';     
   
-  my ($factor, $dnum) = __calcNewFactor ($paref);
+  my ($oldfac, $factor, $dnum) = __calcNewFactor ($paref);
                                                
   delete $paref->{pvrl}; 
-  delete $paref->{pvfc};
-  delete $paref->{oldfac}; 
+  delete $paref->{pvfc}; 
   delete $paref->{range}; 
   delete $paref->{calc};
 
@@ -8821,9 +8814,10 @@ sub __calcNewFactor {
   my $factor;
   my $pvrlsum = $pvrl;
   my $pvfcsum = $pvfc;
-  $oldfac     = 1 if(1 * $oldfac == 0);
   
-  my ($pvhis,$fchis,$dnum) = CircularSumVal ($hash, sprintf("%02d",$h), $range, 0);
+  my ($oldfac, $oldq)        = CircularAutokorrVal ($hash, sprintf("%02d",$h), $range, 0);            # bisher definierter Korrekturfaktor
+  my ($pvhis, $fchis, $dnum) = CircularSumVal      ($hash, sprintf("%02d",$h), $range, 0);
+  $oldfac                    = 1 if(1 * $oldfac == 0);
   
   if ($dnum) {                                                                                        # Werte in History vorhanden -> haben Prio !
       $dnum++;
@@ -8870,7 +8864,7 @@ sub __calcNewFactor {
   $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$range} = $factor;                       # Korrekturfaktor der jeweiligen Stunde als Datenquelle eintragen
   $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{$range} = $qual;
   
-return ($factor, $dnum);
+return ($oldfac, $factor, $dnum);
 }
 
 ################################################################
