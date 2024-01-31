@@ -113,10 +113,10 @@ deb:
 	find .f -type f | xargs chmod 644
 	find .f -type d | xargs chmod 755
 	chmod 755 `cat contrib/executables`
-	chown -R root:root .f
+	sudo chown -R root:root .f
 	mv .f $(DESTDIR)
 	dpkg-deb --build $(DESTDIR)
-	rm -rf $(DESTDIR)
+	sudo rm -rf $(DESTDIR)
 
 backup:
 	@echo
