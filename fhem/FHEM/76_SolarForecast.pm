@@ -5034,11 +5034,11 @@ sub centralTask {
   
   for my $hod (keys %{$data{$type}{$name}{circular}}) {
       for my $range (keys %{$data{$type}{$name}{circular}{$hod}{pvcorrf}}) {
-          delete $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range} if($range !~ /$ra/xs);
+          delete $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range} if($range !~ /^($ra)$/xs);
       }
       
       for my $range (keys %{$data{$type}{$name}{circular}{$hod}{quality}}) {
-          delete $data{$type}{$name}{circular}{$hod}{quality}{$range} if($range !~ /$ra/xs);
+          delete $data{$type}{$name}{circular}{$hod}{quality}{$range} if($range !~ /^($ra)$/xs);
       }
   }
   ## currentWeatherDev in Attr umsetzen
