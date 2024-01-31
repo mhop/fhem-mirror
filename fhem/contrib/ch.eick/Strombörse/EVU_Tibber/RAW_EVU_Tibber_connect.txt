@@ -2,7 +2,7 @@ defmod EVU_Tibber_connect HTTPMOD https://api.tibber.com/v1-beta/gql 0
 attr EVU_Tibber_connect userattr ws_homeId ws_minInterval ws_myId ws_token ws_websocketURL
 attr EVU_Tibber_connect DbLogExclude .*
 attr EVU_Tibber_connect DbLogInclude total_cost_.*,fc0_trigger.*
-attr EVU_Tibber_connect comment Version 2024.01.22 14:00 \
+attr EVU_Tibber_connect comment Version 2024.01.31 13:00 \
 https://developer.tibber.com/explorer\
 \
 In der FHEM Kommandozeile könnt Ihr das token und die homeID im KeyStore ablegen.\
@@ -191,19 +191,18 @@ attr EVU_Tibber_connect get02URL https://api.tibber.com/v1-beta/gql
 attr EVU_Tibber_connect get03-1Name nodes_00_00_from
 attr EVU_Tibber_connect get03-1OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get03-2Name nodes_00_00_cost
-attr EVU_Tibber_connect get03-2OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get03-2OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get03-3Name nodes_00_00_consumption
 attr EVU_Tibber_connect get03-4Name nodes_00_01_from
 attr EVU_Tibber_connect get03-4OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get03-50Name nodes_00_01_cost
-attr EVU_Tibber_connect get03-50OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get03-50OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get03-5Name nodes_00_01_cost
-attr EVU_Tibber_connect get03-5OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get03-5OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get03-6Name nodes_00_01_consumption
 attr EVU_Tibber_connect get03-7Name nodes_00_02_from
 attr EVU_Tibber_connect get03-7OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get03-8Name nodes_00_02_cost
-attr EVU_Tibber_connect get03-8OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get03-8OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get03-9Name nodes_00_02_consumption
 attr EVU_Tibber_connect get03Data { "query": "{viewer {home(id:\"%%homeID%%\") {consumption(resolution: HOURLY, last: 3) {nodes {from cost consumption }}}}}"}
 attr EVU_Tibber_connect get03Header01 Content-Type: application/json
@@ -215,122 +214,122 @@ attr EVU_Tibber_connect get03URL https://api.tibber.com/v1-beta/gql
 attr EVU_Tibber_connect get04-10Name nodes_24_03_from
 attr EVU_Tibber_connect get04-10OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-11Name nodes_24_03_cost
-attr EVU_Tibber_connect get04-11OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-11OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-12Name nodes_24_03_consumption
 attr EVU_Tibber_connect get04-13Name nodes_24_04_from
 attr EVU_Tibber_connect get04-13OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-14Name nodes_24_04_cost
-attr EVU_Tibber_connect get04-14OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-14OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-15Name nodes_24_04_consumption
 attr EVU_Tibber_connect get04-16Name nodes_24_05_from
 attr EVU_Tibber_connect get04-16OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-17Name nodes_24_05_cost
-attr EVU_Tibber_connect get04-17OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-17OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-18Name nodes_24_05_consumption
 attr EVU_Tibber_connect get04-19Name nodes_24_06_from
 attr EVU_Tibber_connect get04-19OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-1Name nodes_24_00_from
 attr EVU_Tibber_connect get04-1OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-20Name nodes_24_06_cost
-attr EVU_Tibber_connect get04-20OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-20OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-21Name nodes_24_06_consumption
 attr EVU_Tibber_connect get04-22Name nodes_24_07_from
 attr EVU_Tibber_connect get04-22OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-23Name nodes_24_07_cost
-attr EVU_Tibber_connect get04-23OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-23OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-24Name nodes_24_07_consumption
 attr EVU_Tibber_connect get04-25Name nodes_24_08_from
 attr EVU_Tibber_connect get04-25OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-26Name nodes_24_08_cost
-attr EVU_Tibber_connect get04-26OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-26OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-27Name nodes_24_08_consumption
 attr EVU_Tibber_connect get04-28Name nodes_24_09_from
 attr EVU_Tibber_connect get04-28OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-29Name nodes_24_09_cost
-attr EVU_Tibber_connect get04-29OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-29OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-2Name nodes_24_00_cost
-attr EVU_Tibber_connect get04-2OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-2OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-30Name nodes_24_09_consumption
 attr EVU_Tibber_connect get04-31Name nodes_24_10_from
 attr EVU_Tibber_connect get04-31OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-32Name nodes_24_10_cost
-attr EVU_Tibber_connect get04-32OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-32OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-33Name nodes_24_10_consumption
 attr EVU_Tibber_connect get04-34Name nodes_24_11_from
 attr EVU_Tibber_connect get04-34OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-35Name nodes_24_11_cost
-attr EVU_Tibber_connect get04-35OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-35OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-36Name nodes_24_11_consumption
 attr EVU_Tibber_connect get04-37Name nodes_24_12_from
 attr EVU_Tibber_connect get04-37OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-38Name nodes_24_12_cost
-attr EVU_Tibber_connect get04-38OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-38OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-39Name nodes_24_12_consumption
 attr EVU_Tibber_connect get04-3Name nodes_24_00_consumption
 attr EVU_Tibber_connect get04-40Name nodes_24_13_from
 attr EVU_Tibber_connect get04-40OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-41Name nodes_24_13_cost
-attr EVU_Tibber_connect get04-41OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-41OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-42Name nodes_24_13_consumption
 attr EVU_Tibber_connect get04-43Name nodes_24_14_from
 attr EVU_Tibber_connect get04-43OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-44Name nodes_24_14_cost
-attr EVU_Tibber_connect get04-44OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-44OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-45Name nodes_24_14_consumption
 attr EVU_Tibber_connect get04-46Name nodes_24_15_from
 attr EVU_Tibber_connect get04-46OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-47Name nodes_24_15_cost
-attr EVU_Tibber_connect get04-47OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-47OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-48Name nodes_24_15_consumption
 attr EVU_Tibber_connect get04-49Name nodes_24_16_from
 attr EVU_Tibber_connect get04-49OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-4Name nodes_24_01_from
 attr EVU_Tibber_connect get04-4OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-50Name nodes_24_16_cost
-attr EVU_Tibber_connect get04-50OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-50OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-51Name nodes_24_16_consumption
 attr EVU_Tibber_connect get04-52Name nodes_24_17_from
 attr EVU_Tibber_connect get04-52OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-53Name nodes_24_17_cost
-attr EVU_Tibber_connect get04-53OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-53OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-54Name nodes_24_17_consumption
 attr EVU_Tibber_connect get04-55Name nodes_24_18_from
 attr EVU_Tibber_connect get04-55OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-56Name nodes_24_18_cost
-attr EVU_Tibber_connect get04-56OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-56OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-57Name nodes_24_18_consumption
 attr EVU_Tibber_connect get04-58Name nodes_24_19_from
 attr EVU_Tibber_connect get04-58OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-59Name nodes_24_19_cost
-attr EVU_Tibber_connect get04-59OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-59OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-5Name nodes_24_01_cost
-attr EVU_Tibber_connect get04-5OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-5OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-60Name nodes_24_19_consumption
 attr EVU_Tibber_connect get04-61Name nodes_24_20_from
 attr EVU_Tibber_connect get04-61OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-62Name nodes_24_20_cost
-attr EVU_Tibber_connect get04-62OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-62OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-63Name nodes_24_20_consumption
 attr EVU_Tibber_connect get04-64Name nodes_24_21_from
 attr EVU_Tibber_connect get04-64OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-65Name nodes_24_21_cost
-attr EVU_Tibber_connect get04-65OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-65OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-66Name nodes_24_21_consumption
 attr EVU_Tibber_connect get04-67Name nodes_24_22_from
 attr EVU_Tibber_connect get04-67OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-68Name nodes_24_22_cost
-attr EVU_Tibber_connect get04-68OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-68OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-69Name nodes_24_22_consumption
 attr EVU_Tibber_connect get04-6Name nodes_24_01_consumption
 attr EVU_Tibber_connect get04-70Name nodes_24_23_from
 attr EVU_Tibber_connect get04-70OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-71Name nodes_24_23_cost
-attr EVU_Tibber_connect get04-71OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-71OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-72Name nodes_24_23_consumption
 attr EVU_Tibber_connect get04-7Name nodes_24_02_from
 attr EVU_Tibber_connect get04-7OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get04-8Name nodes_24_02_cost
-attr EVU_Tibber_connect get04-8OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get04-8OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get04-9Name nodes_24_02_consumption
 attr EVU_Tibber_connect get04Data { "query": "{viewer {home(id:\"%%homeID%%\") {consumption(resolution: HOURLY, last: 24) {nodes {from cost consumption}}}}}"}
 attr EVU_Tibber_connect get04Header01 Content-Type: application/json
@@ -367,122 +366,122 @@ attr EVU_Tibber_connect get06URL https://api.tibber.com/v1-beta/gql
 attr EVU_Tibber_connect get07-10Name nodes_24_03_from
 attr EVU_Tibber_connect get07-10OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-11Name nodes_24_03_cost
-attr EVU_Tibber_connect get07-11OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-11OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-12Name nodes_24_03_consumption
 attr EVU_Tibber_connect get07-13Name nodes_24_04_from
 attr EVU_Tibber_connect get07-13OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-14Name nodes_24_04_cost
-attr EVU_Tibber_connect get07-14OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-14OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-15Name nodes_24_04_consumption
 attr EVU_Tibber_connect get07-16Name nodes_24_05_from
 attr EVU_Tibber_connect get07-16OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-17Name nodes_24_05_cost
-attr EVU_Tibber_connect get07-17OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-17OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-18Name nodes_24_05_consumption
 attr EVU_Tibber_connect get07-19Name nodes_24_06_from
 attr EVU_Tibber_connect get07-19OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-1Name features_realTimeConsumptionEnabled
 attr EVU_Tibber_connect get07-1OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-20Name nodes_24_06_cost
-attr EVU_Tibber_connect get07-20OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-20OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-21Name nodes_24_06_consumption
 attr EVU_Tibber_connect get07-22Name nodes_24_07_from
 attr EVU_Tibber_connect get07-22OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-23Name nodes_24_07_cost
-attr EVU_Tibber_connect get07-23OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-23OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-24Name nodes_24_07_consumption
 attr EVU_Tibber_connect get07-25Name nodes_24_08_from
 attr EVU_Tibber_connect get07-25OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-26Name nodes_24_08_cost
-attr EVU_Tibber_connect get07-26OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-26OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-27Name nodes_24_08_consumption
 attr EVU_Tibber_connect get07-28Name nodes_24_09_from
 attr EVU_Tibber_connect get07-28OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-29Name nodes_24_09_cost
-attr EVU_Tibber_connect get07-29OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-29OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-2Name features_id
-attr EVU_Tibber_connect get07-2OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-2OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-30Name nodes_24_09_consumption
 attr EVU_Tibber_connect get07-31Name nodes_24_10_from
 attr EVU_Tibber_connect get07-31OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-32Name nodes_24_10_cost
-attr EVU_Tibber_connect get07-32OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-32OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-33Name nodes_24_10_consumption
 attr EVU_Tibber_connect get07-34Name nodes_24_11_from
 attr EVU_Tibber_connect get07-34OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-35Name nodes_24_11_cost
-attr EVU_Tibber_connect get07-35OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-35OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-36Name nodes_24_11_consumption
 attr EVU_Tibber_connect get07-37Name nodes_24_12_from
 attr EVU_Tibber_connect get07-37OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-38Name nodes_24_12_cost
-attr EVU_Tibber_connect get07-38OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-38OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-39Name nodes_24_12_consumption
 attr EVU_Tibber_connect get07-3Name nodes_24_00_consumption
 attr EVU_Tibber_connect get07-40Name nodes_24_13_from
 attr EVU_Tibber_connect get07-40OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-41Name nodes_24_13_cost
-attr EVU_Tibber_connect get07-41OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-41OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-42Name nodes_24_13_consumption
 attr EVU_Tibber_connect get07-43Name nodes_24_14_from
 attr EVU_Tibber_connect get07-43OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-44Name nodes_24_14_cost
-attr EVU_Tibber_connect get07-44OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-44OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-45Name nodes_24_14_consumption
 attr EVU_Tibber_connect get07-46Name nodes_24_15_from
 attr EVU_Tibber_connect get07-46OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-47Name nodes_24_15_cost
-attr EVU_Tibber_connect get07-47OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-47OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-48Name nodes_24_15_consumption
 attr EVU_Tibber_connect get07-49Name nodes_24_16_from
 attr EVU_Tibber_connect get07-49OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-4Name nodes_24_01_from
 attr EVU_Tibber_connect get07-4OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-50Name nodes_24_16_cost
-attr EVU_Tibber_connect get07-50OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-50OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-51Name nodes_24_16_consumption
 attr EVU_Tibber_connect get07-52Name nodes_24_17_from
 attr EVU_Tibber_connect get07-52OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-53Name nodes_24_17_cost
-attr EVU_Tibber_connect get07-53OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-53OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-54Name nodes_24_17_consumption
 attr EVU_Tibber_connect get07-55Name nodes_24_18_from
 attr EVU_Tibber_connect get07-55OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-56Name nodes_24_18_cost
-attr EVU_Tibber_connect get07-56OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-56OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-57Name nodes_24_18_consumption
 attr EVU_Tibber_connect get07-58Name nodes_24_19_from
 attr EVU_Tibber_connect get07-58OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-59Name nodes_24_19_cost
-attr EVU_Tibber_connect get07-59OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-59OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-5Name nodes_24_01_cost
-attr EVU_Tibber_connect get07-5OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-5OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-60Name nodes_24_19_consumption
 attr EVU_Tibber_connect get07-61Name nodes_24_20_from
 attr EVU_Tibber_connect get07-61OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-62Name nodes_24_20_cost
-attr EVU_Tibber_connect get07-62OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-62OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-63Name nodes_24_20_consumption
 attr EVU_Tibber_connect get07-64Name nodes_24_21_from
 attr EVU_Tibber_connect get07-64OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-65Name nodes_24_21_cost
-attr EVU_Tibber_connect get07-65OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-65OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-66Name nodes_24_21_consumption
 attr EVU_Tibber_connect get07-67Name nodes_24_22_from
 attr EVU_Tibber_connect get07-67OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-68Name nodes_24_22_cost
-attr EVU_Tibber_connect get07-68OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-68OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-69Name nodes_24_22_consumption
 attr EVU_Tibber_connect get07-6Name nodes_24_01_consumption
 attr EVU_Tibber_connect get07-70Name nodes_24_23_from
 attr EVU_Tibber_connect get07-70OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-71Name nodes_24_23_cost
-attr EVU_Tibber_connect get07-71OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-71OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-72Name nodes_24_23_consumption
 attr EVU_Tibber_connect get07-7Name nodes_24_02_from
 attr EVU_Tibber_connect get07-7OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get07-8Name nodes_24_02_cost
-attr EVU_Tibber_connect get07-8OExpr ($val ne "0" and $val ne "null")? round($val,4) : $val
+attr EVU_Tibber_connect get07-8OExpr ($val ne "0" and $val ne "null")? round($val*1.19,4) : $val
 attr EVU_Tibber_connect get07-9Name nodes_24_02_consumption
 attr EVU_Tibber_connect get07Data { "query": "{viewer {home(id:\"%%homeID%%\") {id features{realTimeConsumptionEnabled} } } }" }
 attr EVU_Tibber_connect get07Header01 Content-Type: application/json
@@ -686,7 +685,7 @@ ws_onConnectionAck:ws_websocketData:.*connection_ack.* {\
     $json .= '}}';;\
     \
     #send the string via websocket as ASCII\
-    Log(3, "$name:$reading: sending JSON: >>>$json<<<");;\
+    #Log(3, "$name:$reading: sending JSON: >>>$json<<<");;\
     DevIo_SimpleWrite($hash, $json, 2);;\
         \
     return POSIX::strftime("%H:%M:%S",localtime(time()));;\
@@ -777,19 +776,23 @@ for (my $loop_last = 1;; $loop_last <= 300;; $loop_last += 3) {\
   $timestamp =  ReadingsVal("$NAME","05_consumption_hourly_100-".sprintf("%04d",$loop_last+2),"null");; # timestamp\
   $timestamp =~ s/T/ /g ;;\
   $timestamp =  substr($timestamp,0,19);;\
-  $value = ReadingsVal("$NAME","05_consumption_hourly_100-".sprintf("%04d",$loop_last+1),"null");;  # cost\
+\
+  # cost aus tibber-Api ohne MwSt\
+  $value = ReadingsVal("$NAME","05_consumption_hourly_100-".sprintf("%04d",$loop_last+1),"null");;\
 \
   if ( $value ne "" ) {\
-    $value = round($value,4);;\
+\
+    # Berechnung der Kosten inkl. 19% MwSt für die Stunde\
+    $value = round($value*1.19,4);;\
 # print $timestamp." ".$value."\n";;\
 \
-    # Eintragen der Kosten für die Stunde\
+    # Schreiben der Kosten für die Stunde in die Datenbank\
     ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
               INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
                 VALUES('".$timestamp."','$NAME','Tibber','nodes_cost','".$value."')\
               ON DUPLICATE KEY UPDATE\
                 VALUE='".$value."';;") ;;\
-    # Eintragen des Verbrauchs für die Stunde\
+    # Schreiben des Verbrauchs für die Stunde in die Datenbank\
     $value = ReadingsVal("$NAME","05_consumption_hourly_100-".sprintf("%04d",$loop_last),"null");;  # consumption\
     $value = round($value,4);;\
     ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
