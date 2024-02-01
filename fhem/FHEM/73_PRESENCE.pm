@@ -1,4 +1,4 @@
-﻿# $Id$
+# $Id$
 ##############################################################################
 #
 #     73_PRESENCE.pm
@@ -42,6 +42,7 @@ PRESENCE_Initialize($)
     $hash->{ReadFn}   = "PRESENCE_Read";
     $hash->{ReadyFn}  = "PRESENCE_Ready";
     $hash->{SetFn}    = "PRESENCE_Set";
+    $hash->{StateFn}  = "PRESENCE_State";
     $hash->{DefFn}    = "PRESENCE_Define";
     $hash->{NotifyFn} = "PRESENCE_Notify";
     $hash->{UndefFn}  = "PRESENCE_Undef";
@@ -262,6 +263,20 @@ PRESENCE_Undef($$)
 
     DevIo_CloseDev($hash);
     return undef;
+}
+
+#####################################
+sub
+PRESENCE_State($$$$)
+{
+  my ($hash, $tim, $vt, $val) = @_;
+
+  $hash->{STATE} = $val if($vt eq "STATE" && !$init_done);
+
+  return undef if($vt ne "state" || $val ne "disabled");
+  $hash->{helper}{DISABLED} = 1;
+  readingsSingleUpdate($hash, "state", "disabled", 1);
+  return undef;
 }
 
 #####################################
