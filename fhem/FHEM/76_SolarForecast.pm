@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.14.1" => "01.02.2024  language support for ___setConsumerPlanningState -> supplement, fix setting 'swoncond not met' ",
   "1.14.0" => "31.01.2024  data maintenance, new sub _addDynAttr for adding attributes at runtime ".
                            "replace setter currentWeatherDev by attr ctrlWeatherDev1, new data with sub CircularSumVal ".
                            "rewrite correction factor calculation with _calcCaQcomplex, _calcCaQsimple, __calcNewFactor ",                           
@@ -544,6 +545,16 @@ my %hqtxt = (                                                                   
               DE => qq{Stand:}                                                                                              },
   object => { EN => qq{Object},
               DE => qq{Pr&uuml;fobjekt}                                                                                     },
+  swonnm => { EN => qq{swoncond not met},
+              DE => qq{swoncond nicht erfüllt}                                                                              },
+  swonmt => { EN => qq{swoncond met},
+              DE => qq{swoncond erfüllt}                                                                                    },
+  swofmt => { EN => qq{swoffcond met},
+              DE => qq{swoffcond erfüllt}                                                                                   },
+  emsple => { EN => qq{expected max surplus less than},
+              DE => qq{erwarteter max Überschuss weniger als}                                                               },
+  nmspld => { EN => qq{no max surplus found for current day},
+              DE => qq{kein max Überschuss für den aktuellen Tag gefunden}                                                  },
   state  => { EN => qq{Status},
               DE => qq{Status}                                                                                              },
   result => { EN => qq{Result},
@@ -7406,6 +7417,7 @@ sub ___doPlanning {
   my $c      = $paref->{consumer};
   my $debug  = $paref->{debug};
   my $type   = $paref->{type};
+  my $lang   = $paref->{lang};
   my $nh     = $data{$type}{$name}{nexthours};
   my $cicfip = AttrVal ($name, 'affectConsForecastInPlanning', 0);                         # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
 
@@ -7518,7 +7530,7 @@ sub ___doPlanning {
               last;
           }
           else {
-              $paref->{supplement} = "expected max surplus less $epiece1";
+              $paref->{supplement} = encode('utf8', $hqtxt{emsple}{$lang}). $epiece1;                  # 'erwarteter max Überschuss weniger als'
               $paref->{ps}         = 'suspended:';
 
               ___setConsumerPlanningState ($paref);
@@ -7552,7 +7564,7 @@ sub ___doPlanning {
       }
 
       if (!$done) {
-          $paref->{supplement} = 'no max surplus found for current day';
+          $paref->{supplement} = encode('utf8', $hqtxt{nmspld}{$lang});                                # 'kein max Überschuss für den aktuellen Tag gefunden'
           $paref->{ps}         = 'suspended:';
 
           ___setConsumerPlanningState ($paref);
@@ -7899,11 +7911,6 @@ return;
 ################################################################
 sub __switchConsumer {
   my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $type  = $paref->{type};
-  my $c     = $paref->{consumer};
-  my $t     = $paref->{t};                                                           # aktueller Unixtimestamp
   my $state = $paref->{state};
 
   $state    = ___switchConsumerOn          ($paref);                                 # Verbraucher Einschaltbedingung prüfen + auslösen
@@ -7926,6 +7933,7 @@ sub ___switchConsumerOn {
   my $t     = $paref->{t};                                                                        # aktueller Unixtimestamp
   my $state = $paref->{state};
   my $debug = $paref->{debug};
+  my $lang  = $paref->{lang};
 
   my ($cname, $dswname) = getCDnames  ($hash, $c);                                                # Consumer und Switch Device Name
 
@@ -7957,7 +7965,6 @@ sub ___switchConsumerOn {
       my $cons   = CurrentVal  ($hash, 'consumption',  0);
       my $nompow = ConsumerVal ($hash, $c, 'power',  '-');
       my $sp     = CurrentVal  ($hash, 'surplus',      0);
-      my $lang   = $paref->{lang};
 
       Log3 ($name, 1, qq{$name DEBUG> ############### consumer "$c" ############### });
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - general switching parameters => }.
@@ -7980,10 +7987,12 @@ sub ___switchConsumerOn {
   my $isintable  = isInterruptable ($hash, $c, 0, 1);                                             # mit Ausgabe Interruptable Info im Debug
   my $isConsRcmd = isConsRcmd      ($hash, $c);
 
-  $paref->{supplement} = 'swoncond not met' if(!$swoncond);
-  $paref->{supplement} = 'swoffcond met'    if($swoffcond);
+  my $supplmnt         = ConsumerVal ($hash, $c, 'planSupplement', '');
+  $paref->{supplement} = '' if($supplmnt =~ /swoncond\snot|swoncond\snicht/xs && $swoncond);
+  $paref->{supplement} = encode('utf8', $hqtxt{swonnm}{$lang}) if(!$swoncond);                    # 'swoncond not met'
+  $paref->{supplement} = encode('utf8', $hqtxt{swofmt}{$lang}) if($swoffcond);                    # 'swoffcond met'
 
-  if ($paref->{supplement}) {
+  if (defined $paref->{supplement}) {
       ___setConsumerPlanningState ($paref);
       delete $paref->{supplement};
   }
