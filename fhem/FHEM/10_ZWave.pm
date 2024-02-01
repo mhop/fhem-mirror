@@ -1844,15 +1844,12 @@ ZWave_meterParse($$)
 
   my $name = $hash->{NAME};
 
-  # rate_type currently not used / not reported
-  my $rate_type = ($v1 >> 5) & 0x3;
-  my @rate_type_text =("undef","consumed", "produced");
-  my $rate_type_text = ($rate_type > $#rate_type_text ?
-                        "undef" : $rate_type_text[$rate_type]);
-
   my $meter_type = ($v1 & 0x1f);
   my $meter_type_text = ($meter_type > $#meter_type_text ?
-                        "UNKNOWN_${meter_type}" : $meter_type_text[$meter_type]);
+                       "UNKNOWN_${meter_type}" : $meter_type_text[$meter_type]);
+
+  my $rate_type = ($v1 >> 5) & 0x3; # ("undef","_import", "_export")
+  $meter_type_text .= "_export" if($meter_type == 1 && $rate_type == 2); #136912
 
   my $precision = ($v2>>5) & 0x7; # 3 bits
   my $scale     = ($v2>>3) & 0x3; # 2 bits, meaning unit
