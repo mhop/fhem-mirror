@@ -1,0 +1,639 @@
+{
+  "aliasColors": {
+    "Garten_Kuehlschrank": "dark-blue",
+    "Heizung": "dark-red",
+    "Heizung value": "dark-red",
+    "Pool": "dark-yellow",
+    "SW_Total_DC_P_Max": "dark-blue",
+    "SW_Total_DC_P_Max value": "dark-blue",
+    "Shaun": "dark-green",
+    "Shaun value": "dark-green",
+    "WB_1_LP_1 Schneechen": "semi-dark-purple",
+    "WB_1_LP_2_Gast": "dark-purple",
+    "Waschmaschine": "light-red"
+  },
+  "bars": false,
+  "dashLength": 10,
+  "dashes": false,
+  "decimals": null,
+  "fieldConfig": {
+    "defaults": {
+      "links": []
+    },
+    "overrides": []
+  },
+  "fill": 1,
+  "fillGradient": 0,
+  "gridPos": {
+    "h": 6,
+    "w": 23,
+    "x": 0,
+    "y": 18
+  },
+  "hiddenSeries": false,
+  "id": 3,
+  "legend": {
+    "alignAsTable": true,
+    "avg": false,
+    "current": true,
+    "hideEmpty": false,
+    "hideZero": false,
+    "max": false,
+    "min": false,
+    "rightSide": true,
+    "show": true,
+    "sideWidth": 350,
+    "sort": "current",
+    "sortDesc": true,
+    "total": false,
+    "values": true
+  },
+  "lines": true,
+  "linewidth": 1,
+  "nullPointMode": "connected",
+  "options": {
+    "alertThreshold": true
+  },
+  "percentage": false,
+  "pluginVersion": "7.5.11",
+  "pointradius": 2,
+  "points": false,
+  "renderer": "flot",
+  "seriesOverrides": [
+    {
+      "$$hashKey": "object:937",
+      "alias": "SW_Total_DC_P_Max",
+      "fill": 0
+    },
+    {
+      "$$hashKey": "object:938",
+      "alias": "Pool",
+      "fill": 3,
+      "stack": true
+    },
+    {
+      "$$hashKey": "object:939",
+      "alias": "Heizung",
+      "fill": 3,
+      "stack": true
+    },
+    {
+      "$$hashKey": "object:940",
+      "alias": "Waschmaschine",
+      "fill": 3,
+      "stack": true
+    },
+    {
+      "$$hashKey": "object:394",
+      "alias": "Brunnen",
+      "fill": 3,
+      "stack": true
+    },
+    {
+      "$$hashKey": "object:416",
+      "alias": "WB_1_LP_1_Schneechen",
+      "fill": 3,
+      "stack": true
+    },
+    {
+      "$$hashKey": "object:253",
+      "alias": "WB_1_LP_2_Gast",
+      "fill": 3,
+      "stack": true
+    }
+  ],
+  "spaceLength": 10,
+  "stack": false,
+  "steppedLine": false,
+  "targets": [
+    {
+      "datasource": "FHEM MySQL",
+      "format": "table",
+      "group": [
+        {
+          "params": [
+            "$__interval",
+            "previous"
+          ],
+          "type": "time"
+        }
+      ],
+      "metricColumn": "none",
+      "rawQuery": true,
+      "rawSql": "SELECT\n  $__timeGroupAlias(TIMESTAMP,$__interval,previous),\n  avg(value) AS \"SW_Total_DC_P_Max\"\nFROM history\nWHERE\n  $__timeFilter(TIMESTAMP) AND\n  DEVICE = 'WR_1' AND\n  READING = 'SW_Total_DC_P_Max'\nGROUP BY 1\nORDER BY $__timeGroup(TIMESTAMP,$__interval,previous)",
+      "refId": "SW_Total_DC_P_Max",
+      "select": [
+        [
+          {
+            "params": [
+              "value"
+            ],
+            "type": "column"
+          },
+          {
+            "params": [
+              "avg"
+            ],
+            "type": "aggregate"
+          },
+          {
+            "params": [
+              "value"
+            ],
+            "type": "alias"
+          }
+        ]
+      ],
+      "table": "history",
+      "timeColumn": "TIMESTAMP",
+      "timeColumnType": "timestamp",
+      "where": [
+        {
+          "name": "$__timeFilter",
+          "params": [],
+          "type": "macro"
+        },
+        {
+          "datatype": "varchar",
+          "name": "",
+          "params": [
+            "DEVICE",
+            "=",
+            "'WR_1'"
+          ],
+          "type": "expression"
+        },
+        {
+          "datatype": "varchar",
+          "name": "",
+          "params": [
+            "READING",
+            "=",
+            "'SW_Total_DC_P_Max'"
+          ],
+          "type": "expression"
+        }
+      ]
+    },
+    {
+      "datasource": "FHEM MySQL",
+      "format": "table",
+      "group": [
+        {
+          "params": [
+            "$__interval",
+            "previous"
+          ],
+          "type": "time"
+        }
+      ],
+      "metricColumn": "none",
+      "rawQuery": true,
+      "rawSql": "SELECT\n  $__timeGroupAlias(TIMESTAMP,$__interval,previous),\n  abs(avg(value)) AS \"Heizung\"\nFROM history\nWHERE\n  $__timeFilter(TIMESTAMP) AND\n  DEVICE = 'StromZaehler_Heizung' AND\n  READING = 'SMAEM1901401955_Saldo_Wirkleistung'\nGROUP BY 1\nORDER BY $__timeGroup(TIMESTAMP,$__interval,previous)",
+      "refId": "Heizung",
+      "select": [
+        [
+          {
+            "params": [
+              "value"
+            ],
+            "type": "column"
+          },
+          {
+            "params": [
+              "avg"
+            ],
+            "type": "aggregate"
+          },
+          {
+            "params": [
+              "value"
+            ],
+            "type": "alias"
+          }
+        ]
+      ],
+      "table": "history",
+      "timeColumn": "TIMESTAMP",
+      "timeColumnType": "timestamp",
+      "where": [
+        {
+          "name": "$__timeFilter",
+          "params": [],
+          "type": "macro"
+        },
+        {
+          "datatype": "varchar",
+          "name": "",
+          "params": [
+            "DEVICE",
+            "=",
+            "'StromZaehler_Heizung'"
+          ],
+          "type": "expression"
+        },
+        {
+          "datatype": "varchar",
+          "name": "",
+          "params": [
+            "READING",
+            "=",
+            "'SMAEM1901401955_Saldo_Wirkleistung'"
+          ],
+          "type": "expression"
+        }
+      ]
+    },
+    {
+      "datasource": "FHEM MySQL",
+      "format": "table",
+      "group": [
+        {
+          "params": [
+            "$__interval",
+            "previous"
+          ],
+          "type": "time"
+        }
+      ],
+      "metricColumn": "none",
+      "rawQuery": true,
+      "rawSql": "SELECT\n  $__timeGroupAlias(TIMESTAMP,$__interval,previous),\n  avg(value) AS \"Pool\"\nFROM history\nWHERE\n  $__timeFilter(TIMESTAMP) AND\n  DEVICE = 'shelly02' AND\n  READING = 'Power_0'\nGROUP BY 1\nORDER BY $__timeGroup(TIMESTAMP,$__interval,previous)",
+      "refId": "Pool",
+      "select": [
+        [
+          {
+            "params": [
+              "value"
+            ],
+            "type": "column"
+          },
+          {
+            "params": [
+              "avg"
+            ],
+            "type": "aggregate"
+          },
+          {
+            "params": [
+              "value"
+            ],
+            "type": "alias"
+          }
+        ]
+      ],
+      "table": "history",
+      "timeColumn": "TIMESTAMP",
+      "timeColumnType": "timestamp",
+      "where": [
+        {
+          "name": "$__timeFilter",
+          "params": [],
+          "type": "macro"
+        },
+        {
+          "datatype": "varchar",
+          "name": "",
+          "params": [
+            "DEVICE",
+            "=",
+            "'shelly02'"
+          ],
+          "type": "expression"
+        },
+        {
+          "datatype": "varchar",
+          "name": "",
+          "params": [
+            "READING",
+            "=",
+            "'Power_0'"
+          ],
+          "type": "expression"
+        }
+      ]
+    },
+    {
+      "datasource": "FHEM MySQL",
+      "format": "table",
+      "group": [
+        {
+          "params": [
+            "$__interval",
+            "previous"
+          ],
+          "type": "time"
+        }
+      ],
+      "metricColumn": "none",
+      "rawQuery": true,
+      "rawSql": "SELECT\n  $__timeGroupAlias(TIMESTAMP,$__interval,previous),\n  avg(value) AS \"Waschmaschine\"\nFROM history\nWHERE\n  $__timeFilter(TIMESTAMP) AND\n  DEVICE = 'shelly03' AND\n  READING = 'power'\nGROUP BY 1\nORDER BY $__timeGroup(TIMESTAMP,$__interval,previous)",
+      "refId": "Waschmaschine",
+      "select": [
+        [
+          {
+            "params": [
+              "value"
+            ],
+            "type": "column"
+          },
+          {
+            "params": [
+              "avg"
+            ],
+            "type": "aggregate"
+          },
+          {
+            "params": [
+              "value"
+            ],
+            "type": "alias"
+          }
+        ]
+      ],
+      "table": "history",
+      "timeColumn": "TIMESTAMP",
+      "timeColumnType": "timestamp",
+      "where": [
+        {
+          "name": "$__timeFilter",
+          "params": [],
+          "type": "macro"
+        },
+        {
+          "datatype": "varchar",
+          "name": "",
+          "params": [
+            "DEVICE",
+            "=",
+            "'shelly03'"
+          ],
+          "type": "expression"
+        },
+        {
+          "datatype": "varchar",
+          "name": "",
+          "params": [
+            "READING",
+            "=",
+            "'power'"
+          ],
+          "type": "expression"
+        }
+      ]
+    },
+    {
+      "datasource": "FHEM MySQL",
+      "format": "table",
+      "group": [
+        {
+          "params": [
+            "$__interval",
+            "previous"
+          ],
+          "type": "time"
+        }
+      ],
+      "metricColumn": "none",
+      "rawQuery": true,
+      "rawSql": "SELECT\n  $__timeGroupAlias(TIMESTAMP,$__interval,previous),\n  avg(value) AS \"Brunnen\"\nFROM history\nWHERE\n  $__timeFilter(TIMESTAMP) AND\n  DEVICE = 'shelly05' AND\n  READING = 'power_0'\nGROUP BY 1\nORDER BY $__timeGroup(TIMESTAMP,$__interval,previous)",
+      "refId": "Brunnen",
+      "select": [
+        [
+          {
+            "params": [
+              "value"
+            ],
+            "type": "column"
+          },
+          {
+            "params": [
+              "avg"
+            ],
+            "type": "aggregate"
+          },
+          {
+            "params": [
+              "value"
+            ],
+            "type": "alias"
+          }
+        ]
+      ],
+      "table": "history",
+      "timeColumn": "TIMESTAMP",
+      "timeColumnType": "timestamp",
+      "where": [
+        {
+          "name": "$__timeFilter",
+          "params": [],
+          "type": "macro"
+        },
+        {
+          "datatype": "varchar",
+          "name": "",
+          "params": [
+            "DEVICE",
+            "=",
+            "'shelly05'"
+          ],
+          "type": "expression"
+        },
+        {
+          "datatype": "varchar",
+          "name": "",
+          "params": [
+            "READING",
+            "=",
+            "'power_0'"
+          ],
+          "type": "expression"
+        }
+      ]
+    },
+    {
+      "datasource": "FHEM MySQL",
+      "format": "table",
+      "group": [
+        {
+          "params": [
+            "$__interval",
+            "previous"
+          ],
+          "type": "time"
+        }
+      ],
+      "hide": false,
+      "metricColumn": "none",
+      "rawQuery": true,
+      "rawSql": "SELECT\n  $__timeGroupAlias(TIMESTAMP,$__interval,previous),\n  avg(value) AS \"WB_1_LP_1_Schneechen\"\nFROM history\nWHERE\n  $__timeFilter(TIMESTAMP) AND\n  DEVICE = 'WB_1' AND\n  READING = 'lp_1_W'\nGROUP BY 1\nORDER BY $__timeGroup(TIMESTAMP,$__interval,previous)",
+      "refId": "WB_1_LP_1_Schneechen",
+      "select": [
+        [
+          {
+            "params": [
+              "value"
+            ],
+            "type": "column"
+          },
+          {
+            "params": [
+              "avg"
+            ],
+            "type": "aggregate"
+          },
+          {
+            "params": [
+              "value"
+            ],
+            "type": "alias"
+          }
+        ]
+      ],
+      "table": "history",
+      "timeColumn": "TIMESTAMP",
+      "timeColumnType": "timestamp",
+      "where": [
+        {
+          "name": "$__timeFilter",
+          "params": [],
+          "type": "macro"
+        },
+        {
+          "datatype": "varchar",
+          "name": "",
+          "params": [
+            "DEVICE",
+            "=",
+            "'shelly02'"
+          ],
+          "type": "expression"
+        },
+        {
+          "datatype": "varchar",
+          "name": "",
+          "params": [
+            "READING",
+            "=",
+            "'Power_0'"
+          ],
+          "type": "expression"
+        }
+      ]
+    },
+    {
+      "datasource": "FHEM MySQL",
+      "format": "table",
+      "group": [
+        {
+          "params": [
+            "$__interval",
+            "previous"
+          ],
+          "type": "time"
+        }
+      ],
+      "hide": false,
+      "metricColumn": "none",
+      "rawQuery": true,
+      "rawSql": "SELECT\n  $__timeGroupAlias(TIMESTAMP,$__interval,previous),\n  avg(value) AS \"WB_1_LP_2_Gast\"\nFROM history\nWHERE\n  $__timeFilter(TIMESTAMP) AND\n  DEVICE = 'WB_1' AND\n  READING = 'lp_2_W'\nGROUP BY 1\nORDER BY $__timeGroup(TIMESTAMP,$__interval,previous)",
+      "refId": "WB_1_LP_2 Gast",
+      "select": [
+        [
+          {
+            "params": [
+              "value"
+            ],
+            "type": "column"
+          },
+          {
+            "params": [
+              "avg"
+            ],
+            "type": "aggregate"
+          },
+          {
+            "params": [
+              "value"
+            ],
+            "type": "alias"
+          }
+        ]
+      ],
+      "table": "history",
+      "timeColumn": "TIMESTAMP",
+      "timeColumnType": "timestamp",
+      "where": [
+        {
+          "name": "$__timeFilter",
+          "params": [],
+          "type": "macro"
+        },
+        {
+          "datatype": "varchar",
+          "name": "",
+          "params": [
+            "DEVICE",
+            "=",
+            "'shelly02'"
+          ],
+          "type": "expression"
+        },
+        {
+          "datatype": "varchar",
+          "name": "",
+          "params": [
+            "READING",
+            "=",
+            "'Power_0'"
+          ],
+          "type": "expression"
+        }
+      ]
+    }
+  ],
+  "thresholds": [],
+  "timeFrom": null,
+  "timeRegions": [],
+  "timeShift": null,
+  "title": "Hauptverbraucher",
+  "tooltip": {
+    "shared": true,
+    "sort": 0,
+    "value_type": "individual"
+  },
+  "type": "graph",
+  "xaxis": {
+    "buckets": null,
+    "mode": "time",
+    "name": null,
+    "show": true,
+    "values": []
+  },
+  "yaxes": [
+    {
+      "$$hashKey": "object:322",
+      "decimals": 0,
+      "format": "short",
+      "label": "Watt",
+      "logBase": 1,
+      "max": "14000",
+      "min": "0",
+      "show": true
+    },
+    {
+      "$$hashKey": "object:323",
+      "format": "short",
+      "label": null,
+      "logBase": 1,
+      "max": null,
+      "min": null,
+      "show": true
+    }
+  ],
+  "yaxis": {
+    "align": false,
+    "alignLevel": null
+  },
+  "datasource": null
+}
