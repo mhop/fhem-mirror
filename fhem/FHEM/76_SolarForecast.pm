@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.14.3" => "02.02.2024  _transferWeatherValues: first step of multi weather device merger ",
   "1.14.2" => "02.02.2024  fix warning, _transferAPIRadiationValues: Consider upper and lower deviation limit AI to API forecast ",
   "1.14.1" => "01.02.2024  language support for ___setConsumerPlanningState -> supplement, fix setting 'swoncond not met' ",
   "1.14.0" => "31.01.2024  data maintenance, new sub _addDynAttr for adding attributes at runtime ".
@@ -924,7 +925,7 @@ sub Initialize {
                                 "affectConsForecastIdentWeekdays:1,0 ".
                                 "affectConsForecastInPlanning:1,0 ".
                                 "affectMaxDayVariance ".
-                                "affectNumHistDays:slider,1,1,30 ".
+                                "affectNumHistDays:obsolete ".
                                 "affectSolCastPercentile:select,10,50,90 ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
@@ -4196,6 +4197,15 @@ sub Attr {
   # $cmd can be "del" or "set"
   # $name is device name
   # aName and aVal are Attribute name and value
+  
+  if ($cmd eq 'set' && $aName eq 'affectNumHistDays') {
+      if (!$init_done) {
+          return qq{Device "$name" -> The attribute 'affectNumHistDays' is obsolete and will be deleted soon. Please press "save config" when restart is finished.};
+      }
+      else {
+          return qq{The attribute 'affectNumHistDays' is obsolete and will be deleted soon.};
+      }
+  }
 
   if ($aName eq 'disable') {
       if($cmd eq 'set') {
@@ -5564,69 +5574,53 @@ sub _transferWeatherValues {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $t     = $paref->{t};                                                                      # Epoche Zeit
+  my $t     = $paref->{t};                                                                     # Epoche Zeit
   my $chour = $paref->{chour};
-  my $date  = $paref->{date};                                                                   # aktuelles Datum
 
-  my $fcname = AttrVal ($name, 'ctrlWeatherDev1', '');                                          # Weather Forecast Device
+  my $fcname = AttrVal ($name, 'ctrlWeatherDev1', '');                                         # Standard Weather Forecast Device
   return if(!$fcname || !$defs{$fcname});
 
   my $err         = checkdwdattr ($name, $fcname, \@dweattrmust);
   $paref->{state} = $err if($err);
 
-  debugLog ($paref, 'collectData', "collect Weather data - device: $fcname =>");
+  $paref->{fcname} = $fcname;
+  my ($fc0_sr_mm, $fc0_ss_mm, $fc1_sr_mm, $fc1_ss_mm) = __sunRS ($paref);                      # Sonnenauf- und untergang
+  delete $paref->{fcname};
+  
+  for my $step (1..3) {
+      $paref->{step}      = $step;
+      $paref->{fc0_sr_mm} = $fc0_sr_mm;
+      $paref->{fc0_ss_mm} = $fc0_ss_mm;
+      $paref->{fc1_sr_mm} = $fc1_sr_mm;
+      $paref->{fc1_ss_mm} = $fc1_ss_mm;
+      
+      __readDataWeather ($paref);                                                              # Wetterdaten in einen Hash einlesen
 
+      delete $paref->{fc0_sr_mm};
+      delete $paref->{fc0_ss_mm};
+      delete $paref->{fc1_sr_mm};
+      delete $paref->{fc1_ss_mm};      
+      delete $paref->{step};
+  }
+  
   my $time_str;
   my $type = $paref->{type};
-
-  $paref->{fcname}                        = $fcname;
-  my ($fc0_sr, $fc0_ss, $fc1_sr, $fc1_ss) = __sunRS ($paref);                                   # Sonnenauf- und untergang
-  delete $paref->{fcname};
-
-  $data{$type}{$name}{current}{sunriseToday}   = $date.' '.$fc0_sr.':00';
-  $data{$type}{$name}{current}{sunriseTodayTs} = timestringToTimestamp ($date.' '.$fc0_sr.':00');
-
-  $data{$type}{$name}{current}{sunsetToday}    = $date.' '.$fc0_ss.':00';
-  $data{$type}{$name}{current}{sunsetTodayTs}  = timestringToTimestamp ($date.' '.$fc0_ss.':00');
-
-  debugLog ($paref, 'collectData', "sunrise/sunset today: $fc0_sr / $fc0_ss, sunrise/sunset tomorrow: $fc1_sr / $fc1_ss");
-
-  storeReading ('Today_SunRise',    $fc0_sr);
-  storeReading ('Today_SunSet',     $fc0_ss);
-  storeReading ('Tomorrow_SunRise', $fc1_sr);
-  storeReading ('Tomorrow_SunSet',  $fc1_ss);
-
-  my $fc0_sr_round = sprintf "%02d", (split ":", $fc0_sr)[0];
-  my $fc0_ss_round = sprintf "%02d", (split ":", $fc0_ss)[0];
-  my $fc1_sr_round = sprintf "%02d", (split ":", $fc1_sr)[0];
-  my $fc1_ss_round = sprintf "%02d", (split ":", $fc1_ss)[0];
+  
+  # Log3 ($name, 1, "$name - Weather data dump:\n". Dumper $data{$type}{$name}{weatherdata});
 
   for my $num (0..46) {
       my ($fd, $fh) = _calcDayHourMove ($chour, $num);
       last if($fd > 1);
 
-      my $fh1   = $fh+1;
-      my $fh2   = $fh1 == 24 ? 23 : $fh1;
-      my $wid   = ReadingsNum ($fcname, "fc${fd}_${fh2}_ww",  -1);
-      my $neff  = ReadingsNum ($fcname, "fc${fd}_${fh2}_Neff", 0);                             # Effektive Wolkendecke
-      my $r101  = ReadingsNum ($fcname, "fc${fd}_${fh2}_R101", 0);                             # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-      my $temp  = ReadingsNum ($fcname, "fc${fd}_${fh2}_TTT",  0);                             # Außentemperatur
-
-      my $don   = 1;                                                                           # es ist default "Tag"
-      my $fhstr = sprintf "%02d", $fh;                                                         # hier kann Tag/Nacht-Grenze verstellt werden
-
-      if($fd == 0 && ($fhstr lt $fc0_sr_round || $fhstr gt $fc0_ss_round)) {                   # Zeit vor Sonnenaufgang oder nach Sonnenuntergang heute
-          $wid += 100;                                                                         # "1" der WeatherID voranstellen wenn Nacht
-          $don  = 0;
-      }
-      elsif ($fd == 1 && ($fhstr lt $fc1_sr_round || $fhstr gt $fc1_ss_round)) {               # Zeit vor Sonnenaufgang oder nach Sonnenuntergang morgen
-          $wid += 100;                                                                         # "1" der WeatherID voranstellen wenn Nacht
-          $don  = 0;
-      }
-
-      my $txt = ReadingsVal($fcname, "fc${fd}_${fh2}_wwd", '');
-
-      debugLog ($paref, 'collectData', "wid: fc${fd}_${fh1}_ww, val: $wid, txt: $txt, cc: $neff, rp: $r101, temp: $temp");
+      my $fh1   = $fh + 1;
+      my $cat   = 1;
+      
+      my $wid   = $data{$type}{$name}{weatherdata}{$cat}{"fc${fd}_${fh1}"}{ww};                # signifikantes Wetter
+      my $wwd   = $data{$type}{$name}{weatherdata}{$cat}{"fc${fd}_${fh1}"}{wwd};               # Wetter Beschreibung
+      my $neff  = $data{$type}{$name}{weatherdata}{$cat}{"fc${fd}_${fh1}"}{neff};              # Effektive Wolkendecke
+      my $r101  = $data{$type}{$name}{weatherdata}{$cat}{"fc${fd}_${fh1}"}{r101};              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
+      my $temp  = $data{$type}{$name}{weatherdata}{$cat}{"fc${fd}_${fh1}"}{ttt};               # Außentemperatur
+      my $don   = $data{$type}{$name}{weatherdata}{$cat}{"fc${fd}_${fh1}"}{don};               # Tag/Nacht-Grenze
 
       $time_str                                             = "NextHour".sprintf "%02d", $num;
       $data{$type}{$name}{nexthours}{$time_str}{weatherid}  = $wid;
@@ -5636,22 +5630,22 @@ sub _transferWeatherValues {
       $data{$type}{$name}{nexthours}{$time_str}{temp}       = $temp;
       $data{$type}{$name}{nexthours}{$time_str}{DoN}        = $don;
 
-      if($num < 23 && $fh < 24) {                                                              # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      if ($num < 23 && $fh < 24) {                                                             # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherid}  = $wid;
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weathertxt} = $txt;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weathertxt} = $wwd;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wcc}        = $neff;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wrp}        = $r101;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{temp}       = $temp;
 
-          if($num == 0) {                                                                      # aktuelle Außentemperatur
+          if ($num == 0) {                                                                      # aktuelle Außentemperatur
               $data{$type}{$name}{current}{temp} = $temp;
           }
       }
 
-      if($fd == 0 && $fh1) {                                                                   # Weather in pvhistory speichern
+      if ($fd == 0 && $fh1) {                                                                  # Weather in pvHistory speichern
           $paref->{wid}      = $wid;
           $paref->{histname} = "weatherid";
-          $paref->{nhour}    = sprintf("%02d",$fh1);
+          $paref->{nhour}    = sprintf "%02d",$fh1;
           setPVhistory ($paref);
 
           $paref->{wcc}      = $neff;
@@ -5674,18 +5668,87 @@ return;
 }
 
 ################################################################
+#   lese Wetterdaten aus Device im Attribut ctrlWeatherDevX
+#   X = laufende Schleifenvariable $step
+################################################################
+sub __readDataWeather {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};                                                                     
+  my $chour = $paref->{chour};                                                                  # aktuelles Datum
+  my $type  = $paref->{type};
+  my $step  = $paref->{step};
+  
+  my $fc0_sr_mm = $paref->{fc0_sr_mm};
+  my $fc0_ss_mm = $paref->{fc0_ss_mm};
+  my $fc1_sr_mm = $paref->{fc1_sr_mm};
+  my $fc1_ss_mm = $paref->{fc1_ss_mm};
+  
+  my $fcname = AttrVal ($name, 'ctrlWeatherDev'.$step, '');                                     # Weather Forecast Device
+  return if(!$fcname || !$defs{$fcname});
+
+  my $err         = checkdwdattr ($name, $fcname, \@dweattrmust);
+  $paref->{state} = $err if($err);
+  
+  delete $data{$type}{$name}{weatherdata}{$step};
+
+  debugLog ($paref, 'collectData', "collect Weather data step $step - device: $fcname =>");
+
+  for my $n (0..46) {
+      my ($fd, $fh) = _calcDayHourMove ($chour, $n);
+      last if($fd > 1);
+      
+      my $wid   = ReadingsNum     ($fcname, "fc${fd}_${fh}_ww",  -1);                         # signifikantes Wetter
+      my $wwd   = ReadingsVal     ($fcname, "fc${fd}_${fh}_wwd", '');                         # Wetter Beschreibung
+      my $neff  = ReadingsNum     ($fcname, "fc${fd}_${fh}_Neff", 0);                         # Effektive Wolkendecke
+      my $temp  = ReadingsNum     ($fcname, "fc${fd}_${fh}_TTT",  0);                         # Außentemperatur
+      my $r101  = int ReadingsNum ($fcname, "fc${fd}_${fh}_R101", 0);                         # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
+
+      my $don   = 1;                                                                          # es ist default "Tag"
+      my $fhstr = sprintf "%02d", $fh;                                                        # hier kann Tag/Nacht-Grenze verstellt werden   
+
+      if ($fd == 0 && ($fhstr lt $fc0_sr_mm || $fhstr gt $fc0_ss_mm)) {                       # Zeit vor Sonnenaufgang oder nach Sonnenuntergang heute
+          $wid += 100;                                                                        # "1" der WeatherID voranstellen wenn Nacht
+          $don  = 0;
+      }
+      elsif ($fd == 1 && ($fhstr lt $fc1_sr_mm || $fhstr gt $fc1_ss_mm)) {                    # Zeit vor Sonnenaufgang oder nach Sonnenuntergang morgen
+          $wid += 100;                                                                        # "1" der WeatherID voranstellen wenn Nacht
+          $don  = 0;
+      }  
+      
+      my $fh1 = $fh + 1;
+      
+      debugLog ($paref, 'collectData', "Weather storage $step: fc${fd}_${fh1}_x, don: $don, ww: $wid, R101: $r101, TTT: $temp, Neff: $neff, wwd: $wwd");
+
+      $data{$type}{$name}{weatherdata}{$step}{"fc${fd}_${fh1}"}{ww}   = $wid;
+      $data{$type}{$name}{weatherdata}{$step}{"fc${fd}_${fh1}"}{wwd}  = $wwd;
+      $data{$type}{$name}{weatherdata}{$step}{"fc${fd}_${fh1}"}{neff} = $neff;
+      $data{$type}{$name}{weatherdata}{$step}{"fc${fd}_${fh1}"}{r101} = $r101;
+      $data{$type}{$name}{weatherdata}{$step}{"fc${fd}_${fh1}"}{ttt}  = $temp;
+      $data{$type}{$name}{weatherdata}{$step}{"fc${fd}_${fh1}"}{don}  = $don;
+  }
+
+return;
+}
+
+################################################################
 #   Sonnenauf- und untergang bei gesetzten global
 #   latitude/longitude Koordinaten berechnen, sonst aus DWD
 #   Device extrahieren
 ################################################################
 sub __sunRS {
   my $paref  = shift;
+  my $name   = $paref->{name};
   my $t      = $paref->{t};                                                       # aktuelle Zeit
   my $fcname = $paref->{fcname};
+  my $type   = $paref->{type};
+  my $date   = $paref->{date};                                                    # aktuelles Datum
 
   my ($fc0_sr, $fc0_ss, $fc1_sr, $fc1_ss);
 
   my ($cset, $lat, $lon) = locCoordinates();
+  
+  debugLog ($paref, 'collectData', "collect sunrise/sunset times - device: $fcname =>");
 
   if ($cset) {
       my $alt = 'HORIZON=-0.833';                                                 # default from https://metacpan.org/release/JFORGET/DateTime-Event-Sunrise-0.0505/view/lib/DateTime/Event/Sunrise.pm
@@ -5700,8 +5763,26 @@ sub __sunRS {
       $fc1_sr = ReadingsVal ($fcname, 'fc1_SunRise', '23:59');
       $fc1_ss = ReadingsVal ($fcname, 'fc1_SunSet',  '00:00');
   }
+  
+  $data{$type}{$name}{current}{sunriseToday}   = $date.' '.$fc0_sr.':00';
+  $data{$type}{$name}{current}{sunriseTodayTs} = timestringToTimestamp ($date.' '.$fc0_sr.':00');
 
-return ($fc0_sr, $fc0_ss, $fc1_sr, $fc1_ss);
+  $data{$type}{$name}{current}{sunsetToday}    = $date.' '.$fc0_ss.':00';
+  $data{$type}{$name}{current}{sunsetTodayTs}  = timestringToTimestamp ($date.' '.$fc0_ss.':00');
+
+  debugLog ($paref, 'collectData', "sunrise/sunset today: $fc0_sr / $fc0_ss, sunrise/sunset tomorrow: $fc1_sr / $fc1_ss");
+
+  storeReading ('Today_SunRise',    $fc0_sr);
+  storeReading ('Today_SunSet',     $fc0_ss);
+  storeReading ('Tomorrow_SunRise', $fc1_sr);
+  storeReading ('Tomorrow_SunSet',  $fc1_ss);
+  
+  my $fc0_sr_mm = sprintf "%02d", (split ":", $fc0_sr)[0];
+  my $fc0_ss_mm = sprintf "%02d", (split ":", $fc0_ss)[0];
+  my $fc1_sr_mm = sprintf "%02d", (split ":", $fc1_sr)[0];
+  my $fc1_ss_mm = sprintf "%02d", (split ":", $fc1_ss)[0];
+
+return ($fc0_sr_mm, $fc0_ss_mm, $fc1_sr_mm, $fc1_ss_mm);
 }
 
 ################################################################
@@ -5733,7 +5814,7 @@ sub _transferAPIRadiationValues {
           next;
       }
 
-      my $fh1      = $fh+1;
+      my $fh1      = $fh + 1;
       my $wantts   = (timestringToTimestamp ($date.' '.$chour.':00:00')) + ($num * 3600);
       my $wantdt   = (timestampToTimestring ($wantts, $lang))[1];
 
@@ -7516,7 +7597,6 @@ sub ___doPlanning {
       }
 
       for my $ts (sort{$a<=>$b} keys %mtimes) {
-
           if ($mtimes{$ts}{spexp} >= $epiece1) {                                                       # die früheste Startzeit sofern Überschuß größer als Bedarf
               my $starttime       = $mtimes{$ts}{starttime};
 
@@ -7540,7 +7620,7 @@ sub ___doPlanning {
               last;
           }
           else {
-              $paref->{supplement} = encode('utf8', $hqtxt{emsple}{$lang}). $epiece1;                  # 'erwarteter max Überschuss weniger als'
+              $paref->{supplement} = encode('utf8', $hqtxt{emsple}{$lang}).' '.$epiece1;              # 'erwarteter max Überschuss weniger als'
               $paref->{ps}         = 'suspended:';
 
               ___setConsumerPlanningState ($paref);
@@ -11889,27 +11969,6 @@ return;
 }
 
 ################################################################
-#       Ist Attribut 'affectNumHistDays' gesetzt ?
-#       $usenhd: 1 - ja, 0 - nein
-#       $nhd   : Anzahl der zu verwendenden HistDays
-################################################################
-sub __useNumHistDays {
-  my $name = shift;
-
-  my $usenhd = 0;
-  my $nhd    = AttrVal($name, 'affectNumHistDays', $calcmaxd + 1);
-
-  if ($nhd == $calcmaxd + 1) {
-      $nhd = $calcmaxd;
-  }
-  else {
-      $usenhd = 1;
-  }
-
-return ($usenhd, $nhd);
-}
-
-################################################################
 #            Qualität der Vorhersage berechnen
 ################################################################
 sub __calcFcQuality {
@@ -16181,8 +16240,8 @@ to ensure that the system configuration is correct.
 
       Switches the automatic prediction correction on/off.
       The mode of operation differs depending on the selected method.
-      The correction behaviour can be influenced with the <a href="#SolarForecast-attr-affectNumHistDays">affectNumHistDays</a>
-      and <a href="#SolarForecast-attr-affectMaxDayVariance">affectMaxDayVariance</a> attributes. <br>
+      The correction behaviour can be influenced with the 
+      <a href="#SolarForecast-attr-affectMaxDayVariance">affectMaxDayVariance</a> attribute. <br>
       (default: off)
 
       <br><br>
@@ -16713,14 +16772,6 @@ to ensure that the system configuration is correct.
          This setting has no influence on the learning and forecasting behavior of any AI support used
          (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>). <br>
          (default: 0.5)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-affectNumHistDays"></a>
-       <li><b>affectNumHistDays </b><br>
-         Number of historical days available in the caches to be used to calculate the PV forecast autocorrection
-         values. <br>
-         (default: all available data in pvHistory and pvCircular)
        </li>
        <br>
 
@@ -18258,7 +18309,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       Schaltet die automatische Vorhersagekorrektur ein/aus.
       Die Wirkungsweise unterscheidet sich je nach gewählter Methode. <br>
-      Das Korrekturverhalten kann mit den Attributen <a href="#SolarForecast-attr-affectNumHistDays">affectNumHistDays</a> und
+      Das Korrekturverhalten kann mit dem Attribut
       <a href="#SolarForecast-attr-affectMaxDayVariance">affectMaxDayVariance</a> beeinflusst werden. <br>
       (default: off)
 
@@ -18798,14 +18849,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>) hat diese Einstellung keinen
          Einfluß. <br>
          (default: 0.5)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-affectNumHistDays"></a>
-       <li><b>affectNumHistDays </b><br>
-         Anzahl der in den Caches verfügbaren historischen Tage, die zur Berechnung der Autokorrekturwerte der
-         PV Vorhersage verwendet werden sollen. <br>
-         (default: alle verfügbaren Daten in pvHistory und pvCircular)
        </li>
        <br>
 
