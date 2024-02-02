@@ -157,7 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.14.2" => "02.02.2024  fix warning ",
+  "1.14.2" => "02.02.2024  fix warning, _transferAPIRadiationValues: Consider upper and lower deviation limit AI to API forecast ",
   "1.14.1" => "01.02.2024  language support for ___setConsumerPlanningState -> supplement, fix setting 'swoncond not met' ",
   "1.14.0" => "31.01.2024  data maintenance, new sub _addDynAttr for adding attributes at runtime ".
                            "replace setter currentWeatherDev by attr ctrlWeatherDev1, new data with sub CircularSumVal ".
@@ -316,6 +316,8 @@ my $airaw          = $root."/FHEM/FhemUtils/AIraw_SolarForecast_";              
 my $aitrblto       = 7200;                                                          # KI Training BlockingCall Timeout
 my $aibcthhld      = 0.2;                                                           # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
 my $aistdudef      = 1095;                                                          # default Haltezeit KI Raw Daten (Tage)
+my $aiDevUpLim     = 150;                                                           # obere Abweichungsgrenze (%) AI von API Prognose
+my $aiDevLowLim    = 50;                                                            # untere Abweichungsgrenze (%) AI von API Prognose
 
 my $calcmaxd       = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
 my @dweattrmust    = qw(TTT Neff R101 ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
@@ -5764,16 +5766,23 @@ sub _transferAPIRadiationValues {
       $data{$type}{$name}{nexthours}{$time_str}{rad1h}     = $rad;
 
       my ($err, $pvaifc) = aiGetResult ($params);                                             # KI Entscheidungen abfragen
+      my $useai          = 0;
       my $pvfc;
 
       if (!$err) {
-          $data{$type}{$name}{nexthours}{$time_str}{pvaifc} = $pvaifc;                        # durch AI gelieferte PV Forecast
-          $data{$type}{$name}{nexthours}{$time_str}{pvfc}   = $pvaifc;
-          $data{$type}{$name}{nexthours}{$time_str}{aihit}  = 1;
+          my $aivar = 100 * $pvaifc / $est;
+          
+          if ($aivar >= $aiDevLowLim && $aivar <= $aiDevUpLim) {                              # Abweichung AI von Standardvorhersage begrenzen
+              $data{$type}{$name}{nexthours}{$time_str}{pvaifc} = $pvaifc;                    # durch AI gelieferte PV Forecast
+              $data{$type}{$name}{nexthours}{$time_str}{pvfc}   = $pvaifc;
+              $data{$type}{$name}{nexthours}{$time_str}{aihit}  = 1;
 
-          $pvfc = $pvaifc;
+              $pvfc  = $pvaifc;
+              $useai = 1;
+          }
       }
-      else {
+      
+      if (!$useai) {
           delete $data{$type}{$name}{nexthours}{$time_str}{pvaifc};
           $data{$type}{$name}{nexthours}{$time_str}{pvfc}  = $est;
           $data{$type}{$name}{nexthours}{$time_str}{aihit} = 0;
