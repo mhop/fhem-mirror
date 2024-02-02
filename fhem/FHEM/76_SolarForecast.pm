@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.14.2" => "02.02.2024  fix warning ",
   "1.14.1" => "01.02.2024  language support for ___setConsumerPlanningState -> supplement, fix setting 'swoncond not met' ",
   "1.14.0" => "31.01.2024  data maintenance, new sub _addDynAttr for adding attributes at runtime ".
                            "replace setter currentWeatherDev by attr ctrlWeatherDev1, new data with sub CircularSumVal ".
@@ -8722,8 +8723,8 @@ sub _calcCaQcomplex {
       return;
   }
   
-  my $chwcc           = HistoryVal ($hash, $day, sprintf("%02d",$h), 'wcc', 0);                      # Wolkenbedeckung Heute & abgefragte Stunde
-  my $range           = cloud2bin  ($chwcc);
+  my $chwcc = HistoryVal ($hash, $day, sprintf("%02d",$h), 'wcc', 0);                                # Wolkenbedeckung Heute & abgefragte Stunde
+  my $range = cloud2bin  ($chwcc);
   
   $paref->{pvrl}   = $pvrl; 
   $paref->{pvfc}   = $pvfc;
@@ -8813,7 +8814,6 @@ sub __calcNewFactor {
   my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $type   = $paref->{type};
-  my $oldfac = $paref->{oldfac};
   my $pvrl   = $paref->{pvrl};
   my $pvfc   = $paref->{pvfc};
   my $range  = $paref->{range};
