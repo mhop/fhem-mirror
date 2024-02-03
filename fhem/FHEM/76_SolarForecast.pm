@@ -157,7 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.15.0" => "03.02.2024  reduce cpu utilization ",
+  "1.15.0" => "03.02.2024  reduce cpu utilization, add attributes ctrlWeatherDev2, ctrlWeatherDev3 ",
   "1.14.3" => "02.02.2024  _transferWeatherValues: first step of multi weather device merger ",
   "1.14.2" => "02.02.2024  fix warning, _transferAPIRadiationValues: Consider upper and lower deviation limit AI to API forecast ",
   "1.14.1" => "01.02.2024  language support for ___setConsumerPlanningState -> supplement, fix setting 'swoncond not met' ",
@@ -300,6 +300,7 @@ my $kJtokWh        = 0.00027778;                                                
 my $defmaxvar      = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
 my $definterval    = 70;                                                            # Standard Abfrageintervall
 my $defslidenum    = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
+my $weatherDevMax  = 3;                                                             # max. Anzahl Wetter Devices (Attr ctrlWeatherDevX)
 my $maxSoCdef      = 95;                                                            # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
 my $carecycledef   = 20;                                                            # max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
 my $batSocChgDay   = 5;                                                             # prozentuale SoC Änderung pro Tag
@@ -476,6 +477,8 @@ my %hattr = (                                                                # H
   ctrlConsRecommendReadings => { fn => \&_attrcreateConsRecRdgs   },
   ctrlStatisticReadings     => { fn => \&_attrcreateStatisticRdgs },
   ctrlWeatherDev1           => { fn => \&_attrWeatherDev          },
+  ctrlWeatherDev2           => { fn => \&_attrWeatherDev          },
+  ctrlWeatherDev3           => { fn => \&_attrWeatherDev          },
 );
 
 my %htr = (                                                                  # Hash even/odd für <tr>
@@ -518,8 +521,8 @@ my %hqtxt = (                                                                   
                        "set LINK plantConfiguration check" oder mit Druck auf das angebotene Icon.<br>
                        Korrigieren sie bitte eventuelle Fehler und beachten sie m&ouml;gliche Hinweise.<br>
                        (Die Anzeigesprache kann mit dem Attribut "ctrlLanguage" umgestellt werden.)<hr><br>}                },
-  cfd    => { EN => qq{Please select the Weather forecast device with "attr LINK ctrlWeatherDev1"},
-              DE => qq{Bitte geben sie das Wettervorhersage Device mit "attr LINK ctrlWeatherDev1" an}                      },
+  cfd    => { EN => qq{Please enter at least one weather forecast device with "attr LINK ctrlWeatherDev1"},
+              DE => qq{Bitte geben sie mindestens ein Wettervorhersage Device mit "attr LINK ctrlWeatherDev1" an}           },
   crd    => { EN => qq{Please select the radiation forecast service with "set LINK currentRadiationAPI"},
               DE => qq{Bitte geben sie den Strahlungsvorhersage Dienst mit "set LINK currentRadiationAPI" an}               },
   cid    => { EN => qq{Please specify the Inverter device with "set LINK currentInverterDev"},
@@ -888,6 +891,7 @@ my %hcsr = (                                                                    
 # $data{$type}{$name}{aidectree}{aitrained}                                      # AI Decision Tree trainierte Daten
 # $data{$type}{$name}{aidectree}{airaw}                                          # Rohdaten für AI Input = Raw Trainigsdaten
 # $data{$type}{$name}{func}                                                      # interne Funktionen
+# $data{$type}{$name}{weatherdata}                                               # temporärer Speicher Wetterdaten
 
 ################################################################
 #               Init Fn
@@ -948,6 +952,8 @@ sub Initialize {
                                 "ctrlStatisticReadings:multiple-strict,$srd ".
                                 "ctrlUserExitFn:textField-long ".
                                 "ctrlWeatherDev1 ".
+                                "ctrlWeatherDev2 ".
+                                "ctrlWeatherDev3 ".
                                 "disable:1,0 ".
                                 "flowGraphicSize ".
                                 "flowGraphicAnimate:1,0 ".
@@ -4507,12 +4513,17 @@ sub _attrWeatherDev {                    ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $aVal  = $paref->{aVal} // return qq{no weather forecast device specified};
+  my $aVal  = $paref->{aVal} // return qq{no weather forecast device specified} if($paref->{cmd} eq 'set');
   
   return if(!$init_done);
 
-  if (!$defs{$aVal} || $defs{$aVal}{TYPE} ne "DWD_OpenData") {
-      return qq{The device "$aVal" doesn't exist or has no TYPE "DWD_OpenData"};
+  if ($paref->{cmd} eq 'set' ) {
+      if (!$defs{$aVal} || $defs{$aVal}{TYPE} ne "DWD_OpenData") {
+          return qq{The device "$aVal" doesn't exist or has no TYPE "DWD_OpenData"};
+      }
+      
+      my $err = checkdwdattr ($name, $aVal, \@dweattrmust);
+      return $err if($err);
   }
 
   InternalTimer (gettimeofday()+2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
@@ -5029,6 +5040,10 @@ sub _addDynAttr {
   @deva   = grep {!/$atd/} @deva;
 
   push @deva, ($adwds ? "ctrlWeatherDev1:$adwds " : "ctrlWeatherDev1:noArg");
+  
+  for my $step (1..$weatherDevMax) {
+      push @deva, ($adwds ? "ctrlWeatherDev".$step.":$adwds " : "ctrlWeatherDev1:noArg");
+  }
 
   $hash->{".AttrList"} = join " ", @deva;                                            
 
@@ -5591,49 +5606,49 @@ sub _transferWeatherValues {
 
   my $fcname = AttrVal ($name, 'ctrlWeatherDev1', '');                                         # Standard Weather Forecast Device
   return if(!$fcname || !$defs{$fcname});
-
-  my $err         = checkdwdattr ($name, $fcname, \@dweattrmust);
-  $paref->{state} = $err if($err);
+  
+  my $type = $paref->{type};
+  
+  delete $data{$type}{$name}{weatherdata};                                                     # Wetterdaten Hash löschen
 
   $paref->{fcname} = $fcname;
   my ($fc0_sr_mm, $fc0_ss_mm, $fc1_sr_mm, $fc1_ss_mm) = __sunRS ($paref);                      # Sonnenauf- und untergang
   delete $paref->{fcname};
   
-  for my $step (1..3) {
-      $paref->{step}      = $step;
-      $paref->{fc0_sr_mm} = $fc0_sr_mm;
-      $paref->{fc0_ss_mm} = $fc0_ss_mm;
-      $paref->{fc1_sr_mm} = $fc1_sr_mm;
-      $paref->{fc1_ss_mm} = $fc1_ss_mm;
-      
+  $paref->{fc0_sr_mm} = $fc0_sr_mm;
+  $paref->{fc0_ss_mm} = $fc0_ss_mm;
+  $paref->{fc1_sr_mm} = $fc1_sr_mm;
+  $paref->{fc1_ss_mm} = $fc1_ss_mm;
+  
+  for my $step (1..$weatherDevMax) {
+      $paref->{step}      = $step;      
       __readDataWeather ($paref);                                                              # Wetterdaten in einen Hash einlesen
-
-      delete $paref->{fc0_sr_mm};
-      delete $paref->{fc0_ss_mm};
-      delete $paref->{fc1_sr_mm};
-      delete $paref->{fc1_ss_mm};      
-      delete $paref->{step};
+       delete $paref->{step};
   }
   
-  my $time_str;
-  my $type = $paref->{type};
+  delete $paref->{fc0_sr_mm};
+  delete $paref->{fc0_ss_mm};
+  delete $paref->{fc1_sr_mm};
+  delete $paref->{fc1_ss_mm};
   
-  # Log3 ($name, 1, "$name - Weather data dump:\n". Dumper $data{$type}{$name}{weatherdata});
+  __mergeDataWeather ($paref);                                                                 # Wetterdaten zusammenfügen
+  
+  my $time_str;
+  my $cat = 'merge';
 
   for my $num (0..46) {
       my ($fd, $fh) = _calcDayHourMove ($chour, $num);
       last if($fd > 1);
 
       my $fh1   = $fh + 1;
-      my $cat   = 1;
       
-      my $wid   = $data{$type}{$name}{weatherdata}{$cat}{"fc${fd}_${fh1}"}{ww};                # signifikantes Wetter
-      my $wwd   = $data{$type}{$name}{weatherdata}{$cat}{"fc${fd}_${fh1}"}{wwd};               # Wetter Beschreibung
-      my $neff  = $data{$type}{$name}{weatherdata}{$cat}{"fc${fd}_${fh1}"}{neff};              # Effektive Wolkendecke
-      my $r101  = $data{$type}{$name}{weatherdata}{$cat}{"fc${fd}_${fh1}"}{r101};              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-      my $temp  = $data{$type}{$name}{weatherdata}{$cat}{"fc${fd}_${fh1}"}{ttt};               # Außentemperatur
-      my $don   = $data{$type}{$name}{weatherdata}{$cat}{"fc${fd}_${fh1}"}{don};               # Tag/Nacht-Grenze
-
+      my $wid   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$cat}{ww};                # signifikantes Wetter
+      my $wwd   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$cat}{wwd};               # Wetter Beschreibung
+      my $neff  = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$cat}{neff};              # Effektive Wolkendecke
+      my $r101  = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$cat}{r101};              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
+      my $temp  = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$cat}{ttt};               # Außentemperatur
+      my $don   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$cat}{don};               # Tag/Nacht-Grenze
+      
       $time_str                                             = "NextHour".sprintf "%02d", $num;
       $data{$type}{$name}{nexthours}{$time_str}{weatherid}  = $wid;
       $data{$type}{$name}{nexthours}{$time_str}{cloudcover} = $neff;
@@ -5701,8 +5716,6 @@ sub __readDataWeather {
 
   my $err         = checkdwdattr ($name, $fcname, \@dweattrmust);
   $paref->{state} = $err if($err);
-  
-  delete $data{$type}{$name}{weatherdata}{$step};
 
   debugLog ($paref, 'collectData', "collect Weather data step $step - device: $fcname =>");
 
@@ -5730,15 +5743,72 @@ sub __readDataWeather {
       
       my $fh1 = $fh + 1;
       
-      debugLog ($paref, 'collectData', "Weather storage $step: fc${fd}_${fh1}_x, don: $don, ww: $wid, R101: $r101, TTT: $temp, Neff: $neff, wwd: $wwd");
+      debugLog ($paref, 'collectData', "Weather $step: fc${fd}_${fh1}, don: $don, ww: $wid, R101: $r101, TTT: $temp, Neff: $neff, wwd: $wwd");
 
-      $data{$type}{$name}{weatherdata}{$step}{"fc${fd}_${fh1}"}{ww}   = $wid;
-      $data{$type}{$name}{weatherdata}{$step}{"fc${fd}_${fh1}"}{wwd}  = $wwd;
-      $data{$type}{$name}{weatherdata}{$step}{"fc${fd}_${fh1}"}{neff} = $neff;
-      $data{$type}{$name}{weatherdata}{$step}{"fc${fd}_${fh1}"}{r101} = $r101;
-      $data{$type}{$name}{weatherdata}{$step}{"fc${fd}_${fh1}"}{ttt}  = $temp;
-      $data{$type}{$name}{weatherdata}{$step}{"fc${fd}_${fh1}"}{don}  = $don;
+      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$step}{ww}   = $wid;
+      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$step}{wwd}  = $wwd;
+      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$step}{neff} = $neff;
+      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$step}{r101} = $r101;
+      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$step}{ttt}  = $temp;
+      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$step}{don}  = $don;
   }
+
+return;
+}
+
+################################################################
+#                     Wetterdaten mergen
+################################################################
+sub __mergeDataWeather {
+  my $paref = shift;
+  my $name  = $paref->{name};                                                                     
+  my $type  = $paref->{type};
+  
+  debugLog ($paref, 'collectData', "merge Weather data =>");
+  
+  my ($q, $m) = (0,0);
+
+  for my $key (sort keys %{$data{$type}{$name}{weatherdata}}) {
+      my ($z, $neff, $r101, $temp) = (0,0,0,0);
+      $q++;
+      
+      $data{$type}{$name}{weatherdata}{$key}{merge}{don}  = $data{$type}{$name}{weatherdata}{$key}{1}{don};
+      $data{$type}{$name}{weatherdata}{$key}{merge}{ww}   = $data{$type}{$name}{weatherdata}{$key}{1}{ww};
+      $data{$type}{$name}{weatherdata}{$key}{merge}{wwd}  = $data{$type}{$name}{weatherdata}{$key}{1}{wwd};      
+      $data{$type}{$name}{weatherdata}{$key}{merge}{neff} = $data{$type}{$name}{weatherdata}{$key}{1}{neff};
+      $data{$type}{$name}{weatherdata}{$key}{merge}{r101} = $data{$type}{$name}{weatherdata}{$key}{1}{r101};
+      $data{$type}{$name}{weatherdata}{$key}{merge}{ttt}  = $data{$type}{$name}{weatherdata}{$key}{1}{ttt};
+      
+      for my $step (1..$weatherDevMax) {
+          my $n = $data{$type}{$name}{weatherdata}{$key}{$step}{neff};
+          my $r = $data{$type}{$name}{weatherdata}{$key}{$step}{r101};
+          my $t = $data{$type}{$name}{weatherdata}{$key}{$step}{ttt};
+          
+          next if(!isNumeric ($n) || !isNumeric ($r) || !isNumeric ($t));
+                 
+          $neff += $n;
+          $r101 += $r;
+          $temp += $t;
+          $z++;
+          $m++;
+      }      
+      
+      next if(!$z);
+      
+      $data{$type}{$name}{weatherdata}{$key}{merge}{neff} = sprintf "%.0f", ($neff / $z);
+      $data{$type}{$name}{weatherdata}{$key}{merge}{r101} = sprintf "%.0f", ($r101 / $z);
+      $data{$type}{$name}{weatherdata}{$key}{merge}{ttt}  = $temp / $z;
+      
+      debugLog ($paref, 'collectData', "Weather merged: $key, ".
+                                       "don: $data{$type}{$name}{weatherdata}{$key}{merge}{don}, ".
+                                       "ww: $data{$type}{$name}{weatherdata}{$key}{1}{ww}, ".
+                                       "R101: $data{$type}{$name}{weatherdata}{$key}{merge}{r101}, ".
+                                       "TTT: $data{$type}{$name}{weatherdata}{$key}{merge}{ttt}, ".
+                                       "Neff: $data{$type}{$name}{weatherdata}{$key}{merge}{neff}, ".
+                                       "wwd: $data{$type}{$name}{weatherdata}{$key}{merge}{wwd}");                                 
+  }
+  
+  debugLog ($paref, 'collectData', "Number of Weather datasets mergers - deliverd: $q, merged: $m, failures: ".($q - $m));
 
 return;
 }
@@ -13343,24 +13413,26 @@ sub checkPlantConfig {
 
   ## Check Attribute DWD Wetterdevice
   #####################################
-  my $fcname = AttrVal ($name, 'ctrlWeatherDev1', '');
+  for my $step (1..$weatherDevMax) {  
+      my $fcname = AttrVal ($name, 'ctrlWeatherDev'.$step, ''); 
 
-  if (!$fcname || !$defs{$fcname}) {
-      $result->{'DWD Weather Attributes'}{state}   = $nok;
-      $result->{'DWD Weather Attributes'}{result} .= qq{The DWD device "$fcname" doesn't exist. <br>};
-      $result->{'DWD Weather Attributes'}{fault}   = 1;
-  }
-  else {
-      $result->{'DWD Weather Attributes'}{note} = qq{checked attributes of device "$fcname": <br>}. join ' ', @dweattrmust;
-      $err                                      = checkdwdattr ($name, $fcname, \@dweattrmust);
-
-      if ($err) {
-          $result->{'DWD Weather Attributes'}{state}  = $nok;
-          $result->{'DWD Weather Attributes'}{result} = $err;
-          $result->{'DWD Weather Attributes'}{fault}  = 1;
+      if (!$fcname || !$defs{$fcname}) {
+          $result->{'DWD Weather Attributes'}{state}   = $nok;
+          $result->{'DWD Weather Attributes'}{result} .= qq{The DWD device "$fcname" doesn't exist. <br>};
+          $result->{'DWD Weather Attributes'}{fault}   = 1;
       }
       else {
-          $result->{'DWD Weather Attributes'}{result} = $hqtxt{fulfd}{$lang};
+          $result->{'DWD Weather Attributes'}{note} .= qq{checked attributes of device "$fcname": <br>}. join (' ', @dweattrmust). '<br>';
+          $err                                       = checkdwdattr ($name, $fcname, \@dweattrmust);
+
+          if ($err) {
+              $result->{'DWD Weather Attributes'}{state}   = $nok;
+              $result->{'DWD Weather Attributes'}{result} .= $err. '<br>';
+              $result->{'DWD Weather Attributes'}{fault}   = 1;
+          }
+          else {
+              $result->{'DWD Weather Attributes'}{result} = $hqtxt{fulfd}{$lang};
+          }
       }
   }
 
@@ -13986,9 +14058,17 @@ sub createAssociatedWith {
       my (@cd,@nd);
       my ($afc,$ara,$ain,$ame,$aba,$h);
 
-      my $fcdev = AttrVal ($name, 'ctrlWeatherDev1', '');                    # Weather forecast Device
-      ($afc,$h) = parseParams ($fcdev);
-      $fcdev    = $afc->[0] // "";
+      my $fcdev1 = AttrVal ($name, 'ctrlWeatherDev1', '');                   # Weather forecast Device 1
+      ($afc,$h)  = parseParams ($fcdev1);
+      $fcdev1    = $afc->[0] // "";
+      
+      my $fcdev2 = AttrVal ($name, 'ctrlWeatherDev2', '');                   # Weather forecast Device 2
+      ($afc,$h)  = parseParams ($fcdev2);
+      $fcdev2    = $afc->[0] // "";
+      
+      my $fcdev3 = AttrVal ($name, 'ctrlWeatherDev3', '');                   # Weather forecast Device 3
+      ($afc,$h)  = parseParams ($fcdev3);
+      $fcdev3    = $afc->[0] // "";
 
       my $radev = ReadingsVal($name, 'currentRadiationAPI', '');             # Radiation forecast Device
       ($ara,$h) = parseParams ($radev);
@@ -14020,16 +14100,23 @@ sub createAssociatedWith {
 
       @nd = @cd;
 
-      push @nd, $fcdev;
-      push @nd, $radev if($radev ne $fcdev && $radev !~ /SolCast-API/xs);
+      push @nd, $fcdev1 if($fcdev1);
+      push @nd, $fcdev2 if($fcdev2);
+      push @nd, $fcdev3 if($fcdev3);
+      push @nd, $radev  if($radev !~ /^($fcdev1|$fcdev2|$fcdev3)/xs && $radev !~ /SolCast-API/xs);
       push @nd, $indev;
       push @nd, $medev;
       push @nd, $badev;
-
-      if(@nd) {
-          $hash->{NOTIFYDEV} = join ",", @cd if(@cd);
-          readingsSingleUpdate ($hash, ".associatedWith", join(" ",@nd), 0);
+      
+      my @ndn = ();
+      
+      for my $e (@nd) {
+          next if($e ~~ @ndn);
+          push @ndn, $e;
       }
+ 
+      $hash->{NOTIFYDEV} = join ",", @cd if(@cd);
+      readingsSingleUpdate ($hash, ".associatedWith", join(" ",@ndn), 0)  if(@ndn);
   }
   else {
       InternalTimer(gettimeofday()+3, "FHEM::SolarForecast::createAssociatedWith", $hash, 0);
@@ -17280,6 +17367,9 @@ to ensure that the system configuration is correct.
        sunrise/sunset, etc.). <br>
        If no device of this type exists, the selection list is empty and a device must first be defined 
        (see <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
+       If more than one ctrlWeatherDevX is specified, the average of all weather stations is determined and used 
+       if the respective value was supplied and is numerical. <br>
+       Otherwise, the data from 'ctrlWeatherDev1' is always used as the leading weather device. <br>
        At least these attributes must be set in the selected DWD_OpenData Device: <br><br>
 
        <ul>
@@ -19356,8 +19446,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        Legt das Device (Typ DWD_OpenData) fest, welches die benötigten Wetterdaten (Bewölkung, Niederschlag,
        Sonnenauf bzw. -untergang, usw.) liefert. <br>
-       Ist noch kein Device dieses Typs vorhanden, ist die Auswahlliste leer und es muß zunächst ein Device definiert 
-       werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
+       Ist noch kein Device dieses Typs vorhanden, ist die Auswahlliste leer und es muß zunächst mindestens ein Device 
+       definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
+       Sind mehr als ein ctrlWeatherDevX angegeben, wird der Durchschnitt aller Wetterstationen ermittelt und verwendet 
+       sofern der jeweilige Wert geliefert wurde und numerisch ist. <br>
+       Anderenfalls werden immer die Daten von 'ctrlWeatherDev1' als führendes Wetterdevice genutzt. <br>
        Im ausgewählten DWD_OpenData Device müssen mindestens diese Attribute gesetzt sein: <br><br>
 
        <ul>
