@@ -32,6 +32,8 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.23.8" => "21.01.2024  Voltage L1-L2-L3 bug",
+  "2.23.7" => "25.12.2023  add DC-Power PV-Inverter",
   "2.23.6" => "24.09.2023  add BAT_P_Charge/Discarge",
   "2.23.5" => "25.06.2023  buxfix line 1267",
   "2.23.4" => "20.06.2023  buxfix DC-Power 2.0",
@@ -904,8 +906,8 @@ sub SMAInverter_getstatusDoParse($) {
 		push(@commands, "sup_SpotBatteryUnload");       	# Check BatteryUnload
 	 }
 	 
-	 push(@commands, "sup_PVEnergyProduction") if($INVCLASS eq "8009");    					# Check PV-EnergyProduction (Hybrid Inverter)
-     push(@commands, "sup_SpotDCPower_3")      if($INVCLASS eq "8009");  					# SpotDCPower summary
+	 push(@commands, "sup_PVEnergyProduction") if($INVCLASS eq "8009");    						# Check PV-EnergyProduction (Hybrid Inverter)
+     push(@commands, "sup_SpotDCPower_3")      if($INVCLASS eq "8009" || $INVCLASS eq "8001");  # SpotDCPower summary
 	 
 	 #push(@commands, "sup_SpotDCPower_2")      if($INVTYPE  >= 9488 && $INVTYPE  <= 9493);  # SpotDCPower String 3 and more
 	 
@@ -2207,8 +2209,10 @@ sub SMAInverter_SMAcommand($$$$$) {
  }
  
  if($data_ID eq 0x46C2) {
-     $inv_SPOT_PDC = unpack("V*", substr $data, 62, 4);
-     $inv_SPOT_PDC = ($inv_SPOT_PDC == 2147483648) ? 0 : $inv_SPOT_PDC;
+     #$inv_SPOT_PDC = unpack("V*", substr $data, 62, 4);
+     #$inv_SPOT_PDC = ($inv_SPOT_PDC == 2147483648) ? 0 : $inv_SPOT_PDC;
+	 $inv_SPOT_PDC = unpack("l*", substr $data, 62, 4);
+	 if(($inv_SPOT_PDC eq -2147483648) || ($inv_SPOT_PDC eq 0xFFFFFFFF)) {$inv_SPOT_PDC = "-"; }
      Log3 $name, 5, "$name - Found Data SPOT_PDC=$inv_SPOT_PDC";
      return (1,$inv_SPOT_PDC,$inv_susyid,$inv_serial);
  } 
@@ -2294,9 +2298,17 @@ sub SMAInverter_SMAcommand($$$$$) {
      $inv_SPOT_UAC1 = unpack("l*", substr $data, 62, 4);
      $inv_SPOT_UAC2 = unpack("l*", substr $data, 90, 4);
      $inv_SPOT_UAC3 = unpack("l*", substr $data, 118, 4);
-     $inv_SPOT_UAC1_2 = unpack("l*", substr $data, 146, 4);
-     $inv_SPOT_UAC2_3 = unpack("l*", substr $data, 174, 4);
-     $inv_SPOT_UAC3_1 = unpack("l*", substr $data, 202, 4);
+	 if($size >= 230) {
+		$inv_SPOT_UAC1_2 = unpack("l*", substr $data, 146, 4);
+		$inv_SPOT_UAC2_3 = unpack("l*", substr $data, 174, 4);
+		$inv_SPOT_UAC3_1 = unpack("l*", substr $data, 202, 4);
+	 }
+	 else
+	 {
+		$inv_SPOT_UAC1_2 = "-";
+		$inv_SPOT_UAC2_3 = "-";
+		$inv_SPOT_UAC3_1 = "-";
+	 }
 	 
 	 if($size >= 230) {
 		 $inv_SPOT_CosPhi = unpack("l*", substr $data, 230, 4);
@@ -2310,10 +2322,11 @@ sub SMAInverter_SMAcommand($$$$$) {
      if(($inv_SPOT_UAC1 eq -2147483648) || ($inv_SPOT_UAC1 eq 0xFFFFFFFF) || $inv_SPOT_UAC1 < 0) {$inv_SPOT_UAC1 = "-"; } else {$inv_SPOT_UAC1 = $inv_SPOT_UAC1 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
      if(($inv_SPOT_UAC2 eq -2147483648) || ($inv_SPOT_UAC2 eq 0xFFFFFFFF) || $inv_SPOT_UAC2 < 0) {$inv_SPOT_UAC2 = "-"; } else {$inv_SPOT_UAC2 = $inv_SPOT_UAC2 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
      if(($inv_SPOT_UAC3 eq -2147483648) || ($inv_SPOT_UAC3 eq 0xFFFFFFFF) || $inv_SPOT_UAC3 < 0) {$inv_SPOT_UAC3 = "-"; } else {$inv_SPOT_UAC3 = $inv_SPOT_UAC3 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_UAC1_2 eq -2147483648) || ($inv_SPOT_UAC1_2 eq 0xFFFFFFFF) || $inv_SPOT_UAC1_2 < 0) {$inv_SPOT_UAC1_2 = "-"; } else {$inv_SPOT_UAC1_2 = $inv_SPOT_UAC1_2 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_UAC2_3 eq -2147483648) || ($inv_SPOT_UAC2_3 eq 0xFFFFFFFF) || $inv_SPOT_UAC2_3 < 0) {$inv_SPOT_UAC2_3 = "-"; } else {$inv_SPOT_UAC2_3 = $inv_SPOT_UAC2_3 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_UAC3_1 eq -2147483648) || ($inv_SPOT_UAC3_1 eq 0xFFFFFFFF) || $inv_SPOT_UAC3_1 < 0) {$inv_SPOT_UAC3_1 = "-"; } else {$inv_SPOT_UAC3_1 = $inv_SPOT_UAC3_1 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     
+	 if($size >= 230) {
+		if(($inv_SPOT_UAC1_2 eq -2147483648) || ($inv_SPOT_UAC1_2 eq 0xFFFFFFFF) || $inv_SPOT_UAC1_2 < 0) {$inv_SPOT_UAC1_2 = "-"; } else {$inv_SPOT_UAC1_2 = $inv_SPOT_UAC1_2 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		if(($inv_SPOT_UAC2_3 eq -2147483648) || ($inv_SPOT_UAC2_3 eq 0xFFFFFFFF) || $inv_SPOT_UAC2_3 < 0) {$inv_SPOT_UAC2_3 = "-"; } else {$inv_SPOT_UAC2_3 = $inv_SPOT_UAC2_3 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		if(($inv_SPOT_UAC3_1 eq -2147483648) || ($inv_SPOT_UAC3_1 eq 0xFFFFFFFF) || $inv_SPOT_UAC3_1 < 0) {$inv_SPOT_UAC3_1 = "-"; } else {$inv_SPOT_UAC3_1 = $inv_SPOT_UAC3_1 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     }
      Log3 $name, 5, "$name - Found Data SPOT_UAC1=$inv_SPOT_UAC1 and SPOT_UAC2=$inv_SPOT_UAC2 and SPOT_UAC3=$inv_SPOT_UAC3 and inv_SPOT_UAC1_2=$inv_SPOT_UAC1_2 and inv_SPOT_UAC2_3=$inv_SPOT_UAC2_3 and inv_SPOT_UAC3_1=$inv_SPOT_UAC3_1 and inv_SPOT_CosPhi=$inv_SPOT_CosPhi";
      return (1,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_UAC1_2,$inv_SPOT_UAC2_3,$inv_SPOT_UAC3_1,$inv_SPOT_CosPhi,$inv_susyid,$inv_serial);
  }
@@ -3507,7 +3520,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.23.6",
+  "version": "v2.23.8",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
