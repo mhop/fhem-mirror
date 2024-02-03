@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.15.0" => "03.02.2024  reduce cpu utilization ",
   "1.14.3" => "02.02.2024  _transferWeatherValues: first step of multi weather device merger ",
   "1.14.2" => "02.02.2024  fix warning, _transferAPIRadiationValues: Consider upper and lower deviation limit AI to API forecast ",
   "1.14.1" => "01.02.2024  language support for ___setConsumerPlanningState -> supplement, fix setting 'swoncond not met' ",
@@ -555,8 +556,8 @@ my %hqtxt = (                                                                   
               DE => qq{swoncond erfüllt}                                                                                    },
   swofmt => { EN => qq{swoffcond met},
               DE => qq{swoffcond erfüllt}                                                                                   },
-  emsple => { EN => qq{expected max surplus less than},
-              DE => qq{erwarteter max Überschuss weniger als}                                                               },
+  emsple => { EN => qq{max surplus forecast too low},
+              DE => qq{max Überschußprognose zu gering}                                                                     },
   nmspld => { EN => qq{no max surplus found for current day},
               DE => qq{kein max Überschuss für den aktuellen Tag gefunden}                                                  },
   state  => { EN => qq{Status},
@@ -4183,6 +4184,11 @@ return;
 }
 
 ################################################################
+#                      Attr 
+# $cmd can be "del" or "set"
+# $name is device name
+# aName and aVal are Attribute name and value
+################################################################
 sub Attr {
   my $cmd   = shift;
   my $name  = shift;
@@ -4193,19 +4199,19 @@ sub Attr {
   my $type  = $hash->{TYPE};
 
   my ($do,$val, $err);
-
-  # $cmd can be "del" or "set"
-  # $name is device name
-  # aName and aVal are Attribute name and value
   
+  ### nicht mehr benötigte Daten löschen - Bereich kann später wieder raus !!
+  ##########################################################################################
   if ($cmd eq 'set' && $aName eq 'affectNumHistDays') {
       if (!$init_done) {
-          return qq{Device "$name" -> The attribute 'affectNumHistDays' is obsolete and will be deleted soon. Please press "save config" when restart is finished.};
+          return qq{Device "$name" -> The attribute '$aName' is obsolete and will be deleted soon. Please press "save config" when restart is finished.};
       }
       else {
-          return qq{The attribute 'affectNumHistDays' is obsolete and will be deleted soon.};
+          return qq{The attribute '$aName' is obsolete and will be deleted soon.};
       }
   }
+  
+  ##########################################################################################
 
   if ($aName eq 'disable') {
       if($cmd eq 'set') {
@@ -4914,24 +4920,30 @@ return @pvconf;
 
 ################################################################
 #              centralTask Start Management
+#     Achtung: relevant für CPU Auslastung!
 ################################################################
 sub runCentralTask {
   my $hash = shift;
 
-  return if(!$init_done);
+  return if(!$init_done || CurrentVal ($hash, 'ctrunning', 0));
 
-  my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};
+  my $t           = time;
+  my $ms          = strftime "%M:%S", localtime($t);
+  my ($min, $sec) = split ':', $ms;                                                  # aktuelle Minute (00-59), aktuelle Sekunde (00-61)
+  $min            = int $min;
+  $sec            = int $sec;
   
-  _addDynAttr ($hash);
-
-  return if(CurrentVal ($hash, 'ctrunning', 0));
-
-  my $debug;
-  my $t        = time;
-  my $second   = int (strftime "%S", localtime($t));                                 # aktuelle Sekunde (00-61)
-  my $minute   = int (strftime "%M", localtime($t));                                 # aktuelle Minute (00-59)
+  if ($sec > 10) {                                                                   # Attribute zur Laufzeit hinzufügen
+      if (!exists $hash->{HELPER}{S10DONE}) {
+          $hash->{HELPER}{S10DONE} = 1;          
+          _addDynAttr ($hash);                                                       # relevant für CPU Auslastung!!
+      }
+  }
+  else {
+      delete $hash->{HELPER}{S10DONE};
+  }
   
+  my $name                             = $hash->{NAME};
   my ($interval, $disabled, $inactive) = controller ($name);
 
   if (!$interval) {
@@ -4956,42 +4968,42 @@ sub runCentralTask {
       my $new       = $t + $interval;                                                # nächste Wiederholungszeit
       $hash->{MODE} = 'Automatic - next Cycletime: '.FmtTime($new);
 
-      $data{$type}{$name}{current}{nextCycleTime} = $new;
+      $data{$hash->{TYPE}}{$name}{current}{nextCycleTime} = $new;
 
       storeReading ('nextCycletime', FmtTime($new));
       centralTask  ($hash, 1);
   }
 
-  if ($minute == 59 && $second > 48 && $second < 58) {
-      if (!exists $hash->{HELPER}{S58DONE}) {
-          $debug                   = getDebug ($hash);
-          $hash->{HELPER}{S58DONE} = 1;
+  if ($min == 59 && $sec > 48) {
+      if (!exists $hash->{HELPER}{S48DONE}) {
+          my $debug                = getDebug ($hash);
+          $hash->{HELPER}{S48DONE} = 1;
 
           if ($debug =~ /collectData/x) {
-              Log3 ($name, 1, "$name DEBUG> Start of unscheduled data collection at the end of an hour");
+              Log3 ($name, 1, "$name DEBUG> INFO - Start of unscheduled data collection at the end of an hour");
           }
 
           centralTask ($hash, 1);
       }
   }
   else {
-      delete $hash->{HELPER}{S58DONE};
+      delete $hash->{HELPER}{S48DONE};
   }
 
-  if ($minute == 0 && $second > 3 && $second < 20) {
-      if (!exists $hash->{HELPER}{S20DONE}) {
-          $debug                   = getDebug ($hash);
-          $hash->{HELPER}{S20DONE} = 1;
+  if ($min == 0 && $sec > 3) {
+      if (!exists $hash->{HELPER}{S03DONE}) {
+          my $debug                = getDebug ($hash);
+          $hash->{HELPER}{S03DONE} = 1;
 
           if ($debug =~ /collectData/x) {
-              Log3 ($name, 1, "$name DEBUG> Start of unscheduled data collection at the beginning of an hour");
+              Log3 ($name, 1, "$name DEBUG> INFO - Start of unscheduled data collection at the beginning of an hour");
           }
-
+          
           centralTask ($hash, 1);
       }
   }
   else {
-      delete $hash->{HELPER}{S20DONE};
+      delete $hash->{HELPER}{S03DONE};
   }
 
 return;
@@ -5051,7 +5063,7 @@ sub centralTask {
   RemoveInternalTimer ($hash, 'FHEM::SolarForecast::centralTask');
   RemoveInternalTimer ($hash, 'FHEM::SolarForecast::singleUpdateState');
 
-  ### nicht mehr benötigte Readings/Daten löschen - Bereich kann später wieder raus !!
+  ### nicht mehr benötigte Daten löschen - Bereich kann später wieder raus !!
   ##########################################################################################
   ## nicht-Bin Werte löschen
   my $ra = '0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90|95|100|percentile';
@@ -7620,7 +7632,7 @@ sub ___doPlanning {
               last;
           }
           else {
-              $paref->{supplement} = encode('utf8', $hqtxt{emsple}{$lang}).' '.$epiece1;              # 'erwarteter max Überschuss weniger als'
+              $paref->{supplement} = encode('utf8', $hqtxt{emsple}{$lang});                            # 'erwarteter max Überschuss weniger als'
               $paref->{ps}         = 'suspended:';
 
               ___setConsumerPlanningState ($paref);
@@ -9673,7 +9685,7 @@ sub _checkSetupNotComplete {
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
 
-  ### nicht mehr benötigte Readings/Daten löschen - Bereich kann später wieder raus !!
+  ### nicht mehr benötigte Daten löschen - Bereich kann später wieder raus !!
   ##########################################################################################
   ## currentWeatherDev in Attr umsetzen
   ## currentWeatherDev in Attr umsetzen
