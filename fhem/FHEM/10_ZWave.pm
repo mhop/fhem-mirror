@@ -1848,9 +1848,6 @@ ZWave_meterParse($$)
   my $meter_type_text = ($meter_type > $#meter_type_text ?
                        "UNKNOWN_${meter_type}" : $meter_type_text[$meter_type]);
 
-  my $rate_type = ($v1 >> 5) & 0x3; # ("undef","_import", "_export")
-  $meter_type_text .= "_export" if($meter_type == 1 && $rate_type == 2); #136912
-
   my $precision = ($v2>>5) & 0x7; # 3 bits
   my $scale     = ($v2>>3) & 0x3; # 2 bits, meaning unit
   my $size      =  $v2     & 0x7; # 3 bits
@@ -1867,6 +1864,8 @@ ZWave_meterParse($$)
     $meter_type_text = "powerFactor";
     $unit_text = "";
   }
+  my $rate_type = ($v1 >> 5) & 0x3; # ("undef","_import", "_export")
+  $meter_type_text .= "_export" if($meter_type == 1 && $rate_type == 2); #136912
 
   my $mv = hex(substr($v3, 0, 2*$size));
   $mv = ($mv >> 31 ? $mv - 2 ** 32 : $mv) if($size == 4);
