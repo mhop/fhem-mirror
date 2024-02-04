@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.15.1" => "04.02.2024  checkPlantConfig: fix check attribute ctrlWeatherDevX ",
   "1.15.0" => "03.02.2024  reduce cpu utilization, add attributes ctrlWeatherDev2, ctrlWeatherDev3 ",
   "1.14.3" => "02.02.2024  _transferWeatherValues: first step of multi weather device merger ",
   "1.14.2" => "02.02.2024  fix warning, _transferAPIRadiationValues: Consider upper and lower deviation limit AI to API forecast ",
@@ -567,6 +568,8 @@ my %hqtxt = (                                                                   
               DE => qq{Status}                                                                                              },
   result => { EN => qq{Result},
               DE => qq{Ergebnis}                                                                                            },
+  attrib => { EN => qq{attribute},
+              DE => qq{Attribut}                                                                                            },
   note   => { EN => qq{Note},
               DE => qq{Hinweis}                                                                                             },
   wfmdcf => { EN => qq{Wait for more days with a consumption figure},
@@ -4921,7 +4924,7 @@ sub _savePlantConfig {
                    );
 
   for my $cfg (@aconfigs) {
-      my $val = ReadingsVal($name, $cfg, "");
+      my $val = ReadingsVal ($name, $cfg, "");
       next if(!$val);
       push @pvconf, $cfg."<>".$val;
   }
@@ -13415,23 +13418,31 @@ sub checkPlantConfig {
   #####################################
   for my $step (1..$weatherDevMax) {  
       my $fcname = AttrVal ($name, 'ctrlWeatherDev'.$step, ''); 
+      next if(!$fcname && $step ne 1);
 
       if (!$fcname || !$defs{$fcname}) {
-          $result->{'DWD Weather Attributes'}{state}   = $nok;
-          $result->{'DWD Weather Attributes'}{result} .= qq{The DWD device "$fcname" doesn't exist. <br>};
-          $result->{'DWD Weather Attributes'}{fault}   = 1;
+          $result->{'DWD Weather Attributes'}{state} = $nok;
+          
+          if (!$fcname) {
+              $result->{'DWD Weather Attributes'}{result} .= qq{No DWD device is defined in attribute "ctrlWeatherDev$step". <br>};
+          }
+          else {
+              $result->{'DWD Weather Attributes'}{result} .= qq{The DWD device "$fcname" doesn't exist. <br>};
+          }
+          
+          $result->{'DWD Weather Attributes'}{fault} = 1;
       }
       else {
-          $result->{'DWD Weather Attributes'}{note} .= qq{checked attributes of device "$fcname": <br>}. join (' ', @dweattrmust). '<br>';
+          $result->{'DWD Weather Attributes'}{note} .= qq{checked attributes of device "$fcname": <br>}. join (' ', @dweattrmust).'<br>';
           $err                                       = checkdwdattr ($name, $fcname, \@dweattrmust);
 
           if ($err) {
               $result->{'DWD Weather Attributes'}{state}   = $nok;
-              $result->{'DWD Weather Attributes'}{result} .= $err. '<br>';
+              $result->{'DWD Weather Attributes'}{result} .= $err.'<br>';
               $result->{'DWD Weather Attributes'}{fault}   = 1;
           }
           else {
-              $result->{'DWD Weather Attributes'}{result} = $hqtxt{fulfd}{$lang};
+              $result->{'DWD Weather Attributes'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: ctrlWeatherDev$step)<br>";      
           }
       }
   }
@@ -15796,12 +15807,13 @@ to ensure that the system configuration is correct.
 
     After the definition of the device, depending on the forecast sources used, it is mandatory to store additional
     plant-specific information with the corresponding set commands. <br>
-    The following set commands are used to store information that is relevant for the function of the module: <br><br>
+    The following set commands and attributes are used to store information that is relevant for the function of the 
+    module: <br><br>
 
       <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>currentWeatherDev</b>    </td><td>DWD_OpenData Device which provides meteorological data (e.g. cloud cover)     </td></tr>
+            <tr><td> <b>ctrlWeatherDevX</b>      </td><td>DWD_OpenData Device which provides meteorological data (e.g. cloud cover)     </td></tr>
             <tr><td> <b>currentRadiationAPI </b> </td><td>DWD_OpenData Device or API for the delivery of radiation data.                </td></tr>
             <tr><td> <b>currentInverterDev</b>   </td><td>Device which provides PV performance data                                     </td></tr>
             <tr><td> <b>currentMeterDev</b>      </td><td>Device which supplies network I/O data                                        </td></tr>
@@ -17363,8 +17375,7 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-ctrlWeatherDev" data-pattern="ctrlWeatherDev.*"></a>
        <li><b>ctrlWeatherDevX </b> <br><br>
 
-       Defines the device (type DWD_OpenData), which provides the required weather data (cloudiness, precipitation,
-       sunrise/sunset, etc.). <br>
+       Defines the device (type DWD_OpenData), which provides the required weather data (cloudiness, precipitation, etc.). <br>
        If no device of this type exists, the selection list is empty and a device must first be defined 
        (see <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
        If more than one ctrlWeatherDevX is specified, the average of all weather stations is determined and used 
@@ -17381,6 +17392,10 @@ to ensure that the system configuration is correct.
             <tr><td> <b>forecastStation</b>         </td><td>&lt;Station code of the evaluated DWD station&gt;   </td></tr>
          </table>
        </ul>
+       <br>
+       
+       <b>Note:</b> If the latitude and longitude attributes are set in the global device, the sunrise and sunset 
+                    result from this information.
        </li>
        <br>
 
@@ -17865,13 +17880,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
     Nach der Definition des Devices sind in Abhängigkeit der verwendeten Prognosequellen zwingend weitere
     anlagenspezifische Angaben mit den entsprechenden set-Kommandos zu hinterlegen. <br>
-    Mit nachfolgenden set-Kommandos werden für die Funktion des Moduls maßgebliche Informationen
+    Mit nachfolgenden set-Kommandos und Attributen werden für die Funktion des Moduls maßgebliche Informationen
     hinterlegt: <br><br>
 
       <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>currentWeatherDev</b>    </td><td>DWD_OpenData Device welches meteorologische Daten (z.B. Bewölkung) liefert     </td></tr>
+            <tr><td> <b>ctrlWeatherDevX</b>      </td><td>DWD_OpenData Device welches meteorologische Daten (z.B. Bewölkung) liefert     </td></tr>
             <tr><td> <b>currentRadiationAPI </b> </td><td>DWD_OpenData Device bzw. API zur Lieferung von Strahlungsdaten                 </td></tr>
             <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert                                       </td></tr>
             <tr><td> <b>currentMeterDev</b>      </td><td>Device welches Netz I/O-Daten liefert                                          </td></tr>
@@ -19444,8 +19459,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-ctrlWeatherDev" data-pattern="ctrlWeatherDev.*"></a>
        <li><b>ctrlWeatherDevX </b> <br><br>
 
-       Legt das Device (Typ DWD_OpenData) fest, welches die benötigten Wetterdaten (Bewölkung, Niederschlag,
-       Sonnenauf bzw. -untergang, usw.) liefert. <br>
+       Legt das Device (Typ DWD_OpenData) fest, welches die benötigten Wetterdaten (Bewölkung, Niederschlag, usw.) 
+       liefert. <br>
        Ist noch kein Device dieses Typs vorhanden, ist die Auswahlliste leer und es muß zunächst mindestens ein Device 
        definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
        Sind mehr als ein ctrlWeatherDevX angegeben, wird der Durchschnitt aller Wetterstationen ermittelt und verwendet 
@@ -19462,6 +19477,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
              <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;  </td></tr>
           </table>
        </ul>
+       <br>
+       
+       <b>Hinweis:</b> Sind die Attribute latitude und longitude im global Device gesetzt, ergibt sich der 
+                       Sonnenauf- und Sonnenuntergang aus diesen Angaben.
        </li>
        <br>
 
