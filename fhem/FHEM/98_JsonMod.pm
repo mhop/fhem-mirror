@@ -253,7 +253,7 @@ sub JsonMod_WritePvtConfig {
 	};
 	$hash->{'SECRETS'} = join ", ", keys (%{$hash->{'CONFIG'}->{'SECRET'}});
 	my $key = $hash->{'FUUID'};
-	my $val = MIME::Base64::encode(JsonMod::JSON::StreamWriter->new()->parse($data));
+	my $val = MIME::Base64::encode(JsonMod::JSON::StreamWriter->new()->parse($data), '');
 	my $error = setKeyValue($key, $val);
 	return;
 };
