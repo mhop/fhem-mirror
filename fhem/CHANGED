@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  72_FRITZBOX: kleiner Fehler bei set <name> smartHome tempOffset
  - bugfix:  76_SolarForecast: fix plant check ctrlWeatherDevX
  - feature: 76_SolarForecast: add attr ctrlWeatherDev2, ctrlWeatherDev3
  - bugfix:  76_SMAInverter: Voltage L1-L2-L3 bug
