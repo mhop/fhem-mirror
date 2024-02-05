@@ -157,7 +157,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.15.2" => "05.02.2024  __mergeDataWeather: fix merger failures, number of temperature decimal places ",
+  "1.15.2" => "05.02.2024  __mergeDataWeather: fix merger failures, number of temperature decimal places ".
+                           "cicrular Hash: replace 'percentile' by 'simple' ",
   "1.15.1" => "04.02.2024  checkPlantConfig: fix check attribute ctrlWeatherDevX ",
   "1.15.0" => "03.02.2024  reduce cpu utilization, add attributes ctrlWeatherDev2, ctrlWeatherDev3 ",
   "1.14.3" => "02.02.2024  _transferWeatherValues: first step of multi weather device merger ",
@@ -4212,7 +4213,7 @@ sub Attr {
   
   ### nicht mehr benötigte Daten löschen - Bereich kann später wieder raus !!
   ##########################################################################################
-  if ($cmd eq 'set' && $aName eq 'affectNumHistDays') {
+  if ($cmd eq 'set' && $aName eq 'affectNumHistDays') {                           # 30.01.2024
       if (!$init_done) {
           return qq{Device "$name" -> The attribute '$aName' is obsolete and will be deleted soon. Please press "save config" when restart is finished.};
       }
@@ -5084,10 +5085,34 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten löschen - Bereich kann später wieder raus !!
   ##########################################################################################
-  ## nicht-Bin Werte löschen
-  my $ra = '0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90|95|100|percentile';
+  ## percentile in simple umsetzen                                 # 05.02.2024
+  for my $idx (sort keys %{$data{$type}{$name}{circular}}) {
+      if(defined $data{$type}{$name}{circular}{$idx}{pvcorrf}{percentile}) {
+          $data{$type}{$name}{circular}{$idx}{pvcorrf}{simple} = $data{$type}{$name}{circular}{$idx}{pvcorrf}{percentile};
+          delete $data{$type}{$name}{circular}{$idx}{pvcorrf}{percentile};
+      }
+      if(defined $data{$type}{$name}{circular}{$idx}{quality}{percentile}) {
+          $data{$type}{$name}{circular}{$idx}{quality}{simple} = $data{$type}{$name}{circular}{$idx}{quality}{percentile};
+          delete $data{$type}{$name}{circular}{$idx}{quality}{percentile};
+      }
+      if(defined $data{$type}{$name}{circular}{$idx}{pvrlsum}{percentile}) {
+          $data{$type}{$name}{circular}{$idx}{pvrlsum}{simple} = $data{$type}{$name}{circular}{$idx}{pvrlsum}{percentile};
+          delete $data{$type}{$name}{circular}{$idx}{pvrlsum}{percentile};
+      }
+      if(defined $data{$type}{$name}{circular}{$idx}{pvfcsum}{percentile}) {
+          $data{$type}{$name}{circular}{$idx}{pvfcsum}{simple} = $data{$type}{$name}{circular}{$idx}{pvfcsum}{percentile};
+          delete $data{$type}{$name}{circular}{$idx}{pvfcsum}{percentile};
+      }
+      if(defined $data{$type}{$name}{circular}{$idx}{dnumsum}{percentile}) {
+          $data{$type}{$name}{circular}{$idx}{dnumsum}{simple} = $data{$type}{$name}{circular}{$idx}{dnumsum}{percentile};
+          delete $data{$type}{$name}{circular}{$idx}{dnumsum}{percentile};
+      }
+  } 
+    
+  ## nicht-Bin Werte löschen  
+  my $ra = '0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90|95|100|percentile|simple';
   
-  for my $hod (keys %{$data{$type}{$name}{circular}}) {
+  for my $hod (keys %{$data{$type}{$name}{circular}}) {                                           # 30.01.2024
       for my $range (keys %{$data{$type}{$name}{circular}{$hod}{pvcorrf}}) {
           delete $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range} if($range !~ /^($ra)$/xs);
       }
@@ -5097,7 +5122,7 @@ sub centralTask {
       }
   }
   ## currentWeatherDev in Attr umsetzen
-  my $cwd = ReadingsVal ($name, 'currentWeatherDev', '');
+  my $cwd = ReadingsVal ($name, 'currentWeatherDev', '');                                        # 30.01.2024
   if ($cwd) {
       CommandAttr (undef, "$name ctrlWeatherDev1 $cwd");
       readingsDelete ($hash, 'currentWeatherDev') if(AttrVal ($name, 'ctrlWeatherDev1', ''));  # erst prüfen ob gesetzt
@@ -6149,7 +6174,7 @@ return $pvsum;
 #  speichert die Werte im Nexthours / pvHistory Hash
 #
 #  Simple:
-#  Liest Korrekturfaktor/Qualität aus pvCircular percentile und
+#  Liest Korrekturfaktor/Qualität aus pvCircular simple und
 #  speichert die Werte im Nexthours / pvHistory Hash
 ######################################################################
 sub ___readCandQ {
@@ -6178,13 +6203,13 @@ sub ___readCandQ {
       $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange} = $range;
   }
   elsif ($acu =~ /on_simple/xs) {
-      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), 'percentile', undef);            # Korrekturfaktor/Qualität der Stunde des Tages (simple)
+      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), 'simple', undef);                # Korrekturfaktor/Qualität der Stunde des Tages (simple)
       $hq      //= '-';
       $hc      //= 1;                                                                                 # Korrekturfaktor = 1
       $hc        = 1 if(1 * $hc == 0);                                                                # 0.0-Werte ignorieren (Schleifengefahr)
   }
   else {                                                                                              # keine Autokorrektur
-      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), 'percentile', undef);            # Korrekturfaktor/Qualität der Stunde des Tages (simple)
+      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), 'simple', undef);                # Korrekturfaktor/Qualität der Stunde des Tages (simple)
       $hq      //= '-';
       $hc        = 1;
   }
@@ -8968,7 +8993,7 @@ sub _calcCaQsimple {
 
   $paref->{pvrl}   = $pvrl; 
   $paref->{pvfc}   = $pvfc;
-  $paref->{range}  = 'percentile'; 
+  $paref->{range}  = 'simple'; 
   $paref->{calc}   = 'Simple';     
   
   my ($oldfac, $factor, $dnum) = __calcNewFactor ($paref);
@@ -9770,8 +9795,7 @@ sub _checkSetupNotComplete {
   ### nicht mehr benötigte Daten löschen - Bereich kann später wieder raus !!
   ##########################################################################################
   ## currentWeatherDev in Attr umsetzen
-  ## currentWeatherDev in Attr umsetzen
-  my $cwd = ReadingsVal ($name, 'currentWeatherDev', '');
+  my $cwd = ReadingsVal ($name, 'currentWeatherDev', '');                     # 30.01.2024
   if ($cwd) {
       CommandAttr (undef, "$name ctrlWeatherDev1 $cwd");
   }
@@ -13294,7 +13318,7 @@ sub _ldchash2val {
       no warnings 'numeric';
       
       for my $f (sort {$a<=>$b} keys %{$pool->{$idx}{$key}}) {
-          next if($f eq 'percentile');
+          next if($f eq 'simple');
           $ret .= " " if($ret);
           $ret .= "$f=".$pool->{$idx}{$key}{$f};
           my $ct = ($ret =~ tr/=// // 0) / 10;
@@ -13303,10 +13327,10 @@ sub _ldchash2val {
       
       use warnings;
 
-      if (defined $pool->{$idx}{$key}{percentile}) {
+      if (defined $pool->{$idx}{$key}{simple}) {
           $ret .= "\n              " if($ret && $ret !~ /\n\s+$/xs);
-          $ret .= " "             if($ret);
-          $ret .= "percentile=".$pool->{$idx}{$key}{percentile};
+          $ret .= " "                if($ret);
+          $ret .= "simple=".$pool->{$idx}{$key}{simple};
       }
   }
   else {
@@ -15354,7 +15378,7 @@ return $def;
 #    $q:      Qualität des Korrekturfaktors
 #
 #    $hod:    Stunde des Tages (01,02,...,24)
-#    $range:  Range Bewölkung (1...100) oder "percentile"
+#    $range:  Range Bewölkung (1...100) oder "simple"
 #    $def:    Defaultwert
 #
 ################################################################
@@ -15398,7 +15422,7 @@ return ($pvcorrf, $quality);
 #    $dnumsum:   Anzahl Tage pro Bewölkungsbereich über die gesamte Laufzeit
 #
 #    $hod:       Stunde des Tages (01,02,...,24)
-#    $range:     Range Bewölkung (1...100) oder "percentile"
+#    $range:     Range Bewölkung (1...100) oder "simple"
 #    $def:       Defaultwert
 #
 #######################################################################################################
@@ -16740,11 +16764,11 @@ to ensure that the system configuration is correct.
             <tr><td> <b>pvapifc</b>          </td><td>expected PV generation (Wh) of the API used                                                                           </td></tr>
             <tr><td> <b>pvaifc</b>           </td><td>PV forecast (Wh) of the AI for the next 24h from the current hour of the day                                          </td></tr>
             <tr><td> <b>pvfc</b>             </td><td>PV forecast used for the next 24h from the current hour of the day                                                    </td></tr>
-            <tr><td> <b>pvcorrf</b>          </td><td>Autocorrection factors for the hour of the day, where "percentile" is the simple correction factor.                   </td></tr>
+            <tr><td> <b>pvcorrf</b>          </td><td>Autocorrection factors for the hour of the day, where 'simple' is the simple correction factor.                       </td></tr>
             <tr><td> <b>pvfcsum</b>          </td><td>summary PV forecast per cloud area over the entire term                                                               </td></tr>
             <tr><td> <b>pvrl</b>             </td><td>real PV generation of the last 24h (Attention: pvforecast and pvreal do not refer to the same period!)                </td></tr>
             <tr><td> <b>pvrlsum</b>          </td><td>summary real PV generation per cloud area over the entire term                                                        </td></tr>
-            <tr><td> <b>quality</b>          </td><td>Quality of the autocorrection factors (0..1), where "percentile" is the quality of the simple correction factor.      </td></tr>
+            <tr><td> <b>quality</b>          </td><td>Quality of the autocorrection factors (0..1), where 'simple' is the quality of the simple correction factor.          </td></tr>
             <tr><td> <b>runTimeTrainAI</b>   </td><td>Duration of the last AI training                                                                                      </td></tr>
             <tr><td> <b>tdayDvtn</b>         </td><td>Today's deviation PV forecast/generation in %                                                                         </td></tr>
             <tr><td> <b>temp</b>             </td><td>Outdoor temperature                                                                                                   </td></tr>
@@ -18823,11 +18847,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>pvapifc</b>          </td><td>erwartete PV Erzeugung (Wh) der verwendeten API                                                                           </td></tr>
             <tr><td> <b>pvaifc</b>           </td><td>PV Vorhersage (Wh) der KI für die nächsten 24h ab aktueller Stunde des Tages                                              </td></tr>
             <tr><td> <b>pvfc</b>             </td><td>verwendete PV Prognose für die nächsten 24h ab aktueller Stunde des Tages                                                 </td></tr>
-            <tr><td> <b>pvcorrf</b>          </td><td>Autokorrekturfaktoren für die Stunde des Tages, wobei "percentile" der einfache (simple) Korrekturfaktor ist.             </td></tr>
+            <tr><td> <b>pvcorrf</b>          </td><td>Autokorrekturfaktoren für die Stunde des Tages, wobei 'simple' der einfach berechnete Korrekturfaktor ist.                </td></tr>
             <tr><td> <b>pvfcsum</b>          </td><td>Summe PV Prognose pro Bewölkungsbereich über die gesamte Laufzeit                                                         </td></tr>
             <tr><td> <b>pvrl</b>             </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!)        </td></tr>
             <tr><td> <b>pvrlsum</b>          </td><td>Summe reale PV Erzeugung pro Bewölkungsbereich über die gesamte Laufzeit                                                  </td></tr>
-            <tr><td> <b>quality</b>          </td><td>Qualität der Autokorrekturfaktoren (0..1), wobei "percentile" die Qualität des einfachen (simple) Korrekturfaktors ist.   </td></tr>
+            <tr><td> <b>quality</b>          </td><td>Qualität der Autokorrekturfaktoren (0..1), wobei 'simple' die Qualität des einfach berechneten Korrekturfaktors ist.      </td></tr>
             <tr><td> <b>runTimeTrainAI</b>   </td><td>Laufzeit des letzten KI Trainings                                                                                         </td></tr>
             <tr><td> <b>tdayDvtn</b>         </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                             </td></tr>
             <tr><td> <b>temp</b>             </td><td>Außentemperatur                                                                                                           </td></tr>
