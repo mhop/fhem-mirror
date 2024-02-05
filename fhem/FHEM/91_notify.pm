@@ -148,6 +148,7 @@ notify_Attr(@)
         my ($me, $msg) = @_;
         return if(defined($hash->{CHANGED}));
         $hash->{CHANGED}[0] = $msg;
+        $hash->{NTFY_TRIGGERTIME} = TimeNow();
         notify_Exec($hash, $hash);
         delete($hash->{CHANGED});
       }
