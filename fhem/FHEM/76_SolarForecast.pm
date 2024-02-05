@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.15.2" => "05.02.2024  __mergeDataWeather: fix merger failures, number of temperature decimal places ",
   "1.15.1" => "04.02.2024  checkPlantConfig: fix check attribute ctrlWeatherDevX ",
   "1.15.0" => "03.02.2024  reduce cpu utilization, add attributes ctrlWeatherDev2, ctrlWeatherDev3 ",
   "1.14.3" => "02.02.2024  _transferWeatherValues: first step of multi weather device merger ",
@@ -5769,11 +5770,17 @@ sub __mergeDataWeather {
   
   debugLog ($paref, 'collectData', "merge Weather data =>");
   
+  my $ds = 0;
+  
+  for my $wd (1..$weatherDevMax) {
+      my $fcname = AttrVal ($name, 'ctrlWeatherDev'.$wd, '');                        # Weather Forecast Device
+      $ds++ if($fcname && $defs{$fcname});
+  }
+  
   my ($q, $m) = (0,0);
 
   for my $key (sort keys %{$data{$type}{$name}{weatherdata}}) {
       my ($z, $neff, $r101, $temp) = (0,0,0,0);
-      $q++;
       
       $data{$type}{$name}{weatherdata}{$key}{merge}{don}  = $data{$type}{$name}{weatherdata}{$key}{1}{don};
       $data{$type}{$name}{weatherdata}{$key}{merge}{ww}   = $data{$type}{$name}{weatherdata}{$key}{1}{ww};
@@ -5782,7 +5789,9 @@ sub __mergeDataWeather {
       $data{$type}{$name}{weatherdata}{$key}{merge}{r101} = $data{$type}{$name}{weatherdata}{$key}{1}{r101};
       $data{$type}{$name}{weatherdata}{$key}{merge}{ttt}  = $data{$type}{$name}{weatherdata}{$key}{1}{ttt};
       
-      for my $step (1..$weatherDevMax) {
+      for my $step (1..$ds) {          
+          $q++;
+          
           my $n = $data{$type}{$name}{weatherdata}{$key}{$step}{neff};
           my $r = $data{$type}{$name}{weatherdata}{$key}{$step}{r101};
           my $t = $data{$type}{$name}{weatherdata}{$key}{$step}{ttt};
@@ -5800,7 +5809,7 @@ sub __mergeDataWeather {
       
       $data{$type}{$name}{weatherdata}{$key}{merge}{neff} = sprintf "%.0f", ($neff / $z);
       $data{$type}{$name}{weatherdata}{$key}{merge}{r101} = sprintf "%.0f", ($r101 / $z);
-      $data{$type}{$name}{weatherdata}{$key}{merge}{ttt}  = $temp / $z;
+      $data{$type}{$name}{weatherdata}{$key}{merge}{ttt}  = sprintf "%.2f", ($temp / $z);
       
       debugLog ($paref, 'collectData', "Weather merged: $key, ".
                                        "don: $data{$type}{$name}{weatherdata}{$key}{merge}{don}, ".
