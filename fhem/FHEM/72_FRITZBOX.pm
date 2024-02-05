@@ -45,7 +45,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.57.11";
+my $ModulVersion = "07.57.11a";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -8026,12 +8026,18 @@ sub FRITZBOX_Get_SmartHome_Devices_List($@) {
  
            if( $unitData->{'type'} eq 'THERMOSTAT' ) {
              $skills = $unitData->{'skills'}[0];
-             # parse preset temperatures
+             # parse preset temperatures ...
              my $presets = $skills->{'presets'};
-
+             # ... and lock status
+             my $interactionControls = $unitData->{'interactionControls'};
              for my $i ( 0 .. 1 ) {
                $ret{Absenktemp} = $presets->[$i]{'temperature'} if( $presets->[$i]{'name'} eq 'LOWER_TEMPERATURE' );
                $ret{Heiztemp} = $presets->[$i]{'temperature'} if( $presets->[$i]{'name'} eq 'UPPER_TEMPERATURE' );
+            
+               if( $interactionControls->[$i]{'isLocked'} ) { 
+                 $ret{locklocal} = "on" if( $interactionControls->[$i]{'devControlName'} eq 'BUTTON' );
+                 $ret{lockuiapp} = "on" if( $interactionControls->[$i]{'devControlName'} eq 'EXTERNAL' );
+               }
              }
 
              $ret{hkr_adaptheat} = ( ( $skills->{'adaptivHeating'}{'isEnabled'} ) ? 1 : 0 );
