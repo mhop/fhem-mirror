@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.15.3" => "06.02.2024  Header: add links to the API website dependend from the used API ",
   "1.15.2" => "05.02.2024  __mergeDataWeather: fix merger failures, number of temperature decimal places ".
                            "cicrular Hash: replace 'percentile' by 'simple' ",
   "1.15.1" => "04.02.2024  checkPlantConfig: fix check attribute ctrlWeatherDevX ",
@@ -10012,10 +10013,10 @@ sub _graphicHeader {
 
       ## Solare API Sektion
       ########################
-      my $api = isSolCastUsed       ($hash) ? 'SolCast:'        :
-                isForecastSolarUsed ($hash) ? 'Forecast.Solar:' :
-                isVictronKiUsed     ($hash) ? 'VictronVRM:'     :
-                isDWDUsed           ($hash) ? 'DWD:'            :
+      my $api = isSolCastUsed       ($hash) ? '<a href="https://solcast.com/live-and-forecast" style="color: inherit !important;" target="_blank">SolCast</a>:'                                                      :
+                isForecastSolarUsed ($hash) ? '<a href="https://forecast.solar" style="color: inherit !important;" target="_blank">Forecast.Solar</a>:'                                                              :    
+                isVictronKiUsed     ($hash) ? '<a href="https://www.victronenergy.com/blog/2023/07/05/new-vrm-solar-production-forecast-feature" style="color: inherit !important;" target="_blank">VictronVRM</a>:' :    
+                isDWDUsed           ($hash) ? '<a href="https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/met_verfahren_mosmix.html" style="color: inherit !important;" target="_blank">DWD</a>:'                :     
                 q{};
 
       my $nscc = ReadingsVal   ($name, 'nextSolCastCall', '?');
@@ -10031,7 +10032,7 @@ sub _graphicHeader {
           }
       }
 
-      if ($api eq 'SolCast:') {
+      if ($api =~ /SolCast/xs) {
           $api .= '&nbsp;'.$lrt;
 
           if ($scrm eq 'success') {
@@ -10061,7 +10062,7 @@ sub _graphicHeader {
           $api .= ')';
           $api .= '</span>';
       }
-      elsif ($api eq 'Forecast.Solar:') {
+      elsif ($api =~ /Forecast.Solar/xs) {
           $api .= '&nbsp;'.$lrt;
 
           if ($scrm eq 'success') {
@@ -10085,7 +10086,7 @@ sub _graphicHeader {
           $api .= ')';
           $api .= '</span>';
       }
-      elsif ($api eq 'VictronVRM:') {
+      elsif ($api =~ /VictronVRM/xs) {
           $api .= '&nbsp;'.$lrt;
 
           if ($scrm eq 'success') {
@@ -10104,7 +10105,7 @@ sub _graphicHeader {
           $api .= ')';
           $api .= '</span>';
       }
-      elsif ($api eq 'DWD:') {
+      elsif ($api =~ /DWD/xs) {
           $nscc = ReadingsVal ($name, 'nextCycletime', '?');
           $api .= '&nbsp;'.$lrt;
 
