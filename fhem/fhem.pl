@@ -5882,6 +5882,10 @@ sub
 setKeyValue($$)
 {
   my ($key,$value) = @_;
+  return "setKeyValue: invalid key: $key"
+        if(!defined($key) || $key =~ m/\n/s);
+  return "setKeyValue: invalid value: $value"
+        if($value && $value =~ m/\n/s);
   my $fName = AttrVal("global", "keyFileName", "uniqueID");
   $fName =~ s/\.\.//g;
   $fName = $attr{global}{modpath}."/FHEM/FhemUtils/$fName";
