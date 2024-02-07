@@ -7,9 +7,9 @@ SCRIPTVERSION="3.22"
 SIGNALPATH=/opt
 SIGNALUSER=signal-cli
 LIBPATH=/usr/lib
-SIGNALVERSION="0.12.4"
+SIGNALVERSION="0.12.8"
 #Check for latest valid version at https://github.com/AsamK/signal-cli/releases
-LIBRARYVERSION="0.32.1"
+LIBRARYVERSION="0.36.1"
 #Check for latest valid version at https://github.com/exquo/signal-libs-build/releases
 #Make sure this matches the required version for signal-cli (see lib/libsignal-client-0.xx.x.jar version in signal-cli)
 LIBSIG=libsignal_jni.tgz
@@ -280,7 +280,7 @@ if [ "$NETDBUS" = "$DBVER" ]; then
 else
 	export PERL_MM_USE_DEFAULT=1
 	echo -n "Installing latest Protocol::DBus..."
-	cpan install Protocol::DBus >>$LOG 2>>$LOG
+	cpan -T install Protocol::DBus >>$LOG 2>>$LOG
 	echo "done"
 fi
 
