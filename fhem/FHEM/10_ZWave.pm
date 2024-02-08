@@ -1925,16 +1925,31 @@ ZWave_meterSet($$)
 sub
 ZWave_meterGet($)
 {
-  my ($scale) = @_;
+  my ($scale, $exp) = split(" ", $_[0]);
 
   if ($scale eq "%s") { # no parameter specified, use V1 get without scale
     return("", "01");
   };
 
-  if($scale < 7) {
-    return ("",sprintf('01%02x', $scale << 3));
+  if($scale !~ m/^[0-9]+/) {
+    my $scaleAsInt;
+    foreach my $arr (values %zwm_unit) {
+      for(my $i1=0; $i1<@{$arr}; $i1++) {
+        $scaleAsInt = $i1 if($arr->[$i1] eq $scale);
+      }
+    }
+    return "unknown unit $scale" if(!defined($scaleAsInt));
+    $scale = $scaleAsInt;
+  }
+
+  return "invalid parameter $exp, only import or export is allowed"
+    if($exp && $exp !~ m/^(export|import)$/);
+  $exp = ($exp ? ($exp eq  "export" ? 0x80 : 0x40) : 0);
+
+  if($scale < 7) { # V1:no scale, V2:2 bits, V3: 3bits
+    return ("",sprintf('01%02x', ($scale << 3) | $exp));
   } else { # Version 4
-    return ("",sprintf('01%02x%02x', 7<<3, $scale-8));
+    return ("",sprintf('01%02x%02x', (7<<3) | $exp, $scale-7));
   }
 }
 
@@ -7125,18 +7140,14 @@ ZWave_tmSet($)
     </li>
 
   <br><br><b>Class METER</b>
-  <li>meter scale<br>
+  <li>meter [scale [export|import]]<br>
     return the meter report for the requested scale.<br>
     Note: protocol V1 does not support the scale parameter, the parameter
     will be ignored and the default scale will be returned.<br>
-    For protocol V2 and higher, scale is supported and depends on the
-    type of the meter (energy, gas or water).<br>
-    The device may not support all scales, see the meterSupported
-    command and its output. If the scale parameter is omitted, the
-    default unit will be reported.<br>
-    Example: For an electric meter, meter 0 will report energy in kWh,
-    meter 2 will report power in W and meter 6 will report current in A
-    (if these scales are supported).<br>
+    For protocol V2 and higher scale can be specified as integer or text, see
+    the output ot the meterSupported command.<br>
+    If the scale parameter is omitted, the default unit will be reported.
+    export/import is only valid for protocol V4 or higher.
     </li>
   <li>meterSupported<br>
     request the type of the meter, the supported scales and the
