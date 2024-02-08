@@ -1,0 +1,163 @@
+## pi@raspberrypi:~/docker-compose/fhem_2022 $ cat docker-compose.yml
+
+# This is an exmaple Docker Compose file to start your own Docker Stack
+
+version: '3.3'
+
+volumes:
+  portainer_data:
+
+
+services:
+
+  fhem:
+    image: fhem/fhem:latest
+    restart: always
+    network_mode: host
+    privileged: true
+#    devices:
+#      - "/dev/ttyACM0:/dev/ttyACM0"
+    volumes:
+      - "./fhem/:/opt/fhem/"
+#      - "./fhem/contrib/configDB/configDB.conf:/opt/fhem/configDB.conf"
+    environment:
+      PIP_PKGS: "vallox_websocket_api fhem beautifulsoup4"
+      CPAN_PKGS: "Crypt::OpenSSL::AES XML::Bare XML::Bare Protocol::WebSocket::Handshake::Server Crypt::Rijndael Crypt::Random --verbose"
+      FHEM_UID: 6061
+      FHEM_GID: 6061
+      TIMEOUT: 10
+      RESTART: 1
+      TELNETPORT: 7072
+      TZ: Europe/Berlin
+#      CONFIGTYPE: configDB
+    depends_on:
+      - "mysql"
+
+  mysql:
+    image: mysql/mysql-server
+    restart: always
+
+    ports:
+      - '3306:3306'
+      - '33060:33060'
+    volumes:
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/fhem-init.sql
+      - ./mysql/data:/var/lib/mysql
+      - ./mysql/log:/var/log
+      - ./mysql/mycustom.cnf:/etc/mysql/conf.d/custom.cnf
+    environment:
+#      TZ: Europe/Berlin
+      MYSQL_ROOT_PASSWORD: < root Password >
+#      MYSQL_ROOT_HOST: 172.*.*.*
+      MYSQL_DATABASE: fhem
+      MYSQL_USER: fhemuser
+      MYSQL_PASSWORD: < fhemuser Password >
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: always
+    ports:
+      - "4000:3000"
+    volumes:
+      - ./grafana/data:/var/lib/grafana
+      - ./grafana/log:/var/log/grafana
+      - ./grafana/conf/mygrafana.ini:/etc/grafana/grafana.ini
+    environment:
+#      TZ: Europe/Berlin
+      - GF_SECURITY_ADMIN_PASSWORT=Alexch0-
+      - GF_LOG_MODE=console file
+      - GF_LOG_LEVEL=debug
+      - GF_PATHS_PLUGINS /var/lib/grafana/plugins
+      - GF_RENDERING_SERVER_URL=http://192.168.178.40:8081/render
+      - GF_RENDERING_CALLBACK_URL=http://192.168.178.40:4000/
+      - GF_LOG_FILTERS=rendering:debug
+      - GF_PANELS_DISABLE_SANITIZE_HTML=true
+    depends_on:
+      - "mysql"
+
+  grafana_old:
+    image: grafana/grafana:7.5.11
+    restart: always
+    ports:
+      - "4001:3000"
+    volumes:
+      - ./grafana_old/data:/var/lib/grafana
+      - ./grafana_old/log:/var/log/grafana
+      - ./grafana_old/conf/mygrafana.ini:/etc/grafana/grafana.ini
+    environment:
+#      TZ: Europe/Berlin
+      - GF_SECURITY_ADMIN_PASSWORT=Alexch0-
+      - GF_LOG_MODE=console file
+      - GF_LOG_LEVEL=debug
+      - GF_PATHS_PLUGINS /var/lib/grafana/plugins
+      - GF_RENDERING_SERVER_URL=http://192.168.178.40:8081/render
+      - GF_RENDERING_CALLBACK_URL=http://192.168.178.40:4000/
+      - GF_LOG_FILTERS=rendering:debug
+      - GF_PANELS_DISABLE_SANITIZE_HTML=true
+    depends_on:
+      - "mysql"
+
+  portainer:
+    image: portainer/portainer:latest
+    restart: always
+##    command: -H unix:///var/run/docker.sock --no-auth
+    ports:
+        - '9000:9000'
+    environment:
+      - REGISTRY_HTTP_TLS_CERTIFICATE=/certs/portainer.crt
+      - REGISTRY_HTTP_TLS_KEY=/certs/portainer.key
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+      - ./certs/portainer.key:/certs/portainer.key
+      - ./certs/portainer.crt:/certs/portainer.crt
+
+  node-red:
+    image: nodered/node-red:latest
+    restart: always
+    environment:
+      - TZ=Europe/Berlin
+    ports:
+      - 1880:1880
+#      - 1502:1502
+    volumes:
+      - ./node-red/data:/data
+
+  zigbee2mqtt:
+    image: koenkk/zigbee2mqtt:latest
+    volumes:
+      - ./zigbee2mqtt/data:/app/data
+      - /run/udev:/run/udev:ro
+    devices:
+      - /dev/ttyACM0:/dev/ttyACM0
+    restart: always
+    ports:
+        - '8084:8080'
+    privileged: true
+    environment:
+      - TZ=Europe/Berlin
+    depends_on:
+      - "fhem"
+
+  sonos:
+    image: ghcr.io/svrooij/sonos2mqtt
+    # or the dockerhub svrooij/sonos2mqtt
+    restart: unless-stopped
+    ports:
+      - "6329:6329"
+    environment:
+      - SONOS2MQTT_DEVICE=192.168.178.36 # Service discovery doesn't work very well inside docker, so start with one device.
+      - SONOS2MQTT_MQTT=mqtt://192.168.178.40:1883 # mqtt2_server FHEM
+      # - SONOS2MQTT_DISTINCT=true # if your want distinct topics
+      - SONOS_LISTENER_HOST=192.168.178.40 # Docker host IP
+      # - SONOS_TTS_ENDPOINT=http://sonos-tts:5601/api/generate # If you deployed the TTS with the same docker-compose
+    depends_on:
+      - "fhem"
+
+  vallox:
+    image: mruettgers/vallox-mqtt-bridge:latest
+    restart: always
+    # environment:
+    #   - TZ=Europe/Berlin
+    volumes:
+      - ./vallox/Vallox_config.yml:/config/vallox-mqtt-bridge.yml
