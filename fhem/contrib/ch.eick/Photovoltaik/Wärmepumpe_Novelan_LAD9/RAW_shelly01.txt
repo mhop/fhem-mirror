@@ -1,0 +1,45 @@
+defmod shelly01 Shelly 192.168.178.54
+attr shelly01 DbLogExclude .*
+attr shelly01 DbLogInclude relay.*,power.*,energy.*
+attr shelly01 alias LWP
+attr shelly01 comment Version 2020.10.19 18:28
+attr shelly01 event-on-change-reading relay.*,power.*,energy.*,state,network
+attr shelly01 group PV Eigenverbrauch-Steuerung
+attr shelly01 icon taster_ch_1
+attr shelly01 mode relay
+attr shelly01 model shelly1pm
+attr shelly01 room Shelly,Heizung->System,Strom->Photovoltaik
+attr shelly01 sortby 412
+attr shelly01 stateFormat {\
+my $link = ReadingsVal($name,"WebLink","none");;\
+\
+my $e0 = sprintf("%08.2f KWh",ReadingsVal("StromZaehler_Heizung","SMAEM1901401955_Bezug_Wirkleistung_Zaehler",0));;\
+my $r0 = (ReadingsVal($name,"relay","") eq "off") ? "<span style='color:red'>off</span>":"<span style='color:green'>on</span>";;\
+my $p0 = sprintf("%06.1f Watt",ReadingsVal("StromZaehler_Heizung","SMAEM1901401955_Bezug_Wirkleistung",0));;\
+\
+"<html><table border=2 bordercolor='darkgreen' cellspacing=0 style='width: 100%'>\
+ <colgroup>\
+   <col span='1' style='width: 30%;;'>\
+   <col span='1' style='width: 30%;;'>\
+   <col span='1' style='width: 20%;;'>\
+ </colgroup>\
+<tr>\
+  <td style='text-align:left'>\
+  </td>\
+  <td style='text-align:left'>\
+    WebLink: $link\
+  </td>\
+  <td style='text-align:right'>\
+     Wärmepumpe Gesamt 0: $e0<br>\
+  <td style='text-align:right'>\
+    Relais 0: $r0 $p0<br>\
+  </td>\
+</tr>\
+</table>\
+</html>"\
+}
+attr shelly01 timeout 8
+attr shelly01 userReadings WebLink:network.* { my $ip=ReadingsVal($name,"network","na");; $ip =~ s/connected to //gs;; $ip =~ s/<[^>]*>//gs;; return("<a href='http://".$ip."/'>".$ip."</a>") },\
+\
+energy_Total:energy.* monotonic { ReadingsVal($name,"energy",0) }
+attr shelly01 webCmd |

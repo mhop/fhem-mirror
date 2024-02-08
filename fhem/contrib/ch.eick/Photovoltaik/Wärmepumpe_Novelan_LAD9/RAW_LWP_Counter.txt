@@ -1,0 +1,12 @@
+defmod LWP_Counter HourCounter StromZaehler_Heizung:SMAEM1901401955_Saldo_Wirkleistung:\s-[0-9]{4}(\.[0-9]{1})*$ StromZaehler_Heizung:SMAEM1901401955_Saldo_Wirkleistung:\s-[0-9]{1,3}(\.[0-9]{1})*$
+attr LWP_Counter DbLogExclude .*
+attr LWP_Counter alias LWP_Counter
+attr LWP_Counter comment Version 2021.01.09 11:16
+attr LWP_Counter event-min-interval .*:600
+attr LWP_Counter event-on-change-reading .*
+attr LWP_Counter group PV Eigenverbrauch-Steuerung
+attr LWP_Counter icon time_timer
+attr LWP_Counter interval 5
+attr LWP_Counter room Heizung->System,Strom->Photovoltaik
+attr LWP_Counter sortby 413
+attr LWP_Counter verbose 0

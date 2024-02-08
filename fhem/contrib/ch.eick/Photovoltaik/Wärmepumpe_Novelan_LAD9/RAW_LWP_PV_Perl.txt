@@ -1,0 +1,521 @@
+defmod LWP_PV_Perl DOIF ################################################################################################################\
+## Eigenverbrauch einschalten: wenn PV Produktion über dem Mindestbedarf ist und die Laufzeit pro Tag noch nicht erreicht ist\
+##\
+01_1_Eigenverbrauch_automatisch_An\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    (    [WR_1:SW_Total_PV_P_reserve] >= [$SELF:PowerLimitOn]            ## Es besteht PV-Überschuss\
+     and [[$SELF:TimeStart]-[$SELF:TimeEnd]]                             ## Das Zeitfenster ist erreicht\
+     and get_Exec("LWP_Ein_timer") < 1                                   ## Der Wait Timer ist noch nicht gestartet\
+     and [$SELF:LWP_Status] eq "Aus"                                     ## Die LWP ist aus\
+     and [LWP_Counter:pulseTimePerDay] < [$SELF:RunTimePerDay]           ## Die maximale Laufzeit der LWP ist noch nicht erreicht\
+     and [Heizung:hotWaterTemperature] < 60                              ## Das Maximum des PV-Modus ist noch nicht erreicht\
+     and [WR_ctl:Yield_fc0_day] < [WR_1_Speicher_1_ExternControl:SpeicherMinSOC_fc1_Limit]   ## Im Herbst/Winter ist wenig zu erwarten\
+    )\
+    or [$SELF:ui_command_1] eq "01_1_Eigenverbrauch_automatisch_An"      ## Hier wird das uiTable select ausgewertet\
+   ) {\
+    if (AttrVal("$SELF","verbose",0) >=3)\
+       {Log 3, "$SELF 01_1 : LWP on waiting"};;\
+\
+    set_Exec("LWP_Ein_timer",[$SELF:PowerLevelMinTime],'PV_Modus_Ein_LWP();;set_Reading("LWP_Status","An")');; ## Den PV-Modus verzögert einschalten\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+    }\
+}\
+################################################################################################################\
+## Signal für den PV-Modus der LWP einschalten.\
+##\
+01_2_Eigenverbrauch_manuell_An\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+       [$SELF:ui_command_1] eq "01_2_Eigenverbrauch_manuell_An"           ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 01_2 : LWP on for manuel PV-Modus"};;\
+\
+    PV_Modus_Ein_LWP();;\
+    set_Reading("LWP_Status","warten");;\
+    set_Exec("LWP_Man_timer",180,'set_Reading("LWP_Status","manuell")');; ## Den Status verzögert ändern\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+################################################################################################################\
+## Signal für den PV-Modus der LWP abschalten.\
+##\
+01_3_Eigenverbrauch_manuell_Aus\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+       [$SELF:ui_command_1] eq "01_3_Eigenverbrauch_manuell_Aus"         ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 01_3 : LWP off after manuel PV-Modus"};;\
+\
+    del_Exec("LWP_Man_timer");;\
+    PV_Modus_Aus_LWP();;\
+    set_Reading("LWP_Status","Aus");;\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+################################################################################################################\
+## Eigenverbrauch abschalten: wenn Mindestlaufzeit erreicht wurde und Maximallaufzeit pro Tag erreicht ist\
+##\
+02_1_Eigenverbrauch_Laufzeit_Aus\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    (    [LWP_Counter:pulseTimePerDay] >= [$SELF:RunTimePerDay]          ## Die Tages Laufzeit ist überschritten\
+     and [LWP_Counter:pulseTimeIncrement] >= [$SELF:RunTimeMin]          ## Die Mindestlaufzeit ist überschritten\
+     and [$SELF:LWP_Status] eq "An"                                      ## Die LWP Läuft\
+    )\
+    or [$SELF:ui_command_1] eq "02_1_Eigenverbrauch_Laufzeit_Aus"        ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 02_1 : LWP off Laufzeit"};;\
+\
+    PV_Modus_Aus_LWP();;\
+    set_Reading("LWP_Status","Aus");;\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+################################################################################################################\
+## Eigenverbrauch abschalten: wenn Mindestlaufzeit erreicht wurde und die PV Produktion unter dem Mindestbedarf ist\
+##\
+02_2_Eigenverbrauch_PV_Min_Aus\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    (    [WR_1:SW_Total_PV_P_reserve] < 100                              ## es soll noch eine Reserve bleiben\
+     and [LWP_Counter:pulseTimeIncrement] >= [$SELF:RunTimeMin]          ## Die Mindestlaufzeit ist überschritten\
+     and [$SELF:LWP_Status] eq "An"                                      ## Die LWP Läuft\
+    )\
+    or [$SELF:ui_command_1] eq "02_2_Eigenverbrauch_PV_Min_Aus"          ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 02_2 : LWP off PV-Min"};;\
+\
+    PV_Modus_Aus_LWP();;\
+    set_Reading("LWP_Status","Aus");;\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+################################################################################################################\
+## Stop, wenn es nur ein kurzer peak ist. Dieser Do Zweig setzt den wait timer vom Einschaltkommando cmd_4 wieder außer kraft,\
+## wenn während der Wartezeit die PV Anlage zuwenig liefert.\
+##\
+03___Stop_Wait_Timer\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    (    get_Exec("LWP_Ein_timer") > 0                                  ## läuft eine Wartezeit\
+     and get_Exec("LWP_Ein_timer") < 5                                  ## läuft die Wartezeit bald ab\
+     and\
+    (\
+     (    [WR_1:SW_Total_PV_P_reserve] < [$SELF:PowerLimitOn]            ## Ist die PV-Leistung zu niedrig?\
+      and [$SELF:LWP_Status] eq "Aus"                                    ## und gibt es keine manuelle Einschaltung\
+     )\
+     or                              ## eventuell läuft die LWP bereits an, dann muss auch der timer gestoppt werden\
+     (    [StromZaehler_Heizung:SMAEM1901401955_Bezug_Wirkleistung] > 300\
+      and [Heizung:opStateHeatPump1] eq "Wärmepumpe kommt"\
+      and [Heizung:opStateHeatPump3] eq "Pumpenvorlauf"\
+     )\
+     or                              ## eventuell läuft die LWP bereits an, dann muss auch der timer gestoppt werden\
+     (    [StromZaehler_Heizung:SMAEM1901401955_Bezug_Wirkleistung] > 300\
+      and [Heizung:opStateHeatPump1] eq "Wärmepumpe läuft"\
+     )\
+    )\
+    )\
+    or [$SELF:ui_command_1] eq "03___Stop_Wait_Timer"                    ## Hier wird das uiTable select ausgewertet\
+   ) {\
+    if (AttrVal("$SELF","verbose",0) >=3)\
+       {Log 3, "$SELF 03__ : Stop wait timer LWP ".get_Exec("LWP_Ein_timer")};;\
+    del_Exec("LWP_Ein_timer");;                                           ## Die LWP wird nicht mehr eingeschaltet\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+################################################################################################################\
+## LWP Zwangseinschalten: Sollte das Brauchwasser noch nicht aufgeheizt sein, wird um die Hysterese erhöht.\
+## Dies kann passieren, wenn am Tag vorher der PV-Modus lief und dann das Wasser noch knapp über dem Mindestwert ist.\
+##\
+04_1_LWP_Nachheizen_WW\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    (    [WR_ctl:Yield_fc0_day] < [WR_1_Speicher_1_ExternControl:SpeicherMaxSOC_fc1_Limit]  ## Im Herbst/Winter ist wenig zu erwarten\
+     and [[$SELF:TimeEnd]]                                               ## Am Ende der möglichen PV Steuerung\
+     and [Heizung:hotWaterTemperature] <= 48                             ## wenn das Wasser noch nicht im Sollbereich ist\
+     and\
+        (   [LWP_Counter:pulseTimePerDay] < [$SELF:RunTimePerDay]        ## Die maximale Laufzeit der LWP/Tag ist noch nicht erreicht\
+         or [LWP_Counter:countsPerDay] eq 0)                             ## oder die LWP ist noch gar nicht gelaufen\
+    )\
+    or [$SELF:ui_command_1] eq "04_1_LWP_Nachheizen_WW"                  ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 04_1 : LWP on for water heating"};;\
+                                                                         ## Es wird die Soll Temperatur um die Hysterese angehoben \
+     ::CommandSet(undef, "Heizung hotWaterTemperatureTarget ".(ReadingsVal("Heizung","hotWaterTemperature",48)+5));;\
+                                                                         ## Das zurücksetzen auf den Standard von 50° erfolgt generell beim Abschalten\
+     set_Reading("LWP_Status","Nachheizen");;\
+\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 04_1 : LWP hotWaterTemperatureTarget ".ReadingsVal("Heizung","hotWaterTemperatureTarget",0)};;\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+################################################################################################################\
+## Hohe Priorität im Winter für die LWP\
+## Einschalten, wenn der Pool läuft, der Speicher geladen ist und noch Überschuss da ist.\
+##\
+04_2_LWP_Prioritaet_An\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    (    [WR_ctl:Yield_fc0_day] < [WR_1_Speicher_1_ExternControl:SpeicherMaxSOC_fc1_Limit]  ## Im Herbst/Winter ist wenig zu erwarten\
+     and [WR_1:SW_Total_PV_P_reserve] >= 2000                            ## es besteht jedoch noch eine Reserve und der\
+     and [shelly02:power_0] > 800                                        ## Pool wird gerade aufgeheizt, was im Winter auch in der Nacht passiert\
+     and [WR_1:Act_state_of_charge] > 60                                 ## Der Speicher sollte schon 60 % gefüllt sein\
+     and [Heizung:hotWaterTemperature] < 60                              ## und die WW Temperatur noch unter 60°\
+     and [$SELF:LWP_Priority] eq "frei"                                  ## Aber nur einmal am Tag\
+    )\
+    or [$SELF:ui_command_1] eq "04_2_LWP_Prioritaet_An"                  ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 04_2 : LWP Priorität"};;\
+\
+    PV_Modus_Ein_LWP();;\
+    set_Reading("LWP_Status","An");;\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+################################################################################################################\
+## LWP Ende\
+##\
+05___LWP_Ende\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    (    [StromZaehler_Heizung:SMAEM1901401955_Bezug_Wirkleistung] < 300\
+     and\
+       (   [$SELF:LWP_Status] eq "An"\
+        or [$SELF:LWP_Status] eq "manuell"\
+        or [$SELF:LWP_Status] eq "Nachheizen"\
+       )\
+     and [LWP_Counter:pulseTimePerDay] >= [$SELF:RunTimeMin]\
+     and ([Heizung:opStateHeatPump1] ne "Wärmepumpe läuft" or [Heizung:opStateHeatPump3] eq "Luftabtauen" )\
+    )\
+    or [$SELF:ui_command_1] eq "05___LWP_Ende"                           ## Hier wird das uiTable select ausgewertet\
+   ) {\
+    if (AttrVal("$SELF","verbose",0) >=3)\
+       {Log 3, "$SELF 05__ : LWP run finished"};;\
+\
+    PV_Modus_Aus_LWP();;\
+    set_Reading("LWP_Status","Aus");;\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+################################################################################################################\
+## Priorität für LWP wieder frei geben, damit einmal am Tag der PV-Modus verwendet werden kann\
+##\
+06___LWP_Prioritaet_Reset\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+       [23:55]\
+    or [$SELF:ui_command_1] eq "06___LWP_Prioritaet_Reset"               ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 06__ : LWP Priorität frei"};;\
+     set_Reading("LWP_Priority","frei");;                                 ## Der PV-Modus darf wieder verwendet weden\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+################################################################################################################\
+## In der Überganszeit wird die Heizung kurz vor der PV-Zeit wieder ein geschaltet\
+## Während des Winters kann man die Heizung bis in die Morgenstunden ganz abschalten (Accu sparen)\
+##\
+07_1_Heizung_An\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+       [[$SELF:TimeStartHeizung]]                                        ## Einschalten der Heizung, damit aus dem Puffer nachgeheizt wird 02:03\
+    or [$SELF:ui_command_1] eq "07_1_Heizung_An"                         ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 07_1 : LWP Heizung Automatik"};;\
+     ::CommandSet(undef, "Heizung opModeHeating Auto");;                  ## Die Heizungssteuerung erfolgt wieder Automatisch\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+################################################################################################################\
+## Während des Winters kann man die Heizung bis in die Morgenstunden ganz abschalten (Accu sparen)\
+##\
+07_2_Heizung_Aus\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+       [[$SELF:TimeEndHeizung]]                                          ## Abschalten der Heizung, damit der Puffer für morgens Heizreserve hat\
+    or [$SELF:ui_command_1] eq "07_2_Heizung_Aus"                        ## Hier wird das uiTable select ausgewertet\
+   ) {\
+   if (AttrVal("$SELF","verbose",0) >=3)\
+      {Log 3, "$SELF 07_2 : LWP Heizung aus"};;\
+   ::CommandSet(undef, "Heizung opModeHeating Off");;                     ## Die Heizung wird komplett abgeschaltet\
+\
+   if (    [WR_ctl:Yield_fc1_day] < [WR_1_Speicher_1_ExternControl:SpeicherMinSOC_fc1_Limit] ## Auch morgen ist das Wetter schlecht\
+       and [Heizung:averageAmbientTemperature] <= 5.6 ) {                ## Die Heizgrenze ist schon ziemlich tief\
+      set_Reading("TimeStartHeizung",[$SELF:TimeStartHeizungWinter]);;    ## Im Winter bis in die Morgenstunden den Accu sparen\
+      if (AttrVal("$SELF","verbose",0) >=3)\
+         {Log 3, "$SELF 07_2 : Parameter: ".[WR_ctl:Yield_fc1_day]." < ".[WR_1_Speicher_1_ExternControl:SpeicherMinSOC_fc1_Limit]." and ".[Heizung:averageAmbientTemperature]." <= 5.6"};;\
+     } else {\
+      set_Reading("TimeStartHeizung",[$SELF:TimeStartHeizungUebergang]);; ## Bei schönerem Wetter erst später Heizen\
+     }\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 07_2 : TimeStartHeizung switched to ".[$SELF:TimeStartHeizung]};;\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+################################################################################################################\
+## Heizung im Wohnzimmer auf 19°\
+##\
+07_3_Heizung_WZ_19_Grad\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+       [$SELF:ui_command_1] eq "07_3_Heizung_WZ_19_Grad"                 ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 07_3 : Heizung WZ 19 Grad"};;\
+     ::CommandSet(undef, "Thermostat_WO desired-temp 19");;               ## Die Warmwasserbereitung wird ausgeschaltet\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+################################################################################################################\
+## Heizung im Wohnzimmer auf 22°\
+##\
+07_4_Heizung_WZ_22_Grad\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+       [$SELF:ui_command_1] eq "07_4_Heizung_WZ_22_Grad"                 ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 07_4 : Heizung WZ 22 Grad"};;\
+     ::CommandSet(undef, "Thermostat_WO desired-temp 22");;               ## Die Warmwasserbereitung wird ausgeschaltet\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+################################################################################################################\
+## Warmwasser Bereitung aus\
+##\
+07_5_Warmwasser_aus\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+       [$SELF:ui_command_1] eq "07_5_Warmwasser_aus"                     ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 07_5 : LWP Warmwasser aus"};;\
+     ::CommandSet(undef, "Heizung opModeHotWater Off");;                  ## Die Warmwasserbereitung wird ausgeschaltet\
+     ::CommandSet(undef, "n_Zirkulation inactive");;                      ## Zirkulation ebenfalls abschalten\
+     ::CommandSet(undef, "Heizung statusRequest");;                       ## Einen aktuellen Status abholen\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+################################################################################################################\
+## Warmwasser Bereitung auf Automatik\
+##\
+07_6_Warmwasser_an\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+       [$SELF:ui_command_1] eq "07_6_Warmwasser_an"                      ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 07_6 : LWP Warmwasser Automatik"};;\
+     ::CommandSet(undef, "Heizung opModeHotWater Auto");;                 ## Die Warmwassersteuerung erfolgt wieder automatisch\
+     ::CommandSet(undef, "n_Zirkulation active");;                        ## Zirkulation wieder einschalten\
+     ::CommandSet(undef, "Heizung statusRequest");;                       ## Einen aktuellen Status abholen\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+################################################################################################################\
+## 12 Stromboerse\
+##\
+12_Stromboerse\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+     and\
+      ((   [WR_ctl:Yield_fc0_day] < [WR_1_Speicher_1_ExternControl:SpeicherMinSOC_fc1_Limit]  ## Im Herbst/Winter ist wenig zu erwarten\
+\
+       and [$SELF:LWP_Stromboerse]  eq "Tibber"                          ## Soll Tibber verwendet werden?\
+       and [EVU_Tibber_connect:fc0_trigger]                              ## Wurde der Trigger geändert\
+       )\
+       or [$SELF:ui_command_4] eq "12_Stromboerse"                       ## Hier wird das uiTable select ausgewertet\
+      )\
+   ) {\
+\
+    if ([?EVU_Tibber_connect:fc0_trigger] eq "on") {\
+      set_Reading("LWP_TriggerLaden","An");;\
+\
+      if ([?Heizung:opModeHeating] eq "Off") {                           ## Ist die Heizung abgeschaltet ?\
+        set_Reading("LWP_Stromborse_Heizung_before","Off");;              ## Den vorherigen Zustand merken\
+        ::CommandSet(undef, "Heizung opModeHeating Auto");;               ## Die Heizungssteuerung erfolgt wieder Automatisch\
+        if (AttrVal("$SELF","verbose",0) >=3)\
+          {Log 3, "$SELF 12_1 : LWP Heizung Automatik"};;\
+      }\
+\
+      PV_Modus_Ein_LWP();;\
+      set_Reading("LWP_Status","warten");;\
+      set_Exec("LWP_Man_timer",180,'set_Reading("LWP_Status","Stromboerse")');; ## Den Status verzögert ändern\
+\
+      if (AttrVal("$SELF","verbose",0) >= 3)\
+         {Log 3, "$SELF 12_Stromboerse          : PV-Modus Start"};;\
+\
+    } else {\
+      set_Reading("LWP_TriggerLaden","Aus");;\
+\
+      PV_Modus_Aus_LWP();;\
+      set_Reading("LWP_Status","Aus");;\
+\
+      if (AttrVal("$SELF","verbose",0) >= 3)\
+         {Log 3, "$SELF 12_Stromboerse          : PV-Modus Stop"};;\
+\
+      if ([$SELF:LWP_Stromborse_Heizung_before] eq "Off") {              ## War die Heizung vorher abgeschaltet ?\
+        set_Reading("LWP_Stromborse_Heizung_before","Auto");;             ## Den jetzigen Zustand merken\
+        ::CommandSet(undef, "Heizung opModeHeating Off");;                ## Die Heizungssteuerung wieder abschalten\
+        if (AttrVal("$SELF","verbose",0) >=3)\
+          {Log 3, "$SELF 12_1 : LWP Heizung Off, wie zuvor"};;\
+      }\
+\
+    }\
+\
+   if (AttrVal("$SELF","verbose",0) >=3)\
+     {Log 3, "$SELF 12_Stromboerse          : ".[EVU_Tibber_connect:fc0_trigger]." by ".[$SELF:LWP_Stromboerse]};;\
+\
+   set_Reading("ui_command_4","---");;                                    ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+################################################################################################################\
+## Definition von Sub Routinen\
+subs {\
+  sub PV_Modus_Ein_LWP() {                                                   ## PV-Modus Einschalten\
+    if (AttrVal("$SELF","verbose",0) >=3)\
+       {Log 3, "$SELF sub  : LWP on"};;\
+    fhem("".ReadingsVal("$SELF","SetCmdOn",0));;\
+    ::CommandSet(undef, "Heizung hotWaterTemperatureTarget 60.0");;\
+    set_Reading("LWP_Priority","verwendet");;\
+  }\
+\
+  sub PV_Modus_Aus_LWP() {                                                   ## PV-Modus Ausschalten\
+    if (AttrVal("$SELF","verbose",0) >=3)\
+       {Log 3, "$SELF sub  : LWP off"};;\
+    fhem("".ReadingsVal("$SELF","SetCmdOff",0));;\
+    ::CommandSet(undef, "Heizung hotWaterTemperatureTarget 50.0");;\
+  }\
+}
+attr LWP_PV_Perl DbLogExclude .*
+attr LWP_PV_Perl DbLogInclude state,cmd.*,Device,LWP_Status,wait_timer
+attr LWP_PV_Perl alias LWP_PV_Perl
+attr LWP_PV_Perl comment Version 2023.01.18 09:00
+attr LWP_PV_Perl disable 0
+attr LWP_PV_Perl group PV Eigenverbrauch-Steuerung
+attr LWP_PV_Perl icon sani_earth_source_heat_pump
+attr LWP_PV_Perl room Heizung->System,Strom->Photovoltaik
+attr LWP_PV_Perl sortby 411
+attr LWP_PV_Perl uiTable {\
+package ui_Table;;\
+  $TABLE = "style='width:100%;;'";;\
+\
+  $TD{0..10}{0}     = "align='center' style='font-size:16px;;border-right-style:solid;;border-color:darkgreen;;border-right-width:2px;;width:26%'";;\
+\
+  $TD{0..10}{1} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:36%;;font-weight:bold;;'";;\
+  $TD{0..10}{2..4} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
+  $TD{0..10}{5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
+\
+sub FUNC_Status {\
+    my($value, $min, $colorMin,  $statusMin,  $colorMiddel, $statusMiddle, $max, $colorMax, $statusMax)=@_;;\
+    my $ret = ($value < $min)? '<span style="color:'.$colorMin.'">'.$statusMin.'</span>' : ($value > $max)? '<span style="color:'.$colorMax.'">'.$statusMax.'</span>' : '<span style="color:'.$colorMiddel.'">'.$statusMiddle.'</span>';;\
+    return $ret;;\
+  }\
+\
+}\
+\
+"$SELF"|\
+::ReadingsTimestamp("Heizung","counterHeatQTotal","")."<dd>Status / LWP Status / Brauchwasser</dd>" |\
+widget([$SELF:ui_command_1],"uzsuDropDown,---,01_1_Eigenverbrauch_automatisch_An,01_2_Eigenverbrauch_manuell_An,01_3_Eigenverbrauch_manuell_Aus,02_1_Eigenverbrauch_abschalten_Laufzeit,02_2_Eigenverbrauch_abschalten_PV_Min,03___Stop_Wait_Timer,04_1_LWP_Nachheizen_WW,04_2_LWP_Prioritaet_An,05___LWP_Ende,06___LWP_Prioritaet_Reset,07_1_Heizung_An,07_2_Heizung_Aus,07_3_Heizung_WZ_19_Grad,07_4_Heizung_WZ_22_Grad,07_5_Warmwasser_aus,07_6_Warmwasser_an") |\
+[Heizung:opStateHeatPump1]." ".[Heizung:opStateHeatPump2]|\
+[Heizung:opStateHeatPump3]|\
+FUNC_Status([Heizung:hotWaterTemperature],47,"orange",[Heizung:hotWaterTemperature],"green",[Heizung:hotWaterTemperature],53,"red",[Heizung:hotWaterTemperature])." °C"\
+\
+|\
+"Konfiguration<dd>PowerLevelMinTime, | PowerLimit On/Off | Time Start/End</dd><dd>RunTime Min/PerDay</dd>"|\
+""|\
+widget([$SELF:PowerLevelMinTime],"selectnumbers,60,60,900,0,lin")."<br>".widget([$SELF:RunTimeMin],"selectnumbers,300,300,7200,0,lin").widget([$SELF:RunTimePerDay],"selectnumbers,900,300,28800,0,lin")|\
+widget([$SELF:PowerLimitOn],"selectnumbers,1000,250,4000,0,lin").widget([$SELF:PowerLimitOff],"selectnumbers,1000,250,4000,0,lin")|\
+widget([$SELF:TimeStart],"time").widget([$SELF:TimeEnd],"time")\
+\
+|\
+"<dd>PV-Modus / Heiz-Modus / Winter, Übergangszeit Heiz Start/Ende</dd>"|\
+"PV-Modus:<br>".[$SELF:LWP_Priority]." / ".(([$SELF:LWP_Status] ne "Aus")?'<span style="color:green">'.[$SELF:LWP_Status].'</span>' : '<span style="color:black">'.[$SELF:LWP_Status].'</span>')|\
+"Heizung: ".[Heizung:opModeHeating]."<br>Warmwasser: ".[Heizung:opModeHotWater]|\
+widget([$SELF:TimeStartHeizungWinter],"time").widget([$SELF:TimeStartHeizungUebergang],"time")|\
+[$SELF:TimeStartHeizung].widget([$SELF:TimeEndHeizung],"time")\
+\
+|\
+"Strombörse<dd>Auswahl / Ladefenster / Trigger Status </dd>" |\
+widget([$SELF:LWP_Stromboerse],"uzsuDropDown,Aus,Tibber") | \
+"<span style=font-weight:bold>Trigger fc0</span><br><br>".Format("trigger_0")|\
+"<span style=font-weight:bold>Trigger fc1</span><br><br>".Format("trigger_1")|\
+[EVU_Tibber_connect:fc0_trigger]\
+\
+|"Statistiken"|"Zähler"|""|"Information"|"Wert"\
+|""|"EVU"|""|"Gesamt"|sprintf("%06d kWh",[EVU_StromZaehler:Strom_Status-02])\
+|""|"Heizung"|""|"LWP/KWL"|sprintf("%06d kWh",[StromZaehler_Heizung:SMAEM1901401955_Bezug_Wirkleistung_Zaehler])\
+|""|"LWP"|""|"Heizung"|sprintf("%06d kWh",[Heizung:counterHeatQHeating])\
+|""|"LWP"|""|"Warmwasser"|sprintf("%06d kWh",[Heizung:counterHeatQHotWater])\
+|""|"LWP"|""|"Photovoltaik"|sprintf("%06d kWh",[Heizung:counterHeatQPool])\
+|""|"LWP"|""|"Gesamt"|sprintf("%06d kWh",[Heizung:counterHeatQTotal])\
+
+attr LWP_PV_Perl verbose 3
+
+setstate LWP_PV_Perl 2024-02-07 23:55:00 LWP_Priority frei
+setstate LWP_PV_Perl 2024-02-05 11:09:07 LWP_Status Aus
+setstate LWP_PV_Perl 2023-12-11 14:54:21 LWP_Stromboerse Aus
+setstate LWP_PV_Perl 2023-12-11 14:54:19 LWP_TriggerLaden Aus
+setstate LWP_PV_Perl 2022-05-13 12:21:48 PowerLevelMinTime 600
+setstate LWP_PV_Perl 2022-05-10 15:51:44 PowerLimitOff 3000
+setstate LWP_PV_Perl 2022-05-10 15:50:44 PowerLimitOn 2250
+setstate LWP_PV_Perl 2022-10-25 19:00:12 RunTimeMin 2400
+setstate LWP_PV_Perl 2022-05-10 15:55:35 RunTimePerDay 28800
+setstate LWP_PV_Perl 2022-05-10 16:23:06 SetCmdOff set shelly01 off 0
+setstate LWP_PV_Perl 2022-05-10 16:23:24 SetCmdOn set shelly01 on 0
+setstate LWP_PV_Perl 2022-05-10 15:50:37 TimeEnd 15:05
+setstate LWP_PV_Perl 2023-02-07 13:27:25 TimeEndHeizung 18:35
+setstate LWP_PV_Perl 2022-05-10 15:50:19 TimeStart 11:30
+setstate LWP_PV_Perl 2024-02-07 18:35:00 TimeStartHeizung 09:50
+setstate LWP_PV_Perl 2022-05-13 16:37:59 TimeStartHeizungUebergang 09:50
+setstate LWP_PV_Perl 2022-12-17 16:11:07 TimeStartHeizungWinter 02:05
+
+setstate LWP_PV_Perl 2024-02-08 09:50:00 ui_command_1 ---
+setstate LWP_PV_Perl 2023-12-11 14:54:19 ui_command_4 ---

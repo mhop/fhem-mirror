@@ -1,0 +1,24 @@
+defmod Heizung LUXTRONIK2 192.168.178.10 300
+attr Heizung DbLogExclude .*
+attr Heizung DbLogInclude 2ndHeatSource1,SWTin_PV-Eigenverbrauch,ambientTemperature,averageAmbientTemperature,counterHeatQHeating,counterHeatQHotWater,counterHeatQPool,counterHeatQTotal,flowDispersion,flowTemperature,heatSourceIN,heatSourceMotor,heatingBufferTemperature,heatingSystemCircPump,heatingSystemCircPumpDeaerate,hotWaterCircPumpDeaerate,hotWaterCircPumpExtern,hotWaterTemperature,hotWaterTemperatureTarget,opStateHeatPump1,opStateHeatPump2,opStateHeatPump3,opStateHotWater,returnTemperature,returnTemperatureExtern,returnTemperatureHeating,returnTemperatureHyst,returnTemperatureSetBack,returnTemperatureTarget
+attr Heizung alias Heizung
+attr Heizung allowSetParameter 1
+attr Heizung comment stateFormat alternative\
+{sprintf("Outside:%.1f°C<br>Flow:%.1f°C<br>Return:%.1f°C(Trgt:%.1f°C)<br> Water:%.1f°C(Trgt:%.1f°C) %s",\
+ReadingsVal($name,"ambientTemperature",0),\
+ReadingsVal($name,"flowTemperature",0),\
+ReadingsVal($name,"returnTemperature",0), ReadingsVal($name,"returnTemperatureTarget",0),\
+ReadingsVal($name,"hotWaterTemperature",0), ReadingsVal($name,"hotWaterTemperatureTarget",0),\
+ReadingsVal($name,"opStateHeatPump3","error")  )}
+attr Heizung event-on-change-reading SWTin_PV-Eigenverbrauch,ambientTemperature,averageAmbientTemperature,counterHeatQ.*,flowDispersion,flowTemperature,heatSourceIN,2ndHeatSource1,heatSourceMotor,heatingBufferTemperature,heatingSystemCircPump,heatingSystemCircPumpDeaerate,hotWaterCircPumpDeaerate,hotWaterCircPumpExtern,hotWaterTemperature.*,opStateHeatPump.*,opStateHotWater,returnTemperature,returnTemperatureExtern,returnTemperatureHeating,returnTemperatureHyst,returnTemperatureSetBack,returnTemperatureTarget,opMode.*,Verbrauch_Heizung,Verbrauch_Warmwasser
+attr Heizung group Heizung
+attr Heizung icon sani_earth_source_heat_pump
+attr Heizung ignoreFirmwareCheck 1
+attr Heizung room Heizung->System
+attr Heizung sortby 01
+attr Heizung userHeatpumpParameters 1136 Verbrauch_Heizung, 1137 Verbrauch_Warmwasser
+attr Heizung userHeatpumpValues 36 SWTin_PV-Eigenverbrauch
+attr Heizung userReadings flowDispersion:opStateHeatPump1 { ReadingsVal($name,"opStateHeatPump1","Error") eq "Wärmepumpe läuft" ? round((ReadingsVal($name,"flowTemperature",0) - ReadingsVal($name,"returnTemperature",0)),1) : round(ReadingsVal($name,"flowDispersion",0),1) },\
+heatingBufferTemperature:opStateHotWater { ReadingsVal($name,"opStateHotWater","Error") ne "Aufheizen" ? ReadingsVal($name,"returnTemperature",0) : ReadingsVal($name,"heatingBufferTemperature",0) },\
+Verbrauch_Gesamt:Verbrauch_.* { ReadingsVal($name,"Verbrauch_Heizung",0) + ReadingsVal($name,"Verbrauch_Warmwasser",0) }
+attr Heizung verbose 0
