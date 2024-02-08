@@ -1,0 +1,24 @@
+defmod DWD_Forecast DWD_OpenData
+attr DWD_Forecast DbLogExclude .*
+attr DWD_Forecast DbLogInclude fc.*_.*_Rad1h,fc.*_.*_TTT,fc.*_.*_FF,fc.*_.*_Neff,fc.*_.*_R101,fc.*_.*_RRS1c,fc.*_.*_DD,fc.*_.*_N,fc.*_.*_VV,fc.*_.*_SunD1
+attr DWD_Forecast comment Version 2022.08.20 12:00\
+TTT 	: Temperature 2m above surface [°C]\
+FF      : Windspeed\
+Neff	: Effective cloud cover [%]\
+R101	: Probability of precipitation > 0.1 mm during the last hour [%]\
+R600	: Probability of precipitation > 0.0mm during the last 6 hours [%]\
+RRs1c	: Snow-Rain-Equivalent during the last 3 hours [kg/m2]\
+Rad1h	: Global Irradiance [kJ/m2]\
+          kJ/m² Umrechnung *0,277778 in kWh/m²\
+ww	: Significant Weather\
+wwM	: Probability for fog within the last hour [%]
+attr DWD_Forecast event-on-update-reading fc.*_.*_[Rad1h|TTT|FF|Neff|R101|RRS1c|DD|N|VV|SunD1].*
+attr DWD_Forecast forecastDays 1
+attr DWD_Forecast forecastProperties Rad1h,TTT,FF,Neff,R600,R101,wwM,ww,RRS1c,DD,N,VV,SunD1
+attr DWD_Forecast forecastResolution 1
+attr DWD_Forecast forecastStation < Die nächste Wetterstation mit RAD1 Werten >
+attr DWD_Forecast group PV Leistungsprognose
+attr DWD_Forecast icon weather_rain_fog
+attr DWD_Forecast room Informationen->Wetter,Strom->Photovoltaik
+attr DWD_Forecast sortby 07
+attr DWD_Forecast verbose 0

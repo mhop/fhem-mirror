@@ -2,7 +2,7 @@ defmod WR_0_KSEM ModbusAttr 1 60 192.168.178.17:502 TCP
 attr WR_0_KSEM DbLogExclude .*
 attr WR_0_KSEM DbLogInclude Active_energy.*
 attr WR_0_KSEM alias WR_0_KSEM
-attr WR_0_KSEM comment Version 2021.04.07 12:00\
+attr WR_0_KSEM comment Version 2024.02.08 12:00\
 Der KSEM ermittelt nicht alle Werte, welche in der SunSpec spezifiziert sind.\
 Alle nicht unterstützen Werte sind mit 0x8000 gekennzeichnet.\
 Für die nicht unterstützten Zählerstände wird die 0x800000000 ausgegeben.\
@@ -42,6 +42,9 @@ attr WR_0_KSEM dev-type-INT16_Voltage-expr $val * (10 ** ReadingsNum("$name" ,"M
 attr WR_0_KSEM dev-type-INT16_Voltage-format %.2f
 attr WR_0_KSEM dev-type-INT16_Voltage-len 1
 attr WR_0_KSEM dev-type-INT16_Voltage-unpack s>
+attr WR_0_KSEM dev-type-INT32-len 2
+attr WR_0_KSEM dev-type-INT32-revRegs 1
+attr WR_0_KSEM dev-type-INT32-unpack s>
 attr WR_0_KSEM dev-type-STR32-expr $val =~ s/[\00]+//gr
 attr WR_0_KSEM dev-type-STR32-format %s
 attr WR_0_KSEM dev-type-STR32-len 16
@@ -55,7 +58,7 @@ attr WR_0_KSEM dev-type-UINT64-format %s
 attr WR_0_KSEM dev-type-UINT64-len 4
 attr WR_0_KSEM dev-type-UINT64-unpack Q>
 attr WR_0_KSEM disable 0
-attr WR_0_KSEM event-on-change-reading Active_energy.*,M_AC_Current_.*,M_AC_Power
+attr WR_0_KSEM event-on-change-reading Active_energy.*,M_AC_Current_.*,M_AC_Power,Home_consumption
 attr WR_0_KSEM group PV Eigenverbrauch
 attr WR_0_KSEM icon measure_power
 attr WR_0_KSEM obj-h40072-reading M_AC_Current_A
