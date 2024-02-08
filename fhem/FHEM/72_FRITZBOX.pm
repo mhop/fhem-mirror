@@ -10634,7 +10634,7 @@ sub FRITZBOX_Helper_Url_Regex {
          UNSPENT: not used in seconds<br>
          PERCENT: in percent<br>
          USED: used in seconds<br>
-         USEDSTR: shows the usage time from - to<br>
+         USEDSTR: shows the time used in hh:mm of quota hh:mm<br>
          Needs FRITZ!OS 7.21 or higher.
       </li><br>
 
@@ -11537,8 +11537,8 @@ sub FRITZBOX_Helper_Url_Regex {
          UNSPENT: nicht genutzt in Sekunden<br>
          PERCENT: in Prozent<br>
          USED: genutzt in Sekunden<br>
-         USEDSTR: zeigt die Nutzungszeit von - bis<br>
-	  Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
+         USEDSTR: zeigt die genutzte Zeit in hh:mm vom Kontingent hh:mm<br>
+	 Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
       </li><br>
 
       <li><a name="luaData"></a>
