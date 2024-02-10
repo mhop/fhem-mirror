@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 76_SolarForecast: integrate sun position from Astro module to AI,
+                              some more internal code changes 
  - feature: 72_FRITZBOX: get <name> lanDeviceInfo <number>
             erweiterte Informationen für Geräte mit Kindersicherung
  - feature: 76_SolarForecast: Links to the website of the API used

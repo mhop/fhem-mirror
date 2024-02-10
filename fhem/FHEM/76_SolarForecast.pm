@@ -53,6 +53,8 @@ use FHEM::SynoModules::SMUtils qw(
                                    moduleVersion
                                    trim
                                  );                                                  # Hilfsroutinen Modul
+                                 
+main::LoadModule ('Astro');                                                          # Astro Modul für Sonnenkennzahlen laden 
 
 use Data::Dumper;
 use Blocking;
@@ -71,6 +73,7 @@ BEGIN {
           AnalyzeCommandChain
           AttrVal
           AttrNum
+          Astro_Get
           BlockingCall
           BlockingKill
           CommandAttr
@@ -152,11 +155,14 @@ BEGIN {
           NexthoursVal
         )
   );
-
 }
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.15.4" => "10.02.2024  integrate sun position from Astro module, setPVhistory: change some writes ".
+                           "_transferAPIRadiationValues: consider 'accurate' or 'spreaded' rsult from AI".
+                           "___calcPeaklossByTemp: bugfix temp, rename moduleDirection to moduleAzimuth ".
+                           "rename moduleTiltAngle to moduleDeclination ",
   "1.15.3" => "06.02.2024  Header: add links to the API website dependend from the used API ",
   "1.15.2" => "05.02.2024  __mergeDataWeather: fix merger failures, number of temperature decimal places ".
                            "cicrular Hash: replace 'percentile' by 'simple' ",
@@ -165,8 +171,8 @@ my %vNotesIntern = (
   "1.14.3" => "02.02.2024  _transferWeatherValues: first step of multi weather device merger ",
   "1.14.2" => "02.02.2024  fix warning, _transferAPIRadiationValues: Consider upper and lower deviation limit AI to API forecast ",
   "1.14.1" => "01.02.2024  language support for ___setConsumerPlanningState -> supplement, fix setting 'swoncond not met' ",
-  "1.14.0" => "31.01.2024  data maintenance, new sub _addDynAttr for adding attributes at runtime ".
-                           "replace setter currentWeatherDev by attr ctrlWeatherDev1, new data with sub CircularSumVal ".
+  "1.14.0" => "31.01.2024  data maintenance, new func _addDynAttr for adding attributes at runtime ".
+                           "replace setter currentWeatherDev by attr ctrlWeatherDev1, new data with func CircularSumVal ".
                            "rewrite correction factor calculation with _calcCaQcomplex, _calcCaQsimple, __calcNewFactor ",                           
   "1.13.0" => "27.01.2024  minor change of deleteOldBckpFiles, Setter writeHistory replaced by operatingMemory ".
                            "save, backup and recover in-memory operating data ",
@@ -177,13 +183,13 @@ my %vNotesIntern = (
   "1.9.0"  => "23.01.2024  modify disable, add operationMode: active/inactive ",
   "1.8.0"  => "22.01.2024  add 'noLearning' Option to Setter pvCorrectionFactor_Auto ",
   "1.7.1"  => "20.01.2024  optimize battery management ",
-  "1.7.0"  => "18.01.2024  Changeover Start centralTask completely to runCentralTask, ".
+  "1.7.0"  => "18.01.2024  Changeover Start centralTask completely to runTask, ".
                            "aiAddRawData: Weekday from pvHistory not taken into account greater than current day  ".
                            "__reviewSwitchTime: new function for review consumer planning state ".
                            "___switchonTimelimits: The current time is taken into account during planning ".
                            "take info-tag into consumerxx Reading ".
                            "fix deletion of currentBatteryDev, currentInverterDev, currentMeterDev ",
-  "1.6.5"  => "10.01.2024  new function runCentralTask in ReadyFn to run centralTask definitely at end/begin of an hour ",
+  "1.6.5"  => "10.01.2024  new function runTask in ReadyFn to run centralTask definitely at end/begin of an hour ",
   "1.6.4"  => "09.01.2024  fix get Automatic State, use key switchdev for auto-Reading if switchdev is set in consumer attr ",
   "1.6.3"  => "08.01.2024  optimize battery management once more ",
   "1.6.2"  => "07.01.2024  optimize battery management ",
@@ -268,7 +274,7 @@ my %vNotesIntern = (
   "0.80.4" => "06.07.2023  new transferprocess for DWD data from solcastapi-Hash to estimate calculation, consolidated ".
                            "the autocorrection model ",
   "0.80.3" => "03.06.2023  preparation for get DWD radiation data to solcastapi-Hash, fix sub isConsumerLogOn (use powerthreshold) ",
-  "0.80.2" => "02.06.2023  new ctrlDebug keys epiecesCalc, change selfconsumption with graphic Adjustment, moduleDirection ".
+  "0.80.2" => "02.06.2023  new ctrlDebug keys epiecesCalc, change selfconsumption with graphic Adjustment, moduleAzimuth ".
                            "accepts azimut values -180 .. 0 .. 180 as well as azimut identifier (S, SE ..) ",
   "0.80.1" => "31.05.2023  adapt _calcCaQsimple to calculate corrfactor like _calcCaQcomplex ",
   "0.80.0" => "28.05.2023  Support for Forecast.Solar-API (https://doc.forecast.solar/api), rename Getter solCastData to solApiData ".
@@ -452,8 +458,8 @@ my %hset = (                                                                # Ha
   reset                     => { fn => \&_setreset                     },
   roofIdentPair             => { fn => \&_setroofIdentPair             },
   moduleRoofTops            => { fn => \&_setmoduleRoofTops            },
-  moduleTiltAngle           => { fn => \&_setmoduleTiltAngle           },
-  moduleDirection           => { fn => \&_setmoduleDirection           },
+  moduleDeclination         => { fn => \&_setmoduleDeclination         },
+  moduleAzimuth             => { fn => \&_setmoduleAzimuth             },
   operatingMemory           => { fn => \&_setoperatingMemory           },
   vrmCredentials            => { fn => \&_setVictronCredentials        },
   aiDecTree                 => { fn => \&_setaiDecTree                 },
@@ -537,10 +543,10 @@ my %hqtxt = (                                                                   
               DE => qq{Bitte geben sie alle von Ihnen verwendeten Stringnamen mit "set LINK inverterStrings" an}            },
   mps    => { EN => qq{Please enter the DC peak power of each string with "set LINK modulePeakString"},
               DE => qq{Bitte geben sie die DC Spitzenleistung von jedem String mit "set LINK modulePeakString" an}          },
-  mdr    => { EN => qq{Please specify the module direction with "set LINK moduleDirection"},
-              DE => qq{Bitte geben sie die Modulausrichtung mit "set LINK moduleDirection" an}                              },
-  mta    => { EN => qq{Please specify the module tilt angle with "set LINK moduleTiltAngle"},
-              DE => qq{Bitte geben sie den Modulneigungswinkel mit "set LINK moduleTiltAngle" an}                           },
+  mdr    => { EN => qq{Please specify the module direction with "set LINK moduleAzimuth"},
+              DE => qq{Bitte geben sie die Modulausrichtung mit "set LINK moduleAzimuth" an}                                },
+  mta    => { EN => qq{Please specify the module tilt angle with "set LINK moduleDeclination"},
+              DE => qq{Bitte geben sie den Modulneigungswinkel mit "set LINK moduleDeclination" an}                         },
   rip    => { EN => qq{Please specify at least one combination Rooftop-ID/SolCast-API with "set LINK roofIdentPair"},
               DE => qq{Bitte geben Sie mindestens eine Kombination Rooftop-ID/SolCast-API mit "set LINK roofIdentPair" an}  },
   mrt    => { EN => qq{Please set the assignment String / Rooftop identification with "set LINK moduleRoofTops"},
@@ -930,7 +936,7 @@ sub Initialize {
   $hash->{DbLog_splitFn}      = \&DbLogSplit;
   $hash->{AttrFn}             = \&Attr;
   $hash->{NotifyFn}           = \&Notify;
-  $hash->{ReadyFn}            = \&runCentralTask;
+  $hash->{ReadyFn}            = \&runTask;
   $hash->{AttrList}           = "affect70percentRule:1,dynamic,0 ".
                                 "affectBatteryPreferredCharge:slider,0,1,100 ".
                                 "affectConsForecastIdentWeekdays:1,0 ".
@@ -1236,8 +1242,8 @@ sub Set {
                   ;
   }
   elsif (isForecastSolarUsed ($hash)) {
-      $setlist .= "moduleDirection ".
-                  "moduleTiltAngle "
+      $setlist .= "moduleAzimuth ".
+                  "moduleDeclination "
                   ;
   }
   elsif (isVictronKiUsed ($hash)) {
@@ -1245,8 +1251,8 @@ sub Set {
                   ;
   }
   else {
-      $setlist .= "moduleDirection ".
-                  "moduleTiltAngle "
+      $setlist .= "moduleAzimuth ".
+                  "moduleDeclination "
                   ;
   }
 
@@ -1399,11 +1405,11 @@ sub _setcurrentRadiationAPI {              ## no critic "not used"
       my ($set, $lat, $lon) = locCoordinates();
       return qq{set attributes 'latitude' and 'longitude' in global device first} if(!$set);
 
-      my $tilt = ReadingsVal ($name, 'moduleTiltAngle', '');                         # Modul Neigungswinkel für jeden Stringbezeichner
-      return qq{Please complete command "set $name moduleTiltAngle".} if(!$tilt);
+      my $tilt = ReadingsVal ($name, 'moduleDeclination', '');                       # Modul Neigungswinkel für jeden Stringbezeichner
+      return qq{Please complete command "set $name moduleDeclination".} if(!$tilt);
 
-      my $dir = ReadingsVal ($name, 'moduleDirection', '');                          # Modul Ausrichtung für jeden Stringbezeichner
-      return qq{Please complete command "set $name moduleDirection".} if(!$dir);
+      my $dir = ReadingsVal ($name, 'moduleAzimuth', '');                            # Modul Ausrichtung für jeden Stringbezeichner
+      return qq{Please complete command "set $name moduleAzimuth".} if(!$dir);
   }
 
   if ($prop eq 'VictronVRM-API') {
@@ -1601,7 +1607,7 @@ sub _setinverterStrings {                ## no critic "not used"
   return if(_checkSetupNotComplete ($hash));                                       # keine Stringkonfiguration wenn Setup noch nicht komplett
 
   my $ret = qq{NOTE: After setting or changing "inverterStrings" please check }.
-            qq{/ set all module parameter (e.g. moduleTiltAngle) again ! \n}.
+            qq{/ set all module parameter (e.g. moduleDeclination) again ! \n}.
             qq{Use "set $name plantConfiguration check" to validate your Setup.};
 
 return $ret;
@@ -1795,9 +1801,9 @@ return;
 }
 
 ################################################################
-#                      Setter moduleTiltAngle
+#                      Setter moduleDeclination
 ################################################################
-sub _setmoduleTiltAngle {                ## no critic "not used"
+sub _setmoduleDeclination {              ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -1817,8 +1823,8 @@ sub _setmoduleTiltAngle {                ## no critic "not used"
       }
   }
 
-  readingsSingleUpdate ($hash, "moduleTiltAngle", $arg, 1);
-  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
+  readingsSingleUpdate ($hash, 'moduleDeclination', $arg, 1);
+  writeCacheToFile     ($hash, 'plantconfig', $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
 
   return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
 
@@ -1829,13 +1835,13 @@ return;
 }
 
 ################################################################
-#                 Setter moduleDirection
+#                 Setter moduleAzimuth
 #
 #  Angabe entweder als Azimut-Bezeichner oder direkte
 #  Azimut Angabe -180 ...0...180
 #
 ################################################################
-sub _setmoduleDirection {                ## no critic "not used"
+sub _setmoduleAzimuth {                  ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -1855,8 +1861,8 @@ sub _setmoduleDirection {                ## no critic "not used"
       }
   }
 
-  readingsSingleUpdate ($hash, "moduleDirection", $arg,         1);
-  writeCacheToFile     ($hash, "plantconfig",     $plantcfg.$name);                # Anlagenkonfiguration File schreiben
+  readingsSingleUpdate ($hash, 'moduleAzimuth',   $arg,         1);
+  writeCacheToFile     ($hash, 'plantconfig',     $plantcfg.$name);                # Anlagenkonfiguration File schreiben
 
   return if(_checkSetupNotComplete ($hash));                                       # keine Stringkonfiguration wenn Setup noch nicht komplett
 
@@ -2054,7 +2060,9 @@ sub _setreset {                          ## no critic "not used"
 
               $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
               $paref->{reorgday} = $dday;
+              
               setPVhistory ($paref);
+              
               delete $paref->{reorg};
               delete $paref->{reorgday};
           }
@@ -4918,9 +4926,9 @@ sub _savePlantConfig {
                      currentMeterDev
                      currentRadiationAPI
                      inverterStrings
-                     moduleDirection
+                     moduleAzimuth
                      modulePeakString
-                     moduleTiltAngle
+                     moduleDeclination
                      moduleRoofTops
                      powerTrigger
                      energyH4Trigger
@@ -4939,7 +4947,7 @@ return @pvconf;
 #              centralTask Start Management
 #     Achtung: relevant für CPU Auslastung!
 ################################################################
-sub runCentralTask {
+sub runTask {
   my $hash = shift;
 
   return if(!$init_done || CurrentVal ($hash, 'ctrunning', 0));
@@ -4990,14 +4998,15 @@ sub runCentralTask {
       storeReading ('nextCycletime', FmtTime($new));
       centralTask  ($hash, 1);
   }
+  
+  my $debug = getDebug ($hash);
 
   if ($min == 59 && $sec > 48) {
       if (!exists $hash->{HELPER}{S48DONE}) {
-          my $debug                = getDebug ($hash);
           $hash->{HELPER}{S48DONE} = 1;
 
           if ($debug =~ /collectData/x) {
-              Log3 ($name, 1, "$name DEBUG> INFO - Start of unscheduled data collection at the end of an hour");
+              Log3 ($name, 1, "$name DEBUG> INFO - runTask starts data collection at the end of an hour");
           }
 
           centralTask ($hash, 1);
@@ -5009,11 +5018,10 @@ sub runCentralTask {
 
   if ($min == 0 && $sec > 3) {
       if (!exists $hash->{HELPER}{S03DONE}) {
-          my $debug                = getDebug ($hash);
           $hash->{HELPER}{S03DONE} = 1;
 
           if ($debug =~ /collectData/x) {
-              Log3 ($name, 1, "$name DEBUG> INFO - Start of unscheduled data collection at the beginning of an hour");
+              Log3 ($name, 1, "$name DEBUG> INFO - runTask starts data collection at the beginning of an hour");
           }
           
           centralTask ($hash, 1);
@@ -5021,6 +5029,32 @@ sub runCentralTask {
   }
   else {
       delete $hash->{HELPER}{S03DONE};
+  }
+  
+  if ($min =~ /^(2|22|42)$/xs && $sec > 20) {
+      if (!exists $hash->{HELPER}{SUNCALCDONE}) {
+          $hash->{HELPER}{SUNCALCDONE} = 1;
+
+          if ($debug =~ /collectData/x) {
+              Log3 ($name, 1, "$name DEBUG> INFO - runTask starts calculation of Sun positions");
+          }
+          
+          my $day   = strftime "%d", localtime($t);                                            # aktueller Tag  (range 01 to 31)
+          my $chour = strftime "%H", localtime($t);                                            # aktuelle Stunde in 24h format (00-23)
+          
+          _calcSunPosition ( { hash  => $hash,
+                               name  => $name,
+                               type  => $hash->{TYPE},
+                               t     => $t,
+                               day   => $day,
+                               chour => $chour,  
+                               debug => $debug
+                             }
+                           );
+      }
+  }
+  else {
+      delete $hash->{HELPER}{SUNCALCDONE};
   }
 
 return;
@@ -5057,6 +5091,62 @@ return;
 }
 
 ################################################################
+#    Ermittlung der Sonnenpositionen
+#    Az,Alt = Azimuth und Höhe (in Dezimalgrad) des Körpers 
+#             über dem Horizont
+################################################################
+sub _calcSunPosition {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  my $t     = $paref->{t};                                                                      # Epoche Zeit
+  my $chour = $paref->{chour};
+  my $day   = $paref->{day};
+  
+  debugLog ($paref, 'collectData', "collect Sun position data =>");
+
+  for my $num (0..46) {
+      my ($fd, $fh) = _calcDayHourMove ($chour, $num);
+      last if($fd > 1);
+                  
+      my $tstr               = (timestampToTimestring ($t + ($num * 3600)))[3];
+      my ($date, $h, $m, $s) = split /[ :]/, $tstr;
+      $tstr                  = $date.' '.$h.':30:00';
+      my $hod                = sprintf "%02d", $h + 1;
+      my $nhtstr             = "NextHour".sprintf "%02d", $num;
+      
+      my $az  = sprintf "%.0f", Astro_Get (undef, 'global', 'text', 'SunAz',  $tstr);          # statt Astro_Get geht auch FHEM::Astro::Get 
+      my $alt = sprintf "%.0f", Astro_Get (undef, 'global', 'text', 'SunAlt', $tstr);
+
+      $data{$type}{$name}{nexthours}{$nhtstr}{sunaz}  = $az;
+      $data{$type}{$name}{nexthours}{$nhtstr}{sunalt} = $alt;
+      
+      debugLog ($paref, 'collectData', "Sun position: hod: $hod, $tstr, azimuth: $az, altitude: $alt");
+
+      if ($fd == 0 && $hod) {                                                                  # Sun Position in pvHistory speichern
+          $paref->{nhour}    = sprintf "%02d", $hod;
+          
+          $paref->{val}      = $az;
+          $paref->{histname} = 'sunaz';
+          setPVhistory ($paref);
+
+          $paref->{val}      = $alt;
+          $paref->{histname} = 'sunalt';
+          setPVhistory ($paref);
+
+          delete $paref->{histname};
+          delete $paref->{val};
+          delete $paref->{nhour};
+      }
+  }
+  
+  debugLog ($paref, 'collectData', "All Sun position data collected");
+
+return;
+}
+
+################################################################
 #                       Zentraler Datenabruf
 ################################################################
 sub centralTask {
@@ -5086,6 +5176,17 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten löschen - Bereich kann später wieder raus !!
   ##########################################################################################
+  ## AI Raw Daten formatieren                                      # 09.02.2024
+  if (defined $data{$type}{$name}{aidectree}{airaw}) {
+      for my $idx (sort keys %{$data{$type}{$name}{aidectree}{airaw}}) {
+          $data{$type}{$name}{aidectree}{airaw}{$idx}{wrp}    = 0 if(AiRawdataVal ($hash, $idx, 'wrp',    0) eq '00');
+          $data{$type}{$name}{aidectree}{airaw}{$idx}{wrp}    = 5 if(AiRawdataVal ($hash, $idx, 'wrp',    0) eq '05');
+          $data{$type}{$name}{aidectree}{airaw}{$idx}{temp}   = 0 if(AiRawdataVal ($hash, $idx, 'temp',   0) eq '00');
+          $data{$type}{$name}{aidectree}{airaw}{$idx}{temp}   = 5 if(AiRawdataVal ($hash, $idx, 'temp',   0) eq '05');
+          $data{$type}{$name}{aidectree}{airaw}{$idx}{temp}   = -5 if(AiRawdataVal ($hash, $idx, 'temp',   0) eq '-05');  
+      }
+  }
+  
   ## percentile in simple umsetzen                                 # 05.02.2024
   for my $idx (sort keys %{$data{$type}{$name}{circular}}) {
       if(defined $data{$type}{$name}{circular}{$idx}{pvcorrf}{percentile}) {
@@ -5111,7 +5212,7 @@ sub centralTask {
   } 
     
   ## nicht-Bin Werte löschen  
-  my $ra = '0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90|95|100|percentile|simple';
+  my $ra = '0|00|05|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90|95|100|percentile|simple';
   
   for my $hod (keys %{$data{$type}{$name}{circular}}) {                                           # 30.01.2024
       for my $range (keys %{$data{$type}{$name}{circular}{$hod}{pvcorrf}}) {
@@ -5127,6 +5228,19 @@ sub centralTask {
   if ($cwd) {
       CommandAttr (undef, "$name ctrlWeatherDev1 $cwd");
       readingsDelete ($hash, 'currentWeatherDev') if(AttrVal ($name, 'ctrlWeatherDev1', ''));  # erst prüfen ob gesetzt
+  }
+  
+  ## Reading umsetzen
+  my $mdr = ReadingsVal ($name, 'moduleDirection', undef);                   # 09.02.2024
+  if ($mdr) {
+      readingsSingleUpdate ($hash, 'moduleAzimuth', $mdr, 0);
+      readingsDelete ($hash, 'moduleDirection');
+  } 
+  
+  my $mta = ReadingsVal ($name, 'moduleTiltAngle', undef);                    # 09.02.2024
+  if ($mta) {
+      readingsSingleUpdate ($hash, 'moduleDeclination', $mta, 0);
+      readingsDelete ($hash, 'moduleTiltAngle');
   }
   
   ############################################################################################
@@ -5192,7 +5306,7 @@ sub centralTask {
   collectAllRegConsumers      ($centpars);                                            # alle Verbraucher Infos laden
   _specialActivities          ($centpars);                                            # zusätzliche Events generieren + Sonderaufgaben
   _transferWeatherValues      ($centpars);                                            # Wetterwerte übertragen
-
+   
   readingsDelete              ($hash, 'AllPVforecastsToEvent');
 
   _getRoofTopData             ($centpars);                                            # Strahlungswerte/Forecast-Werte in solcastapi-Hash erstellen
@@ -5289,8 +5403,8 @@ sub createStringConfig {                 ## no critic "not used"
       }
   }
   elsif (!isVictronKiUsed ($hash)) {
-      my $tilt = ReadingsVal ($name, 'moduleTiltAngle', '');                                      # Modul Neigungswinkel für jeden Stringbezeichner
-      return qq{Please complete command "set $name moduleTiltAngle".} if(!$tilt);
+      my $tilt = ReadingsVal ($name, 'moduleDeclination', '');                                    # Modul Neigungswinkel für jeden Stringbezeichner
+      return qq{Please complete command "set $name moduleDeclination".} if(!$tilt);
 
       my ($at,$ht) = parseParams ($tilt);
 
@@ -5299,15 +5413,15 @@ sub createStringConfig {                 ## no critic "not used"
               $data{$type}{$name}{strings}{$key}{tilt} = $value;
           }
           else {
-              return qq{Check "moduleTiltAngle" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
+              return qq{Check "moduleDeclination" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
           }
       }
 
-      my $dir = ReadingsVal ($name, 'moduleDirection', '');                                      # Modul Ausrichtung für jeden Stringbezeichner
-      return qq{Please complete command "set $name moduleDirection".} if(!$dir);
+      my $dir = ReadingsVal ($name, 'moduleAzimuth', '');                                         # Modul Ausrichtung für jeden Stringbezeichner
+      return qq{Please complete command "set $name moduleAzimuth".} if(!$dir);
 
       my ($ad,$hd) = parseParams ($dir);
-      my $iwrong   = qq{Please check the input of set "moduleDirection". It seems to be wrong.};
+      my $iwrong   = qq{Please check the input of set "moduleAzimuth". It seems to be wrong.};
 
       while (my ($key, $value) = each %$hd) {
           if ($key ~~ @istrings) {
@@ -5315,14 +5429,14 @@ sub createStringConfig {                 ## no critic "not used"
               $data{$type}{$name}{strings}{$key}{azimut} = _ident2azimuth ($value) // return $iwrong;
           }
           else {
-              return qq{Check "moduleDirection" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
+              return qq{Check "moduleAzimuth" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
           }
       }
   }
 
   if(!keys %{$data{$type}{$name}{strings}}) {
       return qq{The string configuration seems to be incomplete. \n}.
-             qq{Please check the settings of inverterStrings, modulePeakString, moduleDirection, moduleTiltAngle }.
+             qq{Please check the settings of inverterStrings, modulePeakString, moduleAzimuth, moduleDeclination }.
              qq{and/or moduleRoofTops if SolCast-API is used.};
   }
 
@@ -5663,7 +5777,6 @@ sub _transferWeatherValues {
   
   __mergeDataWeather ($paref);                                                                 # Wetterdaten zusammenfügen
   
-  my $time_str;
   my $cat = 'merge';
 
   for my $num (0..46) {
@@ -5679,13 +5792,13 @@ sub _transferWeatherValues {
       my $temp  = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$cat}{ttt};               # Außentemperatur
       my $don   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$cat}{don};               # Tag/Nacht-Grenze
       
-      $time_str                                             = "NextHour".sprintf "%02d", $num;
-      $data{$type}{$name}{nexthours}{$time_str}{weatherid}  = $wid;
-      $data{$type}{$name}{nexthours}{$time_str}{cloudcover} = $neff;
-      $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
-      $data{$type}{$name}{nexthours}{$time_str}{rainrange}  = rain2bin ($r101);
-      $data{$type}{$name}{nexthours}{$time_str}{temp}       = $temp;
-      $data{$type}{$name}{nexthours}{$time_str}{DoN}        = $don;
+      my $nhtstr                                          = "NextHour".sprintf "%02d", $num;
+      $data{$type}{$name}{nexthours}{$nhtstr}{weatherid}  = $wid;
+      $data{$type}{$name}{nexthours}{$nhtstr}{cloudcover} = $neff;
+      $data{$type}{$name}{nexthours}{$nhtstr}{rainprob}   = $r101;
+      $data{$type}{$name}{nexthours}{$nhtstr}{rainrange}  = rain2bin ($r101);
+      $data{$type}{$name}{nexthours}{$nhtstr}{temp}       = $temp;
+      $data{$type}{$name}{nexthours}{$nhtstr}{DoN}        = $don;
 
       if ($num < 23 && $fh < 24) {                                                             # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherid}  = $wid;
@@ -5694,7 +5807,7 @@ sub _transferWeatherValues {
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wrp}        = $r101;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{temp}       = $temp;
 
-          if ($num == 0) {                                                                      # aktuelle Außentemperatur
+          if ($num == 0) {                                                                     # aktuelle Außentemperatur
               $data{$type}{$name}{current}{temp} = $temp;
           }
       }
@@ -5934,15 +6047,15 @@ sub _transferAPIRadiationValues {
           next;
       }
 
-      my $fh1      = $fh + 1;
-      my $wantts   = (timestringToTimestamp ($date.' '.$chour.':00:00')) + ($num * 3600);
-      my $wantdt   = (timestampToTimestring ($wantts, $lang))[1];
+      my $fh1    = $fh + 1;
+      my $wantts = (timestringToTimestamp ($date.' '.$chour.':00:00')) + ($num * 3600);
+      my $wantdt = (timestampToTimestring ($wantts, $lang))[1];
 
-      my $time_str = 'NextHour'.sprintf "%02d", $num;
-      my ($hod)    = $wantdt =~ /\s(\d{2}):/xs;
-      $hod         = sprintf "%02d", int $hod + 1;                                            # Stunde des Tages
+      my $nhtstr = 'NextHour'.sprintf "%02d", $num;
+      my ($hod)  = $wantdt =~ /\s(\d{2}):/xs;
+      $hod       = sprintf "%02d", int $hod + 1;                                              # Stunde des Tages
 
-      my $rad      = SolCastAPIVal ($hash, '?All', $wantdt, 'Rad1h', undef);
+      my $rad1h  = SolCastAPIVal ($hash, '?All', $wantdt, 'Rad1h', undef);
 
       my $params = {
           hash    => $hash,
@@ -5950,7 +6063,7 @@ sub _transferAPIRadiationValues {
           type    => $type,
           wantdt  => $wantdt,
           hod     => $hod,
-          nhidx   => $time_str,
+          nhidx   => $nhtstr,
           num     => $num,
           fh1     => $fh1,
           fd      => $fd,
@@ -5960,42 +6073,57 @@ sub _transferAPIRadiationValues {
 
       my $est = __calcPVestimates ($params);
 
-      $data{$type}{$name}{nexthours}{$time_str}{pvapifc}   = $est;                            # durch API gelieferte PV Forecast
-      $data{$type}{$name}{nexthours}{$time_str}{starttime} = $wantdt;
-      $data{$type}{$name}{nexthours}{$time_str}{hourofday} = $hod;
-      $data{$type}{$name}{nexthours}{$time_str}{today}     = $fd == 0 ? 1 : 0;
-      $data{$type}{$name}{nexthours}{$time_str}{rad1h}     = $rad;
+      $data{$type}{$name}{nexthours}{$nhtstr}{pvapifc}   = $est;                              # durch API gelieferte PV Forecast
+      $data{$type}{$name}{nexthours}{$nhtstr}{starttime} = $wantdt;
+      $data{$type}{$name}{nexthours}{$nhtstr}{hourofday} = $hod;
+      $data{$type}{$name}{nexthours}{$nhtstr}{today}     = $fd == 0 ? 1 : 0;
+      $data{$type}{$name}{nexthours}{$nhtstr}{rad1h}     = $rad1h;
 
-      my ($err, $pvaifc) = aiGetResult ($params);                                             # KI Entscheidungen abfragen
+      my ($msg, $pvaifc) = aiGetResult ($params);                                             # KI Entscheidungen abfragen
       my $useai          = 0;
       my $pvfc;
 
-      if (!$err) {
+      if ($msg eq 'accurate' || $msg eq 'spreaded') {
           my $aivar = 100 * $pvaifc / $est;
           
-          if ($aivar >= $aiDevLowLim && $aivar <= $aiDevUpLim) {                              # Abweichung AI von Standardvorhersage begrenzen
-              $data{$type}{$name}{nexthours}{$time_str}{pvaifc} = $pvaifc;                    # durch AI gelieferte PV Forecast
-              $data{$type}{$name}{nexthours}{$time_str}{pvfc}   = $pvaifc;
-              $data{$type}{$name}{nexthours}{$time_str}{aihit}  = 1;
+          if ($msg eq 'accurate') {                                                           # KI liefert 'accurate' Treffer -> verwenden
+              $data{$type}{$name}{nexthours}{$nhtstr}{aihit} = 1;
+              $pvfc  = $pvaifc;
+              $useai = 1; 
 
+              debugLog ($paref, 'aiData', qq{AI Hit - accurate result found -> hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});              
+          }
+          
+          if ($msg eq 'spreaded' && $aivar >= $aiDevLowLim && $aivar <= $aiDevUpLim) {        # Abweichung AI von Standardvorhersage begrenzen
+              $data{$type}{$name}{nexthours}{$nhtstr}{aihit} = 1;
               $pvfc  = $pvaifc;
               $useai = 1;
+              
+              debugLog ($paref, 'aiData', qq{AI Hit - spreaded result found and is in tolerance -> hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
           }
       }
-      
-      if (!$useai) {
-          delete $data{$type}{$name}{nexthours}{$time_str}{pvaifc};
-          $data{$type}{$name}{nexthours}{$time_str}{pvfc}  = $est;
-          $data{$type}{$name}{nexthours}{$time_str}{aihit} = 0;
-
-          $pvfc = $est;
+      else {
+          debugLog ($paref, 'aiData', $msg);
       }
+      
+      if ($useai) {
+          $data{$type}{$name}{nexthours}{$nhtstr}{pvaifc} = $pvaifc;                          # durch AI gelieferte PV Forecast
+      }
+      else {
+          delete $data{$type}{$name}{nexthours}{$nhtstr}{pvaifc};
+          $data{$type}{$name}{nexthours}{$nhtstr}{aihit} = 0;
+          $pvfc = $est;
+          
+          debugLog ($paref, 'aiData', "use PV from API (no AI or AI result tolerance overflow) -> hod: $hod, Rad1h: ".(defined $rad1h ? $rad1h : '-').", pvfc: $pvfc Wh");
+      }
+      
+      $data{$type}{$name}{nexthours}{$nhtstr}{pvfc} = $pvfc;                                  # resultierende PV Forecast zuweisen
 
       if ($num < 23 && $fh < 24) {                                                            # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-          $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{pvapifc} = NexthoursVal ($hash, $time_str, 'pvapifc', undef);
+          $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{pvapifc} = NexthoursVal ($hash, $nhtstr, 'pvapifc', undef);
           $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{pvfc}    = $pvfc;
-          $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{pvaifc}  = NexthoursVal ($hash, $time_str, 'pvaifc',  undef);
-          $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{aihit}   = NexthoursVal ($hash, $time_str, 'aihit',       0);
+          $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{pvaifc}  = NexthoursVal ($hash, $nhtstr, 'pvaifc',  undef);
+          $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{aihit}   = NexthoursVal ($hash, $nhtstr, 'aihit',       0);
       }
 
       if($fd == 0 && int $pvfc > 0) {                                                         # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
@@ -6009,7 +6137,7 @@ sub _transferAPIRadiationValues {
           $paref->{histname} = 'pvfc';
           setPVhistory ($paref);
 
-          $paref->{rad1h}    = $rad;
+          $paref->{rad1h}    = $rad1h;
           $paref->{histname} = 'radiation';
           setPVhistory ($paref);
 
@@ -6113,8 +6241,8 @@ sub __calcPVestimates {
           };
 
           if ($acu =~ /on_complex/xs) {
-              $lh->{"Module Temp (calculated)"}       = $modtemp. " &deg;C";
-              $lh->{"Loss String Peak Power by Temp"} = $peakloss." kWP";
+              $lh->{"Module Temp (calculated)"}                 = $modtemp. " &deg;C";
+              $lh->{"Win(+)/Loss(-) String Peak Power by Temp"} = $peakloss." kWp";
           }
 
           $sq = q{};
@@ -6122,7 +6250,7 @@ sub __calcPVestimates {
               $sq .= $idx." => ".$lh->{$idx}."\n";
           }
 
-          Log3 ($name, 1, "$name DEBUG> PV estimate for $reld Hour ".sprintf ("%02d", $hod)." string $string ->\n$sq");
+          Log3 ($name, 1, "$name DEBUG> PV API estimate for $reld Hour ".sprintf ("%02d", $hod)." string $string ->\n$sq");
       }
 
       $pvsum   += $pv;
@@ -6152,7 +6280,7 @@ sub __calcPVestimates {
           "Forecasted temperature"      => $temp." &deg;C",
           "Cloudcover"                  => $cloudcover,
           "Rainprob"                    => $rainprob,
-          "Use PV Correction"           => ($acu ? $acu : 'no'),
+          "PV Correction mode"          => ($acu ? $acu : 'no'),
           "PV correction factor"        => $hc,
           "PV correction quality"       => $hq,
           "PV generation forecast"      => $pvsum." Wh ".$logao,
@@ -6163,7 +6291,7 @@ sub __calcPVestimates {
           $sq .= $idx." => ".$lh->{$idx}."\n";
       }
 
-      Log3 ($name, 1, "$name DEBUG> PV estimate for $reld Hour ".sprintf ("%02d", $hod)." summary: \n$sq");
+      Log3 ($name, 1, "$name DEBUG> PV API estimate for $reld Hour ".sprintf ("%02d", $hod)." summary: \n$sq");
   }
 
 return $pvsum;
@@ -6260,7 +6388,7 @@ sub ___calcPeaklossByTemp {
   my $temp       = $paref->{temp}       // return (0,0);                                    # vorhergesagte Temperatur Stunde X
 
   my $modtemp  = $temp + ($tempmodinc * (1 - ($cloudcover/100)));                           # kalkulierte Modultemperatur
-  my $peakloss = sprintf "%.2f", $tempcoeffdef * ($temp - $tempbasedef) * $peak / 100;
+  my $peakloss = sprintf "%.2f", $tempcoeffdef * ($modtemp - $tempbasedef) * $peak / 100;
 
 return ($peakloss, $modtemp);
 }
@@ -6722,11 +6850,15 @@ sub _transferBatteryValues {
   my $batmaxsoc = HistoryVal ($hash, $day, 99, 'batmaxsoc', 0);                               # gespeicherter max. SOC des Tages
 
   if ($soc >= $batmaxsoc) {
-      $paref->{batmaxsoc} = $soc;
-      $paref->{nhour}     = 99;
-      $paref->{histname}  = 'batmaxsoc';
+      $paref->{val}      = $soc;
+      $paref->{nhour}    = 99;
+      $paref->{histname} = 'batmaxsoc';
+      
       setPVhistory ($paref);
+      
       delete $paref->{histname};
+      delete $paref->{nhour};
+      delete $paref->{val};
   }
 
   ######
@@ -6873,11 +7005,15 @@ sub _batSocTarget {
 
   ## pvHistory/Readings schreiben
   #################################
-  $paref->{batsetsoc} = $target;
-  $paref->{nhour}     = 99;
-  $paref->{histname}  = 'batsetsoc';
+  $paref->{val}      = $target;
+  $paref->{nhour}    = 99;
+  $paref->{histname} = 'batsetsoc';
+  
   setPVhistory ($paref);
+  
   delete $paref->{histname};
+  delete $paref->{nhour};
+  delete $paref->{val};
 
   storeReading ('Battery_OptimumTargetSoC', $target.' %');
   storeReading ('Battery_ChargeRequest',      $chargereq);
@@ -7094,7 +7230,7 @@ sub _manageConsumerData {
       my $up     = ConsumerVal ($hash, $c, "upcurr", "");
       my $pcurr  = 0;
 
-      if($paread) {
+      if ($paread) {
           my $eup = $up =~ /^kW$/xi ? 1000 : 1;
           $pcurr  = ReadingsNum ($consumer, $paread, 0) * $eup;
 
@@ -7107,7 +7243,7 @@ sub _manageConsumerData {
       my $etotread   = ConsumerVal ($hash, $c, "retotal", "");
       my $u          = ConsumerVal ($hash, $c, "uetotal", "");
 
-      if($etotread) {
+      if ($etotread) {
           my $eu      = $u =~ /^kWh$/xi ? 1000 : 1;
           my $etot    = ReadingsNum ($consumer, $etotread, 0) * $eu;                               # Summe Energieverbrauch des Verbrauchers
           my $ehist   = HistoryVal  ($hash, $day, sprintf("%02d",$nhour), "csmt${c}", undef);      # gespeicherter Totalverbrauch
@@ -7115,7 +7251,7 @@ sub _manageConsumerData {
 
           ## aktuelle Leistung ermitteln wenn kein Reading d. aktuellen Leistung verfügbar
           ##################################################################################
-          if(!$paread){
+          if (!$paread){
               my $timespan = $t    - ConsumerVal ($hash, $c, "old_etottime",  $t);
               my $delta    = $etot - ConsumerVal ($hash, $c, "old_etotal", $etot);
               $pcurr       = sprintf "%.6f", $delta / (3600 * $timespan) if($delta);               # Einheitenformel beachten !!: W = Wh / (3600 * s)
@@ -7126,7 +7262,7 @@ sub _manageConsumerData {
               storeReading ("consumer${c}_currentPower", $pcurr.' W');
           }
 
-          if(defined $ehist && $etot >= $ehist && ($etot - $ehist) >= $ethreshold) {
+          if (defined $ehist && $etot >= $ehist && ($etot - $ehist) >= $ethreshold) {
               my $consumerco  = $etot - $ehist;
               $consumerco    += HistoryVal ($hash, $day, sprintf("%02d",$nhour), "csme${c}", 0);
 
@@ -7191,12 +7327,13 @@ sub _manageConsumerData {
       $paref->{val}      = ConsumerVal ($hash, $c, "numberDayStarts", 0);                                                                    # Anzahl Tageszyklen des Verbrauchers speichern
       $paref->{histname} = "cyclescsm${c}";
       setPVhistory ($paref);
-      delete $paref->{histname};
 
       $paref->{val}      = ceil ConsumerVal ($hash, $c, "minutesOn", 0);                                                                     # Verbrauchsminuten akt. Stunde des Consumers
       $paref->{histname} = "minutescsm${c}";
       setPVhistory ($paref);
+      
       delete $paref->{histname};
+      delete $paref->{val};
 
       ## Durchschnittsverbrauch / Betriebszeit ermitteln + speichern
       ################################################################
@@ -7215,7 +7352,7 @@ sub _manageConsumerData {
       }
 
       if ($dnum) {
-          if($consumerco && $runhours) {
+          if ($consumerco && $runhours) {
               $data{$type}{$name}{consumers}{$c}{avgenergy} = sprintf "%.2f", ($consumerco/$runhours);            # Durchschnittsverbrauch pro Stunde in Wh
           }
           else {
@@ -9800,6 +9937,16 @@ sub _checkSetupNotComplete {
   if ($cwd) {
       CommandAttr (undef, "$name ctrlWeatherDev1 $cwd");
   }
+  
+  my $mdr = ReadingsVal ($name, 'moduleDirection', undef);                    # 09.02.2024
+  if ($mdr) {
+      readingsSingleUpdate ($hash, 'moduleAzimuth', $mdr, 0);
+  }
+
+  my $mta = ReadingsVal   ($name, 'moduleTiltAngle', undef); 
+  if ($mta) {
+      readingsSingleUpdate ($hash, 'moduleDeclination', $mta, 0);
+  }
   ##########################################################################################
 
   my $is    = ReadingsVal   ($name, 'inverterStrings',     undef);                        # String Konfig
@@ -9809,8 +9956,8 @@ sub _checkSetupNotComplete {
   my $medev = ReadingsVal   ($name, 'currentMeterDev',     undef);                        # Meter Device
 
   my $peaks = ReadingsVal   ($name, 'modulePeakString',    undef);                        # String Peak
-  my $dir   = ReadingsVal   ($name, 'moduleDirection',     undef);                        # Modulausrichtung Konfig (Azimut)
-  my $ta    = ReadingsVal   ($name, 'moduleTiltAngle',     undef);                        # Modul Neigungswinkel Konfig
+  my $dir   = ReadingsVal   ($name, 'moduleAzimuth',       undef);                        # Modulausrichtung Konfig (Azimut)
+  my $ta    = ReadingsVal   ($name, 'moduleDeclination',   undef);                        # Modul Neigungswinkel Konfig
   my $mrt   = ReadingsVal   ($name, 'moduleRoofTops',      undef);                        # RoofTop Konfiguration (SolCast API)
 
   my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');                   # Victron VRM Credentials gesetzt
@@ -9846,7 +9993,7 @@ sub _checkSetupNotComplete {
   my $chkicon  = "<a onClick=$cmdplchk>$img</a>";
   my $chktitle = $htitles{plchk}{$lang};
 
-  if (!$is || !$wedev || !$radev || !$indev || !$medev || !$peaks                                       ||
+  if (!$is || !$wedev || !$radev || !$indev || !$medev || !$peaks                                      ||
      (isSolCastUsed ($hash) ? (!$rip || !$mrt) : isVictronKiUsed ($hash) ? !$vrmcr : (!$dir || !$ta )) ||
      (isForecastSolarUsed ($hash) ? !$coset : '')                                                      ||
      !defined $pv0) {
@@ -12238,15 +12385,17 @@ sub aiAddInstance {                   ## no critic "not used"
       my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', 0);
       next if($rad1h <= 0);
 
-      my $temp  = AiRawdataVal ($hash, $idx, 'temp', 20);
-      my $wcc   = AiRawdataVal ($hash, $idx, 'wcc',   0);
-      my $wrp   = AiRawdataVal ($hash, $idx, 'wrp',   0);
+      my $temp   = AiRawdataVal ($hash, $idx, 'temp',  20);
+      my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',    0);
+      my $wrp    = AiRawdataVal ($hash, $idx, 'wrp',    0);
+      my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt', 0);
 
-      eval { $dtree->add_instance (attributes => { rad1h => $rad1h,
-                                                   temp  => $temp,
-                                                   wcc   => $wcc,
-                                                   wrp   => $wrp,
-                                                   hod   => $hod
+      eval { $dtree->add_instance (attributes => { rad1h  => $rad1h,
+                                                   temp   => $temp,
+                                                   wcc    => $wcc,
+                                                   wrp    => $wrp,
+                                                   sunalt => $sunalt,
+                                                   hod    => $hod
                                                  },
                                                  result => $pvrl
                                   )
@@ -12256,7 +12405,7 @@ sub aiAddInstance {                   ## no critic "not used"
                    return;
                  };
 
-      debugLog ($paref, 'aiProcess', qq{AI Instance added - hod: $hod, rad1h: $rad1h, pvrl: $pvrl, wcc: $wcc, wrp: $wrp, temp: $temp});
+      debugLog ($paref, 'aiProcess', qq{AI Instance added - hod: $hod, sunalt: $sunalt, rad1h: $rad1h, pvrl: $pvrl, wcc: $wcc, wrp: $wrp, temp: $temp});
   }
 
   $data{$type}{$name}{aidectree}{object}    = $dtree;
@@ -12340,7 +12489,7 @@ return;
 ################################################################
 #     AI Ergebnis für ermitteln
 ################################################################
-sub aiGetResult {                   ## no critic "not used"
+sub aiGetResult {                       
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -12348,7 +12497,7 @@ sub aiGetResult {                   ## no critic "not used"
   my $hod   = $paref->{hod};
   my $nhidx = $paref->{nhidx};
 
-  return 'the AI usage is not prepared' if(!isPrepared4AI ($hash, 'full'));
+  return 'AI usage is not prepared' if(!isPrepared4AI ($hash, 'full'));
 
   my $dtree = AiDetreeVal ($hash, 'aitrained', undef);
 
@@ -12358,22 +12507,27 @@ sub aiGetResult {                   ## no critic "not used"
 
   my $rad1h = NexthoursVal ($hash, $nhidx, "rad1h", 0);
   return "no rad1h for hod: $hod" if($rad1h <= 0);
+  
+  debugLog ($paref, 'aiData', 'Start AI result check now');
 
-  my $wcc  = NexthoursVal ($hash, $nhidx, "cloudcover",  0);
-  my $wrp  = NexthoursVal ($hash, $nhidx, "rainprob",    0);
-  my $temp = NexthoursVal ($hash, $nhidx, "temp",       20);
+  my $wcc    = NexthoursVal ($hash, $nhidx, 'cloudcover', 0);
+  my $wrp    = NexthoursVal ($hash, $nhidx, 'rainprob',   0);
+  my $temp   = NexthoursVal ($hash, $nhidx, 'temp',      20);
+  my $sunalt = NexthoursVal ($hash, $nhidx, 'sunalt',     0);
 
-  my $tbin = temp2bin  ($temp);
-  my $cbin = cloud2bin ($wcc);
-  my $rbin = rain2bin  ($wrp);
+  my $tbin  = temp2bin   ($temp);
+  my $cbin  = cloud2bin  ($wcc);
+  my $rbin  = rain2bin   ($wrp);
+  my $sabin = sunalt2bin ($sunalt);
 
   my $pvaifc;
 
-  eval { $pvaifc = $dtree->get_result (attributes => { rad1h => $rad1h,
-                                                       temp  => $tbin,
-                                                       wcc   => $cbin,
-                                                       wrp   => $rbin,
-                                                       hod   => $hod
+  eval { $pvaifc = $dtree->get_result (attributes => { rad1h  => $rad1h,
+                                                       temp   => $tbin,
+                                                       wcc    => $cbin,
+                                                       wrp    => $rbin,
+                                                       sunalt => $sabin,
+                                                       hod    => $hod
                                                      }
                                       );
        };
@@ -12384,30 +12538,29 @@ sub aiGetResult {                   ## no critic "not used"
   }
 
   if (defined $pvaifc) {
-      debugLog ($paref, 'aiData', qq{accurate result AI: pvaifc: $pvaifc (hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $rbin, temp: $tbin)});
-      return ('', $pvaifc);
+      debugLog ($paref, 'aiData', qq{AI accurate result found: pvaifc: $pvaifc (hod: $hod, sunalt: $sabin, Rad1h: $rad1h, wcc: $wcc, wrp: $rbin, temp: $tbin)});
+      return ('accurate', $pvaifc);
   }
 
-  my $msg = 'no decition delivered';
-
-  ($msg, $pvaifc) = _aiGetSpread ( { hash  => $hash,
-                                     name  => $name,
-                                     type  => $type,
-                                     rad1h => $rad1h,
-                                     temp  => $tbin,
-                                     wcc   => $cbin,
-                                     wrp   => $rbin,
-                                     hod   => $hod,
-                                     dtree => $dtree,
-                                     debug => $paref->{debug}
-                                   }
-                                 );
+  (my $msg, $pvaifc) = _aiGetSpread ( { hash   => $hash,
+                                        name   => $name,
+                                        type   => $type,
+                                        rad1h  => $rad1h,
+                                        temp   => $tbin,
+                                        wcc    => $cbin,
+                                        wrp    => $rbin,
+                                        sunalt => $sabin,
+                                        hod    => $hod,
+                                        dtree  => $dtree,
+                                        debug  => $paref->{debug}
+                                      }
+                                    );
 
   if (defined $pvaifc) {
-      return ('', $pvaifc);
+      return ($msg, $pvaifc);
   }
 
-return $msg;
+return 'No AI decition delivered';
 }
 
 ################################################################
@@ -12415,32 +12568,38 @@ return $msg;
 #  rad1h-Abweichung schätzen
 ################################################################
 sub _aiGetSpread {
-  my $paref = shift;
-  my $rad1h = $paref->{rad1h};
-  my $temp  = $paref->{temp};
-  my $wcc   = $paref->{wcc};
-  my $wrp   = $paref->{wrp};
-  my $hod   = $paref->{hod};
-  my $dtree = $paref->{dtree};
+  my $paref  = shift;
+  my $rad1h  = $paref->{rad1h};
+  my $temp   = $paref->{temp};
+  my $wcc    = $paref->{wcc};
+  my $wrp    = $paref->{wrp};
+  my $sunalt = $paref->{sunalt};
+  my $hod    = $paref->{hod};
+  my $dtree  = $paref->{dtree};
 
   my $dtn  = 20;                               # positive und negative rad1h Abweichung testen mit Schrittweite "$step"
   my $step = 10;
 
   my ($pos, $neg, $p, $n);
 
-  debugLog ($paref, 'aiData', qq{no accurate result AI found with initial value "$rad1h"});
-  debugLog ($paref, 'aiData', qq{test AI estimation with variance "$dtn", positive/negative step "$step"});
+  debugLog ($paref, 'aiData', qq{AI no accurate result found with initial value "Rad1h: $rad1h" (hod: $hod)});
+  debugLog ($paref, 'aiData', qq{AI test Rad1h variance "$dtn" and positive/negative spread with step size "$step"});
+  
+  my $gra = {
+      temp   => $temp,
+      wcc    => $wcc,
+      wrp    => $wrp,
+      sunalt => $sunalt,
+      hod    => $hod
+  };
 
-  for ($p = $rad1h; $p <= $rad1h + $dtn; $p += $step) {
-      $p = sprintf "%.2f", $p;
+  for ($p = $rad1h + $step; $p <= $rad1h + $dtn; $p += $step) {
+      $p            = sprintf "%.2f", $p;
+      $gra->{rad1h} = $p;
+      
+      debugLog ($paref, 'aiData', qq{AI positive test value "Rad1h: $p"});
 
-      eval { $pos = $dtree->get_result (attributes => { rad1h => $p,
-                                                        temp  => $temp,
-                                                        wcc   => $wcc,
-                                                        wrp   => $wrp,
-                                                        hod   => $hod
-                                                      }
-                                          );
+      eval { $pos = $dtree->get_result (attributes => $gra);
            };
 
       if ($@) {
@@ -12448,22 +12607,19 @@ sub _aiGetSpread {
       }
 
       if ($pos) {
-          debugLog ($paref, 'aiData', qq{AI estimation with test value "$p": $pos});
+          debugLog ($paref, 'aiData', qq{AI positive tolerance hit: $pos Wh});
           last;
       }
   }
 
-  for ($n = $rad1h; $n >= $rad1h - $dtn; $n -= $step) {
+  for ($n = $rad1h - $step; $n >= $rad1h - $dtn; $n -= $step) {
       last if($n <= 0);
-      $n = sprintf "%.2f", $n;
+      $n            = sprintf "%.2f", $n;
+      $gra->{rad1h} = $n;
+      
+      debugLog ($paref, 'aiData', qq{AI negative test value "Rad1h: $n"});
 
-      eval { $neg = $dtree->get_result (attributes => { rad1h => $n,
-                                                        temp  => $temp,
-                                                        wcc   => $wcc,
-                                                        wrp   => $wrp,
-                                                        hod   => $hod
-                                                      }
-                                          );
+      eval { $neg = $dtree->get_result (attributes => $gra);
            };
 
       if ($@) {
@@ -12471,19 +12627,22 @@ sub _aiGetSpread {
       }
 
       if ($neg) {
-          debugLog ($paref, 'aiData', qq{AI estimation with test value "$n": $neg});
+          debugLog ($paref, 'aiData', qq{AI negative tolerance hit: $neg Wh});
           last;
       }
   }
 
-  my $pvaifc = $pos && $neg ? sprintf "%.0f", (($pos + $neg) / 2) : undef;
+  my $pvaifc = $pos && $neg ? sprintf "%.0f", (($pos + $neg) / 2) : 
+               $pos         ? sprintf "%.0f", $pos                : 
+               $neg         ? sprintf "%.0f", $neg                :
+               undef;
 
   if (defined $pvaifc) {
-      debugLog ($paref, 'aiData', qq{appreciated result AI: pvaifc: $pvaifc (hod: $hod, wcc: $wcc, wrp: $wrp, temp: $temp)});
-      return ('', $pvaifc);
+      debugLog ($paref, 'aiData', qq{AI determined average result: pvaifc: $pvaifc Wh (hod: $hod, sunalt: $sunalt, wcc: $wcc, wrp: $wrp, temp: $temp)});
+      return ('spreaded', $pvaifc);
   }
 
-return 'no decition delivered';
+return 'No AI decition delivered';
 }
 
 ################################################################
@@ -12557,24 +12716,27 @@ sub aiAddRawData {
 
           my $ridx = _aiMakeIdxRaw ($pvd, $hod);
 
-          my $temp = HistoryVal ($hash, $pvd, $hod, 'temp', 20);
-          my $wcc  = HistoryVal ($hash, $pvd, $hod, 'wcc',   0);
-          my $wrp  = HistoryVal ($hash, $pvd, $hod, 'wrp',   0);
+          my $temp   = HistoryVal ($hash, $pvd, $hod, 'temp',  20);
+          my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',    0);
+          my $wrp    = HistoryVal ($hash, $pvd, $hod, 'wrp',    0);
+          my $sunalt = HistoryVal ($hash, $pvd, $hod, 'sunalt', 0);
+          
+          my $tbin  = temp2bin   ($temp);
+          my $cbin  = cloud2bin  ($wcc);
+          my $rbin  = rain2bin   ($wrp);
+          my $sabin = sunalt2bin ($sunalt);
 
-          my $tbin = temp2bin  ($temp);
-          my $cbin = cloud2bin ($wcc);
-          my $rbin = rain2bin  ($wrp);
-
-          $data{$type}{$name}{aidectree}{airaw}{$ridx}{rad1h} = $rad1h;
-          $data{$type}{$name}{aidectree}{airaw}{$ridx}{temp}  = $tbin;
-          $data{$type}{$name}{aidectree}{airaw}{$ridx}{wcc}   = $cbin;
-          $data{$type}{$name}{aidectree}{airaw}{$ridx}{wrp}   = $rbin;
-          $data{$type}{$name}{aidectree}{airaw}{$ridx}{hod}   = $hod;
-          $data{$type}{$name}{aidectree}{airaw}{$ridx}{pvrl}  = $pvrl;
+          $data{$type}{$name}{aidectree}{airaw}{$ridx}{rad1h}  = $rad1h;
+          $data{$type}{$name}{aidectree}{airaw}{$ridx}{temp}   = $tbin;
+          $data{$type}{$name}{aidectree}{airaw}{$ridx}{wcc}    = $cbin;
+          $data{$type}{$name}{aidectree}{airaw}{$ridx}{wrp}    = $rbin;
+          $data{$type}{$name}{aidectree}{airaw}{$ridx}{hod}    = $hod;
+          $data{$type}{$name}{aidectree}{airaw}{$ridx}{pvrl}   = $pvrl;
+          $data{$type}{$name}{aidectree}{airaw}{$ridx}{sunalt} = $sabin if($sabin);
 
           $dosave = 1;
 
-          debugLog ($paref, 'aiProcess', qq{AI raw data added - idx: $ridx, day: $pvd, hod: $hod, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, wrp: $rbin, temp: $tbin});
+          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod,".($sabin ? qq{ sunalt: $sabin,} : '')." rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, wrp: $rbin, temp: $tbin");
       }
   }
 
@@ -12668,9 +12830,7 @@ sub setPVhistory {
   my $batinthishour  = $paref->{batinthishour};                            # Batterieladung in Stunde
   my $btotin         = $paref->{batintotal};                               # totale Batterieladung
   my $batoutthishour = $paref->{batoutthishour};                           # Batterieentladung in Stunde
-  my $btotout        = $paref->{batouttotal};                              # totale Batterieentladung
-  my $batmaxsoc      = $paref->{batmaxsoc};                                # max. erreichter SOC des Tages
-  my $batsetsoc      = $paref->{batsetsoc};                                # berechneter optimaler SOC für den laufenden Tag
+  my $btotout        = $paref->{batouttotal};                              # totale Batterieentladung                              
   my $calcpv         = $paref->{calcpv}        // 0;
   my $gcthishour     = $paref->{gctotthishour} // 0;                       # Netzbezug
   my $fithishour     = $paref->{gftotthishour} // 0;                       # Netzeinspeisung
@@ -12682,7 +12842,7 @@ sub setPVhistory {
   my $wrp            = $paref->{wrp}           // 0;                       # Wahrscheinlichkeit von Niederschlag
   my $pvcorrf        = $paref->{pvcorrf}       // "1.00/0";                # pvCorrectionFactor
   my $temp           = $paref->{temp};                                     # Außentemperatur
-  my $val            = $paref->{val}           // qq{};                    # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
+  my $val            = $paref->{val};                                      # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
   my $rad1h          = $paref->{rad1h};                                    # Strahlungsdaten speichern
   my $reorg          = $paref->{reorg}         // 0;                       # Neuberechnung von Werten in Stunde "99" nach Löschen von Stunden eines Tages
   my $reorgday       = $paref->{reorgday}      // q{};                     # Tag der reorganisiert werden soll
@@ -12715,14 +12875,12 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{batout} = $batoutsum;
   }
 
-  if ($histname eq "batmaxsoc") {                                                                 # max. erreichter SOC des Tages
-      $val = $batmaxsoc;
-      $data{$type}{$name}{pvhist}{$day}{99}{batmaxsoc} = $batmaxsoc;
+  if ($histname eq 'batmaxsoc') {                                                                 # max. erreichter SOC des Tages
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{$histname} = $val;
   }
 
-  if ($histname eq "batsetsoc") {                                                                 # optimaler SOC für den Tages
-      $val = $batsetsoc;
-      $data{$type}{$name}{pvhist}{$day}{99}{batsetsoc} = $batsetsoc;
+  if ($histname eq 'batsetsoc') {                                                                 # optimaler SOC für den Tages
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{$histname} = $val;
   }
 
   if ($histname eq 'pvrl') {                                                                      # realer Energieertrag
@@ -12821,6 +12979,10 @@ sub setPVhistory {
       }
   }
 
+  if ($histname =~ /sunaz|sunalt/xs) {                                                             # Sonnenstand Azimuth / Altitude
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{$histname} = $val;
+  }
+  
   if ($histname =~ /cyclescsm[0-9]+$/xs) {                                                         # Anzahl Tageszyklen des Verbrauchers
       $data{$type}{$name}{pvhist}{$day}{99}{$histname} = $val;
   }
@@ -12920,11 +13082,11 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$reorgday}{99}{gfeedin} = $r7;
       $data{$type}{$name}{pvhist}{$reorgday}{99}{con}     = $r8;
 
-      debugLog ($paref, 'saveData2Cache', "setPVhistory -> PV History day >$reorgday< reorganized keys: batin, batout, pvrl, pvfc, con, confc, gcons, gfeedin");
+      debugLog ($paref, 'saveData2Cache', "setPVhistory -> Day >$reorgday< reorganized keys: batin, batout, pvrl, pvfc, con, confc, gcons, gfeedin");
   }
 
   if ($histname) {
-      debugLog ($paref, 'saveData2Cache', "setPVhistory -> save PV History Day: $day, Hour: $nhour, Key: $histname, Value: $val");
+      debugLog ($paref, 'saveData2Cache', "setPVhistory -> save Day: $day, Hour: $nhour, Key: $histname, Value: ".(defined $val ? $val : ''));
   }
 
 return;
@@ -12969,11 +13131,16 @@ sub listDataPool {
           my $batmsoc = HistoryVal ($hash, $day, $key, 'batmaxsoc',   '-');
           my $batssoc = HistoryVal ($hash, $day, $key, 'batsetsoc',   '-');
           my $rad1h   = HistoryVal ($hash, $day, $key, 'rad1h',       '-');
+          my $sunaz   = HistoryVal ($hash, $day, $key, 'sunaz',       '-');
+          my $sunalt  = HistoryVal ($hash, $day, $key, 'sunalt',      '-');
 
           $ret .= "\n      " if($ret);
-          $ret .= $key." => etotal: $etotal, pvfc: $pvfc, pvrl: $pvrl, pvrlvd: $pvrlvd, rad1h: $rad1h";
+          $ret .= $key." => ";
+          $ret .= "etotal: $etotal, pvfc: $pvfc, pvrl: $pvrl, pvrlvd: $pvrlvd, rad1h: $rad1h";
           $ret .= "\n            ";
           $ret .= "confc: $confc, con: $con, gcon: $gcon, gfeedin: $gfeedin";
+          $ret .= "\n            ";
+          $ret .= "sunaz: $sunaz, sunalt: $sunalt";
           $ret .= "\n            ";
           $ret .= "batintotal: $btotin, batin: $batin, batouttotal: $btotout, batout: $batout";
           $ret .= "\n            ";
@@ -13188,11 +13355,20 @@ sub listDataPool {
           my $confc   = NexthoursVal ($hash, $idx, 'confc',      '-');
           my $confcex = NexthoursVal ($hash, $idx, 'confcEx',    '-');
           my $don     = NexthoursVal ($hash, $idx, 'DoN',        '-');
+          my $sunaz   = NexthoursVal ($hash, $idx, 'sunaz',      '-');
+          my $sunalt  = NexthoursVal ($hash, $idx, 'sunalt',     '-');
+          
           $sq        .= "\n" if($sq);
-          $sq        .= $idx." => starttime: $nhts, hourofday: $hod, today: $today\n";
-          $sq        .= "              pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, confc: $confc\n";
-          $sq        .= "              confcEx: $confcex, DoN: $don, wid: $wid, wcc: $neff, wrp: $r101, temp=$temp\n";
-          $sq        .= "              rad1h: $rad1h, rrange: $rrange, crange: $crange, correff: $pvcorrf";
+          $sq        .= $idx." => ";
+          $sq        .= "starttime: $nhts, hourofday: $hod, today: $today";
+          $sq        .= "\n              ";
+          $sq        .= "pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, confc: $confc";
+          $sq        .= "\n              ";
+          $sq        .= "confcEx: $confcex, DoN: $don, wid: $wid, wcc: $neff, wrp: $r101, temp=$temp";
+          $sq        .= "\n              ";
+          $sq        .= "rad1h: $rad1h, sunaz: $sunaz, sunalt: $sunalt";
+          $sq        .= "\n              ";
+          $sq        .= "rrange: $rrange, crange: $crange, correff: $pvcorrf";
       }
   }
 
@@ -13289,14 +13465,15 @@ sub listDataPool {
       $sq = "<b>Number of datasets:</b> ".$maxcnt."\n";
 
       for my $idx (sort keys %{$h}) {
-          my $hod   = AiRawdataVal ($hash, $idx, 'hod',   '-');
-          my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', '-');
-          my $wcc   = AiRawdataVal ($hash, $idx, 'wcc',   '-');
-          my $wrp   = AiRawdataVal ($hash, $idx, 'wrp',   '-');
-          my $pvrl  = AiRawdataVal ($hash, $idx, 'pvrl',  '-');
-          my $temp  = AiRawdataVal ($hash, $idx, 'temp',  '-');
-          $sq      .= "\n";
-          $sq      .= "$idx => hod: $hod, rad1h: $rad1h, wcc: $wcc, wrp: $wrp, pvrl: $pvrl, temp: $temp";
+          my $hod    = AiRawdataVal ($hash, $idx, 'hod',    '-');
+          my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt', '-');
+          my $rad1h  = AiRawdataVal ($hash, $idx, 'rad1h',  '-');
+          my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',    '-');
+          my $wrp    = AiRawdataVal ($hash, $idx, 'wrp',    '-');
+          my $pvrl   = AiRawdataVal ($hash, $idx, 'pvrl',   '-');
+          my $temp   = AiRawdataVal ($hash, $idx, 'temp',   '-');
+          $sq       .= "\n";
+          $sq       .= "$idx => hod: $hod, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, wrp: $wrp, pvrl: $pvrl, temp: $temp";
       }
   }
 
@@ -13922,26 +14099,26 @@ sub timestampToTimestring {
 
   return if($epoch !~ /[0-9]/xs);
 
-  if (length ($epoch) == 13) {                                                                     # Millisekunden
+  if (length ($epoch) == 13) {                                                                      # Millisekunden
       $epoch = $epoch / 1000;
   }
 
   my ($lyear,$lmonth,$lday,$lhour,$lmin,$lsec) = (localtime($epoch))[5,4,3,2,1,0];
   my $tm;
 
-  $lyear += 1900;                                                                                  # year is 1900 based
-  $lmonth++;                                                                                       # month number is zero based
+  $lyear += 1900;                                                                                   # year is 1900 based
+  $lmonth++;                                                                                        # month number is zero based
 
-  my ($sec,$min,$hour,$day,$mon,$year) = (localtime(time))[0,1,2,3,4,5];                           # Standard f. z.B. Readingstimstamp
+  my ($sec,$min,$hour,$day,$mon,$year) = (localtime(time))[0,1,2,3,4,5];                            # Standard f. z.B. Readingstimstamp
   $year += 1900;
   $mon++;
 
-  my $realtm = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year,$mon,$day,$hour,$min,$sec);          # engl. Variante von aktuellen timestamp
-  my $tmdef  = sprintf("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,"00:00");             # engl. Variante von $epoch für Logging-Timestamps etc. (Minute/Sekunde == 00)
-  my $tmfull = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $lyear,$lmonth,$lday,$lhour,$lmin,$lsec);  # engl. Variante Vollzeit von $epoch
+  my $realtm = sprintf ("%04d-%02d-%02d %02d:%02d:%02d", $year,$mon,$day,$hour,$min,$sec);          # engl. Variante von aktuellen timestamp
+  my $tmdef  = sprintf ("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,"00:00");             # engl. Variante von $epoch für Logging-Timestamps etc. (Minute/Sekunde == 00)
+  my $tmfull = sprintf ("%04d-%02d-%02d %02d:%02d:%02d", $lyear,$lmonth,$lday,$lhour,$lmin,$lsec);  # engl. Variante Vollzeit von $epoch
 
   if($lang eq "DE") {
-      $tm = sprintf("%02d.%02d.%04d %02d:%02d:%02d", $lday,$lmonth,$lyear,$lhour,$lmin,$lsec);     # deutsche Variante Vollzeit von $epoch
+      $tm = sprintf ("%02d.%02d.%04d %02d:%02d:%02d", $lday,$lmonth,$lyear,$lhour,$lmin,$lsec);     # deutsche Variante Vollzeit von $epoch
   }
   else {
       $tm = $tmfull;
@@ -14806,19 +14983,20 @@ return ($riseshift, $setshift);
 
 ################################################################
 #  Prüfung ob global Attr latitude und longitude gesetzt sind
-#  gibt latitude und longitude zurück
+#  gibt latitude, longitude und altitude zurück
 ################################################################
 sub locCoordinates {
 
   my $set = 0;
   my $lat = AttrVal ('global', 'latitude',  '');
   my $lon = AttrVal ('global', 'longitude', '');
+  my $alt = AttrVal ('global', 'altitude',  '');
 
   if($lat && $lon) {
       $set = 1;
   }
 
-return ($set, $lat, $lon);
+return ($set, $lat, $lon, $alt);
 }
 
 ################################################################
@@ -14999,24 +15177,24 @@ return ($cname, $dswname);
 #  diskrete Temperaturen in "Bins" wandeln
 ################################################################
 sub temp2bin {
-  my $temp = shift;
+  my $val = shift;
 
-  my $bin = $temp > 35 ? '35' :
-            $temp > 32 ? '35' :
-            $temp > 30 ? '30' :
-            $temp > 27 ? '30' :
-            $temp > 25 ? '25' :
-            $temp > 22 ? '25' :
-            $temp > 20 ? '20' :
-            $temp > 17 ? '20' :
-            $temp > 15 ? '15' :
-            $temp > 12 ? '15' :
-            $temp > 10 ? '10' :
-            $temp > 7  ? '10' :
-            $temp > 5  ? '05' :
-            $temp > 2  ? '05' :
-            $temp > 0  ? '00' :
-            '-05';
+  my $bin = $val > 35 ? 35 :
+            $val > 32 ? 35 :
+            $val > 30 ? 30 :
+            $val > 27 ? 30 :
+            $val > 25 ? 25 :
+            $val > 22 ? 25 :
+            $val > 20 ? 20 :
+            $val > 17 ? 20 :
+            $val > 15 ? 15 :
+            $val > 12 ? 15 :
+            $val > 10 ? 10 :
+            $val > 7  ? 10 :
+            $val > 5  ? 5  :
+            $val > 2  ? 5  :
+            $val > 0  ? 0  :
+            -5;
 
 return $bin;
 }
@@ -15025,48 +15203,48 @@ return $bin;
 #  diskrete Bewölkung in "Bins" wandeln
 ################################################################
 sub cloud2bin {
-  my $wcc = shift;
+  my $val = shift;
 
-  my $bin = $wcc == 100 ? '100' :
-            $wcc >  97  ? '100' :
-            $wcc >  95  ? '95'  :
-            $wcc >  92  ? '95'  :
-            $wcc >  90  ? '90'  :
-            $wcc >  87  ? '90'  :
-            $wcc >  85  ? '85'  :
-            $wcc >  82  ? '85'  :
-            $wcc >  80  ? '80'  :
-            $wcc >  77  ? '80'  :
-            $wcc >  75  ? '75'  :
-            $wcc >  72  ? '75'  :
-            $wcc >  70  ? '70'  :
-            $wcc >  67  ? '70'  :
-            $wcc >  65  ? '65'  :
-            $wcc >  62  ? '65'  :
-            $wcc >  60  ? '60'  :
-            $wcc >  57  ? '60'  :
-            $wcc >  55  ? '55'  :
-            $wcc >  52  ? '55'  :
-            $wcc >  50  ? '50'  :
-            $wcc >  47  ? '50'  :
-            $wcc >  45  ? '45'  :
-            $wcc >  42  ? '45'  :
-            $wcc >  40  ? '40'  :
-            $wcc >  37  ? '40'  :
-            $wcc >  35  ? '35'  :
-            $wcc >  32  ? '35'  :
-            $wcc >  30  ? '30'  :
-            $wcc >  27  ? '30'  :
-            $wcc >  25  ? '25'  :
-            $wcc >  22  ? '25'  :
-            $wcc >  20  ? '20'  :
-            $wcc >  17  ? '20'  :
-            $wcc >  15  ? '15'  :
-            $wcc >  12  ? '15'  :
-            $wcc >  10  ? '10'  :
-            $wcc >  7   ? '10'  :
-            $wcc >  5   ? '05'  :
-            $wcc >  2   ? '05'  :
+  my $bin = $val == 100 ? '100' :
+            $val >  97  ? '100' :
+            $val >  95  ? '95'  :
+            $val >  92  ? '95'  :
+            $val >  90  ? '90'  :
+            $val >  87  ? '90'  :
+            $val >  85  ? '85'  :
+            $val >  82  ? '85'  :
+            $val >  80  ? '80'  :
+            $val >  77  ? '80'  :
+            $val >  75  ? '75'  :
+            $val >  72  ? '75'  :
+            $val >  70  ? '70'  :
+            $val >  67  ? '70'  :
+            $val >  65  ? '65'  :
+            $val >  62  ? '65'  :
+            $val >  60  ? '60'  :
+            $val >  57  ? '60'  :
+            $val >  55  ? '55'  :
+            $val >  52  ? '55'  :
+            $val >  50  ? '50'  :
+            $val >  47  ? '50'  :
+            $val >  45  ? '45'  :
+            $val >  42  ? '45'  :
+            $val >  40  ? '40'  :
+            $val >  37  ? '40'  :
+            $val >  35  ? '35'  :
+            $val >  32  ? '35'  :
+            $val >  30  ? '30'  :
+            $val >  27  ? '30'  :
+            $val >  25  ? '25'  :
+            $val >  22  ? '25'  :
+            $val >  20  ? '20'  :
+            $val >  17  ? '20'  :
+            $val >  15  ? '15'  :
+            $val >  12  ? '15'  :
+            $val >  10  ? '10'  :
+            $val >  7   ? '10'  :
+            $val >  5   ? '05'  :
+            $val >  2   ? '05'  :
             '00';
 
 return $bin;
@@ -15076,49 +15254,96 @@ return $bin;
 #  diskrete Rain Prob in "Bins" wandeln
 ################################################################
 sub rain2bin {
-  my $wrp = shift;
+  my $val = shift;
 
-  my $bin = $wrp == 100 ? '100' :
-            $wrp >  97  ? '100' :
-            $wrp >  95  ? '95'  :
-            $wrp >  92  ? '95'  :
-            $wrp >  90  ? '90'  :
-            $wrp >  87  ? '90'  :
-            $wrp >  85  ? '85'  :
-            $wrp >  82  ? '85'  :
-            $wrp >  80  ? '80'  :
-            $wrp >  77  ? '80'  :
-            $wrp >  75  ? '75'  :
-            $wrp >  72  ? '75'  :
-            $wrp >  70  ? '70'  :
-            $wrp >  67  ? '70'  :
-            $wrp >  65  ? '65'  :
-            $wrp >  62  ? '65'  :
-            $wrp >  60  ? '60'  :
-            $wrp >  57  ? '60'  :
-            $wrp >  55  ? '55'  :
-            $wrp >  52  ? '55'  :
-            $wrp >  50  ? '50'  :
-            $wrp >  47  ? '50'  :
-            $wrp >  45  ? '45'  :
-            $wrp >  42  ? '45'  :
-            $wrp >  40  ? '40'  :
-            $wrp >  37  ? '40'  :
-            $wrp >  35  ? '35'  :
-            $wrp >  32  ? '35'  :
-            $wrp >  30  ? '30'  :
-            $wrp >  27  ? '30'  :
-            $wrp >  25  ? '25'  :
-            $wrp >  22  ? '25'  :
-            $wrp >  20  ? '20'  :
-            $wrp >  17  ? '20'  :
-            $wrp >  15  ? '15'  :
-            $wrp >  12  ? '15'  :
-            $wrp >  10  ? '10'  :
-            $wrp >  7   ? '10'  :
-            $wrp >  5   ? '05'  :
-            $wrp >  2   ? '05'  :
-            '00';
+  my $bin = $val == 100 ? 100 :
+            $val >  97  ? 100 :
+            $val >  95  ? 95  :
+            $val >  92  ? 95  :
+            $val >  90  ? 90  :
+            $val >  87  ? 90  :
+            $val >  85  ? 85  :
+            $val >  82  ? 85  :
+            $val >  80  ? 80  :
+            $val >  77  ? 80  :
+            $val >  75  ? 75  :
+            $val >  72  ? 75  :
+            $val >  70  ? 70  :
+            $val >  67  ? 70  :
+            $val >  65  ? 65  :
+            $val >  62  ? 65  :
+            $val >  60  ? 60  :
+            $val >  57  ? 60  :
+            $val >  55  ? 55  :
+            $val >  52  ? 55  :
+            $val >  50  ? 50  :
+            $val >  47  ? 50  :
+            $val >  45  ? 45  :
+            $val >  42  ? 45  :
+            $val >  40  ? 40  :
+            $val >  37  ? 40  :
+            $val >  35  ? 35  :
+            $val >  32  ? 35  :
+            $val >  30  ? 30  :
+            $val >  27  ? 30  :
+            $val >  25  ? 25  :
+            $val >  22  ? 25  :
+            $val >  20  ? 20  :
+            $val >  17  ? 20  :
+            $val >  15  ? 15  :
+            $val >  12  ? 15  :
+            $val >  10  ? 10  :
+            $val >  7   ? 10  :
+            $val >  5   ? 5   :
+            $val >  2   ? 5   :
+            0;
+
+return $bin;
+}
+
+################################################################
+#  diskrete Sonnen Höhe (altitude) in "Bins" wandeln
+################################################################
+sub sunalt2bin {
+  my $val = shift;
+
+  my $bin = $val == 90  ? 90  :
+            $val >  87  ? 90  :
+            $val >  85  ? 85  :
+            $val >  82  ? 85  :
+            $val >  80  ? 80  :
+            $val >  77  ? 80  :
+            $val >  75  ? 75  :
+            $val >  72  ? 75  :
+            $val >  70  ? 70  :
+            $val >  67  ? 70  :
+            $val >  65  ? 65  :
+            $val >  62  ? 65  :
+            $val >  60  ? 60  :
+            $val >  57  ? 60  :
+            $val >  55  ? 55  :
+            $val >  52  ? 55  :
+            $val >  50  ? 50  :
+            $val >  47  ? 50  :
+            $val >  45  ? 45  :
+            $val >  42  ? 45  :
+            $val >  40  ? 40  :
+            $val >  37  ? 40  :
+            $val >  35  ? 35  :
+            $val >  32  ? 35  :
+            $val >  30  ? 30  :
+            $val >  27  ? 30  :
+            $val >  25  ? 25  :
+            $val >  22  ? 25  :
+            $val >  20  ? 20  :
+            $val >  17  ? 20  :
+            $val >  15  ? 15  :
+            $val >  12  ? 15  :
+            $val >  10  ? 10  :
+            $val >  7   ? 10  :
+            $val >  5   ? 5   :
+            $val >  2   ? 5   :
+            0;
 
 return $bin;
 }
@@ -15276,6 +15501,7 @@ return;
 #             batouttotal - totale Batterieentladung (Wh)
 #             batout      - Batterieentladung der Stunde (Wh)
 #             batmsoc     - max. SOC des Tages (%)
+#             batmaxsoc   - maximum SOC (%) des Tages 
 #             batsetsoc   - optimaler (berechneter) SOC (%) für den Tag
 #             weatherid   - Wetter ID
 #             wcc         - Grad der Bewölkung
@@ -15285,6 +15511,8 @@ return;
 #             dayname     - Tagesname (Kürzel)
 #             csmt${c}    - Totalconsumption Consumer $c (1..$maxconsumer)
 #             csme${c}    - Consumption Consumer $c (1..$maxconsumer) in $hod
+#             sunaz       - Azimuth der Sonne (in Dezimalgrad)
+#             sunalt      - Höhe der Sonne (in Dezimalgrad)
 #    $def: Defaultwert
 #
 ###############################################################################
@@ -15565,7 +15793,7 @@ return $def;
 #
 # $strg:        - Name des Strings aus modulePeakString
 # $key:  peak   - Peakleistung aus modulePeakString
-#        tilt   - Neigungswinkel der Module aus moduleTiltAngle
+#        tilt   - Neigungswinkel der Module aus moduleDeclination
 #        dir    - Ausrichtung der Module als Azimut-Bezeichner (N,NE,E,SE,S,SW,W,NW)
 #        azimut - Ausrichtung der Module als Azimut Angabe -180 .. 0 .. 180
 #
@@ -15630,6 +15858,7 @@ return $def;
 #       wcc        - Bewölkung als Bin
 #       wrp        - Regenwert als Bin
 #       hod        - Stunde des Tages
+#       sunalt     - Höhe der Sonne (in Dezimalgrad)  
 #       pvrl       - reale PV Erzeugung
 #
 # $def:  Defaultwert
@@ -15853,11 +16082,11 @@ to ensure that the system configuration is correct.
             <tr><td> <b>currentMeterDev</b>      </td><td>Device which supplies network I/O data                                        </td></tr>
             <tr><td> <b>currentBatteryDev</b>    </td><td>Device which provides battery performance data (if available)                 </td></tr>
             <tr><td> <b>inverterStrings</b>      </td><td>Identifier of the existing plant strings                                      </td></tr>
-            <tr><td> <b>moduleDirection</b>      </td><td>Alignment (azimuth) of the plant strings                                      </td></tr>
+            <tr><td> <b>moduleAzimuth</b>        </td><td>Azimuth of the plant strings                                                  </td></tr>
             <tr><td> <b>modulePeakString</b>     </td><td>the DC peak power of the plant strings                                        </td></tr>
             <tr><td> <b>roofIdentPair</b>        </td><td>the identification data (when using the SolCast API)                          </td></tr>
             <tr><td> <b>moduleRoofTops</b>       </td><td>the Rooftop parameters (when using the SolCast API)                           </td></tr>
-            <tr><td> <b>moduleTiltAngle</b>      </td><td>the inclination angles of the plant modules                                   </td></tr>
+            <tr><td> <b>moduleDeclination</b>    </td><td>the inclination angles of the plant modules                                   </td></tr>
          </table>
       </ul>
       <br>
@@ -16208,28 +16437,10 @@ to ensure that the system configuration is correct.
       </li>
     </ul>
     <br>
-
+    
     <ul>
-      <a id="SolarForecast-set-modulePeakString"></a>
-      <li><b>modulePeakString &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br>
-
-      The DC peak power of the string "StringnameX" in kWp. The string name is a key value of the
-      Reading <b>inverterStrings</b>. <br>
-      When using an AI-based API (e.g. Model VictronKiAPI), the peak powers of all existing strings are to be assigned as
-      a sum to the string name <b>KI-based</b>. <br><br>
-
-      <ul>
-        <b>Examples: </b> <br>
-        set &lt;name&gt; modulePeakString eastroof=5.1 southgarage=2.0 S3=7.2 <br>
-        set &lt;name&gt; modulePeakString KI-based=14.3 (for AI based API)<br>
-      </ul>
-      </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-moduleDirection"></a>
-      <li><b>moduleDirection &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br>
+      <a id="SolarForecast-set-moduleAzimuth"></a>
+      <li><b>moduleAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br>
       (only model DWD, ForecastSolarAPI) <br><br>
 
       Alignment &lt;dir&gt; of the solar modules in the string "StringnameX". The string name is a key value of the
@@ -16260,7 +16471,42 @@ to ensure that the system configuration is correct.
 
       <ul>
         <b>Example: </b> <br>
-        set &lt;name&gt; moduleDirection eastroof=-90 southgarage=S S3=NW <br>
+        set &lt;name&gt; moduleAzimuth eastroof=-90 southgarage=S S3=NW <br>
+      </ul>
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-set-moduleDeclination"></a>
+      <li><b>moduleDeclination &lt;Stringname1&gt;=&lt;Angle&gt; [&lt;Stringname2&gt;=&lt;Angle&gt; &lt;Stringname3&gt;=&lt;Angle&gt; ...] </b> <br>
+      (only model DWD, ForecastSolarAPI) <br><br>
+
+      Tilt angle of the solar modules. The string name is a key value of the reading <b>inverterStrings</b>. <br>
+      Possible angles of inclination are: 0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90
+      (0 = horizontal, 90 = vertical). <br><br>
+
+      <ul>
+        <b>Example: </b> <br>
+        set &lt;name&gt; moduleDeclination eastroof=40 southgarage=60 S3=30 <br>
+      </ul>
+      </li>
+    </ul>
+    <br>
+
+    <ul>
+      <a id="SolarForecast-set-modulePeakString"></a>
+      <li><b>modulePeakString &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br>
+
+      The DC peak power of the string "StringnameX" in kWp. The string name is a key value of the
+      Reading <b>inverterStrings</b>. <br>
+      When using an AI-based API (e.g. Model VictronKiAPI), the peak powers of all existing strings are to be assigned as
+      a sum to the string name <b>KI-based</b>. <br><br>
+
+      <ul>
+        <b>Examples: </b> <br>
+        set &lt;name&gt; modulePeakString eastroof=5.1 southgarage=2.0 S3=7.2 <br>
+        set &lt;name&gt; modulePeakString KI-based=14.3 (for AI based API)<br>
       </ul>
       </li>
     </ul>
@@ -16280,23 +16526,6 @@ to ensure that the system configuration is correct.
       <ul>
         <b>Example: </b> <br>
         set &lt;name&gt; moduleRoofTops eastroof=p1 southgarage=p2 S3=p3 <br>
-      </ul>
-      </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-moduleTiltAngle"></a>
-      <li><b>moduleTiltAngle &lt;Stringname1&gt;=&lt;Angle&gt; [&lt;Stringname2&gt;=&lt;Angle&gt; &lt;Stringname3&gt;=&lt;Angle&gt; ...] </b> <br>
-      (only model DWD, ForecastSolarAPI) <br><br>
-
-      Tilt angle of the solar modules. The string name is a key value of the reading <b>inverterStrings</b>. <br>
-      Possible angles of inclination are: 0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90
-      (0 = horizontal, 90 = vertical). <br><br>
-
-      <ul>
-        <b>Example: </b> <br>
-        set &lt;name&gt; moduleTiltAngle eastroof=40 southgarage=60 S3=30 <br>
       </ul>
       </li>
     </ul>
@@ -16678,6 +16907,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>rad1h</b>     </td><td>predicted global radiation                                                      </td></tr>
             <tr><td> <b>rrange</b>    </td><td>calculated range of rain probability                                            </td></tr>
             <tr><td> <b>starttime</b> </td><td>start time of the record                                                        </td></tr>
+            <tr><td> <b>sunaz</b>     </td><td>Azimuth of the sun (in decimal degrees)                                         </td></tr>
+            <tr><td> <b>sunalt</b>    </td><td>Altitude of the sun (in decimal degrees)                                        </td></tr>
             <tr><td> <b>temp</b>      </td><td>predicted outdoor temperature                                                   </td></tr>
             <tr><td> <b>today</b>     </td><td>has value '1' if start date on current day                                      </td></tr>
             <tr><td> <b>wrp</b>       </td><td>predicted degree of rain probability                                            </td></tr>
@@ -16702,30 +16933,32 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>etotal</b>         </td><td>total energy yield (Wh) at the beginning of the hour                                                  </td></tr>
-            <tr><td> <b>pvfc</b>           </td><td>the predicted PV yield (Wh)                                                                           </td></tr>
-            <tr><td> <b>pvrl</b>           </td><td>real PV generation (Wh)                                                                               </td></tr>
-            <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' is valid and is taken into account in the learning process, 0-'pvrl' is assessed as abnormal </td></tr>
-            <tr><td> <b>gcon</b>           </td><td>real power consumption (Wh) from the electricity grid                                                 </td></tr>
-            <tr><td> <b>confc</b>          </td><td>expected energy consumption (Wh)                                                                      </td></tr>
-            <tr><td> <b>con</b>            </td><td>real energy consumption (Wh) of the house                                                             </td></tr>
-            <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                           </td></tr>
             <tr><td> <b>batintotal</b>     </td><td>total battery charge (Wh) at the beginning of the hour                                                </td></tr>
             <tr><td> <b>batin</b>          </td><td>Hour battery charge (Wh)                                                                              </td></tr>
             <tr><td> <b>batouttotal</b>    </td><td>total battery discharge (Wh) at the beginning of the hour                                             </td></tr>
             <tr><td> <b>batout</b>         </td><td>Battery discharge of the hour (Wh)                                                                    </td></tr>
             <tr><td> <b>batmaxsoc</b>      </td><td>maximum SOC (%) of the day                                                                            </td></tr>
             <tr><td> <b>batsetsoc</b>      </td><td>optimum SOC setpoint (%) for the day                                                                  </td></tr>
+            <tr><td> <b>confc</b>          </td><td>expected energy consumption (Wh)                                                                      </td></tr>
+            <tr><td> <b>con</b>            </td><td>real energy consumption (Wh) of the house                                                             </td></tr>
+            <tr><td> <b>csmtXX</b>         </td><td>total energy consumption of ConsumerXX                                                                </td></tr>
+            <tr><td> <b>csmeXX</b>         </td><td>Energy consumption of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)          </td></tr>
+            <tr><td> <b>cyclescsmXX</b>    </td><td>Number of active cycles of ConsumerXX of the day                                                      </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>total energy yield (Wh) at the beginning of the hour                                                  </td></tr>
+            <tr><td> <b>gcon</b>           </td><td>real power consumption (Wh) from the electricity grid                                                 </td></tr>
+            <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                           </td></tr>
+            <tr><td> <b>hourscsmeXX</b>    </td><td>average hours of an active cycle of ConsumerXX of the day                                             </td></tr>
+            <tr><td> <b>minutescsmXX</b>   </td><td>total active minutes in the hour of ConsumerXX                                                        </td></tr>
+            <tr><td> <b>pvfc</b>           </td><td>the predicted PV yield (Wh)                                                                           </td></tr>
+            <tr><td> <b>pvrl</b>           </td><td>real PV generation (Wh)                                                                               </td></tr>
+            <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' is valid and is taken into account in the learning process, 0-'pvrl' is assessed as abnormal </td></tr>
+            <tr><td> <b>pvcorrf</b>        </td><td>Autocorrection factor used / forecast quality achieved                                                </td></tr>
+            <tr><td> <b>rad1h</b>          </td><td>global radiation (kJ/m2)                                                                              </td></tr>
+            <tr><td> <b>sunalt</b>         </td><td>Altitude of the sun (in decimal degrees)                                                              </td></tr>
+            <tr><td> <b>sunaz</b>          </td><td>Azimuth of the sun (in decimal degrees)                                                               </td></tr>            
             <tr><td> <b>wid</b>            </td><td>Weather identification number                                                                         </td></tr>
             <tr><td> <b>wcc</b>            </td><td>effective cloud cover                                                                                 </td></tr>
             <tr><td> <b>wrp</b>            </td><td>Probability of precipitation > 0.1 mm during the respective hour                                      </td></tr>
-            <tr><td> <b>pvcorrf</b>        </td><td>Autocorrection factor used / forecast quality achieved                                                </td></tr>
-            <tr><td> <b>rad1h</b>          </td><td>global radiation (kJ/m2)                                                                              </td></tr>
-            <tr><td> <b>csmtXX</b>         </td><td>total energy consumption of ConsumerXX                                                                </td></tr>
-            <tr><td> <b>csmeXX</b>         </td><td>Energy consumption of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)          </td></tr>
-            <tr><td> <b>minutescsmXX</b>   </td><td>total active minutes in the hour of ConsumerXX                                                        </td></tr>
-            <tr><td> <b>hourscsmeXX</b>    </td><td>average hours of an active cycle of ConsumerXX of the day                                             </td></tr>
-            <tr><td> <b>cyclescsmXX</b>    </td><td>Number of active cycles of ConsumerXX of the day                                                      </td></tr>
          </table>
       </ul>
       </li>
@@ -17926,11 +18159,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>currentMeterDev</b>      </td><td>Device welches Netz I/O-Daten liefert                                          </td></tr>
             <tr><td> <b>currentBatteryDev</b>    </td><td>Device welches Batterie Leistungsdaten liefert (sofern vorhanden)              </td></tr>
             <tr><td> <b>inverterStrings</b>      </td><td>Bezeichner der vorhandenen Anlagenstrings                                      </td></tr>
-            <tr><td> <b>moduleDirection</b>      </td><td>Ausrichtung (Azimut) der Anlagenstrings                                        </td></tr>
+            <tr><td> <b>moduleAzimuth</b>        </td><td>Ausrichtung (Azimut) der Anlagenstrings                                        </td></tr>
             <tr><td> <b>modulePeakString</b>     </td><td>die DC-Peakleistung der Anlagenstrings                                         </td></tr>
             <tr><td> <b>roofIdentPair</b>        </td><td>die Identifikationsdaten (bei Nutzung der SolCast API)                         </td></tr>
             <tr><td> <b>moduleRoofTops</b>       </td><td>die Rooftop Parameter (bei Nutzung der SolCast API)                            </td></tr>
-            <tr><td> <b>moduleTiltAngle</b>      </td><td>die Neigungswinkel der der Anlagenmodule                                       </td></tr>
+            <tr><td> <b>moduleDeclination</b>    </td><td>die Neigungswinkel der der Anlagenmodule                                       </td></tr>
          </table>
       </ul>
       <br>
@@ -18283,28 +18516,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       </li>
     </ul>
     <br>
-
+    
     <ul>
-      <a id="SolarForecast-set-modulePeakString"></a>
-      <li><b>modulePeakString &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br>
-
-      Die DC Peakleistung des Strings "StringnameX" in kWp. Der Stringname ist ein Schlüsselwert des
-      Readings <b>inverterStrings</b>. <br>
-      Bei Verwendung einer KI basierenden API (z.B. Model VictronKiAPI) sind die Peakleistungen aller vorhandenen
-      Strings als Summe dem Stringnamen <b>KI-based</b> zuzuordnen. <br><br>
-
-      <ul>
-        <b>Beispiele: </b> <br>
-        set &lt;name&gt; modulePeakString Ostdach=5.1 Südgarage=2.0 S3=7.2 <br>
-        set &lt;name&gt; modulePeakString KI-based=14.3 (bei KI basierender API)<br>
-      </ul>
-      </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-moduleDirection"></a>
-      <li><b>moduleDirection &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br>
+      <a id="SolarForecast-set-moduleAzimuth"></a>
+      <li><b>moduleAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br>
       (nur Model DWD, ForecastSolarAPI) <br><br>
 
       Ausrichtung &lt;dir&gt; der Solarmodule im String "StringnameX". Der Stringname ist ein Schlüsselwert des
@@ -18335,7 +18550,42 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; moduleDirection Ostdach=-90 Südgarage=S S3=NW <br>
+        set &lt;name&gt; moduleAzimuth Ostdach=-90 Südgarage=S S3=NW <br>
+      </ul>
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-set-moduleDeclination"></a>
+      <li><b>moduleDeclination &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br>
+      (nur Model DWD, ForecastSolarAPI) <br><br>
+
+      Neigungswinkel der Solarmodule. Der Stringname ist ein Schlüsselwert des Readings <b>inverterStrings</b>. <br>
+      Mögliche Neigungswinkel sind: 0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90
+      (0 = waagerecht, 90 = senkrecht). <br><br>
+
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; moduleDeclination Ostdach=40 Südgarage=60 S3=30 <br>
+      </ul>
+      </li>
+    </ul>
+    <br>
+
+    <ul>
+      <a id="SolarForecast-set-modulePeakString"></a>
+      <li><b>modulePeakString &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br>
+
+      Die DC Peakleistung des Strings "StringnameX" in kWp. Der Stringname ist ein Schlüsselwert des
+      Readings <b>inverterStrings</b>. <br>
+      Bei Verwendung einer KI basierenden API (z.B. Model VictronKiAPI) sind die Peakleistungen aller vorhandenen
+      Strings als Summe dem Stringnamen <b>KI-based</b> zuzuordnen. <br><br>
+
+      <ul>
+        <b>Beispiele: </b> <br>
+        set &lt;name&gt; modulePeakString Ostdach=5.1 Südgarage=2.0 S3=7.2 <br>
+        set &lt;name&gt; modulePeakString KI-based=14.3 (bei KI basierender API)<br>
       </ul>
       </li>
     </ul>
@@ -18355,23 +18605,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
         <b>Beispiel: </b> <br>
         set &lt;name&gt; moduleRoofTops Ostdach=p1 Südgarage=p2 S3=p3 <br>
-      </ul>
-      </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-moduleTiltAngle"></a>
-      <li><b>moduleTiltAngle &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br>
-      (nur Model DWD, ForecastSolarAPI) <br><br>
-
-      Neigungswinkel der Solarmodule. Der Stringname ist ein Schlüsselwert des Readings <b>inverterStrings</b>. <br>
-      Mögliche Neigungswinkel sind: 0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90
-      (0 = waagerecht, 90 = senkrecht). <br><br>
-
-      <ul>
-        <b>Beispiel: </b> <br>
-        set &lt;name&gt; moduleTiltAngle Ostdach=40 Südgarage=60 S3=30 <br>
       </ul>
       </li>
     </ul>
@@ -18761,6 +18994,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>rad1h</b>     </td><td>vorhergesagte Globalstrahlung                                                      </td></tr>
             <tr><td> <b>rrange</b>    </td><td>berechneter Bereich der Regenwahrscheinlichkeit                                    </td></tr>
             <tr><td> <b>starttime</b> </td><td>Startzeit des Datensatzes                                                          </td></tr>
+            <tr><td> <b>sunaz</b>     </td><td>Azimuth der Sonne (in Dezimalgrad)                                                 </td></tr>
+            <tr><td> <b>sunalt</b>    </td><td>Höhe der Sonne (in Dezimalgrad)                                                    </td></tr>
             <tr><td> <b>temp</b>      </td><td>vorhergesagte Außentemperatur                                                      </td></tr>
             <tr><td> <b>today</b>     </td><td>hat Wert '1' wenn Startdatum am aktuellen Tag                                      </td></tr>
             <tr><td> <b>wrp</b>       </td><td>vorhergesagter Grad der Regenwahrscheinlichkeit                                    </td></tr>
@@ -18785,30 +19020,33 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>etotal</b>         </td><td>totaler Energieertrag (Wh) zu Beginn der Stunde                                                </td></tr>
-            <tr><td> <b>pvfc</b>           </td><td>der prognostizierte PV Ertrag (Wh)                                                             </td></tr>
-            <tr><td> <b>pvrl</b>           </td><td>reale PV Erzeugung (Wh)                                                                        </td></tr>
-            <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' ist gültig und wird im Lernprozess berücksichtigt, 0-'pvrl' ist als abnormal bewertet </td></tr>
-            <tr><td> <b>gcon</b>           </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                                   </td></tr>
-            <tr><td> <b>confc</b>          </td><td>erwarteter Energieverbrauch (Wh)                                                               </td></tr>
-            <tr><td> <b>con</b>            </td><td>realer Energieverbrauch (Wh) des Hauses                                                        </td></tr>
-            <tr><td> <b>gfeedin</b>        </td><td>reale Einspeisung (Wh) in das Stromnetz                                                        </td></tr>
             <tr><td> <b>batintotal</b>     </td><td>totale Batterieladung (Wh) zu Beginn der Stunde                                                </td></tr>
             <tr><td> <b>batin</b>          </td><td>Batterieladung der Stunde (Wh)                                                                 </td></tr>
             <tr><td> <b>batouttotal</b>    </td><td>totale Batterieentladung (Wh) zu Beginn der Stunde                                             </td></tr>
             <tr><td> <b>batout</b>         </td><td>Batterieentladung der Stunde (Wh)                                                              </td></tr>
             <tr><td> <b>batmaxsoc</b>      </td><td>maximaler SOC (%) des Tages                                                                    </td></tr>
             <tr><td> <b>batsetsoc</b>      </td><td>optimaler SOC Sollwert (%) für den Tag                                                         </td></tr>
+            <tr><td> <b>csmtXX</b>         </td><td>Energieverbrauch total von ConsumerXX                                                          </td></tr>
+            <tr><td> <b>csmeXX</b>         </td><td>Energieverbrauch von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)    </td></tr>
+            <tr><td> <b>confc</b>          </td><td>erwarteter Energieverbrauch (Wh)                                                               </td></tr>
+            <tr><td> <b>con</b>            </td><td>realer Energieverbrauch (Wh) des Hauses                                                        </td></tr>
+            <tr><td> <b>cyclescsmXX</b>    </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                  </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>totaler Energieertrag (Wh) zu Beginn der Stunde                                                </td></tr>
+            <tr><td> <b>gcon</b>           </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                                   </td></tr>
+            <tr><td> <b>gfeedin</b>        </td><td>reale Einspeisung (Wh) in das Stromnetz                                                        </td></tr>
+            <tr><td> <b>hourscsmeXX</b>    </td><td>durchschnittliche Stunden eines Aktivzyklus von ConsumerXX des Tages                           </td></tr>
+            <tr><td> <b>minutescsmXX</b>   </td><td>Summe Aktivminuten in der Stunde von ConsumerXX                                                </td></tr>
+            <tr><td> <b>pvfc</b>           </td><td>der prognostizierte PV Ertrag (Wh)                                                             </td></tr>
+            <tr><td> <b>pvrl</b>           </td><td>reale PV Erzeugung (Wh)                                                                        </td></tr>
+            <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' ist gültig und wird im Lernprozess berücksichtigt, 0-'pvrl' ist als abnormal bewertet </td></tr>
+            <tr><td> <b>pvcorrf</b>        </td><td>verwendeter Autokorrekturfaktor / erreichte Prognosequalität                                   </td></tr>
+            <tr><td> <b>rad1h</b>          </td><td>Globalstrahlung (kJ/m2)                                                                        </td></tr>
+            <tr><td> <b>sunalt</b>         </td><td>Höhe der Sonne (in Dezimalgrad)                                                                </td></tr>
+            <tr><td> <b>sunaz</b>          </td><td>Azimuth der Sonne (in Dezimalgrad)                                                             </td></tr>            
             <tr><td> <b>wid</b>            </td><td>Identifikationsnummer des Wetters                                                              </td></tr>
             <tr><td> <b>wcc</b>            </td><td>effektive Wolkenbedeckung                                                                      </td></tr>
             <tr><td> <b>wrp</b>            </td><td>Wahrscheinlichkeit von Niederschlag > 0,1 mm während der jeweiligen Stunde                     </td></tr>
-            <tr><td> <b>pvcorrf</b>        </td><td>verwendeter Autokorrekturfaktor / erreichte Prognosequalität                                   </td></tr>
-            <tr><td> <b>rad1h</b>          </td><td>Globalstrahlung (kJ/m2)                                                                        </td></tr>
-            <tr><td> <b>csmtXX</b>         </td><td>Energieverbrauch total von ConsumerXX                                                          </td></tr>
-            <tr><td> <b>csmeXX</b>         </td><td>Energieverbrauch von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)    </td></tr>
-            <tr><td> <b>minutescsmXX</b>   </td><td>Summe Aktivminuten in der Stunde von ConsumerXX                                                </td></tr>
-            <tr><td> <b>hourscsmeXX</b>    </td><td>durchschnittliche Stunden eines Aktivzyklus von ConsumerXX des Tages                           </td></tr>
-            <tr><td> <b>cyclescsmXX</b>    </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                  </td></tr>
+
          </table>
       </ul>
       </li>
