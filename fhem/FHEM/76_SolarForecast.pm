@@ -162,7 +162,7 @@ my %vNotesIntern = (
   "1.15.4" => "10.02.2024  integrate sun position from Astro module, setPVhistory: change some writes ".
                            "_transferAPIRadiationValues: consider 'accurate' or 'spreaded' rsult from AI".
                            "___calcPeaklossByTemp: bugfix temp, rename moduleDirection to moduleAzimuth ".
-                           "rename moduleTiltAngle to moduleDeclination ",
+                           "rename moduleTiltAngle to moduleDeclination, checkPlantConfig: check global altitude attr ",
   "1.15.3" => "06.02.2024  Header: add links to the API website dependend from the used API ",
   "1.15.2" => "05.02.2024  __mergeDataWeather: fix merger failures, number of temperature decimal places ".
                            "cicrular Hash: replace 'percentile' by 'simple' ",
@@ -12117,7 +12117,7 @@ sub formatVal6 {
       my $t = $v - int($v);                                 # Nachkommstelle ?
 
       if (!$t) {                                            # glatte Zahl ohne Nachkommastelle
-          if(!$v) {
+          if (!$v) {
               return '&nbsp;';                              # 0 nicht anzeigen, passt eigentlich immer bis auf einen Fall im Typ diff
           }
           elsif ($v < 10) {
@@ -13553,10 +13553,6 @@ sub checkPlantConfig {
   my $raname      = ReadingsVal    ($name, 'currentRadiationAPI',     '');
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
-  my $cf     = 0;                                                                                     # config fault: 1 -> Konfig fehlerhaft, 0 -> Konfig ok
-  my $wn     = 0;                                                                                     # Warnung wenn 1
-  my $io     = 0;                                                                                     # Info wenn 1
-
   my $ok     = FW_makeImage ('10px-kreis-gruen.png',     '');
   my $nok    = FW_makeImage ('10px-kreis-rot.png',       '');
   my $warn   = FW_makeImage ('message_attention@orange', '');
@@ -13741,10 +13737,10 @@ sub checkPlantConfig {
 
   ## Allgemeine Settings
   ########################
-  my $eocr               = AttrVal       ($name, 'event-on-change-reading', '');
-  my $aiprep             = isPrepared4AI ($hash, 'full');
-  my $aiusemsg           = CurrentVal    ($hash, 'aicanuse', '');
-  my ($cset, $lat, $lon) = locCoordinates();
+  my $eocr                     = AttrVal       ($name, 'event-on-change-reading', '');
+  my $aiprep                   = isPrepared4AI ($hash, 'full');
+  my $aiusemsg                 = CurrentVal    ($hash, 'aicanuse', '');
+  my ($cset, $lat, $lon, $alt) = locCoordinates();
   my $einstds            = "";
 
   if (!$eocr || $eocr ne '.*') {
@@ -13774,6 +13770,13 @@ sub checkPlantConfig {
       $result->{'Common Settings'}{result} .= qq{Attribute longitude in global device is not set. <br>};
       $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in the longitude attribute of the global device.<br>};
       $result->{'Common Settings'}{warn}    = 1;
+  }
+  
+  if (!$alt) {
+      $result->{'Common Settings'}{state}   = $nok;
+      $result->{'Common Settings'}{result} .= qq{Attribute altitude in global device is not set. <br>};
+      $result->{'Common Settings'}{note}   .= qq{Set the altitude in meters above sea level in the altitude attribute of the global device.<br>};
+      $result->{'Common Settings'}{fault}   = 1;
   }
 
   if (!$aiprep) {
@@ -13831,7 +13834,7 @@ sub checkPlantConfig {
       if (!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
           $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
           $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
-          $result->{'Common Settings'}{note}   .= qq{global latitude, global longitude <br>};
+          $result->{'Common Settings'}{note}   .= qq{global latitude, global longitude, global altitude <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto <br>};
       }
   }
@@ -14021,12 +14024,19 @@ sub checkPlantConfig {
 
   my $hz = keys %{$result};
   my $hc = 0;
+  my $cf = 0;                                                                                     # config fault: 1 -> Konfig fehlerhaft, 0 -> Konfig ok
+  my $wn = 0;                                                                                     # Warnung wenn 1
+  my $io = 0;                                                                                     # Info wenn 1
 
   for my $key (sort keys %{$result}) {
       $hc++;
-      $cf   = $result->{$key}{fault} if($result->{$key}{fault});
-      $wn   = $result->{$key}{warn}  if($result->{$key}{warn});
-      $io   = $result->{$key}{info}  if($result->{$key}{info});
+      $cf = $result->{$key}{fault} if($result->{$key}{fault});
+      $wn = $result->{$key}{warn}  if($result->{$key}{warn});
+      $io = $result->{$key}{info}  if($result->{$key}{info});
+      
+      $result->{$key}{state} = $warn if($result->{$key}{warn});
+      $result->{$key}{state} = $nok  if($result->{$key}{fault});
+      
       $out .= qq{<tr>};
       $out .= qq{<td style="padding: 5px; white-space:nowrap;"> <b>$key</b>              </td>};
       $out .= qq{<td style="padding: 5px; text-align: center"> $result->{$key}{state}    </td>};
