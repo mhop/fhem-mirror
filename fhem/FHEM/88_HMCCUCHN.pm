@@ -6,7 +6,7 @@
 #
 #  Version 5.0
 #
-#  (c) 2022 zap (zap01 <at> t-online <dot> de)
+#  (c) 2024 zap (zap01 <at> t-online <dot> de)
 #
 ######################################################################
 #  Client device for Homematic channels.
@@ -30,7 +30,7 @@ sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
 
-my $HMCCUCHN_VERSION = '5.0 240121821';
+my $HMCCUCHN_VERSION = '5.0 2024-02';
 
 ######################################################################
 # Initialize module
@@ -51,7 +51,7 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = 'IODev ccucalculate '.
-		'ccuflags:multiple-strict,hideStdReadings,replaceStdReadings,noBoundsChecking,ackState,logCommand,noAutoSubstitute,noReadings,trace,simulate,showMasterReadings,showLinkReadings,showDeviceReadings,showServiceReadings '.
+		'ccuflags:multiple-strict,hideStdReadings,replaceStdReadings,noBoundsChecking,ackState,logCommand,noAutoSubstitute,noReadings,trace,simulate,showMasterReadings,showLinkReadings,showDeviceReadings '.
 		'ccureadingfilter:textField-long statedatapoint controldatapoint '.
 		'ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc '.
 		'ccureadingname:textField-long ccuSetOnChange ccuReadingPrefix '.
@@ -212,7 +212,7 @@ sub HMCCUCHN_InitDevice ($$)
 			$rc = -2;
 		}
 
-		HMCCU_GetUpdate ($devHash, $da);
+		HMCCU_ExecuteGetExtValuesCommand ($devHash, $da);
 	}
 
 	return $rc;
@@ -352,9 +352,6 @@ sub HMCCUCHN_Set ($@)
 	elsif ($lcopt eq 'datapoint') {
 		return HMCCU_ExecuteSetDatapointCommand ($hash, $a, $h);
 	}
-#	elsif ($lcopt eq 'toggle') {
-#		return HMCCU_ExecuteToggleCommand ($hash);
-#	}
 	elsif (exists($hash->{hmccu}{roleCmds}{set}{$opt})) {
 		return HMCCU_ExecuteRoleCommand ($ioHash, $hash, 'set', $opt, $a, $h);
 	}
@@ -455,7 +452,7 @@ sub HMCCUCHN_Get ($@)
 	}
 	elsif ($lcopt eq 'extvalues') {
 		my $filter = shift @$a;
-		my $rc = HMCCU_GetUpdate ($hash, $ccuaddr, $filter);
+		my $rc = HMCCU_ExecuteGetExtValuesCommand ($hash, $ccuaddr, $filter);
 		return $rc < 0 ? HMCCU_SetError ($hash, $rc) : 'OK';
 	}
 	elsif ($lcopt eq 'paramsetdesc') {
@@ -525,6 +522,9 @@ sub HMCCUCHN_Get ($@)
    <ul>
       <li><b>set &lt;name&gt; armState {DISARMED|EXTSENS_ARMED|ALLSENS_ARMED|ALARM_BLOCKED}</b><br/>
 	     [alarm siren] Set arm state.
+	  </li><br/>
+	  <li><b>set &lt;name&gt; calibrate {START|STOP}</b><br/>
+		 [blind] Run calibration.
 	  </li><br/>
       <li><b>set &lt;name&gt; clear [&lt;reading-exp&gt;|reset]</b><br/>
          Delete readings matching specified reading name expression. Default expression is '.*'.
@@ -687,7 +687,6 @@ sub HMCCUCHN_Get ($@)
 			<li>showMasterReadings: Store configuration readings of parameter set 'MASTER' of current channel.</li>
 			<li>showDeviceReadings: Store configuration readings of device and value readings of channel 0.</li>
 			<li>showLinkReadings: Store readings of links.</li>
-			<li>showServiceReadings: Store readings of parameter set 'SERVICE'</li>
 		</ul>
 		If non of the flags is set, only readings belonging to parameter set VALUES (datapoints)
 		are stored.
@@ -776,7 +775,6 @@ sub HMCCUCHN_Get ($@)
       	showDeviceReadings: Show readings of device and channel 0.<br/>
       	showLinkReadings: Show link readings.<br/>
       	showMasterReadings: Show configuration readings.<br/>
-		showServiceReadings: Show service readings (HmIP only)<br/>
       	trace: Write log file information for operations related to this device.
       </li><br/>
       <a name="ccuget"></a>
@@ -855,7 +853,6 @@ sub HMCCUCHN_Get ($@)
 			MASTER (configuration parameters): 'R-'<br/>
 			LINK (links parameters): 'L-'<br/>
 			PEER (peering parameters): 'P-'<br/>
-			SERVICE (service parameters): S-<br/>
 		To hide prefix do not specify <i>prefix</i>.
       </li><br/>
       <a name="ccuscaleval"></a>
