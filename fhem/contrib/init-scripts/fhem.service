@@ -4,6 +4,19 @@
 Description=FHEM Home Automation
 Wants=network.target
 After=network.target
+
+# In case of suspicious reconnect problems after reboot
+# you can try to replace the above lines for
+# network target by the below lines with
+# network-online.target
+#
+# network-online.target will only work if
+# "modern" network management tools (e.g. NetworkManager)
+# are used.
+#
+# Wants=network-online.target
+# After=network-online.target
+
 #Requires=postgresql.service
 #After=postgresql.service
 #Requires=mysql.service
