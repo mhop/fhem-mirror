@@ -27,7 +27,7 @@
 #  Leerzeichen entfernen: sed -i 's/[[:space:]]*$//' 76_SolarForecast.pm
 #
 #########################################################################################################################
-main::LoadModule ('Astro');                                                              # Astro Modul für Sonnenkennzahlen laden
+main::LoadModule ('Astro');                                                          # Astro Modul für Sonnenkennzahlen laden
 
 package FHEM::SolarForecast;                              ## no critic 'package'
 
@@ -12645,10 +12645,7 @@ sub _aiGetSpread {
       }
   }
 
-  my $pvaifc = $pos && $neg ? sprintf "%.0f", (($pos + $neg) / 2) : 
-               $pos         ? sprintf "%.0f", $pos                : 
-               $neg         ? sprintf "%.0f", $neg                :
-               undef;
+  my $pvaifc = $pos && $neg ? sprintf "%.0f", (($pos + $neg) / 2) : undef;
 
   if (defined $pvaifc) {
       debugLog ($paref, 'aiData', qq{AI determined average result: pvaifc: $pvaifc Wh (hod: $hod, sunalt: $sunalt, wcc: $wcc, wrp: $wrp, temp: $temp)});
