@@ -27,6 +27,8 @@
 #  Leerzeichen entfernen: sed -i 's/[[:space:]]*$//' 76_SolarForecast.pm
 #
 #########################################################################################################################
+main::LoadModule ('Astro');                                                              # Astro Modul für Sonnenkennzahlen laden
+
 package FHEM::SolarForecast;                              ## no critic 'package'
 
 use strict;
@@ -54,8 +56,6 @@ use FHEM::SynoModules::SMUtils qw(
                                    trim
                                  );                                                  # Hilfsroutinen Modul
                                  
-main::LoadModule ('Astro');                                                          # Astro Modul für Sonnenkennzahlen laden 
-
 use Data::Dumper;
 use Blocking;
 use Storable qw(dclone freeze thaw nstore store retrieve);
@@ -73,7 +73,6 @@ BEGIN {
           AnalyzeCommandChain
           AttrVal
           AttrNum
-          Astro_Get
           BlockingCall
           BlockingKill
           CommandAttr
@@ -159,8 +158,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.15.5" => "11.02.2024  change forecastQualities output, new limits for 'accurate' and 'spreaded' results from AI ".
+                           "checkPlantConfig: change common check info output ".
+                           "fix load Astro ",
   "1.15.4" => "10.02.2024  integrate sun position from Astro module, setPVhistory: change some writes ".
-                           "_transferAPIRadiationValues: consider 'accurate' or 'spreaded' rsult from AI".
+                           "_transferAPIRadiationValues: consider 'accurate' or 'spreaded' result from AI".
                            "___calcPeaklossByTemp: bugfix temp, rename moduleDirection to moduleAzimuth ".
                            "rename moduleTiltAngle to moduleDeclination, checkPlantConfig: check global altitude attr ",
   "1.15.3" => "06.02.2024  Header: add links to the API website dependend from the used API ",
@@ -329,8 +331,10 @@ my $airaw          = $root."/FHEM/FhemUtils/AIraw_SolarForecast_";              
 my $aitrblto       = 7200;                                                          # KI Training BlockingCall Timeout
 my $aibcthhld      = 0.2;                                                           # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
 my $aistdudef      = 1095;                                                          # default Haltezeit KI Raw Daten (Tage)
-my $aiDevUpLim     = 150;                                                           # obere Abweichungsgrenze (%) AI von API Prognose
-my $aiDevLowLim    = 50;                                                            # untere Abweichungsgrenze (%) AI von API Prognose
+my $aiSpreadUpLim  = 150;                                                           # obere Abweichungsgrenze (%) AI 'Spread' von API Prognose
+my $aiSpreadLowLim = 50;                                                            # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
+my $aiAccUpLim     = 170;                                                           # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
+my $aiAccLowLim    = 30;                                                            # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
 
 my $calcmaxd       = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
 my @dweattrmust    = qw(TTT Neff R101 ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
@@ -700,6 +704,8 @@ my %htitles = (                                                                 
                 DE => qq{PV-&#220;berschu&#223; unzureichend}                                                      },
   plchk    => { EN => qq{Configuration check of the plant},
                 DE => qq{Konfigurationspr&#252;fung der Anlage}                                                    },
+  jtsfft   => { EN => qq{Open the SolarForecast Forum},
+                DE => qq{&#214;ffne das SolarForecast Forum}                                                       },
   scaresps => { EN => qq{API request successful},
                 DE => qq{API Abfrage erfolgreich}                                                                  },
   scarespf => { EN => qq{API request failed},
@@ -5100,7 +5106,7 @@ sub _calcSunPosition {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
-  my $t     = $paref->{t};                                                                      # Epoche Zeit
+  my $t     = $paref->{t};                                                                                # Epoche Zeit
   my $chour = $paref->{chour};
   my $day   = $paref->{day};
   
@@ -5116,15 +5122,15 @@ sub _calcSunPosition {
       my $hod                = sprintf "%02d", $h + 1;
       my $nhtstr             = "NextHour".sprintf "%02d", $num;
       
-      my $az  = sprintf "%.0f", Astro_Get (undef, 'global', 'text', 'SunAz',  $tstr);          # statt Astro_Get geht auch FHEM::Astro::Get 
-      my $alt = sprintf "%.0f", Astro_Get (undef, 'global', 'text', 'SunAlt', $tstr);
+      my $az  = sprintf "%.0f", FHEM::Astro::Get (undef, 'global', 'text', 'SunAz',  $tstr);             # statt Astro_Get geht auch FHEM::Astro::Get 
+      my $alt = sprintf "%.0f", FHEM::Astro::Get (undef, 'global', 'text', 'SunAlt', $tstr);
 
       $data{$type}{$name}{nexthours}{$nhtstr}{sunaz}  = $az;
       $data{$type}{$name}{nexthours}{$nhtstr}{sunalt} = $alt;
       
       debugLog ($paref, 'collectData', "Sun position: hod: $hod, $tstr, azimuth: $az, altitude: $alt");
 
-      if ($fd == 0 && $hod) {                                                                  # Sun Position in pvHistory speichern
+      if ($fd == 0 && $hod) {                                                                            # Sun Position in pvHistory speichern
           $paref->{nhour}    = sprintf "%02d", $hod;
           
           $paref->{val}      = $az;
@@ -6086,7 +6092,7 @@ sub _transferAPIRadiationValues {
       if ($msg eq 'accurate' || $msg eq 'spreaded') {
           my $aivar = 100 * $pvaifc / $est;
           
-          if ($msg eq 'accurate') {                                                           # KI liefert 'accurate' Treffer -> verwenden
+          if ($msg eq 'accurate' && $aivar >= $aiAccLowLim && $aivar <= $aiAccUpLim) {        # KI liefert 'accurate' Treffer -> verwenden
               $data{$type}{$name}{nexthours}{$nhtstr}{aihit} = 1;
               $pvfc  = $pvaifc;
               $useai = 1; 
@@ -6094,7 +6100,7 @@ sub _transferAPIRadiationValues {
               debugLog ($paref, 'aiData', qq{AI Hit - accurate result found -> hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});              
           }
           
-          if ($msg eq 'spreaded' && $aivar >= $aiDevLowLim && $aivar <= $aiDevUpLim) {        # Abweichung AI von Standardvorhersage begrenzen
+          if ($msg eq 'spreaded' && $aivar >= $aiSpreadLowLim && $aivar <= $aiSpreadUpLim) {  # Abweichung AI von Standardvorhersage begrenzen
               $data{$type}{$name}{nexthours}{$nhtstr}{aihit} = 1;
               $pvfc  = $pvaifc;
               $useai = 1;
@@ -10142,6 +10148,12 @@ sub _graphicHeader {
       $img         = FW_makeImage('edit_settings@grey');
       my $chkicon  = "<a onClick=$cmdplchk>$img</a>";
       my $chktitle = $htitles{plchk}{$lang};
+      
+      ## Forum Thread-Icon
+      ######################
+      $img         = FW_makeImage('time_note@grey'); 
+      my $fthicon  = "<a href='https://forum.fhem.de/index.php?topic=137058.0' target='_blank'>$img</a>";
+      my $fthtitle = $htitles{jtsfft}{$lang};
 
       ## Update-Icon
       ################
@@ -10315,10 +10327,11 @@ sub _graphicHeader {
       my $dlink = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>};
 
       $header  .= qq{<tr>};
-      $header  .= qq{<td colspan="2" align="left"  $dstyle>                <b>$dlink</b>                 </td>};
-      $header  .= qq{<td colspan="1" align="left"  title="$chktitle" $dstyle> $chkicon                   </td>};
-      $header  .= qq{<td colspan="3" align="left"  $dstyle>                   $lupt $lup &nbsp; $upicon  </td>};
-      $header  .= qq{<td colspan="3" align="right" $dstyle>                   $api                       </td>};
+      $header  .= qq{<td colspan="1" align="left"                    $dstyle> <b>$dlink</b>              </td>};
+      $header  .= qq{<td colspan="1" align="right" title="$chktitle" $dstyle> $chkicon                   </td>};
+      $header  .= qq{<td colspan="1" align="left"  title="$fthtitle" $dstyle> $fthicon                   </td>};
+      $header  .= qq{<td colspan="3" align="left"                    $dstyle> $lupt $lup &nbsp; $upicon  </td>};
+      $header  .= qq{<td colspan="3" align="right"                   $dstyle> $api                       </td>};
       $header  .= qq{</tr>};
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle> $sriseimg &nbsp; $srisetxt &nbsp;&nbsp;&nbsp; $ssetimg &nbsp; $ssettxt  </td>};
@@ -13380,15 +13393,16 @@ sub listDataPool {
       for my $idx (sort keys %{$h}) {
           my $nhfc    = NexthoursVal ($hash, $idx, 'pvfc', undef);
           next if(!$nhfc);
-          my $nhts    = NexthoursVal ($hash, $idx, 'starttime',  undef);
-          my $neff    = NexthoursVal ($hash, $idx, 'cloudcover',   '-');
-          my $crange  = NexthoursVal ($hash, $idx, 'cloudrange',   '-');
-          my $r101    = NexthoursVal ($hash, $idx, 'rainprob',     '-');
-          my $rrange  = NexthoursVal ($hash, $idx, 'rainrange',    '-');
-          my $pvcorrf = NexthoursVal ($hash, $idx, 'pvcorrf',    '-/-');
+          
+          my $nhts    = NexthoursVal ($hash, $idx, 'starttime',  '-');
+          my $pvcorrf = NexthoursVal ($hash, $idx, 'pvcorrf',  '-/-');
+          my $aihit   = NexthoursVal ($hash, $idx, 'aihit',      '-');
+          my $pvfc    = NexthoursVal ($hash, $idx, 'pvfc',       '-');
+          my $neff    = NexthoursVal ($hash, $idx, 'cloudcover', '-');
+          
           my ($f,$q)  = split "/", $pvcorrf;
           $sq        .= "\n" if($sq);
-          $sq        .= "starttime: $nhts, wrp: $r101, rrange: $rrange, wcc: $neff, crange: $crange, quality: $q, factor: $f";
+          $sq        .= "Start: $nhts, Quality: $q, Factor: $f, AI usage: $aihit, PV expect: $pvfc Wh, Cloud: $neff";
       }
   }
 
@@ -13741,7 +13755,7 @@ sub checkPlantConfig {
   my $aiprep                   = isPrepared4AI ($hash, 'full');
   my $aiusemsg                 = CurrentVal    ($hash, 'aicanuse', '');
   my ($cset, $lat, $lon, $alt) = locCoordinates();
-  my $einstds            = "";
+  my $einstds                  = "";
 
   if (!$eocr || $eocr ne '.*') {
       $einstds                              = 'to .*' if($eocr ne '.*');
@@ -13808,9 +13822,7 @@ sub checkPlantConfig {
       $result->{'Common Settings'}{warn}    = 1;
   }
 
-  ## allg. Settings bei Nutzung Forecast.Solar API
-  #################################################
-  if (isForecastSolarUsed ($hash)) {
+  if (isForecastSolarUsed ($hash)) {                                       # allg. Settings bei Nutzung Forecast.Solar API
       if (!$pcf || $pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
@@ -13831,17 +13843,14 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{fault}   = 1;
       }
 
-      if (!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
+      if (!$result->{'Common Settings'}{fault}) {
           $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
-          $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
-          $result->{'Common Settings'}{note}   .= qq{global latitude, global longitude, global altitude <br>};
+          $result->{'Common Settings'}{note}   .= qq{<br>checked parameters and attributes: <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto <br>};
       }
   }
 
-  ## allg. Settings bei Nutzung SolCast
-  #######################################
-  if (isSolCastUsed ($hash)) {
+  if (isSolCastUsed ($hash)) {                                                        # allg. Settings bei Nutzung SolCast API
       my $gdn = AttrVal     ('global', 'dnsServer',                '');
       my $osi = AttrVal     ($name,    'ctrlSolCastAPIoptimizeReq', 0);
 
@@ -13880,17 +13889,14 @@ sub checkPlantConfig {
           $result->{'API Access'}{fault}        = 1;
       }
 
-      if (!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
+      if (!$result->{'Common Settings'}{fault}) {
           $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
-          $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
-          $result->{'Common Settings'}{note}   .= qq{ctrlSolCastAPIoptimizeReq <br>};
-          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading, ctrlLanguage, global language, global dnsServer <br>};
+          $result->{'Common Settings'}{note}   .= qq{<br>checked parameters and attributes: <br>};
+          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, ctrlSolCastAPIoptimizeReq, global dnsServer <br>};
       }
   }
 
-  ## allg. Settings bei Nutzung DWD API
-  #######################################
-  if (isDWDUsed ($hash)) {
+  if (isDWDUsed ($hash)) {                                                               # allg. Settings bei Nutzung DWD API
       my $lam = SolCastAPIVal ($hash, '?All', '?All', 'response_message', 'success');
 
       if ($aidtabs) {
@@ -13915,20 +13921,18 @@ sub checkPlantConfig {
           $result->{'API Access'}{fault}        = 1;
       }
 
-      if (!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
+      if (!$result->{'Common Settings'}{fault}) {
           $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
-          $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
-          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading, ctrlLanguage, global language <br>};
-          $result->{'Common Settings'}{note}   .= qq{checked Perl modules: <br>};
+          $result->{'Common Settings'}{note}   .= qq{<br>checked Perl modules: <br>};
           $result->{'Common Settings'}{note}   .= qq{AI::DecisionTree <br>};
+          $result->{'Common Settings'}{note}   .= qq{<br>checked parameters and attributes: <br>};
+          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto <br>};
       }
   }
 
-  ## allg. Settings bei Nutzung VictronKI-API
-  #############################################
-  if (isVictronKiUsed ($hash)) {
+  if (isVictronKiUsed ($hash)) {                                                              # allg. Settings bei Nutzung VictronKI-API
       my $gdn   = AttrVal       ('global', 'dnsServer', '');
-      my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');                   # Victron VRM Credentials gesetzt
+      my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');
 
       if ($pcf && $pcf !~ /off/xs) {
           $result->{'Common Settings'}{state}   = $warn;
@@ -13951,12 +13955,17 @@ sub checkPlantConfig {
           $result->{'API Access'}{fault}        = 1;
       }
 
-      if (!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
+      if (!$result->{'Common Settings'}{fault}) {
           $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
-          $result->{'Common Settings'}{note}   .= qq{checked parameters: <br>};
-          $result->{'Common Settings'}{note}   .= qq{global dnsServer, global language <br>};
-          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, vrmCredentials, event-on-change-reading, ctrlLanguage <br>};
+          $result->{'Common Settings'}{note}   .= qq{<br>checked parameters and attributes: <br>};
+          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, global dnsServer, vrmCredentials <br>};
       }
+  }
+  
+  if (!$result->{'Common Settings'}{fault}) {
+      $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
+      $result->{'Common Settings'}{note}   .= qq{global latitude, global longitude, global altitude, global language <br>};
+      $result->{'Common Settings'}{note}   .= qq{event-on-change-reading, ctrlLanguage <br>};
   }
 
   ## FTUI Widget Support
@@ -14040,19 +14049,17 @@ sub checkPlantConfig {
       $out .= qq{<tr>};
       $out .= qq{<td style="padding: 5px; white-space:nowrap;"> <b>$key</b>              </td>};
       $out .= qq{<td style="padding: 5px; text-align: center"> $result->{$key}{state}    </td>};
-      $out .= qq{<td style="padding: 5px;"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;               </td>};
+      $out .= qq{<td style="padding: 5px;">                                              </td>};
       $out .= qq{<td style="padding: 0px;"> $result->{$key}{result}                      </td>};
-      $out .= qq{<td style="padding: 0px;"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;               </td>};
+      $out .= qq{<td style="padding: 0px;">                                              </td>};
       $out .= qq{<td style="padding-right: 5px; text-align: left"> $result->{$key}{note} </td>};
       $out .= qq{</tr>};
 
-      #if ($hc < $hz) {                                # Tabelle wird auf Tablet zu groß mit Zwischenzeilen
-      #    $out .= qq{<tr>};
-      #    $out .= qq{<td> &nbsp; </td>};
-      #    $out .= qq{</tr>};
-      #}
-
-      $out .= qq{<tr></tr>};
+      if ($hc < $hz) {                                                                           # Zwischenzeile
+          $out .= qq{<tr>};
+          $out .= qq{<td> &nbsp; </td>};
+          $out .= qq{</tr>};
+      }
   }
 
   $out .= qq{</table>};
