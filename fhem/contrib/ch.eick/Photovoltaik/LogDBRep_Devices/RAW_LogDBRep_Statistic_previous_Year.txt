@@ -1,0 +1,72 @@
+defmod LogDBRep_Statistic_previous_Year DbRep LogDB
+attr LogDBRep_Statistic_previous_Year DbLogExclude .*
+attr LogDBRep_Statistic_previous_Year comment Version 2023.04.28 17:00
+attr LogDBRep_Statistic_previous_Year device WR_1_API
+attr LogDBRep_Statistic_previous_Year reading SW_Statistic%_Year,Statistic_EnergyHomeBat_Year EXCLUDE=%NoBat%,%EnergyPv%
+attr LogDBRep_Statistic_previous_Year room System
+attr LogDBRep_Statistic_previous_Year sqlCmdHistoryLength 1
+attr LogDBRep_Statistic_previous_Year sqlFormatService https://sqlformat.org
+attr LogDBRep_Statistic_previous_Year suppressReading SqlResultRow_.*
+attr LogDBRep_Statistic_previous_Year userExitFn splitReading .*:.*
+attr LogDBRep_Statistic_previous_Year verbose 0
+
+setstate LogDBRep_Statistic_previous_Year 2024-01-01 08:05:11 sqlCmd SELECT *\
+FROM\
+  (SELECT h.TIMESTAMP,\
+          h.READING,\
+          IF (h.READING LIKE '%Rate%'\
+              OR h.READING LIKE '%Autarky%',\
+                 h.VALUE,\
+                 cast(h.VALUE/1000 AS decimal(6))) AS VALUE\
+   FROM history h\
+   INNER JOIN\
+     (SELECT max(TIMESTAMP) AS TIMESTAMP,\
+             READING\
+      FROM history\
+      WHERE §device§\
+        AND §reading§\
+        AND TIMESTAMP > STR_TO_DATE(CONCAT(YEAR(CURDATE())-1, '-12-31'), '%Y-%m-%d')\
+        AND TIMESTAMP < STR_TO_DATE(CONCAT(YEAR(CURDATE()), '-01-01'), '%Y-%m-%d')\
+      GROUP BY READING) x1 USING(TIMESTAMP,READING)) WR_1_API\
+UNION ALL\
+SELECT h.TIMESTAMP,\
+       concat('WB_0_', h.READING) AS READING,\
+       h.VALUE\
+FROM history h\
+INNER JOIN\
+  (SELECT max(TIMESTAMP) AS TIMESTAMP,\
+          READING\
+   FROM history\
+   WHERE DEVICE = 'WB_0'\
+     AND READING = 'Kia_eNiro_kWhCounter_Year'\
+     AND TIMESTAMP > STR_TO_DATE(CONCAT(YEAR(CURDATE())-1, '-12-01'), '%Y-%m-%d')\
+     AND TIMESTAMP < STR_TO_DATE(CONCAT(YEAR(CURDATE()), '-01-01'), '%Y-%m-%d')\
+   GROUP BY READING) WB_0_lp_1 USING(TIMESTAMP,READING)\
+UNION ALL\
+SELECT h.TIMESTAMP,\
+       concat('WB_0_', h.READING) AS READING,\
+       h.VALUE\
+FROM history h\
+INNER JOIN\
+  (SELECT max(TIMESTAMP) AS TIMESTAMP,\
+          READING\
+   FROM history\
+   WHERE DEVICE = 'WB_0'\
+     AND READING = 'Gast_kWhCounter_Year'\
+     AND TIMESTAMP > STR_TO_DATE(CONCAT(YEAR(CURDATE())-1, '-12-01'), '%Y-%m-%d')\
+     AND TIMESTAMP < STR_TO_DATE(CONCAT(YEAR(CURDATE()), '-01-01'), '%Y-%m-%d')\
+   GROUP BY READING) WB_0_lp_2 USING(TIMESTAMP,READING)\
+UNION ALL\
+SELECT h.TIMESTAMP,\
+       concat('WB_1_', h.READING) AS READING,\
+       h.VALUE\
+FROM history h\
+INNER JOIN\
+  (SELECT max(TIMESTAMP) AS TIMESTAMP,\
+          READING\
+   FROM history\
+   WHERE DEVICE = 'WB_1'\
+     AND READING LIKE 'lp_%_kWhCounter_Year'\
+     AND TIMESTAMP > STR_TO_DATE(CONCAT(YEAR(CURDATE())-1, '-12-01'), '%Y-%m-%d')\
+     AND TIMESTAMP < STR_TO_DATE(CONCAT(YEAR(CURDATE()), '-01-01'), '%Y-%m-%d')\
+   GROUP BY READING) WB_1_lp_1 USING(TIMESTAMP,READING);;

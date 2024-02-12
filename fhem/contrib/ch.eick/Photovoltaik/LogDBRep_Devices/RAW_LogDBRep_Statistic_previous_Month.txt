@@ -1,0 +1,84 @@
+defmod LogDBRep_Statistic_previous_Month DbRep LogDB
+attr LogDBRep_Statistic_previous_Month DbLogExclude .*
+attr LogDBRep_Statistic_previous_Month allowDeletion 0
+attr LogDBRep_Statistic_previous_Month comment Version 2023.01.02 15:00
+attr LogDBRep_Statistic_previous_Month device WR_1_API
+attr LogDBRep_Statistic_previous_Month reading SW_Statistic%_Month,Statistic_EnergyHomeBat_Month EXCLUDE=%NoBat%,%EnergyPv%
+attr LogDBRep_Statistic_previous_Month room System
+attr LogDBRep_Statistic_previous_Month sqlCmdHistoryLength 1
+attr LogDBRep_Statistic_previous_Month sqlFormatService https://sqlformat.org
+attr LogDBRep_Statistic_previous_Month suppressReading SqlResultRow_.*
+attr LogDBRep_Statistic_previous_Month userExitFn splitReading .*:.*
+attr LogDBRep_Statistic_previous_Month verbose 0
+
+setstate LogDBRep_Statistic_previous_Month 2024-01-24 17:05:22 sqlCmd SELECT *\
+FROM\
+  (SELECT h.TIMESTAMP,\
+          CONCAT('WR_1_API_', h.READING) AS READING,\
+          IF (h.READING LIKE '%Rate%'\
+              OR h.READING LIKE '%Autarky%',\
+                 h.VALUE,\
+                 cast(h.VALUE/1000 AS decimal(6))) AS VALUE\
+   FROM history h\
+   JOIN\
+     (SELECT max(TIMESTAMP) AS TIMESTAMP,\
+             READING\
+      FROM history\
+      WHERE §device§\
+        AND §reading§\
+        AND TIMESTAMP > DATE_FORMAT(NOW() - INTERVAL 1 MONTH, '%Y-%m-01 00:00:00')\
+        AND TIMESTAMP < DATE_FORMAT(LAST_DAY(NOW() - INTERVAL 1 MONTH), '%Y-%m-%d 23:59:59')\
+      GROUP BY READING) x1 USING(TIMESTAMP,READING)) x\
+UNION ALL\
+SELECT *\
+FROM\
+  (SELECT h.TIMESTAMP,\
+          CONCAT('WB_0_', h.READING) AS READING,\
+          h.VALUE\
+   FROM history h\
+   JOIN\
+     (SELECT max(TIMESTAMP) AS TIMESTAMP,\
+             READING\
+      FROM history\
+      WHERE DEVICE = 'WB_0'\
+        AND READING = 'Kia_eNiro_kWhCounter_Month'\
+        AND TIMESTAMP > DATE_FORMAT(NOW() - INTERVAL 1 MONTH, '%Y-%m-01 00:00:00')\
+        AND TIMESTAMP < DATE_FORMAT(LAST_DAY(NOW() - INTERVAL 1 MONTH), '%Y-%m-%d 23:59:59')\
+      GROUP BY READING) x1 USING(TIMESTAMP,READING)) x\
+UNION ALL\
+SELECT h.TIMESTAMP,\
+       CONCAT('WB_0_', h.READING) AS READING,\
+       h.VALUE\
+FROM history AS h\
+JOIN\
+  (SELECT max(TIMESTAMP) AS TIMESTAMP,\
+          READING\
+   FROM history\
+   WHERE DEVICE = 'WB_0'\
+     AND READING = 'Gast_kWhCounter_Month'\
+     AND TIMESTAMP > DATE_FORMAT(NOW() - INTERVAL 1 MONTH, '%Y-%m-01 00:00:00')\
+     AND TIMESTAMP < DATE_FORMAT(LAST_DAY(NOW() - INTERVAL 1 MONTH), '%Y-%m-%d 23:59:59')\
+   GROUP BY READING) x2 USING(TIMESTAMP,READING)\
+UNION ALL\
+SELECT h.TIMESTAMP,\
+       CONCAT('WB_1_', h.READING) AS READING,\
+       h.VALUE\
+FROM history h\
+JOIN\
+  (SELECT max(TIMESTAMP) AS TIMESTAMP,\
+          READING\
+   FROM history\
+   WHERE DEVICE = 'WB_1'\
+     AND READING LIKE 'lp_%_kWhCounter_Month'\
+     AND TIMESTAMP > DATE_FORMAT(NOW() - INTERVAL 1 MONTH, '%Y-%m-01 00:00:00')\
+     AND TIMESTAMP < DATE_FORMAT(LAST_DAY(NOW() - INTERVAL 1 MONTH), '%Y-%m-%d 23:59:59')\
+   GROUP BY READING) x3 USING(TIMESTAMP,READING)\
+UNION ALL\
+SELECT max(TIMESTAMP) AS TIMESTAMP,\
+       'EVU_Tibber_connect_nodes_consumption_Month' AS READING,\
+       cast(sum(VALUE) AS DECIMAL(10, 0)) AS VALUE\
+FROM history\
+WHERE DEVICE='EVU_Tibber_connect'\
+  AND READING='nodes_consumption'\
+  AND TIMESTAMP > DATE_FORMAT(NOW() - INTERVAL 1 MONTH, '%Y-%m-01 00:00:00')\
+  AND TIMESTAMP < DATE_FORMAT(LAST_DAY(NOW() - INTERVAL 1 MONTH), '%Y-%m-%d 23:59:59');;

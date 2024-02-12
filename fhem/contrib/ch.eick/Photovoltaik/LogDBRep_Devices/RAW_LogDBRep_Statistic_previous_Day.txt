@@ -1,0 +1,30 @@
+defmod LogDBRep_Statistic_previous_Day DbRep LogDB
+attr LogDBRep_Statistic_previous_Day DbLogExclude .*
+attr LogDBRep_Statistic_previous_Day comment Version 2023.01.02 15:00
+attr LogDBRep_Statistic_previous_Day device WR_1_API
+attr LogDBRep_Statistic_previous_Day reading SW_Statistic%_Day,Statistic_EnergyHomeBat_Day EXCLUDE=%NoBat%,%EnergyPv%
+attr LogDBRep_Statistic_previous_Day room System
+attr LogDBRep_Statistic_previous_Day sqlCmdHistoryLength 1
+attr LogDBRep_Statistic_previous_Day sqlFormatService https://sqlformat.org
+attr LogDBRep_Statistic_previous_Day suppressReading SqlResultRow_.*
+attr LogDBRep_Statistic_previous_Day userExitFn splitReading .*:.*
+attr LogDBRep_Statistic_previous_Day verbose 0
+
+setstate LogDBRep_Statistic_previous_Day 2024-02-09 01:17:00 sqlCmd SELECT *\
+FROM\
+  (SELECT h.TIMESTAMP,\
+          CONCAT('WR_1_API_', h.READING) AS READING,\
+          IF (h.READING LIKE '%Rate%'\
+              OR h.READING LIKE '%Autarky%',\
+                 h.VALUE,\
+                 cast(h.VALUE/1000 AS decimal(6))) AS VALUE\
+   FROM history h\
+   JOIN\
+     (SELECT max(TIMESTAMP) AS TIMESTAMP,\
+             READING\
+      FROM history\
+      WHERE §device§\
+        AND §reading§\
+        AND TIMESTAMP > DATE_FORMAT(NOW() - INTERVAL 1 DAY, '%Y-%m-%d 00:00:00')\
+        AND TIMESTAMP < DATE_FORMAT(NOW() - INTERVAL 1 DAY, '%Y-%m-%d 23:59:59')\
+      GROUP BY READING) x1 USING(TIMESTAMP,READING)) x;;
