@@ -1,0 +1,5 @@
+defmod LogDBRep_WR_ctl_SQL DbRep LogDB
+attr LogDBRep_WR_ctl_SQL DbLogExclude .*
+attr LogDBRep_WR_ctl_SQL room System
+
+setstate LogDBRep_WR_ctl_SQL 2023-11-26 07:51:15 sqlCmd SELECT VALUE FROM history  WHERE DEVICE='WR_0_KSEM'  AND READING='Active_energy+'  AND TIMESTAMP > curdate() - interval 1 month  AND TIMESTAMP <= LAST_DAY(SUBDATE(curdate(), INTERVAL 1 MONTH))  ORDER BY TIMESTAMP desc  LIMIT 1;;
