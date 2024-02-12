@@ -4,6 +4,16 @@
 # Version die eine Vorhersage auf Basis der Messwerte - Analyseversion
 # Analyse via Random Forest Regressor
 
+# Achtung, bei neueren Python Bibliotheken sind kleinere Änderungen notwendig
+#
+# pandas 2.2.0
+# pymysql 1.1.0
+# sqlalchemy 2.0.25
+# scikit-learn 1.2.1
+#
+# Für Euer FHEM Login wählt bitte auch eins der beiden Beispiele aus.
+#
+
 import fhem
 import json
 
@@ -22,7 +32,13 @@ try:
         credentials=json.load(f)
     fhem_user = credentials["username"]
     fhem_pass = credentials["password"]
-    fh = fhem.Fhem(web, protocol="http", port=webport, username=fhem_user, password=fhem_pass)
+
+#### Beispiele für die FHEM connection
+#    fh = fhem.Fhem(web, protocol="http", port=webport, username=fhem_user, password=fhem_pass, csrf=fhem_pass)
+#    fh = fhem.Fhem(web, protocol="http", port=webport, username=fhem_user, password=fhem_pass, csrf=False)
+
+    fh = fhem.Fhem(web, protocol="http", port=webport, username=fhem_user, password=fhem_pass, csrf=fhem_pass)
+
     print("PV_KI_Prognose  running - start")
     fh.send_cmd("setreading "+DbRep+" PV_KI_Prognose running start")
 except Exception as e:
@@ -56,6 +72,7 @@ if (verbose >= 4):
 import pandas as pd
 import numpy  as np
 from sqlalchemy import create_engine
+from sqlalchemy import text
 import pymysql
 
 # betrifft beide relevanten Tabellen
@@ -86,7 +103,7 @@ if (verbose >= 3):
     fh.send_cmd("setreading "+DbRep+" PV_KI_Prognose running dwdfull read from DbLog "+DbLog)
 
 # Rad1h = Globale Einstrahlung
-# TTT 	= Temperature 2m above surface [°C]
+# TTT   = Temperature 2m above surface [°C]
 # Neff  = Effektive Wolkendecke
 # R101  = Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
 # SunD1 = Sonnenscheindauer während der letzten Stunde
@@ -168,7 +185,12 @@ while loop_date <= end_date:
 
     # Löschen der bisherigen Prognose von diesem
     sql = "DELETE FROM history WHERE DEVICE = '"+WRname+"' AND TIMESTAMP >= '"+str(loop_date.strftime("%Y-%m-%d"))+" 00:00:00' AND READING = '"+WRread+str(loop_count)+"' ;"
-    db_connection.execute(str(sql))
+
+    with db_connection.connect() as connection:
+        connection.execute(text(sql))
+
+##### Bei neueren Python Bibliotheken kann das notwendig sein.
+#        connection.commit() 
 
     if (verbose >= 3):
         print("PV_KI_Prognose  running - old forecast deleted")
@@ -188,7 +210,7 @@ while loop_date <= end_date:
     fcolumns.append('yield')
 
     # hole die Werte für den Tag, der bearbeitet wird
-    query   = 'year == "'+New_year+'" and month == "'+New_month+'" and day == "'+New_day+'"'
+    query   = "year == "+New_year+" and month == "+New_month+" and day == "+New_day
     dfq     = dfask.query(query)[fcolumns].reset_index()
 
     # erstelle die Prognose für den Tag
@@ -308,10 +330,20 @@ while loop_date <= end_date:
             # Achtung, der Wert wird um eine Stunde früher in die Datenbank eingetragen
             timestamp = date+" "+"%02d:00:00" % (dfhour_start['VALUE'].values[0]+loop_hour-1)
             sql = "UPDATE dwdfull SET forecast ="+str(Prognose)+" WHERE TIMESTAMP = '"+timestamp+"' AND hour ="+str(dfhour_start['VALUE'].values[0]+loop_hour-1)+";"
-            db_connection.execute(str(sql))
+
+            with db_connection.connect() as connection:
+                connection.execute(text(sql))
+
+##### Bei neueren Python Bibliotheken kann das notwendig sein.
+#                connection.commit() 
 
             sql = "INSERT INTO history (TIMESTAMP, DEVICE, TYPE ,READING ,VALUE) VALUES('"+timestamp+"','"+WRname+"','addlog','"+WRread+str(loop_count)+"','"+str(Prognose)+"') ;"
-            db_connection.execute(str(sql))
+
+            with db_connection.connect() as connection:
+                connection.execute(text(sql))
+
+##### Bei neueren Python Bibliotheken kann das notwendig sein.
+#                connection.commit() 
 
             # Die Prognose Werte ins FHEM schreiben
             reading = WRread+str(loop_count)+"_%02d" % (dfhour_start['VALUE'].values[0]+loop_hour-1)
@@ -372,4 +404,3 @@ if (verbose >= 3):
 
 # Zum Schluss noch einen Trigger ins FHEM schreiben
 fh.send_cmd("setreading "+DbRep+" PV_KI_Prognose done")
-
