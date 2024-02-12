@@ -13400,9 +13400,9 @@ __END__
           <ul>
             readings: Alle Messwerte werden gel&ouml;scht, neue Werte werden normal hinzugef&uuml;gt. Kann benutzt werden um alte Daten zu entfernen<br>
             register: Alle in FHEM aufgezeichneten Registerwerte werden entfernt. Dies hat KEINEN Einfluss auf Werte im Ger&auml;t.<br>
-            msgEvents: Alle Anchrichtenz&auml;hler werden gel&ouml;scht. Ebenso wird der Befehlsspeicher zur&uuml;ckgesetzt. <br>
+            msgEvents: Alle Nachrichtenz&auml;hler werden gel&ouml;scht. Ebenso wird der Befehlsspeicher zur&uuml;ckgesetzt. <br>
             rssi: gesammelte RSSI-Werte werden gel&ouml;scht.<br>
-            attack: Einträge bezüglich einer Attack werden gelöscht.<br>
+            attack: Eintr&auml;ge bez&uuml;glich einer Attack werden gel&ouml;scht.<br>
             all: alles oben genannte.<br>
           </ul>
         </li>
@@ -13597,8 +13597,8 @@ __END__
           FHEM Installationen die ausschliesslich HM-LANs nutzen interessant.
         </li>
         <li><B>assignIO &lt;IOname&gt; &lt;set|unset&gt;</B><a id="CUL_HM-set-assignIO"></a><br>
-          IO-Gerät zur Liste der IO's hinzufügen oder aus dieser Löschen.
-          Ändert das Attribut <i>IOList</i> entsprechend.
+          IO-Ger&auml;t zur Liste der IO's hinzuf&uuml;gen oder aus dieser L&ouml;schen.
+          &Auml;ndert das Attribut <i>IOList</i> entsprechend.
         </li>
 
       </ul>
@@ -13637,7 +13637,7 @@ __END__
             </li>
 
             <li><B>eventL &lt;peer&gt; &lt;condition&gt; [&lt;repCount&gt;] [&lt;repDelay&gt;] </B><a id="CUL_HM-set-eventL"></a><br>
-                simuliert einen Event mit zusätzlichem Wert.<br>
+                simuliert einen Event mit zus&auml;tzlichem Wert.<br>
                 <B>&lt;peer&gt;</B> peer auf den der Tastendruck bezogen wird.<br>              
                 <B>&lt;codition&gt;</B>wert des Events, 0..255 <br>              
                 <B>Beispiel:</B>
@@ -13675,7 +13675,7 @@ __END__
             <li><B><a href="#CUL_HM-set-onForTimer">on-for-timer &lt;sec&gt;</a></B> - Nur Dimmer! <br></li>
             <li><B><a href="#CUL_HM-set-onTill">on-till &lt;time&gt;</a></B> - Nur Dimmer! <br></li>
             <li><B>stop</B> - Stopt Bewegung (Rollo) oder Dimmerrampe</li>
-            <li><B>old</B> - schaltet auf den vorigen Wert zurück. Nur dimmer. </li>
+            <li><B>old</B> - schaltet auf den vorigen Wert zur&uuml;ck. Nur dimmer. </li>
             <li><B>pct &lt;level&gt [&lt;ontime&gt] [&lt;ramptime&gt]</B> - setzt Aktor auf gew&uuml;nschten <B>absolut Wert</B>.<br>
               Optional k&ouml;nnen f&uuml;r Dimmer "ontime" und "ramptime" angegeben werden.<br>
               "Ontime" kann dabei in Sekunden angegeben werden. Kann auch als Endzeit angegeben werden im Format hh:mm:ss
@@ -13696,24 +13696,24 @@ __END__
           'protCmdPend' abgefragt werden.
           <ul>
           <li><B>trgEventS [all|&lt;peer&gt;] &lt;condition&gt;</B><a id="CUL_HM-set-trgEventS"></a><br>
-               Initiiert ein eventS fuer die peer entity. Wenn <B>all</B> ausgewählt ist wird das Kommando bei jedem der Peers ausgeführt. Siehe auch <a href="#CUL_HM-set-eventS">eventS</a><br>
+               Initiiert ein eventS fuer die peer entity. Wenn <B>all</B> ausgew&auml;hlt ist wird das Kommando bei jedem der Peers ausgef&uuml;hrt. Siehe auch <a href="#CUL_HM-set-eventS">eventS</a><br>
                <B>&lt;condition&gt;</B>: Ist der Wert welcher mit dem Event versendet wird. Bei einem Bewegungsmelder ist das bspw. die Helligkeit.  
           </li>
           <li><B>trgEventL [all|&lt;peer&gt;] &lt;condition&gt;</B><a id="CUL_HM-set-trgEventL"></a><br>
-               Initiiert ein eventL fuer die peer entity. Wenn <B>all</B> ausgewählt ist wird das Kommando bei jedem der Peers ausgeführt. Siehe auch <a href="#CUL_HM-set-eventL">eventL</a><br>
+               Initiiert ein eventL fuer die peer entity. Wenn <B>all</B> ausgew&auml;hlt ist wird das Kommando bei jedem der Peers ausgef&uuml;hrt. Siehe auch <a href="#CUL_HM-set-eventL">eventL</a><br>
                <B>&lt;condition&gt;</B>: is the condition being transmitted with the event. E.g. the brightness in case of a motion detector. 
           </li>
           <li><B>trgPressS [all|&lt;peer&gt;] </B><a id="CUL_HM-set-trgPressS"></a><br>
-               Initiiert ein pressS fuer die peer entity. Wenn <B>all</B> ausgewählt ist wird das Kommando bei jedem der Peers ausgeführt. Siehe auch <a href="#CUL_HM-set-pressS">pressS</a><br>
+               Initiiert ein pressS fuer die peer entity. Wenn <B>all</B> ausgew&auml;hlt ist wird das Kommando bei jedem der Peers ausgef&uuml;hrt. Siehe auch <a href="#CUL_HM-set-pressS">pressS</a><br>
           </li>
           <li><B>trgPressL [all|&lt;peer&gt;] </B><a id="CUL_HM-set-trgPressL"></a><br>
-               Initiiert ein pressL fuer die peer entity. Wenn <B>all</B> ausgewählt ist wird das Kommando bei jedem der Peers ausgeführt. Siehe auch <a href="#CUL_HM-set-pressL">pressL</a><br>
+               Initiiert ein pressL fuer die peer entity. Wenn <B>all</B> ausgew&auml;hlt ist wird das Kommando bei jedem der Peers ausgef&uuml;hrt. Siehe auch <a href="#CUL_HM-set-pressL">pressL</a><br>
           </li>
           <li><B>peerSmart [&lt;peer&gt;] </B><a id="CUL_HM-set-peerSmart"></a><br>
                Das Kommando ist aehnlich <B><a href="#CUL_HM-set-peerChan">peerChan</a></B> mit reduzierten Optionen.<br>
-               peerSmart peert immer single mode (siehe peerChan). Die Funktionalitaet über das  
+               peerSmart peert immer single mode (siehe peerChan). Die Funktionalitaet &uuml;ber das  
                setzen der Register erstellt (kein grosser Unterschied zu peerChan).<br>
-               Smartes Registersetzen unterstützt bspw hmTemplate.<br>
+               Smartes Registersetzen unterst&uuml;tzt bspw hmTemplate.<br>
           </li>
           <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>|reverse]
               [<u>set</u>|unset] [<u>both</u>|actor|remote]</B><a id="CUL_HM-set-peerChan"></a><br>
@@ -13941,15 +13941,15 @@ __END__
                   Sinnvoll nutzbar wenn man einen TC als Kontroller nutzt. Der Wochenplan des TC wird dann imlizit genutzt</li>
             </li>
             <li><B>tempTmplSet   =>"[[ &lt;file&gt; :]templateName]</B><br>
-              Setzt das Attribut und sendet die Änderungen an das Device.
+              Setzt das Attribut und sendet die &Auml;nderungen an das Device.
             </li>
             <li><B>tplDel   =>" &lt;template&gt; </B><br>
-              Löscht eine Template Eintrag dieser entity.
+              L&ouml;scht eine Template Eintrag dieser entity.
             </li>
             <li><B>tplSet_&lt;peer&gt;   =>" &lt;template&gt; </B><br>
-              setzt ein Template für einen Peer der Entity. Mögliche Parameter des Templates werde auf den aktuellen Wert der Register gesetzt. Die Parameter können danach mit dem Kommando tplPara* geaendert werden.<br>
-              Das Kommando steht nur zu Verfügung wenn HMinfo definiert ist und ein passendes Template erstellt ist.<br>
-              Sollte das Template dediziert einem langen (long) oder kurzen (short) Trigger zugeordnet werden wird je ein Kommando zu Verfügung gestellt - siehe long oder short am Ende des Kommandos.
+              setzt ein Template f&uuml;r einen Peer der Entity. M&ouml;gliche Parameter des Templates werde auf den aktuellen Wert der Register gesetzt. Die Parameter k&ouml;nnen danach mit dem Kommando tplPara* geaendert werden.<br>
+              Das Kommando steht nur zu Verf&uuml;gung wenn HMinfo definiert ist und ein passendes Template erstellt ist.<br>
+              Sollte das Template dediziert einem langen (long) oder kurzen (short) Trigger zugeordnet werden wird je ein Kommando zu Verf&uuml;gung gestellt - siehe long oder short am Ende des Kommandos.
             </li>
             <li><B>tplParaxxx_&lt;peer&gt;_&lt;tpl&gt;_&lt;param&gt;   =>" &lt;template&gt; </B><br>
               Ein Parameter eines zugewiesenen Templates kann geaendert werden. Das Kommando bezieht sich auf genau einen Parameter eines Templates. 
@@ -14042,8 +14042,8 @@ __END__
             <li><B>displayWM help </B><br>
                <B>displayWM [long|short] &lt;text1&gt; &lt;color1&gt; &lt;icon1&gt; ... &lt;text6&gt; &lt;color6&gt; &lt;icon6&gt;</B><br>
                <B>displayWM [long|short] &lt;lineX&gt; &lt;text&gt; &lt;color&gt; &lt;icon&gt;</B><br>
-               es können bis zu 6 Zeilen programmiert werden.<br>
-               <B>lineX</B> legt die zu ändernde Zeilennummer fest. Es können die 3 Parameter der Zeile geändert werden.<br>
+               es k&ouml;nnen bis zu 6 Zeilen programmiert werden.<br>
+               <B>lineX</B> legt die zu &auml;ndernde Zeilennummer fest. Es k&ouml;nnen die 3 Parameter der Zeile ge&auml;ndert werden.<br>
                <B>textNo</B> ist der anzuzeigende Text. Der Inhalt des Texts wird in den Buttonds definiert. 
                txt&lt;BtnNo&gt;_&lt;lineNo&gt; referenziert den Button und dessn jeweiligen Zeile. 
                Alternativ kann ein bis zu 12 Zeichen langer Freitext angegeben werden<br>
@@ -14067,12 +14067,12 @@ __END__
               <B>displayEP &lt;text1,icon1:text2,icon2:text3,icon3&gt; &lt;sound&gt; &lt;repetition&gt; &lt;pause&gt; &lt;signal&gt;</B><br>
               bis zu 3 Zeilen werden adressiert.<br>
               Wenn help eingegeben wird wird eine <i><B>hilfe</B></i> zum Kommando ausgegeben. Optionen der Parameter werden ausgegeben.<br>
-              <B>textx</B> 12 char text für die Zeile. 
-                Wenn leer wird der Wert gemäß Reading genutzt. Typisch bedeuted es, dass keine Änderung stattfindet.
-                text0-9 zeigt den vordefinierten Wert der Kanäle 4 bis 8 an.
+              <B>textx</B> 12 char text f&uuml;r die Zeile. 
+                Wenn leer wird der Wert gem&auml;ß Reading genutzt. Typisch bedeuted es, dass keine &Auml;nderung stattfindet.
+                text0-9 zeigt den vordefinierten Wert der Kan&auml;le 4 bis 8 an.
                 0xHH erlaubt die anzeige eines hex Zeichens.<br>
               <B>iconx</B> Icon der Zeile. 
-                Typisch bedeuted es, dass keine Änderung stattfindet.<br>
+                Typisch bedeuted es, dass keine &Auml;nderung stattfindet.<br>
               <B>sound</B> sound zum Abspielen.<br>
               <B>repetition</B> 0..15 <br>
               <B>pause</B> 1..160<br>
@@ -14082,7 +14082,7 @@ __END__
               <li>
                 Beim Druck einer Taste ueberschreibt das Geraet diemittleren 3 Zeilen. Wenn da Attribut <br>
                 attr chan param reWriteDisplayxx<br>
-                gesetzt ist werden die 3 Zeilen nach xx Sekunden auf den Orginalwert zurück geschrieben.<br>
+                gesetzt ist werden die 3 Zeilen nach xx Sekunden auf den Orginalwert zur&uuml;ck geschrieben.<br>
               </li>
               
             </li>
@@ -14241,9 +14241,9 @@ __END__
            </li>       
        <li><B>listDevice</B><br>
            <ul>
-               <li>bei einer CCU gibt es eine Liste der Devices, welche den ccu service zum zuweisen der IOs zurück<br>
+               <li>bei einer CCU gibt es eine Liste der Devices, welche den ccu service zum zuweisen der IOs zur&uuml;ck<br>
                  </li>
-               <li>beim ActionDetector wird eine Komma geteilte Liste der Entities zurückgegeben<br>
+               <li>beim ActionDetector wird eine Komma geteilte Liste der Entities zur&uuml;ckgegeben<br>
                    get ActionDetector listDevice          # returns alle assigned entities<br>
                    get ActionDetector listDevice notActive# returns entities ohne status alive<br>
                    get ActionDetector listDevice alive    # returns entities mit status alive<br>
@@ -14264,22 +14264,22 @@ __END__
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
       <li><a id="CUL_HM-attr-readingOnDead"></a>readingOnDead<br>
           definiert wie readings behandelt werden sollten wenn das Device als 'dead' mariert wird.<br>
-          Das Attribut ist nur auf Devices anwendbar. Es ändert die Readings wenn das Device nach dead geht. 
-          Beim Verlasen des Zustandes 'dead' werden die ausgewählten Readings nach 'notDead' geändert. Es kann erwartet werden, dass sinnvolle Werte vom Device eingetragen werden.<br>
+          Das Attribut ist nur auf Devices anwendbar. Es &auml;ndert die Readings wenn das Device nach dead geht. 
+          Beim Verlasen des Zustandes 'dead' werden die ausgew&auml;hlten Readings nach 'notDead' ge&auml;ndert. Es kann erwartet werden, dass sinnvolle Werte vom Device eingetragen werden.<br>
           Optionen sind:<br>
-          noChange: keine Readings ausser Actvity werden geändert. Andere Einträge werden ignoriert.<br>
+          noChange: keine Readings ausser Actvity werden ge&auml;ndert. Andere Eintr&auml;ge werden ignoriert.<br>
           state: das Reading 'state' wird auf 'dead' gesetzt.<br>
           periodValues: periodische numerische Readings des Device werden auf '0' gesetzt.<br>
           periodString: periodische string Readings des Device werden auf 'dead' gesetzt.<br>
-          channels: die Readings der Kanäle werden ebenso wie die des Device behandelt und auch geaendert.<br>
+          channels: die Readings der Kan&auml;le werden ebenso wie die des Device behandelt und auch geaendert.<br>
           custom readings: der Anwender kann weitere Readingnamen eintragen, welche ggf. auf 'dead' zu setzen sind.<br>
           <br>
           Beispiel:<br>
           <ul><code>
             attr myDevice readingOnDead noChange,state # kein dead marking - noChange hat Prioritaet <br>
-            attr myDevice readingOnDead state,periodValues,channels # Empfohlen. Reading state des device und aller seiner Kanäle werden auf 'dead' gesetzt.
+            attr myDevice readingOnDead state,periodValues,channels # Empfohlen. Reading state des device und aller seiner Kan&auml;le werden auf 'dead' gesetzt.
             Periodische nummerische werden werden auf 0 gesetzt was Auswirkungen auf die Grafiken hat.<br>
-            attr myDevice readingOnDead state,channels # Reading state des device und aller seiner Kanäle werden auf 'dead' gesetzt.<br>
+            attr myDevice readingOnDead state,channels # Reading state des device und aller seiner Kan&auml;le werden auf 'dead' gesetzt.<br>
             attr myDevice readingOnDead periodValues,channels # Numerische periodische Readings des Device und der Kanaele werden auf '0' gesetzt<br>
             attr myDevice readingOnDead state,deviceMsg,CommandAccepted # beim Eintreten in dead state,deviceMsg und CommandAccepted des Device werden, wenn verfuegbar, auf 'dead' gesetzt.<br>
           </code></ul>           
@@ -14345,7 +14345,7 @@ __END__
           4_off          : no Register<br>
           8_templ+default: templates und default Register<br>
           12_templOnly   : nur templates<br>
-          251_anything   : alles verfügbare<br>
+          251_anything   : alles verf&uuml;gbare<br>
         </ul>
         Wird 'expert' auf ein Ger&auml;t angewendet so gilt dies auch f&uuml;r alle verkn&uuml;pften Kan&auml;le.
         Kann &uuml;bergangen werden indem das Attribut ' expert' auch f&uuml;r den Ger&auml;tekanal gesetzt wird.<br>
@@ -14354,18 +14354,18 @@ __END__
         Gleichwohl setzt "showInternalValues" - bei Definition - 'expert' außer Kraft .
         </li>
       <li><a id="CUL_HM-attr-readOnly">readOnly</a><br>
-          beschränkt kommandos auf Lesen und Beobachten.
+          beschr&auml;nkt kommandos auf Lesen und Beobachten.
           </li>
       <li><a id="CUL_HM-attr-IOgrp"></a>IOgrp<br>
         kann an Devices vergeben werden und zeigt auf eine virtuelle VCCU. 
-        Das Setzen des Attributs führt zum Löschen des Attributs IODev da sich diese ausschliessen. 
+        Das Setzen des Attributs f&uuml;hrt zum L&ouml;schen des Attributs IODev da sich diese ausschliessen. 
         Danach wird die VCCU
-        beim Senden das passende IO für das Device auswählen. Es ist notwendig, dass die virtuelle VCCU
-        definiert und alle erlaubten IOs eingetragen sind. Beim Senden wird die VCCU prüfen
-        welches IO operational ist und welches den besten rssi-faktor für das Device hat.<br>
+        beim Senden das passende IO f&uuml;r das Device ausw&auml;hlen. Es ist notwendig, dass die virtuelle VCCU
+        definiert und alle erlaubten IOs eingetragen sind. Beim Senden wird die VCCU pr&uuml;fen
+        welches IO operational ist und welches den besten rssi-faktor f&uuml;r das Device hat.<br>
         Optional kann ein bevorzugtes IO definiert werden. In diesem Fall wird es, wenn operational,
-        genutzt - unabhängig von den rssi Werten.<br>
-        wenn kein IO aus VCCU's IOList verfügbar ist wird der Mechanismus gestoppt und nichts gesendet.<br>
+        genutzt - unabh&auml;ngig von den rssi Werten.<br>
+        wenn kein IO aus VCCU's IOList verf&uuml;gbar ist wird der Mechanismus gestoppt und nichts gesendet.<br>
         Beispiel:<br>
         <ul><code>
           attr myDevice1 IOgrp vccu<br>
@@ -14398,10 +14398,10 @@ __END__
         Format ist &lt;file&gt;:&lt;templatename&gt;. 
         </li>
       <li><a id="CUL_HM-attr-modelForce"></a>modelForce<br>
-          modelForce überschreibt das model attribut. Dabei wird das Device und seine Kanäle reconfguriert.<br>
-          Grund für dieses Attribut ist ein eQ3 bug bei welchen Devices mit falscher ID ausgeliefert werden. Das Attribut
+          modelForce &uuml;berschreibt das model attribut. Dabei wird das Device und seine Kan&auml;le reconfguriert.<br>
+          Grund f&uuml;r dieses Attribut ist ein eQ3 bug bei welchen Devices mit falscher ID ausgeliefert werden. Das Attribut
           erlaubt dies zu ueberschreiben<br>
-          ACHTUNG: Durch das Eintragen eines anderen model werden die Entites modifiziert, ggf. neu angelegt oder gelöscht.<br>
+          ACHTUNG: Durch das Eintragen eines anderen model werden die Entites modifiziert, ggf. neu angelegt oder gel&ouml;scht.<br>
           </li>
       <li><a id="CUL_HM-attr-model"></a>model<br>
         wird automatisch gesetzt. </li>
@@ -14453,7 +14453,7 @@ __END__
       </li>
       </ul> <br>
     <li>
-    <a id="CUL_HM-attr-param"></a><b>'param'</b> definiert modelspezifische Verhalten oder Funktionen. Verfügbare Parameter für "param" (Modell-abhängig):
+    <a id="CUL_HM-attr-param"></a><b>'param'</b> definiert modelspezifische Verhalten oder Funktionen. Verf&uuml;gbare Parameter f&uuml;r "param" (Modell-abh&auml;ngig):
     <ul>
       <li><B>HM-SEN-RD-O</B><br>
         offAtPon: nur Heizkan&auml;le: erzwingt Ausschalten der Heizung nach einem powerOn<br>
@@ -14462,7 +14462,7 @@ __END__
       <li><B>virtuals</B><br> 
         noOnOff: eine virtuelle Instanz wird den Status nicht &auml;ndern wenn ein Trigger empfangen wird. Ist dieser Paramter
         nicht gegeben so toggled die Instanz ihren Status mit jedem trigger zwischen An und Aus<br>
-        msgReduce: falls gesetzt und der Kanal wird für <a ref="CUL_HM-set-valvePos">valvePos</a> genutzt wird jede Nachricht
+        msgReduce: falls gesetzt und der Kanal wird f&uuml;r <a ref="CUL_HM-set-valvePos">valvePos</a> genutzt wird jede Nachricht
         außer die der Ventilstellung verworfen um die Nachrichtenmenge zu reduzieren<br>
       </li>
       <li><B>blind</B><br>
@@ -14470,8 +14470,8 @@ __END__
         intuitiv f&uuml;r den Nutzer. Defaut f&uuml;r 100% ist offen und wird als 'on'angezeigt. 
         Das Setzen des Parameters invertiert die Anzeige - 0% wird also offen und 100% ist geschlossen.<br>
         ACHTUNG: Die Anpassung betrifft nur Readings und Kommandos. <B>Register sind nicht betroffen.</B><br>
-        ponRestoreSmart: bei powerup des Device fährt das Rollo in die vermeintlich nächstgelegene Endposition und anschliessend in die ursprüngliche Position.<br>
-        ponRestoreForce: bei powerup des Device fährt das Rollo auf Level 0, dann auf Level 100 und anschliessend in die ursprüngliche Position.<br>
+        ponRestoreSmart: bei powerup des Device f&auml;hrt das Rollo in die vermeintlich n&auml;chstgelegene Endposition und anschliessend in die urspr&uuml;ngliche Position.<br>
+        ponRestoreForce: bei powerup des Device f&auml;hrt das Rollo auf Level 0, dann auf Level 100 und anschliessend in die urspr&uuml;ngliche Position.<br>
       </li>
       <li><B>switch</B><br>
         levelInverse: siehe oben bei <i>blind</i>
@@ -14481,7 +14481,7 @@ __END__
           <B>powerMeter</B><br>
           <B>dimmer</B><br>
           <B>rgb</B><br>
-        <B>showTimed</B> wenn timedOn running ist wird -till an state gehängt. Dies führt dazu, dass ggf. on-till im State steht was das stateIcon handling verbessert.<br>
+        <B>showTimed</B> wenn timedOn running ist wird -till an state geh&auml;ngt. Dies f&uuml;hrt dazu, dass ggf. on-till im State steht was das stateIcon handling verbessert.<br>
       </li>
     </ul>
     </li><br>
@@ -14706,7 +14706,7 @@ __END__
   <a id="CUL_HM-internals"></a><b>Internals</b>
   <ul>
     <li><B>aesCommToDev</B><br>
-      Information über Erfolg und Fehler der AES Kommunikation zwischen IO-device und HM-Device<br>
+      Information &uuml;ber Erfolg und Fehler der AES Kommunikation zwischen IO-device und HM-Device<br>
     </li>
   </ul><br>
   <br>
