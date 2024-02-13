@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.16.0" => "12.02.2024  new command get dwdCatalog ",
   "1.15.5" => "11.02.2024  change forecastQualities output, new limits for 'accurate' and 'spreaded' results from AI ".
                            "checkPlantConfig: change common check info output ".
                            "fix load Astro ",
@@ -327,6 +328,8 @@ my $csmcache       = $root."/FHEM/FhemUtils/PVCsm_SolarForecast_";              
 my $scpicache      = $root."/FHEM/FhemUtils/ScApi_SolarForecast_";                  # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
 my $aitrained      = $root."/FHEM/FhemUtils/AItra_SolarForecast_";                  # Filename-Fragment für AI Trainingsdaten (wird mit Devicename ergänzt)
 my $airaw          = $root."/FHEM/FhemUtils/AIraw_SolarForecast_";                  # Filename-Fragment für AI Input Daten = Raw Trainigsdaten
+my $dwdcatalog     = $root."/FHEM/FhemUtils/DWDcat_SolarForecast";                  # Filename-Fragment für DWD Stationskatalog
+my $dwdcatgpx      = $root."/FHEM/FhemUtils/DWDcat_SolarForecast.gpx";              # Filename-Fragment für DWD Stationskatalog
 
 my $aitrblto       = 7200;                                                          # KI Training BlockingCall Timeout
 my $aibcthhld      = 0.2;                                                           # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
@@ -407,6 +410,7 @@ my @dd    = qw( none
                 consumerPlanning
                 consumerSwitching
                 consumption
+                dwdComm
                 epiecesCalc
                 graphic
                 notifyHandling
@@ -484,6 +488,7 @@ my %hget = (                                                                # Ha
   solApiData         => { fn => \&_getlistSolCastData,          needcred => 0 },
   valDecTree         => { fn => \&_getaiDecTree,                needcred => 0 },
   ftuiFramefiles     => { fn => \&_ftuiFramefiles,              needcred => 0 },
+  dwdCatalog         => { fn => \&_getdwdCatalog,               needcred => 0 },
 );
 
 my %hattr = (                                                                # Hash für Attr-Funktion
@@ -585,6 +590,10 @@ my %hqtxt = (                                                                   
               DE => qq{Attribut}                                                                                            },
   note   => { EN => qq{Note},
               DE => qq{Hinweis}                                                                                             },
+  dwdcat => { EN => qq{The Deutscher Wetterdienst Station Catalog},
+              DE => qq{Der Stationskatalog des Deutschen Wetterdienstes}                                                    },
+  nrsele => { EN => qq{No. selected entries:},
+              DE => qq{Anzahl ausgewählter Einträge:}                                                                       },
   wfmdcf => { EN => qq{Wait for more days with a consumption figure},
               DE => qq{Warte auf weitere Tage mit einer Verbrauchszahl}                                                     },
   autoct => { EN => qq{Autocorrection:},
@@ -910,6 +919,7 @@ my %hcsr = (                                                                    
 # $data{$type}{$name}{aidectree}{airaw}                                          # Rohdaten für AI Input = Raw Trainigsdaten
 # $data{$type}{$name}{func}                                                      # interne Funktionen
 # $data{$type}{$name}{weatherdata}                                               # temporärer Speicher Wetterdaten
+# $data{$type}{$name}{dwdcatalog}                                                # DWD Stationskatalog
 
 ################################################################
 #               Init Fn
@@ -1126,6 +1136,17 @@ sub _readCacheFile {
           $data{$type}{$name}{aidectree}{airaw}     = $data;
           $data{$type}{$name}{current}{aitrawstate} = 'ok';
           Log3 ($name, 3, qq{$name - cached data "$title" restored});
+      }
+
+      return;
+  }
+  
+  if ($cachename eq 'dwdcatalog') {
+      my ($err, $data) = fileRetrieve ($file);
+
+      if (!$err && $data) {
+          $data{$type}{$name}{dwdcatalog} = $data;
+          debugLog ($paref, 'dwdComm', qq{$title restored});
       }
 
       return;
@@ -2448,6 +2469,7 @@ sub Get {
   my $getlist = "Unknown argument $opt, choose one of ".
                 "valConsumerMaster:#,$cml ".
                 "data:noArg ".
+                "dwdCatalog ".
                 "forecastQualities:noArg ".
                 "ftuiFramefiles:noArg ".
                 "html:$hol ".
@@ -3941,6 +3963,350 @@ return $ret;
 }
 
 ###############################################################
+#                       Getter dwdCatalog
+###############################################################
+sub _getdwdCatalog {
+  my $paref = shift;
+  my $arg   = $paref->{arg} // 'byID';
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  
+  my ($aa,$ha) = parseParams ($arg);
+  
+  my $sort    = 'byID'      ~~ @$aa ? 'byID'      :
+                'byName'    ~~ @$aa ? 'byName'    : 'byID';
+  my $export  = 'exportgpx' ~~ @$aa ? 'exportgpx' : '';
+  my $force   = 'force'     ~~ @$aa ? 'force'     : '';
+  
+  $paref->{sort}    = $sort;
+  $paref->{export}  = $export;
+  $paref->{filtid}  = $ha->{id}   ? $ha->{id}  : '';
+  $paref->{filtnam} = $ha->{name} ? $ha->{name} : '';
+  $paref->{filtlat} = $ha->{lat}  ? $ha->{lat}  : '';
+  $paref->{filtlon} = $ha->{lon}  ? $ha->{lon}  : '';
+ 
+  my $msg = "The DWD Station Catalog is initially loaded into SolarForecast.\n".
+            "Please execute the command 'get $name $paref->{opt} $arg' again.";
+  
+  if ($force) {
+      __dwdStatCatalog_Request ($paref);
+      $msg = "The DWD Station Catalog is initially loaded into SolarForecast.";
+  }
+  else {
+      if (scalar keys %{$data{$type}{$name}{dwdcatalog}}) {                              # Katalog ist geladen
+          return __generateCatOut ($paref);
+      }
+      else {                                                                             # Katalog nicht geladen -> von File laden
+          _readCacheFile ({ hash      => $paref->{hash},
+                            name      => $name,
+                            type      => $type,
+                            debug     => $paref->{debug},
+                            file      => $dwdcatalog,
+                            cachename => 'dwdcatalog',
+                            title     => 'DWD Station Catalog'
+                          }
+                         );
+
+          if (scalar keys %{$data{$type}{$name}{dwdcatalog}}) {
+              return __generateCatOut ($paref);
+          }
+          else {                                                                         # Ladung von File nicht erfolgreich
+              __dwdStatCatalog_Request ($paref);           
+          }
+      }
+  }
+  
+  #Log3 ($name, 1, "$name > Cat Satz: \n". Dumper $data{$type}{$name}{dwdcatalog}); 
+
+return $msg;
+}
+
+###############################################################
+#         Ausgabe DWD Katalog formatieren
+###############################################################
+sub __generateCatOut {
+  my $paref = shift;
+  my $arg   = $paref->{arg};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  my $lang  = $paref->{lang};
+
+  my $sort    = $paref->{sort};
+  my $export  = $paref->{export};
+  my $filtid  = $paref->{filtid};
+  my $filtnam = $paref->{filtnam};
+  my $filtlat = $paref->{filtlat};
+  my $filtlon = $paref->{filtlon};
+  
+  my $filter  = $filtid ? 'id:'.$filtid : '';
+  $filter    .= ',' if($filter && $filtnam);
+  $filter    .= $filtnam ? 'name:'.$filtnam : '';
+  $filter    .= ',' if($filter && $filtlat);
+  $filter    .= $filtlat ? 'lat:'.$filtlat : '';
+  $filter    .= ',' if($filter && $filtlon);
+  $filter    .= $filtlon ? 'lon:'.$filtlon : '';
+  
+  my $select = 'sort='.$sort;
+  if ($filter) {
+      $select .= ' filter=';
+      $select .= trim ($filter);
+  }
+  $select .= ' ' if($export);
+  $select .= $export;
+  
+  # Katalog Organisation (default ist 'byID)
+  ############################################
+  my $temp;
+  
+  if ($sort eq 'byName') {
+      for my $id (keys %{$data{$type}{$name}{dwdcatalog}}) {
+          $paref->{id} = $id;
+          next if(___isCatFiltered ($paref));
+          
+          my $nid               = $data{$type}{$name}{dwdcatalog}{$id}{stnam};
+          $temp->{$nid}{stnam}  = $data{$type}{$name}{dwdcatalog}{$id}{stnam};
+          $temp->{$nid}{id}     = $data{$type}{$name}{dwdcatalog}{$id}{id};
+          $temp->{$nid}{latdec} = $data{$type}{$name}{dwdcatalog}{$id}{latdec};                   # Latitude Dezimalgrad
+          $temp->{$nid}{londec} = $data{$type}{$name}{dwdcatalog}{$id}{londec};                   # Longitude Dezimalgrad
+          $temp->{$nid}{elev}   = $data{$type}{$name}{dwdcatalog}{$id}{elev};          
+      }
+  }
+  elsif ($sort eq 'byID') {      
+      for my $id (keys %{$data{$type}{$name}{dwdcatalog}}) {
+          $paref->{id} = $id;
+          next if(___isCatFiltered ($paref));
+          
+          $temp->{$id}{stnam}  = $data{$type}{$name}{dwdcatalog}{$id}{stnam};
+          $temp->{$id}{id}     = $data{$type}{$name}{dwdcatalog}{$id}{id};
+          $temp->{$id}{latdec} = $data{$type}{$name}{dwdcatalog}{$id}{latdec};                    # Latitude Dezimalgrad
+          $temp->{$id}{londec} = $data{$type}{$name}{dwdcatalog}{$id}{londec};                    # Longitude Dezimalgrad
+          $temp->{$id}{elev}   = $data{$type}{$name}{dwdcatalog}{$id}{elev};          
+      }
+  }
+  
+  if ($export eq 'exportgpx') {                                                                   # DWD Katalog als gpx speichern
+      my @data = ();
+      push @data, '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>';
+      push @data, '<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="FHEM::SolarForecast"';
+      push @data, 'version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"';
+      push @data, 'xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">';
+      
+      for my $idx (sort keys %{$temp}) {
+          my $londec = $temp->{"$idx"}{londec};
+          my $latdec = $temp->{"$idx"}{latdec};
+          my $elev   = $temp->{"$idx"}{elev};
+          my $id     = $temp->{"$idx"}{id};
+          my $stnam  = $temp->{"$idx"}{stnam};
+          
+          push @data, qq{<wpt lat="$latdec" lon="$londec">};
+          push @data, qq{ <ele>$elev</ele>};
+          push @data, qq{ <name>$stnam (ID=$id, Latitude=$latdec, Longitude=$londec)</name>};
+          push @data, qq{ <sym>City</sym>};
+          push @data, qq{</wpt>};         
+      }
+        
+      push @data, '</gpx>';
+      
+      my $err = FileWrite ( {FileName  => $dwdcatgpx, 
+                             ForceType => 'file'
+                            }, @data
+                          );        
+
+      if (!$err) {
+          debugLog ($paref, 'dwdComm', qq{DWD catalog saved as gpx content: }.$dwdcatgpx);
+      }
+      else {
+          Log3 ($name, 1, "$name - ERROR - $err");
+      }      
+  }
+  
+  my $noe = scalar keys %{$temp};
+         
+  ## Ausgabe
+  ############
+  my $out  = '<html>';
+  $out    .= '<b>'.encode('utf8', $hqtxt{dwdcat}{$lang}).'</b><br>';                              # The Deutscher Wetterdienst Station Catalog
+  $out    .= encode('utf8', $hqtxt{nrsele}{$lang}).' '.$noe.'<br>';                               # Selected entries
+  $out    .= "($select) <br><br>";
+
+  $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
+  $out    .= qq{<tr style="font-weight:bold;">};
+  $out    .= qq{<td style="text-decoration:underline; padding: 5px;"> ID          </td>};
+  $out    .= qq{<td style="text-decoration:underline; padding: 5px;"> NAME        </td>};
+  $out    .= qq{<td style="text-decoration:underline; padding: 5px;"> LATITUDE    </td>};
+  $out    .= qq{<td style="text-decoration:underline; padding: 5px;"> LONGITUDE   </td>};
+  $out    .= qq{<td style="text-decoration:underline; padding: 5px;"> ELEVATION   </td>};
+  $out    .= qq{</tr>};
+  $out    .= qq{<tr></tr>};
+    
+  for my $key (sort keys %{$temp}) {      
+      $out .= qq{<tr>};
+      $out .= qq{<td style="padding: 5px;                    "> $temp->{"$key"}{id}       </td>};
+      $out .= qq{<td style="padding: 5px; white-space:nowrap;"> $temp->{"$key"}{stnam}    </td>};
+      $out .= qq{<td style="padding: 5px;                    "> $temp->{"$key"}{latdec}   </td>};
+      $out .= qq{<td style="padding: 5px;                    "> $temp->{"$key"}{londec}   </td>};
+      $out .= qq{<td style="padding: 5px;                    "> $temp->{"$key"}{elev}     </td>};
+      $out .= qq{</tr>};
+  }
+
+  $out    .= qq{</table>};
+  $out    .= qq{</html>};            
+
+return $out;
+}
+
+###############################################################
+#         Ausgabe DWD Katalog Einträge filtern
+###############################################################
+sub ___isCatFiltered {
+  my $paref = shift;
+  my $id    = $paref->{id};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type}; 
+
+  my $filtid  = $paref->{filtid};
+  my $filtnam = $paref->{filtnam};
+  my $filtlat = $paref->{filtlat};
+  my $filtlon = $paref->{filtlon};
+  
+  my $isfil = 0;
+
+  $isfil = 1 if($filtid  && $id !~ /^$filtid$/ixs);
+  $isfil = 1 if($filtnam && $data{$type}{$name}{dwdcatalog}{$id}{stnam}  !~ /^$filtnam$/ixs);
+  $isfil = 1 if($filtlat && $data{$type}{$name}{dwdcatalog}{$id}{latdec} !~ /^$filtlat$/ixs);
+  $isfil = 1 if($filtlon && $data{$type}{$name}{dwdcatalog}{$id}{londec} !~ /^$filtlon$/ixs);
+          
+return $isfil;
+}
+
+####################################################################################################################
+#   Download DWD Stationskatalog
+#   https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_stationskatalog.cfg?view=nasPublication&nn=16102
+####################################################################################################################
+sub __dwdStatCatalog_Request {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $debug = $paref->{debug};
+  
+  my $url = "https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_stationskatalog.cfg?view=nasPublication&nn=16102";
+
+  debugLog ($paref, 'dwdComm', "Download DWD Station catalog from URL: $url");
+
+  my $param = {
+      url      => $url,
+      timeout  => 10,
+      hash     => $hash,
+      name     => $name,
+      debug    => $debug,
+      stc      => [gettimeofday],
+      lang     => $paref->{lang},
+      method   => 'GET',
+      callback => \&__dwdStatCatalog_Response
+  };
+
+  if ($debug =~ /dwdComm/x) {
+      $param->{loglevel} = 1;
+  }
+
+  HttpUtils_NonblockingGet ($param);
+
+return;
+}
+
+###############################################################
+#          Download DWD Stationskatalog Response
+# Für die Stationsliste im cfg-Format gilt: 
+# Die Angabe der Längen- und Breitengrade erfolgt in der Form
+# Grad und Minuten, also beispielsweise wird die Angabe 53◦ 23′ 
+# in Grad und Minuten hier mit Punkt als 53.23 repräsentiert.
+###############################################################
+sub __dwdStatCatalog_Response {
+  my $paref = shift;
+  my $err   = shift;
+  my $data  = shift;
+
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $stc   = $paref->{stc};                                                                 # Startzeit API Abruf
+  my $lang  = $paref->{lang};
+  my $debug = $paref->{debug};
+
+  my $msg;
+  my $sta = [gettimeofday];                                                                  # Start Response Verarbeitung
+
+  if ($err ne "") {
+      Log3 ($name, 1, "$name - ERROR - $err");
+
+      return;
+  }
+  elsif ($data ne "") {                                                                                  
+      my @datarr = split "\n", $data;
+      my $type   = $hash->{TYPE};
+
+      for my $s (@datarr) {
+          $s = encode ('utf8', $s);
+          
+          my ($id, $tail) = split " ", $s, 2;
+          
+          next if($id !~ /[A-Z0-9]+$/xs || $id eq 'ID');
+          
+          my $ri   = rindex ($tail, " ");
+          my $elev = substr ($tail, $ri + 1);                                                # Meereshöhe
+          $tail    = trim   (substr ($tail, 0, $ri));
+
+          $ri      = rindex ($tail, " ");
+          my $lon  = substr ($tail, $ri + 1);                                                # Longitude
+          $tail    = trim   (substr ($tail, 0, $ri));   
+
+          $ri      = rindex ($tail, " ");
+          my $lat  = substr ($tail, $ri + 1);                                                # Latitude
+          $tail    = trim   (substr ($tail, 0, $ri));  
+
+          my ($icao, $stnam) = split " ", $tail, 2;                                          # ICAO = International Civil Aviation Organization, Stationsname   
+          
+          my ($latg, $latm) = split /\./, $lat;                                              # in Grad und Minuten splitten
+          my ($long, $lonm) = split /\./, $lon;
+          my $latdec        = sprintf "%.2f", ($latg + ($latm / 60));
+          my $londec        = sprintf "%.2f", ($long + ($lonm / 60));
+                    
+          $data{$type}{$name}{dwdcatalog}{$id}{id}     = $id;
+          $data{$type}{$name}{dwdcatalog}{$id}{stnam}  = $stnam;
+          $data{$type}{$name}{dwdcatalog}{$id}{icao}   = $icao;
+          $data{$type}{$name}{dwdcatalog}{$id}{lat}    = $lat;
+          $data{$type}{$name}{dwdcatalog}{$id}{latdec} = $latdec;                            # Latitude Dezimalgrad
+          $data{$type}{$name}{dwdcatalog}{$id}{lon}    = $lon;
+          $data{$type}{$name}{dwdcatalog}{$id}{londec} = $londec;                            # Longitude Dezimalgrad
+          $data{$type}{$name}{dwdcatalog}{$id}{elev}   = $elev;        
+      }   
+
+      $err = writeCacheToFile ($hash, 'dwdcatalog', $dwdcatalog);                            # DWD Stationskatalog speichern
+
+      if (!$err) {
+          debugLog ($paref, 'dwdComm', qq{DWD catalog saved into file: }.$dwdcatalog);
+      }
+      else {
+          Log3 ($name, 1, "$name - ERROR - $err");
+      }
+
+      _readCacheFile ({ hash      => $hash,
+                        name      => $name,
+                        type      => $type,
+                        debug     => $debug,
+                        file      => $dwdcatalog,
+                        cachename => 'dwdcatalog',
+                        title     => 'DWD Station Catalog'
+                      }
+                     );     
+  }
+    
+  my $prt = sprintf "%.4f", (tv_interval ($stc) - tv_interval ($sta));                                     # Laufzeit ermitteln
+  debugLog ($paref, 'dwdComm', "DWD Station Catalog retrieval and processing required >$prt< seconds"); 
+  
+return;
+}
+
+###############################################################
 #                       Getter aiDecTree
 ###############################################################
 sub _getaiDecTree {                   ## no critic "not used"
@@ -4890,10 +5256,27 @@ sub writeCacheToFile {
 
       return;
   }
+  
+  if ($cachename eq 'dwdcatalog') {
+      if (scalar keys %{$data{$type}{$name}{dwdcatalog}}) {
+          $error = fileStore ($data{$type}{$name}{dwdcatalog}, $file);
+      }
+      else {
+          return "The DWD Station Catalog is empty";
+      }
+
+      if ($error) {
+          $err = qq{ERROR while writing DWD Station Catalog to file "$file": $error};
+          Log3 ($name, 1, "$name - $err");
+          return $err;
+      }
+      
+      return;
+  }
 
   if ($cachename eq 'plantconfig') {
       @data = _savePlantConfig ($hash);
-      return 'Plant configuration is empty, no data where written' if(!@data);
+      return 'Plant configuration is empty, no data were written' if(!@data);
   }
   else {
       return if(!$data{$type}{$name}{$cachename});
@@ -16832,6 +17215,44 @@ to ensure that the system configuration is correct.
       </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-get-dwdCatalog"></a>
+      <li><b>dwdCatalog </b> <br><br>
+      The German Weather Service provides a catalog of MOSMIX stations. <br>
+      This command reads the catalog into SolarForecast and saves it in the file
+      ./FHEM/FhemUtils/DWDcat_SolarForecast. <br>
+      The catalog can be extensively filtered and saved in GPS Exchange Format (GPX).
+      The latitude and logitude coordinates are displayed in decimal degrees. <br>
+      Regex expressions in the corresponding keys are used for filtering. The Regex is enclosed in 
+      ^...$ for evaluation. <br>
+      The following parameters can be specified. Without parameters, the entire catalog is output: <br><br>
+      
+      <ul>
+         <table>
+         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>byID</b>               </td><td>The output is sorted by station ID. (default)                                                                                      </td></tr>
+            <tr><td> <b>byName</b>             </td><td>The output is sorted by station name.                                                                                              </td></tr>
+            <tr><td> <b>force</b>              </td><td>The latest version of the DWD station catalog is loaded into the system.                                                           </td></tr>
+            <tr><td> <b>exportgpx</b>          </td><td>The (filtered) stations are saved in the file ./FHEM/FhemUtils/DWDcat_SolarForecast.gpx.                                           </td></tr>
+            <tr><td>                           </td><td>This file can be displayed in the <a href='https://www.j-berkemeier.de/ShowGPX.html' target='_blank'>GPX viewer</a>, for example.  </td></tr>
+            <tr><td> <b>id=&lt;Regex&gt;</b>   </td><td>Filtering is carried out according to station ID.                                                                                  </td></tr>
+            <tr><td> <b>name=&lt;Regex&gt;</b> </td><td>Filtering is carried out according to station name.                                                                                </td></tr>
+            <tr><td> <b>lat=&lt;Regex&gt;</b>  </td><td>Filtering is carried out according to latitude.                                                                                    </td></tr>
+            <tr><td> <b>lon=&lt;Regex&gt;</b>  </td><td>Filtering is carried out according to longitude.                                                                                   </td></tr>
+         </table>
+      </ul>
+      <br>
+
+       <ul>
+        <b>Example: </b> <br>
+        get &lt;name&gt; dwdCatalog byName name=ST.* exportgpx lat=(48|49|50|51|52).* lon=([5-9]|1[0-5]).* <br>
+        # filters the stations largely to German locations beginning with "ST" and exports the data in GPS Exchange format
+       </ul>
+    
+    </li>
+    </ul>
+    <br>
 
     <ul>
       <a id="SolarForecast-get-forecastQualities"></a>
@@ -17499,6 +17920,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>consumerPlanning</b>     </td><td>Consumer scheduling processes                                                    </td></tr>
             <tr><td> <b>consumerSwitching</b>    </td><td>Operations of the internal consumer switching module                             </td></tr>
             <tr><td> <b>consumption</b>          </td><td>Consumption calculation and use                                                  </td></tr>
+            <tr><td> <b>dwdComm</b>              </td><td>Communication with the website or server of the German Weather Service (DWD)     </td></tr>
             <tr><td> <b>epiecesCalc</b>          </td><td>Calculation of specific energy consumption per operating hour and consumer       </td></tr>
             <tr><td> <b>graphic</b>              </td><td>Module graphic information                                                       </td></tr>
             <tr><td> <b>notifyHandling</b>       </td><td>Sequence of event processing in the module                                       </td></tr>
@@ -18915,7 +19337,45 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a id="SolarForecast-get-data"></a>
       <li><b>data </b> <br><br>
       Startet die Datensammlung zur Bestimmung der solaren Vorhersage und anderer Werte.
-      </li>
+    </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-get-dwdCatalog"></a>
+      <li><b>dwdCatalog </b> <br><br>
+      Der Deutsche Wetterdienst stellt einen Katalog der MOSMIX Stationen zur Verfügung. <br>
+      Mit diesem Kommando wird der Katalog in SolarForecast eingelesen und in der Datei
+      ./FHEM/FhemUtils/DWDcat_SolarForecast gespeichert. <br>
+      Der Katalog kann umfangreich gefiltert und im GPS Exchange Format (GPX) gespeichert werden.
+      Die Koordinaten Latitude und Logitude werden in Dezimalgrad ausgegeben. <br>
+      Zur Filterung werden Regex-Ausdrücke in den entsprechenden Schlüsseln verwendet. Der Regex wird zur Auswertung in 
+      ^...$ eingeschlossen. <br>
+      Folgende Parameter können angegeben werden. Ohne Parameter erfolgt die Ausgabe des gesamten Katalogs: <br><br>
+      
+      <ul>
+         <table>
+         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>byID</b>               </td><td>Die Ausgabe erfolgt sortiert nach Stations-ID. (default)                                                                        </td></tr>
+            <tr><td> <b>byName</b>             </td><td>Die Ausgabe erfolgt sortiert nach Stations-Name.                                                                                </td></tr>
+            <tr><td> <b>force</b>              </td><td>Es wird die neueste Version des DWD Stationskatalogs in das System geladen.                                                     </td></tr>
+            <tr><td> <b>exportgpx</b>          </td><td>Die (gefilterten) Stationen werden in der Datei ./FHEM/FhemUtils/DWDcat_SolarForecast.gpx gespeichert.                          </td></tr>
+            <tr><td>                           </td><td>Diese Datei kann z.B. im <a href='https://www.j-berkemeier.de/ShowGPX.html' target='_blank'>GPX-Viewer</a> dargestellt werden.  </td></tr>
+            <tr><td> <b>id=&lt;Regex&gt;</b>   </td><td>Es erfolgt eine Filterung nach Stations-ID.                                                                                     </td></tr>
+            <tr><td> <b>name=&lt;Regex&gt;</b> </td><td>Es erfolgt eine Filterung nach Stations-Name.                                                                                   </td></tr>
+            <tr><td> <b>lat=&lt;Regex&gt;</b>  </td><td>Es erfolgt eine Filterung nach Latitude.                                                                                        </td></tr>
+            <tr><td> <b>lon=&lt;Regex&gt;</b>  </td><td>Es erfolgt eine Filterung nach Longitude.                                                                                       </td></tr>
+         </table>
+      </ul>
+      <br>
+
+       <ul>
+        <b>Beispiel: </b> <br>
+        get &lt;name&gt; dwdCatalog byName name=ST.* exportgpx lat=(48|49|50|51|52).* lon=([5-9]|1[0-5]).* <br>
+        # filtert die Stationen weitgehend auf deutsche Orte beginnend mit "ST" und exportiert die Daten im GPS Exchange Format
+       </ul>
+    
+    </li>
     </ul>
     <br>
 
@@ -19588,6 +20048,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>consumerPlanning</b>     </td><td>Consumer Einplanungsprozesse                                                     </td></tr>
             <tr><td> <b>consumerSwitching</b>    </td><td>Operationen des internen Consumer Schaltmodul                                    </td></tr>
             <tr><td> <b>consumption</b>          </td><td>Verbrauchskalkulation und -nutzung                                               </td></tr>
+            <tr><td> <b>dwdComm</b>              </td><td>Kommunikation mit Webseite oder Server des Deutschen Wetterdienst (DWD)          </td></tr>
             <tr><td> <b>epiecesCalc</b>          </td><td>Berechnung des spezifischen Energieverbrauchs je Betriebsstunde und Verbraucher  </td></tr>
             <tr><td> <b>graphic</b>              </td><td>Informationen der Modulgrafik                                                    </td></tr>
             <tr><td> <b>notifyHandling</b>       </td><td>Ablauf der Eventverarbeitung im Modul                                            </td></tr>
