@@ -45,7 +45,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.57.11b";
+my $ModulVersion = "07.57.12";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -3065,8 +3065,8 @@ sub FRITZBOX_Readout_Run_Web($)
 
     # gets LAN-Port for fw>=6.69 and fw<7
       foreach ( @{ $result->{lanDeviceNew} } ) {
-         $newQueryPart = "&".$_->{_node}."=landevice:settings/".$_->{_node}."/ethernet_port";
-         if (length($queryStr.$newQueryPart) < 4050) {
+         $newQueryPart = "&" . $_->{_node} . "=landevice:settings/" . $_->{_node}."/ethernet_port";
+         if (length($queryStr . $newQueryPart) < 4050) {
             $queryStr .= $newQueryPart;
          }
          else {
@@ -3501,8 +3501,8 @@ sub FRITZBOX_Readout_Run_Web($)
          $srTmp =~ s/uid/$UID/g;
 
       # Create a reading if a landevice is connected
-      #   if ( $_->{active} || $allowPassiv) {
-         if ( ($_->{active} && $_->{ip}) || $allowPassiv) {
+      #   if ( ($_->{active} && $_->{ip}) || $allowPassiv) {
+         if ( $_->{active} || $allowPassiv) {
             my $mac = $_->{mac};
             $mac =~ s/:/_/g;
 
@@ -4448,6 +4448,8 @@ sub FRITZBOX_Readout_Run_Web($)
 
          my $powerLevels;
          my $frequencys;
+         my $modulations;
+         my $modType;
          my $latencys;
          my $corrErrors;
          my $nonCorrErrors;
@@ -4492,17 +4494,24 @@ sub FRITZBOX_Readout_Run_Web($)
 
            $powerLevels = "";
            $frequencys  = "";
+           $modulations = "";
+
+           $modType = $resultData->{data}->{channelUs}->{docsis30}->[0]->{type}?"type":"modulation";
 
            eval {
              for(my $i = 0; $i <= $nbViews - 1; $i++) {
                $powerLevels .= $resultData->{data}->{channelUs}->{docsis30}->[$i]->{powerLevel} . " ";
                $frequencys  .= $resultData->{data}->{channelUs}->{docsis30}->[$i]->{frequency} . " ";
+               $modulations .= $1 if($resultData->{data}->{channelUs}->{docsis30}->[$i]->{$modType} =~ /(\d+)/);
+               $modulations .= " ";
              }
 
              FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Us_powerLevels", substr($powerLevels,0,-1);
              FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Us_frequencys", substr($frequencys,0,-1);
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Us_modulations", substr($modulations,0,-1);
              delete $oldDocDevice{box_docsis30_Us_powerLevels} if exists $oldDocDevice{box_docsis30_Us_powerLevels};
              delete $oldDocDevice{box_docsis30_Us_frequencys} if exists $oldDocDevice{box_docsis30_Us_frequencys};
+             delete $oldDocDevice{box_docsis30_Us_modulations} if exists $oldDocDevice{box_docsis30_Us_modulations};
            };
          }
 
@@ -4513,19 +4522,26 @@ sub FRITZBOX_Readout_Run_Web($)
          }
 
          if ($nbViews > 0) {
-      
+
            $powerLevels = "";
            $frequencys  = "";
+           $modulations  = "";
+
+           $modType = $resultData->{data}->{channelUs}->{docsis31}->[0]->{type}?"type":"modulation";
 
            eval {
              for(my $i = 0; $i <= $nbViews - 1; $i++) {
                $powerLevels .= $resultData->{data}->{channelUs}->{docsis31}->[$i]->{powerLevel} . " ";
                $frequencys  .= $resultData->{data}->{channelUs}->{docsis31}->[$i]->{frequency} . " ";
+               $modulations .= $1 if($resultData->{data}->{channelUs}->{docsis31}->[$i]->{$modType} =~ /(\d+)/);
+               $modulations .= " ";
              }
              FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis31_Us_powerLevels", substr($powerLevels,0,-1);
              FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis31_Us_frequencys", substr($frequencys,0,-1);
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis31_Us_modulations", substr($modulations,0,-1);
              delete $oldDocDevice{box_docsis31_Us_powerLevels} if exists $oldDocDevice{box_docsis31_Us_powerLevels};
              delete $oldDocDevice{box_docsis31_Us_frequencys} if exists $oldDocDevice{box_docsis31_Us_frequencys};
+             delete $oldDocDevice{box_docsis31_Us_modulations} if exists $oldDocDevice{box_docsis31_Us_modulations};
            };
 
          }
@@ -4544,6 +4560,9 @@ sub FRITZBOX_Readout_Run_Web($)
            $corrErrors    = "";
            $nonCorrErrors = "";
            $mses          = "";
+           $modulations   = "";
+
+           $modType = $resultData->{data}->{channelDs}->{docsis30}->[0]->{type}?"type":"modulation";
 
            eval {
              for(my $i = 0; $i <= $nbViews - 1; $i++) {
@@ -4553,6 +4572,8 @@ sub FRITZBOX_Readout_Run_Web($)
                $corrErrors    .= $resultData->{data}->{channelDs}->{docsis30}->[$i]->{corrErrors} . " ";
                $nonCorrErrors .= $resultData->{data}->{channelDs}->{docsis30}->[$i]->{nonCorrErrors} . " ";
                $mses          .= $resultData->{data}->{channelDs}->{docsis30}->[$i]->{mse} . " ";
+               $modulations   .= $1 if($resultData->{data}->{channelDs}->{docsis30}->[$i]->{$modType} =~ /(\d+)/);
+               $modulations   .= " ";
              }
              FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Ds_powerLevels", substr($powerLevels,0,-1);
              FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Ds_latencys", substr($latencys,0,-1);
@@ -4560,12 +4581,14 @@ sub FRITZBOX_Readout_Run_Web($)
              FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Ds_corrErrors", substr($corrErrors,0,-1);
              FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Ds_nonCorrErrors", substr($latencys,0,-1);
              FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Ds_mses", substr($mses,0,-1);
-             delete $oldDocDevice{box_docsis30_Ds_powerLevels} if exists $oldDocDevice{box_docsis30_Ds_powerLevels};
-             delete $oldDocDevice{box_docsis30_Ds_latencys} if exists $oldDocDevice{box_docsis30_Ds_latencys};
-             delete $oldDocDevice{box_docsis30_Ds_frequencys} if exists $oldDocDevice{box_docsis30_Ds_frequencys};
-             delete $oldDocDevice{box_docsis30_Ds_corrErrors} if exists $oldDocDevice{box_docsis30_Ds_corrErrors};
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis30_Ds_modulations", substr($modulations,0,-1);
+             delete $oldDocDevice{box_docsis30_Ds_powerLevels}   if exists $oldDocDevice{box_docsis30_Ds_powerLevels};
+             delete $oldDocDevice{box_docsis30_Ds_latencys}      if exists $oldDocDevice{box_docsis30_Ds_latencys};
+             delete $oldDocDevice{box_docsis30_Ds_frequencys}    if exists $oldDocDevice{box_docsis30_Ds_frequencys};
+             delete $oldDocDevice{box_docsis30_Ds_corrErrors}    if exists $oldDocDevice{box_docsis30_Ds_corrErrors};
              delete $oldDocDevice{box_docsis30_Ds_nonCorrErrors} if exists $oldDocDevice{box_docsis30_Ds_nonCorrErrors};
-             delete $oldDocDevice{box_docsis30_Ds_mses} if exists $oldDocDevice{box_docsis30_Ds_mses};
+             delete $oldDocDevice{box_docsis30_Ds_mses}          if exists $oldDocDevice{box_docsis30_Ds_mses};
+             delete $oldDocDevice{box_docsis30_Ds_modulations}   if exists $oldDocDevice{box_docsis30_Ds_modulations};
            };
 
          }
@@ -4580,16 +4603,23 @@ sub FRITZBOX_Readout_Run_Web($)
 
            $powerLevels = "";
            $frequencys  = "";
+           $modulations   = "";
+
+           $modType = $resultData->{data}->{channelDs}->{docsis31}->[0]->{type}?"type":"modulation";
 
            eval {
              for(my $i = 0; $i <= $nbViews - 1; $i++) {
                $powerLevels .= $resultData->{data}->{channelDs}->{docsis31}->[$i]->{powerLevel} . " ";
                $frequencys  .= $resultData->{data}->{channelDs}->{docsis31}->[$i]->{frequency} . " ";
+               $modulations .= $1 if($resultData->{data}->{channelDs}->{docsis31}->[$i]->{$modType} =~ /(\d+)/);
+               $modulations .= " ";
              }
              FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis31_Ds_powerLevels", substr($powerLevels,0,-1);
              FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis31_Ds_frequencys", substr($frequencys,0,-1);
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_docsis31_Ds_modulations", substr($modulations,0,-1);
              delete $oldDocDevice{box_docsis31_Ds_powerLevels} if exists $oldDocDevice{box_docsis31_Ds_powerLevels};
-             delete $oldDocDevice{box_docsis31_Ds_frequencys} if exists $oldDocDevice{box_docsis31_Ds_frequencys};
+             delete $oldDocDevice{box_docsis31_Ds_frequencys}  if exists $oldDocDevice{box_docsis31_Ds_frequencys};
+             delete $oldDocDevice{box_docsis31_Ds_modulations} if exists $oldDocDevice{box_docsis31_Ds_modulations};
            };
          }
 
@@ -5291,8 +5321,10 @@ sub FRITZBOX_Readout_Process($$)
                                 ."box_moh,box_powerRate,box_rateDown,box_rateUp,box_stdDialPort,box_sys_LogNewest,box_tr064,box_tr069,"
                                 ."box_upnp,box_upnp_control_activated,box_uptime,box_uptimeConnect,box_wan_AccessType,"
                                 ."box_wlan_Count,box_wlan_2.4GHz,box_wlan_5GHz,box_wlan_Active,box_wlan_LogExtended,box_wlan_LogNewest,"
-                                ."box_docsis30_Ds_powerLevels,box_docsis30_Ds_latencys,box_docsis30_Ds_frequencys,box_docsis30_Ds_corrErrors,box_docsis30_Ds_nonCorrErrors,box_docsis30_Ds_mses,"
-                                ."box_docsis30_Us_powerLevels,box_docsis30_Us_frequencys,box_docsis31_Us_powerLevels,box_docsis31_Us_frequencys,box_docsis31_Ds_powerLevels,box_docsis31_Ds_frequencys "
+                                ."box_docsis30_Ds_powerLevels,box_docsis30_Ds_frequencys,box_docsis30_Ds_modulations,box_docsis30_Ds_latencys,box_docsis30_Ds_corrErrors,box_docsis30_Ds_nonCorrErrors,box_docsis30_Ds_mses,"
+                                ."box_docsis31_Ds_powerLevels,box_docsis31_Ds_frequencys,box_docsis31_Ds_modulations,"
+                                ."box_docsis30_Us_powerLevels,box_docsis30_Us_frequencys,box_docsis30_Us_modulations,"
+                                ."box_docsis31_Us_powerLevels,box_docsis31_Us_frequencys,box_docsis31_Us_modulations "
                 ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,_noDefInf_ "
                 .$readingFnAttributes;
 
@@ -7776,6 +7808,8 @@ sub FRITZBOX_Get_DOCSIS_Informations($) {
      $returnStr .= '<td colspan="10">channelUs - docsis30</td>';
      $returnStr .= "</tr>\n";
 
+     my $modType = $result->{data}->{channelUs}->{docsis30}->[0]->{type}?"type":"modulation";
+
      eval {
        for(my $i = 0; $i <= $nbViews - 1; $i++) {
          $returnStr .= "<tr>\n";
@@ -7785,6 +7819,9 @@ sub FRITZBOX_Get_DOCSIS_Informations($) {
          $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{type} . "</td>";
          $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{powerLevel} . "</td>";
          $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{frequency} . "</td>";
+         $returnStr .= "<td>";
+         $returnStr .= $1 if($result->{data}->{channelUs}->{docsis30}->[$i]->{$modType} =~ /(\d+)/);
+         $returnStr .= "</td>";
          $returnStr .= "</tr>\n";
        }
      };
@@ -7805,6 +7842,8 @@ sub FRITZBOX_Get_DOCSIS_Informations($) {
      $returnStr .= '<td colspan="10">channelUs - docsis31</td>';
      $returnStr .= "</tr>\n";
 
+     my $modType = $result->{data}->{channelUs}->{docsis31}->[0]->{type}?"type":"modulation";
+
      eval {
        for(my $i = 0; $i <= $nbViews - 1; $i++) {
          $returnStr .= "<tr>\n";
@@ -7814,6 +7853,9 @@ sub FRITZBOX_Get_DOCSIS_Informations($) {
          $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{type} . "</td>";
          $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{powerLevel} . "</td>";
          $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{frequency} . "</td>";
+         $returnStr .= "<td>";
+         $returnStr .= $1 if($result->{data}->{channelUs}->{docsis31}->[$i]->{$modType} =~ /(\d+)/);
+         $returnStr .= "</td>";
          $returnStr .= "</tr>\n";
        }
      };
@@ -7834,6 +7876,8 @@ sub FRITZBOX_Get_DOCSIS_Informations($) {
      $returnStr .= '<td colspan="10">channelDs - docsis30</td>';
      $returnStr .= "</tr>\n";
 
+     my $modType = $result->{data}->{channelDs}->{docsis30}->[0]->{type}?"type":"modulation";
+
      eval {
        for(my $i = 0; $i <= $nbViews - 1; $i++) {
          $returnStr .= "<tr>\n";
@@ -7846,6 +7890,9 @@ sub FRITZBOX_Get_DOCSIS_Informations($) {
          $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{corrErrors} . "</td>";
          $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{nonCorrErrors} . "</td>";
          $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{mse} . "</td>";
+         $returnStr .= "<td>";
+         $returnStr .= $1 if($result->{data}->{channelDs}->{docsis30}->[$i]->{$modType} =~ /(\d+)/);
+         $returnStr .= "</td>";
          $returnStr .= "</tr>\n";
        }
      };
@@ -7866,6 +7913,8 @@ sub FRITZBOX_Get_DOCSIS_Informations($) {
      $returnStr .= '<td colspan="10">channelDs - docsis31</td>';
      $returnStr .= "</tr>\n";
 
+     my $modType = $result->{data}->{channelDs}->{docsis31}->[0]->{type}?"type":"modulation";
+
      eval {
        for(my $i = 0; $i <= $nbViews - 1; $i++) {
          $returnStr .= "<tr>\n";
@@ -7874,6 +7923,9 @@ sub FRITZBOX_Get_DOCSIS_Informations($) {
          $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis31}->[$i]->{type} . "</td>";
          $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis31}->[$i]->{powerLevel} . "</td>";
          $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis31}->[$i]->{frequency} . "</td>";
+         $returnStr .= "<td>";
+         $returnStr .= $1 if($result->{data}->{channelDs}->{docsis31}->[$i]->{$modType} =~ /(\d+)/);
+         $returnStr .= "</td>";
          $returnStr .= "</tr>\n";
        }
      };
@@ -8890,12 +8942,19 @@ sub FRITZBOX_Get_Lan_Device_Info($$$) {
           $returnStr .= " UID:"      . $result->{data}->{vars}->{dev}->{UID};
           $returnStr .= " NAME:"     . $result->{data}->{vars}->{dev}->{name}->{displayName};
           if ( ref ($result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{selectedRights}) eq 'HASH' ) {
-             $returnStr .= " ACCESS:"  . $result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{selectedRights}->{msgid} if defined($result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{selectedRights}->{msgid});
-             $returnStr .= " USEABLE:" . $result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{onlineTime}->{useable};
-             $returnStr .= " UNSPENT:" . $result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{onlineTime}->{unspent};
-             $returnStr .= " PERCENT:" . $result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{onlineTime}->{percent};
-             $returnStr .= " USED:"    . $result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{onlineTime}->{used};
-             $returnStr .= " USEDSTR:" . $result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{onlineTime}->{usedstr};
+             my $kisi = $result->{data}->{vars}->{dev}->{netAccess}->{kisi};
+#             $returnStr .= " ACCESS:"  . $result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{selectedRights}->{msgid} if defined($result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{selectedRights}->{msgid});
+#             $returnStr .= " USEABLE:" . $result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{onlineTime}->{useable};
+#             $returnStr .= " UNSPENT:" . $result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{onlineTime}->{unspent};
+#             $returnStr .= " PERCENT:" . $result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{onlineTime}->{percent};
+#             $returnStr .= " USED:"    . $result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{onlineTime}->{used};
+#             $returnStr .= " USEDSTR:" . $result->{data}->{vars}->{dev}->{netAccess}->{kisi}->{onlineTime}->{usedstr};
+             $returnStr .= " ACCESS:"  . $kisi->{selectedRights}->{msgid} if defined($kisi->{selectedRights}->{msgid});
+             $returnStr .= " USEABLE:" . $kisi->{onlineTime}->{useable} if defined($kisi->{onlineTime}->{useable});
+             $returnStr .= " UNSPENT:" . $kisi->{onlineTime}->{unspent} if defined($kisi->{onlineTime}->{unspent});
+             $returnStr .= " PERCENT:" . $kisi->{onlineTime}->{percent} if defined($kisi->{onlineTime}->{percent});
+             $returnStr .= " USED:"    . $kisi->{onlineTime}->{used}    if defined($kisi->{onlineTime}->{used});
+             $returnStr .= " USEDSTR:" . $kisi->{onlineTime}->{usedstr} if defined($kisi->{onlineTime}->{usedstr});
           }
           $returnStr .= " DEVTYPE:"  . $result->{data}->{vars}->{dev}->{devType};
           $returnStr .= " STATE:"    . $result->{data}->{vars}->{dev}->{wlan}->{state} if defined($result->{data}->{vars}->{dev}->{wlan}->{state}) and $result->{data}->{vars}->{dev}->{devType} eq 'wlan';
@@ -10995,15 +11054,19 @@ sub FRITZBOX_Helper_Url_Regex {
       <li><b>box_docsis30_Ds_mses</b> - Only Fritz!Box Cable</li>
       <li><b>box_docsis30_Ds_nonCorrErrors</b> - Only Fritz!Box Cable</li>
       <li><b>box_docsis30_Ds_powerLevels</b> - Only Fritz!Box Cable</li>
+      <li><b>box_docsis30_Ds_modulations</b> - Only Fritz!Box Cable</li>
 
       <li><b>box_docsis30_Us_frequencys</b> - Only Fritz!Box Cable</li>
       <li><b>box_docsis30_Us_powerLevels</b> - Only Fritz!Box Cable</li>
+      <li><b>box_docsis30_Us_modulations</b> - Only Fritz!Box Cable</li>
 
       <li><b>box_docsis31_Ds_frequencys</b> - Only Fritz!Box Cable</li>
       <li><b>box_docsis31_Ds_powerLevels</b> - Only Fritz!Box Cable</li>
+      <li><b>box_docsis31_Ds_modulations</b> - Only Fritz!Box Cable</li>
 
       <li><b>box_docsis31_Us_frequencys</b> - Only Fritz!Box Cable</li>
       <li><b>box_docsis31_Us_powerLevels</b> - Only Fritz!Box Cable</li>
+      <li><b>box_docsis31_Us_modulations</b> - Only Fritz!Box Cable</li>
 
       <br>
 
@@ -11901,15 +11964,19 @@ sub FRITZBOX_Helper_Url_Regex {
       <li><b>box_docsis30_Ds_mses</b> - Nur Fritz!Box Cable</li>
       <li><b>box_docsis30_Ds_nonCorrErrors</b> - Nur Fritz!Box Cable</li>
       <li><b>box_docsis30_Ds_powerLevels</b> - Nur Fritz!Box Cable</li>
+      <li><b>box_docsis30_Ds_modulations</b> - Nur Fritz!Box Cable</li>
 
       <li><b>box_docsis30_Us_frequencys</b> - Nur Fritz!Box Cable</li>
       <li><b>box_docsis30_Us_powerLevels</b> - Nur Fritz!Box Cable</li>
+      <li><b>box_docsis30_Us_modulations</b> - Nur Fritz!Box Cable</li>
 
       <li><b>box_docsis31_Ds_frequencys</b> - Nur Fritz!Box Cable</li>
       <li><b>box_docsis31_Ds_powerLevels</b> - Nur Fritz!Box Cable</li>
+      <li><b>box_docsis31_Ds_modulations</b> - Nur Fritz!Box Cable</li>
 
       <li><b>box_docsis31_Us_frequencys</b> - Nur Fritz!Box Cable</li>
       <li><b>box_docsis31_Us_powerLevels</b> - Nur Fritz!Box Cable</li>
+      <li><b>box_docsis31_Us_modulations</b> - Nur Fritz!Box Cable</li>
       <br>
       <li><b>dect</b><i>n</i> - Name des DECT Telefons <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_alarmRingTone</b> - Klingelton beim Wecken &uuml;ber das DECT Telefon <i>n</i></li>
