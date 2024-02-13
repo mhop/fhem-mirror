@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 72_FRITZBOX: QAM Informationen bei Cable Boxen
+ - bufgix:  72_FRITZBOX: kleinere Fehler bereinigt.
+                         LAN Geräte ohne IP wurden nicht angezeigt.
  - bugfix:  76_SolarForecast: fix load Astro module
  - feature: 76_SolarForecast: integrate sun position from Astro module to AI,
                               some more internal code changes 
