@@ -1,6 +1,6 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.22"
+SCRIPTVERSION="3.23"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
@@ -22,11 +22,11 @@ TMPFILE=/tmp/signal$$.tmp
 DBVER=0.22
 OPERATION=$1
 JAVACMD=java
-JAVA_VERSION=17.0
-JDK_PACKAGE=openjdk-17-jre-headless
+JAVA_VERSION=21.0
+JDK_PACKAGE=openjdk-21-jre-headless
 JAVA_NATIVE=yes
 
-#Check if Java 17 installation is available for this system
+#Check if Java 21 installation is available for this system
 JDK_VER=`apt-cache search --names-only $JDK_PACKAGE`
 if ! [ "$JAVA_HOME" = "" ]; then
 	JAVACMD=$JAVA_HOME/bin/java
@@ -248,7 +248,7 @@ install_and_check diff diffutils
 install_and_check dbus-send dbus
 install_and_check cpan cpanminus
 install_and_check zip zip
-install_and_check qrencode
+install_and_check qrencode qrencode
 
 if [ -z "$BASH" ]; then
 	echo "This script requires bash for some functions. Check if bash is installed."
@@ -293,10 +293,16 @@ else
 fi
 
 if [ "$JAVA_NATIVE" = "download" ]; then
-	echo -n "Downloading Java from adoptium..."
 	cd /opt
-	JAVA_ARC=OpenJDK17U-jre_$ARCHJ\_linux_hotspot_17.0.4.1_1.tar.gz
-	wget -qN https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.4.1%2B1/$JAVA_ARC
+	if [ "$ARCHJ" = "arm" ]; then
+		echo -n "Downloading private jdk21 build for armv7l platform..."
+		JAVA_ARC=openjdk-21.0.35-armv7l-glibc2.28.tar.gz
+		wget -qN https://github.com/bublath/FHEM-Signalbot/raw/main/java/$JAVA_ARC
+	else
+		echo -n "Downloading Java from adoptium..."
+		JAVA_ARC=OpenJDK21U-jdk_$ARCHJ\_linux_hotspot_21.0.2_13.tar.gz
+		wget -qN https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/$JAVA_ARC
+	fi
 	
 	if [ -z $JAVA_ARC ]; then
 		echo "failed"
