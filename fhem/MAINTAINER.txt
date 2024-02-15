@@ -403,6 +403,7 @@ FHEM/73_km200.pm             Sailor               Heizungssteuerung/Raumklima ht
 FHEM/73_MPD.pm               Wzut/Beta-User       Multimedia
 FHEM/73_NUKIBridge.pm        CoolTux              Sonstige Systeme
 FHEM/73_PRESENCE.pm          JoWiemann            Unterstützende Dienste
+FHEM/73_PRESENCE2.pm         JoWiemann            Unterstützende Dienste cover version
 FHEM/73_WaterCalculator      Sailor               Unterstützende Dienste https://forum.fhem.de/index.php/topic,58579.0.html
 FHEM/74_AMADDevice.pm        CoolTux              Sonstige Systeme
 FHEM/74_AutomowerConnect.pm  Ellert               Sonstige Systeme https://forum.fhem.de/index.php/topic,131661.0.html
@@ -665,8 +666,7 @@ contrib/DoorPi/70_DoorPi.pm  pahenning            Automatisierung
 contrib/Infratec/*           Wzut                 Bastelecke
 contrib/META.json.full.txt   loredo               FHEM Development
 contrib/META.json.txt        loredo               FHEM Development
-contrib/PRESENCE             jowiemann            Unterstützende Dienste
-contrib/PRESENCE2            jowiemann            Unterstützende Dienste (cover version)
+contrib/PRESENCE             markusbloch/orphan   Unterstützende Dienste
 contrib/PRESENCE/lepresenced PatrickR             Unterstützende Dienste
 contrib/RHASSPY/*            drhirn/Beta-User     Frontends/Sprachsteuerung
 contrib/SIP/*                Wzut                 Sonstiges
