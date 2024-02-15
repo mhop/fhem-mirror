@@ -665,7 +665,8 @@ contrib/DoorPi/70_DoorPi.pm  pahenning            Automatisierung
 contrib/Infratec/*           Wzut                 Bastelecke
 contrib/META.json.full.txt   loredo               FHEM Development
 contrib/META.json.txt        loredo               FHEM Development
-contrib/PRESENCE             markusbloch/orphan   Unterstützende Dienste
+contrib/PRESENCE             jowiemann            Unterstützende Dienste
+contrib/PRESENCE2            jowiemann            Unterstützende Dienste (cover version)
 contrib/PRESENCE/lepresenced PatrickR             Unterstützende Dienste
 contrib/RHASSPY/*            drhirn/Beta-User     Frontends/Sprachsteuerung
 contrib/SIP/*                Wzut                 Sonstiges
