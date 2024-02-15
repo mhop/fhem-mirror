@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.16.1" => "14.02.2024  ___isCatFiltered: add eval for regex evaluation, add sunaz to AI raw and get, fillup AI hash ",
   "1.16.0" => "12.02.2024  new command get dwdCatalog ",
   "1.15.5" => "11.02.2024  change forecastQualities output, new limits for 'accurate' and 'spreaded' results from AI ".
                            "checkPlantConfig: change common check info output ".
@@ -1120,6 +1121,7 @@ sub _readCacheFile {
           my $valid = $dtree->isa('AI::DecisionTree');
 
           if ($valid) {
+              delete $data{$type}{$name}{aidectree}{aitrained};
               $data{$type}{$name}{aidectree}{aitrained}  = $dtree;
               $data{$type}{$name}{current}{aitrainstate} = 'ok';
               Log3 ($name, 3, qq{$name - cached data "$title" restored});
@@ -1133,6 +1135,7 @@ sub _readCacheFile {
       my ($err, $data) = fileRetrieve ($file);
 
       if (!$err && $data) {
+          delete $data{$type}{$name}{aidectree}{airaw};
           $data{$type}{$name}{aidectree}{airaw}     = $data;
           $data{$type}{$name}{current}{aitrawstate} = 'ok';
           Log3 ($name, 3, qq{$name - cached data "$title" restored});
@@ -1145,6 +1148,7 @@ sub _readCacheFile {
       my ($err, $data) = fileRetrieve ($file);
 
       if (!$err && $data) {
+          delete $data{$type}{$name}{dwdcatalog};
           $data{$type}{$name}{dwdcatalog} = $data;
           debugLog ($paref, 'dwdComm', qq{$title restored});
       }
@@ -3980,45 +3984,39 @@ sub _getdwdCatalog {
   
   $paref->{sort}    = $sort;
   $paref->{export}  = $export;
-  $paref->{filtid}  = $ha->{id}   ? $ha->{id}  : '';
+  $paref->{filtid}  = $ha->{id}   ? $ha->{id}   : '';
   $paref->{filtnam} = $ha->{name} ? $ha->{name} : '';
   $paref->{filtlat} = $ha->{lat}  ? $ha->{lat}  : '';
   $paref->{filtlon} = $ha->{lon}  ? $ha->{lon}  : '';
  
-  my $msg = "The DWD Station Catalog is initially loaded into SolarForecast.\n".
+  my $msg = "The DWD Station catalog is initially loaded into SolarForecast.\n".
             "Please execute the command 'get $name $paref->{opt} $arg' again.";
   
   if ($force) {
       __dwdStatCatalog_Request ($paref);
-      $msg = "The DWD Station Catalog is initially loaded into SolarForecast.";
+      return 'The DWD Station Catalog is forced to loaded into SolarForecast.';
   }
-  else {
-      if (scalar keys %{$data{$type}{$name}{dwdcatalog}}) {                              # Katalog ist geladen
-          return __generateCatOut ($paref);
-      }
-      else {                                                                             # Katalog nicht geladen -> von File laden
-          _readCacheFile ({ hash      => $paref->{hash},
-                            name      => $name,
-                            type      => $type,
-                            debug     => $paref->{debug},
-                            file      => $dwdcatalog,
-                            cachename => 'dwdcatalog',
-                            title     => 'DWD Station Catalog'
-                          }
-                         );
 
-          if (scalar keys %{$data{$type}{$name}{dwdcatalog}}) {
-              return __generateCatOut ($paref);
-          }
-          else {                                                                         # Ladung von File nicht erfolgreich
-              __dwdStatCatalog_Request ($paref);           
-          }
-      }
+  if (!scalar keys %{$data{$type}{$name}{dwdcatalog}}) {                             # Katalog ist nicht geladen
+      _readCacheFile ({ hash      => $paref->{hash},
+                        name      => $name,
+                        type      => $type,
+                        debug     => $paref->{debug},
+                        file      => $dwdcatalog,
+                        cachename => 'dwdcatalog',
+                        title     => 'DWD Station Catalog'
+                      }
+                     );
+
+      if (!scalar keys %{$data{$type}{$name}{dwdcatalog}}) {                         # Ladung von File nicht erfolgreich
+          __dwdStatCatalog_Request ($paref); 
+          return $msg;
+      }                         
   }
   
-  #Log3 ($name, 1, "$name > Cat Satz: \n". Dumper $data{$type}{$name}{dwdcatalog}); 
+  return __generateCatOut ($paref);
 
-return $msg;
+return;
 }
 
 ###############################################################
@@ -4056,31 +4054,37 @@ sub __generateCatOut {
   
   # Katalog Organisation (default ist 'byID)
   ############################################
-  my $temp;
+  my ($err, $isfil);
+  my %temp;
   
   if ($sort eq 'byName') {
       for my $id (keys %{$data{$type}{$name}{dwdcatalog}}) {
           $paref->{id} = $id;
-          next if(___isCatFiltered ($paref));
           
-          my $nid               = $data{$type}{$name}{dwdcatalog}{$id}{stnam};
-          $temp->{$nid}{stnam}  = $data{$type}{$name}{dwdcatalog}{$id}{stnam};
-          $temp->{$nid}{id}     = $data{$type}{$name}{dwdcatalog}{$id}{id};
-          $temp->{$nid}{latdec} = $data{$type}{$name}{dwdcatalog}{$id}{latdec};                   # Latitude Dezimalgrad
-          $temp->{$nid}{londec} = $data{$type}{$name}{dwdcatalog}{$id}{londec};                   # Longitude Dezimalgrad
-          $temp->{$nid}{elev}   = $data{$type}{$name}{dwdcatalog}{$id}{elev};          
+          ($err, $isfil) = ___isCatFiltered ($paref);
+          return (split " at", $err)[0] if($err);
+          next                          if($isfil);
+          
+          my $nid             = $data{$type}{$name}{dwdcatalog}{$id}{stnam};
+          $temp{$nid}{stnam}  = $data{$type}{$name}{dwdcatalog}{$id}{stnam};
+          $temp{$nid}{id}     = $data{$type}{$name}{dwdcatalog}{$id}{id};
+          $temp{$nid}{latdec} = $data{$type}{$name}{dwdcatalog}{$id}{latdec};                   # Latitude Dezimalgrad
+          $temp{$nid}{londec} = $data{$type}{$name}{dwdcatalog}{$id}{londec};                   # Longitude Dezimalgrad
+          $temp{$nid}{elev}   = $data{$type}{$name}{dwdcatalog}{$id}{elev};         
       }
   }
   elsif ($sort eq 'byID') {      
       for my $id (keys %{$data{$type}{$name}{dwdcatalog}}) {
           $paref->{id} = $id;
-          next if(___isCatFiltered ($paref));
+          ($err, $isfil) = ___isCatFiltered ($paref);
+          return (split " at", $err)[0] if($err);
+          next                          if($isfil);
           
-          $temp->{$id}{stnam}  = $data{$type}{$name}{dwdcatalog}{$id}{stnam};
-          $temp->{$id}{id}     = $data{$type}{$name}{dwdcatalog}{$id}{id};
-          $temp->{$id}{latdec} = $data{$type}{$name}{dwdcatalog}{$id}{latdec};                    # Latitude Dezimalgrad
-          $temp->{$id}{londec} = $data{$type}{$name}{dwdcatalog}{$id}{londec};                    # Longitude Dezimalgrad
-          $temp->{$id}{elev}   = $data{$type}{$name}{dwdcatalog}{$id}{elev};          
+          $temp{$id}{stnam}  = $data{$type}{$name}{dwdcatalog}{$id}{stnam};
+          $temp{$id}{id}     = $data{$type}{$name}{dwdcatalog}{$id}{id};
+          $temp{$id}{latdec} = $data{$type}{$name}{dwdcatalog}{$id}{latdec};                    # Latitude Dezimalgrad
+          $temp{$id}{londec} = $data{$type}{$name}{dwdcatalog}{$id}{londec};                    # Longitude Dezimalgrad
+          $temp{$id}{elev}   = $data{$type}{$name}{dwdcatalog}{$id}{elev};          
       }
   }
   
@@ -4091,12 +4095,12 @@ sub __generateCatOut {
       push @data, 'version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"';
       push @data, 'xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">';
       
-      for my $idx (sort keys %{$temp}) {
-          my $londec = $temp->{"$idx"}{londec};
-          my $latdec = $temp->{"$idx"}{latdec};
-          my $elev   = $temp->{"$idx"}{elev};
-          my $id     = $temp->{"$idx"}{id};
-          my $stnam  = $temp->{"$idx"}{stnam};
+      for my $idx (sort keys %temp) {
+          my $londec = $temp{"$idx"}{londec};
+          my $latdec = $temp{"$idx"}{latdec};
+          my $elev   = $temp{"$idx"}{elev};
+          my $id     = $temp{"$idx"}{id};
+          my $stnam  = $temp{"$idx"}{stnam};
           
           push @data, qq{<wpt lat="$latdec" lon="$londec">};
           push @data, qq{ <ele>$elev</ele>};
@@ -4107,20 +4111,21 @@ sub __generateCatOut {
         
       push @data, '</gpx>';
       
-      my $err = FileWrite ( {FileName  => $dwdcatgpx, 
-                             ForceType => 'file'
-                            }, @data
-                          );        
+      $err = FileWrite ( {FileName  => $dwdcatgpx, 
+                          ForceType => 'file'
+                         }, @data
+                       );        
 
       if (!$err) {
           debugLog ($paref, 'dwdComm', qq{DWD catalog saved as gpx content: }.$dwdcatgpx);
       }
       else {
           Log3 ($name, 1, "$name - ERROR - $err");
+          return $err;
       }      
   }
   
-  my $noe = scalar keys %{$temp};
+  my $noe = scalar keys %temp;
          
   ## Ausgabe
   ############
@@ -4139,18 +4144,20 @@ sub __generateCatOut {
   $out    .= qq{</tr>};
   $out    .= qq{<tr></tr>};
     
-  for my $key (sort keys %{$temp}) {      
+  for my $key (sort keys %temp) {      
       $out .= qq{<tr>};
-      $out .= qq{<td style="padding: 5px;                    "> $temp->{"$key"}{id}       </td>};
-      $out .= qq{<td style="padding: 5px; white-space:nowrap;"> $temp->{"$key"}{stnam}    </td>};
-      $out .= qq{<td style="padding: 5px;                    "> $temp->{"$key"}{latdec}   </td>};
-      $out .= qq{<td style="padding: 5px;                    "> $temp->{"$key"}{londec}   </td>};
-      $out .= qq{<td style="padding: 5px;                    "> $temp->{"$key"}{elev}     </td>};
+      $out .= qq{<td style="padding: 5px;                    "> $temp{"$key"}{id}       </td>};
+      $out .= qq{<td style="padding: 5px; white-space:nowrap;"> $temp{"$key"}{stnam}    </td>};
+      $out .= qq{<td style="padding: 5px;                    "> $temp{"$key"}{latdec}   </td>};
+      $out .= qq{<td style="padding: 5px;                    "> $temp{"$key"}{londec}   </td>};
+      $out .= qq{<td style="padding: 5px;                    "> $temp{"$key"}{elev}     </td>};
       $out .= qq{</tr>};
   }
 
   $out    .= qq{</table>};
-  $out    .= qq{</html>};            
+  $out    .= qq{</html>};
+
+  undef %temp;  
 
 return $out;
 }
@@ -4171,12 +4178,17 @@ sub ___isCatFiltered {
   
   my $isfil = 0;
 
-  $isfil = 1 if($filtid  && $id !~ /^$filtid$/ixs);
-  $isfil = 1 if($filtnam && $data{$type}{$name}{dwdcatalog}{$id}{stnam}  !~ /^$filtnam$/ixs);
-  $isfil = 1 if($filtlat && $data{$type}{$name}{dwdcatalog}{$id}{latdec} !~ /^$filtlat$/ixs);
-  $isfil = 1 if($filtlon && $data{$type}{$name}{dwdcatalog}{$id}{londec} !~ /^$filtlon$/ixs);
+  eval {$isfil = 1 if($filtid  && $id !~ /^$filtid$/ixs);
+        $isfil = 1 if($filtnam && $data{$type}{$name}{dwdcatalog}{$id}{stnam}  !~ /^$filtnam$/ixs);
+        $isfil = 1 if($filtlat && $data{$type}{$name}{dwdcatalog}{$id}{latdec} !~ /^$filtlat$/ixs);
+        $isfil = 1 if($filtlon && $data{$type}{$name}{dwdcatalog}{$id}{londec} !~ /^$filtlon$/ixs);      
+       };
+       
+  if ($@) {
+      return $@;   
+  }
           
-return $isfil;
+return ('', $isfil);
 }
 
 ####################################################################################################################
@@ -5502,12 +5514,22 @@ sub _calcSunPosition {
       my $tstr               = (timestampToTimestring ($t + ($num * 3600)))[3];
       my ($date, $h, $m, $s) = split /[ :]/, $tstr;
       $tstr                  = $date.' '.$h.':30:00';
-      my $hod                = sprintf "%02d", $h + 1;
-      my $nhtstr             = "NextHour".sprintf "%02d", $num;
       
-      my $az  = sprintf "%.0f", FHEM::Astro::Get (undef, 'global', 'text', 'SunAz',  $tstr);             # statt Astro_Get geht auch FHEM::Astro::Get 
-      my $alt = sprintf "%.0f", FHEM::Astro::Get (undef, 'global', 'text', 'SunAlt', $tstr);
+      my ($az, $alt);
 
+      eval {
+          $az  = sprintf "%.0f", FHEM::Astro::Get (undef, 'global', 'text', 'SunAz',  $tstr);             # statt Astro_Get geht auch FHEM::Astro::Get 
+          $alt = sprintf "%.0f", FHEM::Astro::Get (undef, 'global', 'text', 'SunAlt', $tstr);
+      };
+      
+      if ($@) {
+          Log3 ($name, 1, "$name - ERROR - $@");
+          return;          
+      }
+      
+      my $hod    = sprintf "%02d", $h + 1;
+      my $nhtstr = "NextHour".sprintf "%02d", $num;
+      
       $data{$type}{$name}{nexthours}{$nhtstr}{sunaz}  = $az;
       $data{$type}{$name}{nexthours}{$nhtstr}{sunalt} = $alt;
       
@@ -5568,11 +5590,59 @@ sub centralTask {
   ## AI Raw Daten formatieren                                      # 09.02.2024
   if (defined $data{$type}{$name}{aidectree}{airaw}) {
       for my $idx (sort keys %{$data{$type}{$name}{aidectree}{airaw}}) {
-          $data{$type}{$name}{aidectree}{airaw}{$idx}{wrp}    = 0 if(AiRawdataVal ($hash, $idx, 'wrp',    0) eq '00');
-          $data{$type}{$name}{aidectree}{airaw}{$idx}{wrp}    = 5 if(AiRawdataVal ($hash, $idx, 'wrp',    0) eq '05');
-          $data{$type}{$name}{aidectree}{airaw}{$idx}{temp}   = 0 if(AiRawdataVal ($hash, $idx, 'temp',   0) eq '00');
-          $data{$type}{$name}{aidectree}{airaw}{$idx}{temp}   = 5 if(AiRawdataVal ($hash, $idx, 'temp',   0) eq '05');
-          $data{$type}{$name}{aidectree}{airaw}{$idx}{temp}   = -5 if(AiRawdataVal ($hash, $idx, 'temp',   0) eq '-05');  
+          $data{$type}{$name}{aidectree}{airaw}{$idx}{wrp}  = 0  if(AiRawdataVal ($hash, $idx, 'wrp',  0) eq '00');
+          $data{$type}{$name}{aidectree}{airaw}{$idx}{wrp}  = 5  if(AiRawdataVal ($hash, $idx, 'wrp',  0) eq '05');
+          $data{$type}{$name}{aidectree}{airaw}{$idx}{temp} = 0  if(AiRawdataVal ($hash, $idx, 'temp', 0) eq '00');
+          $data{$type}{$name}{aidectree}{airaw}{$idx}{temp} = 5  if(AiRawdataVal ($hash, $idx, 'temp', 0) eq '05');
+          $data{$type}{$name}{aidectree}{airaw}{$idx}{temp} = -5 if(AiRawdataVal ($hash, $idx, 'temp', 0) eq '-05');  
+      
+          my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt', '');
+          if (!$sunalt) {
+              my $y = substr ($idx,0,4);                                                       # 14.02.2024  KI Hash auffüllen
+              my $m = substr ($idx,4,2);
+              my $d = substr ($idx,6,2);
+              my $h = substr ($idx,8,2);
+              $h       = sprintf "%02d", int $h - 1;
+              my $tstr = "$y-$m-$d $h:30:00";
+              
+              my $alt;
+              eval {
+                $alt = sprintf "%.0f", FHEM::Astro::Get (undef, 'global', 'text', 'SunAlt', $tstr);
+              };
+              
+              if ($@) {
+                  Log3 ($name, 1, "$name - add sunalt - idx: $idx, hod: $h, err: $@");
+                  delete $data{$type}{$name}{aidectree}{airaw}{$idx};
+              }
+              else {
+                  my $sabin = sunalt2bin ($alt);
+                  $data{$type}{$name}{aidectree}{airaw}{$idx}{sunalt} = $sabin;
+              }
+              
+          }
+          
+          my $sunaz  = AiRawdataVal ($hash, $idx, 'sunaz', '');
+          if (!$sunaz) {
+              my $y = substr ($idx,0,4);                                                       # 14.02.2024  KI Hash auffüllen
+              my $m = substr ($idx,4,2);
+              my $d = substr ($idx,6,2);
+              my $h = substr ($idx,8,2);
+              $h       = sprintf "%02d", int $h - 1;
+              my $tstr = "$y-$m-$d $h:30:00";
+              
+              my $az;
+              eval {
+                $az  = sprintf "%.0f", FHEM::Astro::Get (undef, 'global', 'text', 'SunAz',  $tstr);    
+              };
+              
+              if ($@) {
+                  Log3 ($name, 1, "$name - add sunaz - idx: $idx, hod: $h, err: $@");
+                  delete $data{$type}{$name}{aidectree}{airaw}{$idx};                  
+              }
+              else {
+                  $data{$type}{$name}{aidectree}{airaw}{$idx}{sunaz} = $az if(defined $az); 
+              }              
+          }
       }
   }
   
@@ -9385,7 +9455,7 @@ sub calcValueImproves {
       readingsSingleUpdate ($hash, '.pvCorrectionFactor_Auto_Soll', ($aln ? $acu : $acu.' noLearning'), 0) if($acu =~ /on/xs);
 
       if ($t - $idts < 7200) {
-          my $rmh = sprintf "%.1f", ((7200 - ($t - $idts)) / 3600);
+          my $rmh = sprintf "%.2f", ((7200 - ($t - $idts)) / 3600);
           readingsSingleUpdate ($hash, 'pvCorrectionFactor_Auto', "standby (remains in standby for $rmh hours)", 0);
 
           Log3 ($name, 4, "$name - Correction usage is in standby. It starts in $rmh hours.");
@@ -12694,7 +12764,7 @@ return;
 }
 
 ###############################################################
-#    Restaufgaben nach Update
+#    Restaufgaben nach AI Train
 ###############################################################
 sub finishTrain {
   my $serial = decode_base64 (shift);
@@ -12860,7 +12930,7 @@ sub aiTrain {                            ## no critic "not used"
   $err                                      = writeCacheToFile ($hash, 'aitrained', $aitrained.$name);
 
   if (!$err) {
-      debugLog ($paref, 'aiData',    qq{AI trained number of entities: }. scalar keys %{$data{$type}{$name}{aidectree}{aitrained}});
+      debugLog ($paref, 'aiProcess', qq{AI trained number of entities: }. scalar keys %{$data{$type}{$name}{aidectree}{aitrained}});
       debugLog ($paref, 'aiProcess', qq{AI trained and saved data into file: }.$aitrained.$name);
       debugLog ($paref, 'aiProcess', qq{Training instances and their associated information where purged from the AI object});
       $data{$type}{$name}{current}{aitrainstate} = 'ok';
@@ -12904,12 +12974,13 @@ sub aiGetResult {
   my $rad1h = NexthoursVal ($hash, $nhidx, "rad1h", 0);
   return "no rad1h for hod: $hod" if($rad1h <= 0);
   
-  debugLog ($paref, 'aiData', 'Start AI result check now');
+  debugLog ($paref, 'aiData', "Start AI result check for hod: $hod");
 
   my $wcc    = NexthoursVal ($hash, $nhidx, 'cloudcover', 0);
   my $wrp    = NexthoursVal ($hash, $nhidx, 'rainprob',   0);
   my $temp   = NexthoursVal ($hash, $nhidx, 'temp',      20);
   my $sunalt = NexthoursVal ($hash, $nhidx, 'sunalt',     0);
+  my $sunaz  = NexthoursVal ($hash, $nhidx, 'sunaz',      0);
 
   my $tbin  = temp2bin   ($temp);
   my $cbin  = cloud2bin  ($wcc);
@@ -12923,6 +12994,7 @@ sub aiGetResult {
                                                        wcc    => $cbin,
                                                        wrp    => $rbin,
                                                        sunalt => $sabin,
+                                                       sunaz  => $sunaz,
                                                        hod    => $hod
                                                      }
                                       );
@@ -12934,7 +13006,7 @@ sub aiGetResult {
   }
 
   if (defined $pvaifc) {
-      debugLog ($paref, 'aiData', qq{AI accurate result found: pvaifc: $pvaifc (hod: $hod, sunalt: $sabin, Rad1h: $rad1h, wcc: $wcc, wrp: $rbin, temp: $tbin)});
+      debugLog ($paref, 'aiData', qq{AI accurate result found: pvaifc: $pvaifc (hod: $hod, sunaz: $sunaz, sunalt: $sabin, Rad1h: $rad1h, wcc: $wcc, wrp: $rbin, temp: $tbin)});
       return ('accurate', $pvaifc);
   }
 
@@ -12946,6 +13018,7 @@ sub aiGetResult {
                                         wcc    => $cbin,
                                         wrp    => $rbin,
                                         sunalt => $sabin,
+                                        sunaz  => $sunaz,
                                         hod    => $hod,
                                         dtree  => $dtree,
                                         debug  => $paref->{debug}
@@ -12970,6 +13043,7 @@ sub _aiGetSpread {
   my $wcc    = $paref->{wcc};
   my $wrp    = $paref->{wrp};
   my $sunalt = $paref->{sunalt};
+  my $sunaz  = $paref->{sunaz};
   my $hod    = $paref->{hod};
   my $dtree  = $paref->{dtree};
 
@@ -12986,6 +13060,7 @@ sub _aiGetSpread {
       wcc    => $wcc,
       wrp    => $wrp,
       sunalt => $sunalt,
+      sunaz  => $sunaz,
       hod    => $hod
   };
 
@@ -13031,7 +13106,7 @@ sub _aiGetSpread {
   my $pvaifc = $pos && $neg ? sprintf "%.0f", (($pos + $neg) / 2) : undef;
 
   if (defined $pvaifc) {
-      debugLog ($paref, 'aiData', qq{AI determined average result: pvaifc: $pvaifc Wh (hod: $hod, sunalt: $sunalt, wcc: $wcc, wrp: $wrp, temp: $temp)});
+      debugLog ($paref, 'aiData', qq{AI determined average result: pvaifc: $pvaifc Wh (hod: $hod, sunaz: $sunaz, sunalt: $sunalt, wcc: $wcc, wrp: $wrp, temp: $temp)});
       return ('spreaded', $pvaifc);
   }
 
@@ -13113,6 +13188,7 @@ sub aiAddRawData {
           my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',    0);
           my $wrp    = HistoryVal ($hash, $pvd, $hod, 'wrp',    0);
           my $sunalt = HistoryVal ($hash, $pvd, $hod, 'sunalt', 0);
+          my $sunaz  = HistoryVal ($hash, $pvd, $hod, 'sunaz',  0);
           
           my $tbin  = temp2bin   ($temp);
           my $cbin  = cloud2bin  ($wcc);
@@ -13125,11 +13201,12 @@ sub aiAddRawData {
           $data{$type}{$name}{aidectree}{airaw}{$ridx}{wrp}    = $rbin;
           $data{$type}{$name}{aidectree}{airaw}{$ridx}{hod}    = $hod;
           $data{$type}{$name}{aidectree}{airaw}{$ridx}{pvrl}   = $pvrl;
-          $data{$type}{$name}{aidectree}{airaw}{$ridx}{sunalt} = $sabin if($sabin);
+          $data{$type}{$name}{aidectree}{airaw}{$ridx}{sunalt} = $sabin;
+          $data{$type}{$name}{aidectree}{airaw}{$ridx}{sunaz}  = $sunaz;
 
           $dosave = 1;
 
-          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod,".($sabin ? qq{ sunalt: $sabin,} : '')." rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, wrp: $rbin, temp: $tbin");
+          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, wrp: $rbin, temp: $tbin");
       }
   }
 
@@ -13861,13 +13938,14 @@ sub listDataPool {
       for my $idx (sort keys %{$h}) {
           my $hod    = AiRawdataVal ($hash, $idx, 'hod',    '-');
           my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt', '-');
+          my $sunaz  = AiRawdataVal ($hash, $idx, 'sunaz',  '-');
           my $rad1h  = AiRawdataVal ($hash, $idx, 'rad1h',  '-');
           my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',    '-');
           my $wrp    = AiRawdataVal ($hash, $idx, 'wrp',    '-');
           my $pvrl   = AiRawdataVal ($hash, $idx, 'pvrl',   '-');
           my $temp   = AiRawdataVal ($hash, $idx, 'temp',   '-');
           $sq       .= "\n";
-          $sq       .= "$idx => hod: $hod, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, wrp: $wrp, pvrl: $pvrl, temp: $temp";
+          $sq       .= "$idx => hod: $hod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, wrp: $wrp, pvrl: $pvrl, temp: $temp";
       }
   }
 
@@ -17246,7 +17324,7 @@ to ensure that the system configuration is correct.
 
        <ul>
         <b>Example: </b> <br>
-        get &lt;name&gt; dwdCatalog byName name=ST.* exportgpx lat=(48|49|50|51|52).* lon=([5-9]|1[0-5]).* <br>
+        get &lt;name&gt; dwdCatalog byName exportgpx lat=(48|49|50|51|52)\..* lon=([5-9]|10|11|12|13|14|15)\..* <br>
         # filters the stations largely to German locations beginning with "ST" and exports the data in GPS Exchange format
        </ul>
     
@@ -17911,8 +17989,8 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="23%"> <col width="77%"> </colgroup>
-            <tr><td> <b>aiProcess</b>            </td><td>Process flow of AI support                                                       </td></tr>
-            <tr><td> <b>aiData</b>               </td><td>AI data                                                                          </td></tr>
+            <tr><td> <b>aiProcess</b>            </td><td>Data enrichment and training process for AI support                              </td></tr>
+            <tr><td> <b>aiData</b>               </td><td>Data use AI in the forecasting process                                           </td></tr>
             <tr><td> <b>apiCall</b>              </td><td>Retrieval API interface without data output                                      </td></tr>
             <tr><td> <b>apiProcess</b>           </td><td>API data retrieval and processing                                                </td></tr>
             <tr><td> <b>batteryManagement</b>    </td><td>Battery management control values (SoC)                                          </td></tr>
@@ -19371,7 +19449,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
         <b>Beispiel: </b> <br>
-        get &lt;name&gt; dwdCatalog byName name=ST.* exportgpx lat=(48|49|50|51|52).* lon=([5-9]|1[0-5]).* <br>
+        get &lt;name&gt; dwdCatalog byName exportgpx lat=(48|49|50|51|52)\..* lon=([5-9]|10|11|12|13|14|15)\..* <br>
         # filtert die Stationen weitgehend auf deutsche Orte beginnend mit "ST" und exportiert die Daten im GPS Exchange Format
        </ul>
     
@@ -20039,8 +20117,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="23%"> <col width="77%"> </colgroup>
-            <tr><td> <b>aiProcess</b>            </td><td>Prozessablauf der KI Unterstützung                                               </td></tr>
-            <tr><td> <b>aiData</b>               </td><td>KI Daten                                                                         </td></tr>
+            <tr><td> <b>aiProcess</b>            </td><td>Datenanreicherung und Trainingsprozess der KI Unterstützung                      </td></tr>
+            <tr><td> <b>aiData</b>               </td><td>Datennutzung KI im Prognoseprozess                                               </td></tr>
             <tr><td> <b>apiCall</b>              </td><td>Abruf API Schnittstelle ohne Datenausgabe                                        </td></tr>
             <tr><td> <b>apiProcess</b>           </td><td>Abruf und Verarbeitung von API Daten                                             </td></tr>
             <tr><td> <b>batteryManagement</b>    </td><td>Steuerungswerte des Batterie Managements (SoC)                                   </td></tr>
