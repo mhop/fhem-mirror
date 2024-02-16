@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.1"  => "16.02.2024  sqlCmd: executing ckey:latest possible ",
   "8.53.0"  => "10.01.2024  new setter multiCmd, change DbRep_autoForward, fix reducelog problem Forum:#136581 ",
   "8.52.15" => "08.12.2023  fix use fhem default variables in attr executeBeforeProc/executeAfterProc ".
                             "forum: https://forum.fhem.de/index.php?msg=1296146 ",
@@ -1085,7 +1086,7 @@ sub DbRep_Set {
           }
       }
 
-      if($opt eq "sqlCmd") {
+      if ($opt eq "sqlCmd") {
           my @cmd = @a;
           shift @cmd;
           shift @cmd;
@@ -1093,13 +1094,22 @@ sub DbRep_Set {
           $sqlcmd = join ' ', @cmd;
 
           if ($sqlcmd =~ /^ckey:/ix) {
+              if (!keys %{$data{DbRep}{$name}{sqlcache}{cmd}}) {
+                  return qq{No SQL statements are cached.};
+              }
+              
               my $key = (split ":", $sqlcmd)[1];
+              
+              if ($key eq 'latest') {
+                  my @xe = sort{$b<=>$a} keys %{$data{DbRep}{$name}{sqlcache}{cmd}};
+                  $key = shift @xe;                
+              }
 
               if (exists $data{DbRep}{$name}{sqlcache}{cmd}{$key}) {
                   $sqlcmd = $data{DbRep}{$name}{sqlcache}{cmd}{$key};
               }
               else {
-                  return qq{SQL statement with key "$key" doesn't exists in history};
+                  return qq{The SQL statement with key "$key" does not exist.};
               }
           }
 
@@ -13244,7 +13254,7 @@ sub DbRep_addSQLcmdCache {
       }
   }
 
-  if($doIns) {
+  if ($doIns) {
       _DbRep_insertSQLtoCache ($name, $tmpsql);
   }
 
@@ -16277,16 +16287,16 @@ return;
 
     The module provides a command history once a sqlCmd command was executed successfully.
     To use this option, activate the attribute <a href="#DbRep-attr-sqlCmdHistoryLength">sqlCmdHistoryLength</a>
-    with list lenght you want. <br>
-    If the command history is enabled, an indexed list of stored SQL statements is available
-    with <b>___list_sqlhistory___</b> within the sqlCmdHistory command. <br><br>
+    with list lenght you want. <br><br>
 
-    An SQL statement can be executed by specifying its index in this form:
+    An SQL statement can be executed by specifying its list index:
     <br><br>
       <ul>
         set &lt;name&gt; sqlCmd ckey:&lt;Index&gt;   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(e.g. ckey:4)
       </ul>
     <br>
+    
+    The list index "ckey:latest" executes the last statement saved in the SQL history. <br><br>
 
     Relevant attributes are: <br>
 
@@ -19417,17 +19427,18 @@ return;
     Das Modul stellt optional eine Kommando-Historie zur Verfügung sobald ein SQL-Kommando erfolgreich
     ausgeführt wurde.
     Um diese Option zu nutzen, ist das Attribut <a href="#DbRep-attr-sqlCmdHistoryLength">sqlCmdHistoryLength</a> mit der
-    gewünschten Listenlänge zu aktivieren. <br>
-    Ist die Kommando-Historie aktiviert, ist mit <b>___list_sqlhistory___</b> innerhalb des Kommandos
-    sqlCmdHistory eine indizierte Liste der gespeicherten SQL-Statements verfügbar. <br><br>
+    gewünschten Listenlänge zu aktivieren.
+    <br><br>
 
-    Ein SQL-Statement kann durch Angabe seines Index im ausgeführt werden mit:
+    Ein SQL-Statement kann durch Angabe seines Listenindex ausgeführt werden:
     <br><br>
       <ul>
         set &lt;name&gt; sqlCmd ckey:&lt;Index&gt;    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(e.g. ckey:4)
       </ul>
     <br>
-
+    
+    Der Listenindex "ckey:latest" führt das zuletzt in der SQL History gespeicherte Statement aus. <br><br>
+    
     Relevante Attribute sind: <br>
 
     <ul>
@@ -19451,7 +19462,6 @@ return;
     Wenn man sich unsicher ist, sollte man vorsorglich dem Statement ein Limit
     hinzufügen.
     <br><br>
-
     </li>
     <br>
 
