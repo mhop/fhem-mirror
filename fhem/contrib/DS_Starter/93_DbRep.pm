@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 28267 2024-01-09 21:52:20Z DS_Starter $
+# $Id: 93_DbRep.pm 28370 2024-01-10 18:46:13Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -59,7 +59,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.53.0"  => "09.01.2024  new setter multiCmd, change DbRep_autoForward, fix reducelog Hash management ",
+  "8.53.1"  => "16.02.2024  sqlCmd: possible entry ckey:latest ",
+  "8.53.0"  => "10.01.2024  new setter multiCmd, change DbRep_autoForward, fix reducelog problem Forum:#136581 ",
   "8.52.15" => "08.12.2023  fix use fhem default variables in attr executeBeforeProc/executeAfterProc ".
                             "forum: https://forum.fhem.de/index.php?msg=1296146 ",
   "8.52.14" => "08.11.2023  fix period calculation when using attr timeYearPeriod ",
@@ -760,26 +761,23 @@ sub DbRep_Set {
       return;
   }
 
-  if ($opt =~ m/reduceLog/ && $hash->{ROLE} ne "Agent") {
-      delete $hash->{HELPER}{REDUCELOG};
-      
+  if ($opt =~ m/reduceLog/ && $hash->{ROLE} ne "Agent") {      
       if ($hash->{HELPER}{$dbrep_hmainf{reduceLog}{pk}} && $hash->{HELPER}{$dbrep_hmainf{reduceLog}{pk}}{pid} !~ m/DEAD/) {
           return "reduceLog already in progress. Please wait for the current process to finish.";
       }
-      else {
-          delete $hash->{HELPER}{$dbrep_hmainf{reduceLog}{pk}};
-          DbRep_setLastCmd (@a);
 
-          $hash->{HELPER}{REDUCELOG} = \@a;
+      delete $hash->{HELPER}{$dbrep_hmainf{reduceLog}{pk}};
+      DbRep_setLastCmd (@a);
 
-          Log3 ($name, 3, "DbRep $name - ################################################################");
-          Log3 ($name, 3, "DbRep $name - ###                    new reduceLog run                     ###");
-          Log3 ($name, 3, "DbRep $name - ################################################################");
+      $hash->{HELPER}{REDUCELOG} = \@a;
 
-          DbRep_Main ($hash, $opt, $prop);
+      Log3 ($name, 3, "DbRep $name - ################################################################");
+      Log3 ($name, 3, "DbRep $name - ###                    new reduceLog run                     ###");
+      Log3 ($name, 3, "DbRep $name - ################################################################");
 
-          return;
-      }
+      DbRep_Main ($hash, $opt, $prop);
+
+      return;
   }
 
   if ($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) {
@@ -918,7 +916,6 @@ sub DbRep_Set {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       }
 
-      delete $hash->{HELPER}{DELENTRIES};
       DbRep_setLastCmd (@a);
 
       shift @a;
@@ -1089,7 +1086,7 @@ sub DbRep_Set {
           }
       }
 
-      if($opt eq "sqlCmd") {
+      if ($opt eq "sqlCmd") {
           my @cmd = @a;
           shift @cmd;
           shift @cmd;
@@ -1097,13 +1094,22 @@ sub DbRep_Set {
           $sqlcmd = join ' ', @cmd;
 
           if ($sqlcmd =~ /^ckey:/ix) {
+              if (!keys %{$data{DbRep}{$name}{sqlcache}{cmd}}) {
+                  return qq{No SQL statements are cached.};
+              }
+              
               my $key = (split ":", $sqlcmd)[1];
+              
+              if ($key eq 'latest') {
+                  my @xe = sort{$b<=>$a} keys %{$data{DbRep}{$name}{sqlcache}{cmd}};
+                  $key = shift @xe;                
+              }
 
               if (exists $data{DbRep}{$name}{sqlcache}{cmd}{$key}) {
                   $sqlcmd = $data{DbRep}{$name}{sqlcache}{cmd}{$key};
               }
               else {
-                  return qq{SQL statement with key "$key" doesn't exists in history};
+                  return qq{The SQL statement with key "$key" does not exist.};
               }
           }
 
@@ -2384,9 +2390,6 @@ sub DbRep_Main {
  my $dbmodel   = $dbloghash->{MODEL};
 
  my $params;
- 
- my $rdltag = delete $hash->{HELPER}{REDUCELOG};
- my $deetag = delete $hash->{HELPER}{DELENTRIES};
 
  # Entkommentieren für Testroutine im Vordergrund
  # DbRep_testexit($hash);
@@ -2398,6 +2401,7 @@ sub DbRep_Main {
       $hash->{HELPER}{RUNNING_REDUCELOG}       ||
       $hash->{HELPER}{RUNNING_OPTIMIZE})       &&
       $opt !~ /dumpMySQL|restoreMySQL|dumpSQLite|restoreSQLite|optimizeTables|vacuum|repairSQLite/ ) {
+     DbRep_delHashtags ($hash);
      return;
  }
 
@@ -2553,8 +2557,6 @@ sub DbRep_Main {
  if (!$hash->{HELPER}{MINTS} or !$hash->{HELPER}{DBREPCOL}{COLSET}) {
      my $dbname                  = $hash->{DATABASE};
      $hash->{HELPER}{IDRETRIES}  = 3       if($hash->{HELPER}{IDRETRIES} < 0);
-     $hash->{HELPER}{REDUCELOG}  = $rdltag if($rdltag);
-     $hash->{HELPER}{DELENTRIES} = $deetag if($deetag);
 
      Log3 ($name, 3, "DbRep $name - get initial structure information of database \"$dbname\", remaining attempts: ".$hash->{HELPER}{IDRETRIES});
 
@@ -2575,9 +2577,6 @@ sub DbRep_Main {
  Log3 ($name, 4, "DbRep $name - Command: $opt $prop");
 
  my ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next);
- 
- $hash->{HELPER}{REDUCELOG}  = $rdltag if($rdltag);
- $hash->{HELPER}{DELENTRIES} = $deetag if($deetag);
 
  if (defined $dbrep_hmainf{$opt} && defined &{$dbrep_hmainf{$opt}{fn}}) {
      $params = {
@@ -2618,10 +2617,7 @@ sub DbRep_Main {
          
          if (!$valid) {
              Log3 ($name, 2, "DbRep $name - ERROR - $cause");
-      
-             delete $hash->{HELPER}{REDUCELOG};
-             delete $hash->{HELPER}{DELENTRIES};
-     
+             DbRep_delHashtags ($hash);     
              return;
          }
 
@@ -2642,8 +2638,7 @@ sub DbRep_Main {
                                                               $hash
                                                              );
 
-     delete $hash->{HELPER}{REDUCELOG};
-     delete $hash->{HELPER}{DELENTRIES};
+     DbRep_delHashtags ($hash);
 
      if (exists $hash->{HELPER}{$dbrep_hmainf{$opt}{pk}}) {
          $hash->{HELPER}{$dbrep_hmainf{$opt}{pk}}{loglevel} = 5;                                             # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
@@ -13259,7 +13254,7 @@ sub DbRep_addSQLcmdCache {
       }
   }
 
-  if($doIns) {
+  if ($doIns) {
       _DbRep_insertSQLtoCache ($name, $tmpsql);
   }
 
@@ -14262,6 +14257,18 @@ return ($err,$irowdone,$wrt);
 }
 
 ################################################################
+#  gesetzte Hashtags (Steuerbits) löschen
+################################################################
+sub DbRep_delHashtags {    
+  my $hash = shift;
+
+  my $rdltag = delete $hash->{HELPER}{REDUCELOG};
+  my $deetag = delete $hash->{HELPER}{DELENTRIES};
+
+return ($rdltag, $deetag);
+}
+
+################################################################
 # check ob primary key genutzt wird
 ################################################################
 sub DbRep_checkUsePK {
@@ -14488,12 +14495,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 28267 2023-12-08 21:52:20Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 28370 2024-01-10 18:46:13Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 28267 2023-12-08 21:52:20Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 28370 2024-01-10 18:46:13Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -16280,16 +16287,16 @@ return;
 
     The module provides a command history once a sqlCmd command was executed successfully.
     To use this option, activate the attribute <a href="#DbRep-attr-sqlCmdHistoryLength">sqlCmdHistoryLength</a>
-    with list lenght you want. <br>
-    If the command history is enabled, an indexed list of stored SQL statements is available
-    with <b>___list_sqlhistory___</b> within the sqlCmdHistory command. <br><br>
+    with list lenght you want. <br><br>
 
-    An SQL statement can be executed by specifying its index in this form:
+    An SQL statement can be executed by specifying its list index:
     <br><br>
       <ul>
         set &lt;name&gt; sqlCmd ckey:&lt;Index&gt;   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(e.g. ckey:4)
       </ul>
     <br>
+    
+    The list index "ckey:latest" always executes the last statement saved in the SQL history. <br><br>
 
     Relevant attributes are: <br>
 
@@ -19420,17 +19427,18 @@ return;
     Das Modul stellt optional eine Kommando-Historie zur Verfügung sobald ein SQL-Kommando erfolgreich
     ausgeführt wurde.
     Um diese Option zu nutzen, ist das Attribut <a href="#DbRep-attr-sqlCmdHistoryLength">sqlCmdHistoryLength</a> mit der
-    gewünschten Listenlänge zu aktivieren. <br>
-    Ist die Kommando-Historie aktiviert, ist mit <b>___list_sqlhistory___</b> innerhalb des Kommandos
-    sqlCmdHistory eine indizierte Liste der gespeicherten SQL-Statements verfügbar. <br><br>
+    gewünschten Listenlänge zu aktivieren.
+    <br><br>
 
-    Ein SQL-Statement kann durch Angabe seines Index im ausgeführt werden mit:
+    Ein SQL-Statement kann durch Angabe seines Listenindex ausgeführt werden:
     <br><br>
       <ul>
         set &lt;name&gt; sqlCmd ckey:&lt;Index&gt;    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(e.g. ckey:4)
       </ul>
     <br>
-
+    
+    Der Listenindex "ckey:latest" führt immer das zuletzt in der SQL History gespeicherte Statement aus. <br><br>
+    
     Relevante Attribute sind: <br>
 
     <ul>
@@ -19454,7 +19462,6 @@ return;
     Wenn man sich unsicher ist, sollte man vorsorglich dem Statement ein Limit
     hinzufügen.
     <br><br>
-
     </li>
     <br>
 
