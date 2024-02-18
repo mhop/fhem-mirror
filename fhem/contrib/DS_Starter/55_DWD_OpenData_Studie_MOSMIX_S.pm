@@ -1945,6 +1945,7 @@ sub getStationPos {
         my $stname = $placemarkChildNode->textContent();
         if ($stname eq $station) {
           $pos = $n;
+          return $pos;
         }
       }
     }
