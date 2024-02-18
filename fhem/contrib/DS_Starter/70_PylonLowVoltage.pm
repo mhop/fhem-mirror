@@ -15,7 +15,7 @@
 # Copyright notice
 #
 # (c) 2019 Harald Schmitz (70_Pylontech.pm)
-# (c) 2023 Heiko Maaz
+# (c) 2023 - 2024 Heiko Maaz
 #
 # This script is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -122,6 +122,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.2.1"  => "18.02.2024 doOnError: print out faulty response, Forum:https://forum.fhem.de/index.php?msg=1303912 ",
   "0.2.0"  => "15.12.2023 extend possible number of batteries up to 14 ",
   "0.1.11" => "28.10.2023 add needed data format to commandref ",
   "0.1.10" => "18.10.2023 new function pseudoHexToText in _callManufacturerInfo for translate battery name and Manufactorer ",
@@ -688,6 +689,7 @@ sub startUpdate {
                    readings => $readings,
                    sock     => $socket,
                    state    => $errtxt,
+                   res      => '',
                    verbose  => 3
                  }
                 );
@@ -769,6 +771,7 @@ sub _openSocket {
       doOnError ({ hash     => $hash,
                    readings => $readings,
                    sock     => $socket,
+                   res      => '',
                    state    => 'disconnected'
                  }
                 );
@@ -786,6 +789,7 @@ sub _openSocket {
                 or do { doOnError ({ hash     => $hash,
                                      readings => $readings,
                                      state    => 'no connection to RS485 gateway established',
+                                     res      => '',
                                      verbose  => 3
                                    }
                                   );
@@ -844,6 +848,7 @@ sub _callSerialNumber {
       doOnError ({ hash     => $hash,
                    readings => $readings,
                    sock     => $socket,
+                   res      => $res,
                    state    => $rtnerr
                  }
                 );
@@ -879,6 +884,7 @@ sub _callManufacturerInfo {
       doOnError ({ hash     => $hash,
                    readings => $readings,
                    sock     => $socket,
+                   res      => $res,
                    state    => $rtnerr
                  }
                 );
@@ -920,6 +926,7 @@ sub _callProtocolVersion {
       doOnError ({ hash     => $hash,
                    readings => $readings,
                    sock     => $socket,
+                   res      => $res,
                    state    => $rtnerr
                  }
                 );
@@ -954,6 +961,7 @@ sub _callSoftwareVersion {
       doOnError ({ hash     => $hash,
                    readings => $readings,
                    sock     => $socket,
+                   res      => $res,
                    state    => $rtnerr
                  }
                 );
@@ -989,6 +997,7 @@ sub _callSystemParameters {
       doOnError ({ hash     => $hash,
                    readings => $readings,
                    sock     => $socket,
+                   res      => $res,
                    state    => $rtnerr
                  }
                 );
@@ -1034,6 +1043,7 @@ sub _callAlarmInfo {
       doOnError ({ hash     => $hash,
                    readings => $readings,
                    sock     => $socket,
+                   res      => $res,
                    state    => $rtnerr
                  }
                 );
@@ -1078,6 +1088,7 @@ sub _callChargeManagmentInfo {
       doOnError ({ hash     => $hash,
                    readings => $readings,
                    sock     => $socket,
+                   res      => $res,
                    state    => $rtnerr
                  }
                 );
@@ -1126,6 +1137,7 @@ sub _callAnalogValue {
       doOnError ({ hash     => $hash,
                    readings => $readings,
                    sock     => $socket,
+                   res      => $res,
                    state    => $rtnerr
                  }
                 );
@@ -1201,6 +1213,7 @@ sub _callAnalogValue {
       doOnError ({ hash     => $hash,
                    readings => $readings,
                    sock     => $socket,
+                   res      => '',
                    state    => $err
                  }
                 );
@@ -1389,16 +1402,22 @@ sub doOnError {
   my $readings = $paref->{readings};     # Referenz auf das Hash der zu erstellenden Readings
   my $state    = $paref->{state};
   my $socket   = $paref->{sock};
+  my $res      = $paref->{res}     // '';
   my $verbose  = $paref->{verbose} // 4;
 
   ualarm(0);
 
-  my $name           = $hash->{NAME};
+  my $name           = $hash->{NAME};  
   $state             = (split "at ", $state)[0];
   $readings->{state} = $state;
   $verbose           = 3 if($readings->{state} =~ /error/xsi);
 
   Log3 ($name, $verbose, "$name - ".$readings->{state});
+  
+  if ($res) {
+      Log3 ($name, 5, "$name - faulty data is printed out now: ");
+      __resultLog ($hash, $res);
+  }
 
   _closeSocket ($hash);
 
