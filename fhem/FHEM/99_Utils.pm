@@ -415,7 +415,7 @@ WriteFile($$)
       Example:
       <ul>
         attr m2d readingList map:.* { WriteFile("www/images/map.png",$EVENT);; {map=>"images/map.png"} }
-        attr m2d devStateIcon { '<img src="fhem/images/map.png" style="max-width:256;;max-height:256;;">' }
+        attr m2d devStateIcon { '&lt;img src="fhem/images/map.png" style="max-width:256;;max-height:256;;"&gt;' }
 
       </ul>
       </li></br>
