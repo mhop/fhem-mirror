@@ -291,8 +291,6 @@ sub HMCCU_GetDeviceModel ($$$;$);
 sub HMCCU_GetDeviceName ($$;$);
 sub HMCCU_GetDeviceType ($$$);
 sub HMCCU_GetFirmwareVersions ($$);
-sub HMCCU_GetGroupMembers ($$);
-sub HMCCU_GetMatchingDevices ($$$$);
 sub HMCCU_GetParamDef ($$$;$);
 sub HMCCU_GetReceivers ($$$);
 sub HMCCU_IsValidChannel ($$$);
@@ -3804,14 +3802,12 @@ sub HMCCU_GetDeviceConfig ($)
 			$clHash->{ccudevstate} = 'inactive';
 			next;
 		}
+
 		HMCCU_SetSCAttributes ($ioHash, $clHash);
 		HMCCU_UpdateDevice ($ioHash, $clHash);
 		HMCCU_UpdateDeviceRoles ($ioHash, $clHash);
-
-#		my ($sc, $sd, $cc, $cd) = HMCCU_GetSCDatapoints ($clHash);
-
+		HMCCU_SetDefaultSCDatapoints ($ioHash, $clHash);
 		HMCCU_UpdateRoleCommands ($ioHash, $clHash);
-#		HMCCU_UpdateAdditionalCommands ($ioHash, $clHash, $cc, $cd);
 	}
 	
 	return ($cDev, $cPar, $cLnk);
@@ -5853,31 +5849,6 @@ sub HMCCU_GetValidChannelParameters ($$$;$)
 }
 
 ######################################################################
-# Get list of device or channel addresses for which device or channel
-# name matches regular expression.
-# Parameter mode can be 'dev' or 'chn'.
-# Return number of matching entries.
-######################################################################
-
-sub HMCCU_GetMatchingDevices ($$$$)
-{
-	my ($hash, $regexp, $mode, $listref) = @_;
-	my $c = 0;
-
-	foreach my $name (sort keys %{$hash->{hmccu}{adr}}) {
-		next if (
-			$name !~/$regexp/ ||
-			$hash->{hmccu}{adr}{$name}{addtype} ne $mode ||
-			$hash->{hmccu}{adr}{$name}{valid} == 0
-		);
-		push (@$listref, $hash->{hmccu}{adr}{$name}{address});
-		$c++;
-	}
-
-	return $c;
-}
-
-######################################################################
 # Get name of a CCU device by address.
 # Channel number will be removed if specified.
 ######################################################################
@@ -6038,20 +6009,6 @@ sub HMCCU_GetAddress ($$;$$)
 	}
 
 	return ($defadd, $defchn, '');
-}
-
-######################################################################
-# Get addresses of group member devices.
-# Group 'virtual' is ignored.
-# Return list of device addresses or empty list on error.
-######################################################################
-
-sub HMCCU_GetGroupMembers ($$)
-{
-	my ($hash, $group) = @_;
-	
-	return $group ne 'virtual' && exists ($hash->{hmccu}{grp}{$group}) ?
-		split (',', $hash->{hmccu}{grp}{$group}{devs}) : ();
 }
 
 ######################################################################
@@ -6649,14 +6606,14 @@ sub HMCCU_GetStateValues ($;$$)
 
 sub HMCCU_UpdateRoleCommands ($$)
 {
-	my ($ioHash, $clHash, $chnNo) = @_;
-	$chnNo //= '';
+	my ($ioHash, $clHash) = @_;
 
 	my %pset = ('V' => 'VALUES', 'M' => 'MASTER', 'D' => 'MASTER', 'I' => 'INTERNAL', 'S' => 'STRING');
 	my @cmdSetList = ();
 	my @cmdGetList = ();
 	return if (HMCCU_IsFlag ($ioHash, 'noAutoDetect') || !defined($clHash->{hmccu}{role}) || $clHash->{hmccu}{role} eq '');
 
+	my $chnNo //= '';
 	my ($cc, $cd) = HMCCU_ControlDatapoint ($clHash);
 
 	# Delete existing role commands
@@ -6681,6 +6638,8 @@ sub HMCCU_UpdateRoleCommands ($$)
 				$cmdType = $1;
 				$cmd = $2;
 			}
+			next URCCMD if (exists($clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}) && defined($clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{channel}) &&
+				$cc ne '' && "$clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{channel}" eq "$cc");
 			my $parAccess = $cmdType eq 'set' ? 2 : 5;
 
 			my $cmdSyntax = $HMCCU_ROLECMDS->{$role}{$cmdKey};
@@ -7745,6 +7704,8 @@ sub HMCCU_SetSCDatapoints ($$;$$$)
 		# Set value
 		return 0 if (!HMCCU_IsDeviceActive ($clHash) || $v eq '' || $v eq '.' || $v =~ /^[0-9]+\.$/ || $v =~ /^\..+$/);
 
+#		HMCCU_Log ($clHash, 2, "SetSCDatapoint $v");
+
 		if ($f & 10) {
 			# statedatapoint / controldatapoint
 			if ($v =~ /^([0-9]{1,2})\.(.+)$/) {
@@ -7809,7 +7770,6 @@ sub HMCCU_SetSCDatapoints ($$;$$$)
 		my ($cc, $cd) = HMCCU_ControlDatapoint ($clHash);
 		if ($cc ne '' && $cd ne '') {		
 			HMCCU_UpdateRoleCommands ($ioHash, $clHash);
-#			HMCCU_UpdateAdditionalCommands ($ioHash, $clHash, $cc, $cd);
 		}
 	}
 
@@ -7908,7 +7868,6 @@ sub HMCCU_SetDefaultSCDatapoints ($$;$$)
 		my $dpt = $cd ne '' ? $cd : $sd;
 
 		HMCCU_UpdateRoleCommands ($ioHash, $clHash);
-#		HMCCU_UpdateAdditionalCommands ($ioHash, $clHash, $chn, $dpt);
 	}
 
 	my $rsd = $sc ne '' && $sd ne '' ? 1 : 0;

@@ -97,17 +97,9 @@ sub HMCCUDEV_Define ($@)
 	my ($devname, $devtype, $devspec) = splice (@$a, 0, 3);
 	my $ioHash = undef;
 
-	# Handle some legacy options
-	return 'Virtual devices are no longer supported. Use FHEM built in features like readingsgroup or structure'
-		if ($devspec eq 'virtual');
-	HMCCU_Log ($hash, 2, "Found old device definition syntax using group or groupexp. Group options will be ignored in future versions.")
-		if (exists($h->{group}) || exists($h->{groupexp}));
-
 	# Store some definitions for delayed initialization
 	$hash->{readonly} = 'no';
 	$hash->{hmccu}{devspec}     = $devspec;
-	$hash->{hmccu}{groupexp}    = $h->{groupexp} if (exists($h->{groupexp}));
-	$hash->{hmccu}{group}       = $h->{group} if (exists($h->{group}));
 	$hash->{hmccu}{nodefaults}  = $init_done ? 0 : 1;
 	$hash->{hmccu}{forcedev}    = 0;
 	$hash->{hmccu}{detect}      = 0;
@@ -260,34 +252,6 @@ sub HMCCUDEV_InitDevice ($$)
 
 		# Update readings
 		HMCCU_ExecuteGetExtValuesCommand ($devHash, $da);
-	}
-
-	# Parse group options
-	if ($devHash->{ccuif} eq 'VirtualDevices') {
-		my @devlist = ();
-		if (exists ($devHash->{hmccu}{groupexp})) {
-			# Group devices specified by name expression
-			$gdcount = HMCCU_GetMatchingDevices ($ioHash, $devHash->{hmccu}{groupexp}, 'dev', \@devlist);
-			return 4 if ($gdcount == 0);
-		}
-		elsif (exists ($devHash->{hmccu}{group})) {
-			# Group devices specified by comma separated name list
-			my @gdevlist = split (',', $devHash->{hmccu}{group});
-			$devHash->{ccugroup} = '' if (scalar(@gdevlist) > 0);
-			foreach my $gd (@gdevlist) {
-				return 1 if (!HMCCU_IsValidDevice ($ioHash, $gd, 7));
-				my ($gda, $gdc) = HMCCU_GetAddress ($ioHash, $gd);
-				push @devlist, $gdc eq '' ? "$gda:$gdc" : $gda;
-				$gdcount++;
-			}
-		}
-		else {
-			# Group specified by CCU virtual group name
-			@devlist = HMCCU_GetGroupMembers ($ioHash, $gdname);
-			$gdcount = scalar (@devlist);
-		}
-		
-		$devHash->{ccugroup} = join (',', @devlist) if (scalar(@devlist) > 0);
 	}
 
 	return $rc;
