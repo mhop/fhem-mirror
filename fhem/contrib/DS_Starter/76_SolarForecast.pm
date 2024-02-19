@@ -158,6 +158,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.16.2" => "19.02.2024  minor changes, R101 -> RR1c, totalrain instead of weatherrainprob, delete wrp r101 ".
+                           "delete wrp from circular & airaw, remove rain2bin, __getDWDSolarData: change \$runh, ".
+                           "fix  Illegal division by zero Forum: https://forum.fhem.de/index.php?msg=1304009 ",
   "1.16.1" => "14.02.2024  ___isCatFiltered: add eval for regex evaluation, add sunaz to AI raw and get, fillup AI hash ",
   "1.16.0" => "12.02.2024  new command get dwdCatalog ",
   "1.15.5" => "11.02.2024  change forecastQualities output, new limits for 'accurate' and 'spreaded' results from AI ".
@@ -341,7 +344,7 @@ my $aiAccUpLim     = 170;                                                       
 my $aiAccLowLim    = 30;                                                            # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
 
 my $calcmaxd       = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
-my @dweattrmust    = qw(TTT Neff R101 ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
+my @dweattrmust    = qw(TTT Neff RR1c ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
 my @draattrmust    = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat    = 900;                                                           # Wiederholungsintervall Cache File Daten schreiben
 
@@ -3373,7 +3376,7 @@ sub __getDWDSolarData {
 
   for my $num (0..47) {
       my $dateTime = strftime "%Y-%m-%d %H:%M:00", localtime($sts + (3600 * $num));            # laufendes Datum ' ' Zeit
-      my $runh     = int strftime "%H",            localtime($sts + (3600 * $num) + 3600);     # laufende Stunde in 24h format (00-23), DWD liefert Rad1h zum Ende der Stunde - Modul benutzt die Startzeit
+      my $runh     = int strftime "%H",            localtime($sts + (3600 * $num) + 3600);     # laufende Stunde in 24h format (00-23), Rad1h = Absolute Globalstrahlung letzte 1 Stunde
       my ($fd,$fh) = _calcDayHourMove (0, $num);
 
       next if($fh == 24);
@@ -3382,7 +3385,7 @@ sub __getDWDSolarData {
       my $rad   = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", undef);
 
       if (!defined $rad) {
-          $ret                                                              = "The reading 'fc${fd}_${runh}_Rad1h' doesn't exist. Check the device $raname!";
+          $ret                                                              = "The reading 'fc${fd}_${runh}_Rad1h' doesn't exist.\nRun 'set $name plantConfiguration check' for further information.";
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $ret;
 
           debugLog ($paref, "apiCall", "DWD API - ERROR - got no data of starttime: $dateTime. ".$ret);
@@ -5586,12 +5589,11 @@ sub centralTask {
   RemoveInternalTimer ($hash, 'FHEM::SolarForecast::singleUpdateState');
 
   ### nicht mehr benötigte Daten löschen - Bereich kann später wieder raus !!
-  ##########################################################################################
-  ## AI Raw Daten formatieren                                      # 09.02.2024
+  ##########################################################################################################################
+  ## AI Raw Daten formatieren                                                                 # 09.02.2024
   if (defined $data{$type}{$name}{aidectree}{airaw}) {
       for my $idx (sort keys %{$data{$type}{$name}{aidectree}{airaw}}) {
-          $data{$type}{$name}{aidectree}{airaw}{$idx}{wrp}  = 0  if(AiRawdataVal ($hash, $idx, 'wrp',  0) eq '00');
-          $data{$type}{$name}{aidectree}{airaw}{$idx}{wrp}  = 5  if(AiRawdataVal ($hash, $idx, 'wrp',  0) eq '05');
+          delete $data{$type}{$name}{aidectree}{airaw}{$idx}{wrp};
           $data{$type}{$name}{aidectree}{airaw}{$idx}{temp} = 0  if(AiRawdataVal ($hash, $idx, 'temp', 0) eq '00');
           $data{$type}{$name}{aidectree}{airaw}{$idx}{temp} = 5  if(AiRawdataVal ($hash, $idx, 'temp', 0) eq '05');
           $data{$type}{$name}{aidectree}{airaw}{$idx}{temp} = -5 if(AiRawdataVal ($hash, $idx, 'temp', 0) eq '-05');  
@@ -5670,7 +5672,7 @@ sub centralTask {
       }
   } 
     
-  ## nicht-Bin Werte löschen  
+  ## nicht-Bin Werte löschen  / wrp löschen
   my $ra = '0|00|05|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90|95|100|percentile|simple';
   
   for my $hod (keys %{$data{$type}{$name}{circular}}) {                                           # 30.01.2024
@@ -5680,6 +5682,11 @@ sub centralTask {
       
       for my $range (keys %{$data{$type}{$name}{circular}{$hod}{quality}}) {
           delete $data{$type}{$name}{circular}{$hod}{quality}{$range} if($range !~ /^($ra)$/xs);
+      }
+      
+      for my $wp (keys %{$data{$type}{$name}{circular}{$hod}}) {                                 # 19.02.204
+          next if($wp ne 'wrp');
+          delete $data{$type}{$name}{circular}{$hod}{$wp};
       }
   }
   ## currentWeatherDev in Attr umsetzen
@@ -5701,8 +5708,8 @@ sub centralTask {
       readingsSingleUpdate ($hash, 'moduleDeclination', $mta, 0);
       readingsDelete ($hash, 'moduleTiltAngle');
   }
-  
-  ############################################################################################
+    
+  #######################################################################################################################
 
   return if(!$init_done);
 
@@ -6215,81 +6222,70 @@ sub _transferWeatherValues {
   delete $data{$type}{$name}{weatherdata};                                                     # Wetterdaten Hash löschen
 
   $paref->{fcname} = $fcname;
-  my ($fc0_sr_mm, $fc0_ss_mm, $fc1_sr_mm, $fc1_ss_mm) = __sunRS ($paref);                      # Sonnenauf- und untergang
+  __sunRS ($paref);                                                                            # Sonnenauf- und untergang
   delete $paref->{fcname};
-  
-  $paref->{fc0_sr_mm} = $fc0_sr_mm;
-  $paref->{fc0_ss_mm} = $fc0_ss_mm;
-  $paref->{fc1_sr_mm} = $fc1_sr_mm;
-  $paref->{fc1_ss_mm} = $fc1_ss_mm;
-  
+    
   for my $step (1..$weatherDevMax) {
-      $paref->{step}      = $step;      
+      $paref->{step} = $step;      
       __readDataWeather ($paref);                                                              # Wetterdaten in einen Hash einlesen
        delete $paref->{step};
   }
   
-  delete $paref->{fc0_sr_mm};
-  delete $paref->{fc0_ss_mm};
-  delete $paref->{fc1_sr_mm};
-  delete $paref->{fc1_ss_mm};
-  
   __mergeDataWeather ($paref);                                                                 # Wetterdaten zusammenfügen
   
-  my $cat = 'merge';
-
   for my $num (0..46) {
       my ($fd, $fh) = _calcDayHourMove ($chour, $num);
       last if($fd > 1);
-
-      my $fh1   = $fh + 1;
       
-      my $wid   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$cat}{ww};                # signifikantes Wetter
-      my $wwd   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$cat}{wwd};               # Wetter Beschreibung
-      my $neff  = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$cat}{neff};              # Effektive Wolkendecke
-      my $r101  = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$cat}{r101};              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-      my $temp  = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$cat}{ttt};               # Außentemperatur
-      my $don   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$cat}{don};               # Tag/Nacht-Grenze
+      my $wid   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{ww};               # signifikantes Wetter
+      my $wwd   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{wwd};              # Wetter Beschreibung
+      my $neff  = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{neff};             # Effektive Wolkendecke
+      my $rr1c  = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{rr1c};             # Gesamtniederschlag (1-stündig) letzte 1 Stunde 
+      my $temp  = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{ttt};              # Außentemperatur
+      my $don   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{don};              # Tag/Nacht-Grenze
       
       my $nhtstr                                          = "NextHour".sprintf "%02d", $num;
       $data{$type}{$name}{nexthours}{$nhtstr}{weatherid}  = $wid;
       $data{$type}{$name}{nexthours}{$nhtstr}{cloudcover} = $neff;
-      $data{$type}{$name}{nexthours}{$nhtstr}{rainprob}   = $r101;
-      $data{$type}{$name}{nexthours}{$nhtstr}{rainrange}  = rain2bin ($r101);
+      $data{$type}{$name}{nexthours}{$nhtstr}{totalrain}  = $rr1c;
+      $data{$type}{$name}{nexthours}{$nhtstr}{rainrange}  = $rr1c;
       $data{$type}{$name}{nexthours}{$nhtstr}{temp}       = $temp;
       $data{$type}{$name}{nexthours}{$nhtstr}{DoN}        = $don;
 
+      my $fh1 = $fh + 1;                                                                       # = hod
+      
       if ($num < 23 && $fh < 24) {                                                             # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherid}  = $wid;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weathertxt} = $wwd;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wcc}        = $neff;
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wrp}        = $r101;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{rr1c}       = $rr1c;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{temp}       = $temp;
 
           if ($num == 0) {                                                                     # aktuelle Außentemperatur
               $data{$type}{$name}{current}{temp} = $temp;
           }
       }
-
+      
       if ($fd == 0 && $fh1) {                                                                  # Weather in pvHistory speichern
-          $paref->{wid}      = $wid;
-          $paref->{histname} = "weatherid";
-          $paref->{nhour}    = sprintf "%02d",$fh1;
+          $paref->{val}      = $wid // -1;
+          $paref->{histname} = 'weatherid';
+          $paref->{nhour}    = sprintf "%02d", $fh1;
           setPVhistory ($paref);
 
-          $paref->{wcc}      = $neff;
-          $paref->{histname} = "weathercloudcover";
+          $paref->{val}      = $neff // 0;
+          $paref->{histname} = 'weathercloudcover';
           setPVhistory ($paref);
 
-          $paref->{wrp}      = $r101;
-          $paref->{histname} = "weatherrainprob";
+          $paref->{val}      = $rr1c;
+          $paref->{histname} = 'totalrain';
           setPVhistory ($paref);
 
-          $paref->{temp}     = $temp;
-          $paref->{histname} = "temperature";
+          $paref->{val}      = $temp;
+          $paref->{histname} = 'temperature';
           setPVhistory ($paref);
 
           delete $paref->{histname};
+          delete $paref->{val};
       }
   }
 
@@ -6308,11 +6304,6 @@ sub __readDataWeather {
   my $type  = $paref->{type};
   my $step  = $paref->{step};
   
-  my $fc0_sr_mm = $paref->{fc0_sr_mm};
-  my $fc0_ss_mm = $paref->{fc0_ss_mm};
-  my $fc1_sr_mm = $paref->{fc1_sr_mm};
-  my $fc1_ss_mm = $paref->{fc1_ss_mm};
-  
   my $fcname = AttrVal ($name, 'ctrlWeatherDev'.$step, '');                                     # Weather Forecast Device
   return if(!$fcname || !$defs{$fcname});
 
@@ -6325,34 +6316,36 @@ sub __readDataWeather {
       my ($fd, $fh) = _calcDayHourMove ($chour, $n);
       last if($fd > 1);
       
-      my $wid   = ReadingsNum     ($fcname, "fc${fd}_${fh}_ww",  -1);                         # signifikantes Wetter
-      my $wwd   = ReadingsVal     ($fcname, "fc${fd}_${fh}_wwd", '');                         # Wetter Beschreibung
-      my $neff  = ReadingsNum     ($fcname, "fc${fd}_${fh}_Neff", 0);                         # Effektive Wolkendecke
-      my $temp  = ReadingsNum     ($fcname, "fc${fd}_${fh}_TTT",  0);                         # Außentemperatur
-      my $r101  = int ReadingsNum ($fcname, "fc${fd}_${fh}_R101", 0);                         # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-
-      my $don   = 1;                                                                          # es ist default "Tag"
-      my $fhstr = sprintf "%02d", $fh;                                                        # hier kann Tag/Nacht-Grenze verstellt werden   
-
-      if ($fd == 0 && ($fhstr lt $fc0_sr_mm || $fhstr gt $fc0_ss_mm)) {                       # Zeit vor Sonnenaufgang oder nach Sonnenuntergang heute
-          $wid += 100;                                                                        # "1" der WeatherID voranstellen wenn Nacht
-          $don  = 0;
+      my $wid   = ReadingsNum ($fcname, "fc${fd}_${fh}_ww",   -1);                            # Signifikantes Wetter zum Vorhersagezeitpunkt 
+      my $wwd   = ReadingsVal ($fcname, "fc${fd}_${fh}_wwd",  '');                            # Wetter Beschreibung
+      my $neff  = ReadingsNum ($fcname, "fc${fd}_${fh}_Neff",  0);                            # Effektiver Bedeckungsgrad zum Vorhersagezeitpunkt
+      my $temp  = ReadingsNum ($fcname, "fc${fd}_${fh}_TTT",   0);                            # 2m-Temperatur zum Vorhersagezeitpunkt 
+      my $sunup = ReadingsNum ($fcname, "fc${fd}_${fh}_SunUp", 0);                            # 1 - Tag
+      
+      my $fh1 = $fh + 1;        
+      my $fd1 = $fd;
+      
+      if ($fh1 == 24) {
+          $fh1 = 0;
+          $fd1++;
       }
-      elsif ($fd == 1 && ($fhstr lt $fc1_sr_mm || $fhstr gt $fc1_ss_mm)) {                    # Zeit vor Sonnenaufgang oder nach Sonnenuntergang morgen
-          $wid += 100;                                                                        # "1" der WeatherID voranstellen wenn Nacht
-          $don  = 0;
-      }  
       
-      my $fh1 = $fh + 1;
+      last if($fd1 > 1);
       
-      debugLog ($paref, 'collectData', "Weather $step: fc${fd}_${fh1}, don: $don, ww: $wid, R101: $r101, TTT: $temp, Neff: $neff, wwd: $wwd");
+      my $rr1c = ReadingsNum ($fcname, "fc${fd1}_${fh1}_RR1c", 0);                             # Gesamtniederschlag (1-stündig) letzte 1 Stunde 
 
-      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$step}{ww}   = $wid;
-      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$step}{wwd}  = $wwd;
-      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$step}{neff} = $neff;
-      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$step}{r101} = $r101;
-      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$step}{ttt}  = $temp;
-      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh1}"}{$step}{don}  = $don;
+      if (!$sunup) {
+          $wid += 100;
+      }
+      
+      debugLog ($paref, 'collectData', "Weather $step: fc${fd}_${fh}, don: $sunup, ww: $wid, RR1c: $rr1c, TTT: $temp, Neff: $neff, wwd: $wwd");
+
+      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{ww}   = $wid;
+      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{wwd}  = $wwd;
+      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{neff} = $neff;
+      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{rr1c} = $rr1c;
+      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{ttt}  = $temp;
+      $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{don}  = $sunup;
   }
 
 return;
@@ -6378,26 +6371,26 @@ sub __mergeDataWeather {
   my ($q, $m) = (0,0);
 
   for my $key (sort keys %{$data{$type}{$name}{weatherdata}}) {
-      my ($z, $neff, $r101, $temp) = (0,0,0,0);
+      my ($z, $neff, $rr1c, $temp) = (0,0,0,0);
       
       $data{$type}{$name}{weatherdata}{$key}{merge}{don}  = $data{$type}{$name}{weatherdata}{$key}{1}{don};
       $data{$type}{$name}{weatherdata}{$key}{merge}{ww}   = $data{$type}{$name}{weatherdata}{$key}{1}{ww};
       $data{$type}{$name}{weatherdata}{$key}{merge}{wwd}  = $data{$type}{$name}{weatherdata}{$key}{1}{wwd};      
       $data{$type}{$name}{weatherdata}{$key}{merge}{neff} = $data{$type}{$name}{weatherdata}{$key}{1}{neff};
-      $data{$type}{$name}{weatherdata}{$key}{merge}{r101} = $data{$type}{$name}{weatherdata}{$key}{1}{r101};
+      $data{$type}{$name}{weatherdata}{$key}{merge}{rr1c} = $data{$type}{$name}{weatherdata}{$key}{1}{rr1c};
       $data{$type}{$name}{weatherdata}{$key}{merge}{ttt}  = $data{$type}{$name}{weatherdata}{$key}{1}{ttt};
       
       for my $step (1..$ds) {          
           $q++;
           
           my $n = $data{$type}{$name}{weatherdata}{$key}{$step}{neff};
-          my $r = $data{$type}{$name}{weatherdata}{$key}{$step}{r101};
+          my $r = $data{$type}{$name}{weatherdata}{$key}{$step}{rr1c};
           my $t = $data{$type}{$name}{weatherdata}{$key}{$step}{ttt};
           
           next if(!isNumeric ($n) || !isNumeric ($r) || !isNumeric ($t));
                  
           $neff += $n;
-          $r101 += $r;
+          $rr1c += $r;
           $temp += $t;
           $z++;
           $m++;
@@ -6406,19 +6399,19 @@ sub __mergeDataWeather {
       next if(!$z);
       
       $data{$type}{$name}{weatherdata}{$key}{merge}{neff} = sprintf "%.0f", ($neff / $z);
-      $data{$type}{$name}{weatherdata}{$key}{merge}{r101} = sprintf "%.0f", ($r101 / $z);
+      $data{$type}{$name}{weatherdata}{$key}{merge}{rr1c} = sprintf "%.2f", ($rr1c / $z);
       $data{$type}{$name}{weatherdata}{$key}{merge}{ttt}  = sprintf "%.2f", ($temp / $z);
       
       debugLog ($paref, 'collectData', "Weather merged: $key, ".
                                        "don: $data{$type}{$name}{weatherdata}{$key}{merge}{don}, ".
                                        "ww: $data{$type}{$name}{weatherdata}{$key}{1}{ww}, ".
-                                       "R101: $data{$type}{$name}{weatherdata}{$key}{merge}{r101}, ".
+                                       "RR1c: $data{$type}{$name}{weatherdata}{$key}{merge}{rr1c}, ".
                                        "TTT: $data{$type}{$name}{weatherdata}{$key}{merge}{ttt}, ".
                                        "Neff: $data{$type}{$name}{weatherdata}{$key}{merge}{neff}, ".
                                        "wwd: $data{$type}{$name}{weatherdata}{$key}{merge}{wwd}");                                 
   }
   
-  debugLog ($paref, 'collectData', "Number of Weather datasets mergers - deliverd: $q, merged: $m, failures: ".($q - $m));
+  debugLog ($paref, 'collectData', "Number of Weather datasets mergers - delivered: $q, merged: $m, failures: ".($q - $m));
 
 return;
 }
@@ -6513,7 +6506,6 @@ sub _transferAPIRadiationValues {
       my $nhtstr = 'NextHour'.sprintf "%02d", $num;
       my ($hod)  = $wantdt =~ /\s(\d{2}):/xs;
       $hod       = sprintf "%02d", int $hod + 1;                                              # Stunde des Tages
-
       my $rad1h  = SolCastAPIVal ($hash, '?All', $wantdt, 'Rad1h', undef);
 
       my $params = {
@@ -6543,14 +6535,15 @@ sub _transferAPIRadiationValues {
       my $pvfc;
 
       if ($msg eq 'accurate' || $msg eq 'spreaded') {
-          my $aivar = 100 * $pvaifc / $est;
+          my $aivar = 100;
+          $aivar    = 100 * $pvaifc / $est if($est);
           
           if ($msg eq 'accurate' && $aivar >= $aiAccLowLim && $aivar <= $aiAccUpLim) {        # KI liefert 'accurate' Treffer -> verwenden
               $data{$type}{$name}{nexthours}{$nhtstr}{aihit} = 1;
               $pvfc  = $pvaifc;
               $useai = 1; 
 
-              debugLog ($paref, 'aiData', qq{AI Hit - accurate result found -> hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});              
+              debugLog ($paref, 'aiData', qq{AI Hit - accurate result found -> variance $aivar, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});              
           }
           
           if ($msg eq 'spreaded' && $aivar >= $aiSpreadLowLim && $aivar <= $aiSpreadUpLim) {  # Abweichung AI von Standardvorhersage begrenzen
@@ -6659,7 +6652,7 @@ sub __calcPVestimates {
 
   my $reld    = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
 
-  my $rainprob    = NexthoursVal ($hash, "NextHour".sprintf ("%02d", $num), "rainprob", 0);           # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
+  my $totalrain   = NexthoursVal ($hash, "NextHour".sprintf ("%02d", $num), "totalrain",  0);         # Gesamtniederschlag während der letzten Stunde kg/m2
   my $cloudcover  = NexthoursVal ($hash, "NextHour".sprintf ("%02d", $num), "cloudcover", 0);         # effektive Wolkendecke nächste Stunde X
   my $temp        = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num),  "temp", $tempbasedef);    # vorhergesagte Temperatur Stunde X
   my ($acu, $aln) = isAutoCorrUsed ($name);
@@ -6735,14 +6728,14 @@ sub __calcPVestimates {
 
   if ($debug =~ /radiationProcess/xs) {
       $lh = {                                                                                        # Log-Hash zur Ausgabe
-          "Starttime"                   => $wantdt,
-          "Forecasted temperature"      => $temp." &deg;C",
-          "Cloudcover"                  => $cloudcover,
-          "Rainprob"                    => $rainprob,
-          "PV Correction mode"          => ($acu ? $acu : 'no'),
-          "PV correction factor"        => $hc,
-          "PV correction quality"       => $hq,
-          "PV generation forecast"      => $pvsum." Wh ".$logao,
+          "Starttime"                => $wantdt,
+          "Forecasted temperature"   => $temp." &deg;C",
+          "Cloudcover"               => $cloudcover,
+          "Total Rain last hour"     => $totalrain." kg/m2",
+          "PV Correction mode"       => ($acu ? $acu : 'no'),
+          "PV correction factor"     => $hc,
+          "PV correction quality"    => $hq,
+          "PV generation forecast"   => $pvsum." Wh ".$logao,
       };
 
       $sq = q{};
@@ -12640,8 +12633,8 @@ sub checkdwdattr {
   my $dwddev = shift;
   my $amref  = shift;
 
-  my @fcprop = map { trim($_) } split ",", AttrVal($dwddev, "forecastProperties", "pattern");
-  my $fcr    = AttrVal($dwddev, "forecastResolution", 3);
+  my @fcprop = map { trim($_) } split ",", AttrVal ($dwddev, "forecastProperties", "pattern");
+  my $fcr    = AttrVal ($dwddev, "forecastResolution", 3);
   my $err;
 
   my @aneeded;
@@ -12659,7 +12652,7 @@ sub checkdwdattr {
       $err .= qq{ERROR - device "$dwddev" -> attribute "forecastResolution" must be set to "1"};
   }
 
-  Log3 ($name, 1, "$name - $err") if($err);
+  Log3 ($name, 2, "$name - $err") if($err);
 
 return $err;
 }
@@ -12853,13 +12846,13 @@ sub aiAddInstance {                   ## no critic "not used"
 
       my $temp   = AiRawdataVal ($hash, $idx, 'temp',  20);
       my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',    0);
-      my $wrp    = AiRawdataVal ($hash, $idx, 'wrp',    0);
+      my $rr1c   = AiRawdataVal ($hash, $idx, 'rr1c',   0);
       my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt', 0);
 
       eval { $dtree->add_instance (attributes => { rad1h  => $rad1h,
                                                    temp   => $temp,
                                                    wcc    => $wcc,
-                                                   wrp    => $wrp,
+                                                   rr1c   => $rr1c,
                                                    sunalt => $sunalt,
                                                    hod    => $hod
                                                  },
@@ -12871,7 +12864,7 @@ sub aiAddInstance {                   ## no critic "not used"
                    return;
                  };
 
-      debugLog ($paref, 'aiProcess', qq{AI Instance added - hod: $hod, sunalt: $sunalt, rad1h: $rad1h, pvrl: $pvrl, wcc: $wcc, wrp: $wrp, temp: $temp});
+      debugLog ($paref, 'aiProcess', qq{AI Instance added - hod: $hod, sunalt: $sunalt, rad1h: $rad1h, pvrl: $pvrl, wcc: $wcc, rr1c: $rr1c, temp: $temp});
   }
 
   $data{$type}{$name}{aidectree}{object}    = $dtree;
@@ -12977,14 +12970,13 @@ sub aiGetResult {
   debugLog ($paref, 'aiData', "Start AI result check for hod: $hod");
 
   my $wcc    = NexthoursVal ($hash, $nhidx, 'cloudcover', 0);
-  my $wrp    = NexthoursVal ($hash, $nhidx, 'rainprob',   0);
+  my $rr1c   = NexthoursVal ($hash, $nhidx, 'totalrain',  0);
   my $temp   = NexthoursVal ($hash, $nhidx, 'temp',      20);
   my $sunalt = NexthoursVal ($hash, $nhidx, 'sunalt',     0);
   my $sunaz  = NexthoursVal ($hash, $nhidx, 'sunaz',      0);
 
   my $tbin  = temp2bin   ($temp);
   my $cbin  = cloud2bin  ($wcc);
-  my $rbin  = rain2bin   ($wrp);
   my $sabin = sunalt2bin ($sunalt);
 
   my $pvaifc;
@@ -12992,7 +12984,7 @@ sub aiGetResult {
   eval { $pvaifc = $dtree->get_result (attributes => { rad1h  => $rad1h,
                                                        temp   => $tbin,
                                                        wcc    => $cbin,
-                                                       wrp    => $rbin,
+                                                       rr1c   => $rr1c,
                                                        sunalt => $sabin,
                                                        sunaz  => $sunaz,
                                                        hod    => $hod
@@ -13006,7 +12998,7 @@ sub aiGetResult {
   }
 
   if (defined $pvaifc) {
-      debugLog ($paref, 'aiData', qq{AI accurate result found: pvaifc: $pvaifc (hod: $hod, sunaz: $sunaz, sunalt: $sabin, Rad1h: $rad1h, wcc: $wcc, wrp: $rbin, temp: $tbin)});
+      debugLog ($paref, 'aiData', qq{AI accurate result found: pvaifc: $pvaifc (hod: $hod, sunaz: $sunaz, sunalt: $sabin, Rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, temp: $tbin)});
       return ('accurate', $pvaifc);
   }
 
@@ -13016,7 +13008,7 @@ sub aiGetResult {
                                         rad1h  => $rad1h,
                                         temp   => $tbin,
                                         wcc    => $cbin,
-                                        wrp    => $rbin,
+                                        rr1c   => $rr1c,
                                         sunalt => $sabin,
                                         sunaz  => $sunaz,
                                         hod    => $hod,
@@ -13041,7 +13033,7 @@ sub _aiGetSpread {
   my $rad1h  = $paref->{rad1h};
   my $temp   = $paref->{temp};
   my $wcc    = $paref->{wcc};
-  my $wrp    = $paref->{wrp};
+  my $rr1c   = $paref->{rr1c};
   my $sunalt = $paref->{sunalt};
   my $sunaz  = $paref->{sunaz};
   my $hod    = $paref->{hod};
@@ -13058,7 +13050,7 @@ sub _aiGetSpread {
   my $gra = {
       temp   => $temp,
       wcc    => $wcc,
-      wrp    => $wrp,
+      rr1c   => $rr1c,
       sunalt => $sunalt,
       sunaz  => $sunaz,
       hod    => $hod
@@ -13106,7 +13098,7 @@ sub _aiGetSpread {
   my $pvaifc = $pos && $neg ? sprintf "%.0f", (($pos + $neg) / 2) : undef;
 
   if (defined $pvaifc) {
-      debugLog ($paref, 'aiData', qq{AI determined average result: pvaifc: $pvaifc Wh (hod: $hod, sunaz: $sunaz, sunalt: $sunalt, wcc: $wcc, wrp: $wrp, temp: $temp)});
+      debugLog ($paref, 'aiData', qq{AI determined average result: pvaifc: $pvaifc Wh (hod: $hod, sunaz: $sunaz, sunalt: $sunalt, wcc: $wcc, rr1c: $rr1c, temp: $temp)});
       return ('spreaded', $pvaifc);
   }
 
@@ -13186,19 +13178,18 @@ sub aiAddRawData {
 
           my $temp   = HistoryVal ($hash, $pvd, $hod, 'temp',  20);
           my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',    0);
-          my $wrp    = HistoryVal ($hash, $pvd, $hod, 'wrp',    0);
+          my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',   0);
           my $sunalt = HistoryVal ($hash, $pvd, $hod, 'sunalt', 0);
           my $sunaz  = HistoryVal ($hash, $pvd, $hod, 'sunaz',  0);
           
           my $tbin  = temp2bin   ($temp);
           my $cbin  = cloud2bin  ($wcc);
-          my $rbin  = rain2bin   ($wrp);
           my $sabin = sunalt2bin ($sunalt);
 
           $data{$type}{$name}{aidectree}{airaw}{$ridx}{rad1h}  = $rad1h;
           $data{$type}{$name}{aidectree}{airaw}{$ridx}{temp}   = $tbin;
           $data{$type}{$name}{aidectree}{airaw}{$ridx}{wcc}    = $cbin;
-          $data{$type}{$name}{aidectree}{airaw}{$ridx}{wrp}    = $rbin;
+          $data{$type}{$name}{aidectree}{airaw}{$ridx}{rr1c}   = $rr1c;
           $data{$type}{$name}{aidectree}{airaw}{$ridx}{hod}    = $hod;
           $data{$type}{$name}{aidectree}{airaw}{$ridx}{pvrl}   = $pvrl;
           $data{$type}{$name}{aidectree}{airaw}{$ridx}{sunalt} = $sabin;
@@ -13206,7 +13197,7 @@ sub aiAddRawData {
 
           $dosave = 1;
 
-          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, wrp: $rbin, temp: $tbin");
+          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, rr1c: $rr1c, temp: $tbin");
       }
   }
 
@@ -13307,11 +13298,7 @@ sub setPVhistory {
   my $con            = $paref->{con}           // 0;                       # realer Hausverbrauch Energie
   my $confc          = $paref->{confc}         // 0;                       # Verbrauchsvorhersage
   my $consumerco     = $paref->{consumerco};                               # Verbrauch eines Verbrauchers
-  my $wid            = $paref->{wid}           // -1;
-  my $wcc            = $paref->{wcc}           // 0;                       # Wolkenbedeckung
-  my $wrp            = $paref->{wrp}           // 0;                       # Wahrscheinlichkeit von Niederschlag
   my $pvcorrf        = $paref->{pvcorrf}       // "1.00/0";                # pvCorrectionFactor
-  my $temp           = $paref->{temp};                                     # Außentemperatur
   my $val            = $paref->{val};                                      # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
   my $rad1h          = $paref->{rad1h};                                    # Strahlungsdaten speichern
   my $reorg          = $paref->{reorg}         // 0;                       # Neuberechnung von Werten in Stunde "99" nach Löschen von Stunden eines Tages
@@ -13492,22 +13479,19 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{batouttotal}     = q{};
   }
 
-  if ($histname eq "weatherid") {                                                                 # Wetter ID
-      $val = $wid;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{weatherid} = $wid;
+  if ($histname eq 'weatherid') {                                                                 # Wetter ID
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{weatherid} = $val;
       $data{$type}{$name}{pvhist}{$day}{99}{weatherid}     = q{};
   }
 
-  if ($histname eq "weathercloudcover") {                                                         # Wolkenbedeckung
-      $val = $wcc;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{wcc} = $wcc;
+  if ($histname eq 'weathercloudcover') {                                                         # Wolkenbedeckung
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{wcc} = $val;
       $data{$type}{$name}{pvhist}{$day}{99}{wcc}     = q{};
   }
 
-  if ($histname eq "weatherrainprob") {                                                           # Niederschlagswahrscheinlichkeit
-      $val = $wrp;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{wrp} = $wrp;
-      $data{$type}{$name}{pvhist}{$day}{99}{wrp}     = q{};
+  if ($histname eq 'totalrain') {                                                                 # Gesamtniederschlag (1-stündig) letzte 1 Stunde 
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{rr1c} = $val;
+      $data{$type}{$name}{pvhist}{$day}{99}{rr1c}     = q{};
   }
 
   if ($histname eq "pvcorrfactor") {                                                              # pvCorrectionFactor
@@ -13516,9 +13500,8 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{pvcorrf}     = q{};
   }
 
-  if ($histname eq "temperature") {                                                               # Außentemperatur
-      $val = $temp;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{temp} = $temp;
+  if ($histname eq 'temperature') {                                                               # Außentemperatur
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{temp} = $val;
       $data{$type}{$name}{pvhist}{$day}{99}{temp}     = q{};
   }
 
@@ -13589,7 +13572,7 @@ sub listDataPool {
           my $gfeedin = HistoryVal ($hash, $day, $key, 'gfeedin',     '-');
           my $wid     = HistoryVal ($hash, $day, $key, 'weatherid',   '-');
           my $wcc     = HistoryVal ($hash, $day, $key, 'wcc',         '-');
-          my $wrp     = HistoryVal ($hash, $day, $key, 'wrp',         '-');
+          my $rr1c    = HistoryVal ($hash, $day, $key, 'rr1c',        '-');
           my $temp    = HistoryVal ($hash, $day, $key, 'temp',      undef);
           my $pvcorrf = HistoryVal ($hash, $day, $key, 'pvcorrf',     '-');
           my $dayname = HistoryVal ($hash, $day, $key, 'dayname',   undef);
@@ -13618,7 +13601,7 @@ sub listDataPool {
           $ret .= "\n            ";
           $ret .= "wid: $wid";
           $ret .= ", wcc: $wcc";
-          $ret .= ", wrp: $wrp";
+          $ret .= ", rr1c: $rr1c";
           $ret .= ", temp: $temp"       if($temp);
           $ret .= ", pvcorrf: $pvcorrf";
           $ret .= ", dayname: $dayname" if($dayname);
@@ -13749,7 +13732,7 @@ sub listDataPool {
           my $wid      = CircularVal ($hash, $idx, "weatherid",           '-');
           my $wtxt     = CircularVal ($hash, $idx, "weathertxt",          '-');
           my $wccv     = CircularVal ($hash, $idx, "wcc",                 '-');
-          my $wrprb    = CircularVal ($hash, $idx, "wrp",                 '-');
+          my $rr1c     = CircularVal ($hash, $idx, "rr1c",                '-');
           my $temp     = CircularVal ($hash, $idx, "temp",                '-');
           my $pvcorrf  = CircularVal ($hash, $idx, "pvcorrf",             '-');
           my $quality  = CircularVal ($hash, $idx, "quality",             '-');
@@ -13780,7 +13763,7 @@ sub listDataPool {
 
           if ($idx != 99) {
               $sq .= $idx." => pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl\n";
-              $sq .= "      batin: $batin, batout: $batout, confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, wrp: $wrprb\n";
+              $sq .= "      batin: $batin, batout: $batout, confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, rr1c: $rr1c\n";
               $sq .= "      temp: $temp, wid: $wid, wtxt: $wtxt\n";
               $sq .= "      pvcorrf: $pvcf\n";
               $sq .= "      quality: $cfq\n";
@@ -13817,7 +13800,7 @@ sub listDataPool {
           my $wid     = NexthoursVal ($hash, $idx, 'weatherid',  '-');
           my $neff    = NexthoursVal ($hash, $idx, 'cloudcover', '-');
           my $crange  = NexthoursVal ($hash, $idx, 'cloudrange', '-');
-          my $r101    = NexthoursVal ($hash, $idx, 'rainprob',   '-');
+          my $rr1c    = NexthoursVal ($hash, $idx, 'totalrain',  '-');
           my $rrange  = NexthoursVal ($hash, $idx, 'rainrange',  '-');
           my $rad1h   = NexthoursVal ($hash, $idx, 'rad1h',      '-');
           my $pvcorrf = NexthoursVal ($hash, $idx, 'pvcorrf',    '-');
@@ -13834,7 +13817,7 @@ sub listDataPool {
           $sq        .= "\n              ";
           $sq        .= "pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, confc: $confc";
           $sq        .= "\n              ";
-          $sq        .= "confcEx: $confcex, DoN: $don, wid: $wid, wcc: $neff, wrp: $r101, temp=$temp";
+          $sq        .= "confcEx: $confcex, DoN: $don, wid: $wid, wcc: $neff, rr1c: $rr1c, temp=$temp";
           $sq        .= "\n              ";
           $sq        .= "rad1h: $rad1h, sunaz: $sunaz, sunalt: $sunalt";
           $sq        .= "\n              ";
@@ -13941,11 +13924,11 @@ sub listDataPool {
           my $sunaz  = AiRawdataVal ($hash, $idx, 'sunaz',  '-');
           my $rad1h  = AiRawdataVal ($hash, $idx, 'rad1h',  '-');
           my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',    '-');
-          my $wrp    = AiRawdataVal ($hash, $idx, 'wrp',    '-');
+          my $rr1c   = AiRawdataVal ($hash, $idx, 'rr1c',   '-');
           my $pvrl   = AiRawdataVal ($hash, $idx, 'pvrl',   '-');
           my $temp   = AiRawdataVal ($hash, $idx, 'temp',   '-');
           $sq       .= "\n";
-          $sq       .= "$idx => hod: $hod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, wrp: $wrp, pvrl: $pvrl, temp: $temp";
+          $sq       .= "$idx => hod: $hod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, pvrl: $pvrl, temp: $temp";
       }
   }
 
@@ -15726,57 +15709,6 @@ return $bin;
 }
 
 ################################################################
-#  diskrete Rain Prob in "Bins" wandeln
-################################################################
-sub rain2bin {
-  my $val = shift;
-
-  my $bin = $val == 100 ? 100 :
-            $val >  97  ? 100 :
-            $val >  95  ? 95  :
-            $val >  92  ? 95  :
-            $val >  90  ? 90  :
-            $val >  87  ? 90  :
-            $val >  85  ? 85  :
-            $val >  82  ? 85  :
-            $val >  80  ? 80  :
-            $val >  77  ? 80  :
-            $val >  75  ? 75  :
-            $val >  72  ? 75  :
-            $val >  70  ? 70  :
-            $val >  67  ? 70  :
-            $val >  65  ? 65  :
-            $val >  62  ? 65  :
-            $val >  60  ? 60  :
-            $val >  57  ? 60  :
-            $val >  55  ? 55  :
-            $val >  52  ? 55  :
-            $val >  50  ? 50  :
-            $val >  47  ? 50  :
-            $val >  45  ? 45  :
-            $val >  42  ? 45  :
-            $val >  40  ? 40  :
-            $val >  37  ? 40  :
-            $val >  35  ? 35  :
-            $val >  32  ? 35  :
-            $val >  30  ? 30  :
-            $val >  27  ? 30  :
-            $val >  25  ? 25  :
-            $val >  22  ? 25  :
-            $val >  20  ? 20  :
-            $val >  17  ? 20  :
-            $val >  15  ? 15  :
-            $val >  12  ? 15  :
-            $val >  10  ? 10  :
-            $val >  7   ? 10  :
-            $val >  5   ? 5   :
-            $val >  2   ? 5   :
-            0;
-
-return $bin;
-}
-
-################################################################
 #  diskrete Sonnen Höhe (altitude) in "Bins" wandeln
 ################################################################
 sub sunalt2bin {
@@ -15981,7 +15913,7 @@ return;
 #             weatherid   - Wetter ID
 #             wcc         - Grad der Bewölkung
 #             temp        - Außentemperatur
-#             wrp         - Niederschlagswahrscheinlichkeit
+#             rr1c        - Gesamtniederschlag (1-stündig) letzte 1 Stunde kg/m2
 #             pvcorrf     - PV Autokorrekturfaktor f. Stunde des Tages
 #             dayname     - Tagesname (Kürzel)
 #             csmt${c}    - Totalconsumption Consumer $c (1..$maxconsumer)
@@ -16033,7 +15965,7 @@ return $def;
 #             weatherid        - DWD Wetter id
 #             weathertxt       - DWD Wetter Text
 #             wcc              - DWD Wolkendichte
-#             wrp              - DWD Regenwahrscheinlichkeit
+#             rr1c             - Gesamtniederschlag (1-stündig) letzte 1 Stunde kg/m2
 #             temp             - Außentemperatur
 #             pvcorrf          - PV Autokorrekturfaktoren (HASH)
 #             lastTsMaxSocRchd - Timestamp des letzten Erreichens von SoC >= maxSoC
@@ -16181,7 +16113,7 @@ return ($pvrlsum, $pvfcsum, $dnumsum);
 #       weatherid  - DWD Wetter id
 #       cloudcover - DWD Wolkendichte
 #       cloudrange - berechnete Bewölkungsrange
-#       rainprob   - DWD Regenwahrscheinlichkeit
+#       totalrain  - Gesamtniederschlag während der letzten Stunde kg/m2
 #       rad1h      - Globalstrahlung (kJ/m2)
 #       confc      - prognostizierter Hausverbrauch (Wh)
 #       confcEx    - prognostizierter Hausverbrauch ohne registrierte Consumer (Wh)
@@ -16331,7 +16263,7 @@ return $def;
 # $key: rad1h      - Strahlungsdaten
 #       temp       - Temeperatur als Bin
 #       wcc        - Bewölkung als Bin
-#       wrp        - Regenwert als Bin
+#       rr1c       - Gesamtniederschlag (1-stündig) letzte 1 Stunde kg/m2
 #       hod        - Stunde des Tages
 #       sunalt     - Höhe der Sonne (in Dezimalgrad)  
 #       pvrl       - reale PV Erzeugung
@@ -17297,7 +17229,11 @@ to ensure that the system configuration is correct.
     <ul>
       <a id="SolarForecast-get-dwdCatalog"></a>
       <li><b>dwdCatalog </b> <br><br>
-      The German Weather Service provides a catalog of MOSMIX stations. <br>
+      The German Weather Service (DWD) provides a catalog of MOSMIX stations. <br>
+      The stations provide data whose meaning is explained in this 
+      <a href='https://www.dwd.de/DE/leistungen/opendata/help/schluessel_datenformate/kml/mosmix_elemente_xls.html' target='_blank'>Overview</a>.
+      The DWD distinguishes between MOSMIX_L and MOSMIX_S stations, which differ in terms of update frequency
+      and data volume. <br>
       This command reads the catalog into SolarForecast and saves it in the file
       ./FHEM/FhemUtils/DWDcat_SolarForecast. <br>
       The catalog can be extensively filtered and saved in GPS Exchange Format (GPX).
@@ -17418,13 +17354,13 @@ to ensure that the system configuration is correct.
             <tr><td> <b>pvaifc</b>    </td><td>expected PV generation of the AI (Wh)                                           </td></tr>
             <tr><td> <b>pvfc</b>      </td><td>PV generation forecast used (Wh)                                                </td></tr>
             <tr><td> <b>rad1h</b>     </td><td>predicted global radiation                                                      </td></tr>
-            <tr><td> <b>rrange</b>    </td><td>calculated range of rain probability                                            </td></tr>
             <tr><td> <b>starttime</b> </td><td>start time of the record                                                        </td></tr>
             <tr><td> <b>sunaz</b>     </td><td>Azimuth of the sun (in decimal degrees)                                         </td></tr>
             <tr><td> <b>sunalt</b>    </td><td>Altitude of the sun (in decimal degrees)                                        </td></tr>
             <tr><td> <b>temp</b>      </td><td>predicted outdoor temperature                                                   </td></tr>
             <tr><td> <b>today</b>     </td><td>has value '1' if start date on current day                                      </td></tr>
-            <tr><td> <b>wrp</b>       </td><td>predicted degree of rain probability                                            </td></tr>
+            <tr><td> <b>rr1c</b>      </td><td>Total precipitation during the last hour kg/m2                                  </td></tr>
+            <tr><td> <b>rrange</b>    </td><td>range of total rain                                                             </td></tr>            
             <tr><td> <b>wid</b>       </td><td>ID of the predicted weather                                                     </td></tr>
             <tr><td> <b>wcc</b>       </td><td>predicted degree of cloudiness                                                  </td></tr>
          </table>
@@ -17471,7 +17407,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>sunaz</b>          </td><td>Azimuth of the sun (in decimal degrees)                                                               </td></tr>            
             <tr><td> <b>wid</b>            </td><td>Weather identification number                                                                         </td></tr>
             <tr><td> <b>wcc</b>            </td><td>effective cloud cover                                                                                 </td></tr>
-            <tr><td> <b>wrp</b>            </td><td>Probability of precipitation > 0.1 mm during the respective hour                                      </td></tr>
+            <tr><td> <b>rr1c</b>           </td><td>Total precipitation during the last hour kg/m2                                                        </td></tr>
          </table>
       </ul>
       </li>
@@ -17520,7 +17456,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>tdayDvtn</b>         </td><td>Today's deviation PV forecast/generation in %                                                                         </td></tr>
             <tr><td> <b>temp</b>             </td><td>Outdoor temperature                                                                                                   </td></tr>
             <tr><td> <b>wcc</b>              </td><td>Degree of cloud cover                                                                                                 </td></tr>
-            <tr><td> <b>wrp</b>              </td><td>Degree of probability of rain                                                                                         </td></tr>
+            <tr><td> <b>rr1c</b>             </td><td>Total precipitation during the last hour kg/m2                                                                        </td></tr>
             <tr><td> <b>wid</b>              </td><td>ID of the predicted weather                                                                                           </td></tr>
             <tr><td> <b>wtxt</b>             </td><td>Description of the predicted weather                                                                                  </td></tr>
             <tr><td> <b>ydayDvtn</b>         </td><td>Deviation PV forecast/generation in % on the previous day                                                             </td></tr>
@@ -18168,7 +18104,7 @@ to ensure that the system configuration is correct.
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
             <tr><td> <b>forecastDays</b>            </td><td>1                                                   </td></tr>
-            <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,R101,ww,SunUp,SunRise,SunSet               </td></tr>
+            <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet               </td></tr>
             <tr><td> <b>forecastResolution</b>      </td><td>1                                                   </td></tr>
             <tr><td> <b>forecastStation</b>         </td><td>&lt;Station code of the evaluated DWD station&gt;   </td></tr>
          </table>
@@ -19422,7 +19358,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-get-dwdCatalog"></a>
       <li><b>dwdCatalog </b> <br><br>
-      Der Deutsche Wetterdienst stellt einen Katalog der MOSMIX Stationen zur Verfügung. <br>
+      Der Deutsche Wetterdienst (DWD) stellt einen Katalog der MOSMIX Stationen zur Verfügung. <br>
+      Die Stationen liefern Daten deren Bedeutung in dieser 
+      <a href='https://www.dwd.de/DE/leistungen/opendata/help/schluessel_datenformate/kml/mosmix_elemente_xls.html' target='_blank'>Übersicht</a>
+      erläutert ist. Der DWD unterscheidet dabei zwischen MOSMIX_L und MOSMIX_S Stationen die sich durch Aktualisierungfrequenz
+      und Datenumfang unterscheiden. <br>
       Mit diesem Kommando wird der Katalog in SolarForecast eingelesen und in der Datei
       ./FHEM/FhemUtils/DWDcat_SolarForecast gespeichert. <br>
       Der Katalog kann umfangreich gefiltert und im GPS Exchange Format (GPX) gespeichert werden.
@@ -19544,13 +19484,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>pvaifc</b>    </td><td>erwartete PV Erzeugung der KI (Wh)                                                 </td></tr>
             <tr><td> <b>pvfc</b>      </td><td>verwendete PV Erzeugungsprognose (Wh)                                              </td></tr>
             <tr><td> <b>rad1h</b>     </td><td>vorhergesagte Globalstrahlung                                                      </td></tr>
-            <tr><td> <b>rrange</b>    </td><td>berechneter Bereich der Regenwahrscheinlichkeit                                    </td></tr>
             <tr><td> <b>starttime</b> </td><td>Startzeit des Datensatzes                                                          </td></tr>
             <tr><td> <b>sunaz</b>     </td><td>Azimuth der Sonne (in Dezimalgrad)                                                 </td></tr>
             <tr><td> <b>sunalt</b>    </td><td>Höhe der Sonne (in Dezimalgrad)                                                    </td></tr>
             <tr><td> <b>temp</b>      </td><td>vorhergesagte Außentemperatur                                                      </td></tr>
             <tr><td> <b>today</b>     </td><td>hat Wert '1' wenn Startdatum am aktuellen Tag                                      </td></tr>
-            <tr><td> <b>wrp</b>       </td><td>vorhergesagter Grad der Regenwahrscheinlichkeit                                    </td></tr>
+            <tr><td> <b>rr1c</b>      </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                     </td></tr>
+            <tr><td> <b>rrange</b>    </td><td>Bereich des Gesamtniederschlags                                                    </td></tr>
             <tr><td> <b>wid</b>       </td><td>ID des vorhergesagten Wetters                                                      </td></tr>
             <tr><td> <b>wcc</b>       </td><td>vorhergesagter Grad der Bewölkung                                                  </td></tr>
          </table>
@@ -19597,7 +19537,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>sunaz</b>          </td><td>Azimuth der Sonne (in Dezimalgrad)                                                             </td></tr>            
             <tr><td> <b>wid</b>            </td><td>Identifikationsnummer des Wetters                                                              </td></tr>
             <tr><td> <b>wcc</b>            </td><td>effektive Wolkenbedeckung                                                                      </td></tr>
-            <tr><td> <b>wrp</b>            </td><td>Wahrscheinlichkeit von Niederschlag > 0,1 mm während der jeweiligen Stunde                     </td></tr>
+            <tr><td> <b>rr1c</b>           </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                 </td></tr>
 
          </table>
       </ul>
@@ -19647,7 +19587,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>tdayDvtn</b>         </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                             </td></tr>
             <tr><td> <b>temp</b>             </td><td>Außentemperatur                                                                                                           </td></tr>
             <tr><td> <b>wcc</b>              </td><td>Grad der Wolkenüberdeckung                                                                                                </td></tr>
-            <tr><td> <b>wrp</b>              </td><td>Grad der Regenwahrscheinlichkeit                                                                                          </td></tr>
+            <tr><td> <b>rr1c</b>             </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                                            </td></tr>
             <tr><td> <b>wid</b>              </td><td>ID des vorhergesagten Wetters                                                                                             </td></tr>
             <tr><td> <b>wtxt</b>             </td><td>Beschreibung des vorhergesagten Wetters                                                                                   </td></tr>
             <tr><td> <b>ydayDvtn</b>         </td><td>Abweichung PV Prognose/Erzeugung in % am Vortag                                                                           </td></tr>
@@ -20297,7 +20237,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
           <table>
           <colgroup> <col width="25%"> <col width="75%"> </colgroup>
              <tr><td> <b>forecastDays</b>            </td><td>1                                                   </td></tr>
-             <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,R101,ww,SunUp,SunRise,SunSet               </td></tr>
+             <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet               </td></tr>
              <tr><td> <b>forecastResolution</b>      </td><td>1                                                   </td></tr>
              <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;  </td></tr>
           </table>
