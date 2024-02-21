@@ -1,4 +1,4 @@
-REV 28536
+REV 28538
 DIR unused
 UPD 2024-02-19_07:45:02 419733 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -356,7 +356,7 @@ UPD 2016-03-11_07:45:12 7152 FHEM/70_PushNotifier.pm
 UPD 2015-10-31_07:45:12 23797 FHEM/70_Pushbullet.pm
 UPD 2023-04-21_07:45:04 76328 FHEM/70_Pushover.pm
 UPD 2020-02-08_07:45:04 25433 FHEM/70_Pushsafer.pm
-UPD 2024-02-19_07:45:02 82991 FHEM/70_PylonLowVoltage.pm
+UPD 2024-02-21_07:45:03 83039 FHEM/70_PylonLowVoltage.pm
 UPD 2015-07-28_14:05:31 7500 FHEM/70_SCIVT.pm
 UPD 2021-10-02_07:45:03 20117 FHEM/70_SISPM.pm
 UPD 2016-01-29_07:45:11 16312 FHEM/70_SML.pm
@@ -762,12 +762,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2024-02-19_07:45:09 5153424 docs/commandref.html
-UPD 2024-02-17_07:45:12 3168176 docs/commandref_DE.html
+UPD 2024-02-21_07:45:09 5153424 docs/commandref.html
+UPD 2024-02-21_07:45:13 3168176 docs/commandref_DE.html
 UPD 2023-08-25_07:45:03 86242 docs/commandref_frame.html
 UPD 2023-08-25_07:45:03 96940 docs/commandref_frame_DE.html
-UPD 2024-02-20_07:45:14 314926 docs/commandref_modular.html
-UPD 2024-02-20_07:45:15 326786 docs/commandref_modular_DE.html
+UPD 2024-02-21_07:45:14 314926 docs/commandref_modular.html
+UPD 2024-02-21_07:45:15 326786 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
