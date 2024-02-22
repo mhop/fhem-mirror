@@ -1636,6 +1636,10 @@ sub DOIF_setValue_collect
     } else {
       my @rv=splice (@{$va},0,$diff_slots);
       my @rt=splice (@{$ta},0,$diff_slots);
+      if ($diff_slots > 1 and !defined ${$va}[$dim-$diff_slots] and defined ${$collect}{last} and ${$va}[$dim-$diff_slots-1] != ${$collect}{last}) {
+        ${$va}[$dim-$diff_slots]=${$collect}{last};
+        ${$ta}[$dim-$diff_slots]=(int(${$ta}[$dim-$diff_slots-1]/$seconds_per_slot)+1)*$seconds_per_slot;
+      }
       for (my $i=@rv-1;$i>=0;$i--) {
         if (defined ($rv[$i])) {
           ${$collect}{last_value}=$rv[$i];
@@ -1643,6 +1647,7 @@ sub DOIF_setValue_collect
         }
       }
     }
+    ${$collect}{last}=undef;
   }
   
   if (!defined ${$va}[$dim-1] or !defined ${$collect}{last_v} or (abs($r-${$collect}{last_v}) >  abs(${$va}[$dim-1]-${$collect}{last_v}))) {
@@ -1657,8 +1662,9 @@ sub DOIF_setValue_collect
     }
     ${$ta}[$dim-1]=$seconds;
     ${$collect}{last_slot}=$slot_nr;
+  } elsif ($r ne "N/A" and ${$va}[$dim-1] != $r) {
+    ${$collect}{last}=$r;
   }
-  
   
   if (defined $statistic or defined $change) {
     DOIF_statistic_col ($collect)
@@ -3491,18 +3497,18 @@ DOIF_Notify($$)
   return "" if (ReadingsVal($pn,"mode","") eq "disabled");
   
   $ret=0;
-  if (defined $hash->{Regex}{"event_Readings"}) {
-    foreach $device ("$dev->{NAME}","") {
-      if (defined $hash->{Regex}{"event_Readings"}{$device}) {
-        #readingsBeginUpdate($hash);
-        foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$device}}) {
-          my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$dev->{NAME},$reading,$eventa,$eventas);
-          setDOIF_Reading($hash,$reading,$readingregex,"event_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
-        }
-        #readingsEndUpdate($hash,1);
-      }
-    }
-  }
+#  if (defined $hash->{Regex}{"event_Readings"}) {
+#    foreach $device ("$dev->{NAME}","") {
+#      if (defined $hash->{Regex}{"event_Readings"}{$device}) {
+#        foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$device}}) {
+#          my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$dev->{NAME},$reading,$eventa,$eventas);
+#    	   if (defined($readingregex)) {
+#             setDOIF_Reading($hash,$reading,$readingregex,"event_Readings",$eventa, $eventas,$dev->{NAME});
+#		   }
+#        }
+#      }
+#    }
+#  }
   
   if (defined $hash->{Regex}{"accu"}{"$dev->{NAME}"}) {
     my $device=$dev->{NAME};
@@ -3622,21 +3628,22 @@ DOIF_Notify($$)
   if (defined $hash->{Regex}{"event_Readings"}) {
     foreach $device ("$dev->{NAME}","") {
       if (defined $hash->{Regex}{"event_Readings"}{$device}) {
-        #readingsBeginUpdate($hash);
         foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$device}}) {
           my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$dev->{NAME},$reading,$eventa,$eventas);
           setDOIF_Reading($hash,$reading,$readingregex,"event_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
         }
-        #readingsEndUpdate($hash,1);
-      }
-    }
-    if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
-      foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$hash->{NAME}}}) {
-        my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventa},$hash->{helper}{DOIF_eventas});
-        setDOIF_Reading($hash,$reading,$readingregex,"event_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
       }
     }
   }
+ #   if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
+ #     foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$hash->{NAME}}}) {
+ #       my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventa},$hash->{helper}{DOIF_eventas});
+ #       if (defined($readingregex)){
+#		  setDOIF_Reading($hash,$reading,$readingregex,"event_Readings",$eventa, $eventas,$dev->{NAME});
+#        }		  
+#      }
+#    }
+#  }
 
   if (defined $hash->{helper}{DOIF_Readings_events}) {
     if ($dev->{NAME} ne $hash->{NAME}) {
