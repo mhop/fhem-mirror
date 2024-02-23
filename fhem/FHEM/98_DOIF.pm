@@ -3587,25 +3587,7 @@ DOIF_Notify($$)
   
   delete $hash->{helper}{cur_cmd_nr};
   
-  if (defined $hash->{Regex}{"DOIF_Readings"}) {
-    foreach $device ("$dev->{NAME}","") {
-      if (defined $hash->{Regex}{"DOIF_Readings"}{$device}) {
-        #readingsBeginUpdate($hash);
-        foreach my $reading (keys %{$hash->{Regex}{"DOIF_Readings"}{$device}}) {
-          my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$dev->{NAME},$reading,$eventa,$eventas);
-          setDOIF_Reading($hash,$reading,$readingregex,"DOIF_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
-        }
-        #readingsEndUpdate($hash, 1);
-      }
-    }
-    if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
-      foreach my $reading (keys %{$hash->{Regex}{"DOIF_Readings"}{$hash->{NAME}}}) {
-        my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventa},$hash->{helper}{DOIF_eventas});
-        setDOIF_Reading($hash,$reading,$readingregex,"DOIF_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
-      }
-    }
-  }
-  
+   
   foreach my $table ("uiTable","uiState") {
     if (defined $hash->{Regex}{$table}) {
       foreach $device ("$dev->{NAME}","") {
@@ -3616,7 +3598,7 @@ DOIF_Notify($$)
           }
         }
       }
-      if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
+      if (defined ($hash->{helper}{DOIF_eventas})) {# $SELF events
         foreach my $doifId (keys %{$hash->{Regex}{$table}{$hash->{NAME}}}) {
           my $readingregex=CheckRegexpDoIf($hash,$table,$hash->{NAME},$doifId,$hash->{helper}{DOIF_eventa},$hash->{helper}{DOIF_eventas});
           DOIF_UpdateCell($hash,$doifId,$hash->{NAME},$readingregex) if (defined($readingregex));
@@ -3625,27 +3607,26 @@ DOIF_Notify($$)
     }
   }
   
-  if (defined $hash->{Regex}{"event_Readings"}) {
-    foreach $device ("$dev->{NAME}","") {
-      if (defined $hash->{Regex}{"event_Readings"}{$device}) {
-        foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$device}}) {
-          my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$dev->{NAME},$reading,$eventa,$eventas);
-          setDOIF_Reading($hash,$reading,$readingregex,"event_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
+  foreach my $readings ("DOIF_Readings","event_Readings") {
+    if (defined $hash->{Regex}{$readings}) {
+      foreach $device ("$dev->{NAME}","") {
+        if (defined $hash->{Regex}{$readings}{$device}) {
+          foreach my $reading (keys %{$hash->{Regex}{$readings}{$device}}) {
+            my $readingregex=CheckRegexpDoIf($hash,$readings,$dev->{NAME},$reading,$eventa,$eventas);
+            setDOIF_Reading($hash,$reading,$readingregex,$readings,$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
+          }
+        }
+      }
+      if (defined ($hash->{helper}{DOIF_eventas})) {# $SELF events
+        foreach my $reading (keys %{$hash->{Regex}{$readings}{$hash->{NAME}}}) {
+          my $readingregex=CheckRegexpDoIf($hash,$readings,$hash->{NAME},$reading,$hash->{helper}{DOIF_eventa},$hash->{helper}{DOIF_eventas});
+          setDOIF_Reading($hash,$reading,$readingregex,$readings,$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
         }
       }
     }
   }
- #   if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
- #     foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$hash->{NAME}}}) {
- #       my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventa},$hash->{helper}{DOIF_eventas});
- #       if (defined($readingregex)){
-#		  setDOIF_Reading($hash,$reading,$readingregex,"event_Readings",$eventa, $eventas,$dev->{NAME});
-#        }		  
-#      }
-#    }
-#  }
 
-  if (defined $hash->{helper}{DOIF_Readings_events}) {
+  if (defined $hash->{helper}{DOIF_Readings_events}) {# only for DOIF_Readings
     if ($dev->{NAME} ne $hash->{NAME}) {
       @{$hash->{CHANGED}}=@{$hash->{helper}{DOIF_Readings_events}};
       @{$hash->{CHANGEDWITHSTATE}}=@{$hash->{helper}{DOIF_Readings_eventsState}};
