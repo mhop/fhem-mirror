@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.16";
+my $Signalbot_VERSION="3.17";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -38,68 +38,69 @@ use vars qw($FW_wname);
 
 #maybe really get introspective here instead of handwritten list
  my %signatures = (
-	"setContactBlocked" 	=> "sb",
-	"setGroupBlocked" 		=> "ayb",
-	"updateGroup" 			=> "aysass",
-	"updateProfile" 		=> "ssssb",
-	"quitGroup" 			=> "ay",
-	"joinGroup"				=> "s",
+	"setContactBlocked" 	=> "sb", # 
+	"setGroupBlocked" 		=> "ayb", # https://bbernhard.github.io/signal-cli-rest-api/#/Groups/post_v1_groups__number___groupid__block
+	"updateGroup" 			=> "aysass", #https://bbernhard.github.io/signal-cli-rest-api/#/Groups/put_v1_groups__number___groupid_
+	"updateProfile" 		=> "ssssb", #https://bbernhard.github.io/signal-cli-rest-api/#/Profiles/put_v1_profiles__number_
+	"quitGroup" 			=> "ay", #obselete - use new API
+	"joinGroup"				=> "s", #https://bbernhard.github.io/signal-cli-rest-api/#/Groups/post_v1_groups__number___groupid__join
 	"sendGroupMessage"		=> "sasay",
 	"sendNoteToSelfMessage" => "sas",
-	"sendMessage" 			=> "sasas",
+	"sendMessage" 			=> "sasas", #https://bbernhard.github.io/signal-cli-rest-api/#/Messages/post_v2_send
 	"getContactName" 		=> "s",
 	"setContactName" 		=> "ss",
-	"getGroupIds" 			=> "",
+	"getGroupIds" 			=> "", #https://bbernhard.github.io/signal-cli-rest-api/#/Groups/get_v1_groups__number_
 	"getGroupName" 			=> "ay",
-	"getGroupMembers" 		=> "ay",
-	"listNumbers" 			=> "",
+	"getGroupMembers" 		=> "ay",#https://bbernhard.github.io/signal-cli-rest-api/#/Groups/post_v1_groups__number___groupid__members
+	"listNumbers" 			=> "", #??? https://bbernhard.github.io/signal-cli-rest-api/#/Accounts/get_v1_accounts
 	"getContactNumber" 		=> "s",
 	"isContactBlocked" 		=> "s",
 	"isGroupBlocked" 		=> "ay",
 	"isMember"				=> "ay",
-	"createGroup"			=> "sass",
+	"createGroup"			=> "sass", #https://bbernhard.github.io/signal-cli-rest-api/#/Groups/post_v1_groups__number_
 	"getSelfNumber"			=> "", #V0.9.1
 	"deleteContact"			=> "s", #V0.10.0
 	"deleteRecipient"		=> "s", #V0.10.0
 	"setPin"				=> "s", #V0.10.0
 	"removePin"				=> "", #V0.10.0
-	"getGroup"				=> "ay", #V0.10.0
+	"getGroup"				=> "ay", #V0.10.0 #https://bbernhard.github.io/signal-cli-rest-api/#/Groups/get_v1_groups__number___groupid_
 	"getIdentity"			=> "s", #V0.12.0
 	"addDevice"				=> "s",
 	"listDevices"			=> "",
-	"listIdentities"		=> "", #V0.12.0
-	"unregister"			=> "",
+	"listIdentities"		=> "", #V0.12.0 #https://bbernhard.github.io/signal-cli-rest-api/#/Identities/get_v1_identities__number_
+	"unregister"			=> "", #https://bbernhard.github.io/signal-cli-rest-api/#/Devices/post_v1_unregister__number_
 	"sendEndSessionMessage" => "as",		#unused
 	"sendRemoteDeleteMessage" => "xas",		#unused
 	"sendGroupRemoteDeletemessage" => "xay",#unused
 	"sendMessageReaction" => "sbsxas",		#unused
 	"sendGroupMessageReaction" => "sbsxay",	#unused
+	"submitRateLimitChallenge" => "ss",
 );
 	
  my %groupsignatures = (
 	#methods in the "Groups" object from V0.10
-	"deleteGroup"			=> "",
-	"addMembers"			=> "as",
-	"removeMembers"			=> "as",
-	"quitGroup"				=> "",
-	"addAdmins"				=> "as",
-	"removeAdmins"			=> "as",
+	"deleteGroup"			=> "", #https://bbernhard.github.io/signal-cli-rest-api/#/Groups/delete_v1_groups__number___groupid_
+	"addMembers"			=> "as", #https://bbernhard.github.io/signal-cli-rest-api/#/Groups/post_v1_groups__number___groupid__members
+	"removeMembers"			=> "as", #https://bbernhard.github.io/signal-cli-rest-api/#/Groups/delete_v1_groups__number___groupid__members
+	"quitGroup"				=> "", #https://bbernhard.github.io/signal-cli-rest-api/#/Groups/post_v1_groups__number___groupid__quit
+	"addAdmins"				=> "as", #https://bbernhard.github.io/signal-cli-rest-api/#/Groups/post_v1_groups__number___groupid__admins
+	"removeAdmins"			=> "as", #https://bbernhard.github.io/signal-cli-rest-api/#/Groups/delete_v1_groups__number___groupid__admins
 );
 
 my %identitysignatures = (
 	#methods in the "Identities" object from V0.11.12
-	"trust"					=> "",
+	"trust"					=> "", #https://bbernhard.github.io/signal-cli-rest-api/#/Identities/put_v1_identities__number__trust__numberToTrust_
 	"trustVerified"			=> "s",	
 );
 
 #dbus interfaces that only exist in registration mode
 my %regsig = (
-	"listAccounts"			=> "",
-	"link"					=> "s",
-	"registerWithCaptcha"	=> "sbs",
+	"listAccounts"			=> "", #https://bbernhard.github.io/signal-cli-rest-api/#/Accounts/get_v1_accounts
+	"link"					=> "s", #https://bbernhard.github.io/signal-cli-rest-api/#/Devices/get_v1_qrcodelink
+	"registerWithCaptcha"	=> "sbs", #Redundant to register
 	"verifyWithPin"			=> "sss", #not used
-	"register"				=> "sb",
-	"verify"				=> "ss",
+	"register"				=> "sb", #https://bbernhard.github.io/signal-cli-rest-api/#/Devices/post_v1_register__number_
+	"verify"				=> "ss", #https://bbernhard.github.io/signal-cli-rest-api/#/Devices/post_v1_register__number__verify__token_
 	"version" 				=> "",
 );
 
@@ -134,6 +135,7 @@ sub Signalbot_Initialize($) {
 												"authTimeout ".
 												"authDev ".
 												"authTrusted:yes,no ".
+												"sendTimeout ".
 												"cmdKeyword ".
 												"cmdFavorite ".
 												"favorites:textField-long ".
@@ -296,6 +298,14 @@ sub Signalbot_Set($@) {					#
 			return undef;
 		}
 		return "To unregister provide current account for safety reasons";
+	} elsif ( $cmd eq "rateLimit") {
+		my $challenge= shift @args;
+		my $captcha= shift @args;
+		if (defined $challenge and defined $captcha) {
+			my $ret=Signalbot_CallS($hash,"submitRateLimitChallenge",$challenge,$captcha);
+			$hash->{STATE} = $ret if defined $ret;
+			return $ret;
+			}
 	} elsif ( $cmd eq "register") {
 		my $account= shift @args;
 		return "Number needs to start with '+' followed by digits" if !defined Signalbot_checkNumber($account);
@@ -1894,8 +1904,21 @@ sub Signalbot_sendMessage($@) {
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "sentMsg", $mes);
 	readingsBulkUpdate($hash, 'sentMsgTimestamp', "pending");
+	InternalTimer(gettimeofday()+AttrVal($hash->{NAME},"sendTimeout",60)+5, "Signalbot_checkPending", $hash, 0);
 	readingsEndUpdate($hash, 1);
 	Signalbot_CallA($hash,"sendMessage",$mes,\@attach,\@recipient); 
+}
+
+sub Signalbot_checkPending($@) {
+	my ($hash) = @_;
+	my $age=ReadingsAge($hash->{NAME},"sentMsgTimestamp",-1);
+	if (ReadingsVal($hash->{NAME},"sentMsgTimestamp","pending") eq "pending") {
+		if ($age>ReadingsVal($hash->{NAME},"sendTimeout",60)) {
+			Log3 $hash->{NAME}, 1, $hash->{NAME}.": Timeout in sendMessage - check your syslog for signal-cli issues";
+			readingsSingleUpdate($hash, "lastError", "Timeout in sendMessage",0);
+		}
+	}
+	return;
 }
 
 #get the identifies (list of hex codes) for a group based on the name
@@ -1933,6 +1956,7 @@ sub Signalbot_sendGroupMessage($@) {
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "sentMsg", $mes);
 	readingsBulkUpdate($hash, 'sentMsgTimestamp', "pending");
+	InternalTimer(gettimeofday()+AttrVal($hash->{NAME},"sendTimeout",60)+5, "Signalbot_checkPending", $hash, 0);
 	readingsEndUpdate($hash, 1);
 
 	Signalbot_CallA($hash,"sendGroupMessage",$mes,\@attach,\@arr); 
