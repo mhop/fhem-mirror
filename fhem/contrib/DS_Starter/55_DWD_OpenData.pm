@@ -920,6 +920,11 @@ sub Attr {
             return "invalid value for forecastResolution (possible values are 1, 3 and 6)";
           }
         }
+        when ("timeout") {
+          unless ($value =~ /^[0-9]+$/x) {
+              return qq{invalid value for timeout. Use only figures 0-9!};
+          }
+        }
         when ("forecastStation") {
           my $oldForecastStation = ::AttrVal($name, 'forecastStation', undef);
           if ($::init_done && defined($oldForecastStation) && $oldForecastStation ne $value) {
@@ -1599,7 +1604,8 @@ sub GetForecast {
       # kill old blocking call
       ::BlockingKill($hash->{".forecastBlockingCall"});
     }
-    $hash->{".forecastBlockingCall"} = ::BlockingCall("DWD_OpenData::GetForecastStart", $hash, "DWD_OpenData::GetForecastFinish", 30, "DWD_OpenData::GetForecastAbort", $hash);
+    my $to = ::AttrVal($name, 'timeout', 60);
+    $hash->{".forecastBlockingCall"} = ::BlockingCall("DWD_OpenData::GetForecastStart", $hash, "DWD_OpenData::GetForecastFinish", $to, "DWD_OpenData::GetForecastAbort", $hash);
 
     $hash->{forecastUpdating} = time();
 
@@ -2250,7 +2256,8 @@ sub GetAlerts {
       # kill old blocking call
       ::BlockingKill($hash->{".alertsBlockingCall".$communeUnion});
     }
-    $hash->{".alertsBlockingCall".$communeUnion} = ::BlockingCall("DWD_OpenData::GetAlertsStart", $hash, "DWD_OpenData::GetAlertsFinish", 60, "DWD_OpenData::GetAlertsAbort", $hash);
+    my $to = ::AttrVal($name, 'timeout', 60);
+    $hash->{".alertsBlockingCall".$communeUnion} = ::BlockingCall("DWD_OpenData::GetAlertsStart", $hash, "DWD_OpenData::GetAlertsFinish", $to, "DWD_OpenData::GetAlertsAbort", $hash);
 
     $alertsUpdating[$communeUnion] = time();
 
@@ -2788,7 +2795,7 @@ sub DWD_OpenData_Initialize {
   $hash->{AttrList} = 'disable:0,1 '
                       .'forecastStation forecastDays forecastProperties forecastResolution:1,3,6 forecastWW2Text:0,1 forecastPruning:0,1 '
                       .'forecastDataPrecision:low,high alertArea alertLanguage:DE,EN alertExcludeEvents '
-                      .'timezone '
+                      .'timezone timeout '
                       .$readingFnAttributes;
 }
 
@@ -3010,6 +3017,9 @@ sub DWD_OpenData_Initialize {
   <ul> <br>
       <li>disable {0|1}, default: 0<br>
           Disable fetching data.
+      </li><br>
+      <li>timeout {Integer}, default: 60<br>
+          Timeout for getting data from DWD in seconds.
       </li><br>
       <li>timezone &lt;tz&gt;, default: OS dependent<br>
           <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">IANA TZ string</a> for date and time readings (e.g. "Europe/Berlin"), can be used to assume the perspective of a station that is in a different timezone or if your OS timezone settings do not match your local timezone. Alternatively you may use <code>tzselect</code> on the Linux command line to find a valid timezone string.
