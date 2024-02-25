@@ -161,7 +161,8 @@ my %vNotesIntern = (
   "1.16.3" => "24.02.2024  store pvcorrf, quality, pvrlsum, pvfcsum, dnumsum with value <sunalt2bin>.<cloud2bin> in pvCircular ".
                            "get pvcorrf / quality from neff in combination with sun altitude (CircularSunCloudkorrVal) ".
                            "delete CircularCloudkorrVal, show sun position in beamgrafic weather mouse over ".
-                           "split pvCorrection into pvCorrectionRead and pvCorrectionWrite ",
+                           "split pvCorrection into pvCorrectionRead and pvCorrectionWrite ".
+                           "_checkSetupNotComplete: improve setup Wizzard for ForecastSolar-API ",
   "1.16.2" => "22.02.2024  minor changes, R101 -> RR1c, totalrain instead of weatherrainprob, delete wrp r101 ".
                            "delete wrp from circular & airaw, remove rain2bin, __getDWDSolarData: change \$runh, ".
                            "fix  Illegal division by zero Forum: https://forum.fhem.de/index.php?msg=1304009 ".
@@ -1449,6 +1450,13 @@ sub _setcurrentRadiationAPI {              ## no critic "not used"
       my $rmf = reqModFail();
       return "You have to install the required perl module: ".$rmf if($rmf);
   }
+  
+  readingsSingleUpdate ($hash, "currentRadiationAPI", $prop, 1);
+  createAssociatedWith ($hash);
+  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);                      # Anlagenkonfiguration File schreiben
+  setModel             ($hash);                                                      # Model setzen
+  
+  return if(_checkSetupNotComplete ($hash));                                         # keine Stringkonfiguration wenn Setup noch nicht komplett
 
   if ($prop eq 'ForecastSolar-API') {
       my ($set, $lat, $lon) = locCoordinates();
@@ -1460,15 +1468,6 @@ sub _setcurrentRadiationAPI {              ## no critic "not used"
       my $dir = ReadingsVal ($name, 'moduleAzimuth', '');                            # Modul Ausrichtung für jeden Stringbezeichner
       return qq{Please complete command "set $name moduleAzimuth".} if(!$dir);
   }
-
-  if ($prop eq 'VictronVRM-API') {
-
-  }
-
-  readingsSingleUpdate ($hash, "currentRadiationAPI", $prop, 1);
-  createAssociatedWith ($hash);
-  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);                      # Anlagenkonfiguration File schreiben
-  setModel             ($hash);                                                      # Model setzen
 
   my $type                                           = $hash->{TYPE};
   $data{$type}{$name}{current}{allStringsFullfilled} = 0;                            # Stringkonfiguration neu prüfen lassen
@@ -5823,7 +5822,7 @@ sub centralTask {
       return;
   }
 
-  if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
+  if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt    
       my $ret = createStringConfig ($hash);
 
       if ($ret) {
@@ -7508,31 +7507,31 @@ sub _batSocTarget {
 
   ## Aufladewahrscheinlichkeit beachten
   #######################################
-  my $pvfctm     = ReadingsNum ($name, 'Tomorrow_PVforecast',            0);       # PV Prognose morgen
-  my $pvfctd     = ReadingsNum ($name, 'RestOfDayPVforecast',            0);       # PV Prognose Rest heute
-  my $csopt      = ReadingsNum ($name, 'Battery_OptimumTargetSoC', $lowSoc);       # aktuelles SoC Optimum
+  my $pvfctm     = ReadingsNum ($name, 'Tomorrow_PVforecast',            0);               # PV Prognose morgen
+  my $pvfctd     = ReadingsNum ($name, 'RestOfDayPVforecast',            0);               # PV Prognose Rest heute
+  my $csopt      = ReadingsNum ($name, 'Battery_OptimumTargetSoC', $lowSoc);               # aktuelles SoC Optimum
+  
   my $pvexpect   = $pvfctm > $pvfctd ? $pvfctm : $pvfctd;
+  my $batinstcap = CurrentVal ($hash, 'batinstcap', 0);                                    # installierte Batteriekapazität Wh
+  my $cantarget  = 100 - (100 / $batinstcap) * $pvexpect;                                  # berechneter möglicher Min SOC nach Berücksichtigung Ladewahrscheinlichkeit
 
-  my $batinstcap = CurrentVal ($hash, 'batinstcap', 0);                            # installierte Batteriekapazität Wh
-  my $cantarget  = 100 - (100 / $batinstcap) * $pvexpect;                          # berechneter möglicher Min SOC nach Berücksichtigung Ladewahrscheinlichkeit
-
-  my $newtarget  = sprintf "%.0f", ($cantarget < $target ? $cantarget : $target);  # Abgleich möglicher Min SOC gg. berechneten Min SOC
+  my $newtarget  = sprintf "%.0f", ($cantarget < $target ? $cantarget : $target);          # Abgleich möglicher Min SOC gg. berechneten Min SOC
   my $logadd     = '';
 
-  if ($newtarget > $csopt && $t > $delayts) {                                      # Erhöhung des SoC (wird ab Sonnenuntergang angewendet)
+  if ($newtarget > $csopt && $t > $delayts) {                                              # Erhöhung des SoC (wird ab Sonnenuntergang angewendet)
       $target = $newtarget;
       $logadd = "(new target > $csopt % and Sunset has passed)";
   }
-  elsif ($newtarget > $csopt && $t <= $delayts) {                                  # bisheriges Optimum bleibt vorerst
+  elsif ($newtarget > $csopt && $t <= $delayts) {                                          # bisheriges Optimum bleibt vorerst
       $target = $csopt;
       $nt     = (timestampToTimestring ($delayts, $paref->{lang}))[0];
       $logadd = "(calculated new target $newtarget % is only activated after $nt)";
   }
-  elsif ($newtarget < $csopt) {                                                    # Targetminderung sofort umsetzen -> Freiplatz für Ladeprognose
+  elsif ($newtarget < $csopt) {                                                            # Targetminderung sofort umsetzen -> Freiplatz für Ladeprognose
       $target = $newtarget;
       $logadd = "(new target < current Target SoC $csopt)";
   }
-  else {                                                                           # bisheriges Optimum bleibt
+  else {                                                                                   # bisheriges Optimum bleibt
       $target = $newtarget;
       $logadd = "(no change)";
   }
@@ -7670,33 +7669,33 @@ sub _createSummaries {
       $pvfc     = 0 if($pvfc  < 0);                                                         # PV Prognose darf nicht negativ sein
       $confc    = 0 if($confc < 0);                                                         # Verbrauchsprognose darf nicht negativ sein
 
-      if($h == 1) {
+      if ($h == 1) {
           $next1HoursSum->{PV}          += $pvfc  / 60 * $minute;
           $next1HoursSum->{Consumption} += $confc / 60 * $minute;
       }
 
-      if($h <= 2) {
+      if ($h <= 2) {
           $next2HoursSum->{PV}          += $pvfc                 if($h <  2);
           $next2HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 2);
           $next2HoursSum->{Consumption} += $confc                if($h <  2);
           $next2HoursSum->{Consumption} += $confc / 60 * $minute if($h == 2);
       }
 
-      if($h <= 3) {
+      if ($h <= 3) {
           $next3HoursSum->{PV}          += $pvfc                 if($h <  3);
           $next3HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 3);
           $next3HoursSum->{Consumption} += $confc                if($h <  3);
           $next3HoursSum->{Consumption} += $confc / 60 * $minute if($h == 3);
       }
 
-      if($h <= 4) {
+      if ($h <= 4) {
           $next4HoursSum->{PV}          += $pvfc                 if($h <  4);
           $next4HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 4);
           $next4HoursSum->{Consumption} += $confc                if($h <  4);
           $next4HoursSum->{Consumption} += $confc / 60 * $minute if($h == 4);
       }
 
-      if($istdy) {
+      if ($istdy) {
           $restOfDaySum->{PV}          += $pvfc;
           $restOfDaySum->{Consumption} += $confc;
           $tdConFcTillSunset           += $confc if($don);
@@ -9653,7 +9652,7 @@ sub _calcCaQcomplex {
   storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', 'done');
 
   if ($acu =~ /on_complex/xs) {
-      storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac, Sun Alt range: $sabin, Cloud range: $crang, days in range: $dnum)");
+      storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac, Sun Alt range: $sabin, Cloud range: $crang, Days in range: $dnum)");
       storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h).'_autocalc', 'done');
   }
 
@@ -9715,7 +9714,7 @@ sub _calcCaQsimple {
   storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', 'done');
 
   if ($acu =~ /on_simple/xs) {
-      storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac, days in range: $dnum)");
+      storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac, Days in range: $dnum)");
       storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h).'_autocalc', 'done');
   }
 
@@ -9742,7 +9741,7 @@ sub __calcNewFactor {
   my $pvrlsum = $pvrl;
   my $pvfcsum = $pvfc;
   
-  debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> start calculation correction factor for hour: $h");
+  debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> Start calculation correction factor for hour: $h");
 
   my ($oldfac, $oldq)        = CircularSunCloudkorrVal ($hash, sprintf("%02d",$h), $sabin, $crang, 0);  # bisher definierter Korrekturfaktor / Qualität
   my ($pvhis, $fchis, $dnum) = CircularSumVal          ($hash, sprintf("%02d",$h), $sabin, $crang, 0);
@@ -9785,7 +9784,7 @@ sub __calcNewFactor {
   my $qual = __calcFcQuality ($pvfc, $pvrl);                                                          # Qualität der Vorhersage für die vergangene Stunde
 
   debugLog ($paref, 'pvCorrectionWrite',                "$calc Corrf -> determined values - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, old factor: $oldfac, new factor: $factor, days: $dnum");
-  debugLog ($paref, 'pvCorrectionWrite|saveData2Cache', "$calc Corrf -> write correction values into Circular - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, factor: $factor, quality: $qual");
+  debugLog ($paref, 'pvCorrectionWrite|saveData2Cache', "$calc Corrf -> write correction values into Circular - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, factor: $factor, quality: $qual, days: $dnum");
 
   if ($crang ne 'simple') {
       my $idx = $sabin.'.'.$crang;                                                                    # value für pvcorrf Sonne Altitude
@@ -10540,8 +10539,8 @@ sub _checkSetupNotComplete {
   my $medev = ReadingsVal   ($name, 'currentMeterDev',     undef);                        # Meter Device
 
   my $peaks = ReadingsVal   ($name, 'modulePeakString',    undef);                        # String Peak
-  my $dir   = ReadingsVal   ($name, 'moduleAzimuth',       undef);                        # Modulausrichtung Konfig (Azimut)
-  my $ta    = ReadingsVal   ($name, 'moduleDeclination',   undef);                        # Modul Neigungswinkel Konfig
+  my $maz   = ReadingsVal   ($name, 'moduleAzimuth',       undef);                        # Modulausrichtung Konfig (Azimut)
+  my $mdec  = ReadingsVal   ($name, 'moduleDeclination',   undef);                        # Modul Neigungswinkel Konfig
   my $mrt   = ReadingsVal   ($name, 'moduleRoofTops',      undef);                        # RoofTop Konfiguration (SolCast API)
 
   my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');                   # Victron VRM Credentials gesetzt
@@ -10577,9 +10576,9 @@ sub _checkSetupNotComplete {
   my $chkicon  = "<a onClick=$cmdplchk>$img</a>";
   my $chktitle = $htitles{plchk}{$lang};
 
-  if (!$is || !$wedev || !$radev || !$indev || !$medev || !$peaks                                      ||
-     (isSolCastUsed ($hash) ? (!$rip || !$mrt) : isVictronKiUsed ($hash) ? !$vrmcr : (!$dir || !$ta )) ||
-     (isForecastSolarUsed ($hash) ? !$coset : '')                                                      ||
+  if (!$is || !$wedev || !$radev || !$indev || !$medev || !$peaks                                        ||
+     (isSolCastUsed ($hash) ? (!$rip || !$mrt) : isVictronKiUsed ($hash) ? !$vrmcr : (!$maz || !$mdec )) ||
+     (isForecastSolarUsed ($hash) ? !$coset : '')                                                        ||
      !defined $pv0) {
       $ret .= "<table class='roomoverview'>";
       $ret .= "<tr style='height:".$height."px'>";
@@ -10588,6 +10587,12 @@ sub _checkSetupNotComplete {
 
       if (!$wedev) {                                                                        ## no critic 'Cascading'
           $ret .= $hqtxt{cfd}{$lang};
+      }
+      elsif (!$is) {
+          $ret .= $hqtxt{ist}{$lang};
+      }
+      elsif (!$peaks) {
+          $ret .= $hqtxt{mps}{$lang};
       }
       elsif (!$radev) {
           $ret .= $hqtxt{crd}{$lang};
@@ -10598,22 +10603,16 @@ sub _checkSetupNotComplete {
       elsif (!$medev) {
           $ret .= $hqtxt{mid}{$lang};
       }
-      elsif (!$is) {
-          $ret .= $hqtxt{ist}{$lang};
-      }
-      elsif (!$peaks) {
-          $ret .= $hqtxt{mps}{$lang};
-      }
       elsif (!$rip && isSolCastUsed ($hash)) {
           $ret .= $hqtxt{rip}{$lang};
       }
       elsif (!$mrt && isSolCastUsed ($hash)) {
           $ret .= $hqtxt{mrt}{$lang};
       }
-      elsif (!$dir && !isSolCastUsed ($hash) && !isVictronKiUsed ($hash)) {
+      elsif (!$maz && !isSolCastUsed ($hash) && !isVictronKiUsed ($hash)) {
           $ret .= $hqtxt{mdr}{$lang};
       }
-      elsif (!$ta && !isSolCastUsed ($hash) && !isVictronKiUsed ($hash)) {
+      elsif (!$mdec && !isSolCastUsed ($hash) && !isVictronKiUsed ($hash)) {
           $ret .= $hqtxt{mta}{$lang};
       }
       elsif (!$vrmcr && isVictronKiUsed ($hash)) {
