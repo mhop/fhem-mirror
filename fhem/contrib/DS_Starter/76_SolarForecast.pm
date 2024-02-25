@@ -160,7 +160,8 @@ BEGIN {
 my %vNotesIntern = (
   "1.16.3" => "24.02.2024  store pvcorrf, quality, pvrlsum, pvfcsum, dnumsum with value <sunalt2bin>.<cloud2bin> in pvCircular ".
                            "get pvcorrf / quality from neff in combination with sun altitude (CircularSunCloudkorrVal) ".
-                           "delete CircularCloudkorrVal, show sun position in beamgrafic weather mouse over ",
+                           "delete CircularCloudkorrVal, show sun position in beamgrafic weather mouse over ".
+                           "split pvCorrection into pvCorrectionRead and pvCorrectionWrite ",
   "1.16.2" => "22.02.2024  minor changes, R101 -> RR1c, totalrain instead of weatherrainprob, delete wrp r101 ".
                            "delete wrp from circular & airaw, remove rain2bin, __getDWDSolarData: change \$runh, ".
                            "fix  Illegal division by zero Forum: https://forum.fhem.de/index.php?msg=1304009 ".
@@ -422,7 +423,8 @@ my @dd    = qw( none
                 epiecesCalc
                 graphic
                 notifyHandling
-                pvCorrection
+                pvCorrectionRead
+                pvCorrectionWrite
                 radiationProcess
                 saveData2Cache
               );
@@ -713,8 +715,8 @@ my %htitles = (                                                                 
                 DE => qq{Azimut}                                                                                   },
   elevatio => { EN => qq{Elevation},
                 DE => qq{H&#246;he}                                                                                },
-  sunpos   => { EN => qq{Sun position},
-                DE => qq{Sonnenstand}                                                                              },
+  sunpos   => { EN => qq{Sun position (decimal degrees)},
+                DE => qq{Sonnenstand (Dezimalgrad)}                                                                },
   conrec   => { EN => qq{Current time is within the consumption planning},
                 DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung}                                      },
   conrecba => { EN => qq{Current time is within the consumption planning, Priority charging Battery is active},
@@ -6899,7 +6901,7 @@ sub ___readCandQ {
 
   $hc = sprintf "%.2f", $hc;
 
-  debugLog ($paref, 'pvCorrection', "___readCandQ - fd: $fd, hod: ".sprintf("%02d",$fh1).", Sun Altitude Bin: $sabin, Cloud range: $crang, corrf: $hc, quality: $hq");
+  debugLog ($paref, 'pvCorrectionRead', "read parameters - fd: $fd, hod: ".sprintf("%02d",$fh1).", Sun Altitude Bin: $sabin, Cloud range: $crang, corrf: $hc, quality: $hq");
 
   $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf} = $hc."/".$hq;
 
@@ -9617,7 +9619,7 @@ sub _calcCaQcomplex {
 
   if (!$aln) {
       storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', 'done');
-      debugLog     ($paref, 'pvCorrection', "Autolearning is switched off for hour: $h -> skip the recalculation of the complex correction factor");
+      debugLog     ($paref, 'pvCorrectionWrite', "Autolearning is switched off for hour: $h -> skip the recalculation of the complex correction factor");
       return;
   }
 
@@ -9675,13 +9677,13 @@ sub _calcCaQsimple {
   my $sr = ReadingsVal ($name, '.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', '');
 
   if($sr eq "done") {
-      # debugLog ($paref, 'pvCorrection', "Simple Corrf factor Hour: ".sprintf("%02d",$h)." already calculated");
+      # debugLog ($paref, 'pvCorrectionWrite', "Simple Corrf factor Hour: ".sprintf("%02d",$h)." already calculated");
       return;
   }
 
   if (!$aln) {
       storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', 'done');
-      debugLog     ($paref, 'pvCorrection', "Autolearning is switched off for hour: $h -> skip the recalculation of the simple correction factor");
+      debugLog     ($paref, 'pvCorrectionWrite', "Autolearning is switched off for hour: $h -> skip the recalculation of the simple correction factor");
       return;
   }
 
@@ -9739,11 +9741,15 @@ sub __calcNewFactor {
   my $factor;
   my $pvrlsum = $pvrl;
   my $pvfcsum = $pvfc;
+  
+  debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> start calculation correction factor for hour: $h");
 
   my ($oldfac, $oldq)        = CircularSunCloudkorrVal ($hash, sprintf("%02d",$h), $sabin, $crang, 0);  # bisher definierter Korrekturfaktor / Qualität
-  my ($pvhis, $fchis, $dnum) = CircularSumVal          ($hash, sprintf("%02d",$h), $crang, 0);
+  my ($pvhis, $fchis, $dnum) = CircularSumVal          ($hash, sprintf("%02d",$h), $sabin, $crang, 0);
   $oldfac                    = 1 if(1 * $oldfac == 0);
 
+  debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> read historical values: pv real sum: $pvhis, pv forecast sum: $fchis, days sum: $dnum");
+  
   if ($dnum) {                                                                                        # Werte in History vorhanden -> haben Prio !
       $dnum++;
       $pvrlsum = $pvrl + $pvhis;
@@ -9778,9 +9784,8 @@ sub __calcNewFactor {
 
   my $qual = __calcFcQuality ($pvfc, $pvrl);                                                          # Qualität der Vorhersage für die vergangene Stunde
 
-  debugLog ($paref, 'pvCorrection',                "$calc Corrf -> start calculation correction factor for hour: $h");
-  debugLog ($paref, 'pvCorrection',                "$calc Corrf -> determined values - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, old factor: $oldfac, new factor: $factor, days: $dnum");
-  debugLog ($paref, 'pvCorrection|saveData2Cache', "$calc Corrf -> write correction values into Circular - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, factor: $factor, quality: $qual");
+  debugLog ($paref, 'pvCorrectionWrite',                "$calc Corrf -> determined values - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, old factor: $oldfac, new factor: $factor, days: $dnum");
+  debugLog ($paref, 'pvCorrectionWrite|saveData2Cache', "$calc Corrf -> write correction values into Circular - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, factor: $factor, quality: $qual");
 
   if ($crang ne 'simple') {
       my $idx = $sabin.'.'.$crang;                                                                    # value für pvcorrf Sonne Altitude
@@ -12820,7 +12825,7 @@ sub _addHourAiRawdata {
 
   if (!$aln) {
       storeReading ('.signaldone_'.sprintf("%02d",$h), 'done');
-      debugLog     ($paref, 'pvCorrection', "Autolearning is switched off for hour: $h -> skip add AI raw data");
+      debugLog     ($paref, 'pvCorrectionRead', "Autolearning is switched off for hour: $h -> skip add AI raw data");
       return;
   }
 
@@ -16228,7 +16233,7 @@ return ($corrf, $qual);
 #    Die durchschnittliche reale PV Erzeugung, PV Prognose und Tage
 #    einer bestimmten Bewölkungs-Range aus dem circular-Hash zurückliefern
 #    Usage:
-#    ($pvrlsum, $pvfcsum, $dnumsum) = CircularSumVal ($hash, $hod, $crang, $def)
+#    ($pvrlsum, $pvfcsum, $dnumsum) = CircularSumVal ($hash, $hod, $sabin, $crang, $def)
 #
 #    $pvrlsum:   Summe reale PV Erzeugung pro Bewölkungsbereich über die gesamte Laufzeit
 #    $pvfcsum:   Summe PV Prognose pro Bewölkungsbereich über die gesamte Laufzeit
@@ -18126,7 +18131,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>epiecesCalc</b>          </td><td>Calculation of specific energy consumption per operating hour and consumer       </td></tr>
             <tr><td> <b>graphic</b>              </td><td>Module graphic information                                                       </td></tr>
             <tr><td> <b>notifyHandling</b>       </td><td>Sequence of event processing in the module                                       </td></tr>
-            <tr><td> <b>pvCorrection</b>         </td><td>Calculation and application PV correction factors                                </td></tr>
+            <tr><td> <b>pvCorrectionRead</b>     </td><td>Application of PV correction factors                                             </td></tr>
+            <tr><td> <b>pvCorrectionWrite</b>    </td><td>Calculation of PV correction factors                                             </td></tr>
             <tr><td> <b>radiationProcess</b>     </td><td>Collection and processing of solar radiation data                                </td></tr>
             <tr><td> <b>saveData2Cache</b>       </td><td>Data storage in internal memory structures                                       </td></tr>
          </table>
@@ -20260,7 +20266,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>epiecesCalc</b>          </td><td>Berechnung des spezifischen Energieverbrauchs je Betriebsstunde und Verbraucher  </td></tr>
             <tr><td> <b>graphic</b>              </td><td>Informationen der Modulgrafik                                                    </td></tr>
             <tr><td> <b>notifyHandling</b>       </td><td>Ablauf der Eventverarbeitung im Modul                                            </td></tr>
-            <tr><td> <b>pvCorrection</b>         </td><td>Berechnung und Anwendung PV Korrekturfaktoren                                    </td></tr>
+            <tr><td> <b>pvCorrectionRead</b>     </td><td>Anwendung PV Korrekturfaktoren                                                   </td></tr>
+            <tr><td> <b>pvCorrectionWrite</b>    </td><td>Berechnung PV Korrekturfaktoren                                                  </td></tr>
             <tr><td> <b>radiationProcess</b>     </td><td>Sammlung und Verarbeitung der Solarstrahlungsdaten                               </td></tr>
             <tr><td> <b>saveData2Cache</b>       </td><td>Datenspeicherung in internen Speicherstrukturen                                  </td></tr>
          </table>
