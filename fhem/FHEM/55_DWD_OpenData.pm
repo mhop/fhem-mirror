@@ -19,10 +19,6 @@ Use of HttpUtils instead of LWP::Simple:
 
   Copyright (C) 2018 JoWiemann
     see https://forum.fhem.de/index.php/topic,83097.msg761015.html#msg761015
-    
-MOSMIX S forecast data support: 
-
-  Copyright (C) 2024 DS_Starter + Jens B.
 
 Sun position:
 
@@ -621,7 +617,7 @@ use constant UPDATE_COMMUNEUNIONS => -2;
 use constant UPDATE_ALL           => -3;
 
 require Exporter;
-our $VERSION   = '1.017000';
+our $VERSION   = '1.016003';
 our @ISA       = qw(Exporter);
 our @EXPORT    = qw(GetForecast GetAlerts UpdateAlerts UPDATE_DISTRICTS UPDATE_COMMUNEUNIONS UPDATE_ALL);
 our @EXPORT_OK = qw(IsCommuneUnionWarncellId);
@@ -633,14 +629,10 @@ my %forecastPropertyPeriods = (
                                'PEvap' => 24, 'PSd00' => 24, 'PSd30' => 24, 'PSd60' => 24, 'RRdc' => 24, 'RSunD' => 24, 'Rd00' => 24, 'Rd02' => 24, 'Rd10' => 24, 'Rd50' => 24, 'SunD' => 24, 'SunRise' => 24, 'SunSet' => 24, 'Tg' => 24, 'Tm' => 24, 'Tn' => 24, 'Tx' => 24
                               );
 
-my %forecastDefaultPropertiesS = (
-                                  'Tn' => 1, 'Tx' => 1, 'DD' => 1, 'FX1' => 1, 'Neff' => 1, 'RR1c' => 1, 'R602' => 1, 'RR3c' => 1, 'Rh00' => 1, 'TTT' => 1, 'ww' => 1, 'SunUp' => 1
-                                 );
-
-my %forecastDefaultPropertiesL = (
+my %forecastDefaultProperties = (
                                  'Tg' => 1, 'Tn' => 1, 'Tx' => 1, 'DD' => 1, 'FX1' => 1, 'Neff' => 1, 'RR6c' => 1, 'R600' => 1, 'RRhc' => 1, 'Rh00' => 1, 'TTT' => 1, 'ww' => 1, 'SunUp' => 1
-                                 );
-                                
+                                );
+
 # conversion of DWD value to: 1 = temperature in K, 2 = integer value, 3 = wind speed in m/s, 4 = pressure in Pa
 my %forecastPropertyTypes = (
                              'Tx' => 1, 'Tn' => 1, 'Tg' => 1, 'Tm'=> 1, 'Td'  => 1, 'T5cm'  => 1, 'TTT'   => 1,
@@ -802,13 +794,7 @@ sub Define {
   $hash->{'.TZ'} = ::AttrVal($hash, 'timezone', $hash->{FHEM_TZ});
 
   ::readingsSingleUpdate($hash, 'state', ::IsDisabled($name)? 'disabled' : 'defined', 1);
-
-  # @TODO randomize start of next update check to distribute load cause by mulitple module instances
-  my $nextUpdate = gettimeofday() + int(rand(480));
-  ::readingsSingleUpdate($hash, 'nextUpdate', ::FmtTime($nextUpdate), 1);
-  ::InternalTimer($nextUpdate, 'DWD_OpenData::Timer', $hash);
-
-  $hash->{'.firstRun'} = 1;
+  ::InternalTimer(gettimeofday() + 3, 'DWD_OpenData::Timer', $hash, 0);
 
   return undef;
 }
@@ -927,24 +913,12 @@ sub Attr {
             return "invalid value for forecastResolution (possible values are 1, 3 and 6)";
           }
         }
-        when ("downloadTimeout") {
-          unless ($value =~ /^[0-9]+$/x) {
-            return qq{invalid value for downloadTimeout. Use only figures 0-9!};
-          }
-        }
         when ("forecastStation") {
           my $oldForecastStation = ::AttrVal($name, 'forecastStation', undef);
           if ($::init_done && defined($oldForecastStation) && $oldForecastStation ne $value) {
             ::CommandDeleteReading(undef, "$name ^fc.*");
           }
         }
-        # @TODO check attribute name
-        when ("forecastDataPrecision") {
-          my $oldForecastProcess = ::AttrVal($name, 'forecastDataPrecision', 'low');
-          if ($::init_done && $oldForecastProcess ne $value) {
-            ::CommandDeleteReading(undef, "$name ^fc.*");
-          }
-        }       
         when ("forecastWW2Text") {
           if ($::init_done && !$value) {
             ::CommandDeleteReading(undef, "$name ^fc.*wwd\$");
@@ -973,10 +947,6 @@ sub Attr {
           }
         }
         when ("forecastStation") {
-          ::CommandDeleteReading(undef, "$name ^fc.*");
-        }
-        # @TODO check attribute name
-        when ("forecastDataPrecision") {
           ::CommandDeleteReading(undef, "$name ^fc.*");
         }
         when ("forecastWW2Text") {
@@ -1101,21 +1071,15 @@ FHEM I<InternalTimer> function
 sub Timer {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  
+
   ::Log3 $name, 5, "$name: Timer START";
 
   my $time = time();
   my ($tSec, $tMin, $tHour, $tMday, $tMon, $tYear, $tWday, $tYday, $tIsdst) = gmtime($time);
   my $actQuarter = int($tMin/15);
-  
-  # cancel periodic timer
-  ::RemoveInternalTimer($hash);
 
-  my $firstRun = delete $hash->{'.firstRun'} // 0;
-  my $forecastQuarter = ::AttrVal($name, 'forecastDataPrecision', 'low') eq 'low' ? 0 : 2;
-  my $fetchAlerts = defined($hash->{".fetchAlerts"}) && $hash->{".fetchAlerts"};
-  if ($firstRun || ($actQuarter == $forecastQuarter && !$fetchAlerts)) {
-    # preset: try to fetch alerts after forecast
+  if ($actQuarter == 0 && !(defined($hash->{".fetchAlerts"}) && $hash->{".fetchAlerts"})) {
+    # preset: try to fetch alerts immediately
     $hash->{".fetchAlerts"} = 1;
     my $forecastStation = ::AttrVal($name, 'forecastStation', undef);
     if (defined($forecastStation)) {
@@ -1131,8 +1095,7 @@ sub Timer {
     }
   }
 
-  $fetchAlerts = defined($hash->{".fetchAlerts"}) && $hash->{".fetchAlerts"};
-  if ($actQuarter > 0 || $fetchAlerts) {
+  if ($actQuarter > 0 || (defined($hash->{".fetchAlerts"}) && $hash->{".fetchAlerts"})) {
     my $warncellId = ::AttrVal($name, 'alertArea', undef);
     if (defined($warncellId)) {
       # skip update if already in progress
@@ -1148,10 +1111,10 @@ sub Timer {
     $hash->{".fetchAlerts"} = $actQuarter < 3;
   }
 
-  # reschedule next run to 5 .. 600 seconds past next quarter
-  my $nextUpdate = timegm(0, $actQuarter*15, $tHour, $tMday, $tMon, $tYear) + 905 + int(rand(595));
-  ::readingsSingleUpdate($hash, 'nextUpdate', ::FmtTime($nextUpdate), 1);
-  ::InternalTimer($nextUpdate, 'DWD_OpenData::Timer', $hash);
+  # reschedule next run for 5 seconds past next quarter
+  ::RemoveInternalTimer($hash);
+  my $nextTime = timegm(0, $actQuarter*15, $tHour, $tMday, $tMon, $tYear) + 905;
+  ::InternalTimer($nextTime, 'DWD_OpenData::Timer', $hash);
 
   ::Log3 $name, 5, "$name: Timer END";
 }
@@ -1617,8 +1580,7 @@ sub GetForecast {
       # kill old blocking call
       ::BlockingKill($hash->{".forecastBlockingCall"});
     }
-    my $timeout = ::AttrVal($name, 'downloadTimeout', 60);
-    $hash->{".forecastBlockingCall"} = ::BlockingCall("DWD_OpenData::GetForecastStart", $hash, "DWD_OpenData::GetForecastFinish", $timeout, "DWD_OpenData::GetForecastAbort", $hash);
+    $hash->{".forecastBlockingCall"} = ::BlockingCall("DWD_OpenData::GetForecastStart", $hash, "DWD_OpenData::GetForecastFinish", 30, "DWD_OpenData::GetForecastAbort", $hash);
 
     $hash->{forecastUpdating} = time();
 
@@ -1659,21 +1621,13 @@ sub GetForecastStart {
   usleep(100);
 
   # get forecast for station from DWD server
-  my $url;  
-  my $dataPrecision = ::AttrVal($name, 'forecastDataPrecision', 'low') eq 'high' ? 'S' : 'L';
-  if ($dataPrecision eq 'S') {
-    $url = "https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_S/all_stations/kml/MOSMIX_S_LATEST_240.kmz";
-  } else {
-    $url = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_L/single_stations/' . $station . '/kml/MOSMIX_L_LATEST_' . $station . '.kmz ';
-  }
-  
+  my $url = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_L/single_stations/' . $station . '/kml/MOSMIX_L_LATEST_' . $station . '.kmz ';
   my $param = {
                 url        => $url,
                 method     => "GET",
                 timeout    => 10,
                 hash       => $hash,
-                station    => $station,
-                dataPrecision => $dataPrecision
+                station    => $station
               };
   ::Log3 $name, 5, "$name: GetForecastStart START (PID $$): $url";
   my ($httpError, $fileContent) = ::HttpUtils_BlockingGet($param);
@@ -1684,50 +1638,6 @@ sub GetForecastStart {
   ::Log3 $name, 5, "$name: GetForecastStart END";
 
   return $result;
-}
-
-=head2 getStationPos($$$)
-
-=over
-
-=item * param name: name of DWD_OpenData device
-
-=item * param station: name of station to search for
-
-=item * param placemarkNodeList: XML node to search
-
-=item * index in list (1 ..) or 0 if not found
-
-=back
-
-find XML node of station
-
-=cut
-
-sub getStationPos {
-  my $name              = shift;
-  my $station           = shift;
-  my $placemarkNodeList = shift;
-  
-  my $pos = 0;  
-  my $listSize = $placemarkNodeList->size();
-  for my $n (1..$listSize) {
-    my $pn = $placemarkNodeList->get_node($n);
-    for my $placemarkChildNode ($pn->nonBlankChildNodes()) {  
-      if ($placemarkChildNode->nodeName() eq 'kml:name') {
-        my $stname = $placemarkChildNode->textContent();
-        if ($stname eq $station) {
-          $pos = $n;
-          last;
-        }
-      }
-    }
-    if ($pos > 0) {
-      last;
-    }
-  }
-  
-  return $pos;
 }
 
 =head2 ProcessForecast($$$)
@@ -1753,12 +1663,11 @@ ATTENTION: This method is executed in a different process than FHEM.
 
 sub ProcessForecast {
   my ($param, $httpError, $fileContent) = @_;
-  my $hash          = $param->{hash};
-  my $name          = $hash->{NAME};
-  my $url           = $param->{url};
-  my $code          = $param->{code};
-  my $station       = $param->{station};
-  my $dataPrecision = $param->{dataPrecision};
+  my $hash    = $param->{hash};
+  my $name    = $hash->{NAME};
+  my $url     = $param->{url};
+  my $code    = $param->{code};
+  my $station = $param->{station};
 
   ::Log3 $name, 5, "$name: ProcessForecast START";
 
@@ -1784,15 +1693,11 @@ sub ProcessForecast {
     my %selectedProperties;
     if (!@properties) {
       # no selection: use defaults
-      if ($dataPrecision eq 'S') {
-        %selectedProperties = %forecastDefaultPropertiesS;
-      } else {
-        %selectedProperties = %forecastDefaultPropertiesL;
-      }      
+      %selectedProperties = %forecastDefaultProperties;
     } else {
       # use selected properties
-      for my $property (@properties) {                                           # use selected properties
-        $property =~ s/^\s+|\s+$//g;                                             # trim
+      foreach my $property (@properties) {
+        $property =~ s/^\s+|\s+$//g; # trim
         $selectedProperties{$property} = 1;
       }
     }
@@ -1806,8 +1711,8 @@ sub ProcessForecast {
     $header{station} = $station;
 
     # parse XML strings (files from zip)
-    for my $xmlString (@xmlStrings) {                                               
-      if (substr(${$xmlString}, 0, 2) eq 'PK') {                                  # empty string, skip
+    foreach my $xmlString (@xmlStrings) {
+      if (substr(${$xmlString}, 0, 2) eq 'PK') {
         # empty string, skip
         next;
       }
@@ -1826,9 +1731,9 @@ sub ProcessForecast {
       my $issuer = undef;
       my $defaultUndefSign = '-';
       my $productDefinitionNodeList = $dom->getElementsByLocalName('ProductDefinition');
-      if ($productDefinitionNodeList->size()) {     
+      if ($productDefinitionNodeList->size()) {
         my $productDefinitionNode = $productDefinitionNodeList->get_node(1);
-        for my $productDefinitionChildNode ($productDefinitionNode->nonBlankChildNodes()) {
+        foreach my $productDefinitionChildNode ($productDefinitionNode->nonBlankChildNodes()) {
           if ($productDefinitionChildNode->nodeName() eq 'dwd:Issuer') {
             $issuer = $productDefinitionChildNode->textContent();
             $header{copyright} = "Datenbasis: $issuer";
@@ -1836,14 +1741,14 @@ sub ProcessForecast {
             my $issueTime = $productDefinitionChildNode->textContent();
             $header{time} = FormatDateTimeLocal($hash, ParseKMLTime($issueTime));
           } elsif ($productDefinitionChildNode->nodeName() eq 'dwd:ForecastTimeSteps') {
-            for my $forecastTimeStepsChildNode ($productDefinitionChildNode->nonBlankChildNodes()) {
+            foreach my $forecastTimeStepsChildNode ($productDefinitionChildNode->nonBlankChildNodes()) {
               if ($forecastTimeStepsChildNode->nodeName() eq 'dwd:TimeStep') {
                 my $forecastTimeSteps = $forecastTimeStepsChildNode->textContent();
                 push(@timestamps, ParseKMLTime($forecastTimeSteps));
               }
             }
           } elsif ($productDefinitionChildNode->nodeName() eq 'dwd:FormatCfg') {
-            for my $formatCfgChildNode ($productDefinitionChildNode->nonBlankChildNodes()) {
+            foreach my $formatCfgChildNode ($productDefinitionChildNode->nonBlankChildNodes()) {
               if ($formatCfgChildNode->nodeName() eq 'dwd:DefaultUndefSign') {
                 $defaultUndefSign = $formatCfgChildNode->textContent();
               }
@@ -1862,33 +1767,24 @@ sub ProcessForecast {
       my %timeProperties;
       my ($longitude, $latitude, $altitude);
       my $placemarkNodeList = $dom->getElementsByLocalName('Placemark');
-      if ($placemarkNodeList->size()) {        
-        my $placemarkNodePos;
-        if ($dataPrecision eq 'S') {
-          $placemarkNodePos = getStationPos ($name, $station, $placemarkNodeList);
-          if ($placemarkNodePos < 1) {
-            die "station '" .  $station . "' not found in XML data";
-          }
-        } else {
-          $placemarkNodePos = 1;
-        }
-        my $placemarkNode = $placemarkNodeList->get_node($placemarkNodePos);
-        for my $placemarkChildNode ($placemarkNode->nonBlankChildNodes()) {
+      if ($placemarkNodeList->size()) {
+        my $placemarkNode = $placemarkNodeList->get_node(1);
+        foreach my $placemarkChildNode ($placemarkNode->nonBlankChildNodes()) {
           if ($placemarkChildNode->nodeName() eq 'kml:description') {
             my $description = $placemarkChildNode->textContent();
             $header{description} = encode('UTF-8', $description);
           } elsif ($placemarkChildNode->nodeName() eq 'kml:ExtendedData') {
-            for my $extendedDataChildNode ($placemarkChildNode->nonBlankChildNodes()) {
+            foreach my $extendedDataChildNode ($placemarkChildNode->nonBlankChildNodes()) {
               if ($extendedDataChildNode->nodeName() eq 'dwd:Forecast') {
                 my $elementName = $extendedDataChildNode->getAttribute('dwd:elementName');
                 # convert some elements names for backward compatibility
                 my $alias = $forecastPropertyAliases{$elementName};
-                if (defined($alias)) { $elementName = $alias };                
+                if (defined($alias)) { $elementName = $alias };
                 my $selectedProperty = $selectedProperties{$elementName};
                 if (defined($selectedProperty)) {
                   my $textContent = $extendedDataChildNode->nonBlankChildNodes()->get_node(1)->textContent();
-                  $textContent =~ s/^\s+|\s+$//g;                  # trim outside
-                  $textContent =~ s/\s+/ /g;                       # trim inside
+                  $textContent =~ s/^\s+|\s+$//g; # trim outside
+                  $textContent =~ s/\s+/ /g; # trim inside
                   my @values = split(' ', $textContent);
                   $timeProperties{$elementName} = \@values;
                 }
@@ -1911,7 +1807,7 @@ sub ProcessForecast {
         my @sunsets;
         my $lastDate = '';
         my $sunElevationCorrection = AstroSun::ElevationCorrection($altitude);
-        for my $timestamp (@timestamps) {
+        foreach my $timestamp (@timestamps) {
           my ($azimuth, $elevation) = AstroSun::AzimuthElevation($timestamp, $longitude, $latitude);
           push(@azimuths, $azimuth);     # [deg]
           push(@elevations, $elevation); # [deg]
@@ -2055,8 +1951,7 @@ sub GetForecastFinish {
     if (defined($hash->{".fetchAlerts"}) && !$hash->{".fetchAlerts"}) {
       # get forecast was initiated by timer, reschedule to fetch alerts
       $hash->{".fetchAlerts"} = 1;
-      # @TODO needs to be reactivated?
-      #::InternalTimer(gettimeofday() + 1, 'DWD_OpenData::Timer', $hash);
+      ::InternalTimer(gettimeofday() + 1, 'DWD_OpenData::Timer', $hash);
     }
 
     ::Log3 $name, 5, "$name: GetForecastFinish END";
@@ -2098,8 +1993,7 @@ sub GetForecastAbort {
   if (defined($hash->{".fetchAlerts"}) && !$hash->{".fetchAlerts"}) {
     # get forecast was initiated by timer, reschedule to fetch alerts
     $hash->{".fetchAlerts"} = 1;
-    # @TODO needs to be reactivated?
-    #::InternalTimer(gettimeofday() + 1, 'DWD_OpenData::Timer', $hash);
+    ::InternalTimer(gettimeofday() + 1, 'DWD_OpenData::Timer', $hash);
   }
 }
 
@@ -2285,8 +2179,7 @@ sub GetAlerts {
       # kill old blocking call
       ::BlockingKill($hash->{".alertsBlockingCall".$communeUnion});
     }
-    my $timeout = ::AttrVal($name, 'downloadTimeout', 60);
-    $hash->{".alertsBlockingCall".$communeUnion} = ::BlockingCall("DWD_OpenData::GetAlertsStart", $hash, "DWD_OpenData::GetAlertsFinish", $timeout, "DWD_OpenData::GetAlertsAbort", $hash);
+    $hash->{".alertsBlockingCall".$communeUnion} = ::BlockingCall("DWD_OpenData::GetAlertsStart", $hash, "DWD_OpenData::GetAlertsFinish", 60, "DWD_OpenData::GetAlertsAbort", $hash);
 
     $alertsUpdating[$communeUnion] = time();
 
@@ -2822,10 +2715,9 @@ sub DWD_OpenData_Initialize {
   $hash->{GetFn}      = 'DWD_OpenData::Get';
 
   $hash->{AttrList} = 'disable:0,1 '
-                      .'forecastStation forecastDays forecastProperties forecastResolution:1,3,6 forecastWW2Text:0,1 forecastPruning:0,1 forecastDataPrecision:low,high '
+                      .'forecastStation forecastDays forecastProperties forecastResolution:1,3,6 forecastWW2Text:0,1 forecastPruning:0,1 '
                       .'alertArea alertLanguage:DE,EN alertExcludeEvents '
                       .'timezone '
-                      .'downloadTimeout '
                       .$readingFnAttributes;
 }
 
@@ -2836,9 +2728,6 @@ sub DWD_OpenData_Initialize {
 # -----------------------------------------------------------------------------
 #
 # CHANGES
-#
-# 25.02.2024 (version 1.17.0) DS_Starter + jensb
-# feature: support MOSMIX S
 #
 # 16.02.2021 (version 1.16.3) jensb
 # bugfix: fix version for experimental::smartmatch
@@ -3051,9 +2940,6 @@ sub DWD_OpenData_Initialize {
       <li>disable {0|1}, default: 0<br>
           Disable fetching data.
       </li><br>
-      <li>downloadTimeout {Integer}, default: 60 s<br>
-          Timeout for downloading data (alerts, forecast) from DWD server.
-      </li><br>
       <li>timezone &lt;tz&gt;, default: OS dependent<br>
           <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">IANA TZ string</a> for date and time readings (e.g. "Europe/Berlin"), can be used to assume the perspective of a station that is in a different timezone or if your OS timezone settings do not match your local timezone. Alternatively you may use <code>tzselect</code> on the Linux command line to find a valid timezone string.
       </li><br>
@@ -3072,17 +2958,6 @@ sub DWD_OpenData_Initialize {
       <li>forecastResolution {1|3|6}, default: 6 h<br>
           Time resolution (number of hours between 2 samples).<br>
           Note: When value is changed all existing forecast readings will be deleted.
-      </li><br>
-      <li>forecastDataPrecision {low|high}, default: low<br>
-          Selection of the DWD forecast method used. <br> 
-          The DWD distinguishes between MOSMIX_L and MOSMIX_S stations, which differ in terms of update frequency and data volume. <br>
-          See the 
-          <a href="https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_verfahrenbeschreibung_gesamt.pdf;jsessionid=425620479D0FC3EA4EEFD89B0A5D1C8F.live31092?__blob=publicationFile&v=2">Description of the processes</a>
-          and differences of data elements between MOSMIX_L and MOSMIX_S stations in this
-          <a href='https://www.dwd.de/DE/leistungen/opendata/help/schluessel_datenformate/kml/mosmix_elemente_xls.html' target='_blank'>Overview</a>.<br>
-          - low: MOSMIX_L is used  <br>
-          - high: MOSMIX_S is used <br>
-          Note: The "high" method requires powerful hardware in terms of RAM and CPU. At least 4 GB RAM is strongly recommended!
       </li><br>
       <li>forecastProperties [&lt;p1&gt;[,&lt;p2&gt;]...], default: Tx, Tn, Tg, TTT, DD, FX1, Neff, RR6c, RRhc, Rh00, ww<br>
           See the <a href="https://opendata.dwd.de/weather/lib/MetElementDefinition.xml">DWD forecast property defintions</a> for more details.<br>
