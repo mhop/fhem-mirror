@@ -1,5 +1,5 @@
 ﻿# -----------------------------------------------------------------------------
-# $Id: 55_DWD_OpenData.pm 23798 2024-02-25 18:38:00Z jensb $
+# $Id: 55_DWD_OpenData.pm 28555 2024-02-25 21:43:49Z jensb $
 # -----------------------------------------------------------------------------
 
 =encoding UTF-8
@@ -1711,6 +1711,7 @@ sub getStationPos {
   
   my $pos = 0;  
   my $listSize = $placemarkNodeList->size();
+  LOOP: 
   for my $n (1..$listSize) {
     my $pn = $placemarkNodeList->get_node($n);
     for my $placemarkChildNode ($pn->nonBlankChildNodes()) {  
@@ -1718,7 +1719,7 @@ sub getStationPos {
         my $stname = $placemarkChildNode->textContent();
         if ($stname eq $station) {
           $pos = $n;
-          break;
+          last LOOP;
         }
       }
     }
@@ -2819,7 +2820,7 @@ sub DWD_OpenData_Initialize {
   $hash->{GetFn}      = 'DWD_OpenData::Get';
 
   $hash->{AttrList} = 'disable:0,1 '
-                      .'forecastStation forecastDays forecastProperties forecastResolution:1,3,6 forecastWW2Text:0,1 forecastPruning:0,1 forecastDataPrecision:low,high'
+                      .'forecastStation forecastDays forecastProperties forecastResolution:1,3,6 forecastWW2Text:0,1 forecastPruning:0,1 forecastDataPrecision:low,high '
                       .'alertArea alertLanguage:DE,EN alertExcludeEvents '
                       .'timezone '
                       .'downloadTimeout '
