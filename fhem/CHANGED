@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
- - feature: 76_SolarForecast: take into account the position of the sun in 
+ - changed: 73_DoorBird:      New Encryption following DoorBird API & logo
+ - feature: 76_SolarForecast: take into account the position of the sun in
                               addition to cloud cover when determining the 
                               correction factor
  - change:  76_SolarForecast: check age of Rad1h data, use RR1c instead of R101
