@@ -8,6 +8,7 @@
 #     e-mail                     : matthias.deeke(AT)deeke(DOT)eu
 #     Fhem Forum                 : https://forum.fhem.de/index.php/topic,100758
 #     Fhem Wiki                  : https://wiki.fhem.de/wiki/DoorBird
+#     Source Documentation       : https://www.doorbird.com/downloads/api_lan.pdf
 #
 #     This file is part of fhem.
 #
@@ -23,6 +24,17 @@
 #
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+#     Install the following debian packets and cpan libaries
+#     sudo apt-get install -y sox && sudo apt-get install -y libsox-fmt-all && sudo apt-get install -y libsodium-dev && sudo apt-get install -y gstreamer1.0-tools
+#     sudo cpan install Crypt::AuthEnc::ChaCha20Poly1305 
+#     sudo cpan install Crypt::Argon2
+#     sudo cpan install Sodium::FFI
+#     sudo cpan install IO::String module
+#     sudo cpan install IO::Socket
+#
+#     WARNING ### If you have an old version of 73_DoorBird.pm working before you have to re-image your OS since the 
+#     WARNING ### new version does not work with the work-around of the old Alien 1.0.8 libary
 #
 #     fhem.cfg: define <devicename> DoorBird <IPv4-address> <User> <Password>
 #
@@ -46,38 +58,23 @@ use constant true  => 1;
 use strict;
 use warnings;
 use utf8;
+use JSON;
+use HttpUtils;
+use Encode;
+use FHEM::Meta;
+use Cwd;
+use MIME::Base64;
+use Crypt::Argon2 qw/argon2i_raw/;
+use Sodium::FFI qw(crypto_aead_chacha20poly1305_decrypt crypto_aead_chacha20poly1305_NPUBBYTES crypto_aead_chacha20poly1305_KEYBYTES);
+use IO::Socket;
+use IO::String;			   
+use LWP::UserAgent;
+use Data::Dumper;
+use File::Spec::Functions ':ALL';
+
 ###START###### Initialize module ##############################################################################START####
 sub DoorBird_Initialize($) {
-    my ($hash)  = @_;
-
-	### Try to load perl libraries if installed or write log in case of unavailability. ###
-	my @UseLibraries = split(/[\n,\t]/,"
-		JSON
-		HttpUtils
-		Encode
-		FHEM::Meta
-		Cwd
-		MIME::Base64
-		Crypt::NaCl::Sodium qw( :utils )
-		Crypt::Argon2 qw/argon2i_raw/
-		IO::Socket
-		IO::String;			   
-		LWP::UserAgent
-		Data::Dumper
-		File::Spec::Functions ':ALL'
-	");
-
-	foreach my $Library (grep(/\S/, @UseLibraries)) {	
-		eval "use " . $Library;
-		if (length($@) == 0) {
-			Log3 undef, 5, "DoorBird - Successfully Installed Perl Module               : " . $Library
-		}
-		else {
-			Log3 undef, 2, "DoorBird - Cannot find " . $Library . " in \@INC. Please install the Perl library first. Initialization of 73_DoorBird.pm aborted!";
-			return
-		}
-	}
-
+    my ($hash)               = @_;
     $hash->{STATE}           = "Init";
     $hash->{DefFn}           = "DoorBird_Define";
     $hash->{UndefFn}         = "DoorBird_Undefine";
@@ -88,7 +85,6 @@ sub DoorBird_Initialize($) {
 	$hash->{DbLog_splitFn}   = "DoorBird_DbLog_splitFn";
 	$hash->{FW_detailFn}     = "DoorBird_FW_detailFn";
 	$hash->{NotifyFn}        = "DoorBird_Notify";										  
-
     $hash->{AttrList}        = "do_not_notify:1,0 " .
 							   "header " .
 							   "PollingTimeout:slider,1,1,20 " .
@@ -125,6 +121,8 @@ sub DoorBird_Define($$) {
 	my $name				= $a[0];
 							 #$a[1] just contains the "DoorBird" module name and we already know that! :-)
 	my $url					= $a[2];
+
+	return($@) unless(FHEM::Meta::SetInternals($hash));
 
 	### Delete all Readings for DoorBird
 	readingsDelete($hash, ".*");
@@ -185,7 +183,7 @@ sub DoorBird_Define($$) {
 
 	###START###### Writing values to global hash ##############################################################START####
 	  $hash->{NAME}										= $name;
-	  $hash->{RevisonAPI}								= "0.26";
+	  $hash->{RevisonAPI}								= "0.36";
 	  $hash->{helper}{SOX}	  							= "/usr/bin/sox"; #On Windows systems use "C:\Programme\sox\sox.exe"
 	  $hash->{helper}{URL}	  							= $url;
 	  $hash->{helper}{PollingTimeout}					= AttrVal($name,"PollingTimeout",5);
@@ -225,6 +223,12 @@ sub DoorBird_Define($$) {
 	  $hash->{reusePort} 								= AttrVal($name, 'reusePort', defined(&SO_REUSEPORT)?1:0)?1:0;
     ####END####### Writing values to global hash ##############################################################END#####
 
+	### Check whether icon has already been defined
+	if(!defined($attr{$name}{icon}))
+	{
+		### Set attribute with standard logo
+		$attr{$name}{icon} = "doorbird";
+	}
 	
 	### For Debugging purpose only 
 	Log3 $name, 5, $name. " : DoorBird - Define H                               : " . $hash;
@@ -254,7 +258,7 @@ sub DoorBird_Notify($$) {
 
 	### For Debugging purpose only 
 	Log3 $name, 5, $name. " : DoorBird - DoorBird_Notify devname                : " . $devName;
-	Log3 $name, 5, $name. " : DoorBird - DoorBird_Notify events                 : " . Dumper($events);
+	Log3 $name, 5, $name. " : DoorBird - DoorBird_Notify events                 : " . $events =~ s/\r//g;
 
 	### Return without any further action if the module is disabled
 	return "" if(IsDisabled($name));
@@ -337,7 +341,7 @@ sub DoorBird_Attr(@) {
 	my $hash                   = $defs{$name};
 
 	Log3 $name, 5, $name. " : DoorBird_Attr - Subfunction entered.";
-	
+
 	### Check whether disable attribute has been provided
 	if ($a[2] eq "disable") {
 		### Check whether device shall be disabled
@@ -870,7 +874,7 @@ sub DoorBird_Set($@) {
 	Log3 $name, 5, $name. " : DoorBird_Set - command                            : " . $command;
 	Log3 $name, 5, $name. " : DoorBird_Set - option                             : " . $optionString;
 	Log3 $name, 5, $name. " : DoorBird_Set - RelayAdresses                      : " . join(",", @RelayAdresses);
-	Log3 $name, 5, $name. " : DoorBird_Set - OpsModeList                        : " . join(",", @OpsModeList);
+	Log3 $name, 5, $name. " : DoorBird_Set - OpsModeList                        : " . join(" ", @OpsModeList);
 	
 	### Define "set" menu
 	my $usage	= "Unknown argument, choose one of";
@@ -883,13 +887,16 @@ sub DoorBird_Set($@) {
 
 		### Log Entry for debugging purposes	
 		Log3 $name, 5, $name. " : DoorBird_Set - The OpsModeList is empty";
-		Log3 $name, 5, $name. " : DoorBird_Set - OpsModeList                        : " . Dumper(@{$hash->{helper}{OpsModeList}});
+		Log3 $name, 5, $name. " : DoorBird_Set - OpsModeList                        : " . join(" ", Dumper(@{$hash->{helper}{OpsModeList}}));
 
 		### For each item in the list of possible Operation Modes
 		foreach (@OpsModeList) {
 			
 			### Set Prefix for ReadingsName
 			my $OpsModeReadingPrefix = "OpsMode" . $_;
+
+			### For each DoorBirdEvent, create setlist for icon
+			# $usage .= " " . $OpsModeReadingPrefix . "Icon";
 		
 			### For each DoorBirdEvent, create setlist for relays to be activated in case of event
 			$usage .= " " . $OpsModeReadingPrefix . "DoorbellRelay:" . "Off," . join(",", @RelayAdresses);
@@ -986,7 +993,7 @@ sub DoorBird_Set($@) {
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name . " : DoorBord_Set - " . $ErrorMessage;
 	Log3 $name, 2, $name . " : DoorBord_Set - Could not open directory for audiofiles. See commandref for attribute \"AudioFileDir\"." if $ErrorMessage ne "";
-	Log3 $name, 5, $name . " : DoorBird_Set - usage                             : " . $usage;
+	Log3 $name, 5, $name . " : DoorBird_Set - usage                              : " . $usage;
 
 	### Return values
 	return $usage if $command eq '?';
@@ -1041,6 +1048,9 @@ sub DoorBird_Set($@) {
 	else {
 		### Update Reading
 		readingsSingleUpdate($hash, $command, $option, 1);
+
+		### Refresh Browser Window
+		FW_directNotify("#FHEMWEB:$FW_wname", "location.reload()", "") if defined($FW_wname);
 		
 		### Save new Readings in stat file
 		WriteStatefile();
@@ -1064,12 +1074,12 @@ sub DoorBird_OpsModeUpdate($) {
 
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate ____________________________________________________________";
-	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeList              : " . Dumper(@{$hash->{helper}{OpsModeList}});
-	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeListBackup        : " . Dumper(@{$hash->{helper}{OpsModeListBackup}});
+	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeList              : " . join(" ", Dumper(@{$hash->{helper}{OpsModeList}}));
+	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeListBackup        : " . join(" ", Dumper(@{$hash->{helper}{OpsModeListBackup}}));
 	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - Size of OpsModeList      : " . @OpsModeList;
 	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeActive            : " . $OpsModeActive;
 	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - AudioFileDir             : " . $AudioFileDir;
-	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - Readings Current         : " . Dumper(@OpsModeReadings);
+	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - Readings Current         : " . join(" ", Dumper(@OpsModeReadings));
 
 	### If the OpsModeList has been changed
 	if (join(",", @{$hash->{helper}{OpsModeListBackup}}) ne join(",", @{$hash->{helper}{OpsModeList}})) {
@@ -1084,8 +1094,8 @@ sub DoorBird_OpsModeUpdate($) {
 	
 			### Log Entry for debugging purposes	
 			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - The OpsModeList is filled but not in initial state!";
-			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeList              : " . Dumper(@{$hash->{helper}{OpsModeList}});
-			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - Readings Old             : " . Dumper(@OpsModeReadings);	
+			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeList              : " . join(" ", Dumper(@{$hash->{helper}{OpsModeList}}));
+			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - Readings Old             : " . join(" ", Dumper(@OpsModeReadings));	
 		
 			### Delete all Readings which start with "OpsMode"
 			foreach (@OpsModeReadings) {
@@ -1134,9 +1144,9 @@ sub DoorBird_OpsModeUpdate($) {
 
 			### Log Entry for debugging purposes	
 			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - The OpsModeList is empty but not in initial state!";
-			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeList              : " . Dumper(@{$hash->{helper}{OpsModeList}});
-			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeListBackup        : " . Dumper(@{$hash->{helper}{OpsModeListBackup}});
-			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - Readings to be deleted   : " . Dumper(@OpsModeReadings);	
+			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeList              : " . join(" ", Dumper(@{$hash->{helper}{OpsModeList}}));
+			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeListBackup        : " . join(" ", Dumper(@{$hash->{helper}{OpsModeListBackup}}));
+			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - Readings to be deleted   : " . join(" ", Dumper(@OpsModeReadings));
 		
 			### Delete all Readings which start with "OpsMode"
 			foreach (@OpsModeReadings) {
@@ -1165,13 +1175,13 @@ sub DoorBird_OpsModeUpdate($) {
 		else {
 			### Log Entry for debugging purposes	
 			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - The OpsModeList is in unknown state!";
-			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeList              : " . Dumper(@{$hash->{helper}{OpsModeList}});
-			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeListBackup Old    : " . Dumper(@{$hash->{helper}{OpsModeListBackup}});
+			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeList              : " . join(" ", Dumper(@{$hash->{helper}{OpsModeList}}));
+			Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeListBackup Old    : " . join(" ", Dumper(@{$hash->{helper}{OpsModeListBackup}}));
 			
 			### Save new list as backup
 			@{$hash->{helper}{OpsModeListBackup}} = @{$hash->{helper}{OpsModeList}};
 			
-			Log3 $name, 3, $name. " : DoorBird_OpsModeUpdate - OpsModeListBackup New    : " . Dumper(@{$hash->{helper}{OpsModeListBackup}});
+			Log3 $name, 3, $name. " : DoorBird_OpsModeUpdate - OpsModeListBackup New    : " . join(" ", Dumper(@{$hash->{helper}{OpsModeListBackup}}));
 		}
 	}
 	### If the OpsModeList has not been changed
@@ -1198,7 +1208,7 @@ sub DoorBird_OpsModeExecute($$) {
 
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_OpsModeExecute ___________________________________________________________";
-	Log3 $name, 5, $name. " : DoorBird_OpsModeExecute - OpsModeList             : " . Dumper(@OpsModeList);
+	Log3 $name, 5, $name. " : DoorBird_OpsModeExecute - OpsModeList             : " . join(" ", Dumper(@OpsModeList));
 	Log3 $name, 5, $name. " : DoorBird_OpsModeExecute - OpsModeActive           : " . $OpsModeActive;
 	Log3 $name, 5, $name. " : DoorBird_OpsModeExecute - AudioFileDir            : " . $AudioFileDir;
 	Log3 $name, 5, $name. " : DoorBird_OpsModeExecute - OpsModeEvent            : " . $OpsModeEvent;
@@ -1361,7 +1371,7 @@ sub DoorBird_Read($) {
 	$hash->{CD}->recv($buf, 1024, $flags);
 	
 	### Unpack Hex-Package
-	$data = bin2hex($buf);
+	$data = unpack("H*", $buf);
 	
 	### Remove Newlines for better log entries
 	$buf =~ s/\n+\z//;
@@ -1369,14 +1379,14 @@ sub DoorBird_Read($) {
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_Read _____________________________________________________________________";
 	Log3 $name, 5, $name. " : DoorBird_Read - UDP Client said PeerHost          : " . $PeerHost	if defined($PeerHost);
-	Log3 $name, 5, $name. " : DoorBird_Read - UDP Client said buf               : " . $buf		if defined($buf);
+	Log3 $name, 5, $name. " : DoorBird_Read - UDP Client said buf               : " . $buf =~ s/\r//g if defined($buf);
 	Log3 $name, 5, $name. " : DoorBird_Read - UDP Client said flags             : " . $flags	if defined($flags);
 	Log3 $name, 5, $name. " : DoorBird_Read - UDP Client said data              : " . $data		if defined($data);
-	
+
 	### If the UDP datagramm comes from the defined DoorBird
 	if ((defined($PeerHost)) && ($PeerHost eq $url)) {
 		### Log Entry for debugging purposes
-		Log3 $name, 5, $name. " : DoorBird_Read - UDP datagram transmitted by valid PeerHost.";
+		Log3 $name, 5, $name. " : DoorBird_Read - UDP transmitted by valid PeerHost : Yes";
 
 		### Extract message ID
 		my $UdpMessageIdCurrent = $buf;
@@ -1393,7 +1403,7 @@ sub DoorBird_Read($) {
 			### If the MessageID is integer type has not yet appeared yet
 			if ((int($UdpMessageIdCurrent) == $UdpMessageIdCurrent) && ($UdpMessageIdLast != $UdpMessageIdCurrent)) {
 				### Log Entry for debugging purposes
-				Log3 $name, 5, $name. " : DoorBird_Read - UDP datagram transmitted is new - Working on it.";
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP datagram transmitted is new   : YES - Working on it.";
 
 				### Remove timer for LostConn
 				RemoveInternalTimer($hash, "DoorBird_LostConn");
@@ -1416,14 +1426,19 @@ sub DoorBird_Read($) {
 			### If the UDP datagram is already known
 			else {
 				### Log Entry for debugging purposes
-				Log3 $name, 5, $name. " : DoorBird_Read - UDP datagram transmitted is NOT new - Ignoring it.";
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP datagram transmitted is new   : NO - Ignoring it.";
 			}
 		}
 		### If the UDP message is an event message by comparing the first 6 hex-values ignore case sensitivity
 		elsif ($data =~ /^deadbe/i) {
+
+			### Pre-Define variable
+			my $msg;
+			
 			### Decrypt username and password
 			my $username = DoorBird_credential_decrypt($hash->{helper}{".USER"});
 			my $password = DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
+
 
 			### Split up in accordance to DoorBird API description in hex values
 			my $IDENT 	= substr($data, 0, 6);
@@ -1508,7 +1523,6 @@ sub DoorBird_Read($) {
 				$OPSLIMIT 	= hex($OPSLIMIT);
 				$MEMLIMIT 	= hex($MEMLIMIT);
 				$SALT		= pack("H*", $SALT);
-				$NONCE		= pack("H*", $NONCE);
 				$CIPHERTEXT	= pack("H*", $CIPHERTEXT);
 
 				### Log Entry for debugging purposes			
@@ -1543,305 +1557,416 @@ sub DoorBird_Read($) {
 				Log3 $name, 5, $name. " : DoorBird_Read -- Part 3 ------------------------------------------------------------------------------------------------------------------------";
 				Log3 $name, 5, $name. " : DoorBird_Read - UDP StrechedPW hex friendly       : " . $StrechedPWHexFriendly;
 
-				
-				### Open crypto_aead object
-				my $crypto_aead = Crypt::NaCl::Sodium->aead();
-				my $msg;
+				### Extend the key to the required length by the crypto_aead_chacha20poly1305 function
+				my $pack_algo_key = 'H' . crypto_aead_chacha20poly1305_KEYBYTES * 2;
+				my $KEY   = pack($pack_algo_key, $StrechedPWHex);
+
+				### Extend the nonce to the required length by the crypto_aead_chacha20poly1305 function
+				my $pack_algo_nonce = 'H' . crypto_aead_chacha20poly1305_NPUBBYTES * 2;
+				$NONCE = pack($pack_algo_nonce, $NONCE);
+
+				### Log Entry for debugging purposes
+				Log3 $name, 5, $name. " : DoorBird_Read -- Part 3 ------------------------------------------------------------------------------------------------------------------------";
+				Log3 $name, 5, $name. " : DoorBird_Read - pack_algo_key                     : " . $pack_algo_key;
+				Log3 $name, 5, $name. " : DoorBird_Read - pack_algo_nonce                   : " . $pack_algo_nonce;
 
 				### Decrypt message or create error message
 				eval {
-					$msg = $crypto_aead->decrypt($CIPHERTEXT, "", $NONCE, $PASSWORDHASH);
-					
+					$msg = crypto_aead_chacha20poly1305_decrypt($CIPHERTEXT, undef, $NONCE, $KEY);
 					1;
 				};
 				if ( $@ ) {
-					Log3 $name, 3, $name. " : Message forged!";
-				return("Messaged forged!");
+				Log3 $name, 5, $name. " : Encryption version 01 - Decryption status         : Message forged!";
+				return("Encryption version 01 : Messaged forged!");
+				} 
+
+				### Log Entry for debugging purposes				
+				Log3 $name, 5, $name. " : Encryption version 01 - Decryption status         : Message successfully decypted!";
+				Log3 $name, 5, $name. " : DoorBird_Read - msg                               : " . $msg;
+			}
+			### If the version 2 of encryption in accordance to the DoorBird API is used
+			elsif (hex($VERSION) == 2){
+				### Split up in hex values in accordance to DoorBird API as from v0.35 description for encryption version 1 
+				my $NONCE		 = substr($data,  8, 16);
+				my $CIPHERTEXT	 = substr($data, 24, 68);	
+			
+				### Generate user friendly hex-string for data
+				my $HexFriendlyData;
+				for (my $i=0; $i < (length($data)/2); $i++) {
+					$HexFriendlyData .= "0x" . substr($data, $i*2,  2) . " ";
+				}
+				
+				### Generate user friendly hex-string for Ident
+				my $HexFriendlyIdent;
+				for (my $i=0; $i < (length($IDENT)/2); $i++) {
+					$HexFriendlyIdent .= "0x" . substr($IDENT, $i*2,  2) . " ";
+				}
+				
+				### Generate user friendly hex-string for Version
+				my $HexFriendlyVersion;
+				for (my $i=0; $i < (length($VERSION)/2); $i++) {
+					$HexFriendlyVersion .= "0x" . substr($VERSION, $i*2,  2) . " ";
+				}
+				
+				### Generate user friendly hex-string for Nonce
+				my $HexFriendlyNonce;
+				for (my $i=0; $i < (length($NONCE)/2); $i++) {
+					$HexFriendlyNonce .= "0x" . substr($NONCE, $i*2,  2) . " ";
+				}
+				
+				### Generate user friendly hex-string for CipherText
+				my $HexFriendlyCipherText;
+				for (my $i=0; $i < (length($CIPHERTEXT)/2); $i++) {
+					$HexFriendlyCipherText .= "0x" . substr($CIPHERTEXT, $i*2,  2) . " ";
+				}	
+				
+				### Log Entry for debugging purposes
+				Log3 $name, 5, $name. " : DoorBird_Read ------------------------------ Encryption Version 2 in accordance to DoorBird API has been used ------------------------";
+				#Log3 $name, 5, $name. " : DoorBird_Read - UDP Client Udp hex                : " . $HexFriendlyData;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Client Ident hex              : " . $HexFriendlyIdent;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Client Version hex            : " . $HexFriendlyVersion;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Client Nonce hex              : " . $HexFriendlyNonce;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP Client Cipher hex             : " . $HexFriendlyCipherText;
+
+				### Convert in accordance to API 0.35 description 
+				my $KEY     = $hash->{helper}{NOTIFICATION_ENCRYPTION_KEY};
+				$IDENT 		= hex($IDENT);
+				$VERSION 	= hex($VERSION);
+			    $CIPHERTEXT = pack("H*", $CIPHERTEXT);
+
+				### Log Entry for debugging purposes			
+				Log3 $name, 5, $name. " : DoorBird_Read -- Part 2 ------------------------------------------------------------------------------------------------------------------------";
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP IDENT       decimal           : " . $IDENT;
+				Log3 $name, 5, $name. " : DoorBird_Read - UDP VERSION     decimal           : " . $VERSION;
+
+				### Extend the key to the required length by the crypto_aead_chacha20poly1305 function
+				my $pack_algo_key = 'H' . crypto_aead_chacha20poly1305_KEYBYTES * 2;
+				$KEY   = pack($pack_algo_key, unpack("H*", $KEY));
+
+				### Extend the nonce to the required length by the crypto_aead_chacha20poly1305 function
+				my $pack_algo_nonce = 'H' . crypto_aead_chacha20poly1305_NPUBBYTES * 2;
+				$NONCE = pack($pack_algo_nonce, $NONCE);
+
+				### Log Entry for debugging purposes
+				Log3 $name, 5, $name. " : DoorBird_Read -- Part 3 ------------------------------------------------------------------------------------------------------------------------";
+				Log3 $name, 5, $name. " : DoorBird_Read - pack_algo_key                     : " . $pack_algo_key;
+				Log3 $name, 5, $name. " : DoorBird_Read - pack_algo_nonce                   : " . $pack_algo_nonce;
+
+				### Decrypt message or create error message
+
+				eval {
+					$msg = crypto_aead_chacha20poly1305_decrypt($CIPHERTEXT, undef, $NONCE, $KEY);
+					1;
+				};
+				if ( $@ ) {
+					Log3 $name, 5, $name. " : Encryption version 02 - Decryption status         : Message forged!";
+					return("Encryption version 02 : Message forged!");
 				} 
 				
-				### Unpack message as hex
-				 my $DecryptedMsgHex =  $msg->to_hex();
+				### Log Entry for debugging purposes				
+				Log3 $name, 5, $name. " : Encryption version 02 - Decryption status         : Message successfully decypted!";
+				Log3 $name, 5, $name. " : DoorBird_Read - msg                               : " . $msg;
 				
-				### Generate user friendly hex-string
-				my $StrechedMsgHexFriendly;
-				for (my $i=0; $i < (length($DecryptedMsgHex)/2); $i++) {
-					$StrechedMsgHexFriendly .= "0x" . substr($DecryptedMsgHex, $i*2,  2) . " ";
-				}
-				
+			}
+			### If the an unknown version of encryption in accordance to the DoorBird API is used
+			else {
 				### Log Entry for debugging purposes
-				Log3 $name, 5, $name. " : DoorBird_Read -- Part 4 ------------------------------------------------------------------------------------------------------------------------";
-				Log3 $name, 5, $name. " : DoorBird_Read - UDP Msg        hex friendly       : " . $StrechedMsgHexFriendly;
+				Log3 $name, 2, $name. " : DoorBird_Read - UDP datagram version " . $VERSION . " not implemented. Consult module author to implement API updates!";
+				
+				### Break further evaluation
+				return;
+			}
 
-				### Split up in accordance to API 0.24 description in hex values
-				my $INTERCOM_ID = substr($DecryptedMsgHex,  0, 12);
-				my $EVENT 		= substr($DecryptedMsgHex, 12, 16);
-				my $TIMESTAMP 	= substr($DecryptedMsgHex, 28,  8);
+			### Unpack message as hex
+			#my $DecryptedMsgHex =  $msg->to_hex();
+			my $DecryptedMsgHex =  unpack("H*", $msg);
+			
+			### Generate user friendly hex-string
+			my $StrechedMsgHexFriendly;
+			for (my $i=0; $i < (length($DecryptedMsgHex)/2); $i++) {
+				$StrechedMsgHexFriendly .= "0x" . substr($DecryptedMsgHex, $i*2,  2) . " ";
+			}
+			
+			### Log Entry for debugging purposes
+			Log3 $name, 5, $name. " : DoorBird_Read -- Part 4 ------------------------------------------------------------------------------------------------------------------------";
+			Log3 $name, 5, $name. " : DoorBird_Read - UDP Msg        hex friendly       : " . $StrechedMsgHexFriendly;
 
-				### Generate user friendly hex-string for Intercom_Id
-				my $Intercom_IdHexFriendly;
-				for (my $i=0; $i < (length($INTERCOM_ID)/2); $i++) {
-					$Intercom_IdHexFriendly .= "0x" . substr($INTERCOM_ID, $i*2,  2) . " ";
-				}
-				### Generate user friendly hex-string for Event
-				my $EventHexFriendly;
-				for (my $i=0; $i < (length($EVENT)/2); $i++) {
-					$EventHexFriendly .= "0x" . substr($EVENT, $i*2,  2) . " ";
-				}
-				### Generate user friendly hex-string for Timestamp
-				my $TimestampHexFriendly;
-				for (my $i=0; $i < (length($TIMESTAMP)/2); $i++) {
-					$TimestampHexFriendly .= "0x" . substr($TIMESTAMP, $i*2,  2) . " ";
-				}
+			### Split up in accordance to API 0.24 description in hex values
+			my $INTERCOM_ID = substr($DecryptedMsgHex,  0, 12);
+			my $EVENT 		= substr($DecryptedMsgHex, 12, 16);
+			my $TIMESTAMP 	= substr($DecryptedMsgHex, 28,  8);
 
+			### Generate user friendly hex-string for Intercom_Id
+			my $Intercom_IdHexFriendly;
+			for (my $i=0; $i < (length($INTERCOM_ID)/2); $i++) {
+				$Intercom_IdHexFriendly .= "0x" . substr($INTERCOM_ID, $i*2,  2) . " ";
+			}
+			### Generate user friendly hex-string for Event
+			my $EventHexFriendly;
+			for (my $i=0; $i < (length($EVENT)/2); $i++) {
+				$EventHexFriendly .= "0x" . substr($EVENT, $i*2,  2) . " ";
+			}
+			### Generate user friendly hex-string for Timestamp
+			my $TimestampHexFriendly;
+			for (my $i=0; $i < (length($TIMESTAMP)/2); $i++) {
+				$TimestampHexFriendly .= "0x" . substr($TIMESTAMP, $i*2,  2) . " ";
+			}
+
+			### Log Entry for debugging purposes
+			Log3 $name, 5, $name. " : DoorBird_Read -- Part 5 ------------------------------------------------------------------------------------------------------------------------";
+			Log3 $name, 5, $name. " : DoorBird_Read - UDP Intercom_Id hex friendly      : " . $Intercom_IdHexFriendly;
+			Log3 $name, 5, $name. " : DoorBird_Read - UDP Event hex friendly            : " . $EventHexFriendly;
+			Log3 $name, 5, $name. " : DoorBird_Read - UDP Timestamp hex friendly        : " . $TimestampHexFriendly;
+
+			### Convert in accordance to API 0.24 description in hex values
+			$INTERCOM_ID    = pack("H*", $INTERCOM_ID);
+			$EVENT          = pack("H*", $EVENT);
+			$TIMESTAMP      = hex($TIMESTAMP);
+
+			### Convert in accordance to API 0.24 description in hex values
+			my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime($TIMESTAMP);
+			my $TIMESTAMPHR    = sprintf ( "%04d-%02d-%02d %02d:%02d:%02d",$year+1900, $mon+1, $mday, $hour, $min, $sec);
+
+			### Log Entry for debugging purposes
+			Log3 $name, 5, $name. " : DoorBird_Read -- Part 6 ------------------------------------------------------------------------------------------------------------------------";
+			Log3 $name, 5, $name. " : DoorBird_Read - UDP Intercom_Id character         : " . $INTERCOM_ID;
+			Log3 $name, 5, $name. " : DoorBird_Read - UDP EVENT character               : " . $EVENT;
+			Log3 $name, 5, $name. " : DoorBird_Read - UDP TIMESTAMP UNIX                : " . $TIMESTAMP;
+			Log3 $name, 5, $name. " : DoorBird_Read - UDP TIMESTAMP human readeable     : " . $TIMESTAMPHR;
+
+			### Remove trailing whitespace
+			$EVENT =~ s/\s+$//;
+
+			### If event belongs to the current user
+			if ($username =~ m/$INTERCOM_ID/){
 				### Log Entry for debugging purposes
-				Log3 $name, 5, $name. " : DoorBird_Read -- Part 5 ------------------------------------------------------------------------------------------------------------------------";
-				Log3 $name, 5, $name. " : DoorBird_Read - UDP Intercom_Id hex friendly      : " . $Intercom_IdHexFriendly;
-				Log3 $name, 5, $name. " : DoorBird_Read - UDP Event hex friendly            : " . $EventHexFriendly;
-				Log3 $name, 5, $name. " : DoorBird_Read - UDP Timestamp hex friendly        : " . $TimestampHexFriendly;
+				Log3 $name, 5, $name. " : DoorBird_Read -- Part 7 ------------------------------------------------------------------------------------------------------------------------";
+				Log3 $name, 5, $name. " : DoorBird_Read - INTERCOM_ID matches username      : YES";
+			
+				### Create first part command URL for DoorBird
+				my $UrlPrefix 		= "https://" . $url . "/bha-api/";
 
-				### Convert in accordance to API 0.24 description in hex values
-				$INTERCOM_ID    = pack("H*", $INTERCOM_ID);
-				$EVENT          = pack("H*", $EVENT);
-				$TIMESTAMP      = hex($TIMESTAMP);
+				### Update STATE of device
+				readingsSingleUpdate($hash, "state", "Downloading image", 1);
 
-				### Convert in accordance to API 0.24 description in hex values
-				my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime($TIMESTAMP);
-				my $TIMESTAMPHR    = sprintf ( "%04d-%02d-%02d %02d:%02d:%02d",$year+1900, $mon+1, $mday, $hour, $min, $sec);
+			
+				### If event has been triggered by motion sensor
+				if ($EVENT =~ m/motion/) {
+					### If the MessageID is integer type has not yet appeared yet
+					if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpMotionIdLast != $TIMESTAMP)) {
+						### Save Timestamp as new ID
+						$hash->{helper}{UdpMotionId} = $TIMESTAMP;
+						
+						### Create name of reading for event
+						$ReadingEvent 			= "motion_sensor";
+						$ReadingEventContent 	= "Motion detected!";
+						
+						### Create Parameter for CommandURL for motionsensor events
+						$UrlPostfix = "history.cgi?event=motionsensor&index=1";
 
-				### Log Entry for debugging purposes
-				Log3 $name, 5, $name. " : DoorBird_Read -- Part 6 ------------------------------------------------------------------------------------------------------------------------";
-				Log3 $name, 5, $name. " : DoorBird_Read - UDP Intercom_Id character         : " . $INTERCOM_ID;
-				Log3 $name, 5, $name. " : DoorBird_Read - UDP EVENT character               : " . $EVENT;
-				Log3 $name, 5, $name. " : DoorBird_Read - UDP TIMESTAMP UNIX                : " . $TIMESTAMP;
-				Log3 $name, 5, $name. " : DoorBird_Read - UDP TIMESTAMP human readeable     : " . $TIMESTAMPHR;
+						### Create complete command URL for DoorBird
+						$CommandURL = $UrlPrefix . $UrlPostfix;	
+						
+						### Define Parameter for Non-BlockingGet
+						my $param = {
+							url                => $CommandURL,
+							timeout            => $PollingTimeout,
+							user               => $Username,
+							pwd                => $Password,
+							hash               => $hash,
+							method             => $Method,
+							header             => $Header,
+							timestamp          => $TIMESTAMP,
+							event              => "motionsensor",
+							incrementalTimeout => 1,
+							callback           => \&DoorBird_LastEvent_Image
+						};
 
-				### Remove trailing whitespace
-				$EVENT =~ s/\s+$//;
+						### Initiate Bulk Update
+						readingsBeginUpdate($hash);
+						
+						### Update readings of device
+						readingsBulkUpdate($hash, "state", $ReadingEventContent, 1);
+						readingsBulkUpdate($hash, $ReadingEvent, "triggered", 1);
 
-				### If event belongs to the current user
-				if ($username =~ m/$INTERCOM_ID/){
-					### Log Entry for debugging purposes
-					Log3 $name, 5, $name. " : DoorBird_Read -- Part 7 ------------------------------------------------------------------------------------------------------------------------";
-					Log3 $name, 5, $name. " : DoorBird_Read - INTERCOM_ID matches username";
-				
-					### Create first part command URL for DoorBird
-					my $UrlPrefix 		= "https://" . $url . "/bha-api/";
+						### Execute Readings Bulk Update
+						readingsEndUpdate($hash, 1);
 
-					### Update STATE of device
-					readingsSingleUpdate($hash, "state", "Downloading image", 1);
+						### Initiate communication
+						HttpUtils_NonblockingGet($param);
 
-				
-					### If event has been triggered by motion sensor
-					if ($EVENT =~ m/motion/) {
-						### If the MessageID is integer type has not yet appeared yet
-						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpMotionIdLast != $TIMESTAMP)) {
-							### Save Timestamp as new ID
-							$hash->{helper}{UdpMotionId} = $TIMESTAMP;
-							
-							### Create name of reading for event
-							$ReadingEvent 			= "motion_sensor";
-							$ReadingEventContent 	= "Motion detected!";
-							
-							### Create Parameter for CommandURL for motionsensor events
-							$UrlPostfix = "history.cgi?event=motionsensor&index=1";
-
-							### Create complete command URL for DoorBird
-							$CommandURL = $UrlPrefix . $UrlPostfix;	
-							
-							### Define Parameter for Non-BlockingGet
-							my $param = {
-								url                => $CommandURL,
-								timeout            => $PollingTimeout,
-								user               => $Username,
-								pwd                => $Password,
-								hash               => $hash,
-								method             => $Method,
-								header             => $Header,
-								timestamp          => $TIMESTAMP,
-								event              => "motionsensor",
-								incrementalTimeout => 1,
-								callback           => \&DoorBird_LastEvent_Image
-							};
-
-							### Initiate Bulk Update
-							readingsBeginUpdate($hash);
-							
-							### Update readings of device
-							readingsBulkUpdate($hash, "state", $ReadingEventContent, 1);
-							readingsBulkUpdate($hash, $ReadingEvent, "triggered", 1);
-
-							### Execute Readings Bulk Update
-							readingsEndUpdate($hash, 1);
-
-							### Initiate communication
-							HttpUtils_NonblockingGet($param);
-
-							### Wrap up a container and initiate the timer to reset reading "doorbell_button"
-							my %Container;
-							$Container{"HashReference"} = $hash;
-							$Container{"Reading"} 		= $ReadingEvent;
-							InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventReset", \%Container, 0);
-							
-							### Execute event trigger for Operation Mode
-							DoorBird_OpsModeExecute($hash, "motion");
-				
-							### Log Entry
-							Log3 $name, 3, $name. " : An event has been triggered by the DoorBird unit  : " . $EVENT;
-							Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
-						}
-						### If the MessageID is integer type has appeared before
-						else {
-							### Do nothing
-							### Log Entry for debugging purposes
-							Log3 $name, 5, $name. " : DoorBird_Read - Motion sensor message already been sent. Ignoring it!";						
-						}
-					}
-					### If event has been triggered by keypad
-					elsif ($EVENT =~ m/keypad/) {
-						### If the MessageID is integer type has not yet appeared yet
-						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpKeypadIdLast != $TIMESTAMP)) {
-							### Save Timestamp as new ID
-							$hash->{helper}{UdpKeypadId} = $TIMESTAMP;
-
-							### Create name of reading for event
-							$ReadingEvent 			= "keypad_pin";
-							$ReadingEventContent 	= "Access via Keypad!";
-
-							### Create Parameter for CommandURL for keypad events
-							$UrlPostfix = "history.cgi?event=keypad&index=1";
-
-							### Create complete command URL for DoorBird
-							$CommandURL = $UrlPrefix . $UrlPostfix;	
-							
-							### Define Parameter for Non-BlockingGet
-							my $param = {
-								url                => $CommandURL,
-								timeout            => $PollingTimeout,
-								user               => $Username,
-								pwd                => $Password,
-								hash               => $hash,
-								method             => $Method,
-								header             => $Header,
-								timestamp          => $TIMESTAMP,
-								event              => "keypad",
-								incrementalTimeout => 1,
-								callback           => \&DoorBird_LastEvent_Image
-							};
-					
-							### Initiate Bulk Update
-							readingsBeginUpdate($hash);
-							
-							### Update readings of device
-							readingsBulkUpdate($hash, "state", $ReadingEventContent, 1);
-							readingsBulkUpdate($hash, $ReadingEvent, "triggered", 1);
-
-							### Execute Readings Bulk Update
-							readingsEndUpdate($hash, 1);
-
-							### Initiate communication and close
-							HttpUtils_NonblockingGet($param);
-
-							### Wrap up a container and initiate the timer to reset reading "doorbell_button"
-							my %Container;
-							$Container{"HashReference"} = $hash;
-							$Container{"Reading"} 		= $ReadingEvent;
-							InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventReset", \%Container, 0);
-							
-							### Execute event trigger for Operation Mode
-							DoorBird_OpsModeExecute($hash, "keypad");
-
-							### Log Entry
-							Log3 $name, 3, $name. " : An event has been triggered by the DoorBird unit  : " . $EVENT;
-							Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
-						}
-						### If the MessageID is integer type has appeared before
-						else {
-							### Do nothing
-							### Log Entry for debugging purposes
-							Log3 $name, 5, $name. " : DoorBird_Read - Keypad message already been sent. Ignoring it!";						
-						}
-					}
-					### If event has been triggered by doorbell -> Only a number has been transfered
-					elsif (int($EVENT) == $EVENT) {
-						### If the MessageID is integer type has not yet appeared yet
-						if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpDoorbellIdLast != $TIMESTAMP)) {
-							### Save Timestamp as new ID
-							$hash->{helper}{UdpDoorbellId} = $TIMESTAMP;
-
-							### Create name of reading for event
-							$ReadingEvent 			= "doorbell_button_"   . sprintf("%03d", $EVENT);
-							$ReadingEventContent 	= "doorbell pressed!";
-							
-							### Create Parameter for CommandURL for doorbell events
-							$UrlPostfix = "history.cgi?event=doorbell&index=1";
-
-							### Create complete command URL for DoorBird
-							$CommandURL = $UrlPrefix . $UrlPostfix;	
-							
-							### Define Parameter for Non-BlockingGet
-							my $param = {
-								url                => $CommandURL,
-								timeout            => $PollingTimeout,
-								user               => $Username,
-								pwd                => $Password,
-								hash               => $hash,
-								method             => $Method,
-								header             => $Header,
-								timestamp          => $TIMESTAMP,
-								event              => "doorbell",
-								doorbellNo         => $EVENT,
-								incrementalTimeout => 1,
-								callback           => \&DoorBird_LastEvent_Image
-							};
-					
-							### Initiate Bulk Update
-							readingsBeginUpdate($hash);
-							
-							### Update readings of device
-							readingsBulkUpdate($hash, "state", $ReadingEventContent, 1);
-							readingsBulkUpdate($hash, $ReadingEvent, "triggered", 1);
-
-							### Execute Readings Bulk Update
-							readingsEndUpdate($hash, 1);
-
-							### Initiate communication and close
-							HttpUtils_NonblockingGet($param);
-
-							### Wrap up a container and initiate the timer to reset reading "doorbell_button"
-							my %Container;
-							$Container{"HashReference"} = $hash;
-							$Container{"Reading"} 		= $ReadingEvent;
-							InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventReset", \%Container, 0);
-
-							### Execute event trigger for Operation Mode
-							DoorBird_OpsModeExecute($hash, "doorbell");
-							
-							### Log Entry
-							Log3 $name, 3, $name. " : An event has been triggered by the DoorBird unit  : " . $EVENT;
-							Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
-						}
-						### If the MessageID is integer type has appeared before
-						else {
-							### Do nothing
-							### Log Entry for debugging purposes
-							Log3 $name, 5, $name. " : DoorBird_Read - Doorbell message already been sent. Ignoring it!";						
-						}
-					}
-					### If the event has been triggered by unknown code
-					else {
+						### Wrap up a container and initiate the timer to reset reading "doorbell_button"
+						my %Container;
+						$Container{"HashReference"} = $hash;
+						$Container{"Reading"} 		= $ReadingEvent;
+						InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventReset", \%Container, 0);
+						
+						### Execute event trigger for Operation Mode
+						DoorBird_OpsModeExecute($hash, "motion");
+			
 						### Log Entry
-						Log3 $name, 3, $name. " : Unknown event triggered by Doorbird Unit : " . $EVENT;
+						Log3 $name, 3, $name. " : An event has been triggered by the DoorBird unit  : " . $EVENT;
+						Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
+					}
+					### If the MessageID is integer type has appeared before
+					else {
+						### Do nothing
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_Read - Motion sensor message already been sent. Ignoring it!";						
 					}
 				}
-				### Event does not belong to the current user
+				### If event has been triggered by keypad
+				elsif ($EVENT =~ m/keypad/) {
+					### If the MessageID is integer type has not yet appeared yet
+					if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpKeypadIdLast != $TIMESTAMP)) {
+						### Save Timestamp as new ID
+						$hash->{helper}{UdpKeypadId} = $TIMESTAMP;
+
+						### Create name of reading for event
+						$ReadingEvent 			= "keypad_pin";
+						$ReadingEventContent 	= "Access via Keypad!";
+
+						### Create Parameter for CommandURL for keypad events
+						$UrlPostfix = "history.cgi?event=keypad&index=1";
+
+						### Create complete command URL for DoorBird
+						$CommandURL = $UrlPrefix . $UrlPostfix;	
+						
+						### Define Parameter for Non-BlockingGet
+						my $param = {
+							url                => $CommandURL,
+							timeout            => $PollingTimeout,
+							user               => $Username,
+							pwd                => $Password,
+							hash               => $hash,
+							method             => $Method,
+							header             => $Header,
+							timestamp          => $TIMESTAMP,
+							event              => "keypad",
+							incrementalTimeout => 1,
+							callback           => \&DoorBird_LastEvent_Image
+						};
+				
+						### Initiate Bulk Update
+						readingsBeginUpdate($hash);
+						
+						### Update readings of device
+						readingsBulkUpdate($hash, "state", $ReadingEventContent, 1);
+						readingsBulkUpdate($hash, $ReadingEvent, "triggered", 1);
+
+						### Execute Readings Bulk Update
+						readingsEndUpdate($hash, 1);
+
+						### Initiate communication and close
+						HttpUtils_NonblockingGet($param);
+
+						### Wrap up a container and initiate the timer to reset reading "doorbell_button"
+						my %Container;
+						$Container{"HashReference"} = $hash;
+						$Container{"Reading"} 		= $ReadingEvent;
+						InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventReset", \%Container, 0);
+						
+						### Execute event trigger for Operation Mode
+						DoorBird_OpsModeExecute($hash, "keypad");
+
+						### Log Entry
+						Log3 $name, 3, $name. " : An event has been triggered by the DoorBird unit  : " . $EVENT;
+						Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
+					}
+					### If the MessageID is integer type has appeared before
+					else {
+						### Do nothing
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_Read - Keypad message already been sent. Ignoring it!";						
+					}
+				}
+				### If event has been triggered by doorbell -> Only a number has been transfered
+				elsif (int($EVENT) == $EVENT) {
+					### If the MessageID is integer type has not yet appeared yet
+					if ((int($TIMESTAMP) == $TIMESTAMP) && ($UdpDoorbellIdLast != $TIMESTAMP)) {
+
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_Read - Doorbell message already sent     : NO - Working on it!";
+
+						### Save Timestamp as new ID
+						$hash->{helper}{UdpDoorbellId} = $TIMESTAMP;
+
+						### Create name of reading for event
+						$ReadingEvent 			= "doorbell_button_"   . sprintf("%03d", $EVENT);
+						$ReadingEventContent 	= "doorbell pressed!";
+						
+						### Create Parameter for CommandURL for doorbell events
+						$UrlPostfix = "history.cgi?event=doorbell&index=1";
+
+						### Create complete command URL for DoorBird
+						$CommandURL = $UrlPrefix . $UrlPostfix;	
+						
+						### Define Parameter for Non-BlockingGet
+						my $param = {
+							url                => $CommandURL,
+							timeout            => $PollingTimeout,
+							user               => $Username,
+							pwd                => $Password,
+							hash               => $hash,
+							method             => $Method,
+							header             => $Header,
+							timestamp          => $TIMESTAMP,
+							event              => "doorbell",
+							doorbellNo         => $EVENT,
+							incrementalTimeout => 1,
+							callback           => \&DoorBird_LastEvent_Image
+						};
+				
+						### Initiate Bulk Update
+						readingsBeginUpdate($hash);
+						
+						### Update readings of device
+						readingsBulkUpdate($hash, "state", $ReadingEventContent, 1);
+						readingsBulkUpdate($hash, $ReadingEvent, "triggered", 1);
+
+						### Execute Readings Bulk Update
+						readingsEndUpdate($hash, 1);
+
+						### Initiate communication and close
+						HttpUtils_NonblockingGet($param);
+
+						### Wrap up a container and initiate the timer to reset reading "doorbell_button"
+						my %Container;
+						$Container{"HashReference"} = $hash;
+						$Container{"Reading"} 		= $ReadingEvent;
+						InternalTimer(gettimeofday()+ $hash->{helper}{EventReset}, "DoorBird_EventReset", \%Container, 0);
+
+						### Execute event trigger for Operation Mode
+						DoorBird_OpsModeExecute($hash, "doorbell");
+						
+						### Log Entry
+						Log3 $name, 3, $name. " : An event has been triggered by the DoorBird unit  : " . $EVENT;
+						Log3 $name, 5, $name. " : DoorBird_Read - Timer for reset reading in        : " . $hash->{helper}{EventReset};
+					}
+					### If the MessageID is integer type has appeared before
+					else {
+						### Do nothing
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_Read - Doorbell message already sent     : YES - Ignoring it!";
+					}
+				}
+				### If the event has been triggered by unknown code
 				else {
-					### Do nothing
-					
-					### Log Entry for debugging purposes
-					Log3 $name, 5, $name. " : DoorBird_Read -- Part 7 ------------------------------------------------------------------------------------------------------------------------";
-					Log3 $name, 5, $name. " : DoorBird_Read - INTERCOM_ID does not matches username. Ignoring datagram packet!";
+					### Log Entry
+					Log3 $name, 3, $name. " : Unknown event triggered by Doorbird Unit : " . $EVENT;
 				}
 			}
+			### Event does not belong to the current user
+			else {
+				### Do nothing
+				
+				### Log Entry for debugging purposes
+				Log3 $name, 5, $name. " : DoorBird_Read -- Part 7 ------------------------------------------------------------------------------------------------------------------------";
+				Log3 $name, 5, $name. " : DoorBird_Read - INTERCOM_ID does not matches username. Ignoring datagram packet!";
+			}
+			
+			
+			
 		}
 	}
 	else {
@@ -1988,6 +2113,11 @@ sub DoorBird_RenewSessionID($) {
 	
 		### Extract SessionId from hash
 		$hash->{helper}{SessionId} = $json-> {BHA}{SESSIONID};
+		
+		### Extract NOTIFICATION_ENCRYPTION_KEY from hash if available
+		if (exists($json-> {BHA}{NOTIFICATION_ENCRYPTION_KEY})) {
+			$hash->{helper}{NOTIFICATION_ENCRYPTION_KEY} = $json-> {BHA}{NOTIFICATION_ENCRYPTION_KEY};
+		}
 
 		### Remove timer for LostConn
 		RemoveInternalTimer($hash, "DoorBird_RenewSessionID");
@@ -2046,22 +2176,107 @@ sub DoorBird_FW_detailFn($$$$) {
 	my $ImageURL		= ReadingsVal($name, ".ImageURL", "");
 	my $AudioURL		= ReadingsVal($name, ".AudioURL", "");
 	my $htmlCode;
+	my $IconFileDir;
 	my $VideoHtmlCode;
 	my $ImageHtmlCode;
 	my $ImageHtmlCodeBig;
 	my $AudioHtmlCode;
+    my $OpModHtmlCode;
 	my @HistoryDoorbell;
 	my @HistoryMotion;
 
-#	### If Operation Mode(s) have been provided
-#	if (@{$hash->{helper}{OpsModeList}} > 0) {
-#		### Log Entry for debugging purposes
-#		Log3 $name, 5, $name. " : DoorBird_FW_detailFn - OpsModeList                : " . Dumper(@{$hash->{helper}{OpsModeList}});
-#	}
-#	else {
-#		### Log Entry for debugging purposes
-#		Log3 $name, 5, $name. " : DoorBird_FW_detailFn - OpsModeList is empty";
-#	}
+	### If Operation Mode(s) have been provided
+	if (@{$hash->{helper}{OpsModeList}} > 0) {
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : DoorBird_FW_detailFn - OpsModeList                : \n" . join(" ", Dumper(@{$hash->{helper}{OpsModeList}}));
+
+		# ### Get current working directory
+		# my $cwd = getcwd();
+
+		# ### Log Entry for debugging purposes
+		# Log3 $name, 5, $name. " : DoorBird_FW_detailFn - working directory          : " . $cwd;
+
+		# ### If the path is given as UNIX file system format
+		# if ($cwd =~ /\//) {
+			# ### Log Entry for debugging purposes
+			# Log3 $name, 5, $name. " : DoorBird_FW_detailFn - file system format         : LINUX";
+
+			# ### Find out whether it is an absolute path or an relative one (leading "/")
+			# if ($IconFileDir =~ /^\//) {
+				# $IconFileDir = $IconFileDir;
+			# }
+			# else {
+				# $IconFileDir = $cwd . "/" . $IconFileDir;						
+			# }
+			
+			# ### Remove last / of directory if exists
+			# $IconFileDir =~ s/\/\z//;
+			
+			# ### Add last / for definitiv
+			# $IconFileDir .= "/";
+			
+			# ### Add IconName
+			# $IconFileDir .= "www/images/default/" . ReadingsVal($name, "OpsMode" . ReadingsVal($name, "OpsMode", "") . "Icon", "");
+			
+			# ### Remove last .png of path if exists
+			# $IconFileDir =~ s/\.png\z//;
+			
+			# ### Add last .png for definitiv
+			# $IconFileDir .= ".png";
+		# }
+		# ### If the path is given as Windows file system format
+		# elsif ($cwd =~ /\\/) {
+			# ### Log Entry for debugging purposes
+			# Log3 $name, 5, $name. " : DoorBird_FW_detailFn - file system format         : WINDOWS";
+
+			# ### Find out whether it is an absolute path or an relative one (containing ":\")
+			# if ($IconFileDir != /^.:\//) {
+				# $IconFileDir = $cwd . $IconFileDir;
+			# }
+			# else {
+				# $IconFileDir = $IconFileDir;						
+			# }
+			
+			# ### Remove last \ of directory if exists
+			# $IconFileDir =~ s/\\\z//;
+			
+			# ### Add last \ for definitiv
+			# $IconFileDir .= "\\";
+
+			# ### Add IconName
+			# $IconFileDir .= "www\\images\\default\\ " . ReadingsVal($name, "OpsMode" . ReadingsVal($name, "OpsMode", "") . "Icon", "");
+			
+			# ### Remove last .png of path if exists
+			# $IconFileDir =~ s/\.svg\z//;
+			
+			# ### Add last .png for definitiv
+			# $IconFileDir .= ".png";
+		# }
+		# ### If nothing matches above
+		# else {
+			# ### Set directory to nothing
+			# $IconFileDir = "";
+		# }
+
+		# ### Log Entry for debugging purposes
+		# Log3 $name, 5, $name. " : DoorBird_FW_detailFn - IconFileDir                : " . $IconFileDir;
+
+		# ### Generate html code for Operation Mode
+		# $OpModHtmlCode = '<b>Operation Mode : ' . ReadingsVal($name, "OpsMode", "") . "<b>" . '<img src="' . $IconFileDir . '" alt=" Icon is unavailable">';
+
+		### Generate html code for Operation Mode
+		$OpModHtmlCode = '<b>Operation Mode : ' . ReadingsVal($name, "OpsMode", "") . "<b>";
+		
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : DoorBird_FW_detailFn - OpModHtmlCode              : " . $OpModHtmlCode;
+	}
+	else {
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : DoorBird_FW_detailFn - OpsModeList is empty";
+		
+		### Leave html code for Operation Mode empty
+		$OpModHtmlCode = "";
+	}
 
 	### Only if DoorBird has a Camera installed view the Image and History Part
 	if ($hash->{helper}{CameraInstalled} == true) {
@@ -2090,8 +2305,9 @@ sub DoorBird_FW_detailFn($$$$) {
 			my $PopupfunctionCode = "onclick=\"FW_okDialog(\'" . $ImageHtmlCodeBig . "\') \" ";
 			$VideoHtmlCode    =  '<img ' . $PopupfunctionCode . ' width="400" height="300"  src="' . $VideoURL . '">';
 
-			### Create proper html link
-			#$VideoHtmlCode = '<img src="' . $VideoURL . '" width="400px" height="300px">';
+			### Log Entry for debugging purposes
+			Log3 $name, 5, $name. " : DoorBird_FW_detailFn - VideoHtmlCode              : " . $VideoHtmlCode;
+
 		}
 		
 		### If ImageData is empty
@@ -2138,7 +2354,7 @@ sub DoorBird_FW_detailFn($$$$) {
 				</tr>
 				
 				<tr>
-					<td></td>
+					<td align="center">' . $OpModHtmlCode . '</td>
 					<td align="center">' . $AudioHtmlCode . '</td>
 				</tr>	
 			</tbody>
@@ -2447,9 +2663,7 @@ sub DoorBird_Live_Video($$) {
 
 	### Obtain values from hash
 	my $name			= $hash->{NAME};
-
 	my $url 			= $hash->{helper}{URL};
-
 
 	### Create complete command URL for DoorBird depending on whether SessionIdSecurity has been enabled (>0) or disabled (=0)
 	my $UrlPrefix 		= "http://" . $url . "/bha-api/";
@@ -2496,7 +2710,7 @@ sub DoorBird_Live_Video($$) {
 }
 ####END####### Define Subfunction for LIVE VIDEO REQUEST #######################################################END#####
 
-###START###### Define Subfunction for LIVE VIDEO REQUEST ######################################################START####
+###START###### Define Subfunction for LIVE AUDIO REQUEST ######################################################START####
 sub DoorBird_Live_Audio($$) {
 	my ($hash, $option)	= @_;
 
@@ -2545,7 +2759,7 @@ sub DoorBird_Live_Audio($$) {
 	}
 	return
 }
-####END####### Define Subfunction for LIVE VIDEO REQUEST #######################################################END#####
+####END####### Define Subfunction for LIVE AUDIO REQUEST #######################################################END#####
 
 
 ###START###### Define Subfunction for LIVE IMAGE REQUEST ######################################################START####
@@ -2584,7 +2798,6 @@ sub DoorBird_Image_Request($$) {
 	Log3 $name, 5, $name. " : DoorBird_Image_Request - err                      : " . $err;
 #	Log3 $name, 5, $name. " : DoorBird_Image_Request - data                     : " . $data;
 
-	
 	### Encode jpeg data into base64 data and remove lose newlines
     my $ImageData =  MIME::Base64::encode($data);
        $ImageData =~ s{\n}{}g;
@@ -2644,7 +2857,6 @@ sub DoorBird_Image_Request($$) {
 				$ImageFileName .= "/" . $ImageFileTimeStamp . "_snapshot.jpg";
 			}
 		}
-
 		### If the path is given as Windows file system format
 		if ($hash->{helper}{ImageFileDir} =~ /\\/) {
 			### Log Entry for debugging purposes
@@ -2702,7 +2914,7 @@ sub DoorBird_Image_Request($$) {
 		### Close file or write error message in log
 		close $fh or do {
 			### Log Entry 
-			Log3 $name, 2, $name. " : DoorBird_Image_Request - close file error          : " . $! . " - ". $ImageFileName;
+			Log3 $name, 2, $name. " : DoorBird_Image_Request - close file error         : " . $! . " - ". $ImageFileName;
 		};
 	
 		### Free FileDirSpace if exxeeds maximum
@@ -3102,8 +3314,7 @@ sub DoorBird_Light_On($$) {
 			### Log Entry
 			Log3 $name, 3, $name. " : DoorBird_Light_On - Light successfully triggered.";
 			
-			### Create popup message
-			return "Light successful triggered.";
+			return
 		}
 		elsif ($json->{BHA}{RETURNCODE} eq "204") {
 			### Log Entry
@@ -3325,7 +3536,6 @@ sub DoorBird_Receive_Audio($$) {
 	}
 }
 ####END####### Define Subfunction for RECEIVE VIDEO REQUEST ####################################################END#####
-
 
 ###START###### Define Subfunction for HISTORY IMAGE REQUEST ###################################################START####
 ### https://wiki.fhem.de/wiki/HttpUtils#HttpUtils_NonblockingGet
@@ -4410,7 +4620,6 @@ sub DoorBird_Restart($$) {
 }
 ####END####### Define Subfunction for RESTART ##################################################################END#####
 
-
 ###START###### Define Subfunction for SIP Status REQUEST ######################################################START####
 sub DoorBird_SipStatus_Request($$) {
 	my ($hash, $option)	= @_;
@@ -4461,7 +4670,7 @@ sub DoorBird_SipStatus_Request($$) {
 			my $VersionContent = $json-> {BHA}{SIP}[0];
 			
 			### Log Entry for debugging purposes
-			Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- json                      : " . Dumper($json);
+			# Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- json                      : " . Dumper($json);
 			
 			 ### Initiate Bulk Update
 			 readingsBeginUpdate($hash);
@@ -4475,7 +4684,7 @@ sub DoorBird_SipStatus_Request($$) {
 					my @CallUserArray = split(";", $VersionContent -> {$key});
 					
 					### Log Entry for debugging purposes
-					Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- CallUser                       : " . Dumper(@CallUserArray);
+					#Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- CallUser                  : " . join(" ", Dumper(@CallUserArray));
 					
 					### Count Number of current readings containing call user 
 					my $CountCurrentCallUserReadings = 0;
@@ -4486,8 +4695,8 @@ sub DoorBird_SipStatus_Request($$) {
 					}
 
 					### Log Entry for debugging purposes
-					Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- CountCurrentCallUserReadings    : " . $CountCurrentCallUserReadings;
-					Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- CallUserArray                   : " . @CallUserArray;
+					Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- CurrentCallUserReadings   : " . $CountCurrentCallUserReadings;
+					Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- CallUserArray             : " . @CallUserArray;
 					
 					### If the number of call user in DoorBird unit is smaller than the number of Call user readings then delete all respective readings first
 					if (@CallUserArray < $CountCurrentCallUserReadings) {
@@ -4505,7 +4714,7 @@ sub DoorBird_SipStatus_Request($$) {
 						$CallUser =~ s/^[^:]*://;
 					
 						### Log Entry for debugging purposes
-						Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- Content of" . sprintf("%15s %-s", "SIP_INCOMING_CALL_USER_" . sprintf("%02d",$CallUserId), ": " . "sip:" . $CallUser);
+						Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- " . sprintf("%25s %-s", "SIP_INCOMING_CALL_USER_" . sprintf("%02d",$CallUserId), ": " . "sip:" . $CallUser);
 
 						### Update Reading
 						readingsBulkUpdate($hash, "SIP_INCOMING_CALL_USER_" . sprintf("%02d",$CallUserId), "sip:" . $CallUser);
@@ -4525,15 +4734,15 @@ sub DoorBird_SipStatus_Request($$) {
 					readingsBulkUpdate($hash, $NewReadingsName, $VersionContent -> {$key});
 					
 					### Log Entry for debugging purposes
-					Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- Content of" . sprintf("%15s %-s", $key, ": " . $VersionContent -> {$key});
-					Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- Content of" . sprintf("%15s %-s", "NewReadingsName", ": " . $NewReadingsName);
-					Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- Content of" . sprintf("%15s %-s", "RelaisNumber",    ": " . $RelaisNumer);
+					Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- " . sprintf("%25s %-s", $key, ": " . $VersionContent -> {$key});
+					Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- " . sprintf("%25s %-s", "NewReadingsName", ": " . $NewReadingsName);
+					Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- " . sprintf("%25s %-s", "RelaisNumber",    ": " . $RelaisNumer);
 				}
 				### For all other entries
 				else {
 					
 					### Log Entry for debugging purposes
-					Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- Content of" . sprintf("%15s %-s", $key, ": " . $VersionContent -> {$key});
+					Log3 $name, 5, $name. " : DoorBird_SipStatus_Req- " . sprintf("%25s %-s", $key, ": " . $VersionContent -> {$key});
 
 					### Update Reading
 					readingsBulkUpdate($hash, "SIP_" . $key, $VersionContent -> {$key} );
@@ -4749,9 +4958,6 @@ sub DoorBird_FileSpace($$$$) {
 	Log3 $name, 5, $name. " : DoorBird_FileSpace - FileDir                      : " . $FileDir;
 	Log3 $name, 5, $name. " : DoorBird_FileSpace - FileExt                      : " . $FileExt;
 	Log3 $name, 5, $name. " : DoorBird_FileSpace - FileDirMaxSize               : " . $FileDirMaxSize . " MByte";
-	
-
-
 
 	my $SizeOfFiles = 0;
 	my @FileList;
@@ -4831,12 +5037,13 @@ sub DoorBird_FileSpace($$$$) {
 
 ###START###### Description for fhem commandref ################################################################START####
 =pod
+=encoding utf8
 =item device
 =item summary    Connects fhem to the DoorBird IP door station
 =item summary_DE Verbindet fhem mit der DoorBird IP T&uuml;rstation
 =begin html
 
-<a name="DoorBird"></a>
+<a id="DoorBird"></a>
 <h3>DoorBird</h3>
 <ul>
 	<table>
@@ -4847,78 +5054,81 @@ sub DoorBird_FileSpace($$$$) {
 				The following packet - installations are pre-requisite if not already installed by other modules (Examples below tested on Raspbian):<BR>
 				<BR>
 				<code>
-					<li>sudo apt-get install sox					</li>
-					<li>sudo apt-get install libsox-fmt-all			</li>
-					<li>sudo apt-get install libsodium-dev			</li>
-					<li>sudo apt-get install gstreamer1.0-tools     </li>
-					<li>sudo cpan Crypt::Argon2						</li>
-					<li>sudo cpan Alien::Base::ModuleBuild			</li>
-					<li>sudo cpan Alien::Sodium						</li>
-					<li>sudo cpan Crypt::NaCl::Sodium				</li>
+					<li>sudo apt  install sox						</li>
+					<li>sudo apt  install libsox-fmt-all			</li>
+					<li>sudo apt  install libsodium-dev				</li>
+					<li>sudo apt  install gstreamer1.0-tools    	</li>
+					<li>sudo cpan install Crypt::Argon2				</li>
+					<li>sudo cpan install Sodium::FFI				</li>
+					<li>sudo cpan install IO::String module			</li>
+					<li>sudo cpan install IO::Socket				</li>
 				</code>
 			</td>
 		</tr>
 	</table>
 	<BR>
 	<table>
-		<tr><td><a name="DoorBirddefine"></a><b>Define</b></td></tr>
-		<tr><td><ul><code>define &lt;name&gt; DoorBird &lt;IPv4-address&gt; &lt;Username&gt; &lt;Password&gt;</code>																																					                                                                                                                                                                                  <BR>          </ul></td></tr>
-		<tr><td><ul><ul><code>&lt;name&gt;                </code> : The name of the device. Recommendation: "myDoorBird".																																					                                                                                                                                                                              <BR>     </ul></ul></td></tr>
-		<tr><td><ul><ul><code>&lt;IPv4-address&gt;        </code> : A valid IPv4 address of the KMxxx. You might look into your router which DHCP address has been given to the DoorBird unit.																																					                                                                                                          <BR>     </ul></ul></td></tr>
-		<tr><td><ul><ul><code>&lt;Username&gt;            </code> : The username which is required to sign on the DoorBird.																																					                                                                                                                                                                              <BR>     </ul></ul></td></tr>
-		<tr><td><ul><ul><code>&lt;Password&gt;            </code> : The password which is required to sign on the DoorBird.																																					                                                                                                                                                                              <BR>     </ul></ul></td></tr>
-	</table>
-	<BR>
-	<table>
-		<tr><td><a name="DoorBirdSet"></a><b>Set</b></td></tr>
-		<tr><td><ul>The set function is able to change or activate the following features as follows:                                                                                                                                                                                                                                                                                                                                                     <BR>     </ul>     </td></tr>
-		<tr><td><ul><a name="Light_On"                  ></a><li><b><u><code>set Light_On                    </code></u></b> : Activates the IR lights of the DoorBird unit. The IR - light deactivates automatically by the default time within the Doorbird unit																			                                                                                                              <BR></li></ul>     </td></tr>
-		<tr><td><ul><a name="Live_Audio"                ></a><li><b><u><code>set Live_Audio &lt;on:off&gt;   </code></u></b> : Activate/Deactivate the Live Audio Stream of the DoorBird on or off and toggles the direct link in the <b>hidden</b> Reading <code>.AudioURL</code>															                                                                                                              <BR></li></ul>     </td></tr>
-		<tr><td><ul><a name="Live_Video"                ></a><li><b><u><code>set Live_Video &lt;on:off&gt;   </code></u></b> : Activate/Deactivate the Live Video Stream of the DoorBird on or off and toggles the direct link in the <b>hidden</b> Reading <code>.VideoURL</code>															                                                                                                              <BR></li></ul>     </td></tr>
-		<tr><td><ul><a name="Open_Door"                 ></a><li><b><u><code>set Open_Door &lt;Value&gt;     </code></u></b> : Activates the Relay of the DoorBird unit with the given address. The list of installed relay addresses are imported with the initialization of parameters.													                                                                                                              <BR></li></ul>     </td></tr>
-		<tr><td><ul><a name="Restart"                   ></a><li><b><u><code>set Restart                     </code></u></b> : Sends the command to restart (reboot) the Doorbird unit																																						                                                                                                              <BR></li></ul>     </td></tr>
-		<tr><td><ul><a name="Transmit_Audio"            ></a><li><b><u><code>set Transmit_Audio &lt;Path&gt; </code></u></b> : Converts a given audio file and transmits the stream to the DoorBird speaker. Requires a datapath to audio file to be converted and send. The user "fhem" needs to have write access to this directory.   	                                                                                                              <BR></li></ul>     </td></tr>
+		<tr><td><a id="DoorBird-define"></a><b>Define</b></td></tr>
+		<tr><td><ul><code>define &lt;name&gt; DoorBird &lt;IPv4-address&gt; &lt;Username&gt; &lt;Password&gt;</code>																																					                                                                                                                                                                                              <BR>          </ul></td></tr>
+		<tr><td><ul><ul><code>&lt;name&gt;                </code> : The name of the device. Recommendation: "myDoorBird".																																					                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;IPv4-address&gt;        </code> : A valid IPv4 address of the KMxxx. You might look into your router which DHCP address has been given to the DoorBird unit.																																					                                                                                                                      <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;Username&gt;            </code> : The username which is required to sign on the DoorBird.																																					                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;Password&gt;            </code> : The password which is required to sign on the DoorBird.																																					                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+	</table>                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+	<BR>                                                                                                                                                                                                                                                                                                                                                                                                                                                       
+	<table>                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+		<tr><td><a id="DoorBird-set"></a><b>Set</b></td></tr>                                                                                                                                                                                                                                                                                                                                                                                                  
+		<tr><td><ul>The set function is able to change or activate the following features as follows:                                                                                                                                                                                                                                                                                                                                                                 <BR>     </ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-Light_On"                                                     ></a><li><b><u><code>set Light_On                          </code></u></b> : Activates the IR lights of the DoorBird unit. The IR - light deactivates automatically by the default time within the Doorbird unit																			                                                                                                              <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-Live_Audio"                                                   ></a><li><b><u><code>set Live_Audio &lt;on:off&gt;         </code></u></b> : Activate/Deactivate the Live Audio Stream of the DoorBird on or off and toggles the direct link in the <b>hidden</b> Reading <code>.AudioURL</code>															                                                                                                              <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-Live_Video"                                                   ></a><li><b><u><code>set Live_Video &lt;on:off&gt;         </code></u></b> : Activate/Deactivate the Live Video Stream of the DoorBird on or off and toggles the direct link in the <b>hidden</b> Reading <code>.VideoURL</code>															                                                                                                              <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-Open_Door"                                                    ></a><li><b><u><code>set Open_Door &lt;Value&gt;           </code></u></b> : Activates the Relay of the DoorBird unit with the given address. The list of installed relay addresses are imported with the initialization of parameters.													                                                                                                              <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-OpsMode.*DoorbellAudio" data-pattern="OpsMode.*DoorbellAudio" ></a><li><b><u><code>set OpsMode&lt;Value&gt;DoorbellAudio </code></u></b> : A selection of the audio files stored in the directory which is defined in the attribute "AudioFileDir".	This file will be converted and send to the DoorBird to be played in case of doorbell activation.												                                                                  <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-OpsMode.*DoorbellRelay" data-pattern="OpsMode.*DoorbellRelay" ></a><li><b><u><code>set OpsMode&lt;Value&gt;DoorbellRelay </code></u></b> : A selection of the installed relays which shall be activated in case of doorbell activation.                                                                                                                                                                                                                                <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-OpsMode.*MotionAudio"   data-pattern="OpsMode.*MotionAudio"   ></a><li><b><u><code>set OpsMode&lt;Value&gt;MotionAudio   </code></u></b> : A selection of the audio files stored in the directory which is defined in the attribute "AudioFileDir".	This file will be converted and send to the DoorBird to be played in case of motion sensor triggering.												                                                              <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-OpsMode.*MotionRelay"   data-pattern="OpsMode.*MotionRelay"   ></a><li><b><u><code>set OpsMode&lt;Value&gt;MotionRelay   </code></u></b> : A selection of the installed relays which shall be activated in case of motion sensor triggering.                                                                                                                                                                                                                           <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-Receive_Audio"                                                ></a><li><b><u><code>set Receive_Audio &lt;Path&gt;        </code></u></b> : Receives an audio file and saves it. Requires a datapath to audio file to be saved. The user "fhem" needs to have write access to this directory.   	                                                                                                                                                                      <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-Restart"                                                      ></a><li><b><u><code>set Restart                           </code></u></b> : Sends the command to restart (reboot) the Doorbird unit																																						                                                                                                              <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-Transmit_Audio"                                               ></a><li><b><u><code>set Transmit_Audio &lt;Path&gt;       </code></u></b> : Converts a given audio file and transmits the stream to the DoorBird speaker. Requires a datapath to audio file to be converted and send. The user "fhem" needs to have write access to this directory.   	                                                                                                              <BR></li></ul>     </td></tr>
 	</table>                                                                                                                                                                                                                                                                                                                                                                                                                                                       
 	<BR>                                                                                                                                                                                                                                                                                                                                                                                                                                                           
 	<table>                                                                                                                                                                                                                                                                                                                                                                                                                                                        
-		<tr><td><a name="DoorBirdGet"></a><b>Get</b></td></tr>                                                                                                                                                                                                                                                                                                                                                                                                     
-		<tr><td><ul>The get function is able to obtain the following information from the DoorBird unit:<BR></ul></td></tr>                                                                                                                                                                                                                                                                                                                                        
-		<tr><td><ul><a name="History_Request"           ></a><li><b><u><code>get History_Request             </code></u></b> : Downloads the pictures of the last events of the doorbell and motion sensor. (Refer to attribute <code>MaxHistory</code>)																					                                                                                                              <BR></li></ul>     </td></tr>
-		<tr><td><ul><a name="Image_Request"             ></a><li><b><u><code>get Image_Request               </code></u></b> : Downloads the current Image of the camera of DoorBird unit.																																					                                                                                                              <BR></li></ul>     </td></tr>
-		<tr><td><ul><a name="Video_Request"             ></a><li><b><u><code>get Video_Request &lt;Value&gt; </code></u></b> : Downloads the current Video of the camera of DoorBird unit for th etime in seconds given.																													                                                                                                              <BR></li></ul>     </td></tr>
-		<tr><td><ul><a name="Info_Request"              ></a><li><b><u><code>get Info_Request                </code></u></b> : Downloads the current internal setup such as relay configuration, firmware version etc. of the DoorBird unit. The obtained relay adresses will be used as options for the <code>Open_Door</code> command.	                                                                                                              <BR></li></ul>     </td></tr>
-	</table>
-	<BR>
-	<table>
-		<tr><td><a name="DoorBirdAttr"></a><b>Attributes</b></td></tr>
+		<tr><td><a id="DoorBird-get"></a><b>Get</b></td></tr>                                                                                                                                                                                                                                                                                                                                                                                                     
+		<tr><td><ul>The get function is able to obtain the following information from the DoorBird unit:<BR></ul></td></tr>                                                                                                                                                                                                                                                                                                                                            
+		<tr><td><ul><a id="DoorBird-get-History_Request"                                              ></a><li><b><u><code>get History_Request                   </code></u></b> : Downloads the pictures of the last events of the doorbell and motion sensor. (Refer to attribute <code>MaxHistory</code>)																					                                                                                                                  <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-get-Image_Request"                                                ></a><li><b><u><code>get Image_Request                     </code></u></b> : Downloads the current Image of the camera of DoorBird unit.																																					                                                                                                              <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-get-Video_Request"                                                ></a><li><b><u><code>get Video_Request &lt;Value&gt;       </code></u></b> : Downloads the current Video of the camera of DoorBird unit for the time in seconds given.																													                                                                                                                  <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-get-Info_Request"                                                 ></a><li><b><u><code>get Info_Request                      </code></u></b> : Downloads the current internal setup such as relay configuration, firmware version etc. of the DoorBird unit. The obtained relay adresses will be used as options for the <code>Open_Door</code> command.	                                                                                                                  <BR></li></ul>     </td></tr>
+	</table>	<BR><table>
+		<tr><td><a id="DoorBird-attr"></a><b>Attributes</b></td></tr>
 		<tr><td><ul>The following user attributes can be used with the DoorBird module in addition to the global ones e.g. <a href="#room">room</a>.<BR></ul></td></tr>
 	</table>
 	<table>
-		<tr><td><ul><ul><a name="disable"               ></a><li><b><u><code>disable                         </code></u></b> : Stops the device from further reacting on UDP datagrams sent by the DoorBird unit.<BR>The default value is 0 = activated                                                                                                                                                                                                   <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="KeepAliveTimeout"      ></a><li><b><u><code>KeepAliveTimeout                </code></u></b> : Timeout in seconds without still-alive UDP datagrams before state of device will be set to "disconnected".<BR>The default value is 30s                                                                                                                                                                                     <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="MaxHistory"            ></a><li><b><u><code>MaxHistory                      </code></u></b> : Number of pictures to be downloaded from history for both - doorbell and motion sensor events.<BR>The default value is "50" which is the maximum possible.                                                                                                                                                                 <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="PollingTimeout"        ></a><li><b><u><code>PollingTimeout                  </code></u></b> : Timeout in seconds before download requests are terminated in cause of no reaction by DoorBird unit. Might be required to be adjusted due to network speed.<BR>The default value is 10s.                                                                                                                                   <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="UdpPort"               ></a><li><b><u><code>UdpPort                         </code></u></b> : Port number to be used to receice UDP datagrams. Ports are pre-defined by firmware.<BR>The default value is port 6524                                                                                                                                                                                                      <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="SessionIdSec"          ></a><li><b><u><code>SessionIdSec                    </code></u></b> : Time in seconds for how long the session Id shall be valid, which is required for secure Video and Audio transmission. The DoorBird kills the session Id after 10min = 600s automatically. In case of use with CCTV recording units, this function must be disabled by setting to 0.<BR>The default value is 540s = 9min.  <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="AudioFileDir"          ></a><li><b><u><code>AudioFileDir                    </code></u></b> : The relative (e.g. "audio") or absolute (e.g. "/mnt/NAS/audio") with or without trailing "/" directory path to which the audio files supposed to be stored.<BR>The default value is <code>""</code> = disabled                                                                                                             <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="AudioFileDirMaxSize"   ></a><li><b><u><code>AudioFileDirmaxSize             </code></u></b> : The maximum size of the AudioFileDir in Megabyte [MB]. If the maximum Size has been reached with audio files, the oldest files are deleted automatically<BR>The default value is <code>50</code> = 50MB                                                                                                                    <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="ImageFileDir"          ></a><li><b><u><code>ImageFileDir                    </code></u></b> : The relative (e.g. "images") or absolute (e.g. "/mnt/NAS/images") with or without trailing "/" directory path to which the image files supposed to be stored.<BR>The default value is <code>""</code> = disabled                                                                                                           <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="ImageFileDirMaxSize"   ></a><li><b><u><code>ImageFileDirmaxSize             </code></u></b> : The maximum size of the ImageFileDir in Megabyte [MB]. If the maximum Size has been reached with Image files, the oldest files are deleted automatically<BR>The default value is <code>50</code> = 50MB                                                                                                                    <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="VideoFileDir"          ></a><li><b><u><code>VideoFileDir                    </code></u></b> : The relative (e.g. "images") or absolute (e.g. "/mnt/NAS/images") with or without trailing "/" directory path to which the video files supposed to be stored.<BR>The default value is <code>""</code> = disabled                                                                                                           <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="VideoFileDirMaxSize"   ></a><li><b><u><code>VideoFileDirmaxSize             </code></u></b> : The maximum size of the VideoFileDir in Megabyte [MB]. If the maximum Size has been reached with Video files, the oldest files are deleted automatically<BR>The default value is <code>50</code> = 50MB                                                                                                                    <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="VideoFileFormat"       ></a><li><b><u><code>VideoFileFormat                 </code></u></b> : The file format for the video file to be stored<BR>The default value is <code>"mpeg"</code>                                                                                                                                                                                                                                <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="VideoDurationDoorbell" ></a><li><b><u><code>VideoDurationDoorbell           </code></u></b> : Time in seconds for how long the video shall be recorded in case of an doorbbell event.<BR>The default value is <code>0</code> = disabled                                                                                                                                                                                  <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="VideoDurationMotion"   ></a><li><b><u><code>VideoDurationMotion             </code></u></b> : Time in seconds for how long the video shall be recorded in case of an motion sensor event.<BR>The default value is <code>0</code> = disabled                                                                                                                                                                              <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="EventReset"            ></a><li><b><u><code>EventReset                      </code></u></b> : Time in seconds after wich the Readings for the Events Events (e.g. "doorbell_button", "motions sensor", "keypad") shal be reset to "idle".<BR>The default value is 5s                                                                                                                                                     <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="WaitForHistory"        ></a><li><b><u><code>WaitForHistory                  </code></u></b> : Time in seconds after wich the module shall wait for an history image triggered by an event is ready for download. Might be adjusted if fhem-Server and Doorbird unit have large differences in system time.<BR>The default value is 7s                                                                                    <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="OpsModeList"           ></a><li><b><u><code>OpsModeList                     </code></u></b> : A space separated list of names for operational modes (e.g. "Normal Party Fire") on which the DoorBird reacts automatically on events.<BR>The default value is <code>""</code> = disabled                                                                                                                                  <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="HistoryFilePath"       ></a><li><b><u><code>HistoryFilePath                 </code></u></b> : Creates relative datapaths to the last pictures, and videos in order to indicate them directly (e.g. fhem ftui widget "image")<BR>The default value is <code>"0"</code> = disabled                                                                                                                                         <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-disable"                                                 ></a><li><b><u><code>disable                              </code></u></b> : Stops the device from further reacting on UDP datagrams sent by the DoorBird unit.<BR>The default value is 0 = activated                                                                                                                                                                                                   <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-KeepAliveTimeout"                                        ></a><li><b><u><code>KeepAliveTimeout                     </code></u></b> : Timeout in seconds without still-alive UDP datagrams before state of device will be set to "disconnected".<BR>The default value is 30s                                                                                                                                                                                     <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-MaxHistory"                                              ></a><li><b><u><code>MaxHistory                           </code></u></b> : Number of pictures to be downloaded from history for both - doorbell and motion sensor events.<BR>The default value is "50" which is the maximum possible.                                                                                                                                                                 <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-PollingTimeout"                                          ></a><li><b><u><code>PollingTimeout                       </code></u></b> : Timeout in seconds before download requests are terminated in cause of no reaction by DoorBird unit. Might be required to be adjusted due to network speed.<BR>The default value is 10s.                                                                                                                                   <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-UdpPort"                                                 ></a><li><b><u><code>UdpPort                              </code></u></b> : Port number to be used to receice UDP datagrams. Ports are pre-defined by firmware.<BR>The default value is port 6524                                                                                                                                                                                                      <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-SessionIdSec"                                            ></a><li><b><u><code>SessionIdSec                         </code></u></b> : Time in seconds for how long the session Id shall be valid, which is required for secure Video and Audio transmission. The DoorBird kills the session Id after 10min = 600s automatically. In case of use with CCTV recording units, this function must be disabled by setting to 0.<BR>The default value is 540s = 9min.  <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-AudioFileDir"                                            ></a><li><b><u><code>AudioFileDir                         </code></u></b> : The relative (e.g. "audio") or absolute (e.g. "/mnt/NAS/audio") with or without trailing "/" directory path to which the audio files supposed to be stored.<BR>The default value is <code>""</code> = disabled                                                                                                             <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-AudioFileDirMaxSize"                                     ></a><li><b><u><code>AudioFileDirmaxSize                  </code></u></b> : The maximum size of the AudioFileDir in Megabyte [MB]. If the maximum Size has been reached with audio files, the oldest files are deleted automatically<BR>The default value is <code>50</code> = 50MB                                                                                                                    <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-ImageFileDir"                                            ></a><li><b><u><code>ImageFileDir                         </code></u></b> : The relative (e.g. "images") or absolute (e.g. "/mnt/NAS/images") with or without trailing "/" directory path to which the image files supposed to be stored.<BR>The default value is <code>""</code> = disabled                                                                                                           <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-ImageFileDirMaxSize"                                     ></a><li><b><u><code>ImageFileDirmaxSize                  </code></u></b> : The maximum size of the ImageFileDir in Megabyte [MB]. If the maximum Size has been reached with Image files, the oldest files are deleted automatically<BR>The default value is <code>50</code> = 50MB                                                                                                                    <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-VideoFileDir"                                            ></a><li><b><u><code>VideoFileDir                         </code></u></b> : The relative (e.g. "images") or absolute (e.g. "/mnt/NAS/images") with or without trailing "/" directory path to which the video files supposed to be stored.<BR>The default value is <code>""</code> = disabled                                                                                                           <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-VideoFileDirMaxSize"                                     ></a><li><b><u><code>VideoFileDirmaxSize                  </code></u></b> : The maximum size of the VideoFileDir in Megabyte [MB]. If the maximum Size has been reached with Video files, the oldest files are deleted automatically<BR>The default value is <code>50</code> = 50MB                                                                                                                    <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-VideoFileFormat"                                         ></a><li><b><u><code>VideoFileFormat                      </code></u></b> : The file format for the video file to be stored<BR>The default value is <code>"mpeg"</code>                                                                                                                                                                                                                                <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-VideoDurationDoorbell"                                   ></a><li><b><u><code>VideoDurationDoorbell                </code></u></b> : Time in seconds for how long the video shall be recorded in case of an doorbbell event.<BR>The default value is <code>0</code> = disabled                                                                                                                                                                                  <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-VideoDurationMotion"                                     ></a><li><b><u><code>VideoDurationMotion                  </code></u></b> : Time in seconds for how long the video shall be recorded in case of an motion sensor event.<BR>The default value is <code>0</code> = disabled                                                                                                                                                                              <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-EventReset"                                              ></a><li><b><u><code>EventReset                           </code></u></b> : Time in seconds after wich the Readings for the Events Events (e.g. "doorbell_button", "motions sensor", "keypad") shal be reset to "idle".<BR>The default value is 5s                                                                                                                                                     <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-WaitForHistory"                                          ></a><li><b><u><code>WaitForHistory                       </code></u></b> : Time in seconds after wich the module shall wait for an history image triggered by an event is ready for download. Might be adjusted if fhem-Server and Doorbird unit have large differences in system time.<BR>The default value is 7s                                                                                    <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-OpsModeList"                                             ></a><li><b><u><code>OpsModeList                          </code></u></b> : A space separated list of names for operational modes (e.g. "Normal Party Fire") on which the DoorBird reacts automatically on events.<BR>The default value is <code>""</code> = disabled                                                                                                                                  <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-HistoryFilePath"                                         ></a><li><b><u><code>HistoryFilePath                      </code></u></b> : Creates relative datapaths to the last pictures, and videos in order to indicate them directly (e.g. fhem ftui widget "image")<BR>The default value is <code>"0"</code> = disabled                                                                                                                                         <BR></li></ul></ul></td></tr>
 	</table>
 </ul>
 =end html
 =begin html_DE
 
-<a name="DoorBird"></a>
+<a id="DoorBird"></a>
 <h3>DoorBird</h3>
 <ul>
 	<table>
@@ -4929,77 +5139,82 @@ sub DoorBird_FileSpace($$$$) {
 				Die folgenden Software - Pakete m&uuml;ssen noch zus&auml;tzlich installiert werden, sofern dies nicht schon durch andere Module erfolgt ist. (Die Beispiele sind auf dem Raspberry JESSIE gestestet):<BR>
 				<BR>
 				<code>
-					<li>sudo apt-get install sox					</li>
-					<li>sudo apt-get install libsox-fmt-all			</li>
-					<li>sudo apt-get install libsodium-dev			</li>
-					<li>sudo apt-get install gstreamer1.0-tools     </li>
-					<li>sudo cpan Crypt::Argon2						</li>
-					<li>sudo cpan Alien::Base::ModuleBuild			</li>
-					<li>sudo cpan Alien::Sodium						</li>
-					<li>sudo cpan Crypt::NaCl::Sodium				</li>
+					<li>sudo apt  install sox						</li>
+					<li>sudo apt  install libsox-fmt-all			</li>
+					<li>sudo apt  install libsodium-dev				</li>
+					<li>sudo apt  install gstreamer1.0-tools    	</li>
+					<li>sudo cpan install Crypt::Argon2				</li>
+					<li>sudo cpan install Sodium::FFI				</li>
+					<li>sudo cpan install IO::String module			</li>
+					<li>sudo cpan install IO::Socket				</li>
+
 				</code>
 			</td>
 		</tr>
 	</table>
 	<BR>
 	<table>
-		<tr><td><a name="DoorBirddefine"></a><b>Define</b></td></tr>
+		<tr><td><a id="DoorBird-define"></a><b>Define</b></td></tr>
 
-		<tr><td><ul><code>define &lt;name&gt; DoorBird &lt;IPv4-address&gt; &lt;Username&gt; &lt;Passwort&gt;</code>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                <BR>          </ul></td></tr>
-		<tr><td><ul><ul><code>&lt;name&gt;           </code> : </td><td>Der Name des Device unter fhem. Beispiel: "myDoorBird".																												                                                                                                                                                                                                                                                                                                                                                        <BR>     </ul></ul></td></tr>
-		<tr><td><ul><ul><code>&lt;IPv4-Addresse&gt;  </code> : </td><td>Eine g&uuml;ltige IPv4 - Addresse der DoorBird-Anlage. Ggf. muss man im Router nach der entsprechenden DHCP Addresse suchen, die der DoorBird Anlage vergeben wurde.                                                                                                                                                                                                                                                                                                                                                        <BR>     </ul></ul></td></tr>
-		<tr><td><ul><ul><code>&lt;Username&gt;       </code> : </td><td>Der Username zum einloggen auf der DoorBird Anlage.																													                                                                                                                                                                                                                                                                                                                                                        <BR>     </ul></ul></td></tr>
-		<tr><td><ul><ul><code>&lt;Passwort&gt;       </code> : </td><td>Das Passwort zum einloggen auf der DoorBird Anlage.																													                                                                                                                                                                                                                                                                                                                                                        <BR>     </ul></ul></td></tr>
+		<tr><td><ul><code>define &lt;name&gt; DoorBird &lt;IPv4-address&gt; &lt;Username&gt; &lt;Passwort&gt;</code>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    <BR>          </ul></td></tr>
+		<tr><td><ul><ul><code>&lt;name&gt;           </code> : </td><td>Der Name des Device unter fhem. Beispiel: "myDoorBird".																												                                                                                                                                                                                                                                                                                                                                                                                                            <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;IPv4-Addresse&gt;  </code> : </td><td>Eine g&uuml;ltige IPv4 - Addresse der DoorBird-Anlage. Ggf. muss man im Router nach der entsprechenden DHCP Addresse suchen, die der DoorBird Anlage vergeben wurde.                                                                                                                                                                                                                                                                                                                                                                                                            <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;Username&gt;       </code> : </td><td>Der Username zum einloggen auf der DoorBird Anlage.																													                                                                                                                                                                                                                                                                                                                                                                                                            <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;Passwort&gt;       </code> : </td><td>Das Passwort zum einloggen auf der DoorBird Anlage.																													                                                                                                                                                                                                                                                                                                                                                                                                            <BR>     </ul></ul></td></tr>
 	</table>
 	<BR>
 	<table>
-		<tr><td><a name="DoorBirdSet"></a><b>Set</b></td></tr>
-		<tr><td><ul>Die Set - Funktion ist in der lage auf der DoorBird - Anlage die folgenden Einstellungen vorzunehmen bzw. zu de-/aktivieren:                                                                                                                                                                                                                                                                                                                                                                                                                                                    <BR>          </ul></td></tr>
-		<tr><td><ul><a name="Light_On"                  ></a><li><b><u><code>set Light_On                    </code></u></b> : Schaltet das IR lichht der DoorBird Anlage ein. Das IR Licht schaltet sich automatisch nach der in der DoorBird - Anlage vorgegebenen Default Zeit wieder aus.															                                                                                                                                                                                                                                            <BR></li>     </ul></td></tr>
-		<tr><td><ul><a name="Live_Audio"                ></a><li><b><u><code>set Live_Audio &lt;on:off&gt;   </code></u></b> : Aktiviert/Deaktiviert den Live Audio Stream der DoorBird - Anlage Ein oder Aus und wechselt den direkten link in dem <b>versteckten</b> Reading <code>.AudioURL.</code>													                                                                                                                                                                                                                                            <BR></li>     </ul></td></tr>
-		<tr><td><ul><a name="Live_Video"                ></a><li><b><u><code>set Live_Video &lt;on:off&gt;   </code></u></b> : Aktiviert/Deaktiviert den Live Video Stream der DoorBird - Anlage Ein oder Aus und wechselt den direkten link in dem <b>versteckten</b> Reading <code>.VideoURL.</code>													                                                                                                                                                                                                                                            <BR></li>     </ul></td></tr>
-		<tr><td><ul><a name="Open_Door"                 ></a><li><b><u><code>set Open_Door &lt;Value&gt;     </code></u></b> : Aktiviert das Relais der DoorBird - Anlage mit dessen Adresse. Die Liste der installierten Relais werden mit der Initialisierung der Parameter importiert.																                                                                                                                                                                                                                                            <BR></li>     </ul></td></tr>
-		<tr><td><ul><a name="Restart"                   ></a><li><b><u><code>set Restart                     </code></u></b> : Sendet das Kommando zum rebooten der DoorBird - Anlage.																																									                                                                                                                                                                                                                                            <BR></li>     </ul></td></tr>
-		<tr><td><ul><a name="Transmit_Audio"            ></a><li><b><u><code>set Transmit_Audio &lt;Path&gt; </code></u></b> : Konvertiert die angegebene Audio-Datei und sendet diese zur Ausgabe an die DoorBird - Anlage. Es ben&ouml;tigt einen Dateipfad zu der Audio-Datei zu dem der User "fhem" Schreibrechte braucht (z.B.: /opt/fhem/audio).	                                                                                                                                                                                                                                            <BR></li>     </ul></td></tr>
+		<tr><td><a id="DoorBird-set"></a><b>Set</b></td></tr>
+		<tr><td><ul>Die Set - Funktion ist in der lage auf der DoorBird - Anlage die folgenden Einstellungen vorzunehmen bzw. zu de-/aktivieren:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        <BR>          </ul></td></tr>
+		<tr><td><ul><a id="DoorBird-set-Light_On"                                                     ></a><li><b><u><code>set Light_On                          </code></u></b> : Schaltet das IR lichht der DoorBird Anlage ein. Das IR Licht schaltet sich automatisch nach der in der DoorBird - Anlage vorgegebenen Default Zeit wieder aus.															                                                                                                                                                                                                                                            <BR></li>     </ul></td></tr>
+		<tr><td><ul><a id="DoorBird-set-Live_Audio"                                                   ></a><li><b><u><code>set Live_Audio &lt;on:off&gt;         </code></u></b> : Aktiviert/Deaktiviert den Live Audio Stream der DoorBird - Anlage Ein oder Aus und wechselt den direkten link in dem <b>versteckten</b> Reading <code>.AudioURL.</code>													                                                                                                                                                                                                                                            <BR></li>     </ul></td></tr>
+		<tr><td><ul><a id="DoorBird-set-Live_Video"                                                   ></a><li><b><u><code>set Live_Video &lt;on:off&gt;         </code></u></b> : Aktiviert/Deaktiviert den Live Video Stream der DoorBird - Anlage Ein oder Aus und wechselt den direkten link in dem <b>versteckten</b> Reading <code>.VideoURL.</code>													                                                                                                                                                                                                                                            <BR></li>     </ul></td></tr>
+		<tr><td><ul><a id="DoorBird-set-Open_Door"                                                    ></a><li><b><u><code>set Open_Door &lt;Value&gt;           </code></u></b> : Aktiviert das Relais der DoorBird - Anlage mit dessen Adresse. Die Liste der installierten Relais werden mit der Initialisierung der Parameter importiert.																                                                                                                                                                                                                                                            <BR></li>     </ul></td></tr>
+		<tr><td><ul><a id="DoorBird-set-OpsMode.*DoorbellAudio" data-pattern="OpsMode.*DoorbellAudio" ></a><li><b><u><code>set OpsMode&lt;Value&gt;DoorbellAudio </code></u></b> : Eine Auswahl der Audio Dateien die im Unterverzeichnis abgelegt sind welches durch das Attribut "AudioFileDir" definert ist.	Diese Datei wird entsprechend konvertiert und an den DoorBird gesendet und im abgespielt sobald die Klingeltaste bet&auml;tigt wird.												                                                                                                                                                    <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-OpsMode.*DoorbellRelay" data-pattern="OpsMode.*DoorbellRelay" ></a><li><b><u><code>set OpsMode&lt;Value&gt;DoorbellRelay </code></u></b> : Eine Auswahl der installierten Relays die aktiviert weerden, sobald die Klingeltaste bet&auml;tigt wird.												                                                                                                                                                    												                                                                                                            <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-OpsMode.*MotionAudio"   data-pattern="OpsMode.*MotionAudio"   ></a><li><b><u><code>set OpsMode&lt;Value&gt;MotionAudio   </code></u></b> : Wine Auswahl der Audio Dateien die im Unterverzeichnis abgelegt sind welches durch das Attribut "AudioFileDir" definert ist.	Diese Datei wird entsprechend konvertiert und an den DoorBird gesendet und im abgespielt sobald der Bewegungssensor getriggert wird.                                                                                                                                                                                                    <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-OpsMode.*MotionRelay"   data-pattern="OpsMode.*MotionRelay"   ></a><li><b><u><code>set OpsMode&lt;Value&gt;MotionRelay   </code></u></b> : Eine Auswahl der installierten Relays die aktiviert weerden, sobald der Bewegungssensor getriggert wird.												                                                                                                                                                    												                                                                                                            <BR></li></ul>     </td></tr>
+		<tr><td><ul><a id="DoorBird-set-Receive_Audio"                                                ></a><li><b><u><code>set Receive_Audio &lt;Path&gt;        </code></u></b> : Empf&auml;ngt eine Audio-Datei und speichert diese. Es ben&ouml;tigt einen Dateipfad zu der Audio-Datei zu dem der User "fhem" Schreibrechte braucht (z.B.: /opt/fhem/audio).	                                                                                                                                                                                                                                                                                    <BR></li>     </ul></td></tr>
+		<tr><td><ul><a id="DoorBird-set-Restart"                                                      ></a><li><b><u><code>set Restart                           </code></u></b> : Sendet das Kommando zum rebooten der DoorBird - Anlage.																																									                                                                                                                                                                                                                                            <BR></li>     </ul></td></tr>
+		<tr><td><ul><a id="DoorBird-set-Transmit_Audio"                                               ></a><li><b><u><code>set Transmit_Audio &lt;Path&gt;       </code></u></b> : Konvertiert die angegebene Audio-Datei und sendet diese zur Ausgabe an die DoorBird - Anlage. Es ben&ouml;tigt einen Dateipfad zu der Audio-Datei zu dem der User "fhem" Schreibrechte braucht (z.B.: /opt/fhem/audio).	                                                                                                                                                                                                                                            <BR></li>     </ul></td></tr>
 	</table>
 	<BR>
 	<table>
-		<tr><td><a name="DoorBirdGet"></a><b>Get</b></td></tr>
-		<tr><td><ul>Die Get - Funktion ist in der lage von der DoorBird - Anlage die folgenden Informationen und Daten zu laden:                                                                                                                                                                                                                                                                                                                                                                                                                                                                    <BR>          </ul></td></tr>
-		<tr><td><ul><a name="History_Request"           ></a><li><b><u><code>get History_Request             </code></u></b> : L&auml;dt die Bilder der letzten Ereignisse durch die T&uuml;rklingel und dem Bewegungssensor herunter. (Siehe auch Attribut <code>MaxHistory</code>)                                                                                                                                                                                                                                                                                                                <BR></li>     </ul></td></tr>
-		<tr><td><ul><a name="Image_Request"             ></a><li><b><u><code>get Image_Request               </code></u></b> : L&auml;dt das gegenw&auml;rtige Bild der DoorBird - Kamera herunter.                                                                                                                                                                                                                                                                                                                                                                                                 <BR></li>     </ul></td></tr>
-		<tr><td><ul><a name="Video_Request"             ></a><li><b><u><code>get Video_Request &lt;Value&gt; </code></u></b> : L&auml;dt das gegenw&auml;rtige Video der DoorBird - Kamera f&uumlr die gegebene Zeit in Sekunden herunter.                                                                                                                                                                                                                                                                                                                                                          <BR></li>     </ul></td></tr>
-		<tr><td><ul><a name="Info_Request"              ></a><li><b><u><code>get Info_Request                </code></u></b> : L&auml;dt das interne Setup (Firmware Version, Relais Konfiguration etc.) herunter. Die &uuml;bermittelten Relais-Adressen werden als Option f&uuml;r das Kommando <code>Open_Door</code> verwendet.                                                                                                                                                                                                                                                                 <BR></li>     </ul></td></tr>
+		<tr><td><a id="DoorBird-get"></a><b>Get</b></td></tr>
+		<tr><td><ul>Die Get - Funktion ist in der lage von der DoorBird - Anlage die folgenden Informationen und Daten zu laden:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        <BR>          </ul></td></tr>
+		<tr><td><ul><a id="DoorBird-get-History_Request"                                              ></a><li><b><u><code>get History_Request                   </code></u></b> : L&auml;dt die Bilder der letzten Ereignisse durch die T&uuml;rklingel und dem Bewegungssensor herunter. (Siehe auch Attribut <code>MaxHistory</code>)                                                                                                                                                                                                                                                                                                                <BR></li>     </ul></td></tr>
+		<tr><td><ul><a id="DoorBird-get-Image_Request"                                                ></a><li><b><u><code>get Image_Request                     </code></u></b> : L&auml;dt das gegenw&auml;rtige Bild der DoorBird - Kamera herunter.                                                                                                                                                                                                                                                                                                                                                                                                 <BR></li>     </ul></td></tr>
+		<tr><td><ul><a id="DoorBird-get-Video_Request"                                                ></a><li><b><u><code>get Video_Request &lt;Value&gt;       </code></u></b> : L&auml;dt das gegenw&auml;rtige Video der DoorBird - Kamera f&uumlr die gegebene Zeit in Sekunden herunter.                                                                                                                                                                                                                                                                                                                                                          <BR></li>     </ul></td></tr>
+		<tr><td><ul><a id="DoorBird-get-Info_Request"                                                 ></a><li><b><u><code>get Info_Request                      </code></u></b> : L&auml;dt das interne Setup (Firmware Version, Relais Konfiguration etc.) herunter. Die &uuml;bermittelten Relais-Adressen werden als Option f&uuml;r das Kommando <code>Open_Door</code> verwendet.                                                                                                                                                                                                                                                                 <BR></li>     </ul></td></tr>
 	</table>
 	<BR>
 	<table>
-		<tr><td><a name="DoorBirdAttr"></a><b>Attributes</b></td></tr>
+		<tr><td><a id="DoorBird-attr"></a><b>Attributes</b></td></tr>
 		<tr><td><ul>Die folgenden Attribute k&ouml;nnen mit dem DoorBird Module neben den globalen Attributen wie <a href="#room">room</a> verwednet werden.<BR></ul></td></tr>
 	</table>
 	<table>
-		<tr><td><ul><ul><a name="disable"               ></a><li><b><u><code>disable                         </code></u></b> : Stoppt das Ger&auml;t von weiteren Reaktionen auf die von der DoorBird ß Anlage ausgesendeten UDP - Datageramme<BR>Der Default Wert ist 0 = aktiviert                                                                                                                                                                                                                                                                                                                <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="KeepAliveTimeout"      ></a><li><b><u><code>KeepAliveTimeout                </code></u></b> : Timeout in Sekunden ohne "still-alive" - UDP Datagramme bevor der Status des Ger&auml;tes auf  "disconnected" gesetzt wird.<BR>Der Default Wert ist 30s                                                                                                                                                                                                                                                                                                              <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="MaxHistory"            ></a><li><b><u><code>MaxHistory                      </code></u></b> : Anzahl der herunterzuladenden Bilder aus dem Historien-Archiv sowohl f&uuml;r Ereignisse seitens der T&uuml;rklingel als auch f&uuml;r den Bewegungssensor.<BR>Der Default Wert ist "50" = Maximum.                                                                                                                                                                                                                                                                  <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="PollingTimeout"        ></a><li><b><u><code>PollingTimeout                  </code></u></b> : Timeout in Sekunden before der Download-Versuch aufgrund fehlender Antwort seitens der DoorBird-Anlage terminiert wird. Eine Adjustierung mag notwendig sein, sobald Netzwerk-Latenzen aufteten.<BR>Der Default-Wert ist 10s.                                                                                                                                                                                                                                        <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="UdpPort"               ></a><li><b><u><code>UdpPort                         </code></u></b> : Port Nummer auf welcher das DoorBird - Modul nach den UDP Datagrammen der DoorBird - Anlage h&ouml;ren soll. Die Ports sind von der Firmware vorgegeben.<BR>Der Default Port ist 6524                                                                                                                                                                                                                                                                                <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="SessionIdSec"          ></a><li><b><u><code>SessionIdSec                    </code></u></b> : Zeit in Sekunden nach welcher die Session Id erneuert werden soll. Diese ist f&uuml;r die sichere &Uuml;bertragung der Video und Audio Verbindungsdaten notwendig. Die DoorBird-Unit devalidiert die Session Id automatisch nach 10min. F&uuml;r den Fall, dass die DoorBird Kamera an ein &Uuml;berwachungssystem angebunden werden soll, muss diese Funktion ausser Betrieb genommen werden indem man den Wert auf 0 setzt 0.<BR>Der Default Wert ist 540s = 9min. <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="AudioFileDir"          ></a><li><b><u><code>AudioFileDir                    </code></u></b> : Der relative (z.B. "audio") oder absolute (z.B. "/mnt/NAS/audio") Verzeichnispfad mit oder ohne nachfolgendem Pfadzeichen "/"  in welchen die Audio-Dateien abgelegt sind.<BR>Der Default Wert ist <code>""</code> = deaktiviert                                                                                                                                                                                                                                     <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="AudioFileDirMaxSize"   ></a><li><b><u><code>AudioFileDirMaxSize             </code></u></b> : Die maximale Gr&ouml;&szlig;e des Unterverzeichnisses f&uuml;r die Audio-Dateien in Megabyte (MB). Beim Erreichen dieses Wertes, werden die &auml;ltesten Dateien automatisch gel&ouml;scht.<BR>Der Default Wert ist <code>50</code> = 50MB                                                                                                                                                                                                                          <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="ImageFileDir"          ></a><li><b><u><code>ImageFileDir                    </code></u></b> : Der relative (z.B. "images") oderr absolute (z.B. "/mnt/NAS/images") Verzeichnispfad mit oder ohne nachfolgendem Pfadzeichen "/"  in welchen die Video-Dateien gespeichert werden sollen.<BR>Der Default Wert ist <code>""</code> = deaktiviert                                                                                                                                                                                                                      <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="ImageFileDirMaxSize"   ></a><li><b><u><code>ImageFileDirMaxSize             </code></u></b> : Die maximale Gr&ouml;&szlig;e des Unterverzeichnisses f&uuml;r die Image-Dateien in Megabyte (MB). Beim Erreichen dieses Wertes, werden die &auml;ltesten Dateien automatisch gel&ouml;scht.<BR>Der Default Wert ist <code>50</code> = 50MB                                                                                                                                                                                                                          <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="VideoFileDir"          ></a><li><b><u><code>VideoFileDir                    </code></u></b> : Der relative (z.B. "images") oder absolute (z.B. "/mnt/NAS/images") Verzeichnispfad mit oder ohne nachfolgendem Pfadzeichen "/"  in welchen die Bild-Dateien gespeichert werden sollen.<BR>Der Default Wert ist <code>""</code> = deaktiviert                                                                                                                                                                                                                        <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="VideoFileDirMaxSize"   ></a><li><b><u><code>VideoFileDirMaxSize             </code></u></b> : Die maximale Gr&ouml;&szlig;e des Unterverzeichnisses f&uuml;r die Video-Dateien in Megabyte (MB). Beim Erreichen dieses Wertes, werden die &auml;ltesten Dateien automatisch gel&ouml;scht.<BR>Der Default Wert ist <code>50</code> = 50MB                                                                                                                                                                                                                          <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="VideoFileFormat"       ></a><li><b><u><code>VideoFileFormat                 </code></u></b> : Das Dateiformat f&uuml;r die Videodatei<BR>Der Default Wert ist <code>"mpeg"</code>                                                                                                                                                                                                                                                                                                                                                                                  <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="VideoDurationDoorbell" ></a><li><b><u><code>VideoDurationDoorbell           </code></u></b> : Zeit in Sekunden für wie lange das Video im Falle eines Klingel Events aufgenommen werden soll.<BR>Der Default Wert ist <code>0</code> = deaktiviert                                                                                                                                                                                                                                                                                                                 <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="VideoDurationMotion"   ></a><li><b><u><code>VideoDurationMotion             </code></u></b> : Zeit in Sekunden für wie lange das Video im Falle eines Bewegungssensor Events aufgenommen werden soll.<BR>Der Default Wert ist <code>0</code> = deaktiviert                                                                                                                                                                                                                                                                                                         <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="EventReset"            ></a><li><b><u><code>EventReset                      </code></u></b> : Zeit in Sekunden nach welcher die Readings f&uuml;r die Events (z.B. "doorbell_button", "motions sensor", "keypad")wieder auf "idle" gesetzt werden sollen.<BR>Der Default Wert ist 5s                                                                                                                                                                                                                                                                               <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="WaitForHistory"        ></a><li><b><u><code>WaitForHistory                  </code></u></b> : Zeit in Sekunden die das Modul auf das Bereitstellen eines korrespondierenden History Bildes zu einem Event warten soll. Muss ggf. adjustiert werden, sobald deutliche Unterschiede in der Systemzeit zwischen fhemßServer und DoorBird Station vorliegen.<BR>Der Default Wert ist 7s                                                                                                                                                                                <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="OpsModeList"           ></a><li><b><u><code>OpsModeList                     </code></u></b> : Eine durch Leerzeichen getrennte Liste von Namen für Operationszust&auml;nde (e.g. "Normal Party Feuer" auf diese der DoorBird automatisch bei Events reagiert.<BR>Der Default Wert ist "" = deaktiviert                                                                                                                                                                                                                                                             <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="HistoryFilePath"       ></a><li><b><u><code>HistoryFilePath                 </code></u></b> : Erstellt Dateipfade zu den letzten Bildern und Videos um sie in den User Interfaces direkt anzuzeigen (e.g. fhem ftui Widget "Image")<BR>Der Default Wert ist <code>"0"</code> = disabled                                                                                                                                                                                                                                                                            <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-disable"                                                 ></a><li><b><u><code>disable                               </code></u></b> : Stoppt das Ger&auml;t von weiteren Reaktionen auf die von der DoorBird ß Anlage ausgesendeten UDP - Datageramme<BR>Der Default Wert ist 0 = aktiviert                                                                                                                                                                                                                                                                                                                <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-KeepAliveTimeout"                                        ></a><li><b><u><code>KeepAliveTimeout                      </code></u></b> : Timeout in Sekunden ohne "still-alive" - UDP Datagramme bevor der Status des Ger&auml;tes auf  "disconnected" gesetzt wird.<BR>Der Default Wert ist 30s                                                                                                                                                                                                                                                                                                              <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-MaxHistory"                                              ></a><li><b><u><code>MaxHistory                            </code></u></b> : Anzahl der herunterzuladenden Bilder aus dem Historien-Archiv sowohl f&uuml;r Ereignisse seitens der T&uuml;rklingel als auch f&uuml;r den Bewegungssensor.<BR>Der Default Wert ist "50" = Maximum.                                                                                                                                                                                                                                                                  <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-PollingTimeout"                                          ></a><li><b><u><code>PollingTimeout                        </code></u></b> : Timeout in Sekunden before der Download-Versuch aufgrund fehlender Antwort seitens der DoorBird-Anlage terminiert wird. Eine Adjustierung mag notwendig sein, sobald Netzwerk-Latenzen aufteten.<BR>Der Default-Wert ist 10s.                                                                                                                                                                                                                                        <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-UdpPort"                                                 ></a><li><b><u><code>UdpPort                               </code></u></b> : Port Nummer auf welcher das DoorBird - Modul nach den UDP Datagrammen der DoorBird - Anlage h&ouml;ren soll. Die Ports sind von der Firmware vorgegeben.<BR>Der Default Port ist 6524                                                                                                                                                                                                                                                                                <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-SessionIdSec"                                            ></a><li><b><u><code>SessionIdSec                          </code></u></b> : Zeit in Sekunden nach welcher die Session Id erneuert werden soll. Diese ist f&uuml;r die sichere &Uuml;bertragung der Video und Audio Verbindungsdaten notwendig. Die DoorBird-Unit devalidiert die Session Id automatisch nach 10min. F&uuml;r den Fall, dass die DoorBird Kamera an ein &Uuml;berwachungssystem angebunden werden soll, muss diese Funktion ausser Betrieb genommen werden indem man den Wert auf 0 setzt 0.<BR>Der Default Wert ist 540s = 9min. <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-AudioFileDir"                                            ></a><li><b><u><code>AudioFileDir                          </code></u></b> : Der relative (z.B. "audio") oder absolute (z.B. "/mnt/NAS/audio") Verzeichnispfad mit oder ohne nachfolgendem Pfadzeichen "/"  in welchen die Audio-Dateien abgelegt sind.<BR>Der Default Wert ist <code>""</code> = deaktiviert                                                                                                                                                                                                                                     <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-AudioFileDirMaxSize"                                     ></a><li><b><u><code>AudioFileDirMaxSize                   </code></u></b> : Die maximale Gr&ouml;&szlig;e des Unterverzeichnisses f&uuml;r die Audio-Dateien in Megabyte (MB). Beim Erreichen dieses Wertes, werden die &auml;ltesten Dateien automatisch gel&ouml;scht.<BR>Der Default Wert ist <code>50</code> = 50MB                                                                                                                                                                                                                          <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-ImageFileDir"                                            ></a><li><b><u><code>ImageFileDir                          </code></u></b> : Der relative (z.B. "images") oderr absolute (z.B. "/mnt/NAS/images") Verzeichnispfad mit oder ohne nachfolgendem Pfadzeichen "/"  in welchen die Video-Dateien gespeichert werden sollen.<BR>Der Default Wert ist <code>""</code> = deaktiviert                                                                                                                                                                                                                      <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-ImageFileDirMaxSize"                                     ></a><li><b><u><code>ImageFileDirMaxSize                   </code></u></b> : Die maximale Gr&ouml;&szlig;e des Unterverzeichnisses f&uuml;r die Image-Dateien in Megabyte (MB). Beim Erreichen dieses Wertes, werden die &auml;ltesten Dateien automatisch gel&ouml;scht.<BR>Der Default Wert ist <code>50</code> = 50MB                                                                                                                                                                                                                          <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-VideoFileDir"                                            ></a><li><b><u><code>VideoFileDir                          </code></u></b> : Der relative (z.B. "images") oder absolute (z.B. "/mnt/NAS/images") Verzeichnispfad mit oder ohne nachfolgendem Pfadzeichen "/"  in welchen die Bild-Dateien gespeichert werden sollen.<BR>Der Default Wert ist <code>""</code> = deaktiviert                                                                                                                                                                                                                        <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-VideoFileDirMaxSize"                                     ></a><li><b><u><code>VideoFileDirMaxSize                   </code></u></b> : Die maximale Gr&ouml;&szlig;e des Unterverzeichnisses f&uuml;r die Video-Dateien in Megabyte (MB). Beim Erreichen dieses Wertes, werden die &auml;ltesten Dateien automatisch gel&ouml;scht.<BR>Der Default Wert ist <code>50</code> = 50MB                                                                                                                                                                                                                          <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-VideoFileFormat"                                         ></a><li><b><u><code>VideoFileFormat                       </code></u></b> : Das Dateiformat f&uuml;r die Videodatei<BR>Der Default Wert ist <code>"mpeg"</code>                                                                                                                                                                                                                                                                                                                                                                                  <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-VideoDurationDoorbell"                                   ></a><li><b><u><code>VideoDurationDoorbell                 </code></u></b> : Zeit in Sekunden für wie lange das Video im Falle eines Klingel Events aufgenommen werden soll.<BR>Der Default Wert ist <code>0</code> = deaktiviert                                                                                                                                                                                                                                                                                                                 <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-VideoDurationMotion"                                     ></a><li><b><u><code>VideoDurationMotion                   </code></u></b> : Zeit in Sekunden für wie lange das Video im Falle eines Bewegungssensor Events aufgenommen werden soll.<BR>Der Default Wert ist <code>0</code> = deaktiviert                                                                                                                                                                                                                                                                                                         <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-EventReset"                                              ></a><li><b><u><code>EventReset                            </code></u></b> : Zeit in Sekunden nach welcher die Readings f&uuml;r die Events (z.B. "doorbell_button", "motions sensor", "keypad")wieder auf "idle" gesetzt werden sollen.<BR>Der Default Wert ist 5s                                                                                                                                                                                                                                                                               <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-WaitForHistory"                                          ></a><li><b><u><code>WaitForHistory                        </code></u></b> : Zeit in Sekunden die das Modul auf das Bereitstellen eines korrespondierenden History Bildes zu einem Event warten soll. Muss ggf. adjustiert werden, sobald deutliche Unterschiede in der Systemzeit zwischen fhemßServer und DoorBird Station vorliegen.<BR>Der Default Wert ist 7s                                                                                                                                                                                <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-OpsModeList"                                             ></a><li><b><u><code>OpsModeList                           </code></u></b> : Eine durch Leerzeichen getrennte Liste von Namen für Operationszust&auml;nde (e.g. "Normal Party Feuer" auf diese der DoorBird automatisch bei Events reagiert.<BR>Der Default Wert ist "" = deaktiviert                                                                                                                                                                                                                                                             <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DoorBird-attr-HistoryFilePath"                                         ></a><li><b><u><code>HistoryFilePath                       </code></u></b> : Erstellt Dateipfade zu den letzten Bildern und Videos um sie in den User Interfaces direkt anzuzeigen (e.g. fhem ftui Widget "Image")<BR>Der Default Wert ist <code>"0"</code> = disabled                                                                                                                                                                                                                                                                            <BR></li></ul></ul></td></tr>
 	</table>
 </ul>
 =end html_DE
-=encoding utf8
 =for :application/json;q=META.json 73_DoorBird.pm
 {
 	"abstract": "Connects fhem to the DoorBird IP door station",
@@ -5026,24 +5241,22 @@ sub DoorBird_FileSpace($$$$) {
 	"prereqs": {
 		"runtime": {
 			"requires": {
-				"Alien::Base::ModuleBuild": 0,
-				"Alien::Sodium": 0,
 				"Crypt::Argon2": 0,
-				"Crypt::NaCl::Sodium": 0,
-				"IO::String": 0,
 				"Cwd": 0,
 				"Data::Dumper": 0,
 				"Encode": 0,
 				"HttpUtils": 0,
 				"IO::Socket": 0,
+				"IO::String": 0,
 				"JSON": 0,
 				"LWP::UserAgent": 0,
 				"MIME::Base64": 0,
+				"Sodium::FFI": 0,
 				"constant": 0,
+				"perl": 5.014
 				"strict": 0,
 				"utf8": 0,
 				"warnings": 0,
-				"perl": 5.014
 			},
 			"recommends": {
 			},
