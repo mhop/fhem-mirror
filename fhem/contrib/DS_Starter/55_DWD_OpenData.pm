@@ -1666,7 +1666,7 @@ sub GetForecastStart {
   my $param = {
                 url        => $url,
                 method     => "GET",
-                timeout    => 10,
+                timeout    => ::AttrVal($name, 'downloadTimeout', 60),
                 hash       => $hash,
                 station    => $station,
                 dataPrecision => $dataPrecision
