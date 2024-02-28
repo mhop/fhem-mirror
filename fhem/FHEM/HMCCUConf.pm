@@ -396,8 +396,9 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'close' => 'V:LEVEL:0',
 		'up' => 'V:LEVEL:?delta=+20',
 		'down' => 'V:LEVEL:?delta=-20',
-		'oldPos' => 'V:LEVEL:1.005',
-		'stop' => 'V:STOP:1'
+		'oldLevel' => 'V:LEVEL:1.005',
+		'stop' => 'V:STOP:1',
+		'toggle' => 'V:LEVEL:0,100'
 	},
 	'BLIND_VIRTUAL_RECEIVER' => {
 		'pct' => 'V:LEVEL:?level',
@@ -410,7 +411,8 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'pctSlats' => 'V:LEVEL_2:?level V:LEVEL:1.005',
 		'openSlats' => 'V:LEVEL_2:100 V:LEVEL:1.005',
 		'closeSlats' => 'V:LEVEL_2:0 V:LEVEL:1.005',
-		'allLevels' => 'V:LEVEL_2:?slatLevel V:LEVEL:?blindLevel'
+		'allLevels' => 'V:LEVEL_2:?slatLevel V:LEVEL:?blindLevel',
+		'toggle' => 'V:LEVEL:0,100'
 	},
 	'CLIMATECONTROL_REGULATOR' => {
 		'desired-temp' => 'V:SETPOINT:?temperature',
@@ -482,10 +484,12 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'up' => 'V:LEVEL:?delta=+20',
 		'down' => 'V:LEVEL:?delta=-20',
 		'stop' => 'V:STOP:1',
+		'oldLevel' => 'V:LEVEL:1.005',
 		'pctSlats' => 'V:LEVEL_SLATS:?level',
 		'openSlats' => 'V:LEVEL_SLATS:100',
 		'closeSlats' => 'V:LEVEL_SLATS:0',
-		'allLevels' => 'V:LEVEL_SLATS:?slatLevel V:LEVEL:?blindLevel'
+		'allLevels' => 'V:LEVEL_SLATS:?slatLevel V:LEVEL:?blindLevel',
+		'toggle' => 'V:LEVEL:0,100'
 	},
 	'KEY' => {
 		'on' => 'V:PRESS_SHORT:1',
@@ -529,7 +533,8 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'close' => 'V:LEVEL:0',
 		'up' => 'V:LEVEL:?delta=+20',
 		'down' => 'V:LEVEL:?delta=-20',
-		'stop' => 'V:STOP:1'
+		'stop' => 'V:STOP:1',
+		'toggle' => 'V:LEVEL:0,100'
 	},
 	'SMOKE_DETECTOR' => {
 		'command' => 'V:SMOKE_DETECTOR_COMMAND:#command'

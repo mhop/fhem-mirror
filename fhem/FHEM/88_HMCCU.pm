@@ -4365,6 +4365,7 @@ sub HMCCU_GetEnumValues ($$$$;$$)
 			foreach my $cv (split(',', $argList)) {
 				$valList{$cv} = $i;
 				$valIndex{$i} = $cv;
+				$i++;
 			}
 		}
 	}
@@ -6725,7 +6726,7 @@ sub HMCCU_UpdateRoleCommands ($$)
 
 						# Build lookup table
 						my $argList = '';
-						my $el = HMCCU_GetEnumValues ($ioHash, $paramDef, undef, $role, '#', $pv);
+						my $el = HMCCU_GetEnumValues ($ioHash, $paramDef, $dpt, $role, '#', $pv);
 						if ($el ne '') {
 							my $min;
 							my $max;

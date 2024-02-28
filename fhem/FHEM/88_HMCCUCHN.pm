@@ -597,8 +597,7 @@ sub HMCCUCHN_Get ($@)
 	  	Turn device off.
 	  </li><br/>
 	  <li><b>set &lt;name&gt; oldLevel</b><br/>
-	    [dimmer, blind] Set level to previous value. The command is only available if channel
-		contains a datapoint LEVEL with a maximum value of 1.01.
+	    [dimmer, blind, jalousie, shutter] Set level to previous value.
 	  </li><br/>
 	  <li><b>set &lt;name&gt; on</b><br/>
 	  	Turn device on.
