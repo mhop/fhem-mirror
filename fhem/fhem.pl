@@ -4666,6 +4666,7 @@ OldReadingsNum($$$;$)
   my ($d,$n,$default,$round) = @_;
   my $val = OldReadingsVal($d,$n,$default);
   return undef if(!defined($val));
+  return $val if(looks_like_number($val)); # 137283
   $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
   $val =~ s/^(-?)0+([1-9])/$1$2/; # Forum #135120, dont want octal numbers
   return $default if($val eq "");
@@ -4714,6 +4715,7 @@ ReadingsNum($$$;$)
   my ($d,$n,$default,$round) = @_;
   my $val = ReadingsVal($d,$n,$default);
   return undef if(!defined($val));
+  return $val if(looks_like_number($val)); # 137283
   $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
   $val =~ s/^(-?)0+([1-9])/$1$2/; # Forum #135120, dont want octal numbers
   return $default if($val eq "");
