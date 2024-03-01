@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_PRESENCE2: Fehlerbereinigungen
+ - bugfix:  98_CDCOpenData: Fehler bei verbose 5 und golbal logdir
+ - bufgix:  72_FRITZBOX:  Fehler bei verbose 5 und golbal logdir
  - changed: 73_DoorBird:      New Encryption following DoorBird API & logo
  - feature: 76_SolarForecast: take into account the position of the sun in
                               addition to cloud cover when determining the 
