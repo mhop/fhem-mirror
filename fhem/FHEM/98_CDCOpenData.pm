@@ -54,7 +54,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.12c";
+my $ModulVersion = "01.12d";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
@@ -128,11 +128,9 @@ sub CDCOpenData_DebugLog($$$$;$) {
   $loglevel  .= ":" if ($loglevel);
   $loglevel ||= "";
 
-  my $dirdef = AttrVal('global', 'logdir', $attr{global}{modpath}.'/log/');
-
   my ($seconds, $microseconds) = gettimeofday();
   my @t = localtime($seconds);
-  my $nfile = $dirdef . ResolveDateWildcards($filename, @t);
+  my $nfile = ResolveDateWildcards("%L/" . $filename, @t);
   my $fh;
 
   unless ($timestamp) {
@@ -191,10 +189,9 @@ sub CDCOpenData_dbgLogInit($@) {
 
    return if $aVal && $aVal == -1; 
 
-   my $dirdef     = AttrVal('global', 'logdir', $attr{global}{modpath}.'/log/');
+   my $dirdef     = Logdir() . "/";
    my $dbgLogFile = $dirdef . $hash->{helper}{debugLog} . '-%Y-%m.dlog';
 
-#   if ($cmd eq "set" || $cmd eq "init") {
    if ($cmd eq "set" ) {
      
      if($aVal == 5) {
@@ -676,7 +673,7 @@ sub CDCOpenData_Attr($@)
    }
 
    if ($aName eq "ownRadarFileLog") {
-     my $dirdef   = AttrVal('global', 'logdir', $attr{global}{modpath}.'/log/');
+     my $dirdef   = Logdir() . "/";
      my $rLogFile = $dirdef . $hash->{helper}{rainLog} . '.log';
 
      if ($cmd eq "set") {
@@ -1647,6 +1644,7 @@ sub CDCOpenData_Readout_Run_getRain($@)
        CDCOpenData_Log $name, 4, "ftp $tmpDir$remotename not found";
        if ($fromGet) {
          $returnStr = "ERROR: $tmpDir$remotename not found";
+         $returnStr .= "|" . join('|', @roReadings ) if int @roReadings;
          return $returnStr;
        } else {
          CDCOpenData_Log $name, 4, "$tmpDir$remotename not found";
@@ -1660,7 +1658,11 @@ sub CDCOpenData_Readout_Run_getRain($@)
      if (my $status = gunzip $retr_fh => $tmpDir . $localname, AutoClose => 1) {
        CDCOpenData_Log $name, 4,  "getRain - Loaded new local file $tmpDir$localname: $status";
      } else {
+       $ftp->quit;
        CDCOpenData_Log $name, 3, "getRain - $GunzipError";
+       $returnStr = "Error|$tmpDir$remotename -> error while unpacking file";
+       $returnStr .= "|" . join('|', @roReadings ) if int @roReadings;
+       return $returnStr;
      }
 
      # close ftp session:
@@ -1795,7 +1797,7 @@ sub CDCOpenData_Readout_Process($$)
    my $offset  = 0;
    my $dayRainCnt = 0;
    my $ownRadarFLog = AttrVal($name, "ownRadarFileLog", 0);
-   my $dirdef   = AttrVal('global', 'logdir', $attr{global}{modpath}.'/log/');
+   my $dirdef   = Logdir() . "/";
    my $rLogFile = $dirdef . $hash->{helper}{rainLog} . '.log';
 
    my $textRadarLog = "";
