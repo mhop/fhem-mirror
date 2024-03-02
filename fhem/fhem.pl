@@ -4627,6 +4627,19 @@ resolveAttrRename($$)
 # Functions used to make fhem-oneliners more readable,
 # but also recommended to be used by modules
 sub
+numberFromString($$;$)
+{
+  my ($val,$default,$round) = @_;
+  return undef if(!defined($val));
+  # 137283 & perl cookbook
+  $val = ($val =~ /(([+-]?)(?=\d|\.\d)\d*(\.\d*)?([Ee]([+-]?\d+))?)/ ? $1 : "");
+  $val =~ s/^([+-]?)0+([1-9])/$1$2/; # Forum #135120, dont want octal numbers
+  return $default if($val eq "");
+  $val = round($val,$round) if(defined $round);
+  return $val;
+}
+
+sub
 InternalVal($$$)
 {
   my ($d,$n,$default) = @_;
@@ -4641,10 +4654,7 @@ sub
 InternalNum($$$;$)
 {
   my ($d,$n,$default,$round) = @_;
-  my $val = InternalVal($d,$n,$default);
-  $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
-  $val = round($val,$round) if($round);
-  return $val;
+  return numberFromString(InternalVal($d,$n,$default),$default,$round);
 }
 
 sub
@@ -4664,14 +4674,7 @@ sub
 OldReadingsNum($$$;$)
 {
   my ($d,$n,$default,$round) = @_;
-  my $val = OldReadingsVal($d,$n,$default);
-  return undef if(!defined($val));
-  return $val if(looks_like_number($val)); # 137283
-  $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
-  $val =~ s/^(-?)0+([1-9])/$1$2/; # Forum #135120, dont want octal numbers
-  return $default if($val eq "");
-  $val = round($val,$round) if(defined $round);
-  return $val;
+  return numberFromString(OldReadingsVal($d,$n,$default),$default,$round);
 }
 
 sub
@@ -4713,14 +4716,7 @@ sub
 ReadingsNum($$$;$)
 {
   my ($d,$n,$default,$round) = @_;
-  my $val = ReadingsVal($d,$n,$default);
-  return undef if(!defined($val));
-  return $val if(looks_like_number($val)); # 137283
-  $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
-  $val =~ s/^(-?)0+([1-9])/$1$2/; # Forum #135120, dont want octal numbers
-  return $default if($val eq "");
-  $val = round($val,$round) if(defined $round);
-  return $val;
+  return numberFromString(ReadingsVal($d,$n,$default),$default,$round);
 }
 
 sub
