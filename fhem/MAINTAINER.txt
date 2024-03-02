@@ -50,6 +50,7 @@ FHEM/00_TUL.pm               andi291              KNX/EIB
 FHEM/00_ZWCUL.pm             rudolfkoenig         ZWave
 FHEM/00_ZWDongle.pm          rudolfkoenig         ZWave
 FHEM/01_FHEMWEB.pm           rudolfkoenig         Frontends/FHEMWEB
+FHEM/02_FHEMAPP.pm           Benni                Frontends/FHEMapp
 FHEM/02_FRAMEBUFFER.pm       kaihs                Frontends
 FHEM/02_FTUISRV.pm           viegener             Frontends/TabletUI
 FHEM/02_HTTPAPI.pm           klaus.schauer        Automatisierung
