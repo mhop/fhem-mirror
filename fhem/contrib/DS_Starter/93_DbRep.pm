@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 28370 2024-01-10 18:46:13Z DS_Starter $
+# $Id: 93_DbRep.pm 28525 2024-02-16 20:57:30Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -59,7 +59,9 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.53.1"  => "16.02.2024  sqlCmd: possible entry ckey:latest ",
+  "8.53.2"  => "02.03.2024  delEntries, reduceLog: execute next DbRep_nextMultiCmd even if time check got failed ".
+                            "Forum:https://forum.fhem.de/index.php?msg=1305266 ",
+  "8.53.1"  => "16.02.2024  sqlCmd: executing ckey:latest possible ",
   "8.53.0"  => "10.01.2024  new setter multiCmd, change DbRep_autoForward, fix reducelog problem Forum:#136581 ",
   "8.52.15" => "08.12.2023  fix use fhem default variables in attr executeBeforeProc/executeAfterProc ".
                             "forum: https://forum.fhem.de/index.php?msg=1296146 ",
@@ -2617,7 +2619,8 @@ sub DbRep_Main {
          
          if (!$valid) {
              Log3 ($name, 2, "DbRep $name - ERROR - $cause");
-             DbRep_delHashtags ($hash);     
+             DbRep_delHashtags  ($hash);  
+             DbRep_nextMultiCmd ($name);                                      # nächstes multiCmd ausführen falls gesetzt             
              return;
          }
 
@@ -14495,12 +14498,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 28370 2024-01-10 18:46:13Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 28525 2024-02-16 20:57:30Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 28370 2024-01-10 18:46:13Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 28525 2024-02-16 20:57:30Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -16296,7 +16299,7 @@ return;
       </ul>
     <br>
     
-    The list index "ckey:latest" always executes the last statement saved in the SQL history. <br><br>
+    The list index "ckey:latest" executes the last statement saved in the SQL history. <br><br>
 
     Relevant attributes are: <br>
 
@@ -19437,7 +19440,7 @@ return;
       </ul>
     <br>
     
-    Der Listenindex "ckey:latest" führt immer das zuletzt in der SQL History gespeicherte Statement aus. <br><br>
+    Der Listenindex "ckey:latest" führt das zuletzt in der SQL History gespeicherte Statement aus. <br><br>
     
     Relevante Attribute sind: <br>
 
