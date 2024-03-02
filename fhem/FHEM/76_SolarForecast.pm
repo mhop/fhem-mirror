@@ -17288,7 +17288,8 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
             <tr><td> <b>check</b>     </td><td>Checks the current plant configuration. A plausibility check                  </td></tr>
             <tr><td>                  </td><td>is performed and the result and any notes or errors are output.               </td></tr>
-            <tr><td> <b>save</b>      </td><td>Secures important parameters of the plant configuration                       </td></tr>
+            <tr><td> <b>save</b>      </td><td>Secures important parameters of the plant configuration.                      </td></tr>
+            <tr><td>                  </td><td>The operation is performed automatically every day shortly after 00:00.       </td></tr>
             <tr><td> <b>restore</b>   </td><td>Restores a saved plant configuration                                          </td></tr>
          </table>
       </ul>
