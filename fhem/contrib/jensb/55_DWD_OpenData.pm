@@ -1,5 +1,5 @@
 ﻿# -----------------------------------------------------------------------------
-# $Id: 55_DWD_OpenData.pm 28556 2024-03-01 20:12:00Z jensb $
+# $Id: 55_DWD_OpenData.pm 28556 2024-03-02 19:09:00Z jensb $
 # -----------------------------------------------------------------------------
 
 =encoding UTF-8
@@ -601,9 +601,10 @@ use strict;
 use warnings;
 
 use Encode 'encode';
+use File::Basename 'dirname';
 use File::Temp 'tempfile';
 use IO::Uncompress::Unzip qw(unzip $UnzipError);
-use LWP::UserAgent;
+#use LWP::UserAgent;
 use POSIX qw(floor strftime);
 use Scalar::Util 'looks_like_number';
 use Storable qw(freeze thaw);
@@ -621,13 +622,14 @@ use constant UPDATE_DISTRICTS     => -1;
 use constant UPDATE_COMMUNEUNIONS => -2;
 use constant UPDATE_ALL           => -3;
 
-use constant DOWNLOAD_TIMEOUT_MIN     => 30; # [s]
-use constant DOWNLOAD_TIMEOUT_MAX     => 60; # [s]
+use constant DOWNLOAD_TIMEOUT_MIN     =>  30; # [s]
+use constant DOWNLOAD_TIMEOUT_MAX     => 120; # [s]
 use constant DOWNLOAD_TIMEOUT_DEFAULT => DOWNLOAD_TIMEOUT_MIN; # [s]
-use constant PROCESSING_TIMEOUT       => DOWNLOAD_TIMEOUT_MAX + 30; # [s]
+use constant PROCESSING_TIMEOUT       => DOWNLOAD_TIMEOUT_MAX + 60; # [s]
+use constant SCHEDULING_RANGE         => 15*60 - PROCESSING_TIMEOUT - 60; # [s]
 
 require Exporter;
-our $VERSION   = '1.017002';
+our $VERSION   = '1.017003';
 our @ISA       = qw(Exporter);
 our @EXPORT    = qw(GetForecast GetAlerts UpdateAlerts UPDATE_DISTRICTS UPDATE_COMMUNEUNIONS UPDATE_ALL);
 our @EXPORT_OK = qw(IsCommuneUnionWarncellId);
@@ -809,8 +811,8 @@ sub Define {
 
   ::readingsSingleUpdate($hash, 'state', ::IsDisabled($name)? 'disabled' : 'defined', 1);
 
-  # @TODO randomize start of next update check by 8 min to distribute load cause by mulitple module instances
-  my $nextUpdate = gettimeofday() + int(rand(360));
+  # randomize start of next update check by SCHEDULING_RANGE to distribute load cause by mulitple module instances
+  my $nextUpdate = gettimeofday() + int(rand(SCHEDULING_RANGE));
   ::readingsSingleUpdate($hash, 'nextUpdate', ::FmtTime($nextUpdate), 1);
   ::InternalTimer($nextUpdate, 'DWD_OpenData::Timer', $hash);
 
@@ -1165,8 +1167,8 @@ sub Timer {
     $hash->{".fetchAlerts"} = 0;
   }
 
-  # reschedule next run to 5 .. 360 seconds past next quarter
-  my $nextUpdate = timegm(0, $actQuarter*15, $tHour, $tMday, $tMon, $tYear) + 905 + int(rand(355));
+  # reschedule next run to 5 .. SCHEDULING_RANGE seconds past next quarter
+  my $nextUpdate = timegm(0, $actQuarter*15, $tHour, $tMday, $tMon, $tYear) + 905 + int(rand(SCHEDULING_RANGE - 5));
   ::readingsSingleUpdate($hash, 'nextUpdate', ::FmtTime($nextUpdate), 1);
   ::InternalTimer($nextUpdate, 'DWD_OpenData::Timer', $hash);
 
@@ -1686,20 +1688,52 @@ sub GetForecast {
 
 =over
 
+=item * param name: name of DWD_OpenData device
+
 =item * param url: URL for wich the HTTP headers should be retrieved.
+
+=item * return hash of header entries: content_length (bytes), last_modified (epoch time) or C<undef> on error
 
 =back
 
 =cut
 
+#sub GetHeaders {
+#  my ($name, $url) = @_;
+#  my $ua = new LWP::UserAgent(env_proxy => 1, timeout => 5, agent => 'fhem');
+#  my $request = new HTTP::Request('HEAD' => $url);
+#  $request->header('Accept' => 'text/html');
+#  my $response = $ua->request($request);
+#  if ($response->is_success()) {
+#    return $response;
+#  }
+#  return undef;
+#}
+
 sub GetHeaders {
-  my $url=shift;
-  my $ua = new LWP::UserAgent(env_proxy => 1, timeout => 5, agent => 'fhem');
-  my $request = new HTTP::Request('HEAD' => $url);
-  $request->header('Accept' => 'text/html');
-  my $response = $ua->request($request);
-  if ($response->is_success()) {
-    return $response;
+  my ($name, $url) = @_;
+
+  my $param = {
+                url     => $url,
+                method  => "HEAD",
+                timeout => ::AttrVal($name, 'downloadTimeout', DOWNLOAD_TIMEOUT_DEFAULT)
+              };
+
+  my ($httpError, $content) = ::HttpUtils_BlockingGet($param);
+  if (!$httpError) {
+    my @entries = split /\n/, $param->{httpheader};
+    my %headers;
+    for my $entry (@entries) {
+      if ($entry =~ /Content-Length/xs) {
+        ($headers{content_length}) = $entry =~ /Content-Length:\s([0-9]*)/xs;
+      } elsif ($entry =~ /Last-Modified/xs) {
+        my ($lastModified) = $entry =~ /Last-Modified:\s(.*)/xs;
+        eval {
+          $headers{last_modified} = ::timegm(::strptime($lastModified, '%a, %d %b %Y %H:%M:%S %Z'))
+        };
+      }
+    }
+    return %headers;
   }
   return undef;
 }
@@ -1720,6 +1754,8 @@ Check if a web document was updated by comparing the webserver header info with 
 
 =item * param docTime: output, timestamp [UTC] of the web document
 
+=item * return true if new and old document properties differ
+
 =back
 
 =cut
@@ -1730,11 +1766,11 @@ sub IsDocumentUpdated {
 
   # check if file on webserver was modified
   ::Log3 $name, 5, "$name: IsDocumentUpdated BEFORE";
-  my $headers = GetHeaders($url);
+  my %headers = GetHeaders($name, $url);
   my $update = 1;
-  if (defined($headers)) {
-    $_[3] = $headers->content_length(); # docSize
-    $_[4] = FormatDateTimeUTC($headers->last_modified()); # docTime
+  if (%headers) {
+    $_[3] = $headers{content_length}; # docSize
+    $_[4] = FormatDateTimeUTC($headers{last_modified}); # docTime
     my $lastURL = ::ReadingsVal($name, $prefix.'_url', '');
     my $lastSize = ::ReadingsVal($name, $prefix.'_dwdDocSize', 0);
     my $lastTime = ::ReadingsVal($name , $prefix.'_dwdDocTime', '');
@@ -1754,6 +1790,162 @@ sub IsDocumentUpdated {
   ::Log3 $name, 5, "$name: IsDocumentUpdated AFTER";
 
   return $update;
+}
+
+=over
+
+extract parts of exception stacktrace and log
+
+=cut
+
+sub ConvertToErrorMessage {
+  my ($exception, $name, $sub) = @_;
+
+  # exception?
+  my $errorMessage = '';
+  if ($exception) {
+    my @parts = split(/ at |\n/, $exception); # discard anything after " at " or newline
+    if (@parts) {
+      $errorMessage = $parts[0];
+      ::Log3 $name, 4, "$name: $sub ERROR: $parts[0]";
+    } else {
+      $errorMessage = $@;
+      ::Log3 $name, 4, "$name: $sub ERROR: $exception";
+    }
+  }
+
+  # get rid of newlines and commas because of Blocking InformFn parameter restrictions
+  $errorMessage =~ s/\n/; /g;
+  $errorMessage =~ s/,/;/g;
+
+  return $errorMessage;
+}
+
+=over
+
+download forecast kmz file from URL into a string variable and unzip string content into a string array with one entry per file in zip
+
+=over
+
+=item * param name: name of DWD_OpenData device
+
+=item * param param: parameter hash from call to HttpUtils_NonblockingGet
+
+=item * return array of file contents (one per file, typically one)
+
+=back
+
+=cut
+
+sub GetForecastDataDiskless {
+  my ($name, $param) = @_;
+
+  # download forecast document into variable
+  my @fileContent;
+  my ($httpError, $zipFileContent) = ::HttpUtils_BlockingGet($param);
+  eval {
+    my $url = $param->{url};
+    my $code = $param->{code};
+    if (defined($httpError) && length($httpError) > 0) {
+      die "error retrieving URL '$url': $httpError";
+    }
+    if (defined($code) && $code != 200) {
+      die "HTTP error $code retrieving URL '$url'";
+    }
+    if (!defined($zipFileContent) || length($zipFileContent) == 0) {
+      die "no data retrieved from URL '$url'";
+    }
+
+    ::Log3 $name, 5, "$name: GetForecastDataDiskless: data received, unzipping ...";
+
+    # create memory mapped file from received data and unzip into string array
+    open my $zipFileHandle, '<', \$zipFileContent;
+    unzip($zipFileHandle => \@fileContent, MultiStream => 1, AutoClose => 1) or die "unzip failed: $UnzipError\n";
+  };
+
+  return (ConvertToErrorMessage($@, $name, 'GetForecastDataDiskless'), \@fileContent);
+}
+
+=over
+
+download forecast kmz file from URL into a string variable, unzip into temp file and filter forecast data for station into a string
+
+=over
+
+=item * param name: name of DWD_OpenData device
+
+=item * param param: parameter hash from call to HttpUtils_NonblockingGet
+
+=item * return array of file contents (one per file, typically one)
+
+=back
+
+=cut
+
+sub GetForecastDataUsingFile {
+  my ($name, $param) = @_;
+
+  # download forecast document into variable
+  my @fileContent;
+  my ($httpError, $zipFileContent) = ::HttpUtils_BlockingGet($param);
+  eval {
+    my $url = $param->{url};
+    my $code = $param->{code};
+    if (defined($httpError) && length($httpError) > 0) {
+      die "error retrieving URL '$url': $httpError";
+    }
+    if (defined($code) && $code != 200) {
+      die "HTTP error $code retrieving URL '$url'";
+    }
+    if (!defined($zipFileContent) || length($zipFileContent) == 0) {
+      die "no data retrieved from URL '$url'";
+    }
+
+    ::Log3 $name, 5, "$name: GetForecastDataDiskless: data received, unzipping ...";
+
+    # unzip to temp file
+    open(my $zipFileHandle, '<', \$zipFileContent) or die "unable to open file $!";
+    my $hash = $param->{hash};
+    my $station = $param->{station};
+    my $kmlFileName = dirname($hash->{".forecastFile"}) . "/" . "forecast-$station.kml";
+    unzip($zipFileHandle => $kmlFileName, MultiStream => 1, AutoClose => 1) or die "unzip failed: $UnzipError\n";
+    my $kmlFileSize = -s $kmlFileName;
+    ::Log3 $name, 5, "$name: GetForecastDataDiskless: unzipped " . $kmlFileSize . " bytes, filtering ...";
+
+    # read temp file content into string
+    open(my $kmlFileHandle, '<', $kmlFileName) or die "unable to open file $!";
+    #read($kmlFileHandle, my $fileData, -s $kmlFileHandle);
+    my $fileData = '';
+    my $phase = 0; # copy header
+    my $station = $param->{station};
+    while (my $line = <$kmlFileHandle>) {
+      if ($line =~ /<kml:name/) {
+        if ($line =~ /$station/) {
+          $phase = 2; # copy station data
+        } else {
+          $phase = 1; # skip station data
+        }
+      } elsif ($phase == 2 && $line =~ /<\/kml:Placemark/) {
+        $phase = 3; # done
+      }
+      if ($phase == 0 || $phase == 2) {
+        # copy line
+        $fileData .= $line;
+      } elsif ($phase == 3) {
+        # finalize document
+        $fileData .= $line . "    </kml:Document>\n" . "</kml:kml>";
+        $phase = 4;
+        last;
+      }
+    }
+    close($kmlFileHandle);
+    unlink($kmlFileName);
+    ::Log3 $name, 5, "$name: GetForecastDataDiskless: filtered " . length($fileData) . " bytes";
+
+    push(@fileContent, \$fileData);
+  };
+
+  return (ConvertToErrorMessage($@, $name, 'GetForecastDataDiskless'), \@fileContent);
 }
 
 =head2 GetForecastStart($)
@@ -1801,10 +1993,11 @@ sub GetForecastStart {
   my $maxDocAge = (::AttrVal($name, 'forecastRefresh', 6) - 0.5) * 60 * 60; # [s]
   $update = $update && ($lastDocSize == 0 || ($dwdDocTimestamp - $lastDocTimestamp) >= $maxDocAge);
 
-::Log3 $name, 5, "$name: GetForecastStart $dwdDocTime $dwdDocTimestamp $lastDocTimestamp $maxDocAge $update";
+::Log3 $name, 5, "$name: GetForecastStart $dwdDocTime $dwdDocTimestamp $lastDocTimestamp $maxDocAge $lastDocSize : $update";
 
   my $result;
   if ($update) {
+    # define download and processing properties
     my $param = {
                   url        => $url,
                   method     => "GET",
@@ -1815,11 +2008,22 @@ sub GetForecastStart {
                   dwdDocSize => $dwdDocSize,
                   dwdDocTime => $dwdDocTime
                 };
-    ::Log3 $name, 5, "$name: GetForecastStart START (PID $$): $url";
-    my ($httpError, $fileContent) = ::HttpUtils_BlockingGet($param);
 
-    # process retrieved data
-    $result = ProcessForecast($param, $httpError, $fileContent);
+    # download and unpack forecast report
+    ::Log3 $name, 5, "$name: GetForecastStart START (PID $$): $url";
+    my ($errorMessage, $fileContent);
+    if ($dwdDocSize == 0 || $dwdDocSize > 1000000) {
+      ($errorMessage, $fileContent) = GetForecastDataUsingFile($name, $param);
+    } else {
+      ($errorMessage, $fileContent) = GetForecastDataDiskless($name, $param);
+    }
+
+    # process forecast data
+    if (length($errorMessage)) {
+      $result = [$name, $errorMessage];
+    } else {
+      $result = ProcessForecast($param, $fileContent);
+    }
 
     ::Log3 $name, 5, "$name: GetForecastStart END";
   } else {
@@ -1896,11 +2100,10 @@ ATTENTION: This method is executed in a different process than FHEM.
 =cut
 
 sub ProcessForecast {
-  my ($param, $httpError, $fileContent) = @_;
+  my ($param, $xmlStrings) = @_;
   my $hash          = $param->{hash};
   my $name          = $hash->{NAME};
   my $url           = $param->{url};
-  my $code          = $param->{code};
   my $station       = $param->{station};
   my $mosmixType    = $param->{mosmixType};
   my $dwdDocSize    = $param->{dwdDocSize};
@@ -1911,18 +2114,8 @@ sub ProcessForecast {
   my %forecast;
   my $relativeDay = 0;
   my @coordinates;
-  eval {
-    if (defined($httpError) && length($httpError) > 0) {
-      die "error retrieving URL '$url': $httpError";
-    }
-    if (defined($code) && $code != 200) {
-      die "HTTP error $code retrieving URL '$url'";
-    }
-    if (!defined($fileContent) || length($fileContent) == 0) {
-      die "no data retrieved from URL '$url'";
-    }
-
-    ::Log3 $name, 5, "$name: ProcessForecast: data received, decoding ...";
+  {
+    ::Log3 $name, 5, "$name: ProcessForecast: data unpacked, decoding ...";
 
     # prepare processing
     my $forecastProperties = ::AttrVal($name, 'forecastProperties', undef);
@@ -1943,11 +2136,7 @@ sub ProcessForecast {
       }
     }
 
-    # create memory mapped file from received data and unzip
-    open my $zipFileHandle, '<', \$fileContent;
-    my @xmlStrings;
-    unzip($zipFileHandle => \@xmlStrings, MultiStream => 1) or die "unzip failed: $UnzipError\n";
-
+    # collect forecast header data
     my %header;
     $header{station} = $station;
     $header{url} = $url;
@@ -1955,7 +2144,7 @@ sub ProcessForecast {
     $header{dwdDocTime} = $dwdDocTime;
 
     # parse XML strings (files from zip)
-    for my $xmlString (@xmlStrings) {
+    for my $xmlString (@$xmlStrings) {
       if (substr(${$xmlString}, 0, 2) eq 'PK') {                                  # empty string, skip
         # empty string, skip
         next;
@@ -2507,7 +2696,7 @@ sub GetAlertsStart {
     ::Log3 $name, 5, "$name: GetAlertsStart END";
   } else {
     # already up to date
-    $result = [$name, 'up-to-date', $warncellId];
+    $result = [$name, 'up-to-date', $warncellId, time()];
 
     ::Log3 $name, 5, "$name: GetAlertsStart UP-TO-DATE";
   }
@@ -2806,8 +2995,9 @@ sub GetAlertsFinish {
     if (defined($errorMessage) && length($errorMessage) > 0) {
       if ($errorMessage eq 'up-to-date') {
         ::readingsBeginUpdate($hash);
-        ::readingsBulkUpdate($hash, 'state', "alerts unchanged");
+        ::readingsBulkUpdate($hash, 'a_time', FormatDateTimeLocal($hash, $receivedTime));
         ::readingsBulkUpdate($hash, 'a_state', 'updated');
+        ::readingsBulkUpdate($hash, 'state', "alerts unchanged");
         ::readingsEndUpdate($hash, 1);
       } else {
         ::readingsSingleUpdate($hash, 'state', "alerts error: $errorMessage", 1);
@@ -3014,7 +3204,7 @@ sub DWD_OpenData_Initialize {
   $hash->{GetFn}      = 'DWD_OpenData::Get';
 
   $hash->{AttrList} = 'disable:0,1 '
-                      .'forecastStation forecastDays forecastProperties forecastResolution:1,3,6 forecastWW2Text:0,1 forecastPruning:0,1 forecastRefresh:slider,1,1,6 '
+                      .'forecastStation forecastDays forecastProperties forecastResolution:1,3,6 forecastWW2Text:0,1 forecastPruning:0,1 forecastRefresh:slider,6,-1,1 '
                       .'alertArea alertLanguage:DE,EN alertExcludeEvents '
                       .'timezone '
                       .'downloadTimeout '
@@ -3028,6 +3218,11 @@ sub DWD_OpenData_Initialize {
 # -----------------------------------------------------------------------------
 #
 # CHANGES
+#
+# 01.03.2024 (version 1.17.3) jensb + DS_Starter
+# feature: unzip large forecast files to disk and filter out selected station before processing
+# change: increased max value for attribute downloadTimeout to 120 s
+# change: LWP request HEAD replaced with HttpUtils_BlockingGet
 #
 # 01.03.2024 (version 1.17.2) jensb
 # feature: skip download of alert data if DWD document is unchanged
@@ -3142,8 +3337,8 @@ sub DWD_OpenData_Initialize {
 # 22.03.2018 jensb
 # bugfix: replaced trunc with round when calculating delta days to cope with summertime
 #
-# 18.02.2018 jensb
-# feature: LWP::Simple replaced by HttpUtils_NonblockingGet (provided by JoWiemann)
+# 18.02.2018 JoWiemann + jensb
+# feature: LWP::Simple replaced by HttpUtils_NonblockingGet
 #
 # -----------------------------------------------------------------------------
 
@@ -3285,7 +3480,7 @@ sub DWD_OpenData_Initialize {
       <a id="DWD_OpenData-attr-forecastRefresh"></a>
       <li>forecastRefresh &lt;n&gt;, 1 .. 6 h, default: 6 h<br>
           The DWD distinguishes between MOSMIX S and L reports, which differ in terms of update frequency and available data elements:<br>
-          - 1 .. 5 h: MOSMIX S, 40 data elements, updated every 1 h at ~25 min past every hour, download volume ~400 MB/h<br>
+          - 1 .. 5 h: MOSMIX S, 40 data elements, updated every 1 h at ~25 min past every hour, download volume ~40 MB/h<br>
           - 6 h: MOSMIX L, ~115 data elements, updated every 6 h at ~55 min past 21/3/9/15 UTC, download volume ~3 kB/h<br>
 
           See the
@@ -3296,10 +3491,12 @@ sub DWD_OpenData_Initialize {
 
           Notes for using MOSMIX S:<br>
           - MOSMIX S is an EXPERIMENTAL feature and may cause system instability.<br>
-          - MOSMIX S requires more than 100 times the recources of MOSMIX L.<br>
-          - minimum hardware recommendations: CPU with 2 cores, 4 GB RAM, 1 GB tempfs for /tmp<br>
-          - Using an SD card instead of tmpfs for /tmp will reduce the lifetime of the SD card significantly due to the write rate of ~1.5 GB/h.<br>
-          - Processing time dependes on download rate and hardware performance and may take several minutes.<br>
+          - MOSMIX S requires more than 10000 times the recources of MOSMIX L.<br>
+          - Consider dynamically adapting forecastRefresh to your requirements to save recources, e.g. slower refresh at night if you focus is sun related.<br>
+          - Minimum hardware recommendations: CPU with 2 cores, 2 GB RAM, 1 GB tmpfs for /tmp or magnetic disk.<br>
+          - When using an SD card for /tmp its lifetime will be reduced significantly due to the write rate of ~700 MB/h.<br>
+          - Processing time dependes on download bandwidth and hardware performance and may take half a minute or more.<br>
+          - Depending on the available download bandwidth the attribute downloadTimeout must be adjusted.<br>
           - When switching between MOSMIX S and L all existing forecast readings will be deleted.
       </li><br>
       <a id="DWD_OpenData-attr-forecastProperties"></a>
