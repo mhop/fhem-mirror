@@ -59,6 +59,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.2"  => "02.03.2024  delEntries, reduceLog: execute next DbRep_nextMultiCmd even if time check got failed ".
+                            "Forum:https://forum.fhem.de/index.php?msg=1305266 ",
   "8.53.1"  => "16.02.2024  sqlCmd: executing ckey:latest possible ",
   "8.53.0"  => "10.01.2024  new setter multiCmd, change DbRep_autoForward, fix reducelog problem Forum:#136581 ",
   "8.52.15" => "08.12.2023  fix use fhem default variables in attr executeBeforeProc/executeAfterProc ".
@@ -2617,7 +2619,8 @@ sub DbRep_Main {
          
          if (!$valid) {
              Log3 ($name, 2, "DbRep $name - ERROR - $cause");
-             DbRep_delHashtags ($hash);     
+             DbRep_delHashtags  ($hash);  
+             DbRep_nextMultiCmd ($name);                                      # nächstes multiCmd ausführen falls gesetzt             
              return;
          }
 
