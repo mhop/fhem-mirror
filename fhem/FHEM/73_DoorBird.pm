@@ -27,7 +27,6 @@
 #
 #     Install the following debian packets and cpan libaries
 #     sudo apt-get install -y sox && sudo apt-get install -y libsox-fmt-all && sudo apt-get install -y libsodium-dev && sudo apt-get install -y gstreamer1.0-tools
-#     sudo cpan install Crypt::AuthEnc::ChaCha20Poly1305 
 #     sudo cpan install Crypt::Argon2
 #     sudo cpan install Sodium::FFI
 #     sudo cpan install IO::String module
@@ -5253,10 +5252,10 @@ sub DoorBird_FileSpace($$$$) {
 				"MIME::Base64": 0,
 				"Sodium::FFI": 0,
 				"constant": 0,
-				"perl": 5.014
+				"perl": 5.014,
 				"strict": 0,
 				"utf8": 0,
-				"warnings": 0,
+				"warnings": 0
 			},
 			"recommends": {
 			},
