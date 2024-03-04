@@ -5216,46 +5216,43 @@ sub DoorBird_FileSpace($$$$) {
 =end html_DE
 =for :application/json;q=META.json 73_DoorBird.pm
 {
-	"abstract": "Connects fhem to the DoorBird IP door station",
-	"description": "The DoorBird module establishes the communication between the DoorBird - door intercommunication unit and the fhem home automation based on the official API, published by the manufacturer. Please make sure, that the user has been enabled the API-Operator button in the DoorBird Android/iPhone APP under Administration -> User -> Edit -> Permission -> API-Operator.",
+	"abstract"                       : "Connects fhem to the DoorBird IP door station",
+	"description"                    : "The DoorBird module establishes the communication between the DoorBird - door intercommunication unit and the fhem home automation based on the official API, published by the manufacturer. Please make sure, that the user has been enabled the API-Operator button in the DoorBird Android/iPhone APP under Administration -> User -> Edit -> Permission -> API-Operator.",
+    "version"                        : "2.00",
+	"name"                           : "73_DoorBird.pm",
+	"meta-spec": {
+		"version"                    : "2",
+		"url"                        : "http://search.cpan.org/perldoc?CPAN::Meta::Spec"
+	},	
 	"x_lang": {
 		"de": {
-			"abstract": "Verbindet fhem mit der DoorBird IP Türstation",
-			"description": "Das DoorBird Modul ermöglicht die Komminikation zwischen der DoorBird Interkommunikationseinheit und dem fhem Automationssystem basierend auf der API des Herstellers her. Für den vollen Funktionsumfang muss sichergestellt werden, dass das Setting \"API-Operator\" in der DoorBird Android/iPhone - APP unter Administration -> User -> Edit -> Permission -> API-Operator gesetzt ist."
+			"abstract"               : "Verbindet fhem mit der DoorBird IP Türstation",
+			"description"            : "Das DoorBird Modul ermöglicht die Komminikation zwischen der DoorBird Interkommunikationseinheit und dem fhem Automationssystem basierend auf der API des Herstellers her. Für den vollen Funktionsumfang muss sichergestellt werden, dass das Setting \"API-Operator\" in der DoorBird Android/iPhone - APP unter Administration -> User -> Edit -> Permission -> API-Operator gesetzt ist."
 		}
 	},
-	"license": [
-		"GPL_2"
-	],
-	"author": [
-		"Matthias Deeke <matthias.deeke@deeke.eu>"
-	],
-	"x_fhem_maintainer": [
-		"Sailor"
-	],
-	"keywords": [
-		"Doorbird",
-		"Intercom"
-	],
+	"license"                        : ["GPL_2"],
+	"author"                         : ["Matthias Deeke <matthias.deeke@deeke.eu>"],
+	"x_fhem_maintainer"              : ["Sailor"],
+	"keywords"                       : ["Doorbird", "Intercom"],
 	"prereqs": {
 		"runtime": {
 			"requires": {
-				"Crypt::Argon2": 0,
-				"Cwd": 0,
-				"Data::Dumper": 0,
-				"Encode": 0,
-				"HttpUtils": 0,
-				"IO::Socket": 0,
-				"IO::String": 0,
-				"JSON": 0,
-				"LWP::UserAgent": 0,
-				"MIME::Base64": 0,
-				"Sodium::FFI": 0,
-				"constant": 0,
-				"perl": 5.014,
-				"strict": 0,
-				"utf8": 0,
-				"warnings": 0
+				"Crypt::Argon2"      : 0,
+				"Cwd"                : 0,
+				"Data::Dumper"       : 0,
+				"Encode"             : 0,
+				"HttpUtils"          : 0,
+				"IO::Socket"         : 0,
+				"IO::String"         : 0,
+				"JSON"               : 0,
+				"LWP::UserAgent"     : 0,
+				"MIME::Base64"       : 0,
+				"Sodium::FFI"        : 0,
+				"constant"           : 0,
+				"perl"               : 5.014,
+				"strict"             : 0,
+				"utf8"               : 0,
+				"warnings"           : 0
 			},
 			"recommends": {
 			},
@@ -5267,9 +5264,9 @@ sub DoorBird_FileSpace($$$$) {
 		"runtime": {
 			"requires": {
 				"sox": 0,
-				"libsox-fmt-all": 0,
-				"libsodium-dev": 0,
-				"gstreamer1.0-tools": 0
+				"libsox-fmt-all"     : 0,
+				"libsodium-dev"      : 0,
+				"gstreamer1.0-tools" : 0
 			},
 			"recommends": {
 			},
@@ -5279,20 +5276,20 @@ sub DoorBird_FileSpace($$$$) {
 	},
 	"resources": {
 		"x_support_community": {
-			"rss": "https://forum.fhem.de/index.php/topic,100758.msg",
-			"web": "https://forum.fhem.de/index.php/topic,100758.msg",
+			"rss"                    : "https://forum.fhem.de/index.php/topic,100758.msg",
+			"web"                    : "https://forum.fhem.de/index.php/topic,100758.msg",
 			"subCommunity" : {
-				"rss" : "https://forum.fhem.de/index.php/topic,100758.msg",
-				"title" : "This sub-board will be first contact point",
-				"web" : "https://forum.fhem.de/index.php/topic,100758.msg"
+				"rss"                : "https://forum.fhem.de/index.php/topic,100758.msg",
+				"title"              : "This sub-board will be first contact point",
+				"web"                : "https://forum.fhem.de/index.php/topic,100758.msg"
 			}
 		},
 		"x_wiki" : {
-			"title" : "FHEM Wiki: DoorBird",
-			"web" : "https://wiki.fhem.de/wiki/DoorBird"
+			"title"                  : "FHEM Wiki: DoorBird",
+			"web"                    : "https://wiki.fhem.de/wiki/DoorBird"
 		}
 	},
-	"x_support_status": "supported"
+	"x_support_status"               : "supported"
 }
 =end :application/json;q=META.json
 =cut
