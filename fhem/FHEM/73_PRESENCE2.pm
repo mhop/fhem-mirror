@@ -33,7 +33,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday usleep sleep);
 use DevIo;
 
-my $ModulVersion = "01.00";
+my $ModulVersion = "01.01";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -67,14 +67,14 @@ sub PRESENCE2_Log($$$)
 
    my $xsubroutine = ( caller(1) )[3];
    my $sub         = ( split( ':', $xsubroutine ) )[2];
-   $sub =~ s/CDCOpenData_// if ( defined $sub );;
+   $sub =~ s/PRESENCE2_// if ( defined $sub );;
    $sub ||= 'no-subroutine-specified';
 
    $text = $LOG_Text{$loglevel} . $text;
    $text = "[$instName | $sub.$xline] - " . $text;
 
    if ( $instHash->{helper}{logDebug} ) {
-     CDCOpenData_DebugLog $instHash, $instHash->{helper}{debugLog} . "-%Y-%m.dlog", $loglevel, $text;
+     PRESENCE2_DebugLog $instHash, $instHash->{helper}{debugLog} . "-%Y-%m.dlog", $loglevel, $text;
    } else {
      Log3 $hash, $loglevel, $text;
    }
