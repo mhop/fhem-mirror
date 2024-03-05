@@ -317,8 +317,8 @@ sub WR_ctl_Format {\
          $QuarterPrevious = "Q".$loop \
        }\
     }\
-    if ($period eq "_Qx") {\
-      return $QuarterPrevious;;\
+    if ($period eq "_Qx" and $QuarterPrevious ne "null") {\
+        return $QuarterPrevious;;\
     }\
   }\
 \
@@ -400,7 +400,7 @@ sub WR_ctl_Format {\
       $value .= ($YearPrevious ne "null") ? sprintf(" / %05d", ::ReadingsVal($YearBefore,$reading.$period,0) ) : "";;\
       return $value;;\
     }\
-  return " / null";;\
+  return ;;\
 }\
 \
 }\
