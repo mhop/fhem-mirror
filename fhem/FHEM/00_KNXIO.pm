@@ -77,6 +77,8 @@
 # 20/01/2024 cmdref: KNXIOdebug attribute
 #            feature add set cmds: connect, disconnect, restart
 #            modify INITIALIZED logic
+# 05/02/2024 modify write queing (mode H)
+#            add a few debug msgs
 
 
 package KNXIO; ## no critic 'package'
@@ -457,8 +459,8 @@ sub KNXIO_ReadH {
 				KNXIO_Log ($name, 3, qq{Tunneling Ack received CCID= $ccid txseq= $txseqcntr Status= } . KNXIO_errCodes($errcode));
 #what next ?
 			}
-			$hash->{KNXIOhelper}->{SEQUENCECNTR_W}++;
-			$hash->{KNXIOhelper}->{SEQUENCECNTR_W} = 0 if ($hash->{KNXIOhelper}->{SEQUENCECNTR_W} > 255);
+			$hash->{KNXIOhelper}->{SEQUENCECNTR_W} = ($txseqcntr + 1) % 256;
+			KNXIO_Debug ($name, 1, q{Tunnel ack received } . sprintf('%02x', $txseqcntr));
 			return RemoveInternalTimer($hash,\&KNXIO_TunnelRequestTO); # all ok, stop timer
 		}
 		when (0x0202) { # Search response
@@ -612,8 +614,8 @@ sub KNXIO_Write2 {
 	my $adddelay = 0.07;
 
 	if ($nextwrite > $timenow) {
-		KNXIO_Log ($name, 4, qq{frequent IO-write - Nr.msg= $count});
-		KNXIO_Debug ($name, 1, qq{frequent IO-write - Nr.msg= $count});
+		KNXIO_Log ($name, 3, qq{frequent IO-write - msg-count= $count}) if ($count % 10 == 0);
+		KNXIO_Debug ($name, 1, qq{frequent IO-write - msg-count= $count});
 		InternalTimer($nextwrite + $adddelay, \&KNXIO_Write2,$hash);
 		InternalTimer($timenow + 30.0, \&KNXIO_Flooding,$hash) if ($count == 1);
 		return;
@@ -624,16 +626,20 @@ sub KNXIO_Write2 {
 
 	my $ret = 0;
 	my $mode = $hash->{model};
+	if ($mode eq 'H') {
+		# replace sequence counterW
+		substr($msg,8,1) = pack('C',$hash->{KNXIOhelper}->{SEQUENCECNTR_W}); ##no critic (BuiltinFunctions::ProhibitLvalueSubstr)
+#		$msg = substr($msg,0,8) . pack('C',$hash->{KNXIOhelper}->{SEQUENCECNTR_W}) . substr($msg,9); # w.o. LvalueSubstr PBP !
+
+		# Timeout function - expect TunnelAck within 1 sec! - but if fhem has a delay....
+		$hash->{KNXIOhelper}->{LASTSENTMSG} = unpack('H*',$msg); # save msg for resend in case of TO
+		InternalTimer($timenow + 1.5, \&KNXIO_TunnelRequestTO, $hash);
+	}
 	if ($mode eq 'M') {
 		$ret = ::TcpServer_MCastSend($hash,$msg);
 	}
 	else {
 		$ret = ::DevIo_SimpleWrite($hash,$msg,0);
-		if ($mode eq 'H') {
-			# Timeout function - expect TunnelAck within 1 sec! - but if fhem has a delay....
-			$hash->{KNXIOhelper}->{LASTSENTMSG} = unpack('H*',$msg); # save msg for resend in case of TO
-			InternalTimer($timenow + 1.5, \&KNXIO_TunnelRequestTO, $hash);
-		}
 	}
 
 	$count--;
@@ -644,7 +650,9 @@ sub KNXIO_Write2 {
 		RemoveInternalTimer($hash, \&KNXIO_Flooding);
 	}
 	KNXIO_Log ($name, 5, qq{Mode= $mode buf=} . unpack('H*',$msg) . qq{ rc= $ret});
-	KNXIO_Debug ($name, 1, qq{IO-write processed- Nr.msg remain= $count});
+	my $idx = ($mode eq 'H')?16:12; # offset for dst-addr
+	KNXIO_Debug ($name, 1, q{IO-write processed- gad= } . KNXIO_addr2hex(unpack('n',substr($msg,$idx,2)),3) . q{ msg= } .
+	                       unpack('H*',substr($msg,$idx+4)) . qq{ msg-remain= $count});
 	return;
 }
 
@@ -1206,7 +1214,7 @@ sub KNXIO_decodeCEMI {
 	my @acpicodes = qw(read preply write invalid);
 	my $rwp = $acpicodes[$acpi];
 	if (! defined($rwp) || ($rwp eq 'invalid')) { # not a groupvalue-read/write/reply
-		KNXIO_Log ($name, 3, 'no valid acpi-code (read/reply/write) received - discard packet');
+		KNXIO_Log ($name, 3, 'no valid acpi-code (read/reply/write) received - discard packet - programming?');
 		KNXIO_Log ($name, 4, qq{discarded packet: src=$srcd dst=$dstd destaddrType=$dest_addrType prio=$prio hop_count=} .
 		          qq{$hop_count length=} . scalar(@data) . q{ data=} . sprintf('%02x' x scalar(@data),@data));
 		return;
@@ -1516,7 +1524,7 @@ Suggested parameters for KNXD (Version &gt;= 0.14.30), with systemd&colon;
 <li><b>&lt;device&gt;&colon;connected</b> -
   triggered if connection to KNX-GW/KNXD is established.</li>
 <li><b>&lt;device&gt;&colon;disconnected</b> -
-  triggered if connection to KNX-GW/KNXD failed. Recovery is attempted.</li>
+  triggered if connection to KNX-GW/KNXD failed.</li>
 </ul>
 </li>
 </ul>
