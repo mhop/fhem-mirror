@@ -5920,9 +5920,10 @@ addStructChange($$$)
             (!$defs{$dev} || $defs{$dev}{TEMPORARY} || $defs{$dev}{VOLATILE}));
 
   $lastDefChange++;
-  shift @structChangeHist
-          if(@structChangeHist > AttrVal('global', 'maxChangeLog', 10) - 1);
-  $param = substr($param, 0, 40)."..." if(length($param) > 40);
+  my ($mr,$ml) = split(" ", AttrVal('global', 'maxChangeLog', 10));
+  shift @structChangeHist if(@structChangeHist > $mr - 1);
+  $ml = 40 if(!defined($ml));
+  $param = substr($param, 0, $ml)."..." if(length($param) > $ml);
   push @structChangeHist, "$cmd $param";
 }
 

@@ -1711,7 +1711,10 @@ The following local attributes are used by a wider range of devices:
         FHEM stores the structural change history which is displayed by
         "save ?" or in FHEMWEB by clicking on the red question mark.
         By default this list is limited to 10 entries, this attribute changes
-        the limit.
+        the limit.<br>
+        The length of each stored line is limited to 40 characters.  This value
+        can be changed with the (optional, space separated) second number.<br>
+        Example: attr global myxChangeLog 20 200
     </li><br>
 
     <a name="maxShutdownDelay"></a>
