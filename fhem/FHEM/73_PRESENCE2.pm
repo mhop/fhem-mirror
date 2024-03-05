@@ -33,7 +33,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday usleep sleep);
 use DevIo;
 
-my $ModulVersion = "01.01";
+my $ModulVersion = "01.01a";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -233,7 +233,7 @@ sub PRESENCE2_Initialize($) {
     $hash->{AttrList} = "disable:0,1 "
                       . "thresholdAbsence "
                       . "intervalNormal "
-#                      . "intervalPresent "
+                      . "intervalPresent "
                       . "prGroup:multiple,static,dynamic "
                       . "prGroupDisp:condense,verbose "
                       . "FhemLog3Std:0,1 "
