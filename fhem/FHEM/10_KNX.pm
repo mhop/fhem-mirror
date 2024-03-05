@@ -169,6 +169,9 @@
 #              additional dpts 14.xxx - see cmdref
 #              fix dpt14 min/max values
 #              performance tuning in define
+# MH 20240305  change dpt1.009 max-value from closed->close
+#              prevent gadName 'state' in define when nosuffix specified
+#              add on-for...|off-for... to forbidden gadNames
 #
 # todo         replace cascading if..elsif with given
 # todo-11/2023 final removal of attr answerReading conversion
@@ -248,7 +251,8 @@ my $PAT_GAD_OPTIONS = 'get|set|listenonly';
 #pattern for GAD-suffixes
 my $PAT_GAD_SUFFIX = 'nosuffix';
 #pattern for forbidden GAD-Names
-my $PAT_GAD_NONAME = '^(on|off|value|raw|' . $PAT_GAD_OPTIONS . q{|} . $PAT_GAD_SUFFIX . ')';
+#my $PAT_GAD_NONAME = '^(on|off|value|raw|' . $PAT_GAD_OPTIONS . q{|} . $PAT_GAD_SUFFIX . ')';
+my $PAT_GAD_NONAME = 'on|off|on-for-timer|on-until|off-for-timer|off-until|toggle|raw|rgb|string|value';
 #pattern for DPT
 my $PAT_GAD_DPT = 'dpt\d+\.?\d*';
 #pattern for dpt1 (standard)
@@ -265,10 +269,11 @@ my $PAT_DPT16_CLR = qr/>CLR</ixms;
 #CODE is the identifier for the en- and decode algos. See encode and decode functions
 #UNIT is appended to state and readings
 #FACTOR and OFFSET are used to normalize a value. value = FACTOR * (RAW - OFFSET). Must be undef for non-numeric values. - optional
-#PATTERN is used to check an trim the input-values
+#PATTERN is used to check and trim user input.
 #MIN and MAX are used to cast numeric values. Must be undef for non-numeric dpt. Special Usecase: DPT1 - MIN represents 00, MAX represents 01
 #SETLIST (optional) if given, is passed directly to fhemweb in order to show comand-buttons in the details-view (e.g. "colorpicker" or "item1,item2,item3")
-#if setlist is not supplied and min/max are given, a slider is shown for numeric values. Otherwise min/max value are shown in a dropdown list
+#a slider is shown for dpt5 and dpt6 values. 
+#if setlist is not supplied and non-numeric min/max values are given, a dropdown list is shown.
 my %dpttypes = (
 	#Binary value
 	'dpt1'     => {CODE=>'dpt1', UNIT=>q{}, PATTERN=>qr/($PAT_DPT1_PAT)/ixms, MIN=>'off', MAX=>'on', SETLIST=>'on,off,toggle',
@@ -282,7 +287,7 @@ my %dpttypes = (
 	'dpt1.006' => {CODE=>'dpt1', UNIT=>q{}, PATTERN=>qr/($PAT_DPT1_PAT|low|high)/ixms, MIN=>'low', MAX=>'high'},
 	'dpt1.007' => {CODE=>'dpt1', UNIT=>q{}, PATTERN=>qr/($PAT_DPT1_PAT|decrease|increase)/ixms, MIN=>'decrease', MAX=>'increase'},
 	'dpt1.008' => {CODE=>'dpt1', UNIT=>q{}, PATTERN=>qr/($PAT_DPT1_PAT|up|down)/ixms, MIN=>'up', MAX=>'down'},
-	'dpt1.009' => {CODE=>'dpt1', UNIT=>q{}, PATTERN=>qr/($PAT_DPT1_PAT|closed|open)/ixms, MIN=>'open', MAX=>'closed'},
+	'dpt1.009' => {CODE=>'dpt1', UNIT=>q{}, PATTERN=>qr/($PAT_DPT1_PAT|close|open)/ixms, MIN=>'open', MAX=>'close'},
 	'dpt1.010' => {CODE=>'dpt1', UNIT=>q{}, PATTERN=>qr/($PAT_DPT1_PAT|start|stop)/ixms, MIN=>'stop', MAX=>'start'},
 	'dpt1.011' => {CODE=>'dpt1', UNIT=>q{}, PATTERN=>qr/($PAT_DPT1_PAT|inactive|active)/ixms, MIN=>'inactive', MAX=>'active'},
 	'dpt1.012' => {CODE=>'dpt1', UNIT=>q{}, PATTERN=>qr/($PAT_DPT1_PAT|not_inverted|inverted)/ixms, MIN=>'not_inverted', MAX=>'inverted'},
@@ -651,7 +656,8 @@ sub KNX_Define2 {
 			$attr{$name}->{disable} = 1 if (AttrVal($name,'disable',0) != 1);
 		}
 		elsif (!defined($dpttypes{$gadModel})) { #check model-type
-			push(@logarr,qq{invalid model $gadModel for group-number $gadNo, consult commandref - avaliable DPT});
+			push(@logarr,qq{invalid dpt $gadModel for group-number $gadNo, consult commandref - avaliable DPT});
+			$attr{$name}->{disable} = 1 if (AttrVal($name,'disable',0) != 1);
 			next;
 		}
 		elsif ($gadNo == 1) { # gadModel ok - use first gad as mdl reference for fheminfo
@@ -663,9 +669,15 @@ sub KNX_Define2 {
 			$gadOption   = lc(pop(@gadArgs)) if (@gadArgs && $gadArgs[-1] =~ /^($PAT_GAD_OPTIONS)$/ixms);
 			$gadName     = pop(@gadArgs) if (@gadArgs);
 
-			if ($gadName =~ /^$PAT_GAD_NONAME$/ixms) {
-				push(@logarr,qq{forbidden gad-name $gadName});
+#			if ($gadName =~ /^($PAT_GAD_NONAME)$/ixms) {
+			if ($gadName =~ /^($PAT_GAD_NONAME)$/xms) { # allow mixed case 
+				push(@logarr,qq{forbidden gadName $gadName});
 				next;
+			}
+
+			if ($gadName eq q{state} && defined($gadNoSuffix)) {
+				$gadName = q{g} . $gadNo;
+				push(@logarr,qq{forbidden gadName: state -  modified to: $gadName});
 			}
 		}
 
@@ -1214,22 +1226,7 @@ sub KNX_Parse {
 		elsif ($cmd =~ /[r]/ixms) {
 			my $cmdAttr = AttrVal($deviceName, 'putCmd', undef);
 			next if (! defined($cmdAttr) || $cmdAttr eq q{});
-=begin comment
-# replaced by block below !!
-			# special experiment for Amenophis86
-			if ($cmdAttr eq 'noReply') {
-				if ($iohash->{PhyAddr} eq KNX_hexToName2($src)) { # match src-address with phy of IOdev
-					# from fhem - delete ignore reply flag
-					delete $deviceHash->{GADDETAILS}->{$gadName}->{noreplyflag}; # allow when sent from fhem
-				}
-				else {
-					KNX_Log ($deviceName, 4, q{read msg from } . KNX_hexToName2($src) . qq{ for $deviceName $gadName IODev= $iohash->{PhyAddr}});
-					$deviceHash->{GADDETAILS}->{$gadName}->{noreplyflag} = gettimeofday() + 2;
-				}
-				next; # cannot use putCmd logic!
-			}
-=end comment
-=cut
+
 			# generate <putname>
 			my $putName = $getName =~ s/get/put/irxms;
 			$putName .= ($putName eq $getName)?q{-put}:q{};  # nosuffix
@@ -1241,6 +1238,7 @@ sub KNX_Parse {
 				KNX_Log ($deviceName, 2, qq{putCmd eval error gadName=$gadName - no reply sent!});
 				next; # dont send!
 			}
+
 ## special experiment for Amenophis86
 			elsif ($value eq 'noReply') {
 				if ($iohash->{PhyAddr} eq KNX_hexToName2($src)) { # match src-address with phy of IOdev
@@ -1300,7 +1298,12 @@ sub KNX_autoCreate {
 ### KNX_SetReadings is called from KNX_Set and KNX_Parse
 # calling param: $hash, $gadName, $value, caller (set/parse), trigger (event yes/no)
 sub KNX_SetReadings {
-	my ($hash, $gadName, $value, $src, $trigger) = @_;
+#	my ($hash, $gadName, $value, $src, $trigger) = @_;
+	my $hash    = shift;
+	my $gadName = shift;
+	my $value   = shift;
+	my $src     = shift // q{fhem}; # undef when called from set
+	my $trigger = shift // 1; # trigger if undef
 
 	my $name = $hash->{NAME};
 
@@ -1314,13 +1317,14 @@ sub KNX_SetReadings {
 		$value .= q{ } . $unit;
 	}
 
-	my $lsvalue = 'fhem'; # called from set
+	my $lsvalue = q{fhem}; # called from set
 	my $rdName = $hash->{GADDETAILS}->{$gadName}->{RDNAMESET};
-	if (defined($src) && ($src ne q{})) { # called from parse
+	if ($src ne q{fhem}) { # called from parse
+#	if (defined($src) && ($src ne q{})) { # called from parse
 		$lsvalue = KNX_hexToName2($src);
 		$rdName = $hash->{GADDETAILS}->{$gadName}->{RDNAMEGET};
 	}
-	my $trievents = (defined($trigger))?$trigger:1;
+#	my $trievents = (defined($trigger))?$trigger:1;
 
 	#execute stateRegex
 	my $state = KNX_replaceByRegex ($hash, $rdName, $value);
@@ -1347,7 +1351,8 @@ sub KNX_SetReadings {
 		}
 		readingsBulkUpdate($hash, 'state', $state);
 	}
-	readingsEndUpdate($hash, $trievents);
+#	readingsEndUpdate($hash, $trievents);
+	readingsEndUpdate($hash, $trigger);
 	return;
 }
 
@@ -2143,6 +2148,7 @@ sub KNX_chkIO {
 sub doKNX_scan {
 	my $iohash = shift // return;
 
+	return if (! exists($iohash->{Helper}->{knxscan}));
 	my $count = scalar(@{$iohash->{Helper}->{knxscan}});
 	if ($count > 0 ) {
 		my ($devName,$gadName) = split(/\s/xms, shift(@{$iohash->{Helper}->{knxscan}}),2);
@@ -2223,11 +2229,11 @@ This module provides a basic set of operations (on, off, toggle, on-until, on-fo
  devices and to send values to the bus.&nbsp;</p>
 <p>Sophisticated setups can be achieved by combining multiple KNX-groupaddresses&colon;datapoints (GAD's&colon;dpt's)
  in one KNX device instance.</p>
-<p>KNX defines a series of Datapoint Type as standard data types used to allow general interpretation of values
- of devices manufactured by different vendors.
+<p>KNX defines a series of Data-Point-Types (<a href="#KNX-dpt">dpt</a>) as standard data types to allow 
+ interpretation/encoding of messages from/to devices manufactured by different vendors.
  These datatypes are used to interpret the status of a device, so the readings in FHEM will show the
  correct value and optional unit.</p>
-<p>For each received telegram there will be a reading containing the received value and the sender address.<br/> 
+<p>For each received message there will be a reading containing the received value and the sender address.<br/> 
 For every set, there will be a reading containing the sent value.<br/> 
 The reading &lt;state&gt; will be updated with the last sent or received value.&nbsp;</p>
 <p>A (german) wiki page is avaliable here&colon; <a href="https://wiki.fhem.de/wiki/KNX">FHEM Wiki</a></p>
@@ -2236,26 +2242,27 @@ The reading &lt;state&gt; will be updated with the last sent or received value.&
 <li><a id="KNX-define"></a><strong>Define</strong><br/>
 <p><code>define &lt;name&gt; KNX &lt;group&gt;&colon;&lt;dpt&gt;[&colon;[&lt;gadName&gt;]&colon;[set|get|listenonly]&colon;[nosuffix]]
  [&lt;group&gt;&colon;&lt;dpt&gt; ..] <del>[IODev]</del></code></p>
-<p><strong>Important&colon; a KNX device needs at least one&nbsp;valid DPT.</strong> Please refer to <a href="#KNX-dpt">avaliable DPT</a>.
- Otherwise the system cannot en- or decode messages.<br/>
-<strong>Devices defined by autocreate have to be reworked with the suitable dpt and the disable attribute deleted.
+<p><strong>Important&colon; a KNX device needs at least one&nbsp;valid DPT.</strong>
+ The system cannot en- or de-code messages without a valid <a href="#KNX-dpt">dpt</a> defined.<br/>
+<strong>Devices defined by autocreate have to be configured with a correct dpt and the disable attribute deleted.
  Otherwise they won't do anything.</strong></p>
 <p>The &lt;group&gt; parameter is either a group name notation (0-31/0-7/0-255) or the hex representation of it
  ([00-1f][0-7][00-ff]) (5 digits).  All of the defined groups can be used for bus-communication. 
- It is not allowed to have the same group-address more then once in one device. You can have multiple devices containing
+ It is not allowed to have the same group-address more then once in one device. You can have multiple FHEM-devices containing
  the same group-adresses.<br/> 
 As described above the parameter &lt;dpt&gt; has to contain the corresponding DPT - matching the dpt-spec of the KNX-Hardware.</p> 
-<p>The gadNames are default named "g&lt;number&gt;". The corresponding reading-names are getG&lt;number&gt; 
+<p>The gadName default is "g&lt;number&gt;". The corresponding reading-names are getG&lt;number&gt; 
 and setG&lt;number&gt;.<br/> 
 The optional parameteter &lt;gadName&gt; may contain an alias for the GAD. The following gadNames are <b>not allowed&colon;</b>
- on, off, on-for-timer, on-until, off-for-timer, off-until, toggle, raw, rgb, string, value, set, get, listenonly, nosuffix
+ state, on, off, on-for-timer, on-until, off-for-timer, off-until, toggle, raw, rgb, string, value, set, get, listenonly, nosuffix
  -  because of conflict with cmds &amp; parameters.<br/>
 If you supply &lt;gadName&gt; this name is used instead. The readings are &lt;gadName&gt;-get and &lt;gadName&gt;-set. 
 The synonyms &lt;getName&gt; and &lt;setName&gt; are used in this documentation.<br/>
-If you add the option "nosuffix", &lt;getName&gt; and &lt;setName&gt; have the identical name - only &lt;gadName&gt;.<br/>
+If you add the option "nosuffix", &lt;getName&gt; and &lt;setName&gt; have the identical name - &lt;gadName&gt;.
+Both sent and received bus messages will be stored in the same reading &lt;gadName&gt;<br/>
 If you want to restrict the GAD, you can use the options "get", "set", or "listenonly".  The usage should be self-explanatory.
  It is not possible to combine the options.</p>
-<p><b>Specifying an IO-Device in define is now deprecated!</b> Use attribute <a href="#KNX-attr-IODev">IODev</a> instead,
+<p><b>Specifying an IO-Device in define is deprecated!</b> Use attribute <a href="#KNX-attr-IODev">IODev</a> instead,
  but only if absolutely required!</p>
 <p>The first group is used for sending by default. If you want to send to a different group, you have to address it.
  E.g&colon; <code>set &lt;name&gt; &lt;gadName&gt; &lt;value&gt; </code>
@@ -2283,10 +2290,11 @@ Examples&colon;
 </li>
 
 <li><a id="KNX-set"></a><strong>Set</strong><br/>
-<p><code>set &lt;deviceName&gt; [&lt;gadName&gt;] &lt;on|off|toggle&gt;<br/>
-  set &lt;deviceName&gt; [&lt;gadName&gt;] &lt;on-for-timer|off-for-timer&gt; &lt;duration seconds&gt;<br/>
-  set &lt;deviceName&gt; [&lt;gadName&gt;] &lt;on-until|off-until&gt; &lt;timespec&gt;<br/>
-  set &lt;deviceName&gt; [&lt;gadName&gt;] &lt;value&gt;<br/></code></p>
+<p><code>set &lt;deviceName&gt; [&lt;gadName&gt;] on|off|toggle<br/>
+  set &lt;deviceName&gt; &lt;gadName&gt; blink &lt;nr of blinks&gt; &lt;duration seconds&gt;<br/>
+  set &lt;deviceName&gt; &lt;gadName&gt; on-for-timer|off-for-timer &lt;duration seconds&gt;<br/>
+  set &lt;deviceName&gt; &lt;gadName&gt; on-until|off-until &lt;timespec (HH:MM[:SS])&gt;<br/>
+</code></p>
 <p>Set sends the given value to the bus.<br/> If &lt;gadName&gt; is omitted, the first listed GAD of the device is used. 
  If the GAD is restricted in the definition with "get" or "listenonly", the set-command will be refused.<br/> 
  For dpt1 and dpt1.001 valid values are on, off, toggle and blink. Also the timer-functions can be used.
@@ -2443,7 +2451,7 @@ Examples&colon;
 <li><a id="KNX-events"></a><strong>Events</strong><br/>
   <p>Events are generated for each reading sent or received to/from KNX-Bus unless restricted by <code>event-xxx</code> attributes
   or modified by <code>eventMap, stateRegex</code> attributes.
-  KNX-events have this format&colon;</p>
+  <br/>KNX-events have this format&colon;</p>
   <pre>   <code>&lt;device&gt; &lt;readingName&gt;&colon; &ltvalue&gt; # reading event
    &lt;device&gt; &lt;value&gt;                # state event</code></pre>
 </li>
@@ -2462,7 +2470,7 @@ Examples&colon;
 <li><b>dpt1.006 </b>  low, high</li>
 <li><b>dpt1.007 </b>  decrease, increase</li>
 <li><b>dpt1.008 </b>  up, down</li>
-<li><b>dpt1.009 </b>  open, closed</li>
+<li><b>dpt1.009 </b>  open, close</li>
 <li><b>dpt1.010 </b>  stop, start</li>
 <li><b>dpt1.011 </b>  inactive, active</li>
 <li><b>dpt1.012 </b>  not_inverted, inverted</li>
