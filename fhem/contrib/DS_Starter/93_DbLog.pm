@@ -1,5 +1,5 @@
 ##############################################################################################################################
-# $Id: 93_DbLog.pm 28085 2023-10-22 14:22:29Z DS_Starter $
+# $Id: 93_DbLog.pm 28345 2024-01-05 19:46:43Z DS_Starter $
 ##############################################################################################################################
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -8,7 +8,7 @@
 # modified and maintained by Tobias Faust since 2012-06-26 until 2016
 # e-mail: tobias dot faust at online dot de
 #
-# redesigned and maintained 2016-2023 by DS_Starter
+# redesigned and maintained 2016-2024 by DS_Starter
 # e-mail: heiko dot maaz at t-online dot de
 #
 # reduceLog() created by Claudiu Schuster (rapster) adapted by DS_Starter
@@ -56,7 +56,9 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.9.4"   => "27.12.2023 make EVENT writable ",
+  "5.9.6"   => "06.03.2024 adopt META.json Forum: https://forum.fhem.de/index.php?topic=137375.0 ",
+  "5.9.5"   => "04.01.2024 change DbLog_configcheck to select only column width independent from column characteristic ",
+  "5.9.4"   => "03.01.2024 make EVENT writable ",
   "5.9.3"   => "09.10.2023 new attribute colType ",
   "5.9.2"   => "09.10.2023 edit commandref, Forum: https://forum.fhem.de/index.php?msg=1288840 ",
   "5.9.1"   => "15.08.2023 possible use of alternative tables in _DbLog_plotData Forum:134547, fix warnings in ".
@@ -7400,32 +7402,31 @@ sub DbLog_configcheck {
   }
 
   if ($dbmodel =~ /SQLITE/) {
-      my @dev;
-      ($err, @dev) = _DbLog_prepExecQueryOnly ($name, $dbh, "SELECT sql FROM sqlite_master WHERE name = '$history'");
+      my @sql;
+      ($err, @sql) = _DbLog_prepExecQueryOnly ($name, $dbh, "SELECT sql FROM sqlite_master WHERE name = '$history'");
+      my $line     = $sql[0] // "no result";
 
-      $cdat_dev   = $dev[0] // "no result";
-      $cdat_typ   = $cdat_evt = $cdat_rdg = $cdat_val = $cdat_unt = $cdat_dev;
-      ($cdat_dev) = $cdat_dev =~ /DEVICE.varchar\(([\d]+)\)/x;
-      ($cdat_typ) = $cdat_typ =~ /TYPE.varchar\(([\d]+)\)/x;
-      ($cdat_evt) = $cdat_evt =~ /EVENT.varchar\(([\d]+)\)/x;
-      ($cdat_rdg) = $cdat_rdg =~ /READING.varchar\(([\d]+)\)/x;
-      ($cdat_val) = $cdat_val =~ /VALUE.varchar\(([\d]+)\)/x;
-      ($cdat_unt) = $cdat_unt =~ /UNIT.varchar\(([\d]+)\)/x;
+      ($cdat_dev)  = (split "DEVICE",  $line)[1] =~ /\(([\d]+?)\)/x;
+      ($cdat_typ)  = (split "TYPE",    $line)[1] =~ /\(([\d]+?)\)/x;
+      ($cdat_evt)  = (split "EVENT",   $line)[1] =~ /\(([\d]+?)\)/x;
+      ($cdat_rdg)  = (split "READING", $line)[1] =~ /\(([\d]+?)\)/x;
+      ($cdat_val)  = (split "VALUE",   $line)[1] =~ /\(([\d]+?)\)/x;
+      ($cdat_unt)  = (split "UNIT",    $line)[1] =~ /\(([\d]+?)\)/x;
   }
 
   if ($dbmodel !~ /SQLITE/)  {
-      $cdat_dev = @sr_dev ? ($sr_dev[1]) : "no result";
-      $cdat_dev =~ tr/varchar\(|\)//d if($cdat_dev ne "no result");
-      $cdat_typ = @sr_typ ? ($sr_typ[1]) : "no result";
-      $cdat_typ =~ tr/varchar\(|\)//d if($cdat_typ ne "no result");
-      $cdat_evt = @sr_evt ? ($sr_evt[1]) : "no result";
-      $cdat_evt =~ tr/varchar\(|\)//d if($cdat_evt ne "no result");
-      $cdat_rdg = @sr_rdg ? ($sr_rdg[1]) : "no result";
-      $cdat_rdg =~ tr/varchar\(|\)//d if($cdat_rdg ne "no result");
-      $cdat_val = @sr_val ? ($sr_val[1]) : "no result";
-      $cdat_val =~ tr/varchar\(|\)//d if($cdat_val ne "no result");
-      $cdat_unt = @sr_unt ? ($sr_unt[1]) : "no result";
-      $cdat_unt =~ tr/varchar\(|\)//d if($cdat_unt ne "no result");
+      $cdat_dev   = @sr_dev ? $sr_dev[1] : "no result";
+      ($cdat_dev) = $cdat_dev =~ /([\d]+)/x;
+      $cdat_typ   = @sr_typ ? $sr_typ[1] : "no result";
+      ($cdat_typ) = $cdat_typ =~ /([\d]+)/x;
+      $cdat_evt   = @sr_evt ? $sr_evt[1] : "no result";
+      ($cdat_evt) = $cdat_evt =~ /([\d]+)/x;
+      $cdat_rdg   = @sr_rdg ? $sr_rdg[1] : "no result";
+      ($cdat_rdg) = $cdat_rdg =~ /([\d]+)/x;
+      $cdat_val   = @sr_val ? $sr_val[1] : "no result";
+      ($cdat_val) = $cdat_val =~ /([\d]+)/x;
+      $cdat_unt   = @sr_unt ? $sr_unt[1] : "no result";
+      ($cdat_unt) = $cdat_unt =~ /([\d]+)/x;
   }
 
   $cmod_dev = $hash->{HELPER}{DEVICECOL};
@@ -7502,32 +7503,31 @@ sub DbLog_configcheck {
   }
 
   if ($dbmodel =~ /SQLITE/) {
-      my @dev;
-      ($err, @dev) = _DbLog_prepExecQueryOnly ($name, $dbh, "SELECT sql FROM sqlite_master WHERE name = '$current'");
+      my @sql;
+      ($err, @sql) = _DbLog_prepExecQueryOnly ($name, $dbh, "SELECT sql FROM sqlite_master WHERE name = '$current'");
+      my $line     = $sql[0] // "no result";
 
-      $cdat_dev   = $dev[0] // "no result";
-      $cdat_typ   = $cdat_evt = $cdat_rdg = $cdat_val = $cdat_unt = $cdat_dev;
-      ($cdat_dev) = $cdat_dev =~ /DEVICE.varchar\(([\d]+)\)/x;
-      ($cdat_typ) = $cdat_typ =~ /TYPE.varchar\(([\d]+)\)/x;
-      ($cdat_evt) = $cdat_evt =~ /EVENT.varchar\(([\d]+)\)/x;
-      ($cdat_rdg) = $cdat_rdg =~ /READING.varchar\(([\d]+)\)/x;
-      ($cdat_val) = $cdat_val =~ /VALUE.varchar\(([\d]+)\)/x;
-      ($cdat_unt) = $cdat_unt =~ /UNIT.varchar\(([\d]+)\)/x;
+      ($cdat_dev)  = (split "DEVICE",  $line)[1] =~ /\(([\d]+?)\)/x;
+      ($cdat_typ)  = (split "TYPE",    $line)[1] =~ /\(([\d]+?)\)/x;
+      ($cdat_evt)  = (split "EVENT",   $line)[1] =~ /\(([\d]+?)\)/x;
+      ($cdat_rdg)  = (split "READING", $line)[1] =~ /\(([\d]+?)\)/x;
+      ($cdat_val)  = (split "VALUE",   $line)[1] =~ /\(([\d]+?)\)/x;
+      ($cdat_unt)  = (split "UNIT",    $line)[1] =~ /\(([\d]+?)\)/x;
   }
 
-  if ($dbmodel !~ /SQLITE/)  {
-      $cdat_dev = @sr_dev ? ($sr_dev[1]) : "no result";
-      $cdat_dev =~ tr/varchar\(|\)//d if($cdat_dev ne "no result");
-      $cdat_typ = @sr_typ ? ($sr_typ[1]) : "no result";
-      $cdat_typ =~ tr/varchar\(|\)//d if($cdat_typ ne "no result");
-      $cdat_evt = @sr_evt ? ($sr_evt[1]) : "no result";
-      $cdat_evt =~ tr/varchar\(|\)//d if($cdat_evt ne "no result");
-      $cdat_rdg = @sr_rdg ? ($sr_rdg[1]) : "no result";
-      $cdat_rdg =~ tr/varchar\(|\)//d if($cdat_rdg ne "no result");
-      $cdat_val = @sr_val ? ($sr_val[1]) : "no result";
-      $cdat_val =~ tr/varchar\(|\)//d if($cdat_val ne "no result");
-      $cdat_unt = @sr_unt ? ($sr_unt[1]) : "no result";
-      $cdat_unt =~ tr/varchar\(|\)//d if($cdat_unt ne "no result");
+  if ($dbmodel !~ /SQLITE/)  {      
+      $cdat_dev   = @sr_dev ? $sr_dev[1] : "no result";
+      ($cdat_dev) = $cdat_dev =~ /([\d]+)/x;
+      $cdat_typ   = @sr_typ ? $sr_typ[1] : "no result";
+      ($cdat_typ) = $cdat_typ =~ /([\d]+)/x;
+      $cdat_evt   = @sr_evt ? $sr_evt[1] : "no result";
+      ($cdat_evt) = $cdat_evt =~ /([\d]+)/x;
+      $cdat_rdg   = @sr_rdg ? $sr_rdg[1] : "no result";
+      ($cdat_rdg) = $cdat_rdg =~ /([\d]+)/x;
+      $cdat_val   = @sr_val ? $sr_val[1] : "no result";
+      ($cdat_val) = $cdat_val =~ /([\d]+)/x;
+      $cdat_unt   = @sr_unt ? $sr_unt[1] : "no result";
+      ($cdat_unt) = $cdat_unt =~ /([\d]+)/x;
   }
 
   $cmod_dev = $hash->{HELPER}{DEVICECOL};
@@ -8695,13 +8695,13 @@ sub DbLog_setVersionInfo {
 
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 28085 2023-10-22 14:22:29Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 28345 2024-01-05 19:46:43Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/xsg;
       }
       else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 28085 2023-10-22 14:22:29Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 28345 2024-01-05 19:46:43Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -12558,7 +12558,8 @@ attr SMA_Energymeter DbLogValueFn
       "suggests": {
         "Data::Dumper": 0,
         "DBD::Pg": 0,
-        "DBD::mysql": 0,
+        "DBD::mysql": 4.050,
+        "DBD::MariaDB": 0,
         "DBD::SQLite": 0
       }
     }
