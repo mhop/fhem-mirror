@@ -44,7 +44,7 @@ for my $fn (sort { $a <=> $b } @files) {
   }
   close(FH);
   if($pic ne $ppi) {
-    printf "Problem: $pic vs. $ppi\n";
+    printf "$path: CertificationNumern:$pic ne ProductPicture:$ppi\n";
     # just to see new problems with pictures
   }
   if($em eq 'empty') {

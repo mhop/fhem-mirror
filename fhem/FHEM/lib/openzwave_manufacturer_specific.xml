@@ -1558,6 +1558,7 @@
 	<Product config="qubino/ZMNHMDx.xml" id="0051" name="ZMNHMDx Smart leak protector" type="0006"/>
   </Manufacturer>
   <Manufacturer id="0460" name="Shelly Qubino">
+    <Product config="qubino/QNSW001X16EU.xml" id="0083" name="Wave 1"   type="0002" forumNr="137373"/>
     <Product config="qubino/QNSW001P16EU.xml" id="0084" name="Wave 1PM" type="0002" forumNr="135648"/>
   </Manufacturer>
   <Manufacturer id="0130" name="Quby">
