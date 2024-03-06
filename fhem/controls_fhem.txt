@@ -1,11 +1,11 @@
-REV 28595
+REV 28603
 DIR unused
-UPD 2024-03-05_07:45:03 420750 ./CHANGED
+UPD 2024-03-06_07:45:03 420821 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2024-03-03_07:45:03 47202 ./MAINTAINER.txt
 UPD 2023-08-24_07:45:03 46886 ./configDB.pm
 UPD 2023-05-29_07:45:03 21936 ./fhem.cfg.demo
-UPD 2024-03-03_07:45:15 174087 ./fhem.pl
+UPD 2024-03-06_07:45:15 174143 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2021-08-02_07:45:03 60624 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -17,7 +17,7 @@ UPD 2021-11-09_07:45:02 59146 FHEM/00_HMLAN.pm
 UPD 2021-11-09_07:45:02 91885 FHEM/00_HMUARTLGW.pm
 UPD 2018-03-11_07:45:03 3685 FHEM/00_HXB.pm
 UPD 2022-04-17_07:45:03 52966 FHEM/00_KM271.pm
-UPD 2024-01-21_07:45:03 54531 FHEM/00_KNXIO.pm
+UPD 2024-03-06_07:45:03 55094 FHEM/00_KNXIO.pm
 UPD 2019-12-31_07:45:05 17105 FHEM/00_KNXTUL.pm
 UPD 2019-01-06_07:45:02 3796 FHEM/00_LIRC.pm
 UPD 2016-04-26_07:45:11 33379 FHEM/00_MAXLAN.pm
@@ -63,7 +63,7 @@ UPD 2020-05-23_07:45:02 47669 FHEM/10_GFPROBT.pm
 UPD 2018-03-11_07:45:03 10293 FHEM/10_HXBDevice.pm
 UPD 2024-01-04_07:45:03 77733 FHEM/10_IT.pm
 UPD 2016-02-05_07:45:11 4427 FHEM/10_Itach_IR.pm
-UPD 2024-01-14_07:45:02 123732 FHEM/10_KNX.pm
+UPD 2024-03-06_07:45:03 124132 FHEM/10_KNX.pm
 UPD 2016-12-22_07:45:02 36655 FHEM/10_KOPP_FC.pm
 UPD 2021-01-14_07:45:03 111779 FHEM/10_MAX.pm
 UPD 2023-09-06_07:45:04 37786 FHEM/10_MQTT2_DEVICE.pm
@@ -398,7 +398,7 @@ UPD 2022-11-14_07:45:07 120483 FHEM/73_GasCalculator.pm
 UPD 2023-01-12_07:45:03 90682 FHEM/73_MPD.pm
 UPD 2021-12-18_07:45:03 10412 FHEM/73_NUKIBridge.pm
 UPD 2024-02-02_07:45:03 89859 FHEM/73_PRESENCE.pm
-UPD 2024-03-05_07:45:03 79561 FHEM/73_PRESENCE2.pm
+UPD 2024-03-06_07:45:03 79561 FHEM/73_PRESENCE2.pm
 UPD 2022-11-14_07:45:07 130714 FHEM/73_WaterCalculator.pm
 UPD 2022-12-14_07:45:02 2562316 FHEM/73_km200.pm
 UPD 2023-04-11_07:45:03 69312 FHEM/74_AMADDevice.pm
@@ -763,12 +763,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2024-03-03_07:45:09 5165194 docs/commandref.html
-UPD 2024-03-03_07:45:13 3194713 docs/commandref_DE.html
-UPD 2023-08-25_07:45:03 86242 docs/commandref_frame.html
-UPD 2023-08-25_07:45:03 96940 docs/commandref_frame_DE.html
-UPD 2024-03-05_07:45:14 315782 docs/commandref_modular.html
-UPD 2024-03-05_07:45:15 327657 docs/commandref_modular_DE.html
+UPD 2024-03-06_07:45:09 5165512 docs/commandref.html
+UPD 2024-03-06_07:45:13 3194962 docs/commandref_DE.html
+UPD 2024-03-06_07:45:03 86454 docs/commandref_frame.html
+UPD 2024-03-06_07:45:03 97189 docs/commandref_frame_DE.html
+UPD 2024-03-06_07:45:14 315994 docs/commandref_modular.html
+UPD 2024-03-06_07:45:15 327906 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1493,6 +1493,9 @@ UPD 2015-08-10_07:45:11 33346 www/images/fhemSVG/fts_sunblind_60.svg
 UPD 2015-08-10_07:45:11 33260 www/images/fhemSVG/fts_sunblind_70.svg
 UPD 2015-08-10_07:45:11 34356 www/images/fhemSVG/fts_sunblind_80.svg
 UPD 2015-08-10_07:45:11 33264 www/images/fhemSVG/fts_sunblind_90.svg
+UPD 2024-03-06_07:45:03 5082 www/images/fhemSVG/fts_sunblind_down.svg
+UPD 2024-03-06_07:45:03 6184 www/images/fhemSVG/fts_sunblind_stop.svg
+UPD 2024-03-06_07:45:03 5051 www/images/fhemSVG/fts_sunblind_up.svg
 UPD 2015-07-28_14:05:32 1650 www/images/fhemSVG/fts_window_1wbb_open.svg
 UPD 2020-03-02_07:45:03 3323 www/images/fhemSVG/fuel.svg
 UPD 2017-11-14_07:45:02 5430 www/images/fhemSVG/garden_socket.svg
@@ -1505,8 +1508,12 @@ UPD 2015-07-28_14:05:32 2898 www/images/fhemSVG/general_an.svg
 UPD 2015-07-28_14:05:32 8074 www/images/fhemSVG/general_an_fuer_zeit.svg
 UPD 2015-07-28_14:05:32 5226 www/images/fhemSVG/general_aus.svg
 UPD 2015-07-28_14:05:32 10429 www/images/fhemSVG/general_aus_fuer_zeit.svg
+UPD 2024-03-06_07:45:03 6212 www/images/fhemSVG/general_co2.svg
+UPD 2024-03-06_07:45:03 6624 www/images/fhemSVG/general_fertig.svg
+UPD 2024-03-06_07:45:03 4877 www/images/fhemSVG/general_laeuft.svg
 UPD 2015-07-28_14:05:32 4264 www/images/fhemSVG/general_low.svg
 UPD 2015-07-28_14:05:32 3762 www/images/fhemSVG/general_ok.svg
+UPD 2024-03-06_07:45:03 5395 www/images/fhemSVG/general_prep.svg
 UPD 2019-02-14_07:45:03 1111 www/images/fhemSVG/gitlab.svg
 UPD 2019-02-19_07:45:03 4235 www/images/fhemSVG/gtag_kontur.svg
 UPD 2023-07-28_07:45:02 3008 www/images/fhemSVG/helper_automower.svg
@@ -1747,6 +1754,7 @@ UPD 2015-07-28_14:05:32 1062 www/images/fhemSVG/rc_dot.svg
 UPD 2017-11-14_07:45:02 2094 www/images/fhemSVG/rc_templatebutton.svg
 UPD 2015-07-28_14:05:32 5013 www/images/fhemSVG/recycling.svg
 UPD 2015-07-28_14:05:32 1901 www/images/fhemSVG/refresh.svg
+UPD 2024-03-06_07:45:03 2731 www/images/fhemSVG/refresh1.svg
 UPD 2017-11-14_07:45:02 2114 www/images/fhemSVG/remote_control.svg
 UPD 2020-11-26_07:45:03 7385 www/images/fhemSVG/rfid_emblem.svg
 UPD 2020-11-26_07:45:03 4668 www/images/fhemSVG/rfid_tag.svg
@@ -1771,7 +1779,14 @@ UPD 2015-07-28_14:05:32 11560 www/images/fhemSVG/sani_heating_level_60.svg
 UPD 2015-07-28_14:05:32 12465 www/images/fhemSVG/sani_heating_level_70.svg
 UPD 2015-07-28_14:05:32 12459 www/images/fhemSVG/sani_heating_level_80.svg
 UPD 2015-07-28_14:05:32 13366 www/images/fhemSVG/sani_heating_level_90.svg
+UPD 2024-03-06_07:45:03 14297 www/images/fhemSVG/sani_heating_mode.svg
 UPD 2017-11-14_07:45:02 3530 www/images/fhemSVG/sani_heating_timer.svg
+UPD 2024-03-06_07:45:03 8125 www/images/fhemSVG/sani_therme_off.svg
+UPD 2024-03-06_07:45:03 3456 www/images/fhemSVG/sani_therme_off1.svg
+UPD 2024-03-06_07:45:03 7587 www/images/fhemSVG/sani_therme_off2.svg
+UPD 2024-03-06_07:45:03 5401 www/images/fhemSVG/sani_therme_on.svg
+UPD 2024-03-06_07:45:03 6122 www/images/fhemSVG/sani_therme_on1.svg
+UPD 2024-03-06_07:45:03 4217 www/images/fhemSVG/sani_threshold.svg
 UPD 2015-07-28_14:05:32 13389 www/images/fhemSVG/scc_868.svg
 UPD 2015-07-28_14:05:32 2723 www/images/fhemSVG/sdcard.svg
 UPD 2015-07-28_14:05:32 2132 www/images/fhemSVG/security.svg
@@ -1830,6 +1845,12 @@ UPD 2019-06-02_07:45:03 1591 www/images/fhemSVG/telescope.svg
 UPD 2015-07-28_14:05:32 3079 www/images/fhemSVG/temperature_humidity.svg
 UPD 2019-02-14_07:45:03 889 www/images/fhemSVG/terminal.svg
 UPD 2020-07-26_07:45:03 8617 www/images/fhemSVG/terrasse_icon.svg
+UPD 2024-03-06_07:45:03 7874 www/images/fhemSVG/text_eco0.svg
+UPD 2024-03-06_07:45:03 7217 www/images/fhemSVG/text_eco1.svg
+UPD 2024-03-06_07:45:03 7493 www/images/fhemSVG/text_eco2.svg
+UPD 2024-03-06_07:45:03 8127 www/images/fhemSVG/text_i2c.svg
+UPD 2024-03-06_07:45:03 4377 www/images/fhemSVG/text_mofr.svg
+UPD 2024-03-06_07:45:03 5751 www/images/fhemSVG/text_saso.svg
 UPD 2020-07-26_07:45:03 1212 www/images/fhemSVG/tradfri_dimmerswitch.svg
 UPD 2020-01-09_07:45:02 600 www/images/fhemSVG/tradfri_filled_floalt.svg
 UPD 2019-09-08_07:45:03 2111 www/images/fhemSVG/tradfri_gateway.svg
