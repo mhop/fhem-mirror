@@ -59,6 +59,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.3"  => "06.03.2024  delete attribute allowDeletion, multiCmd: executeBeforeProc, executeAfterProc as attributes ".
+                            "Set: all commands are executable even if \$dbloghash->{HELPER}{REOPEN_RUNS_UNTIL}is set ",
   "8.53.2"  => "02.03.2024  delEntries, reduceLog: execute next DbRep_nextMultiCmd even if time check got failed ".
                             "Forum:https://forum.fhem.de/index.php?msg=1305266 ",
   "8.53.1"  => "16.02.2024  sqlCmd: executing ckey:latest possible ",
@@ -93,31 +95,6 @@ my %DbRep_vNotesIntern = (
   "8.51.0"  => "02.01.2023  online formatting of sqlCmd, sqlCmdHistory, sqlSpecial, Commandref edited, get dbValue removed ".
                             "sqlCmdBlocking customized like sqlCmd, bugfix avgTimeWeightMean ",
   "8.50.10" => "01.01.2023  Commandref edited ",
-  "8.50.9"  => "28.12.2022  Commandref changed to a id-links ",
-  "8.50.8"  => "21.12.2022  add call to DbRep_sqlCmd, DbRep_sqlCmdBlocking ",
-  "8.50.7"  => "17.12.2022  Commandref edited ",
-  "8.50.6"  => "14.12.2022  remove ularm from Time::HiRes, Forum: https://forum.fhem.de/index.php/topic,53584.msg1251313.html#msg1251313 ",
-  "8.50.5"  => "05.12.2022  fix diffValue problem (DbRep_diffval) for newer MariaDB versions: https://forum.fhem.de/index.php/topic,130697.0.html ",
-  "8.50.4"  => "04.11.2022  fix daylight saving bug in aggregation eq 'month' (_DbRep_collaggstr) ",
-  "8.50.3"  => "19.09.2022  reduce memory allocation of function DbRep_reduceLog ",
-  "8.50.2"  => "17.09.2022  release setter 'index' for device model 'Agent' ",
-  "8.50.1"  => "05.09.2022  DbRep_setLastCmd, change changeValue syntax, minor fixes ",
-  "8.50.0"  => "20.08.2022  rework of DbRep_reduceLog - add max, max=day, min, min=day, sum, sum=day ",
-  "8.49.1"  => "03.08.2022  fix DbRep_deleteOtherFromDB, Forum: https://forum.fhem.de/index.php/topic,128605.0.html ".
-                            "some code changes and bug fixes ",
-  "8.49.0"  => "16.05.2022  allow optionally set device / reading in the insert command ",
-  "8.48.4"  => "16.05.2022  fix perl warning of set ... insert, Forum: topic,53584.msg1221588.html#msg1221588 ",
-  "8.48.3"  => "09.04.2022  minor code fix in DbRep_reduceLog ",
-  "8.48.2"  => "22.02.2022  more code refacturing ",
-  "8.48.1"  => "31.01.2022  minor fixes e.g. in file size determination, dump routines ",
-  "8.48.0"  => "29.01.2022  new sqlCmdHistory params ___restore_sqlhistory___ , ___save_sqlhistory___ ".
-                            "change _DbRep_mysqlOptimizeTables, revise insert command ",
-  "8.47.0"  => "17.01.2022  new design of sqlCmdHistory, minor fixes ",
-  "8.46.13" => "12.01.2022  more code refacturing, minor fixes ",
-  "8.46.12" => "10.01.2022  more code refacturing, minor fixes, change usage of placeholder §device§, §reading§ in sqlCmd ",
-  "8.46.11" => "03.01.2022  more code refacturing, minor fixes ",
-  "8.46.10" => "02.01.2022  more code refacturing, minor fixes ",
-  "8.46.9"  => "01.01.2022  some more code refacturing, minor fixes ",
   "1.0.0"   => "19.05.2016  Initial"
 );
 
@@ -409,9 +386,9 @@ sub DbRep_Initialize {
  $hash->{FW_deviceOverview} = 1;
 
  $hash->{AttrList} =   "aggregation:minute,hour,day,week,month,year,no ".
+                       "allowDeletion:obsolete ".
                        "disable:1,0 ".
                        "reading ".
-                       "allowDeletion:1,0 ".
                        "autoForward:textField-long ".
                        "averageCalcForm:avgArithmeticMean,avgDailyMeanGWS,avgDailyMeanGWSwithGTS,avgTimeWeightMean ".
                        "countEntriesDetail:1,0 ".
@@ -753,12 +730,7 @@ sub DbRep_Set {
       }
 
       DbRep_setLastCmd ($name, $opt, $prop);
-
-      if ($prop =~ /delete/ && !AttrVal($hash->{NAME}, "allowDeletion", 0)) {
-          return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
-      }
-
-      DbRep_Main ($hash, $opt, $prop);
+      DbRep_Main       ($hash, $opt, $prop);
 
       return;
   }
@@ -884,22 +856,16 @@ sub DbRep_Set {
   #######################################################################################################
   ##        keine Aktionen außer die über diesem Eintrag solange Reopen xxxx im DbLog-Device läuft
   #######################################################################################################
-  if ($dbloghash->{HELPER}{REOPEN_RUNS} && $opt !~ /\?/) {
-      my $ro = $dbloghash->{HELPER}{REOPEN_RUNS_UNTIL};
-
-      Log3 ($name, 3, "DbRep $name - connection $dblogdevice to db $dbname is closed until $ro - $opt postponed");
-
-      ReadingsSingleUpdateValue ($hash, "state", "connection $dblogdevice to $dbname is closed until $ro - $opt postponed", 1);
-      return;
-  }
+  #if ($dbloghash->{HELPER}{REOPEN_RUNS} && $opt !~ /\?/) {
+  #    my $ro = $dbloghash->{HELPER}{REOPEN_RUNS_UNTIL};
+  #    Log3 ($name, 3, "DbRep $name - connection $dblogdevice to db $dbname is closed until $ro - $opt postponed");
+  #   ReadingsSingleUpdateValue ($hash, "state", "connection $dblogdevice to $dbname is closed until $ro - $opt postponed", 1);
+  #   return;
+  #}
 
   if ($opt =~ m/(max|min|sum|average|diff)Value/ && $hash->{ROLE} ne "Agent") {
       if (!AttrVal($hash->{NAME}, "reading", "")) {
           return " The attribute reading to analyze is not set !";
-      }
-
-      if ($prop && $prop =~ /deleteOther/ && !AttrVal($hash->{NAME}, "allowDeletion", 0)) {
-          return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       }
 
       if ($prop && $prop =~ /writeToDB/) {
@@ -914,10 +880,6 @@ sub DbRep_Set {
       DbRep_Main       ($hash,$opt,$prop);
   }
   elsif ($opt =~ m/delEntries|tableCurrentPurge/ && $hash->{ROLE} ne "Agent") {
-      if (!AttrVal($hash->{NAME}, "allowDeletion", undef)) {
-          return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
-      }
-
       DbRep_setLastCmd (@a);
 
       shift @a;
@@ -985,7 +947,7 @@ sub DbRep_Set {
       }
 
       # Attribute device & reading dürfen kein SQL-Wildcard % enthalten
-      if($i_device =~ m/%/ || $i_reading =~ m/%/ ) {
+      if ($i_device =~ m/%/ || $i_reading =~ m/%/ ) {
           return qq{One or both of "device", "reading" containing SQL wildcard "%". Wildcards are not allowed in manual function insert !}
       }
 
@@ -1038,7 +1000,7 @@ sub DbRep_Set {
 
       my $sqlcmd;
 
-      if($opt eq "sqlSpecial") {
+      if ($opt eq "sqlSpecial") {
           my ($tq,$gcl);
 
           if($prop eq "50mostFreqLogsLast2days") {
@@ -1056,9 +1018,9 @@ sub DbRep_Set {
               $sqlcmd = "select device, count(*) from history group by DEVICE;";
           }
           elsif ($prop eq "recentReadingsOfDevice") {
-              if($dbmodel =~ /MYSQL/)      {$tq = "NOW() - INTERVAL 1 DAY"; $gcl = "READING"};
-              if($dbmodel =~ /SQLITE/)     {$tq = "datetime('now','-1 day')"; $gcl = "READING"};
-              if($dbmodel =~ /POSTGRESQL/) {$tq = "CURRENT_TIMESTAMP - INTERVAL '1 day'"; $gcl = "READING,DEVICE"};
+              if ($dbmodel =~ /MYSQL/)      {$tq = "NOW() - INTERVAL 1 DAY"; $gcl = "READING"};
+              if ($dbmodel =~ /SQLITE/)     {$tq = "datetime('now','-1 day')"; $gcl = "READING"};
+              if ($dbmodel =~ /POSTGRESQL/) {$tq = "CURRENT_TIMESTAMP - INTERVAL '1 day'"; $gcl = "READING,DEVICE"};
 
               $sqlcmd = "SELECT t1.TIMESTAMP,t1.DEVICE,t1.READING,t1.VALUE
                          FROM history t1
@@ -1118,7 +1080,7 @@ sub DbRep_Set {
           $sqlcmd .= ';' if ($sqlcmd !~ m/\;$/x);
       }
 
-      if($opt eq "sqlCmdHistory") {
+      if ($opt eq "sqlCmdHistory") {
           $sqlcmd = $prop;
           $sqlcmd =~ s/§/_ESC_ECS_/g;
           $sqlcmd =~ tr/ A-Za-z0-9!"#%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
@@ -1126,35 +1088,30 @@ sub DbRep_Set {
           $sqlcmd =~ s/<c>/,/g;                                                        # noch aus Kompatibilitätsgründen enthalten
           $sqlcmd =~ s/(\x20)*\xbc/,/g;                                                # Forum: https://forum.fhem.de/index.php/topic,103908.0.html
 
-          if($sqlcmd eq "___purge_sqlhistory___") {
+          if ($sqlcmd eq "___purge_sqlhistory___") {
               DbRep_deleteSQLcmdCache ($name);
               return "SQL command historylist of $name deleted.";
           }
 
-          if($sqlcmd eq "___list_sqlhistory___") {
+          if ($sqlcmd eq "___list_sqlhistory___") {
               my ($cache) = DbRep_listSQLcmdCache ($name);
               return $cache;
           }
 
-          if($sqlcmd eq "___save_sqlhistory___") {
+          if ($sqlcmd eq "___save_sqlhistory___") {
               my $err = DbRep_writeSQLcmdCache ($hash);                                # SQL Cache File schreiben
               $err  //= "SQL history entries of $name successfully saved";
               return $err;
           }
 
-          if($sqlcmd eq "___restore_sqlhistory___") {
+          if ($sqlcmd eq "___restore_sqlhistory___") {
               my $count = DbRep_initSQLcmdCache ($name);
               return $count ? "SQL history entries of $name restored: $count" : undef;
           }
       }
 
-      if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($name, 'allowDeletion', undef)) {
-          return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
-      }
-
       $sqlcmd = _DbRep_sqlFormOnline ($hash, $sqlcmd);                                # SQL Statement online formatieren
-
-      $sqlcmd                             = DbRep_trim ($sqlcmd);
+      $sqlcmd = DbRep_trim ($sqlcmd);
       $data{DbRep}{$name}{sqlcache}{temp} = $sqlcmd;                                  # SQL incl. Formatierung zwischenspeichern
 
       my @cmd = split /\s+/, $sqlcmd;
@@ -1175,7 +1132,7 @@ sub DbRep_Set {
 
       my $complex = 0;
 
-      if($newval =~ m/^\s*\{"(.*)"\}\s*$/s) {
+      if ($newval =~ m/^\s*\{"(.*)"\}\s*$/s) {
           $newval  = $1;
           $complex = 1;
       }
@@ -1192,7 +1149,7 @@ sub DbRep_Set {
           return qq{A DbLog-device (standby) is needed to sync. Use "set $name syncStandby <DbLog-standby name>"};
       }
 
-      if(!exists($defs{$prop}) || $defs{$prop}->{TYPE} ne "DbLog") {
+      if (!exists($defs{$prop}) || $defs{$prop}->{TYPE} ne "DbLog") {
           return qq{The device "$prop" doesn't exist or is not a DbLog-device.};
       }
 
@@ -1387,17 +1344,12 @@ sub DbRep_Get {
       $sqlcmd = join ' ', @cmd;
 
       DbRep_setLastCmd ($name, $opt, $sqlcmd);
-
-      if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($name, "allowDeletion", undef)) {
-          return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
-      }
-
-      DbRep_delread    ($hash);                                                          # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
+      DbRep_delread    ($hash);                                                              # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);
 
       return DbRep_sqlCmdBlocking($name,$sqlcmd);
   }
-  elsif ($opt eq "storedCredentials") {                                            # Credentials abrufen
+  elsif ($opt eq "storedCredentials") {                                                      # Credentials abrufen
         my $atxt;
         my $username                            = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{dbuser};
         my $dblogname                           = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{NAME};
@@ -1526,6 +1478,18 @@ sub DbRep_Attr {
   my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbmodel   = $dbloghash->{MODEL};
   my $do;
+  
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+  ######################################################################################################################
+  if ($cmd eq 'set' && $aName eq 'allowDeletion') {
+      if (!$init_done) {
+          return qq{Device "$name" -> The attribute '$aName' is obsolete and will be deleted soon. Please press "save config" when FHEM start is finished.};
+      }
+      else {
+          return qq{The attribute '$aName' is obsolete and will be deleted soon.};
+      }
+  }
+  ######################################################################################################################
 
     # $cmd can be "del" or "set"
     # $name is device name
@@ -1533,7 +1497,6 @@ sub DbRep_Attr {
 
     # nicht erlaubte / nicht setzbare Attribute wenn role = Agent
     my @agentnoattr = qw(aggregation
-                         allowDeletion
                          autoForward
                          dumpDirLocal
                          reading
@@ -13002,6 +12965,8 @@ sub DbRep_nextMultiCmd {
   my @mattr = qw(aggregation
                  autoForward
                  averageCalcForm
+                 executeBeforeProc
+                 executeAfterProc
                  timestamp_begin
                  timestamp_end
                  timeDiffToNow
@@ -15053,8 +15018,6 @@ return;
                                    </ul>
                                    <br>
 
-                                 Due to security reasons the attribute <a href="#DbRep-attr-allowDeletion">allowDeletion</a> needs
-                                 to be set for execute the "delete" option. <br>
                                  The amount of datasets to show by commands "delDoublets adviceDelete" is initially limited
                                  and can be adjusted by <a href="#DbRep-attr-limit">limit</a> attribute.
                                  The adjustment of "limit" has no impact to the "delDoublets delete" function, but affects
@@ -15083,7 +15046,6 @@ return;
                                  <ul>
                                  <table>
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                    <tr><td> <b>allowDeletion</b>                          </td><td>: needs to be set to execute the delete option </td></tr>
                                     <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
                                     <tr><td> <b>limit</b>                                  </td><td>: limits ONLY the count of datasets to display </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
@@ -15116,8 +15078,6 @@ return;
     </ul>
 
     <br>
-    Due to security reasons the attribute <a href="#DbRep-attr-allowDeletion">allowDeletion</a> needs to be set to unlock the
-    delete-function. <br>
     Time limits (days) can be specified as an option. In this case, any time.*-attributes set are
     overmodulated.
     Records older than <b>&lt;no&gt;</b> days and (optionally) newer than
@@ -15129,7 +15089,6 @@ return;
     <ul>
        <table>
        <colgroup> <col width=5%> <col width=95%> </colgroup>
-          <tr><td> <b>allowDeletion</b>     </td><td>: unlock the delete function </td></tr>
           <tr><td> <b>device</b>            </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
           <tr><td> <b>reading</b>           </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>
           <tr><td> <b>time.*</b>            </td><td>: a number of attributes to limit selection by time </td></tr>
@@ -15164,8 +15123,6 @@ return;
                                    </ul>
                                    <br>
 
-                                 Due to security reasons the attribute <a href="#DbRep-attr-allowDeletion">allowDeletion</a> needs to be set for
-                                 execute the "delete" option. <br>
                                  The amount of datasets to show by commands "delSeqDoublets adviceDelete", "delSeqDoublets adviceRemain" is
                                  initially limited (default: 1000) and can be adjusted by attribute <a href="#DbRep-attr-limit">limit</a>.
                                  The adjustment of "limit" has no impact to the "delSeqDoublets delete" function, but affects <b>ONLY</b> the
@@ -15215,7 +15172,6 @@ return;
                                  <ul>
                                  <table>
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                    <tr><td> <b>allowDeletion</b>                          </td><td>: needs to be set to execute the delete option </td></tr>
                                     <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
                                     <tr><td> <b>limit</b>                                  </td><td>: limits ONLY the count of datasets to display </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
@@ -15904,33 +15860,35 @@ return;
     <ul>
       <pre>
         {
-          1  => { timestamp_begin => '2023-12-17 00:00:00', 
-                  timestamp_end   => '2023-12-17 01:00:00', 
-                  device          => 'SMA_Energymeter', 
-                  reading         => 'Einspeisung_Wirkleistung_Zaehler', 
-                  cmd             => 'countEntries history'
+          1  => { executeBeforeProc => 'set LogDB reopen 900',
+                  timestamp_begin   => '2023-12-17 00:00:00', 
+                  timestamp_end     => '2023-12-17 01:00:00', 
+                  device            => 'SMA_Energymeter', 
+                  reading           => 'Einspeisung_Wirkleistung_Zaehler', 
+                  cmd               => 'countEntries history'
                 },
-          2  => { timestamp_begin => '2023-12-15 11:00:00', 
-                  timestamp_end   => 'previous_day_end', 
-                  device          => 'SMA_Energymeter', 
-                  reading         => 'Einspeisung_Wirkleistung_Zaehler', 
-                  cmd             => 'countEntries' 
+          2  => { timestamp_begin   => '2023-12-15 11:00:00', 
+                  timestamp_end     => 'previous_day_end', 
+                  device            => 'SMA_Energymeter', 
+                  reading           => 'Einspeisung_Wirkleistung_Zaehler', 
+                  cmd               => 'countEntries' 
                 },
-          3  => { timeDiffToNow   => 'd:2',
-                  readingNameMap  => 'COUNT',
-                  autoForward     => '{ ".*COUNT.*" => "Dum.Rep.All" }',
-                  device          => 'SMA_%,MySTP.*',
-                  reading         => 'etotal,etoday,Ein% EXCLUDE=%Wirkleistung', 
-                  cmd             => 'countEntries history' 
+          3  => { timeDiffToNow     => 'd:2',
+                  readingNameMap    => 'COUNT',
+                  autoForward       => '{ ".*COUNT.*" => "Dum.Rep.All" }',
+                  device            => 'SMA_%,MySTP.*',
+                  reading           => 'etotal,etoday,Ein% EXCLUDE=%Wirkleistung', 
+                  cmd               => 'countEntries history' 
                 },
-          4  => { timeDiffToNow   => 'd:2',
-                  readingNameMap  => 'SUM',
-                  autoForward     => '{ ".*SUM.*" => "Dum.Rep.All" }',
-                  device          => 'SMA_%,MySTP.*',
-                  reading         => 'etotal,etoday,Ein% EXCLUDE=%Wirkleistung', 
-                  cmd             => 'sumValue' 
+          4  => { timeDiffToNow     => 'd:2',
+                  readingNameMap    => 'SUM',
+                  autoForward       => '{ ".*SUM.*" => "Dum.Rep.All" }',
+                  device            => 'SMA_%,MySTP.*',
+                  reading           => 'etotal,etoday,Ein% EXCLUDE=%Wirkleistung', 
+                  cmd               => 'sumValue' 
                 },
-          5  => { cmd             => 'sqlCmd select count(*) from current'
+          5  => { executeAfterProc  => 'set LogDB reopen',
+                  cmd               => 'sqlCmd select count(*) from current'
                 },
         }
       </pre>
@@ -16224,9 +16182,6 @@ return;
     <li><b> sqlCmd </b> <br><br>
 
     Executes any user-specific command.  <br>
-    If this command contains a delete operation, for safety reasons the attribute
-    <a href="#DbRep-attr-allowDeletion">allowDeletion</a> has to be set. <br>
-
     sqlCmd also accepts the setting of SQL session variables such as.
     "SET @open:=NULL, @closed:=NULL;" or the use of SQLite PRAGMA prior to the
     execution of the SQL statement.
@@ -16306,7 +16261,6 @@ return;
     <ul>
       <a href="#DbRep-attr-executeBeforeProc">executeBeforeProc</a>,
       <a href="#DbRep-attr-executeAfterProc">executeAfterProc</a>,
-      <a href="#DbRep-attr-allowDeletion">allowDeletion</a>,
       <a href="#DbRep-attr-sqlResultFormat">sqlResultFormat</a>,
       <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a>,
       <a href="#DbRep-attr-sqlCmdHistoryLength">sqlCmdHistoryLength</a>,
@@ -16351,7 +16305,6 @@ return;
     <ul>
       <a href="#DbRep-attr-executeBeforeProc">executeBeforeProc</a>,
       <a href="#DbRep-attr-executeAfterProc">executeAfterProc</a>,
-      <a href="#DbRep-attr-allowDeletion">allowDeletion</a>,
       <a href="#DbRep-attr-sqlResultFormat">sqlResultFormat</a>,
       <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a>,
       <a href="#DbRep-attr-sqlCmdHistoryLength">sqlCmdHistoryLength</a>,
@@ -16395,7 +16348,6 @@ return;
     <ul>
       <a href="#DbRep-attr-executeBeforeProc">executeBeforeProc</a>,
       <a href="#DbRep-attr-executeAfterProc">executeAfterProc</a>,
-      <a href="#DbRep-attr-allowDeletion">allowDeletion</a>,
       <a href="#DbRep-attr-sqlResultFormat">sqlResultFormat</a>,
       <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a>,
       <a href="#DbRep-attr-sqlFormatService">sqlFormatService</a>,
@@ -16810,13 +16762,6 @@ sub dbval {
         <tr><td> year    </td><td>- the functional results are summarized per calendar year   </td></tr>
     </table>
   </ul>
-  </li> 
-  <br>
-  
-  <a id="DbRep-attr-allowDeletion"></a>
-  <li><b>allowDeletion </b> <br><br>
-  
-  Enables the delete function of the module.
   </li> 
   <br>
 
@@ -18165,8 +18110,6 @@ return;
                                    </ul>
                                    <br>
 
-                                 Aus Sicherheitsgründen muss das Attribut <a href="#DbRep-attr-allowDeletion">allowDeletion</a> für die "delete" Option
-                                 gesetzt sein. <br>
                                  Die Anzahl der anzuzeigenden Datensätze des Kommandos "delDoublets adviceDelete" ist zunächst
                                  begrenzt (default 1000) und kann durch das Attribut <a href="#DbRep-attr-limit">limit</a> angepasst
                                  werden.
@@ -18196,7 +18139,6 @@ return;
                                  <ul>
                                  <table>
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                    <tr><td> <b>allowDeletion</b>                          </td><td>: Freischaltung der Löschfunktion </td></tr>
                                     <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
                                     <tr><td> <b>limit</b>                                  </td><td>: begrenzt NUR die Anzahl der anzuzeigenden Datensätze  </td></tr>
@@ -18226,8 +18168,6 @@ return;
     </ul>
     <br>
 
-    Aus Sicherheitsgründen muss das Attribut <a href="#DbRep-attr-allowDeletion">allowDeletion</a>
-    gesetzt sein um die Löschfunktion freizuschalten. <br>
     Zeitgrenzen (Tage) können als Option angegeben werden. In diesem Fall werden eventuell gesetzte Zeitattribute
     übersteuert.
     Es werden Datensätze berücksichtigt die älter sind als <b>&lt;no&gt;</b> Tage und (optional) neuer sind als
@@ -18239,7 +18179,6 @@ return;
     <ul>
      <table>
      <colgroup> <col width=5%> <col width=95%> </colgroup>
-        <tr><td> <b>allowDeletion</b>                          </td><td>: Freischaltung der Löschfunktion </td></tr>
         <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
         <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
         <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>
@@ -18274,8 +18213,6 @@ return;
                                    </ul>
                                    <br>
 
-                                 Aus Sicherheitsgründen muss das Attribut <a href="#DbRep-attr-allowDeletion">allowDeletion</a> für die "delete" Option
-                                 gesetzt sein. <br>
                                  Die Anzahl der anzuzeigenden Datensätze der Kommandos "delSeqDoublets adviceDelete", "delSeqDoublets adviceRemain" ist
                                  zunächst begrenzt (default 1000) und kann durch das Attribut <a href="#DbRep-attr-limit">limit</a> angepasst werden.
                                  Die Einstellung von "limit" hat keinen Einfluss auf die "delSeqDoublets delete" Funktion, sondern beeinflusst <b>NUR</b> die
@@ -18326,7 +18263,6 @@ return;
                                  <ul>
                                  <table>
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                    <tr><td> <b>allowDeletion</b>                          </td><td>: needs to be set to execute the delete option </td></tr>
                                     <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
                                     <tr><td> <b>limit</b>                                  </td><td>: begrenzt NUR die Anzahl der anzuzeigenden Datensätze  </td></tr>
@@ -19020,6 +18956,8 @@ return;
     <ul>
       <a href="#DbRep-attr-autoForward">autoForward</a>,
       <a href="#DbRep-attr-averageCalcForm">averageCalcForm</a>,
+      <a href="#DbRep-attr-executeBeforeProc">executeBeforeProc</a>,
+      <a href="#DbRep-attr-executeAfterProc">executeAfterProc</a>,
       <a href="#DbRep-attr-timestamp_begin">timestamp_begin</a>,
       <a href="#DbRep-attr-timestamp_end">timestamp_end</a>,
       <a href="#DbRep-attr-timeDiffToNow">timeDiffToNow</a>,
@@ -19036,33 +18974,35 @@ return;
     <ul>
       <pre>
         {
-          1  => { timestamp_begin => '2023-12-17 00:00:00', 
-                  timestamp_end   => '2023-12-17 01:00:00', 
-                  device          => 'SMA_Energymeter', 
-                  reading         => 'Einspeisung_Wirkleistung_Zaehler', 
-                  cmd             => 'countEntries history'
+          1  => { executeBeforeProc => 'set LogDB reopen 900',
+                  timestamp_begin   => '2023-12-17 00:00:00', 
+                  timestamp_end     => '2023-12-17 01:00:00', 
+                  device            => 'SMA_Energymeter', 
+                  reading           => 'Einspeisung_Wirkleistung_Zaehler', 
+                  cmd               => 'countEntries history'
                 },
-          2  => { timestamp_begin => '2023-12-15 11:00:00', 
-                  timestamp_end   => 'previous_day_end', 
-                  device          => 'SMA_Energymeter', 
-                  reading         => 'Einspeisung_Wirkleistung_Zaehler', 
-                  cmd             => 'countEntries' 
+          2  => { timestamp_begin   => '2023-12-15 11:00:00', 
+                  timestamp_end     => 'previous_day_end', 
+                  device            => 'SMA_Energymeter', 
+                  reading           => 'Einspeisung_Wirkleistung_Zaehler', 
+                  cmd               => 'countEntries' 
                 },
-          3  => { timeDiffToNow   => 'd:2',
-                  readingNameMap  => 'COUNT',
-                  autoForward     => '{ ".*COUNT.*" => "Dum.Rep.All" }',
-                  device          => 'SMA_%,MySTP.*',
-                  reading         => 'etotal,etoday,Ein% EXCLUDE=%Wirkleistung', 
-                  cmd             => 'countEntries history' 
+          3  => { timeDiffToNow     => 'd:2',
+                  readingNameMap    => 'COUNT',
+                  autoForward       => '{ ".*COUNT.*" => "Dum.Rep.All" }',
+                  device            => 'SMA_%,MySTP.*',
+                  reading           => 'etotal,etoday,Ein% EXCLUDE=%Wirkleistung', 
+                  cmd               => 'countEntries history' 
                 },
-          4  => { timeDiffToNow   => 'd:2',
-                  readingNameMap  => 'SUM',
-                  autoForward     => '{ ".*SUM.*" => "Dum.Rep.All" }',
-                  device          => 'SMA_%,MySTP.*',
-                  reading         => 'etotal,etoday,Ein% EXCLUDE=%Wirkleistung', 
-                  cmd             => 'sumValue' 
+          4  => { timeDiffToNow     => 'd:2',
+                  readingNameMap    => 'SUM',
+                  autoForward       => '{ ".*SUM.*" => "Dum.Rep.All" }',
+                  device            => 'SMA_%,MySTP.*',
+                  reading           => 'etotal,etoday,Ein% EXCLUDE=%Wirkleistung', 
+                  cmd               => 'sumValue' 
                 },
-          5  => { cmd             => 'sqlCmd select count(*) from current'
+          5  => { executeAfterProc  => 'set LogDB reopen',
+                  cmd               => 'sqlCmd select count(*) from current'
                 },
         }
       </pre>
@@ -19364,8 +19304,6 @@ return;
     <li><b> sqlCmd </b> <br><br>
 
     Führt ein beliebiges benutzerspezifisches Kommando aus. <br>
-    Enthält dieses Kommando eine Delete-Operation, muss zur Sicherheit das Attribut
-    <a href="#DbRep-attr-allowDeletion">allowDeletion</a> gesetzt sein. <br>
     sqlCmd akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
     "SET @open:=NULL, @closed:=NULL;" oder die Verwendung von SQLite PRAGMA vor der
     Ausführung des SQL-Statements.
@@ -19447,7 +19385,6 @@ return;
     <ul>
       <a href="#DbRep-attr-executeBeforeProc">executeBeforeProc</a>,
       <a href="#DbRep-attr-executeAfterProc">executeAfterProc</a>,
-      <a href="#DbRep-attr-allowDeletion">allowDeletion</a>,
       <a href="#DbRep-attr-sqlResultFormat">sqlResultFormat</a>,
       <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a>,
       <a href="#DbRep-attr-sqlCmdHistoryLength">sqlCmdHistoryLength</a>,
@@ -19493,7 +19430,6 @@ return;
     <ul>
       <a href="#DbRep-attr-executeBeforeProc">executeBeforeProc</a>,
       <a href="#DbRep-attr-executeAfterProc">executeAfterProc</a>,
-      <a href="#DbRep-attr-allowDeletion">allowDeletion</a>,
       <a href="#DbRep-attr-sqlResultFormat">sqlResultFormat</a>,
       <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a>,
       <a href="#DbRep-attr-sqlCmdHistoryLength">sqlCmdHistoryLength</a>,
@@ -19538,7 +19474,6 @@ return;
     <ul>
       <a href="#DbRep-attr-executeBeforeProc">executeBeforeProc</a>,
       <a href="#DbRep-attr-executeAfterProc">executeAfterProc</a>,
-      <a href="#DbRep-attr-allowDeletion">allowDeletion</a>,
       <a href="#DbRep-attr-sqlResultFormat">sqlResultFormat</a>,
       <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a>,
       <a href="#DbRep-attr-sqlFormatService">sqlFormatService</a>,
@@ -19955,13 +19890,6 @@ sub dbval {
         <tr><td> year    </td><td>- die Funktionsergebnisse werden pro Kalenderjahr zusammengefasst   </td></tr>
     </table>
   </ul>
-  </li> 
-  <br>
-
-  <a id="DbRep-attr-allowDeletion"></a>
-  <li><b>allowDeletion </b> <br><br>
-  
-  Schaltet die Löschfunktion des Moduls frei.
   </li> 
   <br>
 
