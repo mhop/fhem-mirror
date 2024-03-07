@@ -599,9 +599,9 @@ END
         command.<br>
         Can be used in scenarios like:
         <ul><code>
-          define Leuchtdauer notify schalter:on
-                set Licht on-for-timer [$SELF:dauer]<br>
-          attr Leuchtdauer setList dauer:60,120,180
+          define lightOn notify switch:on
+                set Light on-for-timer [$SELF:duration]<br>
+          attr lightOn setList duration:60,120,180
         </code></ul>
         </li>
 

@@ -17,8 +17,17 @@ at_Initialize($)
   $hash->{SetFn}    = "at_Set";
   $hash->{AttrFn}   = "at_Attr";
   $hash->{StateFn}  = "at_State";
-  $hash->{AttrList} = "disable:0,1 disabledForIntervals $readingFnAttributes ".
-                        "skip_next:0,1 alignTime computeAfterInit";
+  no warnings 'qw';
+  my @attrList = qw(
+    alignTime
+    computeAfterInit
+    disable:0,1
+    disabledForIntervals
+    setList
+    skip_next:0,1
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList)." $readingFnAttributes";
   $hash->{FW_detailFn} = "at_fhemwebFn";
 }
 
@@ -255,16 +264,33 @@ sub
 at_Set($@)
 {
   my ($hash, @a) = @_;
+  my $me = $hash->{NAME};
 
-  my %sets =(modifyTimeSpec=>1,inactive=>0,active=>0,execNow=>0,"skip_next"=>0);
-  my $cmd = join(" ", sort keys %sets);
-  $cmd =~ s/modifyTimeSpec/modifyTimeSpec:time/ if($at_detailFnCalled);
-  $at_detailFnCalled = 0;
   return "no set argument specified" if(int(@a) < 2);
-  return "Unknown argument $a[1], choose one of $cmd"
-    if(!defined($sets{$a[1]}));
+  my $cmd = $a[1];
+
+  my %sets = ( active         => ":noArg",
+               execNow        => ":noArg",
+               inactive       => ":noArg",
+               modifyTimeSpec => "",
+               skip_next      => ":noArg" );
+ 
+  my $cmdList = join(" ", map { "$_$sets{$_}" } keys %sets);
+  $cmdList =~ s/modifyTimeSpec/modifyTimeSpec:time/ if($at_detailFnCalled);
+  $at_detailFnCalled = 0;
+
+  my $setList = AttrVal($me, "setList", "");
+  my %usrSets = map { $_ =~ s/:.*//; $_ => 1 } split(" ", $setList);
+
+  if(!defined($sets{$cmd}) && !defined($usrSets{$cmd})) {
+    return "Unknown argument $cmd, choose one of $cmdList $setList";
+  }
+  if($usrSets{$cmd}) {
+    readingsSingleUpdate($hash, $cmd, join(" ",@a[2..$#a]), 1);
+    return;
+  }
     
-  if($a[1] eq "modifyTimeSpec") {
+  if($cmd eq "modifyTimeSpec") {
     my ($err, undef) = GetTimeSpec($a[2]);
     return $err if($err);
 
@@ -272,26 +298,25 @@ at_Set($@)
               ($hash->{PERIODIC} eq "yes" ? "*":"").
               $a[2];
     $hash->{OLDDEF} = $hash->{DEF};
-    my $ret = at_Define($hash, "$hash->{NAME} at $def");
+    my $ret = at_Define($hash, "$me at $def");
     delete $hash->{OLDDEF};
     return $ret;
 
-  } elsif($a[1] eq "inactive") {
+  } elsif($cmd eq "inactive") {
     readingsSingleUpdate($hash, "state", "inactive", 1);
     return undef;
 
-  } elsif($a[1] eq "active") {
+  } elsif($cmd eq "active") {
     readingsSingleUpdate($hash,"state","Next: ".FmtTime($hash->{TRIGGERTIME}),1)
-      if(!AttrVal($hash->{NAME}, "disable", undef));
+      if(!AttrVal($me, "disable", undef));
     return undef;
    
-  } elsif($a[1] eq "execNow") {
-    my $name = $hash->{NAME};
-    my %sp = ( "%SELF" => $name );
+  } elsif($cmd eq "execNow") {
+    my %sp = ( "%SELF" => $me );
     my $ret = AnalyzeCommandChain(undef, EvalSpecials($hash->{"COMMAND"}, %sp));
-    Log3 $name, 3, "$name: $ret" if($ret);
+    Log3 $me, 3, "$me: $ret" if($ret);
 
-  } elsif($a[1] eq "skip_next") {
+  } elsif($cmd eq "skip_next") {
     setReadingsVal($hash, $a[1], 1, TimeNow());
     return undef;
 
@@ -577,6 +602,18 @@ at_ultimo(;$$$)
         skip the next execution. Just like the attribute with the same name,
         but better suited for webCmd.
         </li>
+    <a id="at-attr-setList"></a>
+    <li>setList<br>
+        space separated list of user-defined commands. When executing such a
+        command, a reading with the same name is set to the arguments of the
+        command.<br>
+        Can be used in scenarios like:
+        <ul><code>
+          define wakeUp at *07:30 set Light on-for-timer [$SELF:duration]<br>
+          attr wakeUp setList duration:60,120,180
+        </code></ul>
+        </li>
+
 
   </ul><br>
 
@@ -616,7 +653,16 @@ at_ultimo(;$$$)
         Used for at commands: skip the execution of the command the next
         time.</li><br>
 
-    <li><a href="#perlSyntaxCheck">perlSyntaxCheck</a></li>
+    <a id="at-attr-setList"></a>
+    <li>setList<br>
+        Leerzeichen getrennte Liste von benutzerdefinierten Befehlen. Beim
+        ausf&uuml;ren solcher Befehle wird ein gleichnamiges Reading auf dem
+        Wert des Befehls gesetzt. Kann z.Bsp. wie folgt verwendet werden:
+        <ul><code>
+          define wecker at *07:30 set Licht on-for-timer [$SELF:dauer]<br>
+          attr wecker setList dauer:60,120,180
+        </code></ul>
+        </li>
 
   </ul>
   <br>
