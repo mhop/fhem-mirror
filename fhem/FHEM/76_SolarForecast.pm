@@ -158,6 +158,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.16.5" => "04.03.2024  setPVhistory: code changes, plantConfigCheck: check forecastRefresh ".
+                           "check age of weather data according to used MOSMIX variant ",
   "1.16.4" => "02.03.2024  __getDWDSolarData: change check reading to fcx_12_x, internal code changes ".
                            "plantConfiguration: save/restore relevant readings AND attributes ".
                            "visual LED display whether the weather data is current (age < 2h) ",
@@ -481,7 +483,7 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
 my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select|bitfield|widgetList|colorpicker';
 
 # Steuerhashes
-###############
+################
 
 my %hset = (                                                                # Hash der Set-Funktion
   consumerImmediatePlanning => { fn => \&_setconsumerImmediatePlanning },
@@ -780,8 +782,8 @@ my %htitles = (                                                                 
                 DE => qq{&#214;ffne das SolarForecast Forum}                                                       },
   scaresps => { EN => qq{API request successful},
                 DE => qq{API Abfrage erfolgreich}                                                                  },
-  dwfcrsu  => { EN => qq{Weather data are up to date},
-                DE => qq{Wetterdaten sind aktuell}                                                                 },
+  dwfcrsu  => { EN => qq{Weather data are up to date according to used DWD model},
+                DE => qq{Wetterdaten sind aktuell entsprechend des verwendeten DWD Modell}                         },
   scarespf => { EN => qq{API request failed},
                 DE => qq{API Abfrage fehlgeschlagen}                                                               },
   dapic    => { EN => qq{done API requests},
@@ -974,21 +976,33 @@ my %hcsr = (                                                                    
       $hcsr{'currentRunMtsConsumer_'.$csr}{def}  = 0;
   }
 
-my %hfspvh = (                                                                                                     # Funktiontemplate zur Speicherung von Werten in pvHistory
-  radiation         => { fn => \&_storeValSimple, storname => 'rad1h',        nhour => undef, fpar => undef },     # storname = Name des Elements in der pvHistory
-  DoN               => { fn => \&_storeValSimple, storname => 'DoN',          nhour => undef, fpar => undef },     # nhour = evtl. abweichend von $nhour
-  batmaxsoc         => { fn => \&_storeValSimple, storname => 'batmaxsoc',    nhour => undef, fpar => undef },     # fpar = Parameter zur spezifischen Verwendung
-  batsetsoc         => { fn => \&_storeValSimple, storname => 'batsetsoc',    nhour => undef, fpar => undef },
-  sunaz             => { fn => \&_storeValSimple, storname => 'sunaz',        nhour => undef, fpar => undef },
-  sunalt            => { fn => \&_storeValSimple, storname => 'sunalt',       nhour => undef, fpar => undef },
-  etotal            => { fn => \&_storeValSimple, storname => 'etotal',       nhour => undef, fpar => undef },
-  batintotal        => { fn => \&_storeValSimple, storname => 'batintotal',   nhour => undef, fpar => undef },
-  batouttotal       => { fn => \&_storeValSimple, storname => 'batouttotal',  nhour => undef, fpar => undef },
-  weatherid         => { fn => \&_storeValSimple, storname => 'weatherid',    nhour => undef, fpar => undef },
-  weathercloudcover => { fn => \&_storeValSimple, storname => 'wcc',          nhour => undef, fpar => undef },
-  totalrain         => { fn => \&_storeValSimple, storname => 'rr1c',         nhour => undef, fpar => undef },
-  pvcorrfactor      => { fn => \&_storeValSimple, storname => 'pvcorrf',      nhour => undef, fpar => undef },
-  temperature       => { fn => \&_storeValSimple, storname => 'temp',         nhour => undef, fpar => undef },
+# Funktiontemplate zur Speicherung von Werten in pvHistory
+# storname = Name des Elements in der pvHistory
+# nhour = evtl. abweichend von $nhour
+# fpar = Parameter zur spezifischen Verwendung
+my %hfspvh = (                                                                                                  
+  radiation         => { fn => \&_storeVal, storname => 'rad1h',        validkey => undef,    fpar => undef    },    # irradiation  
+  DoN               => { fn => \&_storeVal, storname => 'DoN',          validkey => undef,    fpar => undef    },    # Tag 1 oder Nacht 0    
+  batmaxsoc         => { fn => \&_storeVal, storname => 'batmaxsoc',    validkey => undef,    fpar => undef    },    # max. erreichter SOC des Tages  
+  batsetsoc         => { fn => \&_storeVal, storname => 'batsetsoc',    validkey => undef,    fpar => undef    },    # optimaler SOC für den Tag
+  sunaz             => { fn => \&_storeVal, storname => 'sunaz',        validkey => undef,    fpar => undef    },    # Sonnenstand Azimuth
+  sunalt            => { fn => \&_storeVal, storname => 'sunalt',       validkey => undef,    fpar => undef    },    # Sonnenstand Altitude
+  etotal            => { fn => \&_storeVal, storname => 'etotal',       validkey => undef,    fpar => undef    },    # etotal des Wechselrichters
+  batintotal        => { fn => \&_storeVal, storname => 'batintotal',   validkey => undef,    fpar => undef    },    # totale Batterieladung
+  batouttotal       => { fn => \&_storeVal, storname => 'batouttotal',  validkey => undef,    fpar => undef    },    # totale Batterieentladung
+  weatherid         => { fn => \&_storeVal, storname => 'weatherid',    validkey => undef,    fpar => undef    },    # Wetter ID
+  weathercloudcover => { fn => \&_storeVal, storname => 'wcc',          validkey => undef,    fpar => undef    },    # Wolkenbedeckung
+  totalrain         => { fn => \&_storeVal, storname => 'rr1c',         validkey => undef,    fpar => undef    },    # Gesamtniederschlag (1-stündig) letzte 1 Stunde
+  pvcorrfactor      => { fn => \&_storeVal, storname => 'pvcorrf',      validkey => undef,    fpar => undef    },    # pvCorrectionFactor
+  temperature       => { fn => \&_storeVal, storname => 'temp',         validkey => undef,    fpar => undef    },    # Außentemperatur
+  batinthishour     => { fn => \&_storeVal, storname => 'batin',        validkey => undef,    fpar => 'comp99' },    # Batterieladung in Stunde
+  batoutthishour    => { fn => \&_storeVal, storname => 'batout',       validkey => undef,    fpar => 'comp99' },    # Batterieentladung in Stunde
+  pvfc              => { fn => \&_storeVal, storname => 'pvfc',         validkey => undef,    fpar => 'comp99' },    # prognostizierter Energieertrag
+  confc             => { fn => \&_storeVal, storname => 'confc',        validkey => undef,    fpar => 'comp99' },    # prognostizierter Hausverbrauch
+  cons              => { fn => \&_storeVal, storname => 'gcons',        validkey => undef,    fpar => 'comp99' },    # bezogene Energie
+  gfeedin           => { fn => \&_storeVal, storname => 'gfeedin',      validkey => undef,    fpar => 'comp99' },    # eingespeiste Energie
+  con               => { fn => \&_storeVal, storname => 'con',          validkey => undef,    fpar => 'comp99' },    # realer Hausverbrauch Energie
+  pvrl              => { fn => \&_storeVal, storname => 'pvrl',         validkey => 'pvrlvd', fpar => 'comp99' },    # realer Energieertrag
 );
 
 
@@ -2147,7 +2161,9 @@ sub _setreset {                          ## no critic "not used"
       my $dhour = $paref->{prop2} // "";                                       # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
 
       if ($dday) {
+          $dday = sprintf "%02d", $dday;
           if ($dhour) {
+              $dhour = sprintf "%02d", $dhour;
               delete $data{$type}{$name}{pvhist}{$dday}{$dhour};
               Log3 ($name, 3, qq{$name - Day "$dday" hour "$dhour" deleted from pvHistory});
 
@@ -3464,6 +3480,7 @@ sub __getDWDSolarData {
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests}   += 1;
 
   my $fctime                                  = ReadingsVal ($raname, 'fc_time', '-');
+  $data{$type}{$name}{current}{dwdRad1hDev}   = $raname;
   $data{$type}{$name}{current}{dwdRad1hAge}   = $fctime;
   $data{$type}{$name}{current}{dwdRad1hAgeTS} = timestringToTimestamp ($fctime);
 
@@ -4699,7 +4716,7 @@ sub Attr {
 
   my ($do,$val, $err);
 
-  ### nicht mehr benötigte Daten löschen - Bereich kann später wieder raus !!
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
   #if ($cmd eq 'set' && $aName eq 'affectNumHistDays') {
   #    if (!$init_done) {
@@ -5620,7 +5637,7 @@ sub centralTask {
   RemoveInternalTimer ($hash, 'FHEM::SolarForecast::centralTask');
   RemoveInternalTimer ($hash, 'FHEM::SolarForecast::singleUpdateState');
 
-  ### nicht mehr benötigte Daten löschen - Bereich kann später wieder raus !!
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
   ## AI Raw Daten formatieren                                                                 # 09.02.2024
   if (defined $data{$type}{$name}{aidectree}{airaw}) {
@@ -5751,26 +5768,6 @@ sub centralTask {
           next if($wp ne 'wrp');
           delete $data{$type}{$name}{circular}{$hod}{$wp};
       }
-  }
-
-  ## currentWeatherDev in Attr umsetzen
-  my $cwd = ReadingsVal ($name, 'currentWeatherDev', '');                                        # 30.01.2024
-  if ($cwd) {
-      CommandAttr (undef, "$name ctrlWeatherDev1 $cwd");
-      readingsDelete ($hash, 'currentWeatherDev') if(AttrVal ($name, 'ctrlWeatherDev1', ''));  # erst prüfen ob gesetzt
-  }
-
-  ## Reading umsetzen
-  my $mdr = ReadingsVal ($name, 'moduleDirection', undef);                   # 09.02.2024
-  if ($mdr) {
-      readingsSingleUpdate ($hash, 'moduleAzimuth', $mdr, 0);
-      readingsDelete ($hash, 'moduleDirection');
-  }
-
-  my $mta = ReadingsVal ($name, 'moduleTiltAngle', undef);                    # 09.02.2024
-  if ($mta) {
-      readingsSingleUpdate ($hash, 'moduleDeclination', $mta, 0);
-      readingsDelete ($hash, 'moduleTiltAngle');
   }
 
   #######################################################################################################################
@@ -6300,7 +6297,7 @@ sub _transferWeatherValues {
   }
 
   __mergeDataWeather ($paref);                                                                 # Wetterdaten zusammenfügen
-
+  
   for my $num (0..46) {
       my ($fd, $fh) = _calcDayHourMove ($chour, $num);
       last if($fd > 1);
@@ -6411,7 +6408,7 @@ sub __readDataWeather {
           $wid += 100;
       }
 
-      debugLog ($paref, 'collectData', "Weather $step: fc${fd}_${fh}, don: $sunup, ww: ".(defined $wid ? $wid : '<undef>').", RR1c: $rr1c, TTT: $temp, Neff: $neff, wwd: $wwd");
+      debugLog ($paref, 'collectData', "Weather $step: fc${fd}_${fh}, don: $sunup, ww: ".(defined $wid ? $wid : '<undef>').", RR1c: $rr1c, TTT: $temp, Neff: $neff");
 
       $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{ww}   = $wid;
       $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{wwd}  = $wwd;
@@ -6480,8 +6477,7 @@ sub __mergeDataWeather {
                                        "ww: ".(defined $data{$type}{$name}{weatherdata}{$key}{1}{ww} ? $data{$type}{$name}{weatherdata}{$key}{1}{ww} : '<undef>').", ".
                                        "RR1c: $data{$type}{$name}{weatherdata}{$key}{merge}{rr1c}, ".
                                        "TTT: $data{$type}{$name}{weatherdata}{$key}{merge}{ttt}, ".
-                                       "Neff: $data{$type}{$name}{weatherdata}{$key}{merge}{neff}, ".
-                                       "wwd: $data{$type}{$name}{weatherdata}{$key}{merge}{wwd}");
+                                       "Neff: $data{$type}{$name}{weatherdata}{$key}{merge}{neff}");
   }
 
   debugLog ($paref, 'collectData', "Number of Weather datasets mergers - delivered: $q, merged: $m, failures: ".($q - $m));
@@ -7709,6 +7705,7 @@ sub _createSummaries {
   my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $type   = $paref->{type};
+  my $day    = $paref->{day};
   my $chour  = $paref->{chour};                                                                       # aktuelle Stunde
   my $minute = $paref->{minute};                                                                      # aktuelle Minute
 
@@ -7788,8 +7785,8 @@ sub _createSummaries {
   }
 
   for my $th (1..24) {
-      $todaySumFc->{PV} += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);
-      $todaySumRe->{PV} += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$th)."_PVreal",     0);
+      $todaySumFc->{PV} += HistoryVal ($hash, $day, sprintf("%02d", $th), 'pvfc', 0);
+      $todaySumRe->{PV} += HistoryVal ($hash, $day, sprintf("%02d", $th), 'pvrl', 0);
   }
 
   my $pvre = int $todaySumRe->{PV};
@@ -7829,7 +7826,7 @@ sub _createSummaries {
   storeReading ('Current_SelfConsumptionRate',  $selfconsumptionrate. ' %');
   storeReading ('Current_Surplus',              $surplus.             ' W');
   storeReading ('Current_AutarkyRate',          $autarkyrate.         ' %');
-  storeReading ('Today_PVreal',                 $pvre.               ' Wh') if($pvre > ReadingsNum ($name, 'Today_PVreal', 0));
+  storeReading ('Today_PVreal',                 $pvre.               ' Wh');
   storeReading ('Tomorrow_ConsumptionForecast', $tconsum.            ' Wh') if(defined $tconsum);
 
   storeReading ('NextHours_Sum01_PVforecast',          (int $next1HoursSum->{PV}).         ' Wh');
@@ -9607,8 +9604,8 @@ sub calcTodayPVdeviation {
 
   my $dp;
 
-  if (AttrVal($name, 'ctrlGenPVdeviation', 'daily') eq 'daily') {
-      my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet",  '22:00').':00');
+  if (AttrVal ($name, 'ctrlGenPVdeviation', 'daily') eq 'daily') {
+      my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet", '22:00').':00');
       return if($t < $sstime);
 
       my $diff = $pvfc - $pvre;
@@ -10609,7 +10606,7 @@ sub _checkSetupNotComplete {
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
 
-  ### nicht mehr benötigte Daten löschen - Bereich kann später wieder raus !!
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################
   ## currentWeatherDev in Attr umsetzen
   my $cwd = ReadingsVal ($name, 'currentWeatherDev', '');                     # 30.01.2024
@@ -10832,20 +10829,20 @@ sub _graphicHeader {
       ################
       my $upicon =  __createUpdateIcon ($paref);
 
-      ## Sonnenauf- und untergang
-      ############################
+      ## Sonnenauf- und untergang / Wetterdaten Aktualität
+      ######################################################
       my $sriseimg = FW_makeImage('weather_sunrise@darkorange');
       my $ssetimg  = FW_makeImage('weather_sunset@LightCoral');
       my $srisetxt = ReadingsVal ($name, 'Today_SunRise', '-');
       my $ssettxt  = ReadingsVal ($name, 'Today_SunSet',  '-');
       
-      my $fca = CurrentVal   ($hash, 'dwdWfchAge', '-');
-      $img    = FW_makeImage ('10px-kreis-gruen.png', $htitles{dwfcrsu}{$lang}.'&#10;'.$htitles{dwdtime}{$lang}.': '.$fca);
+      my ($err, $resh) = isWeatherAgeExceeded ($paref);
+      $img = FW_makeImage ('10px-kreis-gruen.png', $htitles{dwfcrsu}{$lang}.' '.$resh->{mosmix}.' &#10;'.$htitles{dwdtime}{$lang}.': '.$resh->{fctime});
 
-      if ($paref->{t} - CurrentVal ($hash, 'dwdWfchAgeTS', 0) > 7200) {
+      if (!$err && $resh->{exceed}) {
           my $agewfc = $htitles{aswfc2o}{$lang};
           $agewfc    =~ s/<NAME>/$name/xs;
-          $img = FW_makeImage ('10px-kreis-gelb.png', $agewfc.'&#10;'.$htitles{dwdtime}{$lang}.': '.$fca);
+          $img = FW_makeImage ('10px-kreis-gelb.png', $agewfc.' &#10;'.$htitles{dwdtime}{$lang}.': '.$resh->{fctime});
       }
       
       my $waicon = "<a>$img</a>";                                                                       # Icon Wetterdaten Alter
@@ -10953,13 +10950,13 @@ sub _graphicHeader {
           $api .= '&nbsp;'.$lrt;
 
           if ($scrm eq 'success') {
-              my $ptr = CurrentVal   ($hash, 'dwdRad1hAge', '-');
-              $img    = FW_makeImage ('10px-kreis-gruen.png', $htitles{scaresps}{$lang}.'&#10;'.$htitles{predtime}{$lang}.' '.$ptr);
+              ($err, $resh) = isRad1hAgeExceeded ($paref);
+              $img          = FW_makeImage ('10px-kreis-gruen.png', $htitles{scaresps}{$lang}.' &#10;'.$htitles{dwfcrsu}{$lang}.' '.$resh->{mosmix}.' &#10;'.$htitles{predtime}{$lang}.' '.$resh->{fctime});
 
-              if ($paref->{t} - CurrentVal ($hash, 'dwdRad1hAgeTS', 0) > 7200) {
+              if (!$err && $resh->{exceed}) {
                   my $agetit = $htitles{arsrad2o}{$lang};
                   $agetit    =~ s/<NAME>/$name/xs;
-                  $img = FW_makeImage ('10px-kreis-gelb.png', $agetit.'&#10;'.$htitles{predtime}{$lang}.' '.$ptr);
+                  $img = FW_makeImage ('10px-kreis-gelb.png', $agetit.' &#10;'.$htitles{predtime}{$lang}.' '.$resh->{fctime});
               }
           }
           else {
@@ -13529,7 +13526,6 @@ sub _aiMakeIdxRaw {
 
 return $ridx;
 }
-
 ################################################################
 #   History-Hash verwalten
 ################################################################
@@ -13548,158 +13544,10 @@ sub setPVhistory {
   my $reorgday  = $paref->{reorgday}  // q{};                              # Tag der reorganisiert werden soll
 
   $data{$type}{$name}{pvhist}{$day}{99}{dayname} = $dayname if($day);
-
-  if ($histname eq 'radiation') {                                                                 # irradiation
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{rad1h} = $val;
-  }
   
-  if ($histname eq 'DoN') {                                                                       # Tag 1 oder Nacht 0
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{DoN} = $val;
-  }
-  
-  if ($histname eq 'batmaxsoc') {                                                                 # max. erreichter SOC des Tages
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{$histname} = $val;
-  }
-
-  if ($histname eq 'batsetsoc') {                                                                 # optimaler SOC für den Tages
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{$histname} = $val;
-  }
-  
-  if ($histname =~ /sunaz|sunalt/xs) {                                                            # Sonnenstand Azimuth / Altitude
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{$histname} = $val;
-  }
-  
-  if ($histname eq 'etotal') {                                                                    # etotal des Wechselrichters
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{etotal} = $val;
-  }
-
-  if ($histname eq 'batintotal') {                                                                # totale Batterieladung
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{batintotal} = $val;
-  }
-
-  if ($histname eq 'batouttotal') {                                                               # totale Batterieentladung
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{batouttotal} = $val;
-  }
-
-  if ($histname eq 'weatherid') {                                                                 # Wetter ID
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{weatherid} = $val;
-  }
-
-  if ($histname eq 'weathercloudcover') {                                                         # Wolkenbedeckung
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{wcc} = $val;
-  }
-
-  if ($histname eq 'totalrain') {                                                                 # Gesamtniederschlag (1-stündig) letzte 1 Stunde
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{rr1c} = $val;
-  }
-
-  if ($histname eq 'pvcorrfactor') {                                                              # pvCorrectionFactor
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvcorrf} = $val;
-  }
-
-  if ($histname eq 'temperature') {                                                               # Außentemperatur
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{temp} = $val;
-  }
-  
-  if ($histname =~ /cyclescsm[0-9]+$/xs) {                                                        # Anzahl Tageszyklen des Verbrauchers
-      $data{$type}{$name}{pvhist}{$day}{99}{$histname} = $val;
-  }
-  
-  if ($histname eq 'batinthishour') {                                                             # Batterieladung in Stunde
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{batin} = $val;
-      my $batinsum = 0;
-      
-      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
-          next if($k eq "99");
-          $batinsum += HistoryVal ($hash, $day, $k, 'batin', 0);
-      }
-      
-      $data{$type}{$name}{pvhist}{$day}{99}{batin} = $batinsum;
-  }
-
-  if ($histname eq 'batoutthishour') {                                                            # Batterieentladung in Stunde
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{batout} = $val;
-      my $batoutsum = 0;
-      
-      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
-          next if($k eq "99");
-          $batoutsum += HistoryVal ($hash, $day, $k, "batout", 0);
-      }
-      
-      $data{$type}{$name}{pvhist}{$day}{99}{batout} = $batoutsum;
-  }
-
-  if ($histname eq 'pvrl') {                                                                      # realer Energieertrag
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl}   = $val;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrlvd} = $pvrlvd;
-      my $pvrlsum = 0;
-      
-      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
-          next if($k eq "99");
-          $pvrlsum += HistoryVal ($hash, $day, $k, 'pvrl', 0);
-      }
-      
-      $data{$type}{$name}{pvhist}{$day}{99}{pvrl} = $pvrlsum;
-  }
-
-  if ($histname eq 'pvfc') {                                                                      # prognostizierter Energieertrag
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvfc} = $val;
-      my $pvfcsum = 0;
-      
-      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
-          next if($k eq "99");
-          $pvfcsum += HistoryVal ($hash, $day, $k, 'pvfc', 0);
-      }
-      
-      $data{$type}{$name}{pvhist}{$day}{99}{pvfc} = $pvfcsum;
-  }
-
-  if ($histname eq 'confc') {                                                                      # prognostizierter Hausverbrauch
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{confc} = $val;
-      my $confcsum = 0;
-      
-      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
-          next if($k eq "99");
-          $confcsum += HistoryVal ($hash, $day, $k, "confc", 0);
-      }
-      
-      $data{$type}{$name}{pvhist}{$day}{99}{confc} = $confcsum;
-  }
-
-  if ($histname eq 'cons') {                                                                      # bezogene Energie
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{gcons} = $val;
-      my $gcsum = 0;
-      
-      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
-          next if($k eq "99");
-          $gcsum += HistoryVal ($hash, $day, $k, "gcons", 0);
-      }
-      
-      $data{$type}{$name}{pvhist}{$day}{99}{gcons} = $gcsum;
-  }
-
-  if ($histname eq 'gfeedin') {                                                                   # eingespeiste Energie
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{gfeedin} = $val;
-      my $gfisum = 0;
-      
-      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
-          next if($k eq "99");
-          $gfisum += HistoryVal ($hash, $day, $k, 'gfeedin', 0);
-      }
-      
-      $data{$type}{$name}{pvhist}{$day}{99}{gfeedin} = $gfisum;
-  }
-
-  if ($histname eq 'con') {                                                                      # realer Hausverbrauch Energie
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{con} = $val;
-      my $consum = 0;
-      
-      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
-          next if($k eq "99");
-          $consum += HistoryVal ($hash, $day, $k, 'con', 0);
-      }
-      
-      $data{$type}{$name}{pvhist}{$day}{99}{con} = $consum;
+  if ($hfspvh{$histname} && defined &{$hfspvh{$histname}{fn}}) {
+      &{$hfspvh{$histname}{fn}} ($paref);
+      return;
   }
 
   if ($histname =~ /csm[et][0-9]+$/xs) {                                                         # Verbrauch eines Verbrauchers
@@ -13736,6 +13584,10 @@ sub setPVhistory {
       my $cycles = HistoryVal ($hash, $day, 99, "cyclescsm${num}", 0);
       $data{$type}{$name}{pvhist}{$day}{99}{"hourscsme${num}"} = sprintf "%.2f", ($minutes / 60 ) if($cycles);
   }
+  
+  if ($histname =~ /cyclescsm[0-9]+$/xs) {                                                        # Anzahl Tageszyklen des Verbrauchers
+      $data{$type}{$name}{pvhist}{$day}{99}{$histname} = $val;
+  }
 
   if ($reorg) {                                                                                   # Reorganisation Stunde "99"
       if (!$reorgday) {
@@ -13771,31 +13623,51 @@ sub setPVhistory {
   }
 
   if ($histname) {
-      debugLog ($paref, 'saveData2Cache', "setPVhistory -> save Day: $day, Hour: $nhour, Key: $histname, Value: ".(defined $val ? $val : ''));
+      debugLog ($paref, 'saveData2Cache', "setPVhistory -> store Day: $day, Hour: $nhour, Key: $histname, Value: ".(defined $val ? $val : 'undef'));
   }
 
 return;
 }
 
 ################################################################
-# Wert ohne weitere Berechnungen in pvHistory speichen (Simple)
+# Wert mit optional weiteren Berechnungen in pvHistory speichen 
 ################################################################
-sub _storeValSimple {                   ## no critic "not used"
+sub _storeVal {                    ## no critic "not used"
   my $paref    = shift;
+  my $hash     = $paref->{hash};
   my $name     = $paref->{name};
   my $type     = $paref->{type};
   my $day      = $paref->{day};
   my $nhour    = $paref->{nhour};
   my $histname = $paref->{histname};
+  my $val      = $paref->{val};
   
   my $store = $hfspvh{$histname}{storname};
+  my ($validkey, $validval);
+
+  $data{$type}{$name}{pvhist}{$day}{$nhour}{$store} = $val;
   
-  if (defined $hfspvh{$histname}{nhour}) {
-      $nhour = $hfspvh{$histname}{nhour};
+  if (defined $hfspvh{$histname}{validkey}) {
+      $validkey = $hfspvh{$histname}{validkey};
+      $validval = $paref->{$validkey};
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{$validkey} = $validval;
   }
+  
+  debugLog ($paref, 'saveData2Cache', "setPVhistory -> stored simple  - Day: $day, Hour: $nhour, Key: $store, Value: ".(defined $val ? $val : 'undef').
+                                      (defined $validkey ? ", ValidKey: $validkey, ValidValue: $validval" : '') );
 
-  $data{$type}{$name}{pvhist}{$day}{$nhour}{$store} = $paref->{val};
-
+  if (defined $hfspvh{$histname}{fpar} && $hfspvh{$histname}{fpar} eq 'comp99') {
+      my $sum = 0;
+      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
+          next if($k eq '99');
+          $sum += HistoryVal ($hash, $day, $k, $store, 0);
+      }
+      
+       $data{$type}{$name}{pvhist}{$day}{99}{$store} = $sum;
+       
+       debugLog ($paref, 'saveData2Cache', "setPVhistory -> stored compute - Day: $day, Hour: 99, Key: $store, Value: $sum");
+  }
+  
 return;
 }
 
@@ -13863,38 +13735,38 @@ sub listDataPool {
 
           my $csm;
           for my $c (1..$maxconsumer) {
-              $c        = sprintf "%02d", $c;
-              my $nl    = 0;
-              my $csmc  = HistoryVal ($hash, $day, $key, "cyclescsm${c}",  undef);
-              my $csmt  = HistoryVal ($hash, $day, $key, "csmt${c}",       undef);
-              my $csme  = HistoryVal ($hash, $day, $key, "csme${c}",       undef);
-              my $csmm  = HistoryVal ($hash, $day, $key, "minutescsm${c}", undef);
-              my $csmh  = HistoryVal ($hash, $day, $key, "hourscsme${c}",  undef);
+              $c       = sprintf "%02d", $c;
+              my $nl   = 0;
+              my $csmc = HistoryVal ($hash, $day, $key, "cyclescsm${c}",  undef);
+              my $csmt = HistoryVal ($hash, $day, $key, "csmt${c}",       undef);
+              my $csme = HistoryVal ($hash, $day, $key, "csme${c}",       undef);
+              my $csmm = HistoryVal ($hash, $day, $key, "minutescsm${c}", undef);
+              my $csmh = HistoryVal ($hash, $day, $key, "hourscsme${c}",  undef);
 
-              if(defined $csmc) {
+              if (defined $csmc) {
                   $csm .= "cyclescsm${c}: $csmc";
                   $nl   = 1;
               }
 
-              if(defined $csmt) {
+              if (defined $csmt) {
                   $csm .= ", " if($nl);
                   $csm .= "csmt${c}: $csmt";
                   $nl   = 1;
               }
 
-              if(defined $csme) {
+              if (defined $csme) {
                   $csm .= ", " if($nl);
                   $csm .= "csme${c}: $csme";
                   $nl   = 1;
               }
 
-              if(defined $csmm) {
+              if (defined $csmm) {
                   $csm .= ", " if($nl);
                   $csm .= "minutescsm${c}: $csmm";
                   $nl   = 1;
               }
 
-              if(defined $csmh) {
+              if (defined $csmh) {
                   $csm .= ", " if($nl);
                   $csm .= "hourscsme${c}: $csmh";
                   $nl   = 1;
@@ -13903,7 +13775,7 @@ sub listDataPool {
               $csm .= "\n            " if($nl);
           }
 
-          if($csm) {
+          if ($csm) {
               $ret .= "\n            ";
               $ret .= $csm;
           }
@@ -14285,7 +14157,7 @@ sub checkPlantConfig {
 
   my $result = {                                                                                    # Ergebnishash
       'String Configuration'     => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
-      'DWD Weather Attributes'   => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'DWD Weather Properties'   => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'Common Settings'          => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'FTUI Widget Files'        => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
   };
@@ -14304,7 +14176,6 @@ sub checkPlantConfig {
 
   ## Check Strings
   ##################
-
   my $err = createStringConfig ($hash);
 
   if ($err) {
@@ -14348,38 +14219,66 @@ sub checkPlantConfig {
 
   ## Check Attribute DWD Wetterdevice
   #####################################
+  my $mosm = '';
+  my $resh;
+  
   for my $step (1..$weatherDevMax) {
       my $fcname = AttrVal ($name, 'ctrlWeatherDev'.$step, '');
       next if(!$fcname && $step ne 1);
 
       if (!$fcname || !$defs{$fcname}) {
-          $result->{'DWD Weather Attributes'}{state} = $nok;
+          $result->{'DWD Weather Properties'}{state} = $nok;
 
           if (!$fcname) {
-              $result->{'DWD Weather Attributes'}{result} .= qq{No DWD device is defined in attribute "ctrlWeatherDev$step". <br>};
+              $result->{'DWD Weather Properties'}{result} .= qq{No DWD device is defined in attribute "ctrlWeatherDev$step". <br>};
           }
           else {
-              $result->{'DWD Weather Attributes'}{result} .= qq{The DWD device "$fcname" doesn't exist. <br>};
+              $result->{'DWD Weather Properties'}{result} .= qq{The DWD device "$fcname" doesn't exist. <br>};
           }
 
-          $result->{'DWD Weather Attributes'}{fault} = 1;
+          $result->{'DWD Weather Properties'}{fault} = 1;
       }
       else {
           $err = checkdwdattr ($name, $fcname, \@dweattrmust);
 
           if ($err) {
-              $result->{'DWD Weather Attributes'}{state}   = $nok;
-              $result->{'DWD Weather Attributes'}{result} .= $err.'<br>';
-              $result->{'DWD Weather Attributes'}{fault}   = 1;
+              $result->{'DWD Weather Properties'}{state}   = $nok;
+              $result->{'DWD Weather Properties'}{result} .= $err.'<br>';
+              $result->{'DWD Weather Properties'}{fault}   = 1;
           }
           else {
-              $result->{'DWD Weather Attributes'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: ctrlWeatherDev$step)<br>";
+              $mosm = AttrVal ($fcname, 'forecastRefresh', 6) == 1 ? 'MOSMIX_S' : 'MOSMIX_L';
+              
+              if ($mosm eq 'MOSMIX_L') {
+                  $result->{'DWD Weather Properties'}{state}   = $info;
+                  $result->{'DWD Weather Properties'}{result} .= qq(The device "$fcname" uses "$mosm" which is only updated by DWD every 6 hours. <br>);
+                  $result->{'DWD Weather Properties'}{info}    = 1;
+              }              
+              
+              $result->{'DWD Weather Properties'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: ctrlWeatherDev$step)<br>";
           }
 
-          $result->{'DWD Weather Attributes'}{note} .= qq{checked parameters and attributes of device "$fcname": <br>};
-          $result->{'DWD Weather Attributes'}{note} .= 'forecastProperties -> '.join (' ', @dweattrmust).'<br>';
+          $result->{'DWD Weather Properties'}{note} .= qq{checked parameters and attributes of device "$fcname": <br>};
+          $result->{'DWD Weather Properties'}{note} .= 'forecastProperties -> '.join (' ', @dweattrmust).'<br>';
+          $result->{'DWD Weather Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to "1" if possible' : '').'<br>';
       }
   }
+  
+  ## Alter DWD Wetterdaten
+  ##########################
+  ($err, $resh) = isWeatherAgeExceeded ( {hash => $hash, name => $name, lang => $lang} );
+  
+  if (!$err && $resh->{exceed}) {
+      $result->{'DWD Weather Properties'}{state} = $warn;
+      $result->{'DWD Weather Properties'}{note} .= qq{The Prediction time of Weather data is older than expected when using $resh->{mosmix}. <br>};
+      $result->{'DWD Weather Properties'}{note} .= qq{Data time forecast: $resh->{fctime} <br>};
+      $result->{'DWD Weather Properties'}{note} .= qq{Check the DWD device(s) for proper functioning of the data retrieval. <br>};
+      $result->{'DWD Weather Properties'}{warn}  = 1;
+  } 
+  
+  $result->{'DWD Weather Properties'}{note} .= '<br>';
+  $result->{'DWD Weather Properties'}{note} .= qq{checked global Weather parameters: <br>};
+  $result->{'DWD Weather Properties'}{note} .= 'MOSMIX variant, Age of Weather data. <br>';
 
   ## Check DWD Radiation Device
   ###############################
@@ -14403,25 +14302,39 @@ sub checkPlantConfig {
               $result->{'DWD Radiation Properties'}{note}   .= qq{<br>Check the parameters set in device '$raname': attribute 'forecastProperties' <br>};
               $result->{'DWD Radiation Properties'}{fault}   = 1;
           }
-
-          if (time() - CurrentVal ($hash, 'dwdRad1hAgeTS', 0) > 7200) {
-              $result->{'DWD Radiation Properties'}{state} = $warn;
-              $result->{'DWD Radiation Properties'}{note} .= qq{The Prediction time of radiation data (Rad1h) is older than 2 hours. <br>};
-              $result->{'DWD Radiation Properties'}{note} .= qq{Check the DWD device '$raname' for proper functioning of the data retrieval.<br>};
-              $result->{'DWD Radiation Properties'}{warn}  = 1;
-          }
-
-          if (!$err) {
-              $result->{'DWD Radiation Properties'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
+          else {
+              $mosm = AttrVal ($raname, 'forecastRefresh', 6) == 1 ? 'MOSMIX_S' : 'MOSMIX_L';
+              
+              if ($mosm eq 'MOSMIX_L') {
+                  $result->{'DWD Radiation Properties'}{state}   = $info;
+                  $result->{'DWD Radiation Properties'}{result} .= qq(The device "$raname" uses "$mosm" which is only updated by DWD every 6 hours. <br>);
+                  $result->{'DWD Radiation Properties'}{info}    = 1;
+              } 
           }
       }
-
+      
+      ## Alter DWD Radiation
+      #######################
+      ($err, $resh) = isRad1hAgeExceeded ( {hash => $hash, name => $name, lang => $lang} );
+      
+      if (!$err && $resh->{exceed}) {
+          $result->{'DWD Radiation Properties'}{state} = $warn;
+          $result->{'DWD Radiation Properties'}{note} .= qq{The Prediction time of radiation data (Rad1h) is older than expected when using $resh->{mosmix}. <br>};
+          $result->{'DWD Radiation Properties'}{note} .= qq{Data time forecast: $resh->{fctime} <br>};
+          $result->{'DWD Radiation Properties'}{note} .= qq{Check the DWD device '$raname' for proper functioning of the data retrieval.<br>};
+          $result->{'DWD Radiation Properties'}{warn}  = 1;
+      } 
+  
       if (!$result->{'DWD Radiation Properties'}{fault}) {
-          $result->{'DWD Radiation Properties'}{result} = $hqtxt{fulfd}{$lang};
-          $result->{'DWD Radiation Properties'}{note}  .= qq{<br>checked parameters and attributes device "$raname": <br>};
-          $result->{'DWD Radiation Properties'}{note}  .= 'Age of Rad1h data <br>';
-          $result->{'DWD Radiation Properties'}{note}  .= 'forecastProperties -> '.join (' ', @draattrmust).'<br>';
+          $result->{'DWD Radiation Properties'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
       }
+      
+      $result->{'DWD Radiation Properties'}{note} .= '<br>';
+      $result->{'DWD Radiation Properties'}{note} .= qq{checked global Radiation parameters: <br>};
+      $result->{'DWD Radiation Properties'}{note} .= 'MOSMIX variant, Age of Radiation data. <br>';      
+      $result->{'DWD Radiation Properties'}{note} .= qq{<br>checked parameters and attributes device "$raname": <br>};
+      $result->{'DWD Radiation Properties'}{note} .= 'forecastProperties -> '.join (' ', @draattrmust).'<br>';
+      $result->{'DWD Radiation Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to "1" if possible' : '').'<br>';
   }
 
   ## Check Rooftop und Roof Ident Pair Settings (SolCast)
@@ -14437,7 +14350,7 @@ sub checkPlantConfig {
       $result->{'Rooftop Settings'}{note}           = '';
       $result->{'Rooftop Settings'}{fault}          = 0;
 
-      my $rft = ReadingsVal($name, 'moduleRoofTops', '');
+      my $rft = ReadingsVal ($name, 'moduleRoofTops', '');
 
       if (!$rft) {
           $result->{'Rooftop Settings'}{state}   = $nok;
@@ -14531,7 +14444,7 @@ sub checkPlantConfig {
   my ($cmerr, $cmupd, $cmmsg, $cmrec) = checkModVer ($name, '76_SolarForecast', 'https://fhem.de/fhemupdate/controls_fhem.txt');
 
   if (!$cmerr && !$cmupd) {
-      $result->{'Common Settings'}{note}   .= qq{$cmmsg<br>};
+      $result->{'Common Settings'}{note}   .= qq{$cmmsg <br>};
       $result->{'Common Settings'}{note}   .= qq{checked module: <br>};
       $result->{'Common Settings'}{note}   .= qq{76_SolarForecast <br>};
   }
@@ -14549,8 +14462,12 @@ sub checkPlantConfig {
       $result->{'Common Settings'}{note}   .= qq{$cmrec <br>};
       $result->{'Common Settings'}{warn}    = 1;
   }
+  
+  if ($result->{'Common Settings'}{result}) {
+      $result->{'Common Settings'}{result} .= '<br>';
+  }
 
-  if (isForecastSolarUsed ($hash)) {                                       # allg. Settings bei Nutzung Forecast.Solar API
+  if (isForecastSolarUsed ($hash)) {                                                         # allg. Settings bei Nutzung Forecast.Solar API
       if (!$pcf || $pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
@@ -14572,15 +14489,15 @@ sub checkPlantConfig {
       }
 
       if (!$result->{'Common Settings'}{fault}) {
-          $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
+          $result->{'Common Settings'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
           $result->{'Common Settings'}{note}   .= qq{<br>checked parameters and attributes: <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto <br>};
       }
   }
 
-  if (isSolCastUsed ($hash)) {                                                        # allg. Settings bei Nutzung SolCast API
-      my $gdn = AttrVal     ('global', 'dnsServer',                '');
-      my $osi = AttrVal     ($name,    'ctrlSolCastAPIoptimizeReq', 0);
+  if (isSolCastUsed ($hash)) {                                                               # allg. Settings bei Nutzung SolCast API
+      my $gdn = AttrVal ('global', 'dnsServer',                '');
+      my $osi = AttrVal ($name,    'ctrlSolCastAPIoptimizeReq', 0);
 
       my $lam = SolCastAPIVal ($hash, '?All', '?All', 'response_message', 'success');
 
@@ -14618,7 +14535,7 @@ sub checkPlantConfig {
       }
 
       if (!$result->{'Common Settings'}{fault}) {
-          $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
+          $result->{'Common Settings'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
           $result->{'Common Settings'}{note}   .= qq{<br>checked parameters and attributes: <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, ctrlSolCastAPIoptimizeReq, global dnsServer <br>};
       }
@@ -14650,7 +14567,7 @@ sub checkPlantConfig {
       }
 
       if (!$result->{'Common Settings'}{fault}) {
-          $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
+          $result->{'Common Settings'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
           $result->{'Common Settings'}{note}   .= qq{<br>checked Perl modules: <br>};
           $result->{'Common Settings'}{note}   .= qq{AI::DecisionTree <br>};
           $result->{'Common Settings'}{note}   .= qq{<br>checked parameters and attributes: <br>};
@@ -14684,14 +14601,13 @@ sub checkPlantConfig {
       }
 
       if (!$result->{'Common Settings'}{fault}) {
-          $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
+          $result->{'Common Settings'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
           $result->{'Common Settings'}{note}   .= qq{<br>checked parameters and attributes: <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, global dnsServer, vrmCredentials <br>};
       }
   }
 
   if (!$result->{'Common Settings'}{fault}) {
-      $result->{'Common Settings'}{result}  = $hqtxt{fulfd}{$lang};
       $result->{'Common Settings'}{note}   .= qq{global latitude, global longitude, global altitude, global language <br>};
       $result->{'Common Settings'}{note}   .= qq{event-on-change-reading, ctrlLanguage <br>};
   }
@@ -15709,6 +15625,105 @@ sub isSunPath {
   }
 
 return $is;
+}
+
+###################################################################
+#  püft das Alter fc_time aller Wetterdevices
+#  $result->{agedv} : Name des DWD mit ältesten Daten
+#  $result->{mosmix}: gewählte MOSMIX Variante
+#  $result->{fctime}: Datenstand (Forecast Time)
+#  $result->{exceed}: Bewertung ob zulässiges Alter überschritten
+###################################################################
+sub isWeatherAgeExceeded {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $lang  = $paref->{lang};
+
+  my $dt     = strftime "%Y-%m-%d %H:%M:%S", localtime(time);
+  my $currts = timestringToTimestamp ($dt);
+  my $agets  = $currts;
+
+  my $resh->{agedv} = '-';
+  $resh->{mosmix}   = '-';
+  $resh->{exceed}   = ''; 
+  $resh->{fctime}   = '-';
+  
+  for my $step (1..$weatherDevMax) {
+      my $fcname = AttrVal ($name, 'ctrlWeatherDev'.$step, '');
+      next if(!$fcname && $step ne 1);     
+   
+      if (!$fcname || !$defs{$fcname}) {
+          if (!$fcname) {
+              return (qq{No DWD device is defined in attribute "ctrlWeatherDev$step"}, $resh);
+          }
+          else {
+              return (qq{The DWD device "$fcname" doesn't exist}, $resh);
+          }
+      }
+      
+      my $fct = ReadingsVal ($fcname, 'fc_time', '');
+      return (qq{The reading 'fc_time' ($fcname) doesn't exist or is empty}, $resh) if(!$fct);
+      
+      my $newts = timestringToTimestamp ($fct);
+      
+      if ($newts <= $agets) {
+          $agets         = $newts;
+          $resh->{agedv} = $fcname;
+      }
+  }
+  
+  $resh->{mosmix} = AttrVal ($resh->{agedv}, 'forecastRefresh', 6) == 1 ? 'MOSMIX_S' : 'MOSMIX_L';
+  my $th          = $resh->{mosmix} eq 'MOSMIX_S' ? 7200 : 25200;
+  
+  $resh->{exceed} = $currts - $agets > $th ? 1 : 0;
+  $resh->{fctime} = (timestampToTimestring ($agets, $lang))[0];
+
+return ('', $resh);
+}
+
+###################################################################
+#  püft das Alter fc_time des DWD Rad1h Devices
+#  $result->{agedv} : Name des DWD Rad1h Devices
+#  $result->{mosmix}: gewählte MOSMIX Variante
+#  $result->{fctime}: Datenstand (Forecast Time)
+#  $result->{exceed}: Bewertung ob zulässiges Alter überschritten
+###################################################################
+sub isRad1hAgeExceeded {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $lang  = $paref->{lang};
+
+  my $currts = timestringToTimestamp (strftime "%Y-%m-%d %H:%M:%S", localtime(time));  
+  my $fcname = CurrentVal ($hash, 'dwdRad1hDev', '');
+  
+  my $resh->{agedv} = '-';
+  $resh->{mosmix}   = '-';
+  $resh->{exceed}   = ''; 
+  $resh->{fctime}   = '-'; 
+
+  if (!$fcname || !$defs{$fcname}) {
+      if (!$fcname) {
+          return (qq{No DWD device is defined in "currentRadiationAPI"}, $resh);
+      }
+      else {
+          return (qq{The DWD device "$fcname" doesn't exist}, $resh);
+      }
+  }
+  
+  my $fct = ReadingsVal ($fcname, 'fc_time', '');
+  return (qq{The reading 'fc_time' ($fcname) doesn't exist or is empty}, $resh) if(!$fct);
+  
+  $resh->{agedv}  = $fcname;
+  $resh->{mosmix} = AttrVal ($resh->{agedv}, 'forecastRefresh', 6) == 1 ? 'MOSMIX_S' : 'MOSMIX_L';
+   
+  my $agets       = timestringToTimestamp ($fct);
+  my $th          = $resh->{mosmix} eq 'MOSMIX_S' ? 7200 : 25200;
+  $resh->{exceed} = $currts - $agets > $th ? 1 : 0;
+  $resh->{fctime} = (timestampToTimestring ($agets, $lang))[0];
+
+return ('', $resh);
 }
 
 ################################################################
