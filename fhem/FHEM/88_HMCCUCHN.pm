@@ -30,7 +30,7 @@ sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
 
-my $HMCCUCHN_VERSION = '5.0 2024-02';
+my $HMCCUCHN_VERSION = '5.0 2024-03';
 
 ######################################################################
 # Initialize module
@@ -523,6 +523,12 @@ sub HMCCUCHN_Get ($@)
       <li><b>set &lt;name&gt; armState {DISARMED|EXTSENS_ARMED|ALLSENS_ARMED|ALARM_BLOCKED}</b><br/>
 	     [alarm siren] Set arm state.
 	  </li><br/>
+	  <li><b>set &lt;name&gt; auto</b><br/>
+         [thermostat] Turn auto mode on.
+	  </li><br/>
+	  <li><b>set &lt;name&gt; boost {on|off}</b><br/>
+         [thermostat] Turn boost mode on or off
+	  </li><br/>
 	  <li><b>set &lt;name&gt; calibrate {START|STOP}</b><br/>
 		 [blind] Run calibration.
 	  </li><br/>
@@ -593,14 +599,17 @@ sub HMCCUCHN_Get ($@)
       	[dimmer, blind] Decrement value of datapoint LEVEL. This command is only available
       	if channel contains a datapoint LEVEL. Default for <i>value</i> is 20.
       </li><br/>
+	  <li><b>set &lt;name&gt; manu [&lt;temperature&gt;]</b><br/>
+	    [thermostat] Set manual mode. Default temperature is 20.
+	  </li><br/>
 	  <li><b>set &lt;name&gt; off</b><br/>
-	  	Turn device off.
+	  	[switch,thermostat,dimmer] Turn device off.
 	  </li><br/>
 	  <li><b>set &lt;name&gt; oldLevel</b><br/>
 	    [dimmer, blind, jalousie, shutter] Set level to previous value.
 	  </li><br/>
 	  <li><b>set &lt;name&gt; on</b><br/>
-	  	Turn device on.
+	  	[switch,thermostat,dimmer] Turn device on.
 	  </li><br/>
       <li><b>set &lt;name&gt; on-for-timer &lt;ontime&gt;</b><br/>
          [switch] Switch device on for specified number of seconds. This command is only available if
@@ -616,6 +625,9 @@ sub HMCCUCHN_Get ($@)
       </li><br/>
 	  <li><b>set &lt;name&gt; open</b><br/>
 		[blind,door] Set level of a shutter or blind to 100%.
+	  </li><br/>
+	  <li><b>set &lt;name&gt; party &lt;temperature&gt; &lt;start-time&gt; &lt;end-time&gt;</b><br/>
+         [thermostat] Turn party mode on. Timestamps must be in format "YYYY_MM_DD HH:MM".
 	  </li><br/>
       <li><b>set &lt;name&gt; pct &lt;value&gt; [&lt;ontime&gt; [&lt;ramptime&gt;]]</b><br/>
          [dimmer,blind] Set datapoint LEVEL of a channel to the specified <i>value</i>. Optionally a <i>ontime</i>
@@ -645,14 +657,7 @@ sub HMCCUCHN_Get ($@)
       	channel contains a datapoint STOP.
       </li><br/>
       <li><b>set &lt;name&gt; toggle</b><br/>
-		Toggle state datapoint between values defined by attribute 'statevals' or by channel role. This command is
-		only available if state values can be detected or are defined by using attribute
-		'statevals'. Toggling supports more than two state values.<br/><br/>
-		Example: Toggle blind actor between states 'open', 'half' and 'close'<br/>
-		<code>
-		attr myswitch statevals open:100,half:50,close:0<br/>
-		set myswitch toggle
-		</code>
+		[switch,dimmer,blind] Toggle state between values on/off or open/close.
       </li><br/>
       <li><b>set &lt;name&gt; up [&lt;value&gt;]</b><br/>
       	[blind,dimmer] Increment value of datapoint LEVEL. This command is only available
