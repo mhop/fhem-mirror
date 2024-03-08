@@ -5858,6 +5858,7 @@ sub DbRep_fetchrows {
 
   my $rt = tv_interval($st);                                                         # SQL-Laufzeit ermitteln
 
+  $sth->finish if($sth);
   $dbh->disconnect;
 
   $rowlist = encode_base64($rowlist,"");                                             # Daten müssen als Einzeiler zurückgegeben werden
