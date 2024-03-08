@@ -1,5 +1,12 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbRep: attribute allowDeletion deleted, multiCmd: use of
+                      executeBeforeProc, executeAfterProc possible,
+                      prepare support of MariaDB,
+                      NOTE: if allowDeletion is set in your devices, messages
+                      like '...The attribute 'allowDeletion' is obsolete and 
+                      will be deleted soon...'. This is _NOT_ an error. 
+                      Please save config when FHEM restart is finished.
  - feature: 76_SolarForecast: plantConfigCheck: check DWD Attr forecastRefresh,
                               check weather/Rad1h data according MOSMIX variant
  - bugfix:  73_PRESENCE2: Fehlerbereinigungen Attribut intervalPresent
