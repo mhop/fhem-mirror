@@ -6247,7 +6247,7 @@ sub DbRep_delseqdoubl {
       my $sql1 = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,$runtime_string_first,$runtime_string_next,'');
       Log3 ($name, 4, "DbRep $name - SQL execute: $sql1");
 
-      eval{$sth->execute($runtime_string_first, $runtime_string_next);};
+      eval {$sth->execute($runtime_string_first, $runtime_string_next);};
       if ($@) {
           $err = encode_base64($@,"");
           Log3 ($name, 2, "DbRep $name - $@");
@@ -6386,6 +6386,7 @@ sub DbRep_delseqdoubl {
   use warnings;
   Log3 ($name, 5, "DbRep $name - row result list:\n$rowlist");
 
+  $sth->finish if($sth);
   $dbh->disconnect;
 
   $rowlist = encode_base64($rowlist,"");                                    # Daten müssen als Einzeiler zurückgegeben werden
@@ -6831,6 +6832,7 @@ sub DbRep_impfile {
   $err = DbRep_commitOnly ($name, $dbh, "import committed");
   return "$name|$err" if ($err);
 
+  $sth->finish if($sth);
   $dbh->disconnect;
 
   close(FH);
@@ -6986,10 +6988,9 @@ sub DbRep_sqlCmd {
       Log3 ($name, 3, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows by $com");
   }
 
-  $sth->finish;
-
   my $rt = tv_interval($st);                                                       # SQL-Laufzeit ermitteln
 
+  $sth->finish if($sth);
   $dbh->disconnect;
 
   my $rowstring = join("§", @rows);                                                # Daten müssen als Einzeiler zurückgegeben werden
@@ -7640,7 +7641,7 @@ sub DbRep_dbmeta {
          push(@row_array, $key." ".$info) if($key =~ m/($param)/i);
      }
  }
-
+ 
  $dbh->disconnect;
 
  my $rt = tv_interval($st);                                              # SQL-Laufzeit ermitteln
@@ -8275,6 +8276,9 @@ sub DbRep_mysql_DumpClientSide {
   my $paref                      = shift;
   my $hash                       = $paref->{hash};
   my $name                       = $paref->{name};
+  
+  my $dbloghash                  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+  my $dbmodel                    = $dbloghash->{MODEL};
 
   my $dump_path                  = AttrVal ($name, "dumpDirLocal",             $dbrep_dump_path_def);
   my $optimize_tables_beforedump = AttrVal ($name, "optimizeTablesBeforeDump",                    0);
@@ -8317,7 +8321,7 @@ sub DbRep_mysql_DumpClientSide {
   my ($err, $dbh, $dbmodel) = DbRep_dbConnect($name, 0);
   return "$name|$err" if($err);
 
-  $dbh->{mysql_enable_utf8} = 0;                                                                             # Dump Performance !!! Forum: https://forum.fhem.de/index.php/topic,53584.msg1204535.html#msg1204535
+  $dbh->{mysql_enable_utf8} = 0 if($dbmodel =~ /MYSQL/xs);                                                   # Dump Performance !!! Forum: https://forum.fhem.de/index.php/topic,53584.msg1204535.html#msg1204535
 
   my $st = [gettimeofday];                                                                                   # SQL-Startzeit
 
@@ -9306,7 +9310,7 @@ sub DbRep_mysql_RestoreClientSide {
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect ($name, 0);
   return "$name|$err" if($err);
 
-  $dbh->{mysql_enable_utf8} = 0;                                               # identisch zu DbRep_mysql_DumpClientSide setzen !
+  $dbh->{mysql_enable_utf8} = 0 if($dbmodel =~ /MYSQL/xs);                     # identisch zu DbRep_mysql_DumpClientSide setzen !
 
   my @row_ary;
   my $sql         = "show variables like 'max_allowed_packet'";                # maximal mögliche Packetgröße ermitteln (in Bits) -> Umrechnen in max. Zeichen
@@ -11719,7 +11723,7 @@ sub DbRep_dbConnect {
 
   if ($utf8) {
       if ($dbmodel =~ /MYSQL|MARIADB/xs) {
-          $dbh->{mysql_enable_utf8} = 1 if($dbmodel =~ /MYSQL/xs);                                             # MariaDB kenn kein mysql_enable_utf8 
+          $dbh->{mysql_enable_utf8} = 1 if($dbmodel =~ /MYSQL/xs);                                             # MariaDB kennt kein mysql_enable_utf8 
 
           ($err, my @se) = DbRep_prepareExec2Array ($name, $dbh, "SHOW VARIABLES LIKE 'collation_database'");
           return $err if ($err);
