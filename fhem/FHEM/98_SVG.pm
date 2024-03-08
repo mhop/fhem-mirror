@@ -492,7 +492,7 @@ SVG_PEdit($$$$)
     my $sel = ($v && $v eq "x1y1") ? "left" : "right";
     $o .= SVG_sel("axes_${idx}", "left,right,left log,right log", $sel );
     $o .= SVG_sel("type_${idx}",
-                "lines,points,steps,fsteps,histeps,bars,ibars,".
+                "lines,points,steps,fsteps,histeps,bars,ibars,needles,".
                 "horizontalLineFrom,horizontalLineTo,".
                 "cubic,quadratic,quadraticSmooth",
                 $conf{lType}[$idx]);
@@ -2055,8 +2055,8 @@ SVG_render($$$$$$$$$$)
       $ret .=  sprintf(" %d,%d", $lx, $y+$hfill) if($isFill && $lx > -1);
       SVG_pO "<polyline $attributes $lStyle points=\"$ret\"/>";
 
-    } elsif( $lType eq "bars" ) {
-      my $bw = $barwidth*$tmul;
+    } elsif( $lType eq "bars" || $lType eq "needles" ) {
+      my $bw = ($lType eq "bars" ? $barwidth*$tmul : 1);   #137386
       # bars are all of equal width (see far above !), 
       # position rounded to integer multiples of bar width
       foreach my $i (0..int(@{$dxp})-1) {
