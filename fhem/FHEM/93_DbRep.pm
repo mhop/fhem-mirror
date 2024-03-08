@@ -8276,9 +8276,6 @@ sub DbRep_mysql_DumpClientSide {
   my $paref                      = shift;
   my $hash                       = $paref->{hash};
   my $name                       = $paref->{name};
-  
-  my $dbloghash                  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
-  my $dbmodel                    = $dbloghash->{MODEL};
 
   my $dump_path                  = AttrVal ($name, "dumpDirLocal",             $dbrep_dump_path_def);
   my $optimize_tables_beforedump = AttrVal ($name, "optimizeTablesBeforeDump",                    0);
