@@ -34,7 +34,7 @@ use vars qw($FW_CSRF);
 my $SVG_RET;        # Returned data (SVG)
 sub SVG_calcOffsets($$);
 sub SVG_doround($$$);
-sub SVG_fmtTime($$);
+sub SVG_fmtTime($$;$);
 sub SVG_pO($);
 sub SVG_readgplotfile($$$);
 sub SVG_render($$$$$$$$$$);
@@ -1733,7 +1733,7 @@ SVG_render($$$$$$$$$$)
   $off1 = $x;
   $off2 = $y+$h+$th;
   $isDE = (AttrVal("global", "language","EN") eq "DE");
-  my $t = SVG_fmtTime($first_tag, $fromsec);
+  my $t = SVG_fmtTime($first_tag, $fromsec, $conf{timefmt});
   SVG_pO "<text x=\"0\" y=\"$off2\" class=\"ylabel\">$t</text>"
         if(!$conf{xrange});
   $initoffset = $step;
@@ -1782,7 +1782,7 @@ SVG_render($$$$$$$$$$)
       } else {
         $off1 = int($x+($i-$fromsec)*$tmul);
       }
-      $t = SVG_fmtTime($tag, $i);
+      $t = SVG_fmtTime($tag, $i, $conf{timefmt});
       if($off1 < $x+10) { # first text, too close to the date field
         SVG_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\" " .
                   "text-anchor=\"left\">$t</text>";
@@ -2405,9 +2405,15 @@ SVG_calcControlPoints($$$$$$)
 }
 
 sub
-SVG_fmtTime($$)
+SVG_fmtTime($$;$)
 {
-  my ($sepfmt, $sec) = @_;
+  my ($sepfmt, $sec, $timefmt) = @_;
+
+  if($timefmt && $timefmt ne '"%Y-%m-%d_%H:%M:%S"') { #137398
+    $timefmt =~ s/^"|"$//g;
+    return ResolveDateWildcards($timefmt, localtime($sec))
+  }
+
   my @tarr = split("[ :]+", localtime($sec));
   my ($sep, $fmt) = split(" ", $sepfmt, 2);
   my $ret = "";
