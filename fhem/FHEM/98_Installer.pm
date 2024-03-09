@@ -42,6 +42,8 @@ use Data::Dumper;
 use Config;
 use ExtUtils::Installed;
 
+
+
 # Run before module compilation
 BEGIN {
 
@@ -81,6 +83,10 @@ BEGIN {
           )
     );
 }
+
+use constant HAS_METARequirementsRange => defined eval {
+     require CPAN::Meta::Requirements::Range; 
+};
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -5136,14 +5142,15 @@ sub LoadInstallStatusPerl(;$) {
                                 && $instV ne ''
                                 && $instV ne '0' )
                             {
-                                $reqV  = version->parse($reqV)->numify;
-                                $instV = version->parse($instV)->numify;
+                                if ( !HAS_METARequirementsRange )
+                                { 
+                                    $pkgStatus{Perl}{pkgs}{$pkg}{status} = 'unknown';
+                                    next; 
+                                }
+                                my $vRange = CPAN::Meta::Requirements::Range->with_string_requirement($reqV);
 
-                                #TODO suport for version range:
-                                #  https://metacpan.org/pod/ \
-                                #   CPAN::Meta::Spec#Version-Range
-                                if ( $reqV > 0 && $instV < $reqV ) {
-
+                                if (!defined $vRange->accepts($instV) )
+                                {
                                     $pkgStatus{Perl}{pkgs}{$pkg}{status} =
                                       'outdated';
                                     push
@@ -5155,6 +5162,7 @@ sub LoadInstallStatusPerl(;$) {
                                         'META.json'
                                         && !$pkgStatus{Perl}{analyzed} );
                                 }
+
                             }
                         }
 
@@ -5541,13 +5549,13 @@ sub __list_module {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.5.7",
+  "version": "v0.6.0",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
   ],
   "x_fhem_maintainer": [
-    "loredo"
+    "coolTux"
   ],
   "x_fhem_maintainer_github": [
     "jpawlowski"
@@ -5560,6 +5568,7 @@ sub __list_module {
   "prereqs": {
     "runtime": {
       "requires": {
+        "CPAN::Meta::Requirements::Range": "2.143",
         "Data::Dumper": 0,
         "Encode": 0,
         "FHEM": 5.00918623,
