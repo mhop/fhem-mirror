@@ -4361,11 +4361,22 @@ sub HMCCU_GetEnumValues ($$$$;$$)
 		}
 		else {
 			# As fallback use values as specified in command definition
-			my $i = 0;
-			foreach my $cv (split(',', $argList)) {
-				$valList{$cv} = $i;
-				$valIndex{$i} = $cv;
-				$i++;
+			if (defined($paramDef) && defined($paramDef->{MIN}) && HMCCU_IsIntNum($paramDef->{MIN})) {
+				my $i = $paramDef->{MIN};
+				foreach my $cv (split(',', $argList)) {
+					$valList{$cv} = $i;
+					$valIndex{$i} = $cv;
+					$i++;
+				}
+			}
+			else {
+				my $i = 0;
+				foreach my $cv (split(',', $argList)) {
+					my $j = HMCCU_IsIntNum($cv) ? $cv : $i;
+					$valList{$cv} = $j;
+					$valIndex{$j} = $cv;
+					$i++;
+				}
 			}
 		}
 	}

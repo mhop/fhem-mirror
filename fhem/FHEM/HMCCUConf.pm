@@ -263,7 +263,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'CLIMATECONTROL_RT_TRANSCEIVER' =>
 		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
 		'^(C#\.)?ACTUAL_HUMIDITY$:+humidity;'.
-		'^(C#\.)?SET_TEMPERATURE$:+desired-temp',
+		'^(C#\.)?SET_TEMPERATURE$:+desired-temp;'.
 		'^(C#\.)?BOOST_MODE$:+boost',
 	'CLIMATE_TRANSCEIVER' =>
 		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
@@ -284,8 +284,9 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
 		'^(C#\.)?HUMIDITY$:+humidity;'.
 		'^(C#\.)?ACTUAL_HUMIDITY$:+humidity;'.
-		'^(C#\.)?SET_POINT_TEMPERATURE$:+desired-temp',
-		'^(C#\.)?BOOST_MODE$:+boost',
+		'^(C#\.)?SET_POINT_TEMPERATURE$:+desired-temp;'.
+		'^(C#\.)?BOOST_MODE$:+boost;'.
+		'^(C#\.)?ACTIVE_PROFILE$:+week-program',
 	'JALOUSIE' =>
 		'^(C#\.)?LEVEL$:+pct,+level;(C#\.)?LEVEL_SLATS$:+pctSlats',
 	'KEY' =>
@@ -309,7 +310,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'THERMALCONTROL_TRANSMIT' =>
 		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
 		'^(C#\.)?ACTUAL_HUMIDITY$:+humidity;'.
-		'^(C#\.)?SET_TEMPERATURE$:+desired-temp',
+		'^(C#\.)?SET_TEMPERATURE$:+desired-temp;'.
 		'^(C#\.)?BOOST_MODE$:+boost',
 	'VIRTUAL_KEY' =>
 		'^(C#\.)?PRESS_(SHORT|LONG)$:+pressed',
@@ -482,7 +483,8 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'rpcset party' => 'V:SET_POINT_MODE:2 V:SET_POINT_TEMPERATURE:?temperature V:PARTY_TIME_START:?timeStart V:PARTY_TIME_END:?timeEnd',
 		'boost' => 'V:BOOST_MODE:#boost=0,1',
 		'on' => 'V:CONTROL_MODE:1 V:SET_POINT_TEMPERATURE:30.5',
-		'off' => 'V:CONTROL_MODE:1 V:SET_POINT_TEMPERATURE:4.5'
+		'off' => 'V:CONTROL_MODE:1 V:SET_POINT_TEMPERATURE:4.5',
+		'week-program' => 'V:ACTIVE_PROFILE:#profile=1,2,3'
 	},
 	'JALOUSIE' => {
 		'pct' => 'V:LEVEL:?level',

@@ -737,7 +737,7 @@ sub HMCCUCHN_Get ($@)
 		update system variables bound to the device. These variables can be read by using command 'get extValues'.
 		If <i>filter-expr</i> is specified, only parameters matching the expression are stored as readings.
       </li><br/>
-      <li><b>get &lt;name&gt; weekProgram [&lt;program-number&gt;|<u>all</u>]</b><br/>
+      <li><b>get &lt;name&gt; week-program [&lt;program-number&gt;|<u>all</u>]</b><br/>
       	Display week programs. This command is only available if a device supports week programs.
       </li>
    </ul>
