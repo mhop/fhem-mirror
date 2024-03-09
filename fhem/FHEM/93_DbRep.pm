@@ -39,7 +39,6 @@ package main;
 
 use strict;
 use warnings;
-use utf8;
 use POSIX qw(strftime SIGALRM);
 use Time::HiRes qw(gettimeofday tv_interval);
 use Scalar::Util qw(looks_like_number);
@@ -60,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.4"  => "09.03.2024  Ready for support of MariaDB Perl driver ",
   "8.53.3"  => "06.03.2024  delete attribute allowDeletion, multiCmd: executeBeforeProc, executeAfterProc as attributes ".
                             "Set: all commands are executable even if \$dbloghash->{HELPER}{REOPEN_RUNS_UNTIL}is set ".
                             "prepare support of MariaDB ",
@@ -1546,7 +1546,7 @@ sub DbRep_Attr {
 
         if ($do == 1) {
             my $dbh = $hash->{DBH};
-            $dbh->disconnect() if($dbh);
+            DbRep_clearConn ($dbh);
         }
     }
 
@@ -1941,7 +1941,7 @@ sub DbRep_Undef {
  RemoveInternalTimer($hash);
 
  my $dbh = $hash->{DBH};
- $dbh->disconnect() if(defined($dbh));
+ DbRep_clearConn ($dbh);
 
  BlockingKill($hash->{HELPER}{RUNNING_PID}) if (exists($hash->{HELPER}{RUNNING_PID}));
  BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) if (exists($hash->{HELPER}{RUNNING_BACKUP_CLIENT}));
@@ -1988,7 +1988,7 @@ sub DbRep_Shutdown {
   my $hash = shift;
 
   my $dbh = $hash->{DBH};
-  $dbh->disconnect() if(defined($dbh));
+  DbRep_clearConn ($dbh);
 
   DbRep_delread          ($hash,1);
   RemoveInternalTimer    ($hash);
@@ -2131,8 +2131,8 @@ sub DbRep_getInitData {
       Log3($name, 2, "DbRep $name - WARNING - $idxstate");
   }
   else {
-      if($hash->{LASTCMD} ne "minTimestamp") {
-          if($ava) {
+      if ($hash->{LASTCMD} ne "minTimestamp") {
+          if ($ava) {
               $idxstate = qq{Index $idx exists};
               Log3($name, 3, "DbRep $name - $idxstate. Check ok");
           }
@@ -2150,7 +2150,7 @@ sub DbRep_getInitData {
 
   my $grants         = _DbRep_getInitData_grants ($paref);
 
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh);
 
   my $rt = tv_interval($st);                                  # SQL-Laufzeit ermitteln
 
@@ -2232,7 +2232,7 @@ sub _DbRep_getInitData_grants {
           }
       }
 
-      $sth->finish;
+      DbRep_clearConn (undef, $sth);
 
       my %seen = ();
       my @g    = split(/,(\s?)/, $row);
@@ -3342,7 +3342,7 @@ sub DbRep_averval {
   ($err, my $arrstr, my $wrstr, $qlf, $gtsstr, my $gtsreached) = &{$dbrep_havgfn{$acf}{fn}} ($paref);
   return "$name|$err" if ($err);
 
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh);
 
   my $rt = tv_interval($st);                                                                         # SQL-Laufzeit ermitteln
 
@@ -3447,7 +3447,7 @@ sub _DbRep_avgArithmeticMean {
       $wrstr .= $runtime_string."#".$avg."#".$wsf[0].$wsft."#".$wsn[0].$wsnt."|";                # Kombi zum Rückschreiben in die DB
   }
 
-  $sth->finish;
+  DbRep_clearConn (undef, $sth);
 
 return ($err, $arrstr, $wrstr, $qlf);
 }
@@ -3487,10 +3487,10 @@ sub _DbRep_avgDailyMeanGWS {
   $qlf        = "avgdmgws";
 
   for my $row (@{$tsaref}) {
-      my @ar                    = split "#", $row;
-      my $runtime_string        = $ar[0];
-      my $runtime_string_first  = $ar[1];
-      my $runtime_string_next   = $ar[2];
+      my @ar                   = split "#", $row;
+      my $runtime_string       = $ar[0];
+      my $runtime_string_first = $ar[1];
+      my $runtime_string_next  = $ar[2];
 
       my $sum = 0;
       my $anz = 0;                                                                 # Anzahl der Messwerte am Tag
@@ -3578,7 +3578,7 @@ sub _DbRep_avgDailyMeanGWS {
       }
   }
 
-  $sth->finish;
+  DbRep_clearConn (undef, $sth);
 
 return ($err, $arrstr, $wrstr, $qlf, $gtsstr, $gtsreached);
 }
@@ -3746,7 +3746,7 @@ sub _DbRep_avgTimeWeightMean {
       $wrstr .= $runtime_string."#".$sum."#".$runtime_string_first."#".$runtime_string_next."|";    # Kombi zum Rückschreiben in die DB
   }
 
-  $sth->finish;
+  DbRep_clearConn (undef, $sth);
 
 return ($err, $arrstr, $wrstr, $qlf);
 }
@@ -3945,8 +3945,7 @@ sub DbRep_count {
       }
   }
 
-  $sth->finish;
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh, $sth);
 
   my $rt = tv_interval($st);                                # SQL-Laufzeit ermitteln
 
@@ -4109,8 +4108,7 @@ sub DbRep_maxval {
      push(@row_array, @array);
  }
 
- $sth->finish;
- $dbh->disconnect;
+ DbRep_clearConn ($dbh, $sth);
 
  my $rt = tv_interval($st);                                                      # SQL-Laufzeit ermitteln
 
@@ -4346,8 +4344,7 @@ sub DbRep_minval {
      push(@row_array, @array);
  }
 
- $sth->finish;
- $dbh->disconnect;
+ DbRep_clearConn ($dbh, $sth);
 
  my $rt = tv_interval($st);                                                        # SQL-Laufzeit ermitteln
 
@@ -4646,8 +4643,7 @@ sub DbRep_diffval {
 
   my $rt = tv_interval($st);                                                         # SQL-Laufzeit ermitteln
 
-  $sth->finish;
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh, $sth);
 
   # Berechnung diffValue aus Selektionshash
   my %rh  = ();                   # Ergebnishash, wird alle Ergebniszeilen enthalten
@@ -4967,8 +4963,7 @@ sub DbRep_sumval {
      $wrstr .= $runtime_string."#".$line[0]."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
  }
 
- $sth->finish;
- $dbh->disconnect;
+ DbRep_clearConn ($dbh, $sth);
 
  my $rt = tv_interval($st);                                                          # SQL-Laufzeit ermitteln
 
@@ -5102,8 +5097,7 @@ sub DbRep_del {
   $rows = $sth->rows;
   $dbh->commit() if(!$dbh->{AutoCommit});
 
-  $sth->finish;
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh, $sth);
 
   my $rt = tv_interval($st);                                                          # SQL-Laufzeit ermitteln
 
@@ -5241,17 +5235,17 @@ sub DbRep_insert {
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - Insert new dataset into database failed".($usepkh ? " (possible PK violation) " : ": ")."$@");
               $dbh->rollback();
-              $dbh->disconnect();
+              DbRep_clearConn ($dbh);
               return "$name|$err";
             };
 
   $err = DbRep_commitOnly ($name, $dbh);
   return "$name|$err" if ($err);
 
-  $dbh->disconnect();
-
   $err  = q{};
   $irow = $sth->rows;
+  
+  DbRep_clearConn ($dbh, $sth);
 
   Log3 ($name, 4, "DbRep $name - Inserted into $hash->{DATABASE}.$table: $i_timestamp, $i_device, $i_type, $i_event, $i_reading, $i_value, $i_unit");
 
@@ -5391,7 +5385,7 @@ sub DbRep_currentfillup {
   $err = DbRep_commitOnly ($name, $dbh);
   return "$name|$err" if ($err);
 
-  $dbh->disconnect();
+  DbRep_clearConn ($dbh, $sth);
 
   $irow = $irow eq "0E0" ? 0 : $irow;
 
@@ -5526,14 +5520,14 @@ sub DbRep_changeDevRead {
               Log3 ($name, 2, qq{DbRep $name - Failed to rename old $m name "$old" to new $m name "$new": $@});
 
               $dbh->rollback() if(!$dbh->{AutoCommit});
-              $dbh->disconnect();
+              DbRep_clearConn ($dbh);
               return "$name|$err";
             };
 
   $err = DbRep_commitOnly ($name, $dbh);
   return "$name|$err" if ($err);
 
-  $dbh->disconnect();
+  DbRep_clearConn ($dbh, $sth);
 
   $urow = $sth->rows;
 
@@ -5623,7 +5617,7 @@ sub DbRep_changeVal {
           or do { $err = encode_base64($@, "");
                   Log3 ($name, 2, qq{DbRep $name - Failed to change old value "$old" to new value "$new": $@});
                   $dbh->rollback() if(!$dbh->{AutoCommit});
-                  $dbh->disconnect();
+                  DbRep_clearConn ($dbh);
                   return "$name|$err";
                 };
 
@@ -5674,7 +5668,7 @@ sub DbRep_changeVal {
              if ($@) {
                  $err = encode_base64($@,"");
                  Log3 ($name, 2, "DbRep $name - $@");
-                 $dbh->disconnect;
+                 DbRep_clearConn ($dbh);
                  return "$name|$err";
              }
 
@@ -5700,7 +5694,7 @@ sub DbRep_changeVal {
                  or do { $err = encode_base64($@,"");
                          Log3 ($name, 2, qq{DbRep $name - Failed to change old value "$old" to new value "$new": $@});
                          $dbh->rollback() if(!$dbh->{AutoCommit});
-                         $dbh->disconnect();
+                         DbRep_clearConn ($dbh);
                          return "$name|$err";
                        };
 
@@ -5712,7 +5706,7 @@ sub DbRep_changeVal {
  $err = DbRep_commitOnly ($name, $dbh);
  return "$name|$err" if ($err);
 
- $dbh->disconnect();
+ DbRep_clearConn ($dbh, $sth);
 
  my $rt  = tv_interval($st);                                     # SQL-Laufzeit ermitteln
  my $brt = tv_interval($bst);                                    # Background-Laufzeit ermitteln
@@ -5858,8 +5852,7 @@ sub DbRep_fetchrows {
 
   my $rt = tv_interval($st);                                                         # SQL-Laufzeit ermitteln
 
-  $sth->finish if($sth);
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh, $sth);
 
   $rowlist = encode_base64($rowlist,"");                                             # Daten müssen als Einzeiler zurückgegeben werden
   my $brt  = tv_interval($bst);                                                      # Background-Laufzeit ermitteln
@@ -6044,7 +6037,7 @@ sub DbRep_deldoublets {
        }
        or do { $err = encode_base64($@,"");
                Log3 ($name, 2, "DbRep $name - $@");
-               $dbh->disconnect;
+               DbRep_clearConn ($dbh);
                return "$name|$err";
              };
 
@@ -6073,7 +6066,7 @@ sub DbRep_deldoublets {
            }
            or do { $err = encode_base64($@,"");
                    Log3 ($name, 2, "DbRep $name - $@");
-                   $dbh->disconnect;
+                   DbRep_clearConn ($dbh);
                    return "$name|$err";
                  };
 
@@ -6127,7 +6120,7 @@ sub DbRep_deldoublets {
                    }
                    or do { $err = encode_base64($@,"");
                            Log3 ($name, 2, "DbRep $name - $@");
-                           $dbh->disconnect;
+                           DbRep_clearConn ($dbh);
                            return "$name|$err";
                          };
 
@@ -6165,7 +6158,7 @@ sub DbRep_deldoublets {
   use warnings;
   Log3 ($name, 5, "DbRep $name -> row result list:\n$rowlist");
 
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh, $sth);
 
   $rowlist = encode_base64($rowlist,"");
   my $brt  = tv_interval($bst);                                                # Background-Laufzeit ermitteln
@@ -6251,7 +6244,7 @@ sub DbRep_delseqdoubl {
       if ($@) {
           $err = encode_base64($@,"");
           Log3 ($name, 2, "DbRep $name - $@");
-          $dbh->disconnect;
+          DbRep_clearConn ($dbh);
           return "$name|$err";
       }
 
@@ -6327,7 +6320,7 @@ sub DbRep_delseqdoubl {
                   if ($@) {
                       $err = encode_base64($@,"");
                       Log3 ($name, 2, "DbRep $name - $@");
-                      $dbh->disconnect;
+                      DbRep_clearConn ($dbh);
                       return "$name|$err";
                   }
 
@@ -6386,8 +6379,7 @@ sub DbRep_delseqdoubl {
   use warnings;
   Log3 ($name, 5, "DbRep $name - row result list:\n$rowlist");
 
-  $sth->finish if($sth);
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh, $sth);
 
   $rowlist = encode_base64($rowlist,"");                                    # Daten müssen als Einzeiler zurückgegeben werden
 
@@ -6579,7 +6571,7 @@ sub DbRep_expfile {
           }
           or do { $err = encode_base64($@,"");
                   Log3 ($name, 2, "DbRep $name - $@");
-                  $dbh->disconnect;
+                  DbRep_clearConn ($dbh);
                   return "$name|$err";
           };
 
@@ -6615,8 +6607,7 @@ sub DbRep_expfile {
 
   my $rt = tv_interval($st);                                                       # SQL-Laufzeit ermitteln
 
-  $sth->finish;
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh, $sth);
 
   my $brt = tv_interval($bst);                                                     # Background-Laufzeit ermitteln
   $rt     = $rt.",".$brt;
@@ -6745,7 +6736,7 @@ sub DbRep_impfile {
        }
        or do { $err = encode_base64($@,"");
                Log3 ($name, 2, "DbRep $name - $@");
-               $dbh->disconnect();
+               DbRep_clearConn ($dbh);
                return "$name|$err";
              };
 
@@ -6805,7 +6796,7 @@ sub DbRep_impfile {
                        close(FH);
 
                        $dbh->rollback;
-                       $dbh->disconnect;
+                       DbRep_clearConn ($dbh);
 
                        return "$name|$err";
                      };
@@ -6823,7 +6814,7 @@ sub DbRep_impfile {
           close(FH);
 
           $dbh->rollback;
-          $dbh->disconnect;
+          DbRep_clearConn ($dbh);
 
           return "$name|$err";
       }
@@ -6832,8 +6823,7 @@ sub DbRep_impfile {
   $err = DbRep_commitOnly ($name, $dbh, "import committed");
   return "$name|$err" if ($err);
 
-  $sth->finish if($sth);
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh, $sth);
 
   close(FH);
 
@@ -6990,8 +6980,7 @@ sub DbRep_sqlCmd {
 
   my $rt = tv_interval($st);                                                       # SQL-Laufzeit ermitteln
 
-  $sth->finish if($sth);
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh, $sth);
 
   my $rowstring = join("§", @rows);                                                # Daten müssen als Einzeiler zurückgegeben werden
   $rowstring    = encode_base64($rowstring,"");
@@ -7091,15 +7080,12 @@ sub DbRep_sqlCmdBlocking {
   alarm(0);                                                                      # Schutz vor Race Condition
 
   if ($failed) {
-      $err = $failed eq "Timeout\n" ? $totxt : $failed;
+      $err       = $failed eq "Timeout\n" ? $totxt : $failed;
+      my $encerr = encode_base64($err, "");
 
       Log3 ($name, 2, "DbRep $name - $err");
 
-      my $encerr = encode_base64($err, "");
-
-      $sth->finish if($sth);
-      $dbh->disconnect;
-
+      DbRep_clearConn ($dbh, $sth);
       _DbRep_sqlBlckgErrorState ($hash, $encerr);
 
       return $err;
@@ -7126,8 +7112,7 @@ sub DbRep_sqlCmdBlocking {
       $ret = $nrows;
   }
 
-  $sth->finish;
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh, $sth);
 
   my $rt  = tv_interval($st);                                                   # SQL-Laufzeit ermitteln
   my $com = (split " ", $sql, 2)[0];
@@ -7596,7 +7581,7 @@ sub DbRep_dbmeta {
              }
          }
 
-         $sth->finish;
+         DbRep_clearConn (undef, $sth);
      }
  }
  else {
@@ -7610,7 +7595,7 @@ sub DbRep_dbmeta {
              }
              or do { $err = encode_base64($@,"");
                      Log3 ($name, 2, "DbRep $name - $@");
-                     $dbh->disconnect;
+                     DbRep_clearConn ($dbh);
                      return "$name|$err";
                    };
 
@@ -7630,7 +7615,7 @@ sub DbRep_dbmeta {
              }
              or do { $err = encode_base64($@,"");
                      Log3 ($name, 2, "DbRep $name - $@");
-                     $dbh->disconnect;
+                     DbRep_clearConn ($dbh);
                      return "$name|$err";
                     };
 
@@ -7642,7 +7627,7 @@ sub DbRep_dbmeta {
      }
  }
  
- $dbh->disconnect;
+ DbRep_clearConn ($dbh, $sth);
 
  my $rt = tv_interval($st);                                              # SQL-Laufzeit ermitteln
 
@@ -7760,10 +7745,10 @@ sub DbRep_Index {
       }
   }
 
-  if($p) {
+  if ($p) {
       Log3 ($name, 2, qq{DbRep $name - user "$dbuser" doesn't have rights "INDEX" and "ALTER" as needed - try use adminCredentials automatically !});
 
-      $dbh->disconnect();
+      DbRep_clearConn ($dbh);
 
       ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, $p);
       return "$name|$err" if ($err);
@@ -7819,7 +7804,7 @@ sub DbRep_Index {
       $err = "database model unknown";
       Log3 ($name, 2, "DbRep $name - DbRep_Index - $err");
       $err = encode_base64($err,"");
-      $dbh->disconnect();
+      DbRep_clearConn ($dbh);
       return "$name|$err";
   }
 
@@ -7835,7 +7820,7 @@ sub DbRep_Index {
   $ret = "";
 
   my ($lt,$li) = ("",""); my $i = 0;
-  while($sth->fetch()) {
+  while ($sth->fetch()) {
       if($lt ne $sql_table || $li ne $sql_idx) {
           $ret .= "\n" if($i>0);
           if($dbmodel =~ /SQLITE/ or $dbmodel =~ /POSTGRESQL/) {
@@ -7871,7 +7856,7 @@ sub DbRep_Index {
                   if($cmd !~ /recreate/) {
                       $err = encode_base64($@,"");
                       Log3 ($name, 2, "DbRep $name - DbRep_Index - $@");
-                      $dbh->disconnect();
+                      DbRep_clearConn ($dbh);
                       return "$name|$err";
                   }
               }
@@ -7893,7 +7878,7 @@ sub DbRep_Index {
           if ($@) {
               $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - DbRep_Index - $@");
-              $dbh->disconnect();
+              DbRep_clearConn ($dbh);
               return "$name|$err";
           }
           else {
@@ -7907,7 +7892,7 @@ sub DbRep_Index {
 
   my $rt = tv_interval($st);                                                       # SQL-Laufzeit ermitteln
 
-  $dbh->disconnect();
+  DbRep_clearConn ($dbh, $sth);
 
   $ret    = encode_base64($ret,"");
   my $brt = tv_interval($bst);                                                     # Background-Laufzeit ermitteln
@@ -7975,7 +7960,7 @@ sub DbRep_IndexAborted {
   $erread    = ", ".(split("but", $erread))[1] if($erread);
   my $state  = $cause.$erread;
 
-  $dbh->disconnect() if(defined($dbh));
+  DbRep_clearConn ($dbh);
 
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
@@ -8038,8 +8023,9 @@ sub DbRep_optimizeTables {
           $err = "There are no tables inside database $dbname ! It doesn't make sense to backup an empty database. Skipping this one.";
           Log3 ($name, 2, "DbRep $name - $err");
           $err = encode_base64($@,"");
-          $sth->finish;
-          $dbh->disconnect;
+          
+          DbRep_clearConn ($dbh, $sth);
+          
           return "$name|$err";
       }
 
@@ -8105,8 +8091,7 @@ sub DbRep_optimizeTables {
       Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB_end");
   }
 
-  $sth->finish;
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh, $sth);
 
   $db_MB_start = encode_base64($db_MB_start,"");
   $db_MB_end   = encode_base64($db_MB_end,  "");
@@ -8298,9 +8283,8 @@ sub DbRep_mysql_DumpClientSide {
 
   Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname'");
 
-  #####################  Beginn Dump  ########################
-  ############################################################
-
+  ##  Beginn Dump
+  #################
   undef %db_tables;
 
   # Startzeit ermitteln
@@ -8312,8 +8296,7 @@ sub DbRep_mysql_DumpClientSide {
   my $CTIME_String = strftime "%Y-%m-%d %T", localtime(time);
   my $time_stamp   = $Jahr."_".sprintf("%02d",$Monat)."_".sprintf("%02d",$Monatstag)."_".sprintf("%02d",$Stunden)."_".sprintf("%02d",$Minuten);
   my $starttime    = sprintf("%02d",$Monatstag).".".sprintf("%02d",$Monat).".".$Jahr."  ".sprintf("%02d",$Stunden).":".sprintf("%02d",$Minuten);
-
-  my $fieldlist = "";
+  my $fieldlist    = "";
 
   my ($err, $dbh, $dbmodel) = DbRep_dbConnect($name, 0);
   return "$name|$err" if($err);
@@ -8422,7 +8405,7 @@ sub DbRep_mysql_DumpClientSide {
       $value->{Index_length} += 0;
   }
 
-  $sth->finish;
+  DbRep_clearConn (undef, $sth);
 
   @tablenames = sort(keys(%db_tables));
 
@@ -8434,7 +8417,7 @@ sub DbRep_mysql_DumpClientSide {
       $err = "There are no tables inside database $dbname ! It doesn't make sense to backup an empty database. Skipping this one.";
       Log3 ($name, 2, "DbRep $name - $err");
       $err = encode_base64($@,"");
-      $dbh->disconnect;
+      DbRep_clearConn ($dbh);
       return "$name|$err";
   }
 
@@ -8469,7 +8452,8 @@ sub DbRep_mysql_DumpClientSide {
           return "$name|$err" if($err);
 
           $db_tables{$tablename}{Rows} = $sth->fetchrow;                                               # how many rows
-          $sth->finish;
+
+          DbRep_clearConn (undef, $sth);
 
           $r += $db_tables{$tablename}{Rows};
           push @tables, $db_tables{$tablename}{Name};                                                  # add tablename to backuped tables
@@ -8557,7 +8541,8 @@ sub DbRep_mysql_DumpClientSide {
   return "$name|$err" if($err);
 
   my $db_create = $sth->fetchrow;
-  $sth->finish;
+
+  DbRep_clearConn (undef, $sth);
 
   $sql_text  = $mysql_commentstring;
   $sql_text .= "\n";
@@ -8605,7 +8590,7 @@ sub DbRep_mysql_DumpClientSide {
           return "$name|$err" if($err);
 
           @ctab = $sth->fetchrow;
-          $sth->finish;
+          DbRep_clearConn (undef, $sth);
 
           $part  = $ctab[1].";";
           $part .= "\n";
@@ -8645,7 +8630,7 @@ sub DbRep_mysql_DumpClientSide {
                   $fieldlist .= "`".$ar[0]."`,";
               }
 
-              $sth->finish;
+              DbRep_clearConn (undef, $sth);
 
               Log3 ($name, 5, "DbRep $name - Fieldlist found: $fieldlist");
 
@@ -8686,7 +8671,7 @@ sub DbRep_mysql_DumpClientSide {
                       }
                   }
 
-                  $sth->finish;
+                  DbRep_clearConn (undef, $sth);
               }
 
               $sql_text .= "\n/*!40000 ALTER TABLE `$tablename` ENABLE KEYS */;\n";
@@ -8711,8 +8696,7 @@ sub DbRep_mysql_DumpClientSide {
   DbRep_WriteToDumpFile("\nSET FOREIGN_KEY_CHECKS=1;\n", $sql_file);
   ($err, $filesize) = DbRep_WriteToDumpFile ($mysql_commentstring."EOB\n", $sql_file);
 
-  $sth->finish();
-  $dbh->disconnect();
+  DbRep_clearConn ($dbh, $sth);
 
   my $rt = tv_interval($st);                                                                       # SQL-Laufzeit ermitteln
 
@@ -8798,7 +8782,7 @@ sub DbRep_mysql_DumpServerSide {
      $db_tables{$value->{Name}} = $value;
  }
 
- $sth->finish;
+ DbRep_clearConn (undef, $sth);
 
  @tablenames = sort(keys(%db_tables));
 
@@ -8806,7 +8790,7 @@ sub DbRep_mysql_DumpServerSide {
      $err = "There are no tables inside database $dbname ! It doesn't make sense to backup an empty database. Skipping this one.";
      Log3 ($name, 2, "DbRep $name - $err");
      $err = encode_base64($@,"");
-     $dbh->disconnect;
+     DbRep_clearConn ($dbh);
      return "$name|$err";
  }
 
@@ -8844,8 +8828,7 @@ sub DbRep_mysql_DumpServerSide {
  ($err, $sth, $drh) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
  return "$name|$err" if ($err);
 
- $sth->finish;
- $dbh->disconnect;
+ DbRep_clearConn ($dbh, $sth);
 
  my $rt       = tv_interval($st);                                                       # SQL-Laufzeit ermitteln
 
@@ -8951,11 +8934,11 @@ sub DbRep_sqlite_Dump {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     $dbh->disconnect;
+     DbRep_clearConn ($dbh);
      return "$name|$err";
  }
 
- $dbh->disconnect;
+ DbRep_clearConn ($dbh);
 
  my $rt    = tv_interval($st);                                                         # SQL-Laufzeit ermitteln
 
@@ -9188,7 +9171,7 @@ sub DbRep_sqliteRestore {
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - $@");
-              $dbh->disconnect;
+              DbRep_clearConn ($dbh);
               return "$name|$err";
             };
 
@@ -9198,7 +9181,7 @@ sub DbRep_sqliteRestore {
       ($err,$bfile) = DbRep_dumpUnCompress($hash,$bfile);
       if ($err) {
           $err = encode_base64($err,"");
-          $dbh->disconnect;
+          DbRep_clearConn ($dbh);
           return "$name|$err";
       }
   }
@@ -9211,11 +9194,11 @@ sub DbRep_sqliteRestore {
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - $@");
-              $dbh->disconnect;
+              DbRep_clearConn ($dbh);
               return "$name|$err";
             };
 
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh);
 
   my $rt  = tv_interval($st);                                         # SQL-Laufzeit ermitteln
   my $brt = tv_interval($bst);                                        # Background-Laufzeit ermitteln
@@ -9252,7 +9235,7 @@ sub DbRep_mysql_RestoreServerSide {
       ($err,$bfile) = DbRep_dumpUnCompress($hash,$bfile);
       if ($err) {
           $err = encode_base64($err,"");
-          $dbh->disconnect;
+          DbRep_clearConn ($dbh);
           return "$name|$err";
       }
   }
@@ -9269,12 +9252,11 @@ sub DbRep_mysql_RestoreServerSide {
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - $@");
-              $dbh->disconnect;
+              DbRep_clearConn ($dbh);
               return "$name|$err";
             };
 
-  $sth->finish;
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh, $sth);
 
   my $rt  = tv_interval($st);                                   # SQL-Laufzeit ermitteln
   my $brt = tv_interval($bst);                                  # Background-Laufzeit ermitteln
@@ -9320,7 +9302,7 @@ sub DbRep_mysql_RestoreClientSide {
 
       if ($err) {
           $err = encode_base64($err,"");
-          $dbh->disconnect;
+          DbRep_clearConn ($dbh);
           return "$name|$err";
       }
   }
@@ -9364,7 +9346,7 @@ sub DbRep_mysql_RestoreClientSide {
                       $e   = $@;
                       $err = encode_base64($e,"");
                       close(FH);
-                      $dbh->disconnect;
+                      DbRep_clearConn ($dbh);
 
                       Log3 ($name, 1, "DbRep $name - last query: $line");
                       Log3 ($name, 1, "DbRep $name - $e");
@@ -9410,7 +9392,7 @@ sub DbRep_mysql_RestoreClientSide {
                           $e = $@;
                           $err = encode_base64($e,"");
                           close(FH);
-                          $dbh->disconnect;
+                          DbRep_clearConn ($dbh);
 
                           Log3 ($name, 1, "DbRep $name - last query: $query");
                           Log3 ($name, 1, "DbRep $name - $e");
@@ -9440,7 +9422,7 @@ sub DbRep_mysql_RestoreClientSide {
                       $e   = $@;
                       $err = encode_base64($e,"");
                       close(FH);
-                      $dbh->disconnect;
+                      DbRep_clearConn ($dbh);
 
                       Log3 ($name, 1, "DbRep $name - last query: $query");
                       Log3 ($name, 1, "DbRep $name - $e");
@@ -9463,7 +9445,7 @@ sub DbRep_mysql_RestoreClientSide {
           $e = $@;
           $err = encode_base64($e,"");
           close(FH);
-          $dbh->disconnect;
+          DbRep_clearConn ($dbh);
 
           Log3 ($name, 1, "DbRep $name - last query: $query");
           Log3 ($name, 1, "DbRep $name - $e");
@@ -9471,7 +9453,7 @@ sub DbRep_mysql_RestoreClientSide {
           return "$name|$err";
       };
 
- $dbh->disconnect;
+ DbRep_clearConn ($dbh);
  close(FH);
 
  my $rt  = tv_interval($st);                                  # SQL-Laufzeit ermitteln
@@ -9548,6 +9530,7 @@ sub DbRep_syncStandby {
 
   # Standby-DB
   my $stbyhash   = $defs{$stbyname};
+  my $stbymodel  = $stbyhash->{MODEL};
   my $stbyconn   = $stbyhash->{dbconn};
   my $stbyuser   = $stbyhash->{dbuser};
   my $stbypasswd = $attr{"sec$stbyname"}{secret};
@@ -9560,12 +9543,14 @@ sub DbRep_syncStandby {
   return "$name|$err" if ($err);
 
   # Verbindung zur Standby-DB
-  eval {$dbhstby = DBI->connect("dbi:$stbyconn", $stbyuser, $stbypasswd, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $stbyutf8 });};
+  eval {$dbhstby = DBI->connect("dbi:$stbyconn", $stbyuser, $stbypasswd, { PrintError => 0, RaiseError => 1, AutoCommit => 1 });};
   if ($@) {
       $err = encode_base64($@,"");
       Log3 ($name, 2, "DbRep $name - $@");
       return "$name|$err";
   }
+  
+  $dbhstby->{mysql_enable_utf8} = $stbyutf8 if($stbymodel =~ /MYSQL/xs);
 
   my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash);                           # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef)
   Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
@@ -9613,8 +9598,8 @@ sub DbRep_syncStandby {
       if ($err) {
           Log3 ($name, 2, "DbRep $name - $err");
           $err = encode_base64($err,"");
-          $dbh->disconnect;
-          $dbhstby->disconnect();
+          DbRep_clearConn ($dbh, $sth);
+          DbRep_clearConn ($dbhstby);
           return "$name|$err";
       }
 
@@ -9624,8 +9609,8 @@ sub DbRep_syncStandby {
   $err = DbRep_commitOnly ($name, $dbhstby);
   return "$name|$err" if ($err);
 
-  $dbh->disconnect();
-  $dbhstby->disconnect();
+  DbRep_clearConn ($dbh, $sth);
+  DbRep_clearConn ($dbhstby);
 
   my $rt  = tv_interval($st);                                       # SQL-Laufzeit ermitteln
   my $brt = tv_interval($bst);                                      # Background-Laufzeit ermitteln
@@ -9977,7 +9962,7 @@ sub DbRep_reduceLog {
 
     Log3 ($name, 3, "DbRep $name - reduceLog finished. $result");
 
-    $dbh->disconnect();
+    DbRep_clearConn ($dbh);
 
     my $ret = encode_base64("reduceLog finished. $result", "");
 
@@ -10699,7 +10684,7 @@ sub DbRep_migCollation {
 
   Log3 ($name, 3, "DbRep $name - migration done");
 
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh, $sth);
 
   my $rt   = tv_interval($st);                                            # SQL-Laufzeit ermitteln
   my $brt  = tv_interval($bst);                                           # Background-Laufzeit ermitteln
@@ -10807,7 +10792,7 @@ sub DbRep_ParseAborted {
 
   my $state  = $cause.$erread;
 
-  $dbh->disconnect() if(defined($dbh));
+  DbRep_clearConn ($dbh);
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
   Log3 ($name, 2, "DbRep $name - Database command aborted: \"$cause\" ");
@@ -10835,7 +10820,7 @@ sub DbRep_reduceLogAborted {
   $erread    = ", ".(split("but", $erread))[1] if($erread);
 
   my $state = $cause.$erread;
-  $dbh->disconnect() if(defined($dbh));
+  DbRep_clearConn ($dbh);
 
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
@@ -10867,7 +10852,7 @@ sub DbRep_restoreAborted {
 
   my $state = $cause.$erread;
 
-  $dbh->disconnect() if(defined($dbh));
+  DbRep_clearConn ($dbh);
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
   Log3 ($name, 2, "DbRep $name - Database restore aborted: \"$cause\" ");
@@ -10899,7 +10884,7 @@ sub DbRep_DumpAborted {
 
   my $state = $cause.$erread;
 
-  $dbh->disconnect() if(defined($dbh));
+  DbRep_clearConn ($dbh);
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
   Log3 ($name, 2, "DbRep $name - Database dump aborted: \"$cause\" ");
@@ -10931,7 +10916,7 @@ sub DbRep_OptimizeAborted {
 
   my $state = $cause.$erread;
 
-  $dbh->disconnect() if(defined($dbh));
+  DbRep_clearConn ($dbh);
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
   Log3 ($name, 2, "DbRep $name - Database optimize aborted: \"$cause\" ");
@@ -10967,7 +10952,7 @@ sub DbRep_RepairAborted {
 
   my $state = $cause.$erread;
 
-  $dbh->disconnect() if(defined($dbh));
+  DbRep_clearConn ($dbh);
   ReadingsSingleUpdateValue ($hash,"state",$state, 1);
 
   Log3 ($name, 2, "DbRep $name - Database repair aborted: \"$cause\" ");
@@ -11747,6 +11732,19 @@ return ($err, $dbh, $dbmodel);
 }
 
 ####################################################################################################
+#         DB disconnect, finish $sth             
+####################################################################################################
+sub DbRep_clearConn {
+  my $dbh = shift;
+  my $sth = shift;
+
+  $sth->finish     if($sth);
+  $dbh->disconnect if($dbh);
+
+return;
+}
+
+####################################################################################################
 #          nur SQL prepare
 #          return $sth bei Erfolg
 ####################################################################################################
@@ -11757,7 +11755,6 @@ sub DbRep_prepareOnly {
   my $info = shift // "SQL prepare: $sql";
 
   my $err  = q{};
-
   my $sth;
 
   Log3 ($name, 4, "DbRep $name - $info");
@@ -11766,7 +11763,7 @@ sub DbRep_prepareOnly {
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
-              $dbh->disconnect;
+              DbRep_clearConn ($dbh);
             };
 
 return ($err, $sth);
@@ -11783,7 +11780,6 @@ sub DbRep_prepareCachedOnly {
   my $info = shift // "SQL prepare cached: $sql";
 
   my $err  = q{};
-
   my $sth;
 
   Log3 ($name, 4, "DbRep $name - $info");
@@ -11792,7 +11788,7 @@ sub DbRep_prepareCachedOnly {
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
-              $dbh->disconnect;
+              DbRep_clearConn ($dbh);
             };
 
 return ($err, $sth);
@@ -11820,8 +11816,7 @@ sub DbRep_prepareExecuteQuery {
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
-              $sth->finish if($sth);
-              $dbh->disconnect;
+              DbRep_clearConn ($dbh, $sth);
             };
 
 return ($err, $sth, $res);
@@ -11850,8 +11845,7 @@ sub DbRep_prepareExec2Array {
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
-              $sth->finish if($sth);
-              $dbh->disconnect;
+              DbRep_clearConn ($dbh, $sth);
             };
 
   @sr = $sth->fetchrow_array;
@@ -11878,7 +11872,7 @@ sub DbRep_dbhDo {
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
-              $dbh->disconnect;
+              DbRep_clearConn ($dbh);
             };
 
 return ($err, $rv);
@@ -11965,7 +11959,7 @@ sub DbRep_beginDatabaseTransaction {
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
-              $dbh->disconnect;
+              DbRep_clearConn ($dbh);
             };
 
 return $err;
@@ -11992,7 +11986,7 @@ sub DbRep_commitOnly {
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
-              $dbh->disconnect;
+              DbRep_clearConn ($dbh);
             };
 
 return $err;
@@ -12019,7 +12013,7 @@ sub DbRep_rollbackOnly {
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
-              $dbh->disconnect;
+              DbRep_clearConn ($dbh);
             };
 
 return $err;
@@ -13894,7 +13888,7 @@ sub DbRep_OutputWriteToDB {
                                                          }
                                                        );
           if ($err) {
-              $dbh->disconnect;
+              DbRep_clearConn ($dbh);
               return ($err,$wrt,$irowdone);
           }
 
@@ -13915,7 +13909,7 @@ sub DbRep_OutputWriteToDB {
                                                              }
                                                            );
               if ($err) {
-                  $dbh->disconnect;
+                  DbRep_clearConn ($dbh);
                   return ($err,$wrt,$irowdone);
               }
 
@@ -13938,7 +13932,7 @@ sub DbRep_OutputWriteToDB {
                                                          }
                                                        );
           if ($err) {
-              $dbh->disconnect;
+              DbRep_clearConn ($dbh);
               return ($err,$wrt,$irowdone);
           }
 
@@ -13961,7 +13955,7 @@ sub DbRep_OutputWriteToDB {
   $err = DbRep_commitOnly ($name, $dbh);
   return ($err,$wrt,$irowdone) if ($err);
 
-  $dbh->disconnect;
+  DbRep_clearConn ($dbh);
 
   Log3 ($name, 3, "DbRep $name - number of lines updated in >$dblogname<: $uhs");
   Log3 ($name, 3, "DbRep $name - number of lines inserted into >$dblogname<: $ihs");
@@ -14048,7 +14042,7 @@ sub DbRep_deleteOtherFromDB {
       $err = DbRep_commitOnly ($name, $dbh);
       return $err if ($err);
 
-      $dbh->disconnect;
+      DbRep_clearConn ($dbh);
 
       Log3 $hash->{NAME}, 3, "DbRep $name - number of lines deleted in \"$dblogname\": $dlines";
 
