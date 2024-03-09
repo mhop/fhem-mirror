@@ -80,7 +80,7 @@ CommandUpdate($$)
   $updateInBackground = AttrVal("global","updateInBackground",1);
   if($arg =~ m/^(check|checktime|all|force)$/i) {
     $arg = lc($arg);
-    $updateInBackground = 0;
+    $updateInBackground = 0 if($arg ne "all");
   }
 
   $updArg = $arg;
