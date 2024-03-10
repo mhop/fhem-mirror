@@ -61,6 +61,7 @@ BEGIN {
     AnalyzePerlCommand
     perlSyntaxCheck
     FmtDateTime time_str2num
+    GetTimeSpec
     notifyRegexpChanged
     deviceEvents
   ) )
@@ -360,7 +361,15 @@ sub Notify {
 
       # CMD ausführen
       my $listWait = AnalyzePerlCommand( $hash, $cmd );
-      $listWait = 0 if !looks_like_number($listWait);
+      if (!looks_like_number($listWait)) {
+	my ( $err, $hour, $min, $sec, $fn ) = GetTimeSpec($listWait);
+        if ($err) {
+          Log3($SELF, 2 , qq($TYPE ($SELF) returns no number for "$listWait" in $ĺist attribute evaluation!));
+          $listWait = 0;
+        } else {
+          $listWait = 3600 * $hour + 60 * $min + $sec;
+        }
+      }
 
       if ( $listFuncAdd eq 'preset' && $listFuncRemove eq 'preset' ) {
         Log3(
