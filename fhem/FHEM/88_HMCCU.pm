@@ -4351,8 +4351,8 @@ sub HMCCU_GetEnumValues ($$$$;$$)
 			# If a list of conversions exists, use values/conversions from HMCCU_CONVERSIONS
 			foreach my $cv (split(',', $argList)) {
 				if (exists($HMCCU_CONVERSIONS->{$role}{$dpt}{$cv})) {
-					$valList{$HMCCU_CONVERSIONS->{$role}{$dpt}{$cv}} = $cv;
-					$valIndex{$cv} = $HMCCU_CONVERSIONS->{$role}{$dpt}{$cv};
+					$valList{$cv} = $HMCCU_CONVERSIONS->{$role}{$dpt}{$cv};
+					$valIndex{$HMCCU_CONVERSIONS->{$role}{$dpt}{$cv}} = $cv;
 				}
 				else {
 					$valList{$cv} = $cv;
@@ -6628,6 +6628,9 @@ sub HMCCU_UpdateRoleCommands ($$)
 	my $chnNo //= '';
 	my ($cc, $cd) = HMCCU_ControlDatapoint ($clHash);
 
+	my $devName = $clHash->{NAME};
+	my $devType = $clHash->{TYPE}; 
+
 	# Delete existing role commands
 	delete $clHash->{hmccu}{roleCmds} if (exists($clHash->{hmccu}{roleCmds}));
 
@@ -6665,7 +6668,7 @@ sub HMCCU_UpdateRoleCommands ($$)
 				$combDpt = $1;
 				$cmdSyntax =~ s/^(COMBINED_PARAMETER|SUBMIT) //;
 				if (!HMCCU_IsValidParameter ($clHash, "$addr:$cmdChn", 'VALUES', $combDpt, $parAccess)) {
-					HMCCU_Log ($clHash, 4, "HMCCUConf: Invalid parameter $addr:$cmdChn VALUES $combDpt $parAccess in role $role, command $cmd");
+					HMCCU_Log ($clHash, 4, "HMCCUConf: Invalid parameter $addr:$cmdChn VALUES $combDpt $parAccess. Ignoring command $cmd in role $role for $devType device $devName");
 					next URCCMD;
 				}
 			}
@@ -6693,7 +6696,7 @@ sub HMCCU_UpdateRoleCommands ($$)
 				my ($ps, $dptList, $par, $fnc) = @subCmdList;
 				my $psName = $ps eq 'I' ? 'VALUES' : $pset{$ps};
 				if (!defined($psName)) {
-					HMCCU_Log ($clHash, 2, "HMCCUConf: Invalid or undefined parameter set in role $role, command $cmd $subCmd");
+					HMCCU_Log ($clHash, 4, "HMCCUConf: Invalid or undefined parameter set. Ignoring command $cmd in role $role for $devType device $devName");
 					next URCSUB;
 				}
 				$clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{ps} //= $psName;
@@ -6724,13 +6727,13 @@ sub HMCCU_UpdateRoleCommands ($$)
 					}
 				}
 				if (!$dptValid) {
-					HMCCU_Log ($clHash, 2, "HMCCUConf: Invalid parameter $addr:$cmdChn $psName $dpt $parAccess in role $role, command $cmd $subCmd");
+					HMCCU_Log ($clHash, 4, "HMCCUConf: Invalid parameter $addr:$cmdChn $psName $dpt $parAccess. Ignoring command $cmd in role $role for $devType device $devName");
 					next URCSUB;
 				}
 				
 				my $paramDef = HMCCU_GetParamDef ($ioHash, "$addr:$cmdChn", $psName, $dpt);
 				if (!defined($paramDef)) {
-					HMCCU_Log ($ioHash, 2, "HMCCUConf: Can't get definition of datapoint $addr:$cmdChn.$dpt. Ignoring command $cmd in role $role for device $clHash->{NAME}");
+					HMCCU_Log ($ioHash, 4, "HMCCUConf: Can't get definition of datapoint $addr:$cmdChn.$dpt. Ignoring command $cmd in role $role for $devType device $devName");
 					next URCCMD;
 				}
 				$clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcmd}{$scn}{scn}  = sprintf("%03d", $subCmdNo);
