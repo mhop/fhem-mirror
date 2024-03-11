@@ -8316,7 +8316,7 @@ sub DbRep_mysql_DumpClientSide {
   ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SELECT VERSION()");                                # Mysql-Version ermitteln
   return "$name|$err" if($err);
 
-  my @mysql_version = $sth->fetchrow;
+  my @mysql_version = $sth->fetchrow_array;
   my @v             = split(/\./,$mysql_version[0]);
   my $collation     = '';
   my $dbcharset     = '';
@@ -8325,7 +8325,7 @@ sub DbRep_mysql_DumpClientSide {
       ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, qq(SHOW VARIABLES LIKE 'collation_database'));
       return "$name|$err" if($err);
 
-      @ar = $sth->fetchrow;
+      @ar = $sth->fetchrow_array;
 
       if ($ar[1]) {
           $collation = $ar[1];
@@ -8339,7 +8339,7 @@ sub DbRep_mysql_DumpClientSide {
       ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SHOW VARIABLES LIKE 'dbcharset'");             # get standard encoding of MySQl-Server
       return "$name|$err" if($err);
 
-      @ar = $sth->fetchrow;
+      @ar = $sth->fetchrow_array;
 
       if ($ar[1]) {
           $dbcharset = $ar[1];
@@ -8367,7 +8367,7 @@ sub DbRep_mysql_DumpClientSide {
   ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
   return "$name|$err" if($err);
 
-  while ( $value = $sth->fetchrow_hashref()) {
+  while ($value = $sth->fetchrow_hashref()) {
       $value->{skip_data} = 0;                                                                          # default -> backup data of table
 
       Log3 ($name, 5, "DbRep $name - ......... Table definition found: .........");
@@ -8548,7 +8548,7 @@ sub DbRep_mysql_DumpClientSide {
   ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, qq(SHOW CREATE DATABASE IF NOT EXISTS $dbname));
   return "$name|$err" if($err);
 
-  my $db_create = $sth->fetchrow;
+  my $db_create = $sth->fetchrow_array;
 
   DbRep_clearConn (undef, $sth);
 
@@ -8597,7 +8597,7 @@ sub DbRep_mysql_DumpClientSide {
           ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, qq(SHOW CREATE TABLE `$tablename`));
           return "$name|$err" if($err);
 
-          @ctab = $sth->fetchrow;
+          @ctab = $sth->fetchrow_array;
           DbRep_clearConn (undef, $sth);
 
           $part  = $ctab[1].";";
@@ -8634,7 +8634,7 @@ sub DbRep_mysql_DumpClientSide {
 
               $fieldlist = "(";
 
-              while (@ar = $sth->fetchrow) {                                                       # build fieldlist
+              while (@ar = $sth->fetchrow_array) {                                                 # build fieldlist
                   $fieldlist .= "`".$ar[0]."`,";
               }
 
@@ -8657,7 +8657,7 @@ sub DbRep_mysql_DumpClientSide {
                   ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql_daten);
                   return "$name|$err" if($err);
 
-                  while (@ar = $sth->fetchrow) {                                                   # Start the insert
+                  while (@ar = $sth->fetchrow_array) {                                             # Start the insert
                       if ($first_insert == 0) {
                           $part = "\n$insert";
                       }
@@ -8680,6 +8680,8 @@ sub DbRep_mysql_DumpClientSide {
 
                   DbRep_clearConn (undef, $sth);
               }
+              
+              ($err, $filesize) = DbRep_WriteToDumpFile ($sql_text, $sql_file) if($sql_text);
 
               $sql_text .= "\n/*!40000 ALTER TABLE `$tablename` ENABLE KEYS */;\n";
           }
@@ -8773,7 +8775,7 @@ sub DbRep_mysql_DumpServerSide {
  ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
  return "$name|$err" if ($err);
 
- while ( $value = $sth->fetchrow_hashref()) {
+ while ($value = $sth->fetchrow_hashref()) {
      Log3 ($name, 5, "DbRep $name - ......... Table definition found: .........");
 
      for my $tk (sort(keys(%$value))) {
