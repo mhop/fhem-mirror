@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.16.6" => "11.03.2024  plantConfigCheck: join forecastProperties with ',' ",
   "1.16.5" => "04.03.2024  setPVhistory: code changes, plantConfigCheck: check forecastRefresh ".
                            "check age of weather data according to used MOSMIX variant ",
   "1.16.4" => "02.03.2024  __getDWDSolarData: change check reading to fcx_12_x, internal code changes ".
@@ -5639,16 +5640,6 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  ## AI Raw Daten formatieren                                                                 # 09.02.2024
-  if (defined $data{$type}{$name}{aidectree}{airaw}) {
-      for my $idx (sort keys %{$data{$type}{$name}{aidectree}{airaw}}) {
-          delete $data{$type}{$name}{aidectree}{airaw}{$idx}{wrp};
-          $data{$type}{$name}{aidectree}{airaw}{$idx}{temp} = 0  if(AiRawdataVal ($hash, $idx, 'temp', 0) eq '00');
-          $data{$type}{$name}{aidectree}{airaw}{$idx}{temp} = 5  if(AiRawdataVal ($hash, $idx, 'temp', 0) eq '05');
-          $data{$type}{$name}{aidectree}{airaw}{$idx}{temp} = -5 if(AiRawdataVal ($hash, $idx, 'temp', 0) eq '-05');
-      }
-  }
-
   ## percentile in simple umsetzen                                 # 05.02.2024
   for my $idx (sort keys %{$data{$type}{$name}{circular}}) {
       if(defined $data{$type}{$name}{circular}{$idx}{pvcorrf}{percentile}) {
@@ -14259,7 +14250,7 @@ sub checkPlantConfig {
           }
 
           $result->{'DWD Weather Properties'}{note} .= qq{checked parameters and attributes of device "$fcname": <br>};
-          $result->{'DWD Weather Properties'}{note} .= 'forecastProperties -> '.join (' ', @dweattrmust).'<br>';
+          $result->{'DWD Weather Properties'}{note} .= 'forecastProperties -> '.join (',', @dweattrmust).'<br>';
           $result->{'DWD Weather Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to "1" if possible' : '').'<br>';
       }
   }
@@ -14333,7 +14324,7 @@ sub checkPlantConfig {
       $result->{'DWD Radiation Properties'}{note} .= qq{checked global Radiation parameters: <br>};
       $result->{'DWD Radiation Properties'}{note} .= 'MOSMIX variant, Age of Radiation data. <br>';      
       $result->{'DWD Radiation Properties'}{note} .= qq{<br>checked parameters and attributes device "$raname": <br>};
-      $result->{'DWD Radiation Properties'}{note} .= 'forecastProperties -> '.join (' ', @draattrmust).'<br>';
+      $result->{'DWD Radiation Properties'}{note} .= 'forecastProperties -> '.join (',', @draattrmust).'<br>';
       $result->{'DWD Radiation Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to "1" if possible' : '').'<br>';
   }
 
