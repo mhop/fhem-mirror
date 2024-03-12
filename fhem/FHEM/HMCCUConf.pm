@@ -566,13 +566,9 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'sensor-on-till' => 'V:ON_TIME:?time V:STATE:1'
 	},
 	'SWITCH_VIRTUAL_RECEIVER' => {
-		'COMBINED_PARAMETER' => {
-			'OT' => 'ON_TIME',
-			'S'  => 'STATE'
-		},
 		'on' => 'V:STATE:1',
 		'off' => 'V:STATE:0',
-		'on-for-timer' => 'COMBINED_PARAMETER V:OT:?duration V:S:true',
+		'on-for-timer' => '1:V:ON_TIME:?time=0.0 2:V:STATE:1',
 		'on-till' => 'V:ON_TIME:?time V:STATE:1',
 		'toggle' => 'V:STATE:0,1'
 	},

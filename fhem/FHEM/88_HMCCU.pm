@@ -6727,7 +6727,7 @@ sub HMCCU_UpdateRoleCommands ($$)
 					}
 				}
 				if (!$dptValid) {
-					HMCCU_Log ($clHash, 4, "HMCCUConf: Invalid parameter $addr:$cmdChn $psName $dpt $parAccess. Ignoring command $cmd in role $role for $devType device $devName");
+					HMCCU_Log ($clHash, 4, "HMCCUConf: Unsupported parameter $addr:$cmdChn $psName $dpt $parAccess. Ignoring sub command $subCmd in role $role for $devType device $devName");
 					next URCSUB;
 				}
 				
