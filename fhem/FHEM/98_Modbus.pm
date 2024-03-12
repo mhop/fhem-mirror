@@ -23,6 +23,7 @@
 
 #
 #   ToDo / Ideas 
+#                   use group attrs in doRequest to group registers for set / get
 #                   verify that nextOpenDelay is integer and >= 1
 #                   set 'active' results in error when tcp is already open
 #                   enforce nextOpenDelay even if slave immediately closes
@@ -3770,6 +3771,7 @@ sub ProcessRequestQueue {
     }
 
     return if (CheckDelays($ioHash, $mHash, $request));     # might set Profiler to delay
+    $now = gettimeofday();                                  # need current time after potential sleep
 
     DropBuffer($ioHash);    
     RemoveInternalTimer ("timeout:$name");                  # remove potential existing ResponseTimeout timer - will be set later
@@ -3791,6 +3793,7 @@ sub ProcessRequestQueue {
 
         my $timeout = DevInfo($mHash, 'timing', 'timeout', ($request->{RELAYHASH} ? 1.5 : 2));
         my $toTime  = $now+$timeout;
+
         InternalTimer($toTime, \&Modbus::ResponseTimeout, "timeout:$name", 0);
         $ioHash->{nextTimeout} = $toTime;                   # to be able to calculate remaining timeout time in ReadAnswer
     } else {
@@ -4400,6 +4403,11 @@ sub ResponseText {
 
 ######################################################
 # log current frame in buffer 
+# todo: new paraeter NoFrameLog - don't log current frame / error 
+#      nenned when called from DoRequest and info from last incomplete response only creates confusion.
+#      in this case only the newly created request is relevant
+#   or: make doRequest call LogRequest (new function) instead of LogFrame
+#
 sub FrameText {
     my ($hash, $request, $response) = @_;
     $request  = $hash->{REQUEST} if (!$request);
