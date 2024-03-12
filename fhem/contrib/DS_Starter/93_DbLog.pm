@@ -58,6 +58,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.10.0"  => "07.03.2024 support of MariaDB driver, optimize Timer execMemCacheAsync, change DbLog_configcheck, _DbLog_SBP_connectDB ".
+                           "remove countNbl, support compression between client and server ",
   "5.9.6"   => "09.03.2024 change META.json ",
   "5.9.5"   => "04.01.2024 change DbLog_configcheck to select only column width independent from column characteristic ",
   "5.9.4"   => "03.01.2024 make EVENT writable ",
@@ -153,14 +155,11 @@ my %DbLog_hset = (                                                              
   addLog           => { fn => \&_DbLog_setaddLog          },
   addCacheLine     => { fn => \&_DbLog_setaddCacheLine    },
   count            => { fn => \&_DbLog_setcount           },
-  countNbl         => { fn => \&_DbLog_setcount           },
   deleteOldDays    => { fn => \&_DbLog_setdeleteOldDays   },
-  deleteOldDaysNbl => { fn => \&_DbLog_setdeleteOldDays   },
   userCommand      => { fn => \&_DbLog_setuserCommand     },
   exportCache      => { fn => \&_DbLog_setexportCache     },
   importCachefile  => { fn => \&_DbLog_setimportCachefile },
   reduceLog        => { fn => \&_DbLog_setreduceLog       },
-  reduceLogNbl     => { fn => \&_DbLog_setreduceLog       },
 );
 
 my %DbLog_hget = (                                                                # Hash der Get-Funktion
@@ -451,13 +450,7 @@ sub DbLog_Attr {
   my $hash = $defs{$name};
   my $do   = 0;
 
-  if ($aName =~ /^(traceHandles|noNotifyDev)$/xs) {
-      my $msg = "$name - The attribute >$aName< is deprecated and is not set anymore.";
-      Log3 ($name, 1, "$name $msg");
-      return $msg;
-  }
-
-  if($cmd eq "set") {
+  if ($cmd eq "set") {
       if ($aName eq "syncInterval"           ||
           $aName eq "cacheLimit"             ||
           $aName eq "cacheOverflowThreshold" ||
@@ -467,11 +460,11 @@ sub DbLog_Attr {
           if ($aVal !~ /^[0-9]+$/) { return "The Value of $aName is not valid. Use only figures 0-9 !";}
       }
 
-      if ($hash->{MODEL} !~ /MYSQL|POSTGRESQL/ && $aName =~ /dbSchema/) {
+      if ($hash->{MODEL} !~ /MYSQL|MARIADB|POSTGRESQL/xs && $aName =~ /dbSchema/) {
            return qq{"$aName" is not valid for database model "$hash->{MODEL}"};
       }
 
-      if($aName =~ /[Vv]alueFn/) {
+      if ($aName =~ /[Vv]alueFn/) {
           my ($err, $func) = DbLog_checkSyntaxValueFn ($name, $aVal);
           return $err if($err);
       }
@@ -491,7 +484,7 @@ sub DbLog_Attr {
       }
   }
 
-  if($aName =~ /^col[ERTV]/xs) {
+  if ($aName =~ /^col[ERTV]/xs) {
       if ($cmd eq "set" && $aVal) {
           unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 !";}
       }
@@ -501,24 +494,22 @@ sub DbLog_Attr {
       }
   }
 
-  if($aName eq 'asyncMode') {
+  if ($aName eq 'asyncMode') {
       if ($cmd eq "set" && $aVal) {
           $hash->{MODE} = 'asynchronous';
-          InternalTimer(gettimeofday()+0.8, 'DbLog_execMemCacheAsync', $hash, 0);
+          InternalTimer (gettimeofday()+0.8, 'DbLog_execMemCacheAsync', $hash, 0);
       }
       else {
+          DbLog_execMemCacheAsync ($hash);
           $hash->{MODE} = 'synchronous';
-
           delete($defs{$name}{READINGS}{NextSync});
           delete($defs{$name}{READINGS}{CacheUsage});
           delete($defs{$name}{READINGS}{CacheOverflowLastNum});
           delete($defs{$name}{READINGS}{CacheOverflowLastState});
-
-          InternalTimer(gettimeofday()+5, "DbLog_execMemCacheAsync", $hash, 0);
       }
   }
 
-  if($aName eq "commitMode") {
+  if ($aName eq "commitMode") {
       my $dbh = $hash->{DBHU};
       __DbLog_SBP_disconnectOnly ($name, $dbh);
       delete $hash->{DBHU};
@@ -530,34 +521,33 @@ sub DbLog_Attr {
       }
   }
 
-  if($aName eq "showproctime") {
+  if ($aName eq "showproctime") {
       if ($cmd ne "set" || !$aVal) {
           delete($defs{$name}{READINGS}{background_processing_time});
           delete($defs{$name}{READINGS}{sql_processing_time});
       }
   }
 
-  if($aName eq "showNotifyTime") {
+  if ($aName eq "showNotifyTime") {
       if ($cmd ne "set" || !$aVal) {
           delete($defs{$name}{READINGS}{notify_processing_time});
       }
   }
 
   if ($aName eq "disable") {
-      my $async = AttrVal($name, 'asyncMode', 0);
-
-      if($cmd eq "set") {
+      if ($cmd eq "set") {
           $do = $aVal ? 1 : 0;
       }
 
       $do     = 0 if($cmd eq "del");
       my $val = $do == 1 ? 'disabled' : 'active';
 
-      DbLog_execMemCacheAsync ($hash)          if($do == 1);                            # letzter CacheSync vor disablen
+      DbLog_execMemCacheAsync ($hash) if($do == 1);                                          # letzter CacheSync vor disable
       DbLog_setReadingstate   ($hash, $val);
+      RemoveInternalTimer     ($hash, 'DbLog_execMemCacheAsync');
 
       if ($do == 0) {
-          InternalTimer(gettimeofday()+1.8, "_DbLog_initOnStart", $hash, 0);
+          InternalTimer (gettimeofday()+1.8, "_DbLog_initOnStart", $hash, 0);
       }
   }
 
@@ -608,7 +598,6 @@ sub DbLog_Set {
                 "clearReadings:noArg ".
                 "count:noArg ".
                 "configCheck:noArg ".
-                "countNbl:noArg ".
                 "deleteOldDays ".
                 "eraseReadings:noArg ".
                 "listCache:noArg ".
@@ -834,7 +823,7 @@ sub _DbLog_setrereadcfg {                ## no critic "not used"
 
   Log3 ($name, 3, "$name - Rereadcfg requested.");
 
-  my $ret = DbLog_readCfg($hash);
+  my $ret = DbLog_readCfg ($hash);
   return $ret if $ret;
 
   my $dbh = $hash->{DBHU};
@@ -1970,14 +1959,13 @@ sub DbLog_execMemCacheAsync {
   my $hash       = shift;
   my $name       = $hash->{NAME};
 
-  my $async      = AttrVal($name, 'asyncMode', 0);
+  RemoveInternalTimer ($hash, 'DbLog_execMemCacheAsync');
 
-  RemoveInternalTimer($hash, 'DbLog_execMemCacheAsync');
-
-  if(!$async || IsDisabled($name) || $init_done != 1) {
-      InternalTimer(gettimeofday()+5, 'DbLog_execMemCacheAsync', $hash, 0);
+  if (!AttrVal ($name, 'asyncMode', 0) || IsDisabled($name)) {
       return;
   }
+  
+  InternalTimer (gettimeofday()+5, 'DbLog_execMemCacheAsync', $hash, 0) if($init_done != 1);
 
   my $nextsync = gettimeofday() + AttrVal($name, 'syncInterval', 30);
   my $se       = AttrVal ($name, 'syncEvents', undef) ? 1 : 0;
@@ -2176,6 +2164,7 @@ sub DbLog_SBP_onRun {
               $store->{dbparams}{dbpassword}  = $memc->{dbpassword};
               $store->{dbparams}{utf8}        = $memc->{utf8};                    # Database UTF8 0|1
               $store->{dbparams}{model}       = $memc->{model};                   # DB Model
+              $store->{dbparams}{compression} = $memc->{compression};             # DB -> Client Komressionsmode
               $store->{dbparams}{sltjm}       = $memc->{sltjm};                   # SQLiteJournalMode
               $store->{dbparams}{sltcs}       = $memc->{sltcs};                   # SQLiteCacheSize
               $store->{dbparams}{cm}          = $memc->{cm};                      # Commit Mode
@@ -2444,18 +2433,19 @@ sub _DbLog_SBP_manageDBconnect {
 
   my ($err, $dbh, $ret);
 
-  my $params = { name       => $name,
-                 dbconn     => $store->{dbparams}{dbconn},
-                 dbname     => $store->{dbparams}{dbname},
-                 dbuser     => $store->{dbparams}{dbuser},
-                 dbpassword => $store->{dbparams}{dbpassword},
-                 utf8       => $store->{dbparams}{utf8},
-                 useac      => $useac,
-                 model      => $store->{dbparams}{model},
-                 sltjm      => $store->{dbparams}{sltjm},
-                 sltcs      => $store->{dbparams}{sltcs},
-                 cofaults   => $store->{dbparams}{cofaults},
-                 subprocess => $subprocess
+  my $params = { name        => $name,
+                 dbconn      => $store->{dbparams}{dbconn},
+                 dbname      => $store->{dbparams}{dbname},
+                 dbuser      => $store->{dbparams}{dbuser},
+                 dbpassword  => $store->{dbparams}{dbpassword},
+                 utf8        => $store->{dbparams}{utf8},
+                 useac       => $useac,
+                 model       => $store->{dbparams}{model},
+                 compression => $store->{dbparams}{compression},
+                 sltjm       => $store->{dbparams}{sltjm},
+                 sltcs       => $store->{dbparams}{sltcs},
+                 cofaults    => $store->{dbparams}{cofaults},
+                 subprocess  => $subprocess
                };
 
   if (!defined $store->{dbh}) {
@@ -2567,21 +2557,25 @@ return $doNext;
 sub _DbLog_SBP_connectDB {
   my $paref      = shift;
 
-  my $name       = $paref->{name};
-  my $dbconn     = $paref->{dbconn};
-  my $dbuser     = $paref->{dbuser};
-  my $dbpassword = $paref->{dbpassword};
-  my $utf8       = $paref->{utf8};
-  my $useac      = $paref->{useac};
-  my $model      = $paref->{model};
-  my $sltjm      = $paref->{sltjm};
-  my $sltcs      = $paref->{sltcs};
-  my $cofaults   = $paref->{cofaults}   // 0;              # Anzahl Connectfehler seit letztem erfolgreichen Connect
-  my $subprocess = $paref->{subprocess} // q{};
+  my $name        = $paref->{name};
+  my $dbconn      = $paref->{dbconn};
+  my $dbuser      = $paref->{dbuser};
+  my $dbpassword  = $paref->{dbpassword};
+  my $utf8        = $paref->{utf8};
+  my $useac       = $paref->{useac};
+  my $model       = $paref->{model};
+  my $compression = $paref->{compression};
+  my $sltjm       = $paref->{sltjm};
+  my $sltcs       = $paref->{sltcs};
+  my $cofaults    = $paref->{cofaults}   // 0;              # Anzahl Connectfehler seit letztem erfolgreichen Connect
+  my $subprocess  = $paref->{subprocess} // q{};
 
   my $dbh = q{};
   my $err = q{};
-
+  
+  $dbconn .= ';mysql_compression=1'   if($compression && $model eq 'MYSQL');
+  $dbconn .= ';mariadb_compression=1' if($compression && $model eq 'MARIADB');
+  
   eval { if (!$useac) {
              $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0,
                                                                         RaiseError          => 1,
@@ -2636,39 +2630,59 @@ sub _DbLog_SBP_connectDB {
 
   return $DBI::errstr if($DBI::errstr);
 
-  if($utf8) {
-      if($model eq "MYSQL") {
-          $dbh->{mysql_enable_utf8} = 1;
+  if ($model =~ /MYSQL/xs) {
+      $dbh->{mysql_enable_utf8} = 1 if($utf8);
 
-          ($err, my @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW VARIABLES LIKE 'collation_database'");
+      if ($compression) {
+         _DbLog_SBP_Log3Parent ( { name       => $name,
+                                   level      => 4,
+                                   msg        => 'Communication between Client and Server will be compressed',
+                                   oper       => 'log3parent',
+                                   subprocess => $subprocess
+                                 }
+                               );          
+      }       
+
+      ($err, my @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW VARIABLES LIKE 'collation_database'");
+      return ($err, q{}) if($err);
+
+      my $dbcharset = @se ? $se[1] : 'noresult';
+
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 4,
+                                msg        => "Database Character set is >$dbcharset<",
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
+
+      if ($dbcharset !~ /noresult|ucs2|utf16|utf32/ixs) {                                                                 # Impermissible Client Character Sets -> https://dev.mysql.com/doc/refman/8.0/en/charset-connection.html
+          my $collation = $dbcharset;
+          $dbcharset    = (split '_', $collation, 2)[0];
+
+          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, qq(set names "$dbcharset" collate "$collation"), $subprocess);   # set names utf8 collate utf8_general_ci
           return ($err, q{}) if($err);
-
-          my $dbcharset = @se ? $se[1] : 'noresult';
-
-          _DbLog_SBP_Log3Parent ( { name       => $name,
-                                    level      => 4,
-                                    msg        => qq(Database Character set is >$dbcharset<),
-                                    oper       => 'log3parent',
-                                    subprocess => $subprocess
-                                  }
-                                );
-
-          if ($dbcharset !~ /noresult|ucs2|utf16|utf32/ixs) {                                                                 # Impermissible Client Character Sets -> https://dev.mysql.com/doc/refman/8.0/en/charset-connection.html
-              my $collation = $dbcharset;
-              $dbcharset    = (split '_', $collation, 2)[0];
-
-              ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, qq(set names "$dbcharset" collate "$collation"), $subprocess);   # set names utf8 collate utf8_general_ci
-              return ($err, q{}) if($err);
-          }
       }
-
-      if($model eq "SQLITE") {
-        ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, 'PRAGMA encoding="UTF-8"', $subprocess);
-        return ($err, q{}) if($err);
-      }
+  }
+  
+  if ($model =~ /MARIADB/xs) {
+      if ($compression) {       
+         _DbLog_SBP_Log3Parent ( { name       => $name,
+                                   level      => 4,
+                                   msg        => 'Communication between Client and Server will be compressed',
+                                   oper       => 'log3parent',
+                                   subprocess => $subprocess
+                                 }
+                               );          
+      } 
   }
 
   if ($model eq 'SQLITE') {
+      if ($utf8) {
+          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, 'PRAGMA encoding="UTF-8"', $subprocess);
+          return ($err, q{}) if($err);          
+      }
+      
       my @dos = ("PRAGMA temp_store=MEMORY",
                  "PRAGMA synchronous=FULL",
                  "PRAGMA journal_mode=$sltjm",
@@ -3751,32 +3765,32 @@ return;
 # SubProcess - deleteOldDays-Routine
 #################################################################
 sub _DbLog_SBP_onRun_deleteOldDays {
-  my $paref       = shift;
+  my $paref      = shift;
 
-  my $subprocess  = $paref->{subprocess};
-  my $name        = $paref->{name};
-  my $memc        = $paref->{memc};
-  my $store       = $paref->{store};                                          # Datenspeicher
-  my $bst         = $paref->{bst};
+  my $subprocess = $paref->{subprocess};
+  my $name       = $paref->{name};
+  my $memc       = $paref->{memc};
+  my $store      = $paref->{store};                                          # Datenspeicher
+  my $bst        = $paref->{bst};
 
-  my $dbh         = $store->{dbh};
-  my $history     = $store->{dbparams}{history};
-  my $model       = $store->{dbparams}{model};
-  my $db          = $store->{dbparams}{dbname};
+  my $dbh        = $store->{dbh};
+  my $history    = $store->{dbparams}{history};
+  my $model      = $store->{dbparams}{model};
+  my $db         = $store->{dbparams}{dbname};
 
-  my $operation   = $memc->{operation} // 'unknown';                          # aktuell angeforderte Operation (log, etc.)
-  my $args        = $memc->{arguments};
+  my $operation  = $memc->{operation} // 'unknown';                          # aktuell angeforderte Operation (log, etc.)
+  my $args       = $memc->{arguments};
 
-  my $error       = q{};
-  my $numdel      = 0;
+  my $error      = q{};
+  my $numdel     = 0;
   my $ret;
 
-  my $cmd         = "delete from $history where TIMESTAMP < ";
+  my $cmd        = "delete from $history where TIMESTAMP < ";
 
   if ($model eq 'SQLITE') {
       $cmd .= "datetime('now', '-$args days')";
   }
-  elsif ($model eq 'MYSQL') {
+  elsif ($model =~ /MYSQL|MARIADB/xs) {
       $cmd .= "DATE_SUB(CURDATE(),INTERVAL $args DAY)";
   }
   elsif ($model eq 'POSTGRESQL') {
@@ -4143,7 +4157,7 @@ sub _DbLog_SBP_onRun_reduceLog {
       $ots = "datetime('now', '-$od days')";
       $nts = "datetime('now', '-$nd days')" if($nd);
   }
-  elsif ($model eq 'MYSQL') {
+  elsif ($model =~ /MYSQL|MARIADB/xs) {
       $ots = "DATE_SUB(CURDATE(),INTERVAL $od DAY)";
       $nts = "DATE_SUB(CURDATE(),INTERVAL $nd DAY)" if($nd);
   }
@@ -5019,7 +5033,7 @@ sub __DbLog_SBP_sthInsTable {
   my $err   = q{};
   my $sth;
 
-  eval { if ($usepk && $model eq 'MYSQL') {
+  eval { if ($usepk && $model =~ /MYSQL|MARIADB/xs) {
              $sth = $dbh->prepare("INSERT IGNORE INTO $table (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
          }
          elsif ($usepk && $model eq 'SQLITE') {
@@ -5051,11 +5065,10 @@ sub __DbLog_SBP_sthUpdTable {
   my $model  = $paref->{model};
   my $usepk  = $paref->{usepk};              # nutze PK ?
   my $pk     = $paref->{pk};
-
   my $err    = q{};
   my $sth;
 
-  eval { if ($usepk && $model eq 'MYSQL') {
+  eval { if ($usepk && $model =~ /MYSQL|MARIADB/xs) {
              $sth = $dbh->prepare("REPLACE INTO $table (TIMESTAMP, TYPE, EVENT, VALUE, UNIT, DEVICE, READING) VALUES (?,?,?,?,?,?,?)");
          }
          elsif ($usepk && $model eq 'SQLITE') {
@@ -5237,6 +5250,7 @@ sub DbLog_SBP_sendConnectionData {
   $memc->{dbuser}      = $hash->{dbuser};
   $memc->{dbpassword}  = $attr{"sec$name"}{secret};
   $memc->{model}       = $hash->{MODEL};
+  $memc->{compression} = $hash->{COMPRESSION};
   $memc->{cm}          = AttrVal ($name, 'commitMode', $dblog_cmdef);
   $memc->{verbose}     = AttrVal ($name, 'verbose',    $attr{global}{verbose});
   $memc->{utf8}        = defined ($hash->{UTF8}) ? $hash->{UTF8} : 0;
@@ -5730,28 +5744,39 @@ sub DbLog_readCfg {
 
   #check the database model
   if($hash->{dbconn} =~ m/pg:/i) {
-      $hash->{MODEL}="POSTGRESQL";
+      $hash->{MODEL} = 'POSTGRESQL';
   }
   elsif ($hash->{dbconn} =~ m/mysql:/i) {
-      $hash->{MODEL}="MYSQL";
+      $hash->{MODEL} = 'MYSQL';
+  }
+  elsif ($hash->{dbconn} =~ m/mariadb:/i) {
+      $hash->{MODEL} = 'MARIADB';
   }
   elsif ($hash->{dbconn} =~ m/oracle:/i) {
-      $hash->{MODEL}="ORACLE";
+      $hash->{MODEL} = 'ORACLE';
   }
   elsif ($hash->{dbconn} =~ m/sqlite:/i) {
-      $hash->{MODEL}="SQLITE";
+      $hash->{MODEL} = 'SQLITE';
   }
   else {
-      $hash->{MODEL}="unknown";
+      $hash->{MODEL} = 'unknown';
 
       Log3 $name, 1, "Unknown database model found in configuration file $configfilename.";
       Log3 $name, 1, "Only MySQL/MariaDB, PostgreSQL, Oracle, SQLite are fully supported.";
 
       return "unknown database type";
   }
+  
+  delete $hash->{UTF8};
+  delete $hash->{COMPRESSION};
 
-  if($hash->{MODEL} eq "MYSQL") {
-      $hash->{UTF8} = defined($dbconfig{utf8}) ? $dbconfig{utf8} : 0;
+  if ($hash->{MODEL} =~ /MYSQL/xs) {
+      $hash->{UTF8}       = defined $dbconfig{utf8} ? $dbconfig{utf8} : 0;
+      $hash->{COMPRESSION} = defined $dbconfig{compression} ? $dbconfig{compression} : 0;
+  }
+  
+  if ($hash->{MODEL} =~ /MARIADB/xs) {
+      $hash->{COMPRESSION} = defined $dbconfig{compression} ? $dbconfig{compression} : 0;
   }
 
 return;
@@ -5803,18 +5828,18 @@ sub _DbLog_getNewDBHandle {
 
   my ($useac,$useta) = DbLog_commitMode ($name, AttrVal($name, 'commitMode', $dblog_cmdef));
 
-  my $params = { name       => $name,
-                 dbconn     => $hash->{dbconn},
-                 dbname     => (split /;|=/, $hash->{dbconn})[1],
-                 dbuser     => $hash->{dbuser},
-                 dbpassword => $attr{"sec$name"}{secret},
-                 utf8       => defined($hash->{UTF8}) ? $hash->{UTF8} : 0,
-                 useac      => $useac,
-                 model      => $hash->{MODEL},
-                 sltjm      => AttrVal ($name, 'SQLiteJournalMode', 'WAL'),
-                 sltcs      => AttrVal ($name, 'SQLiteCacheSize',    4000)
+  my $params = { name        => $name,
+                 dbconn      => $hash->{dbconn},
+                 dbname      => (split /;|=/, $hash->{dbconn})[1],
+                 dbuser      => $hash->{dbuser},
+                 dbpassword  => $attr{"sec$name"}{secret},
+                 utf8        => defined $hash->{UTF8} ? $hash->{UTF8} : 0,
+                 compression => defined $hash->{COMPRESSION} ? $hash->{COMPRESSION} : 0,
+                 useac       => $useac,
+                 model       => $hash->{MODEL},
+                 sltjm       => AttrVal ($name, 'SQLiteJournalMode', 'WAL'),
+                 sltcs       => AttrVal ($name, 'SQLiteCacheSize',    4000)
                };
-
 
   my ($error, $dbh) = _DbLog_SBP_connectDB ($params);
 
@@ -6196,7 +6221,7 @@ sub _DbLog_createQuerySql {
             $yearstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$reading' AND DEVICE = '$device' ";
             $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
         }
-        elsif ($dbmodel eq "MYSQL") {
+        elsif ($dbmodel =~ /MYSQL|MARIADB/xs) {
             ### MYSQL Queries for Statistics ###
             ### hour:
             $hourstats  = "SELECT date_format(timestamp, '%Y-%m-%d %H:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
@@ -6484,7 +6509,7 @@ sub _DbLog_plotData {
       $dbh = $hash->{DBHU};
   }
   else {
-      $dbh = _DbLog_getNewDBHandle($hash) || return "Can't connect to database.";
+      $dbh = _DbLog_getNewDBHandle ($hash) || return "Can't connect to database.";
 
       Log3 ($name, 4, "$name - Created new DBHU for PID: $$");
   }
@@ -6506,7 +6531,7 @@ sub _DbLog_plotData {
       $sqlspec{max_value}      = "MAX(VALUE)";
       $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
   }
-  elsif ($hash->{MODEL} eq "MYSQL") {
+  elsif ($hash->{MODEL} =~ /MYSQL|MARIADB/xs) {
       $sqlspec{get_timestamp}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H:%i:%s')";
       $sqlspec{from_timestamp} = "STR_TO_DATE('$from', '%Y-%m-%d %H:%i:%s')";
       $sqlspec{to_timestamp}   = "STR_TO_DATE('$to', '%Y-%m-%d %H:%i:%s')";
@@ -7070,7 +7095,7 @@ sub DbLog_configcheck {
 
   ### verfügbare Treiber
   ########################
-  my @ary = DBI->available_drivers('true');
+  my @ary = DBI->available_drivers ('true');
   my $dlst;
 
   for my $drv (@ary) {
@@ -7085,28 +7110,30 @@ sub DbLog_configcheck {
 
   ### Version check
   ###################
-  my $pv      = sprintf("%vd",$^V);                                              # Perl Version
-  my $dbi     = $DBI::VERSION;                                                   # DBI Version
-  my %drivers = DBI->installed_drivers();
-  my $dv      = "";
+  my $pv          = sprintf("%vd",$^V);                                              # Perl Version
+  my $dbi         = $DBI::VERSION;                                                   # DBI Version
+  my %drivers     = DBI->installed_drivers();
+  my ($dvy, $dva) = ("","");
 
-  if ($dbmodel =~ /MYSQL/xi) {
+  if ($dbmodel =~ /MYSQL|MARIADB/xs) {
       for (keys %drivers) {
-          $dv = $_ if($_ =~ /mysql|mariadb/x);
+          $dvy = $_ if($_ =~ /mysql/ix);
+          $dva = $_ if($_ =~ /mariadb/ix);
       }
   }
 
-  my $dbd = ($dbmodel =~ /POSTGRESQL/xi)   ? "Pg: ".$DBD::Pg::VERSION         :  # DBD Version
-            ($dbmodel =~ /MYSQL/xi && $dv) ? "$dv: ".$DBD::mysql::VERSION     :
-            ($dbmodel =~ /SQLITE/xi)       ? "SQLite: ".$DBD::SQLite::VERSION :
+  my $dbd = ($dbmodel =~ /POSTGRESQL/xs)      ? "Pg: ".$DBD::Pg::VERSION          :   # DBD Version
+            ($dbmodel =~ /MYSQL/xs && $dvy)   ? "$dvy: ".$DBD::mysql::VERSION     :
+            ($dbmodel =~ /MARIADB/xs && $dva) ? "$dva: ".$DBD::MariaDB::VERSION   :
+            ($dbmodel =~ /SQLITE/xs)          ? "SQLite: ".$DBD::SQLite::VERSION  :
             "Undefined";
 
   my $dbdhint = "";
   my $dbdupd  = 0;
 
-  if ($dbmodel =~ /MYSQL/xi && $dv) {                                             # check DBD Mindest- und empfohlene Version
-      my $dbdver = $DBD::mysql::VERSION * 1;                                      # String to Zahl Konversion
-      if($dbdver < 4.032) {
+  if ($dbmodel =~ /MYSQL/xi && $dvy) {                                                # check DBD Mindest- und empfohlene Version
+      my $dbdver = $DBD::mysql::VERSION * 1;                                          # String to Zahl Konversion
+      if ($dbdver < 4.032) {
           $dbdhint = "<b>Caution:</b> Your DBD version doesn't support UTF8. ";
           $dbdupd  = 1;
       }
@@ -7162,13 +7189,14 @@ sub DbLog_configcheck {
   else {
       $rec = $err;
   }
+  
   $check .= "Connection $rec <br>";
   $check .= defined $dbconfig{connection} && defined $dbconfig{user} && defined $dbconfig{password} ?
             "Rating: ".$ok."<br>" :
             "Rating: ".$nok."<br>";
   $check .= "<br>";
 
-  ### Connection und Collation check
+  ### Connection und Character/Collation check
   #######################################################################
   my $st  = [gettimeofday];                                                                        # Startzeit
   my $dbh = _DbLog_getNewDBHandle ($hash) || return "Can't connect to database.";
@@ -7176,54 +7204,88 @@ sub DbLog_configcheck {
 
   Log3 ($name, 4, "$name - Time required to establish the database connection: ".$ct);
 
-  my (@ce,@se);
-  my ($chutf8mod,$chutf8dat);
+  my (@ce, @se, @co);
+  my ($cltconn, $cltdbase, $cltctail, $cltdtail);
+  my $compression = 'unknown';
 
-  if ($dbmodel =~ /MYSQL/) {
+  if ($dbmodel =~ /MYSQL/xs) {
       ($err, @ce) = _DbLog_prepExecQueryOnly ($name, $dbh, qq(SHOW VARIABLES LIKE 'collation_connection'));      # character_set_connection
-      $chutf8mod  = @ce ? uc($ce[1]) : "no result";
+      $cltconn              = @ce ? uc($ce[1]) : "no result";
+      ($cltconn, $cltctail) = split "_", $cltconn, 2;
 
       ($err, @se) = _DbLog_prepExecQueryOnly ($name, $dbh, qq(SHOW VARIABLES LIKE 'collation_database'));        # character_set_database
-      $chutf8dat  = @se ? uc($se[1]) : "no result";
+      $cltdbase              = @se ? uc($se[1]) : "no result";
+      ($cltdbase, $cltdtail) = split "_", $cltdbase, 2;
 
-      if ($chutf8dat =~ /utf8mb4/xsi && $chutf8mod eq $chutf8dat) {
-          $rec = "settings o.k.";
-      }
-      elsif ($chutf8dat !~ /utf8mb4/xsi && $chutf8mod eq $chutf8dat) {
-          $rec  = "The collation of the database should be changed to 'utf8mb4_bin' so that umlauts and all special characters can be stored. <br>";
-          $rec .= "You can easy do that with the DbRep command <b>set &lt;DbRep-Device&gt; migrateCollation utf8mb4_bin</b>. <br>";
+      if ($cltconn eq $cltdbase) {
+          if ($cltdbase =~ /utf8mb4/xsi) {
+              $rec = "settings o.k.";
+          }
+          elsif ($cltdbase !~ /utf8mb4/xsi) {
+              $rec  = "The Character Set of the database should be changed to 'utf8mb4' so that umlauts and all special characters can be stored. <br>";
+              $rec .= "You can easy do that with the DbRep command <b>set &lt;DbRep-Device&gt; migrateCollation utf8mb4_bin</b>. <br>";
+              $rec .= "Then customize the use of UTF8 connections by setting the UTF8 parameter in the file '$hash->{CONFIGURATION}'. <br>";
+          }
       }
       else {
-          $rec = "Both encodings should be identical. You can adjust the usage of UTF8 connection by setting the UTF8 parameter in file '$hash->{CONFIGURATION}' to the right value. ";
+          $rec = "Both encodings should be identical.";
       }
 
-      if ($chutf8mod !~ /utf8/xsi) {
+      if ($cltconn !~ /utf8/xsi) {
           $dbdhint = "";
       }
       else {
           $dbdhint .= " If you want use UTF8 database option, you must update DBD (Database driver) to at least version 4.032. " if($dbdupd);
       }
-
+      
+      ($err, @co)  = _DbLog_prepExecQueryOnly ($name, $dbh, qq(show global status like 'Compression'));          # Compression Settings
+      $compression = @co ? uc($co[1]) : "no result";
   }
+  elsif ($dbmodel =~ /MARIADB/xs) {
+      ($err, @ce) = _DbLog_prepExecQueryOnly ($name, $dbh, qq(SHOW VARIABLES LIKE 'collation_connection'));      # character_set_connection
+      $cltconn              = @ce ? uc($ce[1]) : "no result";
+      ($cltconn, $cltctail) = split "_", $cltconn, 2;
 
-  if ($dbmodel =~ /POSTGRESQL/) {
-      ($err, @ce) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW CLIENT_ENCODING");
-      $chutf8mod  = @ce ? uc($ce[0]) : "no result";
+      ($err, @se) = _DbLog_prepExecQueryOnly ($name, $dbh, qq(SHOW VARIABLES LIKE 'collation_database'));        # character_set_database
+      $cltdbase              = @se ? uc($se[1]) : "no result";
+      ($cltdbase, $cltdtail) = split "_", $cltdbase, 2;
 
-      ($err, @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "select character_set_name from information_schema.character_sets");
-      $chutf8dat  = @se ? uc($se[0]) : "no result";
-
-      if($chutf8mod eq $chutf8dat) {
+      if ($cltconn eq $cltdbase) {
           $rec = "settings o.k.";
       }
       else {
-          $rec = "This is only an information. PostgreSQL supports automatic character set conversion between server and client for certain character set combinations. The conversion information is stored in the pg_conversion system catalog. PostgreSQL comes with some predefined conversions.";
+          $rec  = "This is only an information. <br>";
+          $rec .= "Using a non-UTF-8 charset for a column, table or database is fine because MariaDB or MySQL server automatically transforms the storage charset to the charset used by the network protocol (utf8mb4). <br>";
+          $rec .= "Note that when DBD::MariaDB is connecting to the MariaDB or MySQL server it calls SQL command SET character_set_server = 'utf8mb4' to ensure that the default charset for new databases would be UTF-8. <br>";
+          $rec .= "In the case MySQL server does not support MySQL's utf8mb4 charset for a network protocol then DBD::MariaDB would try to use MySQL's utf8 charset which is a subset of UTF-8 encoding restricted to the 3 byte UTF-8 sequences. <br>";
+          $rec .= "Support for MySQL's utf8mb4 charset was introduced in MySQL server version 5.5.3.";
+      }
+      
+      ($err, @co)  = _DbLog_prepExecQueryOnly ($name, $dbh, qq(show global status like 'Compression'));          # Compression Settings
+      $compression = @co ? uc($co[1]) : "no result";
+
+  }
+  elsif ($dbmodel =~ /POSTGRESQL/) {
+      ($err, @ce) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW CLIENT_ENCODING");
+      $cltconn              = @ce ? uc($ce[0]) : "no result";
+      ($cltconn, $cltctail) = split "_", $cltconn, 2;
+
+      ($err, @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "select character_set_name from information_schema.character_sets");
+      $cltdbase              = @se ? uc($se[0]) : "no result";
+      ($cltdbase, $cltdtail) = split "_", $cltdbase, 2;
+
+      if ($cltconn eq $cltdbase) {
+          $rec = "settings o.k.";
+      }
+      else {
+          $rec  = "This is only an information. PostgreSQL supports automatic character set conversion between server and client for certain character set combinations. <br>";
+          $rec .= "The conversion information is stored in the pg_conversion system catalog. PostgreSQL comes with some predefined conversions. <br>";
       }
   }
-
-  if ($dbmodel =~ /SQLITE/) {
+  elsif ($dbmodel =~ /SQLITE/) {
       ($err, @ce) = _DbLog_prepExecQueryOnly ($name, $dbh, "PRAGMA encoding");
-      $chutf8dat  = @ce ? uc($ce[0]) : "no result";
+      $cltdbase              = @ce ? uc($ce[0]) : "no result";
+      ($cltdbase, $cltdtail) = split "_", $cltdbase, 2;
 
       ($err, @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "PRAGMA table_info($history)");
       $rec        = "This is only an information about text encoding used by the main database.";
@@ -7234,6 +7296,10 @@ sub DbLog_configcheck {
   if (!$err && @ce && @se) {
       $check .= "Connection to database $dbname successfully done. <br>";
       $check .= "The time required to establish the connection was $ct seconds. <br>";
+      
+      if ($dbmodel =~ /MYSQL|MARIADB/xs) {
+          $check .= "Communication Compression between Client and Server: ".lc $compression." <br>";
+      }
 
       if ($ct > 5.0) {
           $check .= "Rating: ".$nok."<br>";
@@ -7261,11 +7327,17 @@ sub DbLog_configcheck {
       return $check;
   }
 
-  $check .= "<u><b>Result of collation check</u></b><br><br>";
-  $check .= "Collation used by Client (connection): $chutf8mod <br>" if($dbmodel !~ /SQLITE/);
-  $check .= "Collation used by DB $dbname: $chutf8dat <br>";
-  $check .= $dbmodel =~ /SQLITE/       ? "Rating: ".$ok."<br>" :
-            $rec =~ /settings\so.k./xs ? "Rating: ".$ok."<br>" :
+  $check .= "<u><b>Result of Character Sets and Collation check</u></b><br><br>";
+  if ($dbmodel !~ /SQLITE/) {
+      $check .= "Character Set used by Client (connection): $cltconn <br>";
+      $check .= "Collation used by Client (connection): ".$cltconn."_".$cltctail." <br>";
+  }
+  
+  $check .= "Character Set used by DB $dbname: $cltdbase <br>";
+  $check .= "Collation used by DB $dbname: ".$cltdbase."_".$cltdtail." <br>";
+
+  $check .= $dbmodel =~ /SQLITE|MARIADB/ ? "Rating: ".$ok."<br>" :
+            $rec =~ /settings\so.k./xs   ? "Rating: ".$ok."<br>" :
             "Rating: ".$warn."<br>";
   $check .= "<b>Recommendation:</b> $rec $dbdhint <br><br>";
 
@@ -7372,7 +7444,7 @@ sub DbLog_configcheck {
   my ($cdat_dev,$cdat_typ,$cdat_evt,$cdat_rdg,$cdat_val,$cdat_unt);
   my ($cmod_dev,$cmod_typ,$cmod_evt,$cmod_rdg,$cmod_val,$cmod_unt);
 
-  if ($dbmodel =~ /MYSQL/) {
+  if ($dbmodel =~ /MYSQL|MARIADB/xs) {
       ($err, @sr_dev) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $history where FIELD='DEVICE'");
       ($err, @sr_typ) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $history where FIELD='TYPE'");
       ($err, @sr_evt) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $history where FIELD='EVENT'");
@@ -7473,7 +7545,7 @@ sub DbLog_configcheck {
 
   ### Check Spaltenbreite current
   #######################################################################
-  if ($dbmodel =~ /MYSQL/) {
+ if ($dbmodel =~ /MYSQL|MARIADB/xs) {
       ($err, @sr_dev) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $current where FIELD='DEVICE'");
       ($err, @sr_typ) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $current where FIELD='TYPE'");
       ($err, @sr_evt) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $current where FIELD='EVENT'");
@@ -7578,7 +7650,7 @@ sub DbLog_configcheck {
   my ($idef,$idef_dev,$idef_rdg,$idef_tsp);
   $check .= "<u><b>Result of check 'Search_Idx' availability</u></b><br><br>";
 
-  if ($dbmodel =~ /MYSQL/) {
+  if ($dbmodel =~ /MYSQL|MARIADB/xs) {
       ($err, @six) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW INDEX FROM $history where Key_name='Search_Idx'");
 
       if (!@six) {
@@ -7700,7 +7772,7 @@ sub DbLog_configcheck {
   }
 
   if ($isused) {
-      if ($dbmodel =~ /MYSQL/) {
+      if ($dbmodel =~ /MYSQL|MARIADB/xs) {
           ($err, @dix) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW INDEX FROM $history where Key_name='Report_Idx'");
 
           if (!@dix) {
@@ -8745,7 +8817,8 @@ return;
     <table>
     <colgroup> <col width=5%> <col width=95%> </colgroup>
       <tr><td> <b>DBI</b>         </td><td>: <code> sudo apt-get install libdbi-perl </code> </td></tr>
-      <tr><td> <b>MySQL</b>       </td><td>: <code> sudo apt-get install [mysql-server] mysql-client libdbd-mysql libdbd-mysql-perl </code> (mysql-server only if you use a local MySQL-server installation) </td></tr>
+      <tr><td> <b>MySQL</b>       </td><td>: <code> sudo apt-get install [mysql-server] mysql-client libdbd-mysql libdbd-mysql-perl </code> (mysql-server only for local MySQL Server installation) </td></tr>
+      <tr><td> <b>MariaDB</b>     </td><td>: <code> sudo apt-get install [mariadb-server] mariadb-client libdbd-mariadb-perl </code> (mariadb-server only for local MariaDB Server installation)    </td></tr>
       <tr><td> <b>SQLite</b>      </td><td>: <code> sudo apt-get install sqlite3 libdbi-perl libdbd-sqlite3-perl </code> </td></tr>
       <tr><td> <b>PostgreSQL</b>  </td><td>: <code> sudo apt-get install libdbd-pg-perl </code> </td></tr>
     </table>
@@ -8769,7 +8842,7 @@ return;
   (<b>Caution:</b> The local FHEM-Installation subdirectory ./contrib/dblog doesn't contain the freshest scripts!)
   <br><br>
 
-  The default installation of the MySQL/MariaDB database provides for the use of the <b>utf8_bin</b> collation.
+  The older standard installation of the MySQL/MariaDB database provided for the use of the <b>utf8_bin</b> collation.
   With this setting, characters up to 3 bytes long can be stored, which is generally sufficient.
   However, if characters with a length of 4 bytes (e.g. emojis) are to be stored in the database, the <b>utf8mb4</b>
   character set must be used. <br>
@@ -8780,8 +8853,7 @@ return;
   </ul>
   <br>
 
-  In the configuration file (see below) utf8 support must be enabled with the key <b>utf8 => 1</b> if utf8 is to be
-  used. <br><br>
+  Note the key <b>utf8</b> if the MySQL database driver is used (MODEL = MYSQL). <br><br>
 
   The database contains two tables: <code>current</code> and <code>history</code>. <br>
   The latter contains all events whereas the former only contains the last event for any given reading and device.
@@ -8818,8 +8890,9 @@ return;
     <ul>
     <table>
     <colgroup> <col width=5%> <col width=95%> </colgroup>
-      <tr><td> <b>MySQL</b>       </td><td>: <code> CREATE INDEX Search_Idx ON `fhem`.`history` (DEVICE, READING, TIMESTAMP); </code> </td></tr>
-      <tr><td> <b>SQLite</b>      </td><td>: <code> CREATE INDEX Search_Idx ON `history` (DEVICE, READING, TIMESTAMP); </code> </td></tr>
+      <tr><td> <b>MySQL</b>       </td><td>: <code> CREATE INDEX Search_Idx ON `fhem`.`history` (DEVICE, READING, TIMESTAMP); </code>        </td></tr>
+      <tr><td> <b>MariaDB</b>     </td><td>: <code> CREATE INDEX Search_Idx ON `fhem`.`history` (DEVICE, READING, TIMESTAMP); </code>        </td></tr>
+      <tr><td> <b>SQLite</b>      </td><td>: <code> CREATE INDEX Search_Idx ON `history` (DEVICE, READING, TIMESTAMP); </code>               </td></tr>
       <tr><td> <b>PostgreSQL</b>  </td><td>: <code> CREATE INDEX "Search_Idx" ON history USING btree (device, reading, "timestamp"); </code> </td></tr>
     </table>
     </ul>
@@ -8847,10 +8920,25 @@ return;
     #    # connection => "mysql:database=fhem;mysql_socket=&lt;/patch/socket-file&gt;",
     #    user => "fhemuser",
     #    password => "fhempassword",
-    #    # optional enable(1) / disable(0) UTF-8 support
+    #    # optional enable UTF-8 support
     #    # (full UTF-8 support exists from DBD::mysql version 4.032, but installing
     #    # 4.042 is highly suggested)
-    #    utf8 => 1
+    #    utf8 => 1,
+    #    # optional enable communication compression between client and server
+    #    compression => 1
+    #);
+    ####################################################################################
+    #
+    ## for MariaDB
+    ####################################################################################
+    #%dbconfig= (
+    #    connection => "MariaDB:database=fhem;host=&lt;database host&gt;;port=3306",
+    #    # if want communication over socket-file instead of TCP/IP transport, use:
+    #    # connection => "MariaDB:database=fhem;mariadb_socket=&lt;/patch/socket-file&gt;",
+    #    user => "fhemuser",
+    #    password => "fhempassword",
+    #    # optional enable communication compression between client and server
+    #    compression => 1
     #);
     ####################################################################################
     #
@@ -9095,15 +9183,6 @@ return;
       <b>Note</b> <br>
       During the runtime of the command, data to be logged are temporarily stored in the memory cache and written to the
       database written to the database after the command is finished.
-    </ul>
-    </li>
-    <br>
-
-    <li>
-    <a id="DbLog-set-countNbl"></a>
-    <b>set &lt;name&gt; countNbl </b> <br><br>
-      <ul>
-      The function is identical to "set &lt;name&gt; count" and will be removed soon.
     </ul>
     </li>
     <br>
@@ -10616,7 +10695,8 @@ attr SMA_Energymeter DbLogValueFn
     <table>
     <colgroup> <col width=5%> <col width=95%> </colgroup>
       <tr><td> <b>DBI</b>         </td><td>: <code> sudo apt-get install libdbi-perl </code> </td></tr>
-      <tr><td> <b>MySQL</b>       </td><td>: <code> sudo apt-get install [mysql-server] mysql-client libdbd-mysql libdbd-mysql-perl </code> (mysql-server nur bei lokaler MySQL-Server-Installation) </td></tr>
+      <tr><td> <b>MySQL</b>       </td><td>: <code> sudo apt-get install [mysql-server] mysql-client libdbd-mysql libdbd-mysql-perl </code> (mysql-server nur bei lokaler MySQL Server Installation) </td></tr>
+      <tr><td> <b>MariaDB</b>     </td><td>: <code> sudo apt-get install [mariadb-server] mariadb-client libdbd-mariadb-perl </code> (mariadb-server nur bei lokaler MariaDB Server Installation)    </td></tr>
       <tr><td> <b>SQLite</b>      </td><td>: <code> sudo apt-get install sqlite3 libdbi-perl libdbd-sqlite3-perl </code> </td></tr>
       <tr><td> <b>PostgreSQL</b>  </td><td>: <code> sudo apt-get install libdbd-pg-perl </code> </td></tr>
     </table>
@@ -10641,7 +10721,7 @@ attr SMA_Energymeter DbLogValueFn
   (<b>Achtung:</b> Die lokale FHEM-Installation enthält im Unterverzeichnis ./contrib/dblog nicht die aktuellsten
   Scripte!) <br><br>
 
-  Die Standardinstallation der MySQL/MariaDB Datenbank sieht die Nutzung der Collation <b>utf8_bin</b> vor.
+  Die ältere Standardinstallation der MySQL/MariaDB Datenbank sah die Nutzung der Collation <b>utf8_bin</b> vor.
   Mit dieser Einstellung können Zeichen bis 3 Byte Länge gespeichert werden was im Allgemeinen ausreichend ist.
   Sollen jedoch Zeichen mit 4 Byte Länge (z.B. Emojis) in der Datenbank gespeichert werden, ist der Zeichensatz
   <b>utf8mb4</b> zu verwenden. <br>
@@ -10652,8 +10732,7 @@ attr SMA_Energymeter DbLogValueFn
   </ul>
   <br>
 
-  In der Konfigurationsdatei (siehe unten) ist die utf8-Unterstützung mit dem Schlüssel <b>utf8 => 1</b> einzuschalten
-  sofern utf8 genutzt werden soll. <br><br>
+  Beachten sie den Schlüssel <b>utf8</b> wenn der MySQL Datenbanktreiber benutzt wird (MODEL = MYSQL). <br><br>
 
   Die Datenbank beinhaltet 2 Tabellen: <code>current</code> und <code>history</code>. <br>
   Die Tabelle <code>current</code> enthält den letzten Stand pro Device und Reading. <br>
@@ -10688,8 +10767,9 @@ attr SMA_Energymeter DbLogValueFn
     <ul>
     <table>
     <colgroup> <col width=5%> <col width=95%> </colgroup>
-      <tr><td> <b>MySQL</b>       </td><td>: <code> CREATE INDEX Search_Idx ON `fhem`.`history` (DEVICE, READING, TIMESTAMP); </code> </td></tr>
-      <tr><td> <b>SQLite</b>      </td><td>: <code> CREATE INDEX Search_Idx ON `history` (DEVICE, READING, TIMESTAMP); </code> </td></tr>
+      <tr><td> <b>MySQL</b>       </td><td>: <code> CREATE INDEX Search_Idx ON `fhem`.`history` (DEVICE, READING, TIMESTAMP); </code>        </td></tr>
+      <tr><td> <b>MariaDB</b>     </td><td>: <code> CREATE INDEX Search_Idx ON `fhem`.`history` (DEVICE, READING, TIMESTAMP); </code>        </td></tr>
+      <tr><td> <b>SQLite</b>      </td><td>: <code> CREATE INDEX Search_Idx ON `history` (DEVICE, READING, TIMESTAMP); </code>               </td></tr>
       <tr><td> <b>PostgreSQL</b>  </td><td>: <code> CREATE INDEX "Search_Idx" ON history USING btree (device, reading, "timestamp"); </code> </td></tr>
     </table>
     </ul>
@@ -10721,10 +10801,24 @@ attr SMA_Energymeter DbLogValueFn
     #    # connection => "mysql:database=fhem;mysql_socket=&lt;/patch/socket-file&gt;",
     #    user => "fhemuser",
     #    password => "fhempassword",
-    #    # optional enable(1) / disable(0) UTF-8 support
-    #    # (full UTF-8 support exists from DBD::mysql version 4.032, but installing
-    #    # 4.042 is highly suggested)
-    #    utf8 => 1
+    #    # optional enable UTF-8 support
+    #    # (full UTF-8 support exists from DBD::mysql version 4.032, but installing version 4.042 is highly suggested)
+    #    utf8 => 1,
+    #    # optional enable communication compression between client and server
+    #    compression => 1    
+    #);
+    ####################################################################################
+    #
+    ## for MariaDB
+    ####################################################################################
+    #%dbconfig= (
+    #    connection => "MariaDB:database=fhem;host=&lt;database host&gt;;port=3306",
+    #    # if want communication over socket-file instead of TCP/IP transport, use:
+    #    # connection => "MariaDB:database=fhem;mariadb_socket=&lt;/patch/socket-file&gt;",
+    #    user => "fhemuser",
+    #    password => "fhempassword",
+    #    # optional enable communication compression between client and server
+    #    compression => 1 
     #);
     ####################################################################################
     #
@@ -10984,15 +11078,6 @@ attr SMA_Energymeter DbLogValueFn
       <b>Hinweis</b> <br>
       Während der Laufzeit des Befehls werden zu loggende Daten temporär im Memory Cache gespeichert und nach Beendigung
       des Befehls in die Datenbank geschrieben.
-    </ul>
-    </li>
-    <br>
-
-    <li>
-    <a id="DbLog-set-countNbl"></a>
-    <b>set &lt;name&gt; countNbl </b> <br><br>
-      <ul>
-      Die Funktion ist identisch zu "set &lt;name&gt; count" und wird demnächst entfernt.
     </ul>
     </li>
     <br>
@@ -12561,6 +12646,7 @@ attr SMA_Energymeter DbLogValueFn
         "Data::Dumper": "0",
         "DBD::Pg": "0",
         "DBD::mysql": "<5",
+        "DBD::MariaDB": "0",
         "DBD::SQLite": "0"
       }
     }
