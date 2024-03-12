@@ -8597,26 +8597,33 @@ sub DbLog_fhemwebFn {
 
   my $name = "SVG_${d}_$newIdx";
   
-  my $img    = FW_makeImage('time_graph@grey');
-  my $title  = "Create SVG plot from DbLog";
-  
-  if (AttrVal ('global', 'language', 'EN') eq 'DE') {
-      $title = "SVG-Diagramm aus DbLog erstellen";
-  }
-  my $dstyle = qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'};     # TD-Style
+  my $dstyle   = qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'};     # TD-Style
+  my $svgtitle = "Create SVG plot from DbLog";
+  my $svgimg   = FW_makeImage('time_graph@grey');
       
-  my $class = qq{<table width='100%'>};
+  my $forimg   = FW_makeImage('time_note@grey');
+  my $fthicon  = "<a href='https://forum.fhem.de/index.php?board=20.0' target='_blank'>$forimg</a>";
+  my $fthtitle = "Open DbLog Forum";
+
+  if (AttrVal ('global', 'language', 'EN') eq 'DE') {
+      $svgtitle = "SVG-Diagramm aus DbLog erstellen";
+      $fthtitle = "DbLog Forum öffnen";
+  }  
+      
+  my $class = qq{<table width='10%'>};
   $class   .= qq{<tr>};
-  $class   .= qq{<td align="left" title="$title" $dstyle> $img </td>};
+  $class   .= qq{<td align="left" title="$svgtitle" $dstyle> $svgimg </td>};
   $class   .= qq{</tr>};
-  $class   .= qq{</table>};
+  $class   .= qq{</table>}; 
   
+  $ret  = qq{<table width='10%'>};
+  $ret .= qq{<tr>};
   #               $link  , $txt , $td , $class , $doRet , $nonl
   $ret .= FW_pH ("cmd=define $name SVG $d:templateDB:HISTORY;set $name copyGplotFile&detail=$name",
-                 "<div class=\"dval\">$class</div>", 
-                 0, 
-                 "dval", 
-                 1);
+                 "<div class=\"dval\">$class</div>", 1, "dval", 1);
+  $ret .= qq{<td align="left" title="$fthtitle" $dstyle> $fthicon </td>};
+  $ret .= qq{</tr>};
+  $ret .= qq{</table>}; 
   
 return $ret;
 }
