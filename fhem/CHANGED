@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bufgix:  72_FRITZBOX: Fehlerbehandlung verbessert
+ - change:  72_FRITZBOX: commandRef ergänzt
  - change:  76_SolarForecast: minor code changes
  - feature: 93_DbRep: prepare client - server communication compression support
  - feature: 76_SMAInverter: add GridConection reading (SI only)
