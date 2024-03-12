@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.16.7" => "12.03.2024  prevent duplicates in NOTIFYDEV, Forum: https://forum.fhem.de/index.php?msg=1306875 ",
   "1.16.6" => "11.03.2024  plantConfigCheck: join forecastProperties with ',' ",
   "1.16.5" => "04.03.2024  setPVhistory: code changes, plantConfigCheck: check forecastRefresh ".
                            "check age of weather data according to used MOSMIX variant ",
@@ -14929,8 +14930,8 @@ sub createAssociatedWith {
   RemoveInternalTimer($hash, "FHEM::SolarForecast::createAssociatedWith");
 
   if ($init_done) {
-      my (@cd,@nd);
-      my ($afc,$ara,$ain,$ame,$aba,$h);
+      my (@cd, @nd);
+      my ($afc, $ara, $ain, $ame, $aba, $h);
 
       my $fcdev1 = AttrVal ($name, 'ctrlWeatherDev1', '');                   # Weather forecast Device 1
       ($afc,$h)  = parseParams ($fcdev1);
@@ -14963,12 +14964,9 @@ sub createAssociatedWith {
       for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {     # Consumer Devices
           my $consumer = AttrVal($name, "consumer${c}", "");
           my ($ac,$hc) = parseParams ($consumer);
-          my $codev    = $ac->[0] // '';
-
-          push @cd, $codev if($codev);
-
-          my $dswitch = $hc->{switchdev} // '';                              # alternatives Schaltdevice
-
+          my $codev    = $ac->[0]         // '';
+          my $dswitch  = $hc->{switchdev} // '';                             # alternatives Schaltdevice
+          push @cd, $codev   if($codev);
           push @cd, $dswitch if($dswitch);
       }
 
@@ -14988,9 +14986,18 @@ sub createAssociatedWith {
           next if($e ~~ @ndn);
           push @ndn, $e;
       }
-
-      $hash->{NOTIFYDEV} = join ",", @cd if(@cd);
-      readingsSingleUpdate ($hash, ".associatedWith", join(" ",@ndn), 0)  if(@ndn);
+      
+      my %seen;
+      
+      if (@cd) {   
+          $hash->{NOTIFYDEV} = join ",", grep { !$seen{$_ }++ } @cd;         
+      }
+      
+      if (@nd) {
+          undef %seen;
+          my $asw = join " ", grep { !$seen{$_ }++ } @nd; 
+          readingsSingleUpdate ($hash, ".associatedWith", $asw, 0);      
+      }
   }
   else {
       InternalTimer(gettimeofday()+3, "FHEM::SolarForecast::createAssociatedWith", $hash, 0);
