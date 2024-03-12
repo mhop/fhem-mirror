@@ -8596,9 +8596,28 @@ sub DbLog_fhemwebFn {
   }
 
   my $name = "SVG_${d}_$newIdx";
-  $ret    .= FW_pH("cmd=define $name SVG $d:templateDB:HISTORY;".
-                   "set $name copyGplotFile&detail=$name",
-                   "<div class=\"dval\">Create SVG plot from DbLog</div>", 0, "dval", 1);
+  
+  my $img    = FW_makeImage('time_graph@grey');
+  my $title  = "Create SVG plot from DbLog";
+  
+  if (AttrVal ('global', 'language', 'EN') eq 'DE') {
+      $title = "SVG-Diagramm aus DbLog erstellen";
+  }
+  my $dstyle = qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'};     # TD-Style
+      
+  my $class = qq{<table width='100%'>};
+  $class   .= qq{<tr>};
+  $class   .= qq{<td align="left" title="$title" $dstyle> $img </td>};
+  $class   .= qq{</tr>};
+  $class   .= qq{</table>};
+  
+  #               $link  , $txt , $td , $class , $doRet , $nonl
+  $ret .= FW_pH ("cmd=define $name SVG $d:templateDB:HISTORY;set $name copyGplotFile&detail=$name",
+                 "<div class=\"dval\">$class</div>", 
+                 0, 
+                 "dval", 
+                 1);
+  
 return $ret;
 }
 
