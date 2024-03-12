@@ -49,7 +49,34 @@ sub testStep11 {     # check results
     LogStep "check result for combined inputs with doepke fix sumulation";
     is(FhemTestUtils_gotEvent(qr/Master:Lampe:\s0/xms), 1, "Retrieve value 0 from local slave");
     CheckAndReset();
+
     return;
 }
+
+
+# check doepke fix with real doepke response
+
+sub testStep20 {
+    fhem 'attr MS verbose 5';
+    fhem 'set PWP reread';
+    fhem 'attr PWP dev-d-brokenFC2 doepke';
+    return;
+}
+
+
+sub testStep21 {
+    LogStep('simulate broken fc2 response');
+    SimRead('MS', '050202000189b8');      # response type broken FC2 doepke
+    return;
+}
+
+
+sub testStep22 {
+    LogStep('verify brokenfc2 reception');
+    is(FhemTestUtils_gotEvent('PWP:in: 1'), 1, "Doepke response simulated");
+    return;
+}
+
+
 
 1;

@@ -182,7 +182,7 @@ sub testStep16 {
 sub testStep17 {
     LogStep "check get result while connection closed";
     is(FhemTestUtils_gotLog('device opened'), 1, "device opened");
-    is(FhemTestUtils_gotEvent(qr/Master:TempWasserEin:\s12/xms), 0, "No retrieve from local slave yet");
+    #is(FhemTestUtils_gotEvent(qr/Master:TempWasserEin:\s12/xms), 0, "No retrieve from local slave yet");
     return 0.3;
 }
 

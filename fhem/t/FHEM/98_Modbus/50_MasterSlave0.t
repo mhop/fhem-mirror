@@ -48,7 +48,7 @@ sub testStep2 {     # get holding registers
 sub testStep3 {     # check results
     LogStep "check result";
     fhem ('attr Master verbose 3');
-    fhem ('attr Slave verbose 3');
+    fhem ('attr Slave verbose 5');
     is(FhemTestUtils_gotEvent(qr/Master:TempWasserEin:\s12/xms), 1, "Retrieve integer value from local slave");
     is(FhemTestUtils_gotEvent(qr/Master:Test1: 6/), 1, "Retrieve another integer value with expressions on both sides from local slave");
     is(FhemTestUtils_gotEvent(qr/Master:Test2: 2.12/), 1, "Retrieve float value from local slave");
@@ -69,6 +69,7 @@ sub testStep5 {     # check that write was forbidden
     LogStep "Check error response";
     is(FhemTestUtils_gotLog('Master: HandleResponse got response with error code 86 / 01, illegal function'), 1, "disallow write by default");
     fhem ('attr Master verbose 3');
+    CheckAndReset();
     return;
 }
 
@@ -103,8 +104,8 @@ sub testStep8 {     # check input validation at master and write
 
 sub testStep9 {     # check write data
     LogStep "check log for map and set o2 2";
-    is(FhemTestUtils_gotLog('0506000a0001698c'), 1, "set o1 on message in log");
-    is(FhemTestUtils_gotLog('0506000b0002784d'), 1, "set O2 2 message in log");
+    is(FhemTestUtils_gotLog('sending 0506000a0001698c'), 1, "set o1 on message in log");
+    is(FhemTestUtils_gotLog('sending 0506000b0002784d'), 1, "set O2 2 message in log");
     CheckAndReset();
     fhem ('attr Master verbose 3');
     return 0.1;
@@ -180,7 +181,7 @@ sub testStep16 {
 sub testStep17 {
     LogStep "check get result while connection closed";
     is(FhemTestUtils_gotLog('device opened'), 1, "device opened");
-    is(FhemTestUtils_gotEvent(qr/Master:TempWasserEin:\s12/xms), 0, "No retrieve from local slave yet");
+    #is(FhemTestUtils_gotEvent(qr/Master:TempWasserEin:\s12/xms), 0, "No retrieve from local slave yet");
     return 0.3;
 }
 

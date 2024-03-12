@@ -1,5 +1,6 @@
 ##############################################
 # test update timer 
+# perl /opt/fhem/fhem.pl -t /opt/fhem/t/...
 ##############################################
 package main;
 use strict;

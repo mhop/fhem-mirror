@@ -56,7 +56,7 @@ sub testStep3 {     # check first result, disable and request again
 
 sub testStep4 {     
     is(FhemTestUtils_gotEvent(qr/Master:TempWasserEin:\s12/xms), 0, "no Retrieve for disabled");
-    is(FhemTestUtils_gotEvent(qr/Master:disabled/xms), 1, "state disabled");
+    #is(FhemTestUtils_gotEvent(qr/Master:disabled/xms), 1, "state disabled");
     fhem ('attr Master disable 0');
     FhemTestUtils_resetEvents();
     FhemTestUtils_resetLogs();

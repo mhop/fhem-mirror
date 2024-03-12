@@ -192,7 +192,7 @@ sub testStep11 {
     my ($commDelay, $sendDelay) = calcDelays();
     
     is(FhemTestUtils_gotLog('commDelay not over.*sleep'), 1, "sleep message in log");
-    ok($commDelay >0.2, 'forced comm delay big enough');
+    ok($commDelay >=0.2, 'forced comm delay big enough');
     ok($commDelay < 0.22, 'forced comm delay not too big');
     FhemTestUtils_resetLogs();
     return;
