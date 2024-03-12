@@ -21,9 +21,7 @@
 #   First version: 25.12.2013
 #
 #   Todo:       
-#               check encodings in attr (find_encoding, none as special case)
-#               allow set inerval 0
-#               allow multiple values for set -> $val1, $val2, ...
+#               set clearSid?
 #               setXYHintExpression zum dynamischen Ändern / Erweitern der Hints
 #               extractAllReadings mit Filter / Prefix
 #               definierbarer prefix oder Suffix für Readingsnamen wenn sie von unterschiedlichen gets über readingXY erzeugt werden
@@ -36,8 +34,6 @@
 #
 #               replacement scope attribute?
 #               make extracting the sid after a get / update an attribute / option?
-#               multi page log extraction?
-#               Profiling von Modbus übernehmen?
 #
 
 # verwendung von defptr:
@@ -143,7 +139,7 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '4.1.16 - 4.4.2023';
+my $Module_Version = '4.2.0 - 11.8.2023';
 
 my $AttrList = join (' ', 
       'reading[0-9]+(-[0-9]+)?Name', 
@@ -155,6 +151,7 @@ my $AttrList = join (' ',
       '(reading|get|set)[0-9]*(-[0-9]+)?OMap:textField-long',
       '(get|set)[0-9]*(-[0-9]+)?IExpr:textField-long',
       '(get|set)[0-9]*(-[0-9]+)?IMap:textField-long', 
+      '(get|set)[0-9]*(-[0-9]+)?ValueSeparator',                    # to split set value before replacing in FillHttpUtilsHash
       '(reading|get|set)[0-9]*(-[0-9]+)?Format', 
       '(reading|get|set)[0-9]*(-[0-9]+)?Decode', 
       '(reading|get|set)[0-9]*(-[0-9]+)?Encode', 
@@ -233,7 +230,7 @@ my $AttrList = join (' ',
       'idJSON',
       'idXPath',
       'idXPath-Strict',
-      '(get|set|sid)[0-9]*IDRegex',           # old
+      '(get|set|sid)[0-9]*IDRegex',             # old
       '(get|set|sid)[0-9]*IdRegex',
       '(get|set|sid)[0-9]*IdJSON',
       '(get|set|sid)[0-9]*IdXPath',
@@ -243,7 +240,7 @@ my $AttrList = join (' ',
       'sid[0-9]*Header.*',
       'sid[0-9]*Data.*:textField-long',
       'sid[0-9]*IgnoreRedirects:0,1',      
-      'sid[0-9]*ParseResponse:0,1',           # parse response as if it was a get
+      'sid[0-9]*ParseResponse:0,1',             # parse response as if it was a get
       'clearSIdBeforeAuth:0,1',
       'authRetries',
       
@@ -251,7 +248,7 @@ my $AttrList = join (' ',
       'errLogLevel',
       
       'replacement[0-9]+Regex',
-      'replacement[0-9]+Mode:reading,internal,text,expression,key',   # defaults to text
+      'replacement[0-9]*Mode:reading,internal,text,expression,key',   # defaults to text
       'replacement[0-9]+Value:textField-long',                        # device:reading, device:internal, text, replacement expression
       '(get|set)[0-9]*Replacement[0-9]+Value:textField-long',         # can overwrite a global replacement value - todo: auch für auth?
       
@@ -260,17 +257,18 @@ my $AttrList = join (' ',
       'disabledForIntervals',
       'enableControlSet:0,1',
       'enableCookies:0,1',
+      'enableTokens:0,1',                       # new basic / experimental support for authentication tokens
       'useSetExtensions:1,0 '.
-      'handleRedirects:0,1',                  # own redirect handling outside HttpUtils
-      'enableXPath:0,1',                      # old 
-      'enableXPath-Strict:0,1',               # old
+      'handleRedirects:0,1',                    # own redirect handling outside HttpUtils
+      'enableXPath:0,1',                        # old 
+      'enableXPath-Strict:0,1',                 # old
       'enforceGoodReadingNames',
       'dontRequeueAfterAuth',
-      'dumpBuffers',                          # debug -> write buffers to files
-      'fileHeaderSplit',                      # debug -> read file including header
+      'dumpBuffers',                            # debug -> write buffers to files
+      'fileHeaderSplit',                        # debug -> read file including header
 
-      'memReading',                           # debuf -> create a reading for the virtual Memory of the Fhem process together with BufCounter if it is used
-      'model',                                # for attr templates
+      'memReading',                             # debug -> create a reading for the virtual Memory of the Fhem process together with BufCounter if it is used
+      'model',                                  # for attr templates
       'regexDecode',
       'bodyDecode',                             # implemented in the bodyDecode function in Utils
       'bodyEncode',                             # also in utils
@@ -451,6 +449,15 @@ sub AttrFn {
             delete $hash->{CompiledRegexes};        # recompile everything with the right decoding
             #Log3 $name, 4, "$name: Attr got DecodeRegexAttr -> delete all potentially precompiled regexs";
         }
+        if ($aName =~ /body(Encode|Decode)|(reading|get|set).*(Encode|Decode)/) {
+            if ($aVal !~ /none|auto/) {
+                Log3 $name, 5, "$name: Attr checks encoding name $aVal";
+                eval "decode(\$aVal, '')";   ## no critic - need this at runtime!
+                if($@) {
+                    return "encoding $aVal is not valid";
+                }            
+            }
+        }
         if ($aName =~ /Regex/) {                    # catch all Regex like attributes
             delete $hash->{CompiledRegexes}{$aName};
             #Log3 $name, 4, "$name: Attr got regex attr -> delete potentially precompiled regex for $aName";
@@ -512,7 +519,7 @@ sub AttrFn {
         } 
         elsif ($aName =~ /((get|set)[0-9]*)?[Rr]eplacement([0-9]*)Value/) {
             Log3 $name, 5, "$name: validating attr $name $aName $aVal";
-            if (AttrVal($name, "replacement${3}Mode", "text") eq "expression") {
+            if (AttrVal($name, "replacement${3}Mode", AttrVal($name, "replacementMode", "text")) eq "expression") {
                 return "Invalid Expression $aVal" if (!EvalExpr($hash, 
                             {expr => $aVal, action => "attr $aName", checkOnly => 1}));
             }
@@ -520,6 +527,7 @@ sub AttrFn {
         elsif ($aName =~ /(get|reading)[0-9]*JSON$/ 
                 || $aName =~ /[Ee]xtractAllJSON$/ 
                 || $aName =~ /[Rr]eAuthJSON$/
+                || $aName =~ /^enableTokens$/                    
                 || $aName =~ /[Ii]dJSON$/) {
             eval "use JSON";                        ## no critic - need this at runtime!
             if($@) {
@@ -602,7 +610,7 @@ sub AttrFn {
     elsif ($cmd eq 'del') {                             # Deletion of Attributes
         #Log3 $name, 5, "$name: del attribute $aName";
         if ($aName =~                    /((reading|get)[0-9]*JSON$) | [Ee]xtractAllJSON$ | [Rr]eAuthJSON$ | [Ii]dJSON$/xms) {
-            if (!(grep {!/$aName/} grep {/((reading|get)[0-9]*JSON$) | [Ee]xtractAllJSON$ | [Rr]eAuthJSON$ | [Ii]dJSON$/xms} keys %{$attr{$name}} )) {
+            if (!(grep {!/$aName/} grep {/((reading|get)[0-9]*JSON$) | [Ee]xtractAllJSON$ | ^enableTokens$ | [Rr]eAuthJSON$ | [Ii]dJSON$/xms} keys %{$attr{$name}} )) {
                 delete $hash->{'.JSONEnabled'};
             }
         } 
@@ -840,7 +848,8 @@ sub DoReplacement {
         next if ($rr !~ /^replacement([0-9]*)Regex$/);
         my $rNum  = $1;
         my $regex = GetRegex($name, "replacement", $rNum, "Regex", "");
-        my $mode  = AttrVal($name, "replacement${rNum}Mode", "text");
+        my $mode  = AttrVal($name, "replacement${rNum}Mode", 
+                        AttrVal($name, "replacementMode", "text"));
         #Log3 $name, 5, "$name: Replace: rr=$rr, rNum $rNum, look for ${type}Replacement${rNum}Value";
         next if (!$regex);
 
@@ -1136,7 +1145,7 @@ sub ControlSet {
     my $name    = $hash->{NAME};    # fhem device name
     
     if ($setName eq 'interval') {
-        if (!$setVal || $setVal !~ /^[0-9\.]+/) {
+        if (!defined($setVal) || $setVal !~ /^[0-9\.]+/) {
             Log3 $name, 3, "$name: no interval (sec) specified in set, continuing with $hash->{Interval} (sec)";
             return "No Interval specified";
         } 
@@ -1242,12 +1251,13 @@ sub SetFn {
         return "set value $setVal did not match defined map" if (!defined($rawVal));
 
         # make sure $rawVal is numeric unless textArg is specified
-        if (!$map && !GetFAttr($name, 'set', $setNum, 'TextArg') && $rawVal !~ /^-?\d+\.?\d*$/) {
+        if (!$map && !GetFAttr($name, 'set', $setNum, 'TextArg') 
+            && !GetFAttr($name, 'set', $setNum, 'ValueSeparator') && $rawVal !~ /^-?\d+\.?\d*$/) {
             Log3 $name, 3, "$name: set - value $rawVal is not numeric";
             return "set value $rawVal is not numeric";
         }
 
-        if (!GetFAttr($name, 'set', $setNum, 'TextArg') 
+        if (!GetFAttr($name, 'set', $setNum, 'TextArg') && !GetFAttr($name, 'set', $setNum, 'ValueSeparator')
                 && !CheckRange($hash, {val => $rawVal, 
                                         min => GetFAttr($name, 'set', $setNum, 'Min'), 
                                         max => GetFAttr($name, 'set', $setNum, 'Max')} ) ) {
@@ -1278,7 +1288,7 @@ sub SetFn {
     } else {
         readingsSingleUpdate($hash, makeReadingName($setName), $rawVal, 1);
     }
-    ChainGet($hash, 'set', $setNum);
+    ChainGet($hash, 'set', $setNum);            # check attr followGet and queue next request it if it exists
     return;
 }
 
@@ -1934,6 +1944,30 @@ sub GetCookies {
 }
 
 
+###########################################
+# extract Tokens from HTTP Response Body
+# called from ReadCallback
+sub GetTokens {
+    my $hash   = shift;             # hash reference passed to HttpUtils_NonblockingGet (our device hash)
+    my $body   = shift;             # http body read
+    my $name   = $hash->{NAME};     # fhem device name
+    Log3 $name, 5, "$name: GetTokens is looking for Tokens";
+
+    if (defined($hash->{ParserData}{JSON})) {
+        if (defined($hash->{ParserData}{JSON}{'access_token'})) {
+            Log3 $name, 5, "$name: GetTokens found access_token " . $hash->{ParserData}{JSON}{'access_token'};
+            $hash->{TOKENS}{ACCESS_TOKEN} = $hash->{ParserData}{JSON}{'access_token'};
+        }
+        if (defined($hash->{ParserData}{JSON}{'refresh_token'})) {
+            Log3 $name, 5, "$name: GetTokens found refresh_token " . $hash->{ParserData}{JSON}{'refresh_token'};
+            $hash->{TOKENS}{REFRESH_TOKEN} = $hash->{ParserData}{JSON}{'refresh_token'};
+        }
+    }
+    return;
+}
+
+
+
 ###################################
 # initialize Parsers
 # called from _Read
@@ -2388,7 +2422,8 @@ sub ReadCallback {
             
     my $fDefault = ($featurelevel > 5.9 ? 1 : 0);
     InitParsers($hash, $body);
-    GetCookies($hash, $header) if (AttrVal($name, "enableCookies", $fDefault));   
+    GetCookies($hash, $header) if (AttrVal($name, "enableCookies", $fDefault));
+    GetTokens($hash, $body)    if (AttrVal($name, "enableTokens", 0));
     ExtractSid($hash, $buffer); 
     return if (AttrVal($name, "handleRedirects", $fDefault) && CheckRedirects($hash, $header, $huHash->{addr}));
     delete $hash->{RedirCount};
@@ -2562,17 +2597,43 @@ sub FillHttpUtilsHash {
         $huHash->{url}    = DoReplacement($hash, $request->{type}, $huHash->{url} );
     }
 
-    # then replace $val in header, data and URL with value from request (setVal) if it is still there
-    my $value = $request->{value} // '';
-    $huHash->{header} =~ s/\$val/$value/g if ($huHash->{header});
-    $huHash->{data}   =~ s/\$val/$value/g if ($huHash->{data});;
-    $huHash->{url}    =~ s/\$val/$value/g;
+    # replace several value parts if ValueSeparator is set or single $val otherwise
+    my $sep = GetFAttr($name, $request->{type}, $request->{num}, "ValueSeparator", '');
+    if ($sep) {
+        Log3 $name, 5, "$name: found $sep as separator for multiple values (Context $request->{type}, $request->{num})";
+        my @valArray = split ($sep, ($request->{value} // ''));
+        my $num = 1;
+        foreach my $value (@valArray) {
+            $huHash->{header} =~ s/\$val$num/$value/g if ($huHash->{header});
+            $huHash->{data}   =~ s/\$val$num/$value/g if ($huHash->{data});;
+            $huHash->{url}    =~ s/\$val$num/$value/g;
+            $num++;
+        }
+    } else {
+        Log3 $name, 5, "$name: no separator for multiple values (Context $request->{type}, $request->{num})";
+        # then replace $val in header, data and URL with value from request (setVal) if it is still there
+        my $value = $request->{value} // '';
+        $huHash->{header} =~ s/\$val/$value/g if ($huHash->{header});
+        $huHash->{data}   =~ s/\$val/$value/g if ($huHash->{data});;
+        $huHash->{url}    =~ s/\$val/$value/g;
+    }
 
     # sid replacement is also done here - just before sending so changes in session while request was queued will be reflected
     if ( $hash->{sid} ) {
         $huHash->{header} =~ s/\$sid/$hash->{sid}/g if ($huHash->{header});
         $huHash->{data}   =~ s/\$sid/$hash->{sid}/g if ($huHash->{data});
         $huHash->{url}    =~ s/\$sid/$hash->{sid}/g;
+    }
+
+    # token replacement
+    if ( $hash->{TOKENS}) {
+        $huHash->{header} =~ s/%%ACCESS_TOKEN%%/$hash->{TOKENS}{ACCESS_TOKEN}/g if ($huHash->{header});
+        $huHash->{data}   =~ s/%%ACCESS_TOKEN%%/$hash->{TOKENS}{ACCESS_TOKEN}/g if ($huHash->{data});
+        $huHash->{url}    =~ s/%%ACCESS_TOKEN%%/$hash->{TOKENS}{ACCESS_TOKEN}/g;
+        $huHash->{header} =~ s/%%REFRESH_TOKEN%%/$hash->{TOKENS}{REFRESH_TOKEN}/g if ($huHash->{header});
+        $huHash->{data}   =~ s/%%REFRESH_TOKEN%%/$hash->{TOKENS}{REFRESH_TOKEN}/g if ($huHash->{data});
+        $huHash->{url}    =~ s/%%REFRESH_TOKEN%%/$hash->{TOKENS}{REFRESH_TOKEN}/g;
+
     }
 
     if (AttrVal($name, "enableCookies", $fDefault)) {
@@ -3435,6 +3496,7 @@ sub AddToSendQueue {
             defines an expression that is used in an eval to compute one reading value out of the list of matches. <br>
             This is supposed to be used for regexes or xpath specifications that produce multiple results if only one result that combines them is wanted. The list of matches will be in the variable @matchlist.<br>
             Using this attribute for a set command only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>
+            Please note that the recombine feature does not sort the liste to be reombinded but just takes the order thet is created during parsing which might be sorted in some way or not.
         </li>
 		<li><a id="HTTPMOD-attr-getCheckAllReadings" data-pattern=".*CheckAllReadings">get[0-9]*CheckAllReadings</a><br>
             this attribute modifies the behavior of HTTPMOD when the HTTP Response of a get command is parsed. <br>
@@ -3593,6 +3655,18 @@ sub AddToSendQueue {
             defines that no HTTP request will be sent. Instead the value is directly set as a reading value.
         <br>
         </li>
+
+		<li><a id="HTTPMOD-attr-setValueSeparator" data-pattern=".*ValueSeparator">set[0-9]*ValueSeparator</a><br>
+            defines characters to split a set value into pieces that then can be used as $val1, $val2 and so on.<br>
+            This allows several values to be passed in one set. e.g. 
+            <code>
+            attr H1 set01Name Set1<br>
+            attr H1 set01URL https://testurl.local/send?v1=$val1&v2=$val2&v3=$val3<br>
+            attr H1 set01ValueSeparator ,<br>
+            set H1 Set1 1,22,333<br>
+            </code>
+        <br>
+        </li>
 		<li><a id="HTTPMOD-attr-getHdrExpr" data-pattern=".*HdrExpr">(get|set)[0-9]*HdrExpr</a><br>
             Defines a Perl expression to specify the HTTP Headers for this request. This overwrites any other header specification 
             and should be used carefully only if needed. The original headers are availabe as $old and separated by newlines. 
@@ -3727,8 +3801,15 @@ sub AddToSendQueue {
             This simplifies session magamenet in cases where the server uses a session ID in a cookie. In such cases enabling Cookies should be sufficient and no sidRegex and no manual definition of a Cookie Header should be necessary.
             <br>
             starting with featurelevel > 5.9 HTTPMOD uses this feature by default. So you don't need to set it to 1, but you can disable it by setting it to 0.
-
         </li>
+
+		<li><a id="HTTPMOD-attr-enableTokens">enableTokens</a><br>
+            enables experimental support for access tokens. When a respons contains JSON coded access_token or refresh_token then they are saved in an internal under $hash->{TOKENS}.
+            They then can be used as %%ACCESS_TOKEN%% and %%REFRESH_TOKEN%% in further requests. E.g.:<br>
+            attr H1 set02Header3 authorization: Bearer %%ACCESS_TOKEN%%
+        </li>
+
+
 		<li><a id="HTTPMOD-attr-showMatched">showMatched</a><br>
             if set to 1 then HTTPMOD will create a reading with the name MATCHED_READINGS 
             that contains the names of all readings that could be matched in the last request.
