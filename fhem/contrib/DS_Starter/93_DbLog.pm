@@ -8597,17 +8597,24 @@ sub DbLog_fhemwebFn {
 
   my $name = "SVG_${d}_$newIdx";
   
-  my $dstyle   = qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'};     # TD-Style
-  my $svgtitle = "Create SVG plot from DbLog";
+  my $dstyle = qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'};     # TD-Style
+  my $cmdchk = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $d configCheck', function(data){FW_okDialog(data)})"}; 
+  
   my $svgimg   = FW_makeImage('time_graph@grey');
+  my $svgtitle = 'Create SVG plot from DbLog';
       
   my $forimg   = FW_makeImage('time_note@grey');
   my $fthicon  = "<a href='https://forum.fhem.de/index.php?board=20.0' target='_blank'>$forimg</a>";
-  my $fthtitle = "Open DbLog Forum";
+  my $fthtitle = 'Open DbLog Forum';
+  
+  my $chkimg   = FW_makeImage('edit_settings@grey');
+  my $chkicon  = "<a onClick=$cmdchk>$chkimg</a>";
+  my $chktitle = 'run Configuration Check';
 
   if (AttrVal ('global', 'language', 'EN') eq 'DE') {
       $svgtitle = "SVG-Diagramm aus DbLog erstellen";
       $fthtitle = "DbLog Forum öffnen";
+      $chktitle = 'Konfigurationsprüfung ausführen';
   }  
       
   my $class = qq{<table width='10%'>};
@@ -8618,9 +8625,9 @@ sub DbLog_fhemwebFn {
   
   $ret  = qq{<table width='10%'>};
   $ret .= qq{<tr>};
-  #               $link  , $txt , $td , $class , $doRet , $nonl
   $ret .= FW_pH ("cmd=define $name SVG $d:templateDB:HISTORY;set $name copyGplotFile&detail=$name",
                  "<div class=\"dval\">$class</div>", 1, "dval", 1);
+  $ret .= qq{<td align="left" title="$chktitle" $dstyle> $chkicon </td>};
   $ret .= qq{<td align="left" title="$fthtitle" $dstyle> $fthicon </td>};
   $ret .= qq{</tr>};
   $ret .= qq{</table>}; 
