@@ -142,8 +142,7 @@ my %DbLog_vNotesIntern = (
 );
 
 # Steuerhashes
-###############
-
+################
 my %DbLog_hset = (                                                                # Hash der Set-Funktion
   listCache        => { fn => \&_DbLog_setlistCache       },
   clearReadings    => { fn => \&_DbLog_setclearReadings   },
@@ -165,18 +164,19 @@ my %DbLog_hset = (                                                              
 );
 
 my %DbLog_hget = (                                                                # Hash der Get-Funktion
-  ReadingsVal             => { fn => \&_DbLog_dbReadings   },
-  ReadingsTimestamp       => { fn => \&_DbLog_dbReadings   },
-  ReadingsValTimestamp    => { fn => \&_DbLog_dbReadings   },
-  ReadingsMaxVal          => { fn => \&_DbLog_dbReadings   },
-  ReadingsMaxValTimestamp => { fn => \&_DbLog_dbReadings   },
-  ReadingsMinVal          => { fn => \&_DbLog_dbReadings   },
-  ReadingsMinValTimestamp => { fn => \&_DbLog_dbReadings   },
-  ReadingsAvgVal          => { fn => \&_DbLog_dbReadings   },
-  webchart                => { fn => \&_DbLog_chartQuery   },
-  plotdata                => { fn => \&_DbLog_plotData     },
-  retrieve                => { fn => \&_DbLog_chartQuery   },
-  configCheck             => { fn => \&DbLog_configcheck   },
+  ReadingsVal             => { fn => \&_DbLog_dbReadings     },
+  ReadingsTimestamp       => { fn => \&_DbLog_dbReadings     },
+  ReadingsValTimestamp    => { fn => \&_DbLog_dbReadings     },
+  ReadingsMaxVal          => { fn => \&_DbLog_dbReadings     },
+  ReadingsMaxValTimestamp => { fn => \&_DbLog_dbReadings     },
+  ReadingsMinVal          => { fn => \&_DbLog_dbReadings     },
+  ReadingsMinValTimestamp => { fn => \&_DbLog_dbReadings     },
+  ReadingsAvgVal          => { fn => \&_DbLog_dbReadings     },
+  webchart                => { fn => \&_DbLog_chartQuery     },
+  plotdata                => { fn => \&_DbLog_plotData       },
+  retrieve                => { fn => \&_DbLog_chartQuery     },
+  configCheck             => { fn => \&DbLog_configcheck     },
+  showConfigFile          => { fn => \&_DbLog_showConfigFile },
 );
 
 my %DbLog_columns = ("DEVICE"  => 64,
@@ -5722,30 +5722,28 @@ return $retv;
 }
 
 ###################################################################################
-#                            Verbindungen zur DB aufbauen
+#                    Konfiguration lesen und auswerten
 ###################################################################################
 sub DbLog_readCfg {
   my $hash = shift;
   my $name = $hash->{NAME};
+  
+  my $configfilename = $hash->{CONFIGURATION};
 
-  my $configfilename= $hash->{CONFIGURATION};
-  my %dbconfig;
-
-  # use generic fileRead to get configuration data
-  my ($err, @config) = FileRead($configfilename);
+  my ($err, $dbconfig) = _DbLog_confRead ($hash, $configfilename);
   return $err if($err);
-
-  eval join("\n", @config);
-
-  return "could not read connection" if (!defined $dbconfig{connection});
-  $hash->{dbconn} = $dbconfig{connection};
-  return "could not read user" if (!defined $dbconfig{user});
-  $hash->{dbuser} = $dbconfig{user};
-  return "could not read password" if (!defined $dbconfig{password});
-  $attr{"sec$name"}{secret} = $dbconfig{password};
+  
+  $hash->{dbconn} = $dbconfig->{connection};
+  return "could not read user" if(!defined $dbconfig->{user});
+  
+  $hash->{dbuser} = $dbconfig->{user};
+  return "could not read password" if(!defined $dbconfig->{password});
+  
+  $attr{"sec$name"}{secret} = $dbconfig->{password};
 
   #check the database model
-  if($hash->{dbconn} =~ m/pg:/i) {
+  ###########################
+  if ($hash->{dbconn} =~ m/pg:/i) {
       $hash->{MODEL} = 'POSTGRESQL';
   }
   elsif ($hash->{dbconn} =~ m/mysql:/i) {
@@ -5773,15 +5771,34 @@ sub DbLog_readCfg {
   delete $hash->{COMPRESSION};
 
   if ($hash->{MODEL} =~ /MYSQL/xs) {
-      $hash->{UTF8}       = defined $dbconfig{utf8} ? $dbconfig{utf8} : 0;
-      $hash->{COMPRESSION} = defined $dbconfig{compression} ? $dbconfig{compression} : 0;
+      $hash->{UTF8}        = defined $dbconfig->{utf8}        ? $dbconfig->{utf8}        : 0;
+      $hash->{COMPRESSION} = defined $dbconfig->{compression} ? $dbconfig->{compression} : 0;
   }
   
   if ($hash->{MODEL} =~ /MARIADB/xs) {
-      $hash->{COMPRESSION} = defined $dbconfig{compression} ? $dbconfig{compression} : 0;
+      $hash->{COMPRESSION} = defined $dbconfig->{compression} ? $dbconfig->{compression} : 0;
   }
 
 return;
+}
+
+###################################################################################
+#                                 Konfiguration lesen 
+###################################################################################
+sub _DbLog_confRead {
+  my $hash           = shift;
+  my $configfilename = shift // $hash->{CONFIGURATION};
+
+  my %dbconfig;
+
+  my ($err, @config) = FileRead ($configfilename);
+  return $err if($err);
+
+  eval join "\n", @config;
+
+  return "could not read connection" if(!defined $dbconfig{connection});
+
+return ($err, \%dbconfig);
 }
 
 #################################################################
@@ -5962,14 +5979,33 @@ sub DbLog_Get {
 return $getlist;
 }
 
-########################################################################################
+###################################################################################
+#                    Konfigurationfile anzeigen
+###################################################################################
+sub _DbLog_showConfigFile {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+
+  my ($err, $dbconfig) = _DbLog_confRead ($hash);
+  return $err if($err);
+  
+  my $ret = '';
+  
+  for my $k (sort keys %{$dbconfig}) {
+      $ret .= "$k => $dbconfig->{$k} <br>";                                             
+  }
+
+return $ret;
+}
+
+###################################################################################
 # get <dbLog> ReadingsVal               <device> <reading> <default>
 # get <dbLog> ReadingsTimestamp         <device> <reading> <default>
 # get <dbLog> ReadingsValTimestamp      <device> <reading> <default>
 # get <dbLog> ReadingsMaxVal[Timestamp] <device> <reading> <default>
 # get <dbLog> ReadingsMinVal[Timestamp] <device> <reading> <default>
 # get <dbLog> ReadingsAvgVal            <device> <reading> <default>
-########################################################################################
+###################################################################################
 sub _DbLog_dbReadings {
   my $paref   = shift;
 
@@ -8599,8 +8635,9 @@ sub DbLog_fhemwebFn {
 
   my $name = "SVG_${d}_$newIdx";
   
-  my $dstyle = qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'};     # TD-Style
-  my $cmdchk = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $d configCheck', function(data){FW_okDialog(data)})"}; 
+  my $dstyle  = qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'};     # TD-Style
+  my $cmdchk  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $d configCheck', function(data){FW_okDialog(data)})"}; 
+  my $cmdfile = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $d showConfigFile', function(data){FW_okDialog(data)})"}; 
   
   my $svgimg   = FW_makeImage('time_graph@grey');
   my $svgtitle = 'Create SVG plot from DbLog';
@@ -8612,11 +8649,16 @@ sub DbLog_fhemwebFn {
   $img         = FW_makeImage('edit_settings@grey');
   my $chkicon  = "<a onClick=$cmdchk>$img</a>";
   my $chktitle = 'Run Configuration Check';
+  
+  $img         = FW_makeImage('control_hamburger_s@grey');
+  my $filicon  = "<a onClick=$cmdfile>$img</a>";
+  my $filtitle = 'Show Configuration File Content';
 
   if (AttrVal ('global', 'language', 'EN') eq 'DE') {
       $svgtitle = "SVG-Diagramm aus DbLog erstellen";
       $fthtitle = "DbLog Forum öffnen";
       $chktitle = 'Konfigurationsprüfung ausführen';
+      $filtitle = 'Inhalt der Konfigurationsdatei anzeigen';
   }  
       
   my $class = qq{<table width='10%'>};
@@ -8629,6 +8671,7 @@ sub DbLog_fhemwebFn {
   $ret .= qq{<tr>};
   $ret .= FW_pH ("cmd=define $name SVG $d:templateDB:HISTORY;set $name copyGplotFile&detail=$name",
                  "<div class=\"dval\">$class</div>", 1, "dval", 1);
+  $ret .= qq{<td align="left" title="$filtitle" $dstyle> $filicon </td>};
   $ret .= qq{<td align="left" title="$chktitle" $dstyle> $chkicon </td>};
   $ret .= qq{<td align="left" title="$fthtitle" $dstyle> $fthicon </td>};
   $ret .= qq{</tr>};
