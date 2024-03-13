@@ -61,7 +61,7 @@ use vars qw($FW_ME $FW_subdir);                                      # predeclar
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
   "5.10.0"  => "07.03.2024 support of MariaDB driver, optimize Timer execMemCacheAsync, change DbLog_configcheck, _DbLog_SBP_connectDB ".
-                           "remove countNbl, support compression between client and server ",
+                           "remove countNbl, support compression between client and server, improved performance if attr excludeDevs is set ",
   "5.9.6"   => "09.03.2024 change META.json ",
   "5.9.5"   => "04.01.2024 change DbLog_configcheck to select only column width independent from column characteristic ",
   "5.9.4"   => "03.01.2024 make EVENT writable ",
@@ -93,51 +93,6 @@ my %DbLog_vNotesIntern = (
   "5.5.11"  => "09.01.2023 more code rework / structured subroutines ",
   "5.5.10"  => "07.01.2023 more code rework (_DbLog_SBP_checkDiscDelpars) and others, use dbh quote in _DbLog_SBP_onRun_LogSequential ".
                            "configCheck changed to use only one db connect + measuring the connection time, universal DBHU ",
-  "5.5.9"   => "28.12.2022 optimize \$hash->{HELPER}{TH}, \$hash->{HELPER}{TC}, mode in Define ".
-                           "Forum: https://forum.fhem.de/index.php/topic,130588.msg1254073.html#msg1254073 ",
-  "5.5.8"   => "27.12.2022 two-line output of long state messages, define LONGRUN_PID threshold ",
-  "5.5.7"   => "20.12.2022 cutted _DbLog_SBP_onRun_Log into _DbLog_SBP_onRun_LogArray and _DbLog_SBP_onRun_LogSequential ".
-               "__DbLog_SBP_onRun_LogCurrent, __DbLog_SBP_fieldArrays, some bugfixes, add drivers to configCheck, edit comref ",
-  "5.5.6"   => "12.12.2022 Serialize with Storable instead of JSON, more code rework ",
-  "5.5.5"   => "11.12.2022 Array Log -> may be better error processing ",
-  "5.5.4"   => "11.12.2022 Array Log -> print out all cache not saved, DbLog_DelayedShutdown processing changed ",
-  "5.5.3"   => "10.12.2022 more internal code rework ",
-  "5.5.2"   => "09.12.2022 _DbLog_ConnectPush function removed ",
-  "5.5.1"   => "09.12.2022 commit inserted lines in array insert though some lines are faulty ",
-  "5.5.0"   => "08.12.2022 implement commands with SBP: reduceLog, reduceLogNbL, attr timeout adapted ",
-  "5.4.0"   => "07.12.2022 implement commands with SBP: importCacheFile ",
-  "5.3.0"   => "05.12.2022 activate func _DbLog_SBP_onRun_Log, implement commands with SBP: count(Nbl), deleteOldDays(Nbl) ".
-                           "userCommand, exportCache ",
-  "5.2.0"   => "05.12.2022 LONGRUN_PID, \$hash->{prioSave}, rework SetFn ",
-  "5.1.0"   => "03.12.2022 implement SubProcess for logging data in synchron Mode ",
-  "5.0.0"   => "02.12.2022 implement SubProcess for logging data in asynchron Mode, delete attr traceHandles ",
-  "4.13.3"  => "26.11.2022 revise commandref ",
-  "4.13.2"  => "06.11.2022 Patch Delta calculation (delta-d,delta-h) https://forum.fhem.de/index.php/topic,129975.msg1242272.html#msg1242272 ",
-  "4.13.1"  => "16.10.2022 edit commandref ",
-  "4.13.0"  => "15.04.2022 new Attr convertTimezone, minor fixes in reduceLog(NbL) ",
-  "4.12.7"  => "08.03.2022 \$data{firstvalX} doesn't work, forum: https://forum.fhem.de/index.php/topic,126631.0.html ",
-  "4.12.6"  => "17.01.2022 change log message deprecated to outdated, forum:#topic,41089.msg1201261.html#msg1201261 ",
-  "4.12.5"  => "31.12.2021 standard unit assignment for readings beginning with 'temperature' and removed, forum:#125087 ",
-  "4.12.4"  => "27.12.2021 change ParseEvent for FBDECT, warning messages for deprecated commands added ",
-  "4.12.3"  => "20.04.2021 change sub _DbLog_getNewDBHandle for SQLITE, change error Logging in DbLog_writeFileIfCacheOverflow ",
-  "4.12.2"  => "08.04.2021 change standard splitting ",
-  "4.12.1"  => "07.04.2021 improve escaping the pipe ",
-  "4.12.0"  => "29.03.2021 new attributes SQLiteCacheSize, SQLiteJournalMode ",
-  "4.11.0"  => "20.02.2021 new attr cacheOverflowThreshold, reading CacheOverflowLastNum/CacheOverflowLastState, ".
-                           "remove prototypes, new subs DbLog_writeFileIfCacheOverflow, DbLog_setReadingstate ",
-  "4.10.2"  => "23.06.2020 configCheck changed for SQLite again ",
-  "4.10.1"  => "22.06.2020 configCheck changed for SQLite ",
-  "4.10.0"  => "22.05.2020 improve configCheck, new vars \$LASTTIMESTAMP and \$LASTVALUE in valueFn / DbLogValueFn, Forum:#111423 ",
-  "4.9.13"  => "12.05.2020 commandRef changed, AutoInactiveDestroy => 1 for dbh ",
-  "4.9.12"  => "28.04.2020 fix line breaks in set function, Forum: #110673 ",
-  "4.9.11"  => "22.03.2020 logfile entry if DBI module not installed, Forum: #109382 ",
-  "4.9.10"  => "31.01.2020 fix warning, Forum: #107950 ",
-  "4.9.9"   => "21.01.2020 default ParseEvent changed again, Forum: #106769 ",
-  "4.9.8"   => "17.01.2020 adjust configCheck with plotEmbed check. Forum: #107383 ",
-  "4.9.7"   => "13.01.2020 change datetime pattern in valueFn of DbLog_addCacheLine. Forum: #107285 ",
-  "4.9.6"   => "04.01.2020 fix change off 4.9.4 in default splitting. Forum: #106992 ",
-  "4.9.5"   => "01.01.2020 do not reopen database connection if device is disabled (fix) ",
-  "4.9.4"   => "08.01.2023 all version informationen from v 1.8.1 to v 4.9.4 deleted ",
   "1.7.1"   => "15.12.2016 initial rework "
 );
 
@@ -195,6 +150,8 @@ my $dblog_todef    = 86400;                                                     
 my $dblog_lrpth    = 0.8;                                                       # Schwellenwert für LONGRUN_PID ab dem "Another operation is in progress...." im state ausgegeben wird
 my $dblog_pifl     = 40;                                                        # default Breite Eingabefelder im Plot Editor
 my $dblog_svgfnset = ',delta-d,delta-h,delta-ts,int,int1,int2,int3,int4,int5';  # Funktionen für SVG sampleDataFn
+
+# $data{DbLog}{$name}{cache}                                                    # Log-Daten Arbeitscache
 
 ################################################################
 sub DbLog_Initialize {
@@ -1217,13 +1174,29 @@ sub DbLog_Log {
   my $max      = int(@{$events});
   my $vb4show  = 0;
   my @vb4devs  = split ",", AttrVal ($name, 'verbose4Devs', '');                # verbose4 Logs nur für Devices in Attr "verbose4Devs"
+  my $exc      = AttrVal ($name, 'excludeDevs', '');                            # attr <device> excludeDevs [<devspec>#]<Reading1>,[<devspec>#]<Reading2>,[<devspec>#]<Reading..>
+  
+  my @exdvs = ();
+  if ($exc) {                                                                   # Excluded Devices & Readings
+      $exc       =~ s/[\s\n]/,/g;
+      my @excldr = split ',', $exc;
+
+      for my $excl (@excldr) {
+          my ($ds,$rd) = split '#', $excl;
+          my @da       = devspec2array ($ds); 
+          
+          for my $d (@da) {
+              push @exdvs, ($rd ? "$d:$rd" : $d);
+          }
+      }
+  }
 
   if (!@vb4devs) {
       $vb4show = 1;
   }
   else {
       for (@vb4devs) {
-          if($dev_name =~ m/$_/i) {
+          if ($dev_name =~ m/$_/i) {
               $vb4show = 1;
               last;
           }
@@ -1232,7 +1205,7 @@ sub DbLog_Log {
 
   my $log4rel = $vb4show && !defined $hash->{HELPER}{LONGRUN_PID} ? 1 : 0;
 
-  if(AttrVal ($name, 'verbose', 3) > 3) {
+  if (AttrVal ($name, 'verbose', 3) > 3) {
       if($log4rel) {
           Log3 ($name, 4, "$name - ################################################################");
           Log3 ($name, 4, "$name - ###              start of new Logcycle                       ###");
@@ -1272,11 +1245,11 @@ sub DbLog_Log {
 
           Log3 ($name, 4, "$name - check Device: $dev_name , Event: $event") if($log4rel);
 
-          if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
+          if ($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
               my $timestamp = $ts_0;
               $timestamp    = $dev_hash->{CHANGETIME}[$i] if(defined($dev_hash->{CHANGETIME}[$i]));
 
-              if($ctz ne 'none') {
+              if ($ctz ne 'none') {
                   my $params = {
                       name      => $name,
                       dtstring  => $timestamp,
@@ -1299,49 +1272,33 @@ sub DbLog_Log {
               $reading = $r[0];
               $value   = $r[1];
               $unit    = $r[2];
-              if(!defined $reading)             {$reading = "";}
-              if(!defined $value)               {$value = "";}
-              if(!defined $unit || $unit eq "") {$unit = AttrVal("$dev_name", "unit", "");}
+              if (!defined $reading)             {$reading = "";}
+              if (!defined $value)               {$value = "";}
+              if (!defined $unit || $unit eq "") {$unit = AttrVal("$dev_name", "unit", "");}
 
               $unit = DbLog_charfilter($unit) if(AttrVal($name, "useCharfilter",0));
 
               # Devices / Readings ausschließen durch Attribut "excludeDevs"
-              # attr <device> excludeDevs [<devspec>#]<Reading1>,[<devspec>#]<Reading2>,[<devspec>#]<Reading..>
-              my ($exc,@excldr,$ds,$rd,@exdvs);
-              $exc = AttrVal($name, "excludeDevs", "");
-
-              if($exc) {
-                  $exc    =~ s/[\s\n]/,/g;
-                  @excldr = split ',', $exc;
-
-                  for my $excl (@excldr) {
-                      ($ds,$rd) = split '#', $excl;
-                      @exdvs    = devspec2array($ds);
-
-                      if(@exdvs) {
-                          for my $ed (@exdvs) {
-                              if($rd) {
-                                  if("$dev_name:$reading" =~ m/^$ed:$rd$/) {
-                                      Log3 ($name, 4, "$name - Device:Reading \"$dev_name:$reading\" global excluded from logging by attribute \"excludeDevs\" ") if($log4rel);
-                                      $next = 1;
-                                  }
-                              }
-                              else {
-                                  if($dev_name =~ m/^$ed$/) {
-                                      Log3 ($name, 4, "$name - Device \"$dev_name\" global excluded from logging by attribute \"excludeDevs\" ") if($log4rel);
-                                      $next = 1;
-                                  }
-                              }
-                          }
+              for my $ed (@exdvs) {                                        # $ed ist "$d[:$r]"
+                  if ($ed =~ /:/xs) {
+                      if ("$dev_name:$reading" =~ m/^$ed$/) {
+                          Log3 ($name, 4, qq{$name - Device:Reading "$dev_name:$reading" global excluded from logging by attribute "excludeDevs"}) if($log4rel);
+                          $next = 1;
                       }
                   }
-
-                  next if($next);
+                  else {
+                      if ($dev_name =~ m/^$ed$/) {
+                          Log3 ($name, 4, qq{$name - Device "$dev_name" global excluded from logging by attribute "excludeDevs"}) if($log4rel);
+                          $next = 1;
+                      }
+                  }
               }
+              
+              next if($next);
 
               Log3 ($name, 5, "$name - parsed Event: $dev_name , Event: $event") if($log4rel);
 
-              if($log4rel) {
+              if ($log4rel) {
                   Log3 ($name, 5, qq{$name - DbLogExclude of "$dev_name": $DbLogExclude}) if($DbLogExclude);
                   Log3 ($name, 5, qq{$name - DbLogInclude of "$dev_name": $DbLogInclude}) if($DbLogInclude);
               }
@@ -1352,21 +1309,21 @@ sub DbLog_Log {
               $DoIt = 0;
               $DoIt = 1 if($DbLogSelectionMode =~ m/Exclude/ );
 
-              if($DbLogExclude && $DbLogSelectionMode =~ m/Exclude/) {                                        # Bsp: "(temperature|humidity):300,battery:3600:force"
+              if ($DbLogExclude && $DbLogSelectionMode =~ m/Exclude/) {                                       # Bsp: "(temperature|humidity):300,battery:3600:force"
                   my @v1 = DbLog_attrLong2Array ($DbLogExclude, ',');
 
                   for (my $i = 0; $i < int(@v1); $i++) {
                       my @v2 = split /:/, $v1[$i];
                       $DoIt  = 0 if(!$v2[1] && $reading =~ m,^$v2[0]$,);                                      # Reading matcht auf Regexp, kein MinIntervall angegeben
 
-                      if(($v2[1] && $reading =~ m,^$v2[0]$,) && ($v2[1] =~ m/^(\d+)$/)) {                     # Regexp matcht und MinIntervall ist angegeben
+                      if (($v2[1] && $reading =~ m,^$v2[0]$,) && ($v2[1] =~ m/^(\d+)$/)) {                    # Regexp matcht und MinIntervall ist angegeben
                           my $lt = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME};
                           my $lv = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE};
                           $lt    = 0  if(!$lt);
                           $lv    = "" if(!defined $lv);                                                       # Forum: #100344
                           $force = ($v2[2] && $v2[2] =~ /force/i) ? 1 : 0;                                    # Forum: #97148
 
-                          if(($now-$lt < $v2[1]) && ($lv eq $value || $force)) {                              # innerhalb MinIntervall und LastValue=Value
+                          if (($now-$lt < $v2[1]) && ($lv eq $value || $force)) {                             # innerhalb MinIntervall und LastValue=Value
                               $DoIt = 0;
                           }
                       }
@@ -1375,15 +1332,15 @@ sub DbLog_Log {
 
               # Hier ggf. zusätzlich noch dbLogInclude pruefen, falls bereits durch DbLogExclude ausgeschlossen
               # Im Endeffekt genau die gleiche Pruefung, wie fuer DBLogExclude, lediglich mit umgegkehrtem Ergebnis.
-              if($DoIt == 0) {
-                  if($DbLogInclude && ($DbLogSelectionMode =~ m/Include/)) {
+              if ($DoIt == 0) {
+                  if ($DbLogInclude && ($DbLogSelectionMode =~ m/Include/)) {
                       my @v1 = DbLog_attrLong2Array ($DbLogInclude, ',');
 
                       for (my $i = 0; $i < int(@v1); $i++) {
                           my @v2 = split /:/, $v1[$i];
                           $DoIt  = 1 if($reading =~ m,^$v2[0]$,);                                               # Reading matcht auf Regexp
 
-                          if(($v2[1] && $reading =~ m,^$v2[0]$,) && ($v2[1] =~ m/^(\d+)$/)) {                   # Regexp matcht und MinIntervall ist angegeben
+                          if (($v2[1] && $reading =~ m,^$v2[0]$,) && ($v2[1] =~ m/^(\d+)$/)) {                  # Regexp matcht und MinIntervall ist angegeben
                               my $lt = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME};
                               my $lv = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE};
                               $lt    = 0  if(!$lt);
@@ -1416,7 +1373,7 @@ sub DbLog_Log {
                   $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME}  = $now;
                   $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE} = $value;
 
-                  if($DbLogValueFn ne '') {                                                                    # Device spezifische DbLogValueFn-Funktion anwenden
+                  if ($DbLogValueFn ne '') {                                                                   # Device spezifische DbLogValueFn-Funktion anwenden
                       my $TIMESTAMP     = $timestamp;
                       my $LASTTIMESTAMP = $lastt // 0;                                                         # patch Forum:#111423
                       my $DEVICE        = $dev_name;
@@ -1429,7 +1386,7 @@ sub DbLog_Log {
                       my $CN            = " ";
 
                       eval $DbLogValueFn;
-                      if($@) {
+                      if ($@) {
                           Log3 ($name, 2, "$name - error device \"$dev_name\" specific DbLogValueFn: ".$@);
                       }
 
@@ -1437,7 +1394,7 @@ sub DbLog_Log {
                           $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME}  = $lastt if($lastt);                     # patch Forum:#111423
                           $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE} = $lastv if(defined $lastv);
 
-                          if($log4rel) {
+                          if ($log4rel) {
                               Log3 ($name, 4, "$name - Event ignored by device \"$dev_name\" specific DbLogValueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
                           }
 
@@ -1459,7 +1416,7 @@ sub DbLog_Log {
                       $unit    = $UNIT     if(defined $UNIT);
                   }
 
-                  if($value_fn ne '') {                                                                                 # zentrale valueFn im DbLog-Device abarbeiten
+                  if ($value_fn ne '') {                                                                                 # zentrale valueFn im DbLog-Device abarbeiten
                       my $NAME          = $name;
                       my $TIMESTAMP     = $timestamp;
                       my $LASTTIMESTAMP = $lastt // 0;                                                                  # patch Forum:#111423
@@ -1482,7 +1439,7 @@ sub DbLog_Log {
                           $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME}  = $lastt if($lastt);                  # patch Forum:#111423
                           $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE} = $lastv if(defined $lastv);
 
-                          if($log4rel) {
+                          if ($log4rel) {
                               Log3 ($name, 4, "$name - Event ignored by valueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
                           }
 
@@ -1512,34 +1469,34 @@ sub DbLog_Log {
 
                   my $row = $timestamp."|".$dev_name."|".$dev_type."|".$event."|".$reading."|".$value."|".$unit;
 
-                  if($log4rel) {
+                  if ($log4rel) {
                     Log3 ($name, 4, "$name - added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
                   }
 
-                  $memcount = DbLog_addMemCacheRow ($name, $row);                            # Datensatz zum Memory Cache hinzufügen
+                  $memcount = DbLog_addMemCacheRow ($name, $row);                             # Datensatz zum Memory Cache hinzufügen
               }
           }
       }
   };
 
   if (!$memcount) {
-      $net = tv_interval($nst);                                                              # Notify-Routine Laufzeit ermitteln
+      $net = tv_interval($nst);                                                               # Notify-Routine Laufzeit ermitteln
 
-      if(AttrVal($name, 'showNotifyTime', 0)) {
+      if (AttrVal($name, 'showNotifyTime', 0)) {
           readingsSingleUpdate($hash, 'notify_processing_time', sprintf("%.4f",$net), 1);
       }
 
       return;
   }
 
-  if($async) {                                                                               # asynchoner non-blocking Mode
+  if ($async) {                                                                               # asynchoner non-blocking Mode
       readingsSingleUpdate($hash, 'CacheUsage', $memcount, ($ce == 1 ? 1 : 0)) if($DoIt);
 
-      if($memcount >= $clim) {                                                           # asynchrone Schreibroutine aufrufen wenn Füllstand des Cache erreicht ist
+      if ($memcount >= $clim) {                                                               # asynchrone Schreibroutine aufrufen wenn Füllstand des Cache erreicht ist
           my $lmlr     = $hash->{HELPER}{LASTLIMITRUNTIME};
           my $syncival = AttrVal($name, "syncInterval", 30);
 
-          if(!$lmlr || gettimeofday() > $lmlr+($syncival/2)) {
+          if (!$lmlr || gettimeofday() > $lmlr+($syncival/2)) {
 
               Log3 ($name, 4, "$name - Number of cache entries reached cachelimit $clim - start database sync.");
 
@@ -1550,7 +1507,7 @@ sub DbLog_Log {
       }
   }
 
-  if(!$async) {                                                                         # synchroner non-blocking Mode
+  if (!$async) {                                                                        # synchroner non-blocking Mode
       return if(defined $hash->{HELPER}{SHUTDOWNSEQ});                                  # Shutdown Sequenz läuft
       return if($hash->{HELPER}{REOPEN_RUNS});                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
 
@@ -1562,7 +1519,7 @@ sub DbLog_Log {
 
   $net = tv_interval($nst);                                                             # Notify-Routine Laufzeit ermitteln
 
-  if(AttrVal($name, 'showNotifyTime', 0)) {
+  if (AttrVal($name, 'showNotifyTime', 0)) {
       readingsSingleUpdate($hash, 'notify_processing_time', sprintf("%.4f",$net), 1);
   }
 
