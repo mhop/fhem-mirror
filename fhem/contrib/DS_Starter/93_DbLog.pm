@@ -5771,12 +5771,12 @@ sub DbLog_readCfg {
   delete $hash->{COMPRESSION};
 
   if ($hash->{MODEL} =~ /MYSQL/xs) {
-      $hash->{UTF8}        = defined $dbconfig->{utf8}        ? $dbconfig->{utf8}        : 0;
-      $hash->{COMPRESSION} = defined $dbconfig->{compression} ? $dbconfig->{compression} : 0;
+      $hash->{UTF8}        = $dbconfig->{utf8}        if(defined $dbconfig->{utf8});
+      $hash->{COMPRESSION} = $dbconfig->{compression} if(defined $dbconfig->{compression});
   }
   
   if ($hash->{MODEL} =~ /MARIADB/xs) {
-      $hash->{COMPRESSION} = defined $dbconfig->{compression} ? $dbconfig->{compression} : 0;
+      $hash->{COMPRESSION} = $dbconfig->{compression} if(defined $dbconfig->{compression});
   }
 
 return;
