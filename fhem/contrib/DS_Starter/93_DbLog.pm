@@ -61,7 +61,8 @@ use vars qw($FW_ME $FW_subdir);                                      # predeclar
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
   "5.10.0"  => "07.03.2024 support of MariaDB driver, optimize Timer execMemCacheAsync, change DbLog_configcheck, _DbLog_SBP_connectDB ".
-                           "remove countNbl, support compression between client and server, improved performance if attr excludeDevs is set ",
+                           "remove countNbl, support compression between client and server, improved performance if attr excludeDevs is set ".
+                           "Fix _DbLog_plotData Forum: https://forum.fhem.de/index.php?topic=136930.0 ",
   "5.9.6"   => "09.03.2024 change META.json ",
   "5.9.5"   => "04.01.2024 change DbLog_configcheck to select only column width independent from column characteristic ",
   "5.9.4"   => "03.01.2024 make EVENT writable ",
@@ -6964,7 +6965,8 @@ sub _DbLog_plotData {
               $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00") if($readings[$i]->[3] eq "delta-d");
           }
 
-          $sum[$i] += $out_value;
+          $lastv[$i] = $out_value;                                                        # V5.10.0 Forum: https://forum.fhem.de/index.php?topic=136930.0
+          $sum[$i]  += $out_value;
           $cnt[$i]++;
 
           if ($outf =~ m/(all)/) {
@@ -6974,7 +6976,7 @@ sub _DbLog_plotData {
               push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
           }
           else {
-             $out_tstamp =~ s/\ /_/g;                                                      #needed by generating plots
+             $out_tstamp =~ s/\ /_/g;                                                      # needed by generating plots
              $retval    .= "$out_tstamp $out_value\n";
           }
 
