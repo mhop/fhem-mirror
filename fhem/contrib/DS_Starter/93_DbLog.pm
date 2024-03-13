@@ -56,6 +56,9 @@ use SubProcess;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
+use vars qw($FW_ME);
+use vars qw($FW_subdir);
+
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
   "5.10.0"  => "07.03.2024 support of MariaDB driver, optimize Timer execMemCacheAsync, change DbLog_configcheck, _DbLog_SBP_connectDB ".
@@ -8586,7 +8589,7 @@ return ($err, $func);
 #  Routine für FHEMWEB Detailanzeige
 ################################################################
 sub DbLog_fhemwebFn {
-  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my ($FW_wname, $d, $room, $pageHash) = @_;                          # pageHash is set for summaryFn.
 
   my $ret;
   my $newIdx = 1;
@@ -8603,13 +8606,13 @@ sub DbLog_fhemwebFn {
   my $svgimg   = FW_makeImage('time_graph@grey');
   my $svgtitle = 'Create SVG plot from DbLog';
       
-  my $forimg   = FW_makeImage('time_note@grey');
-  my $fthicon  = "<a href='https://forum.fhem.de/index.php?board=20.0' target='_blank'>$forimg</a>";
+  my $img      = FW_makeImage('time_note@grey');
+  my $fthicon  = "<a href='https://forum.fhem.de/index.php?board=20.0' target='_blank'>$img</a>";
   my $fthtitle = 'Open DbLog Forum';
   
-  my $chkimg   = FW_makeImage('edit_settings@grey');
-  my $chkicon  = "<a onClick=$cmdchk>$chkimg</a>";
-  my $chktitle = 'run Configuration Check';
+  $img         = FW_makeImage('edit_settings@grey');
+  my $chkicon  = "<a onClick=$cmdchk>$img</a>";
+  my $chktitle = 'Run Configuration Check';
 
   if (AttrVal ('global', 'language', 'EN') eq 'DE') {
       $svgtitle = "SVG-Diagramm aus DbLog erstellen";
