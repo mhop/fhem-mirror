@@ -56,8 +56,7 @@ use SubProcess;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-use vars qw($FW_ME);
-use vars qw($FW_subdir);
+use vars qw($FW_ME $FW_subdir);                                      # predeclare global variable names
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
