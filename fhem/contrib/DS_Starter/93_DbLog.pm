@@ -8594,7 +8594,6 @@ sub DbLog_fhemwebFn {
   }
 
   my $svgname = "SVG_${d}_$newIdx";
-  my $hdlink  = AttrVal ($d, 'headerLinks', 'icon');
   my $dstyle  = qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'};     # TD-Style
   my $cmdchk  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $d configCheck', function(data){FW_okDialog(data)})"}; 
   my $cmdfile = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $d showConfigFile', function(data){FW_okDialog(data)})"}; 
@@ -8618,7 +8617,7 @@ sub DbLog_fhemwebFn {
       $filtitle = 'Inhalt der Konfigurationsdatei anzeigen';
   }  
     
-  if ($hdlink eq 'text') { 
+  if (AttrVal ($d, 'headerLinks', 'icon') eq 'text') { 
       $svgimg   = $svgtitle; $filimg   = $filtitle; $chkimg   = $chktitle; $fhtimg   = $fthtitle;
       $svgtitle = '';        $filtitle = '';        $chktitle = '';        $fthtitle = ''; 
   }
