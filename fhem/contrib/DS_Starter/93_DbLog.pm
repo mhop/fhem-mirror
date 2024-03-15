@@ -187,6 +187,7 @@ sub DbLog_Initialize {
                                "excludeDevs ".
                                "expimpdir ".
                                "exportCacheAppend:1,0 ".
+                               "headerLinks:text,icon ".
                                "insertMode:1,0 ".
                                "noSupportPK:1,0 ".
                                "plotInputFieldLength ".
@@ -6973,7 +6974,7 @@ sub _DbLog_plotData {
               $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
           }
           elsif ($outf =~ m/(array)/) {
-              push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
+              push @ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit};
           }
           else {
              $out_tstamp =~ s/\ /_/g;                                                      # needed by generating plots
@@ -8588,30 +8589,27 @@ sub DbLog_fhemwebFn {
   my $ret;
   my $newIdx = 1;
 
-  while($defs{"SVG_${d}_$newIdx"}) {
+  while ($defs{"SVG_${d}_$newIdx"}) {
       $newIdx++;
   }
 
-  my $name = "SVG_${d}_$newIdx";
-  
+  my $svgname = "SVG_${d}_$newIdx";
+  my $hdlink  = AttrVal ($d, 'headerLinks', 'icon');
   my $dstyle  = qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'};     # TD-Style
   my $cmdchk  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $d configCheck', function(data){FW_okDialog(data)})"}; 
   my $cmdfile = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $d showConfigFile', function(data){FW_okDialog(data)})"}; 
   
-  my $svgimg   = FW_makeImage('time_graph@grey');
   my $svgtitle = 'Create SVG plot from DbLog';
+  my $svgimg   = FW_makeImage('time_graph@grey');
       
-  my $img      = FW_makeImage('time_note@grey');
-  my $fthicon  = "<a href='https://forum.fhem.de/index.php?board=20.0' target='_blank'>$img</a>";
   my $fthtitle = 'Open DbLog Forum';
+  my $fhtimg   = FW_makeImage('time_note@grey');
   
-  $img         = FW_makeImage('edit_settings@grey');
-  my $chkicon  = "<a onClick=$cmdchk>$img</a>";
   my $chktitle = 'Run Configuration Check';
+  my $chkimg   = FW_makeImage('edit_settings@grey');
   
-  $img         = FW_makeImage('control_hamburger_s@grey');
-  my $filicon  = "<a onClick=$cmdfile>$img</a>";
   my $filtitle = 'Show Configuration File Content';
+  my $filimg   = FW_makeImage('control_hamburger_s@grey');
 
   if (AttrVal ('global', 'language', 'EN') eq 'DE') {
       $svgtitle = "SVG-Diagramm aus DbLog erstellen";
@@ -8619,7 +8617,16 @@ sub DbLog_fhemwebFn {
       $chktitle = 'Konfigurationsprüfung ausführen';
       $filtitle = 'Inhalt der Konfigurationsdatei anzeigen';
   }  
-      
+    
+  if ($hdlink eq 'text') { 
+      $svgimg   = $svgtitle; $filimg   = $filtitle; $chkimg   = $chktitle; $fhtimg   = $fthtitle;
+      $svgtitle = '';        $filtitle = '';        $chktitle = '';        $fthtitle = ''; 
+  }
+  
+  my $filicon = "<a onClick=$cmdfile>$filimg</a>";
+  my $chkicon = "<a onClick=$cmdchk>$chkimg</a>";
+  my $fthicon = "<a href='https://forum.fhem.de/index.php?board=20.0' target='_blank'>$fhtimg</a>";
+    
   my $class = qq{<table width='10%'>};
   $class   .= qq{<tr>};
   $class   .= qq{<td align="left" title="$svgtitle" $dstyle> $svgimg </td>};
@@ -8628,7 +8635,7 @@ sub DbLog_fhemwebFn {
   
   $ret  = qq{<table width='10%'>};
   $ret .= qq{<tr>};
-  $ret .= FW_pH ("cmd=define $name SVG $d:templateDB:HISTORY;set $name copyGplotFile&detail=$name",
+  $ret .= FW_pH ("cmd=define $svgname SVG $d:templateDB:HISTORY;set $svgname copyGplotFile&detail=$svgname",
                  "<div class=\"dval\">$class</div>", 1, "dval", 1);
   $ret .= qq{<td align="left" title="$filtitle" $dstyle> $filicon </td>};
   $ret .= qq{<td align="left" title="$chktitle" $dstyle> $chkicon </td>};
@@ -8954,7 +8961,7 @@ return;
     #%dbconfig= (
     #    connection => "mysql:database=fhem;host=&lt;database host&gt;;port=3306",
     #    # if want communication over socket-file instead of TCP/IP transport, use:
-    #    # connection => "mysql:database=fhem;mysql_socket=&lt;/patch/socket-file&gt;",
+    #    # connection => "mysql:database=fhem;mysql_socket=&lt;/path/socket-file&gt;",
     #    user => "fhemuser",
     #    password => "fhempassword",
     #    # optional enable UTF-8 support
@@ -8971,7 +8978,7 @@ return;
     #%dbconfig= (
     #    connection => "MariaDB:database=fhem;host=&lt;database host&gt;;port=3306",
     #    # if want communication over socket-file instead of TCP/IP transport, use:
-    #    # connection => "MariaDB:database=fhem;mariadb_socket=&lt;/patch/socket-file&gt;",
+    #    # connection => "MariaDB:database=fhem;mariadb_socket=&lt;/path/socket-file&gt;",
     #    user => "fhemuser",
     #    password => "fhempassword",
     #    # optional enable communication compression between client and server
@@ -8997,7 +9004,7 @@ return;
     #);
     ####################################################################################
     </pre>
-    If configDB is used, the configuration file has to be uploaded into the configDB ! <br><br>
+    If configDB is used, the configuration file has to be uploaded into the configDB! <br><br>
 
     <b>Note about special characters:</b><br>
     If special characters, e.g. @,$ or % which have a meaning in the perl programming
@@ -9919,15 +9926,14 @@ return;
       DbLog uses a sub-process to write the log data into the database and processes the data
       generally not blocking for FHEM. <br>
       Thus, the writing process to the database is generally not blocking and FHEM is not affected in the case
-      the database is not performing or is not available (maintenance, error condition). <br>
-      (default: 0)
+      the database is not performing or is not available (maintenance, error condition). 
       <br><br>
 
       <ul>
        <table>
        <colgroup> <col width=5%> <col width=95%> </colgroup>
        <tr><td> 0 - </td><td><b>Synchronous log mode.</b> The data to be logged is only briefly cached and immediately                                              </td></tr>
-       <tr><td>     </td><td>written to the database.                                                                                                               </td></tr>
+       <tr><td>     </td><td>written to the database. (default)                                                                                                     </td></tr>
        <tr><td>     </td><td><b>Advantages:</b>                                                                                                                     </td></tr>
        <tr><td>     </td><td>In principle, the data is immediately available in the database.                                                                       </td></tr>
        <tr><td>     </td><td>Very little to no data is lost when FHEM crashes.                                                                                      </td></tr>
@@ -10408,6 +10414,18 @@ attr SMA_Energymeter DbLogValueFn
      </li>
   </ul>
   <br>
+  
+  <ul>
+     <a id="DbLog-attr-headerLinks"></a>
+     <li><b>headerLinks [text|icon] </b> <br><br>
+
+     <ul>
+       The links offered in the header area of the device for executing various functions are displayed either as icons (default)
+       or text. The text language is defined by the global attribute 'language'.
+     </ul>
+     </li>
+  </ul>
+  <br>
 
   <ul>
     <a id="DbLog-attr-insertMode"></a>
@@ -10419,14 +10437,11 @@ attr SMA_Energymeter DbLogValueFn
       <ul>
        <table>
        <colgroup> <col width=5%> <col width=95%> </colgroup>
-       <tr><td> 0 - </td><td>The data is passed as an array to the database interface.                                               </td></tr>
+       <tr><td> 0 - </td><td>The data is passed as an array to the database interface.  (default)                                    </td></tr>
        <tr><td>     </td><td>It is in most cases the most performant way to insert a lot of data into the database at once.          </td></tr>
        <tr><td> 1 - </td><td>The records are passed sequentially to the database interface and inserted into the DB.                 </td></tr>
        </table>
       </ul>
-      <br>
-
-      (default: 0)
     </ul>
   </ul>
   </li>
@@ -10835,7 +10850,7 @@ attr SMA_Energymeter DbLogValueFn
     #%dbconfig= (
     #    connection => "mysql:database=fhem;host=&lt;database host&gt;;port=3306",
     #    # if want communication over socket-file instead of TCP/IP transport, use:
-    #    # connection => "mysql:database=fhem;mysql_socket=&lt;/patch/socket-file&gt;",
+    #    # connection => "mysql:database=fhem;mysql_socket=&lt;/path/socket-file&gt;",
     #    user => "fhemuser",
     #    password => "fhempassword",
     #    # optional enable UTF-8 support
@@ -10851,7 +10866,7 @@ attr SMA_Energymeter DbLogValueFn
     #%dbconfig= (
     #    connection => "MariaDB:database=fhem;host=&lt;database host&gt;;port=3306",
     #    # if want communication over socket-file instead of TCP/IP transport, use:
-    #    # connection => "MariaDB:database=fhem;mariadb_socket=&lt;/patch/socket-file&gt;",
+    #    # connection => "MariaDB:database=fhem;mariadb_socket=&lt;/path/socket-file&gt;",
     #    user => "fhemuser",
     #    password => "fhempassword",
     #    # optional enable communication compression between client and server
@@ -10878,7 +10893,7 @@ attr SMA_Energymeter DbLogValueFn
     ####################################################################################
     </pre>
 
-    Wird configDB genutzt, ist das Konfigurationsfile in die configDB hochzuladen ! <br><br>
+    Wird configDB genutzt, ist das Konfigurationsfile in die configDB hochzuladen! <br><br>
 
     <b>Hinweis zu Sonderzeichen:</b><br>
     Werden Sonderzeichen, wie z.B. @, $ oder %, welche eine programmtechnische Bedeutung in Perl haben im Passwort verwendet,
@@ -11836,15 +11851,14 @@ attr SMA_Energymeter DbLogValueFn
       generell nicht blockierend für FHEM. <br>
       Dadurch erfolgt der Schreibprozess in die Datenbank generell nicht blockierend und FHEM wird in dem Fall,
       dass die Datenbank nicht performant arbeitet oder nicht verfügbar ist (Wartung, Fehlerzustand, etc.),
-      nicht beeinträchtigt.<br>
-      (default: 0)
+      nicht beeinträchtigt.
       <br><br>
 
       <ul>
        <table>
        <colgroup> <col width=5%> <col width=95%> </colgroup>
        <tr><td> 0 - </td><td><b>Synchroner Log-Modus.</b> Die zu loggenden Daten werden nur kurz im Cache zwischengespeichert und sofort           </td></tr>
-       <tr><td>     </td><td>in die Datenbank geschrieben.                                                                                         </td></tr>
+       <tr><td>     </td><td>in die Datenbank geschrieben. (default)                                                                               </td></tr>
        <tr><td>     </td><td><b>Vorteile:</b>                                                                                                      </td></tr>
        <tr><td>     </td><td>Die Daten stehen im Prinzip sofort in der Datenbank zur Verfügung.                                                    </td></tr>
        <tr><td>     </td><td>Bei einem Absturz von FHEM gehen sehr wenige bis keine Daten verloren.                                                </td></tr>
@@ -12327,6 +12341,18 @@ attr SMA_Energymeter DbLogValueFn
      </li>
   </ul>
   <br>
+  
+  <ul>
+     <a id="DbLog-attr-headerLinks"></a>
+     <li><b>headerLinks [text|icon] </b> <br><br>
+
+     <ul>
+       Die im Kopfbereich des Devices angebotenen Links zur Ausführung verschiedener Funktionen werden entweder als Icon (default)
+       oder Text dargestellt. Die Textsprache wird durch das global Attribut 'language' festgelegt.
+     </ul>
+     </li>
+  </ul>
+  <br>
 
   <ul>
     <a id="DbLog-attr-insertMode"></a>
@@ -12338,14 +12364,11 @@ attr SMA_Energymeter DbLogValueFn
       <ul>
        <table>
        <colgroup> <col width=5%> <col width=95%> </colgroup>
-       <tr><td> 0 - </td><td>Die Daten werden als Array der Datenbankschnittstelle übergeben.                                                 </td></tr>
+       <tr><td> 0 - </td><td>Die Daten werden als Array der Datenbankschnittstelle übergeben. (default)                                       </td></tr>
        <tr><td>     </td><td>Es ist in den meisten Fällen der performanteste Weg viele Daten auf einmal in die Datenbank einzufügen.          </td></tr>
        <tr><td> 1 - </td><td>Die Datensätze werden sequentiell der Datenbankschnittstelle übergeben und in die DB eingefügt.                  </td></tr>
        </table>
       </ul>
-      <br>
-
-      (default: 0)
     </ul>
   </ul>
   </li>
