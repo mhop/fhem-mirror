@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.6"  => "15.03.2024  change verbose level of DbRep_beforeproc, DbRep_afterproc to 3 ",
   "8.53.5"  => "11.03.2024  some changes for MariaDB Perl driver usage, change DbRep_dbConnect".
                             "support compression between client and server ",
   "8.53.4"  => "09.03.2024  Ready for support of MariaDB Perl driver ",
@@ -12644,16 +12645,16 @@ sub DbRep_beforeproc {
   my $name = $hash->{NAME};
   my $fn   = AttrVal($name, 'executeBeforeProc', '');
 
-  if($fn) {
+  if ($fn) {
       Log3 ($name, 3, "DbRep $name - execute command before $cmd: '$fn' ");
 
-      my $err = _DbRep_procCode ($hash, $fn);
+      my $msg = _DbRep_procCode ($hash, $fn);
 
-      if ($err) {
-          Log3 ($name, 2, "DbRep $name - command message before $cmd: \"$err\" ");
+      if ($msg) {
+          Log3 ($name, 3, "DbRep $name - command message before $cmd: \"$msg\" ");
           my $erread = "Warning - message from command before $cmd appeared";
 
-          ReadingsSingleUpdateValue ($hash, "before_".$cmd."_message", $err, 1);
+          ReadingsSingleUpdateValue ($hash, "before_".$cmd."_message", $msg, 1);
           ReadingsSingleUpdateValue ($hash, "state", $erread, 1);
       }
   }
@@ -12669,24 +12670,22 @@ sub DbRep_afterproc {
   my $cmd   = shift // q{process};
   my $bfile = shift // q{};
 
-  my ($err,$erread);
+  my $name = $hash->{NAME};
+  $cmd     = (split " ", $cmd)[0];
+  my $sval = ReadingsVal ($name, 'state', '');
+  my $fn   = AttrVal     ($name, 'executeAfterProc', '');
 
-  my $name   = $hash->{NAME};
-  $cmd       = (split " ", $cmd)[0];
-  my $sval   = ReadingsVal ($name, 'state', '');
-  my $fn     = AttrVal     ($name, 'executeAfterProc', '');
-
-  if($fn) {
+  if ($fn) {
       Log3 ($name, 3, "DbRep $name - execute command after $cmd: '$fn' ");
 
-      $err = _DbRep_procCode ($hash, $fn);
+      my $msg = _DbRep_procCode ($hash, $fn);
 
-      if ($err) {
-          Log3 ($name, 2, qq{DbRep $name - command message after $cmd: >$err<});
+      if ($msg) {
+          Log3 ($name, 3, qq{DbRep $name - command message after $cmd: >$msg<});
 
-          $erread = $sval eq 'error' ? $sval : qq(WARNING - $cmd finished, but message after command appeared);
+          my $erread = $sval eq 'error' ? $sval : qq(WARNING - $cmd finished, but message after command appeared);
 
-          ReadingsSingleUpdateValue ($hash, 'after_'.$cmd.'_message', $err, 1);
+          ReadingsSingleUpdateValue ($hash, 'after_'.$cmd.'_message', $msg, 1);
           ReadingsSingleUpdateValue ($hash, 'state', $erread, 1);
 
           return $erread;
