@@ -158,6 +158,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.16.8" => "16.03.2024  plantConfigCheck: adjust pvCorrectionFactor_Auto check, settings of forecastRefresh ".
+                           "rename reading nextSolCastCall to nextRadiationAPICall ".
+                           "currentMeterDev: new optional keys conprice, feedprice ".
+                           "destroy runtime data when delete device ",
   "1.16.7" => "12.03.2024  prevent duplicates in NOTIFYDEV, Forum: https://forum.fhem.de/index.php?msg=1306875 ",
   "1.16.6" => "11.03.2024  plantConfigCheck: join forecastProperties with ',' ",
   "1.16.5" => "04.03.2024  setPVhistory: code changes, plantConfigCheck: check forecastRefresh ".
@@ -1549,6 +1553,7 @@ sub _setcurrentRadiationAPI {              ## no critic "not used"
   createAssociatedWith ($hash);
   writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);                      # Anlagenkonfiguration File schreiben
   setModel             ($hash);                                                      # Model setzen
+  deleteReadingspec    ($hash, 'nextRadiationAPICall');
   
   return if(_checkSetupNotComplete ($hash));                                         # keine Stringkonfiguration wenn Setup noch nicht komplett
 
@@ -1563,7 +1568,7 @@ sub _setcurrentRadiationAPI {              ## no critic "not used"
       return qq{Please complete command "set $name moduleAzimuth".} if(!$dir);
   }
 
-  my $type                                           = $hash->{TYPE};
+  my $type = $hash->{TYPE};
   $data{$type}{$name}{current}{allStringsFullfilled} = 0;                            # Stringkonfiguration neu prüfen lassen
 
 return;
@@ -1766,23 +1771,33 @@ sub _setmeterDevice {                    ## no critic "not used"
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
 
-  if(!$arg) {
+  if (!$arg) {
       return qq{The command "$opt" needs an argument !};
   }
 
   my ($a,$h) = parseParams ($arg);
   my $medev  = $a->[0] // "";
 
-  if(!$medev || !$defs{$medev}) {
+  if (!$medev || !$defs{$medev}) {
       return qq{The device "$medev" doesn't exist!};
   }
 
-  if(!$h->{gcon} || !$h->{contotal} || !$h->{gfeedin} || !$h->{feedtotal}) {
+  if (!$h->{gcon} || !$h->{contotal} || !$h->{gfeedin} || !$h->{feedtotal}) {
       return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
   }
 
-  if($h->{gcon} eq "-gfeedin" && $h->{gfeedin} eq "-gcon") {
+  if ($h->{gcon} eq "-gfeedin" && $h->{gfeedin} eq "-gcon") {
       return qq{Incorrect input. It is not allowed that the keys gcon and gfeedin refer to each other.};
+  }
+  
+  if ($h->{conprice}) {
+      my ($gcp,$gcpcucy) = split ":", $h->{conprice};
+      return qq{Incorrect input for key 'conprice'. Please consider the commandref.} if(!$gcp || !$gcpcucy);
+  }
+  
+  if ($h->{feedprice}) {
+      my ($gfr,$gfrcucy) = split ":", $h->{feedprice};   
+      return qq{Incorrect input for key 'feedprice'. Please consider the commandref.} if(!$gfr || !$gfrcucy);      
   }
 
   ## alte Speicherwerte löschen
@@ -2719,7 +2734,7 @@ sub __getSolCastData {
       $etxt         =~ s{<WT>}{($leadtime/60)}eg;
 
       if ($trc <= 0) {
-          readingsSingleUpdate($hash, 'nextSolCastCall', $etxt, 1);
+          readingsSingleUpdate($hash, 'nextRadiationAPICall', $etxt, 1);
           return qq{SolCast free daily limit is used up};
       }
 
@@ -2728,7 +2743,7 @@ sub __getSolCastData {
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
 
       if ($t < $srtime - $leadtime || $t > $sstime + $lagtime) {
-          readingsSingleUpdate($hash, 'nextSolCastCall', $etxt, 1);
+          readingsSingleUpdate($hash, 'nextRadiationAPICall', $etxt, 1);
           return "The current time is not between sunrise minus ".($leadtime/60)." minutes and sunset";
       }
 
@@ -3115,7 +3130,7 @@ sub ___setSolCastAPIcallKeyData {
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - next API Call: ".(timestampToTimestring ($t + $apiitv, $lang))[0]);
   }
 
-  readingsSingleUpdate ($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
+  readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
 
 return;
 }
@@ -3140,7 +3155,7 @@ sub __getForecastSolarData {
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
 
       if ($t < $srtime - $leadtime || $t > $sstime + $lagtime) {
-          readingsSingleUpdate($hash, 'nextSolCastCall', $etxt, 1);
+          readingsSingleUpdate($hash, 'nextRadiationAPICall', $etxt, 1);
           return "The current time is not between sunrise minus ".($leadtime/60)." minutes and sunset";
       }
 
@@ -3450,7 +3465,7 @@ sub ___setForeCastAPIcallKeyData {
       $smt    = '(forced waiting time)';
   }
 
-  readingsSingleUpdate ($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0].' '.$smt, 1);
+  readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0].' '.$smt, 1);
 
 return;
 }
@@ -3549,7 +3564,7 @@ sub __getVictronSolarData {
       }
   }
 
-  readingsSingleUpdate ($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
+  readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
 
   __VictronVRM_ApiRequestLogin ($paref);
 
@@ -5215,9 +5230,9 @@ return;
 # Gerät zu löschen die mit dieser Gerätedefinition zu tun haben.
 #################################################################
 sub Delete {
-  my $hash  = shift;
-  my $arg   = shift;
-  my $name  = $hash->{NAME};
+  my $hash = shift;
+  my $arg  = shift;
+  my $name = $hash->{NAME};
 
   my @ftd = ( $pvhcache.$name,
               $pvccache.$name,
@@ -5246,6 +5261,10 @@ sub Delete {
           Log3 ($name, 1, qq{$name - Message while deleting file "$f": $err});
       }
   }
+  
+  my $type = $hash->{TYPE};
+  
+  delete $data{$type}{$name};
 
 return;
 }
@@ -5641,30 +5660,6 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  ## percentile in simple umsetzen                                 # 05.02.2024
-  for my $idx (sort keys %{$data{$type}{$name}{circular}}) {
-      if(defined $data{$type}{$name}{circular}{$idx}{pvcorrf}{percentile}) {
-          $data{$type}{$name}{circular}{$idx}{pvcorrf}{simple} = $data{$type}{$name}{circular}{$idx}{pvcorrf}{percentile};
-          delete $data{$type}{$name}{circular}{$idx}{pvcorrf}{percentile};
-      }
-      if(defined $data{$type}{$name}{circular}{$idx}{quality}{percentile}) {
-          $data{$type}{$name}{circular}{$idx}{quality}{simple} = $data{$type}{$name}{circular}{$idx}{quality}{percentile};
-          delete $data{$type}{$name}{circular}{$idx}{quality}{percentile};
-      }
-      if(defined $data{$type}{$name}{circular}{$idx}{pvrlsum}{percentile}) {
-          $data{$type}{$name}{circular}{$idx}{pvrlsum}{simple} = $data{$type}{$name}{circular}{$idx}{pvrlsum}{percentile};
-          delete $data{$type}{$name}{circular}{$idx}{pvrlsum}{percentile};
-      }
-      if(defined $data{$type}{$name}{circular}{$idx}{pvfcsum}{percentile}) {
-          $data{$type}{$name}{circular}{$idx}{pvfcsum}{simple} = $data{$type}{$name}{circular}{$idx}{pvfcsum}{percentile};
-          delete $data{$type}{$name}{circular}{$idx}{pvfcsum}{percentile};
-      }
-      if(defined $data{$type}{$name}{circular}{$idx}{dnumsum}{percentile}) {
-          $data{$type}{$name}{circular}{$idx}{dnumsum}{simple} = $data{$type}{$name}{circular}{$idx}{dnumsum}{percentile};
-          delete $data{$type}{$name}{circular}{$idx}{dnumsum}{percentile};
-      }
-  }
-
   ## nicht-Bin Werte löschen  / wrp löschen
   my $ra = '0|00|05|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90|95|100|.*\..*|simple';
 
@@ -5760,6 +5755,12 @@ sub centralTask {
           next if($wp ne 'wrp');
           delete $data{$type}{$name}{circular}{$hod}{$wp};
       }
+  }
+  
+  my $nscc = ReadingsVal ($name, 'nextSolCastCall', '');                                        # 14.03.2024
+  if ($nscc) {
+      readingsSingleUpdate ($hash, 'nextRadiationAPICall', $nscc, 0);
+      deleteReadingspec ($hash, 'nextSolCastCall');
   }
 
   #######################################################################################################################
@@ -7169,9 +7170,21 @@ sub _transferMeterValues {
   my ($gf,$gfunit) = split ":", $h->{gfeedin};                                                # Readingname/Unit für aktuelle Netzeinspeisung
   my ($gt,$ctunit) = split ":", $h->{contotal};                                               # Readingname/Unit für Bezug total
   my ($ft,$ftunit) = split ":", $h->{feedtotal};                                              # Readingname/Unit für Einspeisung total
-
+  
   return if(!$gc || !$gf || !$gt || !$ft);
-
+  
+  if ($h->{conprice}) {
+      my ($gcp,$gcpcucy) = split ":", $h->{conprice};                                         # Bezugspreis (Arbeitspreis) pro kWh
+      $data{$type}{$name}{current}{ePurchasePrice}    = $gcp;
+      $data{$type}{$name}{current}{ePurchasePriceCcy} = $gcpcucy;
+  }
+  
+  if ($h->{feedprice}) {
+      my ($gfr,$gfrcucy) = split ":", $h->{feedprice};                                        # Einspeisevergütung pro kWh
+      $data{$type}{$name}{current}{eFeedInTariff}     = $gfr;
+      $data{$type}{$name}{current}{eFeedInTariffCcy}  = $gfrcucy;
+  }
+  
   $gfunit //= $gcunit;
   $gcunit //= $gfunit;
 
@@ -8295,9 +8308,12 @@ sub __planInitialSwitchTime {
 
       return;
   }
-
-  debugLog ($paref, "consumerPlanning", qq{Planning consumer "$c" - name: }.ConsumerVal ($hash, $c, 'name', '').
-                                        qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
+  
+  if ($debug =~ /consumerPlanning/x) {
+      Log3 ($name, 1, qq{$name DEBUG> ############### consumerPlanning consumer "$c" ############### });
+      Log3 ($name, 1, qq{$name DEBUG> Planning consumer "$c" - name: }.ConsumerVal ($hash, $c, 'name', '').
+                      qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
+  }
 
   if (ConsumerVal ($hash, $c, 'type', $defctype) eq 'noSchedule') {
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
@@ -8413,8 +8429,8 @@ sub ___doPlanning {
   my %max;
   my %mtimes;
 
-  ## max. Überschuß ermitteln
-  #############################
+  ## max. PV-Forecast bzw. Überschuß (bei gesetzen affectConsForecastInPlanning) ermitteln
+  ##########################################################################################
   for my $idx (sort keys %{$nh}) {
       my $pvfc    = NexthoursVal ($hash, $idx, 'pvfc',    0);
       my $confcex = NexthoursVal ($hash, $idx, 'confcEx', 0);                              # prognostizierter Verbrauch ohne registrierte Consumer
@@ -8952,7 +8968,7 @@ sub ___switchConsumerOn {
       my $nompow = ConsumerVal ($hash, $c, 'power',  '-');
       my $sp     = CurrentVal  ($hash, 'surplus',      0);
 
-      Log3 ($name, 1, qq{$name DEBUG> ############### consumer "$c" ############### });
+      Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ############### });
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - general switching parameters => }.
                       qq{auto mode: $auto, current Consumption: $cons W, nompower: $nompow, surplus: $sp W, }.
                       qq{planstate: $pstate, starttime: }.($startts ? (timestampToTimestring ($startts, $lang))[0] : "undef")
@@ -10851,7 +10867,7 @@ sub _graphicHeader {
                 isDWDUsed           ($hash) ? '<a href="https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/met_verfahren_mosmix.html" style="color: inherit !important;" target="_blank">DWD</a>:'                :
                 q{};
 
-      my $nscc = ReadingsVal   ($name, 'nextSolCastCall', '?');
+      my $nscc = ReadingsVal   ($name, 'nextRadiationAPICall', '?');
       my $lrt  = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time', '-');
       my $scrm = SolCastAPIVal ($hash, '?All', '?All', 'response_message',   '-');
 
@@ -14136,10 +14152,12 @@ sub checkPlantConfig {
 
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
+  
+  setModel ($hash);                                                                            # Model setzen
 
   my $lang        = AttrVal        ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang));
-  my $pcf         = ReadingsVal    ($name, 'pvCorrectionFactor_Auto', '');
-  my $raname      = ReadingsVal    ($name, 'currentRadiationAPI',     '');
+  my $pcf         = ReadingsVal    ($name, 'pvCorrectionFactor_Auto', 'off');
+  my $raname      = ReadingsVal    ($name, 'currentRadiationAPI',        '');
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
   my $ok     = FW_makeImage ('10px-kreis-gruen.png',     '');
@@ -14239,7 +14257,7 @@ sub checkPlantConfig {
               $result->{'DWD Weather Properties'}{fault}   = 1;
           }
           else {
-              $mosm = AttrVal ($fcname, 'forecastRefresh', 6) == 1 ? 'MOSMIX_S' : 'MOSMIX_L';
+              $mosm = AttrVal ($fcname, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S'; 
               
               if ($mosm eq 'MOSMIX_L') {
                   $result->{'DWD Weather Properties'}{state}   = $info;
@@ -14252,7 +14270,7 @@ sub checkPlantConfig {
 
           $result->{'DWD Weather Properties'}{note} .= qq{checked parameters and attributes of device "$fcname": <br>};
           $result->{'DWD Weather Properties'}{note} .= 'forecastProperties -> '.join (',', @dweattrmust).'<br>';
-          $result->{'DWD Weather Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to "1" if possible' : '').'<br>';
+          $result->{'DWD Weather Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to below "6" if possible' : '').'<br>';
       }
   }
   
@@ -14295,7 +14313,7 @@ sub checkPlantConfig {
               $result->{'DWD Radiation Properties'}{fault}   = 1;
           }
           else {
-              $mosm = AttrVal ($raname, 'forecastRefresh', 6) == 1 ? 'MOSMIX_S' : 'MOSMIX_L';
+              $mosm = AttrVal ($raname, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S';  
               
               if ($mosm eq 'MOSMIX_L') {
                   $result->{'DWD Radiation Properties'}{state}   = $info;
@@ -14326,7 +14344,7 @@ sub checkPlantConfig {
       $result->{'DWD Radiation Properties'}{note} .= 'MOSMIX variant, Age of Radiation data. <br>';      
       $result->{'DWD Radiation Properties'}{note} .= qq{<br>checked parameters and attributes device "$raname": <br>};
       $result->{'DWD Radiation Properties'}{note} .= 'forecastProperties -> '.join (',', @draattrmust).'<br>';
-      $result->{'DWD Radiation Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to "1" if possible' : '').'<br>';
+      $result->{'DWD Radiation Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to below "6" if possible' : '').'<br>';
   }
 
   ## Check Rooftop und Roof Ident Pair Settings (SolCast)
@@ -14460,10 +14478,10 @@ sub checkPlantConfig {
   }
 
   if (isForecastSolarUsed ($hash)) {                                                         # allg. Settings bei Nutzung Forecast.Solar API
-      if (!$pcf || $pcf !~ /on/xs) {
+      if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
-          $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on*" if an automatic adjustment of the prescaler data should be done.<br>};
+          $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on_complex" is recommended.<br>};
       }
 
       if (!$lat) {
@@ -14493,10 +14511,10 @@ sub checkPlantConfig {
 
       my $lam = SolCastAPIVal ($hash, '?All', '?All', 'response_message', 'success');
 
-      if (!$pcf || $pcf !~ /on/xs) {
+      if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
-          $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "on*" is recommended if the SolCast efficiency factor is already adjusted.<br>};
+          $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "on_complex" is recommended if the SolCast efficiency factor is already adjusted.<br>};
       }
 
       if (!$osi) {
@@ -14543,10 +14561,10 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{info}    = 1;
       }
 
-      if (!$pcf || $pcf !~ /on/xs) {
+      if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
-          $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on*" if an automatic adjustment of the prescaler data should be done.<br>};
+          $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on_complex" or "on_complex_ai" is recommended.<br>};
       }
 
       if ($lam ne 'success') {
@@ -14571,10 +14589,10 @@ sub checkPlantConfig {
       my $gdn   = AttrVal       ('global', 'dnsServer', '');
       my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');
 
-      if ($pcf && $pcf !~ /off/xs) {
+      if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $warn;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
-          $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "off" is recommended because of this API is KI based.<br>};
+          $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "on_complex" is recommended.<br>};
           $result->{'Common Settings'}{warn}    = 1;
       }
 
@@ -14654,7 +14672,7 @@ sub checkPlantConfig {
   ## Ausgabe
   ############
   my $out  = qq{<html>};
-  $out    .= qq{<b>}.$hqtxt{plntck}{$lang}.qq{</b> <br><br>};
+  $out    .= qq{<b>}.$hqtxt{plntck}{$lang}.qq{ - Model: $hash->{MODEL} </b> <br><br>};
 
   $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
   $out    .= qq{<tr style="font-weight:bold;">};
@@ -15051,7 +15069,6 @@ sub setModel {
   }
   else {
       $hash->{MODEL} = 'DWD';
-      deleteReadingspec ($hash, 'nextSolCastCall');
   }
 
 return;
@@ -15671,7 +15688,7 @@ sub isWeatherAgeExceeded {
       }
   }
   
-  $resh->{mosmix} = AttrVal ($resh->{agedv}, 'forecastRefresh', 6) == 1 ? 'MOSMIX_S' : 'MOSMIX_L';
+  $resh->{mosmix} = AttrVal ($resh->{agedv}, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S';   
   my $th          = $resh->{mosmix} eq 'MOSMIX_S' ? 7200 : 25200;
   
   $resh->{exceed} = $currts - $agets > $th ? 1 : 0;
@@ -17016,8 +17033,10 @@ to ensure that the system configuration is correct.
 
     <ul>
       <a id="SolarForecast-set-currentMeterDev"></a>
-      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Unit&gt; contotal=&lt;Readingname&gt;:&lt;Unit&gt; gfeedin=&lt;Readingname&gt;:&lt;Unit&gt; feedtotal=&lt;Readingname&gt;:&lt;Unit&gt;   </b> <br><br>
-
+      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Einheit&gt; contotal=&lt;Readingname&gt;:&lt;Einheit&gt; 
+                             gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;   
+                             [conprice=&lt;Wert&gt;:&lt;Currency&gt;] [feedprice=&lt;Wert&gt;:&lt;Currency&gt;] </b> <br><br>
+                             
       Sets any device and its readings for energy measurement.
       The module assumes that the numeric value of the readings is positive.
       It can also be a dummy device with corresponding readings. The meaning of the respective "Readingname" is:
@@ -17026,11 +17045,13 @@ to ensure that the system configuration is correct.
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>gcon</b>       </td><td>Reading welches die aktuell aus dem Netz bezogene Leistung liefert                                          </td></tr>
-          <tr><td> <b>contotal</b>   </td><td>Reading welches die Summe der aus dem Netz bezogenen Energie liefert (ein sich stetig erhöhender Zähler)    </td></tr>
-          <tr><td> <b>gfeedin</b>    </td><td>Reading welches die aktuell in das Netz eingespeiste Leistung liefert                                       </td></tr>
-          <tr><td> <b>feedtotal</b>  </td><td>Reading welches die Summe der in das Netz eingespeisten Energie liefert (ein sich stetig erhöhender Zähler) </td></tr>
-          <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                         </td></tr>
+          <tr><td> <b>gcon</b>       </td><td>Reading which supplies the power currently drawn from the grid                                     </td></tr>
+          <tr><td> <b>contotal</b>   </td><td>Reading which provides the sum of the energy drawn from the grid (a constantly increasing meter)   </td></tr>
+          <tr><td> <b>gfeedin</b>    </td><td>Reading which supplies the power currently fed into the grid                                       </td></tr>
+          <tr><td> <b>feedtotal</b>  </td><td>Reading which provides the sum of the energy fed into the grid (a constantly increasing meter)     </td></tr>
+          <tr><td> <b>Einheit</b>    </td><td>the respective unit (W,kW,Wh,kWh)                                                                  </td></tr>
+          <tr><td> <b>conprice</b>   </td><td>Price and currency for the purchase of one kWh (optional)                                          </td></tr>
+          <tr><td> <b>feedprice</b>  </td><td>Price and currency for the feed-in of one kWh (optional)                                           </td></tr>
         </table>
       </ul>
       <br>
@@ -17047,7 +17068,7 @@ to ensure that the system configuration is correct.
 
       <ul>
         <b>Example: </b> <br>
-        set &lt;name&gt; currentMeterDev Meter gcon=Wirkleistung:W contotal=BezWirkZaehler:kWh gfeedin=-gcon feedtotal=EinWirkZaehler:kWh   <br>
+        set &lt;name&gt; currentMeterDev Meter gcon=Wirkleistung:W contotal=BezWirkZaehler:kWh gfeedin=-gcon feedtotal=EinWirkZaehler:kWh conprice=0.2958:€ feedprice=0.1269:€ <br>
         <br>
         # Device Meter provides the current grid reference in the reading "Wirkleistung" (W),
           the sum of the grid reference in the reading "BezWirkZaehler" (kWh), the current feed in "Wirkleistung" if "Wirkleistung" is negative,
@@ -17369,7 +17390,7 @@ to ensure that the system configuration is correct.
       <br><br>
 
       <b>Model SolCastAPI:</b> <br>
-      The recommended autocorrection method is <b>on_simple</b>. <br>
+      The recommended autocorrection method is <b>on_complex</b>. <br>
       Before turning on autocorrection, optimise the forecast with the following steps: <br><br>
       <ul>
          <li>
@@ -17914,7 +17935,8 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-affectMaxDayVariance"></a>
        <li><b>affectMaxDayVariance &lt;Zahl&gt; </b><br>
-         Maximum change size of the PV prediction factor (Reading pvCorrectionFactor_XX) per day. <br>
+         Maximum adjustment of the PV prediction factor (Reading pvCorrectionFactor_XX) that can be made 
+         in relation to one hour per day. <br>
          This setting has no influence on the learning and forecasting behavior of any AI support used
          (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>). <br>
          (default: 0.5)
@@ -19141,7 +19163,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
     <ul>
       <a id="SolarForecast-set-currentMeterDev"></a>
-      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Einheit&gt; contotal=&lt;Readingname&gt;:&lt;Einheit&gt; gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;   </b> <br><br>
+      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Einheit&gt; contotal=&lt;Readingname&gt;:&lt;Einheit&gt; 
+                             gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;   
+                             [conprice=&lt;Wert&gt;:&lt;Currency&gt;] [feedprice=&lt;Wert&gt;:&lt;Currency&gt;] </b> <br><br>
 
       Legt ein beliebiges Device und seine Readings zur Energiemessung fest.
       Das Modul geht davon aus, dass der numerische Wert der Readings positiv ist.
@@ -19156,6 +19180,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
           <tr><td> <b>gfeedin</b>    </td><td>Reading welches die aktuell in das Netz eingespeiste Leistung liefert                                       </td></tr>
           <tr><td> <b>feedtotal</b>  </td><td>Reading welches die Summe der in das Netz eingespeisten Energie liefert (ein sich stetig erhöhender Zähler) </td></tr>
           <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                         </td></tr>
+          <tr><td> <b>conprice</b>   </td><td>Preis und Währung für den Bezug einer kWh (optional)                                                        </td></tr>
+          <tr><td> <b>feedprice</b>  </td><td>Preis und Währung für die Einspeisung einer kWh (optional)                                                  </td></tr>
         </table>
       </ul>
       <br>
@@ -19172,7 +19198,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; currentMeterDev Meter gcon=Wirkleistung:W contotal=BezWirkZaehler:kWh gfeedin=-gcon feedtotal=EinWirkZaehler:kWh  <br>
+        set &lt;name&gt; currentMeterDev Meter gcon=Wirkleistung:W contotal=BezWirkZaehler:kWh gfeedin=-gcon feedtotal=EinWirkZaehler:kWh conprice=0.2958:€ feedprice=0.1269:€ <br>
         <br>
         # Device Meter liefert den aktuellen Netzbezug im Reading "Wirkleistung" (W),
           die Summe des Netzbezugs im Reading "BezWirkZaehler" (kWh), die aktuelle Einspeisung in "Wirkleistung" wenn "Wirkleistung" negativ ist,
@@ -19504,7 +19530,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <br><br>
 
       <b>Model SolCastAPI:</b> <br>
-      Die empfohlene Autokorrekturmethode ist <b>on_simple</b>. <br>
+      Die empfohlene Autokorrekturmethode ist <b>on_complex</b>. <br>
       Bevor man die Autokorrektur eingeschaltet, ist die Prognose mit folgenden Schritten zu optimieren: <br><br>
       <ul>
          <li>
@@ -20049,7 +20075,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-affectMaxDayVariance"></a>
        <li><b>affectMaxDayVariance &lt;Zahl&gt; </b><br>
-         Maximale Änderungsgröße des PV Vorhersagefaktors (Reading pvCorrectionFactor_XX) pro Tag. <br>
+         Maximale Anpassung des PV Vorhersagefaktors (Reading pvCorrectionFactor_XX) die bezogen auf eine 
+         Stunde pro Tag vorgenommen werden kann. <br>
          Auf das Lern- und Prognoseverhalten einer eventuell verwendeten KI-Unterstützung
          (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>) hat diese Einstellung keinen
          Einfluß. <br>
