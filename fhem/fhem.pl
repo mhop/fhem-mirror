@@ -5569,6 +5569,7 @@ json2reading($$;$$$$)
 sub
 Debug($) {
   my $msg= shift;
+  stacktrace() if(AttrNum('global','stacktrace',0) == 1);
   Log 1, "DEBUG>" . $msg;
 }
 
