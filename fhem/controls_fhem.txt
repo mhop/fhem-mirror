@@ -1,6 +1,6 @@
-REV 28658
+REV 28663
 DIR unused
-UPD 2024-03-13_07:45:03 422060 ./CHANGED
+UPD 2024-03-16_07:45:03 422137 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2024-03-03_07:45:03 47202 ./MAINTAINER.txt
 UPD 2023-08-24_07:45:03 46886 ./configDB.pm
@@ -461,7 +461,7 @@ UPD 2022-06-02_07:45:02 19537 FHEM/91_watchdog.pm
 UPD 2024-02-01_07:45:02 66658 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2024-03-10_07:45:03 543576 FHEM/93_DbLog.pm
-UPD 2024-03-12_07:45:03 965726 FHEM/93_DbRep.pm
+UPD 2024-03-16_07:45:03 965798 FHEM/93_DbRep.pm
 UPD 2022-12-29_07:45:03 23863 FHEM/93_FHEM2FHEM.pm
 UPD 2023-02-12_07:45:03 37594 FHEM/93_InfluxDBLogger.pm
 UPD 2023-01-24_07:45:03 177000 FHEM/93_Log2Syslog.pm
@@ -767,8 +767,8 @@ UPD 2024-03-13_07:45:09 5166284 docs/commandref.html
 UPD 2024-03-13_07:45:13 3193677 docs/commandref_DE.html
 UPD 2024-03-06_07:45:03 86454 docs/commandref_frame.html
 UPD 2024-03-06_07:45:03 97189 docs/commandref_frame_DE.html
-UPD 2024-03-15_07:45:14 316042 docs/commandref_modular.html
-UPD 2024-03-15_07:45:15 327954 docs/commandref_modular_DE.html
+UPD 2024-03-16_07:45:14 316042 docs/commandref_modular.html
+UPD 2024-03-16_07:45:15 327954 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2027,6 +2027,9 @@ UPD 2015-07-28_14:05:33 1014 www/images/openautomation/control_centr_arrow_right
 UPD 2015-07-28_14:05:33 944 www/images/openautomation/control_centr_arrow_up.svg
 UPD 2015-07-28_14:05:33 1084 www/images/openautomation/control_centr_arrow_up_left.svg
 UPD 2015-07-28_14:05:33 1085 www/images/openautomation/control_centr_arrow_up_right.svg
+UPD 2024-03-16_07:45:03 1385 www/images/openautomation/control_hamburger_e.svg
+UPD 2024-03-16_07:45:03 1168 www/images/openautomation/control_hamburger_f.svg
+UPD 2024-03-16_07:45:03 1038 www/images/openautomation/control_hamburger_s.svg
 UPD 2015-07-28_14:05:33 1002 www/images/openautomation/control_home.svg
 UPD 2015-07-28_14:05:33 776 www/images/openautomation/control_minus.svg
 UPD 2015-07-28_14:05:33 1149 www/images/openautomation/control_on_off.svg
