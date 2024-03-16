@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       SMUtils.pm
 #
-#       (c) 2020-2023 by Heiko Maaz
+#       (c) 2020-2024 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module provides routines for FHEM modules developed for Synology use cases.
@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.27.2  16.03.2024  change checkModVer text output
 # 1.27.1  04.12.2023  change checkModVer
 # 1.27.0  03.12.2023  new function checkModVer
 # 1.26.0  08.04.2023  add postid to _addSendqueueExtended
@@ -58,7 +59,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version 0.77; our $VERSION = version->declare('1.27.1');
+use version 0.77; our $VERSION = version->declare('1.27.2');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -2075,7 +2076,7 @@ sub checkModVer {
       }
 
       if (!$fileOk) {
-          $msg = "A new $fName version is available on SVN (creation time: $r[1], size: $r[2] Bytes).";
+          $msg = "Another official $fName version is available on SVN (creation time: $r[1], size: $r[2] Bytes).";
           $rec = "You should update FHEM to get the recent $fName version from Repository.";
           return (0, 1, $msg, $rec, $fName, $r[2]);
       }
