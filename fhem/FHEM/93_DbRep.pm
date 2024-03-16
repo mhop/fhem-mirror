@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.7"  => "16.03.2024  prevent some attribute evaluation as long as init_done is not set ",
   "8.53.6"  => "15.03.2024  change verbose level of DbRep_beforeproc, DbRep_afterproc to 3 ",
   "8.53.5"  => "11.03.2024  some changes for MariaDB Perl driver usage, change DbRep_dbConnect".
                             "support compression between client and server ",
@@ -1537,7 +1538,7 @@ sub DbRep_Attr {
                          );
 
     if ($aName eq "disable") {
-        if($cmd eq "set") {
+        if ($cmd eq "set") {
             $do = ($aVal) ? 1 : 0;
         }
 
@@ -1563,24 +1564,14 @@ sub DbRep_Attr {
             return "Usage of $aName is wrong. Use a comma separated list of readings which are should prevent from deletion when a new selection starts.";
         }
     }
-
-    if ($aName eq "fetchValueFn") {
-        if($cmd eq "set") {
-            my $VALUE = "Hello";
-            if( $aVal =~ m/^\s*(\{.*\})\s*$/s ) {                            # Funktion aus Attr validieren
-                $aVal = $1;
-            }
-            else {
-                $aVal = "";
-            }
-            return "Your function does not match the form \"{<function>}\"" if(!$aVal);
-            eval $aVal;
-            return "Bad function: $@" if($@);
-        }
+    
+    if ($aName eq "device") {
+        my $awdev = $aVal;
+        DbRep_modAssociatedWith ($hash,$cmd,$awdev);
     }
 
     if ($aName eq "sqlCmdHistoryLength") {
-        if($cmd eq "set") {
+        if ($cmd eq "set") {
             $do = ($aVal) ? 1 : 0;
         }
         $do = 0 if($cmd eq "del");
@@ -1589,41 +1580,10 @@ sub DbRep_Attr {
         }
     }
 
-    if ($aName eq "userExitFn") {
-        if($cmd eq "set") {
-            if(!$aVal) {
-                return "Usage of $aName is wrong. The function has to be specified as \"<UserExitFn> [reading:value]\" ";
-            }
-            if ($aVal =~ m/^\s*(\{.*\})\s*$/xs) {                             # unnamed Funktion direkt in userExitFn mit {...}
-                $aVal = $1;
-                my ($NAME,$READING,$VALUE) = ('','','');
-                eval $aVal;
-                return $@ if ($@);
-            }
-        }
-    }
-
-    if ($aName =~ /executeAfterProc|executeBeforeProc/xs) {
-        if($cmd eq "set") {
-            if ($aVal =~ m/^\s*(\{.*\}|{.*|.*})\s*$/xs && $aVal !~ /{".*"}/xs) {
-                $aVal = $1;
-
-                my $fdv                   = __DbRep_fhemDefVars ();
-                my ($today, $hms, $we)    = ($fdv->{today}, $fdv->{hms},   $fdv->{we});
-                my ($sec, $min, $hour)    = ($fdv->{sec},   $fdv->{min},   $fdv->{hour});
-                my ($mday, $month, $year) = ($fdv->{mday},  $fdv->{month}, $fdv->{year});
-                my ($wday, $yday, $isdst) = ($fdv->{wday},  $fdv->{yday},  $fdv->{isdst});
-
-                eval $aVal;
-                return $@ if ($@);
-            }
-        }
-    }
-
     if ($aName eq "role") {
-        if($cmd eq "set") {
+        if ($cmd eq "set") {
             if ($aVal eq "Agent") {
-                foreach(devspec2array("TYPE=DbRep")) {                       # check ob bereits ein Agent für die angeschlossene Datenbank existiert -> DbRep-Device kann dann keine Agent-Rolle einnehmen
+                foreach (devspec2array("TYPE=DbRep")) {                       # check ob bereits ein Agent für die angeschlossene Datenbank existiert -> DbRep-Device kann dann keine Agent-Rolle einnehmen
                     my $devname = $_;
                     next if($devname eq $name);
                     my $devrole = $defs{$_}{ROLE};
@@ -1648,37 +1608,75 @@ sub DbRep_Attr {
         delete($attr{$name}{icon}) if($do eq "Client");
     }
 
-    if($aName eq "device") {
-        my $awdev = $aVal;
-        DbRep_modAssociatedWith ($hash,$cmd,$awdev);
-    }
+    if ($cmd eq 'set') {
+        if ($aName eq 'fetchValueFn' && $init_done) {
+            my $VALUE = "Hello";
+            if ( $aVal =~ m/^\s*(\{.*\})\s*$/s ) {                            # Funktion aus Attr validieren
+                $aVal = $1;
+            }
+            else {
+                $aVal = "";
+            }
+            
+            return "Your function does not match the form \"{<function>}\"" if(!$aVal);
+            
+            eval $aVal;
+            return "Bad function: $@" if($@);
+        }
+        
+        if ($aName eq 'userExitFn' && $init_done) {
+            if (!$aVal) {
+                return "Usage of $aName is wrong. The function has to be specified as \"<UserExitFn> [reading:value]\" ";
+            }
+            
+            if ($aVal =~ m/^\s*(\{.*\})\s*$/xs) {                             # unnamed Funktion direkt in userExitFn mit {...}
+                $aVal = $1;
+                my ($NAME,$READING,$VALUE) = ('','','');
+                eval $aVal;
+                return $@ if($@);
+            }
+        }
+        
+        if ($aName =~ /executeAfterProc|executeBeforeProc/xs && $init_done) {
+            if ($aVal =~ m/^\s*(\{.*\}|{.*|.*})\s*$/xs && $aVal !~ /{".*"}/xs) {
+                $aVal = $1;
 
-    if ($cmd eq "set") {
+                my $fdv                   = __DbRep_fhemDefVars ();
+                my ($today, $hms, $we)    = ($fdv->{today}, $fdv->{hms},   $fdv->{we});
+                my ($sec, $min, $hour)    = ($fdv->{sec},   $fdv->{min},   $fdv->{hour});
+                my ($mday, $month, $year) = ($fdv->{mday},  $fdv->{month}, $fdv->{year});
+                my ($wday, $yday, $isdst) = ($fdv->{wday},  $fdv->{yday},  $fdv->{isdst});
+
+                eval $aVal;
+                return $@ if ($@);
+            }
+        }
+        
         if ($aName =~ /valueFilter/) {
             eval { "Hallo" =~ m/$aVal/ };
             return "Bad regexp: $@" if($@);
         }
 
-        if ($aName eq "autoForward") {
+        if ($aName eq "autoForward" && $init_done) {
             my $em = "Usage of $aName is wrong. The function has to be specified as ".
                      "\"{ <destination-device> => \"<source-reading (Regex)> => [=> destination-reading]\" }\". ".
                      "The specification can be made in several lines separated by comma.";
-            if($aVal !~ m/^\{.*(=>)+?.*\}$/s) {return $em;}
+            if ($aVal !~ m/^\{.*(=>)+?.*\}$/s) {return $em;}
             my $av = eval $aVal;
 
-            if($@) {
+            if ($@) {
                 Log3($name, 2, "$name - Error while evaluate: ".$@);
                 return $@;
             }
 
-            if(ref($av) ne "HASH") {
+            if (ref($av) ne "HASH") {
                 return $em;
             }
         }
 
         if ($aName =~ /seqDoubletsVariance/) {
             my $edge = "";
-            if($aVal =~ /EDGE=/) {
+            if ($aVal =~ /EDGE=/) {
                 ($aVal,$edge) = split("EDGE=", $aVal);
                 unless ($edge =~ /^positive$|^negative$/i) { return qq{The parameter EDGE can only be "positive" or "negative" !}; }
             }
@@ -1842,11 +1840,11 @@ sub DbRep_Attr {
         }
 
         if ($aName eq "ftpUse") {
-            delete($attr{$name}{ftpUseSSL});
+            delete $attr{$name}{ftpUseSSL};
         }
 
         if ($aName eq "ftpUseSSL") {
-            delete($attr{$name}{ftpUse});
+            delete $attr{$name}{ftpUse};
         }
 
         if ($aName eq "useAdminCredentials" && $aVal) {
@@ -5899,14 +5897,14 @@ sub DbRep_fetchrowsDone {
       return;
   }
 
-  my ($rt,$brt)  = split ",", $bt;
-  my $reading    = AttrVal($name, "reading",        '');
-  my $limit      = AttrVal($name, "limit",        1000);
-  my $fvfn       = AttrVal($name, "fetchValueFn",   '');
+  my ($rt,$brt) = split ",", $bt;
+  my $reading   = AttrVal($name, "reading",        '');
+  my $limit     = AttrVal($name, "limit",        1000);
+  my $fvfn      = AttrVal($name, "fetchValueFn",   '');
 
-  my $color      = "<html><span style=\"color: #".AttrVal($name, "fetchMarkDuplicates", "000000").";\">";  # Highlighting doppelter DB-Einträge
-  $color         =~ s/#// if($color =~ /red|blue|brown|green|orange/);
-  my $ecolor     = "</span></html>";                                                                       # Ende Highlighting
+  my $color     = "<html><span style=\"color: #".AttrVal($name, "fetchMarkDuplicates", "000000").";\">";  # Highlighting doppelter DB-Einträge
+  $color        =~ s/#// if($color =~ /red|blue|brown|green|orange/);
+  my $ecolor    = "</span></html>";                                                                       # Ende Highlighting
 
   my @row;
   my $reading_runtime_string;
@@ -5976,10 +5974,10 @@ sub DbRep_fetchrowsDone {
           }
       }
 
-      if($fvfn) {
+      if ($fvfn) {
           my $VALUE = $val;
 
-          if( $fvfn =~ m/^\s*(\{.*\})\s*$/s ) {
+          if ($fvfn =~ m/^\s*(\{.*\})\s*$/s) {
               $fvfn = $1;
           }
           else {
@@ -12308,7 +12306,7 @@ sub DbRep_autoForward {
   my $hash = $defs{$name};
   my $av   = AttrVal ($name, 'autoForward', '');
 
-  return if(!$av);
+  return if(!$av || !$init_done);
 
   $av =~ m/^\{(.*)\}/s;
   $av = $1;
@@ -12329,9 +12327,9 @@ sub DbRep_autoForward {
 
   $af = eval $av;
 
-  if($@ || ref($af) ne "HASH") {
-      Log3($name, 2, "$name - Values specified in attribute \"autoForward\" are not defined as HASH ... exiting !") if(ref($af) ne "HASH");
-      Log3($name, 2, "$name - Error while evaluate: ".$@) if($@);
+  if ($@ || ref($af) ne "HASH") {
+      Log3 ($name, 2, "$name - Values specified in attribute \"autoForward\" are not defined as HASH ... exiting !") if(ref($af) ne "HASH");
+      Log3 ($name, 2, "$name - Error while evaluate: ".$@) if($@);
       return;
   }
 
@@ -12340,15 +12338,15 @@ sub DbRep_autoForward {
       $ddev                 = DbRep_trim ($ddev) if($ddev);
       next if(!$ddev);
 
-      $srr  = DbRep_trim ($srr) if($srr);
-      $dr   = DbRep_trim ($dr)  if($dr);
+      $srr = DbRep_trim ($srr) if($srr);
+      $dr  = DbRep_trim ($dr)  if($dr);
 
-      if(!$defs{$ddev}) {                                                          # Vorhandensein Destination Device prüfen
+      if (!$defs{$ddev}) {                                                          # Vorhandensein Destination Device prüfen
           Log3($name, 2, "$name - WARNING - Forward reading \"$reading\" not possible, device \"$ddev\" doesn't exist");
           next;
       }
 
-      if(!$srr || $reading !~ /^$srr$/) {
+      if (!$srr || $reading !~ /^$srr$/) {
           # Log3 ($name, 4, "$name - Reading \"$reading\" doesn't match autoForward-Regex: ".($srr?$srr:"")." - no forward to \"$ddev\" ");
           next;
       }
@@ -12357,9 +12355,9 @@ sub DbRep_autoForward {
       $dr = $dr ? $dr : ($sr !~ /\.\*/xs) ? $sr : $reading;                        # Destination Reading = Source Reading wenn Destination Reading nicht angegeben
       $dr = makeReadingName ($dr);                                                 # Destination Readingname validieren / entfernt aus dem übergebenen Readingname alle ungültigen Zeichen und ersetzt diese durch einen Unterstrich "_"
 
-      Log3($name, 4, "$name - Forward reading \"$reading\" to \"$ddev:$dr\" ");
+      Log3 ($name, 4, "$name - Forward reading \"$reading\" to \"$ddev:$dr\" ");
 
-      CommandSetReading(undef, "$ddev $dr $value");
+      CommandSetReading (undef, "$ddev $dr $value");
   }
 
 return;
@@ -18122,8 +18120,8 @@ return;
           <tr><td> <b>device</b>                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
           <tr><td> <b>reading</b>                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
           <tr><td> <b>time.*</b>                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-          <tr><td> executeBeforeProc             </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Ausführung </td></tr>
-          <tr><td> executeAfterProc              </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ausführung </td></tr>
+          <tr><td> <b>executeBeforeProc</b>      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Ausführung </td></tr>
+          <tr><td> <b>executeAfterProc</b>       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ausführung </td></tr>
           <tr><td> <b>readingNameMap</b>         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>
           <tr><td> <b>valueFilter</b>            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
           </table>
