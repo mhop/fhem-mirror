@@ -429,6 +429,21 @@ structure_Set($@)
     @devList = reverse @devList;
   }
 
+  if(@list > 1 && $list[$#list] =~ m/^random:(\d+)/) { #137517
+    my $selCount = $1;
+    my $devCount = $#devList + 1;
+    $selCount    = $devCount if ($selCount > $devCount || $selCount < 1);
+    my @selDev   = @devList;
+    @devList     = ();
+    for (1..$selCount) {
+      my $n = int(rand($devCount));
+      redo if ($selDev[$n] eq "");   
+      push(@devList,$selDev[$n]);
+      $selDev[$n] = "";
+    }
+    pop @list;   
+  }
+
   if($list[1] =~ m/^(save|restore)StructState$/) {
     return "Usage: set $me $list[1] readingName" if(@list != 3);
     return "Bad reading name $list[2]" if(!goodReadingName($list[2]));
@@ -670,7 +685,9 @@ structure_Attr($@)
     propagated set for the attached devices like this: <code>set
     &lt;devN&gt;:FILTER=&lt;filter&gt; &lt;type-specific&gt;</code><br>
     If the last set parameter is "reverse", then execute the set commands in
-    the reverse order.
+    the reverse order.<br/>
+    If the last set parameter is given as "random:4" only 4 structure members will
+    be selected randomly which will receive the given command.<br/>
   </ul>
   <br>
 
@@ -899,15 +916,17 @@ structure_Attr($@)
       </li><br>
     Jedes andere set Kommando wird an alle Devices dieser Struktur
     weitergegeben.<br>
-    Aussnahme: das Attribut structexclude ist in einem Device definiert und
+    Ausnahme: das Attribut structexclude ist in einem Device definiert und
     dessen Attributwert matched als Regexp zum Namen der aktuellen
     Struktur.<br> Wenn das set Kommando diese Form hat <code>set
     &lt;structure&gt; [FILTER=&lt;filter&gt;] &lt;type-specific&gt;</code> wird
-    :FILTER=&lt;filter&gt; bei der Weitergebe der set an jeden Devicenamen wie
+    :FILTER=&lt;filter&gt; bei der Weitergabe der set an jeden Devicenamen wie
     folgt angeh&auml;ngt: <code>set &lt;devN&gt;:FILTER=&lt;filter&gt;
     &lt;type-specific&gt;</code><br>
     Falls der letzte Parameter reverse ist, dann werden die Befehle in der
-    umgekehrten Reihenfolge ausgef&uuml;hrt.
+    umgekehrten Reihenfolge ausgef&uuml;hrt.<br/>
+    Falls der letzte Parameter dem Muster "random:4" entspricht, erhalten nur 4
+    zuf&auml;llig ausgew&auml;hlte Devices den Befehl.<br/>
   </ul>
   <br>
   <a id="structure-get"></a>
