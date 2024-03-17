@@ -1,13 +1,14 @@
-For usage instruction see commandref.html, section define
-2007-12-30bn
+For usage instruction see commandref.html, section define of DbLog
 
-- 93_DbLog.pm
-  copy this file into <modpath>/FHEM
 - db.conf
   sample database configuration file
-- fhemdb_create.sql
-  sample sql command to create a mysql database for logging purposes
+- db_create_mysql.sql
+  sample sql command to create a MySQL or MariaDB database for logging purposes
+- db_create_postgresql.sql
+  sample sql command to create a PostgreSQL database for logging purposes
+- db_create_sqlite.sql
+  sample sql command to create a SQLite database for logging purposes
 - fhemdb_get.pl
-  sample perl script for retrieving the current (latest) data from
+  short sample perl script for retrieving the current (latest) data from
   the logging database
 
