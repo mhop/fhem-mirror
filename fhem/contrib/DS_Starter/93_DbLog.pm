@@ -60,7 +60,7 @@ use vars qw($FW_ME $FW_subdir);                                      # predeclar
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.10.0"  => "07.03.2024 support of MariaDB driver, optimize Timer execMemCacheAsync, change DbLog_configcheck, _DbLog_SBP_connectDB ".
+  "5.10.0"  => "17.03.2024 support of MariaDB driver, optimize Timer execMemCacheAsync, optimize DbLog_configcheck,_DbLog_SBP_connectDB ".
                            "remove countNbl, support compression between client and server, improved performance if attr excludeDevs is set ".
                            "Fix _DbLog_plotData Forum: https://forum.fhem.de/index.php?topic=136930.0 ",
   "5.9.6"   => "09.03.2024 change META.json ",
@@ -7110,11 +7110,11 @@ sub DbLog_configcheck {
   ###################
   my $pv          = sprintf("%vd",$^V);                                              # Perl Version
   my $dbi         = $DBI::VERSION;                                                   # DBI Version
-  my %drivers     = DBI->installed_drivers();
+  my @drivers     = DBI->available_drivers();
   my ($dvy, $dva) = ("","");
 
   if ($dbmodel =~ /MYSQL|MARIADB/xs) {
-      for (keys %drivers) {
+      for (@drivers) {
           $dvy = $_ if($_ =~ /mysql/ix);
           $dva = $_ if($_ =~ /mariadb/ix);
       }
@@ -7332,7 +7332,7 @@ sub DbLog_configcheck {
   }
   
   $check .= "Character Set used by DB $dbname: $cltdbase <br>";
-  $check .= "Collation used by DB $dbname: ".$cltdbase."_".$cltdtail." <br>";
+  $check .= "Collation used by DB $dbname: ".$cltdbase.($cltdtail ? "_".$cltdtail : '')." <br>";
 
   $check .= $dbmodel =~ /SQLITE|MARIADB/ ? "Rating: ".$ok."<br>" :
             $rec =~ /settings\so.k./xs   ? "Rating: ".$ok."<br>" :
