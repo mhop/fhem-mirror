@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 28621 2024-03-08 23:25:01Z DS_Starter $
+# $Id: 93_DbRep.pm 28668 2024-03-16 20:01:55Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -59,6 +59,11 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.8"  => "17.03.2024  sqlCmdBlocking able to use sql Keywords (§timestamp_end§ etc.) ",
+  "8.53.7"  => "16.03.2024  prevent some attribute evaluation as long as init_done is not set ",
+  "8.53.6"  => "15.03.2024  change verbose level of DbRep_beforeproc, DbRep_afterproc to 3 ",
+  "8.53.5"  => "11.03.2024  some changes for MariaDB Perl driver usage, change DbRep_dbConnect".
+                            "support compression between client and server ",
   "8.53.4"  => "09.03.2024  Ready for support of MariaDB Perl driver ",
   "8.53.3"  => "06.03.2024  delete attribute allowDeletion, multiCmd: executeBeforeProc, executeAfterProc as attributes ".
                             "Set: all commands are executable even if \$dbloghash->{HELPER}{REOPEN_RUNS_UNTIL}is set ".
@@ -377,77 +382,77 @@ my $dbrep_deftobl             = 10;                                             
 ###################################################################################
 sub DbRep_Initialize {
  my ($hash) = @_;
- $hash->{DefFn}        = "DbRep_Define";
- $hash->{UndefFn}      = "DbRep_Undef";
- $hash->{DeleteFn}     = "DbRep_Delete";
- $hash->{ShutdownFn}   = "DbRep_Shutdown";
- $hash->{NotifyFn}     = "DbRep_Notify";
- $hash->{SetFn}        = "DbRep_Set";
- $hash->{GetFn}        = "DbRep_Get";
- $hash->{AttrFn}       = "DbRep_Attr";
+ $hash->{DefFn}             = "DbRep_Define";
+ $hash->{UndefFn}           = "DbRep_Undef";
+ $hash->{DeleteFn}          = "DbRep_Delete";
+ $hash->{ShutdownFn}        = "DbRep_Shutdown";
+ $hash->{NotifyFn}          = "DbRep_Notify";
+ $hash->{SetFn}             = "DbRep_Set";
+ $hash->{GetFn}             = "DbRep_Get";
+ $hash->{AttrFn}            = "DbRep_Attr";
  $hash->{FW_deviceOverview} = 1;
 
- $hash->{AttrList} =   "aggregation:minute,hour,day,week,month,year,no ".
-                       "allowDeletion:obsolete ".
-                       "disable:1,0 ".
-                       "reading ".
-                       "autoForward:textField-long ".
-                       "averageCalcForm:avgArithmeticMean,avgDailyMeanGWS,avgDailyMeanGWSwithGTS,avgTimeWeightMean ".
-                       "countEntriesDetail:1,0 ".
-                       "device " .
-                       "dumpComment ".
-                       "dumpCompress:1,0 ".
-                       "dumpDirLocal ".
-                       "dumpDirRemote ".
-                       "dumpMemlimit ".
-                       "dumpSpeed ".
-                       "dumpFilesKeep:0,1,2,3,4,5,6,7,8,9,10 ".
-                       "executeBeforeProc:textField-long ".
-                       "executeAfterProc:textField-long ".
-                       "expimpfile ".
-                       "fastStart:0,1 ".
-                       "fetchRoute:ascent,descent ".
-                       "fetchMarkDuplicates:red,blue,brown,green,orange ".
-                       "fetchValueFn:textField-long ".
-                       "ftpDebug:1,0 ".
-                       "ftpDir ".
-                       "ftpDumpFilesKeep:1,2,3,4,5,6,7,8,9,10 ".
-                       "ftpPassive:1,0 ".
-                       "ftpPwd ".
-                       "ftpPort ".
-                       "ftpServer ".
-                       "ftpTimeout ".
-                       "ftpUse:1,0 ".
-                       "ftpUser ".
-                       "ftpUseSSL:1,0 ".
-                       "diffAccept ".
-                       "limit ".
-                       "numDecimalPlaces:0,1,2,3,4,5,6,7 ".
-                       "optimizeTablesBeforeDump:1,0 ".
-                       "readingNameMap ".
-                       "readingPreventFromDel ".
-                       "role:Client,Agent ".
-                       "seqDoubletsVariance ".
-                       "showproctime:1,0 ".
-                       "showSvrInfo ".
-                       "showVariables ".
-                       "showStatus ".
-                       "showTableInfo ".
-                       "sqlCmdHistoryLength:slider,0,1,200 ".
-                       "sqlCmdVars ".
-                       "sqlFormatService:https://sqlformat.org,none ".
-                       "sqlResultFormat:separated,mline,sline,table,json ".
-                       "sqlResultFieldSep:|,:,\/ ".
-                       "timeYearPeriod ".
-                       "timestamp_begin ".
-                       "timestamp_end ".
-                       "timeDiffToNow ".
-                       "timeOlderThan ".
-                       "timeout ".
-                       "useAdminCredentials:1,0 ".
-                       "userExitFn:textField-long ".
-                       "valueFilter ".
-                       $readingFnAttributes;
+ $hash->{AttrList} = "aggregation:minute,hour,day,week,month,year,no ".
+                     "allowDeletion:obsolete ".
+                     "disable:1,0 ".
+                     "reading ".
+                     "autoForward:textField-long ".
+                     "averageCalcForm:avgArithmeticMean,avgDailyMeanGWS,avgDailyMeanGWSwithGTS,avgTimeWeightMean ".
+                     "countEntriesDetail:1,0 ".
+                     "device " .
+                     "dumpComment ".
+                     "dumpCompress:1,0 ".
+                     "dumpDirLocal ".
+                     "dumpDirRemote ".
+                     "dumpMemlimit ".
+                     "dumpSpeed ".
+                     "dumpFilesKeep:0,1,2,3,4,5,6,7,8,9,10 ".
+                     "executeBeforeProc:textField-long ".
+                     "executeAfterProc:textField-long ".
+                     "expimpfile ".
+                     "fastStart:0,1 ".
+                     "fetchRoute:ascent,descent ".
+                     "fetchMarkDuplicates:red,blue,brown,green,orange ".
+                     "fetchValueFn:textField-long ".
+                     "ftpDebug:1,0 ".
+                     "ftpDir ".
+                     "ftpDumpFilesKeep:1,2,3,4,5,6,7,8,9,10 ".
+                     "ftpPassive:1,0 ".
+                     "ftpPwd ".
+                     "ftpPort ".
+                     "ftpServer ".
+                     "ftpTimeout ".
+                     "ftpUse:1,0 ".
+                     "ftpUser ".
+                     "ftpUseSSL:1,0 ".
+                     "diffAccept ".
+                     "limit ".
+                     "numDecimalPlaces:0,1,2,3,4,5,6,7 ".
+                     "optimizeTablesBeforeDump:1,0 ".
+                     "readingNameMap ".
+                     "readingPreventFromDel ".
+                     "role:Client,Agent ".
+                     "seqDoubletsVariance ".
+                     "showproctime:1,0 ".
+                     "showSvrInfo ".
+                     "showVariables ".
+                     "showStatus ".
+                     "showTableInfo ".
+                     "sqlCmdHistoryLength:slider,0,1,200 ".
+                     "sqlCmdVars ".
+                     "sqlFormatService:https://sqlformat.org,none ".
+                     "sqlResultFormat:separated,mline,sline,table,json ".
+                     "sqlResultFieldSep:|,:,\/ ".
+                     "timeYearPeriod ".
+                     "timestamp_begin ".
+                     "timestamp_end ".
+                     "timeDiffToNow ".
+                     "timeOlderThan ".
+                     "timeout ".
+                     "useAdminCredentials:1,0 ".
+                     "userExitFn:textField-long ".
+                     "valueFilter ".
+                     $readingFnAttributes;
 
  my %hash = (
        Fn  => 'CommandDbReadingsVal',
@@ -498,7 +503,6 @@ sub DbRep_Define {
   $hash->{NOTIFYDEV}             = "global,".$name;                                        # nur Events dieser Devices an DbRep_Notify weiterleiten
   my $dbconn                     = $defs{$a[2]}{dbconn};
   $hash->{DATABASE}              = (split(/;|=/, $dbconn))[1];
-  $hash->{UTF8}                  = defined($defs{$a[2]}{UTF8}) ? $defs{$a[2]}{UTF8} : 0;   # wird in DbRep_getInitData aus DB abgefragt und neu gesetzt
 
   DbRep_setVersionInfo  ($hash);                                                           # Versionsinformationen setzen
   DbRep_initSQLcmdCache ($name);                                                           # SQL Kommando Cache initialisieren
@@ -1349,7 +1353,7 @@ sub DbRep_Get {
       DbRep_delread    ($hash);                                                              # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);
 
-      return DbRep_sqlCmdBlocking($name,$sqlcmd);
+      return DbRep_sqlCmdBlocking ($name,$sqlcmd);
   }
   elsif ($opt eq "storedCredentials") {                                                      # Credentials abrufen
         my $atxt;
@@ -1465,7 +1469,7 @@ sub DbRep_Get {
       return $ret;
   }
   else {
-      return "$getlist";
+      return $getlist;
   }
 
 return;
@@ -1535,7 +1539,7 @@ sub DbRep_Attr {
                          );
 
     if ($aName eq "disable") {
-        if($cmd eq "set") {
+        if ($cmd eq "set") {
             $do = ($aVal) ? 1 : 0;
         }
 
@@ -1561,24 +1565,14 @@ sub DbRep_Attr {
             return "Usage of $aName is wrong. Use a comma separated list of readings which are should prevent from deletion when a new selection starts.";
         }
     }
-
-    if ($aName eq "fetchValueFn") {
-        if($cmd eq "set") {
-            my $VALUE = "Hello";
-            if( $aVal =~ m/^\s*(\{.*\})\s*$/s ) {                            # Funktion aus Attr validieren
-                $aVal = $1;
-            }
-            else {
-                $aVal = "";
-            }
-            return "Your function does not match the form \"{<function>}\"" if(!$aVal);
-            eval $aVal;
-            return "Bad function: $@" if($@);
-        }
+    
+    if ($aName eq "device") {
+        my $awdev = $aVal;
+        DbRep_modAssociatedWith ($hash,$cmd,$awdev);
     }
 
     if ($aName eq "sqlCmdHistoryLength") {
-        if($cmd eq "set") {
+        if ($cmd eq "set") {
             $do = ($aVal) ? 1 : 0;
         }
         $do = 0 if($cmd eq "del");
@@ -1587,41 +1581,10 @@ sub DbRep_Attr {
         }
     }
 
-    if ($aName eq "userExitFn") {
-        if($cmd eq "set") {
-            if(!$aVal) {
-                return "Usage of $aName is wrong. The function has to be specified as \"<UserExitFn> [reading:value]\" ";
-            }
-            if ($aVal =~ m/^\s*(\{.*\})\s*$/xs) {                             # unnamed Funktion direkt in userExitFn mit {...}
-                $aVal = $1;
-                my ($NAME,$READING,$VALUE) = ('','','');
-                eval $aVal;
-                return $@ if ($@);
-            }
-        }
-    }
-
-    if ($aName =~ /executeAfterProc|executeBeforeProc/xs) {
-        if($cmd eq "set") {
-            if ($aVal =~ m/^\s*(\{.*\}|{.*|.*})\s*$/xs && $aVal !~ /{".*"}/xs) {
-                $aVal = $1;
-
-                my $fdv                   = __DbRep_fhemDefVars ();
-                my ($today, $hms, $we)    = ($fdv->{today}, $fdv->{hms},   $fdv->{we});
-                my ($sec, $min, $hour)    = ($fdv->{sec},   $fdv->{min},   $fdv->{hour});
-                my ($mday, $month, $year) = ($fdv->{mday},  $fdv->{month}, $fdv->{year});
-                my ($wday, $yday, $isdst) = ($fdv->{wday},  $fdv->{yday},  $fdv->{isdst});
-
-                eval $aVal;
-                return $@ if ($@);
-            }
-        }
-    }
-
     if ($aName eq "role") {
-        if($cmd eq "set") {
+        if ($cmd eq "set") {
             if ($aVal eq "Agent") {
-                foreach(devspec2array("TYPE=DbRep")) {                       # check ob bereits ein Agent für die angeschlossene Datenbank existiert -> DbRep-Device kann dann keine Agent-Rolle einnehmen
+                foreach (devspec2array("TYPE=DbRep")) {                       # check ob bereits ein Agent für die angeschlossene Datenbank existiert -> DbRep-Device kann dann keine Agent-Rolle einnehmen
                     my $devname = $_;
                     next if($devname eq $name);
                     my $devrole = $defs{$_}{ROLE};
@@ -1646,37 +1609,75 @@ sub DbRep_Attr {
         delete($attr{$name}{icon}) if($do eq "Client");
     }
 
-    if($aName eq "device") {
-        my $awdev = $aVal;
-        DbRep_modAssociatedWith ($hash,$cmd,$awdev);
-    }
+    if ($cmd eq 'set') {
+        if ($aName eq 'fetchValueFn' && $init_done) {
+            my $VALUE = "Hello";
+            if ( $aVal =~ m/^\s*(\{.*\})\s*$/s ) {                            # Funktion aus Attr validieren
+                $aVal = $1;
+            }
+            else {
+                $aVal = "";
+            }
+            
+            return "Your function does not match the form \"{<function>}\"" if(!$aVal);
+            
+            eval $aVal;
+            return "Bad function: $@" if($@);
+        }
+        
+        if ($aName eq 'userExitFn' && $init_done) {
+            if (!$aVal) {
+                return "Usage of $aName is wrong. The function has to be specified as \"<UserExitFn> [reading:value]\" ";
+            }
+            
+            if ($aVal =~ m/^\s*(\{.*\})\s*$/xs) {                             # unnamed Funktion direkt in userExitFn mit {...}
+                $aVal = $1;
+                my ($NAME,$READING,$VALUE) = ('','','');
+                eval $aVal;
+                return $@ if($@);
+            }
+        }
+        
+        if ($aName =~ /executeAfterProc|executeBeforeProc/xs && $init_done) {
+            if ($aVal =~ m/^\s*(\{.*\}|{.*|.*})\s*$/xs && $aVal !~ /{".*"}/xs) {
+                $aVal = $1;
 
-    if ($cmd eq "set") {
+                my $fdv                   = __DbRep_fhemDefVars ();
+                my ($today, $hms, $we)    = ($fdv->{today}, $fdv->{hms},   $fdv->{we});
+                my ($sec, $min, $hour)    = ($fdv->{sec},   $fdv->{min},   $fdv->{hour});
+                my ($mday, $month, $year) = ($fdv->{mday},  $fdv->{month}, $fdv->{year});
+                my ($wday, $yday, $isdst) = ($fdv->{wday},  $fdv->{yday},  $fdv->{isdst});
+
+                eval $aVal;
+                return $@ if ($@);
+            }
+        }
+        
         if ($aName =~ /valueFilter/) {
             eval { "Hallo" =~ m/$aVal/ };
             return "Bad regexp: $@" if($@);
         }
 
-        if ($aName eq "autoForward") {
+        if ($aName eq "autoForward" && $init_done) {
             my $em = "Usage of $aName is wrong. The function has to be specified as ".
                      "\"{ <destination-device> => \"<source-reading (Regex)> => [=> destination-reading]\" }\". ".
                      "The specification can be made in several lines separated by comma.";
-            if($aVal !~ m/^\{.*(=>)+?.*\}$/s) {return $em;}
+            if ($aVal !~ m/^\{.*(=>)+?.*\}$/s) {return $em;}
             my $av = eval $aVal;
 
-            if($@) {
+            if ($@) {
                 Log3($name, 2, "$name - Error while evaluate: ".$@);
                 return $@;
             }
 
-            if(ref($av) ne "HASH") {
+            if (ref($av) ne "HASH") {
                 return $em;
             }
         }
 
         if ($aName =~ /seqDoubletsVariance/) {
             my $edge = "";
-            if($aVal =~ /EDGE=/) {
+            if ($aVal =~ /EDGE=/) {
                 ($aVal,$edge) = split("EDGE=", $aVal);
                 unless ($edge =~ /^positive$|^negative$/i) { return qq{The parameter EDGE can only be "positive" or "negative" !}; }
             }
@@ -1840,11 +1841,11 @@ sub DbRep_Attr {
         }
 
         if ($aName eq "ftpUse") {
-            delete($attr{$name}{ftpUseSSL});
+            delete $attr{$name}{ftpUseSSL};
         }
 
         if ($aName eq "ftpUseSSL") {
-            delete($attr{$name}{ftpUse});
+            delete $attr{$name}{ftpUse};
         }
 
         if ($aName eq "useAdminCredentials" && $aVal) {
@@ -2010,12 +2011,18 @@ sub DbRep_firstconnect {
   RemoveInternalTimer ($hash, "DbRep_firstconnect");
   return if(IsDisabled($name));
 
-  if ($init_done == 1) {
+  if ($init_done) {
       my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
       my $dbconn    = $dbloghash->{dbconn};
       my $dbuser    = $dbloghash->{dbuser};
       my $fadef     = $hash->{MODEL} eq "Client" ? 1 : 0;                      # fastStart default immer 1 für Clients (0 für Agenten)
 
+      delete $hash->{COMPRESSION};
+      delete $hash->{UTF8};
+      
+      $hash->{COMPRESSION} = $dbloghash->{COMPRESSION} if(defined $dbloghash->{COMPRESSION}); 
+      $hash->{UTF8}        = $dbloghash->{UTF8}        if(defined $dbloghash->{UTF8}); 
+  
       if (AttrVal($name, "fastStart", $fadef) && $prop eq "onBoot" ) {
           DbRep_setLastCmd ($name, "initial database connect stopped due to attribute 'fastStart'");
 
@@ -2073,7 +2080,7 @@ sub DbRep_getInitData {
 
   my $bst = [gettimeofday];                                     # Background-Startzeit
 
-  my ($err,$dbh,$dbmodel) = DbRep_dbConnect ($name, 0);
+  my ($err, $dbh, $dbmodel) = DbRep_dbConnect ($name, 0);
   return "$name|$err" if ($err);
 
   my $st = [gettimeofday];                                      # SQL-Startzeit
@@ -2089,17 +2096,17 @@ sub DbRep_getInitData {
   my $encc = qq{};
   my (@se,@sec);
 
-  if($dbmodel =~ /MYSQL|MARIADB/xs) {
+  if ($dbmodel =~ /MYSQL|MARIADB/xs) {
       eval { @se = $dbh->selectrow_array("SELECT default_character_set_name FROM information_schema.SCHEMATA WHERE schema_name = '$database'") };
       $enc = $se[0] // $enc;
       eval { @sec = $dbh->selectrow_array("SHOW VARIABLES LIKE 'character_set_connection'") };
       $encc = $sec[1] // $encc;
   }
-  elsif($dbmodel =~ /SQLITE/xs) {
+  elsif ($dbmodel =~ /SQLITE/xs) {
       eval { @se = $dbh->selectrow_array("PRAGMA encoding;") };
       $enc = $se[0] // $enc;
   }
-  elsif($dbmodel =~ /POSTGRESQL/xs) {
+  elsif ($dbmodel =~ /POSTGRESQL/xs) {
       eval { @se = $dbh->selectrow_array("SELECT pg_encoding_to_char(encoding) FROM pg_database WHERE datname = '$database'") };
       $enc = $se[0] // $enc;
       eval { @sec = $dbh->selectrow_array("SHOW CLIENT_ENCODING") };
@@ -2115,13 +2122,13 @@ sub DbRep_getInitData {
 
   my ($ava,$sqlava);
 
-  if($dbmodel =~ /MYSQL|MARIADB/xs) {
+  if ($dbmodel =~ /MYSQL|MARIADB/xs) {
       $sqlava = "SHOW INDEX FROM history where Key_name='$idx';";
   }
-  elsif($dbmodel =~ /SQLITE/xs) {
+  elsif ($dbmodel =~ /SQLITE/xs) {
       $sqlava = "SELECT name FROM sqlite_master WHERE type='index' AND name='$idx';";
   }
-  elsif($dbmodel =~ /POSTGRESQL/xs) {
+  elsif ($dbmodel =~ /POSTGRESQL/xs) {
       $sqlava = "SELECT indexname FROM pg_indexes WHERE tablename='history' and indexname ='$idx';";
   }
 
@@ -2173,7 +2180,7 @@ sub DbRep_getInitData {
 
   $err  = q{};
 
-return "$name|$err|$mints|$rt|$opt|$prop|$fret|$idxstate|$grants|$enc|$encc";
+return "$name|$err|$mints|$rt|$opt|$prop|$fret|$idxstate|$grants|$enc|$encc|$dbmodel";
 }
 
 ####################################################################################################
@@ -2268,6 +2275,7 @@ sub DbRep_getInitDataDone {
   my $grants    = $a[8]  ? decode_base64($a[8])  : '';
   my $enc       = $a[9]  ? decode_base64($a[9])  : '';
   my $encc      = $a[10] ? decode_base64($a[10]) : '';
+  my $dbmodel   = $a[11];
 
   my $hash      = $defs{$name};
 
@@ -2296,15 +2304,16 @@ sub DbRep_getInitDataDone {
 
       readingsBeginUpdate ($hash);
 
-      if($hash->{LASTCMD} eq "minTimestamp") {
+      if ($hash->{LASTCMD} eq "minTimestamp") {
           ReadingsBulkUpdateValue ($hash, "timestamp_oldest_dataset", $mints);
       }
       else {
           ReadingsBulkUpdateValue ($hash, "dbEncoding",                    $enc);
-          ReadingsBulkUpdateValue ($hash, "connectionEncoding",           $encc) if($encc);
+          ReadingsBulkUpdateValue ($hash, "dbModel",                   $dbmodel);
+          ReadingsBulkUpdateValue ($hash, "connectionEncoding",           $encc)  if($encc);
           ReadingsBulkUpdateValue ($hash, "indexState",               $idxstate);
           ReadingsBulkUpdateValue ($hash, "timestamp_oldest_dataset",    $mints);
-          ReadingsBulkUpdateValue ($hash, "userRights",                 $grants) if($grants);
+          ReadingsBulkUpdateValue ($hash, "userRights",                 $grants)  if($grants);
       }
 
       ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
@@ -2314,7 +2323,6 @@ sub DbRep_getInitDataDone {
 
       $hash->{HELPER}{MINTS}  = $mints;
       $hash->{HELPER}{GRANTS} = $grants if($grants);
-      $hash->{UTF8}           = $enc =~ /utf-?8/xi ? 1 : 0;
   }
 
 return if(!$fret);
@@ -5890,14 +5898,14 @@ sub DbRep_fetchrowsDone {
       return;
   }
 
-  my ($rt,$brt)  = split ",", $bt;
-  my $reading    = AttrVal($name, "reading",        '');
-  my $limit      = AttrVal($name, "limit",        1000);
-  my $fvfn       = AttrVal($name, "fetchValueFn",   '');
+  my ($rt,$brt) = split ",", $bt;
+  my $reading   = AttrVal($name, "reading",        '');
+  my $limit     = AttrVal($name, "limit",        1000);
+  my $fvfn      = AttrVal($name, "fetchValueFn",   '');
 
-  my $color      = "<html><span style=\"color: #".AttrVal($name, "fetchMarkDuplicates", "000000").";\">";  # Highlighting doppelter DB-Einträge
-  $color         =~ s/#// if($color =~ /red|blue|brown|green|orange/);
-  my $ecolor     = "</span></html>";                                                                       # Ende Highlighting
+  my $color     = "<html><span style=\"color: #".AttrVal($name, "fetchMarkDuplicates", "000000").";\">";  # Highlighting doppelter DB-Einträge
+  $color        =~ s/#// if($color =~ /red|blue|brown|green|orange/);
+  my $ecolor    = "</span></html>";                                                                       # Ende Highlighting
 
   my @row;
   my $reading_runtime_string;
@@ -5967,10 +5975,10 @@ sub DbRep_fetchrowsDone {
           }
       }
 
-      if($fvfn) {
+      if ($fvfn) {
           my $VALUE = $val;
 
-          if( $fvfn =~ m/^\s*(\{.*\})\s*$/s ) {
+          if ($fvfn =~ m/^\s*(\{.*\})\s*$/s) {
               $fvfn = $1;
           }
           else {
@@ -6999,23 +7007,37 @@ return "$name|$err|$rowstring|$opt|$cmd|$nrows|$rt";
 #     liefert Ergebnis sofort zurück, setzt keine Readings
 ####################################################################################################
 sub DbRep_sqlCmdBlocking {
-  my $name   = shift;
-  my $cmd    = shift;
+  my $name = shift;
+  my $cmd  = shift;
 
-  my $hash   = $defs{$name};
-  my $srs    = AttrVal ($name, 'sqlResultFieldSep',  '|');
-  my $to     = AttrVal ($name, 'timeout', $dbrep_deftobl);
+  my $hash    = $defs{$name};
+  my $srs     = AttrVal ($name, 'sqlResultFieldSep',  '|');
+  my $to      = AttrVal ($name, 'timeout', $dbrep_deftobl);
+  my $reading = AttrVal ($name, 'reading', '%');
+  my $device  = AttrVal ($name, 'device',  '%');
 
-  my ($ret);
+  my $ret;
 
-  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name);
+  my ($err, $dbh, $dbmodel) = DbRep_dbConnect ($name);
   if ($err) {
       _DbRep_sqlBlckgErrorState ($hash, $err);
       return $err;
   }
+  
+  my ($IsTimeSet, $IsAggrSet, $aggregation) = DbRep_checktimeaggr ($hash);
+  my ($runtime_string_first, $runtime_string_next);
+  
+  if ($IsTimeSet || $IsAggrSet) {
+      (undef, undef, $runtime_string_first, $runtime_string_next) = DbRep_createTimeArray ($hash, $aggregation, 'sqlCmdBlocking');
+  }
+  else {
+      Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: not set");
+      Log3 ($name, 4, "DbRep $name - Timestamp end human readable: not set");
+  }
 
-  $cmd =~ s/\;\;/ESC_ESC_ESC/gx;                                                     # ersetzen von escapeten ";" (;;)
+  Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation");
 
+  $cmd    =~ s/\;\;/ESC_ESC_ESC/gx;                                                     # ersetzen von escapeten ";" (;;)
   $cmd   .= ";" if ($cmd !~ m/\;$/x);
   my $sql = $cmd;
 
@@ -7043,6 +7065,21 @@ sub DbRep_sqlCmdBlocking {
   }
 
   $err = _DbRep_execSessPrepare ($name, $dbh, \$sql);
+  if ($err) {
+      _DbRep_sqlBlckgErrorState ($hash, $err);
+      return $err;
+  }
+  
+  # Ersetzung von Schlüsselwörtern für Timing, Gerät, Lesen (unter Verwendung der Attributsyntax)
+  ($err, $sql) = _DbRep_sqlReplaceKeywords ( { hash    => $hash,
+                                               sql     => $sql,
+                                               device  => $device,
+                                               reading => $reading,
+                                               dbmodel => $dbmodel,
+                                               rsf     => $runtime_string_first,
+                                               rsn     => $runtime_string_next
+                                             }
+                                           );
   if ($err) {
       _DbRep_sqlBlckgErrorState ($hash, $err);
       return $err;
@@ -7119,7 +7156,7 @@ sub DbRep_sqlCmdBlocking {
 
   Log3 ($name, 4, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows");
 
-  readingsBeginUpdate         ($hash);
+  readingsBeginUpdate ($hash);
 
   if (defined $data{DbRep}{$name}{sqlcache}{temp}) {                # SQL incl. Formatierung aus Zwischenspeicherzwischenspeichern
       my $tmpsql = delete $data{DbRep}{$name}{sqlcache}{temp};
@@ -8281,8 +8318,6 @@ sub DbRep_mysql_DumpClientSide {
 
   my $bst = [gettimeofday];                                                        # Background-Startzeit
 
-  Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname'");
-
   ##  Beginn Dump
   #################
   undef %db_tables;
@@ -8300,15 +8335,17 @@ sub DbRep_mysql_DumpClientSide {
 
   my ($err, $dbh, $dbmodel) = DbRep_dbConnect($name, 0);
   return "$name|$err" if($err);
+  
+  Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname' (model: $dbmodel)");
 
   $dbh->{mysql_enable_utf8} = 0 if($dbmodel =~ /MYSQL/xs);                                                   # Dump Performance !!! Forum: https://forum.fhem.de/index.php/topic,53584.msg1204535.html#msg1204535
-
+  
   my $st = [gettimeofday];                                                                                   # SQL-Startzeit
 
   ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SELECT VERSION()");                                # Mysql-Version ermitteln
   return "$name|$err" if($err);
 
-  my @mysql_version = $sth->fetchrow;
+  my @mysql_version = $sth->fetchrow_array;
   my @v             = split(/\./,$mysql_version[0]);
   my $collation     = '';
   my $dbcharset     = '';
@@ -8317,7 +8354,7 @@ sub DbRep_mysql_DumpClientSide {
       ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, qq(SHOW VARIABLES LIKE 'collation_database'));
       return "$name|$err" if($err);
 
-      @ar = $sth->fetchrow;
+      @ar = $sth->fetchrow_array;
 
       if ($ar[1]) {
           $collation = $ar[1];
@@ -8331,7 +8368,7 @@ sub DbRep_mysql_DumpClientSide {
       ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SHOW VARIABLES LIKE 'dbcharset'");             # get standard encoding of MySQl-Server
       return "$name|$err" if($err);
 
-      @ar = $sth->fetchrow;
+      @ar = $sth->fetchrow_array;
 
       if ($ar[1]) {
           $dbcharset = $ar[1];
@@ -8359,7 +8396,7 @@ sub DbRep_mysql_DumpClientSide {
   ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
   return "$name|$err" if($err);
 
-  while ( $value = $sth->fetchrow_hashref()) {
+  while ($value = $sth->fetchrow_hashref()) {
       $value->{skip_data} = 0;                                                                          # default -> backup data of table
 
       Log3 ($name, 5, "DbRep $name - ......... Table definition found: .........");
@@ -8540,7 +8577,7 @@ sub DbRep_mysql_DumpClientSide {
   ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, qq(SHOW CREATE DATABASE IF NOT EXISTS $dbname));
   return "$name|$err" if($err);
 
-  my $db_create = $sth->fetchrow;
+  my $db_create = $sth->fetchrow_array;
 
   DbRep_clearConn (undef, $sth);
 
@@ -8589,7 +8626,7 @@ sub DbRep_mysql_DumpClientSide {
           ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, qq(SHOW CREATE TABLE `$tablename`));
           return "$name|$err" if($err);
 
-          @ctab = $sth->fetchrow;
+          @ctab = $sth->fetchrow_array;
           DbRep_clearConn (undef, $sth);
 
           $part  = $ctab[1].";";
@@ -8626,7 +8663,7 @@ sub DbRep_mysql_DumpClientSide {
 
               $fieldlist = "(";
 
-              while (@ar = $sth->fetchrow) {                                                       # build fieldlist
+              while (@ar = $sth->fetchrow_array) {                                                 # build fieldlist
                   $fieldlist .= "`".$ar[0]."`,";
               }
 
@@ -8649,7 +8686,7 @@ sub DbRep_mysql_DumpClientSide {
                   ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql_daten);
                   return "$name|$err" if($err);
 
-                  while ( @ar = $sth->fetchrow) {                                                  # Start the insert
+                  while (@ar = $sth->fetchrow_array) {                                             # Start the insert
                       if ($first_insert == 0) {
                           $part = "\n$insert";
                       }
@@ -8666,13 +8703,14 @@ sub DbRep_mysql_DumpClientSide {
 
                       if ($memory_limit > 0 && length($sql_text) > $memory_limit) {
                           ($err, $filesize) = DbRep_WriteToDumpFile ($sql_text, $sql_file);
-                          # Log3 ($name, 5, "DbRep $name - Memory limit '$memory_limit' exceeded. Wrote to '$sql_file'. Filesize: '"._DbRep_byteOutput($filesize)."'");
-                          $sql_text = "";
+                          $sql_text         = "";
                       }
                   }
 
                   DbRep_clearConn (undef, $sth);
               }
+              
+              ($err, $filesize) = DbRep_WriteToDumpFile ($sql_text, $sql_file) if($sql_text);
 
               $sql_text .= "\n/*!40000 ALTER TABLE `$tablename` ENABLE KEYS */;\n";
           }
@@ -8755,7 +8793,7 @@ sub DbRep_mysql_DumpServerSide {
 
  my $bst = [gettimeofday];                                              # Background-Startzeit
 
- my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
+ my ($err, $dbh, $dbmodel) = DbRep_dbConnect($name, 0);
  return "$name|$err" if ($err);
 
  my $value  = 0;
@@ -8766,7 +8804,7 @@ sub DbRep_mysql_DumpServerSide {
  ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
  return "$name|$err" if ($err);
 
- while ( $value = $sth->fetchrow_hashref()) {
+ while ($value = $sth->fetchrow_hashref()) {
      Log3 ($name, 5, "DbRep $name - ......... Table definition found: .........");
 
      for my $tk (sort(keys(%$value))) {
@@ -8808,7 +8846,7 @@ sub DbRep_mysql_DumpServerSide {
      return "$name|$err" if ($err);
  }
 
- Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname', table '$table'");
+ Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname', table '$table' (model: $dbmodel)");
 
  # Startzeit ermitteln
  my ($Sekunden, $Minuten, $Stunden, $Monatstag, $Monat, $Jahr, $Wochentag, $Jahrestag, $Sommerzeit) = localtime(time);
@@ -8892,7 +8930,7 @@ sub DbRep_sqlite_Dump {
  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
  return "$name|$err" if ($err);
 
- if($optimize_tables_beforedump) {                                                           # Vacuum vor Dump  # Anfangsgröße ermitteln
+ if ($optimize_tables_beforedump) {                                                           # Vacuum vor Dump  # Anfangsgröße ermitteln
      $fsBytes  = _DbRep_fsizeInBytes ($dbname);
      $db_MB    = _DbRep_byteOutput   ($fsBytes);
 
@@ -8913,7 +8951,7 @@ sub DbRep_sqlite_Dump {
 
  $dbname = (split /[\/]/, $dbname)[-1];
 
- Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname'");
+ Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname' (model: $dbmodel)");
 
  # Startzeit ermitteln
  my ($Sekunden, $Minuten, $Stunden, $Monatstag, $Monat, $Jahr, $Wochentag, $Jahrestag, $Sommerzeit) = localtime(time);
@@ -11660,20 +11698,20 @@ return $sql;
 #              1  - adminCredentials werden immer verwendet
 ######################################################################################
 sub DbRep_dbConnect {
-  my $name       = shift;
-  my $uac        = shift // AttrVal($name, "useAdminCredentials", 0);
-
-  my $hash       = $defs{$name};
-  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
-  my $dbconn     = $dbloghash->{dbconn};
-  my $dbuser     = $dbloghash->{dbuser};
-  my $dblogname  = $dbloghash->{NAME};
-  my $dbmodel    = $dbloghash->{MODEL};
-  my $dbpassword = $attr{"sec$dblogname"}{secret};
-  my $utf8       = $hash->{UTF8} // 0;
-
+  my $name        = shift;
+  my $uac         = shift // AttrVal ($name, "useAdminCredentials", 0);
+  my $hash        = $defs{$name};
+  my $dbloghash   = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+  my $dbconn      = $dbloghash->{dbconn};
+  my $dbuser      = $dbloghash->{dbuser};
+  my $dblogname   = $dbloghash->{NAME};
+  my $model       = $dbloghash->{MODEL};
+  my $compression = $dbloghash->{COMPRESSION};
+  my $dbpassword  = $attr{"sec$dblogname"}{secret};
+  my $utf8        = $dbloghash->{UTF8};
+  my $err         = q{};
+  
   my $dbh;
-  my $err = q{};
 
   if ($uac) {
       my ($success,$admusername,$admpassword) = DbRep_getcredentials ($hash, "adminCredentials");
@@ -11689,8 +11727,12 @@ sub DbRep_dbConnect {
       }
   }
 
+  Log3 ($name, 4, "DbRep $name - Database Model: $model");
   Log3 ($name, 4, "DbRep $name - Database connect - user: ".($dbuser ? $dbuser : 'no').", UTF-8 option set: ".($utf8 ? 'yes' : 'no'));
-
+  
+  $dbconn .= ';mysql_compression=1'   if($compression && $model eq 'MYSQL');
+  $dbconn .= ';mariadb_compression=1' if($compression && $model eq 'MARIADB');
+  
   eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0,
                                                                     RaiseError          => 1,
                                                                     AutoCommit          => 1,
@@ -11702,33 +11744,55 @@ sub DbRep_dbConnect {
                Log3 ($name, 2, "DbRep $name - ERROR: $@");
                return $err;
              };
+             
+  return $DBI::errstr if($DBI::errstr);
+  
+  if ($model =~ /MYSQL/xs) {
+      $dbh->{mysql_enable_utf8} = 1 if($utf8);
 
-  if ($utf8) {
-      if ($dbmodel =~ /MYSQL|MARIADB/xs) {
-          $dbh->{mysql_enable_utf8} = 1 if($dbmodel =~ /MYSQL/xs);                                             # MariaDB kennt kein mysql_enable_utf8 
+      if ($compression) {
+          Log3 ($name, 4, "DbRep $name - Communication between Client and Server will be compressed");          
+      }         
 
-          ($err, my @se) = DbRep_prepareExec2Array ($name, $dbh, "SHOW VARIABLES LIKE 'collation_database'");
+      ($err, my @se) = DbRep_prepareExec2Array ($name, $dbh, "SHOW VARIABLES LIKE 'collation_database'");
+      return $err if ($err);
+
+      my $dbcharset = @se ? $se[1] : 'noresult';
+
+      Log3 ($name, 4, "DbRep $name - Database Character set is >$dbcharset<");
+
+      if ($dbcharset !~ /noresult|ucs2|utf16|utf32/ixs) {                                     # Impermissible Client Character Sets -> https://dev.mysql.com/doc/refman/8.0/en/charset-connection.html
+          my $collation = $dbcharset;
+          $dbcharset    = (split '_', $collation, 2)[0];
+
+          ($err, undef) = DbRep_dbhDo ($name, $dbh, qq(set names "$dbcharset" collate "$collation"));
           return $err if ($err);
-
-          my $dbcharset = @se ? $se[1] : 'noresult';
-
-          Log3 ($name, 4, "DbRep $name - Database Character set is >$dbcharset<");
-
-          if ($dbcharset !~ /noresult|ucs2|utf16|utf32/ixs) {                                                                 # Impermissible Client Character Sets -> https://dev.mysql.com/doc/refman/8.0/en/charset-connection.html
-              my $collation = $dbcharset;
-              $dbcharset    = (split '_', $collation, 2)[0];
-
-              ($err, undef) = DbRep_dbhDo ($name, $dbh, qq(set names "$dbcharset" collate "$collation"));
-              return $err if ($err);
-          }
       }
+  }
+  
+  if ($model =~ /MARIADB/xs) {
+      if ($compression) {
+          Log3 ($name, 4, "DbRep $name - Communication between Client and Server will be compressed");           
+      } 
+  }
 
-      if ($dbmodel eq "SQLITE") {
-        $dbh->do('PRAGMA encoding="UTF-8"');
+  if ($model eq 'SQLITE') {
+      if ($utf8) {
+          ($err, undef) = DbRep_dbhDo ($name, $dbh, 'PRAGMA encoding="UTF-8"');
+          return $err if ($err);          
+      }
+      
+      my @dos = ("PRAGMA temp_store=MEMORY",
+                 "PRAGMA synchronous=FULL",
+                );
+
+      for my $do (@dos) {
+          ($err, undef) = DbRep_dbhDo ($name, $dbh, $do);
+          return $err if ($err);
       }
   }
 
-return ($err, $dbh, $dbmodel);
+return ($err, $dbh, $model);
 }
 
 ####################################################################################################
@@ -12272,7 +12336,7 @@ sub DbRep_autoForward {
   my $hash = $defs{$name};
   my $av   = AttrVal ($name, 'autoForward', '');
 
-  return if(!$av);
+  return if(!$av || !$init_done);
 
   $av =~ m/^\{(.*)\}/s;
   $av = $1;
@@ -12293,9 +12357,9 @@ sub DbRep_autoForward {
 
   $af = eval $av;
 
-  if($@ || ref($af) ne "HASH") {
-      Log3($name, 2, "$name - Values specified in attribute \"autoForward\" are not defined as HASH ... exiting !") if(ref($af) ne "HASH");
-      Log3($name, 2, "$name - Error while evaluate: ".$@) if($@);
+  if ($@ || ref($af) ne "HASH") {
+      Log3 ($name, 2, "$name - Values specified in attribute \"autoForward\" are not defined as HASH ... exiting !") if(ref($af) ne "HASH");
+      Log3 ($name, 2, "$name - Error while evaluate: ".$@) if($@);
       return;
   }
 
@@ -12304,15 +12368,15 @@ sub DbRep_autoForward {
       $ddev                 = DbRep_trim ($ddev) if($ddev);
       next if(!$ddev);
 
-      $srr  = DbRep_trim ($srr) if($srr);
-      $dr   = DbRep_trim ($dr)  if($dr);
+      $srr = DbRep_trim ($srr) if($srr);
+      $dr  = DbRep_trim ($dr)  if($dr);
 
-      if(!$defs{$ddev}) {                                                          # Vorhandensein Destination Device prüfen
+      if (!$defs{$ddev}) {                                                          # Vorhandensein Destination Device prüfen
           Log3($name, 2, "$name - WARNING - Forward reading \"$reading\" not possible, device \"$ddev\" doesn't exist");
           next;
       }
 
-      if(!$srr || $reading !~ /^$srr$/) {
+      if (!$srr || $reading !~ /^$srr$/) {
           # Log3 ($name, 4, "$name - Reading \"$reading\" doesn't match autoForward-Regex: ".($srr?$srr:"")." - no forward to \"$ddev\" ");
           next;
       }
@@ -12321,9 +12385,9 @@ sub DbRep_autoForward {
       $dr = $dr ? $dr : ($sr !~ /\.\*/xs) ? $sr : $reading;                        # Destination Reading = Source Reading wenn Destination Reading nicht angegeben
       $dr = makeReadingName ($dr);                                                 # Destination Readingname validieren / entfernt aus dem übergebenen Readingname alle ungültigen Zeichen und ersetzt diese durch einen Unterstrich "_"
 
-      Log3($name, 4, "$name - Forward reading \"$reading\" to \"$ddev:$dr\" ");
+      Log3 ($name, 4, "$name - Forward reading \"$reading\" to \"$ddev:$dr\" ");
 
-      CommandSetReading(undef, "$ddev $dr $value");
+      CommandSetReading (undef, "$ddev $dr $value");
   }
 
 return;
@@ -12609,16 +12673,16 @@ sub DbRep_beforeproc {
   my $name = $hash->{NAME};
   my $fn   = AttrVal($name, 'executeBeforeProc', '');
 
-  if($fn) {
+  if ($fn) {
       Log3 ($name, 3, "DbRep $name - execute command before $cmd: '$fn' ");
 
-      my $err = _DbRep_procCode ($hash, $fn);
+      my $msg = _DbRep_procCode ($hash, $fn);
 
-      if ($err) {
-          Log3 ($name, 2, "DbRep $name - command message before $cmd: \"$err\" ");
+      if ($msg) {
+          Log3 ($name, 3, "DbRep $name - command message before $cmd: \"$msg\" ");
           my $erread = "Warning - message from command before $cmd appeared";
 
-          ReadingsSingleUpdateValue ($hash, "before_".$cmd."_message", $err, 1);
+          ReadingsSingleUpdateValue ($hash, "before_".$cmd."_message", $msg, 1);
           ReadingsSingleUpdateValue ($hash, "state", $erread, 1);
       }
   }
@@ -12634,24 +12698,22 @@ sub DbRep_afterproc {
   my $cmd   = shift // q{process};
   my $bfile = shift // q{};
 
-  my ($err,$erread);
+  my $name = $hash->{NAME};
+  $cmd     = (split " ", $cmd)[0];
+  my $sval = ReadingsVal ($name, 'state', '');
+  my $fn   = AttrVal     ($name, 'executeAfterProc', '');
 
-  my $name   = $hash->{NAME};
-  $cmd       = (split " ", $cmd)[0];
-  my $sval   = ReadingsVal ($name, 'state', '');
-  my $fn     = AttrVal     ($name, 'executeAfterProc', '');
-
-  if($fn) {
+  if ($fn) {
       Log3 ($name, 3, "DbRep $name - execute command after $cmd: '$fn' ");
 
-      $err = _DbRep_procCode ($hash, $fn);
+      my $msg = _DbRep_procCode ($hash, $fn);
 
-      if ($err) {
-          Log3 ($name, 2, qq{DbRep $name - command message after $cmd: >$err<});
+      if ($msg) {
+          Log3 ($name, 3, qq{DbRep $name - command message after $cmd: >$msg<});
 
-          $erread = $sval eq 'error' ? $sval : qq(WARNING - $cmd finished, but message after command appeared);
+          my $erread = $sval eq 'error' ? $sval : qq(WARNING - $cmd finished, but message after command appeared);
 
-          ReadingsSingleUpdateValue ($hash, 'after_'.$cmd.'_message', $err, 1);
+          ReadingsSingleUpdateValue ($hash, 'after_'.$cmd.'_message', $msg, 1);
           ReadingsSingleUpdateValue ($hash, 'state', $erread, 1);
 
           return $erread;
@@ -14461,12 +14523,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 28621 2024-03-08 23:25:01Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 28668 2024-03-16 20:01:55Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 28621 2024-03-08 23:25:01Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 28668 2024-03-16 20:01:55Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -14566,7 +14628,7 @@ sub DbReadingsVal($$$$) {
   }
 
   $hash->{LASTCMD} = "sqlCmdBlocking $sql";
-  $ret             = DbRep_sqlCmdBlocking($name,$sql);
+  $ret             = DbRep_sqlCmdBlocking ($name,$sql);
   $ret             = $ret ? $ret : $default;
 
 return $ret;
@@ -16550,47 +16612,51 @@ return;
 
  <ul><ul>
     <a id="DbRep-get-blockinginfo"></a>
-    <li><b> blockinginfo </b> - list the current system wide running background processes (BlockingCalls) together with their informations.
-                                If character string is too long (e.g. arguments) it is reported shortened.
-                                </li>
-                                <br><br>
+    <li><b> blockinginfo </b> <br>
+    List the current system wide running background processes (BlockingCalls) together with their informations.
+    If character string is too long (e.g. arguments) it is reported shortened.
+    </li>
+    <br><br>
 
     <a id="DbRep-get-dbstatus"></a>
-    <li><b> dbstatus </b> -  lists global information about MySQL server status (e.g. informations related to cache, threads, bufferpools, etc. ).
-                             Initially all available informations are reported. Using the attribute <a href="#DbRep-attr-showStatus">showStatus</a> the quantity of
-                             results can be limited to show only the desired values. Further detailed informations of items meaning are
-                             explained <a href="http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html">here</a>.  <br><br>
+    <li><b> dbstatus </b> <br>
+    Lists global information about MySQL server status (e.g. informations related to cache, threads, bufferpools, etc. ).
+    Initially all available informations are reported. Using the attribute <a href="#DbRep-attr-showStatus">showStatus</a> the quantity of
+    results can be limited to show only the desired values. Further detailed informations of items meaning are
+    explained <a href="http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html">here</a>.  <br><br>
 
-                                 <ul>
-                                   <b>Example</b>  <br>
-                                   attr &lt;name&gt; showStatus %uptime%,%qcache%    <br>
-                                   get &lt;name&gt; dbstatus  <br>
-                                   # Only readings containing "uptime" and "qcache" in name will be created
-                                 </ul>
-                                 </li>
-                                 <br><br>
+    <ul>
+      <b>Example</b>  <br>
+      attr &lt;name&gt; showStatus %uptime%,%qcache%    <br>
+      get &lt;name&gt; dbstatus  <br>
+      # Only readings containing "uptime" and "qcache" in name will be created
+    </ul>
+    </li>
+    <br><br>
 
     <a id="DbRep-get-dbvars"></a>
-    <li><b> dbvars </b> -  lists global informations about MySQL system variables. Included are e.g. readings related to InnoDB-Home, datafile path,
-                           memory- or cache-parameter and so on. The Output reports initially all available informations. Using the
-                           attribute <a href="#DbRep-attr-showVariables">showVariables</a> the quantity of results can be limited to show only the desired values.
-                           Further detailed informations of items meaning are explained
-                           <a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html">here</a>. <br><br>
+    <li><b> dbvars </b> <br> 
+    Lists global informations about MySQL system variables. Included are e.g. readings related to InnoDB-Home, datafile path,
+    memory- or cache-parameter and so on. The Output reports initially all available informations. Using the
+    attribute <a href="#DbRep-attr-showVariables">showVariables</a> the quantity of results can be limited to show only the desired values.
+    Further detailed informations of items meaning are explained
+    <a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html">here</a>. <br><br>
 
-                                 <ul>
-                                   <b>Example</b>  <br>
-                                   attr &lt;name&gt; showVariables %version%,%query_cache%    <br>
-                                   get &lt;name&gt; dbvars  <br>
-                                   # Only readings containing "version" and "query_cache" in name will be created
-                                 </ul>
-                                 </li>
-                                 <br><br>
+    <ul>
+      <b>Example</b>  <br>
+      attr &lt;name&gt; showVariables %version%,%query_cache%    <br>
+      get &lt;name&gt; dbvars  <br>
+      # Only readings containing "version" and "query_cache" in name will be created
+    </ul>
+    </li>
+    <br><br>
 
     <a id="DbRep-get-initData"></a>
-    <li><b> initData </b> - Determines some database properties relevant for the module function.
-                            The command is executed implicitly at the first database connection.
-                            </li>
-                            <br><br>
+    <li><b> initData </b> <br>
+    Determines some database properties relevant for the module function.
+    The command is executed implicitly at the first database connection.
+    </li>
+    <br><br>
 
     <a id="DbRep-get-minTimestamp"></a>
     <li><b> minTimestamp </b> - Identifies the oldest timestamp in the database (will be executed implicitely at FHEM start).
@@ -18084,8 +18150,8 @@ return;
           <tr><td> <b>device</b>                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
           <tr><td> <b>reading</b>                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
           <tr><td> <b>time.*</b>                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-          <tr><td> executeBeforeProc             </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Ausführung </td></tr>
-          <tr><td> executeAfterProc              </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ausführung </td></tr>
+          <tr><td> <b>executeBeforeProc</b>      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Ausführung </td></tr>
+          <tr><td> <b>executeAfterProc</b>       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ausführung </td></tr>
           <tr><td> <b>readingNameMap</b>         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>
           <tr><td> <b>valueFilter</b>            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
           </table>
@@ -19678,47 +19744,52 @@ return;
 
  <ul><ul>
     <a id="DbRep-get-blockinginfo"></a>
-    <li><b> blockinginfo </b> - Listet die aktuell systemweit laufenden Hintergrundprozesse (BlockingCalls) mit ihren Informationen auf.
-                                Zu lange Zeichenketten (z.B. Argumente) werden gekürzt ausgeschrieben.
-                                </li>
-                                <br><br>
+    <li><b> blockinginfo </b> <br>
+    Listet die aktuell systemweit laufenden Hintergrundprozesse (BlockingCalls) mit ihren Informationen auf.
+    Zu lange Zeichenketten (z.B. Argumente) werden gekürzt ausgeschrieben.
+    </li>
+    <br><br>
 
     <a id="DbRep-get-dbstatus"></a>
-    <li><b> dbstatus </b> -  Listet globale Informationen zum MySQL Serverstatus (z.B. Informationen zum Cache, Threads, Bufferpools, etc. ).
-                             Es werden zunächst alle verfügbaren Informationen berichtet. Mit dem Attribut <a href="#DbRep-attr-showStatus">showStatus</a> kann die
-                             Ergebnismenge eingeschränkt werden, um nur gewünschte Ergebnisse abzurufen. Detailinformationen zur Bedeutung der einzelnen Readings
-                             sind <a href="http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html">hier</a> verfügbar.  <br><br>
+    <li><b> dbstatus </b> <br>  
+    Listet globale Informationen zum MySQL Serverstatus (z.B. Informationen zum Cache, Threads, Bufferpools, etc. ).
+    Es werden zunächst alle verfügbaren Informationen berichtet. Mit dem Attribut <a href="#DbRep-attr-showStatus">showStatus</a> kann die
+    Ergebnismenge eingeschränkt werden, um nur gewünschte Ergebnisse abzurufen. Detailinformationen zur Bedeutung der einzelnen Readings
+    sind <a href="http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html">hier</a> verfügbar.  
+    <br><br>
 
-                             <ul>
-                               <b>Beispiel</b>  <br>
-                               attr &lt;name&gt; showStatus %uptime%,%qcache%    <br>
-                               get &lt;name&gt; dbstatus  <br>
-                               # Es werden nur Readings erzeugt die im Namen "uptime" und "qcache" enthaltenen
-                             </ul>
-                             </li>
-                             <br><br>
+    <ul>
+      <b>Beispiel</b>  <br>
+      attr &lt;name&gt; showStatus %uptime%,%qcache%    <br>
+      get &lt;name&gt; dbstatus  <br>
+      # Es werden nur Readings erzeugt die im Namen "uptime" und "qcache" enthaltenen
+    </ul>
+    </li>
+    <br><br>
 
     <a id="DbRep-get-dbvars"></a>
-    <li><b> dbvars </b> -  Zeigt die globalen Werte der MySQL Systemvariablen. Enthalten sind zum Beispiel Angaben zum InnoDB-Home, dem Datafile-Pfad,
-                           Memory- und Cache-Parameter, usw. Die Ausgabe listet zunächst alle verfügbaren Informationen auf. Mit dem Attribut
-                           <a href="#DbRep-attr-showVariables">showVariables</a> kann die Ergebnismenge eingeschränkt werden um nur gewünschte Ergebnisse
-                           abzurufen. Weitere Informationen zur Bedeutung der ausgegebenen Variablen sind
-                           <a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html">hier</a> verfügbar. <br><br>
+    <li><b> dbvars </b> <br>
+    Zeigt die globalen Werte der MySQL Systemvariablen. Enthalten sind zum Beispiel Angaben zum InnoDB-Home, dem Datafile-Pfad,
+    Memory- und Cache-Parameter, usw. Die Ausgabe listet zunächst alle verfügbaren Informationen auf. Mit dem Attribut
+    <a href="#DbRep-attr-showVariables">showVariables</a> kann die Ergebnismenge eingeschränkt werden um nur gewünschte Ergebnisse
+    abzurufen. Weitere Informationen zur Bedeutung der ausgegebenen Variablen sind
+    <a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html">hier</a> verfügbar. <br><br>
 
-                           <ul>
-                             <b>Beispiel</b>  <br>
-                             attr &lt;name&gt; showVariables %version%,%query_cache%    <br>
-                             get &lt;name&gt; dbvars  <br>
-                             # Es werden nur Readings erzeugt die im Namen "version" und "query_cache" enthalten
-                           </ul>
-                           </li>
-                           <br><br>
+    <ul>
+      <b>Beispiel</b>  <br>
+      attr &lt;name&gt; showVariables %version%,%query_cache%    <br>
+      get &lt;name&gt; dbvars  <br>
+      # Es werden nur Readings erzeugt die im Namen "version" und "query_cache" enthalten
+    </ul>
+    </li>
+    <br><br>
 
     <a id="DbRep-get-initData"></a>
-    <li><b> initData </b> - Ermittelt einige für die Funktion des Moduls relevante Datenbankeigenschaften.
-                            Der Befehl wird bei der ersten Datenbankverbindung implizit ausgeführt.
-                            </li>
-                            <br><br>
+    <li><b> initData </b> <br>
+    Ermittelt einige für die Funktion des Moduls relevante Datenbankeigenschaften.
+    Der Befehl wird bei der ersten Datenbankverbindung implizit ausgeführt.
+    </li>
+    <br><br>
 
     <a id="DbRep-get-minTimestamp"></a>
     <li><b> minTimestamp </b> - Ermittelt den Zeitstempel des ältesten Datensatzes in der Datenbank (wird implizit beim Start von
