@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.8"  => "17.03.2024  sqlCmdBlocking able to use sql Keywords (§timestamp_end§ etc.) ",
   "8.53.7"  => "16.03.2024  prevent some attribute evaluation as long as init_done is not set ",
   "8.53.6"  => "15.03.2024  change verbose level of DbRep_beforeproc, DbRep_afterproc to 3 ",
   "8.53.5"  => "11.03.2024  some changes for MariaDB Perl driver usage, change DbRep_dbConnect".
@@ -1352,7 +1353,7 @@ sub DbRep_Get {
       DbRep_delread    ($hash);                                                              # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);
 
-      return DbRep_sqlCmdBlocking($name,$sqlcmd);
+      return DbRep_sqlCmdBlocking ($name,$sqlcmd);
   }
   elsif ($opt eq "storedCredentials") {                                                      # Credentials abrufen
         my $atxt;
@@ -7006,23 +7007,37 @@ return "$name|$err|$rowstring|$opt|$cmd|$nrows|$rt";
 #     liefert Ergebnis sofort zurück, setzt keine Readings
 ####################################################################################################
 sub DbRep_sqlCmdBlocking {
-  my $name   = shift;
-  my $cmd    = shift;
+  my $name = shift;
+  my $cmd  = shift;
 
-  my $hash   = $defs{$name};
-  my $srs    = AttrVal ($name, 'sqlResultFieldSep',  '|');
-  my $to     = AttrVal ($name, 'timeout', $dbrep_deftobl);
+  my $hash    = $defs{$name};
+  my $srs     = AttrVal ($name, 'sqlResultFieldSep',  '|');
+  my $to      = AttrVal ($name, 'timeout', $dbrep_deftobl);
+  my $reading = AttrVal ($name, 'reading', '%');
+  my $device  = AttrVal ($name, 'device',  '%');
 
-  my ($ret);
+  my $ret;
 
-  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name);
+  my ($err, $dbh, $dbmodel) = DbRep_dbConnect ($name);
   if ($err) {
       _DbRep_sqlBlckgErrorState ($hash, $err);
       return $err;
   }
+  
+  my ($IsTimeSet, $IsAggrSet, $aggregation) = DbRep_checktimeaggr ($hash);
+  my ($runtime_string_first, $runtime_string_next);
+  
+  if ($IsTimeSet || $IsAggrSet) {
+      (undef, undef, $runtime_string_first, $runtime_string_next) = DbRep_createTimeArray ($hash, $aggregation, 'sqlCmdBlocking');
+  }
+  else {
+      Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: not set");
+      Log3 ($name, 4, "DbRep $name - Timestamp end human readable: not set");
+  }
 
-  $cmd =~ s/\;\;/ESC_ESC_ESC/gx;                                                     # ersetzen von escapeten ";" (;;)
+  Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation");
 
+  $cmd    =~ s/\;\;/ESC_ESC_ESC/gx;                                                     # ersetzen von escapeten ";" (;;)
   $cmd   .= ";" if ($cmd !~ m/\;$/x);
   my $sql = $cmd;
 
@@ -7050,6 +7065,21 @@ sub DbRep_sqlCmdBlocking {
   }
 
   $err = _DbRep_execSessPrepare ($name, $dbh, \$sql);
+  if ($err) {
+      _DbRep_sqlBlckgErrorState ($hash, $err);
+      return $err;
+  }
+  
+  # Ersetzung von Schlüsselwörtern für Timing, Gerät, Lesen (unter Verwendung der Attributsyntax)
+  ($err, $sql) = _DbRep_sqlReplaceKeywords ( { hash    => $hash,
+                                               sql     => $sql,
+                                               device  => $device,
+                                               reading => $reading,
+                                               dbmodel => $dbmodel,
+                                               rsf     => $runtime_string_first,
+                                               rsn     => $runtime_string_next
+                                             }
+                                           );
   if ($err) {
       _DbRep_sqlBlckgErrorState ($hash, $err);
       return $err;
@@ -7126,7 +7156,7 @@ sub DbRep_sqlCmdBlocking {
 
   Log3 ($name, 4, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows");
 
-  readingsBeginUpdate         ($hash);
+  readingsBeginUpdate ($hash);
 
   if (defined $data{DbRep}{$name}{sqlcache}{temp}) {                # SQL incl. Formatierung aus Zwischenspeicherzwischenspeichern
       my $tmpsql = delete $data{DbRep}{$name}{sqlcache}{temp};
@@ -12334,7 +12364,7 @@ sub DbRep_autoForward {
   }
 
   for my $key (keys %{$af}) {
-      my ($srr, $ddev, $dr) = split("=>", $af->{$key});
+      my ($srr, $ddev, $dr) = split "=>", $af->{$key};
       $ddev                 = DbRep_trim ($ddev) if($ddev);
       next if(!$ddev);
 
@@ -12342,12 +12372,12 @@ sub DbRep_autoForward {
       $dr  = DbRep_trim ($dr)  if($dr);
 
       if (!$defs{$ddev}) {                                                          # Vorhandensein Destination Device prüfen
-          Log3($name, 2, "$name - WARNING - Forward reading \"$reading\" not possible, device \"$ddev\" doesn't exist");
+          Log3($name, 2, "DbRep $name - WARNING - Forward reading \"$reading\" not possible, device \"$ddev\" doesn't exist");
           next;
       }
 
       if (!$srr || $reading !~ /^$srr$/) {
-          # Log3 ($name, 4, "$name - Reading \"$reading\" doesn't match autoForward-Regex: ".($srr?$srr:"")." - no forward to \"$ddev\" ");
+          # Log3 ($name, 4, "DbRep $name - Reading \"$reading\" doesn't match autoForward-Regex: ".($srr?$srr:"")." - no forward to \"$ddev\" ");
           next;
       }
 
@@ -12355,7 +12385,7 @@ sub DbRep_autoForward {
       $dr = $dr ? $dr : ($sr !~ /\.\*/xs) ? $sr : $reading;                        # Destination Reading = Source Reading wenn Destination Reading nicht angegeben
       $dr = makeReadingName ($dr);                                                 # Destination Readingname validieren / entfernt aus dem übergebenen Readingname alle ungültigen Zeichen und ersetzt diese durch einen Unterstrich "_"
 
-      Log3 ($name, 4, "$name - Forward reading \"$reading\" to \"$ddev:$dr\" ");
+      Log3 ($name, 4, "DbRep $name - Forward reading \"$reading\" to \"$ddev:$dr\" ");
 
       CommandSetReading (undef, "$ddev $dr $value");
   }
@@ -14598,7 +14628,7 @@ sub DbReadingsVal($$$$) {
   }
 
   $hash->{LASTCMD} = "sqlCmdBlocking $sql";
-  $ret             = DbRep_sqlCmdBlocking($name,$sql);
+  $ret             = DbRep_sqlCmdBlocking ($name,$sql);
   $ret             = $ret ? $ret : $default;
 
 return $ret;
