@@ -418,7 +418,7 @@ sub HMCCUCHN_Get ($@)
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 
 	# Build set command syntax
-	my $syntax = 'update config paramsetDesc:noArg deviceInfo:noArg values extValues';
+	my $syntax = 'update config paramsetDesc:noArg deviceInfo:noArg values extValues metaData';
 	
 	# Command datapoint depends on readable datapoints
 	my ($add, $chn) = split(":", $hash->{ccuaddr});
@@ -458,6 +458,11 @@ sub HMCCUCHN_Get ($@)
 	elsif ($lcopt eq 'paramsetdesc') {
 		my $result = HMCCU_ParamsetDescToStr ($ioHash, $hash);
 		return defined($result) ? $result : HMCCU_SetError ($hash, "Can't get device model");
+	}
+	elsif ($lcopt eq 'metadata') {
+		my $filter = shift @$a;
+		my ($rc, $result) = HMCCU_ExecuteGetMetaDataCommand ($ioHash, $hash, $filter);
+		return $rc < 0 ? HMCCU_SetError ($hash, $rc, $result) : $result;
 	}
 	elsif (exists($hash->{hmccu}{roleCmds}{get}{$opt})) {
 		return HMCCU_ExecuteRoleCommand ($ioHash, $hash, 'get', $opt, $a, $h);
@@ -721,6 +726,11 @@ sub HMCCUCHN_Get ($@)
 		variables by using CCU Rega (Homematic script). This command will also update system variables bound
 		to the device.
 		If <i>filter-expr</i> is specified, only datapoints matching the expression are stored as readings.
+	  </li><br/>
+	  <li><b>get &lt;name&gt; metaData [&lt;filter-expr&gt;]</b><br/>
+	  	Read meta data for device or channel. If <i>filter-expr</i> is specified only meta data IDs matching
+		the specified regular expression are stored as readings.<br/>
+		Example: get myDev metaData energy.*
 	  </li><br/>
       <li><b>get &lt;name&gt; paramsetDesc</b><br/>
 		Display description of parameter sets of channel and device. The output of this command

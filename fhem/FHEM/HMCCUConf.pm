@@ -430,8 +430,8 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'off' => 'V:MANU_MODE:4.5',
 		'auto' => 'V:AUTO_MODE:1',
 		'boost' => 'V:BOOST_MODE:#boost=on,off',
-		'week-program:VirtualDevices' => 'D:WEEK_PROGRAM_POINTER:#program',
-		'get week-program:VirtualDevices' => 'D:WEEK_PROGRAM_POINTER:#program:HMCCU_DisplayWeekProgram'
+		'week-program' => 'D:WEEK_PROGRAM_POINTER:#program',
+		'get week-program' => 'D:WEEK_PROGRAM_POINTER:#program:HMCCU_DisplayWeekProgram'
 	},
 	'DIMMER' => {
 		'pct' => '3:V:LEVEL:?level 1:V:ON_TIME:?time=0.0 2:V:RAMP_TIME:?ramp=0.5',
@@ -484,7 +484,9 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'boost' => 'V:BOOST_MODE:#boost=on,off',
 		'on' => 'V:CONTROL_MODE:1 V:SET_POINT_TEMPERATURE:30.5',
 		'off' => 'V:CONTROL_MODE:1 V:SET_POINT_TEMPERATURE:4.5',
-		'week-program' => 'V:ACTIVE_PROFILE:#profile=1,2,3'
+		'week-program' => 'V:ACTIVE_PROFILE:#profile=1,2,3',
+		# For getting parameters from MASTER paramset the parameter is not used. But it must be a valid parameter of the role
+		'get week-program' => 'M:P1_ENDTIME_MONDAY_1:#profile=1,2,3:HMCCU_DisplayWeekProgram'
 	},
 	'JALOUSIE' => {
 		'pct' => 'V:LEVEL:?level',
@@ -2362,6 +2364,60 @@ lResult = system.Exec(lCommand,&lGetOut,&lGetErr);
 if(lResult == 0) {
   WriteLine(lGetOut);
 }
+		)
+	},
+	"GetMetaData" => {
+		description => "Read metadata of device or channel",
+		syntax      => "name",
+		parameters  => 1,
+		code        => qq(
+string name = "\$name";
+string ignore = "AUTOCONF,DEVDESC,MASTERDESC,LINKCOUNT,PARAMSETS";
+string dataId;
+object hmObj = dom.GetObject(name);
+if (hmObj) {
+  if (hmObj.IsTypeOf(OT_CHANNEL) || hmObj.IsTypeOf(OT_DEVICE)) {
+    string dataIdList = hmObj.EnumMetaData();
+    string address = hmObj.Address();
+    foreach (dataId, dataIdList.Split(' ')) {
+      if (!ignore.Contains(dataId)) {
+        string metaVal = hmObj.MetaData(dataId);
+        WriteLine(address # '=' # dataId # '=' # metaVal);
+      }
+    }
+    if (hmObj.IsTypeOf(OT_DEVICE)) {
+      string chnid;
+      foreach (chnid, hmObj.Channels()) {
+        object chnObj = dom.GetObject(chnid);
+        if (chnObj) {
+          string address = chnObj.Address();
+          string dataIdList = chnObj.EnumMetaData();
+          foreach (dataId, dataIdList.Split(' ')) {
+            if (!ignore.Contains(dataId)) {
+              string metaVal = chnObj.MetaData(dataId);
+              WriteLine(address # '=' # dataId # '=' # metaVal);
+            }
+          }
+        }
+      }
+    }
+  }
+  else {
+    WriteLine(name # " is no device or channel");
+  }
+}
+else {
+	WriteLine("Device or channel " # name # " not found");
+}
+		)
+	},
+	"AddMetaData" => {
+		description => "Add metadata to channel",
+		syntax      => "name key value",
+		parameters  => 3,
+		code        => qq(
+object chnObj = channels.Get("\$name");
+chnObj.AddMetaData("\$key", "\$value");
 		)
 	},
 	"GetServiceMessages" => {

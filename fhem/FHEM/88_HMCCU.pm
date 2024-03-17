@@ -4341,6 +4341,7 @@ sub HMCCU_GetEnumValues ($$$$;$$)
 		foreach my $cv (split(',', $HMCCU_STATECONTROL->{$role}{V})) {
 			my ($vn, $vv) = split(':', $cv);
 			if (defined($vv)) {
+				$vv = $vv eq 'true' ? 1 : ($vv eq 'false' ? 0 : $vv);
 				$valList{$vn} = $vv;
 				$valIndex{$vv} = $vn;
 			}
@@ -7145,7 +7146,7 @@ sub HMCCU_ExecuteRoleCommand ($@)
 		if ($ndpval > 0 && $ncfval == 0) { $opt = 'values'; }
 		elsif ($ndpval == 0 && $ncfval > 0) { $opt = 'config'; }
 		elsif ($ndpval > 0 && $ncfval > 0) { $opt = 'update'; }
-		
+
 		if ($opt ne '') {
 			$chnAddr =~ s/:d$//;
  			my $resp = HMCCU_ExecuteGetParameterCommand ($ioHash, $clHash, $opt, [ $chnAddr ]);
@@ -7572,6 +7573,46 @@ sub HMCCU_ExecuteGetExtValuesCommand ($@)
 	my $nonBlock = HMCCU_IsFlag ($ioHash->{NAME}, 'nonBlocking') ? 1 : 0;
 
 	return HMCCU_UpdateClients ($ioHash, $devexp, $ccuget, $ifname, $nonBlock);
+}
+
+######################################################################
+# Read meta data of device or channel
+######################################################################
+
+sub HMCCU_ExecuteGetMetaDataCommand ($@)
+{
+	my ($ioHash, $clHash, $filter) = @_;
+	$filter //= '.*';
+
+	my $response = HMCCU_HMScriptExt ($ioHash, '!GetMetaData', { name => $clHash->{ccuname} });
+	return (-2, $response) if ($response eq '' || $response =~ /^ERROR:.*/);
+  
+	my %readings;
+	my $count = 0;
+	my $result = '';
+
+	foreach my $meta (split /[\n\r]+/, $response) {
+		# Array values: 0=dataId, 1=value
+		my ($address, $dataId, $value) = split /=/, $meta;
+		if (!defined($dataId)) {
+			# Return error message from script
+			return (-2, $address) if (defined($address));
+			next;
+		}
+		next if ($dataId !~ /$filter/);
+		$value //= '';
+		my ($devAddr, $chnNo) = HMCCU_SplitChnAddr ($address);
+		my $rn = HMCCU_CorrectName ($dataId);
+		$rn = "$chnNo.$rn" if ($chnNo ne '' && $clHash->{TYPE} eq 'HMCCUDEV');
+		my $rv = HMCCU_ISO2UTF ($value);
+		$readings{$rn} = HMCCU_FormatReadingValue ($clHash, $rv, $dataId);
+		$result .= "$rn=$rv\n";
+		$count++;
+	}
+	
+	HMCCU_UpdateReadings ($clHash, \%readings) if ($count > 0);
+
+	return ($count, $count > 0 ? $result: 'OK');
 }
 
 ######################################################################
@@ -8993,7 +9034,14 @@ sub HMCCU_ScaleValue ($$$$$;$)
 		$min = $paramDef->{MIN} if (defined($paramDef->{MIN}) && $paramDef->{MIN} ne '' && HMCCU_IsFltNum($paramDef->{MIN}));
 		$max = $paramDef->{MAX} if (defined($paramDef->{MAX}) && $paramDef->{MAX} ne '' && HMCCU_IsFltNum($paramDef->{MAX}));
 		$unit = $paramDef->{UNIT};
-		$unit = '100%' if (!defined($unit) && ($dpt eq 'LEVEL' || $dpt eq 'LEVEL_2' || $dpt eq 'LEVEL_SLATS'));
+		if (!defined($unit)) {
+			if ($dpt eq 'LEVEL' || $dpt eq 'LEVEL_2' || $dpt eq 'LEVEL_SLATS') {
+				$unit = '100%';
+			}
+			elsif ($dpt =~ /^P[0-9]_ENDTIME_/ && defined($max) && $max == 1440) {
+				$unit = 'minutes';
+			}
+		}
 	}
 	else {
 		HMCCU_Trace ($hash, 2, "Can't get parameter definion for addr=$ccuaddr chn=$chnno dpt=$dpt");
