@@ -20,34 +20,6 @@ use File::Path qw(rmtree);
 #https://www.perl-howto.de/2008/07/temporare-dateien-sicher-erzeugen.html
 #https://metacpan.org/release/TJENNESS/File-Temp-0.22/view/Temp.pm#OBJECT-ORIENTED_INTERFACE
 
-#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#+++ TODOS 
-#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#	+ set getConfig -> Ausgabe der Config ohne OK-Dialog (wie bei get)
-#  + Config-File in "Edit Files" sichtbar machen (je FHEMAPP-Device)
-#    -> per Attribut exposeConfigFile=1
-#  + Config-Files Extension von .fhemapp auf .fhemapp.json ändern.
-#	  -> First read check if .fhemapp.json vorhanden, dann den nehmen, wenn nur
-#    -> .fhemapp vorhanden, dann den nehmen, direkt als .fhemappp.json
-#	  -> speichern ... am besten in get_config_filename
-#  - Extension aktivieren (per Attribut) -> Info ggf. in $date ablegen
-#	  -> einer für alle, alle für einen -> activate Extension
-#	  -> oder extension mit dem ersten aktivieren und alle anderen der
-#       ersten extension bekannt geben. Dann bei entfernen der letzten
-# 		  Bekanntmachung auch Extension deaktivieren
-#       -> Attribut extensionAvailability=1‚
-#  + Reading / Event updataAvailable wenn neues Update im Stream verfügbar
-#  - set forceVersion - Update/Downgrade auf Version, per tag, egal 
-#    welcher Stream
-#	- Backup der Config per set BackupConfig und restore per set RestoreConfig
-#    -> vielleicht!!!
-#  - Download der Config als File ... weiß leider noch nicht so recht, wie!
-#  + Anpassung des Internal für den Link, wenn none als Verzeichnis gewählt
-#    wurde
-#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-
 #########################################################################
 # Importing/Exporting Functions and variables from/to main
 #########################################################################
@@ -1231,15 +1203,15 @@ sub ReadConfig
 
 	if($err) {
 		#Reading failed, then check if a file with .fhemapp extension exists
-		Log($name,"Could not read $filename",2);
-		Log($name,"Check if an old .fhemapp file exists...",2);
+		Log($name,"Could not read $filename",4);
+		Log($name,"Check if an old .fhemapp file exists...",4);
 		$err=undef;
 		$filename=get_config_file($name,1); 
-		Log($name,"Trying to read $filename",2);
+		Log($name,"Trying to read $filename",5);
 		($err,@content)=FileRead($filename);
 		if(!$err) {
 			#old .fhemapp file successfully read ... need to save later
-			Log($name, "Successfully read old formatted '$filename'",2);
+			Log($name, "Successfully read old formatted '$filename'",4);
 			$saveAsNew=1;
 		}
 	}
