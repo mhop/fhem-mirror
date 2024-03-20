@@ -917,6 +917,11 @@ FW_answerCall($)
   } else {
     my $redirectTo = AttrVal($FW_wname, "redirectTo","");
     if($redirectTo) {
+      if($redirectTo =~ m/^eventFor:(.*)/ && $arg =~ m/$1/) {
+        DoTrigger($FW_wname, $arg);
+        FW_finishRead($FW_chash, 0, "");
+        return -1;
+      }
       Log3 $FW_wname, 1,"$FW_wname: redirecting $arg to $FW_ME/$redirectTo$arg";
       return FW_answerCall("$FW_ME/$redirectTo$arg") 
     }
@@ -4331,6 +4336,15 @@ FW_log($$)
         </li>
         <br>
 
+    <a id="FHEMWEB-attr-redirectTo"></a>
+    <li>redirectTo<br>
+        If set, and FHEMWEB cannot handle a request, redirect the client to
+        $FW_ME/$redirectTo$arg. If not set, redirect to $FW_ME. If set to
+        eventFor:<regexp>, and $arg matches the regexp, then an event for the
+        FHEMWEB instance with $arg will be generated.
+        </li>
+        <br>
+
     <a id="FHEMWEB-attr-refresh"></a>
     <li>refresh<br>
         If set, a http-equiv="refresh" entry will be genererated with the given
@@ -5190,6 +5204,16 @@ FW_log($$)
         setzen des Attributs auf 0, z.Bsp. um den Syntax der Kommunikation mit
         FHEMWEB zu untersuchen.
         </li><br>
+
+    <a id="FHEMWEB-attr-redirectTo"></a>
+    <li>redirectTo<br>
+        Falls gesetzt, und FHEMWEB eine Anfrage nicht bedienen kann, wird die
+        Seite nach $FW_ME/$redirectTo$arg umgeleitet. Falls nicht gesetzt, dann
+        nach $FW_ME. Falls der Wert den Form eventFor:<regexp> hat, und $arg
+        auf <regexp> passt, dann wird ein Event mit der FHEMWEB Instanz und
+        $arg generiert.
+        </li>
+        <br>
 
     <a id="FHEMWEB-attr-refresh"></a>
     <li>refresh<br>
