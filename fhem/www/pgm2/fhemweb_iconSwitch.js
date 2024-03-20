@@ -133,6 +133,7 @@ FW_iconSwitchCreate(elName, devName, vArr, currVal, set, params, cmd)
                                             $(newEl).find("label").attr("style","border-style:solid; background-color:#f6f6f6; background-image:none;font-size: inherit;");
                                       }
                                     }
+                                    currVal = arg;                /********* beaune *********/
                                     button.button("refresh");
                                   };
 
