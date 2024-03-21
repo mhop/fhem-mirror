@@ -65,7 +65,7 @@ use SetExtensions   qw(:all);
 use HttpUtils;
 use FHEM::HTTPMOD::Utils  qw(:all);
 use POSIX;
-use Data::Dumper;
+#use Data::Dumper; # only for debugging
 
 use Exporter ('import');
 our @EXPORT_OK = qw();
