@@ -1,4 +1,4 @@
-REV 28685
+REV 28688
 DIR unused
 UPD 2024-03-20_07:45:02 422496 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -40,7 +40,7 @@ UPD 2023-12-08_07:45:03 146755 FHEM/00_THZ.pm
 UPD 2017-12-16_07:45:02 35823 FHEM/00_TUL.pm
 UPD 2021-06-08_07:45:02 21487 FHEM/00_ZWCUL.pm
 UPD 2023-11-02_07:45:02 45942 FHEM/00_ZWDongle.pm
-UPD 2024-01-01_07:45:03 181138 FHEM/01_FHEMWEB.pm
+UPD 2024-03-21_07:45:02 182105 FHEM/01_FHEMWEB.pm
 UPD 2024-03-19_07:45:03 51189 FHEM/02_FHEMAPP.pm
 UPD 2016-09-07_07:45:12 15690 FHEM/02_FRAMEBUFFER.pm
 UPD 2020-10-03_07:45:14 43003 FHEM/02_FTUISRV.pm
@@ -763,12 +763,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2024-03-20_07:45:09 5172310 docs/commandref.html
-UPD 2024-03-20_07:45:13 3199675 docs/commandref_DE.html
+UPD 2024-03-21_07:45:09 5172684 docs/commandref.html
+UPD 2024-03-21_07:45:12 3200102 docs/commandref_DE.html
 UPD 2024-03-06_07:45:03 86454 docs/commandref_frame.html
 UPD 2024-03-06_07:45:03 97189 docs/commandref_frame_DE.html
-UPD 2024-03-20_07:45:14 316098 docs/commandref_modular.html
-UPD 2024-03-20_07:45:15 328010 docs/commandref_modular_DE.html
+UPD 2024-03-21_07:45:14 316122 docs/commandref_modular.html
+UPD 2024-03-21_07:45:15 328034 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2490,7 +2490,7 @@ UPD 2020-01-19_07:45:03 4252 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
 UPD 2017-11-07_07:45:02 5913 www/pgm2/fhemweb_iconLabel.js
 UPD 2018-01-14_07:45:02 21914 www/pgm2/fhemweb_iconRadio.js
-UPD 2017-11-07_07:45:02 7925 www/pgm2/fhemweb_iconSwitch.js
+UPD 2024-03-21_07:45:02 8020 www/pgm2/fhemweb_iconSwitch.js
 UPD 2017-10-04_07:45:02 1953 www/pgm2/fhemweb_knob.js
 UPD 2017-10-04_07:45:02 4248 www/pgm2/fhemweb_readingsGroup.js
 UPD 2017-10-04_07:45:02 920 www/pgm2/fhemweb_readingsHistory.js
