@@ -50,6 +50,7 @@ BEGIN {
           modules
           attr
           AttrVal
+          AttrNum
           InternalTimer
           RemoveInternalTimer
           Log3
@@ -87,6 +88,7 @@ sub Initialize($) {
                           "password " .
                           "oilfox " .
                           "interval " .
+                          "timeout " .
                           $readingFnAttributes;
 }
 
@@ -300,7 +302,7 @@ sub APIAuth($) {
 
     HttpUtils_NonblockingGet({
         url        	=> API . "customer-api/v1/login",
-        timeout    	=> 5,
+        timeout    	=> AttrNum($name, "timeout", 45),
         hash       	=> $hash,
         method     	=> "POST",
         header     	=> $header,  
@@ -406,7 +408,7 @@ sub get($) {
 
     HttpUtils_NonblockingGet({
         url        	=> API .  "customer-api/v1/device",
-        timeout    	=> 5,
+        timeout    	=> AttrNum($name, "timeout", 45),
         hash       	=> $hash,
         method     	=> "GET",
         header     	=> $header,  
@@ -487,7 +489,7 @@ sub getResponse($) {
 =item summary    support for OilFox
 =begin html
 
-<a name="OilFox"></a>
+<a id="OilFox"></a>
 <h3>OilFox</h3>
 <ul>
 	<u><b>Requirements</b></u>
@@ -497,7 +499,7 @@ sub getResponse($) {
   	</ul>
 	<br>
 	
-	<a name="OilFoxDefine"></a>
+	<a id="OilFoxDefine"></a>
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; OilFox</code>
@@ -515,10 +517,10 @@ sub getResponse($) {
 	<br>
 	
 
-	<a name="OilFoxAttributes"></a>
+	<a id="OilFox-attr"></a>
 	<b>Attributes</b>
 	<ul>
-		<li>username - Email that is used in OilFox App</li>
+		<li>email - Email that is used in OilFox App</li>
 		<li>password - Password that is used in OilFox App</li>
 	</ul>
 	<br>
@@ -526,6 +528,7 @@ sub getResponse($) {
 	<b>Optional attributes</b>
 	<ul>
 		<li>oilfox - ID of OilFox, if more that one is registered. Default: 0</li>
+		<li>timeout  - Connection timeout</li>
 		<li>interval - Time in seconds that is used to get new data from OilFox Cloud. Default: 300</li>
 	</ul>
 	<br>
