@@ -49,9 +49,6 @@ CommandUpdate($$)
   my ($cl,$param) = @_;
   my @args = split(/ +/,$param);
 
-  return "An update is already running" if($upd_running);
-  $upd_running = 1;
-
   my $err = upd_metainit(0);
   return $err if($err);
 
@@ -80,6 +77,9 @@ CommandUpdate($$)
   $arg = lc($arg) if($arg =~ m/^(check|checktime|all|force)$/i);
   $updateInBackground = AttrVal("global","updateInBackground",1);
   $updateInBackground = 0 if($arg =~ m/^(check|checktime)$/);
+
+  return "An update is already running" if($upd_running);
+  $upd_running = 1;
 
   $updArg = $arg;
   if($updateInBackground) {
