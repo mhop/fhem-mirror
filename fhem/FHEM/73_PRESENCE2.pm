@@ -33,7 +33,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday usleep sleep);
 use DevIo;
 
-my $ModulVersion = "01.01a";
+my $ModulVersion = "01.03";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -216,7 +216,7 @@ sub PRESENCE2_dbgLogInit($@) {
 
 } # end PRESENCE2_dbgLogInit
 
-
+#######################################################################
 sub PRESENCE2_Initialize($) {
     my ($hash) = @_;
 
@@ -238,11 +238,9 @@ sub PRESENCE2_Initialize($) {
                       . "prGroupDisp:condense,verbose "
                       . "FhemLog3Std:0,1 "
                       . $readingFnAttributes;
-
-    $hash->{AttrRenameMap} = { "bluetooth_hci_device" => "bluetoothHciDevice"
-                             };
 }
 
+#######################################################################
 sub PRESENCE2_Rename($$$) {
     my ($name, $oldName) = @_;
     my $dN = PRESENCE2_getDaemonName();
@@ -250,6 +248,7 @@ sub PRESENCE2_Rename($$$) {
     PRESENCE2_doDaemonCleanup();
 }
 
+#######################################################################
 sub PRESENCE2_Define($$) {
     my ($hash, $def) = @_;
     my @a = split("[ \t]+", $def);
@@ -260,14 +259,16 @@ sub PRESENCE2_Define($$) {
     $hash->{NAME}    = $name;
     $hash->{VERSION} = $ModulVersion;
 
-   # initialize DEGUB LOg function
-   $hash->{helper}{FhemLog3Std}  = AttrVal($name, "FhemLog3Std", 0);
-   PRESENCE2_dbgLogInit($hash, "init", "verbose", AttrVal($name, "verbose", -1));
-   # end initialize DEGUB LOg function
+    # initialize DEGUB LOg function
+    $hash->{helper}{FhemLog3Std}  = AttrVal($name, "FhemLog3Std", 0);
+    PRESENCE2_dbgLogInit($hash, "init", "verbose", AttrVal($name, "verbose", -1));
+    # end initialize DEGUB LOg function
 
     if(defined($a[2]) and defined($a[3])) {
         $attr{$name}{intervalNormal}   = (defined($a[4]) and $a[4] =~ /^\d+$/ and $a[4] > 0) ? $a[4] : 1;
         $attr{$name}{intervalPresent}  = (defined($a[5]) and $a[5] =~ /^\d+$/ and $a[5] > 0) ? $a[5] : 1;
+        $hash->{INTERVAL}            = (defined($a[4]) and $a[4] =~ /^\d+$/ and $a[4] > 0) ? $a[4] : 1;
+        $hash->{TIMEOUT}             = AttrVal($name, "nonblockingTimeOut", 60);
         $hash->{MODE}                = $a[2];
         $hash->{ADDRESS}             = $a[3];
         $hash->{helper}{maybe}       = 0;
@@ -283,13 +284,13 @@ sub PRESENCE2_Define($$) {
         $hash->{helper}{DISABLED}          = 0;
         $hash->{helper}{disp}{condense}    = 1;
         $hash->{helper}{disp}{verbose}     = 0;
+        $hash->{helper}{updateConfig}      = $name . ".Initialize";
+
+        use List::Util qw(pairmap);
+        my $hciDev = qx(hcitool dev);
 
         if   ($a[2] eq "lan-ping") {
-#            if(-X "/usr/bin/ctlmgr_ctl" and not $username eq "root") {
-#                my $msg = "FHEM is not running under root (currently $username) This check can only performed with root access";
-#                Log 2, "PRESENCE2 ($name) - ".$msg;
-#                return $msg;
-#            }
+            delete $attr{$name}{nonblockingTimeOut};
             $hash->{helper}{os}{Cmd} = ($^O =~ m/(Win|cygwin)/) ? "ping -n 1 -4 $hash->{ADDRESS}"
                                       :($^O =~ m/solaris/)      ? "ping $hash->{ADDRESS} 4"
                                       :                           "ping -c 1 -w 1 $hash->{ADDRESS} 2>&1"
@@ -300,11 +301,7 @@ sub PRESENCE2_Define($$) {
 
         }
         elsif($a[2] eq "lan-bluetooth") {
-#            unless($a[3] =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/){
-#                my $msg = "given address is not a bluetooth hardware address";
-#                Log 2, "PRESENCE2 ($name) - ".$msg;
-#                return $msg
-#            }
+            delete $attr{$name}{nonblockingTimeOut};
             DevIo_CloseDev($hash);# {DevIo_CloseDev($dev{prBtTest })}
 
             $attr{$name}{intervalNormal}   = 30;
@@ -314,11 +311,24 @@ sub PRESENCE2_Define($$) {
             $hash->{DeviceName} = "$dev:$port";
         }
         elsif($a[2] eq "bluetooth") {
-#            if(-X "/usr/bin/ctlmgr_ctl" and not $username eq "root") {
-#                my $msg = "FHEM is not running under root (currently $username) This check can only performed with root access";
-#                Log 2, "PRESENCE2 ($name) - ".$msg;
-#                return $msg;
-#            }
+
+            delete $attr{$name}{nonblockingTimeOut};
+
+            if ($^O !~ m/linux/) {
+              my $msg = "local bluetooth is only by linux supported";
+              Log 2, "PRESENCE2 ($name) - " . $msg;
+              return $msg;
+            }
+
+            my $hcitool = qx(which hcitool);
+            Log 5, "PRESENCE2 ($name) - 'which hcitool' returns: $hcitool";
+            chomp $hcitool;
+
+            unless(-x $hcitool) {
+              my $msg = "no hcitool binary found. Please check that the bluez-package is properly installed";
+              Log 2, "PRESENCE2 ($name) - " . $msg;
+              return $msg;
+            }
 
             unless($a[3] =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/)
             {
@@ -327,10 +337,42 @@ sub PRESENCE2_Define($$) {
                 return $msg
             }
 
-            $hash->{helper}{os}{Cmd}    = "hcitool -i hci0 name $hash->{ADDRESS}";
-            $hash->{helper}{os}{search} = '[A-Za-z0-9]+';
+            my $blueAttr = "disable:0,1 "
+                      . "thresholdAbsence "
+                      . "intervalNormal "
+                      . "intervalPresent "
+                      . "prGroup:multiple,static,dynamic "
+                      . "prGroupDisp:condense,verbose "
+                      . "FhemLog3Std:0,1 "
+                      . "hcitoolParam:name,info ";
+
+            if ($hciDev =~ /Devices:/) {
+              $hciDev =~ s/\s+/ /g;
+              $hciDev =~ s/Devices:\s//g;
+              $hciDev =~ s/(\s..:..:..:..:..:..)//g;
+              $hciDev =~ s/\s+$//g;
+              $hciDev =~ s/\s+/,/g;
+              $hash->{helper}{os}{hci} = $hciDev;
+              $blueAttr .= "bluetoothHciDevice:" . $hciDev . " ";
+            }
+            $blueAttr .= $readingFnAttributes;
+            setDevAttrList($hash->{NAME}, $blueAttr);
+
+            $hash->{helper}{os}{bluetoothHciDevice} = AttrVal($name, "bluetoothHciDevice", "");
+            $hash->{helper}{os}{hcitoolParam} = AttrVal($name, "hcitoolParam", "name");
+
+            $hash->{helper}{os}{Cmd}  = "hcitool";
+            $hash->{helper}{os}{Cmd} .= " -i " . $hash->{helper}{os}{bluetoothHciDevice} if $hash->{helper}{os}{bluetoothHciDevice} ne "";
+
+            $hash->{helper}{os}{Cmd} .= ' ' . $hash->{helper}{os}{hcitoolParam} . ' ' . $hash->{ADDRESS} . ' 2>/dev/null';
+            if ($hash->{helper}{os}{hcitoolParam} eq "name") {
+              $hash->{helper}{os}{search} = '[A-Za-z0-9]+';
+            } else {
+              $hash->{helper}{os}{search} = '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}';
+            }
         }
         elsif($a[2] =~ /(shellscript|function)/) {
+            delete $attr{$name}{nonblockingTimeOut};
             if($def =~ /[ \t]+cmd:(.*?)[ \t]+scan:(.*)[ \t]*$/s) {
                 $hash->{helper}{os}{Cmd} = $1;
                 $hash->{helper}{os}{search} = $2;
@@ -352,9 +394,19 @@ sub PRESENCE2_Define($$) {
             return "only one daemon allowed" if(PRESENCE2_getDaemonName() ne $name);
             delete $attr{$name}{intervalPresent};
             delete $attr{$name}{thresholdAbsence};
+            delete $attr{$name}{bluetoothHciDevice};
+            delete $attr{$name}{hcitoolParam};
             $hash->{helper}{interval}{absent}  = 30;
             $hash->{helper}{interval}{present} = 30;
-            
+
+            my $daemonAttr = "disable:0,1 "
+                        . "intervalNormal "
+                        . "nonblockingTimeOut "
+                        . "prGroup:multiple,static,dynamic "
+                        . "prGroupDisp:condense,verbose "
+                        . "FhemLog3Std:0,1 "
+                        . $readingFnAttributes;
+            setDevAttrList($hash->{NAME}, $daemonAttr);
         }
         else {
             my $msg = "unknown mode \"".$a[2]."\" in define statement: Please use lan-ping, daemon, shellscript, function,bluetooth,lan-bluetooth";
@@ -373,12 +425,17 @@ sub PRESENCE2_Define($$) {
 
     readingsSingleUpdate($hash,"model",$hash->{MODE},0);
 
-    RemoveInternalTimer("PRESENCE2_updateConfig");
-    InternalTimer(2,"PRESENCE2_updateConfig", "PRESENCE2_updateConfig", 1);
+    if ($init_done) {
+       RemoveInternalTimer("PRESENCE2_updateConfig");
+       InternalTimer(2,"PRESENCE2_updateConfig", $hash->{helper}{updateConfig});
+    }
+
+    PRESENCE2_Log $name, 2, "define gaceful done";
 
     return undef;
 }
 
+#######################################################################
 sub PRESENCE2_Undef($$) {
     my ($hash, $arg) = @_;
     
@@ -391,52 +448,89 @@ sub PRESENCE2_Undef($$) {
     DevIo_CloseDev($hash);
 }
 
-sub PRESENCE2_updateConfig(){
+#####################################
+sub PRESENCE2_updateConfig($){
+   my ($timerpara) = @_;
 
-    my @daemons = devspec2array("TYPE=PRESENCE2:FILTER=MODE=daemon");
-    my $daemonName = shift @daemons;# leave the first alive
+   # my ( $name, $func ) = split( /\./, $timerpara );
+   my $index = rindex( $timerpara, "." );    # rechter Punkt
+   my $func  = substr $timerpara, $index + 1, length($timerpara);    # function extrahieren
+   my $name  = substr $timerpara, 0, $index;                         # name extrahieren
+   my $hash  = $defs{$name};
 
-    CommandDelete(undef,$_)foreach (@daemons);
+   my @daemons = devspec2array("TYPE=PRESENCE2:FILTER=MODE=daemon");
+   my $daemonName;
+
+   if (int @daemons > 1) {
+
+     Log3 $name, 2, "PRESENCE2 - $name: more than one daemon found";
+
+     $daemonName = shift @daemons;# leave the first alive
+
+     CommandDelete(undef,$_)foreach (@daemons);
+   } elsif (int @daemons == 1) {
+
+     $daemonName = $daemons[0];
+     Log3 $name, 2, "PRESENCE2 - $name: one daemon found: " . $daemonName;
+
+   } else {
+     undef $daemonName;
+   }
         
-    if (!defined $daemonName){         # daemon not available
-      CommandDefine(undef,'PsnceDaemon PRESENCE2 daemon daemon');
-    }
+   if (!defined $daemonName){         # daemon not available
+     Log3 $name, 2, "PRESENCE2 - $name: no daemon found. Creating one";
+     CommandDefine(undef,'PsnceDaemon PRESENCE2 daemon daemon');
+   }
 
-    my $dN = PRESENCE2_getDaemonName();
-    PRESENCE2_doDaemonCleanup();
-    RemoveInternalTimer(undef,"PRESENCE2_daemonScanScheduler");
-    InternalTimer(gettimeofday() + $attr{$dN}{intervalNormal}, "PRESENCE2_daemonScanScheduler", $defs{$dN}, 0);
+   my $dN = PRESENCE2_getDaemonName();
+   Log3 $name, 2, "PRESENCE2 - $name: using daemon: " . $dN;
+   PRESENCE2_doDaemonCleanup();
+
+   RemoveInternalTimer(undef,"PRESENCE2_daemonScanScheduler");
+   InternalTimer(gettimeofday() + $attr{$dN}{intervalNormal}, "PRESENCE2_daemonScanScheduler", $defs{$dN}, 0);
     
-    PRESENCE2_doEvtSetup("init");
-    foreach (devspec2array("TYPE=PRESENCE2:FILTER=MODE=lan-bluetooth")){
-        my $hash = $defs{$_};
-        next if ($hash->{helper}{DISABLED} == 1);
-        next if (defined $hash->{FD});
-        DevIo_OpenDev($hash, 0, "PRESENCE2_lanBtDoInit");
-    }
+   PRESENCE2_doEvtSetup("init");
+   foreach (devspec2array("TYPE=PRESENCE2:FILTER=MODE=lan-bluetooth")){
+     my $hash = $defs{$_};
+     next if ($hash->{helper}{DISABLED} == 1);
+     next if (defined $hash->{FD});
+     DevIo_OpenDev($hash, 0, "PRESENCE2_lanBtDoInit");
+   }
     
 
-    my $gua = AttrVal("global","userattr","");
-    $gua .=  ($gua =~ m/presentCycle/   ? "" : " presentCycle"  )
-            .($gua =~ m/presentReading/ ? "" : " presentReading")
+   my $gua = AttrVal("global","userattr","");
+   $gua .=  ($gua =~ m/presentCycle/   ? "" : " presentCycle"  )
+           .($gua =~ m/presentReading/ ? "" : " presentReading")
             ;
-    CommandAttr(undef, "global userattr $gua") if(AttrVal("global","userattr","") ne $gua);
+
+   CommandAttr(undef, "global userattr $gua") if(AttrVal("global","userattr","") ne $gua);
 }
 
+#####################################
 sub PRESENCE2_Notify($$) {
-    my ($hash,$dev) = @_;
-    return undef if(!defined $hash || !defined $hash->{NAME} || !defined $hash->{MODE} || $hash->{MODE} ne "daemon" 
-                 || !defined $dev  || !defined $dev->{NAME}  ||                           $dev->{NAME}  ne "global" 
-                 );
+    my ($hash, $dev) = @_;
 
-    my $events = deviceEvents($dev,0);
+    return undef if(!defined $hash || !defined $hash->{NAME} || !defined $hash->{MODE} || $hash->{MODE} ne "daemon" 
+                 || !defined $dev  || !defined $dev->{NAME}  || $dev->{NAME}  ne "global" );
+
+    my $events = deviceEvents($dev, 1);
     my $name = $hash->{NAME};
 
-    if($name eq "global" && grep(m/^INITIALIZED|REREADCFG$/, @{$events}))
+    return "" if(IsDisabled($name)); # Return without any further action if the module is disabled
+
+    if($dev->{NAME} eq "global" && grep(m/^INITIALIZED|REREADCFG$/, @{$events}))
     {
+
+       Log3 $name, 2, "PRESENCE2 - $name: starting initial Config ";
+
        # initialize DEGUB LOg function
+       Log3 $name, 2, "PRESENCE2 - $name: starting initial dbgLogInit";
        PRESENCE2_dbgLogInit($hash, "init", "verbose", AttrVal($name, "verbose", -1));
        # end initialize DEGUB LOg function
+
+       Log3 $name, 2, "PRESENCE2 - $name: starting initial updateConfig " . $hash->{helper}{updateConfig};
+       RemoveInternalTimer("PRESENCE2_updateConfig");
+       PRESENCE2_updateConfig ($hash->{helper}{updateConfig});
     }
 
     if (grep /^(ATTR|DELETEATTR).*(presentCycle|presentReading)/,@{$events}){
@@ -445,6 +539,7 @@ sub PRESENCE2_Notify($$) {
 
 }
 
+#####################################
 sub PRESENCE2_Set($@) {
     my ($hash, @a) = @_;
     my $name = $hash->{NAME};
@@ -500,6 +595,8 @@ sub PRESENCE2_Set($@) {
     }
 
 }
+
+#####################################
 sub PRESENCE2_Get($@) {
     my ($hash, @a) = @_;
     my $name = $hash->{NAME};
@@ -660,6 +757,7 @@ sub PRESENCE2_Get($@) {
     return undef;
 }
 
+#####################################
 sub PRESENCE2_Attr(@) {
     my @a = @_;
     my $hash = $defs{$a[1]};
@@ -705,28 +803,71 @@ sub PRESENCE2_Attr(@) {
               PRESENCE2_lanBtWrite($hash, "stop");
             }
         }
+
         elsif($a[2] eq "thresholdAbsence") {
-            return $a[2]." must be a valid integer number" if($a[3] !~ /^\d+$/);
-            return $a[2]." not used by daemon"             if($hash->{MODE} eq "daemon");
+            return $a[2] . " must be a valid integer number" if($a[3] !~ /^\d+$/) ;
+            return $a[2] . " not used by daemon"             if($hash->{MODE} eq "daemon");
         }
-        elsif($a[2] =~ m/^interval(Normal|Present)$/) {
-            return $a[2]." not a positive number" if( $a[3] !~ /^\d+$/ or $a[3] < 0);
+
+        elsif($a[2] =~ m/^interval(Normal|Present|nonblockingTimeOut)$/) {
+            return $a[2] . " not a positive number" if( $a[3] !~ /^\d+$/ or $a[3] < 0);
+            return $a[2] . " must be in between 30..240 seconds" if(($a[3] < 30 || $a[3] > 240) && $a[2] eq "nonblockingTimeOut");
+
             $hash->{helper}{nextScan} = gettimeofday();
+
             if ($hash->{MODE} eq "daemon"){
                 $hash->{helper}{nextScan} += $a[3];
-                return $a[2]." not allowed for daemon entites" if($a[2] eq "intervalPresent");
+                return $a[2] . " not allowed for daemon entites" if($a[2] eq "intervalPresent");
+
                 RemoveInternalTimer(undef,"PRESENCE2_daemonScanScheduler");
                 InternalTimer($hash->{helper}{nextScan}, "PRESENCE2_daemonScanScheduler", $hash, 0);
+
+                if($a[2] eq "nonblockingTimeOut") {
+                  $hash->{TIMEOUT} = $a[3];
+                } else{
+                  $hash->{INTERVAL} = $a[3];
+                }
+            } else {
+                return $a[2] . " not allowed for $hash->{MODE} entites" if($a[2] eq "nonblockingTimeOut");
             }
+
             if ($a[2] eq "intervalPresent"){
                 $hash->{helper}{interval}{present} = $a[3];  
-            }
-            else{
+            } elsif ($a[2] eq "intervalNormal") {
                 $hash->{helper}{interval}{absent}  = $a[3];
-                $hash->{helper}{interval}{present} = AttrVal($name,"intervalPresent",$a[3]);
+                $hash->{helper}{interval}{present} = AttrVal($name, "intervalPresent", $a[3]);
             }
         }
+        elsif ($a[2] eq "bluetoothHciDevice" ) {
+            return $a[2] . " only used by bluetooth" if($hash->{MODE} ne "bluetooth");
+
+            $hash->{helper}{os}{bluetoothHciDevice} = $a[3];
+            $hash->{helper}{os}{Cmd} = 'hcitool -i ' . $hash->{helper}{os}{bluetoothHciDevice} . ' ' . $hash->{helper}{os}{hcitoolParam} . ' ' . $hash->{ADDRESS} . ' 2>/dev/null';
+
+            if ($hash->{helper}{os}{hcitoolParam} eq "name") {
+              $hash->{helper}{os}{search} = '[A-Za-z0-9]+';
+            } else {
+              $hash->{helper}{os}{search} = '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}';
+            }
+        }
+        elsif ($a[2] eq "hcitoolParam" ) {
+            return $a[2] . " only used by bluetooth" if($hash->{MODE} ne "bluetooth");
+
+            $hash->{helper}{os}{hcitoolParam} = $a[3];
+
+            $hash->{helper}{os}{Cmd}  = "hcitool";
+            $hash->{helper}{os}{Cmd} .= " -i " . $hash->{helper}{os}{bluetoothHciDevice} if $hash->{helper}{os}{bluetoothHciDevice} ne "";
+
+            $hash->{helper}{os}{Cmd} .= ' ' . $hash->{helper}{os}{hcitoolParam} . ' ' . $hash->{ADDRESS} . ' 2>/dev/null';
+            if ($hash->{helper}{os}{hcitoolParam} eq "name") {
+              $hash->{helper}{os}{search} = '[A-Za-z0-9]+';
+            } else {
+              $hash->{helper}{os}{search} = '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}';
+            }
+        }
+
     }
+
     elsif($a[0] eq "del") {
         if ($a[2] =~ m/^(disable)$/ ) {
           RemoveInternalTimer($hash);
@@ -741,21 +882,50 @@ sub PRESENCE2_Attr(@) {
             }
           }
         }
+
         elsif($a[2] eq "intervalPresent"){
-            $hash->{helper}{interval}{present} = $hash->{helper}{interval}{absent};  
+            $hash->{helper}{interval}{present} = $hash->{helper}{interval};  
         }
+
         elsif($a[2] eq "intervalNormal"){
             $hash->{helper}{interval}{absent}  = $hash->{MODE} eq "lan-bluetooth" ? 30 : 1;
-            $hash->{helper}{interval}{present} = AttrVal($name,"intervalPresent",$hash->{helper}{interval}{absent});
+            $hash->{helper}{interval}{present} = AttrVal($name, "intervalPresent", $hash->{helper}{interval}{absent});
+            $hash->{INTERVAL} = 1;
+        }
+        elsif($a[2] eq "nonblockingTimeOut") {
+            $hash->{TIMEOUT} = 60;
+        }
+        elsif ($a[2] eq "bluetoothHciDevice" ) {
+
+            $hash->{helper}{os}{bluetoothHciDevice} = "";
+            $hash->{helper}{os}{Cmd}    = 'hcitool ' . $hash->{helper}{os}{hcitoolParam} . ' ' . $hash->{ADDRESS} . ' 2>/dev/null';
+
+            if ($hash->{helper}{os}{hcitoolParam} eq "name") {
+              $hash->{helper}{os}{search} = '[A-Za-z0-9]+';
+            } else {
+              $hash->{helper}{os}{search} = '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}';
+            }
+        }
+        elsif ($a[2] eq "hcitoolParam" ) {
+            $hash->{helper}{os}{hcitoolParam} = "name";
+            $hash->{helper}{os}{search} = '[A-Za-z0-9]+';
+
+            $hash->{helper}{os}{Cmd}  = "hcitool";
+            $hash->{helper}{os}{Cmd} .= " -i " . $hash->{helper}{os}{bluetoothHciDevice} if $hash->{helper}{os}{bluetoothHciDevice} ne "";
+
+            $hash->{helper}{os}{Cmd} .= ' ' . $hash->{helper}{os}{hcitoolParam} . ' ' . $hash->{ADDRESS} . ' 2>/dev/null';
+
         }
     }
 
     if($a[2] eq "intervalNormal"){
-        PRESENCE2_lanBtUpdtTiming($hash) ;
+        PRESENCE2_lanBtUpdtTiming($hash);
     }
+
     elsif($a[2] eq "intervalPresent"){
-        PRESENCE2_lanBtUpdtTiming($hash) ;
+        PRESENCE2_lanBtUpdtTiming($hash);
     }
+
     elsif($a[2] eq "prGroupDisp"){
         if ($a[0] eq "set") {                          # || $a[3] != m/(condense|verbose)/){
             $hash->{helper}{disp}{$_} = 0 foreach ("condense","verbose");#reset all
@@ -772,23 +942,24 @@ sub PRESENCE2_Attr(@) {
         }
         PRESENCE2_doDaemonCleanup();
     }
+
     elsif   ($a[2] eq "prGroup") {
         my %pgH = ( "static"  => 1
                    ,"dynamic" => 1
                    );
 
         if($a[0] eq "set"){
-          $pgH{$_} = 1 foreach(grep/../,split(",",$a[3]));
+          $pgH{$_} = 1 foreach(grep/../, split(",", $a[3]));
         }
 
         foreach my $e (grep !/^$name$/,devspec2array("TYPE=PRESENCE2")){
             if (defined $attr{$e}{prGroup} && $attr{$e}{prGroup}){
-                $pgH{$_} = 1 foreach(grep/../,split(",",$attr{$e}{prGroup}));
+                $pgH{$_} = 1 foreach(grep/../, split(",", $attr{$e}{prGroup}));
             }
         }
         my @pGroups = keys %pgH;
-        my $pgs1 = join(",",@pGroups);
-        my $pgs = " prGroup:multiple" . ($pgs1 ? ",".$pgs1." " : " ");
+        my $pgs1 = join(",", @pGroups);
+        my $pgs = " prGroup:multiple" . ($pgs1 ? "," . $pgs1 . " " : " ");
         $modules{PRESENCE2}{AttrList} =~ s/ prGroup.*? /$pgs/;
         my $dn = PRESENCE2_getDaemonName();
         $defs{$dn}{helper}{prGroups} = \@pGroups if (defined $dn && $dn ne "");
@@ -796,34 +967,43 @@ sub PRESENCE2_Attr(@) {
     return undef;
 }
 
+#####################################
 sub PRESENCE2_setNotfiyDev($) {############## todo
     my ($hash) = @_;
 
     notifyRegexpChanged($hash,"(global|".$hash->{EVENT_PRESENT}."|".$hash->{EVENT_ABSENT}.")");
 }
 
+#####################################
 sub PRESENCE2_getBlockingEntites() {
     return devspec2array("TYPE=PRESENCE2:FILTER=MODE!=(daemon|lan-bluetooth)");
 }
+
+#####################################
 sub PRESENCE2_getAllEntites() {
     return devspec2array("TYPE=PRESENCE2:FILTER=MODE!=(daemon)");
 }
+
+#####################################
 sub PRESENCE2_getDaemonName() {
     my @a = devspec2array("TYPE=PRESENCE2:FILTER=MODE=daemon");
     return defined $a[0]? $a[0] : undef;
 }
 
+#####################################
 sub PRESENCE2_lanBtWrite($$){
-    my ($hash,$cmd) = @_;
+    my ($hash, $cmd) = @_;
     if (defined $hash->{FD}){
-        PRESENCE2_Log $hash->{NAME}, 5 , "PRESENCE2 ($hash->{NAME}) - write : $cmd";
-        DevIo_SimpleWrite($hash, $cmd."\n", 2);
+       PRESENCE2_Log $hash->{NAME}, 5 , "PRESENCE2 ($hash->{NAME}) - write : $cmd";
+       DevIo_SimpleWrite($hash, $cmd . "\n", 2);
     }
     else{
-        PRESENCE2_Log $hash->{NAME}, 5 , "PRESENCE2 ($hash->{NAME}) - write ignored - no FD: $cmd ";
+       PRESENCE2_Log $hash->{NAME}, 5, "PRESENCE2 ($hash->{NAME}) - write ignored - no FD: $cmd ";
     }
 }
-sub PRESENCE2_lanBtDoInit($){############## todo
+
+#####################################
+sub PRESENCE2_lanBtDoInit($){  ############## todo
     my ($hash) = @_;
 
     PRESENCE2_Log $hash->{NAME}, 5, "PRESENCE2 ($hash->{NAME}) - do init";
@@ -835,10 +1015,13 @@ sub PRESENCE2_lanBtDoInit($){############## todo
         readingsSingleUpdate($hash, "state", "disabled",0);
     }
 }
+
+#####################################
 sub PRESENCE2_lanBtRead($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
     my $buf = DevIo_SimpleRead($hash);
+
     return "" if(!defined($buf));
 
     chomp $buf;
@@ -896,19 +1079,23 @@ sub PRESENCE2_lanBtRead($) {
     }
     readingsEndUpdate($hash, 1);
 }
+
+#####################################
 sub PRESENCE2_lanBtUpdtTiming($) {
     my ($hash) = @_;
     if($hash->{MODE} eq "lan-bluetooth"){
-        PRESENCE2_lanBtWrite($hash, $hash->{ADDRESS}
-                                  ."|".$hash->{helper}{interval}{$hash->{helper}{curState}});
+        PRESENCE2_lanBtWrite($hash, $hash->{ADDRESS} . "|" . $hash->{helper}{interval}{$hash->{helper}{curState}});
     }
 }
+
+#####################################
 sub PRESENCE2_lanBtReady($) {
     my ($hash) = @_;
     if(!$hash->{helper}{DISABLED}){
         return DevIo_OpenDev($hash, 1, "PRESENCE2_lanBtDoInit");
     }
 }
+
 #####################################
 sub PRESENCE2_lanBtProcessAddonData($$){
     my ($hash, $data) = @_;
@@ -916,6 +1103,7 @@ sub PRESENCE2_lanBtProcessAddonData($$){
     readingsBulkUpdate($hash, $_, $h->{$_}) foreach (keys %{$h});
 }
 
+#####################################
 sub PRESENCE2_ProcessState($$) {
     my ($hash, $state) = @_;
     my $name = $hash->{NAME};
@@ -926,7 +1114,7 @@ sub PRESENCE2_ProcessState($$) {
         return;
     }
 
-    my $thresHld  = ReadingsVal($name,"state","") eq "present" ? AttrVal($name,"thresholdAbsence", 1) : 1;
+    my $thresHld  = ReadingsVal($name,"state","") eq "present" ? AttrVal($name, "thresholdAbsence", 1) : 1;
     $hash->{helper}{cnt}{exec}++;
     if (++$hash->{helper}{cnt}{th} >= $thresHld)
     {
@@ -942,9 +1130,8 @@ sub PRESENCE2_ProcessState($$) {
         readingsBulkUpdate($hash, "state"      , $state);
         readingsBulkUpdate($hash, "thresHldCnt", 0     ) if($hash->{helper}{maybe});
         $hash->{helper}{maybe} = 0;
-    }
-    else
-    {
+
+    } else {
         PRESENCE2_Log $name, 4, "PRESENCE2 ($name) - device is $state after $hash->{helper}{cnt}{th} check. "
                    .($thresHld - $hash->{helper}{cnt}{th})." attempts left before going absent";
                    
@@ -953,11 +1140,11 @@ sub PRESENCE2_ProcessState($$) {
         $hash->{helper}{maybe} = 1;
     }
 
-    readingsBulkUpdate($hash, "presence", ($hash->{helper}{maybe}?"maybe ":"").$state);
-
+    readingsBulkUpdate($hash, "presence", ($hash->{helper}{maybe} ? "maybe ":"") . $state);
 }
+
 sub PRESENCE2_daemonScanScheduler($;$) {
-    my ($hash,$scanMeNow) = @_; # $scanMeNow: force a scan immediately for a single device
+    my ($hash, $scanMeNow) = @_;        # $scanMeNow: force a scan immediately for a single device
     my $name = $hash->{NAME};
     my $daemonInterval = AttrVal($name,"intervalNormal",30);
     my $now = gettimeofday();
@@ -983,14 +1170,17 @@ sub PRESENCE2_daemonScanScheduler($;$) {
                 }
                 PRESENCE2_doEvtCheck($hash,$now);
             }
+
             if (scalar(@scanNowList) > 0){# only fork if something to scan
 
-                PRESENCE2_Log $name, 4, "PRESENCE2_doDaemonUnBlocking:\n" . $name."#".join(",",@scanNowList);
+                PRESENCE2_Log $name, 4, "PRESENCE2_doDaemonUnBlocking:\n" . $name . "#" . join(",",@scanNowList);
+
+                my $nonBlockingTimeout = AttrVal( $name, "nonblockingTimeOut", 60 );
 
                 $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE2_doDaemonUnBlocking"
-                                                          , $name."#".join(",",@scanNowList)
+                                                          , $name . "#" . join(",", @scanNowList)
                                                           , "PRESENCE2_daemonScanReply"
-                                                          , 60
+                                                          , $nonBlockingTimeout
                                                           , "PRESENCE2_daemonAbortedScan"
                                                           , $hash);
             }
@@ -1006,7 +1196,7 @@ sub PRESENCE2_doDaemonUnBlocking($) {
 
     my @ret = ();
     foreach my $e (@scanList){
-        push @ret,PRESENCE2_doDaemonEntityScan($name,$e);
+      push @ret,PRESENCE2_doDaemonEntityScan($name,$e);
     }
 
     my $duration = int(gettimeofday() - $start);
@@ -1080,7 +1270,15 @@ sub PRESENCE2_daemonAbortedScan($) {
     my $instHash = ( ref($hash) eq "HASH" ) ? $hash : $defs{$hash};
     my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $hash;
 
-    PRESENCE2_Log $instName, 2, "PRESENCE2 ($instName) - scan aborted";
+    my $xline       = ( caller(0) )[2];
+
+    my $xsubroutine = ( caller(1) )[3];
+    my $sub         = ( split( ':', $xsubroutine ) )[2];
+    $sub =~ s/PRESENCE2_//       if ( defined $sub );
+    $sub ||= 'no-subroutine-specified';
+
+    PRESENCE2_Log $instName, 5, "PRESENCE2 ($instName) - scan aborted: $xline | $sub";
+
     delete $defs{$instName}{helper}{RUNNING_PID};
     $defs{$instName}{helper}{cnt}{aboart} = defined $defs{$instName}{helper}{cnt}{aboart} ? $defs{$instName}{helper}{cnt}{aboart} + 1 : 1;
     readingsSingleUpdate($instHash, "daemonAboartCnt", $defs{$instName}{helper}{cnt}{aboart}, 1);
@@ -1088,35 +1286,69 @@ sub PRESENCE2_daemonAbortedScan($) {
 
 sub PRESENCE2_doDaemonEntityScan($$) {
     my ($dn,$NAME) = @_;
-    my ($ADDRESS, $local, $count,$hash) = (InternalVal($NAME,"ADDRESS",""),0,1,$defs{$NAME});
+    my ($ADDRESS, $local, $count,$hash) = (InternalVal($NAME,"ADDRESS",""), 0, 1, $defs{$NAME});
+
     $SIG{CHLD} = 'IGNORE';
     
+    my $ps;
     my $temp;
     my $cmd = $hash->{helper}{os}{Cmd};
     
     if (!defined $hash->{helper}{os}{Cmd} || !$hash->{helper}{os}{Cmd}){
-        return "$NAME|error";
+      return "$NAME|error";
     }
+
     $cmd =~ s/\$ADDRESS/$ADDRESS/;
     $cmd =~ s/\$NAME/$NAME/;
-    if ($hash->{MODE} eq "function"){$temp = AnalyzeCommandChain(undef, $cmd);}
-    else                            {$temp = qx($cmd);}
 
     my $result = "";
     my $search = $hash->{helper}{os}{search};
     $search =~ s/\$ADDRESS/$ADDRESS/;
     $search =~ s/\$NAME/$NAME/;
-    if(! defined($temp) or  $temp eq ""){
-        $result = "error|Could not execute command: \"$cmd\"";
-        $temp = "empty";
+
+
+    if ($hash->{MODE} eq "function"){
+      $temp = AnalyzeCommandChain(undef, $cmd);
+    } else {
+      PRESENCE2_Log $hash->{NAME}, 5, "$NAME calling - $cmd";
+      if (defined $hash->{helper}{os}{bluetoothHciDevice}) {
+        my $wait = 1;
+        while($wait)
+        {   # check if another hcitool process is running
+            $ps = qx(ps ax | grep hcitool | grep -v grep);
+            if(not $ps =~ /^\s*$/)
+            {
+                # sleep between 1 and 5 seconds and try again
+                PRESENCE2_Log $NAME, 5, "PRESENCE ($NAME) - another hcitool command is running. waiting...";
+                sleep(rand(4)+1);
+            }
+            else
+            {
+                $wait = 0;
+            }
+        }
+      }
+      $temp = qx($cmd);
     }
-    else{
-        chomp $temp;
-        $result  = $temp =~ /$search/ ? "present":"absent";
+
+    if (defined $hash->{helper}{os}{bluetoothHciDevice}) {
+      $result = $temp =~ /$search/gs ? "present":"absent";
+
+    } elsif(! defined($temp) or $temp eq "") {
+
+      $result = "error|Could not execute command: \"$cmd\"";
+      $temp = "empty";
+
+    } else {
+      $result = $temp =~ /$search/gs ? "present":"absent";
     }
-    PRESENCE2_Log $NAME, 5, "PRESENCE2 ($NAME) - result:$result\n########command>$cmd\n########reply  >$temp";
+
+    # Log3 $NAME, 5, "PRESENCE2 ($NAME) - result:$result\n########command>$cmd\n########reply  >$temp";
+    PRESENCE2_Log $NAME, 5, "result:$result\n########command>$cmd\n########reply  >$temp";
+
     return "$NAME|$result";
 }
+
 sub PRESENCE2_doDaemonCleanup(){
     my $name = PRESENCE2_getDaemonName();
     my $hash = $defs{$name};
@@ -1482,6 +1714,28 @@ Options:
        Not applicable for daemon entity<br>
     </li><br>
 
+    <li><a name="nonblockingTimeOut"></a>
+       <dt><code>nonblockingTimeOut &lt;30..240&gt;</code></dt>
+       <br>
+       timeout for regularly checking presende. Default is 60 (seconds).
+    </li><br>
+
+    <li><a name="bluetoothHciDevice"</a>
+       <dt><code>set &lt;name&gt; bluetoothHciDevice &lt;hci[0..n]&gt;</code></dt>
+       (Only applicable in local “bluetooth” mode and not applicable to Daemon device)<br>
+       <br>
+       Set a specific bluetooth HCI device to use for scanning. If you have multiple bluetooth modules connected,<br>
+       you can select a specific one to use for scanning (e.g. hci0, hci1, ...).<br>
+    </li><br>
+
+    <li><a name="hcitoolParam"></a>
+       <dt><code>set &lt;name&gt; hcitoolParam &lt;name|info&gt;</code></dt>
+       (Only applicable in local “bluetooth” mode and not applicable to Daemon device)<br>
+       <br>
+       Selection of which parameter the hcitool should use to recognize a connected bluetooth device<br>
+       Default is &lt;name&gt;
+    </li><br>
+
     <li><a name="disable"></a>
         <dt><code>set &lt;name&gt; disable &lt;0|1&gt;</code></dt>
         If activated, any check is disabled and state is set to disabled.<br>
@@ -1818,8 +2072,30 @@ Optionen:
        Gilt nicht für Daemon-Entitäten<br>
     </li><br>
 
+    <li><a name="nonblockingTimeOut"></a>
+       <dt><code>nonblockingTimeOut &lt;30..240&gt;</code></dt>
+       <br>
+       Timeout f&uuml;r das regelm&auml;&szlig;ige prüfen auf Anwesenheit. Standard ist 60 (Sekunden).
+    </li><br>
+
+    <li><a name="bluetoothHciDevice"></a>
+       <dt><code>set &lt;name&gt; bluetoothHciDevice &lt;hci[0..n]&gt;</code></dt>
+       (Nur im lokalen Modus "bluetooth" und nicht für Daemon Device anwendbar)<br>
+       <br>
+       Sofern man mehrere Bluetooth-Empf&auml;nger verf&uuml;gbar hat, kann man mit diesem Attribut ein bestimmten Empf&auml;nger ausw&auml;hlen,<br>
+       welcher zur Erkennung verwendet werden soll (bspw. hci0, hci1, ...).<br>
+    </li><br>
+
+    <li><a name="hcitoolParam"></a>
+       <dt><code>set &lt;name&gt; hcitoolParam &lt;name|info&gt;</code></dt>
+       (Nur im lokalen Modus "bluetooth" und nicht für Daemon Device anwendbar)<br>
+       <br>
+       Auswahl über welchen Paramter das hcitool ein verbundenes Bluetooth Device erkennen soll.<br>
+       Vorgabe ist &lt;name&gt;
+    </li><br>
+
     <li><a name="disable"></a>
-        <dt><code>set &lt;name&gt; &lt;0|1&gt;</code></dt> deaktivieren
+        <dt><code>set &lt;name&gt; disable &lt;0|1&gt;</code></dt>
         Wenn aktiviert, ist jede Prüfung deaktiviert und der Status wird auf deaktiviert gesetzt.<br>
     </li><br>
 
