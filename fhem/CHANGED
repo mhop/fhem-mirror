@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_PRESENCE2: Fehlerbereinigungen
+                          Hochlaufen bei Neustart von Fhem korrigiert
+                          Lokale Bluetooth Erkennung korrigiert
+ - feature: 73_PRESENCE2: Neues Attribut bluetoothHciDevice, hcitoolParam
  - change:  70_PylonLowVoltage: edit commandref
  - feature: 93_DbLog: support of MariaDB driver and more, see Forum:#137480
  - feature: 93_DbRep: sqlCmdBlocking can use sql Keywords §timestamp_end§ etc.
