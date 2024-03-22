@@ -1,0 +1,603 @@
+#!/usr/bin/perl
+
+# vim: set softtabstop=2 shiftwidth=2 expandtab :
+
+##############################################################################
+# $Id$
+##############################################################################
+#
+# ble2mqttd
+#
+# checks for one or multiple bluetooth *low energy* devices for their
+# presence state and reports it to an mqtt server.
+#
+# Copyright (C) 2015-2018 P. Reinhardt, pr-fhem (at) reinhardtweb (dot) de
+# Contributions by (in chronological order): decaflo
+#
+# This script free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# The GNU General Public License can be found at
+# http://www.gnu.org/copyleft/gpl.html.
+# A copy is found in the textfile GPL.txt and important notices to the
+# license from the author is found in LICENSE.txt distributed with these
+# scripts.
+#
+# This script is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+##############################################################################
+
+
+# cpan Net::MQTT::Simple
+# apt-get install bluez libexpect-perl libnet-server-perl libreadonly-perl
+
+use strict;
+use warnings;
+no warnings 'redefine';
+
+use Readonly;
+use Expect;
+use Digest::MD5;
+
+use Net::MQTT::Simple;
+use Net::MQTT::Simple::SSL;
+use IO::Socket::SSL;
+
+use Fcntl 'LOCK_EX', 'LOCK_NB';
+use Sys::Syslog qw(:standard :macros);
+use Sys::Hostname;
+use Time::HiRes qw(usleep);
+use POSIX qw(strftime);
+use Getopt::Long;
+use Net::Server::Daemonize qw(daemonize);
+
+use Data::Dumper;
+
+Readonly my $EXPECT_TIMEOUT                       => 10;
+Readonly my $BLUETOOTHCTL_RESTART_SLEEP           => 1;
+Readonly my $MAINLOOP_SLEEP_US                    => 250 * 1000;
+Readonly my $HEARTBEAT_INTERVAL                   => 60;
+Readonly my $DUMP_INTERVAL                        => 15;
+Readonly my $EVALUATION_INTERVAL                  => 5;
+Readonly my $PUBLISH_FILTER_INTERVAL              => 15;
+Readonly my $CLEANUP_INTERVAL                     => 15 * 60;
+Readonly my $CLEANUP_MAX_AGE                      => 30 * 60;
+Readonly my $QUERY_INTERVAL                       => 2;
+Readonly my $BATTERY_INTERVAL                     => 1 * 60 * 60;
+Readonly my $INITIAL_BATTERY_INTERVAL             => 2 * 60;
+Readonly my $MQTT_MAX_CLIENTID_LENGTH             => 23;
+Readonly my $BATTERY_LEVEL_CHARACTERISTIC_UUID    => '00002a19-0000-1000-8000-00805f9b34fb';
+
+Readonly my $DEFAULT_BATTERY_MAX_AGE              => 48;
+Readonly my $DEFAULT_RSSI_THRESHOLD               => 10;
+Readonly my $DEFAULT_ABSENT_INTERVAL              => 60;
+
+Readonly my $ME                                   => 'ble2mqttd';
+Readonly my $VERSION                              => '0.15';
+Readonly my $PIDFILE                              => "/var/run/$ME.pid";
+
+my ($mqtt, $bluetoothctl, $loglevel, $logtarget, $debug);
+my ($nextheartbeat, $nextdump, $nextevaluation, $nextcleanup, $nextbattery, $lastquery, $lastevent, $lastconnect);
+my %devices;
+
+*Net::MQTT::Simple::_client_identifier = sub {
+  return(
+    substr(sprintf("%s-%s", $ME, hostname()), 0, $MQTT_MAX_CLIENTID_LENGTH)
+  );
+};
+
+sub tsprefix {
+  return(sprintf('[%s] ', strftime('%F %H:%M:%S', localtime())));
+}
+
+sub syslogw {
+  my ($priority, @args) = @_;
+  return if (scalar(@args) < 1);
+  my $logmessage;
+  if (scalar(@args)==1) {
+    my ($message) = @args;
+    $logmessage = sprintf("%s: $message", (caller(1))[3] // 'main');
+  } else {
+    my ($format, @args) = @args;
+    $logmessage = sprintf("%s: $format", (caller(1))[3] // 'main', @args);
+  }
+  if ($loglevel >= $priority) {
+    if ($logtarget eq 'syslog') {
+      syslog($priority, $logmessage) if ($loglevel >= $priority);
+    } elsif ($logtarget eq 'stdout' && !$debug) {
+      printf("%s%s\n", tsprefix(),$logmessage);
+    }
+  }
+  printf("%s%s\n", tsprefix(),$logmessage) if ($debug);
+  return();
+}
+
+sub error_exit {
+  my ($exit_code, @args) = @_;
+  syslogw(LOG_ERR, @args);
+  $bluetoothctl->hard_close() if ($bluetoothctl);
+  closelog();
+  exit ($exit_code);
+}
+
+sub usage_exit {
+  printf("%s --mqttserver <mqtt server:mqtt port> --mqttfingerprint <ssl fingerprint> --mqttuser <mqtt user> --mqttpass <mqtt pass> --loglevel <log level> --logtarget <log target> --daemon --mac <regex>\n", $ME);
+  print("valid log levels:\n");
+  print("\tLOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO, LOG_DEBUG. Default: LOG_INFO\n");
+  print("valid log targets:\n");
+  print("\tsyslog, stdout. Default: syslog\n");
+  print("optional arguments:\n");
+  print("\t--mqtttopic - Set custom mqtt topic, especially necessary if more than one instance is used.\n");
+  print("\t--daemonize - Run as daemon.\n");
+  printf("\t--absentinterval - Seconds after which device is considered absent. Minimum value: 30, default: %i.\n", $DEFAULT_ABSENT_INTERVAL);
+  printf("\t--rssithreshold - rssi deviation to trigger an update. Minimum value: 5, default: %i.\n", $DEFAULT_RSSI_THRESHOLD);
+  print("\t--watchdogthreshold - if (any) last beacon was received before the set watchdog threshold, bluetoothctl is restarted. Minimum value: 30 seconds, default: disabled.\n");
+  print("\t--debug <number> - print extensive debug output to stdout (mutually exclusive with --daemon). A higher number results in more debug output.\n");
+  print("\t--mac <regex> - filter handled MAC Adresses with regular expression.\n");
+  printf("\t--batterymaxage <number> - Maximum time (in hours) after which the battery reading is considered outdated and updated, default: %i. A value of 0 disables all battery checks.\n", $DEFAULT_BATTERY_MAX_AGE);
+  print("\t--forcebattery - Forces the battery check on known devices even though the battery service is not recognized. Requires setting --mac.\n");
+  print("\t--retain - Publishes the topics present, lastseen as retained.\n");
+  print("examples:\n");
+  printf("\t%s --mqttserver mqtt.domain:1883\n", $ME);
+  printf("\t%s --mqttserver mqtt.domain:1883 --mqtttopic ble2mqtt/livingroom\n", $ME);
+  printf("\t%s --mqttserver mqtt.domain:1883 --mqttuser azurediamond --mqttpass hunter2\n", $ME);
+  printf("\t%s --mqttserver mqtt.domain:8883 --getmqttfingerprint -> Displays the mqtt fingerprint of the server.\n", $ME);
+  printf("\t%s --mqttserver mqtt.domain:8883 --mqttfingerprint 'sha256\$11e20bbb668da517a0ae8536f3c79887d06ddec945fab60401deab92dc7e7c1f'\n", $ME);
+  printf("\t%s --mqttserver mqtt.domain:8883 --mqttfingerprint 'sha256\$11e20bbb668da517a0ae8536f3c79887d06ddec945fab60401deab92dc7e7c1f' --mqttuser user --mqttpass pass\n", $ME);
+  printf("\t%s --mqttserver mqtt.domain:8883 --mqttfingerprint 'sha256\$11e20bbb668da517a0ae8536f3c79887d06ddec945fab60401deab92dc7e7c1f' --mqttuser user --mqttpass pass --mac 'AB:CD:EF:.*'\n", $ME);
+  closelog();
+  exit(1);
+}
+
+sub parse_loglevel {
+  my ($loglevel_str) = @_;
+  $loglevel_str = uc($loglevel_str);
+
+  return  ( $loglevel_str eq 'LOG_EMERG'   ? LOG_EMERG
+          : $loglevel_str eq 'LOG_ALERT'   ? LOG_ALERT
+          : $loglevel_str eq 'LOG_CRIT'    ? LOG_CRIT
+          : $loglevel_str eq 'LOG_ERR'     ? LOG_ERR
+          : $loglevel_str eq 'LOG_WARNING' ? LOG_WARNING
+          : $loglevel_str eq 'LOG_NOTICE'  ? LOG_NOTICE
+          : $loglevel_str eq 'LOG_INFO'    ? LOG_INFO
+          : $loglevel_str eq 'LOG_DEBUG'   ? LOG_DEBUG
+          : usage_exit()
+          );
+}
+
+sub parse_options {
+  my $device                      = "hci0";
+  my $mqttserver;
+  my $mqttfingerprint;
+  my $mqttuser;
+  my $mqttpass;
+  my $mqtttopic                   = "ble2mqtt";
+  my $daemonize                   = 0;
+  my $logtarget                   = "syslog";
+  my $loglevel                    = "LOG_INFO";
+  my $absentinterval              = $DEFAULT_ABSENT_INTERVAL;
+  my $rssithreshold               = $DEFAULT_RSSI_THRESHOLD;
+  my $watchdogthreshold           = 0;
+  my $debug                       = 0;
+  my $debugbluetoothctl           = 0;
+  my $help                        = 0;
+  my $getmqttfingerprint          = 0;
+  my $macregex;
+  my $forcebattery                = 0;
+  my $retain                      = 0;
+  my $batterymaxage               = $DEFAULT_BATTERY_MAX_AGE;
+
+  GetOptions(
+    #'bluetoothdevice|device|b=s'  => \$device,
+    'mqttserver|m=s'              => \$mqttserver,
+    'mqttfingerprint|f=s'         => \$mqttfingerprint,
+    'mqttuser|u=s'                => \$mqttuser,
+    'mqttpass|p=s'                => \$mqttpass,
+    'mqtttopic|t=s'               => \$mqtttopic,
+    'getmqttfingerprint|g'        => \$getmqttfingerprint,
+    'daemon|daemonize|d!'         => \$daemonize,
+    'loglevel|l=s'                => \$loglevel,
+    'logtarget|t=s'               => \$logtarget,
+    'absentinterval|a=i'          => \$absentinterval,
+    'rssithreshold=i'             => \$rssithreshold,
+    'watchdogthreshold|w=i'       => \$watchdogthreshold,
+    'debug=i'                     => \$debug,
+    'debugbluetoothctl!'          => \$debugbluetoothctl,
+    'help|h'                      => \$help,
+    'forcebattery!'               => \$forcebattery,
+    'retain!'                     => \$retain,
+    'batterymaxage=i'             => \$batterymaxage,
+    'mac=s'                       => \$macregex,
+  ) or usage_exit();
+
+  usage_exit() if ($help);
+  usage_exit() unless ($mqttserver);
+  usage_exit() unless ($absentinterval >= 30);
+  usage_exit() unless ($rssithreshold >= 5);
+  usage_exit() unless ($batterymaxage >= 0);
+  usage_exit() if ($watchdogthreshold && $watchdogthreshold < 30);
+  usage_exit() if ($forcebattery && !$macregex);
+  
+  $logtarget =~ m/^(syslog|stdout)$/ or usage_exit();
+  $loglevel = parse_loglevel($loglevel);
+  $daemonize = 0 if ($debug);
+  
+  return ($device, $mqttserver, $mqttuser, $mqttpass, $mqttfingerprint, $getmqttfingerprint, $mqtttopic, $daemonize, $loglevel, $logtarget, $absentinterval, $rssithreshold, $watchdogthreshold, $debug, $debugbluetoothctl, $macregex, $forcebattery, $retain, $batterymaxage);
+}
+
+sub sanity_check {
+  my ($batterymaxage) = @_;
+  error_exit(3, "ERROR: $ME is already running. Exiting.") if (!flock DATA, LOCK_EX | LOCK_NB);
+
+  # log md5 digest
+  open (my $me, '<', $0);
+  binmode ($me);
+  syslogw(LOG_INFO, "md5 digest of '%s' is: '%s'.", $0, Digest::MD5->new->addfile($me)->hexdigest());
+  close($me);
+  
+  # check if necessary external binaries exist
+  my $ok = 1;
+  foreach my $binary ($batterymaxage > 0 ? qw/bluetoothctl gatttool/ : qw/bluetoothctl/) {
+    my $binpath = `which $binary 2>/dev/null`;
+    chomp($binpath);
+    if ($? == 0) {
+      syslogw(LOG_INFO, "%s found at '%s'.", $binary, $binpath);
+    } else {
+      syslogw(LOG_ERR, "ERROR: %s not found!", $binary);
+      $ok = 0;
+    }
+  }
+  error_exit(4, "ERROR: Exiting due to missing binaries.") if (!$ok);
+  return();
+}
+
+sub mqtt_check_reconnect {
+  my ($mqtt, $mqtttopic) = @_;
+  if (!defined($lastconnect) || $lastconnect != $mqtt->{last_connect}) {
+    syslogw(LOG_INFO, '(Re-)connect detected, handling...');
+    $mqtt->retain($mqtttopic . '/state', 'connected');
+    $lastconnect = $mqtt->{last_connect};
+  }
+}
+
+sub mqtt_connect {
+  my ($mqttserver, $mqttuser, $mqttpass, $mqttfingerprint, $mqtttopic) = @_;
+  my $mqtt;
+  if (!defined($mqttfingerprint)) {
+    if ($mqttuser && $mqttpass) {
+      $ENV{MQTT_SIMPLE_ALLOW_INSECURE_LOGIN} = 1;
+      $mqtt = Net::MQTT::Simple->new($mqttserver);
+      $mqtt->login($mqttuser,$mqttpass);
+    } else {
+      $mqtt = Net::MQTT::Simple->new($mqttserver);
+    }
+  } else {
+    $mqtt = Net::MQTT::Simple::SSL->new($mqttserver, {SSL_fingerprint => $mqttfingerprint});
+    if ($mqttuser && $mqttpass) {
+      $mqtt->login($mqttuser, $mqttpass);
+    }
+  }
+  $mqtt->last_will($mqtttopic . '/state', 'disconnected', 1);
+  mqtt_check_reconnect($mqtt, $mqtttopic);
+  return($mqtt);
+}
+
+sub dump_task {
+  syslogw(LOG_INFO, 'Executing dump task.');
+  
+  printf("%sKnown devices (%i):\n", tsprefix(), scalar(keys(%devices)));
+  foreach my $mac (sort keys(%devices)) {
+    printf("\tmac: %s, present: %i, name: %s, address type: %s, first seen: %i, last seen: %i, last published: %i, rssi: %s, published rssi: %s, query count: %s, battery service: %i, battery: %s (%s)\n",
+      $mac,
+      $devices{$mac}{'present'} // 'unknown',
+      $devices{$mac}{'name'} // 'unknown',
+      $devices{$mac}{'address_type'} // 'unknown',
+      time() - $devices{$mac}{'firstseen'},
+      time() - $devices{$mac}{'lastseen'},
+      time() - $devices{$mac}{'lastpublished'},
+      $devices{$mac}{'rssi'} // 'unknown',
+      $devices{$mac}{'rssipublished'} // 'unknown',
+      $devices{$mac}{'query_count'} // '%',
+      $devices{$mac}{'batteryservice'} // 0,
+      $devices{$mac}{'battery'} // 'unknown',
+      $devices{$mac}{'batterytime'} // 'never'
+    );
+  }
+  return();
+}
+
+sub evaluation_task {
+  my ($absentinterval, $mqtttopic, $retain) = @_;
+  syslogw(LOG_DEBUG, 'Executing evaluation task.');
+  foreach my $mac (sort keys(%devices)) {
+    if ($devices{$mac}{'present'} && time() - $devices{$mac}{'lastseen'} > $absentinterval) {
+      syslogw(LOG_INFO, 'Device %s is now absent.', $mac);
+      if ($retain) {
+        $mqtt->retain($mqtttopic . '/' . $mac . '/present', 0);
+      } else {
+        $mqtt->publish($mqtttopic . '/' . $mac . '/present', 0);
+      }
+      $devices{$mac}{'present'} = 0;
+    }
+  }
+}
+
+sub cleanup_task {
+  my $start_time = time();
+  my $deleted_items = 0;
+  foreach my $mac (keys(%devices)) {
+    next if ($devices{$mac}{'present'});
+    my $age = time() - $devices{$mac}{'lastseen'};
+    if ($age > $CLEANUP_MAX_AGE) {
+      $deleted_items++;
+      syslogw(LOG_DEBUG, "Deleting device %s.", $mac);
+      delete($devices{$mac});
+    }
+  }
+  syslogw(LOG_INFO, "Cleanup finished, deleted %i devices in %i seconds.", $deleted_items, time() - $start_time);
+  return();
+}
+
+sub get_battery_level {
+  my ($mac) = @_;
+  my $address_type = $devices{$mac}{'address_type'} // 'public';
+  #-i $device 
+  open(my $gatttool, "-|", "gatttool -b $mac -t $address_type --char-read --uuid=$BATTERY_LEVEL_CHARACTERISTIC_UUID 2>&1") || die('Error executing gatttool!');
+
+  my $result = 'unknown';
+  while (<$gatttool>) {
+    chomp($_);
+    syslogw(LOG_DEBUG, "gatttool (mac: %s, address type: '%s'): '%s'", $mac, $address_type, $_);
+    if ($_ =~ m/^handle:\s[0-9A-Fa-fx]+\s+value:\s([0-9a-f]+)\s*$/) {
+      # Success: 'handle: 0x0028 	 value: 64'
+      $result = hex($1);
+    } elsif ($_ =~ m/^Read characteristics by UUID failed: No attribute found within the given range$/) {
+      # Unsupported: 'Read characteristics by UUID failed: No attribute found within the given range'
+      $result = 'unknown (unsupported)';
+    } elsif ($_ =~ m/^connect error: Connection refused \(111\)$/) {
+      # Unreachable (after 40s): 'connect error: Connection refused (111)'
+      # Shouldn't happen very often because we try to query only reachable clients that offer battery service
+      $result = 'unknown (timeout)';
+    }
+  }
+  close($gatttool);  
+  return($result);
+}
+
+sub battery_task {
+  my ($mqtttopic, $forcebattery, $batterymaxage) = @_;
+
+  syslogw(LOG_INFO, 'Executing battery task.');
+  foreach my $mac (sort keys(%devices)) {
+    if (
+      $devices{$mac}{'present'} &&
+      ($devices{$mac}{'batteryservice'} || $forcebattery) &&
+      (!$devices{$mac}{'batterytime'} || (time()-$devices{$mac}{'batterytime'}) >= $batterymaxage * 60 * 60)
+    ) {
+      my $battery = get_battery_level($mac);
+      if ($battery !~ m/^unknown/) {
+        syslogw(LOG_INFO, 'Battery level of device %s is %s, updating reading...', $mac, $battery);
+        $devices{$mac}{'battery'} = $battery;
+        $devices{$mac}{'batterytime'} = time();
+        $mqtt->publish($mqtttopic . '/' . $mac . '/battery', $devices{$mac}{'battery'});
+        $mqtt->publish($mqtttopic . '/' . $mac . '/batterytime', $devices{$mac}{'batterytime'});
+      } else {
+        syslogw(LOG_INFO, 'Battery level of device %s is %s, skipping reading update...', $mac, $battery);
+      }
+    }
+  }
+
+  $nextbattery = time() + $BATTERY_INTERVAL;
+  return();
+}
+
+sub query_task {
+  my ($bluetoothctl) = @_;
+
+  foreach my $mac (sort keys(%devices)) {
+    if (
+      $devices{$mac}{'present'} &&
+      !$devices{$mac}{'address_type'} &&
+      (!$devices{$mac}{'next_query_time'} || time() > $devices{$mac}{'next_query_time'})
+    ) {
+      $devices{$mac}{'query_count'}++;
+      my $backoff = 2**$devices{$mac}{'query_count'}; # exponential backoff
+      $devices{$mac}{'next_query_time'} = time() + $backoff;
+      $bluetoothctl->send(sprintf("info %s\n", $mac));
+      syslogw(LOG_DEBUG, 'Executing query task. Querying %s (count: %i, backoff: %i)...', $mac, $devices{$mac}{'query_count'}, $backoff);
+      return(); # only one query per interval
+    }
+  }
+}
+
+sub handle_match {
+  my ($mqtttopic, $rssithreshold, $type, $mac, $info, $bluetoothctl, $macregex, $retain) = @_;
+  $info =~ s/\s+$//;
+  $mac = uc($mac);
+
+  if($macregex && $mac!~/$macregex/i) {
+    printf("%s### Match (filtered): [%s] %s (%s)\n", tsprefix(), $type, $mac, $info) if ($debug >= 2);
+    return(); 
+  }
+
+  $lastevent = time();
+  if (my ($rssi) = ($info =~ m/^RSSI: (-?[0-9]+)$/)) {
+    printf("%s### Match RSSI:       [%s] %s -> %s\n", tsprefix(), $type, $mac, $rssi) if ($debug >= 2);
+    $devices{$mac}{'rssi'}=$rssi;
+    if (!$devices{$mac}{'rssipublished'} || abs($devices{$mac}{'rssipublished'} - $rssi) > $rssithreshold) {
+      $mqtt->publish($mqtttopic . '/' . $mac . '/rssi', $rssi);
+      $devices{$mac}{'rssipublished'} = $rssi;
+    }
+  }
+
+  if($devices{$mac}{'firstseen'}) {
+    printf("%s### Match:            [%s] %s (%s)\n", tsprefix(), $type, $mac, $info) if ($debug >= 2);
+  } else {
+    printf("%s### Match (new):      [%s] %s (%s)\n", tsprefix(), $type, $mac, $info) if ($debug >= 2);
+    $devices{$mac}{'firstseen'} = time();
+    $devices{$mac}{'query_count'} = 0;
+  }
+
+  $devices{$mac}{'lastseen'} = time();
+  $devices{$mac}{'present'} = 1;
+  if (!$devices{$mac}{'present'} || !$devices{$mac}{'lastpublished'} || time() - $devices{$mac}{'lastpublished'} > $PUBLISH_FILTER_INTERVAL) {
+    if ($retain) {
+      $mqtt->retain($mqtttopic . '/' . $mac . '/lastseen', time());
+      $mqtt->retain($mqtttopic . '/' . $mac . '/present', 1);
+    } else {
+      $mqtt->publish($mqtttopic . '/' . $mac . '/lastseen', time());
+      $mqtt->publish($mqtttopic . '/' . $mac . '/present', 1);
+    }
+    $devices{$mac}{'lastpublished'} = time();
+    syslogw(LOG_INFO, 'Device %s is now present.', $mac) unless ($devices{$mac}{'present'});
+  }
+}
+
+(my $device, my $mqttserver, my $mqttuser, my $mqttpass, my $mqttfingerprint, my $getmqttfingerprint, my $mqtttopic, my $daemonize, $loglevel, $logtarget, my $absentinterval, my $rssithreshold, my $watchdogthreshold, $debug, my $debugbluetoothctl, my $macregex, my $forcebattery, my $retain, my $batterymaxage) = parse_options();
+
+syslogw(LOG_NOTICE, "Version %s started (device: %s, mqtt server: %s, mqtt user: %s, mqtt fingerprint: %s, get mqtt fingerprint: %s, mqtt topic: %s, daemonize: %i, log level: %i, log target: %s, absent interval: %s, rssi threshold: %s, watchdog threshold: %s, mac regex: %s, debug: %i, debug bluetoothctl: %i, force battery: %i, battery max age: %i).",
+  $VERSION, $device, $mqttserver, $mqttuser // '-none-', $mqttfingerprint // '-none-', $getmqttfingerprint, $mqtttopic // '-none-', $daemonize, $loglevel, $logtarget, $absentinterval, $rssithreshold, $watchdogthreshold, $macregex // '-none-', $debug, $debugbluetoothctl, $forcebattery, $batterymaxage);
+
+
+sanity_check($batterymaxage);
+daemonize('root', 'root', $PIDFILE) if $daemonize;
+
+local $SIG{INT} = local $SIG{TERM} = local $SIG{HUP} = sub {
+  syslogw(LOG_NOTICE, "Caught signal, cleaning up and exiting...");
+  unlink($PIDFILE) if (-e $PIDFILE);
+  if ($mqtt) {
+    $mqtt->retain($mqtttopic . '/state', 'disconnected');
+    $mqtt->disconnect();
+  }
+  $bluetoothctl->hard_close() if ($bluetoothctl);
+  closelog();
+  exit(1);
+};
+
+if ($getmqttfingerprint) {
+	printf("Fingerprint for server '%s': '%s'.\n", $mqttserver, IO::Socket::SSL->new(PeerHost => $mqttserver, SSL_verify_mode => SSL_VERIFY_NONE)->get_fingerprint);
+	exit(0);
+}
+
+$mqtt = mqtt_connect($mqttserver, $mqttuser, $mqttpass, $mqttfingerprint, $mqtttopic);
+
+$lastquery = 0;
+$nextheartbeat = 0;
+$nextdump = time() + $DUMP_INTERVAL;
+$nextevaluation = time() + $EVALUATION_INTERVAL;
+$nextbattery = time() + $INITIAL_BATTERY_INTERVAL;
+$nextcleanup = time() + $CLEANUP_INTERVAL;
+
+for(;;) {
+  $bluetoothctl=Expect->new();
+  $bluetoothctl->spawn('bluetoothctl') or error_exit(10, "Cannot spawn bluetoothctl: $!");
+  $bluetoothctl->log_stdout(0);
+  $bluetoothctl->log_file("/tmp/$ME.log", "w") if ($debugbluetoothctl);
+
+  # Requires bluez >=~5.50
+  for my $cmd (
+    "menu scan",
+    "clear",
+    "duplicate-data on",
+    "transport le",
+    "back",
+    "scan on",
+    "version"
+  ) {
+    $bluetoothctl->expect($EXPECT_TIMEOUT, '#') or error_exit(11, "ERROR expecting bluetoothctl prompt while waiting to send '$cmd'.");
+    syslogw(LOG_DEBUG, "Sending '%s'...", $cmd);
+    $bluetoothctl->send($cmd."\n");
+  }
+
+  $bluetoothctl->expect($EXPECT_TIMEOUT, '#') or error_exit(12, "ERROR expecting bluetoothctl prompt.");
+  syslogw(LOG_INFO, "Scan started.");
+
+  my $current_mac;
+  $lastevent = time();
+  do {
+    $bluetoothctl->expect(0,
+      # [<lovely control characters>NEW|CHG<lovely control characters>] Device 63:A7:11:06:7D:8B 63-A7-11-06-7D-8B
+      [qr/\[.*(NEW|CHG).*\] Device ([0-9A-Fa-f:]+) (.*)/ => sub {
+        handle_match($mqtttopic, $rssithreshold, $bluetoothctl->matchlist(), $bluetoothctl, $macregex, $retain);
+        exp_continue();
+      }],
+      [qr/Device ([0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}) not available/ => sub {
+        printf("%s+++ Device info:    %s not available\n", tsprefix(), $bluetoothctl->matchlist()) if ($debug >= 2);
+        $current_mac='';
+        exp_continue();
+      }],
+      [qr/Device ([0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}) \((random|public)\)/ => sub {
+        my ($mac, $type) = $bluetoothctl->matchlist();
+        printf("%s+++ Device info:    %s %s\n", tsprefix(), $mac, $type) if ($debug >= 2);
+        $current_mac = $mac;
+        $devices{$mac}{'address_type'} = $type;
+        delete($devices{$current_mac}{'query_count'});
+        delete($devices{$current_mac}{'next_query_time'});
+        exp_continue();
+      }],
+      [qr/\s+Name:\s*([\w -]+)/ => sub {
+        printf("%s+++ Device name:    %s '%s'\n", tsprefix(), $current_mac // 'NONE', $bluetoothctl->matchlist()) if ($debug >= 2);
+        if ($current_mac) {
+          $devices{$current_mac}{'name'}=$bluetoothctl->matchlist()->[0];
+        } else {
+          syslogw(LOG_INFO, "WARNING: Current mac is not set, ignoring!\n") if ($debug >= 2);
+        }
+        exp_continue();
+      }],
+      [qr/\s+UUID:\s*Battery Service/ => sub {
+        printf("%s+++ Device battery  %s\n", tsprefix(), $current_mac // 'NONE') if ($debug >= 2);
+        if ($current_mac) {
+          $devices{$current_mac}{'batteryservice'}=1;
+        } else {
+          syslogw(LOG_INFO, "WARNING: Current mac is not set, ignoring!\n") if ($debug >= 2);
+        }
+        exp_continue();
+      }],
+      [qr/Version\s*([\w\.]+)/ => sub {
+        chomp($bluetoothctl->matchlist()->[0]);
+        syslogw(LOG_INFO, "Found bluetoothctl version %s.", $bluetoothctl->matchlist()->[0]);
+        exp_continue();
+      }],
+    );
+
+    mqtt_check_reconnect($mqtt, $mqtttopic);
+
+    # For performance reasons, a maximum of one task is performed per loop
+    if (time() >= $nextheartbeat) {
+      $mqtt->publish($mqtttopic . '/heartbeat', time());
+      $nextheartbeat = time() + $HEARTBEAT_INTERVAL;
+    } elsif (time() > $nextevaluation) {
+      evaluation_task($absentinterval, $mqtttopic, $retain);
+      $nextevaluation = time() + $EVALUATION_INTERVAL;
+    } elsif ((time() - $lastquery > $QUERY_INTERVAL)) {
+      query_task($bluetoothctl);
+      $lastquery=time();
+    } elsif (time() > $nextcleanup) {
+      cleanup_task();
+      $nextcleanup = time() + $CLEANUP_INTERVAL;
+    } elsif ($debug >= 1 && time() >= $nextdump) {
+      dump_task();
+      $nextdump = time() + $DUMP_INTERVAL;
+    }
+    usleep($MAINLOOP_SLEEP_US);
+  } while ((!$watchdogthreshold || (time() - $lastevent < $watchdogthreshold)) && ($batterymaxage == 0 || time() < $nextbattery));
+
+  $bluetoothctl->send("exit\n");
+  $bluetoothctl->hard_close();
+
+  if ($batterymaxage > 0 && time() >= $nextbattery) {
+    battery_task($mqtttopic, $forcebattery);
+  } else {
+    syslogw(LOG_INFO, "Watchdog timeout! Didn't receive any beacon for %i seconds. Restarting bluetoothctl handling in %i second(s).", $watchdogthreshold, $BLUETOOTHCTL_RESTART_SLEEP);
+    sleep($BLUETOOTHCTL_RESTART_SLEEP);
+  }
+}
+
+
+__DATA__
+This exists to allow the locking code at the beginning of the file to work and to praise adamk's wisdom.

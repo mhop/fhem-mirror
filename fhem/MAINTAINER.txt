@@ -655,6 +655,7 @@ contrib/98_FileLogConvert.pm DeeSPe               Automatisierung
 contrib/97_SprinkleControl.pm Tobias              Unterstützende Dienste
 contrib/98_Sprinkle.pm       Tobias               Unterstützende Dienste
 contrib/betateilchen/*       betateilchen         No support!
+contrib/ble2mqttd            PatrickR             Unterstützende Dienste
 contrib/AttrTemplate/*       Beta-User            (depends on attrTemplate)
 contrib/AttrTemplate/99_sonos2mqttUtils.pm Otto123 MQTT
 contrib/commandref*          rudolfkoenig         Sonstiges
