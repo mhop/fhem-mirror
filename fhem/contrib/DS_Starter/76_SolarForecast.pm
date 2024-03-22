@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.17.0" => "20.03.2024  new DWD ICON API, change defmaxvar from 0.5 to 0.8 ",
   "1.16.8" => "16.03.2024  plantConfigCheck: adjust pvCorrectionFactor_Auto check, settings of forecastRefresh ".
                            "rename reading nextSolCastCall to nextRadiationAPICall ".
                            "currentMeterDev: new optional keys conprice, feedprice ".
@@ -330,8 +331,9 @@ my %vNotesIntern = (
 my @da;                                                                             # Readings-Store
 my $deflang        = 'EN';                                                          # default Sprache wenn nicht konfiguriert
 my @chours         = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten
-my $kJtokWh        = 0.00027778;                                                    # Umrechnungsfaktor kJ in kWh
-my $defmaxvar      = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
+my $kJtokWh        = 0.0002777777778;                                               # Umrechnungsfaktor kJ in kWh
+my $kJtoWh         = 0.2777777778;                                                  # Umrechnungsfaktor kJ in Wh
+my $defmaxvar      = 0.8;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
 my $definterval    = 70;                                                            # Standard Abfrageintervall
 my $defslidenum    = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
 my $weatherDevMax  = 3;                                                             # max. Anzahl Wetter Devices (Attr ctrlWeatherDevX)
@@ -367,6 +369,7 @@ my $whistrepeat    = 900;                                                       
 
 my $solapirepdef   = 3600;                                                          # default Abrufintervall SolCast API (s)
 my $forapirepdef   = 900;                                                           # default Abrufintervall ForecastSolar API (s)
+my $ometeorepdef   = 600;                                                           # default Abrufintervall Open-Meteo API (s)
 my $vrmapirepdef   = 300;                                                           # default Abrufintervall Victron VRM API Forecast
 my $apimaxreqdef   = 50;                                                            # max. täglich mögliche Requests SolCast API
 my $leadtime       = 3600;                                                          # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
@@ -792,8 +795,8 @@ my %htitles = (                                                                 
                 DE => qq{Wetterdaten sind aktuell entsprechend des verwendeten DWD Modell}                         },
   scarespf => { EN => qq{API request failed},
                 DE => qq{API Abfrage fehlgeschlagen}                                                               },
-  dapic    => { EN => qq{done API requests},
-                DE => qq{bisherige API-Anfragen}                                                                   },
+  dapic    => { EN => qq{API requests already executed today},
+                DE => qq{Heute bereits durchgef&#252;hrte API-Anfragen}                                            },
   rapic    => { EN => qq{remaining API requests},
                 DE => qq{verf&#252;gbare API-Anfragen}                                                             },
   yheyfdl  => { EN => qq{You have exceeded your free daily limit!},
@@ -1329,11 +1332,12 @@ sub Set {
              );
   my $resets = join ",",@re;
 
-  my @fcdevs = devspec2array("TYPE=DWD_OpenData");
+  my @fcdevs = devspec2array ("TYPE=DWD_OpenData");
 
   push @fcdevs, 'SolCast-API';
   push @fcdevs, 'ForecastSolar-API';
   push @fcdevs, 'VictronKI-API';
+  push @fcdevs, 'OpenMeteoDWD-API';
 
   my $rdd = join ",", @fcdevs;
 
@@ -1538,11 +1542,11 @@ sub _setcurrentRadiationAPI {              ## no critic "not used"
   my $name  = $paref->{name};
   my $prop  = $paref->{prop} // return qq{no radiation device specified};
 
-  if($prop !~ /-API$/x && (!$defs{$prop} || $defs{$prop}{TYPE} ne "DWD_OpenData")) {
+  if ($prop !~ /-API$/x && (!$defs{$prop} || $defs{$prop}{TYPE} ne "DWD_OpenData")) {
       return qq{The device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};
   }
 
-  if ($prop eq 'SolCast-API') {
+  if ($prop =~ /(SolCast|OpenMeteoDWD)-API/xs) {
       return "The library FHEM::Utility::CTZ is missing. Please update FHEM completely." if($ctzAbsent);
 
       my $rmf = reqModFail();
@@ -1557,8 +1561,8 @@ sub _setcurrentRadiationAPI {              ## no critic "not used"
   
   return if(_checkSetupNotComplete ($hash));                                         # keine Stringkonfiguration wenn Setup noch nicht komplett
 
-  if ($prop eq 'ForecastSolar-API') {
-      my ($set, $lat, $lon) = locCoordinates();
+  if ($prop =~ /(ForecastSolar|OpenMeteoDWD)-API/xs) {
+      my ($set, $lat, $lon, $elev) = locCoordinates();
       return qq{set attributes 'latitude' and 'longitude' in global device first} if(!$set);
 
       my $tilt = ReadingsVal ($name, 'moduleDeclination', '');                       # Modul Neigungswinkel für jeden Stringbezeichner
@@ -2008,12 +2012,12 @@ sub _setmoduleAzimuth {                  ## no critic "not used"
 
   my ($a,$h) = parseParams ($arg);
 
-  if(!keys %$h) {
+  if (!keys %$h) {
       return qq{The provided module direction has wrong format};
   }
 
   while (my ($key, $value) = each %$h) {
-      if($value !~ /^(?:$dirs)$/x && ($value !~ /^(?:-?[0-9]{1,3})$/x || $value < -180 || $value > 180)) {
+      if ($value !~ /^(?:$dirs)$/x && ($value !~ /^(?:-?[0-9]{1,3})$/x || $value < -180 || $value > 180)) {
           return qq{The module direction of "$key" is wrong: $value};
       }
   }
@@ -2623,7 +2627,7 @@ sub Get {
       type  => $type,
       opt   => $opt,
       arg   => $arg,
-      t     => time,
+      t     => int time,
       date  => (strftime "%Y-%m-%d", localtime(time)),
       debug => getDebug ($hash),
       lang  => getLang  ($hash)
@@ -2673,8 +2677,12 @@ sub _getRoofTopData {
       my $ret = __getVictronSolarData ($paref);
       return $ret;
   }
+  elsif ($hash->{MODEL} eq 'OpenMeteoDWDAPI') {
+      my $ret = __getopenMeteoDWDdata ($paref);
+      return $ret;
+  }
 
-return "$hash->{NAME} ist not model DWD, SolCastAPI or ForecastSolarAPI";
+return "$name is not a valid SolarForeCast Model: ".$hash->{MODEL};
 }
 
 ################################################################
@@ -2734,7 +2742,7 @@ sub __getSolCastData {
       $etxt         =~ s{<WT>}{($leadtime/60)}eg;
 
       if ($trc <= 0) {
-          readingsSingleUpdate($hash, 'nextRadiationAPICall', $etxt, 1);
+          readingsSingleUpdate ($hash, 'nextRadiationAPICall', $etxt, 1);
           return qq{SolCast free daily limit is used up};
       }
 
@@ -2814,7 +2822,7 @@ sub __solCast_ApiRequest {
             "&api_key=".
             $apikey;
 
-  debugLog ($paref, "apiProcess|apiCall", qq{Request SolCast API for string "$string": $url});
+  debugLog ($paref, "apiProcess|apiCall", qq{Request SolCast API for PV-String "$string": $url});
 
   my $caller = (caller(0))[3];                                                                        # Rücksprungmarke
 
@@ -2935,7 +2943,6 @@ sub __solCast_ApiResponse {
           return;
       }
 
-      my $k = 0;
       my ($period,$starttmstr);
 
       my $perc = AttrVal ($name, 'affectSolCastPercentile', 50);                                         # das gewählte zu nutzende Percentil
@@ -2943,7 +2950,8 @@ sub __solCast_ApiResponse {
       debugLog ($paref, "apiProcess", qq{SolCast API used percentile: }. $perc);
 
       $perc = q{} if($perc == 50);
-
+      my $k = 0;
+      
       while ($jdata->{'forecasts'}[$k]) {                                                                # vorhandene Startzeiten Schlüssel im SolCast API Hash löschen
           my $petstr          = $jdata->{'forecasts'}[$k]{'period_end'};
           ($err, $starttmstr) = ___convPendToPstart ($name, $lang, $petstr);
@@ -2955,7 +2963,7 @@ sub __solCast_ApiResponse {
               return;
           }
 
-          if(!$k && $petstr =~ /T\d{2}:00/xs) {                                                          # spezielle Behandlung ersten Datensatz wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)
+          if (!$k && $petstr =~ /T\d{2}:00/xs) {                                                         # spezielle Behandlung ersten Datensatz wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)
               $period   = $jdata->{'forecasts'}[$k]{'period'};                                           # -> dann bereits beim letzten Abruf gespeicherte Daten der aktuellen Stunde durch 2 teilen damit
               $period   =~ s/.*(\d\d).*/$1/;                                                             # -> die neuen Daten (in dem Fall nur die einer halben Stunde) im nächsten Schritt addiert werden
 
@@ -2974,7 +2982,7 @@ sub __solCast_ApiResponse {
       $k = 0;
 
       while ($jdata->{'forecasts'}[$k]) {
-          if(!$jdata->{'forecasts'}[$k]{'pv_estimate'.$perc}) {                                              # keine PV Prognose -> Datensatz überspringen -> Verarbeitungszeit sparen
+          if (!$jdata->{'forecasts'}[$k]{'pv_estimate'.$perc}) {                                             # keine PV Prognose -> Datensatz überspringen -> Verarbeitungszeit sparen
               $k++;
               next;
           }
@@ -2987,7 +2995,7 @@ sub __solCast_ApiResponse {
           $period             = $jdata->{'forecasts'}[$k]{'period'};
           $period             =~ s/.*(\d\d).*/$1/;
 
-          if($debug =~ /apiProcess/x) {                                                                      # nur für Debugging
+          if ($debug =~ /apiProcess/x) {                                                                     # nur für Debugging
               if (exists $data{$type}{$name}{solcastapi}{$string}{$starttmstr}) {
                   Log3 ($name, 1, qq{$name DEBUG> SolCast API Hash - Start Date/Time: }. $starttmstr);
                   Log3 ($name, 1, qq{$name DEBUG> SolCast API Hash - pv_estimate50 add: }.(sprintf "%.0f", ($pvest50 * ($period/60) * 1000)).qq{, contains already: }.SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0));
@@ -3147,15 +3155,14 @@ sub __getForecastSolarData {
   my $lang  = $paref->{lang};
 
   if (!$force) {                                                                                   # regulärer API Abruf
-      my $etxt      = $hqtxt{bnsas}{$lang};
-      $etxt         =~ s{<WT>}{($leadtime/60)}eg;
-
+      my $etxt   = $hqtxt{bnsas}{$lang};
+      $etxt      =~ s{<WT>}{($leadtime/60)}eg;
       my $date   = strftime "%Y-%m-%d", localtime($t);
       my $srtime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunRise", '23:59').':59');
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
 
       if ($t < $srtime - $leadtime || $t > $sstime + $lagtime) {
-          readingsSingleUpdate($hash, 'nextRadiationAPICall', $etxt, 1);
+          readingsSingleUpdate ($hash, 'nextRadiationAPICall', $etxt, 1);
           return "The current time is not between sunrise minus ".($leadtime/60)." minutes and sunset";
       }
 
@@ -3200,11 +3207,13 @@ sub __forecastSolar_ApiRequest {
   my $paref      = shift;
   my $hash       = $paref->{hash};
   my $name       = $paref->{name};
-  my $allstrings = $paref->{allstrings};                                # alle Strings
+  my $type       = $paref->{type};
+  my $allstrings = $paref->{allstrings};                                               # alle Strings
   my $debug      = $paref->{debug};
 
-  if(!$allstrings) {                                                    # alle Strings wurden abgerufen
-      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);         # Cache File API Werte schreiben
+  if (!$allstrings) {                                                                  # alle Strings wurden abgerufen
+      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                        # Cache File API Werte schreiben
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1; 
       return;
   }
 
@@ -3213,7 +3222,7 @@ sub __forecastSolar_ApiRequest {
 
   my ($set, $lat, $lon) = locCoordinates();
 
-  if(!$set) {
+  if (!$set) {
       my $err = qq{the attribute 'latitude' and/or 'longitude' in global device is not set};
       singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
       return $err;
@@ -3230,7 +3239,7 @@ sub __forecastSolar_ApiRequest {
             $az."/".
             $peak;
 
-  debugLog ($paref, "apiCall", qq{ForecastSolar API Call - Request for string "$string":\n$url});
+  debugLog ($paref, "apiCall", qq{ForecastSolar API Call - Request for PV-String "$string":\n$url});
 
   my $caller = (caller(0))[3];                                                                        # Rücksprungmarke
 
@@ -3239,6 +3248,7 @@ sub __forecastSolar_ApiRequest {
       timeout    => 30,
       hash       => $hash,
       name       => $name,
+      type       => $type,
       debug      => $debug,
       header     => 'Accept: application/json',
       caller     => \&$caller,
@@ -3250,7 +3260,7 @@ sub __forecastSolar_ApiRequest {
       callback   => \&__forecastSolar_ApiResponse
   };
 
-  if($debug =~ /apiCall/x) {
+  if ($debug =~ /apiCall/x) {
       $param->{loglevel} = 1;
   }
 
@@ -3275,7 +3285,7 @@ sub __forecastSolar_ApiResponse {
   my $stc         = $paref->{stc};                                                                          # Startzeit API Abruf
   my $lang        = $paref->{lang};
   my $debug       = $paref->{debug};
-  my $type        = $hash->{TYPE};
+  my $type        = $paref->{type};
 
   my $t           = time;
   $paref->{t}     = $t;
@@ -3406,6 +3416,7 @@ sub __forecastSolar_ApiResponse {
   my $param = {
       hash       => $hash,
       name       => $name,
+      type       => $type,
       debug      => $debug,
       allstrings => $allstrings,
       lang       => $lang
@@ -3424,21 +3435,13 @@ sub ___setForeCastAPIcallKeyData {
   my $paref = shift;
 
   my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $lang  = $paref->{lang};
   my $debug = $paref->{debug};
   my $t     = $paref->{t} // time;
 
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};
-
-  my $rts = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', 0);
-
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
-
-  my $asc = CurrentVal    ($hash, 'allstringscount', 1);                                    # Anzahl der Strings
-  my $dar = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 1);
-
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} = $dar / $asc;
 
   ## Berechnung des optimalen Request Intervalls
   ################################################
@@ -3470,10 +3473,46 @@ sub ___setForeCastAPIcallKeyData {
 return;
 }
 
-################################################################
+##################################################################################################
 #   Abruf DWD Strahlungsdaten und Rohdaten ohne Korrektur
 #   speichern in solcastapi Hash
-################################################################
+#
+#                   !!!! NACHFOLGENDE INFO GILT NUR BEI DWD RAD1H VERWENDUNG !!!!
+#                   #############################################################
+#
+#            PV Forecast Rad1h in kWh / Wh
+# Berechnung nach Formel 1 aus http://www.ing-büro-junge.de/html/photovoltaik.html:
+#
+#    * Faktor für Umwandlung kJ in kWh:   0.00027778
+#    * Eigene Modulfläche in qm z.B.:     31,04
+#    * Wirkungsgrad der Module in % z.B.: 16,52
+#    * Wirkungsgrad WR in % z.B.:         98,3
+#    * Korrekturwerte wegen Ausrichtung/Verschattung etc.
+#
+# Die Formel wäre dann:
+# Ertrag in Wh = Rad1h * 0.00027778 * 31,04 qm * 16,52% * 98,3% * 100% * 1000
+#
+# Berechnung nach Formel 2 aus http://www.ing-büro-junge.de/html/photovoltaik.html:
+#
+#    * Globalstrahlung:                G = kWh/m2   (DWD Rad1h = kJ/m2)
+#    * Korrektur mit Flächenfaktor f:  Gk = G * f
+#    * Globalstrahlung (STC):          1 kW/m2
+#    * Peak Leistung String (kWp):     Pnenn = x kW
+#    * Performance Ratio:              PR (typisch 0,85 bis 0,9)
+#    * weitere Korrekturwerte für Regen, Wolken etc.: Korr
+#
+#    pv (kWh) = G * f * 0.00027778 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr
+#    pv (Wh)  = G * f * 0.00027778 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr * 1000
+#
+# Die Abhängigkeit der Strahlungsleistung der Sonnenenergie nach Wetterlage und Jahreszeit ist
+# hier beschrieben:
+# https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
+#
+# !!! PV Berechnungsgrundlagen !!!
+# https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/ertrag
+# http://www.ing-büro-junge.de/html/photovoltaik.html
+#
+##################################################################################################
 sub __getDWDSolarData {
   my $paref = shift;
   my $hash  = $paref->{hash};
@@ -3510,19 +3549,20 @@ sub __getDWDSolarData {
 
       next if($fh == 24);
 
-      my $rad = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');
+      my $rad   = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');
+      my $radwh = sprintf "%.1f", ($rad * $kJtoWh);
 
       if ($runh == 12 && !$rad) {                                                             
-          $ret                                                              = "The reading 'fc${fd}_${runh}_Rad1h' does not appear to be present or has an unusual value.\nRun 'set $name plantConfiguration check' for further information.";
+          $ret = "The reading 'fc${fd}_${runh}_Rad1h' does not appear to be present or has an unusual value.\nRun 'set $name plantConfiguration check' for further information.";
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $ret;
 
           debugLog ($paref, "apiCall", "DWD API - ERROR - got unusual data of starttime: $dateTime. ".$ret);
       }
       else {
-          debugLog ($paref, "apiCall", "DWD API - got data -> starttime: $dateTime, reading: fc${fd}_${runh}_Rad1h, rad: $rad");
+          debugLog ($paref, "apiCall", "DWD API - got data -> starttime: $dateTime, reading: fc${fd}_${runh}_Rad1h, rad: $rad kJ/m2 ($radwh Wh/m2)");
       }
       
-      $data{$type}{$name}{solcastapi}{'?All'}{$dateTime}{Rad1h} = $rad;
+      $data{$type}{$name}{solcastapi}{'?All'}{$dateTime}{Rad1h} = $radwh;
 
       for my $string (@strings) {                                                              # für jeden String der Config ..
           my $peak = $data{$type}{$name}{strings}{$string}{peak};                              # String Peak (kWp)
@@ -3531,7 +3571,7 @@ sub __getDWDSolarData {
           my $dir  = $data{$type}{$name}{strings}{$string}{dir};                               # Ausrichtung der Solarmodule
 
           my $af = $hff{$ta}{$dir} / 100;                                                      # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
-          my $pv = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $prdef);
+          my $pv = sprintf "%.1f", ($radwh / 1000 * $af * $peak * $prdef);                     # Rad wird in kW/m2 erwartet
 
           debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $pv Wh");
 
@@ -3962,6 +4002,336 @@ sub __VictronVRM_ApiResponseLogout {
   }
 
 return;
+}
+
+################################################################################################
+#             Abruf Open-Meteo DWD ICON API data
+################################################################################################
+sub __getopenMeteoDWDdata {
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $force   = $paref->{force} // 0;
+  my $t       = $paref->{t};
+  my $lang    = $paref->{lang};
+
+  if (!$force) {                                                                                      # regulärer API Abruf
+      my $lrt = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', 0);
+
+      if ($lrt && $t < $lrt + $ometeorepdef) {
+          my $rt = $lrt + $ometeorepdef - $t;
+          return qq{The waiting time to the next SolCast API call has not expired yet. The remaining waiting time is $rt seconds};
+      }
+  }
+
+  $paref->{allstrings} = ReadingsVal ($name, 'inverterStrings', '');
+  $paref->{timeres}    = $paref->{arg} ? $paref->{arg} : '60/15';
+  $paref->{begin}      = 1;
+
+  __openMeteoDWD_ApiRequest ($paref);
+
+return;
+}
+
+########################################################################################################################
+#                Open-Meteo DWD ICON API Request
+#  Open data weather forecasts from the German weather service DWD
+#  Quelle Seite: https://open-meteo.com/
+#
+#  Aufruf:    https://api.open-meteo.com/v1/dwd-icon?latitude=<>&longitude=<>&hourly=<Werte Komma getrennt>&daily=<Werte Komma getrennt>&forecast_hours=<>&tilt=<>&azimuth=<>
+#
+#  Beispiel:  https://api.open-meteo.com/v1/dwd-icon?latitude=51.285272&longitude=12.067722&hourly=temperature_2m,rain,weather_code,cloud_cover,is_day,global_tilted_irradiance_instant&daily=sunrise,sunset&forecast_hours=48&tilt=45&azimuth=0
+#
+#  temperature_2m - Air temperature at 2 meters above ground
+#  rain           - Regen aus Großwetterlagen der vorangegangenen Stunde in Millimeter
+#  weather_code   - Wetterlage als numerischer Code. Befolgen Sie die WMO-Wetterinterpretationscodes.
+#  cloud_cover    - Gesamtbewölkung als Flächenanteil (%)
+#  is_day         - Tag oder Nacht
+#  timeformat     - Wenn das Format unixtime gewählt wird, werden alle Zeitwerte in UNIX-Epochenzeit in Sekunden 
+#                   zurückgegeben. Bitte beachten Sie, dass alle Zeitstempel in GMT+0 sind!
+#  global_tilted_irradiance_instant - Gesamte Strahlung, die auf eine geneigte Scheibe fällt, als Durchschnitt der 
+#  (GTI)                              vorangegangenen Stunde. 
+#                                     Die Berechnung erfolgt unter der Annahme einer festen Albedo von 20% und eines 
+#                                     isotropen Himmels. (in W/m²) 
+#  timezone       - If auto is set as a time zone, the coordinates will be automatically resolved to the local time zone.
+#
+########################################################################################################################
+sub __openMeteoDWD_ApiRequest {
+  my $paref      = shift;
+  my $hash       = $paref->{hash};
+  my $name       = $paref->{name};
+  my $type       = $paref->{type};
+  my $allstrings = $paref->{allstrings};                                     # alle Strings
+  my $debug      = $paref->{debug};
+  my $lang       = $paref->{lang};
+  my $t          = $paref->{t}       // int time;
+  my $timeres    = $paref->{timeres};                                        # Zeitauflösung für Request 15min / 60min
+
+  if (!$allstrings) {                                                        # alle Strings wurden abgerufen
+      writeCacheToFile     ($hash, 'solcastapi', $scpicache.$name);          # Cache File API Werte schreiben
+      readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $ometeorepdef, $lang))[0], 1);
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1;
+      return;
+  }
+
+  my $string;
+  ($string, $allstrings) = split ",", $allstrings, 2;
+
+  my ($set, $lat, $lon, $elev) = locCoordinates();
+
+  if (!$set) {
+      my $err = qq{the attribute 'latitude' and/or 'longitude' in global device is not set};
+      singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
+      return $err;
+  }
+
+  my $tilt = StringVal ($hash, $string, 'tilt',   '<unknown>');
+  my $az   = StringVal ($hash, $string, 'azimut', '<unknown>');
+
+  my $url = "https://api.open-meteo.com/v1/dwd-icon?".
+            "latitude=".$lat.
+            "&longitude=".$lon.
+            "&hourly=temperature_2m,rain,weather_code,cloud_cover,is_day,global_tilted_irradiance_instant".  
+            "&minutely_15=global_tilted_irradiance".            
+            "&daily=sunrise,sunset".
+            "&forecast_hours=48".
+            "&forecast_days=2".
+            "&tilt=".$tilt.
+            "&azimuth=".$az;
+
+  debugLog ($paref, 'apiCall', qq{Open-Meteo DWD ICON API Call - Request for PV-String "$string" with Time resolution >$timeres<:\n$url});
+
+  my $caller = (caller(0))[3];                                                                        # Rücksprungmarke
+
+  my $param = {
+      url        => $url,
+      timeout    => 30,
+      hash       => $hash,
+      name       => $name,
+      type       => $paref->{type},
+      debug      => $debug,
+      header     => 'Accept: application/json',
+      timeres    => $timeres,
+      begin      => $paref->{begin},
+      caller     => \&$caller,
+      stc        => [gettimeofday],
+      allstrings => $allstrings,
+      string     => $string,
+      lang       => $paref->{lang},
+      method     => "GET",
+      callback   => \&__openMeteoDWD_ApiResponse
+  };
+
+  if ($debug =~ /apiCall/x) {
+      $param->{loglevel} = 1;
+  }
+
+  HttpUtils_NonblockingGet ($param);
+
+return;
+}
+
+################################################################################################
+#             Open-Meteo DWD ICON API Response
+#
+#  Rad1h vom DWD  - Globalstrahlung in kJ/m2
+#
+# Berechnung nach Formel 2 aus http://www.ing-büro-junge.de/html/photovoltaik.html:
+#
+#    * Globalstrahlung:                G = kWh/m2   (GTI = W/m2), (DWD Rad1h = kJ/m2)
+#    * Korrektur mit Flächenfaktor f:  Gk = G * f
+#    * Globalstrahlung (STC):          1 kW/m2
+#    * Peak Leistung String (kWp):     Pnenn = x kW
+#    * Performance Ratio:              PR (typisch 0,85 bis 0,9)
+#    * weitere Korrekturwerte für Regen, Wolken etc.: Korr
+#
+#    pv (Wh)  = GTI * f / 1000 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr * 1000
+#              (GTI * f) ist bereits in dem API-Ergebnis $rad enthalten in Wh/m2
+#             -> $rad / 1000 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr   (bezogen auf 1 Stunde)
+#             -> my $pv = sprintf "%.0f", ($rad / 1000 * $peak * $prdef);
+#
+################################################################################################
+sub __openMeteoDWD_ApiResponse {
+  my $paref      = shift;
+  my $err        = shift;
+  my $myjson     = shift;
+
+  my $hash        = $paref->{hash};
+  my $name        = $paref->{name};
+  my $type        = $paref->{type};
+  my $caller      = $paref->{caller};
+  my $string      = $paref->{string};
+  my $allstrings  = $paref->{allstrings};
+  my $stc         = $paref->{stc};                                                                                             # Startzeit API Abruf
+  my $lang        = $paref->{lang};
+  my $debug       = $paref->{debug};
+  my $timeres     = $paref->{timeres};
+
+  my $t       = int time;
+  my $sta     = [gettimeofday];                           # Start Response Verarbeitung 
+  $paref->{t} = $t;
+
+  my $msg;                                                                                         
+
+  if ($err ne "") {
+      $msg = 'Open-Meteo DWD ICON API server response: '.$err;
+
+      Log3 ($name, 1, "$name - $msg");
+
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
+
+      singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+      $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                                 # Verarbeitungszeit ermitteln
+      $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));           # API Laufzeit ermitteln
+
+      return;
+  }
+  elsif ($myjson ne "") {                                                                                                     # Evaluiere ob Daten im JSON-Format empfangen wurden
+      my ($success) = evaljson ($hash, $myjson);
+
+      if (!$success) {
+          $msg = 'ERROR - invalid Open-Meteo DWD ICON API server response';
+
+          Log3 ($name, 1, "$name - $msg");
+
+          singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+          $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+          $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+
+          return;
+      }
+
+      my $rt    = (timestampToTimestring ($t, $lang))[3];
+      my $jdata = decode_json ($myjson);
+
+      # debugLog ($paref, 'apiProcess', qq{Open-Meteo DWD ICON API Call - response for string "$string":\n}. Dumper $jdata);
+      
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = $rt;                                                    # letzte Abrufzeit
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                   # letzter Abrufzeitstempel
+      
+      ## bei Fehler in API intern kommt
+      ###################################
+      # error:	true
+      # reason: <Grund>
+
+      if ($jdata->{'error'}) {
+          $msg = "Open-Meteo DWD ICON API server ERROR response: $jdata->{'reason'}";
+
+          Log3 ($name, 3, "$name - $msg");
+
+          singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $jdata->{'reason'};
+          $data{$type}{$name}{current}{runTimeLastAPIProc}                  = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+          $data{$type}{$name}{current}{runTimeLastAPIAnswer}                = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+
+          return;
+      }
+                                                           
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1;
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}   = 'success';
+
+      if ($debug =~ /apiCall/xs) {
+          Log3 ($name, 1, qq{$name DEBUG> Open-Meteo DWD ICON API Call - server response for PV string "$string"});
+          Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API Call - request time: ".$rt." ($t)");
+          Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API Call - status: success");
+      }
+      
+      my $peak = StringVal ($hash, $string, 'peak', 0);                                          # String Peak (kWp)
+      $peak   *= 1000;                                                                           # kWp in Wp
+      my $k    = 0;
+      
+      while ($jdata->{hourly}{time}[$k]) {           
+          ($err, my $otmstr) = timestringUTCtoLocal ($name, $jdata->{hourly}{time}[$k], '%Y-%m-%dT%H:%M');
+          
+          if ($err) {
+              $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
+              Log3 ($name, 1, "$name - $msg");
+              singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
+              return;
+          }
+          
+          my $ots     = timestringToTimestamp  ($otmstr);
+          my $pvtmstr = (timestampToTimestring ($ots-3600))[0];                                 # Strahlung wird als Durchschnitt der !vorangegangenen! Stunde geliefert!
+          my $rad1wh  = $jdata->{hourly}{global_tilted_irradiance_instant}[$k];                 # Wh/m2
+          my $pv      = sprintf "%.1f", ($rad1wh / 1000 * $peak * $prdef);                      # Rad wird in kWh/m2 erwartet
+          my $don     = $jdata->{hourly}{is_day}[$k];
+          my $temp    = $jdata->{hourly}{temperature_2m}[$k];
+          my $rain    = $jdata->{hourly}{rain}[$k];                                             # Regen in Millimeter = kg/m2
+          my $wid     = ($don ? 0 : 100) + $jdata->{hourly}{weather_code}[$k];
+          my $wcc     = $jdata->{hourly}{cloud_cover}[$k];
+          
+          $k++;
+          
+          if ($debug =~ /apiProcess/xs) {
+              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - Rad1h: $rad1wh, PV estimate: $pv Wh");
+              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - WeatherID: $wid");
+              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - Neff: $wcc");
+              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - RR1c: $rain");
+              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - DoN: $don");
+              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - Temp: $temp");
+          }       
+       
+          if ($paref->{begin}) {                                                                # im ersten Call den DS löschen -> dann Aufsummierung
+              delete $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h};
+          }
+          
+          $data{$type}{$name}{solcastapi}{$string}{$pvtmstr}{pv_estimate50} = $pv;              # Startstunde verschieben
+          $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h}         += $rad1wh;          # Startstunde verschieben, Rad Werte aller Strings addieren
+          $data{$type}{$name}{solcastapi}{'?All'}{$otmstr}{don}             = $don;
+          $data{$type}{$name}{solcastapi}{'?All'}{$otmstr}{ttt}             = $temp;
+          $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{rr1c}           = $rain;            # Startstunde verschieben
+          $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{ww}             = $wid;             # Startstunde verschieben
+          $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{neff}           = $wcc;             # Startstunde verschieben
+      }
+      
+      $k = 0;
+      
+      while ($jdata->{daily}{time}[$k]) { 
+          my $oday = $jdata->{daily}{time}[$k];
+          
+          ($err, my $sunrise) = timestringUTCtoLocal ($name, $jdata->{daily}{sunrise}[$k], '%Y-%m-%dT%H:%M');
+          ($err, my $sunset)  = timestringUTCtoLocal ($name, $jdata->{daily}{sunset}[$k],  '%Y-%m-%dT%H:%M');
+          
+          if ($err) {
+              $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
+              Log3 ($name, 1, "$name - $msg");
+              singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
+              return;
+          }
+          
+          if ($k == 0) {
+              $data{$type}{$name}{solcastapi}{'?All'}{sunrise}{today} = $sunrise;
+              $data{$type}{$name}{solcastapi}{'?All'}{sunset}{today}  = $sunset;
+          }
+          
+          if ($k == 1) {
+              $data{$type}{$name}{solcastapi}{'?All'}{sunrise}{tomorrow} = $sunrise;
+              $data{$type}{$name}{solcastapi}{'?All'}{sunset}{tomorrow}  = $sunset;
+          }
+          
+          $k++;
+      }
+  }
+  
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
+
+  Log3 ($name, 4, qq{$name - Open-Meteo DWD ICON API answer received for string "$string"});
+
+  my $param = {
+      hash       => $hash,
+      name       => $name,
+      type       => $type,
+      debug      => $debug,
+      allstrings => $allstrings,
+      timeres    => $timeres,
+      lang       => $lang
+  };
+
+  $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+  $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+
+return &$caller($param);
 }
 
 ###############################################################
@@ -5659,104 +6029,7 @@ sub centralTask {
   RemoveInternalTimer ($hash, 'FHEM::SolarForecast::singleUpdateState');
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ##########################################################################################################################
-  ## nicht-Bin Werte löschen  / wrp löschen
-  my $ra = '0|00|05|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90|95|100|.*\..*|simple';
-
-  for my $hod (keys %{$data{$type}{$name}{circular}}) {                                           # 30.01.2024
-      for my $range (keys %{$data{$type}{$name}{circular}{$hod}{pvcorrf}}) {
-          delete $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range} if($range !~ /^($ra)$/xs);
-
-          if($range !~ /simple|\./xs) {                                                           # 24.02.2024
-              $data{$type}{$name}{circular}{$hod}{pvcorrf}{"5.$range"} = $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvcorrf}{"10.$range"} = $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvcorrf}{"15.$range"} = $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvcorrf}{"20.$range"} = $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvcorrf}{"25.$range"} = $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvcorrf}{"30.$range"} = $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvcorrf}{"35.$range"} = $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvcorrf}{"40.$range"} = $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvcorrf}{"45.$range"} = $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range};
-              delete $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range};
-          }
-          delete $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range} if(!defined $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range});
-      }
-
-      for my $range (keys %{$data{$type}{$name}{circular}{$hod}{quality}}) {
-          delete $data{$type}{$name}{circular}{$hod}{quality}{$range} if($range !~ /^($ra)$/xs);
-
-          if($range !~ /simple|\./xs) {                                                          # 24.02.2024
-              $data{$type}{$name}{circular}{$hod}{quality}{"5.$range"} = $data{$type}{$name}{circular}{$hod}{quality}{$range};
-              $data{$type}{$name}{circular}{$hod}{quality}{"10.$range"} = $data{$type}{$name}{circular}{$hod}{quality}{$range};
-              $data{$type}{$name}{circular}{$hod}{quality}{"15.$range"} = $data{$type}{$name}{circular}{$hod}{quality}{$range};
-              $data{$type}{$name}{circular}{$hod}{quality}{"20.$range"} = $data{$type}{$name}{circular}{$hod}{quality}{$range};
-              $data{$type}{$name}{circular}{$hod}{quality}{"25.$range"} = $data{$type}{$name}{circular}{$hod}{quality}{$range};
-              $data{$type}{$name}{circular}{$hod}{quality}{"30.$range"} = $data{$type}{$name}{circular}{$hod}{quality}{$range};
-              $data{$type}{$name}{circular}{$hod}{quality}{"35.$range"} = $data{$type}{$name}{circular}{$hod}{quality}{$range};
-              $data{$type}{$name}{circular}{$hod}{quality}{"40.$range"} = $data{$type}{$name}{circular}{$hod}{quality}{$range};
-              $data{$type}{$name}{circular}{$hod}{quality}{"45.$range"} = $data{$type}{$name}{circular}{$hod}{quality}{$range};
-              delete $data{$type}{$name}{circular}{$hod}{quality}{$range};
-          }
-          delete $data{$type}{$name}{circular}{$hod}{quality}{$range} if(!defined $data{$type}{$name}{circular}{$hod}{quality}{$range});
-      }
-
-      for my $range (keys %{$data{$type}{$name}{circular}{$hod}{pvrlsum}}) {
-          delete $data{$type}{$name}{circular}{$hod}{pvrlsum}{$range} if($range !~ /^($ra)$/xs);
-          
-          if($range !~ /simple|\./xs) {                                                          # 24.02.2024
-              $data{$type}{$name}{circular}{$hod}{pvrlsum}{"5.$range"} = $data{$type}{$name}{circular}{$hod}{pvrlsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvrlsum}{"10.$range"} = $data{$type}{$name}{circular}{$hod}{pvrlsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvrlsum}{"15.$range"} = $data{$type}{$name}{circular}{$hod}{pvrlsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvrlsum}{"20.$range"} = $data{$type}{$name}{circular}{$hod}{pvrlsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvrlsum}{"25.$range"} = $data{$type}{$name}{circular}{$hod}{pvrlsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvrlsum}{"30.$range"} = $data{$type}{$name}{circular}{$hod}{pvrlsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvrlsum}{"35.$range"} = $data{$type}{$name}{circular}{$hod}{pvrlsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvrlsum}{"40.$range"} = $data{$type}{$name}{circular}{$hod}{pvrlsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvrlsum}{"45.$range"} = $data{$type}{$name}{circular}{$hod}{pvrlsum}{$range};
-              delete $data{$type}{$name}{circular}{$hod}{pvrlsum}{$range};
-          }
-      }
-
-      for my $range (keys %{$data{$type}{$name}{circular}{$hod}{pvfcsum}}) {
-          delete $data{$type}{$name}{circular}{$hod}{pvfcsum}{$range} if($range !~ /^($ra)$/xs);
-          
-          if($range !~ /simple|\./xs) {                                                          # 24.02.2024
-              $data{$type}{$name}{circular}{$hod}{pvfcsum}{"5.$range"} = $data{$type}{$name}{circular}{$hod}{pvfcsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvfcsum}{"10.$range"} = $data{$type}{$name}{circular}{$hod}{pvfcsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvfcsum}{"15.$range"} = $data{$type}{$name}{circular}{$hod}{pvfcsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvfcsum}{"20.$range"} = $data{$type}{$name}{circular}{$hod}{pvfcsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvfcsum}{"25.$range"} = $data{$type}{$name}{circular}{$hod}{pvfcsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvfcsum}{"30.$range"} = $data{$type}{$name}{circular}{$hod}{pvfcsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvfcsum}{"35.$range"} = $data{$type}{$name}{circular}{$hod}{pvfcsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvfcsum}{"40.$range"} = $data{$type}{$name}{circular}{$hod}{pvfcsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{pvfcsum}{"45.$range"} = $data{$type}{$name}{circular}{$hod}{pvfcsum}{$range};
-              delete $data{$type}{$name}{circular}{$hod}{pvfcsum}{$range};
-          }
-      }
-
-      for my $range (keys %{$data{$type}{$name}{circular}{$hod}{dnumsum}}) {
-          delete $data{$type}{$name}{circular}{$hod}{dnumsum}{$range} if($range !~ /^($ra)$/xs);
-          
-          if($range !~ /simple|\./xs) {                                                          # 24.02.2024
-              $data{$type}{$name}{circular}{$hod}{dnumsum}{"5.$range"} = $data{$type}{$name}{circular}{$hod}{dnumsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{dnumsum}{"10.$range"} = $data{$type}{$name}{circular}{$hod}{dnumsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{dnumsum}{"15.$range"} = $data{$type}{$name}{circular}{$hod}{dnumsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{dnumsum}{"20.$range"} = $data{$type}{$name}{circular}{$hod}{dnumsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{dnumsum}{"25.$range"} = $data{$type}{$name}{circular}{$hod}{dnumsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{dnumsum}{"30.$range"} = $data{$type}{$name}{circular}{$hod}{dnumsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{dnumsum}{"35.$range"} = $data{$type}{$name}{circular}{$hod}{dnumsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{dnumsum}{"40.$range"} = $data{$type}{$name}{circular}{$hod}{dnumsum}{$range};
-              $data{$type}{$name}{circular}{$hod}{dnumsum}{"45.$range"} = $data{$type}{$name}{circular}{$hod}{dnumsum}{$range};
-              delete $data{$type}{$name}{circular}{$hod}{dnumsum}{$range};
-          }
-      }
-
-      for my $wp (keys %{$data{$type}{$name}{circular}{$hod}}) {                                 # 19.02.204
-          next if($wp ne 'wrp');
-          delete $data{$type}{$name}{circular}{$hod}{$wp};
-      }
-  }
-  
+  ########################################################################################################################## 
   my $nscc = ReadingsVal ($name, 'nextSolCastCall', '');                                        # 14.03.2024
   if ($nscc) {
       readingsSingleUpdate ($hash, 'nextRadiationAPICall', $nscc, 0);
@@ -5821,6 +6094,7 @@ sub centralTask {
   }
 
   singleUpdateState           ($centpars);
+  
   $centpars->{state} = 'updated';                                                     # kann durch Subs überschrieben werden!
 
   collectAllRegConsumers      ($centpars);                                            # alle Verbraucher Infos laden
@@ -6754,43 +7028,9 @@ sub __calcSunPosition {
 return;
 }
 
-##################################################################################################
-#                   !!!! NACHFOLGENDE INFO GILT NUR BEI DWD RAD1H VERWENDUNG !!!!
-#                   #############################################################
-#
-#            PV Forecast Rad1h in kWh / Wh
-# Berechnung nach Formel 1 aus http://www.ing-büro-junge.de/html/photovoltaik.html:
-#
-#    * Faktor für Umwandlung kJ in kWh:   0.00027778
-#    * Eigene Modulfläche in qm z.B.:     31,04
-#    * Wirkungsgrad der Module in % z.B.: 16,52
-#    * Wirkungsgrad WR in % z.B.:         98,3
-#    * Korrekturwerte wegen Ausrichtung/Verschattung etc.
-#
-# Die Formel wäre dann:
-# Ertrag in Wh = Rad1h * 0.00027778 * 31,04 qm * 16,52% * 98,3% * 100% * 1000
-#
-# Berechnung nach Formel 2 aus http://www.ing-büro-junge.de/html/photovoltaik.html:
-#
-#    * Globalstrahlung:                G =  kJ / m2
-#    * Korrektur mit Flächenfaktor f:  Gk = G * f
-#    * Globalstrahlung (STC):          1 kW/m2
-#    * Peak Leistung String (kWp):     Pnenn = x kW
-#    * Performance Ratio:              PR (typisch 0,85 bis 0,9)
-#    * weitere Korrekturwerte für Regen, Wolken etc.: Korr
-#
-#    pv (kWh) = G * f * 0.00027778 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr
-#    pv (Wh)  = G * f * 0.00027778 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr * 1000
-#
-# Die Abhängigkeit der Strahlungsleistung der Sonnenenergie nach Wetterlage und Jahreszeit ist
-# hier beschrieben:
-# https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
-#
-# !!! PV Berechnungsgrundlagen !!!
-# https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/ertrag
-# http://www.ing-büro-junge.de/html/photovoltaik.html
-#
-##################################################################################################
+#########################################################################
+#  API Erzeugungsprognose mit gewählter Autokorrekturmethode anpassen
+#########################################################################
 sub __calcPVestimates {
   my $paref   = shift;
   my $hash    = $paref->{hash};
@@ -6838,9 +7078,9 @@ sub __calcPVestimates {
 
       if ($debug =~ /radiationProcess/xs) {
           $lh = {                                                                                     # Log-Hash zur Ausgabe
-              "modulePeakString"               => $peak.    " W",
-              "Estimated PV generation (raw)"  => $est.     " Wh",
-              "Estimated PV generation (calc)" => $pv.      " Wh",
+              "modulePeakString"               => $peak. " W",
+              "Estimated PV generation (raw)"  => $est.  " Wh",
+              "Estimated PV generation (calc)" => $pv.   " Wh",
           };
 
           if ($acu =~ /on_complex/xs) {
@@ -10680,6 +10920,7 @@ sub _checkSetupNotComplete {
   if (!$is || !$wedev || !$radev || !$indev || !$medev || !$peaks                                        ||
      (isSolCastUsed ($hash) ? (!$rip || !$mrt) : isVictronKiUsed ($hash) ? !$vrmcr : (!$maz || !$mdec )) ||
      (isForecastSolarUsed ($hash) ? !$coset : '')                                                        ||
+     (isOpenMeteoUsed ($hash)     ? !$coset : '')                                                        ||
      !defined $pv0) {
       $ret .= "<table class='roomoverview'>";
       $ret .= "<tr style='height:".$height."px'>";
@@ -10720,6 +10961,9 @@ sub _checkSetupNotComplete {
           $ret .= $hqtxt{vrmcr}{$lang};
       }
       elsif (!$coset && isForecastSolarUsed ($hash)) {
+          $ret .= $hqtxt{coord}{$lang};
+      }
+      elsif (!$coset && isOpenMeteoUsed ($hash)) {
           $ret .= $hqtxt{coord}{$lang};
       }
       elsif (!defined $pv0) {
@@ -10865,6 +11109,7 @@ sub _graphicHeader {
                 isForecastSolarUsed ($hash) ? '<a href="https://forecast.solar" style="color: inherit !important;" target="_blank">Forecast.Solar</a>:'                                                              :
                 isVictronKiUsed     ($hash) ? '<a href="https://www.victronenergy.com/blog/2023/07/05/new-vrm-solar-production-forecast-feature" style="color: inherit !important;" target="_blank">VictronVRM</a>:' :
                 isDWDUsed           ($hash) ? '<a href="https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/met_verfahren_mosmix.html" style="color: inherit !important;" target="_blank">DWD</a>:'                :
+                isOpenMeteoUsed     ($hash) ? '<a href="https://open-meteo.com/" style="color: inherit !important;" target="_blank">OpenMeteo</a>:'                                                                        :
                 q{};
 
       my $nscc = ReadingsVal   ($name, 'nextRadiationAPICall', '?');
@@ -10980,6 +11225,25 @@ sub _graphicHeader {
           $api .= ')';
           $api .= '</span>';
       }
+      elsif ($api =~ /OpenMeteo/xs) {
+          $api .= '&nbsp;'.$lrt;
+
+          if ($scrm eq 'success') {
+              $img = FW_makeImage ('10px-kreis-gruen.png', $htitles{scaresps}{$lang}.' &#10;'.$htitles{natc}{$lang}.' '.$nscc);
+          }
+          else {
+              $img = FW_makeImage('10px-kreis-rot.png', $htitles{scarespf}{$lang}.': '. $scrm);
+          }
+
+          $scicon = "<a>$img</a>";
+
+          $api .= '&nbsp;&nbsp;'.$scicon;
+          $api .= '<span title="'.$htitles{dapic}{$lang}.'">';
+          $api .= '&nbsp;&nbsp;(';
+          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+          $api .= ')';
+          $api .= '</span>';
+      }      
 
       ## Qualitäts-Icon
       ######################
@@ -14134,7 +14398,7 @@ sub _ldpspaces {
   my $sp    = shift // q{};
   my $const = shift // 4;
 
-  my $le  = $const + length $str;
+  my $le  = $const + length Encode::decode('UTF-8', $str);
   my $spn = $sp;
 
   for (my $i = 0; $i < $le; $i++) {
@@ -14400,8 +14664,8 @@ sub checkPlantConfig {
       }
   }
 
-  ## Allgemeine Settings
-  ########################
+  ## Allgemeine Settings (auch API spezifisch)
+  ##############################################
   my $eocr                     = AttrVal       ($name, 'event-on-change-reading', '');
   my $aiprep                   = isPrepared4AI ($hash, 'full');
   my $aiusemsg                 = CurrentVal    ($hash, 'aicanuse', '');
@@ -14478,6 +14742,34 @@ sub checkPlantConfig {
   }
 
   if (isForecastSolarUsed ($hash)) {                                                         # allg. Settings bei Nutzung Forecast.Solar API
+      if ($pcf !~ /on/xs) {
+          $result->{'Common Settings'}{state}   = $info;
+          $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
+          $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on_complex" is recommended.<br>};
+      }
+
+      if (!$lat) {
+          $result->{'Common Settings'}{state}   = $nok;
+          $result->{'Common Settings'}{result} .= qq{Attribute latitude in global device is not set. <br>};
+          $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in the latitude attribute of the global device.<br>};
+          $result->{'Common Settings'}{fault}   = 1;
+      }
+
+      if (!$lon) {
+          $result->{'Common Settings'}{state}   = $nok;
+          $result->{'Common Settings'}{result} .= qq{Attribute longitude in global device is not set. <br>};
+          $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in the longitude attribute of the global device.<br>};
+          $result->{'Common Settings'}{fault}   = 1;
+      }
+
+      if (!$result->{'Common Settings'}{fault}) {
+          $result->{'Common Settings'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
+          $result->{'Common Settings'}{note}   .= qq{<br>checked parameters and attributes: <br>};
+          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto <br>};
+      }
+  }
+  
+  if (isOpenMeteoUsed ($hash)) {                                                         # allg. Settings bei Nutzung Open-Meteo API
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
@@ -14788,7 +15080,7 @@ sub timestampToTimestring {
   my $tmdef  = sprintf ("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,"00:00");             # engl. Variante von $epoch für Logging-Timestamps etc. (Minute/Sekunde == 00)
   my $tmfull = sprintf ("%04d-%02d-%02d %02d:%02d:%02d", $lyear,$lmonth,$lday,$lhour,$lmin,$lsec);  # engl. Variante Vollzeit von $epoch
 
-  if($lang eq "DE") {
+  if ($lang eq "DE") {
       $tm = sprintf ("%02d.%02d.%04d %02d:%02d:%02d", $lday,$lmonth,$lyear,$lhour,$lmin,$lsec);     # deutsche Variante Vollzeit von $epoch
   }
   else {
@@ -14826,6 +15118,30 @@ sub timestringToTimestampGMT {
   my $tsgm = fhemTimeGm ($s, $m, $h, $d, $mo-1, $y-1900);
 
 return $tsgm;
+}
+
+###############################################################
+#   Konvertiere UTC zu lokaler Zeit
+###############################################################
+sub timestringUTCtoLocal {
+  my $name    = shift;
+  my $timstr  = shift;
+  my $pattern = shift // '%Y-%m-%dT%H:%M:%S';
+
+  my ($err, $ctime) = convertTimeZone ( { name      => $name,
+                                          pattern   => $pattern,
+                                          dtstring  => $timstr,
+                                          tzcurrent => 'UTC',
+                                          tzconv    => 'local',
+                                          writelog  => 0 
+                                        } 
+                                      );
+
+  if ($err) {
+      $err = 'ERROR while converting time zone: '.$err;
+  }
+
+return ($err, $ctime);
 }
 
 ################################################################
@@ -15066,6 +15382,9 @@ sub setModel {
   }
   elsif ($api =~ /VictronKI/xs) {
       $hash->{MODEL} = 'VictronKiAPI';
+  }
+  elsif ($api =~ /OpenMeteoDWD/xs) {
+      $hash->{MODEL} = 'OpenMeteoDWDAPI';
   }
   else {
       $hash->{MODEL} = 'DWD';
@@ -15592,6 +15911,21 @@ return $ret;
 }
 
 ################################################################
+#  Prüfung auf Verwendung von Open-Meteo API
+################################################################
+sub isOpenMeteoUsed {
+  my $hash = shift;
+
+  my $ret = 0;
+
+  if ($hash->{MODEL} && $hash->{MODEL} eq 'OpenMeteoDWDAPI') {
+      $ret = 1;
+  }
+
+return $ret;
+}
+
+################################################################
 #       welche PV Autokorrektur wird verwendet ?
 #       Standard bei nur "on" -> on_simple
 #       $aln: 1 - Lernen aktiviert (default)
@@ -15765,9 +16099,9 @@ sub locCoordinates {
   my $set = 0;
   my $lat = AttrVal ('global', 'latitude',  '');
   my $lon = AttrVal ('global', 'longitude', '');
-  my $alt = AttrVal ('global', 'altitude',  '');
+  my $alt = AttrVal ('global', 'altitude',   0);
 
-  if($lat && $lon) {
+  if ($lat && $lon) {
       $set = 1;
   }
 
@@ -17084,6 +17418,21 @@ to ensure that the system configuration is correct.
 
       Defines the source for the delivery of the solar radiation data. You can select a device of the type DWD_OpenData or
       an implemented API can be selected. <br><br>
+      
+      <b>OpenMeteoDWD-API</b> <br>
+      
+      Open-Meteo is an open source weather API and offers free access for non-commercial purposes. 
+      No API key is required.
+      Open-Meteo leverages a powerful combination of global (11 km) and mesoscale (1 km) weather models from esteemed 
+      national weather services.
+      This API provides access to the renowned ICON weather models of the German Weather Service (DWD), which provide 
+      15-minute data for short-term forecasts in Central Europe and global forecasts with a resolution of 11 km. 
+      The ICON model is a preferred choice for general weather forecast APIs when no other high-resolution weather 
+      models are available.
+      The comprehensive and clearly laid out 
+      <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on 
+      the service's website.               
+      <br><br>
 
       <b>SolCast-API</b> <br>
 
@@ -17361,7 +17710,6 @@ to ensure that the system configuration is correct.
       The correction behaviour can be influenced with the
       <a href="#SolarForecast-attr-affectMaxDayVariance">affectMaxDayVariance</a> attribute. <br>
       (default: off)
-
       <br><br>
 
       <b>on_simple(_ai):</b> <br>
@@ -17382,11 +17730,13 @@ to ensure that the system configuration is correct.
 
       <b>Note:</b> The automatic prediction correction is learning and needs time to optimise the correction values.
       After activation, optimal predictions cannot be expected immediately!
-
       <br><br>
 
-      Nhe following are some API-specific tips that are merely best practice recommendations.
-
+      Below are some API-specific tips that are merely best practice recommendations.
+      <br><br>
+      
+      <b>Model OpenMeteoDWDAPI:</b> <br>
+      Die empfohlene Autokorrekturmethode ist <b>on_complex</b>.
       <br><br>
 
       <b>Model SolCastAPI:</b> <br>
@@ -17821,22 +18171,25 @@ to ensure that the system configuration is correct.
 
       Lists the data stored in the context of the API call.
       Administrative records are marked with a leading '?
-      The predicted PV yield (Wh) data provided by the API is consolidated to one hour.
+      The predicted global irradiation and PV yield (Wh) data provided by the API is consolidated to one hour.
+      The available characteristic values differ depending on the API used.
       <br><br>
 
       <ul>
          <table>
          <colgroup> <col width="37%"> <col width="63%"> </colgroup>
-            <tr><td> <b>currentAPIinterval</b>        </td><td>the currently used API retrieval interval in seconds            </td></tr>
-            <tr><td> <b>lastretrieval_time</b>        </td><td>Time of the last API call                                       </td></tr>
-            <tr><td> <b>lastretrieval_timestamp</b>   </td><td>Unix timestamp of the last API call                             </td></tr>
-            <tr><td> <b>pv_estimate</b>               </td><td>expected PV generation (Wh)                                     </td></tr>
-            <tr><td> <b>todayDoneAPIrequests</b>      </td><td>Number of executed API requests on the current day              </td></tr>
-            <tr><td> <b>todayRemainingAPIrequests</b> </td><td>Number of remaining SolCast API requests on the current day     </td></tr>
-            <tr><td> <b>todayDoneAPIcalls</b>         </td><td>Number of executed API calls on the current day                 </td></tr>
-            <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>Number of SolCast API calls still possible on the current day   </td></tr>
-            <tr><td>                                  </td><td>(one call can execute several SolCast API requests)             </td></tr>
-            <tr><td> <b>todayMaxAPIcalls</b>          </td><td>Maximum number of SolCast API calls per day                     </td></tr>
+            <tr><td> <b>currentAPIinterval</b>        </td><td>the currently used API retrieval interval in seconds                                       </td></tr>
+            <tr><td> <b>lastretrieval_time</b>        </td><td>Time of the last API call                                                                  </td></tr>
+            <tr><td> <b>lastretrieval_timestamp</b>   </td><td>Unix timestamp of the last API call                                                        </td></tr>
+            <tr><td> <b>Rad1h</b>                     </td><td>if available, expected global irradiation (GI) or global tilted irradiation (GTI) in Wh/m2 </td></tr>
+            <tr><td> <b>pv_estimate</b>               </td><td>expected PV generation (Wh)                                                                </td></tr>
+            <tr><td> <b>KI-based_co</b>               </td><td>expected Energy consumption (Wh)                                                           </td></tr>
+            <tr><td> <b>todayDoneAPIrequests</b>      </td><td>Number of executed API requests on the current day                                         </td></tr>
+            <tr><td> <b>todayRemainingAPIrequests</b> </td><td>Number of remaining SolCast API requests on the current day                                </td></tr>
+            <tr><td> <b>todayDoneAPIcalls</b>         </td><td>Number of executed API calls on the current day                                            </td></tr>
+            <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>Number of SolCast API calls still possible on the current day                              </td></tr>
+            <tr><td>                                  </td><td>(one call can execute several SolCast API requests)                                        </td></tr>
+            <tr><td> <b>todayMaxAPIcalls</b>          </td><td>Maximum number of SolCast API calls per day                                                </td></tr>
          </table>
       </ul>
       </li>
@@ -17939,7 +18292,7 @@ to ensure that the system configuration is correct.
          in relation to one hour per day. <br>
          This setting has no influence on the learning and forecasting behavior of any AI support used
          (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>). <br>
-         (default: 0.5)
+         (default: 0.8)
        </li>
        <br>
 
@@ -19213,7 +19566,21 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <li><b>currentRadiationAPI </b> <br><br>
 
       Legt die Quelle zur Lieferung der solaren Strahlungsdaten fest. Es kann ein Device vom Typ DWD_OpenData oder
-      eine implementierte API ausgewählt werden. <br><br>
+      eine implementierte API eines Dienstes ausgewählt werden. <br><br>
+      
+      <b>OpenMeteoDWD-API</b> <br>
+      
+      Open-Meteo ist eine Open-Source-Wetter-API und bietet kostenlosen Zugang für nicht-kommerzielle Zwecke. 
+      Es ist kein API-Schlüssel erforderlich.
+      Open-Meteo nutzt eine leistungsstarke Kombination aus globalen (11 km) und mesoskaligen (1 km) Wettermodellen 
+      von angesehenen nationalen Wetterdiensten.
+      Diese API bietet Zugang zu den renommierten ICON-Wettermodellen des Deutschen Wetterdienstes (DWD), die 
+      15-minütige Daten für kurzfristige Vorhersagen in Mitteleuropa und globale Vorhersagen mit einer Auflösung 
+      von 11 km liefern. Das ICON-Modell ist eine bevorzugte Wahl für allgemeine Wettervorhersage-APIs, wenn keine 
+      anderen hochauflösenden Wettermodelle verfügbar sind.
+      Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
+      <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.                  
+      <br><br>
 
       <b>SolCast-API</b> <br>
 
@@ -19493,7 +19860,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Das Korrekturverhalten kann mit dem Attribut
       <a href="#SolarForecast-attr-affectMaxDayVariance">affectMaxDayVariance</a> beeinflusst werden. <br>
       (default: off)
-
       <br><br>
 
       <b>noLearning:</b> <br>
@@ -19522,11 +19888,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <b>Hinweis:</b> Die automatische Vorhersagekorrektur ist lernend und benötigt Zeit um die Korrekturwerte zu optimieren.
       Nach der Aktivierung sind nicht sofort optimale Vorhersagen zu erwarten!
-
       <br><br>
 
       Nachfolgend einige API-spezifische Hinweise die lediglich Best Practice Empfehlungen darstellen.
-
+      <br><br>
+      
+      <b>Model OpenMeteoDWDAPI:</b> <br>
+      Die empfohlene Autokorrekturmethode ist <b>on_complex</b>.
       <br><br>
 
       <b>Model SolCastAPI:</b> <br>
@@ -19962,22 +20330,25 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       Listet die im Kontext des API-Abrufs gespeicherten Daten auf.
       Verwaltungsdatensätze sind mit einem führenden '?' gekennzeichnet.
-      Die von der API gelieferten Vorhersagedaten bzgl. des PV Ertrages (Wh) sind auf eine Stunde konsolidiert.
+      Die von der API gelieferten Vorhersagedaten bzgl. der Globalstrahlung Rad1h und des PV Ertrages (Wh) sind auf 
+      eine Stunde konsolidiert. Die verfügbaren Kennwerte unterscheiden sich je nach verwendeter API. 
       <br><br>
 
       <ul>
          <table>
          <colgroup> <col width="37%"> <col width="63%"> </colgroup>
-            <tr><td> <b>currentAPIinterval</b>        </td><td>das aktuell verwendete API Abrufintervall in Sekunden            </td></tr>
-            <tr><td> <b>lastretrieval_time</b>        </td><td>Zeit des letzten API Abrufs                                      </td></tr>
-            <tr><td> <b>lastretrieval_timestamp</b>   </td><td>Unix Timestamp des letzten API Abrufs                            </td></tr>
-            <tr><td> <b>pv_estimate</b>               </td><td>erwartete PV Erzeugung (Wh)                                      </td></tr>
-            <tr><td> <b>todayDoneAPIrequests</b>      </td><td>Anzahl der ausgeführten API Requests am aktuellen Tag            </td></tr>
-            <tr><td> <b>todayRemainingAPIrequests</b> </td><td>Anzahl der verbleibenden SolCast API Requests am aktuellen Tag   </td></tr>
-            <tr><td> <b>todayDoneAPIcalls</b>         </td><td>Anzahl der ausgeführten API Abrufe am aktuellen Tag              </td></tr>
-            <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>Anzahl der noch möglichen SolCast API Abrufe am aktuellen Tag    </td></tr>
-            <tr><td>                                  </td><td>(ein Abruf kann mehrere SolCast API Requests ausführen)          </td></tr>
-            <tr><td> <b>todayMaxAPIcalls</b>          </td><td>Anzahl der maximal möglichen SolCast API Abrufe pro Tag          </td></tr>
+            <tr><td> <b>currentAPIinterval</b>        </td><td>das aktuell verwendete API Abrufintervall in Sekunden                                           </td></tr>
+            <tr><td> <b>lastretrieval_time</b>        </td><td>Zeit des letzten API Abrufs                                                                     </td></tr>
+            <tr><td> <b>lastretrieval_timestamp</b>   </td><td>Unix Timestamp des letzten API Abrufs                                                           </td></tr>
+            <tr><td> <b>Rad1h</b>                     </td><td>wenn vorhanden, erwartete Globalstrahlung (GI) bzw. globale Schräglagenstrahlung (GTI) in Wh/m2 </td></tr>
+            <tr><td> <b>pv_estimate</b>               </td><td>erwartete PV Erzeugung (Wh)                                                                     </td></tr>
+            <tr><td> <b>KI-based_co</b>               </td><td>erwarteter Energieverbrauch (Wh)                                                                </td></tr>
+            <tr><td> <b>todayDoneAPIrequests</b>      </td><td>Anzahl der ausgeführten API Requests am aktuellen Tag                                           </td></tr>
+            <tr><td> <b>todayRemainingAPIrequests</b> </td><td>Anzahl der verbleibenden SolCast API Requests am aktuellen Tag                                  </td></tr>
+            <tr><td> <b>todayDoneAPIcalls</b>         </td><td>Anzahl der ausgeführten API Abrufe am aktuellen Tag                                             </td></tr>
+            <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>Anzahl der noch möglichen SolCast API Abrufe am aktuellen Tag                                   </td></tr>
+            <tr><td>                                  </td><td>(ein Abruf kann mehrere SolCast API Requests ausführen)                                         </td></tr>
+            <tr><td> <b>todayMaxAPIcalls</b>          </td><td>Anzahl der maximal möglichen SolCast API Abrufe pro Tag                                         </td></tr>
          </table>
       </ul>
       </li>
@@ -20080,7 +20451,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Auf das Lern- und Prognoseverhalten einer eventuell verwendeten KI-Unterstützung
          (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>) hat diese Einstellung keinen
          Einfluß. <br>
-         (default: 0.5)
+         (default: 0.8)
        </li>
        <br>
 
