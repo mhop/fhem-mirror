@@ -68,6 +68,7 @@
 # 5.20      Bug Fix: suppress status calls for disabled devices
 # 5.21      Bug Fix: Shelly-dimmer: convert dim-command with brightness=0 to an off-command
 #           Bug Fix: Shelly-dimmer, Shelly-bulb: slider for pct starts with 1
+# 5.21.1    Bug Fix: removed uninitialized $oldtimer
 
 
 package main;
@@ -86,7 +87,7 @@ sub Log($$);
 sub Shelly_Set ($@);
 
 #-- globals on start
-my $version = "5.21 21.03.2024";
+my $version = "5.21.1 22.03.2024";
 
 my $defaultINTERVAL = 60;
 my $secndIntervalMulti = 4;  # Multiplier for 'long update'
@@ -1974,9 +1975,9 @@ sub Shelly_Set ($@) {
     if( $cmd eq "dim" ){
            # 
            if( $brightness == 0 ){           
-               $cmd = "?turn=off$oldtimer";
+               $cmd = "?turn=off";
            }else{
-               $cmd = "?brightness=$brightness&turn=on$oldtimer";
+               $cmd = "?brightness=$brightness&turn=on";
            }
     }
     #-- check timer command
