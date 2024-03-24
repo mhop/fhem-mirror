@@ -4276,10 +4276,10 @@ sub __openMeteoDWD_ApiResponse {
           
           if ($debug =~ /apiProcess/xs) {
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - Rad1h: $rad1wh, PV estimate: $pv Wh");
-              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - WeatherID: $wid");
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - Neff: $wcc");
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - RR1c: $rain");
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - DoN: $don");
+              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - WeatherID: $wid");
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - Temp: $temp");
           }              
                      
@@ -4293,12 +4293,12 @@ sub __openMeteoDWD_ApiResponse {
           
           $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{Rad1h} += $rad1wh;                     # Startstunde verschieben, Rad Werte aller Strings addieren
           $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{rr1c}   = $rain;                       # Startstunde verschieben
-          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ww}     = $wid;                        # Startstunde verschieben
           $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{neff}   = $wcc;                        # Startstunde verschieben          
           
           $fwtg = formatWeatherTimestrg ($otmstr);
           
           $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{don} = $don;
+          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ww}  = $wid;                        
           $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ttt} = $temp;
       }
       
@@ -5965,7 +5965,7 @@ sub runTask {
   my $debug = getDebug ($hash);
 
   if ($min == 59 && $sec > 48) {
-      if (!exists $hash->{HELPER}{S48DONE}) {
+      if (!defined $hash->{HELPER}{S48DONE}) {
           $hash->{HELPER}{S48DONE} = 1;
 
           if ($debug =~ /collectData/x) {
@@ -5980,7 +5980,7 @@ sub runTask {
   }
 
   if ($min == 0 && $sec > 3) {
-      if (!exists $hash->{HELPER}{S03DONE}) {
+      if (!defined $hash->{HELPER}{S03DONE}) {
           $hash->{HELPER}{S03DONE} = 1;
 
           if ($debug =~ /collectData/x) {
@@ -6061,12 +6061,7 @@ sub centralTask {
       readingsSingleUpdate ($hash, 'nextRadiationAPICall', $nscc, 0);
       deleteReadingspec ($hash, 'nextSolCastCall');
   }
-  
-  #for my $idx (sort keys %{$data{$type}{$name}{solcastapi}{'?All'}}) {                           # 23.03.2024                
-  #    my $ds = timestringToTimestamp ($idx);
-  #    delete $data{$type}{$name}{solcastapi}{'?All'}{$idx} if($ds);             # valider Zeitstring
-  #}
-  
+    
   #######################################################################################################################
 
   return if(!$init_done);
@@ -6409,8 +6404,8 @@ sub _specialActivities {
   $minute = int $minute;
   
   if ($chour == 0 && $minute >= 1) {                           
-      if (!exists $hash->{HELPER}{H00DONE}) {
-          $hash->{HELPER}{H00DONE} = 1;
+      if (!defined $hash->{HELPER}{H00M1DONE}) {
+          $hash->{HELPER}{H00M1DONE} = 1;
           
           $date = strftime "%Y-%m-%d", localtime($t-7200);                                   # Vortag (2 h Differenz reichen aus)
           $ts   = $date." 23:59:59";
@@ -6490,7 +6485,7 @@ sub _specialActivities {
       }
   }
   else {
-      delete $hash->{HELPER}{H00DONE};
+      delete $hash->{HELPER}{H00M1DONE};
   }
 
 return;
@@ -6870,15 +6865,17 @@ return;
 ################################################################
 sub __sunRS {
   my $paref  = shift;
+  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $t      = $paref->{t};                                                       # aktuelle Zeit
   my $fcname = $paref->{fcname};
   my $type   = $paref->{type};
   my $date   = $paref->{date};                                                    # aktuelles Datum
+  my $apiu   = $paref->{apiu};
 
   my ($fc0_sr, $fc0_ss, $fc1_sr, $fc1_ss);
 
-  my ($cset, $lat, $lon) = locCoordinates();
+  my ($cset, undef, undef, undef) = locCoordinates();
 
   debugLog ($paref, 'collectData', "collect sunrise/sunset times - device: $fcname =>");
 
@@ -6889,11 +6886,19 @@ sub __sunRS {
       $fc1_sr = substr (sunrise_abs_dat ($t + 86400, $alt), 0, 5);                # SunRise morgen
       $fc1_ss = substr (sunset_abs_dat  ($t + 86400, $alt), 0, 5);                # SunSet morgen
   }
-  else {                                                                          # Daten aus DWD Device holen
-      $fc0_sr = ReadingsVal ($fcname, 'fc0_SunRise', '23:59');
-      $fc0_ss = ReadingsVal ($fcname, 'fc0_SunSet',  '00:00');
-      $fc1_sr = ReadingsVal ($fcname, 'fc1_SunRise', '23:59');
-      $fc1_ss = ReadingsVal ($fcname, 'fc1_SunSet',  '00:00');
+  else {
+      if (!$apiu) {                                                               # Daten aus DWD Device holen
+          $fc0_sr = ReadingsVal ($fcname, 'fc0_SunRise', '23:59');
+          $fc0_ss = ReadingsVal ($fcname, 'fc0_SunSet',  '00:00');
+          $fc1_sr = ReadingsVal ($fcname, 'fc1_SunRise', '23:59');
+          $fc1_ss = ReadingsVal ($fcname, 'fc1_SunSet',  '00:00');
+      }
+      else {                                                                                          # Daten aus solcastapi (API) holen       
+          $fc0_sr = substr (SolCastAPIVal ($hash, '?All', 'sunrise', 'today',    '23:59:59'), 0, 5);
+          $fc0_ss = substr (SolCastAPIVal ($hash, '?All', 'sunset',  'today',    '00:00:00'), 0, 5);
+          $fc1_sr = substr (SolCastAPIVal ($hash, '?All', 'sunrise', 'tomorrow', '23:59:59'), 0, 5);
+          $fc1_ss = substr (SolCastAPIVal ($hash, '?All', 'sunset',  'tomorrow', '00:00:00'), 0, 5);
+      }
   }
 
   $data{$type}{$name}{current}{sunriseToday}   = $date.' '.$fc0_sr.':00';
@@ -8736,7 +8741,7 @@ sub __reviewSwitchTime {
 
           for my $m (qw(15 45)) {
               if (int $minute >= $m) {
-                  if (!exists $hash->{HELPER}{$c.'M'.$m.'DONE'}) {
+                  if (!defined $hash->{HELPER}{$c.'M'.$m.'DONE'}) {
                       my $name                          = $paref->{name};
                       $hash->{HELPER}{$c.'M'.$m.'DONE'} = 1;
 
@@ -12745,7 +12750,7 @@ sub __weatherOnBeam {
   $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                              # freier Platz am Anfang
 
   for my $i (0..($maxhours * 2) - 1) {
-      last if (!exists ($hfcg->{$i}{weather}));
+      last if (!defined ($hfcg->{$i}{weather}));
 
       $hfcg->{$i}{weather} = 999 if(!defined $hfcg->{$i}{weather});
       my $wcc              = $hfcg->{$i}{wcc} // '-';                                                        # Bewölkungsgrad ergänzen
@@ -14622,10 +14627,11 @@ sub checkPlantConfig {
   my $resh;
   
   for my $step (1..$weatherDevMax) {
-      my $fcname = AttrVal ($name, 'ctrlWeatherDev'.$step, '');
+      #my $fcname = AttrVal ($name, 'ctrlWeatherDev'.$step, '');
+      my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'ctrlWeatherDev'.$step);
       next if(!$fcname && $step ne 1);
 
-      if (!$fcname || !$defs{$fcname}) {
+      if (!$valid) {
           $result->{'DWD Weather Properties'}{state} = $nok;
 
           if (!$fcname) {
@@ -14638,28 +14644,33 @@ sub checkPlantConfig {
           $result->{'DWD Weather Properties'}{fault} = 1;
       }
       else {
-          $err = checkdwdattr ($name, $fcname, \@dweattrmust);
+          if (!$apiu) {
+              $err = checkdwdattr ($name, $fcname, \@dweattrmust);
 
-          if ($err) {
-              $result->{'DWD Weather Properties'}{state}   = $nok;
-              $result->{'DWD Weather Properties'}{result} .= $err.'<br>';
-              $result->{'DWD Weather Properties'}{fault}   = 1;
+              if ($err) {
+                  $result->{'DWD Weather Properties'}{state}   = $nok;
+                  $result->{'DWD Weather Properties'}{result} .= $err.'<br>';
+                  $result->{'DWD Weather Properties'}{fault}   = 1;
+              }
+              else {
+                  $mosm = AttrVal ($fcname, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S'; 
+                  
+                  if ($mosm eq 'MOSMIX_L') {
+                      $result->{'DWD Weather Properties'}{state}   = $info;
+                      $result->{'DWD Weather Properties'}{result} .= qq(The device "$fcname" uses "$mosm" which is only updated by DWD every 6 hours. <br>);
+                      $result->{'DWD Weather Properties'}{info}    = 1;
+                  }              
+                  
+                  $result->{'DWD Weather Properties'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: ctrlWeatherDev$step)<br>";
+              }
+
+              $result->{'DWD Weather Properties'}{note} .= qq{checked parameters and attributes of device "$fcname": <br>};
+              $result->{'DWD Weather Properties'}{note} .= 'forecastProperties -> '.join (',', @dweattrmust).'<br>';
+              $result->{'DWD Weather Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to below "6" if possible' : '').'<br>';
           }
           else {
-              $mosm = AttrVal ($fcname, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S'; 
-              
-              if ($mosm eq 'MOSMIX_L') {
-                  $result->{'DWD Weather Properties'}{state}   = $info;
-                  $result->{'DWD Weather Properties'}{result} .= qq(The device "$fcname" uses "$mosm" which is only updated by DWD every 6 hours. <br>);
-                  $result->{'DWD Weather Properties'}{info}    = 1;
-              }              
-              
               $result->{'DWD Weather Properties'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: ctrlWeatherDev$step)<br>";
           }
-
-          $result->{'DWD Weather Properties'}{note} .= qq{checked parameters and attributes of device "$fcname": <br>};
-          $result->{'DWD Weather Properties'}{note} .= 'forecastProperties -> '.join (',', @dweattrmust).'<br>';
-          $result->{'DWD Weather Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to below "6" if possible' : '').'<br>';
       }
   }
   
@@ -14677,7 +14688,7 @@ sub checkPlantConfig {
   
   $result->{'DWD Weather Properties'}{note} .= '<br>';
   $result->{'DWD Weather Properties'}{note} .= qq{checked global Weather parameters: <br>};
-  $result->{'DWD Weather Properties'}{note} .= 'MOSMIX variant, Age of Weather data. <br>';
+  $result->{'DWD Weather Properties'}{note} .= 'MOSMIX variant or ICON Forecast Model, Age of Weather data. <br>';
 
   ## Check DWD Radiation Device
   ###############################
@@ -14873,20 +14884,6 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on_complex" is recommended.<br>};
       }
 
-      if (!$lat) {
-          $result->{'Common Settings'}{state}   = $nok;
-          $result->{'Common Settings'}{result} .= qq{Attribute latitude in global device is not set. <br>};
-          $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in the latitude attribute of the global device.<br>};
-          $result->{'Common Settings'}{fault}   = 1;
-      }
-
-      if (!$lon) {
-          $result->{'Common Settings'}{state}   = $nok;
-          $result->{'Common Settings'}{result} .= qq{Attribute longitude in global device is not set. <br>};
-          $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in the longitude attribute of the global device.<br>};
-          $result->{'Common Settings'}{fault}   = 1;
-      }
-
       if (!$result->{'Common Settings'}{fault}) {
           $result->{'Common Settings'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
           $result->{'Common Settings'}{note}   .= qq{<br>checked parameters and attributes: <br>};
@@ -14894,25 +14891,11 @@ sub checkPlantConfig {
       }
   }
   
-  if (isOpenMeteoUsed ($hash)) {                                                         # allg. Settings bei Nutzung Open-Meteo API
+  if (isOpenMeteoUsed ($hash)) {                                                             # allg. Settings bei Nutzung Open-Meteo API
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
           $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on_complex" is recommended.<br>};
-      }
-
-      if (!$lat) {
-          $result->{'Common Settings'}{state}   = $nok;
-          $result->{'Common Settings'}{result} .= qq{Attribute latitude in global device is not set. <br>};
-          $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in the latitude attribute of the global device.<br>};
-          $result->{'Common Settings'}{fault}   = 1;
-      }
-
-      if (!$lon) {
-          $result->{'Common Settings'}{state}   = $nok;
-          $result->{'Common Settings'}{result} .= qq{Attribute longitude in global device is not set. <br>};
-          $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in the longitude attribute of the global device.<br>};
-          $result->{'Common Settings'}{fault}   = 1;
       }
 
       if (!$result->{'Common Settings'}{fault}) {
@@ -16054,7 +16037,7 @@ return $ret;
 #    Prüft ob das in ctrlWeatherDevX 
 #    übergebene Weather Device valide ist
 #    return - $valid -> ist die Angabe valide (1)
-#             $apiu  -> wird ein Device (0) oder API (1) verwendet
+#             $apiu  -> wird ein Device oder API verwendet
 #####################################################################
 sub isWeatherDevValid {
   my $hash = shift;
@@ -16069,7 +16052,7 @@ sub isWeatherDevValid {
   
  if (isOpenMeteoUsed($hash) && $fcname =~ /OpenMeteoDWD-API/xs) {
      $valid = 1;
-     $apiu  = 1;
+     $apiu  = 'OpenMeteoDWD-API';
  }
   
 return ($valid, $fcname, $apiu);
@@ -16139,8 +16122,6 @@ sub isWeatherAgeExceeded {
   my $name  = $paref->{name};
   my $lang  = $paref->{lang};
 
-  #my $dt     = strftime "%Y-%m-%d %H:%M:%S", localtime(time);
-  #my $currts = timestringToTimestamp ($dt);
   my $currts = int time;
   my $agets  = $currts;
 
@@ -16215,7 +16196,7 @@ sub isRad1hAgeExceeded {
   my $name  = $paref->{name};
   my $lang  = $paref->{lang};
 
-  my $currts = timestringToTimestamp (strftime "%Y-%m-%d %H:%M:%S", localtime(time));  
+  my $currts = int time;  
   my $fcname = CurrentVal ($hash, 'dwdRad1hDev', '');
   
   my $resh->{agedv} = '-';
