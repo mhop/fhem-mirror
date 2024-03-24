@@ -158,7 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.17.0" => "20.03.2024  new DWD ICON API, change defmaxvar from 0.5 to 0.8 ",
+  "1.17.0" => "24.03.2024  new DWD ICON API, change defmaxvar from 0.5 to 0.8, attr ctrlWeatherDev1 can select OpenMeteoDWD-API ",
   "1.16.8" => "16.03.2024  plantConfigCheck: adjust pvCorrectionFactor_Auto check, settings of forecastRefresh ".
                            "rename reading nextSolCastCall to nextRadiationAPICall ".
                            "currentMeterDev: new optional keys conprice, feedprice ".
@@ -1332,12 +1332,13 @@ sub Set {
              );
   my $resets = join ",",@re;
 
-  my @fcdevs = devspec2array ("TYPE=DWD_OpenData");
-
-  push @fcdevs, 'SolCast-API';
-  push @fcdevs, 'ForecastSolar-API';
-  push @fcdevs, 'VictronKI-API';
-  push @fcdevs, 'OpenMeteoDWD-API';
+  my @fcdevs = qw( OpenMeteoDWD-API 
+                   SolCast-API 
+                   ForecastSolar-API 
+                   VictronKI-API
+                 );
+                 
+  push @fcdevs, devspec2array ("TYPE=DWD_OpenData");
 
   my $rdd = join ",", @fcdevs;
 
@@ -1544,6 +1545,11 @@ sub _setcurrentRadiationAPI {              ## no critic "not used"
 
   if ($prop !~ /-API$/x && (!$defs{$prop} || $defs{$prop}{TYPE} ne "DWD_OpenData")) {
       return qq{The device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};
+  }
+  
+  if ($prop ne 'OpenMeteoDWD-API' && AttrVal ($name, 'ctrlWeatherDev1', '') eq 'OpenMeteoDWD-API') {
+      return "The attribute 'ctrlWeatherDev1' is set to 'OpenMeteoDWD-API'. \n".
+             "Change that attribute to another weather device first if you want use an other API.";
   }
 
   if ($prop =~ /(SolCast|OpenMeteoDWD)-API/xs) {
@@ -2497,7 +2503,7 @@ sub _setclientAction {                 ## no critic "not used"
   my $arg     = $paref->{arg};
   my $argsref = $paref->{argsref};
 
-  if(!$arg) {
+  if (!$arg) {
       return qq{The command "$opt" needs an argument !};
   }
 
@@ -2511,25 +2517,25 @@ sub _setclientAction {                 ## no critic "not used"
 
   Log3 ($name, 4, qq{$name - Client Action received / execute: "$action $cname $tail"});
 
-  if($action eq 'set') {
+  if ($action eq 'set') {
       CommandSet (undef, "$cname $tail");
       my $async = ConsumerVal ($hash, $c, 'asynchron', 0);
       centralTask ($hash, $evt) if(!$async);                                  # nur wenn Consumer synchron arbeitet direkte Statusabfrage, sonst via Notify
       return;
   }
 
-  if($action eq 'get') {
+  if ($action eq 'get') {
       if($tail eq 'data') {
           centralTask ($hash, $evt);
           return;
       }
   }
 
-  if($action eq 'setreading') {
+  if ($action eq 'setreading') {
       CommandSetReading (undef, "$cname $tail");
   }
 
-  if($action eq 'consumerImmediatePlanning') {
+  if ($action eq 'consumerImmediatePlanning') {
       CommandSet (undef, "$name $action $cname $evt");
       return;
   }
@@ -3545,7 +3551,7 @@ sub __getDWDSolarData {
   for my $num (0..47) {
       my $dateTime = strftime "%Y-%m-%d %H:%M:00", localtime($sts + (3600 * $num));            # laufendes Datum ' ' Zeit
       my $runh     = int strftime "%H",            localtime($sts + (3600 * $num) + 3600);     # Stunde in 24h format (00-23), Rad1h = Absolute Globalstrahlung letzte 1 Stunde
-      my ($fd,$fh) = _calcDayHourMove (0, $num);
+      my ($fd,$fh) = calcDayHourMove (0, $num);
 
       next if($fh == 24);
 
@@ -4008,12 +4014,12 @@ return;
 #             Abruf Open-Meteo DWD ICON API data
 ################################################################################################
 sub __getopenMeteoDWDdata {
-  my $paref   = shift;
-  my $hash    = $paref->{hash};
-  my $name    = $paref->{name};
-  my $force   = $paref->{force} // 0;
-  my $t       = $paref->{t};
-  my $lang    = $paref->{lang};
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $force = $paref->{force} // 0;
+  my $t     = $paref->{t};
+  my $lang  = $paref->{lang};
 
   if (!$force) {                                                                                      # regulärer API Abruf
       my $lrt = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', 0);
@@ -4237,9 +4243,11 @@ sub __openMeteoDWD_ApiResponse {
           Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API Call - status: success");
       }
       
-      my $peak = StringVal ($hash, $string, 'peak', 0);                                          # String Peak (kWp)
-      $peak   *= 1000;                                                                           # kWp in Wp
-      my $k    = 0;
+      my $date  = strftime "%Y-%m-%d", localtime(time); 
+      my $refts = timestringToTimestamp ($date.' 00:00:00');                                      # Referenztimestring
+      my $peak  = StringVal ($hash, $string, 'peak', 0);                                          # String Peak (kWp)
+      $peak    *= 1000;                                                                           # kWp in Wp
+      my $k     = 0;
       
       while ($jdata->{hourly}{time}[$k]) {           
           ($err, my $otmstr) = timestringUTCtoLocal ($name, $jdata->{hourly}{time}[$k], '%Y-%m-%dT%H:%M');
@@ -4253,6 +4261,9 @@ sub __openMeteoDWD_ApiResponse {
           
           my $ots     = timestringToTimestamp  ($otmstr);
           my $pvtmstr = (timestampToTimestring ($ots-3600))[0];                                 # Strahlung wird als Durchschnitt der !vorangegangenen! Stunde geliefert!
+          
+          next if(timestringToTimestamp($pvtmstr) < $refts);                                    # Daten älter als akt. Tag 00:00:00 verwerfen
+          
           my $rad1wh  = $jdata->{hourly}{global_tilted_irradiance_instant}[$k];                 # Wh/m2
           my $pv      = sprintf "%.1f", ($rad1wh / 1000 * $peak * $prdef);                      # Rad wird in kWh/m2 erwartet
           my $don     = $jdata->{hourly}{is_day}[$k];
@@ -4270,19 +4281,25 @@ sub __openMeteoDWD_ApiResponse {
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - RR1c: $rain");
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - DoN: $don");
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - Temp: $temp");
-          }       
-       
+          }              
+                     
+          $data{$type}{$name}{solcastapi}{$string}{$pvtmstr}{pv_estimate50} = $pv;              # Startstunde verschieben
+             
+          my $fwtg = formatWeatherTimestrg ($pvtmstr);
+          
           if ($paref->{begin}) {                                                                # im ersten Call den DS löschen -> dann Aufsummierung
-              delete $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h};
+              delete $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{Rad1h};
           }
           
-          $data{$type}{$name}{solcastapi}{$string}{$pvtmstr}{pv_estimate50} = $pv;              # Startstunde verschieben
-          $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h}         += $rad1wh;          # Startstunde verschieben, Rad Werte aller Strings addieren
-          $data{$type}{$name}{solcastapi}{'?All'}{$otmstr}{don}             = $don;
-          $data{$type}{$name}{solcastapi}{'?All'}{$otmstr}{ttt}             = $temp;
-          $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{rr1c}           = $rain;            # Startstunde verschieben
-          $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{ww}             = $wid;             # Startstunde verschieben
-          $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{neff}           = $wcc;             # Startstunde verschieben
+          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{Rad1h} += $rad1wh;                     # Startstunde verschieben, Rad Werte aller Strings addieren
+          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{rr1c}   = $rain;                       # Startstunde verschieben
+          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ww}     = $wid;                        # Startstunde verschieben
+          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{neff}   = $wcc;                        # Startstunde verschieben          
+          
+          $fwtg = formatWeatherTimestrg ($otmstr);
+          
+          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{don} = $don;
+          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ttt} = $temp;
       }
       
       $k = 0;
@@ -5414,10 +5431,15 @@ sub _attrWeatherDev {                    ## no critic "not used"
   return if(!$init_done);
 
   if ($paref->{cmd} eq 'set' ) {
-      if (!$defs{$aVal} || $defs{$aVal}{TYPE} ne "DWD_OpenData") {
+      if ($aVal ne 'OpenMeteoDWD-API' && (!$defs{$aVal} || $defs{$aVal}{TYPE} ne "DWD_OpenData")) {
           return qq{The device "$aVal" doesn't exist or has no TYPE "DWD_OpenData"};
       }
-
+      
+      if ($aVal eq 'OpenMeteoDWD-API') {
+          CommandSet (undef,"$name currentRadiationAPI $aVal");                     # automatisch currentRadiationAPI setzen
+          return;
+      }
+      
       my $err = checkdwdattr ($name, $aVal, \@dweattrmust);
       return $err if($err);
   }
@@ -5495,7 +5517,7 @@ sub Notify {
       for my $event (@{$events}) {
           $event  = "" if(!defined($event));
 
-          my @parts = split(/: /,$event, 2);
+          my @parts = split (/: /,$event, 2);
           $reading  = shift @parts;
 
           if (@parts == 2) {
@@ -5976,7 +5998,6 @@ return;
 ################################################################
 sub _addDynAttr {
   my $hash = shift;
-
   my $type = $hash->{TYPE};
 
   ## Attr ctrlWeatherDevX zur Laufzeit hinzufügen
@@ -5989,10 +6010,10 @@ sub _addDynAttr {
   my $atd = 'ctrlWeatherDev';
   @deva   = grep {!/$atd/} @deva;
 
-  push @deva, ($adwds ? "ctrlWeatherDev1:$adwds " : "ctrlWeatherDev1:noArg");
+  #push @deva, ($adwds ? "ctrlWeatherDev1:$adwds " : "ctrlWeatherDev1:noArg");
 
   for my $step (1..$weatherDevMax) {
-      push @deva, ($adwds ? "ctrlWeatherDev".$step.":$adwds " : "ctrlWeatherDev1:noArg");
+      push @deva, ($adwds ? "ctrlWeatherDev".$step.":OpenMeteoDWD-API,$adwds " : "ctrlWeatherDev1:OpenMeteoDWD-API");
   }
 
   $hash->{".AttrList"} = join " ", @deva;
@@ -6035,7 +6056,12 @@ sub centralTask {
       readingsSingleUpdate ($hash, 'nextRadiationAPICall', $nscc, 0);
       deleteReadingspec ($hash, 'nextSolCastCall');
   }
-
+  
+  #for my $idx (sort keys %{$data{$type}{$name}{solcastapi}{'?All'}}) {                           # 23.03.2024                
+  #    my $ds = timestringToTimestamp ($idx);
+  #    delete $data{$type}{$name}{solcastapi}{'?All'}{$idx} if($ds);             # valider Zeitstring
+  #}
+  
   #######################################################################################################################
 
   return if(!$init_done);
@@ -6331,15 +6357,16 @@ return ($interval, $disabled, $inactive);
 #     Sonderaufgaben !
 ################################################################
 sub _specialActivities {
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $type  = $paref->{type};
-  my $date  = $paref->{date};                                              # aktuelles Datum
-  my $chour = $paref->{chour};
-  my $t     = $paref->{t};                                                 # aktuelle Zeit
-  my $day   = $paref->{day};
-
+  my $paref  = shift;
+  my $hash   = $paref->{hash};
+  my $name   = $paref->{name};
+  my $type   = $paref->{type};
+  my $date   = $paref->{date};                                              # aktuelles Datum
+  my $chour  = $paref->{chour};     
+  my $minute = $paref->{minute};
+  my $t      = $paref->{t};                                                 # aktuelle Zeit
+  my $day    = $paref->{day};
+ 
   my ($ts,$ts1,$pvfc,$pvrl,$gcon);
 
   $ts1  = $date." ".sprintf("%02d",$chour).":00:00";
@@ -6373,9 +6400,13 @@ sub _specialActivities {
 
   ## bestimmte einmalige Aktionen
   ##################################
-  my $tlim = "00";
-  if ($chour =~ /^($tlim)$/x) {
+  $chour  = int $chour;
+  $minute = int $minute;
+  
+  if ($chour == 0 && $minute >= 1) {                           
       if (!exists $hash->{HELPER}{H00DONE}) {
+          $hash->{HELPER}{H00DONE} = 1;
+          
           $date = strftime "%Y-%m-%d", localtime($t-7200);                                   # Vortag (2 h Differenz reichen aus)
           $ts   = $date." 23:59:59";
 
@@ -6398,21 +6429,11 @@ sub _specialActivities {
           deleteReadingspec ($hash, "Today_PVdeviation");
           deleteReadingspec ($hash, "Today_PVreal");
 
-          for my $wdr (@widgetreadings) {
+          for my $wdr (@widgetreadings) {                                                     # Array der Hilfsreadings (Attributspeicher) löschen
               deleteReadingspec ($hash, $wdr);
           }
 
-          for my $n (1..24) {
-              $n = sprintf "%02d", $n;
-
-              deleteReadingspec ($hash, ".pvCorrectionFactor_${n}_cloudcover");               # verstecktes Reading löschen
-              deleteReadingspec ($hash, ".pvCorrectionFactor_${n}_apipercentil");             # verstecktes Reading löschen
-              deleteReadingspec ($hash, ".signaldone_${n}");                                  # verstecktes Reading löschen
-
-              if (ReadingsVal ($name, "pvCorrectionFactor_Auto", "off") =~ /on/xs) {
-                  deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
-              }
-          }
+          __deleteHiddenReadings ($paref);                                                    # verstecktes Steuerungsreading löschen
 
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
@@ -6461,8 +6482,6 @@ sub _specialActivities {
           delete $paref->{taa};
 
           periodicWriteCachefiles ($hash, 'bckp');                                          # Backup Files erstellen und alte Versionen löschen
-
-          $hash->{HELPER}{H00DONE} = 1;
       }
   }
   else {
@@ -6471,6 +6490,29 @@ sub _specialActivities {
 
 return;
 }
+
+#############################################################################
+#              versteckte Steuerungsreadings löschen
+#############################################################################     
+sub __deleteHiddenReadings  {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+
+  for my $n (1..24) {
+      $n = sprintf "%02d", $n;
+
+      deleteReadingspec ($hash, ".pvCorrectionFactor_${n}_cloudcover");         
+      deleteReadingspec ($hash, ".pvCorrectionFactor_${n}_apipercentil");       
+      deleteReadingspec ($hash, ".signaldone_${n}");                            
+
+      if (ReadingsVal ($name, "pvCorrectionFactor_Auto", "off") =~ /on/xs) {
+          deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
+      }
+  }
+
+return;
+} 
 
 #############################################################################
 # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
@@ -6515,6 +6557,10 @@ sub __delObsoleteAPIData {
           delete $data{$type}{$name}{solcastapi}{$idx}{$scd} if ($ds && $ds < $refts);
       }
   }
+  
+  for my $idx (keys %{$data{$type}{$name}{solcastapi}{'?All'}}) {                      # Wetterindexe löschen
+      delete $data{$type}{$name}{solcastapi}{'?All'}{$idx} if($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs);             
+  }
 
   writeCacheToFile ($hash, "solcastapi", $scpicache.$name);                            # Cache File SolCast API Werte schreiben
 
@@ -6534,7 +6580,7 @@ return;
 
 ################################################################
 #    Wetter Werte aus dem angebenen Wetterdevice extrahieren
-################################################################
+################################################################ 
 sub _transferWeatherValues {
   my $paref = shift;
   my $hash  = $paref->{hash};
@@ -6542,20 +6588,32 @@ sub _transferWeatherValues {
   my $t     = $paref->{t};                                                                     # Epoche Zeit
   my $chour = $paref->{chour};
 
-  my $fcname = AttrVal ($name, 'ctrlWeatherDev1', '');                                         # Standard Weather Forecast Device
-  return if(!$fcname || !$defs{$fcname});
+  my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'ctrlWeatherDev1');                  # Standard Weather Forecast Device
+  return if(!$valid);
 
   my $type = $paref->{type};
 
   delete $data{$type}{$name}{weatherdata};                                                     # Wetterdaten Hash löschen
 
+  $paref->{apiu}   = $apiu;                                                                    # API wird verwendet
   $paref->{fcname} = $fcname;
   __sunRS ($paref);                                                                            # Sonnenauf- und untergang
   delete $paref->{fcname};
+  delete $paref->{apiu};
   
-  my $fctime                                 = ReadingsVal ($fcname, 'fc_time', '-');          # Alter der DWD Daten
+  my ($fctime, $fctimets);                                                                     # Alter der DWD Daten
+  
+  if (!$apiu) {
+      $fctime   = ReadingsVal ($fcname, 'fc_time', '-');
+      $fctimets = timestringToTimestamp ($fctime);
+  }
+  else {
+      $fctime   = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time',      '-');
+      $fctimets = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', '-');
+  }
+  
   $data{$type}{$name}{current}{dwdWfchAge}   = $fctime;
-  $data{$type}{$name}{current}{dwdWfchAgeTS} = timestringToTimestamp ($fctime);
+  $data{$type}{$name}{current}{dwdWfchAgeTS} = $fctimets;
 
   for my $step (1..$weatherDevMax) {
       $paref->{step} = $step;
@@ -6566,7 +6624,7 @@ sub _transferWeatherValues {
   __mergeDataWeather ($paref);                                                                 # Wetterdaten zusammenfügen
   
   for my $num (0..46) {
-      my ($fd, $fh) = _calcDayHourMove ($chour, $num);
+      my ($fd, $fh) = calcDayHourMove ($chour, $num);
       last if($fd > 1);
 
       my $wid   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{ww};               # signifikantes Wetter = Wetter ID
@@ -6641,8 +6699,15 @@ sub __readDataWeather {
   my $type  = $paref->{type};
   my $step  = $paref->{step};
 
-  my $fcname = AttrVal ($name, 'ctrlWeatherDev'.$step, '');                                     # Weather Forecast Device
-  return if(!$fcname || !$defs{$fcname});
+  my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'ctrlWeatherDev'.$step);              # Weather Forecast Device
+  return if(!$valid);
+  
+  if ($apiu) {                                                                                  # eine API wird verwendet
+      $paref->{fcname} = $fcname;
+      ___readDataWeatherAPI ($paref);
+      delete $paref->{fcname};
+      return;
+  }
 
   my $err         = checkdwdattr ($name, $fcname, \@dweattrmust);
   $paref->{state} = $err if($err);
@@ -6650,7 +6715,7 @@ sub __readDataWeather {
   debugLog ($paref, 'collectData', "collect Weather data step $step - device: $fcname =>");
 
   for my $n (0..46) {
-      my ($fd, $fh) = _calcDayHourMove ($chour, $n);
+      my ($fd, $fh) = calcDayHourMove ($chour, $n);
       last if($fd > 1);
 
       my $wid   = ReadingsNum ($fcname, "fc${fd}_${fh}_ww", undef);                            # Signifikantes Wetter zum Vorhersagezeitpunkt
@@ -6686,13 +6751,54 @@ sub __readDataWeather {
   }
 
 return;
-}
+}  
+
+################################################################
+#   lese Wetterdaten aus API Speicher (solcastapi)
+################################################################
+sub ___readDataWeatherAPI {
+  my $paref  = shift;
+  my $hash   = $paref->{hash};
+  my $name   = $paref->{name};
+  my $type   = $paref->{type};
+  my $step   = $paref->{step};
+  my $fcname = $paref->{fcname};
+
+  debugLog ($paref, 'collectData', "collect Weather data step $step - API: $fcname =>");
+
+  for my $idx (sort keys %{$data{$type}{$name}{solcastapi}{'?All'}}) {                                          
+      if ($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs) {                                        # valider Weather API Index
+          my $rr1c = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{rr1c};  
+          my $wid  = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{ww}; 
+          my $neff = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{neff};
+          my $don  = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{don};
+          my $ttt  = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{ttt};
+
+          $data{$type}{$name}{weatherdata}{$idx}{$step}{ww}   = $wid  if(defined $wid);
+          $data{$type}{$name}{weatherdata}{$idx}{$step}{neff} = $neff if(defined $neff);
+          $data{$type}{$name}{weatherdata}{$idx}{$step}{rr1c} = $rr1c if(defined $rr1c);
+          $data{$type}{$name}{weatherdata}{$idx}{$step}{ttt}  = $ttt  if(defined $ttt);
+          $data{$type}{$name}{weatherdata}{$idx}{$step}{don}  = $don  if(defined $don);          
+
+          debugLog ($paref, 'collectData', "Weather $step: $idx".
+                                           ", don: ". (defined $don  ? $don  : '<undef>').
+                                           ", ww: ".  (defined $wid  ? $wid  : '<undef>').
+                                           ", RR1c: ".(defined $rr1c ? $rr1c : '<undef>').
+                                           ", TTT: ". (defined $ttt  ? $ttt  : '<undef>').
+                                           ", Neff: ".(defined $neff ? $neff : '<undef>')
+                                           );          
+      }
+  }
+  
+return;
+}    
 
 ################################################################
 #                     Wetterdaten mergen
 ################################################################
 sub __mergeDataWeather {
   my $paref = shift;
+  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
 
@@ -6701,8 +6807,8 @@ sub __mergeDataWeather {
   my $ds = 0;
 
   for my $wd (1..$weatherDevMax) {
-      my $fcname = AttrVal ($name, 'ctrlWeatherDev'.$wd, '');                        # Weather Forecast Device
-      $ds++ if($fcname && $defs{$fcname});
+      my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'ctrlWeatherDev'.$wd);              # Weather Forecast Device
+      $ds++ if($valid);
   }
 
   my ($q, $m) = (0,0);
@@ -6828,7 +6934,7 @@ sub _transferAPIRadiationValues {
   my $lang = $paref->{lang};
 
   for my $num (0..47) {
-      my ($fd,$fh) = _calcDayHourMove ($chour, $num);
+      my ($fd,$fh) = calcDayHourMove ($chour, $num);
 
       if ($fd > 1) {                                                                          # überhängende Werte löschen
           delete $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d", $num};
@@ -6984,7 +7090,7 @@ sub __calcSunPosition {
   my $num    = $paref->{num};
   my $nhtstr = $paref->{nhtstr};
 
-  my ($fd, $fh) = _calcDayHourMove ($chour, $num);
+  my ($fd, $fh) = calcDayHourMove ($chour, $num);
   last if($fd > 1);
 
   my $tstr               = (timestampToTimestring ($t + ($num * 3600)))[3];
@@ -10143,10 +10249,10 @@ return ($oldfac, $factor, $dnum);
 }
 
 ################################################################
-#     Berechnen Forecast Tag / Stunden Verschieber
+#     Berechnen Tag / Stunden Verschieber
 #     aus aktueller Stunde + lfd. Nummer
 ################################################################
-sub _calcDayHourMove {
+sub calcDayHourMove {
   my $chour = shift;
   my $num   = shift;
 
@@ -10154,7 +10260,26 @@ sub _calcDayHourMove {
   my $fd = int ($fh / 24) ;
   $fh    = $fh - ($fd * 24);
 
-return ($fd,$fh);
+return ($fd, $fh);
+}
+
+################################################################
+#  Berechnen Tag / Stunden Verschieber ab aktuellen Tag
+#  Input:   YYYY-MM-DD HH:MM:SS
+#  Output:  $fd - 0 (Heute), 1 (Morgen), 2 (Übermorgen), ....
+#           $fh - Stunde von $fd ohne führende Null
+#  Return:  fc${fd}_${fh}
+################################################################
+sub formatWeatherTimestrg {
+  my $date = shift // return;
+
+  my $cdate = strftime "%Y-%m-%d", localtime(time); 
+  my $refts = timestringToTimestamp ($cdate.' 00:00:00');                                      # Referenztimestring
+  my $datts = timestringToTimestamp ($date);
+  my $fd    = int (($datts - $refts) / 86400);
+  my $fh    = int ((split /[ :]/, $date)[1]); 
+
+return "fc${fd}_${fh}";
 }
 
 ################################################################
@@ -10857,11 +10982,6 @@ sub _checkSetupNotComplete {
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################
   ## currentWeatherDev in Attr umsetzen
-  my $cwd = ReadingsVal ($name, 'currentWeatherDev', '');                     # 30.01.2024
-  if ($cwd) {
-      CommandAttr (undef, "$name ctrlWeatherDev1 $cwd");
-  }
-
   my $mdr = ReadingsVal ($name, 'moduleDirection', undef);                    # 09.02.2024
   if ($mdr) {
       readingsSingleUpdate ($hash, 'moduleAzimuth', $mdr, 0);
@@ -15283,15 +15403,15 @@ sub createAssociatedWith {
       ($ara,$h) = parseParams ($radev);
       $radev    = $ara->[0] // "";
 
-      my $indev = ReadingsVal($name, 'currentInverterDev',  '');             # Inverter Device
+      my $indev = ReadingsVal($name, 'currentInverterDev', '');              # Inverter Device
       ($ain,$h) = parseParams ($indev);
       $indev    = $ain->[0] // "";
 
-      my $medev = ReadingsVal($name, 'currentMeterDev',     '');             # Meter Device
+      my $medev = ReadingsVal($name, 'currentMeterDev', '');                 # Meter Device
       ($ame,$h) = parseParams ($medev);
       $medev    = $ame->[0] // "";
 
-      my $badev = ReadingsVal($name, 'currentBatteryDev',   '');             # Battery Device
+      my $badev = ReadingsVal($name, 'currentBatteryDev', '');               # Battery Device
       ($aba,$h) = parseParams ($badev);
       $badev    = $aba->[0] // "";
 
@@ -15306,10 +15426,10 @@ sub createAssociatedWith {
 
       @nd = @cd;
 
-      push @nd, $fcdev1 if($fcdev1);
-      push @nd, $fcdev2 if($fcdev2);
-      push @nd, $fcdev3 if($fcdev3);
-      push @nd, $radev  if($radev !~ /^($fcdev1|$fcdev2|$fcdev3)/xs && $radev !~ /SolCast-API/xs);
+      push @nd, $fcdev1 if($fcdev1 && $fcdev1 !~ /-API/xs);
+      push @nd, $fcdev2 if($fcdev2 && $fcdev2 !~ /-API/xs);
+      push @nd, $fcdev3 if($fcdev3 && $fcdev3 !~ /-API/xs);
+      push @nd, $radev  if($radev  && $radev  !~ /-API/xs);
       push @nd, $indev;
       push @nd, $medev;
       push @nd, $badev;
@@ -15925,6 +16045,31 @@ sub isOpenMeteoUsed {
 return $ret;
 }
 
+#####################################################################
+#    Prüft ob das in ctrlWeatherDevX 
+#    übergebene Weather Device valide ist
+#    return - $valid -> ist die Angabe valide (1)
+#             $apiu  -> wird ein Device (0) oder API (1) verwendet
+#####################################################################
+sub isWeatherDevValid {
+  my $hash = shift;
+  my $wdev = shift;
+  
+  my $valid  = '';
+  my $apiu   = '';
+  my $fcname = AttrVal ($hash->{NAME}, $wdev, '');                                            # Weather Forecast Device
+
+  if ($fcname) { $valid = 1  }
+  if (!$defs{$fcname} || $defs{$fcname}{TYPE} ne "DWD_OpenData") { $valid = '' }      
+  
+ if (isOpenMeteoUsed($hash) && $fcname =~ /OpenMeteoDWD-API/xs) {
+     $valid = 1;
+     $apiu  = 1;
+ }
+  
+return ($valid, $fcname, $apiu);
+}
+
 ################################################################
 #       welche PV Autokorrektur wird verwendet ?
 #       Standard bei nur "on" -> on_simple
@@ -15989,8 +16134,9 @@ sub isWeatherAgeExceeded {
   my $name  = $paref->{name};
   my $lang  = $paref->{lang};
 
-  my $dt     = strftime "%Y-%m-%d %H:%M:%S", localtime(time);
-  my $currts = timestringToTimestamp ($dt);
+  #my $dt     = strftime "%Y-%m-%d %H:%M:%S", localtime(time);
+  #my $currts = timestringToTimestamp ($dt);
+  my $currts = int time;
   my $agets  = $currts;
 
   my $resh->{agedv} = '-';
@@ -15998,36 +16144,56 @@ sub isWeatherAgeExceeded {
   $resh->{exceed}   = ''; 
   $resh->{fctime}   = '-';
   
+  my ($newts, $th);
+  
   for my $step (1..$weatherDevMax) {
-      my $fcname = AttrVal ($name, 'ctrlWeatherDev'.$step, '');
+      my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'ctrlWeatherDev'.$step);
       next if(!$fcname && $step ne 1);     
    
-      if (!$fcname || !$defs{$fcname}) {
-          if (!$fcname) {
-              return (qq{No DWD device is defined in attribute "ctrlWeatherDev$step"}, $resh);
+      if (!$apiu) {
+          if (!$fcname || !$valid) {
+              if (!$fcname) {
+                  return (qq{No DWD device is defined in attribute "ctrlWeatherDev$step"}, $resh);
+              }
+              else {
+                  return (qq{The DWD device "$fcname" doesn't exist}, $resh);
+              }
           }
-          else {
-              return (qq{The DWD device "$fcname" doesn't exist}, $resh);
+          
+          my $fct = ReadingsVal ($fcname, 'fc_time', '');
+          return (qq{The reading 'fc_time' ($fcname) doesn't exist or is empty}, $resh) if(!$fct);
+          
+          $newts = timestringToTimestamp ($fct);
+          
+          if ($newts <= $agets) {
+              $agets         = $newts;
+              $resh->{agedv} = $fcname;
+              $resh->{apiu}  = $apiu;
           }
       }
-      
-      my $fct = ReadingsVal ($fcname, 'fc_time', '');
-      return (qq{The reading 'fc_time' ($fcname) doesn't exist or is empty}, $resh) if(!$fct);
-      
-      my $newts = timestringToTimestamp ($fct);
-      
-      if ($newts <= $agets) {
-          $agets         = $newts;
-          $resh->{agedv} = $fcname;
+      else {
+          $newts = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', $agets);
+          
+          if ($newts <= $agets) {
+              $agets         = $newts;
+              $resh->{agedv} = $fcname;
+              $resh->{apiu}  = $apiu;
+          }
       }
   }
   
-  $resh->{mosmix} = AttrVal ($resh->{agedv}, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S';   
-  my $th          = $resh->{mosmix} eq 'MOSMIX_S' ? 7200 : 25200;
+  if (!$resh->{apiu}) {                                                                                 # DWD Device ist Wetterdatenlieferant
+      $resh->{mosmix} = AttrVal ($resh->{agedv}, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S';   
+      $th             = $resh->{mosmix} eq 'MOSMIX_S' ? 7200 : 25200;
+  }
+  else {                                                                                                # API ist Wetterdatenlieferant
+      $resh->{mosmix} = 'ICON';
+      $th = 5400;
+  }
   
   $resh->{exceed} = $currts - $agets > $th ? 1 : 0;
   $resh->{fctime} = (timestampToTimestring ($agets, $lang))[0];
-
+  
 return ('', $resh);
 }
 
@@ -17417,7 +17583,9 @@ to ensure that the system configuration is correct.
       <li><b>currentRadiationAPI </b> <br><br>
 
       Defines the source for the delivery of the solar radiation data. You can select a device of the type DWD_OpenData or
-      an implemented API can be selected. <br><br>
+      an implemented API can be selected. <br>
+      <b>Note:</b> If OpenMeteoDWD-API is set in the 'ctrlWeatherDev1' attribute, no radiation data service other than 
+      OpenMeteoDWD-API can be selected. <br><br>
       
       <b>OpenMeteoDWD-API</b> <br>
       
@@ -18787,12 +18955,16 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-ctrlWeatherDev" data-pattern="ctrlWeatherDev.*"></a>
        <li><b>ctrlWeatherDevX </b> <br><br>
 
-       Defines the device (type DWD_OpenData), which provides the required weather data (cloudiness, precipitation, etc.). <br>
-       If no device of this type exists, the selection list is empty and a device must first be defined
+       Specifies the device or API that provides the required weather data (cloud cover, precipitation, etc.).<br>
+       The attribute 'ctrlWeatherDev1' specifies the leading weather service and is mandatory.<br>
+       If 'OpenMeteoDWD-API' is selected in the 'ctrlWeatherDev1' attribute, the Open-Meteo service is automatically set as the 
+       source of the radiation data (setter currentRadiationAPI).<br>
+       If an FHEM device is to be used to supply the weather data, it must be of type 'DWD_OpenData'.<br>
+       If no device of this type exists, at least one DWD_OpenData device must first be defined.
        (see <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
-       If more than one ctrlWeatherDevX is specified, the average of all weather stations is determined and used
+       If more than one ctrlWeatherDevX is specified, the average of all weather stations is determined
        if the respective value was supplied and is numerical. <br>
-       Otherwise, the data from 'ctrlWeatherDev1' is always used as the leading weather device. <br>
+       Otherwise, the data from 'ctrlWeatherDev1' is always used as the leading weather device.<br>
        At least these attributes must be set in the selected DWD_OpenData Device: <br><br>
 
        <ul>
@@ -19566,7 +19738,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <li><b>currentRadiationAPI </b> <br><br>
 
       Legt die Quelle zur Lieferung der solaren Strahlungsdaten fest. Es kann ein Device vom Typ DWD_OpenData oder
-      eine implementierte API eines Dienstes ausgewählt werden. <br><br>
+      eine implementierte API eines Dienstes ausgewählt werden. <br>
+      <b>Hinweis:</b> Ist OpenMeteoDWD-API im Attribut 'ctrlWeatherDev1' gesetzt, kann kein anderer Strahlungsdatendienst als 
+      OpenMeteoDWD-API ausgewählt werden. <br><br>
       
       <b>OpenMeteoDWD-API</b> <br>
       
@@ -20947,14 +21121,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-ctrlWeatherDev" data-pattern="ctrlWeatherDev.*"></a>
        <li><b>ctrlWeatherDevX </b> <br><br>
 
-       Legt das Device (Typ DWD_OpenData) fest, welches die benötigten Wetterdaten (Bewölkung, Niederschlag, usw.)
-       liefert. <br>
-       Ist noch kein Device dieses Typs vorhanden, ist die Auswahlliste leer und es muß zunächst mindestens ein Device
+       Gibt das Gerät oder die API an, das/die die erforderlichen Wetterdaten (Wolkendecke, Niederschlag usw.) liefert.<br>
+       Das Attribut 'ctrlWeatherDev1' gibt den führenden Wetterdienst an und ist zwingend erforderlich.<br>
+       Wird 'OpenMeteoDWD-API' im Attribut 'ctrlWeatherDev1' ausgewählt, wird der Dienst Open-Meteo automatisch auch als Quelle 
+       der Strahlungsdaten (Setter currentRadiationAPI) eingestellt. <br>
+       Soll ein FHEM Gerät zur Lieferung der Wetterdaten dienen, muß es vom Typ 'DWD_OpenData' sein.<br>
+       Ist noch kein Gerät dieses Typs vorhanden, muß zunächst mindestens ein DWD_OpenData-Gerät
        definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
-       Sind mehr als ein ctrlWeatherDevX angegeben, wird der Durchschnitt aller Wetterstationen ermittelt und verwendet
+       Sind mehr als ein ctrlWeatherDevX angegeben, wird der Durchschnitt aller Wetterstationen ermittelt
        sofern der jeweilige Wert geliefert wurde und numerisch ist. <br>
        Anderenfalls werden immer die Daten von 'ctrlWeatherDev1' als führendes Wetterdevice genutzt. <br>
-       Im ausgewählten DWD_OpenData Device müssen mindestens diese Attribute gesetzt sein: <br><br>
+       Im ausgewählten DWD_OpenData Gerät müssen mindestens diese Attribute gesetzt sein: <br><br>
 
        <ul>
           <table>
