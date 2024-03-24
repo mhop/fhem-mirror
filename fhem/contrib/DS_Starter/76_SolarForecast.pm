@@ -5427,15 +5427,20 @@ sub _attrWeatherDev {                    ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal} // return qq{no weather forecast device specified} if($paref->{cmd} eq 'set');
+  my $aName = $paref->{aName};
 
   return if(!$init_done);
 
   if ($paref->{cmd} eq 'set' ) {
       if ($aVal ne 'OpenMeteoDWD-API' && (!$defs{$aVal} || $defs{$aVal}{TYPE} ne "DWD_OpenData")) {
-          return qq{The device "$aVal" doesn't exist or has no TYPE "DWD_OpenData"};
+          return qq{The device "$aVal" doesn't exist or has no TYPE 'DWD_OpenData'};
       }
       
       if ($aVal eq 'OpenMeteoDWD-API') {
+          if ($aName ne 'ctrlWeatherDev1') {
+              return qq{Only the leading attribute 'ctrlWeatherDev1' can set to 'OpenMeteoDWD-API'};
+          }
+          
           CommandSet (undef,"$name currentRadiationAPI $aVal");                     # automatisch currentRadiationAPI setzen
           return;
       }
