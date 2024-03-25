@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.9"  => "18.03.2024  multicmd: add nextHop Keyword ",
   "8.53.8"  => "17.03.2024  sqlCmdBlocking able to use sql Keywords (§timestamp_end§ etc.) ",
   "8.53.7"  => "16.03.2024  prevent some attribute evaluation as long as init_done is not set ",
   "8.53.6"  => "15.03.2024  change verbose level of DbRep_beforeproc, DbRep_afterproc to 3 ",
@@ -376,6 +377,7 @@ my $dbrep_fName               = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbR
 my $dbrep_deftonbl            = 86400;                                                 # default Timeout non-blocking Operationen
 my $dbrep_deftobl             = 10;                                                    # default Timeout blocking Operationen
 
+# $data{DbRep}{$name}{multicmd}                                                        # MultiCommand Hash + Steuerung
 
 ###################################################################################
 # DbRep_Initialize
@@ -1169,10 +1171,12 @@ sub DbRep_Set {
 
       my $ok  = 0;
       my $arg = join " ", @cmd;
-      my $err = perlSyntaxCheck ($arg);
-      return $err if($err);
+      #my $err = perlSyntaxCheck ($arg);
+      #return $err if($err);
+      
+      (undef, $arg) = _DbRep_replaceStrKeywords ( { hash => $hash, string  => $arg } );     # Keywords (nextHop) ersetzen
 
-      if ($arg =~ m/^\{.*\}$/xs && $arg =~ m/=>/xs) {                                # ist als Hash geschrieben
+      if ($arg =~ m/^\{.*\}$/xs && $arg =~ m/=>/xs) {                                       # ist als Hash geschrieben?         
           my $av = eval $arg;
 
           if (ref $av eq "HASH") {
@@ -1183,14 +1187,14 @@ sub DbRep_Set {
 
       return "The syntax of 'multiCmd' is wrong. See command reference." if(!$ok);
 
-      delete $data{DbRep}{$name}{multicmd};                                          # evtl. alten multiCmd löschen
-      $data{DbRep}{$name}{multicmd} = $arg;
+      delete $data{DbRep}{$name}{multicmd};                                                 # evtl. alten multiCmd löschen
+      $data{DbRep}{$name}{multicmd}{cmdhash} = $arg;
 
       DbRep_setLastCmd   ($name, $opt);
-      DbRep_nextMultiCmd ($name);                                                    # Multikommandokette starten
+      DbRep_nextMultiCmd ($name);                                                           # Multikommandokette starten
   }
   else {
-      return "$setlist";
+      return $setlist;
   }
 
 return;
@@ -6909,7 +6913,7 @@ sub DbRep_sqlCmd {
 
   my $bst = [gettimeofday];                                                          # Background-Startzeit
 
-  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name);
+  my ($err, $dbh, $dbmodel) = DbRep_dbConnect($name);
   return "$name|$err" if ($err);
 
   no warnings 'uninitialized';
@@ -6934,8 +6938,8 @@ sub DbRep_sqlCmd {
   return "$name|$err" if ($err);
 
   # Ersetzung von Schlüsselwörtern für Timing, Gerät, Lesen (unter Verwendung der Attributsyntax)
-  ($err, $sql) = _DbRep_sqlReplaceKeywords ( { hash    => $hash,
-                                               sql     => $sql,
+  ($err, $sql) = _DbRep_replaceStrKeywords ( { hash    => $hash,
+                                               string  => $sql,
                                                device  => $device,
                                                reading => $reading,
                                                dbmodel => $dbmodel,
@@ -7071,8 +7075,8 @@ sub DbRep_sqlCmdBlocking {
   }
   
   # Ersetzung von Schlüsselwörtern für Timing, Gerät, Lesen (unter Verwendung der Attributsyntax)
-  ($err, $sql) = _DbRep_sqlReplaceKeywords ( { hash    => $hash,
-                                               sql     => $sql,
+  ($err, $sql) = _DbRep_replaceStrKeywords ( { hash    => $hash,
+                                               string  => $sql,
                                                device  => $device,
                                                reading => $reading,
                                                dbmodel => $dbmodel,
@@ -7318,32 +7322,35 @@ return;
 
 ####################################################################################################
 #        Ersetzung von Schlüsselwörtern für Time*, Devices und Readings
-#        in SQL-Statements (unter Verwendung der Attributsyntax)
+#        in Strings (SQL-Statements etc) unter Verwendung der Attributsyntax
 ####################################################################################################
-sub _DbRep_sqlReplaceKeywords {
+sub _DbRep_replaceStrKeywords {
   my $paref   = shift;
   my $hash    = $paref->{hash};
-  my $sql     = $paref->{sql};
+  my $string  = $paref->{string};
   my $device  = $paref->{device};
   my $reading = $paref->{reading};
   my $dbmodel = $paref->{dbmodel};
   my $rsf     = $paref->{rsf};
   my $rsn     = $paref->{rsn};
+  my $name    = $hash->{NAME};
+  my $err     = q{};
+  
+  $string =~ s/nextHop\s\((.*)\)/DbRep_nextHop (q|$name|, q|$1|)/g;
+  
+  return ($err, $string) if(!$dbmodel);                       # Rückgabe String wenn kein SQL-Statement -> dbmodel fehlt in dem Fall
 
-  my $err  = q{};
-  my $name = $hash->{NAME};
+  $string =~ s/§timestamp_begin§/'$rsf'/g;
+  $string =~ s/§timestamp_end§/'$rsn'/g;
+  
+  my $rdspec;
   my $sfx  = AttrVal("global", "language", "EN");
   $sfx     = $sfx eq 'EN' ? '' : "_$sfx";
-
-  $sql =~ s/§timestamp_begin§/'$rsf'/g;
-  $sql =~ s/§timestamp_end§/'$rsn'/g;
-
-  my $rdspec;
 
   my @keywords = qw(device reading);
 
   for my $kw (@keywords) {
-      next if ($sql !~ /§${kw}§/xs);
+      next if ($string !~ /§${kw}§/xs);
 
       my $vna = $kw eq "device"  ? $device  :
                 $kw eq "reading" ? $reading :
@@ -7356,16 +7363,16 @@ sub _DbRep_sqlReplaceKeywords {
 
           $err = qq{<html> $err </html>};
           $err =~ s/"${kw}"/<a href='https:\/\/fhem.de\/commandref${sfx}.html#${kw}' target='_blank'>${kw}<\/a>/xs;
-          $err = encode_base64($err,"");
+          $err = encode_base64 ($err,"");
           return $err;
       }
 
-      $rdspec = DbRep_createCommonSql( {hash => $hash, ${kw} => $vna, dbmodel => $dbmodel} );
+      $rdspec = DbRep_createCommonSql ( {hash => $hash, ${kw} => $vna, dbmodel => $dbmodel} );
       $rdspec = (split /AND\s(?:1|true)/xis, $rdspec)[0];
-      $sql    =~ s/§${kw}§/$rdspec/xg;
+      $string =~ s/§${kw}§/$rdspec/xg;
   }
 
-return ($err, $sql);
+return ($err, $string);
 }
 
 ####################################################################################################
@@ -12744,10 +12751,10 @@ sub _DbRep_procCode {
   my $err  = q{};
   my $name = $hash->{NAME};
 
-  $fn =~ s/\s*#.*//g;                                          # Kommentare entfernen
-  $fn =  join ' ', split /\s+/sx, $fn;                         # Funktion serialisieren
+  $fn =~ s/\s*#.*//g;                                                                 # Kommentare entfernen
+  $fn =  join ' ', split /\s+/sx, $fn;                                                # Funktion serialisieren
 
-  if ($fn =~ m/^\s*(\{.*\})\s*$/xs) {                          # unnamed Funktion direkt mit {...}
+  if ($fn =~ m/^\s*(\{.*\})\s*$/xs) {                                                 # unnamed Funktion direkt mit {...}
       $fn = $1;
 
       my $fdv                   = __DbRep_fhemDefVars ();
@@ -13020,7 +13027,7 @@ return ($success);
 sub DbRep_nextMultiCmd {
   my $name = shift;
 
-  return if(!defined $data{DbRep}{$name}{multicmd} || !scalar keys %{$data{DbRep}{$name}{multicmd}});
+  return if(!defined $data{DbRep}{$name}{multicmd}{cmdhash} || !scalar keys %{$data{DbRep}{$name}{multicmd}{cmdhash}});
 
   my @mattr = qw(aggregation
                  autoForward
@@ -13035,6 +13042,7 @@ sub DbRep_nextMultiCmd {
                  device
                  reading
                  readingNameMap
+                 userExitFn
                  optimizeTablesBeforeDump
                 );
 
@@ -13042,15 +13050,29 @@ sub DbRep_nextMultiCmd {
       CommandDeleteAttr (undef, "-silent $name $da") if(defined AttrVal($name, $da, undef));
   }
 
-  pop (@mattr);                                                          # optimizeTablesBeforeDump aus Liste entfernen -> Attr darf nicht gesetzt werden!
+  pop @mattr;                                                          # optimizeTablesBeforeDump aus Liste entfernen -> Attr darf nicht gesetzt werden!
 
-  my $ok   = 0;
-  my $verb = 4;
-  my $cmd  = '';
-  my $la   = '';
+  my $ok      = 0;
+  my $verb    = 4;
+  my $cmd     = '';
+  my $la      = '';
+  my $nexthop;
+  
+  $nexthop = delete $data{DbRep}{$name}{multicmd}{nexthop} if(defined $data{DbRep}{$name}{multicmd}{nexthop});
 
-  for my $k (sort{$a<=>$b} keys %{$data{DbRep}{$name}{multicmd}}) {
-      my $mcmd = delete $data{DbRep}{$name}{multicmd}{$k};
+  for my $k (sort{$a<=>$b} keys %{$data{DbRep}{$name}{multicmd}{cmdhash}}) {
+      my $mcmd = delete $data{DbRep}{$name}{multicmd}{cmdhash}{$k};
+      
+      if ($nexthop && $nexthop ne $k) {
+          if ($nexthop eq 'quit') {
+              Log3 ($name, $verb, "DbRep $name - nextHop is set to >$nexthop< -> Exit multiCmd");
+              delete $data{DbRep}{$name}{multicmd};
+              return;
+          }
+          
+          Log3 ($name, $verb, "DbRep $name - nextHop is set to >$nexthop< -> multiCmd index >$k< skipped");
+          next;
+      }
 
       for my $sa (@mattr) {
           next if(!defined $mcmd->{$sa});
@@ -13070,6 +13092,8 @@ sub DbRep_nextMultiCmd {
           $la   = "don't contain a valid command -> skip '$cmd'";
       }
 
+      delete $data{DbRep}{$name}{multicmd}{nexthop};                    # vor MC Ausführung {nexthop} löschen (wurde evtl. durch Attribut setzen definiert!)
+      
       Log3 ($name, $verb, "DbRep $name - multiCmd index >$k< $la");
 
       last;                                                             # immer nur den ersten verbliebenen Eintrag abarbeiten
@@ -13082,6 +13106,20 @@ sub DbRep_nextMultiCmd {
       DbRep_nextMultiCmd ($name);                                       # nächsten Eintrag abarbeiten falls Kommando ungültig
   }
 
+return;
+}
+
+###################################################################################
+#           nextHop für multiCmd speichern 
+###################################################################################
+sub DbRep_nextHop {
+  my $name = shift;
+  my $hop  = shift // return;
+
+  $data{DbRep}{$name}{multicmd}{nexthop} = $hop;
+  
+  Log3 ($name, 4, "DbRep $name - multiCmd nextHop was set by previous function: ".$data{DbRep}{$name}{multicmd}{nexthop});
+  
 return;
 }
 
@@ -15899,7 +15937,7 @@ return;
     hash.  <br>
     The commands to be executed (key <b>cmd</b>) and the attributes to be set for them are defined via keys in the
     transferred hash. The order in which the commands are processed is determined via the command index in the
-    hash.
+    hash which must not be '0'.
     <br><br>
 
     Attribute keys that can be defined in the hash are: <br>
@@ -15907,14 +15945,17 @@ return;
     <ul>
       <a href="#DbRep-attr-autoForward">autoForward</a>,
       <a href="#DbRep-attr-averageCalcForm">averageCalcForm</a>,
+      <a href="#DbRep-attr-device">device</a>,
+      <a href="#DbRep-attr-executeBeforeProc">executeBeforeProc</a>,
+      <a href="#DbRep-attr-executeAfterProc">executeAfterProc</a>,
+      <a href="#DbRep-attr-reading">reading</a>,
+      <a href="#DbRep-attr-reading">readingNameMap</a>,
       <a href="#DbRep-attr-timestamp_begin">timestamp_begin</a>,
       <a href="#DbRep-attr-timestamp_end">timestamp_end</a>,
       <a href="#DbRep-attr-timeDiffToNow">timeDiffToNow</a>,
       <a href="#DbRep-attr-timeOlderThan">timeOlderThan</a>,
       <a href="#DbRep-attr-timeYearPeriod">timeYearPeriod</a>,
-      <a href="#DbRep-attr-device">device</a>,
-      <a href="#DbRep-attr-reading">reading</a>,
-      <a href="#DbRep-attr-reading">readingNameMap</a>,
+      <a href="#DbRep-attr-userExitFn">userExitFn</a>,
     </ul>
     <br>
 
@@ -19015,7 +19056,7 @@ return;
     Hash enthält.  <br>
     Die auszuführenden Befehle (Schlüssel <b>cmd</b>) und die dafür zu setzenden Attribute werden über Schlüssel im
     übergebenen Hash definiert. Die Festlegung der Abarbeitungsreihenfolge der Befehle erfolgt über den Befehl-Index im
-    Hash.
+    Hash der nicht '0' sein darf.
     <br><br>
 
     Im Hash definierbare Attributschlüssel sind: <br>
@@ -19023,16 +19064,17 @@ return;
     <ul>
       <a href="#DbRep-attr-autoForward">autoForward</a>,
       <a href="#DbRep-attr-averageCalcForm">averageCalcForm</a>,
+      <a href="#DbRep-attr-device">device</a>,
       <a href="#DbRep-attr-executeBeforeProc">executeBeforeProc</a>,
       <a href="#DbRep-attr-executeAfterProc">executeAfterProc</a>,
+      <a href="#DbRep-attr-reading">reading</a>,
+      <a href="#DbRep-attr-reading">readingNameMap</a>,
       <a href="#DbRep-attr-timestamp_begin">timestamp_begin</a>,
       <a href="#DbRep-attr-timestamp_end">timestamp_end</a>,
       <a href="#DbRep-attr-timeDiffToNow">timeDiffToNow</a>,
       <a href="#DbRep-attr-timeOlderThan">timeOlderThan</a>,
       <a href="#DbRep-attr-timeYearPeriod">timeYearPeriod</a>,
-      <a href="#DbRep-attr-device">device</a>,
-      <a href="#DbRep-attr-reading">reading</a>,
-      <a href="#DbRep-attr-reading">readingNameMap</a>,
+      <a href="#DbRep-attr-userExitFn">userExitFn</a>,
     </ul>
     <br>
 
