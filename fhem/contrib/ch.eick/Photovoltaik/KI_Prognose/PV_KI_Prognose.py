@@ -240,13 +240,13 @@ while loop_date <= end_date:
         # Zu kleine Werte werden verworfen
         if (Prognose < 20):
             if (verbose >= 4):
-                print("Forecast value to smale")
+                print("Forecast value to smale : " + str(Prognose))
             Prognose = 0
 
         # Zu große Werte werden limitiert
         # Achtung, die yield Prognose Werte sind Angaben zum Ende der Stunde
         if (Prognose > 0):
-          timestamp = date+" %02d:00:00" % (dfhour_start['VALUE'].values[0]+loop_hour)
+          timestamp = date+" %02d:00:00" % (dfhour_start['VALUE'].values[0]+loop_hour-1)
           Limit = int(round(dfask.loc[dfask['TIMESTAMP'] == timestamp].yield_max.values[0],0))
           if (verbose >= 4):
             # Hier wird beim Anzeigen der Wert um eine Stunde vorher angezeigt

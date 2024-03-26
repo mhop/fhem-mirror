@@ -536,7 +536,7 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
      if (AttrVal("$SELF","verbose",0) >=3){                              ## (die Uhrzeiten wurden bereits durch Solar_forecast() im WR_1 Device eingetragen)\
        Log 3, "$SELF cmd_7  : Batterie SpeicherMiddayControlRunning vorbereitet";;\
        Log 3, "$SELF cmd_7  : Batterie Yield_fc0_middayhigh_start ".ReadingsVal("WR_ctl","Yield_fc0_middayhigh_start", "00:00")." gesetzt";;\
-       Log 3, "$SELF cmd_7  : Batterie Yield_fc0_middayhigh_stop  ".ReadingsVal("WR_ctl","Yield_fc0_middayhigh_stop ", "00:00")." gesetzt";;\
+       Log 3, "$SELF cmd_7  : Batterie Yield_fc0_middayhigh_stop  ".ReadingsVal("WR_ctl","Yield_fc0_middayhigh_stop" , "00:00")." gesetzt";;\
      };;\
    } else {                                                              ## Kein Mittagshoch\
      Log 3, "$SELF cmd_7  : SpeicherMiddayControl es wird kein Middayhigh geben";;\
