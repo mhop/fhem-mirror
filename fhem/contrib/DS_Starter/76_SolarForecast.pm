@@ -158,6 +158,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.17.1" => "27.03.2024  add AI to OpenMeteoDWD-API, changed AI train debuglog, new attr ctrlAIshiftTrainStart ". 
+                           "_specialActivities: split tasks to several time slots, bugfixes ".
+                           "AI: modify aiAddInstance, Customize pattern training data ".
+                           "add batteryTrigger to save plantconfig, valDecTree: more infos in get aiRuleStrings ",
   "1.17.0" => "24.03.2024  new DWD ICON API, change defmaxvar from 0.5 to 0.8, attr ctrlWeatherDev1 can select OpenMeteoDWD-API ",
   "1.16.8" => "16.03.2024  plantConfigCheck: adjust pvCorrectionFactor_Auto check, settings of forecastRefresh ".
                            "rename reading nextSolCastCall to nextRadiationAPICall ".
@@ -333,6 +337,7 @@ my $deflang        = 'EN';                                                      
 my @chours         = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten
 my $kJtokWh        = 0.0002777777778;                                               # Umrechnungsfaktor kJ in kWh
 my $kJtoWh         = 0.2777777778;                                                  # Umrechnungsfaktor kJ in Wh
+my $WhtokJ         = 3.6;                                                           # Umrechnungsfaktor Wh in kJ
 my $defmaxvar      = 0.8;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
 my $definterval    = 70;                                                            # Standard Abfrageintervall
 my $defslidenum    = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
@@ -365,7 +370,7 @@ my $aiAccLowLim    = 50;                                                        
 my $calcmaxd       = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
 my @dweattrmust    = qw(TTT Neff RR1c ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
 my @draattrmust    = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
-my $whistrepeat    = 900;                                                           # Wiederholungsintervall Cache File Daten schreiben
+my $whistrepeat    = 851;                                                           # Wiederholungsintervall Cache File Daten schreiben
 
 my $solapirepdef   = 3600;                                                          # default Abrufintervall SolCast API (s)
 my $forapirepdef   = 900;                                                           # default Abrufintervall ForecastSolar API (s)
@@ -460,6 +465,7 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                    modulePeakString
                    moduleDeclination
                    moduleRoofTops
+                   batteryTrigger
                    powerTrigger
                    energyH4Trigger
                  );
@@ -1072,6 +1078,7 @@ sub Initialize {
                                 "consumerAdviceIcon ".
                                 "consumerLink:0,1 ".
                                 "ctrlAIdataStorageDuration ".
+                                "ctrlAIshiftTrainStart:slider,1,1,23 ".
                                 "ctrlAutoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "ctrlAutoRefreshFW:$fwd ".
                                 "ctrlBackupFilesKeep ".
@@ -1204,7 +1211,7 @@ sub Define {
   singleUpdateState ( {hash => $hash, state => 'initialized', evt => 1} );
 
   $readyfnlist{$name} = $hash;                                                                           # Registrierung in Ready-Schleife
-  InternalTimer (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteCachefiles", $hash, 0); # Einstieg periodisches Schreiben historische Daten
+  InternalTimer (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteMemcache", $hash, 0);   # Einstieg periodisches Schreiben historische Daten
 
 return;
 }
@@ -1614,7 +1621,7 @@ sub _setroofIdentPair {                 ## no critic "not used"
   $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk}{rtid}   = $h->{rtid};
   $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk}{apikey} = $h->{apikey};
 
-  writeCacheToFile ($hash, "solcastapi", $scpicache.$name);                             # Cache File SolCast API Werte schreiben
+  writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                             # Cache File SolCast API Werte schreiben
 
   my $msg = qq{The Roof identification pair "$pk" has been saved. }.
             qq{Repeat the command if you want to save more Roof identification pairs.};
@@ -1663,7 +1670,7 @@ sub _setVictronCredentials {                 ## no critic "not used"
       $msg = qq{Credentials for the Victron VRM API has been saved.};
   }
 
-  writeCacheToFile ($hash, "solcastapi", $scpicache.$name);                             # Cache File SolCast API Werte schreiben
+  writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                             # Cache File SolCast API Werte schreiben
 
 return $msg;
 }
@@ -2357,7 +2364,7 @@ sub _setreset {                          ## no critic "not used"
           Log3($name, 3, qq{$name - roofIdentPair: all pair keys deleted});
       }
 
-      writeCacheToFile ($hash, "solcastapi", $scpicache.$name);                # Cache File SolCast API Werte schreiben
+      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                # Cache File SolCast API Werte schreiben
       return;
   }
 
@@ -2458,11 +2465,11 @@ sub _setoperatingMemory {                ## no critic "not used"
   my $prop  = $paref->{prop} // return qq{no operation specified for command};
 
   if ($prop eq 'save') {
-      periodicWriteCachefiles ($hash);                                         # Cache File für PV History, PV Circular schreiben
+      periodicWriteMemcache ($hash);                                           # Cache File für PV History, PV Circular schreiben
   }
 
   if ($prop eq 'backup') {
-      periodicWriteCachefiles ($hash, 'bckp');                                 # Backup Files erstellen und alte Versionen löschen
+      periodicWriteMemcache ($hash, 'bckp');                                   # Backup Files erstellen und alte Versionen löschen
   }
 
   if ($prop =~ /^recover-/xs) {                                                # Sicherung wiederherstellen
@@ -2800,7 +2807,7 @@ sub __solCast_ApiRequest {
   my $allstrings = $paref->{allstrings};                                # alle Strings
   my $debug      = $paref->{debug};
 
-  if(!$allstrings) {                                                    # alle Strings wurden abgerufen
+  if (!$allstrings) {                                                   # alle Strings wurden abgerufen
       writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);         # Cache File SolCast API Werte schreiben
       return;
   }
@@ -3555,8 +3562,7 @@ sub __getDWDSolarData {
 
       next if($fh == 24);
 
-      my $rad   = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');
-      my $radwh = sprintf "%.1f", ($rad * $kJtoWh);
+      my $rad = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                        # kJ/m2
 
       if ($runh == 12 && !$rad) {                                                             
           $ret = "The reading 'fc${fd}_${runh}_Rad1h' does not appear to be present or has an unusual value.\nRun 'set $name plantConfiguration check' for further information.";
@@ -3565,10 +3571,10 @@ sub __getDWDSolarData {
           debugLog ($paref, "apiCall", "DWD API - ERROR - got unusual data of starttime: $dateTime. ".$ret);
       }
       else {
-          debugLog ($paref, "apiCall", "DWD API - got data -> starttime: $dateTime, reading: fc${fd}_${runh}_Rad1h, rad: $rad kJ/m2 ($radwh Wh/m2)");
+          debugLog ($paref, "apiCall", "DWD API - got data -> starttime: $dateTime, reading: fc${fd}_${runh}_Rad1h, rad: $rad kJ/m2");
       }
       
-      $data{$type}{$name}{solcastapi}{'?All'}{$dateTime}{Rad1h} = $radwh;
+      $data{$type}{$name}{solcastapi}{'?All'}{$dateTime}{Rad1h} = sprintf "%.0f", $rad;
 
       for my $string (@strings) {                                                              # für jeden String der Config ..
           my $peak = $data{$type}{$name}{strings}{$string}{peak};                              # String Peak (kWp)
@@ -3577,7 +3583,7 @@ sub __getDWDSolarData {
           my $dir  = $data{$type}{$name}{strings}{$string}{dir};                               # Ausrichtung der Solarmodule
 
           my $af = $hff{$ta}{$dir} / 100;                                                      # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
-          my $pv = sprintf "%.1f", ($radwh / 1000 * $af * $peak * $prdef);                     # Rad wird in kW/m2 erwartet
+          my $pv = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $prdef);                   # Rad wird in kW/m2 erwartet
 
           debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $pv Wh");
 
@@ -3887,9 +3893,12 @@ sub __VictronVRM_ApiResponseForecast {
 
           my $k = 0;
           while ($jdata->{'records'}{'solar_yield_forecast'}[$k]) {
-              next if(ref $jdata->{'records'}{'solar_yield_forecast'}[$k] ne "ARRAY");                             # Forum: https://forum.fhem.de/index.php?msg=1288637
+              if (ref $jdata->{'records'}{'solar_yield_forecast'}[$k] ne "ARRAY") {             # Forum: https://forum.fhem.de/index.php?msg=1288637
+                  $k++;
+                  next;                             
+              }
 
-              my $starttmstr = $jdata->{'records'}{'solar_yield_forecast'}[$k][0];                                 # Millisekunden geliefert
+              my $starttmstr = $jdata->{'records'}{'solar_yield_forecast'}[$k][0];              # Millisekunden geliefert
               my $val        = $jdata->{'records'}{'solar_yield_forecast'}[$k][1];
               $starttmstr    = (timestampToTimestring ($starttmstr, $lang))[3];
 
@@ -3908,15 +3917,17 @@ sub __VictronVRM_ApiResponseForecast {
 
           $k = 0;
           while ($jdata->{'records'}{'vrm_consumption_fc'}[$k]) {
-              next if(ref $jdata->{'records'}{'vrm_consumption_fc'}[$k] ne "ARRAY");                             # Forum: https://forum.fhem.de/index.php?msg=1288637
+              if (ref $jdata->{'records'}{'vrm_consumption_fc'}[$k] ne "ARRAY") {              # Forum: https://forum.fhem.de/index.php?msg=1288637
+                  $k++;
+                  next;
+              }                  
 
-              my $starttmstr = $jdata->{'records'}{'vrm_consumption_fc'}[$k][0];                                 # Millisekunden geliefert
+              my $starttmstr = $jdata->{'records'}{'vrm_consumption_fc'}[$k][0];               # Millisekunden geliefert
               my $val        = $jdata->{'records'}{'vrm_consumption_fc'}[$k][1];
               $starttmstr    = (timestampToTimestring ($starttmstr, $lang))[3];
 
               if ($val) {
-                  $val = sprintf "%.2f", $val;
-
+                  $val       = sprintf "%.2f", $val;
                   my $string = ReadingsVal ($name, 'inverterStrings', '?');
 
                   $data{$type}{$name}{solcastapi}{$string.'_co'}{$starttmstr}{co_estimate} = $val;
@@ -4031,7 +4042,7 @@ sub __getopenMeteoDWDdata {
   }
 
   $paref->{allstrings} = ReadingsVal ($name, 'inverterStrings', '');
-  $paref->{timeres}    = $paref->{arg} ? $paref->{arg} : '60/15';
+  $paref->{submodel}   = $paref->{arg} ? $paref->{arg} : 'DWD ICON Seamless';
   $paref->{begin}      = 1;
 
   __openMeteoDWD_ApiRequest ($paref);
@@ -4071,7 +4082,7 @@ sub __openMeteoDWD_ApiRequest {
   my $debug      = $paref->{debug};
   my $lang       = $paref->{lang};
   my $t          = $paref->{t}       // int time;
-  my $timeres    = $paref->{timeres};                                        # Zeitauflösung für Request 15min / 60min
+  my $submodel   = $paref->{submodel};                                       # abzufragendes Wettermodell
 
   if (!$allstrings) {                                                        # alle Strings wurden abgerufen
       writeCacheToFile     ($hash, 'solcastapi', $scpicache.$name);          # Cache File API Werte schreiben
@@ -4094,10 +4105,15 @@ sub __openMeteoDWD_ApiRequest {
   my $tilt = StringVal ($hash, $string, 'tilt',   '<unknown>');
   my $az   = StringVal ($hash, $string, 'azimut', '<unknown>');
 
-  my $url = "https://api.open-meteo.com/v1/dwd-icon?".
-            "latitude=".$lat.
+  #my $url = "https://api.open-meteo.com/v1/dwd-icon?".
+  
+  my $url = "https://api.open-meteo.com/v1/forecast?";
+  $url   .= "models=icon_seamless" if($submodel eq 'DWD ICON Seamless');
+  $url   .= "models=best_match"    if($submodel eq 'Best Match');
+  $url   .= "&latitude=".$lat.
             "&longitude=".$lon.
             "&hourly=temperature_2m,rain,weather_code,cloud_cover,is_day,global_tilted_irradiance_instant".  
+            "&current=temperature_2m,weather_code,cloud_cover".
             "&minutely_15=global_tilted_irradiance".            
             "&daily=sunrise,sunset".
             "&forecast_hours=48".
@@ -4105,7 +4121,7 @@ sub __openMeteoDWD_ApiRequest {
             "&tilt=".$tilt.
             "&azimuth=".$az;
 
-  debugLog ($paref, 'apiCall', qq{Open-Meteo DWD ICON API Call - Request for PV-String "$string" with Time resolution >$timeres<:\n$url});
+  debugLog ($paref, 'apiCall', qq{Open-Meteo DWD ICON API Call - Request for PV-String "$string" with weather model >$submodel<:\n$url});
 
   my $caller = (caller(0))[3];                                                                        # Rücksprungmarke
 
@@ -4117,7 +4133,7 @@ sub __openMeteoDWD_ApiRequest {
       type       => $paref->{type},
       debug      => $debug,
       header     => 'Accept: application/json',
-      timeres    => $timeres,
+      submodel   => $submodel,
       begin      => $paref->{begin},
       caller     => \&$caller,
       stc        => [gettimeofday],
@@ -4171,7 +4187,7 @@ sub __openMeteoDWD_ApiResponse {
   my $stc         = $paref->{stc};                                                                                             # Startzeit API Abruf
   my $lang        = $paref->{lang};
   my $debug       = $paref->{debug};
-  my $timeres     = $paref->{timeres};
+  my $submodel    = $paref->{submodel};
 
   my $t       = int time;
   my $sta     = [gettimeofday];                           # Start Response Verarbeitung 
@@ -4221,7 +4237,7 @@ sub __openMeteoDWD_ApiResponse {
       # reason: <Grund>
 
       if ($jdata->{'error'}) {
-          $msg = "Open-Meteo DWD ICON API server ERROR response: $jdata->{'reason'}";
+          $msg = "Open-Meteo DWD ICON API server ERROR response: ".$jdata->{'reason'};
 
           Log3 ($name, 3, "$name - $msg");
 
@@ -4247,7 +4263,25 @@ sub __openMeteoDWD_ApiResponse {
       my $refts = timestringToTimestamp ($date.' 00:00:00');                                      # Referenztimestring
       my $peak  = StringVal ($hash, $string, 'peak', 0);                                          # String Peak (kWp)
       $peak    *= 1000;                                                                           # kWp in Wp
-      my $k     = 0;
+           
+      ## Akt. Werte
+      #################
+      ($err, my $curstr) = timestringUTCtoLocal ($name, $jdata->{current}{time}, '%Y-%m-%dT%H:%M');
+ 
+      if ($err) {
+          $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
+          Log3 ($name, 1, "$name - $msg");
+          singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
+          return;
+      } 
+      
+      my $curwid = $jdata->{current}{weather_code};
+      my $curwcc = $jdata->{current}{cloud_cover};
+      my $curtmp = $jdata->{current}{temperature_2m};                      
+      
+      ## Stundenwerte
+      #################
+      my $k = 0;
       
       while ($jdata->{hourly}{time}[$k]) {           
           ($err, my $otmstr) = timestringUTCtoLocal ($name, $jdata->{hourly}{time}[$k], '%Y-%m-%dT%H:%M');
@@ -4262,25 +4296,35 @@ sub __openMeteoDWD_ApiResponse {
           my $ots     = timestringToTimestamp  ($otmstr);
           my $pvtmstr = (timestampToTimestring ($ots-3600))[0];                                 # Strahlung wird als Durchschnitt der !vorangegangenen! Stunde geliefert!
           
-          next if(timestringToTimestamp($pvtmstr) < $refts);                                    # Daten älter als akt. Tag 00:00:00 verwerfen
+          if (timestringToTimestamp($pvtmstr) < $refts) {
+              $k++;
+              next;                                                                             # Daten älter als akt. Tag 00:00:00 verwerfen
+          }
           
           my $rad1wh  = $jdata->{hourly}{global_tilted_irradiance_instant}[$k];                 # Wh/m2
-          my $pv      = sprintf "%.1f", ($rad1wh / 1000 * $peak * $prdef);                      # Rad wird in kWh/m2 erwartet
+          my $rad     = 10 * (sprintf "%.0f", ($rad1wh * $WhtokJ) / 10);                        # Umrechnung Wh/m2 in kJ/m2 -> 
+          my $pv      = sprintf "%.2f", int ($rad1wh / 1000 * $peak * $prdef);                  # Rad wird in kWh/m2 erwartet
           my $don     = $jdata->{hourly}{is_day}[$k];
           my $temp    = $jdata->{hourly}{temperature_2m}[$k];
           my $rain    = $jdata->{hourly}{rain}[$k];                                             # Regen in Millimeter = kg/m2
           my $wid     = ($don ? 0 : 100) + $jdata->{hourly}{weather_code}[$k];
           my $wcc     = $jdata->{hourly}{cloud_cover}[$k];
           
-          $k++;
+          if ($k == 0) { $curwid = ($don ? 0 : 100) +  $curwid }
           
           if ($debug =~ /apiProcess/xs) {
-              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - Rad1h: $rad1wh, PV estimate: $pv Wh");
-              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - Neff: $wcc");
+              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - Rad1Wh: $rad1wh, Rad1kJ: $rad, PV est: $pv Wh");
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - RR1c: $rain");
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - DoN: $don");
-              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - WeatherID: $wid");
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - Temp: $temp");
+              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - Weather Code: $wid");
+              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - Cloud Cover: $wcc");
+              
+              if ($k == 0) {
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - current Temp: $curtmp");
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $curstr - current Weather Code: $curwid");
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $curstr - current Cloud Cover: $curwcc");
+              }
           }              
                      
           $data{$type}{$name}{solcastapi}{$string}{$pvtmstr}{pv_estimate50} = $pv;              # Startstunde verschieben
@@ -4288,20 +4332,31 @@ sub __openMeteoDWD_ApiResponse {
           my $fwtg = formatWeatherTimestrg ($pvtmstr);
           
           if ($paref->{begin}) {                                                                # im ersten Call den DS löschen -> dann Aufsummierung
-              delete $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{Rad1h};
+              delete $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h};
           }
           
-          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{Rad1h} += $rad1wh;                     # Startstunde verschieben, Rad Werte aller Strings addieren
-          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{rr1c}   = $rain;                       # Startstunde verschieben
-          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{neff}   = $wcc;                        # Startstunde verschieben          
+          $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h} += $rad;                     # Startstunde verschieben, Rad Werte aller Strings addieren
+          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{rr1c}      = $rain;                    # Startstunde verschieben
           
           $fwtg = formatWeatherTimestrg ($otmstr);
           
-          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{don} = $don;
-          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ww}  = $wid;                        
-          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ttt} = $temp;
+          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{don}        = $don;
+          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{neff}       = $wcc;             
+          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ww}         = $wid;
+          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ttt}        = $temp;
+          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{UpdateTime} = $rt;
+          
+          if ($k == 0) {
+              $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{neff} = $curwcc;
+              $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ww}   = $curwid;
+              $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ttt}  = $curtmp;
+          }
+          
+          $k++;
       }
       
+      ## Tageswerte
+      ###############
       $k = 0;
       
       while ($jdata->{daily}{time}[$k]) { 
@@ -4328,7 +4383,7 @@ sub __openMeteoDWD_ApiResponse {
           }
           
           $k++;
-      }
+      }      
   }
   
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
@@ -4341,7 +4396,7 @@ sub __openMeteoDWD_ApiResponse {
       type       => $type,
       debug      => $debug,
       allstrings => $allstrings,
-      timeres    => $timeres,
+      submodel   => $submodel,
       lang       => $lang
   };
 
@@ -4874,16 +4929,22 @@ sub __getaiRuleStrings {                 ## no critic "not used"
   }
 
   my $rs = 'no rules delivered';
-  my @rsl;
+  my (@rsl, $nodes, $depth);
 
-  eval { @rsl = $dtree->rule_statements()
+  eval { @rsl   = $dtree->rule_statements();                          # Returns a list of strings that describe the tree in rule-form
+         $nodes = $dtree->nodes();                                    # Returns the number of nodes in the trained decision tree
+         $depth = $dtree->depth();                                    # Returns the depth of the tree. This is the maximum number of decisions that would need to be made to classify an unseen instance, i.e. the length of the longest path from the tree's root to a leaf.
+         1;
        }
        or do { return $@;
              };
 
   if (@rsl) {
       my $l = scalar @rsl;
-      $rs   = "<b>Number of rules: ".$l."</b>";
+      $rs   = "<b>Number of Rules: $l / Number of Nodes: $nodes / Depth: $depth</b>\n";
+      $rs  .= "Rules: List of strings that describe the tree in rule-form\n";
+      $rs  .= "Nodes: Number of nodes in the trained decision tree\n";
+      $rs  .= "Depth: Maximum number of decisions that would need to be made a classification";
       $rs  .= "\n\n";
       $rs  .= join "\n", @rsl;
   }
@@ -5589,10 +5650,10 @@ sub Shutdown {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  writeCacheToFile ($hash, "pvhist",      $pvhcache.$name);             # Cache File für PV History schreiben
-  writeCacheToFile ($hash, "circular",    $pvccache.$name);             # Cache File für PV Circular schreiben
-  writeCacheToFile ($hash, "consumers",   $csmcache.$name);             # Cache File Consumer schreiben
-  writeCacheToFile ($hash, "solcastapi", $scpicache.$name);             # Cache File SolCast API Werte schreiben
+  writeCacheToFile ($hash, 'pvhist',      $pvhcache.$name);             # Cache File für PV History schreiben
+  writeCacheToFile ($hash, 'circular',    $pvccache.$name);             # Cache File für PV Circular schreiben
+  writeCacheToFile ($hash, 'consumers',   $csmcache.$name);             # Cache File Consumer schreiben
+  writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);             # Cache File SolCast API Werte schreiben
 
 return;
 }
@@ -5667,22 +5728,27 @@ return;
 }
 
 ################################################################
-#        Timer für Cache File Daten schreiben
+#        Timer schreiben Memory Struktur in File
 ################################################################
-sub periodicWriteCachefiles {
+sub periodicWriteMemcache {
   my $hash = shift;
   my $bckp = shift // '';
 
   my $name = $hash->{NAME};
 
-  RemoveInternalTimer ($hash, "FHEM::SolarForecast::periodicWriteCachefiles");
-  InternalTimer       (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteCachefiles", $hash, 0);
+  RemoveInternalTimer ($hash, "FHEM::SolarForecast::periodicWriteMemcache");
+  InternalTimer       (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteMemcache", $hash, 0);
 
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
 
-  writeCacheToFile ($hash, "circular", $pvccache.$name);                      # Cache File PV Circular schreiben
-  writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);                      # Cache File PV History schreiben
+  writeCacheToFile ($hash, 'circular',   $pvccache.$name);                    # Cache File PV Circular schreiben
+  writeCacheToFile ($hash, 'pvhist',     $pvhcache.$name);                    # Cache File PV History schreiben
+  writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                   # Cache File SolCast API Werte schreiben
+  
+  $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." whole Operating Memory";
+  
+  Log3 ($name, 4, "$name - The working memory >circular pvhist solcastapi< has been saved to persistance");
 
   if ($bckp) {
       my $tstr = (timestampToTimestring (0))[2];
@@ -6062,6 +6128,25 @@ sub centralTask {
       deleteReadingspec ($hash, 'nextSolCastCall');
   }
     
+  if (keys %{$data{$type}{$name}{aidectree}{airaw}}) {                                          # 27.03.2024
+      for my $idx (sort keys %{$data{$type}{$name}{aidectree}{airaw}}) {
+          my $val = AiRawdataVal ($hash, $idx, 'rad1h', undef);
+          
+          if (!defined $val) {
+              delete $data{$type}{$name}{aidectree}{airaw}{$idx};
+              $val = 'aaaaaaaaaa';
+          }
+          
+          if ($val =~ /\.[0-9]{1}$/xs) {
+              delete $data{$type}{$name}{aidectree}{airaw}{$idx};
+          }
+
+          if ($val =~ /\.00$/xs) {
+              my $renv = int $val;
+              $data{$type}{$name}{aidectree}{airaw}{$idx}{rad1h} = $renv;
+          }        
+      }
+  }
   #######################################################################################################################
 
   return if(!$init_done);
@@ -6353,8 +6438,7 @@ return ($interval, $disabled, $inactive);
 }
 
 ################################################################
-#     Zusätzliche Readings/ Events für Logging generieren und
-#     Sonderaufgaben !
+#                       Sonderaufgaben !
 ################################################################
 sub _specialActivities {
   my $paref  = shift;
@@ -6400,12 +6484,17 @@ sub _specialActivities {
 
   ## bestimmte einmalige Aktionen
   ##################################
-  $chour  = int $chour;
-  $minute = int $minute;
+  $chour    = int $chour;
+  $minute   = int $minute;
+  my $aitrh = AttrVal ($name, 'ctrlAIshiftTrainStart', 1);                                                        # Stunde f. Start AI-Training
   
-  if ($chour == 0 && $minute >= 1) {                           
-      if (!defined $hash->{HELPER}{H00M1DONE}) {
-          $hash->{HELPER}{H00M1DONE} = 1;
+  ## Task 1
+  ###########
+  if ($chour == 0 && $minute >= 0) {                           
+      if (!defined $hash->{HELPER}{T1RUN}) {
+          $hash->{HELPER}{T1RUN} = 1;
+          
+          Log3 ($name, 4, "$name - Daily special tasks - Task 1 started");
           
           $date = strftime "%Y-%m-%d", localtime($t-7200);                                   # Vortag (2 h Differenz reichen aus)
           $ts   = $date." 23:59:59";
@@ -6419,8 +6508,6 @@ sub _specialActivities {
           $gcon = ReadingsNum ($name, "Today_Hour24_GridConsumption", 0);
           storeReading ('LastHourGridconsumptionReal', "$gcon Wh", $ts);
 
-          writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                           # Anlagenkonfiguration sichern
-
           deleteReadingspec ($hash, "Today_Hour.*_Grid.*");
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
           deleteReadingspec ($hash, "Today_Hour.*_Bat.*");
@@ -6432,8 +6519,6 @@ sub _specialActivities {
           for my $wdr (@widgetreadings) {                                                     # Array der Hilfsreadings (Attributspeicher) löschen
               deleteReadingspec ($hash, $wdr);
           }
-
-          __deleteHiddenReadings ($paref);                                                    # verstecktes Steuerungsreading löschen
 
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
@@ -6459,8 +6544,25 @@ sub _specialActivities {
           delete $data{$type}{$name}{circular}{'99'}{tdayDvtn};
 
           delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag aus History löschen
-          Log3 ($name, 3, qq{$name - history day "$day" deleted});
-
+          
+          writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                         # Anlagenkonfiguration sichern
+          
+          Log3 ($name, 3, "$name - history day >$day< deleted");      
+          Log3 ($name, 4, "$name - Daily special tasks - Task 1 finished");
+      }
+  } 
+  else {
+      delete $hash->{HELPER}{T1RUN};
+  }
+      
+  ## Task 2
+  ###########      
+  if ($chour == 0 && $minute >= 2) {                           
+      if (!defined $hash->{HELPER}{T2RUN}) {
+          $hash->{HELPER}{T2RUN} = 1;          
+          
+          Log3 ($name, 4, "$name - Daily special tasks - Task 2 started");
+          
           for my $c (keys %{$data{$type}{$name}{consumers}}) {                              # Planungsdaten regulär löschen
               next if(ConsumerVal ($hash, $c, "plandelete", "regular") ne "regular");
 
@@ -6472,22 +6574,71 @@ sub _specialActivities {
           }
 
           writeCacheToFile ($hash, "consumers", $csmcache.$name);                           # Cache File Consumer schreiben
+          
+          Log3 ($name, 4, "$name - Daily special tasks - Task 2 finished");
+      }
+  } 
+  else {
+      delete $hash->{HELPER}{T2RUN};
+  }          
+       
+  ## Task 3
+  ###########       
+  if ($chour == 0 && $minute >= 5) {                           
+      if (!defined $hash->{HELPER}{T3RUN}) {
+          $hash->{HELPER}{T3RUN} = 1;    
 
+          Log3 ($name, 4, "$name - Daily special tasks - Task 3 started");
+          
           __createAdditionalEvents ($paref);                                                # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
-          __delObsoleteAPIData     ($paref);                                                # Bereinigung obsoleter Daten im solcastapi Hash
-          aiDelRawData             ($paref);                                                # KI Raw Daten löschen welche die maximale Haltezeit überschritten haben
+          __delObsoleteAPIData     ($paref);                                                # Bereinigung obsoleter Daten im solcastapi Hash          
+      
+          Log3 ($name, 4, "$name - Daily special tasks - Task 3 finished");
+      }
+  } 
+  else {
+      delete $hash->{HELPER}{T3RUN};
+  }          
+  
+  ## Task 4
+  ###########       
+  if ($chour == 1 && $minute >= 9) {                           
+      if (!defined $hash->{HELPER}{T4RUN}) {
+          $hash->{HELPER}{T4RUN} = 1;    
+
+          Log3 ($name, 4, "$name - Daily special tasks - Task 4 started");
+          
+          __deleteHiddenReadings ($paref);                                                  # verstecktes Steuerungsreading löschen
+          periodicWriteMemcache  ($hash, 'bckp');                                           # Backup Files erstellen und alte Versionen löschen
+          
+          Log3 ($name, 4, "$name - Daily special tasks - Task 4 finished");
+      }
+  } 
+  else {
+      delete $hash->{HELPER}{T4RUN};
+  } 
+     
+  ## Task 5
+  ###########     
+  if ($chour == $aitrh && $minute >= 15) {                           
+      if (!defined $hash->{HELPER}{T5RUN}) {
+          $hash->{HELPER}{T5RUN} = 1;    
+          
+          Log3 ($name, 4, "$name - Daily special tasks - Task 5 started");
+          
+          aiDelRawData ($paref);                                                            # KI Raw Daten löschen welche die maximale Haltezeit überschritten haben
 
           $paref->{taa} = 1;
           aiAddInstance ($paref);                                                           # AI füllen, trainieren und sichern
           delete $paref->{taa};
-
-          periodicWriteCachefiles ($hash, 'bckp');                                          # Backup Files erstellen und alte Versionen löschen
+      
+          Log3 ($name, 4, "$name - Daily special tasks - Task 5 finished");
       }
-  }
+  } 
   else {
-      delete $hash->{HELPER}{H00M1DONE};
-  }
-
+      delete $hash->{HELPER}{T5RUN};
+  }        
+          
 return;
 }
 
@@ -6562,8 +6713,6 @@ sub __delObsoleteAPIData {
       delete $data{$type}{$name}{solcastapi}{'?All'}{$idx} if($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs);             
   }
 
-  writeCacheToFile ($hash, "solcastapi", $scpicache.$name);                            # Cache File SolCast API Werte schreiben
-
   my @as = split ",", ReadingsVal($name, 'inverterStrings', '');
   return if(!scalar @as);
 
@@ -6572,6 +6721,7 @@ sub __delObsoleteAPIData {
       next if($k ~~ @as);
 
       delete $data{$type}{$name}{strings}{$k};
+      
       Log3 ($name, 2, "$name - obsolete PV-String >$k< was deleted from Strings-Hash");
   }
 
@@ -10026,8 +10176,6 @@ sub calcValueImproves {
       readingsSingleUpdate ($hash, '.pvCorrectionFactor_Auto_Soll', 'off', 0);
   }
 
-  Log3 ($name, 4, "$name - INFO - The correction factors are now calculated and stored proactively independent of the autocorrection usage");
-
   $paref->{acu} = $acu;
   $paref->{aln} = $aln;
 
@@ -13423,13 +13571,12 @@ sub finishTrain {
   my $hash  = $defs{$name};
   my $type  = $hash->{TYPE};
 
-  delete($hash->{HELPER}{AIBLOCKRUNNING}) if(defined $hash->{HELPER}{AIBLOCKRUNNING});
-
   my $aicanuse       = $paref->{aicanuse};
   my $aiinitstate    = $paref->{aiinitstate};
   my $aitrainstate   = $paref->{aitrainstate};
   my $runTimeTrainAI = $paref->{runTimeTrainAI};
 
+  $data{$type}{$name}{current}{aiAddedToTrain}      = 0;
   $data{$type}{$name}{current}{aicanuse}            = $aicanuse       if(defined $aicanuse);
   $data{$type}{$name}{current}{aiinitstate}         = $aiinitstate    if(defined $aiinitstate);
   $data{$type}{$name}{circular}{99}{runTimeTrainAI} = $runTimeTrainAI if(defined $runTimeTrainAI);  # !! in Circular speichern um zu persistieren, setTimeTracking speichert zunächst in Current !!
@@ -13444,7 +13591,13 @@ sub finishTrain {
                       }
                      );
   }
-
+  
+  $paref->{debug} = getDebug ($hash);
+  if (defined $hash->{HELPER}{AIBLOCKRUNNING}) {
+      debugLog ($paref, 'aiProcess', qq{AI Training BlockingCall PID "$hash->{HELPER}{AIBLOCKRUNNING}{pid}" finished});
+      delete($hash->{HELPER}{AIBLOCKRUNNING});
+  }
+   
 return;
 }
 
@@ -13461,7 +13614,8 @@ sub abortTrain {
 
   delete($hash->{HELPER}{AIBLOCKRUNNING});
 
-  $data{$type}{$name}{current}{aitrainstate} = 'Traing (Child) process timed out';
+  $data{$type}{$name}{current}{aitrainstate}   = 'Traing (Child) process timed out';
+  $data{$type}{$name}{current}{aiAddedToTrain} = 0;
 
 return;
 }
@@ -13479,14 +13633,11 @@ sub aiAddInstance {                   ## no critic "not used"
 
   return if(!isPrepared4AI ($hash));
 
-  my $err;
+  my $err = aiInit ($paref);
+  return if($err);
   my $dtree = AiDetreeVal ($hash, 'object', undef);
-
-  if (!$dtree) {
-      $err = aiInit ($paref);
-      return if($err);
-      $dtree = AiDetreeVal ($hash, 'object', undef);
-  }
+  
+  $data{$type}{$name}{current}{aiAddedToTrain} = 0;
 
   for my $idx (sort keys %{$data{$type}{$name}{aidectree}{airaw}}) {
       next if(!$idx);
@@ -13513,15 +13664,20 @@ sub aiAddInstance {                   ## no critic "not used"
                                                    hod    => $hod
                                                  },
                                                  result => $pvrl
-                                  )
+                                  );
+             1;
            }
            or do { Log3 ($name, 1, "$name - aiAddInstance ERROR: $@");
                    $data{$type}{$name}{current}{aiaddistate} = $@;
                    return;
                  };
-
-      debugLog ($paref, 'aiProcess', qq{AI Instance added - hod: $hod, sunalt: $sunalt, rad1h: $rad1h, pvrl: $pvrl, wcc: $wcc, rr1c: $rr1c, temp: $temp});
+      
+      $data{$type}{$name}{current}{aiAddedToTrain}++;
+      
+      debugLog ($paref, 'aiProcess', qq{AI Instance added $idx - hod: $hod, sunalt: $sunalt, rad1h: $rad1h, pvrl: $pvrl, wcc: $wcc, rr1c: $rr1c, temp: $temp}, 4);
   }
+  
+  debugLog ($paref, 'aiProcess', "AI Instance add - ".$data{$type}{$name}{current}{aiAddedToTrain}." entities added for training ".(AttrVal ($name, 'verbose', 3) != 4 ? '(set verbose 4 for output more detail)' : ''));
 
   $data{$type}{$name}{aidectree}{object}    = $dtree;
   $data{$type}{$name}{current}{aiaddistate} = 'ok';
@@ -13543,31 +13699,24 @@ sub aiTrain {                            ## no critic "not used"
   my $type  = $paref->{type};
   my $block = $paref->{block} // 0;
 
-  my $serial;
+  my ($serial, $err);
 
   if (!isPrepared4AI ($hash)) {
-      my $err = CurrentVal ($hash, 'aicanuse', '');
+      $err    = CurrentVal ($hash, 'aicanuse', '');
       $serial = encode_base64 (Serialize ( {name => $name, aicanuse => $err} ), "");
       $block ? return ($serial) : return \&finishTrain ($serial);
   }
 
-  my $cst = [gettimeofday];                                           # Zyklus-Startzeit
-
-  my $err;
+  my $cst   = [gettimeofday];                                           # Zyklus-Startzeit
   my $dtree = AiDetreeVal ($hash, 'object', undef);
-
+   
   if (!$dtree) {
-      $err = aiInit ($paref);
-
-      if ($err) {
-          $serial = encode_base64 (Serialize ( {name => $name, aiinitstate => $err} ), "");
-          $block ? return ($serial) : return \&finishTrain ($serial);
-      }
-
-      $dtree = AiDetreeVal ($hash, 'object', undef);
+      $serial = encode_base64 (Serialize ( {name => $name, aiinitstate => 'no AI::DecisionTree object present'} ), "");
+      $block ? return ($serial) : return \&finishTrain ($serial);
   }
 
-  eval { $dtree->train
+  eval { $dtree->train();
+         1;
        }
        or do { Log3 ($name, 1, "$name - aiTrain ERROR: $@");
                $data{$type}{$name}{current}{aitrainstate} = $@;
@@ -13579,7 +13728,7 @@ sub aiTrain {                            ## no critic "not used"
   $err                                      = writeCacheToFile ($hash, 'aitrained', $aitrained.$name);
 
   if (!$err) {
-      debugLog ($paref, 'aiProcess', qq{AI trained number of entities: }. scalar keys %{$data{$type}{$name}{aidectree}{aitrained}});
+      debugLog ($paref, 'aiProcess', qq{AI trained number of entities: }. $data{$type}{$name}{current}{aiAddedToTrain});
       debugLog ($paref, 'aiProcess', qq{AI trained and saved data into file: }.$aitrained.$name);
       debugLog ($paref, 'aiProcess', qq{Training instances and their associated information where purged from the AI object});
       $data{$type}{$name}{current}{aitrainstate} = 'ok';
@@ -13803,7 +13952,8 @@ sub aiAddRawData {
 
   delete $data{$type}{$name}{current}{aitrawstate};
 
-  my ($err, $dosave);
+  my $err;
+  my $dosave = 0;
 
   for my $pvd (sort keys %{$data{$type}{$name}{pvhist}}) {
       next if(!$pvd);
@@ -13851,18 +14001,20 @@ sub aiAddRawData {
           $data{$type}{$name}{aidectree}{airaw}{$ridx}{sunalt} = $sabin;
           $data{$type}{$name}{aidectree}{airaw}{$ridx}{sunaz}  = $sunaz;
 
-          $dosave = 1;
+          $dosave++;
 
-          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, rr1c: $rr1c, temp: $tbin");
+          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, rr1c: $rr1c, temp: $tbin", 4);
       }
   }
+  
+  debugLog ($paref, 'aiProcess', "AI raw add - $dosave entities added to raw data pool ".(AttrVal ($name, 'verbose', 3) != 4 ? '(set verbose 4 for output more detail)' : ''));
 
   if ($dosave) {
       $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
 
       if (!$err) {
           $data{$type}{$name}{current}{aitrawstate} = 'ok';
-          debugLog ($paref, 'aiProcess', qq{AI raw data saved into file: }.$airaw.$name);
+          debugLog ($paref, 'aiProcess', "AI raw data saved into file: ".$airaw.$name);
       }
   }
 
@@ -14571,8 +14723,8 @@ sub checkPlantConfig {
       my $ret;
 
       for my $key (sort keys %{$data{$type}{$name}{strings}{$string}}) {
-          $ret    .= ", " if($ret);
-          $ret    .= $key.": ".$data{$type}{$name}{strings}{$string}{$key};
+          $ret .= ", " if($ret);
+          $ret .= $key.": ".$data{$type}{$name}{strings}{$string}{$key};
       }
 
       return $ret;
@@ -15330,15 +15482,16 @@ return;
 #  erstellt einen Debug-Eintrag im Log
 ################################################################
 sub debugLog {
-  my $paref = shift;
-  my $dreg  = shift;                       # Regex zum Vergleich
-  my $dmsg  = shift;                       # auszugebender Meldungstext
+  my $paref   = shift;
+  my $dreg    = shift;                       # Regex zum Vergleich
+  my $dmsg    = shift;                       # auszugebender Meldungstext
+  my $verbose = shift // 1;
 
   my $name  = $paref->{name};
   my $debug = $paref->{debug};
 
   if ($debug =~ /$dreg/x) {
-      Log3 ($name, 1, "$name DEBUG> $dmsg");
+      Log3 ($name, $verbose, "$name DEBUG> $dmsg");
   }
 
 return;
@@ -15531,14 +15684,14 @@ sub isPrepared4AI {
 
   my $err;
 
-  if(!isDWDUsed ($hash)) {
-      $err = qq(The selected SolarForecast model cannot use AI support);
+  if (!isDWDUsed($hash) && !isOpenMeteoUsed($hash)) {
+      $err = qq(The selected SolarForecast Model cannot use AI support);
   }
   elsif ($aidtabs) {
       $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "sudo apt-get install libai-decisiontree-perl" for AI support);
   }
   elsif ($full && $acu !~ /ai/xs) {
-      $err = 'The setting of pvCorrectionFactor_Auto does not contain AI support';
+      $err = "Set pvCorrectionFactor_Auto to '<any>_ai' for switch on AI support";
   }
 
   if ($err) {
@@ -15560,7 +15713,7 @@ sub isConsumerPhysOn {
   my $c    = shift;
   my $name = $hash->{NAME};
 
-my ($cname, $dswname) = getCDnames ($hash, $c);                          # Consumer und Switch Device Name
+  my ($cname, $dswname) = getCDnames ($hash, $c);                          # Consumer und Switch Device Name
 
   if(!$defs{$dswname}) {
       Log3($name, 1, qq{$name - ERROR - the device "$dswname" is invalid. Please check device names in consumer "$c" attribute});
@@ -16033,31 +16186,6 @@ sub isOpenMeteoUsed {
 return $ret;
 }
 
-#####################################################################
-#    Prüft ob das in ctrlWeatherDevX 
-#    übergebene Weather Device valide ist
-#    return - $valid -> ist die Angabe valide (1)
-#             $apiu  -> wird ein Device oder API verwendet
-#####################################################################
-sub isWeatherDevValid {
-  my $hash = shift;
-  my $wdev = shift;
-  
-  my $valid  = '';
-  my $apiu   = '';
-  my $fcname = AttrVal ($hash->{NAME}, $wdev, '');                                            # Weather Forecast Device
-
-  if ($fcname) { $valid = 1  }
-  if (!$defs{$fcname} || $defs{$fcname}{TYPE} ne "DWD_OpenData") { $valid = '' }      
-  
- if (isOpenMeteoUsed($hash) && $fcname =~ /OpenMeteoDWD-API/xs) {
-     $valid = 1;
-     $apiu  = 'OpenMeteoDWD-API';
- }
-  
-return ($valid, $fcname, $apiu);
-}
-
 ################################################################
 #       welche PV Autokorrektur wird verwendet ?
 #       Standard bei nur "on" -> on_simple
@@ -16107,6 +16235,31 @@ sub isSunPath {
   }
 
 return $is;
+}
+
+#####################################################################
+#    Prüft ob das in ctrlWeatherDevX 
+#    übergebene Weather Device valide ist
+#    return - $valid -> ist die Angabe valide (1)
+#             $apiu  -> wird ein Device oder API verwendet
+#####################################################################
+sub isWeatherDevValid {
+  my $hash = shift;
+  my $wdev = shift;
+  
+  my $valid  = '';
+  my $apiu   = '';
+  my $fcname = AttrVal ($hash->{NAME}, $wdev, '');                                            # Weather Forecast Device
+
+  if ($fcname) { $valid = 1  }
+  if (!$defs{$fcname} || $defs{$fcname}{TYPE} ne "DWD_OpenData") { $valid = '' }      
+  
+ if (isOpenMeteoUsed($hash) && $fcname =~ /OpenMeteoDWD-API/xs) {
+     $valid = 1;
+     $apiu  = 'OpenMeteoDWD-API';
+ }
+  
+return ($valid, $fcname, $apiu);
 }
 
 ###################################################################
@@ -18335,7 +18488,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>currentAPIinterval</b>        </td><td>the currently used API retrieval interval in seconds                                       </td></tr>
             <tr><td> <b>lastretrieval_time</b>        </td><td>Time of the last API call                                                                  </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>   </td><td>Unix timestamp of the last API call                                                        </td></tr>
-            <tr><td> <b>Rad1h</b>                     </td><td>if available, expected global irradiation (GI) or global tilted irradiation (GTI) in Wh/m2 </td></tr>
+            <tr><td> <b>Rad1h</b>                     </td><td>if available, expected Global Irradiation (GI) or Global tilted Irradiation (GTI) in kJ/m2 </td></tr>
             <tr><td> <b>pv_estimate</b>               </td><td>expected PV generation (Wh)                                                                </td></tr>
             <tr><td> <b>KI-based_co</b>               </td><td>expected Energy consumption (Wh)                                                           </td></tr>
             <tr><td> <b>todayDoneAPIrequests</b>      </td><td>Number of executed API requests on the current day                                         </td></tr>
@@ -18677,9 +18830,19 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-ctrlAIdataStorageDuration"></a>
        <li><b>ctrlAIdataStorageDuration &lt;Tage&gt;</b> <br>
-         If the corresponding prerequisites are met, training data is collected and stored for the module-internal AI.
-         Data that has exceeded the specified holding period (days) is deleted.  <br>
+         If the corresponding prerequisites are met, training data is collected and stored for the 
+         module-internal AI. <br>
+         The data is deleted when it has exceeded the specified holding period (days).<br>
          (default: 1095)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-ctrlAIshiftTrainStart"></a>
+       <li><b>ctrlAIshiftTrainStart &lt;1...23&gt;</b> <br>
+         Daily training takes place when using the internal AI.<br>
+         Training starts 15 minutes after the hour specified in the attribute. <br>
+         For example, with a set value of '3', training would start at around 03:15. <br>
+         (default: 1)
        </li>
        <br>
 
@@ -20500,7 +20663,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>currentAPIinterval</b>        </td><td>das aktuell verwendete API Abrufintervall in Sekunden                                           </td></tr>
             <tr><td> <b>lastretrieval_time</b>        </td><td>Zeit des letzten API Abrufs                                                                     </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>   </td><td>Unix Timestamp des letzten API Abrufs                                                           </td></tr>
-            <tr><td> <b>Rad1h</b>                     </td><td>wenn vorhanden, erwartete Globalstrahlung (GI) bzw. globale Schräglagenstrahlung (GTI) in Wh/m2 </td></tr>
+            <tr><td> <b>Rad1h</b>                     </td><td>wenn vorhanden, erwartete Globalstrahlung (GI) bzw. globale Schräglagenstrahlung (GTI) in kJ/m2 </td></tr>
             <tr><td> <b>pv_estimate</b>               </td><td>erwartete PV Erzeugung (Wh)                                                                     </td></tr>
             <tr><td> <b>KI-based_co</b>               </td><td>erwarteter Energieverbrauch (Wh)                                                                </td></tr>
             <tr><td> <b>todayDoneAPIrequests</b>      </td><td>Anzahl der ausgeführten API Requests am aktuellen Tag                                           </td></tr>
@@ -20842,8 +21005,18 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-ctrlAIdataStorageDuration"></a>
        <li><b>ctrlAIdataStorageDuration &lt;Tage&gt;</b> <br>
          Sind die entsprechenden Voraussetzungen gegeben, werden Trainingsdaten für die modulinterne KI gesammelt und
-         gespeichert. Daten welche die angegebene Haltedauer (Tage) überschritten haben, werden gelöscht.  <br>
+         gespeichert. <br>
+         Die Daten werden gelöscht wenn sie die angegebene Haltedauer (Tage) überschritten haben.<br>
          (default: 1095)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-ctrlAIshiftTrainStart"></a>
+       <li><b>ctrlAIshiftTrainStart &lt;1...23&gt;</b> <br>
+         Bei Nutzung der internen KI erfolgt ein tägliches Training.<br>
+         Der Start des Trainings erfolgt 15 Minuten nach der im Attribut festgelegten vollen Stunde. <br>
+         Zum Beispiel würde bei einem eingestellten Wert von '3' das Traning ca. 03:15 Uhr starten. <br>
+         (default: 1)
        </li>
        <br>
 
