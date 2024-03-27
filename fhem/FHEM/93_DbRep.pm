@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.10" => "27.03.2024  multicmd: add attr seqDoubletsVariance ",            
   "8.53.9"  => "18.03.2024  multicmd: add nextHop Keyword ",
   "8.53.8"  => "17.03.2024  sqlCmdBlocking able to use sql Keywords (§timestamp_end§ etc.) ",
   "8.53.7"  => "16.03.2024  prevent some attribute evaluation as long as init_done is not set ",
@@ -13042,6 +13043,7 @@ sub DbRep_nextMultiCmd {
                  device
                  reading
                  readingNameMap
+                 seqDoubletsVariance
                  userExitFn
                  optimizeTablesBeforeDump
                 );
@@ -15950,6 +15952,7 @@ return;
       <a href="#DbRep-attr-executeAfterProc">executeAfterProc</a>,
       <a href="#DbRep-attr-reading">reading</a>,
       <a href="#DbRep-attr-reading">readingNameMap</a>,
+      <a href="#DbRep-attr-seqDoubletsVariance">seqDoubletsVariance</a>,
       <a href="#DbRep-attr-timestamp_begin">timestamp_begin</a>,
       <a href="#DbRep-attr-timestamp_end">timestamp_end</a>,
       <a href="#DbRep-attr-timeDiffToNow">timeDiffToNow</a>,
@@ -15958,6 +15961,10 @@ return;
       <a href="#DbRep-attr-userExitFn">userExitFn</a>,
     </ul>
     <br>
+    
+    <b>Note:</b> All of the above attributes are deleted before each command index is executed. <br>
+    The attributes specified in the respective command index are set before the step is executed.
+    <br><br> 
 
     <b>Example of the definition of a command hash: </b> <br>
 
@@ -19069,6 +19076,7 @@ return;
       <a href="#DbRep-attr-executeAfterProc">executeAfterProc</a>,
       <a href="#DbRep-attr-reading">reading</a>,
       <a href="#DbRep-attr-reading">readingNameMap</a>,
+      <a href="#DbRep-attr-seqDoubletsVariance">seqDoubletsVariance</a>,
       <a href="#DbRep-attr-timestamp_begin">timestamp_begin</a>,
       <a href="#DbRep-attr-timestamp_end">timestamp_end</a>,
       <a href="#DbRep-attr-timeDiffToNow">timeDiffToNow</a>,
@@ -19077,6 +19085,10 @@ return;
       <a href="#DbRep-attr-userExitFn">userExitFn</a>,
     </ul>
     <br>
+    
+    <b>Hinweis:</b> Alle oben genannten Attribute werden vor Ausführung jedes Befehl-Index gelöscht. <br>
+    Die im jeweiligen Befehl-Index angegebenen Attribute werden vor Ausführung des Schrittes definiert gesetzt.
+    <br><br>    
 
     <b>Beispiel für die Definition eines Befehl-Hashes: </b> <br>
 
