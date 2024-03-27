@@ -6486,7 +6486,7 @@ sub _specialActivities {
   ##################################
   $chour    = int $chour;
   $minute   = int $minute;
-  my $aitrh = AttrVal ($name, 'ctrlAIshiftTrainStart', 1);                                                        # Stunde f. Start AI-Training
+  my $aitrh = AttrVal ($name, 'ctrlAIshiftTrainStart', 1);                                   # Stunde f. Start AI-Training
   
   ## Task 1
   ###########
@@ -18043,7 +18043,7 @@ to ensure that the system configuration is correct.
       <br><br>
       
       <b>Model OpenMeteoDWDAPI:</b> <br>
-      Die empfohlene Autokorrekturmethode ist <b>on_complex</b>.
+      The recommended autocorrection method is <b>on_complex</b> or <b>on_complex_ai</b>.
       <br><br>
 
       <b>Model SolCastAPI:</b> <br>
@@ -20217,7 +20217,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <br><br>
       
       <b>Model OpenMeteoDWDAPI:</b> <br>
-      Die empfohlene Autokorrekturmethode ist <b>on_complex</b>.
+      Die empfohlene Autokorrekturmethode ist <b>on_complex</b> bzw. <b>on_complex_ai</b>.
       <br><br>
 
       <b>Model SolCastAPI:</b> <br>
