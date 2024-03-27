@@ -562,9 +562,9 @@ at_ultimo(;$$$)
           on the last day of month.</br>
           at_ultimo() can take additional parameters to specify an other time
           on this day<br/>
-          <code>define at_ultimo at *{at_ultimo(12,23,45)} set lamp1
+          <code>define at_ultimo at *{at_ultimo(12,34,56)} set lamp1
           off</code><br/>
-          This will create an at device which will be executed ad 12:34:45
+          This will create an at device which will be executed at 12:34:56
           on the last day of month.<br/>
       </li>
     </ul>
@@ -767,9 +767,9 @@ at_ultimo(;$$$)
           Monats um 23:59:00 Uhr ausgeführt wird.<br/>
           at_ultimo() kann drei optionale Parameter verarbeiten, um eine andere
           Uhrzeit anzugeben.<br/>
-          <code>define at_ultimo at *{at_ultimo(12,23,45)} set lamp1
+          <code>define at_ultimo at *{at_ultimo(12,34,56)} set lamp1
           off</code><br/>
-          Es wird ein at device erzeugt, das immer um 12:34:45 am Monatsletzten
+          Es wird ein at device erzeugt, das immer um 12:34:56 am Monatsletzten
           ausgeführt wird.<br/>
       </li>
     </ul>
