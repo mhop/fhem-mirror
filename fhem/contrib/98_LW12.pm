@@ -39,7 +39,7 @@
 package main;
 use strict;
 use warnings;
-use feature qw/say switch/;
+use experimental qw/say switch/;
  
 use IO::Socket;
 # include this for the self-calling timer we use later on
