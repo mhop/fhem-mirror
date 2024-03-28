@@ -158,7 +158,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.17.1" => "27.03.2024  add AI to OpenMeteoDWD-API, changed AI train debuglog, new attr ctrlAIshiftTrainStart ". 
+  "1.17.2" => "28.03.2024  aiTrain: better status info, limit ctrlWeatherDev2/3 to can only use DWD Devices ".
+                           "integrate OpenMeteoWorld-API with the 'Best match' Weather model ",
+  "1.17.1" => "27.03.2024  add AI to OpenMeteoDWD-API, changed AI train debuglog, new attr ctrlAIshiftTrainStart ".
                            "_specialActivities: split tasks to several time slots, bugfixes ".
                            "AI: modify aiAddInstance, Customize pattern training data ".
                            "add batteryTrigger to save plantconfig, valDecTree: more infos in get aiRuleStrings ",
@@ -486,15 +488,15 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
                    graphicBeam1MaxVal graphicEnergyUnit graphicHeaderOwnspec graphicHeaderOwnspecValForm
                    graphicHeaderDetail graphicHeaderShow graphicHistoryHour graphicHourCount graphicHourStyle
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
-                   graphicSpaceSize graphicStartHtml graphicEndHtml graphicWeatherColor graphicWeatherColorNight             
+                   graphicSpaceSize graphicStartHtml graphicEndHtml graphicWeatherColor graphicWeatherColorNight
                  );
-  
+
                   for my $cinit (1..$maxconsumer) {                             # Anlagenkonfiguration: add Consumer Attribute
                       $cinit    = sprintf "%02d", $cinit;
                       my $consumer = "consumer${cinit}";
                       push @aconfigs, $consumer;
-                  }                 
-         
+                  }
+
 my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select|bitfield|widgetList|colorpicker';
 
 # Steuerhashes
@@ -762,7 +764,7 @@ my %htitles = (                                                                 
   predtime => { EN => qq{Prediction time Radiation data:},
                 DE => qq{Vorhersagezeitpunkt Strahlungsdaten:}                                                     },
   dwdtime  => { EN => qq{Forecast time Weather data},
-                DE => qq{Vorhersagezeitpunkt Wetterdaten}                                                          }, 
+                DE => qq{Vorhersagezeitpunkt Wetterdaten}                                                          },
   upd      => { EN => qq{Click for update},
                 DE => qq{Klick f&#252;r Update}                                                                    },
   on       => { EN => qq{switched on},
@@ -995,10 +997,10 @@ my %hcsr = (                                                                    
 # storname = Name des Elements in der pvHistory
 # nhour = evtl. abweichend von $nhour
 # fpar = Parameter zur spezifischen Verwendung
-my %hfspvh = (                                                                                                  
-  radiation         => { fn => \&_storeVal, storname => 'rad1h',        validkey => undef,    fpar => undef    },    # irradiation  
-  DoN               => { fn => \&_storeVal, storname => 'DoN',          validkey => undef,    fpar => undef    },    # Tag 1 oder Nacht 0    
-  batmaxsoc         => { fn => \&_storeVal, storname => 'batmaxsoc',    validkey => undef,    fpar => undef    },    # max. erreichter SOC des Tages  
+my %hfspvh = (
+  radiation         => { fn => \&_storeVal, storname => 'rad1h',        validkey => undef,    fpar => undef    },    # irradiation
+  DoN               => { fn => \&_storeVal, storname => 'DoN',          validkey => undef,    fpar => undef    },    # Tag 1 oder Nacht 0
+  batmaxsoc         => { fn => \&_storeVal, storname => 'batmaxsoc',    validkey => undef,    fpar => undef    },    # max. erreichter SOC des Tages
   batsetsoc         => { fn => \&_storeVal, storname => 'batsetsoc',    validkey => undef,    fpar => undef    },    # optimaler SOC für den Tag
   sunaz             => { fn => \&_storeVal, storname => 'sunaz',        validkey => undef,    fpar => undef    },    # Sonnenstand Azimuth
   sunalt            => { fn => \&_storeVal, storname => 'sunalt',       validkey => undef,    fpar => undef    },    # Sonnenstand Altitude
@@ -1269,12 +1271,12 @@ sub _readCacheFile {
 
       return;
   }
-  
+
   if ($cachename eq 'plantconfig') {
       my ($err, $plantcfg) = fileRetrieve ($file);
       return $err if($err);
       my ($nr, $na);
-      
+
       if ($plantcfg) {
           ($nr, $na) = _restorePlantConfig ($hash, $plantcfg);
           Log3 ($name, 3, qq{$name - cached data "$title" restored. Number of restored Readings/Attributes: $nr/$na});
@@ -1339,12 +1341,13 @@ sub Set {
              );
   my $resets = join ",",@re;
 
-  my @fcdevs = qw( OpenMeteoDWD-API 
-                   SolCast-API 
-                   ForecastSolar-API 
+  my @fcdevs = qw( OpenMeteoDWD-API
+                   OpenMeteoWorld-API
+                   SolCast-API
+                   ForecastSolar-API
                    VictronKI-API
                  );
-                 
+
   push @fcdevs, devspec2array ("TYPE=DWD_OpenData");
 
   my $rdd = join ",", @fcdevs;
@@ -1553,28 +1556,31 @@ sub _setcurrentRadiationAPI {              ## no critic "not used"
   if ($prop !~ /-API$/x && (!$defs{$prop} || $defs{$prop}{TYPE} ne "DWD_OpenData")) {
       return qq{The device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};
   }
+
+  my $awdev1 = AttrVal ($name, 'ctrlWeatherDev1', '');
   
-  if ($prop ne 'OpenMeteoDWD-API' && AttrVal ($name, 'ctrlWeatherDev1', '') eq 'OpenMeteoDWD-API') {
-      return "The attribute 'ctrlWeatherDev1' is set to 'OpenMeteoDWD-API'. \n".
+  if (($awdev1 eq 'OpenMeteoDWD-API'   && $prop ne 'OpenMeteoDWD-API')   || 
+      ($awdev1 eq 'OpenMeteoWorld-API' && $prop ne 'OpenMeteoWorld-API')) {
+      return "The attribute 'ctrlWeatherDev1' is set to '$awdev1'. \n".
              "Change that attribute to another weather device first if you want use an other API.";
   }
 
-  if ($prop =~ /(SolCast|OpenMeteoDWD)-API/xs) {
+  if ($prop =~ /(SolCast|OpenMeteoDWD|OpenMeteoWorld)-API/xs) {
       return "The library FHEM::Utility::CTZ is missing. Please update FHEM completely." if($ctzAbsent);
 
       my $rmf = reqModFail();
       return "You have to install the required perl module: ".$rmf if($rmf);
   }
-  
+
   readingsSingleUpdate ($hash, "currentRadiationAPI", $prop, 1);
   createAssociatedWith ($hash);
   writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);                      # Anlagenkonfiguration File schreiben
   setModel             ($hash);                                                      # Model setzen
   deleteReadingspec    ($hash, 'nextRadiationAPICall');
-  
+
   return if(_checkSetupNotComplete ($hash));                                         # keine Stringkonfiguration wenn Setup noch nicht komplett
 
-  if ($prop =~ /(ForecastSolar|OpenMeteoDWD)-API/xs) {
+  if ($prop =~ /(ForecastSolar|OpenMeteoDWD|OpenMeteoWorld)-API/xs) {
       my ($set, $lat, $lon, $elev) = locCoordinates();
       return qq{set attributes 'latitude' and 'longitude' in global device first} if(!$set);
 
@@ -1806,15 +1812,15 @@ sub _setmeterDevice {                    ## no critic "not used"
   if ($h->{gcon} eq "-gfeedin" && $h->{gfeedin} eq "-gcon") {
       return qq{Incorrect input. It is not allowed that the keys gcon and gfeedin refer to each other.};
   }
-  
+
   if ($h->{conprice}) {
       my ($gcp,$gcpcucy) = split ":", $h->{conprice};
       return qq{Incorrect input for key 'conprice'. Please consider the commandref.} if(!$gcp || !$gcpcucy);
   }
-  
+
   if ($h->{feedprice}) {
-      my ($gfr,$gfrcucy) = split ":", $h->{feedprice};   
-      return qq{Incorrect input for key 'feedprice'. Please consider the commandref.} if(!$gfr || !$gfrcucy);      
+      my ($gfr,$gfrcucy) = split ":", $h->{feedprice};
+      return qq{Incorrect input for key 'feedprice'. Please consider the commandref.} if(!$gfr || !$gfrcucy);
   }
 
   ## alte Speicherwerte löschen
@@ -2075,7 +2081,7 @@ sub _setplantConfiguration {             ## no critic "not used"
 
   if ($arg eq "save") {
       ($err, $nr, $na) = writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);             # Anlagenkonfiguration fileStore schreiben
-      
+
       if ($err) {
           return $err;
       }
@@ -2083,20 +2089,20 @@ sub _setplantConfiguration {             ## no critic "not used"
           return qq{Plant Configuration has been written to file "$plantcfg.$name". Number of saved Readings/Attributes: $nr/$na};
       }
   }
-  
-  if ($arg eq "restore") {      
-      $paref->{file}      = $plantcfg.$name;                                                                
+
+  if ($arg eq "restore") {
+      $paref->{file}      = $plantcfg.$name;
       $paref->{cachename} = 'plantconfig';
       $paref->{title}     = 'Plant Configuration';
       ($err, $nr, $na)    = _readCacheFile ($paref);
-      
+
       if (!$err) {
           if ($nr || $na) {
               return qq{Plant Configuration restored from file "$plantcfg.$name". Number of restored Readings/Attributes: $nr/$na};
           }
           else {
               return qq{The Plant Configuration file "}.$plantcfg.$name.qq{" was empty, nothing restored};
-          }         
+          }
       }
       else {
           return $err;
@@ -2690,8 +2696,8 @@ sub _getRoofTopData {
       my $ret = __getVictronSolarData ($paref);
       return $ret;
   }
-  elsif ($hash->{MODEL} eq 'OpenMeteoDWDAPI') {
-      my $ret = __getopenMeteoDWDdata ($paref);
+  elsif ($hash->{MODEL} =~ /^OpenMeteo/xs) {
+      my $ret = __getopenMeteoData ($paref);
       return $ret;
   }
 
@@ -2964,7 +2970,7 @@ sub __solCast_ApiResponse {
 
       $perc = q{} if($perc == 50);
       my $k = 0;
-      
+
       while ($jdata->{'forecasts'}[$k]) {                                                                # vorhandene Startzeiten Schlüssel im SolCast API Hash löschen
           my $petstr          = $jdata->{'forecasts'}[$k]{'period_end'};
           ($err, $starttmstr) = ___convPendToPstart ($name, $lang, $petstr);
@@ -3226,7 +3232,7 @@ sub __forecastSolar_ApiRequest {
 
   if (!$allstrings) {                                                                  # alle Strings wurden abgerufen
       writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                        # Cache File API Werte schreiben
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1; 
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1;
       return;
   }
 
@@ -3564,7 +3570,7 @@ sub __getDWDSolarData {
 
       my $rad = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                        # kJ/m2
 
-      if ($runh == 12 && !$rad) {                                                             
+      if ($runh == 12 && !$rad) {
           $ret = "The reading 'fc${fd}_${runh}_Rad1h' does not appear to be present or has an unusual value.\nRun 'set $name plantConfiguration check' for further information.";
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $ret;
 
@@ -3573,7 +3579,7 @@ sub __getDWDSolarData {
       else {
           debugLog ($paref, "apiCall", "DWD API - got data -> starttime: $dateTime, reading: fc${fd}_${runh}_Rad1h, rad: $rad kJ/m2");
       }
-      
+
       $data{$type}{$name}{solcastapi}{'?All'}{$dateTime}{Rad1h} = sprintf "%.0f", $rad;
 
       for my $string (@strings) {                                                              # für jeden String der Config ..
@@ -3895,7 +3901,7 @@ sub __VictronVRM_ApiResponseForecast {
           while ($jdata->{'records'}{'solar_yield_forecast'}[$k]) {
               if (ref $jdata->{'records'}{'solar_yield_forecast'}[$k] ne "ARRAY") {             # Forum: https://forum.fhem.de/index.php?msg=1288637
                   $k++;
-                  next;                             
+                  next;
               }
 
               my $starttmstr = $jdata->{'records'}{'solar_yield_forecast'}[$k][0];              # Millisekunden geliefert
@@ -3920,7 +3926,7 @@ sub __VictronVRM_ApiResponseForecast {
               if (ref $jdata->{'records'}{'vrm_consumption_fc'}[$k] ne "ARRAY") {              # Forum: https://forum.fhem.de/index.php?msg=1288637
                   $k++;
                   next;
-              }                  
+              }
 
               my $starttmstr = $jdata->{'records'}{'vrm_consumption_fc'}[$k][0];               # Millisekunden geliefert
               my $val        = $jdata->{'records'}{'vrm_consumption_fc'}[$k][1];
@@ -4022,9 +4028,9 @@ return;
 }
 
 ################################################################################################
-#             Abruf Open-Meteo DWD ICON API data
+#             Abruf Open-Meteo API Daten
 ################################################################################################
-sub __getopenMeteoDWDdata {
+sub __getopenMeteoData {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -4041,9 +4047,15 @@ sub __getopenMeteoDWDdata {
       }
   }
 
+  my $submodel         = InternalVal ($hash->{NAME}, 'MODEL', '');
   $paref->{allstrings} = ReadingsVal ($name, 'inverterStrings', '');
-  $paref->{submodel}   = $paref->{arg} ? $paref->{arg} : 'DWD ICON Seamless';
-  $paref->{begin}      = 1;
+  $paref->{submodel}   = $submodel eq 'OpenMeteoDWDAPI'   ? 'DWD ICON Seamless' : 
+                         $submodel eq 'OpenMeteoWorldAPI' ? 'World Best Match'  :  
+                         'unknown';
+                         
+  return "The Weather Model '$submodel' is not a valid Open-Meteo Weather Model" if($paref->{submodel} eq 'unknown'); 
+                     
+  $paref->{begin} = 1;
 
   __openMeteoDWD_ApiRequest ($paref);
 
@@ -4064,12 +4076,12 @@ return;
 #  weather_code   - Wetterlage als numerischer Code. Befolgen Sie die WMO-Wetterinterpretationscodes.
 #  cloud_cover    - Gesamtbewölkung als Flächenanteil (%)
 #  is_day         - Tag oder Nacht
-#  timeformat     - Wenn das Format unixtime gewählt wird, werden alle Zeitwerte in UNIX-Epochenzeit in Sekunden 
+#  timeformat     - Wenn das Format unixtime gewählt wird, werden alle Zeitwerte in UNIX-Epochenzeit in Sekunden
 #                   zurückgegeben. Bitte beachten Sie, dass alle Zeitstempel in GMT+0 sind!
-#  global_tilted_irradiance_instant - Gesamte Strahlung, die auf eine geneigte Scheibe fällt, als Durchschnitt der 
-#  (GTI)                              vorangegangenen Stunde. 
-#                                     Die Berechnung erfolgt unter der Annahme einer festen Albedo von 20% und eines 
-#                                     isotropen Himmels. (in W/m²) 
+#  global_tilted_irradiance_instant - Gesamte Strahlung, die auf eine geneigte Scheibe fällt, als Durchschnitt der
+#  (GTI)                              vorangegangenen Stunde.
+#                                     Die Berechnung erfolgt unter der Annahme einer festen Albedo von 20% und eines
+#                                     isotropen Himmels. (in W/m²)
 #  timezone       - If auto is set as a time zone, the coordinates will be automatically resolved to the local time zone.
 #
 ########################################################################################################################
@@ -4085,15 +4097,14 @@ sub __openMeteoDWD_ApiRequest {
   my $submodel   = $paref->{submodel};                                       # abzufragendes Wettermodell
 
   if (!$allstrings) {                                                        # alle Strings wurden abgerufen
-      writeCacheToFile     ($hash, 'solcastapi', $scpicache.$name);          # Cache File API Werte schreiben
+      writeCacheToFile     ($hash, 'solcastapi', $scpicache.$name);          
       readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $ometeorepdef, $lang))[0], 1);
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1;
       return;
   }
 
   my $string;
-  ($string, $allstrings) = split ",", $allstrings, 2;
-
+  ($string, $allstrings)       = split ",", $allstrings, 2;
   my ($set, $lat, $lon, $elev) = locCoordinates();
 
   if (!$set) {
@@ -4105,23 +4116,21 @@ sub __openMeteoDWD_ApiRequest {
   my $tilt = StringVal ($hash, $string, 'tilt',   '<unknown>');
   my $az   = StringVal ($hash, $string, 'azimut', '<unknown>');
 
-  #my $url = "https://api.open-meteo.com/v1/dwd-icon?".
-  
   my $url = "https://api.open-meteo.com/v1/forecast?";
   $url   .= "models=icon_seamless" if($submodel eq 'DWD ICON Seamless');
-  $url   .= "models=best_match"    if($submodel eq 'Best Match');
+  $url   .= "models=best_match"    if($submodel eq 'World Best Match');
   $url   .= "&latitude=".$lat.
             "&longitude=".$lon.
-            "&hourly=temperature_2m,rain,weather_code,cloud_cover,is_day,global_tilted_irradiance_instant".  
+            "&hourly=temperature_2m,rain,weather_code,cloud_cover,is_day,global_tilted_irradiance_instant".
             "&current=temperature_2m,weather_code,cloud_cover".
-            "&minutely_15=global_tilted_irradiance".            
+            "&minutely_15=global_tilted_irradiance".
             "&daily=sunrise,sunset".
             "&forecast_hours=48".
             "&forecast_days=2".
             "&tilt=".$tilt.
             "&azimuth=".$az;
 
-  debugLog ($paref, 'apiCall', qq{Open-Meteo DWD ICON API Call - Request for PV-String "$string" with weather model >$submodel<:\n$url});
+  debugLog ($paref, 'apiCall', qq{Open-Meteo API Call - Request for PV-String "$string" with Weather Model >$submodel<:\n$url});
 
   my $caller = (caller(0))[3];                                                                        # Rücksprungmarke
 
@@ -4190,10 +4199,10 @@ sub __openMeteoDWD_ApiResponse {
   my $submodel    = $paref->{submodel};
 
   my $t       = int time;
-  my $sta     = [gettimeofday];                           # Start Response Verarbeitung 
+  my $sta     = [gettimeofday];                           # Start Response Verarbeitung
   $paref->{t} = $t;
 
-  my $msg;                                                                                         
+  my $msg;
 
   if ($err ne "") {
       $msg = 'Open-Meteo DWD ICON API server response: '.$err;
@@ -4226,11 +4235,11 @@ sub __openMeteoDWD_ApiResponse {
       my $rt    = (timestampToTimestring ($t, $lang))[3];
       my $jdata = decode_json ($myjson);
 
-      # debugLog ($paref, 'apiProcess', qq{Open-Meteo DWD ICON API Call - response for string "$string":\n}. Dumper $jdata);
-      
+      # debugLog ($paref, 'apiProcess', qq{Open-Meteo API Call - response for string "$string":\n}. Dumper $jdata);
+
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = $rt;                                                    # letzte Abrufzeit
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                   # letzter Abrufzeitstempel
-      
+
       ## bei Fehler in API intern kommt
       ###################################
       # error:	true
@@ -4249,69 +4258,69 @@ sub __openMeteoDWD_ApiResponse {
 
           return;
       }
-                                                           
+
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1;
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}   = 'success';
 
       if ($debug =~ /apiCall/xs) {
-          Log3 ($name, 1, qq{$name DEBUG> Open-Meteo DWD ICON API Call - server response for PV string "$string"});
-          Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API Call - request time: ".$rt." ($t)");
-          Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API Call - status: success");
+          Log3 ($name, 1, qq{$name DEBUG> Open-Meteo API Call - server response for PV string "$string"});
+          Log3 ($name, 1, "$name DEBUG> Open-Meteo API Call - request time: ".$rt." ($t)");
+          Log3 ($name, 1, "$name DEBUG> Open-Meteo API Call - status: success");
       }
-      
-      my $date  = strftime "%Y-%m-%d", localtime(time); 
+
+      my $date  = strftime "%Y-%m-%d", localtime(time);
       my $refts = timestringToTimestamp ($date.' 00:00:00');                                      # Referenztimestring
       my $peak  = StringVal ($hash, $string, 'peak', 0);                                          # String Peak (kWp)
       $peak    *= 1000;                                                                           # kWp in Wp
-           
+
       ## Akt. Werte
       #################
       ($err, my $curstr) = timestringUTCtoLocal ($name, $jdata->{current}{time}, '%Y-%m-%dT%H:%M');
- 
+
       if ($err) {
           $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
           Log3 ($name, 1, "$name - $msg");
           singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
           return;
-      } 
-      
+      }
+
       my $curwid = $jdata->{current}{weather_code};
       my $curwcc = $jdata->{current}{cloud_cover};
-      my $curtmp = $jdata->{current}{temperature_2m};                      
-      
+      my $curtmp = $jdata->{current}{temperature_2m};
+
       ## Stundenwerte
       #################
       my $k = 0;
-      
-      while ($jdata->{hourly}{time}[$k]) {           
+
+      while ($jdata->{hourly}{time}[$k]) {
           ($err, my $otmstr) = timestringUTCtoLocal ($name, $jdata->{hourly}{time}[$k], '%Y-%m-%dT%H:%M');
-          
+
           if ($err) {
               $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
               Log3 ($name, 1, "$name - $msg");
               singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
               return;
           }
-          
+
           my $ots     = timestringToTimestamp  ($otmstr);
           my $pvtmstr = (timestampToTimestring ($ots-3600))[0];                                 # Strahlung wird als Durchschnitt der !vorangegangenen! Stunde geliefert!
-          
+
           if (timestringToTimestamp($pvtmstr) < $refts) {
               $k++;
               next;                                                                             # Daten älter als akt. Tag 00:00:00 verwerfen
           }
-          
+
           my $rad1wh  = $jdata->{hourly}{global_tilted_irradiance_instant}[$k];                 # Wh/m2
-          my $rad     = 10 * (sprintf "%.0f", ($rad1wh * $WhtokJ) / 10);                        # Umrechnung Wh/m2 in kJ/m2 -> 
+          my $rad     = 10 * (sprintf "%.0f", ($rad1wh * $WhtokJ) / 10);                        # Umrechnung Wh/m2 in kJ/m2 ->
           my $pv      = sprintf "%.2f", int ($rad1wh / 1000 * $peak * $prdef);                  # Rad wird in kWh/m2 erwartet
           my $don     = $jdata->{hourly}{is_day}[$k];
           my $temp    = $jdata->{hourly}{temperature_2m}[$k];
           my $rain    = $jdata->{hourly}{rain}[$k];                                             # Regen in Millimeter = kg/m2
           my $wid     = ($don ? 0 : 100) + $jdata->{hourly}{weather_code}[$k];
           my $wcc     = $jdata->{hourly}{cloud_cover}[$k];
-          
+
           if ($k == 0) { $curwid = ($don ? 0 : 100) +  $curwid }
-          
+
           if ($debug =~ /apiProcess/xs) {
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - Rad1Wh: $rad1wh, Rad1kJ: $rad, PV est: $pv Wh");
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - RR1c: $rain");
@@ -4319,73 +4328,73 @@ sub __openMeteoDWD_ApiResponse {
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - Temp: $temp");
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - Weather Code: $wid");
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - Cloud Cover: $wcc");
-              
+
               if ($k == 0) {
                   Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - current Temp: $curtmp");
                   Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $curstr - current Weather Code: $curwid");
                   Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $curstr - current Cloud Cover: $curwcc");
               }
-          }              
-                     
+          }
+
           $data{$type}{$name}{solcastapi}{$string}{$pvtmstr}{pv_estimate50} = $pv;              # Startstunde verschieben
-             
+
           my $fwtg = formatWeatherTimestrg ($pvtmstr);
-          
+
           if ($paref->{begin}) {                                                                # im ersten Call den DS löschen -> dann Aufsummierung
               delete $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h};
           }
-          
+
           $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h} += $rad;                     # Startstunde verschieben, Rad Werte aller Strings addieren
           $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{rr1c}      = $rain;                    # Startstunde verschieben
-          
+
           $fwtg = formatWeatherTimestrg ($otmstr);
-          
+
           $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{don}        = $don;
-          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{neff}       = $wcc;             
+          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{neff}       = $wcc;
           $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ww}         = $wid;
           $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ttt}        = $temp;
           $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{UpdateTime} = $rt;
-          
+
           if ($k == 0) {
               $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{neff} = $curwcc;
               $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ww}   = $curwid;
               $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ttt}  = $curtmp;
           }
-          
+
           $k++;
       }
-      
+
       ## Tageswerte
       ###############
       $k = 0;
-      
-      while ($jdata->{daily}{time}[$k]) { 
+
+      while ($jdata->{daily}{time}[$k]) {
           my $oday = $jdata->{daily}{time}[$k];
-          
+
           ($err, my $sunrise) = timestringUTCtoLocal ($name, $jdata->{daily}{sunrise}[$k], '%Y-%m-%dT%H:%M');
           ($err, my $sunset)  = timestringUTCtoLocal ($name, $jdata->{daily}{sunset}[$k],  '%Y-%m-%dT%H:%M');
-          
+
           if ($err) {
               $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
               Log3 ($name, 1, "$name - $msg");
               singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
               return;
           }
-          
+
           if ($k == 0) {
               $data{$type}{$name}{solcastapi}{'?All'}{sunrise}{today} = $sunrise;
               $data{$type}{$name}{solcastapi}{'?All'}{sunset}{today}  = $sunset;
           }
-          
+
           if ($k == 1) {
               $data{$type}{$name}{solcastapi}{'?All'}{sunrise}{tomorrow} = $sunrise;
               $data{$type}{$name}{solcastapi}{'?All'}{sunset}{tomorrow}  = $sunset;
           }
-          
+
           $k++;
-      }      
+      }
   }
-  
+
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
 
   Log3 ($name, 4, qq{$name - Open-Meteo DWD ICON API answer received for string "$string"});
@@ -5493,24 +5502,39 @@ sub _attrWeatherDev {                    ## no critic "not used"
   return if(!$init_done);
 
   if ($paref->{cmd} eq 'set' ) {
-      if ($aVal ne 'OpenMeteoDWD-API' && (!$defs{$aVal} || $defs{$aVal}{TYPE} ne "DWD_OpenData")) {
+      if ($aVal !~ /^OpenMeteo/xs && (!$defs{$aVal} || $defs{$aVal}{TYPE} ne "DWD_OpenData")) {
           return qq{The device "$aVal" doesn't exist or has no TYPE 'DWD_OpenData'};
       }
-      
-      if ($aVal eq 'OpenMeteoDWD-API') {
+
+      if ($aVal =~ /^OpenMeteo/xs) {
           if ($aName ne 'ctrlWeatherDev1') {
-              return qq{Only the leading attribute 'ctrlWeatherDev1' can set to 'OpenMeteoDWD-API'};
+              return qq{Only the leading attribute 'ctrlWeatherDev1' can set to '$aVal'};
           }
-          
-          CommandSet (undef,"$name currentRadiationAPI $aVal");                     # automatisch currentRadiationAPI setzen
+
+          #CommandSet (undef, "$name currentRadiationAPI $aVal");                         # automatisch currentRadiationAPI setzen wenn ctrlWeatherDev1
+          InternalTimer (gettimeofday()+1, 'FHEM::SolarForecast::__setRadAPIdelayed', $hash, 0);   # automatisch currentRadiationAPI setzen wenn ctrlWeatherDev1
           return;
       }
-      
+
       my $err = checkdwdattr ($name, $aVal, \@dweattrmust);
       return $err if($err);
   }
 
   InternalTimer (gettimeofday()+2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
+
+return;
+}
+
+################################################################
+#     currentRadiationAPI verzögert aus Attr setzen      
+################################################################
+sub __setRadAPIdelayed {                    
+  my $hash = shift;
+  
+  my $name   = $hash->{NAME};
+  my $awdev1 = AttrVal ($name, 'ctrlWeatherDev1', '');
+  
+  CommandSet (undef, "$name currentRadiationAPI $awdev1");                         # automatisch currentRadiationAPI setzen
 
 return;
 }
@@ -5719,9 +5743,9 @@ sub Delete {
           Log3 ($name, 1, qq{$name - Message while deleting file "$f": $err});
       }
   }
-  
+
   my $type = $hash->{TYPE};
-  
+
   delete $data{$type}{$name};
 
 return;
@@ -5745,9 +5769,9 @@ sub periodicWriteMemcache {
   writeCacheToFile ($hash, 'circular',   $pvccache.$name);                    # Cache File PV Circular schreiben
   writeCacheToFile ($hash, 'pvhist',     $pvhcache.$name);                    # Cache File PV History schreiben
   writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                   # Cache File SolCast API Werte schreiben
-  
+
   $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." whole Operating Memory";
-  
+
   Log3 ($name, 4, "$name - The working memory >circular pvhist solcastapi< has been saved to persistance");
 
   if ($bckp) {
@@ -5880,7 +5904,7 @@ sub writeCacheToFile {
 
       return;
   }
-  
+
   if ($cachename eq 'plantconfig') {
       my ($plantcfg, $nr, $na) = _storePlantConfig ($hash);
 
@@ -5928,7 +5952,7 @@ sub _storePlantConfig {
   my $name = $hash->{NAME};
 
   my $plantcfg;
-  my ($nr, $na) = (0,0); 
+  my ($nr, $na) = (0,0);
 
   for my $rcfg (@rconfigs) {
       my $val = ReadingsVal ($name, $rcfg, '');
@@ -5936,7 +5960,7 @@ sub _storePlantConfig {
       $plantcfg->{$rcfg} = $val;
       $nr++;
   }
-  
+
   for my $acfg (@aconfigs) {
       my $val = AttrVal ($name, $acfg, '');
       next if(!$val);
@@ -5955,14 +5979,14 @@ sub _restorePlantConfig {
   my $plantcfg = shift;
   my $name     = $hash->{NAME};
 
-  my ($nr, $na) = (0,0); 
-  
+  my ($nr, $na) = (0,0);
+
   while (my ($key, $val) = each %{$plantcfg}) {
       if ($key ~~ @rconfigs) {                                                 # Reading wiederherstellen
           CommandSetReading (undef,"$name $key $val");
           $nr++;
       }
-      
+
       if ($key ~~ @aconfigs) {                                                 # Attribut wiederherstellen
           CommandAttr (undef, "$name $key $val");
           $na++;
@@ -6081,10 +6105,12 @@ sub _addDynAttr {
   my $atd = 'ctrlWeatherDev';
   @deva   = grep {!/$atd/} @deva;
 
-  #push @deva, ($adwds ? "ctrlWeatherDev1:$adwds " : "ctrlWeatherDev1:noArg");
-
   for my $step (1..$weatherDevMax) {
-      push @deva, ($adwds ? "ctrlWeatherDev".$step.":OpenMeteoDWD-API,$adwds " : "ctrlWeatherDev1:OpenMeteoDWD-API");
+      if ($step == 1) {
+          push @deva, ($adwds ? "ctrlWeatherDev".$step.":OpenMeteoDWD-API,OpenMeteoWorld-API,$adwds" : "ctrlWeatherDev1:OpenMeteoDWD-API,OpenMeteoWorld-API");
+          next;
+      }
+      push @deva, ($adwds ? "ctrlWeatherDev".$step.":$adwds" : "ctrlWeatherDev1");
   }
 
   $hash->{".AttrList"} = join " ", @deva;
@@ -6121,22 +6147,22 @@ sub centralTask {
   RemoveInternalTimer ($hash, 'FHEM::SolarForecast::singleUpdateState');
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ########################################################################################################################## 
+  ##########################################################################################################################
   my $nscc = ReadingsVal ($name, 'nextSolCastCall', '');                                        # 14.03.2024
   if ($nscc) {
       readingsSingleUpdate ($hash, 'nextRadiationAPICall', $nscc, 0);
       deleteReadingspec ($hash, 'nextSolCastCall');
   }
-    
+
   if (keys %{$data{$type}{$name}{aidectree}{airaw}}) {                                          # 27.03.2024
       for my $idx (sort keys %{$data{$type}{$name}{aidectree}{airaw}}) {
           my $val = AiRawdataVal ($hash, $idx, 'rad1h', undef);
-          
+
           if (!defined $val) {
               delete $data{$type}{$name}{aidectree}{airaw}{$idx};
               $val = 'aaaaaaaaaa';
           }
-          
+
           if ($val =~ /\.[0-9]{1}$/xs) {
               delete $data{$type}{$name}{aidectree}{airaw}{$idx};
           }
@@ -6144,7 +6170,7 @@ sub centralTask {
           if ($val =~ /\.00$/xs) {
               my $renv = int $val;
               $data{$type}{$name}{aidectree}{airaw}{$idx}{rad1h} = $renv;
-          }        
+          }
       }
   }
   #######################################################################################################################
@@ -6162,7 +6188,7 @@ sub centralTask {
       return;
   }
 
-  if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt    
+  if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
       my $ret = createStringConfig ($hash);
 
       if ($ret) {
@@ -6205,7 +6231,7 @@ sub centralTask {
   }
 
   singleUpdateState           ($centpars);
-  
+
   $centpars->{state} = 'updated';                                                     # kann durch Subs überschrieben werden!
 
   collectAllRegConsumers      ($centpars);                                            # alle Verbraucher Infos laden
@@ -6446,11 +6472,11 @@ sub _specialActivities {
   my $name   = $paref->{name};
   my $type   = $paref->{type};
   my $date   = $paref->{date};                                              # aktuelles Datum
-  my $chour  = $paref->{chour};     
+  my $chour  = $paref->{chour};
   my $minute = $paref->{minute};
   my $t      = $paref->{t};                                                 # aktuelle Zeit
   my $day    = $paref->{day};
- 
+
   my ($ts,$ts1,$pvfc,$pvrl,$gcon);
 
   $ts1  = $date." ".sprintf("%02d",$chour).":00:00";
@@ -6487,15 +6513,15 @@ sub _specialActivities {
   $chour    = int $chour;
   $minute   = int $minute;
   my $aitrh = AttrVal ($name, 'ctrlAIshiftTrainStart', 1);                                   # Stunde f. Start AI-Training
-  
+
   ## Task 1
   ###########
-  if ($chour == 0 && $minute >= 0) {                           
+  if ($chour == 0 && $minute >= 0) {
       if (!defined $hash->{HELPER}{T1RUN}) {
           $hash->{HELPER}{T1RUN} = 1;
-          
+
           Log3 ($name, 4, "$name - Daily special tasks - Task 1 started");
-          
+
           $date = strftime "%Y-%m-%d", localtime($t-7200);                                   # Vortag (2 h Differenz reichen aus)
           $ts   = $date." 23:59:59";
 
@@ -6544,25 +6570,25 @@ sub _specialActivities {
           delete $data{$type}{$name}{circular}{'99'}{tdayDvtn};
 
           delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag aus History löschen
-          
+
           writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                         # Anlagenkonfiguration sichern
-          
-          Log3 ($name, 3, "$name - history day >$day< deleted");      
+
+          Log3 ($name, 3, "$name - history day >$day< deleted");
           Log3 ($name, 4, "$name - Daily special tasks - Task 1 finished");
       }
-  } 
+  }
   else {
       delete $hash->{HELPER}{T1RUN};
   }
-      
+
   ## Task 2
-  ###########      
-  if ($chour == 0 && $minute >= 2) {                           
+  ###########
+  if ($chour == 0 && $minute >= 2) {
       if (!defined $hash->{HELPER}{T2RUN}) {
-          $hash->{HELPER}{T2RUN} = 1;          
-          
+          $hash->{HELPER}{T2RUN} = 1;
+
           Log3 ($name, 4, "$name - Daily special tasks - Task 2 started");
-          
+
           for my $c (keys %{$data{$type}{$name}{consumers}}) {                              # Planungsdaten regulär löschen
               next if(ConsumerVal ($hash, $c, "plandelete", "regular") ne "regular");
 
@@ -6574,77 +6600,77 @@ sub _specialActivities {
           }
 
           writeCacheToFile ($hash, "consumers", $csmcache.$name);                           # Cache File Consumer schreiben
-          
+
           Log3 ($name, 4, "$name - Daily special tasks - Task 2 finished");
       }
-  } 
+  }
   else {
       delete $hash->{HELPER}{T2RUN};
-  }          
-       
+  }
+
   ## Task 3
-  ###########       
-  if ($chour == 0 && $minute >= 5) {                           
+  ###########
+  if ($chour == 0 && $minute >= 5) {
       if (!defined $hash->{HELPER}{T3RUN}) {
-          $hash->{HELPER}{T3RUN} = 1;    
+          $hash->{HELPER}{T3RUN} = 1;
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 3 started");
-          
+
           __createAdditionalEvents ($paref);                                                # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
-          __delObsoleteAPIData     ($paref);                                                # Bereinigung obsoleter Daten im solcastapi Hash          
-      
+          __delObsoleteAPIData     ($paref);                                                # Bereinigung obsoleter Daten im solcastapi Hash
+
           Log3 ($name, 4, "$name - Daily special tasks - Task 3 finished");
       }
-  } 
+  }
   else {
       delete $hash->{HELPER}{T3RUN};
-  }          
-  
+  }
+
   ## Task 4
-  ###########       
-  if ($chour == 1 && $minute >= 9) {                           
+  ###########
+  if ($chour == 0 && $minute >= 9) {
       if (!defined $hash->{HELPER}{T4RUN}) {
-          $hash->{HELPER}{T4RUN} = 1;    
+          $hash->{HELPER}{T4RUN} = 1;
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 started");
-          
+
           __deleteHiddenReadings ($paref);                                                  # verstecktes Steuerungsreading löschen
           periodicWriteMemcache  ($hash, 'bckp');                                           # Backup Files erstellen und alte Versionen löschen
-          
+
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 finished");
       }
-  } 
+  }
   else {
       delete $hash->{HELPER}{T4RUN};
-  } 
-     
+  }
+
   ## Task 5
-  ###########     
-  if ($chour == $aitrh && $minute >= 15) {                           
+  ###########
+  if ($chour == $aitrh && $minute >= 15) {
       if (!defined $hash->{HELPER}{T5RUN}) {
-          $hash->{HELPER}{T5RUN} = 1;    
-          
+          $hash->{HELPER}{T5RUN} = 1;
+
           Log3 ($name, 4, "$name - Daily special tasks - Task 5 started");
-          
+
           aiDelRawData ($paref);                                                            # KI Raw Daten löschen welche die maximale Haltezeit überschritten haben
 
           $paref->{taa} = 1;
           aiAddInstance ($paref);                                                           # AI füllen, trainieren und sichern
           delete $paref->{taa};
-      
+
           Log3 ($name, 4, "$name - Daily special tasks - Task 5 finished");
       }
-  } 
+  }
   else {
       delete $hash->{HELPER}{T5RUN};
-  }        
-          
+  }
+
 return;
 }
 
 #############################################################################
 #              versteckte Steuerungsreadings löschen
-#############################################################################     
+#############################################################################
 sub __deleteHiddenReadings  {
   my $paref = shift;
   my $hash  = $paref->{hash};
@@ -6653,9 +6679,9 @@ sub __deleteHiddenReadings  {
   for my $n (1..24) {
       $n = sprintf "%02d", $n;
 
-      deleteReadingspec ($hash, ".pvCorrectionFactor_${n}_cloudcover");         
-      deleteReadingspec ($hash, ".pvCorrectionFactor_${n}_apipercentil");       
-      deleteReadingspec ($hash, ".signaldone_${n}");                            
+      deleteReadingspec ($hash, ".pvCorrectionFactor_${n}_cloudcover");
+      deleteReadingspec ($hash, ".pvCorrectionFactor_${n}_apipercentil");
+      deleteReadingspec ($hash, ".signaldone_${n}");
 
       if (ReadingsVal ($name, "pvCorrectionFactor_Auto", "off") =~ /on/xs) {
           deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
@@ -6663,7 +6689,7 @@ sub __deleteHiddenReadings  {
   }
 
 return;
-} 
+}
 
 #############################################################################
 # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
@@ -6708,9 +6734,9 @@ sub __delObsoleteAPIData {
           delete $data{$type}{$name}{solcastapi}{$idx}{$scd} if ($ds && $ds < $refts);
       }
   }
-  
+
   for my $idx (keys %{$data{$type}{$name}{solcastapi}{'?All'}}) {                      # Wetterindexe löschen
-      delete $data{$type}{$name}{solcastapi}{'?All'}{$idx} if($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs);             
+      delete $data{$type}{$name}{solcastapi}{'?All'}{$idx} if($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs);
   }
 
   my @as = split ",", ReadingsVal($name, 'inverterStrings', '');
@@ -6721,7 +6747,7 @@ sub __delObsoleteAPIData {
       next if($k ~~ @as);
 
       delete $data{$type}{$name}{strings}{$k};
-      
+
       Log3 ($name, 2, "$name - obsolete PV-String >$k< was deleted from Strings-Hash");
   }
 
@@ -6730,7 +6756,7 @@ return;
 
 ################################################################
 #    Wetter Werte aus dem angebenen Wetterdevice extrahieren
-################################################################ 
+################################################################
 sub _transferWeatherValues {
   my $paref = shift;
   my $hash  = $paref->{hash};
@@ -6750,9 +6776,9 @@ sub _transferWeatherValues {
   __sunRS ($paref);                                                                            # Sonnenauf- und untergang
   delete $paref->{fcname};
   delete $paref->{apiu};
-  
+
   my ($fctime, $fctimets);                                                                     # Alter der DWD Daten
-  
+
   if (!$apiu) {
       $fctime   = ReadingsVal ($fcname, 'fc_time', '-');
       $fctimets = timestringToTimestamp ($fctime);
@@ -6761,7 +6787,7 @@ sub _transferWeatherValues {
       $fctime   = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time',      '-');
       $fctimets = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', '-');
   }
-  
+
   $data{$type}{$name}{current}{dwdWfchAge}   = $fctime;
   $data{$type}{$name}{current}{dwdWfchAgeTS} = $fctimets;
 
@@ -6772,7 +6798,7 @@ sub _transferWeatherValues {
   }
 
   __mergeDataWeather ($paref);                                                                 # Wetterdaten zusammenfügen
-  
+
   for my $num (0..46) {
       my ($fd, $fh) = calcDayHourMove ($chour, $num);
       last if($fd > 1);
@@ -6823,7 +6849,7 @@ sub _transferWeatherValues {
           $paref->{val}      = $temp;
           $paref->{histname} = 'temperature';
           setPVhistory ($paref);
-          
+
           $paref->{val}      = $don;
           $paref->{histname} = 'DoN';
           setPVhistory ($paref);
@@ -6851,7 +6877,7 @@ sub __readDataWeather {
 
   my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'ctrlWeatherDev'.$step);              # Weather Forecast Device
   return if(!$valid);
-  
+
   if ($apiu) {                                                                                  # eine API wird verwendet
       $paref->{fcname} = $fcname;
       ___readDataWeatherAPI ($paref);
@@ -6901,7 +6927,7 @@ sub __readDataWeather {
   }
 
 return;
-}  
+}
 
 ################################################################
 #   lese Wetterdaten aus API Speicher (solcastapi)
@@ -6916,10 +6942,10 @@ sub ___readDataWeatherAPI {
 
   debugLog ($paref, 'collectData', "collect Weather data step $step - API: $fcname =>");
 
-  for my $idx (sort keys %{$data{$type}{$name}{solcastapi}{'?All'}}) {                                          
+  for my $idx (sort keys %{$data{$type}{$name}{solcastapi}{'?All'}}) {
       if ($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs) {                                        # valider Weather API Index
-          my $rr1c = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{rr1c};  
-          my $wid  = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{ww}; 
+          my $rr1c = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{rr1c};
+          my $wid  = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{ww};
           my $neff = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{neff};
           my $don  = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{don};
           my $ttt  = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{ttt};
@@ -6928,7 +6954,7 @@ sub ___readDataWeatherAPI {
           $data{$type}{$name}{weatherdata}{$idx}{$step}{neff} = $neff if(defined $neff);
           $data{$type}{$name}{weatherdata}{$idx}{$step}{rr1c} = $rr1c if(defined $rr1c);
           $data{$type}{$name}{weatherdata}{$idx}{$step}{ttt}  = $ttt  if(defined $ttt);
-          $data{$type}{$name}{weatherdata}{$idx}{$step}{don}  = $don  if(defined $don);          
+          $data{$type}{$name}{weatherdata}{$idx}{$step}{don}  = $don  if(defined $don);
 
           debugLog ($paref, 'collectData', "Weather $step: $idx".
                                            ", don: ". (defined $don  ? $don  : '<undef>').
@@ -6936,12 +6962,12 @@ sub ___readDataWeatherAPI {
                                            ", RR1c: ".(defined $rr1c ? $rr1c : '<undef>').
                                            ", TTT: ". (defined $ttt  ? $ttt  : '<undef>').
                                            ", Neff: ".(defined $neff ? $neff : '<undef>')
-                                           );          
+                                           );
       }
   }
-  
+
 return;
-}    
+}
 
 ################################################################
 #                     Wetterdaten mergen
@@ -7043,7 +7069,7 @@ sub __sunRS {
           $fc1_sr = ReadingsVal ($fcname, 'fc1_SunRise', '23:59');
           $fc1_ss = ReadingsVal ($fcname, 'fc1_SunSet',  '00:00');
       }
-      else {                                                                                          # Daten aus solcastapi (API) holen       
+      else {                                                                                          # Daten aus solcastapi (API) holen
           $fc0_sr = substr (SolCastAPIVal ($hash, '?All', 'sunrise', 'today',    '23:59:59'), 0, 5);
           $fc0_ss = substr (SolCastAPIVal ($hash, '?All', 'sunset',  'today',    '00:00:00'), 0, 5);
           $fc1_sr = substr (SolCastAPIVal ($hash, '?All', 'sunrise', 'tomorrow', '23:59:59'), 0, 5);
@@ -7117,41 +7143,41 @@ sub _transferAPIRadiationValues {
       $paref->{num}    = $num;
       $paref->{fh1}    = $fh1;
       $paref->{fd}     = $fd;
-      
+
       $data{$type}{$name}{nexthours}{$nhtstr}{starttime} = $wantdt;
       $data{$type}{$name}{nexthours}{$nhtstr}{hourofday} = $hod;
       $data{$type}{$name}{nexthours}{$nhtstr}{today}     = $fd == 0 ? 1 : 0;
       $data{$type}{$name}{nexthours}{$nhtstr}{rad1h}     = $rad1h;
-      
+
       my $sunalt = HistoryVal ($hash, $wtday, $hod, 'sunalt', undef);
       my $sunaz  = HistoryVal ($hash, $wtday, $hod, 'sunaz',  undef);
-      
+
       if (!defined $sunalt || !defined $sunaz) {
           __calcSunPosition ($paref);
           $sunalt = HistoryVal ($hash, $wtday, $hod, 'sunalt', undef);
           $sunaz  = HistoryVal ($hash, $wtday, $hod, 'sunaz',  undef);
       }
-      
+
       if (defined $sunaz) {
           $data{$type}{$name}{nexthours}{$nhtstr}{sunaz} = $sunaz;
       }
       else {
           $sunaz = NexthoursVal ($hash, $nhtstr, 'sunaz', 0);
       }
-      
+
       if (defined $sunalt) {
           $data{$type}{$name}{nexthours}{$nhtstr}{sunalt} = $sunalt;
       }
       else {
           $sunalt = NexthoursVal ($hash, $nhtstr, 'sunalt', 0);
       }
-      
+
       $paref->{sabin}    = sunalt2bin ($sunalt);
       my $est            = __calcPVestimates ($paref);
       my ($msg, $pvaifc) = aiGetResult ($paref);                                              # KI Entscheidungen abfragen
-      
+
       $data{$type}{$name}{nexthours}{$nhtstr}{pvapifc} = $est;                                # durch API gelieferte PV Forecast
-      
+
       delete $paref->{fd};
       delete $paref->{fh1};
       delete $paref->{num};
@@ -7161,7 +7187,7 @@ sub _transferAPIRadiationValues {
       delete $paref->{wantdt};
       delete $paref->{wantts};
       delete $paref->{sabin};
-      
+
       my $useai = 0;
       my $pvfc;
 
@@ -7307,7 +7333,7 @@ sub __calcPVestimates {
   my $fd      = $paref->{fd};
   my $num     = $paref->{num};
   my $debug   = $paref->{debug};
-  
+
   my $reld        = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
   my $totalrain   = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num), "totalrain",  0);          # Gesamtniederschlag während der letzten Stunde kg/m2
   my $cloudcover  = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num), "cloudcover", 0);          # effektive Wolkendecke nächste Stunde X
@@ -7676,21 +7702,21 @@ sub _transferMeterValues {
   my ($gf,$gfunit) = split ":", $h->{gfeedin};                                                # Readingname/Unit für aktuelle Netzeinspeisung
   my ($gt,$ctunit) = split ":", $h->{contotal};                                               # Readingname/Unit für Bezug total
   my ($ft,$ftunit) = split ":", $h->{feedtotal};                                              # Readingname/Unit für Einspeisung total
-  
+
   return if(!$gc || !$gf || !$gt || !$ft);
-  
+
   if ($h->{conprice}) {
       my ($gcp,$gcpcucy) = split ":", $h->{conprice};                                         # Bezugspreis (Arbeitspreis) pro kWh
       $data{$type}{$name}{current}{ePurchasePrice}    = $gcp;
       $data{$type}{$name}{current}{ePurchasePriceCcy} = $gcpcucy;
   }
-  
+
   if ($h->{feedprice}) {
       my ($gfr,$gfrcucy) = split ":", $h->{feedprice};                                        # Einspeisevergütung pro kWh
       $data{$type}{$name}{current}{eFeedInTariff}     = $gfr;
       $data{$type}{$name}{current}{eFeedInTariffCcy}  = $gfrcucy;
   }
-  
+
   $gfunit //= $gcunit;
   $gcunit //= $gfunit;
 
@@ -7781,9 +7807,9 @@ sub _transferMeterValues {
       $paref->{val}      = $gctotthishour;
       $paref->{nhour}    = sprintf "%02d", $nhour;
       $paref->{histname} = 'cons';
-      
+
       setPVhistory ($paref);
-      
+
       delete $paref->{histname};
       delete $paref->{nhour};
       delete $paref->{val};
@@ -7820,9 +7846,9 @@ sub _transferMeterValues {
       $paref->{val}      = $gftotthishour;
       $paref->{nhour}    = sprintf "%02d", $nhour;
       $paref->{histname} = 'gfeedin';
-      
+
       setPVhistory ($paref);
-      
+
       delete $paref->{histname};
       delete $paref->{nhour};
       delete $paref->{val};
@@ -7930,9 +7956,9 @@ sub _transferBatteryValues {
       $paref->{val}      = $btotin;
       $paref->{nhour}    = sprintf "%02d", $nhour;
       $paref->{histname} = 'batintotal';
-      
+
       setPVhistory ($paref);
-      
+
       delete $paref->{histname};
       delete $paref->{nhour};
       delete $paref->{val};
@@ -7951,9 +7977,9 @@ sub _transferBatteryValues {
   $paref->{val}      = $batinthishour;
   $paref->{nhour}    = sprintf "%02d", $nhour;
   $paref->{histname} = 'batinthishour';
-  
+
   setPVhistory ($paref);
-  
+
   delete $paref->{histname};
   delete $paref->{nhour};
   delete $paref->{val};
@@ -7967,9 +7993,9 @@ sub _transferBatteryValues {
       $paref->{val}      = $btotout;
       $paref->{nhour}    = sprintf "%02d", $nhour;
       $paref->{histname} = 'batouttotal';
-      
+
       setPVhistory ($paref);
-      
+
       delete $paref->{histname};
       delete $paref->{nhour};
       delete $paref->{val};
@@ -7988,9 +8014,9 @@ sub _transferBatteryValues {
   $paref->{val}      = $batoutthishour;
   $paref->{nhour}    = sprintf "%02d", $nhour;
   $paref->{histname} = 'batoutthishour';
-  
+
   setPVhistory ($paref);
-  
+
   delete $paref->{histname};
   delete $paref->{nhour};
   delete $paref->{val};
@@ -8099,7 +8125,7 @@ sub _batSocTarget {
   my $pvfctm     = ReadingsNum ($name, 'Tomorrow_PVforecast',            0);               # PV Prognose morgen
   my $pvfctd     = ReadingsNum ($name, 'RestOfDayPVforecast',            0);               # PV Prognose Rest heute
   my $csopt      = ReadingsNum ($name, 'Battery_OptimumTargetSoC', $lowSoc);               # aktuelles SoC Optimum
-  
+
   my $pvexpect   = $pvfctm > $pvfctd ? $pvfctm : $pvfctd;
   my $batinstcap = CurrentVal ($hash, 'batinstcap', 0);                                    # installierte Batteriekapazität Wh
   my $cantarget  = 100 - (100 / $batinstcap) * $pvexpect;                                  # berechneter möglicher Min SOC nach Berücksichtigung Ladewahrscheinlichkeit
@@ -8419,18 +8445,18 @@ sub _manageConsumerData {
 
               $paref->{val}      = $consumerco;                                                   # Verbrauch des Consumers aktuelle Stunde
               $paref->{histname} = "csme${c}";
-              
+
               setPVhistory ($paref);
-              
+
               delete $paref->{histname};
               delete $paref->{val};
           }
 
           $paref->{val}      = $etot;                                                             # Totalverbrauch des Verbrauchers
           $paref->{histname} = "csmt${c}";
-          
+
           setPVhistory ($paref);
-          
+
           delete $paref->{histname};
           delete $paref->{val};
       }
@@ -8814,7 +8840,7 @@ sub __planInitialSwitchTime {
 
       return;
   }
-  
+
   if ($debug =~ /consumerPlanning/x) {
       Log3 ($name, 1, qq{$name DEBUG> ############### consumerPlanning consumer "$c" ############### });
       Log3 ($name, 1, qq{$name DEBUG> Planning consumer "$c" - name: }.ConsumerVal ($hash, $c, 'name', '').
@@ -9964,9 +9990,9 @@ sub _estConsumptionForecast {
                $paref->{val}      = $conavg;
                $paref->{nhour}    = sprintf "%02d", $nhhr;
                $paref->{histname} = 'confc';
-               
+
                setPVhistory ($paref);
-               
+
                delete $paref->{histname};
                delete $paref->{nhour};
                delete $paref->{val};
@@ -10341,7 +10367,7 @@ sub __calcNewFactor {
   my $factor;
   my $pvrlsum = $pvrl;
   my $pvfcsum = $pvfc;
-  
+
   debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> Start calculation correction factor for hour: $h");
 
   my ($oldfac, $oldq)        = CircularSunCloudkorrVal ($hash, sprintf("%02d",$h), $sabin, $crang, 0);  # bisher definierter Korrekturfaktor / Qualität
@@ -10349,7 +10375,7 @@ sub __calcNewFactor {
   $oldfac                    = 1 if(1 * $oldfac == 0);
 
   debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> read historical values: pv real sum: $pvhis, pv forecast sum: $fchis, days sum: $dnum");
-  
+
   if ($dnum) {                                                                                        # Werte in History vorhanden -> haben Prio !
       $dnum++;
       $pvrlsum = $pvrl + $pvhis;
@@ -10431,11 +10457,11 @@ return ($fd, $fh);
 sub formatWeatherTimestrg {
   my $date = shift // return;
 
-  my $cdate = strftime "%Y-%m-%d", localtime(time); 
+  my $cdate = strftime "%Y-%m-%d", localtime(time);
   my $refts = timestringToTimestamp ($cdate.' 00:00:00');                                      # Referenztimestring
   my $datts = timestringToTimestamp ($date);
   my $fd    = int (($datts - $refts) / 86400);
-  my $fh    = int ((split /[ :]/, $date)[1]); 
+  my $fh    = int ((split /[ :]/, $date)[1]);
 
 return "fc${fd}_${fh}";
 }
@@ -10484,9 +10510,9 @@ sub saveEnergyConsumption {
   $paref->{val}      = $con;
   $paref->{nhour}    = sprintf "%02d", $shr;
   $paref->{histname} = 'con';
-  
+
   setPVhistory ($paref);
-  
+
   delete $paref->{histname};
   delete $paref->{nhour};
   delete $paref->{val};
@@ -11365,7 +11391,7 @@ sub _graphicHeader {
       my $ssetimg  = FW_makeImage('weather_sunset@LightCoral');
       my $srisetxt = ReadingsVal ($name, 'Today_SunRise', '-');
       my $ssettxt  = ReadingsVal ($name, 'Today_SunSet',  '-');
-      
+
       my ($err, $resh) = isWeatherAgeExceeded ($paref);
       $img = FW_makeImage ('10px-kreis-gruen.png', $htitles{dwfcrsu}{$lang}.' '.$resh->{mosmix}.' &#10;'.$htitles{dwdtime}{$lang}.': '.$resh->{fctime});
 
@@ -11374,7 +11400,7 @@ sub _graphicHeader {
           $agewfc    =~ s/<NAME>/$name/xs;
           $img = FW_makeImage ('10px-kreis-gelb.png', $agewfc.' &#10;'.$htitles{dwdtime}{$lang}.': '.$resh->{fctime});
       }
-      
+
       my $waicon = "<a>$img</a>";                                                                       # Icon Wetterdaten Alter
 
       ## Autokorrektur-Icon
@@ -11521,7 +11547,7 @@ sub _graphicHeader {
           $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
           $api .= ')';
           $api .= '</span>';
-      }      
+      }
 
       ## Qualitäts-Icon
       ######################
@@ -12923,7 +12949,7 @@ sub __weatherOnBeam {
       $wcc   += 0 if(isNumeric ($wcc));                                                                      # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661
       $title .= ': '.$wcc;
       $title .= '&#10;';
-      $title .= $htitles{sunpos}{$lang}.':';       
+      $title .= $htitles{sunpos}{$lang}.':';
       $title .= '&#10;';
       $title .= $htitles{elevatio}{$lang}.' '.$hfcg->{$i}{sunalt};
       $title .= '&#10;';
@@ -13579,6 +13605,7 @@ sub finishTrain {
   $data{$type}{$name}{current}{aiAddedToTrain}      = 0;
   $data{$type}{$name}{current}{aicanuse}            = $aicanuse       if(defined $aicanuse);
   $data{$type}{$name}{current}{aiinitstate}         = $aiinitstate    if(defined $aiinitstate);
+  $data{$type}{$name}{current}{aitrainstate}        = $aitrainstate   if(defined $aitrainstate);
   $data{$type}{$name}{circular}{99}{runTimeTrainAI} = $runTimeTrainAI if(defined $runTimeTrainAI);  # !! in Circular speichern um zu persistieren, setTimeTracking speichert zunächst in Current !!
 
   if ($aitrainstate eq 'ok') {
@@ -13591,13 +13618,14 @@ sub finishTrain {
                       }
                      );
   }
-  
+
   $paref->{debug} = getDebug ($hash);
+  
   if (defined $hash->{HELPER}{AIBLOCKRUNNING}) {
       debugLog ($paref, 'aiProcess', qq{AI Training BlockingCall PID "$hash->{HELPER}{AIBLOCKRUNNING}{pid}" finished});
       delete($hash->{HELPER}{AIBLOCKRUNNING});
   }
-   
+
 return;
 }
 
@@ -13636,7 +13664,7 @@ sub aiAddInstance {                   ## no critic "not used"
   my $err = aiInit ($paref);
   return if($err);
   my $dtree = AiDetreeVal ($hash, 'object', undef);
-  
+
   $data{$type}{$name}{current}{aiAddedToTrain} = 0;
 
   for my $idx (sort keys %{$data{$type}{$name}{aidectree}{airaw}}) {
@@ -13671,12 +13699,12 @@ sub aiAddInstance {                   ## no critic "not used"
                    $data{$type}{$name}{current}{aiaddistate} = $@;
                    return;
                  };
-      
+
       $data{$type}{$name}{current}{aiAddedToTrain}++;
-      
+
       debugLog ($paref, 'aiProcess', qq{AI Instance added $idx - hod: $hod, sunalt: $sunalt, rad1h: $rad1h, pvrl: $pvrl, wcc: $wcc, rr1c: $rr1c, temp: $temp}, 4);
   }
-  
+
   debugLog ($paref, 'aiProcess', "AI Instance add - ".$data{$type}{$name}{current}{aiAddedToTrain}." entities added for training ".(AttrVal ($name, 'verbose', 3) != 4 ? '(set verbose 4 for output more detail)' : ''));
 
   $data{$type}{$name}{aidectree}{object}    = $dtree;
@@ -13709,9 +13737,13 @@ sub aiTrain {                            ## no critic "not used"
 
   my $cst   = [gettimeofday];                                           # Zyklus-Startzeit
   my $dtree = AiDetreeVal ($hash, 'object', undef);
-   
+
   if (!$dtree) {
-      $serial = encode_base64 (Serialize ( {name => $name, aiinitstate => 'no AI::DecisionTree object present'} ), "");
+      $serial = encode_base64 (Serialize ( {name         => $name, 
+                                            aitrainstate => "Train: not performed (see 'get $name valCurrent' -> aiinitstate for further info)",
+                                            aiinitstate  => 'Init: no AI::DecisionTree object present'
+                                           } 
+                                         ), "");
       $block ? return ($serial) : return \&finishTrain ($serial);
   }
 
@@ -13719,8 +13751,12 @@ sub aiTrain {                            ## no critic "not used"
          1;
        }
        or do { Log3 ($name, 1, "$name - aiTrain ERROR: $@");
-               $data{$type}{$name}{current}{aitrainstate} = $@;
-               $serial = encode_base64 (Serialize ( {name => $name, aitrainstate => $@} ), "");
+               #$data{$type}{$name}{current}{aitrainstate} = $@;
+               $err    = (split / at/, $@)[0];
+               $serial = encode_base64 (Serialize ( {name         => $name, 
+                                                     aitrainstate => "Train: $err"
+                                                    } 
+                                                  ), "");
                $block ? return ($serial) : return \&finishTrain ($serial);
              };
 
@@ -14006,7 +14042,7 @@ sub aiAddRawData {
           debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, rr1c: $rr1c, temp: $tbin", 4);
       }
   }
-  
+
   debugLog ($paref, 'aiProcess', "AI raw add - $dosave entities added to raw data pool ".(AttrVal ($name, 'verbose', 3) != 4 ? '(set verbose 4 for output more detail)' : ''));
 
   if ($dosave) {
@@ -14092,13 +14128,13 @@ sub setPVhistory {
   my $dayname   = $paref->{dayname};                                       # aktueller Wochentagsname
   my $nhour     = $paref->{nhour};
   my $histname  = $paref->{histname};
-  my $val       = $paref->{val};                                           # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)  
+  my $val       = $paref->{val};                                           # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
   my $pvrlvd    = $paref->{pvrlvd};                                        # 1: Eintrag 'pvrl' wird im Lernprozess berücksichtigt
   my $reorg     = $paref->{reorg}     // 0;                                # Neuberechnung von Werten in Stunde "99" nach Löschen von Stunden eines Tages
   my $reorgday  = $paref->{reorgday}  // q{};                              # Tag der reorganisiert werden soll
 
   $data{$type}{$name}{pvhist}{$day}{99}{dayname} = $dayname if($day);
-  
+
   if ($hfspvh{$histname} && defined &{$hfspvh{$histname}{fn}}) {
       &{$hfspvh{$histname}{fn}} ($paref);
       return;
@@ -14138,7 +14174,7 @@ sub setPVhistory {
       my $cycles = HistoryVal ($hash, $day, 99, "cyclescsm${num}", 0);
       $data{$type}{$name}{pvhist}{$day}{99}{"hourscsme${num}"} = sprintf "%.2f", ($minutes / 60 ) if($cycles);
   }
-  
+
   if ($histname =~ /cyclescsm[0-9]+$/xs) {                                                        # Anzahl Tageszyklen des Verbrauchers
       $data{$type}{$name}{pvhist}{$day}{99}{$histname} = $val;
   }
@@ -14184,7 +14220,7 @@ return;
 }
 
 ################################################################
-# Wert mit optional weiteren Berechnungen in pvHistory speichen 
+# Wert mit optional weiteren Berechnungen in pvHistory speichen
 ################################################################
 sub _storeVal {                    ## no critic "not used"
   my $paref    = shift;
@@ -14195,18 +14231,18 @@ sub _storeVal {                    ## no critic "not used"
   my $nhour    = $paref->{nhour};
   my $histname = $paref->{histname};
   my $val      = $paref->{val};
-  
+
   my $store = $hfspvh{$histname}{storname};
   my ($validkey, $validval);
 
   $data{$type}{$name}{pvhist}{$day}{$nhour}{$store} = $val;
-  
+
   if (defined $hfspvh{$histname}{validkey}) {
       $validkey = $hfspvh{$histname}{validkey};
       $validval = $paref->{$validkey};
       $data{$type}{$name}{pvhist}{$day}{$nhour}{$validkey} = $validval;
   }
-  
+
   debugLog ($paref, 'saveData2Cache', "setPVhistory -> stored simple  - Day: $day, Hour: $nhour, Key: $store, Value: ".(defined $val ? $val : 'undef').
                                       (defined $validkey ? ", ValidKey: $validkey, ValidValue: $validval" : '') );
 
@@ -14216,12 +14252,12 @@ sub _storeVal {                    ## no critic "not used"
           next if($k eq '99');
           $sum += HistoryVal ($hash, $day, $k, $store, 0);
       }
-      
+
        $data{$type}{$name}{pvhist}{$day}{99}{$store} = $sum;
-       
+
        debugLog ($paref, 'saveData2Cache', "setPVhistory -> stored compute - Day: $day, Hour: 99, Key: $store, Value: $sum");
   }
-  
+
 return;
 }
 
@@ -14698,7 +14734,7 @@ sub checkPlantConfig {
 
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  
+
   setModel ($hash);                                                                            # Model setzen
 
   my $lang        = AttrVal        ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang));
@@ -14777,7 +14813,7 @@ sub checkPlantConfig {
   #####################################
   my $mosm = '';
   my $resh;
-  
+
   for my $step (1..$weatherDevMax) {
       #my $fcname = AttrVal ($name, 'ctrlWeatherDev'.$step, '');
       my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'ctrlWeatherDev'.$step);
@@ -14805,14 +14841,14 @@ sub checkPlantConfig {
                   $result->{'DWD Weather Properties'}{fault}   = 1;
               }
               else {
-                  $mosm = AttrVal ($fcname, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S'; 
-                  
+                  $mosm = AttrVal ($fcname, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S';
+
                   if ($mosm eq 'MOSMIX_L') {
                       $result->{'DWD Weather Properties'}{state}   = $info;
                       $result->{'DWD Weather Properties'}{result} .= qq(The device "$fcname" uses "$mosm" which is only updated by DWD every 6 hours. <br>);
                       $result->{'DWD Weather Properties'}{info}    = 1;
-                  }              
-                  
+                  }
+
                   $result->{'DWD Weather Properties'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: ctrlWeatherDev$step)<br>";
               }
 
@@ -14825,19 +14861,19 @@ sub checkPlantConfig {
           }
       }
   }
-  
+
   ## Alter DWD Wetterdaten
   ##########################
   ($err, $resh) = isWeatherAgeExceeded ( {hash => $hash, name => $name, lang => $lang} );
-  
+
   if (!$err && $resh->{exceed}) {
       $result->{'DWD Weather Properties'}{state} = $warn;
       $result->{'DWD Weather Properties'}{note} .= qq{The Prediction time of Weather data is older than expected when using $resh->{mosmix}. <br>};
       $result->{'DWD Weather Properties'}{note} .= qq{Data time forecast: $resh->{fctime} <br>};
       $result->{'DWD Weather Properties'}{note} .= qq{Check the DWD device(s) for proper functioning of the data retrieval. <br>};
       $result->{'DWD Weather Properties'}{warn}  = 1;
-  } 
-  
+  }
+
   $result->{'DWD Weather Properties'}{note} .= '<br>';
   $result->{'DWD Weather Properties'}{note} .= qq{checked global Weather parameters: <br>};
   $result->{'DWD Weather Properties'}{note} .= 'MOSMIX variant or ICON Forecast Model, Age of Weather data. <br>';
@@ -14865,35 +14901,35 @@ sub checkPlantConfig {
               $result->{'DWD Radiation Properties'}{fault}   = 1;
           }
           else {
-              $mosm = AttrVal ($raname, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S';  
-              
+              $mosm = AttrVal ($raname, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S';
+
               if ($mosm eq 'MOSMIX_L') {
                   $result->{'DWD Radiation Properties'}{state}   = $info;
                   $result->{'DWD Radiation Properties'}{result} .= qq(The device "$raname" uses "$mosm" which is only updated by DWD every 6 hours. <br>);
                   $result->{'DWD Radiation Properties'}{info}    = 1;
-              } 
+              }
           }
       }
-      
+
       ## Alter DWD Radiation
       #######################
       ($err, $resh) = isRad1hAgeExceeded ( {hash => $hash, name => $name, lang => $lang} );
-      
+
       if (!$err && $resh->{exceed}) {
           $result->{'DWD Radiation Properties'}{state} = $warn;
           $result->{'DWD Radiation Properties'}{note} .= qq{The Prediction time of radiation data (Rad1h) is older than expected when using $resh->{mosmix}. <br>};
           $result->{'DWD Radiation Properties'}{note} .= qq{Data time forecast: $resh->{fctime} <br>};
           $result->{'DWD Radiation Properties'}{note} .= qq{Check the DWD device '$raname' for proper functioning of the data retrieval.<br>};
           $result->{'DWD Radiation Properties'}{warn}  = 1;
-      } 
-  
+      }
+
       if (!$result->{'DWD Radiation Properties'}{fault}) {
           $result->{'DWD Radiation Properties'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
       }
-      
+
       $result->{'DWD Radiation Properties'}{note} .= '<br>';
       $result->{'DWD Radiation Properties'}{note} .= qq{checked global Radiation parameters: <br>};
-      $result->{'DWD Radiation Properties'}{note} .= 'MOSMIX variant, Age of Radiation data. <br>';      
+      $result->{'DWD Radiation Properties'}{note} .= 'MOSMIX variant, Age of Radiation data. <br>';
       $result->{'DWD Radiation Properties'}{note} .= qq{<br>checked parameters and attributes device "$raname": <br>};
       $result->{'DWD Radiation Properties'}{note} .= 'forecastProperties -> '.join (',', @draattrmust).'<br>';
       $result->{'DWD Radiation Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to below "6" if possible' : '').'<br>';
@@ -15024,7 +15060,7 @@ sub checkPlantConfig {
       $result->{'Common Settings'}{note}   .= qq{$cmrec <br>};
       $result->{'Common Settings'}{warn}    = 1;
   }
-  
+
   if ($result->{'Common Settings'}{result}) {
       $result->{'Common Settings'}{result} .= '<br>';
   }
@@ -15042,7 +15078,7 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto <br>};
       }
   }
-  
+
   if (isOpenMeteoUsed ($hash)) {                                                             # allg. Settings bei Nutzung Open-Meteo API
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
@@ -15393,8 +15429,8 @@ sub timestringUTCtoLocal {
                                           dtstring  => $timstr,
                                           tzcurrent => 'UTC',
                                           tzconv    => 'local',
-                                          writelog  => 0 
-                                        } 
+                                          writelog  => 0
+                                        }
                                       );
 
   if ($err) {
@@ -15581,17 +15617,17 @@ sub createAssociatedWith {
           next if($e ~~ @ndn);
           push @ndn, $e;
       }
-      
+
       my %seen;
-      
-      if (@cd) {   
-          $hash->{NOTIFYDEV} = join ",", grep { !$seen{$_ }++ } @cd;         
+
+      if (@cd) {
+          $hash->{NOTIFYDEV} = join ",", grep { !$seen{$_ }++ } @cd;
       }
-      
+
       if (@nd) {
           undef %seen;
-          my $asw = join " ", grep { !$seen{$_ }++ } @nd; 
-          readingsSingleUpdate ($hash, ".associatedWith", $asw, 0);      
+          my $asw = join " ", grep { !$seen{$_ }++ } @nd;
+          readingsSingleUpdate ($hash, ".associatedWith", $asw, 0);
       }
   }
   else {
@@ -15647,6 +15683,9 @@ sub setModel {
   elsif ($api =~ /OpenMeteoDWD/xs) {
       $hash->{MODEL} = 'OpenMeteoDWDAPI';
   }
+  elsif ($api =~ /OpenMeteoWorld/xs) {
+      $hash->{MODEL} = 'OpenMeteoWorldAPI';
+  }  
   else {
       $hash->{MODEL} = 'DWD';
   }
@@ -16119,7 +16158,7 @@ sub isDWDUsed {
 
   my $ret = 0;
 
-  if ($hash->{MODEL} && $hash->{MODEL} eq 'DWD') {
+  if (InternalVal ($hash->{NAME}, 'MODEL', '') eq 'DWD') {
       $ret = 1;
   }
 
@@ -16134,7 +16173,7 @@ sub isSolCastUsed {
 
   my $ret = 0;
 
-  if ($hash->{MODEL} && $hash->{MODEL} eq 'SolCastAPI') {
+  if (InternalVal ($hash->{NAME}, 'MODEL', '') eq 'SolCastAPI') {
       $ret = 1;
   }
 
@@ -16149,7 +16188,7 @@ sub isForecastSolarUsed {
 
   my $ret = 0;
 
-  if ($hash->{MODEL} && $hash->{MODEL} eq 'ForecastSolarAPI') {
+  if (InternalVal ($hash->{NAME}, 'MODEL', '') eq 'ForecastSolarAPI') {
       $ret = 1;
   }
 
@@ -16164,7 +16203,7 @@ sub isVictronKiUsed {
 
   my $ret = 0;
 
-  if ($hash->{MODEL} && $hash->{MODEL} eq 'VictronKiAPI') {
+  if (InternalVal ($hash->{NAME}, 'MODEL', '') eq 'VictronKiAPI') {
       $ret = 1;
   }
 
@@ -16179,7 +16218,7 @@ sub isOpenMeteoUsed {
 
   my $ret = 0;
 
-  if ($hash->{MODEL} && $hash->{MODEL} eq 'OpenMeteoDWDAPI') {
+  if (InternalVal ($hash->{NAME}, 'MODEL', '') =~ /^OpenMeteo/xs) {
       $ret = 1;
   }
 
@@ -16238,7 +16277,7 @@ return $is;
 }
 
 #####################################################################
-#    Prüft ob das in ctrlWeatherDevX 
+#    Prüft ob das in ctrlWeatherDevX
 #    übergebene Weather Device valide ist
 #    return - $valid -> ist die Angabe valide (1)
 #             $apiu  -> wird ein Device oder API verwendet
@@ -16246,19 +16285,19 @@ return $is;
 sub isWeatherDevValid {
   my $hash = shift;
   my $wdev = shift;
-  
+
   my $valid  = '';
   my $apiu   = '';
   my $fcname = AttrVal ($hash->{NAME}, $wdev, '');                                            # Weather Forecast Device
 
   if ($fcname) { $valid = 1  }
-  if (!$defs{$fcname} || $defs{$fcname}{TYPE} ne "DWD_OpenData") { $valid = '' }      
-  
- if (isOpenMeteoUsed($hash) && $fcname =~ /OpenMeteoDWD-API/xs) {
+  if (!$defs{$fcname} || $defs{$fcname}{TYPE} ne "DWD_OpenData") { $valid = '' }
+
+ if (isOpenMeteoUsed($hash) && $fcname =~ /^OpenMeteo/xs) {
      $valid = 1;
-     $apiu  = 'OpenMeteoDWD-API';
+     $apiu  = $fcname;
  }
-  
+
 return ($valid, $fcname, $apiu);
 }
 
@@ -16280,15 +16319,15 @@ sub isWeatherAgeExceeded {
 
   my $resh->{agedv} = '-';
   $resh->{mosmix}   = '-';
-  $resh->{exceed}   = ''; 
+  $resh->{exceed}   = '';
   $resh->{fctime}   = '-';
-  
+
   my ($newts, $th);
-  
+
   for my $step (1..$weatherDevMax) {
       my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'ctrlWeatherDev'.$step);
-      next if(!$fcname && $step ne 1);     
-   
+      next if(!$fcname && $step ne 1);
+
       if (!$apiu) {
           if (!$fcname || !$valid) {
               if (!$fcname) {
@@ -16298,12 +16337,12 @@ sub isWeatherAgeExceeded {
                   return (qq{The DWD device "$fcname" doesn't exist}, $resh);
               }
           }
-          
+
           my $fct = ReadingsVal ($fcname, 'fc_time', '');
           return (qq{The reading 'fc_time' ($fcname) doesn't exist or is empty}, $resh) if(!$fct);
-          
+
           $newts = timestringToTimestamp ($fct);
-          
+
           if ($newts <= $agets) {
               $agets         = $newts;
               $resh->{agedv} = $fcname;
@@ -16312,7 +16351,7 @@ sub isWeatherAgeExceeded {
       }
       else {
           $newts = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', $agets);
-          
+
           if ($newts <= $agets) {
               $agets         = $newts;
               $resh->{agedv} = $fcname;
@@ -16320,19 +16359,19 @@ sub isWeatherAgeExceeded {
           }
       }
   }
-  
+
   if (!$resh->{apiu}) {                                                                                 # DWD Device ist Wetterdatenlieferant
-      $resh->{mosmix} = AttrVal ($resh->{agedv}, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S';   
+      $resh->{mosmix} = AttrVal ($resh->{agedv}, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S';
       $th             = $resh->{mosmix} eq 'MOSMIX_S' ? 7200 : 25200;
   }
   else {                                                                                                # API ist Wetterdatenlieferant
       $resh->{mosmix} = 'ICON';
       $th = 5400;
   }
-  
+
   $resh->{exceed} = $currts - $agets > $th ? 1 : 0;
   $resh->{fctime} = (timestampToTimestring ($agets, $lang))[0];
-  
+
 return ('', $resh);
 }
 
@@ -16349,13 +16388,13 @@ sub isRad1hAgeExceeded {
   my $name  = $paref->{name};
   my $lang  = $paref->{lang};
 
-  my $currts = int time;  
+  my $currts = int time;
   my $fcname = CurrentVal ($hash, 'dwdRad1hDev', '');
-  
+
   my $resh->{agedv} = '-';
   $resh->{mosmix}   = '-';
-  $resh->{exceed}   = ''; 
-  $resh->{fctime}   = '-'; 
+  $resh->{exceed}   = '';
+  $resh->{fctime}   = '-';
 
   if (!$fcname || !$defs{$fcname}) {
       if (!$fcname) {
@@ -16365,13 +16404,13 @@ sub isRad1hAgeExceeded {
           return (qq{The DWD device "$fcname" doesn't exist}, $resh);
       }
   }
-  
+
   my $fct = ReadingsVal ($fcname, 'fc_time', '');
   return (qq{The reading 'fc_time' ($fcname) doesn't exist or is empty}, $resh) if(!$fct);
-  
+
   $resh->{agedv}  = $fcname;
   $resh->{mosmix} = AttrVal ($resh->{agedv}, 'forecastRefresh', 6) == 1 ? 'MOSMIX_S' : 'MOSMIX_L';
-   
+
   my $agets       = timestringToTimestamp ($fct);
   my $th          = $resh->{mosmix} eq 'MOSMIX_S' ? 7200 : 25200;
   $resh->{exceed} = $currts - $agets > $th ? 1 : 0;
@@ -17672,10 +17711,10 @@ to ensure that the system configuration is correct.
 
     <ul>
       <a id="SolarForecast-set-currentMeterDev"></a>
-      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Einheit&gt; contotal=&lt;Readingname&gt;:&lt;Einheit&gt; 
-                             gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;   
+      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Einheit&gt; contotal=&lt;Readingname&gt;:&lt;Einheit&gt;
+                             gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;
                              [conprice=&lt;Wert&gt;:&lt;Currency&gt;] [feedprice=&lt;Wert&gt;:&lt;Currency&gt;] </b> <br><br>
-                             
+
       Sets any device and its readings for energy measurement.
       The module assumes that the numeric value of the readings is positive.
       It can also be a dummy device with corresponding readings. The meaning of the respective "Readingname" is:
@@ -17723,24 +17762,34 @@ to ensure that the system configuration is correct.
 
       Defines the source for the delivery of the solar radiation data. You can select a device of the type DWD_OpenData or
       an implemented API can be selected. <br>
-      <b>Note:</b> If OpenMeteoDWD-API is set in the 'ctrlWeatherDev1' attribute, no radiation data service other than 
+      <b>Note:</b> If OpenMeteoDWD-API is set in the 'ctrlWeatherDev1' attribute, no radiation data service other than
       OpenMeteoDWD-API can be selected. <br><br>
-      
+
       <b>OpenMeteoDWD-API</b> <br>
-      
-      Open-Meteo is an open source weather API and offers free access for non-commercial purposes. 
+
+      Open-Meteo is an open source weather API and offers free access for non-commercial purposes.
       No API key is required.
-      Open-Meteo leverages a powerful combination of global (11 km) and mesoscale (1 km) weather models from esteemed 
+      Open-Meteo leverages a powerful combination of global (11 km) and mesoscale (1 km) weather models from esteemed
       national weather services.
-      This API provides access to the renowned ICON weather models of the German Weather Service (DWD), which provide 
-      15-minute data for short-term forecasts in Central Europe and global forecasts with a resolution of 11 km. 
-      The ICON model is a preferred choice for general weather forecast APIs when no other high-resolution weather 
-      models are available.
-      The comprehensive and clearly laid out 
-      <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on 
-      the service's website.               
+      This API provides access to the renowned ICON weather models of the German Weather Service (DWD), which provide
+      15-minute data for short-term forecasts in Central Europe and global forecasts with a resolution of 11 km.
+      The ICON model is a preferred choice for general weather forecast APIs when no other high-resolution weather
+      models are available. The models DWD Icon D2, DWD Icon EU and DWD Icon Global models are merged into a 
+      seamless forecast.
+      The comprehensive and clearly laid out
+      <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on
+      the service's website.
       <br><br>
 
+      <b>OpenMeteoWorld-API</b> <br>
+      
+      As a variant of the Open Meteo service, the OpenMeteoWorld API provides the optimum forecast for a specific location worldwide.
+      The OpenMeteoWorld API seamlessly combines ensemble models from well-known organizations such as NOAA (National Oceanic and Atmospheric 
+      Administration), DWD (German Weather Service), CMCC (Canadian) and ECMWF (European Centre for Medium-Range Weather Forecasts).
+      The best models are combined for each location worldwide to produce the best possible forecast.
+      The weather models are selected automatically based on the location coordinates contained in the API call.
+      <br><br>
+      
       <b>SolCast-API</b> <br>
 
       API usage requires one or more API-keys (accounts) and one or more Rooftop-ID's in advance
@@ -18041,7 +18090,7 @@ to ensure that the system configuration is correct.
 
       Below are some API-specific tips that are merely best practice recommendations.
       <br><br>
-      
+
       <b>Model OpenMeteoDWDAPI:</b> <br>
       The recommended autocorrection method is <b>on_complex</b> or <b>on_complex_ai</b>.
       <br><br>
@@ -18416,7 +18465,7 @@ to ensure that the system configuration is correct.
       The hours 01 - 24 refer to the hour of the day, e.g. the hour 09 refers to the time from
       08 - 09 o'clock. <br>
       Hour 99 has a special function. <br>
-      The values of the keys pvcorrf, quality, pvrlsum, pvfcsum and dnumsum are coded in the form 
+      The values of the keys pvcorrf, quality, pvrlsum, pvfcsum and dnumsum are coded in the form
       &lt;range sun elevation&gt;.&lt;cloud cover range&gt;. <br>
       Explanation of the values: <br><br>
 
@@ -18595,7 +18644,7 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-affectMaxDayVariance"></a>
        <li><b>affectMaxDayVariance &lt;Zahl&gt; </b><br>
-         Maximum adjustment of the PV prediction factor (Reading pvCorrectionFactor_XX) that can be made 
+         Maximum adjustment of the PV prediction factor (Reading pvCorrectionFactor_XX) that can be made
          in relation to one hour per day. <br>
          This setting has no influence on the learning and forecasting behavior of any AI support used
          (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>). <br>
@@ -18830,13 +18879,13 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-ctrlAIdataStorageDuration"></a>
        <li><b>ctrlAIdataStorageDuration &lt;Tage&gt;</b> <br>
-         If the corresponding prerequisites are met, training data is collected and stored for the 
+         If the corresponding prerequisites are met, training data is collected and stored for the
          module-internal AI. <br>
          The data is deleted when it has exceeded the specified holding period (days).<br>
          (default: 1095)
        </li>
        <br>
-       
+
        <a id="SolarForecast-attr-ctrlAIshiftTrainStart"></a>
        <li><b>ctrlAIshiftTrainStart &lt;1...23&gt;</b> <br>
          Daily training takes place when using the internal AI.<br>
@@ -19106,8 +19155,8 @@ to ensure that the system configuration is correct.
 
        Specifies the device or API that provides the required weather data (cloud cover, precipitation, etc.).<br>
        The attribute 'ctrlWeatherDev1' specifies the leading weather service and is mandatory.<br>
-       If 'OpenMeteoDWD-API' is selected in the 'ctrlWeatherDev1' attribute, the Open-Meteo service is automatically set as the 
-       source of the radiation data (setter currentRadiationAPI).<br>
+       If an Open-Mete API is selected in the 'ctrlWeatherDev1' attribute, the Open-Meteo service is automatically set as the 
+       source of the radiation data (setter currentRadiationAPI). <br>
        If an FHEM device is to be used to supply the weather data, it must be of type 'DWD_OpenData'.<br>
        If no device of this type exists, at least one DWD_OpenData device must first be defined.
        (see <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
@@ -19837,8 +19886,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
     <ul>
       <a id="SolarForecast-set-currentMeterDev"></a>
-      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Einheit&gt; contotal=&lt;Readingname&gt;:&lt;Einheit&gt; 
-                             gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;   
+      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Einheit&gt; contotal=&lt;Readingname&gt;:&lt;Einheit&gt;
+                             gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;
                              [conprice=&lt;Wert&gt;:&lt;Currency&gt;] [feedprice=&lt;Wert&gt;:&lt;Currency&gt;] </b> <br><br>
 
       Legt ein beliebiges Device und seine Readings zur Energiemessung fest.
@@ -19888,23 +19937,33 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       Legt die Quelle zur Lieferung der solaren Strahlungsdaten fest. Es kann ein Device vom Typ DWD_OpenData oder
       eine implementierte API eines Dienstes ausgewählt werden. <br>
-      <b>Hinweis:</b> Ist OpenMeteoDWD-API im Attribut 'ctrlWeatherDev1' gesetzt, kann kein anderer Strahlungsdatendienst als 
-      OpenMeteoDWD-API ausgewählt werden. <br><br>
-      
-      <b>OpenMeteoDWD-API</b> <br>
-      
-      Open-Meteo ist eine Open-Source-Wetter-API und bietet kostenlosen Zugang für nicht-kommerzielle Zwecke. 
-      Es ist kein API-Schlüssel erforderlich.
-      Open-Meteo nutzt eine leistungsstarke Kombination aus globalen (11 km) und mesoskaligen (1 km) Wettermodellen 
-      von angesehenen nationalen Wetterdiensten.
-      Diese API bietet Zugang zu den renommierten ICON-Wettermodellen des Deutschen Wetterdienstes (DWD), die 
-      15-minütige Daten für kurzfristige Vorhersagen in Mitteleuropa und globale Vorhersagen mit einer Auflösung 
-      von 11 km liefern. Das ICON-Modell ist eine bevorzugte Wahl für allgemeine Wettervorhersage-APIs, wenn keine 
-      anderen hochauflösenden Wettermodelle verfügbar sind.
-      Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
-      <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.                  
-      <br><br>
+      <b>Hinweis:</b> Ist eine OpenMeteo API im Attribut 'ctrlWeatherDev1' gesetzt, kann kein anderer Strahlungsdatendienst als
+      diese OpenMeteo API ausgewählt werden. <br><br>
 
+      <b>OpenMeteoDWD-API</b> <br>
+
+      Open-Meteo ist eine Open-Source-Wetter-API und bietet kostenlosen Zugang für nicht-kommerzielle Zwecke.
+      Es ist kein API-Schlüssel erforderlich.
+      Open-Meteo nutzt eine leistungsstarke Kombination aus globalen (11 km) und mesoskaligen (1 km) Wettermodellen
+      von angesehenen nationalen Wetterdiensten.
+      Diese API bietet Zugang zu den renommierten ICON-Wettermodellen des Deutschen Wetterdienstes (DWD), die
+      15-minütige Daten für kurzfristige Vorhersagen in Mitteleuropa und globale Vorhersagen mit einer Auflösung
+      von 11 km liefern. Das ICON-Modell ist eine bevorzugte Wahl für allgemeine Wettervorhersage-APIs, wenn keine
+      anderen hochauflösenden Wettermodelle verfügbar sind. Es werden die Modelle DWD Icon D2, DWD Icon EU 
+      und DWD Icon Global zu einer nahtlosen Vorhersage zusammengeführt.
+      Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
+      <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
+      <br><br>
+      
+      <b>OpenMeteoWorld-API</b> <br>
+      
+      Als Variante des Open-Meteo Dienstes liefert die OpenMeteoWorld-API die optimale Vorhersage für einen bestimmten Ort weltweit.
+      Die OpenMeteoWorld-API vereint nahtlos Ensemblemodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric 
+      Administration), DWD (Deutscher Wetterdienst), CMCC (Canadian) und ECMWF (Europäisches Zentrum für mittelfristige Wettervorhersage).
+      Für jeden Ort weltweit werden die besten Modelle kombiniert, um die bestmögliche Vorhersage zu erstellen.
+      Die Auswahl der Wettermodelle erfolgt automatisch anhand der im API Aufruf enthalteten Standortkoordinaten.
+      <br><br>    
+      
       <b>SolCast-API</b> <br>
 
       Die API-Nutzung benötigt vorab ein oder mehrere API-keys (Accounts) sowie ein oder mehrere Rooftop-ID's
@@ -20215,7 +20274,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       Nachfolgend einige API-spezifische Hinweise die lediglich Best Practice Empfehlungen darstellen.
       <br><br>
-      
+
       <b>Model OpenMeteoDWDAPI:</b> <br>
       Die empfohlene Autokorrekturmethode ist <b>on_complex</b> bzw. <b>on_complex_ai</b>.
       <br><br>
@@ -20591,7 +20650,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Die Stundenangaben 01 - 24 beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von
       08 - 09 Uhr. <br>
       Die Stunde 99 hat eine Sonderfunktion. <br>
-      Die Werte der Schlüssel pvcorrf, quality, pvrlsum, pvfcsum und dnumsum sind in der Form 
+      Die Werte der Schlüssel pvcorrf, quality, pvrlsum, pvfcsum und dnumsum sind in der Form
       &lt;Bereich Sonnenstand Höhe&gt;.&lt;Bewölkungsbereich&gt; kodiert. <br>
       Erläuterung der Werte: <br><br>
 
@@ -20653,8 +20712,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       Listet die im Kontext des API-Abrufs gespeicherten Daten auf.
       Verwaltungsdatensätze sind mit einem führenden '?' gekennzeichnet.
-      Die von der API gelieferten Vorhersagedaten bzgl. der Globalstrahlung Rad1h und des PV Ertrages (Wh) sind auf 
-      eine Stunde konsolidiert. Die verfügbaren Kennwerte unterscheiden sich je nach verwendeter API. 
+      Die von der API gelieferten Vorhersagedaten bzgl. der Globalstrahlung Rad1h und des PV Ertrages (Wh) sind auf
+      eine Stunde konsolidiert. Die verfügbaren Kennwerte unterscheiden sich je nach verwendeter API.
       <br><br>
 
       <ul>
@@ -20769,7 +20828,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-affectMaxDayVariance"></a>
        <li><b>affectMaxDayVariance &lt;Zahl&gt; </b><br>
-         Maximale Anpassung des PV Vorhersagefaktors (Reading pvCorrectionFactor_XX) die bezogen auf eine 
+         Maximale Anpassung des PV Vorhersagefaktors (Reading pvCorrectionFactor_XX) die bezogen auf eine
          Stunde pro Tag vorgenommen werden kann. <br>
          Auf das Lern- und Prognoseverhalten einer eventuell verwendeten KI-Unterstützung
          (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>) hat diese Einstellung keinen
@@ -21010,7 +21069,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          (default: 1095)
        </li>
        <br>
-       
+
        <a id="SolarForecast-attr-ctrlAIshiftTrainStart"></a>
        <li><b>ctrlAIshiftTrainStart &lt;1...23&gt;</b> <br>
          Bei Nutzung der internen KI erfolgt ein tägliches Training.<br>
@@ -21282,7 +21341,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        Gibt das Gerät oder die API an, das/die die erforderlichen Wetterdaten (Wolkendecke, Niederschlag usw.) liefert.<br>
        Das Attribut 'ctrlWeatherDev1' gibt den führenden Wetterdienst an und ist zwingend erforderlich.<br>
-       Wird 'OpenMeteoDWD-API' im Attribut 'ctrlWeatherDev1' ausgewählt, wird der Dienst Open-Meteo automatisch auch als Quelle 
+       Wird eine Open-Mete API im Attribut 'ctrlWeatherDev1' ausgewählt, wird der Dienst Open-Meteo automatisch auch als Quelle
        der Strahlungsdaten (Setter currentRadiationAPI) eingestellt. <br>
        Soll ein FHEM Gerät zur Lieferung der Wetterdaten dienen, muß es vom Typ 'DWD_OpenData' sein.<br>
        Ist noch kein Gerät dieses Typs vorhanden, muß zunächst mindestens ein DWD_OpenData-Gerät
