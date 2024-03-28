@@ -18091,7 +18091,7 @@ to ensure that the system configuration is correct.
       Below are some API-specific tips that are merely best practice recommendations.
       <br><br>
 
-      <b>Model OpenMeteoDWDAPI:</b> <br>
+      <b>Model OpenMeteo...API:</b> <br>
       The recommended autocorrection method is <b>on_complex</b> or <b>on_complex_ai</b>.
       <br><br>
 
@@ -20275,7 +20275,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Nachfolgend einige API-spezifische Hinweise die lediglich Best Practice Empfehlungen darstellen.
       <br><br>
 
-      <b>Model OpenMeteoDWDAPI:</b> <br>
+      <b>Model OpenMeteo...API:</b> <br>
       Die empfohlene Autokorrekturmethode ist <b>on_complex</b> bzw. <b>on_complex_ai</b>.
       <br><br>
 
