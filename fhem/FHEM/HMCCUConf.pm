@@ -254,8 +254,6 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'^(C#\.)?LEVEL$:+pct,+level',
 	'BLIND_TRANSMITTER' =>
 		'^(C#\.)?LEVEL$:+pct,+level;^(C#\.)?LEVEL_2$:+pctSlats',
-#	'BLIND_VIRTUAL_RECEIVER' =>
-#		'^(C#\.)?LEVEL$:+pct,+level',
 	'CAPACITIVE_FILLING_LEVEL_SENSOR' =>
 		'^(C#\.)?FILLING_LEVEL$:+level',
 	'CLIMATECONTROL_REGULATOR' =>
@@ -274,8 +272,6 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'^(C#\.)?LEVEL$:+pct,+level',
 	'DIMMER_TRANSMITTER' =>
 		'^(C#\.)?LEVEL$:+pct,+level;(C#\.)?COLOR$:+color',
-#	'DIMMER_VIRTUAL_RECEIVER' =>
-#		'^(C#\.)?LEVEL$:+pct,+level;(C#\.)?COLOR$:+color',
 	'DIMMER_WEEK_PROFILE' =>
 		'^(C#\.)?WEEK_PROGRAM_CHANNEL_LOCKS$:+progMode',
 	'HB_GENERIC_DIST' =>
@@ -301,8 +297,6 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'^(C#\.)?ILLUMINATION$:+brightness;(C#\.)?PRESENCE_DETECTION_STATE:+presence;(C#\.)?PRESENCE_DETECTION_ACTIVE:+detection',
 	'SHUTTER_TRANSMITTER' =>
 		'^(C#\.)?LEVEL$:+pct,+level',
-#	'SHUTTER_VIRTUAL_RECEIVER' =>
-#		'^(C#\.)?LEVEL$:+pct,+level',
 	'SWITCH_PANIC' =>
 		'^(C#\.)?STATE$:+panic',
 	'SWITCH_SENSOR' =>
@@ -321,11 +315,11 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'^(C#\.)?TEMPERATURE$:+measured-temp;'.
 		'^(C#\.)?HUMIDITY$:+humidity',
 	'DEFAULT' =>
-#		'^([0-9]{1,2}\.)?LEVEL$:+pct,+level;'.
 		'^([0-9]{1,2}\.)?SET_TEMPERATURE$:+desired-temp;'.
 		'^([0-9]{1,2}\.)?(ACTUAL_TEMPERATURE|TEMPERATURE)$:+measured-temp;'.
 		'^([0-9]{1,2}\.)?SET_POINT_TEMPERATURE$:+desired-temp;'.
-		'^([0-9]{1,2}\.)?ACTUAL_HUMIDITY$:+humidity'
+		'^([0-9]{1,2}\.)?ACTUAL_HUMIDITY$:+humidity;'.
+		'^(P#)?WEEK_PROGRAM_POINTER$:+week-program'
 );
 
 #######################################################################################
@@ -484,9 +478,8 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'boost' => 'V:BOOST_MODE:#boost=on,off',
 		'on' => 'V:CONTROL_MODE:1 V:SET_POINT_TEMPERATURE:30.5',
 		'off' => 'V:CONTROL_MODE:1 V:SET_POINT_TEMPERATURE:4.5',
-		'week-program' => 'V:ACTIVE_PROFILE:#profile=1,2,3',
-		# For getting parameters from MASTER paramset the parameter is not used. But it must be a valid parameter of the role
-		'get week-program' => 'M:P1_ENDTIME_MONDAY_1:#profile=1,2,3:HMCCU_DisplayWeekProgram'
+		'week-program' => 'V:ACTIVE_PROFILE:#profile=ACTIVE_PROFILE',
+		'get week-program' => 'M:*:#profile=ACTIVE_PROFILE:HMCCU_DisplayWeekProgram'
 	},
 	'JALOUSIE' => {
 		'pct' => 'V:LEVEL:?level',
@@ -2136,21 +2129,21 @@ string chnid;
 string sifid;
 string prgid;
 foreach(devid, root.Devices().EnumUsedIDs()) {
-   object odev=dom.GetObject(devid);
-   if(odev) {
-      var intid=odev.Interface();
-      object oiface=dom.GetObject(intid);
-      if(oiface) {
-         string intna=oiface.Name();
-         integer cc=0;
-         foreach (chnid, odev.Channels()) {
-            object ochn=dom.GetObject(chnid);
-            WriteLine("C;" # ochn.Address() # ";" # ochn.Name() # ";" # ochn.ChnDirection());
-            cc=cc+1;
-         }
-         WriteLine("D;" # intna # ";" # odev.Address() # ";" # odev.Name() # ";" # odev.HssType() # ";" # cc);
+  object odev=dom.GetObject(devid);
+  if(odev) {
+    var intid=odev.Interface();
+    object oiface=dom.GetObject(intid);
+    if(oiface) {
+      string intna=oiface.Name();
+      integer cc=0;
+      foreach (chnid, odev.Channels()) {
+        object ochn=dom.GetObject(chnid);
+        WriteLine("C;" # ochn.Address() # ";" # ochn.Name() # ";" # ochn.ChnDirection());
+        cc=cc+1;
       }
-   }
+      WriteLine("D;" # intna # ";" # odev.Address() # ";" # odev.Name() # ";" # odev.HssType() # ";" # cc);
+    }
+  }
 }
 foreach(sifid, root.Interfaces().EnumIDs()) {
   object oIf=dom.GetObject(sifid);
@@ -2411,13 +2404,44 @@ else {
 }
 		)
 	},
-	"AddMetaData" => {
-		description => "Add metadata to channel",
+	"SetMetaData" => {
+		description => "Set metadata value in device or channel",
 		syntax      => "name key value",
 		parameters  => 3,
 		code        => qq(
-object chnObj = channels.Get("\$name");
-chnObj.AddMetaData("\$key", "\$value");
+string name = "\$name";
+object hmObj = dom.GetObject(name);
+if (hmObj) {
+  if (hmObj.IsTypeOf(OT_CHANNEL) || hmObj.IsTypeOf(OT_DEVICE)) {
+	hmObj.SetMetaData("\$key", "\$value");
+  }
+  else {
+    WriteLine(name # " is no device or channel");
+  }
+}
+else {
+	WriteLine("Device or channel " # name # " not found");
+}
+		)
+	},
+	"DelMetaData" => {
+		description => "Remove metadata from device or channel",
+		syntax      => "name key",
+		parameters  => 2,
+		code        => qq(
+string name = "\$name";
+object hmObj = dom.GetObject(name);
+if (hmObj) {
+  if (hmObj.IsTypeOf(OT_CHANNEL) || hmObj.IsTypeOf(OT_DEVICE)) {
+	hmObj.RemoveMetaData("\$key");
+  }
+  else {
+    WriteLine(name # " is no device or channel");
+  }
+}
+else {
+	WriteLine("Device or channel " # name # " not found");
+}
 		)
 	},
 	"GetServiceMessages" => {
