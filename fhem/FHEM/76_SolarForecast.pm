@@ -17820,7 +17820,7 @@ to ensure that the system configuration is correct.
       <b>OpenMeteoWorld-API</b> <br>
       
       As a variant of the Open Meteo service, the OpenMeteoWorld API provides the optimum forecast for a specific location worldwide.
-      The OpenMeteoWorld API seamlessly combines ensemble models from well-known organizations such as NOAA (National Oceanic and Atmospheric 
+      The OpenMeteoWorld API seamlessly combines weather models from well-known organizations such as NOAA (National Oceanic and Atmospheric 
       Administration), DWD (German Weather Service), CMCC (Canadian) and ECMWF (European Centre for Medium-Range Weather Forecasts).
       The best models are combined for each location worldwide to produce the best possible forecast.
       The weather models are selected automatically based on the location coordinates contained in the API call.
@@ -19995,7 +19995,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <b>OpenMeteoWorld-API</b> <br>
       
       Als Variante des Open-Meteo Dienstes liefert die OpenMeteoWorld-API die optimale Vorhersage für einen bestimmten Ort weltweit.
-      Die OpenMeteoWorld-API vereint nahtlos Ensemblemodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric 
+      Die OpenMeteoWorld-API vereint nahtlos Wettermodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric 
       Administration), DWD (Deutscher Wetterdienst), CMCC (Canadian) und ECMWF (Europäisches Zentrum für mittelfristige Wettervorhersage).
       Für jeden Ort weltweit werden die besten Modelle kombiniert, um die bestmögliche Vorhersage zu erstellen.
       Die Auswahl der Wettermodelle erfolgt automatisch anhand der im API Aufruf enthaltenen Standortkoordinaten.
