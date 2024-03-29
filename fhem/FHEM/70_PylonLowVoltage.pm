@@ -122,6 +122,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.2.4"  => "29.03.2024 avoid possible Illegal division by zero at line 1438 ",
   "0.2.3"  => "19.03.2024 edit commandref ",
   "0.2.2"  => "20.02.2024 correct commandref ",
   "0.2.1"  => "18.02.2024 doOnError: print out faulty response, Forum:https://forum.fhem.de/index.php?msg=1303912 ",
@@ -1434,8 +1435,8 @@ sub additionalReadings {
 
     my ($vmax, $vmin);
 
-    $readings->{averageCellVolt} = sprintf "%.3f", $readings->{packVolt} / $readings->{packCellcount}                  if(defined $readings->{packCellcount});
-    $readings->{packSOC}         = sprintf "%.2f", ($readings->{packCapacityRemain} / $readings->{packCapacity} * 100) if(defined $readings->{packCapacity});
+    $readings->{averageCellVolt} = sprintf "%.3f", $readings->{packVolt} / $readings->{packCellcount}                  if($readings->{packCellcount});
+    $readings->{packSOC}         = sprintf "%.2f", ($readings->{packCapacityRemain} / $readings->{packCapacity} * 100) if($readings->{packCapacity});
     $readings->{packPower}       = sprintf "%.2f", $readings->{packCurrent} * $readings->{packVolt};
 
     for (my $i=1; $i <= $readings->{packCellcount}; $i++) {
