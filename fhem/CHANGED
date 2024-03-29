@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  50_Signalbot: Improved registration procedure for Voice
  - feature: 93_DbRep: multicmd: add attr seqDoubletsVariance
  - feature: 93_DbRep: multicmd: add nextHop Keyword
  - bugfix:  73_PRESENCE2: Fehlerbereinigungen

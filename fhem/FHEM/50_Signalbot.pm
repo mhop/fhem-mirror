@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.17";
+my $Signalbot_VERSION="3.19";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -310,26 +310,12 @@ sub Signalbot_Set($@) {					#
 		my $account= shift @args;
 		return "Number needs to start with '+' followed by digits" if !defined Signalbot_checkNumber($account);
 		delete $hash->{helper}{captcha};
-		my $ret=Signalbot_Registration($hash,$account);
-		if (!defined $ret) {
-			my $err=ReadingsVal($name,"lastError","");
-			$hash->{helper}{verification}=undef;
-			$hash->{helper}{qr}=undef;
-			$err="Captcha";
-			if ($err =~ /Captcha/) {
-				$hash->{helper}{register}=$account;
-				Signalbot_createRegfiles($hash);
-				return;
-			} else {
-				$hash->{helper}{register}=undef;
-			}
-		} 			
-		$hash->{helper}{verification}=$account;
-		$hash->{helper}{register}=undef;
-		if (defined $ret && $ret==-1) {
-			#Special case: registration succeeded without captcha as it just was reactivated - no verification
-			$hash->{helper}{verification}=undef;
-			$ret=Signalbot_setAccount($hash,$account);
+		$hash->{helper}{register}=$account;
+		$hash->{helper}{method}=0;
+		Signalbot_createRegfiles($hash);
+		my $method=AttrVal($name,"registerMethod","SMS");
+		if ($method eq "Voice") {
+			$hash->{helper}{method}=1;
 		}
 		return;
 		
@@ -337,23 +323,11 @@ sub Signalbot_Set($@) {					#
 		my $captcha=shift @args;
 		if ($captcha =~ /signalcaptcha:\/\//) {
 			$hash->{helper}{captcha}=$captcha =~ s/signalcaptcha:\/\///rg;;
-			my $account=$hash->{helper}{register};
 			if (defined $account) {
-				#register already done before - try again right away
-				my $ret=Signalbot_Registration($hash,$account);
-				if (defined $ret) {
-					$hash->{helper}{verification}=$account;
-					$hash->{helper}{register}=undef;
-					#Switch back to device overview - experimental hint from rudolphkoenig https://forum.fhem.de/index.php/topic,122771.msg1173835.html#new
-					my $web=$hash->{CL}{SNAME};
-					my $peer=$hash->{CL}{PEER};
-					DoTrigger($web,"JS#$peer:location.href=".'"'."?detail=$name".'"');
-					return undef;
-				} else {
-					my $err=ReadingsVal($name,"lastError","");
-					return "Error with captcha:$err";
-				}
+				my $ret=Signalbot_setCaptcha($hash);
+				return $ret;
 			}
+			return;
 		}
 		return "Incorrect captcha - e.g. needs to start with signalcaptcha://";
 	} elsif ( $cmd eq "verify" ) {
@@ -1569,6 +1543,7 @@ sub Signalbot_CallDbus($@) {
 			#Handle Error here and mark Serial for mainloop to ignore
 			my $b=$msg->get_body()->[0];
 			$hash->{helper}{lasterr}="Error in $function:".$b;
+			Log3 $hash->{NAME}, 5, $hash->{NAME}.": Error message: ".$hash->{helper}{lasterr};				
 			readingsSingleUpdate($hash, 'lastError', $hash->{helper}{lasterr},1);
 			return;
 		}
@@ -1591,6 +1566,7 @@ sub Signalbot_CallDbus($@) {
 				#Error Case
 				$hash->{helper}{lasterr}="Error in $function:".$b;
 				readingsSingleUpdate($hash, 'lastError', $hash->{helper}{lasterr},1);
+				Log3 $hash->{NAME}, 5, $hash->{NAME}.": Error message: ".$hash->{helper}{lasterr};
 				return undef;
 			}
 			if ($got_response==1) {
@@ -2087,19 +2063,59 @@ sub Signalbot_setAccount($$) {
 	return "Unknown account $account, please register or use listAccounts to view existing accounts";
 }
 
+sub Signalbot_setCaptcha {
+	my ($hash) = @_;
+	my $name=$hash->{NAME};
+	my $account=$hash->{helper}{register};
+	my $method=$hash->{helper}{method};
+	#Use number from verification mode as "register" is already empty when in stage 2 of VOICE
+	$account=$hash->{helper}{verification} if $method==2;
+	my $ret=Signalbot_Registration($hash,$account);
+	if (defined $ret) {
+		$hash->{helper}{register}=undef;
+		$hash->{helper}{verification}=$account;
+		#Switch back to device overview - experimental hint from rudolphkoenig https://forum.fhem.de/index.php/topic,122771.msg1173835.html#new
+		#my $web=$hash->{CL}{SNAME};
+		#my $peer=$hash->{CL}{PEER};
+		#DoTrigger($web,"JS#$peer:location.href=".'"'."?detail=$name".'"');
+		if ($method == 1) {
+			$hash->{helper}{method} = 2;
+			Log3 $hash->{NAME}, 5, $hash->{NAME}." Triggering timer to try VOICE registration in 60s";
+			#Requested Voice, but ran SMS first, so now trigger second attempt with timer
+			InternalTimer(gettimeofday()+60, "Signalbot_setCaptcha", $hash, 0);
+		} else {
+			$hash->{helper}{method} = 0;
+		}
+		return undef;
+	} else {
+		my $err=ReadingsVal($name,"lastError","");
+		return "Error with captcha:$err";
+	}
+	return $ret;
+}
 
 sub Signalbot_Registration($$) {
 	my ($hash,$account) = @_;
 	my $name=$hash->{NAME};
 	my $method=AttrVal($name,"registerMethod","SMS");
 	$method=$method eq "SMS"?0:1;
+	if ($method == 1 and $hash->{helper}{method} == 1) {
+		#If trying to register with Voice, first fallback to SMS
+		$method=0;
+	}
 	my $captcha=$hash->{helper}{captcha};
 	my $ret;
 	if (!defined $captcha) {
 		#try without captcha (but never works nowadays)
+		Log3 $hash->{NAME}, 4, $hash->{NAME}." Register $account";
+		Log3 $hash->{NAME}, 4, $hash->{NAME}." Method $method";
+		Log3 $hash->{NAME}, 4, $hash->{NAME}." Without Captcha";
 		$ret=Signalbot_CallS($hash,"register",$account,$method);
 		return -1 if (defined $ret)
 	} else {
+		Log3 $hash->{NAME}, 4, $hash->{NAME}." Register $account";
+		Log3 $hash->{NAME}, 4, $hash->{NAME}." Method $method";
+		Log3 $hash->{NAME}, 4, $hash->{NAME}." Captcha $captcha";
 		$ret=Signalbot_CallS($hash,"registerWithCaptcha",$account,$method,$captcha);
 	}
 	return $ret;
@@ -2178,13 +2194,17 @@ sub Signalbot_Notify($$) {
 ################################### 
 sub Signalbot_Define($$) {			#
 	my ($hash, $def) = @_;
-	Log3 $hash->{NAME}, 2, $hash->{NAME}." Define: $def";
+	my $name=$hash->{NAME};
+	Log3 $name, 2, $name." Define: $def";
 	
 	$hash->{NOTIFYDEV} = "global";
 		if ($init_done) {
-			Log3 $hash->{NAME}, 2, "Define init_done: $def";
+			Log3 $name, 2, "Define init_done: $def";
 			my $ret=Signalbot_Init( $hash, $def );
 			return $ret if $ret;
+	}
+	if( !AttrVal($name, 'icon', undef )) {
+		CommandAttr(undef, "$name icon signal_messenger");
 	}
 	return undef;
 }
@@ -2266,6 +2286,7 @@ sub Signalbot_Detail {
 	return $ret if ($hash->{helper}{version}<1100);
 	
 	my $current=ReadingsVal($name,"account","none");
+	my $method=AttrVal($name,"registerMethod","SMS");
 	my $account=$hash->{helper}{register};
 	my $verification=$hash->{helper}{verification};
 	my $accounts=$hash->{helper}{accounts};
@@ -2284,6 +2305,12 @@ sub Signalbot_Detail {
 
 	if(defined $account) {
 		$ret .= "<b>Your registration for $account requires a Captcha to succeed.</b><br><br>";
+		if ($method eq "Voice") {
+			$ret .= "<br> <b>Note:</b> you chose to register with 'Voice'. Due to security measures in Signal, it is required to register with 'SMS' first.<br>";
+			$ret .= "Signalbot will help with that process. It will first register with 'SMS' , wait for 60s and re-register with 'Voice'<br><br>";
+		} else {
+			$ret .="<br> Note: you chose to register with 'SMS'. Make sure your device supports receiving text messages before proceeding.<br><br>";
+		}
 		if ($FW_userAgent =~ /Mobile/) {
 			$ret .= "You seem to access FHEM from a mobile device. If the Signal Messenger is installed on this device, the Captcha will be catched by Signal and you will not be able to properly register FHEM. Recommendation is to do this from Windows where this can mostly be automated<br><br>";
 		}
@@ -2305,9 +2332,14 @@ sub Signalbot_Detail {
 	}
 
 	if (defined $verification) {
-		$ret .= "<b>Your registration for $verification requires a verification code to complete.</b><br><br>";
-		$ret .= "You should have received a SMS or Voice call providing you the verification code.<br>";
-		$ret .= "use <b>set verify</b> with that code to complete the process.<br>";
+		if ($method eq "Voice") {
+			$ret .= "<b>Signalbot is going through the procedure to first try SMS, wait for 60s and then try Voice.</b><br>";
+			$ret .= "Please Wait about 60s for a call on $verification and ";
+		} else {
+			$ret .= "<b>Your registration for $verification requires a verification code to complete.</b><br><br>";
+			$ret .= "You should have received a SMS providing you the verification code.<br>Then ";
+		}	
+		$ret .= "use <b>set verify</b> with that code to complete the process.<br><br>";
 	}
 
 	my $qr_url = $hash->{helper}{qr};
