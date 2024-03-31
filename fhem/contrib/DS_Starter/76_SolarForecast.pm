@@ -158,7 +158,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.17.2" => "28.03.2024  aiTrain: better status info, limit ctrlWeatherDev2/3 to can only use DWD Devices ".
+  "1.17.3" => "31.03.2024  edit commandref, valDecTree: more infos in aiRuleStrings output, integrate OpenMeteoDWDEnsemble-API ".
+                           "change Call interval Open-Meteo API to 900s, OpenMeteo-API: fix todayDoneAPIcalls, implement callequivalent".
+                           "aiTrain: change default start to hour 2, change AI acceptable result limits ",
+  "1.17.2" => "29.03.2024  aiTrain: better status info, limit ctrlWeatherDev2/3 to can only use DWD Devices ".
                            "integrate OpenMeteoWorld-API with the 'Best match' Weather model ",
   "1.17.1" => "27.03.2024  add AI to OpenMeteoDWD-API, changed AI train debuglog, new attr ctrlAIshiftTrainStart ".
                            "_specialActivities: split tasks to several time slots, bugfixes ".
@@ -363,11 +366,12 @@ my $dwdcatgpx      = $root."/FHEM/FhemUtils/DWDcat_SolarForecast.gpx";          
 
 my $aitrblto       = 7200;                                                          # KI Training BlockingCall Timeout
 my $aibcthhld      = 0.2;                                                           # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
+my $aitrstartdef   = 2;                                                             # default Stunde f. Start AI-Training
 my $aistdudef      = 1095;                                                          # default Haltezeit KI Raw Daten (Tage)
-my $aiSpreadUpLim  = 130;                                                           # obere Abweichungsgrenze (%) AI 'Spread' von API Prognose
-my $aiSpreadLowLim = 70;                                                            # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
-my $aiAccUpLim     = 150;                                                           # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-my $aiAccLowLim    = 50;                                                            # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
+my $aiSpreadUpLim  = 120;                                                           # obere Abweichungsgrenze (%) AI 'Spread' von API Prognose
+my $aiSpreadLowLim = 80;                                                            # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
+my $aiAccUpLim     = 130;                                                           # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
+my $aiAccLowLim    = 70;                                                            # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
 
 my $calcmaxd       = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
 my @dweattrmust    = qw(TTT Neff RR1c ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
@@ -376,9 +380,10 @@ my $whistrepeat    = 851;                                                       
 
 my $solapirepdef   = 3600;                                                          # default Abrufintervall SolCast API (s)
 my $forapirepdef   = 900;                                                           # default Abrufintervall ForecastSolar API (s)
-my $ometeorepdef   = 600;                                                           # default Abrufintervall Open-Meteo API (s)
+my $ometeorepdef   = 900;                                                           # default Abrufintervall Open-Meteo API (s)
 my $vrmapirepdef   = 300;                                                           # default Abrufintervall Victron VRM API Forecast
-my $apimaxreqdef   = 50;                                                            # max. täglich mögliche Requests SolCast API
+my $solcmaxreqdef  = 50;                                                            # max. täglich mögliche Requests SolCast API
+my $ometmaxreq     = 9500;                                                          # Beschränkung auf max. mögliche Requests Open-Meteo API
 my $leadtime       = 3600;                                                          # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
 my $lagtime        = 1800;                                                          # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
 
@@ -706,6 +711,16 @@ my %hqtxt = (                                                                   
               DE => qq{KI Unterst&uuml;tzung arbeitet einwandfrei, liefert jedoch keinen Wert f&uuml;r die aktuelle Stunde} },
   aiwhit => { EN => qq{the PV forecast value for the current hour is provided by the AI support},
               DE => qq{der PV Vorhersagewert f&uuml;r die aktuelle Stunde wird von der KI Unterst&uuml;tzung geliefert}     },
+  ailatr => { EN => qq{last AI training:},
+              DE => qq{letztes KI-Training:}                                                                                },
+  aitris => { EN => qq{Runtime in seconds:},
+              DE => qq{Laufzeit in Sekunden:}                                                                               },
+  airule => { EN => qq{List of strings that describe the tree in rule-form},
+              DE => qq{Liste von Zeichenfolgen, die den Baum in Form von Regeln beschreiben}                                },
+  ainode => { EN => qq{Number of nodes in the trained decision tree},
+              DE => qq{Anzahl der Knoten im trainierten Entscheidungsbaum}                                                  },
+  aidept => { EN => qq{Maximum number of decisions that would need to be made a classification},
+              DE => qq{Maximale Anzahl von Entscheidungen, die f&uuml;r eine Klassifizierung getroffen werden m&uuml;ssen}  },
   nxtscc => { EN => qq{next SolCast call},
               DE => qq{n&auml;chste SolCast Abfrage}                                                                        },
   fulfd  => { EN => qq{fulfilled},
@@ -803,8 +818,8 @@ my %htitles = (                                                                 
                 DE => qq{Wetterdaten sind aktuell entsprechend des verwendeten DWD Modell}                         },
   scarespf => { EN => qq{API request failed},
                 DE => qq{API Abfrage fehlgeschlagen}                                                               },
-  dapic    => { EN => qq{API requests already executed today},
-                DE => qq{Heute bereits durchgef&#252;hrte API-Anfragen}                                            },
+  dapic    => { EN => qq{API requests or request equivalents already carried out today},
+                DE => qq{Heute bereits durchgef&#252;hrte API-Anfragen bzw. Anfragen-&#196;quivalente}             },
   rapic    => { EN => qq{remaining API requests},
                 DE => qq{verf&#252;gbare API-Anfragen}                                                             },
   yheyfdl  => { EN => qq{You have exceeded your free daily limit!},
@@ -1240,10 +1255,14 @@ sub _readCacheFile {
               delete $data{$type}{$name}{aidectree}{aitrained};
               $data{$type}{$name}{aidectree}{aitrained}  = $dtree;
               $data{$type}{$name}{current}{aitrainstate} = 'ok';
+              
               Log3 ($name, 3, qq{$name - cached data "$title" restored});
+              return;
           }
       }
-
+      
+      delete $data{$type}{$name}{circular}{99}{aitrainLastFinishTs};
+      delete $data{$type}{$name}{circular}{99}{runTimeTrainAI};
       return;
   }
 
@@ -1342,6 +1361,7 @@ sub Set {
   my $resets = join ",",@re;
 
   my @fcdevs = qw( OpenMeteoDWD-API
+                   OpenMeteoDWDEnsemble-API
                    OpenMeteoWorld-API
                    SolCast-API
                    ForecastSolar-API
@@ -1559,13 +1579,14 @@ sub _setcurrentRadiationAPI {              ## no critic "not used"
 
   my $awdev1 = AttrVal ($name, 'ctrlWeatherDev1', '');
   
-  if (($awdev1 eq 'OpenMeteoDWD-API'   && $prop ne 'OpenMeteoDWD-API')   || 
-      ($awdev1 eq 'OpenMeteoWorld-API' && $prop ne 'OpenMeteoWorld-API')) {
+  if (($awdev1 eq 'OpenMeteoDWD-API'         && $prop ne 'OpenMeteoDWD-API')         ||
+      ($awdev1 eq 'OpenMeteoDWDEnsemble-API' && $prop ne 'OpenMeteoDWDEnsemble-API') ||  
+      ($awdev1 eq 'OpenMeteoWorld-API'       && $prop ne 'OpenMeteoWorld-API')) {
       return "The attribute 'ctrlWeatherDev1' is set to '$awdev1'. \n".
              "Change that attribute to another weather device first if you want use an other API.";
   }
 
-  if ($prop =~ /(SolCast|OpenMeteoDWD|OpenMeteoWorld)-API/xs) {
+  if ($prop =~ /(SolCast|OpenMeteoDWD|OpenMeteoDWDEnsemble|OpenMeteoWorld)-API/xs) {
       return "The library FHEM::Utility::CTZ is missing. Please update FHEM completely." if($ctzAbsent);
 
       my $rmf = reqModFail();
@@ -1580,7 +1601,7 @@ sub _setcurrentRadiationAPI {              ## no critic "not used"
 
   return if(_checkSetupNotComplete ($hash));                                         # keine Stringkonfiguration wenn Setup noch nicht komplett
 
-  if ($prop =~ /(ForecastSolar|OpenMeteoDWD|OpenMeteoWorld)-API/xs) {
+  if ($prop =~ /(ForecastSolar|OpenMeteoDWD|OpenMeteoDWDEnsemble|OpenMeteoWorld)-API/xs) {
       my ($set, $lat, $lon, $elev) = locCoordinates();
       return qq{set attributes 'latitude' and 'longitude' in global device first} if(!$set);
 
@@ -2567,15 +2588,15 @@ sub _setaiDecTree {                   ## no critic "not used"
   my $name  = $paref->{name};
   my $prop  = $paref->{prop} // return;
 
-  if($prop eq 'addInstances') {
+  if ($prop eq 'addInstances') {
       aiAddInstance ($paref);
   }
 
-  if($prop eq 'addRawData') {
+  if ($prop eq 'addRawData') {
       aiAddRawData ($paref);
   }
 
-  if($prop eq 'train') {
+  if ($prop eq 'train') {
       manageTrain ($paref);
   }
 
@@ -2746,7 +2767,7 @@ sub __getSolCastData {
       $maxcnt       = $mx{$apikey} if(!$maxcnt || $mx{$apikey} > $maxcnt);
   }
 
-  my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
+  my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', $solcmaxreqdef);
   my $madc      = sprintf "%.0f", ($apimaxreq / $maxcnt);                                          # max. tägliche Anzahl API Calls
   my $mpk       = $maxcnt;                                                                         # Requestmultiplikator
 
@@ -2783,7 +2804,7 @@ sub __getSolCastData {
       }
   }
 
-  if($debug =~ /apiCall/x) {
+  if ($debug =~ /apiCall/x) {
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - max possible daily API requests: $apimaxreq");
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - Requestmultiplier: $mpk");
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - possible daily API Calls: $madc");
@@ -2953,7 +2974,7 @@ sub __solCast_ApiResponse {
           $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
           if($debug =~ /apiProcess|apiCall/x) {
-              my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
+              my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', $solcmaxreqdef);
 
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - response status: ".$jdata->{'response_status'}{'message'});
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - todayRemainingAPIrequests: ".SolCastAPIVal($hash, '?All', '?All', 'todayRemainingAPIrequests', $apimaxreq));
@@ -3110,7 +3131,7 @@ sub ___setSolCastAPIcallKeyData {
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];   # letzte Abrufzeit
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                       # letzter Abrufzeitstempel
 
-  my $apimaxreq = AttrVal       ($name, 'ctrlSolCastAPImaxReq',         $apimaxreqdef);
+  my $apimaxreq = AttrVal       ($name, 'ctrlSolCastAPImaxReq',        $solcmaxreqdef);
   my $mpl       = SolCastAPIVal ($hash, '?All', '?All', 'solCastAPIcallMultiplier', 1);
   my $ddc       = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls',        0);
 
@@ -4037,25 +4058,38 @@ sub __getopenMeteoData {
   my $force = $paref->{force} // 0;
   my $t     = $paref->{t};
   my $lang  = $paref->{lang};
-
+  my $debug = $paref->{debug};
+  
+  my $donearq = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+  
+  if ($donearq >= $ometmaxreq) {
+      my $msg = "The limit of maximum $ometmaxreq daily API requests is reached or already exceeded. Process is exited.";
+      Log3 ($name, 1, "$name - ERROR - $msg");
+      return $msg;
+  }
+  
   if (!$force) {                                                                                      # regulärer API Abruf
       my $lrt = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', 0);
 
       if ($lrt && $t < $lrt + $ometeorepdef) {
           my $rt = $lrt + $ometeorepdef - $t;
-          return qq{The waiting time to the next SolCast API call has not expired yet. The remaining waiting time is $rt seconds};
+          return qq{The waiting time to the next Open-Meteo API call has not expired yet. The remaining waiting time is $rt seconds};
       }
   }
 
+  debugLog ($paref, 'apiCall', qq{Open-Meteo API Call - the daily API requests -> limited to: $ometmaxreq, done: $donearq});
+  
   my $submodel         = InternalVal ($hash->{NAME}, 'MODEL', '');
   $paref->{allstrings} = ReadingsVal ($name, 'inverterStrings', '');
-  $paref->{submodel}   = $submodel eq 'OpenMeteoDWDAPI'   ? 'DWD ICON Seamless' : 
-                         $submodel eq 'OpenMeteoWorldAPI' ? 'World Best Match'  :  
+  $paref->{submodel}   = $submodel eq 'OpenMeteoDWDAPI'         ? 'DWD ICON Seamless'          : 
+                         $submodel eq 'OpenMeteoDWDEnsembleAPI' ? 'DWD ICON Seamless Ensemble' : 
+                         $submodel eq 'OpenMeteoWorldAPI'       ? 'World Best Match'           :  
                          'unknown';
                          
   return "The Weather Model '$submodel' is not a valid Open-Meteo Weather Model" if($paref->{submodel} eq 'unknown'); 
-                     
-  $paref->{begin} = 1;
+  
+  $paref->{callequivalent} = $submodel eq 'OpenMeteoDWDEnsembleAPI' ? 20 : 1;               
+  $paref->{begin}          = 1;
 
   __openMeteoDWD_ApiRequest ($paref);
 
@@ -4117,40 +4151,42 @@ sub __openMeteoDWD_ApiRequest {
   my $az   = StringVal ($hash, $string, 'azimut', '<unknown>');
 
   my $url = "https://api.open-meteo.com/v1/forecast?";
-  $url   .= "models=icon_seamless" if($submodel eq 'DWD ICON Seamless');
-  $url   .= "models=best_match"    if($submodel eq 'World Best Match');
-  $url   .= "&latitude=".$lat.
-            "&longitude=".$lon.
-            "&hourly=temperature_2m,rain,weather_code,cloud_cover,is_day,global_tilted_irradiance_instant".
-            "&current=temperature_2m,weather_code,cloud_cover".
-            "&minutely_15=global_tilted_irradiance".
-            "&daily=sunrise,sunset".
-            "&forecast_hours=48".
-            "&forecast_days=2".
-            "&tilt=".$tilt.
-            "&azimuth=".$az;
+  $url    = "https://ensemble-api.open-meteo.com/v1/ensemble?" if($submodel =~ /Ensemble/xs);                    # Ensemble Modell gewählt
+  $url   .= "models=icon_seamless"                             if($submodel =~ /DWD\sICON\sSeamless/xs);
+  $url   .= "models=best_match"                                if($submodel eq 'World Best Match');
+  $url   .= "&latitude=".$lat;
+  $url   .= "&longitude=".$lon;
+  $url   .= "&hourly=temperature_2m,rain,weather_code,cloud_cover,is_day,global_tilted_irradiance";
+  $url   .= "&current=temperature_2m,weather_code,cloud_cover" if($submodel !~ /Ensemble/xs);  
+  $url   .= "&minutely_15=global_tilted_irradiance"            if($submodel !~ /Ensemble/xs);        
+  $url   .= "&daily=sunrise,sunset"                            if($submodel !~ /Ensemble/xs);  
+  $url   .= "&forecast_hours=48";
+  $url   .= "&forecast_days=2";
+  $url   .= "&tilt=".$tilt;
+  $url   .= "&azimuth=".$az;
 
   debugLog ($paref, 'apiCall', qq{Open-Meteo API Call - Request for PV-String "$string" with Weather Model >$submodel<:\n$url});
 
   my $caller = (caller(0))[3];                                                                        # Rücksprungmarke
 
   my $param = {
-      url        => $url,
-      timeout    => 30,
-      hash       => $hash,
-      name       => $name,
-      type       => $paref->{type},
-      debug      => $debug,
-      header     => 'Accept: application/json',
-      submodel   => $submodel,
-      begin      => $paref->{begin},
-      caller     => \&$caller,
-      stc        => [gettimeofday],
-      allstrings => $allstrings,
-      string     => $string,
-      lang       => $paref->{lang},
-      method     => "GET",
-      callback   => \&__openMeteoDWD_ApiResponse
+      url            => $url,
+      timeout        => 30,
+      hash           => $hash,
+      name           => $name,
+      type           => $paref->{type},
+      debug          => $debug,
+      header         => 'Accept: application/json',
+      submodel       => $submodel,
+      begin          => $paref->{begin},
+      callequivalent => $paref->{callequivalent},
+      caller         => \&$caller,
+      stc            => [gettimeofday],
+      allstrings     => $allstrings,
+      string         => $string,
+      lang           => $paref->{lang},
+      method         => "GET",
+      callback       => \&__openMeteoDWD_ApiResponse
   };
 
   if ($debug =~ /apiCall/x) {
@@ -4259,8 +4295,7 @@ sub __openMeteoDWD_ApiResponse {
           return;
       }
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1;
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}   = 'success';
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'success';
 
       if ($debug =~ /apiCall/xs) {
           Log3 ($name, 1, qq{$name DEBUG> Open-Meteo API Call - server response for PV string "$string"});
@@ -4275,18 +4310,22 @@ sub __openMeteoDWD_ApiResponse {
 
       ## Akt. Werte
       #################
-      ($err, my $curstr) = timestringUTCtoLocal ($name, $jdata->{current}{time}, '%Y-%m-%dT%H:%M');
+      my ($curwid, $curwcc, $curtmp, $curstr);
+      
+      if (defined $jdata->{current}{time}) {
+          ($err, $curstr) = timestringUTCtoLocal ($name, $jdata->{current}{time}, '%Y-%m-%dT%H:%M');
 
-      if ($err) {
-          $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
-          Log3 ($name, 1, "$name - $msg");
-          singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
-          return;
+          if ($err) {
+              $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
+              Log3 ($name, 1, "$name - $msg");
+              singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
+              return;
+          }
+
+          $curwid = $jdata->{current}{weather_code};
+          $curwcc = $jdata->{current}{cloud_cover};
+          $curtmp = $jdata->{current}{temperature_2m};
       }
-
-      my $curwid = $jdata->{current}{weather_code};
-      my $curwcc = $jdata->{current}{cloud_cover};
-      my $curtmp = $jdata->{current}{temperature_2m};
 
       ## Stundenwerte
       #################
@@ -4310,7 +4349,7 @@ sub __openMeteoDWD_ApiResponse {
               next;                                                                             # Daten älter als akt. Tag 00:00:00 verwerfen
           }
 
-          my $rad1wh  = $jdata->{hourly}{global_tilted_irradiance_instant}[$k];                 # Wh/m2
+          my $rad1wh  = $jdata->{hourly}{global_tilted_irradiance}[$k];                         # Wh/m2
           my $rad     = 10 * (sprintf "%.0f", ($rad1wh * $WhtokJ) / 10);                        # Umrechnung Wh/m2 in kJ/m2 ->
           my $pv      = sprintf "%.2f", int ($rad1wh / 1000 * $peak * $prdef);                  # Rad wird in kWh/m2 erwartet
           my $don     = $jdata->{hourly}{is_day}[$k];
@@ -4319,7 +4358,7 @@ sub __openMeteoDWD_ApiResponse {
           my $wid     = ($don ? 0 : 100) + $jdata->{hourly}{weather_code}[$k];
           my $wcc     = $jdata->{hourly}{cloud_cover}[$k];
 
-          if ($k == 0) { $curwid = ($don ? 0 : 100) +  $curwid }
+          if ($k == 0 && $curwid) { $curwid = ($don ? 0 : 100) +  $curwid }
 
           if ($debug =~ /apiProcess/xs) {
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - Rad1Wh: $rad1wh, Rad1kJ: $rad, PV est: $pv Wh");
@@ -4330,9 +4369,9 @@ sub __openMeteoDWD_ApiResponse {
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - Cloud Cover: $wcc");
 
               if ($k == 0) {
-                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - current Temp: $curtmp");
-                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $curstr - current Weather Code: $curwid");
-                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $curstr - current Cloud Cover: $curwcc");
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - current Temp: $curtmp")         if(defined $curtmp);
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $curstr - current Weather Code: $curwid") if(defined $curwid);
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $curstr - current Cloud Cover: $curwcc")  if(defined $curwcc);
               }
           }
 
@@ -4356,9 +4395,9 @@ sub __openMeteoDWD_ApiResponse {
           $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{UpdateTime} = $rt;
 
           if ($k == 0) {
-              $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{neff} = $curwcc;
-              $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ww}   = $curwid;
-              $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ttt}  = $curtmp;
+              $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{neff} = $curwcc if(defined $curwcc);
+              $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ww}   = $curwid if(defined $curwid);
+              $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ttt}  = $curtmp if(defined $curtmp);
           }
 
           $k++;
@@ -4384,29 +4423,40 @@ sub __openMeteoDWD_ApiResponse {
           if ($k == 0) {
               $data{$type}{$name}{solcastapi}{'?All'}{sunrise}{today} = $sunrise;
               $data{$type}{$name}{solcastapi}{'?All'}{sunset}{today}  = $sunset;
+              
+              if ($debug =~ /apiProcess/xs) {
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API - Sunrise Today: $sunrise");
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API - SunSet Today: $sunset");
+              }
           }
 
           if ($k == 1) {
               $data{$type}{$name}{solcastapi}{'?All'}{sunrise}{tomorrow} = $sunrise;
               $data{$type}{$name}{solcastapi}{'?All'}{sunset}{tomorrow}  = $sunset;
+              
+              if ($debug =~ /apiProcess/xs) {
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API - Sunrise Tomorrow: $sunrise");
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API - SunSet Tomorrow: $sunset");
+              }
           }
 
           $k++;
       }
   }
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += $paref->{callequivalent};
 
   Log3 ($name, 4, qq{$name - Open-Meteo DWD ICON API answer received for string "$string"});
 
   my $param = {
-      hash       => $hash,
-      name       => $name,
-      type       => $type,
-      debug      => $debug,
-      allstrings => $allstrings,
-      submodel   => $submodel,
-      lang       => $lang
+      hash           => $hash,
+      name           => $name,
+      type           => $type,
+      debug          => $debug,
+      allstrings     => $allstrings,
+      submodel       => $submodel,
+      callequivalent => $paref->{callequivalent},
+      lang           => $lang
   };
 
   $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
@@ -4914,7 +4964,7 @@ sub _getaiDecTree {                   ## no critic "not used"
   }
 
   if($arg eq 'aiRuleStrings') {
-      $ret = __getaiRuleStrings ($hash);
+      $ret = __getaiRuleStrings ($paref);
   }
 
   $ret .= lineFromSpaces ($ret, 5);
@@ -4927,7 +4977,9 @@ return $ret;
 #  Entscheidungsbaum in Form von Regeln beschreiben
 ################################################################
 sub __getaiRuleStrings {                 ## no critic "not used"
-  my $hash = shift;
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $lang  = $paref->{lang};
 
   return 'the AI usage is not prepared' if(!isPrepared4AI ($hash));
 
@@ -4948,12 +5000,18 @@ sub __getaiRuleStrings {                 ## no critic "not used"
        or do { return $@;
              };
 
+  my $atf = CircularVal ($hash, 99, 'aitrainLastFinishTs', 0);
+  $atf    = '<b>'.$hqtxt{ailatr}{$lang}.' </b>'.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
+  my $art = $hqtxt{aitris}{$lang}.' '.CircularVal ($hash, 99, 'runTimeTrainAI', '-');
+  
   if (@rsl) {
       my $l = scalar @rsl;
       $rs   = "<b>Number of Rules: $l / Number of Nodes: $nodes / Depth: $depth</b>\n";
-      $rs  .= "Rules: List of strings that describe the tree in rule-form\n";
-      $rs  .= "Nodes: Number of nodes in the trained decision tree\n";
-      $rs  .= "Depth: Maximum number of decisions that would need to be made a classification";
+      $rs  .= "Rules: ".$hqtxt{airule}{$lang}."\n";
+      $rs  .= "Nodes: ".$hqtxt{ainode}{$lang}."\n";
+      $rs  .= "Depth: ".$hqtxt{aidept}{$lang};
+      $rs  .= "\n\n";
+      $rs  .= $atf.' / '.$art;
       $rs  .= "\n\n";
       $rs  .= join "\n", @rsl;
   }
@@ -6107,7 +6165,7 @@ sub _addDynAttr {
 
   for my $step (1..$weatherDevMax) {
       if ($step == 1) {
-          push @deva, ($adwds ? "ctrlWeatherDev".$step.":OpenMeteoDWD-API,OpenMeteoWorld-API,$adwds" : "ctrlWeatherDev1:OpenMeteoDWD-API,OpenMeteoWorld-API");
+          push @deva, ($adwds ? "ctrlWeatherDev".$step.":OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API,$adwds" : "ctrlWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API");
           next;
       }
       push @deva, ($adwds ? "ctrlWeatherDev".$step.":$adwds" : "ctrlWeatherDev1");
@@ -6512,7 +6570,7 @@ sub _specialActivities {
   ##################################
   $chour    = int $chour;
   $minute   = int $minute;
-  my $aitrh = AttrVal ($name, 'ctrlAIshiftTrainStart', 1);                                   # Stunde f. Start AI-Training
+  my $aitrh = AttrVal ($name, 'ctrlAIshiftTrainStart', $aitrstartdef);                        # Stunde f. Start AI-Training
 
   ## Task 1
   ###########
@@ -10546,7 +10604,7 @@ sub genStatisticReadings {
       my $par = $hcsr{$kpi}{par};
 
       if ($def eq 'apimaxreq') {
-          $def = AttrVal ($name, 'ctrlSolCastAPImaxReq', $apimaxreqdef);
+          $def = AttrVal ($name, 'ctrlSolCastAPImaxReq', $solcmaxreqdef);
       }
 
       if ($hcsr{$kpi}{fnr} == 1) {
@@ -11165,16 +11223,7 @@ sub _checkSetupNotComplete {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################
-  ## currentWeatherDev in Attr umsetzen
-  my $mdr = ReadingsVal ($name, 'moduleDirection', undef);                    # 09.02.2024
-  if ($mdr) {
-      readingsSingleUpdate ($hash, 'moduleAzimuth', $mdr, 0);
-  }
 
-  my $mta = ReadingsVal   ($name, 'moduleTiltAngle', undef);
-  if ($mta) {
-      readingsSingleUpdate ($hash, 'moduleDeclination', $mta, 0);
-  }
   ##########################################################################################
 
   my $is    = ReadingsVal   ($name, 'inverterStrings',     undef);                        # String Konfig
@@ -11791,12 +11840,15 @@ sub __createAIicon {
               $aicanuse ne 'ok' ? $htitles{ainuse}{$lang} :
               q{};
   $aitit   =~ s/<NAME>/$name/xs;
+  
+  my $atf = CircularVal ($hash, 99, 'aitrainLastFinishTs', 0);
+  $atf    = $hqtxt{ailatr}{$lang}.' '.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
 
   my $aiimg  = $aidtabs          ? '--' :
                $aicanuse ne 'ok' ? '-'  :
                $aitst ne 'ok'    ? FW_makeImage ('10px-kreis-rot.png', $aitst) :
-               $aihit            ? FW_makeImage ('10px-kreis-gruen.png', $hqtxt{aiwhit}{$lang}) :
-               FW_makeImage ('10px-kreis-gelb.png', $hqtxt{aiwook}{$lang});
+               $aihit            ? FW_makeImage ('10px-kreis-gruen.png', $hqtxt{aiwhit}{$lang}.' &#10;'.$atf) :
+               FW_makeImage ('10px-kreis-gelb.png', $hqtxt{aiwook}{$lang}.' &#10;'.$atf);
 
   my $aiicon = qq{<a title="$aitit">$aiimg</a>};
 
@@ -13597,17 +13649,19 @@ sub finishTrain {
   my $hash  = $defs{$name};
   my $type  = $hash->{TYPE};
 
-  my $aicanuse       = $paref->{aicanuse};
-  my $aiinitstate    = $paref->{aiinitstate};
-  my $aitrainstate   = $paref->{aitrainstate};
-  my $runTimeTrainAI = $paref->{runTimeTrainAI};
+  my $aicanuse        = $paref->{aicanuse};
+  my $aitrainstate    = $paref->{aitrainstate};
+  my $runTimeTrainAI  = $paref->{runTimeTrainAI};
+  my $aiinitstate     = $paref->{aiinitstate};
+  my $aitrainFinishTs = $paref->{aitrainLastFinishTs};
 
-  $data{$type}{$name}{current}{aiAddedToTrain}      = 0;
-  $data{$type}{$name}{current}{aicanuse}            = $aicanuse       if(defined $aicanuse);
-  $data{$type}{$name}{current}{aiinitstate}         = $aiinitstate    if(defined $aiinitstate);
-  $data{$type}{$name}{current}{aitrainstate}        = $aitrainstate   if(defined $aitrainstate);
-  $data{$type}{$name}{circular}{99}{runTimeTrainAI} = $runTimeTrainAI if(defined $runTimeTrainAI);  # !! in Circular speichern um zu persistieren, setTimeTracking speichert zunächst in Current !!
-
+  $data{$type}{$name}{current}{aiAddedToTrain}           = 0;
+  $data{$type}{$name}{current}{aicanuse}                 = $aicanuse;
+  $data{$type}{$name}{current}{aitrainstate}             = $aitrainstate;
+  $data{$type}{$name}{current}{aiinitstate}              = $aiinitstate     if(defined $aiinitstate);
+  $data{$type}{$name}{circular}{99}{runTimeTrainAI}      = $runTimeTrainAI  if(defined $runTimeTrainAI);  # !! in Circular speichern um zu persistieren, setTimeTracking speichert zunächst in Current !!
+  $data{$type}{$name}{circular}{99}{aitrainLastFinishTs} = $aitrainFinishTs if(defined $aitrainFinishTs);
+  
   if ($aitrainstate eq 'ok') {
       _readCacheFile ({ hash      => $hash,
                         name      => $name,
@@ -13622,8 +13676,11 @@ sub finishTrain {
   $paref->{debug} = getDebug ($hash);
   
   if (defined $hash->{HELPER}{AIBLOCKRUNNING}) {
-      debugLog ($paref, 'aiProcess', qq{AI Training BlockingCall PID "$hash->{HELPER}{AIBLOCKRUNNING}{pid}" finished});
+      debugLog ($paref, 'aiProcess', qq{AI Training BlockingCall PID "$hash->{HELPER}{AIBLOCKRUNNING}{pid}" finished, state: $aitrainstate});
       delete($hash->{HELPER}{AIBLOCKRUNNING});
+  }
+  else {
+      debugLog ($paref, 'aiProcess', qq{AI Training finished, state: $aitrainstate});
   }
 
 return;
@@ -13731,7 +13788,12 @@ sub aiTrain {                            ## no critic "not used"
 
   if (!isPrepared4AI ($hash)) {
       $err    = CurrentVal ($hash, 'aicanuse', '');
-      $serial = encode_base64 (Serialize ( {name => $name, aicanuse => $err} ), "");
+      $serial = encode_base64 (Serialize ( { name         => $name,
+                                             aitrainstate => "Train: not performed -> $err",      
+                                             aicanuse     => $err
+                                           } 
+                                         ), "");
+      
       $block ? return ($serial) : return \&finishTrain ($serial);
   }
 
@@ -13739,9 +13801,11 @@ sub aiTrain {                            ## no critic "not used"
   my $dtree = AiDetreeVal ($hash, 'object', undef);
 
   if (!$dtree) {
+      $err    = 'no AI::DecisionTree object present';
       $serial = encode_base64 (Serialize ( {name         => $name, 
-                                            aitrainstate => "Train: not performed (see 'get $name valCurrent' -> aiinitstate for further info)",
-                                            aiinitstate  => 'Init: no AI::DecisionTree object present'
+                                            aitrainstate => "Train: not performed -> $err",
+                                            aiinitstate  => "Init: $err",
+                                            aicanuse     => 'ok'
                                            } 
                                          ), "");
       $block ? return ($serial) : return \&finishTrain ($serial);
@@ -13751,12 +13815,13 @@ sub aiTrain {                            ## no critic "not used"
          1;
        }
        or do { Log3 ($name, 1, "$name - aiTrain ERROR: $@");
-               #$data{$type}{$name}{current}{aitrainstate} = $@;
                $err    = (split / at/, $@)[0];
                $serial = encode_base64 (Serialize ( {name         => $name, 
-                                                     aitrainstate => "Train: $err"
+                                                     aitrainstate => "Train: $err",
+                                                     aicanuse     => 'ok'
                                                     } 
                                                   ), "");
+               
                $block ? return ($serial) : return \&finishTrain ($serial);
              };
 
@@ -13767,14 +13832,15 @@ sub aiTrain {                            ## no critic "not used"
       debugLog ($paref, 'aiProcess', qq{AI trained number of entities: }. $data{$type}{$name}{current}{aiAddedToTrain});
       debugLog ($paref, 'aiProcess', qq{AI trained and saved data into file: }.$aitrained.$name);
       debugLog ($paref, 'aiProcess', qq{Training instances and their associated information where purged from the AI object});
-      $data{$type}{$name}{current}{aitrainstate} = 'ok';
   }
 
-  setTimeTracking ($hash, $cst, 'runTimeTrainAI');                   # Zyklus-Laufzeit ermitteln
+  setTimeTracking ($hash, $cst, 'runTimeTrainAI');                                                     # Zyklus-Laufzeit ermitteln
 
-  $serial = encode_base64 (Serialize ( {name           => $name,
-                                        aitrainstate   => CurrentVal ($hash, 'aitrainstate',   ''),
-                                        runTimeTrainAI => CurrentVal ($hash, 'runTimeTrainAI', '')
+  $serial = encode_base64 (Serialize ( {name                => $name,
+                                        aitrainstate        => 'ok',
+                                        runTimeTrainAI      => CurrentVal ($hash, 'runTimeTrainAI', ''),
+                                        aitrainLastFinishTs => int time,
+                                        aicanuse            => 'ok'
                                        }
                                      )
                                      , "");
@@ -14012,6 +14078,14 @@ sub aiAddRawData {
 
           my $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
           next if(!$rad1h || $rad1h <= 0);
+          
+          ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+          #######################################################################################################################
+          next if($rad1h =~ /\.[0-9]{1}$/xs);                 # 29.03.2024 -> einen Monat drin lassen wegen pvHistory turn
+          if ($rad1h =~ /\.00$/xs) {                          # 29.03.2024 -> einen Monat drin lassen wegen pvHistory turn
+              $rad1h = int $rad1h;
+          }
+          #######################################################################################################################
 
           my $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
           next if(!$pvrl || $pvrl <= 0);
@@ -14469,6 +14543,7 @@ sub listDataPool {
           my $idbotot  = CircularVal ($hash, $idx, "initdaybatouttot",    '-');
           my $botot    = CircularVal ($hash, $idx, "batouttot",           '-');
           my $rtaitr   = CircularVal ($hash, $idx, "runTimeTrainAI",      '-');
+          my $fsaitr   = CircularVal ($hash, $idx, "aitrainLastFinishTs", '-');
 
           my $pvcf = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvcorrf', cval => $pvcorrf} );
           my $cfq  = _ldchash2val ( {pool => $h, idx => $idx, key => 'quality', cval => $quality} );
@@ -14489,13 +14564,13 @@ sub listDataPool {
               $sq .= "      dnumsum: $dnus";
           }
           else {
-              $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn\n";
-              $sq .= "      feedintotal: $fitot, initdayfeedin: $idfi\n";
-              $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon\n";
-              $sq .= "      batintot: $bitot, initdaybatintot: $idbitot\n";
-              $sq .= "      batouttot: $botot, initdaybatouttot: $idbotot\n";
+              $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn \n";
+              $sq .= "      feedintotal: $fitot, initdayfeedin: $idfi \n";
+              $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon \n";
+              $sq .= "      batintot: $bitot, initdaybatintot: $idbitot \n";
+              $sq .= "      batouttot: $botot, initdaybatouttot: $idbotot \n";
               $sq .= "      lastTsMaxSocRchd: $ltsmsr, nextTsMaxSocChge: $ntsmsc, days2care:$dtocare \n";
-              $sq .= "      runTimeTrainAI: $rtaitr\n";
+              $sq .= "      runTimeTrainAI: $rtaitr, aitrainLastFinishTs: $fsaitr \n";
           }
       }
   }
@@ -15671,19 +15746,22 @@ sub setModel {
 
   my $api = ReadingsVal ($hash->{NAME}, 'currentRadiationAPI', 'DWD');
 
-  if ($api =~ /SolCast/xs) {
+  if ($api =~ /SolCast-/xs) {
       $hash->{MODEL} = 'SolCastAPI';
   }
-  elsif ($api =~ /ForecastSolar/xs) {
+  elsif ($api =~ /ForecastSolar-/xs) {
       $hash->{MODEL} = 'ForecastSolarAPI';
   }
-  elsif ($api =~ /VictronKI/xs) {
+  elsif ($api =~ /VictronKI-/xs) {
       $hash->{MODEL} = 'VictronKiAPI';
   }
-  elsif ($api =~ /OpenMeteoDWD/xs) {
+  elsif ($api =~ /OpenMeteoDWDEnsemble-/xs) {
+      $hash->{MODEL} = 'OpenMeteoDWDEnsembleAPI';
+  }
+  elsif ($api =~ /OpenMeteoDWD-/xs) {
       $hash->{MODEL} = 'OpenMeteoDWDAPI';
   }
-  elsif ($api =~ /OpenMeteoWorld/xs) {
+  elsif ($api =~ /OpenMeteoWorld-/xs) {
       $hash->{MODEL} = 'OpenMeteoWorldAPI';
   }  
   else {
@@ -17780,14 +17858,25 @@ to ensure that the system configuration is correct.
       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on
       the service's website.
       <br><br>
+      
+      <b>OpenMeteoDWDEnsemble-API</b> <br>
+
+      This Open-Meteo API variant provides access to the DWD's global Ensemble Prediction System (EPS). <br>
+      The ensemble models ICON-D2-EPS, ICON-EU-EPS and ICON-EPS are seamlessly combined. <br>
+      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are 
+      a special type of forecasting method that takes into account the uncertainties in weather forecasting. 
+      They do this by running several simulations or models with slight differences in the starting conditions or settings. 
+      Each simulation, known as an ensemble member, represents a possible outcome of the weather.
+      In this implementation, 40 ensemble members per weather feature are combined and the most probable result is used. 
+      <br><br>
 
       <b>OpenMeteoWorld-API</b> <br>
       
       As a variant of the Open Meteo service, the OpenMeteoWorld API provides the optimum forecast for a specific location worldwide.
-      The OpenMeteoWorld API seamlessly combines ensemble models from well-known organizations such as NOAA (National Oceanic and Atmospheric 
+      The OpenMeteoWorld API seamlessly combines weather models from well-known organizations such as NOAA (National Oceanic and Atmospheric 
       Administration), DWD (German Weather Service), CMCC (Canadian) and ECMWF (European Centre for Medium-Range Weather Forecasts).
-      The best models are combined for each location worldwide to produce the best possible forecast.
-      The weather models are selected automatically based on the location coordinates contained in the API call.
+      The providers' models are combined for each location worldwide to produce the best possible forecast.
+      The services and weather models are used automatically based on the location coordinates contained in the API call.
       <br><br>
       
       <b>SolCast-API</b> <br>
@@ -18472,40 +18561,41 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aihit</b>            </td><td>Delivery status of the AI for the PV forecast (0-no delivery, 1-delivery)                                             </td></tr>
-            <tr><td> <b>batin</b>            </td><td>Battery charge (Wh)                                                                                                   </td></tr>
-            <tr><td> <b>batout</b>           </td><td>Battery discharge (Wh)                                                                                                </td></tr>
-            <tr><td> <b>batouttot</b>        </td><td>total energy drawn from the battery (Wh)                                                                              </td></tr>
-            <tr><td> <b>batintot</b>         </td><td>total energy charged into the battery (Wh)                                                                            </td></tr>
-            <tr><td> <b>confc</b>            </td><td>expected energy consumption (Wh)                                                                                      </td></tr>
-            <tr><td> <b>days2care</b>        </td><td>remaining days until the battery maintenance SoC (default 95%) is reached                                             </td></tr>
-            <tr><td> <b>dnumsum</b>          </td><td>Number of days per cloudy area over the entire term                                                                   </td></tr>
-            <tr><td> <b>feedintotal</b>      </td><td>total PV energy fed into the public grid (Wh)                                                                         </td></tr>
-            <tr><td> <b>gcon</b>             </td><td>real power drawn from the electricity grid                                                                            </td></tr>
-            <tr><td> <b>gfeedin</b>          </td><td>real power feed-in to the electricity grid                                                                            </td></tr>
-            <tr><td> <b>gridcontotal</b>     </td><td>total energy drawn from the public grid (Wh)                                                                          </td></tr>
-            <tr><td> <b>initdayfeedin</b>    </td><td>initial PV feed-in value at the beginning of the current day (Wh)                                                     </td></tr>
-            <tr><td> <b>initdaygcon</b>      </td><td>initial grid reference value at the beginning of the current day (Wh)                                                 </td></tr>
-            <tr><td> <b>initdaybatintot</b>  </td><td>initial value of the total energy charged into the battery at the beginning of the current day. (Wh)                  </td></tr>
-            <tr><td> <b>initdaybatouttot</b> </td><td>initial value of the total energy drawn from the battery at the beginning of the current day. (Wh)                    </td></tr>
-            <tr><td> <b>lastTsMaxSocRchd</b> </td><td>Timestamp of last achievement of battery SoC >= maxSoC (default 95%)                                                  </td></tr>
-            <tr><td> <b>nextTsMaxSocChge</b> </td><td>Timestamp by which the battery should reach maxSoC at least once                                                      </td></tr>
-            <tr><td> <b>pvapifc</b>          </td><td>expected PV generation (Wh) of the API used                                                                           </td></tr>
-            <tr><td> <b>pvaifc</b>           </td><td>PV forecast (Wh) of the AI for the next 24h from the current hour of the day                                          </td></tr>
-            <tr><td> <b>pvfc</b>             </td><td>PV forecast used for the next 24h from the current hour of the day                                                    </td></tr>
-            <tr><td> <b>pvcorrf</b>          </td><td>Autocorrection factors for the hour of the day, where 'simple' is the simple correction factor.                       </td></tr>
-            <tr><td> <b>pvfcsum</b>          </td><td>summary PV forecast per cloud area over the entire term                                                               </td></tr>
-            <tr><td> <b>pvrl</b>             </td><td>real PV generation of the last 24h (Attention: pvforecast and pvreal do not refer to the same period!)                </td></tr>
-            <tr><td> <b>pvrlsum</b>          </td><td>summary real PV generation per cloud area over the entire term                                                        </td></tr>
-            <tr><td> <b>quality</b>          </td><td>Quality of the autocorrection factors (0..1), where 'simple' is the quality of the simple correction factor.          </td></tr>
-            <tr><td> <b>runTimeTrainAI</b>   </td><td>Duration of the last AI training                                                                                      </td></tr>
-            <tr><td> <b>tdayDvtn</b>         </td><td>Today's deviation PV forecast/generation in %                                                                         </td></tr>
-            <tr><td> <b>temp</b>             </td><td>Outdoor temperature                                                                                                   </td></tr>
-            <tr><td> <b>wcc</b>              </td><td>Degree of cloud cover                                                                                                 </td></tr>
-            <tr><td> <b>rr1c</b>             </td><td>Total precipitation during the last hour kg/m2                                                                        </td></tr>
-            <tr><td> <b>wid</b>              </td><td>ID of the predicted weather                                                                                           </td></tr>
-            <tr><td> <b>wtxt</b>             </td><td>Description of the predicted weather                                                                                  </td></tr>
-            <tr><td> <b>ydayDvtn</b>         </td><td>Deviation PV forecast/generation in % on the previous day                                                             </td></tr>
+            <tr><td> <b>aihit</b>               </td><td>Delivery status of the AI for the PV forecast (0-no delivery, 1-delivery)                                             </td></tr>
+            <tr><td> <b>batin</b>               </td><td>Battery charge (Wh)                                                                                                   </td></tr>
+            <tr><td> <b>batout</b>              </td><td>Battery discharge (Wh)                                                                                                </td></tr>
+            <tr><td> <b>batouttot</b>           </td><td>total energy drawn from the battery (Wh)                                                                              </td></tr>
+            <tr><td> <b>batintot</b>            </td><td>total energy charged into the battery (Wh)                                                                            </td></tr>
+            <tr><td> <b>confc</b>               </td><td>expected energy consumption (Wh)                                                                                      </td></tr>
+            <tr><td> <b>days2care</b>           </td><td>remaining days until the battery maintenance SoC (default 95%) is reached                                             </td></tr>
+            <tr><td> <b>dnumsum</b>             </td><td>Number of days per cloudy area over the entire term                                                                   </td></tr>
+            <tr><td> <b>feedintotal</b>         </td><td>total PV energy fed into the public grid (Wh)                                                                         </td></tr>
+            <tr><td> <b>gcon</b>                </td><td>real power drawn from the electricity grid                                                                            </td></tr>
+            <tr><td> <b>gfeedin</b>             </td><td>real power feed-in to the electricity grid                                                                            </td></tr>
+            <tr><td> <b>gridcontotal</b>        </td><td>total energy drawn from the public grid (Wh)                                                                          </td></tr>
+            <tr><td> <b>initdayfeedin</b>       </td><td>initial PV feed-in value at the beginning of the current day (Wh)                                                     </td></tr>
+            <tr><td> <b>initdaygcon</b>         </td><td>initial grid reference value at the beginning of the current day (Wh)                                                 </td></tr>
+            <tr><td> <b>initdaybatintot</b>     </td><td>initial value of the total energy charged into the battery at the beginning of the current day. (Wh)                  </td></tr>
+            <tr><td> <b>initdaybatouttot</b>    </td><td>initial value of the total energy drawn from the battery at the beginning of the current day. (Wh)                    </td></tr>
+            <tr><td> <b>lastTsMaxSocRchd</b>    </td><td>Timestamp of last achievement of battery SoC >= maxSoC (default 95%)                                                  </td></tr>
+            <tr><td> <b>nextTsMaxSocChge</b>    </td><td>Timestamp by which the battery should reach maxSoC at least once                                                      </td></tr>
+            <tr><td> <b>pvapifc</b>             </td><td>expected PV generation (Wh) of the API used                                                                           </td></tr>
+            <tr><td> <b>pvaifc</b>              </td><td>PV forecast (Wh) of the AI for the next 24h from the current hour of the day                                          </td></tr>
+            <tr><td> <b>pvfc</b>                </td><td>PV forecast used for the next 24h from the current hour of the day                                                    </td></tr>
+            <tr><td> <b>pvcorrf</b>             </td><td>Autocorrection factors for the hour of the day, where 'simple' is the simple correction factor.                       </td></tr>
+            <tr><td> <b>pvfcsum</b>             </td><td>summary PV forecast per cloud area over the entire term                                                               </td></tr>
+            <tr><td> <b>pvrl</b>                </td><td>real PV generation of the last 24h (Attention: pvforecast and pvreal do not refer to the same period!)                </td></tr>
+            <tr><td> <b>pvrlsum</b>             </td><td>summary real PV generation per cloud area over the entire term                                                        </td></tr>
+            <tr><td> <b>quality</b>             </td><td>Quality of the autocorrection factors (0..1), where 'simple' is the quality of the simple correction factor.          </td></tr>
+            <tr><td> <b>runTimeTrainAI</b>      </td><td>Duration of the last AI training                                                                                      </td></tr>
+            <tr><td> <b>aitrainLastFinishTs</b> </td><td>Timestamp of the last successful AI training                                                                          </td></tr>
+            <tr><td> <b>tdayDvtn</b>            </td><td>Today's deviation PV forecast/generation in %                                                                         </td></tr>
+            <tr><td> <b>temp</b>                </td><td>Outdoor temperature                                                                                                   </td></tr>
+            <tr><td> <b>wcc</b>                 </td><td>Degree of cloud cover                                                                                                 </td></tr>
+            <tr><td> <b>rr1c</b>                </td><td>Total precipitation during the last hour kg/m2                                                                        </td></tr>
+            <tr><td> <b>wid</b>                 </td><td>ID of the predicted weather                                                                                           </td></tr>
+            <tr><td> <b>wtxt</b>                </td><td>Description of the predicted weather                                                                                  </td></tr>
+            <tr><td> <b>ydayDvtn</b>            </td><td>Deviation PV forecast/generation in % on the previous day                                                             </td></tr>
          </table>
       </ul>
 
@@ -18889,9 +18979,9 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-ctrlAIshiftTrainStart"></a>
        <li><b>ctrlAIshiftTrainStart &lt;1...23&gt;</b> <br>
          Daily training takes place when using the internal AI.<br>
-         Training starts 15 minutes after the hour specified in the attribute. <br>
+         Training begins approx. 15 minutes after the hour specified in the attribute. <br>
          For example, with a set value of '3', training would start at around 03:15. <br>
-         (default: 1)
+         (default: 2)
        </li>
        <br>
 
@@ -19155,9 +19245,48 @@ to ensure that the system configuration is correct.
 
        Specifies the device or API that provides the required weather data (cloud cover, precipitation, etc.).<br>
        The attribute 'ctrlWeatherDev1' specifies the leading weather service and is mandatory.<br>
-       If an Open-Mete API is selected in the 'ctrlWeatherDev1' attribute, the Open-Meteo service is automatically set as the 
-       source of the radiation data (setter currentRadiationAPI). <br>
-       If an FHEM device is to be used to supply the weather data, it must be of type 'DWD_OpenData'.<br>
+       If an Open-Meteo API is selected in the 'ctrlWeatherDev1' attribute, this Open-Meteo service is automatically set as the 
+       source of the radiation data (Setter currentRadiationAPI). <br><br>
+       
+       <b>OpenMeteoDWD-API</b> <br>
+
+       Open-Meteo is an open source weather API and offers free access for non-commercial purposes.
+       No API key is required.
+       Open-Meteo leverages a powerful combination of global (11 km) and mesoscale (1 km) weather models from esteemed
+       national weather services.
+       This API provides access to the renowned ICON weather models of the German Weather Service (DWD), which provide
+       15-minute data for short-term forecasts in Central Europe and global forecasts with a resolution of 11 km.
+       The ICON model is a preferred choice for general weather forecast APIs when no other high-resolution weather
+       models are available. The models DWD Icon D2, DWD Icon EU and DWD Icon Global models are merged into a 
+       seamless forecast.
+       The comprehensive and clearly laid out
+       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on
+       the service's website.
+       <br><br>
+       
+      <b>OpenMeteoDWDEnsemble-API</b> <br>
+
+      This Open-Meteo API variant provides access to the DWD's global Ensemble Prediction System (EPS). <br>
+      The ensemble models ICON-D2-EPS, ICON-EU-EPS and ICON-EPS are seamlessly combined. <br>
+      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are 
+      a special type of forecasting method that takes into account the uncertainties in weather forecasting. 
+      They do this by running several simulations or models with slight differences in the starting conditions or settings. 
+      Each simulation, known as an ensemble member, represents a possible outcome of the weather.
+      In this implementation, 40 ensemble members per weather feature are combined and the most probable result is used. 
+      <br><br>
+
+       <b>OpenMeteoWorld-API</b> <br>
+      
+       As a variant of the Open Meteo service, the OpenMeteoWorld API provides the optimum forecast for a specific location worldwide.
+       The OpenMeteoWorld API seamlessly combines weather models from well-known organizations such as NOAA (National Oceanic and Atmospheric 
+       Administration), DWD (German Weather Service), CMCC (Canadian) and ECMWF (European Centre for Medium-Range Weather Forecasts).
+       The providers' models are combined for each location worldwide to produce the best possible forecast.
+       The services and weather models are used automatically based on the location coordinates contained in the API call.
+       <br><br>      
+       
+       <b>DWD Device</b> <br>
+       
+       As an alternative to Open-Meteo, an FHEM 'DWD_OpenData' device can be used to supply the weather data.<br>
        If no device of this type exists, at least one DWD_OpenData device must first be defined.
        (see <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
        If more than one ctrlWeatherDevX is specified, the average of all weather stations is determined
@@ -19955,14 +20084,26 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
       <br><br>
       
+      <b>OpenMeteoDWDEnsemble-API</b> <br>
+
+      Diese Open-Meteo API Variante bietet Zugang zum globalen Ensemble-Vorhersagesystem (EPS) des DWD. <br>
+      Es werden die Ensemble Modelle ICON-D2-EPS, ICON-EU-EPS und ICON-EPS nahtlos vereint. <br>
+      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind 
+      eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt. 
+      Sie tun dies, indem sie mehrere Simulationen oder Modelle mit leichten Unterschieden in den Startbedingungen 
+      oder Einstellungen ausführen. Jede Simulation, bekannt als Ensemblemitglied, stellt ein mögliches Ergebnis des Wetters dar.
+      In der vorliegenden Implementierung werden 40 Ensemblemitglieder pro Wettermerkmal zusammengeführt und das wahrscheinlichste
+      Ergbnis verwendet.      
+      <br><br>
+      
       <b>OpenMeteoWorld-API</b> <br>
       
       Als Variante des Open-Meteo Dienstes liefert die OpenMeteoWorld-API die optimale Vorhersage für einen bestimmten Ort weltweit.
-      Die OpenMeteoWorld-API vereint nahtlos Ensemblemodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric 
+      Die OpenMeteoWorld-API vereint nahtlos Wettermodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric 
       Administration), DWD (Deutscher Wetterdienst), CMCC (Canadian) und ECMWF (Europäisches Zentrum für mittelfristige Wettervorhersage).
-      Für jeden Ort weltweit werden die besten Modelle kombiniert, um die bestmögliche Vorhersage zu erstellen.
-      Die Auswahl der Wettermodelle erfolgt automatisch anhand der im API Aufruf enthalteten Standortkoordinaten.
-      <br><br>    
+      Für jeden Ort weltweit werden die Modelle der Anbieter kombiniert, um die bestmögliche Vorhersage zu erstellen.
+      Die Nutzung der Dienste und Wettermodelle erfolgt automatisch anhand der im API Aufruf enthaltenen Standortkoordinaten.
+      <br><br>   
       
       <b>SolCast-API</b> <br>
 
@@ -20657,40 +20798,41 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aihit</b>            </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)                                                </td></tr>
-            <tr><td> <b>batin</b>            </td><td>Batterieladung (Wh)                                                                                                       </td></tr>
-            <tr><td> <b>batout</b>           </td><td>Batterieentladung (Wh)                                                                                                    </td></tr>
-            <tr><td> <b>batouttot</b>        </td><td>total aus der Batterie entnommene Energie (Wh)                                                                            </td></tr>
-            <tr><td> <b>batintot</b>         </td><td>total in die Batterie geladene Energie (Wh)                                                                               </td></tr>
-            <tr><td> <b>confc</b>            </td><td>erwarteter Energieverbrauch (Wh)                                                                                          </td></tr>
-            <tr><td> <b>days2care</b>        </td><td>verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll                                            </td></tr>
-            <tr><td> <b>dnumsum</b>          </td><td>Anzahl Tage pro Bewölkungsbereich über die gesamte Laufzeit                                                               </td></tr>
-            <tr><td> <b>feedintotal</b>      </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                                </td></tr>
-            <tr><td> <b>gcon</b>             </td><td>realer Leistungsbezug aus dem Stromnetz                                                                                   </td></tr>
-            <tr><td> <b>gfeedin</b>          </td><td>reale Leistungseinspeisung in das Stromnetz                                                                               </td></tr>
-            <tr><td> <b>gridcontotal</b>     </td><td>vom öffentlichen Netz total bezogene Energie (Wh)                                                                         </td></tr>
-            <tr><td> <b>initdayfeedin</b>    </td><td>initialer PV Einspeisewert zu Beginn des aktuellen Tages (Wh)                                                             </td></tr>
-            <tr><td> <b>initdaygcon</b>      </td><td>initialer Netzbezugswert zu Beginn des aktuellen Tages (Wh)                                                               </td></tr>
-            <tr><td> <b>initdaybatintot</b>  </td><td>initialer Wert der total in die Batterie geladenen Energie zu Beginn des aktuellen Tages (Wh)                             </td></tr>
-            <tr><td> <b>initdaybatouttot</b> </td><td>initialer Wert der total aus der Batterie entnommenen Energie zu Beginn des aktuellen Tages (Wh)                          </td></tr>
-            <tr><td> <b>lastTsMaxSocRchd</b> </td><td>Timestamp des letzten Erreichens von Batterie SoC >= maxSoC (default 95%)                                                 </td></tr>
-            <tr><td> <b>nextTsMaxSocChge</b> </td><td>Timestamp bis zu dem die Batterie mindestens einmal maxSoC erreichen soll                                                 </td></tr>
-            <tr><td> <b>pvapifc</b>          </td><td>erwartete PV Erzeugung (Wh) der verwendeten API                                                                           </td></tr>
-            <tr><td> <b>pvaifc</b>           </td><td>PV Vorhersage (Wh) der KI für die nächsten 24h ab aktueller Stunde des Tages                                              </td></tr>
-            <tr><td> <b>pvfc</b>             </td><td>verwendete PV Prognose für die nächsten 24h ab aktueller Stunde des Tages                                                 </td></tr>
-            <tr><td> <b>pvcorrf</b>          </td><td>Autokorrekturfaktoren für die Stunde des Tages, wobei 'simple' der einfach berechnete Korrekturfaktor ist.                </td></tr>
-            <tr><td> <b>pvfcsum</b>          </td><td>Summe PV Prognose pro Bewölkungsbereich über die gesamte Laufzeit                                                         </td></tr>
-            <tr><td> <b>pvrl</b>             </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!)        </td></tr>
-            <tr><td> <b>pvrlsum</b>          </td><td>Summe reale PV Erzeugung pro Bewölkungsbereich über die gesamte Laufzeit                                                  </td></tr>
-            <tr><td> <b>quality</b>          </td><td>Qualität der Autokorrekturfaktoren (0..1), wobei 'simple' die Qualität des einfach berechneten Korrekturfaktors ist.      </td></tr>
-            <tr><td> <b>runTimeTrainAI</b>   </td><td>Laufzeit des letzten KI Trainings                                                                                         </td></tr>
-            <tr><td> <b>tdayDvtn</b>         </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                             </td></tr>
-            <tr><td> <b>temp</b>             </td><td>Außentemperatur                                                                                                           </td></tr>
-            <tr><td> <b>wcc</b>              </td><td>Grad der Wolkenüberdeckung                                                                                                </td></tr>
-            <tr><td> <b>rr1c</b>             </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                                            </td></tr>
-            <tr><td> <b>wid</b>              </td><td>ID des vorhergesagten Wetters                                                                                             </td></tr>
-            <tr><td> <b>wtxt</b>             </td><td>Beschreibung des vorhergesagten Wetters                                                                                   </td></tr>
-            <tr><td> <b>ydayDvtn</b>         </td><td>Abweichung PV Prognose/Erzeugung in % am Vortag                                                                           </td></tr>
+            <tr><td> <b>aihit</b>               </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)                                                </td></tr>
+            <tr><td> <b>batin</b>               </td><td>Batterieladung (Wh)                                                                                                       </td></tr>
+            <tr><td> <b>batout</b>              </td><td>Batterieentladung (Wh)                                                                                                    </td></tr>
+            <tr><td> <b>batouttot</b>           </td><td>total aus der Batterie entnommene Energie (Wh)                                                                            </td></tr>
+            <tr><td> <b>batintot</b>            </td><td>total in die Batterie geladene Energie (Wh)                                                                               </td></tr>
+            <tr><td> <b>confc</b>               </td><td>erwarteter Energieverbrauch (Wh)                                                                                          </td></tr>
+            <tr><td> <b>days2care</b>           </td><td>verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll                                            </td></tr>
+            <tr><td> <b>dnumsum</b>             </td><td>Anzahl Tage pro Bewölkungsbereich über die gesamte Laufzeit                                                               </td></tr>
+            <tr><td> <b>feedintotal</b>         </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                                </td></tr>
+            <tr><td> <b>gcon</b>                </td><td>realer Leistungsbezug aus dem Stromnetz                                                                                   </td></tr>
+            <tr><td> <b>gfeedin</b>             </td><td>reale Leistungseinspeisung in das Stromnetz                                                                               </td></tr>
+            <tr><td> <b>gridcontotal</b>        </td><td>vom öffentlichen Netz total bezogene Energie (Wh)                                                                         </td></tr>
+            <tr><td> <b>initdayfeedin</b>       </td><td>initialer PV Einspeisewert zu Beginn des aktuellen Tages (Wh)                                                             </td></tr>
+            <tr><td> <b>initdaygcon</b>         </td><td>initialer Netzbezugswert zu Beginn des aktuellen Tages (Wh)                                                               </td></tr>
+            <tr><td> <b>initdaybatintot</b>     </td><td>initialer Wert der total in die Batterie geladenen Energie zu Beginn des aktuellen Tages (Wh)                             </td></tr>
+            <tr><td> <b>initdaybatouttot</b>    </td><td>initialer Wert der total aus der Batterie entnommenen Energie zu Beginn des aktuellen Tages (Wh)                          </td></tr>
+            <tr><td> <b>lastTsMaxSocRchd</b>    </td><td>Timestamp des letzten Erreichens von Batterie SoC >= maxSoC (default 95%)                                                 </td></tr>
+            <tr><td> <b>nextTsMaxSocChge</b>    </td><td>Timestamp bis zu dem die Batterie mindestens einmal maxSoC erreichen soll                                                 </td></tr>
+            <tr><td> <b>pvapifc</b>             </td><td>erwartete PV Erzeugung (Wh) der verwendeten API                                                                           </td></tr>
+            <tr><td> <b>pvaifc</b>              </td><td>PV Vorhersage (Wh) der KI für die nächsten 24h ab aktueller Stunde des Tages                                              </td></tr>
+            <tr><td> <b>pvfc</b>                </td><td>verwendete PV Prognose für die nächsten 24h ab aktueller Stunde des Tages                                                 </td></tr>
+            <tr><td> <b>pvcorrf</b>             </td><td>Autokorrekturfaktoren für die Stunde des Tages, wobei 'simple' der einfach berechnete Korrekturfaktor ist.                </td></tr>
+            <tr><td> <b>pvfcsum</b>             </td><td>Summe PV Prognose pro Bewölkungsbereich über die gesamte Laufzeit                                                         </td></tr>
+            <tr><td> <b>pvrl</b>                </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!)        </td></tr>
+            <tr><td> <b>pvrlsum</b>             </td><td>Summe reale PV Erzeugung pro Bewölkungsbereich über die gesamte Laufzeit                                                  </td></tr>
+            <tr><td> <b>quality</b>             </td><td>Qualität der Autokorrekturfaktoren (0..1), wobei 'simple' die Qualität des einfach berechneten Korrekturfaktors ist.      </td></tr>
+            <tr><td> <b>runTimeTrainAI</b>      </td><td>Laufzeit des letzten KI Trainings                                                                                         </td></tr>
+            <tr><td> <b>aitrainLastFinishTs</b> </td><td>Timestamp des letzten erfolgreichen KI Trainings                                                                          </td></tr>
+            <tr><td> <b>tdayDvtn</b>            </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                             </td></tr>
+            <tr><td> <b>temp</b>                </td><td>Außentemperatur                                                                                                           </td></tr>
+            <tr><td> <b>wcc</b>                 </td><td>Grad der Wolkenüberdeckung                                                                                                </td></tr>
+            <tr><td> <b>rr1c</b>                </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                                            </td></tr>
+            <tr><td> <b>wid</b>                 </td><td>ID des vorhergesagten Wetters                                                                                             </td></tr>
+            <tr><td> <b>wtxt</b>                </td><td>Beschreibung des vorhergesagten Wetters                                                                                   </td></tr>
+            <tr><td> <b>ydayDvtn</b>            </td><td>Abweichung PV Prognose/Erzeugung in % am Vortag                                                                           </td></tr>
          </table>
       </ul>
 
@@ -21073,9 +21215,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-ctrlAIshiftTrainStart"></a>
        <li><b>ctrlAIshiftTrainStart &lt;1...23&gt;</b> <br>
          Bei Nutzung der internen KI erfolgt ein tägliches Training.<br>
-         Der Start des Trainings erfolgt 15 Minuten nach der im Attribut festgelegten vollen Stunde. <br>
+         Der Start des Trainings erfolgt ca. 15 Minuten nach der im Attribut festgelegten vollen Stunde. <br>
          Zum Beispiel würde bei einem eingestellten Wert von '3' das Traning ca. 03:15 Uhr starten. <br>
-         (default: 1)
+         (default: 2)
        </li>
        <br>
 
@@ -21340,11 +21482,50 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>ctrlWeatherDevX </b> <br><br>
 
        Gibt das Gerät oder die API an, das/die die erforderlichen Wetterdaten (Wolkendecke, Niederschlag usw.) liefert.<br>
-       Das Attribut 'ctrlWeatherDev1' gibt den führenden Wetterdienst an und ist zwingend erforderlich.<br>
-       Wird eine Open-Mete API im Attribut 'ctrlWeatherDev1' ausgewählt, wird der Dienst Open-Meteo automatisch auch als Quelle
-       der Strahlungsdaten (Setter currentRadiationAPI) eingestellt. <br>
-       Soll ein FHEM Gerät zur Lieferung der Wetterdaten dienen, muß es vom Typ 'DWD_OpenData' sein.<br>
-       Ist noch kein Gerät dieses Typs vorhanden, muß zunächst mindestens ein DWD_OpenData-Gerät
+       Das Attribut 'ctrlWeatherDev1' definiert den führenden Wetterdienst und ist zwingend erforderlich.<br>
+       Ist eine Open-Meteo API im Attribut 'ctrlWeatherDev1' ausgewählt, wird dieser Open-Meteo Dienst automatisch auch als Quelle
+       der Strahlungsdaten (Setter currentRadiationAPI) eingestellt. <br><br>
+
+       <b>OpenMeteoDWD-API</b> <br>
+
+       Open-Meteo ist eine Open-Source-Wetter-API und bietet kostenlosen Zugang für nicht-kommerzielle Zwecke.
+       Es ist kein API-Schlüssel erforderlich.
+       Open-Meteo nutzt eine leistungsstarke Kombination aus globalen (11 km) und mesoskaligen (1 km) Wettermodellen
+       von angesehenen nationalen Wetterdiensten.
+       Diese API bietet Zugang zu den renommierten ICON-Wettermodellen des Deutschen Wetterdienstes (DWD), die
+       15-minütige Daten für kurzfristige Vorhersagen in Mitteleuropa und globale Vorhersagen mit einer Auflösung
+       von 11 km liefern. Das ICON-Modell ist eine bevorzugte Wahl für allgemeine Wettervorhersage-APIs, wenn keine
+       anderen hochauflösenden Wettermodelle verfügbar sind. Es werden die Modelle DWD Icon D2, DWD Icon EU 
+       und DWD Icon Global zu einer nahtlosen Vorhersage zusammengeführt.
+       Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
+       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
+       <br><br>
+       
+      <b>OpenMeteoDWDEnsemble-API</b> <br>
+
+      Diese Open-Meteo API Variante bietet Zugang zum globalen Ensemble-Vorhersagesystem (EPS) des DWD. <br>
+      Es werden die Ensemble Modelle ICON-D2-EPS, ICON-EU-EPS und ICON-EPS nahtlos vereint. <br>
+      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind 
+      eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt. 
+      Sie tun dies, indem sie mehrere Simulationen oder Modelle mit leichten Unterschieden in den Startbedingungen 
+      oder Einstellungen ausführen. Jede Simulation, bekannt als Ensemblemitglied, stellt ein mögliches Ergebnis des Wetters dar.
+      In der vorliegenden Implementierung werden 40 Ensemblemitglieder pro Wettermerkmal zusammengeführt und das wahrscheinlichste
+      Ergbnis verwendet.      
+      <br><br>
+      
+       <b>OpenMeteoWorld-API</b> <br>
+      
+       Als Variante des Open-Meteo Dienstes liefert die OpenMeteoWorld-API die optimale Vorhersage für einen bestimmten Ort weltweit.
+       Die OpenMeteoWorld-API vereint nahtlos Wettermodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric 
+       Administration), DWD (Deutscher Wetterdienst), CMCC (Canadian) und ECMWF (Europäisches Zentrum für mittelfristige Wettervorhersage).
+       Für jeden Ort weltweit werden die Modelle der Anbieter kombiniert, um die bestmögliche Vorhersage zu erstellen.
+       Die Nutzung der Dienste und Wettermodelle erfolgt automatisch anhand der im API Aufruf enthaltenen Standortkoordinaten.
+       <br><br>
+       
+       <b>DWD Gerät</b> <br>
+       
+       Alternativ zu Open-Meteo kann ein FHEM 'DWD_OpenData'-Gerät zur Lieferung der Wetterdaten dienen.<br>
+       Ist noch kein Gerät dieses Typs vorhanden, muß zunächst mindestens ein DWD_OpenData Gerät
        definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
        Sind mehr als ein ctrlWeatherDevX angegeben, wird der Durchschnitt aller Wetterstationen ermittelt
        sofern der jeweilige Wert geliefert wurde und numerisch ist. <br>
