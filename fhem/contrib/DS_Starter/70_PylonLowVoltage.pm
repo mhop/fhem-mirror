@@ -122,6 +122,10 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.2.5"  => "01.04.2024 _callAnalogValue: more than 5 temperature positions (US5000) ",
+  "0.2.4"  => "29.03.2024 avoid possible Illegal division by zero at line 1438 ",
+  "0.2.3"  => "19.03.2024 edit commandref ",
+  "0.2.2"  => "20.02.2024 correct commandref ",
   "0.2.1"  => "18.02.2024 doOnError: print out faulty response, Forum:https://forum.fhem.de/index.php?msg=1303912 ",
   "0.2.0"  => "15.12.2023 extend possible number of batteries up to 14 ",
   "0.1.11" => "28.10.2023 add needed data format to commandref ",
@@ -1152,11 +1156,11 @@ sub _callAnalogValue {
 
   for my $z (1..$pcc) {
       my $fz                          = sprintf "%02d", $z;                                      # formatierter Zähler
-      $readings->{'cellVoltage_'.$fz} = sprintf "%.3f", hex(substr($res, $bpos, 4)) / 1000;      # Pos 19 - 75 bei 15 Zellen
+      $readings->{'cellVoltage_'.$fz} = sprintf "%.3f", hex(substr($res, $bpos, 4)) / 1000;      # Pos 19 -> 75 bei 15 Zellen
       $bpos += 4;                                                                                # letzter Durchlauf: Pos 79 bei 15 Zellen, Pos 83 bei 16 Zellen
   }
-
-  $readings->{numberTempPos}             = hex(substr($res, $bpos, 2));                          # Anzahl der jetzt folgenden Teperaturpositionen -> 5
+  
+  $readings->{numberTempPos}             = hex(substr($res, $bpos, 2));                          # Anzahl der jetzt folgenden Temperaturpositionen -> 5 oder mehr (US5000: 6)
   $bpos += 2;
 
   $readings->{bmsTemperature}            = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 81 bei 15 Zellen
@@ -1174,7 +1178,13 @@ sub _callAnalogValue {
   $readings->{'cellTemperature_13'.$pcc} = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 97
   $bpos += 4;
 
-  my $current                            =  hex (substr($res, $bpos, 4));                        # Pos 101
+  for my $t (6..$readings->{numberTempPos}) {
+      $t = 'add'.sprintf "%02d", $t;
+      $readings->{'cellTemperature_'.$t} = (hex (substr($res, $bpos, 4)) - 2731) / 10;          # mehr als 5 Temperaturpositionen (z.B. US5000)
+      $bpos += 4;     
+  }
+
+  my $current                            =  hex (substr($res, $bpos, 4));                        # Pos 101 (bei 5 Temperaturpositionen)
   $bpos += 4;
 
   $readings->{packVolt}                  = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 105
@@ -1432,8 +1442,8 @@ sub additionalReadings {
 
     my ($vmax, $vmin);
 
-    $readings->{averageCellVolt} = sprintf "%.3f", $readings->{packVolt} / $readings->{packCellcount}                  if(defined $readings->{packCellcount});
-    $readings->{packSOC}         = sprintf "%.2f", ($readings->{packCapacityRemain} / $readings->{packCapacity} * 100) if(defined $readings->{packCapacity});
+    $readings->{averageCellVolt} = sprintf "%.3f", $readings->{packVolt} / $readings->{packCellcount}                  if($readings->{packCellcount});
+    $readings->{packSOC}         = sprintf "%.2f", ($readings->{packCapacityRemain} / $readings->{packCapacity} * 100) if($readings->{packCapacity});
     $readings->{packPower}       = sprintf "%.2f", $readings->{packCurrent} * $readings->{packVolt};
 
     for (my $i=1; $i <= $readings->{packCellcount}; $i++) {
@@ -1503,41 +1513,41 @@ return;
 
 =begin html
 
-<a id="PylonLowVoltage"></a>
-<h3>PylonLowVoltage</h3>
-<br>
-Module for integration of low voltage batteries with battery management system (BMS) of the manufacturer Pylontech via
-RS485/Ethernet gateway. Communication to the RS485 gateway takes place exclusively via an Ethernet connection.<br>
-The module has been successfully used so far with Pylontech batteries of the following types: <br>
+ <a id="PylonLowVoltage"></a>
+ <h3>PylonLowVoltage</h3>
+ <br>
+ Module for integration of low voltage batteries with battery management system (BMS) of the manufacturer Pylontech via
+ RS485/Ethernet gateway. Communication to the RS485 gateway takes place exclusively via an Ethernet connection.<br>
+ The module has been successfully used so far with Pylontech batteries of the following types: <br>
 
-<ul>
- <li> US2000        </li>
- <li> US2000B Plus  </li>
- <li> US2000C       </li>
- <li> US2000 Plus   </li>
- <li> US3000        </li>
- <li> US3000C       </li>
-</ul>
+ <ul>
+  <li> US2000        </li>
+  <li> US2000B Plus  </li>
+  <li> US2000C       </li>
+  <li> US2000 Plus   </li>
+  <li> US3000        </li>
+  <li> US3000C       </li>
+ </ul>
 
-The following devices have been successfully used as RS485 Ethernet gateways to date: <br>
-<ul>
- <li> USR-TCP232-304 from the manufacturer USRiot </li>
- <li> Waveshare RS485 to Ethernet Converter       </li>
-</ul>
+ The following devices have been successfully used as RS485 Ethernet gateways to date: <br>
+ <ul>
+  <li> USR-TCP232-304 from the manufacturer USRiot </li>
+  <li> Waveshare RS485 to Ethernet Converter       </li>
+ </ul>
 
-In principle, any other RS485/Ethernet gateway should also be compatible.
-<br><br>
+ In principle, any other RS485/Ethernet gateway should also be compatible.
+ <br><br>
 
-<b>Requirements</b>
-<br><br>
-This module requires the Perl modules:
-<ul>
+ <b>Requirements</b>
+ <br><br>
+ This module requires the Perl modules:
+ <ul>
     <li>IO::Socket::INET    (apt-get install libio-socket-multicast-perl)                          </li>
     <li>IO::Socket::Timeout (Installation e.g. via the CPAN shell or the FHEM Installer module)    </li>
-</ul>
+ </ul>
 
-The data format must be set on the RS485 gateway as follows:
-<br>
+ The data format must be set on the RS485 gateway as follows:
+ <br>
 
   <ul>
      <table>
@@ -1549,15 +1559,47 @@ The data format must be set on the RS485 gateway as follows:
      </table>
   </ul>
   <br>
+  
+ <b>Example configuration of a Waveshare RS485 to Ethernet converter</b>
+ <br><br>
+ The converter's web interface offers several pages with settings. The relevant settings are shown below
+ as an example. The assignment of a fixed IP address is assumed in advance.
+ <br>
 
-<b>Limitations</b>
-<br>
-The module currently supports a maximum of 14 batteries (master + 13 slaves) in one group.
-<br><br>
+  <ul>
+     <table>
+     <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+        <tr><td> <b>Serial port settings</b>          </td><td>                                         </td></tr>
+        <tr><td> - Baud Rate                          </td><td>: according to the battery setting       </td></tr>
+        <tr><td> - Data Size                          </td><td>: 8 Bit                                  </td></tr>
+        <tr><td> - Parity                             </td><td>: None                                   </td></tr>
+        <tr><td> - Stop Bits                          </td><td>: 1                                      </td></tr>
+        <tr><td> - Local Port Number                  </td><td>: freely selected                        </td></tr>
+        <tr><td> - Work Mode                          </td><td>: TCP Server                             </td></tr>
+        <tr><td> - Reset                              </td><td>: not set                                </td></tr>
+        <tr><td> - Link                               </td><td>: set                                    </td></tr>
+        <tr><td> - Index                              </td><td>: not set                                </td></tr>
+        <tr><td> - Similar RCF2217                    </td><td>: set                                    </td></tr>
+        <tr><td>                                      </td><td>                                         </td></tr>
+        <tr><td> <b>Settings Expand Function</b>      </td><td>                                         </td></tr>
+        <tr><td> - Heartbeat Packet Type              </td><td>: None                                   </td></tr>
+        <tr><td> - Register Packet Type               </td><td>: None                                   </td></tr>
+        <tr><td> - Short Connection                   </td><td>: not set                                </td></tr>
+        <tr><td> - TCP Server-kick off old connection </td><td>: set                                    </td></tr>
+        <tr><td> - Buffer Data before Connected       </td><td>: set                                    </td></tr>
+        <tr><td> - UART Set Parameter                 </td><td>: not set                                </td></tr>
+     </table>
+  </ul>
+  <br>
 
-<a id="PylonLowVoltage-define"></a>
-<b>Definition</b>
-<ul>
+ <b>Limitations</b>
+ <br>
+ The module currently supports a maximum of 14 batteries (master + 13 slaves) in one group.
+ <br><br>
+
+ <a id="PylonLowVoltage-define"></a>
+ <b>Definition</b>
+ <ul>
   <code><b>define &lt;name&gt; PylonLowVoltage &lt;hostname/ip&gt;:&lt;port&gt; [&lt;bataddress&gt;]</b></code><br>
   <br>
   <li><b>hostname/ip:</b><br>
@@ -1572,34 +1614,34 @@ The module currently supports a maximum of 14 batteries (master + 13 slaves) in 
      Device address of the Pylontech battery. Several Pylontech batteries can be connected via a Pylontech-specific
      Link connection. The permissible number can be found in the respective Pylontech documentation. <br>
      The master battery in the network (with open link port 0 or to which the RS485 connection is connected) has the
-     address 2, the next battery then has address 3 and so on.
+     address 1, the next battery then has address 2 and so on.
      If no device address is specified, address 1 is used.
   </li>
   <br>
-</ul>
+ </ul>
 
-<b>Mode of operation</b>
-<ul>
-Depending on the setting of the "Interval" attribute, the module cyclically reads values provided by the battery
-management system via the RS485 interface.
-</ul>
+ <b>Mode of operation</b>
+ <ul>
+ Depending on the setting of the "Interval" attribute, the module cyclically reads values provided by the battery
+ management system via the RS485 interface.
+ </ul>
 
-<a id="PylonLowVoltage-get"></a>
-<b>Get</b>
-<br>
-<ul>
+ <a id="PylonLowVoltage-get"></a>
+ <b>Get</b>
+ <br>
+ <ul>
   <li><b>data</b><br>
     The data query of the battery management system is executed. The timer of the cyclic query is reinitialized according
     to the set value of the "interval" attribute.
     <br>
   </li>
-<br>
-</ul>
+ <br>
+ </ul>
 
-<a id="PylonLowVoltage-attr"></a>
-<b>Attributes</b>
-<br<br>
-<ul>
+ <a id="PylonLowVoltage-attr"></a>
+ <b>Attributes</b>
+ <br<br>
+ <ul>
    <a id="PylonLowVoltage-attr-disable"></a>
    <li><b>disable 0|1</b><br>
      Enables/disables the device definition.
@@ -1630,105 +1672,105 @@ management system via the RS485 interface.
      The automatically determined battery type (Reading batteryType) is replaced by the specified string.
    </li>
    <br>
-</ul>
+ </ul>
 
-<a id="PylonLowVoltage-readings"></a>
-<b>Readings</b>
-<ul>
-<li><b>averageCellVolt</b><br>        Average cell voltage (V)                                                           </li>
-<li><b>bmsTemperature</b><br>         Temperature (°C) of the battery management system                                  </li>
-<li><b>cellTemperature_0104</b><br>   Temperature (°C) of cell packs 1 to 4                                              </li>
-<li><b>cellTemperature_0508</b><br>   Temperature (°C) of cell packs 5 to 8                                              </li>
-<li><b>cellTemperature_0912</b><br>   Temperature (°C) of the cell packs 9 to 12                                         </li>
-<li><b>cellTemperature_1315</b><br>   Temperature (°C) of the cell packs 13 to 15                                        </li>
-<li><b>cellVoltage_XX</b><br>         Cell voltage (V) of the cell pack XX. In the battery module "packCellcount"
-                                      cell packs are connected in series. Each cell pack consists of single cells
-                                      connected in parallel.                                                             </li>
-<li><b>chargeCurrentLimit</b><br>     current limit value for the charging current (A)                                   </li>
-<li><b>chargeEnable</b><br>           current flag loading allowed                                                       </li>
-<li><b>chargeFullRequest</b><br>      current flag charge battery module fully (from the mains if necessary)             </li>
-<li><b>chargeImmediatelySOCXX</b><br> current flag charge battery module immediately
-                                      (05: SOC limit 5-9%, 09: SOC limit 9-13%)                                          </li>
-<li><b>chargeVoltageLimit</b><br>     current charge voltage limit (V) of the battery module                             </li>
-<li><b>dischargeCurrentLimit</b><br>  current limit value for the discharge current (A)                                  </li>
-<li><b>dischargeEnable</b><br>        current flag unloading allowed                                                     </li>
-<li><b>dischargeVoltageLimit</b><br>  current discharge voltage limit (V) of the battery module                          </li>
+ <a id="PylonLowVoltage-readings"></a>
+ <b>Readings</b>
+ <ul>
+ <li><b>averageCellVolt</b><br>        Average cell voltage (V)                                                           </li>
+ <li><b>bmsTemperature</b><br>         Temperature (°C) of the battery management system                                  </li>
+ <li><b>cellTemperature_0104</b><br>   Temperature (°C) of cell packs 1 to 4                                              </li>
+ <li><b>cellTemperature_0508</b><br>   Temperature (°C) of cell packs 5 to 8                                              </li>
+ <li><b>cellTemperature_0912</b><br>   Temperature (°C) of the cell packs 9 to 12                                         </li>
+ <li><b>cellTemperature_1315</b><br>   Temperature (°C) of the cell packs 13 to 15                                        </li>
+ <li><b>cellVoltage_XX</b><br>         Cell voltage (V) of the cell pack XX. In the battery module "packCellcount"
+                                       cell packs are connected in series. Each cell pack consists of single cells
+                                       connected in parallel.                                                             </li>
+ <li><b>chargeCurrentLimit</b><br>     current limit value for the charging current (A)                                   </li>
+ <li><b>chargeEnable</b><br>           current flag loading allowed                                                       </li>
+ <li><b>chargeFullRequest</b><br>      current flag charge battery module fully (from the mains if necessary)             </li>
+ <li><b>chargeImmediatelySOCXX</b><br> current flag charge battery module immediately
+                                       (05: SOC limit 5-9%, 09: SOC limit 9-13%)                                          </li>
+ <li><b>chargeVoltageLimit</b><br>     current charge voltage limit (V) of the battery module                             </li>
+ <li><b>dischargeCurrentLimit</b><br>  current limit value for the discharge current (A)                                  </li>
+ <li><b>dischargeEnable</b><br>        current flag unloading allowed                                                     </li>
+ <li><b>dischargeVoltageLimit</b><br>  current discharge voltage limit (V) of the battery module                          </li>
 
-<li><b>moduleSoftwareVersion_manufacture</b><br> Firmware version of the battery module                                  </li>
+ <li><b>moduleSoftwareVersion_manufacture</b><br> Firmware version of the battery module                                  </li>
 
-<li><b>packAlarmInfo</b><br>          Alarm status (ok - battery module is OK, failure - there is a fault in the
-                                      battery module)                                                                    </li>
-<li><b>packCapacity</b><br>           nominal capacity (Ah) of the battery module                                        </li>
-<li><b>packCapacityRemain</b><br>     current capacity (Ah) of the battery module                                        </li>
-<li><b>packCellcount</b><br>          Number of cell packs in the battery module                                         </li>
-<li><b>packCurrent</b><br>            current charge current (+) or discharge current (-) of the battery module (A)      </li>
-<li><b>packCycles</b><br>             Number of full cycles - The number of cycles is, to some extent, a measure of the
-                                      wear and tear of the battery. A complete charge and discharge is counted as one
-                                      cycle. If the battery is discharged and recharged 50%, it only counts as one
-                                      half cycle. Pylontech specifies a lifetime of several 1000 cycles
-                                      (see data sheet).                                                                  </li>
-<li><b>packImbalance</b><br>          current imbalance of voltage between the single cells of the
-                                      battery module (%)                                                                 </li>
-<li><b>packPower</b><br>              current drawn (+) or delivered (-) power (W) of the battery module                 </li>
-<li><b>packSOC</b><br>                State of charge (%) of the battery module                                          </li>
-<li><b>packState</b><br>              current working status of the battery module                                       </li>
-<li><b>packVolt</b><br>               current voltage (V) of the battery module                                          </li>
+ <li><b>packAlarmInfo</b><br>          Alarm status (ok - battery module is OK, failure - there is a fault in the
+                                       battery module)                                                                    </li>
+ <li><b>packCapacity</b><br>           nominal capacity (Ah) of the battery module                                        </li>
+ <li><b>packCapacityRemain</b><br>     current capacity (Ah) of the battery module                                        </li>
+ <li><b>packCellcount</b><br>          Number of cell packs in the battery module                                         </li>
+ <li><b>packCurrent</b><br>            current charge current (+) or discharge current (-) of the battery module (A)      </li>
+ <li><b>packCycles</b><br>             Number of full cycles - The number of cycles is, to some extent, a measure of the
+                                       wear and tear of the battery. A complete charge and discharge is counted as one
+                                       cycle. If the battery is discharged and recharged 50%, it only counts as one
+                                       half cycle. Pylontech specifies a lifetime of several 1000 cycles
+                                       (see data sheet).                                                                  </li>
+ <li><b>packImbalance</b><br>          current imbalance of voltage between the single cells of the
+                                       battery module (%)                                                                 </li>
+ <li><b>packPower</b><br>              current drawn (+) or delivered (-) power (W) of the battery module                 </li>
+ <li><b>packSOC</b><br>                State of charge (%) of the battery module                                          </li>
+ <li><b>packState</b><br>              current working status of the battery module                                       </li>
+ <li><b>packVolt</b><br>               current voltage (V) of the battery module                                          </li>
 
-<li><b>paramCellHighVoltLimit</b><br>      System parameter upper voltage limit (V) of a cell                                 </li>
-<li><b>paramCellLowVoltLimit</b><br>       System parameter lower voltage limit (V) of a cell (alarm limit)                   </li>
-<li><b>paramCellUnderVoltLimit</b><br>     System parameter undervoltage limit (V) of a cell (protection limit)               </li>
-<li><b>paramChargeCurrentLimit</b><br>     System parameter charging current limit (A) of the battery module                  </li>
-<li><b>paramChargeHighTempLimit</b><br>    System parameter upper temperature limit (°C) up to which the battery charges      </li>
-<li><b>paramChargeLowTempLimit</b><br>     System parameter lower temperature limit (°C) up to which the battery charges      </li>
-<li><b>paramDischargeCurrentLimit</b><br>  System parameter discharge current limit (A) of the battery module                 </li>
-<li><b>paramDischargeHighTempLimit</b><br> System parameter upper temperature limit (°C) up to which the battery discharges   </li>
-<li><b>paramDischargeLowTempLimit</b><br>  System parameter lower temperature limit (°C) up to which the battery discharges   </li>
-<li><b>paramModuleHighVoltLimit</b><br>    System parameter upper voltage limit (V) of the battery module                     </li>
-<li><b>paramModuleLowVoltLimit</b><br>     System parameter lower voltage limit (V) of the battery module (alarm limit)       </li>
-<li><b>paramModuleUnderVoltLimit</b><br>   System parameter undervoltage limit (V) of the battery module (protection limit)   </li>
-<li><b>protocolVersion</b><br>             PYLON low voltage RS485 protocol version                                           </li>
-<li><b>serialNumber</b><br>                Serial number                                                                      </li>
-</ul>
-<br><br>
+ <li><b>paramCellHighVoltLimit</b><br>      System parameter upper voltage limit (V) of a cell                                 </li>
+ <li><b>paramCellLowVoltLimit</b><br>       System parameter lower voltage limit (V) of a cell (alarm limit)                   </li>
+ <li><b>paramCellUnderVoltLimit</b><br>     System parameter undervoltage limit (V) of a cell (protection limit)               </li>
+ <li><b>paramChargeCurrentLimit</b><br>     System parameter charging current limit (A) of the battery module                  </li>
+ <li><b>paramChargeHighTempLimit</b><br>    System parameter upper temperature limit (°C) up to which the battery charges      </li>
+ <li><b>paramChargeLowTempLimit</b><br>     System parameter lower temperature limit (°C) up to which the battery charges      </li>
+ <li><b>paramDischargeCurrentLimit</b><br>  System parameter discharge current limit (A) of the battery module                 </li>
+ <li><b>paramDischargeHighTempLimit</b><br> System parameter upper temperature limit (°C) up to which the battery discharges   </li>
+ <li><b>paramDischargeLowTempLimit</b><br>  System parameter lower temperature limit (°C) up to which the battery discharges   </li>
+ <li><b>paramModuleHighVoltLimit</b><br>    System parameter upper voltage limit (V) of the battery module                     </li>
+ <li><b>paramModuleLowVoltLimit</b><br>     System parameter lower voltage limit (V) of the battery module (alarm limit)       </li>
+ <li><b>paramModuleUnderVoltLimit</b><br>   System parameter undervoltage limit (V) of the battery module (protection limit)   </li>
+ <li><b>protocolVersion</b><br>             PYLON low voltage RS485 protocol version                                           </li>
+ <li><b>serialNumber</b><br>                Serial number                                                                      </li>
+ </ul>
+ <br><br>
 
 =end html
 =begin html_DE
 
-<a id="PylonLowVoltage"></a>
-<h3>PylonLowVoltage</h3>
-<br>
-Modul zur Einbindung von Niedervolt-Batterien mit Batteriemanagmentsystem (BMS) des Herstellers Pylontech über RS485 via
-RS485/Ethernet-Gateway. Die Kommunikation zum RS485-Gateway erfolgt ausschließlich über eine Ethernet-Verbindung.<br>
-Das Modul wurde bisher erfolgreich mit Pylontech Batterien folgender Typen eingesetzt: <br>
+ <a id="PylonLowVoltage"></a>
+ <h3>PylonLowVoltage</h3>
+ <br>
+ Modul zur Einbindung von Niedervolt-Batterien mit Batteriemanagmentsystem (BMS) des Herstellers Pylontech über RS485 via
+ RS485/Ethernet-Gateway. Die Kommunikation zum RS485-Gateway erfolgt ausschließlich über eine Ethernet-Verbindung.<br>
+ Das Modul wurde bisher erfolgreich mit Pylontech Batterien folgender Typen eingesetzt: <br>
 
-<ul>
- <li> US2000        </li>
- <li> US2000B Plus  </li>
- <li> US2000C       </li>
- <li> US2000 Plus   </li>
- <li> US3000        </li>
- <li> US3000C       </li>
-</ul>
+ <ul>
+  <li> US2000        </li>
+  <li> US2000B Plus  </li>
+  <li> US2000C       </li>
+  <li> US2000 Plus   </li>
+  <li> US3000        </li>
+  <li> US3000C       </li>
+ </ul>
 
-Als RS485-Ethernet-Gateways wurden bisher folgende Geräte erfolgreich eingesetzt: <br>
-<ul>
- <li> USR-TCP232-304 des Herstellers USRiot </li>
- <li> Waveshare RS485 to Ethernet Converter </li>
-</ul>
+ Als RS485-Ethernet-Gateways wurden bisher folgende Geräte erfolgreich eingesetzt: <br>
+ <ul>
+  <li> USR-TCP232-304 des Herstellers USRiot </li>
+  <li> Waveshare RS485 to Ethernet Converter </li>
+ </ul>
 
-Prinzipiell sollte auch jedes andere RS485/Ethernet-Gateway kompatibel sein.
-<br><br>
+ Prinzipiell sollte auch jedes andere RS485/Ethernet-Gateway kompatibel sein.
+ <br><br>
 
-<b>Voraussetzungen</b>
-<br><br>
-Dieses Modul benötigt die Perl-Module:
-<ul>
+ <b>Voraussetzungen</b>
+ <br><br>
+ Dieses Modul benötigt die Perl-Module:
+ <ul>
     <li>IO::Socket::INET    (apt-get install libio-socket-multicast-perl)                          </li>
     <li>IO::Socket::Timeout (Installation z.B. über die CPAN-Shell oder das FHEM Installer Modul)  </li>
-</ul>
+ </ul>
 
-Das Datenformat muß auf dem RS485 Gateway wie folgt eingestellt werden:
-<br>
+ Das Datenformat muß auf dem RS485 Gateway wie folgt eingestellt werden:
+ <br>
 
   <ul>
      <table>
@@ -1740,15 +1782,47 @@ Das Datenformat muß auf dem RS485 Gateway wie folgt eingestellt werden:
      </table>
   </ul>
   <br>
+  
+ <b>Beispielkonfiguration eines Waveshare RS485 to Ethernet Converters</b>
+ <br><br>
+ Das Webinterface des Konverters bietet mehrere Seiten mit Einstellungen an. Die relevanten Einstellungen sind nachfolgend
+ beispielhaft gezeigt. Die Zuweisung einer festen IP-Adresse wird vorab vorausgesetzt.
+ <br>
 
-<b>Einschränkungen</b>
-<br>
-Das Modul unterstützt zur Zeit maximal 14 Batterien (Master + 13 Slaves) in einer Gruppe.
-<br><br>
+  <ul>
+     <table>
+     <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+        <tr><td> <b>Einstellungen Serial Port</b>     </td><td>                                         </td></tr>
+        <tr><td> - Baud Rate                          </td><td>: entsprechend Einstellung der Batterie  </td></tr>
+        <tr><td> - Data Size                          </td><td>: 8 Bit                                  </td></tr>
+        <tr><td> - Parity                             </td><td>: None                                   </td></tr>
+        <tr><td> - Stop Bits                          </td><td>: 1                                      </td></tr>
+        <tr><td> - Local Port Number                  </td><td>: frei gewählt                           </td></tr>
+        <tr><td> - Work Mode                          </td><td>: TCP Server                             </td></tr>
+        <tr><td> - Reset                              </td><td>: nicht gesetzt                          </td></tr>
+        <tr><td> - Link                               </td><td>: gesetzt                                </td></tr>
+        <tr><td> - Index                              </td><td>: nicht gesetzt                          </td></tr>
+        <tr><td> - Similar RCF2217                    </td><td>: gesetzt                                </td></tr>
+        <tr><td>                                      </td><td>                                         </td></tr>
+        <tr><td> <b>Einstellungen Expand Function</b> </td><td>                                         </td></tr>
+        <tr><td> - Heartbeat Packet Type              </td><td>: None                                   </td></tr>
+        <tr><td> - Register Packet Type               </td><td>: None                                   </td></tr>
+        <tr><td> - Short Connection                   </td><td>: nicht gesetzt                          </td></tr>
+        <tr><td> - TCP Server-kick off old connection </td><td>: gesetzt                                </td></tr>
+        <tr><td> - Buffer Data before Connected       </td><td>: gesetzt                                </td></tr>
+        <tr><td> - UART Set Parameter                 </td><td>: nicht gesetzt                          </td></tr>
+     </table>
+  </ul>
+  <br>
 
-<a id="PylonLowVoltage-define"></a>
-<b>Definition</b>
-<ul>
+ <b>Einschränkungen</b>
+ <br>
+ Das Modul unterstützt zur Zeit maximal 14 Batterien (Master + 13 Slaves) in einer Gruppe.
+ <br><br>
+
+ <a id="PylonLowVoltage-define"></a>
+ <b>Definition</b>
+ <ul>
   <code><b>define &lt;name&gt; PylonLowVoltage &lt;hostname/ip&gt;:&lt;port&gt; [&lt;bataddress&gt;]</b></code><br>
   <br>
   <li><b>hostname/ip:</b><br>
@@ -1763,34 +1837,34 @@ Das Modul unterstützt zur Zeit maximal 14 Batterien (Master + 13 Slaves) in ein
      Geräteadresse der Pylontech Batterie. Es können mehrere Pylontech Batterien über eine Pylontech-spezifische
      Link-Verbindung verbunden werden. Die zulässige Anzahl ist der jeweiligen Pylontech Dokumentation zu entnehmen. <br>
      Die Master Batterie im Verbund (mit offenem Link Port 0 bzw. an der die RS485-Verbindung angeschlossen ist) hat die
-     Adresse 2, die nächste Batterie hat dann die Adresse 3 und so weiter.
+     Adresse 1, die nächste Batterie hat dann die Adresse 2 und so weiter.
      Ist keine Geräteadresse angegeben, wird die Adresse 1 verwendet.
   </li>
   <br>
-</ul>
+ </ul>
 
-<b>Arbeitsweise</b>
-<ul>
-Das Modul liest entsprechend der Einstellung des Attributes "interval" zyklisch Werte aus, die das
-Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
-</ul>
+ <b>Arbeitsweise</b>
+ <ul>
+ Das Modul liest entsprechend der Einstellung des Attributes "interval" zyklisch Werte aus, die das
+ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
+ </ul>
 
-<a id="PylonLowVoltage-get"></a>
-<b>Get</b>
-<br>
-<ul>
+ <a id="PylonLowVoltage-get"></a>
+ <b>Get</b>
+ <br>
+ <ul>
   <li><b>data</b><br>
     Die Datenabfrage des Batteriemanagementsystems wird ausgeführt. Der Zeitgeber der zyklischen Abfrage wird entsprechend
     dem gesetzten Wert des Attributes "interval" neu initialisiert.
     <br>
   </li>
-<br>
-</ul>
+ <br>
+ </ul>
 
-<a id="PylonLowVoltage-attr"></a>
-<b>Attribute</b>
-<br<br>
-<ul>
+ <a id="PylonLowVoltage-attr"></a>
+ <b>Attribute</b>
+ <br<br>
+ <ul>
    <a id="PylonLowVoltage-attr-disable"></a>
    <li><b>disable 0|1</b><br>
      Aktiviert/deaktiviert die Gerätedefinition.
@@ -1822,66 +1896,66 @@ Batteriemanagementsystem über die RS485-Schnittstelle zur Verfügung stellt.
      Der automatisch ermittelte Batterietyp (Reading batteryType) wird durch die angegebene Zeichenfolge ersetzt.
    </li>
    <br>
-</ul>
+ </ul>
 
-<a id="PylonLowVoltage-readings"></a>
-<b>Readings</b>
-<ul>
-<li><b>averageCellVolt</b><br>        mittlere Zellenspannung (V)                                                        </li>
-<li><b>bmsTemperature</b><br>         Temperatur (°C) des Batteriemanagementsystems                                      </li>
-<li><b>cellTemperature_0104</b><br>   Temperatur (°C) der Zellenpacks 1 bis 4                                            </li>
-<li><b>cellTemperature_0508</b><br>   Temperatur (°C) der Zellenpacks 5 bis 8                                            </li>
-<li><b>cellTemperature_0912</b><br>   Temperatur (°C) der Zellenpacks 9 bis 12                                           </li>
-<li><b>cellTemperature_1315</b><br>   Temperatur (°C) der Zellenpacks 13 bis 15                                          </li>
-<li><b>cellVoltage_XX</b><br>         Zellenspannung (V) des Zellenpacks XX. In dem Batteriemodul sind "packCellcount"
-                                      Zellenpacks in Serie geschaltet verbaut. Jedes Zellenpack besteht aus parallel
-                                      geschalten Einzelzellen.                                                           </li>
-<li><b>chargeCurrentLimit</b><br>     aktueller Grenzwert für den Ladestrom (A)                                          </li>
-<li><b>chargeEnable</b><br>           aktuelles Flag Laden erlaubt                                                       </li>
-<li><b>chargeFullRequest</b><br>      aktuelles Flag Batteriemodul voll laden (notfalls aus dem Netz)                    </li>
-<li><b>chargeImmediatelySOCXX</b><br> aktuelles Flag Batteriemodul sofort laden
-                                      (05: SOC Grenze 5-9%, 09: SOC Grenze 9-13%)                                        </li>
-<li><b>chargeVoltageLimit</b><br>     aktuelle Ladespannungsgrenze (V) des Batteriemoduls                                </li>
-<li><b>dischargeCurrentLimit</b><br>  aktueller Grenzwert für den Entladestrom (A)                                       </li>
-<li><b>dischargeEnable</b><br>        aktuelles Flag Entladen erlaubt                                                    </li>
-<li><b>dischargeVoltageLimit</b><br>  aktuelle Entladespannungsgrenze (V) des Batteriemoduls                             </li>
+ <a id="PylonLowVoltage-readings"></a>
+ <b>Readings</b>
+ <ul>
+ <li><b>averageCellVolt</b><br>        mittlere Zellenspannung (V)                                                        </li>
+ <li><b>bmsTemperature</b><br>         Temperatur (°C) des Batteriemanagementsystems                                      </li>
+ <li><b>cellTemperature_0104</b><br>   Temperatur (°C) der Zellenpacks 1 bis 4                                            </li>
+ <li><b>cellTemperature_0508</b><br>   Temperatur (°C) der Zellenpacks 5 bis 8                                            </li>
+ <li><b>cellTemperature_0912</b><br>   Temperatur (°C) der Zellenpacks 9 bis 12                                           </li>
+ <li><b>cellTemperature_1315</b><br>   Temperatur (°C) der Zellenpacks 13 bis 15                                          </li>
+ <li><b>cellVoltage_XX</b><br>         Zellenspannung (V) des Zellenpacks XX. In dem Batteriemodul sind "packCellcount"
+                                       Zellenpacks in Serie geschaltet verbaut. Jedes Zellenpack besteht aus parallel
+                                       geschalten Einzelzellen.                                                           </li>
+ <li><b>chargeCurrentLimit</b><br>     aktueller Grenzwert für den Ladestrom (A)                                          </li>
+ <li><b>chargeEnable</b><br>           aktuelles Flag Laden erlaubt                                                       </li>
+ <li><b>chargeFullRequest</b><br>      aktuelles Flag Batteriemodul voll laden (notfalls aus dem Netz)                    </li>
+ <li><b>chargeImmediatelySOCXX</b><br> aktuelles Flag Batteriemodul sofort laden
+                                       (05: SOC Grenze 5-9%, 09: SOC Grenze 9-13%)                                        </li>
+ <li><b>chargeVoltageLimit</b><br>     aktuelle Ladespannungsgrenze (V) des Batteriemoduls                                </li>
+ <li><b>dischargeCurrentLimit</b><br>  aktueller Grenzwert für den Entladestrom (A)                                       </li>
+ <li><b>dischargeEnable</b><br>        aktuelles Flag Entladen erlaubt                                                    </li>
+ <li><b>dischargeVoltageLimit</b><br>  aktuelle Entladespannungsgrenze (V) des Batteriemoduls                             </li>
 
-<li><b>moduleSoftwareVersion_manufacture</b><br> Firmware Version des Batteriemoduls                                     </li>
+ <li><b>moduleSoftwareVersion_manufacture</b><br> Firmware Version des Batteriemoduls                                     </li>
 
-<li><b>packAlarmInfo</b><br>          Alarmstatus (ok - Batterienmodul ist in Ordnung, failure - im Batteriemodul liegt
-                                      eine Störung vor)                                                                  </li>
-<li><b>packCapacity</b><br>           nominale Kapazität (Ah) des Batteriemoduls                                         </li>
-<li><b>packCapacityRemain</b><br>     aktuelle Kapazität (Ah) des Batteriemoduls                                         </li>
-<li><b>packCellcount</b><br>          Anzahl der Zellenpacks im Batteriemodul                                            </li>
-<li><b>packCurrent</b><br>            aktueller Ladestrom (+) bzw. Entladstrom (-) des Batteriemoduls (A)                </li>
-<li><b>packCycles</b><br>             Anzahl der Vollzyklen - Die Anzahl der Zyklen ist in gewisserweise ein Maß für den
-                                      Verschleiß der Batterie. Eine komplettes Laden und Entladen wird als ein Zyklus
-                                      gewertet. Wird die Batterie 50% entladen und wieder aufgeladen, zählt das nur als ein
-                                      halber Zyklus. Pylontech gibt eine Lebensdauer von mehreren 1000 Zyklen an
-                                      (siehe Datenblatt).                                                                </li>
-<li><b>packImbalance</b><br>          aktuelles Ungleichgewicht der Spannung zwischen den Einzelzellen des
-                                      Batteriemoduls (%)                                                                 </li>
-<li><b>packPower</b><br>              aktuell bezogene (+) bzw. gelieferte (-) Leistung (W) des Batteriemoduls           </li>
-<li><b>packSOC</b><br>                Ladezustand (%) des Batteriemoduls                                                 </li>
-<li><b>packState</b><br>              aktueller Arbeitsstatus des Batteriemoduls                                         </li>
-<li><b>packVolt</b><br>               aktuelle Spannung (V) des Batteriemoduls                                           </li>
+ <li><b>packAlarmInfo</b><br>          Alarmstatus (ok - Batterienmodul ist in Ordnung, failure - im Batteriemodul liegt
+                                       eine Störung vor)                                                                  </li>
+ <li><b>packCapacity</b><br>           nominale Kapazität (Ah) des Batteriemoduls                                         </li>
+ <li><b>packCapacityRemain</b><br>     aktuelle Kapazität (Ah) des Batteriemoduls                                         </li>
+ <li><b>packCellcount</b><br>          Anzahl der Zellenpacks im Batteriemodul                                            </li>
+ <li><b>packCurrent</b><br>            aktueller Ladestrom (+) bzw. Entladstrom (-) des Batteriemoduls (A)                </li>
+ <li><b>packCycles</b><br>             Anzahl der Vollzyklen - Die Anzahl der Zyklen ist in gewisserweise ein Maß für den
+                                       Verschleiß der Batterie. Eine komplettes Laden und Entladen wird als ein Zyklus
+                                       gewertet. Wird die Batterie 50% entladen und wieder aufgeladen, zählt das nur als ein
+                                       halber Zyklus. Pylontech gibt eine Lebensdauer von mehreren 1000 Zyklen an
+                                       (siehe Datenblatt).                                                                </li>
+ <li><b>packImbalance</b><br>          aktuelles Ungleichgewicht der Spannung zwischen den Einzelzellen des
+                                       Batteriemoduls (%)                                                                 </li>
+ <li><b>packPower</b><br>              aktuell bezogene (+) bzw. gelieferte (-) Leistung (W) des Batteriemoduls           </li>
+ <li><b>packSOC</b><br>                Ladezustand (%) des Batteriemoduls                                                 </li>
+ <li><b>packState</b><br>              aktueller Arbeitsstatus des Batteriemoduls                                         </li>
+ <li><b>packVolt</b><br>               aktuelle Spannung (V) des Batteriemoduls                                           </li>
 
-<li><b>paramCellHighVoltLimit</b><br>      Systemparameter obere Spannungsgrenze (V) einer Zelle                         </li>
-<li><b>paramCellLowVoltLimit</b><br>       Systemparameter untere Spannungsgrenze (V) einer Zelle (Alarmgrenze)          </li>
-<li><b>paramCellUnderVoltLimit</b><br>     Systemparameter Unterspannungsgrenze (V) einer Zelle (Schutzgrenze)           </li>
-<li><b>paramChargeCurrentLimit</b><br>     Systemparameter Ladestromgrenze (A) des Batteriemoduls                        </li>
-<li><b>paramChargeHighTempLimit</b><br>    Systemparameter obere Temperaturgrenze (°C) bis zu der die Batterie lädt      </li>
-<li><b>paramChargeLowTempLimit</b><br>     Systemparameter untere Temperaturgrenze (°C) bis zu der die Batterie lädt     </li>
-<li><b>paramDischargeCurrentLimit</b><br>  Systemparameter Entladestromgrenze (A) des Batteriemoduls                     </li>
-<li><b>paramDischargeHighTempLimit</b><br> Systemparameter obere Temperaturgrenze (°C) bis zu der die Batterie entlädt   </li>
-<li><b>paramDischargeLowTempLimit</b><br>  Systemparameter untere Temperaturgrenze (°C) bis zu der die Batterie entlädt  </li>
-<li><b>paramModuleHighVoltLimit</b><br>    Systemparameter obere Spannungsgrenze (V) des Batteriemoduls                  </li>
-<li><b>paramModuleLowVoltLimit</b><br>     Systemparameter untere Spannungsgrenze (V) des Batteriemoduls (Alarmgrenze)   </li>
-<li><b>paramModuleUnderVoltLimit</b><br>   Systemparameter Unterspannungsgrenze (V) des Batteriemoduls (Schutzgrenze)    </li>
-<li><b>protocolVersion</b><br>             PYLON low voltage RS485 Prokollversion                                        </li>
-<li><b>serialNumber</b><br>                Seriennummer                                                                  </li>
-</ul>
-<br><br>
+ <li><b>paramCellHighVoltLimit</b><br>      Systemparameter obere Spannungsgrenze (V) einer Zelle                         </li>
+ <li><b>paramCellLowVoltLimit</b><br>       Systemparameter untere Spannungsgrenze (V) einer Zelle (Alarmgrenze)          </li>
+ <li><b>paramCellUnderVoltLimit</b><br>     Systemparameter Unterspannungsgrenze (V) einer Zelle (Schutzgrenze)           </li>
+ <li><b>paramChargeCurrentLimit</b><br>     Systemparameter Ladestromgrenze (A) des Batteriemoduls                        </li>
+ <li><b>paramChargeHighTempLimit</b><br>    Systemparameter obere Temperaturgrenze (°C) bis zu der die Batterie lädt      </li>
+ <li><b>paramChargeLowTempLimit</b><br>     Systemparameter untere Temperaturgrenze (°C) bis zu der die Batterie lädt     </li>
+ <li><b>paramDischargeCurrentLimit</b><br>  Systemparameter Entladestromgrenze (A) des Batteriemoduls                     </li>
+ <li><b>paramDischargeHighTempLimit</b><br> Systemparameter obere Temperaturgrenze (°C) bis zu der die Batterie entlädt   </li>
+ <li><b>paramDischargeLowTempLimit</b><br>  Systemparameter untere Temperaturgrenze (°C) bis zu der die Batterie entlädt  </li>
+ <li><b>paramModuleHighVoltLimit</b><br>    Systemparameter obere Spannungsgrenze (V) des Batteriemoduls                  </li>
+ <li><b>paramModuleLowVoltLimit</b><br>     Systemparameter untere Spannungsgrenze (V) des Batteriemoduls (Alarmgrenze)   </li>
+ <li><b>paramModuleUnderVoltLimit</b><br>   Systemparameter Unterspannungsgrenze (V) des Batteriemoduls (Schutzgrenze)    </li>
+ <li><b>protocolVersion</b><br>             PYLON low voltage RS485 Prokollversion                                        </li>
+ <li><b>serialNumber</b><br>                Seriennummer                                                                  </li>
+ </ul>
+ <br><br>
 
 =end html_DE
 
