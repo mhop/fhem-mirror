@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.17.4" => "01.04.2024  fix ctrlWeatherDev1 Drop-Down list if no DWD Device exists, edit commandref ",
   "1.17.3" => "31.03.2024  edit commandref, valDecTree: more infos in aiRuleStrings output, integrate OpenMeteoDWDEnsemble-API ".
                            "change Call interval Open-Meteo API to 900s, OpenMeteo-API: fix todayDoneAPIcalls, implement callequivalent".
                            "aiTrain: change default start to hour 2, change AI acceptable result limits ",
@@ -6165,10 +6166,11 @@ sub _addDynAttr {
 
   for my $step (1..$weatherDevMax) {
       if ($step == 1) {
-          push @deva, ($adwds ? "ctrlWeatherDev".$step.":OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API,$adwds" : "ctrlWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API");
+          push @deva, ($adwds ? "ctrlWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API,$adwds" : "ctrlWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API");
           next;
       }
-      push @deva, ($adwds ? "ctrlWeatherDev".$step.":$adwds" : "ctrlWeatherDev1");
+      
+      push @deva, ($adwds ? "ctrlWeatherDev".$step.":$adwds" : "");
   }
 
   $hash->{".AttrList"} = join " ", @deva;
@@ -17861,7 +17863,9 @@ to ensure that the system configuration is correct.
       
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
-      This Open-Meteo API variant provides access to the DWD's global Ensemble Prediction System (EPS). <br>
+      This Open-Meteo API variant provides access to the DWD's global 
+      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble Prediction System (EPS)</a>.
+      <br>
       The ensemble models ICON-D2-EPS, ICON-EU-EPS and ICON-EPS are seamlessly combined. <br>
       <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are 
       a special type of forecasting method that takes into account the uncertainties in weather forecasting. 
@@ -19266,7 +19270,9 @@ to ensure that the system configuration is correct.
        
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
-      This Open-Meteo API variant provides access to the DWD's global Ensemble Prediction System (EPS). <br>
+      This Open-Meteo API variant provides access to the DWD's global 
+      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble Prediction System (EPS)</a>.
+      <br>
       The ensemble models ICON-D2-EPS, ICON-EU-EPS and ICON-EPS are seamlessly combined. <br>
       <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are 
       a special type of forecasting method that takes into account the uncertainties in weather forecasting. 
@@ -20086,7 +20092,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
-      Diese Open-Meteo API Variante bietet Zugang zum globalen Ensemble-Vorhersagesystem (EPS) des DWD. <br>
+      Diese Open-Meteo API Variante bietet Zugang zum globalen
+      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble-Vorhersagesystem (EPS)</a>
+      des DWD. <br>
       Es werden die Ensemble Modelle ICON-D2-EPS, ICON-EU-EPS und ICON-EPS nahtlos vereint. <br>
       <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind 
       eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt. 
@@ -21503,7 +21511,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
-      Diese Open-Meteo API Variante bietet Zugang zum globalen Ensemble-Vorhersagesystem (EPS) des DWD. <br>
+      Diese Open-Meteo API Variante bietet Zugang zum globalen
+      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble-Vorhersagesystem (EPS)</a>
+      des DWD. <br>
       Es werden die Ensemble Modelle ICON-D2-EPS, ICON-EU-EPS und ICON-EPS nahtlos vereint. <br>
       <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind 
       eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt. 
