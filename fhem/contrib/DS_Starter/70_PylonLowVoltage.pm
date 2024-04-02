@@ -178,10 +178,9 @@ my %fns1 = (                                                                  # 
 );
 
 my %fns2 = (                                                                  # Abrufklasse dynamische Werte:
-  1 => { fn => \&_callAlarmInfo           },                                  #   alarmInfo
-  2 => { fn => \&_callChargeManagmentInfo },                                  #   chargeManagmentInfo
-  3 => { fn => \&_callAnalogValue         },                                  #   analogValue
-  
+  1 => { fn => \&_callAnalogValue         },                                  #   analogValue
+  2 => { fn => \&_callAlarmInfo           },                                  #   alarmInfo
+  3 => { fn => \&_callChargeManagmentInfo },                                  #   chargeManagmentInfo  
 );
 
 ##################################################################################################################################################################
@@ -567,30 +566,29 @@ return;
 ###############################################################
 sub manageUpdate {
   my $hash = shift;
-
   my $name = $hash->{NAME};
   my $age1 = delete $hash->{HELPER}{AGE1} // $age1def;
 
   RemoveInternalTimer ($hash);
 
-  if(!$init_done) {
+  if (!$init_done) {
       InternalTimer(gettimeofday() + 2, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
       return;
   }
 
   return if(IsDisabled ($name));
 
-  my $interval  = AttrVal ($name, 'interval', $definterval);                                 # 0 -> manuell gesteuert
-  my $timeout   = AttrVal ($name, 'timeout',        $defto);
+  my $interval = AttrVal ($name, 'interval', $definterval);                                 # 0 -> manuell gesteuert
+  my $timeout  = AttrVal ($name, 'timeout',        $defto);
   my $readings;
 
-  if(!$interval) {
+  if (!$interval) {
       $hash->{OPMODE}            = 'Manual';
       $readings->{nextCycletime} = 'Manual';
   }
   else {
       my $new = gettimeofday() + $interval;
-      InternalTimer ($new, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);                             # Wiederholungsintervall
+      InternalTimer ($new, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);                # Wiederholungsintervall
 
       $hash->{OPMODE}            = 'Automatic';
       $readings->{nextCycletime} = FmtTime($new);
@@ -1026,96 +1024,6 @@ sub _callSystemParameters {
 return;
 }
 
-###############################################################
-#       Abruf alarmInfo
-###############################################################
-sub _callAlarmInfo {
-  my $hash     = shift;
-  my $socket   = shift;
-  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
-
-  my $res = Request ({ hash   => $hash,
-                       socket => $socket,
-                       cmd    => $hralm{$hash->{BATADDRESS}}{cmd},
-                       cmdtxt => 'alarmInfo'
-                     }
-                    );
-
-  my $rtnerr = responseCheck ($res, $hralm{$hash->{BATADDRESS}}{mlen});
-
-  if ($rtnerr) {
-      doOnError ({ hash     => $hash,
-                   readings => $readings,
-                   sock     => $socket,
-                   res      => $res,
-                   state    => $rtnerr
-                 }
-                );
-      return $rtnerr;
-  }
-
-  __resultLog ($hash, $res);
-
-  $readings->{packCellcount} = hex (substr($res, 17, 2));
-
-  if (substr($res, 19, 30) eq "000000000000000000000000000000" &&
-      substr($res, 51, 10) eq "0000000000"                     &&
-      substr($res, 67, 2)  eq "00"                             &&
-      substr($res, 73, 4)  eq "0000") {
-      $readings->{packAlarmInfo} = "ok";
-  }
-  else {
-      $readings->{packAlarmInfo} = "failure";
-  }
-
-return;
-}
-
-###############################################################
-#       Abruf chargeManagmentInfo
-###############################################################
-sub _callChargeManagmentInfo {
-  my $hash     = shift;
-  my $socket   = shift;
-  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
-
-  my $res = Request ({ hash   => $hash,
-                       socket => $socket,
-                       cmd    => $hrcmi{$hash->{BATADDRESS}}{cmd},
-                       cmdtxt => 'chargeManagmentInfo'
-                     }
-                    );
-
-  my $rtnerr = responseCheck ($res, $hrcmi{$hash->{BATADDRESS}}{mlen});
-
-  if ($rtnerr) {
-      doOnError ({ hash     => $hash,
-                   readings => $readings,
-                   sock     => $socket,
-                   res      => $res,
-                   state    => $rtnerr
-                 }
-                );
-      return $rtnerr;
-  }
-
-  __resultLog ($hash, $res);
-
-  $readings->{chargeVoltageLimit}     = sprintf "%.3f", hex (substr ($res, 15, 4)) / 1000;        # Genauigkeit 3
-  $readings->{dischargeVoltageLimit}  = sprintf "%.3f", hex (substr ($res, 19, 4)) / 1000;        # Genauigkeit 3
-  $readings->{chargeCurrentLimit}     = sprintf "%.1f", hex (substr ($res, 23, 4)) / 10;          # Genauigkeit 1
-  $readings->{dischargeCurrentLimit}  = sprintf "%.1f", (65536 - hex substr ($res, 27, 4)) / 10;  # Genauigkeit 1, Fixed point, unsigned integer
-
-  my $cdstat                          = sprintf "%08b", hex substr ($res, 31, 2);                 # Rohstatus
-  $readings->{chargeEnable}           = substr ($cdstat, 0, 1) == 1 ? 'yes' : 'no';               # Bit 7
-  $readings->{dischargeEnable}        = substr ($cdstat, 1, 1) == 1 ? 'yes' : 'no';               # Bit 6
-  $readings->{chargeImmediatelySOC05} = substr ($cdstat, 2, 1) == 1 ? 'yes' : 'no';               # Bit 5 - SOC 5~9%  -> für Wechselrichter, die aktives Batteriemanagement bei gegebener DC-Spannungsfunktion haben oder Wechselrichter, der von sich aus einen niedrigen SOC/Spannungsgrenzwert hat
-  $readings->{chargeImmediatelySOC09} = substr ($cdstat, 3, 1) == 1 ? 'yes' : 'no';               # Bit 4 - SOC 9~13% -> für Wechselrichter hat keine aktive Batterieabschaltung haben
-  $readings->{chargeFullRequest}      = substr ($cdstat, 4, 1) == 1 ? 'yes' : 'no';               # Bit 3 - wenn SOC in 30 Tagen nie höher als 97% -> Flag = 1, wenn SOC-Wert ≥ 97% -> Flag = 0
-
-return;
-}
-
 #################################################################################
 #       Abruf analogValue
 # Answer from US2000 = 128 Bytes, from US3000 = 140 Bytes
@@ -1179,33 +1087,33 @@ sub _callAnalogValue {
   $bpos += 4;
 
   for my $t (6..$readings->{numberTempPos}) {
-      $t = 'add'.sprintf "%02d", $t;
-      $readings->{'cellTemperature_'.$t} = (hex (substr($res, $bpos, 4)) - 2731) / 10;          # mehr als 5 Temperaturpositionen (z.B. US5000)
-      $bpos += 4;     
+      $t = 'TempPos_'.sprintf "%02d", $t;
+      $readings->{'cellTemperature_'.$t} = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # mehr als 5 Temperaturpositionen (z.B. US5000)
+      $bpos += 4;                                                                                # Position bei 5 Temp.Angaben (bei 6 Temperaturen)
   }
 
-  my $current                            =  hex (substr($res, $bpos, 4));                        # Pos 101 (bei 5 Temperaturpositionen)
+  my $current                            =  hex (substr($res, $bpos, 4));                        # Pos 101 (105)
   $bpos += 4;
 
-  $readings->{packVolt}                  = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 105
+  $readings->{packVolt}                  = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 105 (109)
   $bpos += 4;
 
-  my $remcap1                            = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 109
+  my $remcap1                            = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 109 (113)
   $bpos += 4;
 
-  my $udi                                = hex substr($res, $bpos, 2);                           # Pos 113, user defined item=Entscheidungskriterium -> 2: Batterien <= 65Ah, 4: Batterien > 65Ah
+  my $udi                                = hex substr($res, $bpos, 2);                           # Pos 113 (117)  user defined item=Entscheidungskriterium -> 2: Batterien <= 65Ah, 4: Batterien > 65Ah
   $bpos += 2;
 
-  my $totcap1                            = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 115
+  my $totcap1                            = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 115 (119)
   $bpos += 4;
 
-  $readings->{packCycles}                = hex substr($res, $bpos, 4);                           # Pos 119
+  $readings->{packCycles}                = hex substr($res, $bpos, 4);                           # Pos 119 (123)
   $bpos += 4;
 
-  my $remcap2                            = sprintf "%.3f", hex (substr($res, $bpos, 6)) / 1000;  # Pos 123
+  my $remcap2                            = sprintf "%.3f", hex (substr($res, $bpos, 6)) / 1000;  # Pos 123 (127)
   $bpos += 6;
 
-  my $totcap2                            = sprintf "%.3f", hex (substr($res, $bpos, 6)) / 1000;  # Pos 129
+  my $totcap2                            = sprintf "%.3f", hex (substr($res, $bpos, 6)) / 1000;  # Pos 129 (133)
   $bpos += 6;
 
   # kalkulierte Werte generieren
@@ -1236,6 +1144,163 @@ sub _callAnalogValue {
 
   $readings->{packCellcount} = $pcc;
   $readings->{packCurrent}   = sprintf "%.3f", $current / 10;
+
+return;
+}
+
+###############################################################
+#       Abruf alarmInfo
+###############################################################
+sub _callAlarmInfo {
+  my $hash     = shift;
+  my $socket   = shift;
+  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
+
+  my $res = Request ({ hash   => $hash,
+                       socket => $socket,
+                       cmd    => $hralm{$hash->{BATADDRESS}}{cmd},
+                       cmdtxt => 'alarmInfo'
+                     }
+                    );
+
+  my $rtnerr = responseCheck ($res, $hralm{$hash->{BATADDRESS}}{mlen});
+
+  if ($rtnerr) {
+      doOnError ({ hash     => $hash,
+                   readings => $readings,
+                   sock     => $socket,
+                   res      => $res,
+                   state    => $rtnerr
+                 }
+                );
+      return $rtnerr;
+  }
+
+  __resultLog ($hash, $res);
+  
+  my $alm;
+
+  my $bpos = 17;                                                                  # Startposition 
+  $readings->{packCellcount} = hex (substr($res, $bpos, 2));                      # Pos. 17
+  $bpos += 2;
+  
+  for my $cnt (1..$readings->{packCellcount}) {                                   # Start Pos. 19
+      $cnt                                = sprintf "%02d", $cnt;                       
+      $readings->{'AlmCellVoltage_'.$cnt} = substr ($res, $bpos, 2); 
+      $alm   = 1 if(int $readings->{'AlmCellVoltage_'.$cnt});
+      $bpos += 2;      
+  }
+  
+  my $ntp = hex (substr($res, $bpos, 2));                                         # Pos. 49 bei 15 Zellen (Anzahl der Temperaturpositionen)
+  $bpos += 2;
+
+  for my $nt (1..$ntp) {                                                          # Start Pos. 51 bei 15 Zellen
+      $nt                                = sprintf "%02d", $nt;                       
+      $readings->{'AlmTemperature_'.$nt} = substr ($res, $bpos, 2); 
+      $alm   = 1 if(int $readings->{'AlmTemperature_'.$nt});
+      $bpos += 2;      
+  }  
+  
+  my $chcurralm  = substr ($res, $bpos, 2);                                       # Pos. 61 b. 15 Zellen u. 5 Temp.positionen
+  $alm   = 1 if(int $chcurralm);
+  $bpos += 2;
+  
+  my $modvoltalm = substr ($res, $bpos, 2);                                       # Pos. 63 b. 15 Zellen u. 5 Temp.positionen
+  $alm   = 1 if(int $modvoltalm);
+  $bpos += 2;
+  
+  my $dchcurralm = substr ($res, $bpos, 2);                                       # Pos. 65 b. 15 Zellen u. 5 Temp.positionen
+  $alm   = 1 if(int $dchcurralm);
+  $bpos += 2;
+  
+  my $stat1alm   = substr ($res, $bpos, 2);                                       # Pos. 67 b. 15 Zellen u. 5 Temp.positionen
+  $bpos += 2;
+  
+  my $stat2alm   = substr ($res, $bpos, 2);                                       # Pos. 69 b. 15 Zellen u. 5 Temp.positionen
+  $bpos += 2;
+  
+  my $stat3alm   = substr ($res, $bpos, 2);                                       # Pos. 71 b. 15 Zellen u. 5 Temp.positionen
+  $bpos += 2;
+  
+  my $stat4alm   = substr ($res, $bpos, 2);                                       # Pos. 73 b. 15 Zellen u. 5 Temp.positionen
+  $bpos += 2;
+  
+  my $stat5alm   = substr ($res, $bpos, 2);                                       # Pos. 75 b. 15 Zellen u. 5 Temp.positionen
+  
+  $readings->{AlmChargeCurrent}    = $chcurralm;
+  $readings->{AlmModuleVoltage}    = $modvoltalm;
+  $readings->{AlmDischargeCurrent} = $dchcurralm;
+
+  if (!$alm) {
+      $readings->{packAlarmInfo} = "ok";
+  }
+  else {
+      $readings->{packAlarmInfo} = "failure";
+  }  
+  
+#  if (substr($res, 19, 30) eq "000000000000000000000000000000" &&
+#      substr($res, 51, 10) eq "0000000000"                     &&
+#      substr($res, 67, 2)  eq "00"                             &&
+#      substr($res, 73, 4)  eq "0000") {
+#      $readings->{packAlarmInfo} = "ok";
+#  }
+#  else {
+#      $readings->{packAlarmInfo} = "failure";
+#  }
+  
+  my $name = $hash->{NAME};
+  
+  if (AttrVal ($name, 'verbose', 3) > 4) {
+      Log3 ($name, 5, "$name - Alarminfo - Status 1 alarm: $stat1alm");
+      Log3 ($name, 5, "$name - Alarminfo - Status 2 Info: $stat2alm");
+      Log3 ($name, 5, "$name - Alarminfo - Status 3 Info: $stat3alm");
+      Log3 ($name, 5, "$name - Alarminfo - Status 4 alarm: $stat4alm");
+      Log3 ($name, 5, "$name - Alarminfo - Status 5 alarm: $stat5alm");
+  }
+return;
+}
+
+###############################################################
+#       Abruf chargeManagmentInfo
+###############################################################
+sub _callChargeManagmentInfo {
+  my $hash     = shift;
+  my $socket   = shift;
+  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
+
+  my $res = Request ({ hash   => $hash,
+                       socket => $socket,
+                       cmd    => $hrcmi{$hash->{BATADDRESS}}{cmd},
+                       cmdtxt => 'chargeManagmentInfo'
+                     }
+                    );
+
+  my $rtnerr = responseCheck ($res, $hrcmi{$hash->{BATADDRESS}}{mlen});
+
+  if ($rtnerr) {
+      doOnError ({ hash     => $hash,
+                   readings => $readings,
+                   sock     => $socket,
+                   res      => $res,
+                   state    => $rtnerr
+                 }
+                );
+      return $rtnerr;
+  }
+
+  __resultLog ($hash, $res);
+
+  $readings->{chargeVoltageLimit}     = sprintf "%.3f", hex (substr ($res, 15, 4)) / 1000;        # Genauigkeit 3
+  $readings->{dischargeVoltageLimit}  = sprintf "%.3f", hex (substr ($res, 19, 4)) / 1000;        # Genauigkeit 3
+  $readings->{chargeCurrentLimit}     = sprintf "%.1f", hex (substr ($res, 23, 4)) / 10;          # Genauigkeit 1
+  $readings->{dischargeCurrentLimit}  = sprintf "%.1f", (65536 - hex substr ($res, 27, 4)) / 10;  # Genauigkeit 1, Fixed point, unsigned integer
+
+  my $cdstat                          = sprintf "%08b", hex substr ($res, 31, 2);                 # Rohstatus
+  $readings->{chargeEnable}           = substr ($cdstat, 0, 1) == 1 ? 'yes' : 'no';               # Bit 7
+  $readings->{dischargeEnable}        = substr ($cdstat, 1, 1) == 1 ? 'yes' : 'no';               # Bit 6
+  $readings->{chargeImmediatelySOC05} = substr ($cdstat, 2, 1) == 1 ? 'yes' : 'no';               # Bit 5 - SOC 5~9%  -> für Wechselrichter, die aktives Batteriemanagement bei gegebener DC-Spannungsfunktion haben oder Wechselrichter, der von sich aus einen niedrigen SOC/Spannungsgrenzwert hat
+  $readings->{chargeImmediatelySOC09} = substr ($cdstat, 3, 1) == 1 ? 'yes' : 'no';               # Bit 4 - SOC 9~13% -> für Wechselrichter hat keine aktive Batterieabschaltung haben
+  $readings->{chargeFullRequest}      = substr ($cdstat, 4, 1) == 1 ? 'yes' : 'no';               # Bit 3 - wenn SOC in 30 Tagen nie höher als 97% -> Flag = 1, wenn SOC-Wert ≥ 97% -> Flag = 0
 
 return;
 }
