@@ -1172,14 +1172,48 @@ attr DEVICE setList \
 attr DEVICE periodicCmd temperature:55
 attr DEVICE devStateIcon LOCKED:secur_lock:btnLock+UNLOCK UNLOCKED:secur_open:btnLock+LOCK
 attr DEVICE webCmd desired-temp
-attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temperature Battery:batteryPercent system_mode:mode voltage:batterymV
+attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temperature Battery:batteryPercent system_mode:mode voltage:batterymV child_lock:btnLock
 attr DEVICE stateFormat btnLock\
 Measured: temperature Battery: batteryPercent %
 attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}, batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
 attr DEVICE model zigbee2mqtt_thermostat_without_weekrofile
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20240108
+setreading DEVICE attrTemplateVersion 20240402
+
+
+#contributed by clumsy via pm
+name:zigbee2mqtt_thermostat_with_weekrofile_5_1_1
+desc: Developed for <a href="https://www.zigbee2mqtt.io/devices/BHT-002_BHT-006.html#moes-bht-002%252Fbht-006">Models Moes BHT-002/BHT-006</a> via zigbee2mqtt <br>
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_17b1
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to temp_control;{ AttrVal("DEVICE","icon","temp_control") }
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE setList \
+  desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": $EVTPART1}\
+  btnLock:LOCK,UNLOCK $\DEVICETOPIC/set {"child_lock": "$EVTPART1"}\
+  mode:heat,off $\DEVICETOPIC/set {"system_mode": "$EVTPART1"}\
+  preset:hold,program $\DEVICETOPIC/set {"preset": "$EVTPART1"}\
+  saturday $\DEVICETOPIC/set/schedule { "saturday":[$EVTPART1] }\
+  sunday $\DEVICETOPIC/set/schedule { "sunday":[$EVTPART1] }\
+  weekdays $\DEVICETOPIC/set/schedule { "weekdays":[$EVTPART1] }\
+  weekprofile { no strict 'vars';;  FHEM::attrT_z2m_thermostat_Utils::z2t_send_BHT($NAME, $EVTPART1, $EVTPART2) }\
+  x_send_set_payload:textField { my $payload = $EVENT;;$payload =~ s/$EVTPART0 //;; qq($\DEVICETOPIC/set $payload)}
+attr DEVICE devStateIcon LOCKED:secur_lock:btnLock+UNLOCK UNLOCKED:secur_open:btnLock+LOCK
+attr DEVICE webCmd desired-temp
+attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temperature Battery:batteryPercent system_mode:mode voltage:batterymV child_lock:btnLock
+attr DEVICE stateFormat btnLock\
+Measured: temperature Battery: batteryPercent %
+attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}, batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
+attr DEVICE model zigbee2mqtt_thermostat_with_weekrofile_5_1_1
+set DEVICE attrTemplate speechcontrol_type_thermostat
+deletereading -q DEVICE (?!associatedWith|IODev).*
+setreading DEVICE attrTemplateVersion 20240402
+
 
 ###########################################
 # TASMOTA
