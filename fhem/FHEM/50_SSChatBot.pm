@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       50_SSChatBot.pm
 #
-#       (c) 2019-2023 by Heiko Maaz
+#       (c) 2019-2024 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate as Bot for Synology Chat.
@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.15.1" => "02.04.2024  _botCGIdata: fix 'disabled' is not working when receiving data ",
   "1.15.0" => "19.05.2023  compatibility to DSM starting with DSM 7.2, Forum: https://forum.fhem.de/index.php?msg=1276303 ",
   "1.14.0" => "08.04.2023  prepared for new Setter deletePostId, loglevel for HttpUtils ",
   "1.13.0" => "14.01.2023  new attr spareHost, sparePort ",
@@ -1557,6 +1558,9 @@ sub _botCGIdata {
   return ($mime, $err) if($err);
   
   my $name = $dat->{name};
+  
+  return ('text/plain; charset=utf-8', 'disabled') if(IsDisabled($name));
+  
   my $args = $dat->{args};
   my $h    = $dat->{h};
   
