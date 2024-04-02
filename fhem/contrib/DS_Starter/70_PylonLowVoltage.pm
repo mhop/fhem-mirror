@@ -122,7 +122,8 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
-  "0.2.5"  => "01.04.2024 _callAnalogValue: more than 5 temperature positions (US5000) ",
+  "0.2.5"  => "02.04.2024 _callAnalogValue / _callAlarmInfo: integrate a Cell and Temperature Position counter ".
+                          "more specific Alarm readings ",
   "0.2.4"  => "29.03.2024 avoid possible Illegal division by zero at line 1438 ",
   "0.2.3"  => "19.03.2024 edit commandref ",
   "0.2.2"  => "20.02.2024 correct commandref ",
@@ -1186,8 +1187,8 @@ sub _callAlarmInfo {
   
   for my $cnt (1..$readings->{packCellcount}) {                                   # Start Pos. 19
       $cnt                                = sprintf "%02d", $cnt;                       
-      $readings->{'AlmCellVoltage_'.$cnt} = substr ($res, $bpos, 2); 
-      $alm   = 1 if(int $readings->{'AlmCellVoltage_'.$cnt});
+      $readings->{'almCellVoltage_'.$cnt} = substr ($res, $bpos, 2); 
+      $alm   = 1 if(int $readings->{'almCellVoltage_'.$cnt});
       $bpos += 2;      
   }
   
@@ -1196,8 +1197,8 @@ sub _callAlarmInfo {
 
   for my $nt (1..$ntp) {                                                          # Start Pos. 51 bei 15 Zellen
       $nt                                = sprintf "%02d", $nt;                       
-      $readings->{'AlmTemperature_'.$nt} = substr ($res, $bpos, 2); 
-      $alm   = 1 if(int $readings->{'AlmTemperature_'.$nt});
+      $readings->{'almTemperature_'.$nt} = substr ($res, $bpos, 2); 
+      $alm   = 1 if(int $readings->{'almTemperature_'.$nt});
       $bpos += 2;      
   }  
   
@@ -1227,9 +1228,9 @@ sub _callAlarmInfo {
   
   my $stat5alm   = substr ($res, $bpos, 2);                                       # Pos. 75 b. 15 Zellen u. 5 Temp.positionen
   
-  $readings->{AlmChargeCurrent}    = $chcurralm;
-  $readings->{AlmModuleVoltage}    = $modvoltalm;
-  $readings->{AlmDischargeCurrent} = $dchcurralm;
+  $readings->{almChargeCurrent}    = $chcurralm;
+  $readings->{almModuleVoltage}    = $modvoltalm;
+  $readings->{almDischargeCurrent} = $dchcurralm;
 
   if (!$alm) {
       $readings->{packAlarmInfo} = "ok";
@@ -1237,17 +1238,7 @@ sub _callAlarmInfo {
   else {
       $readings->{packAlarmInfo} = "failure";
   }  
-  
-#  if (substr($res, 19, 30) eq "000000000000000000000000000000" &&
-#      substr($res, 51, 10) eq "0000000000"                     &&
-#      substr($res, 67, 2)  eq "00"                             &&
-#      substr($res, 73, 4)  eq "0000") {
-#      $readings->{packAlarmInfo} = "ok";
-#  }
-#  else {
-#      $readings->{packAlarmInfo} = "failure";
-#  }
-  
+    
   my $name = $hash->{NAME};
   
   if (AttrVal ($name, 'verbose', 3) > 4) {
@@ -1255,7 +1246,7 @@ sub _callAlarmInfo {
       Log3 ($name, 5, "$name - Alarminfo - Status 2 Info: $stat2alm");
       Log3 ($name, 5, "$name - Alarminfo - Status 3 Info: $stat3alm");
       Log3 ($name, 5, "$name - Alarminfo - Status 4 alarm: $stat4alm");
-      Log3 ($name, 5, "$name - Alarminfo - Status 5 alarm: $stat5alm");
+      Log3 ($name, 5, "$name - Alarminfo - Status 5 alarm: $stat5alm \n");
   }
 return;
 }
@@ -1457,7 +1448,7 @@ sub pseudoHexToText {
    my $charcode;
    my $text = '';
    
-   for (my $i = 0; $i < length($string); $i = $i + 2) {
+   for (my $i = 0; $i < length($string); $i += 2) {
       $charcode = hex substr ($string, $i, 2);                  # charcode = aquivalente Dezimalzahl der angegebenen Hexadezimalzahl
       next if($charcode == 45);                                 # Hyphen '-' ausblenden 
       
