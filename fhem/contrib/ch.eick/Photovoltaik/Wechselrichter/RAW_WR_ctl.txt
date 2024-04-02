@@ -13,17 +13,6 @@ defmod WR_ctl DOIF #############################################################
   ::CommandGet(undef, "WR_2_API 20_Statistic_EnergyFlow");;                                ## Zuerst WR_2 und anschließend\
   set_Exec("wait_Statistic",2,'::CommandGet(undef, "WR_1_API 20_Statistic_EnergyFlow")');; ## WR_1, damit die Schwarm Werte stimmen\
 \
-   ## Schattenmanagement \
-   if ($hour == 9)   {\
-     ::CommandSet(undef, "WR_1_API 40_02_Generator_ShadowMgmt 0");;       ## Komplett aus\
-   }\
-   if ($hour == 16) {\
-     ::CommandSet(undef, "WR_1_API 40_02_Generator_ShadowMgmt 2");;       ## Im Westen unten einschalten\
-   }\
-   if ($hour == 21) {\
-     ::CommandSet(undef, "WR_1_API 40_02_Generator_ShadowMgmt 1");;       ## Schattenmanagement für den Osten vorbereiten\
-   }\
-\
   if (AttrVal("$SELF","verbose",0) >=3) {\
       Log 3, "$SELF cmd_1  : Abfrage der Statistiken";;\
     }\
@@ -41,7 +30,11 @@ defmod WR_ctl DOIF #############################################################
 2_KI_Prognose\
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
     and\
+     (\
       ReadingsVal("LogDBRep_PV_KI_Prognose","PV_KI_Prognose","null") eq "done"  ## Die Prognose darf nicht gerade laufen !!!\
+      or\
+      ReadingsVal("LogDBRep_PV_KI_Prognose","state","null") eq "initialized"\
+     )\
     and\
   (\
     ([05:00-22:00] and [:03]                                             ## In der PV-Zeit jede Stunde aktualisieren\
@@ -50,7 +43,11 @@ defmod WR_ctl DOIF #############################################################
   )\
    ) {\
 \
-  ::CommandSet(undef, "LogDBRep_PV_KI_Prognose sqlCmd call dwd_load(curdate(),'none')");;\
+  if ($hour == 5) {\
+    ::CommandSet(undef, "LogDBRep_PV_KI_Prognose sqlCmd call dwd_load('full',curdate(),'none')");;\
+  } else {\
+    ::CommandSet(undef, "LogDBRep_PV_KI_Prognose sqlCmd call dwd_load('update',curdate(),'none')");;\
+  }\
 \
   if (AttrVal("$SELF","verbose",0) >=3) {\
       Log 3, "$SELF 2_KI_Prognose : Start KI Prognose";;\
@@ -74,7 +71,7 @@ defmod WR_ctl DOIF #############################################################
 \
   for (my $j=0;;$j<=1;;$j++){                                              ## loop fc0 und fc1\
     for (my $i=5;;$i<=21;;$i++){                                           ## loop für die PV-Zeit\
-      $timestamp = sprintf("%s_%02d:00:00", POSIX::strftime("%Y-%m-%d",localtime(time)), $i);;\
+      $timestamp = sprintf("%s_%02d:00:00", POSIX::strftime("%Y-%m-%d",localtime(time+86400*$j)), $i);;\
       $out[$j]  .= $timestamp." ".::round(::ReadingsVal("$SELF",sprintf("Yield_fc%d_%02d",$j, $i),0)/1000,2)."\n";;\
     } # End $i\
   } # End $j\
@@ -175,7 +172,7 @@ defmod WR_ctl DOIF #############################################################
 
 attr WR_ctl DbLogExclude .*
 attr WR_ctl DbLogInclude Yield_fc0_day,Yield_fc0_middayhigh.*
-attr WR_ctl comment Version 2023.06.21 12:00 \
+attr WR_ctl comment Version 2024.04.02 10:00 \
 \
 Die readings Yield_fc* werden direkt vom KI Prognose Skript in die Datenbank geschrieben und müssen hier nicht extra gelogged werden.
 attr WR_ctl disable 0
@@ -317,8 +314,10 @@ sub WR_ctl_Format {\
          $QuarterPrevious = "Q".$loop \
        }\
     }\
-    if ($period eq "_Qx" and $QuarterPrevious ne "null") {\
+    if ($period eq "_Qx") {\
+      if ( $QuarterPrevious ne "null") {\
         return $QuarterPrevious;;\
+      }\
     }\
   }\
 \
