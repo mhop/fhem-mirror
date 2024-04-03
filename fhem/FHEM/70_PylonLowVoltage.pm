@@ -122,6 +122,8 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.2.5"  => "02.04.2024 _callAnalogValue / _callAlarmInfo: integrate a Cell and Temperature Position counter ".
+                          "add specific Alarm readings ",
   "0.2.4"  => "29.03.2024 avoid possible Illegal division by zero at line 1438 ",
   "0.2.3"  => "19.03.2024 edit commandref ",
   "0.2.2"  => "20.02.2024 correct commandref ",
@@ -177,10 +179,16 @@ my %fns1 = (                                                                  # 
 );
 
 my %fns2 = (                                                                  # Abrufklasse dynamische Werte:
-  1 => { fn => \&_callAlarmInfo           },                                  #   alarmInfo
-  2 => { fn => \&_callChargeManagmentInfo },                                  #   chargeManagmentInfo
-  3 => { fn => \&_callAnalogValue         },                                  #   analogValue
-  
+  1 => { fn => \&_callAnalogValue         },                                  #   analogValue
+  2 => { fn => \&_callAlarmInfo           },                                  #   alarmInfo
+  3 => { fn => \&_callChargeManagmentInfo },                                  #   chargeManagmentInfo  
+);
+
+my %halm = (                                                                  # Codierung Alarme
+  '00' => { alm => 'normal'            },
+  '01' => { alm => 'below lower limit' },
+  '02' => { alm => 'above higher limit'},
+  'F0' => { alm => 'other error'       },
 );
 
 ##################################################################################################################################################################
@@ -566,30 +574,29 @@ return;
 ###############################################################
 sub manageUpdate {
   my $hash = shift;
-
   my $name = $hash->{NAME};
   my $age1 = delete $hash->{HELPER}{AGE1} // $age1def;
 
   RemoveInternalTimer ($hash);
 
-  if(!$init_done) {
+  if (!$init_done) {
       InternalTimer(gettimeofday() + 2, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
       return;
   }
 
   return if(IsDisabled ($name));
 
-  my $interval  = AttrVal ($name, 'interval', $definterval);                                 # 0 -> manuell gesteuert
-  my $timeout   = AttrVal ($name, 'timeout',        $defto);
+  my $interval = AttrVal ($name, 'interval', $definterval);                                 # 0 -> manuell gesteuert
+  my $timeout  = AttrVal ($name, 'timeout',        $defto);
   my $readings;
 
-  if(!$interval) {
+  if (!$interval) {
       $hash->{OPMODE}            = 'Manual';
       $readings->{nextCycletime} = 'Manual';
   }
   else {
       my $new = gettimeofday() + $interval;
-      InternalTimer ($new, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);                             # Wiederholungsintervall
+      InternalTimer ($new, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);                # Wiederholungsintervall
 
       $hash->{OPMODE}            = 'Automatic';
       $readings->{nextCycletime} = FmtTime($new);
@@ -1025,6 +1032,130 @@ sub _callSystemParameters {
 return;
 }
 
+#################################################################################
+#       Abruf analogValue
+# Answer from US2000 = 128 Bytes, from US3000 = 140 Bytes
+# Remain capacity US2000 hex(substr($res,109,4), US3000 hex(substr($res,123,6)
+# Module capacity US2000 hex(substr($res,115,4), US3000 hex(substr($res,129,6)
+#################################################################################
+sub _callAnalogValue {
+  my $hash     = shift;
+  my $socket   = shift;
+  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
+  my $name     = $hash->{NAME};
+
+  my $res = Request ({ hash   => $hash,
+                       socket => $socket,
+                       cmd    => $hrcmn{$hash->{BATADDRESS}}{cmd},
+                       cmdtxt => 'analogValue'
+                     }
+                    );
+
+  my $rtnerr = responseCheck ($res, $hrcmn{$hash->{BATADDRESS}}{mlen});
+
+  if ($rtnerr) {
+      doOnError ({ hash     => $hash,
+                   readings => $readings,
+                   sock     => $socket,
+                   res      => $res,
+                   state    => $rtnerr
+                 }
+                );
+      return $rtnerr;
+  }
+
+  __resultLog ($hash, $res);
+
+  my $bpos = 17;                                                                                 # Startposition
+  my $pcc  = hex (substr($res, $bpos, 2));                                                       # Anzahl Zellen (15 od. 16)
+  $bpos   += 2;                                                                                  # Pos 19
+
+  for my $z (1..$pcc) {
+      my $fz                          = sprintf "%02d", $z;                                      # formatierter Zähler
+      $readings->{'cellVoltage_'.$fz} = sprintf "%.3f", hex(substr($res, $bpos, 4)) / 1000;      # Pos 19 -> 75 bei 15 Zellen
+      $bpos += 4;                                                                                # letzter Durchlauf: Pos 79 bei 15 Zellen, Pos 83 bei 16 Zellen
+  }
+  
+  $readings->{numberTempPos}             = hex(substr($res, $bpos, 2));                          # Anzahl der jetzt folgenden Temperaturpositionen -> 5 oder mehr (US5000: 6)
+  $bpos += 2;
+
+  $readings->{bmsTemperature}            = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 81 bei 15 Zellen
+  $bpos += 4;
+
+  $readings->{cellTemperature_0104}      = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 85
+  $bpos += 4;
+
+  $readings->{cellTemperature_0508}      = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 89
+  $bpos += 4;
+
+  $readings->{cellTemperature_0912}      = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 93
+  $bpos += 4;
+
+  $readings->{'cellTemperature_13'.$pcc} = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 97
+  $bpos += 4;
+
+  for my $t (6..$readings->{numberTempPos}) {
+      $t = 'Pos_'.sprintf "%02d", $t;
+      $readings->{'cellTemperature_'.$t} = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # mehr als 5 Temperaturpositionen (z.B. US5000)
+      $bpos += 4;                                                                                # Position bei 5 Temp.Angaben (bei 6 Temperaturen)
+  }
+
+  my $current                            =  hex (substr($res, $bpos, 4));                        # Pos 101 (105)
+  $bpos += 4;
+
+  $readings->{packVolt}                  = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 105 (109)
+  $bpos += 4;
+
+  my $remcap1                            = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 109 (113)
+  $bpos += 4;
+
+  my $udi                                = hex substr($res, $bpos, 2);                           # Pos 113 (117)  user defined item=Entscheidungskriterium -> 2: Batterien <= 65Ah, 4: Batterien > 65Ah
+  $bpos += 2;
+
+  my $totcap1                            = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 115 (119)
+  $bpos += 4;
+
+  $readings->{packCycles}                = hex substr($res, $bpos, 4);                           # Pos 119 (123)
+  $bpos += 4;
+
+  my $remcap2                            = sprintf "%.3f", hex (substr($res, $bpos, 6)) / 1000;  # Pos 123 (127)
+  $bpos += 6;
+
+  my $totcap2                            = sprintf "%.3f", hex (substr($res, $bpos, 6)) / 1000;  # Pos 129 (133)
+  $bpos += 6;
+
+  # kalkulierte Werte generieren
+  ################################
+  if ($udi == 2) {
+      $readings->{packCapacityRemain} = $remcap1;
+      $readings->{packCapacity}       = $totcap1;
+  }
+  elsif ($udi == 4) {
+      $readings->{packCapacityRemain} = $remcap2;
+      $readings->{packCapacity}       = $totcap2;
+  }
+  else {
+      my $err = 'wrong value retrieve analogValue -> user defined items: '.$udi;
+      doOnError ({ hash     => $hash,
+                   readings => $readings,
+                   sock     => $socket,
+                   res      => '',
+                   state    => $err
+                 }
+                );
+      return $err;
+  }
+
+  if ($current & 0x8000) {
+      $current = $current - 0x10000;
+  }
+
+  $readings->{packCellcount} = $pcc;
+  $readings->{packCurrent}   = sprintf "%.3f", $current / 10;
+
+return;
+}
+
 ###############################################################
 #       Abruf alarmInfo
 ###############################################################
@@ -1054,19 +1185,77 @@ sub _callAlarmInfo {
   }
 
   __resultLog ($hash, $res);
+  
+  my ($alm, $aval);
+  
+  my $bpos = 17;                                                                  # Startposition 
+  $readings->{packCellcount} = hex (substr($res, $bpos, 2));                      # Pos. 17
+  $bpos += 2;
+  
+  for my $cnt (1..$readings->{packCellcount}) {                                   # Start Pos. 19
+      $cnt                                = sprintf "%02d", $cnt;                       
+      $aval                               = substr ($res, $bpos, 2);
+      $readings->{'almCellVoltage_'.$cnt} = $halm{$aval}{alm}; 
+      $alm   = 1 if(int $aval);
+      $bpos += 2;      
+  }
+  
+  my $ntp = hex (substr($res, $bpos, 2));                                         # Pos. 49 bei 15 Zellen (Anzahl der Temperaturpositionen)
+  $bpos += 2;
 
-  $readings->{packCellcount} = hex (substr($res, 17, 2));
-
-  if (substr($res, 19, 30) eq "000000000000000000000000000000" &&
-      substr($res, 51, 10) eq "0000000000"                     &&
-      substr($res, 67, 2)  eq "00"                             &&
-      substr($res, 73, 4)  eq "0000") {
+  for my $nt (1..$ntp) {                                                          # Start Pos. 51 bei 15 Zellen
+      $nt                                = sprintf "%02d", $nt; 
+      $aval                              = substr ($res, $bpos, 2);
+      $readings->{'almTemperature_'.$nt} = $halm{$aval}{alm}; 
+      $alm   = 1 if(int $aval);
+      $bpos += 2;      
+  }  
+  
+  $aval                         = substr ($res, $bpos, 2);                        # Pos. 61 b. 15 Zellen u. 5 Temp.positionen
+  $readings->{almChargeCurrent} = $halm{$aval}{alm};
+  $alm   = 1 if(int $aval);
+  $bpos += 2;
+  
+  $aval                         = substr ($res, $bpos, 2);                        # Pos. 63 b. 15 Zellen u. 5 Temp.positionen
+  $readings->{almModuleVoltage} = $halm{$aval}{alm};
+  $alm   = 1 if(int $aval);
+  $bpos += 2;
+  
+  $aval                            = substr ($res, $bpos, 2);                     # Pos. 65 b. 15 Zellen u. 5 Temp.positionen
+  $readings->{almDischargeCurrent} = $halm{$aval}{alm};
+  $alm   = 1 if(int $aval);
+  $bpos += 2;
+  
+  my $stat1alm = substr ($res, $bpos, 2);                                         # Pos. 67 b. 15 Zellen u. 5 Temp.positionen
+  $bpos += 2;
+  
+  my $stat2alm = substr ($res, $bpos, 2);                                         # Pos. 69 b. 15 Zellen u. 5 Temp.positionen
+  $bpos += 2;
+  
+  my $stat3alm = substr ($res, $bpos, 2);                                         # Pos. 71 b. 15 Zellen u. 5 Temp.positionen
+  $bpos += 2;
+  
+  my $stat4alm = substr ($res, $bpos, 2);                                         # Pos. 73 b. 15 Zellen u. 5 Temp.positionen
+  $bpos += 2;
+  
+  my $stat5alm = substr ($res, $bpos, 2);                                         # Pos. 75 b. 15 Zellen u. 5 Temp.positionen
+  
+  if (!$alm) {
       $readings->{packAlarmInfo} = "ok";
   }
   else {
       $readings->{packAlarmInfo} = "failure";
+  }  
+    
+  my $name = $hash->{NAME};
+  
+  if (AttrVal ($name, 'verbose', 3) > 4) {
+      Log3 ($name, 5, "$name - Alarminfo - Status 1 alarm: $stat1alm");
+      Log3 ($name, 5, "$name - Alarminfo - Status 2 Info: $stat2alm");
+      Log3 ($name, 5, "$name - Alarminfo - Status 3 Info: $stat3alm");
+      Log3 ($name, 5, "$name - Alarminfo - Status 4 alarm: $stat4alm");
+      Log3 ($name, 5, "$name - Alarminfo - Status 5 alarm: $stat5alm \n");
   }
-
 return;
 }
 
@@ -1111,124 +1300,6 @@ sub _callChargeManagmentInfo {
   $readings->{chargeImmediatelySOC05} = substr ($cdstat, 2, 1) == 1 ? 'yes' : 'no';               # Bit 5 - SOC 5~9%  -> für Wechselrichter, die aktives Batteriemanagement bei gegebener DC-Spannungsfunktion haben oder Wechselrichter, der von sich aus einen niedrigen SOC/Spannungsgrenzwert hat
   $readings->{chargeImmediatelySOC09} = substr ($cdstat, 3, 1) == 1 ? 'yes' : 'no';               # Bit 4 - SOC 9~13% -> für Wechselrichter hat keine aktive Batterieabschaltung haben
   $readings->{chargeFullRequest}      = substr ($cdstat, 4, 1) == 1 ? 'yes' : 'no';               # Bit 3 - wenn SOC in 30 Tagen nie höher als 97% -> Flag = 1, wenn SOC-Wert ≥ 97% -> Flag = 0
-
-return;
-}
-
-#################################################################################
-#       Abruf analogValue
-# Answer from US2000 = 128 Bytes, from US3000 = 140 Bytes
-# Remain capacity US2000 hex(substr($res,109,4), US3000 hex(substr($res,123,6)
-# Module capacity US2000 hex(substr($res,115,4), US3000 hex(substr($res,129,6)
-#################################################################################
-sub _callAnalogValue {
-  my $hash     = shift;
-  my $socket   = shift;
-  my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
-  my $name     = $hash->{NAME};
-
-  my $res = Request ({ hash   => $hash,
-                       socket => $socket,
-                       cmd    => $hrcmn{$hash->{BATADDRESS}}{cmd},
-                       cmdtxt => 'analogValue'
-                     }
-                    );
-
-  my $rtnerr = responseCheck ($res, $hrcmn{$hash->{BATADDRESS}}{mlen});
-
-  if ($rtnerr) {
-      doOnError ({ hash     => $hash,
-                   readings => $readings,
-                   sock     => $socket,
-                   res      => $res,
-                   state    => $rtnerr
-                 }
-                );
-      return $rtnerr;
-  }
-
-  __resultLog ($hash, $res);
-
-  my $bpos = 17;                                                                                 # Startposition
-  my $pcc  = hex (substr($res, $bpos, 2));                                                       # Anzahl Zellen (15 od. 16)
-  $bpos   += 2;                                                                                  # Pos 19
-
-  for my $z (1..$pcc) {
-      my $fz                          = sprintf "%02d", $z;                                      # formatierter Zähler
-      $readings->{'cellVoltage_'.$fz} = sprintf "%.3f", hex(substr($res, $bpos, 4)) / 1000;      # Pos 19 - 75 bei 15 Zellen
-      $bpos += 4;                                                                                # letzter Durchlauf: Pos 79 bei 15 Zellen, Pos 83 bei 16 Zellen
-  }
-
-  $readings->{numberTempPos}             = hex(substr($res, $bpos, 2));                          # Anzahl der jetzt folgenden Teperaturpositionen -> 5
-  $bpos += 2;
-
-  $readings->{bmsTemperature}            = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 81 bei 15 Zellen
-  $bpos += 4;
-
-  $readings->{cellTemperature_0104}      = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 85
-  $bpos += 4;
-
-  $readings->{cellTemperature_0508}      = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 89
-  $bpos += 4;
-
-  $readings->{cellTemperature_0912}      = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 93
-  $bpos += 4;
-
-  $readings->{'cellTemperature_13'.$pcc} = (hex (substr($res, $bpos, 4)) - 2731) / 10;           # Pos 97
-  $bpos += 4;
-
-  my $current                            =  hex (substr($res, $bpos, 4));                        # Pos 101
-  $bpos += 4;
-
-  $readings->{packVolt}                  = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 105
-  $bpos += 4;
-
-  my $remcap1                            = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 109
-  $bpos += 4;
-
-  my $udi                                = hex substr($res, $bpos, 2);                           # Pos 113, user defined item=Entscheidungskriterium -> 2: Batterien <= 65Ah, 4: Batterien > 65Ah
-  $bpos += 2;
-
-  my $totcap1                            = sprintf "%.3f", hex (substr($res, $bpos, 4)) / 1000;  # Pos 115
-  $bpos += 4;
-
-  $readings->{packCycles}                = hex substr($res, $bpos, 4);                           # Pos 119
-  $bpos += 4;
-
-  my $remcap2                            = sprintf "%.3f", hex (substr($res, $bpos, 6)) / 1000;  # Pos 123
-  $bpos += 6;
-
-  my $totcap2                            = sprintf "%.3f", hex (substr($res, $bpos, 6)) / 1000;  # Pos 129
-  $bpos += 6;
-
-  # kalkulierte Werte generieren
-  ################################
-  if ($udi == 2) {
-      $readings->{packCapacityRemain} = $remcap1;
-      $readings->{packCapacity}       = $totcap1;
-  }
-  elsif ($udi == 4) {
-      $readings->{packCapacityRemain} = $remcap2;
-      $readings->{packCapacity}       = $totcap2;
-  }
-  else {
-      my $err = 'wrong value retrieve analogValue -> user defined items: '.$udi;
-      doOnError ({ hash     => $hash,
-                   readings => $readings,
-                   sock     => $socket,
-                   res      => '',
-                   state    => $err
-                 }
-                );
-      return $err;
-  }
-
-  if ($current & 0x8000) {
-      $current = $current - 0x10000;
-  }
-
-  $readings->{packCellcount} = $pcc;
-  $readings->{packCurrent}   = sprintf "%.3f", $current / 10;
 
 return;
 }
@@ -1385,7 +1456,7 @@ sub pseudoHexToText {
    my $charcode;
    my $text = '';
    
-   for (my $i = 0; $i < length($string); $i = $i + 2) {
+   for (my $i = 0; $i < length($string); $i += 2) {
       $charcode = hex substr ($string, $i, 2);                  # charcode = aquivalente Dezimalzahl der angegebenen Hexadezimalzahl
       next if($charcode == 45);                                 # Hyphen '-' ausblenden 
       
@@ -1520,6 +1591,7 @@ return;
   <li> US2000 Plus   </li>
   <li> US3000        </li>
   <li> US3000C       </li>
+  <li> US5000        </li>
  </ul>
 
  The following devices have been successfully used as RS485 Ethernet gateways to date: <br>
@@ -1676,6 +1748,7 @@ return;
  <li><b>cellTemperature_0508</b><br>   Temperature (°C) of cell packs 5 to 8                                              </li>
  <li><b>cellTemperature_0912</b><br>   Temperature (°C) of the cell packs 9 to 12                                         </li>
  <li><b>cellTemperature_1315</b><br>   Temperature (°C) of the cell packs 13 to 15                                        </li>
+ <li><b>cellTemperature_Pos_XX</b><br> Temperature (°C) of position XX (not further specified)                            </li>
  <li><b>cellVoltage_XX</b><br>         Cell voltage (V) of the cell pack XX. In the battery module "packCellcount"
                                        cell packs are connected in series. Each cell pack consists of single cells
                                        connected in parallel.                                                             </li>
@@ -1743,6 +1816,7 @@ return;
   <li> US2000 Plus   </li>
   <li> US3000        </li>
   <li> US3000C       </li>
+  <li> US5000        </li>
  </ul>
 
  Als RS485-Ethernet-Gateways wurden bisher folgende Geräte erfolgreich eingesetzt: <br>
@@ -1900,6 +1974,7 @@ return;
  <li><b>cellTemperature_0508</b><br>   Temperatur (°C) der Zellenpacks 5 bis 8                                            </li>
  <li><b>cellTemperature_0912</b><br>   Temperatur (°C) der Zellenpacks 9 bis 12                                           </li>
  <li><b>cellTemperature_1315</b><br>   Temperatur (°C) der Zellenpacks 13 bis 15                                          </li>
+ <li><b>cellTemperature_Pos_XX</b><br> Temperatur (°C) der Position XX (nicht näher spezifiziert)                         </li>
  <li><b>cellVoltage_XX</b><br>         Zellenspannung (V) des Zellenpacks XX. In dem Batteriemodul sind "packCellcount"
                                        Zellenpacks in Serie geschaltet verbaut. Jedes Zellenpack besteht aus parallel
                                        geschalten Einzelzellen.                                                           </li>
