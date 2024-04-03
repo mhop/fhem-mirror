@@ -45,7 +45,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.57.12b";
+my $ModulVersion = "07.57.12c";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -2882,6 +2882,7 @@ sub FRITZBOX_Readout_Start($)
       $hash->{helper}{READOUT_RUNNING_PID} = BlockingCall($runFn, $name,
                                                        "FRITZBOX_Readout_Done", $timeout,
                                                        "FRITZBOX_Readout_Aborted", $hash);
+      $hash->{helper}{READOUT_RUNNING_PID}->{loglevel} = GetVerbose($name);
       FRITZBOX_Log $hash, 4, "Fork process $runFn";
    }
    else {
@@ -5756,6 +5757,7 @@ sub FRITZBOX_Readout_SetGet_Start($)
    $hash->{helper}{CMD_RUNNING_PID} = BlockingCall($cmdFunction, $handover,
                                        "FRITZBOX_Readout_SetGet_Done", $timeout,
                                        "FRITZBOX_Readout_SetGet_Aborted", $hash);
+   $hash->{helper}{READOUT_RUNNING_PID}->{loglevel} = GetVerbose($name);
    return undef;
 } # end FRITZBOX_Readout_SetGet_Start
 
