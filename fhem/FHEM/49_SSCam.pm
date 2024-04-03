@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       49_SSCam.pm
 #
-#       (c) 2015-2023 by Heiko Maaz
+#       (c) 2015-2024 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
@@ -192,6 +192,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.11.1" => "03.04.2024  send Data: check if SSChatBot / TelegramBot device is disabled ",
   "9.11.0" => "14.02.2023  Telegram send attributes extended by key option => silent, peer can be fetch from r:<reading> ",
   "9.10.9" => "22.01.2023  substitution of \$#TIME corrected ",
   "9.10.8" => "14.01.2023  add blank line in setter runView, goPreset, runPatrol ",
@@ -9829,8 +9830,9 @@ sub _sendChat {
    $data{SSCam}{$name}{PARAMS}{$tac}{name} = $name;
 
    my @err = ();
+   
    for my $key (keys(%chatparams)) {
-       push(@err, $key) if ($chatparams{$key}->{required} && !$data{SSCam}{$name}{PARAMS}{$tac}{$key});
+       push (@err, $key) if($chatparams{$key}->{required} && !$data{SSCam}{$name}{PARAMS}{$tac}{$key});
    }
 
    if ($#err >= 0) {
@@ -9838,7 +9840,7 @@ sub _sendChat {
        Log3($name, 2, "$name - $ret");
 
        readingsBeginUpdate ($hash);
-       readingsBulkUpdate  ($hash,"sendChatState",$ret);
+       readingsBulkUpdate  ($hash,'sendChatState', $ret);
        readingsEndUpdate   ($hash, 1);
 
        $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
@@ -9849,20 +9851,35 @@ sub _sendChat {
    my $peers   = $data{SSCam}{$name}{PARAMS}{$tac}{peers};
    my $rootUrl = $data{SSCam}{$name}{PARAMS}{$tac}{videofolderMap};
 
-   if(!$defs{$chatbot}) {
-       $ret = "No SSChatBot device \"$chatbot\" available";
-       readingsSingleUpdate($hash, "sendChatState", $ret, 1);
+   if (!$defs{$chatbot}) {
+       $ret = qq{No SSChatBot device "$chatbot" available};
+       readingsSingleUpdate ($hash, 'sendChatState', $ret, 1);
+       
        Log3($name, 2, "$name - $ret");
+       
+       $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
+       return;
+   }
+   
+   if (IsDisabled($defs{$chatbot}->{NAME})) {
+       $ret = qq{Can't send data to SSChatBot device - "$chatbot" is disabled};
+       readingsSingleUpdate ($hash, 'sendChatState', $ret, 1);
+       
+       Log3($name, 2, "$name - $ret");
+       
        $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
        return;
    }
 
-   if(!$peers) {
+   if (!$peers) {
        $peers = AttrVal($chatbot,"defaultPeer", "");
-       if(!$peers) {
-           $ret = "No peers of SSChatBot device \"$chatbot\" found";
-           readingsSingleUpdate($hash, "sendChatState", $ret, 1);
+       
+       if (!$peers) {
+           $ret = qq{No peers of SSChatBot device "$chatbot" found};
+           readingsSingleUpdate ($hash, 'sendChatState', $ret, 1);
+           
            Log3($name, 2, "$name - $ret");
+           
            $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
            return;
        }
@@ -9871,25 +9888,27 @@ sub _sendChat {
        $peers = join(",", split(" ", $peers));
    }
 
-   if(!$data{SSCam}{$name}{PARAMS}{$tac}{sdat} && !$data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {
+   if (!$data{SSCam}{$name}{PARAMS}{$tac}{sdat} && !$data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {
        $ret = "no video or image data existing for send process by SSChatBot \"$chatbot\" ";
-       readingsSingleUpdate($hash, "sendChatState", $ret, 1);
+       readingsSingleUpdate ($hash, "sendChatState", $ret, 1);
+       
        Log3($name, 2, "$name - $ret");
+       
        $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
        return;
    }
 
   my ($subject,$fileUrl,$uid,$fname,@as,%seen,@unique);
 
-  $cache = cache($name, "c_init");                                                           # Cache initialisieren
+  $cache = cache($name, "c_init");                                                             # Cache initialisieren
   Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
 
-  if(!$cache || $cache eq "internal" ) {
-      if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
+  if (!$cache || $cache eq "internal" ) {
+      if ($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                           # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
           @as    = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{sdat}};
           $mtype = "\@Snapshot";
       }
-      elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                       # Aufnahmen liegen in einem Hash-Ref in $vdat vor
+      elsif ($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                        # Aufnahmen liegen in einem Hash-Ref in $vdat vor
           @as    = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{vdat}};
           $mtype = $hash->{CAMNAME};
       }
@@ -9897,14 +9916,17 @@ sub _sendChat {
       for my $key (@as) {
            ($subject,$fname) = __extractForChat($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
 
-           my @ua = split(",", $peers);                                                     # User aufsplitten und zu jedem die ID ermitteln
+           my @ua = split(",", $peers);                                                        # User aufsplitten und zu jedem die ID ermitteln
            for (@ua) {
                next if(!$_);
                $uid = $defs{$chatbot}{HELPER}{USERS}{$_}{id};
-               if(!$uid) {
+               
+               if (!$uid) {
                    $ret = "The receptor \"$_\" seems to be unknown because its ID coulnd't be found.";
                    readingsSingleUpdate($hash, "sendChatState", $ret, 1);
+                   
                    Log3($name, 2, "$name - $ret");
+                   
                    $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
                    return;
                }
@@ -9926,7 +9948,7 @@ sub _sendChat {
                };
                $ret = FHEM::SSChatBot::addSendqueue ($params);
 
-               if($ret) {
+               if ($ret) {
                    readingsSingleUpdate($hash, "sendChatState", $ret, 1);
                    Log3($name, 2, "$name - ERROR: $ret");
                }
@@ -9937,12 +9959,13 @@ sub _sendChat {
                }
            }
       }
+      
       $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
   }
   else {
       # alle Serial Numbers "{$sn}" der Transaktion ermitteln
-      if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
+      if ($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
           extractTIDfromCache ( { name  => $name,
                                   tac   => $tac,
                                   media => "SENDSNAPS",
@@ -9952,7 +9975,7 @@ sub _sendChat {
                               );
           $mtype  = "\@Snapshot";
       }
-      elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
+      elsif ($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
           extractTIDfromCache ( { name  => $name,
                                   tac   => $tac,
                                   media => "SENDRECS",
@@ -10162,7 +10185,7 @@ sub _sendTelegram {
 
    my @err = ();
    for my $key (keys(%teleparams)) {
-       push(@err, $key) if ($teleparams{$key}->{required} && !$data{SSCam}{$name}{PARAMS}{$tac}{$key});
+       push (@err, $key) if($teleparams{$key}->{required} && !$data{SSCam}{$name}{PARAMS}{$tac}{$key});
    }
 
    if ($#err >= 0) {
@@ -10180,13 +10203,23 @@ sub _sendTelegram {
 
    my $telebot = $data{SSCam}{$name}{PARAMS}{$tac}{telebot};
 
-   if(!$defs{$telebot}) {
-       $ret = "No TelegramBot device \"$telebot\" available";
+   if (!$defs{$telebot}) {
+       $ret = qq{No TelegramBot device "$telebot" available};
 
-       readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+       readingsSingleUpdate ($hash, 'sendTeleState', $ret, 1);
 
        Log3 ($name, 2, "$name - $ret");
 
+       $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
+       return;
+   }
+   
+   if (IsDisabled($defs{$telebot}->{NAME})) {
+       $ret = qq{Can't send data to TelegramBot device - "$telebot" is disabled};
+       readingsSingleUpdate ($hash, 'sendTeleState', $ret, 1);
+       
+       Log3 ($name, 2, "$name - $ret");
+       
        $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
        return;
    }
@@ -10200,13 +10233,13 @@ sub _sendTelegram {
        Log3 ($name, 4, "$name - peers was fetched from reading >$pr<: $peers");       
    }
 
-   if(!$peers) {
+   if (!$peers) {
        $peers = AttrVal ($telebot, 'defaultPeer', '');
 
-       if(!$peers) {
-           $ret = "No peers of TelegramBot device \"$telebot\" found";
+       if (!$peers) {
+           $ret = qq{No peers of TelegramBot device "$telebot" found};
 
-           readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+           readingsSingleUpdate ($hash, 'sendTeleState', $ret, 1);
 
            Log3 ($name, 2, "$name - $ret");
 
@@ -10215,10 +10248,10 @@ sub _sendTelegram {
        }
    }
 
-   if(!$data{SSCam}{$name}{PARAMS}{$tac}{sdat} && !$data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {
+   if (!$data{SSCam}{$name}{PARAMS}{$tac}{sdat} && !$data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {
        $ret = "no video or image data existing for send process by TelegramBot \"$telebot\" ";
 
-       readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+       readingsSingleUpdate ($hash, 'sendTeleState', $ret, 1);
 
        Log3 ($name, 2, "$name - $ret");
 
@@ -10239,30 +10272,30 @@ sub _sendTelegram {
 
    my ($msg,$subject,$MediaStream,$fname,@as,%seen,@unique);
 
-   $cache = cache($name, "c_init");                                                           # Cache initialisieren
+   $cache = cache ($name, "c_init");                                                              # Cache initialisieren
 
    Log3 ($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
 
-   if(!$cache || $cache eq "internal" ) {
-       if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
+   if (!$cache || $cache eq "internal" ) {
+       if ($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                             # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
            @as = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{sdat}};
        }
-       elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                       # Aufnahmen liegen in einem Hash-Ref in $vdat vor
+       elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                           # Aufnahmen liegen in einem Hash-Ref in $vdat vor
            @as = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{vdat}};
        }
 
        for my $key (@as) {
             ($msg,$subject,$MediaStream,$fname) = __extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
-            $ret = __TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, $options);
+            $ret = __TBotSendIt ($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, $options);
 
-            if($ret) {
-                readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+            if ($ret) {
+                readingsSingleUpdate ($hash, 'sendTeleState', $ret, 1);
 
                 Log3 ($name, 2, "$name - ERROR: $ret");
             }
             else {
                 $ret = "Telegram message [$key] of transaction \"$tac\" sent to \"$peers\" by \"$telebot\" ";
-                readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+                readingsSingleUpdate ($hash, 'sendTeleState', $ret, 1);
 
                 Log3 ($name, 3, "$name - $ret");
             }
@@ -10274,7 +10307,7 @@ sub _sendTelegram {
    }
    else {
        # alle Serial Numbers "{$sn}" der Transaktion ermitteln
-       if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
+       if ($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
            extractTIDfromCache ( { name  => $name,
                                    tac   => $tac,
                                    media => "SENDSNAPS",
@@ -10283,7 +10316,7 @@ sub _sendTelegram {
                                  }
                                );
        }
-       elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                       # Aufnahmen liegen in einem Hash-Ref in $vdat vor
+       elsif ($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                       # Aufnahmen liegen in einem Hash-Ref in $vdat vor
            extractTIDfromCache ( { name  => $name,
                                    tac   => $tac,
                                    media => "SENDRECS",
@@ -10293,13 +10326,13 @@ sub _sendTelegram {
                                );
        }
 
-       @unique = sort{$b<=>$a} grep { !$seen{$_}++ } @as;                                     # distinct / unique the keys
+       @unique = sort{$b<=>$a} grep { !$seen{$_}++ } @as;                                      # distinct / unique the keys
 
        for my $key (@unique) {
             ($msg,$subject,$MediaStream,$fname) = __extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
             $ret = __TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, $options);
 
-            if($ret) {
+            if ($ret) {
                 readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
 
                 Log3 ($name, 2, "$name - ERROR: $ret");
