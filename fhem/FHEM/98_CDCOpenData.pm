@@ -54,7 +54,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.12d";
+my $ModulVersion = "01.12e";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
@@ -1049,6 +1049,7 @@ sub CDCOpenData_Readout_Start($)
       $hash->{helper}{READOUT_RUNNING_PID} = BlockingCall($runFn, $name,
                                                        "CDCOpenData_Readout_Done", $timeout,
                                                        "CDCOpenData_Readout_Aborted", $hash);
+      $hash->{helper}{READOUT_RUNNING_PID}->{loglevel} = GetVerbose($name);
 
       CDCOpenData_Log $hash, 4, "Fork process $runFn";
    }
@@ -2053,6 +2054,7 @@ sub CDCOpenData_Set_Cmd_Start($)
    $hash->{helper}{CMD_RUNNING_PID} = BlockingCall($cmdFunction, $handover,
                                        "CDCOpenData_Set_Cmd_Done", $timeout,
                                        "CDCOpenData_Set_Cmd_Aborted", $hash);
+   $hash->{helper}{READOUT_RUNNING_PID}->{loglevel} = GetVerbose($name);
    return undef;
 } # end CDCOpenData_Set_Cmd_Start
 
