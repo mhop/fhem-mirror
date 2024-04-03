@@ -1,4 +1,4 @@
-# $Id$
+﻿# $Id$
 ##############################################################################
 #
 #     73_PRESENCE.pm
@@ -33,8 +33,18 @@ use Blocking;
 use Time::HiRes qw(gettimeofday usleep sleep);
 use DevIo;
 
-sub
-PRESENCE_Initialize($)
+my $ModulVersion = "02.00";
+my %LOG_Text = (
+   0 => "SERVER:",
+   1 => "ERROR:",
+   2 => "SIGNIFICANT:",
+   3 => "BASIC:",
+   4 => "EXPANDED:",
+   5 => "DEBUG:"
+); 
+
+#######################################################################
+sub PRESENCE_Initialize($)
 {
     my ($hash) = @_;
 
@@ -69,7 +79,7 @@ PRESENCE_Initialize($)
 
 }
 
-#####################################
+#######################################################################
 sub
 PRESENCE_Define($$)
 {
@@ -248,7 +258,7 @@ PRESENCE_Define($$)
     return undef;
 }
 
-#####################################
+#######################################################################
 sub
 PRESENCE_Undef($$)
 {
@@ -265,7 +275,7 @@ PRESENCE_Undef($$)
     return undef;
 }
 
-#####################################
+#######################################################################
 sub
 PRESENCE_State($$$$)
 {
@@ -279,7 +289,7 @@ PRESENCE_State($$$$)
   return undef;
 }
 
-#####################################
+#######################################################################
 sub
 PRESENCE_Notify($$)
 {
@@ -343,7 +353,7 @@ PRESENCE_Notify($$)
     }
 }
 
-#####################################
+#######################################################################
 sub
 PRESENCE_Set($@)
 {
@@ -585,7 +595,7 @@ PRESENCE_Attr(@)
 }
 
 
-#####################################
+#######################################################################
 # Receives an event and creates several readings for event triggering
 sub
 PRESENCE_Read($)
@@ -683,7 +693,7 @@ PRESENCE_Read($)
     readingsEndUpdate($hash, 1);
 }
 
-#####################################
+#######################################################################
 sub
 PRESENCE_Ready($)
 {
@@ -693,13 +703,13 @@ PRESENCE_Ready($)
 }
 
 
-##########################################################################################################################
+################################################################################################################################################################################################################################
 #
 #  Functions for local testing with Blocking.pm to ensure a smooth FHEM processing
 #
-##########################################################################################################################
+################################################################################################################################################################################################################################
 
-#####################################
+#######################################################################
 sub PRESENCE_StartLocalScan($;$)
 {
     my ($hash, $local) = @_;
@@ -727,26 +737,31 @@ sub PRESENCE_StartLocalScan($;$)
         {
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode local-bluetooth";
             $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "bluetoothHciDevice", ""), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
+            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
         }
         elsif($mode eq "lan-ping")
         {
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode lan-ping";
             $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "pingCount", "4"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
+            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
         }
         elsif($mode eq "fritzbox")
         {
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode fritzbox";
             $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "fritzboxCheckSpeed", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
+            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
         }
         elsif($mode eq "shellscript")
         {
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode shellscript";
             $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalShellScriptScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
+            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
         }
         elsif($mode eq "function")
         {
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode function";
             $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFunctionScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
+            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
         }
 
         if(!$hash->{helper}{RUNNING_PID} and $mode =~ /^local-bluetooth|lan-ping|fritzbox|shellscript|function$/)
@@ -781,7 +796,7 @@ sub PRESENCE_StartLocalScan($;$)
     }
 }
 
-#####################################
+#######################################################################
 sub PRESENCE_DoLocalPingScan($)
 {
 
@@ -846,7 +861,7 @@ sub PRESENCE_DoLocalPingScan($)
     return $return;
 }
 
-#####################################
+#######################################################################
 sub PRESENCE_ExecuteFritzBoxCMD($$)
 {
 
@@ -874,7 +889,7 @@ sub PRESENCE_ExecuteFritzBoxCMD($$)
     return $status;
 }
 
-#####################################
+#######################################################################
 sub PRESENCE_DoLocalFritzBoxScan($)
 {
     my ($string) = @_;
@@ -980,7 +995,7 @@ sub PRESENCE_DoLocalFritzBoxScan($)
     return ($status == 0 ? "$name|$local|absent" : "$name|$local|present").($number <= $max ? "|$number" : "|").($speedcheck == 1 and defined($speed) ? "|$speed" : "");
 }
 
-#####################################
+#######################################################################
 sub PRESENCE_DoLocalBluetoothScan($)
 {
     my ($string) = @_;
@@ -1054,7 +1069,7 @@ sub PRESENCE_DoLocalBluetoothScan($)
     return $return;
 }
 
-#####################################
+#######################################################################
 sub PRESENCE_DoLocalShellScriptScan($)
 {
 
@@ -1098,7 +1113,7 @@ sub PRESENCE_DoLocalShellScriptScan($)
     return $return;
 }
 
-#####################################
+#######################################################################
 sub PRESENCE_DoLocalFunctionScan($)
 {
 
@@ -1140,7 +1155,7 @@ sub PRESENCE_DoLocalFunctionScan($)
     return $return;
 }
 
-#####################################
+#######################################################################
 sub PRESENCE_ProcessLocalScan($)
 {
     my ($string) = @_;
@@ -1165,7 +1180,7 @@ sub PRESENCE_ProcessLocalScan($)
 
     if(defined($hash->{helper}{RETRY_COUNT}))
     {
-        Log3 $hash->{NAME}, 2, "PRESENCE ($name) - check returned a valid result after ".$hash->{helper}{RETRY_COUNT}." unsuccesful ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry");
+        Log3 $hash->{NAME}, 3, "PRESENCE ($name) - check returned a valid result after ".$hash->{helper}{RETRY_COUNT}." unsuccesful ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry");
         delete($hash->{helper}{RETRY_COUNT});
     }
 
@@ -1215,7 +1230,7 @@ sub PRESENCE_ProcessLocalScan($)
     }
 }
 
-#####################################
+#######################################################################
 sub PRESENCE_ProcessAbortedScan($)
 {
     my ($hash, $msg) = @_;
@@ -1229,13 +1244,13 @@ sub PRESENCE_ProcessAbortedScan($)
     {
         if($hash->{helper}{RETRY_COUNT} >= AttrVal($name, "retryCount", 3))
         {
-            Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry"). " (resuming normal operation): $msg" if($hash->{helper}{RETRY_COUNT} == 3);
+            Log3 $hash->{NAME}, 3, "PRESENCE ($name) - device could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry"). " (resuming normal operation): $msg" if($hash->{helper}{RETRY_COUNT} == 3);
             InternalTimer(gettimeofday()+$hash->{INTERVAL_NORMAL}, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
             $hash->{helper}{RETRY_COUNT}++;
         }
         else
         {
-            Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry")." (retrying in $retry_interval seconds): $msg";
+            Log3 $hash->{NAME}, 3, "PRESENCE ($name) - device could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry")." (retrying in $retry_interval seconds): $msg";
             InternalTimer(gettimeofday()+$retry_interval, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
             $hash->{helper}{RETRY_COUNT}++;
         }
@@ -1244,20 +1259,20 @@ sub PRESENCE_ProcessAbortedScan($)
     {
         $hash->{helper}{RETRY_COUNT} = 1;
         InternalTimer(gettimeofday()+$retry_interval, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
-        Log3 $hash->{NAME}, 2, "PRESENCE ($name) - device could not be checked (retrying in $retry_interval seconds): $msg"
+        Log3 $hash->{NAME}, 3, "PRESENCE ($name) - device could not be checked (retrying in $retry_interval seconds): $msg"
     }
 
     readingsSingleUpdate($hash, "state", "timeout",1);
 }
 
-##########################################################################################################################
+################################################################################################################################################################################################################################
 #
 #  Helper Functions
 #
-##########################################################################################################################
+################################################################################################################################################################################################################################
 
 
-#####################################
+#######################################################################
 sub PRESENCE_DoInit($)
 {
     my ($hash) = @_;
@@ -1276,7 +1291,7 @@ sub PRESENCE_DoInit($)
     return undef;
 }
 
-#####################################
+#######################################################################
 sub PRESENCE_calculateThreshold($)
 {
     my ($value) = @_;
@@ -1304,7 +1319,7 @@ sub PRESENCE_calculateThreshold($)
     return $value;
 }
 
-#####################################
+#######################################################################
 sub PRESENCE_ThresholdTrigger($)
 {
     my ($hash) = @_;
@@ -1328,7 +1343,7 @@ sub PRESENCE_ThresholdTrigger($)
     }
 }
 
-#####################################
+#######################################################################
 sub PRESENCE_ProcessState($$)
 {
     my ($hash, $state) = @_;
@@ -1446,7 +1461,7 @@ sub PRESENCE_ProcessState($$)
     }
 }
 
-#####################################
+#######################################################################
 sub PRESENCE_ProcessAddonData($$)
 {
     my ($hash, $data) = @_;
@@ -1461,7 +1476,7 @@ sub PRESENCE_ProcessAddonData($$)
     return undef;
 }
 
-#####################################
+#######################################################################
 sub PRESENCE_setNotfiyDev($)
 {
     my ($hash) = @_;
