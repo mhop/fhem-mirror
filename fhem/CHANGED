@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  73_PRESENCE2: BlockingCall loglevel = GetVerbose($name)
+ - bugfix:  73_PRESENCE:  BlockingCall loglevel = GetVerbose($name)
+ - bugfix:  98_CDCOpenData:  BlockingCall loglevel = GetVerbose($name)
+ - bufgix:  72_FRITZBOX:   BlockingCall loglevel = GetVerbose($name)
  - bugfix:  50_SSChatbot: 'disabled' is not working when receiving data
  - bugfix:  76_SolarForecast: ctrlWeatherDev1 Drop-Down if no DWD Device exists
  - feature: 76_SolarForecast: integrate OpenMeteoDWDEnsemble-API
