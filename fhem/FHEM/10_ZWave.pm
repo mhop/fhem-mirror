@@ -415,7 +415,7 @@ my %zwave_class = (
                 'sprintf("userCode:id %d status %d code %s", $1, $2, $3)' ,
               "..6305(..)" => '"userCodeUsersNumber:".hex($1)'}
     },
-  APPLIANCE                => { id => '64' },
+  APPLIANCE                => { id => '64' }, # or HUMIDITY_CONTROL_SETPOINT (?)
   DMX                      => { id => '65' },
   BARRIER_OPERATOR         => { id => '66',
     set   => { barrierClose=> "0100",
@@ -433,6 +433,8 @@ my %zwave_class = (
   WINDOW_COVERING          => { id => '6a' },
   IRRIGATION               => { id => '6b' },
   SUPERVISION              => { id => '6c' },
+  HUMIDITY_CONTROL_MODE    => { id => '6d' },
+  HUMIDITY_CONTROL_OPSTATE => { id => '6e' },
   ENTRY_CONTROL            => { id => '6f',
     parse => { "^..6f01(.*)" => 'ZWave_entryControlParse($hash,$1)'} },
   CONFIGURATION            => { id => '70',
@@ -443,7 +445,7 @@ my %zwave_class = (
     get   => { config      => "05%02x",
                configAll   => 'ZWave_configAllGet($hash)' },
     parse => { "^..70..(..)(..)(.*)" => 'ZWave_configParse($hash,$1,$2,$3)'} },
-  ALARM                    => { id => '71', deprecated=>1,
+  ALARM                    => { id => '71', deprecated=>1,  # or  NOTIFICATION
     set   => {
       alarmnotification   => 'ZWave_ALARM_06_Set("%s")',    # >=V2
       },
@@ -480,6 +482,7 @@ my %zwave_class = (
                "067306(..)(..)(....)" =>
                    '"powerlvlTest:node ".hex($1)." status ".hex($2).
                     " frameAck ".hex($3)',} },
+  INCLUSION_CONTROLLER     => { id => '74' },
   PROTECTION               => { id => '75',
     set   => { protectionOff => "0100",
                protectionSeq => "0101",
@@ -498,6 +501,7 @@ my %zwave_class = (
                location => '05' },
     parse => { '..770300(.*)' => '"name:".pack("H*", $1)',
                '..770600(.*)' => '"location:".pack("H*", $1)' } },
+  NODE_PROVISIONING        => { id => '78' },
   SOUND_SWITCH             => { id => '79',
     set   => { toneConfiguration  => "05%02x%02x",
                tonePlay           => "08%02x",
@@ -517,6 +521,7 @@ my %zwave_class = (
   GROUPING_NAME            => { id => '7b', deprecated=>1 },
   REMOTE_ASSOCIATION_ACTIVATE=>{id => '7c', obsoleted=>1 },
   REMOTE_ASSOCIATION       => { id => '7d', obsoleted=>1 },
+  ANTITEFT_UNLOCK          => { id => '7e' },
   BATTERY                  => { id => '80',
     get   => { battery     => "02" },
     parse => { "0.8003(..)"=> 'ZWave_battery($1)'} } ,
@@ -4214,7 +4219,7 @@ ZWave_secNonceReceived($$)
   my $cmd    = $secArr[3];
 
   if (!$secMsg) {
-    Log3 $name, 1, "$name: Error, nonce reveived but no stored command for ".
+    Log3 $name, 1, "$name: Error, nonce received but no stored command for ".
       "encryption found";
     return undef;
   }

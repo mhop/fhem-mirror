@@ -871,7 +871,7 @@ ZWDongle_Read($@)
     Log3 $name, 4, "ZWDongle_Read $name: rcvd $msg ($ztp $zfi), sending ACK";
     DevIo_SimpleWrite($hash, "06", 1);
 
-    ZWDongle_shiftSendStack($hash, 1, 5, "device ack reveived", $1)
+    ZWDongle_shiftSendStack($hash, 1, 5, "device ack received", $1)
         if($msg =~ m/^0013(..)/);
 
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
