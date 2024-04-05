@@ -158,6 +158,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.17.5" => "04.04.2024  currentInverterDev: check syntax of key capacity if set, change defmaxvar back from 0.8 to 0.5 ".
+                           "currentMeterDev: [conprice=<Devicename>:<Readingname>:<Einheit>] [feedprice=<Devicename>:<Readingname>:<Einheit>] ".
+                           "___setOpenMeteoAPIcallKeyData: new sub to calculate the minimum Open-Meteo request intervalls ",
+  "1.17.4" => "01.04.2024  fix ctrlWeatherDev1 Drop-Down list if no DWD Device exists, edit commandref ",
   "1.17.3" => "31.03.2024  edit commandref, valDecTree: more infos in aiRuleStrings output, integrate OpenMeteoDWDEnsemble-API ".
                            "change Call interval Open-Meteo API to 900s, OpenMeteo-API: fix todayDoneAPIcalls, implement callequivalent".
                            "aiTrain: change default start to hour 2, change AI acceptable result limits ",
@@ -343,7 +347,7 @@ my @chours         = (5..21);                                                   
 my $kJtokWh        = 0.0002777777778;                                               # Umrechnungsfaktor kJ in kWh
 my $kJtoWh         = 0.2777777778;                                                  # Umrechnungsfaktor kJ in Wh
 my $WhtokJ         = 3.6;                                                           # Umrechnungsfaktor Wh in kJ
-my $defmaxvar      = 0.8;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
+my $defmaxvar      = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
 my $definterval    = 70;                                                            # Standard Abfrageintervall
 my $defslidenum    = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
 my $weatherDevMax  = 3;                                                             # max. Anzahl Wetter Devices (Attr ctrlWeatherDevX)
@@ -1755,12 +1759,16 @@ sub _setinverterDevice {                 ## no critic "not used"
   my ($a,$h) = parseParams ($arg);
   my $indev  = $a->[0] // "";
 
-  if(!$indev || !$defs{$indev}) {
+  if (!$indev || !$defs{$indev}) {
       return qq{The device "$indev" doesn't exist!};
   }
 
-  if(!$h->{pv} || !$h->{etotal}) {
+  if (!$h->{pv} || !$h->{etotal}) {
       return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
+  }
+  
+  if ($h->{capacity} && !isNumeric($h->{capacity})) {
+      return qq{The syntax of key "capacity" is not correct. Please consider the commandref.};
   }
 
   readingsSingleUpdate ($hash, 'currentInverterDev', $arg, 1);
@@ -1834,14 +1842,14 @@ sub _setmeterDevice {                    ## no critic "not used"
       return qq{Incorrect input. It is not allowed that the keys gcon and gfeedin refer to each other.};
   }
 
-  if ($h->{conprice}) {
-      my ($gcp,$gcpcucy) = split ":", $h->{conprice};
-      return qq{Incorrect input for key 'conprice'. Please consider the commandref.} if(!$gcp || !$gcpcucy);
+  if ($h->{conprice}) {                                                                       # Bezugspreis (Arbeitspreis) pro kWh
+      my @acp = split ":", $h->{conprice};
+      return qq{Incorrect input for key 'conprice'. Please consider the commandref.} if(scalar(@acp) != 2 && scalar(@acp) != 3);
   }
 
-  if ($h->{feedprice}) {
-      my ($gfr,$gfrcucy) = split ":", $h->{feedprice};
-      return qq{Incorrect input for key 'feedprice'. Please consider the commandref.} if(!$gfr || !$gfrcucy);
+  if ($h->{feedprice}) {                                                                       # Einspeisevergütung pro kWh
+      my @afp = split ":", $h->{feedprice};
+      return qq{Incorrect input for key 'feedprice'. Please consider the commandref.} if(scalar(@afp) != 2 && scalar(@afp) != 3);    
   }
 
   ## alte Speicherwerte löschen
@@ -3432,7 +3440,7 @@ sub __forecastSolar_ApiResponse {
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{requests_limit}          = $jdata->{'message'}{'ratelimit'}{'limit'};              # Requests Limit in Periode
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{place}                   = encode ("utf8", $jdata->{'message'}{'info'}{'place'});
 
-      if($debug =~ /apiCall/x) {
+      if ($debug =~ /apiCall/x) {
           Log3 ($name, 1, qq{$name DEBUG> ForecastSolar API Call - server response for PV string "$string"});
           Log3 ($name, 1, "$name DEBUG> ForecastSolar API Call - request time: ".      $rt." ($rts)");
           Log3 ($name, 1, "$name DEBUG> ForecastSolar API Call - requests remaining: ".$jdata->{'message'}{'ratelimit'}{'remaining'});
@@ -4131,8 +4139,9 @@ sub __openMeteoDWD_ApiRequest {
   my $submodel   = $paref->{submodel};                                       # abzufragendes Wettermodell
 
   if (!$allstrings) {                                                        # alle Strings wurden abgerufen
-      writeCacheToFile     ($hash, 'solcastapi', $scpicache.$name);          
-      readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $ometeorepdef, $lang))[0], 1);
+      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);          
+      my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $ometeorepdef);
+      readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1;
       return;
   }
@@ -4299,7 +4308,6 @@ sub __openMeteoDWD_ApiResponse {
 
       if ($debug =~ /apiCall/xs) {
           Log3 ($name, 1, qq{$name DEBUG> Open-Meteo API Call - server response for PV string "$string"});
-          Log3 ($name, 1, "$name DEBUG> Open-Meteo API Call - request time: ".$rt." ($t)");
           Log3 ($name, 1, "$name DEBUG> Open-Meteo API Call - status: success");
       }
 
@@ -4444,7 +4452,7 @@ sub __openMeteoDWD_ApiResponse {
       }
   }
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += $paref->{callequivalent};
+  ___setOpenMeteoAPIcallKeyData ($paref);
 
   Log3 ($name, 4, qq{$name - Open-Meteo DWD ICON API answer received for string "$string"});
 
@@ -4463,6 +4471,49 @@ sub __openMeteoDWD_ApiResponse {
   $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
 return &$caller($param);
+}
+
+################################################################
+#     Kennzahlen aus letzten Open-Meteo Request ableiten
+################################################################
+sub ___setOpenMeteoAPIcallKeyData {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $lang  = $paref->{lang};
+  my $debug = $paref->{debug};
+  my $cequ  = $paref->{callequivalent};
+  my $t     = $paref->{t} // time;
+
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += $cequ;
+  
+  my $dar = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+  my $dac = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls',    0);
+  my $asc = CurrentVal    ($hash, 'allstringscount', 1);
+
+  my $drr = $ometmaxreq - $dar;
+  $drr    = 0 if($drr < 0);
+
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests} = $drr;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval}        = $ometeorepdef;
+
+  ## Berechnung des optimalen Request Intervalls
+  ################################################
+  my $edate = strftime "%Y-%m-%d 23:58:00", localtime($t);
+  my $ets   = timestringToTimestamp ($edate);
+  my $rmdif = $ets - int $t;
+  
+  if ($drr) {
+      my $optrep = $rmdif / ($drr / ($cequ * $asc));
+      $optrep    = $ometeorepdef if($optrep < $ometeorepdef);
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $optrep;
+  }
+
+  debugLog ($paref, "apiProcess|apiCall", "Open-Meteo API Call - remaining API Requests: $drr, Request equivalents p. call: $cequ, new call interval: ".SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $ometeorepdef));
+
+return;
 }
 
 ###############################################################
@@ -6165,10 +6216,11 @@ sub _addDynAttr {
 
   for my $step (1..$weatherDevMax) {
       if ($step == 1) {
-          push @deva, ($adwds ? "ctrlWeatherDev".$step.":OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API,$adwds" : "ctrlWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API");
+          push @deva, ($adwds ? "ctrlWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API,$adwds" : "ctrlWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API");
           next;
       }
-      push @deva, ($adwds ? "ctrlWeatherDev".$step.":$adwds" : "ctrlWeatherDev1");
+      
+      push @deva, ($adwds ? "ctrlWeatherDev".$step.":$adwds" : "");
   }
 
   $hash->{".AttrList"} = join " ", @deva;
@@ -7763,16 +7815,44 @@ sub _transferMeterValues {
 
   return if(!$gc || !$gf || !$gt || !$ft);
 
-  if ($h->{conprice}) {
-      my ($gcp,$gcpcucy) = split ":", $h->{conprice};                                         # Bezugspreis (Arbeitspreis) pro kWh
-      $data{$type}{$name}{current}{ePurchasePrice}    = $gcp;
-      $data{$type}{$name}{current}{ePurchasePriceCcy} = $gcpcucy;
+  if ($h->{conprice}) {                                                                       # Bezugspreis (Arbeitspreis) pro kWh
+      my @acp = split ":", $h->{conprice};
+      
+      if (scalar(@acp) == 3) {
+          $data{$type}{$name}{current}{ePurchasePrice}    = ReadingsNum ($acp[0], $acp[1], 0);   
+          $data{$type}{$name}{current}{ePurchasePriceCcy} = $acp[2];          
+      }
+      
+      if (scalar(@acp) == 2) {
+          if (isNumeric($acp[0])) {
+              $data{$type}{$name}{current}{ePurchasePrice}     = $acp[0];
+              $data{$type}{$name}{current}{ePurchasePriceCcy} = $acp[1];
+          }
+          else {
+              $data{$type}{$name}{current}{ePurchasePrice}    = ReadingsNum ($medev, $acp[0], 0);   
+              $data{$type}{$name}{current}{ePurchasePriceCcy} = $acp[1];             
+          }          
+      }
   }
-
-  if ($h->{feedprice}) {
-      my ($gfr,$gfrcucy) = split ":", $h->{feedprice};                                        # Einspeisevergütung pro kWh
-      $data{$type}{$name}{current}{eFeedInTariff}     = $gfr;
-      $data{$type}{$name}{current}{eFeedInTariffCcy}  = $gfrcucy;
+  
+  if ($h->{feedprice}) {                                                                       # Einspeisevergütung pro kWh
+      my @afp = split ":", $h->{feedprice};
+      
+      if (scalar(@afp) == 3) {
+          $data{$type}{$name}{current}{eFeedInTariff}    = ReadingsNum ($afp[0], $afp[1], 0);   
+          $data{$type}{$name}{current}{eFeedInTariffCcy} = $afp[2];          
+      }
+      
+      if (scalar(@afp) == 2) {
+          if (isNumeric($afp[0])) {
+              $data{$type}{$name}{current}{eFeedInTariff}    = $afp[0];
+              $data{$type}{$name}{current}{eFeedInTariffCcy} = $afp[1];
+          }
+          else {
+              $data{$type}{$name}{current}{eFeedInTariff}    = ReadingsNum ($medev, $afp[0], 0);   
+              $data{$type}{$name}{current}{eFeedInTariffCcy} = $afp[1];             
+          }          
+      }
   }
 
   $gfunit //= $gcunit;
@@ -11504,7 +11584,7 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;(';
           $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
           $api .= '/';
-          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIrequests', 50);
+          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIrequests', $solcmaxreqdef);
           $api .= ')';
           $api .= '</span>';
       }
@@ -11591,9 +11671,11 @@ sub _graphicHeader {
           $scicon = "<a>$img</a>";
 
           $api .= '&nbsp;&nbsp;'.$scicon;
-          $api .= '<span title="'.$htitles{dapic}{$lang}.'">';
+          $api .= '<span title="'.$htitles{dapic}{$lang}.' / '.$htitles{rapic}{$lang}.'">';
           $api .= '&nbsp;&nbsp;(';
           $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+          $api .= '/';
+          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIrequests', $ometmaxreq);
           $api .= ')';
           $api .= '</span>';
       }
@@ -14646,7 +14728,7 @@ sub listDataPool {
       }
       for my $idx (sort keys %{$h}) {
           if (ref $h->{$idx} ne "ARRAY") {
-              $sq .= $idx." => ".$h->{$idx}."\n";
+              $sq .= $idx." => ".(defined $h->{$idx} ? $h->{$idx} : '')."\n";
           }
           else {
              my $aser = join " ",@{$h->{$idx}};
@@ -17789,9 +17871,9 @@ to ensure that the system configuration is correct.
 
     <ul>
       <a id="SolarForecast-set-currentMeterDev"></a>
-      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Einheit&gt; contotal=&lt;Readingname&gt;:&lt;Einheit&gt;
-                             gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;
-                             [conprice=&lt;Wert&gt;:&lt;Currency&gt;] [feedprice=&lt;Wert&gt;:&lt;Currency&gt;] </b> <br><br>
+      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Unit&gt; contotal=&lt;Readingname&gt;:&lt;Unit&gt;
+                             gfeedin=&lt;Readingname&gt;:&lt;Unit&gt; feedtotal=&lt;Readingname&gt;:&lt;Unit&gt;
+                             [conprice=&lt;Field&gt;] [feedprice=&lt;Field&gt;] </b> <br><br>
 
       Sets any device and its readings for energy measurement.
       The module assumes that the numeric value of the readings is positive.
@@ -17801,13 +17883,21 @@ to ensure that the system configuration is correct.
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>gcon</b>       </td><td>Reading which supplies the power currently drawn from the grid                                     </td></tr>
-          <tr><td> <b>contotal</b>   </td><td>Reading which provides the sum of the energy drawn from the grid (a constantly increasing meter)   </td></tr>
-          <tr><td> <b>gfeedin</b>    </td><td>Reading which supplies the power currently fed into the grid                                       </td></tr>
-          <tr><td> <b>feedtotal</b>  </td><td>Reading which provides the sum of the energy fed into the grid (a constantly increasing meter)     </td></tr>
-          <tr><td> <b>Einheit</b>    </td><td>the respective unit (W,kW,Wh,kWh)                                                                  </td></tr>
-          <tr><td> <b>conprice</b>   </td><td>Price and currency for the purchase of one kWh (optional)                                          </td></tr>
-          <tr><td> <b>feedprice</b>  </td><td>Price and currency for the feed-in of one kWh (optional)                                           </td></tr>
+          <tr><td> <b>gcon</b>       </td><td>Reading which supplies the power currently drawn from the grid                                                            </td></tr>
+          <tr><td> <b>contotal</b>   </td><td>Reading which provides the sum of the energy drawn from the grid (a constantly increasing meter)                          </td></tr>
+          <tr><td> <b>gfeedin</b>    </td><td>Reading which supplies the power currently fed into the grid                                                              </td></tr>
+          <tr><td> <b>feedtotal</b>  </td><td>Reading which provides the sum of the energy fed into the grid (a constantly increasing meter)                            </td></tr>
+          <tr><td> <b>Unit</b>       </td><td>the respective unit (W,kW,Wh,kWh)                                                                                         </td></tr>
+          <tr><td>                   </td><td>                                                                                                                          </td></tr>
+          <tr><td> <b>conprice</b>   </td><td>Price for the purchase of one kWh (optional). The &lt;field&gt; can be specified in one of the following variants:        </td></tr>
+          <tr><td>                   </td><td>&lt;Price&gt;:&lt;Currency&gt; - Price as a numerical value and its currency                                              </td></tr>
+          <tr><td>                   </td><td>&lt;Reaging&gt;:&lt;Currency&gt; - Reading of the <b>meter device</b> that contains the price : Currency                  </td></tr>
+          <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reaging&gt;:&lt;Currency&gt; - any device and reading containing the price : Currency                  </td></tr>
+          <tr><td>                   </td><td>                                                                                                                          </td></tr>
+          <tr><td> <b>feedprice</b>  </td><td>Remuneration for the feed-in of one kWh (optional). The &lt;field&gt; can be specified in one of the following variants:  </td></tr>
+          <tr><td>                   </td><td>&lt;Remuneration&gt;:&lt;Currency&gt; - Remuneration as a numerical value and its currency                                </td></tr>
+          <tr><td>                   </td><td>&lt;Reaging&gt;:&lt;Currency&gt; - Reading of the <b>meter device</b> that contains the remuneration : Currency           </td></tr>
+          <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reaging&gt;:&lt;Currency&gt; - any device and reading containing the remuneration : Currency           </td></tr>
         </table>
       </ul>
       <br>
@@ -17824,7 +17914,7 @@ to ensure that the system configuration is correct.
 
       <ul>
         <b>Example: </b> <br>
-        set &lt;name&gt; currentMeterDev Meter gcon=Wirkleistung:W contotal=BezWirkZaehler:kWh gfeedin=-gcon feedtotal=EinWirkZaehler:kWh conprice=0.2958:€ feedprice=0.1269:€ <br>
+        set &lt;name&gt; currentMeterDev Meter gcon=Wirkleistung:W contotal=BezWirkZaehler:kWh gfeedin=-gcon feedtotal=EinWirkZaehler:kWh conprice=powerCost:€ feedprice=0.1269:€ <br>
         <br>
         # Device Meter provides the current grid reference in the reading "Wirkleistung" (W),
           the sum of the grid reference in the reading "BezWirkZaehler" (kWh), the current feed in "Wirkleistung" if "Wirkleistung" is negative,
@@ -17861,7 +17951,9 @@ to ensure that the system configuration is correct.
       
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
-      This Open-Meteo API variant provides access to the DWD's global Ensemble Prediction System (EPS). <br>
+      This Open-Meteo API variant provides access to the DWD's global 
+      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble Prediction System (EPS)</a>.
+      <br>
       The ensemble models ICON-D2-EPS, ICON-EU-EPS and ICON-EPS are seamlessly combined. <br>
       <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are 
       a special type of forecasting method that takes into account the uncertainties in weather forecasting. 
@@ -19243,7 +19335,7 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-ctrlWeatherDev" data-pattern="ctrlWeatherDev.*"></a>
        <li><b>ctrlWeatherDevX </b> <br><br>
 
-       Specifies the device or API that provides the required weather data (cloud cover, precipitation, etc.).<br>
+       Specifies the device or API for providing the required weather data (cloud cover, precipitation, etc.).<br>
        The attribute 'ctrlWeatherDev1' specifies the leading weather service and is mandatory.<br>
        If an Open-Meteo API is selected in the 'ctrlWeatherDev1' attribute, this Open-Meteo service is automatically set as the 
        source of the radiation data (Setter currentRadiationAPI). <br><br>
@@ -19266,7 +19358,9 @@ to ensure that the system configuration is correct.
        
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
-      This Open-Meteo API variant provides access to the DWD's global Ensemble Prediction System (EPS). <br>
+      This Open-Meteo API variant provides access to the DWD's global 
+      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble Prediction System (EPS)</a>.
+      <br>
       The ensemble models ICON-D2-EPS, ICON-EU-EPS and ICON-EPS are seamlessly combined. <br>
       <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are 
       a special type of forecasting method that takes into account the uncertainties in weather forecasting. 
@@ -20017,7 +20111,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a id="SolarForecast-set-currentMeterDev"></a>
       <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Einheit&gt; contotal=&lt;Readingname&gt;:&lt;Einheit&gt;
                              gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;
-                             [conprice=&lt;Wert&gt;:&lt;Currency&gt;] [feedprice=&lt;Wert&gt;:&lt;Currency&gt;] </b> <br><br>
+                             [conprice=&lt;Feld&gt;] [feedprice=&lt;Feld&gt;] </b> <br><br>
 
       Legt ein beliebiges Device und seine Readings zur Energiemessung fest.
       Das Modul geht davon aus, dass der numerische Wert der Readings positiv ist.
@@ -20027,14 +20121,22 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>gcon</b>       </td><td>Reading welches die aktuell aus dem Netz bezogene Leistung liefert                                          </td></tr>
-          <tr><td> <b>contotal</b>   </td><td>Reading welches die Summe der aus dem Netz bezogenen Energie liefert (ein sich stetig erhöhender Zähler)    </td></tr>
-          <tr><td> <b>gfeedin</b>    </td><td>Reading welches die aktuell in das Netz eingespeiste Leistung liefert                                       </td></tr>
-          <tr><td> <b>feedtotal</b>  </td><td>Reading welches die Summe der in das Netz eingespeisten Energie liefert (ein sich stetig erhöhender Zähler) </td></tr>
-          <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                         </td></tr>
-          <tr><td> <b>conprice</b>   </td><td>Preis und Währung für den Bezug einer kWh (optional)                                                        </td></tr>
-          <tr><td> <b>feedprice</b>  </td><td>Preis und Währung für die Einspeisung einer kWh (optional)                                                  </td></tr>
-        </table>
+          <tr><td> <b>gcon</b>       </td><td>Reading welches die aktuell aus dem Netz bezogene Leistung liefert                                                         </td></tr>
+          <tr><td> <b>contotal</b>   </td><td>Reading welches die Summe der aus dem Netz bezogenen Energie liefert (ein sich stetig erhöhender Zähler)                   </td></tr>
+          <tr><td> <b>gfeedin</b>    </td><td>Reading welches die aktuell in das Netz eingespeiste Leistung liefert                                                      </td></tr>
+          <tr><td> <b>feedtotal</b>  </td><td>Reading welches die Summe der in das Netz eingespeisten Energie liefert (ein sich stetig erhöhender Zähler)                </td></tr>
+          <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                                        </td></tr>
+          <tr><td>                   </td><td>                                                                                                                           </td></tr>
+          <tr><td> <b>conprice</b>   </td><td>Preis für den Bezug einer kWh (optional). Die Angabe &lt;Feld&gt; ist in einer der folgenden Varianten möglich:            </td></tr>
+          <tr><td>                   </td><td>&lt;Preis&gt;:&lt;Währung&gt; - Preis als numerischer Wert und dessen Währung                                              </td></tr>
+          <tr><td>                   </td><td>&lt;Reaging&gt;:&lt;Währung&gt; - Reading des <b>Meter Device</b> das den Preis enthält : Währung                          </td></tr>
+          <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reaging&gt;:&lt;Währung&gt; - beliebiges Device und Reading welches den Preis enthält : Währung         </td></tr>
+          <tr><td>                   </td><td>                                                                                                                           </td></tr>
+          <tr><td> <b>feedprice</b>  </td><td>Vergütung für die Einspeisung einer kWh (optional). Die Angabe &lt;Feld&gt; ist in einer der folgenden Varianten möglich:  </td></tr>
+          <tr><td>                   </td><td>&lt;Vergütung&gt;:&lt;Währung&gt; - Vergütung als numerischer Wert und dessen Währung                                      </td></tr>
+          <tr><td>                   </td><td>&lt;Reaging&gt;:&lt;Währung&gt; - Reading des <b>Meter Device</b> das die Vergütung enthält : Währung                      </td></tr>
+          <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reaging&gt;:&lt;Währung&gt; - beliebiges Device und Reading welches die Vergütung enthält : Währung     </td></tr>
+       </table>
       </ul>
       <br>
 
@@ -20050,7 +20152,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; currentMeterDev Meter gcon=Wirkleistung:W contotal=BezWirkZaehler:kWh gfeedin=-gcon feedtotal=EinWirkZaehler:kWh conprice=0.2958:€ feedprice=0.1269:€ <br>
+        set &lt;name&gt; currentMeterDev Meter gcon=Wirkleistung:W contotal=BezWirkZaehler:kWh gfeedin=-gcon feedtotal=EinWirkZaehler:kWh conprice=powerCost:€ feedprice=0.1269:€ <br>
         <br>
         # Device Meter liefert den aktuellen Netzbezug im Reading "Wirkleistung" (W),
           die Summe des Netzbezugs im Reading "BezWirkZaehler" (kWh), die aktuelle Einspeisung in "Wirkleistung" wenn "Wirkleistung" negativ ist,
@@ -20086,7 +20188,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
-      Diese Open-Meteo API Variante bietet Zugang zum globalen Ensemble-Vorhersagesystem (EPS) des DWD. <br>
+      Diese Open-Meteo API Variante bietet Zugang zum globalen
+      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble-Vorhersagesystem (EPS)</a>
+      des DWD. <br>
       Es werden die Ensemble Modelle ICON-D2-EPS, ICON-EU-EPS und ICON-EPS nahtlos vereint. <br>
       <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind 
       eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt. 
@@ -21481,7 +21585,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-ctrlWeatherDev" data-pattern="ctrlWeatherDev.*"></a>
        <li><b>ctrlWeatherDevX </b> <br><br>
 
-       Gibt das Gerät oder die API an, das/die die erforderlichen Wetterdaten (Wolkendecke, Niederschlag usw.) liefert.<br>
+       Gibt das Gerät oder die API zur Lieferung der erforderlichen Wetterdaten (Wolkendecke, Niederschlag usw.) an.<br>
        Das Attribut 'ctrlWeatherDev1' definiert den führenden Wetterdienst und ist zwingend erforderlich.<br>
        Ist eine Open-Meteo API im Attribut 'ctrlWeatherDev1' ausgewählt, wird dieser Open-Meteo Dienst automatisch auch als Quelle
        der Strahlungsdaten (Setter currentRadiationAPI) eingestellt. <br><br>
@@ -21503,7 +21607,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
-      Diese Open-Meteo API Variante bietet Zugang zum globalen Ensemble-Vorhersagesystem (EPS) des DWD. <br>
+      Diese Open-Meteo API Variante bietet Zugang zum globalen
+      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble-Vorhersagesystem (EPS)</a>
+      des DWD. <br>
       Es werden die Ensemble Modelle ICON-D2-EPS, ICON-EU-EPS und ICON-EPS nahtlos vereint. <br>
       <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind 
       eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt. 
