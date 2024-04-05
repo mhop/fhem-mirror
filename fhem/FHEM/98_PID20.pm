@@ -360,7 +360,7 @@ sub PID20_Get($@)
       $ret .= 'Actor upper limit: ' . $hash->{helper}{actorLimitUpper} . "\n";
       return $ret;
   } else {
-    return $usage; }
+    return $usage;
   }
 }
 ########################################
