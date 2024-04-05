@@ -91,6 +91,7 @@
 #               invalid name of sensor / reading / actor will no longer
 #               prevent the definition, but will write log entries with errors.
 #
+# 2024-04-05    remove smartmatch issues
 #
 ####################################################################################################
 =cut
