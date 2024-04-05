@@ -17891,13 +17891,13 @@ to ensure that the system configuration is correct.
           <tr><td>                   </td><td>                                                                                                                          </td></tr>
           <tr><td> <b>conprice</b>   </td><td>Price for the purchase of one kWh (optional). The &lt;field&gt; can be specified in one of the following variants:        </td></tr>
           <tr><td>                   </td><td>&lt;Price&gt;:&lt;Currency&gt; - Price as a numerical value and its currency                                              </td></tr>
-          <tr><td>                   </td><td>&lt;Reaging&gt;:&lt;Currency&gt; - Reading of the <b>meter device</b> that contains the price : Currency                  </td></tr>
-          <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reaging&gt;:&lt;Currency&gt; - any device and reading containing the price : Currency                  </td></tr>
+          <tr><td>                   </td><td>&lt;Reading&gt;:&lt;Currency&gt; - Reading of the <b>meter device</b> that contains the price : Currency                  </td></tr>
+          <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reading&gt;:&lt;Currency&gt; - any device and reading containing the price : Currency                  </td></tr>
           <tr><td>                   </td><td>                                                                                                                          </td></tr>
           <tr><td> <b>feedprice</b>  </td><td>Remuneration for the feed-in of one kWh (optional). The &lt;field&gt; can be specified in one of the following variants:  </td></tr>
           <tr><td>                   </td><td>&lt;Remuneration&gt;:&lt;Currency&gt; - Remuneration as a numerical value and its currency                                </td></tr>
-          <tr><td>                   </td><td>&lt;Reaging&gt;:&lt;Currency&gt; - Reading of the <b>meter device</b> that contains the remuneration : Currency           </td></tr>
-          <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reaging&gt;:&lt;Currency&gt; - any device and reading containing the remuneration : Currency           </td></tr>
+          <tr><td>                   </td><td>&lt;Reading&gt;:&lt;Currency&gt; - Reading of the <b>meter device</b> that contains the remuneration : Currency           </td></tr>
+          <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reading&gt;:&lt;Currency&gt; - any device and reading containing the remuneration : Currency           </td></tr>
         </table>
       </ul>
       <br>
@@ -20129,13 +20129,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
           <tr><td>                   </td><td>                                                                                                                           </td></tr>
           <tr><td> <b>conprice</b>   </td><td>Preis für den Bezug einer kWh (optional). Die Angabe &lt;Feld&gt; ist in einer der folgenden Varianten möglich:            </td></tr>
           <tr><td>                   </td><td>&lt;Preis&gt;:&lt;Währung&gt; - Preis als numerischer Wert und dessen Währung                                              </td></tr>
-          <tr><td>                   </td><td>&lt;Reaging&gt;:&lt;Währung&gt; - Reading des <b>Meter Device</b> das den Preis enthält : Währung                          </td></tr>
-          <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reaging&gt;:&lt;Währung&gt; - beliebiges Device und Reading welches den Preis enthält : Währung         </td></tr>
+          <tr><td>                   </td><td>&lt;Reading&gt;:&lt;Währung&gt; - Reading des <b>Meter Device</b> das den Preis enthält : Währung                          </td></tr>
+          <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reading&gt;:&lt;Währung&gt; - beliebiges Device und Reading welches den Preis enthält : Währung         </td></tr>
           <tr><td>                   </td><td>                                                                                                                           </td></tr>
           <tr><td> <b>feedprice</b>  </td><td>Vergütung für die Einspeisung einer kWh (optional). Die Angabe &lt;Feld&gt; ist in einer der folgenden Varianten möglich:  </td></tr>
           <tr><td>                   </td><td>&lt;Vergütung&gt;:&lt;Währung&gt; - Vergütung als numerischer Wert und dessen Währung                                      </td></tr>
-          <tr><td>                   </td><td>&lt;Reaging&gt;:&lt;Währung&gt; - Reading des <b>Meter Device</b> das die Vergütung enthält : Währung                      </td></tr>
-          <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reaging&gt;:&lt;Währung&gt; - beliebiges Device und Reading welches die Vergütung enthält : Währung     </td></tr>
+          <tr><td>                   </td><td>&lt;Reading&gt;:&lt;Währung&gt; - Reading des <b>Meter Device</b> das die Vergütung enthält : Währung                      </td></tr>
+          <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reading&gt;:&lt;Währung&gt; - beliebiges Device und Reading welches die Vergütung enthält : Währung     </td></tr>
        </table>
       </ul>
       <br>
