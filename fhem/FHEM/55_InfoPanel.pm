@@ -1219,9 +1219,9 @@ sub btIP_evalLayout {
         $params{textdecoration} = "none";
         foreach my $s (@args) {
           if($s ne 'clear') {
-            $params{fontstyle}      = "$s " if($s ~~ @style);
-            $params{fontweight}     = "$s " if($s ~~ @weight);
-            $params{textdecoration} = "$s " if($s ~~ @deco);
+            $params{fontstyle}      = "$s " if (grep($s,@style));
+            $params{fontweight}     = "$s " if (grep($s,@weight));
+            $params{textdecoration} = "$s " if (grep($s,@deco));
           }
         }
       } elsif ($cmd eq "ticker") {
@@ -1239,14 +1239,14 @@ sub btIP_evalLayout {
 	      $svg .= btIP_itemTime($id,$x,$y,%params);
 	    } elsif ($cmd eq "thalign"){
         my $d = AnalyzePerlCommand(undef, $def);
-        if($d ~~ @valid_halign) { 
+        if (grep($d,@valid_halign)) { 
           $params{thalign}= $d;
         } else {
           Log3($name, 2, "InfoPanel $name: Illegal horizontal alignment $d");
         }
       } elsif ($cmd eq "tvalign"){
         my $d = AnalyzePerlCommand(undef, $def);
-        if($d ~~ @valid_valign) { 
+        if(grep($d,@valid_valign)) { 
           $params{tvalign}= $d;
         } else {
           Log3($name, 2, "InfoPanel $name: Illegal vertical alignment $d");
