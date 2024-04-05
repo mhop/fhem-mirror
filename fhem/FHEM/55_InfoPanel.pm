@@ -1059,7 +1059,7 @@ sub btIP_evalLayout {
 	      $params{xx} = $x;
 	      $params{yy} = $y;
 	      $svg .= btIP_itemDate($id,$x,$y,%params);
-	    } "ellipse") {
+	    } elsif ($cmd eq "ellipse") {
 	      ($id,$x1,$y1,$rx,$ry,$filled,$stroked,$link)= split("[ \t]+", $def, 8);
 	      ($x1,$y1) = btIP_xy($x1,$y1,%params);
               ($rx,$ry) = btIP_xy($rx,$ry,%params);
@@ -1070,7 +1070,7 @@ sub btIP_evalLayout {
 	      $link //= "";
           $link = AnalyzePerlCommand(undef,$link);
 	      $svg .= btIP_itemEllipse($id,$x1,$y1,$rx,$ry,$filled,$stroked,$link,%params);
-	    } "embed") {
+	    } elsif ($cmd eq "embed") {
 	      ($id,$x,$y,$width,$height,$arg)= split("[ \t]+", $def, 6);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      ($width,$height)= btIP_xy($width,$height,%params);
