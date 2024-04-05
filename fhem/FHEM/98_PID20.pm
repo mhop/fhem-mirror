@@ -346,10 +346,7 @@ sub PID20_Get($@)
   my $usage = "Unknown argument $a[1], choose one of params:noArg";
   return $usage if ( @a < 2 );
   my $cmd = lc( $a[1] );
-  given ($cmd)
-  {
-    when ('params')
-    {
+  if ($cmd eq 'params') {
       my $ret = "Defined parameters for PID20 $name:\n\n";
       $ret .= 'Actor name       : ' . $hash->{helper}{actor} . "\n";
       $ret .= 'Actor cmd        : ' . $hash->{helper}{actorCommand} . "\n\n";
@@ -362,8 +359,8 @@ sub PID20_Get($@)
       $ret .= 'Actor lower limit: ' . $hash->{helper}{actorLimitLower} . "\n";
       $ret .= 'Actor upper limit: ' . $hash->{helper}{actorLimitUpper} . "\n";
       return $ret;
-    }
-    default { return $usage; }
+  } else {
+    return $usage; }
   }
 }
 ########################################
