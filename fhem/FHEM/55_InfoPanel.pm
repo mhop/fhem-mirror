@@ -78,6 +78,8 @@
 #
 # 2023-07-04 - 27724 - changed: minor bugfix for perl 5.36
 #
+# 2024-04-05 -         changed: remove smartmatch issues
+#
 ##############################################
 =cut
 
@@ -87,7 +89,7 @@ use warnings;
 
 #use Data::Dumper;
 
-use feature qw/switch/;
+#use feature qw/switch/;
 use vars qw(%data);
 use HttpUtils;
 
@@ -96,7 +98,7 @@ my @valid_halign = qw(start middle end);
 
 my $useImgTools = 1;
 
-no if $] >= 5.017011, warnings => 'experimental';
+#no if $] >= 5.017011, warnings => 'experimental';
 
 sub btIP_Define;
 sub btIP_Undef;
@@ -211,28 +213,22 @@ sub btIP_Set {
 
   my $usage= "Unknown argument, choose one of reread:noArg ovClear ovEnable ovDisable";
   my $ret = undef;
-
-  given ($a[1]) {
+  my $cmd = $a[1];
   
-     when ("ovClear") {
-        if ($a[2] eq "all") {
-           delete $defs{$name}{fhem}{override};
-        } else {
-           delete $defs{$name}{fhem}{override}{$a[2]};
-        }
-     }
-     when ("ovDisable") {
-        $defs{$name}{fhem}{override}{$a[2]} = 0;
-     }
-     when ("ovEnable") {
-        $defs{$name}{fhem}{override}{$a[2]} = 1;
-     }
-     when ("reread") {
-        btIP_readLayout($hash);
-     }
-     default {
-        $ret = $usage;
-     }
+	if ($cmd eq "ovClear") {
+		if ($a[2] eq "all") {
+			delete $defs{$name}{fhem}{override};
+		} else {
+		  delete $defs{$name}{fhem}{override}{$a[2]};
+		}
+	} elsif ($cmd eq "ovDisable") {
+	  $defs{$name}{fhem}{override}{$a[2]} = 0;
+  } elsif ($cmd eq "ovEnable") {
+	  $defs{$name}{fhem}{override}{$a[2]} = 1;
+  } elsif ($cmd eq "reread") {
+	  btIP_readLayout($hash);
+  } else  {
+	  $ret = $usage;
   }
   return $ret;
 }
@@ -244,24 +240,20 @@ sub btIP_Get {
 
   my $usage= "Unknown argument, choose one of reread:noArg counter:noArg layout:noArg overrides:noArg";
   my $ret = undef;
+  my $cmd = $a[1];
 
-  given ($a[1]) {
-     when ("counter") {
-        $ret = $defs{$name}{fhem}{counter};
-     }
-     when ("layout") {
-        $ret = $defs{$name}{fhem}{layout};
-     }
-     when ("overrides") {
-        last if(!defined($defs{$name}{fhem}{override}));
-        foreach my $key ( keys %{$defs{$name}{fhem}{override}} ) {
-          $ret .= "$key => $defs{$name}{fhem}{override}{$key} \n";
-        }
-     }
-     default {
-        $ret = $usage;
-     }
-  }
+	if ($cmd eq "counter") {
+		$ret = $defs{$name}{fhem}{counter};
+	} elsif ($cmd eq "layout") {
+		$ret = $defs{$name}{fhem}{layout};
+	} elsif ($cmd eq "overrides") {
+		last if(!defined($defs{$name}{fhem}{override}));
+		foreach my $key ( keys %{$defs{$name}{fhem}{override}} ) {
+			$ret .= "$key => $defs{$name}{fhem}{override}{$key} \n";
+		}
+	} else {
+		$ret = $usage;
+	}
   return $ret;
 }
 
@@ -1018,44 +1010,34 @@ sub btIP_evalLayout {
 # Debug "before command $line: x= " . $params{xx} . ", y= " . $params{yy};
 
     eval {
-      given($cmd) {
-
-	    when("area") {
+	    if ($cmd eq "area") {
 	      ($id,$x1,$y1,$x2,$y2,$link,$target)= split("[ \t]+", $def, 7);
-              $target //= "";
+        $target //= "";
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
 	      $link = AnalyzePerlCommand(undef,$link);
-          $params{xx} = $x1;
-          $params{yy} = $y2;
+        $params{xx} = $x1;
+        $params{yy} = $y2;
 	      $svg .= btIP_itemArea($id,$x1,$y1,$x2,$y2,$link,$target,%params);
-	    }
-
-        when("boxcolor"){
+	    } elsif ($cmd eq "boxcolor") {
 	      $def = "\"$def\"" if(length($def) == 6 && $def =~ /[[:xdigit:]]{6}/);
 	      $params{boxcolor} = AnalyzePerlCommand(undef, $def);
-	    }
-
-        when("button") {
+	    } elsif ($cmd eq "button") {
 	      ($id,$x1,$y1,$x2,$y2,$rx,$ry,$link,$text)= split("[ \t]+", $def, 9);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
 	      ($rx,$ry)= btIP_xy($rx,$ry,%params);
-          $params{xx} = $x1;
-          $params{yy} = $y2;
-          $link = AnalyzePerlCommand(undef,$link);
-          $link = (length($link)) ? $link : "-$params{name}.html";
-          $text = AnalyzePerlCommand(undef,$text);
+        $params{xx} = $x1;
+        $params{yy} = $y2;
+        $link = AnalyzePerlCommand(undef,$link);
+        $link = (length($link)) ? $link : "-$params{name}.html";
+        $text = AnalyzePerlCommand(undef,$text);
 	      $svg .= btIP_itemButton($id,$x1,$y1,$x2,$y2,$rx,$ry,$link,$text,%params);
-        }
-	    
-        when("buttonpanel"){
-           $defs{$params{name}}{fhem}{div} .= "<div id=\"hiddenDiv\" ".
-              "style=\"display:none\" >".
-              "<iframe id=\"secretFrame\" name=\"secret\" src=\"\"></iframe></div>\n";
-        }
-
-	    when("circle") {
+      } elsif ($cmd eq "buttonpanel") {
+        $defs{$params{name}}{fhem}{div} .= "<div id=\"hiddenDiv\" ".
+          "style=\"display:none\" >".
+          "<iframe id=\"secretFrame\" name=\"secret\" src=\"\"></iframe></div>\n";
+      } elsif ($cmd eq "circle") {
 	      ($id,$x1,$y1,$radius,$filled,$stroked,$link)= split("[ \t]+", $def, 7);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      $params{xx} = $x1;
@@ -1063,27 +1045,21 @@ sub btIP_evalLayout {
 	      $filled  //= 0; 
 	      $stroked //= 0;
 	      $link //= "";
-          $link = AnalyzePerlCommand(undef,$link);
+        $link = AnalyzePerlCommand(undef,$link);
 	      $svg .= btIP_itemCircle($id,$x1,$y1,$radius,$filled,$stroked,$link,%params);
-	    }
-	    
-	    when("counter") {
+	    } elsif ($cmd eq "counter") {
 	      ($id,$x,$y)= split("[ \t]+", $def, 3);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
 	      $svg .= btIP_itemCounter($id,$x,$y,%params);
-	    }
-	    
-	    when("date") {
+	    } elsif ($cmd eq "date") {
 	      ($id,$x,$y)= split("[ \t]+", $def, 3);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
 	      $svg .= btIP_itemDate($id,$x,$y,%params);
-	    }
-	    
-	    when("ellipse") {
+	    } "ellipse") {
 	      ($id,$x1,$y1,$rx,$ry,$filled,$stroked,$link)= split("[ \t]+", $def, 8);
 	      ($x1,$y1) = btIP_xy($x1,$y1,%params);
               ($rx,$ry) = btIP_xy($rx,$ry,%params);
@@ -1094,257 +1070,190 @@ sub btIP_evalLayout {
 	      $link //= "";
           $link = AnalyzePerlCommand(undef,$link);
 	      $svg .= btIP_itemEllipse($id,$x1,$y1,$rx,$ry,$filled,$stroked,$link,%params);
-	    }
-	    
-	    when("embed") {
+	    } "embed") {
 	      ($id,$x,$y,$width,$height,$arg)= split("[ \t]+", $def, 6);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      ($width,$height)= btIP_xy($width,$height,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
 	      $arg = AnalyzePerlCommand(undef,$arg);
-          $defs{$name}{fhem}{div} .= btIP_itemEmbed($id,$x,$y,$width,$height,$arg,%params);
-        }
-
-	    when("font") {
+        $defs{$name}{fhem}{div} .= btIP_itemEmbed($id,$x,$y,$width,$height,$arg,%params);
+      } elsif ($cmd eq "font") {
           $params{font} = $def;
-        }
-
-	    when("group") {
+      } elsif ($cmd eq "group") {
 	      ($id,$text,$x,$y) = split("[ \t]+", $def, 4);
 	      $x //= $params{xx};
 	      $y //= $params{yy};
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
-              if($text eq 'open') {
-                 $params{groupx} = $x;
-	         $params{groupy} = $y;
-              } else {
-                 $params{groupx} = 0;
-	         $params{groupy} = 0;
-              }
-	      $svg .= btIP_itemGroup($id,$text,$x,$y,%params);
+        if($text eq 'open') {
+          $params{groupx} = $x;
+	        $params{groupy} = $y;
+        } else {
+          $params{groupx} = 0;
+	        $params{groupy} = 0;
         }
-
-	    when("img") {
+	      $svg .= btIP_itemGroup($id,$text,$x,$y,%params);
+      } elsif ($cmd eq "img") {
 	      ($id,$x,$y,$scale,$link,$srctype,$arg) = split("[ \t]+", $def,7);
 	      ($x,$y) = btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y; 
  	      $arg  = AnalyzePerlCommand(undef,$arg);
-          $link = AnalyzePerlCommand(undef,$link);
-          my($output,$width,$height)= btIP_itemImg($id,$x,$y,$scale,$link,$srctype,$arg,%params);
-          $svg .= $output;
+        $link = AnalyzePerlCommand(undef,$link);
+        my($output,$width,$height)= btIP_itemImg($id,$x,$y,$scale,$link,$srctype,$arg,%params);
+        $svg .= $output;
 	      $params{xx} = $x;
 	      $params{yy} = $y+$height;
-	    }
-	    
-        when("line") {
+	    } elsif ($cmd eq "line") {
 	      ($id,$x1,$y1,$x2,$y2,$format) = split("[ \t]+", $def, 6);
 	      ($x1,$y1) = btIP_xy($x1,$y1,%params);
 	      ($x2,$y2) = btIP_xy($x2,$y2,%params);
 	      $format //= 1;
 	      $svg .= btIP_itemLine($id,$x1,$y1,$x2,$y2,$format,%params);
-	    }
-	    
-        when("longpoll") {
-          ($id,$x,$y,$text)= split("[ \t]+", $def, 4);
-          $text //= undef;
-          $text = AnalyzePerlCommand(undef,$text) if defined($text);
+	    } elsif ($cmd eq "longpoll") {
+        ($id,$x,$y,$text)= split("[ \t]+", $def, 4);
+        $text //= undef;
+        $text = AnalyzePerlCommand(undef,$text) if defined($text);
 	      ($x,$y)= btIP_xy($x,$y,%params);
-              $x += $params{groupx};
-              $y += $params{groupy};
+        $x += $params{groupx};
+        $y += $params{groupy};
 	      $params{xx} = $x;
 	      $params{yy} = $y;
-          $svg .= btIP_itemLongpoll($id,$x,$y,$text,%params);
-        }
-        
-        when("movecalculated") {
-          my ($tox,$toy)= split('[ \t]+', $def, 2);
-          $params{xx} = AnalyzePerlCommand(undef,$tox);
-          $params{yy} = AnalyzePerlCommand(undef,$toy);
-        }
-
-        when("moveby") {
-          my ($byx,$byy) = split('[ \t]+', $def, 2);
-          my ($x,$y)= btIP_xy($byx,$byy,%params);
-          $params{xx} += $x;
-          $params{yy} += $y;
-        }
-        
-        when("moveto") {
-          my ($tox,$toy)= split('[ \t]+', $def, 2);
-          my ($x,$y)= btIP_xy($tox,$toy,%params);
-          $params{xx} = $x;
-          $params{yy} = $y;
-        }
-
-        when("padding") {
-          $params{padding}= AnalyzePerlCommand(undef,$def);
-        }
-
-	    when("plain") {
-          $svg .= AnalyzePerlCommand(undef,$def);
-        }
-
-	    when("plot") {
+        $svg .= btIP_itemLongpoll($id,$x,$y,$text,%params);
+      } elsif ($cmd eq "movecalculated") {
+        my ($tox,$toy)= split('[ \t]+', $def, 2);
+        $params{xx} = AnalyzePerlCommand(undef,$tox);
+        $params{yy} = AnalyzePerlCommand(undef,$toy);
+      } elsif ($cmd eq "moveby") {
+        my ($byx,$byy) = split('[ \t]+', $def, 2);
+        my ($x,$y)= btIP_xy($byx,$byy,%params);
+        $params{xx} += $x;
+        $params{yy} += $y;
+      } elsif ($cmd eq "moveto") {
+        my ($tox,$toy)= split('[ \t]+', $def, 2);
+        my ($x,$y)= btIP_xy($tox,$toy,%params);
+        $params{xx} = $x;
+        $params{yy} = $y;
+      } elsif ($cmd eq "padding") {
+        $params{padding}= AnalyzePerlCommand(undef,$def);
+      } elsif ($cmd eq "plain") {
+        $svg .= AnalyzePerlCommand(undef,$def);
+      } elsif ($cmd eq "plot") {
 	      ($id,$x,$y,$scale,$inline,$arg)= split("[ \t]+", $def,6);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $arg = AnalyzePerlCommand(undef, $arg);
-              my($output,$width,$height)= btIP_itemPlot($id,$x,$y,$scale,$inline,$arg,%params);
-              $svg .= $output;
+        my($output,$width,$height)= btIP_itemPlot($id,$x,$y,$scale,$inline,$arg,%params);
+        $svg .= $output;
 	      $params{xx} = $x;
 	      $params{yy} = $y+$height;
-	    }
-
-        when("pop") {
-          return unless $pstackcount;
-          foreach my $key ( keys %{$pstack{$pstackcount}} ) {
-#             Debug "pop key: $key, value: $pstack{$pstackcount}{$key}";
-             $params{$key} = $pstack{$pstackcount}{$key};
-          }
-
-          delete $pstack{$pstackcount};
-          $pstackcount--;
+	    } elsif ($cmd eq "pop") {
+        return unless $pstackcount;
+        foreach my $key ( keys %{$pstack{$pstackcount}} ) {
+#         Debug "pop key: $key, value: $pstack{$pstackcount}{$key}";
+          $params{$key} = $pstack{$pstackcount}{$key};
         }
-
-        when("pt") {
-          $def = AnalyzePerlCommand(undef, $def);
+        delete $pstack{$pstackcount};
+         $pstackcount--;
+      } elsif ($cmd eq "pt") {
+        $def = AnalyzePerlCommand(undef, $def);
 	      if($def =~ m/^[+-]/) {
-		    $params{pt} += $def;
+		      $params{pt} += $def;
 	      } else {
-		    $params{pt} =  $def;
+		      $params{pt} =  $def;
 	      }
-          $params{pt} = 6 if($params{pt} < 0);
+        $params{pt} = 6 if($params{pt} < 0);
+      } elsif ($cmd eq "push") {
+        $pstackcount++;
+        foreach my $key ( keys %params ) {
+#         Debug "push key: $key, value: $params{$key}";
+          $pstack{$pstackcount}{$key} = $params{$key};
         }
-        
-        when("push") {
-          $pstackcount++;
-          foreach my $key ( keys %params ) {
-#             Debug "push key: $key, value: $params{$key}";
-             $pstack{$pstackcount}{$key} = $params{$key};
-          }
-        }
-
-	    when("rect") {
+      } elsif ($cmd eq "rect") {
 	      ($id,$x1,$y1,$x2,$y2,$rx,$ry,$filled,$stroked,$link)= split("[ \t]+", $def, 10);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
-          ($rx,$ry) = btIP_xy($rx,$ry,%params);
-          $params{xx} = $x1;
-          $params{yy} = $y2;
+        ($rx,$ry) = btIP_xy($rx,$ry,%params);
+        $params{xx} = $x1;
+        $params{yy} = $y2;
 	      $filled  //= 0; # set 0 as default (not filled)
-          $stroked //= 0; # set 0 as default (not stroked)
-          $link //= "";
-          $link = AnalyzePerlCommand(undef,$link);
+        $stroked //= 0; # set 0 as default (not stroked)
+        $link //= "";
+        $link = AnalyzePerlCommand(undef,$link);
 	      $svg .= btIP_itemRect($id,$x1,$y1,$x2,$y2,$rx,$ry,$filled,$stroked,$link,undef,%params);
-	    }
-	    
-        when("rgb"){
+	    } elsif ($cmd eq "rgb") {
 	      $def = "\"$def\"" if(length($def) == 6 && $def =~ /[[:xdigit:]]{6}/);
 	      $params{rgb} = AnalyzePerlCommand(undef, $def);
-	    }
-
-	    when("seconds") {
-          ($id,$x,$y,$format) = split("[ \+]", $def,4);
-          ($x,$y)= btIP_xy($x,$y,%params);
-          $params{xx} = $x;
-          $params{yy} = $y;
-          $svg .= btIP_itemSeconds($id,$x,$y,$format,%params);
-	    }
-	    
-        when("text") {
-          ($id,$x,$y,$text)= split("[ \t]+", $def, 4);
+	    } elsif ($cmd eq "seconds") {
+        ($id,$x,$y,$format) = split("[ \+]", $def,4);
+        ($x,$y)= btIP_xy($x,$y,%params);
+        $params{xx} = $x;
+        $params{yy} = $y;
+        $svg .= btIP_itemSeconds($id,$x,$y,$format,%params);
+	    } elsif ($cmd eq "text") {
+        ($id,$x,$y,$text)= split("[ \t]+", $def, 4);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
 	      $text= AnalyzePerlCommand(undef, $text);
-          $svg .= btIP_itemText($id,$x,$y,$text,%params);
-        }
-        
-        when("lptext") {
-          $svg .= "\n<!-- lptext no longer provided. Use longpoll instead. -->\n\n";
-          Log3($name, 2, "InfoPanel $name: command 'lptext' no longer supported.");
-        }
-
-        when("textbox") {
-          ($id,$x,$y,$boxwidth,$boxheight,$link,$text)= split("[ \t]+", $def, 7);
+        $svg .= btIP_itemText($id,$x,$y,$text,%params);
+      } elsif ($cmd eq "textbox") {
+        ($id,$x,$y,$boxwidth,$boxheight,$link,$text)= split("[ \t]+", $def, 7);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $text =  AnalyzePerlCommand(undef, $text);
 	      $text =~ s/\n/<br\/>/g;
-          $link =  AnalyzePerlCommand(undef, $link);
+        $link =  AnalyzePerlCommand(undef, $link);
 	      $svg .= btIP_itemTextBox($id,$x,$y,$boxwidth,$boxheight,$text,$link,%params);
-          $params{xx} = $x;
-          $params{yy} = $y + $boxheight;
-        }
-        
-        when("textboxalign") {
-          $params{tbalign} = $def;
-        }
-        
-        when("textdesign") {
-          my @args   = split(/,/,$def);
-          my @deco   = qw(underline overline line-through); #text-decoration
-          my @style  = qw(italic oblique); #font-style
-          my @weight = qw(bold); #font-weight
-          $params{fontstyle}      = "initial";
-          $params{fontweight}     = "initial";
-          $params{textdecoration} = "none";
-
-          foreach my $s (@args) {
-             if($s ne 'clear') {
-                $params{fontstyle}      = "$s " if($s ~~ @style);
-                $params{fontweight}     = "$s " if($s ~~ @weight);
-                $params{textdecoration} = "$s " if($s ~~ @deco);
-             }
+        $params{xx} = $x;
+        $params{yy} = $y + $boxheight;
+      } elsif ($cmd eq "textboxalign") {
+        $params{tbalign} = $def;
+      } elsif ($cmd eq "textdesign") {
+        my @args   = split(/,/,$def);
+        my @deco   = qw(underline overline line-through); #text-decoration
+        my @style  = qw(italic oblique); #font-style
+        my @weight = qw(bold); #font-weight
+        $params{fontstyle}      = "initial";
+        $params{fontweight}     = "initial";
+        $params{textdecoration} = "none";
+        foreach my $s (@args) {
+          if($s ne 'clear') {
+            $params{fontstyle}      = "$s " if($s ~~ @style);
+            $params{fontweight}     = "$s " if($s ~~ @weight);
+            $params{textdecoration} = "$s " if($s ~~ @deco);
           }
         }
-
-        when("ticker") {
+      } elsif ($cmd eq "ticker") {
 	      ($id,$x,$y,$width,$format,$speed,$arg)= split("[ \t]+", $def, 7);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
 	      $arg = AnalyzePerlCommand(undef,$arg);
-          $defs{$name}{fhem}{div} .= btIP_itemTicker($id,$x,$y,$width,$format,$speed,$arg,%params);
-        }
-	    
-	    when("time") {
+        $defs{$name}{fhem}{div} .= btIP_itemTicker($id,$x,$y,$width,$format,$speed,$arg,%params);
+      } elsif ($cmd eq "time") {
 	      ($id,$x,$y)= split("[ \t]+", $def, 3);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
 	      $svg .= btIP_itemTime($id,$x,$y,%params);
-	    }
-
-	    when("trash") {
-          $svg .= "\n<!-- Trashcan no longer provided by module due to perfomance issues. -->\n\n";
-          Log3($name, 2, "InfoPanel $name: command 'trash' no longer supported.");
-	    }
-
-        when("thalign"){
-          my $d = AnalyzePerlCommand(undef, $def);
-          if($d ~~ @valid_halign) { 
-             $params{thalign}= $d;
-          } else {
-             Log3($name, 2, "InfoPanel $name: Illegal horizontal alignment $d");
-          }
+	    } elsif ($cmd eq "thalign"){
+        my $d = AnalyzePerlCommand(undef, $def);
+        if($d ~~ @valid_halign) { 
+          $params{thalign}= $d;
+        } else {
+          Log3($name, 2, "InfoPanel $name: Illegal horizontal alignment $d");
         }
-
-        when("tvalign"){
-           my $d = AnalyzePerlCommand(undef, $def);
-           if($d ~~ @valid_valign) { 
-              $params{tvalign}= $d;
-           } else {
-              Log3($name, 2, "InfoPanel $name: Illegal vertical alignment $d");
-           }
+      } elsif ($cmd eq "tvalign"){
+        my $d = AnalyzePerlCommand(undef, $def);
+        if($d ~~ @valid_valign) { 
+          $params{tvalign}= $d;
+        } else {
+          Log3($name, 2, "InfoPanel $name: Illegal vertical alignment $d");
         }
-
-	    default {
-              Log3($name, 2, "InfoPanel $name: Illegal command $cmd in layout definition.");
-            } # default
-      } # given
+      } else {
+        Log3($name, 2, "InfoPanel $name: Illegal command $cmd in layout definition.");
+      }
     } # eval
 
 #Debug "after  command $line: x= " . $params{xx} . ", y= " . $params{yy};
