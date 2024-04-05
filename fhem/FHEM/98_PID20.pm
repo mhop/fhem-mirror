@@ -100,14 +100,11 @@ package main;
 use strict;
 use warnings;
 
-no if $] >= 5.017011, warnings => 'experimental';
-
-use feature qw/say switch/;
 use vars qw(%defs);
 use vars qw($readingFnAttributes);
 use vars qw(%modules);
 
-my $PID20_Version = "1.0.0.9";
+my $PID20_Version = "1.0.0.10";
 sub PID20_Calc($);
 ########################################
 sub PID20_Log($$$)
@@ -383,61 +380,45 @@ sub PID20_Set($@)
   my $desiredName = lc( AttrVal( $name, 'pidDesiredName', 'desired' ) );
 
   #PID20_Log $hash, 3, "name:$name cmd:$cmd $desired:$desired";
-  given ($cmd)
-  {
-    when ('?')
-    {
-      return $usage;
-    }
-    when ($desiredName)
-    {
-      return "Set " . AttrVal( $name, 'pidDesiredName', 'desired' ) . " needs a <value> parameter"
-        if ( @a != 3 );
-      my $value = $a[2];
-      $value = ( $value =~ m/$reFloat/ ) ? $1 : undef;
-      return "value " . $a[2] . " is not a number"
-        if ( !defined($value) );
-      readingsSingleUpdate( $hash, $cmd, $value, 1 );
-      PID20_Log $hash, 3, "set $name $cmd $a[2]";
-    }
-    when ('start')
-    {
-      return 'Set start needs a <value> parameter'
-        if ( @a != 2 );
-      $hash->{helper}{stopped} = 0;
-      PID20_RestartTimer($hash,1);
-    }
-    when ('stop')
-    {
-      return 'Set stop needs a <value> parameter'
-        if ( @a != 2 );
-      $hash->{helper}{stopped} = 1;
-      PID20_RestartTimer($hash,1);
-    }
-    when ('restart')
-    {
-      return 'Set restart needs a <value> parameter'
-        if ( @a != 3 );
-      my $value = $a[2];
-      $value = ( $value =~ m/$reFloat/ ) ? $1 : undef;
+	if ($cmd eq '?') {
+		return $usage;
+	} elsif ($cmd eq $desiredName) {
+		return "Set " . AttrVal( $name, 'pidDesiredName', 'desired' ) . " needs a <value> parameter"
+			if ( @a != 3 );
+		my $value = $a[2];
+		$value = ( $value =~ m/$reFloat/ ) ? $1 : undef;
+		return "value " . $a[2] . " is not a number"
+			if ( !defined($value) );
+		readingsSingleUpdate( $hash, $cmd, $value, 1 );
+		PID20_Log $hash, 3, "set $name $cmd $a[2]";
+	} elsif ($cmd eq 'start') {
+		return 'Set start needs a <value> parameter'
+			if ( @a != 2 );
+		$hash->{helper}{stopped} = 0;
+		PID20_RestartTimer($hash,1);
+	} elsif ($cmd eq 'stop') {
+		return 'Set stop needs a <value> parameter'
+			if ( @a != 2 );
+		$hash->{helper}{stopped} = 1;
+		PID20_RestartTimer($hash,1);
+	} elsif ($cmd eq 'restart') {
+		return 'Set restart needs a <value> parameter'
+			if ( @a != 3 );
+		my $value = $a[2];
+		$value = ( $value =~ m/$reFloat/ ) ? $1 : undef;
 
-      #PID20_Log $hash, 1, "value:$value";
-      return "value " . $a[2] . " is not a number"
-        if ( !defined($value) );
-      $hash->{helper}{stopped} = 0;
-      $hash->{helper}{adjust}  = $value;
-      PID20_RestartTimer($hash,1);
-      PID20_Log $hash, 3, "set $name $cmd $value";
-    }
-    when ("calc")    # inofficial function, only for debugging purposes
-    {
-      PID20_Calc($name);
-    }
-    default
-    {
-      return $usage;
-    }
-  }
+		#PID20_Log $hash, 1, "value:$value";
+		return "value " . $a[2] . " is not a number"
+			if ( !defined($value) );
+		$hash->{helper}{stopped} = 0;
+		$hash->{helper}{adjust}  = $value;
+		PID20_RestartTimer($hash,1);
+		PID20_Log $hash, 3, "set $name $cmd $value";
+	} elsif ($cmd eq 'calc') {
+		PID20_Calc($name);
+	} else {
+		return $usage;
+	}
   return;
 }
 ########################################
