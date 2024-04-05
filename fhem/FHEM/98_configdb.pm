@@ -4,11 +4,8 @@
 package main;
 use strict;
 use warnings;
-use feature qw/say switch/;
 use POSIX;
 use configDB;
-
-no if $] >= 5.017011, warnings => 'experimental';
 
 sub CommandConfigdb;
 sub _cfgDB_readConfig();
@@ -51,213 +48,172 @@ sub CommandConfigdb {
 
 	my $ret;
 
-	given ($cmd) {
-
-		when ('attr') {
-			Log3('configdb', 4, "configdb: attr $param1 $param2 requested.");
-			if ($param1 eq '' && $param2 eq '') {
-			# list attributes
-				foreach my $c (sort keys %{$configDB{attr}}) {
-					my $val = $configDB{attr}{$c};
-					$val =~ s/;/;;/g;
-					$val =~ s/\n/\\\n/g;
-					$ret .= "configdb attr $c $val\n";
-				}
-			} elsif(lc($param1) eq '?' || lc($param1) eq 'help') {
-			# list all available attributes
-			    my $l = 0;
-				foreach my $c (sort keys %{$configDB{knownAttr}}) {
-    				$l = length($c) > $l ? length($c) : $l;
-    			}
-				foreach my $c (sort keys %{$configDB{knownAttr}}) {
-					my $val = $configDB{knownAttr}{$c};
-					$val =~ s/;/;;/g;
-					$val =~ s/\n/\\\n/g;
-					$ret .= sprintf("%-*s : ",$l,$c)."$val\n";
-				}
-			} elsif($param2 eq '') {
-			# delete attribute
-				delete $configDB{attr}{$param1};
-				$ret = " attribute $param1 deleted";
-				addStructChange('configdb attr',undef,"$param1 (deleted)");
-
-			} else {
-			# set attribute
-				$configDB{attr}{$param1} = $param2;
-				$ret = " attribute $param1 set to value $param2";
-                addStructChange('configdb attr',undef,"$param1 $param2 (set)");
+	if ($cmd eq 'attr') {
+		Log3('configdb', 4, "configdb: attr $param1 $param2 requested.");
+		if ($param1 eq '' && $param2 eq '') {
+		# list attributes
+			foreach my $c (sort keys %{$configDB{attr}}) {
+				my $val = $configDB{attr}{$c};
+				$val =~ s/;/;;/g;
+				$val =~ s/\n/\\\n/g;
+				$ret .= "configdb attr $c $val\n";
 			}
-		}
-
-		when ('dump') {
-			return _cfgDB_dump($param1);
-		}
-
-
-		when ('diff') {
-			return "\n Syntax: configdb diff <device> <version>" if @a != 3;
-			return "Invalid paramaeter '$param2' for diff. Must be a number."
-				unless (looks_like_number($param2) || $param2 eq 'current');
-			Log3('configdb', 4, "configdb: diff requested for device: $param1 in version $param2.");
-			$ret = _cfgDB_Diff($param1, $param2);
-		}
-
-		when ('filedelete') {
-			return "\n Syntax: configdb filedelete <pathToFile>" if @a != 2;
-			my $filename = makeFilename($param1);
-			$ret  = "File $filename ";
-			$ret .= defined(_cfgDB_Filedelete($filename)) ? "deleted from" : "not found in";
-			$ret .= " database.";
-		}
-
-		when ('fileexport') {
-			return "\n Syntax: configdb fileexport <pathToFile>" if @a != 2;
-			if ($param1 ne 'all') {
-				my $filename = makeFilename($param1);
-				$ret = _cfgDB_Fileexport $filename;
-			} else { # start export all
-				my $flist    = _cfgDB_Filelist(1);
-				my @filelist = split(/\n/,$flist);
-				undef $flist;
-				foreach my $f (@filelist) {
-					Log3 (4,undef,"configDB: exporting $f");
-					my ($path,$file) = $f =~ m|^(.*[/\\])([^/\\]+?)$|;
-					$path = "/tmp/$path";
-					eval { qx(mkdir -p $path) } unless (-e "$path");
-					$ret .= _cfgDB_Fileexport $f; 
-					$ret .= "\n";
+		} elsif(lc($param1) eq '?' || lc($param1) eq 'help') {
+		# list all available attributes
+				my $l = 0;
+			foreach my $c (sort keys %{$configDB{knownAttr}}) {
+					$l = length($c) > $l ? length($c) : $l;
 				}
-			} # end export all
-		}
-
-		when ('fileimport') {
-			return "\n Syntax: configdb fileimport <pathToFile>" if @a != 2;
-			my $filename = makeFilename($param1);
-			if ( -r $filename ) {
-				my $filesize = -s $filename;
-				$ret = _cfgDB_binFileimport($filename,$filesize);
-			} elsif ( -e $filename) {
-				$ret = "\n Read error on file $filename";
-			} else {
-				$ret = "\n File $filename not found.";
+			foreach my $c (sort keys %{$configDB{knownAttr}}) {
+				my $val = $configDB{knownAttr}{$c};
+				$val =~ s/;/;;/g;
+				$val =~ s/\n/\\\n/g;
+				$ret .= sprintf("%-*s : ",$l,$c)."$val\n";
 			}
-		}
+		} elsif($param2 eq '') {
+		# delete attribute
+			delete $configDB{attr}{$param1};
+			$ret = " attribute $param1 deleted";
+			addStructChange('configdb attr',undef,"$param1 (deleted)");
 
-		when ('filelist') {
-			return _cfgDB_Filelist;
+		} else {
+		# set attribute
+			$configDB{attr}{$param1} = $param2;
+			$ret = " attribute $param1 set to value $param2";
+							addStructChange('configdb attr',undef,"$param1 $param2 (set)");
 		}
-
-		when ('filemove') {
-			return "\n Syntax: configdb filemove <pathToFile>" if @a != 2;
+	} elsif ($cmd eq 'dump') {
+		return _cfgDB_dump($param1);
+	} elsif ($cmd eq 'diff') {
+		return "\n Syntax: configdb diff <device> <version>" if @a != 3;
+		return "Invalid paramaeter '$param2' for diff. Must be a number."
+			unless (looks_like_number($param2) || $param2 eq 'current');
+		Log3('configdb', 4, "configdb: diff requested for device: $param1 in version $param2.");
+		$ret = _cfgDB_Diff($param1, $param2);
+	} elsif ($cmd eq 'filedelete') {
+		return "\n Syntax: configdb filedelete <pathToFile>" if @a != 2;
+		my $filename = makeFilename($param1);
+		$ret  = "File $filename ";
+		$ret .= defined(_cfgDB_Filedelete($filename)) ? "deleted from" : "not found in";
+		$ret .= " database.";
+	} elsif ($cmd eq 'fileexport') {
+		return "\n Syntax: configdb fileexport <pathToFile>" if @a != 2;
+		if ($param1 ne 'all') {
 			my $filename = makeFilename($param1);
-			if ( -r $filename ) {
-				my $filesize = -s $filename;
-				$ret  = _cfgDB_binFileimport ($filename,$filesize,1);
-				$ret .= "\nFile $filename deleted from local filesystem.";
-			} elsif ( -e $filename) {
-				$ret = "\n Read error on file $filename";
-			} else {
-				$ret = "\n File $filename not found.";
+			$ret = _cfgDB_Fileexport $filename;
+		} else { # start export all
+			my $flist    = _cfgDB_Filelist(1);
+			my @filelist = split(/\n/,$flist);
+			undef $flist;
+			foreach my $f (@filelist) {
+				Log3 (4,undef,"configDB: exporting $f");
+				my ($path,$file) = $f =~ m|^(.*[/\\])([^/\\]+?)$|;
+				$path = "/tmp/$path";
+				eval { qx(mkdir -p $path) } unless (-e "$path");
+				$ret .= _cfgDB_Fileexport $f; 
+				$ret .= "\n";
 			}
+		} # end export all
+	} elsif ($cmd eq 'fileimport') {
+		return "\n Syntax: configdb fileimport <pathToFile>" if @a != 2;
+		my $filename = makeFilename($param1);
+		if ( -r $filename ) {
+			my $filesize = -s $filename;
+			$ret = _cfgDB_binFileimport($filename,$filesize);
+		} elsif ( -e $filename) {
+			$ret = "\n Read error on file $filename";
+		} else {
+			$ret = "\n File $filename not found.";
 		}
-
-		when ('fileshow') {
-			return "\n Syntax: configdb fileshow <pathToFile>" if @a != 2;
-			my @rets = cfgDB_FileRead($param1);
-			my $r = (int(@rets)) ? join "\n",@rets : "File $param1 not found in database.";
-			return $r;
+	} elsif ($cmd eq 'filelist') {
+		return _cfgDB_Filelist;
+	} elsif ($cmd eq 'filemove') {
+		return "\n Syntax: configdb filemove <pathToFile>" if @a != 2;
+		my $filename = makeFilename($param1);
+		if ( -r $filename ) {
+			my $filesize = -s $filename;
+			$ret  = _cfgDB_binFileimport ($filename,$filesize,1);
+			$ret .= "\nFile $filename deleted from local filesystem.";
+		} elsif ( -e $filename) {
+			$ret = "\n Read error on file $filename";
+		} else {
+			$ret = "\n File $filename not found.";
 		}
-
-		when ('info') {
-			my $raw = lc($param1) eq 'raw' ? 1 : 0;
-			Log3('configdb', 4, "info requested.");
-			$ret = _cfgDB_Info('$Id$',$raw);
-		}
-
-		when ('list') {
-			$param1 = $param1 ? $param1 : '%';
-			$param2 = looks_like_number($param2) ? $param2 : 0;
-			$ret = "list not allowed for configDB itself.";
-			break if($param1 =~ m/configdb/i);
-			Log3('configdb', 4, "configdb: list requested for device: $param1 in version $param2.");
-			$ret = _cfgDB_Search($param1,$param2,1);
-		}
-
-		when ('migrate') {
-			return "\n Migration not possible. Already running with configDB!" if $configfile eq 'configDB';
-			$data{cfgDB_debug} = 1 if (lc($param1) eq 'debug');
-			Log3('configdb', 4, "configdb: migration requested.");
-			$ret = _cfgDB_Migrate;
-		}
-
-		when ('rawList'){
-			$data{cfgDB_rawList} = 1;
-			my @out = cfgDB_SaveCfg();
-			delete $data{cfgDB_rawList};
-			return join("\n",@out);
-		}
-
-		when ('recover') {
-			return "\n Syntax: configdb recover <version>" if @a != 2;
-			return "Invalid paramaeter '$param1' for recover. Must be a number."
-				unless looks_like_number($param1);
-			Log3('configdb', 4, "configdb: recover for version $param1 requested.");
-			$ret = _cfgDB_Recover($param1);
-		}
-
-		when ('renum') {
-			Log3('configdb', 4, "configdb: renum requested for device: $param1.");
-			return "Unknown device $param1" if !defined $defs{$param1};
-			my $oldnum = $defs{$param1}{NR};
-			$defs{$param1}{NR} = 2;
-			$ret  = "configdb: renum requested for device: $param1 \n";
-			$ret .= "use 'save config' and 'shutdown restart' to make changes persistant.";
-		}
-
-		when ('reorg') {
-			$param1 = 3 unless $param1;
-			return "Invalid paramaeter '$param1' for reorg. Must be a number."
-				unless looks_like_number($param1);
-			Log3('configdb', 4, "configdb: reorg requested with keep: $param1.");
-			$ret = _cfgDB_Reorg($param1);
-		}
-
-		when ('search') {
-			return "\n Syntax: configdb search <searchTerm> [searchVersion]" if @a < 2;
-			$param1 = $param1 ? $param1 : '%';
-			$param2 = looks_like_number($param2) ? $param2 : 0;
-			Log3('configdb', 4, "configdb: list requested for device: $param1 in version $param2.");
-			$ret = _cfgDB_Search($param1,$param2,0);
-		}
-
-		when ('uuid') {
-			$param1 = createUniqueId();
-			Log3('configdb', 4, "configdb: uuid requested: $param1");
-			$ret = $param1;
-		}
-
-		default { 	
-			$ret =	"\n Syntax:\n".
-					"         configdb attr [attribute] [value]\n".
-					"         configdb diff <device> <version>\n".
-					"         configdb dump\n".
-					"         configDB filedelete <pathToFilename>\n".
-					"         configDB fileimport <pathToFilename>\n".
-					"         configDB fileexport <pathToFilename>\n".
-					"         configDB filelist\n".
-					"         configDB filemove <pathToFilename>\n".
-					"         configDB fileshow <pathToFilename>\n".
-					"         configdb info\n".
-					"         configdb list [device] [version]\n".
-					"         configdb migrate\n".
-					"         configdb rawList\n".
-					"         configdb recover <version>\n".
-					"         configdb reorg [keepVersions]\n".
-					"         configdb search <searchTerm> [version]\n".
-					"         configdb uuid\n".
-					"";
-		}
-
+	} elsif ($cmd eq 'fileshow') {
+		return "\n Syntax: configdb fileshow <pathToFile>" if @a != 2;
+		my @rets = cfgDB_FileRead($param1);
+		my $r = (int(@rets)) ? join "\n",@rets : "File $param1 not found in database.";
+		return $r;
+	} elsif ($cmd eq 'info') {
+		my $raw = lc($param1) eq 'raw' ? 1 : 0;
+		Log3('configdb', 4, "info requested.");
+		$ret = _cfgDB_Info('$Id$',$raw);
+	} elsif ($cmd eq 'list') {
+		$param1 = $param1 ? $param1 : '%';
+		$param2 = looks_like_number($param2) ? $param2 : 0;
+		$ret = "list not allowed for configDB itself.";
+		return $ret if($param1 =~ m/configdb/i);
+		Log3('configdb', 4, "configdb: list requested for device: $param1 in version $param2.");
+		$ret = _cfgDB_Search($param1,$param2,1);
+	} elsif ($cmd eq 'migrate') {
+		return "\n Migration not possible. Already running with configDB!" if $configfile eq 'configDB';
+		$data{cfgDB_debug} = 1 if (lc($param1) eq 'debug');
+		Log3('configdb', 4, "configdb: migration requested.");
+		$ret = _cfgDB_Migrate;
+	} elsif ($cmd eq 'rawList'){
+		$data{cfgDB_rawList} = 1;
+		my @out = cfgDB_SaveCfg();
+		delete $data{cfgDB_rawList};
+		return join("\n",@out);
+	} elsif ($cmd eq 'recover') {
+		return "\n Syntax: configdb recover <version>" if @a != 2;
+		return "Invalid paramaeter '$param1' for recover. Must be a number."
+			unless looks_like_number($param1);
+		Log3('configdb', 4, "configdb: recover for version $param1 requested.");
+		$ret = _cfgDB_Recover($param1);
+	} elsif ($cmd eq 'renum') {
+		Log3('configdb', 4, "configdb: renum requested for device: $param1.");
+		return "Unknown device $param1" if !defined $defs{$param1};
+		my $oldnum = $defs{$param1}{NR};
+		$defs{$param1}{NR} = 2;
+		$ret  = "configdb: renum requested for device: $param1 \n";
+		$ret .= "use 'save config' and 'shutdown restart' to make changes persistant.";
+	} elsif ($cmd eq 'reorg') {
+		$param1 = 3 unless $param1;
+		return "Invalid paramaeter '$param1' for reorg. Must be a number."
+			unless looks_like_number($param1);
+		Log3('configdb', 4, "configdb: reorg requested with keep: $param1.");
+		$ret = _cfgDB_Reorg($param1);
+	} elsif ($cmd eq 'search') {
+		return "\n Syntax: configdb search <searchTerm> [searchVersion]" if @a < 2;
+		$param1 = $param1 ? $param1 : '%';
+		$param2 = looks_like_number($param2) ? $param2 : 0;
+		Log3('configdb', 4, "configdb: list requested for device: $param1 in version $param2.");
+		$ret = _cfgDB_Search($param1,$param2,0);
+	} elsif ($cmd eq 'uuid') {
+		$param1 = createUniqueId();
+		Log3('configdb', 4, "configdb: uuid requested: $param1");
+		$ret = $param1;
+	} else { 	
+		$ret =	"\n Syntax:\n".
+				"         configdb attr [attribute] [value]\n".
+				"         configdb diff <device> <version>\n".
+				"         configdb dump\n".
+				"         configDB filedelete <pathToFilename>\n".
+				"         configDB fileimport <pathToFilename>\n".
+				"         configDB fileexport <pathToFilename>\n".
+				"         configDB filelist\n".
+				"         configDB filemove <pathToFilename>\n".
+				"         configDB fileshow <pathToFilename>\n".
+				"         configdb info\n".
+				"         configdb list [device] [version]\n".
+				"         configdb migrate\n".
+				"         configdb rawList\n".
+				"         configdb recover <version>\n".
+				"         configdb reorg [keepVersions]\n".
+				"         configdb search <searchTerm> [version]\n".
+				"         configdb uuid\n".
+				"";
 	}
 
 	return $ret;
