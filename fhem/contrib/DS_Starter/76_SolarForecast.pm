@@ -387,7 +387,7 @@ my $forapirepdef   = 900;                                                       
 my $ometeorepdef   = 900;                                                           # default Abrufintervall Open-Meteo API (s)
 my $vrmapirepdef   = 300;                                                           # default Abrufintervall Victron VRM API Forecast
 my $solcmaxreqdef  = 50;                                                            # max. täglich mögliche Requests SolCast API
-my $ometmaxreq     = 9500;                                                          # Beschränkung auf max. mögliche Requests Open-Meteo API
+my $ometmaxreq     = 9700;                                                          # Beschränkung auf max. mögliche Requests Open-Meteo API
 my $leadtime       = 3600;                                                          # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
 my $lagtime        = 1800;                                                          # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
 
@@ -7746,9 +7746,10 @@ sub _transferInverterValues {
   debugLog ($paref, "collectData", "pv: $pv W, etotal: $etotal Wh");
 
   my $nhour    = $chour + 1;
-  my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "etotal", 0);               # etotal zu Beginn einer Stunde
-
-  my $ethishour;
+  my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'etotal', 0);               # etotal zu Beginn einer Stunde
+  my $warn     = '';
+  my ($ethishour, $etot);
+  
   if (!$histetot) {                                                                           # etotal der aktuelle Stunde gesetzt ?
       $paref->{val}      = $etotal;
       $paref->{nhour}    = sprintf "%02d", $nhour;
@@ -7760,18 +7761,40 @@ sub _transferInverterValues {
       delete $paref->{nhour};
       delete $paref->{val};
 
-      my $etot   = CurrentVal ($hash, "etotal", $etotal);
+      $etot      = CurrentVal ($hash, 'etotal', $etotal);
       $ethishour = int ($etotal - $etot);
   }
   else {
       $ethishour = int ($etotal - $histetot);
+      
+      if ($h->{capacity} && $ethishour > 2 x $h->{capacity}) {
+          Log3 ($name, 1, "$name - WARNING - The generated PV of Inverter '$indev' is much more higher than inverter capacity. It seems to be a failure and Energy Total is reinitialized.");
+          $warn = ' (WARNING: too much generated PV was registered - see log file)';
+          
+          $paref->{val}      = $etotal;
+          $paref->{nhour}    = sprintf "%02d", $nhour;
+          $paref->{histname} = 'etotal';
+
+          setPVhistory ($paref);
+
+          delete $paref->{histname};
+          delete $paref->{nhour};
+          delete $paref->{val};
+
+          $etot      = CurrentVal ($hash, 'etotal', $etotal);
+          $ethishour = int ($etotal - $etot);
+      }
   }
 
   $data{$type}{$name}{current}{etotal} = $etotal;                                             # aktuellen etotal des WR speichern
+  
+  if ($ethishour < 0) {
+      $ethishour = 0;
+      Log3 ($name, 1, "$name - WARNING - The Total Energy from Inverter '$indev' is lower than the value saved before. This situation is invalid and the Energy generated of current hour is set to '0'.");
+      $warn = ' (WARNING invalid real PV occured - see Logfile)';
+  }
 
-  $ethishour = 0 if($ethishour < 0);
-
-  storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_PVreal', $ethishour.' Wh');
+  storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_PVreal', $ethishour.' Wh'.$warn);
   $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishour;                   # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
 
   my ($acu, $aln) = isAutoCorrUsed ($name);
@@ -7779,7 +7802,7 @@ sub _transferInverterValues {
   $paref->{val}      = $ethishour;
   $paref->{nhour}    = sprintf "%02d", $nhour;
   $paref->{histname} = 'pvrl';
-  $paref->{pvrlvd}   = $aln;                                                                 # 1: beim Learning berücksichtigen, 0: nicht
+  $paref->{pvrlvd}   = $aln;                                                                  # 1: beim Learning berücksichtigen, 0: nicht
 
   setPVhistory ($paref);
 
