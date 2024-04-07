@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 76_SolarForecast: options for conprice, feedprice and more
  - change:  49_SSCam: check SSChatBot/TelegramBot is disabled before send data
  - feature: 70_PylonLowVoltage: add specific Alarm readings, support of US5000
  - bugfix:  73_PRESENCE2: BlockingCall loglevel = GetVerbose($name)
