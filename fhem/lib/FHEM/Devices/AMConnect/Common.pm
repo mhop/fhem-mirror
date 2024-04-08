@@ -2777,7 +2777,7 @@ sub getDesignAttr {
   my $hsh = '';
   my $val = '';
   my %desDef = map { ( $hsh, $val ) = $_ =~ /(.*)=(.*)/; $hsh => $val } @designDefault;
-  %desDef = map { ( $hsh, $val ) = $_ =~ /(.*)=(.*)/; $hsh => $val } @designAttr;
+  %desDef = ( %desDef, map { ( $hsh, $val ) = $_ =~ /(.*)=(.*)/; $hsh => $val } @designAttr );
   my $desDef = \%desDef;
   my @mergedDesign = map { "$_=$desDef->{$_}" } sort keys %desDef;
   my $design = 'data-' . join( 'data-', @mergedDesign );

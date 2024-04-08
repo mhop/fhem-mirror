@@ -453,7 +453,7 @@ __END__
       <code>attr &lt;name&gt; mowingAreaHull &lt;use button 'mowingAreaHullToAttribute' to fill the attribute&gt;</code><br>
       Contains the calculated hull coordinates as JSON string and is set by button 'mowingAreaHullToAttribute' under the dislpayed map.<br>
       The stored hull polygon is displayed like the other limits.<br>
-      Use the design attribute 'hullResolution' to change the number of fractions &#8469;<sub>0</sub><br>.
+      Use the design attribute 'hullResolution' to change the number of fractions &#8469;<br>.
       The hull polygon is calculated when the design attribut is set to 1 <code>hullCalculate="1"</code> and there are more than 50 Points for activity MOWING.<br>
       The calculation is done only after site reload.<br>
       The calculation of hull is stopped when the attribute ist set and starts again when attribute is deleted.<br>
@@ -894,7 +894,7 @@ __END__
       <code>attr &lt;name&gt; mowingAreaHull &lt;use button 'mowingAreaHullToAttribute' to fill the attribute&gt;</code><br><br>
       Enthält die berechneten Hüllenkooordinaten als JSON String und wird gesetzt durch den Button 'mowingAreaHullToAttribute' unterhalb der angezeigten Karte.<br>
       Das gespeicherte Hüllenpolygon wird wie die anderen Grenzen angezeigt.<br>
-      Mit dem Designattribut 'hullResolution' kann die Anzahl der Brechungen beeinflusst werden &#8469;<sub>0</sub>, Default 40.<br>
+      Mit dem Designattribut 'hullResolution' kann die Anzahl der Brechungen beeinflusst werden &#8469;, Default 40.<br>
       Das Hüllenpolygon wird berechnet wenn das Designattribute gesetzt ist, <code>hullCalculate="1"</code> und es mehr als 50 Wegpunkte der Aktivität MOWING gibt.<br>
       Die Berechnung wird beim Laden oder Wiederladen der Website ausgeführt.<br>
       Die Berechnung stopt wenn dieses Attribut gesetzt ist und startet wenn das Attibut gelöst wird.<br>
