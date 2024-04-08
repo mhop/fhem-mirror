@@ -48,6 +48,8 @@ BEGIN {
           CommandDeleteReading
           FmtDateTime
           FW_ME
+          FW_dir
+          FW_wname
           getKeyValue
           InternalTimer
           InternalVal
@@ -123,9 +125,14 @@ sub Define{
   $client_id =$val[2];
   $mowerNumber = $val[3] ? $val[3] : 0;
 
-my $mapAttr = 'areaLimitsColor="#ff8000"
+  my $mapAttr = 'areaLimitsColor="#ff8000"
 areaLimitsLineWidth="1"
 areaLimitsConnector=""
+hullColor="#0066ff"
+hullLineWidth="1"
+hullConnector="1"
+hullResolution="40"
+hullCalculate=""
 propertyLimitsColor="#33cc33"
 propertyLimitsLineWidth="1"
 propertyLimitsConnector="1"
@@ -160,7 +167,7 @@ mowingPathUseDots=""
 mowingPathShowCollisions=""
 ';
 
-my $mapZonesTpl = '{
+  my $mapZonesTpl = '{
     "01_oben" : {
       "condition" : "$latitude > 52.6484600648553 || $longitude > 9.54799477359984 && $latitude > 52.64839739580418",
       "cuttingHeight" : "7"
@@ -169,11 +176,19 @@ my $mapZonesTpl = '{
       "condition" : "undef",
       "cuttingHeight" : "3"
   }
-}';
+  }';
+
+ my ( $path, $file) = $::data{FWEXT}{AutomowerConnectA}{SCRIPT} =~ /\/(.*)\/(.*)/;
+
 
   %$hash = (%$hash,
     helper => {
       passObj                   => FHEM::Core::Authentication::Passwords->new($type),
+      FWEXTA                    => {
+        path                    => $path,
+        file                    => $file,
+        url                     => 'https://raw.githubusercontent.com/AndriiHeonia/hull/master/dist/hull.js'
+      },
       interval                  => 840,
       interval_ws               => 7110,
       interval_ping             => 570,
@@ -295,7 +310,10 @@ my $mapZonesTpl = '{
         currentWeekTime         => 0,
         lastWeekTrack           => 0,
         lastWeekArea            => 0,
-        lastWeekTime            => 0
+        lastWeekTime            => 0,
+        propertyArea            => 0,
+        mowingArea              => 0,
+        hullArea                => 0
       }
     }
   );
@@ -325,6 +343,10 @@ my $mapZonesTpl = '{
     }
 
   }
+
+    my $url = $hash->{helper}{FWEXTA}{url};
+    mkdir( "$FW_dir/$path" ) if ( ! -d "$FW_dir/$path" );
+    getTpFile( $hash, $url, "$FW_dir/$path", $file ) if ( ! -e "$FW_dir/$path/$file"); 
 
   if( $hash->{helper}->{passObj}->getReadPassword($name) ) {
 
@@ -373,7 +395,10 @@ sub Delete {
   my $type = $hash->{TYPE};
   my $iam ="$type $name Delete: ";
   Log3( $name, 5, "$iam called" );
-
+  if ( scalar devspec2array( "TYPE=$type" ) == 1 ) {
+    delete $::data{FWEXT}{AutomowerConnect};
+    delete $::data{FWEXT}{AutomowerConnectA};
+  }
   my ($passResp,$passErr) = $hash->{helper}->{passObj}->setDeletePassword($name);
   Log3( $name, 1, "$iam error: $passErr" ) if ($passErr);
 
@@ -463,9 +488,8 @@ sub FW_detailFn {
   my $zoom=AttrVal( $name,"mapImageZoom", 0.7 );
   my $backgroundcolor = AttrVal($name, 'mapBackgroundColor','');
   my $bgstyle = $backgroundcolor ? " background-color:$backgroundcolor;" : '';
-  my $design = AttrVal( $name, 'mapDesignAttributes', $hash->{helper}{mapdesign} );
-  my @adesign = split(/\R/,$design);
-  my $mapDesign = 'data-'.join("data-",@adesign);
+ 
+  my $mapDesign = getDesignAttr( $hash );
 
   my ($picx,$picy) = AttrVal( $name,"mapImageWidthHeight", $hash->{helper}{imageWidthHeight} ) =~ /(\d+)\s(\d+)/;
   $picx=int($picx*$zoom);
@@ -475,9 +499,9 @@ sub FW_detailFn {
   my $mapx = $lonlo-$lonru;
   my $mapy = $latlo-$latru;
 
-  AttrVal($name,'scaleToMeterXY', $hash->{helper}{scaleToMeterLongitude} . ' ' .$hash->{helper}{scaleToMeterLatitude}) =~ /(-?\d+)\s+(-?\d+)/;
-  my $scalx = ( $lonru - $lonlo ) * $1;
-  my $scaly = ( $latlo - $latru ) * $2;
+  my ( $scx, $scy ) = AttrVal($name,'scaleToMeterXY', $hash->{helper}{scaleToMeterLongitude} . ' ' .$hash->{helper}{scaleToMeterLatitude}) =~ /(-?\d+)\s+(-?\d+)/;
+  my $scalx = ( $lonru - $lonlo ) * $scx;
+  my $scaly = ( $latlo - $latru ) * $scy;
 
   # CHARGING STATION POSITION 
   my $csimgpos = AttrVal( $name,"chargingStationImagePosition","right" );
@@ -494,10 +518,19 @@ sub FW_detailFn {
   my $limi = '';
   if ($arealimits) {
     my @lixy = (split(/\s|,|\R$/,$arealimits));
+    my @liar = ();
     $limi = int( ( $lonlo - $lixy[ 0 ] ) * $picx / $mapx ) . "," . int( ( $latlo - $lixy[ 1 ] ) * $picy / $mapy );
     for (my $i=2;$i<@lixy;$i+=2){
-      $limi .= ",".int( ( $lonlo - $lixy[ $i ] ) * $picx / $mapx).",".int( ( $latlo-$lixy[$i+1] ) * $picy / $mapy);
+      $limi .= ",".int( ( $lonlo - $lixy[ $i ] ) * $picx / $mapx).",".int( ( $latlo - $lixy[$i+1] ) * $picy / $mapy);
+      my $x = ( $lonlo - $lixy[ $i ] ) * $scx;
+      my $y = ( $latlo - $lixy[$i+1] ) * $scy;
+      push( @liar, [ $x, $y ]);
     }
+    my $x0 = ( $lonlo - $lixy[ 0 ] ) * $scx;
+    my $y0 = ( $latlo - $lixy[ 1] ) * $scy;
+    unshift( @liar, [ $x0, $y0 ]);
+    push( @liar, [ $x0, $y0 ]);
+    $hash->{helper}{statistics}{mowingArea} = int( abs( polygonArea( \@liar, 1, 1) ) );
   }
   $limi = 'data-areaLimitsPath="'.$limi.'"';
 
@@ -506,12 +539,32 @@ sub FW_detailFn {
   my $propli = '';
   if ($propertylimits) {
     my @propxy = (split(/\s|,|\R$/,$propertylimits));
+    my @liar = ();
     $propli = int(($lonlo-$propxy[0]) * $picx / $mapx).",".int(($latlo-$propxy[1]) * $picy / $mapy);
     for (my $i=2;$i<@propxy;$i+=2){
       $propli .= ",".int(($lonlo-$propxy[$i]) * $picx / $mapx).",".int(($latlo-$propxy[$i+1]) * $picy / $mapy);
+      my $x = ( $lonlo - $propxy[ $i ] ) * $scx;
+      my $y = ( $latlo - $propxy[$i+1] ) * $scy;
+      push( @liar, [ $x, $y ]);
     }
+    my $x0 = ( $lonlo - $propxy[ 0 ] ) * $scx;
+    my $y0 = ( $latlo - $propxy[ 1] ) * $scy;
+    unshift( @liar, [ $x0, $y0 ]);
+    push( @liar, [ $x0, $y0 ]);
+    $hash->{helper}{statistics}{propertyArea} = int( abs( polygonArea( \@liar, 1, 1) ) );
   }
   $propli = 'data-propertyLimitsPath="'.$propli.'"';
+
+  # MOWING AREA HULL 
+  my $hulljson = AttrVal($name, 'mowingAreaHull', '[]');
+  my $hull = eval { decode_json( $hulljson ) };
+  if ( $@ ) {
+    Log3 $name, 1, "$type $name FW_detailFn: decode error: $@ \n $hulljson";
+    $hull = [];
+  }
+
+  $hash->{helper}{statistics}{hullArea} = int( polygonArea( $hull, $scalx/$picx, $scaly/$picy ) );
+  $hash->{helper}{mapupdate}{hullxy} = $hull;
 
   my $ret = "";
   $ret .= "<style>
@@ -526,10 +579,13 @@ sub FW_detailFn {
   .${type}_${name}_canvas_1{
     position: absolute; left: 0; top: 0; z-index: 1;}
   </style>";
-  $ret .= "<div id='${type}_${name}_div' class='${type}_${name}_div' $mapDesign $csdata $limi $propli >";
+  $ret .= "<div id='${type}_${name}_div' class='${type}_${name}_div' $$mapDesign $csdata $limi $propli width='$picx' height='$picy' >";
   $ret .= "<canvas id='${type}_${name}_canvas_0' class='${type}_${name}_canvas_0' width='$picx' height='$picy' ></canvas>";
   $ret .= "<canvas id='${type}_${name}_canvas_1' class='${type}_${name}_canvas_1' width='$picx' height='$picy' ></canvas>";
   $ret .= "</div>";
+  $ret .= "<button title='Sends the hull polygon points to attribute mowingAreaHull.' onclick='AutomowerConnectGetHull( \"$FW_ME/$type/$name/json\" )'>mowingAreaHullToAttribute</button>"
+          if ( -e "$FW_dir/$hash->{helper}{FWEXTA}{path}/$hash->{helper}{FWEXTA}{file}" && !AttrVal( $name,'mowingAreaHull','' ) && $$mapDesign =~ m/hullCalculate="1"/g );
+  $ret .= "<br>";
   $hash->{helper}{detailFnFirst} = 1;
   my $mid = $hash->{helper}{map_init_delay};
   InternalTimer( gettimeofday() + $mid, \&FW_detailFn_Update, $hash, 0 );
@@ -608,6 +664,7 @@ sub FW_detailFn_Update {
   $hash->{helper}{mapupdate}{picx} = $picx;
   $hash->{helper}{mapupdate}{picy} = $picy;
   $hash->{helper}{mapupdate}{scalx} = $scalx;
+  $hash->{helper}{mapupdate}{scaly} = $scaly;
   $hash->{helper}{mapupdate}{errdesc} = [ "$errdesc", "$errdate", "$errstate" ];
   $hash->{helper}{mapupdate}{posxy} = \@posxy;
   $hash->{helper}{mapupdate}{poserrxy} = \@poserrxy;
@@ -1057,7 +1114,7 @@ sub getNewAccessToken {
 ##############################################################
 
 sub CMD {
-  my ($hash,@cmd) = @_;
+  my ( $hash, @cmd ) = @_;
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   my $iam = "$type $name CMD:";
@@ -1089,6 +1146,8 @@ my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nA
   elsif ($cmd[0] eq "Pause")           { $json = '{"data": {"type":"'.$cmd[0].'"}}'; $post = 'actions' }
   elsif ($cmd[0] eq "Park")            { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"duration":'.$cmd[1].'}}}'; $post = 'actions' }
   elsif ($cmd[0] eq "Start")           { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"duration":'.$cmd[1].'}}}'; $post = 'actions' }
+  elsif ($cmd[0] eq "cuttingHeightInWorkArea")
+                                        { $json = '{"data": {"type":"workArea","id":"'.$cmd[1].'","attributes":{"cuttingHight":'.$cmd[2].'}}}'; $post = 'workAreas/'.$cmd[1]; $method = 'PATCH' }
   elsif ($cmd[0] eq "StartInWorkArea" && $cmd[2])
                                        { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"workAreaId":'.$cmd[1].',"duration":'.$cmd[2].'}}}'; $post = 'actions' }
   elsif ($cmd[0] eq "StartInWorkArea" && !$cmd[2])
@@ -1185,7 +1244,7 @@ sub CMDResponse {
 
   readingsEndUpdate($hash, 1);
 
-  Log3 $name, 2, "\n$iam \n\$statuscode >$statuscode<\n\$err >$err<,\n\$data >$data<\n\$param->url $param->{url}";
+  Log3 $name, 2, "\n$iam \n\$statuscode >$statuscode<\n\$err >$err<,\n\$data >$data<\n\$param->{url} >$param->{url}<\n\$param->{data} >$param->{data}<";
   return undef;
 }
 
@@ -1215,6 +1274,15 @@ sub Set {
     my $ym = $hash->{helper}{chargingStation}{latitude} // 51.28;
     CommandAttr( $hash, "$name chargingStationCoordinates $xm $ym" );
     return undef;
+
+  # } elsif ( $setName eq 'mowingAreaHullToAttribute' ) {
+
+    # if ( $FW_ME ) {
+      # map { 
+        # ::FW_directNotify("#FHEMWEB:$_", "AutomowerConnectGetHull ( '$FW_ME/$type/$name/json' )","");
+      # } devspec2array("TYPE=FHEMWEB");
+      # return undef;
+    # }
 
   } elsif ( $setName eq 'defaultDesignAttributesToAttribute' ) {
 
@@ -1293,7 +1361,7 @@ sub Set {
     CMD($hash,$setName);
     return undef;
 
-  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^(StartInWorkArea)$/ && AttrVal( $name, 'testing', '' ) ) {
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^(StartInWorkArea|cuttingHeightInWorkArea)$/ && AttrVal( $name, 'testing', '' ) ) {
 
     my $id = undef;
     $id = name2id( $hash, $setVal, 'workAreas' ) if ( $setVal !~ /^(\d+)$/ );
@@ -1325,7 +1393,7 @@ sub Set {
   my $ret = " getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,60,60,600,0,lin Park:selectnumbers,60,60,600,0,lin ResumeSchedule:noArg getUpdate:noArg client_secret ";
   $ret .= "chargingStationPositionToAttribute:noArg headlight:ALWAYS_OFF,ALWAYS_ON,EVENING_ONLY,EVENING_AND_NIGHT cuttingHeight:1,2,3,4,5,6,7,8,9 mowerScheduleToAttribute:noArg ";
   $ret .= "sendScheduleFromAttributeToMower:noArg defaultDesignAttributesToAttribute:noArg mapZonesTemplateToAttribute:noArg ";
-  $ret .= "StartInWorkArea " if ( $hash->{helper}{mower}{attributes}{capabilities}{workAreas} && AttrVal( $name, 'testing', '' ) );
+  $ret .= "StartInWorkArea cuttingHeightInWorkArea " if ( $hash->{helper}{mower}{attributes}{capabilities}{workAreas} && AttrVal( $name, 'testing', '' ) );
   $ret .= "confirmError:noArg " if ( AttrVal( $name, 'testing', '' ) );
   $ret .= "stayOutZone_enable stayOutZone_disable " if ( $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones} && AttrVal( $name, 'testing', '' ) );
   return "Unknown argument $setName, choose one of".$ret;
@@ -1391,6 +1459,20 @@ sub Attr {
 
     }
 
+  ##########
+  } elsif( $attrName eq "mowingAreaHull" ) {
+
+    if( $cmd eq "set" ) {
+
+      my $perl = eval { decode_json ( $attrVal ) };
+      
+      if ($@) {
+        return "$iam $cmd $attrName decode error: $@ \n $attrVal";
+      }
+      Log3 $name, 4, "$iam $cmd $attrName";
+
+    }
+    
   ##########
   } elsif( $attrName eq "weekdaysToResetWayPoints" ) {
 
@@ -2398,6 +2480,14 @@ sub listStatisticsData {
 
     }
 
+    my @fences = qw(hull mowing property);
+
+    for my $item ( @fences ) {
+
+      $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> <b> calculated '.$item.' area </b> &emsp;</td><td> ' . $hash->{helper}{statistics}{$item.'Area'} . ' </td><td> qm </td></tr>' if ( $hash->{helper}{statistics}{$item.'Area'} );
+
+    }
+
     $ret .= '</tbody></table>';
     $ret .= '<p><sup>1</sup> totalDriveDistance = totalRunningTime * '. sprintf( "%.2f", $hash->{helper}{mower}{attributes}{statistics}{totalDriveDistance} / $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} ) if ( $hash->{helper}{mower}{attributes}{statistics}{totalRunningTime} );
     $ret .= '<p><sup>2</sup> totalRunningTime = totalCuttingTime + totalSearchingTime';
@@ -2541,7 +2631,7 @@ sub listInternalData {
 
     $ret .= '</tbody></table><p>';
     $ret .= '<table class="block wide">';
-    $ret .= '<caption><b>Way Point Stacks</b></caption><tbody>'; 
+    $ret .= '<caption><b>Way Point Stacks</b></caption><tbody>';
 
     $ret .= '<tr class="col_header"><td> Used For Activities&emsp;</td><td> Stack Name&emsp;</td><td> Current Size&emsp;</td><td> Max Size&emsp;</td></tr>';
     $ret .= '<tr class="column odd"><td>PARKED_IN_CS, CHARGING&emsp;</td><td> cspos&emsp;</td><td> ' . $csnr . ' </td><td> ' . $csnrmax . '&emsp;</td></tr>';
@@ -2549,27 +2639,37 @@ sub listInternalData {
     $ret .= '<tr class="column odd"><td>NOT_APPLICABLE with error time stamp&emsp;</td><td> lasterror/positions&emsp;</td><td> ' . $ernr . ' </td><td> -&emsp;</td></tr>';
 
     $ret .= '</tbody></table>';
-    if ( $hash->{TYPE} eq 'AutomowerConnect' ) {
+    $ret .= '<p><table class="block wide">';
+    $ret .= '<caption><b>Rest API Data</b></caption><tbody>'; 
 
-      $ret .= '<p><table class="block wide">';
-      $ret .= '<caption><b>Rest API Data</b></caption><tbody>'; 
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Link to APIs</td><td><a target="_blank" href="https://developer.husqvarnagroup.cloud/">Husqvarna Developer</a></td></tr>';
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Authentification API URL</td><td>' . AUTHURL . '</td></tr>';
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Automower Connect API URL</td><td>' . APIURL . '</td></tr>';
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Websocket IO Device name</td><td>' . WSDEVICENAME . '</td></tr>';
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Client-Id</td><td>' . $hash->{helper}{client_id} . '</td></tr>';
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Grant-Type</td><td>' . $hash->{helper}{grant_type} . '</td></tr>';
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> User-Id</td><td>' . ReadingsVal($name, '.user_id', '-') . '</td></tr>';
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Provider</td><td>' . ReadingsVal($name, '.provider', '-') . '</td></tr>';
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Scope</td><td>' . ReadingsVal($name, '.scope', '-') . '</td></tr>';
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Token Type</td><td>' . ReadingsVal($name, '.token_type', '-') . '</td></tr>';
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Token Expires</td><td> ' . FmtDateTime( ReadingsVal($name, '.expires', '0') ) . '</td></tr>';
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Access Token</td><td style="word-wrap:break-word; max-width:40em">' . ReadingsVal($name, '.access_token', '0') . '</td></tr>';
 
-      $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Link to APIs</td><td><a target="_blank" href="https://developer.husqvarnagroup.cloud/">Husqvarna Developer</a></td></tr>';
-      $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Authentification API URL</td><td>' . AUTHURL . '</td></tr>';
-      $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Automower Connect API URL</td><td>' . APIURL . '</td></tr>';
-      $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Websocket IO Device name</td><td>' . WSDEVICENAME . '</td></tr>';
-      $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Client-Id</td><td>' . $hash->{helper}{client_id} . '</td></tr>';
-      $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Grant-Type</td><td>' . $hash->{helper}{grant_type} . '</td></tr>';
-      $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> User-Id</td><td>' . ReadingsVal($name, '.user_id', '-') . '</td></tr>';
-      $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Provider</td><td>' . ReadingsVal($name, '.provider', '-') . '</td></tr>';
-      $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Scope</td><td>' . ReadingsVal($name, '.scope', '-') . '</td></tr>';
-      $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Token Type</td><td>' . ReadingsVal($name, '.token_type', '-') . '</td></tr>';
-      $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Token Expires</td><td> ' . FmtDateTime( ReadingsVal($name, '.expires', '0') ) . '</td></tr>';
-      $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Access Token</td><td style="word-wrap:break-word; max-width:40em">' . ReadingsVal($name, '.access_token', '0') . '</td></tr>';
+$ret .= '</tbody></table>';
+    $ret .= '<p><table class="block wide">';
+    $ret .= '<caption><b>Default mapDesignAttributes</b></caption><tbody>'; 
 
-      $ret .= '</tbody></table>';
+my $mapdesign = $hash->{helper}{mapdesign};
+    $mapdesign =~ s/\n/<br>/g;
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td style="word-wrap:break-word; max-width:40em">' . $mapdesign . '</td></tr>';
 
-    }
+    $ret .= '</tbody></table>';
+    $ret .= '<p><table class="block wide">';
+    $ret .= '<caption><b>Third Party Software</b></caption><tbody>'; 
+
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td>hull calculation (hull.js)</td><td style="word-wrap:break-word; max-width:40em"> Server: ' . $hash->{helper}{FWEXTA}{url} . '</td></tr>';
+
+    $ret .= '</tbody></table>';
 
     $ret .= '</html>';
     return $ret;
@@ -2622,6 +2722,66 @@ sub listErrorCodes {
 sub FmtDateTimeGMT {
   my $ti = shift // 0;
   my $ret = POSIX::strftime( "%F %H:%M:%S", gmtime( $ti ) );
+}
+
+#########################
+sub polygonArea {
+  my ( $ptsref, $sx, $sy )  = @_;
+  my $sumarea = 0;
+  my @pts = @{$ptsref};
+
+  for (my $i = 0; $i < @pts; $i++) {
+      my $addX = $pts[$i][0]*$sx;
+      my $addY = $pts[$i == @pts - 1 ? 0 : $i + 1][1]*$sy;
+      my $subX = $pts[$i == @pts - 1 ? 0 : $i + 1][0]*$sx;
+      my $subY = $pts[$i][1]*$sy;
+      $sumarea += ($addX * $addY * 0.5);
+      $sumarea -= ($subX * $subY * 0.5);
+
+  }
+  return $sumarea;
+}
+
+#########################
+sub getTpFile {
+  my ( $hash, $url, $path, $file ) = @_;
+  my $name = $hash->{NAME};
+  my $msg = ::GetFileFromURL( $url );
+  if ( $msg ) {
+    my $fh;
+
+    if( !open( $fh, ">", "$path/$file" ) ) {
+
+      Log3 $name, 1, "$name getTpFile: Can't open $path/$file";
+
+    } else {
+
+      print $fh $msg;
+      close( $fh );
+      readingsSingleUpdate( $hash, 'third_party_library', "$file downloaded to: $path", 1 );
+      Log3 $name, 1, "$name getTpFile: third party library downloaded from $url to $path";
+
+
+    }
+
+  }
+  return undef;
+}
+
+#########################
+sub getDesignAttr {
+  my ( $hash ) = @_;
+  my $name = $hash->{NAME};             
+  my @designDefault = split( /\R/,$hash->{helper}{mapdesign} );
+  my @designAttr = split( /\R/, AttrVal( $name, 'mapDesignAttributes', '' ) );
+  my $hsh = '';
+  my $val = '';
+  my %desDef = map { ( $hsh, $val ) = $_ =~ /(.*)=(.*)/; $hsh => $val } @designDefault;
+  %desDef = map { ( $hsh, $val ) = $_ =~ /(.*)=(.*)/; $hsh => $val } @designAttr;
+  my $desDef = \%desDef;
+  my @mergedDesign = map { "$_=$desDef->{$_}" } sort keys %desDef;
+  my $design = 'data-' . join( 'data-', @mergedDesign );
+  return \$design;
 }
 
 ##############################################################

@@ -44,6 +44,38 @@ function AutomowerConnectShowError( ctx, div, dev, picx, picy, errdesc, erray ) 
 
 }
 
+function AutomowerConnectHull( ctx, div, pos, type ) {
+//  log("array length: "+pos.length);
+  if ( pos.length > 3 ) {
+    // draw limits
+    ctx.beginPath();
+
+      ctx.lineWidth = div.getAttribute( 'data-'+ type + 'LineWidth' );
+      ctx.strokeStyle = div.getAttribute( 'data-'+ type + 'Color' );
+      ctx.setLineDash( [] );
+
+    for (var i=0;i < pos.length; i++ ) {
+      ctx.lineTo( pos[i][0], pos[i][1]);
+    }
+    ctx.stroke();
+
+    // hull connector
+    if ( div.getAttribute( 'data-'+ type + 'Connector' ) ) {
+      for ( var i = 0; i < pos.length; i++ ) {
+        ctx.beginPath();
+        ctx.setLineDash( [] );
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = div.getAttribute( 'data-'+ type + 'Color' );
+        ctx.fillStyle= 'white';
+        ctx.moveTo( pos[i][0], pos[i][1]);
+        ctx.arc( pos[i][0], pos[i][1], 2, 0, 2 * Math.PI, false);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+  }
+}
+
 function AutomowerConnectLimits( ctx, div, pos, type ) {
 //  log("array length: "+pos.length);
   if ( pos.length > 3 ) {
@@ -315,7 +347,7 @@ function AutomowerConnectUpdateJson ( path ) {
   $.getJSON( path, function( data, textStatus ) {
     console.log( 'AutomowerConnectUpdateJson ( \''+path+'\' ): status '+textStatus );
     if ( textStatus == 'success') 
-      AutomowerConnectUpdateDetail ( data.name, data.type, data.detailfnfirst, data.picx, data.picy, data.scalx, data.errdesc, data.posxy, data.poserrxy );
+      AutomowerConnectUpdateDetail ( data.name, data.type, data.detailfnfirst, data.picx, data.picy, data.scalx, data.scaly, data.errdesc, data.posxy, data.poserrxy, data.hullxy );
 
   });
 
@@ -325,14 +357,48 @@ function AutomowerConnectUpdateJsonFtui ( path ) {
   $.getJSON( path, function( data, textStatus ) {
     console.log( 'AutomowerConnectUpdateJsonFtui ( \''+path+'\' ): status '+textStatus );
     if ( textStatus == 'success') 
-      AutomowerConnectUpdateDetail ( data.name, data.type, 1, data.picx, data.picy, data.scalx, data.errdesc, data.posxy, data.poserrxy );
+      AutomowerConnectUpdateDetail ( data.name, data.type, 1, data.picx, data.picy, data.scalx, data.scaly, data.errdesc, data.posxy, data.poserrxy, data.hullxy );
 
   });
 
 }
 
-//AutomowerConnectUpdateDetail (<devicename>, <type>, <detailfnfirst>, <imagesize x>, <imagesize y>,<scale x>, <error description>, <path array>, <error array>)
-function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, scalx, errdesc, pos, erray) {
+function AutomowerConnectGetHull ( path ) {
+  $.getJSON( path, function( data, textStatus ) {
+    console.log( 'AutomowerConnectGetHull ( \''+path+'\' ): status '+textStatus );
+
+    if ( textStatus == 'success') {
+      // data.name, data.type, data.picx, data.picy, data.scalx, data.scaly, data.errdesc, data.posxy, data.poserrxy );
+      const div = document.getElementById(data.type+'_'+data.name+'_div');
+      const pos =data.posxy;
+
+      if ( div && div.getAttribute( 'data-hullCalculate' ) && typeof hull === "function" ){
+        const wypts = [];
+
+        for ( let i = 0; i < pos.length; i+=3 ){
+
+          if ( pos[i+2] == "M") wypts.push( [ pos[i], pos[i+1] ] );
+
+        }
+
+        if ( wypts.length > 50 ) {
+
+          const wyres = div.getAttribute( 'data-hullResolution' );
+          const hullpts = hull( wypts, wyres );
+          FW_cmd( FW_root+"?cmd=attr "+data.name+" mowingAreaHull "+JSON.stringify( hullpts )+"&XHR=1",function(data){setTimeout(()=>{window.location.reload()},500)} );
+
+        }
+
+      }
+
+    }
+
+  });
+
+}
+
+//AutomowerConnectUpdateDetail (<devicename>, <type>, <detailfnfirst>, <imagesize x>, <imagesize y>, <scale x>, <scale y>, <error description>, <path array>, <error array>, <hull array>)
+function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, scalx, scaly, errdesc, pos, erray, hullxy) {
   const colorat = {
     "U" : "otherActivityPath",
     "N" : "errorPath",
@@ -368,6 +434,30 @@ function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, sca
       // draw property limits
       const plixy = div.getAttribute( 'data-propertyLimitsPath' ).split( "," );
       if ( plixy.length > 0 ) AutomowerConnectLimits( ctx0, div, plixy, 'property' );
+
+      // draw hull
+      if ( div.getAttribute( 'data-hullCalculate' ) && typeof hull === "function" && hullxy.length == 0 ) {
+        const pts = [];
+
+        for ( let i = 0; i < pos.length; i+=3 ){
+
+          if ( pos[i+2] == "M") pts.push( [ pos[i], pos[i+1] ] );
+
+        }
+
+        if ( pts.length > 50 ) {
+
+          const res = div.getAttribute( 'data-hullResolution' );
+          const hullpts = hull( pts, res );
+          AutomowerConnectHull( ctx0, div, hullpts, 'hull' );
+
+        }
+
+      } else if ( hullxy.length > 0 ) {
+
+        AutomowerConnectHull( ctx0, div, hullxy, 'hull' );
+
+      }
 
       // draw scale
       AutomowerConnectScale( ctx0, picx, picy, scalx );
