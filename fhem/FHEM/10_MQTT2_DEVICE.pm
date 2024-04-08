@@ -32,7 +32,7 @@ MQTT2_DEVICE_Initialize($)
     IODev
     autocreate:0,1
     bridgeRegexp:textField-long
-    devicetopic
+    devicetopic:textField-long
     devPos
     disable:0,1
     disabledForIntervals
