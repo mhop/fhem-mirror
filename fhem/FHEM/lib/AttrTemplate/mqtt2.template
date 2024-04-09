@@ -36,11 +36,11 @@ attr DEVICE bridgeRegexp \
   (ebusd[^/]*)/global/.*:.* "$1"\
   [^/]+/(ems-esp[^/]+)/start:.* "$1"\
   (mygateway[\d]+)-(in|out)/.* "$1"\
-  (wallpanel|wled)/([^/]+)/.*:.* "$1_$2"\
+  (wallpanel|wled|instar)/([^/]+)/.*:.* "$1_$2"\
+  (nuki)/[^/]+/.* "$1"\
   go-eCharger/([^/]+)/.*:.* "go_eCharger_$1"\
   owntracks/[^/]+/([^/:]+).* "owntracks_$1"\
   home/(O[^/]*M[^/]*G[^/]*)/LWT:.* "$1"\
-  instar/([^/]+)/.*:.* "instar_$1"\
   homeassistant/.*/config:.* ""\
   tasmota/discovery/[^/:]+/(config|sensors):.* ""
 attr DEVICE setList clear_all:noArg {fhem("deleteattr $NAME readingList; deletereading -q $NAME (?!associatedWith|IODev).*");return undef}
@@ -49,7 +49,7 @@ attr DEVICE comment Do not use very open bridgeRegexp expressions! This might le
 attr DEVICE setStateList on off
 farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
 attr DEVICE model MQTT2_CLIENT_general_bridge
-setreading DEVICE attrTemplateVersion 20220110
+setreading DEVICE attrTemplateVersion 20240409
 
 ###############
 #MQTT2 IO ignoreRegexp
@@ -4774,13 +4774,14 @@ attr DEVICE readingList\
   homeassistant/.+?/config:.* {}
 attr DEVICE setList\
   restart:noArg $\DEVICETOPIC/commands/MQTTtoSYS/config {"cmd":"restart"}\
-  update { my $payload = $EVENT; $payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/commands/firmware_update $payload) }\
+  update { my $payload = $EVENT; $payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/commands/MQTTtoSYS/firmware_update $payload) }\
   BT_config { my $payload = $EVENT; $payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/commands/MQTTtoBT/config $payload) }\
   BT_scan_now:noArg $\DEVICETOPIC/commands/MQTTtoBT/config {"interval":0}\
   BT_scan_interval:textField $\DEVICETOPIC/commands/MQTTtoBT/config {"interval":$EVTPART1}\
   BT_blacklist:textField $\DEVICETOPIC/commands/MQTTtoBT/config {"black-list":[$EVTPART1]}\
   BT_whitelist:textField $\DEVICETOPIC/commands/MQTTtoBT/config {"white-list":[$EVTPART1]}\
-  BT_minrssi:slider,-110,1,0 $\DEVICETOPIC/commands/MQTTtoBT/config {"minrssi":$EVTPART1}}\
+  BT_minrssi:slider,-110,1,0 $\DEVICETOPIC/commands/MQTTtoBT/config {"minrssi":$EVTPART1}\
+  BT_hasspresence:true,false $\DEVICETOPIC/commands/MQTTtoBT/config {"hasspresence":$EVTPART1}
   deleteReadings:noArg {fhem "deletereading -q $NAME (?!associatedWith|attrTemplateVersion|last|LWT|version|Sys_).* 86400"}
 attr DEVICE periodicCmd deleteReadings:1440
 attr DEVICE comment For syntax wrt. update and BT commands see https://github.com/1technophile/OpenMQTTGateway/releases/tag/v0.9.7
@@ -4799,7 +4800,7 @@ attr DEVICE readingList\
   homeassistant/.+?/config:.* {}
 attr DEVICE setList\
   restart:noArg $\DEVICETOPIC/commands/MQTTtoSYS/config {"cmd":"restart"}\
-  update { my $payload = $EVENT; $payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/commands/firmware_update $payload) }
+  update { my $payload = $EVENT; $payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/commands/MQTTtoSYS/firmware_update $payload) }
 option:global
 attr DEVICE stateFormat <a href="http://Sys_ip" target="_blank">\
 LWT\
@@ -4808,7 +4809,7 @@ attr DEVICE icon ICON
 attr DEVICE comment For syntax wrt. update and BT commands see https://github.com/1technophile/OpenMQTTGateway/releases/tag/v0.9.7
 attr DEVICE devStateIcon online:10px-kreis-gruen offline.*:10px-kreis-rot
 attr DEVICE model OpenMQTTGateway_MCU
-setreading DEVICE attrTemplateVersion 20220307
+setreading DEVICE attrTemplateVersion 20240409
 { AttrTemplate_Initialize() }
 
 name:OpenMQTTGateway_BT_scanner
