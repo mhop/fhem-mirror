@@ -158,6 +158,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.17.7" => "09.04.2024  export pvHistory to CSV ", 
+  "1.17.6" => "07.04.2024  new sub writeToHistory with many internal changes in pvHistory write process ". 
+                           "_transferInverterValues: react on inverter etotal behavior ",
   "1.17.5" => "04.04.2024  currentInverterDev: check syntax of key capacity if set, change defmaxvar back from 0.8 to 0.5 ".
                            "currentMeterDev: [conprice=<Devicename>:<Readingname>:<Einheit>] [feedprice=<Devicename>:<Readingname>:<Einheit>] ".
                            "___setOpenMeteoAPIcallKeyData: new sub to calculate the minimum Open-Meteo request intervalls ",
@@ -330,12 +333,6 @@ my %vNotesIntern = (
   "0.77.1" => "07.05.2023  rewrite function pageRefresh ",
   "0.77.0" => "03.05.2023  new attribute ctrlUserExitFn ",
   "0.76.0" => "01.05.2023  new ctrlStatisticReadings SunMinutes_Remain, SunHours_Remain ",
-  "0.75.3" => "23.04.2023  fix Illegal division by zero at ./FHEM/76_SolarForecast.pm line 6199 ",
-  "0.75.2" => "16.04.2023  some minor changes ",
-  "0.75.1" => "24.03.2023  change epieces for consumer type washingmachine, PV Vorhersage auf WR Kapazität begrenzen ",
-  "0.75.0" => "16.02.2023  new attribute ctrlSolCastAPImaxReq, rename attr ctrlOptimizeSolCastInterval to ctrlSolCastAPIoptimizeReq ",
-  "0.74.8" => "11.02.2023  change description of 'mintime', mintime with SunPath value possible ",
-  "0.74.7" => "23.01.2023  fix evaljson evaluation ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -365,8 +362,9 @@ my $csmcache       = $root."/FHEM/FhemUtils/PVCsm_SolarForecast_";              
 my $scpicache      = $root."/FHEM/FhemUtils/ScApi_SolarForecast_";                  # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
 my $aitrained      = $root."/FHEM/FhemUtils/AItra_SolarForecast_";                  # Filename-Fragment für AI Trainingsdaten (wird mit Devicename ergänzt)
 my $airaw          = $root."/FHEM/FhemUtils/AIraw_SolarForecast_";                  # Filename-Fragment für AI Input Daten = Raw Trainigsdaten
-my $dwdcatalog     = $root."/FHEM/FhemUtils/DWDcat_SolarForecast";                  # Filename-Fragment für DWD Stationskatalog
-my $dwdcatgpx      = $root."/FHEM/FhemUtils/DWDcat_SolarForecast.gpx";              # Filename-Fragment für DWD Stationskatalog
+my $dwdcatalog     = $root."/FHEM/FhemUtils/DWDcat_SolarForecast";                  # Filename für DWD Stationskatalog
+my $dwdcatgpx      = $root."/FHEM/FhemUtils/DWDcat_SolarForecast.gpx";              # Export Filename für DWD Stationskatalog im gpx-Format
+my $pvhexprtcsv    = $root."/FHEM/FhemUtils/PVH_Export_SolarForecast_";             # Filename-Fragment für PV History Exportfile (wird mit Devicename ergänzt) 
 
 my $aitrblto       = 7200;                                                          # KI Training BlockingCall Timeout
 my $aibcthhld      = 0.2;                                                           # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
@@ -1035,7 +1033,7 @@ my %hfspvh = (
   batoutthishour    => { fn => \&_storeVal, storname => 'batout',       validkey => undef,    fpar => 'comp99' },    # Batterieentladung in Stunde
   pvfc              => { fn => \&_storeVal, storname => 'pvfc',         validkey => undef,    fpar => 'comp99' },    # prognostizierter Energieertrag
   confc             => { fn => \&_storeVal, storname => 'confc',        validkey => undef,    fpar => 'comp99' },    # prognostizierter Hausverbrauch
-  cons              => { fn => \&_storeVal, storname => 'gcons',        validkey => undef,    fpar => 'comp99' },    # bezogene Energie
+  gcons             => { fn => \&_storeVal, storname => 'gcons',        validkey => undef,    fpar => 'comp99' },    # bezogene Energie
   gfeedin           => { fn => \&_storeVal, storname => 'gfeedin',      validkey => undef,    fpar => 'comp99' },    # eingespeiste Energie
   con               => { fn => \&_storeVal, storname => 'con',          validkey => undef,    fpar => 'comp99' },    # realer Hausverbrauch Energie
   pvrl              => { fn => \&_storeVal, storname => 'pvrl',         validkey => 'pvrlvd', fpar => 'comp99' },    # realer Energieertrag
@@ -2238,7 +2236,9 @@ sub _setreset {                          ## no critic "not used"
 
               $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
               $paref->{reorgday} = $dday;
+              
               setPVhistory ($paref);
+              
               delete $paref->{reorg};
               delete $paref->{reorgday};
           }
@@ -2654,7 +2654,7 @@ sub Get {
                 "html:$hol ".
                 "nextHours:noArg ".
                 "pvCircular:noArg ".
-                "pvHistory:#,$pvl ".
+                "pvHistory:#,exportToCsv,$pvl ".
                 "rooftopData:noArg ".
                 "solApiData:noArg ".
                 "valCurrent:noArg "
@@ -6255,6 +6255,8 @@ sub centralTask {
 
   RemoveInternalTimer ($hash, 'FHEM::SolarForecast::centralTask');
   RemoveInternalTimer ($hash, 'FHEM::SolarForecast::singleUpdateState');
+  
+  return if(!$init_done);
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
@@ -6284,8 +6286,6 @@ sub centralTask {
       }
   }
   #######################################################################################################################
-
-  return if(!$init_done);
 
   setModel ($hash);                                                                            # Model setzen
 
@@ -6943,30 +6943,11 @@ sub _transferWeatherValues {
       }
 
       if ($fd == 0 && $fh1) {                                                                  # Weather in pvHistory speichern
-          $paref->{val}      = $wid;
-          $paref->{histname} = 'weatherid';
-          $paref->{nhour}    = sprintf "%02d", $fh1;
-          setPVhistory ($paref);
-
-          $paref->{val}      = $neff // 0;
-          $paref->{histname} = 'weathercloudcover';
-          setPVhistory ($paref);
-
-          $paref->{val}      = $rr1c;
-          $paref->{histname} = 'totalrain';
-          setPVhistory ($paref);
-
-          $paref->{val}      = $temp;
-          $paref->{histname} = 'temperature';
-          setPVhistory ($paref);
-
-          $paref->{val}      = $don;
-          $paref->{histname} = 'DoN';
-          setPVhistory ($paref);
-
-          delete $paref->{histname};
-          delete $paref->{val};
-          delete $paref->{nhour};
+          writeToHistory ( { paref => $paref, key => 'weatherid',         val => $wid,       hour => $fh1 } );
+          writeToHistory ( { paref => $paref, key => 'weathercloudcover', val => $neff // 0, hour => $fh1 } );         
+          writeToHistory ( { paref => $paref, key => 'totalrain',         val => $rr1c,      hour => $fh1 } );      
+          writeToHistory ( { paref => $paref, key => 'temperature',       val => $temp,      hour => $fh1 } );
+          writeToHistory ( { paref => $paref, key => 'DoN',               val => $don,       hour => $fh1 } );
       }
   }
 
@@ -7350,18 +7331,8 @@ sub _transferAPIRadiationValues {
       }
 
       if ($fd == 0 && $fh1) {
-          $paref->{nhour}    = sprintf "%02d", $fh1;
-          $paref->{val}      = $pvfc;
-          $paref->{histname} = 'pvfc';
-          setPVhistory ($paref);
-
-          $paref->{val}      = $rad1h;
-          $paref->{histname} = 'radiation';
-          setPVhistory ($paref);
-
-          delete $paref->{histname};
-          delete $paref->{val};
-          delete $paref->{nhour};
+          writeToHistory ( { paref => $paref, key => 'pvfc',      val => $pvfc,  hour => $fh1 } );
+          writeToHistory ( { paref => $paref, key => 'radiation', val => $rad1h, hour => $fh1 } );
       }
   }
 
@@ -7412,19 +7383,9 @@ sub __calcSunPosition {
 
   debugLog ($paref, 'collectData', "Sun position: day: $wtday, hod: $hodn, $tstr, azimuth: $az, altitude: $alt");
 
-  if ($fd == 0 && $hodn) {                                                                            # Sun Position in pvHistory speichern
-      $paref->{nhour}    = $hodn;
-      $paref->{val}      = $az;
-      $paref->{histname} = 'sunaz';
-      setPVhistory ($paref);
-
-      $paref->{val}      = $alt;
-      $paref->{histname} = 'sunalt';
-      setPVhistory ($paref);
-
-      delete $paref->{histname};
-      delete $paref->{val};
-      delete $paref->{nhour};
+  if ($fd == 0 && $hodn) {                                                                            # Sun Position in pvHistory speichern    
+      writeToHistory ( { paref => $paref, key => 'sunaz',  val => $az,  hour => $hodn } );     
+      writeToHistory ( { paref => $paref, key => 'sunalt', val => $alt, hour => $hodn } );
   }
 
 return;
@@ -7544,8 +7505,8 @@ return $pvsum;
 
 ######################################################################
 #  Complex:
-#  Liest bewölkungsabhängige Korrekturfaktor/Qualität und
-#  speichert die Werte im Nexthours / pvHistory Hash
+#  Liest bewölkungsabhängige Korrekturfaktor/Qualität aus pvCircular
+#  und speichert die Werte im Nexthours / pvHistory Hash
 #
 #  Simple:
 #  Liest Korrekturfaktor/Qualität aus pvCircular simple und
@@ -7597,16 +7558,8 @@ sub ___readCandQ {
 
   $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf} = $hc."/".$hq;
 
-  if($fd == 0 && $fh1) {
-      $paref->{val}      = $hc.'/'.$hq;
-      $paref->{nhour}    = sprintf "%02d", $fh1;
-      $paref->{histname} = 'pvcorrfactor';
-
-      setPVhistory ($paref);
-
-      delete $paref->{histname};
-      delete $paref->{val};
-      delete $paref->{nhour};
+  if ($fd == 0 && $fh1) {      
+      writeToHistory ( { paref => $paref, key => 'pvcorrfactor', val => $hc.'/'.$hq, hour => $fh1 } );
   }
 
 return ($hc, $hq);
@@ -7725,7 +7678,7 @@ sub _transferInverterValues {
   my ($pvread,$pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
   my ($edread,$etunit) = split ":", $h->{etotal};                                             # Readingname/Unit für Energie total (PV Erzeugung)
 
-  $data{$type}{$name}{current}{invertercapacity} = $h->{capacity} if($h->{capacity});         # optionale Angabe max. WR-Leistung
+  $data{$type}{$name}{current}{invertercapacity} = $h->{capacity} if(defined $h->{capacity}); # optionale Angabe max. WR-Leistung
 
   return if(!$pvread || !$edread);
 
@@ -7748,41 +7701,24 @@ sub _transferInverterValues {
   my $nhour    = $chour + 1;
   my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'etotal', 0);               # etotal zu Beginn einer Stunde
   my $warn     = '';
-  my ($ethishour, $etot);
+  my ($ethishour, $etotsvd);
   
-  if (!$histetot) {                                                                           # etotal der aktuelle Stunde gesetzt ?
-      $paref->{val}      = $etotal;
-      $paref->{nhour}    = sprintf "%02d", $nhour;
-      $paref->{histname} = 'etotal';
-
-      setPVhistory ($paref);
-
-      delete $paref->{histname};
-      delete $paref->{nhour};
-      delete $paref->{val};
-
-      $etot      = CurrentVal ($hash, 'etotal', $etotal);
-      $ethishour = int ($etotal - $etot);
+  if (!$histetot) {                                                                           # etotal der aktuelle Stunde gesetzt ?    
+      writeToHistory ( { paref => $paref, key => 'etotal', val => $etotal, hour => $nhour } );
+      
+      $etotsvd   = CurrentVal ($hash, 'etotal', $etotal);
+      $ethishour = int ($etotal - $etotsvd);
   }
   else {
       $ethishour = int ($etotal - $histetot);
-      
-      if ($h->{capacity} && $ethishour > 2 x $h->{capacity}) {
+      if (defined $h->{capacity} && $ethishour > 2 x $h->{capacity}) {                        # Schutz vor plötzlichem Anstieg von 0 auf mehr als doppelte WR-Kapazität
           Log3 ($name, 1, "$name - WARNING - The generated PV of Inverter '$indev' is much more higher than inverter capacity. It seems to be a failure and Energy Total is reinitialized.");
           $warn = ' (WARNING: too much generated PV was registered - see log file)';
-          
-          $paref->{val}      = $etotal;
-          $paref->{nhour}    = sprintf "%02d", $nhour;
-          $paref->{histname} = 'etotal';
+                    
+          writeToHistory ( { paref => $paref, key => 'etotal', val => $etotal, hour => $nhour } );
 
-          setPVhistory ($paref);
-
-          delete $paref->{histname};
-          delete $paref->{nhour};
-          delete $paref->{val};
-
-          $etot      = CurrentVal ($hash, 'etotal', $etotal);
-          $ethishour = int ($etotal - $etot);
+          $etotsvd   = CurrentVal ($hash, 'etotal', $etotal);
+          $ethishour = int ($etotal - $etotsvd);
       }
   }
 
@@ -7798,18 +7734,8 @@ sub _transferInverterValues {
   $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishour;                   # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
 
   my ($acu, $aln) = isAutoCorrUsed ($name);
-
-  $paref->{val}      = $ethishour;
-  $paref->{nhour}    = sprintf "%02d", $nhour;
-  $paref->{histname} = 'pvrl';
-  $paref->{pvrlvd}   = $aln;                                                                  # 1: beim Learning berücksichtigen, 0: nicht
-
-  setPVhistory ($paref);
-
-  delete $paref->{pvrlvd};
-  delete $paref->{histname};
-  delete $paref->{nhour};
-  delete $paref->{val};
+  
+  writeToHistory ( { paref => $paref, key => 'pvrl', val => $ethishour, hour => $nhour, valid => $aln } );       # valid=1: beim Learning berücksichtigen, 0: nicht
 
 return;
 }
@@ -7964,16 +7890,8 @@ sub _transferMeterValues {
       my $nhour = $chour + 1;
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_GridConsumption', $gctotthishour.' Wh');
       $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{gcons} = $gctotthishour;                  # Hilfshash Wert Bezug (Wh) Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-
-      $paref->{val}      = $gctotthishour;
-      $paref->{nhour}    = sprintf "%02d", $nhour;
-      $paref->{histname} = 'cons';
-
-      setPVhistory ($paref);
-
-      delete $paref->{histname};
-      delete $paref->{nhour};
-      delete $paref->{val};
+      
+      writeToHistory ( { paref => $paref, key => 'gcons', val => $gctotthishour, hour => $nhour } );
   }
 
   my $dofeed = 0;
@@ -8003,16 +7921,8 @@ sub _transferMeterValues {
       my $nhour = $chour+1;
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_GridFeedIn', $gftotthishour.' Wh');
       $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{gfeedin} = $gftotthishour;
-
-      $paref->{val}      = $gftotthishour;
-      $paref->{nhour}    = sprintf "%02d", $nhour;
-      $paref->{histname} = 'gfeedin';
-
-      setPVhistory ($paref);
-
-      delete $paref->{histname};
-      delete $paref->{nhour};
-      delete $paref->{val};
+      
+      writeToHistory ( { paref => $paref, key => 'gfeedin', val => $gftotthishour, hour => $nhour } );
   }
 
 return;
@@ -8114,15 +8024,17 @@ sub _transferBatteryValues {
   my $batinthishour;
 
   if (!defined $histbatintot) {                                                                # totale Batterieladung der aktuelle Stunde gesetzt ?
-      $paref->{val}      = $btotin;
-      $paref->{nhour}    = sprintf "%02d", $nhour;
-      $paref->{histname} = 'batintotal';
+      #$paref->{val}      = $btotin;
+      #$paref->{nhour}    = sprintf "%02d", $nhour;
+      #$paref->{histname} = 'batintotal';
 
-      setPVhistory ($paref);
+      #setPVhistory ($paref);
 
-      delete $paref->{histname};
-      delete $paref->{nhour};
-      delete $paref->{val};
+      #delete $paref->{histname};
+      #delete $paref->{nhour};
+      #delete $paref->{val};
+      
+      writeToHistory ( { paref => $paref, key => 'batintotal', val => $btotin, hour => $nhour } );
 
       my $bitot      = CurrentVal ($hash, "batintotal", $btotin);
       $batinthishour = int ($btotin - $bitot);
@@ -8135,15 +8047,17 @@ sub _transferBatteryValues {
 
   $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{batin} = $batinthishour;                # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
 
-  $paref->{val}      = $batinthishour;
-  $paref->{nhour}    = sprintf "%02d", $nhour;
-  $paref->{histname} = 'batinthishour';
+  #$paref->{val}      = $batinthishour;
+  #$paref->{nhour}    = sprintf "%02d", $nhour;
+  #$paref->{histname} = 'batinthishour';
 
-  setPVhistory ($paref);
+  #setPVhistory ($paref);
 
-  delete $paref->{histname};
-  delete $paref->{nhour};
-  delete $paref->{val};
+  #delete $paref->{histname};
+  #delete $paref->{nhour};
+  #delete $paref->{val};
+  
+  writeToHistory ( { paref => $paref, key => 'batinthishour', val => $batinthishour, hour => $nhour } );
 
   # Batterieentladung aktuelle Stunde in pvHistory speichern
   ############################################################
@@ -8151,15 +8065,17 @@ sub _transferBatteryValues {
   my $batoutthishour;
 
   if (!defined $histbatouttot) {                                                                # totale Betterieladung der aktuelle Stunde gesetzt ?
-      $paref->{val}      = $btotout;
-      $paref->{nhour}    = sprintf "%02d", $nhour;
-      $paref->{histname} = 'batouttotal';
+      #$paref->{val}      = $btotout;
+      #$paref->{nhour}    = sprintf "%02d", $nhour;
+      #$paref->{histname} = 'batouttotal';
 
-      setPVhistory ($paref);
+      #setPVhistory ($paref);
 
-      delete $paref->{histname};
-      delete $paref->{nhour};
-      delete $paref->{val};
+      #delete $paref->{histname};
+      #delete $paref->{nhour};
+      #delete $paref->{val};
+      
+      writeToHistory ( { paref => $paref, key => 'batouttotal', val => $btotout, hour => $nhour } );
 
       my $botot       = CurrentVal ($hash, 'batouttotal', $btotout);
       $batoutthishour = int ($btotout - $botot);
@@ -8172,30 +8088,34 @@ sub _transferBatteryValues {
 
   $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{batout} = $batoutthishour;             # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
 
-  $paref->{val}      = $batoutthishour;
-  $paref->{nhour}    = sprintf "%02d", $nhour;
-  $paref->{histname} = 'batoutthishour';
+  #$paref->{val}      = $batoutthishour;
+  #$paref->{nhour}    = sprintf "%02d", $nhour;
+  #$paref->{histname} = 'batoutthishour';
 
-  setPVhistory ($paref);
+  #setPVhistory ($paref);
 
-  delete $paref->{histname};
-  delete $paref->{nhour};
-  delete $paref->{val};
+  #delete $paref->{histname};
+  #delete $paref->{nhour};
+  #delete $paref->{val};
+  
+  writeToHistory ( { paref => $paref, key => 'batoutthishour', val => $batoutthishour, hour => $nhour } );
 
   # täglichen max. SOC in pvHistory speichern
   #############################################
   my $batmaxsoc = HistoryVal ($hash, $day, 99, 'batmaxsoc', 0);                               # gespeicherter max. SOC des Tages
 
   if ($soc >= $batmaxsoc) {
-      $paref->{val}      = $soc;
-      $paref->{nhour}    = 99;
-      $paref->{histname} = 'batmaxsoc';
+      #$paref->{val}      = $soc;
+      #$paref->{nhour}    = 99;
+      #$paref->{histname} = 'batmaxsoc';
 
-      setPVhistory ($paref);
+      #setPVhistory ($paref);
 
-      delete $paref->{histname};
-      delete $paref->{nhour};
-      delete $paref->{val};
+      #delete $paref->{histname};
+      #delete $paref->{nhour};
+      #delete $paref->{val};
+      
+      writeToHistory ( { paref => $paref, key => 'batmaxsoc', val => $soc, hour => 99 } );
   }
 
   ######
@@ -8341,19 +8261,10 @@ sub _batSocTarget {
                     ($chargereq ? 'yes (battery charge is below minimum SoC)' : 'no (Battery is sufficiently charged)'));
 
   ## pvHistory/Readings schreiben
-  #################################
-  $paref->{val}      = $target;
-  $paref->{nhour}    = 99;
-  $paref->{histname} = 'batsetsoc';
-
-  setPVhistory ($paref);
-
-  delete $paref->{histname};
-  delete $paref->{nhour};
-  delete $paref->{val};
-
-  storeReading ('Battery_OptimumTargetSoC', $target.' %');
-  storeReading ('Battery_ChargeRequest',      $chargereq);
+  #################################  
+  writeToHistory ( { paref => $paref, key => 'batsetsoc', val => $target, hour => 99 } );
+  storeReading   ('Battery_OptimumTargetSoC', $target.' %');
+  storeReading   ('Battery_ChargeRequest',      $chargereq);
 
 return;
 }
@@ -10146,17 +10057,8 @@ sub _estConsumptionForecast {
            $data{$type}{$name}{nexthours}{$k}{confc}   = $conavg;                                   # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
 
            if (NexthoursVal ($hash, $k, "today", 0)) {                                              # nur Werte des aktuellen Tag speichern
-               $data{$type}{$name}{circular}{sprintf("%02d",$nhhr)}{confc} = $conavg;
-
-               $paref->{val}      = $conavg;
-               $paref->{nhour}    = sprintf "%02d", $nhhr;
-               $paref->{histname} = 'confc';
-
-               setPVhistory ($paref);
-
-               delete $paref->{histname};
-               delete $paref->{nhour};
-               delete $paref->{val};
+               $data{$type}{$name}{circular}{sprintf("%02d",$nhhr)}{confc} = $conavg;               
+               writeToHistory ( { paref => $paref, key => 'confc', val => $conavg, hour => $nhhr } );
            }
 
            debugLog ($paref, "consumption", "estimated Consumption for $nhday -> starttime: $nhtime, confc: $conavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
@@ -10659,24 +10561,15 @@ sub saveEnergyConsumption {
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
 
-  my $shr     = $chour+1;
+  my $shr     = $chour + 1;
   my $pvrl    = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_PVreal",          0);
   my $gfeedin = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_GridFeedIn",      0);
   my $gcon    = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_GridConsumption", 0);
   my $batin   = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_BatIn",           0);
   my $batout  = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_BatOut",          0);
-
-  my $con = $pvrl - $gfeedin + $gcon - $batin + $batout;
-
-  $paref->{val}      = $con;
-  $paref->{nhour}    = sprintf "%02d", $shr;
-  $paref->{histname} = 'con';
-
-  setPVhistory ($paref);
-
-  delete $paref->{histname};
-  delete $paref->{nhour};
-  delete $paref->{val};
+  my $con     = $pvrl - $gfeedin + $gcon - $batin + $batout;
+  
+  writeToHistory ( { paref => $paref, key => 'con', val => $con, hour => $shr } );
 
 return;
 }
@@ -14295,6 +14188,39 @@ sub _aiMakeIdxRaw {
 
 return $ridx;
 }
+
+################################################################
+#    einen Schlüssel-Wert in die pvHistory schreiben
+# $valid - Wert für Valid-Key festgelegt in $hfspvh Hash
+# z.B. pvrlvd = 1: beim Learning berücksichtigen, 0: nicht
+################################################################
+sub writeToHistory {
+  my $ph    = shift;
+  
+  my $paref = $ph->{paref};
+  my $key   = $ph->{key};
+  my $val   = $ph->{val};
+  my $hour  = $ph->{hour};
+  my $valid = $ph->{valid};                            
+
+  $paref->{val}      = $val;
+  $paref->{nhour}    = sprintf "%02d", $hour;
+  $paref->{histname} = $key;
+  
+  if (defined $hfspvh{$key}{validkey}) {    
+      $paref->{$hfspvh{$key}{validkey}} = $valid;
+  }
+
+  setPVhistory ($paref);
+
+  delete $paref->{histname};
+  delete $paref->{nhour};
+  delete $paref->{val};
+  delete $paref->{$hfspvh{$key}{validkey}} if(defined $hfspvh{$key}{validkey});
+
+return;
+} 
+
 ################################################################
 #   History-Hash verwalten
 ################################################################
@@ -14308,7 +14234,6 @@ sub setPVhistory {
   my $nhour     = $paref->{nhour};
   my $histname  = $paref->{histname};
   my $val       = $paref->{val};                                           # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
-  my $pvrlvd    = $paref->{pvrlvd};                                        # 1: Eintrag 'pvrl' wird im Lernprozess berücksichtigt
   my $reorg     = $paref->{reorg}     // 0;                                # Neuberechnung von Werten in Stunde "99" nach Löschen von Stunden eines Tages
   my $reorgday  = $paref->{reorgday}  // q{};                              # Tag der reorganisiert werden soll
 
@@ -14416,7 +14341,7 @@ sub _storeVal {                    ## no critic "not used"
 
   $data{$type}{$name}{pvhist}{$day}{$nhour}{$store} = $val;
 
-  if (defined $hfspvh{$histname}{validkey}) {
+  if (defined $hfspvh{$histname}{validkey}) {                            # 1: bestimmter Eintrag wird intern für Prozesse (z.B. Lernprozess) berücksichtigt oder nicht (0)
       $validkey = $hfspvh{$histname}{validkey};
       $validval = $paref->{$validkey};
       $data{$type}{$name}{pvhist}{$day}{$nhour}{$validkey} = $validval;
@@ -14448,11 +14373,17 @@ sub listDataPool {
   my $hash = shift;
   my $htol = shift;
   my $par  = shift // q{};
-
+  
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  my ($sq,$h);
+  my ($sq, $h, $hexp);
+  my $export = q{};
+  
+  if ($par eq 'exportToCsv') {
+      $export = 'csv';
+      $par    = q{};
+  }
 
   my $sub = sub {
       my $day = shift;
@@ -14461,7 +14392,7 @@ sub listDataPool {
           my $pvrl    = HistoryVal ($hash, $day, $key, 'pvrl',        '-');
           my $pvrlvd  = HistoryVal ($hash, $day, $key, 'pvrlvd',      '-');
           my $pvfc    = HistoryVal ($hash, $day, $key, 'pvfc',        '-');
-          my $gcon    = HistoryVal ($hash, $day, $key, 'gcons',       '-');
+          my $gcons   = HistoryVal ($hash, $day, $key, 'gcons',       '-');
           my $con     = HistoryVal ($hash, $day, $key, 'con',         '-');
           my $confc   = HistoryVal ($hash, $day, $key, 'confc',       '-');
           my $gfeedin = HistoryVal ($hash, $day, $key, 'gfeedin',     '-');
@@ -14482,12 +14413,39 @@ sub listDataPool {
           my $sunaz   = HistoryVal ($hash, $day, $key, 'sunaz',       '-');
           my $sunalt  = HistoryVal ($hash, $day, $key, 'sunalt',      '-');
           my $don     = HistoryVal ($hash, $day, $key, 'DoN',         '-');
-
+          
+          if ($export eq 'csv') {
+              $hexp->{$day}{$key}{pvrl}        = $pvrl;
+              $hexp->{$day}{$key}{pvrlvd}      = $pvrlvd;
+              $hexp->{$day}{$key}{pvfc}        = $pvfc;
+              $hexp->{$day}{$key}{gcons}       = $gcons;
+              $hexp->{$day}{$key}{con}         = $con;
+              $hexp->{$day}{$key}{confc}       = $confc;
+              $hexp->{$day}{$key}{gfeedin}     = $gfeedin;
+              $hexp->{$day}{$key}{weatherid}   = $wid;
+              $hexp->{$day}{$key}{wcc}         = $wcc;
+              $hexp->{$day}{$key}{rr1c}        = $rr1c;
+              $hexp->{$day}{$key}{temp}        = $temp    // '';
+              $hexp->{$day}{$key}{pvcorrf}     = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[0];
+              $hexp->{$day}{$key}{quality}     = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[1];
+              $hexp->{$day}{$key}{dayname}     = $dayname // '';
+              $hexp->{$day}{$key}{etotal}      = $etotal;
+              $hexp->{$day}{$key}{batin}       = $batin;
+              $hexp->{$day}{$key}{batouttotal} = $btotout;
+              $hexp->{$day}{$key}{batout}      = $batout;
+              $hexp->{$day}{$key}{batmaxsoc}   = $batmsoc;
+              $hexp->{$day}{$key}{batsetsoc}   = $batssoc;
+              $hexp->{$day}{$key}{rad1h}       = $rad1h;
+              $hexp->{$day}{$key}{sunaz}       = $sunaz;
+              $hexp->{$day}{$key}{sunalt}      = $sunalt;
+              $hexp->{$day}{$key}{DoN}         = $don;
+          }
+          
           $ret .= "\n      " if($ret);
           $ret .= $key." => ";
           $ret .= "etotal: $etotal, pvfc: $pvfc, pvrl: $pvrl, pvrlvd: $pvrlvd, rad1h: $rad1h";
           $ret .= "\n            ";
-          $ret .= "confc: $confc, con: $con, gcon: $gcon, gfeedin: $gfeedin";
+          $ret .= "confc: $confc, con: $con, gcon: $gcons, gfeedin: $gfeedin";
           $ret .= "\n            ";
           $ret .= "DoN: $don, sunaz: $sunaz, sunalt: $sunalt";
           $ret .= "\n            ";
@@ -14511,6 +14469,14 @@ sub listDataPool {
               my $csme = HistoryVal ($hash, $day, $key, "csme${c}",       undef);
               my $csmm = HistoryVal ($hash, $day, $key, "minutescsm${c}", undef);
               my $csmh = HistoryVal ($hash, $day, $key, "hourscsme${c}",  undef);
+              
+              if ($export eq 'csv') {
+                  $hexp->{$day}{$key}{"cyclescsm${c}"}  = $csmc if(defined $csmc);
+                  $hexp->{$day}{$key}{"csmt${c}"}       = $csmt if(defined $csmt);
+                  $hexp->{$day}{$key}{"csme${c}"}       = $csme if(defined $csme);
+                  $hexp->{$day}{$key}{"minutescsm${c}"} = $csmm if(defined $csmm);
+                  $hexp->{$day}{$key}{"hourscsme${c}"}  = $csmh if(defined $csmh);
+              }
 
               if (defined $csmc) {
                   $csm .= "cyclescsm${c}: $csmc";
@@ -14569,6 +14535,10 @@ sub listDataPool {
       for my $idx (sort{$a<=>$b} keys %{$h}) {
           next if($par && $idx ne $par);
           $sq .= $idx." => ".$sub->($idx)."\n";
+      }
+      
+      if ($export eq 'csv') {
+          return _writeAsCsv ($hash, $hexp, $pvhexprtcsv.$name.'.csv');
       }
   }
 
@@ -14904,6 +14874,55 @@ sub _ldpspaces {
   }
 
 return $spn;
+}
+
+################################################################
+#   Export Speicherstruktur in CSV-Datei
+################################################################
+sub _writeAsCsv {
+  my $hash    = shift;
+  my $hexp    = shift;
+  my $outfile = shift // return "No file specified for writing data";
+        
+  my @data;
+  
+  ## Header schreiben
+  #####################
+  my @head = qw (Day Hour);
+  for my $hexd (sort{$a<=>$b} keys %{$hexp}) {
+      for my $hexh (sort{$a<=>$b} keys %{$hexp->{$hexd}}) {                  
+          for my $hk (sort keys %{$hexp->{$hexd}{$hexh}}) {                      
+              push @head, $hk;
+          }
+          last;                  
+      }
+      last;              
+  }
+  
+  push @data, join(',', map { s{"}{""}g; qq{"$_"};} @head); 
+  
+  ## Daten schreiben
+  ####################
+  for my $exd (sort{$a<=>$b} keys %{$hexp}) {
+      for my $exh (sort{$a<=>$b} keys %{$hexp->{$exd}}) {
+          my @aexp;
+          push @aexp, $exd;
+          push @aexp, $exh;
+          
+          for my $k (sort keys %{$hexp->{$exd}{$exh}}) {  
+              my $val = $hexp->{$exd}{$exh}{$k};
+              $val    =~ s/\./,/xs;              
+              push @aexp, $val;
+          }
+          
+          push @data, join(',', map { s{"}{""}g; qq{"$_"};} @aexp);   
+      }              
+  }
+  
+  my $err = FileWrite ($outfile, @data);
+  return $err if($err);
+
+return "The memory structure was written to the file $outfile";
 }
 
 ################################################################
@@ -17873,11 +17892,12 @@ to ensure that the system configuration is correct.
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation                                       </td></tr>
-          <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).  </td></tr>
-          <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                      </td></tr>
-          <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet (max. possible output in watts)    </td></tr>
-        </table>
+          <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation                                         </td></tr>
+          <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).    </td></tr>
+          <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                        </td></tr>
+          <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts  </td></tr>
+          <tr><td>                 </td><td>(The entry is optional, but is strongly recommended)                                     </td></tr>        
+       </table>
       </ul>
       <br>
 
@@ -18619,9 +18639,11 @@ to ensure that the system configuration is correct.
     <ul>
       <a id="SolarForecast-get-pvHistory"></a>
       <li><b>pvHistory </b> <br><br>
-      Shows the content of the pvHistory data memory sorted by date and hour. The selection list can be used to jump to a
-      specific day. The drop-down list contains the days currently available in the memory.
+      Displays or exports the contents of the pvHistory data memory sorted by date and hour. <br>
+      The selection list can be used to jump to a specific day. The drop-down list contains the days currently 
+      available in the memory.
       Without an argument, the entire data storage is listed.
+      The 'exportToCsv' specification exports the entire content of the pvHistory to a CSV file. <br>
 
       The hour specifications refer to the respective hour of the day, e.g. the hour 09 refers to the time from
       08 o'clock to 09 o'clock. <br><br>
@@ -20111,10 +20133,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung liefert                                       </td></tr>
-          <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler) </td></tr>
-          <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                     </td></tr>
-          <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt (max. möglicher Output in Watt) </td></tr>
+          <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung liefert                                            </td></tr>
+          <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)    </td></tr>
+          <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                          </td></tr>
+          <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt  </td></tr>
+          <tr><td>                 </td><td>(Die Angabe ist optional, wird aber dringend empfohlen zu setzen)                            </td></tr>
         </table>
       </ul>
       <br>
@@ -20867,9 +20890,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-get-pvHistory"></a>
       <li><b>pvHistory </b> <br><br>
-      Zeigt den Inhalt des pvHistory Datenspeichers sortiert nach dem Tagesdatum und Stunde. Mit der Auswahlliste kann ein
-      bestimmter Tag angesprungen werden. Die Drop-Down Liste enthält die aktuell im Speicher verfügbaren Tage.
-      Ohne Argument wird der gesamte Datenspeicher gelistet.
+      Zeigt oder exportiert den Inhalt des pvHistory Datenspeichers sortiert nach dem Tagesdatum und Stunde. <br> 
+      Mit der Auswahlliste kann ein bestimmter Tag angesprungen werden. Die Drop-Down Liste enthält die aktuell 
+      im Speicher verfügbaren Tage.
+      Ohne Argument wird der gesamte Datenspeicher gelistet. 
+      Die Angabe 'exportToCsv' exportiert den gesamten Inhalt der pvHistory in eine CSV-Datei. <br>
 
       Die Stundenangaben beziehen sich auf die jeweilige Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit
       von 08 Uhr bis 09 Uhr. <br><br>
