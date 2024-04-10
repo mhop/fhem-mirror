@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.17.7" => "09.04.2024  export pvHistory to CSV, making attr affectMaxDayVariance obsolete ", 
   "1.17.6" => "07.04.2024  new sub writeToHistory with many internal changes in pvHistory write process ". 
                            "_transferInverterValues: react on inverter etotal behavior ",
   "1.17.5" => "04.04.2024  currentInverterDev: check syntax of key capacity if set, change defmaxvar back from 0.8 to 0.5 ".
@@ -361,8 +362,9 @@ my $csmcache       = $root."/FHEM/FhemUtils/PVCsm_SolarForecast_";              
 my $scpicache      = $root."/FHEM/FhemUtils/ScApi_SolarForecast_";                  # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
 my $aitrained      = $root."/FHEM/FhemUtils/AItra_SolarForecast_";                  # Filename-Fragment für AI Trainingsdaten (wird mit Devicename ergänzt)
 my $airaw          = $root."/FHEM/FhemUtils/AIraw_SolarForecast_";                  # Filename-Fragment für AI Input Daten = Raw Trainigsdaten
-my $dwdcatalog     = $root."/FHEM/FhemUtils/DWDcat_SolarForecast";                  # Filename-Fragment für DWD Stationskatalog
-my $dwdcatgpx      = $root."/FHEM/FhemUtils/DWDcat_SolarForecast.gpx";              # Filename-Fragment für DWD Stationskatalog
+my $dwdcatalog     = $root."/FHEM/FhemUtils/DWDcat_SolarForecast";                  # Filename für DWD Stationskatalog
+my $dwdcatgpx      = $root."/FHEM/FhemUtils/DWDcat_SolarForecast.gpx";              # Export Filename für DWD Stationskatalog im gpx-Format
+my $pvhexprtcsv    = $root."/FHEM/FhemUtils/PVH_Export_SolarForecast_";             # Filename-Fragment für PV History Exportfile (wird mit Devicename ergänzt) 
 
 my $aitrblto       = 7200;                                                          # KI Training BlockingCall Timeout
 my $aibcthhld      = 0.2;                                                           # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
@@ -478,7 +480,7 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                  );
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
 my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsForecastIdentWeekdays
-                   affectConsForecastInPlanning affectMaxDayVariance affectSolCastPercentile
+                   affectConsForecastInPlanning affectSolCastPercentile
                    consumerLegend consumerAdviceIcon consumerLink
                    ctrlAIdataStorageDuration ctrlAutoRefresh ctrlAutoRefreshFW ctrlBackupFilesKeep
                    ctrlBatSocManagement ctrlConsRecommendReadings ctrlGenPVdeviation ctrlInterval
@@ -1089,7 +1091,7 @@ sub Initialize {
                                 "affectBatteryPreferredCharge:slider,0,1,100 ".
                                 "affectConsForecastIdentWeekdays:1,0 ".
                                 "affectConsForecastInPlanning:1,0 ".
-                                "affectMaxDayVariance ".
+                                "affectMaxDayVariance:obsolete ".
                                 "affectSolCastPercentile:select,10,50,90 ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
@@ -2652,7 +2654,7 @@ sub Get {
                 "html:$hol ".
                 "nextHours:noArg ".
                 "pvCircular:noArg ".
-                "pvHistory:#,$pvl ".
+                "pvHistory:#,exportToCsv,$pvl ".
                 "rooftopData:noArg ".
                 "solApiData:noArg ".
                 "valCurrent:noArg "
@@ -5299,14 +5301,14 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  #if ($cmd eq 'set' && $aName eq 'affectNumHistDays') {
-  #    if (!$init_done) {
-  #        return qq{Device "$name" -> The attribute '$aName' is obsolete and will be deleted soon. Please press "save config" when restart is finished.};
-  #    }
-  #    else {
-  #        return qq{The attribute '$aName' is obsolete and will be deleted soon.};
-  #    }
-  #}
+  if ($cmd eq 'set' && $aName eq 'affectMaxDayVariance') {
+      if (!$init_done) {
+          return qq{Device "$name" -> The attribute '$aName' is obsolete and will be deleted soon. Please press "save config" when restart is finished.};
+      }
+      else {
+          return qq{The attribute '$aName' is obsolete and will be deleted soon.};
+      }
+  }
   ######################################################################################################################
 
   if ($aName eq 'disable') {
@@ -5371,12 +5373,6 @@ sub Attr {
       if ($aName eq 'ctrlInterval' || $aName eq 'ctrlBackupFilesKeep' || $aName eq 'ctrlAIdataStorageDuration') {
           unless ($aVal =~ /^[0-9]+$/x) {
               return qq{Invalid value for $aName. Use only figures 0-9!};
-          }
-      }
-
-      if ($aName eq 'affectMaxDayVariance') {
-          unless ($aVal =~ /^[0-9.]+$/x) {
-              return qq{The value for $aName is not valid. Use only numbers with optional decimal places !};
           }
       }
 
@@ -10455,12 +10451,11 @@ sub __calcNewFactor {
       $factor  = sprintf "%.2f", ($pvrl / $pvfc);
   }
 
-  my $maxvar = AttrVal ($name, 'affectMaxDayVariance', $defmaxvar);                                   # max. Korrekturvarianz
-  $factor    = 1.00 if(1 * $factor == 0);                                                             # 0.00-Werte ignorieren (Schleifengefahr)
+  $factor = 1.00 if(1 * $factor == 0);                                                                # 0.00-Werte ignorieren (Schleifengefahr)
 
-  if (abs($factor - $oldfac) > $maxvar) {
-      $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
-      Log3 ($name, 3, "$name - new $calc correction factor calculated (limited by affectMaxDayVariance): $factor (old: $oldfac) for hour: $h");
+  if (abs($factor - $oldfac) > $defmaxvar) {
+      $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $defmaxvar : $oldfac - $defmaxvar);
+      Log3 ($name, 3, "$name - new $calc correction factor calculated (limited by maximum Day Variance): $factor (old: $oldfac) for hour: $h");
   }
   else {
       Log3 ($name, 3, "$name - new $calc correction factor for hour $h calculated: $factor (old: $oldfac)");
@@ -14371,11 +14366,17 @@ sub listDataPool {
   my $hash = shift;
   my $htol = shift;
   my $par  = shift // q{};
-
+  
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  my ($sq,$h);
+  my ($sq, $h, $hexp);
+  my $export = q{};
+  
+  if ($par eq 'exportToCsv') {
+      $export = 'csv';
+      $par    = q{};
+  }
 
   my $sub = sub {
       my $day = shift;
@@ -14405,7 +14406,35 @@ sub listDataPool {
           my $sunaz   = HistoryVal ($hash, $day, $key, 'sunaz',       '-');
           my $sunalt  = HistoryVal ($hash, $day, $key, 'sunalt',      '-');
           my $don     = HistoryVal ($hash, $day, $key, 'DoN',         '-');
-
+          
+          if ($export eq 'csv') {
+              $hexp->{$day}{$key}{PVreal}             = $pvrl;
+              $hexp->{$day}{$key}{PVrealValid}        = $pvrlvd;
+              $hexp->{$day}{$key}{PVforecast}         = $pvfc;
+              $hexp->{$day}{$key}{GridConsumption}    = $gcons;
+              $hexp->{$day}{$key}{Consumption}        = $con;
+              $hexp->{$day}{$key}{confc}              = $confc;
+              $hexp->{$day}{$key}{GridFeedIn}         = $gfeedin;
+              $hexp->{$day}{$key}{WeatherId}          = $wid;
+              $hexp->{$day}{$key}{CoudCover}          = $wcc;
+              $hexp->{$day}{$key}{TotalPrecipitation} = $rr1c;
+              $hexp->{$day}{$key}{Temperature}        = $temp    // '';
+              $hexp->{$day}{$key}{PVCorrectionFactor} = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[0];
+              $hexp->{$day}{$key}{Quality}            = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[1];
+              $hexp->{$day}{$key}{DayName}            = $dayname // '';
+              $hexp->{$day}{$key}{Etotal}             = $etotal;
+              $hexp->{$day}{$key}{BatteryInTotal}     = $btotin;
+              $hexp->{$day}{$key}{BatteryIn}          = $batin;
+              $hexp->{$day}{$key}{BatteryOutTotal}    = $btotout;
+              $hexp->{$day}{$key}{BatteryOut}         = $batout;
+              $hexp->{$day}{$key}{BatteryMaxSoc}      = $batmsoc;
+              $hexp->{$day}{$key}{BatterySetSoc}      = $batssoc;
+              $hexp->{$day}{$key}{GlobalRadiation }   = $rad1h;
+              $hexp->{$day}{$key}{SunAzimuth}         = $sunaz;
+              $hexp->{$day}{$key}{SunAltitude}        = $sunalt;
+              $hexp->{$day}{$key}{DayOrNight}         = $don;
+          }
+          
           $ret .= "\n      " if($ret);
           $ret .= $key." => ";
           $ret .= "etotal: $etotal, pvfc: $pvfc, pvrl: $pvrl, pvrlvd: $pvrlvd, rad1h: $rad1h";
@@ -14434,6 +14463,14 @@ sub listDataPool {
               my $csme = HistoryVal ($hash, $day, $key, "csme${c}",       undef);
               my $csmm = HistoryVal ($hash, $day, $key, "minutescsm${c}", undef);
               my $csmh = HistoryVal ($hash, $day, $key, "hourscsme${c}",  undef);
+              
+              if ($export eq 'csv') {
+                  $hexp->{$day}{$key}{"CyclesCsm${c}"}  = $csmc if(defined $csmc);
+                  $hexp->{$day}{$key}{"Csmt${c}"}       = $csmt if(defined $csmt);
+                  $hexp->{$day}{$key}{"Csme${c}"}       = $csme if(defined $csme);
+                  $hexp->{$day}{$key}{"MinutesCsm${c}"} = $csmm if(defined $csmm);
+                  $hexp->{$day}{$key}{"HoursCsme${c}"}  = $csmh if(defined $csmh);
+              }
 
               if (defined $csmc) {
                   $csm .= "cyclescsm${c}: $csmc";
@@ -14492,6 +14529,10 @@ sub listDataPool {
       for my $idx (sort{$a<=>$b} keys %{$h}) {
           next if($par && $idx ne $par);
           $sq .= $idx." => ".$sub->($idx)."\n";
+      }
+      
+      if ($export eq 'csv') {
+          return _writeAsCsv ($hash, $hexp, $pvhexprtcsv.$name.'.csv');
       }
   }
 
@@ -14827,6 +14868,53 @@ sub _ldpspaces {
   }
 
 return $spn;
+}
+
+################################################################
+#   Export Speicherstruktur in CSV-Datei
+################################################################
+sub _writeAsCsv {
+  my $hash    = shift;
+  my $hexp    = shift;
+  my $outfile = shift // return "No file specified for writing data";
+        
+  my @data;
+  
+  ## Header schreiben
+  #####################
+  my @head = qw (Day Hour);
+  for my $hexd (sort{$a<=>$b} keys %{$hexp}) {
+      for my $hexh (sort{$a<=>$b} keys %{$hexp->{$hexd}}) {                  
+          for my $hk (sort keys %{$hexp->{$hexd}{$hexh}}) {                      
+              push @head, $hk;
+          }
+          last;                  
+      }
+      last;              
+  }
+  
+  push @data, join(',', map { s{"}{""}g; qq{"$_"};} @head); 
+  
+  ## Daten schreiben
+  ####################
+  for my $exd (sort{$a<=>$b} keys %{$hexp}) {
+      for my $exh (sort{$a<=>$b} keys %{$hexp->{$exd}}) {
+          push my @aexp, ($exd, $exh);
+          
+          for my $k (sort keys %{$hexp->{$exd}{$exh}}) {  
+              my $val = $hexp->{$exd}{$exh}{$k};
+              $val    =~ s/\./,/xs;              
+              push @aexp, $val;
+          }
+          
+          push @data, join(',', map { s{"}{""}g; qq{"$_"};} @aexp);   
+      }              
+  }
+  
+  my $err = FileWrite ($outfile, @data);
+  return $err if($err);
+
+return "The memory structure was written to the file $outfile";
 }
 
 ################################################################
@@ -18190,9 +18278,7 @@ to ensure that the system configuration is correct.
       <li><b>pvCorrectionFactor_Auto </b> <br><br>
 
       Switches the automatic prediction correction on/off.
-      The mode of operation differs depending on the selected method.
-      The correction behaviour can be influenced with the
-      <a href="#SolarForecast-attr-affectMaxDayVariance">affectMaxDayVariance</a> attribute. <br>
+      The mode of operation differs depending on the selected method. <br>
       (default: off)
       <br><br>
 
@@ -18543,9 +18629,11 @@ to ensure that the system configuration is correct.
     <ul>
       <a id="SolarForecast-get-pvHistory"></a>
       <li><b>pvHistory </b> <br><br>
-      Shows the content of the pvHistory data memory sorted by date and hour. The selection list can be used to jump to a
-      specific day. The drop-down list contains the days currently available in the memory.
+      Displays or exports the contents of the pvHistory data memory sorted by date and hour. <br>
+      The selection list can be used to jump to a specific day. The drop-down list contains the days currently 
+      available in the memory.
       Without an argument, the entire data storage is listed.
+      The 'exportToCsv' specification exports the entire content of the pvHistory to a CSV file. <br>
 
       The hour specifications refer to the respective hour of the day, e.g. the hour 09 refers to the time from
       08 o'clock to 09 o'clock. <br><br>
@@ -18768,16 +18856,6 @@ to ensure that the system configuration is correct.
          If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast. <br>
          Otherwise, all weekdays are used equally for calculation. <br>
          (default: 0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-affectMaxDayVariance"></a>
-       <li><b>affectMaxDayVariance &lt;Zahl&gt; </b><br>
-         Maximum adjustment of the PV prediction factor (Reading pvCorrectionFactor_XX) that can be made
-         in relation to one hour per day. <br>
-         This setting has no influence on the learning and forecasting behavior of any AI support used
-         (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>). <br>
-         (default: 0.8)
        </li>
        <br>
 
@@ -20432,8 +20510,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       Schaltet die automatische Vorhersagekorrektur ein/aus.
       Die Wirkungsweise unterscheidet sich je nach gewählter Methode. <br>
-      Das Korrekturverhalten kann mit dem Attribut
-      <a href="#SolarForecast-attr-affectMaxDayVariance">affectMaxDayVariance</a> beeinflusst werden. <br>
       (default: off)
       <br><br>
 
@@ -20792,9 +20868,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-get-pvHistory"></a>
       <li><b>pvHistory </b> <br><br>
-      Zeigt den Inhalt des pvHistory Datenspeichers sortiert nach dem Tagesdatum und Stunde. Mit der Auswahlliste kann ein
-      bestimmter Tag angesprungen werden. Die Drop-Down Liste enthält die aktuell im Speicher verfügbaren Tage.
-      Ohne Argument wird der gesamte Datenspeicher gelistet.
+      Zeigt oder exportiert den Inhalt des pvHistory Datenspeichers sortiert nach dem Tagesdatum und Stunde. <br> 
+      Mit der Auswahlliste kann ein bestimmter Tag angesprungen werden. Die Drop-Down Liste enthält die aktuell 
+      im Speicher verfügbaren Tage.
+      Ohne Argument wird der gesamte Datenspeicher gelistet. 
+      Die Angabe 'exportToCsv' exportiert den gesamten Inhalt der pvHistory in eine CSV-Datei. <br>
 
       Die Stundenangaben beziehen sich auf die jeweilige Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit
       von 08 Uhr bis 09 Uhr. <br><br>
@@ -21017,17 +21095,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen. <br>
          Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet. <br>
          (default: 0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-affectMaxDayVariance"></a>
-       <li><b>affectMaxDayVariance &lt;Zahl&gt; </b><br>
-         Maximale Anpassung des PV Vorhersagefaktors (Reading pvCorrectionFactor_XX) die bezogen auf eine
-         Stunde pro Tag vorgenommen werden kann. <br>
-         Auf das Lern- und Prognoseverhalten einer eventuell verwendeten KI-Unterstützung
-         (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>) hat diese Einstellung keinen
-         Einfluß. <br>
-         (default: 0.8)
        </li>
        <br>
 

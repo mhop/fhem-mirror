@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 76_SolarForecast: possible export pvHistory to CSV, 
+                              making attr affectMaxDayVariance obsolete 
  - feature: 72_FRITZBOX: attr <name> lanDeviceReading <mac|ip>
                Legt fest, ob der Reading Name aus der IP-Adresse mit Präfix
                ip_ oder der MAC-Adresse mit Präfix mac_ für Netzwerk Geräte
