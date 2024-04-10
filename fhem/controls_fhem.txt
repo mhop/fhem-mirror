@@ -1,6 +1,6 @@
-REV 28773
+REV 28778
 DIR unused
-UPD 2024-04-09_07:45:02 423997 ./CHANGED
+UPD 2024-04-10_07:45:02 424271 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2024-04-09_07:45:02 47157 ./MAINTAINER.txt
 UPD 2023-08-24_07:45:03 46886 ./configDB.pm
@@ -384,7 +384,7 @@ UPD 2019-07-13_07:45:02 131256 FHEM/71_YAMAHA_NP.pm
 UPD 2019-11-07_07:45:03 19531 FHEM/71_ZM_Monitor.pm
 UPD 2021-11-29_07:45:03 89494 FHEM/72_FB_CALLLIST.pm
 UPD 2023-11-15_07:45:03 127780 FHEM/72_FB_CALLMONITOR.pm
-UPD 2024-04-04_07:45:03 547302 FHEM/72_FRITZBOX.pm
+UPD 2024-04-10_07:45:02 548945 FHEM/72_FRITZBOX.pm
 UPD 2022-02-07_07:45:02 29303 FHEM/72_TA_CMI_JSON.pm
 UPD 2022-10-10_07:45:03 15950 FHEM/72_UBUS_CALL.pm
 UPD 2023-10-02_07:45:03 17311 FHEM/72_UBUS_CLIENT.pm
@@ -660,7 +660,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2023-12-30_07:45:03 10369 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2024-04-03_07:45:03 435170 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2024-04-10_07:45:02 435279 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2022-12-13_07:45:02 11263 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -763,12 +763,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2024-04-09_07:45:09 5186857 docs/commandref.html
-UPD 2024-04-09_07:45:12 3214782 docs/commandref_DE.html
+UPD 2024-04-10_07:45:08 5186721 docs/commandref.html
+UPD 2024-04-10_07:45:12 3214490 docs/commandref_DE.html
 UPD 2024-03-06_07:45:03 86454 docs/commandref_frame.html
 UPD 2024-03-06_07:45:03 97189 docs/commandref_frame_DE.html
-UPD 2024-04-09_07:45:13 316314 docs/commandref_modular.html
-UPD 2024-04-09_07:45:15 328226 docs/commandref_modular_DE.html
+UPD 2024-04-10_07:45:13 316293 docs/commandref_modular.html
+UPD 2024-04-10_07:45:14 328205 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
