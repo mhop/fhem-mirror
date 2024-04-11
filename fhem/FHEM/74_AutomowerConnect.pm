@@ -179,7 +179,8 @@ __END__
 
     <li><a id='AutomowerConnect-set-StartInWorkArea'>StartInWorkArea</a><br>
       <code>set &lt;name&gt; StartInWorkArea &lt;workAreaId|name&gt; [&lt;number of minutes&gt;]</code><br>
-      Testing: Starts immediately in &lt;workAreaId|name&gt; for &lt;number of minutes&gt;<br>
+      Testing: Starts immediately in &lt;workAreaId|name&gt; for &lt;number of minutes&gt;.<br>
+      If &lt;number of minutes&gt; is empty or 0 is selected in the widget the mower will continue forever.<br>
        Work area name must not include space.</li>
 
     <li><a id='AutomowerConnect-set-chargingStationPositionToAttribute'>chargingStationPositionToAttribute</a><br>
@@ -198,13 +199,9 @@ __END__
       <code>set &lt;name&gt; cuttingHeightInWorkArea &lt;Id|name&gt; &lt;0..100&gt;</code><br>
       Testing: Sets the cutting height for Id or zone name from 0 to 100. Zone name must not include space and contain at least one alphabetic character.</li>
 
-    <li><a id='AutomowerConnect-set-stayOutZone_enable'>stayOutZone_enable</a><br>
-      <code>set &lt;name&gt; stayOutZone_enable &lt;Id|name&gt;</code><br>
-      Testing: Enables stay out zone by Id or zone name. Zone name must not include space and contain at least one alphabetic character.</li>
-
-    <li><a id='AutomowerConnect-set-stayOutZone_disable'>stayOutZone_disable</a><br>
-      <code>set &lt;name&gt; stayOutZone_disable &lt;Id|name&gt;</code><br>
-      Testing: Disables stay out zone by Id or zone name. Zone name must not include space and contain at least one alphabetic character.</li>
+    <li><a id='AutomowerConnect-set-stayOutZone'>stayOutZone</a><br>
+      <code>set &lt;name&gt; stayOutZone &lt;Id|name&gt; &lt;enable|disable&gt;</code><br>
+      Testing: Enables or disables stay out zone by Id or zone name. Zone name must not include space and contain at least one alphabetic character.</li>
 
     <li><a id='AutomowerConnect-set-getNewAccessToken'>getNewAccessToken</a><br>
       <code>set &lt;name&gt; getNewAccessToken</code><br>
@@ -304,7 +301,7 @@ __END__
         hullLineWidth="1"<br>
         hullConnector="1"<br>
         hullResolution="40"<br>
-        hullCalculate=""<br>
+        hullCalculate="1"<br>
         propertyLimitsColor="#33cc33"<br>
         propertyLimitsLineWidth="1"<br>
         propertyLimitsConnector="1"<br>
@@ -321,15 +318,15 @@ __END__
         otherActivityPathLineColor="#999999"<br>
         otherActivityPathLineDash="6,2"<br>
         otherActivityPathLineWidth="1"<br>
-        otherActivityPathDotWidth="4"<br>
+        otherActivityPathDotWidth="2"<br>
         leavingPathLineColor="#33cc33"<br>
         leavingPathLineDash="6,2"<br>
-        leavingPathLineWidth="2"<br>
-        leavingPathDotWidth="4"<br>
+        leavingPathLineWidth="1"<br>
+        leavingPathDotWidth="2"<br>
         goingHomePathLineColor="#0099ff"<br>
         goingHomePathLineDash="6,2"<br>
-        goingHomePathLineWidth="2"<br>
-        goingHomePathDotWidth="4"<br>
+        goingHomePathLineWidth="1"<br>
+        goingHomePathDotWidth="2"<br>
         mowingPathDisplayStart=""<br>
         mowingPathLineColor="#ff0000"<br>
         mowingPathLineDash="6,2"<br>
@@ -613,6 +610,7 @@ __END__
     <li><a id='AutomowerConnect-set-StartInWorkArea'>StartInWorkArea</a><br>
       <code>set &lt;name&gt; StartInWorkArea &lt;workAreaId|zone name&gt; [&lt;number of minutes&gt;]</code><br>
       Testing: Startet sofort in &lt;workAreaId|name&gt; für &lt;number of minutes&gt;<br>
+      Wenn &lt;number of minutes&gt; nicht angegeben wird oder im Auswahlfeld 0 gewählt wird, dann wird der Mähvorgang bis auf Weiteres fortgesetzt.<br>
       Der Name der WorkArea darf keine Leerzeichen beinhalten und muss mindestens einen Buchstaben enthalten.</li>
 
     <li><a id='AutomowerConnect-set-chargingStationPositionToAttribute'>chargingStationPositionToAttribute</a><br>
@@ -631,13 +629,10 @@ __END__
       <code>set &lt;name&gt; cuttingHeightInWorkArea &lt;Id|name&gt; &lt;0..100&gt;</code><br>
       Testing: Setzt die Schnitthöhe für Id oder Zonennamen von 0 bis 100. Der Zonenname darf keine Leerzeichen beinhalten und muss mindestens einen Buchstaben enthalten.</li>
 
-    <li><a id='AutomowerConnect-set-stayOutZone_enable'>stayOutZone_enable</a><br>
-      <code>set &lt;name&gt; stayOutZone_enable &lt;Id|zone name&gt;</code><br>
-      Testing: Enabled stayOutZone für die Id oder den Namen der Zone, er darf keine Leerzeichen beinhalten und muss mindestens einen Buchstaben enthalten.</li>
-
-    <li><a id='AutomowerConnect-set-stayOutZone_disable'>stayOutZone_disable</a><br>
-      <code>set &lt;name&gt; stayOutZone_disable &lt;Id|zone name&gt;</code><br>
-      Testing: Disabled stayOutZone für die Id oder den Namen der Zone, er darf keine Leerzeichen beinhalten und muss mindestens einen Buchstaben enthalten.</li>
+    <li><a id='AutomowerConnect-set-stayOutZone'>stayOutZone</a><br>
+      <code>set &lt;name&gt; stayOutZone &lt;Id|name&gt; &lt;enable|disable&gt;</code><br>
+      Testing: Schaltet stayOutZone ein oder aus, für die Id oder den Namen der Zone.<br>
+      Der Zonenname darf keine Leerzeichen beinhalten und muss mindestens einen Buchstaben enthalten.</li>
 
     <li><a id='AutomowerConnect-set-confirmError'>confirmError</a><br>
       <code>set &lt;name&gt; confirmError</code><br>
@@ -741,7 +736,7 @@ __END__
         hullLineWidth="1"<br>
         hullConnector="1"<br>
         hullResolution="40"<br>
-        hullCalculate=""<br>
+        hullCalculate="1"<br>
         propertyLimitsColor="#33cc33"<br>
         propertyLimitsLineWidth="1"<br>
         propertyLimitsConnector="1"<br>
@@ -758,15 +753,15 @@ __END__
         otherActivityPathLineColor="#999999"<br>
         otherActivityPathLineDash="6,2"<br>
         otherActivityPathLineWidth="1"<br>
-        otherActivityPathDotWidth="4"<br>
+        otherActivityPathDotWidth="2"<br>
         leavingPathLineColor="#33cc33"<br>
         leavingPathLineDash="6,2"<br>
         leavingPathLineWidth="2"<br>
-        leavingPathDotWidth="4"<br>
+        leavingPathDotWidth="2"<br>
         goingHomePathLineColor="#0099ff"<br>
         goingHomePathLineDash="6,2"<br>
         goingHomePathLineWidth="2"<br>
-        goingHomePathDotWidth="4"<br>
+        goingHomePathDotWidth="2"<br>
         mowingPathDisplayStart=""<br>
         mowingPathLineColor="#ff0000"<br>
         mowingPathLineDash="6,2"<br>
@@ -831,8 +826,8 @@ __END__
      <li><a id='AutomowerConnect-attr-scaleToMeterXY'>scaleToMeterXY</a><br>
       <code>attr &lt;name&gt; scaleToMeterXY &lt;scale factor longitude&gt;&lt;seperator&gt;&lt;scale factor latitude&gt;</code><br>
       Der Skalierfaktor hängt vom Standort ab und muss daher für kurze Strecken berechnet werden. &lt;seperator&gt; ist 1 Leerzeichen.<br>
-      Longitude: <code>(LongitudeMeter_1 - LongitudeMeter_2) / (LongitudeDegree_1 - LongitudeDegree _2)</code><br>
-      Latitude: <code>(LatitudeMeter_1 - LatitudeMeter_2) / (LatitudeDegree_1 - LatitudeDegree _2)</code></li>
+      Longitude: <code>(LongitudeMeter_1 - LongitudeMeter_2) / (LongitudeDegree_1 - LongitudeDegree_2)</code><br>
+      Latitude: <code>(LatitudeMeter_1 - LatitudeMeter_2) / (LatitudeDegree_1 - LatitudeDegree_2)</code></li>
 
     <li><a id='AutomowerConnect-attr-mapZones'>mapZones</a><br>
       <code>attr &lt;name&gt; mapZones &lt;JSON string with zone names in alpabetical order and valid perl condition to seperate the zones&gt;</code><br>
@@ -897,7 +892,7 @@ __END__
       Mit dem Designattribut 'hullResolution' kann die Anzahl der Brechungen beeinflusst werden &#8469;, Default 40.<br>
       Das Hüllenpolygon wird berechnet wenn das Designattribute gesetzt ist, <code>hullCalculate="1"</code> und es mehr als 50 Wegpunkte der Aktivität MOWING gibt.<br>
       Die Berechnung wird beim Laden oder Wiederladen der Website ausgeführt.<br>
-      Die Berechnung stopt wenn dieses Attribut gesetzt ist und startet wenn das Attibut gelöst wird.<br>
+      Die Berechnung stopt wenn dieses Attribut gesetzt ist und startet wenn das Attibut gelöscht wird.<br>
       Das Attribut <code>weekdaysToResetWayPoints</code> sollte auf <code>-</code> und das Designattribut <code>mowingPathUseDots</code> sollte auf <code>"1"</code> gesetzt werden, bis das Polygon die Hülle der Mähfläche zufriedenstellend abbildet.
     </li>
 

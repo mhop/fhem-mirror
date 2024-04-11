@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 74_AutomowerConnect.pm: use widgetList for stayOutZones
+            and workAreas setter, update commandref, some default values
+            changed regarding design attributes
  - bugfix: 72_FRITZBOX: commandRef
                perl Warnung beim Fhem Start
  - feature: 72_FRITZBOX: Info statische/dynamische IP Adresse Lan Device

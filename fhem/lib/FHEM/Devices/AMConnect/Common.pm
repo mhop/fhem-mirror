@@ -132,7 +132,7 @@ hullColor="#0066ff"
 hullLineWidth="1"
 hullConnector="1"
 hullResolution="40"
-hullCalculate=""
+hullCalculate="1"
 propertyLimitsColor="#33cc33"
 propertyLimitsLineWidth="1"
 propertyLimitsConnector="1"
@@ -149,15 +149,15 @@ chargingStationPathDotWidth="2"
 otherActivityPathLineColor="#999999"
 otherActivityPathLineDash="6,2"
 otherActivityPathLineWidth="1"
-otherActivityPathDotWidth="4"
+otherActivityPathDotWidth="2"
 leavingPathLineColor="#33cc33"
 leavingPathLineDash="6,2"
-leavingPathLineWidth="2"
-leavingPathDotWidth="4"
+leavingPathLineWidth="1"
+leavingPathDotWidth="2"
 goingHomePathLineColor="#0099ff"
 goingHomePathLineDash="6,2"
-goingHomePathLineWidth="2"
-goingHomePathDotWidth="4"
+goingHomePathLineWidth="1"
+goingHomePathDotWidth="2"
 mowingPathDisplayStart=""
 mowingPathLineColor="#ff0000"
 mowingPathLineDash="6,2"
@@ -1120,7 +1120,7 @@ sub CMD {
   my $iam = "$type $name CMD:";
   my $timeout = AttrVal( $name, 'timeoutCMD', $hash->{helper}->{timeout_cmd} );
   my $method = 'POST';
-  $hash->{helper}{mower_commandSend} = $cmd[ 0 ] . ' ' . ( $cmd[ 1 ] ? $cmd[ 1 ] : '' );
+  $hash->{helper}{mower_commandSend} = $cmd[ 0 ] . ( $cmd[ 1 ] ? ' '.$cmd[ 1 ] : '' ) . ( $cmd[ 2 ] ? ' '.$cmd[ 2 ] : '' );
 
   if ( IsDisabled( $name ) ) {
 
@@ -1154,8 +1154,7 @@ my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nA
                                        { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"workAreaId":'.$cmd[1].'}}}'; $post = 'actions' }
   elsif ($cmd[0] eq "headlight")       { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": {"mode": "'.$cmd[1].'"}}}}'; $post = 'settings' }
   elsif ($cmd[0] eq "cuttingHeight")   { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": '.$cmd[1].'}}}'; $post = 'settings' }
-  elsif ($cmd[0] eq "stayOutZone_enable")  { $json = '{"data": {"type":"stayOutZone","id":"'.$cmd[1].'","attributes":{"enable": true}}}'; $post = 'stayOutZones/' . $cmd[1]; $method = 'PATCH' }
-  elsif ($cmd[0] eq "stayOutZone_disable") { $json = '{"data": {"type":"stayOutZone","id":"'.$cmd[1].'","attributes":{"enable": false}}}'; $post = 'stayOutZones/' . $cmd[1]; $method = 'PATCH' }
+  elsif ($cmd[0] eq "stayOutZone")     { $json = '{"data": {"type":"stayOutZone","id":"'.$cmd[1].'","attributes":{"enable": '.$cmd[2].'}}}'; $post = 'stayOutZones/' . $cmd[1]; $method = 'PATCH' }
   elsif ($cmd[0] eq "confirmError")    { $json = '{}'; $post = 'errors/confirm' }
   elsif ($cmd[0] eq "sendScheduleFromAttributeToMower" && AttrVal( $name, 'mowerSchedule', '')) {
 
@@ -1275,15 +1274,6 @@ sub Set {
     CommandAttr( $hash, "$name chargingStationCoordinates $xm $ym" );
     return undef;
 
-  # } elsif ( $setName eq 'mowingAreaHullToAttribute' ) {
-
-    # if ( $FW_ME ) {
-      # map { 
-        # ::FW_directNotify("#FHEMWEB:$_", "AutomowerConnectGetHull ( '$FW_ME/$type/$name/json' )","");
-      # } devspec2array("TYPE=FHEMWEB");
-      # return undef;
-    # }
-
   } elsif ( $setName eq 'defaultDesignAttributesToAttribute' ) {
 
     my $design = $hash->{helper}{mapdesign};
@@ -1363,6 +1353,7 @@ sub Set {
 
   } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^(StartInWorkArea|cuttingHeightInWorkArea)$/ && AttrVal( $name, 'testing', '' ) ) {
 
+    ( $setVal, $setVal2 ) = $setVal =~ /(.*),(\d+)/ if ( $setVal =~/,/ && ! defined( $setVal2 ) );
     my $id = undef;
     $id = name2id( $hash, $setVal, 'workAreas' ) if ( $setVal !~ /^(\d+)$/ );
     $setVal = $id // $setVal;
@@ -1375,14 +1366,16 @@ sub Set {
 
     Log3 $name, 2, "$iam $setName : no valid Id or zone name for $setVal .";
 
-  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^stayOutZone_(enable|disable)$/ && AttrVal( $name, 'testing', '' ) ) {
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^stayOutZone$/ && AttrVal( $name, 'testing', '' ) ) {
 
+    ( $setVal, $setVal2 ) = $setVal =~ /(.*),(enable|disable)/ if ( $setVal =~/,/ && ! defined( $setVal2 ) );
     my $id = undef;
     $id = name2id( $hash, $setVal, 'stayOutZones' ) if ( $setVal !~ /\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b/ );
     $setVal = $id // $setVal;
     if ( $setVal =~ /\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b/ ) { #  && $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones}
 
-      CMD($hash ,$setName, $setVal);
+      $setVal2 = $setVal2 eq 'enable' ? 'true' : 'false';
+      CMD($hash ,$setName, $setVal, $setVal2);
       return undef;
 
     }
@@ -1390,12 +1383,28 @@ sub Set {
     Log3 $name, 2, "$iam $setName : no valid Id or zone name for $setVal .";
 
   }
-  my $ret = " getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,60,60,600,0,lin Park:selectnumbers,60,60,600,0,lin ResumeSchedule:noArg getUpdate:noArg client_secret ";
+  my $ret = " getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,30,30,600,0,lin Park:selectnumbers,30,30,600,0,lin ResumeSchedule:noArg getUpdate:noArg client_secret ";
   $ret .= "chargingStationPositionToAttribute:noArg headlight:ALWAYS_OFF,ALWAYS_ON,EVENING_ONLY,EVENING_AND_NIGHT cuttingHeight:1,2,3,4,5,6,7,8,9 mowerScheduleToAttribute:noArg ";
   $ret .= "sendScheduleFromAttributeToMower:noArg defaultDesignAttributesToAttribute:noArg mapZonesTemplateToAttribute:noArg ";
-  $ret .= "StartInWorkArea cuttingHeightInWorkArea " if ( $hash->{helper}{mower}{attributes}{capabilities}{workAreas} && AttrVal( $name, 'testing', '' ) );
+
+  if ( $hash->{helper}{mower}{attributes}{capabilities}{workAreas} && defined ( $hash->{helper}{mower}{attributes}{workAreas} ) && AttrVal( $name, 'testing', '' ) ) {
+
+    my @ar = @{ $hash->{helper}{mower}{attributes}{workAreas} };
+    my @anlist = map { ','.$_->{name} } @ar;
+    $ret .= "cuttingHeightInWorkArea:widgetList,".(scalar @anlist + 1).",select".join('',@anlist).",6,selectnumbers,0,10,100,0,lin ";
+    $ret .= "StartInWorkArea:widgetList,".(scalar @anlist + 1).",select".join('',@anlist).",6,selectnumbers,0,30,600,0,lin ";
+
+  }
+
+  if ( $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones} && defined ( $hash->{helper}{mower}{attributes}{stayOutZones}{zones} ) && AttrVal( $name, 'testing', '' ) ) {
+
+    my @so = @{ $hash->{helper}{mower}{attributes}{stayOutZones}{zones} };
+    my @solist = map { ','.$_->{name} } @so;
+    $ret .= "stayOutZone:widgetList,".(scalar @solist + 1).",select".join('',@solist).",3,select,enable,disable ";
+
+  }
+
   $ret .= "confirmError:noArg " if ( AttrVal( $name, 'testing', '' ) );
-  $ret .= "stayOutZone_enable stayOutZone_disable " if ( $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones} && AttrVal( $name, 'testing', '' ) );
   return "Unknown argument $setName, choose one of".$ret;
   
 }
