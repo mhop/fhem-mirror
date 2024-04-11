@@ -45,7 +45,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.57.13";
+my $ModulVersion = "07.57.13a";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -497,7 +497,7 @@ sub FRITZBOX_Initialize($)
   $hash->{AttrFn}   = "FRITZBOX_Attr";
   $hash->{AttrList} = "boxUser "
                 ."disable:0,1 "
-                ."nonblockingTimeOut:50,75,100,125 "
+                ."nonblockingTimeOut:30,35,40,50,75,100,125 "
                 ."INTERVAL "
                 ."reConnectInterval "
                 ."maxSIDrenewErrCnt "
@@ -531,7 +531,7 @@ sub FRITZBOX_Initialize($)
                                 ."box_moh,box_powerRate,box_rateDown,box_rateUp,box_stdDialPort,box_sys_LogNewest,box_tr064,box_tr069,"
                                 ."box_upnp,box_upnp_control_activated,box_uptime,box_uptimeConnect,box_wan_AccessType,"
                                 ."box_wlan_Count,box_wlan_2.4GHz,box_wlan_5GHz,box_wlan_Active,box_wlan_LogExtended,box_wlan_LogNewest "
-                ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,_noDefInf_ "
+                ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,statIP,_noDefInf_ "
                 ."disableTableFormat:multiple-strict,border(8),cellspacing(10),cellpadding(20) "
                 ."FhemLog3Std:0,1 "
                 ."lanDeviceReading:mac,ip "
@@ -990,7 +990,7 @@ sub FRITZBOX_Attr($@)
          readingsDelete($hash, $_) if $_ =~ /^mac_|ip_/ && defined $hash->{READINGS}{$_}{VAL};
        }
      }
-     if ($cmd eq "del" || $aVal == "mac") {
+     if ($cmd eq "del" || $aVal eq "mac") {
        foreach (keys %{ $hash->{READINGS} }) {
          readingsDelete($hash, $_) if $_ =~ /^ip_/ && defined $hash->{READINGS}{$_}{VAL};
        }
@@ -2967,22 +2967,19 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Log $hash, 4, "Prepare query string for luaQuery.";
 
    my $queryStr = "&radio=configd:settings/WEBRADIO/list(Name)"; # Webradio
+
    #queryStr .= "&box_dectRingTone=dect:settings/ServerRingtone/list(UID,Name)"; #settings/LastSetServerRingtoneState
    #queryStr .= "&box_dectNightTime=dect:settings/NightTime";
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
+
    $queryStr .= "&handsetCount=dect:settings/Handset/count"; # Anzahl Handsets
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion,Productname)"; # DECT Handsets
-   $queryStr .= "&wlanList=wlan:settings/wlanlist/list(mac,speed,speed_rx,rssi,is_guest)"; # WLAN devices
-   $queryStr .= "&wlanListNew=wlan:settings/wlanlist/list(mac,speed,rssi)"; # WLAN devices fw>=6.69
 
-   #wlan:settings/wlanlist/list(hostname,mac,UID,state,rssi,quality,is_turbo,cipher,wmm_active,powersave,is_ap,ap_state,is_repeater,flags,flags_set,mode,is_guest,speed,speed_rx,channel_width,streams)   #wlan:settings/wlanlist/list(hostname,mac,UID,state,rssi,quality,is_turbo,wmm_active,cipher,powersave,is_repeater,flags,flags_set,mode,is_guest,speed,speed_rx,speed_rx_max,speed_tx_max,channel_width,streams,mu_mimo_group,is_fail_client)
-   #$queryStr .= "&lanDevice=landevice:settings/landevice/list(mac,ip,ethernet,ethernet_port,guest,name,active,online,wlan,speed,UID)"; # LAN devices
+   $queryStr .= "&wlanList=wlan:settings/wlanlist/list(mac,speed,speed_rx,rssi,is_guest,is_remote,is_repeater,is_ap)"; # WLAN devices
+   $queryStr .= "&wlanListNew=wlan:settings/wlanlist/list(mac,speed,rssi,is_remote,is_repeater,is_ap)"; # WLAN devices fw>=6.69
 
-   $queryStr .= "&lanDevice=landevice:settings/landevice/list(mac,ip,ethernet,ethernet_port,ethernetport,guest,name,active,online,wlan,speed,UID)"; # LAN devices
-   $queryStr .= "&lanDeviceNew=landevice:settings/landevice/list(mac,ip,ethernet,guest,name,active,online,wlan,speed,UID)"; # LAN devices fw>=6.69
-
-   #landevice:settings/landevice/list(name,ip,mac,UID,dhcp,wlan,ethernet,active,static_dhcp,manu_name,wakeup,deleteable,source,online,speed,wlan_UIDs,auto_wakeup,guest,url,wlan_station_type,vendorname)
-   #landevice:settings/landevice/list(name,ip,mac,parentname,parentuid,ethernet_port,wlan_show_in_monitor,plc,ipv6_ifid,parental_control_abuse,plc_UIDs)   #landevice:settings/landevice/list(name,ip,mac,UID,dhcp,wlan,ethernet,active,static_dhcp,manu_name,wakeup,deleteable,source,online,speed,wlan_UIDs,auto_wakeup,guest,url,wlan_station_type,vendorname,parentname,parentuid,ethernet_port,wlan_show_in_monitor,plc,ipv6_ifid,parental_control_abuse,plc_UIDs)
+   $queryStr .= "&lanDevice=landevice:settings/landevice/list(mac,ip,ethernet,ethernet_port,ethernetport,guest,name,active,online,wlan,speed,UID,static_dhcp)"; # LAN devices
+   $queryStr .= "&lanDeviceNew=landevice:settings/landevice/list(mac,ip,ethernet,guest,name,active,online,wlan,speed,UID,static_dhcp)"; # LAN devices fw>=6.69
 
    $queryStr .= "&init=telcfg:settings/Foncontrol"; # Init
    $queryStr .= "&box_stdDialPort=telcfg:settings/DialPort"; #Dial Port
@@ -3095,11 +3092,10 @@ sub FRITZBOX_Readout_Run_Web($)
     # gets WLAN speed for fw>=6.69 and < 7
       $queryStr="";
       foreach ( @{ $result->{wlanListNew} } ) {
-         $newQueryPart = "&".$_->{_node}."=wlan:settings/".$_->{_node}."/speed_rx";
-         if (length($queryStr.$newQueryPart) < 4050) {
+         $newQueryPart = "&" . $_->{_node} . "=wlan:settings/" . $_->{_node}."/speed_rx";
+         if (length($queryStr . $newQueryPart) < 4050) {
             $queryStr .= $newQueryPart;
-         }
-         else {
+         } else {
             $result2 = FRITZBOX_call_Lua_Query( $hash, $queryStr );
 
             # Abbruch wenn Fehler beim Lesen der Fritzbox-Antwort
@@ -3133,9 +3129,9 @@ sub FRITZBOX_Readout_Run_Web($)
 
     # get missing user-fields for fw>=6.69
       foreach ( @{ $result->{userProfilNew} } ) {
-         $newQueryPart = "&".$_->{_node}."_filter=user:settings/".$_->{_node}."/filter_profile_UID";
-         $newQueryPart .= "&".$_->{_node}."_month=user:settings/".$_->{_node}."/this_month_time";
-         $newQueryPart .= "&".$_->{_node}."_today=user:settings/".$_->{_node}."/today_time";
+         $newQueryPart = "&"  . $_->{_node} . "_filter=user:settings/" . $_->{_node} . "/filter_profile_UID";
+         $newQueryPart .= "&" . $_->{_node} . "_month=user:settings/"  . $_->{_node} . "/this_month_time";
+         $newQueryPart .= "&" . $_->{_node} . "_today=user:settings/"  . $_->{_node} . "/today_time";
          if (length($queryStr.$newQueryPart) < 4050) {
             $queryStr .= $newQueryPart;
          }
@@ -3148,7 +3144,7 @@ sub FRITZBOX_Readout_Run_Web($)
             # $sidNew += $result2->{sidNew} if defined $result2->{sidNew};
 
             %{$result} = ( %{$result}, %{$result2 } );
-            $queryStr = $newQueryPart;
+            $queryStr  = $newQueryPart;
          }
       }
 
@@ -3472,7 +3468,7 @@ sub FRITZBOX_Readout_Run_Web($)
       foreach ( @{ $result->{wlanList} } ) {
          my $mac = $_->{mac};
          $mac =~ s/:/_/g;
-         # Anscheinend gibt es Anmeldungen sowohl fÃƒÂ¼r Repeater als auch fÃƒÂ¼r FBoxen
+         # Anscheinend gibt es Anmeldungen sowohl für Repeater als auch für FBoxen
          $wlanList{$mac}{speed} = $_->{speed}   if ! defined $wlanList{$mac}{speed} || $_->{speed} ne "0";
          $wlanList{$mac}{speed_rx} = $_->{speed_rx} if ! defined $wlanList{$mac}{speed_rx} || $_->{speed_rx} ne "0";
          #$wlanList{$mac}{speed_rx} = $result_lan->{$_->{_node}};
@@ -3496,10 +3492,15 @@ sub FRITZBOX_Readout_Run_Web($)
       if ($_ =~ /^${lDevName}_/ && defined $hash->{READINGS}{$_}{VAL}) {
         my $mac_ip = $_;
         $mac_ip =~ s/^${lDevName}_//;
-        if ($hash->{fhem}->{landevice}->{$mac_ip} && (split(/\|/, $hash->{fhem}->{landevice}->{$mac_ip}))[1]) {
-          $oldLanDevice{$_} .= (split(/\|/, $hash->{fhem}->{landevice}->{$mac_ip}))[1] . "|";
-        } else {
-          $oldLanDevice{$_} .= (split(/\|/, $hash->{fhem}->{landevice}->{$mac_ip}))[0] . "|";
+
+        if ( $hash->{fhem}->{landevice}->{$mac_ip} ) {
+          if ( (split(/\|/, $hash->{fhem}->{landevice}->{$mac_ip}))[1] ) {
+            $oldLanDevice{$_} .= (split(/\|/, $hash->{fhem}->{landevice}->{$mac_ip}))[1] . "|";
+          } elsif ((split(/\|/, $hash->{fhem}->{landevice}->{$mac_ip}))[0]) {
+            $oldLanDevice{$_} .= (split(/\|/, $hash->{fhem}->{landevice}->{$mac_ip}))[0] . "|";
+          } else {
+            $oldLanDevice{$_} .= $hash->{fhem}->{landevice}->{$mac_ip} . "|";
+          }
         }
         $oldLanDevice{$_} .= $hash->{READINGS}{$_}{VAL};
 #        FRITZBOX_Log $hash, 3, "deviceInfo -> $oldLanDevice{$_} -> $_";
@@ -3514,11 +3515,11 @@ sub FRITZBOX_Readout_Run_Web($)
       #Ipv4,IPv6,lanName,devName,Mbit,RSSI "
       
       # iPad-Familie [landevice810] (WLAN: 142 / 72 Mbit/s RSSI: -53)
-      my $deviceInfo = AttrVal($name, "deviceInfo", "_defDef_,name,[uid],(connection: speedcomma rssi)");
+      my $deviceInfo = AttrVal($name, "deviceInfo", "_defDef_,name,[uid],(connection: speedcomma rssi) statIP");
 
       $deviceInfo =~ s/\n//g;
 
-      $deviceInfo = "_noDefInf_,_defDef_,name,[uid],(connection: speedcomma rssi)" if $deviceInfo eq "_noDefInf_";
+      $deviceInfo = "_noDefInf_,_defDef_,name,[uid],(connection: speedcomma rssi) statIP" if $deviceInfo eq "_noDefInf_";
 
       my $noDefInf = $deviceInfo =~ /_noDefInf_/ ? 1 : 0; #_noDefInf_ 
       $deviceInfo =~ s/\,_noDefInf_|_noDefInf_\,//g;
@@ -3542,9 +3543,11 @@ sub FRITZBOX_Readout_Run_Web($)
       FRITZBOX_Log $hash, 5, "deviceInfo -> " . $deviceInfo;
 
       foreach ( @{ $result->{lanDevice} } ) {
-         my $dIp   = $_->{ip};    # IP Adress
-         my $UID   = $_->{UID};   # FritzBoy lan device ID
-         my $dName = $_->{name};  # name of the device
+         my $dIp   = $_->{ip};          # IP Adress
+         my $UID   = $_->{UID};         # FritzBoy lan device ID
+         my $dName = $_->{name};        # name of the device
+
+         my $dhcp  = $_->{static_dhcp} eq "0" ? "statIP:off" : "statIP:on"; # IP is defined as static / dynamic
 
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$dIp", $dName;
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$UID", $dName;
@@ -3570,9 +3573,6 @@ sub FRITZBOX_Readout_Run_Web($)
 
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$mac", $UID . "|" . $dIp;
             $landevice{$mac} = $UID;
-
-            # if ( !$_->{ethernet} && $_->{wlan} ) { # funktioniert nicht mehr seit v7
-            # if ( defined $wlanList{$mac} ) {
 
             # Copes with fw >= 7
             if ( defined $wlanList{$mac} and !$_->{ethernet_port} and !$_->{ethernetport} ) {
@@ -3617,6 +3617,8 @@ sub FRITZBOX_Readout_Run_Web($)
                  $srTmp =~ s/speed/$dName/g;
                }
             }
+
+            $srTmp =~ s/statIP/${sep}${dhcp}/g;
 
             $srTmp =~ s/rssi${sep}|${sep}rssi|rssi//g;
 
@@ -5365,7 +5367,7 @@ sub FRITZBOX_Readout_Process($$)
        if (($rValue =~ "Box") && (lc($rValue) =~ "6[4,5,6][3,6,9][0,1]") ) {
          my $cable = "boxUser "
                   ."disable:0,1 "
-                  ."nonblockingTimeOut:50,75,100,125 "
+                  ."nonblockingTimeOut:30,35,40,50,75,100,125 "
                   ."INTERVAL "
                   ."reConnectInterval "
                   ."maxSIDrenewErrCnt "
@@ -5402,7 +5404,7 @@ sub FRITZBOX_Readout_Process($$)
                                 ."box_docsis31_Ds_powerLevels,box_docsis31_Ds_frequencys,box_docsis31_Ds_modulations,"
                                 ."box_docsis30_Us_powerLevels,box_docsis30_Us_frequencys,box_docsis30_Us_modulations,"
                                 ."box_docsis31_Us_powerLevels,box_docsis31_Us_frequencys,box_docsis31_Us_modulations "
-                  ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,_noDefInf_ "
+                  ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,statIP,_noDefInf_ "
                   ."lanDeviceReading:mac,ip "
                   .$readingFnAttributes;
 
@@ -10728,9 +10730,11 @@ sub FRITZBOX_Helper_Url_Regex {
       </li><br>
 
       <li><a name="luaFunction"></a>
-         <dt><code>get &lt;name&gt; luaFunction &lt;Command&gt;</code></dt>
+         <dt><code>get &lt;name&gt; luaFunction &lt;function&gt;</code></dt>
          <br>
-         Evaluates commands via AVM lua functions.
+         Executes AVM lua functions.<br>
+         function: <code>&lt;path/luaFunction?&gt;&lt;Parameter&gt;</code><br>
+         function: <code>internet/inetstat_monitor.lua?myXhr=1&action=disconnect&useajax=1&xhr=1</code> gets a new IP address for the FritzBox.
       </li><br>
 
       <li><a name="luaInfo"></a>
@@ -10749,9 +10753,11 @@ sub FRITZBOX_Helper_Url_Regex {
       </li><br>
 
       <li><a name="luaQuery"></a>
-         <dt><code>get &lt;name&gt; luaQuery &lt;Command&gt;</code></dt>
+         <dt><code>get &lt;name&gt; luaQuery &lt;query&gt;</code></dt>
          <br>
-         Shows informations via query.lua requests.
+         Displays information by caling query.lua.<br>
+         query: <code>&lt;queryFunction:&gt;&lt;queryRequest&gt;</code><br>
+         query: <code>uimodlogic:status/uptime_hours</code> gets the hours that the FritzBox has been running continuously since the last restart.
       </li><br>
 
       <li><a name="tr064Command"></a>
@@ -10830,7 +10836,7 @@ sub FRITZBOX_Helper_Url_Regex {
       </li><br>
 
       <li><a name="deviceInfo"></a>
-         <dt><code>deviceInfo &lt;ipv4, name, uid, connection, speed, rssi, _noDefInf_, _default_&, space, comma&gt;</code></dt>
+         <dt><code>deviceInfo &lt;ipv4, name, uid, connection, speed, rssi, statIP, _noDefInf_, _default_&, space, comma&gt;</code></dt>
          <br>
          This attribute can be used to design the content of the device readings (mac_...). If the attribute is not set, sets
          the content breaks down as follows:<br>
@@ -11629,9 +11635,11 @@ sub FRITZBOX_Helper_Url_Regex {
       </li><br>
 
       <li><a name="luaFunction"></a>
-         <dt><code>get &lt;name&gt; luaFunction &lt;Command&gt;</code></dt>
+         <dt><code>get &lt;name&gt; luaFunction &lt;funktion&gt;</code></dt>
          <br>
-         F&uuml;hrt AVM lua Funktionen aus.
+         Führt AVM lua Funktionen aus.<br>
+         funktion: <code>&lt;Pfad/luaFunktion?&gt;&lt;Parameter&gt;</code><br>
+         funktion: <code>internet/inetstat_monitor.lua?myXhr=1&action=disconnect&useajax=1&xhr=1</code> holt eine neue IP-Adresse für die FritzBox.
       </li><br>
 
       <li><a name="luaInfo"></a>
@@ -11650,9 +11658,11 @@ sub FRITZBOX_Helper_Url_Regex {
       </li><br>
 
       <li><a name="luaQuery"></a>
-         <dt><code>get &lt;name&gt; luaQuery &lt;Command&gt;</code></dt>
+         <dt><code>get &lt;name&gt; luaQuery &lt;abfrage&gt;</code></dt>
          <br>
-         Zeigt Informations durch Abfragen der query.lua.
+         Zeigt Informations durch Abfragen der query.lua.<br>
+         abfrage: <code>&lt;queryFunction:&gt;&lt;queryRequest&gt;</code><br>
+         abfrage: <code>uimodlogic:status/uptime_hours</code> holt die Stunden, die die FritzBox seit dem letzten Neustart ununterbrochen läuft.
       </li><br>
 
       <li><a name="tr064Command"></a>
@@ -11729,7 +11739,7 @@ sub FRITZBOX_Helper_Url_Regex {
       </li><br>
 
       <li><a name="deviceInfo"></a>
-         <dt><code>deviceInfo &lt;ipv4, name, uid, connection, speed, rssi, _noDefInf_, _default_&, space, comma&gt;</code></dt>
+         <dt><code>deviceInfo &lt;ipv4, name, uid, connection, speed, rssi, statIP, _noDefInf_, _default_&, space, comma&gt;</code></dt>
          <br>
          Mit diesem Attribut kann der Inhalt der Device Readings (mac_...) gestaltet werden. Ist das Attribut nicht gesetzt, setzt
          sich der Inhalt wie folgt zusammen:<br>
