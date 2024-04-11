@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix: 72_FRITZBOX: commandRef
+               perl Warnung beim Fhem Start
+ - feature: 72_FRITZBOX: Info statische/dynamische IP Adresse Lan Device
  - feature: 76_SolarForecast: possible export pvHistory to CSV, 
                               making attr affectMaxDayVariance obsolete 
  - feature: 72_FRITZBOX: attr <name> lanDeviceReading <mac|ip>
