@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 14_CUL_TCM97001.pm: NX7674, Kuehl- & Gefrierschrank-Thermometer
+                (Rosenstein & Söhne), zugefügt
+                Bei einem modify der DEF wird nun die alte DEF gelöscht
+ - change:  14_CUL_TCM97001.pm: commandref
+ - bugfix:  14_CUL_TCM97001.pm: Kanal beim Auriol_IAN
+ - bugfix:  10_IT: Attribut ITfrequency
  - feature: 74_AutomowerConnect.pm: use widgetList for stayOutZones
             and workAreas setter, update commandref, some default values
             changed regarding design attributes

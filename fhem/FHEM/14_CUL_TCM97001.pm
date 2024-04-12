@@ -41,6 +41,7 @@
 # 05.04.2022 add Mebus HQ7312
 #            new attribute disableCreateUndefDevice: this can be used to deactivate the creation of new devices
 #            new attribute disableUnknownEvents: with this, the events can be deactivated for unknown messages
+# 15.11.2023 add NX7674: fridge and freezer thermometer
 ##############################################
 
 package main;
@@ -78,6 +79,7 @@ my %models = (
     "W174"        => 'W174',
     "W044"        => 'W044',
     "W132"        => 'W132',
+    "NX7674"      => 'NX7674'
 );
 
 sub
@@ -86,9 +88,9 @@ CUL_TCM97001_Initialize($)
   my ($hash) = @_;
 
   $hash->{Match}     = "^s....."; 
-  $hash->{DefFn}     = "CUL_TCM97001_Define";
-  $hash->{UndefFn}   = "CUL_TCM97001_Undef";
-  $hash->{ParseFn}   = "CUL_TCM97001_Parse";
+  $hash->{DefFn}     = \&CUL_TCM97001_Define;
+  $hash->{UndefFn}   = \&CUL_TCM97001_Undef;
+  $hash->{ParseFn}   = \&CUL_TCM97001_Parse;
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 " .
                         "$readingFnAttributes " .
                         "max-deviation-temp:1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50 ".
@@ -124,6 +126,7 @@ CUL_TCM97001_Initialize($)
             "W044.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},
             "W132.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},
             "Mebus7312.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},
+            "NX7674.*"    => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4:Temp,", FILTER => "%NAME", autocreateThreshold => "2:180"},
             "Unknown_.*" => { autocreateThreshold => "2:10"}
         };
 }
@@ -138,6 +141,17 @@ CUL_TCM97001_Define($$)
   return "wrong syntax: define <name> CUL_TCM97001 <code>"
         if(int(@a) < 3 || int(@a) > 5);
 
+  my $dp = $modules{CUL_TCM97001}{defptr};
+  my $old = ($dp && $dp->{$a[2]} ? $dp->{$a[2]}{NAME} : "");
+  my $olddef = $hash->{OLDDEF};
+  my $op = ($hash->{OLDDEF} ? "modify":"define");
+  my $oc = ($hash->{OLDDEF} ? $hash->{CODE} : "");
+  if ($olddef) {
+    Log3 $hash, 2 , "CUL_TCM97001_Define: a2=$a[2], dp=$dp, OLDDEF=" . $olddef . ", code=" . $hash->{CODE} . ", old=$old";
+  }
+  return "Cannot $op as the code $a[2] is already used by $old" if ($old && $oc ne $a[2]);
+  delete($modules{CUL_TCM97001}{defptr}{$oc}) if($oc);
+ 
   $hash->{CODE} = $a[2];
   $hash->{lastT} =  0;
   $hash->{lastH} =  0;
@@ -341,6 +355,27 @@ sub checkCRC_Type1 {
       #Log3 "Unknown", 5 , "CUL_TCM97001 Type1 checksum ok, crc = $CRC";
       return TRUE;
   }
+  return FALSE;
+}
+
+sub checkCRC_sduinoID33 {
+  my $hash = shift;
+  my $bitData = shift;
+  my $crc = 0;
+
+  for (my $i=0; $i < 34; $i++) {
+    if (substr($bitData, $i, 1) == ($crc & 1)) {
+      $crc >>= 1;
+    } else {
+      $crc = ($crc>>1) ^ 12;
+    }
+  }
+  $crc ^= oct("0b" . reverse(substr($bitData, 34, 4)));
+  if ($crc == oct("0b" . reverse(substr($bitData, 38, 4)))) {
+    Log3 $hash, 5 , $hash->{NAME} . ": CUL_TCM97001 sduinoID33 checksum ok, calc CRC = ref CRC = $crc";
+    return TRUE;
+  }
+  Log3 $hash, 5 , $hash->{NAME} . ": CUL_TCM97001 sduinoID3 ERROR, checksum not ok!, calc CRC = $crc, ref CRC = " . oct("0b" . reverse(substr($bitData, 38, 4)));
   return FALSE;
 }
 
@@ -821,6 +856,9 @@ CUL_TCM97001_Parse($$)
     
   } elsif (length($msg) == 12) { 
     my $bin = undef;
+    my $hlen = length($msg);
+    my $blen = $hlen * 4;
+    my $bitData = unpack("B$blen", pack("H$hlen", $msg));
     my $idType1 = hex($a[0] . $a[1]);
     #my $idType2 = hex($a[1] . $a[2]);
     #my $idType3 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
@@ -856,7 +894,7 @@ CUL_TCM97001_Parse($$)
     $readedModel = AttrVal($name, "model", "Unknown");
     Log3 $iodev, 4, "$iodev: CUL_TCM97001 Parse Name: $name , devicecode: $deviceCode , Model defined: $readedModel";
     
-    if (($readedModel eq "Eurochron" || (hex($a[6]) == 0xF && $readedModel eq "Unknown" && $hash->{TYPE} ne "SIGNALduino") && $syncBit[1] < 5000)) {
+    if (($readedModel eq "Eurochron" || (hex($a[6]) == 0xF && $readedModel eq "Unknown" && $hash->{TYPE} !~ m/^SIGNALduino/) && $syncBit[1] < 5000)) {
       # EAS 800 
       # G is every time 1111
       #
@@ -1032,9 +1070,9 @@ CUL_TCM97001_Parse($$)
         my $bitUnreverse = "";
         my $x = undef;
         my $bin3;
-        my $hlen = length($msg);
-        my $blen = $hlen * 4;
-        my $bitData = unpack("B$blen", pack("H$hlen", $msg));
+        #my $hlen = length($msg);
+        #my $blen = $hlen * 4;
+        #my $bitData = unpack("B$blen", pack("H$hlen", $msg));
         
         foreach $x (@a) {
            $bin3=sprintf("%024b",hex($x));
@@ -1231,6 +1269,49 @@ CUL_TCM97001_Parse($$)
       }
     }
     
+    #if (checkCRC_sduinoID33($hash,$bitData) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "NX7674")) {
+       # https://forum.fhem.de/index.php?topic=135692.0
+       # Rosenstein & Soehne, Kuehl- & Gefrierschrank-Thermometer
+       #
+       # 0    4    | 8    12   | 16   20   | 24   28   | 32   36   | 40
+       # 00Ii iiii | ii00 cctt | tttt tttt | tt00 0000 | 000b TTxx | xx00
+       # I: 0 - sensor 2, 1 - sensor 1
+       # i: random id (changes on power-loss)
+       # c: Channel
+       # t: Temperature
+       # b: battery indicator (0=>OK, 1=>LOW)
+       # T: Temperature trend
+       # x: crc4
+       #
+       # $temp = (oct("0b". substr($bitData,22,4) . substr($bitData,18,4) . substr($bitData,14,4)) - 1220) * 5 / 90.0;
+       # $batbit = substr($bitData,35,1) eq "0" ? 1 : 0; 
+       # $channel = substr($bitData,2,1) eq "0" ? 2 : 1;
+       # $trend = oct("0b".substr($bitData,36,2));
+       # if ($trend == 1 || $trend == 2) { # falling und rising tauschen
+       #   $trend ^= 3;
+       # }
+       # $model = "NX7674";
+       #
+       #   if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
+       #   {
+       #     Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
+       #   } else {
+       #     $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
+       #   }
+       # $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+       #  if($def) {
+       #    $name = $def->{NAME};
+       #  } else {
+       #    goto UNDEFINED_MODEL;
+       #  }
+       #  
+       # $hasbatcheck = TRUE;
+       # $haschannel = TRUE;
+       # $hastrend = TRUE;
+       # $packageOK = TRUE;
+       #
+       # $readedModel=$model;
+    # }
     
       #Log3 $name, 4, "CUL_TCM97001: CRC for TCM21.... Failed, checking other protocolls";
       # Check for Prologue
@@ -1645,7 +1726,7 @@ CUL_TCM97001_Parse($$)
         $batbit = ~$batbit & 0x1; # Bat bit umdrehen
         $mode = (hex($a[3]) & 0x8) >> 3;
         $trend = hex($a[3]) & 0x3;
-        $channel = (hex($a[10])) & 0x3;
+        $channel = (hex($a[9])) & 0x3;
 
         $model="Auriol_IAN";
 
@@ -1670,7 +1751,7 @@ CUL_TCM97001_Parse($$)
         $hashumidity = TRUE;
         #}
         $hasbatcheck = TRUE;
-        $haschannel = FALSE;
+        $haschannel = TRUE;
         $hasmode = TRUE;
         $hastrend = TRUE;
         $packageOK = TRUE;
@@ -1866,6 +1947,63 @@ CUL_TCM97001_Parse($$)
       } else {
         $name = $nameUnknown;
       }
+    }
+  } elsif (length($msg) == 14) {
+    my $hlen = length($msg);
+    my $blen = $hlen * 4;
+    my $bitData = unpack("B$blen", pack("H$hlen", $msg));
+    my $idType1 = hex($a[0] . $a[1]);
+    $deviceCode = "CUL_TCM97001_" . $idType1;
+    $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+    if($def) {
+       $name = $def->{NAME};
+    }
+    $readedModel = AttrVal($name, "model", "Unknown");
+    Log3 $iodev, 4, "$iodev: CUL_TCM97001 Parse Name: $name , devicecode: $deviceCode, Model defined: $readedModel";
+    
+    if (checkCRC_sduinoID33($hash,$bitData) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "NX7674")) {
+       # https://forum.fhem.de/index.php?topic=135692.0
+       # Rosenstein & Soehne, Kuehl- & Gefrierschrank-Thermometer
+       #
+       # 0    4    | 8    12   | 16   20   | 24   28   | 32   36   | 40
+       # 00Ii iiii | ii00 cctt | tttt tttt | tt00 0000 | 000b TTxx | xx00
+       # I: 0 - sensor 1, 1 - sensor 2
+       # i: random id (changes on power-loss)
+       # c: Channel
+       # t: Temperature
+       # b: battery indicator (0=>OK, 1=>LOW)
+       # T: Temperature trend
+       # x: crc4
+       #
+       # dmsg s114735400540E3 T: 15.6, Bat: ok, CH: 1
+       $temp = (oct("0b". substr($bitData,22,4) . substr($bitData,18,4) . substr($bitData,14,4)) - 1220) * 5 / 90.0;
+       $batbit = substr($bitData,35,1) eq "0" ? 1 : 0; 
+       $channel = substr($bitData,2,1) eq "0" ? 1 : 2;
+       $trend = oct("0b".substr($bitData,36,2));
+       if ($trend == 1 || $trend == 2) { # falling und rising tauschen
+         $trend ^= 3;
+       }
+       $model = "NX7674";
+       
+         if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
+         {
+           Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
+         } else {
+           $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
+         }
+       $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+       if($def) {
+         $name = $def->{NAME};
+       } else {
+         goto UNDEFINED_MODEL;
+       }
+         
+       $hasbatcheck = TRUE;
+       $haschannel = TRUE;
+       $hastrend = TRUE;
+       $packageOK = TRUE;
+       
+       $readedModel=$model;
     }
   }
   
@@ -2243,7 +2381,7 @@ sub do_undefModelReading {
 
 =begin html_DE
 
-<a name="CUL_TCM97001"></a>
+<a id="CUL_TCM97001"></a>
 <h3>CUL_TCM97001</h3>
 <ul>
   Das CUL_TCM97001 Modul verarbeitet von einem IO Ger&auml;t (CUL, CUN, SIGNALDuino, etc.) empfangene Nachrichten von Temperatur \ Wind \ Rain - Sensoren.<br>
@@ -2274,7 +2412,7 @@ sub do_undefModelReading {
   Neu empfangene Sensoren werden in der fhem Kategory CUL_TCM97001 per autocreate angelegt.
   <br><br>
 
-  <a name="CUL_TCM97001_Define"></a>
+  <a id="CUL_TCM97001-define"></a>
   <b>Define</b> 
   <ul>Die empfangenen Sensoren werden automatisch angelegt.<br>
   Die ID der angelegten Sensoren sind die ersten zwei HEX Werte des empfangenen Paketes in dezimaler Schreibweise.<br>
@@ -2296,27 +2434,66 @@ sub do_undefModelReading {
    <li>windgust: Windb&ouml;e</li>
   </ul>
   <br>
+  <a id="CUL_TCM97001-attr"></a>
   <b>Attribute</b>
   <ul>
+    <a id="CUL_TCM97001-attr-IODev"></a>
     <li><a href="#IODev">IODev</a>
       Spezifiziert das physische Ger&auml;t, das die Ausstrahlung der Befehle f&uuml;r das 
       "logische" Ger&auml;t ausf&uuml;hrt. Ein Beispiel f&uuml;r ein physisches Ger&auml;t ist ein CUL.<br>
       </li>
-    <li>disableCreateUndefDevice<br>
+    <a id="CUL_TCM97001-attr-disableCreateUndefDevice"></a>
+    <li>disableCreateUndefDevice (nur beim device Unknown)<br>
          damit kann das Anlegen neuer Devices deaktiviert werden<br>
          die neuen Devices (Modell + ID, ioname, Anzahl) werden im Device Unknown in den readings "undefModel_a" und "undefModel_b" gespeichert</li>
-    <li>disableUnknownEvents<br>
+    <a id="CUL_TCM97001-attr-disableUnknownEvents"></a>
+    <li>disableUnknownEvents (nur beim device Unknown)<br>
          damit k&ouml;nnen die events bei unbekannten Nachrichten deaktiviert werden</li>
+    <a id="CUL_TCM97001-attr-do_not_notify"></a>
     <li><a href="#do_not_notify">do_not_notify</a></li>
+    <a id="CUL_TCM97001-attr-ignore"></a>
     <li><a href="#ignore">ignore</a></li>
-    <li><a href="#model">model</a> (ABS700, AURIOL, Auriol_IAN, GT_WT_02, KW9010, NC_WS, PFR-130, Prologue, Rubicson, TCM21...., TCM218943, TCM97…, Unknown, W044, W132, W174)</li>
+    <a id="CUL_TCM97001-attr-model"></a>
+    <li>model (L&auml;nge = Codel&auml;nge + 2)<br>
+    L&auml;nge = 8 (nur Temp)<br>
+    - ABS700<br>
+    - TCM97...<br>
+    L&auml;nge = 10 (nur Temp)<br>
+    - Mebus (CRC)<br>
+    - AURIOL<br>
+    - Auriol_Z31743B (Lidl Version: 09/2013), Z31743B IAN 91838 (checksum)<br>
+    L&auml;nge = 12<br>
+    - Eurochron<br>
+    - W174 (CRC)<br>
+    - TCM21.... (CRC)<br>
+    - W044 (CRC)<br>
+    - W132 (CRC)<br>
+    - GT_WT_02 (CRC)<br>
+    - Type1 (CRC)<br>
+    - Prologue (beginnt mit 9)<br>
+    - NC_WS (beginnt mit 5)<br>
+    - Rubicson (3. Stelle ist 8)<br>
+    - PFR_130 (CRC)<br>
+    - KW9010 und KW9015(CRC)<br>
+    - Auriol_IAN<br>
+    - Mebus7312 (7. Stelle ist F)<br>
+    - AURIOL nur Temp (Lidl Version: 09/2013), Z31743B IAN 91838<br>
+    - TCM218943<br>
+    L&auml;nge = 14<br>
+    - NX7674 (CRC)</li>
+    <a id="CUL_TCM97001-attr-max-deviation-temp"></a>
     <li>max-deviation-temp: (Default:1, erlaubte Werte: 1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50)<br>
          Maximal erlaubte Abweichung der gemessenen Temperatur zum vorhergehenden Wert in Kelvin.</li>
+    <a id="CUL_TCM97001-attr-max-diff-rain"></a>
     <li>max-diff-rain: Default:0 (deaktiviert)<br>
          Maximal erlaubte Abweichung der Regenmenge zum vorhergehenden Wert in l/qm.</li>
+    <a id="CUL_TCM97001-attr-negation-batt"></a>
     <li>negation-batt: Battery reading invertieren</li>
+    <a id="CUL_TCM97001-attr-showtime"></a>
     <li><a href="#showtime">showtime</a></li>
+    <a id="CUL_TCM97001-attr-readingFnAttributes"></a>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <a id="CUL_TCM97001-attr-windDirectionInverse"></a>
     <li>windDirectionInverse: Wenn der Windmesser auf dem Kopf montiert wurde, kann damit die Windrichtung herumgedreht werden.</li>
   </ul>
 
