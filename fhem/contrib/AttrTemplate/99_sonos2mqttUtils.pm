@@ -498,7 +498,7 @@ if ( $1 eq $uuid or $1 eq $player ) {
 1;
 =pod
 =item summary    generic MQTT2 Sonos Devices based on sonos2mqtt.
-=item summary_DE generische MQTT2 Sonos Ger&#228;te auf Basis von sonos2mqtt
+=item summary_DE generische MQTT2 Sonos Geraete auf Basis von sonos2mqtt
 =begin html
 
 Some Subroutines for generic MQTT2 Sonos Devices based on sonos2mqtt.
@@ -506,7 +506,7 @@ Some Subroutines for generic MQTT2 Sonos Devices based on sonos2mqtt.
 =end html
 =begin html_DE
 
-Enthaelt einige Subroutinen fuer generische MQTT2 Sonos Ger&#228;te auf Basis von sonos2mqtt.
+Enthaelt einige Subroutinen fuer generische MQTT2 Sonos Geraete auf Basis von sonos2mqtt.
 
 =end html_DE
 =cut
