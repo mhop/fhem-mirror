@@ -397,6 +397,66 @@ function AutomowerConnectGetHull ( path ) {
 
 }
 
+function AutomowerConnectSubtractHull ( path ) {
+  $.getJSON( path, function( data, textStatus ) {
+    console.log( 'AutomowerConnectGetHull ( \''+path+'\' ): status '+textStatus );
+
+    if ( textStatus == 'success') {
+      // data.name, data.type, data.picx, data.picy, data.scalx, data.scaly, data.errdesc, data.posxy, data.poserrxy );
+      const div = document.getElementById(data.type+'_'+data.name+'_div');
+      const pos =data.posxy;
+
+      if ( div && div.getAttribute( 'data-hullSubtract' ) && typeof hull === "function" ){
+        const wypts = [];
+        const hsub = div.getAttribute( 'data-hullSubtract' );
+        const wyres = div.getAttribute( 'data-hullResolution' );
+        var hullpts = [];
+
+        for ( let i = 0; i < pos.length; i+=3 ){
+
+          if ( pos[i+2] == "M") wypts.push( [ pos[i], pos[i+1] ] );
+
+        }
+
+        for ( let i = 0; i < hsub; i++ ){
+
+          if ( wypts.length > 50 ) {
+
+            hullpts = hull( wypts, wyres );
+            
+            for ( let k = 0; k < hullpts.length; k++ ){
+
+              for ( let m = 0; m < wypts.length; m++ ){
+
+                if ( hullpts[k][0] == wypts[m][0] && hullpts[k][1] == wypts[m][1] ) {
+
+                  wypts.splice( m, 1 );
+                  break;
+                  //~ m--;
+                  //~ k++;
+
+                }
+
+              }
+
+            }
+
+          }
+
+          hullpts = hull( wypts, wyres );
+
+        }
+
+       FW_cmd( FW_root+"?cmd=attr "+data.name+" mowingAreaHull "+JSON.stringify( hullpts )+"&XHR=1",function(data){setTimeout(()=>{window.location.reload()},500)} );
+
+      }
+
+    }
+
+  });
+
+}
+
 //AutomowerConnectUpdateDetail (<devicename>, <type>, <detailfnfirst>, <imagesize x>, <imagesize y>, <scale x>, <scale y>, <error description>, <path array>, <error array>, <hull array>)
 function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, scalx, scaly, errdesc, pos, erray, hullxy) {
   const colorat = {

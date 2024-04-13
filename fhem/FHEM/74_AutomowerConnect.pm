@@ -118,6 +118,9 @@ __END__
     <li>The mower path is shown in the detail view.</li>
     <li>An arbitrary map can be used as background for the mower path.</li>
     <li>The map has to be a raster image in webp, png or jpg format.</li>
+    <li>The property limits can be registered manually.</li>
+    <li>The mowing area limits can be registered manually.</li>
+    <li>The mowing area limits can be calculated, alternatively.</li>
     <li>It's possible to control everything the API offers, e.g. schedule, headlight, cutting height and actions like start, pause, park etc. </li>
     <li>Zones are definable. </li>
     <li>Cutting height can be set for each zone differently. </li>
@@ -302,6 +305,7 @@ __END__
         hullConnector="1"<br>
         hullResolution="40"<br>
         hullCalculate="1"<br>
+        hullSubtract=""<br>
         propertyLimitsColor="#33cc33"<br>
         propertyLimitsLineWidth="1"<br>
         propertyLimitsConnector="1"<br>
@@ -455,6 +459,10 @@ __END__
       The calculation is done only after site reload.<br>
       The calculation of hull is stopped when the attribute ist set and starts again when attribute is deleted.<br>
       The attribute <code>weekdaysToResetWayPoints</code> should be set to - and also the design attribute <code>mowingPathUseDots</code> should be set to "1" until the hull is sufficient.
+      If there is a polygon in attribute, it can be changed.<br>
+      The design attribute <code>hullSubtract</code> can be set to a natural number {&#8469;}, it depicts the recursion depth in which polygon points removed from way points.<br>
+      This reduces spikes in border region.<br>
+      <code>hullSubtract=""</code> removes the button 'Subtract Hull'.<br>
       
     </li>
 
@@ -551,6 +559,9 @@ __END__
     <li>Der Pfad des Mähroboters wird in der Detailansicht des FHEMWEB Frontends angezeigt.</li>
     <li>Der Pfad kann mit einer beliebigen Karte hinterlegt werden.</li>
     <li>Die Karte muss als Rasterbild im webp, png oder jpg Format vorliegen.</li>
+    <li>Die Grundstücksgrenze kann manuell eingetragen werden.</li>
+    <li>Die Die Mähflächengrenze kann manuell eingetragen werden.</li>
+    <li>Alternativ kann die Mähflächengrenze berechnet werden.</li>
     <li>Es ist möglich alles was die API anbietet zu steuern, z.B. Mähplan,Scheinwerfer, Schnitthöhe und Aktionen wie, Start, Pause, Parken usw. </li>
     <li>Zonen können selbst definiert werden. </li>
     <li>Die Schnitthöhe kann je selbstdefinierter Zone eingestellt werden. </li>
@@ -737,6 +748,7 @@ __END__
         hullConnector="1"<br>
         hullResolution="40"<br>
         hullCalculate="1"<br>
+        hullSubtract=""<br>
         propertyLimitsColor="#33cc33"<br>
         propertyLimitsLineWidth="1"<br>
         propertyLimitsConnector="1"<br>
@@ -893,7 +905,11 @@ __END__
       Das Hüllenpolygon wird berechnet wenn das Designattribute gesetzt ist, <code>hullCalculate="1"</code> und es mehr als 50 Wegpunkte der Aktivität MOWING gibt.<br>
       Die Berechnung wird beim Laden oder Wiederladen der Website ausgeführt.<br>
       Die Berechnung stopt wenn dieses Attribut gesetzt ist und startet wenn das Attibut gelöscht wird.<br>
-      Das Attribut <code>weekdaysToResetWayPoints</code> sollte auf <code>-</code> und das Designattribut <code>mowingPathUseDots</code> sollte auf <code>"1"</code> gesetzt werden, bis das Polygon die Hülle der Mähfläche zufriedenstellend abbildet.
+      Das Attribut <code>weekdaysToResetWayPoints</code> sollte auf <code>-</code> und das Designattribut <code>mowingPathUseDots</code> sollte auf <code>"1"</code> gesetzt werden.<br>
+      Befindet sich ein Polygon im Attribut, besteht die Möglichkeit das Polygon anzupassen.<br>
+      Das Designattribut <code>hullSubtract</code> kann auf eine natürliche Zahl {&#8469;} gesetzt werden, die angibt in welcher Rekursionstiefe Polygonpunkte aus der Menge der Wegpunkte entfernt werden.<br>
+      Das reduziert Ausreißer im Randbereich der vom Polygon umschlossenen Fläche.<br>
+      Wenn <code>hullSubtract=""</code> gesetzt wird, dann wird der Button 'Subtract Hull' entfernt.<br>
     </li>
 
      <li><a href="disable">disable</a></li>

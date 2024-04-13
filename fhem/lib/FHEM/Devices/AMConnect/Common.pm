@@ -133,6 +133,7 @@ hullLineWidth="1"
 hullConnector="1"
 hullResolution="40"
 hullCalculate="1"
+hullSubtract=""
 propertyLimitsColor="#33cc33"
 propertyLimitsLineWidth="1"
 propertyLimitsConnector="1"
@@ -585,6 +586,8 @@ sub FW_detailFn {
   $ret .= "</div>";
   $ret .= "<button title='Sends the hull polygon points to attribute mowingAreaHull.' onclick='AutomowerConnectGetHull( \"$FW_ME/$type/$name/json\" )'>mowingAreaHullToAttribute</button>"
           if ( -e "$FW_dir/$hash->{helper}{FWEXTA}{path}/$hash->{helper}{FWEXTA}{file}" && !AttrVal( $name,'mowingAreaHull','' ) && $$mapDesign =~ m/hullCalculate="1"/g );
+  $ret .= "<button title='Subtracts hull polygon points from way points. To hide button set hullSubtract=\"\".' onclick='AutomowerConnectSubtractHull( \"$FW_ME/$type/$name/json\" )'>Subtract Hull</button>"
+          if ( -e "$FW_dir/$hash->{helper}{FWEXTA}{path}/$hash->{helper}{FWEXTA}{file}" && AttrVal( $name,'mowingAreaHull','' ) && $$mapDesign =~ m/hullSubtract="\d+"/g );
   $ret .= "<br>";
   $hash->{helper}{detailFnFirst} = 1;
   my $mid = $hash->{helper}{map_init_delay};
