@@ -36,7 +36,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '5.0 2024-03';
+my $HMCCURPCPROC_VERSION = '5.0 2024-04';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -1624,6 +1624,7 @@ sub HMCCURPCPROC_StartRPCServer ($)
 
 	$hash->{hmccu}{rpc}{clkey}  = $clkey;
 	$hash->{hmccu}{rpc}{cbport} = $callbackport;
+	$hash->{callback} = "$localaddr:$callbackport";
 
 	# Start RPC server process
 	my $rpcpid = fhemFork ();
