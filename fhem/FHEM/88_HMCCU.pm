@@ -7546,7 +7546,6 @@ sub HMCCU_DisplayWeekProgram ($$$;$$)
 
 	if (defined($cmd->{min}) && HMCCU_IsIntNum($cmd->{min}) && $cmd->{min} > 0) {
 		$program -= $cmd->{min};
-		HMCCU_Log ($clHash, 2, "program = $program, was ".$program+$cmd->{min});
 	}
 
 	my $s = '<html>';
