@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  49_SSCam: change internal logic for sending data and their Saving
  - change: 10_SOMFY.pm: Signalduino modif and doc cleanup - msg1298875
  - feature: 74_AutomowerConnect.pm: reduce spikes in border region after a hull
               polygon is set to attribut.

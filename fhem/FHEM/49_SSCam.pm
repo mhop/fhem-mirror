@@ -192,6 +192,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.11.2" => "14.04.2024  internal change logic for sending data via telegram, email, chat and their Saving ",
   "9.11.1" => "03.04.2024  send Data: check if SSChatBot / TelegramBot device is disabled ",
   "9.11.0" => "14.02.2023  Telegram send attributes extended by key option => silent, peer can be fetch from r:<reading> ",
   "9.10.9" => "22.01.2023  substitution of \$#TIME corrected ",
@@ -202,97 +203,6 @@ my %vNotesIntern = (
   "9.10.5" => "01.07.2022  fix noQuotesForSID using in streaming devices type mjpeg ",
   "9.10.4" => "03.06.2022  avoid warning 'No data for Cache with key: {LASTSNAP}' if no snap exists ",
   "9.10.3" => "23.11.2022  made SYNO.SurveillanceStation.AudioStream, SYNO.SurveillanceStation.VideoStream optional for SVS compatibility to 9.0.0 ",
-  "9.10.2" => "03.11.2021  set SVS compatibility to 8.2.10 ",
-  "9.10.1" => "18.07.2021  set SVS compatibility to 8.2.9 ",
-  "9.10.0" => "03.07.2021  change getApiSites_Parse for better simu_SVSversion, new value 8.2.8-xxxx for attr simu_SVSversion ",
-  "9.9.0"  => "21.05.2021  new get command saveLastSnap ",
-  "9.8.5"  => "22.02.2021  remove sscam_tooltip.js, substitute /fhem by \$FW_ME ",
-  "9.8.4"  => "20.02.2021  sub Define minor fix ",
-  "9.8.3"  => "29.11.2020  fix cannot send snaps/recs if snapTelegramTxt + snapChatTxt and no cacheType (cacheType=internal) is set ",
-  "9.8.2"  => "04.10.2020  use showStoredCredentials from SMUtils ",
-  "9.8.1"  => "28.09.2020  align getApiSites_Parse to other syno modules ",
-  "9.8.0"  => "27.09.2020  optimize getApiSites_Parse, new getter apiInfo ",
-  "9.7.26" => "26.09.2020  use moduleVersion and other from SMUtils ",
-  "9.7.25" => "25.09.2020  change FHEM::SSChatBot::addQueue to FHEM::SSChatBot::addSendqueue ",
-  "9.7.24" => "24.09.2020  optimize prepareSendData ",
-  "9.7.23" => "23.09.2020  setVersionInfo back from SMUtils, separate prepareSendData ",
-  "9.7.22" => "22.09.2020  bugfix error condition if try new login in some cases ",
-  "9.7.21" => "21.09.2020  control parse function by the hparse hash step 4 ",
-  "9.7.20" => "20.09.2020  control parse function by the hparse hash step 3 (refactored getsnapinfo, getsnapgallery, runView Snap) ",
-  "9.7.19" => "18.09.2020  control parse function by the hparse hash step 2 ",
-  "9.7.18" => "16.09.2020  control parse function by the hparse hash ",
-  "9.7.17" => "13.09.2020  optimize _Oprunliveview ",
-  "9.7.16" => "12.09.2020  function _Oprunliveview to execute livestream (no snap / HLS) in new camOp variant ",
-  "9.7.15" => "12.09.2020  changed audiolink handling to new execution variant in camOp ",
-  "9.7.14" => "10.09.2020  bugfix in reactivation HLS streaming ",
-  "9.7.13" => "10.09.2020  optimize liveview handling ",
-  "9.7.12" => "09.09.2020  implement new getApiSites usage, httptimeout default value increased to 20s, fix setting motdetsc ",
-  "9.7.11" => "07.09.2020  implement new camOp control ",
-  "9.7.10" => "06.09.2020  rebuild timer sequences, minor fixes ",
-  "9.7.9"  => "05.09.2020  more refactoring according PBP ",
-  "9.7.8"  => "02.09.2020  refactored setter: pirSensor runPatrol goAbsPTZ move runView hlsreactivate hlsactivate refresh ".
-                           "extevent stopView setPreset setHome, camOP_parse for extevent, use setReadingErrorNone from SMUtils ".
-                           "fix setting CamNTPServer",
-  "9.7.7"  => "01.09.2020  minor fixes, refactored setter: createReadingsGroup enable disable motdetsc expmode homeMode ".
-                           "autocreateCams goPreset optimizeParams ",
-  "9.7.6"  => "31.08.2020  refactored setter: snapGallery createSnapGallery createPTZcontrol createStreamDev, minor bugfixes ",
-  "9.7.5"  => "30.08.2020  some more code review and optimisation, exitOnDis with fix check Availability instead of state ",
-  "9.7.4"  => "29.08.2020  some code changes ",
-  "9.7.3"  => "29.08.2020  move login, loginReturn, logout, logoutReturn, setActiveToken, delActiveToken to SMUtils.pm ".
-                           "move expErrorsAuth, expErrors to ErrCodes.pm",
-  "9.7.2"  => "26.08.2020  move setCredentials, getCredentials, evaljson to SMUtils.pm ",
-  "9.7.1"  => "25.08.2020  switch to lib/FHEM/SynoModules/API.pm and lib/FHEM/SynoModules/SMUtils.pm ".
-                           "move __getPtzPresetList, __getPtzPatrolList to return path of OpMOde Getcaminfo ",
-  "9.7.0"  => "17.08.2020  compatibility to SSChatBot version 1.10.0 ",
-  "9.6.1"  => "13.08.2020  avoid warnings during FHEM shutdown/restart ",
-  "9.6.0"  => "12.08.2020  new attribute ptzNoCapPrePat ",
-  "9.5.3"  => "27.07.2020  fix warning: Use of uninitialized value in subroutine dereference at ... ",
-  "9.5.2"  => "26.07.2020  more changes according PBP level 3, minor fixes ",
-  "9.5.1"  => "24.07.2020  set compatibility to 8.2.8, some changes according PBP level 3 ",
-  "9.5.0"  => "15.07.2020  streamDev master type added, comref revised ",
-  "9.4.5"  => "15.07.2020  fix crash while autocreate CommandDelete, CommandSave is missing ",
-  "9.4.4"  => "14.07.2020  fix crash while autocreate makeDeviceName is missing ",
-  "9.4.3"  => "13.07.2020  streamDev refactored, comref revised ",
-  "9.4.2"  => "11.07.2020  more changes according PBP level 3, headline PTZ Control, revised comref ",
-  "9.4.1"  => "05.07.2020  new Zoom icons ",
-  "9.4.0"  => "01.07.2020  switch to packages, much more changes according PBP ",
-  "9.3.0"  => "21.06.2020  SVS device 'inctive' if disabled, add zoom capability, much more internal code changes ",
-  "9.2.3"  => "30.05.2020  change SSChatBot_formText to SSChatBot_formString ",
-  "9.2.2"  => "14.04.2020  increase read timeout of Redis server cache, fix autocreate bug with https ",
-  "9.2.1"  => "24.02.2020  set compatibility to SVS version 8.2.7 ",
-  "9.2.0"  => "10.12.2019  attribute \"recChatTxt\" for sending recordings by SSChatBot ",
-  "9.1.0"  => "08.12.2019  attribute \"snapChatTxt\" for sending snapshots by SSChatBot ",
-  "9.0.6"  => "26.11.2019  minor code change ",
-  "9.0.5"  => "22.11.2019  commandref revised ",
-  "9.0.4"  => "18.11.2019  fix FHEM crash when sending data by telegramBot, Forum: https://forum.fhem.de/index.php/topic,105486.0.html ",
-  "9.0.3"  => "04.11.2019  change send Telegram routines, undef variables, fix cache and transaction coding, fix __sendEmailblocking ",
-  "9.0.2"  => "03.11.2019  change Streamdev type \"lastsnap\" use \$data Hash or CHI cache ",
-  "9.0.1"  => "02.11.2019  correct snapgallery number of snaps in case of cache usage, fix display number of retrieved snaps ",
-  "9.0.0"  => "26.10.2019  finalize all changes beginning with 8.20.0 and revised commandref ",
-  "8.23.0" => "26.10.2019  new attribute \"debugCachetime\" ",
-  "8.22.0" => "23.10.2019  implement CacheCache driver for CHI ",
-  "8.21.0" => "20.10.2019  implement Redis driver for CHI ",
-  "8.20.0" => "19.10.2019  implement caching with CHI, implement {SENDCOUNT} ",
-  "8.19.6" => "14.10.2019  optimize memory usage of composeGallery ",
-  "8.19.5" => "13.10.2019  change FH to Data in __sendEmailblocking, save variables ",
-  "8.19.4" => "11.10.2019  further optimize memory usage when send recordings by email and/or telegram ",
-  "8.19.3" => "09.10.2019  optimize memory usage when send images and recordings by email and/or telegram ",
-  "8.19.2" => "06.10.2019  delete key/value pairs in __extractForTelegram and sendEmailblocking, ".
-                           "change datacontainer of SNAPHASH(OLD) from %defs to %data ",
-  "8.19.1" => "26.09.2019  set compatibility to 8.2.6 ",
-  "8.19.0" => "21.09.2019  support attr \"hideAudio\" SSCamSTRM-device ",
-  "8.18.2" => "19.09.2019  sample streams changed in comref, support of attr noLink in Streaming-Device ",
-  "8.18.1" => "18.09.2019  fix warnings, Forum: https://forum.fhem.de/index.php/topic,45671.msg975610.html#msg975610 ",
-  "8.18.0" => "13.09.2019  change usage of own hashes to central %data hash, release unnecessary allocated memory ",
-  "8.17.0" => "12.09.2019  fix warnings, support hide buttons in streaming device, change handle delete SNAPOLDHASH ",
-  "8.16.3" => "13.08.2019  commandref revised ",
-  "8.16.2" => "17.07.2019  change function ptzPanel using css stylesheet ",
-  "8.16.1" => "16.07.2019  fix warnings ",
-  "8.16.0" => "14.07.2019  change detail link generation from SSCamSTRM to SSCam ",
-  "8.15.2" => "14.07.2019  fix order of snaps in snapgallery when adding new snaps, fix english date formating in composeGallery, ".
-                           "align center of FTUI table, set compatibility to 8.2.5 ",
-  "8.15.1" => "11.07.2019  enhancement and bugfixes for refresh of SSCamSTRM devices (integrate FUUID) ",
-  "8.15.0" => "09.07.2019  support of SSCamSTRM get function and FTUI widget ",
   "1.0.0"  => "12.12.2015  initial, changed completly to HttpUtils_NonblockingGet "
 );
 
@@ -688,13 +598,22 @@ my $todef             = 20;                                # httptimeout default
 
  my @simus  = qw(7.1-xxxx 7.2-xxxx 8.0.0-xxxx
                  8.1.5-xxxx 8.2.0-xxxx 8.2.8-xxxx
-                );                                         # mögliche Simulationsversionen
+                );                                          # mögliche Simulationsversionen
 
-#use vars qw($FW_ME);                                      # webname (default is fhem), used by 97_GROUP/weblink
-#use vars qw($FW_subdir);                                  # Sub-path in URL, used by FLOORPLAN/weblink
-#use vars qw($FW_room);                                    # currently selected room
-#use vars qw($FW_detail);                                  # currently selected device for detail view
-#use vars qw($FW_wname);                                   # Web instance
+# use vars qw($FW_ME);                                      # webname (default is fhem), used by 97_GROUP/weblink
+# use vars qw($FW_subdir);                                  # Sub-path in URL, used by FLOORPLAN/weblink
+# use vars qw($FW_room);                                    # currently selected room
+# use vars qw($FW_detail);                                  # currently selected device for detail view
+# use vars qw($FW_wname);                                   # Web instance
+
+# $data{SSCam}{$name}{PARAMS}
+# $data{SSCam}{$name}{SENDCOUNT}
+# $data{SSCam}{$name}{SENDRECS}
+# $data{SSCam}{$name}{SENDSNAPS}
+# $data{SSCam}{$name}{LASTSNAP}
+# $data{SSCam}{$name}{SNAPHASH}
+# $data{SSCam}{$name}{SNAPOLDHASH}
+# $data{SSCam}{$name}{UNI}                                  # Universelle Nutzung
 
 #############################################################################################
 #                                       Hint Hash EN
@@ -1425,7 +1344,7 @@ sub Attr {
     }
 
     if ($aName eq "snapGallerySize") {
-        if($cmd eq "set") {
+        if ($cmd eq "set") {
             $do = ($aVal eq "Icon")?1:2;
         }
         $do = 0 if($cmd eq "del");
@@ -1446,12 +1365,12 @@ sub Attr {
     }
 
     if ($aName eq "snapGalleryBoost") {
-        if($cmd eq "set") {
+        if ($cmd eq "set") {
             $do = ($aVal == 1) ? 1 : 0;
         }
         $do = 0 if($cmd eq "del");
 
-        if($do == 0) {
+        if ($do == 0) {
             delete($hash->{HELPER}{".SNAPHASH"});  # Snaphash löschen
             Log3($name, 4, "$name - Snapshot hash deleted");
 
@@ -1472,9 +1391,10 @@ sub Attr {
 
     if ($aName eq "snapGalleryNumber" && AttrVal($name,"snapGalleryBoost",0)) {
         my ($slim,$ssize);
-        if($cmd eq "set") {
+        if ($cmd eq "set") {
             $do = ($aVal != 0) ? 1 : 0;
         }
+        
         $do = 0 if($cmd eq "del");
 
         if ($do == 0) {
@@ -1484,7 +1404,7 @@ sub Attr {
             $slim = $aVal;
         }
 
-        if($init_done == 1) {
+        if ($init_done == 1) {
             delete($hash->{HELPER}{".SNAPHASH"});                                               # bestehenden Snaphash löschen
             $hash->{HELPER}{GETSNAPGALLERY} = 1;
             my $sg                          = AttrVal($name,"snapGallerySize","Icon");          # Auflösung Image
@@ -1496,13 +1416,14 @@ sub Attr {
     }
 
     if ($aName eq "snapReadingRotate") {
-        if($cmd eq "set") {
+        if ($cmd eq "set") {
             $do = ($aVal) ? 1 : 0;
         }
+        
         $do = 0 if($cmd eq "del");
-        if(!$do) {$aVal = 0}
+        if (!$do) {$aVal = 0}
         for my $i (1..10) {
-            if($i>$aVal) {
+            if ($i>$aVal) {
                 readingsDelete($hash, "LastSnapFilename$i" );
                 readingsDelete($hash, "LastSnapId$i"       );
                 readingsDelete($hash, "LastSnapTime$i"     );
@@ -1518,14 +1439,14 @@ sub Attr {
         InternalTimer       (gettimeofday()+0.5, "FHEM::SSCam::__getCaminfoAll", $hash, 0);
     }
 
-    if($aName =~ m/pollcaminfoall/ && $init_done == 1) {
+    if ($aName =~ m/pollcaminfoall/ && $init_done == 1) {
         RemoveInternalTimer ($hash,              "FHEM::SSCam::__getCaminfoAll"          );
         InternalTimer       (gettimeofday()+1.0, "FHEM::SSCam::__getCaminfoAll", $hash, 0);
         RemoveInternalTimer ($hash,              "FHEM::SSCam::wdpollcaminfo"            );
         InternalTimer       (gettimeofday()+1.5, "FHEM::SSCam::wdpollcaminfo",   $hash, 0);
     }
 
-    if($aName =~ m/pollnologging/ && $init_done == 1) {
+    if ($aName =~ m/pollnologging/ && $init_done == 1) {
         RemoveInternalTimer ($hash,              "FHEM::SSCam::wdpollcaminfo"          );
         InternalTimer       (gettimeofday()+1.0, "FHEM::SSCam::wdpollcaminfo", $hash, 0);
     }
@@ -1534,17 +1455,20 @@ sub Attr {
         if ($aName =~ m/httptimeout|snapGalleryColumns|rectime|pollcaminfoall/x) {
             unless ($aVal =~ /^\d+$/x) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
         }
-        if($aName =~ m/pollcaminfoall/x) {
+        
+        if ($aName =~ m/pollcaminfoall/x) {
             return "The value of \"$aName\" has to be greater than 10 seconds." if($aVal <= 10);
         }
-        if($aName =~ m/cacheServerParam/x) {
+        
+        if ($aName =~ m/cacheServerParam/x) {
             return "Please provide the Redis server parameters in form: <Redis-server address>:<Redis-server port> or unix:</path/to/sock>" if($aVal !~ /:\d+$|unix:.+$/x);
             my $type = AttrVal($name, "cacheType", "internal");
             if($hash->{HELPER}{CACHEKEY} && $type eq "redis") {
                 cache($name, "c_destroy");
             }
         }
-        if($aName =~ m/snapChatTxt|recChatTxt/x) {
+        
+        if ($aName =~ m/snapChatTxt|recChatTxt/x) {
             return "When you want activate \"$aName\", you have to set first the attribute \"videofolderMap\" to the root folder ".
                    "of recordings and snapshots provided by an URL.\n".
                    "Example: http://server.domain:8081/surveillance "
@@ -1586,7 +1510,8 @@ sub Set {
       $setlist = "Unknown argument $opt, choose one of ".
                  "credentials "
                  ;
-  } elsif(IsModelCam($hash)) {
+  } 
+  elsif (IsModelCam($hash)) {
       # selist für Cams
       my $hlslfw = IsCapHLS($hash) ? ",live_fw_hls," : ",";
 
@@ -1646,7 +1571,7 @@ sub Set {
   };
 
   no strict "refs";                                                        ## no critic 'NoStrict'
-  if($hset{$opt} && defined &{$hset{$opt}{fn}}) {
+  if ($hset{$opt} && defined &{$hset{$opt}{fn}}) {
       my $ret = q{};
 
       if (!$hash->{CREDENTIALS} && $hset{$opt}{needcred}) {
@@ -1736,17 +1661,17 @@ sub _seton {                             ## no critic "not used"
   $hash->{HELPER}{INFORM} = $inf if($inf);
 
   my $emtxt = AttrVal($name, "recEmailTxt", "");
-  if($spec =~ /recEmailTxt:/x) {
+  if ($spec =~ /recEmailTxt:/x) {
       ($emtxt) = $spec =~ m/recEmailTxt:"(.*)"/xi;
   }
 
-  if($emtxt) {                                               # Recording soll per Email versendet werden, recEmailTxt muss sein:  subject => <Subject-Text>, body => <Body-Text>
+  if ($emtxt) {                                               # Recording soll per Email versendet werden, recEmailTxt muss sein:  subject => <Subject-Text>, body => <Body-Text>
       if (!$hash->{SMTPCREDENTIALS}) {return "Due to \"recEmailTxt\" is set, you want to send recordings by email but SMTP credentials are not set - make sure you've set credentials with \"set $name smtpcredentials username password\"";}
       $hash->{HELPER}{SMTPRECMSG} = $emtxt;
   }
 
   my $teletxt = AttrVal($name, "recTelegramTxt", "");
-  if($spec =~ /recTelegramTxt:/x) {
+  if ($spec =~ /recTelegramTxt:/x) {
       ($teletxt) = $spec =~ m/recTelegramTxt:"(.*)"/xi;
   }
 
@@ -1755,7 +1680,7 @@ sub _seton {                             ## no critic "not used"
   }
 
   my $chattxt = AttrVal($name, "recChatTxt", "");
-  if($spec =~ /recChatTxt:/x) {
+  if ($spec =~ /recChatTxt:/x) {
       ($chattxt) = $spec =~ m/recChatTxt:"(.*)"/xi;
   }
 
@@ -1834,7 +1759,7 @@ sub _setsnap {                           ## no critic "not used"
   }
 
   my $teletxt = AttrVal ($name, "snapTelegramTxt", "");
-  if($spec =~ /snapTelegramTxt:/x) {
+  if ($spec =~ /snapTelegramTxt:/x) {
       ($teletxt) = $spec =~ m/snapTelegramTxt:"(.*)"/xi;
   }
 
@@ -1843,7 +1768,7 @@ sub _setsnap {                           ## no critic "not used"
   }
 
   my $chattxt = AttrVal ($name, "snapChatTxt", "");
-  if($spec =~ /snapChatTxt:/x) {
+  if ($spec =~ /snapChatTxt:/x) {
       ($chattxt) = $spec =~ m/snapChatTxt:"(.*)"/xi;
   }
 
@@ -1851,13 +1776,13 @@ sub _setsnap {                           ## no critic "not used"
       $hash->{HELPER}{CHATMSG} = $chattxt;
   }
 
-  __camSnap("$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$chattxt");
+  __camSnap ("$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$chattxt");
 
 return;
 }
 
 ################################################################
-#                      Setter snapCams
+#                      Setter snapCams (in SVS)
 ################################################################
 sub _setsnapCams {                       ## no critic "not used"
   my $paref = shift;
@@ -1872,71 +1797,69 @@ sub _setsnapCams {                       ## no critic "not used"
   my ($num,$lag,$ncount) = (1,2,1);
   my $cams               = "all";
 
-  if($prop =~ /^\d+$/x) {                                              # Anzahl der Schnappschüsse zu triggern (default: 1)
+  if ($prop =~ /^\d+$/x) {                                              # Anzahl der Schnappschüsse zu triggern (default: 1)
       $num    = $prop;
       $ncount = $prop;
   }
 
-  if($prop1 =~ /^\d+$/x) {                                             # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
+  if ($prop1 =~ /^\d+$/x) {                                             # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
       $lag = $prop1;
   }
 
   my $at = join " ",@$aref;
-  if($at =~ /CAM:/xi) {
+  if ($at =~ /CAM:/xi) {
       ($cams) = $at =~ m/CAM:"(.*)"/xi;
       $cams   =~ s/\s//gx;
   }
 
   my @camdvs;
-  if($cams eq "all") {                                                  # alle nicht disabled Kameras auslösen, sonst nur die gewählten
+  if ($cams eq 'all') {                                                          # alle nicht disabled Kameras auslösen, sonst nur die gewählten
       @camdvs = devspec2array("TYPE=SSCam:FILTER=MODEL!=SVS");
-      for (@camdvs) {
-          if($defs{$_} && !IsDisabled($_)) {
-              $hash->{HELPER}{ALLSNAPREF}{$_} = "";                     # Schnappschuss Hash für alle Cams -> Schnappschußdaten sollen hinein
-          }
-      }
   }
   else {
-      @camdvs = split(",",$cams);
-      for (@camdvs) {
-          if($defs{$_} && !IsDisabled($_)) {
-              $hash->{HELPER}{ALLSNAPREF}{$_} = "";
-          }
+      @camdvs = split ",", $cams;
+  }
+  
+  delete $hash->{HELPER}{ALLSNAPREF};                                           # Initialisieren
+  
+  for my $cam (@camdvs) {
+      if ($defs{$cam} && !IsDisabled($cam)) {
+          $hash->{HELPER}{ALLSNAPREF}{DOCAMS}{$cam} = 1;
       }
   }
 
-  return "No valid camera devices are specified for trigger snapshots" if(!$hash->{HELPER}{ALLSNAPREF});
+  return "No valid camera devices are specified for trigger snapshots" if(!scalar @camdvs);
 
   my $emtxt;
   my $teletxt = "";
   my $rawet   = AttrVal ($name, "snapEmailTxt", "");
   my $bt      = join " ", @$aref;
 
-  if($bt =~ /snapEmailTxt:/x) {
+  if ($bt =~ /snapEmailTxt:/x) {
       ($rawet) = $bt =~ m/snapEmailTxt:"(.*)"/xi;
   }
 
-  if($rawet) {
-      $hash->{HELPER}{CANSENDSNAP} = 1;                                # zentraler Schnappschußversand wird aktiviert
-      $hash->{HELPER}{SMTPMSG}     = $rawet;
+  if ($rawet) {
+      $hash->{HELPER}{SMTPMSG} = $rawet;                                       # zentraler Schnappschußversand per eMail wird aktiviert
   }
 
-  my ($csnap,$cmail) = ("","");
+  my ($csnap,$cmail) = ('','');
 
-  for my $key (keys%{$hash->{HELPER}{ALLSNAPREF}}) {
-      if(!AttrVal ($key, "snapEmailTxt", "")) {
-          delete $hash->{HELPER}{ALLSNAPREF}->{$key};                  # Snap dieser Kamera auslösen aber nicht senden
-          $csnap .= $csnap ? ", $key" : $key;
+  for my $camname (keys%{$hash->{HELPER}{ALLSNAPREF}{DOCAMS}}) {
+      if (!AttrVal ($camname, 'snapEmailTxt', '')) {
+          delete $hash->{HELPER}{ALLSNAPREF}{DOCAMS}{$camname};                # Snap dieser Kamera auslösen aber nicht senden
+          $csnap .= $csnap ? ", $camname" : $camname;
           $emtxt  = "";
       }
       else {
-          $cmail .= $cmail ? ", $key" : $key;
+          $cmail .= $cmail ? ", $camname" : $camname;
           $emtxt  = $rawet;
       }
-      __camSnap("$key!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt");
+      
+      __camSnap ("$camname!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt");
   }
 
-  Log3($name, 4, "$name - Trigger snapshots by SVS - Number: $num, Lag: $lag, Snap only: \"$csnap\", Snap and send: \"$cmail\" ");
+  Log3 ($name, 4, "$name - Trigger snapshots by SVS - Number: $num, Lag: $lag, Snap only: \"$csnap\", Snap and send: \"$cmail\" ");
 
 return;
 }
@@ -2849,7 +2772,7 @@ sub __camStartRec {
     my $hash                            = $defs{$name};
     my $camname                         = $hash->{CAMNAME};
 
-    my $caller  = (caller(0))[3];
+    my $caller = (caller(0))[3];
 
     RemoveInternalTimer($hash, $caller);
 
@@ -2857,7 +2780,7 @@ sub __camStartRec {
     return if(exitOnDis ($name, "Start Recording of Camera $camname can't be executed"));
 
     if (ReadingsVal("$name", "Record", "") eq "Start" && !AttrVal($name, "recextend", "")) {
-        Log3($name, 3, "$name - another recording is already running - new start-command will be ignored");
+        Log3 ($name, 3, "$name - another recording is already running - new start-command will be ignored");
         return;
     }
 
@@ -2874,21 +2797,16 @@ sub __camStartRec {
         $hash->{HELPER}{CALL}{VKEY} = "EXTREC";
         $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Record&cameraId=_CID_&action=start&_sid="_SID_"};
 
-        if($hash->{HELPER}{API}{EXTREC}{VER} >= 3) {
+        if ($hash->{HELPER}{API}{EXTREC}{VER} >= 3) {
             $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Record&cameraIds=_CID_&action=start&_sid="_SID_"};
         }
 
-        if($emtxt || $teletxt || $chattxt) {
-            $hash->{HELPER}{CANSENDREC} = 1        if($emtxt);           # Versand Aufnahme soll per Email erfolgen
-            $hash->{HELPER}{CANTELEREC} = 1        if($teletxt);         # Versand Aufnahme soll per TelegramBot erfolgen
-            $hash->{HELPER}{CANCHATREC} = 1        if($chattxt);         # Versand Aufnahme soll per SSChatBot erfolgen
-            $hash->{HELPER}{SMTPRECMSG} = $emtxt   if($emtxt);           # Text für Email-Versand
-            $hash->{HELPER}{TELERECMSG} = $teletxt if($teletxt);         # Text für Telegram-Versand
-            $hash->{HELPER}{CHATRECMSG} = $chattxt if($chattxt);         # Text für Synology Chat-Versand
-        }
+        $hash->{HELPER}{SMTPRECMSG} = $emtxt   if($emtxt);           # Text für Email-Versand
+        $hash->{HELPER}{TELERECMSG} = $teletxt if($teletxt);         # Text für Telegram-Versand
+        $hash->{HELPER}{CHATRECMSG} = $chattxt if($chattxt);         # Text für Synology Chat-Versand
 
-        setActiveToken($hash);
-        checkSid      ($hash);
+        setActiveToken ($hash);
+        checkSid       ($hash);
     }
     else {
         schedule ($name, $str);
@@ -3096,7 +3014,7 @@ return;
 ###############################################################################
 sub __camSnap {
     my $str              = shift;
-    my ($name,$num,$lag,$ncount,$emtxt,$teletxt,$chattxt,$tac) = split("!_!",$str);
+    my ($name,$num,$lag,$ncount,$emtxt,$teletxt,$chattxt,$tac) = split "!_!", $str;
     my $hash             = $defs{$name};
     my $camname          = $hash->{CAMNAME};
 
@@ -3104,7 +3022,7 @@ sub __camSnap {
     my $ta     = $hash->{HELPER}{TRANSACTION};
     my $caller = (caller(0))[3];
 
-    RemoveInternalTimer($hash, $caller);
+    RemoveInternalTimer ($hash, $caller);
 
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Snapshot of Camera $camname can't be executed"));
@@ -3119,21 +3037,20 @@ sub __camSnap {
             return;
         }
 
-        $hash->{HELPER}{CANSENDSNAP}  = 1       if($emtxt);                        # Versand Schnappschüsse soll per Email erfolgen
-        $hash->{HELPER}{CANTELESNAP}  = 1       if($teletxt);                      # Versand Schnappschüsse soll per TelegramBot erfolgen
-        $hash->{HELPER}{CANCHATSNAP}  = 1       if($chattxt);                      # Versand Schnappschüsse soll per SSChatBot erfolgen
-        $hash->{HELPER}{SNAPNUM}      = $num    if($num);                          # Gesamtzahl der auszulösenden Schnappschüsse
-        $hash->{HELPER}{SNAPLAG}      = $lag    if($lag);                          # Zeitverzögerung zwischen zwei Schnappschüssen
-        $hash->{HELPER}{SNAPNUMCOUNT} = $ncount if($ncount);                       # Restzahl der auszulösenden Schnappschüsse  (wird runtergezählt)
-        $hash->{HELPER}{SMTPMSG}      = $emtxt  if($emtxt);                        # Text für Email-Versand
+        $hash->{HELPER}{SNAPNUM}      = $num     if($num);                         # Gesamtzahl der auszulösenden Schnappschüsse
+        $hash->{HELPER}{SNAPLAG}      = $lag     if($lag);                         # Zeitverzögerung zwischen zwei Schnappschüssen
+        $hash->{HELPER}{SNAPNUMCOUNT} = $ncount  if($ncount);                      # Restzahl der auszulösenden Schnappschüsse  (wird runtergezählt)
+        $hash->{HELPER}{SMTPMSG}      = $emtxt   if($emtxt);                       # Text für Email-Versand
+        $hash->{HELPER}{CHATMSG}      = $chattxt if($chattxt);                     # Text für Chat-Versand
+        $hash->{HELPER}{TELEMSG}      = $teletxt if($teletxt);                     # Text für Telegram-Versand
 
         $hash->{HELPER}{CALL}{VKEY}   = "SNAPSHOT";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&dsId="0"&method="TakeSnapshot"&blSave="true"&camId="_CID_"&_sid="_SID_"};
 
-        readingsSingleUpdate($hash,"state", "snap", 1);
+        readingsSingleUpdate ($hash,"state", "snap", 1);
 
-        setActiveToken($hash);
-        checkSid      ($hash);
+        setActiveToken ($hash);
+        checkSid       ($hash);
     }
     else {
         $tac = $tac // "";
@@ -5791,7 +5708,7 @@ sub camOp_Parse {
         return;
    }
    elsif ($myjson ne "") {                                                            # wenn die Abfrage erfolgreich war
-        if($OpMode !~ /SaveRec|GetRec/x) {                                            # "SaveRec/GetRec" liefern MP4-Daten und kein JSON
+        if ($OpMode !~ /SaveRec|GetRec/x) {                                           # "SaveRec/GetRec" liefern MP4-Daten und kein JSON
             ($success,$myjson) = evaljson($hash,$myjson);
 
             if (!$success) {
@@ -5824,11 +5741,13 @@ sub camOp_Parse {
             };
 
             no strict "refs";                                                        ## no critic 'NoStrict'
-            if($hparse{$OpMode} && defined &{$hparse{$OpMode}{fn}}) {
+            
+            if ($hparse{$OpMode} && defined &{$hparse{$OpMode}{fn}}) {
                 my $ret = q{};
                 $ret    = &{$hparse{$OpMode}{fn}} ($params);
                 return if($ret);
             }
+            
             use strict "refs";
 
             if ($OpMode eq "ExpMode") {
@@ -6131,7 +6050,7 @@ sub _parseGetRec {                                      ## no critic "not used"
   my $tac = openOrgetTrans($hash);                                                                     # Transaktion starten
 
   my $cache;
-  if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC} || $hash->{HELPER}{CANCHATREC}) {
+  if (canEmailRec($hash) || canTeleRec($hash) || canChatRec($hash)) {
       $cache = cache($name, "c_init");                                                                 # Cache initialisieren für Versandhash
       Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
 
@@ -6154,15 +6073,15 @@ sub _parseGetRec {                                      ## no critic "not used"
   }
 
   # Recording als Email / Telegram / Chat versenden
-  if(!$cache || $cache eq "internal" ) {
+  if (!$cache || $cache eq "internal" ) {
       prepareSendData ($hash, $OpMode, $data{SSCam}{$name}{SENDRECS}{$tac});
   }
   else {
       prepareSendData ($hash, $OpMode, "{SENDRECS}{$tac}");
   }
 
-  closeTrans         ($hash);                                                                        # Transaktion beenden
-  setReadingErrorNone( $hash, 1 );
+  closeTrans          ($hash);                                                                        # Transaktion beenden
+  setReadingErrorNone ($hash, 1);
 
 return;
 }
@@ -6364,32 +6283,32 @@ sub _parseSnap {                                        ## no critic "not used"
   my $data    = $paref->{data};
   my $camname = $paref->{camname};
 
-  roomRefresh($hash,0,1,0);                                            # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
+  roomRefresh ($hash,0,1,0);                                            # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
 
   my $tac = "";
-  if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) {
+  if (canEmailSnap($hash) || canTeleSnap($hash) || canChatSnap($hash)) {
       $tac = openOrgetTrans($hash);                                    # Transaktion starten oder vorhandenen Code holen
   }
 
   my $snapid = $data->{data}{'id'};
 
-  setReadingErrorNone($hash, 1);
+  setReadingErrorNone ($hash, 1);
 
   if ($snapid) {
-      Log3($name, 3, "$name - Snapshot of Camera $camname created. ID: $snapid");
+      Log3 ($name, 3, "$name - Snapshot of Camera $camname created. ID: $snapid");
   }
   else {
-      Log3($name, 1, "$name - Snapshot of Camera $camname probably not created. No ID was delivered.");
-      closeTrans    ($hash);                                           # Transaktion beenden falls gestartet
-      delActiveToken($hash);
+      Log3 ($name, 1, "$name - Snapshot of Camera $camname probably not created. No ID was delivered.");
+      closeTrans     ($hash);                                          # Transaktion beenden falls gestartet
+      delActiveToken ($hash);
       return 1;
   }
 
-  my $num     = $hash->{HELPER}{SNAPNUM};                              # Gesamtzahl der auszulösenden Schnappschüsse
-  my $ncount  = $hash->{HELPER}{SNAPNUMCOUNT};                         # Restzahl der auszulösenden Schnappschüsse
+  my $num    = $hash->{HELPER}{SNAPNUM};                               # Gesamtzahl der auszulösenden Schnappschüsse
+  my $ncount = $hash->{HELPER}{SNAPNUMCOUNT};                          # Restzahl der auszulösenden Schnappschüsse
 
   if (AttrVal($name,"debugactivetoken",0)) {
-      Log3($name, 1, "$name - Snapshot number ".($num-$ncount+1)." (ID: $snapid) of total $num snapshots with TA-code: $tac done");
+      Log3 ($name, 1, "$name - Snapshot number ".($num-$ncount+1)." (ID: $snapid) of total $num snapshots with TA-code: $tac done");
   }
   $ncount--;                                                           # wird vermindert je Snap
 
@@ -6398,10 +6317,10 @@ sub _parseSnap {                                        ## no critic "not used"
   my $teletxt = $hash->{HELPER}{TELEMSG} // "";                        # Text für TelegramBot-Versand
   my $chattxt = $hash->{HELPER}{CHATMSG} // "";                        # Text für SSChatBot-Versand
 
-  if($ncount > 0) {
-      InternalTimer(gettimeofday()+$lag, "FHEM::SSCam::__camSnap", "$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$chattxt!_!$tac", 0);
-      if(!$tac) {
-          delActiveToken($hash);                                       # Token freigeben wenn keine Transaktion läuft
+  if ($ncount > 0) {
+      InternalTimer (gettimeofday()+$lag, "FHEM::SSCam::__camSnap", "$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$chattxt!_!$tac", 0);
+      if (!$tac) {
+          delActiveToken ($hash);                                       # Token freigeben wenn keine Transaktion läuft
       }
       return 1;
   }
@@ -6412,8 +6331,8 @@ sub _parseSnap {                                        ## no critic "not used"
       Log3($name, 1, "$name - start get snapinfo of last $slim snapshots with TA-code: $tac");
   }
 
-  if(!$hash->{HELPER}{TRANSACTION}) {                                  # Token freigeben vor nächstem Kommando wenn keine Transaktion läuft
-      delActiveToken($hash);
+  if (!$hash->{HELPER}{TRANSACTION}) {                                  # Token freigeben vor nächstem Kommando wenn keine Transaktion läuft
+      delActiveToken ($hash);
   }
 
   __getSnapInfo ("$name:$slim:$ssize:$tac");
@@ -7029,7 +6948,7 @@ sub _parsegeteventlist {                                ## no critic "not used"
 
   Log3($name, $verbose, "$name - Query eventlist of camera $camname retrieved");
 
-  if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC} || $hash->{HELPER}{CANCHATREC}) {        # Versand Aufnahme initiieren
+  if (canEmailRec($hash) || canTeleRec($hash) || canChatRec($hash)) {                    # Versand Aufnahme initiieren
       __getRec($hash);
   }
 
@@ -7096,7 +7015,7 @@ sub _parsegetsnapgallery {                              ## no critic "not used"
   my $verbose = $paref->{verbose};
   my $camname = $paref->{camname};
 
-  my $lang    = AttrVal("global","language","EN");
+  my $lang    = AttrVal("global", "language", "EN");
 
   my @as;
 
@@ -7108,10 +7027,9 @@ sub _parsegetsnapgallery {                              ## no critic "not used"
   __doSnapRotation      ($paref);                                                                            # Rotationsfeature
   __moveSnapCacheToOld  ($paref);                                                                            # bestehende Schnappschußdaten aus SNAPHASH Cache auf SNAPOLDHASH schreiben und in SNAPHASH löschen
 
-
   #####   transaktionaler Versand der erzeugten Schnappschüsse #####
   ##################################################################
-  if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) {         # es soll die Anzahl "$hash->{HELPER}{SNAPNUM}" Schnappschüsse versendet werden
+  if (canEmailSnap($hash) || canTeleSnap($hash) || canChatSnap($hash)) {                                     # es soll die Anzahl "$hash->{HELPER}{SNAPNUM}" Schnappschüsse versendet werden
       my $tac = openOrgetTrans($hash);                                                                       # Transaktion vorhandenen Code holen
 
       $paref->{tac} = $tac;
@@ -7123,7 +7041,7 @@ sub _parsegetsnapgallery {                              ## no critic "not used"
       # Schnappschüsse als Email / Telegram / SSChatBot versenden
       ###########################################################
       my $cache = cache($name, "c_init");                                                                    # Cache initialisieren
-      if(!$cache || $cache eq "internal" ) {
+      if (!$cache || $cache eq "internal" ) {
           prepareSendData ($hash, "getsnapgallery", $data{SSCam}{$name}{SENDSNAPS}{$tac});
       }
       else {
@@ -7142,7 +7060,7 @@ sub _parsegetsnapgallery {                              ## no critic "not used"
       __copySnapsBackFromOld ($paref);                                                                    # gesicherte Schnappschußdaten aus SNAPOLDHASH an SNAPHASH anhängen
 
       # Direktausgabe Snaphash wenn nicht gepollt wird
-      if(!AttrVal($name, "snapGalleryBoost",0)) {
+      if (!AttrVal($name, "snapGalleryBoost",0)) {
           my %pars = (
               linkparent => $name,
               linkname   => '',
@@ -7155,8 +7073,8 @@ sub _parsegetsnapgallery {                              ## no critic "not used"
               asyncOutput($hash->{HELPER}{CL}{$c},"$htmlCode");
           }
 
-          delete($data{SSCam}{$name}{SNAPHASH});                        # Snaphash Referenz löschen
-          delClHash  ($name);
+          delete $data{SSCam}{$name}{SNAPHASH};                        # Snaphash Referenz löschen
+          delClHash ($name);
       }
   }
 
@@ -7179,17 +7097,17 @@ sub __saveLastSnapToCache {
   my $name  = $paref->{name};
   my $data  = $paref->{data};                                                                 # decodierte JSON Daten
 
-  return if (!exists $data->{data}{data}[0]{imageData});                                      # kein Snap vorhanden
+  return if(!exists $data->{data}{data}[0]{imageData});                                       # kein Snap vorhanden
 
   my $cache = cache($name, "c_init");                                                         # Cache initialisieren
 
-  Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
+  Log3 ($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
 
   if(!$cache || $cache eq "internal" ) {
       $data{SSCam}{$name}{LASTSNAP} = $data->{data}{data}[0]{imageData};
   }
   else {
-      cache($name, "c_write", "{LASTSNAP}", $data->{data}{data}[0]{imageData});
+      cache ($name, "c_write", "{LASTSNAP}", $data->{data}{data}[0]{imageData});
   }
 
 return;
@@ -7277,10 +7195,10 @@ sub __moveSnapCacheToOld {
 
   my $cache = cache($name, "c_init");                                                                    # Cache initialisieren
 
-  Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
+  Log3 ($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
 
-  if(!$cache || $cache eq "internal" ) {
-      if($data{SSCam}{$name}{SNAPHASH}) {
+  if (!$cache || $cache eq "internal" ) {
+      if ($data{SSCam}{$name}{SNAPHASH}) {
           for my $key (sort(keys%{$data{SSCam}{$name}{SNAPHASH}})) {
               $data{SSCam}{$name}{SNAPOLDHASH}{$key} = delete($data{SSCam}{$name}{SNAPHASH}{$key});
           }
@@ -7295,25 +7213,28 @@ sub __moveSnapCacheToOld {
                             }
                           );
 
-      my (%seen,$g);
+      my %seen;
       my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @$aref;
 
-      for my $key (@unique) {
-          $g = cache($name, "c_read",   "{SNAPHASH}{$key}{snapid}"          );
-          cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{snapid}",    $g) if(defined $g);
-          cache     ($name, "c_remove", "{SNAPHASH}{$key}{snapid}"          );
-          $g = cache($name, "c_read",   "{SNAPHASH}{$key}{createdTm}"       );
-          cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{createdTm}", $g) if(defined $g);
-          cache     ($name, "c_remove", "{SNAPHASH}{$key}{createdTm}"       );
-          $g = cache($name, "c_read",   "{SNAPHASH}{$key}{fileName}"        );
-          cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{fileName}",  $g) if(defined $g);
-          cache     ($name, "c_remove", "{SNAPHASH}{$key}{fileName}"        );
-          $g = cache($name, "c_read",   "{SNAPHASH}{$key}{imageData}"       );
-          cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{imageData}", $g) if(defined $g);
-          cache     ($name, "c_remove", "{SNAPHASH}{$key}{imageData}"       );
+      for my $key (@unique) {    
+          $data{SSCam}{$name}{UNI} = cache($name, "c_read", "{SNAPHASH}{$key}{snapid}");
+          cache ($name, "c_write",  "{SNAPOLDHASH}{$key}{snapid}", $data{SSCam}{$name}{UNI})    if($data{SSCam}{$name}{UNI});
+          cache ($name, "c_remove", "{SNAPHASH}{$key}{snapid}");
+          
+          $data{SSCam}{$name}{UNI} = cache($name, "c_read", "{SNAPHASH}{$key}{createdTm}");
+          cache ($name, "c_write",  "{SNAPOLDHASH}{$key}{createdTm}", $data{SSCam}{$name}{UNI}) if($data{SSCam}{$name}{UNI});
+          cache ($name, "c_remove", "{SNAPHASH}{$key}{createdTm}");
+          
+          $data{SSCam}{$name}{UNI} = cache($name, "c_read", "{SNAPHASH}{$key}{fileName}");
+          cache ($name, "c_write",  "{SNAPOLDHASH}{$key}{fileName}", $data{SSCam}{$name}{UNI})  if($data{SSCam}{$name}{UNI});
+          cache ($name, "c_remove", "{SNAPHASH}{$key}{fileName}");
+          
+          $data{SSCam}{$name}{UNI} = cache($name, "c_read", "{SNAPHASH}{$key}{imageData}");
+          cache ($name, "c_write",  "{SNAPOLDHASH}{$key}{imageData}", $data{SSCam}{$name}{UNI}) if($data{SSCam}{$name}{UNI});
+          cache ($name, "c_remove", "{SNAPHASH}{$key}{imageData}");
       }
-
-      undef $g;
+      
+       delete $data{SSCam}{$name}{UNI};
   }
 
 return;
@@ -7328,7 +7249,7 @@ sub __insertSnapsToCache {
   my $paref   = shift;
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
-  my $data    = $paref->{data};                                                                              # decodierte JSON Daten
+  my $jdata   = $paref->{data};                                                                                 # decodierte JSON Daten
   my $camname = $paref->{camname};
   my $tac     = $paref->{tac} // q{};
 
@@ -7339,22 +7260,21 @@ sub __insertSnapsToCache {
 
   my $cache;
 
-  while ($data->{'data'}{'data'}[$i]) {
-
-      if(!$data->{'data'}{'data'}[$i]{'camName'} || $data->{'data'}{'data'}[$i]{'camName'} ne $camname) {    # Forum:#97706
+  while ($jdata->{'data'}{'data'}[$i]) {
+      if (!$jdata->{'data'}{'data'}[$i]{'camName'} || $jdata->{'data'}{'data'}[$i]{'camName'} ne $camname) {    # Forum:#97706
           $i += 1;
           next;
       }
 
-      my $snapid    = $data->{data}{data}[$i]{id};
-      my $fileName  = $data->{data}{data}[$i]{fileName};
-      my $imageData = $data->{data}{data}[$i]{imageData};                                                    # Image data of snapshot in base64 format
+      my $snapid    = $jdata->{data}{data}[$i]{id};
+      my $fileName  = $jdata->{data}{data}[$i]{fileName};
+      my $imageData = $jdata->{data}{data}[$i]{imageData};                                                      # Image data of snapshot in base64 format
 
-      my @t = split(" ", FmtDateTime($data->{data}{data}[$i]{createdTm}));
+      my @t = split(" ", FmtDateTime($jdata->{data}{data}[$i]{createdTm}));
       my @d = split("-", $t[0]);
 
       my $createdTm;
-      if($lang eq "DE") {
+      if ($lang eq "DE") {
           $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
       }
       else {
@@ -7363,13 +7283,13 @@ sub __insertSnapsToCache {
 
       # Schnappschuss Hash zum Versand wird erstellt
       ##############################################
-      if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) {
-          if($tac) {
-              $cache = cache($name, "c_init");                                                               # Cache initialisieren
+      if (canEmailSnap($hash) || canTeleSnap($hash) || canChatSnap($hash)) {
+          if ($tac) {
+              $cache = cache($name, "c_init");                                                                   # Cache initialisieren
 
-              Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
+              Log3 ($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
 
-              if(!$cache || $cache eq "internal" ) {
+              if (!$cache || $cache eq "internal" ) {
                   $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{snapid}    = $snapid;
                   $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{createdTm} = $createdTm;
                   $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{fileName}  = $fileName;
@@ -7382,10 +7302,10 @@ sub __insertSnapsToCache {
                   cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{imageData}" ,$imageData);
               }
 
-              Log3($name,4, "$name - Snap '$sn' (tac: $tac) added to send gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");
+              Log3 ($name,4, "$name - Snap '$sn' (tac: $tac) added to send gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");
           }
           else {
-              Log3($name, 1, "$name - ERROR - try to send snapshots without transaction. Send process is discarded.");
+              Log3 ($name, 1, "$name - ERROR - try to send snapshots without transaction. Send process is discarded.");
           }
       }
 
@@ -7393,9 +7313,9 @@ sub __insertSnapsToCache {
       ################################
       $cache = cache($name, "c_init");                                                                      # Cache initialisieren
 
-      Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
+      Log3 ($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
 
-      if(!$cache || $cache eq "internal" ) {
+      if (!$cache || $cache eq "internal" ) {
           $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}    = $snapid;
           $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm} = $createdTm;
           $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}  = $fileName;
@@ -7408,14 +7328,10 @@ sub __insertSnapsToCache {
           cache($name, "c_write", "{SNAPHASH}{$sn}{imageData}", $imageData);
       }
 
-      Log3($name, 4, "$name - Snap '$sn' added to gallery view hash: SN => $sn, ID => $snapid, File => $fileName, Created => $createdTm");
+      Log3 ($name, 4, "$name - Snap '$sn' added to gallery view hash: SN => $sn, ID => $snapid, File => $fileName, Created => $createdTm");
 
       $sn += 1;
       $i  += 1;
-
-      undef $imageData;
-      undef $fileName;
-      undef $createdTm;
   }
 
 return $sn;
@@ -7432,44 +7348,48 @@ sub __copySnapsBackFromOld {
   my $sn    = $paref->{sn};                   # letzte lfd. Nummer aktueller Snaphash
 
   my $snapnum = $hash->{HELPER}{SNAPLIMIT} // $defSlim;
-  my $sgn     = AttrVal($name, "snapGalleryNumber", $snapnum);
+  my $sgn     = AttrVal ($name, "snapGalleryNumber", $snapnum);
   my $ss      = $sn;
   $sn         = 0;
 
   my $cache   = cache($name, "c_init");                                                                     # Cache initialisieren
 
-  Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
+  Log3 ($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
 
-  if(!$cache || $cache eq "internal" ) {
-      if($data{SSCam}{$name}{SNAPOLDHASH} && $sgn > $ss) {
+  if (!$cache || $cache eq "internal" ) {
+      if ($data{SSCam}{$name}{SNAPOLDHASH} && $sgn > $ss) {
           for my $kn ($ss..($sgn-1)) {
               $data{SSCam}{$name}{SNAPHASH}{$kn}{snapid}    = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{snapid};
               $data{SSCam}{$name}{SNAPHASH}{$kn}{createdTm} = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{createdTm};
               $data{SSCam}{$name}{SNAPHASH}{$kn}{fileName}  = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{fileName};
               $data{SSCam}{$name}{SNAPHASH}{$kn}{imageData} = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{imageData};
+              
               $sn += 1;
           }
       }
   }
   else {
-      my $g;
-      for my $kn ($ss..($sgn-1)) {
-          $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{snapid}"    );
-          cache     ($name, "c_write",  "{SNAPHASH}{$kn}{snapid}",    $g) if(defined $g);
-          cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{snapid}"    );
-          $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{createdTm}" );
-          cache     ($name, "c_write",  "{SNAPHASH}{$kn}{createdTm}", $g) if(defined $g);
-          cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{createdTm}" );
-          $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{fileName}"  );
-          cache     ($name, "c_write",  "{SNAPHASH}{$kn}{fileName}",  $g) if(defined $g);
-          cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{fileName}"  );
-          $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{imageData}" );
-          cache     ($name, "c_write",  "{SNAPHASH}{$kn}{imageData}", $g) if(defined $g);
-          cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{imageData}" );
+      for my $kn ($ss..($sgn-1)) {          
+          $data{SSCam}{$name}{UNI} = cache($name, "c_read", "{SNAPOLDHASH}{$sn}{snapid}");
+          cache ($name, "c_write",  "{SNAPHASH}{$kn}{snapid}", $data{SSCam}{$name}{UNI})    if($data{SSCam}{$name}{UNI});
+          cache ($name, "c_remove", "{SNAPOLDHASH}{$sn}{snapid}");
+          
+          $data{SSCam}{$name}{UNI} = cache($name, "c_read", "{SNAPOLDHASH}{$sn}{createdTm}");
+          cache ($name, "c_write",  "{SNAPHASH}{$kn}{createdTm}", $data{SSCam}{$name}{UNI}) if($data{SSCam}{$name}{UNI});
+          cache ($name, "c_remove", "{SNAPOLDHASH}{$sn}{createdTm}");
+          
+          $data{SSCam}{$name}{UNI} = cache($name, "c_read", "{SNAPOLDHASH}{$sn}{fileName}");
+          cache ($name, "c_write",  "{SNAPHASH}{$kn}{fileName}",  $data{SSCam}{$name}{UNI}) if($data{SSCam}{$name}{UNI});
+          cache ($name, "c_remove", "{SNAPOLDHASH}{$sn}{fileName}"  );
+          
+          $data{SSCam}{$name}{UNI} = cache($name, "c_read", "{SNAPOLDHASH}{$sn}{imageData}");
+          cache ($name, "c_write",  "{SNAPHASH}{$kn}{imageData}", $data{SSCam}{$name}{UNI}) if($data{SSCam}{$name}{UNI});
+          cache ($name, "c_remove", "{SNAPOLDHASH}{$sn}{imageData}");
+          
           $sn += 1;
       }
-
-      undef $g;
+      
+      delete $data{SSCam}{$name}{UNI};
   }
 
 return;
@@ -7597,6 +7517,170 @@ sub IsModelMaster {                                                     # ist de
   my $mm = $model eq "master" ? 1 : 0;
 
 return $mm;
+}
+
+#############################################################################################
+#                 kann/soll Schnappschuß per Synology Chat verschickt werden
+#############################################################################################
+sub canChatSnap {
+   my $hash = shift;
+   
+return _canSendChat ($hash, $hash->{HELPER}{CHATMSG});
+}
+
+#############################################################################################
+#                 kann/soll Aufnahme per Synology Chat verschickt werden
+#############################################################################################
+sub canChatRec {
+   my $hash = shift;
+   
+return _canSendChat ($hash, $hash->{HELPER}{CHATRECMSG});
+}
+
+#############################################################################################
+#                 ist Chat Device verwendbar oder nicht
+#############################################################################################
+sub _canSendChat {
+   my $hash = shift;
+   my $mt   = shift;
+
+   my $can  = 0;
+   
+   if ($mt) {
+       $can = 1;
+       my $msg;
+       my $name      = $hash->{NAME};
+       my ($chatbot) = split ",",  $mt, 3;
+       
+       if ($chatbot) {
+           $chatbot = (split "=>", $chatbot)[1];
+           $chatbot = trim($chatbot);
+       }
+       
+       if (!$defs{$chatbot}->{NAME}) {
+           $msg = qq{No SSChatBot device "$chatbot" available};
+           readingsSingleUpdate ($hash, 'sendChatState', $msg, 1);
+           Log3 ($name, 2, "$name - $msg");
+           $can = 0;
+       }
+       else {
+           if (IsDisabled($defs{$chatbot}->{NAME})) {
+               $msg = qq{Can't send data to SSChatBot device - "$chatbot" is disabled};
+               readingsSingleUpdate ($hash, 'sendChatState', $msg, 1);
+               Log3 ($name, 3, "$name - $msg");
+               $can = 0;
+           }
+       }
+   }
+
+return $can;
+}
+
+#############################################################################################
+#                 kann/soll Schnappschuß per Mail verschickt werden
+#############################################################################################
+sub canEmailSnap {
+   my $hash = shift;
+   
+return _canSendEmail ($hash, $hash->{HELPER}{SMTPMSG});
+}
+
+#############################################################################################
+#                 kann/soll Aufnahme per Mail verschickt werden
+#############################################################################################
+sub canEmailRec {
+   my $hash = shift;
+   
+return _canSendEmail ($hash, $hash->{HELPER}{SMTPRECMSG});
+}
+
+#############################################################################################
+#                 ist Mailversand möglich oder nicht
+#############################################################################################
+sub _canSendEmail {
+   my $hash = shift;
+   my $mt   = shift;
+
+   my $can  = 0;
+   
+   if ($mt) {
+       $can     = 1;
+       my $name = $hash->{NAME};
+       my $msg;
+   
+       my @pc;
+       push @pc, 'smtpcredentials' if(!$hash->{SMTPCREDENTIALS});
+       push @pc, 'smtpFrom'        if(!AttrVal ($name, 'smtpFrom', ''));
+       push @pc, 'smtpHost'        if(!AttrVal ($name, 'smtpHost', ''));
+       push @pc, 'smtpTo'          if(!AttrVal ($name, 'smtpTo',   ''));
+       
+       if (scalar @pc) {
+           my $preq = join ",", @pc;
+           $msg = qq{Missing required parameter or attribute: $preq};
+           readingsSingleUpdate ($hash, 'sendEmailState', $msg, 1);
+           Log3 ($name, 2, "$name - $msg");
+           $can = 0;
+       }
+   }
+
+return $can;
+}
+
+#############################################################################################
+#                 kann/soll Schnappschuß per Telegram verschickt werden
+#############################################################################################
+sub canTeleSnap {
+   my $hash = shift;
+   
+return _canSendTelegram ($hash, $hash->{HELPER}{TELEMSG});
+}
+
+#############################################################################################
+#                 kann/soll Aufnahme per Telegram verschickt werden
+#############################################################################################
+sub canTeleRec {
+   my $hash = shift;
+   
+return _canSendTelegram ($hash, $hash->{HELPER}{TELERECMSG});
+}
+
+#############################################################################################
+#                 ist Telegram Device verwendbar oder nicht
+#############################################################################################
+sub _canSendTelegram {
+   my $hash = shift;
+   my $mt   = shift;
+
+   my $can  = 0;
+   
+   if ($mt) {
+       $can = 1;
+       my $msg;
+       my $name      = $hash->{NAME};
+       my ($telebot) =  split ",",  $mt, 4;
+       
+       if ($telebot) {
+           $telebot = (split "=>", $telebot)[1];
+           $telebot = trim($telebot);
+       }
+       
+       if (!$defs{$telebot}->{NAME}) {
+           $msg = qq{No TelegramBot device "$telebot" available};
+           readingsSingleUpdate ($hash, 'sendTeleState', $msg, 1);
+           Log3 ($name, 2, "$name - $msg");
+           $can = 0;
+       }
+       else {
+           if (IsDisabled($defs{$telebot}->{NAME})) {
+               $msg = qq{Can't send data to TelegramBot device - "$telebot" is disabled};
+               readingsSingleUpdate ($hash, 'sendTeleState', $msg, 1);
+               Log3 ($name, 3, "$name - $msg");
+               $can = 0;
+           }
+       }
+   }
+
+return $can;
 }
 
 ######################################################################################
@@ -9027,35 +9111,34 @@ sub snapLimSize {
 
   my ($slim,$ssize);
 
-  if(!AttrVal($name,"snapGalleryBoost",0)) {
+  if (!AttrVal($name,"snapGalleryBoost",0)) {
       $slim  = 1;
       $ssize = 0;
   }
   else {
       $hash->{HELPER}{GETSNAPGALLERY} = 1;
-      $slim                           = AttrVal($name,"snapGalleryNumber",$defSlim);      # Anzahl der abzurufenden Snaps
+      $slim                           = AttrVal ($name,"snapGalleryNumber",$defSlim);     # Anzahl der abzurufenden Snaps
   }
 
-  if(AttrVal($name,"snapGallerySize","Icon") eq "Full") {
+  if (AttrVal($name,"snapGallerySize","Icon") eq "Full") {
       $ssize = 2;                                                                         # Full Size
   }
   else {
       $ssize = 1;                                                                         # Icon Size
   }
 
-  if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) {
-      # Versand Schnappschuß darf erfolgen falls gewünscht
+  if (canEmailSnap($hash) || canTeleSnap($hash) || canChatSnap($hash)) {                  # Versand Schnappschuß darf erfolgen falls gewünscht
       $ssize = 2;                                                                         # Full Size für EMail/Telegram/SSChatBot -Versand
   }
 
-  if($hash->{HELPER}{SNAPNUM}) {
+  if ($hash->{HELPER}{SNAPNUM}) {
       $slim                           = delete $hash->{HELPER}{SNAPNUM};                  # enthält die Anzahl der ausgelösten Schnappschüsse
       $hash->{HELPER}{GETSNAPGALLERY} = 1;                                                # Steuerbit für Snap-Galerie bzw. Daten mehrerer Schnappschüsse abrufen
   }
 
   my @strmdevs = devspec2array("TYPE=SSCamSTRM:FILTER=PARENT=$name:FILTER=MODEL=lastsnap");
-  if(scalar(@strmdevs) >= 1) {
-      Log3($name, 4, "$name - Streaming devs of type \"lastsnap\": @strmdevs");
+  if (scalar(@strmdevs) >= 1) {
+      Log3 ($name, 4, "$name - Streaming devs of type \"lastsnap\": @strmdevs");
   }
 
   $hash->{HELPER}{GETSNAPGALLERY} = 1 if($force);                                         # Bugfix 04.03.2019 Forum:https://forum.fhem.de/index.php/topic,45671.msg914685.html#msg914685
@@ -9419,15 +9502,13 @@ sub prepareSendData {
        $svshash = $defs{$svs} if($defs{$svs});
        next if(!$svshash                          ||
                !AttrVal($svs, "snapEmailTxt", "") ||
-               !$svshash->{HELPER}{ALLSNAPREF}    ||
-               !$svshash->{HELPER}{CANSENDSNAP});                                                 # Sammel-Schnappschüsse nur senden wenn CANSENDSNAP und Attribut gesetzt ist
+               !$svshash->{HELPER}{ALLSNAPREF});
 
        $asref = $svshash->{HELPER}{ALLSNAPREF};                                                   # Hashreferenz zum summarischen Snaphash
 
-       for my $key (keys%{$asref}) {
-           if($key eq $name) {                                                                    # Kamera Key im Bildhash matcht -> Bilddaten übernehmen
+       for my $camname (keys%{$svshash->{HELPER}{ALLSNAPREF}{DOCAMS}}) {
+           if ($camname eq $name) {                                                               # Kamera Key im Bildhash matcht -> Bilddaten übernehmen
                 if($type eq "internal") {
-
                     for my $pkey (keys%{$dat}) {
                         my $nkey = time()+int(rand(1000));
 
@@ -9435,7 +9516,7 @@ sub prepareSendData {
                         $asref->{$nkey.$pkey}{imageData} = $dat->{$pkey}{imageData};              # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
                         $asref->{$nkey.$pkey}{fileName}  = $dat->{$pkey}{fileName};               # Filenamen der Kamera werden im summarischen Snaphash eingefügt
 
-                        Log3($svs, 4, "$svs - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");
+                        Log3 ($svs, 4, "$svs - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");
                     }
                 }
                 else {
@@ -9462,32 +9543,29 @@ sub prepareSendData {
                     }
                 }
 
-                delete $hash->{HELPER}{CANSENDSNAP};               # Flag im Kamera-Device !! löschen
-                delete $asref->{$key};                             # ursprünglichen Key (Kameranamen) löschen
-           }
-       }
-       $asref = $svshash->{HELPER}{ALLSNAPREF};                    # Hashreferenz zum summarischen Snaphash
-
-       for my $key (keys%{$asref}) {                               # prüfen ob Bildhash komplett ?
-           if(!$asref->{$key}) {
-               return;                                             # Bildhash noch nicht komplett
+                delete $hash->{HELPER}{SMTPMSG};                                              # Flag im Kamera-Device !! löschen
+                delete $svshash->{HELPER}{ALLSNAPREF}{DOCAMS}{$camname};                      # Kameranamen löschen wenn Snap erledigt
            }
        }
 
-       delete $svshash->{HELPER}{ALLSNAPREF};                      # ALLSNAPREF löschen -> gemeinsamer Versand beendet
-       $hash = $svshash;                                           # Hash durch SVS-Hash ersetzt
-       $name = $svshash->{NAME};                                   # Name des auslösenden SVS-Devices wird eingesetzt
+       return if(scalar keys%{$svshash->{HELPER}{ALLSNAPREF}{DOCAMS}});                       # prüfen ob Bildhash komplett ?
 
-       Log3($name, 4, "$name - Central Snaphash fillup completed by all selected cams. Send it now ...");
+       delete $svshash->{HELPER}{ALLSNAPREF}{DOCAMS};
+       
+       $asref = delete $svshash->{HELPER}{ALLSNAPREF};                                        # ALLSNAPREF löschen -> gemeinsamer Versand beendet                 
+       $hash  = $svshash;                                                                     # Hash durch SVS-Hash ersetzt
+       $name  = $svshash->{NAME};                                                             # Name des auslösenden SVS-Devices wird eingesetzt
 
-       my $cache = cache($name, "c_init");                         # Cache initialisieren (im SVS Device)
+       Log3 ($name, 4, "$name - Central Snaphash fillup completed by all selected cams. Send it now ...");
 
-       if(!$cache || $cache eq "internal" ) {
+       my $cache = cache($name, "c_init");                                                    # Cache initialisieren (im SVS Device)
+
+       if (!$cache || $cache eq "internal" ) {
            delete $data{SSCam}{RS};
-           for my $key (keys%{$asref}) {                           # Referenz zum summarischen Hash einsetzen
+           for my $key (keys%{$asref}) {                                  # Referenz zum summarischen Hash einsetzen
                $data{SSCam}{RS}{$key} = delete $asref->{$key};
            }
-           $dat = $data{SSCam}{RS};                                # Referenz zum summarischen Hash einsetzen
+           $dat = $data{SSCam}{RS};                                       # Referenz zum summarischen Hash einsetzen
        }
        else {
            cache ($name, 'c_clear');
@@ -9512,25 +9590,23 @@ sub prepareSendData {
    my $sslfrominit   = 0;
    my $smtpsslport   = 465;
 
-   if(AttrVal($name,"smtpSSLPort",0)) {
+   if (AttrVal($name, 'smtpSSLPort', 0)) {
        $sslfrominit = 1;
        $smtpsslport = AttrVal($name,"smtpSSLPort",0);
    }
 
    $tac                                 = $hash->{HELPER}{TRANSACTION};         # Code der laufenden Transaktion
-
    $data{SSCam}{$name}{SENDCOUNT}{$tac} = 0;                                    # Hilfszähler Senden, init -> +1 , done -> -1, keine Daten
                                                                                 # d. Transaktion werden gelöscht bis Zähler wieder 0 !! (siehe closeTrans)
 
-   Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+   Log3 ($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name, 'debugactivetoken', 0));
 
-   ### Schnappschüsse als Email versenden wenn $hash->{HELPER}{CANSENDSNAP} definiert ist
-   ######################################################################################
-   if($OpMode =~ /^getsnap/x && $hash->{HELPER}{CANSENDSNAP}) {
-       delete $hash->{HELPER}{CANSENDSNAP};
+   ### Schnappschüsse als Email versenden 
+   ########################################
+   if ($OpMode =~ /^getsnap/x && canEmailSnap($hash)) {
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
 
-       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       Log3 ($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}." (eMail)") if(AttrVal($name, "debugactivetoken", 0));
 
        my $mt = delete $hash->{HELPER}{SMTPMSG};
 
@@ -9560,13 +9636,12 @@ sub prepareSendData {
        readingsSingleUpdate($hash, "sendEmailState", $ret, 1) if ($ret);
    }
 
-   ### Aufnahmen als Email versenden wenn $hash->{HELPER}{CANSENDREC} definiert ist
-   ################################################################################
-   if($OpMode =~ /^GetRec/x && $hash->{HELPER}{CANSENDREC}) {
-       delete $hash->{HELPER}{CANSENDREC};
+   ### Aufnahmen als Email versenden 
+   ###################################
+   if ($OpMode =~ /^GetRec/x && canEmailRec($hash)) {
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
 
-       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}." (eMail)") if(AttrVal($name,"debugactivetoken",0));
 
        my $mt = delete $hash->{HELPER}{SMTPRECMSG};
 
@@ -9602,11 +9677,10 @@ sub prepareSendData {
    # Format in $hash->{HELPER}{TELEMSG} muss sein:
    # tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
    ################################################################################################
-   if($OpMode =~ /^getsnap/x && $hash->{HELPER}{CANTELESNAP}) {
-       delete $hash->{HELPER}{CANTELESNAP};
+   if ($OpMode =~ /^getsnap/x && canTeleSnap($hash)) {
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
 
-       Log3 ($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       Log3 ($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}." (Telegram)") if(AttrVal($name,"debugactivetoken",0));
 
        my $mt = delete $hash->{HELPER}{TELEMSG};
 
@@ -9641,11 +9715,10 @@ sub prepareSendData {
    # Format in $hash->{HELPER}{TELEMSG} muss sein:
    # tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
    #################################################################################################
-   if($OpMode =~ /^GetRec/x && $hash->{HELPER}{CANTELEREC}) {
-       delete $hash->{HELPER}{CANTELEREC};
+   if ($OpMode =~ /^GetRec/x && canTeleRec($hash)) {
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
 
-       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}." (Telegram)") if(AttrVal($name,"debugactivetoken",0));
 
        my $mt = delete $hash->{HELPER}{TELERECMSG};
 
@@ -9679,11 +9752,10 @@ sub prepareSendData {
    # Format in $hash->{HELPER}{CHATMSG} muss sein: snapChatTxt:"chatbot => <SSChatBot Device>,
    #           peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
    #############################################################################################
-   if($OpMode =~ /^getsnap/x && $hash->{HELPER}{CANCHATSNAP}) {
-       delete $hash->{HELPER}{CANCHATSNAP};
+   if ($OpMode =~ /^getsnap/x && canChatSnap($hash)) {
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
 
-       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}." (Chat)") if(AttrVal($name,"debugactivetoken",0));
 
        my $mt = delete $hash->{HELPER}{CHATMSG};
 
@@ -9714,11 +9786,10 @@ sub prepareSendData {
    # Format in $hash->{HELPER}{CHATRECMSG} muss sein: chatbot => <SSChatBot Device>,
    #           peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
    ###################################################################################
-   if($OpMode =~ /^GetRec/x && $hash->{HELPER}{CANCHATREC}) {
-       delete $hash->{HELPER}{CANCHATREC};
+   if ($OpMode =~ /^GetRec/x && canChatRec($hash)) {
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
 
-       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       Log3($name, 1, "$name - Send Counter transaction \"$tac\" Synology Chat: ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
 
        my $mt = delete $hash->{HELPER}{CHATRECMSG};
 
@@ -9741,10 +9812,10 @@ sub prepareSendData {
                                }
                        );
 
-       readingsSingleUpdate($hash, "sendChatState", $ret, 1) if ($ret);
+       readingsSingleUpdate ($hash, 'sendChatState', $ret, 1) if ($ret);
    }
 
-   closeTrans($hash) if($hash->{HELPER}{TRANSACTION} eq "multiple_snapsend");     # Transaction Sammelversand (SVS) schließen, Daten bereinigen
+   closeTrans ($hash) if($hash->{HELPER}{TRANSACTION} eq "multiple_snapsend");     # Transaction Sammelversand (SVS) schließen, Daten bereinigen
 
 return;
 }
@@ -9818,8 +9889,8 @@ sub _sendChat {
    for my $key (keys %chatparams) {
        $data{SSCam}{$name}{PARAMS}{$tac}{$key} = AttrVal($name, $chatparams{$key}->{attr}, $chatparams{$key}->{default})
                                                    if(exists $chatparams{$key}->{attr});
-       if($chatparams{$key}->{set}) {
-           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $chatparams{$key}->{default} if (!$extparamref->{$key} && !$chatparams{$key}->{attr});
+       if ($chatparams{$key}->{set}) {
+           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $chatparams{$key}->{default} if(!$extparamref->{$key} && !$chatparams{$key}->{attr});
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key}  if(exists $extparamref->{$key});
        }
 
@@ -9855,7 +9926,7 @@ sub _sendChat {
        $ret = qq{No SSChatBot device "$chatbot" available};
        readingsSingleUpdate ($hash, 'sendChatState', $ret, 1);
        
-       Log3($name, 2, "$name - $ret");
+       Log3 ($name, 2, "$name - $ret");
        
        $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
        return;
@@ -9865,7 +9936,7 @@ sub _sendChat {
        $ret = qq{Can't send data to SSChatBot device - "$chatbot" is disabled};
        readingsSingleUpdate ($hash, 'sendChatState', $ret, 1);
        
-       Log3($name, 2, "$name - $ret");
+       Log3 ($name, 3, "$name - $ret");
        
        $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
        return;
@@ -9961,7 +10032,7 @@ sub _sendChat {
       }
       
       $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
-      Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+      Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}." (Chat)") if(AttrVal($name,"debugactivetoken",0));
   }
   else {
       # alle Serial Numbers "{$sn}" der Transaktion ermitteln
@@ -10033,12 +10104,11 @@ sub _sendChat {
       }
 
       $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
-      Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+      Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}." (Chat)") if(AttrVal($name,"debugactivetoken",0));
   }
 
   FHEM::SSChatBot::getApiSites ($chatbot);                           # Übertragung Sendqueue starten
 
-  # use strict "refs";
   undef %chatparams;
   undef %{$extparamref};
 
@@ -10120,7 +10190,7 @@ sub _prepSendTelegram {
    $tbott = trim ($tbott) if($tbott);
    $peert = trim ($peert) if($peert);
 
-   if($subjt) {
+   if ($subjt) {
        $subjt = trim($subjt);
        $subjt =~ s/[\$#]CAM/$calias/gx;
        $subjt =~ s/[\$#]DATE/$date/gx;
@@ -10303,7 +10373,7 @@ sub _sendTelegram {
 
        $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
 
-       Log3 ($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       Log3 ($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}." (Telegram)") if(AttrVal($name,"debugactivetoken",0));
    }
    else {
        # alle Serial Numbers "{$sn}" der Transaktion ermitteln
@@ -10348,7 +10418,7 @@ sub _sendTelegram {
 
        $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
 
-       Log3 ($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       Log3 ($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}." (Telegram)") if(AttrVal($name,"debugactivetoken",0));
    }
 
    undef %teleparams;
@@ -10843,9 +10913,9 @@ sub _sendEmail {
    for my $key (keys %mailparams) {
        $data{SSCam}{$name}{PARAMS}{$tac}{$key} = AttrVal($name, $mailparams{$key}->{attr}, $mailparams{$key}->{default})
                                                    if(exists $mailparams{$key}->{attr});
-       if($mailparams{$key}->{set}) {
-           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $mailparams{$key}->{default} if (!$extparamref->{$key} && !$mailparams{$key}->{attr});
-           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key} if (exists $extparamref->{$key});
+       if ($mailparams{$key}->{set}) {
+           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $mailparams{$key}->{default} if(!$extparamref->{$key} && !$mailparams{$key}->{attr});
+           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key}  if(exists $extparamref->{$key});
        }
 
        Log3 ($name, 4, "$name - param $key is now >".$data{SSCam}{$name}{PARAMS}{$tac}{$key}."< ") if($key !~ /sdat/x);
@@ -10919,7 +10989,7 @@ sub __sendEmailblocking {                                                    ## 
       $err = "SMTP credentials couldn't be retrieved successfully - make sure you've set it with \"set $name smtpcredentials <username> <password>\"";
       Log3($name, 2, "$name - $err");
       $err = encode_base64($err,"");
-      return "$name|$err|''";
+      return "$name|$err|$tac";
   }
 
   $subject = decode_utf8($subject);
@@ -10935,7 +11005,7 @@ sub __sendEmailblocking {                                                    ## 
 
   ### Add image, Das Image liegt bereits als File vor
   ####################################################
-  if($image) {
+  if ($image) {
       $mailmsg->attach(
           Type        => $part2type,
           Path        => $image,
@@ -10944,11 +11014,12 @@ sub __sendEmailblocking {                                                    ## 
       );
   }
 
-  if($sdat) {
+  if ($sdat) {
       ### Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
       my ($ct,$img,$decoded);
       $cache = cache($name, "c_init");              # Cache initialisieren
-      if(!$cache || $cache eq "internal" ) {
+      
+      if (!$cache || $cache eq "internal" ) {
           @as = sort{$a<=>$b}keys%{$sdat};
           for my $key (@as) {
               $ct      = delete $sdat->{$key}{createdTm};
@@ -10975,10 +11046,9 @@ sub __sendEmailblocking {                                                    ## 
               Log3($name, 4, "$name - Image data sequence [$key] decoded from internal Cache for Email attachment") if($decoded);
           }
 
-          BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0);
+          # BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0);
       }
-      else {
-          # alle Serial Numbers "{$sn}" der Transaktion ermitteln
+      else {                                                                                    # alle Serial Numbers "{$sn}" der Transaktion ermitteln
           extractTIDfromCache ( { name  => $name,
                                   tac   => $tac,
                                   media => "SENDSNAPS|RS",
@@ -11017,14 +11087,14 @@ sub __sendEmailblocking {                                                    ## 
               Log3($name, 4, "$name - Image data sequence [$key] decoded from CHI-Cache for Email attachment");
           }
 
-          BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0);
+          # BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0);
       }
   }
 
-  if($vdat) {                                                      # Videodaten (mp4) wurden geliefert
+  if ($vdat) {                                                      # Videodaten (mp4) wurden geliefert
       my ($ct,$video);
       $cache = cache($name, "c_init");                             # Cache initialisieren
-      if(!$cache || $cache eq "internal" ) {
+      if (!$cache || $cache eq "internal" ) {
           @as = sort{$a<=>$b}keys%{$vdat};
           for my $key (@as) {
               $ct      = delete $vdat->{$key}{createdTm};
@@ -11051,7 +11121,7 @@ sub __sendEmailblocking {                                                    ## 
               Log3($name, 4, "$name - Video data sequence [$key] decoded from internal Cache for Email attachment");
           }
 
-          BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0);
+          # BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0);
       }
       else {
           # alle Serial Numbers "{$sn}" der Transaktion ermitteln
@@ -11093,29 +11163,26 @@ sub __sendEmailblocking {                                                    ## 
               Log3($name, 4, "$name - Video data sequence [$key] decoded from CHI-Cache for Email attachment");
           }
 
-          BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0);
+          # BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0);
       }
   }
 
   ### Add the text message part (Note that "attach" has same arguments as "new")
   ###############################################################################
-  $mailmsg->attach(
-      Type => $part1type,
-      Data => $part1txt,
-  );
+  $mailmsg->attach(Type => $part1type, Data => $part1txt);
 
   $mailmsg->attr('content-type.charset' => 'UTF-8');
 
   #####  SMTP-Connection #####
   # login to SMTP Host
-  if($sslfb) {
+  if ($sslfb) {
       # Verwendung altes Net::SMTP::SSL <= 3.00 -> immer direkter SSL-Aufbau, Attribut "smtpNoUseSSL" wird ignoriert
-      Log3($name, 3, "$name - Attribute \"smtpNoUseSSL\" will be ignored due to usage of Net::SMTP::SSL") if(AttrVal($name,"smtpNoUseSSL",0));
+      Log3 ($name, 3, "$name - Attribute \"smtpNoUseSSL\" will be ignored due to usage of Net::SMTP::SSL") if(AttrVal($name,"smtpNoUseSSL",0));
       $smtp = Net::SMTP::SSL->new(Host => $smtphost, Port => $smtpsslport, Debug => $smtpdebug);
   }
   else {
       # Verwendung neues Net::SMTP::SSL > 3.00
-      if($sslfrominit) {                                                        # sofortiger SSL connect
+      if ($sslfrominit) {                                                        # sofortiger SSL connect
           $smtp = Net::SMTP->new(Host => $smtphost, Port => $smtpsslport, SSL => 1, Debug => $smtpdebug);
       }
       else {                                                                    # erst unverschlüsselt, danach switch zu encrypted
@@ -11123,104 +11190,104 @@ sub __sendEmailblocking {                                                    ## 
       }
   }
 
-  if(!$smtp) {
+  if (!$smtp) {
       $err = "SMTP Error: Can't connect to host $smtphost";
       Log3($name, 2, "$name - $err");
       $err = encode_base64($err,"");
-      return "$name|$err|''";
+      return "$name|$err|$tac";
   }
 
-  if(!$sslfb && !$sslfrominit) {                                               # Aufbau unverschlüsselt -> switch zu verschlüsselt wenn nicht untersagt
-      if($smtp->can_ssl() && !$smtpnousessl) {
-          unless( $smtp->starttls ( SSL_verify_mode => 0,
+  if (!$sslfb && !$sslfrominit) {                                               # Aufbau unverschlüsselt -> switch zu verschlüsselt wenn nicht untersagt
+      if ($smtp->can_ssl() && !$smtpnousessl) {
+          unless ($smtp->starttls ( SSL_verify_mode => 0,
                                     SSL_version => "TLSv1_2:!TLSv1_1:!SSLv3:!SSLv23:!SSLv2",
-                                  ) ) {
+                                  )) {
               $err = "SMTP Error while switch to SSL: ".$smtp->message();
               Log3($name, 2, "$name - $err");
               $err = encode_base64($err,"");
-              return "$name|$err|''";
+              return "$name|$err|$tac";
           }
 
           $sslver = $smtp->get_sslversion();
-          Log3($name, 3, "$name - SMTP-Host $smtphost switched to encrypted connection with SSL version: $sslver");
+          Log3 ($name, 3, "$name - SMTP-Host $smtphost switched to encrypted connection with SSL version: $sslver");
       }
       else {
-          Log3($name, 3, "$name - SMTP-Host $smtphost use unencrypted connection !");
+          Log3 ($name, 3, "$name - SMTP-Host $smtphost use unencrypted connection");
       }
   }
   else {
       eval { $sslver = $smtp->get_sslversion(); };        ## no critic 'eval not tested' # Forum: https://forum.fhem.de/index.php/topic,45671.msg880602.html#msg880602
       $sslver = $sslver ? $sslver : "n.a.";
-      Log3($name, 3, "$name - SMTP-Host $smtphost use immediately encrypted connection with SSL version: $sslver");
+      Log3 ($name, 3, "$name - SMTP-Host $smtphost use immediately encrypted connection with SSL version: $sslver");
   }
 
-  unless( $smtp->auth($username, $password) ) {
+  unless ($smtp->auth($username, $password)) {
       $err = "SMTP Error authentication: ".$smtp->message();
       Log3($name, 2, "$name - $err");
       $err = encode_base64($err,"");
-      return "$name|$err|''";
+      return "$name|$err|$tac";
   }
 
-  unless( $smtp->mail($from) ) {
+  unless ($smtp->mail($from)) {
       $err = "SMTP Error setting sender: ".$smtp->message();
       Log3($name, 2, "$name - $err");
       $err = encode_base64($err,"");
-      return "$name|$err|''";
+      return "$name|$err|$tac";
   }
 
-  my @r = split(",", $to);
-  unless( $smtp->to(@r) ) {
+  my @r = split ",", $to;
+  unless ($smtp->to(@r)) {
       $err = "SMTP Error setting receiver: ".$smtp->message();
       Log3($name, 2, "$name - $err");
       $err = encode_base64($err,"");
-      return "$name|$err|''";
+      return "$name|$err|$tac";
   }
 
   if ($cc) {
-      my @c = split(",", $cc);
-      unless( $smtp->cc(@c) ) {
+      my @c = split ",", $cc;
+      unless ($smtp->cc(@c)) {
           $err = "SMTP Error setting carbon-copy $cc: ".$smtp->message();
           Log3($name, 2, "$name - $err");
           $err = encode_base64($err,"");
-          return "$name|$err|''";
+          return "$name|$err|$tac";
       }
   }
 
-  unless( $smtp->data() ) {
+  unless ($smtp->data()) {
       $err = "SMTP Error setting data: ".$smtp->message();
       Log3($name, 2, "$name - $err");
       $err = encode_base64($err,"");
-      return "$name|$err|''";
+      return "$name|$err|$tac";
   }
 
-  unless( $smtp->datasend(encode('utf8',$mailmsg->as_string)) ) {
+  unless ($smtp->datasend(encode('utf8',$mailmsg->as_string))) {
       $err = "SMTP Error sending email: ".$smtp->message();
       Log3($name, 2, "$name - $err");
       $err = encode_base64($err,"");
-      return "$name|$err|''";
+      return "$name|$err|$tac";
   }
 
-  unless( $smtp->dataend() ) {
+  unless ($smtp->dataend()) {
       $err = "SMTP Error ending transaction: ".$smtp->message();
       Log3($name, 2, "$name - $err");
       $err = encode_base64($err,"");
-      return "$name|$err|''";
+      return "$name|$err|$tac";
   }
 
-  unless( $smtp->quit() ) {
+  unless ($smtp->quit()) {
       $err = "SMTP Error saying good-bye: ".$smtp->message();
       Log3($name, 2, "$name - $err");
       $err = encode_base64($err,"");
-      return "$name|$err|''";
+      return "$name|$err|$tac";
   }
 
-  my $ret = "Email transaction \"$tac\" successfully sent ".( $sslver?"encoded by $sslver":""  );
-  Log3($name, 3, "$name - $ret To: $to".(($cc)?", CC: $cc":"") );
+  my $ret = "Email transaction \"$tac\" successfully sent ".( $sslver ? "encoded by $sslver" : "");
+  Log3 ($name, 3, "$name - $ret To: $to".(($cc)?", CC: $cc":"") );
 
   # Daten müssen als Einzeiler zurückgegeben werden
-  $ret = encode_base64($ret,"");
+  $ret = encode_base64 ($ret, "");
 
-return "$name|''|$ret";
+return "$name|''|$tac|$ret";
 }
 
 ####################################################################################################
@@ -11244,25 +11311,32 @@ return $txt;
 ####################################################################################################
 sub __sendEmaildone {                                                        ## no critic 'not used'
   my $string = shift;
-  my @a      = split("\\|",$string);
+  my @a      = split "\\|", $string;
   my $hash   = $defs{$a[0]};
-  my $err    = $a[1] ? trim(decode_base64($a[1])) : undef;
-  my $ret    = $a[2] ? trim(decode_base64($a[2])) : undef;
+  my $err    = $a[1] ? trim(decode_base64($a[1])) : '';
+  my $tac    = $a[2];
+  my $ret    = $a[3] ? trim(decode_base64($a[3])) : '';
+  
+  my $name = $hash->{NAME};
+  
+  $data{SSCam}{$name}{SENDCOUNT}{$tac}--;
+  
+  Log3 ($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}." (eMail)") if(AttrVal($name, 'debugactivetoken', 0));
 
   if ($err) {
-      readingsBeginUpdate($hash);
-      readingsBulkUpdate ($hash,"sendEmailState",$err);
-      readingsEndUpdate  ($hash, 1);
+      readingsBeginUpdate ($hash);
+      readingsBulkUpdate  ($hash,"sendEmailState",$err);
+      readingsEndUpdate   ($hash, 1);
 
       delete($hash->{HELPER}{RUNNING_PID});
       return;
   }
 
-  readingsBeginUpdate($hash);
-  readingsBulkUpdate ($hash,"sendEmailState",$ret);
-  readingsEndUpdate  ($hash, 1);
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, 'sendEmailState', $ret);
+  readingsEndUpdate   ($hash, 1);
 
-  delete($hash->{HELPER}{RUNNING_PID});
+  delete $hash->{HELPER}{RUNNING_PID};
 
 return;
 }
@@ -11271,17 +11345,17 @@ return;
 #                               Abbruchroutine Send EMail
 ####################################################################################################
 sub __sendEmailto {                                                          ## no critic 'not used'
-  my ($hash,$cause) = @_;
-  my $name = $hash->{NAME};
+  my $hash  = shift;
+  my $cause = shift // 'Timeout: process terminated';
+  my $name  = $hash->{NAME};
 
-  $cause = $cause // "Timeout: process terminated";
   Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
 
   readingsBeginUpdate         ($hash);
   readingsBulkUpdateIfChanged ($hash,"sendEmailState",$cause);
   readingsEndUpdate           ($hash, 1);
 
-  delete($hash->{HELPER}{RUNNING_PID});
+  delete $hash->{HELPER}{RUNNING_PID};
 
 return;
 }
@@ -11304,22 +11378,25 @@ sub extractTIDfromCache {
   my $mode   = $params->{mode};
   my $aref   = $params->{aref};
 
-  if($mode eq "serial") {                                                                # Serial Nummern auslesen
+  if ($mode eq "serial") {                                                                # Serial Nummern auslesen
       for my $ck (cache($name, "c_getkeys")) {
           next if $ck !~ /\{$media\}\{.*?\}\{.*?\}\{.*?\}/x;
           my ($k1,$k2,$k3) = $ck =~ /\{($media)\}\{(.*?)\}\{(.*?)\}\{.*?\}/x;
-          if($tac) {
+          
+          if ($tac) {
               next if "$k2" ne "$tac";
           }
-          push @$aref,$k3 if($k3 =~ /^(\d+|\d+.\d+)$/x);                                 # Serial Nummer in übergebenes Array eintragen
+          
+          push @$aref, $k3 if($k3 =~ /^(\d+|\d+.\d+)$/x);                                 # Serial Nummer in übergebenes Array eintragen
       }
   }
 
-  if($mode eq "readkeys") {                                                              # liest alle Schlüssel aus gegebenen Cache aus
+  if ($mode eq "readkeys") {                                                              # liest alle Schlüssel aus gegebenen Cache aus
       for my $ck (cache($name, "c_getkeys")) {
           next if $ck !~ /\{$media\}\{\d+?\}\{.*?\}/x;
           my ($k1) = $ck =~ /\{$media\}\{(\d+?)\}\{.*?\}/x;
-          push @$aref,$k1 if($k1 =~ /^\d+$/x);
+          
+          push @$aref, $k1 if($k1 =~ /^\d+$/x);
     }
   }
 
@@ -11356,12 +11433,11 @@ sub closeTrans {
    my $name = $hash->{NAME};
 
    my $tac = delete $hash->{HELPER}{TRANSACTION};            # diese Transaktion beenden
-   $tac    = $tac // q{};
 
    return if(!$tac);
-   cleanData("$name:$tac");                                  # %data Hash & Cache bereinigen
+   cleanData ("$name:$tac");                                 # %data Hash & Cache bereinigen
 
-   Log3($name, 1, "$name - Transaction \"$tac\" closed") if(AttrVal($name,"debugactivetoken",0));
+   Log3 ($name, 1, qq{$name - Transaction "$tac" closed}) if(AttrVal($name, 'debugactivetoken', 0));
 
 return;
 }
@@ -11370,38 +11446,42 @@ return;
 #                               $data Hash bereinigen
 ####################################################################################################
 sub cleanData {
-  my ($str)            = @_;
-  my ($name,$tac) = split(":",$str);
-  my $hash   = $defs{$name};
-  my $del    = 0;
+  my $str         = shift;
+  my ($name,$tac) = split ":", $str;
+  my $hash        = $defs{$name};
+  my $del         = 0;
 
   RemoveInternalTimer($hash, "FHEM::SSCam::cleanData");
 
-  if($data{SSCam}{$name}{SENDCOUNT}{$tac} && $data{SSCam}{$name}{SENDCOUNT}{$tac} > 0) {     # Cacheinhalt erst löschen wenn Sendezähler 0
+  if ($data{SSCam}{$name}{SENDCOUNT}{$tac} && $data{SSCam}{$name}{SENDCOUNT}{$tac} > 0) {     # Cacheinhalt erst löschen wenn Sendezähler 0
       InternalTimer(gettimeofday()+1, "FHEM::SSCam::cleanData", "$name:$tac", 0);
       return;
   }
 
-  if(AttrVal($name, "cacheType", "internal") eq "internal") {                                # internes Caching
-      if($tac) {
-          if($data{SSCam}{RS}{$tac}) {
+  if (AttrVal($name, "cacheType", "internal") eq "internal") {                                # internes Caching
+      if ($tac) {
+          if ($data{SSCam}{RS}{$tac}) {
               delete $data{SSCam}{RS}{$tac};
               $del = 1;
           }
-          if($data{SSCam}{$name}{SENDRECS}{$tac}) {
+          
+          if ($data{SSCam}{$name}{SENDRECS}{$tac}) {
               delete $data{SSCam}{$name}{SENDRECS}{$tac};
               $del = 1;
           }
-          if($data{SSCam}{$name}{SENDSNAPS}{$tac}) {
+          
+          if ($data{SSCam}{$name}{SENDSNAPS}{$tac}) {
               delete $data{SSCam}{$name}{SENDSNAPS}{$tac};
               $del = 1;
           }
-          if($data{SSCam}{$name}{PARAMS}{$tac}) {
+          
+          if ($data{SSCam}{$name}{PARAMS}{$tac}) {
               delete $data{SSCam}{$name}{PARAMS}{$tac};
               $del = 1;
           }
+          
           if ($del && AttrVal($name,"debugactivetoken",0)) {
-              Log3($name, 1, "$name - Data of Transaction \"$tac\" deleted");
+              Log3 ($name, 1, "$name - Data of Transaction \"$tac\" deleted");
           }
       }
       else {
@@ -11410,19 +11490,20 @@ sub cleanData {
           delete $data{SSCam}{$name}{SENDSNAPS};
           delete $data{SSCam}{$name}{PARAMS};
           if (AttrVal($name,"debugactivetoken",0)) {
-              Log3($name, 1, "$name - Data of internal Cache removed");
+              Log3 ($name, 1, "$name - Data of internal Cache removed");
           }
       }
   }
   else {                                                                                   # Caching mit CHI
       my @as = cache($name, "c_getkeys");
-      if($tac) {
+      if ($tac) {
           for my $k (@as) {
               if ($k =~ /$tac/x) {
                   cache($name, "c_remove", $k);
                   $del = 1;
               }
           }
+          
           if ($del && AttrVal($name,"debugactivetoken",0)) {
               Log3($name, 1, "$name - Data of Transaction \"$tac\" removed");
           }
@@ -11430,6 +11511,7 @@ sub cleanData {
       }
       else {
           cache($name, "c_clear");
+          
           if (AttrVal($name,"debugactivetoken",0)) {
               Log3($name, 1, "$name - Data of CHI-Cache removed");
           }
@@ -11447,15 +11529,15 @@ sub subaddFromBlocking {
   my ($name,$op,$tac) = @_;
   my $hash            = $defs{$name};
 
-  if($op eq "-") {
+  if ($op eq "-") {
       $data{SSCam}{$name}{SENDCOUNT}{$tac}--;
   }
 
-  if($op eq "+") {
+  if ($op eq "+") {
       $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
   }
 
-  Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+  Log3 ($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}." (eMail)") if(AttrVal($name,"debugactivetoken",0));
 
 return;
 }
@@ -11481,10 +11563,14 @@ return;
 #             return 1 = ok , return 0 = nok
 #############################################################################################
 sub cache {
-  my ($name,$op,$key,$dat) = @_;
+  my $name = shift;
+  my $op   = shift;
+  my $key  = shift;
+  my $dat  = shift;
+  
   my $hash           = $defs{$name};
   my $type           = AttrVal($name,"cacheType","internal");
-  my ($server,$port) = split(":",AttrVal($name,"cacheServerParam",""));
+  my ($server,$port) = split ":", AttrVal ($name, 'cacheServerParam', '');
   my $path           = $attr{global}{modpath}."/FHEM/FhemUtils/cacheSSCam";       # Dir für FileCache
   my $fuuid          = $hash->{FUUID};
   my ($cache,$r,$bst,$brt);
@@ -11493,21 +11579,23 @@ sub cache {
 
   ### Cache Initialisierung ###
   #############################
-  if($op eq "c_init") {
+  if ($op eq "c_init") {
       if ($type eq "internal") {
           Log3($name, 4, "$name - internal Cache mechanism is used ");
           return $type;
       }
 
-      if($SScamMMCHI) {
+      if ($SScamMMCHI) {
           Log3($name, 1, "$name - Perl cache module ".$SScamMMCHI." is missing. You need to install it with the FHEM Installer for example.");
           return 0;
       }
-      if($type eq "redis" && $SScamMMCHIRedis) {
+      
+      if ($type eq "redis" && $SScamMMCHIRedis) {
           Log3($name, 1, "$name - Perl cache module ".$SScamMMCHIRedis." is missing. You need to install it with the FHEM Installer for example.");
           return 0;
       }
-      if($type eq "filecache" && $SScamMMCacheCache) {
+      
+      if ($type eq "filecache" && $SScamMMCacheCache) {
           Log3($name, 1, "$name - Perl cache module ".$SScamMMCacheCache." is missing. You need to install it with the FHEM Installer for example.");
           return 0;
       }
@@ -11517,7 +11605,7 @@ sub cache {
           return $type;
       }
 
-      if($type eq "mem") {
+      if ($type eq "mem") {
           # This cache driver stores data on a per-process basis. This is the fastest of the cache implementations,
           # but data can not be shared between processes. Data will remain in the cache until cleared, expired,
           # or the process dies.
@@ -11530,7 +11618,7 @@ sub cache {
                            );
       }
 
-      if($type eq "rawmem") {
+      if ($type eq "rawmem") {
           # This is a subclass of CHI::Driver::Memory that stores references to data structures directly instead
           # of serializing / deserializing. This makes the cache faster at getting and setting complex data structures,
           # but unlike most drivers, modifications to the original data structure will affect the data structure stored
@@ -11544,12 +11632,12 @@ sub cache {
                            );
       }
 
-      if($type eq "redis") {
+      if ($type eq "redis") {
           # A CHI driver that uses Redis to store the data. Care has been taken to not have this module fail in fiery
           # ways if the cache is unavailable. It is my hope that if it is failing and the cache is not required for your work,
           # you can ignore its warnings.
           # https://metacpan.org/pod/CHI::Driver::Redis
-          if(!$server || !$port) {
+          if (!$server || !$port) {
               Log3($name, 1, "$name - ERROR in cache Redis definition. Please provide Redis server parameter in form <Redis-server address>:<Redis-server port> ");
               return 0;
           }
@@ -11590,19 +11678,21 @@ sub cache {
                            );
       }
 
-      if($type eq "file") {
+      if ($type eq "file") {
           # This is a filecache using Cache::Cache.
           # https://metacpan.org/pod/Cache::Cache
           my $pr = (split('/',reverse($path),2))[1];
           $pr    = reverse($pr);
-          if(!(-R $pr) || !(-W $pr)) {                                # root-erzeichnis testen
+          
+          if (!(-R $pr) || !(-W $pr)) {                                # root-erzeichnis testen
               Log3($name, 1, "$name - ERROR - cannot create \"$type\" Cache in dir \"$pr\": ".$!);
               delete $hash->{HELPER}{CACHEKEY};
               return 0;
           }
-          if(!(-d $path)) {                                           # Zielverzeichnis anlegen wenn nicht vorhanden
+          
+          if (!(-d $path)) {                                           # Zielverzeichnis anlegen wenn nicht vorhanden
               my $success = mkdir($path,0775);
-              if(!$success) {
+              if (!$success) {
                   Log3($name, 1, "$name - ERROR - cannot create \"$type\" Cache path \"$path\": ".$!);
                   delete $hash->{HELPER}{CACHEKEY};
                   return 0;
@@ -11634,15 +11724,14 @@ sub cache {
 
   ### Test Operationen ###
   ########################
-
-  if($hash->{HELPER}{CACHEKEY}) {
+  if ($hash->{HELPER}{CACHEKEY}) {
       $cache = $hash->{HELPER}{CACHEKEY};
   }
   else {
       return 0;
   }
 
-  if($type eq "redis") {
+  if ($type eq "redis") {
       # Test ob Redis Serververbindung möglich
       my $rc = $hash->{HELPER}{REDISKEY};
       if ($rc) {
@@ -11660,7 +11749,7 @@ sub cache {
       }
   }
 
-  if($type eq "file" && (!(-R $path) || !(-W $path))) {
+  if ($type eq "file" && (!(-R $path) || !(-W $path))) {
       Log3($name, 1, "$name - ERROR - cannot handle \"$type\" Cache: ".$!);
       delete $hash->{HELPER}{CACHEKEY};
       return 0;
@@ -11670,15 +11759,15 @@ sub cache {
   #########################
 
   # in Cache schreiben
-  if($op eq "c_write") {
+  if ($op eq "c_write") {
       if (!defined $dat) {
           Log3($name, 1, "$name - ERROR - No data for Cache with key: $key ");
       }
 
-      if($key) {
+      if ($key) {
           $cache->set($key,$dat);
           $brt = tv_interval($bst);
-          Log3($name, 1, "$name - Cache time write key \"$key\": ".$brt) if(AttrVal($name,"debugCachetime",0));
+          Log3 ($name, 1, "$name - Cache time write key \"$key\": ".$brt) if(AttrVal($name,"debugCachetime",0));
           return 1;
       }
       else {
@@ -11687,13 +11776,13 @@ sub cache {
   }
 
   # aus Cache lesen
-  if($op eq "c_read") {
+  if ($op eq "c_read") {
       my $g = $cache->get($key);
       $brt  = tv_interval($bst);
-      Log3($name, 1, "$name - Cache time read key \"$key\": ".$brt) if(AttrVal($name,"debugCachetime",0));
+      Log3 ($name, 1, "$name - Cache time read key \"$key\": ".$brt) if(AttrVal($name,"debugCachetime",0));
 
-      if(!$g) {
-          return "";
+      if (!$g) {
+          return;
       }
       else {
           return $g;
@@ -11701,7 +11790,7 @@ sub cache {
   }
 
   # einen Key entfernen
-  if($op eq "c_remove") {
+  if ($op eq "c_remove") {
       $cache->remove($key);
       $brt = tv_interval($bst);
       Log3($name, 1, "$name - Cache time remove key \"$key\": ".$brt) if(AttrVal($name,"debugCachetime",0));
@@ -11710,24 +11799,24 @@ sub cache {
   }
 
   # alle Einträge aus Cache (Namespace) entfernen
-  if($op eq "c_clear") {
+  if ($op eq "c_clear") {
       $cache->clear();
       Log3($name, 4, "$name - All entries removed from \"$type\" cache ");
       return 1;
   }
 
   # alle Keys aus Cache zurück liefern
-  if($op eq "c_getkeys") {
+  if ($op eq "c_getkeys") {
       return $cache->get_keys;
   }
 
   # einen Key im Cache prüfen
-  if($op eq "c_isvalidkey") {
+  if ($op eq "c_isvalidkey") {
       return $cache->is_valid($key);
   }
 
   # Cache entfernen
-  if($op eq "c_destroy") {
+  if ($op eq "c_destroy") {
       $cache->clear();
       delete $hash->{HELPER}{CACHEKEY};
       Log3($name, 3, "$name - Cache \"$type\" destroyed ");
