@@ -258,12 +258,12 @@ sub SOMFY_Initialize($) {
 # allow also matches for longer commands of newer devices -->   
 	$hash->{Match}	= "^Ys..............";    #msg1224029
 
-	$hash->{SetFn}		= "SOMFY_Set";
+	$hash->{SetFn}		= \&SOMFY_Set;
 	#$hash->{StateFn} 	= "SOMFY_SetState";
-	$hash->{DefFn}   	= "SOMFY_Define";
-	$hash->{UndefFn}	= "SOMFY_Undef";
-	$hash->{ParseFn}  	= "SOMFY_Parse";
-	$hash->{AttrFn}  	= "SOMFY_Attr";
+	$hash->{DefFn}   	= \&SOMFY_Define;
+	$hash->{UndefFn}	= \&SOMFY_Undef;
+	$hash->{ParseFn}  	= \&SOMFY_Parse;
+	$hash->{AttrFn}  	= \&SOMFY_Attr;
 
 	$hash->{AttrList} = " drive-down-time-to-100"
 	  . " drive-down-time-to-close"
@@ -556,7 +556,7 @@ sub SOMFY_Parse($$) {
 #	return "IODev unsupported" if ((my $ioType = $hash->{TYPE}) !~ m/^(CUL|SIGNALduino)$/);
 
 	# preprocessing if IODev is SIGNALduino	
-	if ($ioType eq "SIGNALduino") {
+	if ($ioType =~ m/^SIGNALduino/) {
 		my $encData = substr($msg, 2);
     $ret = "Somfy RTS message format error (length must be 14 or 20)! :".$encData.":" if ( (length($encData) != 14) && (length($encData) != 20));
     $ret = "Somfy RTS message format error! :".$encData.":" if ( ( ! $ret ) && ($encData !~ m/^[0-9A-F]+$/) );
@@ -1676,7 +1676,7 @@ sub SOMFY_SendCommand($@)
 	}
 
 	# CUL specifics
-	if ($ioType ne "SIGNALduino") {
+	if ($ioType !~ m/SIGNALduino/) {
 		## Do we need to change RFMode to SlowRF?
 		if (   defined( $attr{ $name } )
 			&& defined( $attr{ $name }{"switch_rfmode"} ) )
@@ -1745,7 +1745,7 @@ sub SOMFY_SendCommand($@)
 	Log3 $hash, 5, "SOMFY_send $name enc key : ". $new_enc_key."  rolling code : ".$new_rolling_code;
 
 	## Send Message to IODev using IOWrite
-	if ($ioType eq "SIGNALduino") {
+	if ($ioType =~ m/SIGNALduino/) {
 		my $SignalRepeats = AttrVal($name,'repetition', '6');
 		# swap address, remove leading s
 		my $decData = substr($message, 1, 8) . substr($message, 13, 2) . substr($message, 11, 2) . substr($message, 9, 2);
@@ -1771,7 +1771,7 @@ sub SOMFY_SendCommand($@)
   # SOMFY_updateDef( $hash, $new_enc_key, $new_rolling_code );
 
 	# CUL specifics
-	if ($ioType ne "SIGNALduino") {
+	if ($ioType !~ m/SIGNALduino/) {
 		## Do we need to change symbol length back?
 		if (   defined( $attr{ $name } )
 			&& defined( $attr{ $name }{"symbol-length"} ) )
@@ -1837,7 +1837,7 @@ sub SOMFY_SendCommand($@)
 =item summary_DE für Geräte, die das SOMFY RTS protocol unterstützen - Rolläden 
 =begin html
 
-<a name="SOMFY"></a>
+<a id="SOMFY"></a>
 <h3>SOMFY - Somfy RTS / Simu Hz protocol</h3>
 <ul>
   The Somfy RTS (identical to Simu Hz) protocol is used by a wide range of devices,
@@ -1850,7 +1850,7 @@ sub SOMFY_SendCommand($@)
 
   <br><br>
 
-  <a name="SOMFYdefine"></a>
+  <a id="SOMFY-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; SOMFY &lt;address&gt; [&lt;encryption-key&gt;] [&lt;rolling-code&gt;] </code>
@@ -1894,7 +1894,7 @@ sub SOMFY_SendCommand($@)
   </ul>
   <br>
 
-  <a name="SOMFYset"></a>
+  <a id="SOMFY-set"></a>
   <b>Set </b>
   <ul>
     <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt]</code>
@@ -1963,44 +1963,45 @@ sub SOMFY_SendCommand($@)
 
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="SOMFYattr"></a>
+  <a id="SOMFY-attr"></a>
   <b>Attributes</b>
   <ul>
+    <a id="SOMFY-attr-IODev"></a>
     <li>IODev<br>
         Set the IO or physical device which should be used for sending signals
         for this "logical" device. An example for the physical device is a CUL.<br>
         Note: The IODev has to be set, otherwise no commands will be sent!<br>
         If you have both a CUL868 and CUL433, use the CUL433 as IODev for increased range.
 		</li><br>
-
+    <a id="SOMFY-attr-positionInverse"></a>
     <li>positionInverse<br>
         Inverse operation for positions instead of 0 to 100-200 the positions are ranging from 100 to 10 (down) and then to 0 (closed). The pos set command will point in this case to the reversed pos values. This does NOT reverse the operation of the on/off command, meaning that on always will move the shade down and off will move it up towards the initial position.
 		</li><br>
-
+    <a id="SOMFY-attr-additionalPosReading"></a>
     <li>additionalPosReading<br>
         Position of the shutter will be stored in the reading <code>pos</code> as numeric value. 
         Additionally this attribute might specify a name for an additional reading to be updated with the same value than the pos.
 		</li><br>
-
+    <a id="SOMFY-attr-finalPosReading"></a>
     <li>finalPosReading<br>
         This attribute can specify the name of an additional posReading that is only set at the end of a move. Meaning intermediate values are not set.
         The name can not be any of the standard readings
 		</li><br>
-
+    <a id="SOMFY-attr-fixed_enckey"></a>
     <li>fixed_enckey 1|0<br>
         If set to 1 the enc-key is not changed after a command sent to the device. Default is value 0 meaning enc-key is changed normally for the RTS protocol.
 		</li><br>
-    
+    <a id="SOMFY-attr-autoStoreRollingCode"></a>
     <li>autoStoreRollingCode 1|0<br>
         If set to 1 the rolling code is stored automatically in the FHEM uniqueID file (Default is 0 - off). After setting the attribute, the code is first saved after the next change of the rolling code. 
 		</li><br>
     
-
+    <a id="SOMFY-attr-rawDevice"></a>
     <li>rawDevice <somfy address - 6 digit hex> [ <list of further somfy addresses> ]<br>
         If set this SOMFY device is representing a manual remote, that is used to control a somfy blind. The address of the blind (the physical blind) is specified in the rawdevice attribute to sync position changes in the blind when the remote is used. This requires an iodevice able to receive somfy commands (e.g. signalduino). Multiple physical blinds can be specified separated by space in the attribute.
 		</li><br>
     
-
+    <a id="SOMFY-attr-eventMap"></a>
     <li>eventMap<br>
         Replace event names and set arguments. The value of this attribute
         consists of a list of space separated values, each value is a colon
@@ -2013,13 +2014,13 @@ sub SOMFY_SendCommand($@)
         set store open
         </code></ul>
         </li><br>
-
+    <a id="SOMFY-attr-do_not_notify"></a>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
-
+    <a id="SOMFY-attr-loglevel"></a>
     <li><a href="#loglevel">loglevel</a></li><br>
-
+    <a id="SOMFY-attr-showtime"></a>
     <li><a href="#showtime">showtime</a></li><br>
-
+    <a id="SOMFY-attr-model"></a>
     <li>model<br>
         The model attribute denotes the model type of the device.
         The attributes will (currently) not be used by the fhem.pl directly.
@@ -2035,7 +2036,7 @@ sub SOMFY_SendCommand($@)
           <b>Receiver/Actor</b>: somfyblinds<br>
     </li><br>
 
-
+    <a id="SOMFY-attr-ignore"></a>
     <li>ignore<br>
         Ignore this device, e.g. if it belongs to your neighbour. The device
         won't trigger any FileLogs/notifys, issued commands will silently
@@ -2046,24 +2047,24 @@ sub SOMFY_SendCommand($@)
         (see <a href="#devspec">devspec</a>). You still get them with the
         "ignored=1" special devspec.
         </li><br>
-
+    <a id="SOMFY-attr-drive-down-time-to-100"></a>
     <li>drive-down-time-to-100<br>
         The time the blind needs to drive down from "open" (pos 0) to pos 100.<br>
 		In this position, the lower edge touches the window frame, but it is not completely shut.<br>
 		For a mid-size window this time is about 12 to 15 seconds.
         </li><br>
-
+    <a id="SOMFY-attr-drive-down-time-to-close"></a>
     <li>drive-down-time-to-close<br>
         The time the blind needs to drive down from "open" (pos 0) to "close", the end position of the blind.<br>
         Note: If set, this value always needs to be higher than drive-down-time-to-100
 		This is about 3 to 5 seonds more than the "drive-down-time-to-100" value.
         </li><br>
-
+    <a id="SOMFY-attr-drive-up-time-to-100"></a>
     <li>drive-up-time-to-100<br>
         The time the blind needs to drive up from "close" (endposition) to "pos 100".<br>
 		This usually takes about 3 to 5 seconds.
         </li><br>
-
+    <a id="SOMFY-attr-drive-up-time-to-open"></a>
     <li>drive-up-time-to-open<br>
         The time the blind needs drive up from "close" (endposition) to "open" (upper endposition).<br>
         Note: If set, this value always needs to be higher than drive-down-time-to-100
