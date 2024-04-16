@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.17.8" => "16.04.2024  calcTodayPVdeviation: change of calculation ",
   "1.17.7" => "09.04.2024  export pvHistory to CSV, making attr affectMaxDayVariance obsolete ", 
   "1.17.6" => "07.04.2024  new sub writeToHistory with many internal changes in pvHistory write process ". 
                            "_transferInverterValues: react on inverter etotal behavior ",
@@ -10205,13 +10206,12 @@ sub calcTodayPVdeviation {
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet", '22:00').':00');
       return if($t < $sstime);
 
-      my $diff = $pvfc - $pvre;
-      $dp      = sprintf "%.2f" , (100 * $diff / $pvre);
+      $dp = sprintf "%.2f", (100 - (100 * $pvfc / $pvre));
   }
   else {
       my $rodfc = ReadingsNum ($name, 'RestOfDayPVforecast', 0);
-      my $dayfc = $pvre + $rodfc;                                            # laufende Tagesprognose aus PVreal + Prognose Resttag
-      $dp       = sprintf "%.2f", (100 * ($pvfc - $dayfc) / $dayfc);
+      my $fcun  = $pvfc - $rodfc;                                            # laufende PV Prognose aus Tagesprognose - Prognose Resttag
+      $dp       = sprintf "%.2f", (100 - (100 * $pvre / $fcun));
   }
 
   $data{$type}{$name}{circular}{99}{tdayDvtn} = $dp;
