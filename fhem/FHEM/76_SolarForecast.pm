@@ -8148,16 +8148,16 @@ sub _batSocTarget {
   my $oldd2care  = CircularVal ($hash, 99, 'days2care',            0);
   my $ltsmsr     = CircularVal ($hash, 99, 'lastTsMaxSocRchd', undef);
   my $batcharge  = CurrentVal  ($hash, 'batcharge',                0);                       # aktuelle Ladung in %
-  my $batinstcap = CurrentVal  ($hash, 'batinstcap', 0);                                     # installierte Batteriekapazität Wh
+  my $batinstcap = CurrentVal  ($hash, 'batinstcap',               0);                       # installierte Batteriekapazität Wh
+  my $cgbt       = AttrVal     ($name, 'ctrlBatSocManagement', undef);
   
-  if (!$batinstcap) {
+  if ($cgbt && !$batinstcap) {
       Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement is active, but the required key 'cap' is not setup in currentBatteryDev. Exit.");
       return;     
   }
 
   __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $batcharge >= $maxSoCdef || $oldd2care < 0);
 
-  my $cgbt                                  = AttrVal ($name, 'ctrlBatSocManagement', undef);
   my ($lowSoc, $upSoc, $maxsoc, $careCycle) = __parseAttrBatSoc ($name, $cgbt);
   return if(!$lowSoc ||!$upSoc);
 
