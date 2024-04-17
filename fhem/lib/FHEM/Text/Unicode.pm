@@ -140,7 +140,7 @@ sub formatStringUnicode($$) {
 		"script" => [0x1d4ea,0x1d4d0,0x30],	#Using boldface since normal misses some letters
 		"fraktur" => [0x1d586,0x1d56c,0x30],#Using boldface since normal misses some letters
 		"square" => [0x1f130,0x1f130,0x30],
-		"mono" => [0x1d68a,0x1d670,0x30],
+		"mono" => [0x1d68a,0x1d670,0x1d7f6],
 	);
 
 	return undef if (! defined $uc{$font});
