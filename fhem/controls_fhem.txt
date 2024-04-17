@@ -1,6 +1,6 @@
-REV 28796
+REV 28799
 DIR unused
-UPD 2024-04-15_07:45:02 425356 ./CHANGED
+UPD 2024-04-17_07:45:03 425430 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2024-04-09_07:45:02 47157 ./MAINTAINER.txt
 UPD 2023-08-24_07:45:03 46886 ./configDB.pm
@@ -421,7 +421,7 @@ UPD 2016-08-22_07:45:11 9037 FHEM/76_MSGFile.pm
 UPD 2016-12-08_07:45:12 17663 FHEM/76_MSGMail.pm
 UPD 2022-11-02_07:45:02 77314 FHEM/76_SMAEVCharger.pm
 UPD 2024-03-11_07:45:03 177410 FHEM/76_SMAInverter.pm
-UPD 2024-04-11_07:45:03 1120648 FHEM/76_SolarForecast.pm
+UPD 2024-04-17_07:45:03 1120693 FHEM/76_SolarForecast.pm
 UPD 2022-05-31_07:45:03 43244 FHEM/76_msgDialog.pm
 UPD 2021-10-29_07:45:03 57317 FHEM/77_SMAEM.pm
 UPD 2016-07-19_07:45:16 23026 FHEM/77_SMASTP.pm
@@ -742,7 +742,7 @@ UPD 2024-03-07_07:45:03 50559 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2023-10-22_07:45:02 730362 FHEM/lib/openzwave_deviceconfig.xml.gz
 UPD 2024-03-07_07:45:03 174447 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2024-03-07_07:45:03 39770 FHEM/lib/zwave_alliancelinks.csv.gz
-UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
+UPD 2024-04-17_07:45:03 22499 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2023-01-05_07:45:03 19832 FHEM/msgSchema.pm
 UPD 2020-03-26_07:45:03 391 FHEM/myUtilsTemplate.pm
 UPD 2015-07-28_14:05:31 162 FHEM/template.layout
@@ -767,8 +767,8 @@ UPD 2024-04-15_07:45:09 5187172 docs/commandref.html
 UPD 2024-04-14_07:45:13 3216210 docs/commandref_DE.html
 UPD 2024-03-06_07:45:03 86454 docs/commandref_frame.html
 UPD 2024-03-06_07:45:03 97189 docs/commandref_frame_DE.html
-UPD 2024-04-16_07:45:13 317073 docs/commandref_modular.html
-UPD 2024-04-16_07:45:14 328985 docs/commandref_modular_DE.html
+UPD 2024-04-17_07:45:14 317073 docs/commandref_modular.html
+UPD 2024-04-17_07:45:15 328985 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
