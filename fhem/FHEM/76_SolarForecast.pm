@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.17.9" => "17.04.2024  _batSocTarget: fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1310930 ",
   "1.17.8" => "16.04.2024  calcTodayPVdeviation: change of calculation ",
   "1.17.7" => "09.04.2024  export pvHistory to CSV, making attr affectMaxDayVariance obsolete ", 
   "1.17.6" => "07.04.2024  new sub writeToHistory with many internal changes in pvHistory write process ". 
@@ -5332,8 +5333,8 @@ sub Attr {
 
   if ($aName eq 'ctrlBatSocManagement' && $init_done) {
       if ($cmd eq 'set') {
-          return qq{Define the key "cap" with "set $name currentBatteryDev" before this attribute.}
-                 if(ReadingsVal ($name, 'currentBatteryDev', '') !~ /\s+cap=/xs);
+          return qq{Define the key "cap" with "set $name currentBatteryDev" before this attribute in the correct form.}
+                 if(!CurrentVal($hash, 'batinstcap', 0));                                             # https://forum.fhem.de/index.php?msg=1310930
 
           my ($lowSoc, $upSoc, $maxsoc, $careCycle) = __parseAttrBatSoc ($name, $aVal);
 
@@ -8140,13 +8141,19 @@ sub _batSocTarget {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
-  my $t     = $paref->{t};                                                    # aktuelle Zeit
+  my $t     = $paref->{t};                                                                   # aktuelle Zeit
 
   return if(!isBatteryUsed ($name));
 
-  my $oldd2care = CircularVal ($hash, 99, 'days2care',            0);
-  my $ltsmsr    = CircularVal ($hash, 99, 'lastTsMaxSocRchd', undef);
-  my $batcharge = CurrentVal  ($hash, 'batcharge',                0);         # aktuelle Ladung in %
+  my $oldd2care  = CircularVal ($hash, 99, 'days2care',            0);
+  my $ltsmsr     = CircularVal ($hash, 99, 'lastTsMaxSocRchd', undef);
+  my $batcharge  = CurrentVal  ($hash, 'batcharge',                0);                       # aktuelle Ladung in %
+  my $batinstcap = CurrentVal  ($hash, 'batinstcap', 0);                                     # installierte Batteriekapazität Wh
+  
+  if (!$batinstcap) {
+      Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement is active, but the required key 'cap' is not setup in currentBatteryDev. Exit.");
+      return;     
+  }
 
   __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $batcharge >= $maxSoCdef || $oldd2care < 0);
 
@@ -8203,7 +8210,6 @@ sub _batSocTarget {
   my $csopt      = ReadingsNum ($name, 'Battery_OptimumTargetSoC', $lowSoc);               # aktuelles SoC Optimum
 
   my $pvexpect   = $pvfctm > $pvfctd ? $pvfctm : $pvfctd;
-  my $batinstcap = CurrentVal ($hash, 'batinstcap', 0);                                    # installierte Batteriekapazität Wh
   my $cantarget  = 100 - (100 / $batinstcap) * $pvexpect;                                  # berechneter möglicher Min SOC nach Berücksichtigung Ladewahrscheinlichkeit
 
   my $newtarget  = sprintf "%.0f", ($cantarget < $target ? $cantarget : $target);          # Abgleich möglicher Min SOC gg. berechneten Min SOC
