@@ -158,7 +158,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.17.7" => "09.04.2024  export pvHistory to CSV ", 
+  "1.17.9" => "17.04.2024  _batSocTarget: fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1310930 ",
+  "1.17.8" => "16.04.2024  calcTodayPVdeviation: change of calculation ",
+  "1.17.7" => "09.04.2024  export pvHistory to CSV, making attr affectMaxDayVariance obsolete ", 
   "1.17.6" => "07.04.2024  new sub writeToHistory with many internal changes in pvHistory write process ". 
                            "_transferInverterValues: react on inverter etotal behavior ",
   "1.17.5" => "04.04.2024  currentInverterDev: check syntax of key capacity if set, change defmaxvar back from 0.8 to 0.5 ".
@@ -480,7 +482,7 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                  );
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
 my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsForecastIdentWeekdays
-                   affectConsForecastInPlanning affectMaxDayVariance affectSolCastPercentile
+                   affectConsForecastInPlanning affectSolCastPercentile
                    consumerLegend consumerAdviceIcon consumerLink
                    ctrlAIdataStorageDuration ctrlAutoRefresh ctrlAutoRefreshFW ctrlBackupFilesKeep
                    ctrlBatSocManagement ctrlConsRecommendReadings ctrlGenPVdeviation ctrlInterval
@@ -1091,7 +1093,7 @@ sub Initialize {
                                 "affectBatteryPreferredCharge:slider,0,1,100 ".
                                 "affectConsForecastIdentWeekdays:1,0 ".
                                 "affectConsForecastInPlanning:1,0 ".
-                                "affectMaxDayVariance ".
+                                "affectMaxDayVariance:obsolete ".
                                 "affectSolCastPercentile:select,10,50,90 ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
@@ -5301,14 +5303,14 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  #if ($cmd eq 'set' && $aName eq 'affectNumHistDays') {
-  #    if (!$init_done) {
-  #        return qq{Device "$name" -> The attribute '$aName' is obsolete and will be deleted soon. Please press "save config" when restart is finished.};
-  #    }
-  #    else {
-  #        return qq{The attribute '$aName' is obsolete and will be deleted soon.};
-  #    }
-  #}
+  if ($cmd eq 'set' && $aName eq 'affectMaxDayVariance') {
+      if (!$init_done) {
+          return qq{Device "$name" -> The attribute '$aName' is obsolete and will be deleted soon. Please press "save config" when restart is finished.};
+      }
+      else {
+          return qq{The attribute '$aName' is obsolete and will be deleted soon.};
+      }
+  }
   ######################################################################################################################
 
   if ($aName eq 'disable') {
@@ -5331,8 +5333,8 @@ sub Attr {
 
   if ($aName eq 'ctrlBatSocManagement' && $init_done) {
       if ($cmd eq 'set') {
-          return qq{Define the key "cap" with "set $name currentBatteryDev" before this attribute.}
-                 if(ReadingsVal ($name, 'currentBatteryDev', '') !~ /\s+cap=/xs);
+          return qq{Define the key "cap" with "set $name currentBatteryDev" before this attribute in the correct form.}
+                 if(!CurrentVal($hash, 'batinstcap', 0));                                             # https://forum.fhem.de/index.php?msg=1310930
 
           my ($lowSoc, $upSoc, $maxsoc, $careCycle) = __parseAttrBatSoc ($name, $aVal);
 
@@ -5373,12 +5375,6 @@ sub Attr {
       if ($aName eq 'ctrlInterval' || $aName eq 'ctrlBackupFilesKeep' || $aName eq 'ctrlAIdataStorageDuration') {
           unless ($aVal =~ /^[0-9]+$/x) {
               return qq{Invalid value for $aName. Use only figures 0-9!};
-          }
-      }
-
-      if ($aName eq 'affectMaxDayVariance') {
-          unless ($aVal =~ /^[0-9.]+$/x) {
-              return qq{The value for $aName is not valid. Use only numbers with optional decimal places !};
           }
       }
 
@@ -8145,13 +8141,19 @@ sub _batSocTarget {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
-  my $t     = $paref->{t};                                                    # aktuelle Zeit
+  my $t     = $paref->{t};                                                                   # aktuelle Zeit
 
   return if(!isBatteryUsed ($name));
 
-  my $oldd2care = CircularVal ($hash, 99, 'days2care',            0);
-  my $ltsmsr    = CircularVal ($hash, 99, 'lastTsMaxSocRchd', undef);
-  my $batcharge = CurrentVal  ($hash, 'batcharge',                0);         # aktuelle Ladung in %
+  my $oldd2care  = CircularVal ($hash, 99, 'days2care',            0);
+  my $ltsmsr     = CircularVal ($hash, 99, 'lastTsMaxSocRchd', undef);
+  my $batcharge  = CurrentVal  ($hash, 'batcharge',                0);                       # aktuelle Ladung in %
+  my $batinstcap = CurrentVal  ($hash, 'batinstcap', 0);                                     # installierte Batteriekapazität Wh
+  
+  if (!$batinstcap) {
+      Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement is active, but the required key 'cap' is not setup in currentBatteryDev. Exit.");
+      return;     
+  }
 
   __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $batcharge >= $maxSoCdef || $oldd2care < 0);
 
@@ -8208,7 +8210,6 @@ sub _batSocTarget {
   my $csopt      = ReadingsNum ($name, 'Battery_OptimumTargetSoC', $lowSoc);               # aktuelles SoC Optimum
 
   my $pvexpect   = $pvfctm > $pvfctd ? $pvfctm : $pvfctd;
-  my $batinstcap = CurrentVal ($hash, 'batinstcap', 0);                                    # installierte Batteriekapazität Wh
   my $cantarget  = 100 - (100 / $batinstcap) * $pvexpect;                                  # berechneter möglicher Min SOC nach Berücksichtigung Ladewahrscheinlichkeit
 
   my $newtarget  = sprintf "%.0f", ($cantarget < $target ? $cantarget : $target);          # Abgleich möglicher Min SOC gg. berechneten Min SOC
@@ -10211,13 +10212,12 @@ sub calcTodayPVdeviation {
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet", '22:00').':00');
       return if($t < $sstime);
 
-      my $diff = $pvfc - $pvre;
-      $dp      = sprintf "%.2f" , (100 * $diff / $pvre);
+      $dp = sprintf "%.2f", (100 - (100 * $pvfc / $pvre));
   }
   else {
       my $rodfc = ReadingsNum ($name, 'RestOfDayPVforecast', 0);
-      my $dayfc = $pvre + $rodfc;                                            # laufende Tagesprognose aus PVreal + Prognose Resttag
-      $dp       = sprintf "%.2f", (100 * ($pvfc - $dayfc) / $dayfc);
+      my $fcun  = $pvfc - $rodfc;                                            # laufende PV Prognose aus Tagesprognose - Prognose Resttag
+      $dp       = sprintf "%.2f", (100 - (100 * $pvre / $fcun));
   }
 
   $data{$type}{$name}{circular}{99}{tdayDvtn} = $dp;
@@ -10457,12 +10457,11 @@ sub __calcNewFactor {
       $factor  = sprintf "%.2f", ($pvrl / $pvfc);
   }
 
-  my $maxvar = AttrVal ($name, 'affectMaxDayVariance', $defmaxvar);                                   # max. Korrekturvarianz
-  $factor    = 1.00 if(1 * $factor == 0);                                                             # 0.00-Werte ignorieren (Schleifengefahr)
+  $factor = 1.00 if(1 * $factor == 0);                                                                # 0.00-Werte ignorieren (Schleifengefahr)
 
-  if (abs($factor - $oldfac) > $maxvar) {
-      $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
-      Log3 ($name, 3, "$name - new $calc correction factor calculated (limited by affectMaxDayVariance): $factor (old: $oldfac) for hour: $h");
+  if (abs($factor - $oldfac) > $defmaxvar) {
+      $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $defmaxvar : $oldfac - $defmaxvar);
+      Log3 ($name, 3, "$name - new $calc correction factor calculated (limited by maximum Day Variance): $factor (old: $oldfac) for hour: $h");
   }
   else {
       Log3 ($name, 3, "$name - new $calc correction factor for hour $h calculated: $factor (old: $oldfac)");
@@ -14415,30 +14414,31 @@ sub listDataPool {
           my $don     = HistoryVal ($hash, $day, $key, 'DoN',         '-');
           
           if ($export eq 'csv') {
-              $hexp->{$day}{$key}{pvrl}        = $pvrl;
-              $hexp->{$day}{$key}{pvrlvd}      = $pvrlvd;
-              $hexp->{$day}{$key}{pvfc}        = $pvfc;
-              $hexp->{$day}{$key}{gcons}       = $gcons;
-              $hexp->{$day}{$key}{con}         = $con;
-              $hexp->{$day}{$key}{confc}       = $confc;
-              $hexp->{$day}{$key}{gfeedin}     = $gfeedin;
-              $hexp->{$day}{$key}{weatherid}   = $wid;
-              $hexp->{$day}{$key}{wcc}         = $wcc;
-              $hexp->{$day}{$key}{rr1c}        = $rr1c;
-              $hexp->{$day}{$key}{temp}        = $temp    // '';
-              $hexp->{$day}{$key}{pvcorrf}     = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[0];
-              $hexp->{$day}{$key}{quality}     = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[1];
-              $hexp->{$day}{$key}{dayname}     = $dayname // '';
-              $hexp->{$day}{$key}{etotal}      = $etotal;
-              $hexp->{$day}{$key}{batin}       = $batin;
-              $hexp->{$day}{$key}{batouttotal} = $btotout;
-              $hexp->{$day}{$key}{batout}      = $batout;
-              $hexp->{$day}{$key}{batmaxsoc}   = $batmsoc;
-              $hexp->{$day}{$key}{batsetsoc}   = $batssoc;
-              $hexp->{$day}{$key}{rad1h}       = $rad1h;
-              $hexp->{$day}{$key}{sunaz}       = $sunaz;
-              $hexp->{$day}{$key}{sunalt}      = $sunalt;
-              $hexp->{$day}{$key}{DoN}         = $don;
+              $hexp->{$day}{$key}{PVreal}             = $pvrl;
+              $hexp->{$day}{$key}{PVrealValid}        = $pvrlvd;
+              $hexp->{$day}{$key}{PVforecast}         = $pvfc;
+              $hexp->{$day}{$key}{GridConsumption}    = $gcons;
+              $hexp->{$day}{$key}{Consumption}        = $con;
+              $hexp->{$day}{$key}{confc}              = $confc;
+              $hexp->{$day}{$key}{GridFeedIn}         = $gfeedin;
+              $hexp->{$day}{$key}{WeatherId}          = $wid;
+              $hexp->{$day}{$key}{CoudCover}          = $wcc;
+              $hexp->{$day}{$key}{TotalPrecipitation} = $rr1c;
+              $hexp->{$day}{$key}{Temperature}        = $temp    // '';
+              $hexp->{$day}{$key}{PVCorrectionFactor} = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[0];
+              $hexp->{$day}{$key}{Quality}            = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[1];
+              $hexp->{$day}{$key}{DayName}            = $dayname // '';
+              $hexp->{$day}{$key}{Etotal}             = $etotal;
+              $hexp->{$day}{$key}{BatteryInTotal}     = $btotin;
+              $hexp->{$day}{$key}{BatteryIn}          = $batin;
+              $hexp->{$day}{$key}{BatteryOutTotal}    = $btotout;
+              $hexp->{$day}{$key}{BatteryOut}         = $batout;
+              $hexp->{$day}{$key}{BatteryMaxSoc}      = $batmsoc;
+              $hexp->{$day}{$key}{BatterySetSoc}      = $batssoc;
+              $hexp->{$day}{$key}{GlobalRadiation }   = $rad1h;
+              $hexp->{$day}{$key}{SunAzimuth}         = $sunaz;
+              $hexp->{$day}{$key}{SunAltitude}        = $sunalt;
+              $hexp->{$day}{$key}{DayOrNight}         = $don;
           }
           
           $ret .= "\n      " if($ret);
@@ -14471,11 +14471,11 @@ sub listDataPool {
               my $csmh = HistoryVal ($hash, $day, $key, "hourscsme${c}",  undef);
               
               if ($export eq 'csv') {
-                  $hexp->{$day}{$key}{"cyclescsm${c}"}  = $csmc if(defined $csmc);
-                  $hexp->{$day}{$key}{"csmt${c}"}       = $csmt if(defined $csmt);
-                  $hexp->{$day}{$key}{"csme${c}"}       = $csme if(defined $csme);
-                  $hexp->{$day}{$key}{"minutescsm${c}"} = $csmm if(defined $csmm);
-                  $hexp->{$day}{$key}{"hourscsme${c}"}  = $csmh if(defined $csmh);
+                  $hexp->{$day}{$key}{"CyclesCsm${c}"}  = $csmc if(defined $csmc);
+                  $hexp->{$day}{$key}{"Csmt${c}"}       = $csmt if(defined $csmt);
+                  $hexp->{$day}{$key}{"Csme${c}"}       = $csme if(defined $csme);
+                  $hexp->{$day}{$key}{"MinutesCsm${c}"} = $csmm if(defined $csmm);
+                  $hexp->{$day}{$key}{"HoursCsme${c}"}  = $csmh if(defined $csmh);
               }
 
               if (defined $csmc) {
@@ -14905,9 +14905,7 @@ sub _writeAsCsv {
   ####################
   for my $exd (sort{$a<=>$b} keys %{$hexp}) {
       for my $exh (sort{$a<=>$b} keys %{$hexp->{$exd}}) {
-          my @aexp;
-          push @aexp, $exd;
-          push @aexp, $exh;
+          push my @aexp, ($exd, $exh);
           
           for my $k (sort keys %{$hexp->{$exd}{$exh}}) {  
               my $val = $hexp->{$exd}{$exh}{$k};
@@ -18286,9 +18284,7 @@ to ensure that the system configuration is correct.
       <li><b>pvCorrectionFactor_Auto </b> <br><br>
 
       Switches the automatic prediction correction on/off.
-      The mode of operation differs depending on the selected method.
-      The correction behaviour can be influenced with the
-      <a href="#SolarForecast-attr-affectMaxDayVariance">affectMaxDayVariance</a> attribute. <br>
+      The mode of operation differs depending on the selected method. <br>
       (default: off)
       <br><br>
 
@@ -18866,16 +18862,6 @@ to ensure that the system configuration is correct.
          If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast. <br>
          Otherwise, all weekdays are used equally for calculation. <br>
          (default: 0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-affectMaxDayVariance"></a>
-       <li><b>affectMaxDayVariance &lt;Zahl&gt; </b><br>
-         Maximum adjustment of the PV prediction factor (Reading pvCorrectionFactor_XX) that can be made
-         in relation to one hour per day. <br>
-         This setting has no influence on the learning and forecasting behavior of any AI support used
-         (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>). <br>
-         (default: 0.8)
        </li>
        <br>
 
@@ -20530,8 +20516,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       Schaltet die automatische Vorhersagekorrektur ein/aus.
       Die Wirkungsweise unterscheidet sich je nach gewählter Methode. <br>
-      Das Korrekturverhalten kann mit dem Attribut
-      <a href="#SolarForecast-attr-affectMaxDayVariance">affectMaxDayVariance</a> beeinflusst werden. <br>
       (default: off)
       <br><br>
 
@@ -21117,17 +21101,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen. <br>
          Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet. <br>
          (default: 0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-affectMaxDayVariance"></a>
-       <li><b>affectMaxDayVariance &lt;Zahl&gt; </b><br>
-         Maximale Anpassung des PV Vorhersagefaktors (Reading pvCorrectionFactor_XX) die bezogen auf eine
-         Stunde pro Tag vorgenommen werden kann. <br>
-         Auf das Lern- und Prognoseverhalten einer eventuell verwendeten KI-Unterstützung
-         (<a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a>) hat diese Einstellung keinen
-         Einfluß. <br>
-         (default: 0.8)
        </li>
        <br>
 
