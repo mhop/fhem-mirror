@@ -457,6 +457,11 @@ function AutomowerConnectSubtractHull ( path ) {
 
 }
 
+function AutomowerConnectPanelCmd ( panelcmd ) {
+  if ( typeof FW_cmd === "function" )
+      FW_cmd( FW_root+"?cmd="+panelcmd+"&XHR=1" );
+}
+
 //AutomowerConnectUpdateDetail (<devicename>, <type>, <detailfnfirst>, <imagesize x>, <imagesize y>, <scale x>, <scale y>, <error description>, <path array>, <error array>, <hull array>)
 function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, scalx, scaly, errdesc, pos, erray, hullxy) {
   const colorat = {

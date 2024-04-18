@@ -45,42 +45,44 @@ require FHEM::Devices::AMConnect::Common;
 sub Initialize() {
   my ($hash) = @_;
 
-  $hash->{DefFn}      = \&FHEM::Devices::AMConnect::Common::Define;
-  $hash->{GetFn}      = \&FHEM::Devices::AMConnect::Common::Get;
-  $hash->{UndefFn}    = \&FHEM::Devices::AMConnect::Common::Undefine;
-  $hash->{DeleteFn}   = \&FHEM::Devices::AMConnect::Common::Delete;
-  $hash->{ShutdownFn} = \&FHEM::Devices::AMConnect::Common::Shutdown;
-  $hash->{RenameFn}   = \&FHEM::Devices::AMConnect::Common::Rename;
-  $hash->{FW_detailFn}= \&FHEM::Devices::AMConnect::Common::FW_detailFn;
-  $hash->{ReadFn}     = \&FHEM::Devices::AMConnect::Common::wsRead; 
-  $hash->{ReadyFn}    = \&FHEM::Devices::AMConnect::Common::wsReady;
-  $hash->{SetFn}      = \&FHEM::Devices::AMConnect::Common::Set;
-  $hash->{AttrFn}     = \&FHEM::Devices::AMConnect::Common::Attr;
-  $hash->{AttrList}   = "disable:1,0 " .
-                        "debug:1,0 " .
-                        "disabledForIntervals " .
-                        "mapImagePath " .
-                        "mapImageWidthHeight " .
-                        "mapImageCoordinatesToRegister:textField-long " .
-                        "mapImageCoordinatesUTM:textField-long " .
-                        "mapImageZoom " .
-                        "mapBackgroundColor " .
-                        "mapDesignAttributes:textField-long " .
-                        "mapZones:textField-long " .
-                        "showMap:1,0 " .
-                        "chargingStationCoordinates " .
-                        "chargingStationImagePosition:left,top,right,bottom,center " .
-                        "scaleToMeterXY " .
-                        "mowerCuttingWidth " .
-                        "mowerSchedule:textField-long " .
-                        "mowingAreaLimits:textField-long " .
-                        "mowingAreaHull:textField-long " .
-                        "propertyLimits:textField-long " .
-                        "weekdaysToResetWayPoints " .
-                        "numberOfWayPointsToDisplay " .
-                        "addPollingMinInterval " .
-                        "addPositionPolling:1,0 " .
-                        $::readingFnAttributes;
+  $hash->{DefFn}        = \&FHEM::Devices::AMConnect::Common::Define;
+  $hash->{GetFn}        = \&FHEM::Devices::AMConnect::Common::Get;
+  $hash->{UndefFn}      = \&FHEM::Devices::AMConnect::Common::Undefine;
+  $hash->{DeleteFn}     = \&FHEM::Devices::AMConnect::Common::Delete;
+  $hash->{ShutdownFn}   = \&FHEM::Devices::AMConnect::Common::Shutdown;
+  $hash->{RenameFn}     = \&FHEM::Devices::AMConnect::Common::Rename;
+  $hash->{FW_detailFn}  = \&FHEM::Devices::AMConnect::Common::FW_detailFn;
+  # $hash->{FW_summaryFn} = \&FHEM::Devices::AMConnect::Common::FW_summaryFn;
+  $hash->{ReadFn}       = \&FHEM::Devices::AMConnect::Common::wsRead; 
+  $hash->{ReadyFn}      = \&FHEM::Devices::AMConnect::Common::wsReady;
+  $hash->{SetFn}        = \&FHEM::Devices::AMConnect::Common::Set;
+  $hash->{AttrFn}       = \&FHEM::Devices::AMConnect::Common::Attr;
+  $hash->{AttrList}     = "disable:1,0 " .
+                          "debug:1,0 " .
+                          "disabledForIntervals " .
+                          "mapImagePath " .
+                          "mapImageWidthHeight " .
+                          "mapImageCoordinatesToRegister:textField-long " .
+                          "mapImageCoordinatesUTM:textField-long " .
+                          "mapImageZoom " .
+                          "mapBackgroundColor " .
+                          "mapDesignAttributes:textField-long " .
+                          "mapZones:textField-long " .
+                          "showMap:1,0 " .
+                          "chargingStationCoordinates " .
+                          "chargingStationImagePosition:left,top,right,bottom,center " .
+                          "scaleToMeterXY " .
+                          "mowerCuttingWidth " .
+                          "mowerPanel:textField-long,85 " .
+                          "mowerSchedule:textField-long " .
+                          "mowingAreaLimits:textField-long " .
+                          "mowingAreaHull:textField-long " .
+                          "propertyLimits:textField-long " .
+                          "weekdaysToResetWayPoints " .
+                          "numberOfWayPointsToDisplay " .
+                          "addPollingMinInterval " .
+                          "addPositionPolling:1,0 " .
+                          $::readingFnAttributes;
 
   $::data{FWEXT}{AutomowerConnect}{SCRIPT} = 'automowerconnect.js';
   $::data{FWEXT}{AutomowerConnectA}{SCRIPT} = '/automowerconnect/hull.js';
@@ -463,7 +465,22 @@ __END__
       The design attribute <code>hullSubtract</code> can be set to a natural number {&#8469;}, it depicts the recursion depth in which polygon points removed from way points.<br>
       This reduces spikes in border region.<br>
       <code>hullSubtract=""</code> removes the button 'Subtract Hull'.<br>
-      
+    </li>
+
+    <li><a id='AutomowerConnect-attr-mowerPanel'>mowerPanel</a><br>
+      <code>attr &lt;name&gt; mowerPanel &lt;html code&gt;</code><br>
+      Shows user defined html beneath the map. usefull for a panel with shortcuts<br>
+      The command attribute has to contain the mower command, without set &lt;name&gt;<br>
+      <code>command="Start 210"</code> stands for <code>set &lt;name&gt; Start 210</code><br>
+      Directives as comment in the first line allow positioning.<br>
+      <ul>
+      <code>ON_TOP</code> shows html above map<br>
+      </ul>
+      Example:<br>
+      <code>
+      &lt;!-- ON_TOP --&gt;<br>
+      &lt;button command="Start 210" &gt;Start für 3 1/2 h&lt;/button&gt;<br>
+      </code>
     </li>
 
     <li><a href="disable">disable</a></li>
@@ -910,6 +927,22 @@ __END__
       Das Designattribut <code>hullSubtract</code> kann auf eine natürliche Zahl {&#8469;} gesetzt werden, die angibt in welcher Rekursionstiefe Polygonpunkte aus der Menge der Wegpunkte entfernt werden.<br>
       Das reduziert Ausreißer im Randbereich der vom Polygon umschlossenen Fläche.<br>
       Wenn <code>hullSubtract=""</code> gesetzt wird, dann wird der Button 'Subtract Hull' entfernt.<br>
+    </li>
+
+    <li><a id='AutomowerConnect-attr-mowerPanel'>mowerPanel</a><br>
+      <code>attr &lt;name&gt; mowerPanel &lt;html code&gt;</code><br>
+      Zeigt HTML Kode unterhalb der Karte z.B. für ein Panel mit Kurzbefehlen.<br>
+      Das command Attribut beinhaltet den Mäherbefehl, ohne set &lt;name&gt;<br>
+      <code>command="Start 210"</code> steht für <code>set &lt;name&gt; Start 210</code><br>
+      Direktiven als Kommentar erlauben die Positionierung.<br>
+      <ul>
+      <code>ON_TOP</code> zeigt Buttons über der Karte<br>
+      </ul>
+      Beispiel:<br>
+      <code>
+      &lt;!-- ON_TOP --&gt;<br>
+      &lt;button command="Start 210" &gt;Start für 3 1/2 h&lt;/button&gt;<br>
+      </code>
     </li>
 
      <li><a href="disable">disable</a></li>

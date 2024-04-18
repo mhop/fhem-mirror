@@ -479,6 +479,17 @@ sub Get {
 }
 
 #########################
+sub FW_summaryFn {
+  my ($FW_wname, $name, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my $hash = $defs{$name};
+  my $type = $hash->{TYPE};
+  my $content = AttrVal($name, 'mowerPanel', '');
+  return '' if( AttrVal($name, 'disable', 0) || !$content || !$::init_done);
+  $content =~ s/command=['"](.*?)['"]/onclick="AutomowerConnectPanelCmd('set $name $1')"/g;
+  return $content if ( $content =~ /IN_STATE/ );
+}
+
+#########################
 sub FW_detailFn {
   my ($FW_wname, $name, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$name};
@@ -580,6 +591,10 @@ sub FW_detailFn {
   .${type}_${name}_canvas_1{
     position: absolute; left: 0; top: 0; z-index: 1;}
   </style>";
+  my $content = AttrVal($name, 'mowerPanel', '');
+  my $contentflg = $content =~ /ON_TOP/;
+  $content =~ s/command=['"](.*?)['"]/onclick="AutomowerConnectPanelCmd('set $name $1')"/g;
+  $ret .= $content if ( $contentflg );
   $ret .= "<div id='${type}_${name}_div' class='${type}_${name}_div' $$mapDesign $csdata $limi $propli width='$picx' height='$picy' >";
   $ret .= "<canvas id='${type}_${name}_canvas_0' class='${type}_${name}_canvas_0' width='$picx' height='$picy' ></canvas>";
   $ret .= "<canvas id='${type}_${name}_canvas_1' class='${type}_${name}_canvas_1' width='$picx' height='$picy' ></canvas>";
@@ -588,6 +603,7 @@ sub FW_detailFn {
           if ( -e "$FW_dir/$hash->{helper}{FWEXTA}{path}/$hash->{helper}{FWEXTA}{file}" && !AttrVal( $name,'mowingAreaHull','' ) && $$mapDesign =~ m/hullCalculate="1"/g );
   $ret .= "<button title='Subtracts hull polygon points from way points. To hide button set hullSubtract=\"\".' onclick='AutomowerConnectSubtractHull( \"$FW_ME/$type/$name/json\" )'>Subtract Hull</button>"
           if ( -e "$FW_dir/$hash->{helper}{FWEXTA}{path}/$hash->{helper}{FWEXTA}{file}" && AttrVal( $name,'mowingAreaHull','' ) && $$mapDesign =~ m/hullSubtract="\d+"/g );
+  $ret .= $content  if ( !$contentflg );
   $ret .= "<br>";
   $hash->{helper}{detailFnFirst} = 1;
   my $mid = $hash->{helper}{map_init_delay};
