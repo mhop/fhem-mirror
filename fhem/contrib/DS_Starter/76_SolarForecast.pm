@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.17.10"=> "19.04.2024  calcTodayPVdeviation: avoid Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1311121 ",
   "1.17.9" => "17.04.2024  _batSocTarget: fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1310930 ",
   "1.17.8" => "16.04.2024  calcTodayPVdeviation: change of calculation ",
   "1.17.7" => "09.04.2024  export pvHistory to CSV, making attr affectMaxDayVariance obsolete ", 
@@ -10215,9 +10216,10 @@ sub calcTodayPVdeviation {
       $dp = sprintf "%.2f", (100 - (100 * $pvfc / $pvre));
   }
   else {
-      my $rodfc = ReadingsNum ($name, 'RestOfDayPVforecast', 0);
-      my $fcun  = $pvfc - $rodfc;                                            # laufende PV Prognose aus Tagesprognose - Prognose Resttag
-      $dp       = sprintf "%.2f", (100 - (100 * $pvre / $fcun));
+      my $rodfc = ReadingsNum ($name, 'RestOfDayPVforecast', 0);             # PV Forecast für den Rest des Tages
+      my $cufc  = $pvfc - $rodfc;                                            # laufende PV Prognose aus Tagesprognose - Prognose Resttag
+      return if(!$cufc);                                                     # Illegal division by zero verhindern Forum:
+      $dp       = sprintf "%.2f", (100 - (100 * $pvre / $cufc));
   }
 
   $data{$type}{$name}{circular}{99}{tdayDvtn} = $dp;

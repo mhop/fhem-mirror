@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  76_SolarForecast: possible Illegal division by zero if Attr
+                              ctrlGenPVdeviation is set to continuously
  - feature: 74_AutomowerConnect.pm: new attribute mowerPanel
  - bugfix:  76_SolarForecast: possible Illegal division by zero if Battery SOC
                               management is activated 
