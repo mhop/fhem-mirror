@@ -28,6 +28,9 @@
 #
 #########################################################################################
 
+# TODO: in 716 und 818 & Trennzeichen kollidiert mit & in Namen.
+# buy/sell/remove mit Liste der Stocks
+
 package main;
 
 use strict;
@@ -37,7 +40,7 @@ use Finance::Quote;
 use Encode qw(decode encode);
 
 #-- global variables
-my $version = "1.0";
+my $version = "1.2";
 
 my %shares_transtable_DE = ( 
     "symbol"            =>  "Symbol",
@@ -113,7 +116,7 @@ sub Shares_Initialize($)
   $hash->{GetFn}     = "Shares_Get";
   $hash->{AttrFn}    = "Shares_Attr";
   
-  my $attr = "pollInterval queryTimeout colors depotCurrency shareCurrency defaultSource sources sourcesLinks stocks:textField-long ".
+  my $attr = "pollInterval queryTimeout arrows colors headercolor depotCurrency shareCurrency altSymbol defaultSource sources sourcesLinks stocks:textField-long ".
              "shareFurtherReadings:multiple,open,close,last,return,high,low,value_entry,value_prev,div_yield,eps,volume,year_range ".
              "$main::readingFnAttributes";        
   $hash->{AttrList} = $attr;
@@ -144,7 +147,7 @@ sub Shares_Define($$){
 
   $attr{$name}{"pollInterval"}    = 1800;
   $attr{$name}{"queryTimeout"}    = 120;
-  $attr{$name}{"defaultSource"}   = "yahoo_json";
+  $attr{$name}{"defaultSource"}   = "xetra";
   $attr{$name}{"depotCurrency"}   = "EUR:€";
   $attr{$name}{"shareCurrency"}   = "EUR:€";
   
@@ -246,6 +249,66 @@ sub shares_round($){
   return sprintf("%.2f",$num)
 }
 
+sub shares_storekey {
+    my ($hash,$keyname,$keyvalue) = @_;
+    my $name = $hash->{NAME};
+    
+    my $index = $hash->{TYPE} ."_". $name ."_". $keyname;
+    my $key     = getUniqueId() . $index;
+    my $enc_key = "";
+
+    if ( eval "use Digest::MD5;1" ) {
+      $key = Digest::MD5::md5_hex( unpack "H*", $key );
+      $key .= Digest::MD5::md5_hex($key);
+    }
+
+    for my $char ( split //, $keyvalue ) {
+      my $encode = chop($key);
+      $enc_key .= sprintf( "%.2x", ord($char) ^ ord($encode) );
+      $key = $encode . $key;
+    }
+
+    my $err = setKeyValue( $index, $enc_key );
+    if ( defined($err) ){
+      return "[shares_storekey] error while saving the value for key $keyname - $err" ;
+    }else{
+      return "[shares_storekey] key $keyname successfully saved";
+    }
+}
+
+sub shares_readkey {
+    my ($hash,$keyname) = @_;
+    my $name = $hash->{NAME};
+  
+    my $index = $hash->{TYPE} ."_". $name ."_". $keyname;
+    my $key   = getUniqueId() . $index;
+    Log3 $name,1,"[shares_readkey] reading value for key $keyname from file";
+    my ($err, $keyvalue ) = getKeyValue($index);
+
+    if ( defined($err) ) {
+      Log3 $name,1,"[shares_readkey] unable to read value for key $keyname from file";
+      return;
+    }
+
+    if ( defined($keyvalue) ) {
+      if ( eval "use Digest::MD5;1" ) {
+        $key = Digest::MD5::md5_hex( unpack "H*", $key );
+        $key .= Digest::MD5::md5_hex($key);
+      }
+      my $dec_key = '';
+      for my $char ( map { pack( 'C', hex($_) ) } ( $keyvalue =~ /(..)/g ) ) {
+        my $decode = chop($key);
+        $dec_key .= chr( ord($char) ^ ord($decode) );
+        $key = $decode . $key;
+      }
+      return $dec_key;
+    }else{
+      Log3 $name, 1, "[shares_readkey] no value for key $keyname in file";
+      return;
+    }
+    return;
+}
+
 #########################################################################################
 #
 # Shares_GetLinkHashes 
@@ -264,8 +327,12 @@ sub Shares_GetLinkHashes($){
   my %linkHash = ();
 
   foreach my $link (@links) {
+    if ($link !~ /^.*\:https?\:/){
+      Log3 $name,1,"[Shares_GetLinkHashes] missing protocol part missing in link $link";
+      }
     my @toks = split ":", $link;
-    $linkHash{$toks[0]} = $toks[1];
+    #Log 1,"========> setting link for source ".$toks[0]." to ".$toks[1].":".$toks[2];
+    $linkHash{$toks[0]} = $toks[1].":".$toks[2];                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         $toks[2];
   }
   return \%linkHash;
 }
@@ -285,6 +352,7 @@ sub Shares_SetStockHashes($$){
   #-- attribute stocks contains share informations in format: 
   #   <Symbol>:<Count>:<Value_entry>:<Category>
   #   IMPORTANT
+  #   <Symbol> may have the format <Symbol1>[|<SymbolN>]*
   #   <Value_entry> in attribute is in depot currency
   #   <Value_entry> in hash is in share currency 
   
@@ -299,6 +367,7 @@ sub Shares_SetStockHashes($$){
   my $buyval;
   my $str   = "";
   my $first = 1;
+  
   foreach my $stock (sort keys %{ $stocks }) {
     $str .= ",\n" unless $first;
     $first = 0;
@@ -309,7 +378,8 @@ sub Shares_SetStockHashes($$){
       $buyval = shares_round($stocks->{$stock}[1]*$exr);
       Log3 $name,5,"[Shares_SetStockHashes] share ".$stock." transforming buy value ".$stocks->{$stock}[1]." $cur into $buyval $depcur";
     }
-    $str .= $stock.":".$stocks->{$stock}[0].":".$buyval.":".lc($stocks->{$stock}[2]);
+    #-- [0] is number, [1] is buyval (modified), [2] is catgory, [3] is long name
+    $str .= $stocks->{$stock}[3].":".$stocks->{$stock}[0].":".$buyval.":".lc($stocks->{$stock}[2]);
   }
   
   Log3 $name, 4, "[Shares_SetStockHashes] setting stocks attribute to $str";
@@ -342,6 +412,7 @@ sub Shares_GetStockHashes($){
   
   my $cur    = (split(':',AttrVal($name, "shareCurrency", "")))[0];
   my $depcur = (split(':',AttrVal($name, "depotCurrency", "")))[0];
+  my $altsym = AttrVal($name, "altSymbol",0);
   my $exr    = ReadingsNum($name, "exchangerate", 1);
   my ($buyval,$category);
 
@@ -349,6 +420,14 @@ sub Shares_GetStockHashes($){
 
   foreach my $stock (@stocks) {
     my @toks = split ":", $stock;
+    #-- check if alternate symbol is needed when first source does not work
+    my @stocksyms = split '\|', $toks[0];
+    my $stocksym = $stocksyms[$altsym];
+    if( !defined($stocksym) ){
+      $stocksym=$stocksyms[0];
+      Log3 $name,1,"[Shares_GetStockHashes] missing alternate symbol $altsym, using $stocksym instead";
+    }
+    
     #-- buy value
     if( $depcur eq $cur ){
       $buyval = $toks[2];
@@ -358,12 +437,12 @@ sub Shares_GetStockHashes($){
     }
     #-- category
     if( !defined($toks[3])){
-      Log3 $name,4,"[Shares_GetStockHashes] Share: ".$toks[0]." does not have a category assigned";
+      Log3 $name,4,"[Shares_GetStockHashes] share $stocksym does not have a category assigned";
       $category = "";
     }else{
       $category = $toks[3];
     }
-    $stockHash{$toks[0]} = [$toks[1], $buyval, $category];
+    $stockHash{$stocksym} = [$toks[1], $buyval, $category,$toks[0]];
   }
   return \%stockHash;
 }
@@ -555,6 +634,10 @@ sub Shares_Set($@){
   }
   elsif($cmd eq "clearReadings") {
     return Shares_ClearReadings($hash);
+  }elsif($cmd eq "alphavantagekey") {
+    return Shares_ClearReadings($hash);
+  }elsif($cmd eq "sparkasseID") {
+    return Shares_ClearReadings($hash);
   }
   
   my $res = "Unknown argument ".$cmd.", choose one of update:noArg clearReadings:noArg buy sell add remove";
@@ -665,7 +748,16 @@ sub Shares_GetSource($$){
     return $exHash{$stock};
   }
   
-  return AttrVal($name, "defaultSource", "europe");
+  #-- check if alternate src is needed when first source does not work
+  my $altsym = AttrVal($name, "altSymbol",0);
+  my @altsrcs = split '\|',AttrVal($name, "defaultSource", "europe");
+  my $src = $altsrcs[$altsym];
+  if( !defined($src) ){
+    $src=$altsrcs[0];
+    Log3 $name,1,"[Shares_GetSources] missing alternate source $altsym, using $src instead";
+  }
+  
+  return $src;
 }
 
 #########################################################################################
@@ -713,6 +805,7 @@ sub Shares_QueryQuotesBlocking($){
       
       $ret .= "|".join("&", @keys)."&";
       $val = encode('UTF-8', $val, Encode::FB_CROAK) if ($keys[1] eq "name");
+      $val =~ s/\&//g;
       $ret .= $val;
     }
   }
@@ -820,17 +913,22 @@ sub Shares_QueryQuotesFinished($){
       $sname = $toks[2];
       $sname =~ /$symb\s\((.*)\)/;
       $sname = $1
-        if( $1 ne "" );
+        if( $1 && $1 ne "" );
       readingsBulkUpdate($hash, $toks[0]."_name" , $sname);
       $stockState{$toks[0]}{"name"}     = $toks[2];
     }elsif( $toks[1] eq "return"){
       readingsBulkUpdate($hash, $toks[0]."_return" , $toks[2]);
       $stockState{$toks[0]}{"return"} = $toks[2];
+    }elsif( $toks[1] eq "price"){
+      readingsBulkUpdate($hash, $toks[0]."_price" , $toks[2]);
+      $stockState{$toks[0]}{"price"} = $toks[2];
     }elsif( $toks[1] eq "last"){
       readingsBulkUpdate($hash, $toks[0]."_last" , $toks[2]);
       $stockState{$toks[0]}{"last"} = $toks[2];
     }elsif( $toks[1] eq "close"){
       #-- not yet in readings, need to process after last is defined
+      ### TEMP correction
+       readingsBulkUpdate($hash, $toks[0]."_close" , $toks[2]);
       $stockState{$toks[0]}{"close"} = $toks[2];
     #-- take out p from change
     }elsif( $toks[1] eq "p_change"){
@@ -849,7 +947,7 @@ sub Shares_QueryQuotesFinished($){
       $stockState{$toks[0]}{$toks[1]} = $toks[2];
     }  
   }
-  readingsEndUpdate($hash, 1);
+  readingsEndUpdate($hash, 1);  
   
   #-- Second run through all shares: derived values
   my ($count,$last,$value,$close,$value_close,$value_entry,$value_diff);
@@ -985,6 +1083,8 @@ sub Shares_MakeTable($){
   my $cur    = (split(':',AttrVal($name, "shareCurrency", "")))[0];
   my $depcur = (split(':',AttrVal($name, "depotCurrency", "")))[0];
   my @colors =  split(',',AttrVal($name, "colors","green,seagreen,black,orangered,red"));
+  my @arrows =  split(',',AttrVal($name, "arrows","&#129153;,&#129157;,&#129154;,&#129158;,&#129155;"));
+  my $bgcolor= AttrVal($name,"headercolor","#aaaaff;"); 
 
   my $stocks = Shares_GetStockHashes($hash);
   my $links  = Shares_GetLinkHashes($hash);
@@ -995,13 +1095,13 @@ sub Shares_MakeTable($){
   my $smidleft = "border-left:1px solid gray;border-radius:0px;";
   my $smidright= "border-right:1px solid gray;border-radius:0px;";
       
-  $change   = $hash->{READINGS}{"depot_change"}{VAL};
-  $changest = 'style="text-align:right;color:'.(($change>1)?$colors[0]:(($change>0.1)?$colors[1]:(($change==0)?$colors[2]:(($change>-0.1)?$colors[3]:$colors[4])))).'"';
-  $trend   = $hash->{READINGS}{"depot_change_day"}{VAL};
-  $trendf   = $trend."% ".(($trend>1)?"&#129153;":(($trend>0.1)?"&#129157;":(($trend==0)?"&#129154;":(($trend>-0.1)?"&#129158;":"&#129155;"))));
-  $trendst = 'style="text-align:right;color:'.(($trend>1)?$colors[0]:(($trend>0.1)?$colors[1]:(($trend==0)?$colors[2]:(($trend>-0.1)?$colors[3]:$colors[4])))).'"';
-         
-  my $table = "<tr class=\"odd\" style=\"background-color:#aaaaff;font-weight:bold;text-align:right\">".
+  $change   = exists($hash->{READINGS}{"depot_change"}{VAL}) ? $hash->{READINGS}{"depot_change"}{VAL} : 0.0;
+  $changest = 'style="text-align:right;color:'.(($change>1.0)?$colors[0]:(($change>0.1)?$colors[1]:(($change>=-0.1)?$colors[2]:(($change>=-1.0)?$colors[3]:$colors[4])))).'"';
+  $trend   = exists($hash->{READINGS}{"depot_change_day"}{VAL}) ? $hash->{READINGS}{"depot_change_day"}{VAL} : 0.0;
+  $trendf   = $trend."% ".(($trend>1.0)?$arrows[0]:(($trend>0.1)?$arrows[1]:(($trend>=-0.1)?$arrows[2]:(($trend>=-1.0)?$arrows[3]:$arrows[4]))));
+  $trendst = 'style="text-align:right;color:'.(($trend>1.0)?$colors[0]:(($trend>0.1)?$colors[1]:(($trend>=-0.1)?$colors[2]:(($trend>=-1.0)?$colors[3]:$colors[4])))).'"';
+      
+  my $table = "<tr class=\"odd\" style=\"background-color:$bgcolor;font-weight:bold;text-align:right\">".
               "<td style=\"$smidleft\"><a href=\"/fhem?detail=$name\">$name</a></td><td colspan=\"2\" style=\"text-align:right\">".$hash->{READINGS}{"depot_value"}{VAL}.
               "€</td><td $changest>$change".
               "%</td><td $changest>".$hash->{READINGS}{"depot_diff"}{VAL}.
@@ -1012,27 +1112,30 @@ sub Shares_MakeTable($){
  ##my $td_style = 'style="padding-left:6px;padding-right:6px;"';
    
   $oddeven = 0;
-  foreach $stock (sort keys %{$stocks}) {
+  
+     
+  foreach $stock (sort {lc $hash->{READINGS}{$a."_name"}{VAL} cmp lc $hash->{READINGS}{$b."_name"}{VAL} } keys %{$stocks}) {
     #-- link defined?
     my $source = Shares_GetSource($hash, $stock);
     if (not exists $links->{$source}) {
       $estock = $stock;
     }else{
       $source = $links->{$source};
+      $source =~ s/(https?)\/\//$1\:\/\//;
       $source =~ s/\$SYMBOL/$stock/g;
-      $estock = "<a href=\"http://".$source."\" target=\"_blank\">$stock</a>";
+      $estock = "<a href=\"".$source."\" target=\"_blank\">$stock</a>";
     }
     $estyle   = ($oddeven == 1)?" class=\"odd\"":" class=\"even\"";
     $oddeven  = 1- $oddeven;
     $sname    = $hash->{READINGS}{$stock."_name"}{VAL};
-    $value    = shares_round($hash->{READINGS}{$stock."_value"}{VAL}*$exrate);
-    $change   = $hash->{READINGS}{$stock."_change"}{VAL};
-    $changest = 'style="text-align:right;color:'.(($change>1)?$colors[0]:(($change>0.1)?$colors[1]:(($change==0)?$colors[2]:(($change>-0.1)?$colors[3]:$colors[4])))).'"';
-    $diff     = shares_round($hash->{READINGS}{$stock."_diff"}{VAL}*$exrate);
-    $trend    = $hash->{READINGS}{$stock."_change_day"}{VAL};
-    $trendf   = $trend."% ".(($trend>1)?"&#129153;":(($trend>0.1)?"&#129157;":(($trend==0)?"&#129154;":(($trend>-0.1)?"&#129158;":"&#129155;"))));
-    $trendst  = 'style="text-align:right;color:'.(($trend>1)?$colors[0]:(($trend>0.1)?$colors[1]:(($trend==0)?$colors[2]:(($trend>-0.1)?$colors[3]:$colors[4])))).'"';   
-    $rate     = $hash->{READINGS}{$stock."_last"}{VAL};
+    $value    = exists($hash->{READINGS}{$stock."_value"}{VAL}) ? shares_round($hash->{READINGS}{$stock."_value"}{VAL}*$exrate) : 0.0;
+    $change   = exists($hash->{READINGS}{$stock."_change"}{VAL}) ? $hash->{READINGS}{$stock."_change"}{VAL} : 0.0;
+    $changest = 'style="text-align:right;color:'.(($change>1.0)?$colors[0]:(($change>0.1)?$colors[1]:(($change>=-0.1)?$colors[2]:(($change>=-1.0)?$colors[3]:$colors[4])))).'"';
+    $diff     = exists($hash->{READINGS}{$stock."_diff"}{VAL}) ? shares_round($hash->{READINGS}{$stock."_diff"}{VAL}*$exrate) : 0.0;
+    $trend    = exists($hash->{READINGS}{$stock."_change_day"}{VAL}) ? $hash->{READINGS}{$stock."_change_day"}{VAL} : 0.0;
+    $trendf   = $trend."% ".(($trend>1.0)?$arrows[0]:(($trend>0.1)?$arrows[1]:(($trend>=-0.1)?$arrows[2]:(($trend>=-1.0)?$arrows[3]:$arrows[4]))));
+    $trendst  = 'style="text-align:right;color:'.(($trend>1.0)?$colors[0]:(($trend>0.1)?$colors[1]:(($trend>=-0.1)?$colors[2]:(($trend>=-1.0)?$colors[3]:$colors[4])))).'"';   
+    $rate     = exists($hash->{READINGS}{$stock."_last"}{VAL}) ? $hash->{READINGS}{$stock."_last"}{VAL} : 0.0;
     $erate    = shares_round($rate*$exrate);
     $frate    = ($cur ne $depcur)?"(".shares_round($rate)." $cur)":"";
     $count    = $stocks->{$stock}->[0];
@@ -1066,11 +1169,16 @@ sub Shares_MakeTable($){
 
 	<a name="Sharesset"></a>
 	 Notes: <ul>
-	    <li>The &lt;Symbol&gt; for a particular share depends very much on the source!</li>
+	    <li>This FHEM module uses the Perl module Finance::Quote, which acquires share data from different sources (see attribute sources). 
+	    Since the suppliers of data change their policies from time to time, it may occur that from one day to the next no data is available.
+	    Therefore this FHEM module implements a flexible approach that allows to change the default data source for all shares with a single attribute altSymbol.</li>
+	    <li>The &lt;Symbol&gt; for a particular share depends very much on the source! Therefore, each share <i>can</i> be represented 
+	    by a '|'-separated list of symbols, example: The well known NASDAQ ETF is represented by NADQ.DE|LU2197908721|..., where the first symbol is used by Yahoo, 
+	    the second symbol is the ISIN used by Deutsche Börse etc. See attributes defaultSource, altSymbol, stocks.</li>
         <li>This module uses the global attribute <code>language</code> to determine its output data<br/>
          (default: EN=english). For German output set <code>attr global language DE</code>.</li>
          <li>This module needs the package Finance::Quote. Install with
-    <code>cpan install Finance::Quote</code> or <code>sudo apt-get install libfinance-quote-perl</code><br><br></li>
+         <code>cpan Finance::Quote</code> or <code>sudo apt-get install libfinance-quote-perl</code><br><br></li>
          </ul>
 	<b>Set</b>
 	<ul>
@@ -1127,11 +1235,11 @@ sub Shares_MakeTable($){
 			Standard: 300, valid values: Number<br><br>
 		</li>		
 		<li>defaultSource<br>
-			Default source for share values.<br>
-			Default: yahoo_json, valid values: from <code>get &lt;name&gt; sources</code><br><br>
+			'|'-separated list of default sources for share values. See altSymbol attribute<br>
+			Default: yahoo_json (single source), valid values: from <code>get &lt;name&gt; sources</code><br><br>
 		</li>
 		<li>sources<br>
-			An individual data source can be set for every single share.<br>
+			An individual data source can be set for every single symbol.<br>
 			Data sources can be fetched with: <code>get &lt;name&gt; sources</code>.<br>
 			Format: &lt;Symbol&gt;:&lt;Source&gt;[,&lt;Symbol&gt;:&lt;Source&gt;...]<br>
 			Shares not listed in sources will be updated from defaultSource.<br><br>
@@ -1141,9 +1249,22 @@ sub Shares_MakeTable($){
 			The string <code>$SYMBOL</code> in each link will be replaced by the symbol for a share.<br> 
 			Format: &lt;Source&gt;:&lt;Link&gt;[,&lt;Source&gt;:&lt;Link&gt;...]<br>
 			Example: yahoo_json:de.finance.yahoo.com/quote/$SYMBOL<br><br>	</li>
+				    <li>arroWs<br>
+	        Comma-separated list of arrow symbols (in HTML-Format) for denoting change in stock value, boundary values are >1%,1%,0%,-1%,<-1%
+			 Default: "&#129153;,&#129157;,&#129154;,&#129158;,&#129155;" </li>
+	    <li>colors<br>
+	        Comma-separated list of color specs (in HTML-Format) for coloring change in stock value, boundary values are >1%,1%,0%,-1%,<-1%
+			 Default: "green,seagreen,black,orangered,red" </li>
+			 <li>headercolor<br>
+			 color spec (in HTML-Format) for coloring the header line in a depot table. Default #aaaaff;  
+			 </li>
+		 <li>altSymbol<br>
+			Numerical value, the index for the list of symbols representing each share in the stocks attribute. The default value for the
+			altSymbol is 0, which means that the first symbol is used for querying Finance::Quote. A value of 1 means to use the second symbol, etc.
+		</li>
 		<li>stocks<br>
 			Will be created/modified via buy/sell/add/remove<br>
-			Contains share informations in the format: &lt;Symbol&gt;:&lt;Number&gt;:&lt;Buy value in depotCurrency&gt;:&lt;Category&gt;<br><br>
+			Contains share informations in the format: &lt;Symbol0[|Symbol1|...]&gt;:&lt;Number&gt;:&lt;Buy value in depotCurrency&gt;:&lt;Category&gt;<br><br>
 		</li>
 	</ul><br>
 </ul>
