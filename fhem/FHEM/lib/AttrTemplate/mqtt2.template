@@ -5694,7 +5694,7 @@ par:BASE_ID;BASE_ID as set on the esp;{ AttrVal('DEVICE','readingList','') =~ m,
 par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
 attr DEVICE icon ICON
 attr DEVICE bridgeRegexp BASE_ID/([^/]+)/ch[0-9]+/.*:.* "BASE_ID_$1"\
-  BASE_ID/([^/]+)/(available|last_success|ack_pwr_limit|alarm/\d+|radio_stat|dis_night_comm):.* "BASE_ID_$1"
+  BASE_ID/([^/]+)/(available|last_success|ack_pwr_limit|alarm/\d+|radio_stat|dis_night_comm|firmware|hardware):.* "BASE_ID_$1"
 attr DEVICE autocreate 1
 attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/free_heap:.* free_heap\
@@ -5705,19 +5705,18 @@ attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/wifi_rssi:.* wifi_rssi\
   BASE_ID/comm_start:.* comm_start\
   BASE_ID/comm_stop:.* comm_stop\
-  BASE_ID/dis_night_comm:.* dis_night_comm\
   BASE_ID/comm_disabled:.* comm_disabled\
-  BASE_ID/comm_dis_ts:.* comm_dis_ts\
   BASE_ID/sunrise:.* sunrise\
   BASE_ID/sunset:.* sunset\
   BASE_ID/status:.* status\
   BASE_ID/total/P_AC:.* P_AC\
   BASE_ID/total/P_DC:.* P_DC\
   BASE_ID/total/YieldDay:.* YieldDay\
-  BASE_ID/total/YieldTotal:.* YieldTotal
+  BASE_ID/total/YieldTotal:.* YieldTotal\
+  BASE_ID/total/MaxPower:.* MaxPower
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_hub_bridge
-setreading DEVICE attrTemplateVersion 20240108
+setreading DEVICE attrTemplateVersion 20240421
 { AttrTemplate_Initialize() }
 #   "setup/set_time",
 #   "setup/sync_ntp
@@ -5746,6 +5745,9 @@ attr DEVICE readingList INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/last_success:.* last_success\
   INVERTERLONG_ID/radio_stat:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   INVERTERLONG_ID/dis_night_comm:.* dis_night_comm\
+  INVERTERLONG_ID/ack_pwr_limit:.* ack_pwr_limit\
+  INVERTERLONG_ID/firmware:.* { json2nameValue($EVENT) }\
+  INVERTERLONG_ID/hardware:.* { json2nameValue($EVENT) }\
   INVERTERLONG_ID/ch0/active_PowerLimit:.* active_PowerLimit\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
@@ -5761,16 +5763,6 @@ attr DEVICE readingList INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/ch0/Efficiency:.* Efficiency\
   INVERTERLONG_ID/ch0/YieldDay:.* {}\
   INVERTERLONG_ID/ch0/YieldTotal:.* {}\
-  INVERTERLONG_ID/ch0/BootloaderVersion:.* BootloaderVersion\
-  INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
-  INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
-  INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
-  INVERTERLONG_ID/ch0/FWBuildHourMinute:.* FWBuildHourMinute\
-  INVERTERLONG_ID/ch0/BootloaderVersion:.* BootloaderVersion\
-  INVERTERLONG_ID/ch0/HWPartNumber:.* HWPartNumber\
-  INVERTERLONG_ID/ch0/HWVersion:.* HWVersion\
-  INVERTERLONG_ID/ch0/GridProfileCode:.* GridProfileCode\
-  INVERTERLONG_ID/ch0/GridProfileVersion:.* GridProfileVersion\
   INVERTERLONG_ID/ch0/active_PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC\
@@ -5780,7 +5772,7 @@ attr DEVICE readingList INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal\
   INVERTERLONG_ID/ch0/MaxPower:.* MaxPower\
   INVERTERLONG_ID/alarm/cnt:.* alarmCnt\
-  INVERTERLONG_ID/alarm/[\d]+:.* { $TOPIC =~ m,alarm/([\d]+),; { "alarm_${1}_$2"=>$EVENT } }
+  INVERTERLONG_ID/alarm/[\d]+:.* { $TOPIC =~ m,alarm/([\d]+),; { "alarm_${1}"=>$EVENT } }
 option:{ RADIO_DOUBLE }
 attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name,2)}
 attr DEVICE readingList \
@@ -5788,6 +5780,9 @@ attr DEVICE readingList \
   INVERTERLONG_ID/last_success:.* last_success\
   INVERTERLONG_ID/radio_stat:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   INVERTERLONG_ID/dis_night_comm:.* dis_night_comm\
+  INVERTERLONG_ID/ack_pwr_limit:.* ack_pwr_limit\
+  INVERTERLONG_ID/firmware:.* { json2nameValue($EVENT) }\
+  INVERTERLONG_ID/hardware:.* { json2nameValue($EVENT) }\
   INVERTERLONG_ID/ch0/active_PowerLimit:.* active_PowerLimit\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
@@ -5803,16 +5798,6 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/Efficiency:.* Efficiency\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
-  INVERTERLONG_ID/ch0/BootloaderVersion:.* BootloaderVersion\
-  INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
-  INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
-  INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
-  INVERTERLONG_ID/ch0/FWBuildHourMinute:.* FWBuildHourMinute\
-  INVERTERLONG_ID/ch0/HWPartNumber:.* HWPartNumber\
-  INVERTERLONG_ID/ch0/HWVersion:.* HWVersion\
-  INVERTERLONG_ID/ch0/GridProfileCode:.* GridProfileCode\
-  INVERTERLONG_ID/ch0/GridProfileVersion:.* GridProfileVersion\
-  INVERTERLONG_ID/ch0/active_PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
   INVERTERLONG_ID/ch1/U_DC:.* U_DC1\
@@ -5829,7 +5814,7 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch1/MaxPower:.* MaxPower1\
   INVERTERLONG_ID/ch2/MaxPower:.* MaxPower2\
   INVERTERLONG_ID/alarm/cnt:.* alarmCnt\
-  INVERTERLONG_ID/alarm/[\d]+:.* { $TOPIC =~ m,alarm/([\d]+),; { "alarm_${1}_$2"=>$EVENT } }
+  INVERTERLONG_ID/alarm/[\d]+:.* { $TOPIC =~ m,alarm/([\d]+),; { "alarm_${1}"=>$EVENT } }
 option:{ RADIO_QUATTRO }
 attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name)}
 attr DEVICE readingList \
@@ -5837,6 +5822,9 @@ attr DEVICE readingList \
   INVERTERLONG_ID/last_success:.* last_success\
   INVERTERLONG_ID/radio_stat:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   INVERTERLONG_ID/dis_night_comm:.* dis_night_comm\
+  INVERTERLONG_ID/ack_pwr_limit:.* ack_pwr_limit\
+  INVERTERLONG_ID/firmware:.* { json2nameValue($EVENT) }\
+  INVERTERLONG_ID/hardware:.* { json2nameValue($EVENT) }\
   INVERTERLONG_ID/ch0/active_PowerLimit:.* active_PowerLimit\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
@@ -5855,16 +5843,6 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/Temp:.* temperature\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
-  INVERTERLONG_ID/ch0/BootloaderVersion:.* BootloaderVersion\
-  INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
-  INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
-  INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
-  INVERTERLONG_ID/ch0/FWBuildHourMinute:.* FWBuildHourMinute\
-  INVERTERLONG_ID/ch0/HWPartNumber:.* HWPartNumber\
-  INVERTERLONG_ID/ch0/HWVersion:.* HWVersion\
-  INVERTERLONG_ID/ch0/GridProfileCode:.* GridProfileCode\
-  INVERTERLONG_ID/ch0/GridProfileVersion:.* GridProfileVersion\
-  INVERTERLONG_ID/ch0/active_PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
@@ -5896,7 +5874,7 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch3/MaxPower:.* MaxPower3\
   INVERTERLONG_ID/ch4/MaxPower:.* MaxPower4\
   INVERTERLONG_ID/alarm/cnt:.* alarmCnt\
-  INVERTERLONG_ID/alarm/[\d]+:.* { $TOPIC =~ m,alarm/([\d]+),; { "alarm_${1}_$2"=>$EVENT } }
+  INVERTERLONG_ID/alarm/[\d]+:.* { $TOPIC =~ m,alarm/([\d]+),; { "alarm_${1}"=>$EVENT } }
 option:{ RADIO_SIXCH }
 attr DEVICE devStateIcon {FHEM::attrT_Ahoy_Utils::devStateIcon($name,6)}
 attr DEVICE readingList \
@@ -5904,6 +5882,9 @@ attr DEVICE readingList \
   INVERTERLONG_ID/last_success:.* last_success\
   INVERTERLONG_ID/radio_stat:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   INVERTERLONG_ID/dis_night_comm:.* dis_night_comm\
+  INVERTERLONG_ID/ack_pwr_limit:.* ack_pwr_limit\
+  INVERTERLONG_ID/firmware:.* { json2nameValue($EVENT) }\
+  INVERTERLONG_ID/hardware:.* { json2nameValue($EVENT) }\
   INVERTERLONG_ID/ch0/active_PowerLimit:.* active_PowerLimit\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
@@ -5922,16 +5903,6 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/Temp:.* temperature\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
-  INVERTERLONG_ID/ch0/BootloaderVersion:.* BootloaderVersion\
-  INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
-  INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
-  INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
-  INVERTERLONG_ID/ch0/FWBuildHourMinute:.* FWBuildHourMinute\
-  INVERTERLONG_ID/ch0/HWPartNumber:.* HWPartNumber\
-  INVERTERLONG_ID/ch0/HWVersion:.* HWVersion\
-  INVERTERLONG_ID/ch0/GridProfileCode:.* GridProfileCode\
-  INVERTERLONG_ID/ch0/GridProfileVersion:.* GridProfileVersion\
-  INVERTERLONG_ID/ch0/active_PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
@@ -5977,7 +5948,7 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch4/MaxPower:.* MaxPower5\
   INVERTERLONG_ID/ch5/MaxPower:.* MaxPower6\
   INVERTERLONG_ID/alarm/cnt:.* alarmCnt\
-  INVERTERLONG_ID/alarm/[\d]+:.* { $TOPIC =~ m,alarm/([\d]+),; { "alarm_${1}_$2"=>$EVENT } }
+  INVERTERLONG_ID/alarm/[\d]+:.* { $TOPIC =~ m,alarm/([\d]+),; { "alarm_${1}"=>$EVENT } }
 option:global
 attr DEVICE setList \
   reboot:noArg BASE_ID/ctrl/restart/INVERTER_NR\
@@ -5985,7 +5956,7 @@ attr DEVICE setList \
   limit_pct:slider,2,1,100 BASE_ID/ctrl/limit/INVERTER_NR $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20240108
+setreading DEVICE attrTemplateVersion 20240421
 
 # contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
 name:hoymiles_opendtu_hub_bridge
