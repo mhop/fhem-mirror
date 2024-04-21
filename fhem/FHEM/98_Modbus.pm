@@ -3474,7 +3474,7 @@ sub GetFC {
 
     SEARCH:                                             # find default function code first
     foreach my $fc (keys %fcMap) {
-        if ($fcMap{$fc}{type} && $fcMap{$fc}{type} eq $type && exists $fcMap{$fc}{$op} && exists $fcMap{$fc}{default}) {
+        if ($fcMap{$fc}{type} && $fcMap{$fc}{type} eq $type && exists $fcMap{$fc}{$fcKey} && exists $fcMap{$fc}{default}) {
             $defFC = $fc;
             last SEARCH;
         }
