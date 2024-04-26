@@ -428,57 +428,6 @@ sub Rename {
 }
 
 #########################
-sub Get {
-  my ($hash,@val) = @_;
-  my $type = $hash->{TYPE};
-  my $name = $hash->{NAME};
-  my $iam = "$type $name Get:";
-
-  return "$iam needs at least one argument" if ( @val < 2 );
-  return "$iam disabled" if ( IsDisabled( $name ) );
-
-  my ($pname,$setName,$setVal,$setVal2,$setVal3) = @val;
-
-  Log3 $name, 4, "$iam called with $setName " . ($setVal ? $setVal : "");
-
-  if ( $setName eq 'html' ) {
-    
-    my $ret = '<html>' . FW_detailFn( undef, $name, undef, undef) . '</html>';
-    return $ret;
-
-  } elsif (  $setName eq 'errorCodes' ) {
-
-    my $ret = listErrorCodes();
-    return $ret;
-
-  } elsif (  $setName eq 'InternalData' ) {
-
-    my $ret = listInternalData($hash);
-    return $ret;
-
-  } elsif (  $setName eq 'MowerData' ) {
-
-    my $ret = listMowerData($hash);
-    return $ret;
-
-  } elsif (  $setName eq 'StatisticsData' ) {
-
-    my $ret = listStatisticsData($hash);
-    return $ret;
-
-  } elsif (  $setName eq 'errorStack' ) {
-
-    my $ret = listErrorStack($hash);
-    return $ret;
-
-  } else {
-
-    return "Unknown argument $setName, choose one of StatisticsData:noArg MowerData:noArg InternalData:noArg errorCodes:noArg errorStack:noArg ";
-
-  }
-}
-
-#########################
 sub FW_summaryFn {
   my ($FW_wname, $name, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$name};
@@ -494,7 +443,20 @@ sub FW_detailFn {
   my ($FW_wname, $name, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$name};
   my $type = $hash->{TYPE};
-  return '' if( AttrVal($name, 'disable', 0) || !AttrVal($name, 'showMap', 1) || !$::init_done || !$FW_ME );
+  my $iam = "$type $name FW_detailFn:";
+  return '' if( AttrVal($name, 'disable', 0) || !$::init_done || !$FW_ME );
+
+  my $calendarjson = eval {
+    require JSON::PP;
+    my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9);
+    JSON::PP->new->sort_by(
+      sub {($ORDER{$JSON::PP::a} // 999) <=> ($ORDER{$JSON::PP::b} // 999) or $JSON::PP::a cmp $JSON::PP::b})
+      ->encode ($hash->{helper}{mower}{attributes}{calendar}{tasks})
+  };
+  return "$iam $@" if ($@);
+
+  my $reta = "<div id='amc_${name}_schedule_buttons' name='fhem_amc_mower_schedule_buttons' ><button id='amc_${name}_schedule_button' onclick='AutomowerConnectSchedule( \"$name\", $calendarjson )' style='font-size:16px; ' >Mower Schedule</button></div>";
+  return $reta if( !AttrVal ($name, 'showMap', 1 ) );
 
   my $img = "$FW_ME/$type/$name/map";
   my $zoom=AttrVal( $name,"mapImageZoom", 0.7 );
@@ -580,7 +542,7 @@ sub FW_detailFn {
 
   my $ret = "";
   $ret .= "<style>
-  .${type}_${name}_div{padding:0px !important;
+  .${type}_devname_div{padding:0px !important;
     $bgstyle background-image: url('$img');
     background-size: ${picx}px ${picy}px;
     background-repeat: no-repeat; 
@@ -595,16 +557,20 @@ sub FW_detailFn {
   my $contentflg = $content =~ /ON_TOP/;
   $content =~ s/command=['"](.*?)['"]/onclick="AutomowerConnectPanelCmd('set $name $1')"/g;
   $ret .= $content if ( $contentflg );
-  $ret .= "<div id='${type}_${name}_div' class='${type}_${name}_div' $$mapDesign $csdata $limi $propli width='$picx' height='$picy' >";
+  $ret .= "<div id='${type}_${name}_div' class='${type}_devname_div' $$mapDesign $csdata $limi $propli width='$picx' height='$picy' >";
   $ret .= "<canvas id='${type}_${name}_canvas_0' class='${type}_${name}_canvas_0' width='$picx' height='$picy' ></canvas>";
   $ret .= "<canvas id='${type}_${name}_canvas_1' class='${type}_${name}_canvas_1' width='$picx' height='$picy' ></canvas>";
   $ret .= "</div>";
-  $ret .= "<button title='Sends the hull polygon points to attribute mowingAreaHull.' onclick='AutomowerConnectGetHull( \"$FW_ME/$type/$name/json\" )'>mowingAreaHullToAttribute</button>"
+  $ret .=  $reta if( AttrVal ($name, 'showMap', 1 ) );
+
+  $ret .= "<div class='fhem_amc_hull_buttons' >";
+  $ret .= "<button class='fhem_amc_hull_button' title='Sends the hull polygon points to attribute mowingAreaHull.' onclick='AutomowerConnectGetHull( \"$FW_ME/$type/$name/json\" )' style='font-weight:bold; font-size:16pt; ' >mowingAreaHullToAttribute</button>"
           if ( -e "$FW_dir/$hash->{helper}{FWEXTA}{path}/$hash->{helper}{FWEXTA}{file}" && !AttrVal( $name,'mowingAreaHull','' ) && $$mapDesign =~ m/hullCalculate="1"/g );
-  $ret .= "<button title='Subtracts hull polygon points from way points. To hide button set hullSubtract=\"\".' onclick='AutomowerConnectSubtractHull( \"$FW_ME/$type/$name/json\" )'>Subtract Hull</button>"
+  $ret .= "<button class='fhem_amc_hull_button' title='Subtracts hull polygon points from way points. To hide button set hullSubtract=\"\".' onclick='AutomowerConnectSubtractHull( \"$FW_ME/$type/$name/json\" )' style='font-weight:bold; font-size:16pt; ' >Subtract Hull</button>"
           if ( -e "$FW_dir/$hash->{helper}{FWEXTA}{path}/$hash->{helper}{FWEXTA}{file}" && AttrVal( $name,'mowingAreaHull','' ) && $$mapDesign =~ m/hullSubtract="\d+"/g );
+  $ret .= "</div>";
   $ret .= $content  if ( !$contentflg );
-  $ret .= "<br>";
+
   $hash->{helper}{detailFnFirst} = 1;
   my $mid = $hash->{helper}{map_init_delay};
   InternalTimer( gettimeofday() + $mid, \&FW_detailFn_Update, $hash, 0 );
@@ -1126,6 +1092,259 @@ sub getNewAccessToken {
   APIAuth( $hash );
 }
 
+#########################
+sub Get {
+  my ($hash,@val) = @_;
+  my $type = $hash->{TYPE};
+  my $name = $hash->{NAME};
+  my $iam = "$type $name Get:";
+
+  return "$iam needs at least one argument" if ( @val < 2 );
+  return "$iam disabled" if ( IsDisabled( $name ) );
+
+  my ($pname,$setName,$setVal,$setVal2,$setVal3) = @val;
+
+  Log3 $name, 4, "$iam called with $setName " . ($setVal ? $setVal : "");
+
+  if ( $setName eq 'html' ) {
+    
+    my $ret = '<html>' . FW_detailFn( undef, $name, undef, undef) . '</html>';
+    return $ret;
+
+  } elsif (  $setName eq 'errorCodes' ) {
+
+    my $ret = listErrorCodes();
+    return $ret;
+
+  } elsif (  $setName eq 'InternalData' ) {
+
+    my $ret = listInternalData($hash);
+    return $ret;
+
+  } elsif (  $setName eq 'MowerData' ) {
+
+    my $ret = listMowerData($hash);
+    return $ret;
+
+  } elsif (  $setName eq 'StatisticsData' ) {
+
+    my $ret = listStatisticsData($hash);
+    return $ret;
+
+  } elsif ( $setName eq 'errorStack' ) {
+
+    my $ret = listErrorStack($hash);
+    return $ret;
+
+  } else {
+
+    return "Unknown argument $setName, choose one of StatisticsData:noArg MowerData:noArg InternalData:noArg errorCodes:noArg errorStack:noArg ";
+
+  }
+}
+
+#########################
+sub Set {
+  my ($hash,@val) = @_;
+  my $type = $hash->{TYPE};
+  my $name = $hash->{NAME};
+  my $iam = "$type $name Set:";
+
+  return "$iam: needs at least one argument" if ( @val < 2 );
+  return "Unknown argument, $iam is disabled, choose one of none:noArg" if ( IsDisabled( $name ) );
+
+  my ($pname,$setName,$setVal,$setVal2,$setVal3) = @val;
+
+  Log3 $name, 4, "$iam called with $setName " . ($setVal ? $setVal : "") if ($setName !~ /^(\?|client_secret)$/);
+
+  ##########
+  if ( !$hash->{helper}{midnightCycle} && $setName eq 'getUpdate' ) {
+
+    RemoveInternalTimer($hash, \&APIAuth);
+    APIAuth($hash);
+    return undef;
+
+  ##########
+  } elsif ( $setName eq 'chargingStationPositionToAttribute' ) {
+
+    my $xm = $hash->{helper}{chargingStation}{longitude} // 10.1165;
+    my $ym = $hash->{helper}{chargingStation}{latitude} // 51.28;
+    CommandAttr( $hash, "$name chargingStationCoordinates $xm $ym" );
+    return undef;
+
+  ##########
+  } elsif ( $setName eq 'defaultDesignAttributesToAttribute' ) {
+
+    my $design = $hash->{helper}{mapdesign};
+    CommandAttr( $hash, "$name mapDesignAttributes $design" );
+    return undef;
+
+  ##########
+  } elsif ( $setName eq 'mapZonesTemplateToAttribute' ) {
+
+    my $tpl = $hash->{helper}{mapZonesTpl};
+    CommandAttr( $hash, "$name mapZones $tpl" );
+    return undef;
+
+  ##########
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName eq 'mowerScheduleToAttribute' ) {
+
+    my $calendarjson = eval {
+      JSON::XS->new->pretty(1)->encode ($hash->{helper}{mower}{attributes}{calendar}{tasks});
+    };
+    return "$iam $@" if ($@);
+    
+    CommandAttr($hash,"$name mowerSchedule $calendarjson");
+    return undef;
+
+  ##########
+  } elsif ( $setName eq 'client_secret' ) {
+    if ( $setVal ) {
+
+      my ($passResp, $passErr) = $hash->{helper}->{passObj}->setStorePassword($name, $setVal);
+      Log3 $name, 1, "$iam error: $passErr" if ($passErr);
+      return "$iam $passErr" if( $passErr );
+
+      readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, '.access_token', '', 0 );
+        readingsBulkUpdateIfChanged( $hash, 'device_state', 'initialized');
+        readingsBulkUpdateIfChanged( $hash, 'mower_commandStatus', 'cleared');
+      readingsEndUpdate($hash, 1);
+      
+      RemoveInternalTimer($hash, \&APIAuth);
+      APIAuth($hash);
+      return undef;
+    }
+
+  ##########
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^(Start|Park|cuttingHeight)$/ ) {
+    if ( $setVal =~ /^(\d+)$/) {
+
+      CMD($hash ,$setName, $setVal);
+      return undef;
+
+    }
+
+  ##########
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName eq 'headlight' ) {
+    if ( $setVal =~ /^(ALWAYS_OFF|ALWAYS_ON|EVENING_ONLY|EVENING_AND_NIGHT)$/) {
+
+      CMD($hash ,$setName, $setVal);
+
+      return undef;
+    }
+
+  ##########
+  } elsif ( $setName eq 'getNewAccessToken' ) {
+
+    readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, '.access_token', '', 0 );
+      readingsBulkUpdateIfChanged( $hash, 'device_state', 'initialized');
+      readingsBulkUpdateIfChanged( $hash, 'mower_commandStatus', 'cleared');
+    readingsEndUpdate($hash, 1);
+
+      RemoveInternalTimer($hash, \&APIAuth);
+      APIAuth($hash);
+      return undef;
+
+  ##########
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /ParkUntilFurtherNotice|ParkUntilNextSchedule|Pause|ResumeSchedule|sendScheduleFromAttributeToMower/ ) {
+
+    CMD($hash,$setName);
+    return undef;
+
+  ##########
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName eq "sendJsonScheduleToAttribute" ) {
+
+    my $calendarjson = eval { decode_json ( $setVal ) };
+    return "$iam decode error: $@ \n $setVal" if ($@);
+    $calendarjson = eval {
+      require JSON::PP;
+      my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9);
+      JSON::PP->new->sort_by(
+        sub {($ORDER{$JSON::PP::a} // 999) <=> ($ORDER{$JSON::PP::b} // 999) or $JSON::PP::a cmp $JSON::PP::b})
+        ->pretty(1)->encode( $calendarjson )
+    };
+    return "$iam encode error: $@ in \$calendarjson" if ($@);
+    CommandAttr($hash,"$name mowerSchedule $calendarjson");
+
+  return undef;
+
+  ##########
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName eq "sendJsonScheduleToMower" ) {
+
+    CMD($hash,$setName,$setVal);
+    return undef;
+
+  ##########
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /confirmError/ && AttrVal( $name, 'testing', '' ) ) {
+
+    CMD($hash,$setName);
+    return undef;
+
+  ##########
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^(StartInWorkArea|cuttingHeightInWorkArea)$/ && AttrVal( $name, 'testing', '' ) ) {
+
+    ( $setVal, $setVal2 ) = $setVal =~ /(.*),(\d+)/ if ( $setVal =~/,/ && ! defined( $setVal2 ) );
+    my $id = undef;
+    $id = name2id( $hash, $setVal, 'workAreas' ) if ( $setVal !~ /^(\d+)$/ );
+    $setVal = $id // $setVal;
+    if ( $setVal =~ /^(\d+)$/ && ( $setVal2 =~ /^(\d+)$/ or !$setVal2 ) ) { #  && $hash->{helper}{mower}{attributes}{capabilities}{workAreas}
+
+      CMD($hash ,$setName, $setVal, $setVal2);
+      return undef;
+
+    }
+
+    Log3 $name, 2, "$iam $setName : no valid Id or zone name for $setVal .";
+
+  ##########
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^stayOutZone$/ && AttrVal( $name, 'testing', '' ) ) {
+
+    ( $setVal, $setVal2 ) = $setVal =~ /(.*),(enable|disable)/ if ( $setVal =~/,/ && ! defined( $setVal2 ) );
+    my $id = undef;
+    $id = name2id( $hash, $setVal, 'stayOutZones' ) if ( $setVal !~ /\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b/ );
+    $setVal = $id // $setVal;
+    if ( $setVal =~ /\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b/ ) { #  && $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones}
+
+      $setVal2 = $setVal2 eq 'enable' ? 'true' : 'false';
+      CMD($hash ,$setName, $setVal, $setVal2);
+      return undef;
+
+    }
+
+    Log3 $name, 2, "$iam $setName : no valid Id or zone name for $setVal .";
+
+  }
+  ##########
+  my $ret = " getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,30,30,600,0,lin Park:selectnumbers,30,30,600,0,lin ResumeSchedule:noArg getUpdate:noArg client_secret ";
+  $ret .= "chargingStationPositionToAttribute:noArg headlight:ALWAYS_OFF,ALWAYS_ON,EVENING_ONLY,EVENING_AND_NIGHT cuttingHeight:1,2,3,4,5,6,7,8,9 mowerScheduleToAttribute:noArg ";
+  $ret .= "sendScheduleFromAttributeToMower:noArg defaultDesignAttributesToAttribute:noArg mapZonesTemplateToAttribute:noArg ";
+
+  ##########
+  if ( $hash->{helper}{mower}{attributes}{capabilities}{workAreas} && defined ( $hash->{helper}{mower}{attributes}{workAreas} ) && AttrVal( $name, 'testing', '' ) ) {
+
+    my @ar = @{ $hash->{helper}{mower}{attributes}{workAreas} };
+    my @anlist = map { ','.$_->{name} } @ar;
+    $ret .= "cuttingHeightInWorkArea:widgetList,".(scalar @anlist + 1).",select".join('',@anlist).",6,selectnumbers,0,10,100,0,lin ";
+    $ret .= "StartInWorkArea:widgetList,".(scalar @anlist + 1).",select".join('',@anlist).",6,selectnumbers,0,30,600,0,lin ";
+
+  }
+
+  ##########
+  if ( $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones} && defined ( $hash->{helper}{mower}{attributes}{stayOutZones}{zones} ) && AttrVal( $name, 'testing', '' ) ) {
+
+    my @so = @{ $hash->{helper}{mower}{attributes}{stayOutZones}{zones} };
+    my @solist = map { ','.$_->{name} } @so;
+    $ret .= "stayOutZone:widgetList,".(scalar @solist + 1).",select".join('',@solist).",3,select,enable,disable ";
+
+  }
+
+  $ret .= "confirmError:noArg " if ( AttrVal( $name, 'testing', '' ) );
+  return "Unknown argument $setName, choose one of".$ret;
+  
+}
+
 ##############################################################
 #
 # SEND COMMAND
@@ -1178,6 +1397,19 @@ my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nA
   elsif ($cmd[0] eq "sendScheduleFromAttributeToMower" && AttrVal( $name, 'mowerSchedule', '')) {
 
     my $perl = eval { decode_json (AttrVal( $name, 'mowerSchedule', '')) };
+    if ($@) {
+      return "$iam decode error: $@ \n $perl";
+    }
+    my $jsonSchedule = eval { encode_json ($perl) };
+    if ($@) {
+      return "$iam encode error: $@ \n $json";
+    }
+    $json = '{"data":{"type": "calendar","attributes":{"tasks":'.$jsonSchedule.'}}}'; 
+    $post = 'calendar';
+  }
+  elsif ($cmd[0] eq "sendJsonScheduleToMower" && $cmd[1]) {
+
+    my $perl = eval { decode_json ( $cmd[1] ) };
     if ($@) {
       return "$iam decode error: $@ \n $perl";
     }
@@ -1267,168 +1499,6 @@ sub CMDResponse {
 }
 
 #########################
-sub Set {
-  my ($hash,@val) = @_;
-  my $type = $hash->{TYPE};
-  my $name = $hash->{NAME};
-  my $iam = "$type $name Set:";
-
-  return "$iam: needs at least one argument" if ( @val < 2 );
-  return "Unknown argument, $iam is disabled, choose one of none:noArg" if ( IsDisabled( $name ) );
-
-  my ($pname,$setName,$setVal,$setVal2,$setVal3) = @val;
-
-  Log3 $name, 4, "$iam called with $setName " . ($setVal ? $setVal : "") if ($setName !~ /^(\?|client_secret)$/);
-
-  if ( !$hash->{helper}{midnightCycle} && $setName eq 'getUpdate' ) {
-
-    RemoveInternalTimer($hash, \&APIAuth);
-    APIAuth($hash);
-    return undef;
-
-  } elsif ( $setName eq 'chargingStationPositionToAttribute' ) {
-
-    my $xm = $hash->{helper}{chargingStation}{longitude} // 10.1165;
-    my $ym = $hash->{helper}{chargingStation}{latitude} // 51.28;
-    CommandAttr( $hash, "$name chargingStationCoordinates $xm $ym" );
-    return undef;
-
-  } elsif ( $setName eq 'defaultDesignAttributesToAttribute' ) {
-
-    my $design = $hash->{helper}{mapdesign};
-    CommandAttr( $hash, "$name mapDesignAttributes $design" );
-    return undef;
-
-  } elsif ( $setName eq 'mapZonesTemplateToAttribute' ) {
-
-    my $tpl = $hash->{helper}{mapZonesTpl};
-    CommandAttr( $hash, "$name mapZones $tpl" );
-    return undef;
-
-  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName eq 'mowerScheduleToAttribute' ) {
-
-    my $calendarjson = eval { JSON::XS->new->pretty(1)->encode ($hash->{helper}{mower}{attributes}{calendar}{tasks}) };
-    if ( $@ ) {
-      return "$iam $@";
-    }
-    CommandAttr($hash,"$name mowerSchedule $calendarjson");
-    return undef;
-
-  } elsif ( $setName eq 'client_secret' ) {
-    if ( $setVal ) {
-
-      my ($passResp, $passErr) = $hash->{helper}->{passObj}->setStorePassword($name, $setVal);
-      Log3 $name, 1, "$iam error: $passErr" if ($passErr);
-      return "$iam $passErr" if( $passErr );
-
-      readingsBeginUpdate($hash);
-        readingsBulkUpdateIfChanged( $hash, '.access_token', '', 0 );
-        readingsBulkUpdateIfChanged( $hash, 'device_state', 'initialized');
-        readingsBulkUpdateIfChanged( $hash, 'mower_commandStatus', 'cleared');
-      readingsEndUpdate($hash, 1);
-      
-      RemoveInternalTimer($hash, \&APIAuth);
-      APIAuth($hash);
-      return undef;
-    }
-
-  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^(Start|Park|cuttingHeight)$/ ) {
-    if ( $setVal =~ /^(\d+)$/) {
-
-      CMD($hash ,$setName, $setVal);
-      return undef;
-
-    }
-
-  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName eq 'headlight' ) {
-    if ( $setVal =~ /^(ALWAYS_OFF|ALWAYS_ON|EVENING_ONLY|EVENING_AND_NIGHT)$/) {
-
-      CMD($hash ,$setName, $setVal);
-
-      return undef;
-    }
-
-  } elsif ( $setName eq 'getNewAccessToken' ) {
-
-    readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, '.access_token', '', 0 );
-      readingsBulkUpdateIfChanged( $hash, 'device_state', 'initialized');
-      readingsBulkUpdateIfChanged( $hash, 'mower_commandStatus', 'cleared');
-    readingsEndUpdate($hash, 1);
-
-      RemoveInternalTimer($hash, \&APIAuth);
-      APIAuth($hash);
-      return undef;
-
-  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /ParkUntilFurtherNotice|ParkUntilNextSchedule|Pause|ResumeSchedule|sendScheduleFromAttributeToMower/ ) {
-
-    CMD($hash,$setName);
-    return undef;
-
-  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /confirmError/ && AttrVal( $name, 'testing', '' ) ) {
-
-    CMD($hash,$setName);
-    return undef;
-
-  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^(StartInWorkArea|cuttingHeightInWorkArea)$/ && AttrVal( $name, 'testing', '' ) ) {
-
-    ( $setVal, $setVal2 ) = $setVal =~ /(.*),(\d+)/ if ( $setVal =~/,/ && ! defined( $setVal2 ) );
-    my $id = undef;
-    $id = name2id( $hash, $setVal, 'workAreas' ) if ( $setVal !~ /^(\d+)$/ );
-    $setVal = $id // $setVal;
-    if ( $setVal =~ /^(\d+)$/ && ( $setVal2 =~ /^(\d+)$/ or !$setVal2 ) ) { #  && $hash->{helper}{mower}{attributes}{capabilities}{workAreas}
-
-      CMD($hash ,$setName, $setVal, $setVal2);
-      return undef;
-
-    }
-
-    Log3 $name, 2, "$iam $setName : no valid Id or zone name for $setVal .";
-
-  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^stayOutZone$/ && AttrVal( $name, 'testing', '' ) ) {
-
-    ( $setVal, $setVal2 ) = $setVal =~ /(.*),(enable|disable)/ if ( $setVal =~/,/ && ! defined( $setVal2 ) );
-    my $id = undef;
-    $id = name2id( $hash, $setVal, 'stayOutZones' ) if ( $setVal !~ /\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b/ );
-    $setVal = $id // $setVal;
-    if ( $setVal =~ /\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b/ ) { #  && $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones}
-
-      $setVal2 = $setVal2 eq 'enable' ? 'true' : 'false';
-      CMD($hash ,$setName, $setVal, $setVal2);
-      return undef;
-
-    }
-
-    Log3 $name, 2, "$iam $setName : no valid Id or zone name for $setVal .";
-
-  }
-  my $ret = " getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,30,30,600,0,lin Park:selectnumbers,30,30,600,0,lin ResumeSchedule:noArg getUpdate:noArg client_secret ";
-  $ret .= "chargingStationPositionToAttribute:noArg headlight:ALWAYS_OFF,ALWAYS_ON,EVENING_ONLY,EVENING_AND_NIGHT cuttingHeight:1,2,3,4,5,6,7,8,9 mowerScheduleToAttribute:noArg ";
-  $ret .= "sendScheduleFromAttributeToMower:noArg defaultDesignAttributesToAttribute:noArg mapZonesTemplateToAttribute:noArg ";
-
-  if ( $hash->{helper}{mower}{attributes}{capabilities}{workAreas} && defined ( $hash->{helper}{mower}{attributes}{workAreas} ) && AttrVal( $name, 'testing', '' ) ) {
-
-    my @ar = @{ $hash->{helper}{mower}{attributes}{workAreas} };
-    my @anlist = map { ','.$_->{name} } @ar;
-    $ret .= "cuttingHeightInWorkArea:widgetList,".(scalar @anlist + 1).",select".join('',@anlist).",6,selectnumbers,0,10,100,0,lin ";
-    $ret .= "StartInWorkArea:widgetList,".(scalar @anlist + 1).",select".join('',@anlist).",6,selectnumbers,0,30,600,0,lin ";
-
-  }
-
-  if ( $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones} && defined ( $hash->{helper}{mower}{attributes}{stayOutZones}{zones} ) && AttrVal( $name, 'testing', '' ) ) {
-
-    my @so = @{ $hash->{helper}{mower}{attributes}{stayOutZones}{zones} };
-    my @solist = map { ','.$_->{name} } @so;
-    $ret .= "stayOutZone:widgetList,".(scalar @solist + 1).",select".join('',@solist).",3,select,enable,disable ";
-
-  }
-
-  $ret .= "confirmError:noArg " if ( AttrVal( $name, 'testing', '' ) );
-  return "Unknown argument $setName, choose one of".$ret;
-  
-}
-
-#########################
 sub Attr {
 
   my ( $cmd, $name, $attrName, $attrVal ) = @_;
@@ -1493,10 +1563,7 @@ sub Attr {
     if( $cmd eq "set" ) {
 
       my $perl = eval { decode_json ( $attrVal ) };
-      
-      if ($@) {
-        return "$iam $cmd $attrName decode error: $@ \n $attrVal";
-      }
+      return "$iam $cmd $attrName decode error: $@ \n $attrVal" if ($@);
       Log3 $name, 4, "$iam $cmd $attrName";
 
     }
@@ -1700,14 +1767,17 @@ sub Attr {
     if( $cmd eq "set" ) {
 
       my $perl = eval { decode_json ($attrVal) };
+      return "$iam $cmd $attrName decode error: $@ \n $perl" if ($@);
 
-      if ($@) {
-        return "$iam $cmd $attrName decode error: $@ \n $perl";
-      }
-      my $json = eval { encode_json ($perl) };
-      if ($@) {
-        return "$iam $cmd $attrName encode error: $@ \n $json";
-      }
+      $attrVal = eval {
+        require JSON::PP;
+        my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9);
+        JSON::PP->new->sort_by(
+          sub {($ORDER{$JSON::PP::a} // 999) <=> ($ORDER{$JSON::PP::b} // 999) or $JSON::PP::a cmp $JSON::PP::b})
+          ->pretty(1)->encode( $perl )
+      };
+      return "$iam $cmd $attrName encode error: $@ \n $attrVal" if ($@);
+
       Log3 $name, 4, "$iam $cmd $attrName mower schedule array";
 
     }
@@ -1719,19 +1789,14 @@ sub Attr {
       my $latitude = 52;
       my $perl = eval { decode_json ($attrVal) };
 
-      if ($@) {
-        return "$iam $cmd $attrName decode error: $@ \n $attrVal";
-      }
+      return "$iam $cmd $attrName decode error: $@ \n $attrVal" if ($@);
 
       for ( keys %{$perl} ) {
 
         $perl->{$_}{zoneCnt} = 0;
         $perl->{$_}{zoneLength} = 0;
         my $cond = eval "($perl->{$_}{condition})";
-
-        if ($@) {
-          return "$iam $cmd $attrName syntax error in condition: $@ \n $perl->{$_}{condition}";
-        }
+        return "$iam $cmd $attrName syntax error in condition: $@ \n $perl->{$_}{condition}" if ($@);
 
       }
 

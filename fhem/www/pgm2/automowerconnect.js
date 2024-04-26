@@ -1,7 +1,22 @@
 
 if ( !(typeof FW_version === 'undefined') )
   FW_version["automowerconnect.js"] = "$Id$";
+  
+{  window.onload = ( ()=>{
+    let room = document.querySelector("#content");
+    room = room.getAttribute("room");
+    if ( room ) {
+      let invis = document.querySelectorAll( "div[name='fhem_amc_mower_schedule_buttons'], div.fhem_amc_hull_buttons " ).forEach( (item, index, invis) => { // do not display schedule and hull buttons
+        item.style.display = "none";
+      });
+    }
+    let invis = document.querySelectorAll( "div.amc_panel_div" ).forEach( (item, index, invis) => { // do not display panel
+      let ivipan = item.getAttribute("data-amc_panel_inroom");
+      item.style.display = ( room && !ivipan ? "none" : "" );
+    });
 
+  });
+}
 function AutomowerConnectShowError( ctx, div, dev, picx, picy, errdesc, erray ) {
   // ERROR BANNER
   ctx.beginPath();
@@ -356,9 +371,12 @@ function AutomowerConnectUpdateJson ( path ) {
 function AutomowerConnectUpdateJsonFtui ( path ) {
   $.getJSON( path, function( data, textStatus ) {
     console.log( 'AutomowerConnectUpdateJsonFtui ( \''+path+'\' ): status '+textStatus );
-    if ( textStatus == 'success') 
+    if ( textStatus == 'success') {
       AutomowerConnectUpdateDetail ( data.name, data.type, 1, data.picx, data.picy, data.scalx, data.scaly, data.errdesc, data.posxy, data.poserrxy, data.hullxy );
-
+      let invis = document.querySelectorAll( "div[name='fhem_amc_mower_schedule_buttons'], div.amc_panel_div, div.fhem_amc_hull_buttons" ).forEach((item, index, invis) => { // do not display buttons
+        item.style.display = "none";
+      });
+    }
   });
 
 }
@@ -460,6 +478,196 @@ function AutomowerConnectSubtractHull ( path ) {
 function AutomowerConnectPanelCmd ( panelcmd ) {
   if ( typeof FW_cmd === "function" )
       FW_cmd( FW_root+"?cmd="+panelcmd+"&XHR=1" );
+}
+
+function AutomowerConnectHandleInput ( dev ) {
+  let cal = JSON.parse( document.querySelector( '#amc_'+dev+'_schedule_div' ).getAttribute( 'data-amc_schedule' ) );
+  let cali = document.querySelector('#amc_'+dev+'_index').value || cal.length;
+  if ( cali > cal.length ) cali = cal.length;
+  if ( cali > 13 ) cali = 13;
+
+  for (let i=cal.length;i<=cali;i++) { cal.push( { "start":0, "duration":1439, "monday":false, "tuesday":false, "wednesday":false, "thursday":false, "friday":false, "saturday":false, "sunday":false } ) }
+  //~ console.log('cali: '+cali+'   cal.length: '+cal.length);
+
+  let elements = ["start", "duration"];
+  elements.forEach((item, index) => {
+    let val = document.getElementById('amc_'+dev+'_'+item).value;
+    let hour = parseInt(val.slice(0,2)) * 60;
+    let min = parseInt(val.slice(-2));
+
+    if ( isNaN( hour ) && item == "start" ) hour = 0;
+    if ( isNaN( min )  && item == "start" ) min = 0;
+    if ( isNaN( hour ) && item == "duration" ) hour = 23;
+    if ( isNaN( min )  && item == "duration" ) min = 59;
+
+    cal[cali][item] = hour + min;
+
+  });
+
+  elements = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  elements.forEach((item, index) => {
+  cal[cali][item] = (document.getElementById('amc_'+dev+'_'+item).checked ? true : false);
+
+  });
+
+  let daysum = cal[cali].start + cal[cali].duration;
+  if ( ! ( cal[cali].monday || cal[cali].tuesday || cal[cali].wednesday || cal[cali].thursday || cal[cali].friday || cal[cali].saturday || cal[cali].sunday ) ) {
+
+    cal.splice( cali, 1 );
+
+  } else {
+
+    if ( daysum > 1439 ) {
+      cal[cali].start = 1439 - cal[cali].duration;
+    }
+
+    elements = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+    elements.forEach((item, index) => {
+      let cnt = 0;
+      for (let i=0;i<cal.length;i++) {
+        if ( cal[cali][item] && cal[i][item] ) cnt++;
+      }
+      if ( cnt > 2 ) cal[cali][item] = false;
+    });
+
+    let cnt = 0;
+    elements.forEach((item, index) => {
+      if ( cal[cali][item] ) cnt++;
+    });
+    if ( cnt == 0 ) cal.splice( cali, 1 );
+
+    cal.forEach((item, index) => {
+      if ( JSON.stringify( cal[cali] ) == JSON.stringify( item ) && cali != index ) {
+        cal.splice( cali, 1 );
+      }
+    });
+
+  }
+  
+  if ( cali > cal.length -1 ) cali = cal.length -1;
+  if ( !cal[cali] ) {
+    cal = [ { "start":0, "duration":1440, "monday":true, "tuesday":true, "wednesday":true, "thursday":true, "friday":true, "saturday":true, "sunday":true } ];
+    cali = 0;
+  }
+
+  //~ console.log('index: '+cali+'   start: '+cal[cali].start+'   duration: '+cal[cali].duration+'   monday: '+cal[cali].monday+'   tuesday: '+cal[cali].tuesday+'   wednesday: '+cal[cali].wednesday+'   thursday: '+cal[cali].thursday+'   friday: '+cal[cali].friday+'   saturday: '+cal[cali].saturday+'   sunday: '+cal[cali].sunday);
+  let shdl ='';
+  shdl = "<div id='amc_"+dev+"_schedule_div' class='ui-dialog-content ui-widget-content' data-amc_schedule='"+JSON.stringify(cal)+"' style='width:auto; height:auto; ' title='Schedule editor'>";
+  shdl += "<style>";
+  shdl += ".amc_schedule_tabth{margin:auto; width:50%; text-align:left;}";
+  shdl += "</style>";
+  shdl += "<table id='amc_"+dev+"_schedule_table0' class='amc_schedule_table col_bg block wide' ><tbody>";
+  shdl += "<tr class='even amc_schedule_tabth' ><th>Index</th><th>Start</th><th>Duration</th><th>Mon.</th><th>Tue.</th><th>Wed.</th><th>Thu.</th><th>Fri.</th><th>Sat.</th><th>Sun.</th><th></th></tr>";
+  shdl += "<tr class='even'>";
+  shdl += "<td><input id='amc_"+dev+"_index' type='number' value='"+cali+"' min='0' max='13' step='1' size='3' /></td>";
+  shdl += "<td><input id='amc_"+dev+"_start' type='time' value='"+("0"+parseInt(cal[cali].start/60)).slice(-2)+":"+("0"+cal[cali].start%60).slice(-2)+"' /></td>";
+  shdl += "<td><input id='amc_"+dev+"_duration' type='time' value='"+("0"+parseInt(cal[cali].duration/60)).slice(-2)+":"+("0"+cal[cali].duration%60).slice(-2)+"' /></td>";
+  shdl += "<td><input id='amc_"+dev+"_monday' type='checkbox' "+(cal[cali].monday?"checked='checked'":"")+" /></td>";
+  shdl += "<td><input id='amc_"+dev+"_tuesday' type='checkbox' "+(cal[cali].tuesday?"checked='checked'":"")+" /></td>";
+  shdl += "<td><input id='amc_"+dev+"_wednesday' type='checkbox' "+(cal[cali].wednesday?"checked='checked'":"")+" /></td>";
+  shdl += "<td><input id='amc_"+dev+"_thursday' type='checkbox' "+(cal[cali].thursday?"checked='checked'":"")+" /></td>";
+  shdl += "<td><input id='amc_"+dev+"_friday' type='checkbox' "+(cal[cali].friday?"checked='checked'":"")+" /></td>";
+  shdl += "<td><input id='amc_"+dev+"_saturday' type='checkbox' "+(cal[cali].saturday?"checked='checked'":"")+" /></td>";
+  shdl += "<td><input id='amc_"+dev+"_sunday' type='checkbox' "+(cal[cali].sunday?"checked='checked'":"")+" /></td>";
+  shdl += "<td><button id='amc_"+dev+"_schedule_button_plus' title='add: prepare a data set and click &plusmn;&#013;delete: unckeck each weekday and click &plusmn;&#013;reset: fill any time field with -- and click &plusmn;' onclick=' AutomowerConnectHandleInput ( \""+dev+"\" )' style='padding-bottom:4px; font-weight:bold; font-size:16pt; ' >&ensp;&plusmn;&ensp;</button></td>";
+  shdl += "</tr><tr style='border-bottom:1px solid black'><td colspan='100%'></td></tr>";
+
+  for (let i=0; i< cal.length; i++){
+    shdl += "<tr class='"+( i % 2 ? 'even' : 'odd' )+"' >";
+    shdl += "<td>&thinsp;"+i+"</td>";
+    shdl += "<td>&thinsp;"+("0"+parseInt(cal[i].start/60)).slice(-2)+":"+("0"+cal[i].start%60).slice(-2)+"</td>";
+    shdl += "<td>&thinsp;"+("0"+parseInt(cal[i].duration/60)).slice(-2)+":"+("0"+cal[i].duration%60).slice(-2)+"</td>";
+    shdl += "<td>&thinsp;"+(cal[i].monday?"&#x2611;":"&#x2610;")+"</td>";
+    shdl += "<td>&thinsp;"+(cal[i].tuesday?"&#x2611;":"&#x2610;")+"</td>";
+    shdl += "<td>&thinsp;"+(cal[i].wednesday?"&#x2611;":"&#x2610;")+"</td>";
+    shdl += "<td>&thinsp;"+(cal[i].thursday?"&#x2611;":"&#x2610;")+"</td>";
+    shdl += "<td>&thinsp;"+(cal[i].friday?"&#x2611;":"&#x2610;")+"</td>";
+    shdl += "<td>&thinsp;"+(cal[i].saturday?"&#x2611;":"&#x2610;")+"</td>";
+    shdl += "<td>&thinsp;"+(cal[i].sunday?"&#x2611;":"&#x2610;")+"</td><td></td>";
+    shdl += "</tr>";
+    }
+
+  shdl += "<tr>";
+  let nrows = cal.length*11+2;
+  shdl += "<td colspan='12' ><textarea style='font-size:10pt; ' readOnly wrap='off' cols='62' rows='"+(nrows > 35 ? 35 : nrows)+"'>"+JSON.stringify(cal,null,"  ")+"</textarea></td>";
+  shdl += "</tr>";
+  shdl += "</tbody></table>";
+  shdl += "</div>";
+
+  const newdiv = new DOMParser().parseFromString( shdl, "text/html" ).querySelector( '#amc_'+dev+'_schedule_div' );
+  const olddiv = document.querySelector( '#amc_'+dev+'_schedule_div' );
+  olddiv.parentNode.replaceChild( newdiv, olddiv );
+
+}
+
+function AutomowerConnectSchedule ( dev, cal ) {
+  
+  let el = document.getElementById('amc_'+dev+'_schedule_div');
+  if ( el ) el.remove();
+
+  let cali = 0;
+  let shdl = "<div id='amc_"+dev+"_schedule_div' data-amc_schedule='"+JSON.stringify(cal)+"' title='Schedule editor'>";
+  shdl += "<style>";
+  shdl += ".amc_schedule_tabth{text-align:left;}";
+  shdl += "</style>";
+  shdl += "<table id='amc_"+dev+"_schedule_table0' class='amc_schedule_table col_bg block wide'><tbody>";
+  shdl += "<tr class='even amc_schedule_tabth ' ><th>Index</th><th>Start</th><th>Duration</th><th>Mon.</th><th>Tue.</th><th>Wed.</th><th>Thu.</th><th>Fri.</th><th>Sat.</th><th>Sun.</td><th></th></tr>";
+  shdl += "<tr class='even'>";
+  shdl += "<td><input id='amc_"+dev+"_index' type='number' value='"+cali+"' min='0' max='13' step='1' size='3' /></td>";
+  shdl += "<td><input id='amc_"+dev+"_start' type='time' value='"+("0"+parseInt(cal[cali].start/60)).slice(-2)+":"+("0"+cal[cali].start%60).slice(-2)+"' /></td>";
+  shdl += "<td><input id='amc_"+dev+"_duration' type='time' value='"+("0"+parseInt(cal[cali].duration/60)).slice(-2)+":"+("0"+cal[cali].duration%60).slice(-2)+"' /></td>";
+  shdl += "<td><input id='amc_"+dev+"_monday' type='checkbox' "+(cal[cali].monday?"checked='checked'":"")+" /></td>";
+  shdl += "<td><input id='amc_"+dev+"_tuesday' type='checkbox' "+(cal[cali].tuesday?"checked='checked'":"")+" /></td>";
+  shdl += "<td><input id='amc_"+dev+"_wednesday' type='checkbox' "+(cal[cali].wednesday?"checked='checked'":"")+" /></td>";
+  shdl += "<td><input id='amc_"+dev+"_thursday' type='checkbox' "+(cal[cali].thursday?"checked='checked'":"")+" /></td>";
+  shdl += "<td><input id='amc_"+dev+"_friday' type='checkbox' "+(cal[cali].friday?"checked='checked'":"")+" /></td>";
+  shdl += "<td><input id='amc_"+dev+"_saturday' type='checkbox' "+(cal[cali].saturday?"checked='checked'":"")+" /></td>";
+  shdl += "<td><input id='amc_"+dev+"_sunday' type='checkbox' "+(cal[cali].sunday?"checked='checked'":"")+" /></td>";
+  shdl += "<td><button id='amc_"+dev+"_schedule_button_plus' title='add: prepare a data set and click &plusmn;&#013;delete: unckeck each weekday and click &plusmn;&#013;reset: fill any time field with -- and click &plusmn;' onclick=' AutomowerConnectHandleInput ( \"am430x1\" )' style='padding-bottom:4px; font-weight:bold; font-size:16pt; ' >&ensp;&plusmn;&ensp;</button></td>";
+  shdl += "</tr><tr style='border-bottom:1px solid black'><td colspan='100%'></td></tr>";
+
+  for (let i=0; i< cal.length; i++){
+    shdl += "<tr class='"+( i % 2 ? 'even' : 'odd' )+"' >";
+    shdl += "<td >&thinsp;"+i+"</td>";
+    shdl += "<td>&thinsp;"+("0"+parseInt(cal[i].start/60)).slice(-2)+":"+("0"+cal[i].start%60).slice(-2)+"</td>";
+    shdl += "<td>&thinsp;"+("0"+parseInt(cal[i].duration/60)).slice(-2)+":"+("0"+cal[i].duration%60).slice(-2)+"</td>";
+    shdl += "<td>&thinsp;"+(cal[i].monday?"&#x2611;":"&#x2610;")+"</td>";
+    shdl += "<td>&thinsp;"+(cal[i].tuesday?"&#x2611;":"&#x2610;")+"</td>";
+    shdl += "<td>&thinsp;"+(cal[i].wednesday?"&#x2611;":"&#x2610;")+"</td>";
+    shdl += "<td>&thinsp;"+(cal[i].thursday?"&#x2611;":"&#x2610;")+"</td>";
+    shdl += "<td>&thinsp;"+(cal[i].friday?"&#x2611;":"&#x2610;")+"</td>";
+    shdl += "<td>&thinsp;"+(cal[i].saturday?"&#x2611;":"&#x2610;")+"</td>";
+    shdl += "<td>&thinsp;"+(cal[i].sunday?"&#x2611;":"&#x2610;")+"</td><td></td>";
+    shdl += "</tr>";
+  }
+  shdl += "<tr>";
+  let nrows = cal.length*11+2;
+  shdl += "<td colspan='12' ><textarea style='font-size:10pt; ' readOnly wrap='off' cols='62' rows='"+(nrows > 35 ? 35 : nrows)+"'>"+JSON.stringify(cal,null,"  ")+"</textarea></td>";
+  shdl += "</tr>";
+  shdl += "</tbody></table>";
+  shdl += "</div>";
+  let schedule = new DOMParser().parseFromString( shdl, "text/html" ).querySelector( '#amc_'+dev+'_schedule_div' );
+  document.querySelector('body').append( schedule );
+  document.querySelector( "#amc_"+dev+"_schedule_button_plus" ).setAttribute( "onclick", "AutomowerConnectHandleInput( '"+dev+"' )" );
+
+  $(schedule).dialog({
+    dialogClass:"no-close", modal:true, width:"auto", closeOnEscape:true, 
+    maxWidth:$(window).width()*0.9, maxHeight:$(window).height()*0.9,
+    buttons: [{text:"Send To Attribute", click:function(){
+      schedule = document.querySelector( '#amc_'+dev+'_schedule_div' );
+      cal = JSON.parse( schedule.getAttribute( 'data-amc_schedule' ) );
+      FW_cmd( FW_root+"?cmd=set "+dev+" sendJsonScheduleToAttribute "+JSON.stringify( cal )+"+&XHR=1" );
+      
+    }},{text:"Send To Mower", click:function(){
+      schedule = document.querySelector( '#amc_'+dev+'_schedule_div' );
+      cal = JSON.parse( schedule.getAttribute( 'data-amc_schedule' ) );
+      FW_cmd( FW_root+"?cmd=set "+dev+" sendJsonScheduleToMower "+JSON.stringify( cal )+"&XHR=1" );
+    }},{text:"Close", click:function(){
+      $(this).dialog("close");
+      document.querySelector( '#amc_'+dev+'_schedule_div' ).remove();
+    }}]
+  });
+
 }
 
 //AutomowerConnectUpdateDetail (<devicename>, <type>, <detailfnfirst>, <imagesize x>, <imagesize y>, <scale x>, <scale y>, <error description>, <path array>, <error array>, <hull array>)
@@ -576,7 +784,7 @@ function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, sca
     if ( errdesc[0] != '-' ) AutomowerConnectShowError( ctx, div, dev, picx, picy, errdesc, erray );
 
   } else {
-    setTimeout(()=>{
+    setTimeout ( ()=>{
       console.log('AutomowerConnectUpdateDetail loop: div && canvas && canvas_0 false '+ type+' '+dev );
       AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, scalx, errdesc, pos, erray);
     }, 100);

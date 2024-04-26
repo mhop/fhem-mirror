@@ -105,7 +105,6 @@ __END__
 
 =begin html
 
-<a id="74_AutomowerConnect.pm" ></a>
 <a id="AutomowerConnect" ></a>
 <h3>AutomowerConnect</h3>
 <ul>
@@ -150,6 +149,15 @@ __END__
     <br><br>
   </ul>
   <br>
+
+  <b>Button</b>
+  <ul>
+    <li><a id='AutomowerConnect-button-mowerschedule'>Mower Schedule</a><br>
+      The Button <button >Mower Schedule</button> opens GUI to maintain the mower schedule..<br>
+      Add/change entry: fill out the schedule fields and press <button >&plusmn;</button>.<br>
+      Delete entry: unselect each weekday and press <button >&plusmn;</button>.<br>
+      Reset entry: fill any time field with -- and press <button >&plusmn;</button>.</li>
+  </ul>
 
   <a id="AutomowerConnectSet"></a>
   <b>Set</b>
@@ -373,7 +381,7 @@ __END__
 
     <li><a id='AutomowerConnect-attr-mowerSchedule'>mowerSchedule</a><br>
       <code>attr &lt;name&gt; mowerSchedule &lt;schedule array&gt;</code><br>
-      This attribute provides the possebility to edit the mower schedule in form of an JSON array.<br>The actual schedule can be loaded with the command <code>set &lt;name&gt; mowerScheduleToAttribute</code>. <br>The command <code>set &lt;name&gt; sendScheduleFromAttributeToMower</code> sends the schedule to the mower. The maximum of array elements is 14 and 2 each day, so every day of a week can have 2 time spans. Each array element consists of 7 unsorted day values (<code>monday</code> to <code>sunday</code>) which can be <code>true</code> or <code>false</code>, a <code>start</code> and <code>duration</code> value in minutes. Start time counts from midnight.  NOTE: Do not use for 550 EPOS and Ceora. Delete the attribute after the schedule is successfully uploaded.</li>
+      This attribute provides the possebility to edit the mower schedule in form of an JSON array.<br>The actual schedule can be loaded with the command <code>set &lt;name&gt; mowerScheduleToAttribute</code>. <br>The command <code>set &lt;name&gt; sendScheduleFromAttributeToMower</code> sends the schedule to the mower. The maximum of array elements is 14 and 2 each day, so every day of a week can have 2 time spans. Each array element consists of 7 day values (<code>monday</code> to <code>sunday</code>) which can be <code>true</code> or <code>false</code>, a <code>start</code> and <code>duration</code> value in minutes. Start time counts from midnight.  NOTE: Do not use for 550 EPOS and Ceora. Delete the attribute after the schedule is successfully uploaded.</li>
 
     <li><a id='AutomowerConnect-attr-mowingAreaLimits'>mowingAreaLimits</a><br>
       <code>attr &lt;name&gt; mowingAreaLimits &lt;positions list&gt;</code><br>
@@ -472,14 +480,25 @@ __END__
       Shows user defined html beneath the map. usefull for a panel with shortcuts<br>
       The command attribute has to contain the mower command, without set &lt;name&gt;<br>
       <code>command="Start 210"</code> stands for <code>set &lt;name&gt; Start 210</code><br>
-      Directives as comment in the first line allow positioning.<br>
+      A directive as comment in the first line allows positioning.<br>
       <ul>
-      <code>ON_TOP</code> shows html above map<br>
+        <li>
+          &lt;!-- ON_TOP --&gt; shows html above map</li>
       </ul>
+      Panel has to be enclosed by a div-tag with a mandatory HTML-attribute <code>data-amc_panel_inroom=&lt;"1"|""&gt;</code>. Panel is shown in room view, i.e. for uiTable, weblink, etc., for value  "1" and hidden for value "" look at example.<br>
       Example:<br>
       <code>
-      &lt;!-- ON_TOP --&gt;<br>
-      &lt;button command="Start 210" &gt;Start für 3 1/2 h&lt;/button&gt;<br>
+        &lt;style&gt;<br>
+          .amc_panel_button {height:50px; width:150px;}<br>
+          .amc_panel_div {position:relative; left:348px; top:-330px;  z-index: 2; width:150px; height:1px}<br>
+        &lt;/style&gt;<br>
+        &lt;div class="amc_panel_div" data-amc_panel_inroom="1" &gt;<br>
+          &lt;button class="amc_panel_button" command="Start 210" &gt;Start für 3 1/2 h&lt;/button&gt;<br>
+          &lt;button class="amc_panel_button" command="Pause" &gt;Pause bis auf Weiteres&lt;/button&gt;<br>
+          &lt;button class="amc_panel_button" command="ResumeSchedule" &gt;Weiter nach Plan&lt;/button&gt;<br>
+          &lt;button class="amc_panel_button" command="ParkUntilNextSchedule" &gt;Parken bis nächsten Termin&lt;/button&gt;<br>
+          &lt;button class="amc_panel_button" command="ParkUntilNextSchedule" &gt;Parken bis auf Weiteres&lt;/button&gt;<br>
+        &lt;/div&gt;<br>
       </code>
     </li>
 
@@ -608,8 +627,17 @@ __END__
   </ul>
   <br>
 
-    <a id="AutomowerConnectSet"></a>
-    <b>Set</b>
+  <b>Button</b>
+  <ul>
+    <li><a id='AutomowerConnect-button-mowerschedule'>Mower Schedule</a><br>
+      Über den Button <button >Mower Schedule</button> kann eine Benutzeroberfläche zur Bearbeitung des Mähplans geöffnet werden.<br>
+      Eintrag zufügen/ändern: Die gewünschten Angaben eintragen und <button >&plusmn;</button> betätigen.<br>
+      Eintrag löschen: Alle Wochentage abwählen und <button >&plusmn;</button> betätigen.<br>
+      Eintrag zurücksetzen: Irgend ein Zeitfeld mit -- füllen und <button >&plusmn;</button> betätigen.</li>
+  </ul>
+
+  <a id="AutomowerConnectSet"></a>
+  <b>Set</b>
   <ul>
     <li><a id='AutomowerConnect-set-Park'>Park</a><br>
       <code>set &lt;name&gt; Park &lt;number of minutes&gt;</code><br>
@@ -834,7 +862,7 @@ __END__
 
     <li><a id='AutomowerConnect-attr-mowerSchedule'>mowerSchedule</a><br>
       <code>attr &lt;name&gt; mowerSchedule &lt;schedule array&gt;</code><br>
-      Dieses Attribut bietet die Möglichkeit den Mähplan zu ändern, er liegt als JSON Array vor.<br>Der aktuelleMähplan kann mit dem Befehl <code>set &lt;name&gt; mowerScheduleToAttrbute</code> ins Attribut geschrieben werden. <br>Der Befehl <code>set &lt;name&gt; sendScheduleFromAttributeToMower</code> sendet den Mähplan an den Mäher. Das Maximum der Arrayelemente beträgt 14, 2 für jeden Tag, so daß jeden Tag zwei Intervalle geplant werden können. Jedes Arrayelement besteht aus 7 unsortierten Tageswerten (<code>monday</code> bis <code>sunday</code>) die auf <code>true</code> oder <code>false</code> gesetzt werden können, einen <code>start</code> Wert und einen <code>duration</code> Wert in Minuten. Die Startzeit <code>start</code> wird von Mitternacht an gezählt.  HINWEIS: Nicht für 550 EPOS und Ceora geeignet.</li>
+      Dieses Attribut bietet die Möglichkeit den Mähplan zu ändern, er liegt als JSON Array vor.<br>Der aktuelle Mähplan kann mit dem Befehl <code>set &lt;name&gt; mowerScheduleToAttrbute</code> ins Attribut geschrieben werden. <br>Der Befehl <code>set &lt;name&gt; sendScheduleFromAttributeToMower</code> sendet den Mähplan an den Mäher. Das Maximum der Arrayelemente beträgt 14, 2 für jeden Tag, so daß jeden Tag zwei Intervalle geplant werden können. Jedes Arrayelement besteht aus 7 Tageswerten (<code>monday</code> bis <code>sunday</code>) die auf <code>true</code> oder <code>false</code> gesetzt werden können, einen <code>start</code> Wert und einen <code>duration</code> Wert in Minuten. Die Startzeit <code>start</code> wird von Mitternacht an gezählt.  HINWEIS: Nicht für 550 EPOS und Ceora geeignet.</li>
 
     <li><a id='AutomowerConnect-attr-mowingAreaLimits'>mowingAreaLimits</a><br>
       <code>attr &lt;name&gt; mowingAreaLimits &lt;positions list&gt;</code><br>
@@ -934,14 +962,25 @@ __END__
       Zeigt HTML Kode unterhalb der Karte z.B. für ein Panel mit Kurzbefehlen.<br>
       Das command Attribut beinhaltet den Mäherbefehl, ohne set &lt;name&gt;<br>
       <code>command="Start 210"</code> steht für <code>set &lt;name&gt; Start 210</code><br>
-      Direktiven als Kommentar erlauben die Positionierung.<br>
+      Eine Direktive als Kommentar in der ersten Zeile erlaubt die Positionierung:<br>
       <ul>
-      <code>ON_TOP</code> zeigt Buttons über der Karte<br>
+        <li>
+          &lt;!-- ON_TOP --&gt; zeigt das Panel über der Karte an.</li>
       </ul>
+      Das Panel muss in einem div-Element eingebettet sein das ein HTML-Attribut <code>data-amc_panel_inroom=&lt;"1"|""&gt;</code> enthält. Das Panel wird in der Raumansicht, z.B. bei uiTable, weblink, usw., angezeigt wenn der Wert "1" ist und versteckt falls der Wert "" ist, s. Bsp.<br>
       Beispiel:<br>
       <code>
-      &lt;!-- ON_TOP --&gt;<br>
-      &lt;button command="Start 210" &gt;Start für 3 1/2 h&lt;/button&gt;<br>
+        &lt;style&gt;<br>
+          .amc_panel_button {height:50px; width:150px;}<br>
+          .amc_panel_div {position:relative; left:348px; top:-330px;  z-index: 2; width:150px; height:1px}<br>
+        &lt;/style&gt;<br>
+        &lt;div class="amc_panel_div" data-amc_panel_inroom="1" &gt;<br>
+          &lt;button class="amc_panel_button" command="Start 210" &gt;Start für 3 1/2 h&lt;/button&gt;<br>
+          &lt;button class="amc_panel_button" command="Pause" &gt;Pause bis auf Weiteres&lt;/button&gt;<br>
+          &lt;button class="amc_panel_button" command="ResumeSchedule" &gt;Weiter nach Plan&lt;/button&gt;<br>
+          &lt;button class="amc_panel_button" command="ParkUntilNextSchedule" &gt;Parken bis nächsten Termin&lt;/button&gt;<br>
+          &lt;button class="amc_panel_button" command="ParkUntilNextSchedule" &gt;Parken bis auf Weiteres&lt;/button&gt;<br>
+        &lt;/div&gt;<br>
       </code>
     </li>
 
