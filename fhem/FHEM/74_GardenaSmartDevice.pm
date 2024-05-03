@@ -2,7 +2,7 @@
 #
 # Developed with VSCodium and richterger perl plugin.
 #
-#  (c) 2017-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2017-2024 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
@@ -324,8 +324,9 @@ sub Set {
     elsif ( lc $cmd eq 'parkuntilnexttimer' ) {
         $payload = '"name":"park_until_next_timer"';
         if ( $mainboard_version > 10.30 ) {
-            $payload   = '"properties":{"name":"mower_timer","value":0}';
-            $abilities = 'mower_timer';
+            $payload =
+              '"mowerTimer":0,"startingPointDistance":null,"areaId":null';
+            $abilities = 'mower';
         }
     }
     elsif ( lc $cmd eq 'startresumeschedule' ) {
@@ -339,13 +340,15 @@ sub Set {
         }
     }
     elsif ( lc $cmd eq 'startoverridetimer' ) {
-        $payload = '"name":"start_override_timer","parameters":{"duration":'
-          . $aArg->[0] * 60 . '}';
-        if ( $mainboard_version > 10.30 ) {
-            $payload = '"properties":{"name":"mower_timer","value":'
-              . $aArg->[0] * 60 . '}';
-            $abilities = 'mower_timer';
-        }
+
+        # $payload = '"name":"start_override_timer","parameters":{"duration":'
+        # . $aArg->[0] * 60 . '}';
+        # if ( $mainboard_version > 10.30 ) {
+        $payload = '"startingPointDistance":null,"areaId":null, "mowerTimer": '
+          . $aArg->[0] * 60;
+        $abilities = 'mower';
+
+        # }  removed code < 10.30 api changes March 2024
 
     }
     elsif ( lc $cmd eq 'startpoint' ) {
@@ -735,7 +738,8 @@ sub WriteReadings {
                       . RigReadingsValue( $hash,
                         $propertie->{value} )  # cast all data to string with ""
                   )
-                  if ( exists( $propertie->{value} )
+                  if (
+                    exists( $propertie->{value} )
                     && $decode_json->{abilities}[$abilities]{name} . '-'
                     . $propertie->{name} ne 'radio-quality'
                     && $decode_json->{abilities}[$abilities]{name} . '-'
@@ -754,7 +758,10 @@ sub WriteReadings {
                     . $propertie->{name} ne 'ic24-valves_connected'
                     && $decode_json->{abilities}[$abilities]{name} . '-'
                     . $propertie->{name} ne 'ic24-valves_master_config'
-                    && ref( $propertie->{value} ) ne "HASH" );
+                    && (  $decode_json->{abilities}[$abilities]{name} . '-'
+                        . $propertie->{name} ) !~ /scheduling-timeslot_state_\d/
+                    && ref( $propertie->{value} ) ne "HASH"
+                  );
 
                 readingsBulkUpdateIfChanged(
                     $hash,
@@ -851,7 +858,30 @@ sub WriteReadings {
                     }
                 }
 
-                # ic24 and other watering devices calc irrigation left in sec
+                # decode timeslot_state_N arrays  code by hhhdg
+                if ( defined( $propertie->{value} )
+                    && $decode_json->{abilities}[$abilities]{name} . '-'
+                    . $propertie->{name} =~ /scheduling-timeslot_state_\d/
+                    && ref( $propertie->{value} ) eq "ARRAY" )
+                {
+                    while ( my ( $r, $v ) = each @{ $propertie->{value} } ) {
+                        if ( ref($v) eq "HASH" ) {
+                            my $entry = $r + 1;
+                            while ( my ( $i_r, $i_v ) = each %{$v} ) {
+                                readingsBulkUpdateIfChanged(
+                                    $hash,
+                                    $decode_json->{abilities}[$abilities]{name}
+                                      . '-'
+                                      . $propertie->{name} . '_'
+                                      . $entry . '_'
+                                      . $i_r,
+                                    RigReadingsValue( $hash, $i_v )
+                                );
+                            }
+                        }
+                    }
+                }    # fi defined
+                   # ic24 and other watering devices calc irrigation left in sec
                 readingsBulkUpdateIfChanged(
                     $hash,
                     $decode_json->{abilities}[$abilities]{name} . '-'
@@ -907,15 +937,15 @@ sub WriteReadings {
         foreach my $dev_schedules ( sort keys %{ $hash->{READINGS} } ) {
             my $dev_reading = ReadingsVal( $name, $dev_schedules, "error" );
             push @ist, $dev_reading
-              if $dev_schedules =~ /schedule.*\d_id/;    # push reading _id
+              if $dev_schedules =~ /schedule.*\d+_id/;    # push reading _id
             push @ist, $1
               if $dev_schedules =~
-              /schedule.*_(\d)_id/;    # push readigs d from x_id
+              /schedule.*_(\d+)_id/;    # push readigs d from x_id
 
             Log3 $name, 5,
               "[DEBUG] $name - Schedule - Key ist : $dev_schedules ";
             Log3 $name, 5, "[DEBUG] $name - Schedule - ID FOUND $dev_reading"
-              if $dev_schedules =~ /schedule.*_\d_id/;    # cloud hat  SOLL
+              if $dev_schedules =~ /schedule.*_\d+_id/;    # cloud hat  SOLL
         }
 
    #Log3 $name, 5, "[DEBUG] Cloud:".Dumper(@soll) . "- Internal:". Dumper(@ist);
@@ -951,15 +981,13 @@ sub WriteReadings {
             && scalar(@soll) != scalar( @ist / 2 ) )
         {
             while ( my $old_schedule_id = shift(@ist) ) {
-                if ( length($old_schedule_id) == 1 ) {
-                    foreach ( keys %{ $hash->{READINGS} } ) {
-                        delete $hash->{READINGS}->{$_}
-                          if ( $_ =~
-                            /scheduling-schedules_event_$old_schedule_id.*/ );
-                    }
+                foreach ( keys %{ $hash->{READINGS} } ) {
+                    delete $hash->{READINGS}->{$_}
+                      if ( $_ =~
+                        /scheduling-schedules_event_${old_schedule_id}_.*/ );
                 }    # fi
                 Log3 $name, 5,
-"[DEBUG] - $name : deletereading scheduling-schedules_event_$old_schedule_id.*"
+"[DEBUG] - $name : deletereading scheduling-schedules_event_${old_schedule_id}_.*"
                   if length($old_schedule_id) == 1;
             }
         }
@@ -2684,7 +2712,7 @@ sub SetPredefinedStartPoints {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.6.1",
+  "version": "v2.6.3",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
