@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.17.11"=> "04.05.2024  correction in commandref, delete attr affectMaxDayVariance ",
   "1.17.10"=> "19.04.2024  calcTodayPVdeviation: avoid Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1311121 ",
   "1.17.9" => "17.04.2024  _batSocTarget: fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1310930 ",
   "1.17.8" => "16.04.2024  calcTodayPVdeviation: change of calculation ",
@@ -1094,7 +1095,6 @@ sub Initialize {
                                 "affectBatteryPreferredCharge:slider,0,1,100 ".
                                 "affectConsForecastIdentWeekdays:1,0 ".
                                 "affectConsForecastInPlanning:1,0 ".
-                                "affectMaxDayVariance:obsolete ".
                                 "affectSolCastPercentile:select,10,50,90 ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
@@ -5304,14 +5304,14 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  if ($cmd eq 'set' && $aName eq 'affectMaxDayVariance') {
-      if (!$init_done) {
-          return qq{Device "$name" -> The attribute '$aName' is obsolete and will be deleted soon. Please press "save config" when restart is finished.};
-      }
-      else {
-          return qq{The attribute '$aName' is obsolete and will be deleted soon.};
-      }
-  }
+  #if ($cmd eq 'set' && $aName eq 'affectMaxDayVariance') {
+  #    if (!$init_done) {
+  #        return qq{Device "$name" -> The attribute '$aName' is obsolete and will be deleted soon. Please press "save config" when restart is finished.};
+  #    }
+  #    else {
+  #        return qq{The attribute '$aName' is obsolete and will be deleted soon.};
+  #    }
+  #}
   ######################################################################################################################
 
   if ($aName eq 'disable') {
@@ -6257,32 +6257,8 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  my $nscc = ReadingsVal ($name, 'nextSolCastCall', '');                                        # 14.03.2024
-  if ($nscc) {
-      readingsSingleUpdate ($hash, 'nextRadiationAPICall', $nscc, 0);
-      deleteReadingspec ($hash, 'nextSolCastCall');
-  }
 
-  if (keys %{$data{$type}{$name}{aidectree}{airaw}}) {                                          # 27.03.2024
-      for my $idx (sort keys %{$data{$type}{$name}{aidectree}{airaw}}) {
-          my $val = AiRawdataVal ($hash, $idx, 'rad1h', undef);
-
-          if (!defined $val) {
-              delete $data{$type}{$name}{aidectree}{airaw}{$idx};
-              $val = 'aaaaaaaaaa';
-          }
-
-          if ($val =~ /\.[0-9]{1}$/xs) {
-              delete $data{$type}{$name}{aidectree}{airaw}{$idx};
-          }
-
-          if ($val =~ /\.00$/xs) {
-              my $renv = int $val;
-              $data{$type}{$name}{aidectree}{airaw}{$idx}{rad1h} = $renv;
-          }
-      }
-  }
-  #######################################################################################################################
+  ##########################################################################################################################
 
   setModel ($hash);                                                                            # Model setzen
 
@@ -14077,14 +14053,6 @@ sub aiAddRawData {
 
           my $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
           next if(!$rad1h || $rad1h <= 0);
-          
-          ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-          #######################################################################################################################
-          next if($rad1h =~ /\.[0-9]{1}$/xs);                 # 29.03.2024 -> einen Monat drin lassen wegen pvHistory turn
-          if ($rad1h =~ /\.00$/xs) {                          # 29.03.2024 -> einen Monat drin lassen wegen pvHistory turn
-              $rad1h = int $rad1h;
-          }
-          #######################################################################################################################
 
           my $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
           next if(!$pvrl || $pvrl <= 0);
@@ -17905,8 +17873,8 @@ to ensure that the system configuration is correct.
         <b>Example: </b> <br>
         set &lt;name&gt; currentInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 <br>
         <br>
-        # Device STP5000 provides PV values. The current generated power in the reading "total_pac" (kW) and the daily generation in the reading "etotal" (kWh).
-          The maximum power of the inverter is 5000 Watt.
+        # Device STP5000 provides PV values. The currently generated power in the "total_pac" reading (kW) and the total energy 
+          generated in the reading "etotal" (kWh). The maximum output of the inverter is 5000 watts.
       </ul>
       </li>
     </ul>
@@ -20134,7 +20102,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         <b>Beispiel: </b> <br>
         set &lt;name&gt; currentInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 <br>
         <br>
-        # Device STP5000 liefert PV-Werte. Die aktuell erzeugte Leistung im Reading "total_pac" (kW) und die tägliche Erzeugung im
+        # Device STP5000 liefert PV-Werte. Die aktuell erzeugte Leistung im Reading "total_pac" (kW) und die erzeugte Gesamtenergie im
           Reading "etotal" (kWh). Die max. Leistung des Wechselrichters beträgt 5000 Watt.
       </ul>
       </li>
