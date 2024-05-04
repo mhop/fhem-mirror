@@ -17,4 +17,4 @@ Laden mit:
 { Svn_GetFile('contrib/AutomowerConnect/Common.pm', 'lib/FHEM/Devices/AMConnect/Common.pm') }
 { Svn_GetFile('contrib/AutomowerConnect/automowerconnect.js', 'www/pgm2/automowerconnect.js') }
 
-Alle Pfade gelten für eine Standardinstallation und sind ggf. anzupassen.
+Alle Zielpfade gelten für eine Standardinstallation und sind ggf. anzupassen.
