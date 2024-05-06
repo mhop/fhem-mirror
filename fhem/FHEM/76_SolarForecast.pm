@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.17.12"=> "06.05.2024  attr ctrlInterval: immediate impact when set ",
   "1.17.11"=> "04.05.2024  correction in commandref, delete attr affectMaxDayVariance ",
   "1.17.10"=> "19.04.2024  calcTodayPVdeviation: avoid Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1311121 ",
   "1.17.9" => "17.04.2024  _batSocTarget: fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1310930 ",
@@ -5379,15 +5380,22 @@ sub Attr {
           }
       }
 
-      if ($init_done == 1 && $aName eq "ctrlSolCastAPIoptimizeReq") {
+      if ($init_done && $aName eq 'ctrlSolCastAPIoptimizeReq') {
           if (!isSolCastUsed ($hash)) {
               return qq{The attribute $aName is only valid for device model "SolCastAPI".};
           }
       }
 
-      if ($aName eq 'ctrlUserExitFn' && $init_done) {
+      if ($init_done && $aName eq 'ctrlUserExitFn') {
           ($err) = checkCode ($name, $aVal, 'cc1');
           return $err if($err);
+      }
+      
+      if ($init_done && $aName eq 'ctrlInterval') {
+          _newCycTime ($hash, time, $aVal);
+          my $nct = CurrentVal ($hash, 'nextCycleTime', 0);                               # gespeicherte nächste CyleTime
+          readingsSingleUpdate ($hash, 'nextCycletime', FmtTime($nct), 0);
+          return;
       }
   }
 
@@ -6149,12 +6157,7 @@ sub runTask {
   my $nct = CurrentVal ($hash, 'nextCycleTime', 0);                                  # gespeicherte nächste CyleTime
 
   if ($t >= $nct) {
-      my $new       = $t + $interval;                                                # nächste Wiederholungszeit
-      $hash->{MODE} = 'Automatic - next Cycletime: '.FmtTime($new);
-
-      $data{$hash->{TYPE}}{$name}{current}{nextCycleTime} = $new;
-
-      storeReading ('nextCycletime', FmtTime($new));
+       _newCycTime ($hash, $t, $interval);
       centralTask  ($hash, 1);
   }
 
@@ -6190,6 +6193,23 @@ sub runTask {
       delete $hash->{HELPER}{S03DONE};
   }
 
+return;
+}
+
+################################################################
+#                   neue Zykluszeit bestimmen                      
+################################################################
+sub _newCycTime {
+  my $hash     = shift;
+  my $t        = shift;
+  my $interval = shift;
+   
+  my $new       = $t + $interval;                                                # nächste Wiederholungszeit
+  $hash->{MODE} = 'Automatic - next Cycletime: '.FmtTime($new);
+  
+  $data{$hash->{TYPE}}{$hash->{NAME}}{current}{nextCycleTime} = $new;
+  storeReading ('nextCycletime', FmtTime($new));
+   
 return;
 }
 
