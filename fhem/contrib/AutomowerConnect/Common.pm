@@ -25,7 +25,7 @@
 ################################################################################
 
 package FHEM::Devices::AMConnect::Common;
-my $cvsid = '$Id: Common.pm 28823b 2024-04-26 13:14:53Z Ellert $';
+my $cvsid = '$Id: Common.pm 28823c 2024-04-26 13:14:53Z Ellert $';
 use strict;
 use warnings;
 use POSIX;
@@ -1207,7 +1207,7 @@ sub Set {
 
     my $calendarjson = eval {
       require JSON::PP;
-      my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9);
+      my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9,workAreaId=>10);
       JSON::PP->new->sort_by(
         sub {($ORDER{$JSON::PP::a} // 999) <=> ($ORDER{$JSON::PP::b} // 999) or $JSON::PP::a cmp $JSON::PP::b})
         ->pretty(1)->utf8( not $unicodeEncoding )->encode( $hash->{helper}{mower}{attributes}{calendar}{tasks} )
@@ -1289,7 +1289,7 @@ sub Set {
     return "$iam decode error: $@ \n $setVal" if ($@);
     $calendarjson = eval {
       require JSON::PP;
-      my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9);
+      my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9,workAreaId=>10);
       JSON::PP->new->sort_by(
         sub {($ORDER{$JSON::PP::a} // 999) <=> ($ORDER{$JSON::PP::b} // 999) or $JSON::PP::a cmp $JSON::PP::b})
         ->pretty(1)->utf8( not $unicodeEncoding )->encode( $calendarjson )
@@ -1801,7 +1801,7 @@ sub Attr {
 
       $attrVal = eval {
         require JSON::PP;
-        my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9);
+        my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9,workAreaId=>10);
         JSON::PP->new->sort_by(
           sub {($ORDER{$JSON::PP::a} // 999) <=> ($ORDER{$JSON::PP::b} // 999) or $JSON::PP::a cmp $JSON::PP::b})
           ->pretty(1)->encode( $perl )
@@ -2908,7 +2908,7 @@ sub getDefaultScheduleAsJSON {
   my $hash = $defs{$name};
   my $json = eval {
     require JSON::PP;
-    my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9);
+    my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9,workAreaId=>10);
     JSON::PP->new->sort_by(
       sub {($ORDER{$JSON::PP::a} // 999) <=> ($ORDER{$JSON::PP::b} // 999) or $JSON::PP::a cmp $JSON::PP::b})
       ->utf8( not $unicodeEncoding )->encode( $hash->{helper}{mower}{attributes}{calendar}{tasks} )

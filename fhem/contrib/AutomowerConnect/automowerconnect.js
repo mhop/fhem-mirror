@@ -1,6 +1,6 @@
 
 if ( !(typeof FW_version === 'undefined') )
-  FW_version["automowerconnect.js"] = "$Id: automowerconnect.js 28823a 2024-04-26 13:14:53Z Ellert $";
+  FW_version["automowerconnect.js"] = "$Id: automowerconnect.js 28823c 2024-04-26 13:14:53Z Ellert $";
   
 {  window.onload = ( ()=>{
     let room = document.querySelector("#content");
@@ -481,13 +481,20 @@ function AutomowerConnectPanelCmd ( panelcmd ) {
       FW_cmd( FW_root+"?cmd="+panelcmd+"&XHR=1" );
 }
 
-function AutomowerConnectHandleInput ( dev ) {
+function AutomowerConnectHandleInput ( dev, hasWorkAreaId, workAreaId ) {
   let cal = JSON.parse( document.querySelector( '#amc_'+dev+'_schedule_div' ).getAttribute( 'data-amc_schedule' ) );
   let cali = document.querySelector('#amc_'+dev+'_index').value || cal.length;
   if ( cali > cal.length ) cali = cal.length;
   if ( cali > 13 ) cali = 13;
+  
 
-  for (let i=cal.length;i<=cali;i++) { cal.push( { "start":0, "duration":1439, "monday":false, "tuesday":false, "wednesday":false, "thursday":false, "friday":false, "saturday":false, "sunday":false } ) }
+  for (let i=cal.length;i<=cali;i++) {
+    if ( hasWorkAreaId ) {
+      cal.push( { "start":0, "duration":1439, "monday":false, "tuesday":false, "wednesday":false, "thursday":false, "friday":false, "saturday":false, "sunday":false, "workAreaId":workAreaId } )
+    } else {
+      cal.push( { "start":0, "duration":1439, "monday":false, "tuesday":false, "wednesday":false, "thursday":false, "friday":false, "saturday":false, "sunday":false } )
+    }
+  }
   //~ console.log('cali: '+cali+'   cal.length: '+cal.length);
 
   let elements = ["start", "duration"];
@@ -498,7 +505,7 @@ function AutomowerConnectHandleInput ( dev ) {
 
     if ( isNaN( hour ) && item == "start" ) hour = 0;
     if ( isNaN( min )  && item == "start" ) min = 0;
-    if ( isNaN( hour ) && item == "duration" ) hour = 23;
+    if ( isNaN( hour ) && item == "duration" ) hour = 23*60;
     if ( isNaN( min )  && item == "duration" ) min = 59;
 
     cal[cali][item] = hour + min;
@@ -547,7 +554,11 @@ function AutomowerConnectHandleInput ( dev ) {
   
   if ( cali > cal.length -1 ) cali = cal.length -1;
   if ( !cal[cali] ) {
-    cal = [ { "start":0, "duration":1440, "monday":true, "tuesday":true, "wednesday":true, "thursday":true, "friday":true, "saturday":true, "sunday":true } ];
+    if ( hasWorkAreaId ) {
+      cal = [ { "start":0, "duration":1440, "monday":true, "tuesday":true, "wednesday":true, "thursday":true, "friday":true, "saturday":true, "sunday":true, "workAreaId":workAreaId } ];
+    } else {
+      cal = [ { "start":0, "duration":1440, "monday":true, "tuesday":true, "wednesday":true, "thursday":true, "friday":true, "saturday":true, "sunday":true } ];
+    }
     cali = 0;
   }
 
@@ -557,8 +568,11 @@ function AutomowerConnectHandleInput ( dev ) {
   shdl += "<style>";
   shdl += ".amc_schedule_tabth{margin:auto; width:50%; text-align:left;}";
   shdl += "</style>";
-  shdl += "<table id='amc_"+dev+"_schedule_table0' class='amc_schedule_table col_bg block wide' ><tbody>";
+  shdl += "<table id='amc_"+dev+"_schedule_table0' class='amc_schedule_table col_bg block wide'><thead>";
+    //~ if ( hasWorkAreaId ) shdl += "<td><input id='amc_"+dev+"_workareaid' type='number' value='"+workAreaId+"' readonly /></td>";
+  if ( hasWorkAreaId ) shdl += "<tr class='even amc_schedule_tabth' ><th  colspan='100%' >Calendar for Work Area Id: "+workAreaId+"</th></tr>";
   shdl += "<tr class='even amc_schedule_tabth' ><th>Index</th><th>Start</th><th>Duration</th><th>Mon.</th><th>Tue.</th><th>Wed.</th><th>Thu.</th><th>Fri.</th><th>Sat.</th><th>Sun.</th><th></th></tr>";
+  shdl += "</thead><tbody>";
   shdl += "<tr class='even'>";
   shdl += "<td><input id='amc_"+dev+"_index' type='number' value='"+cali+"' min='0' max='13' step='1' size='3' /></td>";
   shdl += "<td><input id='amc_"+dev+"_start' type='time' value='"+("0"+parseInt(cal[cali].start/60)).slice(-2)+":"+("0"+cal[cali].start%60).slice(-2)+"' /></td>";
@@ -570,7 +584,7 @@ function AutomowerConnectHandleInput ( dev ) {
   shdl += "<td><input id='amc_"+dev+"_friday' type='checkbox' "+(cal[cali].friday?"checked='checked'":"")+" /></td>";
   shdl += "<td><input id='amc_"+dev+"_saturday' type='checkbox' "+(cal[cali].saturday?"checked='checked'":"")+" /></td>";
   shdl += "<td><input id='amc_"+dev+"_sunday' type='checkbox' "+(cal[cali].sunday?"checked='checked'":"")+" /></td>";
-  shdl += "<td><button id='amc_"+dev+"_schedule_button_plus' title='add: prepare a data set and click &plusmn;&#013;delete: unckeck each weekday and click &plusmn;&#013;reset: fill any time field with -- and click &plusmn;' onclick=' AutomowerConnectHandleInput ( \""+dev+"\" )' style='padding-bottom:4px; font-weight:bold; font-size:16pt; ' >&ensp;&plusmn;&ensp;</button></td>";
+  shdl += "<td><button id='amc_"+dev+"_schedule_button_plus' title='add: prepare a data set and click &plusmn;&#013;delete: unckeck each weekday and click &plusmn;&#013;reset: fill any time field with -- and click &plusmn;' onclick=' AutomowerConnectHandleInput ( \""+dev+"\", \""+hasWorkAreaId+"\", \""+workAreaId+"\" )' style='padding-bottom:4px; font-weight:bold; font-size:16pt; ' >&ensp;&plusmn;&ensp;</button></td>";
   shdl += "</tr><tr style='border-bottom:1px solid black'><td colspan='100%'></td></tr>";
 
   for (let i=0; i< cal.length; i++){
@@ -584,13 +598,15 @@ function AutomowerConnectHandleInput ( dev ) {
     shdl += "<td>&thinsp;"+(cal[i].thursday?"&#x2611;":"&#x2610;")+"</td>";
     shdl += "<td>&thinsp;"+(cal[i].friday?"&#x2611;":"&#x2610;")+"</td>";
     shdl += "<td>&thinsp;"+(cal[i].saturday?"&#x2611;":"&#x2610;")+"</td>";
-    shdl += "<td>&thinsp;"+(cal[i].sunday?"&#x2611;":"&#x2610;")+"</td><td></td>";
+    shdl += "<td>&thinsp;"+(cal[i].sunday?"&#x2611;":"&#x2610;")+"</td>";
+    if ( hasWorkAreaId ) shdl += "<td>&thinsp;"+workAreaId+"</td>";
+    shdl += "<td></td>";
     shdl += "</tr>";
     }
 
   shdl += "<tr>";
-  let nrows = cal.length*11+2;
-  shdl += "<td colspan='12' ><textarea style='font-size:10pt; ' readOnly wrap='off' cols='62' rows='"+(nrows > 35 ? 35 : nrows)+"'>"+JSON.stringify(cal,null,"  ")+"</textarea></td>";
+    let nrows = cal.length*(hasWorkAreaId?12:11)+2;
+    shdl += "<td colspan='12' ><textarea style='font-size:10pt; width:98%; ' readOnly wrap='off' cols='62' rows='"+(nrows > (3*(hasWorkAreaId?12:11)+2) ? (3*(hasWorkAreaId?12:11)+2) : nrows)+"'>"+JSON.stringify(cal,null,"  ")+"</textarea></td>";
   shdl += "</tr>";
   shdl += "</tbody></table>";
   shdl += "</div>";
@@ -606,17 +622,27 @@ function AutomowerConnectSchedule ( dev ) {
   let el = document.getElementById('amc_'+dev+'_schedule_div');
   if ( el ) el.remove();
 
+  let hasWorkAreaId = false;
+  let workAreaId = null;
+
   FW_cmd( FW_root+"?cmd={ FHEM::Devices::AMConnect::Common::getDefaultScheduleAsJSON( \""+dev+"\" ) }&XHR=1",( cal ) => {
     cal = JSON.parse( cal );
-    if (cal.length == 0) cal = [ { "start":0, "duration":1440, "monday":true, "tuesday":true, "wednesday":true, "thursday":true, "friday":true, "saturday":true, "sunday":true } ];
+    if ( cal.length == 0 ) cal = [ { "start":0, "duration":1440, "monday":true, "tuesday":true, "wednesday":true, "thursday":true, "friday":true, "saturday":true, "sunday":true } ];
+    if ( cal[0].workAreaId != null ) {
+      hasWorkAreaId = true;
+      workAreaId = cal[0].workAreaId
+    }
 
     let cali = 0;
     let shdl = "<div id='amc_"+dev+"_schedule_div' data-amc_schedule='"+JSON.stringify(cal)+"' title='Schedule editor' class='col_fg'>";
     shdl += "<style>";
     shdl += ".amc_schedule_tabth{text-align:left;}";
     shdl += "</style>";
-    shdl += "<table id='amc_"+dev+"_schedule_table0' class='amc_schedule_table col_bg block wide'><tbody>";
-    shdl += "<tr class='even amc_schedule_tabth ' ><th>Index</th><th>Start</th><th>Duration</th><th>Mon.</th><th>Tue.</th><th>Wed.</th><th>Thu.</th><th>Fri.</th><th>Sat.</th><th>Sun.</td><th></th></tr>";
+    shdl += "<table id='amc_"+dev+"_schedule_table0' class='amc_schedule_table col_bg block wide'><thead>";
+      //~ if ( hasWorkAreaId ) shdl += "<td><input id='amc_"+dev+"_workareaid' type='number' value='"+workAreaId+"' readonly /></td>";
+    if ( hasWorkAreaId ) shdl += "<tr class='even amc_schedule_tabth' ><th  colspan='100%' >Calendar for Work Area Id: "+workAreaId+"</th></tr>";
+    shdl += "<tr class='even amc_schedule_tabth' ><th>Index</th><th>Start</th><th>Duration</th><th>Mon.</th><th>Tue.</th><th>Wed.</th><th>Thu.</th><th>Fri.</th><th>Sat.</th><th>Sun.</th><th></th></tr>";
+    shdl += "</thead><tbody>";
     shdl += "<tr class='even'>";
     shdl += "<td><input id='amc_"+dev+"_index' type='number' value='"+cali+"' min='0' max='13' step='1' size='3' /></td>";
     shdl += "<td><input id='amc_"+dev+"_start' type='time' value='"+("0"+parseInt(cal[cali].start/60)).slice(-2)+":"+("0"+cal[cali].start%60).slice(-2)+"' /></td>";
@@ -628,7 +654,7 @@ function AutomowerConnectSchedule ( dev ) {
     shdl += "<td><input id='amc_"+dev+"_friday' type='checkbox' "+(cal[cali].friday?"checked='checked'":"")+" /></td>";
     shdl += "<td><input id='amc_"+dev+"_saturday' type='checkbox' "+(cal[cali].saturday?"checked='checked'":"")+" /></td>";
     shdl += "<td><input id='amc_"+dev+"_sunday' type='checkbox' "+(cal[cali].sunday?"checked='checked'":"")+" /></td>";
-    shdl += "<td><button id='amc_"+dev+"_schedule_button_plus' title='add: prepare a data set and click &plusmn;&#013;delete: unckeck each weekday and click &plusmn;&#013;reset: fill any time field with -- and click &plusmn;' onclick='AutomowerConnectHandleInput ( \""+dev+"\" )' style='padding-bottom:4px; font-weight:bold; font-size:16pt; ' >&ensp;&plusmn;&ensp;</button></td>";
+    shdl += "<td><button id='amc_"+dev+"_schedule_button_plus' title='add: prepare a data set and click &plusmn;&#013;delete: unckeck each weekday and click &plusmn;&#013;reset: fill any time field with -- and click &plusmn;' onclick='AutomowerConnectHandleInput ( \""+dev+"\", \""+hasWorkAreaId+"\", \""+workAreaId+"\" )' style='padding-bottom:4px; font-weight:bold; font-size:16pt; ' >&ensp;&plusmn;&ensp;</button></td>";
     shdl += "</tr><tr style='border-bottom:1px solid black'><td colspan='100%'></td></tr>";
 
     for (let i=0; i< cal.length; i++){
@@ -642,18 +668,19 @@ function AutomowerConnectSchedule ( dev ) {
       shdl += "<td>&thinsp;"+(cal[i].thursday?"&#x2611;":"&#x2610;")+"</td>";
       shdl += "<td>&thinsp;"+(cal[i].friday?"&#x2611;":"&#x2610;")+"</td>";
       shdl += "<td>&thinsp;"+(cal[i].saturday?"&#x2611;":"&#x2610;")+"</td>";
-      shdl += "<td>&thinsp;"+(cal[i].sunday?"&#x2611;":"&#x2610;")+"</td><td></td>";
+      shdl += "<td>&thinsp;"+(cal[i].sunday?"&#x2611;":"&#x2610;")+"</td>";
+      shdl += "<td></td>";
       shdl += "</tr>";
     }
     shdl += "<tr>";
-    let nrows = cal.length*11+2;
-    shdl += "<td colspan='12' ><textarea style='font-size:10pt; ' readOnly wrap='off' cols='62' rows='"+(nrows > 35 ? 35 : nrows)+"'>"+JSON.stringify(cal,null,"  ")+"</textarea></td>";
+    let nrows = cal.length*(hasWorkAreaId?12:11)+2;
+    shdl += "<td colspan='12' ><textarea style='font-size:10pt; width:98%; ' readOnly wrap='off' cols='62' rows='"+(nrows > (3*(hasWorkAreaId?12:11)+2) ? (3*(hasWorkAreaId?12:11)+2) : nrows)+"'>"+JSON.stringify(cal,null,"  ")+"</textarea></td>";
     shdl += "</tr>";
     shdl += "</tbody></table>";
     shdl += "</div>";
     let schedule = new DOMParser().parseFromString( shdl, "text/html" ).querySelector( '#amc_'+dev+'_schedule_div' );
     document.querySelector('body').append( schedule );
-    document.querySelector( "#amc_"+dev+"_schedule_button_plus" ).setAttribute( "onclick", "AutomowerConnectHandleInput( '"+dev+"' )" );
+    document.querySelector( "#amc_"+dev+"_schedule_button_plus" ).setAttribute( "onclick", "AutomowerConnectHandleInput( '"+dev+"', '"+hasWorkAreaId+"', '"+workAreaId+"' )" );
 
     $(schedule).dialog({
       dialogClass:"no-close", modal:true, width:"auto", closeOnEscape:true, 
