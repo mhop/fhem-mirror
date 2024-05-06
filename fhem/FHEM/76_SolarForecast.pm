@@ -5393,8 +5393,8 @@ sub Attr {
       
       if ($init_done && $aName eq 'ctrlInterval') {
           _newCycTime ($hash, time, $aVal);
-          my $nct = CurrentVal ($hash, 'nextCycleTime', 0);                               # gespeicherte nächste CyleTime
-          readingsSingleUpdate ($hash, 'nextCycletime', FmtTime($nct), 0);
+          my $nct = CurrentVal ($hash, 'nextCycleTime', 0);                                     # gespeicherte nächste CyleTime
+          readingsSingleUpdate ($hash, 'nextCycletime', (!$nct ? 'Manual' : FmtTime($nct)), 0);
           return;
       }
   }
@@ -6203,6 +6203,13 @@ sub _newCycTime {
   my $hash     = shift;
   my $t        = shift;
   my $interval = shift;
+  
+  if (!$interval) {
+      $hash->{MODE} = 'Manual';
+      $data{$hash->{TYPE}}{$hash->{NAME}}{current}{nextCycleTime} = 0;
+      storeReading ('nextCycletime', 'Manual');
+      return;
+  }
    
   my $new       = $t + $interval;                                                # nächste Wiederholungszeit
   $hash->{MODE} = 'Automatic - next Cycletime: '.FmtTime($new);
