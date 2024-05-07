@@ -4946,8 +4946,14 @@ readingsEndUpdate($$)
       #Debug "Evaluating " . $reading;
       $cmdFromAnalyze = $perlCode;      # For the __WARN__ sub
       my $NAME = $name; # no exceptions, #53069
+
+      my $stopRecursion = ".evalUserReading_$reading";
+      next if($hash->{$stopRecursion}); # No warning / #138149
+      $hash->{$stopRecursion} = 1;
       my $value= eval $perlCode;
+      delete($hash->{$stopRecursion});
       $cmdFromAnalyze = undef;
+
       my $result;
       # store result
       if($@) {
