@@ -12749,25 +12749,25 @@ sub _beamGraphic {
   # Die Tabelle ist recht schmal angelegt, aber nur so lassen sich Umbrüche erzwingen
 
   my ($val,$z2,$z3,$z4,$he);
-  my $ret;
 
-  $ret .= __weatherOnBeam ($paref);
-  my $m = $paref->{modulo} % 2;
+  my $ret .= __weatherOnBeam ($paref);
+  my $m    = $paref->{modulo} % 2;
 
-  if ($show_diff eq 'top') {                                                                                      # Zusätzliche Zeile Ertrag - Verbrauch
+  if ($show_diff eq 'top') {                                                                                    # Zusätzliche Zeile Ertrag - Verbrauch
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";
       my $ii;
-      for my $i (0..($maxhours * 2) - 1) {                                                                       # gleiche Bedingung wie oben
+      
+      for my $i (0..($maxhours * 2) - 1) {                                                                      # gleiche Bedingung wie oben
           next if(!$show_night && $hfcg->{$i}{weather} > 99
                                && !$hfcg->{$i}{beam1}
                                && !$hfcg->{$i}{beam2});
-          $ii++;                                                                                                 # wieviele Stunden haben wir bisher angezeigt ?
+          $ii++;                                                                                                # wieviele Stunden haben wir bisher angezeigt ?
 
           last if($ii > $maxhours);                                                                             # vorzeitiger Abbruch
 
-          $val  = formatVal6 ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather});
+          $val = formatVal6 ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather});
 
-          if ($val ne '&nbsp;') {                                                                                # Forum: https://forum.fhem.de/index.php/topic,117864.msg1166215.html#msg1166215
+          if ($val ne '&nbsp;') {                                                                               # Forum: https://forum.fhem.de/index.php/topic,117864.msg1166215.html#msg1166215
           $val = $hfcg->{$i}{diff} < 0 ? '<b>'.$val.'<b/>' :
                  $val > 0              ? '+'.$val          :
                  $val;                                                                                          # negative Zahlen in Fettschrift, 0 aber ohne +
@@ -12775,14 +12775,15 @@ sub _beamGraphic {
 
           $ret .= "<td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td>";
       }
-      $ret .= "<td class='solarfc'></td></tr>";                                                                  # freier Platz am Ende
+      
+      $ret .= "<td class='solarfc'></td></tr>";                                                                 # freier Platz am Ende
   }
 
-  $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                                  # Neue Zeile mit freiem Platz am Anfang
+  $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                                 # Neue Zeile mit freiem Platz am Anfang
 
   my $ii = 0;
 
-  for my $i (0..($maxhours * 2) - 1) {                                                                           # gleiche Bedingung wie oben
+  for my $i (0..($maxhours * 2) - 1) {                                                                          # gleiche Bedingung wie oben
       next if(!$show_night && $hfcg->{$i}{weather} > 99
                            && !$hfcg->{$i}{beam1}
                            && !$hfcg->{$i}{beam2});
@@ -12804,27 +12805,28 @@ sub _beamGraphic {
 
       if ($lotype eq 'double') {
           # Berechnung der Zonen
+          ########################
           # he - freier der Raum über den Balken. fsize wird nicht verwendet, da bei diesem Typ keine Zahlen über den Balken stehen
-          # z2 - der Ertrag ggf mit Icon
-          # z3 - der Verbrauch , bei zu kleinem Wert wird der Platz komplett Zone 2 zugeschlagen und nicht angezeigt
-          # z2 und z3 nach Bedarf tauschen, wenn der Verbrauch größer als der Ertrag ist
+          # z2 - primärer Balkenwert ggf. mit Icon
+          # z3 - sekundärer Balkenwert, bei zu kleinem Wert wird der Platz komplett Zone 2 zugeschlagen und nicht angezeigt
+          # z2 und z3 nach Bedarf tauschen, wenn sekundärer Balkenwert > primärer Balkenwert
 
           $maxVal = $maxCon if($maxCon > $maxVal);                                                              # wer hat den größten Wert ?
 
-          if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                         # Beam1 oben , Beam2 unten
+          if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                        # Beam1 oben , Beam2 unten
               $z2 = $hfcg->{$i}{beam1}; 
               $z3 = $hfcg->{$i}{beam2};
           }
-          else {                                                                                                 # tauschen, Verbrauch ist größer als Ertrag
+          else {                                                                                                # tauschen, Verbrauch ist größer als Ertrag
               $z3 = $hfcg->{$i}{beam1}; 
               $z2 = $hfcg->{$i}{beam2};
           }
 
           $he = int(($maxVal-$z2) / $maxVal * $height);
           $z2 = int(($z2 - $z3)   / $maxVal * $height);
-          $z3 = int($height - $he - $z2);                                                                        # was von maxVal noch übrig ist
+          $z3 = int($height - $he - $z2);                                                                       # was von maxVal noch übrig ist
 
-          if ($z3 < int($fsize / 2)) {                                                                             # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
+          if ($z3 < int($fsize / 2)) {                                                                          # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
               $z2 += $z3;
               $z3  = 0;
           }
@@ -12832,6 +12834,7 @@ sub _beamGraphic {
 
       if ($lotype eq 'diff') {
           # Berechnung der Zonen
+          ########################
           # he - freier der Raum über den Balken , Zahl positiver Wert + fsize
           # z2 - positiver Balken inkl Icon
           # z3 - negativer Balken
@@ -12861,41 +12864,46 @@ sub _beamGraphic {
               }
           }
 
-          if ($hfcg->{$i}{diff} >= 0) {                                                                          # Zone 2 & 3 mit ihren direkten Werten vorbesetzen
+          if ($hfcg->{$i}{diff} >= 0) {                                                                         # Zone 2 & 3 mit ihren direkten Werten vorbesetzen
               $z2 = $hfcg->{$i}{diff};
               $z3 = abs($minDif);
           }
           else {
               $z2 = $maxDif;
-              $z3 = abs($hfcg->{$i}{diff});                                                                      # Nur Betrag ohne Vorzeichen
+              $z3 = abs($hfcg->{$i}{diff});                                                                     # Nur Betrag ohne Vorzeichen
           }
-                                                                                                                 # Alle vorbesetzen Werte umrechnen auf echte Ausgabe px
-          $he = (!$px_pos || !$maxDif) ? 0 : int(($maxDif-$z2) / $maxDif * $px_pos);                                 # Teilung durch 0 vermeiden
+                                                                                                                # Alle vorbesetzen Werte umrechnen auf echte Ausgabe px
+          $he = (!$px_pos || !$maxDif) ? 0 : int(($maxDif-$z2) / $maxDif * $px_pos);                            # Teilung durch 0 vermeiden
           $z2 = ($px_pos - $he) ;
 
-          $z4 = (!$px_neg || !$minDif) ? 0 : int((abs($minDif)-$z3) / abs($minDif) * $px_neg);                       # Teilung durch 0 unbedingt vermeiden
+          $z4 = (!$px_neg || !$minDif) ? 0 : int((abs($minDif)-$z3) / abs($minDif) * $px_neg);                  # Teilung durch 0 unbedingt vermeiden
           $z3 = ($px_neg - $z4);
-                                                                                                                 # Beiden Zonen die Werte ausgeben könnten muß fsize als zusätzlicher Raum zugeschlagen werden !
+                                                                                                                # Beiden Zonen die Werte ausgeben könnten muß fsize als zusätzlicher Raum zugeschlagen werden !
           $he += $fsize;
           $z4 += $fsize if($z3);                                                                                # komplette Grafik ohne negativ Balken, keine Ausgabe von z3 & z4
       }
 
+      ## Erstellung der Balken
+      ##########################
       # das style des nächsten TD bestimmt ganz wesentlich das gesammte Design
       # das \n erleichtert das lesen des Seitenquelltext beim debugging
       # vertical-align:bottom damit alle Balken und Ausgaben wirklich auf der gleichen Grundlinie sitzen
 
       $ret .="<td style='text-align: center; padding-left:1px; padding-right:1px; margin:0px; vertical-align:bottom; padding-top:0px'>\n";
-
+      
+      $he /= 10;                                                                                                    # freier der Raum über den Balken 
+      $he  = $he < 20 ? 20 : $he;
+      
       if ($lotype eq 'single') {
           $val = formatVal6 ($hfcg->{$i}{beam1}, $kw, $hfcg->{$i}{weather});
 
-          $ret .="<table width='100%' height='100%'>";                                                           # mit width=100% etwas bessere Füllung der Balken
+          $ret .="<table width='100%' height='100%'>";                                                              # mit width=100% etwas bessere Füllung der Balken
           $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'>";
           $ret .="<td class='solarfc' style='vertical-align:bottom; color:#$fcolor1;'>".$val.'</td></tr>';
 
-          if ($hfcg->{$i}{beam1} || $show_night) {                                                               # Balken nur einfärben wenn der User via Attr eine Farbe vorgibt, sonst bestimmt class odd von TR alleine die Farbe
+          if ($hfcg->{$i}{beam1} || $show_night) {                                                                  # Balken nur einfärben wenn der User via Attr eine Farbe vorgibt, sonst bestimmt class odd von TR alleine die Farbe
               my $style = "style=\"padding-bottom:0px; vertical-align:top; margin-left:auto; margin-right:auto;";
-              $style   .= defined $colorb1 ? " background-color:#$colorb1\"" : '"';                              # Syntaxhilight
+              $style   .= defined $colorb1 ? " background-color:#$colorb1\"" : '"';                                 # Syntaxhilight
 
               $ret .= "<tr class='odd' style='height:".$z3."px;'>";
               $ret .= "<td align='center' class='solarfc' ".$style.">";
@@ -12909,14 +12917,13 @@ sub _beamGraphic {
               $ret .= "</td></tr>";
           }
       }
-
+      
       if ($lotype eq 'double') {
           my ($color1, $color2, $style1, $style2, $v);
           my $style = "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
 
-          $ret .="<table width='100%' height='100%'>\n";                                                         # mit width=100% etwas bessere Füllung der Balken
-                                                                                                                 # der Freiraum oben kann beim größten Balken ganz entfallen
-          $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'><td class='solarfc'></td></tr>" if($he);
+          $ret .="<table width='100%' height='100%'>\n";                                                                 # mit width=100% etwas bessere Füllung der Balken                                                                                            
+          $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'><td class='solarfc'></td></tr>" if(defined $he);   # Freiraum über den Balken einfügen
 
           if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                         # wer ist oben, Beam2 oder Beam1 ? Wert und Farbe für Zone 2 & 3 vorbesetzen
               $val    = formatVal6 ($hfcg->{$i}{beam1}, $kw, $hfcg->{$i}{weather});
