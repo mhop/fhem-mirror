@@ -158,6 +158,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.18.0" => "07.05.2024  add secondary level of the bar chart, new attr graphicBeam3Content, graphicBeam4Content ".
+                           "graphicBeam3Color, graphicBeam4Color, graphicBeam3FontColor, graphicBeam4FontColor ",
   "1.17.12"=> "06.05.2024  attr ctrlInterval: immediate impact when set ",
   "1.17.11"=> "04.05.2024  correction in commandref, delete attr affectMaxDayVariance ",
   "1.17.10"=> "19.04.2024  calcTodayPVdeviation: avoid Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1311121 ",
@@ -418,6 +420,10 @@ my $b1coldef       = 'FFAC63';                                                  
 my $b1fontcoldef   = '0D0D0D';                                                      # default Schriftfarbe Beam 1
 my $b2coldef       = 'C4C4A7';                                                      # default Farbe Beam 2
 my $b2fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 2
+my $b3coldef       = 'BED6C0';                                                      # default Farbe Beam 3
+my $b3fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 3
+my $b4coldef       = 'DBDBD0';                                                      # default Farbe Beam 4
+my $b4fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 4
 my $fgCDdef        = 130;                                                           # Abstand Verbrauchericons zueinander
 
 my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
@@ -1133,10 +1139,16 @@ sub Initialize {
                                 "graphicBeamWidth:slider,20,5,100 ".
                                 "graphicBeam1Color:colorpicker,RGB ".
                                 "graphicBeam2Color:colorpicker,RGB ".
+                                "graphicBeam3Color:colorpicker,RGB ".
+                                "graphicBeam4Color:colorpicker,RGB ".
                                 "graphicBeam1Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
                                 "graphicBeam2Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
+                                "graphicBeam3Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
+                                "graphicBeam4Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
                                 "graphicBeam1FontColor:colorpicker,RGB ".
                                 "graphicBeam2FontColor:colorpicker,RGB ".
+                                "graphicBeam3FontColor:colorpicker,RGB ".
+                                "graphicBeam4FontColor:colorpicker,RGB ".
                                 "graphicBeam1MaxVal ".
                                 "graphicEnergyUnit:Wh,kWh ".
                                 "graphicHeaderOwnspec:textField-long ".
@@ -11064,6 +11076,8 @@ sub entryGraphic {
       fcolor2        => AttrVal ($name, 'graphicBeam2FontColor',  $b2fontcoldef),
       beam1cont      => AttrVal ($name, 'graphicBeam1Content',         'pvReal'),
       beam2cont      => AttrVal ($name, 'graphicBeam2Content',     'pvForecast'),
+      beam3cont      => AttrVal ($name, 'graphicBeam3Content',               ''),
+      beam4cont      => AttrVal ($name, 'graphicBeam4Content',               ''),
       caicon         => AttrVal ($name, 'consumerAdviceIcon',        $caicondef),                # Consumer AdviceIcon
       clegend        => AttrVal ($name, 'consumerLegend',            'icon_top'),                # Lage und Art Cunsumer Legende
       clink          => AttrVal ($name, 'consumerLink'  ,                     1),                # Detail-Link zum Verbraucher
@@ -11075,7 +11089,7 @@ sub entryGraphic {
       maxVal         => AttrNum ($name, 'graphicBeam1MaxVal',                 0),                # dyn. Anpassung der Balkenhöhe oder statisch ?
       show_night     => AttrNum ($name, 'graphicShowNight',                   0),                # alle Balken (Spalten) anzeigen ?
       show_diff      => AttrVal ($name, 'graphicShowDiff',                 'no'),                # zusätzliche Anzeige $di{} in allen Typen
-      weather        => AttrNum ($name, 'graphicShowWeather',                 1),
+      weather        => AttrNum ($name, 'graphicShowWeather',                 1),                # Wetter Icons anzeigen
       colorw         => AttrVal ($name, 'graphicWeatherColor',      $wthcolddef),                # Wetter Icon Farbe Tag
       colorwn        => AttrVal ($name, 'graphicWeatherColorNight', $wthcolndef),                # Wetter Icon Farbe Nacht
       wlalias        => AttrVal ($name, 'alias',                          $name),
@@ -11148,20 +11162,19 @@ sub entryGraphic {
 
   $m = $paref->{modulo} % 2;
 
-  # Balkengrafik
-  ################
+  # Balkengrafiken
+  ##################
   if ($gsel =~ /both/xs || $gsel =~ /forecast/xs) {
-      my %hfch;
-      my $hfcg  = \%hfch;                                                                                   #(hfcg = hash forecast graphic)
+      my %hfcg1;
 
       # Werte aktuelle Stunde
       ##########################
-      $paref->{hfcg}     = $hfcg;
+      $paref->{hfcg}     = \%hfcg1;                                                                        # (hfcg = hash forecast graphic)
       $paref->{thishour} = _beamGraphicFirstHour ($paref);
 
       # get consumer list and display it in Graphics
       ################################################
-      _showConsumerInGraphicBeam ($paref);
+      # _showConsumerInGraphicBeam ($paref);                                                               # keine Verwendung zur Zeit
 
       # Werte restliche Stunden
       ###########################
@@ -11174,8 +11187,39 @@ sub entryGraphic {
       # Balkengrafik
       ################
       $ret .= _beamGraphic ($paref);
-  }
+      
+      my $secbeam = 1;
+      
+      if ($paref->{beam3cont} || $paref->{beam4cont}) {                                                    # Balkengrafik 3. und 4. Ebene
+           my %hfcg2;
+          
+          $paref->{beam1cont} = $paref->{beam3cont};
+          $paref->{beam2cont} = $paref->{beam4cont};
+          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color', $b3coldef);
+          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam4Color', $b4coldef);
+          $paref->{weather}   = 0;
 
+          # Werte aktuelle Stunde
+          ##########################
+          $paref->{hfcg}     = \%hfcg2;
+          $paref->{thishour} = _beamGraphicFirstHour ($paref);
+
+          # Werte restliche Stunden
+          ###########################
+          my $back         = _beamGraphicRemainingHours ($paref);
+          $paref->{maxVal} = $back->{maxVal};                                                             # Startwert wenn kein Wert bereits via attr vorgegeben ist
+          $paref->{maxCon} = $back->{maxCon};
+          $paref->{maxDif} = $back->{maxDif};                                                             # für Typ diff
+          $paref->{minDif} = $back->{minDif};                                                             # für Typ diff
+
+          # Balkengrafik
+          ################
+          $ret .= _beamGraphic ($paref);
+      }
+      
+      $paref->{modulo}++;
+  }
+  
   $m = $paref->{modulo} % 2;
 
   # Flußgrafik
@@ -12537,8 +12581,19 @@ sub _beamGraphicFirstHour {
   }
 
   $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
-  $hfcg->{0}{beam1}    = ($beam1cont eq 'pvForecast') ? $val1 : ($beam1cont eq 'pvReal') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
-  $hfcg->{0}{beam2}    = ($beam2cont eq 'pvForecast') ? $val1 : ($beam2cont eq 'pvReal') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
+  $hfcg->{0}{beam1}    = ($beam1cont eq 'pvForecast')          ? $val1 : 
+                         ($beam1cont eq 'pvReal')              ? $val2 : 
+                         ($beam1cont eq 'gridconsumption')     ? $val3 : 
+                         ($beam1cont eq 'consumptionForecast') ? $val4 : 
+                         undef;
+  $hfcg->{0}{beam2}    = ($beam2cont eq 'pvForecast')          ? $val1 : 
+                         ($beam2cont eq 'pvReal')              ? $val2 : 
+                         ($beam2cont eq 'gridconsumption')     ? $val3 : 
+                         ($beam2cont eq 'consumptionForecast') ? $val4 : 
+                         undef;
+  
+  $hfcg->{0}{beam1}  //= 0;
+  $hfcg->{0}{beam2}  //= 0;
   $hfcg->{0}{diff}     = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
 
 return ($thishour);
@@ -12617,8 +12672,16 @@ sub _beamGraphicRemainingHours {
       }
 
       $hfcg->{$i}{time_str} = sprintf('%02d', $hfcg->{$i}{time}-1).$hourstyle;
-      $hfcg->{$i}{beam1}    = ($beam1cont eq 'pvForecast') ? $val1 : ($beam1cont eq 'pvReal') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
-      $hfcg->{$i}{beam2}    = ($beam2cont eq 'pvForecast') ? $val1 : ($beam2cont eq 'pvReal') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
+      $hfcg->{$i}{beam1}    = ($beam1cont eq 'pvForecast')          ? $val1 : 
+                              ($beam1cont eq 'pvReal')              ? $val2 : 
+                              ($beam1cont eq 'gridconsumption')     ? $val3 : 
+                              ($beam1cont eq 'consumptionForecast') ? $val4 : 
+                              undef;
+      $hfcg->{$i}{beam2}    = ($beam2cont eq 'pvForecast')          ? $val1 : 
+                              ($beam2cont eq 'pvReal')              ? $val2 : 
+                              ($beam2cont eq 'gridconsumption')     ? $val3 : 
+                              ($beam2cont eq 'consumptionForecast') ? $val4 : 
+                              undef;
 
       $hfcg->{$i}{beam1} //= 0;
       $hfcg->{$i}{beam2} //= 0;
@@ -12944,8 +13007,6 @@ sub _beamGraphic {
 
       $ret .="</td></tr></table></td>";
   }
-
-  $paref->{modulo}++;
 
   $ret .= "<td class='solarfc'></td>";
   $ret .= "</tr>";
@@ -19513,66 +19574,89 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-graphicBeam1Color"></a>
        <li><b>graphicBeam1Color </b><br>
-         Color selection of the primary bars.
+         Color selection of the primary bar of the first level. <br>
+         (default: FFAC63)
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam1FontColor"></a>
        <li><b>graphicBeam1FontColor </b><br>
-         Selection of the font color of the primary bar. <br>
+         Selection of the font color of the primary bar of the first level. <br>
          (default: 0D0D0D)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam1Content"></a>
-       <li><b>graphicBeam1Content </b><br>
-         Defines the content of the primary bars to be displayed.
-
-         <ul>
-         <table>
-         <colgroup> <col width="45%"> <col width="55%"> </colgroup>
-            <tr><td> <b>pvReal</b>              </td><td>real PV generation (default)      </td></tr>
-            <tr><td> <b>pvForecast</b>          </td><td>Forecast PV generation            </td></tr>
-            <tr><td> <b>gridconsumption</b>     </td><td>Energy purchase from the grid     </td></tr>
-            <tr><td> <b>consumptionForecast</b> </td><td>predicted energy consumption      </td></tr>
-         </table>
-         </ul>
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam1MaxVal"></a>
        <li><b>graphicBeam1MaxVal &lt;0...val&gt; </b><br>
-         Setting the maximum amount of the primary bar (hourly value) to calculate the maximum bar height.
-         This results in an adjustment of the total allowed height of the graphic. <br>
-         With the value "0" a dynamic adjustment takes place. <br>
+         Definition of the maximum amount of the primary beam of the first level for calculating the maximum beam height. 
+         height.
+         This results in an adjustment of the permissible total height of the graphic. <br>
+         The value “0” is used for dynamic adjustment. <br>
          (default: 0)
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam2Color"></a>
        <li><b>graphicBeam2Color </b><br>
-         Color selection of the secondary bars. The second color is only useful for the display device type "pvco" and "diff".
+         Color selection of the secondary bars of the first level. <br>
+         (default: C4C4A7)
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam2FontColor"></a>
        <li><b>graphicBeam2FontColor </b><br>
-         Selection of the font color of the secondary bar. <br>
+         Selection of the font color of the secondary bars of the first level. <br>
          (default: 000000)
        </li>
        <br>
-
-       <a id="SolarForecast-attr-graphicBeam2Content"></a>
-       <li><b>graphicBeam2Content </b><br>
-         Legt den darzustellenden Inhalt der sekundären Balken fest.
-
+       
+       <a id="SolarForecast-attr-graphicBeam3Color"></a>
+       <li><b>graphicBeam3Color </b><br>
+         Color selection of the primary bars of the second level. <br>
+         (default: BED6C0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeam3FontColor"></a>
+       <li><b>graphicBeam3FontColor </b><br>
+         Selection of the font color of the primary bars of the second level. <br>
+         (default: 000000)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeam4Color"></a>
+       <li><b>graphicBeam4Color </b><br>
+         Color selection of the secondary bars of the second level. <br>
+         (default: DBDBD0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeam4FontColor"></a>
+       <li><b>graphicBeam4FontColor </b><br>
+         Selection of the font color of the secondary bars of the second level. <br>
+         (default: 000000)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeamXContent" data-pattern="graphicBeam.*Content"></a>
+       <li><b>graphicBeamXContent </b><br>
+         Defines the content of the bars to be displayed in the bar charts. 
+         The bar charts are available in two levels. <br>
+         Level 1 is preset by default. The content is determined by the attributes graphicBeam1Content and 
+         graphicBeam2Content. <br>
+         Level 2 of the bar charts can be activated by setting the attributes graphicBeam3Content and 
+         graphicBeam4Content. <br>
+         The attributes graphicBeam1Content and graphicBeam3Content represent the primary beams, the attributes
+         graphicBeam2Content and graphicBeam4Content attributes represent the secondary beams of the 
+         respective level.
+         
          <ul>
          <table>
-         <colgroup> <col width="43%"> <col width="57%"> </colgroup>
-            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default) </td></tr>
-            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung                     </td></tr>
-            <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz             </td></tr>
-            <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch      </td></tr>
+         <colgroup> <col width="45%"> <col width="55%"> </colgroup>
+            <tr><td> <b>pvReal</b>              </td><td>real PV generation (default for graphicBeam1Content)            </td></tr>
+            <tr><td> <b>pvForecast</b>          </td><td>predicted PV generation (default for graphicBeam2Content)       </td></tr>
+            <tr><td> <b>gridconsumption</b>     </td><td>Energy purchase from the grid                                   </td></tr>
+            <tr><td> <b>consumptionForecast</b> </td><td>Forecasted energy consumption                                   </td></tr>
          </table>
          </ul>
        </li>
@@ -21753,36 +21837,22 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicBeam1Color"></a>
        <li><b>graphicBeam1Color </b><br>
-         Farbauswahl der primären Balken.
+         Farbauswahl des primären Balken der ersten Ebene. <br>
+         (default: FFAC63)
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam1FontColor"></a>
        <li><b>graphicBeam1FontColor </b><br>
-         Auswahl der Schriftfarbe des primären Balken. <br>
+         Auswahl der Schriftfarbe des primären Balken der ersten Ebene. <br>
          (default: 0D0D0D)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam1Content"></a>
-       <li><b>graphicBeam1Content </b><br>
-         Legt den darzustellenden Inhalt der primären Balken fest.
-
-         <ul>
-         <table>
-         <colgroup> <col width="45%"> <col width="55%"> </colgroup>
-            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung (default)           </td></tr>
-            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung           </td></tr>
-            <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz             </td></tr>
-            <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch      </td></tr>
-         </table>
-         </ul>
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam1MaxVal"></a>
        <li><b>graphicBeam1MaxVal &lt;0...val&gt; </b><br>
-         Festlegung des maximalen Betrags des primären Balkens (Stundenwert) zur Berechnung der maximalen Balkenhöhe.
+         Festlegung des maximalen Betrags des primären Balkens der ersten Ebene zur Berechnung der maximalen 
+         Balkenhöhe.
          Dadurch erfolgt eine Anpassung der zulässigen Gesamthöhe der Grafik. <br>
          Mit dem Wert "0" erfolgt eine dynamische Anpassung. <br>
          (default: 0)
@@ -21791,28 +21861,64 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicBeam2Color"></a>
        <li><b>graphicBeam2Color </b><br>
-         Farbauswahl der sekundären Balken. Die zweite Farbe ist nur sinnvoll für den Anzeigedevice-Typ "pvco" und "diff".
+         Farbauswahl der sekundären Balken der ersten Ebene. <br>
+         (default: C4C4A7)
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam2FontColor"></a>
        <li><b>graphicBeam2FontColor </b><br>
-         Auswahl der Schriftfarbe des sekundären Balken. <br>
+         Auswahl der Schriftfarbe der sekundären Balken der ersten Ebene. <br>
          (default: 000000)
        </li>
        <br>
-
-       <a id="SolarForecast-attr-graphicBeam2Content"></a>
-       <li><b>graphicBeam2Content </b><br>
-         Legt den darzustellenden Inhalt der sekundären Balken fest.
-
+       
+       <a id="SolarForecast-attr-graphicBeam3Color"></a>
+       <li><b>graphicBeam3Color </b><br>
+         Farbauswahl für die primären Balken der zweiten Ebene. <br>
+         (default: BED6C0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeam3FontColor"></a>
+       <li><b>graphicBeam3FontColor </b><br>
+         Auswahl der Schriftfarbe der primären Balken der zweiten Ebene. <br>
+         (default: 000000)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeam4Color"></a>
+       <li><b>graphicBeam4Color </b><br>
+         Farbauswahl für die sekundären Balken der zweiten Ebene. <br>
+         (default: DBDBD0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeam4FontColor"></a>
+       <li><b>graphicBeam4FontColor </b><br>
+         Auswahl der Schriftfarbe der sekundären Balken der zweiten Ebene. <br>
+         (default: 000000)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeamXContent" data-pattern="graphicBeam.*Content"></a>
+       <li><b>graphicBeamXContent </b><br>
+         Legt den darzustellenden Inhalt der Balken in den Balkendiagrammen fest. 
+         Die Balkendiagramme sind in zwei Ebenen verfügbar. <br>
+         Die Ebene 1 ist im Standard voreingestellt. Der Inhalt durch die Attribute graphicBeam1Content und 
+         graphicBeam2Content bestimmt. <br>
+         Die Ebene 2 der Balkendiagramme kann durch Setzen der Attribute graphicBeam3Content und 
+         graphicBeam4Content zugeschaltet werden. <br>
+         Die Attribute graphicBeam1Content und graphicBeam3Content stellen die primären Balken, die Attribute
+         graphicBeam2Content und graphicBeam4Content die sekundären Balken der jeweiligen Ebene dar.
+         
          <ul>
          <table>
-         <colgroup> <col width="43%"> <col width="57%"> </colgroup>
-            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default) </td></tr>
-            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung                     </td></tr>
-            <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz             </td></tr>
-            <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch      </td></tr>
+         <colgroup> <col width="45%"> <col width="55%"> </colgroup>
+            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung (default für graphicBeam1Content)            </td></tr>
+            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default für graphicBeam2Content)  </td></tr>
+            <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz                                      </td></tr>
+            <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch                               </td></tr>
          </table>
          </ul>
        </li>
