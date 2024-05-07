@@ -161,7 +161,7 @@ my %vNotesIntern = (
   "1.18.0" => "07.05.2024  add secondary level of the bar chart, new attr graphicBeam3Content, graphicBeam4Content ".
                            "graphicBeam3Color, graphicBeam4Color, graphicBeam3FontColor, graphicBeam4FontColor ".
                            "value consumption available for attr graphicBeamXContent ".
-                           "rename graphicBeamHeight to graphicBeamHeightLevel1 ".
+                           "rename graphicBeamHeight to graphicBeamHeightLevel1 ",
   "1.17.12"=> "06.05.2024  attr ctrlInterval: immediate impact when set ",
   "1.17.11"=> "04.05.2024  correction in commandref, delete attr affectMaxDayVariance ",
   "1.17.10"=> "19.04.2024  calcTodayPVdeviation: avoid Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1311121 ",
