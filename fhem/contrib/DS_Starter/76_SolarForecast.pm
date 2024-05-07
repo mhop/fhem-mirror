@@ -159,7 +159,8 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.18.0" => "07.05.2024  add secondary level of the bar chart, new attr graphicBeam3Content, graphicBeam4Content ".
-                           "graphicBeam3Color, graphicBeam4Color, graphicBeam3FontColor, graphicBeam4FontColor ",
+                           "graphicBeam3Color, graphicBeam4Color, graphicBeam3FontColor, graphicBeam4FontColor ".
+                           "value consumption available for attr graphicBeamXContent ",
   "1.17.12"=> "06.05.2024  attr ctrlInterval: immediate impact when set ",
   "1.17.11"=> "04.05.2024  correction in commandref, delete attr affectMaxDayVariance ",
   "1.17.10"=> "19.04.2024  calcTodayPVdeviation: avoid Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1311121 ",
@@ -1141,10 +1142,10 @@ sub Initialize {
                                 "graphicBeam2Color:colorpicker,RGB ".
                                 "graphicBeam3Color:colorpicker,RGB ".
                                 "graphicBeam4Color:colorpicker,RGB ".
-                                "graphicBeam1Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
-                                "graphicBeam2Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
-                                "graphicBeam3Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
-                                "graphicBeam4Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
+                                "graphicBeam1Content:pvForecast,pvReal,gridconsumption,consumption,consumptionForecast ".
+                                "graphicBeam2Content:pvForecast,pvReal,gridconsumption,consumption,consumptionForecast ".
+                                "graphicBeam3Content:pvForecast,pvReal,gridconsumption,consumption,consumptionForecast ".
+                                "graphicBeam4Content:pvForecast,pvReal,gridconsumption,consumption,consumptionForecast ".
                                 "graphicBeam1FontColor:colorpicker,RGB ".
                                 "graphicBeam2FontColor:colorpicker,RGB ".
                                 "graphicBeam3FontColor:colorpicker,RGB ".
@@ -11188,10 +11189,8 @@ sub entryGraphic {
       ################
       $ret .= _beamGraphic ($paref);
       
-      my $secbeam = 1;
-      
       if ($paref->{beam3cont} || $paref->{beam4cont}) {                                                    # Balkengrafik 3. und 4. Ebene
-           my %hfcg2;
+          my %hfcg2;
           
           $paref->{beam1cont} = $paref->{beam3cont};
           $paref->{beam2cont} = $paref->{beam4cont};
@@ -12537,7 +12536,7 @@ sub _beamGraphicFirstHour {
 
   my $stt                              = NexthoursVal ($hash, "NextHour00", "starttime", '0000-00-00 24');
   my ($year,$month,$day_str,$thishour) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-  my ($val1,$val2,$val3,$val4)         = (0,0,0,0);
+  my ($val1,$val2,$val3,$val4,$val5)   = (0,0,0,0,0);
 
   $thishour++;
 
@@ -12550,7 +12549,7 @@ sub _beamGraphicFirstHour {
   $hfcg->{0}{day}      = $day;
   $hfcg->{0}{mktime}   = fhemTimeLocal(0,0,$thishour,$day,int($month)-1,$year-1900);                        # gleich die Unix Zeit dazu holen
 
-  if ($offset) {
+  #if ($offset) {
       $hfcg->{0}{time} += $offset;
 
       if ($hfcg->{0}{time} < 0) {
@@ -12566,32 +12565,36 @@ sub _beamGraphicFirstHour {
       $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvrl',  0);
       $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gcons', 0);
       $val4 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'confc', 0);
+      $val5 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'con',   0);
 
       $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'weatherid', 999);
       $hfcg->{0}{wcc}     = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'wcc',       '-');
       $hfcg->{0}{sunalt}  = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunalt',    '-');
       $hfcg->{0}{sunaz}   = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunaz',     '-');
-  }
-  else {
-      $val1 = CircularVal ($hash, $hfcg->{0}{time_str}, 'pvfc',  0);
-      $val2 = CircularVal ($hash, $hfcg->{0}{time_str}, 'pvrl',  0);
-      $val3 = CircularVal ($hash, $hfcg->{0}{time_str}, 'gcons', 0);
-      $val4 = CircularVal ($hash, $hfcg->{0}{time_str}, 'confc', 0);
+  #}
+  #else {
+  #    $val1 = CircularVal ($hash, $hfcg->{0}{time_str}, 'pvfc',  0);
+  #    $val2 = CircularVal ($hash, $hfcg->{0}{time_str}, 'pvrl',  0);
+  #    $val3 = CircularVal ($hash, $hfcg->{0}{time_str}, 'gcons', 0);
+  #    $val4 = CircularVal ($hash, $hfcg->{0}{time_str}, 'confc', 0);
+  #    $val5 = CircularVal ($hash, $hfcg->{0}{time_str}, 'con',   0);   # Wert con fehlt noch in pvCircular!
 
-      $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, 'weatherid', 999);
-      #$val4   = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : 999;
-  }
+  #    $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, 'weatherid', 999);
+  #    #$val4   = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : 999;
+  #}
 
   $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
-  $hfcg->{0}{beam1}    = ($beam1cont eq 'pvForecast')          ? $val1 : 
-                         ($beam1cont eq 'pvReal')              ? $val2 : 
-                         ($beam1cont eq 'gridconsumption')     ? $val3 : 
-                         ($beam1cont eq 'consumptionForecast') ? $val4 : 
+  $hfcg->{0}{beam1}    = ($beam1cont eq 'pvForecast')          ? $val1 :
+                         ($beam1cont eq 'pvReal')              ? $val2 :
+                         ($beam1cont eq 'gridconsumption')     ? $val3 :
+                         ($beam1cont eq 'consumptionForecast') ? $val4 :
+                         ($beam1cont eq 'consumption')         ? $val5 :
                          undef;
-  $hfcg->{0}{beam2}    = ($beam2cont eq 'pvForecast')          ? $val1 : 
-                         ($beam2cont eq 'pvReal')              ? $val2 : 
-                         ($beam2cont eq 'gridconsumption')     ? $val3 : 
-                         ($beam2cont eq 'consumptionForecast') ? $val4 : 
+  $hfcg->{0}{beam2}    = ($beam2cont eq 'pvForecast')          ? $val1 :
+                         ($beam2cont eq 'pvReal')              ? $val2 :
+                         ($beam2cont eq 'gridconsumption')     ? $val3 :
+                         ($beam2cont eq 'consumptionForecast') ? $val4 :
+                         ($beam2cont eq 'consumption')         ? $val5 :
                          undef;
   
   $hfcg->{0}{beam1}  //= 0;
@@ -12617,18 +12620,15 @@ sub _beamGraphicRemainingHours {
 
   $maxVal  //= $hfcg->{0}{beam1};                                                                       # Startwert wenn kein Wert bereits via attr vorgegeben ist
 
-  my ($val1,$val2,$val3,$val4);
+  my ($val1,$val2,$val3,$val4,$val5);
 
   my $maxCon = $hfcg->{0}{beam1};
   my $maxDif = $hfcg->{0}{diff};                                                                        # für Typ diff
   my $minDif = $hfcg->{0}{diff};                                                                        # für Typ diff
 
   for my $i (1..($maxhours*2)-1) {                                                                      # doppelte Anzahl berechnen    my $val1 = 0;
-      $val2 = 0;
-      $val3 = 0;
-      $val4 = 0;
-
-      $hfcg->{$i}{time}  = $hfcg->{0}{time} + $i;
+      ($val1,$val2,$val3,$val4,$val5) = (0,0,0,0,0);
+      $hfcg->{$i}{time}               = $hfcg->{0}{time} + $i;
 
       while ($hfcg->{$i}{time} > 24) {
           $hfcg->{$i}{time} -= 24;                                                                      # wird bis zu 2x durchlaufen
@@ -12649,6 +12649,7 @@ sub _beamGraphicRemainingHours {
               $val2 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'pvrl',  0);
               $val3 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'gcons', 0);
               $val4 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'confc', 0);
+              $val5 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'con',   0);
 
               $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'weatherid', 999);
               $hfcg->{$i}{wcc}     = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
@@ -12674,15 +12675,17 @@ sub _beamGraphicRemainingHours {
       }
 
       $hfcg->{$i}{time_str} = sprintf('%02d', $hfcg->{$i}{time}-1).$hourstyle;
-      $hfcg->{$i}{beam1}    = ($beam1cont eq 'pvForecast')          ? $val1 : 
-                              ($beam1cont eq 'pvReal')              ? $val2 : 
-                              ($beam1cont eq 'gridconsumption')     ? $val3 : 
-                              ($beam1cont eq 'consumptionForecast') ? $val4 : 
+      $hfcg->{$i}{beam1}    = ($beam1cont eq 'pvForecast')          ? $val1 :
+                              ($beam1cont eq 'pvReal')              ? $val2 :
+                              ($beam1cont eq 'gridconsumption')     ? $val3 :
+                              ($beam1cont eq 'consumptionForecast') ? $val4 :
+                              ($beam1cont eq 'consumption')         ? $val5 :                              
                               undef;
-      $hfcg->{$i}{beam2}    = ($beam2cont eq 'pvForecast')          ? $val1 : 
-                              ($beam2cont eq 'pvReal')              ? $val2 : 
-                              ($beam2cont eq 'gridconsumption')     ? $val3 : 
-                              ($beam2cont eq 'consumptionForecast') ? $val4 : 
+      $hfcg->{$i}{beam2}    = ($beam2cont eq 'pvForecast')          ? $val1 :
+                              ($beam2cont eq 'pvReal')              ? $val2 :
+                              ($beam2cont eq 'gridconsumption')     ? $val3 :
+                              ($beam2cont eq 'consumptionForecast') ? $val4 :
+                              ($beam2cont eq 'consumption')         ? $val5 :
                               undef;
 
       $hfcg->{$i}{beam1} //= 0;
@@ -19646,8 +19649,7 @@ to ensure that the system configuration is correct.
          The bar charts are available in two levels. <br>
          Level 1 is preset by default. The content is determined by the attributes graphicBeam1Content and 
          graphicBeam2Content. <br>
-         Level 2 of the bar charts can be activated by setting the attributes graphicBeam3Content and 
-         graphicBeam4Content. <br>
+         Level 2 can be activated by setting the attributes graphicBeam3Content and graphicBeam4Content. <br>
          The attributes graphicBeam1Content and graphicBeam3Content represent the primary beams, the attributes
          graphicBeam2Content and graphicBeam4Content attributes represent the secondary beams of the 
          respective level.
@@ -19657,13 +19659,14 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="45%"> <col width="55%"> </colgroup>
             <tr><td> <b>pvReal</b>              </td><td>real PV generation (default for graphicBeam1Content)            </td></tr>
             <tr><td> <b>pvForecast</b>          </td><td>predicted PV generation (default for graphicBeam2Content)       </td></tr>
-            <tr><td> <b>gridconsumption</b>     </td><td>Energy purchase from the grid                                   </td></tr>
-            <tr><td> <b>consumptionForecast</b> </td><td>Forecasted energy consumption                                   </td></tr>
+            <tr><td> <b>consumption</b>         </td><td>Energy consumption                                              </td></tr>
+            <tr><td> <b>gridconsumption</b>     </td><td>Energy purchase from the public grid                            </td></tr>
+            <tr><td> <b>consumptionForecast</b> </td><td>forecasted energy consumption                                   </td></tr>
          </table>
          </ul>
        </li>
        <br>
-
+       
        <a id="SolarForecast-attr-graphicBeamHeight"></a>
        <li><b>graphicBeamHeight &lt;value&gt; </b><br>
          Height of the bars in px and thus determination of the total height.
@@ -19885,8 +19888,8 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-graphicShowDiff"></a>
        <li><b>graphicShowDiff &lt;no | top | bottom&gt; </b><br>
-         Additional display of the difference "graphicBeam1Content - graphicBeam2Content" in the header or footer area of the
-         bar graphic. <br>
+         Additional display of the difference “primary bar content - secondary bar content” in the header or 
+         footer of the bar chart. <br>
          (default: no)
        </li>
        <br>
@@ -21911,8 +21914,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Die Balkendiagramme sind in zwei Ebenen verfügbar. <br>
          Die Ebene 1 ist im Standard voreingestellt. Der Inhalt durch die Attribute graphicBeam1Content und 
          graphicBeam2Content bestimmt. <br>
-         Die Ebene 2 der Balkendiagramme kann durch Setzen der Attribute graphicBeam3Content und 
-         graphicBeam4Content zugeschaltet werden. <br>
+         Die Ebene 2 kann durch Setzen der Attribute graphicBeam3Content und graphicBeam4Content zugeschaltet 
+         werden. <br>
          Die Attribute graphicBeam1Content und graphicBeam3Content stellen die primären Balken, die Attribute
          graphicBeam2Content und graphicBeam4Content die sekundären Balken der jeweiligen Ebene dar.
          
@@ -21921,7 +21924,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="45%"> <col width="55%"> </colgroup>
             <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung (default für graphicBeam1Content)            </td></tr>
             <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default für graphicBeam2Content)  </td></tr>
-            <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz                                      </td></tr>
+            <tr><td> <b>consumption</b>         </td><td>Energieverbrauch                                                </td></tr>
+            <tr><td> <b>gridconsumption</b>     </td><td>Energiebezug aus dem öffentlichen Netz                          </td></tr>
             <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch                               </td></tr>
          </table>
          </ul>
@@ -22147,8 +22151,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicShowDiff"></a>
        <li><b>graphicShowDiff &lt;no | top | bottom&gt; </b><br>
-         Zusätzliche Anzeige der Differenz "graphicBeam1Content - graphicBeam2Content" im Kopf- oder Fußbereich der
-         Balkengrafik. <br>
+         Zusätzliche Anzeige der Differenz "primärer Balkeninhalt - sekundärer Balkeninhalt" im Kopf- oder 
+         Fußbereich der Balkengrafik. <br>
          (default: no)
        </li>
        <br>
