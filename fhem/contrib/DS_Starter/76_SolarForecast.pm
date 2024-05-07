@@ -11195,8 +11195,10 @@ sub entryGraphic {
           
           $paref->{beam1cont} = $paref->{beam3cont};
           $paref->{beam2cont} = $paref->{beam4cont};
-          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color', $b3coldef);
-          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam4Color', $b4coldef);
+          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color',          $b3coldef);
+          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam4Color',          $b4coldef);
+          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam3FontColor',  $b3fontcoldef);
+          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam4FontColor',  $b4fontcoldef);
           $paref->{weather}   = 0;
 
           # Werte aktuelle Stunde
