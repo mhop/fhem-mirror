@@ -19891,8 +19891,10 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-graphicShowNight"></a>
        <li><b>graphicShowNight </b><br>
-         Show/hide the night hours (without yield forecast) in the bar graph. <br>
-         (default: 0)
+         Show/hide the night hours without values in the bar chart. <br>
+         If the selected bar contents contain a value in the night hours, these bars are also displayed if 
+         graphicShowNight=0. <br>         
+         (default: 0 (hide))
        </li>
        <br>
 
@@ -22151,8 +22153,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicShowNight"></a>
        <li><b>graphicShowNight </b><br>
-         Anzeigen/Verbergen der Nachtstunden (ohne Ertragsprognose) in der Balkengrafik. <br>
-         (default: 0)
+         Anzeigen/Verbergen der Nachtstunden ohne Werte in der Balkengrafik. <br>
+         Sofern die ausgewählten Balkeninhalte in den Nachtstunden einen Wert enthalten, werden diese Balken 
+         auch im Fall graphicShowNight=0 dargestellt. <br>         
+         (default: 0 (verbergen))
        </li>
        <br>
 
