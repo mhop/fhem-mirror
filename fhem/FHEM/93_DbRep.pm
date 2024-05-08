@@ -9740,7 +9740,8 @@ sub DbRep_reduceLog {
 
     my @b;
     for my $w (@a) {                                     # ausfiltern von optionalen Zeitangaben, z.B. 700:750
-        next if($w =~ /\b(\d+(:\d+)?)\s\b/);             # Forum: https://forum.fhem.de/index.php?topic=138082.0
+        $w = DbRep_trim ($w);
+        next if($w =~ /\d+(:\d+)?$/xs);                  # Forum: https://forum.fhem.de/index.php?topic=138082.0
         push @b, $w;
     }
 
