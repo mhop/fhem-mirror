@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  93_DbRep: reduceLog: fix bug if EXCL/INCL-devices end with a digit
  - feature: 76_SolarForecast: add secondary level of the bar chart
  - change:  76_SolarForecast: attr ctrlInterval: immediate impact when set
  - bugfix:  74_GardenaSmartDevice: fix patch code scheduling by hhhdg

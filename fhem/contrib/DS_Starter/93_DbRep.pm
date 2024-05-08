@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 28674 2024-03-17 18:30:25Z DS_Starter $
+# $Id: 93_DbRep.pm 28714 2024-03-27 21:40:03Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -59,6 +59,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.11" => "08.05.2024  reduceLog: fix bug if EXCL/INCL-devices end with a digit ",  
+  "8.53.10" => "27.03.2024  multicmd: add attr seqDoubletsVariance ",            
   "8.53.9"  => "18.03.2024  multicmd: add nextHop Keyword ",
   "8.53.8"  => "17.03.2024  sqlCmdBlocking able to use sql Keywords (§timestamp_end§ etc.) ",
   "8.53.7"  => "16.03.2024  prevent some attribute evaluation as long as init_done is not set ",
@@ -377,6 +379,7 @@ my $dbrep_fName               = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbR
 my $dbrep_deftonbl            = 86400;                                                 # default Timeout non-blocking Operationen
 my $dbrep_deftobl             = 10;                                                    # default Timeout blocking Operationen
 
+# $data{DbRep}{$name}{multicmd}                                                        # MultiCommand Hash + Steuerung
 
 ###################################################################################
 # DbRep_Initialize
@@ -9737,13 +9740,13 @@ sub DbRep_reduceLog {
 
     my @b;
     for my $w (@a) {                                     # ausfiltern von optionalen Zeitangaben, z.B. 700:750
-        next if($w =~ /\b(\d+(:\d+)?)\b/);
+        next if($w =~ /\b(\d+(:\d+)?)\s\b/);             # Forum: https://forum.fhem.de/index.php?topic=138082.0
         push @b, $w;
     }
 
     @a = @b;
 
-    my ($pa,$ph) = parseParams(join ' ', @a);
+    my ($pa,$ph) = parseParams (join ' ', @a);
 
     my $mode = (@$pa[1]        && @$pa[1] =~ /average/i)   ? 'average'     :
                ($ph->{average} && $ph->{average} eq "day") ? 'average=day' :
@@ -13041,6 +13044,7 @@ sub DbRep_nextMultiCmd {
                  device
                  reading
                  readingNameMap
+                 seqDoubletsVariance
                  userExitFn
                  optimizeTablesBeforeDump
                 );
@@ -13064,12 +13068,12 @@ sub DbRep_nextMultiCmd {
       
       if ($nexthop && $nexthop ne $k) {
           if ($nexthop eq 'quit') {
-              Log3 ($name, $verb, "DbRep $name - nexthop is set to >$nexthop< -> Exit multiCmd");
+              Log3 ($name, $verb, "DbRep $name - nextHop is set to >$nexthop< -> Exit multiCmd");
               delete $data{DbRep}{$name}{multicmd};
               return;
           }
           
-          Log3 ($name, $verb, "DbRep $name - nexthop is set to >$nexthop< -> multiCmd index >$k< skipped");
+          Log3 ($name, $verb, "DbRep $name - nextHop is set to >$nexthop< -> multiCmd index >$k< skipped");
           next;
       }
 
@@ -14560,12 +14564,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 28674 2024-03-17 18:30:25Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 28714 2024-03-27 21:40:03Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 28674 2024-03-17 18:30:25Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 28714 2024-03-27 21:40:03Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -15949,6 +15953,7 @@ return;
       <a href="#DbRep-attr-executeAfterProc">executeAfterProc</a>,
       <a href="#DbRep-attr-reading">reading</a>,
       <a href="#DbRep-attr-reading">readingNameMap</a>,
+      <a href="#DbRep-attr-seqDoubletsVariance">seqDoubletsVariance</a>,
       <a href="#DbRep-attr-timestamp_begin">timestamp_begin</a>,
       <a href="#DbRep-attr-timestamp_end">timestamp_end</a>,
       <a href="#DbRep-attr-timeDiffToNow">timeDiffToNow</a>,
@@ -15957,6 +15962,10 @@ return;
       <a href="#DbRep-attr-userExitFn">userExitFn</a>,
     </ul>
     <br>
+    
+    <b>Note:</b> All of the above attributes are deleted before each command index is executed. <br>
+    The attributes specified in the respective command index are set before the step is executed.
+    <br><br> 
 
     <b>Example of the definition of a command hash: </b> <br>
 
@@ -19068,6 +19077,7 @@ return;
       <a href="#DbRep-attr-executeAfterProc">executeAfterProc</a>,
       <a href="#DbRep-attr-reading">reading</a>,
       <a href="#DbRep-attr-reading">readingNameMap</a>,
+      <a href="#DbRep-attr-seqDoubletsVariance">seqDoubletsVariance</a>,
       <a href="#DbRep-attr-timestamp_begin">timestamp_begin</a>,
       <a href="#DbRep-attr-timestamp_end">timestamp_end</a>,
       <a href="#DbRep-attr-timeDiffToNow">timeDiffToNow</a>,
@@ -19076,6 +19086,10 @@ return;
       <a href="#DbRep-attr-userExitFn">userExitFn</a>,
     </ul>
     <br>
+    
+    <b>Hinweis:</b> Alle oben genannten Attribute werden vor Ausführung jedes Befehl-Index gelöscht. <br>
+    Die im jeweiligen Befehl-Index angegebenen Attribute werden vor Ausführung des Schrittes definiert gesetzt.
+    <br><br>    
 
     <b>Beispiel für die Definition eines Befehl-Hashes: </b> <br>
 

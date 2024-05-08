@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.11" => "08.05.2024  reduceLog: fix bug if EXCL/INCL-devices end with a digit ",  
   "8.53.10" => "27.03.2024  multicmd: add attr seqDoubletsVariance ",            
   "8.53.9"  => "18.03.2024  multicmd: add nextHop Keyword ",
   "8.53.8"  => "17.03.2024  sqlCmdBlocking able to use sql Keywords (§timestamp_end§ etc.) ",
@@ -9739,13 +9740,13 @@ sub DbRep_reduceLog {
 
     my @b;
     for my $w (@a) {                                     # ausfiltern von optionalen Zeitangaben, z.B. 700:750
-        next if($w =~ /\b(\d+(:\d+)?)\b/);
+        next if($w =~ /\b(\d+(:\d+)?)\s\b/);             # Forum: https://forum.fhem.de/index.php?topic=138082.0
         push @b, $w;
     }
 
     @a = @b;
 
-    my ($pa,$ph) = parseParams(join ' ', @a);
+    my ($pa,$ph) = parseParams (join ' ', @a);
 
     my $mode = (@$pa[1]        && @$pa[1] =~ /average/i)   ? 'average'     :
                ($ph->{average} && $ph->{average} eq "day") ? 'average=day' :
