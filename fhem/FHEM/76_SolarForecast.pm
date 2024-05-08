@@ -158,6 +158,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.18.0" => "08.05.2024  add secondary level of the bar chart, new attr graphicBeam3Content, graphicBeam4Content ".
+                           "graphicBeam3Color, graphicBeam4Color, graphicBeam3FontColor, graphicBeam4FontColor ".
+                           "value consumption available for attr graphicBeamXContent ".
+                           "rename graphicBeamHeight to graphicBeamHeightLevel1 ",
   "1.17.12"=> "06.05.2024  attr ctrlInterval: immediate impact when set ",
   "1.17.11"=> "04.05.2024  correction in commandref, delete attr affectMaxDayVariance ",
   "1.17.10"=> "19.04.2024  calcTodayPVdeviation: avoid Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1311121 ",
@@ -418,6 +422,10 @@ my $b1coldef       = 'FFAC63';                                                  
 my $b1fontcoldef   = '0D0D0D';                                                      # default Schriftfarbe Beam 1
 my $b2coldef       = 'C4C4A7';                                                      # default Farbe Beam 2
 my $b2fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 2
+my $b3coldef       = 'BED6C0';                                                      # default Farbe Beam 3
+my $b3fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 3
+my $b4coldef       = 'DBDBD0';                                                      # default Farbe Beam 4
+my $b4fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 4
 my $fgCDdef        = 130;                                                           # Abstand Verbrauchericons zueinander
 
 my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
@@ -495,8 +503,11 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
                    disable
                    flowGraphicSize flowGraphicAnimate flowGraphicConsumerDistance flowGraphicShowConsumer
                    flowGraphicShowConsumerDummy flowGraphicShowConsumerPower flowGraphicShowConsumerRemainTime
-                   flowGraphicCss graphicBeamHeight graphicBeamWidth graphicBeam1Color graphicBeam2Color
-                   graphicBeam1Content graphicBeam2Content graphicBeam1FontColor graphicBeam2FontColor
+                   flowGraphicCss graphicBeamWidth
+                   graphicBeamHeightLevel1 graphicBeamHeightLevel2
+                   graphicBeam1Content graphicBeam2Content graphicBeam3Content graphicBeam4Content 
+                   graphicBeam1Color graphicBeam2Color graphicBeam3Color graphicBeam4Color
+                   graphicBeam1FontColor graphicBeam2FontColor graphicBeam3FontColor graphicBeam4FontColor
                    graphicBeam1MaxVal graphicEnergyUnit graphicHeaderOwnspec graphicHeaderOwnspecValForm
                    graphicHeaderDetail graphicHeaderShow graphicHistoryHour graphicHourCount graphicHourStyle
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
@@ -1129,14 +1140,21 @@ sub Initialize {
                                 "flowGraphicShowConsumerPower:0,1 ".
                                 "flowGraphicShowConsumerRemainTime:0,1 ".
                                 "flowGraphicCss:textField-long ".
-                                "graphicBeamHeight ".
+                                "graphicBeamHeightLevel1 ".
+                                "graphicBeamHeightLevel2 ".
                                 "graphicBeamWidth:slider,20,5,100 ".
                                 "graphicBeam1Color:colorpicker,RGB ".
                                 "graphicBeam2Color:colorpicker,RGB ".
-                                "graphicBeam1Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
-                                "graphicBeam2Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
+                                "graphicBeam3Color:colorpicker,RGB ".
+                                "graphicBeam4Color:colorpicker,RGB ".
+                                "graphicBeam1Content:pvForecast,pvReal,gridconsumption,consumption,consumptionForecast ".
+                                "graphicBeam2Content:pvForecast,pvReal,gridconsumption,consumption,consumptionForecast ".
+                                "graphicBeam3Content:pvForecast,pvReal,gridconsumption,consumption,consumptionForecast ".
+                                "graphicBeam4Content:pvForecast,pvReal,gridconsumption,consumption,consumptionForecast ".
                                 "graphicBeam1FontColor:colorpicker,RGB ".
                                 "graphicBeam2FontColor:colorpicker,RGB ".
+                                "graphicBeam3FontColor:colorpicker,RGB ".
+                                "graphicBeam4FontColor:colorpicker,RGB ".
                                 "graphicBeam1MaxVal ".
                                 "graphicEnergyUnit:Wh,kWh ".
                                 "graphicHeaderOwnspec:textField-long ".
@@ -1164,9 +1182,8 @@ sub Initialize {
   # $hash->{FW_addDetailToSummary} = 1;
   # $hash->{FW_atPageEnd} = 1;                         # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 
-  # $hash->{AttrRenameMap} = { "beam1Color"         => "graphicBeam1Color",
-  #                            "beam1Content"       => "graphicBeam1Content",
-  #                          };
+   $hash->{AttrRenameMap} = { "graphicBeamHeight"  => "graphicBeamHeightLevel1",     # 07.05.24
+                            };
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
 
@@ -11064,18 +11081,20 @@ sub entryGraphic {
       fcolor2        => AttrVal ($name, 'graphicBeam2FontColor',  $b2fontcoldef),
       beam1cont      => AttrVal ($name, 'graphicBeam1Content',         'pvReal'),
       beam2cont      => AttrVal ($name, 'graphicBeam2Content',     'pvForecast'),
+      beam3cont      => AttrVal ($name, 'graphicBeam3Content',               ''),
+      beam4cont      => AttrVal ($name, 'graphicBeam4Content',               ''),
       caicon         => AttrVal ($name, 'consumerAdviceIcon',        $caicondef),                # Consumer AdviceIcon
       clegend        => AttrVal ($name, 'consumerLegend',            'icon_top'),                # Lage und Art Cunsumer Legende
       clink          => AttrVal ($name, 'consumerLink'  ,                     1),                # Detail-Link zum Verbraucher
       lotype         => AttrVal ($name, 'graphicLayoutType',           'double'),
       kw             => AttrVal ($name, 'graphicEnergyUnit',               'Wh'),
-      height         => AttrNum ($name, 'graphicBeamHeight',                200),
+      height         => AttrNum ($name, 'graphicBeamHeightLevel1',          200),
       width          => $width,
       fsize          => AttrNum ($name, 'graphicSpaceSize',                  24),
       maxVal         => AttrNum ($name, 'graphicBeam1MaxVal',                 0),                # dyn. Anpassung der Balkenhöhe oder statisch ?
       show_night     => AttrNum ($name, 'graphicShowNight',                   0),                # alle Balken (Spalten) anzeigen ?
       show_diff      => AttrVal ($name, 'graphicShowDiff',                 'no'),                # zusätzliche Anzeige $di{} in allen Typen
-      weather        => AttrNum ($name, 'graphicShowWeather',                 1),
+      weather        => AttrNum ($name, 'graphicShowWeather',                 1),                # Wetter Icons anzeigen
       colorw         => AttrVal ($name, 'graphicWeatherColor',      $wthcolddef),                # Wetter Icon Farbe Tag
       colorwn        => AttrVal ($name, 'graphicWeatherColorNight', $wthcolndef),                # Wetter Icon Farbe Nacht
       wlalias        => AttrVal ($name, 'alias',                          $name),
@@ -11148,20 +11167,19 @@ sub entryGraphic {
 
   $m = $paref->{modulo} % 2;
 
-  # Balkengrafik
-  ################
+  # Balkengrafiken
+  ##################
   if ($gsel =~ /both/xs || $gsel =~ /forecast/xs) {
-      my %hfch;
-      my $hfcg  = \%hfch;                                                                                   #(hfcg = hash forecast graphic)
+      my %hfcg1;
 
       # Werte aktuelle Stunde
       ##########################
-      $paref->{hfcg}     = $hfcg;
+      $paref->{hfcg}     = \%hfcg1;                                                                        # (hfcg = hash forecast graphic)
       $paref->{thishour} = _beamGraphicFirstHour ($paref);
 
       # get consumer list and display it in Graphics
       ################################################
-      _showConsumerInGraphicBeam ($paref);
+      # _showConsumerInGraphicBeam ($paref);                                                               # keine Verwendung zur Zeit
 
       # Werte restliche Stunden
       ###########################
@@ -11174,8 +11192,40 @@ sub entryGraphic {
       # Balkengrafik
       ################
       $ret .= _beamGraphic ($paref);
-  }
+      
+      if ($paref->{beam3cont} || $paref->{beam4cont}) {                                                    # Balkengrafik Ebene 2
+          my %hfcg2;
+          
+          $paref->{beam1cont} = $paref->{beam3cont};
+          $paref->{beam2cont} = $paref->{beam4cont};
+          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color',              $b3coldef);
+          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam4Color',              $b4coldef);
+          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam3FontColor',      $b3fontcoldef);
+          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam4FontColor',      $b4fontcoldef);
+          $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel2', $paref->{height}); 
+          $paref->{weather}   = 0;
 
+          # Werte aktuelle Stunde
+          ##########################
+          $paref->{hfcg}     = \%hfcg2;
+          $paref->{thishour} = _beamGraphicFirstHour ($paref);
+
+          # Werte restliche Stunden
+          ###########################
+          my $back         = _beamGraphicRemainingHours ($paref);
+          $paref->{maxVal} = $back->{maxVal};                                                             # Startwert wenn kein Wert bereits via attr vorgegeben ist
+          $paref->{maxCon} = $back->{maxCon};
+          $paref->{maxDif} = $back->{maxDif};                                                             # für Typ diff
+          $paref->{minDif} = $back->{minDif};                                                             # für Typ diff
+
+          # Balkengrafik
+          ################
+          $ret .= _beamGraphic ($paref);
+      }
+      
+      $paref->{modulo}++;
+  }
+  
   $m = $paref->{modulo} % 2;
 
   # Flußgrafik
@@ -11246,7 +11296,7 @@ sub _checkSetupNotComplete {
   my $pv0   = NexthoursVal ($hash, 'NextHour00', 'pvfc', undef);                          # der erste PV ForeCast Wert
 
   my $link   = qq{<a href="$FW_ME$FW_subdir?detail=$name">$name</a>};
-  my $height = AttrNum ($name, 'graphicBeamHeight', 200);
+  my $height = AttrNum ($name, 'graphicBeamHeightLevel1', 200);
   my $lang   = getLang ($hash);
 
   my (undef, $disabled, $inactive) = controller ($name);
@@ -12476,7 +12526,7 @@ return $ctable;
 }
 
 ################################################################
-#    Werte aktuelle Stunde für forecastGraphic
+#    Werte erste Stunde in Balkengrafik
 ################################################################
 sub _beamGraphicFirstHour {
   my $paref     = shift;
@@ -12491,61 +12541,63 @@ sub _beamGraphicFirstHour {
 
   my $stt                              = NexthoursVal ($hash, "NextHour00", "starttime", '0000-00-00 24');
   my ($year,$month,$day_str,$thishour) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-  my ($val1,$val2,$val3,$val4)         = (0,0,0,0);
+  my ($val1,$val2,$val3,$val4,$val5)   = (0,0,0,0,0);
 
   $thishour++;
 
   $hfcg->{0}{time_str} = $thishour;
-  $thishour            = int($thishour);                                                                    # keine führende Null
+  $thishour            = int($thishour);                                                           # keine führende Null
 
   $hfcg->{0}{time}     = $thishour;
   $hfcg->{0}{day_str}  = $day_str;
   $day                 = int($day_str);
   $hfcg->{0}{day}      = $day;
-  $hfcg->{0}{mktime}   = fhemTimeLocal(0,0,$thishour,$day,int($month)-1,$year-1900);                        # gleich die Unix Zeit dazu holen
+  $hfcg->{0}{mktime}   = fhemTimeLocal(0,0,$thishour,$day,int($month)-1,$year-1900);               # gleich die Unix Zeit dazu holen
+  $hfcg->{0}{time}    += $offset;
 
-  if ($offset) {
-      $hfcg->{0}{time} += $offset;
-
-      if ($hfcg->{0}{time} < 0) {
-          $hfcg->{0}{time}   += 24;
-          my $n_day           = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs($offset)));       # Achtung : Tageswechsel - day muss jetzt neu berechnet werden !
-          $hfcg->{0}{day}     = int($n_day);
-          $hfcg->{0}{day_str} = $n_day;
-      }
-
-      $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time});
-
-      $val1 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvfc',  0);
-      $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvrl',  0);
-      $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gcons', 0);
-      $val4 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'confc', 0);
-
-      $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'weatherid', 999);
-      $hfcg->{0}{wcc}     = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'wcc',       '-');
-      $hfcg->{0}{sunalt}  = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunalt',    '-');
-      $hfcg->{0}{sunaz}   = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunaz',     '-');
+  if ($hfcg->{0}{time} < 0) {
+      $hfcg->{0}{time}   += 24;
+      my $n_day           = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs($offset)));  # Achtung : Tageswechsel - day muss jetzt neu berechnet werden !
+      $hfcg->{0}{day}     = int($n_day);
+      $hfcg->{0}{day_str} = $n_day;
   }
-  else {
-      $val1 = CircularVal ($hash, $hfcg->{0}{time_str}, 'pvfc',  0);
-      $val2 = CircularVal ($hash, $hfcg->{0}{time_str}, 'pvrl',  0);
-      $val3 = CircularVal ($hash, $hfcg->{0}{time_str}, 'gcons', 0);
-      $val4 = CircularVal ($hash, $hfcg->{0}{time_str}, 'confc', 0);
 
-      $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, 'weatherid', 999);
-      #$val4   = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : 999;
-  }
+  $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time});
+
+  $val1 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvfc',  0);
+  $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvrl',  0);
+  $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gcons', 0);
+  $val4 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'confc', 0);
+  $val5 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'con',   0);
+
+  $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'weatherid', 999);
+  $hfcg->{0}{wcc}     = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'wcc',       '-');
+  $hfcg->{0}{sunalt}  = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunalt',    '-');
+  $hfcg->{0}{sunaz}   = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunaz',     '-');
 
   $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
-  $hfcg->{0}{beam1}    = ($beam1cont eq 'pvForecast') ? $val1 : ($beam1cont eq 'pvReal') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
-  $hfcg->{0}{beam2}    = ($beam2cont eq 'pvForecast') ? $val1 : ($beam2cont eq 'pvReal') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
+  $hfcg->{0}{beam1}    = ($beam1cont eq 'pvForecast')          ? $val1 :
+                         ($beam1cont eq 'pvReal')              ? $val2 :
+                         ($beam1cont eq 'gridconsumption')     ? $val3 :
+                         ($beam1cont eq 'consumptionForecast') ? $val4 :
+                         ($beam1cont eq 'consumption')         ? $val5 :
+                         undef;
+  $hfcg->{0}{beam2}    = ($beam2cont eq 'pvForecast')          ? $val1 :
+                         ($beam2cont eq 'pvReal')              ? $val2 :
+                         ($beam2cont eq 'gridconsumption')     ? $val3 :
+                         ($beam2cont eq 'consumptionForecast') ? $val4 :
+                         ($beam2cont eq 'consumption')         ? $val5 :
+                         undef;
+  
+  $hfcg->{0}{beam1}  //= 0;
+  $hfcg->{0}{beam2}  //= 0;
   $hfcg->{0}{diff}     = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
 
-return ($thishour);
+return $thishour;
 }
 
 ################################################################
-#    Werte restliche Stunden für forecastGraphic
+#    Werte restliche Stunden in Balkengrafik
 ################################################################
 sub _beamGraphicRemainingHours {
   my $paref     = shift;
@@ -12558,20 +12610,17 @@ sub _beamGraphicRemainingHours {
   my $beam2cont = $paref->{beam2cont};
   my $maxVal    = $paref->{maxVal};                                                                     # dyn. Anpassung der Balkenhöhe oder statisch ?
 
-  $maxVal  //= $hfcg->{0}{beam1};                                                                       # Startwert wenn kein Wert bereits via attr vorgegeben ist
+  $maxVal //= $hfcg->{0}{beam1};                                                                        # Startwert wenn kein Wert bereits via attr vorgegeben ist
 
-  my ($val1,$val2,$val3,$val4);
+  my ($val1,$val2,$val3,$val4,$val5);
 
   my $maxCon = $hfcg->{0}{beam1};
   my $maxDif = $hfcg->{0}{diff};                                                                        # für Typ diff
   my $minDif = $hfcg->{0}{diff};                                                                        # für Typ diff
 
   for my $i (1..($maxhours*2)-1) {                                                                      # doppelte Anzahl berechnen    my $val1 = 0;
-      $val2 = 0;
-      $val3 = 0;
-      $val4 = 0;
-
-      $hfcg->{$i}{time}  = $hfcg->{0}{time} + $i;
+      ($val1,$val2,$val3,$val4,$val5) = (0,0,0,0,0);
+      $hfcg->{$i}{time}               = $hfcg->{0}{time} + $i;
 
       while ($hfcg->{$i}{time} > 24) {
           $hfcg->{$i}{time} -= 24;                                                                      # wird bis zu 2x durchlaufen
@@ -12592,6 +12641,7 @@ sub _beamGraphicRemainingHours {
               $val2 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'pvrl',  0);
               $val3 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'gcons', 0);
               $val4 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'confc', 0);
+              $val5 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'con',   0);
 
               $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'weatherid', 999);
               $hfcg->{$i}{wcc}     = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
@@ -12617,8 +12667,18 @@ sub _beamGraphicRemainingHours {
       }
 
       $hfcg->{$i}{time_str} = sprintf('%02d', $hfcg->{$i}{time}-1).$hourstyle;
-      $hfcg->{$i}{beam1}    = ($beam1cont eq 'pvForecast') ? $val1 : ($beam1cont eq 'pvReal') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
-      $hfcg->{$i}{beam2}    = ($beam2cont eq 'pvForecast') ? $val1 : ($beam2cont eq 'pvReal') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
+      $hfcg->{$i}{beam1}    = ($beam1cont eq 'pvForecast')          ? $val1 :
+                              ($beam1cont eq 'pvReal')              ? $val2 :
+                              ($beam1cont eq 'gridconsumption')     ? $val3 :
+                              ($beam1cont eq 'consumptionForecast') ? $val4 :
+                              ($beam1cont eq 'consumption')         ? $val5 :                              
+                              undef;
+      $hfcg->{$i}{beam2}    = ($beam2cont eq 'pvForecast')          ? $val1 :
+                              ($beam2cont eq 'pvReal')              ? $val2 :
+                              ($beam2cont eq 'gridconsumption')     ? $val3 :
+                              ($beam2cont eq 'consumptionForecast') ? $val4 :
+                              ($beam2cont eq 'consumption')         ? $val5 :
+                              undef;
 
       $hfcg->{$i}{beam1} //= 0;
       $hfcg->{$i}{beam2} //= 0;
@@ -12637,7 +12697,7 @@ sub _beamGraphicRemainingHours {
       minDif => $minDif,
   };
 
-return ($back);
+return $back;
 }
 
 ################################################################
@@ -12669,160 +12729,164 @@ sub _beamGraphic {
   my $beam1cont  = $paref->{beam1cont};
   my $beam2cont  = $paref->{beam2cont};
 
-  $lotype        = 'single' if ($beam1cont eq $beam2cont);                                                       # User Auswahl Layout überschreiben bei gleichen Beamcontent !
+  $lotype        = 'single' if($beam1cont eq $beam2cont);                                                       # User Auswahl Layout überschreiben bei gleichen Beamcontent !
 
   # Wenn Table class=block alleine steht, zieht es bei manchen Styles die Ausgabe auf 100% Seitenbreite
   # lässt sich durch einbetten in eine zusätzliche Table roomoverview eindämmen
   # Die Tabelle ist recht schmal angelegt, aber nur so lassen sich Umbrüche erzwingen
 
   my ($val,$z2,$z3,$z4,$he);
-  my $ret;
 
-  $ret .= __weatherOnBeam ($paref);
+  my $ret .= __weatherOnBeam ($paref);
+  my $m    = $paref->{modulo} % 2;
 
-  my $m = $paref->{modulo} % 2;
-
-  if($show_diff eq 'top') {                                                                                      # Zusätzliche Zeile Ertrag - Verbrauch
+  if ($show_diff eq 'top') {                                                                                    # Zusätzliche Zeile Ertrag - Verbrauch
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";
       my $ii;
-      for my $i (0..($maxhours * 2) - 1) {                                                                       # gleiche Bedingung wie oben
+      
+      for my $i (0..($maxhours * 2) - 1) {                                                                      # gleiche Bedingung wie oben
           next if(!$show_night && $hfcg->{$i}{weather} > 99
                                && !$hfcg->{$i}{beam1}
                                && !$hfcg->{$i}{beam2});
-          $ii++;                                                                                                 # wieviele Stunden haben wir bisher angezeigt ?
+          $ii++;                                                                                                # wieviele Stunden haben wir bisher angezeigt ?
 
-          last if ($ii > $maxhours);                                                                             # vorzeitiger Abbruch
+          last if($ii > $maxhours);                                                                             # vorzeitiger Abbruch
 
-          $val  = formatVal6 ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather});
+          $val = formatVal6 ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather});
 
-          if ($val ne '&nbsp;') {                                                                                # Forum: https://forum.fhem.de/index.php/topic,117864.msg1166215.html#msg1166215
-          $val  = $hfcg->{$i}{diff} < 0 ? '<b>'.$val.'<b/>' :
-                  $val > 0              ? '+'.$val          :
-                  $val;                                                                                          # negative Zahlen in Fettschrift, 0 aber ohne +
+          if ($val ne '&nbsp;') {                                                                               # Forum: https://forum.fhem.de/index.php/topic,117864.msg1166215.html#msg1166215
+          $val = $hfcg->{$i}{diff} < 0 ? '<b>'.$val.'<b/>' :
+                 $val > 0              ? '+'.$val          :
+                 $val;                                                                                          # negative Zahlen in Fettschrift, 0 aber ohne +
           }
 
           $ret .= "<td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td>";
       }
-      $ret .= "<td class='solarfc'></td></tr>";                                                                  # freier Platz am Ende
+      
+      $ret .= "<td class='solarfc'></td></tr>";                                                                 # freier Platz am Ende
   }
 
-  $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                                  # Neue Zeile mit freiem Platz am Anfang
+  $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                                 # Neue Zeile mit freiem Platz am Anfang
 
   my $ii = 0;
-
-  for my $i (0..($maxhours * 2) - 1) {                                                                           # gleiche Bedingung wie oben
+  
+  for my $i (0..($maxhours * 2) - 1) {                                                                          # gleiche Bedingung wie oben
       next if(!$show_night && $hfcg->{$i}{weather} > 99
                            && !$hfcg->{$i}{beam1}
                            && !$hfcg->{$i}{beam2});
       $ii++;
-      last if ($ii > $maxhours);
+      last if($ii > $maxhours);
 
-      # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen
-      $height = 200 if (!$height);                                                                               # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
-      $maxVal = 1   if (!int $maxVal);
-      $maxCon = 1   if (!$maxCon);
+      $height = 200 if(!$height);                                                                               # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
+      $maxVal = 1   if(!int $maxVal);                                                                           # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen
+      $maxCon = 1   if(!$maxCon);
 
-      # Der zusätzliche Offset durch $fsize verhindert bei den meisten Skins
-      # dass die Grundlinie der Balken nach unten durchbrochen wird
-
+      # Berechnung der Zonen
+      ########################
+      
       if ($lotype eq 'single') {
-          $he = int(($maxVal-$hfcg->{$i}{beam1}) / $maxVal*$height) + $fsize;
+          $he = int(($maxVal - $hfcg->{$i}{beam1}) / $maxVal * $height) + $fsize;                               # Der zusätzliche Offset durch $fsize verhindert bei den meisten Skins dass die Grundlinie der Balken nach unten durchbrochen wird
           $z3 = int($height + $fsize - $he);
       }
 
       if ($lotype eq 'double') {
-          # Berechnung der Zonen
           # he - freier der Raum über den Balken. fsize wird nicht verwendet, da bei diesem Typ keine Zahlen über den Balken stehen
-          # z2 - der Ertrag ggf mit Icon
-          # z3 - der Verbrauch , bei zu kleinem Wert wird der Platz komplett Zone 2 zugeschlagen und nicht angezeigt
-          # z2 und z3 nach Bedarf tauschen, wenn der Verbrauch größer als der Ertrag ist
+          # z2 - primärer Balkenwert ggf. mit Icon
+          # z3 - sekundärer Balkenwert, bei zu kleinem Wert wird der Platz komplett Zone 2 zugeschlagen und nicht angezeigt
+          # z2 und z3 nach Bedarf tauschen, wenn sekundärer Balkenwert > primärer Balkenwert
 
-          $maxVal = $maxCon if ($maxCon > $maxVal);                                                              # wer hat den größten Wert ?
+          $maxVal = $maxCon if($maxCon > $maxVal);                                                              # wer hat den größten Wert ?
 
-          if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                         # Beam1 oben , Beam2 unten
-              $z2 = $hfcg->{$i}{beam1}; $z3 = $hfcg->{$i}{beam2};
+          if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                        # Beam1 oben , Beam2 unten
+              $z2 = $hfcg->{$i}{beam1}; 
+              $z3 = $hfcg->{$i}{beam2};
           }
-          else {                                                                                                 # tauschen, Verbrauch ist größer als Ertrag
-              $z3 = $hfcg->{$i}{beam1}; $z2 = $hfcg->{$i}{beam2};
+          else {                                                                                                # tauschen, Verbrauch ist größer als Ertrag
+              $z3 = $hfcg->{$i}{beam1}; 
+              $z2 = $hfcg->{$i}{beam2};
           }
 
-          $he = int(($maxVal-$z2)/$maxVal*$height);
-          $z2 = int(($z2 - $z3)/$maxVal*$height);
+          $he = int(($maxVal-$z2) / $maxVal * $height);
+          $z2 = int(($z2 - $z3)   / $maxVal * $height);
+          $z3 = int($height - $he - $z2);                                                                       # was von maxVal noch übrig ist
 
-          $z3 = int($height - $he - $z2);                                                                        # was von maxVal noch übrig ist
-
-          if ($z3 < int($fsize/2)) {                                                                             # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
+          if ($z3 < int($fsize / 2)) {                                                                          # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
               $z2 += $z3;
               $z3  = 0;
           }
       }
 
       if ($lotype eq 'diff') {
-          # Berechnung der Zonen
           # he - freier der Raum über den Balken , Zahl positiver Wert + fsize
           # z2 - positiver Balken inkl Icon
           # z3 - negativer Balken
           # z4 - Zahl negativer Wert + fsize
 
           my ($px_pos,$px_neg);
-          my $maxValBeam = 0;                                                                                    # ToDo:  maxValBeam noch aus Attribut graphicBeam1MaxVal ableiten
+          my $maxValBeam = 0;                                                                                   # ToDo:  maxValBeam noch aus Attribut graphicBeam1MaxVal ableiten
 
-          if ($maxValBeam) {                                                                                     # Feste Aufteilung +/- , jeder 50 % bei maxValBeam = 0
+          if ($maxValBeam) {                                                                                    # Feste Aufteilung +/- , jeder 50 % bei maxValBeam = 0
               $px_pos = int($height/2);
-              $px_neg = $height - $px_pos;                                                                       # Rundungsfehler vermeiden
+              $px_neg = $height - $px_pos;                                                                      # Rundungsfehler vermeiden
           }
-          else {                                                                                                 # Dynamische hoch/runter Verschiebung der Null-Linie
-              if ($minDif >= 0 ) {                                                                               # keine negativen Balken vorhanden, die Positiven bekommen den gesammten Raum
+          else {                                                                                                # Dynamische hoch/runter Verschiebung der Null-Linie
+              if ($minDif >= 0 ) {                                                                              # keine negativen Balken vorhanden, die Positiven bekommen den gesammten Raum
                   $px_neg = 0;
                   $px_pos = $height;
               }
               else {
                   if ($maxDif > 0) {
-                      $px_neg = int($height * abs($minDif) / ($maxDif + abs($minDif)));                          # Wieviel % entfallen auf unten ?
-                      $px_pos = $height-$px_neg;                                                                 # der Rest ist oben
+                      $px_neg = int($height * abs($minDif) / ($maxDif + abs($minDif)));                         # Wieviel % entfallen auf unten ?
+                      $px_pos = $height - $px_neg;                                                                 # der Rest ist oben
                   }
-                  else {                                                                                         # keine positiven Balken vorhanden, die Negativen bekommen den gesammten Raum
+                  else {                                                                                        # keine positiven Balken vorhanden, die Negativen bekommen den gesammten Raum
                       $px_neg = $height;
                       $px_pos = 0;
                   }
               }
           }
 
-          if ($hfcg->{$i}{diff} >= 0) {                                                                          # Zone 2 & 3 mit ihren direkten Werten vorbesetzen
+          if ($hfcg->{$i}{diff} >= 0) {                                                                         # Zone 2 & 3 mit ihren direkten Werten vorbesetzen
               $z2 = $hfcg->{$i}{diff};
               $z3 = abs($minDif);
           }
           else {
               $z2 = $maxDif;
-              $z3 = abs($hfcg->{$i}{diff});                                                                      # Nur Betrag ohne Vorzeichen
+              $z3 = abs($hfcg->{$i}{diff});                                                                     # Nur Betrag ohne Vorzeichen
           }
-                                                                                                                 # Alle vorbesetzen Werte umrechnen auf echte Ausgabe px
-          $he = (!$px_pos || !$maxDif) ? 0 : int(($maxDif-$z2)/$maxDif*$px_pos);                                 # Teilung durch 0 vermeiden
+                                                                                                                # Alle vorbesetzen Werte umrechnen auf echte Ausgabe px
+          $he = (!$px_pos || !$maxDif) ? 0 : int(($maxDif-$z2) / $maxDif * $px_pos);                            # Teilung durch 0 vermeiden
           $z2 = ($px_pos - $he) ;
 
-          $z4 = (!$px_neg || !$minDif) ? 0 : int((abs($minDif)-$z3)/abs($minDif)*$px_neg);                       # Teilung durch 0 unbedingt vermeiden
+          $z4 = (!$px_neg || !$minDif) ? 0 : int((abs($minDif)-$z3) / abs($minDif) * $px_neg);                  # Teilung durch 0 unbedingt vermeiden
           $z3 = ($px_neg - $z4);
-                                                                                                                 # Beiden Zonen die Werte ausgeben könnten muß fsize als zusätzlicher Raum zugeschlagen werden !
+                                                                                                                # Beiden Zonen die Werte ausgeben könnten muß fsize als zusätzlicher Raum zugeschlagen werden !
           $he += $fsize;
-          $z4 += $fsize if ($z3);                                                                                # komplette Grafik ohne negativ Balken, keine Ausgabe von z3 & z4
+          $z4 += $fsize if($z3);                                                                                # komplette Grafik ohne negativ Balken, keine Ausgabe von z3 & z4
       }
 
+      ## Erstellung der Balken
+      ##########################
+      
       # das style des nächsten TD bestimmt ganz wesentlich das gesammte Design
       # das \n erleichtert das lesen des Seitenquelltext beim debugging
       # vertical-align:bottom damit alle Balken und Ausgaben wirklich auf der gleichen Grundlinie sitzen
 
       $ret .="<td style='text-align: center; padding-left:1px; padding-right:1px; margin:0px; vertical-align:bottom; padding-top:0px'>\n";
-
+      
+      $he /= 10;                                                                                                    # freier der Raum über den Balken 
+      $he  = $he < 20 ? 20 : $he;
+      
       if ($lotype eq 'single') {
           $val = formatVal6 ($hfcg->{$i}{beam1}, $kw, $hfcg->{$i}{weather});
 
-          $ret .="<table width='100%' height='100%'>";                                                           # mit width=100% etwas bessere Füllung der Balken
+          $ret .="<table width='100%' height='100%'>";                                                              # mit width=100% etwas bessere Füllung der Balken
           $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'>";
           $ret .="<td class='solarfc' style='vertical-align:bottom; color:#$fcolor1;'>".$val.'</td></tr>';
 
-          if ($hfcg->{$i}{beam1} || $show_night) {                                                               # Balken nur einfärben wenn der User via Attr eine Farbe vorgibt, sonst bestimmt class odd von TR alleine die Farbe
+          if ($hfcg->{$i}{beam1} || $show_night) {                                                                  # Balken nur einfärben wenn der User via Attr eine Farbe vorgibt, sonst bestimmt class odd von TR alleine die Farbe
               my $style = "style=\"padding-bottom:0px; vertical-align:top; margin-left:auto; margin-right:auto;";
-              $style   .= defined $colorb1 ? " background-color:#$colorb1\"" : '"';                              # Syntaxhilight
+              $style   .= defined $colorb1 ? " background-color:#$colorb1\"" : '"';                                 # Syntaxhilight
 
               $ret .= "<tr class='odd' style='height:".$z3."px;'>";
               $ret .= "<td align='center' class='solarfc' ".$style.">";
@@ -12836,24 +12900,23 @@ sub _beamGraphic {
               $ret .= "</td></tr>";
           }
       }
-
+      
       if ($lotype eq 'double') {
           my ($color1, $color2, $style1, $style2, $v);
           my $style = "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
 
-          $ret .="<table width='100%' height='100%'>\n";                                                         # mit width=100% etwas bessere Füllung der Balken
-                                                                                                                 # der Freiraum oben kann beim größten Balken ganz entfallen
-          $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'><td class='solarfc'></td></tr>" if($he);
+          $ret .="<table width='100%' height='100%'>\n";                                                                 # mit width=100% etwas bessere Füllung der Balken                                                                                            
+          $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'><td class='solarfc'></td></tr>" if(defined $he);   # Freiraum über den Balken einfügen
 
           if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                         # wer ist oben, Beam2 oder Beam1 ? Wert und Farbe für Zone 2 & 3 vorbesetzen
-              $val     = formatVal6 ($hfcg->{$i}{beam1}, $kw, $hfcg->{$i}{weather});
-              $color1  = $colorb1;
-              $style1  = $style." background-color:#$color1; color:#$fcolor1;'";
+              $val    = formatVal6 ($hfcg->{$i}{beam1}, $kw, $hfcg->{$i}{weather});
+              $color1 = $colorb1;
+              $style1 = $style." background-color:#$color1; color:#$fcolor1;'";
 
               if ($z3) {                                                                                         # die Zuweisung können wir uns sparen wenn Zone 3 nachher eh nicht ausgegeben wird
-                  $v       = formatVal6 ($hfcg->{$i}{beam2}, $kw, $hfcg->{$i}{weather});
-                  $color2  = $colorb2;
-                  $style2  = $style." background-color:#$color2; color:#$fcolor2;'";
+                  $v      = formatVal6 ($hfcg->{$i}{beam2}, $kw, $hfcg->{$i}{weather});
+                  $color2 = $colorb2;
+                  $style2 = $style." background-color:#$color2; color:#$fcolor2;'";
               }
           }
           else {
@@ -12888,7 +12951,7 @@ sub _beamGraphic {
           $ret .= "<table width='100%' border='0'>\n";                                                           # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
 
           $val = ($hfcg->{$i}{diff} > 0) ? formatVal6 ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather}) : '';
-          $val = '&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;' if ($hfcg->{$i}{diff} == 0);                                  # Sonderfall , hier wird die 0 gebraucht !
+          $val = '&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;' if($hfcg->{$i}{diff} == 0);                                  # Sonderfall , hier wird die 0 gebraucht !
 
           if ($val) {
               $ret .= "<tr class='$htr{$m}{cl}' style='height:".$he."px'>";
@@ -12944,8 +13007,6 @@ sub _beamGraphic {
 
       $ret .="</td></tr></table></td>";
   }
-
-  $paref->{modulo}++;
 
   $ret .= "<td class='solarfc'></td>";
   $ret .= "</tr>";
@@ -19513,75 +19574,99 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-graphicBeam1Color"></a>
        <li><b>graphicBeam1Color </b><br>
-         Color selection of the primary bars.
+         Color selection of the primary bar of the first level. <br>
+         (default: FFAC63)
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam1FontColor"></a>
        <li><b>graphicBeam1FontColor </b><br>
-         Selection of the font color of the primary bar. <br>
+         Selection of the font color of the primary bar of the first level. <br>
          (default: 0D0D0D)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam1Content"></a>
-       <li><b>graphicBeam1Content </b><br>
-         Defines the content of the primary bars to be displayed.
-
-         <ul>
-         <table>
-         <colgroup> <col width="45%"> <col width="55%"> </colgroup>
-            <tr><td> <b>pvReal</b>              </td><td>real PV generation (default)      </td></tr>
-            <tr><td> <b>pvForecast</b>          </td><td>Forecast PV generation            </td></tr>
-            <tr><td> <b>gridconsumption</b>     </td><td>Energy purchase from the grid     </td></tr>
-            <tr><td> <b>consumptionForecast</b> </td><td>predicted energy consumption      </td></tr>
-         </table>
-         </ul>
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam1MaxVal"></a>
        <li><b>graphicBeam1MaxVal &lt;0...val&gt; </b><br>
-         Setting the maximum amount of the primary bar (hourly value) to calculate the maximum bar height.
-         This results in an adjustment of the total allowed height of the graphic. <br>
-         With the value "0" a dynamic adjustment takes place. <br>
+         Definition of the maximum amount of the primary beam of the first level for calculating the maximum beam height. 
+         height.
+         This results in an adjustment of the permissible total height of the graphic. <br>
+         The value “0” is used for dynamic adjustment. <br>
          (default: 0)
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam2Color"></a>
        <li><b>graphicBeam2Color </b><br>
-         Color selection of the secondary bars. The second color is only useful for the display device type "pvco" and "diff".
+         Color selection of the secondary bars of the first level. <br>
+         (default: C4C4A7)
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam2FontColor"></a>
        <li><b>graphicBeam2FontColor </b><br>
-         Selection of the font color of the secondary bar. <br>
+         Selection of the font color of the secondary bars of the first level. <br>
          (default: 000000)
        </li>
        <br>
-
-       <a id="SolarForecast-attr-graphicBeam2Content"></a>
-       <li><b>graphicBeam2Content </b><br>
-         Legt den darzustellenden Inhalt der sekundären Balken fest.
-
+       
+       <a id="SolarForecast-attr-graphicBeam3Color"></a>
+       <li><b>graphicBeam3Color </b><br>
+         Color selection of the primary bars of the second level. <br>
+         (default: BED6C0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeam3FontColor"></a>
+       <li><b>graphicBeam3FontColor </b><br>
+         Selection of the font color of the primary bars of the second level. <br>
+         (default: 000000)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeam4Color"></a>
+       <li><b>graphicBeam4Color </b><br>
+         Color selection of the secondary bars of the second level. <br>
+         (default: DBDBD0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeam4FontColor"></a>
+       <li><b>graphicBeam4FontColor </b><br>
+         Selection of the font color of the secondary bars of the second level. <br>
+         (default: 000000)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeamXContent" data-pattern="graphicBeam.*Content"></a>
+       <li><b>graphicBeamXContent </b><br>
+         Defines the content of the bars to be displayed in the bar charts. 
+         The bar charts are available in two levels. <br>
+         Level 1 is preset by default. The content is determined by the attributes graphicBeam1Content and 
+         graphicBeam2Content. <br>
+         Level 2 can be activated by setting the attributes graphicBeam3Content and graphicBeam4Content. <br>
+         The attributes graphicBeam1Content and graphicBeam3Content represent the primary beams, the attributes
+         graphicBeam2Content and graphicBeam4Content attributes represent the secondary beams of the 
+         respective level.
+         
          <ul>
          <table>
-         <colgroup> <col width="43%"> <col width="57%"> </colgroup>
-            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default) </td></tr>
-            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung                     </td></tr>
-            <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz             </td></tr>
-            <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch      </td></tr>
+         <colgroup> <col width="45%"> <col width="55%"> </colgroup>
+            <tr><td> <b>pvReal</b>              </td><td>real PV generation (default for graphicBeam1Content)            </td></tr>
+            <tr><td> <b>pvForecast</b>          </td><td>predicted PV generation (default for graphicBeam2Content)       </td></tr>
+            <tr><td> <b>consumption</b>         </td><td>Energy consumption                                              </td></tr>
+            <tr><td> <b>gridconsumption</b>     </td><td>Energy purchase from the public grid                            </td></tr>
+            <tr><td> <b>consumptionForecast</b> </td><td>forecasted energy consumption                                   </td></tr>
          </table>
          </ul>
        </li>
        <br>
-
-       <a id="SolarForecast-attr-graphicBeamHeight"></a>
-       <li><b>graphicBeamHeight &lt;value&gt; </b><br>
-         Height of the bars in px and thus determination of the total height.
-         In connection with "graphicHourCount" it is possible to create quite small graphic outputs. <br>
+       
+       <a id="SolarForecast-attr-graphicBeamHeightLevelX" data-pattern="graphicBeamHeightLevel.*"></a>
+       <li><b>graphicBeamHeightLevelX &lt;value&gt; </b><br>
+         Multiplier for determining the maximum bar height of the respective level. <br>
+         In conjunction with the attribute <a href=“#SolarForecast-attr-graphicHourCount”>graphicHourCount</a> 
+         this can also be used to generate very small graphic outputs. <br>
          (default: 200)
        </li>
        <br>
@@ -19799,16 +19884,18 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-graphicShowDiff"></a>
        <li><b>graphicShowDiff &lt;no | top | bottom&gt; </b><br>
-         Additional display of the difference "graphicBeam1Content - graphicBeam2Content" in the header or footer area of the
-         bar graphic. <br>
+         Additional display of the difference “primary bar content - secondary bar content” in the header or 
+         footer of the bar chart. <br>
          (default: no)
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicShowNight"></a>
        <li><b>graphicShowNight </b><br>
-         Show/hide the night hours (without yield forecast) in the bar graph. <br>
-         (default: 0)
+         Show/hide the night hours without values in the bar chart. <br>
+         If the selected bar contents contain a value in the night hours, these bars are also displayed if 
+         graphicShowNight=0. <br>         
+         (default: 0 (hide))
        </li>
        <br>
 
@@ -21753,36 +21840,22 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicBeam1Color"></a>
        <li><b>graphicBeam1Color </b><br>
-         Farbauswahl der primären Balken.
+         Farbauswahl des primären Balken der ersten Ebene. <br>
+         (default: FFAC63)
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam1FontColor"></a>
        <li><b>graphicBeam1FontColor </b><br>
-         Auswahl der Schriftfarbe des primären Balken. <br>
+         Auswahl der Schriftfarbe des primären Balken der ersten Ebene. <br>
          (default: 0D0D0D)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam1Content"></a>
-       <li><b>graphicBeam1Content </b><br>
-         Legt den darzustellenden Inhalt der primären Balken fest.
-
-         <ul>
-         <table>
-         <colgroup> <col width="45%"> <col width="55%"> </colgroup>
-            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung (default)           </td></tr>
-            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung           </td></tr>
-            <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz             </td></tr>
-            <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch      </td></tr>
-         </table>
-         </ul>
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam1MaxVal"></a>
        <li><b>graphicBeam1MaxVal &lt;0...val&gt; </b><br>
-         Festlegung des maximalen Betrags des primären Balkens (Stundenwert) zur Berechnung der maximalen Balkenhöhe.
+         Festlegung des maximalen Betrags des primären Balkens der ersten Ebene zur Berechnung der maximalen 
+         Balkenhöhe.
          Dadurch erfolgt eine Anpassung der zulässigen Gesamthöhe der Grafik. <br>
          Mit dem Wert "0" erfolgt eine dynamische Anpassung. <br>
          (default: 0)
@@ -21791,37 +21864,75 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicBeam2Color"></a>
        <li><b>graphicBeam2Color </b><br>
-         Farbauswahl der sekundären Balken. Die zweite Farbe ist nur sinnvoll für den Anzeigedevice-Typ "pvco" und "diff".
+         Farbauswahl der sekundären Balken der ersten Ebene. <br>
+         (default: C4C4A7)
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam2FontColor"></a>
        <li><b>graphicBeam2FontColor </b><br>
-         Auswahl der Schriftfarbe des sekundären Balken. <br>
+         Auswahl der Schriftfarbe der sekundären Balken der ersten Ebene. <br>
          (default: 000000)
        </li>
        <br>
-
-       <a id="SolarForecast-attr-graphicBeam2Content"></a>
-       <li><b>graphicBeam2Content </b><br>
-         Legt den darzustellenden Inhalt der sekundären Balken fest.
-
+       
+       <a id="SolarForecast-attr-graphicBeam3Color"></a>
+       <li><b>graphicBeam3Color </b><br>
+         Farbauswahl für die primären Balken der zweiten Ebene. <br>
+         (default: BED6C0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeam3FontColor"></a>
+       <li><b>graphicBeam3FontColor </b><br>
+         Auswahl der Schriftfarbe der primären Balken der zweiten Ebene. <br>
+         (default: 000000)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeam4Color"></a>
+       <li><b>graphicBeam4Color </b><br>
+         Farbauswahl für die sekundären Balken der zweiten Ebene. <br>
+         (default: DBDBD0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeam4FontColor"></a>
+       <li><b>graphicBeam4FontColor </b><br>
+         Auswahl der Schriftfarbe der sekundären Balken der zweiten Ebene. <br>
+         (default: 000000)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeamXContent" data-pattern="graphicBeam.*Content"></a>
+       <li><b>graphicBeamXContent </b><br>
+         Legt den darzustellenden Inhalt der Balken in den Balkendiagrammen fest. 
+         Die Balkendiagramme sind in zwei Ebenen verfügbar. <br>
+         Die Ebene 1 ist im Standard voreingestellt. Der Inhalt durch die Attribute graphicBeam1Content und 
+         graphicBeam2Content bestimmt. <br>
+         Die Ebene 2 kann durch Setzen der Attribute graphicBeam3Content und graphicBeam4Content zugeschaltet 
+         werden. <br>
+         Die Attribute graphicBeam1Content und graphicBeam3Content stellen die primären Balken, die Attribute
+         graphicBeam2Content und graphicBeam4Content die sekundären Balken der jeweiligen Ebene dar.
+         
          <ul>
          <table>
-         <colgroup> <col width="43%"> <col width="57%"> </colgroup>
-            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default) </td></tr>
-            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung                     </td></tr>
-            <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz             </td></tr>
-            <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch      </td></tr>
+         <colgroup> <col width="45%"> <col width="55%"> </colgroup>
+            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung (default für graphicBeam1Content)            </td></tr>
+            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default für graphicBeam2Content)  </td></tr>
+            <tr><td> <b>consumption</b>         </td><td>Energieverbrauch                                                </td></tr>
+            <tr><td> <b>gridconsumption</b>     </td><td>Energiebezug aus dem öffentlichen Netz                          </td></tr>
+            <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch                               </td></tr>
          </table>
          </ul>
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicBeamHeight"></a>
-       <li><b>graphicBeamHeight &lt;value&gt; </b><br>
-         Höhe der Balken in px und damit Bestimmung der gesammten Höhe.
-         In Verbindung mit "graphicHourCount" lassen sich damit auch recht kleine Grafikausgaben erzeugen. <br>
+       <a id="SolarForecast-attr-graphicBeamHeightLevelX" data-pattern="graphicBeamHeightLevel.*"></a>
+       <li><b>graphicBeamHeightLevelX &lt;value&gt; </b><br>
+         Multiplikator zur Festlegung der maximalen Balkenhöhe der jeweiligen Ebene. <br>
+         In Verbindung mit dem Attribut <a href="#SolarForecast-attr-graphicHourCount">graphicHourCount</a> 
+         lassen sich damit auch recht kleine Grafikausgaben erzeugen. <br>
          (default: 200)
        </li>
        <br>
@@ -22037,16 +22148,18 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicShowDiff"></a>
        <li><b>graphicShowDiff &lt;no | top | bottom&gt; </b><br>
-         Zusätzliche Anzeige der Differenz "graphicBeam1Content - graphicBeam2Content" im Kopf- oder Fußbereich der
-         Balkengrafik. <br>
+         Zusätzliche Anzeige der Differenz "primärer Balkeninhalt - sekundärer Balkeninhalt" im Kopf- oder 
+         Fußbereich der Balkengrafik. <br>
          (default: no)
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicShowNight"></a>
        <li><b>graphicShowNight </b><br>
-         Anzeigen/Verbergen der Nachtstunden (ohne Ertragsprognose) in der Balkengrafik. <br>
-         (default: 0)
+         Anzeigen/Verbergen der Nachtstunden ohne Werte in der Balkengrafik. <br>
+         Sofern die ausgewählten Balkeninhalte in den Nachtstunden einen Wert enthalten, werden diese Balken 
+         auch im Fall graphicShowNight=0 dargestellt. <br>         
+         (default: 0 (verbergen))
        </li>
        <br>
 
