@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.12" => "09.05.2024  DbRep_dbConnect: change PRAGMA temp_store=MEMORY to FILE, Forum: https://forum.fhem.de/index.php?msg=1312722 ",
   "8.53.11" => "08.05.2024  reduceLog: fix bug if EXCL/INCL-devices end with a digit ",  
   "8.53.10" => "27.03.2024  multicmd: add attr seqDoubletsVariance ",            
   "8.53.9"  => "18.03.2024  multicmd: add nextHop Keyword ",
@@ -11792,7 +11793,7 @@ sub DbRep_dbConnect {
           return $err if ($err);          
       }
       
-      my @dos = ("PRAGMA temp_store=MEMORY",
+      my @dos = ("PRAGMA temp_store=FILE",                                                   # Forum: https://forum.fhem.de/index.php?msg=1312722
                  "PRAGMA synchronous=FULL",
                 );
 
