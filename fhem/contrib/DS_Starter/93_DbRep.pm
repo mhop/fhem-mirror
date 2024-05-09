@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 28714 2024-03-27 21:40:03Z DS_Starter $
+# $Id: 93_DbRep.pm 28857 2024-05-08 20:29:49Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.12" => "09.05.2024  DbRep_dbConnect: change PRAGMA temp_store=MEMORY to FILE, Forum: https://forum.fhem.de/index.php?msg=1312722 ",
   "8.53.11" => "08.05.2024  reduceLog: fix bug if EXCL/INCL-devices end with a digit ",  
   "8.53.10" => "27.03.2024  multicmd: add attr seqDoubletsVariance ",            
   "8.53.9"  => "18.03.2024  multicmd: add nextHop Keyword ",
@@ -11792,7 +11793,7 @@ sub DbRep_dbConnect {
           return $err if ($err);          
       }
       
-      my @dos = ("PRAGMA temp_store=MEMORY",
+      my @dos = ("PRAGMA temp_store=FILE",                                                   # Forum: https://forum.fhem.de/index.php?msg=1312722
                  "PRAGMA synchronous=FULL",
                 );
 
@@ -14565,12 +14566,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 28714 2024-03-27 21:40:03Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 28857 2024-05-08 20:29:49Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 28714 2024-03-27 21:40:03Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 28857 2024-05-08 20:29:49Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
