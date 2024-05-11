@@ -58,7 +58,6 @@ sub Initialize() {
   $hash->{SetFn}        = \&FHEM::Devices::AMConnect::Common::Set;
   $hash->{AttrFn}       = \&FHEM::Devices::AMConnect::Common::Attr;
   $hash->{AttrList}     = "disable:1,0 " .
-                          "debug:1,0 " .
                           "disabledForIntervals " .
                           "mapImagePath " .
                           "mapImageWidthHeight " .
@@ -85,7 +84,6 @@ sub Initialize() {
                           $::readingFnAttributes;
 
   $::data{FWEXT}{AutomowerConnect}{SCRIPT} = 'automowerconnect.js';
-  $::data{FWEXT}{AutomowerConnectA}{SCRIPT} = '/automowerconnect/hull.js';
 
   return undef;
 }
@@ -149,6 +147,13 @@ __END__
     <br><br>
   </ul>
   <br>
+
+  <a id='AutomowerConnect-Hints'></a>
+  <b>Hints</b>
+  <ul>
+    <li>The available setter, attributes, Readings and and the map depend on the mower capabilities ( cutting height, headlights, position, stay out zones, work areas ).</li>
+    <br>
+  </ul>
 
   <b>Button</b>
   <ul>
@@ -623,9 +628,15 @@ __END__
     <code>define myMower AutomowerConnect 123456789012345678901234567890123456</code> Erstes Gerät: die Defaultmähernummer ist 0.<br>
     Es muss ein <b>client_secret</b> gesetzt werden. Es ist das Application Secret vom <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.<br>
     <code>set myMower client_secret &lt;client secret&gt;</code><br>
-    <br>
   </ul>
   <br>
+
+  <a id='AutomowerConnect-Hints'></a>
+  <b>Hinweise</b>
+  <ul>
+    <li> Die verfügbaren Setter, Attribute und Readings, so wie die Karte, werden durch die im Mähertyp vorhandenen Fähigkeiten ( cutting height, headlights, position, stay out zones, work areas ) bestimmt.</li>
+    <br>
+  </ul>
 
   <b>Button</b>
   <ul>

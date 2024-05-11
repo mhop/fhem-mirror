@@ -1,6 +1,6 @@
 
 if ( !(typeof FW_version === 'undefined') )
-  FW_version["automowerconnect.js"] = "$Id: automowerconnect.js 28823c 2024-04-26 13:14:53Z Ellert $";
+  FW_version["automowerconnect.js"] = "$Id: automowerconnect.js 28823d 2024-04-26 13:14:53Z Ellert $";
   
 {  window.onload = ( ()=>{
     let room = document.querySelector("#content");
@@ -391,7 +391,7 @@ function AutomowerConnectGetHull ( path ) {
       const div = document.getElementById(data.type+'_'+data.name+'_div');
       const pos =data.posxy;
 
-      if ( div && div.getAttribute( 'data-hullCalculate' ) && typeof hull === "function" ){
+      if ( div && div.getAttribute( 'data-hullCalculate' ) ){
         const wypts = [];
 
         for ( let i = 0; i < pos.length; i+=3 ){
@@ -403,8 +403,21 @@ function AutomowerConnectGetHull ( path ) {
         if ( wypts.length > 50 ) {
 
           const wyres = div.getAttribute( 'data-hullResolution' );
-          const hullpts = hull( wypts, wyres );
-          FW_cmd( FW_root+"?cmd=attr "+data.name+" mowingAreaHull "+JSON.stringify( hullpts )+"&XHR=1",function(data){setTimeout(()=>{window.location.reload()},500)} );
+          if ( typeof hull === "function" ){
+
+            const hullpts = hull( wypts, wyres );
+            FW_cmd( FW_root+"?cmd=attr "+data.name+" mowingAreaHull "+JSON.stringify( hullpts )+"&XHR=1",function(data){setTimeout(()=>{window.location.reload()},500)} );
+
+          } else if ( typeof loadScript === 'function' ){
+
+            loadScript('automowerconnect/hull.js', ()=>{
+
+              const hullpts = hull( wypts, wyres );
+              FW_cmd( FW_root+"?cmd=attr "+data.name+" mowingAreaHull "+JSON.stringify( hullpts )+"&XHR=1",function(data){setTimeout(()=>{window.location.reload()},500)} );
+
+            });
+
+          }
 
         }
 
@@ -425,34 +438,36 @@ function AutomowerConnectSubtractHull ( path ) {
       const div = document.getElementById(data.type+'_'+data.name+'_div');
       const pos =data.posxy;
 
-      if ( div && div.getAttribute( 'data-hullSubtract' ) && typeof hull === "function" ){
-        const wypts = [];
-        const hsub = div.getAttribute( 'data-hullSubtract' );
-        const wyres = div.getAttribute( 'data-hullResolution' );
-        var hullpts = [];
+      if ( div && div.getAttribute( 'data-hullSubtract' ) ){
 
-        for ( let i = 0; i < pos.length; i+=3 ){
+        if ( typeof hull === "function" ) {
+          const wypts = [];
+          const hsub = div.getAttribute( 'data-hullSubtract' );
+          const wyres = div.getAttribute( 'data-hullResolution' );
+          var hullpts = [];
 
-          if ( pos[i+2] == "M") wypts.push( [ pos[i], pos[i+1] ] );
+          for ( let i = 0; i < pos.length; i+=3 ){
 
-        }
+            if ( pos[i+2] == "M") wypts.push( [ pos[i], pos[i+1] ] );
 
-        for ( let i = 0; i < hsub; i++ ){
+          }
 
-          if ( wypts.length > 50 ) {
+          for ( let i = 0; i < hsub; i++ ){
 
-            hullpts = hull( wypts, wyres );
-            
-            for ( let k = 0; k < hullpts.length; k++ ){
+            if ( wypts.length > 50 ) {
 
-              for ( let m = 0; m < wypts.length; m++ ){
+              hullpts = hull( wypts, wyres );
+              
+              for ( let k = 0; k < hullpts.length; k++ ){
 
-                if ( hullpts[k][0] == wypts[m][0] && hullpts[k][1] == wypts[m][1] ) {
+                for ( let m = 0; m < wypts.length; m++ ){
 
-                  wypts.splice( m, 1 );
-                  break;
-                  //~ m--;
-                  //~ k++;
+                  if ( hullpts[k][0] == wypts[m][0] && hullpts[k][1] == wypts[m][1] ) {
+
+                    wypts.splice( m, 1 );
+                    break;
+
+                  }
 
                 }
 
@@ -460,13 +475,58 @@ function AutomowerConnectSubtractHull ( path ) {
 
             }
 
+            hullpts = hull( wypts, wyres );
+
           }
 
-          hullpts = hull( wypts, wyres );
+          FW_cmd( FW_root+"?cmd=attr "+data.name+" mowingAreaHull "+JSON.stringify( hullpts )+"&XHR=1",function(data){setTimeout(()=>{window.location.reload()},500)} );
+
+        } else if (typeof loadScript === 'function' ) {
+
+          loadScript( 'automowerconnect/hull.js', ()=>{
+            const wypts = [];
+            const hsub = div.getAttribute( 'data-hullSubtract' );
+            const wyres = div.getAttribute( 'data-hullResolution' );
+            var hullpts = [];
+
+            for ( let i = 0; i < pos.length; i+=3 ){
+
+              if ( pos[i+2] == "M") wypts.push( [ pos[i], pos[i+1] ] );
+
+            }
+
+            for ( let i = 0; i < hsub; i++ ){
+
+              if ( wypts.length > 50 ) {
+
+                hullpts = hull( wypts, wyres );
+                
+                for ( let k = 0; k < hullpts.length; k++ ){
+
+                  for ( let m = 0; m < wypts.length; m++ ){
+
+                    if ( hullpts[k][0] == wypts[m][0] && hullpts[k][1] == wypts[m][1] ) {
+
+                      wypts.splice( m, 1 );
+                      break;
+
+                    }
+
+                  }
+
+                }
+
+              }
+
+              hullpts = hull( wypts, wyres );
+
+            }
+
+            FW_cmd( FW_root+"?cmd=attr "+data.name+" mowingAreaHull "+JSON.stringify( hullpts )+"&XHR=1",function(data){setTimeout(()=>{window.location.reload()},500)} );
+
+          });
 
         }
-
-       FW_cmd( FW_root+"?cmd=attr "+data.name+" mowingAreaHull "+JSON.stringify( hullpts )+"&XHR=1",function(data){setTimeout(()=>{window.location.reload()},500)} );
 
       }
 
@@ -584,7 +644,7 @@ function AutomowerConnectHandleInput ( dev, hasWorkAreaId, workAreaId ) {
   shdl += "<td><input id='amc_"+dev+"_friday' type='checkbox' "+(cal[cali].friday?"checked='checked'":"")+" /></td>";
   shdl += "<td><input id='amc_"+dev+"_saturday' type='checkbox' "+(cal[cali].saturday?"checked='checked'":"")+" /></td>";
   shdl += "<td><input id='amc_"+dev+"_sunday' type='checkbox' "+(cal[cali].sunday?"checked='checked'":"")+" /></td>";
-  shdl += "<td><button id='amc_"+dev+"_schedule_button_plus' title='add: prepare a data set and click &plusmn;&#013;delete: unckeck each weekday and click &plusmn;&#013;reset: fill any time field with -- and click &plusmn;' onclick=' AutomowerConnectHandleInput ( \""+dev+"\", \""+hasWorkAreaId+"\", \""+workAreaId+"\" )' style='padding-bottom:4px; font-weight:bold; font-size:16pt; ' >&ensp;&plusmn;&ensp;</button></td>";
+  shdl += "<td><button id='amc_"+dev+"_schedule_button_plus' title='add: prepare a data set and click &plusmn;&#013;delete: unckeck each weekday and click &plusmn;&#013;reset: fill any time field with -- and click &plusmn;' onclick=' AutomowerConnectHandleInput ( \""+dev+"\", "+hasWorkAreaId+", "+workAreaId+" )' style='padding-bottom:4px; font-weight:bold; font-size:16pt; ' >&ensp;&plusmn;&ensp;</button></td>";
   shdl += "</tr><tr style='border-bottom:1px solid black'><td colspan='100%'></td></tr>";
 
   for (let i=0; i< cal.length; i++){
@@ -599,7 +659,6 @@ function AutomowerConnectHandleInput ( dev, hasWorkAreaId, workAreaId ) {
     shdl += "<td>&thinsp;"+(cal[i].friday?"&#x2611;":"&#x2610;")+"</td>";
     shdl += "<td>&thinsp;"+(cal[i].saturday?"&#x2611;":"&#x2610;")+"</td>";
     shdl += "<td>&thinsp;"+(cal[i].sunday?"&#x2611;":"&#x2610;")+"</td>";
-    if ( hasWorkAreaId ) shdl += "<td>&thinsp;"+workAreaId+"</td>";
     shdl += "<td></td>";
     shdl += "</tr>";
     }
@@ -654,7 +713,7 @@ function AutomowerConnectSchedule ( dev ) {
     shdl += "<td><input id='amc_"+dev+"_friday' type='checkbox' "+(cal[cali].friday?"checked='checked'":"")+" /></td>";
     shdl += "<td><input id='amc_"+dev+"_saturday' type='checkbox' "+(cal[cali].saturday?"checked='checked'":"")+" /></td>";
     shdl += "<td><input id='amc_"+dev+"_sunday' type='checkbox' "+(cal[cali].sunday?"checked='checked'":"")+" /></td>";
-    shdl += "<td><button id='amc_"+dev+"_schedule_button_plus' title='add: prepare a data set and click &plusmn;&#013;delete: unckeck each weekday and click &plusmn;&#013;reset: fill any time field with -- and click &plusmn;' onclick='AutomowerConnectHandleInput ( \""+dev+"\", \""+hasWorkAreaId+"\", \""+workAreaId+"\" )' style='padding-bottom:4px; font-weight:bold; font-size:16pt; ' >&ensp;&plusmn;&ensp;</button></td>";
+    shdl += "<td><button id='amc_"+dev+"_schedule_button_plus' title='add: prepare a data set and click &plusmn;&#013;delete: unckeck each weekday and click &plusmn;&#013;reset: fill any time field with -- and click &plusmn;' onclick='AutomowerConnectHandleInput ( \""+dev+"\", "+hasWorkAreaId+", "+workAreaId+" )' style='padding-bottom:4px; font-weight:bold; font-size:16pt; ' >&ensp;&plusmn;&ensp;</button></td>";
     shdl += "</tr><tr style='border-bottom:1px solid black'><td colspan='100%'></td></tr>";
 
     for (let i=0; i< cal.length; i++){
@@ -680,7 +739,7 @@ function AutomowerConnectSchedule ( dev ) {
     shdl += "</div>";
     let schedule = new DOMParser().parseFromString( shdl, "text/html" ).querySelector( '#amc_'+dev+'_schedule_div' );
     document.querySelector('body').append( schedule );
-    document.querySelector( "#amc_"+dev+"_schedule_button_plus" ).setAttribute( "onclick", "AutomowerConnectHandleInput( '"+dev+"', '"+hasWorkAreaId+"', '"+workAreaId+"' )" );
+    document.querySelector( "#amc_"+dev+"_schedule_button_plus" ).setAttribute( "onclick", "AutomowerConnectHandleInput( '"+dev+"', "+hasWorkAreaId+", "+workAreaId+" )" );
 
     $(schedule).dialog({
       dialogClass:"no-close", modal:true, width:"auto", closeOnEscape:true, 
@@ -742,20 +801,47 @@ function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, sca
       if ( plixy.length > 0 ) AutomowerConnectLimits( ctx0, div, plixy, 'property' );
 
       // draw hull
-      if ( div.getAttribute( 'data-hullCalculate' ) && typeof hull === "function" && hullxy.length == 0 ) {
-        const pts = [];
+      if ( div.getAttribute( 'data-hullCalculate' ) && hullxy.length == 0 ) {
 
-        for ( let i = 0; i < pos.length; i+=3 ){
+        if ( typeof hull === "function" ) {
 
-          if ( pos[i+2] == "M") pts.push( [ pos[i], pos[i+1] ] );
+          const pts = [];
 
-        }
+          for ( let i = 0; i < pos.length; i+=3 ){
 
-        if ( pts.length > 50 ) {
+            if ( pos[i+2] == "M") pts.push( [ pos[i], pos[i+1] ] );
 
-          const res = div.getAttribute( 'data-hullResolution' );
-          const hullpts = hull( pts, res );
-          AutomowerConnectHull( ctx0, div, hullpts, 'hull' );
+          }
+
+          if ( pts.length > 50 ) {
+
+            const res = div.getAttribute( 'data-hullResolution' );
+            const hullpts = hull( pts, res );
+            AutomowerConnectHull( ctx0, div, hullpts, 'hull' );
+
+          }
+
+        } else if ( typeof loadScript === "function" ) {
+
+          loadScript('automowerconnect/hull.js', ()=> {
+
+            const pts = [];
+
+            for ( let i = 0; i < pos.length; i+=3 ){
+
+              if ( pos[i+2] == "M") pts.push( [ pos[i], pos[i+1] ] );
+
+            }
+
+            if ( pts.length > 50 ) {
+
+              const res = div.getAttribute( 'data-hullResolution' );
+              const hullpts = hull( pts, res );
+              AutomowerConnectHull( ctx0, div, hullpts, 'hull' );
+
+            }
+
+          });
 
         }
 

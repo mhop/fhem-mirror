@@ -30,7 +30,7 @@ use strict;
 use warnings;
 use POSIX;
 
-# wird fÃ¼r den Import der FHEM Funktionen aus der fhem.pl benÃ¶tigt
+# wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use GPUtils qw(:all);
 use FHEM::Core::Authentication::Passwords qw(:ALL);
 
@@ -68,7 +68,9 @@ BEGIN {
           readingsSingleUpdate
           ReadingsVal
           RemoveInternalTimer
+          setDevAttrList
           setKeyValue
+          unicodeEncoding
           defs
           attr
           modules
@@ -90,7 +92,7 @@ require HttpUtils;
 
 my $errorjson = '{"23":"Wheel drive problem, left","24":"Cutting system blocked","123":"Destination not reachable","710":"SIM card locked","50":"Guide 1 not found","717":"SMS could not be sent","108":"Folding cutting deck sensor defect","4":"Loop sensor problem - front","15":"Lifted","29":"Slope too steep","1":"Outside working area","45":"Cutting height problem - dir","52":"Guide 3 not found","28":"Memory circuit problem","95":"Folding sensor activated","9":"Trapped","114":"Too high discharge current","103":"Cutting drive motor 2 defect","65":"Temporary battery problem","119":"Zone generator problem","6":"Loop sensor problem - left","82":"Wheel motor blocked - rear right","714":"Geofence problem","703":"Connectivity problem","708":"SIM card locked","75":"Connection changed","7":"Loop sensor problem - right","35":"Wheel motor overloaded - right","3":"Wrong loop signal","117":"High internal power loss","0":"Unexpected error","80":"Cutting system imbalance - Warning","110":"Collision sensor error","100":"Ultrasonic Sensor 3 defect","79":"Invalid battery combination - Invalid combination of different battery types.","724":"Communication circuit board SW must be updated","86":"Wheel motor overloaded - rear right","81":"Safety function faulty","78":"Slipped - Mower has Slipped. Situation not solved with moving pattern","107":"Docking sensor defect","33":"Mower tilted","69":"Alarm! Mower switched off","68":"Temporary battery problem","34":"Cutting stopped - slope too steep","127":"Battery problem","73":"Alarm! Mower in motion","74":"Alarm! Outside geofence","713":"Geofence problem","87":"Wheel motor overloaded - rear left","120":"Internal voltage error","39":"Cutting motor problem","704":"Connectivity problem","63":"Temporary battery problem","109":"Loop sensor defect","38":"Electronic problem","64":"Temporary battery problem","113":"Complex working area","93":"No accurate position from satellites","104":"Cutting drive motor 3 defect","709":"SIM card not found","94":"Reference station communication problem","43":"Cutting height problem - drive","13":"No drive","44":"Cutting height problem - curr","118":"Charging system problem","14":"Mower lifted","57":"Guide calibration failed","707":"SIM card requires PIN","99":"Ultrasonic Sensor 2 defect","98":"Ultrasonic Sensor 1 defect","51":"Guide 2 not found","56":"Guide calibration accomplished","49":"Ultrasonic problem","2":"No loop signal","124":"Destination blocked","25":"Cutting system blocked","19":"Collision sensor problem, front","18":"Collision sensor problem - rear","48":"No response from charger","105":"Lift Sensor defect","111":"No confirmed position","10":"Upside down","40":"Limited cutting height range","716":"Connectivity problem","27":"Settings restored","90":"No power in charging station","21":"Wheel motor blocked - left","26":"Invalid sub-device combination","92":"Work area not valid","702":"Connectivity settings restored","125":"Battery needs replacement","5":"Loop sensor problem - rear","12":"Empty battery","55":"Difficult finding home","42":"Limited cutting height range","30":"Charging system problem","72":"Alarm! Mower tilted","85":"Wheel drive problem - rear left","8":"Wrong PIN code","62":"Temporary battery problem","102":"Cutting drive motor 1 defect","116":"High charging power loss","122":"CAN error","60":"Temporary battery problem","705":"Connectivity problem","711":"SIM card locked","70":"Alarm! Mower stopped","32":"Tilt sensor problem","37":"Charging current too high","89":"Invalid system configuration","76":"Connection NOT changed","71":"Alarm! Mower lifted","88":"Angular sensor problem","701":"Connectivity problem","715":"Connectivity problem","61":"Temporary battery problem","66":"Battery problem","106":"Collision sensor defect","67":"Battery problem","112":"Cutting system major imbalance","83":"Wheel motor blocked - rear left","84":"Wheel drive problem - rear right","126":"Battery near end of life","77":"Com board not available","36":"Wheel motor overloaded - left","31":"STOP button problem","17":"Charging station blocked","54":"Weak GPS signal","47":"Cutting height problem","53":"GPS navigation problem","121":"High internal temerature","97":"Left brush motor overloaded","712":"SIM card locked","20":"Wheel motor blocked - right","91":"Switch cord problem","96":"Right brush motor overloaded","58":"Temporary battery problem","59":"Temporary battery problem","22":"Wheel drive problem - right","706":"Poor signal quality","41":"Unexpected cutting height adj","46":"Cutting height blocked","11":"Low battery","16":"Stuck in charging station","101":"Ultrasonic Sensor 4 defect","115":"Too high internal current"}';
 
-our $errortable = eval { decode_json ( $errorjson ) };
+our $errortable = eval { JSON::XS->new->decode ( $errorjson ) };
 if ($@) {
   return "FHEM::Devices::AMConnect::Common \$errortable: $@";
 }
@@ -179,18 +181,23 @@ mowingPathShowCollisions=""
   }
   }';
 
- my ( $path, $file) = $::data{FWEXT}{AutomowerConnectA}{SCRIPT} =~ /\/(.*)\/(.*)/;
-
+  my $noPositionAttr =  "disable:1,0 " .
+                        "disabledForIntervals " .
+                        "mowerPanel:textField-long,85 " .
+                        "mowerSchedule:textField-long " .
+                        "addPollingMinInterval " .
+                        $::readingFnAttributes;
 
   %$hash = (%$hash,
     helper => {
       passObj                   => FHEM::Core::Authentication::Passwords->new($type),
       FWEXTA                    => {
-        path                    => $path,
-        file                    => $file,
+        path                    => 'automowerconnect/',
+        file                    => 'hull.js',
         url                     => 'https://raw.githubusercontent.com/AndriiHeonia/hull/master/dist/hull.js'
       },
       interval                  => 840,
+      no_position_attr          => $noPositionAttr,
       interval_ws               => 7110,
       interval_ping             => 570,
       use_position_polling      => 0,
@@ -335,7 +342,7 @@ mowingPathShowCollisions=""
 
     my $attrVal = $attr{$name}{mapImagePath};
 
-    if ($attrVal =~ '(webp|png|jpg|jpeg)$' ) {
+    if ( $attrVal || $attrVal =~ '(webp|png|jpg|jpeg)$' ) {
 
       $hash->{helper}{MAP_PATH} = $attrVal;
       $hash->{helper}{MAP_MIME} = "image/".$1;
@@ -346,6 +353,8 @@ mowingPathShowCollisions=""
   }
 
     my $url = $hash->{helper}{FWEXTA}{url};
+    my $path = $hash->{helper}{FWEXTA}{path};
+    my $file = $hash->{helper}{FWEXTA}{file};
     mkdir( "$FW_dir/$path" ) if ( ! -d "$FW_dir/$path" );
     getTpFile( $hash, $url, "$FW_dir/$path", $file ) if ( ! -e "$FW_dir/$path/$file"); 
 
@@ -398,7 +407,6 @@ sub Delete {
   Log3( $name, 5, "$iam called" );
   if ( scalar devspec2array( "TYPE=$type" ) == 1 ) {
     delete $::data{FWEXT}{AutomowerConnect};
-    delete $::data{FWEXT}{AutomowerConnectA};
   }
   my ($passResp,$passErr) = $hash->{helper}->{passObj}->setDeletePassword($name);
   Log3( $name, 1, "$iam error: $passErr" ) if ($passErr);
@@ -446,23 +454,18 @@ sub FW_detailFn {
   my $iam = "$type $name FW_detailFn:";
   return '' if( AttrVal($name, 'disable', 0) || !$::init_done || !$FW_ME );
 
-  my $calendarjson = eval {
-    require JSON::PP;
-    my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9);
-    JSON::PP->new->sort_by(
-      sub {($ORDER{$JSON::PP::a} // 999) <=> ($ORDER{$JSON::PP::b} // 999) or $JSON::PP::a cmp $JSON::PP::b})
-      ->encode ($hash->{helper}{mower}{attributes}{calendar}{tasks})
-  };
-  return "$iam $@" if ($@);
-
-  my $reta = "<div id='amc_${name}_schedule_buttons' name='fhem_amc_mower_schedule_buttons' ><button id='amc_${name}_schedule_button' onclick='AutomowerConnectSchedule( \"$name\", $calendarjson )' style='font-size:16px; ' >Mower Schedule</button></div>";
-  return $reta if( !AttrVal ($name, 'showMap', 1 ) );
+  my $reta = "<div id='amc_${name}_schedule_buttons' name='fhem_amc_mower_schedule_buttons' ><button id='amc_${name}_schedule_button' onclick='AutomowerConnectSchedule( \"$name\" )' style='font-size:16px; ' >Mower Schedule</button>";
+  # $reta .= "<label for='amc_${name}_select_workareas' > for Work Area: </label><select id='amc_${name}_select_workareas' name=work_areas_select>";
+  # $reta .= "<option value='-1' selected >default</option>";
+  # $reta .= "<select/>";
+  $reta .= "</div>";
+  return $reta if( !AttrVal ($name, 'showMap', 1 ) || !$hash->{helper}{mower}{attributes}{capabilities}{position} );
 
   my $img = "$FW_ME/$type/$name/map";
   my $zoom=AttrVal( $name,"mapImageZoom", 0.7 );
   my $backgroundcolor = AttrVal($name, 'mapBackgroundColor','');
   my $bgstyle = $backgroundcolor ? " background-color:$backgroundcolor;" : '';
- 
+
   my $mapDesign = getDesignAttr( $hash );
 
   my ($picx,$picy) = AttrVal( $name,"mapImageWidthHeight", $hash->{helper}{imageWidthHeight} ) =~ /(\d+)\s(\d+)/;
@@ -531,7 +534,7 @@ sub FW_detailFn {
 
   # MOWING AREA HULL 
   my $hulljson = AttrVal($name, 'mowingAreaHull', '[]');
-  my $hull = eval { decode_json( $hulljson ) };
+  my $hull = eval { JSON::XS->new->decode( $hulljson ) };
   if ( $@ ) {
     Log3 $name, 1, "$type $name FW_detailFn: decode error: $@ \n $hulljson";
     $hull = [];
@@ -564,9 +567,9 @@ sub FW_detailFn {
   $ret .=  $reta if( AttrVal ($name, 'showMap', 1 ) );
 
   $ret .= "<div class='fhem_amc_hull_buttons' >";
-  $ret .= "<button class='fhem_amc_hull_button' title='Sends the hull polygon points to attribute mowingAreaHull.' onclick='AutomowerConnectGetHull( \"$FW_ME/$type/$name/json\" )' style='font-weight:bold; font-size:16pt; ' >mowingAreaHullToAttribute</button>"
+  $ret .= "<button class='fhem_amc_hull_button' title='Sends the hull polygon points to attribute mowingAreaHull.' onclick='AutomowerConnectGetHull( \"$FW_ME/$type/$name/json\" )' style='font-size:12pt; ' >mowingAreaHullToAttribute</button>"
           if ( -e "$FW_dir/$hash->{helper}{FWEXTA}{path}/$hash->{helper}{FWEXTA}{file}" && !AttrVal( $name,'mowingAreaHull','' ) && $$mapDesign =~ m/hullCalculate="1"/g );
-  $ret .= "<button class='fhem_amc_hull_button' title='Subtracts hull polygon points from way points. To hide button set hullSubtract=\"\".' onclick='AutomowerConnectSubtractHull( \"$FW_ME/$type/$name/json\" )' style='font-weight:bold; font-size:16pt; ' >Subtract Hull</button>"
+  $ret .= "<button class='fhem_amc_hull_button' title='Subtracts hull polygon points from way points. To hide button set hullSubtract=\"\".' onclick='AutomowerConnectSubtractHull( \"$FW_ME/$type/$name/json\" )' style='font-size:12pt; ' >Subtract Hull</button>"
           if ( -e "$FW_dir/$hash->{helper}{FWEXTA}{path}/$hash->{helper}{FWEXTA}{file}" && AttrVal( $name,'mowingAreaHull','' ) && $$mapDesign =~ m/hullSubtract="\d+"/g );
   $ret .= "</div>";
   $ret .= $content  if ( !$contentflg );
@@ -584,7 +587,7 @@ sub FW_detailFn_Update {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  return undef if( AttrVal($name, 'disable', 0) || !AttrVal($name, 'showMap', 1) );
+  return undef if( AttrVal($name, 'disable', 0) || !AttrVal($name, 'showMap', 1) || !$hash->{helper}{mower}{attributes}{capabilities}{position} );
 
   my @pos = @{ $hash->{helper}{areapos} };
   my @poserr = @{ $hash->{helper}{lasterror}{positions} };
@@ -746,11 +749,11 @@ sub APIAuthResponse {
   my $iam = "$type $name APIAuthResponse:";
 
   Log3 $name, 1, "$iam response time ". sprintf( "%.2f", ( gettimeofday() - $param->{t_begin} ) ) . ' s' if ( $param->{timeout} == 60 );
-  Log3 $name, 1, "\ndebug $iam \n\$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}" if ( AttrVal($name, 'debug', '') );
+  Log3 $name, 5, "$iam \n\$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}";
 
   if( !$err && $statuscode == 200 && $data) {
 
-    my $result = eval { decode_json($data) };
+    my $result = eval { JSON::XS->new->utf8( not $unicodeEncoding )->decode( $data ) };
     if ($@) {
 
       Log3 $name, 2, "$iam JSON error [ $@ ]";
@@ -844,133 +847,6 @@ sub getMower {
 }
 
 #########################
-sub getMowerWs {
-  
-  my ( $hash ) = @_;
-  my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};
-  my $iam = "$type $name getMowerWs:";
-  my $access_token = ReadingsVal($name,".access_token","");
-  my $provider = ReadingsVal($name,".provider","");
-  my $client_id = $hash->{helper}->{client_id};
-  my $timeout = AttrVal( $name, 'timeoutGetMower', $hash->{helper}->{timeout_getmower} );
-
-  my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: " . $client_id . "\r\nAuthorization: Bearer " . $access_token . "\r\nAuthorization-Provider: " . $provider;
-  Log3 $name, 5, "$iam header [ $header ]";
-  readingsSingleUpdate( $hash, 'api_callsThisMonth' , ReadingsVal( $name,  'api_callsThisMonth', 0 ) + 1, 0) if ( $hash->{helper}{additional_polling} );
-
-  ::HttpUtils_NonblockingGet( {
-    url        => APIURL . '/mowers/' . $hash->{helper}{mower}{id},
-    timeout    => $timeout,
-    hash       => $hash,
-    method     => "GET",
-    header     => $header,  
-    callback   => \&getMowerResponseWs,
-    t_begin    => scalar gettimeofday()
-  } );
-
-  return undef;
-}
-
-#########################
-sub getMowerResponseWs {
-
-  my ( $param, $err, $data ) = @_;
-  my $hash = $param->{hash};
-  my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};
-  my $statuscode = $param->{code} // '';
-  my $iam = "$type $name getMowerResponseWs:";
-
-  Log3 $name, 1, "$iam response time ". sprintf( "%.2f", ( gettimeofday() - $param->{t_begin} ) ) . ' s' if ( $param->{timeout} == 60 );
-  Log3 $name, 4, "$iam response polling after status-event \$statuscode >$statuscode<, \$err >$err<, \$param->url $param->{url} \n \$data >$data<";
-
-  if( !$err && $statuscode == 200 && $data) {
-
-    if ( $data eq '' ) {
-
-      Log3 $name, 2, "$iam no mower data present";
-
-    } else {
-
-      my $result = eval { decode_json($data) };
-
-      if ($@) {
-
-        Log3( $name, 2, "$iam - JSON error while request: $@");
-
-      } else {
-
-        $hash->{helper}{wsResult}{mower} = dclone( $result->{data} ) if ( AttrVal($name, 'debug', '') );
-        $hash->{helper}{mower}{attributes}{statistics} = dclone( $result->{data}{attributes}{statistics} );
-
-        if ( $hash->{helper}{use_position_polling} ) {
-
-          my $cnt = 0;
-          my $tmp = [];
-          my $poslen = @{ $result->{data}{attributes}{positions} };
-
-          for ( $cnt = 0; $cnt < $poslen; $cnt++ ) { 
-
-            if (   $hash->{helper}{searchpos}[ 0 ]{longitude} == $result->{data}{attributes}{positions}[ $cnt ]{longitude}
-                && $hash->{helper}{searchpos}[ 0 ]{latitude} == $result->{data}{attributes}{positions}[ $cnt ]{latitude} || $cnt == $poslen -1) { # if nothing found take all
-
-              if ( $cnt > 0 ) {
-
-                my @ar;
-                push @ar, @{ $result->{data}{attributes}{positions} }[ 0 .. $cnt-1 ];
-                $hash->{helper}{mower}{attributes}{positions} = dclone( \@ar );
-                
-                AlignArray( $hash );
-                FW_detailFn_Update ($hash);
-
-              } else {
-
-                $hash->{helper}{mower}{attributes}{positions} = [];
-
-              }
-
-              last;
-
-            }
-
-          }
-
-        }
-
-        isErrorThanPrepare( $hash );
-        resetLastErrorIfCorrected( $hash );
-
-        # Update readings
-        readingsBeginUpdate($hash);
-
-          fillReadings( $hash );
-          # readingsBulkUpdate( $hash, 'mower_wsEvent', $hash->{helper}{wsResult}{type} ); #to do check what event
-          readingsBulkUpdate( $hash, 'mower_wsEvent', 'status-event' );
-          readingsBulkUpdateIfChanged( $hash, 'device_state', 'connected' );
-
-        readingsEndUpdate($hash, 1);
-
-        $hash->{helper}{searchpos} = [ dclone $result->{data}{attributes}{positions}[ 0 ] ];
-
-        return undef;
-
-      }
-
-    }
-    
-  } else {
-
-    readingsSingleUpdate( $hash, 'device_state', "additional Polling error statuscode $statuscode", 1 );
-    Log3 $name, 1, "$iam \$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}";
-
-  }
-
-  return undef;
-
-}
-
-#########################
 sub getMowerResponse {
   
   my ( $param, $err, $data ) = @_;
@@ -992,7 +868,7 @@ sub getMowerResponse {
       
     } else {
 
-      my $result = eval { decode_json($data) };
+      my $result = eval { JSON::XS->new->utf8( not $::unicodeEncoding )->decode( $data ) };
       if ($@) {
 
         Log3( $name, 2, "$iam - JSON error while request: $@");
@@ -1029,18 +905,28 @@ sub getMowerResponse {
           $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{mower}{activity};
           $hash->{helper}{mowerold}{attributes}{statistics}{numberOfCollisions} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{statistics}{numberOfCollisions};
           $hash->{helper}{statistics}{numberOfCollisionsOld} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{statistics}{numberOfCollisions};
-          $hash->{helper}{searchpos} = [ dclone $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions}[0] ];
 
-          if ( AttrVal( $name, 'mapImageCoordinatesToRegister', '' ) eq '' ) {
-            posMinMax( $hash, $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions} );
+          if ( $hash->{helper}{mowers}[$mowerNumber]{attributes}{capabilities}{position} ) {
+
+            $hash->{helper}{searchpos} = [ dclone $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions}[0] ];
+
+            if ( AttrVal( $name, 'mapImageCoordinatesToRegister', '' ) eq '' ) {
+              posMinMax( $hash, $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions} );
+            }
+
           }
 
         }
 
         $hash->{helper}{mower} = dclone( $hash->{helper}{mowers}[$mowerNumber] );
-        $hash->{helper}{mower}{attributes}{positions}[0]{getMower} = 'from polling';
         $hash->{helper}{mower_id} = $hash->{helper}{mower}{id};
         $hash->{helper}{newdatasets} = 0;
+        
+        if ( $hash->{helper}{mower}{attributes}{capabilities}{position} ) {
+          setDevAttrList( $name );
+        } else {
+          setDevAttrList( $name, $hash->{helper}{no_position_attr} );
+        }
 
         $hash->{helper}{storediff} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
 
@@ -1081,6 +967,133 @@ sub getMowerResponse {
   RemoveInternalTimer( $hash, \&APIAuth );
   InternalTimer( gettimeofday() + $hash->{helper}{retry_interval_getmower}, \&APIAuth, $hash, 0 );
   Log3 $name, 1, "$iam failed retry in $hash->{helper}{retry_interval_getmower} seconds.";
+  return undef;
+
+}
+
+#########################
+sub getMowerWs {
+  
+  my ( $hash ) = @_;
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  my $iam = "$type $name getMowerWs:";
+  my $access_token = ReadingsVal($name,".access_token","");
+  my $provider = ReadingsVal($name,".provider","");
+  my $client_id = $hash->{helper}->{client_id};
+  my $timeout = AttrVal( $name, 'timeoutGetMower', $hash->{helper}->{timeout_getmower} );
+
+  my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: " . $client_id . "\r\nAuthorization: Bearer " . $access_token . "\r\nAuthorization-Provider: " . $provider;
+  Log3 $name, 5, "$iam header [ $header ]";
+  readingsSingleUpdate( $hash, 'api_callsThisMonth' , ReadingsVal( $name,  'api_callsThisMonth', 0 ) + 1, 0) if ( $hash->{helper}{additional_polling} );
+
+  ::HttpUtils_NonblockingGet( {
+    url        => APIURL . '/mowers/' . $hash->{helper}{mower}{id},
+    timeout    => $timeout,
+    hash       => $hash,
+    method     => "GET",
+    header     => $header,  
+    callback   => \&getMowerResponseWs,
+    t_begin    => scalar gettimeofday()
+  } );
+
+  return undef;
+}
+
+#########################
+sub getMowerResponseWs {
+
+  my ( $param, $err, $data ) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  my $statuscode = $param->{code} // '';
+  my $iam = "$type $name getMowerResponseWs:";
+
+  Log3 $name, 1, "$iam response time ". sprintf( "%.2f", ( gettimeofday() - $param->{t_begin} ) ) . ' s' if ( $param->{timeout} == 60 );
+  Log3 $name, 5, "$iam response polling after status-event \$statuscode >$statuscode<, \$err >$err<, \$param->url $param->{url} \n \$data >$data<";
+
+  if( !$err && $statuscode == 200 && $data) {
+
+    if ( $data eq '' ) {
+
+      Log3 $name, 2, "$iam no mower data present";
+
+    } else {
+
+      my $result = eval { JSON::XS->new->utf8( not $::unicodeEncoding )->decode( $data ) };
+
+      if ($@) {
+
+        Log3( $name, 2, "$iam - JSON error while request: $@");
+
+      } else {
+
+        $hash->{helper}{wsResult}{mower} = dclone( $result->{data} ) if ( AttrVal($name, 'debug', '') );
+        $hash->{helper}{mower}{attributes}{statistics} = dclone( $result->{data}{attributes}{statistics} );
+
+        if ( $hash->{helper}{use_position_polling} && $hash->{helper}{mower}{attributes}{capabilities}{position} ) {
+
+          my $cnt = 0;
+          my $tmp = [];
+          my $poslen = @{ $result->{data}{attributes}{positions} };
+
+          for ( $cnt = 0; $cnt < $poslen; $cnt++ ) { 
+
+            if (   $hash->{helper}{searchpos}[ 0 ]{longitude} == $result->{data}{attributes}{positions}[ $cnt ]{longitude}
+                && $hash->{helper}{searchpos}[ 0 ]{latitude} == $result->{data}{attributes}{positions}[ $cnt ]{latitude} || $cnt == $poslen -1) { # if nothing found take all
+
+              if ( $cnt > 0 ) {
+
+                my @ar;
+                push @ar, @{ $result->{data}{attributes}{positions} }[ 0 .. $cnt-1 ];
+                $hash->{helper}{mower}{attributes}{positions} = dclone( \@ar );
+                
+                AlignArray( $hash );
+                FW_detailFn_Update ($hash);
+
+              } else {
+
+                $hash->{helper}{mower}{attributes}{positions} = [];
+
+              }
+
+              last;
+
+            }
+
+          }
+
+        $hash->{helper}{searchpos} = [ dclone $result->{data}{attributes}{positions}[ 0 ] ];
+
+        }
+
+        isErrorThanPrepare( $hash );
+        resetLastErrorIfCorrected( $hash );
+
+        # Update readings
+        readingsBeginUpdate($hash);
+
+          fillReadings( $hash );
+          # readingsBulkUpdate( $hash, 'mower_wsEvent', $hash->{helper}{wsResult}{type} ); #to do check what event
+          readingsBulkUpdate( $hash, 'mower_wsEvent', 'status-event' );
+          readingsBulkUpdateIfChanged( $hash, 'device_state', 'connected' );
+
+        readingsEndUpdate($hash, 1);
+
+        return undef;
+
+      }
+
+    }
+    
+  } else {
+
+    readingsSingleUpdate( $hash, 'device_state', "additional Polling error statuscode $statuscode", 1 );
+    Log3 $name, 1, "$iam \$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}";
+
+  }
+
   return undef;
 
 }
@@ -1165,7 +1178,7 @@ sub Set {
     return undef;
 
   ##########
-  } elsif ( $setName eq 'chargingStationPositionToAttribute' ) {
+  } elsif ( $setName eq 'chargingStationPositionToAttribute' && $hash->{helper}{mower}{attributes}{capabilities}{position} ) {
 
     my $xm = $hash->{helper}{chargingStation}{longitude} // 10.1165;
     my $ym = $hash->{helper}{chargingStation}{latitude} // 51.28;
@@ -1173,14 +1186,14 @@ sub Set {
     return undef;
 
   ##########
-  } elsif ( $setName eq 'defaultDesignAttributesToAttribute' ) {
+  } elsif ( $setName eq 'defaultDesignAttributesToAttribute' && $hash->{helper}{mower}{attributes}{capabilities}{position} ) {
 
     my $design = $hash->{helper}{mapdesign};
     CommandAttr( $hash, "$name mapDesignAttributes $design" );
     return undef;
 
   ##########
-  } elsif ( $setName eq 'mapZonesTemplateToAttribute' ) {
+  } elsif ( $setName eq 'mapZonesTemplateToAttribute' && $hash->{helper}{mower}{attributes}{capabilities}{position} ) {
 
     my $tpl = $hash->{helper}{mapZonesTpl};
     CommandAttr( $hash, "$name mapZones $tpl" );
@@ -1190,7 +1203,11 @@ sub Set {
   } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName eq 'mowerScheduleToAttribute' ) {
 
     my $calendarjson = eval {
-      JSON::XS->new->pretty(1)->encode ($hash->{helper}{mower}{attributes}{calendar}{tasks});
+      require JSON::PP;
+      my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9,workAreaId=>10);
+      JSON::PP->new->sort_by(
+        sub {($ORDER{$JSON::PP::a} // 999) <=> ($ORDER{$JSON::PP::b} // 999) or $JSON::PP::a cmp $JSON::PP::b})
+        ->pretty(1)->utf8( not $unicodeEncoding )->encode( $hash->{helper}{mower}{attributes}{calendar}{tasks} )
     };
     return "$iam $@" if ($@);
     
@@ -1226,7 +1243,16 @@ sub Set {
     }
 
   ##########
-  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName eq 'headlight' ) {
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^cuttingHeight$/ && defined $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} ) {
+    if ( $setVal =~ /^(\d+)$/) {
+
+      CMD($hash ,$setName, $setVal);
+      return undef;
+
+    }
+
+  ##########
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName eq 'headlight' && $hash->{helper}{mower}{attributes}{capabilities}{headlights}) {
     if ( $setVal =~ /^(ALWAYS_OFF|ALWAYS_ON|EVENING_ONLY|EVENING_AND_NIGHT)$/) {
 
       CMD($hash ,$setName, $setVal);
@@ -1256,14 +1282,14 @@ sub Set {
   ##########
   } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName eq "sendJsonScheduleToAttribute" ) {
 
-    my $calendarjson = eval { decode_json ( $setVal ) };
+    my $calendarjson = eval { JSON::XS->new->decode ( $setVal ) };
     return "$iam decode error: $@ \n $setVal" if ($@);
     $calendarjson = eval {
       require JSON::PP;
-      my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9);
+      my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9,workAreaId=>10);
       JSON::PP->new->sort_by(
         sub {($ORDER{$JSON::PP::a} // 999) <=> ($ORDER{$JSON::PP::b} // 999) or $JSON::PP::a cmp $JSON::PP::b})
-        ->pretty(1)->encode( $calendarjson )
+        ->pretty(1)->utf8( not $unicodeEncoding )->encode( $calendarjson )
     };
     return "$iam encode error: $@ in \$calendarjson" if ($@);
     CommandAttr($hash,"$name mowerSchedule $calendarjson");
@@ -1283,13 +1309,14 @@ sub Set {
     return undef;
 
   ##########
-  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^(StartInWorkArea|cuttingHeightInWorkArea)$/ && AttrVal( $name, 'testing', '' ) ) {
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/
+    && $setName =~ /^(StartInWorkArea|cuttingHeightInWorkArea)$/ && $hash->{helper}{mower}{attributes}{capabilities}{workAreas} && AttrVal( $name, 'testing', '' ) ) {
 
     ( $setVal, $setVal2 ) = $setVal =~ /(.*),(\d+)/ if ( $setVal =~/,/ && ! defined( $setVal2 ) );
     my $id = undef;
     $id = name2id( $hash, $setVal, 'workAreas' ) if ( $setVal !~ /^(\d+)$/ );
     $setVal = $id // $setVal;
-    if ( $setVal =~ /^(\d+)$/ && ( $setVal2 =~ /^(\d+)$/ or !$setVal2 ) ) { #  && $hash->{helper}{mower}{attributes}{capabilities}{workAreas}
+    if ( $setVal =~ /^(\d+)$/ && ( $setVal2 =~ /^(\d+)$/ or !$setVal2 ) ) { # 
 
       CMD($hash ,$setName, $setVal, $setVal2);
       return undef;
@@ -1299,13 +1326,14 @@ sub Set {
     Log3 $name, 2, "$iam $setName : no valid Id or zone name for $setVal .";
 
   ##########
-  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /^stayOutZone$/ && AttrVal( $name, 'testing', '' ) ) {
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/
+    && $setName =~ /^stayOutZone$/ && $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones} && AttrVal( $name, 'testing', '' ) ) {
 
     ( $setVal, $setVal2 ) = $setVal =~ /(.*),(enable|disable)/ if ( $setVal =~/,/ && ! defined( $setVal2 ) );
     my $id = undef;
     $id = name2id( $hash, $setVal, 'stayOutZones' ) if ( $setVal !~ /\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b/ );
     $setVal = $id // $setVal;
-    if ( $setVal =~ /\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b/ ) { #  && $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones}
+    if ( $setVal =~ /\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b/ ) {
 
       $setVal2 = $setVal2 eq 'enable' ? 'true' : 'false';
       CMD($hash ,$setName, $setVal, $setVal2);
@@ -1318,8 +1346,10 @@ sub Set {
   }
   ##########
   my $ret = " getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,30,30,600,0,lin Park:selectnumbers,30,30,600,0,lin ResumeSchedule:noArg getUpdate:noArg client_secret ";
-  $ret .= "chargingStationPositionToAttribute:noArg headlight:ALWAYS_OFF,ALWAYS_ON,EVENING_ONLY,EVENING_AND_NIGHT cuttingHeight:1,2,3,4,5,6,7,8,9 mowerScheduleToAttribute:noArg ";
-  $ret .= "sendScheduleFromAttributeToMower:noArg defaultDesignAttributesToAttribute:noArg mapZonesTemplateToAttribute:noArg ";
+  $ret .= "mowerScheduleToAttribute:noArg sendScheduleFromAttributeToMower:noArg ";
+  $ret .= "cuttingHeight:1,2,3,4,5,6,7,8,9 " if ( defined $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} );
+  $ret .= "defaultDesignAttributesToAttribute:noArg mapZonesTemplateToAttribute:noArg chargingStationPositionToAttribute:noArg " if ( $hash->{helper}{mower}{attributes}{capabilities}{position} );
+  $ret .= "headlight:ALWAYS_OFF,ALWAYS_ON,EVENING_ONLY,EVENING_AND_NIGHT " if ( $hash->{helper}{mower}{attributes}{capabilities}{headlights} );
 
   ##########
   if ( $hash->{helper}{mower}{attributes}{capabilities}{workAreas} && defined ( $hash->{helper}{mower}{attributes}{workAreas} ) && AttrVal( $name, 'testing', '' ) ) {
@@ -1396,27 +1426,24 @@ my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nA
   elsif ($cmd[0] eq "confirmError")    { $json = '{}'; $post = 'errors/confirm' }
   elsif ($cmd[0] eq "sendScheduleFromAttributeToMower" && AttrVal( $name, 'mowerSchedule', '')) {
 
-    my $perl = eval { decode_json (AttrVal( $name, 'mowerSchedule', '')) };
-    if ($@) {
-      return "$iam decode error: $@ \n $perl";
-    }
-    my $jsonSchedule = eval { encode_json ($perl) };
-    if ($@) {
-      return "$iam encode error: $@ \n $json";
-    }
+    my $perl = eval { JSON::XS->new->decode (AttrVal( $name, 'mowerSchedule', '')) };
+    return "$iam decode error: $@ \n $perl" if ($@);
+    
+    my $jsonSchedule = eval { JSON::XS->new->utf8( not $unicodeEncoding )->encode ($perl) };
+    return "$iam encode error: $@ \n $jsonSchedule" if ($@);
+    
+    $hash->{helper}{mower_commandSend} .= ' '. $jsonSchedule;
     $json = '{"data":{"type": "calendar","attributes":{"tasks":'.$jsonSchedule.'}}}'; 
     $post = 'calendar';
   }
   elsif ($cmd[0] eq "sendJsonScheduleToMower" && $cmd[1]) {
 
-    my $perl = eval { decode_json ( $cmd[1] ) };
-    if ($@) {
-      return "$iam decode error: $@ \n $perl";
-    }
-    my $jsonSchedule = eval { encode_json ($perl) };
-    if ($@) {
-      return "$iam encode error: $@ \n $json";
-    }
+    my $perl = eval { JSON::XS->new->decode ( $cmd[1] ) };
+    return "$iam decode error: $@ \n $perl" if ($@);
+
+    my $jsonSchedule = eval { JSON::XS->new->utf8( not $unicodeEncoding )->encode ($perl) };
+    return "$iam encode error: $@ \n $jsonSchedule" if ($@);
+
     $json = '{"data":{"type": "calendar","attributes":{"tasks":'.$jsonSchedule.'}}}'; 
     $post = 'calendar';
   }
@@ -1447,11 +1474,11 @@ sub CMDResponse {
   my $iam = "$type $name CMDResponse:";
 
   Log3 $name, 1, "$iam response time ". sprintf( "%.2f", ( gettimeofday() - $param->{t_begin} ) ) . ' s' if ( $param->{timeout} == 60 );
-  Log3 $name, 1, "\ndebug $iam \n\$statuscode >$statuscode<\n\$err >$err<,\n \$data >$data< \n\$param->url $param->{url}" if ( AttrVal($name, 'debug', '') );
+  Log3 $name, 5, "$iam \n\$statuscode >$statuscode<\n\$err >$err<,\n \$data >$data< \n\$param->url $param->{url}";
 
   if( !$err && $statuscode == 202 && $data ) {
 
-    my $result = eval { decode_json($data) };
+    my $result = eval { JSON::XS->new->decode($data) };
     if ($@) {
 
       Log3( $name, 2, "$iam - JSON error while request: $@");
@@ -1494,7 +1521,7 @@ sub CMDResponse {
 
   readingsEndUpdate($hash, 1);
 
-  Log3 $name, 2, "\n$iam \n\$statuscode >$statuscode<\n\$err >$err<,\n\$data >$data<\n\$param->{url} >$param->{url}<\n\$param->{data} >$param->{data}<";
+  Log3 $name, 2, "$iam \n\$statuscode >$statuscode<\n\$err >$err<,\n\$data >$data<\n\$param->{url} >$param->{url}<\n\$param->{data} >$param->{data}<";
   return undef;
 }
 
@@ -1562,7 +1589,7 @@ sub Attr {
 
     if( $cmd eq "set" ) {
 
-      my $perl = eval { decode_json ( $attrVal ) };
+      my $perl = eval { JSON::XS->new->decode ( $attrVal ) };
       return "$iam $cmd $attrName decode error: $@ \n $attrVal" if ($@);
       Log3 $name, 4, "$iam $cmd $attrName";
 
@@ -1766,12 +1793,12 @@ sub Attr {
   } elsif( $attrName eq "mowerSchedule" ) {
     if( $cmd eq "set" ) {
 
-      my $perl = eval { decode_json ($attrVal) };
+      my $perl = eval { JSON::XS->new->decode ($attrVal) };
       return "$iam $cmd $attrName decode error: $@ \n $perl" if ($@);
 
       $attrVal = eval {
         require JSON::PP;
-        my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9);
+        my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9,workAreaId=>10);
         JSON::PP->new->sort_by(
           sub {($ORDER{$JSON::PP::a} // 999) <=> ($ORDER{$JSON::PP::b} // 999) or $JSON::PP::a cmp $JSON::PP::b})
           ->pretty(1)->encode( $perl )
@@ -1787,7 +1814,7 @@ sub Attr {
 
       my $longitude = 10;
       my $latitude = 52;
-      my $perl = eval { decode_json ($attrVal) };
+      my $perl = eval { JSON::XS->new->decode ($attrVal) };
 
       return "$iam $cmd $attrName decode error: $@ \n $attrVal" if ($@);
 
@@ -1975,15 +2002,20 @@ sub isErrorThanPrepare {
 
   if ( $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} ) {
 
-    if ( ( $hash->{helper}{lasterror}{timestamp} != $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} ) && @{ $hash->{helper}{areapos} } > 1) {
+    if ( ( $hash->{helper}{lasterror}{timestamp} != $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} ) ) {
+
+      if ( $hash->{helper}{mower}{attributes}{capabilities}{position} && @{ $hash->{helper}{areapos} } > 1 ) {
+
+        $hash->{helper}{areapos}[ 0 ]{act} = 'N';
+        $hash->{helper}{areapos}[ 1 ]{act} = 'N';
+        $hash->{helper}{lasterror}{positions} = [ dclone( $hash->{helper}{areapos}[ 0 ] ), dclone( $hash->{helper}{areapos}[ 1 ] ) ];
+
+      }
 
       my $ect = $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp};
-      $hash->{helper}{areapos}[ 0 ]{act} = 'N';
-      $hash->{helper}{areapos}[ 1 ]{act} = 'N';
-      $hash->{helper}{lasterror}{positions} = [ dclone( $hash->{helper}{areapos}[ 0 ] ), dclone( $hash->{helper}{areapos}[ 1 ] ) ];
       $hash->{helper}{lasterror}{timestamp} = $ect;
       my $errc = $hash->{helper}{mower}{attributes}{mower}{errorCode};
-      $hash->{helper}{lasterror}{errordesc} = $::FHEM::Devices::AMConnect::Common::errortable->{$errc};
+      $hash->{helper}{lasterror}{errordesc} = $errortable->{$errc};
       $hash->{helper}{lasterror}{errordate} = FmtDateTimeGMT( $ect / 1000 );
       $hash->{helper}{lasterror}{errorstate} = $hash->{helper}{mower}{attributes}{mower}{state};
       $hash->{helper}{lasterror}{errorzone} = $hash->{helper}{currentZone} if ( defined( $hash->{helper}{currentZone} ) );
@@ -1991,7 +2023,7 @@ sub isErrorThanPrepare {
       my $tmp = dclone( $hash->{helper}{lasterror} );
       unshift ( @{ $hash->{helper}{errorstack} }, $tmp );
       pop ( @{ $hash->{helper}{errorstack} } ) if ( @{ $hash->{helper}{errorstack} } > $hash->{helper}{errorstackmax} );
-      ::FHEM::Devices::AMConnect::Common::FW_detailFn_Update ($hash);
+      FW_detailFn_Update ($hash);
 
     }
 
@@ -2011,7 +2043,7 @@ sub resetLastErrorIfCorrected {
     $hash->{helper}{lasterror}{errordesc} = '-';
     $hash->{helper}{lasterror}{errordate} = '';
     $hash->{helper}{lasterror}{errorstate} = '';
-    ::FHEM::Devices::AMConnect::Common::FW_detailFn_Update ($hash);
+    FW_detailFn_Update ($hash);
 
   }
 
@@ -2234,10 +2266,10 @@ sub GetJson() {
     my $name   = $2;
     my $hash = $::defs{$name};
     my $jsonMime = "application/json";
-    my $jsonData = eval { encode_json ( $hash->{helper}{mapupdate} ) };
+    my $jsonData = eval { JSON::XS->new->encode ( $hash->{helper}{mapupdate} ) };
     if ($@) {
 
-      Log3 $name, 2, "$type $name encode_json error: $@";
+      Log3 $name, 2, "$type $name encode error: $@";
       return ( "text/plain; charset=utf-8", "No AutomowerConnect device for webhook $request" );
 
     }
@@ -2370,7 +2402,8 @@ sub fillReadings {
   readingsBulkUpdateIfChanged( $hash, $pref."_name", $hash->{helper}{mower}{attributes}{$pref}{name} );
   my $model = $hash->{helper}{mower}{attributes}{$pref}{model};
   $model =~ s/AUTOMOWER./AM/;
-  $hash->{MODEL} = $model if ( $model && $hash->{MODEL} ne $model );
+  readingsBulkUpdateIfChanged( $hash, "model", $model );
+  # $hash->{MODEL} = $model if ( $model && $hash->{MODEL} ne $model );
   $pref = 'planner';
   readingsBulkUpdateIfChanged( $hash, "planner_restrictedReason", $hash->{helper}{mower}{attributes}{$pref}{restrictedReason} );
   readingsBulkUpdateIfChanged( $hash, "planner_overrideAction", $hash->{helper}{mower}{attributes}{$pref}{override}{action} ) if ( $hash->{helper}{mower}{attributes}{$pref}{override}{action} );
@@ -2382,10 +2415,10 @@ sub fillReadings {
   $pref = 'statistics';
   my $noCol = $hash->{helper}{statistics}{currentDayCollisions};
   readingsBulkUpdateIfChanged( $hash, $pref."_numberOfCollisions", '(' . $noCol . '/' . $hash->{helper}{statistics}{lastDayCollisions} . '/' . $hash->{helper}{mower}{attributes}{$pref}{numberOfCollisions} . ')' );
-  readingsBulkUpdateIfChanged( $hash, $pref."_newGeoDataSets", $hash->{helper}{newdatasets} );
+  readingsBulkUpdateIfChanged( $hash, $pref."_newGeoDataSets", $hash->{helper}{newdatasets} ) if ( $hash->{helper}{mower}{attributes}{capabilities}{position} );
   $pref = 'settings';
-  readingsBulkUpdateIfChanged( $hash, $pref."_headlight", $hash->{helper}{mower}{attributes}{$pref}{headlight}{mode} );
-  readingsBulkUpdateIfChanged( $hash, $pref."_cuttingHeight", $hash->{helper}{mower}{attributes}{$pref}{cuttingHeight} );
+  readingsBulkUpdateIfChanged( $hash, $pref."_headlight", $hash->{helper}{mower}{attributes}{$pref}{headlight}{mode} ) if ( $hash->{helper}{mower}{attributes}{capabilities}{headlights} );
+  readingsBulkUpdateIfChanged( $hash, $pref."_cuttingHeight", $hash->{helper}{mower}{attributes}{$pref}{cuttingHeight} ) if ( defined $hash->{helper}{mower}{attributes}{$pref}{cuttingHeight} );
   $pref = 'status';
   my $connected = $hash->{helper}{mower}{attributes}{metadata}{connected};
   readingsBulkUpdateIfChanged( $hash, $pref."_connected", ( $connected ? "CONNECTED($connected)"  : "OFFLINE($connected)") );
@@ -2402,16 +2435,19 @@ sub calculateStatistics {
   my $name = $hash->{NAME};
   my @time = localtime();
 
-  $hash->{helper}{statistics}{lastDayTrack} = $hash->{helper}{statistics}{currentDayTrack};
-  $hash->{helper}{statistics}{lastDayArea} = $hash->{helper}{statistics}{currentDayArea};
-  $hash->{helper}{statistics}{lastDayTime} = $hash->{helper}{statistics}{currentDayTime};
   $hash->{helper}{statistics}{lastDayCollisions} = $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions} - $hash->{helper}{statistics}{numberOfCollisionsOld};
   $hash->{helper}{statistics}{numberOfCollisionsOld} = $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions};
-  
-  $hash->{helper}{statistics}{currentWeekTrack} += $hash->{helper}{statistics}{currentDayTrack};
-  $hash->{helper}{statistics}{currentWeekArea} += $hash->{helper}{statistics}{currentDayArea};
-  $hash->{helper}{statistics}{currentWeekTime} += $hash->{helper}{statistics}{currentDayTime};
   $hash->{helper}{statistics}{currentWeekCollisions} += $hash->{helper}{statistics}{lastDayCollisions};
+
+  if ( $hash->{helper}{mower}{attributes}{capabilities}{position} ) {
+    $hash->{helper}{statistics}{lastDayTrack} = $hash->{helper}{statistics}{currentDayTrack};
+    $hash->{helper}{statistics}{lastDayArea} = $hash->{helper}{statistics}{currentDayArea};
+    $hash->{helper}{statistics}{lastDayTime} = $hash->{helper}{statistics}{currentDayTime};
+    $hash->{helper}{statistics}{currentWeekTrack} += $hash->{helper}{statistics}{currentDayTrack};
+    $hash->{helper}{statistics}{currentWeekArea} += $hash->{helper}{statistics}{currentDayArea};
+    $hash->{helper}{statistics}{currentWeekTime} += $hash->{helper}{statistics}{currentDayTime};
+  }
+
   $hash->{helper}{statistics}{currentDayTrack} = 0;
   $hash->{helper}{statistics}{currentDayArea} = 0;
   $hash->{helper}{statistics}{currentDayTime} = 0;
@@ -2627,11 +2663,13 @@ sub listMowerData {
     $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{planner}{restrictedReason} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{planner}{restrictedReason} . ' </td><td>  </td></tr>';
     $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{metadata}{connected} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{metadata}{connected} . ' </td><td>  </td></tr>';
     $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} . ' </td><td> ms </td></tr>';
-    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{positions}[0]{longitude} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{positions}[0]{longitude} . ' </td><td> decimal degree </td></tr>';
-    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{positions}[0]{latitude} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{positions}[0]{latitude} . ' </td><td> decimal degree </td></tr>';
-    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} . ' </td><td>  </td></tr>';
-    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{settings}{headlight}{mode} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{settings}{headlight}{mode} . ' </td><td>  </td></tr>';
-  #  $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{cuttingBladeUsageTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{cuttingBladeUsageTime} . ' </td><td>  </td></tr>';
+     if ( $hash->{helper}{mower}{attributes}{capabilities}{position} ) {
+      $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{positions}[0]{longitude} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{positions}[0]{longitude} . ' </td><td> decimal degree </td></tr>';
+      $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{positions}[0]{latitude} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{positions}[0]{latitude} . ' </td><td> decimal degree </td></tr>';
+    }
+    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} . ' </td><td>  </td></tr>' if ( defined $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} );
+    $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{settings}{headlight}{mode} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{settings}{headlight}{mode} . ' </td><td>  </td></tr>' if ( $hash->{helper}{mower}{attributes}{settings}{headlight}{mode} );
+   $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{cuttingBladeUsageTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{cuttingBladeUsageTime} . ' </td><td>  </td></tr>' if ( defined $hash->{helper}{mower}{attributes}{statistics}{cuttingBladeUsageTime} );
     $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{numberOfChargingCycles} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{numberOfChargingCycles} . ' </td><td>  </td></tr>';
     $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions} . ' </td><td>  </td></tr>';
     $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> $hash->{helper}{mower}{attributes}{statistics}{totalChargingTime} &emsp;</td><td> ' . $hash->{helper}{mower}{attributes}{statistics}{totalChargingTime} . ' </td><td> s </td></tr>';
@@ -2862,6 +2900,21 @@ sub getTpFile {
 }
 
 #########################
+sub getDefaultScheduleAsJSON {
+  my ( $name ) = @_;
+  my $hash = $defs{$name};
+  my $json = eval {
+    require JSON::PP;
+    my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9,workAreaId=>10);
+    JSON::PP->new->sort_by(
+      sub {($ORDER{$JSON::PP::a} // 999) <=> ($ORDER{$JSON::PP::b} // 999) or $JSON::PP::a cmp $JSON::PP::b})
+      ->utf8( not $unicodeEncoding )->encode( $hash->{helper}{mower}{attributes}{calendar}{tasks} )
+  };
+  return "$name getDefaultScheduleAsJSON: $@" if ($@);
+  return $json;
+}
+
+#########################
 sub getDesignAttr {
   my ( $hash ) = @_;
   my $name = $hash->{NAME};             
@@ -2965,7 +3018,7 @@ sub wsRead {
     $buf =~ s/}\{/},{/g;
     $buf = "[${buf}]";
 
-    my $bufres = eval { decode_json( $buf ) };
+    my $bufres = eval { JSON::XS->new->decode( $buf ) };
 
     if ( $@ ) {
 
