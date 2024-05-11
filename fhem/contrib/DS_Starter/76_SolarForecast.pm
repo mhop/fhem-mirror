@@ -158,7 +158,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.18.0" => "07.05.2024  add secondary level of the bar chart, new attr graphicBeam3Content, graphicBeam4Content ".
+  "1.19.0" => "11.05.2024  conprice, feedprice saved in pvHistory, graphicBeamXContent: energycosts, feedincome available ",
+  "1.18.0" => "08.05.2024  add secondary level of the bar chart, new attr graphicBeam3Content, graphicBeam4Content ".
                            "graphicBeam3Color, graphicBeam4Color, graphicBeam3FontColor, graphicBeam4FontColor ".
                            "value consumption available for attr graphicBeamXContent ".
                            "rename graphicBeamHeight to graphicBeamHeightLevel1 ",
@@ -1045,6 +1046,8 @@ my %hfspvh = (
   totalrain         => { fn => \&_storeVal, storname => 'rr1c',         validkey => undef,    fpar => undef    },    # Gesamtniederschlag (1-stündig) letzte 1 Stunde
   pvcorrfactor      => { fn => \&_storeVal, storname => 'pvcorrf',      validkey => undef,    fpar => undef    },    # pvCorrectionFactor
   temperature       => { fn => \&_storeVal, storname => 'temp',         validkey => undef,    fpar => undef    },    # Außentemperatur
+  conprice          => { fn => \&_storeVal, storname => 'conprice',     validkey => undef,    fpar => undef    },    # Bezugspreis pro kWh der Stunde 
+  feedprice         => { fn => \&_storeVal, storname => 'feedprice',    validkey => undef,    fpar => undef    },    # Einspeisevergütung pro kWh der Stunde 
   batinthishour     => { fn => \&_storeVal, storname => 'batin',        validkey => undef,    fpar => 'comp99' },    # Batterieladung in Stunde
   batoutthishour    => { fn => \&_storeVal, storname => 'batout',       validkey => undef,    fpar => 'comp99' },    # Batterieentladung in Stunde
   pvfc              => { fn => \&_storeVal, storname => 'pvfc',         validkey => undef,    fpar => 'comp99' },    # prognostizierter Energieertrag
@@ -1147,10 +1150,10 @@ sub Initialize {
                                 "graphicBeam2Color:colorpicker,RGB ".
                                 "graphicBeam3Color:colorpicker,RGB ".
                                 "graphicBeam4Color:colorpicker,RGB ".
-                                "graphicBeam1Content:pvForecast,pvReal,gridconsumption,consumption,consumptionForecast ".
-                                "graphicBeam2Content:pvForecast,pvReal,gridconsumption,consumption,consumptionForecast ".
-                                "graphicBeam3Content:pvForecast,pvReal,gridconsumption,consumption,consumptionForecast ".
-                                "graphicBeam4Content:pvForecast,pvReal,gridconsumption,consumption,consumptionForecast ".
+                                "graphicBeam1Content:pvReal,pvForecast,consumption,consumptionForecast,gridconsumption,energycosts,feedincome ".
+                                "graphicBeam2Content:pvReal,pvForecast,consumption,consumptionForecast,gridconsumption,energycosts,feedincome ".
+                                "graphicBeam3Content:pvReal,pvForecast,consumption,consumptionForecast,gridconsumption,energycosts,feedincome ".
+                                "graphicBeam4Content:pvReal,pvForecast,consumption,consumptionForecast,gridconsumption,energycosts,feedincome ".
                                 "graphicBeam1FontColor:colorpicker,RGB ".
                                 "graphicBeam2FontColor:colorpicker,RGB ".
                                 "graphicBeam3FontColor:colorpicker,RGB ".
@@ -7780,8 +7783,10 @@ sub _transferMeterValues {
   my ($ft,$ftunit) = split ":", $h->{feedtotal};                                              # Readingname/Unit für Einspeisung total
 
   return if(!$gc || !$gf || !$gt || !$ft);
+  
+  my $nhour = $chour + 1;
 
-  if ($h->{conprice}) {                                                                       # Bezugspreis (Arbeitspreis) pro kWh
+  if ($h->{conprice}) {                                                                        # Bezugspreis (Arbeitspreis) pro kWh
       my @acp = split ":", $h->{conprice};
       
       if (scalar(@acp) == 3) {
@@ -7791,7 +7796,7 @@ sub _transferMeterValues {
       
       if (scalar(@acp) == 2) {
           if (isNumeric($acp[0])) {
-              $data{$type}{$name}{current}{ePurchasePrice}     = $acp[0];
+              $data{$type}{$name}{current}{ePurchasePrice}    = $acp[0];
               $data{$type}{$name}{current}{ePurchasePriceCcy} = $acp[1];
           }
           else {
@@ -7799,6 +7804,13 @@ sub _transferMeterValues {
               $data{$type}{$name}{current}{ePurchasePriceCcy} = $acp[1];             
           }          
       }
+      
+      writeToHistory ( { paref => $paref,                                                      # Bezugspreis in pvHistory speichern
+                         key   => 'conprice', 
+                         val   => CurrentVal ($hash, 'ePurchasePrice', 0), 
+                         hour  => $nhour 
+                       } 
+                     );
   }
   
   if ($h->{feedprice}) {                                                                       # Einspeisevergütung pro kWh
@@ -7819,6 +7831,13 @@ sub _transferMeterValues {
               $data{$type}{$name}{current}{eFeedInTariffCcy} = $afp[1];             
           }          
       }
+      
+      writeToHistory ( { paref => $paref,                                                      # Einspeisevergütung in pvHistory speichern
+                         key   => 'feedprice', 
+                         val   => CurrentVal ($hash, 'eFeedInTariff', 0), 
+                         hour  => $nhour 
+                       } 
+                     );
   }
 
   $gfunit //= $gcunit;
@@ -7904,7 +7923,6 @@ sub _transferMeterValues {
           $gctotthishour = 0;
       }
 
-      my $nhour = $chour + 1;
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_GridConsumption', $gctotthishour.' Wh');
       $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{gcons} = $gctotthishour;                  # Hilfshash Wert Bezug (Wh) Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
       
@@ -7935,7 +7953,6 @@ sub _transferMeterValues {
           $gftotthishour = 0;
       }
 
-      my $nhour = $chour+1;
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_GridFeedIn', $gftotthishour.' Wh');
       $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{gfeedin} = $gftotthishour;
       
@@ -12526,7 +12543,7 @@ return $ctable;
 }
 
 ################################################################
-#    Werte aktuelle Stunde für forecastGraphic
+#    Werte erste Stunde in Balkengrafik
 ################################################################
 sub _beamGraphicFirstHour {
   my $paref     = shift;
@@ -12541,52 +12558,44 @@ sub _beamGraphicFirstHour {
 
   my $stt                              = NexthoursVal ($hash, "NextHour00", "starttime", '0000-00-00 24');
   my ($year,$month,$day_str,$thishour) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-  my ($val1,$val2,$val3,$val4,$val5)   = (0,0,0,0,0);
+  
+  my ($val1,$val2,$val3,$val4,$val5,$val6,$val7);
 
   $thishour++;
 
   $hfcg->{0}{time_str} = $thishour;
-  $thishour            = int($thishour);                                                                    # keine führende Null
+  $thishour            = int($thishour);                                                           # keine führende Null
 
   $hfcg->{0}{time}     = $thishour;
   $hfcg->{0}{day_str}  = $day_str;
   $day                 = int($day_str);
   $hfcg->{0}{day}      = $day;
-  $hfcg->{0}{mktime}   = fhemTimeLocal(0,0,$thishour,$day,int($month)-1,$year-1900);                        # gleich die Unix Zeit dazu holen
+  $hfcg->{0}{mktime}   = fhemTimeLocal (0,0,$thishour,$day,int($month)-1,$year-1900);               # gleich die Unix Zeit dazu holen
+  $hfcg->{0}{time}    += $offset;
 
-  #if ($offset) {
-      $hfcg->{0}{time} += $offset;
+  if ($hfcg->{0}{time} < 0) {
+      $hfcg->{0}{time}   += 24;
+      my $n_day           = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs($offset)));   # Achtung : Tageswechsel - day muss jetzt neu berechnet werden !
+      $hfcg->{0}{day}     = int($n_day);
+      $hfcg->{0}{day_str} = $n_day;
+  }
 
-      if ($hfcg->{0}{time} < 0) {
-          $hfcg->{0}{time}   += 24;
-          my $n_day           = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs($offset)));       # Achtung : Tageswechsel - day muss jetzt neu berechnet werden !
-          $hfcg->{0}{day}     = int($n_day);
-          $hfcg->{0}{day_str} = $n_day;
-      }
+  $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time});
 
-      $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time});
+  $val1 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvfc',  0);
+  $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvrl',  0);
+  $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gcons', 0);
+  $val4 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'confc', 0);
+  $val5 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'con',   0);
+  $val6 = sprintf "%.2f", (HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'conprice',  0) * 
+                           $val3 / 1000);                                                                          # Energiekosten der Stunde
+  $val7 = sprintf "%.2f", (HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'feedprice', 0) * 
+                           HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gfeedin',   0) / 1000);  # Einspeisevergütung der Stunde
 
-      $val1 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvfc',  0);
-      $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvrl',  0);
-      $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gcons', 0);
-      $val4 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'confc', 0);
-      $val5 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'con',   0);
-
-      $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'weatherid', 999);
-      $hfcg->{0}{wcc}     = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'wcc',       '-');
-      $hfcg->{0}{sunalt}  = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunalt',    '-');
-      $hfcg->{0}{sunaz}   = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunaz',     '-');
-  #}
-  #else {
-  #    $val1 = CircularVal ($hash, $hfcg->{0}{time_str}, 'pvfc',  0);
-  #    $val2 = CircularVal ($hash, $hfcg->{0}{time_str}, 'pvrl',  0);
-  #    $val3 = CircularVal ($hash, $hfcg->{0}{time_str}, 'gcons', 0);
-  #    $val4 = CircularVal ($hash, $hfcg->{0}{time_str}, 'confc', 0);
-  #    $val5 = CircularVal ($hash, $hfcg->{0}{time_str}, 'con',   0);   # Wert con fehlt noch in pvCircular!
-
-  #    $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, 'weatherid', 999);
-  #    #$val4   = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : 999;
-  #}
+  $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'weatherid', 999);
+  $hfcg->{0}{wcc}     = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'wcc',       '-');
+  $hfcg->{0}{sunalt}  = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunalt',    '-');
+  $hfcg->{0}{sunaz}   = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunaz',     '-');
 
   $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
   $hfcg->{0}{beam1}    = ($beam1cont eq 'pvForecast')          ? $val1 :
@@ -12594,23 +12603,27 @@ sub _beamGraphicFirstHour {
                          ($beam1cont eq 'gridconsumption')     ? $val3 :
                          ($beam1cont eq 'consumptionForecast') ? $val4 :
                          ($beam1cont eq 'consumption')         ? $val5 :
+                         ($beam1cont eq 'energycosts')         ? $val6 :
+                         ($beam1cont eq 'feedincome')          ? $val7 :
                          undef;
   $hfcg->{0}{beam2}    = ($beam2cont eq 'pvForecast')          ? $val1 :
                          ($beam2cont eq 'pvReal')              ? $val2 :
                          ($beam2cont eq 'gridconsumption')     ? $val3 :
                          ($beam2cont eq 'consumptionForecast') ? $val4 :
                          ($beam2cont eq 'consumption')         ? $val5 :
+                         ($beam2cont eq 'energycosts')         ? $val6 :
+                         ($beam2cont eq 'feedincome')          ? $val7 :
                          undef;
   
   $hfcg->{0}{beam1}  //= 0;
   $hfcg->{0}{beam2}  //= 0;
   $hfcg->{0}{diff}     = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
 
-return ($thishour);
+return $thishour;
 }
 
 ################################################################
-#    Werte restliche Stunden für forecastGraphic
+#    Werte restliche Stunden in Balkengrafik
 ################################################################
 sub _beamGraphicRemainingHours {
   my $paref     = shift;
@@ -12623,17 +12636,17 @@ sub _beamGraphicRemainingHours {
   my $beam2cont = $paref->{beam2cont};
   my $maxVal    = $paref->{maxVal};                                                                     # dyn. Anpassung der Balkenhöhe oder statisch ?
 
-  $maxVal  //= $hfcg->{0}{beam1};                                                                       # Startwert wenn kein Wert bereits via attr vorgegeben ist
+  $maxVal //= $hfcg->{0}{beam1};                                                                        # Startwert wenn kein Wert bereits via attr vorgegeben ist
 
-  my ($val1,$val2,$val3,$val4,$val5);
+  my ($val1,$val2,$val3,$val4,$val5,$val6,$val7);
 
   my $maxCon = $hfcg->{0}{beam1};
   my $maxDif = $hfcg->{0}{diff};                                                                        # für Typ diff
   my $minDif = $hfcg->{0}{diff};                                                                        # für Typ diff
 
   for my $i (1..($maxhours*2)-1) {                                                                      # doppelte Anzahl berechnen    my $val1 = 0;
-      ($val1,$val2,$val3,$val4,$val5) = (0,0,0,0,0);
-      $hfcg->{$i}{time}               = $hfcg->{0}{time} + $i;
+      ($val1,$val2,$val3,$val4,$val5,$val6,$val7) = (0,0,0,0,0,0,0);
+      $hfcg->{$i}{time}                           = $hfcg->{0}{time} + $i;
 
       while ($hfcg->{$i}{time} > 24) {
           $hfcg->{$i}{time} -= 24;                                                                      # wird bis zu 2x durchlaufen
@@ -12655,6 +12668,10 @@ sub _beamGraphicRemainingHours {
               $val3 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'gcons', 0);
               $val4 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'confc', 0);
               $val5 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'con',   0);
+              $val6 = sprintf "%.2f", (HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'conprice',  0) * $val3 / 1000);     # Energiekosten der Stunde
+              $val7 = sprintf "%.2f", (HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'feedprice', 0) * 
+                                       HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'gfeedin',   0) / 1000);             # Einspeisevergütung der Stunde
+
 
               $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'weatherid', 999);
               $hfcg->{$i}{wcc}     = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
@@ -12684,13 +12701,17 @@ sub _beamGraphicRemainingHours {
                               ($beam1cont eq 'pvReal')              ? $val2 :
                               ($beam1cont eq 'gridconsumption')     ? $val3 :
                               ($beam1cont eq 'consumptionForecast') ? $val4 :
-                              ($beam1cont eq 'consumption')         ? $val5 :                              
+                              ($beam1cont eq 'consumption')         ? $val5 :
+                              ($beam1cont eq 'energycosts')         ? $val6 :
+                              ($beam1cont eq 'feedincome')          ? $val7 :                          
                               undef;
       $hfcg->{$i}{beam2}    = ($beam2cont eq 'pvForecast')          ? $val1 :
                               ($beam2cont eq 'pvReal')              ? $val2 :
                               ($beam2cont eq 'gridconsumption')     ? $val3 :
                               ($beam2cont eq 'consumptionForecast') ? $val4 :
                               ($beam2cont eq 'consumption')         ? $val5 :
+                              ($beam2cont eq 'energycosts')         ? $val6 :
+                              ($beam2cont eq 'feedincome')          ? $val7 :
                               undef;
 
       $hfcg->{$i}{beam1} //= 0;
@@ -12710,7 +12731,7 @@ sub _beamGraphicRemainingHours {
       minDif => $minDif,
   };
 
-return ($back);
+return $back;
 }
 
 ################################################################
@@ -12782,7 +12803,7 @@ sub _beamGraphic {
   $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                                 # Neue Zeile mit freiem Platz am Anfang
 
   my $ii = 0;
-
+  
   for my $i (0..($maxhours * 2) - 1) {                                                                          # gleiche Bedingung wie oben
       next if(!$show_night && $hfcg->{$i}{weather} > 99
                            && !$hfcg->{$i}{beam1}
@@ -12790,22 +12811,19 @@ sub _beamGraphic {
       $ii++;
       last if($ii > $maxhours);
 
-      # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen
       $height = 200 if(!$height);                                                                               # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
-      $maxVal = 1   if(!int $maxVal);
+      $maxVal = 1   if(!int $maxVal);                                                                           # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen
       $maxCon = 1   if(!$maxCon);
 
-      # Der zusätzliche Offset durch $fsize verhindert bei den meisten Skins
-      # dass die Grundlinie der Balken nach unten durchbrochen wird
-
+      # Berechnung der Zonen
+      ########################
+      
       if ($lotype eq 'single') {
-          $he = int(($maxVal - $hfcg->{$i}{beam1}) / $maxVal * $height) + $fsize;
+          $he = int(($maxVal - $hfcg->{$i}{beam1}) / $maxVal * $height) + $fsize;                               # Der zusätzliche Offset durch $fsize verhindert bei den meisten Skins dass die Grundlinie der Balken nach unten durchbrochen wird
           $z3 = int($height + $fsize - $he);
       }
 
       if ($lotype eq 'double') {
-          # Berechnung der Zonen
-          ########################
           # he - freier der Raum über den Balken. fsize wird nicht verwendet, da bei diesem Typ keine Zahlen über den Balken stehen
           # z2 - primärer Balkenwert ggf. mit Icon
           # z3 - sekundärer Balkenwert, bei zu kleinem Wert wird der Platz komplett Zone 2 zugeschlagen und nicht angezeigt
@@ -12833,31 +12851,29 @@ sub _beamGraphic {
       }
 
       if ($lotype eq 'diff') {
-          # Berechnung der Zonen
-          ########################
           # he - freier der Raum über den Balken , Zahl positiver Wert + fsize
           # z2 - positiver Balken inkl Icon
           # z3 - negativer Balken
           # z4 - Zahl negativer Wert + fsize
 
           my ($px_pos,$px_neg);
-          my $maxValBeam = 0;                                                                                    # ToDo:  maxValBeam noch aus Attribut graphicBeam1MaxVal ableiten
+          my $maxValBeam = 0;                                                                                   # ToDo:  maxValBeam noch aus Attribut graphicBeam1MaxVal ableiten
 
-          if ($maxValBeam) {                                                                                     # Feste Aufteilung +/- , jeder 50 % bei maxValBeam = 0
+          if ($maxValBeam) {                                                                                    # Feste Aufteilung +/- , jeder 50 % bei maxValBeam = 0
               $px_pos = int($height/2);
-              $px_neg = $height - $px_pos;                                                                       # Rundungsfehler vermeiden
+              $px_neg = $height - $px_pos;                                                                      # Rundungsfehler vermeiden
           }
-          else {                                                                                                 # Dynamische hoch/runter Verschiebung der Null-Linie
-              if ($minDif >= 0 ) {                                                                               # keine negativen Balken vorhanden, die Positiven bekommen den gesammten Raum
+          else {                                                                                                # Dynamische hoch/runter Verschiebung der Null-Linie
+              if ($minDif >= 0 ) {                                                                              # keine negativen Balken vorhanden, die Positiven bekommen den gesammten Raum
                   $px_neg = 0;
                   $px_pos = $height;
               }
               else {
                   if ($maxDif > 0) {
-                      $px_neg = int($height * abs($minDif) / ($maxDif + abs($minDif)));                          # Wieviel % entfallen auf unten ?
+                      $px_neg = int($height * abs($minDif) / ($maxDif + abs($minDif)));                         # Wieviel % entfallen auf unten ?
                       $px_pos = $height - $px_neg;                                                                 # der Rest ist oben
                   }
-                  else {                                                                                         # keine positiven Balken vorhanden, die Negativen bekommen den gesammten Raum
+                  else {                                                                                        # keine positiven Balken vorhanden, die Negativen bekommen den gesammten Raum
                       $px_neg = $height;
                       $px_pos = 0;
                   }
@@ -12885,6 +12901,7 @@ sub _beamGraphic {
 
       ## Erstellung der Balken
       ##########################
+      
       # das style des nächsten TD bestimmt ganz wesentlich das gesammte Design
       # das \n erleichtert das lesen des Seitenquelltext beim debugging
       # vertical-align:bottom damit alle Balken und Ausgaben wirklich auf der gleichen Grundlinie sitzen
@@ -14487,6 +14504,8 @@ sub listDataPool {
           my $sunaz   = HistoryVal ($hash, $day, $key, 'sunaz',       '-');
           my $sunalt  = HistoryVal ($hash, $day, $key, 'sunalt',      '-');
           my $don     = HistoryVal ($hash, $day, $key, 'DoN',         '-');
+          my $conprc  = HistoryVal ($hash, $day, $key, 'conprice',    '-');
+          my $feedprc = HistoryVal ($hash, $day, $key, 'feedprice',   '-');
           
           if ($export eq 'csv') {
               $hexp->{$day}{$key}{PVreal}             = $pvrl;
@@ -14514,13 +14533,17 @@ sub listDataPool {
               $hexp->{$day}{$key}{SunAzimuth}         = $sunaz;
               $hexp->{$day}{$key}{SunAltitude}        = $sunalt;
               $hexp->{$day}{$key}{DayOrNight}         = $don;
+              $hexp->{$day}{$key}{PurchasePrice}      = $conprc;
+              $hexp->{$day}{$key}{FeedInPrice}        = $feedprc;
           }
           
           $ret .= "\n      " if($ret);
           $ret .= $key." => ";
           $ret .= "etotal: $etotal, pvfc: $pvfc, pvrl: $pvrl, pvrlvd: $pvrlvd, rad1h: $rad1h";
           $ret .= "\n            ";
-          $ret .= "confc: $confc, con: $con, gcon: $gcons, gfeedin: $gfeedin";
+          $ret .= "confc: $confc, con: $con, gcon: $gcons, conprice: $conprc";
+          $ret .= "\n            ";
+          $ret .= "gfeedin: $gfeedin, feedprice: $feedprc";
           $ret .= "\n            ";
           $ret .= "DoN: $don, sunaz: $sunaz, sunalt: $sunalt";
           $ret .= "\n            ";
@@ -18717,38 +18740,41 @@ to ensure that the system configuration is correct.
       The 'exportToCsv' specification exports the entire content of the pvHistory to a CSV file. <br>
 
       The hour specifications refer to the respective hour of the day, e.g. the hour 09 refers to the time from
-      08 o'clock to 09 o'clock. <br><br>
+      08 o'clock to 09 o'clock. 
+      <br><br>
 
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>batintotal</b>     </td><td>total battery charge (Wh) at the beginning of the hour                                                </td></tr>
-            <tr><td> <b>batin</b>          </td><td>Hour battery charge (Wh)                                                                              </td></tr>
-            <tr><td> <b>batouttotal</b>    </td><td>total battery discharge (Wh) at the beginning of the hour                                             </td></tr>
-            <tr><td> <b>batout</b>         </td><td>Battery discharge of the hour (Wh)                                                                    </td></tr>
-            <tr><td> <b>batmaxsoc</b>      </td><td>maximum SOC (%) of the day                                                                            </td></tr>
-            <tr><td> <b>batsetsoc</b>      </td><td>optimum SOC setpoint (%) for the day                                                                  </td></tr>
-            <tr><td> <b>confc</b>          </td><td>expected energy consumption (Wh)                                                                      </td></tr>
-            <tr><td> <b>con</b>            </td><td>real energy consumption (Wh) of the house                                                             </td></tr>
-            <tr><td> <b>csmtXX</b>         </td><td>total energy consumption of ConsumerXX                                                                </td></tr>
-            <tr><td> <b>csmeXX</b>         </td><td>Energy consumption of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)          </td></tr>
-            <tr><td> <b>cyclescsmXX</b>    </td><td>Number of active cycles of ConsumerXX of the day                                                      </td></tr>
-            <tr><td> <b>DoN</b>            </td><td>Sunrise and sunset status (0 - night, 1 - day)                                                        </td></tr>
-            <tr><td> <b>etotal</b>         </td><td>total energy yield (Wh) at the beginning of the hour                                                  </td></tr>
-            <tr><td> <b>gcon</b>           </td><td>real power consumption (Wh) from the electricity grid                                                 </td></tr>
-            <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                           </td></tr>
-            <tr><td> <b>hourscsmeXX</b>    </td><td>average hours of an active cycle of ConsumerXX of the day                                             </td></tr>
-            <tr><td> <b>minutescsmXX</b>   </td><td>total active minutes in the hour of ConsumerXX                                                        </td></tr>
-            <tr><td> <b>pvfc</b>           </td><td>the predicted PV yield (Wh)                                                                           </td></tr>
-            <tr><td> <b>pvrl</b>           </td><td>real PV generation (Wh)                                                                               </td></tr>
-            <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' is valid and is taken into account in the learning process, 0-'pvrl' is assessed as abnormal </td></tr>
-            <tr><td> <b>pvcorrf</b>        </td><td>Autocorrection factor used / forecast quality achieved                                                </td></tr>
-            <tr><td> <b>rad1h</b>          </td><td>global radiation (kJ/m2)                                                                              </td></tr>
-            <tr><td> <b>sunalt</b>         </td><td>Altitude of the sun (in decimal degrees)                                                              </td></tr>
-            <tr><td> <b>sunaz</b>          </td><td>Azimuth of the sun (in decimal degrees)                                                               </td></tr>
-            <tr><td> <b>wid</b>            </td><td>Weather identification number                                                                         </td></tr>
-            <tr><td> <b>wcc</b>            </td><td>effective cloud cover                                                                                 </td></tr>
-            <tr><td> <b>rr1c</b>           </td><td>Total precipitation during the last hour kg/m2                                                        </td></tr>
+            <tr><td> <b>batintotal</b>     </td><td>total battery charge (Wh) at the beginning of the hour                                                                   </td></tr>
+            <tr><td> <b>batin</b>          </td><td>Hour battery charge (Wh)                                                                                                 </td></tr>
+            <tr><td> <b>batouttotal</b>    </td><td>total battery discharge (Wh) at the beginning of the hour                                                                </td></tr>
+            <tr><td> <b>batout</b>         </td><td>Battery discharge of the hour (Wh)                                                                                       </td></tr>
+            <tr><td> <b>batmaxsoc</b>      </td><td>maximum SOC (%) of the day                                                                                               </td></tr>
+            <tr><td> <b>batsetsoc</b>      </td><td>optimum SOC setpoint (%) for the day                                                                                     </td></tr>
+            <tr><td> <b>confc</b>          </td><td>expected energy consumption (Wh)                                                                                         </td></tr>
+            <tr><td> <b>con</b>            </td><td>real energy consumption (Wh) of the house                                                                                </td></tr>
+            <tr><td> <b>conprice</b>       </td><td>Price for the purchase of one kWh. The currency of the price is defined in the currentMeterDev.                          </td></tr>
+            <tr><td> <b>csmtXX</b>         </td><td>total energy consumption of ConsumerXX                                                                                   </td></tr>
+            <tr><td> <b>csmeXX</b>         </td><td>Energy consumption of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)                             </td></tr>
+            <tr><td> <b>cyclescsmXX</b>    </td><td>Number of active cycles of ConsumerXX of the day                                                                         </td></tr>
+            <tr><td> <b>DoN</b>            </td><td>Sunrise and sunset status (0 - night, 1 - day)                                                                           </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>total energy yield (Wh) at the beginning of the hour                                                                     </td></tr>
+            <tr><td> <b>gcon</b>           </td><td>real power consumption (Wh) from the electricity grid                                                                    </td></tr>
+            <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                                              </td></tr>
+            <tr><td> <b>feedprice</b>      </td><td>Remuneration for the feed-in of one kWh. The currency of the price is defined in the currentMeterDev.                    </td></tr>
+            <tr><td> <b>hourscsmeXX</b>    </td><td>average hours of an active cycle of ConsumerXX of the day                                                                </td></tr>
+            <tr><td> <b>minutescsmXX</b>   </td><td>total active minutes in the hour of ConsumerXX                                                                           </td></tr>
+            <tr><td> <b>pvfc</b>           </td><td>the predicted PV yield (Wh)                                                                                              </td></tr>
+            <tr><td> <b>pvrl</b>           </td><td>real PV generation (Wh)                                                                                                  </td></tr>
+            <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' is valid and is taken into account in the learning process, 0-'pvrl' is assessed as abnormal                    </td></tr>
+            <tr><td> <b>pvcorrf</b>        </td><td>Autocorrection factor used / forecast quality achieved                                                                   </td></tr>
+            <tr><td> <b>rad1h</b>          </td><td>global radiation (kJ/m2)                                                                                                 </td></tr>
+            <tr><td> <b>sunalt</b>         </td><td>Altitude of the sun (in decimal degrees)                                                                                 </td></tr>
+            <tr><td> <b>sunaz</b>          </td><td>Azimuth of the sun (in decimal degrees)                                                                                  </td></tr>
+            <tr><td> <b>wid</b>            </td><td>Weather identification number                                                                                            </td></tr>
+            <tr><td> <b>wcc</b>            </td><td>effective cloud cover                                                                                                    </td></tr>
+            <tr><td> <b>rr1c</b>           </td><td>Total precipitation during the last hour kg/m2                                                                           </td></tr>
          </table>
       </ul>
       </li>
@@ -19665,15 +19691,18 @@ to ensure that the system configuration is correct.
          The attributes graphicBeam1Content and graphicBeam3Content represent the primary beams, the attributes
          graphicBeam2Content and graphicBeam4Content attributes represent the secondary beams of the 
          respective level.
+         <br><br>
          
          <ul>
          <table>
-         <colgroup> <col width="45%"> <col width="55%"> </colgroup>
-            <tr><td> <b>pvReal</b>              </td><td>real PV generation (default for graphicBeam1Content)            </td></tr>
-            <tr><td> <b>pvForecast</b>          </td><td>predicted PV generation (default for graphicBeam2Content)       </td></tr>
-            <tr><td> <b>consumption</b>         </td><td>Energy consumption                                              </td></tr>
-            <tr><td> <b>gridconsumption</b>     </td><td>Energy purchase from the public grid                            </td></tr>
-            <tr><td> <b>consumptionForecast</b> </td><td>forecasted energy consumption                                   </td></tr>
+         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>consumption</b>         </td><td>Energy consumption                                                                                     </td></tr>
+            <tr><td> <b>consumptionForecast</b> </td><td>forecasted energy consumption                                                                          </td></tr>
+            <tr><td> <b>energycosts</b>         </td><td>Cost of energy purchased from the grid. The currency is defined in the currentMeterDev, key conprice.  </td></tr>
+            <tr><td> <b>feedincome</b>          </td><td>Remuneration for feeding into the grid. The currency is defined in the currentMeterDev, key feedprice. </td></tr>
+            <tr><td> <b>gridconsumption</b>     </td><td>Energy purchase from the public grid                                                                   </td></tr>
+            <tr><td> <b>pvReal</b>              </td><td>real PV generation (default for graphicBeam1Content)                                                   </td></tr>
+            <tr><td> <b>pvForecast</b>          </td><td>predicted PV generation (default for graphicBeam2Content)                                              </td></tr>
          </table>
          </ul>
        </li>
@@ -19707,6 +19736,7 @@ to ensure that the system configuration is correct.
        <li><b>graphicHeaderDetail </b><br>
          Selection of the zones of the graphic header to be displayed. <br>
          (default: all)
+         <br><br>
 
          <ul>
          <table>
@@ -20982,38 +21012,41 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Die Angabe 'exportToCsv' exportiert den gesamten Inhalt der pvHistory in eine CSV-Datei. <br>
 
       Die Stundenangaben beziehen sich auf die jeweilige Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit
-      von 08 Uhr bis 09 Uhr. <br><br>
+      von 08 Uhr bis 09 Uhr. 
+      <br><br>
 
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>batintotal</b>     </td><td>totale Batterieladung (Wh) zu Beginn der Stunde                                                </td></tr>
-            <tr><td> <b>batin</b>          </td><td>Batterieladung der Stunde (Wh)                                                                 </td></tr>
-            <tr><td> <b>batouttotal</b>    </td><td>totale Batterieentladung (Wh) zu Beginn der Stunde                                             </td></tr>
-            <tr><td> <b>batout</b>         </td><td>Batterieentladung der Stunde (Wh)                                                              </td></tr>
-            <tr><td> <b>batmaxsoc</b>      </td><td>maximaler SOC (%) des Tages                                                                    </td></tr>
-            <tr><td> <b>batsetsoc</b>      </td><td>optimaler SOC Sollwert (%) für den Tag                                                         </td></tr>
-            <tr><td> <b>csmtXX</b>         </td><td>Energieverbrauch total von ConsumerXX                                                          </td></tr>
-            <tr><td> <b>csmeXX</b>         </td><td>Energieverbrauch von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)    </td></tr>
-            <tr><td> <b>confc</b>          </td><td>erwarteter Energieverbrauch (Wh)                                                               </td></tr>
-            <tr><td> <b>con</b>            </td><td>realer Energieverbrauch (Wh) des Hauses                                                        </td></tr>
-            <tr><td> <b>cyclescsmXX</b>    </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                  </td></tr>
-            <tr><td> <b>DoN</b>            </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                           </td></tr>
-            <tr><td> <b>etotal</b>         </td><td>totaler Energieertrag (Wh) zu Beginn der Stunde                                                </td></tr>
-            <tr><td> <b>gcon</b>           </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                                   </td></tr>
-            <tr><td> <b>gfeedin</b>        </td><td>reale Einspeisung (Wh) in das Stromnetz                                                        </td></tr>
-            <tr><td> <b>hourscsmeXX</b>    </td><td>durchschnittliche Stunden eines Aktivzyklus von ConsumerXX des Tages                           </td></tr>
-            <tr><td> <b>minutescsmXX</b>   </td><td>Summe Aktivminuten in der Stunde von ConsumerXX                                                </td></tr>
-            <tr><td> <b>pvfc</b>           </td><td>der prognostizierte PV Ertrag (Wh)                                                             </td></tr>
-            <tr><td> <b>pvrl</b>           </td><td>reale PV Erzeugung (Wh)                                                                        </td></tr>
-            <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' ist gültig und wird im Lernprozess berücksichtigt, 0-'pvrl' ist als abnormal bewertet </td></tr>
-            <tr><td> <b>pvcorrf</b>        </td><td>verwendeter Autokorrekturfaktor / erreichte Prognosequalität                                   </td></tr>
-            <tr><td> <b>rad1h</b>          </td><td>Globalstrahlung (kJ/m2)                                                                        </td></tr>
-            <tr><td> <b>sunalt</b>         </td><td>Höhe der Sonne (in Dezimalgrad)                                                                </td></tr>
-            <tr><td> <b>sunaz</b>          </td><td>Azimuth der Sonne (in Dezimalgrad)                                                             </td></tr>
-            <tr><td> <b>wid</b>            </td><td>Identifikationsnummer des Wetters                                                              </td></tr>
-            <tr><td> <b>wcc</b>            </td><td>effektive Wolkenbedeckung                                                                      </td></tr>
-            <tr><td> <b>rr1c</b>           </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                 </td></tr>
+            <tr><td> <b>batintotal</b>     </td><td>totale Batterieladung (Wh) zu Beginn der Stunde                                                    </td></tr>
+            <tr><td> <b>batin</b>          </td><td>Batterieladung der Stunde (Wh)                                                                     </td></tr>
+            <tr><td> <b>batouttotal</b>    </td><td>totale Batterieentladung (Wh) zu Beginn der Stunde                                                 </td></tr>
+            <tr><td> <b>batout</b>         </td><td>Batterieentladung der Stunde (Wh)                                                                  </td></tr>
+            <tr><td> <b>batmaxsoc</b>      </td><td>maximaler SOC (%) des Tages                                                                        </td></tr>
+            <tr><td> <b>batsetsoc</b>      </td><td>optimaler SOC Sollwert (%) für den Tag                                                             </td></tr>
+            <tr><td> <b>csmtXX</b>         </td><td>Energieverbrauch total von ConsumerXX                                                              </td></tr>
+            <tr><td> <b>csmeXX</b>         </td><td>Energieverbrauch von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)        </td></tr>
+            <tr><td> <b>confc</b>          </td><td>erwarteter Energieverbrauch (Wh)                                                                   </td></tr>
+            <tr><td> <b>con</b>            </td><td>realer Energieverbrauch (Wh) des Hauses                                                            </td></tr>
+            <tr><td> <b>conprice</b>       </td><td>Preis für den Bezug einer kWh. Die Einheit des Preises ist im currentMeterDev definiert.           </td></tr>
+            <tr><td> <b>cyclescsmXX</b>    </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                      </td></tr>
+            <tr><td> <b>DoN</b>            </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                               </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>totaler Energieertrag (Wh) zu Beginn der Stunde                                                    </td></tr>
+            <tr><td> <b>gcon</b>           </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                                       </td></tr>
+            <tr><td> <b>gfeedin</b>        </td><td>reale Einspeisung (Wh) in das Stromnetz                                                            </td></tr>
+            <tr><td> <b>feedprice</b>      </td><td>Vergütung für die Einpeisung einer kWh. Die Währung des Preises ist im currentMeterDev definiert.  </td></tr>
+            <tr><td> <b>hourscsmeXX</b>    </td><td>durchschnittliche Stunden eines Aktivzyklus von ConsumerXX des Tages                               </td></tr>
+            <tr><td> <b>minutescsmXX</b>   </td><td>Summe Aktivminuten in der Stunde von ConsumerXX                                                    </td></tr>
+            <tr><td> <b>pvfc</b>           </td><td>der prognostizierte PV Ertrag (Wh)                                                                 </td></tr>
+            <tr><td> <b>pvrl</b>           </td><td>reale PV Erzeugung (Wh)                                                                            </td></tr>
+            <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' ist gültig und wird im Lernprozess berücksichtigt, 0-'pvrl' ist als abnormal bewertet     </td></tr>
+            <tr><td> <b>pvcorrf</b>        </td><td>verwendeter Autokorrekturfaktor / erreichte Prognosequalität                                       </td></tr>
+            <tr><td> <b>rad1h</b>          </td><td>Globalstrahlung (kJ/m2)                                                                            </td></tr>
+            <tr><td> <b>sunalt</b>         </td><td>Höhe der Sonne (in Dezimalgrad)                                                                    </td></tr>
+            <tr><td> <b>sunaz</b>          </td><td>Azimuth der Sonne (in Dezimalgrad)                                                                 </td></tr>
+            <tr><td> <b>wid</b>            </td><td>Identifikationsnummer des Wetters                                                                  </td></tr>
+            <tr><td> <b>wcc</b>            </td><td>effektive Wolkenbedeckung                                                                          </td></tr>
+            <tr><td> <b>rr1c</b>           </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                     </td></tr>
 
          </table>
       </ul>
@@ -21931,15 +21964,18 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          werden. <br>
          Die Attribute graphicBeam1Content und graphicBeam3Content stellen die primären Balken, die Attribute
          graphicBeam2Content und graphicBeam4Content die sekundären Balken der jeweiligen Ebene dar.
+         <br><br>
          
          <ul>
          <table>
-         <colgroup> <col width="45%"> <col width="55%"> </colgroup>
-            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung (default für graphicBeam1Content)            </td></tr>
-            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default für graphicBeam2Content)  </td></tr>
-            <tr><td> <b>consumption</b>         </td><td>Energieverbrauch                                                </td></tr>
-            <tr><td> <b>gridconsumption</b>     </td><td>Energiebezug aus dem öffentlichen Netz                          </td></tr>
-            <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch                               </td></tr>
+         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>consumption</b>         </td><td>Energieverbrauch                                                                                             </td></tr>
+            <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch                                                                            </td></tr>
+            <tr><td> <b>energycosts</b>         </td><td>Kosten des Energiebezuges aus dem Netz. Die Währung ist im currentMeterDev, Schlüssel conprice, definiert.   </td></tr>
+            <tr><td> <b>feedincome</b>          </td><td>Vergütung für die Netzeinspeisung. Die Währung ist im currentMeterDev, Schlüssel feedprice, definiert.       </td></tr>
+            <tr><td> <b>gridconsumption</b>     </td><td>Energiebezug aus dem öffentlichen Netz                                                                       </td></tr>
+            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung (default für graphicBeam1Content)                                                         </td></tr>
+            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default für graphicBeam2Content)                                               </td></tr>
          </table>
          </ul>
        </li>
@@ -21973,6 +22009,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>graphicHeaderDetail </b><br>
          Auswahl der anzuzeigenden Zonen des Grafik Kopfbereiches. <br>
          (default: all)
+         <br><br>
 
          <ul>
          <table>
