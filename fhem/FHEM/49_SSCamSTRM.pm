@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       49_SSCamSTRM.pm
 #
-#       (c) 2018-2023 by Heiko Maaz
+#       (c) 2018-2024 by Heiko Maaz
 #       forked from 98_weblink.pm by Rudolf König
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
@@ -91,6 +91,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.15.5" => "11.05.2024  optimize memory consumption ",
   "2.15.4" => "14.01.2023  change ptzButtonSize, ptzButtonSizeFTUI starting with 10 ",
   "2.15.3" => "13.01.2023  change behavior of hideDisplayName, hideDisplayNameFTUI if device is disabled ",
   "2.15.2" => "01.01.2022  minor code change in _setpopupStream ",
@@ -644,54 +645,40 @@ sub Attr {
 return;
 }
 
-#############################################################################################
+#########################################################################################################
 #                                 FHEMWEB Summary  
-#############################################################################################
+#
+# Beispielsyntax: "{$hash->{LINKFN}('$hash->{LINKPARENT}','$hash->{LINKNAME}','$hash->{LINKMODEL}')}";
+#########################################################################################################
 sub FwFn {
   my ($FW_wname, $name, $room, $pageHash) = @_;               # pageHash is set for summaryFn.
   my $hash = $defs{$name};
   
-  RemoveInternalTimer($hash);
+  RemoveInternalTimer ($hash);
   
   $hash->{HELPER}{FW} = $FW_wname;
-  my $clink           = ReadingsVal($name, "clientLink", "");
+  my $clink           = ReadingsVal ($name, "clientLink", "");
     
   sofAdoptSubset  ($hash);
   explodeLinkData ($hash, $clink, 0) if($init_done == 1);
   
-  # Beispielsyntax: "{$hash->{LINKFN}('$hash->{LINKPARENT}','$hash->{LINKNAME}','$hash->{LINKMODEL}')}";
-  
-  my $ftui   = 0;
-  my $linkfn = $hash->{LINKFN};
-  my %pars   = ( linkparent => $hash->{LINKPARENT},
-			     linkname   => $hash->{LINKNAME},
-                 linkmodel  => $hash->{LINKMODEL},
-                 omodel     => $hash->{MODEL},
-                 oname      => $hash->{NAME},
-				 ftui       => $ftui
-               );
-  
-  no strict "refs";                                      ## no critic 'NoStrict' 
-  my $html = eval{ &{$linkfn}(\%pars) } or do { return qq{Error in Streaming function definition of <html><a href=\"/fhem?detail=$name\">$name</a></html>} };
-  use strict "refs";  
-  
   my $ret = "";
   
-  if(IsModelMaster($hash) && $clink) {
-      my $alias = AttrVal ($name, 'alias', $name);                                                         # Linktext als Aliasname oder Devicename setzen
+  if (IsModelMaster ($hash) && $clink) {
+      my $alias = AttrVal ($name, 'alias', $name);                                                        # Linktext als Aliasname oder Devicename setzen
       my $lang  = AttrVal ('global', 'language', 'EN');
       my $txt   = "is Streaming master of";
       $txt      = "ist Streaming Master von " if($lang eq "DE");
       my $dlink = "<a href=\"/fhem?detail=$name\">$alias</a> $txt ";
       $dlink    = "$alias $txt " if(AttrVal($name, "noLink", 0));                                         # keine Links im Stream-Dev generieren
       
-      if(!AttrVal ($name, 'hideDisplayName', 0) && !IsDisabled($name)) {
+      if (!AttrVal ($name, 'hideDisplayName', 0) && !IsDisabled($name)) {
           $ret .= "<span align=\"center\">$dlink </span>";
       }
   }
   
-  if(IsDisabled($name)) {
-      if(AttrVal($name, 'hideDisplayName', 0)) {
+  if (IsDisabled($name)) {
+      if (AttrVal($name, 'hideDisplayName', 0)) {
           $ret .= "Stream-device is disabled";
       } 
       else {
@@ -699,18 +686,29 @@ sub FwFn {
       } 
   } 
   else {
-      $ret .= $html;
-      $ret .= sDevsWidget($name) if(IsModelMaster($hash)); 
+      my $ftui   = 0;
+      my $linkfn = $hash->{LINKFN};
+      my %pars   = ( linkparent => $hash->{LINKPARENT},
+                     linkname   => $hash->{LINKNAME},
+                     linkmodel  => $hash->{LINKMODEL},
+                     omodel     => $hash->{MODEL},
+                     oname      => $hash->{NAME},
+                     ftui       => $ftui
+                   );
+      
+      no strict "refs";                                      ## no critic 'NoStrict' 
+      $ret .= eval{ &{$linkfn}(\%pars) } or do { return qq{Error in Streaming function definition of <html><a href=\"/fhem?detail=$name\">$name</a></html>} };
+      use strict "refs";
+
+      $ret .= sDevsWidget ($name) if(IsModelMaster($hash)); 
   }
    
   my $al = AttrVal ($name, 'autoRefresh', 0);                                                             # Autorefresh nur des aufrufenden FHEMWEB-Devices
   
-  if($al) {  
-      InternalTimer(gettimeofday()+$al, "FHEM::SSCamSTRM::webRefresh", $hash, 0);
-      Log3($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
+  if ($al) {  
+      InternalTimer (gettimeofday()+$al, "FHEM::SSCamSTRM::webRefresh", $hash, 0);
+      Log3 ($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
   }
-  
-  undef $html;
 
 return $ret;
 }
