@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.20.0" => "12.05.2024  graphicBeamXContent: gridfeedin available, beamGraphic: Mouse-Over shows beamcontent text ",
   "1.19.0" => "11.05.2024  conprice, feedprice saved in pvHistory, graphicBeamXContent: energycosts, feedincome available ",
   "1.18.0" => "08.05.2024  add secondary level of the bar chart, new attr graphicBeam3Content, graphicBeam4Content ".
                            "graphicBeam3Color, graphicBeam4Color, graphicBeam3FontColor, graphicBeam4FontColor ".
@@ -815,6 +816,22 @@ my %htitles = (                                                                 
                 DE => qq{H&#246;he}                                                                                },
   sunpos   => { EN => qq{Sun position (decimal degrees)},
                 DE => qq{Sonnenstand (Dezimalgrad)}                                                                },
+  enconsrl => { EN => qq{real Energy consumption},
+                DE => qq{realer Energieverbrauch}                                                                  },
+  enconsfc => { EN => qq{forecasted energy consumption},
+                DE => qq{prognostizierter Energieverbrauch}                                                        },
+  enpchcst => { EN => qq{Energy purchase costs},
+                DE => qq{Kosten Energiebezug}                                                                      },
+  rengfeed => { EN => qq{Remuneration for the grid feed-in},
+                DE => qq{Verg&#252;tung Netzeinspeisung}                                                           },
+  enppubgd => { EN => qq{Energy purchase from the public grid},
+                DE => qq{Energiebezug aus dem &#246;ffentlichen Netz}                                              },
+  enfeedgd => { EN => qq{Feed-in},
+                DE => qq{Einspeisung}                                                                              },
+  pvgenerl => { EN => qq{real PV generation},
+                DE => qq{reale PV-Erzeugung}                                                                       },
+  pvgenefc => { EN => qq{forecasted PV generation},
+                DE => qq{prognostizierte PV-Erzeugung}                                                             },
   conrec   => { EN => qq{Current time is within the consumption planning},
                 DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung}                                      },
   conrecba => { EN => qq{Current time is within the consumption planning, Priority charging Battery is active},
@@ -1080,9 +1097,10 @@ my %hfspvh = (
 sub Initialize {
   my $hash = shift;
 
-  my $fwd  = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
-  my $hod  = join ",", map { sprintf "%02d", $_} (1..24);
-  my $srd  = join ",", sort keys (%hcsr);
+  my $fwd = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
+  my $hod = join ",", map { sprintf "%02d", $_} (1..24);
+  my $srd = join ",", sort keys (%hcsr);
+  my $gbc = 'pvReal,pvForecast,consumption,consumptionForecast,gridconsumption,energycosts,gridfeedin,feedincome';
 
   my ($consumer,@allc);
   for my $c (1..$maxconsumer) {
@@ -1150,10 +1168,10 @@ sub Initialize {
                                 "graphicBeam2Color:colorpicker,RGB ".
                                 "graphicBeam3Color:colorpicker,RGB ".
                                 "graphicBeam4Color:colorpicker,RGB ".
-                                "graphicBeam1Content:pvReal,pvForecast,consumption,consumptionForecast,gridconsumption,energycosts,feedincome ".
-                                "graphicBeam2Content:pvReal,pvForecast,consumption,consumptionForecast,gridconsumption,energycosts,feedincome ".
-                                "graphicBeam3Content:pvReal,pvForecast,consumption,consumptionForecast,gridconsumption,energycosts,feedincome ".
-                                "graphicBeam4Content:pvReal,pvForecast,consumption,consumptionForecast,gridconsumption,energycosts,feedincome ".
+                                "graphicBeam1Content:$gbc ".
+                                "graphicBeam2Content:$gbc ".
+                                "graphicBeam3Content:$gbc ".
+                                "graphicBeam4Content:$gbc ".
                                 "graphicBeam1FontColor:colorpicker,RGB ".
                                 "graphicBeam2FontColor:colorpicker,RGB ".
                                 "graphicBeam3FontColor:colorpicker,RGB ".
@@ -5660,6 +5678,33 @@ return;
 }
 
 ################################################################
+#                      Attr graphicBeamXContent 
+################################################################
+sub _attrgraphicBeamXContent {           ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $aVal  = $paref->{aVal};
+  my $cmd   = $paref->{cmd};
+
+  return if(!$init_done); 
+  
+  my $medev  = ReadingsVal ($name, "currentMeterDev", "");                                 # aktuelles Meter device
+  my ($a,$h) = parseParams ($medev);
+
+  if ($cmd eq "set") {
+      if ($aVal eq 'energycosts') {
+          return "Define key 'conprice' in the currentMeterDev first before setting $aVal" if(!defined $h->{conprice});
+      }
+      
+      if ($aVal eq 'feedincome') {
+          return "Define key 'feedprice' in the currentMeterDev first before setting $aVal" if(!defined $h->{feedprice});
+      }
+  }
+
+return;
+}
+
+################################################################
 #     currentRadiationAPI verzögert aus Attr setzen      
 ################################################################
 sub __setRadAPIdelayed {                    
@@ -7770,7 +7815,7 @@ sub _transferMeterValues {
   my $t     = $paref->{t};
   my $chour = $paref->{chour};
 
-  my $medev  = ReadingsVal($name, "currentMeterDev", "");                                     # aktuelles Meter device
+  my $medev  = ReadingsVal ($name, "currentMeterDev", "");                                    # aktuelles Meter device
   my ($a,$h) = parseParams ($medev);
   $medev     = $a->[0] // "";
   return if(!$medev || !$defs{$medev});
@@ -7991,16 +8036,16 @@ sub _transferBatteryValues {
   $boutunit //= $binunit;
   $binunit  //= $boutunit;
 
-  my $piuf      = $piunit   =~ /^kW$/xi  ? 1000 : 1;
-  my $pouf      = $pounit   =~ /^kW$/xi  ? 1000 : 1;
-  my $binuf     = $binunit  =~ /^kWh$/xi ? 1000 : 1;
-  my $boutuf    = $boutunit =~ /^kWh$/xi ? 1000 : 1;
+  my $piuf    = $piunit   =~ /^kW$/xi  ? 1000 : 1;
+  my $pouf    = $pounit   =~ /^kW$/xi  ? 1000 : 1;
+  my $binuf   = $binunit  =~ /^kWh$/xi ? 1000 : 1;
+  my $boutuf  = $boutunit =~ /^kWh$/xi ? 1000 : 1;
 
-  my $pbo       = ReadingsNum ($badev, $pou,    0) * $pouf;                                    # aktuelle Batterieentladung (W)
-  my $pbi       = ReadingsNum ($badev, $pin,    0) * $piuf;                                    # aktueller Batterieladung (W)
-  my $btotout   = ReadingsNum ($badev, $bout,   0) * $boutuf;                                  # totale Batterieentladung (Wh)
-  my $btotin    = ReadingsNum ($badev, $bin,    0) * $binuf;                                   # totale Batterieladung (Wh)
-  my $soc       = ReadingsNum ($badev, $batchr, 0);
+  my $pbo     = ReadingsNum ($badev, $pou,    0) * $pouf;                                      # aktuelle Batterieentladung (W)
+  my $pbi     = ReadingsNum ($badev, $pin,    0) * $piuf;                                      # aktueller Batterieladung (W)
+  my $btotout = ReadingsNum ($badev, $bout,   0) * $boutuf;                                    # totale Batterieentladung (Wh)
+  my $btotin  = ReadingsNum ($badev, $bin,    0) * $binuf;                                     # totale Batterieladung (Wh)
+  my $soc     = ReadingsNum ($badev, $batchr, 0);
 
   if ($instcap && !isNumeric ($instcap)) {                                                     # wenn $instcap Reading Wert abfragen
       my ($bcapr,$bcapunit) = split ':', $instcap;
@@ -8057,17 +8102,7 @@ sub _transferBatteryValues {
   my $histbatintot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "batintotal", undef);    # totale Batterieladung zu Beginn einer Stunde
   my $batinthishour;
 
-  if (!defined $histbatintot) {                                                                # totale Batterieladung der aktuelle Stunde gesetzt ?
-      #$paref->{val}      = $btotin;
-      #$paref->{nhour}    = sprintf "%02d", $nhour;
-      #$paref->{histname} = 'batintotal';
-
-      #setPVhistory ($paref);
-
-      #delete $paref->{histname};
-      #delete $paref->{nhour};
-      #delete $paref->{val};
-      
+  if (!defined $histbatintot) {                                                                # totale Batterieladung der aktuelle Stunde gesetzt?      
       writeToHistory ( { paref => $paref, key => 'batintotal', val => $btotin, hour => $nhour } );
 
       my $bitot      = CurrentVal ($hash, "batintotal", $btotin);
@@ -8079,18 +8114,7 @@ sub _transferBatteryValues {
 
   $batinthishour = 0 if($batinthishour < 0);
 
-  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{batin} = $batinthishour;                # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-
-  #$paref->{val}      = $batinthishour;
-  #$paref->{nhour}    = sprintf "%02d", $nhour;
-  #$paref->{histname} = 'batinthishour';
-
-  #setPVhistory ($paref);
-
-  #delete $paref->{histname};
-  #delete $paref->{nhour};
-  #delete $paref->{val};
-  
+  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{batin} = $batinthishour;                # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350 
   writeToHistory ( { paref => $paref, key => 'batinthishour', val => $batinthishour, hour => $nhour } );
 
   # Batterieentladung aktuelle Stunde in pvHistory speichern
@@ -8098,17 +8122,7 @@ sub _transferBatteryValues {
   my $histbatouttot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'batouttotal', undef);   # totale Betterieladung zu Beginn einer Stunde
   my $batoutthishour;
 
-  if (!defined $histbatouttot) {                                                                # totale Betterieladung der aktuelle Stunde gesetzt ?
-      #$paref->{val}      = $btotout;
-      #$paref->{nhour}    = sprintf "%02d", $nhour;
-      #$paref->{histname} = 'batouttotal';
-
-      #setPVhistory ($paref);
-
-      #delete $paref->{histname};
-      #delete $paref->{nhour};
-      #delete $paref->{val};
-      
+  if (!defined $histbatouttot) {                                                                # totale Betterieladung der aktuelle Stunde gesetzt?      
       writeToHistory ( { paref => $paref, key => 'batouttotal', val => $btotout, hour => $nhour } );
 
       my $botot       = CurrentVal ($hash, 'batouttotal', $btotout);
@@ -8120,35 +8134,14 @@ sub _transferBatteryValues {
 
   $batoutthishour = 0 if($batoutthishour < 0);
 
-  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{batout} = $batoutthishour;             # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-
-  #$paref->{val}      = $batoutthishour;
-  #$paref->{nhour}    = sprintf "%02d", $nhour;
-  #$paref->{histname} = 'batoutthishour';
-
-  #setPVhistory ($paref);
-
-  #delete $paref->{histname};
-  #delete $paref->{nhour};
-  #delete $paref->{val};
-  
+  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{batout} = $batoutthishour;             # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350  
   writeToHistory ( { paref => $paref, key => 'batoutthishour', val => $batoutthishour, hour => $nhour } );
 
   # täglichen max. SOC in pvHistory speichern
   #############################################
   my $batmaxsoc = HistoryVal ($hash, $day, 99, 'batmaxsoc', 0);                               # gespeicherter max. SOC des Tages
 
-  if ($soc >= $batmaxsoc) {
-      #$paref->{val}      = $soc;
-      #$paref->{nhour}    = 99;
-      #$paref->{histname} = 'batmaxsoc';
-
-      #setPVhistory ($paref);
-
-      #delete $paref->{histname};
-      #delete $paref->{nhour};
-      #delete $paref->{val};
-      
+  if ($soc >= $batmaxsoc) {     
       writeToHistory ( { paref => $paref, key => 'batmaxsoc', val => $soc, hour => 99 } );
   }
 
@@ -11126,7 +11119,7 @@ sub entryGraphic {
       flowgconsDist  => AttrVal ($name, 'flowGraphicConsumerDistance', $fgCDdef),                # Abstand Verbrauchericons zueinander
       css            => AttrVal ($name, 'flowGraphicCss',               $cssdef),                # flowGraphicCss Styles
       genpvdva       => AttrVal ($name, 'ctrlGenPVdeviation',           'daily'),                # Methode der Abweichungsberechnung
-      lang           => AttrVal ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang)),
+      lang           => getLang  ($hash),
       debug          => getDebug ($hash),                                                        # Debug Module
   };
 
@@ -12553,13 +12546,14 @@ sub _beamGraphicFirstHour {
   my $hourstyle = $paref->{hourstyle};
   my $beam1cont = $paref->{beam1cont};
   my $beam2cont = $paref->{beam2cont};
+  my $lang      = $paref->{lang};
 
   my $day;
 
   my $stt                              = NexthoursVal ($hash, "NextHour00", "starttime", '0000-00-00 24');
   my ($year,$month,$day_str,$thishour) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
   
-  my ($val1,$val2,$val3,$val4,$val5,$val6,$val7);
+  my ($val1,$val2,$val3,$val4,$val5,$val6,$val7,$val8);
 
   $thishour++;
 
@@ -12589,9 +12583,10 @@ sub _beamGraphicFirstHour {
   $val5 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'con',   0);
   $val6 = sprintf "%.2f", (HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'conprice',  0) * 
                            $val3 / 1000);                                                                          # Energiekosten der Stunde
-  $val7 = sprintf "%.2f", (HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'feedprice', 0) * 
-                           HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gfeedin',   0) / 1000);  # Einspeisevergütung der Stunde
-
+  $val7 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gfeedin', 0);
+  $val8 = sprintf "%.2f", (HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'feedprice', 0) * 
+                           $val7 / 1000);                                                                          # Einspeisevergütung der Stunde
+  
   $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'weatherid', 999);
   $hfcg->{0}{wcc}     = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'wcc',       '-');
   $hfcg->{0}{sunalt}  = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunalt',    '-');
@@ -12604,7 +12599,8 @@ sub _beamGraphicFirstHour {
                          ($beam1cont eq 'consumptionForecast') ? $val4 :
                          ($beam1cont eq 'consumption')         ? $val5 :
                          ($beam1cont eq 'energycosts')         ? $val6 :
-                         ($beam1cont eq 'feedincome')          ? $val7 :
+                         ($beam1cont eq 'gridfeedin')          ? $val7 :
+                         ($beam1cont eq 'feedincome')          ? $val8 :
                          undef;
   $hfcg->{0}{beam2}    = ($beam2cont eq 'pvForecast')          ? $val1 :
                          ($beam2cont eq 'pvReal')              ? $val2 :
@@ -12612,12 +12608,35 @@ sub _beamGraphicFirstHour {
                          ($beam2cont eq 'consumptionForecast') ? $val4 :
                          ($beam2cont eq 'consumption')         ? $val5 :
                          ($beam2cont eq 'energycosts')         ? $val6 :
-                         ($beam2cont eq 'feedincome')          ? $val7 :
+                         ($beam2cont eq 'gridfeedin')          ? $val7 :
+                         ($beam2cont eq 'feedincome')          ? $val8 :
                          undef;
   
   $hfcg->{0}{beam1}  //= 0;
   $hfcg->{0}{beam2}  //= 0;
   $hfcg->{0}{diff}     = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
+  
+  my $epc = '('.CurrentVal ($hash, 'ePurchasePriceCcy', 0).')';
+  my $efc = '('.CurrentVal ($hash, 'eFeedInTariffCcy',  0).')';
+  
+  $hfcg->{0}{beam1txt} = ($beam1cont eq 'pvForecast')          ? $htitles{pvgenefc}{$lang} :
+                         ($beam1cont eq 'pvReal')              ? $htitles{pvgenerl}{$lang} :
+                         ($beam1cont eq 'gridconsumption')     ? $htitles{enppubgd}{$lang} :
+                         ($beam1cont eq 'consumptionForecast') ? $htitles{enconsfc}{$lang} :
+                         ($beam1cont eq 'consumption')         ? $htitles{enconsrl}{$lang} :
+                         ($beam1cont eq 'energycosts')         ? $htitles{enpchcst}{$lang}." $epc" :
+                         ($beam1cont eq 'gridfeedin')          ? $htitles{enfeedgd}{$lang} :
+                         ($beam1cont eq 'feedincome')          ? $htitles{rengfeed}{$lang}." $efc" :
+                         '';
+  $hfcg->{0}{beam2txt} = ($beam2cont eq 'pvForecast')          ? $htitles{pvgenefc}{$lang} :
+                         ($beam2cont eq 'pvReal')              ? $htitles{pvgenerl}{$lang} :
+                         ($beam2cont eq 'gridconsumption')     ? $htitles{enppubgd}{$lang} :
+                         ($beam2cont eq 'consumptionForecast') ? $htitles{enconsfc}{$lang} :
+                         ($beam2cont eq 'consumption')         ? $htitles{enconsrl}{$lang} :
+                         ($beam2cont eq 'energycosts')         ? $htitles{enpchcst}{$lang}." $epc" :
+                         ($beam2cont eq 'gridfeedin')          ? $htitles{enfeedgd}{$lang} :
+                         ($beam2cont eq 'feedincome')          ? $htitles{rengfeed}{$lang}." $efc" :
+                         '';
 
 return $thishour;
 }
@@ -12638,15 +12657,15 @@ sub _beamGraphicRemainingHours {
 
   $maxVal //= $hfcg->{0}{beam1};                                                                        # Startwert wenn kein Wert bereits via attr vorgegeben ist
 
-  my ($val1,$val2,$val3,$val4,$val5,$val6,$val7);
+  my ($val1,$val2,$val3,$val4,$val5,$val6,$val7,$val8);
 
   my $maxCon = $hfcg->{0}{beam1};
   my $maxDif = $hfcg->{0}{diff};                                                                        # für Typ diff
   my $minDif = $hfcg->{0}{diff};                                                                        # für Typ diff
 
   for my $i (1..($maxhours*2)-1) {                                                                      # doppelte Anzahl berechnen    my $val1 = 0;
-      ($val1,$val2,$val3,$val4,$val5,$val6,$val7) = (0,0,0,0,0,0,0);
-      $hfcg->{$i}{time}                           = $hfcg->{0}{time} + $i;
+      ($val1,$val2,$val3,$val4,$val5,$val6,$val7,$val8) = (0,0,0,0,0,0,0,0);
+      $hfcg->{$i}{time}                                 = $hfcg->{0}{time} + $i;
 
       while ($hfcg->{$i}{time} > 24) {
           $hfcg->{$i}{time} -= 24;                                                                      # wird bis zu 2x durchlaufen
@@ -12669,8 +12688,8 @@ sub _beamGraphicRemainingHours {
               $val4 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'confc', 0);
               $val5 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'con',   0);
               $val6 = sprintf "%.2f", (HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'conprice',  0) * $val3 / 1000);     # Energiekosten der Stunde
-              $val7 = sprintf "%.2f", (HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'feedprice', 0) * 
-                                       HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'gfeedin',   0) / 1000);             # Einspeisevergütung der Stunde
+              $val7 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'gfeedin', 0);
+              $val8 = sprintf "%.2f", (HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'feedprice', 0) * $val7 / 1000);     # Einspeisevergütung der Stunde
 
 
               $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'weatherid', 999);
@@ -12703,7 +12722,8 @@ sub _beamGraphicRemainingHours {
                               ($beam1cont eq 'consumptionForecast') ? $val4 :
                               ($beam1cont eq 'consumption')         ? $val5 :
                               ($beam1cont eq 'energycosts')         ? $val6 :
-                              ($beam1cont eq 'feedincome')          ? $val7 :                          
+                              ($beam1cont eq 'gridfeedin')          ? $val7 :
+                              ($beam1cont eq 'feedincome')          ? $val8 :                          
                               undef;
       $hfcg->{$i}{beam2}    = ($beam2cont eq 'pvForecast')          ? $val1 :
                               ($beam2cont eq 'pvReal')              ? $val2 :
@@ -12711,7 +12731,8 @@ sub _beamGraphicRemainingHours {
                               ($beam2cont eq 'consumptionForecast') ? $val4 :
                               ($beam2cont eq 'consumption')         ? $val5 :
                               ($beam2cont eq 'energycosts')         ? $val6 :
-                              ($beam2cont eq 'feedincome')          ? $val7 :
+                              ($beam2cont eq 'gridfeedin')          ? $val7 :
+                              ($beam2cont eq 'feedincome')          ? $val8 :
                               undef;
 
       $hfcg->{$i}{beam1} //= 0;
@@ -12769,7 +12790,7 @@ sub _beamGraphic {
   # lässt sich durch einbetten in eine zusätzliche Table roomoverview eindämmen
   # Die Tabelle ist recht schmal angelegt, aber nur so lassen sich Umbrüche erzwingen
 
-  my ($val,$z2,$z3,$z4,$he);
+  my ($val, $z2, $z3, $z4, $he, $titz2, $titz3);
 
   my $ret .= __weatherOnBeam ($paref);
   my $m    = $paref->{modulo} % 2;
@@ -12803,7 +12824,7 @@ sub _beamGraphic {
   $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                                 # Neue Zeile mit freiem Platz am Anfang
 
   my $ii = 0;
-  
+    
   for my $i (0..($maxhours * 2) - 1) {                                                                          # gleiche Bedingung wie oben
       next if(!$show_night && $hfcg->{$i}{weather} > 99
                            && !$hfcg->{$i}{beam1}
@@ -12817,10 +12838,10 @@ sub _beamGraphic {
 
       # Berechnung der Zonen
       ########################
-      
       if ($lotype eq 'single') {
-          $he = int(($maxVal - $hfcg->{$i}{beam1}) / $maxVal * $height) + $fsize;                               # Der zusätzliche Offset durch $fsize verhindert bei den meisten Skins dass die Grundlinie der Balken nach unten durchbrochen wird
-          $z3 = int($height + $fsize - $he);
+          $he    = int(($maxVal - $hfcg->{$i}{beam1}) / $maxVal * $height) + $fsize;                               # Der zusätzliche Offset durch $fsize verhindert bei den meisten Skins dass die Grundlinie der Balken nach unten durchbrochen wird
+          $z3    = int($height + $fsize - $he);
+          $titz3 = qq/title="$hfcg->{0}{beam1txt}"/;
       }
 
       if ($lotype eq 'double') {
@@ -12834,10 +12855,14 @@ sub _beamGraphic {
           if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                        # Beam1 oben , Beam2 unten
               $z2 = $hfcg->{$i}{beam1}; 
               $z3 = $hfcg->{$i}{beam2};
+              $titz2 = qq/title="$hfcg->{0}{beam1txt}"/;
+              $titz3 = qq/title="$hfcg->{0}{beam2txt}"/;
           }
           else {                                                                                                # tauschen, Verbrauch ist größer als Ertrag
               $z3 = $hfcg->{$i}{beam1}; 
               $z2 = $hfcg->{$i}{beam2};
+              $titz2 = qq/title="$hfcg->{0}{beam2txt}"/;
+              $titz3 = qq/title="$hfcg->{0}{beam1txt}"/;
           }
 
           $he = int(($maxVal-$z2) / $maxVal * $height);
@@ -12916,14 +12941,15 @@ sub _beamGraphic {
 
           $ret .="<table width='100%' height='100%'>";                                                              # mit width=100% etwas bessere Füllung der Balken
           $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'>";
-          $ret .="<td class='solarfc' style='vertical-align:bottom; color:#$fcolor1;'>".$val.'</td></tr>';
+          $ret .="<td class='solarfc' style='vertical-align:bottom; color:#$fcolor1;' $titz3>".$val;
+          $ret .="</td></tr>";
 
           if ($hfcg->{$i}{beam1} || $show_night) {                                                                  # Balken nur einfärben wenn der User via Attr eine Farbe vorgibt, sonst bestimmt class odd von TR alleine die Farbe
               my $style = "style=\"padding-bottom:0px; vertical-align:top; margin-left:auto; margin-right:auto;";
               $style   .= defined $colorb1 ? " background-color:#$colorb1\"" : '"';                                 # Syntaxhilight
 
               $ret .= "<tr class='odd' style='height:".$z3."px;'>";
-              $ret .= "<td align='center' class='solarfc' ".$style.">";
+              $ret .= "<td align='center' class='solarfc' $style $titz3>";
 
               my $sicon = 1;
 
@@ -12937,6 +12963,7 @@ sub _beamGraphic {
       
       if ($lotype eq 'double') {
           my ($color1, $color2, $style1, $style2, $v);
+          
           my $style = "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
 
           $ret .="<table width='100%' height='100%'>\n";                                                                 # mit width=100% etwas bessere Füllung der Balken                                                                                            
@@ -12966,7 +12993,7 @@ sub _beamGraphic {
           }
 
           $ret .= "<tr class='odd' style='height:".$z2."px'>";
-          $ret .= "<td align='center' class='solarfc' ".$style1.">$val";
+          $ret .= "<td align='center' class='solarfc' $style1 $titz2>".$val;
 
           # inject the new icon if defined
           ##################################
@@ -12976,58 +13003,65 @@ sub _beamGraphic {
 
           if ($z3) {                                                                                             # die Zone 3 lassen wir bei zu kleinen Werten auch ganz weg
               $ret .= "<tr class='odd' style='height:".$z3."px'>";
-              $ret .= "<td align='center' class='solarfc' ".$style2.">$v</td></tr>";
+              $ret .= "<td align='center' class='solarfc' $style2 $titz3>".$v;
+              $ret .= "</td></tr>";
           }
       }
 
       if ($lotype eq 'diff') {                                                                                   # Type diff
           my $style = "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
-          $ret .= "<table width='100%' border='0'>\n";                                                           # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
+          $ret     .= "<table width='100%' border='0'>\n";                                                      # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
 
           $val = ($hfcg->{$i}{diff} > 0) ? formatVal6 ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather}) : '';
           $val = '&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;' if($hfcg->{$i}{diff} == 0);                                  # Sonderfall , hier wird die 0 gebraucht !
 
           if ($val) {
               $ret .= "<tr class='$htr{$m}{cl}' style='height:".$he."px'>";
-              $ret .= "<td class='solarfc' style='vertical-align:bottom; color:#$fcolor1;'>".$val."</td></tr>";
+              $ret .= "<td class='solarfc' style='vertical-align:bottom; color:#$fcolor1;'>".$val;
+              $ret .= "</td></tr>";
           }
 
           if ($hfcg->{$i}{diff} >= 0) {                                                                          # mit Farbe 1 colorb1 füllen
               $style .= " background-color:#$colorb1'";
               $z2     = 1 if ($hfcg->{$i}{diff} == 0);                                                           # Sonderfall , 1px dünnen Strich ausgeben
               $ret   .= "<tr class='odd' style='height:".$z2."px'>";
-              $ret   .= "<td align='center' class='solarfc' ".$style.">";
+              $ret   .= "<td align='center' class='solarfc' $style>";
               $ret   .= "</td></tr>";
           }
           else {                                                                                                 # ohne Farbe
-              $z2 = 2 if ($hfcg->{$i}{diff} == 0);                                                               # Sonderfall, hier wird die 0 gebraucht !
+              $z2 = 2 if($hfcg->{$i}{diff} == 0);                                                                # Sonderfall, hier wird die 0 gebraucht !
               if ($z2 && $val) {                                                                                 # z2 weglassen wenn nicht unbedigt nötig bzw. wenn zuvor he mit val keinen Wert hatte
                   $ret .= "<tr class='$htr{$m}{cl}' style='height:".$z2."px'>";
-                  $ret .= "<td class='solarfc'></td></tr>";
+                  $ret .= "<td class='solarfc'>";
+                  $ret .= "</td></tr>";
               }
           }
 
           if ($hfcg->{$i}{diff} < 0) {                                                                           # Negativ Balken anzeigen ?
               $style .= " background-color:#$colorb2'";                                                          # mit Farbe 2 colorb2 füllen
               $ret   .= "<tr class='odd' style='height:".$z3."px'>";
-              $ret   .= "<td align='center' class='solarfc' ".$style."></td></tr>";
+              $ret   .= "<td align='center' class='solarfc' $style>";
+              $ret   .= "</td></tr>";
           }
           elsif ($z3) {                                                                                          # ohne Farbe
               $ret .= "<tr class='$htr{$m}{cl}' style='height:".$z3."px'>";
-              $ret .= "<td class='solarfc'></td></tr>";
+              $ret .= "<td class='solarfc'>";
+              $ret .= "</td></tr>";
           }
 
-          if($z4) {                                                                                              # kann entfallen wenn auch z3 0 ist
-              $val  = ($hfcg->{$i}{diff} < 0) ? formatVal6 ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather}) : '&nbsp;';
+          if ($z4) {                                                                                             # kann entfallen wenn auch z3 0 ist
+              $val  = $hfcg->{$i}{diff} < 0 ? formatVal6 ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather}) : '&nbsp;';
               $ret .= "<tr class='$htr{$m}{cl}' style='height:".$z4."px'>";
-              $ret .= "<td class='solarfc' style='vertical-align:top'>".$val."</td></tr>";
+              $ret .= "<td class='solarfc' style='vertical-align:top'>".$val;
+              $ret .= "</td></tr>";
           }
       }
 
       if ($show_diff eq 'bottom') {                                                                                                      # zusätzliche diff Anzeige
           $val  = formatVal6 ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather});
           $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val > 0 ) ? '+'.$val : $val if ($val ne '&nbsp;');                    # negative Zahlen in Fettschrift, 0 aber ohne +
-          $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td></tr>";
+          $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc' style='vertical-align:middle; text-align:center;'>$val";
+          $ret .= "</td></tr>";
       }
 
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc' style='vertical-align:bottom; text-align:center;'>";
@@ -13035,7 +13069,7 @@ sub _beamGraphic {
                                    '<a class="changed" style="visibility:visible"><span>'.$hfcg->{$i}{time_str}.'</span></a>' :
                                    $hfcg->{$i}{time_str};
 
-      if($hfcg->{$i}{time} == $thishour) {
+      if ($hfcg->{$i}{time} == $thishour) {
           $thishour = 99;                                                                                                                # nur einmal verwenden !
       }
 
@@ -17990,6 +18024,8 @@ to ensure that the system configuration is correct.
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
           <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation                                         </td></tr>
           <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).    </td></tr>
+          <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,              </td></tr>
+          <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.    </td></tr>
           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                        </td></tr>
           <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts  </td></tr>
           <tr><td>                 </td><td>(The entry is optional, but is strongly recommended)                                     </td></tr>        
@@ -19701,10 +19737,15 @@ to ensure that the system configuration is correct.
             <tr><td> <b>energycosts</b>         </td><td>Cost of energy purchased from the grid. The currency is defined in the currentMeterDev, key conprice.  </td></tr>
             <tr><td> <b>feedincome</b>          </td><td>Remuneration for feeding into the grid. The currency is defined in the currentMeterDev, key feedprice. </td></tr>
             <tr><td> <b>gridconsumption</b>     </td><td>Energy purchase from the public grid                                                                   </td></tr>
+            <tr><td> <b>gridfeedin</b>          </td><td>Feed into the public grid                                                                              </td></tr>
             <tr><td> <b>pvReal</b>              </td><td>real PV generation (default for graphicBeam1Content)                                                   </td></tr>
             <tr><td> <b>pvForecast</b>          </td><td>predicted PV generation (default for graphicBeam2Content)                                              </td></tr>
          </table>
          </ul>
+         <br>
+         
+         <b>Hinweis:</b> The selection of the parameters energycosts and feedincome only makes sense if the optional keys 
+                         conprice and feedprice are set in currentMeterDev.
        </li>
        <br>
        
@@ -20252,6 +20293,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
           <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung liefert                                            </td></tr>
           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)    </td></tr>
+          <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt       </td></tr>
+          <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch eine Logmeldung.     </td></tr>
           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                          </td></tr>
           <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt  </td></tr>
           <tr><td>                 </td><td>(Die Angabe ist optional, wird aber dringend empfohlen zu setzen)                            </td></tr>
@@ -21974,10 +22017,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>energycosts</b>         </td><td>Kosten des Energiebezuges aus dem Netz. Die Währung ist im currentMeterDev, Schlüssel conprice, definiert.   </td></tr>
             <tr><td> <b>feedincome</b>          </td><td>Vergütung für die Netzeinspeisung. Die Währung ist im currentMeterDev, Schlüssel feedprice, definiert.       </td></tr>
             <tr><td> <b>gridconsumption</b>     </td><td>Energiebezug aus dem öffentlichen Netz                                                                       </td></tr>
+            <tr><td> <b>gridfeedin</b>          </td><td>Einspeisung in das öffentliche Netz                                                                          </td></tr>
             <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung (default für graphicBeam1Content)                                                         </td></tr>
             <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default für graphicBeam2Content)                                               </td></tr>
          </table>
          </ul>
+         <br>
+         
+         <b>Hinweis:</b> Die Auswahl der Parameter energycosts und feedincome ist nur sinnvoll wenn in currentMeterDev die
+                         optionalen Schlüssel conprice und feedprice gesetzt sind.
        </li>
        <br>
 
