@@ -12544,6 +12544,7 @@ sub _beamGraphicFirstHour {
   my $beam1cont = $paref->{beam1cont};
   my $beam2cont = $paref->{beam2cont};
   my $lang      = $paref->{lang};
+  my $kw        = $paref->{kw};
 
   my $day;
 
@@ -12613,26 +12614,26 @@ sub _beamGraphicFirstHour {
   $hfcg->{0}{beam2}  //= 0;
   $hfcg->{0}{diff}     = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
   
-  my $epc = '('.CurrentVal ($hash, 'ePurchasePriceCcy', 0).')';
-  my $efc = '('.CurrentVal ($hash, 'eFeedInTariffCcy',  0).')';
+  my $epc = CurrentVal ($hash, 'ePurchasePriceCcy', 0);
+  my $efc = CurrentVal ($hash, 'eFeedInTariffCcy',  0);
   
-  $hfcg->{0}{beam1txt} = ($beam1cont eq 'pvForecast')          ? $htitles{pvgenefc}{$lang} :
-                         ($beam1cont eq 'pvReal')              ? $htitles{pvgenerl}{$lang} :
-                         ($beam1cont eq 'gridconsumption')     ? $htitles{enppubgd}{$lang} :
-                         ($beam1cont eq 'consumptionForecast') ? $htitles{enconsfc}{$lang} :
-                         ($beam1cont eq 'consumption')         ? $htitles{enconsrl}{$lang} :
-                         ($beam1cont eq 'energycosts')         ? $htitles{enpchcst}{$lang}." $epc" :
-                         ($beam1cont eq 'gridfeedin')          ? $htitles{enfeedgd}{$lang} :
-                         ($beam1cont eq 'feedincome')          ? $htitles{rengfeed}{$lang}." $efc" :
+  $hfcg->{0}{beam1txt} = ($beam1cont eq 'pvForecast')          ? $htitles{pvgenefc}{$lang}." ($kw)"  :
+                         ($beam1cont eq 'pvReal')              ? $htitles{pvgenerl}{$lang}." ($kw)"  :
+                         ($beam1cont eq 'gridconsumption')     ? $htitles{enppubgd}{$lang}." ($kw)"  :
+                         ($beam1cont eq 'consumptionForecast') ? $htitles{enconsfc}{$lang}." ($kw)"  :
+                         ($beam1cont eq 'consumption')         ? $htitles{enconsrl}{$lang}." ($kw)"  :
+                         ($beam1cont eq 'energycosts')         ? $htitles{enpchcst}{$lang}." ($epc)" :
+                         ($beam1cont eq 'gridfeedin')          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
+                         ($beam1cont eq 'feedincome')          ? $htitles{rengfeed}{$lang}." ($efc)" :
                          '';
-  $hfcg->{0}{beam2txt} = ($beam2cont eq 'pvForecast')          ? $htitles{pvgenefc}{$lang} :
-                         ($beam2cont eq 'pvReal')              ? $htitles{pvgenerl}{$lang} :
-                         ($beam2cont eq 'gridconsumption')     ? $htitles{enppubgd}{$lang} :
-                         ($beam2cont eq 'consumptionForecast') ? $htitles{enconsfc}{$lang} :
-                         ($beam2cont eq 'consumption')         ? $htitles{enconsrl}{$lang} :
-                         ($beam2cont eq 'energycosts')         ? $htitles{enpchcst}{$lang}." $epc" :
-                         ($beam2cont eq 'gridfeedin')          ? $htitles{enfeedgd}{$lang} :
-                         ($beam2cont eq 'feedincome')          ? $htitles{rengfeed}{$lang}." $efc" :
+  $hfcg->{0}{beam2txt} = ($beam2cont eq 'pvForecast')          ? $htitles{pvgenefc}{$lang}." ($kw)"  :
+                         ($beam2cont eq 'pvReal')              ? $htitles{pvgenerl}{$lang}." ($kw)"  :
+                         ($beam2cont eq 'gridconsumption')     ? $htitles{enppubgd}{$lang}." ($kw)"  :
+                         ($beam2cont eq 'consumptionForecast') ? $htitles{enconsfc}{$lang}." ($kw)"  :
+                         ($beam2cont eq 'consumption')         ? $htitles{enconsrl}{$lang}." ($kw)"  :
+                         ($beam2cont eq 'energycosts')         ? $htitles{enpchcst}{$lang}." ($epc)" :
+                         ($beam2cont eq 'gridfeedin')          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
+                         ($beam2cont eq 'feedincome')          ? $htitles{rengfeed}{$lang}." ($efc)" :
                          '';
 
 return $thishour;
