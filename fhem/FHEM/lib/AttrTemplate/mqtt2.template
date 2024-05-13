@@ -5968,17 +5968,24 @@ par:BASE_ID;Base topic as set in OpenDTU MQTT settings;{ AttrVal('DEVICE','readi
 par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
 #par:BR_REG_NAME;Bridge RegEx Name for target inverter device;{ my $r1 = AttrVal('DEVICE','readingList','') =~ m,([^:]+)/([^:]+)/name:, ? $1 : "xxx";; my $r2 = AttrVal('DEVICE','readingList','') =~ m,([^:]+)/([^:]+)/name:, ? $2 : "yyy";; my $rn = $r1 . "_" . $r2 ."_name";; return ReadingsVal('DEVICE',"$rn",undef) }
 attr DEVICE icon ICON
-attr DEVICE bridgeRegexp BASE_ID/([0-9]+)/.*/.*:.* "BASE_ID_$1"
+attr DEVICE bridgeRegexp BASE_ID/([[:xdigit:]]+)/.*:.*  "BASE_ID_$1"
 #attr DEVICE bridgeRegexp BASE_ID/[0-9]+/.*/.*:.* "BR_REG_NAME"
 attr DEVICE autocreate 1
 attr DEVICE readingList BASE_ID/dtu/uptime:.* uptime\
   BASE_ID/dtu/status:.* status\
   BASE_ID/dtu/ip:.* ip\
   BASE_ID/dtu/rssi:.' rssi\
-  BASE_ID/dtu/hostname:.* hostname
+  BASE_ID/dtu/hostname:.* hostname\
+  BASE_ID/ac/power:.* power\
+  BASE_ID/ac/yieldtotal:.* yieldtotal\
+  BASE_ID/ac/yieldday:.* yieldday\
+  BASE_ID/ac/is_valid:.* is_valid\
+  BASE_ID/dc/power:.* powerdc\
+  BASE_ID/dc/irradiation:.* irradiation\
+  BASE_ID/dc/is_valid:.* is_validdc
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_opendtu_hub_bridge
-setreading DEVICE attrTemplateVersion 20221215
+setreading DEVICE attrTemplateVersion 20240513
 { AttrTemplate_Initialize() }
 
 name:hoymiles_opendtu_microinverter
@@ -5995,6 +6002,17 @@ attr DEVICE icon ICON
 deletereading -q DEVICE .*_.*
 option:{ RADIO_SINGLE }
 attr DEVICE readingList \
+  INVERTERLONG_ID/name:.* name\
+  INVERTERLONG_ID/status/reachable:.* reachable\
+  INVERTERLONG_ID/status/producing:.* producing\
+  INVERTERLONG_ID/status/last_update:.* last_update\
+  INVERTERLONG_ID/device/bootloaderversion:.* bootloaderversion\
+  INVERTERLONG_ID/device/fwbuildversion:.* fwbuildversion\
+  INVERTERLONG_ID/device/fwbuilddatetime:.* fwbuilddatetime\
+  INVERTERLONG_ID/device/hwpartnumber:.* hwpartnumber\
+  INVERTERLONG_ID/device/hwversion:.* hwversion\
+  INVERTERLONG_ID/status/limit_relative:.* limit_relative\
+  INVERTERLONG_ID/status/limit_absolute:.* limit_absolute\
   INVERTERLONG_ID/0/powerdc:.* powerdc\
   INVERTERLONG_ID/0/yieldday:.* {}\
   INVERTERLONG_ID/0/yieldtotal:.* {}\
@@ -6012,15 +6030,23 @@ attr DEVICE readingList \
   INVERTERLONG_ID/1/irradiation:.* irradiation1\
   INVERTERLONG_ID/1/yieldday:.* yieldday\
   INVERTERLONG_ID/1/yieldtotal:.* yieldtotal\
+  INVERTERLONG_ID/1/name:.* name1
+option:{ RADIO_DOUBLE }
+attr DEVICE readingList \
   INVERTERLONG_ID/name:.* name\
   INVERTERLONG_ID/status/reachable:.* reachable\
   INVERTERLONG_ID/status/producing:.* producing\
-  INVERTERLONG_ID/status/last_update:.* last_update
-option:{ RADIO_DOUBLE }
-attr DEVICE readingList \
+  INVERTERLONG_ID/status/last_update:.* last_update\
+  INVERTERLONG_ID/device/bootloaderversion:.* bootloaderversion\
+  INVERTERLONG_ID/device/fwbuildversion:.* fwbuildversion\
+  INVERTERLONG_ID/device/fwbuilddatetime:.* fwbuilddatetime\
+  INVERTERLONG_ID/device/hwpartnumber:.* hwpartnumber\
+  INVERTERLONG_ID/device/hwversion:.* hwversion\
+  INVERTERLONG_ID/status/limit_relative:.* limit_relative\
+  INVERTERLONG_ID/status/limit_absolute:.* limit_absolute\
   INVERTERLONG_ID/0/powerdc:.* powerdc\
-  INVERTERLONG_ID/0/yieldday:.* yieldday\
-  INVERTERLONG_ID/0/yieldtotal:.* yieldtotal\
+  INVERTERLONG_ID/0/yieldday:.* {}\
+  INVERTERLONG_ID/0/yieldtotal:.* {}\
   INVERTERLONG_ID/0/voltage:.* voltage\
   INVERTERLONG_ID/0/current:.* current\
   INVERTERLONG_ID/0/power:.* power\
@@ -6035,21 +6061,30 @@ attr DEVICE readingList \
   INVERTERLONG_ID/1/irradiation:.* irradiation1\
   INVERTERLONG_ID/1/yieldday:.* yieldday1\
   INVERTERLONG_ID/1/yieldtotal:.* yieldtotal1\
+  INVERTERLONG_ID/1/name:.* name1\
   INVERTERLONG_ID/2/voltage:.* voltage2\
   INVERTERLONG_ID/2/current:.* current2\
   INVERTERLONG_ID/2/power:.* power2\
   INVERTERLONG_ID/2/irradiation:.* irradiation2\
   INVERTERLONG_ID/2/yieldday:.* yieldday2\
   INVERTERLONG_ID/2/yieldtotal:.* yieldtotal2\
+  INVERTERLONG_ID/2/name:.* name2
+option:{ RADIO_QUATTRO }
+attr DEVICE readingList \
   INVERTERLONG_ID/name:.* name\
   INVERTERLONG_ID/status/reachable:.* reachable\
   INVERTERLONG_ID/status/producing:.* producing\
-  INVERTERLONG_ID/status/last_update:.* last_update
-option:{ RADIO_QUATTRO }
-attr DEVICE readingList \
+  INVERTERLONG_ID/status/last_update:.* last_update\
+  INVERTERLONG_ID/device/bootloaderversion:.* bootloaderversion\
+  INVERTERLONG_ID/device/fwbuildversion:.* fwbuildversion\
+  INVERTERLONG_ID/device/fwbuilddatetime:.* fwbuilddatetime\
+  INVERTERLONG_ID/device/hwpartnumber:.* hwpartnumber\
+  INVERTERLONG_ID/device/hwversion:.* hwversion\
+  INVERTERLONG_ID/status/limit_relative:.* limit_relative\
+  INVERTERLONG_ID/status/limit_absolute:.* limit_absolute\
   INVERTERLONG_ID/0/powerdc:.* powerdc\
-  INVERTERLONG_ID/0/yieldday:.* yieldday\
-  INVERTERLONG_ID/0/yieldtotal:.* yieldtotal\
+  INVERTERLONG_ID/0/yieldday:.* {}\
+  INVERTERLONG_ID/0/yieldtotal:.* {}\
   INVERTERLONG_ID/0/voltage:.* voltage\
   INVERTERLONG_ID/0/current:.* current\
   INVERTERLONG_ID/0/power:.* power\
@@ -6063,23 +6098,29 @@ attr DEVICE readingList \
   INVERTERLONG_ID/1/power:.* power1\
   INVERTERLONG_ID/1/irradiation:.* irradiation1\
   INVERTERLONG_ID/1/yieldday:.* yieldday1\
+  INVERTERLONG_ID/1/yieldtotal:.* yieldtotal1\
+  INVERTERLONG_ID/1/name:.* name1\
+  INVERTERLONG_ID/2/voltage:.* voltage2\
+  INVERTERLONG_ID/2/current:.* current2\
+  INVERTERLONG_ID/2/power:.* power2\
+  INVERTERLONG_ID/2/irradiation:.* irradiation2\
+  INVERTERLONG_ID/2/yieldday:.* yieldday2\
   INVERTERLONG_ID/2/yieldtotal:.* yieldtotal2\
+  INVERTERLONG_ID/2/name:.* name2\
   INVERTERLONG_ID/3/voltage:.* voltage3\
   INVERTERLONG_ID/3/current:.* current3\
   INVERTERLONG_ID/3/power:.* power3\
   INVERTERLONG_ID/3/irradiation:.* irradiation3\
   INVERTERLONG_ID/3/yieldday:.* yieldday3\
   INVERTERLONG_ID/3/yieldtotal:.* yieldtotal3\
+  INVERTERLONG_ID/3/name:.* name3\
   INVERTERLONG_ID/4/voltage:.* voltage4\
   INVERTERLONG_ID/4/current:.* current4\
   INVERTERLONG_ID/4/power:.* power4\
   INVERTERLONG_ID/4/irradiation:.* irradiation4\
   INVERTERLONG_ID/4/yieldday:.* yieldday4\
   INVERTERLONG_ID/4/yieldtotal:.* yieldtotal4\
-  INVERTERLONG_ID/name:.* name\
-  INVERTERLONG_ID/status/reachable:.* reachable\
-  INVERTERLONG_ID/status/producing:.* producing\
-  INVERTERLONG_ID/status/last_update:.* last_update
+  INVERTERLONG_ID/4/name:.* name4
 option:global
 attr DEVICE setList \
   on:noArg INVERTERLONG_ID/cmd/power 1\
@@ -6091,7 +6132,7 @@ attr DEVICE setList \
   limit_persistent_pct:slider,2,1,100 INVERTERLONG_ID/cmd/limit_nonpersistent_relative $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_opendtu_microinverter
-setreading DEVICE attrTemplateVersion 20221215
+setreading DEVICE attrTemplateVersion 20240513
 
 
 ###########################################
