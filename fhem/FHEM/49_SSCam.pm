@@ -192,6 +192,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.11.4" => "13.05.2024  optimize memory consumption once more ",
   "9.11.3" => "08.05.2024  optimize memory consumption ",
   "9.11.2" => "14.04.2024  internal change logic for sending data via telegram, email, chat and their Saving ",
   "9.11.1" => "03.04.2024  send Data: check if SSChatBot / TelegramBot device is disabled ",
@@ -5936,15 +5937,16 @@ sub camOp_Parse {
 
             if ($errorcode =~ /105/x) {
                Log3 ($name, 2, "$name - ERROR - $errorcode - $error in operation $OpMode -> try new login");
-               undef $data{SSCam}{$name}{TMPDA};
-               undef $data{SSCam}{$name}{TMPMJ};
+               delete $data{SSCam}{$name}{TMPDA};
+               delete $data{SSCam}{$name}{TMPMJ};
                return login ($hash, $hash->{HELPER}{API}, \&camOp);
             }
 
             Log3 ($name, 2, "$name - ERROR - Operation $OpMode not successful. Cause: $errorcode - $error");
        }
-       undef $data{SSCam}{$name}{TMPDA};
-       undef $data{SSCam}{$name}{TMPMJ};
+       
+       delete $data{SSCam}{$name}{TMPDA};
+       delete $data{SSCam}{$name}{TMPMJ};
    }
 
    delActiveToken ($hash);                                                     # Token freigeben
@@ -7166,8 +7168,6 @@ sub __doSnapRotation {
       rotateReading($hash,"LastSnapTime",$snaps{$$aref[0]}{createdTm},$rotnum,1);
   }
 
-  undef %snaps;
-
 return;
 }
 
@@ -7793,7 +7793,7 @@ sub streamDev {                                               ## no critic 'comp
   my $dlink  = "<a href=\"/fhem?detail=$strmdev\">$alias</a>";
   $dlink     = $alias if(AttrVal($strmdev, "noLink", 0));                   # keine Links im Stream-Dev generieren
 
-  my $StmKey = ReadingsVal($camname,"StmKey",undef);
+  my $StmKey = ReadingsVal ($camname, "StmKey", undef);
 
   my %params = (
     camname            => $camname,
@@ -8011,7 +8011,6 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   }
 
   Log3($strmdev, 4, "$strmdev - Link called: $link") if($link);
-  undef $link;
 
 return $ret;
 }
@@ -8291,7 +8290,7 @@ sub _streamDevSWITCHED {                                       ## no critic 'not
   my $wltype = $hash->{HELPER}{WLTYPE};
   $link      = $hash->{HELPER}{LINK};
 
-  if(!$link) {
+  if (!$link) {
       my $cam = AttrVal($camname, "alias", $camname);
       $cause  = "Playback cam \"$cam\" switched off";
       $ret   .= "<td> <br> <b> $cause </b> <br><br>";
@@ -8307,7 +8306,7 @@ sub _streamDevSWITCHED {                                       ## no critic 'not
 
   # Streaming ausführen
   no strict "refs";                                                        ## no critic 'NoStrict'
-  if($sdswfn{$wltype}) {
+  if ($sdswfn{$wltype}) {
       $ret .= &{$sdswfn{$wltype}{fn}} ($params) if(defined &{$sdswfn{$wltype}{fn}});
   }
   else {
@@ -8317,7 +8316,6 @@ sub _streamDevSWITCHED {                                       ## no critic 'not
   use strict "refs";
 
   Log3($strmdev, 4, "$strmdev - Link called: $link");
-  undef $link;
 
 return $ret;
 }
@@ -8699,7 +8697,7 @@ sub doAutocreate {
 
        Log3($name, 2, "$name - Autocreate camera: define $cmd");
 
-       $err = CommandDefine(undef, $cmd);
+       $err = CommandDefine (undef, $cmd);
 
        if($err) {
            Log3($name, 1, "ERROR: $err");
@@ -9054,13 +9052,13 @@ sub composeGallery {
           $cell++;
 
           if ($cell == $sgc + 1) {
-              $htmlCode .= sprintf("<td>$imgTm<br> <img src=\"data:image/jpeg;base64,$data{SSCam}{$name}{TMPCDAT}\" $gattr $data{SSCam}{$name}{TMPIDAT}> </td>" );
+              $htmlCode .= sprintf ("<td>$imgTm<br> <img src=\"data:image/jpeg;base64,$data{SSCam}{$name}{TMPCDAT}\" $gattr $data{SSCam}{$name}{TMPIDAT}> </td>" );
               $htmlCode .= "</tr>";
               $htmlCode .= "<tr class=\"odd\">";
               $cell = 1;
           }
           else {
-              $htmlCode .= sprintf("<td>$imgTm<br> <img src=\"data:image/jpeg;base64,$data{SSCam}{$name}{TMPCDAT}\" $gattr $data{SSCam}{$name}{TMPIDAT}> </td>" );
+              $htmlCode .= sprintf ("<td>$imgTm<br> <img src=\"data:image/jpeg;base64,$data{SSCam}{$name}{TMPCDAT}\" $gattr $data{SSCam}{$name}{TMPIDAT}> </td>" );
           }
 
           delete $data{SSCam}{$name}{TMPIDAT};
@@ -9089,7 +9087,6 @@ sub composeGallery {
 
   delete $data{SSCam}{$name}{TMPCDAT};
   delete $data{SSCam}{$name}{TMPIDAT};
-  undef $imgTm;
 
 return $htmlCode;
 }
@@ -9196,7 +9193,7 @@ sub ptzPanel {
 
   for my $rownr (0..9) {
       $rownr = sprintf("%2.2d",$rownr);
-      $row   = AttrVal("$name","ptzPanel_row$rownr",undef);
+      $row   = AttrVal ("$name", "ptzPanel_row$rownr", undef);
       next if (!$row);
 
       $rowisset = 1;
@@ -10105,9 +10102,6 @@ sub _sendChat {
 
   FHEM::SSChatBot::getApiSites ($chatbot);                           # Übertragung Sendqueue starten
 
-  undef %chatparams;
-  undef %{$extparamref};
-
 return;
 }
 
@@ -10417,10 +10411,6 @@ sub _sendTelegram {
        Log3 ($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}." (Telegram)") if(AttrVal($name,"debugactivetoken",0));
    }
 
-   undef %teleparams;
-   undef %{$extparamref};
-   undef $msg;
-
 return;
 }
 
@@ -10436,9 +10426,9 @@ sub __extractForTelegram {
   my $vdat               = $paref->{vdat};                           # Hashref der Videodaten
   my ($data,$fname,$ct,$img,$cache);
 
-  if($sdat) {
+  if ($sdat) {
       $cache = cache($name, "c_init");              # Cache initialisieren
-      if(!$cache || $cache eq "internal" ) {
+      if (!$cache || $cache eq "internal" ) {
           $ct     = $paref->{sdat}{$key}{createdTm};
           $img    = $paref->{sdat}{$key}{imageData};
           $fname  = trim ($paref->{sdat}{$key}{fileName});
@@ -10456,9 +10446,9 @@ sub __extractForTelegram {
       }
   }
 
-  if($vdat) {
+  if ($vdat) {
       $cache = cache($name, "c_init");              # Cache initialisieren
-      if(!$cache || $cache eq "internal" ) {
+      if (!$cache || $cache eq "internal" ) {
           $ct    = $paref->{vdat}{$key}{createdTm};
           $data  = $paref->{vdat}{$key}{imageData};
           $fname = trim ($paref->{vdat}{$key}{fileName});
@@ -10687,8 +10677,6 @@ sub __TBotSendIt {
       Log3($camname, 4, "$camname - __TBotSendIt: timeout for sent :".$hash->{HU_DO_PARAMS}->{timeout}.": ");
       HttpUtils_NonblockingGet($hash->{HU_DO_PARAMS});
   }
-
-  undef $msg;
 
 return $ret;
 }
@@ -10938,9 +10926,6 @@ sub _sendEmail {
 
    $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SSCam::__sendEmailblocking", $data{SSCam}{$name}{PARAMS}{$tac}, "FHEM::SSCam::__sendEmaildone", $timeout, "FHEM::SSCam::__sendEmailto", $hash);
    $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
-
-   undef %mailparams;
-   undef %$extparamref;
 
 return;
 }
