@@ -326,7 +326,6 @@ mowingPathShowCollisions=""
     }
   );
   
-  $hash->{MODEL} = '';
   ( $hash->{VERSION} ) = $::FHEM::AutomowerConnect::cvsid =~ /\.pm (.*)Z/;
   $attr{$name}{room} = 'AutomowerConnect' if( !defined( $attr{$name}{room} ) );
   $attr{$name}{icon} = 'automower' if( !defined( $attr{$name}{icon} ) );
@@ -2372,10 +2371,16 @@ sub posMinMax {
 sub fillReadings {
   my ( $hash ) = @_;
   my $name = $hash->{NAME};
-
   readingsBulkUpdateIfChanged( $hash, '.mower_id', $hash->{helper}{mower}{id}, 0 ); 
   readingsBulkUpdateIfChanged( $hash, "batteryPercent", $hash->{helper}{mower}{attributes}{battery}{batteryPercent} ); 
   my $pref = 'mower';
+
+  if ( ! ReadingsVal( $name, $pref.'_inactiveReason', '' ) && $hash->{helper}{mower}{attributes}{$pref}{inactiveReason} ne 'NONE' ) {
+    readingsBulkUpdateIfChanged( $hash, $pref.'_inactiveReason', $hash->{helper}{mower}{attributes}{$pref}{inactiveReason} );
+  } else {
+    readingsBulkUpdateIfChanged( $hash, $pref.'_inactiveReason', $hash->{helper}{mower}{attributes}{$pref}{inactiveReason} );
+  }
+
   readingsBulkUpdateIfChanged( $hash, $pref.'_mode', $hash->{helper}{mower}{attributes}{$pref}{mode} );
   readingsBulkUpdateIfChanged( $hash, $pref.'_activity', $hash->{helper}{mower}{attributes}{$pref}{activity} );
   readingsBulkUpdateIfChanged( $hash, $pref.'_state', $hash->{helper}{mower}{attributes}{$pref}{state} );
@@ -2403,7 +2408,6 @@ sub fillReadings {
   my $model = $hash->{helper}{mower}{attributes}{$pref}{model};
   $model =~ s/AUTOMOWER./AM/;
   readingsBulkUpdateIfChanged( $hash, "model", $model );
-  # $hash->{MODEL} = $model if ( $model && $hash->{MODEL} ne $model );
   $pref = 'planner';
   readingsBulkUpdateIfChanged( $hash, "planner_restrictedReason", $hash->{helper}{mower}{attributes}{$pref}{restrictedReason} );
   readingsBulkUpdateIfChanged( $hash, "planner_overrideAction", $hash->{helper}{mower}{attributes}{$pref}{override}{action} ) if ( $hash->{helper}{mower}{attributes}{$pref}{override}{action} );

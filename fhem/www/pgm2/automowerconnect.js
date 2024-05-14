@@ -3,17 +3,18 @@ if ( !(typeof FW_version === 'undefined') )
   FW_version["automowerconnect.js"] = "$Id$";
   
 {  window.onload = ( ()=>{
-    let room = document.querySelector("#content");
-    room = room.getAttribute("room");
-    if ( room ) {
+    let amcontent = document.querySelector("#content");
+    if ( amcontent && amcontent.getAttribute("room") || ! amcontent ) {
       let invis = document.querySelectorAll( "div[name='fhem_amc_mower_schedule_buttons'], div.fhem_amc_hull_buttons " ).forEach( (item, index, invis) => { // do not display schedule and hull buttons
         item.style.display = "none";
       });
+
+      invis = document.querySelectorAll( "div.amc_panel_div" ).forEach( (item, index, invis) => { // do not display panel
+        let ivipan = item.getAttribute("data-amc_panel_inroom");
+        item.style.display = ( ! ivipan ? "none" : "" );
+      });
+
     }
-    let invis = document.querySelectorAll( "div.amc_panel_div" ).forEach( (item, index, invis) => { // do not display panel
-      let ivipan = item.getAttribute("data-amc_panel_inroom");
-      item.style.display = ( room && !ivipan ? "none" : "" );
-    });
 
   });
 }
