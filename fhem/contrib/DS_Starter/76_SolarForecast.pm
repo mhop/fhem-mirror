@@ -158,7 +158,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.20.0" => "12.05.2024  graphicBeamXContent: gridfeedin available, beamGraphic: Mouse-Over shows beamcontent text ",
+  "1.21.0" => "14.05.2024  currentMeterDev: meter can be a Day meter, contotal and feedtotal can be reset at day begin ",
+  "1.20.0" => "12.05.2024  graphicBeamXContent: gridfeedin available, beamGraphic: Mouse-Over shows beamcontent text ".
+                           "complete command printout in Debug mode, ___switchConsumerOn: add continuing ",
   "1.19.0" => "11.05.2024  conprice, feedprice saved in pvHistory, graphicBeamXContent: energycosts, feedincome available ",
   "1.18.0" => "08.05.2024  add secondary level of the bar chart, new attr graphicBeam3Content, graphicBeam4Content ".
                            "graphicBeam3Color, graphicBeam4Color, graphicBeam3FontColor, graphicBeam4FontColor ".
@@ -3823,7 +3825,7 @@ sub __VictronVRM_ApiResponseLogin {
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
 
-          if($debug =~ /apiProcess|apiCall/x) {
+          if ($debug =~ /apiProcess|apiCall/x) {
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - error_code: ".$jdata->{'error_code'});
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - errors: "    .$jdata->{'errors'});
           }
@@ -5744,7 +5746,7 @@ sub Notify {
 
   my $debug = getDebug ($myHash);                                                         # Debug Mode
 
-  if($devName ~~ @consumers) {
+  if ($devName ~~ @consumers) {
       my ($cname, $cindex);
       my $type = $myHash->{TYPE};
 
@@ -5753,6 +5755,11 @@ sub Notify {
 
           if ($devName eq $cname) {
               $cindex = $c;
+              
+              if ($debug =~ /notifyHandling/x) {
+                  Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Event of consumer >$devName< (index: $c) received});
+              }
+              
               last;
           }
 
@@ -5760,7 +5767,7 @@ sub Notify {
               $cindex = $c;
 
               if ($debug =~ /notifyHandling/x) {
-                  Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Event device >$devName< is switching device of consumer >$cname< (index: $c)});
+                  Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Event of device >$devName< which is switching device of consumer >$cname< (index: $c) received});
               }
 
               last;
@@ -7943,18 +7950,25 @@ sub _transferMeterValues {
       $gcdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_GridConsumption", 0);
       $gfdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_GridFeedIn",      0);
   }
-
-  my $docon = 0;
-
-  if ($gcdaypast == 0) {                                                                             # Management der Stundenberechnung auf Basis Totalwerte GridConsumtion
-      if (defined CircularVal ($hash, 99, 'initdaygcon', undef)) {
+  
+  ## Management aus dem Netz bezogener Energie
+  ##############################################
+  my $docon  = 0;
+  my $idgcon = CircularVal ($hash, 99, 'initdaygcon', undef);
+  
+  if (!$gctotal) {
+      $data{$type}{$name}{circular}{99}{initdaygcon} = 0;
+      Log3 ($name, 3, "$name - WARNING - '$medev' - the total energy drawn from grid was reset and is registered with >0<.");
+  }
+  elsif ($gcdaypast == 0) {                                                                             # Management der Stundenberechnung auf Basis Totalwerte GridConsumtion
+      if (defined $idgcon) {
           $docon = 1;
       }
       else {
-          $data{$type}{$name}{circular}{99}{initdaygcon} = $gctotal;
+          $data{$type}{$name}{circular}{99}{initdaygcon} = $gctotal; 
       }
   }
-  elsif (!defined CircularVal ($hash, 99, 'initdaygcon', undef)) {
+  elsif (!defined $idgcon) {
       $data{$type}{$name}{circular}{99}{initdaygcon} = $gctotal - $gcdaypast - ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
   }
   else {
@@ -7974,17 +7988,24 @@ sub _transferMeterValues {
       writeToHistory ( { paref => $paref, key => 'gcons', val => $gctotthishour, hour => $nhour } );
   }
 
+  ## Management der in das Netz eingespeister Energie
+  #####################################################
   my $dofeed = 0;
-
-  if ($gfdaypast == 0) {                                                                              # Management der Stundenberechnung auf Basis Totalwerte GridFeedIn
-      if (defined CircularVal ($hash, 99, 'initdayfeedin', undef)) {
+  my $idfin  = CircularVal ($hash, 99, 'initdayfeedin', undef);
+  
+  if (!$fitotal) {
+      $data{$type}{$name}{circular}{99}{initdayfeedin} = 0;
+      Log3 ($name, 3, "$name - WARNING - '$medev' - the total energy feed in to grid was reset and is registered with >0<.");
+  }
+  elsif ($gfdaypast == 0) {                                                                              # Management der Stundenberechnung auf Basis Totalwerte GridFeedIn
+      if (defined $idfin) {
           $dofeed = 1;
       }
       else {
           $data{$type}{$name}{circular}{99}{initdayfeedin} = $fitotal;
       }
   }
-  elsif (!defined CircularVal ($hash, 99, 'initdayfeedin', undef)) {
+  elsif (!defined $idfin) {
       $data{$type}{$name}{circular}{99}{initdayfeedin} = $fitotal - $gfdaypast - ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridFeedIn", 0);
   }
   else {
@@ -9617,7 +9638,7 @@ sub ___switchConsumerOn {
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOffCond Info: $infoff}) if($swoffcond && $infoff);
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - device >$dswname< is used as switching device});
 
-      if ($simpCstat =~ /planned|priority|starting/xs && $isInTime && $iilt) {
+      if ($simpCstat =~ /planned|priority|starting|continuing/xs && $isInTime && $iilt) {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - switching on postponed by >isInLocktime<});
       }
   }
@@ -9637,8 +9658,8 @@ sub ___switchConsumerOn {
 
   if ($auto && $oncom && $swoncond && !$swoffcond && !$iilt &&                                    # kein Einschalten wenn zusätzliche Switch off Bedingung oder Sperrzeit zutrifft
       $simpCstat =~ /planned|priority|starting/xs && $isInTime) {                                 # Verbraucher Start ist geplant && Startzeit überschritten
-      my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                                   # Consumer Planungsmode
-      my $enable  = ___enableSwitchByBatPrioCharge ($paref);                                      # Vorrangladung Batterie ?
+      my $mode   = ConsumerVal ($hash, $c, "mode", $defcmode);                                    # Consumer Planungsmode
+      my $enable = ___enableSwitchByBatPrioCharge ($paref);                                       # Vorrangladung Batterie ?
 
       debugLog ($paref, "consumerSwitching", qq{$name DEBUG> Consumer switch enable by battery state: $enable});
 
@@ -9650,40 +9671,36 @@ sub ___switchConsumerOn {
           delete $paref->{ps};
       }
       elsif ($mode eq "must" || $isConsRcmd) {                                                    # "Muss"-Planung oder Überschuß > Leistungsaufnahme (can)
-          CommandSet(undef,"$dswname $oncom");
+          $state = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom"};
+          
+          Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+          
+          CommandSet (undef, "$dswname $oncom");
 
           $paref->{ps} = "switching on:";
-
           ___setConsumerPlanningState ($paref);
-
           delete $paref->{ps};
 
-          $state = qq{switching Consumer '$calias' to '$oncom'};
-
           writeCacheToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
-
-          Log3 ($name, 2, "$name - $state (Automatic = $auto)");
       }
   }
   elsif ((($isintable == 1 && $isConsRcmd)          ||                                             # unterbrochenen Consumer fortsetzen
           ($isintable == 3 && $isConsRcmd))         &&
          $isInTime && $auto && $oncom && !$iilt     &&
-         $simpCstat =~ /interrupted|interrupting/xs) {
-
-      CommandSet(undef,"$dswname $oncom");
-
-      $paref->{ps} = "continuing:";
-
-      ___setConsumerPlanningState ($paref);
-
-      delete $paref->{ps};
+         $simpCstat =~ /interrupted|interrupting|continuing/xs) {
 
       my $cause = $isintable == 3 ? 'interrupt condition no longer present' : 'existing surplus';
-      $state    = qq{switching Consumer '$calias' to '$oncom', cause: $cause};
+      $state    = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom", cause: $cause};
+
+      Log3 ($name, 2, "$name - $state");      
+      
+      CommandSet (undef, "$dswname $oncom");
+
+      $paref->{ps} = "continuing:";
+      ___setConsumerPlanningState ($paref);
+      delete $paref->{ps};
 
       writeCacheToFile ($hash, "consumers", $csmcache.$name);                                     # Cache File Consumer schreiben
-
-      Log3 ($name, 2, "$name - $state");
   }
 
 return $state;
@@ -9732,41 +9749,36 @@ sub ___switchConsumerOff {
 
   my $isintable = isInterruptable ($hash, $c, $hyst, 1);                                          # mit Ausgabe Interruptable Info im Debug
 
-  if(($swoffcond || ($stopts && $t >= $stopts)) && !$iilt &&
+  if (($swoffcond || ($stopts && $t >= $stopts)) && !$iilt &&
      ($auto && $offcom && $simpCstat =~ /started|starting|stopping|interrupt|continu/xs)) {
-      CommandSet(undef,"$dswname $offcom");
-
-      $paref->{ps} = "switching off:";
-
-      ___setConsumerPlanningState ($paref);
-
-      delete $paref->{ps};
-
       $cause = $swoffcond ? "switch-off condition (key swoffcond) is true" : "planned switch-off time reached/exceeded";
-      $state = qq{switching Consumer '$calias' to '$offcom', cause: $cause};
-
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                                                # Cache File Consumer schreiben
+      $state = qq{switching Consumer '$calias' to '$offcom', command: "set $dswname $offcom", cause: $cause};
 
       Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+      
+      CommandSet (undef,"$dswname $offcom");
+
+      $paref->{ps} = "switching off:";
+      ___setConsumerPlanningState ($paref);
+      delete $paref->{ps};
+
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                     # Cache File Consumer schreiben
   }
   elsif ((($isintable && !isConsRcmd ($hash, $c)) || $isintable == 2) &&                          # Consumer unterbrechen
          isInTimeframe ($hash, $c) && $auto && $offcom && !$iilt      &&
          $simpCstat =~ /started|continued|interrupting/xs) {
-
-      CommandSet(undef,"$dswname $offcom");
+      $cause = $isintable == 2 ? 'interrupt condition' : 'surplus shortage';
+      $state = qq{switching Consumer '$calias' to '$offcom', command: "set $dswname $offcom", cause: $cause};
+      
+      Log3 ($name, 2, "$name - $state");
+      
+      CommandSet (undef,"$dswname $offcom");
 
       $paref->{ps} = "interrupting:";
-
       ___setConsumerPlanningState ($paref);
-
       delete $paref->{ps};
 
-      $cause = $isintable == 2 ? 'interrupt condition' : 'surplus shortage';
-      $state = qq{switching Consumer '$calias' to '$offcom', cause: $cause};
-
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                                                # Cache File Consumer schreiben
-
-      Log3 ($name, 2, "$name - $state");
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                     # Cache File Consumer schreiben
   }
 
 return $state;
@@ -12547,6 +12559,7 @@ sub _beamGraphicFirstHour {
   my $beam1cont = $paref->{beam1cont};
   my $beam2cont = $paref->{beam2cont};
   my $lang      = $paref->{lang};
+  my $kw        = $paref->{kw};
 
   my $day;
 
@@ -12616,26 +12629,26 @@ sub _beamGraphicFirstHour {
   $hfcg->{0}{beam2}  //= 0;
   $hfcg->{0}{diff}     = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
   
-  my $epc = '('.CurrentVal ($hash, 'ePurchasePriceCcy', 0).')';
-  my $efc = '('.CurrentVal ($hash, 'eFeedInTariffCcy',  0).')';
+  my $epc = CurrentVal ($hash, 'ePurchasePriceCcy', 0);
+  my $efc = CurrentVal ($hash, 'eFeedInTariffCcy',  0);
   
-  $hfcg->{0}{beam1txt} = ($beam1cont eq 'pvForecast')          ? $htitles{pvgenefc}{$lang} :
-                         ($beam1cont eq 'pvReal')              ? $htitles{pvgenerl}{$lang} :
-                         ($beam1cont eq 'gridconsumption')     ? $htitles{enppubgd}{$lang} :
-                         ($beam1cont eq 'consumptionForecast') ? $htitles{enconsfc}{$lang} :
-                         ($beam1cont eq 'consumption')         ? $htitles{enconsrl}{$lang} :
-                         ($beam1cont eq 'energycosts')         ? $htitles{enpchcst}{$lang}." $epc" :
-                         ($beam1cont eq 'gridfeedin')          ? $htitles{enfeedgd}{$lang} :
-                         ($beam1cont eq 'feedincome')          ? $htitles{rengfeed}{$lang}." $efc" :
+  $hfcg->{0}{beam1txt} = ($beam1cont eq 'pvForecast')          ? $htitles{pvgenefc}{$lang}." ($kw)"  :
+                         ($beam1cont eq 'pvReal')              ? $htitles{pvgenerl}{$lang}." ($kw)"  :
+                         ($beam1cont eq 'gridconsumption')     ? $htitles{enppubgd}{$lang}." ($kw)"  :
+                         ($beam1cont eq 'consumptionForecast') ? $htitles{enconsfc}{$lang}." ($kw)"  :
+                         ($beam1cont eq 'consumption')         ? $htitles{enconsrl}{$lang}." ($kw)"  :
+                         ($beam1cont eq 'energycosts')         ? $htitles{enpchcst}{$lang}." ($epc)" :
+                         ($beam1cont eq 'gridfeedin')          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
+                         ($beam1cont eq 'feedincome')          ? $htitles{rengfeed}{$lang}." ($efc)" :
                          '';
-  $hfcg->{0}{beam2txt} = ($beam2cont eq 'pvForecast')          ? $htitles{pvgenefc}{$lang} :
-                         ($beam2cont eq 'pvReal')              ? $htitles{pvgenerl}{$lang} :
-                         ($beam2cont eq 'gridconsumption')     ? $htitles{enppubgd}{$lang} :
-                         ($beam2cont eq 'consumptionForecast') ? $htitles{enconsfc}{$lang} :
-                         ($beam2cont eq 'consumption')         ? $htitles{enconsrl}{$lang} :
-                         ($beam2cont eq 'energycosts')         ? $htitles{enpchcst}{$lang}." $epc" :
-                         ($beam2cont eq 'gridfeedin')          ? $htitles{enfeedgd}{$lang} :
-                         ($beam2cont eq 'feedincome')          ? $htitles{rengfeed}{$lang}." $efc" :
+  $hfcg->{0}{beam2txt} = ($beam2cont eq 'pvForecast')          ? $htitles{pvgenefc}{$lang}." ($kw)"  :
+                         ($beam2cont eq 'pvReal')              ? $htitles{pvgenerl}{$lang}." ($kw)"  :
+                         ($beam2cont eq 'gridconsumption')     ? $htitles{enppubgd}{$lang}." ($kw)"  :
+                         ($beam2cont eq 'consumptionForecast') ? $htitles{enconsfc}{$lang}." ($kw)"  :
+                         ($beam2cont eq 'consumption')         ? $htitles{enconsrl}{$lang}." ($kw)"  :
+                         ($beam2cont eq 'energycosts')         ? $htitles{enpchcst}{$lang}." ($epc)" :
+                         ($beam2cont eq 'gridfeedin')          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
+                         ($beam2cont eq 'feedincome')          ? $htitles{rengfeed}{$lang}." ($efc)" :
                          '';
 
 return $thishour;
@@ -12698,7 +12711,7 @@ sub _beamGraphicRemainingHours {
               $hfcg->{$i}{sunaz}   = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'sunaz',     '-');
           }
           else {
-              $nh = sprintf '%02d', $i + $offset;
+              $nh = sprintf '%02d', ($i + $offset);
           }
       }
       else {
@@ -12712,7 +12725,6 @@ sub _beamGraphicRemainingHours {
           $hfcg->{$i}{wcc}     = NexthoursVal ($hash, 'NextHour'.$nh, 'cloudcover', '-');
           $hfcg->{$i}{sunalt}  = NexthoursVal ($hash, 'NextHour'.$nh, 'sunalt',     '-');
           $hfcg->{$i}{sunaz}   = NexthoursVal ($hash, 'NextHour'.$nh, 'sunaz',      '-');
-          #$val4   = (ReadingsVal($name,"NextHour".$ii."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
       }
 
       $hfcg->{$i}{time_str} = sprintf('%02d', $hfcg->{$i}{time}-1).$hourstyle;
@@ -12865,9 +12877,9 @@ sub _beamGraphic {
               $titz3 = qq/title="$hfcg->{0}{beam1txt}"/;
           }
 
-          $he = int(($maxVal-$z2) / $maxVal * $height);
-          $z2 = int(($z2 - $z3)   / $maxVal * $height);
-          $z3 = int($height - $he - $z2);                                                                       # was von maxVal noch übrig ist
+          $he = int (($maxVal-$z2) / $maxVal * $height);
+          $z2 = int (($z2 - $z3)   / $maxVal * $height);
+          $z3 = int ($height - $he - $z2);                                                                      # was von maxVal noch übrig ist
 
           if ($z3 < int($fsize / 2)) {                                                                          # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
               $z2 += $z3;
@@ -12896,7 +12908,7 @@ sub _beamGraphic {
               else {
                   if ($maxDif > 0) {
                       $px_neg = int($height * abs($minDif) / ($maxDif + abs($minDif)));                         # Wieviel % entfallen auf unten ?
-                      $px_pos = $height - $px_neg;                                                                 # der Rest ist oben
+                      $px_pos = $height - $px_neg;                                                              # der Rest ist oben
                   }
                   else {                                                                                        # keine positiven Balken vorhanden, die Negativen bekommen den gesammten Raum
                       $px_neg = $height;
@@ -12907,12 +12919,15 @@ sub _beamGraphic {
 
           if ($hfcg->{$i}{diff} >= 0) {                                                                         # Zone 2 & 3 mit ihren direkten Werten vorbesetzen
               $z2 = $hfcg->{$i}{diff};
-              $z3 = abs($minDif);
+              $z3 = abs($minDif);      
           }
           else {
               $z2 = $maxDif;
-              $z3 = abs($hfcg->{$i}{diff});                                                                     # Nur Betrag ohne Vorzeichen
+              $z3 = abs($hfcg->{$i}{diff});                                                                     # Nur Betrag ohne Vorzeichen        
           }
+          
+          $titz2 = qq/title="$hfcg->{0}{beam1txt}"/;   
+          $titz3 = qq/title="$hfcg->{0}{beam2txt}"/; 
                                                                                                                 # Alle vorbesetzen Werte umrechnen auf echte Ausgabe px
           $he = (!$px_pos || !$maxDif) ? 0 : int(($maxDif-$z2) / $maxDif * $px_pos);                            # Teilung durch 0 vermeiden
           $z2 = ($px_pos - $he) ;
@@ -13025,7 +13040,7 @@ sub _beamGraphic {
               $style .= " background-color:#$colorb1'";
               $z2     = 1 if ($hfcg->{$i}{diff} == 0);                                                           # Sonderfall , 1px dünnen Strich ausgeben
               $ret   .= "<tr class='odd' style='height:".$z2."px'>";
-              $ret   .= "<td align='center' class='solarfc' $style>";
+              $ret   .= "<td align='center' class='solarfc' $style $titz2>";
               $ret   .= "</td></tr>";
           }
           else {                                                                                                 # ohne Farbe
@@ -13040,7 +13055,7 @@ sub _beamGraphic {
           if ($hfcg->{$i}{diff} < 0) {                                                                           # Negativ Balken anzeigen ?
               $style .= " background-color:#$colorb2'";                                                          # mit Farbe 2 colorb2 füllen
               $ret   .= "<tr class='odd' style='height:".$z3."px'>";
-              $ret   .= "<td align='center' class='solarfc' $style>";
+              $ret   .= "<td align='center' class='solarfc' $style $titz3>";
               $ret   .= "</td></tr>";
           }
           elsif ($z3) {                                                                                          # ohne Farbe
@@ -18060,8 +18075,12 @@ to ensure that the system configuration is correct.
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
           <tr><td> <b>gcon</b>       </td><td>Reading which supplies the power currently drawn from the grid                                                            </td></tr>
           <tr><td> <b>contotal</b>   </td><td>Reading which provides the sum of the energy drawn from the grid (a constantly increasing meter)                          </td></tr>
+          <tr><td>                   </td><td>If the counter is reset to '0' at the start of the day (daily counter), this reading can be used.                         </td></tr>
+          <tr><td>                   </td><td>In this case, a message is displayed in the log with verbose 3.                                                           </td></tr>         
           <tr><td> <b>gfeedin</b>    </td><td>Reading which supplies the power currently fed into the grid                                                              </td></tr>
           <tr><td> <b>feedtotal</b>  </td><td>Reading which provides the sum of the energy fed into the grid (a constantly increasing meter)                            </td></tr>
+          <tr><td>                   </td><td>If the counter is reset to '0' at the start of the day (daily counter), this reading can be used.                         </td></tr>
+          <tr><td>                   </td><td>In this case, a message is displayed in the log with verbose 3.                                                           </td></tr>         
           <tr><td> <b>Unit</b>       </td><td>the respective unit (W,kW,Wh,kWh)                                                                                         </td></tr>
           <tr><td>                   </td><td>                                                                                                                          </td></tr>
           <tr><td> <b>conprice</b>   </td><td>Price for the purchase of one kWh (optional). The &lt;field&gt; can be specified in one of the following variants:        </td></tr>
@@ -20329,8 +20348,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
           <tr><td> <b>gcon</b>       </td><td>Reading welches die aktuell aus dem Netz bezogene Leistung liefert                                                         </td></tr>
           <tr><td> <b>contotal</b>   </td><td>Reading welches die Summe der aus dem Netz bezogenen Energie liefert (ein sich stetig erhöhender Zähler)                   </td></tr>
+          <tr><td>                   </td><td>Wird der Zähler zu Beginn des Tages auf '0' zurückgesetzt (Tageszähler), kann dieses Reading verwendet werden.             </td></tr>
+          <tr><td>                   </td><td>In diesem Fall erfolgt eine Meldung im Log mit verbose 3.             </td></tr>
           <tr><td> <b>gfeedin</b>    </td><td>Reading welches die aktuell in das Netz eingespeiste Leistung liefert                                                      </td></tr>
           <tr><td> <b>feedtotal</b>  </td><td>Reading welches die Summe der in das Netz eingespeisten Energie liefert (ein sich stetig erhöhender Zähler)                </td></tr>
+          <tr><td>                   </td><td>Wird der Zähler zu Beginn des Tages auf '0' zurückgesetzt (Tageszähler), kann dieses Reading verwendet werden.             </td></tr>
+          <tr><td>                   </td><td>In diesem Fall erfolgt eine Meldung im Log mit verbose 3.             </td></tr>
           <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                                        </td></tr>
           <tr><td>                   </td><td>                                                                                                                           </td></tr>
           <tr><td> <b>conprice</b>   </td><td>Preis für den Bezug einer kWh (optional). Die Angabe &lt;Feld&gt; ist in einer der folgenden Varianten möglich:            </td></tr>
