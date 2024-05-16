@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.21.0" => "14.05.2024  currentMeterDev: meter can be a Day meter, contotal and feedtotal can be reset at day begin ",
   "1.20.0" => "12.05.2024  graphicBeamXContent: gridfeedin available, beamGraphic: Mouse-Over shows beamcontent text ".
                            "complete command printout in Debug mode, ___switchConsumerOn: add continuing ",
   "1.19.0" => "11.05.2024  conprice, feedprice saved in pvHistory, graphicBeamXContent: energycosts, feedincome available ",
@@ -3824,7 +3825,7 @@ sub __VictronVRM_ApiResponseLogin {
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
 
-          if($debug =~ /apiProcess|apiCall/x) {
+          if ($debug =~ /apiProcess|apiCall/x) {
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - error_code: ".$jdata->{'error_code'});
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - errors: "    .$jdata->{'errors'});
           }
@@ -7949,18 +7950,25 @@ sub _transferMeterValues {
       $gcdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_GridConsumption", 0);
       $gfdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_GridFeedIn",      0);
   }
-
-  my $docon = 0;
-
-  if ($gcdaypast == 0) {                                                                             # Management der Stundenberechnung auf Basis Totalwerte GridConsumtion
-      if (defined CircularVal ($hash, 99, 'initdaygcon', undef)) {
+  
+  ## Management aus dem Netz bezogener Energie
+  ##############################################
+  my $docon  = 0;
+  my $idgcon = CircularVal ($hash, 99, 'initdaygcon', undef);
+  
+  if (!$gctotal) {
+      $data{$type}{$name}{circular}{99}{initdaygcon} = 0;
+      Log3 ($name, 3, "$name - WARNING - '$medev' - the total energy drawn from grid was reset and is registered with >0<.");
+  }
+  elsif ($gcdaypast == 0) {                                                                             # Management der Stundenberechnung auf Basis Totalwerte GridConsumtion
+      if (defined $idgcon) {
           $docon = 1;
       }
       else {
-          $data{$type}{$name}{circular}{99}{initdaygcon} = $gctotal;
+          $data{$type}{$name}{circular}{99}{initdaygcon} = $gctotal; 
       }
   }
-  elsif (!defined CircularVal ($hash, 99, 'initdaygcon', undef)) {
+  elsif (!defined $idgcon) {
       $data{$type}{$name}{circular}{99}{initdaygcon} = $gctotal - $gcdaypast - ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
   }
   else {
@@ -7980,17 +7988,24 @@ sub _transferMeterValues {
       writeToHistory ( { paref => $paref, key => 'gcons', val => $gctotthishour, hour => $nhour } );
   }
 
+  ## Management der in das Netz eingespeister Energie
+  #####################################################
   my $dofeed = 0;
-
-  if ($gfdaypast == 0) {                                                                              # Management der Stundenberechnung auf Basis Totalwerte GridFeedIn
-      if (defined CircularVal ($hash, 99, 'initdayfeedin', undef)) {
+  my $idfin  = CircularVal ($hash, 99, 'initdayfeedin', undef);
+  
+  if (!$fitotal) {
+      $data{$type}{$name}{circular}{99}{initdayfeedin} = 0;
+      Log3 ($name, 3, "$name - WARNING - '$medev' - the total energy feed in to grid was reset and is registered with >0<.");
+  }
+  elsif ($gfdaypast == 0) {                                                                              # Management der Stundenberechnung auf Basis Totalwerte GridFeedIn
+      if (defined $idfin) {
           $dofeed = 1;
       }
       else {
           $data{$type}{$name}{circular}{99}{initdayfeedin} = $fitotal;
       }
   }
-  elsif (!defined CircularVal ($hash, 99, 'initdayfeedin', undef)) {
+  elsif (!defined $idfin) {
       $data{$type}{$name}{circular}{99}{initdayfeedin} = $fitotal - $gfdaypast - ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridFeedIn", 0);
   }
   else {
@@ -18060,8 +18075,12 @@ to ensure that the system configuration is correct.
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
           <tr><td> <b>gcon</b>       </td><td>Reading which supplies the power currently drawn from the grid                                                            </td></tr>
           <tr><td> <b>contotal</b>   </td><td>Reading which provides the sum of the energy drawn from the grid (a constantly increasing meter)                          </td></tr>
+          <tr><td>                   </td><td>If the counter is reset to '0' at the beginning of the day (daily counter), the module handles this situation accordingly.</td></tr>
+          <tr><td>                   </td><td>In this case, a message is displayed in the log with verbose 3.                                                           </td></tr>         
           <tr><td> <b>gfeedin</b>    </td><td>Reading which supplies the power currently fed into the grid                                                              </td></tr>
           <tr><td> <b>feedtotal</b>  </td><td>Reading which provides the sum of the energy fed into the grid (a constantly increasing meter)                            </td></tr>
+          <tr><td>                   </td><td>If the counter is reset to '0' at the beginning of the day (daily counter), the module handles this situation accordingly.</td></tr>
+          <tr><td>                   </td><td>In this case, a message is displayed in the log with verbose 3.                                                           </td></tr>         
           <tr><td> <b>Unit</b>       </td><td>the respective unit (W,kW,Wh,kWh)                                                                                         </td></tr>
           <tr><td>                   </td><td>                                                                                                                          </td></tr>
           <tr><td> <b>conprice</b>   </td><td>Price for the purchase of one kWh (optional). The &lt;field&gt; can be specified in one of the following variants:        </td></tr>
@@ -20329,8 +20348,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
           <tr><td> <b>gcon</b>       </td><td>Reading welches die aktuell aus dem Netz bezogene Leistung liefert                                                         </td></tr>
           <tr><td> <b>contotal</b>   </td><td>Reading welches die Summe der aus dem Netz bezogenen Energie liefert (ein sich stetig erhöhender Zähler)                   </td></tr>
+          <tr><td>                   </td><td>Wird der Zähler zu Beginn des Tages auf '0' zurückgesetzt (Tageszähler), behandelt das Modul diese Situation entsprechend. </td></tr>
+          <tr><td>                   </td><td>In diesem Fall erfolgt eine Meldung im Log mit verbose 3.             </td></tr>
           <tr><td> <b>gfeedin</b>    </td><td>Reading welches die aktuell in das Netz eingespeiste Leistung liefert                                                      </td></tr>
           <tr><td> <b>feedtotal</b>  </td><td>Reading welches die Summe der in das Netz eingespeisten Energie liefert (ein sich stetig erhöhender Zähler)                </td></tr>
+          <tr><td>                   </td><td>Wird der Zähler zu Beginn des Tages auf '0' zurückgesetzt (Tageszähler), behandelt das Modul diese Situation entsprechend. </td></tr>
+          <tr><td>                   </td><td>In diesem Fall erfolgt eine Meldung im Log mit verbose 3.             </td></tr>
           <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                                        </td></tr>
           <tr><td>                   </td><td>                                                                                                                           </td></tr>
           <tr><td> <b>conprice</b>   </td><td>Preis für den Bezug einer kWh (optional). Die Angabe &lt;Feld&gt; ist in einer der folgenden Varianten möglich:            </td></tr>
