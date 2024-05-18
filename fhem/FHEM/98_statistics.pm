@@ -1324,7 +1324,8 @@ __END__
       </li><br>
 	  <a id="statistics-set-setStatistics"></a><li><code>setStatistics  &lt;device&gt;  &lt;reading&gt;  &lt;period&gt;  &lt;value&gt;</code>
       <br>
-      Sets a statistic value to a fixed value. Period is one of Hour, Day, Month, Year.
+      Sets a statistic value to a fixed value. Period is one of Hour, Day, Month, Year.<br>
+	  Implemented for delta readings only (Hour, Day, Month, Year) Hint: covers not last readings
       </li>
   </ul>
 
@@ -1366,7 +1367,12 @@ __END__
       So, only the readings that are listed in the specific attributes are evaluated.
       <br>
     </li><br>
-     
+     <a id="statistics-attr-limitDecimals"></a><li><code>limitDecimals <code>&lt;reading:decimals&gt;</code></code>
+      <br>
+      Space separated list of reading:decimals to set the maximun number of decimal places after decimal point.<br>
+      Valid only for Delta und Avg.
+      <br>
+    </li><br>     
     <a id="statistics-attr-minAvgMaxReadings"></a><li><code>minAvgMaxReadings &lt;readings&gt;</code>
       <br>
       Comma separated list of reading names for which a min/average/max statistic shall be calculated. 
@@ -1486,6 +1492,11 @@ __END__
          <br>
          Berechnet die aktuellen Statistiken aller beobachteten Geräte.
       </li>
+	   <a id="statistics-set-setStatistics"></a><li><code>setStatistics  &lt;device&gt;  &lt;reading&gt;  &lt;period&gt;  &lt;value&gt;</code>
+      <br>
+      Setzt einen statistic Wert auf einen festen Wert. Die period ist eine aus Hour, Day, Month, Year.<br>
+	  Iimplementiert für delta Readings (Hour, Day, Month, Year). Hinweis: nicht für die Last-Readings.
+      </li>
   </ul>
 
   <a id="statistics-get"></a>
@@ -1518,7 +1529,12 @@ __END__
          z.B. <code>FritzDect:current|Sensor_.*:humidity</code>
          <br>
       </li><br>
-
+     <a id="statistics-attr-limitDecimals"></a><li><code>limitDecimals <code>&lt;reading:decimals&gt;</code></code>
+      <br>
+      Durch Angabe einer Liste im Format reading:decimals (Leerzeichen getrennt) wird die maximale Anzahl <br>
+      von Nachkommastellen festgelegt (greift nur bei Delta und Avg).
+      <br>
+     </li><br>
      <a id="statistics-attr-ignoreDefaultAssignments"></a><li><code>ignoreDefaultAssignments <code>&lt;0 | 1&gt;</code></code>
       <br>
       Ignoriert die Standardzuordnung von Gerätewerten zu Statistik-Typen..<br>
