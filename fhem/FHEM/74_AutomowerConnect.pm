@@ -556,6 +556,7 @@ __END__
     <li>mower_commandSend - Last successfull sent command</li>
     <li>mower_commandStatus - Status of the last sent command cleared each status update</li>
     <li>mower_currentZone - Zone name with activity MOWING in the last status time stamp interval and number of way points in parenthesis.</li>
+    <li>mower_inactiveReason - They are NONE, PLANNING, SEARCHING_FOR_SATELLITES.</li>
     <li>mower_wsEvent - websocket connection events (status-event, positions-event, settings-event)</li>
     <li>mower_errorCode - last error code</li>
     <li>mower_errorCodeTimestamp - last error code time stamp</li>
@@ -1044,6 +1045,7 @@ __END__
     <li>mower_commandSend - Letzter erfolgreich gesendeter Befehl.</li>
     <li>mower_commandStatus - Status des letzten uebermittelten Kommandos wird duch Statusupdate zurückgesetzt.</li>
     <li>mower_currentZone - Name der Zone im aktuell abgefragten Intervall der Statuszeitstempel , in der der Mäher gemäht hat und Anzahl der Wegpunkte in der Zone in Klammern.</li>
+    <li>mower_inactiveReason - Gründe für Inaktivität: NONE, PLANNING, SEARCHING_FOR_SATELLITES.</li>
     <li>mower_wsEvent - Events der Websocketverbindung (status-event, positions-event, settings-event)</li>
     <li>mower_errorCode - last error code</li>
     <li>mower_errorCodeTimestamp - last error code time stamp</li>

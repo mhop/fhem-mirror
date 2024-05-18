@@ -2374,10 +2374,11 @@ sub fillReadings {
   readingsBulkUpdateIfChanged( $hash, '.mower_id', $hash->{helper}{mower}{id}, 0 ); 
   readingsBulkUpdateIfChanged( $hash, "batteryPercent", $hash->{helper}{mower}{attributes}{battery}{batteryPercent} ); 
   my $pref = 'mower';
+  my $rval = ReadingsVal( $name, $pref.'_inactiveReason', '' );
 
-  if ( ! ReadingsVal( $name, $pref.'_inactiveReason', '' ) && $hash->{helper}{mower}{attributes}{$pref}{inactiveReason} ne 'NONE' ) {
+  if ( !$rval && $hash->{helper}{mower}{attributes}{$pref}{inactiveReason} ne 'NONE' ) {
     readingsBulkUpdateIfChanged( $hash, $pref.'_inactiveReason', $hash->{helper}{mower}{attributes}{$pref}{inactiveReason} );
-  } else {
+  } elsif ( $rval ) {
     readingsBulkUpdateIfChanged( $hash, $pref.'_inactiveReason', $hash->{helper}{mower}{attributes}{$pref}{inactiveReason} );
   }
 
