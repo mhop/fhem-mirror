@@ -603,13 +603,13 @@ use warnings;
 use Encode 'encode';
 use File::Basename 'dirname';
 use File::Temp 'tempfile';
-use IO::Uncompress::Unzip qw(unzip $UnzipError);  
+use IO::Uncompress::Unzip qw(unzip $UnzipError);
 use POSIX qw(floor strftime);
 use Scalar::Util 'looks_like_number';
 use Storable qw(freeze thaw);
 use Time::HiRes qw(gettimeofday usleep);
 use Time::Local qw(timelocal timegm);
-use Time::Piece qw(localtime gmtime);    
+use Time::Piece qw(localtime gmtime);
 
 use Blocking;
 use HttpUtils;
@@ -1277,7 +1277,7 @@ sub FormatDateTimeUTC {
   my $t = shift;
   #return strftime('%Y-%m-%d %H:%M:%SZ', gmtime(@_));         # Heiko
   return $t.'Z';                                              # Heiko
-} 
+}
 
 =head2 ParseDateTimeUTC($$)
 
@@ -1292,11 +1292,11 @@ sub FormatDateTimeUTC {
 =cut
 
 sub ParseDateTimeUTC {
-  my $int = shift; 
+  my $int = shift;
   my $t;
   my ($y, $mo, $d, $h, $m, $s) = $int =~ /([0-9]{4})-([0-9]{2})-([0-9]{2})\s([0-9]{2}):([0-9]{2}):([0-9]{2})/xs;  # Heiko
   eval { $t = ::fhemTimeGm($s, $m, $h, $d, $mo - 1, $y - 1900) };                 # Heiko
-  ::Log 1, 'eval: '.$@ if($@);                                          # Heiko                                         
+  ::Log 1, 'eval: '.$@ if($@);                                          # Heiko
   return $t;
 }
 
@@ -1389,7 +1389,7 @@ sub FormatWeekdayLocal {
 sub ParseDateTimeLocal {
   my ($hash, $s) = @_;
   my $t;
-  eval { $t = Timelocal($hash, ::strptime($s, '%Y-%m-%d %H:%M:%S')) };  
+  eval { $t = Timelocal($hash, ::strptime($s, '%Y-%m-%d %H:%M:%S')) };
   return $t;
 }
 
@@ -1502,7 +1502,7 @@ sub RotateForecast {
   my $stationChanged = ::ReadingsVal($name, 'fc_station', '') ne $station;
   if ($stationChanged) {
     # different station, delete all existing readings
-    ::Log3 $name, 3, "$name: RotateForecast: station has changed, deleting exisiting readings";
+    ::Log3 $name, 3, "$name: RotateForecast: station has changed, deleting existing readings";
     ::CommandDeleteReading(undef, "$name ^fc.*");
     $daysAvailable = 0;
   } elsif (defined($oldToday)) {
@@ -1733,13 +1733,13 @@ sub GetHeaders {
         ::Log3 $name, 5, "$name: GetHeaders content_length: $headers{content_length}";
       } elsif ($entry =~ /Last-Modified/xs) {
         my ($lastModified) = $entry =~ /Last-Modified:\s(.*GMT)/;                                # Heiko
-        ::Log3 $name, 5, "$name: GetHeaders last_modified raw: $lastModified";        
+        ::Log3 $name, 5, "$name: GetHeaders last_modified raw: $lastModified";
         eval {
           my $lm = gmtime(Time::Piece->strptime ($lastModified, '%a, %d %b %Y %H:%M:%S %Z'))->datetime;   # Heiko
           $lm =~ s/T/ /;                                                                                   # Heiko
           $headers{last_modified} = $lm;                                                                   # Heiko
         };
-        ::Log3 $name, 5, "$name: GetHeaders last_modified formatted: $headers{last_modified}"; 
+        ::Log3 $name, 5, "$name: GetHeaders last_modified formatted: $headers{last_modified}";
       }
     }
     return %headers;
@@ -1770,7 +1770,7 @@ Check if a web document was updated by comparing the webserver header info with 
 =cut
 
 sub IsDocumentUpdated {
-  my ($hash, $url, $prefix) = @_;         
+  my ($hash, $url, $prefix) = @_;
   my $name = $hash->{NAME};
 
   # check if file on webserver was modified
@@ -1781,8 +1781,8 @@ sub IsDocumentUpdated {
     $_[3] = $headers{content_length}; # docSize
     $_[4] = FormatDateTimeUTC($headers{last_modified}); # docTime
     my $lastURL = ::ReadingsVal($name, $prefix.'_url', '');
-    my $lastSize = ::ReadingsVal($name, $prefix.'_dwdDocSize', 0);       
-    my $lastTime = ::ReadingsVal($name , $prefix.'_dwdDocTime', '');     
+    my $lastSize = ::ReadingsVal($name, $prefix.'_dwdDocSize', 0);
+    my $lastTime = ::ReadingsVal($name , $prefix.'_dwdDocTime', '');
     my $emptyAlertsZipSize = 22; # bytes of empty zip file
     ::Log3 $name, 5, "$name: IsDocumentUpdated docSize:$_[3]/$lastSize docTime:$_[4]/$lastTime URL:$url/$lastURL";
     if ($url eq $lastURL && ($_[3] == $lastSize && $_[4] eq $lastTime) || ($prefix eq 'a' && $_[3] == $emptyAlertsZipSize && $lastSize == $emptyAlertsZipSize)) {
@@ -1828,133 +1828,6 @@ sub ConvertToErrorMessage {
   $errorMessage =~ s/,/;/g;
 
   return $errorMessage;
-}
-
-=over
-
-download forecast kmz file from URL into a string variable and unzip string content into a string array with one entry per file in zip
-
-=over
-
-=item * param name: name of DWD_OpenData device
-
-=item * param param: parameter hash from call to HttpUtils_NonblockingGet
-
-=item * return array of file contents (one per file, typically one)
-
-=back
-
-=cut
-
-sub GetForecastDataDiskless {
-  my ($name, $param) = @_;
-
-  # download forecast document into variable
-  my @fileContent;
-  my ($httpError, $zipFileContent) = ::HttpUtils_BlockingGet($param);
-  eval {
-    my $url = $param->{url};
-    my $code = $param->{code};
-    if (defined($httpError) && length($httpError) > 0) {
-      die "error retrieving URL '$url': $httpError";
-    }
-    if (defined($code) && $code != 200) {
-      die "HTTP error $code retrieving URL '$url'";
-    }
-    if (!defined($zipFileContent) || length($zipFileContent) == 0) {
-      die "no data retrieved from URL '$url'";
-    }
-
-    ::Log3 $name, 5, "$name: GetForecastDataDiskless: data received, unzipping ...";
-
-    # create memory mapped file from received data and unzip into string array
-    open my $zipFileHandle, '<', \$zipFileContent;
-    unzip($zipFileHandle => \@fileContent, MultiStream => 1, AutoClose => 1) or die "unzip failed: $UnzipError\n";
-  };
-
-  return (ConvertToErrorMessage($@, $name, 'GetForecastDataDiskless'), \@fileContent);
-}
-
-=over
-
-download forecast kmz file from URL into a string variable, unzip into temp file and filter forecast data for station into a string
-
-=over
-
-=item * param name: name of DWD_OpenData device
-
-=item * param param: parameter hash from call to HttpUtils_NonblockingGet
-
-=item * return array of file contents (one per file, typically one)
-
-=back
-
-=cut
-
-sub GetForecastDataUsingFile {
-  my ($name, $param) = @_;
-
-  # download forecast document into variable
-  my @fileContent;
-  my ($httpError, $zipFileContent) = ::HttpUtils_BlockingGet($param);
-  eval {
-    my $url = $param->{url};
-    my $code = $param->{code};
-    if (defined($httpError) && length($httpError) > 0) {
-      die "error retrieving URL '$url': $httpError";
-    }
-    if (defined($code) && $code != 200) {
-      die "HTTP error $code retrieving URL '$url'";
-    }
-    if (!defined($zipFileContent) || length($zipFileContent) == 0) {
-      die "no data retrieved from URL '$url'";
-    }
-
-    ::Log3 $name, 5, "$name: GetForecastDataUsingFile: data received, unzipping ...";
-
-    # unzip to temp file
-    open(my $zipFileHandle, '<', \$zipFileContent) or die "unable to open file $!";
-    my $hash = $param->{hash};
-    my $station = $param->{station};
-    my $kmlFileName = dirname($hash->{".forecastFile"}) . "/" . "forecast-$station.kml";
-    unzip($zipFileHandle => $kmlFileName, MultiStream => 1, AutoClose => 1) or die "unzip failed: $UnzipError\n";
-    my $kmlFileSize = -s $kmlFileName;
-    ::Log3 $name, 5, "$name: GetForecastDataUsingFile: unzipped " . $kmlFileSize . " bytes, filtering ...";
-
-    # read temp file content into string
-    open(my $kmlFileHandle, '<', $kmlFileName) or die "unable to open file $!";
-    #read($kmlFileHandle, my $fileData, -s $kmlFileHandle);
-    my $fileData = '';
-    my $phase = 0; # copy header
-    $station = $param->{station};
-    while (my $line = <$kmlFileHandle>) {
-      if ($line =~ /<kml:name/) {
-        if ($line =~ /$station/) {
-          $phase = 2; # copy station data
-        } else {
-          $phase = 1; # skip station data
-        }
-      } elsif ($phase == 2 && $line =~ /<\/kml:Placemark/) {
-        $phase = 3; # done
-      }
-      if ($phase == 0 || $phase == 2) {
-        # copy line
-        $fileData .= $line;
-      } elsif ($phase == 3) {
-        # finalize document
-        $fileData .= $line . "    </kml:Document>\n" . "</kml:kml>";
-        $phase = 4;
-        last;
-      }
-    }
-    close($kmlFileHandle);
-    unlink($kmlFileName);
-    ::Log3 $name, 5, "$name: GetForecastDataUsingFile: filtered " . length($fileData) . " bytes";
-
-    push(@fileContent, \$fileData);
-  };
-
-  return (ConvertToErrorMessage($@, $name, 'GetForecastDataUsingFile'), \@fileContent);
 }
 
 =head2 GetForecastStart($)
@@ -2003,7 +1876,7 @@ sub GetForecastStart {
   $maxDocAge = 0;     # Heiko ... wozu nochmal Wartezeit checken wenn bereits in IsDocumentUpdated?
   $update = $update && ($lastDocSize == 0 || ($dwdDocTimestamp - $lastDocTimestamp) >= $maxDocAge);
 
-::Log3 $name, 5, "$name: GetForecastStart dwdDocTime: $dwdDocTime, dwdDocTimestamp: $dwdDocTimestamp,  dwdDocSize: $dwdDocSize, lastDocTimestamp: $lastDocTimestamp, maxDocAge: $maxDocAge, lastDocSize: $lastDocSize : update: $update";
+  ::Log3 $name, 5, "$name: GetForecastStart dwdDocTime: $dwdDocTime, dwdDocTimestamp: $dwdDocTimestamp,  dwdDocSize: $dwdDocSize, lastDocTimestamp: $lastDocTimestamp, maxDocAge: $maxDocAge, lastDocSize: $lastDocSize : update: $update";
 
   my $result;
   if ($update) {
@@ -2021,19 +1894,8 @@ sub GetForecastStart {
 
     # download and unpack forecast report
     ::Log3 $name, 5, "$name: GetForecastStart START (PID $$): $url";
-    my ($errorMessage, $fileContent);                      
-    if ($dwdDocSize == 0 || $dwdDocSize > 1000000) {
-      ($errorMessage, $fileContent) = GetForecastDataUsingFile($name, $param);
-    } else {
-      ($errorMessage, $fileContent) = GetForecastDataDiskless($name, $param);
-    }
 
-    # process forecast data
-    if (length($errorMessage)) {
-      $result = [$name, $errorMessage];
-    } else {
-      $result = ProcessForecast($param, $fileContent);
-    }
+    $result = ProcessForecast($param);
 
     ::Log3 $name, 5, "$name: GetForecastStart END";
   } else {
@@ -2088,7 +1950,7 @@ sub getStationPos {
   return $pos;
 }
 
-=head2 ProcessForecast($$$)
+=head2 ProcessForecast($)
 
 =over
 
@@ -2110,7 +1972,7 @@ ATTENTION: This method is executed in a different process than FHEM.
 =cut
 
 sub ProcessForecast {
-  my ($param, $xmlStrings) = @_;
+  my $param         = shift;
   my $hash          = $param->{hash};
   my $name          = $hash->{NAME};
   my $url           = $param->{url};
@@ -2125,7 +1987,23 @@ sub ProcessForecast {
   my $relativeDay = 0;
   my @coordinates;
   {
-    ::Log3 $name, 5, "$name: ProcessForecast: data unpacked, decoding ...";
+    ::Log3 $name, 5, "$name: ProcessForecast: download data ...";
+    
+    # download forecast document into variable
+    my ($httpError, $zipFileContent) = ::HttpUtils_BlockingGet($param);
+    my $url = $param->{url};
+    my $code = $param->{code};
+    if (defined($httpError) && length($httpError) > 0) {
+      die "error retrieving URL '$url': $httpError";
+    }
+    if (defined($code) && $code != 200) {
+      die "HTTP error $code retrieving URL '$url'";
+    }
+    if (!defined($zipFileContent) || length($zipFileContent) == 0) {
+      die "no data retrieved from URL '$url'";
+    }
+
+    ::Log3 $name, 5, "$name: ProcessForecast: data received, unzipping and decoding ...";
 
     # prepare processing
     my $forecastProperties = ::AttrVal($name, 'forecastProperties', undef);
@@ -2153,150 +2031,207 @@ sub ProcessForecast {
     $header{dwdDocSize} = $dwdDocSize;
     $header{dwdDocTime} = $dwdDocTime;
 
-    # parse XML strings (files from zip)
-    for my $xmlString (@$xmlStrings) {
-      if (substr(${$xmlString}, 0, 2) eq 'PK') {                                  # empty string, skip
-        # empty string, skip
-        next;
-      }
+    my $zip = new IO::Uncompress::Unzip(\$zipFileContent) or die "unzip failed: $UnzipError\n";
 
-      # parse XML string
-      ::Log3 $name, 5, "$name: ProcessForecast: parsing XML document";
-      my $dom = XML::LibXML->load_xml(string => $xmlString);
-      if (!$dom) {
-        die "parsing XML failed";
-      }
+    my $buffer;
+    my $offset = 0;
+    my $startOfLine = 0;
+    my $endOfLine = 0;
+    my $line;
+    my $collect = 0;
+    my $collectString = '';
+    my $headerParsed = 0;
+    my $xmlVersion = '<?xml version="1.0" encoding="ISO-8859-1" standalone="yes"?>';
+    my $xmlFormat = '<kml:kml xmlns:dwd="https://opendata.dwd.de/weather/lib/pointforecast_dwd_extension_V1_0.xsd" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:xal="urn:oasis:names:tc:ciq:xsdschema:xAL:2.0" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">';
 
-      ::Log3 $name, 5, "$name: ProcessForecast: extracting data";
+    my @timestamps;
+    my $issuer = undef;
+    my $defaultUndefSign = '-';
+    my %timeProperties;
+    my ($longitude, $latitude, $altitude);
 
-      # extract header data
-      my @timestamps;
-      my $issuer = undef;
-      my $defaultUndefSign = '-';
-      my $productDefinitionNodeList = $dom->getElementsByLocalName('ProductDefinition');
-      if ($productDefinitionNodeList->size()) {
-        my $productDefinitionNode = $productDefinitionNodeList->get_node(1);
-        for my $productDefinitionChildNode ($productDefinitionNode->nonBlankChildNodes()) {
-          if ($productDefinitionChildNode->nodeName() eq 'dwd:Issuer') {
-            $issuer = $productDefinitionChildNode->textContent();
-            $header{copyright} = "Datenbasis: $issuer";
-          } elsif ($productDefinitionChildNode->nodeName() eq 'dwd:IssueTime') {
-            my $issueTime = $productDefinitionChildNode->textContent();
-            $header{time} = FormatDateTimeLocal($hash, ParseKMLTime($issueTime));
-          } elsif ($productDefinitionChildNode->nodeName() eq 'dwd:ForecastTimeSteps') {
-            for my $forecastTimeStepsChildNode ($productDefinitionChildNode->nonBlankChildNodes()) {
-              if ($forecastTimeStepsChildNode->nodeName() eq 'dwd:TimeStep') {
-                my $forecastTimeSteps = $forecastTimeStepsChildNode->textContent();
-                push(@timestamps, ParseKMLTime($forecastTimeSteps));
-              }
+    # split into chunks of 1MB
+    READ_CHUNKS:
+    while ($zip->read($buffer, 1000000, $offset) > 0) {
+      $endOfLine = index($buffer, "\n");
+
+      while ($endOfLine != -1) {
+        $line = substr($buffer, $startOfLine, $endOfLine - $startOfLine + 1);
+        $startOfLine = $endOfLine + 1;
+        $endOfLine = index($buffer, "\n", $startOfLine);
+
+        if ($headerParsed == 0) {
+          if (index($line, '<?xml') != -1) {
+            $xmlVersion = $line;
+          } elsif (index($line, '<kml:kml') != -1) {
+            $xmlFormat = $line;
+          } elsif (index($line, '<dwd:Issuer>') != -1) {
+            if ($line =~ /<dwd:Issuer>([^<]+)<\/dwd:Issuer>/) {
+              $issuer = $1;
+              $header{copyright} = "Datenbasis: $issuer";
             }
-          } elsif ($productDefinitionChildNode->nodeName() eq 'dwd:FormatCfg') {
-            for my $formatCfgChildNode ($productDefinitionChildNode->nonBlankChildNodes()) {
-              if ($formatCfgChildNode->nodeName() eq 'dwd:DefaultUndefSign') {
-                $defaultUndefSign = $formatCfgChildNode->textContent();
-              }
+          } elsif (index($line, '<dwd:IssueTime>') != -1) {
+            if ($line =~ /<dwd:IssueTime>([^<]+)<\/dwd:IssueTime>/) {
+              my $issueTime = $1;
+              $header{time} = FormatDateTimeLocal($hash, ParseKMLTime($issueTime));
             }
+          } elsif (index($line, '<dwd:ForecastTimeSteps>') != -1) {
+            $collect = 1;
+          } elsif (index($line, '</dwd:ForecastTimeSteps>') != -1) {
+            $collect = 0;
+
+            while ($collectString =~ m/<dwd:TimeStep>([^<]+)<\/dwd:TimeStep>/g) {
+              my $forecastTimeSteps = $1;
+              push(@timestamps, ParseKMLTime($forecastTimeSteps));
+            }
+
+            $collectString = '';
+          } elsif (index($line, '<dwd:FormatCfg>') != -1) {
+            $collect = 1;
+          } elsif (index($line, '</dwd:FormatCfg>') != -1) {
+            $collect = 0;
+
+            if ($collectString =~ m/<dwd:DefaultUndefSign>([^<]+)<\/dwd:DefaultUndefSign>/) {
+              $defaultUndefSign = $1;
+            }
+
+            $collectString = '';
           }
         }
-      }
-      $forecast{timestamps} = \@timestamps;
-      $header{defaultUndefSign} = $defaultUndefSign;
 
-      if (!defined($issuer)) {
-        die "error in XML data, forecast issuer not found";
-      }
-
-      # extract time data
-      my %timeProperties;
-      my ($longitude, $latitude, $altitude);
-      my $placemarkNodeList = $dom->getElementsByLocalName('Placemark');
-      if ($placemarkNodeList->size()) {
-        my $placemarkNodePos;
-        if ($mosmixType eq 'S') {
-          $placemarkNodePos = getStationPos ($name, $station, $placemarkNodeList);
-          if ($placemarkNodePos < 1) {
-            die "station '" .  $station . "' not found in XML data";
+        if (index($line, '<kml:Placemark>') != -1) {
+          # parsing the header data is not needed anymore
+          $headerParsed = 1;
+          $collect = 1;
+        } elsif (($collect == 1) && (index($line, '<kml:name>') != -1)) {
+          if (index($line, $station.'</kml:name>', 10) == -1) {
+            # no match
+            $collect = 0;
+            $collectString = '';
           }
-        } else {
-          $placemarkNodePos = 1;
-        }
-        my $placemarkNode = $placemarkNodeList->get_node($placemarkNodePos);
-        for my $placemarkChildNode ($placemarkNode->nonBlankChildNodes()) {
-          if ($placemarkChildNode->nodeName() eq 'kml:description') {
-            my $description = $placemarkChildNode->textContent();
-            $header{description} = encode('UTF-8', $description);
-          } elsif ($placemarkChildNode->nodeName() eq 'kml:ExtendedData') {
-            for my $extendedDataChildNode ($placemarkChildNode->nonBlankChildNodes()) {
-              if ($extendedDataChildNode->nodeName() eq 'dwd:Forecast') {
-                my $elementName = $extendedDataChildNode->getAttribute('dwd:elementName');
-                # convert some elements names for backward compatibility
-                my $alias = $forecastPropertyAliases{$elementName};
-                if (defined($alias)) { $elementName = $alias };
-                my $selectedProperty = $selectedProperties{$elementName};
-                if (defined($selectedProperty)) {
-                  my $textContent = $extendedDataChildNode->nonBlankChildNodes()->get_node(1)->textContent();
-                  $textContent =~ s/^\s+|\s+$//g;                  # trim outside
-                  $textContent =~ s/\s+/ /g;                       # trim inside
-                  my @values = split(' ', $textContent);
-                  $timeProperties{$elementName} = \@values;
+        } elsif (($collect == 1) && (index($line, '</kml:Placemark>') != -1)) {
+          $collect = 0;
+          # add some additional tags needed for libXML
+          $collectString = $xmlVersion."\n".$xmlFormat."\n<kml:Document>\n".$collectString.$line."\n</kml:Document>\n</kml:kml>";
+
+          my $dom = XML::LibXML->load_xml(string => $collectString);
+          if (!$dom) {
+            die "parsing XML failed";
+          }
+
+          my $placemarkNodeList = $dom->getElementsByLocalName('Placemark');
+          if ($placemarkNodeList->size()) {
+            my $placemarkNode = $placemarkNodeList->get_node(1);
+
+            for my $placemarkChildNode ($placemarkNode->nonBlankChildNodes()) {
+              if ($placemarkChildNode->nodeName() eq 'kml:description') {
+                my $description = $placemarkChildNode->textContent();
+                $header{description} = encode('UTF-8', $description);
+              } elsif ($placemarkChildNode->nodeName() eq 'kml:ExtendedData') {
+                for my $extendedDataChildNode ($placemarkChildNode->nonBlankChildNodes()) {
+                  if ($extendedDataChildNode->nodeName() eq 'dwd:Forecast') {
+                    my $elementName = $extendedDataChildNode->getAttribute('dwd:elementName');
+                    # convert some elements names for backward compatibility
+                    my $alias = $forecastPropertyAliases{$elementName};
+                    if (defined($alias)) {
+                      $elementName = $alias
+                    }
+
+                    my $selectedProperty = $selectedProperties{$elementName};
+                    if (defined($selectedProperty)) {
+                      my $textContent = $extendedDataChildNode->nonBlankChildNodes()->get_node(1)->textContent();
+                      $textContent =~ s/^\s+|\s+$//g;                  # trim outside
+                      $textContent =~ s/\s+/ /g;                       # trim inside
+                      my @values = split(' ', $textContent);
+                      $timeProperties{$elementName} = \@values;
+                    }
+                  }
                 }
+              } elsif ($placemarkChildNode->nodeName() eq 'kml:Point') {
+                my $coordinates = $placemarkChildNode->nonBlankChildNodes()->get_node(1)->textContent();
+                $header{coordinates} = $coordinates;
+                ($longitude, $latitude, $altitude) = split(',', $coordinates);
               }
             }
-          } elsif ($placemarkChildNode->nodeName() eq 'kml:Point') {
-            my $coordinates = $placemarkChildNode->nonBlankChildNodes()->get_node(1)->textContent();
-            $header{coordinates} = $coordinates;
-            ($longitude, $latitude, $altitude) = split(',', $coordinates);
           }
+
+          # jump out of chunk loop
+          last READ_CHUNKS;
+        }
+
+        if ($collect == 1) {
+          $collectString .= $line;
         }
       }
 
-      # calculate sun position dependent properties for each timestamp
-      if (defined($longitude) && defined($latitude) && defined($altitude)) {
-        my @azimuths;
-        my @elevations;
-        my @sunups;
-        my @sunrises;
-        my @sunsets;
-        my $lastDate = '';
-        my $sunElevationCorrection = AstroSun::ElevationCorrection($altitude);
-        for my $timestamp (@timestamps) {
-          my ($azimuth, $elevation) = AstroSun::AzimuthElevation($timestamp, $longitude, $latitude);
-          push(@azimuths, $azimuth);     # [deg]
-          push(@elevations, $elevation); # [deg]
-          push(@sunups, $elevation >= $sunElevationCorrection? 1 : 0);
-          my $date = FormatDateLocal($hash, $timestamp);
-          if ($date ne $lastDate) {
-            # one calculation per day
-            my ($rise, $transit, $set) = AstroSun::RiseSet($timestamp + LocaltimeOffset($hash, $timestamp), $longitude, $latitude, $altitude);
-            push(@sunrises, FormatTimeLocal($hash, $rise));    # round down to current minute
-            push(@sunsets, FormatTimeLocal($hash, $set + 30)); # round up to next minute
-            $lastDate = $date;
-
-            #::Log3 $name, 3, "$name: ProcessForecast " . FormatDateTimeLocal($hash, $timestamp) . " $rise " . FormatDateTimeLocal($hash, $rise) . " $transit " . FormatDateTimeLocal($hash, $transit). " $set " . FormatDateTimeLocal($hash, $set + 30);
-          } else {
-            push(@sunrises, $defaultUndefSign); # round down to current minute
-            push(@sunsets, $defaultUndefSign);  # round up to next minute
-          }
-        }
-        if (defined($selectedProperties{SunAz})) {
-          $timeProperties{SunAz} = \@azimuths;
-        }
-        if (defined($selectedProperties{SunEl})) {
-          $timeProperties{SunEl} = \@elevations;
-        }
-        if (defined($selectedProperties{SunUp})) {
-          $timeProperties{SunUp} = \@sunups;
-        }
-        if (defined($selectedProperties{SunRise})) {
-          $timeProperties{SunRise} = \@sunrises;
-        }
-        if (defined($selectedProperties{SunSet})) {
-          $timeProperties{SunSet} = \@sunsets;
-        }
+      # find end of last line within chunk
+      my $end = rindex($buffer, "\n");
+      # copy the last incomplete line to the buffer of the next chunk
+      if (($end > 0) && ($end < length($buffer) - 1)) {
+        $buffer = substr($buffer, $end + 1);
+        $offset = length($buffer);
       }
-
-      $forecast{timeProperties} = \%timeProperties;
+      
+      $startOfLine = 0;
     }
+
+    $zip->close();
+
+    $forecast{timestamps} = \@timestamps;
+    $header{defaultUndefSign} = $defaultUndefSign;
+
+    if (!defined($issuer)) {
+      die "error in XML data, forecast issuer not found";
+    }
+
+    ::Log3 $name, 5, "$name: ProcessForecast: extracting data";
+
+    # calculate sun position dependent properties for each timestamp
+    if (defined($longitude) && defined($latitude) && defined($altitude)) {
+      my @azimuths;
+      my @elevations;
+      my @sunups;
+      my @sunrises;
+      my @sunsets;
+      my $lastDate = '';
+      my $sunElevationCorrection = AstroSun::ElevationCorrection($altitude);
+      for my $timestamp (@timestamps) {
+        my ($azimuth, $elevation) = AstroSun::AzimuthElevation($timestamp, $longitude, $latitude);
+        push(@azimuths, $azimuth);     # [deg]
+        push(@elevations, $elevation); # [deg]
+        push(@sunups, $elevation >= $sunElevationCorrection? 1 : 0);
+        my $date = FormatDateLocal($hash, $timestamp);
+        if ($date ne $lastDate) {
+          # one calculation per day
+          my ($rise, $transit, $set) = AstroSun::RiseSet($timestamp + LocaltimeOffset($hash, $timestamp), $longitude, $latitude, $altitude);
+          push(@sunrises, FormatTimeLocal($hash, $rise));    # round down to current minute
+          push(@sunsets, FormatTimeLocal($hash, $set + 30)); # round up to next minute
+          $lastDate = $date;
+
+          #::Log3 $name, 3, "$name: ProcessForecast " . FormatDateTimeLocal($hash, $timestamp) . " $rise " . FormatDateTimeLocal($hash, $rise) . " $transit " . FormatDateTimeLocal($hash, $transit). " $set " . FormatDateTimeLocal($hash, $set + 30);
+        } else {
+          push(@sunrises, $defaultUndefSign); # round down to current minute
+          push(@sunsets, $defaultUndefSign);  # round up to next minute
+        }
+      }
+      if (defined($selectedProperties{SunAz})) {
+        $timeProperties{SunAz} = \@azimuths;
+      }
+      if (defined($selectedProperties{SunEl})) {
+        $timeProperties{SunEl} = \@elevations;
+      }
+      if (defined($selectedProperties{SunUp})) {
+        $timeProperties{SunUp} = \@sunups;
+      }
+      if (defined($selectedProperties{SunRise})) {
+        $timeProperties{SunRise} = \@sunrises;
+      }
+      if (defined($selectedProperties{SunSet})) {
+        $timeProperties{SunSet} = \@sunsets;
+      }
+    }
+
+    $forecast{timeProperties} = \%timeProperties;
     $forecast{header} = \%header;
   };
 
@@ -3228,6 +3163,9 @@ sub DWD_OpenData_Initialize {
 # -----------------------------------------------------------------------------
 #
 # CHANGES
+#
+# 18.05.2024 (version 1.17.4) mumpitzstuff
+# feature: uRAM/Flash consumption significantly reduced
 #
 # 01.03.2024 (version 1.17.3) jensb + DS_Starter
 # feature: unzip large forecast files to disk and filter out selected station before processing
