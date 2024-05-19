@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  49_SSCAM: NOTE! set enable/disable renamed to enableCam/disableCam
+                      switch commandref to ID tags
  - change:  74_AutomowerConnect: minor changes
  - feature: 76_SolarForecast: currentMeterDev: contotal and feedtotal can be 
                               reset at day begin (day meter)

@@ -192,6 +192,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.11.5" => "19.05.2024  optimize memory consumption once more, set enable/disable renamed to enableCam/disableCam ".
+                           "switch commandref to ID tags ",
   "9.11.4" => "13.05.2024  optimize memory consumption once more ",
   "9.11.3" => "08.05.2024  optimize memory consumption ",
   "9.11.2" => "14.04.2024  internal change logic for sending data via telegram, email, chat and their Saving ",
@@ -397,8 +399,8 @@ my %hset = (                                                                # Ha
   createPTZcontrol    => { fn => "_setcreatePTZcontrol",    needcred => 1 },
   createStreamDev     => { fn => "_setcreateStreamDev",     needcred => 1 },
   createReadingsGroup => { fn => "_setcreateReadingsGroup", needcred => 1 },
-  enable              => { fn => "_setenable",              needcred => 1 },
-  disable             => { fn => "_setdisable",             needcred => 1 },
+  enableCam           => { fn => "_setenable",              needcred => 1 },
+  disableCam          => { fn => "_setdisable",             needcred => 1 },
   motdetsc            => { fn => "_setmotdetsc",            needcred => 1 },
   expmode             => { fn => "_setexpmode",             needcred => 1 },
   homeMode            => { fn => "_sethomeMode",            needcred => 1 },
@@ -592,7 +594,8 @@ my %hsimu = (                                                              # Fun
 # Standardvariablen und Forward-Deklaration
 my $defSlim           = 3;                                 # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $defColumns        = 3;                                 # default Anzahl der Spalten einer snapGallery
-my $defSnum           = "1,2,3,4,5,6,7,8,9,10";            # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $sgnum             = "1,2,3,4,5,6,7,8,9,10";            # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $sgbdef            = 0;                                 # default value Attr snapGalleryBoost
 my $compstat          = "9.0.00";                          # getestete SVS-Version
 my $valZoom           = ".++,+,stop,-,--.";                # Inhalt des Setters "setZoom"
 my $shutdownInProcess = 0;                                 # Statusbit shutdown
@@ -798,7 +801,7 @@ sub Initialize {
                      "snapTelegramTxt:textField-long ".
                      "snapGalleryBoost:0,1 ".
                      "snapGallerySize:Icon,Full ".
-                     "snapGalleryNumber:$defSnum ".
+                     "snapGalleryNumber:$sgnum ".
                      "snapGalleryColumns ".
                      "snapGalleryHtmlAttr ".
                      "snapReadingRotate:0,1,2,3,4,5,6,7,8,9,10 ".
@@ -1351,18 +1354,18 @@ sub Attr {
 
     if ($aName eq "snapGallerySize") {
         if ($cmd eq "set") {
-            $do = ($aVal eq "Icon")?1:2;
+            $do = $aVal eq 'Icon' ? 1 : 2;
         }
-        $do = 0 if($cmd eq "del");
+        $do = 0 if($cmd eq 'del');
 
         if ($do == 0) {
-            delete($hash->{HELPER}{".SNAPHASH"}) if(AttrVal($name,"snapGalleryBoost",0));     # Snaphash nur löschen wenn Snaps gepollt werden
+            delete($hash->{HELPER}{".SNAPHASH"}) if(AttrVal($name, 'snapGalleryBoost', $sgbdef));   # Snaphash nur löschen wenn Snaps gepollt werden
             Log3($name, 4, "$name - Snapshot hash deleted");
 
         }
-        elsif (AttrVal($name,"snapGalleryBoost",0) && $init_done == 1) {                      # snap-Infos abhängig ermitteln wenn gepollt werden soll
+        elsif (AttrVal($name, 'snapGalleryBoost', $sgbdef) && $init_done == 1) {                    # snap-Infos abhängig ermitteln wenn gepollt werden soll
             $hash->{HELPER}{GETSNAPGALLERY} = 1;
-            my $slim                        = AttrVal($name,"snapGalleryNumber",$defSlim);    # Anzahl der abzurufenden Snaps
+            my $slim                        = AttrVal($name, 'snapGalleryNumber', $defSlim);        # Anzahl der abzurufenden Snaps
             my $ssize                       = $do;
 
             RemoveInternalTimer($hash,              "FHEM::SSCam::__getSnapInfo" );
@@ -1370,7 +1373,7 @@ sub Attr {
         }
     }
 
-    if ($aName eq "snapGalleryBoost") {
+    if ($aName eq 'snapGalleryBoost') {
         if ($cmd eq "set") {
             $do = ($aVal == 1) ? 1 : 0;
         }
@@ -1378,7 +1381,7 @@ sub Attr {
 
         if ($do == 0) {
             delete($hash->{HELPER}{".SNAPHASH"});  # Snaphash löschen
-            Log3($name, 4, "$name - Snapshot hash deleted");
+            Log3 ($name, 4, "$name - Snapshot hash deleted");
 
         }
         elsif ($init_done == 1) {                                                            # snapgallery regelmäßig neu einlesen wenn Polling ein
@@ -1395,13 +1398,13 @@ sub Attr {
         }
     }
 
-    if ($aName eq "snapGalleryNumber" && AttrVal($name,"snapGalleryBoost",0)) {
+    if ($aName eq "snapGalleryNumber" && AttrVal($name, 'snapGalleryBoost', $sgbdef)) {
         my ($slim,$ssize);
-        if ($cmd eq "set") {
-            $do = ($aVal != 0) ? 1 : 0;
+        if ($cmd eq 'set') {
+            $do = $aVal != 0 ? 1 : 0;
         }
         
-        $do = 0 if($cmd eq "del");
+        $do = 0 if($cmd eq 'del');
 
         if ($do == 0) {
             $slim = 3;
@@ -1421,12 +1424,12 @@ sub Attr {
         }
     }
 
-    if ($aName eq "snapReadingRotate") {
-        if ($cmd eq "set") {
-            $do = ($aVal) ? 1 : 0;
+    if ($aName eq 'snapReadingRotate') {
+        if ($cmd eq 'set') {
+            $do = $aVal ? 1 : 0;
         }
         
-        $do = 0 if($cmd eq "del");
+        $do = 0 if($cmd eq 'del');
         if (!$do) {$aVal = 0}
         for my $i (1..10) {
             if ($i>$aVal) {
@@ -1457,7 +1460,7 @@ sub Attr {
         InternalTimer       (gettimeofday()+1.0, "FHEM::SSCam::wdpollcaminfo", $hash, 0);
     }
 
-    if ($cmd eq "set") {
+    if ($cmd eq 'set') {
         if ($aName =~ m/httptimeout|snapGalleryColumns|rectime|pollcaminfoall/x) {
             unless ($aVal =~ /^\d+$/x) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
         }
@@ -1468,8 +1471,8 @@ sub Attr {
         
         if ($aName =~ m/cacheServerParam/x) {
             return "Please provide the Redis server parameters in form: <Redis-server address>:<Redis-server port> or unix:</path/to/sock>" if($aVal !~ /:\d+$|unix:.+$/x);
-            my $type = AttrVal($name, "cacheType", "internal");
-            if($hash->{HELPER}{CACHEKEY} && $type eq "redis") {
+            my $type = AttrVal($name, 'cacheType', 'internal');
+            if($hash->{HELPER}{CACHEKEY} && $type eq 'redis') {
                 cache($name, "c_destroy");
             }
         }
@@ -1478,16 +1481,15 @@ sub Attr {
             return "When you want activate \"$aName\", you have to set first the attribute \"videofolderMap\" to the root folder ".
                    "of recordings and snapshots provided by an URL.\n".
                    "Example: http://server.domain:8081/surveillance "
-                   if(!AttrVal($name, "videofolderMap", "") && $init_done == 1);
+                   if(!AttrVal($name, 'videofolderMap', '') && $init_done == 1);
 
         }
     }
 
-    if ($cmd eq "del") {
-        if ($aName =~ m/pollcaminfoall/x) {
-            # Polling nicht ausschalten wenn snapGalleryBoost ein (regelmäßig neu einlesen)
+    if ($cmd eq 'del') {
+        if ($aName =~ m/pollcaminfoall/x) {                                        # Polling nicht ausschalten wenn snapGalleryBoost ein (regelmäßig neu einlesen)
             return "Please switch off \"snapGalleryBoost\" first if you want to deactivate \"pollcaminfoall\" because the functionality of \"snapGalleryBoost\" depends on retrieving snapshots periodical."
-                   if(AttrVal($name,"snapGalleryBoost",0));
+                   if(AttrVal($name, 'snapGalleryBoost', $sgbdef));
         }
     }
 
@@ -1520,18 +1522,23 @@ sub Set {
   elsif (IsModelCam($hash)) {
       # selist für Cams
       my $hlslfw = IsCapHLS($hash) ? ",live_fw_hls," : ",";
+      my $sg     = AttrVal ($name, 'snapGalleryBoost', $sgbdef)                                                ? 
+                   (AttrVal($name, 'snapGalleryNumber', undef) || AttrVal($name, 'snapGalleryBoost', $sgbdef)) ? 
+                   "snapGallery:noArg "                                                                        : 
+                   "snapGallery:$sgnum "                                                                       : 
+                   "";
 
       $setlist   = "Unknown argument $opt, choose one of ".
                    "createSnapGallery:noArg ".
                    "createStreamDev:generic,hls,lastsnap,mjpeg,switched ".
                    "createReadingsGroup ".
                    "credentials ".
-                   "disable:noArg ".
-                   "enable:noArg ".
+                   "disableCam:noArg ".
+                   "enableCam:noArg ".
                    "expmode:auto,day,night ".
                    "motdetsc:disable,camera,SVS ".
                    "snap ".
-                   (AttrVal($name, "snapGalleryBoost",0) ? (AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0)) ? "snapGallery:noArg " : "snapGallery:$defSnum " : " ").
+                   $sg.
                    "on ".
                    "off:noArg ".
                    "optimizeParams ".
@@ -1942,7 +1949,7 @@ sub _setsnapGallery {                    ## no critic "not used"
   my $ret = getClHash($hash);
   return $ret if($ret);
 
-  if(!AttrVal($name, "snapGalleryBoost",0)) {                                     # Snaphash ist nicht vorhanden und wird neu abgerufen und ausgegeben
+  if (!AttrVal($name, 'snapGalleryBoost', $sgbdef)) {                             # Snaphash ist nicht vorhanden und wird neu abgerufen und ausgegeben
       $hash->{HELPER}{GETSNAPGALLERY} = 1;
 
       my $slim   = $prop // AttrVal($name,"snapGalleryNumber",$defSlim);          # Anzahl der abzurufenden Snapshots
@@ -1986,7 +1993,7 @@ sub _setcreateSnapGallery {              ## no critic "not used"
 
   return if(!IsModelCam($hash));
 
-  if(!AttrVal($name,"snapGalleryBoost",0)) {
+  if (!AttrVal($name, 'snapGalleryBoost', $sgbdef)) {
       return qq{Before you can use "$opt", you must first set the "snapGalleryBoost" attribute, since automatic snapshot retrieval is required.};
   }
 
@@ -4072,8 +4079,8 @@ sub Get {
     }
     elsif(IsModelCam($hash)) {                                                        # getlist für Cams
         $getlist .= "caminfo:noArg ".
-                    ((AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))
-                       ? "snapGallery:noArg " : "snapGallery:$defSnum ").
+                    ((AttrVal($name, 'snapGalleryNumber', undef) || AttrVal($name, 'snapGalleryBoost', $sgbdef))
+                       ? "snapGallery:noArg " : "snapGallery:$sgnum ").
                     (IsCapPTZPan($hash) ? "listPresets:noArg " : "").
                     "snapinfo:noArg ".
                     "saveRecording ".
@@ -4319,7 +4326,7 @@ sub _getsnapGallery {                    ## no critic "not used"
   my $ret = getClHash($hash);
   return $ret if($ret);
 
-  if(!AttrVal($name, "snapGalleryBoost",0)) {                                                  # Snaphash ist nicht vorhanden und wird abgerufen
+  if (!AttrVal($name, 'snapGalleryBoost', $sgbdef)) {                                          # Snaphash ist nicht vorhanden und wird abgerufen
       $hash->{HELPER}{GETSNAPGALLERY} = 1;
 
       my $slim  = $arg // AttrVal($name,"snapGalleryNumber",$defSlim);                         # Anzahl der abzurufenden Snapshots
@@ -5725,12 +5732,15 @@ sub camOp_Parse {
 
             if (!$success) {
                 Log3 ($name, 4, "$name - Data returned: ".$data{SSCam}{$name}{TMPMJ});
+                delete $data{SSCam}{$name}{TMPMJ};
                 delActiveToken ($hash);
                 return;
             }
 
             $data{SSCam}{$name}{TMPDA} = decode_json ($data{SSCam}{$name}{TMPMJ});
             $success                   = $data{SSCam}{$name}{TMPDA}->{'success'};
+            delete $data{SSCam}{$name}{TMPMJ};
+            
             Log3 ($name, 5, "$name - JSON returned: ". Dumper $data{SSCam}{$name}{TMPDA});     # Logausgabe decodierte JSON Daten
         }
         else {
@@ -5752,6 +5762,7 @@ sub camOp_Parse {
             if ($hparse{$OpMode} && defined &{$hparse{$OpMode}{fn}}) {
                 my $ret = q{};
                 $ret    = &{$hparse{$OpMode}{fn}} ($params);
+                delete $data{SSCam}{$name}{TMPDA};
                 return if($ret);
             }
             
@@ -5835,7 +5846,7 @@ sub camOp_Parse {
             elsif ($OpMode eq "reactivate_hls") {                                                       # HLS Streaming wurde deaktiviert, Aktivitätsstatus speichern
                 $hash->{HELPER}{HLSSTREAM} = "inactive";
                 Log3($name, 3, "$name - HLS Streaming of camera \"$name\" deactivated for reactivation");
-
+                delete $data{SSCam}{$name}{TMPDA};
                 delActiveToken ($hash);                                                                 # Token freigeben vor hlsactivate
                 __activateHls  ($hash);
                 return;
@@ -5851,6 +5862,7 @@ sub camOp_Parse {
                 if (!$snapid) {
                    Log3 ($name, 2, "$name - Snap-ID \"LastSnapId\" isn't set. Filename can't be retrieved");
                    delActiveToken ($hash);                                                              # Token freigeben vor hlsactivate
+                   delete $data{SSCam}{$name}{TMPDA};
                    return;
                 }
 
@@ -5938,7 +5950,6 @@ sub camOp_Parse {
             if ($errorcode =~ /105/x) {
                Log3 ($name, 2, "$name - ERROR - $errorcode - $error in operation $OpMode -> try new login");
                delete $data{SSCam}{$name}{TMPDA};
-               delete $data{SSCam}{$name}{TMPMJ};
                return login ($hash, $hash->{HELPER}{API}, \&camOp);
             }
 
@@ -5946,7 +5957,6 @@ sub camOp_Parse {
        }
        
        delete $data{SSCam}{$name}{TMPDA};
-       delete $data{SSCam}{$name}{TMPMJ};
    }
 
    delActiveToken ($hash);                                                     # Token freigeben
@@ -7050,7 +7060,7 @@ sub _parsegetsnapgallery {                              ## no critic "not used"
       __copySnapsBackFromOld ($paref);                                                                      # gesicherte Schnappschußdaten aus SNAPOLDHASH an SNAPHASH anhängen
 
       # Direktausgabe Snaphash wenn nicht gepollt wird
-      if (!AttrVal($name, "snapGalleryBoost", 0)) {
+      if (!AttrVal($name, 'snapGalleryBoost', $sgbdef)) {
           my %pars = (
               linkparent => $name,
               linkname   => '',
@@ -8935,9 +8945,9 @@ sub composeGallery {
 
   # wenn SSCamSTRM-device genutzt wird und attr "snapGalleryBoost" nicht gesetzt ist -> Warnung in Gallerie ausgeben
   my $sgbnote = " ";
-  if ($strmdev && !AttrVal ($name,"snapGalleryBoost",0)) {
+  if ($strmdev && !AttrVal($name, 'snapGalleryBoost', $sgbdef)) {
       $sgbnote = "<b>CAUTION</b> - The gallery is not updated automatically. Please set the attribute \"snapGalleryBoost=1\" in device <a href=\"$FW_ME?detail=$name\">$name</a>";
-      $sgbnote = "<b>ACHTUNG</b> - Die Galerie wird nicht automatisch aktualisiert. Dazu bitte das Attribut \"snapGalleryBoost=1\" im Device <a href=\"$FW_ME?detail=$name\">$name</a> setzen." if ($lang eq "DE");
+      $sgbnote = "<b>ACHTUNG</b> - Die Galerie wird nicht automatisch aktualisiert. Dazu bitte das Attribut \"snapGalleryBoost=1\" im Device <a href=\"$FW_ME?detail=$name\">$name</a> setzen." if($lang eq "DE");
   }
 
   my $ttsnap = $ttips_en{"ttsnap"}; $ttsnap =~ s/§NAME§/$camname/xg;
@@ -8959,13 +8969,13 @@ sub composeGallery {
 
   if ($lang eq "EN") {
       $header .= "Snapshots (_LIMIT_/$totalcnt) of camera <b>$camname</b> - newest Snapshot: $lss<br>";
-      $header .= " (Possibly another snapshots are available. Last recall: $lupt)<br>" if(AttrVal($name,"snapGalleryBoost",0));
+      $header .= " (Possibly another snapshots are available. Last recall: $lupt)<br>" if(AttrVal($name, 'snapGalleryBoost', $sgbdef));
   }
   else {
       $header .= "Schnappschüsse (_LIMIT_/$totalcnt) von Kamera <b>$camname</b> - neueste Aufnahme: $lss <br>";
       $lupt    =~ /(\d+)-(\d\d)-(\d\d)\s+(.*)/x;
       $lupt    = "$3.$2.$1 $4";
-      $header .= " (Eventuell sind neuere Aufnahmen verfügbar. Letzter Abruf: $lupt)<br>" if(AttrVal($name,"snapGalleryBoost",0));
+      $header .= " (Eventuell sind neuere Aufnahmen verfügbar. Letzter Abruf: $lupt)<br>" if(AttrVal($name, 'snapGalleryBoost', $sgbdef));
   }
   $header .= $sgbnote;
 
@@ -9001,7 +9011,7 @@ sub composeGallery {
           }
 
           if (!$ftui) {
-              $data{SSCam}{$name}{TMPIDAT} = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData} $pws>')\"" if(AttrVal($name, "snapGalleryBoost", 0));
+              $data{SSCam}{$name}{TMPIDAT} = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData} $pws>')\"" if(AttrVal($name, 'snapGalleryBoost', $sgbdef));
           }
           
           $data{SSCam}{$name}{TMPIDAT} = '' if(!defined $data{SSCam}{$name}{TMPIDAT});
@@ -9045,7 +9055,7 @@ sub composeGallery {
           $imgTm                       = cache ($name, "c_read", "{SNAPHASH}{$key}{createdTm}");
 
           if (!$ftui) {
-              $data{SSCam}{$name}{TMPIDAT} = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$data{SSCam}{$name}{TMPCDAT} $pws>')\"" if(AttrVal ($name, "snapGalleryBoost", 0));
+              $data{SSCam}{$name}{TMPIDAT} = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$data{SSCam}{$name}{TMPCDAT} $pws>')\"" if(AttrVal ($name, 'snapGalleryBoost', $sgbdef));
           }
           
           $data{SSCam}{$name}{TMPIDAT} = '' if(!defined $data{SSCam}{$name}{TMPIDAT});
@@ -9103,13 +9113,13 @@ sub snapLimSize {
 
   my ($slim,$ssize);
 
-  if (!AttrVal($name,"snapGalleryBoost",0)) {
+  if (!AttrVal($name,'snapGalleryBoost', $sgbdef)) {
       $slim  = 1;
       $ssize = 0;
   }
   else {
       $hash->{HELPER}{GETSNAPGALLERY} = 1;
-      $slim                           = AttrVal ($name,"snapGalleryNumber",$defSlim);     # Anzahl der abzurufenden Snaps
+      $slim                           = AttrVal ($name, 'snapGalleryNumber', $defSlim);   # Anzahl der abzurufenden Snaps
   }
 
   if (AttrVal($name,"snapGallerySize","Icon") eq "Full") {
@@ -12043,7 +12053,7 @@ return;
 =item summary_DE Kamera-Modul für die Steuerung der Synology Surveillance Station
 =begin html
 
-<a name="SSCam"></a>
+<a id="SSCam"></a>
 <h3>SSCam</h3>
 <ul>
   Using this Module you are able to operate cameras which are defined in Synology Surveillance Station (SVS) and execute
@@ -12111,7 +12121,7 @@ return;
 
     SSCam is completely using the nonblocking functions of HttpUtils respectively HttpUtils_NonblockingGet. <br>
     In DSM respectively in Synology Surveillance Station an User has to be created. The login credentials are needed later when using a set-command to assign the login-data to a device. <br>
-    Further informations could be find among <a href="#Credentials">Credentials</a>.  <br><br>
+    Further informations could be find among <a href="#SSCam-Credentials">Credentials</a>.  <br><br>
 
     Overview which Perl-modules SSCam is using: <br><br>
 
@@ -12145,7 +12155,7 @@ return;
     <br><br>
   </ul>
 
-  <a name="SSCamdefine"></a>
+  <a id="SSCam-define"></a>
   <b>Define</b>
   <ul>
   <br>
@@ -12204,13 +12214,13 @@ return;
     </pre>
 
     When a new Camera is defined, as a start the recordingtime of 15 seconds will be assigned to the device.<br>
-    Using the <a href="#SSCamattr">attribute</a> "rectime" you can adapt the recordingtime for every camera individually.<br>
+    Using the <a href="#SSCam-attr-rectime">rectime</a> attribute you can adapt the recordingtime for every camera individually.<br>
     The value of "0" for rectime will lead to an endless recording which has to be stopped by a "set &lt;name&gt; off" command.<br>
     Due to a Log-Entry with a hint to that circumstance will be written. <br><br>
 
-    If the <a href="#SSCamattr">attribute</a> "rectime" would be deleted again, the default-value for recording-time (15s) become active.<br><br>
+    If the <a href="#SSCam-attr-rectime">rectime</a> attribute would be deleted again, the default-value for recording-time (15s) become active.<br><br>
 
-    With <a href="#SSCamset">command</a> <b>"set &lt;name&gt; on [rectime]"</b> a temporary recordingtime is determinded which would overwrite the dafault-value of recordingtime <br>
+    With <a href="#SSCam-set">command</a> <b>"set &lt;name&gt; on [rectime]"</b> a temporary recordingtime is determinded which would overwrite the dafault-value of recordingtime <br>
     and the attribute "rectime" (if it is set) uniquely. <br><br>
 
     In that case the command <b>"set &lt;name&gt; on 0"</b> leads also to an endless recording as well.<br><br>
@@ -12219,13 +12229,13 @@ return;
 
     If the module recognizes the defined camera as a PTZ-device (Reading "DeviceType = PTZ"), then a control panel is
     created automatically in the detal view. This panel requires SVS >= 7.1. The properties and the behave of the
-    panel can be affected by <a href="#SSCamattr">attributes</a> "ptzPanel_.*". <br>
-    Please see also <a href="#SSCamset">command</a> <b>"set &lt;name&gt; createPTZcontrol"</b> in this context.
+    panel can be affected by <a href="#SSCam-attr">attributes</a> "ptzPanel_.*". <br>
+    Please see also <a href="#SSCam-set">command</a> <b>"set &lt;name&gt; createPTZcontrol"</b> in this context.
     <br><br><br>
 
     </ul>
 
-    <a name="Credentials"></a>
+    <a id="SSCam-Credentials"></a>
     <b>Credentials </b><br><br>
 
     <ul>
@@ -12241,7 +12251,7 @@ return;
     If the user is member of admin-group, he has access to all module functions. Without this membership the user can only
     execute functions with lower need of rights. <br>
     Is <a href="https://www.synology.com/en-global/knowledgebase/DSM/tutorial/General/How_to_add_extra_security_to_your_Synology_NAS#t5">2-step verification</a>
-    activated in DSM, the setup to a session with Surveillance Station is necessary (<a href="#SSCamattr">attribute</a> "session = SurveillanceStation"). <br><br>
+    activated in DSM, the setup to a session with Surveillance Station is necessary (<a href="#SSCam-attr-session">session = SurveillanceStation</a> attribute). <br><br>
     The required minimum rights to execute functions are listed in a table further down. <br>
 
     Alternatively to DSM-user a user created in SVS can be used. Also in that case a user of type "manager" has the right to
@@ -12256,7 +12266,7 @@ return;
     </ul>
     <br>
 
-    Using the <a href="#SSCamattr">Attribute</a> "session" can be selected, if the session should be established to DSM or the
+    Using the <a href="#SSCam-attr-session">session</a> attribute can be selected, if the session should be established to DSM or the
     SVS instead. Further informations about user management in SVS are available by execute
     "get &lt;name&gt; versionNotes 5".<br>
     If the session will be established to DSM, SVS Web-API methods are available as well as further API methods of other API's
@@ -12304,19 +12314,19 @@ return;
     <br><br>
   </ul>
 
-<a name="HTTPTimeout"></a>
+<a id="SSCam-HTTPTimeout"></a>
 <b>HTTP-Timeout Settings</b><br><br>
 
   <ul>
     All functions of SSCam use HTTP-calls to SVS Web API. <br>
-    You can set the attribute <a href="#httptimeout">httptimeout</a> &gt; 0 to adjust
+    You can set the attribute <a href="#SSCam-attr-httptimeout">httptimeout</a> &gt; 0 to adjust
     the value as needed in your technical environment. <br>
 
   </ul>
   <br><br><br>
 
 
-<a name="SSCamset"></a>
+<a id="SSCam-set"></a>
 <b>Set </b>
   <ul>
   <br>
@@ -12333,7 +12343,7 @@ return;
   </ul>
 
   <ul>
-  <a name="SSCamcreateStreamDev"></a>
+  <a id="SSCam-set-createStreamDev"></a>
   <li><b> createStreamDev [generic | hls | lastsnap | mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM) <br>
   respectively <br>
   <b> createStreamDev [master] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS) <br>
@@ -12347,7 +12357,7 @@ return;
     <ul>
     <table>
     <colgroup> <col width=10%> <col width=90%> </colgroup>
-      <tr><td>generic   </td><td>- the streaming device playback a content determined by attribute <a href="#genericStrmHtmlTag">genericStrmHtmlTag</a> </td></tr>
+      <tr><td>generic   </td><td>- the streaming device playback a content determined by attribute <a href="#SSCam-attr-genericStrmHtmlTag">genericStrmHtmlTag</a> </td></tr>
       <tr><td>hls       </td><td>- the streaming device playback a permanent HLS video stream </td></tr>
       <tr><td>lastsnap  </td><td>- the streaming device playback the newest snapshot </td></tr>
       <tr><td>mjpeg     </td><td>- the streaming device playback a permanent MJPEG video stream (Streamkey method) </td></tr>
@@ -12357,17 +12367,17 @@ return;
     </ul>
     <br><br>
 
-  You can control the design with HTML tags in attribute <a href="#htmlattr">htmlattr</a> of the camera device or by
+  You can control the design with HTML tags in attribute <a href="#SSCam-attr-htmlattr">htmlattr</a> of the camera device or by
   specific attributes of the SSCamSTRM-device itself. <br><br>
   </li>
 
   <b>Streaming device "hls"</b> <br><br>
 
   The Streaming-device of type "hls" uses the library hls.js to playback the video stream and is executable on most current
-  browsers with MediaSource extensions (MSE). With <a href="#SSCamattr">attribuet</a> "hlsNetScript" can be specified, whether
+  browsers with MediaSource extensions (MSE). With <a href="#SSCam-attr-hlsNetScript">hlsNetScript</a> attribute can be specified, whether
   the local installed version of hls.js (./www/pgm2/sscam_hls.js) or the newest online library version from the hls.js
   project site should be used. This attribute has to be set centrally in a device of type "SVS" ! <br>
-  If this kind of streaming device is used, the <a href="#SSCamattr">attribute</a> "hlsStrmObject" must be set in the parent
+  If this kind of streaming device is used, the <a href="#SSCam-attr-hlsStrmObject">hlsStrmObject</a> attribute must be set in the parent
   camera device (see Internal PARENT).
   <br><br>
 
@@ -12424,7 +12434,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 
   A separate PTZ control panel will be created (type SSCamSTRM). The current room of the parent camera device is
   assigned if it is set there (default "SSCam").
-  With the "ptzPanel_.*"-<a href="#SSCamattr">attributes</a> or respectively the specific attributes of the SSCamSTRM-device
+  With the "ptzPanel_.*"-<a href="#SSCam-attr">attributes</a> or respectively the specific attributes of the SSCamSTRM-device
   the properties of the control panel can be affected. <br>
   <br><br>
   <br>
@@ -12445,7 +12455,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 
   A snapshot gallery will be created as a separate device (type SSCamSTRM). The device will be provided in
   room "SSCam".
-  With the "snapGallery..."-<a href="#SSCamattr">attributes</a> respectively the specific attributes of the SSCamSTRM-device
+  With the "snapGallery..."-<a href="#SSCam-attr">attributes</a> respectively the specific attributes of the SSCamSTRM-device
   you are able to manipulate the properties of the new snapshot gallery device.
   <br><br>
 
@@ -12459,7 +12469,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b> credentials &lt;username&gt; &lt;password&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
 
   set username / password combination for access the Synology Surveillance Station.
-  See <a href="#Credentials">Credentials</a><br> for further informations.
+  See <a href="#SSCam-Credentials">Credentials</a><br> for further informations.
 
   <br><br>
   </ul>
@@ -12473,23 +12483,24 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
 
   <ul>
-  <a name="disable"></a>
-  <li><b> disable </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
+  <a id="SSCam-set-disableCam"></a>
+  <li><b> disableCam </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
   Disables the camera in Synology Surveillance Station.
   </li>
   </ul>
   <br><br>
 
   <ul>
-  <a name="enable"></a>
-  <li><b> enable </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
+  <a id="SSCam-set-enableCam"></a>
+  <li><b> enableCam </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
   Activate the camera in Synology Surveillance Station.
   </li>
   </ul>
   <br><br>
 
   <ul>
-  <li><b> expmode [day|night|auto] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <a id="SSCam-set-expmode"></a>
+  <li><b>expmode [day|night|auto] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM) <br>
 
   With this command you are able to control the exposure mode and can set it to day, night or automatic mode.
   Thereby, for example, the behavior of camera LED's will be suitable controlled.
@@ -12499,6 +12510,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   The successfully execution of this function depends on if SVS supports that functionality of the connected camera.
   Is the field for the Day/Night-mode shown greyed in SVS -&gt; IP-camera -&gt; optimization -&gt; exposure mode, this function will be probably unsupported.
   </ul>
+  </li> 
   <br><br>
 
   <ul>
@@ -12630,7 +12642,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   The each available options are dependend of camera type respectively the supported functions by SVS. Only the options can be used they are available in
   SVS -&gt; edit camera -&gt; motion detection. Further informations please read in SVS online help. <br><br>
 
-  With the command "get &lt;name&gt; caminfoall" the <a href="#SSCamreadings">Reading</a> "CamMotDetSc" also will be updated which documents the current setup of motion detection.
+  With the command "get &lt;name&gt; caminfoall" the Reading "CamMotDetSc" also will be updated which documents the current setup of motion detection.
   Only the parameters and parameter values supported by SVS at present will be shown. The camera itself may offer further  options to adjust. <br><br>
 
   Example:
@@ -12679,14 +12691,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
              </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
 
   A recording will be started. The default recording time is 15 seconds. It can be individually changed by
-  the <a href="#SSCamattr">attribute</a> "rectime".
+  the <a href="#SSCam-attr-rectime">rectime</a> attribute.
   The recording time can be overwritten on-time by "set &lt;name&gt; on &lt;rectime&gt;" for the current recording.
   The recording will be stopped after processing time "rectime"automatically.<br>
 
   A special case is start recording by "set &lt;name&gt; on 0" respectively the attribute value "rectime = 0". In this case
   an endless-recording will be started. One have to explicitely stop this recording with command "set &lt;name&gt; off".<br>
 
-  Furthermore the recording behavior can be impacted with <a href="#SSCamattr">attribute</a> "recextend" as explained as
+  Furthermore the recording behavior can be impacted with <a href="#SSCam-attr-recextend">recextend</a> attribute as explained as
   follows.<br><br>
 
   <b>Attribute "recextend = 0" or not set (default):</b><br>
@@ -12703,27 +12715,27 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Therefore a running recording will be extended until no start command will be get. </li>
 
   <li> a before started endless-recording will be stopped after recordingtime 2rectime" if a new "set <name> on"-command is received (new set of timer). If it is unwanted make sure you
-  don't set the <a href="#SSCamattr">attribute</a> "recextend" in case of endless-recordings. </li>
+  don't set the <a href="#SSCam-attr-recextend">recextend</a> attribute in case of endless-recordings. </li>
   </ul>
   <br>
 
-  The shipping of recording by <b>Synology Chat</b> can be activated permanently by setting attribute <a href="#recChatTxt">recChatTxt</a>
+  The shipping of recording by <b>Synology Chat</b> can be activated permanently by setting attribute <a href="#SSCam-attr-recChatTxt">recChatTxt</a>
   Of course, the <a href="https://wiki.fhem.de/wiki/SSChatBot_-_Integration_des_Synology_Chat_Servers">SSChatBot device</a> which is
   used for send data, must be defined and fully functional before. <br>
   If you want temporary overwrite the message text as set in attribute "recChatTxt", you can optionally specify the
   "recChatTxt:"-tag as shown above. If the attribute "recChatTxt" is not set, the shipping by Telegram is
   activated one-time. (the tag-syntax is equivalent to the "recChatTxt" attribute) <br><br>
 
-  The <b>Email shipping</b> of recordings can be activated by setting <a href="#SSCamattr">attribute</a> "recEmailTxt".
-  Before you have to prepare the Email shipping as described in section <a href="#SSCamEmail">Setup Email shipping</a>.
+  The <b>Email shipping</b> of recordings can be activated by setting <a href="#SSCam-attr-recEmailTxt">recEmailTxt</a> attribute.
+  Before you have to prepare the Email shipping as described in section <a href="#SSCam-Email">Setup Email shipping</a>.
   (for further information execute "<b>get &lt;name&gt; versionNotes 7</b>") <br>
   Alternatively you can activate the Email-shipping one-time when you specify the "recEmailTxt:"-tag in the "on"-command.
   In this case the tag-text is used for creating the Email instead the text specified in "recEmailTxt"-attribute.
   (the tag syntax is identical to the "recEmailTxt" attribute)
   <br><br>
 
-  The shipping of the last recording by <b>Telegram</b> can be activated permanently by setting <a href="#SSCamattr">attribute</a>
-  "recTelegramTxt". Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> which is
+  The shipping of the last recording by <b>Telegram</b> can be activated permanently by setting <a href="#SSCam-attr-recTelegramTxt">recTelegramTxt</a>
+  attribute. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> which is
   used, must be defined and fully functional before. <br>
   If you want temporary overwrite the message text as set with attribute "recTelegramTxt", you can optionally specify the
   "recTelegramTxt:"-tag as shown above. If the attribute "recTelegramTxt" is not set, the shipping by Telegram is
@@ -12824,7 +12836,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   The <b>"lastrec_open"</b> command can be extended optionally by a room. In this case the new window opens only, if the
   room is the same as a FHEMWEB-session has currently opened. <br>
   The command <b>"set &lt;name&gt; runView lastsnap_fw"</b> shows the last snapshot of the camera embedded. <br>
-  The Streaming-Device properties can be affected by HTML-tags in <a href="#SSCamattr">attribute</a> "htmlattr".
+  The Streaming-Device properties can be affected by HTML-tags in <a href="#SSCam-attr-htmlattr">htmlattr</a> attribute.
   <br><br>
 
   <b>Examples:</b><br>
@@ -12837,9 +12849,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   A browser window will be initiated to open for every FHEMWEB-session which is active. If you want to change this behavior,
   you can use command <b>"set &lt;name&gt; runView live_open &lt;room&gt;"</b>. In this case the new window opens only, if the
   room is the same as a FHEMWEB-session has currently opened. <br>
-  The settings of <a href="#SSCamattr">attribute</a> "livestreamprefix" overwrite the data for protocol, servername and
-  port in <a href="#SSCamreadings">reading</a> "LiveStreamUrl".
-  By "livestreamprefix" the LivestreamURL (is shown if <a href="#SSCamattr">attribute</a> "showStmInfoFull" is set) can
+  The settings of <a href="#SSCam-attr-livestreamprefix">livestreamprefix</a> attribute overwrite the data for protocol, servername and
+  port in Reading "LiveStreamUrl".
+  By "livestreamprefix" the LivestreamURL (is shown if <a href="#SSCam-attr-showStmInfoFull">showStmInfoFull</a> attribute is set) can
   be modified and used for distribution and external access to the Livestream. <br><br>
 
   <b>Example:</b><br>
@@ -12914,27 +12926,27 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   each snapshot can be optionally specified. Without any specification only one snapshot is triggered. <br>
   The ID and the filename of the last snapshot will be displayed in Reading "LastSnapId" respectively
   "LastSnapFilename". <br>
-  To get data of the last 1-10 snapshots in various versions, the attribute <a href="#snapReadingRotate">snapReadingRotate</a>
+  To get data of the last 1-10 snapshots in various versions, the attribute <a href="#SSCam-attr-snapReadingRotate">snapReadingRotate</a>
   can be used.
   <br><br>
 
-  A snapshot shipping by <b>Synology Chat</b> can be permanently activated by setting attribute <a href="#snapChatTxt">snapChatTxt</a>.
+  A snapshot shipping by <b>Synology Chat</b> can be permanently activated by setting attribute <a href="#SSCam-attr-snapChatTxt">snapChatTxt</a>.
   Of course, the <a href="https://wiki.fhem.de/wiki/SSChatBot_-_Integration_des_Synology_Chat_Servers">SSChatBot device</a> which is
   used must be defined and fully functional before. <br>
   If you want temporary overwrite the subject set in attribute "snapChatTxt", you can optionally specify the
   "snapChatTxt:"-tag as shown above. If the attribute "snapChatTxt" is not set, the shipping by SSChatBot is
   activated one-time (the tag-syntax is equivalent to the "snapChatTxt" attribute). <br>
-  In either case the attribute <a href="#videofolderMap">videofolderMap</a> has to be set before. It must contain an URL to the
+  In either case the attribute <a href="#SSCam-attr-videofolderMap">videofolderMap</a> has to be set before. It must contain an URL to the
   root directory of recordings and snapshots (e.g. http://server.me:8081/surveillance). <br><br>
 
-  The snapshot <b>Email shipping</b> can be activated by setting attribute <a href="#snapEmailTxt">snapEmailTxt</a>.
-  Before you have to prepare the Email shipping as described in section <a href="#SSCamEmail">Setup Email shipping</a>.
+  The snapshot <b>Email shipping</b> can be activated by setting attribute <a href="#SSCam-attr-snapEmailTxt">snapEmailTxt</a>.
+  Before you have to prepare the Email shipping as described in section <a href="#SSCam-Email">Setup Email shipping</a>.
   (for further information execute "<b>get &lt;name&gt; versionNotes 7</b>") <br>
   If you want temporary overwrite the message text set in attribute "snapEmailTxt", you can optionally specify the
   "snapEmailTxt:"-tag as shown above. If the attribute "snapEmailTxt" is not set, the Email shipping is
   activated one-time. (the tag-syntax is equivalent to the "snapEmailTxt" attribut) <br><br>
 
-  A snapshot shipping by <b>Telegram</b> can be permanently activated by setting attribute <a href="#snapTelegramTxt">snapTelegramTxt</a>.
+  A snapshot shipping by <b>Telegram</b> can be permanently activated by setting attribute <a href="#SSCam-attr-snapTelegramTxt">snapTelegramTxt</a>.
   Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> which is
   used must be defined and fully functional before. <br>
   If you want temporary overwrite the message text set in attribute "snapTelegramTxt", you can optionally specify the
@@ -12962,9 +12974,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   The ID and the filename of the last snapshot will be displayed in Reading "LastSnapId" respectively "LastSnapFilename" of
   the appropriate camera device. <br><br>
 
-  The snapshot <b>Email shipping</b> can be activated by setting <a href="#SSCamattr">attribute</a> "snapEmailTxt" in the
+  The snapshot <b>Email shipping</b> can be activated by setting <a href="#SSCam-attr-snapEmailTxt">snapEmailTxt</a> attribute in the
   SVS device <b>AND</b> in the camera devices whose snapshots should be shipped.
-  Before you have to prepare the Email shipping as described in section <a href="#SSCamEmail">Setup Email shipping</a>.
+  Before you have to prepare the Email shipping as described in section <a href="#SSCam-Email">Setup Email shipping</a>.
   (for further information execute "<b>get &lt;name&gt; versionNotes 7</b>") <br>
   Only the message text set in attribute "snapEmailTxt" of the SVS device is used in the created Email. The settings of
   those attribute in the camera devices is ignored !! <br><br>
@@ -12982,11 +12994,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 
   The command is only available if the attribute "snapGalleryBoost=1" is set. <br>
   It creates an output of the last [x] snapshots as well as "get ... snapGallery".  But differing from "get" with
-  <a href="#SSCamattr">attribute</a> "snapGalleryBoost=1" no popup will be created. The snapshot gallery will be depicted as
-  an browserpage instead. All further functions and attributes are appropriate the <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a>
+  <a href="#SSCam-attr-snapGalleryBoost">snapGalleryBoost=1</a> attribute no popup will be created. The snapshot gallery will be depicted as
+  an browserpage instead. All further functions and attributes are appropriate the <a href="#SSCam-get">"get &lt;name&gt; snapGallery"</a>
   command. <br>
   If you want create a snapgallery output by triggering, e.g. with an "at" or "notify", you should use the
-  <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a> command instead of "set".
+  <a href="#SSCam-get">"get &lt;name&gt; snapGallery"</a> command instead of "set".
   <br><br>
 
   <b>Note</b> <br>
@@ -13017,7 +13029,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 <br>
 
 
-<a name="SSCamget"></a>
+<a id="SSCam-get"></a>
 <b>Get</b>
  <ul>
   <br>
@@ -13026,7 +13038,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   They can be selected in the drop-down-menu of the particular device. <br><br>
 
   <ul>
-  <a name="apiInfo"></a>
+  <a id="SSCam-get-apiInfo"></a>
   <li><b> apiInfo </b> <br>
 
   Retrieves the API information of the Synology Surveillance Station and open a popup window with its data.
@@ -13048,10 +13060,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <ul>
   <li><b>  eventlist </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
 
-  The <a href="#SSCamreadings">Reading</a> "CamEventNum" and "CamLastRecord" will be refreshed which containes the total number
+  The Reading "CamEventNum" and "CamLastRecord" will be refreshed which containes the total number
   of in SVS registered camera events and the path/name of the last recording.
   This command will be implicit executed when "get &lt;name&gt; caminfoall" is running. <br>
-  The <a href="#SSCamattr">attribute</a> "videofolderMap" replaces the content of reading "VideoFolder". You can use it for
+  The <a href="#SSCam-attr-videofolderMap">videofolderMap</a> attribute replaces the content of reading "VideoFolder". You can use it for
   example if you have mounted the videofolder of SVS under another name or path and want to access by your local pc.
   </ul>
   <br><br>
@@ -13064,7 +13076,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
 
   <ul>
-    <a name="listLog"></a>
+    <a id="SSCam-get-listLog"></a>
     <li><b>  listLog [severity:&lt;Loglevel&gt;] [limit:&lt;Number of lines&gt;] [match:&lt;Searchstring&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS) <br>
 
     Fetches the Surveillance Station Log from Synology server. Without any further options the whole log will be retrieved. <br>
@@ -13089,7 +13101,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     </ul>
 
 
-    If the polling of SVS is activated by setting the <a href="#SSCamattr">attribute</a> "pollcaminfoall", the <a href="#SSCamreadings">reading</a>
+    If the polling of SVS is activated by setting the <a href="#SSCam-attr-pollcaminfoall">pollcaminfoall</a> attribute, the Reading
     "LastLogEntry" will be created. <br>
     In the protocol-setup of the SVS you can adjust what data you want to log. For further informations please have a look at
     <a href="https://www.synology.com/en-uk/knowledgebase/Surveillance/help/SurveillanceStation/log_advanced">Synology Online-Help</a>.
@@ -13148,32 +13160,32 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <ul>
   <li><b>  snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
 
-  A popup with the last [x] snapshots will be created. If the <a href="#SSCamattr">attribute</a> "snapGalleryBoost" is set,
+  A popup with the last [x] snapshots will be created. If the <a href="#SSCam-attr-snapGalleryBoost">snapGalleryBoost</a> attribute is set,
   the last snapshots (default 3) are requested by polling and they will be stored in the FHEM-servers main memory.
   This method is helpful to speed up the output especially in case of full size images, but it can be possible
   that NOT the newest snapshots are be shown if they have not be initialized by the SSCAm-module itself. <br>
   The function can also be triggered, e.g. by an "at" or "notify". In that case the snapshotgallery will be displayed on all
   connected FHEMWEB instances as a popup. <br><br>
 
-  To control this function behavior there are further <a href="#SSCamattr">attributes</a>: <br><br>
+  To control this function behavior there are further attributes: <br><br>
 
   <ul>
-     <li>snapGalleryBoost   </li>
-     <li>snapGalleryColumns   </li>
-     <li>snapGalleryHtmlAttr   </li>
-     <li>snapGalleryNumber   </li>
-     <li>snapGallerySize   </li>
+     <li><a href="#SSCam-attr-snapGalleryBoost">snapGalleryBoost</a>         </li>
+     <li><a href="#SSCam-attr-snapGalleryColumns">snapGalleryColumns</a>     </li>
+     <li><a href="#SSCam-attr-snapGalleryHtmlAttr">snapGalleryHtmlAttr</a>   </li>
+     <li><a href="#SSCam-attr-snapGalleryNumber">snapGalleryNumber</a>       </li>
+     <li><a href="#SSCam-attr-snapGallerySize">snapGallerySize</a>           </li>
   </ul> <br>
   available.
   </ul> <br>
 
-        <ul>
-        <b>Note:</b><br>
-        Depended from quantity and resolution (quality) of the snapshot images adequate CPU and/or main memory
-        ressources are needed. The camera names in Synology SVS should not be very similar, otherwise the retrieval of
-        snapshots could come to inaccuracies.
-        </ul>
-        <br><br>
+    <ul>
+    <b>Note:</b><br>
+    Depended from quantity and resolution (quality) of the snapshot images adequate CPU and/or main memory
+    ressources are needed. The camera names in Synology SVS should not be very similar, otherwise the retrieval of
+    snapshots could come to inaccuracies.
+    </ul>
+    <br><br>
 
   <ul>
   <li><b>  snapfileinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
@@ -13196,7 +13208,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 
   This command is to fetch the streamkey information and streamurl using that streamkey. The reading "StmKey" will be filled when this command will be executed and can be used
   to send it and run by your own application like a browser (see example).
-  If the <a href="#SSCamattr">attribute</a> "showStmInfoFull" is set, additional stream readings like "StmKeyUnicst", "StmKeymjpegHttp" will be shown and can be used to run the
+  If the <a href="#SSCam-attr-showStmInfoFull">showStmInfoFull</a> attribute is set, additional stream readings like "StmKeyUnicst", "StmKeymjpegHttp" will be shown and can be used to run the
   appropriate livestream without session id. Is the attribute "livestreamprefix" (usage: "http(s)://&lt;hostname&gt;&lt;port&gt;) used, the servername / port will be replaced if necessary.
   The strUrlPath function will be included automatically if polling is used.
   <br><br>
@@ -13239,7 +13251,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   <br><br>
 
-  <a name="SSCamEmail"></a>
+  <a id="SSCam-Email"></a>
   <b>Setup Email shipping</b> <br><br>
 
   <ul>
@@ -13294,8 +13306,6 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
    </ul>
    <br>
 
-   For further information please see description of the <a href="#SSCamattr">attributes</a>. <br><br>
-
    Description of the placeholders: <br><br>
 
    <ul>
@@ -13312,7 +13322,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   <br><br>
 
-  <a name="SSCamPolling"></a>
+  <a id="SSCam-Polling"></a>
   <b>Polling of Camera/SVS-Properties</b><br><br>
   <ul>
   Retrieval of Camera-Properties can be done automatically if the attribute "pollcaminfoall" will be set to a value &gt; 10. <br>
@@ -13335,14 +13345,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   <br>
 
-  The readings are described <a href="#SSCamreadings">here</a>. <br><br>
+  The readings are described <a href="#SSCam-readings">here</a>. <br><br>
 
   <b>Notes:</b> <br><br>
 
   If polling is used, the interval should be adjusted only as short as needed due to the detected camera values are predominantly static. <br>
   A feasible guide value for attribute "pollcaminfoall" could be between 600 - 1800 (s). <br>
   Per polling call and camera approximately 10 - 20 Http-calls will are stepped against Surveillance Station. <br>
-  Because of that if HTTP-Timeout (pls. refer attribute <a href="#httptimeout">httptimeout</a>) is set to 4 seconds, the theoretical processing time couldn't be higher than 80 seconds. <br>
+  Because of that if HTTP-Timeout (pls. refer attribute <a href="#SSCam-attr-httptimeout">httptimeout</a>) is set to 4 seconds, the theoretical processing time couldn't be higher than 80 seconds. <br>
   Considering a safety margin, in that example you shouldn't set the polling interval lower than 160 seconds. <br><br>
 
   If several Cameras are defined in SSCam, attribute "pollcaminfoall" of every Cameras shouldn't be set exactly to the same value to avoid processing bottlenecks <br>
@@ -13353,7 +13363,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 </ul>
 
 
-<a name="SSCaminternals"></a>
+<a id="SSCam-Internals"></a>
 <b>Internals</b> <br><br>
  <ul>
  The meaning of used Internals is depicted in following list: <br><br>
@@ -13371,13 +13381,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
  </ul>
 
-<a name="SSCamattr"></a>
+<a id="SSCam-attr"></a>
 <b>Attributes</b>
   <br><br>
   <ul>
   <ul>
 
-  <a name="cacheServerParam"></a>
+  <a id="SSCam-attr-cacheServerParam"></a>
   <li><b>cacheServerParam</b><br>
     Specification of connection parameters to a central data cache. <br><br>
 
@@ -13389,7 +13399,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br>
   </li><br>
 
-  <a name="cacheType"></a>
+  <a id="SSCam-attr-cacheType"></a>
   <li><b>cacheType</b><br>
     Defines the used Cache for storage of snapshots, recordings und other mass data.
     (Default: internal). <br>
@@ -13411,22 +13421,22 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br>
   </li><br>
 
-  <a name="debugactivetoken"></a>
+  <a id="SSCam-attr-debugactivetoken"></a>
   <li><b>debugactivetoken</b><br>
     If set, the state of active token will be logged - only for debugging, don't use it in normal operation !
   </li><br>
 
-  <a name="debugCachetime"></a>
+  <a id="SSCam-attr-debugCachetime"></a>
   <li><b>debugCachetime</b><br>
     Shows the consumed time of cache operations.
   </li><br>
 
-  <a name="disable"></a>
+  <a id="SSCam-attr-disable"></a>
   <li><b>disable</b><br>
     deactivates the device definition
   </li><br>
 
-  <a name="genericStrmHtmlTag"></a>
+  <a id="SSCam-attr-genericStrmHtmlTag"></a>
   <li><b>genericStrmHtmlTag</b><br>
   This attribute contains HTML-Tags for video-specification in a Streaming-Device of type "generic".
   (see also "set &lt;name&gt; createStreamDev generic") <br><br>
@@ -13449,7 +13459,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br><br>
     </li>
 
-  <a name="hlsNetScript"></a>
+  <a id="SSCam-attr-hlsNetScript"></a>
   <li><b>hlsNetScript</b> &nbsp;&nbsp;&nbsp;&nbsp;(settable in device model "SVS") <br>
     If set, the latest hls.js library version from the project site is used (internet connection is needed).
     <br>
@@ -13458,7 +13468,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     This attribute has to be set in a device model "SVS" and applies to all streaming devices !
   </li><br>
 
-  <a name="hlsStrmObject"></a>
+  <a id="SSCam-attr-hlsStrmObject"></a>
   <li><b>hlsStrmObject</b><br>
   If a streaming device was defined by "set &lt;name&gt; createStreamDev hls", this attribute has to be set and must contain the
   link to the video object to play back. <br>
@@ -13481,12 +13491,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         <br>
   </li>
 
-  <a name="httptimeout"></a>
+  <a id="SSCam-attr-httptimeout"></a>
   <li><b>httptimeout</b><br>
     Timeout-Value of HTTP-Calls to Synology Surveillance Station. <br>
     (default: 20 seconds) </li><br>
 
-  <a name="htmlattr"></a>
+  <a id="SSCam-attr-htmlattr"></a>
   <li><b>htmlattr</b><br>
     additional specifications to inline oictures to manipulate the behavior of stream, e.g. size of the image.  </li><br>
 
@@ -13496,7 +13506,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         </ul>
         <br>
 
-  <a name="livestreamprefix"></a>
+  <a id="SSCam-attr-livestreamprefix"></a>
   <li><b>livestreamprefix</b><br>
     Overwrites the specifications of protocol, servername and port for further use in livestream address and
     StmKey.*-readings , e.g. as a link for external use. <br>
@@ -13513,11 +13523,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     Servername can be the name or the IP-address of your Synology Surveillance Station.
     </li><br>
 
-  <a name="loginRetries"></a>
+  <a id="SSCam-attr-loginRetries"></a>
   <li><b>loginRetries</b><br>
     set the amount of login-repetitions in case of failure (default = 3)   </li><br>
 
-  <a name="noQuotesForSID"></a>
+  <a id="SSCam-attr-noQuotesForSID"></a>
   <li><b>noQuotesForSID</b><br>
     This attribute delete the quotes for SID and for StmKeys.
     The attribute may be helpful in some cases to avoid errormessages "402 - permission denied" or "105 -
@@ -13525,38 +13535,38 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     (default: 0)
   </li><br>
 
-  <a name="pollcaminfoall"></a>
+  <a id="SSCam-attr-pollcaminfoall"></a>
   <li><b>pollcaminfoall</b><br>
     Interval of automatic polling the Camera properties (&lt;= 10: no polling, &gt; 10: polling with interval)
   </li><br>
 
-  <a name="pollnologging"></a>
+  <a id="SSCam-attr-pollnologging"></a>
   <li><b>pollnologging</b><br>
     "0" resp. not set = Logging device polling active (default), "1" = Logging device polling inactive
   </li><br>
 
-  <a name="ptzNoCapPrePat"></a>
+  <a id="SSCam-attr-ptzNoCapPrePat"></a>
   <li><b>ptzNoCapPrePat</b><br>
     Some PTZ cameras cannot store presets and patrols despite their PTZ capabilities.
     To avoid errors and corresponding log messages, the attribute ptzNoCapPrePat can be set in these cases.
     The system will be notified of a missing preset / patrol capability.
   </li><br>
 
-  <a name="ptzPanel_Home"></a>
+  <a id="SSCam-attr-ptzPanel_Home"></a>
   <li><b>ptzPanel_Home</b><br>
     In the PTZ-control panel the Home-Icon (in attribute "ptzPanel_row02") is automatically assigned to the value of
     Reading "PresetHome".
     With "ptzPanel_Home" you can change the assignment to another preset from the available Preset list.
   </li><br>
 
-  <a name="ptzPanel_iconPath"></a>
+  <a id="SSCam-attr-ptzPanel_iconPath"></a>
   <li><b>ptzPanel_iconPath</b><br>
     Path for icons used in PTZ-control panel, default is "www/images/sscam".
     The attribute value will be used for all icon-files except *.svg. <br>
     For further information execute "get &lt;name&gt; versionNotes 2,6".
   </li><br>
 
-  <a name="ptzPanel_iconPrefix"></a>
+  <a id="SSCam-attr-ptzPanel_iconPrefix"></a>
   <li><b>ptzPanel_iconPrefix</b><br>
     Prefix for icons used in PTZ-control panel, default is "black_btn_".
     The attribute value will be used for all icon-files except *.svg. <br>
@@ -13564,7 +13574,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     attributes "ptzPanel_row[00-09]" just with the subsequent part of name, e.g. "CAMDOWN.png".
     </li><br>
 
-  <a name="ptzPanel_row00"></a>
+  <a id="SSCam-attr-ptzPanel_row00"></a>
   <li><b>ptzPanel_row[00-09] &lt;command&gt;:&lt;icon&gt;,&lt;command&gt;:&lt;icon&gt;,... </b><br>
     For PTZ-cameras the attributes "ptzPanel_row00" to "ptzPanel_row04" are created automatically for usage by
     the PTZ-control panel. <br>
@@ -13591,7 +13601,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         <br>
     </li><br>
 
-  <a name="ptzPanel_use"></a>
+  <a id="SSCam-attr-ptzPanel_use"></a>
   <li><b>ptzPanel_use</b><br>
     Switch the usage of a PTZ-control panel in detail view respectively a created StreamDevice off or on
     (default: on). <br>
@@ -13600,10 +13610,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     (e.g. "attr WEB iconPath default:fhemSVG:openautomation:sscam").
   </li><br>
 
-  <a name="recChatTxt"></a>
+  <a id="SSCam-attr-recChatTxt"></a>
   <li><b>recChatTxt chatbot => &lt;SSChatBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
     Activates the permanent shipping of recordings by Synology Chat after its creation. <br>
-    Before activating the attribute <a href="#videofolderMap">videofolderMap</a> has to be set. It must contain an URL to the
+    Before activating the attribute <a href="#SSCam-attr-videofolderMap">videofolderMap</a> has to be set. It must contain an URL to the
     root directory of your SVS recordings and snapshots ( e.g. http://server.me:8081/surveillance ). <br>
     The attribute recChatTxt has to be defined in the form as described. With key "chatbot" the SSChatBot device is specified,
     which is used for sending the data. Of course, the <a href="https://wiki.fhem.de/wiki/SSChatBot_-_Integration_des_Synology_Chat_Servers">SSChatBot device</a>
@@ -13633,7 +13643,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br>
   </li><br>
 
-  <a name="recEmailTxt"></a>
+  <a id="SSCam-attr-recEmailTxt"></a>
   <li><b>recEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
     Activates the Email shipping of recordings after whose creation. <br>
     The attribute must be defined in the specified form. <br>
@@ -13658,7 +13668,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
       <br>
   </li>
 
-  <a name="recTelegramTxt"></a>
+  <a id="SSCam-attr-recTelegramTxt"></a>
   <li><b>recTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Text&gt;], option => [silent]  </b><br>
     Enables permanent sending of recordings after their creation via TelegramBot. <br>
     The attribute must be defined in the specified form.
@@ -13706,24 +13716,24 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br>
   </li><br>
 
-  <a name="rectime"></a>
+  <a id="SSCam-attr-rectime"></a>
   <li><b>rectime</b><br>
    determines the recordtime when a recording starts. If rectime = 0 an endless recording will be started. If
    it isn't defined, the default recordtime of 15s is activated </li><br>
 
-  <a name="recextend"></a>
+  <a id="SSCam-attr-recextend"></a>
   <li><b>recextend</b><br>
     "rectime" of a started recording will be set new. Thereby the recording time of the running recording will be
     extended </li><br>
 
-  <a name="session"></a>
+  <a id="SSCam-attr-session"></a>
   <li><b>session</b><br>
     selection of login-Session. Not set or set to "DSM" -&gt; session will be established to DSM (Sdefault).
     "SurveillanceStation" -&gt; session will be established to SVS. <br>
     For establish a sesion with Surveillance Station you have to create a user with suitable privilege profile in SVS.
     If you need more infomations please execute "get &lt;name&gt; versionNotes 5".    </li><br>
 
-  <a name="simu_SVSversion"></a>
+  <a id="SSCam-attr-simu_SVSversion"></a>
   <li><b>simu_SVSversion</b><br>
     A logical "downgrade" to the specified SVS version is performed. The attribute is useful to temporarily eliminate
     incompatibilities that may occur when updating/upgrading Synology Surveillance Station.
@@ -13731,60 +13741,60 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </li>
   <br>
 
-  <a name="smtpHost"></a>
+  <a id="SSCam-attr-smtpHost"></a>
   <li><b>smtpHost &lt;Hostname&gt; </b><br>
     The name or IP-address of outgoing email server (e.g. securesmtp.t-online.de).
   </li>
   <br>
 
-  <a name="smtpCc"></a>
+  <a id="SSCam-attr-smtpCc"></a>
   <li><b>smtpCc &lt;name&gt;@&lt;domain&gt;[, &lt;name&gt;@&lt;domain&gt;][, &lt;name&gt;@&lt;domain&gt;]... </b><br>
     Optional you can enter a carbon-copy receiving address. Several receiving addresses are separated by ",".
   </li>
   <br>
 
-  <a name="smtpDebug"></a>
+  <a id="SSCam-attr-smtpDebug"></a>
   <li><b>smtpDebug </b><br>
     Switch the debugging mode for SMTP connection on (if Email shipping is used).
   </li>
   <br>
 
-  <a name="smtpFrom"></a>
+  <a id="SSCam-attr-smtpFrom"></a>
   <li><b>smtpFrom &lt;name&gt;@&lt;domain&gt; </b><br>
     Return address if Email shipping is used.
   </li>
   <br>
 
-  <a name="smtpPort"></a>
+  <a id="SSCam-attr-smtpPort"></a>
   <li><b>smtpPort &lt;Port&gt; </b><br>
     Optional setting of default SMTP port of outgoing email server (default: 25).
   </li>
   <br>
 
-  <a name="smtpSSLPort"></a>
+  <a id="SSCam-attr-smtpSSLPort"></a>
   <li><b>smtpSSLPort &lt;Port&gt; </b><br>
     Optional setting of SSL port of outgoing email server (default: 465). If set, the established connection to the Email
     server will be encrypted immediately.
   </li>
   <br>
 
-  <a name="smtpTo"></a>
+  <a id="SSCam-attr-smtpTo"></a>
   <li><b>smtpTo &lt;name&gt;@&lt;domain&gt;[, &lt;name&gt;@&lt;domain&gt;][, &lt;name&gt;@&lt;domain&gt;]... </b><br>
     Receiving address for emal shipping. Several receiving addresses are separated by ",".
   </li>
   <br>
 
-  <a name="smtpNoUseSSL"></a>
+  <a id="SSCam-attr-smtpNoUseSSL"></a>
   <li><b>smtpNoUseSSL </b><br>
     If no Email SSL encryption should be used, set this attribute to "1" (default: 0).
   </li>
   <br>
 
-  <a name="snapChatTxt"></a>
+  <a id="SSCam-attr-snapChatTxt"></a>
   <li><b>snapChatTxt chatbot => &lt;SSChatBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
     Activates the permanent shipping of snapshots by Synology Chat after their creation. If several snapshots were triggert,
     they will be sequentially delivered.<br>
-    Before activating the attribute <a href="#videofolderMap">videofolderMap</a> has to be set. It must contain an URL to the
+    Before activating the attribute <a href="#SSCam-attr-videofolderMap">videofolderMap</a> has to be set. It must contain an URL to the
     root directory of your SVS recordings and snapshots ( e.g. http://server.me:8081/surveillance ). <br>
     The attribute snapChatTxt has to be defined in the form as described. With key "chatbot" the SSChatBot device is specified,
     which is used for sending the data. Of course, the <a href="https://wiki.fhem.de/wiki/SSChatBot_-_Integration_des_Synology_Chat_Servers">SSChatBot device</a>
@@ -13815,7 +13825,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br>
   </li><br>
 
-  <a name="snapEmailTxt"></a>
+  <a id="SSCam-attr-snapEmailTxt"></a>
   <li><b>snapEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
     Activates the Email shipping of snapshots after whose creation. <br>
     The attribute must be defined in the specified form. <br>
@@ -13840,7 +13850,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
       <br><br>
   </li>
 
-  <a name="snapTelegramTxt"></a>
+  <a id="SSCam-attr-snapTelegramTxt"></a>
   <li><b>snapTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;], option => [silent]  </b><br>
     Enables permanent sending of snapshots after their creation via TelegramBot.
     If several snapshots were triggered, they are sent sequentially. <br>
@@ -13889,19 +13899,24 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br>
   </li><br>
 
-  <a name="snapGalleryBoost"></a>
+  <a id="SSCam-attr-snapGalleryBoost"></a>
   <li><b>snapGalleryBoost</b><br>
     If set, the last snapshots (default 3) will be retrieved by Polling, will be stored in the FHEM-servers main memory
     and can be displayed by the "set/get ... snapGallery" command. <br>
     This mode is helpful if many or full size images shall be displayed.
     If the attribute is set, you can't specify arguments in addition to the "set/get ... snapGallery" command.
-    (see also attribut "snapGalleryNumber") </li><br>
+    (see also attribut "snapGalleryNumber"). <br><br>
+    
+    (default: 0)
+    
+  </li>
+  <br>
 
-  <a name="snapGalleryColumns"></a>
+  <a id="SSCam-attr-snapGalleryColumns"></a>
   <li><b>snapGalleryColumns</b><br>
     The number of snapshots which shall appear in one row of the gallery popup (default 3). </li><br>
 
-  <a name="snapGalleryHtmlAttr"></a>
+  <a id="SSCam-attr-snapGalleryHtmlAttr"></a>
   <li><b>snapGalleryHtmlAttr</b><br>
     the image parameter can be controlled by this attribute. <br>
     If the attribute isn't set, the value of attribute "htmlattr" will be used. <br>
@@ -13914,37 +13929,37 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         <br>
         </li>
 
-  <a name="snapGalleryNumber"></a>
+  <a id="SSCam-attr-snapGalleryNumber"></a>
   <li><b>snapGalleryNumber</b><br>
     The number of snapshots to retrieve (default 3). </li><br>
 
-  <a name="snapGallerySize"></a>
+  <a id="SSCam-attr-snapGallerySize"></a>
   <li><b>snapGallerySize</b><br>
      By this attribute the quality of the snapshot images can be controlled (default "Icon"). <br>
      If mode "Full" is set, the images are retrieved with their original available resolution. That requires more ressources
      and may slow down the display. By setting attribute "snapGalleryBoost=1" the display may accelerated, because in that case
      the images will be retrieved by continuous polling and need only bring to display. </li><br>
 
-  <a name="snapReadingRotate"></a>
+  <a id="SSCam-attr-snapReadingRotate"></a>
   <li><b>snapReadingRotate 0...10</b><br>
     Activates the version control of snapshot readings (default: 0). A consecutive number of readings "LastSnapFilename",
     "LastSnapId" and "LastSnapTime" until to the specified value of snapReadingRotate will be created and contain the data
     of the last X snapshots. </li><br>
 
-  <a name="showStmInfoFull"></a>
+  <a id="SSCam-attr-showStmInfoFull"></a>
   <li><b>showStmInfoFull</b><br>
     additional stream informations like LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp will be created  </li><br>
 
-  <a name="showPassInLog"></a>
+  <a id="SSCam-attr-showPassInLog"></a>
   <li><b>showPassInLog</b><br>
     if set the used password will be shown in logfile with verbose 4. (default = 0) </li><br>
 
-  <a name="videofolderMap"></a>
+  <a id="SSCam-attr-videofolderMap"></a>
   <li><b>videofolderMap</b><br>
     Replaces the content of reading "VideoFolder". Use it if e.g. folders are mountet with different names than original
     in SVS or providing an URL for acces the snapshots / recordings by a web server. </li><br>
 
-  <a name="verbose"></a>
+  <a id="SSCam-attr-verbose"></a>
   <li><b>verbose</b></li><br>
 
   <ul>
@@ -13968,7 +13983,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   <br><br>
 
-<a name="SSCamreadings"></a>
+<a id="SSCam-Readings"></a>
 <b>Readings</b>
  <ul>
   <br>
@@ -14029,15 +14044,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <tr><td><li>LastSnapId[x]</li>      </td><td>- the ID of the last snapshot or snapshots   </td></tr>
     <tr><td><li>LastSnapTime[x]</li>    </td><td>- timestamp of the last snapshot or snapshots (format depends of global attribute "language")  </td></tr>
     <tr><td><li>LastUpdateTime</li>     </td><td>- date / time the last update of readings by "caminfoall" (format depends of global attribute "language") </td></tr>
-    <tr><td><li>LiveStreamUrl </li>     </td><td>- the livestream URL if stream is started (is shown if <a href="#SSCamattr">attribute</a> "showStmInfoFull" is set) </td></tr>
+    <tr><td><li>LiveStreamUrl </li>     </td><td>- the livestream URL if stream is started (is shown if <a href="#SSCam-attr-showStmInfoFull">showStmInfoFull</a> attribute is set) </td></tr>
     <tr><td><li>Patrols</li>            </td><td>- in Synology Surveillance Station predefined patrols (at PTZ-Cameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- shows the state of automatic polling  </td></tr>
     <tr><td><li>PresetHome</li>         </td><td>- Name of Home-position (at PTZ-Cameras)  </td></tr>
     <tr><td><li>Presets</li>            </td><td>- in Synology Surveillance Station predefined Presets (at PTZ-Cameras)  </td></tr>
     <tr><td><li>Record</li>             </td><td>- if recording is running = Start, if no recording is running = Stop  </td></tr>
     <tr><td><li>StmKey</li>             </td><td>- current streamkey. it can be used to open livestreams without session id    </td></tr>
-    <tr><td><li>StmKeyUnicst</li>       </td><td>- Uni-cast stream path of the camera. (<a href="#SSCamattr">attribute</a> "showStmInfoFull" has to be set)  </td></tr>
-    <tr><td><li>StmKeymjpegHttp</li>    </td><td>- Mjpeg stream path(over http) of the camera (<a href="#SSCamattr">attribute</a> "showStmInfoFull" has to be set)  </td></tr>
+    <tr><td><li>StmKeyUnicst</li>       </td><td>- Uni-cast stream path of the camera. (<a href="#SSCam-attr-showStmInfoFull">showStmInfoFull</a> has to be set)  </td></tr>
+    <tr><td><li>StmKeymjpegHttp</li>    </td><td>- Mjpeg stream path(over http) of the camera (<a href="#SSCam-attr-showStmInfoFull">showStmInfoFull</a> has to be set)  </td></tr>
     <tr><td><li>SVScustomPortHttp</li>  </td><td>- Customized port of Surveillance Station (HTTP) (to get with "svsinfo")  </td></tr>
     <tr><td><li>SVScustomPortHttps</li> </td><td>- Customized port of Surveillance Station (HTTPS) (to get with "svsinfo")  </td></tr>
     <tr><td><li>SVSlicenseNumber</li>   </td><td>- The total number of installed licenses (to get with "svsinfo")  </td></tr>
@@ -14057,7 +14072,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 =end html
 =begin html_DE
 
-<a name="SSCam"></a>
+<a id="SSCam"></a>
 <h3>SSCam</h3>
 <ul>
     Mit diesem Modul können Operationen von in der Synology Surveillance Station (SVS) definierten Kameras und Funktionen
@@ -14131,7 +14146,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     Das Modul verwendet für HTTP-Calls die nichtblockierenden Funktionen von HttpUtils bzw. HttpUtils_NonblockingGet. <br>
     Im DSM bzw. der Synology Surveillance Station muß ein Nutzer angelegt sein. Die Zugangsdaten werden später über ein Set-Kommando dem
     angelegten Gerät zugewiesen. <br>
-    Nähere Informationen dazu unter <a href="#Credentials">Credentials</a><br><br>
+    Nähere Informationen dazu unter <a href="#SSCam-Credentials">Credentials</a><br><br>
 
     Überblick über die Perl-Module welche von SSCam genutzt werden: <br><br>
 
@@ -14165,7 +14180,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br><br>
     </ul>
 
-<a name="SSCamdefine"></a>
+<a id="SSCam-define"></a>
 <b>Definition</b>
   <ul>
   <br>
@@ -14223,25 +14238,25 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
      </pre>
 
     Wird eine neue Kamera definiert, wird diesem Device zunächst eine Standardaufnahmedauer von 15 zugewiesen. <br>
-    Über das <a href="#SSCamattr">Attribut</a> "rectime" kann die Aufnahmedauer für jede Kamera individuell angepasst werden. Der Wert "0" für "rectime" führt zu einer Endlosaufnahme, die durch "set &lt;name&gt; off" wieder gestoppt werden muß. <br>
+    Über das <a href="#SSCam-attr-rectime">rectime</a> Attribut kann die Aufnahmedauer für jede Kamera individuell angepasst werden. Der Wert "0" für "rectime" führt zu einer Endlosaufnahme, die durch "set &lt;name&gt; off" wieder gestoppt werden muß. <br>
     Ein Logeintrag mit einem entsprechenden Hinweis auf diesen Umstand wird geschrieben. <br><br>
 
-    Wird das <a href="#SSCamattr">Attribut</a> "rectime" gelöscht, greift wieder der Default-Wert (15s) für die Aufnahmedauer. <br><br>
+    Wird das <a href="#SSCam-attr-rectime">rectime</a> Attribut gelöscht, greift wieder der Default-Wert (15s) für die Aufnahmedauer. <br><br>
 
-    Mit dem <a href="#SSCamset">Befehl</a> <b>"set &lt;name&gt; on [rectime]"</b> wird die Aufnahmedauer temporär festgelegt und überschreibt einmalig sowohl den Defaultwert als auch den Wert des gesetzten Attributs "rectime". <br>
+    Mit dem <a href="#SSCam-set">Befehl</a> <b>"set &lt;name&gt; on [rectime]"</b> wird die Aufnahmedauer temporär festgelegt und überschreibt einmalig sowohl den Defaultwert als auch den Wert des gesetzten Attributs "rectime". <br>
     Auch in diesem Fall führt <b>"set &lt;name&gt; on 0"</b> zu einer Daueraufnahme. <br><br>
 
     Eine eventuell in der SVS eingestellte Dauer der Voraufzeichnung wird weiterhin berücksichtigt. <br><br>
 
     Erkennt das Modul die definierte Kamera als PTZ-Device (Reading "DeviceType = PTZ"), wird automatisch ein
     Steuerungspaneel in der Detailansicht erstellt. Dieses Paneel setzt SVS >= 7.1 voraus. Die Eigenschaften und das
-    Verhalten des Paneels können mit den <a href="#SSCamattr">Attributen</a> "ptzPanel_.*" beeinflusst werden. <br>
-    Siehe dazu auch den <a href="#SSCamset">Befehl</a> <b>"set &lt;name&gt; createPTZcontrol"</b>.
+    Verhalten des Paneels können mit den <a href="#SSCam-attr">Attributen</a> "ptzPanel_.*" beeinflusst werden. <br>
+    Siehe dazu auch den <a href="#SSCam-set">Befehl</a> <b>"set &lt;name&gt; createPTZcontrol"</b>.
 
     <br><br><br>
     </ul>
 
-    <a name="Credentials"></a>
+    <a id="SSCam-Credentials"></a>
     <b>Credentials </b><br><br>
 
     <ul>
@@ -14254,7 +14269,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     Die Passwortlänge beträgt maximal 20 Zeichen. <br>
     Der Anwender kann in Abhängigkeit der beabsichtigten einzusetzenden Funktionen einen Nutzer im DSM bzw. in der Surveillance
     Station einrichten. Sollte im DSM die <a href="https://www.synology.com/de-de/knowledgebase/DSM/tutorial/General/How_to_add_extra_security_to_your_Synology_NAS#t5">2-Stufen Verifizierung</a>
-    aktiviert sein, ist die Session mit der Surveillance Station aufzubauen (<a href="#SSCamattr">Attribut</a> "session = SurveillanceStation"). <br><br>
+    aktiviert sein, ist die Session mit der Surveillance Station aufzubauen (<a href="#SSCam-attr-session">session = SurveillanceStation</a> Attribut). <br><br>
     Ist der DSM-Nutzer der Gruppe Administratoren zugeordnet, hat er auf alle Funktionen Zugriff. Ohne diese Gruppenzugehörigkeit
     können nur Funktionen mit niedrigeren Rechtebedarf ausgeführt werden. Die benötigten Mindestrechte der Funktionen sind in
     der Tabelle weiter unten aufgeführt. <br>
@@ -14270,7 +14285,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     </ul>
     <br>
 
-    Über das <a href="#SSCamattr">Attribut</a> "session" kann ausgewählt werden, ob die Session mit dem DSM oder der SVS
+    Über das <a href="#SSCam-attr-session">session</a> Attribut kann ausgewählt werden, ob die Session mit dem DSM oder der SVS
     aufgebaut werden soll. Weitere Informationen zum Usermanagement in der SVS sind verfügbar mit
     "get &lt;name&gt; versionNotes 5".<br>
     Erfolgt der Session-Aufbau mit dem DSM, stehen neben der SVS Web-API auch darüber hinausgehende API-Zugriffe zur Verfügung,
@@ -14319,18 +14334,18 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br><br>
     </ul>
 
-<a name="HTTPTimeout"></a>
+<a id="SSCam-httptimeout"></a>
 <b>HTTP-Timeout setzen</b><br><br>
 
     <ul>
     Alle Funktionen dieses Moduls verwenden HTTP-Aufrufe gegenüber der SVS Web API. <br>
-    Durch Setzen des Attributes <a href="#httptimeout">httptimeout</a> &gt; 0 kann dieser Wert bei Bedarf entsprechend
+    Durch Setzen des Attributes <a href="#SSCam-attr-httptimeout">httptimeout</a> &gt; 0 kann dieser Wert bei Bedarf entsprechend
     den technischen Gegebenheiten angepasst werden. <br>
 
   </ul>
   <br><br><br>
 
-<a name="SSCamset"></a>
+<a id="SSCam-set"></a>
 <b>Set </b>
 <ul>
   <br>
@@ -14348,7 +14363,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
 
   <ul>
-  <a name="SSCamcreateStreamDev"></a>
+  <a id="SSCam-set-createStreamDev"></a>
   <li><b> createStreamDev [generic | hls | lastsnap | mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
   bzw. <br>
   <b> createStreamDev [master] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS) <br>
@@ -14362,7 +14377,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <ul>
     <table>
     <colgroup> <col width=10%> <col width=90%> </colgroup>
-      <tr><td>generic   </td><td>- das Streaming-Device gibt einen durch das Attribut <a href="#genericStrmHtmlTag">genericStrmHtmlTag</a> bestimmten Content wieder </td></tr>
+      <tr><td>generic   </td><td>- das Streaming-Device gibt einen durch das Attribut <a href="#SSCam-attr-genericStrmHtmlTag">genericStrmHtmlTag</a> bestimmten Content wieder </td></tr>
       <tr><td>hls       </td><td>- das Streaming-Device gibt einen permanenten HLS Datenstrom wieder </td></tr>
       <tr><td>lastsnap  </td><td>- das Streaming-Device zeigt den neuesten Schnappschuß an </td></tr>
       <tr><td>mjpeg     </td><td>- das Streaming-Device gibt einen permanenten MJPEG Kamerastream wieder (Streamkey Methode) </td></tr>
@@ -14372,17 +14387,17 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     </ul>
     <br>
 
-  Die Gestaltung kann durch HTML-Tags im Attribut <a href="#htmlattr">htmlattr</a> im Kameradevice oder mit den
+  Die Gestaltung kann durch HTML-Tags im Attribut <a href="#SSCam-attr-htmlattr">htmlattr</a> im Kameradevice oder mit den
   spezifischen Attributen im Streaming-Device beeinflusst werden. <br><br>
   </li>
 
   <b>Streaming Device "hls"</b> <br><br>
 
   Das Streaming-Device vom Typ "hls" verwendet die Bibliothek hls.js zur Bildverarbeitung und ist auf allen Browsern mit
-  MediaSource extensions (MSE) lauffähig. Mit dem <a href="#SSCamattr">Attribut</a> "hlsNetScript" kann bestimmt werden, ob
+  MediaSource extensions (MSE) lauffähig. Mit dem Attribut <a href="#SSCam-attr-hlsNetScript">hlsNetScript</a> kann bestimmt werden, ob
   die lokal installierte hls.js (./www/pgm2/sscam_hls.js) oder immer die aktuellste Bibliotheksversion von der hls.js Projektseite
   verwendet werden soll. Dieses Attribut ist zentral in einem Device vom Typ "SVS" zu setzen ! <br>
-  Bei Verwendung dieses Streamingdevices ist zwingend das <a href="#SSCamattr">Attribut</a> "hlsStrmObject" im verbundenen
+  Bei Verwendung dieses Streamingdevices ist zwingend das Attribut <a href="#SSCam-attr-hlsStrmObject">hlsStrmObject</a> im verbundenen
   Kamera-Device (siehe Internal PARENT) anzugeben.
   <br><br>
 
@@ -14438,7 +14453,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 
   Es wird ein separates PTZ-Steuerungspaneel (Type SSCamSTRM) erstellt. Es wird der aktuelle Raum des Kameradevice
   zugewiesen sofern dort gesetzt (default "SSCam").
-  Mit den "ptzPanel_.*"-<a href="#SSCamattr">Attributen</a> bzw. den spezifischen Attributen des erzeugten
+  Mit den "ptzPanel_.*"-<a href="#SSCam-attr">Attributen</a> bzw. den spezifischen Attributen des erzeugten
   SSCamSTRM-Devices können die Eigenschaften des PTZ-Paneels beeinflusst werden. <br>
   <br><br>
   </ul>
@@ -14457,7 +14472,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 
   Es wird eine Schnappschußgallerie als separates Device (Type SSCamSTRM) erzeugt. Das Device wird im Raum
   "SSCam" erstellt.
-  Mit den "snapGallery..."-<a href="#SSCamattr">Attributen</a> bzw. den spezifischen Attributen des erzeugten SSCamSTRM-Devices
+  Mit den "snapGallery..."-<a href="#SSCam-attr">Attributen</a> bzw. den spezifischen Attributen des erzeugten SSCamSTRM-Devices
   können die Eigenschaften der Schnappschußgallerie beeinflusst werden.
   <br><br>
 
@@ -14473,7 +14488,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b> credentials &lt;username&gt; &lt;password&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
 
   Setzt Username / Passwort für den Zugriff auf die Synology Surveillance Station.
-  Siehe <a href="#Credentials">Credentials</a><br>
+  Siehe <a href="#SSCam-attr-Credentials">Credentials</a><br>
 
   <br><br>
   </ul>
@@ -14488,23 +14503,24 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
 
   <ul>
-  <a name="disable"></a>
-  <li><b> disable </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
+  <a id="SSCam-set-disableCam"></a>
+  <li><b> disableCam </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
     Deaktiviert die Kamera in der Synology Surveillance Station.
   </li>
   </ul>
   <br><br>
 
   <ul>
-  <a name="enable"></a>
-  <li><b> enable </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
+  <a id="SSCam-set-enableCam"></a>
+  <li><b> enableCam </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
     Aktiviert die Kamera in der Synology Surveillance Station.
   </li>
   </ul>
   <br><br>
 
   <ul>
-  <li><b> expmode [day|night|auto] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <a id="SSCam-set-expmode"></a>
+  <li><b>expmode [day|night|auto] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
 
   Mit diesem Befehl kann der Belichtungsmodus der Kameras gesetzt werden. Dadurch wird z.B. das Verhalten der Kamera-LED's entsprechend gesteuert.
   Die erfolgreiche Umschaltung wird durch das Reading CamExposureMode ("get ... caminfoall") reportet. <br><br>
@@ -14513,8 +14529,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Die erfolgreiche Ausführung dieser Funktion ist davon abhängig ob die SVS diese Funktionalität der Kamera unterstützt.
   Ist in SVS -&gt; IP-Kamera -&gt; Optimierung -&gt; Belichtungsmodus das Feld für den Tag/Nachtmodus grau hinterlegt, ist nicht von einer lauffähigen Unterstützung dieser
   Funktion auszugehen.
-  <br><br>
+  </li>
   </ul>
+  <br><br>
 
   <ul>
   <li><b> extevent [ 1-10 ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
@@ -14530,7 +14547,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
 
   <ul>
-    <a name=goAbsPTZ></a>
+    <a id="SSCam-set-goAbsPTZ"></a>
     <li><b> goAbsPTZ [ X Y | up | down | left | right ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
 
     Mit diesem Kommando wird eine PTZ-Kamera in Richtung einer wählbaren absoluten X/Y-Koordinate bewegt, oder zur maximalen
@@ -14614,7 +14631,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
 
   <ul>
-  <a name="motdetsc"></a>
+  <a id="SSCam-set-motdetsc"></a>
   <li><b> motdetsc [camera [&lt;options&gt;] | SVS [&lt;options&gt;] | disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
 
   Der Befehl schaltet die Bewegungserkennung in den gewünschten Modus.
@@ -14655,7 +14672,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Die jeweils verfügbaren Optionen unterliegen der Funktion der Kamera und der Unterstützung durch die SVS. Es können jeweils nur die Optionen genutzt werden die in
   SVS -&gt; Kamera bearbeiten -&gt; Ereigniserkennung zur Verfügung stehen. Weitere Infos sind der Online-Hilfe zur SVS zu entnehmen. <br><br>
 
-  Über den Befehl "get &lt;name&gt; caminfoall" wird auch das <a href="#SSCamreadings">Reading</a> "CamMotDetSc" aktualisiert welches die gegenwärtige Einstellung der Bewegungserkennung dokumentiert.
+  Über den Befehl "get &lt;name&gt; caminfoall" wird auch das Reading "CamMotDetSc" aktualisiert welches die gegenwärtige Einstellung der Bewegungserkennung dokumentiert.
   Es werden nur die Parameter und Parameterwerte angezeigt, welche die SVS aktiv unterstützt. Die Kamera selbst kann weiterführende Einstellmöglichkeiten besitzen. <br><br>
 
   <b>Beipiel:</b>
@@ -14735,21 +14752,21 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   <br>
 
-  Ein <b>Synology Chat Versand</b> der Aufnahme kann durch Setzen des <a href="#SSCamattr">recChatTxt</a> Attributs permanent aktiviert
+  Ein <b>Synology Chat Versand</b> der Aufnahme kann durch Setzen des <a href="#SSCam-attr-recChatTxt">recChatTxt</a> Attributs permanent aktiviert
   werden. Das zu verwendende <a href="https://wiki.fhem.de/wiki/SSChatBot_-_Integration_des_Synology_Chat_Servers">SSChatBot-Device</a> muss natürlich
   funktionstüchtig eingerichtet sein. <br>
   Der Text im Attribut "recChatTxt" kann durch die Spezifikation des optionalen "recChatTxt:"-Tags, wie oben
   gezeigt, temporär überschrieben bzw. geändert werden. Sollte das Attribut "recChatTxt" nicht gesetzt sein, wird durch Angabe dieses Tags
   der Versand mit Synology Chat einmalig aktiviert. (die Tag-Syntax entspricht dem "recChatTxt"-Attribut) <br><br>
 
-  Ein <b>Email-Versand</b> der letzten Aufnahme kann durch Setzen des <a href="#SSCamattr">Attributs</a> "recEmailTxt"
-  aktiviert werden. Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCamEmail">Einstellung Email-Versand</a> beschrieben,
+  Ein <b>Email-Versand</b> der letzten Aufnahme kann durch Setzen des <a href="#SSCam-attr-recEmailTxt">recEmailTxt</a>
+  aktiviert werden. Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCam-Email">Einstellung Email-Versand</a> beschrieben,
   einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
   Alternativ kann durch Verwendung des optionalen "recEmailTxt:"-Tags der Email-Versand der gestarteten Aufnahme nach deren
   Beendigung aktiviert werden. Sollte das Attribut "recEmailTxt" bereits gesetzt sein, wird der Text des "recEmailTxt:"-Tags
   anstatt des Attribut-Textes verwendet. <br><br>
 
-  Ein <b>Telegram-Versand</b> der letzten Aufnahme kann durch Setzen des <a href="#SSCamattr">Attributs</a> "recTelegramTxt" permanent aktiviert
+  Ein <b>Telegram-Versand</b> der letzten Aufnahme kann durch Setzen des <a href="#SSCam-attr-recTelegramTxt">recTelegramTxt</a> permanent aktiviert
   werden. Das zu verwendende <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich
   funktionstüchtig eingerichtet sein. <br>
   Der Text im Attribut "recTelegramTxt" kann durch die Spezifikation des optionalen "recTelegramTxt:"-Tags, wie oben
@@ -14759,7 +14776,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <b>Beispiele </b>: <br>
   <code> set &lt;name&gt; on [rectime] </code><br>
   # startet die Aufnahme der Kamera &lt;name&gt;, automatischer Stop der Aufnahme nach Ablauf der Zeit [rectime]
-  (default 15s oder wie im <a href="#SSCamattr">Attribut</a> "rectime" angegeben) <br><br>
+  (default 15s oder wie im <a href="#SSCam-attr-rectime">rectime</a> angegeben) <br><br>
 
   <code> set &lt;name&gt; on 0  </code><br>
   # startet eine Daueraufnahme die mit "off" gestoppt werden muss. <br><br>
@@ -14855,7 +14872,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 
   Der Befehl <b>"set &lt;name&gt; runView lastsnap_fw"</b> zeigt den letzten Schnappschuss der Kamera eingebettet an. <br>
   Durch Angabe des optionalen Raumes bei <b>"lastrec_open"</b> erfolgt die gleiche Einschränkung wie bei "live_open". <br>
-  Die Gestaltung der Fenster im FHEMWEB kann durch HTML-Tags im <a href="#SSCamattr">Attribut</a> "htmlattr" beeinflusst werden.
+  Die Gestaltung der Fenster im FHEMWEB kann durch HTML-Tags im <a href="#SSCam-attr-htmlattr">htmlattr</a> Attribut beeinflusst werden.
   <br><br>
 
   <b>Beispiel:</b><br>
@@ -14870,7 +14887,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Dabei wird für jede aktive FHEMWEB-Session eine Fensteröffnung initiiert. Soll dieses Verhalten geändert werden, kann
   <b>"set &lt;name&gt; runView live_open &lt;room&gt;"</b> verwendet werden um das Öffnen des Browserfensters in einem
   beliebigen, in einer FHEMWEB-Session aktiven Raum "&lt;room&gt;", zu initiieren.<br>
-  Das gesetzte <a href="#SSCamattr">Attribut</a> "livestreamprefix" überschreibt im <a href="#SSCamreadings">Reading</a> "LiveStreamUrl"
+  Das gesetzte <a href="#SSCam-attr-livestreamprefix">livestreamprefix</a> Attribut überschreibt im Reading "LiveStreamUrl"
   die Angaben für Protokoll, Servername und Port. Damit kann z.B. die LiveStreamUrl für den Versand und externen Zugriff
   auf die SVS modifiziert werden. <br><br>
 
@@ -14955,28 +14972,28 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Abstand in Sekunden optional angegeben werden. Ohne Angabe wird ein Schnappschuß getriggert. <br>
   Es wird die ID und der Filename des letzten Snapshots als Wert der Readings "LastSnapId" bzw. "LastSnapFilename" in
   der Kamera gespeichert. <br>
-  Um die Daten der letzen 1-10 Schnappschüsse zu versionieren, kann das <a href="#SSCamattr">Attribut</a> "snapReadingRotate"
+  Um die Daten der letzen 1-10 Schnappschüsse zu versionieren, kann das <a href="#SSCam-attr-snapReadingRotate">snapReadingRotate</a> Attribute
   verwendet werden.
   <br><br>
 
-  Ein <b>Synology Chat Versand</b> der Schnappschüsse kann durch Setzen des Attributs <a href="#snapChatTxt">snapChatTxt</a> permanent aktiviert
+  Ein <b>Synology Chat Versand</b> der Schnappschüsse kann durch Setzen des Attributs <a href="#SSCam-attr-snapChatTxt">snapChatTxt</a> permanent aktiviert
   werden. Das zu verwendende <a href="https://wiki.fhem.de/wiki/SSChatBot_-_Integration_des_Synology_Chat_Servers">SSChatBot-Device</a> muss natürlich
   funktionstüchtig eingerichtet sein. <br>
   Der Text im Attribut "snapChatTxt" kann durch die Spezifikation des optionalen "snapChatTxt:"-Tags, wie oben
   gezeigt, temporär überschrieben bzw. geändert werden. Sollte das Attribut "snapChatTxt" nicht gesetzt sein, wird durch Angabe dieses Tags
   der SSChatBot-Versand einmalig aktiviert (die Syntax entspricht dem "snapChatTxt"-Attribut). <br>
-  In jedem Fall ist vorher das Attribut <a href="#videofolderMap">videofolderMap</a> zu setzen. Es muß eine URL zum
+  In jedem Fall ist vorher das Attribut <a href="#SSCam-attr-videofolderMap">videofolderMap</a> zu setzen. Es muß eine URL zum
   root-Verzeichnis der Aufnahmen und Schnappschüssen enthalten ( z.B. http://server.mein:8081/surveillance ).  <br><br>
 
-  Ein <b>Email-Versand</b> der Schnappschüsse kann durch Setzen des Attributs <a href="#snapEmailTxt">snapEmailTxt</a> permanent aktiviert
-  werden. Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCamEmail">Einstellung Email-Versand</a> beschrieben,
+  Ein <b>Email-Versand</b> der Schnappschüsse kann durch Setzen des Attributs <a href="#SSCam-attr-snapEmailTxt">snapEmailTxt</a> permanent aktiviert
+  werden. Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCam-Email">Einstellung Email-Versand</a> beschrieben,
   einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
   Der Text im Attribut "snapEmailTxt" kann durch die Spezifikation des optionalen "snapEmailTxt:"-Tags, wie oben
   gezeigt, temporär überschrieben bzw. geändert werden. Sollte das Attribut "snapEmailTxt" nicht gesetzt sein, wird durch Angabe dieses Tags
   der Email-Versand einmalig aktiviert. (die Tag-Syntax entspricht dem "snapEmailTxt"-Attribut) <br><br>
 
   Ein <b>Telegram-Versand</b> der Schnappschüsse kann durch Setzen des Attributs
-  <a href="#snapTelegramTxt">snapTelegramTxt</a> permanent aktiviert werden.
+  <a href="#SSCam-attr-snapTelegramTxt">snapTelegramTxt</a> permanent aktiviert werden.
   Das zu verwendende <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich
   funktionstüchtig eingerichtet sein. <br>
   Der Text im Attribut "snapTelegramTxt" kann durch die Spezifikation des optionalen "snapTelegramTxt:"-Tags, wie oben
@@ -15004,10 +15021,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   (default: 2) angegeben werden. <br>
   Es wird die ID und der Filename des letzten Snapshots als Wert der Readings "LastSnapId" bzw. "LastSnapFilename"
   der entsprechenden Kamera gespeichert. <br><br>
-  Ein <b>Email-Versand</b> der Schnappschüsse kann durch Setzen des <a href="#SSCamattr">Attributs</a> <b>"snapEmailTxt"</b> im
+  Ein <b>Email-Versand</b> der Schnappschüsse kann durch Setzen des Attributes <a href="#SSCam-attr-snapEmailTxt">snapEmailTxt</a> im
   SVS-Device <b>UND</b> in den Kamera-Devices, deren Schnappschüsse versendet werden sollen, aktiviert werden.
   Bei Kamera-Devices die kein Attribut "snapEmailTxt" gesetzt haben, werden die Schnappschüsse ausgelöst, aber nicht versendet.
-  Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCamEmail">Einstellung Email-Versand</a> beschrieben,
+  Zuvor ist der Email-Versand, wie im Abschnitt <a href="#SSCam-Email">Einstellung Email-Versand</a> beschrieben,
   einzustellen. (Für weitere Informationen "<b>get &lt;name&gt; versionNotes 7</b>" ausführen) <br>
   Es wird ausschließlich der im Attribut "snapEmailTxt" des SVS-Devices hinterlegte Email-Text in der erstellten Email
   verwendet. Der Text im Attribut "snapEmailTxt" der einzelnen Kameras wird ignoriert !! <br><br>
@@ -15022,21 +15039,22 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
 
   <ul>
-  <li><b> snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b>snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
 
   Der Befehl ist nur vorhanden wenn das Attribut "snapGalleryBoost=1" gesetzt wurde.
-  Er erzeugt eine Ausgabe der letzten [x] Schnappschüsse ebenso wie <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a>.  Abweichend von "get" wird mit Attribut
-  <a href="#SSCamattr">Attribut</a> "snapGalleryBoost=1" kein Popup erzeugt, sondern die Schnappschußgalerie als Browserseite
-  dargestellt. Alle weiteren Funktionen und Attribute entsprechen dem "get &lt;name&gt; snapGallery" Kommando. <br>
+  Er erzeugt eine Ausgabe der letzten [x] Schnappschüsse ebenso wie <a href="#SSCam-get">"get &lt;name&gt; snapGallery"</a>.  
+  Abweichend von "get" wird mit Attribut <a href="#SSCam-attr-snapGalleryBoost">snapGalleryBoost=1</a> kein 
+  Popup erzeugt, sondern die Schnappschußgalerie als Browserseite dargestellt. Alle weiteren Funktionen und Attribute 
+  entsprechen dem "get &lt;name&gt; snapGallery" Kommando. <br>
   Wenn die Ausgabe einer Schnappschußgalerie, z.B. über ein "at oder "notify", getriggert wird, sollte besser das
-  <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a> Kommando anstatt "set" verwendet werden.
+  <a href="#SSCam-get">"get &lt;name&gt; snapGallery"</a> Kommando anstatt "set" verwendet werden.
   <br><br>
 
   <b>Hinweis</b> <br>
   Die Namen der Kameras in der SVS sollten sich nicht stark ähneln, da es ansonsten zu Ungenauigkeiten beim Abruf der
   Schnappschußgallerie kommen kann.
-
   </ul>
+  </li>
   <br><br>
 
   <ul>
@@ -15060,7 +15078,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   <br>
 
-<a name="SSCamget"></a>
+<a id="SSCam-get"></a>
 <b>Get</b>
  <ul>
   <br>
@@ -15069,7 +15087,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Drop-Down-Menü des jeweiligen Devices zur Auswahl zur Verfügung. <br><br>
 
   <ul>
-  <a name="apiInfo"></a>
+  <a id="SSCam-get-apiInfo"></a>
   <li><b> apiInfo </b> <br>
 
   Ruft die API Informationen der Synology Surveillance Station ab und öffnet ein Popup mit diesen Informationen.
@@ -15092,10 +15110,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <ul>
   <li><b>  eventlist </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
 
-  Es wird das <a href="#SSCamreadings">Reading</a> "CamEventNum" und "CamLastRec"
+  Es wird das Reading "CamEventNum" und "CamLastRec"
   aktualisiert, welches die Gesamtanzahl der registrierten Kameraevents und den Pfad / Namen der letzten Aufnahme enthält.
   Dieser Befehl wird implizit mit "get &lt;name&gt; caminfoall" ausgeführt. <br>
-  Mit dem <a href="#SSCamattr">Attribut</a> "videofolderMap" kann der Inhalt des Readings "VideoFolder" überschrieben werden.
+  Mit dem <a href="#SSCam-attr-videofolderMap">videofolderMap</a> Attribut kann der Inhalt des Readings "VideoFolder" überschrieben werden.
   Dies kann von Vortel sein wenn das Surveillance-Verzeichnis der SVS an dem lokalen PC unter anderem Pfadnamen gemountet ist
   und darüber der Zugriff auf die Aufnahmen erfolgen soll (z.B. Verwendung bei Email-Versand). <br><br>
 
@@ -15115,7 +15133,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
 
   <ul>
-    <a name="listLog"></a>
+    <a id="SSCam-get-listLog"></a>
     <li><b>  listLog [severity:&lt;Loglevel&gt;] [limit:&lt;Zeilenzahl&gt;] [match:&lt;Suchstring&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS) <br>
 
     Ruft das Surveillance Station Log vom Synology Server ab. Ohne Angabe der optionalen Zusätze wird das gesamte Log abgerufen. <br>
@@ -15140,7 +15158,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     </ul>
 
 
-    Wurde mit dem Attribut <a href="#pollcaminfoall">pollcaminfoall</a> das Polling der SVS aktiviert, wird das <a href="#SSCamreadings">Reading</a>
+    Wurde mit dem Attribut <a href="#SSCam-attr-pollcaminfoall">pollcaminfoall</a> das Polling der SVS aktiviert, wird das Reading
     "LastLogEntry" erstellt. <br>
     Im Protokoll-Setup der SVS kann man einstellen was protokolliert werden soll. Für weitere Informationen
     siehe <a href="https://www.synology.com/de-de/knowledgebase/Surveillance/help/SurveillanceStation/log_advanced">Synology Online-Hlfe</a>.
@@ -15197,35 +15215,36 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
 
   <ul>
-  <li><b>  snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b>snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) </li><br>
 
-  Es wird ein Popup mit den letzten [x] Schnapschüssen erzeugt. Ist das <a href="#SSCamattr">Attribut</a> "snapGalleryBoost" gesetzt,
+  Es wird ein Popup mit den letzten [x] Schnapschüssen erzeugt. Ist das <a href="#SSCam-attr-snapGalleryBoost">snapGalleryBoost</a> Attribut gesetzt,
   werden die letzten Schnappschüsse (default 3) über Polling abgefragt und im Speicher gehalten. Das Verfahren hilft die Ausgabe zu beschleunigen,
   kann aber möglicherweise nicht den letzten Schnappschuß anzeigen, falls dieser NICHT über das Modul ausgelöst wurde. <br>
   Diese Funktion kann ebenfalls, z.B. mit "at" oder "notify", getriggert werden. Dabei wird die Schnappschußgalerie auf allen
   verbundenen FHEMWEB-Instanzen als Popup angezeigt. <br><br>
 
-  Zur weiteren Steuerung dieser Funktion stehen die <a href="#SSCamattr">Attribute</a>: <br><br>
+  Zur weiteren Steuerung dieser Funktion stehen die Attribute: <br><br>
 
   <ul>
-     <li>snapGalleryBoost   </li>
-     <li>snapGalleryColumns   </li>
-     <li>snapGalleryHtmlAttr   </li>
-     <li>snapGalleryNumber   </li>
-     <li>snapGallerySize   </li>
+     <li><a href="#SSCam-attr-snapGalleryBoost">snapGalleryBoost</a>         </li>
+     <li><a href="#SSCam-attr-snapGalleryColumns">snapGalleryColumns</a>     </li>
+     <li><a href="#SSCam-attr-snapGalleryHtmlAttr">snapGalleryHtmlAttr</a>   </li>
+     <li><a href="#SSCam-attr-snapGalleryNumber">snapGalleryNumber</a>       </li>
+     <li><a href="#SSCam-attr-snapGallerySize">snapGallerySize</a>           </li>
   </ul> <br>
   zur Verfügung.
   </ul> <br>
 
-        <ul>
-        <b>Hinweis:</b><br>
-        Abhängig von der Anzahl und Auflösung (Qualität) der Schnappschuß-Images werden entsprechend ausreichende CPU und/oder
-        RAM-Ressourcen benötigt. Die Namen der Kameras in der SVS sollten sich nicht stark ähneln, da es ansonsten zu
-        Ungnauigkeiten beim Abruf der Schnappschußgallerie kommen kann.
-        </ul>
-        <br><br>
+    <ul>
+    <b>Hinweis:</b><br>
+    Abhängig von der Anzahl und Auflösung (Qualität) der Schnappschuß-Images werden entsprechend ausreichende CPU und/oder
+    RAM-Ressourcen benötigt. Die Namen der Kameras in der SVS sollten sich nicht stark ähneln, da es ansonsten zu
+    Ungnauigkeiten beim Abruf der Schnappschußgallerie kommen kann.
+    </ul>
+    <br><br>
 
   <ul>
+  
   <li><b>  snapfileinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
 
   Es wird der Filename des letzten Schnapschusses ermittelt. Der Befehl wird implizit mit <b>"get &lt;name&gt; snap"</b>
@@ -15246,7 +15265,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 
   Mit diesem Kommando wird der aktuelle Streamkey der Kamera abgerufen und das Reading mit dem Key-Wert gefüllt.
   Dieser Streamkey kann verwendet werden um eigene Aufrufe eines Livestreams aufzubauen (siehe Beispiel).
-  Wenn das <a href="#SSCamattr">Attribut</a> "showStmInfoFull" gesetzt ist, werden zusaätzliche Stream-Informationen wie "StmKeyUnicst", "StmKeymjpegHttp" ausgegeben.
+  Wenn das <a href="#SSCam-attr-showStmInfoFull">showStmInfoFull</a> Attribut gesetzt ist, werden zusaätzliche Stream-Informationen wie "StmKeyUnicst", "StmKeymjpegHttp" ausgegeben.
   Diese Readings enthalten die gültigen Stream-Pfade zu einem Livestream und können z.B. versendet und von einer entsprechenden Anwendung ohne session Id geöffnet werden.
   Wenn das Attribut "livestreamprefix" (Format: "http(s)://&lt;hostname&gt;&lt;port&gt;) gesetzt ist, wird der Servername und Port überschrieben soweit es sinnvoll ist.
   Wird Polling der Kameraeigenschaften genutzt, wird die stmUrlPath-Funktion automatisch mit ausgeführt.
@@ -15298,7 +15317,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   </ul>
   <br><br>
 
-  <a name="SSCamEmail"></a>
+  <a id="SSCam-Email"></a>
   <b>Einstellung Email-Versand </b> <br><br>
   <ul>
   Schnappschüsse und Aufnahmen können nach der Erstellung per <b>Email</b> versendet werden. Dazu enthält das
@@ -15317,7 +15336,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   Die Credentials für den Zugang zum Email-Server müssen mit dem Befehl <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>
   hinterlegt werden. Der Verbindungsaufbau zum Postausgangsserver erfolgt initial unverschüsselt und wechselt zu einer verschlüsselten
   Verbindung wenn SSL zur Verfügung steht. In diesem Fall erfolgt auch die Übermittlung von User/Password verschlüsselt.
-  Ist das Attribut <a href="#smtpSSLPort">smtpSSLPort</a> definiert, erfolgt der Verbindungsaufbau zum Email-Server sofort verschlüsselt.
+  Ist das Attribut <a href="#SSCam-attr-smtpSSLPort">smtpSSLPort</a> definiert, erfolgt der Verbindungsaufbau zum Email-Server sofort verschlüsselt.
   <br><br>
 
   Optionale Attribute sind gekennzeichnet: <br><br>
@@ -15359,8 +15378,6 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
    </ul>
    <br>
 
-   Zur näheren Erläuterung siehe Beschreibung der <a href="#SSCamattr">Attribute</a>. <br><br>
-
    Erläuterung der Platzhalter: <br><br>
 
    <ul>
@@ -15377,16 +15394,16 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   </ul>
   <br><br>
 
-  <a name="SSCamPolling"></a>
+  <a id="SSCam-Polling"></a>
   <b>Polling der Kamera/SVS-Eigenschaften:</b><br><br>
   <ul>
-  Die Abfrage der Kameraeigenschaften erfolgt automatisch, wenn das Attribut <a href="#pollcaminfoall">pollcaminfoall</a> mit einem Wert &gt; 10 gesetzt wird. <br>
-  Per Default ist das Attribut <a href="#pollcaminfoall">pollcaminfoall</a> nicht gesetzt und das automatische Polling nicht aktiv. <br>
+  Die Abfrage der Kameraeigenschaften erfolgt automatisch, wenn das Attribut <a href="#SSCam-attr-pollcaminfoall">pollcaminfoall</a> mit einem Wert &gt; 10 gesetzt wird. <br>
+  Per Default ist das Attribut <a href="#SSCam-attr-pollcaminfoall">pollcaminfoall</a> nicht gesetzt und das automatische Polling nicht aktiv. <br>
   Der Wert dieses Attributes legt das Intervall der Abfrage in Sekunden fest. Ist das Attribut nicht gesetzt oder &lt; 10 wird kein automatisches Polling <br>
   gestartet bzw. gestoppt wenn vorher der Wert &gt; 10 gesetzt war. <br><br>
 
-  Das Attribut <a href="#pollcaminfoall">pollcaminfoall</a> wird durch einen Watchdog-Timer überwacht. Änderungen des Attributwertes werden alle 90 Sekunden ausgewertet und entsprechend umgesetzt. <br>
-  Eine Änderung des Pollingstatus / Pollingintervalls wird im FHEM-Logfile protokolliert. Diese Protokollierung kann durch Setzen des Attributes <a href="#pollnologging">pollnologging=1</a> abgeschaltet werden.<br>
+  Das Attribut <a href="#SSCam-attr-pollcaminfoall">pollcaminfoall</a> wird durch einen Watchdog-Timer überwacht. Änderungen des Attributwertes werden alle 90 Sekunden ausgewertet und entsprechend umgesetzt. <br>
+  Eine Änderung des Pollingstatus / Pollingintervalls wird im FHEM-Logfile protokolliert. Diese Protokollierung kann durch Setzen des Attributes <a href="#SSCam-attr-pollnologging">pollnologging=1</a> abgeschaltet werden.<br>
   Dadurch kann ein unnötiges Anwachsen des Logs vermieden werden. Ab verbose=4 wird allerdings trotz gesetzten "pollnologging"-Attribut ein Log des Pollings <br>
   zu Analysezwecken aktiviert. <br><br>
 
@@ -15400,14 +15417,14 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   </ul>
   <br>
 
-  Die Bedeutung der Readingwerte ist unter <a href="#SSCamreadings">Readings</a> beschrieben. <br><br>
+  Die Bedeutung der Readingwerte ist unter <a href="#SSCam-readings">Readings</a> beschrieben. <br><br>
 
   <b>Hinweise:</b> <br><br>
 
   Wird Polling eingesetzt, sollte das Intervall nur so kurz wie benötigt eingestellt werden da die ermittelten Werte überwiegend statisch sind. <br>
   Das eingestellte Intervall sollte nicht kleiner sein als die Summe aller HTTP-Verarbeitungszeiten.
   Pro Pollingaufruf und Kamera werden ca. 10 - 20 Http-Calls gegen die Surveillance Station abgesetzt.<br><br>
-  Bei einem eingestellten HTTP-Timeout (siehe <a href="#httptimeout">httptimeout</a>) von 4 Sekunden kann die theoretische Verarbeitungszeit nicht höher als 80 Sekunden betragen. <br>
+  Bei einem eingestellten HTTP-Timeout (siehe <a href="#SSCam-attr-httptimeout">httptimeout</a>) von 4 Sekunden kann die theoretische Verarbeitungszeit nicht höher als 80 Sekunden betragen. <br>
   In dem Beispiel sollte man das Pollingintervall mit einem Sicherheitszuschlag auf nicht weniger 160 Sekunden setzen. <br>
   Ein praktikabler Richtwert könnte zwischen 600 - 1800 (s) liegen. <br>
 
@@ -15417,7 +15434,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   </ul>
   <br><br>
 
-<a name="SSCaminternals"></a>
+<a id="SSCam-Internals"></a>
 <b>Internals</b> <br><br>
  <ul>
  Die Bedeutung der verwendeten Internals stellt die nachfolgende Liste dar: <br><br>
@@ -15437,13 +15454,13 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
  </ul>
 
 
-<a name="SSCamattr"></a>
+<a id="SSCam-attr"></a>
 <b>Attribute</b>
   <br><br>
   <ul>
   <ul>
 
-  <a name="cacheServerParam"></a>
+  <a id="SSCam-attr-cacheServerParam"></a>
   <li><b>cacheServerParam</b><br>
     Angabe der Verbindungsparameter zu einem zentralen Datencache. <br><br>
 
@@ -15455,7 +15472,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <br>
   </li><br>
 
-  <a name="cacheType"></a>
+  <a id="SSCam-attr-cacheType"></a>
   <li><b>cacheType</b><br>
     Legt den zu verwendenden Cache für die Speicherung von Schnappschüssen, Aufnahmen und anderen Massendaten fest.
     (Default: internal). <br>
@@ -15477,22 +15494,22 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <br>
   </li><br>
 
-  <a name="debugactivetoken"></a>
+  <a id="SSCam-attr-debugactivetoken"></a>
   <li><b>debugactivetoken</b><br>
     Wenn gesetzt, wird der Status des Active-Tokens gelogged - nur für Debugging, nicht im
     normalen Betrieb benutzen !
   </li><br>
 
-  <a name="debugCachetime"></a>
+  <a id="SSCam-attr-debugCachetime"></a>
   <li><b>debugCachetime</b><br>
     Zeigt die verbrauchte Zeit für Cache-Operationen an.
   </li><br>
 
-  <a name="disable"></a>
+  <a id="SSCam-attr-disable"></a>
   <li><b>disable</b><br>
     deaktiviert das Gerätemodul bzw. die Gerätedefinition </li><br>
 
-  <a name="genericStrmHtmlTag"></a>
+  <a id="SSCam-attr-genericStrmHtmlTag"></a>
   <li><b>genericStrmHtmlTag</b><br>
   Das Attribut enthält HTML-Tags zur Video-Spezifikation in einem Streaming-Device von Typ "generic".
   (siehe "set &lt;name&gt; createStreamDev generic") <br><br>
@@ -15515,12 +15532,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br><br>
     </li>
 
-  <a name="httptimeout"></a>
+  <a id="SSCam-attr-httptimeout"></a>
   <li><b>httptimeout</b><br>
     Timeout-Wert für HTTP-Aufrufe zur Synology Surveillance Station. <br>
     (default: 20 Sekunden) </li><br>
 
-  <a name="hlsNetScript"></a>
+  <a id="SSCam-attr-hlsNetScript"></a>
   <li><b>hlsNetScript</b> &nbsp;&nbsp;&nbsp;&nbsp;(setzbar in Device Model "SVS") <br>
     Wenn gesetzt, wird die aktuellste hls.js Version von der Projektseite verwendet (Internetverbindung nötig).
     <br>
@@ -15529,7 +15546,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     Dieses Attribut wird in einem Device vom Model "SVS" gesetzt und gilt zentral für alle Streaming Devices !
   </li><br>
 
-  <a name="hlsStrmObject"></a>
+  <a id="SSCam-attr-hlsStrmObject"></a>
   <li><b>hlsStrmObject</b><br>
   Wurde ein Streaming Device mit "set &lt;name&gt; createStreamDev hls" definiert, muss mit diesem Attribut der Link zum
   Wiedergabeobjekt bekannt gemacht werden. <br>
@@ -15553,7 +15570,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         </li>
 
 
-  <a name="htmlattr"></a>
+  <a id="SSCam-attr-htmlattr"></a>
   <li><b>htmlattr</b><br>
   ergänzende Angaben zur Inline-Bilddarstellung um das Verhalten wie Bildgröße zu beeinflussen. <br><br>
 
@@ -15564,7 +15581,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         <br>
         </li>
 
-  <a name="livestreamprefix"></a>
+  <a id="SSCam-attr-livestreamprefix"></a>
   <li><b>livestreamprefix</b><br>
     Überschreibt die Angaben zu Protokoll, Servernamen und Port in StmKey.*-Readings bzw. der Livestreamadresse zur
     Weiterverwendung z.B. als externer Link. <br>
@@ -15582,11 +15599,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 
     </li><br>
 
-  <a name="loginRetries"></a>
+  <a id="SSCam-attr-loginRetries"></a>
   <li><b>loginRetries</b><br>
     Setzt die Anzahl der Login-Wiederholungen im Fehlerfall (default = 3)   </li><br>
 
-  <a name="noQuotesForSID"></a>
+  <a id="SSCam-attr-noQuotesForSID"></a>
   <li><b>noQuotesForSID</b><br>
     Dieses Attribut entfernt Quotes für SID bzw. der StmKeys.
     Es kann in bestimmten Fällen die Fehlermeldung "402 - permission denied" oder "105 - Insufficient user privilege"
@@ -15594,37 +15611,37 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     (default: 0)
   </li><br>
 
-  <a name="pollcaminfoall"></a>
+  <a id="SSCam-attr-pollcaminfoall"></a>
   <li><b>pollcaminfoall</b><br>
     Intervall der automatischen Eigenschaftsabfrage (Polling) einer Kamera (&lt;= 10: kein Polling, &gt; 10: Polling mit Intervall) </li><br>
 
-  <a name="pollnologging"></a>
+  <a id="SSCam-attr-pollnologging"></a>
   <li><b>pollnologging</b><br>
     "0" bzw. nicht gesetzt = Logging Gerätepolling aktiv (default), "1" = Logging
     Gerätepolling inaktiv </li><br>
 
-  <a name="ptzNoCapPrePat"></a>
+  <a id="SSCam-attr-ptzNoCapPrePat"></a>
   <li><b>ptzNoCapPrePat</b><br>
     Manche PTZ-Kameras können trotz ihrer PTZ-Fähigkeiten keine Presets und Patrols speichern.
     Um Fehler und entsprechende Logmeldungen zu vermeiden, kann in diesen Fällen das Attribut ptzNoCapPrePat gesetzt
     werden. Dem System wird eine fehlende Preset / Patrol Fähigkeit mitgeteilt.
   </li><br>
 
-  <a name="ptzPanel_Home"></a>
+  <a id="SSCam-attr-ptzPanel_Home"></a>
   <li><b>ptzPanel_Home</b><br>
     Im PTZ-Steuerungspaneel wird dem Home-Icon (im Attribut "ptzPanel_row02") automatisch der Wert des Readings
     "PresetHome" zugewiesen.
     Mit "ptzPanel_Home" kann diese Zuweisung mit einem Preset aus der verfügbaren Preset-Liste geändert werden.
   </li><br>
 
-  <a name="ptzPanel_iconPath"></a>
+  <a id="SSCam-attr-ptzPanel_iconPath"></a>
   <li><b>ptzPanel_iconPath</b><br>
     Pfad für Icons im PTZ-Steuerungspaneel, default ist "www/images/sscam".
     Der Attribut-Wert wird für alle Icon-Dateien außer *.svg verwendet. <br>
     Für weitere Information bitte "get &lt;name&gt; versionNotes 2,6" ausführen.
   </li><br>
 
-  <a name="ptzPanel_iconPrefix"></a>
+  <a id="SSCam-attr-ptzPanel_iconPrefix"></a>
   <li><b>ptzPanel_iconPrefix</b><br>
     Prefix für Icon-Dateien im PTZ-Steuerungspaneel, default ist "black_btn_".
     Der Attribut-Wert wird für alle Icon-Dateien außer *.svg verwendet. <br>
@@ -15632,7 +15649,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     Attributen "ptzPanel_row[00-09]" nur noch mit dem darauf folgenden Teilstring, z.B. "CAMDOWN.png" benannt zu werden.
     </li><br>
 
-  <a name="ptzPanel_row00"></a>
+  <a id="SSCam-attr-ptzPanel_row00"></a>
   <li><b>ptzPanel_row[00-09] &lt;command&gt;:&lt;icon&gt;,&lt;command&gt;:&lt;icon&gt;,... </b><br>
     Für PTZ-Kameras werden automatisch die Attribute "ptzPanel_row00" bis "ptzPanel_row04" zur Verwendung im
     PTZ-Steuerungspaneel angelegt. <br>
@@ -15660,7 +15677,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         <br>
     </li><br>
 
-  <a name="ptzPanel_use"></a>
+  <a id="SSCam-attr-ptzPanel_use"></a>
   <li><b>ptzPanel_use</b><br>
     Die Anzeige des PTZ-Steuerungspaneels in der Detailanzeige bzw. innerhalb eines generierten Streamdevice wird
     ein- bzw. ausgeschaltet (default ein). <br>
@@ -15669,10 +15686,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     (z.B. "attr WEB iconPath default:fhemSVG:openautomation:sscam").
   </li><br>
 
-  <a name="recChatTxt"></a>
+  <a id="SSCam-attr-recChatTxt"></a>
   <li><b>recChatTxt chatbot => &lt;SSChatBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]  </b><br>
     Aktiviert den permanenten Versand von Aufnahmen nach deren Erstellung per Synology Chat. <br>
-    Vor der Aktivierung ist das Attribut <a href="#videofolderMap">videofolderMap</a> zu setzen. Es muß eine URL zum
+    Vor der Aktivierung ist das Attribut <a href="#SSCam-attr-videofolderMap">videofolderMap</a> zu setzen. Es muß eine URL zum
     root-Verzeichnis der Aufnahmen und Schnappschüsse enthalten ( z.B. http://server.mein:8081/surveillance ). <br>
     Das Attribut recChatTxt muß in der angegebenen Form definiert werden. Im Schlüssel "chatbot" ist das SSChatBot-Device
     anzugeben, welches für den Versand der Daten verwendet werden soll.
@@ -15703,7 +15720,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br>
   </li><br>
 
-  <a name="recEmailTxt"></a>
+  <a id="SSCam-attr-recEmailTxt"></a>
   <li><b>recEmailTxt subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt; </b><br>
     Aktiviert den Emailversand von Aufnahmen nach deren Erstellung. <br>
     Das Attribut muß in der angegebenen Form definiert werden. <br>
@@ -15728,7 +15745,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
       <br>
   </li>
 
-  <a name="recTelegramTxt"></a>
+  <a id="SSCam-attr-recTelegramTxt"></a>
   <li><b>recTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Text&gt;], option => [silent]  </b><br>
     Aktiviert den permanenten Versand von Aufnahmen nach deren Erstellung per TelegramBot. <br>
     Das Attribut muß in der angegebenen Form definiert werden.
@@ -15776,25 +15793,25 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
       <br>
   </li><br>
 
-  <a name="rectime"></a>
+  <a id="SSCam-attr-rectime"></a>
   <li><b>rectime</b><br>
     festgelegte Aufnahmezeit wenn eine Aufnahme gestartet wird. Mit rectime = 0 wird eine
     Endlosaufnahme gestartet. Ist "rectime" nicht gesetzt, wird der Defaultwert von 15s
     verwendet.</li><br>
 
-  <a name="recextend"></a>
+  <a id="SSCam-attr-recextend"></a>
   <li><b>recextend</b><br>
     "rectime" einer gestarteten Aufnahme wird neu gesetzt. Dadurch verlängert sich die
     Aufnahemzeit einer laufenden Aufnahme </li><br>
 
-  <a name="session"></a>
+  <a id="SSCam-attr-session"></a>
   <li><b>session</b><br>
     Auswahl der Login-Session. Nicht gesetzt oder "DSM" -> session wird mit DSM aufgebaut
     (Standard). "SurveillanceStation" -> Session-Aufbau erfolgt mit SVS. <br>
     Um eine Session mit der Surveillance Station aufzubauen muss ein Nutzer mit passenden Privilegien Profil in der SVS
     angelegt werden. Für weitere Informationen bitte "get &lt;name&gt; versionNotes 5" ausführen.  </li><br>
 
-  <a name="simu_SVSversion"></a>
+  <a id="SSCam-attr-simu_SVSversion"></a>
   <li><b>simu_SVSversion</b><br>
     Es wird ein logisches "Downgrade" auf die angegebene SVS-Version ausgeführt. Das Attribut ist hilfreich um eventuell
     bei einem Update/Upgrade der Synology Surveillance Station auftretende Inkompatibilitäten temporär zu eliminieren.
@@ -15802,60 +15819,60 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </li>
   <br>
 
-  <a name="smtpHost"></a>
+  <a id="SSCam-attr-smtpHost"></a>
   <li><b>smtpHost &lt;Hostname&gt; </b><br>
     Gibt den Hostnamen oder die IP-Adresse des Postausgangsservers für den Emailversand an (z.B. securesmtp.t-online.de).
   </li>
   <br>
 
-  <a name="smtpCc"></a>
+  <a id="SSCam-attr-smtpCc"></a>
   <li><b>smtpCc &lt;name&gt;@&lt;domain&gt;[, &lt;name&gt;@&lt;domain&gt;][, &lt;name&gt;@&lt;domain&gt;]... </b><br>
     Optionale zusätzliche Empfängeradresse(n) für den Email-Versand. Mehrere Adressen müssen durch "," getrennt werden.
   </li>
   <br>
 
-  <a name="smtpDebug"></a>
+  <a id="SSCam-attr-smtpDebug"></a>
   <li><b>smtpDebug </b><br>
     Schaltet den Debugging-Modus der Verbindung zum Email-Server ein (wenn Email Versand verwendet wird).
   </li>
   <br>
 
-  <a name="smtpFrom"></a>
+  <a id="SSCam-attr-smtpFrom"></a>
   <li><b>smtpFrom &lt;name&gt;@&lt;domain&gt; </b><br>
     Absenderadresse bei Verwendung des Emailversands.
   </li>
   <br>
 
-  <a name="smtpPort"></a>
+  <a id="SSCam-attr-smtpPort"></a>
   <li><b>smtpPort &lt;Port&gt; </b><br>
     Optionale Angabe Standard-SMTP-Port des Postausgangsservers (default: 25).
   </li>
   <br>
 
-  <a name="smtpSSLPort"></a>
+  <a id="SSCam-attr-smtpSSLPort"></a>
   <li><b>smtpSSLPort &lt;Port&gt; </b><br>
     Optionale Angabe SSL Port des Postausgangsservers (default: 465). Ist dieses Attribut gesetzt, erfolgt die Verbindung zum
     Email-Server sofort verschlüsselt.
   </li>
   <br>
 
-  <a name="smtpTo"></a>
+  <a id="SSCam-attr-smtpTo"></a>
   <li><b>smtpTo &lt;name&gt;@&lt;domain&gt;[, &lt;name&gt;@&lt;domain&gt;][, &lt;name&gt;@&lt;domain&gt;]... </b><br>
     Empfängeradresse(n) für den Email-Versand. Mehrere Adressen müssen durch "," getrennt werden.
   </li>
   <br>
 
-  <a name="smtpNoUseSSL"></a>
+  <a id="SSCam-attr-smtpNoUseSSL"></a>
   <li><b>smtpNoUseSSL </b><br>
     Soll keine Email SSL-Verschlüsselung genutzt werden, ist dieses Attribut auf "1" zu setzen (default: 0).
   </li>
   <br>
 
-  <a name="snapChatTxt"></a>
+  <a id="SSCam-attr-snapChatTxt"></a>
   <li><b>snapChatTxt chatbot => &lt;SSChatBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]  </b><br>
     Aktiviert den permanenten Versand von Schnappschüssen nach deren Erstellung per Synology Chat. Wurden mehrere Schnappschüsse ausgelöst,
     werden sie sequentiell versendet.<br>
-    Vor der Aktivierung ist das Attribut <a href="#videofolderMap">videofolderMap</a> zu setzen. Es muß eine URL zum
+    Vor der Aktivierung ist das Attribut <a href="#SSCam-attr-videofolderMap">videofolderMap</a> zu setzen. Es muß eine URL zum
     root-Verzeichnis der Aufnahmen und Schnappschüsse enthalten ( z.B. http://server.mein:8081/surveillance ). <br>
     Das Attribut snapChatTxt muß in der angegebenen Form definiert werden. Im Schlüssel "chatbot" ist das SSChatBot-Device
     anzugeben, welches für den Versand der Daten verwendet werden soll.
@@ -15886,7 +15903,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br>
   </li><br>
 
-  <a name="snapEmailTxt"></a>
+  <a id="SSCam-attr-snapEmailTxt"></a>
   <li><b>snapEmailTxt subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt; </b><br>
     Aktiviert den Emailversand von Schnappschüssen nach deren Erstellung. Wurden mehrere Schnappschüsse ausgelöst,
     werden sie gemeinsam in einer Mail versendet. <br>
@@ -15912,7 +15929,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
       <br>
   </li>
 
-  <a name="snapTelegramTxt"></a>
+  <a id="SSCam-attr-snapTelegramTxt"></a>
   <li><b>snapTelegramTxt tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;], option => [silent]  </b><br>
     Aktiviert den permanenten Versand von Schnappschüssen nach deren Erstellung per TelegramBot.
     Wurden mehrere Schnappschüsse ausgelöst, werden sie sequentiell versendet.<br>
@@ -15962,18 +15979,22 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br>
   </li>
 
-  <a name="snapGalleryBoost"></a>
+  <a id="SSCam-attr-snapGalleryBoost"></a>
   <li><b>snapGalleryBoost</b><br>
     Wenn gesetzt, werden die letzten Schnappschüsse (default 3) über Polling im Speicher gehalten und mit "set/get snapGallery"
     aufbereitet angezeigt. Dieser Modus bietet sich an wenn viele bzw. Fullsize Images angezeigt werden sollen.
     Ist das Attribut eingeschaltet, können bei "set/get snapGallery" keine Argumente mehr mitgegeben werden.
-    (siehe Attribut "snapGalleryNumber") </li><br>
+    (siehe Attribut "snapGalleryNumber"). <br><br>
+    
+    (default: 0)
+  </li>
+  <br>
 
-  <a name="snapGalleryColumns"></a>
+  <a id="SSCam-attr-snapGalleryColumns"></a>
   <li><b>snapGalleryColumns</b><br>
     Die Anzahl der Snaps die in einer Reihe im Popup erscheinen sollen (default 3). </li><br>
 
-  <a name="snapGalleryHtmlAttr"></a>
+  <a id="SSCam-attr-snapGalleryHtmlAttr"></a>
   <li><b>snapGalleryHtmlAttr</b><br>
     hiermit kann die Bilddarstellung beeinflusst werden. <br>
     Ist das Attribut nicht gesetzt, wird das Attribut "htmlattr" verwendet. <br>
@@ -15986,39 +16007,39 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         <br>
         </li>
 
-  <a name="snapGalleryNumber"></a>
+  <a id="SSCam-attr-snapGalleryNumber"></a>
   <li><b>snapGalleryNumber</b><br>
     Die Anzahl der abzurufenden Schnappschüsse (default 3). </li><br>
 
-  <a name="snapGallerySize"></a>
+  <a id="SSCam-attr-snapGallerySize"></a>
   <li><b>snapGallerySize</b><br>
      Mit diesem Attribut kann die Qualität der Images eingestellt werden (default "Icon"). <br>
      Im Modus "Full" wird die original vorhandene Auflösung der Images abgerufen. Dies erfordert mehr Ressourcen und kann die
      Anzeige verlangsamen. Mit "snapGalleryBoost=1" kann die Ausgabe beschleunigt werden, da in diesem Fall die Aufnahmen über
      Polling abgerufen und nur noch zur Anzeige gebracht werden. </li><br>
 
-  <a name="snapReadingRotate"></a>
+  <a id="SSCam-attr-snapReadingRotate"></a>
   <li><b>snapReadingRotate 0...10</b><br>
     Aktiviert die Versionierung von Schnappschußreadings (default: 0). Es wird eine fortlaufende Nummer der Readings
     "LastSnapFilename", "LastSnapId" und "LastSnapTime" bis zum eingestellten Wert von snapReadingRotate erzeugt und enthält
     die Daten der letzten X Schnappschüsse. </li><br>
 
-  <a name="showStmInfoFull"></a>
+  <a id="SSCam-attr-showStmInfoFull"></a>
   <li><b>showStmInfoFull</b><br>
     zusaätzliche Streaminformationen wie LiveStreamUrl, StmKeyUnicst, StmKeymjpegHttp werden
     ausgegeben</li><br>
 
-  <a name="showPassInLog"></a>
+  <a id="SSCam-attr-showPassInLog"></a>
   <li><b>showPassInLog</b><br>
     Wenn gesetzt, wird das verwendete Passwort im Logfile mit verbose 4 angezeigt.
     (default = 0) </li><br>
 
-  <a name="videofolderMap"></a>
+  <a id="SSCam-attr-videofolderMap"></a>
   <li><b>videofolderMap</b><br>
     Ersetzt den Inhalt des Readings "VideoFolder". Verwendung z.B. bei gemounteten
     Verzeichnissen oder URL-Bereitstellung durch einen Webserver. </li><br>
 
-  <a name="verbose"></a>
+  <a id="SSCam-attr-verbose"></a>
   <li><b>verbose</b> </li><br>
 
   <ul>
@@ -16040,7 +16061,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
    <br><br>
   </ul>
 
-<a name="SSCamreadings"></a>
+<a id="SSCam-readings"></a>
 <b>Readings</b>
  <ul>
   <br>
@@ -16101,15 +16122,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <tr><td><li>LastSnapId[x]</li>      </td><td>- die ID des/der letzten Schnapschüsse   </td></tr>
     <tr><td><li>LastSnapTime[x]</li>    </td><td>- Zeitstempel des/der letzten Schnapschüsse (Format abhängig vom global Attribut "language") </td></tr>
     <tr><td><li>LastUpdateTime</li>     </td><td>- Datum / Zeit der letzten Aktualisierung durch "caminfoall" (Format abhängig vom global Attribut "language")</td></tr>
-    <tr><td><li>LiveStreamUrl </li>     </td><td>- die LiveStream-Url wenn der Stream gestartet ist. (<a href="#SSCamattr">Attribut</a> "showStmInfoFull" muss gesetzt sein) </td></tr>
+    <tr><td><li>LiveStreamUrl </li>     </td><td>- die LiveStream-Url wenn der Stream gestartet ist. (<a href="#SSCam-attr-showStmInfoFull">showStmInfoFull</a> muss gesetzt sein) </td></tr>
     <tr><td><li>Patrols</li>            </td><td>- in Surveillance Station voreingestellte Überwachungstouren (bei PTZ-Kameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- zeigt den Status des automatischen Pollings an  </td></tr>
     <tr><td><li>PresetHome</li>         </td><td>- Name der Home-Position (bei PTZ-Kameras)  </td></tr>
     <tr><td><li>Presets</li>            </td><td>- in Surveillance Station voreingestellte Positionen (bei PTZ-Kameras)  </td></tr>
     <tr><td><li>Record</li>             </td><td>- Aufnahme läuft = Start, keine Aufnahme = Stop  </td></tr>
     <tr><td><li>StmKey</li>             </td><td>- aktueller StreamKey. Kann zum öffnen eines Livestreams ohne Session Id genutzt werden.    </td></tr>
-    <tr><td><li>StmKeyUnicst</li>       </td><td>- Uni-cast Stream Pfad der Kamera. (<a href="#SSCamattr">Attribut</a> "showStmInfoFull" muss gesetzt sein)  </td></tr>
-    <tr><td><li>StmKeymjpegHttp</li>    </td><td>- Mjpeg Stream Pfad (über http) der Kamera. (<a href="#SSCamattr">Attribut</a> "showStmInfoFull" muss gesetzt sein)  </td></tr>
+    <tr><td><li>StmKeyUnicst</li>       </td><td>- Uni-cast Stream Pfad der Kamera. (<a href="#SSCam-attr-showStmInfoFull">showStmInfoFull</a> muss gesetzt sein)  </td></tr>
+    <tr><td><li>StmKeymjpegHttp</li>    </td><td>- Mjpeg Stream Pfad (über http) der Kamera. (<a href="#SSCam-attr-showStmInfoFull">showStmInfoFull</a> muss gesetzt sein)  </td></tr>
     <tr><td><li>SVScustomPortHttp</li>  </td><td>- benutzerdefinierter Port der Surveillance Station (HTTP) im DSM-Anwendungsportal (get mit "svsinfo")  </td></tr>
     <tr><td><li>SVScustomPortHttps</li> </td><td>- benutzerdefinierter Port der Surveillance Station (HTTPS) im DSM-Anwendungsportal (get mit "svsinfo") </td></tr>
     <tr><td><li>SVSlicenseNumber</li>   </td><td>- die Anzahl der installierten Kameralizenzen (get mit "svsinfo") </td></tr>
