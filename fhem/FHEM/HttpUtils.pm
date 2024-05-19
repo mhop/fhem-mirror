@@ -1058,7 +1058,10 @@ HttpUtils_ParseAnswer($)
   my $encoding = defined($hash->{forceEncoding}) ? $hash->{forceEncoding} :
                  $hash->{httpheader} =~ m/^Content-Type.*charset=(\S*)/im ? $1 :
                 'UTF-8';
-  $ret = Encode::decode($encoding, $ret) if($unicodeEncoding && $encoding);
+  if($unicodeEncoding && $encoding) {
+    eval { $ret = Encode::decode($encoding, $ret) };
+    return $@ if($@);
+  }
 
   # Debug
   Log3 $hash, $hash->{loglevel}+1,
