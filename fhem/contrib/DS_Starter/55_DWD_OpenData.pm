@@ -629,7 +629,7 @@ use constant PROCESSING_TIMEOUT       => DOWNLOAD_TIMEOUT_MAX + 60; # [s]
 use constant SCHEDULING_RANGE         => 15*60 - PROCESSING_TIMEOUT - 60; # [s]
 
 require Exporter;
-our $VERSION   = '1.017003';
+our $VERSION   = '1.017005';
 our @ISA       = qw(Exporter);
 our @EXPORT    = qw(GetForecast GetAlerts UpdateAlerts UPDATE_DISTRICTS UPDATE_COMMUNEUNIONS UPDATE_ALL);
 our @EXPORT_OK = qw(IsCommuneUnionWarncellId);
