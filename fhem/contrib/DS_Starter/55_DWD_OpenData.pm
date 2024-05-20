@@ -600,7 +600,8 @@ package DWD_OpenData;
 use strict;
 use warnings;
 
-use Encode 'encode';
+use Encode qw(decode encode);
+use utf8;
 use File::Basename 'dirname';
 use File::Temp 'tempfile';
 use IO::Uncompress::Unzip qw(unzip $UnzipError);
@@ -1702,18 +1703,6 @@ sub GetForecast {
 
 =cut
 
-#sub GetHeaders {
-#  my ($name, $url) = @_;
-#  my $ua = new LWP::UserAgent(env_proxy => 1, timeout => 5, agent => 'fhem');
-#  my $request = new HTTP::Request('HEAD' => $url);
-#  $request->header('Accept' => 'text/html');
-#  my $response = $ua->request($request);
-#  if ($response->is_success()) {
-#    return $response;
-#  }
-#  return undef;
-#}
-
 sub GetHeaders {
   my ($name, $url) = @_;
 
@@ -1882,14 +1871,15 @@ sub GetForecastStart {
   if ($update) {
     # define download and processing properties
     my $param = {
-                  url        => $url,
-                  method     => "GET",
-                  timeout    => ::AttrVal($name, 'downloadTimeout', DOWNLOAD_TIMEOUT_DEFAULT),
-                  hash       => $hash,
-                  station    => $station,
-                  mosmixType => $mosmixType,
-                  dwdDocSize => $dwdDocSize,
-                  dwdDocTime => $dwdDocTime
+                  url           => $url,
+                  method        => "GET",
+                  timeout       => ::AttrVal($name, 'downloadTimeout', DOWNLOAD_TIMEOUT_DEFAULT),
+                  hash          => $hash,
+                  station       => $station,
+                  mosmixType    => $mosmixType,
+                  dwdDocSize    => $dwdDocSize,
+                  dwdDocTime    => $dwdDocTime,
+                  forceEncoding => 0
                 };
 
     # download and unpack forecast report
@@ -1991,6 +1981,7 @@ sub ProcessForecast {
     
     # download forecast document into variable
     my ($httpError, $zipFileContent) = ::HttpUtils_BlockingGet($param);
+    
     my $url = $param->{url};
     my $code = $param->{code};
     if (defined($httpError) && length($httpError) > 0) {
@@ -2002,7 +1993,9 @@ sub ProcessForecast {
     if (!defined($zipFileContent) || length($zipFileContent) == 0) {
       die "no data retrieved from URL '$url'";
     }
-
+    
+    ::Log3 $name, 5, "$name: ProcessForecast: HTTP-Header received:\n".$param->{httpheader};
+    
     ::Log3 $name, 5, "$name: ProcessForecast: data received, unzipping and decoding ...";
 
     # prepare processing
@@ -2423,7 +2416,7 @@ sub UpdateForecast {
   delete $forecast->{header}{defaultUndefSign};
   while (my ($property, $value) = each %{$forecast->{header}})
   {
-    ::readingsBulkUpdate($hash, 'fc_'.$property, $value);
+    ::readingsBulkUpdate($hash, 'fc_'.$property, (!$::unicodeEncoding ? encode('UTF-8', $value) : $value));
   }
 
   # prepare time processing
@@ -2452,7 +2445,7 @@ sub UpdateForecast {
     # write data
     my $dayPrefix = 'fc'.$relativeDay.'_';
     if ($dayPrefix ne $lastDayPrefix) {
-      ::readingsBulkUpdate($hash, $dayPrefix.'date', FormatDateLocal($hash, $forecastTime));
+      ::readingsBulkUpdate($hash, $dayPrefix.'date',    FormatDateLocal   ($hash, $forecastTime));
       ::readingsBulkUpdate($hash, $dayPrefix.'weekday', FormatWeekdayLocal($hash, $forecastTime));
       $lastDayPrefix = $dayPrefix;
     }
@@ -2482,7 +2475,7 @@ sub UpdateForecast {
             elsif ($forecastPropertyType == 2) {
               $value = sprintf('%0.0f', $value); # round()
               if ($forecastWW2Text && ($property eq 'ww') && defined($hourPrefix) && length($value) > 0) {
-                ::readingsBulkUpdate($hash, $dayPrefix.$hourPrefix.'wwd', $wwdText[$value]);
+                ::readingsBulkUpdate($hash, $dayPrefix.$hourPrefix.'wwd', (!$::unicodeEncoding ? encode('UTF-8', $wwdText[$value]) : $wwdText[$value]));   
               }
             }
             elsif ($forecastPropertyType == 3) {
@@ -2498,10 +2491,10 @@ sub UpdateForecast {
           my $forecastPropertyPeriod = $forecastPropertyPeriods{$property};
           if ($forecastPropertyPeriod == 24) {
             # day property
-            ::readingsBulkUpdate($hash, $dayPrefix.$property, $value);
+            ::readingsBulkUpdate($hash, $dayPrefix.$property, (!$::unicodeEncoding ? encode('UTF-8', $value) : $value));
           } elsif (defined($hourPrefix)) {
             # hour property
-            ::readingsBulkUpdate($hash, $dayPrefix.$hourPrefix.$property, $value);
+            ::readingsBulkUpdate($hash, $dayPrefix.$hourPrefix.$property, (!$::unicodeEncoding ? encode('UTF-8', $value) : $value));
           }
         }
       }
@@ -3075,7 +3068,7 @@ sub UpdateAlerts {
           my $prefix = 'a_'.$index.'_';
           ::readingsBulkUpdate($hash, $prefix.'category',     $alert->{category});
           ::readingsBulkUpdate($hash, $prefix.'event',        $alert->{eventCode});
-          ::readingsBulkUpdate($hash, $prefix.'eventDesc',    encode('UTF-8', $alert->{event}));
+          ::readingsBulkUpdate($hash, $prefix.'eventDesc',    (!$::unicodeEncoding ? encode('UTF-8', $alert->{event}) : $alert->{event}));
           ::readingsBulkUpdate($hash, $prefix.'eventGroup',   $alert->{eventGroup});
           ::readingsBulkUpdate($hash, $prefix.'responseType', $alert->{responseType});
           ::readingsBulkUpdate($hash, $prefix.'urgency',      $alert->{urgency});
@@ -3083,11 +3076,11 @@ sub UpdateAlerts {
           ::readingsBulkUpdate($hash, $prefix.'areaColor',    $alert->{areaColor});
           ::readingsBulkUpdate($hash, $prefix.'onset',        FormatDateTimeLocal($hash, $alert->{onset}));
           ::readingsBulkUpdate($hash, $prefix.'expires',      FormatDateTimeLocal($hash, $alert->{expires}));
-          ::readingsBulkUpdate($hash, $prefix.'headline',     encode('UTF-8', $alert->{headline}));
-          ::readingsBulkUpdate($hash, $prefix.'description',  encode('UTF-8', $alert->{description}));
-          ::readingsBulkUpdate($hash, $prefix.'instruction',  encode('UTF-8', $alert->{instruction}));
+          ::readingsBulkUpdate($hash, $prefix.'headline',     (!$::unicodeEncoding ? encode('UTF-8', $alert->{headline}) : $alert->{headline}));
+          ::readingsBulkUpdate($hash, $prefix.'description',  (!$::unicodeEncoding ? encode('UTF-8', $alert->{description}) : $alert->{description}));
+          ::readingsBulkUpdate($hash, $prefix.'instruction',  (!$::unicodeEncoding ? encode('UTF-8', $alert->{instruction}) : $alert->{instruction}));
           ::readingsBulkUpdate($hash, $prefix.'area',         $alert->{warncellid}[$areaIndex]);
-          ::readingsBulkUpdate($hash, $prefix.'areaDesc',     encode('UTF-8', $alert->{areaDesc}[$areaIndex]));
+          ::readingsBulkUpdate($hash, $prefix.'areaDesc',     (!$::unicodeEncoding ? encode('UTF-8', $alert->{areaDesc}[$areaIndex]) : $alert->{areaDesc}[$areaIndex]));
           ::readingsBulkUpdate($hash, $prefix.'altitude',     floor(0.3048*$alert->{altitude}[$areaIndex] + 0.5));
           ::readingsBulkUpdate($hash, $prefix.'ceiling',      floor(0.3048*$alert->{ceiling}[$areaIndex] + 0.5));
           $index++;
@@ -3098,7 +3091,7 @@ sub UpdateAlerts {
 
       # license
       if ($index == 1 && defined($alert->{license})) {
-        ::readingsBulkUpdate($hash, 'a_copyright', encode('UTF-8', $alert->{license}));
+        ::readingsBulkUpdate($hash, 'a_copyright', (!$::unicodeEncoding ? encode('UTF-8', $alert->{license}) : $alert->{license}));
       }
     }
   }
@@ -3164,8 +3157,11 @@ sub DWD_OpenData_Initialize {
 #
 # CHANGES
 #
+# 20.05.2024 (version 1.17.5) DS_Starter
+# feature: use utf8, accept global encode=unicode
+#
 # 18.05.2024 (version 1.17.4) mumpitzstuff
-# feature: uRAM/Flash consumption significantly reduced
+# feature: RAM/Flash consumption significantly reduced
 #
 # 01.03.2024 (version 1.17.3) jensb + DS_Starter
 # feature: unzip large forecast files to disk and filter out selected station before processing
