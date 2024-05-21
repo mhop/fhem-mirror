@@ -1059,7 +1059,7 @@ HttpUtils_ParseAnswer($)
                  $hash->{httpheader} =~ m/^Content-Type.*charset=(\S*)/im ? $1 :
                 'UTF-8';
   if($unicodeEncoding && $encoding) {
-    $encoding =~ s/["']//g; #138273
+    $encoding =~ s/"//g; #138273
     eval { $ret = Encode::decode($encoding, $ret) };
     return $@ if($@);
   }
