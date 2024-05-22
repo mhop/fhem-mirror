@@ -205,6 +205,7 @@ sub Define {
     my $hash = shift // return;
     my $aArg = shift // return;
 
+
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
@@ -221,8 +222,9 @@ sub Define {
     $hash->{URL} =
       AttrVal( $name, 'gardenaBaseURL', 'https://smart.gardena.com' ) . '/v1';
     $hash->{VERSION}   = version->parse($VERSION)->normal;
-    $hash->{INTERVAL}  = 60;
+    $hash->{INTERVAL}  = 180;
     $hash->{NOTIFYDEV} = "global,$name";
+    $hash->{helper}{gettoken_count} = 0;
 
     CommandAttr( undef, $name . ' room GardenaSmart' )
       if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
@@ -264,6 +266,8 @@ sub Attr {
         if ( $cmd eq 'set' && $attrVal eq '1' ) {
             RemoveInternalTimer( $hash,
                 "FHEM::GardenaSmartBridge::getDevices" );
+            RemoveInternalTimer( $hash,
+                "FHEM::GardenaSmartBridge::getToken" );
             readingsSingleUpdate( $hash, 'state', 'inactive', 1 );
             Log3 $name, 3, "GardenaSmartBridge ($name) - disabled";
         }
@@ -290,14 +294,14 @@ sub Attr {
               if ( $attrVal == 0 );
             RemoveInternalTimer( $hash,
                 "FHEM::GardenaSmartBridge::getDevices" );
-            $hash->{INTERVAL} = $attrVal;
+            $hash->{INTERVAL} = $attrVal if $attrVal >= 180;
             Log3 $name, 3,
               "GardenaSmartBridge ($name) - set interval: $attrVal";
         }
         elsif ( $cmd eq 'del' ) {
             RemoveInternalTimer( $hash,
                 "FHEM::GardenaSmartBridge::getDevices" );
-            $hash->{INTERVAL} = 60;
+            $hash->{INTERVAL} = 180;
             Log3 $name, 3,
 "GardenaSmartBridge ($name) - delete User interval and set default: 60";
         }
@@ -691,6 +695,16 @@ sub ErrorHandling {
               "GardenaSmartBridge ($dname) - RequestERROR: check the ???";
 
         }
+        elsif ( $decode_json->{errors}[0]{code} eq "ratelimit.exceeded"  ) {
+          Log3 $name, 5,
+            "GardenaSmartBridge ($name) - RequestERROR: error ratelimit.exceeded";
+          readingsBulkUpdate( $hash, "lastRequestState", "too many requests", 1 );
+          readingsBulkUpdate( $hash, "state", "inactive", 1 );
+          # remove all timer and disable bridge
+          RemoveInternalTimer( $hash );
+
+          return; # post request max.
+        }
         else {
 
             Log3 $dname, 5,
@@ -700,8 +714,18 @@ sub ErrorHandling {
 
         if ( !defined( $hash->{helper}{session_id} ) ) {
             readingsSingleUpdate( $hash, 'token', 'none', 1 );
-            InternalTimer( gettimeofday() + 5,
-                "FHEM::GardenaSmartBridge::getToken", $hash );
+            Log3 $name, 3,
+              "GardenaSmartBridge ($name) - getToken limit: " 
+              . $hash->{helper}{gettoken_count} ;
+
+            if ($hash->{helper}{gettoken_count} < 6) {
+              $hash->{helper}{gettoken_count}++;
+              InternalTimer( gettimeofday() + 5,
+                "FHEM::GardenaSmartBridge::getToken", $hash )
+            } else {
+              RemoveInternalTimer ($hash);
+              $hash->{helper}{gettoken_count} = 0;
+            }
         }
         readingsEndUpdate( $dhash, 1 );
 
@@ -1176,21 +1200,21 @@ sub getToken {
 
     Write(
         $hash,
-        '"data": {"type":"token", "attributes":{"username": "'
+        '"data":{"type":"token","attributes":{"username":"'
           . AttrVal( $name, 'gardenaAccountEmail', 'none' )
-          . '","password": "'
+          . '","password":"'
           . ReadPassword( $hash, $name )
-          . '", "client_id":"smartgarden-jwt-client"}}',
+          . '","client_id":"smartgarden-jwt-client"}}',
         undef,
         undef
     );
 
     Log3 $name, 4,
-        '"data": {"type":"token", "attributes":{"username": "'
+        '"data": {"type":"token", "attributes":{"username":"'
       . AttrVal( $name, 'gardenaAccountEmail', 'none' )
-      . '","password": "'
+      . '","password":"'
       . ReadPassword( $hash, $name )
-      . '", "client_id":"smartgarden-jwt-client"}}';
+      . '","client_id":"smartgarden-jwt-client"}}';
     Log3 $name, 3,
 "GardenaSmartBridge ($name) - send credentials to fetch Token and locationId";
 
@@ -1289,7 +1313,10 @@ sub createHttpValueStrings {
     my ( $hash, $payload, $deviceId, $abilities, $service_id ) = @_;
 
     my $session_id = $hash->{helper}{session_id};
-    my $header     = "Content-Type: application/json";
+    my $header = 'Content-Type: application/json';
+    $header .= "\r\norigin: https://smart.gardena.com";
+    $header .= "\r\nuser-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+    #my $header     = "Content-Type: application/json; origin: https://smart.gardena.com";
     my $uri        = '';
     my $method     = 'POST';
     $header .= "\r\nAuthorization: Bearer $session_id"
@@ -1496,7 +1523,7 @@ sub DeletePassword {
   <ul>
     <li>debugJSON - </li>
     <li>disable - Disables the Bridge</li>
-    <li>interval - Interval in seconds (Default=60)</li>
+    <li>interval - Interval in seconds (Default=180)</li>
     <li>gardenaAccountEmail - Email Adresse which was used in the GardenaAPP</li>
   </ul>
 </ul>
@@ -1557,7 +1584,7 @@ sub DeletePassword {
   <ul>
     <li>debugJSON - JSON Fehlermeldungen</li>
     <li>disable - Schaltet die Datenübertragung der Bridge ab</li>
-    <li>interval - Abfrageinterval in Sekunden (default: 60)</li>
+    <li>interval - Abfrageinterval in Sekunden (default: 180)</li>
     <li>gardenaAccountEmail - Email Adresse, die auch in der GardenaApp verwendet wurde</li>
   </ul>
 </ul>
@@ -1581,7 +1608,7 @@ sub DeletePassword {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.6.2",
+  "version": "v2.6.3",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
