@@ -1,6 +1,6 @@
-REV 28894
+REV 28897
 DIR unused
-UPD 2024-05-20_07:45:02 426973 ./CHANGED
+UPD 2024-05-23_07:45:03 427033 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2024-04-09_07:45:02 47157 ./MAINTAINER.txt
 UPD 2023-08-24_07:45:03 46886 ./configDB.pm
@@ -393,7 +393,7 @@ UPD 2023-04-11_07:45:03 51177 FHEM/73_AMADCommBridge.pm
 UPD 2023-01-04_07:45:04 116377 FHEM/73_AutoShuttersControl.pm
 UPD 2024-03-05_07:45:03 253577 FHEM/73_DoorBird.pm
 UPD 2022-11-14_07:45:07 148175 FHEM/73_ElectricityCalculator.pm
-UPD 2024-05-04_07:45:03 50033 FHEM/73_GardenaSmartBridge.pm
+UPD 2024-05-23_07:45:03 51324 FHEM/73_GardenaSmartBridge.pm
 UPD 2022-11-14_07:45:07 120483 FHEM/73_GasCalculator.pm
 UPD 2024-04-25_07:45:03 90685 FHEM/73_MPD.pm
 UPD 2021-12-18_07:45:03 10412 FHEM/73_NUKIBridge.pm
@@ -763,12 +763,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2024-05-20_07:45:09 5196897 docs/commandref.html
-UPD 2024-05-20_07:45:12 3224507 docs/commandref_DE.html
+UPD 2024-05-23_07:45:09 5196898 docs/commandref.html
+UPD 2024-05-23_07:45:13 3224508 docs/commandref_DE.html
 UPD 2024-03-06_07:45:03 86454 docs/commandref_frame.html
 UPD 2024-03-06_07:45:03 97189 docs/commandref_frame_DE.html
-UPD 2024-05-22_07:45:13 317972 docs/commandref_modular.html
-UPD 2024-05-22_07:45:14 329884 docs/commandref_modular_DE.html
+UPD 2024-05-23_07:45:14 317972 docs/commandref_modular.html
+UPD 2024-05-23_07:45:15 329884 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2482,7 +2482,7 @@ UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2022-12-07_07:45:02 5952 www/pgm2/defaultCommon.css
 UPD 2018-09-11_07:45:03 3636 www/pgm2/defaultfloorplanstyle.css
 UPD 2021-05-15_07:45:04 1960 www/pgm2/doif.js
-UPD 2023-05-16_07:45:03 32349 www/pgm2/f18.js
+UPD 2024-05-23_07:45:03 32634 www/pgm2/f18.js
 UPD 2022-08-24_07:45:03 10106 www/pgm2/f18style.css
 UPD 2023-03-18_07:45:02 8651 www/pgm2/fhemdoc_modular.js
 UPD 2023-11-23_07:45:03 74704 www/pgm2/fhemweb.js
