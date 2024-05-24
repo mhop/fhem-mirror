@@ -252,10 +252,13 @@ sub HTTPAPI_Read {
     return if (!$chash);
     $chash->{encoding} = $encoding;
     $chash->{cname} = $name;
+    $chash->{infix} = $hash->{INFIX};
     $chash->{CD}->blocking(0);
     return;
   }
 
+  $infix = $hash->{infix};
+  
   # read data
   my $buf;
   my $ret = sysread($hash->{CD}, $buf, 2048);
