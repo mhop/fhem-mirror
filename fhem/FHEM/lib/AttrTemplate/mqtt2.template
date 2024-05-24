@@ -6159,3 +6159,51 @@ ring $\DEVICETOPIC/exec $EVTPART0_$EVTPART1\
 playAudio $\DEVICETOPIC/playAudio $EVTPART1
 attr DEVICE model SiedleGateway
 setreading DEVICE attrTemplateVersion 20210515
+
+####################################
+# provided by Tueftler1983, see https://forum.fhem.de/index.php?msg=1313868
+#Use this for the WLAN Module RelaxAndSpa for Bestway Lay Z Spar Wirlpools. The Wlan module ist Selled and #Supportet from Michael Krenner https://www.mk-innovations.de/smartandrelax-modul/
+name:LayZSpa
+filter:TYPE=MQTT2_DEVICE
+order:W_743354
+par:BASE_TOPIC;base topic set in SmarAndRelax MQTT Konfiguration;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)/Status:, ? $1 : undef }
+desc:Use this for the WiFi Module RelaxAndSpa for Bestway Lay Z Spar Wirlpools. The WiFi module ist selled and supportet by Michael Krenner https://www.mk-innovations.de/smartandrelax-modul/. Note: in case Client-ID and Basic-Topic include SPACE letters, you will have to change that fist in the settings of the WiFi module!
+attr DEVICE readingList BASE_TOPIC/button:.* button\
+  BASE_TOPIC/message:.* { $EVENT =~ s/"(FLT|AIR|RED|GRN)":1/"$1":"on"/g; $EVENT =~ s/"(FLT|AIR|RED|GRN)":0/"$1":"off"/g; $EVENT =~ s/"(UNT)":1/"$1":"Celsius"/g; $EVENT =~ s/"(UNT)":0/"$1":"Fahrenheit"/g; json2nameValue($EVENT,'',$JSONMAP) }\
+  BASE_TOPIC/times:.* { json2nameValue($EVENT, 'times_', $JSONMAP) }\
+  BASE_TOPIC/other:.* { json2nameValue($EVENT, 'other_', $JSONMAP) }\
+  BASE_TOPIC/Status:.* { $EVENT eq 'Alive' ? {LWT=>'online'} : {LWT=>'offline'} }\
+  BASE_TOPIC/MAC_Address:.* MAC_Address\
+  BASE_TOPIC/MQTT_Connect_Count:.* MQTT_Connect_Count\
+  BASE_TOPIC/reboot_time:.* reboot_time\
+  BASE_TOPIC/reboot_reason:.* reboot_reason
+attr DEVICE devStateIcon 2.on:water-heat@orange:heater+off\
+2.off:water-heat@red:heater+on\
+3.off:water-heat@red:heater+on\
+3.on:water-heat@green:heater+off\
+1.on:sani_domestic_waterworks@green:pump+off\
+1.off:sani_domestic_waterworks@red:pump+on\
+4.off:vent_ventilation_level_0@red:air+on\
+4.on:vent_ventilation_level_3@green:air+off
+attr DEVICE jsonMap TGT:desired-temp TMP:temperature FLT:pump AIR:air RED:heater GRN:hot UNT:unit AMB:ambiant-temp
+attr DEVICE setList pump:on,off { my $on = $EVTPART1 eq 'on'?1:0; qq(BASE_TOPIC/command { "CMD":4, "VALUE":$on, "XTIME":0, "INTERVAL":0 }) }\
+  desired-temp:slider,20,1,40 BASE_TOPIC/command {CMD:0,VALUE:$EVTPART1,XTIME:0,INTERVAL:0}\
+  air:on,off { my $on = $EVTPART1 eq 'on'?1:0; qq(BASE_TOPIC/command { "CMD":2, "VALUE":$on, "XTIME":0, "INTERVAL":0 }) }\
+  unit:Celsius,Fahrenheit { my $Celsius = $EVTPART1 eq 'Celsius'?1:0; qq(BASE_TOPIC/command  { "CMD":1, "VALUE":$Celsius, "XTIME":0, "INTERVAL":0 }) }\
+  heater:on,off { my $on = $EVTPART1 eq 'on'?1:0; qq(BASE_TOPIC/command { "CMD":3, "VALUE":$on, "XTIME":0, "INTERVAL":0 }) }\
+  reset_chlorid BASE_TOPIC/command {"CMD":9,"VALUE":,"XTIME":0,"INTERVAL":0}\
+  reset_filter BASE_TOPIC/command {"CMD":10,"VALUE":,"XTIME":0,"INTERVAL":0}
+attr DEVICE stateFormat 1:pump\
+2:heater\
+3:hot\
+4:air\
+temperature Grad C\
+<br>\
+Letzter Filter Wechsel last_filter_change Tage\
+<br>\
+Letzte Chlorung last_add_chlorid Tage
+attr DEVICE userReadings last_add_chlorid:times_CLTIME.* {return int((time()-ReadingsVal($name, 'times_CLTIME', 0))/DAYSECONDS);}, last_filter_change:times_FTIME.* {return int((time()-ReadingsVal($name, 'times_FTIME', 0))/DAYSECONDS);}
+attr DEVICE webCmd desired-temp:reset_filter:reset_chlorid
+attr DEVICE setStateList on off
+attr DEVICE model LayZSpa
+setreading DEVICE attrTemplateVersion 20240524
