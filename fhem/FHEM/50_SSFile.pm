@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       50_SSFile.pm
 #
-#       (c) 2020-2021 by Heiko Maaz
+#       (c) 2020-2024 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module integrate the Synology File Station into FHEM
@@ -74,7 +74,6 @@ use Encode;
 use Encode::Guess;
 use File::Find;
 use File::Glob ':bsd_glob';
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;                 ## no critic 'eval'
                                                     
 # no if $] >= 5.017011, warnings => 'experimental';
@@ -145,6 +144,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.0.2"  => "25.05.2024  replace Smartmatch Forum:#137776 ",
   "1.0.1"  => "18.07.2021  compatibility to DSM7 ",
   "1.0.0"  => "25.05.2021  ready for check in ",
   "0.8.1"  => "24.05.2021  fix FHEM crash when malfomed JSON is received ".
