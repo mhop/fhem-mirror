@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       57_SSCal.pm
 #
-#       (c) 2019 - 2022 by Heiko Maaz
+#       (c) 2019 - 2024 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module integrate the Synology Calendar into FHEM
@@ -71,7 +71,6 @@ use HttpUtils;
 use Encode;
 use utf8;
 use Blocking;
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;                 ## no critic 'eval'
                                                     
 # no if $] >= 5.017011, warnings => 'experimental';
@@ -140,6 +139,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.4.11" => "25.05.2024  replace Smartmatch Forum:#137776 ",
   "2.4.10" => "16.07.2022  fix problem recurring MONTHLY appointment by day, ".
                            "forum: https://forum.fhem.de/index.php/topic,106963.msg1228098.html#msg1228098 ",
   "2.4.9"  => "11.07.2021  set adaption of AUTH for DSM7 compatibility ",
