@@ -27,7 +27,7 @@ my $linkPattern = "^\/?(([^\/]*(\/[^\/]+)*)\/?)\$";
 my $tcpServAdr = 'global';
 my $tcpServPort = 8087;
 
-sub HTTPAPI_Initialize($) {
+sub HTTPAPI_Initialize {
   my ($hash) = @_;
   $hash->{AttrFn} = "HTTPAPI_Attr";
   $hash->{DefFn} = "HTTPAPI_Define";
@@ -38,7 +38,7 @@ sub HTTPAPI_Initialize($) {
   return undef;
 }
 
-sub HTTPAPI_Define($$) {
+sub HTTPAPI_Define {
   my ($hash, $a, $h) = @_;
   my $name = $a->[0];
   if (defined $a->[2]) {
@@ -84,7 +84,7 @@ sub HTTPAPI_Define($$) {
   return $ret;
 }
 
-sub HTTPAPI_Attr(@) {
+sub HTTPAPI_Attr {
   my ($cmd, $name, $aName, $aVal) = @_;
   if ($cmd eq "set") {
     if ($aName =~ "devicesCtrl") {
@@ -98,7 +98,7 @@ sub HTTPAPI_Attr(@) {
   return undef;
 }
 
-sub HTTPAPI_CGI($$$) {
+sub HTTPAPI_CGI {
   # execute request to http://<host>:<port>/$infix?<cmd string>
   my ($hash, $name, $request) = @_;
   my $apiCmd;
@@ -107,14 +107,14 @@ sub HTTPAPI_CGI($$$) {
   my $link;
   return($hash, 503, 'close', "text/plain; charset=utf-8", encode($encoding, "error=503 Service Unavailable")) if(IsDisabled($name));
 
-  if($request =~ m/^(\/$infix)\/(set|get|read|readtimestamp|write)\?(.*)$/) {
+  if($request =~ m/^(\/$infix)\/(set|get|read|readtimestamp|readinternal|write)\?(.*)$/) {
     $link = $1;
     $apiCmd = $2;
     $apiCmdString = $3;
 
     # url decoding
     $request =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
-    #readingsSingleUpdate($defs{$name}, 'request', $request, 0);
+    readingsSingleUpdate($defs{$name}, 'request', $request, 0);
 
     if ($apiCmdString =~ /&device(\=[^&]*)?(?=&|$)|^device(\=[^&]*)?(&|$)/) {
       $fhemDevName = substr(($1 // $2), 1);
@@ -148,23 +148,24 @@ sub HTTPAPI_CGI($$$) {
           } else {
             return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > attribute action is missing"))
           }
-        } elsif ($apiCmd =~ /^read|readtimestamp$/) {
-          my $readingName;
-          if ($apiCmdString =~ /&reading(\=[^&]*)?(?=&|$)|^reading(\=[^&]*)?(&|$)/) {
-            $readingName = substr(($1 // $2), 1);
+        } elsif ($apiCmd =~ /^read|readtimestamp|readinternal$/) {
+          my $valName;
+          if ($apiCmdString =~ /&reading(\=[^&]*)?(?=&|$)|^reading(\=[^&]*)?(&|$)|&internal(\=[^&]*)?(&|$)/) {
+            $valName = substr(($1 // $2 // $3 // $4), 1);
             # url decoding
-            $readingName =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
-            my $readingVal = $apiCmd eq 'readtimestamp' ? ReadingsTimestamp($fhemDevName, $readingName, undef) : ReadingsVal($fhemDevName, $readingName, undef);
-            #readingsSingleUpdate($defs{$name}, 'reponse', "$readingName=$readingVal", 1);
-            if (defined $readingVal) {
-              return($hash, 200, 'close', "text/plain; charset=utf-8", encode($encoding, "$readingName=$readingVal"));
+            $valName =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
+            my $val = $apiCmd eq 'readtimestamp' ? ReadingsTimestamp($fhemDevName, $valName, undef) :
+                      $apiCmd eq 'readinternal'  ? InternalVal($fhemDevName, $valName, undef)       :
+                      ReadingsVal($fhemDevName, $valName, undef);
+            #readingsSingleUpdate($defs{$name}, 'reponse', "$valName=$val", 1);
+            if (defined $val) {
+              return($hash, 200, 'close', "text/plain; charset=utf-8", encode($encoding, "$valName=$val"));
             } else {
-              return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > reading $readingName unknown"))
+              return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > reading or internal $valName unknown"))
             }
           } else {
-            return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > attribute reading is missing"))
+            return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > attribute reading or internal is missing"))
           }
-
         } elsif ($apiCmd eq 'set') {
           my $setCmd;
           if ($apiCmdString =~ /&action(\=[^&]*)?(?=&|$)|^action(\=[^&]*)?(&|$)/) {
@@ -231,7 +232,7 @@ sub HTTPAPI_CGI($$$) {
   return;
 }
 
-sub HTTPAPI_CommandRef($) {
+sub HTTPAPI_CommandRef {
   my ($hash) = @_;
   my $fileName = $gPath . '/02_HTTPAPI.pm';
   my ($err, @contents) = FileRead({FileName => $fileName, ForceType => 'file'});
@@ -241,7 +242,7 @@ sub HTTPAPI_CommandRef($) {
   return ($hash, 200, 'close', "text/html; charset=utf-8", encode($encoding, $1));
 }
 
-sub HTTPAPI_Read($) {
+sub HTTPAPI_Read {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
@@ -250,9 +251,13 @@ sub HTTPAPI_Read($) {
     my $chash = TcpServer_Accept($hash, "HTTPAPI");
     return if (!$chash);
     $chash->{encoding} = $encoding;
+    $chash->{cname} = $name;
+    $chash->{infix} = $hash->{INFIX};
     $chash->{CD}->blocking(0);
     return;
   }
+
+  $infix = $hash->{infix};
 
   # read data
   my $buf;
@@ -305,14 +310,14 @@ sub HTTPAPI_Read($) {
       delete $hash->{CONTENT_LENGTH};
       next;
     } elsif ($url !~ m/\/$infix\//i) {
-      $ret = HTTPAPI_TcpServerWrite($hash, 400, 'close', "text/plain; charset=utf-8", "error=400 Bad Request");
+      $ret = HTTPAPI_TcpServerWrite($hash, 400, 'close', "text/plain; charset=utf-8", "error=400 Bad Request, wrong infix");
       delete $hash->{CONTENT_LENGTH};
       next;
     } else {
       $url =~ m/\/$infix\/(.*)\?(.*)$/i;
       my ($requestCmd, $cmdString) = ($1, $2);
       # CGI Aufruf
-      $ret = HTTPAPI_TcpServerWrite(HTTPAPI_CGI($hash, $name, $url));
+      $ret = HTTPAPI_TcpServerWrite(HTTPAPI_CGI($hash, $hash->{cname}, $url));
       delete $hash->{CONTENT_LENGTH};
       next:
     }
@@ -323,7 +328,7 @@ sub HTTPAPI_Read($) {
   return;
 }
 
-sub HTTPAPI_TcpServerWrite($$$$$) {
+sub HTTPAPI_TcpServerWrite {
   my ($hash, $httpState, $connection, $contentType, $content) = @_;
   my ($contentLength, $header) = (0, "HTTP/1.1 ");
   my %httpState = (
@@ -344,7 +349,7 @@ sub HTTPAPI_TcpServerWrite($$$$$) {
   return TcpServer_WriteBlocking($hash, $header . $content);
 }
 
-sub HTTPAPI_Undef($) {
+sub HTTPAPI_Undef {
   my ($hash) = @_;
   return TcpServer_Close($hash, 1);
 }
@@ -472,6 +477,16 @@ sub HTTPAPI_Undef($) {
       Response:
       <ul>
         <code>&lt;reading name&gt;=|error=&lt;error message&gt;</code><br>
+      </ul>
+    </li>
+    <li>API command line for querying a internal<br>
+      Request:
+      <ul>
+        <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/readinternal?device=&lt;devname&gt;&internal=&lt;name&gt;</code><br>
+      </ul>
+      Response:
+      <ul>
+        <code>&lt;internal name&gt;=&lt;val&gt;|error=&lt;error message&gt;</code><br>
       </ul>
     </li>
   </ul>
