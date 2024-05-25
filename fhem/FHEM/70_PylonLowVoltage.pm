@@ -67,8 +67,6 @@ eval "use Storable qw(freeze thaw);1;" or my $storabs       = 'Storable';       
 use FHEM::SynoModules::SMUtils qw(moduleVersion);                                            # Hilfsroutinen Modul
 #use Data::Dumper;
 
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
-
 # Run before module compilation
 BEGIN {
   # Import from main::
@@ -122,6 +120,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.2.6"  => "25.05.2024 replace Smartmatch Forum:#137776 ",
   "0.2.5"  => "02.04.2024 _callAnalogValue / _callAlarmInfo: integrate a Cell and Temperature Position counter ".
                           "add specific Alarm readings ",
   "0.2.4"  => "29.03.2024 avoid possible Illegal division by zero at line 1438 ",
@@ -1540,10 +1539,10 @@ sub createReadings {
 
     for my $rdg (keys %{$readings}) {
         next if(!defined $readings->{$rdg});
-        readingsBulkUpdate ($hash, $rdg, $readings->{$rdg}) if($success || $rdg ~~ @blackl);
+        readingsBulkUpdate ($hash, $rdg, $readings->{$rdg}) if($success || grep /^$rdg$/, @blackl);  
     }
 
-    readingsEndUpdate  ($hash, 1);
+    readingsEndUpdate ($hash, 1);
 
 return;
 }
@@ -1560,7 +1559,7 @@ sub deleteReadingspec {
   my $readingspec = '^'.$spec.'$';
 
   for my $reading ( grep { /$readingspec/x } keys %{$hash->{READINGS}} ) {
-      next if($reading ~~ @blackl);
+      next if(grep /^$reading$/, @blackl);              
       readingsDelete ($hash, $reading);
   }
 
