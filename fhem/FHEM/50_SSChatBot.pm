@@ -72,8 +72,7 @@ use HttpUtils;
 use Encode;
 eval "use JSON;1;"                                                    or my $SSChatBotMM = "JSON";            ## no critic 'eval' # Debian: apt-get install libjson-perl
 eval "use FHEM::Meta;1"                                               or my $modMetaAbsent = 1;               ## no critic 'eval'
-eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSChatBotNDom = "Net::Domain";   ## no critic 'eval'
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';                                   
+eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSChatBotNDom = "Net::Domain";   ## no critic 'eval'                                  
 
 # Run before module compilation
 BEGIN {
@@ -136,6 +135,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.15.2" => "25.05.2024  replace Smartmatch Forum:#137776 ",
   "1.15.1" => "02.04.2024  _botCGIdata: fix 'disabled' is not working when receiving data ",
   "1.15.0" => "19.05.2023  compatibility to DSM starting with DSM 7.2, Forum: https://forum.fhem.de/index.php?msg=1276303 ",
   "1.14.0" => "08.04.2023  prepared for new Setter deletePostId, loglevel for HttpUtils ",
@@ -2035,7 +2035,7 @@ sub ___botCGIorder {
   my @aul      = split ",", $au;
   my $cr       = q{}; 
   
-  if($au eq "all" || $username ~~ @aul) {      
+  if($au eq "all" || grep /^$username$/, @aul) {     
       if ($order =~ /^[GS]et$/x) {
           Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$cmd);
           no strict "refs";                                          ## no critic 'NoStrict' 
