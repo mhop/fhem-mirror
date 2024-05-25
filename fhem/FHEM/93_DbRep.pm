@@ -55,10 +55,10 @@ use FHEM::SynoModules::SMUtils qw( evalDecodeJSON );
 
 use IO::Compress::Gzip qw(gzip $GzipError);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.13" => "25.05.2024  replace Smartmatch Forum:#137776 ",
   "8.53.12" => "09.05.2024  DbRep_dbConnect: change PRAGMA temp_store=MEMORY to FILE, Forum: https://forum.fhem.de/index.php?msg=1312722 ",
   "8.53.11" => "08.05.2024  reduceLog: fix bug if EXCL/INCL-devices end with a digit ",  
   "8.53.10" => "27.03.2024  multicmd: add attr seqDoubletsVariance ",            
@@ -1762,7 +1762,7 @@ sub DbRep_Attr {
                           previous_hour_end
                          );
 
-            if ($aVal ~~ @dtas) {
+            if (grep /^$aVal$/, @dtas) {      
                 delete($attr{$name}{timeDiffToNow});
                 delete($attr{$name}{timeOlderThan});
                 delete($attr{$name}{timeYearPeriod});
