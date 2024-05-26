@@ -60,7 +60,6 @@ use Data::Dumper;
 use Blocking;
 use Storable qw(dclone freeze thaw nstore store retrieve);
 use MIME::Base64;
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Run before module compilation
 BEGIN {
@@ -158,6 +157,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.21.2" => "26.05.2024  __VictronVRM_ApiRequestForecast: change request time from current time to '<current hour>:00:00'",
+  "1.21.1" => "23.05.2024  new sub isDeviceValid, replace Smartmatch Forum:#137776 ",
   "1.21.0" => "14.05.2024  currentMeterDev: meter can be a Day meter, contotal and feedtotal can be reset at day begin ",
   "1.20.0" => "12.05.2024  graphicBeamXContent: gridfeedin available, beamGraphic: Mouse-Over shows beamcontent text ".
                            "complete command printout in Debug mode, ___switchConsumerOn: add continuing ",
@@ -247,7 +248,7 @@ my %vNotesIntern = (
   "1.6.4"  => "09.01.2024  fix get Automatic State, use key switchdev for auto-Reading if switchdev is set in consumer attr ",
   "1.6.3"  => "08.01.2024  optimize battery management once more ",
   "1.6.2"  => "07.01.2024  optimize battery management ",
-  "1.6.1"  => "04.01.2024  new sub __setPhysSwState, edit ___setConsumerPlanningState, boost performance of collectAllRegConsumers ".
+  "1.6.1"  => "04.01.2024  new sub __setPhysSwState, edit ___setConsumerPlanningState, boost performance of _collectAllRegConsumers ".
                            "CurrentVal ctrunning - Central Task running Statusbit, edit comref ",
   "1.6.0"  => "22.12.2023  store daily batmaxsoc in pvHistory, new attr ctrlBatSocManagement, reading Battery_OptimumTargetSoC ".
                            "currentBatteryDev: new optional key 'cap', adapt cloud2bin,temp2bin,rain2bin ".
@@ -359,7 +360,7 @@ my $kJtoWh         = 0.2777777778;                                              
 my $WhtokJ         = 3.6;                                                           # Umrechnungsfaktor Wh in kJ
 my $defmaxvar      = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
 my $definterval    = 70;                                                            # Standard Abfrageintervall
-my $defslidenum    = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
+my $slidenumdef    = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
 my $weatherDevMax  = 3;                                                             # max. Anzahl Wetter Devices (Attr ctrlWeatherDevX)
 my $maxSoCdef      = 95;                                                            # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
 my $carecycledef   = 20;                                                            # max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
@@ -1674,18 +1675,18 @@ sub _setroofIdentPair {                 ## no critic "not used"
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
 
-  if(!$arg) {
+  if (!$arg) {
       return qq{The command "$opt" needs an argument !};
   }
 
   my ($a,$h) = parseParams ($arg);
   my $pk  = $a->[0] // "";
 
-  if(!$pk) {
+  if (!$pk) {
       return qq{Every roofident pair needs a pairkey! Use: <pairkey> rtid=<Rooftop ID> apikey=<api key>};
   }
 
-  if(!$h->{rtid} || !$h->{apikey}) {
+  if (!$h->{rtid} || !$h->{apikey}) {
       return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
   }
 
@@ -1716,10 +1717,9 @@ sub _setVictronCredentials {                 ## no critic "not used"
   my $arg   = $paref->{arg};
 
   my $type  = $hash->{TYPE};
-
   my $msg;
 
-  if(!$arg) {
+  if (!$arg) {
       return qq{The command "$opt" needs an argument !};
   }
 
@@ -1730,7 +1730,7 @@ sub _setVictronCredentials {                 ## no critic "not used"
       $msg = qq{Credentials for the Victron VRM API are deleted. };
   }
   else {
-      if(!$h->{user} || !$h->{pwd} || !$h->{idsite}) {
+      if (!$h->{user} || !$h->{pwd} || !$h->{idsite}) {
           return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
       }
 
@@ -1739,7 +1739,6 @@ sub _setVictronCredentials {                 ## no critic "not used"
                         or do { return "Serialization ERROR: $@" };
 
       $data{$type}{$name}{solcastapi}{'?VRM'}{'?API'}{credentials} = chew ($serial);
-
       $msg = qq{Credentials for the Victron VRM API has been saved.};
   }
 
@@ -1759,7 +1758,7 @@ sub _setmoduleRoofTops {                ## no critic "not used"
 
   my ($a,$h) = parseParams ($arg);
 
-  if(!keys %$h) {
+  if (!keys %$h) {
       return qq{The provided module RoofTop has wrong format};
   }
 
@@ -1767,7 +1766,7 @@ sub _setmoduleRoofTops {                ## no critic "not used"
       my $rtid   = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'rtid',   '');
       my $apikey = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
 
-      if(!$rtid || !$apikey) {
+      if (!$rtid || !$apikey) {
           return qq{The roofIdentPair "$pk" of String "$is" has no Rooftop-ID and/or SolCast-API key assigned ! \n}.
                  qq{Set the roofIdentPair "$pk" previously with "set $name roofIdentPair".} ;
       }
@@ -1794,16 +1793,12 @@ sub _setinverterDevice {                 ## no critic "not used"
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
 
-  if(!$arg) {
+  if (!$arg) {
       return qq{The command "$opt" needs an argument !};
   }
-
-  my ($a,$h) = parseParams ($arg);
-  my $indev  = $a->[0] // "";
-
-  if (!$indev || !$defs{$indev}) {
-      return qq{The device "$indev" doesn't exist!};
-  }
+  
+  my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => $arg, method => 'string' } );
+  return $err if($err);
 
   if (!$h->{pv} || !$h->{etotal}) {
       return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
@@ -1838,7 +1833,7 @@ sub _setinverterStrings {                ## no critic "not used"
   my @istrings = split ",", $prop;
 
   for my $k (keys %{$data{$type}{$name}{solcastapi}}) {
-      next if ($k =~ /\?/xs || $k ~~ @istrings);
+      next if ($k =~ /\?/xs || grep /^$k$/, @istrings);         
       delete $data{$type}{$name}{solcastapi}{$k};
   }
 
@@ -1868,13 +1863,9 @@ sub _setmeterDevice {                    ## no critic "not used"
   if (!$arg) {
       return qq{The command "$opt" needs an argument !};
   }
-
-  my ($a,$h) = parseParams ($arg);
-  my $medev  = $a->[0] // "";
-
-  if (!$medev || !$defs{$medev}) {
-      return qq{The device "$medev" doesn't exist!};
-  }
+  
+  my ($err, $medev, $h) = isDeviceValid ( { name => $name, obj => $arg, method => 'string' } );
+  return $err if($err);
 
   if (!$h->{gcon} || !$h->{contotal} || !$h->{gfeedin} || !$h->{feedtotal}) {
       return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
@@ -1919,27 +1910,23 @@ sub _setbatteryDevice {                  ## no critic "not used"
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
 
-  if(!$arg) {
+  if (!$arg) {
       return qq{The command "$opt" needs an argument !};
   }
+  
+  my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => $arg, method => 'string' } );
+  return $err if($err);
 
-  my ($a,$h) = parseParams ($arg);
-  my $badev  = $a->[0] // "";
-
-  if(!$badev || !$defs{$badev}) {
-      return qq{The device "$badev" doesn't exist!};
-  }
-
-  if(!$h->{pin} || !$h->{pout}) {
+  if (!$h->{pin} || !$h->{pout}) {
       return qq{The keys "pin" and/or "pout" are not set. Please note the command reference.};
   }
 
-  if(($h->{pin}  !~ /-/xs && $h->{pin} !~ /:/xs)   ||
+  if (($h->{pin}  !~ /-/xs && $h->{pin} !~ /:/xs)   ||
      ($h->{pout} !~ /-/xs && $h->{pout} !~ /:/xs)) {
       return qq{The keys "pin" and/or "pout" are not set correctly. Please note the command reference.};
   }
 
-  if($h->{pin} eq "-pout" && $h->{pout} eq "-pin") {
+  if ($h->{pin} eq "-pout" && $h->{pout} eq "-pin") {
       return qq{Incorrect input. It is not allowed that the keys pin and pout refer to each other.};
   }
 
@@ -1983,18 +1970,18 @@ sub _setTrigger {                        ## no critic "not used"
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
 
-  if(!$arg) {
+  if (!$arg) {
       return qq{The command "$opt" needs an argument !};
   }
 
   my ($a,$h) = parseParams ($arg);
 
-  if(!$h) {
+  if (!$h) {
       return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
   }
 
   for my $key (keys %{$h}) {
-      if($key !~ /^[0-9]+(?:on|off)$/x || $h->{$key} !~ /^[0-9]+$/x) {
+      if ($key !~ /^[0-9]+(?:on|off)$/x || $h->{$key} !~ /^[0-9]+$/x) {
           return qq{The key "$key" is invalid. Please consider the commandref.};
       }
   }
@@ -2030,12 +2017,12 @@ sub _setmodulePeakString {               ## no critic "not used"
 
   my ($a,$h) = parseParams ($arg);
 
-  if(!keys %$h) {
+  if (!keys %$h) {
       return qq{The provided PV module peak has wrong format};
   }
 
   while (my ($key, $value) = each %$h) {
-      if($value !~ /[0-9.]/x) {
+      if ($value !~ /[0-9.]/x) {
           return qq{The module peak of "$key" must be specified by numbers and optionally with decimal places};
       }
   }
@@ -2064,12 +2051,12 @@ sub _setmoduleDeclination {              ## no critic "not used"
 
   my ($a,$h) = parseParams ($arg);
 
-  if(!keys %$h) {
+  if (!keys %$h) {
       return qq{The specified inclination angle has an incorrect format};
   }
 
   while (my ($key, $value) = each %$h) {
-      if($value !~ /^(?:$tilt)$/x) {
+      if ($value !~ /^(?:$tilt)$/x) {
           return qq{The inclination angle of "$key" is incorrect};
       }
   }
@@ -2713,14 +2700,16 @@ sub Get {
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
 
+  my $t      = int time;
   my $params = {
       hash  => $hash,
       name  => $name,
       type  => $type,
       opt   => $opt,
       arg   => $arg,
-      t     => int time,
-      date  => (strftime "%Y-%m-%d", localtime(time)),
+      t     => $t,
+      chour => (strftime "%H",       localtime($t)),                                            # aktuelle Stunde in 24h format (00-23)
+      date  => (strftime "%Y-%m-%d", localtime($t)),
       debug => getDebug ($hash),
       lang  => getLang  ($hash)
   };
@@ -2901,7 +2890,7 @@ sub __solCast_ApiRequest {
   my $roofid = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'rtid',   '');
   my $apikey = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
 
-  if(!$roofid || !$apikey) {
+  if (!$roofid || !$apikey) {
       my $err = qq{The roofIdentPair "$pk" of String "$string" has no Rooftop-ID and/or SolCast-API key assigned !};
       singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
       return $err;
@@ -2916,7 +2905,7 @@ sub __solCast_ApiRequest {
 
   debugLog ($paref, "apiProcess|apiCall", qq{Request SolCast API for PV-String "$string": $url});
 
-  my $caller = (caller(0))[3];                                                                        # Rücksprungmarke
+  my $caller = (caller(0))[3];                                         # Rücksprungmarke
 
   my $param = {
       url        => $url,
@@ -2935,7 +2924,7 @@ sub __solCast_ApiRequest {
       callback   => \&__solCast_ApiResponse
   };
 
-  if($debug =~ /apiCall/x) {
+  if ($debug =~ /apiCall/x) {
       $param->{loglevel} = 1;
   }
 
@@ -3675,14 +3664,17 @@ sub __getDWDSolarData {
 return;
 }
 
-################################################################
+####################################################################################################
 #                Abruf Victron VRM API Forecast
-################################################################
+#
+# https://community.victronenergy.com/questions/216543/new-vrm-feature-solar-forecast.html
+# API Beschreibung: https://vrm-api-docs.victronenergy.com/#/operations/installations/idSite/stats
+####################################################################################################
 sub __getVictronSolarData {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $force = $paref->{force} // 0;
-  my $t     = $paref->{t}     // time;
+  my $t     = $paref->{t};
   my $lang  = $paref->{lang};
 
   my $lrt    = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', 0);
@@ -3750,6 +3742,8 @@ sub __VictronVRM_ApiRequestLogin {
       debug      => $debug,
       caller     => \&$caller,
       lang       => $paref->{lang},
+      chour      => $paref->{chour},                                            # aktuelle Stunde in 24h format (00-23)
+      date       => $paref->{date},
       idsite     => $idsite,
       header     => { "Content-Type" => "application/json" },
       data       => qq({ "username": "$user",  "password": "$pwd" }),
@@ -3851,11 +3845,11 @@ sub __VictronVRM_ApiResponseLogin {
 return;
 }
 
-################################################################################################
+######################################################################################################
 #                Victron VRM API Forecast Data
 # https://vrm-api-docs.victronenergy.com/#/
-# https://vrmapi.victronenergy.com/v2/installations/<instalation id>/stats?type=forecast&interval=hours&start=<start date and time>&end=<end date and time>
-################################################################################################
+# # API Beschreibung: https://vrm-api-docs.victronenergy.com/#/operations/installations/idSite/stats
+######################################################################################################
 sub __VictronVRM_ApiRequestForecast {
   my $paref  = shift;
 
@@ -3865,9 +3859,11 @@ sub __VictronVRM_ApiRequestForecast {
   my $debug  = $paref->{debug};
   my $lang   = $paref->{lang};
   my $idsite = $paref->{idsite};
+  my $chour  = $paref->{chour};                                                   # aktuelle Stunde in 24h format (00-23)
+  my $date   = $paref->{date};
 
-  my $tstart = time;
-  my $tend   = time + 259200;                                                     # 172800 = 2 Tage
+  my $tstart = timestringToTimestamp ("$date $chour:00:00");
+  my $tend   = $tstart + 259200;                                                  # 172800 = 2 Tage
 
   my $url = "https://vrmapi.victronenergy.com/v2/installations/$idsite/stats?type=forecast&interval=hours&start=$tstart&end=$tend";
 
@@ -3967,6 +3963,8 @@ sub __VictronVRM_ApiResponseForecast {
           return;
       }
       else {
+          #debugLog ($paref, "apiProcess", "Victron VRM API - raw data received:\n". Dumper $jdata);
+          
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}    += 1;
 
@@ -4004,6 +4002,8 @@ sub __VictronVRM_ApiResponseForecast {
               my $starttmstr = $jdata->{'records'}{'vrm_consumption_fc'}[$k][0];               # Millisekunden geliefert
               my $val        = $jdata->{'records'}{'vrm_consumption_fc'}[$k][1];
               $starttmstr    = (timestampToTimestring ($starttmstr, $lang))[3];
+              
+              debugLog ($paref, "apiProcess", "Victron VRM API - CO estimate: ".$starttmstr.' => '.$val.' Wh');
 
               if ($val) {
                   $val       = sprintf "%.2f", $val;
@@ -4702,10 +4702,11 @@ sub _getdwdCatalog {
 
   my ($aa,$ha) = parseParams ($arg);
 
-  my $sort    = 'byID'      ~~ @$aa ? 'byID'      :
-                'byName'    ~~ @$aa ? 'byName'    : 'byID';
-  my $export  = 'exportgpx' ~~ @$aa ? 'exportgpx' : '';
-  my $force   = 'force'     ~~ @$aa ? 'force'     : '';
+  my $sort    = grep (/byID/,   @$aa) ? 'byID'      :              
+                grep (/byName/, @$aa) ? 'byName'    : 
+                'byID'; 
+  my $export  = grep (/exportgpx/, @$aa) ? 'exportgpx' : ''; 
+  my $force   = grep (/force/,     @$aa) ? 'force'     : ''; 
 
   $paref->{sort}    = $sort;
   $paref->{export}  = $export;
@@ -5473,31 +5474,22 @@ sub _attrconsumer {                      ## no critic "not used"
 
   return if(!$init_done);                                                                  # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159959.html#msg1159959
 
-  my ($err, $valid);
-
-  if ($cmd eq "set") {
-      my ($a,$h) = parseParams ($aVal);
-      my $codev  = $a->[0] // "";
-
-      if (!$codev || !$defs{$codev}) {
-          return qq{The device "$codev" doesn't exist!};
-      }
+  if ($cmd eq "set") {      
+      my ($err, $codev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
+      return $err if($err);
 
       if (!$h->{type} || !exists $h->{power}) {
           return qq{The syntax of "$aName" is not correct. Please consider the commandref.};
       }
 
-      my $alowt = $h->{type} ~~ @ctypes ? 1 : 0;
+      my $alowt = grep (/^$h->{type}$/, @ctypes) ? 1 : 0;   
       if (!$alowt) {
           return qq{The type "$h->{type}" isn't allowed!};
       }
 
-      if (exists $h->{switchdev}) {
-          my $dswitch = $h->{switchdev};                                                           # alternatives Schaltdevice
-
-          if(!$defs{$dswitch}) {
-              return qq{The device "$dswitch" doesn't exist!};
-          }
+      if (exists $h->{switchdev}) {                                                       # alternatives Schaltdevice                                                           
+          ($err) = isDeviceValid ( { name => $name, obj => $h->{switchdev}, method => 'string' } );
+          return $err if($err);
       }
 
       if ($h->{power} !~ /^[0-9]+$/xs) {
@@ -5507,6 +5499,8 @@ sub _attrconsumer {                      ## no critic "not used"
       if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
           return qq{The mode "$h->{mode}" isn't allowed!};
       }
+      
+      my $valid;
 
       if (exists $h->{notbefore}) {
           if ($h->{notbefore} =~ m/^\s*\{.*\}\s*$/xs) {
@@ -5746,12 +5740,12 @@ sub Notify {
 
   my $debug = getDebug ($myHash);                                                         # Debug Mode
 
-  if ($devName ~~ @consumers) {
+  if (grep /^$devName$/, @consumers) {        
       my ($cname, $cindex);
       my $type = $myHash->{TYPE};
 
       for my $c (sort{$a<=>$b} keys %{$data{$type}{$myName}{consumers}}) {
-          my ($cname, $dswname) = getCDnames ($myHash, $c);
+          my ($err, $cname, $dswname) = getCDnames ($myHash, $c);
 
           if ($devName eq $cname) {
               $cindex = $c;
@@ -6168,15 +6162,15 @@ sub _restorePlantConfig {
   my ($nr, $na) = (0,0);
 
   while (my ($key, $val) = each %{$plantcfg}) {
-      if ($key ~~ @rconfigs) {                                                 # Reading wiederherstellen
+      if (grep /^$key$/, @rconfigs) {                                          # Reading wiederherstellen
           CommandSetReading (undef,"$name $key $val");
           $nr++;
-      }
+      }   
 
-      if ($key ~~ @aconfigs) {                                                 # Attribut wiederherstellen
+      if (grep /^$key$/, @aconfigs) {                                          # Attribut wiederherstellen
           CommandAttr (undef, "$name $key $val");
           $na++;
-      }
+      } 
   }
 
 return ($nr, $na);
@@ -6416,7 +6410,7 @@ sub centralTask {
 
   $centpars->{state} = 'updated';                                                     # kann durch Subs überschrieben werden!
 
-  collectAllRegConsumers      ($centpars);                                            # alle Verbraucher Infos laden
+  _collectAllRegConsumers     ($centpars);                                            # alle Verbraucher Infos laden
   _specialActivities          ($centpars);                                            # zusätzliche Events generieren + Sonderaufgaben
   _transferWeatherValues      ($centpars);                                            # Wetterwerte übertragen
 
@@ -6484,7 +6478,7 @@ sub createStringConfig {                 ## no critic "not used"
   delete $data{$type}{$name}{current}{allstringspeak};
 
   while (my ($strg, $pp) = each %$ha) {
-      if ($strg ~~ @istrings) {
+      if (grep /^$strg$/, @istrings) {   
           $data{$type}{$name}{strings}{$strg}{peak}     = $pp;
           $data{$type}{$name}{current}{allstringspeak} += $pp * 1000;                             # insgesamt installierte Peakleistung in W
       }
@@ -6500,7 +6494,7 @@ sub createStringConfig {                 ## no critic "not used"
       my ($ad,$hd) = parseParams ($mrt);
 
       while (my ($is, $pk) = each %$hd) {
-          if ($is ~~ @istrings) {
+          if (grep /^$is$/, @istrings) { 
               $data{$type}{$name}{strings}{$is}{pk} = $pk;
           }
           else {
@@ -6522,7 +6516,7 @@ sub createStringConfig {                 ## no critic "not used"
       my ($at,$ht) = parseParams ($tilt);
 
       while (my ($key, $value) = each %$ht) {
-          if ($key ~~ @istrings) {
+          if (grep /^$key$/, @istrings) { 
               $data{$type}{$name}{strings}{$key}{tilt} = $value;
           }
           else {
@@ -6537,7 +6531,7 @@ sub createStringConfig {                 ## no critic "not used"
       my $iwrong   = qq{Please check the input of set "moduleAzimuth". It seems to be wrong.};
 
       while (my ($key, $value) = each %$hd) {
-          if ($key ~~ @istrings) {
+          if (grep /^$key$/, @istrings) {  
               $data{$type}{$name}{strings}{$key}{dir}    = _azimuth2ident ($value) // return $iwrong;
               $data{$type}{$name}{strings}{$key}{azimut} = _ident2azimuth ($value) // return $iwrong;
           }
@@ -6557,7 +6551,7 @@ sub createStringConfig {                 ## no critic "not used"
   my @tom;
 
   for my $sn (@istrings) {
-      next if ($sn ~~ @sca);
+      next if(grep /^$sn$/, @sca);    
       push @tom, $sn;
   }
 
@@ -6643,6 +6637,159 @@ sub controller {
   my $inactive = $idval == 3 ? 1 : 0;
 
 return ($interval, $disabled, $inactive);
+}
+
+################################################################
+#         Grunddaten aller registrierten Consumer speichern
+################################################################
+sub _collectAllRegConsumers {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+
+  return if(CurrentVal ($hash, 'consumerCollected', 0));                                          # Abbruch wenn Consumer bereits gesammelt
+
+  delete $data{$type}{$name}{current}{consumerdevs};
+
+  for my $c (1..$maxconsumer) {
+      $c = sprintf "%02d", $c;
+      my ($err, $consumer, $hc) = isDeviceValid ( { name => $name, obj => "consumer${c}", method => 'attr' } );
+      next if($err);
+
+      push @{$data{$type}{$name}{current}{consumerdevs}}, $consumer;                              # alle Consumerdevices in CurrentHash eintragen
+
+      my $dswitch = $hc->{switchdev};                                                             # alternatives Schaltdevice
+
+      if ($dswitch) {
+          my ($err) = isDeviceValid ( { name => $name, obj => $dswitch, method => 'string' } );
+          next if($err);
+
+          push @{$data{$type}{$name}{current}{consumerdevs}}, $dswitch;                           # Switchdevice zusätzlich in CurrentHash eintragen
+      }
+      else {
+          $dswitch = $consumer;
+      }
+
+      my $alias = AttrVal ($consumer, 'alias', $consumer);
+
+      my ($rtot,$utot,$ethreshold);
+      if (exists $hc->{etotal}) {
+          my $etotal                = $hc->{etotal};
+          ($rtot,$utot,$ethreshold) = split ":", $etotal;
+      }
+
+      my ($rpcurr,$upcurr,$pthreshold);
+      if (exists $hc->{pcurr}) {
+          my $pcurr                     = $hc->{pcurr};
+          ($rpcurr,$upcurr,$pthreshold) = split ":", $pcurr;
+      }
+
+      my $asynchron;
+      if (exists $hc->{asynchron}) {
+          $asynchron = $hc->{asynchron};
+      }
+
+      my $noshow;
+      if (exists $hc->{noshow}) {                                                                  # Consumer ausblenden in Grafik
+          $noshow = $hc->{noshow};
+      }
+
+      my ($rswstate,$onreg,$offreg);
+      if(exists $hc->{swstate}) {
+          ($rswstate,$onreg,$offreg) = split ":", $hc->{swstate};
+      }
+
+      my ($dswoncond,$rswoncond,$swoncondregex);
+      if (exists $hc->{swoncond}) {                                                                # zusätzliche Einschaltbedingung
+          ($dswoncond,$rswoncond,$swoncondregex) = split ":", $hc->{swoncond};
+      }
+
+      my ($dswoffcond,$rswoffcond,$swoffcondregex);
+      if (exists $hc->{swoffcond}) {                                                               # vorrangige Ausschaltbedingung
+          ($dswoffcond,$rswoffcond,$swoffcondregex) = split ":", $hc->{swoffcond};
+      }
+
+      my ($dspignorecond,$rigncond,$spignorecondregex);
+      if(exists $hc->{spignorecond}) {                                                            # Bedingung um vorhandenen PV Überschuß zu ignorieren
+          ($dspignorecond,$rigncond,$spignorecondregex) = split ":", $hc->{spignorecond};
+      }
+
+      my $interruptable = 0;
+      my ($hyst);
+      if (exists $hc->{interruptable} && $hc->{interruptable} ne '0') {
+          $interruptable         = $hc->{interruptable};
+          ($interruptable,$hyst) = $interruptable =~ /(.*):(.*)$/xs if($interruptable ne '1');
+      }
+
+      delete $data{$type}{$name}{consumers}{$c}{sunriseshift};
+      delete $data{$type}{$name}{consumers}{$c}{sunsetshift};
+      my ($riseshift, $setshift);
+
+      if (exists $hc->{mintime}) {                                                                # Check Regex
+          my $mintime = $hc->{mintime};
+
+          if ($mintime =~ /^SunPath/xsi) {
+              (undef, $riseshift, $setshift) = split ":", $mintime, 3;
+              $riseshift *= 60 if($riseshift);
+              $setshift  *= 60 if($setshift);
+          }
+      }
+
+      my $clt;
+      if (exists $hc->{locktime}) {
+          $clt = $hc->{locktime};
+      }
+
+      my $rauto = $hc->{auto} // q{};
+      my $ctype = $hc->{type} // $defctype;
+
+      $data{$type}{$name}{consumers}{$c}{name}              = $consumer;                                # Name des Verbrauchers (Device)
+      $data{$type}{$name}{consumers}{$c}{alias}             = $alias;                                   # Alias des Verbrauchers (Device)
+      $data{$type}{$name}{consumers}{$c}{type}              = $hc->{type}         // $defctype;         # Typ des Verbrauchers
+      $data{$type}{$name}{consumers}{$c}{power}             = $hc->{power};                             # Leistungsaufnahme des Verbrauchers in W
+      $data{$type}{$name}{consumers}{$c}{avgenergy}         = q{};                                      # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
+      $data{$type}{$name}{consumers}{$c}{mintime}           = $hc->{mintime}      // $hef{$ctype}{mt};  # Initialwert min. Einplanungsdauer (evtl. Überschreiben in manageConsumerData)
+      $data{$type}{$name}{consumers}{$c}{mode}              = $hc->{mode}         // $defcmode;         # Planungsmode des Verbrauchers
+      $data{$type}{$name}{consumers}{$c}{icon}              = $hc->{icon}         // q{};               # Icon für den Verbraucher
+      $data{$type}{$name}{consumers}{$c}{oncom}             = $hc->{on}           // q{};               # Setter Einschaltkommando
+      $data{$type}{$name}{consumers}{$c}{offcom}            = $hc->{off}          // q{};               # Setter Ausschaltkommando
+      $data{$type}{$name}{consumers}{$c}{dswitch}           = $dswitch;                                 # Switchdevice zur Kommandoausführung
+      $data{$type}{$name}{consumers}{$c}{autoreading}       = $rauto;                                   # Readingname zur Automatiksteuerung
+      $data{$type}{$name}{consumers}{$c}{retotal}           = $rtot               // q{};               # Reading der Leistungsmessung
+      $data{$type}{$name}{consumers}{$c}{uetotal}           = $utot               // q{};               # Unit der Leistungsmessung
+      $data{$type}{$name}{consumers}{$c}{rpcurr}            = $rpcurr             // q{};               # Reading der aktuellen Leistungsaufnahme
+      $data{$type}{$name}{consumers}{$c}{upcurr}            = $upcurr             // q{};               # Unit der aktuellen Leistungsaufnahme
+      $data{$type}{$name}{consumers}{$c}{energythreshold}   = $ethreshold;                              # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird
+      $data{$type}{$name}{consumers}{$c}{powerthreshold}    = $pthreshold;                              # Schwellenwert d. aktuellen Leistung(W) ab der ein Verbraucher als aktiv gewertet wird
+      $data{$type}{$name}{consumers}{$c}{notbefore}         = $hc->{notbefore}    // q{};               # nicht einschalten vor Stunde in 24h Format (00-23)
+      $data{$type}{$name}{consumers}{$c}{notafter}          = $hc->{notafter}     // q{};               # nicht einschalten nach Stunde in 24h Format (00-23)
+      $data{$type}{$name}{consumers}{$c}{rswstate}          = $rswstate           // 'state';           # Schaltstatus Reading
+      $data{$type}{$name}{consumers}{$c}{asynchron}         = $asynchron          // 0;                 # Arbeitsweise FHEM Consumer Device
+      $data{$type}{$name}{consumers}{$c}{noshow}            = $noshow             // 0;                 # ausblenden in Grafik
+      $data{$type}{$name}{consumers}{$c}{locktime}          = $clt                // '0:0';             # Sperrzeit im Automatikmodus ('offlt:onlt')
+      $data{$type}{$name}{consumers}{$c}{onreg}             = $onreg              // 'on';              # Regex für 'ein'
+      $data{$type}{$name}{consumers}{$c}{offreg}            = $offreg             // 'off';             # Regex für 'aus'
+      $data{$type}{$name}{consumers}{$c}{dswoncond}         = $dswoncond          // q{};               # Device zur Lieferung einer zusätzliche Einschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{rswoncond}         = $rswoncond          // q{};               # Reading zur Lieferung einer zusätzliche Einschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{swoncondregex}     = $swoncondregex      // q{};               # Regex einer zusätzliche Einschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{dswoffcond}        = $dswoffcond         // q{};               # Device zur Lieferung einer vorrangigen Ausschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{rswoffcond}        = $rswoffcond         // q{};               # Reading zur Lieferung einer vorrangigen Ausschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{swoffcondregex}    = $swoffcondregex     // q{};               # Regex einer vorrangigen Ausschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{dspignorecond}     = $dspignorecond      // q{};               # Device liefert Ignore Bedingung
+      $data{$type}{$name}{consumers}{$c}{rigncond}          = $rigncond           // q{};               # Reading liefert Ignore Bedingung
+      $data{$type}{$name}{consumers}{$c}{spignorecondregex} = $spignorecondregex  // q{};               # Regex der Ignore Bedingung
+      $data{$type}{$name}{consumers}{$c}{interruptable}     = $interruptable;                           # Ein-Zustand des Verbrauchers ist unterbrechbar
+      $data{$type}{$name}{consumers}{$c}{hysteresis}        = $hyst               // $defhyst;          # Hysterese
+      $data{$type}{$name}{consumers}{$c}{sunriseshift}      = $riseshift if(defined $riseshift);        # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
+      $data{$type}{$name}{consumers}{$c}{sunsetshift}       = $setshift  if(defined $setshift);         # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
+  }
+
+  $data{$type}{$name}{current}{consumerCollected} = 1;
+
+  Log3 ($name, 3, "$name - all registered consumers collected");
+
+return;
 }
 
 ################################################################
@@ -6926,7 +7073,7 @@ sub __delObsoleteAPIData {
 
   for my $k (keys %{$data{$type}{$name}{strings}}) {                                   # veraltete Strings aus Strings-Hash löschen
       next if($k =~ /\?All/);
-      next if($k ~~ @as);
+      next if(grep /^$k$/, @as);       
 
       delete $data{$type}{$name}{strings}{$k};
 
@@ -7739,13 +7886,11 @@ sub _transferInverterValues {
   my $t     = $paref->{t};                                                                    # aktuelle Unix-Zeit
   my $chour = $paref->{chour};
   my $day   = $paref->{day};
+  
+  my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => 'currentInverterDev', method => 'reading' } );
+  return if($err);
 
-  my $indev  = ReadingsVal($name, 'currentInverterDev', '');
-  my ($a,$h) = parseParams ($indev);
-  $indev     = $a->[0] // "";
-  return if(!$indev || !$defs{$indev});
-
-  my $type  = $paref->{type};
+  my $type = $paref->{type};
 
   my ($pvread,$pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
   my ($edread,$etunit) = split ":", $h->{etotal};                                             # Readingname/Unit für Energie total (PV Erzeugung)
@@ -7762,7 +7907,7 @@ sub _transferInverterValues {
   $data{$type}{$name}{current}{generation} = $pv;                                             # Hilfshash Wert current generation Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
 
   push @{$data{$type}{$name}{current}{genslidereg}}, $pv;                                     # Schieberegister PV Erzeugung
-  limitArray ($data{$type}{$name}{current}{genslidereg}, $defslidenum);
+  limitArray ($data{$type}{$name}{current}{genslidereg}, $slidenumdef);
 
   my $etuf   = $etunit =~ /^kWh$/xi ? 1000 : 1;
   my $etotal = ReadingsNum ($indev, $edread, 0) * $etuf;                                      # Erzeugung total (Wh)
@@ -7821,11 +7966,9 @@ sub _transferMeterValues {
   my $name  = $paref->{name};
   my $t     = $paref->{t};
   my $chour = $paref->{chour};
-
-  my $medev  = ReadingsVal ($name, "currentMeterDev", "");                                    # aktuelles Meter device
-  my ($a,$h) = parseParams ($medev);
-  $medev     = $a->[0] // "";
-  return if(!$medev || !$defs{$medev});
+  
+  my ($err, $medev, $h) = isDeviceValid ( { name => $name, obj => 'currentMeterDev', method => 'reading' } );
+  return if($err);
 
   my $type = $paref->{type};
 
@@ -8037,9 +8180,9 @@ sub _transferBatteryValues {
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
   my $day   = $paref->{day};
-
-  my ($badev,$a,$h) = isBatteryUsed ($name);
-  return if(!$badev);
+  
+  my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'currentBatteryDev', method => 'reading' } );
+  return if($err);
 
   my $type = $paref->{type};
 
@@ -8180,7 +8323,7 @@ sub _transferBatteryValues {
   $data{$type}{$name}{current}{batinstcap}  = $instcap;                                       # installierte Batteriekapazität
 
   push @{$data{$type}{$name}{current}{socslidereg}}, $soc;                                    # Schieberegister Batterie SOC
-  limitArray ($data{$type}{$name}{current}{socslidereg}, $defslidenum);
+  limitArray ($data{$type}{$name}{current}{socslidereg}, $slidenumdef);
 
 return;
 }
@@ -8454,7 +8597,7 @@ sub _createSummaries {
   my $pvre = int $todaySumRe->{PV};
 
   push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
-  limitArray ($data{$type}{$name}{current}{h4fcslidereg}, $defslidenum);
+  limitArray ($data{$type}{$name}{current}{h4fcslidereg}, $slidenumdef);
 
   my $gcon    = CurrentVal ($hash, "gridconsumption",         0);                                       # aktueller Netzbezug
   my $tconsum = CurrentVal ($hash, "tomorrowconsumption", undef);                                       # Verbrauchsprognose für folgenden Tag
@@ -8721,21 +8864,18 @@ sub __getAutomaticState {
   my $c     = $paref->{consumer};
 
   my $consumer = ConsumerVal ($hash, $c, 'name', '');                                  # Name Consumer Device
-
-  if (!$consumer || !$defs{$consumer}) {
-      my $err = qq{ERROR - the device "$consumer" doesn't exist anymore! Delete or change the attribute "consumer${c}".};
-      Log3 ($name, 1, "$name - $err");
-      return;
-  }
-
+  my ($err)    = isDeviceValid ( { name   => $name, 
+                                   obj    => $consumer, 
+                                   method => 'string',                                  
+                                 } 
+                               );
+  return if($err);
+  
   my $dswitch = ConsumerVal ($hash, $c, 'dswitch', '');                                # alternatives Schaltdevice
 
   if ($dswitch) {
-      if (!$defs{$dswitch}) {
-          my $err = qq{ERROR - the device "$dswitch" doesn't exist anymore! Delete or change the attribute "consumer${c}".};
-          Log3 ($name, 1, "$name - $err");
-          return;
-      }
+      ($err) = isDeviceValid ( { name => $name, obj => $dswitch, method => 'string'  } );
+      return if($err);
   }
   else {
       $dswitch = $consumer;
@@ -9594,10 +9734,10 @@ sub ___switchConsumerOn {
   my $debug = $paref->{debug};
   my $lang  = $paref->{lang};
 
-  my ($cname, $dswname) = getCDnames  ($hash, $c);                                                # Consumer und Switch Device Name
+  my ($err, $cname, $dswname) = getCDnames ($hash, $c);                                           # Consumer und Switch Device Name
 
-  if(!$defs{$dswname}) {
-      $state = qq{ERROR - the device "$dswname" is invalid. Please check device names in consumer "$c" attribute};
+  if ($err) {
+      $state = 'ERROR - '.$err;
       Log3 ($name, 1, "$name - $state");
       return $state;
   }
@@ -9610,7 +9750,7 @@ sub ___switchConsumerOn {
   my $simpCstat = simplifyCstate ($pstate);
   my $isInTime  = isInTimeframe  ($hash, $c);
 
-  my ($swoncond,$swoffcond,$infon,$infoff,$err);
+  my ($swoncond,$swoffcond,$infon,$infoff);
 
   ($swoncond,$infon,$err) = isAddSwitchOnCond ($hash, $c);                                        # zusätzliche Switch on Bedingung
   Log3 ($name, 1, "$name - $err") if($err);
@@ -9725,14 +9865,15 @@ sub ___switchConsumerOff {
   my $mode    = ConsumerVal ($hash, $c, "mode",      $defcmode);                                  # Consumer Planungsmode
   my $hyst    = ConsumerVal ($hash, $c, "hysteresis", $defhyst);                                  # Hysterese
 
-  my ($cname, $dswname)        = getCDnames         ($hash, $c);                                  # Consumer und Switch Device Name
   my $offcom                   = ConsumerVal        ($hash, $c, 'offcom', '');                    # Set Command für "off"
   my ($swoffcond,$infoff,$err) = isAddSwitchOffCond ($hash, $c);                                  # zusätzliche Switch off Bedingung
   my $simpCstat                = simplifyCstate     ($pstate);
+  my (undef, $cname, $dswname) = getCDnames         ($hash, $c);                                  # Consumer und Switch Device Name
+
   my $cause;
 
   Log3 ($name, 1, "$name - $err") if($err);
-
+  
   my ($iilt,$rlt) = isInLocktime ($paref);                                                        # Sperrzeit Status ermitteln
 
   if ($debug =~ /consumerSwitching/x) {                                                           # nur für Debugging
@@ -9999,15 +10140,17 @@ sub _estConsumptionForecast {
   my $day     = $paref->{day};                                                      # aktuelles Tagdatum (01...31)
   my $dayname = $paref->{dayname};                                                  # aktueller Tagname
 
-  my $medev    = ReadingsVal ($name, "currentMeterDev",                "");         # aktuelles Meter device
+  my ($err, $medev, $h) = isDeviceValid ( { name   => $name, 
+                                            obj    => 'currentMeterDev', 
+                                            method => 'reading',                                            
+                                          } 
+                                        );                                          # aktuelles Meter device
+  return if($err);
+  
   my $swdfcfc  = AttrVal     ($name, "affectConsForecastIdentWeekdays", 0);         # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
   my ($am,$hm) = parseParams ($medev);
-
-  $medev       = $am->[0] // "";
-  return if(!$medev || !$defs{$medev});
-
-  my $type  = $paref->{type};
-  my $acref = $data{$type}{$name}{consumers};
+  my $type     = $paref->{type};
+  my $acref    = $data{$type}{$name}{consumers};
 
   ## Verbrauchsvorhersage für den nächsten Tag
   ##############################################
@@ -10171,24 +10314,24 @@ sub __evaluateArray {
   my @aa    = ();
   @aa       = @{$aaref} if (ref $aaref eq 'ARRAY');
 
-  return if(scalar @aa < $defslidenum);
+  return if(scalar @aa < $slidenumdef);
 
   my $gen1   = $aa[0];
   my $gen2   = $aa[1];
   my $gen3   = $aa[2];
 
-  my ($a,$h) = parseParams ($tholds);
+  my ($a, $h) = parseParams ($tholds);
 
   for my $key (keys %{$h}) {
       my ($knum,$cond) = $key =~ /^([0-9]+)(on|off)$/x;
 
-      if($cond eq "on" && $gen1 > $h->{$key}) {
+      if ($cond eq "on" && $gen1 > $h->{$key}) {
           next if($gen2 < $h->{$key});
           next if($gen3 < $h->{$key});
           storeReading ("${tname}_${knum}", 'on') if(ReadingsVal($name, "${tname}_${knum}", "off") eq "off");
       }
 
-      if($cond eq "off" && $gen1 < $h->{$key}) {
+      if ($cond eq "off" && $gen1 < $h->{$key}) {
           next if($gen2 > $h->{$key});
           next if($gen3 > $h->{$key});
           storeReading ("${tname}_${knum}", 'off') if(ReadingsVal($name, "${tname}_${knum}", "on") eq "on");
@@ -10629,9 +10772,8 @@ sub genStatisticReadings {
   my @srd = sort keys (%hcsr);
   my @csr = split ',', AttrVal ($name, 'ctrlStatisticReadings', '');
 
-  for my $item (@srd) {
-      next if($item ~~ @csr);
-
+  for my $item (@srd) { 
+      next if(grep /^$item$/, @csr);
       deleteReadingspec ($hash, 'statistic_'.$item);
       deleteReadingspec ($hash, 'statistic_'.$item.'_.*') if($item eq 'todayConsumptionForecast');
   }
@@ -10809,171 +10951,6 @@ sub genStatisticReadings {
           }
       }
   }
-
-return;
-}
-
-################################################################
-#         Grunddaten aller registrierten Consumer speichern
-################################################################
-sub collectAllRegConsumers {
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $type  = $paref->{type};
-
-  return if(CurrentVal ($hash, 'consumerCollected', 0));                                          # Abbruch wenn Consumer bereits gesammelt
-
-  delete $data{$type}{$name}{current}{consumerdevs};
-
-  for my $c (1..$maxconsumer) {
-      $c           = sprintf "%02d", $c;
-      my $consumer = AttrVal ($name, "consumer${c}", "");
-      next if(!$consumer);
-
-      my ($ac,$hc) = parseParams ($consumer);
-      $consumer    = $ac->[0] // "";
-
-      if (!$consumer || !$defs{$consumer}) {
-          my $err = qq{ERROR - the device "$consumer" doesn't exist anymore! Delete or change the attribute "consumer${c}".};
-          Log3 ($name, 1, "$name - $err");
-          next;
-      }
-
-      push @{$data{$type}{$name}{current}{consumerdevs}}, $consumer;                              # alle Consumerdevices in CurrentHash eintragen
-
-      my $dswitch = $hc->{switchdev};                                                             # alternatives Schaltdevice
-
-      if ($dswitch) {
-          if (!$defs{$dswitch}) {
-              my $err = qq{ERROR - the device "$dswitch" doesn't exist anymore! Delete or change the attribute "consumer${c}".};
-              Log3 ($name, 1, "$name - $err");
-              next;
-          }
-
-          push @{$data{$type}{$name}{current}{consumerdevs}}, $dswitch;                           # Switchdevice zusätzlich in CurrentHash eintragen
-      }
-      else {
-          $dswitch = $consumer;
-      }
-
-      my $alias = AttrVal ($consumer, "alias", $consumer);
-
-      my ($rtot,$utot,$ethreshold);
-      if (exists $hc->{etotal}) {
-          my $etotal                = $hc->{etotal};
-          ($rtot,$utot,$ethreshold) = split ":", $etotal;
-      }
-
-      my ($rpcurr,$upcurr,$pthreshold);
-      if (exists $hc->{pcurr}) {
-          my $pcurr                     = $hc->{pcurr};
-          ($rpcurr,$upcurr,$pthreshold) = split ":", $pcurr;
-      }
-
-      my $asynchron;
-      if (exists $hc->{asynchron}) {
-          $asynchron = $hc->{asynchron};
-      }
-
-      my $noshow;
-      if (exists $hc->{noshow}) {                                                                  # Consumer ausblenden in Grafik
-          $noshow = $hc->{noshow};
-      }
-
-      my ($rswstate,$onreg,$offreg);
-      if(exists $hc->{swstate}) {
-          ($rswstate,$onreg,$offreg) = split ":", $hc->{swstate};
-      }
-
-      my ($dswoncond,$rswoncond,$swoncondregex);
-      if (exists $hc->{swoncond}) {                                                                # zusätzliche Einschaltbedingung
-          ($dswoncond,$rswoncond,$swoncondregex) = split ":", $hc->{swoncond};
-      }
-
-      my ($dswoffcond,$rswoffcond,$swoffcondregex);
-      if (exists $hc->{swoffcond}) {                                                               # vorrangige Ausschaltbedingung
-          ($dswoffcond,$rswoffcond,$swoffcondregex) = split ":", $hc->{swoffcond};
-      }
-
-      my ($dspignorecond,$rigncond,$spignorecondregex);
-      if(exists $hc->{spignorecond}) {                                                            # Bedingung um vorhandenen PV Überschuß zu ignorieren
-          ($dspignorecond,$rigncond,$spignorecondregex) = split ":", $hc->{spignorecond};
-      }
-
-      my $interruptable = 0;
-      my ($hyst);
-      if (exists $hc->{interruptable} && $hc->{interruptable} ne '0') {
-          $interruptable         = $hc->{interruptable};
-          ($interruptable,$hyst) = $interruptable =~ /(.*):(.*)$/xs if($interruptable ne '1');
-      }
-
-      delete $data{$type}{$name}{consumers}{$c}{sunriseshift};
-      delete $data{$type}{$name}{consumers}{$c}{sunsetshift};
-      my ($riseshift, $setshift);
-
-      if (exists $hc->{mintime}) {                                                                # Check Regex
-          my $mintime = $hc->{mintime};
-
-          if ($mintime =~ /^SunPath/xsi) {
-              (undef, $riseshift, $setshift) = split ":", $mintime, 3;
-              $riseshift *= 60 if($riseshift);
-              $setshift  *= 60 if($setshift);
-          }
-      }
-
-      my $clt;
-      if (exists $hc->{locktime}) {
-          $clt = $hc->{locktime};
-      }
-
-      my $rauto = $hc->{auto} // q{};
-      my $ctype = $hc->{type} // $defctype;
-
-      $data{$type}{$name}{consumers}{$c}{name}              = $consumer;                                # Name des Verbrauchers (Device)
-      $data{$type}{$name}{consumers}{$c}{alias}             = $alias;                                   # Alias des Verbrauchers (Device)
-      $data{$type}{$name}{consumers}{$c}{type}              = $hc->{type}         // $defctype;         # Typ des Verbrauchers
-      $data{$type}{$name}{consumers}{$c}{power}             = $hc->{power};                             # Leistungsaufnahme des Verbrauchers in W
-      $data{$type}{$name}{consumers}{$c}{avgenergy}         = q{};                                      # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
-      $data{$type}{$name}{consumers}{$c}{mintime}           = $hc->{mintime}      // $hef{$ctype}{mt};  # Initialwert min. Einplanungsdauer (evtl. Überschreiben in manageConsumerData)
-      $data{$type}{$name}{consumers}{$c}{mode}              = $hc->{mode}         // $defcmode;         # Planungsmode des Verbrauchers
-      $data{$type}{$name}{consumers}{$c}{icon}              = $hc->{icon}         // q{};               # Icon für den Verbraucher
-      $data{$type}{$name}{consumers}{$c}{oncom}             = $hc->{on}           // q{};               # Setter Einschaltkommando
-      $data{$type}{$name}{consumers}{$c}{offcom}            = $hc->{off}          // q{};               # Setter Ausschaltkommando
-      $data{$type}{$name}{consumers}{$c}{dswitch}           = $dswitch;                                 # Switchdevice zur Kommandoausführung
-      $data{$type}{$name}{consumers}{$c}{autoreading}       = $rauto;                                   # Readingname zur Automatiksteuerung
-      $data{$type}{$name}{consumers}{$c}{retotal}           = $rtot               // q{};               # Reading der Leistungsmessung
-      $data{$type}{$name}{consumers}{$c}{uetotal}           = $utot               // q{};               # Unit der Leistungsmessung
-      $data{$type}{$name}{consumers}{$c}{rpcurr}            = $rpcurr             // q{};               # Reading der aktuellen Leistungsaufnahme
-      $data{$type}{$name}{consumers}{$c}{upcurr}            = $upcurr             // q{};               # Unit der aktuellen Leistungsaufnahme
-      $data{$type}{$name}{consumers}{$c}{energythreshold}   = $ethreshold;                              # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird
-      $data{$type}{$name}{consumers}{$c}{powerthreshold}    = $pthreshold;                              # Schwellenwert d. aktuellen Leistung(W) ab der ein Verbraucher als aktiv gewertet wird
-      $data{$type}{$name}{consumers}{$c}{notbefore}         = $hc->{notbefore}    // q{};               # nicht einschalten vor Stunde in 24h Format (00-23)
-      $data{$type}{$name}{consumers}{$c}{notafter}          = $hc->{notafter}     // q{};               # nicht einschalten nach Stunde in 24h Format (00-23)
-      $data{$type}{$name}{consumers}{$c}{rswstate}          = $rswstate           // 'state';           # Schaltstatus Reading
-      $data{$type}{$name}{consumers}{$c}{asynchron}         = $asynchron          // 0;                 # Arbeitsweise FHEM Consumer Device
-      $data{$type}{$name}{consumers}{$c}{noshow}            = $noshow             // 0;                 # ausblenden in Grafik
-      $data{$type}{$name}{consumers}{$c}{locktime}          = $clt                // '0:0';             # Sperrzeit im Automatikmodus ('offlt:onlt')
-      $data{$type}{$name}{consumers}{$c}{onreg}             = $onreg              // 'on';              # Regex für 'ein'
-      $data{$type}{$name}{consumers}{$c}{offreg}            = $offreg             // 'off';             # Regex für 'aus'
-      $data{$type}{$name}{consumers}{$c}{dswoncond}         = $dswoncond          // q{};               # Device zur Lieferung einer zusätzliche Einschaltbedingung
-      $data{$type}{$name}{consumers}{$c}{rswoncond}         = $rswoncond          // q{};               # Reading zur Lieferung einer zusätzliche Einschaltbedingung
-      $data{$type}{$name}{consumers}{$c}{swoncondregex}     = $swoncondregex      // q{};               # Regex einer zusätzliche Einschaltbedingung
-      $data{$type}{$name}{consumers}{$c}{dswoffcond}        = $dswoffcond         // q{};               # Device zur Lieferung einer vorrangigen Ausschaltbedingung
-      $data{$type}{$name}{consumers}{$c}{rswoffcond}        = $rswoffcond         // q{};               # Reading zur Lieferung einer vorrangigen Ausschaltbedingung
-      $data{$type}{$name}{consumers}{$c}{swoffcondregex}    = $swoffcondregex     // q{};               # Regex einer vorrangigen Ausschaltbedingung
-      $data{$type}{$name}{consumers}{$c}{dspignorecond}     = $dspignorecond      // q{};               # Device liefert Ignore Bedingung
-      $data{$type}{$name}{consumers}{$c}{rigncond}          = $rigncond           // q{};               # Reading liefert Ignore Bedingung
-      $data{$type}{$name}{consumers}{$c}{spignorecondregex} = $spignorecondregex  // q{};               # Regex der Ignore Bedingung
-      $data{$type}{$name}{consumers}{$c}{interruptable}     = $interruptable;                           # Ein-Zustand des Verbrauchers ist unterbrechbar
-      $data{$type}{$name}{consumers}{$c}{hysteresis}        = $hyst               // $defhyst;          # Hysterese
-      $data{$type}{$name}{consumers}{$c}{sunriseshift}      = $riseshift if(defined $riseshift);        # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
-      $data{$type}{$name}{consumers}{$c}{sunsetshift}       = $setshift  if(defined $setshift);         # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
-  }
-
-  $data{$type}{$name}{current}{consumerCollected} = 1;
-
-  Log3 ($name, 3, "$name - all registered consumers collected");
 
 return;
 }
@@ -12390,14 +12367,14 @@ sub _graphicConsumerLegend {
   for my $c (@consumers) {
       next if(isConsumerNoshow ($hash, $c) =~ /^[12]$/xs);                                          # Consumer ausblenden
 
-      my $caicon            = $paref->{caicon};                                                     # Consumer AdviceIcon
-      my ($cname, $dswname) = getCDnames  ($hash, $c);                                              # Consumer und Switch Device Name
-      my $calias            = ConsumerVal ($hash, $c, 'alias',   $cname);                           # Alias des Consumerdevices
-      my $cicon             = ConsumerVal ($hash, $c, 'icon',        '');                           # Icon des Consumerdevices
-      my $oncom             = ConsumerVal ($hash, $c, 'oncom',       '');                           # Consumer Einschaltkommando
-      my $offcom            = ConsumerVal ($hash, $c, 'offcom',      '');                           # Consumer Ausschaltkommando
-      my $autord            = ConsumerVal ($hash, $c, 'autoreading', '');                           # Readingname f. Automatiksteuerung
-      my $auto              = ConsumerVal ($hash, $c, 'auto',         1);                           # Automatic Mode
+      my $caicon                  = $paref->{caicon};                                               # Consumer AdviceIcon
+      my ($err, $cname, $dswname) = getCDnames  ($hash, $c);                                        # Consumer und Switch Device Name
+      my $calias                  = ConsumerVal ($hash, $c, 'alias',   $cname);                     # Alias des Consumerdevices
+      my $cicon                   = ConsumerVal ($hash, $c, 'icon',        '');                     # Icon des Consumerdevices
+      my $oncom                   = ConsumerVal ($hash, $c, 'oncom',       '');                     # Consumer Einschaltkommando
+      my $offcom                  = ConsumerVal ($hash, $c, 'offcom',      '');                     # Consumer Ausschaltkommando
+      my $autord                  = ConsumerVal ($hash, $c, 'autoreading', '');                     # Readingname f. Automatiksteuerung
+      my $auto                    = ConsumerVal ($hash, $c, 'auto',         1);                     # Automatic Mode
 
       my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 set $dswname $oncom')"};
       my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction $c 0 set $dswname $offcom')"};
@@ -13667,7 +13644,7 @@ sub checkdwdattr {
 
   my @aneeded;
   for my $am (@$amref) {
-      next if($am ~~ @fcprop);
+      next if(grep /^$am$/, @fcprop);   
       push @aneeded, $am;
   }
 
@@ -15159,7 +15136,6 @@ sub checkPlantConfig {
   my $resh;
 
   for my $step (1..$weatherDevMax) {
-      #my $fcname = AttrVal ($name, 'ctrlWeatherDev'.$step, '');
       my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'ctrlWeatherDev'.$step);
       next if(!$fcname && $step ne 1);
 
@@ -15958,7 +15934,7 @@ sub createAssociatedWith {
       my @ndn = ();
 
       for my $e (@nd) {
-          next if($e ~~ @ndn);
+          next if(grep /^$e$/, @ndn);
           push @ndn, $e;
       }
 
@@ -16099,10 +16075,10 @@ sub isConsumerPhysOn {
   my $c    = shift;
   my $name = $hash->{NAME};
 
-  my ($cname, $dswname) = getCDnames ($hash, $c);                          # Consumer und Switch Device Name
+  my ($err, $cname, $dswname) = getCDnames ($hash, $c);                  # Consumer und Switch Device Name
 
-  if(!$defs{$dswname}) {
-      Log3($name, 1, qq{$name - ERROR - the device "$dswname" is invalid. Please check device names in consumer "$c" attribute});
+  if ($err) {
+      Log3 ($name, 1, "$name - ERROR - $err");
       return 0;
   }
 
@@ -16126,10 +16102,10 @@ sub isConsumerPhysOff {
   my $c    = shift;
   my $name = $hash->{NAME};
 
-  my ($cname, $dswname) = getCDnames ($hash, $c);                        # Consumer und Switch Device Name
+  my ($err, $cname, $dswname) = getCDnames ($hash, $c);                  # Consumer und Switch Device Name
 
-  if(!$defs{$dswname}) {
-      Log3($name, 1, qq{$name - ERROR - the device "$dswname" is invalid. Please check device names in consumer "$c" attribute});
+  if ($err) {
+      Log3 ($name, 1, "$name - ERROR - $err");
       return 0;
   }
 
@@ -16158,14 +16134,15 @@ sub isConsumerLogOn {
   my $pcurr = shift // 0;
 
   my $name  = $hash->{NAME};
-  my $cname = ConsumerVal ($hash, $c, "name", "");                                         # Devicename Customer
-
-  if(!$defs{$cname}) {
-      Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the "on" state can't be identified});
+  my $cname = ConsumerVal ($hash, $c, 'name', '');                                         # Devicename Customer
+  my ($err) = isDeviceValid ( { name => $name, obj => $cname, method => 'string' } );
+  
+  if ($err) {
+      Log3 ($name, 1, qq{$name - ERROR - The consumer device '$cname' is invalid. The 'on'-state can't be identified.});
       return 0;
   }
 
-  if(isConsumerPhysOff($hash, $c)) {                                                       # Device ist physisch ausgeschaltet
+  if (isConsumerPhysOff ($hash, $c)) {                                                     # Device ist physisch ausgeschaltet
       return 0;
   }
 
@@ -16174,7 +16151,7 @@ sub isConsumerLogOn {
   my $rpcurr     = ConsumerVal ($hash, $c, "rpcurr",        "");                           # Reading für akt. Verbrauch angegeben ?
   my $pthreshold = ConsumerVal ($hash, $c, "powerthreshold", 0);                           # Schwellenwert (W) ab der ein Verbraucher als aktiv gewertet wird
 
-  if (!$rpcurr && isConsumerPhysOn($hash, $c)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
+  if (!$rpcurr && isConsumerPhysOn ($hash, $c)) {                                          # Workaround wenn Verbraucher ohne Leistungsmessung
       $pcurr = $nompower;
   }
 
@@ -16183,7 +16160,7 @@ sub isConsumerLogOn {
 
   $data{$type}{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
 
-  if($pcurr > $pthreshold || $currpowerpercent > $defpopercent) {                          # Verbraucher ist logisch aktiv
+  if ($pcurr > $pthreshold || $currpowerpercent > $defpopercent) {                          # Verbraucher ist logisch aktiv
       return 1;
   }
 
@@ -16204,8 +16181,8 @@ sub isConsumerNoshow {
   my $noshow = ConsumerVal ($hash, $c, 'noshow', 0);                                 # Schalter "Ausblenden"
 
   if (!isNumeric ($noshow)) {                                                        # Key "noshow" enthält Signalreading
-      my $rdg             = $noshow;
-      my ($dev, $dswname) = getCDnames ($hash, $c);                                  # Consumer und Switch Device Name
+      my $rdg                   = $noshow;
+      my ($err, $dev, $dswname) = getCDnames ($hash, $c);                            # Consumer und Switch Device Name
 
       if ($noshow =~ /:/xs) {
           ($dev, $rdg) = split ":", $noshow;
@@ -16214,7 +16191,7 @@ sub isConsumerNoshow {
       $noshow = ReadingsNum ($dev, $rdg, 0);
   }
 
-  if ($noshow !~ /^[0123]$/xs) {                                                    # nue Ergebnisse 0..3 zulassen
+  if ($noshow !~ /^[0123]$/xs) {                                                     # nur Ergebnisse 0..3 zulassen
       $noshow = 0;
   }
 
@@ -16234,15 +16211,20 @@ sub isAddSwitchOnCond {
   my $c    = shift;
 
   my $info = q{};
-  my $err  = q{};
 
   my $dswoncond = ConsumerVal ($hash, $c, 'dswoncond', '');                     # Device zur Lieferung einer zusätzlichen Einschaltbedingung
-
-  if($dswoncond && !$defs{$dswoncond}) {
+  my ($err)     = isDeviceValid ( { name   => $hash->{NAME}, 
+                                    obj    => $dswoncond, 
+                                    method => 'string',                                    
+                                  }      
+                                );
+                                
+  if ($dswoncond && $err) {
       $err = qq{ERROR - the device "$dswoncond" doesn't exist! Check the key "swoncond" in attribute "consumer${c}"};
       return (0, $info, $err);
   }
 
+  $err              = q{};
   my $rswoncond     = ConsumerVal ($hash, $c, 'rswoncond',     '');             # Reading zur Lieferung einer zusätzlichen Einschaltbedingung
   my $swoncondregex = ConsumerVal ($hash, $c, 'swoncondregex', '');             # Regex einer zusätzliche Einschaltbedingung
   my $condval       = ReadingsVal ($dswoncond, $rswoncond,     '');             # Wert zum Vergleich mit Regex
@@ -16275,7 +16257,6 @@ sub isAddSwitchOffCond {
 
   my $swoff          = 0;
   my $info           = q{};
-  my $err            = q{};
   my $dswoffcond     = q{};                                                       # Device zur Lieferung einer Ausschaltbedingung
   my $rswoffcond     = q{};                                                       # Reading zur Lieferung einer Ausschaltbedingung
   my $swoffcondregex = q{};                                                       # Regex der Ausschaltbedingung (wenn wahr)
@@ -16288,12 +16269,15 @@ sub isAddSwitchOffCond {
       $rswoffcond     = ConsumerVal ($hash, $c, 'rswoffcond',     '');
       $swoffcondregex = ConsumerVal ($hash, $c, 'swoffcondregex', '');
   }
+  
+  my ($err) = isDeviceValid ( { name => $hash->{NAME}, obj => $dswoffcond, method => 'string' } );
 
-  if ($dswoffcond && !$defs{$dswoffcond}) {
+  if ($dswoffcond && $err) {
       $err = qq{ERROR - the device "$dswoffcond" doesn't exist! Check the key "swoffcond" or "interruptable" in attribute "consumer${c}"};
       return (0, $info, $err);
   }
 
+  $err        = q{};
   my $condval = ReadingsVal ($dswoffcond, $rswoffcond, undef);
 
   if (defined $condval) {
@@ -16341,15 +16325,19 @@ sub isSurplusIgnoCond {
   my $debug = shift;
 
   my $info = q{};
-  my $err  = q{};
 
   my $digncond = ConsumerVal ($hash, $c, 'dspignorecond', '');                          # Device zur Lieferung einer "Überschuß Ignore-Bedingung"
-
-  if($digncond && !$defs{$digncond}) {
+  my ($err)    = isDeviceValid ( { name   => $hash->{NAME}, 
+                                   obj    => $digncond, 
+                                   method => 'string',
+                                 }      
+                               );
+  if ($digncond && $err) {
       $err = qq{ERROR - the device "$digncond" doesn't exist! Check the key "spignorecond" in attribute "consumer${c}"};
       return (0, $info, $err);
   }
-
+  
+  $err                  = q{};
   my $rigncond          = ConsumerVal ($hash, $c, 'rigncond',          '');             # Reading zur Lieferung einer zusätzlichen Einschaltbedingung
   my $spignorecondregex = ConsumerVal ($hash, $c, 'spignorecondregex', '');             # Regex einer zusätzliche Einschaltbedingung
   my $condval           = ReadingsVal ($digncond, $rigncond,           '');             # Wert zum Vergleich mit Regex
@@ -16433,15 +16421,12 @@ return ConsumerVal ($hash, $c, 'isConsumptionRecommended', 0);
 #       1 - ja, 0 - nein
 ################################################################
 sub isBatteryUsed {
-  my $name   = shift;
+  my $name = shift;
+  
+  my ($err) = isDeviceValid ( { name => $name, obj => 'currentBatteryDev', method => 'reading' } );
+  return if($err);
 
-  my $badev  = ReadingsVal($name, 'currentBatteryDev', '');                  # aktuelles Meter device für Batteriewerte
-  my ($a,$h) = parseParams ($badev);
-  $badev     = $a->[0] // "";
-
-  return if(!$badev || !$defs{$badev});
-
-return ($badev, $a ,$h);
+return 1;
 }
 
 ################################################################
@@ -16616,11 +16601,60 @@ sub isSunPath {
           $is      = 0;
           my $name = $hash->{NAME};
 
-          Log3($name, 1, qq{$name - ERROR - consumer >$c< use >mintime=SunPath< but readings >Today_SunRise< / >Today_SunSet< are not set properly.});
+          Log3 ($name, 1, qq{$name - ERROR - consumer >$c< use >mintime=SunPath< but readings >Today_SunRise< / >Today_SunSet< are not set properly.});
       }
   }
 
 return $is;
+}
+
+#####################################################################
+#    Prüft ob das im Ojekt übergebene Device valide ist
+#    input:  $obj    - das Objekt (Reading, Attr, String)
+#            method  - Art des Objekts
+#                      reading: Device ist im Reading Value enthalten
+#                      attr:    Device ist im Attr Value enthalten
+#                      string:  Device ist im Objekt-Inhalt enthalten
+#    return: $valid  - ist die Angabe valide (1)
+#            $a->[0] - das extrahierte Device 
+#            $h      - Hash der geparsten Entität
+#####################################################################
+sub isDeviceValid {
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $obj    = $paref->{obj};
+  my $method = $paref->{method} // 'reading';
+
+  my $err = '';
+  my $dev = '';
+  
+  if ($method eq 'reading') {
+      $dev = ReadingsVal ($name, $obj, '');
+      return qq{Reading '$obj' is not set or is empty} if(!$dev);
+  }
+  elsif ($method eq 'attr') {
+      $dev = AttrVal ($name, $obj, '');
+      return qq{Attribute '$obj' is not set} if(!$dev);
+  }
+  elsif ($method eq 'string') {
+      return qq{Object '$obj' is empty} if(!$obj);
+      $dev = $obj;
+  }  
+  
+  my ($a, $h) = parseParams ($dev);
+  
+  if (!$a->[0] || !$defs{$a->[0]}) {
+      $a->[0] //= '';
+      $err      = qq{The device '$a->[0]' doesn't exist or is not a valid device.};
+      $err      = qq{There is no device set. Check the syntax with the command reference.}               if(!$a->[0]);
+      $err      = qq{The device '$a->[0]' doesn't exist anymore! Delete or change the attribute '$obj'.} if(!$defs{$a->[0]} && $method eq 'attr' && $obj =~ /consumer/);
+  }
+  
+  if ($err) {
+      Log3 ($name, 1, "$name - ERROR - $err");
+  }
+
+return ($err, $a->[0], $h);
 }
 
 #####################################################################
@@ -16807,10 +16841,10 @@ sub lastConsumerSwitchtime {
   my $c    = shift;
   my $name = $hash->{NAME};
 
-  my ($cname, $dswname) = getCDnames ($hash, $c);                              # Consumer und Switch Device Name
+  my ($err, $cname, $dswname) = getCDnames ($hash, $c);                        # Consumer und Switch Device Name
 
-  if(!$defs{$dswname}) {
-      Log3($name, 1, qq{$name - ERROR - The last switching time can't be identified due to the device "$dswname" is invalid. Please check device names in consumer "$c" attribute});
+  if ($err) {
+      Log3 ($name, 1, qq{$name - ERROR - The last switching time can't be identified due to the device '$dswname' is invalid. Please check device names in consumer "$c" attribute});
       return;
   }
 
@@ -16966,11 +17000,12 @@ sub getCDnames {
   my $hash = shift;
   my $c    = shift;
 
-  my $cname   = ConsumerVal ($hash, $c, "name",        "");                                  # Name des Consumerdevices
-  my $dswname = ConsumerVal ($hash, $c, 'dswitch', $cname);                                  # alternatives Switch Device
+  my $cname   = ConsumerVal ($hash, $c, "name",        "");                                         # Name des Consumerdevices
+  my $dswname = ConsumerVal ($hash, $c, 'dswitch', $cname);                                         # alternatives Switch Device
+  my ($err)   = isDeviceValid ( { name => $hash->{NAME}, obj => $dswname, method => 'string' } );
+  $err        = qq{$err Please check device names in consumer '$c' attribute} if($err);
 
-
-return ($cname, $dswname);
+return ($err, $cname, $dswname);
 }
 
 ################################################################
@@ -18075,11 +18110,11 @@ to ensure that the system configuration is correct.
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
           <tr><td> <b>gcon</b>       </td><td>Reading which supplies the power currently drawn from the grid                                                            </td></tr>
           <tr><td> <b>contotal</b>   </td><td>Reading which provides the sum of the energy drawn from the grid (a constantly increasing meter)                          </td></tr>
-          <tr><td>                   </td><td>If the counter is reset to '0' at the start of the day (daily counter), this reading can be used.                         </td></tr>
+          <tr><td>                   </td><td>If the counter is reset to '0' at the beginning of the day (daily counter), the module handles this situation accordingly.</td></tr>
           <tr><td>                   </td><td>In this case, a message is displayed in the log with verbose 3.                                                           </td></tr>         
           <tr><td> <b>gfeedin</b>    </td><td>Reading which supplies the power currently fed into the grid                                                              </td></tr>
           <tr><td> <b>feedtotal</b>  </td><td>Reading which provides the sum of the energy fed into the grid (a constantly increasing meter)                            </td></tr>
-          <tr><td>                   </td><td>If the counter is reset to '0' at the start of the day (daily counter), this reading can be used.                         </td></tr>
+          <tr><td>                   </td><td>If the counter is reset to '0' at the beginning of the day (daily counter), the module handles this situation accordingly.</td></tr>
           <tr><td>                   </td><td>In this case, a message is displayed in the log with verbose 3.                                                           </td></tr>         
           <tr><td> <b>Unit</b>       </td><td>the respective unit (W,kW,Wh,kWh)                                                                                         </td></tr>
           <tr><td>                   </td><td>                                                                                                                          </td></tr>
@@ -20348,11 +20383,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
           <tr><td> <b>gcon</b>       </td><td>Reading welches die aktuell aus dem Netz bezogene Leistung liefert                                                         </td></tr>
           <tr><td> <b>contotal</b>   </td><td>Reading welches die Summe der aus dem Netz bezogenen Energie liefert (ein sich stetig erhöhender Zähler)                   </td></tr>
-          <tr><td>                   </td><td>Wird der Zähler zu Beginn des Tages auf '0' zurückgesetzt (Tageszähler), kann dieses Reading verwendet werden.             </td></tr>
+          <tr><td>                   </td><td>Wird der Zähler zu Beginn des Tages auf '0' zurückgesetzt (Tageszähler), behandelt das Modul diese Situation entsprechend. </td></tr>
           <tr><td>                   </td><td>In diesem Fall erfolgt eine Meldung im Log mit verbose 3.             </td></tr>
           <tr><td> <b>gfeedin</b>    </td><td>Reading welches die aktuell in das Netz eingespeiste Leistung liefert                                                      </td></tr>
           <tr><td> <b>feedtotal</b>  </td><td>Reading welches die Summe der in das Netz eingespeisten Energie liefert (ein sich stetig erhöhender Zähler)                </td></tr>
-          <tr><td>                   </td><td>Wird der Zähler zu Beginn des Tages auf '0' zurückgesetzt (Tageszähler), kann dieses Reading verwendet werden.             </td></tr>
+          <tr><td>                   </td><td>Wird der Zähler zu Beginn des Tages auf '0' zurückgesetzt (Tageszähler), behandelt das Modul diese Situation entsprechend. </td></tr>
           <tr><td>                   </td><td>In diesem Fall erfolgt eine Meldung im Log mit verbose 3.             </td></tr>
           <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                                        </td></tr>
           <tr><td>                   </td><td>                                                                                                                           </td></tr>

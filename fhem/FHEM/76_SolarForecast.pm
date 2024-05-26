@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.21.2" => "26.05.2024  __VictronVRM_ApiRequestForecast: change request time from current time to '<current hour>:00:00'",
   "1.21.1" => "23.05.2024  new sub isDeviceValid, replace Smartmatch Forum:#137776 ",
   "1.21.0" => "14.05.2024  currentMeterDev: meter can be a Day meter, contotal and feedtotal can be reset at day begin ",
   "1.20.0" => "12.05.2024  graphicBeamXContent: gridfeedin available, beamGraphic: Mouse-Over shows beamcontent text ".
@@ -2699,14 +2700,16 @@ sub Get {
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
 
+  my $t      = int time;
   my $params = {
       hash  => $hash,
       name  => $name,
       type  => $type,
       opt   => $opt,
       arg   => $arg,
-      t     => int time,
-      date  => (strftime "%Y-%m-%d", localtime(time)),
+      t     => $t,
+      chour => (strftime "%H",       localtime($t)),                                            # aktuelle Stunde in 24h format (00-23)
+      date  => (strftime "%Y-%m-%d", localtime($t)),
       debug => getDebug ($hash),
       lang  => getLang  ($hash)
   };
@@ -3661,14 +3664,17 @@ sub __getDWDSolarData {
 return;
 }
 
-################################################################
+####################################################################################################
 #                Abruf Victron VRM API Forecast
-################################################################
+#
+# https://community.victronenergy.com/questions/216543/new-vrm-feature-solar-forecast.html
+# API Beschreibung: https://vrm-api-docs.victronenergy.com/#/operations/installations/idSite/stats
+####################################################################################################
 sub __getVictronSolarData {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $force = $paref->{force} // 0;
-  my $t     = $paref->{t}     // time;
+  my $t     = $paref->{t};
   my $lang  = $paref->{lang};
 
   my $lrt    = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', 0);
@@ -3736,6 +3742,8 @@ sub __VictronVRM_ApiRequestLogin {
       debug      => $debug,
       caller     => \&$caller,
       lang       => $paref->{lang},
+      chour      => $paref->{chour},                                            # aktuelle Stunde in 24h format (00-23)
+      date       => $paref->{date},
       idsite     => $idsite,
       header     => { "Content-Type" => "application/json" },
       data       => qq({ "username": "$user",  "password": "$pwd" }),
@@ -3837,11 +3845,11 @@ sub __VictronVRM_ApiResponseLogin {
 return;
 }
 
-################################################################################################
+######################################################################################################
 #                Victron VRM API Forecast Data
 # https://vrm-api-docs.victronenergy.com/#/
-# https://vrmapi.victronenergy.com/v2/installations/<instalation id>/stats?type=forecast&interval=hours&start=<start date and time>&end=<end date and time>
-################################################################################################
+# # API Beschreibung: https://vrm-api-docs.victronenergy.com/#/operations/installations/idSite/stats
+######################################################################################################
 sub __VictronVRM_ApiRequestForecast {
   my $paref  = shift;
 
@@ -3851,9 +3859,11 @@ sub __VictronVRM_ApiRequestForecast {
   my $debug  = $paref->{debug};
   my $lang   = $paref->{lang};
   my $idsite = $paref->{idsite};
+  my $chour  = $paref->{chour};                                                   # aktuelle Stunde in 24h format (00-23)
+  my $date   = $paref->{date};
 
-  my $tstart = time;
-  my $tend   = time + 259200;                                                     # 172800 = 2 Tage
+  my $tstart = timestringToTimestamp ("$date $chour:00:00");
+  my $tend   = $tstart + 259200;                                                  # 172800 = 2 Tage
 
   my $url = "https://vrmapi.victronenergy.com/v2/installations/$idsite/stats?type=forecast&interval=hours&start=$tstart&end=$tend";
 
@@ -3953,6 +3963,8 @@ sub __VictronVRM_ApiResponseForecast {
           return;
       }
       else {
+          #debugLog ($paref, "apiProcess", "Victron VRM API - raw data received:\n". Dumper $jdata);
+          
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}    += 1;
 
@@ -3990,6 +4002,8 @@ sub __VictronVRM_ApiResponseForecast {
               my $starttmstr = $jdata->{'records'}{'vrm_consumption_fc'}[$k][0];               # Millisekunden geliefert
               my $val        = $jdata->{'records'}{'vrm_consumption_fc'}[$k][1];
               $starttmstr    = (timestampToTimestring ($starttmstr, $lang))[3];
+              
+              debugLog ($paref, "apiProcess", "Victron VRM API - CO estimate: ".$starttmstr.' => '.$val.' Wh');
 
               if ($val) {
                   $val       = sprintf "%.2f", $val;
