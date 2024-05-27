@@ -9,13 +9,13 @@ use warnings;
 use DevIo;
 use Time::HiRes qw(gettimeofday usleep);
 
-sub ElsnerWS_Checksum($$);
-sub ElsnerWS_Define($$$);
-sub ElsnerWS_Delete($$);
-sub ElsnerWS_Initialize($);
-sub ElsnerWS_Read($);
-sub ElsnerWS_Ready($);
-sub ElsnerWS_Shutdown($);
+sub ElsnerWS_Checksum;
+sub ElsnerWS_Define;
+sub ElsnerWS_Delete;
+sub ElsnerWS_Initialize;
+sub ElsnerWS_Read;
+sub ElsnerWS_Ready;
+sub ElsnerWS_Shutdown;
 
 # trigger values for down and up commands
 my %customCmdTrigger = ('dayNight' => ['night', 'day'],
@@ -35,7 +35,7 @@ my %customCmdPeriod =(once => -1,
 my %specials;
 
 # Init
-sub ElsnerWS_Initialize($) {
+sub ElsnerWS_Initialize {
   my ($hash) = @_;
 
 # Provider
@@ -67,7 +67,7 @@ sub ElsnerWS_Initialize($) {
 }
 
 # Define
-sub ElsnerWS_Define($$$) {
+sub ElsnerWS_Define {
   my ($hash, $a, $h) = @_;
   my $name = $a->[0];
   #return "ElsnerWS: wrong syntax, correct is: define <name> ElsnerWS {devicename[\@baudrate]|ip:port}" if($#$a != 2);
@@ -76,17 +76,17 @@ sub ElsnerWS_Define($$$) {
   } elsif (exists $h->{comtype}) {
     $hash->{ComType} = $h->{comtype};
   } else {
-    return "ElsnerWS: wrong syntax, correct is: define <name> ElsnerWS [comtype=](rs485) [devicename=]{devicename[\@baudrate]|ip:port}";
+    return "ElsnerWS: wrong syntax, correct is: define <name> ElsnerWS [comtype=]rs485 [devicename=]{devicename[\@baudrate]|ip:port}";
   }
   if ($hash->{ComType} ne 'rs485') {
-    return "ElsnerWS: wrong syntax, correct is: define <name> ElsnerWS [comtype=](rs485) [devicename=]{devicename[\@baudrate]|ip:port}";
+    return "ElsnerWS: wrong syntax, correct is: define <name> ElsnerWS [comtype=]rs485 [devicename=]{devicename[\@baudrate]|ip:port}";
   }
   if (defined $a->[3]) {
     $hash->{DeviceName} = $a->[3];
   } elsif (exists $h->{devicename}) {
     $hash->{DeviceName} = $h->{devicename};
   } else {
-    return "ElsnerWS: wrong syntax, correct is: define <name> ElsnerWS [comtype=](rs485|modbus) [devicename=]{devicename[\@baudrate]|ip:port}";
+    return "ElsnerWS: wrong syntax, correct is: define <name> ElsnerWS [comtype=](rs485) [devicename=]{devicename[\@baudrate]|ip:port}";
   }
   $hash->{NOTIFYDEV} = "global";
   my ($autocreateFilelog, $autocreateHash, $autocreateName, $autocreateDeviceRoom, $autocreateWeblinkRoom) =
@@ -162,7 +162,7 @@ sub ElsnerWS_Define($$$) {
 }
 
 # Initialize serial communication
-sub ElsnerWS_InitSerialCom($) {
+sub ElsnerWS_InitSerialCom {
   # return if attribute list is incomplete
   #return undef if (!$init_done);
   my ($hash) = @_;
@@ -177,7 +177,7 @@ sub ElsnerWS_InitSerialCom($) {
   return undef;
 }
 
-sub ElsnerWS_Checksum($$) {
+sub ElsnerWS_Checksum {
   my ($packetType, $msg) = @_;
   $msg = $packetType . $msg;
   my $ml = length($msg);
@@ -190,7 +190,7 @@ sub ElsnerWS_Checksum($$) {
 
 # Read
 # called from the global loop, when the select for hash->{FD} reports data
-sub ElsnerWS_Read($) {
+sub ElsnerWS_Read {
   my ($hash) = @_;
   my $buf = DevIo_SimpleRead($hash);
   return "" if(!defined($buf));
@@ -509,7 +509,7 @@ sub ElsnerWS_Read($) {
   return;
 }
 
-sub ElsnerWS_CustomCmdDoTrigger($$$$$) {
+sub ElsnerWS_CustomCmdDoTrigger {
   # set do trigger
   my ($hash, $customCmdName, $customCmdVal, $customCmdTrigger, $element) = @_;
   my $readingName;
@@ -547,7 +547,7 @@ sub ElsnerWS_CustomCmdDoTrigger($$$$$) {
   return;
 }
 
-sub ElsnerWS_CustomCmdDo($$$$) {
+sub ElsnerWS_CustomCmdDo {
   my ($hash, $customCmdName, $customCmd, $customCmdPeriod) = @_;
   my $name = $hash->{NAME};
   #Log3 $name, 3, "ElsnerWS $name $customCmdName do: $hash->{helper}{$customCmdName}{do} Count: $hash->{helper}{$customCmdName}{Count}";
@@ -584,7 +584,7 @@ sub ElsnerWS_CustomCmdDo($$$$) {
   return;
 }
 
-sub ElsnerWS_AlarmOn($) {
+sub ElsnerWS_AlarmOn {
   my ($readingParam) = @_;
   my ($hash, $readingName, $readingVal, $ctrl, $log, $clear) = @$readingParam;
   if (defined $hash) {
@@ -600,7 +600,7 @@ sub ElsnerWS_AlarmOn($) {
   return;
 }
 
-sub ElsnerWS_updateArrayElement($$$$$) {
+sub ElsnerWS_updateArrayElement {
   # read und update values to array
   my ($hash, $readingName, $readingVal, $arrayName, $numArrayElementsMax) = @_;
   my $numArrayElements = $#{$hash->{helper}{$arrayName}{$readingName}{val}};
@@ -616,7 +616,7 @@ sub ElsnerWS_updateArrayElement($$$$$) {
   return $numArrayElements;
 }
 
-sub ElsnerWS_SMA($$$$$$$$) {
+sub ElsnerWS_SMA {
   # simple moving average (SMA)
   my ($hash, $readingName, $readingVal, $averageName, $valMaxName, $valMinName, $arrayName, $numArrayElementsCalc) = @_;
   my $average = exists($hash->{helper}{$arrayName}{$readingName}{average}) ? $hash->{helper}{$arrayName}{$readingName}{average} : $readingVal;
@@ -638,7 +638,7 @@ sub ElsnerWS_SMA($$$$$$$$) {
   return ($average, $valMin, $valMax);
 }
 
-sub ElsnerWS_LWMA($$$$) {
+sub ElsnerWS_LWMA {
   # linear weighted moving average (LWMA)
   my ($hash, $readingName, $readingVal, $numArrayElementsMax) = @_;
   push(@{$hash->{helper}{lwma}{$readingName}{val}}, $readingVal);
@@ -654,7 +654,7 @@ sub ElsnerWS_LWMA($$$$) {
   return $average;
 }
 
-sub ElsnerWS_EMA($$$$) {
+sub ElsnerWS_EMA {
   # exponential moving average (EMA)
   # 0 < $wheight < 1
   my ($hash, $readingName, $readingVal, $wheight) = @_;
@@ -664,7 +664,7 @@ sub ElsnerWS_EMA($$$$) {
   return $average;
 }
 
-sub ElsnerWS_Smooting($$$$$) {
+sub ElsnerWS_Smooting {
   my ($hash, $readingName, $readingVal, $theshold, $averageParam) = @_;
   my $iniVal;
   $readingVal = ElsnerWS_EMA($hash, $readingName, $readingVal, $averageParam) if (defined $averageParam);
@@ -682,7 +682,7 @@ sub ElsnerWS_Smooting($$$$$) {
   return $iniVal;
 }
 
-sub ElsnerWS_swayCtrl($$$$$$$$$$$) {
+sub ElsnerWS_swayCtrl {
   # sway range and delay calculation
   my ($hash, $readingName, $readingVal, $attrNameRange, $attrNameDelay, $swayRangeLow, $swayRangeHigh, $swayDelayLow, $swayDelayHigh, $swayRangeLowVal, $swayRangeHighVal) = @_;
   my ($swayRangeLowAttr, $swayRangeHighAttr) = split(':', AttrVal($hash->{NAME}, $attrNameRange, "$swayRangeLow:$swayRangeHigh"));
@@ -748,7 +748,7 @@ sub ElsnerWS_swayCtrl($$$$$$$$$$$) {
   return $swayVal;
 }
 
-sub ElsnerWS_swayCtrlDelay($) {
+sub ElsnerWS_swayCtrlDelay {
   my ($readingParam) = @_;
   my ($hash, $readingName, $readingVal, $delay, $ctrl, $log, $clear) = @$readingParam;
   if (defined $hash) {
@@ -760,7 +760,7 @@ sub ElsnerWS_swayCtrlDelay($) {
   return;
 }
 
-sub ElsnerWS_readingsSingleUpdate($) {
+sub ElsnerWS_readingsSingleUpdate {
   my ($readingParam) = @_;
   my ($hash, $readingName, $readingVal, $ctrl, $log, $clear) = @$readingParam;
   if (defined $hash) {
@@ -770,7 +770,7 @@ sub ElsnerWS_readingsSingleUpdate($) {
   return;
 }
 
-sub ElsnerWS_readingsBulkUpdate($$$$$$) {
+sub ElsnerWS_readingsBulkUpdate {
   my ($hash, $readingName, $readingVal, $theshold, $averageParam, $sFormat) = @_;
   if (exists $hash->{helper}{timer}{heartbeat}) {
     $readingVal = sprintf("$sFormat", ElsnerWS_Smooting($hash, $readingName, $readingVal, $theshold, $averageParam));
@@ -783,7 +783,7 @@ sub ElsnerWS_readingsBulkUpdate($$$$$$) {
 }
 
 #
-sub ElsnerWS_cdmClearTimer($) {
+sub ElsnerWS_cdmClearTimer {
   my ($functionArray) = @_;
   my ($hash, $timer) = @$functionArray;
   delete $hash->{helper}{timer}{$timer};
@@ -792,7 +792,7 @@ sub ElsnerWS_cdmClearTimer($) {
 }
 
 # Ready
-sub ElsnerWS_Ready($) {
+sub ElsnerWS_Ready {
   my ($hash) = @_;
   return DevIo_OpenDev($hash, 1, undef) if($hash->{STATE} eq "disconnected");
   # This is relevant for windows/USB only
@@ -803,7 +803,7 @@ sub ElsnerWS_Ready($) {
 }
 
 # Attributes check
-sub ElsnerWS_Attr(@) {
+sub ElsnerWS_Attr {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $hash = $defs{$name};
   # return if attribute list is incomplete
@@ -938,7 +938,7 @@ sub ElsnerWS_Attr(@) {
 }
 
 # Notify actions
-sub ElsnerWS_Notify(@) {
+sub ElsnerWS_Notify {
   my ($hash, $dev) = @_;
   return "" if (IsDisabled($hash->{NAME}));
   if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}})) {
@@ -948,14 +948,14 @@ sub ElsnerWS_Notify(@) {
 }
 
 # Undef
-sub ElsnerWS_Undef($$) {
+sub ElsnerWS_Undef {
   my ($hash, $arg) = @_;
   DevIo_CloseDev($hash);
   return undef;
 }
 
 # Delete
-sub ElsnerWS_Delete($$) {
+sub ElsnerWS_Delete {
   my ($hash, $name) = @_;
   my $logName = "FileLog_$name";
   my ($count, $gplotFile, $logFile, $weblinkName, $weblinkHash);
@@ -984,7 +984,7 @@ sub ElsnerWS_Delete($$) {
 }
 
 # Shutdown
-sub ElsnerWS_Shutdown($) {
+sub ElsnerWS_Shutdown {
   my ($hash) = @_;
   DevIo_CloseDev($hash);
   return undef;
