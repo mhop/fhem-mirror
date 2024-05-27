@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use Time::Local;
 use DevIo;
-sub ModbusElsnerWS_Initialize($);
+sub ModbusElsnerWS_Initialize;
 
 my %ModbusElsnerWS_ParseInfo = (
   'i0'  => {reading => 'raw',
@@ -60,7 +60,7 @@ my %customCmdPeriod =(once => -1,
 my %specials;
 my @weekday = ('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday');
 
-sub ModbusElsnerWS_Initialize($) {
+sub ModbusElsnerWS_Initialize {
   my ($hash) = @_;
   LoadModule "Modbus";
 
@@ -96,7 +96,7 @@ sub ModbusElsnerWS_Initialize($) {
   return;
 }
 
-sub ModbusElsnerWS_Define($$) {
+sub ModbusElsnerWS_Define {
   # my ($hash, $def) = @_;
   #return "ModbusElsnerWS: wrong syntax, correct is: define <name> ModbusElsnerWS (modbusid) {interval}" if($#$a != 2);
 
@@ -194,7 +194,7 @@ sub ModbusElsnerWS_Define($$) {
   return;
 }
 
-sub ModbusElsnerWS_Eval($$$) {
+sub ModbusElsnerWS_Eval {
   my ($hash, $readingName, $readingVal) = @_;
   my $name = $hash->{NAME};
   my $ctrl = 1;
@@ -406,7 +406,7 @@ sub ModbusElsnerWS_Eval($$$) {
   return $ctrl;
 }
 
-sub ModbusElsnerWS_CustomCmdDoTrigger($$$$$) {
+sub ModbusElsnerWS_CustomCmdDoTrigger {
   # set do trigger
   my ($hash, $customCmdName, $customCmdVal, $customCmdTrigger, $element) = @_;
   my $readingName;
@@ -444,7 +444,7 @@ sub ModbusElsnerWS_CustomCmdDoTrigger($$$$$) {
   return;
 }
 
-sub ModbusElsnerWS_CustomCmdDo($$$$) {
+sub ModbusElsnerWS_CustomCmdDo {
   my ($hash, $customCmdName, $customCmd, $customCmdPeriod) = @_;
   my $name = $hash->{NAME};
   #Log3 $name, 3, "ModbusElsnerWS $name $customCmdName do: $hash->{helper}{$customCmdName}{do} Count: $hash->{helper}{$customCmdName}{Count}";
@@ -481,7 +481,7 @@ sub ModbusElsnerWS_CustomCmdDo($$$$) {
   return;
 }
 
-sub ModbusElsnerWS_AlarmOn($) {
+sub ModbusElsnerWS_AlarmOn {
   my ($readingParam) = @_;
   my ($hash, $readingName, $readingVal, $ctrl, $log, $clear) = @$readingParam;
   if (defined $hash) {
@@ -497,7 +497,7 @@ sub ModbusElsnerWS_AlarmOn($) {
   return;
 }
 
-sub ModbusElsnerWS_Attr(@) {
+sub ModbusElsnerWS_Attr {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $hash = $defs{$name};
   # return if attribute list is incomplete
@@ -626,21 +626,21 @@ sub ModbusElsnerWS_Attr(@) {
   return $err;
 }
 
-sub ModbusElsnerWS_Get($$$) {
+sub ModbusElsnerWS_Get {
   my ($hash, $a, $h) = @_;
   my ($result, $name, $opt) = (undef, $a->[1], $a->[2]);
   $result = ModbusLD_Get($hash, @$a);
   return $result;
 }
 
-sub ModbusElsnerWS_Set($$$) {
+sub ModbusElsnerWS_Set {
   my ($hash, $a, $h) = @_;
   my ($error, $name, $cmd) = (undef, $a->[1], $a->[2]);
   $error = ModbusLD_Set($hash, @$a);
   return $error;
 }
 
-sub ModbusElsnerWS_Notify(@) {
+sub ModbusElsnerWS_Notify {
   my ($hash, $dev) = @_;
   return "" if (IsDisabled($hash->{NAME}));
   return undef if (!$init_done);
@@ -650,7 +650,7 @@ sub ModbusElsnerWS_Notify(@) {
   return undef;
 }
 
-sub ModubusElsnerWS_updateArrayElement($$$$$) {
+sub ModubusElsnerWS_updateArrayElement {
   # read und update values to array
   my ($hash, $readingName, $readingVal, $arrayName, $numArrayElementsMax) = @_;
   my $numArrayElements = $#{$hash->{helper}{$arrayName}{$readingName}{val}};
@@ -666,7 +666,7 @@ sub ModubusElsnerWS_updateArrayElement($$$$$) {
   return $numArrayElements;
 }
 
-sub ModubusElsnerWS_SMA($$$$$$$$) {
+sub ModubusElsnerWS_SMA {
   # simple moving average (SMA)
   my ($hash, $readingName, $readingVal, $averageName, $valMaxName, $valMinName, $arrayName, $numArrayElementsCalc) = @_;
   my $average = exists($hash->{helper}{$arrayName}{$readingName}{average}) ? $hash->{helper}{$arrayName}{$readingName}{average} : $readingVal;
@@ -688,7 +688,7 @@ sub ModubusElsnerWS_SMA($$$$$$$$) {
   return ($average, $valMin, $valMax);
 }
 
-sub ModbusElsnerWS_LWMA($$$$) {
+sub ModbusElsnerWS_LWMA {
   # linear weighted moving average (LWMA)
   my ($hash, $readingName, $readingVal, $averageOrder) = @_;
   push(@{$hash->{helper}{lwma}{$readingName}{val}}, $readingVal);
@@ -704,7 +704,7 @@ sub ModbusElsnerWS_LWMA($$$$) {
   return $average;
 }
 
-sub ModbusElsnerWS_EMA($$$$) {
+sub ModbusElsnerWS_EMA {
   # exponential moving average (EMA)
   # 0 < $wheight < 1
   my ($hash, $readingName, $readingVal, $wheight) = @_;
@@ -714,7 +714,7 @@ sub ModbusElsnerWS_EMA($$$$) {
   return $average;
 }
 
-sub ModbusElsnerWS_Smooting($$$$$) {
+sub ModbusElsnerWS_Smooting {
   my ($hash, $readingName, $readingVal, $theshold, $averageParam) = @_;
   my $iniVal;
   $readingVal = ModbusElsnerWS_EMA($hash, $readingName, $readingVal, $averageParam) if (defined $averageParam);
@@ -732,7 +732,7 @@ sub ModbusElsnerWS_Smooting($$$$$) {
   return $iniVal;
 }
 
-sub ModbusElsnerWS_swayCtrl($$$$$$$$$$$) {
+sub ModbusElsnerWS_swayCtrl {
   # sway range and delay calculation
   my ($hash, $readingName, $readingVal, $attrNameRange, $attrNameDelay, $swayRangeLow, $swayRangeHigh, $swayDelayLow, $swayDelayHigh, $swayRangeLowVal, $swayRangeHighVal) = @_;
   my ($swayRangeLowAttr, $swayRangeHighAttr) = split(':', AttrVal($hash->{NAME}, $attrNameRange, "$swayRangeLow:$swayRangeHigh"));
@@ -798,7 +798,7 @@ sub ModbusElsnerWS_swayCtrl($$$$$$$$$$$) {
   return $swayVal;
 }
 
-sub ModbusElsnerWS_swayCtrlDelay($) {
+sub ModbusElsnerWS_swayCtrlDelay {
   my ($readingParam) = @_;
   my ($hash, $readingName, $readingVal, $delay, $ctrl, $log, $clear) = @$readingParam;
   if (defined $hash) {
@@ -810,7 +810,7 @@ sub ModbusElsnerWS_swayCtrlDelay($) {
   return;
 }
 
-sub ModbusElsnerWS_readingsSingleUpdate($) {
+sub ModbusElsnerWS_readingsSingleUpdate {
   my ($readingParam) = @_;
   my ($hash, $readingName, $readingVal, $ctrl, $log, $clear) = @$readingParam;
   if (defined $hash) {
@@ -821,7 +821,7 @@ sub ModbusElsnerWS_readingsSingleUpdate($) {
   return;
 }
 
-sub ModbusElsnerWS_readingsBulkUpdate($$$$$$) {
+sub ModbusElsnerWS_readingsBulkUpdate {
   my ($hash, $readingName, $readingVal, $theshold, $averageParam, $sFormat) = @_;
   if (exists $hash->{helper}{timer}{heartbeat}) {
     $readingVal = sprintf("$sFormat", ModbusElsnerWS_Smooting($hash, $readingName, $readingVal, $theshold, $averageParam));
@@ -834,7 +834,7 @@ sub ModbusElsnerWS_readingsBulkUpdate($$$$$$) {
 }
 
 #
-sub ModbusElsnerWS_cdmClearTimer($) {
+sub ModbusElsnerWS_cdmClearTimer {
   my ($functionArray) = @_;
   my ($hash, $timer) = @$functionArray;
   delete $hash->{helper}{timer}{$timer};
@@ -842,14 +842,14 @@ sub ModbusElsnerWS_cdmClearTimer($) {
   return;
 }
 
-sub ModbusElsnerWS_Undef($$) {
+sub ModbusElsnerWS_Undef {
   my ($hash, $arg) = @_;
   ModbusLD_Undef($hash, $arg);
   return;
 }
 
 # Delete
-sub ModbusElsnerWS_Delete($$) {
+sub ModbusElsnerWS_Delete {
   my ($hash, $name) = @_;
   my $logName = "FileLog_$name";
   my ($count, $gplotFile, $logFile, $weblinkName, $weblinkHash);
