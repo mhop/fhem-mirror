@@ -92,7 +92,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#  https://forum.fhem.de/index.php?topic=113850.390
+#  https://forum.fhem.de/index.php?topic=138356.0
 #
 ##############################################################################
 
@@ -852,6 +852,8 @@ sub fronius_setState($$) {
 <h3>fronius</h3>
 <ul>
   Module to read data from Fronius inverter devices using <a href="https://www.fronius.com/~/downloads/Solar%20Energy/Operating%20Instructions/42,0410,2012.pdf">Fronius Solar API V1</a>
+  <br>
+  see also <a href="https://forum.fhem.de/index.php?topic=138356.0">FHEM Forum discussion thread</a>
   <br>
   <br>
   
