@@ -9,12 +9,12 @@ package main;
 use strict;
 use warnings;
 
-sub PIFACE_Define($$);
-sub PIFACE_Undefine($$);
-sub PIFACE_Set($@);
-sub PIFACE_Get($@);
-sub PIFACE_Notify(@);
-sub PIFACE_Attr(@);
+sub PIFACE_Define;
+sub PIFACE_Undefine;
+sub PIFACE_Set;
+sub PIFACE_Get;
+sub PIFACE_Notify;
+sub PIFACE_Attr;
 
 my $base = 200;
 my $gpioCmd;
@@ -24,7 +24,7 @@ if (-e '/usr/local/bin/gpio') {
   $gpioCmd = 'gpio';
 }
 
-sub PIFACE_Initialize($){
+sub PIFACE_Initialize {
   my ($hash) = @_;
   $hash->{DefFn}	= "PIFACE_Define";
   $hash->{UndefFn}	= "PIFACE_Undefine";
@@ -48,7 +48,7 @@ sub PIFACE_Initialize($){
                           " watchdog:on,off,silent watchdogInterval";
 }
 
-sub PIFACE_Define($$) {
+sub PIFACE_Define {
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
   $hash->{NOTIFYDEV} = "global";
@@ -59,14 +59,14 @@ sub PIFACE_Define($$) {
   return;
 }
 
-sub PIFACE_Undefine($$) {
+sub PIFACE_Undefine {
   my($hash, $name) = @_;
   RemoveInternalTimer($hash->{helper}{timer}{poll});
   RemoveInternalTimer($hash->{helper}{timer}{watchdog});
   return;
 }
 
-sub PIFACE_Set($@) {
+sub PIFACE_Set {
 	my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
         if (IsDisabled($name)) {
@@ -107,7 +107,7 @@ sub PIFACE_Set($@) {
 	return;
 }
 
-sub PIFACE_Get($@) {
+sub PIFACE_Get {
   my ($hash, @a)	= @_;
   my $name = $hash->{NAME};
   return undef if (IsDisabled($name));
@@ -142,7 +142,7 @@ sub PIFACE_Get($@) {
   return;
 }
 
-sub PIFACE_Attr(@) {
+sub PIFACE_Attr {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $hash = $defs{$name};
   return undef if (!$init_done);
@@ -218,7 +218,7 @@ sub PIFACE_Attr(@) {
   return;
 }
 
-sub PIFACE_Notify(@) {
+sub PIFACE_Notify {
   my ($hash, $dev) = @_;
   my $name = $hash->{NAME};
   return undef if (IsDisabled($name));
@@ -232,7 +232,7 @@ sub PIFACE_Notify(@) {
   return undef;
 }
 
-sub PIFACE_Read_Outports($$) {
+sub PIFACE_Read_Outports {
 	my ($updateMode, $hash) = @_;
         my $name = $hash->{NAME};
 	my ($all, $cmd, $i, $j, $port, $val);
@@ -257,7 +257,7 @@ sub PIFACE_Read_Outports($$) {
 	return;
 }
 
-sub PIFACE_Read_Inports($$) {
+sub PIFACE_Read_Inports {
 	my ($updateMode, $hash) = @_;
         my $name = $hash->{NAME};
 	my ($cmd, $i, $j, $port, $portMode, $val);
@@ -278,7 +278,7 @@ sub PIFACE_Read_Inports($$) {
 	return;
 }
 
-sub PIFACE_Restore_Outports_State($) {
+sub PIFACE_Restore_Outports_State {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my @cmd = ($name, 0, 0);
@@ -304,7 +304,7 @@ sub PIFACE_Restore_Outports_State($) {
   return;
 }
 
-sub PIFACE_Restore_Inports_Mode($) {
+sub PIFACE_Restore_Inports_Mode {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my ($cmd, $port, $portMode, $valIn);
@@ -320,7 +320,7 @@ sub PIFACE_Restore_Inports_Mode($) {
   return;
 }
 
-sub PIFACE_GetUpdate($) {
+sub PIFACE_GetUpdate {
   #my ($hash) = @_;
   my ($functionHash) = @_;
   my $hash = $functionHash->{hash};
@@ -336,7 +336,7 @@ sub PIFACE_GetUpdate($) {
   return;
 }
 
-sub PIFACE_Watchdog($) {
+sub PIFACE_Watchdog {
   #my ($hash) = @_;
   my ($functionHash) = @_;
   my $hash = $functionHash->{hash};
@@ -428,7 +428,7 @@ sub PIFACE_Watchdog($) {
   return;
 }
 
-sub PIFACE_Shutdown($) {
+sub PIFACE_Shutdown {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   return undef if (AttrVal($name, "shutdownClearIO", 'no') eq 'no');
@@ -463,8 +463,9 @@ sub PIFACE_Shutdown($) {
   The status of the ports can be displayed periodically. The update of the states via interrupt is not supported.<br>
   The module can be periodically monitored by a watchdog function.<br>
   The ports can be read and controlled individually by the function <a href="#readingsProxy">readingsProxy</a>.<br>
-  PIFACE is tested with the Raspbian OS.<br><br>
-
+  PIFACE is tested with the Raspbian OS, Debian version 11 (bullseye) 32 bit and wiringpi_3.2-bullseye_armhf.<br>
+  Raspberry 5 and Raspbian OS Bookworm may work but is not tested.
+  <br><br>
   <b>Preparatory Work</b><br>
   The use of PIFACE module requires some preparatory work. The module needs the <a href=http://wiringpi.com>Wiring Pi</a> tool.
   <ul>
