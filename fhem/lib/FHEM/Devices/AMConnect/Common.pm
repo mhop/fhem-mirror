@@ -168,6 +168,7 @@ mowingPathLineWidth="1"
 mowingPathDotWidth="2"
 mowingPathUseDots=""
 mowingPathShowCollisions=""
+hideSchedulerButton=""
 ';
 
   my $mapZonesTpl = '{
@@ -453,6 +454,7 @@ sub FW_detailFn {
   my $iam = "$type $name FW_detailFn:";
   return '' if( AttrVal($name, 'disable', 0) || !$::init_done || !$FW_ME );
 
+  my $mapDesign = getDesignAttr( $hash );
   my $reta = "<div id='amc_${name}_schedule_buttons' name='fhem_amc_mower_schedule_buttons' ><button id='amc_${name}_schedule_button' onclick='AutomowerConnectSchedule( \"$name\" )' style='font-size:16px; ' >Mower Schedule</button>";
   # $reta .= "<label for='amc_${name}_select_workareas' > for Work Area: </label><select id='amc_${name}_select_workareas' name=work_areas_select>";
   # $reta .= "<option value='-1' selected >default</option>";
@@ -464,8 +466,6 @@ sub FW_detailFn {
   my $zoom=AttrVal( $name,"mapImageZoom", 0.7 );
   my $backgroundcolor = AttrVal($name, 'mapBackgroundColor','');
   my $bgstyle = $backgroundcolor ? " background-color:$backgroundcolor;" : '';
-
-  my $mapDesign = getDesignAttr( $hash );
 
   my ($picx,$picy) = AttrVal( $name,"mapImageWidthHeight", $hash->{helper}{imageWidthHeight} ) =~ /(\d+)\s(\d+)/;
   $picx=int($picx*$zoom);
@@ -544,7 +544,7 @@ sub FW_detailFn {
 
   my $ret = "";
   $ret .= "<style>
-  .${type}_devname_div{padding:0px !important;
+  .${type}_${name}_div{padding:0px !important;
     $bgstyle background-image: url('$img');
     background-size: ${picx}px ${picy}px;
     background-repeat: no-repeat; 
@@ -559,11 +559,13 @@ sub FW_detailFn {
   my $contentflg = $content =~ /ON_TOP/;
   $content =~ s/command=['"](.*?)['"]/onclick="AutomowerConnectPanelCmd('set $name $1')"/g;
   $ret .= $content if ( $contentflg );
-  $ret .= "<div id='${type}_${name}_div' class='${type}_devname_div' $$mapDesign $csdata $limi $propli width='$picx' height='$picy' >";
+  my $mDesign = $$mapDesign;
+  $mDesign =~ s/data-hideSchedulerButton="1?"//;
+  $ret .= "<div id='${type}_${name}_div' class='${type}_${name}_div' $mDesign $csdata $limi $propli width='$picx' height='$picy' >";
   $ret .= "<canvas id='${type}_${name}_canvas_0' class='${type}_${name}_canvas_0' width='$picx' height='$picy' ></canvas>";
   $ret .= "<canvas id='${type}_${name}_canvas_1' class='${type}_${name}_canvas_1' width='$picx' height='$picy' ></canvas>";
   $ret .= "</div>";
-  $ret .=  $reta if( AttrVal ($name, 'showMap', 1 ) );
+  $ret .=  $reta if( AttrVal ($name, 'showMap', 1 ) ) && $$mapDesign =~ m/hideSchedulerButton=""/g;
 
   $ret .= "<div class='fhem_amc_hull_buttons' >";
   $ret .= "<button class='fhem_amc_hull_button' title='Sends the hull polygon points to attribute mowingAreaHull.' onclick='AutomowerConnectGetHull( \"$FW_ME/$type/$name/json\" )' style='font-size:12pt; ' >mowingAreaHullToAttribute</button>"

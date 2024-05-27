@@ -352,7 +352,8 @@ __END__
         mowingPathLineWidth="1"<br>
         mowingPathDotWidth="2"<br>
         mowingPathUseDots=""<br>
-        mowingPathShowCollisions=""
+        mowingPathShowCollisions=""<br>
+        hideSchedulerButton=""
       </code>
       </ul>
     </li>
@@ -837,7 +838,8 @@ __END__
         mowingPathLineWidth="1"<br>
         mowingPathDotWidth="2"<br>
         mowingPathUseDots=""<br>
-        mowingPathShowCollisions=""
+        mowingPathShowCollisions=""<br>
+        hideSchedulerButton=""
       </code>
       </ul>
     </li>
