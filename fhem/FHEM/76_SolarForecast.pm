@@ -157,6 +157,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.21.4" => "28.05.2024  __getCyclesAndRuntime: rename numberDayStarts to cycleDayNum ".
+                           "currentRunMtsConsumer_XX: edit commandref, Consumers: replace avgruntime by runtimeAvgDay ".
+                           "ctrlStatisticReadings: new runTimeAvgDayConsumer_XX, pvHistory: new key avgcycmntscsmXX",
   "1.21.3" => "27.05.2024  __getCyclesAndRuntime: change procedure determine consumer runtime and cycles per day ".
                            "__calcPVestimates: correct printout 'Estimated PV generation (calc)' and '(raw)' ".
                            "ctrlDebug: consumerSwitching splitted into separated consumers ",
@@ -1042,11 +1045,18 @@ my %hcsr = (                                                                    
 
   for my $csr (1..$maxconsumer) {
       $csr                                       = sprintf "%02d", $csr;
+      
       $hcsr{'currentRunMtsConsumer_'.$csr}{fnr}  = 4;
       $hcsr{'currentRunMtsConsumer_'.$csr}{fn}   = \&ConsumerVal;
       $hcsr{'currentRunMtsConsumer_'.$csr}{par}  = 'cycleTime';
       $hcsr{'currentRunMtsConsumer_'.$csr}{unit} = ' min';
       $hcsr{'currentRunMtsConsumer_'.$csr}{def}  = 0;
+      
+      $hcsr{'runTimeAvgDayConsumer_'.$csr}{fnr}  = 4;
+      $hcsr{'runTimeAvgDayConsumer_'.$csr}{fn}   = \&ConsumerVal;
+      $hcsr{'runTimeAvgDayConsumer_'.$csr}{par}  = 'runtimeAvgDay';
+      $hcsr{'runTimeAvgDayConsumer_'.$csr}{unit} = ' min';
+      $hcsr{'runTimeAvgDayConsumer_'.$csr}{def}  = 0;
   }
 
 # Funktiontemplate zur Speicherung von Werten in pvHistory
@@ -5620,7 +5630,7 @@ sub _attrcreateStatisticRdgs {           ## no critic "not used"
   my $aName = $paref->{aName};
   my $aVal  = $paref->{aVal};
 
-  my $te = 'currentRunMtsConsumer_';
+  my $te = 'currentRunMtsConsumer_|runTimeAvgDayConsumer_';
 
   if ($aVal =~ /$te/xs && $init_done) {
       my @aa = split ",", $aVal;
@@ -8751,25 +8761,30 @@ sub _manageConsumerData {
       }
 
       deleteReadingspec ($hash, "consumer${c}_currentPower") if(!$etotread && !$paread);
+      
+      __getAutomaticState     ($paref);                                                                           # Automatic Status des Consumers abfragen
+      __calcEnergyPieces      ($paref);                                                                           # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
+      __planInitialSwitchTime ($paref);                                                                           # Consumer Switch Zeiten planen
+      __setTimeframeState     ($paref);                                                                           # Timeframe Status ermitteln
+      __setConsRcmdState      ($paref);                                                                           # Consumption Recommended Status setzen
+      __switchConsumer        ($paref);                                                                           # Consumer schalten
+      
+      $paref->{pcurr} = $pcurr;
+      
+      __getCyclesAndRuntime   ($paref);                                                                           # Verbraucher - Laufzeit, Tagesstarts und Aktivminuten pro Stunde ermitteln      
+      __setPhysLogSwState     ($paref);                                                                           # physischen / logischen Schaltzustand festhalten
+      __reviewSwitchTime      ($paref);                                                                           # Planungsdaten überprüfen und ggf. neu planen
+      __remainConsumerTime    ($paref);                                                                           # Restlaufzeit Verbraucher ermitteln
 
-      $paref->{val}      = ConsumerVal ($hash, $c, "numberDayStarts", 0);                        # Anzahl Tageszyklen des Verbrauchers speichern
-      $paref->{histname} = "cyclescsm${c}";
-      setPVhistory ($paref);
-
-      $paref->{val}      = ceil ConsumerVal ($hash, $c, "minutesOn", 0);                         # Verbrauchsminuten akt. Stunde des Consumers speichern
-      $paref->{histname} = "minutescsm${c}";
-      setPVhistory ($paref);
-
-      delete $paref->{histname};
-      delete $paref->{val};
-
+      delete $paref->{pcurr};
+      
       ## Durchschnittsverbrauch / Betriebszeit ermitteln + speichern
       ################################################################
       my $consumerco = 0;
       my $runhours   = 0;
       my $dnum       = 0;
 
-      for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {                           # Betriebszeit und gemessenen Verbrauch ermitteln
+      for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {                            # Betriebszeit und gemessenen Verbrauch ermitteln
           my $csme  = HistoryVal ($hash, $n, 99, "csme${c}", 0);
           my $hours = HistoryVal ($hash, $n, 99, "hourscsme${c}", 0);
           next if(!$hours);
@@ -8787,25 +8802,8 @@ sub _manageConsumerData {
               delete $data{$type}{$name}{consumers}{$c}{avgenergy};
           }
 
-          $data{$type}{$name}{consumers}{$c}{avgruntime} = sprintf "%.2f", (($runhours / $dnum) * 60);            # Durchschnittslaufzeit am Tag in Minuten
+          $data{$type}{$name}{consumers}{$c}{runtimeAvgDay} = sprintf "%.2f", (($runhours / $dnum) * 60);            # Durchschnittslaufzeit am Tag in Minuten
       }
-
-      
-      __getAutomaticState     ($paref);                                                                           # Automatic Status des Consumers abfragen
-      __calcEnergyPieces      ($paref);                                                                           # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
-      __planInitialSwitchTime ($paref);                                                                           # Consumer Switch Zeiten planen
-      __setTimeframeState     ($paref);                                                                           # Timeframe Status ermitteln
-      __setConsRcmdState      ($paref);                                                                           # Consumption Recommended Status setzen
-      __switchConsumer        ($paref);                                                                           # Consumer schalten
-      
-      $paref->{pcurr} = $pcurr;
-      
-      __getCyclesAndRuntime   ($paref);                                                                           # Verbraucher - Laufzeit, Tagesstarts und Aktivminuten pro Stunde ermitteln      
-      __setPhysLogSwState     ($paref);                                                                           # physischen / logischen Schaltzustand festhalten
-      __reviewSwitchTime      ($paref);                                                                           # Planungsdaten überprüfen und ggf. neu planen
-      __remainConsumerTime    ($paref);                                                                           # Restlaufzeit Verbraucher ermitteln
-
-      delete $paref->{pcurr};
       
       ## Consumer Schaltstatus und Schaltzeit für Readings ermitteln
       ################################################################
@@ -10020,9 +10018,11 @@ return $state;
 }
 
 ################################################################
-## Verbraucher - Laufzeit, Tagesstarts und Aktivminuten pro 
-## Stunde ermitteln
-## Tageswechsel Management
+# Verbraucher - Laufzeit, Tagesstarts und Aktivminuten pro 
+# Stunde ermitteln
+# Stundenwechsel + Tageswechsel Management
+#
+# startTime - wichtig für Wechselmanagement!!
 ################################################################
 sub __getCyclesAndRuntime {
   my $paref = shift;
@@ -10036,18 +10036,33 @@ sub __getCyclesAndRuntime {
   my $pcurr = $paref->{pcurr};
   my $c     = $paref->{consumer};
   my $debug = $paref->{debug};
+  
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+  ##########################################################################################################################
+  my $nds = ConsumerVal ($hash, $c, 'numberDayStarts', 'leer');           # 28.05.2024
+  my $art = ConsumerVal ($hash, $c, 'avgruntime', 'leer');
+  if ($nds ne 'leer') {
+      $data{$type}{$name}{consumers}{$c}{cycleDayNum} = $nds;
+      delete $data{$type}{$name}{consumers}{$c}{numberDayStarts};
+  }
+  
+  if ($art ne 'leer') {
+      $data{$type}{$name}{consumers}{$c}{runtimeAvgDay} = $art;
+      delete $data{$type}{$name}{consumers}{$c}{avgruntime};
+  }
+  ##########################################################################################################################
 
-  my ($startday, $starthour);
+  my ($starthour, $startday);
   
   if (isConsumerLogOn ($hash, $c, $pcurr)) {                                                                                             # Verbraucher ist logisch "an"
-        if (ConsumerVal ($hash, $c, 'onoff', 'off') eq 'off') {
-            $data{$type}{$name}{consumers}{$c}{onoff}           = 'on';
-            $data{$type}{$name}{consumers}{$c}{startTime}       = $t;                                                                    # startTime ist nicht von "Automatic" abhängig -> nicht identisch mit planswitchon !!!
-            $data{$type}{$name}{consumers}{$c}{cycleStarttime}  = $t;
-            $data{$type}{$name}{consumers}{$c}{cycleTime}       = 0;
-            #my $stimes                                          = ConsumerVal ($hash, $c, 'numberDayStarts', 0);                         # Anzahl der On-Schaltungen am Tag
-            $data{$type}{$name}{consumers}{$c}{numberDayStarts}++;
-            $data{$type}{$name}{consumers}{$c}{lastMinutesOn}   = ConsumerVal ($hash, $c, 'minutesOn', 0);
+        if (ConsumerVal ($hash, $c, 'onoff', 'off') eq 'off') {                                                                          # Status im letzen Zyklus war "off"
+            $data{$type}{$name}{consumers}{$c}{onoff}          = 'on';
+            $data{$type}{$name}{consumers}{$c}{startTime}      = $t;                                                                     # startTime ist nicht von "Automatic" abhängig -> nicht identisch mit planswitchon !!!
+            $data{$type}{$name}{consumers}{$c}{cycleStarttime} = $t;
+            $data{$type}{$name}{consumers}{$c}{cycleTime}      = 0;                      
+            $data{$type}{$name}{consumers}{$c}{lastMinutesOn}  = ConsumerVal ($hash, $c, 'minutesOn', 0);
+            
+            $data{$type}{$name}{consumers}{$c}{cycleDayNum}++;                                                                           # Anzahl der On-Schaltungen am Tag                  
         }
         else {
             $data{$type}{$name}{consumers}{$c}{cycleTime} = (($t - ConsumerVal ($hash, $c, 'cycleStarttime', $t)) / 60);                 # Minuten
@@ -10060,47 +10075,60 @@ sub __getCyclesAndRuntime {
             my $runtime                                   = (($t - ConsumerVal ($hash, $c, 'startTime', $t)) / 60);                      # in Minuten ! (gettimeofday sind ms !)
             $data{$type}{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($hash, $c, 'lastMinutesOn', 0) + $runtime;
         }
-        else {                                                                                                                           # neue Stunde hat begonnen
-            if (ConsumerVal ($hash, $c, 'onoff', 'off') eq 'on') {
-                $data{$type}{$name}{consumers}{$c}{startTime}     = timestringToTimestamp ($date.' '.sprintf("%02d",  $chour).':00:00');
-                $data{$type}{$name}{consumers}{$c}{minutesOn}     = ($t - ConsumerVal ($hash, $c, 'startTime', $t)) / 60;                # in Minuten ! (gettimeofday sind ms !)
+        else {                                                                             # Stundenwechsel
+            if (ConsumerVal ($hash, $c, 'onoff', 'off') eq 'on') {                                                                       # Status im letzen Zyklus war "on"
+                my $newst                                         = timestringToTimestamp ($date.' '.sprintf("%02d",  $chour).':00:00');
+                $data{$type}{$name}{consumers}{$c}{startTime}     = $newst;
+                $data{$type}{$name}{consumers}{$c}{minutesOn}     = ($t - ConsumerVal ($hash, $c, 'startTime', $newst)) / 60;            # in Minuten ! (gettimeofday sind ms !)
                 $data{$type}{$name}{consumers}{$c}{lastMinutesOn} = 0;
             
-                if ($day ne $startday) {                                                                                                 # Tageswechsel
-                    $data{$type}{$name}{consumers}{$c}{numberDayStarts} = 1;
+                if ($day ne $startday) {                                                   # Tageswechsel
+                    $data{$type}{$name}{consumers}{$c}{cycleDayNum} = 1;
                 }
             }
         }
   }
-  else {                                                                                                                                 # Verbraucher soll nicht aktiv sein
-      $data{$type}{$name}{consumers}{$c}{onoff} = 'off';
-      #$data{$type}{$name}{consumers}{$c}{cycleTime} = 0;
-      $starthour = strftime "%H", localtime(ConsumerVal ($hash, $c, 'startTime', $t));
-      $startday  = strftime "%d", localtime(ConsumerVal ($hash, $c, 'startTime', $t));
+  else {                                                                                                                                 # Verbraucher soll nicht aktiv sein   
+      $starthour = strftime "%H", localtime(ConsumerVal ($hash, $c, 'startTime', 1));
+      $startday  = strftime "%d", localtime(ConsumerVal ($hash, $c, 'startTime', 1));                                                   # aktueller Tag  (range 01 to 31)
       
-      if ($chour ne $starthour) {
+      if ($chour ne $starthour) {                                                          # Stundenwechsel                   
           $data{$type}{$name}{consumers}{$c}{minutesOn} = 0;
-          delete $data{$type}{$name}{consumers}{$c}{startTime};
       }
       
-      if ($day ne $startday) {                                                                                                 # Tageswechsel
-          $data{$type}{$name}{consumers}{$c}{numberDayStarts} = 0;
+      if ($day ne $startday) {                                                             # Tageswechsel
+          $data{$type}{$name}{consumers}{$c}{cycleDayNum} = 0;
       }
+      
+      $data{$type}{$name}{consumers}{$c}{onoff} = 'off';
   }
   
   if ($debug =~ /consumerSwitching${c}/xs) {
       my $sr  = 'still running';     
-      my $son = isConsumerLogOn ($hash, $c, $pcurr) ? $sr : ConsumerVal ($hash, $c, 'cycleTime', 0) * 60;                     # letzte Cycle-Zeitdauer in Sekunden
+      my $son = isConsumerLogOn ($hash, $c, $pcurr) ? $sr : ConsumerVal ($hash, $c, 'cycleTime', 0) * 60;                                # letzte Cycle-Zeitdauer in Sekunden
       my $cst = ConsumerVal     ($hash, $c, 'cycleStarttime', 0);
       $son    = $son && $son ne $sr ? timestampToTimestring ($cst + $son, $paref->{lang}) : 
                 $son eq $sr         ? $sr                                                 :
                 '-';
-      $cst    = $cst ? timestampToTimestring ($cst, $paref->{lang})        : '-';
+      $cst    = $cst ? timestampToTimestring ($cst, $paref->{lang}) : '-';
          
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - numberDayStarts: }.ConsumerVal ($hash, $c, 'numberDayStarts', 0));
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - cycleDayNum: }.ConsumerVal ($hash, $c, 'cycleDayNum', 0));
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - last cycle start time: $cst});
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - last cycle end time: $son});
   }
+  
+  ## History schreiben
+  ######################
+  $paref->{val}      = ConsumerVal ($hash, $c, "cycleDayNum", 0);                         # Anzahl Tageszyklen des Verbrauchers speichern
+  $paref->{histname} = "cyclescsm${c}";
+  setPVhistory ($paref);
+
+  $paref->{val}      = ceil ConsumerVal ($hash, $c, "minutesOn", 0);                      # Verbrauchsminuten akt. Stunde des Consumers speichern
+  $paref->{histname} = "minutescsm${c}";
+  setPVhistory ($paref);
+
+  delete $paref->{histname};
+  delete $paref->{val};
   
 return;
 }
@@ -10859,6 +10887,11 @@ sub genStatisticReadings {
   for my $kpi (@csr) {
       my $def = $hcsr{$kpi}{def};
       my $par = $hcsr{$kpi}{par};
+      
+      if (!defined $def || !defined $par) {
+          Log3 ($name, 1, "$name - ERROR in Application - attribute ctrlStatisticReadings KPI '$kpi' has no Parameter or default value set. Set the attribute again or inform Maintainer.");
+        next;
+      }
 
       if ($def eq 'apimaxreq') {
           $def = AttrVal ($name, 'ctrlSolCastAPImaxReq', $solcmaxreqdef);
@@ -10978,6 +11011,19 @@ sub genStatisticReadings {
               my $mion = &{$hcsr{$kpi}{fn}} ($hash, $c, $hcsr{$kpi}{par}, $def);
 
               storeReading ('statistic_'.$kpi, (sprintf "%.0f", $mion).$hcsr{$kpi}{unit});
+          }
+          
+          if ($kpi =~ /runTimeAvgDayConsumer_/xs) {
+              my $c = (split "_", $kpi)[1];                                                          # Consumer Nummer extrahieren
+
+              if (!AttrVal ($name, 'consumer'.$c, '')) {
+                  deleteReadingspec ($hash, 'statistic_runTimeAvgDayConsumer_'.$c);
+                  return;
+              }
+
+              my $radc = &{$hcsr{$kpi}{fn}} ($hash, $c, $hcsr{$kpi}{par}, $def);
+
+              storeReading ('statistic_'.$kpi, $radc.$hcsr{$kpi}{unit});
           }
 
           if ($kpi eq 'todayConsumptionForecast') {
@@ -14469,7 +14515,11 @@ sub setPVhistory {
       }
 
       my $cycles = HistoryVal ($hash, $day, 99, "cyclescsm${num}", 0);
-      $data{$type}{$name}{pvhist}{$day}{99}{"hourscsme${num}"} = sprintf "%.2f", ($minutes / 60 ) if($cycles);
+      
+      if ($cycles) {
+          $data{$type}{$name}{pvhist}{$day}{99}{"hourscsme${num}"}     = sprintf "%.2f", ($minutes / 60 );
+          $data{$type}{$name}{pvhist}{$day}{99}{"avgcycmntscsm${num}"} = sprintf "%.2f", ($minutes / $cycles);
+      }
   }
 
   if ($histname =~ /cyclescsm[0-9]+$/xs) {                                                        # Anzahl Tageszyklen des Verbrauchers
@@ -14664,18 +14714,20 @@ sub listDataPool {
           for my $c (1..$maxconsumer) {
               $c       = sprintf "%02d", $c;
               my $nl   = 0;
-              my $csmc = HistoryVal ($hash, $day, $key, "cyclescsm${c}",  undef);
-              my $csmt = HistoryVal ($hash, $day, $key, "csmt${c}",       undef);
-              my $csme = HistoryVal ($hash, $day, $key, "csme${c}",       undef);
-              my $csmm = HistoryVal ($hash, $day, $key, "minutescsm${c}", undef);
-              my $csmh = HistoryVal ($hash, $day, $key, "hourscsme${c}",  undef);
+              my $csmc = HistoryVal ($hash, $day, $key, "cyclescsm${c}",      undef);
+              my $csmt = HistoryVal ($hash, $day, $key, "csmt${c}",           undef);
+              my $csme = HistoryVal ($hash, $day, $key, "csme${c}",           undef);
+              my $csmm = HistoryVal ($hash, $day, $key, "minutescsm${c}",     undef);
+              my $csmh = HistoryVal ($hash, $day, $key, "hourscsme${c}",      undef);
+              my $csma = HistoryVal ($hash, $day, $key, "avgcycmntscsm${c}",  undef);
               
               if ($export eq 'csv') {
-                  $hexp->{$day}{$key}{"CyclesCsm${c}"}  = $csmc if(defined $csmc);
-                  $hexp->{$day}{$key}{"Csmt${c}"}       = $csmt if(defined $csmt);
-                  $hexp->{$day}{$key}{"Csme${c}"}       = $csme if(defined $csme);
-                  $hexp->{$day}{$key}{"MinutesCsm${c}"} = $csmm if(defined $csmm);
-                  $hexp->{$day}{$key}{"HoursCsme${c}"}  = $csmh if(defined $csmh);
+                  $hexp->{$day}{$key}{"CyclesCsm${c}"}          = $csmc if(defined $csmc);
+                  $hexp->{$day}{$key}{"Csmt${c}"}               = $csmt if(defined $csmt);
+                  $hexp->{$day}{$key}{"Csme${c}"}               = $csme if(defined $csme);
+                  $hexp->{$day}{$key}{"MinutesCsm${c}"}         = $csmm if(defined $csmm);
+                  $hexp->{$day}{$key}{"HoursCsme${c}"}          = $csmh if(defined $csmh);
+                  $hexp->{$day}{$key}{"AvgCycleMinutesCsm${c}"} = $csma if(defined $csma);
               }
 
               if (defined $csmc) {
@@ -14704,6 +14756,12 @@ sub listDataPool {
               if (defined $csmh) {
                   $csm .= ", " if($nl);
                   $csm .= "hourscsme${c}: $csmh";
+                  $nl   = 1;
+              }
+              
+              if (defined $csma) {
+                  $csm .= ", " if($nl);
+                  $csm .= "avgcycmntscsm${c}: $csma";
                   $nl   = 1;
               }
 
@@ -17793,7 +17851,7 @@ return $def;
 #       energythreshold - Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird
 #       upcurr          - Unit des aktuellen Verbrauchs
 #       avgenergy       - initialer / gemessener Durchschnittsverbrauch pro Stunde
-#       avgruntime      - durchschnittliche Einschalt- bzw. Zykluszeit (Minuten)
+#       runtimeAvgDay   - durchschnittliche 'On'-Zeit an einem Tag (Minuten)
 #       epieces         - prognostizierte Energiescheiben (Hash)
 #       ehodpieces      - geplante Energiescheiben nach Tagesstunde (hour of day) (Hash)
 #       dswoncond       - Device zur Lieferung einer zusätzliche Einschaltbedingung
@@ -18930,7 +18988,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>gcon</b>           </td><td>real power consumption (Wh) from the electricity grid                                                                    </td></tr>
             <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                                              </td></tr>
             <tr><td> <b>feedprice</b>      </td><td>Remuneration for the feed-in of one kWh. The currency of the price is defined in the currentMeterDev.                    </td></tr>
-            <tr><td> <b>hourscsmeXX</b>    </td><td>average hours of an active cycle of ConsumerXX of the day                                                                </td></tr>
+            <tr><td> <b>hourscsmeXX</b>    </td><td>total active hours of the day from ConsumerXX                                                                            </td></tr>
             <tr><td> <b>minutescsmXX</b>   </td><td>total active minutes in the hour of ConsumerXX                                                                           </td></tr>
             <tr><td> <b>pvfc</b>           </td><td>the predicted PV yield (Wh)                                                                                              </td></tr>
             <tr><td> <b>pvrl</b>           </td><td>real PV generation (Wh)                                                                                                  </td></tr>
@@ -19576,12 +19634,13 @@ to ensure that the system configuration is correct.
             <tr><td> <b>allStringsFullfilled</b>       </td><td>Fulfillment status of error-free generation of all strings                                                           </td></tr>
             <tr><td> <b>conForecastTillNextSunrise</b> </td><td>Consumption forecast from current hour to the coming sunrise                                                         </td></tr>
             <tr><td> <b>currentAPIinterval</b>         </td><td>the current call interval of the SolCast API (only model SolCastAPI) in seconds                                      </td></tr>
-            <tr><td> <b>currentRunMtsConsumer_XX</b>   </td><td>the running time (minutes) of the consumer "XX" since the last switch-on. (0 - consumer is off)                      </td></tr>
+            <tr><td> <b>currentRunMtsConsumer_XX</b>   </td><td>the running time (minutes) of the consumer "XX" since the last switch-on. (last running cycle)                       </td></tr>
             <tr><td> <b>dayAfterTomorrowPVforecast</b> </td><td>provides the forecast of PV generation for the day after tomorrow (if available) without autocorrection (raw data)   </td></tr>
             <tr><td> <b>daysUntilBatteryCare</b>       </td><td>Days until the next battery maintenance (reaching the charge 'maxSoC' from attribute ctrlBatSocManagement)           </td></tr>
             <tr><td> <b>lastretrieval_time</b>         </td><td>the last call time of the API (only Model SolCastAPI, ForecastSolarAPI)                                              </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>    </td><td>the timestamp of the last call time of the API (only Model SolCastAPI, ForecastSolarAPI)                             </td></tr>
             <tr><td> <b>response_message</b>           </td><td>the last status message of the API (only Model SolCastAPI, ForecastSolarAPI)                                         </td></tr>
+            <tr><td> <b>runTimeAvgDayConsumer_XX</b>   </td><td>the average running time (minutes) of consumer "XX" on one day                                                       </td></tr>
             <tr><td> <b>runTimeCentralTask</b>         </td><td>the runtime of the last SolarForecast interval (total process) in seconds                                            </td></tr>
             <tr><td> <b>runTimeTrainAI</b>             </td><td>the runtime of the last AI training cycle in seconds                                                                 </td></tr>
             <tr><td> <b>runTimeLastAPIAnswer</b>       </td><td>the last response time of the API call to a request in seconds (only model SolCastAPI, ForecastSolarAPI)             </td></tr>
@@ -21196,35 +21255,36 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>batintotal</b>     </td><td>totale Batterieladung (Wh) zu Beginn der Stunde                                                    </td></tr>
-            <tr><td> <b>batin</b>          </td><td>Batterieladung der Stunde (Wh)                                                                     </td></tr>
-            <tr><td> <b>batouttotal</b>    </td><td>totale Batterieentladung (Wh) zu Beginn der Stunde                                                 </td></tr>
-            <tr><td> <b>batout</b>         </td><td>Batterieentladung der Stunde (Wh)                                                                  </td></tr>
-            <tr><td> <b>batmaxsoc</b>      </td><td>maximaler SOC (%) des Tages                                                                        </td></tr>
-            <tr><td> <b>batsetsoc</b>      </td><td>optimaler SOC Sollwert (%) für den Tag                                                             </td></tr>
-            <tr><td> <b>csmtXX</b>         </td><td>Energieverbrauch total von ConsumerXX                                                              </td></tr>
-            <tr><td> <b>csmeXX</b>         </td><td>Energieverbrauch von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)        </td></tr>
-            <tr><td> <b>confc</b>          </td><td>erwarteter Energieverbrauch (Wh)                                                                   </td></tr>
-            <tr><td> <b>con</b>            </td><td>realer Energieverbrauch (Wh) des Hauses                                                            </td></tr>
-            <tr><td> <b>conprice</b>       </td><td>Preis für den Bezug einer kWh. Die Einheit des Preises ist im currentMeterDev definiert.           </td></tr>
-            <tr><td> <b>cyclescsmXX</b>    </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                      </td></tr>
-            <tr><td> <b>DoN</b>            </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                               </td></tr>
-            <tr><td> <b>etotal</b>         </td><td>totaler Energieertrag (Wh) zu Beginn der Stunde                                                    </td></tr>
-            <tr><td> <b>gcon</b>           </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                                       </td></tr>
-            <tr><td> <b>gfeedin</b>        </td><td>reale Einspeisung (Wh) in das Stromnetz                                                            </td></tr>
-            <tr><td> <b>feedprice</b>      </td><td>Vergütung für die Einpeisung einer kWh. Die Währung des Preises ist im currentMeterDev definiert.  </td></tr>
-            <tr><td> <b>hourscsmeXX</b>    </td><td>durchschnittliche Stunden eines Aktivzyklus von ConsumerXX des Tages                               </td></tr>
-            <tr><td> <b>minutescsmXX</b>   </td><td>Summe Aktivminuten in der Stunde von ConsumerXX                                                    </td></tr>
-            <tr><td> <b>pvfc</b>           </td><td>der prognostizierte PV Ertrag (Wh)                                                                 </td></tr>
-            <tr><td> <b>pvrl</b>           </td><td>reale PV Erzeugung (Wh)                                                                            </td></tr>
-            <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' ist gültig und wird im Lernprozess berücksichtigt, 0-'pvrl' ist als abnormal bewertet     </td></tr>
-            <tr><td> <b>pvcorrf</b>        </td><td>verwendeter Autokorrekturfaktor / erreichte Prognosequalität                                       </td></tr>
-            <tr><td> <b>rad1h</b>          </td><td>Globalstrahlung (kJ/m2)                                                                            </td></tr>
-            <tr><td> <b>sunalt</b>         </td><td>Höhe der Sonne (in Dezimalgrad)                                                                    </td></tr>
-            <tr><td> <b>sunaz</b>          </td><td>Azimuth der Sonne (in Dezimalgrad)                                                                 </td></tr>
-            <tr><td> <b>wid</b>            </td><td>Identifikationsnummer des Wetters                                                                  </td></tr>
-            <tr><td> <b>wcc</b>            </td><td>effektive Wolkenbedeckung                                                                          </td></tr>
-            <tr><td> <b>rr1c</b>           </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                     </td></tr>
+            <tr><td> <b>batintotal</b>      </td><td>totale Batterieladung (Wh) zu Beginn der Stunde                                                    </td></tr>
+            <tr><td> <b>batin</b>           </td><td>Batterieladung der Stunde (Wh)                                                                     </td></tr>
+            <tr><td> <b>batouttotal</b>     </td><td>totale Batterieentladung (Wh) zu Beginn der Stunde                                                 </td></tr>
+            <tr><td> <b>batout</b>          </td><td>Batterieentladung der Stunde (Wh)                                                                  </td></tr>
+            <tr><td> <b>batmaxsoc</b>       </td><td>maximaler SOC (%) des Tages                                                                        </td></tr>
+            <tr><td> <b>batsetsoc</b>       </td><td>optimaler SOC Sollwert (%) für den Tag                                                             </td></tr>
+            <tr><td> <b>csmtXX</b>          </td><td>Energieverbrauch total von ConsumerXX                                                              </td></tr>
+            <tr><td> <b>csmeXX</b>          </td><td>Energieverbrauch von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)        </td></tr>
+            <tr><td> <b>confc</b>           </td><td>erwarteter Energieverbrauch (Wh)                                                                   </td></tr>
+            <tr><td> <b>con</b>             </td><td>realer Energieverbrauch (Wh) des Hauses                                                            </td></tr>
+            <tr><td> <b>conprice</b>        </td><td>Preis für den Bezug einer kWh. Die Einheit des Preises ist im currentMeterDev definiert.           </td></tr>
+            <tr><td> <b>cyclescsmXX</b>     </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                      </td></tr>
+            <tr><td> <b>DoN</b>             </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                               </td></tr>
+            <tr><td> <b>etotal</b>          </td><td>totaler Energieertrag (Wh) zu Beginn der Stunde                                                    </td></tr>
+            <tr><td> <b>gcon</b>            </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                                       </td></tr>
+            <tr><td> <b>gfeedin</b>         </td><td>reale Einspeisung (Wh) in das Stromnetz                                                            </td></tr>
+            <tr><td> <b>feedprice</b>       </td><td>Vergütung für die Einpeisung einer kWh. Die Währung des Preises ist im currentMeterDev definiert.  </td></tr>
+            <tr><td> <b>avgcycmntscsmXX</b> </td><td>durchschnittliche Dauer eines Einschaltzyklus des Tages von ConsumerXX in Minuten                  </td></tr>
+            <tr><td> <b>hourscsmeXX</b>     </td><td>Summe Aktivstunden des Tages von ConsumerXX                                                        </td></tr>
+            <tr><td> <b>minutescsmXX</b>    </td><td>Summe Aktivminuten in der Stunde von ConsumerXX                                                    </td></tr>
+            <tr><td> <b>pvfc</b>            </td><td>der prognostizierte PV Ertrag (Wh)                                                                 </td></tr>
+            <tr><td> <b>pvrl</b>            </td><td>reale PV Erzeugung (Wh)                                                                            </td></tr>
+            <tr><td> <b>pvrlvd</b>          </td><td>1-'pvrl' ist gültig und wird im Lernprozess berücksichtigt, 0-'pvrl' ist als abnormal bewertet     </td></tr>
+            <tr><td> <b>pvcorrf</b>         </td><td>verwendeter Autokorrekturfaktor / erreichte Prognosequalität                                       </td></tr>
+            <tr><td> <b>rad1h</b>           </td><td>Globalstrahlung (kJ/m2)                                                                            </td></tr>
+            <tr><td> <b>sunalt</b>          </td><td>Höhe der Sonne (in Dezimalgrad)                                                                    </td></tr>
+            <tr><td> <b>sunaz</b>           </td><td>Azimuth der Sonne (in Dezimalgrad)                                                                 </td></tr>
+            <tr><td> <b>wid</b>             </td><td>Identifikationsnummer des Wetters                                                                  </td></tr>
+            <tr><td> <b>wcc</b>             </td><td>effektive Wolkenbedeckung                                                                          </td></tr>
+            <tr><td> <b>rr1c</b>            </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                     </td></tr>
 
          </table>
       </ul>
@@ -21860,12 +21920,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>allStringsFullfilled</b>       </td><td>Erfüllungsstatus der fehlerfreien Generierung aller Strings                                                     </td></tr>
             <tr><td> <b>conForecastTillNextSunrise</b> </td><td>Verbrauchsprognose von aktueller Stunde bis zum kommenden Sonnenaufgang                                         </td></tr>
             <tr><td> <b>currentAPIinterval</b>         </td><td>das aktuelle Abrufintervall der SolCast API (nur Model SolCastAPI) in Sekunden                                  </td></tr>
-            <tr><td> <b>currentRunMtsConsumer_XX</b>   </td><td>die Laufzeit (Minuten) des Verbrauchers "XX" seit dem letzten Einschalten. (0 - Verbraucher ist aus)            </td></tr>
+            <tr><td> <b>currentRunMtsConsumer_XX</b>   </td><td>die Laufzeit (Minuten) des Verbrauchers "XX" seit dem letzten Einschalten. (letzter Laufzyklus)                 </td></tr>
             <tr><td> <b>dayAfterTomorrowPVforecast</b> </td><td>liefert die Vorhersage der PV Erzeugung für Übermorgen (sofern verfügbar) ohne Autokorrektur (Rohdaten).        </td></tr>
             <tr><td> <b>daysUntilBatteryCare</b>       </td><td>Tage bis zur nächsten Batteriepflege (Erreichen der Ladung 'maxSoC' aus Attribut ctrlBatSocManagement)          </td></tr>
             <tr><td> <b>lastretrieval_time</b>         </td><td>der letzte Abrufzeitpunkt der API (nur Model SolCastAPI, ForecastSolarAPI)                                      </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>    </td><td>der Timestamp der letzen Abrufzeitpunkt der API (nur Model SolCastAPI, ForecastSolarAPI)                        </td></tr>
             <tr><td> <b>response_message</b>           </td><td>die letzte Statusmeldung der API (nur Model SolCastAPI, ForecastSolarAPI)                                       </td></tr>
+            <tr><td> <b>runTimeAvgDayConsumer_XX</b>   </td><td>die durchschnittliche Laufzeit (Minuten) des Verbrauchers "XX" an einem Tag                                     </td></tr>
             <tr><td> <b>runTimeCentralTask</b>         </td><td>die Laufzeit des letzten SolarForecast Intervalls (Gesamtprozess) in Sekunden                                   </td></tr>
             <tr><td> <b>runTimeTrainAI</b>             </td><td>die Laufzeit des letzten KI Trainingszyklus in Sekunden                                                         </td></tr>
             <tr><td> <b>runTimeLastAPIAnswer</b>       </td><td>die letzte Antwortzeit des API Abrufs auf einen Request in Sekunden (nur Model SolCastAPI, ForecastSolarAPI)    </td></tr>
