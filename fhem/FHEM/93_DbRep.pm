@@ -58,6 +58,7 @@ use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.14" => "29.05.2024  _DbRep_avgTimeWeightMean: accept if \$val1=0 (use looks_like_number) ",
   "8.53.13" => "25.05.2024  replace Smartmatch Forum:#137776 ",
   "8.53.12" => "09.05.2024  DbRep_dbConnect: change PRAGMA temp_store=MEMORY to FILE, Forum: https://forum.fhem.de/index.php?msg=1312722 ",
   "8.53.11" => "08.05.2024  reduceLog: fix bug if EXCL/INCL-devices end with a digit ",  
@@ -3695,7 +3696,7 @@ sub _DbRep_avgTimeWeightMean {
 
       my @twm_array = map { $_->[0]."_ESC_".$_->[1] } @{$sth->fetchall_arrayref()};
 
-      if ($bin_end && $val1) {                                                      # der letzte Datenwert aus dem vorherigen Bin wird dem aktuellen Bin vorangestellt,
+      if ($bin_end && looks_like_number ($val1)) {                                  # der letzte Datenwert aus dem vorherigen Bin wird dem aktuellen Bin vorangestellt, V. 8.53.14: looks_like_number
           unshift @twm_array, $bin_end.'_ESC_'.$val1;                               # wobei das vorherige $bin_end als Zeitstempel verwendet wird
       }
 
