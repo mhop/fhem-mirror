@@ -157,7 +157,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.22.0" => "01.06.2024  change setter currentMeterDev to attr setupMeterDev, plantConfiguration: setModel after restore ",
+  "1.22.0" => "01.06.2024  change setter currentMeterDev to attr setupMeterDev, plantConfiguration: setModel after restore ".
+                           "delete reset currentMeterSet ",
   "1.21.5" => "30.05.2024  listDataPool: list current can operate three hash levels, first preparation for remote objects ",
   "1.21.4" => "28.05.2024  __getCyclesAndRuntime: rename numberDayStarts to cycleDayNum ".
                            "currentRunMtsConsumer_XX: edit commandref, Consumers: replace avgruntime by runtimeAvgDay ".
@@ -1412,7 +1413,6 @@ sub Set {
                consumption
                currentBatterySet
                currentInverterSet
-               currentMeterSet
                energyH4TriggerSet
                inverterStringSet
                moduleRoofTopSet
@@ -2398,29 +2398,6 @@ sub _setreset {                          ## no critic "not used"
 
       writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                # Cache File SolCast API Werte schreiben
       return;
-  }
-
-  if ($prop eq 'currentMeterSet') {
-      readingsDelete ($hash, "Current_GridConsumption");
-      readingsDelete ($hash, "Current_GridFeedIn");
-      delete $data{$type}{$name}{circular}{'99'}{initdayfeedin};
-      delete $data{$type}{$name}{circular}{'99'}{gridcontotal};
-      delete $data{$type}{$name}{circular}{'99'}{initdaygcon};
-      delete $data{$type}{$name}{circular}{'99'}{feedintotal};
-      delete $data{$type}{$name}{current}{gridconsumption};
-      delete $data{$type}{$name}{current}{tomorrowconsumption};
-      delete $data{$type}{$name}{current}{gridfeedin};
-      delete $data{$type}{$name}{current}{consumption};
-      delete $data{$type}{$name}{current}{autarkyrate};
-      delete $data{$type}{$name}{current}{selfconsumption};
-      delete $data{$type}{$name}{current}{selfconsumptionrate};
-      delete $data{$type}{$name}{current}{eFeedInTariff};
-      delete $data{$type}{$name}{current}{eFeedInTariffCcy};
-      delete $data{$type}{$name}{current}{ePurchasePrice};
-      delete $data{$type}{$name}{current}{ePurchasePriceCcy};
-      delete $data{$type}{$name}{current}{x_remote};
-
-      writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
   }
 
   if ($prop eq 'currentBatterySet') {
@@ -5671,7 +5648,24 @@ sub _attrMeterDev {                    ## no critic "not used"
       }
   }
 
-  if ($paref->{cmd} eq 'del' ) {
+  if ($paref->{cmd} eq 'del' ) {      
+      readingsDelete ($hash, "Current_GridConsumption");
+      readingsDelete ($hash, "Current_GridFeedIn");
+      delete $data{$type}{$name}{circular}{'99'}{initdayfeedin};
+      delete $data{$type}{$name}{circular}{'99'}{gridcontotal};
+      delete $data{$type}{$name}{circular}{'99'}{initdaygcon};
+      delete $data{$type}{$name}{circular}{'99'}{feedintotal};
+      delete $data{$type}{$name}{current}{gridconsumption};
+      delete $data{$type}{$name}{current}{tomorrowconsumption};
+      delete $data{$type}{$name}{current}{gridfeedin};
+      delete $data{$type}{$name}{current}{consumption};
+      delete $data{$type}{$name}{current}{autarkyrate};
+      delete $data{$type}{$name}{current}{selfconsumption};
+      delete $data{$type}{$name}{current}{selfconsumptionrate};
+      delete $data{$type}{$name}{current}{eFeedInTariff};
+      delete $data{$type}{$name}{current}{eFeedInTariffCcy};
+      delete $data{$type}{$name}{current}{ePurchasePrice};
+      delete $data{$type}{$name}{current}{ePurchasePriceCcy};
       delete $data{$type}{$name}{current}{x_remote};
   }
   
@@ -18800,7 +18794,6 @@ to ensure that the system configuration is correct.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumption 08 10) </ul>   </td></tr>
             <tr><td> <b>currentBatterySet</b>  </td><td>deletes the set battery device and corresponding data.                                                                  </td></tr>
             <tr><td> <b>currentInverterSet</b> </td><td>deletes the set inverter device and corresponding data.                                                                 </td></tr>
-            <tr><td> <b>currentMeterSet</b>    </td><td>deletes the set meter device and corresponding data.                                                                    </td></tr>
             <tr><td> <b>energyH4TriggerSet</b> </td><td>deletes the 4-hour energy trigger points                                                                                </td></tr>
             <tr><td> <b>inverterStringSet</b>  </td><td>deletes the string configuration of the installation                                                                    </td></tr>
             <tr><td> <b>powerTriggerSet</b>    </td><td>deletes the trigger points for PV generation values                                                                     </td></tr>
@@ -20350,12 +20343,11 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupMeterDev Meter gcon=Wirkleistung:W contotal=BezWirkZaehler:kWh gfeedin=-gcon feedtotal=EinWirkZaehler:kWh conprice=powerCost:€ feedprice=0.1269:€ <br>
-         <br>
-         # Device Meter provides the current grid reference in the reading "Wirkleistung" (W),
-           the sum of the grid reference in the reading "BezWirkZaehler" (kWh), the current feed in "Wirkleistung" if "Wirkleistung" is negative,
-           the sum of the feed in the reading "EinWirkZaehler". (kWh)
+         attr &lt;name&gt; setupMeterDev Meter gcon=Wirkleistung:W contotal=BezWirkZaehler:kWh gfeedin=-gcon feedtotal=EinWirkZaehler:kWh conprice=powerCost:€ feedprice=0.1269:€
        </ul>
+       <br>
+       
+       <b>Note:</b> Deleting the attribute also removes the internally corresponding data.
        </li>
      <br>
 
@@ -21082,7 +21074,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumption 08 10) </ul> </td></tr>
             <tr><td> <b>currentBatterySet</b>  </td><td>löscht das eingestellte Batteriedevice und korrespondierende Daten                                                      </td></tr>
             <tr><td> <b>currentInverterSet</b> </td><td>löscht das eingestellte Inverterdevice und korrespondierende Daten                                                      </td></tr>
-            <tr><td> <b>currentMeterSet</b>    </td><td>löscht das eingestellte Meterdevice und korrespondierende Daten                                                         </td></tr>
             <tr><td> <b>energyH4TriggerSet</b> </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                              </td></tr>
             <tr><td> <b>inverterStringSet</b>  </td><td>löscht die Stringkonfiguration der Anlage                                                                               </td></tr>
             <tr><td> <b>powerTriggerSet</b>    </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                         </td></tr>
@@ -22632,12 +22623,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupMeterDev Meter gcon=Wirkleistung:W contotal=BezWirkZaehler:kWh gfeedin=-gcon feedtotal=EinWirkZaehler:kWh conprice=powerCost:€ feedprice=0.1269:€ <br>
-         <br>
-         # Device Meter liefert den aktuellen Netzbezug im Reading "Wirkleistung" (W),
-           die Summe des Netzbezugs im Reading "BezWirkZaehler" (kWh), die aktuelle Einspeisung in "Wirkleistung" wenn "Wirkleistung" negativ ist,
-           die Summe der Einspeisung im Reading "EinWirkZaehler" (kWh)
+         attr &lt;name&gt; setupMeterDev Meter gcon=Wirkleistung:W contotal=BezWirkZaehler:kWh gfeedin=-gcon feedtotal=EinWirkZaehler:kWh conprice=powerCost:€ feedprice=0.1269:€
        </ul>
+       <br>
+       
+       <b>Hinweis:</b> Durch Löschen des Attributes werden ebenfalls die intern korrespondierenden Daten entfernt.
        </li>
      <br>
 
