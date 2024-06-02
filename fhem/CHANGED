@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  76_SolarForecast: set currentBatteryDev to attr setupBatteryDev
+                              !NOTE! save FHEM config after restart,
+                              minor other changes
  - change:  76_SolarForecast: change set currentMeterDev to attr setupMeterDev
  - feature: 76_SolarForecast: ctrlStatisticReadings: new runTimeAvgDayConsumer
  - change:  76_SolarForecast: ctrlDebug consumerSwitching splitted into 

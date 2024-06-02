@@ -157,7 +157,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.22.0" => "01.06.2024  change setter currentMeterDev to attr setupMeterDev, plantConfiguration: setModel after restore ".
+  "1.23.0" => "02.06.2024  transformed setter currentBatteryDev to attr setupBatteryDev, _transferInverterValues: change output for DEBUG ".
+                           "new key attrInvChangedTs in circular, prepare transformation of currentInverterDev ",
+  "1.22.0" => "01.06.2024  transformed setter currentMeterDev to attr setupMeterDev, plantConfiguration: setModel after restore ".
                            "delete reset currentMeterSet ",
   "1.21.5" => "30.05.2024  listDataPool: list current can operate three hash levels, first preparation for remote objects ",
   "1.21.4" => "28.05.2024  __getCyclesAndRuntime: rename numberDayStarts to cycleDayNum ".
@@ -490,7 +492,6 @@ my @fs = qw( ftui_forecast.css
            );
                                                                                  # Anlagenkonfiguration: maßgebliche Readings
 my @rconfigs = qw( pvCorrectionFactor_Auto
-                   currentBatteryDev
                    currentInverterDev
                    currentRadiationAPI
                    inverterStrings
@@ -523,7 +524,7 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
                    graphicHeaderDetail graphicHeaderShow graphicHistoryHour graphicHourCount graphicHourStyle
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
                    graphicSpaceSize graphicStartHtml graphicEndHtml graphicWeatherColor graphicWeatherColorNight
-                   setupMeterDev
+                   setupMeterDev setupBatteryDev
                  );
 
 for my $cinit (1..$maxconsumer) {                             
@@ -545,7 +546,6 @@ my %hset = (                                                                # Ha
   inverterStrings           => { fn => \&_setinverterStrings           },
   clientAction              => { fn => \&_setclientAction              },
   currentInverterDev        => { fn => \&_setinverterDevice            },
-  currentBatteryDev         => { fn => \&_setbatteryDevice             },
   energyH4Trigger           => { fn => \&_setTrigger                   },
   plantConfiguration        => { fn => \&_setplantConfiguration        },
   batteryTrigger            => { fn => \&_setTrigger                   },
@@ -606,6 +606,7 @@ my %hattr = (                                                                # H
   ctrlWeatherDev2           => { fn => \&_attrWeatherDev          },
   ctrlWeatherDev3           => { fn => \&_attrWeatherDev          },
   setupMeterDev             => { fn => \&_attrMeterDev            },
+  setupBatteryDev           => { fn => \&_attrBatteryDev          },
 );
 
 my %htr = (                                                                  # Hash even/odd für <tr>
@@ -1215,6 +1216,7 @@ sub Initialize {
                                 "graphicWeatherColor:colorpicker,RGB ".
                                 "graphicWeatherColorNight:colorpicker,RGB ".
                                 "setupMeterDev:textField-long ".
+                                "setupBatteryDev:textField-long ".
                                 $consumer.
                                 $readingFnAttributes;
 
@@ -1411,7 +1413,6 @@ sub Set {
                consumerMaster
                consumerPlanning
                consumption
-               currentBatterySet
                currentInverterSet
                energyH4TriggerSet
                inverterStringSet
@@ -1465,7 +1466,6 @@ sub Set {
              "consumerImmediatePlanning:$coms ".
              "consumerNewPlanning:$coms ".
              "currentRadiationAPI:$rdd ".
-             "currentBatteryDev:textField-long ".
              "currentInverterDev:textField-long ".
              "energyH4Trigger:textField-long ".
              "inverterStrings ".
@@ -1805,6 +1805,7 @@ sub _setinverterDevice {                 ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
 
@@ -1823,6 +1824,8 @@ sub _setinverterDevice {                 ## no critic "not used"
       return qq{The syntax of key "capacity" is not correct. Please consider the commandref.};
   }
 
+  $data{$type}{$name}{circular}{99}{attrInvChangedTs} = int time;
+  
   readingsSingleUpdate ($hash, 'currentInverterDev', $arg, 1);
   createAssociatedWith ($hash);
   writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
@@ -1862,53 +1865,6 @@ sub _setinverterStrings {                ## no critic "not used"
             qq{Use "set $name plantConfiguration check" to validate your Setup.};
 
 return $ret;
-}
-
-################################################################
-#                      Setter currentBatteryDev
-################################################################
-sub _setbatteryDevice {                  ## no critic "not used"
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $type  = $paref->{type};
-  my $opt   = $paref->{opt};
-  my $arg   = $paref->{arg};
-
-  if (!$arg) {
-      return qq{The command "$opt" needs an argument !};
-  }
-  
-  my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => $arg, method => 'string' } );
-  return $err if($err);
-
-  if (!$h->{pin} || !$h->{pout}) {
-      return qq{The keys "pin" and/or "pout" are not set. Please note the command reference.};
-  }
-
-  if (($h->{pin}  !~ /-/xs && $h->{pin} !~ /:/xs)   ||
-     ($h->{pout} !~ /-/xs && $h->{pout} !~ /:/xs)) {
-      return qq{The keys "pin" and/or "pout" are not set correctly. Please note the command reference.};
-  }
-
-  if ($h->{pin} eq "-pout" && $h->{pout} eq "-pin") {
-      return qq{Incorrect input. It is not allowed that the keys pin and pout refer to each other.};
-  }
-
-  ## alte Speicherwerte löschen
-  ###############################
-  delete $data{$type}{$name}{circular}{'99'}{initdaybatintot};
-  delete $data{$type}{$name}{circular}{'99'}{batintot};
-  delete $data{$type}{$name}{circular}{'99'}{initdaybatouttot};
-  delete $data{$type}{$name}{circular}{'99'}{batouttot};
-  delete $data{$type}{$name}{circular}{'99'}{lastTsMaxSocRchd};
-  delete $data{$type}{$name}{circular}{'99'}{nextTsMaxSocChge};
-
-  readingsSingleUpdate ($hash, "currentBatteryDev", $arg, 1);
-  createAssociatedWith ($hash);
-  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
-
-return;
 }
 
 ################################################################
@@ -2400,31 +2356,14 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if ($prop eq 'currentBatterySet') {
-      readingsDelete    ($hash, 'Current_PowerBatIn');
-      readingsDelete    ($hash, 'Current_PowerBatOut');
-      readingsDelete    ($hash, 'Current_BatCharge');
-      readingsDelete    ($hash, 'currentBatteryDev');
-      deleteReadingspec ($hash, 'Battery_.*');
-      undef @{$data{$type}{$name}{current}{socslidereg}};
-      delete $data{$type}{$name}{circular}{'99'}{lastTsMaxSocRchd};
-      delete $data{$type}{$name}{circular}{'99'}{nextTsMaxSocChge};
-      delete $data{$type}{$name}{circular}{'99'}{initdaybatintot};
-      delete $data{$type}{$name}{circular}{'99'}{initdaybatouttot};
-      delete $data{$type}{$name}{circular}{'99'}{batintot};
-      delete $data{$type}{$name}{circular}{'99'}{batouttot};
-      delete $data{$type}{$name}{current}{powerbatout};
-      delete $data{$type}{$name}{current}{powerbatin};
-      delete $data{$type}{$name}{current}{batcharge};
-
-      writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                      # Anlagenkonfiguration File schreiben
-  }
-
   if ($prop eq 'currentInverterSet') {
       undef @{$data{$type}{$name}{current}{genslidereg}};
       readingsDelete    ($hash, "Current_PV");
       readingsDelete    ($hash, "currentInverterDev");
       deleteReadingspec ($hash, ".*_PVreal" );
+      
+      delete $data{$type}{$name}{circular}{99}{attrInvChangedTs};
+      
       writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);                     # Anlagenkonfiguration File schreiben
   }
 
@@ -5323,7 +5262,7 @@ sub Attr {
 
   if ($aName eq 'ctrlBatSocManagement' && $init_done) {
       if ($cmd eq 'set') {
-          return qq{Define the key "cap" with "set $name currentBatteryDev" before this attribute in the correct form.}
+          return qq{Define the key "cap" with "attr $name setupBatteryDev" before this attribute in the correct form.}
                  if(!CurrentVal($hash, 'batinstcap', 0));                                             # https://forum.fhem.de/index.php?msg=1310930
 
           my ($lowSoc, $upSoc, $maxsoc, $careCycle) = __parseAttrBatSoc ($name, $aVal);
@@ -5338,8 +5277,8 @@ sub Attr {
           deleteReadingspec ($hash, 'Battery_.*');
       }
 
-      delete $data{$type}{$name}{circular}{'99'}{lastTsMaxSocRchd};
-      delete $data{$type}{$name}{circular}{'99'}{nextTsMaxSocChge};
+      delete $data{$type}{$name}{circular}{99}{lastTsMaxSocRchd};
+      delete $data{$type}{$name}{circular}{99}{nextTsMaxSocChge};
   }
 
   if ($aName eq 'ctrlGenPVdeviation' && $aVal eq 'daily') {
@@ -5669,8 +5608,63 @@ sub _attrMeterDev {                    ## no critic "not used"
       delete $data{$type}{$name}{current}{x_remote};
   }
   
-  InternalTimer (gettimeofday()+2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday()+3, 'FHEM::SolarForecast::writeCacheToFile',  [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile',  [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+
+return;
+}
+
+################################################################
+#                      Attr setupBatteryDev
+################################################################
+sub _attrBatteryDev {                    ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $aVal  = $paref->{aVal};
+  my $aName = $paref->{aName};
+  my $type  = $paref->{type};
+  
+  return if(!$init_done);
+
+  if ($paref->{cmd} eq 'set' ) {  
+      my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
+      return $err if($err);
+
+      if (!$h->{pin} || !$h->{pout}) {
+          return qq{The keys "pin" and/or "pout" are not set. Please note the command reference.};
+      }
+
+      if (($h->{pin}  !~ /-/xs && $h->{pin} !~ /:/xs)   ||
+         ($h->{pout} !~ /-/xs && $h->{pout} !~ /:/xs)) {
+          return qq{The keys "pin" and/or "pout" are not set correctly. Please note the command reference.};
+      }
+
+      if ($h->{pin} eq "-pout" && $h->{pout} eq "-pin") {
+          return qq{Incorrect input. It is not allowed that the keys pin and pout refer to each other.};
+      }
+  }
+
+  if ($paref->{cmd} eq 'del' ) {      
+      readingsDelete    ($hash, 'Current_PowerBatIn');
+      readingsDelete    ($hash, 'Current_PowerBatOut');
+      readingsDelete    ($hash, 'Current_BatCharge');
+      deleteReadingspec ($hash, 'Battery_.*');
+      undef @{$data{$type}{$name}{current}{socslidereg}};
+      delete $data{$type}{$name}{circular}{'99'}{lastTsMaxSocRchd};
+      delete $data{$type}{$name}{circular}{'99'}{nextTsMaxSocChge};
+      delete $data{$type}{$name}{circular}{'99'}{initdaybatintot};
+      delete $data{$type}{$name}{circular}{'99'}{initdaybatouttot};
+      delete $data{$type}{$name}{circular}{'99'}{batintot};
+      delete $data{$type}{$name}{circular}{'99'}{batouttot};
+      delete $data{$type}{$name}{current}{powerbatout};
+      delete $data{$type}{$name}{current}{powerbatin};
+      delete $data{$type}{$name}{current}{batcharge};
+      delete $data{$type}{$name}{current}{batinstcap};
+  }
+
+  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile',  [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -6398,10 +6392,22 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  my $val = ReadingsVal ($name, 'currentMeterDev', '');                   # 01.06.2024
+  my $val = ReadingsVal ($name, 'currentMeterDev', '');                       # 01.06.2024
   if ($val) {
       CommandAttr (undef, "$name setupMeterDev $val");
       readingsDelete ($hash, 'currentMeterDev');
+  }
+  
+  my $val1 = ReadingsVal ($name, 'currentBatteryDev', '');                    # 02.06.2024
+  if ($val1) {
+      CommandAttr (undef, "$name setupBatteryDev $val1");
+      readingsDelete ($hash, 'currentBatteryDev');
+  }
+  
+  my $idts = ReadingsTimestamp ($name, 'currentInverterDev', '');             # 02.06.2024
+  if ($idts) {
+      $idts = timestringToTimestamp ($idts);
+      $data{$type}{$name}{circular}{99}{attrInvChangedTs} = $idts;
   }
   ##########################################################################################################################
 
@@ -8073,7 +8079,15 @@ sub _transferInverterValues {
   
   if ($ethishour < 0) {
       $ethishour = 0;
-      Log3 ($name, 1, "$name - WARNING - The Total Energy from Inverter '$indev' is lower than the value saved before. This situation is invalid and the Energy generated of current hour is set to '0'.");
+      my $vl     = 3;
+      my $pre    = '- WARNING -';
+      
+      if ($paref->{debug} =~ /collectData/xs) {                                               # V 1.23.0 Forum: https://forum.fhem.de/index.php?msg=1314453
+          $vl  = 1;
+          $pre = 'DEBUG> - WARNING -';
+      }
+      
+      Log3 ($name, $vl, "$name $pre The Total Energy of Inverter '$indev' is lower than the value saved before. This situation is unexpected and the Energy generated of current hour is set to '0'.");
       $warn = ' (WARNING invalid real PV occured - see Logfile)';
   }
 
@@ -8309,7 +8323,7 @@ sub _transferBatteryValues {
   my $chour = $paref->{chour};
   my $day   = $paref->{day};
   
-  my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'currentBatteryDev', method => 'reading' } );
+  my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev', method => 'attr' } );
   return if($err);
 
   my $type = $paref->{type};
@@ -8339,11 +8353,18 @@ sub _transferBatteryValues {
   my $btotin  = ReadingsNum ($badev, $bin,    0) * $binuf;                                     # totale Batterieladung (Wh)
   my $soc     = ReadingsNum ($badev, $batchr, 0);
 
-  if ($instcap && !isNumeric ($instcap)) {                                                     # wenn $instcap Reading Wert abfragen
-      my ($bcapr,$bcapunit) = split ':', $instcap;
-      $bcapunit           //= 'Wh';
-      $instcap              = ReadingsNum ($badev, $bcapr, 0);
-      $instcap              = $instcap * ($bcapunit =~ /^kWh$/xi ? 1000 : 1);
+  if ($instcap) {
+      if (!isNumeric ($instcap)) {                                                             # wenn $instcap Reading Wert abfragen
+          my ($bcapr,$bcapunit) = split ':', $instcap;
+          $bcapunit           //= 'Wh';
+          $instcap              = ReadingsNum ($badev, $bcapr, 0);
+          $instcap              = $instcap * ($bcapunit =~ /^kWh$/xi ? 1000 : 1);
+      }
+      
+      $data{$type}{$name}{current}{batinstcap} = $instcap;                                     # installierte Batteriekapazität
+  }
+  else {
+      delete $data{$type}{$name}{current}{batinstcap};
   }
 
   my $debug = $paref->{debug};
@@ -8354,7 +8375,7 @@ sub _transferBatteryValues {
 
   my $params;
 
-  if ($pin eq "-pout") {                                                                      # Spezialfall pin bei neg. pout
+  if ($pin eq "-pout") {                                                                       # Spezialfall pin bei neg. pout
       $params = {
           dev  => $badev,
           rdg  => $pou,
@@ -8448,8 +8469,7 @@ sub _transferBatteryValues {
   $data{$type}{$name}{current}{powerbatin}  = int $pbi;                                       # Hilfshash Wert aktuelle Batterieladung
   $data{$type}{$name}{current}{powerbatout} = int $pbo;                                       # Hilfshash Wert aktuelle Batterieentladung
   $data{$type}{$name}{current}{batcharge}   = $soc;                                           # aktuelle Batterieladung
-  $data{$type}{$name}{current}{batinstcap}  = $instcap;                                       # installierte Batteriekapazität
-
+  
   push @{$data{$type}{$name}{current}{socslidereg}}, $soc;                                    # Schieberegister Batterie SOC
   limitArray ($data{$type}{$name}{current}{socslidereg}, $slidenumdef);
 
@@ -8475,7 +8495,7 @@ sub _batSocTarget {
   my $cgbt       = AttrVal     ($name, 'ctrlBatSocManagement', undef);
   
   if ($cgbt && !$batinstcap) {
-      Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement is active, but the required key 'cap' is not setup in currentBatteryDev. Exit.");
+      Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement is active, but the required key 'cap' is not setup in setupBatteryDev. Exit.");
       return;     
   }
 
@@ -10626,14 +10646,12 @@ sub calcValueImproves {
   my $chour = $paref->{chour};
   my $t     = $paref->{t};                                                            # aktuelle Unix-Zeit
 
-  my $idts = ReadingsTimestamp ($name, 'currentInverterDev', '');                     # Definitionstimestamp des Inverterdevice
+  my $idts = CircularVal ($hash, 99, "attrInvChangedTs", '');                         # Definitionstimestamp des Attr setupInverterDev
   return if(!$idts);
 
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
   if ($acu) {
-      $idts = timestringToTimestamp ($idts);
-
       readingsSingleUpdate ($hash, '.pvCorrectionFactor_Auto_Soll', ($aln ? $acu : $acu.' noLearning'), 0) if($acu =~ /on/xs);
 
       if ($t - $idts < 7200) {
@@ -14974,6 +14992,7 @@ sub listDataPool {
           my $botot    = CircularVal ($hash, $idx, "batouttot",           '-');
           my $rtaitr   = CircularVal ($hash, $idx, "runTimeTrainAI",      '-');
           my $fsaitr   = CircularVal ($hash, $idx, "aitrainLastFinishTs", '-');
+          my $aicts    = CircularVal ($hash, $idx, "attrInvChangedTs",    '-');
 
           my $pvcf = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvcorrf', cval => $pvcorrf} );
           my $cfq  = _ldchash2val ( {pool => $h, idx => $idx, key => 'quality', cval => $quality} );
@@ -14999,8 +15018,8 @@ sub listDataPool {
               $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon \n";
               $sq .= "      batintot: $bitot, initdaybatintot: $idbitot \n";
               $sq .= "      batouttot: $botot, initdaybatouttot: $idbotot \n";
-              $sq .= "      lastTsMaxSocRchd: $ltsmsr, nextTsMaxSocChge: $ntsmsc, days2care:$dtocare \n";
-              $sq .= "      runTimeTrainAI: $rtaitr, aitrainLastFinishTs: $fsaitr \n";
+              $sq .= "      lastTsMaxSocRchd: $ltsmsr, nextTsMaxSocChge: $ntsmsc, days2care: $dtocare \n";
+              $sq .= "      runTimeTrainAI: $rtaitr, aitrainLastFinishTs: $fsaitr, attrInvChangedTs: $aicts \n";
           }
       }
   }
@@ -16175,7 +16194,7 @@ sub createAssociatedWith {
       ($ame,$h) = parseParams ($medev);
       $medev    = $ame->[0] // "";
 
-      my $badev = ReadingsVal ($name, 'currentBatteryDev', '');              # Battery Device
+      my $badev = AttrVal ($name, 'setupBatteryDev', '');                    # Battery Device
       ($aba,$h) = parseParams ($badev);
       $badev    = $aba->[0] // "";
 
@@ -16690,7 +16709,7 @@ return ConsumerVal ($hash, $c, 'isConsumptionRecommended', 0);
 sub isBatteryUsed {
   my $name = shift;
   
-  my ($err) = isDeviceValid ( { name => $name, obj => 'currentBatteryDev', method => 'reading' } );
+  my ($err) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev', method => 'attr' } );
   return if($err);
 
 return 1;
@@ -18152,7 +18171,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>currentRadiationAPI </b> </td><td>DWD_OpenData Device or API for the delivery of radiation data.                </td></tr>
             <tr><td> <b>currentInverterDev</b>   </td><td>Device which provides PV performance data                                     </td></tr>
             <tr><td> <b>setupMeterDev</b>        </td><td>Device which supplies network I/O data                                        </td></tr>
-            <tr><td> <b>currentBatteryDev</b>    </td><td>Device which provides battery performance data (if available)                 </td></tr>
+            <tr><td> <b>setupBatteryDev</b>      </td><td>Device which provides battery performance data (if available)                 </td></tr>
             <tr><td> <b>inverterStrings</b>      </td><td>Identifier of the existing plant strings                                      </td></tr>
             <tr><td> <b>moduleAzimuth</b>        </td><td>Azimuth of the plant strings                                                  </td></tr>
             <tr><td> <b>modulePeakString</b>     </td><td>the DC peak power of the plant strings                                        </td></tr>
@@ -18278,54 +18297,6 @@ to ensure that the system configuration is correct.
       <ul>
         <b>Example: </b> <br>
         set &lt;name&gt; consumerImmediatePlanning 01 <br>
-      </ul>
-    </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-currentBatteryDev"></a>
-      <li><b>currentBatteryDev &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt;
-                               [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
-                               [cap=&lt;Option&gt;] [charge=&lt;Readingname&gt;]  </b> <br><br>
-
-      Specifies an arbitrary Device and its Readings to deliver the battery performance data.
-      The module assumes that the numerical value of the readings is always positive.
-      It can also be a dummy device with corresponding readings. The meaning of the respective "Readingname" is:
-      <br><br>
-
-      <ul>
-       <table>
-       <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>pin</b>       </td><td>Reading which provides the current battery charging power                                         </td></tr>
-          <tr><td> <b>pout</b>      </td><td>Reading which provides the current battery discharge rate                                         </td></tr>
-          <tr><td> <b>intotal</b>   </td><td>Reading which provides the total battery charge as a continuous counter (optional)                </td></tr>
-          <tr><td> <b>outtotal</b>  </td><td>Reading which provides the total battery discharge as a continuous counter (optional)             </td></tr>
-          <tr><td> <b>cap</b>       </td><td>installed battery capacity (optional). Option can be:                                             </td></tr>
-          <tr><td>                  </td><td><b>numerical value</b> - direct indication of the battery capacity in Wh                          </td></tr>
-          <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;unit&gt;</b> - Reading which provides the capacity and unit (Wh, kWh)  </td></tr>
-          <tr><td> <b>charge</b>    </td><td>Reading which provides the current state of charge (SOC in percent) (optional)                    </td></tr>
-          <tr><td> <b>Unit</b>      </td><td>the respective unit (W,Wh,kW,kWh)                                                                 </td></tr>
-        </table>
-      </ul>
-      <br>
-
-      <b>Special cases:</b> If the reading for pin and pout should be identical but signed,
-      the keys pin and pout can be defined as follows: <br><br>
-      <ul>
-        pin=-pout  &nbsp;&nbsp;&nbsp;(a negative value of pout is used as pin)  <br>
-        pout=-pin  &nbsp;&nbsp;&nbsp;(a negative value of pin is used as pout)
-      </ul>
-      <br>
-
-      The unit is omitted in the particular special case. <br><br>
-
-      <ul>
-        <b>Example: </b> <br>
-        set &lt;name&gt; currentBatteryDev BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh <br>
-        <br>
-        # Device BatDummy returns the current battery charge in the reading "BatVal" (W), the battery discharge in the same reading with negative sign, <br>
-        # the summary charge in the reading "intotal" (Wh), as well as the summary discharge in the reading "outtotal". (Wh)
       </ul>
     </li>
     </ul>
@@ -18792,7 +18763,6 @@ to ensure that the system configuration is correct.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Day&gt;   (e.g. set &lt;name&gt; reset consumption 08) </ul>                 </td></tr>
             <tr><td>                           </td><td>To delete the consumption values of a specific hour of a day:                                                           </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumption 08 10) </ul>   </td></tr>
-            <tr><td> <b>currentBatterySet</b>  </td><td>deletes the set battery device and corresponding data.                                                                  </td></tr>
             <tr><td> <b>currentInverterSet</b> </td><td>deletes the set inverter device and corresponding data.                                                                 </td></tr>
             <tr><td> <b>energyH4TriggerSet</b> </td><td>deletes the 4-hour energy trigger points                                                                                </td></tr>
             <tr><td> <b>inverterStringSet</b>  </td><td>deletes the string configuration of the installation                                                                    </td></tr>
@@ -19099,6 +19069,7 @@ to ensure that the system configuration is correct.
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
             <tr><td> <b>aihit</b>               </td><td>Delivery status of the AI for the PV forecast (0-no delivery, 1-delivery)                                             </td></tr>
+            <tr><td> <b>attrInvChangedTs</b>    </td><td>Timestamp of the last change to the inverter device definition                                                        </td></tr>
             <tr><td> <b>batin</b>               </td><td>Battery charge (Wh)                                                                                                   </td></tr>
             <tr><td> <b>batout</b>              </td><td>Battery discharge (Wh)                                                                                                </td></tr>
             <tr><td> <b>batouttot</b>           </td><td>total energy drawn from the battery (Wh)                                                                              </td></tr>
@@ -19537,7 +19508,7 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-ctrlBatSocManagement"></a>
        <li><b>ctrlBatSocManagement lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] </b> <br><br>
-         If a battery device (currentBatteryDev) is installed, this attribute activates the battery SoC management. <br>
+         If a battery device (setupBatteryDev) is installed, this attribute activates the battery SoC management. <br>
          The <b>Battery_OptimumTargetSoC</b> reading contains the optimum minimum SoC calculated by the module. <br>
          The <b>Battery_ChargeRequest</b> reading is set to '1' if the current SoC has fallen below the minimum SoC. <br>
          In this case, the battery should be forcibly charged, possibly with mains power. <br>
@@ -19756,7 +19727,7 @@ to ensure that the system configuration is correct.
          <ul>
          <b>Beispiel: </b> <br>
             {                                                                                           <br>
-              my $batdev = (split " ", ReadingsVal ($name, 'currentBatteryDev', ''))[0];                <br>
+              my $batdev = (split " ", AttrVal ($name, 'setupBatteryDev', ''))[0];                      <br>
               my $pvfc   = ReadingsNum ($name, 'RestOfDayPVforecast',          0);                      <br>
               my $cofc   = ReadingsNum ($name, 'RestOfDayConsumptionForecast', 0);                      <br>
               my $diff   = $pvfc - $cofc;                                                               <br>
@@ -20295,6 +20266,52 @@ to ensure that the system configuration is correct.
        </li>
        <br>
        
+       <a id="SolarForecast-attr-setupBatteryDev"></a>
+       <li><b>setupBatteryDev &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt;
+                              [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
+                              [cap=&lt;Option&gt;] [charge=&lt;Readingname&gt;]  </b> <br><br>
+
+       Specifies an arbitrary Device and its Readings to deliver the battery performance data.
+       The module assumes that the numerical value of the readings is always positive.
+       It can also be a dummy device with corresponding readings. The meaning of the respective "Readingname" is:
+       <br><br>
+
+       <ul>
+        <table>
+        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+           <tr><td> <b>pin</b>       </td><td>Reading which provides the current battery charging power                                         </td></tr>
+           <tr><td> <b>pout</b>      </td><td>Reading which provides the current battery discharge rate                                         </td></tr>
+           <tr><td> <b>intotal</b>   </td><td>Reading which provides the total battery charge as a continuous counter (optional)                </td></tr>
+           <tr><td> <b>outtotal</b>  </td><td>Reading which provides the total battery discharge as a continuous counter (optional)             </td></tr>
+           <tr><td> <b>cap</b>       </td><td>installed battery capacity (optional). Option can be:                                             </td></tr>
+           <tr><td>                  </td><td><b>numerical value</b> - direct indication of the battery capacity in Wh                          </td></tr>
+           <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;unit&gt;</b> - Reading which provides the capacity and unit (Wh, kWh)  </td></tr>
+           <tr><td> <b>charge</b>    </td><td>Reading which provides the current state of charge (SOC in percent) (optional)                    </td></tr>
+           <tr><td> <b>Unit</b>      </td><td>the respective unit (W,Wh,kW,kWh)                                                                 </td></tr>
+         </table>
+       </ul>
+       <br>
+
+       <b>Special cases:</b> If the reading for pin and pout should be identical but signed,
+       the keys pin and pout can be defined as follows: <br><br>
+       <ul>
+         pin=-pout  &nbsp;&nbsp;&nbsp;(a negative value of pout is used as pin)  <br>
+         pout=-pin  &nbsp;&nbsp;&nbsp;(a negative value of pin is used as pout)
+       </ul>
+       <br>
+
+       The unit is omitted in the particular special case. <br><br>
+
+       <ul>
+         <b>Example: </b> <br>
+         attr &lt;name&gt; setupBatteryDev BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh
+       </ul>
+       <br>
+       
+       <b>Note:</b> Deleting the attribute also removes the internally corresponding data.
+       </li>
+       <br>
+       
        <a id="SolarForecast-attr-setupMeterDev"></a>
        <li><b>setupMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Unit&gt; contotal=&lt;Readingname&gt;:&lt;Unit&gt;
                             gfeedin=&lt;Readingname&gt;:&lt;Unit&gt; feedtotal=&lt;Readingname&gt;:&lt;Unit&gt;
@@ -20349,7 +20366,7 @@ to ensure that the system configuration is correct.
        
        <b>Note:</b> Deleting the attribute also removes the internally corresponding data.
        </li>
-     <br>
+       <br>
 
      </ul>
   </ul>
@@ -20422,7 +20439,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>currentRadiationAPI </b> </td><td>DWD_OpenData Device bzw. API zur Lieferung von Strahlungsdaten                 </td></tr>
             <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert                                       </td></tr>
             <tr><td> <b>setupMeterDev</b>        </td><td>Device welches Netz I/O-Daten liefert                                          </td></tr>
-            <tr><td> <b>currentBatteryDev</b>    </td><td>Device welches Batterie Leistungsdaten liefert (sofern vorhanden)              </td></tr>
+            <tr><td> <b>setupBatteryDev</b>      </td><td>Device welches Batterie Leistungsdaten liefert (sofern vorhanden)              </td></tr>
             <tr><td> <b>inverterStrings</b>      </td><td>Bezeichner der vorhandenen Anlagenstrings                                      </td></tr>
             <tr><td> <b>moduleAzimuth</b>        </td><td>Ausrichtung (Azimut) der Anlagenstrings                                        </td></tr>
             <tr><td> <b>modulePeakString</b>     </td><td>die DC-Peakleistung der Anlagenstrings                                         </td></tr>
@@ -20548,54 +20565,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
         <b>Beispiel: </b> <br>
         set &lt;name&gt; consumerImmediatePlanning 01 <br>
-      </ul>
-    </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-currentBatteryDev"></a>
-      <li><b>currentBatteryDev &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt;
-                               [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
-                               [cap=&lt;Option&gt;] [charge=&lt;Readingname&gt;]  </b> <br><br>
-
-      Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest.
-      Das Modul geht davon aus, dass der numerische Wert der Readings immer positiv ist.
-      Es kann auch ein Dummy Device mit entsprechenden Readings sein. Die Bedeutung des jeweiligen "Readingname" ist:
-      <br><br>
-
-      <ul>
-       <table>
-       <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>pin</b>       </td><td>Reading welches die aktuelle Batterieladeleistung liefert                                                </td></tr>
-          <tr><td> <b>pout</b>      </td><td>Reading welches die aktuelle Batterieentladeleistung liefert                                             </td></tr>
-          <tr><td> <b>intotal</b>   </td><td>Reading welches die totale Batterieladung als fortlaufenden Zähler liefert (optional)                    </td></tr>
-          <tr><td> <b>outtotal</b>  </td><td>Reading welches die totale Batterieentladung als fortlaufenden Zähler liefert (optional)                 </td></tr>
-          <tr><td> <b>cap</b>       </td><td>installierte Batteriekapazität (optional). Option kann sein:                                             </td></tr>
-          <tr><td>                  </td><td><b>numerischer Wert</b> - direkte Angabe der Batteriekapazität in Wh                                     </td></tr>
-          <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;Einheit&gt;</b> - Reading welches die Kapazität liefert und Einheit (Wh, kWh) </td></tr>
-          <tr><td> <b>charge</b>    </td><td>Reading welches den aktuellen Ladezustand (SOC in Prozent) liefert (optional)                            </td></tr>
-          <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                                                      </td></tr>
-        </table>
-      </ul>
-      <br>
-
-      <b>Sonderfälle:</b> Sollte das Reading für pin und pout identisch, aber vorzeichenbehaftet sein,
-      können die Schlüssel pin und pout wie folgt definiert werden: <br><br>
-      <ul>
-        pin=-pout  &nbsp;&nbsp;&nbsp;(ein negativer Wert von pout wird als pin verwendet)  <br>
-        pout=-pin  &nbsp;&nbsp;&nbsp;(ein negativer Wert von pin wird als pout verwendet)
-      </ul>
-      <br>
-
-      Die Einheit entfällt in dem jeweiligen Sonderfall. <br><br>
-
-      <ul>
-        <b>Beispiel: </b> <br>
-        set &lt;name&gt; currentBatteryDev BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh <br>
-        <br>
-        # Device BatDummy liefert die aktuelle Batterieladung im Reading "BatVal" (W), die Batterieentladung im gleichen Reading mit negativen Vorzeichen, <br>
-        # die summarische Ladung im Reading "intotal" (Wh), sowie die summarische Entladung im Reading "outtotal" (Wh)
       </ul>
     </li>
     </ul>
@@ -21072,7 +21041,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumption 08) </ul>                 </td></tr>
             <tr><td>                           </td><td>Um die Verbrauchswerte einer bestimmten Stunde eines Tages zu löschen:                                                  </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumption 08 10) </ul> </td></tr>
-            <tr><td> <b>currentBatterySet</b>  </td><td>löscht das eingestellte Batteriedevice und korrespondierende Daten                                                      </td></tr>
             <tr><td> <b>currentInverterSet</b> </td><td>löscht das eingestellte Inverterdevice und korrespondierende Daten                                                      </td></tr>
             <tr><td> <b>energyH4TriggerSet</b> </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                              </td></tr>
             <tr><td> <b>inverterStringSet</b>  </td><td>löscht die Stringkonfiguration der Anlage                                                                               </td></tr>
@@ -21381,6 +21349,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
             <tr><td> <b>aihit</b>               </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)                                                </td></tr>
+            <tr><td> <b>attrInvChangedTs</b>    </td><td>Zeitstempel der letzten Änderung der Inverter Gerätedefinition                                                            </td></tr>
             <tr><td> <b>batin</b>               </td><td>Batterieladung (Wh)                                                                                                       </td></tr>
             <tr><td> <b>batout</b>              </td><td>Batterieentladung (Wh)                                                                                                    </td></tr>
             <tr><td> <b>batouttot</b>           </td><td>total aus der Batterie entnommene Energie (Wh)                                                                            </td></tr>
@@ -21817,7 +21786,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-ctrlBatSocManagement"></a>
        <li><b>ctrlBatSocManagement lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] </b> <br><br>
-         Sofern ein Batterie Device (currentBatteryDev) installiert ist, aktiviert dieses Attribut das Batterie
+         Sofern ein Batterie Device (setupBatteryDev) installiert ist, aktiviert dieses Attribut das Batterie
          SoC-Management. <br>
          Das Reading <b>Battery_OptimumTargetSoC</b> enthält den vom Modul berechneten optimalen Mindest-SoC. <br>
          Das Reading <b>Battery_ChargeRequest</b> wird auf '1' gesetzt, wenn der aktuelle SoC unter den Mindest-SoC gefallen
@@ -22038,7 +22007,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <b>Beispiel: </b> <br>
             {                                                                                           <br>
-              my $batdev = (split " ", ReadingsVal ($name, 'currentBatteryDev', ''))[0];                <br>
+              my $batdev = (split " ", AttrVal ($name, 'setupBatteryDev', ''))[0];                      <br>
               my $pvfc   = ReadingsNum ($name, 'RestOfDayPVforecast',          0);                      <br>
               my $cofc   = ReadingsNum ($name, 'RestOfDayConsumptionForecast', 0);                      <br>
               my $diff   = $pvfc - $cofc;                                                               <br>
@@ -22572,6 +22541,52 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-graphicWeatherColorNight"></a>
        <li><b>graphicWeatherColorNight </b><br>
          Farbe der Wetter-Icons für die Nachtstunden.
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-setupBatteryDev"></a>
+       <li><b>setupBatteryDev &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt;
+                              [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
+                              [cap=&lt;Option&gt;] [charge=&lt;Readingname&gt;]  </b> <br><br>
+
+       Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest.
+       Das Modul geht davon aus, dass der numerische Wert der Readings immer positiv ist.
+       Es kann auch ein Dummy Device mit entsprechenden Readings sein. Die Bedeutung des jeweiligen "Readingname" ist:
+       <br><br>
+
+       <ul>
+        <table>
+        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+           <tr><td> <b>pin</b>       </td><td>Reading welches die aktuelle Batterieladeleistung liefert                                                </td></tr>
+           <tr><td> <b>pout</b>      </td><td>Reading welches die aktuelle Batterieentladeleistung liefert                                             </td></tr>
+           <tr><td> <b>intotal</b>   </td><td>Reading welches die totale Batterieladung als fortlaufenden Zähler liefert (optional)                    </td></tr>
+           <tr><td> <b>outtotal</b>  </td><td>Reading welches die totale Batterieentladung als fortlaufenden Zähler liefert (optional)                 </td></tr>
+           <tr><td> <b>cap</b>       </td><td>installierte Batteriekapazität (optional). Option kann sein:                                             </td></tr>
+           <tr><td>                  </td><td><b>numerischer Wert</b> - direkte Angabe der Batteriekapazität in Wh                                     </td></tr>
+           <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;Einheit&gt;</b> - Reading welches die Kapazität liefert und Einheit (Wh, kWh) </td></tr>
+           <tr><td> <b>charge</b>    </td><td>Reading welches den aktuellen Ladezustand (SOC in Prozent) liefert (optional)                            </td></tr>
+           <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                                                      </td></tr>
+         </table>
+       </ul>
+       <br>
+
+       <b>Sonderfälle:</b> Sollte das Reading für pin und pout identisch, aber vorzeichenbehaftet sein,
+       können die Schlüssel pin und pout wie folgt definiert werden: <br><br>
+       <ul>
+         pin=-pout  &nbsp;&nbsp;&nbsp;(ein negativer Wert von pout wird als pin verwendet)  <br>
+         pout=-pin  &nbsp;&nbsp;&nbsp;(ein negativer Wert von pin wird als pout verwendet)
+       </ul>
+       <br>
+
+       Die Einheit entfällt in dem jeweiligen Sonderfall. <br><br>
+
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; setupBatteryDev BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh
+       </ul>
+       <br>
+       
+       <b>Hinweis:</b> Durch Löschen des Attributes werden ebenfalls die intern korrespondierenden Daten entfernt.
        </li>
        <br>
        
