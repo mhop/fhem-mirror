@@ -18139,7 +18139,8 @@ In addition to the PV generation forecast, consumption values or grid reference 
 consumption forecast. <br>
 The module calculates a future energy surplus from the forecast values, which is used to plan the operation of consumers.
 Furthermore, the module offers <a href="#SolarForecast-Consumer">Consumer Integration</a> for integrated
-planning and control of PV surplus dependent consumer circuits. <br><br>
+planning and control of PV surplus dependent consumer circuits. Support for optimum battery 
+SoC management is also part of the range of functions. <br><br>
 
 At the first definition of the module the user is supported by a Guided Procedure to make all initial entries. <br>
 At the end of the process and after relevant changes to the system or device configuration, it is essential to perform a
@@ -20400,13 +20401,14 @@ Zur Erstellung der solaren Vorhersage kann das Modul SolarForecast unterschiedli
   <br>
 
 Die Nutzung der erwähnten API's beschränkt sich auf die jeweils kostenlose Version des Dienstes. <br>
-Die KI-Unterstützung kann in Abhängigkeit vom verwendeten Model aktiviert werden. <br><br> 
+In Abhängigkeit vom verwendeten Model kann eine KI-Unterstützung aktiviert werden. <br><br> 
 
 Über die PV Erzeugungsprognose hinaus werden Verbrauchswerte bzw. Netzbezugswerte erfasst und für eine
 Verbrauchsprognose verwendet. <br>
 Das Modul errechnet aus den Prognosewerten einen zukünftigen Energieüberschuß der zur Betriebsplanung von Verbrauchern
 genutzt wird. Weiterhin bietet das Modul eine <a href="#SolarForecast-Consumer">Consumer Integration</a> zur integrierten
-Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen. <br><br>
+Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen. Eine Unterstützung zum optimalen 
+Batterie SoC-Management gehört ebenfalls zum Funktionsumfang. <br><br>
 
 Bei der ersten Definition des Moduls wird der Benutzer über eine Guided Procedure unterstützt um alle initial notwendigen Eingaben
 vorzunehmen. <br>
