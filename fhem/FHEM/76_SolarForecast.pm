@@ -158,7 +158,8 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.23.0" => "02.06.2024  transformed setter currentBatteryDev to attr setupBatteryDev, _transferInverterValues: change output for DEBUG ".
-                           "new key attrInvChangedTs in circular, prepare transformation of currentInverterDev ",
+                           "new key attrInvChangedTs in circular, prepare transformation of currentInverterDev ".
+                           "calcTodayPVdeviation: fix daily calc ",
   "1.22.0" => "01.06.2024  transformed setter currentMeterDev to attr setupMeterDev, plantConfiguration: setModel after restore ".
                            "delete reset currentMeterSet ",
   "1.21.5" => "30.05.2024  listDataPool: list current can operate three hash levels, first preparation for remote objects ",
@@ -10617,14 +10618,14 @@ sub calcTodayPVdeviation {
 
   if (AttrVal ($name, 'ctrlGenPVdeviation', 'daily') eq 'daily') {
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet", '22:00').':00');
-      return if($t < $sstime);
+      return if(!$pvfc || $t < $sstime);                                     # V 1.23.0
 
-      $dp = sprintf "%.2f", (100 - (100 * $pvfc / $pvre));
+      $dp = sprintf "%.2f", (100 - (100 * $pvre / $pvfc));                   # V 1.23.0
   }
   else {
       my $rodfc = ReadingsNum ($name, 'RestOfDayPVforecast', 0);             # PV Forecast für den Rest des Tages
       my $cufc  = $pvfc - $rodfc;                                            # laufende PV Prognose aus Tagesprognose - Prognose Resttag
-      return if(!$cufc);                                                     # Illegal division by zero verhindern Forum:
+      return if(!$cufc);                                                     # Illegal division by zero verhindern
       $dp       = sprintf "%.2f", (100 - (100 * $pvre / $cufc));
   }
 
