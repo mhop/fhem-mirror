@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.19";
+my $Signalbot_VERSION="3.20";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -267,7 +267,7 @@ sub Signalbot_Set($@) {					#
 		$acname="FHEM" if (!defined $acname);
 		my $qrcode=Signalbot_CallS($hash,"link",$acname);
 		if (defined $qrcode) {
-			my $qr_url = "https://chart.googleapis.com/chart?cht=qr&chs=200x200"."&chl=";
+			my $qr_url = "https://api.qrserver.com/v1/create-qr-code/?size=200x200"."&data=";
 			$qr_url .= uri_escape($qrcode);
 			$hash->{helper}{qr}=$qr_url;
 			$hash->{helper}{uri}=$qrcode;
