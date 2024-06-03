@@ -33,7 +33,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday usleep sleep);
 use DevIo;
 
-my $ModulVersion = "01.03a";
+my $ModulVersion = "01.03b";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -1183,7 +1183,7 @@ sub PRESENCE2_daemonScanScheduler($;$) {
                                                           , $nonBlockingTimeout
                                                           , "PRESENCE2_daemonAbortedScan"
                                                           , $hash);
-                $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
+#                $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
             }
         }
     }

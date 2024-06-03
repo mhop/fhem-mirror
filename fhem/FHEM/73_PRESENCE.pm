@@ -33,7 +33,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday usleep sleep);
 use DevIo;
 
-my $ModulVersion = "02.00";
+my $ModulVersion = "02.00a";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -737,31 +737,31 @@ sub PRESENCE_StartLocalScan($;$)
         {
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode local-bluetooth";
             $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "bluetoothHciDevice", ""), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
-            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
+#            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
         }
         elsif($mode eq "lan-ping")
         {
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode lan-ping";
             $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "pingCount", "4"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
-            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
+#            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
         }
         elsif($mode eq "fritzbox")
         {
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode fritzbox";
             $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "fritzboxCheckSpeed", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
-            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
+#            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
         }
         elsif($mode eq "shellscript")
         {
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode shellscript";
             $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalShellScriptScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
-            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
+#            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
         }
         elsif($mode eq "function")
         {
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode function";
             $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFunctionScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
-            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
+#            $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
         }
 
         if(!$hash->{helper}{RUNNING_PID} and $mode =~ /^local-bluetooth|lan-ping|fritzbox|shellscript|function$/)
