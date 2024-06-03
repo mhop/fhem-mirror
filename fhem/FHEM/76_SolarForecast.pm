@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.24.0" => "03.06.2024  transformed setter currentInverterDev to attr setupInverterDev, calcTodayPVdeviation: fix continuously calc ",
   "1.23.0" => "02.06.2024  transformed setter currentBatteryDev to attr setupBatteryDev, _transferInverterValues: change output for DEBUG ".
                            "new key attrInvChangedTs in circular, prepare transformation of currentInverterDev ".
                            "calcTodayPVdeviation: fix daily calc ",
@@ -493,7 +494,6 @@ my @fs = qw( ftui_forecast.css
            );
                                                                                  # Anlagenkonfiguration: maßgebliche Readings
 my @rconfigs = qw( pvCorrectionFactor_Auto
-                   currentInverterDev
                    currentRadiationAPI
                    inverterStrings
                    moduleAzimuth
@@ -525,7 +525,7 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
                    graphicHeaderDetail graphicHeaderShow graphicHistoryHour graphicHourCount graphicHourStyle
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
                    graphicSpaceSize graphicStartHtml graphicEndHtml graphicWeatherColor graphicWeatherColorNight
-                   setupMeterDev setupBatteryDev
+                   setupMeterDev setupBatteryDev setupInverterDev
                  );
 
 for my $cinit (1..$maxconsumer) {                             
@@ -546,7 +546,6 @@ my %hset = (                                                                # Ha
   modulePeakString          => { fn => \&_setmodulePeakString          },
   inverterStrings           => { fn => \&_setinverterStrings           },
   clientAction              => { fn => \&_setclientAction              },
-  currentInverterDev        => { fn => \&_setinverterDevice            },
   energyH4Trigger           => { fn => \&_setTrigger                   },
   plantConfiguration        => { fn => \&_setplantConfiguration        },
   batteryTrigger            => { fn => \&_setTrigger                   },
@@ -608,6 +607,7 @@ my %hattr = (                                                                # H
   ctrlWeatherDev3           => { fn => \&_attrWeatherDev          },
   setupMeterDev             => { fn => \&_attrMeterDev            },
   setupBatteryDev           => { fn => \&_attrBatteryDev          },
+  setupInverterDev          => { fn => \&_attrInverterDev         },
 );
 
 my %htr = (                                                                  # Hash even/odd für <tr>
@@ -654,8 +654,8 @@ my %hqtxt = (                                                                   
               DE => qq{Bitte geben sie mindestens ein Wettervorhersage Device mit "attr LINK ctrlWeatherDev1" an}           },
   crd    => { EN => qq{Please select the radiation forecast service with "set LINK currentRadiationAPI"},
               DE => qq{Bitte geben sie den Strahlungsvorhersage Dienst mit "set LINK currentRadiationAPI" an}               },
-  cid    => { EN => qq{Please specify the Inverter device with "set LINK currentInverterDev"},
-              DE => qq{Bitte geben sie das Wechselrichter Device mit "set LINK currentInverterDev" an}                      },
+  cid    => { EN => qq{Please specify the Inverter device with "attr LINK setupInverterDev"},
+              DE => qq{Bitte geben sie das Wechselrichter Device mit "attr LINK setupInverterDev" an}                       },
   mid    => { EN => qq{Please specify the device for energy measurement with "attr LINK setupMeterDev"},
               DE => qq{Bitte geben sie das Device zur Energiemessung mit "attr LINK setupMeterDev" an}                      },
   ist    => { EN => qq{Please define all of your used string names with "set LINK inverterStrings"},
@@ -1216,6 +1216,7 @@ sub Initialize {
                                 "graphicEndHtml ".
                                 "graphicWeatherColor:colorpicker,RGB ".
                                 "graphicWeatherColorNight:colorpicker,RGB ".
+                                "setupInverterDev:textField-long ".
                                 "setupMeterDev:textField-long ".
                                 "setupBatteryDev:textField-long ".
                                 $consumer.
@@ -1467,7 +1468,6 @@ sub Set {
              "consumerImmediatePlanning:$coms ".
              "consumerNewPlanning:$coms ".
              "currentRadiationAPI:$rdd ".
-             "currentInverterDev:textField-long ".
              "energyH4Trigger:textField-long ".
              "inverterStrings ".
              "modulePeakString ".
@@ -1795,41 +1795,6 @@ sub _setmoduleRoofTops {                ## no critic "not used"
 
   my $ret = createStringConfig ($hash);
   return $ret if($ret);
-
-return;
-}
-
-################################################################
-#                      Setter currentInverterDev
-################################################################
-sub _setinverterDevice {                 ## no critic "not used"
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $type  = $paref->{type};
-  my $opt   = $paref->{opt};
-  my $arg   = $paref->{arg};
-
-  if (!$arg) {
-      return qq{The command "$opt" needs an argument !};
-  }
-  
-  my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => $arg, method => 'string' } );
-  return $err if($err);
-
-  if (!$h->{pv} || !$h->{etotal}) {
-      return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
-  }
-  
-  if ($h->{capacity} && !isNumeric($h->{capacity})) {
-      return qq{The syntax of key "capacity" is not correct. Please consider the commandref.};
-  }
-
-  $data{$type}{$name}{circular}{99}{attrInvChangedTs} = int time;
-  
-  readingsSingleUpdate ($hash, 'currentInverterDev', $arg, 1);
-  createAssociatedWith ($hash);
-  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -2355,17 +2320,6 @@ sub _setreset {                          ## no critic "not used"
 
       writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                # Cache File SolCast API Werte schreiben
       return;
-  }
-
-  if ($prop eq 'currentInverterSet') {
-      undef @{$data{$type}{$name}{current}{genslidereg}};
-      readingsDelete    ($hash, "Current_PV");
-      readingsDelete    ($hash, "currentInverterDev");
-      deleteReadingspec ($hash, ".*_PVreal" );
-      
-      delete $data{$type}{$name}{circular}{99}{attrInvChangedTs};
-      
-      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);                     # Anlagenkonfiguration File schreiben
   }
 
   if ($prop eq 'consumerPlanning') {                                                 # Verbraucherplanung resetten
@@ -5570,7 +5524,7 @@ sub _attrMeterDev {                    ## no critic "not used"
       return $err if($err);
 
       if (!$h->{gcon} || !$h->{contotal} || !$h->{gfeedin} || !$h->{feedtotal}) {
-          return qq{The syntax of "$aName" is not correct. Please consider the commandref.};
+          return qq{The syntax of '$aName' is not correct. Please consider the commandref.};
       }
 
       if ($h->{gcon} eq "-gfeedin" && $h->{gfeedin} eq "-gcon") {
@@ -5587,8 +5541,7 @@ sub _attrMeterDev {                    ## no critic "not used"
           return qq{Incorrect input for key 'feedprice'. Please consider the commandref.} if(scalar(@afp) != 2 && scalar(@afp) != 3);    
       }
   }
-
-  if ($paref->{cmd} eq 'del' ) {      
+  elsif ($paref->{cmd} eq 'del' ) {      
       readingsDelete ($hash, "Current_GridConsumption");
       readingsDelete ($hash, "Current_GridFeedIn");
       delete $data{$type}{$name}{circular}{'99'}{initdayfeedin};
@@ -5616,6 +5569,46 @@ return;
 }
 
 ################################################################
+#                      Attr setupInverterDev
+################################################################
+sub _attrInverterDev {                   ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $aVal  = $paref->{aVal};
+  my $aName = $paref->{aName};
+  my $type  = $paref->{type};
+  
+  return if(!$init_done);
+  
+  if ($paref->{cmd} eq 'set' ) {
+      my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
+      return $err if($err);
+
+      if (!$h->{pv} || !$h->{etotal}) {
+          return qq{The syntax of '$aName' is not correct. Please consider the commandref.};
+      }
+      
+      if ($h->{capacity} && !isNumeric($h->{capacity})) {
+          return qq{The syntax of key 'capacity' is not correct. Please consider the commandref.};
+      }
+
+      $data{$type}{$name}{circular}{99}{attrInvChangedTs} = int time;
+  }
+  elsif ($paref->{cmd} eq 'del' ) {
+      readingsDelete    ($hash, "Current_PV");
+      deleteReadingspec ($hash, ".*_PVreal" );
+      undef @{$data{$type}{$name}{current}{genslidereg}};
+      delete $data{$type}{$name}{circular}{99}{attrInvChangedTs};
+  }
+  
+  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile',  [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+
+return;
+}
+
+################################################################
 #                      Attr setupBatteryDev
 ################################################################
 sub _attrBatteryDev {                    ## no critic "not used"
@@ -5633,20 +5626,19 @@ sub _attrBatteryDev {                    ## no critic "not used"
       return $err if($err);
 
       if (!$h->{pin} || !$h->{pout}) {
-          return qq{The keys "pin" and/or "pout" are not set. Please note the command reference.};
+          return qq{The keys 'pin' and/or 'pout' are not set. Please note the command reference.};
       }
 
       if (($h->{pin}  !~ /-/xs && $h->{pin} !~ /:/xs)   ||
          ($h->{pout} !~ /-/xs && $h->{pout} !~ /:/xs)) {
-          return qq{The keys "pin" and/or "pout" are not set correctly. Please note the command reference.};
+          return qq{The keys 'pin' and/or 'pout' are not set correctly. Please note the command reference.};
       }
 
       if ($h->{pin} eq "-pout" && $h->{pout} eq "-pin") {
           return qq{Incorrect input. It is not allowed that the keys pin and pout refer to each other.};
       }
   }
-
-  if ($paref->{cmd} eq 'del' ) {      
+  elsif ($paref->{cmd} eq 'del' ) {      
       readingsDelete    ($hash, 'Current_PowerBatIn');
       readingsDelete    ($hash, 'Current_PowerBatOut');
       readingsDelete    ($hash, 'Current_BatCharge');
@@ -6409,6 +6401,12 @@ sub centralTask {
   if ($idts) {
       $idts = timestringToTimestamp ($idts);
       $data{$type}{$name}{circular}{99}{attrInvChangedTs} = $idts;
+  }
+  
+  my $val2 = ReadingsVal ($name, 'currentInverterDev', '');                    # 03.06.2024
+  if ($val2) {
+      CommandAttr (undef, "$name setupInverterDev $val2");
+      readingsDelete ($hash, 'currentInverterDev');
   }
   ##########################################################################################################################
 
@@ -8024,7 +8022,7 @@ sub _transferInverterValues {
   my $chour = $paref->{chour};
   my $day   = $paref->{day};
   
-  my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => 'currentInverterDev', method => 'reading' } );
+  my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => 'setupInverterDev', method => 'attr' } );
   return if($err);
 
   my $type = $paref->{type};
@@ -10612,21 +10610,18 @@ sub calcTodayPVdeviation {
   my $pvfc = ReadingsNum ($name, 'Today_PVforecast', 0);
   my $pvre = ReadingsNum ($name, 'Today_PVreal',     0);
 
-  return if(!$pvre);
+  return if(!$pvre || !$pvfc);                                                # Illegal division by zero verhindern
 
   my $dp;
 
   if (AttrVal ($name, 'ctrlGenPVdeviation', 'daily') eq 'daily') {
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet", '22:00').':00');
-      return if(!$pvfc || $t < $sstime);                                     # V 1.23.0
+      return if($t < $sstime);                                     
 
-      $dp = sprintf "%.2f", (100 - (100 * $pvre / $pvfc));                   # V 1.23.0
+      $dp = sprintf "%.2f", (100 - (100 * $pvre / $pvfc));                    # V 1.23.0
   }
-  else {
-      my $rodfc = ReadingsNum ($name, 'RestOfDayPVforecast', 0);             # PV Forecast für den Rest des Tages
-      my $cufc  = $pvfc - $rodfc;                                            # laufende PV Prognose aus Tagesprognose - Prognose Resttag
-      return if(!$cufc);                                                     # Illegal division by zero verhindern
-      $dp       = sprintf "%.2f", (100 - (100 * $pvre / $cufc));
+  else {                                                     
+      $dp = sprintf "%.2f", (100 - (100 * $pvre / $pvfc));                    # V 1.24.0
   }
 
   $data{$type}{$name}{circular}{99}{tdayDvtn} = $dp;
@@ -11510,15 +11505,17 @@ sub _checkSetupNotComplete {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################
-
+  my $val2 = ReadingsVal ($name, 'currentInverterDev', '');                    # 03.06.2024
+  if ($val2) {
+      CommandAttr (undef, "$name setupInverterDev $val2");
+  }
   ##########################################################################################
 
   my $is    = ReadingsVal   ($name, 'inverterStrings',     undef);                        # String Konfig
   my $wedev = AttrVal       ($name, 'ctrlWeatherDev1',     undef);                        # Device Vorhersage Wetterdaten (Bewölkung etc.)
   my $radev = ReadingsVal   ($name, 'currentRadiationAPI', undef);                        # Device Strahlungsdaten Vorhersage
-  my $indev = ReadingsVal   ($name, 'currentInverterDev',  undef);                        # Inverter Device
+  my $indev = AttrVal       ($name, 'setupInverterDev',    undef);                        # Inverter Device
   my $medev = AttrVal       ($name, 'setupMeterDev',       undef);                        # Meter Device
-
   my $peaks = ReadingsVal   ($name, 'modulePeakString',    undef);                        # String Peak
   my $maz   = ReadingsVal   ($name, 'moduleAzimuth',       undef);                        # Modulausrichtung Konfig (Azimut)
   my $mdec  = ReadingsVal   ($name, 'moduleDeclination',   undef);                        # Modul Neigungswinkel Konfig
@@ -16187,7 +16184,7 @@ sub createAssociatedWith {
       ($ara,$h) = parseParams ($radev);
       $radev    = $ara->[0] // "";
 
-      my $indev = ReadingsVal ($name, 'currentInverterDev', '');             # Inverter Device
+      my $indev = AttrVal ($name, 'setupInverterDev', '');                   # Inverter Device
       ($ain,$h) = parseParams ($indev);
       $indev    = $ain->[0] // "";
 
@@ -18171,7 +18168,7 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
             <tr><td> <b>ctrlWeatherDevX</b>      </td><td>DWD_OpenData Device which provides meteorological data (e.g. cloud cover)     </td></tr>
             <tr><td> <b>currentRadiationAPI </b> </td><td>DWD_OpenData Device or API for the delivery of radiation data.                </td></tr>
-            <tr><td> <b>currentInverterDev</b>   </td><td>Device which provides PV performance data                                     </td></tr>
+            <tr><td> <b>setupInverterDev</b>     </td><td>Device which provides PV performance data                                     </td></tr>
             <tr><td> <b>setupMeterDev</b>        </td><td>Device which supplies network I/O data                                        </td></tr>
             <tr><td> <b>setupBatteryDev</b>      </td><td>Device which provides battery performance data (if available)                 </td></tr>
             <tr><td> <b>inverterStrings</b>      </td><td>Identifier of the existing plant strings                                      </td></tr>
@@ -18301,42 +18298,6 @@ to ensure that the system configuration is correct.
         set &lt;name&gt; consumerImmediatePlanning 01 <br>
       </ul>
     </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-currentInverterDev"></a>
-      <li><b>currentInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; [capacity=&lt;max. WR-Leistung&gt;] </b> <br><br>
-
-      Specifies any Device and its Readings to deliver the current PV generation values.
-      It can also be a dummy device with appropriate readings.
-      The values of several inverter devices are merged e.g. in a dummy device and this device is specified with the
-      corresponding readings. <br>
-      Specifying <b>capacity</b> is optional, but strongly recommended to optimize prediction accuracy.
-      <br><br>
-
-      <ul>
-       <table>
-       <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation                                         </td></tr>
-          <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).    </td></tr>
-          <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,              </td></tr>
-          <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.    </td></tr>
-          <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                        </td></tr>
-          <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts  </td></tr>
-          <tr><td>                 </td><td>(The entry is optional, but is strongly recommended)                                     </td></tr>        
-       </table>
-      </ul>
-      <br>
-
-      <ul>
-        <b>Example: </b> <br>
-        set &lt;name&gt; currentInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 <br>
-        <br>
-        # Device STP5000 provides PV values. The currently generated power in the "total_pac" reading (kW) and the total energy 
-          generated in the reading "etotal" (kWh). The maximum output of the inverter is 5000 watts.
-      </ul>
-      </li>
     </ul>
     <br>
 
@@ -18765,7 +18726,6 @@ to ensure that the system configuration is correct.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Day&gt;   (e.g. set &lt;name&gt; reset consumption 08) </ul>                 </td></tr>
             <tr><td>                           </td><td>To delete the consumption values of a specific hour of a day:                                                           </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumption 08 10) </ul>   </td></tr>
-            <tr><td> <b>currentInverterSet</b> </td><td>deletes the set inverter device and corresponding data.                                                                 </td></tr>
             <tr><td> <b>energyH4TriggerSet</b> </td><td>deletes the 4-hour energy trigger points                                                                                </td></tr>
             <tr><td> <b>inverterStringSet</b>  </td><td>deletes the string configuration of the installation                                                                    </td></tr>
             <tr><td> <b>powerTriggerSet</b>    </td><td>deletes the trigger points for PV generation values                                                                     </td></tr>
@@ -20314,6 +20274,40 @@ to ensure that the system configuration is correct.
        </li>
        <br>
        
+       <a id="SolarForecast-attr-setupInverterDev"></a>
+       <li><b>setupInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; [capacity=&lt;max. WR-Leistung&gt;] </b> <br><br>
+
+       Specifies any Device and its Readings to deliver the current PV generation values.
+       It can also be a dummy device with appropriate readings.
+       The values of several inverter devices are merged e.g. in a dummy device and this device is specified with the
+       corresponding readings. <br>
+       Specifying <b>capacity</b> is optional, but strongly recommended to optimize prediction accuracy.
+       <br><br>
+
+       <ul>
+        <table>
+        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+           <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation                                         </td></tr>
+           <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).    </td></tr>
+           <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,              </td></tr>
+           <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.    </td></tr>
+           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                        </td></tr>
+           <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts  </td></tr>
+           <tr><td>                 </td><td>(The entry is optional, but is strongly recommended)                                     </td></tr>        
+        </table>
+       </ul>
+       <br>
+
+       <ul>
+         <b>Example: </b> <br>
+         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 
+       </ul>
+       <br>
+       
+       <b>Note:</b> Deleting the attribute also removes the internally corresponding data.
+       </li>
+       <br>
+       
        <a id="SolarForecast-attr-setupMeterDev"></a>
        <li><b>setupMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Unit&gt; contotal=&lt;Readingname&gt;:&lt;Unit&gt;
                             gfeedin=&lt;Readingname&gt;:&lt;Unit&gt; feedtotal=&lt;Readingname&gt;:&lt;Unit&gt;
@@ -20440,7 +20434,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
             <tr><td> <b>ctrlWeatherDevX</b>      </td><td>DWD_OpenData Device welches meteorologische Daten (z.B. Bewölkung) liefert     </td></tr>
             <tr><td> <b>currentRadiationAPI </b> </td><td>DWD_OpenData Device bzw. API zur Lieferung von Strahlungsdaten                 </td></tr>
-            <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert                                       </td></tr>
+            <tr><td> <b>setupInverterDev</b>     </td><td>Device welches PV Leistungsdaten liefert                                       </td></tr>
             <tr><td> <b>setupMeterDev</b>        </td><td>Device welches Netz I/O-Daten liefert                                          </td></tr>
             <tr><td> <b>setupBatteryDev</b>      </td><td>Device welches Batterie Leistungsdaten liefert (sofern vorhanden)              </td></tr>
             <tr><td> <b>inverterStrings</b>      </td><td>Bezeichner der vorhandenen Anlagenstrings                                      </td></tr>
@@ -20570,42 +20564,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         set &lt;name&gt; consumerImmediatePlanning 01 <br>
       </ul>
     </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-currentInverterDev"></a>
-      <li><b>currentInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; [capacity=&lt;max. WR-Leistung&gt;] </b> <br><br>
-
-      Legt ein beliebiges Device und dessen Readings zur Lieferung der aktuellen PV Erzeugungswerte fest.
-      Es kann auch ein Dummy Device mit entsprechenden Readings sein.
-      Die Werte mehrerer Inverterdevices führt man z.B. in einem Dummy Device zusammen und gibt dieses Device mit den
-      entsprechenden Readings an. <br>
-      Die Angabe von <b>capacity</b> ist optional, wird aber zur Optimierung der Vorhersagegenauigkeit dringend empfohlen.
-      <br><br>
-
-      <ul>
-       <table>
-       <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung liefert                                            </td></tr>
-          <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)    </td></tr>
-          <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt       </td></tr>
-          <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch eine Logmeldung.     </td></tr>
-          <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                          </td></tr>
-          <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt  </td></tr>
-          <tr><td>                 </td><td>(Die Angabe ist optional, wird aber dringend empfohlen zu setzen)                            </td></tr>
-        </table>
-      </ul>
-      <br>
-
-      <ul>
-        <b>Beispiel: </b> <br>
-        set &lt;name&gt; currentInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 <br>
-        <br>
-        # Device STP5000 liefert PV-Werte. Die aktuell erzeugte Leistung im Reading "total_pac" (kW) und die erzeugte Gesamtenergie im
-          Reading "etotal" (kWh). Die max. Leistung des Wechselrichters beträgt 5000 Watt.
-      </ul>
-      </li>
     </ul>
     <br>
 
@@ -21044,7 +21002,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumption 08) </ul>                 </td></tr>
             <tr><td>                           </td><td>Um die Verbrauchswerte einer bestimmten Stunde eines Tages zu löschen:                                                  </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumption 08 10) </ul> </td></tr>
-            <tr><td> <b>currentInverterSet</b> </td><td>löscht das eingestellte Inverterdevice und korrespondierende Daten                                                      </td></tr>
             <tr><td> <b>energyH4TriggerSet</b> </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                              </td></tr>
             <tr><td> <b>inverterStringSet</b>  </td><td>löscht die Stringkonfiguration der Anlage                                                                               </td></tr>
             <tr><td> <b>powerTriggerSet</b>    </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                         </td></tr>
@@ -22586,6 +22543,40 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <ul>
          <b>Beispiel: </b> <br>
          attr &lt;name&gt; setupBatteryDev BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh
+       </ul>
+       <br>
+       
+       <b>Hinweis:</b> Durch Löschen des Attributes werden ebenfalls die intern korrespondierenden Daten entfernt.
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-setupInverterDev"></a>
+       <li><b>setupInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; [capacity=&lt;max. WR-Leistung&gt;] </b> <br><br>
+
+       Legt ein beliebiges Device und dessen Readings zur Lieferung der aktuellen PV Erzeugungswerte fest.
+       Es kann auch ein Dummy Device mit entsprechenden Readings sein.
+       Die Werte mehrerer Inverterdevices führt man z.B. in einem Dummy Device zusammen und gibt dieses Device mit den
+       entsprechenden Readings an. <br>
+       Die Angabe von <b>capacity</b> ist optional, wird aber zur Optimierung der Vorhersagegenauigkeit dringend empfohlen.
+       <br><br>
+
+       <ul>
+        <table>
+        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+           <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung liefert                                            </td></tr>
+           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)    </td></tr>
+           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt       </td></tr>
+           <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch eine Logmeldung.     </td></tr>
+           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                          </td></tr>
+           <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt  </td></tr>
+           <tr><td>                 </td><td>(Die Angabe ist optional, wird aber dringend empfohlen zu setzen)                            </td></tr>
+         </table>
+       </ul>
+       <br>
+
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000
        </ul>
        <br>
        
