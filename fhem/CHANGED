@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  73_PRESENCE2: entfernt BlockingCall loglevel = GetVerbose($name)
+ - bugfix:  73_PRESENCE:  entfernt BlockingCall loglevel = GetVerbose($name)
+ - bugfix:  98_CDCOpenData:  entfernt BlockingCall loglevel = GetVerbose($name)
+ - bufgix:  72_FRITZBOX:   entfernt BlockingCall loglevel = GetVerbose($name)
  - change:  76_SolarForecast: set currentBatteryDev to attr setupBatteryDev
                               !NOTE! save FHEM config after restart,
                               minor other changes
