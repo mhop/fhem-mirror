@@ -20287,6 +20287,16 @@ to ensure that the system configuration is correct.
        </ul>
        <br>
        
+       <ul>
+         <b>Example: </b> <br>
+         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 
+       </ul>
+       <br>
+       
+       <b>Note:</b> Deleting the attribute also removes the internally corresponding data.
+       </li>
+       <br>
+       
        <a id="SolarForecast-attr-setupInverterStrings"></a>
        <li><b>setupInverterStrings &lt;Stringname1&gt;[,&lt;Stringname2&gt;,&lt;Stringname3&gt;,...] </b> <br><br>
 
@@ -20300,16 +20310,6 @@ to ensure that the system configuration is correct.
          attr &lt;name&gt; setupInverterStrings eastroof,southgarage,S3 <br>
          attr &lt;name&gt; setupInverterStrings KI-based <br>
        </ul>
-       </li>
-       <br>
-
-       <ul>
-         <b>Example: </b> <br>
-         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 
-       </ul>
-       <br>
-       
-       <b>Note:</b> Deleting the attribute also removes the internally corresponding data.
        </li>
        <br>
        
@@ -22560,6 +22560,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </ul>
        <br>
        
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000
+       </ul>
+       <br>
+       
+       <b>Hinweis:</b> Durch Löschen des Attributes werden ebenfalls die intern korrespondierenden Daten entfernt.
+       </li>
+       <br>
+       
        <a id="SolarForecast-attr-setupInverterStrings"></a>
        <li><b>setupInverterStrings &lt;Stringname1&gt;[,&lt;Stringname2&gt;,&lt;Stringname3&gt;,...] </b> <br><br>
 
@@ -22573,16 +22583,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          attr &lt;name&gt; setupInverterStrings Ostdach,Südgarage,S3 <br>
          attr &lt;name&gt; setupInverterStrings KI-based <br>
        </ul>
-       </li>
-       <br>
-
-       <ul>
-         <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000
-       </ul>
-       <br>
-       
-       <b>Hinweis:</b> Durch Löschen des Attributes werden ebenfalls die intern korrespondierenden Daten entfernt.
        </li>
        <br>
        
