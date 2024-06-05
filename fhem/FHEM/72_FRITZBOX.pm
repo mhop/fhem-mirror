@@ -45,7 +45,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.57.13b";
+my $ModulVersion = "07.57.13c";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -8180,7 +8180,7 @@ sub FRITZBOX_Get_SmartHome_Devices_List($@) {
                    my $endTime     = $timeSchedule->[$i]{'timeSetting'}{'endTime'};
                
                    $ret{$holiday . "ID"}        = $i + 1;
-                   $ret{$holiday . "Enabled"}   = ( ( $timeSchedule->[$i]{'timeSetting'}{'isEnabled'} ) ? 1 : 0 );
+                   $ret{$holiday . "Enabled"}   = ( ( $timeSchedule->[$i]{'isEnabled'} ) ? 1 : 0 );
                    $ret{$holiday ."StartDay"}   = $startDate;
                    $ret{$holiday ."StartDay"}   =~ s/([0-9]{4})-([0-9]{2})-([0-9]{2})/$3/;
                    $ret{$holiday ."StartMonth"} = $startDate;
@@ -8217,7 +8217,7 @@ sub FRITZBOX_Get_SmartHome_Devices_List($@) {
                    $ret{SummerEndMonth}   = $endDate;
                    $ret{SummerEndMonth}   =~ s/([0-9]{4})-([0-9]{2})-([0-9]{2})/$2/;
                
-                   $ret{SummerEnabled}    = ( ( $timeSchedule->[$i]{'timeSetting'}{'isEnabled'} ) ? 1 : 0 );
+                   $ret{SummerEnabled}    = ( ( $timeSchedule->[$i]{'isEnabled'} ) ? 1 : 0 );
                  }
 
                }
