@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 18 / 2023-07-23
+# Release 19 / 2024-06-08
 
 
 package main;
@@ -1234,7 +1234,11 @@ sub withings_initUser($) {
   $attr{$name}{stateFormat} = "weight kg" if( !defined( $attr{$name}{stateFormat} ) );
 
   InternalTimer(gettimeofday()+60, "withings_poll", $hash, 0);
-  withings_AuthRefresh($hash) if(defined(ReadingsVal($name,".refresh_token",undef)));
+  if(defined(ReadingsVal($name,".refresh_token",undef))){
+    RemoveInternalTimer($hash, "withings_AuthRefresh");
+    InternalTimer(gettimeofday()+12, "withings_AuthRefresh", $hash, 0);
+  }
+
 
 }
 
@@ -2894,10 +2898,10 @@ sub withings_Get($$@) {
       my $users = withings_getUsers($hash);
       my $ret;
       foreach my $user (@{$users}) {
-        $ret .= "$user->{id}\t\[$user->{shortname}\]\t$user->{publickey}   \t$user->{usertype}/$user->{status}\t$user->{firstname} $user->{lastname}\n";
+        $ret .= "$user->{id}\t\[$user->{shortname}\]\t$user->{usertype}/$user->{status}\t\t$user->{firstname} $user->{lastname}\n";
       }
 
-      $ret = "id\tshort\tpublickey\tusertype/status\tname\n" . $ret if( $ret );;
+      $ret = "id\tshort\tusertype/status\tname\n" . $ret if( $ret );;
       $ret = "no users found" if( !$ret );
       return $ret;
     }
@@ -3899,7 +3903,7 @@ sub withings_AuthApp($;$) {
   readingsSingleUpdate( $userhash, ".refresh_token", $json->{body}{refresh_token}, 1 ) if(defined($json->{body}{refresh_token}));
 
   RemoveInternalTimer($userhash, "withings_AuthRefresh");
-  InternalTimer(gettimeofday()+$json->{body}{expires_in}-60, "withings_AuthRefresh", $userhash, 0);
+  InternalTimer(gettimeofday()+$json->{body}{expires_in}-1800, "withings_AuthRefresh", $userhash, 0);
 
 
   #https://wbsapi.withings.net/notify?action=subscribe&access_token=a639e912dfc31a02cc01ea4f38de7fa4a1464c2e&callbackurl=http://fhem:remote@gu9mohkaxqdgpix5.myfritz.net/fhem/withings&appli=1&comment=fhem
@@ -3958,7 +3962,7 @@ sub withings_AuthRefresh($) {
   $hash->{helper}{OAuthValid} = (int(time)+$json->{body}{expires_in}) if(defined($json->{body}{expires_in}));
   readingsSingleUpdate( $hash, ".refresh_token", $json->{body}{refresh_token}, 1 ) if(defined($json->{body}{refresh_token}));
 
-  InternalTimer(gettimeofday()+$json->{body}{expires_in}-60, "withings_AuthRefresh", $hash, 0);
+  InternalTimer(gettimeofday()+$json->{body}{expires_in}-1800, "withings_AuthRefresh", $hash, 0);
 
   #https://wbsapi.withings.net/notify?action=subscribe&access_token=a639e912dfc31a02cc01ea4f38de7fa4a1464c2e&callbackurl=http://fhem:remote@gu9mohkaxqdgpix5.myfritz.net/fhem/withings&appli=1&comment=fhem
 
