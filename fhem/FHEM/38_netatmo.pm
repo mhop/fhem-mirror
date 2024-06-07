@@ -954,7 +954,11 @@ netatmo_checkConnection($;$)
   my $name = $hash->{NAME};
 
   return undef if(!$forcecheck && $hash->{network} eq "ok");
-  return undef if(!defined($hash->{access_token}));
+  if(!defined($hash->{access_token})){
+    $hash->{status} = "error";
+    $hash->{network} = "disconnected";
+    return undef;
+  }
   Log3 $name, 3, "$name: refreshing connection information";
 
   HttpUtils_NonblockingGet({
@@ -1090,6 +1094,18 @@ netatmo_parseDev($$$)
   }
     
   my $found = 0;
+  if( ref($json) eq "HASH" && $json->{error} ){
+    Log3 $name, 2, "$name: dev hash error: ".Dumper($json->{error});
+    return undef;
+  } elsif ( ref($json) ne "HASH" ){
+    Log3 $name, 2, "$name: dev hash json error: ".Dumper($json);
+    return undef;
+  } #elsif ( ref($json->{body}) ne "ARRAY" ){
+    #Log3 $name, 2, "$name: dev body array error: ".Dumper($json);
+    #return undef;
+  #}
+
+  #foreach my $devapp ( @{$json->{body}}) {
   foreach my $devappid ( keys %{$json->{body}}) {
     my $devapp = $json->{body}{$devappid};
     if(defined($devapp->{webhook_uri}) && $devapp->{webhook_uri} eq AttrVal($name,"webhookURL","-")){
@@ -2746,7 +2762,7 @@ netatmo_poll($)
     return undef;
   } elsif( $hash->{SUBTYPE} ne "ACCOUNT" &&  defined($hash->{IODev}->{network}) && $hash->{IODev}->{network} ne "ok" ) {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+150, "netatmo_poll", $hash);
+    InternalTimer(gettimeofday()+600+($hash->{helper}{INTERVAL}*2)+int(rand(600)), "netatmo_poll", $hash);
     $hash->{status} = "delayed update";
     #netatmo_checkConnection($hash->{IODev});
     readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data" && $hash->{SUBTYPE} ne "WEBHOOK");
@@ -2887,6 +2903,10 @@ netatmo_dispatch($$$)
         $hash->{status} = $json->{error};
         Log3 $name, 2, "$name: json message error: ".$json->{error};
         readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data");
+        if($json->{error} eq "invalid_grant"){
+          $hash->{status} = "error";
+          $hash->{network} = "disconnected" if($hash->{SUBTYPE} eq "ACCOUNT");
+        }
         return undef;
       }
 
@@ -3316,7 +3336,7 @@ netatmo_parseToken($$)
     $hash->{helper}{refresh_token} = $json->{refresh_token};
     my $new_refresh = $json->{refresh_token};
 
-    $hash->{STATE} = "Connected";
+    $hash->{STATE} = "connected";
     $hash->{network} = "ok";
 
     $hash->{expires_at} = int(gettimeofday());
@@ -3750,7 +3770,7 @@ netatmo_parseGlobal($$)
     $readings = $hash->{readings} if( defined($hash->{readings}) );
     if( $hash->{status} eq "ok" )
     {
-      $hash->{STATE} = "Connected";
+      $hash->{STATE} = "connected";
       foreach my $devicedata ( @{$json->{body}{devices}})
       {
 
@@ -4006,7 +4026,7 @@ netatmo_parseForecast($$)
 
     if( $hash->{status} eq "ok" )
     {
-      #$hash->{STATE} = "Connected";
+      #$hash->{STATE} = "connected";
       
       my $datatime = time;
       my $forecasttime = time;
@@ -4307,7 +4327,7 @@ netatmo_parseHomeReadings($$;$)
     $readings = $hash->{readings} if( defined($hash->{readings}) );
     if( $hash->{status} eq "ok" )
     {
-      #$hash->{STATE} = "Connected";
+      #$hash->{STATE} = "connected";
       return undef if(!defined($json->{body}{homes}));
       foreach my $homedata ( @{$json->{body}{homes}})
       {
@@ -5009,7 +5029,7 @@ netatmo_parsePersonReadings($$;$)
 
       if( $hash->{status} eq "ok" )
       {
-        #$hash->{STATE} = "Connected";
+        #$hash->{STATE} = "connected";
 
           if(defined($json->{body}{events_list}))
           {
@@ -5133,7 +5153,7 @@ netatmo_parseThermostatReadings($$;$)
         my $hash = $modules{$hash->{TYPE}}{defptr}{"R$devicedata->{_id}"};
         next if (!defined($hash));
         next if($devicedata->{_id} ne $hash->{Relay});
-        #$hash->{STATE} = "Connected";
+        #$hash->{STATE} = "connected";
 
         readingsSingleUpdate($hash, "name", encode_utf8($devicedata->{station_name}), 1) if(defined($devicedata->{station_name}));
 
