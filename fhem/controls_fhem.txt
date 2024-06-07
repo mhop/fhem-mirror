@@ -1,4 +1,4 @@
-REV 28947
+REV 28949
 DIR unused
 UPD 2024-06-06_07:45:03 428356 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -544,7 +544,7 @@ UPD 2018-03-02_07:47:09 3985 FHEM/98_cmdalias.pm
 UPD 2024-04-06_07:45:02 21629 FHEM/98_configdb.pm
 UPD 2018-03-10_07:45:02 1997 FHEM/98_copy.pm
 UPD 2020-04-01_07:45:03 1441 FHEM/98_count.pm
-UPD 2019-03-11_07:45:02 35510 FHEM/98_dewpoint.pm
+UPD 2024-06-07_07:45:04 35492 FHEM/98_dewpoint.pm
 UPD 2022-02-02_07:45:02 5875 FHEM/98_dummy.pm
 UPD 2018-09-12_07:45:02 11093 FHEM/98_expandJSON.pm
 UPD 2018-07-17_07:45:04 49521 FHEM/98_feels_like.pm
@@ -763,12 +763,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2024-06-06_07:45:09 5197266 docs/commandref.html
-UPD 2024-06-06_07:45:13 3224559 docs/commandref_DE.html
+UPD 2024-06-07_07:45:10 5197254 docs/commandref.html
+UPD 2024-06-07_07:45:14 3224547 docs/commandref_DE.html
 UPD 2024-03-06_07:45:03 86454 docs/commandref_frame.html
 UPD 2024-03-06_07:45:03 97189 docs/commandref_frame_DE.html
-UPD 2024-06-06_07:45:14 317975 docs/commandref_modular.html
-UPD 2024-06-06_07:45:15 329887 docs/commandref_modular_DE.html
+UPD 2024-06-07_07:45:15 317975 docs/commandref_modular.html
+UPD 2024-06-07_07:45:16 329887 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
