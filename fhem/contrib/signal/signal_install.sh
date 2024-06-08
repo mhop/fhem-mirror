@@ -1,15 +1,15 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.27"
+SCRIPTVERSION="3.28"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
 SIGNALPATH=/opt
 SIGNALUSER=signal-cli
 LIBPATH=/usr/lib
-SIGNALVERSION="0.13.3"
+SIGNALVERSION="0.13.4"
 #Check for latest valid version at https://github.com/AsamK/signal-cli/releases
-LIBRARYVERSION="0.44.0"
+LIBRARYVERSION="0.47.0"
 #Check for latest valid version at https://github.com/exquo/signal-libs-build/releases
 #Make sure this matches the required version for signal-cli (see lib/libsignal-client-0.xx.x.jar version in signal-cli)
 LIBSIG=libsignal_jni.tgz
