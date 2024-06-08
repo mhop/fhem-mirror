@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 29 / 2023-12-06
+# Release 30 / 2024-06-08
 
 package main;
 
@@ -449,7 +449,7 @@ netatmo_Define($$)
     $hash->{helper}{password} = $password;
     $hash->{helper}{client_id} = $client_id;
     $hash->{helper}{client_secret} = $client_secret;
-    $hash->{refresh_token} = $refresh_token;
+    $hash->{refresh_token} = $refresh_token if(!defined($hash->{refresh_token}));
     $hash->{helper}{refresh_token} = $hash->{refresh_token};
     $hash->{helper}{refresh_token} = $refresh_token if(!$hash->{helper}{refresh_token});
 
@@ -2906,6 +2906,7 @@ netatmo_dispatch($$$)
         if($json->{error} eq "invalid_grant"){
           $hash->{status} = "error";
           $hash->{network} = "disconnected" if($hash->{SUBTYPE} eq "ACCOUNT");
+          delete($hash->{refresh_token});
         }
         return undef;
       }
@@ -3343,11 +3344,12 @@ netatmo_parseToken($$)
     $hash->{expires_at} += int($json->{expires_in}*0.8);
 
     if($old_refresh ne $hash->{refresh_token}){
-      if($hash->{DEF} =~ /ACCOUNT/){
+      if($hash->{SUBTYPE} eq "ACCOUNT"){
         my @defarray = split(/ /, $hash->{DEF});
         pop(@defarray);
         push(@defarray, $json->{refresh_token});
         $hash->{DEF} = join(' ', @defarray);
+        $hash->{last_refresh} = FmtDateTime(gettimeofday());
       }
     }
 
@@ -6759,7 +6761,7 @@ sub netatmo_weatherIcon()
   <a name="netatmo_Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; netatmo [ACCOUNT] &lt;username&gt; &lt;password&gt; &lt;client_id&gt; &lt;client_secret&gt; &lt;refresh_token&gt;</code><br>
+    <code>define &lt;name&gt; netatmo ACCOUNT &lt;username&gt; &lt;password&gt; &lt;client_id&gt; &lt;client_secret&gt; &lt;refresh_token&gt;</code><br>
     <code>define &lt;name&gt; netatmo &lt;device&gt;</code> (you should use autocreate from the account device!)<br>
     <br>
 
