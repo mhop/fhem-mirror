@@ -46,6 +46,7 @@ BEGIN {
           AttrVal
           CommandAttr
           CommandDeleteReading
+          DoTrigger
           FmtDateTime
           FW_ME
           FW_dir
@@ -808,6 +809,8 @@ sub APIAuthResponse {
   RemoveInternalTimer( $hash, \&APIAuth );
   InternalTimer( gettimeofday() + $hash->{helper}{retry_interval_apiauth}, \&APIAuth, $hash, 0 );
   Log3 $name, 1, "$iam failed retry in $hash->{helper}{retry_interval_apiauth} seconds.";
+  DoTrigger($name, "AUTHENTICATION ERROR");
+
   return undef;
 
 }
@@ -962,12 +965,14 @@ sub getMowerResponse {
 
     readingsSingleUpdate( $hash, 'device_state', "error statuscode $statuscode", 1 );
     Log3 $name, 1, "$iam \$statuscode >$statuscode<, \$err >$err<, \$param->url $param->{url} \n\$data >$data<";
+    DoTrigger($name, "MOWERAPI ERROR");
 
   }
 
   RemoveInternalTimer( $hash, \&APIAuth );
   InternalTimer( gettimeofday() + $hash->{helper}{retry_interval_getmower}, \&APIAuth, $hash, 0 );
   Log3 $name, 1, "$iam failed retry in $hash->{helper}{retry_interval_getmower} seconds.";
+
   return undef;
 
 }
@@ -1092,6 +1097,8 @@ sub getMowerResponseWs {
 
     readingsSingleUpdate( $hash, 'device_state', "additional Polling error statuscode $statuscode", 1 );
     Log3 $name, 1, "$iam \$statuscode [$statuscode]\n\$err [$err],\n \$data [$data] \n\$param->url $param->{url}";
+    DoTrigger($name, "MOWERAPI ERROR");
+
 
   }
 
@@ -1540,7 +1547,7 @@ sub Attr {
 
       readingsSingleUpdate( $hash,'device_state','disabled',1);
       RemoveInternalTimer( $hash );
-      DevIo_CloseDev( $hash ) if ( DevIo_IsOpen( $hash ) );
+      DevIo_CloseDev( $hash );
       DevIo_setStates( $hash, "closed" );
       Log3 $name, 3, "$iam $cmd $attrName disabled";
 
@@ -2982,7 +2989,10 @@ sub wsCb {
   my $type = $hash->{TYPE};
   my $iam = "$type $name wsCb:";
   my $l = $hash->{devioLoglevel};
-  Log3 $name, ( $l ? $l : 1 ), "$iam failed with error: $error" if( $error );
+  if( $error ){
+    Log3 $name, ( $l ? $l : 1 ), "$iam failed with error: $error";
+    DoTrigger($name, "WEBSOCKET ERROR");
+  }
   return undef;
 
 }
