@@ -551,7 +551,7 @@ __END__
   <ul>
   A List of Events generated besides readings events.<br>
   
-    <li><code>&lt;device name&gt;:AUTHENTIFICATION ERROR</code> Error during Authentification.</li>
+    <li><code>&lt;device name&gt;:AUTHENTICATION ERROR</code> Error during Authentification.</li>
     <li><code>&lt;device name&gt;:MOWERAPI ERROR</code> Error while Connecting AutomowerConnect API.</li>
     <li><code>&lt;device name&gt;:WEBSOCKET ERROR</code> Error related to websocket connection.</li>
   </ul>
@@ -1051,7 +1051,7 @@ __END__
   <ul>
   Eine Liste von Events zusätzlich zu den Readingsevents.<br>
   
-    <li><code>&lt;device name&gt;:AUTHENTIFICATION ERROR</code> Fehler bei der Authentifizierung.</li>
+    <li><code>&lt;device name&gt;:AUTHENTICATION ERROR</code> Fehler bei der Authentifizierung.</li>
     <li><code>&lt;device name&gt;:MOWERAPI ERROR</code> Fehler bei der Verbindung zur AutomowerConnect API.</li>
     <li><code>&lt;device name&gt;:WEBSOCKET ERROR</code> Fehler bei der Websocketverbindung.</li>
   </ul>
