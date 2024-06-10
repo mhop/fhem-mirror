@@ -2921,7 +2921,7 @@ sub
 ZWave_configParseModel($;$)
 {
   my ($cfg, $my) = @_;
-  return if(!$my && ZWave_configParseModel($cfg, 1));
+  return if(!$my && ZWave_configParseModel($cfg, 1)); # first fhem_ then open...
 
   my $fn = $attr{global}{modpath}."/FHEM/lib/".($my ? "fhem_":"open").
                                 "zwave_deviceconfig.xml.gz";

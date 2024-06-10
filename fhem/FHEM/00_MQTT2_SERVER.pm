@@ -400,6 +400,8 @@ MQTT2_SERVER_Read($@)
     ($cid, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
 
     if($hash->{protoNum} > 4) {
+      Log3 $sname, 3, "$cname: unsuported protocol version $hash->{protoNum}, ".
+                      "closing the connection";
       return MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, 1), $dump,
                                 sub{ CommandDelete(undef, $hash->{NAME}); });
     }
