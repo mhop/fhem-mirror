@@ -157,6 +157,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.26.0" => "10.06.2024  transformed setter currentRadiationAPI to attr setupRadiationAPI ",
+  "1.25.2" => "09.06.2024  _specialActivities: change delete readings exec ",  
   "1.25.1" => "08.06.2024  Illegal division by zero Forum:https://forum.fhem.de/index.php?msg=1314730 ",  
   "1.25.0" => "05.06.2024  transformed setter inverterStrings to attr setupInverterStrings, calcTodayPVdeviation: fix continuously calc again ",
   "1.24.0" => "03.06.2024  transformed setter currentInverterDev to attr setupInverterDev, calcTodayPVdeviation: fix continuously calc ",
@@ -496,7 +498,6 @@ my @fs = qw( ftui_forecast.css
            );
                                                                                  # Anlagenkonfiguration: maßgebliche Readings
 my @rconfigs = qw( pvCorrectionFactor_Auto
-                   currentRadiationAPI
                    moduleAzimuth
                    modulePeakString
                    moduleDeclination
@@ -526,7 +527,7 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
                    graphicHeaderDetail graphicHeaderShow graphicHistoryHour graphicHourCount graphicHourStyle
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
                    graphicSpaceSize graphicStartHtml graphicEndHtml graphicWeatherColor graphicWeatherColorNight
-                   setupMeterDev setupBatteryDev setupInverterDev setupInverterStrings
+                   setupMeterDev setupBatteryDev setupInverterDev setupInverterStrings setupRadiationAPI
                  );
 
 for my $cinit (1..$maxconsumer) {                             
@@ -542,8 +543,7 @@ my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select
 
 my %hset = (                                                                # Hash der Set-Funktion
   consumerImmediatePlanning => { fn => \&_setconsumerImmediatePlanning },
-  consumerNewPlanning       => { fn => \&_setconsumerNewPlanning       },
-  currentRadiationAPI       => { fn => \&_setcurrentRadiationAPI       },
+  consumerNewPlanning       => { fn => \&_setconsumerNewPlanning       },    
   modulePeakString          => { fn => \&_setmodulePeakString          },
   clientAction              => { fn => \&_setclientAction              },
   energyH4Trigger           => { fn => \&_setTrigger                   },
@@ -609,6 +609,7 @@ my %hattr = (                                                                # H
   setupBatteryDev           => { fn => \&_attrBatteryDev          },
   setupInverterDev          => { fn => \&_attrInverterDev         },
   setupInverterStrings      => { fn => \&_attrInverterStrings     },
+  setupRadiationAPI         => { fn => \&_attrRadiationAPI        },
 );
 
 my %htr = (                                                                  # Hash even/odd für <tr>
@@ -653,8 +654,8 @@ my %hqtxt = (                                                                   
                        (Die Anzeigesprache kann mit dem Attribut "ctrlLanguage" umgestellt werden.)<hr><br>}                },
   cfd    => { EN => qq{Please enter at least one weather forecast device with "attr LINK ctrlWeatherDev1"},
               DE => qq{Bitte geben sie mindestens ein Wettervorhersage Device mit "attr LINK ctrlWeatherDev1" an}           },
-  crd    => { EN => qq{Please select the radiation forecast service with "set LINK currentRadiationAPI"},
-              DE => qq{Bitte geben sie den Strahlungsvorhersage Dienst mit "set LINK currentRadiationAPI" an}               },
+  crd    => { EN => qq{Please select the radiation forecast service with "attr LINK setupRadiationAPI"},
+              DE => qq{Bitte geben sie den Strahlungsvorhersage Dienst mit "attr LINK setupRadiationAPI" an}                },
   cid    => { EN => qq{Please specify the Inverter device with "attr LINK setupInverterDev"},
               DE => qq{Bitte geben sie das Wechselrichter Device mit "attr LINK setupInverterDev" an}                       },
   mid    => { EN => qq{Please specify the device for energy measurement with "attr LINK setupMeterDev"},
@@ -1221,6 +1222,7 @@ sub Initialize {
                                 "setupInverterStrings ".
                                 "setupMeterDev:textField-long ".
                                 "setupBatteryDev:textField-long ".
+                                "setupRadiationAPI ".
                                 $consumer.
                                 $readingFnAttributes;
 
@@ -1468,7 +1470,6 @@ sub Set {
   $setlist = "Unknown argument $opt, choose one of ".
              "consumerImmediatePlanning:$coms ".
              "consumerNewPlanning:$coms ".
-             "currentRadiationAPI:$rdd ".
              "energyH4Trigger:textField-long ".
              "modulePeakString ".
              "operatingMemory:backup,save".$rf." ".
@@ -1623,60 +1624,6 @@ sub _setconsumerNewPlanning {            ## no critic "not used"
   }
 
   centralTask ($hash, $evt);
-
-return;
-}
-
-################################################################
-#                      Setter currentRadiationAPI
-################################################################
-sub _setcurrentRadiationAPI {              ## no critic "not used"
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $prop  = $paref->{prop} // return qq{no radiation device specified};
-
-  if ($prop !~ /-API$/x && (!$defs{$prop} || $defs{$prop}{TYPE} ne "DWD_OpenData")) {
-      return qq{The device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};
-  }
-
-  my $awdev1 = AttrVal ($name, 'ctrlWeatherDev1', '');
-  
-  if (($awdev1 eq 'OpenMeteoDWD-API'         && $prop ne 'OpenMeteoDWD-API')         ||
-      ($awdev1 eq 'OpenMeteoDWDEnsemble-API' && $prop ne 'OpenMeteoDWDEnsemble-API') ||  
-      ($awdev1 eq 'OpenMeteoWorld-API'       && $prop ne 'OpenMeteoWorld-API')) {
-      return "The attribute 'ctrlWeatherDev1' is set to '$awdev1'. \n".
-             "Change that attribute to another weather device first if you want use an other API.";
-  }
-
-  if ($prop =~ /(SolCast|OpenMeteoDWD|OpenMeteoDWDEnsemble|OpenMeteoWorld)-API/xs) {
-      return "The library FHEM::Utility::CTZ is missing. Please update FHEM completely." if($ctzAbsent);
-
-      my $rmf = reqModFail();
-      return "You have to install the required perl module: ".$rmf if($rmf);
-  }
-
-  readingsSingleUpdate ($hash, "currentRadiationAPI", $prop, 1);
-  createAssociatedWith ($hash);
-  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);                      # Anlagenkonfiguration File schreiben
-  setModel             ($hash);                                                      # Model setzen
-  deleteReadingspec    ($hash, 'nextRadiationAPICall');
-
-  return if(_checkSetupNotComplete ($hash));                                         # keine Stringkonfiguration wenn Setup noch nicht komplett
-
-  if ($prop =~ /(ForecastSolar|OpenMeteoDWD|OpenMeteoDWDEnsemble|OpenMeteoWorld)-API/xs) {
-      my ($set, $lat, $lon, $elev) = locCoordinates();
-      return qq{set attributes 'latitude' and 'longitude' in global device first} if(!$set);
-
-      my $tilt = ReadingsVal ($name, 'moduleDeclination', '');                       # Modul Neigungswinkel für jeden Stringbezeichner
-      return qq{Please complete command "set $name moduleDeclination".} if(!$tilt);
-
-      my $dir = ReadingsVal ($name, 'moduleAzimuth', '');                            # Modul Ausrichtung für jeden Stringbezeichner
-      return qq{Please complete command "set $name moduleAzimuth".} if(!$dir);
-  }
-
-  my $type = $hash->{TYPE};
-  $data{$type}{$name}{current}{allStringsFullfilled} = 0;                            # Stringkonfiguration neu prüfen lassen
 
 return;
 }
@@ -2049,7 +1996,7 @@ sub _setpvCorrectionFactor {             ## no critic "not used"
   my $opt   = $paref->{opt};
   my $prop  = $paref->{prop} // return qq{no correction value specified};
 
-  if($prop !~ /[0-9,.]/x) {
+  if ($prop !~ /[0-9,.]/x) {
       return qq{The correction value must be specified by numbers and optionally with decimal places};
   }
 
@@ -2058,7 +2005,7 @@ sub _setpvCorrectionFactor {             ## no critic "not used"
   readingsSingleUpdate($hash, $opt, $prop." (manual)", 1);
 
   my $cfnum = (split "_", $opt)[1];
-  deleteReadingspec ($hash, "pvCorrectionFactor_${cfnum}_autocalc");
+  readingsDelete ($hash, "pvCorrectionFactor_${cfnum}_autocalc");
 
   centralTask ($hash, 0);
 
@@ -2265,8 +2212,8 @@ sub _setreset {                          ## no critic "not used"
   }
 
   if ($prop eq 'moduleRoofTopSet') {
-      deleteReadingspec ($hash, "moduleRoofTops");
-      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);
+      readingsDelete   ($hash, "moduleRoofTops");
+      writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);
       return;
   }
 
@@ -3411,7 +3358,7 @@ sub __getDWDSolarData {
 
   my $type  = $hash->{TYPE};
 
-  my $raname = ReadingsVal ($name, "currentRadiationAPI", "");                                 # Radiation Forecast API
+  my $raname = AttrVal ($name, 'setupRadiationAPI', '');                                       # Radiation Forecast API
   return if(!$raname || !$defs{$raname});
 
   my $stime   = $date.' 00:00:00';                                                             # Startzeit Soll Übernahmedaten
@@ -5204,7 +5151,7 @@ sub Attr {
 
   if ($aName eq 'ctrlGenPVdeviation' && $aVal eq 'daily') {
       my $type = $hash->{TYPE};
-      deleteReadingspec ($hash, 'Today_PVdeviation');
+      readingsDelete ($hash, 'Today_PVdeviation');
       delete $data{$type}{$name}{circular}{99}{tdayDvtn};
   }
 
@@ -5681,8 +5628,7 @@ sub _attrWeatherDev {                    ## no critic "not used"
               return qq{Only the leading attribute 'ctrlWeatherDev1' can set to '$aVal'};
           }
 
-          #CommandSet (undef, "$name currentRadiationAPI $aVal");                         # automatisch currentRadiationAPI setzen wenn ctrlWeatherDev1
-          InternalTimer (gettimeofday()+1, 'FHEM::SolarForecast::__setRadAPIdelayed', $hash, 0);   # automatisch currentRadiationAPI setzen wenn ctrlWeatherDev1
+          InternalTimer (gettimeofday()+1, 'FHEM::SolarForecast::__setRadAPIdelayed', $hash, 0);   # automatisch setupRadiationAPI setzen wenn ctrlWeatherDev1
           return;
       }
 
@@ -5691,6 +5637,65 @@ sub _attrWeatherDev {                    ## no critic "not used"
   }
 
   InternalTimer (gettimeofday()+2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
+
+return;
+}
+
+################################################################
+#                      Attr setupRadiationAPI
+################################################################
+sub _attrRadiationAPI {                  ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $aVal  = $paref->{aVal};
+  my $aName = $paref->{aName};
+  my $type  = $paref->{type};
+  
+  return if(!$init_done);
+
+  if ($paref->{cmd} eq 'set') {
+      if ($aVal !~ /-API$/x && (!$defs{$aVal} || $defs{$aVal}{TYPE} ne "DWD_OpenData")) {
+          return qq{The device "$aVal" doesn't exist or has no TYPE "DWD_OpenData"};
+      }
+
+      my $awdev1 = AttrVal ($name, 'ctrlWeatherDev1', '');
+      
+      if (($awdev1 eq 'OpenMeteoDWD-API'         && $aVal ne 'OpenMeteoDWD-API')         ||
+          ($awdev1 eq 'OpenMeteoDWDEnsemble-API' && $aVal ne 'OpenMeteoDWDEnsemble-API') ||  
+          ($awdev1 eq 'OpenMeteoWorld-API'       && $aVal ne 'OpenMeteoWorld-API')) {
+          return "The attribute 'ctrlWeatherDev1' is set to '$awdev1'. \n".
+                 "Change that attribute to another weather device first if you want use an other API.";
+      }
+
+      if ($aVal =~ /(SolCast|OpenMeteoDWD|OpenMeteoDWDEnsemble|OpenMeteoWorld)-API/xs) {
+          return "The library FHEM::Utility::CTZ is missing. Please update FHEM completely." if($ctzAbsent);
+
+          my $rmf = reqModFail();
+          return "You have to install the required perl module: ".$rmf if($rmf);
+      }
+
+      return if(_checkSetupNotComplete ($hash));                                         # keine Stringkonfiguration wenn Setup noch nicht komplett
+
+      if ($aVal =~ /(ForecastSolar|OpenMeteoDWD|OpenMeteoDWDEnsemble|OpenMeteoWorld)-API/xs) {
+          my ($set, $lat, $lon, $elev) = locCoordinates();
+          return qq{set attributes 'latitude' and 'longitude' in global device first} if(!$set);
+
+          my $tilt = ReadingsVal ($name, 'moduleDeclination', '');                       # Modul Neigungswinkel für jeden Stringbezeichner
+          return qq{Please complete command "set $name moduleDeclination".} if(!$tilt);
+
+          my $dir = ReadingsVal ($name, 'moduleAzimuth', '');                            # Modul Ausrichtung für jeden Stringbezeichner
+          return qq{Please complete command "set $name moduleAzimuth".} if(!$dir);
+      }
+
+      $data{$type}{$name}{current}{allStringsFullfilled} = 0;                            # Stringkonfiguration neu prüfen lassen
+  }
+  
+  readingsDelete ($hash, 'nextRadiationAPICall');
+  
+  InternalTimer (gettimeofday() + 1, 'FHEM::SolarForecast::setModel',             $hash, 0);                                  # Model setzen
+  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile',  [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -5723,7 +5728,7 @@ return;
 }
 
 ################################################################
-#     currentRadiationAPI verzögert aus Attr setzen      
+#     setupRadiationAPI verzögert aus Attr setzen      
 ################################################################
 sub __setRadAPIdelayed {                    
   my $hash = shift;
@@ -5731,7 +5736,7 @@ sub __setRadAPIdelayed {
   my $name   = $hash->{NAME};
   my $awdev1 = AttrVal ($name, 'ctrlWeatherDev1', '');
   
-  CommandSet (undef, "$name currentRadiationAPI $awdev1");                         # automatisch currentRadiationAPI setzen
+  CommandAttr (undef, "$name setupRadiationAPI $awdev1");                         # automatisch setupRadiationAPI setzen
 
 return;
 }
@@ -6331,9 +6336,19 @@ sub _addDynAttr {
   my $adwds  = '';
   my @alldwd = devspec2array ("TYPE=DWD_OpenData");
   $adwds     = join ",", @alldwd if(@alldwd);
+  my @fcdevs = qw( OpenMeteoDWD-API
+                   OpenMeteoDWDEnsemble-API
+                   OpenMeteoWorld-API
+                   SolCast-API
+                   ForecastSolar-API
+                   VictronKI-API
+                 );
+  push @fcdevs, @alldwd if(@alldwd);
+  my $rdd = join ",", @fcdevs;
+  
   my @deva   = split " ", $modules{$type}{AttrList};
 
-  my $atd = 'ctrlWeatherDev';
+  my $atd = 'ctrlWeatherDev|setupRadiationAPI';
   @deva   = grep {!/$atd/} @deva;
 
   for my $step (1..$weatherDevMax) {
@@ -6344,6 +6359,8 @@ sub _addDynAttr {
       
       push @deva, ($adwds ? "ctrlWeatherDev".$step.":$adwds" : "");
   }
+  
+  push @deva, "setupRadiationAPI:$rdd ";
 
   $hash->{".AttrList"} = join " ", @deva;
 
@@ -6410,6 +6427,12 @@ sub centralTask {
   if ($val3) {
       CommandAttr (undef, "$name setupInverterStrings $val3");
       readingsDelete ($hash, 'inverterStrings');
+  }
+  
+  my $val4 = ReadingsVal ($name, 'currentRadiationAPI', '');                    # 10.06.2024
+  if ($val4) {
+      CommandAttr (undef, "$name setupRadiationAPI $val4");
+      readingsDelete ($hash, 'currentRadiationAPI');
   }
   ##########################################################################################################################
 
@@ -7005,17 +7028,14 @@ sub _specialActivities {
 
           $gcon = ReadingsNum ($name, "Today_Hour24_GridConsumption", 0);
           storeReading ('LastHourGridconsumptionReal', "$gcon Wh", $ts);
-
-          deleteReadingspec ($hash, "Today_Hour.*_Grid.*");
-          deleteReadingspec ($hash, "Today_Hour.*_PV.*");
-          deleteReadingspec ($hash, "Today_Hour.*_Bat.*");
-          deleteReadingspec ($hash, "powerTrigger_.*");
-          deleteReadingspec ($hash, "Today_MaxPVforecast.*");
-          deleteReadingspec ($hash, "Today_PVdeviation");
-          deleteReadingspec ($hash, "Today_PVreal");
+          
+          deleteReadingspec ($hash, '(Today_Hour(.*_Grid.*|.*_PV.*|.*_Bat.*)|powerTrigger_.*|Today_MaxPVforecast.*)');
+          
+          readingsDelete    ($hash, 'Today_PVdeviation');
+          readingsDelete    ($hash, 'Today_PVreal');
 
           for my $wdr (@widgetreadings) {                                                     # Array der Hilfsreadings (Attributspeicher) löschen
-              deleteReadingspec ($hash, $wdr);
+              readingsDelete ($hash, $wdr);
           }
 
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests};
@@ -7146,9 +7166,9 @@ sub __deleteHiddenReadings  {
   for my $n (1..24) {
       $n = sprintf "%02d", $n;
 
-      deleteReadingspec ($hash, ".pvCorrectionFactor_${n}_cloudcover");
-      deleteReadingspec ($hash, ".pvCorrectionFactor_${n}_apipercentil");
-      deleteReadingspec ($hash, ".signaldone_${n}");
+      readingsDelete ($hash, ".pvCorrectionFactor_${n}_cloudcover");
+      readingsDelete ($hash, ".pvCorrectionFactor_${n}_apipercentil");
+      readingsDelete ($hash, ".signaldone_${n}");
 
       if (ReadingsVal ($name, "pvCorrectionFactor_Auto", "off") =~ /on/xs) {
           deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
@@ -8879,7 +8899,7 @@ sub _manageConsumerData {
           delete $paref->{val};
       }
 
-      deleteReadingspec ($hash, "consumer${c}_currentPower") if(!$etotread && !$paread);
+      readingsDelete ($hash, "consumer${c}_currentPower") if(!$etotread && !$paread);
       
       __getAutomaticState     ($paref);                                                                           # Automatic Status des Consumers abfragen
       __calcEnergyPieces      ($paref);                                                                           # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
@@ -10995,7 +11015,7 @@ sub genStatisticReadings {
 
   for my $item (@srd) { 
       next if(grep /^$item$/, @csr);
-      deleteReadingspec ($hash, 'statistic_'.$item);
+      readingsDelete    ($hash, 'statistic_'.$item);
       deleteReadingspec ($hash, 'statistic_'.$item.'_.*') if($item eq 'todayConsumptionForecast');
   }
 
@@ -11121,7 +11141,7 @@ sub genStatisticReadings {
               my $c = (split "_", $kpi)[1];                                                          # Consumer Nummer extrahieren
 
               if (!AttrVal ($name, 'consumer'.$c, '')) {
-                  deleteReadingspec ($hash, 'statistic_currentRunMtsConsumer_'.$c);
+                  readingsDelete ($hash, 'statistic_currentRunMtsConsumer_'.$c);
                   return;
               }
 
@@ -11134,7 +11154,7 @@ sub genStatisticReadings {
               my $c = (split "_", $kpi)[1];                                                          # Consumer Nummer extrahieren
 
               if (!AttrVal ($name, 'consumer'.$c, '')) {
-                  deleteReadingspec ($hash, 'statistic_runTimeAvgDayConsumer_'.$c);
+                  readingsDelete ($hash, 'statistic_runTimeAvgDayConsumer_'.$c);
                   return;
               }
 
@@ -11524,7 +11544,7 @@ sub _checkSetupNotComplete {
 
   my $is    = AttrVal       ($name, 'setupInverterStrings', undef);                       # String Konfig
   my $wedev = AttrVal       ($name, 'ctrlWeatherDev1',      undef);                       # Device Vorhersage Wetterdaten (Bewölkung etc.)
-  my $radev = ReadingsVal   ($name, 'currentRadiationAPI',  undef);                       # Device Strahlungsdaten Vorhersage
+  my $radev = AttrVal       ($name, 'setupRadiationAPI',    undef);                       # Device Strahlungsdaten Vorhersage
   my $indev = AttrVal       ($name, 'setupInverterDev',     undef);                       # Inverter Device
   my $medev = AttrVal       ($name, 'setupMeterDev',        undef);                       # Meter Device
   my $peaks = ReadingsVal   ($name, 'modulePeakString',     undef);                       # String Peak
@@ -15355,7 +15375,7 @@ sub checkPlantConfig {
 
   my $lang        = AttrVal        ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang));
   my $pcf         = ReadingsVal    ($name, 'pvCorrectionFactor_Auto', 'off');
-  my $raname      = ReadingsVal    ($name, 'currentRadiationAPI',        '');
+  my $raname      = AttrVal        ($name, 'setupRadiationAPI',          '');
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
   my $ok     = FW_makeImage ('10px-kreis-gruen.png',     '');
@@ -16191,7 +16211,7 @@ sub createAssociatedWith {
       ($afc,$h)  = parseParams ($fcdev3);
       $fcdev3    = $afc->[0] // "";
 
-      my $radev = ReadingsVal ($name, 'currentRadiationAPI', '');            # Radiation forecast Device
+      my $radev = AttrVal ($name, 'setupRadiationAPI', '');                  # Radiation forecast Device
       ($ara,$h) = parseParams ($radev);
       $radev    = $ara->[0] // "";
 
@@ -16284,7 +16304,7 @@ return;
 sub setModel {
   my $hash = shift;
 
-  my $api = ReadingsVal ($hash->{NAME}, 'currentRadiationAPI', 'DWD');
+  my $api = AttrVal ($hash->{NAME}, 'setupRadiationAPI', 'DWD');
 
   if ($api =~ /SolCast-/xs) {
       $hash->{MODEL} = 'SolCastAPI';
@@ -17079,7 +17099,7 @@ sub isRad1hAgeExceeded {
 
   if (!$fcname || !$defs{$fcname}) {
       if (!$fcname) {
-          return (qq{No DWD device is defined in "currentRadiationAPI"}, $resh);
+          return (qq{No DWD device is defined in "setupRadiationAPI"}, $resh);
       }
       else {
           return (qq{The DWD device "$fcname" doesn't exist}, $resh);
@@ -18178,7 +18198,7 @@ to ensure that the system configuration is correct.
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
             <tr><td> <b>ctrlWeatherDevX</b>      </td><td>DWD_OpenData Device which provides meteorological data (e.g. cloud cover)     </td></tr>
-            <tr><td> <b>currentRadiationAPI </b> </td><td>DWD_OpenData Device or API for the delivery of radiation data.                </td></tr>
+            <tr><td> <b>setupRadiationAPI </b>   </td><td>DWD_OpenData Device or API for the delivery of radiation data.                </td></tr>
             <tr><td> <b>setupInverterDev</b>     </td><td>Device which provides PV performance data                                     </td></tr>
             <tr><td> <b>setupMeterDev</b>        </td><td>Device which supplies network I/O data                                        </td></tr>
             <tr><td> <b>setupBatteryDev</b>      </td><td>Device which provides battery performance data (if available)                 </td></tr>
@@ -18309,110 +18329,6 @@ to ensure that the system configuration is correct.
         set &lt;name&gt; consumerImmediatePlanning 01 <br>
       </ul>
     </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-currentRadiationAPI"></a>
-      <li><b>currentRadiationAPI </b> <br><br>
-
-      Defines the source for the delivery of the solar radiation data. You can select a device of the type DWD_OpenData or
-      an implemented API can be selected. <br>
-      <b>Note:</b> If OpenMeteoDWD-API is set in the 'ctrlWeatherDev1' attribute, no radiation data service other than
-      OpenMeteoDWD-API can be selected. <br><br>
-
-      <b>OpenMeteoDWD-API</b> <br>
-
-      Open-Meteo is an open source weather API and offers free access for non-commercial purposes.
-      No API key is required.
-      Open-Meteo leverages a powerful combination of global (11 km) and mesoscale (1 km) weather models from esteemed
-      national weather services.
-      This API provides access to the renowned ICON weather models of the German Weather Service (DWD), which provide
-      15-minute data for short-term forecasts in Central Europe and global forecasts with a resolution of 11 km.
-      The ICON model is a preferred choice for general weather forecast APIs when no other high-resolution weather
-      models are available. The models DWD Icon D2, DWD Icon EU and DWD Icon Global models are merged into a 
-      seamless forecast.
-      The comprehensive and clearly laid out
-      <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on
-      the service's website.
-      <br><br>
-      
-      <b>OpenMeteoDWDEnsemble-API</b> <br>
-
-      This Open-Meteo API variant provides access to the DWD's global 
-      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble Prediction System (EPS)</a>.
-      <br>
-      The ensemble models ICON-D2-EPS, ICON-EU-EPS and ICON-EPS are seamlessly combined. <br>
-      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are 
-      a special type of forecasting method that takes into account the uncertainties in weather forecasting. 
-      They do this by running several simulations or models with slight differences in the starting conditions or settings. 
-      Each simulation, known as an ensemble member, represents a possible outcome of the weather.
-      In this implementation, 40 ensemble members per weather feature are combined and the most probable result is used. 
-      <br><br>
-
-      <b>OpenMeteoWorld-API</b> <br>
-      
-      As a variant of the Open Meteo service, the OpenMeteoWorld API provides the optimum forecast for a specific location worldwide.
-      The OpenMeteoWorld API seamlessly combines weather models from well-known organizations such as NOAA (National Oceanic and Atmospheric 
-      Administration), DWD (German Weather Service), CMCC (Canadian) and ECMWF (European Centre for Medium-Range Weather Forecasts).
-      The providers' models are combined for each location worldwide to produce the best possible forecast.
-      The services and weather models are used automatically based on the location coordinates contained in the API call.
-      <br><br>
-      
-      <b>SolCast-API</b> <br>
-
-      API usage requires one or more API-keys (accounts) and one or more Rooftop-ID's in advance
-      created on the <a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast</a> website.
-      A rooftop is equivalent to one <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a>
-      in the SolarForecast context. <br>
-      Free API usage is limited to one daily rate API requests. The number of defined strings (rooftops)
-      increases the number of API requests required. The module optimizes the query cycles with the attribute
-      <a href="#SolarForecast-attr-ctrlSolCastAPIoptimizeReq ">ctrlSolCastAPIoptimizeReq </a>.
-      <br><br>
-
-      <b>ForecastSolar-API</b> <br>
-
-      Free use of the <a href='https://doc.forecast.solar/start' target='_blank'>Forecast.Solar API</a>.
-      does not require registration. API requests are limited to 12 within one hour in the free version.
-      There is no daily limit. The module automatically determines the optimal query interval
-      depending on the configured strings.
-      <br><br>
-
-      <b>VictronKI-API</b> <br>
-
-      This API can be applied by users of the Victron Energy VRM Portal. This API is AI based.
-      As string the value "AI-based" has to be entered in the setup of the
-      <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a>. <br>
-      In the Victron Energy VRM Portal, the location of the PV system must be specified as a prerequisite. <br>
-      See also the blog post
-      <a href="https://www.victronenergy.com/blog/2023/07/05/new-vrm-solar-production-forecast-feature/">Introducing Solar Production Forecast</a>.
-      <br><br>
-
-      <b>DWD_OpenData Device</b> <br>
-
-      The DWD service is integrated via a FHEM device of type DWD_OpenData.
-      If there is no device of type DWD_OpenData yet, it must be defined in advance
-      (look at <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
-      To obtain a good radiation forecast, a DWD station located near the plant site should be used. <br>
-      Unfortunately, not all
-      <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/statliste/statlex_html.html;jsessionid=EC5F572A52EB69684D552DCF6198F290.live31092?view=nasPublication&nn=16102">DWD stations</a>
-      provide the required Rad1h values. <br>
-      Explanations of the stations are listed in
-      <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/stationsliste.html">Stationslexikon</a>. <br>
-      At least the following attributes must be set in the selected DWD_OpenData Device: <br><br>
-
-      <ul>
-         <table>
-         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>forecastDays</b>            </td><td>1                                                                                             </td></tr>
-            <tr><td> <b>forecastProperties</b>      </td><td>Rad1h                                                                                         </td></tr>
-            <tr><td> <b>forecastResolution</b>      </td><td>1                                                                                             </td></tr>
-            <tr><td> <b>forecastStation</b>         </td><td>&lt;Station code of the evaluated DWD station&gt;                                             </td></tr>
-            <tr><td>                                </td><td><b>Note:</b> The selected DWD station must provide radiation values (Rad1h Readings).         </td></tr>
-            <tr><td>                                </td><td>Not all stations provide this data!                                                           </td></tr>
-         </table>
-      </ul>
-      </li>
     </ul>
     <br>
 
@@ -19699,7 +19615,7 @@ to ensure that the system configuration is correct.
        Specifies the device or API for providing the required weather data (cloud cover, precipitation, etc.).<br>
        The attribute 'ctrlWeatherDev1' specifies the leading weather service and is mandatory.<br>
        If an Open-Meteo API is selected in the 'ctrlWeatherDev1' attribute, this Open-Meteo service is automatically set as the 
-       source of the radiation data (Setter currentRadiationAPI). <br><br>
+       source of the radiation data (Attribute setupRadiationAPI). <br><br>
        
        <b>OpenMeteoDWD-API</b> <br>
 
@@ -20371,6 +20287,108 @@ to ensure that the system configuration is correct.
        <b>Note:</b> Deleting the attribute also removes the internally corresponding data.
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-setupRadiationAPI"></a>
+       <li><b>setupRadiationAPI </b> <br><br>
+
+       Defines the source for the delivery of the solar radiation data. You can select a device of the type DWD_OpenData or
+       an implemented API can be selected. <br>
+       <b>Note:</b> If OpenMeteoDWD-API is set in the 'ctrlWeatherDev1' attribute, no radiation data service other than
+       OpenMeteoDWD-API can be selected. <br><br>
+
+       <b>OpenMeteoDWD-API</b> <br>
+
+       Open-Meteo is an open source weather API and offers free access for non-commercial purposes.
+       No API key is required.
+       Open-Meteo leverages a powerful combination of global (11 km) and mesoscale (1 km) weather models from esteemed
+       national weather services.
+       This API provides access to the renowned ICON weather models of the German Weather Service (DWD), which provide
+       15-minute data for short-term forecasts in Central Europe and global forecasts with a resolution of 11 km.
+       The ICON model is a preferred choice for general weather forecast APIs when no other high-resolution weather
+       models are available. The models DWD Icon D2, DWD Icon EU and DWD Icon Global models are merged into a 
+       seamless forecast.
+       The comprehensive and clearly laid out
+       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on
+       the service's website.
+       <br><br>
+      
+       <b>OpenMeteoDWDEnsemble-API</b> <br>
+
+       This Open-Meteo API variant provides access to the DWD's global 
+       <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble Prediction System (EPS)</a>.
+       <br>
+       The ensemble models ICON-D2-EPS, ICON-EU-EPS and ICON-EPS are seamlessly combined. <br>
+       <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are 
+       a special type of forecasting method that takes into account the uncertainties in weather forecasting. 
+       They do this by running several simulations or models with slight differences in the starting conditions or settings. 
+       Each simulation, known as an ensemble member, represents a possible outcome of the weather.
+       In this implementation, 40 ensemble members per weather feature are combined and the most probable result is used. 
+       <br><br>
+
+       <b>OpenMeteoWorld-API</b> <br>
+      
+       As a variant of the Open Meteo service, the OpenMeteoWorld API provides the optimum forecast for a specific location worldwide.
+       The OpenMeteoWorld API seamlessly combines weather models from well-known organizations such as NOAA (National Oceanic and Atmospheric 
+       Administration), DWD (German Weather Service), CMCC (Canadian) and ECMWF (European Centre for Medium-Range Weather Forecasts).
+       The providers' models are combined for each location worldwide to produce the best possible forecast.
+       The services and weather models are used automatically based on the location coordinates contained in the API call.
+       <br><br>
+      
+       <b>SolCast-API</b> <br>
+
+       API usage requires one or more API-keys (accounts) and one or more Rooftop-ID's in advance
+       created on the <a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast</a> website.
+       A rooftop is equivalent to one <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a>
+       in the SolarForecast context. <br>
+       Free API usage is limited to one daily rate API requests. The number of defined strings (rooftops)
+       increases the number of API requests required. The module optimizes the query cycles with the attribute
+       <a href="#SolarForecast-attr-ctrlSolCastAPIoptimizeReq ">ctrlSolCastAPIoptimizeReq </a>.
+       <br><br>
+
+       <b>ForecastSolar-API</b> <br>
+
+       Free use of the <a href='https://doc.forecast.solar/start' target='_blank'>Forecast.Solar API</a>.
+       does not require registration. API requests are limited to 12 within one hour in the free version.
+       There is no daily limit. The module automatically determines the optimal query interval
+       depending on the configured strings.
+       <br><br>
+
+       <b>VictronKI-API</b> <br>
+
+       This API can be applied by users of the Victron Energy VRM Portal. This API is AI based.
+       As string the value "AI-based" has to be entered in the setup of the
+       <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a>. <br>
+       In the Victron Energy VRM Portal, the location of the PV system must be specified as a prerequisite. <br>
+       See also the blog post
+       <a href="https://www.victronenergy.com/blog/2023/07/05/new-vrm-solar-production-forecast-feature/">Introducing Solar Production Forecast</a>.
+       <br><br>
+
+       <b>DWD_OpenData Device</b> <br>
+
+       The DWD service is integrated via a FHEM device of type DWD_OpenData.
+       If there is no device of type DWD_OpenData yet, it must be defined in advance
+       (look at <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
+       To obtain a good radiation forecast, a DWD station located near the plant site should be used. <br>
+       Unfortunately, not all
+       <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/statliste/statlex_html.html;jsessionid=EC5F572A52EB69684D552DCF6198F290.live31092?view=nasPublication&nn=16102">DWD stations</a>
+       provide the required Rad1h values. <br>
+       Explanations of the stations are listed in
+       <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/stationsliste.html">Stationslexikon</a>. <br>
+       At least the following attributes must be set in the selected DWD_OpenData Device: <br><br>
+
+       <ul>
+          <table>
+          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+             <tr><td> <b>forecastDays</b>            </td><td>1                                                                                             </td></tr>
+             <tr><td> <b>forecastProperties</b>      </td><td>Rad1h                                                                                         </td></tr>
+             <tr><td> <b>forecastResolution</b>      </td><td>1                                                                                             </td></tr>
+             <tr><td> <b>forecastStation</b>         </td><td>&lt;Station code of the evaluated DWD station&gt;                                             </td></tr>
+             <tr><td>                                </td><td><b>Note:</b> The selected DWD station must provide radiation values (Rad1h Readings).         </td></tr>
+             <tr><td>                                </td><td>Not all stations provide this data!                                                           </td></tr>
+          </table>
+       </ul>
+       </li>
+       <br>
 
      </ul>
   </ul>
@@ -20441,7 +20459,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
             <tr><td> <b>ctrlWeatherDevX</b>      </td><td>DWD_OpenData Device welches meteorologische Daten (z.B. Bewölkung) liefert     </td></tr>
-            <tr><td> <b>currentRadiationAPI </b> </td><td>DWD_OpenData Device bzw. API zur Lieferung von Strahlungsdaten                 </td></tr>
+            <tr><td> <b>setupRadiationAPI </b>   </td><td>DWD_OpenData Device bzw. API zur Lieferung von Strahlungsdaten                 </td></tr>
             <tr><td> <b>setupInverterDev</b>     </td><td>Device welches PV Leistungsdaten liefert                                       </td></tr>
             <tr><td> <b>setupMeterDev</b>        </td><td>Device welches Netz I/O-Daten liefert                                          </td></tr>
             <tr><td> <b>setupBatteryDev</b>      </td><td>Device welches Batterie Leistungsdaten liefert (sofern vorhanden)              </td></tr>
@@ -20572,112 +20590,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         set &lt;name&gt; consumerImmediatePlanning 01 <br>
       </ul>
     </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-currentRadiationAPI"></a>
-      <li><b>currentRadiationAPI </b> <br><br>
-
-      Legt die Quelle zur Lieferung der solaren Strahlungsdaten fest. Es kann ein Device vom Typ DWD_OpenData oder
-      eine implementierte API eines Dienstes ausgewählt werden. <br>
-      <b>Hinweis:</b> Ist eine OpenMeteo API im Attribut 'ctrlWeatherDev1' gesetzt, kann kein anderer Strahlungsdatendienst als
-      diese OpenMeteo API ausgewählt werden. <br><br>
-
-      <b>OpenMeteoDWD-API</b> <br>
-
-      Open-Meteo ist eine Open-Source-Wetter-API und bietet kostenlosen Zugang für nicht-kommerzielle Zwecke.
-      Es ist kein API-Schlüssel erforderlich.
-      Open-Meteo nutzt eine leistungsstarke Kombination aus globalen (11 km) und mesoskaligen (1 km) Wettermodellen
-      von angesehenen nationalen Wetterdiensten.
-      Diese API bietet Zugang zu den renommierten ICON-Wettermodellen des Deutschen Wetterdienstes (DWD), die
-      15-minütige Daten für kurzfristige Vorhersagen in Mitteleuropa und globale Vorhersagen mit einer Auflösung
-      von 11 km liefern. Das ICON-Modell ist eine bevorzugte Wahl für allgemeine Wettervorhersage-APIs, wenn keine
-      anderen hochauflösenden Wettermodelle verfügbar sind. Es werden die Modelle DWD Icon D2, DWD Icon EU 
-      und DWD Icon Global zu einer nahtlosen Vorhersage zusammengeführt.
-      Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
-      <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
-      <br><br>
-      
-      <b>OpenMeteoDWDEnsemble-API</b> <br>
-
-      Diese Open-Meteo API Variante bietet Zugang zum globalen
-      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble-Vorhersagesystem (EPS)</a>
-      des DWD. <br>
-      Es werden die Ensemble Modelle ICON-D2-EPS, ICON-EU-EPS und ICON-EPS nahtlos vereint. <br>
-      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind 
-      eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt. 
-      Sie tun dies, indem sie mehrere Simulationen oder Modelle mit leichten Unterschieden in den Startbedingungen 
-      oder Einstellungen ausführen. Jede Simulation, bekannt als Ensemblemitglied, stellt ein mögliches Ergebnis des Wetters dar.
-      In der vorliegenden Implementierung werden 40 Ensemblemitglieder pro Wettermerkmal zusammengeführt und das wahrscheinlichste
-      Ergbnis verwendet.      
-      <br><br>
-      
-      <b>OpenMeteoWorld-API</b> <br>
-      
-      Als Variante des Open-Meteo Dienstes liefert die OpenMeteoWorld-API die optimale Vorhersage für einen bestimmten Ort weltweit.
-      Die OpenMeteoWorld-API vereint nahtlos Wettermodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric 
-      Administration), DWD (Deutscher Wetterdienst), CMCC (Canadian) und ECMWF (Europäisches Zentrum für mittelfristige Wettervorhersage).
-      Für jeden Ort weltweit werden die Modelle der Anbieter kombiniert, um die bestmögliche Vorhersage zu erstellen.
-      Die Nutzung der Dienste und Wettermodelle erfolgt automatisch anhand der im API Aufruf enthaltenen Standortkoordinaten.
-      <br><br>   
-      
-      <b>SolCast-API</b> <br>
-
-      Die API-Nutzung benötigt vorab ein oder mehrere API-keys (Accounts) sowie ein oder mehrere Rooftop-ID's
-      die auf der <a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast</a> Webseite angelegt
-      werden müssen.
-      Ein Rooftop ist im SolarForecast-Kontext mit einem <a href="#SolarForecast-attr-setupInverterStrings">setupInverterString</a>
-      gleichzusetzen. <br>
-      Die kostenfreie API-Nutzung ist auf eine Tagesrate API-Anfragen begrenzt. Die Anzahl definierter Strings (Rooftops)
-      erhöht die Anzahl erforderlicher API-Anfragen. Das Modul optimiert die Abfragezyklen mit dem Attribut
-      <a href="#SolarForecast-attr-ctrlSolCastAPIoptimizeReq ">ctrlSolCastAPIoptimizeReq </a>.
-      <br><br>
-
-      <b>ForecastSolar-API</b> <br>
-
-      Die kostenfreie Nutzung der <a href='https://doc.forecast.solar/start' target='_blank'>Forecast.Solar API</a>
-      erfordert keine Registrierung. Die API-Anfragen sind in der kostenfreien Version auf 12 innerhalb einer Stunde
-      begrenzt. Ein Tageslimit gibt es dabei nicht. Das Modul ermittelt automatisch das optimale Abfrageintervall
-      in Abhängigkeit der konfigurierten Strings.
-      <br><br>
-
-      <b>VictronKI-API</b> <br>
-
-      Diese API kann durch Nutzer des Victron Energy VRM Portals angewendet werden. Diese API ist KI basierend.
-      Als String ist der Wert "KI-based" im Setup der <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a>
-      einzutragen. <br>
-      Im Victron Energy VRM Portal ist als Voraussetzung der Standort der PV-Anlage anzugeben. <br>
-      Siehe dazu auch den Blog-Beitrag
-      <a href="https://www.victronenergy.com/blog/2023/07/05/new-vrm-solar-production-forecast-feature/">Introducing Solar Production Forecast</a>.
-      <br><br>
-
-      <b>DWD_OpenData Device</b> <br>
-
-      Der DWD-Dienst wird über ein FHEM Device vom Typ DWD_OpenData eingebunden.
-      Ist noch kein Device des Typs DWD_OpenData vorhanden, muß es vorab definiert werden
-      (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
-      Um eine gute Strahlungsprognose zu erhalten, sollte eine nahe dem Anlagenstandort gelegene DWD-Station genutzt
-      werden. <br>
-      Leider liefern nicht alle
-      <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/statliste/statlex_html.html;jsessionid=EC5F572A52EB69684D552DCF6198F290.live31092?view=nasPublication&nn=16102">DWD-Stationen</a>
-      die benötigten Rad1h-Werte. <br>
-      Erläuterungen zu den Stationen sind im
-      <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/stationsliste.html">Stationslexikon</a> aufgeführt. <br>
-      Im ausgewählten DWD_OpenData Device müssen mindestens die folgenden Attribute gesetzt sein: <br><br>
-
-      <ul>
-         <table>
-         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>forecastDays</b>            </td><td>1                                                                                             </td></tr>
-            <tr><td> <b>forecastProperties</b>      </td><td>Rad1h                                                                                         </td></tr>
-            <tr><td> <b>forecastResolution</b>      </td><td>1                                                                                             </td></tr>
-            <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;                                            </td></tr>
-            <tr><td>                                </td><td><b>Hinweis:</b> Die ausgewählte DWD Station muß Strahlungswerte (Rad1h Readings) liefern.     </td></tr>
-            <tr><td>                                </td><td>Nicht alle Stationen liefern diese Daten!                                                     </td></tr>
-         </table>
-      </ul>
-      </li>
     </ul>
     <br>
 
@@ -21974,7 +21886,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        Gibt das Gerät oder die API zur Lieferung der erforderlichen Wetterdaten (Wolkendecke, Niederschlag usw.) an.<br>
        Das Attribut 'ctrlWeatherDev1' definiert den führenden Wetterdienst und ist zwingend erforderlich.<br>
        Ist eine Open-Meteo API im Attribut 'ctrlWeatherDev1' ausgewählt, wird dieser Open-Meteo Dienst automatisch auch als Quelle
-       der Strahlungsdaten (Setter currentRadiationAPI) eingestellt. <br><br>
+       der Strahlungsdaten (Attribut setupRadiationAPI) eingestellt. <br><br>
 
        <b>OpenMeteoDWD-API</b> <br>
 
@@ -22642,8 +22554,112 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
        
        <b>Hinweis:</b> Durch Löschen des Attributes werden ebenfalls die intern korrespondierenden Daten entfernt.
-       </li>
-     <br>
+      </li>
+      <br>
+     
+      <a id="SolarForecast-attr-setupRadiationAPI"></a>
+      <li><b>setupRadiationAPI </b> <br><br>
+
+      Legt die Quelle zur Lieferung der solaren Strahlungsdaten fest. Es kann ein Device vom Typ DWD_OpenData oder
+      eine implementierte API eines Dienstes ausgewählt werden. <br>
+      <b>Hinweis:</b> Ist eine OpenMeteo API im Attribut 'ctrlWeatherDev1' gesetzt, kann kein anderer Strahlungsdatendienst als
+      diese OpenMeteo API ausgewählt werden. <br><br>
+
+      <b>OpenMeteoDWD-API</b> <br>
+
+      Open-Meteo ist eine Open-Source-Wetter-API und bietet kostenlosen Zugang für nicht-kommerzielle Zwecke.
+      Es ist kein API-Schlüssel erforderlich.
+      Open-Meteo nutzt eine leistungsstarke Kombination aus globalen (11 km) und mesoskaligen (1 km) Wettermodellen
+      von angesehenen nationalen Wetterdiensten.
+      Diese API bietet Zugang zu den renommierten ICON-Wettermodellen des Deutschen Wetterdienstes (DWD), die
+      15-minütige Daten für kurzfristige Vorhersagen in Mitteleuropa und globale Vorhersagen mit einer Auflösung
+      von 11 km liefern. Das ICON-Modell ist eine bevorzugte Wahl für allgemeine Wettervorhersage-APIs, wenn keine
+      anderen hochauflösenden Wettermodelle verfügbar sind. Es werden die Modelle DWD Icon D2, DWD Icon EU 
+      und DWD Icon Global zu einer nahtlosen Vorhersage zusammengeführt.
+      Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
+      <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
+      <br><br>
+      
+      <b>OpenMeteoDWDEnsemble-API</b> <br>
+
+      Diese Open-Meteo API Variante bietet Zugang zum globalen
+      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble-Vorhersagesystem (EPS)</a>
+      des DWD. <br>
+      Es werden die Ensemble Modelle ICON-D2-EPS, ICON-EU-EPS und ICON-EPS nahtlos vereint. <br>
+      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind 
+      eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt. 
+      Sie tun dies, indem sie mehrere Simulationen oder Modelle mit leichten Unterschieden in den Startbedingungen 
+      oder Einstellungen ausführen. Jede Simulation, bekannt als Ensemblemitglied, stellt ein mögliches Ergebnis des Wetters dar.
+      In der vorliegenden Implementierung werden 40 Ensemblemitglieder pro Wettermerkmal zusammengeführt und das wahrscheinlichste
+      Ergbnis verwendet.      
+      <br><br>
+      
+      <b>OpenMeteoWorld-API</b> <br>
+      
+      Als Variante des Open-Meteo Dienstes liefert die OpenMeteoWorld-API die optimale Vorhersage für einen bestimmten Ort weltweit.
+      Die OpenMeteoWorld-API vereint nahtlos Wettermodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric 
+      Administration), DWD (Deutscher Wetterdienst), CMCC (Canadian) und ECMWF (Europäisches Zentrum für mittelfristige Wettervorhersage).
+      Für jeden Ort weltweit werden die Modelle der Anbieter kombiniert, um die bestmögliche Vorhersage zu erstellen.
+      Die Nutzung der Dienste und Wettermodelle erfolgt automatisch anhand der im API Aufruf enthaltenen Standortkoordinaten.
+      <br><br>   
+      
+      <b>SolCast-API</b> <br>
+
+      Die API-Nutzung benötigt vorab ein oder mehrere API-keys (Accounts) sowie ein oder mehrere Rooftop-ID's
+      die auf der <a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast</a> Webseite angelegt
+      werden müssen.
+      Ein Rooftop ist im SolarForecast-Kontext mit einem <a href="#SolarForecast-attr-setupInverterStrings">setupInverterString</a>
+      gleichzusetzen. <br>
+      Die kostenfreie API-Nutzung ist auf eine Tagesrate API-Anfragen begrenzt. Die Anzahl definierter Strings (Rooftops)
+      erhöht die Anzahl erforderlicher API-Anfragen. Das Modul optimiert die Abfragezyklen mit dem Attribut
+      <a href="#SolarForecast-attr-ctrlSolCastAPIoptimizeReq ">ctrlSolCastAPIoptimizeReq </a>.
+      <br><br>
+
+      <b>ForecastSolar-API</b> <br>
+
+      Die kostenfreie Nutzung der <a href='https://doc.forecast.solar/start' target='_blank'>Forecast.Solar API</a>
+      erfordert keine Registrierung. Die API-Anfragen sind in der kostenfreien Version auf 12 innerhalb einer Stunde
+      begrenzt. Ein Tageslimit gibt es dabei nicht. Das Modul ermittelt automatisch das optimale Abfrageintervall
+      in Abhängigkeit der konfigurierten Strings.
+      <br><br>
+
+      <b>VictronKI-API</b> <br>
+
+      Diese API kann durch Nutzer des Victron Energy VRM Portals angewendet werden. Diese API ist KI basierend.
+      Als String ist der Wert "KI-based" im Setup der <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a>
+      einzutragen. <br>
+      Im Victron Energy VRM Portal ist als Voraussetzung der Standort der PV-Anlage anzugeben. <br>
+      Siehe dazu auch den Blog-Beitrag
+      <a href="https://www.victronenergy.com/blog/2023/07/05/new-vrm-solar-production-forecast-feature/">Introducing Solar Production Forecast</a>.
+      <br><br>
+
+      <b>DWD_OpenData Device</b> <br>
+
+      Der DWD-Dienst wird über ein FHEM Device vom Typ DWD_OpenData eingebunden.
+      Ist noch kein Device des Typs DWD_OpenData vorhanden, muß es vorab definiert werden
+      (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
+      Um eine gute Strahlungsprognose zu erhalten, sollte eine nahe dem Anlagenstandort gelegene DWD-Station genutzt
+      werden. <br>
+      Leider liefern nicht alle
+      <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/statliste/statlex_html.html;jsessionid=EC5F572A52EB69684D552DCF6198F290.live31092?view=nasPublication&nn=16102">DWD-Stationen</a>
+      die benötigten Rad1h-Werte. <br>
+      Erläuterungen zu den Stationen sind im
+      <a href="https://www.dwd.de/DE/leistungen/klimadatendeutschland/stationsliste.html">Stationslexikon</a> aufgeführt. <br>
+      Im ausgewählten DWD_OpenData Device müssen mindestens die folgenden Attribute gesetzt sein: <br><br>
+
+      <ul>
+         <table>
+         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+            <tr><td> <b>forecastDays</b>            </td><td>1                                                                                             </td></tr>
+            <tr><td> <b>forecastProperties</b>      </td><td>Rad1h                                                                                         </td></tr>
+            <tr><td> <b>forecastResolution</b>      </td><td>1                                                                                             </td></tr>
+            <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;                                            </td></tr>
+            <tr><td>                                </td><td><b>Hinweis:</b> Die ausgewählte DWD Station muß Strahlungswerte (Rad1h Readings) liefern.     </td></tr>
+            <tr><td>                                </td><td>Nicht alle Stationen liefern diese Daten!                                                     </td></tr>
+         </table>
+      </ul>
+      </li>
+      <br>
 
      </ul>
   </ul>
