@@ -822,7 +822,7 @@ netatmo_refreshToken($;$)
 
   if( defined($hash->{access_token}) && defined($hash->{expires_at}) ) {
     my ($seconds) = gettimeofday();
-    return undef if( $seconds < $hash->{expires_at} - 300 );
+    return undef if( $seconds < $hash->{expires_at} - 600 );
   }
 
   Log3 $name, 3, "$name: refreshing token";
@@ -842,6 +842,7 @@ netatmo_refreshToken($;$)
   }
 
   if( !$hash->{helper}{refresh_token} ) {
+    Log3 $name, 1, "$name: No refresh token found";
     netatmo_getToken($hash);
     return undef;
   }
@@ -1085,6 +1086,7 @@ netatmo_parseDev($$$)
   my ($param,$err,$data) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
+  my $iohash = $hash->{IODev};
   
   my $json = eval { JSON->new->utf8(0)->decode($data) };
   if($@)
@@ -1096,6 +1098,9 @@ netatmo_parseDev($$$)
   my $found = 0;
   if( ref($json) eq "HASH" && $json->{error} ){
     Log3 $name, 2, "$name: dev hash error: ".Dumper($json->{error});
+    if($json->{error} =~ /Access token expired/){
+      netatmo_refreshAppToken( $iohash, defined($iohash->{access_token_app}) );
+    }
     return undef;
   } elsif ( ref($json) ne "HASH" ){
     Log3 $name, 2, "$name: dev hash json error: ".Dumper($json);
@@ -2724,6 +2729,13 @@ netatmo_poll($)
     return undef;
   }
 
+  my $iohash = $hash->{IODev};
+  my $ioname = $iohash->{NAME};
+  if(defined($ioname) && IsDisabled($ioname)) {
+    return undef;
+  }
+
+
   # my $resolve = inet_aton($hash->{helper}{apiserver});
   # if(!defined($resolve))
   # {
@@ -2903,10 +2915,11 @@ netatmo_dispatch($$$)
         $hash->{status} = $json->{error};
         Log3 $name, 2, "$name: json message error: ".$json->{error};
         readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data");
-        if($json->{error} eq "invalid_grant"){
+        if($param->{type} eq "token" && $json->{error} eq "invalid_grant"){
           $hash->{status} = "error";
           $hash->{network} = "disconnected" if($hash->{SUBTYPE} eq "ACCOUNT");
-          delete($hash->{refresh_token});
+          $attr{$name}{disable} = "1" if($hash->{SUBTYPE} eq "ACCOUNT");
+          Log3 $name, 2, "$name: invalid refresh ticket, disabling module";
         }
         return undef;
       }
@@ -3329,7 +3342,7 @@ netatmo_parseToken($$)
   my $name = $hash->{NAME};
 
   my $had_token = $hash->{access_token};
-  my $old_refresh = $hash->{refresh_token};
+  my $old_refresh = $hash->{helper}{refresh_token};
   if( $json->{access_token} ) {
 
     $hash->{access_token} = $json->{access_token};
@@ -3354,13 +3367,14 @@ netatmo_parseToken($$)
     }
 
     netatmo_getDevices($hash) if( !$had_token );
-
+    RemoveInternalTimer($hash, "netatmo_refreshTokenTimer");
     InternalTimer($hash->{expires_at}, "netatmo_refreshTokenTimer", $hash);
   } else {
     $hash->{expires_at} = int(gettimeofday());
     $hash->{STATE} = "Error" if( !$hash->{access_token} );
     Log3 $name, 1, "$name: token error ".Dumper($json);
-    InternalTimer(gettimeofday()+600, "netatmo_refreshTokenTimer", $hash);
+    RemoveInternalTimer($hash, "netatmo_refreshTokenTimer");
+    InternalTimer(gettimeofday()+300, "netatmo_refreshTokenTimer", $hash);
   }
 }
 
@@ -3378,12 +3392,14 @@ netatmo_parseAppToken($$)
     $hash->{expires_at_app} = int(gettimeofday());
     $hash->{expires_at_app} += int($json->{expires_in}*0.8);
 
+    RemoveInternalTimer($hash, "netatmo_refreshAppTokenTimer");
      InternalTimer($hash->{expires_at_app}, "netatmo_refreshAppTokenTimer", $hash);
    } else {
      $hash->{expires_at_app} = int(gettimeofday());
      $hash->{STATE} = "Error" if( !$hash->{access_token_app} );
      Log3 $name, 1, "$name: app token error ".Dumper($json);
-     InternalTimer(gettimeofday()+600, "netatmo_refreshAppTokenTimer", $hash);
+    RemoveInternalTimer($hash, "netatmo_refreshAppTokenTimer");
+    InternalTimer(gettimeofday()+300, "netatmo_refreshAppTokenTimer", $hash);
    }
 }
 
@@ -6755,7 +6771,7 @@ sub netatmo_weatherIcon()
   Notes:
   <ul>
     <li>JSON has to be installed on the FHEM host.</li>
-    <li>You need to create an app <u><a href="https://dev.netatmo.com/apps/">here</a></u> to get your <i>client_id / client_secret</i>.<br />Request the full access scope including cameras and thermostats and generate a refresh token on the dev.netatmo.com page.</li>
+    <li>You need to create an app <u><a href="https://dev.netatmo.com/apps/">here</a></u> to get your <i>client_id / client_secret</i>.<br />Request the access scope including cameras and thermostats as given (read_thermostat write_thermostat read_camera write_camera access_camera read_doorbell access_doorbell read_presence write_presence access_presence read_homecoach read_carbonmonoxidedetector read_smokedetector read_station) and generate a refresh token on the dev.netatmo.com page.</li>
   </ul><br>
 
   <a name="netatmo_Define"></a>
