@@ -157,6 +157,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.27.0" => "12.06.2024  __VictronVRM_ApiResponseLogin: check token not empty ".
+                           "transformed setter modulePeakString to attr setupStringPeak ",
   "1.26.0" => "10.06.2024  transformed setter currentRadiationAPI to attr setupRadiationAPI ",
   "1.25.2" => "09.06.2024  _specialActivities: change delete readings exec ",  
   "1.25.1" => "08.06.2024  Illegal division by zero Forum:https://forum.fhem.de/index.php?msg=1314730 ",  
@@ -499,7 +501,6 @@ my @fs = qw( ftui_forecast.css
                                                                                  # Anlagenkonfiguration: maßgebliche Readings
 my @rconfigs = qw( pvCorrectionFactor_Auto
                    moduleAzimuth
-                   modulePeakString
                    moduleDeclination
                    moduleRoofTops
                    batteryTrigger
@@ -527,7 +528,7 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
                    graphicHeaderDetail graphicHeaderShow graphicHistoryHour graphicHourCount graphicHourStyle
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
                    graphicSpaceSize graphicStartHtml graphicEndHtml graphicWeatherColor graphicWeatherColorNight
-                   setupMeterDev setupBatteryDev setupInverterDev setupInverterStrings setupRadiationAPI
+                   setupMeterDev setupBatteryDev setupInverterDev setupInverterStrings setupRadiationAPI setupStringPeak
                  );
 
 for my $cinit (1..$maxconsumer) {                             
@@ -543,8 +544,7 @@ my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select
 
 my %hset = (                                                                # Hash der Set-Funktion
   consumerImmediatePlanning => { fn => \&_setconsumerImmediatePlanning },
-  consumerNewPlanning       => { fn => \&_setconsumerNewPlanning       },    
-  modulePeakString          => { fn => \&_setmodulePeakString          },
+  consumerNewPlanning       => { fn => \&_setconsumerNewPlanning       },
   clientAction              => { fn => \&_setclientAction              },
   energyH4Trigger           => { fn => \&_setTrigger                   },
   plantConfiguration        => { fn => \&_setplantConfiguration        },
@@ -610,6 +610,7 @@ my %hattr = (                                                                # H
   setupInverterDev          => { fn => \&_attrInverterDev         },
   setupInverterStrings      => { fn => \&_attrInverterStrings     },
   setupRadiationAPI         => { fn => \&_attrRadiationAPI        },
+  setupStringPeak           => { fn => \&_attrStringPeak          },
 );
 
 my %htr = (                                                                  # Hash even/odd für <tr>
@@ -662,8 +663,8 @@ my %hqtxt = (                                                                   
               DE => qq{Bitte geben sie das Device zur Energiemessung mit "attr LINK setupMeterDev" an}                      },
   ist    => { EN => qq{Please define all of your used string names with "attr LINK setupInverterStrings"},
               DE => qq{Bitte geben sie alle von Ihnen verwendeten Stringnamen mit "attr LINK setupInverterStrings" an}      },
-  mps    => { EN => qq{Please enter the DC peak power of each string with "set LINK modulePeakString"},
-              DE => qq{Bitte geben sie die DC Spitzenleistung von jedem String mit "set LINK modulePeakString" an}          },
+  mps    => { EN => qq{Please enter the DC peak power of each string with "attr LINK setupStringPeak"},
+              DE => qq{Bitte geben sie die DC Spitzenleistung von jedem String mit "attr LINK setupStringPeak" an}          },
   mdr    => { EN => qq{Please specify the module direction with "set LINK moduleAzimuth"},
               DE => qq{Bitte geben sie die Modulausrichtung mit "set LINK moduleAzimuth" an}                                },
   mta    => { EN => qq{Please specify the module tilt angle with "set LINK moduleDeclination"},
@@ -1223,6 +1224,7 @@ sub Initialize {
                                 "setupMeterDev:textField-long ".
                                 "setupBatteryDev:textField-long ".
                                 "setupRadiationAPI ".
+                                "setupStringPeak ".
                                 $consumer.
                                 $readingFnAttributes;
 
@@ -1419,7 +1421,6 @@ sub Set {
                consumerMaster
                consumerPlanning
                consumption
-               currentInverterSet
                energyH4TriggerSet
                moduleRoofTopSet
                powerTriggerSet
@@ -1471,7 +1472,6 @@ sub Set {
              "consumerImmediatePlanning:$coms ".
              "consumerNewPlanning:$coms ".
              "energyH4Trigger:textField-long ".
-             "modulePeakString ".
              "operatingMemory:backup,save".$rf." ".
              "operationMode:active,inactive ".
              "plantConfiguration:check,save,restore ".
@@ -1800,40 +1800,6 @@ sub _setTrigger {                        ## no critic "not used"
   }
 
   writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                              # Anlagenkonfiguration File schreiben
-
-return;
-}
-
-################################################################
-#                      Setter modulePeakString
-################################################################
-sub _setmodulePeakString {               ## no critic "not used"
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $arg   = $paref->{arg} // return qq{no PV module peak specified};
-
-  $arg =~ s/,/./xg;
-
-  my ($a,$h) = parseParams ($arg);
-
-  if (!keys %$h) {
-      return qq{The provided PV module peak has wrong format};
-  }
-
-  while (my ($key, $value) = each %$h) {
-      if ($value !~ /[0-9.]/x) {
-          return qq{The module peak of "$key" must be specified by numbers and optionally with decimal places};
-      }
-  }
-
-  readingsSingleUpdate ($hash, "modulePeakString", $arg, 1);
-  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
-
-  return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
-
-  my $ret = createStringConfig ($hash);
-  return $ret if($ret);
 
 return;
 }
@@ -3586,13 +3552,17 @@ sub __VictronVRM_ApiResponseLogin {
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{verification_mode}       = $jdata->{'verification_mode'};
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];                # letzte Abrufzeit
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{token}                   = 'got successful at '.SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time', '-');;
 
           debugLog ($paref, "apiProcess", qq{Victron VRM API response Login:\n}. Dumper $jdata);
-
-          $paref->{token} = $jdata->{'token'};
-
-          __VictronVRM_ApiRequestForecast ($paref);
+          
+          if (defined $jdata->{'token'}) {
+              $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{token} = 'got successful at '.SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time', '-');
+              $paref->{token}                                        = $jdata->{'token'};
+              __VictronVRM_ApiRequestForecast ($paref);
+          }
+          else {
+              $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'empty Token';
+          }
       }
   }
 
@@ -5476,7 +5446,7 @@ sub _attrMeterDev {                    ## no critic "not used"
   }
   
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile',  [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -5516,7 +5486,7 @@ sub _attrInverterDev {                   ## no critic "not used"
   }
   
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile',  [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -5547,7 +5517,53 @@ sub _attrInverterStrings {               ## no critic "not used"
       }
   }
 
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile',  [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+
+return;
+}
+
+################################################################
+#                      Attr setupStringPeak
+################################################################
+sub _attrStringPeak {                    ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $aVal  = $paref->{aVal};
+  
+  return if(!$init_done);
+  
+  if ($paref->{cmd} eq 'set') {
+      $aVal =~ s/,/./xg;
+
+      my ($a,$h) = parseParams ($aVal);
+
+      if (!keys %$h) {
+          return qq{The attribute content has wrong format};
+      }
+
+      while (my ($key, $value) = each %$h) {
+          if ($value !~ /[0-9.]/x) {
+              return qq{The module peak of '$key' must be specified by numbers and optionally with decimal places};
+          }
+      }
+
+      return if(_checkSetupNotComplete ($hash));                                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
+      
+      my @istrings = split ",", AttrVal ($name, 'setupInverterStrings', '');                          # Stringbezeichner
+
+      if (!@istrings) {
+          return qq{Define all used strings with command "attr $name setupInverterStrings" first.};
+      }
+
+      while (my ($strg, $pp) = each %$h) {
+          if (!grep /^$strg$/, @istrings) {
+              return qq{The stringname '$strg' is not defined as valid string in attribute 'setupInverterStrings'};
+          }
+      }
+  }
+  
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -5601,7 +5617,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
   }
 
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile',  [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -5695,7 +5711,7 @@ sub _attrRadiationAPI {                  ## no critic "not used"
   
   InternalTimer (gettimeofday() + 1, 'FHEM::SolarForecast::setModel',             $hash, 0);                                  # Model setzen
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile',  [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);    # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -6434,6 +6450,12 @@ sub centralTask {
       CommandAttr (undef, "$name setupRadiationAPI $val4");
       readingsDelete ($hash, 'currentRadiationAPI');
   }
+  
+  my $val5 = ReadingsVal ($name, 'modulePeakString', '');                    # 12.06.2024
+  if ($val5) {
+      CommandAttr (undef, "$name setupStringPeak $val5");
+      readingsDelete ($hash, 'modulePeakString');
+  }
   ##########################################################################################################################
 
   setModel ($hash);                                                                            # Model setzen
@@ -6555,8 +6577,8 @@ sub createStringConfig {                 ## no critic "not used"
       return qq{Define all used strings with command "attr $name setupInverterStrings" first.};
   }
 
-  my $peak = ReadingsVal ($name, 'modulePeakString', '');                                         # kWp für jeden Stringbezeichner
-  return qq{Please complete command "set $name modulePeakString".} if(!$peak);
+  my $peak = AttrVal ($name, 'setupStringPeak', '');                                              # kWp für jeden Stringbezeichner
+  return qq{Please complete attribute 'setupStringPeak'} if(!$peak);
 
   my ($aa,$ha) = parseParams ($peak);
   delete $data{$type}{$name}{current}{allstringspeak};
@@ -6567,7 +6589,7 @@ sub createStringConfig {                 ## no critic "not used"
           $data{$type}{$name}{current}{allstringspeak} += $pp * 1000;                             # insgesamt installierte Peakleistung in W
       }
       else {
-          return qq{Check "modulePeakString" -> the stringname "$strg" is not defined as valid string in attribute "setupInverterStrings"};
+          return qq{Check 'setupStringPeak' -> the stringname '$strg' is not defined as valid string in attribute 'setupInverterStrings'};
       }
   }
 
@@ -6627,7 +6649,7 @@ sub createStringConfig {                 ## no critic "not used"
 
   if(!keys %{$data{$type}{$name}{strings}}) {
       return qq{The string configuration seems to be incomplete. \n}.
-             qq{Please check the settings of setupInverterStrings, modulePeakString, moduleAzimuth, moduleDeclination }.
+             qq{Please check the settings of setupInverterStrings, setupStringPeak, moduleAzimuth, moduleDeclination }.
              qq{and/or moduleRoofTops if SolCast-API is used.};
   }
 
@@ -7818,7 +7840,7 @@ sub __calcPVestimates {
 
       if ($debug =~ /radiationProcess/xs) {
           $lh = {                                                                                     # Log-Hash zur Ausgabe
-              "modulePeakString"               => $peak. " W",
+              "String Peak"                    => $peak. " W",
               "Estimated PV generation (raw)"  => $est.  " Wh",
               "Estimated PV generation (calc)" => $pv.   " Wh",
               "PV correction factor"           => $hc,
@@ -11547,7 +11569,7 @@ sub _checkSetupNotComplete {
   my $radev = AttrVal       ($name, 'setupRadiationAPI',    undef);                       # Device Strahlungsdaten Vorhersage
   my $indev = AttrVal       ($name, 'setupInverterDev',     undef);                       # Inverter Device
   my $medev = AttrVal       ($name, 'setupMeterDev',        undef);                       # Meter Device
-  my $peaks = ReadingsVal   ($name, 'modulePeakString',     undef);                       # String Peak
+  my $peaks = AttrVal       ($name, 'setupStringPeak',      undef);                       # String Peak
   my $maz   = ReadingsVal   ($name, 'moduleAzimuth',        undef);                       # Modulausrichtung Konfig (Azimut)
   my $mdec  = ReadingsVal   ($name, 'moduleDeclination',    undef);                       # Modul Neigungswinkel Konfig
   my $mrt   = ReadingsVal   ($name, 'moduleRoofTops',       undef);                       # RoofTop Konfiguration (SolCast API)
@@ -17910,8 +17932,8 @@ return $def;
 # Usage:
 # StringVal ($hash, $strg, $key, $def)
 #
-# $strg:        - Name des Strings aus modulePeakString
-# $key:  peak   - Peakleistung aus modulePeakString
+# $strg:        - Name des Strings aus setupStringPeak
+# $key:  peak   - Peakleistung aus setupStringPeak
 #        tilt   - Neigungswinkel der Module aus moduleDeclination
 #        dir    - Ausrichtung der Module als Azimut-Bezeichner (N,NE,E,SE,S,SW,W,NW)
 #        azimut - Ausrichtung der Module als Azimut Angabe -180 .. 0 .. 180
@@ -18204,7 +18226,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>setupBatteryDev</b>      </td><td>Device which provides battery performance data (if available)                 </td></tr>
             <tr><td> <b>setupInverterStrings</b> </td><td>Identifier of the existing plant strings                                      </td></tr>
             <tr><td> <b>moduleAzimuth</b>        </td><td>Azimuth of the plant strings                                                  </td></tr>
-            <tr><td> <b>modulePeakString</b>     </td><td>the DC peak power of the plant strings                                        </td></tr>
+            <tr><td> <b>setupStringPeak</b>      </td><td>the DC peak power of the plant strings                                        </td></tr>
             <tr><td> <b>roofIdentPair</b>        </td><td>the identification data (when using the SolCast API)                          </td></tr>
             <tr><td> <b>moduleRoofTops</b>       </td><td>the Rooftop parameters (when using the SolCast API)                           </td></tr>
             <tr><td> <b>moduleDeclination</b>    </td><td>the inclination angles of the plant modules                                   </td></tr>
@@ -18404,24 +18426,6 @@ to ensure that the system configuration is correct.
       <ul>
         <b>Example: </b> <br>
         set &lt;name&gt; moduleDeclination eastroof=40 southgarage=60 S3=30 <br>
-      </ul>
-      </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-modulePeakString"></a>
-      <li><b>modulePeakString &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br>
-
-      The DC peak power of the string "StringnameX" in kWp. The string name is a key value of the
-      attribute <b>setupInverterStrings</b>. <br>
-      When using an AI-based API (e.g. Model VictronKiAPI), the peak powers of all existing strings are to be assigned as
-      a sum to the string name <b>KI-based</b>. <br><br>
-
-      <ul>
-        <b>Examples: </b> <br>
-        set &lt;name&gt; modulePeakString eastroof=5.1 southgarage=2.0 S3=7.2 <br>
-        set &lt;name&gt; modulePeakString KI-based=14.3 (for AI based API)<br>
       </ul>
       </li>
     </ul>
@@ -20389,6 +20393,22 @@ to ensure that the system configuration is correct.
        </ul>
        </li>
        <br>
+       
+      <a id="SolarForecast-attr-setupStringPeak"></a>
+      <li><b>setupStringPeak &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br>
+
+      The DC peak power of the string "StringnameX" in kWp. The string name is a key value of the
+      attribute <b>setupInverterStrings</b>. <br>
+      When using an AI-based API (e.g. Model VictronKiAPI), the peak powers of all existing strings are to be assigned as
+      a sum to the string name <b>KI-based</b>. <br><br>
+
+      <ul>
+        <b>Examples: </b> <br>
+        attr &lt;name&gt; setupStringPeak eastroof=5.1 southgarage=2.0 S3=7.2 <br>
+        attr &lt;name&gt; setupStringPeak KI-based=14.3 (for AI based API)<br>
+      </ul>
+      </li>
+      <br>
 
      </ul>
   </ul>
@@ -20465,7 +20485,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>setupBatteryDev</b>      </td><td>Device welches Batterie Leistungsdaten liefert (sofern vorhanden)              </td></tr>
             <tr><td> <b>setupInverterStrings</b> </td><td>Bezeichner der vorhandenen Anlagenstrings                                      </td></tr>
             <tr><td> <b>moduleAzimuth</b>        </td><td>Ausrichtung (Azimut) der Anlagenstrings                                        </td></tr>
-            <tr><td> <b>modulePeakString</b>     </td><td>die DC-Peakleistung der Anlagenstrings                                         </td></tr>
+            <tr><td> <b>setupStringPeak</b>      </td><td>die DC-Peakleistung der Anlagenstrings                                         </td></tr>
             <tr><td> <b>roofIdentPair</b>        </td><td>die Identifikationsdaten (bei Nutzung der SolCast API)                         </td></tr>
             <tr><td> <b>moduleRoofTops</b>       </td><td>die Rooftop Parameter (bei Nutzung der SolCast API)                            </td></tr>
             <tr><td> <b>moduleDeclination</b>    </td><td>die Neigungswinkel der der Anlagenmodule                                       </td></tr>
@@ -20665,24 +20685,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
         <b>Beispiel: </b> <br>
         set &lt;name&gt; moduleDeclination Ostdach=40 Südgarage=60 S3=30 <br>
-      </ul>
-      </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-modulePeakString"></a>
-      <li><b>modulePeakString &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br>
-
-      Die DC Peakleistung des Strings "StringnameX" in kWp. Der Stringname ist ein Schlüsselwert des
-      Attributs <b>setupInverterStrings</b>. <br>
-      Bei Verwendung einer KI basierenden API (z.B. Model VictronKiAPI) sind die Peakleistungen aller vorhandenen
-      Strings als Summe dem Stringnamen <b>KI-based</b> zuzuordnen. <br><br>
-
-      <ul>
-        <b>Beispiele: </b> <br>
-        set &lt;name&gt; modulePeakString Ostdach=5.1 Südgarage=2.0 S3=7.2 <br>
-        set &lt;name&gt; modulePeakString KI-based=14.3 (bei KI basierender API)<br>
       </ul>
       </li>
     </ul>
@@ -22657,6 +22659,22 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                </td><td><b>Hinweis:</b> Die ausgewählte DWD Station muß Strahlungswerte (Rad1h Readings) liefern.     </td></tr>
             <tr><td>                                </td><td>Nicht alle Stationen liefern diese Daten!                                                     </td></tr>
          </table>
+      </ul>
+      </li>
+      <br>
+      
+      <a id="SolarForecast-attr-setupStringPeak"></a>
+      <li><b>setupStringPeak &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br>
+
+      Die DC Peakleistung des Strings "StringnameX" in kWp. Der Stringname ist ein Schlüsselwert des
+      Attributs <b>setupInverterStrings</b>. <br>
+      Bei Verwendung einer KI basierenden API (z.B. Model VictronKiAPI) sind die Peakleistungen aller vorhandenen
+      Strings als Summe dem Stringnamen <b>KI-based</b> zuzuordnen. <br><br>
+
+      <ul>
+        <b>Beispiele: </b> <br>
+        attr &lt;name&gt; setupStringPeak Ostdach=5.1 Südgarage=2.0 S3=7.2 <br>
+        attr &lt;name&gt; setupStringPeak KI-based=14.3 (bei KI basierender API)<br>
       </ul>
       </li>
       <br>
