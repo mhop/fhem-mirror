@@ -2,7 +2,7 @@
 # This file is part of the smarthomatic module for FHEM.
 #
 # Copyright (c) 2014 Stefan Baumann
-#               2014, 2015, 2019, 2022, 2023 Uwe Freese
+#               2014, 2015, 2019, 2022, 2023, 2024 Uwe Freese
 #
 # You can find smarthomatic at www.smarthomatic.org.
 # You can find FHEM at www.fhem.de.
@@ -34,11 +34,22 @@ use SHC_parser;
 
 my $parser = new SHC_parser();
 
+my %icons = (
+  "PowerSwitch"         => "message_socket",
+  "Dimmer"              => "light_ceiling",
+  "EnvSensor"           => "temperature_humidity",
+  "Controller"          => "display_dot",
+  "Proxy"               => "it_router",
+  "RGBDimmer"           => "control_arrow_turn_right",
+  "SoilMoistureMeter"   => "sani_irrigation"
+);
+
 my %dev_state_icons = (
   "PowerSwitch"         => ".*1\\d{7}:on:off .*0\\d{7}:off:on set.*:light_question:off",
   "Dimmer"              => "on:on off:off set.*:light_question:off",
   "EnvSensor"           => undef,
   "Controller"          => undef,
+  "Proxy"               => undef,
   "RGBDimmer"           => undef,
   "SoilMoistureMeter"   => ".*H:\\s\\d\\..*:ampel_rot"
 );
@@ -48,6 +59,7 @@ my %web_cmds = (
   "Dimmer"              => "on:off:statusRequest",
   "EnvSensor"           => undef,
   "Controller"          => undef,
+  "Proxy"               => undef,
   "RGBDimmer"           => undef,
   "SoilMoistureMeter"   => undef
 );
@@ -140,7 +152,7 @@ sub SHCdev_Initialize($)
                        ." readonly:1"
                        ." forceOn:1"
                        ." $readingFnAttributes"
-                       ." devtype:EnvSensor,Dimmer,PowerSwitch,Controller,RGBDimmer,SoilMoistureMeter";
+                       ." devtype:EnvSensor,Dimmer,PowerSwitch,Controller,Proxy,RGBDimmer,SoilMoistureMeter";
 }
 
 #####################################
@@ -437,6 +449,9 @@ sub SHCdev_Parse($$)
   # If the devtype is defined add, if not already done, the according webCmds and devStateIcons
   my $devtype2 = AttrVal( $rname, "devtype", undef );
   if (defined($devtype2)) {
+    if (!defined($attr{$rname}{icon}) && defined($icons{$devtype2})) {
+      $attr{$rname}{icon} = $icons{$devtype2};
+    }
     if (!defined($attr{$rname}{devStateIcon}) && defined($dev_state_icons{$devtype2})) {
       $attr{$rname}{devStateIcon} = $dev_state_icons{$devtype2};
     }

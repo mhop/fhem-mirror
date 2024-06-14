@@ -205,6 +205,10 @@
 					<Name>BaseStation</Name>
 				</Element>
 				<Element>
+					<Value>10</Value>
+					<Name>Proxy</Name>
+				</Element>
+				<Element>
 					<Value>20</Value>
 					<Name>EnvSensor</Name>
 				</Element>
