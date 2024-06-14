@@ -452,6 +452,7 @@ netatmo_Define($$)
     $hash->{refresh_token} = $refresh_token if(!defined($hash->{refresh_token}));
     $hash->{helper}{refresh_token} = $hash->{refresh_token};
     $hash->{helper}{refresh_token} = $refresh_token if(!$hash->{helper}{refresh_token});
+    $hash->{helper}{last_refresh} = 0;
 
     $hash->{helper}{INTERVAL} = 60*60 if( !$hash->{helper}{INTERVAL} );
     $attr{$name}{room} = "netatmo" if( !defined($attr{$name}{room}) && defined($name));
@@ -820,6 +821,9 @@ netatmo_refreshToken($;$)
   my ($hash,$nonblocking) = @_;
   my $name = $hash->{NAME};
 
+  return undef if($hash->{helper}{last_refresh} > (gettimeofday()-30));
+  $hash->{helper}{last_refresh} = int(gettimeofday());
+
   if( defined($hash->{access_token}) && defined($hash->{expires_at}) ) {
     my ($seconds) = gettimeofday();
     return undef if( $seconds < $hash->{expires_at} - 600 );
@@ -1050,7 +1054,7 @@ netatmo_connect($)
   netatmo_getToken($hash);
   #netatmo_getAppToken($hash);
 
-  InternalTimer(gettimeofday()+90, "netatmo_poll", $hash);
+  InternalTimer(gettimeofday()+60+int(rand(60)), "netatmo_poll", $hash);
 
 }
 
@@ -1097,9 +1101,10 @@ netatmo_parseDev($$$)
     
   my $found = 0;
   if( ref($json) eq "HASH" && $json->{error} ){
-    Log3 $name, 2, "$name: dev hash error: ".Dumper($json->{error});
+    Log3 $name, 2, "$name: dev hash error: ".Dumper($json->{error}{message});
     if($json->{error} =~ /Access token expired/){
       netatmo_refreshAppToken( $iohash, defined($iohash->{access_token_app}) );
+      InternalTimer(gettimeofday()+30, "netatmo_checkDev", $hash);
     }
     return undef;
   } elsif ( ref($json) ne "HASH" ){
@@ -1367,7 +1372,7 @@ netatmo_initDevice($)
     return undef;
   }
 
-  InternalTimer(gettimeofday()+90, "netatmo_poll", $hash);
+  InternalTimer(gettimeofday()+60+int(rand(60)), "netatmo_poll", $hash);
 
 }
 
@@ -1939,8 +1944,8 @@ netatmo_initHome($@)
     callback => \&netatmo_dispatch,
   });
 
-  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "netatmo_poll", $hash);
-  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL};
+  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}+int(rand(60)), "netatmo_poll", $hash);
+  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL}+int(rand(60));
 }
 
 sub
@@ -2042,8 +2047,8 @@ netatmo_initHeatingHome($@)
     callback => \&netatmo_dispatch,
   });
 
-  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "netatmo_poll", $hash);
-  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL};
+  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}+int(rand(60)), "netatmo_poll", $hash);
+  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL}+int(rand(60));
 }
 
 
@@ -2084,8 +2089,8 @@ netatmo_pollHeatingHome($@)
     callback => \&netatmo_dispatch,
   });
 
-  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "netatmo_poll", $hash);
-  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL};
+  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}+int(rand(60)), "netatmo_poll", $hash);
+  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL}+int(rand(60));
 
   return undef;
 }
@@ -2139,8 +2144,8 @@ netatmo_pollHeatingRoom($@)
     callback => \&netatmo_dispatch,
   });
 
-  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "netatmo_poll", $hash);
-  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL};
+  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}+int(rand(60)), "netatmo_poll", $hash);
+  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL}+int(rand(60));
 
   return undef;
 }
@@ -2732,6 +2737,7 @@ netatmo_poll($)
   my $iohash = $hash->{IODev};
   my $ioname = $iohash->{NAME};
   if(defined($ioname) && IsDisabled($ioname)) {
+    InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}+7200+int(rand(1800)), "netatmo_poll", $hash);
     return undef;
   }
 
@@ -2819,8 +2825,8 @@ netatmo_poll($)
   if( defined($hash->{helper}{update_count}) && $hash->{helper}{update_count} > 1024 ) {
     InternalTimer(gettimeofday()+30, "netatmo_poll", $hash);
   } else {
-    $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL};
-    InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "netatmo_poll", $hash);
+    $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL}+int(rand(60));
+    InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}+int(rand(60)), "netatmo_poll", $hash);
   }
 }
 
@@ -2916,10 +2922,12 @@ netatmo_dispatch($$$)
         Log3 $name, 2, "$name: json message error: ".$json->{error};
         readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data");
         if($param->{type} eq "token" && $json->{error} eq "invalid_grant"){
-          $hash->{status} = "error";
+          #if($hash->{expires_at} <= int(gettimeofday())){
+            $hash->{status} = "invalid_grant error";
           $hash->{network} = "disconnected" if($hash->{SUBTYPE} eq "ACCOUNT");
           $attr{$name}{disable} = "1" if($hash->{SUBTYPE} eq "ACCOUNT");
           Log3 $name, 2, "$name: invalid refresh ticket, disabling module";
+          #}
         }
         return undef;
       }
@@ -3368,7 +3376,7 @@ netatmo_parseToken($$)
 
     netatmo_getDevices($hash) if( !$had_token );
     RemoveInternalTimer($hash, "netatmo_refreshTokenTimer");
-    InternalTimer($hash->{expires_at}, "netatmo_refreshTokenTimer", $hash);
+    InternalTimer($hash->{expires_at}-600, "netatmo_refreshTokenTimer", $hash);
   } else {
     $hash->{expires_at} = int(gettimeofday());
     $hash->{STATE} = "Error" if( !$hash->{access_token} );
@@ -3692,14 +3700,14 @@ netatmo_parseReadings($$;$)
         InternalTimer($hash->{helper}{NEXT_POLL}, "netatmo_poll", $hash);
         Log3 $name, 3, "$name: next fixed interval update for device ($requested) at ".FmtDateTime($hash->{helper}{NEXT_POLL});
       } elsif(defined($last_time) && int($last_time) > 0 && defined($step_time)) {
-        my $nextdata = $last_time + 2*$step_time + 10 + int(rand(20));
+        my $nextdata = $last_time + 2*$step_time + 10 + int(rand(30));
         
         if($hash->{SUBTYPE} eq "MODULE")
         {
           my $devicehash = $modules{$hash->{TYPE}}{defptr}{"D$hash->{Device}"};
           if(defined($devicehash) && defined($devicehash->{helper}{NEXT_POLL}))
           {
-            $nextdata = ($devicehash->{helper}{NEXT_POLL} + 10 + int(rand(20)) ) if($devicehash->{helper}{NEXT_POLL} >= gettimeofday()+150);
+            $nextdata = ($devicehash->{helper}{NEXT_POLL} + 10 + int(rand(30)) ) if($devicehash->{helper}{NEXT_POLL} >= gettimeofday()+150);
             if($nextdata >= (gettimeofday()+155))
             {
               RemoveInternalTimer($hash, "netatmo_poll");
@@ -3722,7 +3730,7 @@ netatmo_parseReadings($$;$)
         }
         elsif($nextdata >= (gettimeofday()+280))
         {
-          $nextdata = $nextdata + 10 + int(rand(20));
+          $nextdata = $nextdata + 10 + int(rand(60));
           RemoveInternalTimer($hash, "netatmo_poll");
           InternalTimer($nextdata, "netatmo_poll", $hash);
           $hash->{helper}{NEXT_POLL} = $nextdata;
@@ -3740,14 +3748,14 @@ netatmo_parseReadings($$;$)
           }
         }
       } elsif(defined($last_time) && int($last_time) > 0) {
-        my $nextdata = int($last_time)+(12*60);
+        my $nextdata = int($last_time)+(12*60)+int(rand(60));
         $nextdata = int(gettimeofday()+280) if($nextdata <= (gettimeofday()+280));
         RemoveInternalTimer($hash, "netatmo_poll");
         InternalTimer($nextdata, "netatmo_poll", $hash);
         $hash->{helper}{NEXT_POLL} = $nextdata;
         Log3 $name, 3, "$name: next predictive update for device ($requested) at ".FmtDateTime($nextdata);
       } else {
-        $hash->{helper}{NEXT_POLL} = int(gettimeofday())+(12*60);
+        $hash->{helper}{NEXT_POLL} = int(gettimeofday())+(12*60)+int(rand(60));
         RemoveInternalTimer($hash, "netatmo_poll");
         InternalTimer($hash->{helper}{NEXT_POLL}, "netatmo_poll", $hash);
         Log3 $name, 3, "$name: next fixed update for device ($requested) at ".FmtDateTime($hash->{helper}{NEXT_POLL});
