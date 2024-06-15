@@ -10506,7 +10506,7 @@ sub _estConsumptionForecast {
               my $csme    = HistoryVal ($hash, $m, $nhhr, "csme${c}", 0);
               
               if ($exconfc) {
-                  debugLog ($paref, 'consumption', "Consumer '$c' values excluded from forecast calculation by 'exconfc' - day: $m, hour: $nhhr, csme: $csme");
+                  debugLog ($paref, 'consumption', "Consumer '$c' values excluded from forecast calc by 'exconfc' - day: $m, hour: $nhhr, csme: $csme");
                   $hcon -= $csme;
                   next;
               }
