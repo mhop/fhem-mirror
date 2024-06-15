@@ -10430,7 +10430,7 @@ sub _estConsumptionForecast {
   my $totcon   = 0;
   my $dnum     = 0;
 
-  debugLog ($paref, "consumption", "################### Consumption forecast for the next day ###################");
+  debugLog ($paref, 'consumption', "################### Consumption forecast for the next day ###################");
 
   for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
       next if ($n eq $day);                                                                             # aktuellen (unvollständigen) Tag nicht berücksichtigen
@@ -10443,7 +10443,7 @@ sub _estConsumptionForecast {
       my $dcon = HistoryVal ($hash, $n, 99, 'con', 0);
       next if(!$dcon);
 
-      debugLog ($paref, "consumption", "History Consumption day >$n<: $dcon");
+      debugLog ($paref, 'consumption', "History Consumption day >$n<: $dcon");
 
       $totcon += $dcon;
       $dnum++;
@@ -10453,7 +10453,7 @@ sub _estConsumptionForecast {
        my $tomavg                                        = int ($totcon / $dnum);
        $data{$type}{$name}{current}{tomorrowconsumption} = $tomavg;                                      # prognostizierter Durchschnittsverbrauch aller (gleicher) Wochentage
 
-       debugLog ($paref, "consumption", "estimated Consumption for tomorrow: $tomavg, days for avg: $dnum");
+       debugLog ($paref, 'consumption', "estimated Consumption for tomorrow: $tomavg, days for avg: $dnum");
   }
   else {
       my $lang = $paref->{lang};
@@ -10478,7 +10478,7 @@ sub _estConsumptionForecast {
                  "21" => 0, "22" => 0, "23" => 0, "24" => 0,
                };
 
-  debugLog ($paref, "consumption", "################### Consumption forecast for the next hours ###################");
+  debugLog ($paref, 'consumption', "################### Consumption forecast for the next hours ###################");
 
   for my $k (sort keys %{$data{$type}{$name}{nexthours}}) {
       my $nhtime = NexthoursVal ($hash, $k, "starttime", undef);                                    # Startzeit
@@ -10503,13 +10503,15 @@ sub _estConsumptionForecast {
 
           for my $c (sort{$a<=>$b} keys %{$acref}) {                                                # historischer Verbrauch aller registrierten Verbraucher aufaddieren
               my $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);                                  # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
-
+              my $csme    = HistoryVal ($hash, $m, $nhhr, "csme${c}", 0);
+              
               if ($exconfc) {
-                  $hcon -= $exconfc;
+                  debugLog ($paref, 'consumption', "Consumer '$c' values excluded from forecast calculation by 'exconfc' - day: $m, hour: $nhhr, csme: $csme");
+                  $hcon -= $csme;
                   next;
               }
 
-              $consumerco += HistoryVal ($hash, $m, $nhhr, "csme${c}", 0);
+              $consumerco += $csme;
           }
 
           $conhex->{$nhhr} += $hcon - $consumerco if($hcon >= $consumerco);                         # prognostizierter Verbrauch Ex registrierter Verbraucher
@@ -10527,7 +10529,7 @@ sub _estConsumptionForecast {
                writeToHistory ( { paref => $paref, key => 'confc', val => $conavg, hour => $nhhr } );
            }
 
-           debugLog ($paref, "consumption", "estimated Consumption for $nhday -> starttime: $nhtime, confc: $conavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
+           debugLog ($paref, 'consumption', "estimated Consumption for $nhday -> starttime: $nhtime, confc: $conavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
       }
   }
 
@@ -19473,7 +19475,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>collectData</b>          </td><td>detailed data collection                                                         </td></tr>
             <tr><td> <b>consumerPlanning</b>     </td><td>Consumer scheduling processes                                                    </td></tr>
             <tr><td> <b>consumerSwitchingXX</b>  </td><td>Operations of the internal consumer switching module of consumer XX              </td></tr>
-            <tr><td> <b>consumption</b>          </td><td>Consumption calculation and use                                                  </td></tr>
+            <tr><td> <b>consumption</b>          </td><td>Consumption calculation, consumption forecasting and utilization                 </td></tr>
             <tr><td> <b>dwdComm</b>              </td><td>Communication with the website or server of the German Weather Service (DWD)     </td></tr>
             <tr><td> <b>epiecesCalc</b>          </td><td>Calculation of specific energy consumption per operating hour and consumer       </td></tr>
             <tr><td> <b>graphic</b>              </td><td>Module graphic information                                                       </td></tr>
@@ -21746,7 +21748,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>collectData</b>          </td><td>detailliierte Datensammlung                                                      </td></tr>
             <tr><td> <b>consumerPlanning</b>     </td><td>Consumer Einplanungsprozesse                                                     </td></tr>
             <tr><td> <b>consumerSwitchingXX</b>  </td><td>Operationen des internen Consumer Schaltmodul für Verbraucher XX                 </td></tr>
-            <tr><td> <b>consumption</b>          </td><td>Verbrauchskalkulation und -nutzung                                               </td></tr>
+            <tr><td> <b>consumption</b>          </td><td>Verbrauchskalkulation, Verbrauchsvorhersage und -nutzung                         </td></tr>
             <tr><td> <b>dwdComm</b>              </td><td>Kommunikation mit Webseite oder Server des Deutschen Wetterdienst (DWD)          </td></tr>
             <tr><td> <b>epiecesCalc</b>          </td><td>Berechnung des spezifischen Energieverbrauchs je Betriebsstunde und Verbraucher  </td></tr>
             <tr><td> <b>graphic</b>              </td><td>Informationen der Modulgrafik                                                    </td></tr>
