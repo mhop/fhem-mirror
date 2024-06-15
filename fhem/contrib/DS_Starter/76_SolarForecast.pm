@@ -10409,20 +10409,22 @@ sub _estConsumptionForecast {
   my $name    = $paref->{name};
   my $chour   = $paref->{chour};
   my $t       = $paref->{t};
-  my $day     = $paref->{day};                                                      # aktuelles Tagdatum (01...31)
-  my $dayname = $paref->{dayname};                                                  # aktueller Tagname
+  my $day     = $paref->{day};                                                                          # aktuelles Tagdatum (01...31)
+  my $dayname = $paref->{dayname};                                                                      # aktueller Tagname
 
   my ($err, $medev, $h) = isDeviceValid ( { name   => $name,
                                             obj    => 'setupMeterDev',
                                             method => 'attr',
                                           }
-                                        );                                          # aktuelles Meter device
+                                        );                                                              # aktuelles Meter device
   return if($err);
 
-  my $swdfcfc   = AttrVal     ($name, "affectConsForecastIdentWeekdays", 0);        # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
+  my $swdfcfc   = AttrVal     ($name, "affectConsForecastIdentWeekdays", 0);                            # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
   my ($am, $hm) = parseParams ($medev);
   my $type      = $paref->{type};
   my $acref     = $data{$type}{$name}{consumers};
+  
+  my ($exconfc, $csme);
 
   ## Verbrauchsvorhersage für den nächsten Tag
   ##############################################
@@ -10441,10 +10443,24 @@ sub _estConsumptionForecast {
       }
 
       my $dcon = HistoryVal ($hash, $n, 99, 'con', 0);
-      next if(!$dcon);
-
-      debugLog ($paref, 'consumption', "History Consumption day >$n<: $dcon");
-
+      
+      if(!$dcon) {
+          debugLog ($paref, 'consumption', "Day >$n< has no registered consumption, ignore it.");
+          next;
+      }
+      
+      for my $c (sort{$a<=>$b} keys %{$acref}) {                                                        # historischer Verbrauch aller registrierten Verbraucher aufaddieren
+          $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);                                             # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
+          $csme    = HistoryVal ($hash, $n, 99, "csme${c}", 0);
+          
+          if ($exconfc) {
+              $dcon -= $csme;
+              debugLog ($paref, 'consumption', "Consumer '$c' values excluded from forecast calc by 'exconfc' - day: $n, csme: $csme");
+          }
+      }
+      
+      debugLog ($paref, 'consumption', "History Consumption day >$n< considering possible exclusions: $dcon");
+      
       $totcon += $dcon;
       $dnum++;
   }
@@ -10502,8 +10518,8 @@ sub _estConsumptionForecast {
           next if(!$hcon);
 
           for my $c (sort{$a<=>$b} keys %{$acref}) {                                                # historischer Verbrauch aller registrierten Verbraucher aufaddieren
-              my $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);                                  # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
-              my $csme    = HistoryVal ($hash, $m, $nhhr, "csme${c}", 0);
+              $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);                                     # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
+              $csme    = HistoryVal ($hash, $m, $nhhr, "csme${c}", 0);
               
               if ($exconfc) {
                   debugLog ($paref, 'consumption', "Consumer '$c' values excluded from forecast calc by 'exconfc' - day: $m, hour: $nhhr, csme: $csme");
