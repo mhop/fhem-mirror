@@ -157,6 +157,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.29.0" => "16.06.2024  _setreset: improve reset consumerMaster ".
+                           "tranformed setter moduleAzimuth to setupStringAzimuth ".
+                           "tranformed setter moduleDeclination to setupStringDeclination ".
+                           "tranformed setter moduleRoofTops to setupRoofTops ",
   "1.28.0" => "15.06.2024  new consumer key exconfc, Forum: https://forum.fhem.de/index.php?msg=1315111 ",
   "1.27.0" => "12.06.2024  __VictronVRM_ApiResponseLogin: check token not empty ".
                            "transformed setter modulePeakString to attr setupStringPeak ",
@@ -501,9 +505,8 @@ my @fs = qw( ftui_forecast.css
            );
                                                                                  # Anlagenkonfiguration: maßgebliche Readings
 my @rconfigs = qw( pvCorrectionFactor_Auto
-                   moduleAzimuth
-                   moduleDeclination
-                   moduleRoofTops
+                   setupStringAzimuth
+                   setupStringDeclination
                    batteryTrigger
                    powerTrigger
                    energyH4Trigger
@@ -530,6 +533,7 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
                    graphicSpaceSize graphicStartHtml graphicEndHtml graphicWeatherColor graphicWeatherColorNight
                    setupMeterDev setupBatteryDev setupInverterDev setupInverterStrings setupRadiationAPI setupStringPeak
+                   setupRoofTops
                  );
 
 for my $cinit (1..$maxconsumer) {
@@ -571,10 +575,8 @@ my %hset = (                                                                # Ha
   pvCorrectionFactor_21     => { fn => \&_setpvCorrectionFactor        },
   pvCorrectionFactor_Auto   => { fn => \&_setpvCorrectionFactorAuto    },
   reset                     => { fn => \&_setreset                     },
-  roofIdentPair             => { fn => \&_setroofIdentPair             },
-  moduleRoofTops            => { fn => \&_setmoduleRoofTops            },
-  moduleDeclination         => { fn => \&_setmoduleDeclination         },
-  moduleAzimuth             => { fn => \&_setmoduleAzimuth             },
+  setupStringDeclination    => { fn => \&_setstringDeclination         },
+  setupStringAzimuth        => { fn => \&_setstringAzimuth             },
   operatingMemory           => { fn => \&_setoperatingMemory           },
   vrmCredentials            => { fn => \&_setVictronCredentials        },
   aiDecTree                 => { fn => \&_setaiDecTree                 },
@@ -612,6 +614,7 @@ my %hattr = (                                                                # H
   setupInverterStrings      => { fn => \&_attrInverterStrings     },
   setupRadiationAPI         => { fn => \&_attrRadiationAPI        },
   setupStringPeak           => { fn => \&_attrStringPeak          },
+  setupRoofTops             => { fn => \&_attrRoofTops            },
 );
 
 my %htr = (                                                                  # Hash even/odd für <tr>
@@ -666,14 +669,14 @@ my %hqtxt = (                                                                   
               DE => qq{Bitte geben sie alle von Ihnen verwendeten Stringnamen mit "attr LINK setupInverterStrings" an}      },
   mps    => { EN => qq{Please enter the DC peak power of each string with "attr LINK setupStringPeak"},
               DE => qq{Bitte geben sie die DC Spitzenleistung von jedem String mit "attr LINK setupStringPeak" an}          },
-  mdr    => { EN => qq{Please specify the module direction with "set LINK moduleAzimuth"},
-              DE => qq{Bitte geben sie die Modulausrichtung mit "set LINK moduleAzimuth" an}                                },
-  mta    => { EN => qq{Please specify the module tilt angle with "set LINK moduleDeclination"},
-              DE => qq{Bitte geben sie den Modulneigungswinkel mit "set LINK moduleDeclination" an}                         },
+  mdr    => { EN => qq{Please specify the module direction with "set LINK setupStringAzimuth"},
+              DE => qq{Bitte geben sie die Modulausrichtung mit "set LINK setupStringAzimuth" an}                           },
+  mta    => { EN => qq{Please specify the module tilt angle with "set LINK setupStringDeclination"},
+              DE => qq{Bitte geben sie den Modulneigungswinkel mit "set LINK setupStringDeclination" an}                    },
   rip    => { EN => qq{Please specify at least one combination Rooftop-ID/SolCast-API with "set LINK roofIdentPair"},
               DE => qq{Bitte geben Sie mindestens eine Kombination Rooftop-ID/SolCast-API mit "set LINK roofIdentPair" an}  },
-  mrt    => { EN => qq{Please set the assignment String / Rooftop identification with "set LINK moduleRoofTops"},
-              DE => qq{Bitte setzen sie die Zuordnung String / Rooftop Identifikation mit "set LINK moduleRoofTops"}        },
+  mrt    => { EN => qq{Please set the assignment String / Rooftop identification with "attr LINK setupRoofTops"},
+              DE => qq{Bitte setzen sie die Zuordnung String / Rooftop Identifikation mit "attr LINK setupRoofTops"}        },
   coord  => { EN => qq{Please set attributes 'latitude' and 'longitude' in global device},
               DE => qq{Bitte setzen sie die Attribute 'latitude' und 'longitude' im global Device}                          },
   cnsm   => { EN => qq{Consumer},
@@ -1223,6 +1226,7 @@ sub Initialize {
                                 "setupInverterDev:textField-long ".
                                 "setupInverterStrings ".
                                 "setupMeterDev:textField-long ".
+                                "setupRoofTops ".
                                 "setupBatteryDev:textField-long ".
                                 "setupRadiationAPI ".
                                 "setupStringPeak ".
@@ -1423,7 +1427,6 @@ sub Set {
                consumerPlanning
                consumption
                energyH4TriggerSet
-               moduleRoofTopSet
                powerTriggerSet
                pvCorrection
                roofIdentPair
@@ -1485,13 +1488,12 @@ sub Set {
   ## API spezifische Setter
   ###########################
   if (isSolCastUsed ($hash)) {
-      $setlist .= "moduleRoofTops ".
-                  "roofIdentPair "
+      $setlist .= "roofIdentPair "
                   ;
   }
   elsif (isForecastSolarUsed ($hash)) {
-      $setlist .= "moduleAzimuth ".
-                  "moduleDeclination "
+      $setlist .= "setupStringAzimuth ".
+                  "setupStringDeclination "
                   ;
   }
   elsif (isVictronKiUsed ($hash)) {
@@ -1499,8 +1501,8 @@ sub Set {
                   ;
   }
   else {
-      $setlist .= "moduleAzimuth ".
-                  "moduleDeclination "
+      $setlist .= "setupStringAzimuth ".
+                  "setupStringDeclination "
                   ;
   }
 
@@ -1712,42 +1714,6 @@ return $msg;
 }
 
 ################################################################
-#                 Setter moduleRoofTops
-################################################################
-sub _setmoduleRoofTops {                ## no critic "not used"
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $arg   = $paref->{arg} // return qq{no module RoofTop was provided};
-
-  my ($a,$h) = parseParams ($arg);
-
-  if (!keys %$h) {
-      return qq{The provided module RoofTop has wrong format};
-  }
-
-  while (my ($is, $pk) = each %$h) {
-      my $rtid   = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'rtid',   '');
-      my $apikey = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
-
-      if (!$rtid || !$apikey) {
-          return qq{The roofIdentPair "$pk" of String "$is" has no Rooftop-ID and/or SolCast-API key assigned ! \n}.
-                 qq{Set the roofIdentPair "$pk" previously with "set $name roofIdentPair".} ;
-      }
-  }
-
-  readingsSingleUpdate ($hash, "moduleRoofTops", $arg, 1);
-  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
-
-  return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
-
-  my $ret = createStringConfig ($hash);
-  return $ret if($ret);
-
-return;
-}
-
-################################################################
 #       Setter operationMode
 ################################################################
 sub _setoperationMode {                  ## no critic "not used"
@@ -1806,9 +1772,9 @@ return;
 }
 
 ################################################################
-#                      Setter moduleDeclination
+#                      Setter setupStringDeclination
 ################################################################
-sub _setmoduleDeclination {              ## no critic "not used"
+sub _setstringDeclination {              ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -1828,8 +1794,8 @@ sub _setmoduleDeclination {              ## no critic "not used"
       }
   }
 
-  readingsSingleUpdate ($hash, 'moduleDeclination', $arg, 1);
-  writeCacheToFile     ($hash, 'plantconfig', $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
+  readingsSingleUpdate ($hash, 'setupStringDeclination', $arg, 1);
+  writeCacheToFile     ($hash, 'plantconfig',    $plantcfg.$name);                # Anlagenkonfiguration File schreiben
 
   return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
 
@@ -1840,13 +1806,13 @@ return;
 }
 
 ################################################################
-#                 Setter moduleAzimuth
+#                 Setter setupStringAzimuth
 #
 #  Angabe entweder als Azimut-Bezeichner oder direkte
 #  Azimut Angabe -180 ...0...180
 #
 ################################################################
-sub _setmoduleAzimuth {                  ## no critic "not used"
+sub _setstringAzimuth {                  ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -1866,7 +1832,7 @@ sub _setmoduleAzimuth {                  ## no critic "not used"
       }
   }
 
-  readingsSingleUpdate ($hash, 'moduleAzimuth', $arg,         1);
+  readingsSingleUpdate ($hash, 'setupStringAzimuth', $arg,    1);
   writeCacheToFile     ($hash, 'plantconfig',   $plantcfg.$name);                  # Anlagenkonfiguration File schreiben
 
   return if(_checkSetupNotComplete ($hash));                                       # keine Stringkonfiguration wenn Setup noch nicht komplett
@@ -2019,8 +1985,7 @@ sub _setreset {                          ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $prop  = $paref->{prop} // return qq{no source specified for reset};
-
-  my $type  = $hash->{TYPE};
+  my $type  = $paref->{type};
 
   if ($prop eq 'pvHistory') {
       my $dday  = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
@@ -2178,12 +2143,6 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if ($prop eq 'moduleRoofTopSet') {
-      readingsDelete   ($hash, "moduleRoofTops");
-      writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);
-      return;
-  }
-
   readingsDelete ($hash, $prop);
 
   if ($prop eq 'roofIdentPair') {
@@ -2218,22 +2177,24 @@ sub _setreset {                          ## no critic "not used"
   }
 
   if ($prop eq 'consumerMaster') {                                                   # Verbraucherhash löschen
-      my $c = $paref->{prop1} // "";                                                 # bestimmten Verbraucher setzen falls angegeben
+      my $c = $paref->{prop1} // '';                                                 # bestimmten Verbraucher setzen falls angegeben
 
       if ($c) {
-          my $calias = ConsumerVal ($hash, $c, "alias", "");
-          delete $data{$type}{$name}{consumers}{$c};
-          Log3($name, 3, qq{$name - Consumer "$calias" deleted from memory});
+          $paref->{c} = $c;  
+          delConsumerFromMem ($paref);                                               # spezifischen Consumer aus History löschen
       }
       else {
-          for my $cs (keys %{$data{$type}{$name}{consumers}}) {
-              my $calias = ConsumerVal ($hash, $cs, "alias", "");
-              delete $data{$type}{$name}{consumers}{$cs};
-              Log3($name, 3, qq{$name - Consumer "$calias" deleted from memory});
+          for my $c (keys %{$data{$type}{$name}{consumers}}) {
+              $paref->{c} = $c;
+              delConsumerFromMem ($paref);                                           # alle Consumer aus History löschen
           }
       }
-
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                       # Cache File Consumer schreiben
+      
+      delete $paref->{c};
+      $data{$type}{$name}{current}{consumerCollected} = 0;                           # Consumer neu sammeln
+      
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                        # Cache File Consumer schreiben
+      centralTask      ($hash, 0);
   }
 
   createAssociatedWith ($hash);
@@ -2604,7 +2565,7 @@ sub __solCast_ApiRequest {
   my $string;
   ($string, $allstrings) = split ",", $allstrings, 2;
 
-  my $rft    = ReadingsVal ($name, "moduleRoofTops", "");
+  my $rft    = AttrVal     ($name, 'setupRoofTops', '');
   my ($a,$h) = parseParams ($rft);
 
   my $pk     = $h->{$string} // q{};
@@ -5295,17 +5256,11 @@ sub _attrconsumer {                      ## no critic "not used"
   else {
       my $day  = strftime "%d", localtime(time);                                                   # aktueller Tag  (range 01 to 31)
       my ($c)  = $aName =~ /consumer([0-9]+)/xs;
+      
+      $paref->{c} = $c;
+      delConsumerFromMem ($paref);                                                                 # Consumerdaten aus History löschen
 
       deleteReadingspec ($hash, "consumer${c}.*");
-
-      for my $i (1..24) {                                                                          # Consumer aus History löschen
-          delete $data{$type}{$name}{pvhist}{$day}{sprintf("%02d",$i)}{"csmt${c}"};
-          delete $data{$type}{$name}{pvhist}{$day}{sprintf("%02d",$i)}{"csme${c}"};
-      }
-
-      delete $data{$type}{$name}{pvhist}{$day}{99}{"csmt${c}"};
-      delete $data{$type}{$name}{pvhist}{$day}{99}{"csme${c}"};
-      delete $data{$type}{$name}{consumers}{$c};                                                   # Consumer Hash Verbraucher löschen
   }
 
   writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                          # Cache File Consumer schreiben
@@ -5570,6 +5525,45 @@ return;
 }
 
 ################################################################
+#                 Attr setupRoofTops
+################################################################
+sub _attrRoofTops {                      ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $aVal  = $paref->{aVal};
+  
+  return if(!$init_done);
+  
+  if ($paref->{cmd} eq 'set') {
+      my ($a,$h) = parseParams ($aVal);
+
+      if (!keys %$h) {
+          return qq{The attribute content has wrong format};
+      }
+
+      while (my ($is, $pk) = each %$h) {
+          my $rtid   = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'rtid',   '');
+          my $apikey = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
+
+          if (!$rtid || !$apikey) {
+              return qq{The roofIdentPair "$pk" of String "$is" has no Rooftop-ID and/or SolCast-API key assigned! \n}.
+                     qq{Set the roofIdentPair "$pk" previously with "set $name roofIdentPair".} ;
+          }
+      }
+
+      return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
+
+      #my $ret = createStringConfig ($hash);
+      #return $ret if($ret);
+  }
+  
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+
+return;
+}
+
+################################################################
 #                      Attr setupBatteryDev
 ################################################################
 sub _attrBatteryDev {                    ## no critic "not used"
@@ -5692,20 +5686,20 @@ sub _attrRadiationAPI {                  ## no critic "not used"
           return "You have to install the required perl module: ".$rmf if($rmf);
       }
 
-      return if(_checkSetupNotComplete ($hash));                                         # keine Stringkonfiguration wenn Setup noch nicht komplett
+      return if(_checkSetupNotComplete ($hash));                                                   # keine Stringkonfiguration wenn Setup noch nicht komplett
 
       if ($aVal =~ /(ForecastSolar|OpenMeteoDWD|OpenMeteoDWDEnsemble|OpenMeteoWorld)-API/xs) {
           my ($set, $lat, $lon, $elev) = locCoordinates();
           return qq{set attributes 'latitude' and 'longitude' in global device first} if(!$set);
 
-          my $tilt = ReadingsVal ($name, 'moduleDeclination', '');                       # Modul Neigungswinkel für jeden Stringbezeichner
-          return qq{Please complete command "set $name moduleDeclination".} if(!$tilt);
+          my $tilt = ReadingsVal ($name, 'setupStringDeclination', '');                            # Modul Neigungswinkel für jeden Stringbezeichner
+          return qq{Please complete command "set $name setupStringDeclination".} if(!$tilt);
 
-          my $dir = ReadingsVal ($name, 'moduleAzimuth', '');                            # Modul Ausrichtung für jeden Stringbezeichner
-          return qq{Please complete command "set $name moduleAzimuth".} if(!$dir);
+          my $dir = ReadingsVal ($name, 'setupStringAzimuth', '');                                 # Modul Ausrichtung für jeden Stringbezeichner
+          return qq{Please complete command "set $name setupStringAzimuth".} if(!$dir);
       }
 
-      $data{$type}{$name}{current}{allStringsFullfilled} = 0;                            # Stringkonfiguration neu prüfen lassen
+      $data{$type}{$name}{current}{allStringsFullfilled} = 0;                                      # Stringkonfiguration neu prüfen lassen
   }
 
   readingsDelete ($hash, 'nextRadiationAPICall');
@@ -6055,6 +6049,40 @@ sub deleteOldBckpFiles {
 
       Log3 ($name, 3, "$name - old backup file '$cachedir/$files[$i]' deleted") if($done);
   }
+
+return;
+}
+
+################################################################
+#            Consumer Daten aus History löschen    
+################################################################
+sub delConsumerFromMem {                   
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  my $c     = $paref->{c};
+
+  my $calias = ConsumerVal ($hash, $c, 'alias', '');
+  
+  for my $d (1..31) {
+      $d = sprintf("%02d", $d);
+      delete $data{$type}{$name}{pvhist}{$d}{99}{"csme${c}"};
+      delete $data{$type}{$name}{pvhist}{$d}{99}{"cyclescsm${c}"};
+      delete $data{$type}{$name}{pvhist}{$d}{99}{"hourscsme${c}"};
+      delete $data{$type}{$name}{pvhist}{$d}{99}{"avgcycmntscsm${c}"};
+      
+      for my $i (1..24) {                                                    
+          $i = sprintf("%02d", $i);
+          delete $data{$type}{$name}{pvhist}{$d}{$i}{"csmt${c}"};
+          delete $data{$type}{$name}{pvhist}{$d}{$i}{"csme${c}"};
+          delete $data{$type}{$name}{pvhist}{$d}{$i}{"minutescsm${c}"}; 
+      }
+  }
+  
+  delete $data{$type}{$name}{consumers}{$c};
+  
+  Log3 ($name, 3, qq{$name - Consumer "$c - $calias" deleted from memory});
 
 return;
 }
@@ -6457,6 +6485,24 @@ sub centralTask {
       CommandAttr (undef, "$name setupStringPeak $val5");
       readingsDelete ($hash, 'modulePeakString');
   }
+  
+  my $dir = ReadingsVal ($name, 'moduleAzimuth', '');                         # 16.06.2024
+  if ($dir) {
+      readingsSingleUpdate ($hash, 'setupStringAzimuth', $dir, 0);
+      readingsDelete ($hash, 'moduleAzimuth');
+  }
+  
+  my $dec = ReadingsVal ($name, 'moduleDeclination', '');                         # 16.06.2024
+  if ($dec) {
+      readingsSingleUpdate ($hash, 'setupStringDeclination', $dec, 0);
+      readingsDelete ($hash, 'moduleDeclination');
+  }
+  
+  my $val6 = ReadingsVal ($name, 'moduleRoofTops', '');                    # 16.06.2024
+  if ($val6) {
+      CommandAttr (undef, "$name setupRoofTops $val6");
+      readingsDelete ($hash, 'moduleRoofTops');
+  }
   ##########################################################################################################################
 
   setModel ($hash);                                                                            # Model setzen
@@ -6595,8 +6641,8 @@ sub createStringConfig {                 ## no critic "not used"
   }
 
   if (isSolCastUsed ($hash)) {                                                                   # SolCast-API Strahlungsquelle
-      my $mrt = ReadingsVal ($name, 'moduleRoofTops', '');                                       # RoofTop Konfiguration -> Zuordnung <pk>
-      return qq{Please complete command "set $name moduleRoofTops".} if(!$mrt);
+      my $mrt = AttrVal ($name, 'setupRoofTops', '');                                            # RoofTop Konfiguration -> Zuordnung <pk>
+      return qq{Please complete command "attr $name setupRoofTops".} if(!$mrt);
 
       my ($ad,$hd) = parseParams ($mrt);
 
@@ -6605,7 +6651,7 @@ sub createStringConfig {                 ## no critic "not used"
               $data{$type}{$name}{strings}{$is}{pk} = $pk;
           }
           else {
-              return qq{Check "moduleRoofTops" -> the stringname "$is" is not defined as valid string in attribute "setupInverterStrings"};
+              return qq{Check "setupRoofTops" -> the stringname "$is" is not defined as valid string in attribute "setupInverterStrings"};
           }
       }
   }
@@ -6617,8 +6663,8 @@ sub createStringConfig {                 ## no critic "not used"
       }
   }
   elsif (!isVictronKiUsed ($hash)) {
-      my $tilt = ReadingsVal ($name, 'moduleDeclination', '');                                    # Modul Neigungswinkel für jeden Stringbezeichner
-      return qq{Please complete command "set $name moduleDeclination".} if(!$tilt);
+      my $tilt = ReadingsVal ($name, 'setupStringDeclination', '');                                    # Modul Neigungswinkel für jeden Stringbezeichner
+      return qq{Please complete command "set $name setupStringDeclination".} if(!$tilt);
 
       my ($at,$ht) = parseParams ($tilt);
 
@@ -6627,15 +6673,15 @@ sub createStringConfig {                 ## no critic "not used"
               $data{$type}{$name}{strings}{$key}{tilt} = $value;
           }
           else {
-              return qq{Check "moduleDeclination" -> the stringname "$key" is not defined as valid string in attribute "setupInverterStrings"};
+              return qq{Check "setupStringDeclination" -> the stringname "$key" is not defined as valid string in attribute "setupInverterStrings"};
           }
       }
 
-      my $dir = ReadingsVal ($name, 'moduleAzimuth', '');                                         # Modul Ausrichtung für jeden Stringbezeichner
-      return qq{Please complete command "set $name moduleAzimuth".} if(!$dir);
+      my $dir = ReadingsVal ($name, 'setupStringAzimuth', '');                                         # Modul Ausrichtung für jeden Stringbezeichner
+      return qq{Please complete command "set $name setupStringAzimuth".} if(!$dir);
 
       my ($ad,$hd) = parseParams ($dir);
-      my $iwrong   = qq{Please check the input of set "moduleAzimuth". It seems to be wrong.};
+      my $iwrong   = qq{Please check the input of set "setupStringAzimuth". It seems to be wrong.};
 
       while (my ($key, $value) = each %$hd) {
           if (grep /^$key$/, @istrings) {
@@ -6643,15 +6689,15 @@ sub createStringConfig {                 ## no critic "not used"
               $data{$type}{$name}{strings}{$key}{azimut} = _ident2azimuth ($value) // return $iwrong;
           }
           else {
-              return qq{Check "moduleAzimuth" -> the stringname "$key" is not defined as valid string in attribute "setupInverterStrings"};
+              return qq{Check "setupStringAzimuth" -> the stringname "$key" is not defined as valid string in attribute "setupInverterStrings"};
           }
       }
   }
 
-  if(!keys %{$data{$type}{$name}{strings}}) {
+  if (!keys %{$data{$type}{$name}{strings}}) {
       return qq{The string configuration seems to be incomplete. \n}.
-             qq{Please check the settings of setupInverterStrings, setupStringPeak, moduleAzimuth, moduleDeclination }.
-             qq{and/or moduleRoofTops if SolCast-API is used.};
+             qq{Please check the settings of setupInverterStrings, setupStringPeak, setupStringAzimuth, setupStringDeclination }.
+             qq{and/or setupRoofTops if SolCast-API is used.};
   }
 
   my @sca = keys %{$data{$type}{$name}{strings}};                                               # Gegencheck ob nicht mehr Strings in setupInverterStrings enthalten sind als eigentlich verwendet
@@ -11594,17 +11640,28 @@ sub _checkSetupNotComplete {
   if ($val3) {
       CommandAttr (undef, "$name setupInverterStrings $val3");
   }
+  
+  my $dir = ReadingsVal ($name, 'moduleAzimuth', '');                         # 16.06.2024
+  if ($dir) {
+      readingsSingleUpdate ($hash, 'setupStringAzimuth', $dir, 0);
+  }
+  
+  my $dec = ReadingsVal ($name, 'moduleDeclination', '');                         # 16.06.2024
+  if ($dec) {
+      readingsSingleUpdate ($hash, 'setupStringDeclination', $dec, 0);
+  }
+  
   ##########################################################################################
 
-  my $is    = AttrVal       ($name, 'setupInverterStrings', undef);                       # String Konfig
-  my $wedev = AttrVal       ($name, 'ctrlWeatherDev1',      undef);                       # Device Vorhersage Wetterdaten (Bewölkung etc.)
-  my $radev = AttrVal       ($name, 'setupRadiationAPI',    undef);                       # Device Strahlungsdaten Vorhersage
-  my $indev = AttrVal       ($name, 'setupInverterDev',     undef);                       # Inverter Device
-  my $medev = AttrVal       ($name, 'setupMeterDev',        undef);                       # Meter Device
-  my $peaks = AttrVal       ($name, 'setupStringPeak',      undef);                       # String Peak
-  my $maz   = ReadingsVal   ($name, 'moduleAzimuth',        undef);                       # Modulausrichtung Konfig (Azimut)
-  my $mdec  = ReadingsVal   ($name, 'moduleDeclination',    undef);                       # Modul Neigungswinkel Konfig
-  my $mrt   = ReadingsVal   ($name, 'moduleRoofTops',       undef);                       # RoofTop Konfiguration (SolCast API)
+  my $is    = AttrVal     ($name, 'setupInverterStrings',   undef);                       # String Konfig
+  my $wedev = AttrVal     ($name, 'ctrlWeatherDev1',        undef);                       # Device Vorhersage Wetterdaten (Bewölkung etc.)
+  my $radev = AttrVal     ($name, 'setupRadiationAPI',      undef);                       # Device Strahlungsdaten Vorhersage
+  my $indev = AttrVal     ($name, 'setupInverterDev',       undef);                       # Inverter Device
+  my $medev = AttrVal     ($name, 'setupMeterDev',          undef);                       # Meter Device
+  my $peaks = AttrVal     ($name, 'setupStringPeak',        undef);                       # String Peak
+  my $maz   = ReadingsVal ($name, 'setupStringAzimuth',     undef);                       # Modulausrichtung Konfig (Azimut)
+  my $mdec  = ReadingsVal ($name, 'setupStringDeclination', undef);                       # Modul Neigungswinkel Konfig
+  my $mrt   = AttrVal     ($name, 'setupRoofTops',          undef);                       # RoofTop Konfiguration (SolCast API)
 
   my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');                   # Victron VRM Credentials gesetzt
 
@@ -14828,7 +14885,16 @@ sub listDataPool {
 
   my $sub = sub {
       my $day = shift;
+      
+      #for my $dh (keys %{$h->{$day}}) {
+      #    if (!isNumeric ($dh)) {
+      #        delete $data{$type}{$name}{pvhist}{$day}{$dh};
+      #        Log3 ($name, 2, qq{$name - INFO - invalid key "$day -> $dh" was deleted from pvHistory storage});
+      #    }
+      #}
+      
       my $ret;
+      
       for my $key (sort {$a<=>$b} keys %{$h->{$day}}) {
           my $pvrl    = HistoryVal ($hash, $day, $key, 'pvrl',        '-');
           my $pvrlvd  = HistoryVal ($hash, $day, $key, 'pvrlvd',      '-');
@@ -14988,7 +15054,7 @@ sub listDataPool {
           }
       }
 
-      for my $idx (sort{$a<=>$b} keys %{$h}) {
+      for my $idx (sort keys %{$h}) {
           next if($par && $idx ne $par);
           $sq .= $idx." => ".$sub->($idx)."\n";
       }
@@ -15637,12 +15703,12 @@ sub checkPlantConfig {
       $result->{'Rooftop Settings'}{note}           = '';
       $result->{'Rooftop Settings'}{fault}          = 0;
 
-      my $rft = ReadingsVal ($name, 'moduleRoofTops', '');
+      my $rft = AttrVal ($name, 'setupRoofTops', '');
 
       if (!$rft) {
           $result->{'Rooftop Settings'}{state}   = $nok;
           $result->{'Rooftop Settings'}{result} .= qq{No RoofTops are defined <br>};
-          $result->{'Rooftop Settings'}{note}   .= qq{Set your Rooftops with "set $name moduleRoofTops" command. <br>};
+          $result->{'Rooftop Settings'}{note}   .= qq{Set your Rooftops with "attr $name setupRoofTops". <br>};
           $result->{'Rooftop Settings'}{fault}   = 1;
 
           $result->{'Roof Ident Pair Settings'}{state}   = $nok;
@@ -17966,7 +18032,7 @@ return $def;
 #
 # $strg:        - Name des Strings aus setupStringPeak
 # $key:  peak   - Peakleistung aus setupStringPeak
-#        tilt   - Neigungswinkel der Module aus moduleDeclination
+#        tilt   - Neigungswinkel der Module aus setupStringDeclination
 #        dir    - Ausrichtung der Module als Azimut-Bezeichner (N,NE,E,SE,S,SW,W,NW)
 #        azimut - Ausrichtung der Module als Azimut Angabe -180 .. 0 .. 180
 #
@@ -18251,17 +18317,17 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>ctrlWeatherDevX</b>      </td><td>DWD_OpenData Device which provides meteorological data (e.g. cloud cover)     </td></tr>
-            <tr><td> <b>setupRadiationAPI </b>   </td><td>DWD_OpenData Device or API for the delivery of radiation data.                </td></tr>
-            <tr><td> <b>setupInverterDev</b>     </td><td>Device which provides PV performance data                                     </td></tr>
-            <tr><td> <b>setupMeterDev</b>        </td><td>Device which supplies network I/O data                                        </td></tr>
-            <tr><td> <b>setupBatteryDev</b>      </td><td>Device which provides battery performance data (if available)                 </td></tr>
-            <tr><td> <b>setupInverterStrings</b> </td><td>Identifier of the existing plant strings                                      </td></tr>
-            <tr><td> <b>moduleAzimuth</b>        </td><td>Azimuth of the plant strings                                                  </td></tr>
-            <tr><td> <b>setupStringPeak</b>      </td><td>the DC peak power of the plant strings                                        </td></tr>
-            <tr><td> <b>roofIdentPair</b>        </td><td>the identification data (when using the SolCast API)                          </td></tr>
-            <tr><td> <b>moduleRoofTops</b>       </td><td>the Rooftop parameters (when using the SolCast API)                           </td></tr>
-            <tr><td> <b>moduleDeclination</b>    </td><td>the inclination angles of the plant modules                                   </td></tr>
+            <tr><td> <b>ctrlWeatherDevX</b>        </td><td>DWD_OpenData Device which provides meteorological data (e.g. cloud cover)     </td></tr>
+            <tr><td> <b>setupRadiationAPI </b>     </td><td>DWD_OpenData Device or API for the delivery of radiation data.                </td></tr>
+            <tr><td> <b>setupInverterDev</b>       </td><td>Device which provides PV performance data                                     </td></tr>
+            <tr><td> <b>setupMeterDev</b>          </td><td>Device which supplies network I/O data                                        </td></tr>
+            <tr><td> <b>setupBatteryDev</b>        </td><td>Device which provides battery performance data (if available)                 </td></tr>
+            <tr><td> <b>setupInverterStrings</b>   </td><td>Identifier of the existing plant strings                                      </td></tr>
+            <tr><td> <b>setupStringAzimuth</b>     </td><td>Azimuth of the plant strings                                                  </td></tr>
+            <tr><td> <b>setupStringPeak</b>        </td><td>the DC peak power of the plant strings                                        </td></tr>
+            <tr><td> <b>roofIdentPair</b>          </td><td>the identification data (when using the SolCast API)                          </td></tr>
+            <tr><td> <b>setupRoofTops</b>          </td><td>the Rooftop parameters (when using the SolCast API)                           </td></tr>
+            <tr><td> <b>setupStringDeclination</b> </td><td>the angle of inclination of the plant modules                                 </td></tr>
          </table>
       </ul>
       <br>
@@ -18408,8 +18474,8 @@ to ensure that the system configuration is correct.
     <br>
 
     <ul>
-      <a id="SolarForecast-set-moduleAzimuth"></a>
-      <li><b>moduleAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br>
+      <a id="SolarForecast-set-setupStringAzimuth"></a>
+      <li><b>setupStringAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br>
       (only model DWD, ForecastSolarAPI) <br><br>
 
       Alignment &lt;dir&gt; of the solar modules in the string "StringnameX". The string name is a key value of the
@@ -18440,15 +18506,15 @@ to ensure that the system configuration is correct.
 
       <ul>
         <b>Example: </b> <br>
-        set &lt;name&gt; moduleAzimuth eastroof=-90 southgarage=S S3=NW <br>
+        set &lt;name&gt; setupStringAzimuth eastroof=-90 southgarage=S S3=NW <br>
       </ul>
       </li>
     </ul>
     <br>
 
     <ul>
-      <a id="SolarForecast-set-moduleDeclination"></a>
-      <li><b>moduleDeclination &lt;Stringname1&gt;=&lt;Angle&gt; [&lt;Stringname2&gt;=&lt;Angle&gt; &lt;Stringname3&gt;=&lt;Angle&gt; ...] </b> <br>
+      <a id="SolarForecast-set-setupStringDeclination"></a>
+      <li><b>setupStringDeclination &lt;Stringname1&gt;=&lt;Angle&gt; [&lt;Stringname2&gt;=&lt;Angle&gt; &lt;Stringname3&gt;=&lt;Angle&gt; ...] </b> <br>
       (only model DWD, ForecastSolarAPI) <br><br>
 
       Tilt angle of the solar modules. The string name is a key value of the attribute <b>setupInverterStrings</b>. <br>
@@ -18457,26 +18523,7 @@ to ensure that the system configuration is correct.
 
       <ul>
         <b>Example: </b> <br>
-        set &lt;name&gt; moduleDeclination eastroof=40 southgarage=60 S3=30 <br>
-      </ul>
-      </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-moduleRoofTops"></a>
-      <li><b>moduleRoofTops &lt;Stringname1&gt;=&lt;pk&gt; [&lt;Stringname2&gt;=&lt;pk&gt; &lt;Stringname3&gt;=&lt;pk&gt; ...] </b> <br>
-      (only when using Model SolCastAPI) <br><br>
-
-      The string "StringnameX" is assigned to a key &lt;pk&gt;. The key &lt;pk&gt; was created with the setter
-      <a href="#SolarForecast-set-roofIdentPair">roofIdentPair</a>. This is used to specify the rooftop ID and API key to
-      be used in the SolCast API.  <br>
-      The string nameX is a key value of the attribute <b>setupInverterStrings</b>.
-      <br><br>
-
-      <ul>
-        <b>Example: </b> <br>
-        set &lt;name&gt; moduleRoofTops eastroof=p1 southgarage=p2 S3=p3 <br>
+        set &lt;name&gt; setupStringDeclination eastroof=40 southgarage=60 S3=30 <br>
       </ul>
       </li>
     </ul>
@@ -18663,7 +18710,8 @@ to ensure that the system configuration is correct.
             <tr><td>                           </td><td>To delete the planning data of only one consumer, use:                                                                  </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Consumer number&gt; </ul>                                               </td></tr>
             <tr><td>                           </td><td>The module carries out an automatic rescheduling of the consumer circuit.                                               </td></tr>
-            <tr><td> <b>consumerMaster</b>     </td><td>deletes the data of all registered consumers from the memory                                                            </td></tr>
+            <tr><td> <b>consumerMaster</b>     </td><td>deletes the current and historical data of all registered consumers from the memory                                     </td></tr>
+            <tr><td>                           </td><td>The defined consumer attributes remain and the data is collected again.                                                 </td></tr>
             <tr><td>                           </td><td>To delete the data of only one consumer use:                                                                            </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Consumer number&gt; </ul>                                                 </td></tr>
             <tr><td> <b>consumption</b>        </td><td>deletes the stored consumption values of the house                                                                      </td></tr>
@@ -18684,7 +18732,6 @@ to ensure that the system configuration is correct.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset pvHistory 08) </ul>                     </td></tr>
             <tr><td>                           </td><td>To delete a specific hour of a historical day:                                                                          </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt; &lt;Hour&gt;  (e.g. set &lt;name&gt; reset pvHistory 08 10) </ul>      </td></tr>
-            <tr><td> <b>moduleRoofTopSet</b>   </td><td>deletes the SolCast API Rooftops                                                                                        </td></tr>
             <tr><td> <b>roofIdentPair</b>      </td><td>deletes all saved SolCast API Rooftop ID / API Key pairs.                                                               </td></tr>
             <tr><td>                           </td><td>To delete a specific pair, specify its key &lt;pk&gt;:                                                                  </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (e.g. set &lt;name&gt; reset roofIdentPair p1) </ul>              </td></tr>
@@ -18706,7 +18753,7 @@ to ensure that the system configuration is correct.
        <b>one after the other</b>. In that case, a new name for "&lt;pk&gt;" is to be used in each case.
        <br><br>
 
-       The key &lt;pk&gt; is assigned in the setter <a href="#SolarForecast-set-moduleRoofTops">moduleRoofTops</a> to the
+       The key &lt;pk&gt; is assigned in the atribute <a href="#SolarForecast-attr-setupRoofTops">setupRoofTops</a> to the
        Rooftops (=Strings) to be retrieved.
        <br><br>
 
@@ -20429,6 +20476,23 @@ to ensure that the system configuration is correct.
        </ul>
        </li>
        <br>
+       
+      <a id="SolarForecast-attr-setupRoofTops"></a>
+      <li><b>setupRoofTops &lt;Stringname1&gt;=&lt;pk&gt; [&lt;Stringname2&gt;=&lt;pk&gt; &lt;Stringname3&gt;=&lt;pk&gt; ...] </b> <br>
+      (only when using Model SolCastAPI) <br><br>
+
+      The string "StringnameX" is assigned to a key &lt;pk&gt;. The key &lt;pk&gt; was created with the setter
+      <a href="#SolarForecast-set-roofIdentPair">roofIdentPair</a>. This is used to specify the rooftop ID and API key to
+      be used in the SolCast API.  <br>
+      The StringnameX is a key value of the attribute <b>setupInverterStrings</b>.
+      <br><br>
+
+      <ul>
+        <b>Example: </b> <br>
+        attr &lt;name&gt; setupRoofTops eastroof=p1 southgarage=p2 S3=p3 <br>
+      </ul>
+      </li>
+      <br>
 
       <a id="SolarForecast-attr-setupStringPeak"></a>
       <li><b>setupStringPeak &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br>
@@ -20514,17 +20578,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>ctrlWeatherDevX</b>      </td><td>DWD_OpenData Device welches meteorologische Daten (z.B. Bewölkung) liefert     </td></tr>
-            <tr><td> <b>setupRadiationAPI </b>   </td><td>DWD_OpenData Device bzw. API zur Lieferung von Strahlungsdaten                 </td></tr>
-            <tr><td> <b>setupInverterDev</b>     </td><td>Device welches PV Leistungsdaten liefert                                       </td></tr>
-            <tr><td> <b>setupMeterDev</b>        </td><td>Device welches Netz I/O-Daten liefert                                          </td></tr>
-            <tr><td> <b>setupBatteryDev</b>      </td><td>Device welches Batterie Leistungsdaten liefert (sofern vorhanden)              </td></tr>
-            <tr><td> <b>setupInverterStrings</b> </td><td>Bezeichner der vorhandenen Anlagenstrings                                      </td></tr>
-            <tr><td> <b>moduleAzimuth</b>        </td><td>Ausrichtung (Azimut) der Anlagenstrings                                        </td></tr>
-            <tr><td> <b>setupStringPeak</b>      </td><td>die DC-Peakleistung der Anlagenstrings                                         </td></tr>
-            <tr><td> <b>roofIdentPair</b>        </td><td>die Identifikationsdaten (bei Nutzung der SolCast API)                         </td></tr>
-            <tr><td> <b>moduleRoofTops</b>       </td><td>die Rooftop Parameter (bei Nutzung der SolCast API)                            </td></tr>
-            <tr><td> <b>moduleDeclination</b>    </td><td>die Neigungswinkel der der Anlagenmodule                                       </td></tr>
+            <tr><td> <b>ctrlWeatherDevX</b>        </td><td>DWD_OpenData Device welches meteorologische Daten (z.B. Bewölkung) liefert     </td></tr>
+            <tr><td> <b>setupRadiationAPI </b>     </td><td>DWD_OpenData Device bzw. API zur Lieferung von Strahlungsdaten                 </td></tr>
+            <tr><td> <b>setupInverterDev</b>       </td><td>Device welches PV Leistungsdaten liefert                                       </td></tr>
+            <tr><td> <b>setupMeterDev</b>          </td><td>Device welches Netz I/O-Daten liefert                                          </td></tr>
+            <tr><td> <b>setupBatteryDev</b>        </td><td>Device welches Batterie Leistungsdaten liefert (sofern vorhanden)              </td></tr>
+            <tr><td> <b>setupInverterStrings</b>   </td><td>Bezeichner der vorhandenen Anlagenstrings                                      </td></tr>
+            <tr><td> <b>setupStringAzimuth</b>     </td><td>Ausrichtung (Azimut) der Anlagenstrings                                        </td></tr>
+            <tr><td> <b>setupStringPeak</b>        </td><td>die DC-Peakleistung der Anlagenstrings                                         </td></tr>
+            <tr><td> <b>roofIdentPair</b>          </td><td>die Identifikationsdaten (bei Nutzung der SolCast API)                         </td></tr>
+            <tr><td> <b>setupRoofTops</b>          </td><td>die Rooftop Parameter (bei Nutzung der SolCast API)                            </td></tr>
+            <tr><td> <b>setupStringDeclination</b> </td><td>die Neigungswinkel der Anlagenmodule                                           </td></tr>
          </table>
       </ul>
       <br>
@@ -20671,8 +20735,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <br>
 
     <ul>
-      <a id="SolarForecast-set-moduleAzimuth"></a>
-      <li><b>moduleAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br>
+      <a id="SolarForecast-set-setupStringAzimuth"></a>
+      <li><b>setupStringAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br>
       (nur Model DWD, ForecastSolarAPI) <br><br>
 
       Ausrichtung &lt;dir&gt; der Solarmodule im String "StringnameX". Der Stringname ist ein Schlüsselwert des
@@ -20703,15 +20767,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; moduleAzimuth Ostdach=-90 Südgarage=S S3=NW <br>
+        set &lt;name&gt; setupStringAzimuth Ostdach=-90 Südgarage=S S3=NW <br>
       </ul>
       </li>
     </ul>
     <br>
 
     <ul>
-      <a id="SolarForecast-set-moduleDeclination"></a>
-      <li><b>moduleDeclination &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br>
+      <a id="SolarForecast-set-setupStringDeclination"></a>
+      <li><b>setupStringDeclination &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br>
       (nur Model DWD, ForecastSolarAPI) <br><br>
 
       Neigungswinkel der Solarmodule. Der Stringname ist ein Schlüsselwert des Attributs <b>setupInverterStrings</b>. <br>
@@ -20720,26 +20784,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; moduleDeclination Ostdach=40 Südgarage=60 S3=30 <br>
-      </ul>
-      </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-moduleRoofTops"></a>
-      <li><b>moduleRoofTops &lt;Stringname1&gt;=&lt;pk&gt; [&lt;Stringname2&gt;=&lt;pk&gt; &lt;Stringname3&gt;=&lt;pk&gt; ...] </b> <br>
-      (nur bei Verwendung Model SolCastAPI) <br><br>
-
-      Es erfolgt die Zuordnung des Strings "StringnameX" zu einem Schlüssel &lt;pk&gt;. Der Schlüssel &lt;pk&gt; wurde mit dem
-      Setter <a href="#SolarForecast-set-roofIdentPair">roofIdentPair</a> angelegt. Damit wird bei Abruf des Rooftops (=String)
-      in der SolCast API die zu verwendende Rooftop-ID sowie der zu verwendende API-Key festgelegt. <br>
-      Der StringnameX ist ein Schlüsselwert des Attributs <b>setupInverterStrings</b>.
-      <br><br>
-
-      <ul>
-        <b>Beispiel: </b> <br>
-        set &lt;name&gt; moduleRoofTops Ostdach=p1 Südgarage=p2 S3=p3 <br>
+        set &lt;name&gt; setupStringDeclination Ostdach=40 Südgarage=60 S3=30 <br>
       </ul>
       </li>
     </ul>
@@ -20934,7 +20979,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                   </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                             </td></tr>
             <tr><td>                           </td><td>Das Modul führt eine automatische Neuplanung der Verbraucherschaltung durch.                                            </td></tr>
-            <tr><td> <b>consumerMaster</b>     </td><td>löscht die Daten aller registrierten Verbraucher aus dem Speicher                                                       </td></tr>
+            <tr><td> <b>consumerMaster</b>     </td><td>löscht die aktuellen und historischen Daten aller registrierten Verbraucher aus dem Speicher                            </td></tr>
+            <tr><td>                           </td><td>Die definierten Consumer Attribute bleiben bestehen und die Daten werden neu gesammelt.                                 </td></tr>
             <tr><td>                           </td><td>Um die Daten nur eines Verbrauchers zu löschen verwendet man:                                                           </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Verbrauchernummer&gt; </ul>                                               </td></tr>
             <tr><td> <b>consumption</b>        </td><td>löscht die gespeicherten Verbrauchswerte des Hauses                                                                     </td></tr>
@@ -20955,7 +21001,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08) </ul>                     </td></tr>
             <tr><td>                           </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                                           </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </ul>    </td></tr>
-            <tr><td> <b>moduleRoofTopSet</b>   </td><td>löscht die SolCast API Rooftops                                                                                         </td></tr>
             <tr><td> <b>roofIdentPair</b>      </td><td>löscht alle gespeicherten SolCast API Rooftop-ID / API-Key Paare                                                        </td></tr>
             <tr><td>                           </td><td>Um ein bestimmtes Paar zu löschen ist dessen Schlüssel &lt;pk&gt; anzugeben:                                            </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (z.B. set &lt;name&gt; reset roofIdentPair p1) </ul>              </td></tr>
@@ -20976,8 +21021,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        Paare <b>nacheinander</b> angelegt werden. In dem Fall ist jeweils ein neuer Name für "&lt;pk&gt;" zu verwenden.
        <br><br>
 
-       Der Schlüssel &lt;pk&gt; wird im Setter <a href="#SolarForecast-set-moduleRoofTops">moduleRoofTops</a> der abzurufenden
-       Rooftops (=Strings) zugeordnet.
+       Der Schlüssel &lt;pk&gt; wird im Attribut <a href="#SolarForecast-attr-setupRoofTops">setupRoofTops</a> dem abzurufenden
+       Rooftop (=String) zugeordnet.
        <br><br>
 
        <ul>
@@ -22699,6 +22744,23 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                </td><td><b>Hinweis:</b> Die ausgewählte DWD Station muß Strahlungswerte (Rad1h Readings) liefern.     </td></tr>
             <tr><td>                                </td><td>Nicht alle Stationen liefern diese Daten!                                                     </td></tr>
          </table>
+      </ul>
+      </li>
+      <br>
+      
+      <a id="SolarForecast-attr-setupRoofTops"></a>
+      <li><b>setupRoofTops &lt;Stringname1&gt;=&lt;pk&gt; [&lt;Stringname2&gt;=&lt;pk&gt; &lt;Stringname3&gt;=&lt;pk&gt; ...] </b> <br>
+      (nur bei Verwendung Model SolCastAPI) <br><br>
+
+      Es erfolgt die Zuordnung des Strings "StringnameX" zu einem Schlüssel &lt;pk&gt;. Der Schlüssel &lt;pk&gt; wurde mit dem
+      Setter <a href="#SolarForecast-set-roofIdentPair">roofIdentPair</a> angelegt. Damit wird bei Abruf des Rooftops (=String)
+      in der SolCast API die zu verwendende Rooftop-ID sowie der zu verwendende API-Key festgelegt. <br>
+      Der StringnameX ist ein Schlüsselwert des Attributs <b>setupInverterStrings</b>.
+      <br><br>
+
+      <ul>
+        <b>Beispiel: </b> <br>
+        attr &lt;name&gt; setupRoofTops Ostdach=p1 Südgarage=p2 S3=p3 <br>
       </ul>
       </li>
       <br>
