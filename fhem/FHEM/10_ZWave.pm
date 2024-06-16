@@ -22,6 +22,7 @@ sub ZWave_secEnd($);
 sub ZWave_configParseModel($;$);
 sub ZWave_callbackId($;$);
 sub ZWave_setEndpoints($);
+sub ZWave_mfsParse($$$$$;$);
 
 our ($FW_ME,$FW_tp,$FW_ss);
 our %zwave_id2class;
@@ -2576,9 +2577,9 @@ ZWave_mfsAddClasses($$)
 }
 
 sub
-ZWave_mfsParse($$$$$)
+ZWave_mfsParse($$$$$;$)
 {
-  my ($hash, $mf, $prod, $id, $config) = @_;
+  my ($hash, $mf, $prod, $id, $config, $ozw) = @_;
   my $getVal = sub { return $_[0] =~ m/$_[1]\s*=\s*"([^"]*)"/ ? $1 : "unknown"};
 
   if($config == 2) {
@@ -2586,8 +2587,8 @@ ZWave_mfsParse($$$$$)
     return "modelId:$mf-$prod-$id";
   }
 
-  my $xml = $attr{global}{modpath}.
-            "/FHEM/lib/openzwave_manufacturer_specific.xml";
+  my $xml = $attr{global}{modpath}."/FHEM/lib/".
+              ($ozw ? "openzwave" : "user_zwave"). "_manufacturer_specific.xml";
   ($mf, $prod, $id) = (lc($mf), lc($prod), lc($id)); # Just to make it sure
   if(open(FH, $xml)) {
     my ($lastMf, $mName, $ret) = ("","");
@@ -2621,9 +2622,10 @@ ZWave_mfsParse($$$$$)
     return $ret if($ret);
 
   } else {
-    Log 1, "can't open $xml: $!";
+    Log 1, "can't open $xml: $!" if($ozw);
 
   }
+  return ZWave_mfsParse($hash, $mf, $prod, $id, $config, 1) if(!$ozw);
   return sprintf("model:0x%s 0x%s 0x%s", $mf, $prod, $id);
 }
 
@@ -2920,15 +2922,16 @@ ZWave_cleanString($$$)
 sub
 ZWave_configParseModel($;$)
 {
-  my ($cfg, $my) = @_;
-  return if(!$my && ZWave_configParseModel($cfg, 1)); # first fhem_ then open...
+  my ($cfg, $run) = @_;
+  $run = 0 if(!$run);
 
-  my $fn = $attr{global}{modpath}."/FHEM/lib/".($my ? "fhem_":"open").
+  my @fList = ("user_", "fhem_", "open");
+  my $fn = $attr{global}{modpath}."/FHEM/lib/".$fList[$run].
                                 "zwave_deviceconfig.xml.gz";
   my $gz = gzopen($fn, "rb");
   if(!$gz) {
-    Log 3, "Can't open $fn: $!" if(!$my);
-    return 0;
+    Log 3, "Can't open $fn: $!" if($run == 2); # user_
+    return $run < 2 ? ZWave_configParseModel($cfg, $run+1) : 0;
   }
 
   my ($ret, $line, $class, %hash, $cmdName, %classInfo, %group, $origName);
@@ -3005,7 +3008,9 @@ ZWave_configParseModel($;$)
     }
 
     if($line =~ m+<Help>(.*)</Help>+s) {
-      $hash{$cmdName}{Help} .= "$bsHelp$1<br>";
+      my $h = $1;
+      $h =~ s/ {9}/<br>/g; #138451
+      $hash{$cmdName}{Help} .= "$bsHelp$h<br>";
       $bsHelp="";
     }
 
@@ -3050,9 +3055,11 @@ ZWave_configParseModel($;$)
   }
 
   $zwave_modelConfig{$cfg} = \%mc;
-  Log 3, "ZWave got config for $cfg from $fn, found ".keys(%hash)." commands"
-    if($ret);
-  return $ret;
+  if($ret) {
+    Log 3, "ZWave got config for $cfg from $fn, found ".keys(%hash)." commands";
+  } elsif($run < 2) {
+    return ZWave_configParseModel($cfg, $run+1);
+  }
 }
 
 ###################################
@@ -7139,9 +7146,8 @@ ZWave_tmSet($)
     return the manufacturer specific id (16bit),
     the product type (16bit)
     and the product specific id (16bit).<br>
-    Note: if the openzwave xml files are installed, then return the name of the
-    manufacturer and of the product. This call is also necessary to decode more
-    model specific configuration commands and parameters.
+    Note: if the id combination is found in the user_, fhem_ or openzwave files,
+    more descriptive config commands and help for these commands is available.
     </li>
 
   <br><br><b>Class METER</b>
