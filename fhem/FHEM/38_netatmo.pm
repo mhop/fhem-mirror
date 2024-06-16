@@ -423,7 +423,7 @@ netatmo_Define($$)
 
     delete($hash->{access_token});
     delete($hash->{access_token_app});
-    #delete($hash->{refresh_token});
+    delete($hash->{refresh_token});
     delete($hash->{refresh_token_app});
     delete($hash->{expires_at});
     delete($hash->{expires_at_app});
