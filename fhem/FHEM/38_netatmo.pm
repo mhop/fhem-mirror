@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 30 / 2024-06-08
+# Release 31 / 2024-06-17
 
 package main;
 
@@ -449,9 +449,8 @@ netatmo_Define($$)
     $hash->{helper}{password} = $password;
     $hash->{helper}{client_id} = $client_id;
     $hash->{helper}{client_secret} = $client_secret;
-    $hash->{refresh_token} = $refresh_token if(!defined($hash->{refresh_token}));
+    $hash->{refresh_token} = $refresh_token;
     $hash->{helper}{refresh_token} = $hash->{refresh_token};
-    $hash->{helper}{refresh_token} = $refresh_token if(!$hash->{helper}{refresh_token});
     $hash->{helper}{last_refresh} = 0;
 
     $hash->{helper}{INTERVAL} = 60*60 if( !$hash->{helper}{INTERVAL} );
@@ -2916,18 +2915,28 @@ netatmo_dispatch($$$)
     Log3 $name, 5, Dumper($json);
 
     if( ref($json) eq "HASH" && $json->{error} ) {
-      if(ref($json->{error}) ne "HASH") {
+      if(ref($json->{error}) ne "HASH") { #only error on login/token, error->message on other data communication
         $hash->{STATE} = "LOGIN FAILED" if($hash->{SUBTYPE} eq "ACCOUNT");
-        $hash->{status} = $json->{error};
         Log3 $name, 2, "$name: json message error: ".$json->{error};
         readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data");
         if($param->{type} eq "token" && $json->{error} eq "invalid_grant"){
-          #if($hash->{expires_at} <= int(gettimeofday())){
-            $hash->{status} = "invalid_grant error";
+          if($hash->{status} eq "invalid_grant error"){
           $hash->{network} = "disconnected" if($hash->{SUBTYPE} eq "ACCOUNT");
+            CommandDeleteReading( undef, "$hash->{NAME} .refreshtoken" );
           $attr{$name}{disable} = "1" if($hash->{SUBTYPE} eq "ACCOUNT");
           Log3 $name, 2, "$name: invalid refresh ticket, disabling module";
+          }
+          else {
+            #if($hash->{expires_at} <= int(gettimeofday())){
+              $hash->{status} = "invalid_grant error";
+              Log3 $name, 2, "$name: invalid refresh ticket, retrying once";
+              $hash->{helper}{refresh_token} = ReadingsVal($name, ".refreshtoken", undef);
+              InternalTimer(gettimeofday()+5, "netatmo_refreshToken", $hash, 0);
           #}
+        }
+        }
+        else {
+          $hash->{status} = $json->{error};
         }
         return undef;
       }
@@ -3366,6 +3375,8 @@ netatmo_parseToken($$)
 
     if($old_refresh ne $hash->{refresh_token}){
       if($hash->{SUBTYPE} eq "ACCOUNT"){
+        readingsSingleUpdate( $hash, ".refreshtoken", $json->{refresh_token}, 0 );
+
         my @defarray = split(/ /, $hash->{DEF});
         pop(@defarray);
         push(@defarray, $json->{refresh_token});
