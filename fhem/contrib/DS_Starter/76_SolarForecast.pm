@@ -459,7 +459,7 @@ my $fgCDdef        = 130;                                                       
 
 my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
 my $pPath = '?format=txt';                                                          # Download Format
-my $cfile = 'controls_solarforecast.txt';                                           # Name des Conrrolfiles
+my $cfile = 'controls_solarforecast.txt';                                           # Name des Controlfiles
 
                                                                                     # default CSS-Style
 my $cssdef = qq{.flowg.text           { stroke: none; fill: gray; font-size: 60px; }                                     \n}.
@@ -7274,8 +7274,14 @@ sub __deletePvCorffReadings  {
       readingsDelete ($hash, ".pvCorrectionFactor_${n}_apipercentil");
       readingsDelete ($hash, ".signaldone_${n}");
 
-      if (ReadingsVal ($name, "pvCorrectionFactor_Auto", "off") =~ /on/xs) {
-          deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
+      if (ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off') =~ /on/xs) {
+          my ($pcf, $tail) = split " / ", ReadingsVal ($name, "pvCorrectionFactor_${n}", '');
+          if ($pcf !~ /manual/xs) {                                                   # manuell gesetzte pcf-Readings nicht löschen 
+              deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
+          }
+          else {
+              readingsSingleUpdate ($hash, "pvCorrectionFactor_${n}", $pcf, 0); 
+          }
       }
   }
 
@@ -10909,6 +10915,9 @@ sub _calcCaQcomplex {
       if ($paref->{cpcf} !~ /manual/xs) {                                                            # pcf-Reading nur überschreiben wenn nicht 'manual xxx' gesetzt
           storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac, Sun Alt range: $sabin, Cloud range: $crang, Days in range: $dnum)");
       }
+      else {
+          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $paref->{cpcf}." / flexmatic result $factor for Sun Alt range: $sabin, Cloud range: $crang, Days in range: $dnum");
+      }
       
       storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h).'_autocalc', 'done');
   }
@@ -10974,6 +10983,10 @@ sub _calcCaQsimple {
       if ($paref->{cpcf} !~ /manual/xs) {                                                            # pcf-Reading nur überschreiben wenn nicht 'manual xxx' gesetzt
           storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac, Days in range: $dnum)");
       }
+      else {
+          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $paref->{cpcf}." / flexmatic result $factor, Days in range: $dnum");
+      }
+      
       storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h).'_autocalc', 'done');
   }
 
