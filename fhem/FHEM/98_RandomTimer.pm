@@ -43,6 +43,7 @@ BEGIN {
         qw(
           defs
           modules
+          init_done
           attr
           featurelevel
           readingFnAttributes
@@ -105,11 +106,11 @@ sub Define {
         $tspec = $3;
     }
     else { 
-        return qq{ "Wrong timespec_start <$timespec_start>, use "[+][*]<time or func>" };
+        return qq{ "Wrong timespec_start <$timespec_start>, use "[+][*]<time or func>" } if $init_done;
     }
 
     my ( $err, $hr, $min, $sec, $fn ) = GetTimeSpec($tspec);
-    return $err if ($err);
+    return $err if $err && $init_done;
 
     $rel = $rel // q{};
     $rep = $rep // q{};
@@ -120,13 +121,12 @@ sub Define {
         $srep   = $2;
         $stspec = $3;
     }
-    else {
-        return
-          qq{"Wrong timespec_stop <$timespec_stop>, use "[+][*]<time or func>"};
+    elsif ($init_done) {
+        return qq{Wrong timespec_stop <$timespec_stop>, use "[+][*]<time or func>"};
     }
 
     my ( $e, $h, $m, $s, $f ) = GetTimeSpec($stspec);
-    return $e if $e;
+    return $e if $e && $init_done;
 
     return "invalid timeToSwitch <$timeToSwitch>, use 9999"
       if ( !( $timeToSwitch =~ m{^[0-9]{2,4}$}ixms ) );
@@ -207,7 +207,7 @@ sub Set {
     my ( $hash, @arr ) = @_;
 
     return "no set value specified" if int(@arr) < 2 ;
-    return "Unknown argument, choose one of execNow:noArg active:noArg inactive:noArg"
+    return "Unknown argument, choose one of execNow:noArg active:noArg inactive:noArg recomputeTimes:noArg"
       if $arr[1] eq '?';
 
     my $name = shift @arr;
@@ -235,6 +235,18 @@ sub Set {
         InternalTimer(time + 1,\&RT_Exec,$hash);
         return;
     }
+    if ( $v eq 'recomputeTimes' ) {
+        Log3( $hash, 3, "[$name] set $name $v" );
+        if ( AttrVal( $name, 'disable', 0 ) ) {
+            Log3( $hash, 3, "[$name] is disabled, set recomputeTimes not possible" );
+        }
+        else {
+            RemoveInternalTimer($hash,\&RT_Exec);
+            InternalTimer(time + 1,\&RT_SetTimer,$hash);
+        }
+        return;
+    }
+
     return;
 }
 
@@ -760,6 +772,12 @@ __END__
        <code>set &lt;name&gt; inactive</code>
      <br>
      Temporarily disable the RandomTimer w/o setting disable attribute. When set the next switch will be immediately executed.
+     </ul><br>
+     <ul><a id="RandomTimer-set-recomputeTimes"></a>
+       <code>set &lt;name&gt; recomputeTimes</code>
+     <br>
+     Recalculate timespec_start and timespec_stop values. Might be helpfull in case you set timer limits in external devices (e.g. dummy).<br>
+     Note: recomputing times will never issue any command towards &lt;device&gt;; esp.when shorting the time slot, make sure, your &lt;device&gt; is finally switched off.
      </ul><br>
     </ul>
    <ul>  
