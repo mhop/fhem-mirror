@@ -1539,7 +1539,7 @@ sub Set {
       debug   => getDebug ($hash)
   };
 
-  if($hset{$opt} && defined &{$hset{$opt}{fn}}) {
+  if ($hset{$opt} && defined &{$hset{$opt}{fn}}) {
       my $ret = q{};
       $ret    = &{$hset{$opt}{fn}} ($params);
       return $ret;
@@ -7275,12 +7275,15 @@ sub __deletePvCorffReadings  {
       readingsDelete ($hash, ".signaldone_${n}");
 
       if (ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off') =~ /on/xs) {
-          my ($pcf, $tail) = split " / ", ReadingsVal ($name, "pvCorrectionFactor_${n}", '');
+          my $pcf = ReadingsVal ($name, "pvCorrectionFactor_${n}", '');
+          ($pcf)  = split " / ", $pcf if($pcf =~ /\s\/\s/xs);
+          
           if ($pcf !~ /manual/xs) {                                                   # manuell gesetzte pcf-Readings nicht löschen 
               deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
           }
           else {
               readingsSingleUpdate ($hash, "pvCorrectionFactor_${n}", $pcf, 0); 
+              deleteReadingspec    ($hash, "pvCorrectionFactor_${n}_autocalc");
           }
       }
   }
