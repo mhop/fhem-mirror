@@ -155,6 +155,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.29.2" => "17.06.2024  ___readCandQ: improve manual setting of pvCorrectionFactor_XX ",
   "1.29.1" => "17.06.2024  fix Warnings, Forum: https://forum.fhem.de/index.php?msg=1315283, fix roofIdentPair ",
   "1.29.0" => "16.06.2024  _setreset: improve reset consumerMaster ".
                            "tranformed setter moduleAzimuth to setupStringAzimuth ".
@@ -458,7 +459,7 @@ my $fgCDdef        = 130;                                                       
 
 my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
 my $pPath = '?format=txt';                                                          # Download Format
-my $cfile = 'controls_solarforecast.txt';                                           # Name des Conrrolfiles
+my $cfile = 'controls_solarforecast.txt';                                           # Name des Controlfiles
 
                                                                                     # default CSS-Style
 my $cssdef = qq{.flowg.text           { stroke: none; fill: gray; font-size: 60px; }                                     \n}.
@@ -1538,7 +1539,7 @@ sub Set {
       debug   => getDebug ($hash)
   };
 
-  if($hset{$opt} && defined &{$hset{$opt}{fn}}) {
+  if ($hset{$opt} && defined &{$hset{$opt}{fn}}) {
       my $ret = q{};
       $ret    = &{$hset{$opt}{fn}} ($params);
       return $ret;
@@ -1934,8 +1935,11 @@ sub _setpvCorrectionFactor {             ## no critic "not used"
   }
 
   $prop =~ s/,/./x;
+  
+  my ($acu, $aln) = isAutoCorrUsed ($name);
+  my $mode        = $acu =~ /on/xs ? 'manual flex' : 'manual fix';
 
-  readingsSingleUpdate($hash, $opt, $prop." (manual)", 1);
+  readingsSingleUpdate ($hash, $opt, $prop." ($mode)", 1);
 
   my $cfnum = (split "_", $opt)[1];
   readingsDelete ($hash, "pvCorrectionFactor_${cfnum}_autocalc");
@@ -1960,16 +1964,34 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
       $prop   = $pfa.' '.$prop;
   }
 
-  readingsSingleUpdate($hash, 'pvCorrectionFactor_Auto', $prop, 1);
+  readingsSingleUpdate ($hash, 'pvCorrectionFactor_Auto', $prop, 1);
 
   if ($prop eq 'off') {
       for my $n (1..24) {
           $n     = sprintf "%02d", $n;
           my $rv = ReadingsVal ($name, "pvCorrectionFactor_${n}", "");
-          deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*")  if($rv !~ /manual/xs);
+          
+          if ($rv !~ /manual/xs) {
+              deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
+          }
+          else {
+              $rv =~ s/flex/fix/xs;
+              readingsSingleUpdate ($hash, "pvCorrectionFactor_${n}", $rv, 0);
+          }
       }
 
       deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
+  }
+  elsif ($prop =~ /on/xs) {
+      for my $n (1..24) {
+          $n     = sprintf "%02d", $n;
+          my $rv = ReadingsVal ($name, "pvCorrectionFactor_${n}", "");
+          
+          if ($rv =~ /manual/xs) {
+              $rv =~ s/fix/flex/xs;
+              readingsSingleUpdate ($hash, "pvCorrectionFactor_${n}", $rv, 0);         
+          }
+      }    
   }
 
    writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                    # Anlagenkonfiguration sichern
@@ -2096,7 +2118,7 @@ sub _setreset {                          ## no critic "not used"
               }
           }
 
-          Log3($name, 3, qq{$name - all stored PV correction factors from pvCircular and pvHistory deleted});
+          Log3 ($name, 3, qq{$name - all stored PV correction factors from pvCircular and pvHistory deleted});
       }
 
       return;
@@ -7203,8 +7225,8 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 started");
 
-          __deleteHiddenReadings ($paref);                                                  # verstecktes Steuerungsreading löschen
-          periodicWriteMemcache  ($hash, 'bckp');                                           # Backup Files erstellen und alte Versionen löschen
+          __deletePvCorffReadings ($paref);                                                 # Readings der pvCorrectionFactor-Steuerung löschen
+          periodicWriteMemcache   ($hash, 'bckp');                                          # Backup Files erstellen und alte Versionen löschen
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 finished");
       }
@@ -7238,9 +7260,9 @@ return;
 }
 
 #############################################################################
-#              versteckte Steuerungsreadings löschen
+#         Readings der pvCorrectionFactor-Steuerung löschen
 #############################################################################
-sub __deleteHiddenReadings  {
+sub __deletePvCorffReadings  {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -7252,8 +7274,17 @@ sub __deleteHiddenReadings  {
       readingsDelete ($hash, ".pvCorrectionFactor_${n}_apipercentil");
       readingsDelete ($hash, ".signaldone_${n}");
 
-      if (ReadingsVal ($name, "pvCorrectionFactor_Auto", "off") =~ /on/xs) {
-          deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
+      if (ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off') =~ /on/xs) {
+          my $pcf = ReadingsVal ($name, "pvCorrectionFactor_${n}", '');
+          ($pcf)  = split " / ", $pcf if($pcf =~ /\s\/\s/xs);
+          
+          if ($pcf !~ /manual/xs) {                                                   # manuell gesetzte pcf-Readings nicht löschen 
+              deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
+          }
+          else {
+              readingsSingleUpdate ($hash, "pvCorrectionFactor_${n}", $pcf, 0); 
+              deleteReadingspec    ($hash, "pvCorrectionFactor_${n}_autocalc");
+          }
       }
   }
 
@@ -7984,36 +8015,40 @@ sub ___readCandQ {
 
   my ($acu, $aln) = isAutoCorrUsed ($name);                                                           # Autokorrekturmodus
   my $sunalt      = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), 'sunalt', undef);           # Sun Altitude
-  my $hc          = ReadingsNum  ($name, 'pvCorrectionFactor_'.sprintf("%02d",$fh1), 1.00);           # Voreinstellung RAW-Korrekturfaktor
+  my $hcraw       = ReadingsNum  ($name, 'pvCorrectionFactor_'.sprintf("%02d",$fh1), 1.00);           # Voreinstellung RAW-Korrekturfaktor (evtl. manuell gesetzt)
+  my $cpcf        = ReadingsVal  ($name, 'pvCorrectionFactor_'.sprintf("%02d",$fh1),   '');           # aktuelles pcf-Reading
   my $hq          = '-';                                                                              # keine Qualität definiert
   my $crang       = 'simple';
-
+  my $hc;
+  
   delete $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange};
 
   if ($acu =~ /on_complex/xs) {                                                                       # Autokorrektur complex soll genutzt werden
       $crang     = cloud2bin ($cc);                                                                   # Range errechnen
-      ($hc, $hq) = CircularSunCloudkorrVal ($hash, sprintf("%02d",$fh1), $sabin, $crang, undef);      # Korrekturfaktor/Qualität der Stunde des Tages (complex)
-      $hq      //= '-';
-      $hc      //= 1;                                                                                 # Korrekturfaktor = 1 (keine Korrektur)                                                                                                        # keine Qualität definiert
-      $hc        = 1 if(1 * $hc == 0);                                                                # 0.0-Werte ignorieren (Schleifengefahr)
-
+      ($hc, $hq) = CircularSunCloudkorrVal ($hash, sprintf("%02d",$fh1), $sabin, $crang, undef);      # Korrekturfaktor/Qualität der Stunde des Tages (complex)                                                                                                 
+      
       $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange} = $crang;
   }
   elsif ($acu =~ /on_simple/xs) {
       ($hc, $hq) = CircularSunCloudkorrVal ($hash, sprintf("%02d",$fh1), $sabin, 'simple', undef);    # Korrekturfaktor/Qualität der Stunde des Tages (simple)
-      $hq      //= '-';
-      $hc      //= 1;                                                                                 # Korrekturfaktor = 1
-      $hc        = 1 if(1 * $hc == 0);                                                                # 0.0-Werte ignorieren (Schleifengefahr)
   }
   else {                                                                                              # keine Autokorrektur
       ($hc, $hq) = CircularSunCloudkorrVal ($hash, sprintf("%02d",$fh1), $sabin, 'simple', undef);    # Korrekturfaktor/Qualität der Stunde des Tages (simple)
-      $hq      //= '-';
-      $hc        = 1;
   }
 
-  $hc = sprintf "%.2f", $hc;
-
-  debugLog ($paref, 'pvCorrectionRead', "read parameters - fd: $fd, hod: ".sprintf("%02d",$fh1).", Sun Altitude Bin: $sabin, Cloud range: $crang, corrf: $hc, quality: $hq");
+  $hq //= '-';                                                                                        # keine Qualität definiert
+  $hc //= $hcraw;                                                                                     # Korrekturfaktor Voreinstellung
+  $hc   = 1 if(1 * $hc == 0);                                                                         # 0.0-Werte ignorieren (Schleifengefahr)
+  $hc   = sprintf "%.2f", $hc;
+  
+  if ($cpcf =~ /manual\sfix/xs) {                                                                     # Voreinstellung pcf-Reading verwenden wenn 'manual fix'
+      $hc = $hcraw;
+      debugLog ($paref, 'pvCorrectionRead', "use 'manual fix' - fd: $fd, hod: ".sprintf("%02d",$fh1).",  corrf: $hc, quality: $hq"); 
+  }
+  else {
+      my $flex = $cpcf =~ /manual\sflex/xs ? "use 'manual flex'" : 'read parameters';
+      debugLog ($paref, 'pvCorrectionRead', "$flex - fd: $fd, hod: ".sprintf("%02d",$fh1).", Sun Altitude Bin: $sabin, Cloud range: $crang, corrf: $hc, quality: $hq"); 
+  }
 
   $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf} = $hc."/".$hq;
 
@@ -10805,13 +10840,16 @@ sub calcValueImproves {
 
   for my $h (1..23) {
       next if(!$chour || $h > $chour);
-      $paref->{h} = $h;
+      
+      $paref->{cpcf} = ReadingsVal ($name, 'pvCorrectionFactor_'.sprintf("%02d",$h), '');         # aktuelles pvCorf-Reading
+      $paref->{h}    = $h;
 
-      _calcCaQcomplex   ($paref);                                            # Korrekturberechnung mit Bewölkung duchführen/speichern
-      _calcCaQsimple    ($paref);                                            # einfache Korrekturberechnung duchführen/speichern
-      _addHourAiRawdata ($paref);                                            # AI Raw Data hinzufügen
+      _calcCaQcomplex   ($paref);                                                                 # Korrekturberechnung mit Bewölkung duchführen/speichern
+      _calcCaQsimple    ($paref);                                                                 # einfache Korrekturberechnung duchführen/speichern
+      _addHourAiRawdata ($paref);                                                                 # AI Raw Data hinzufügen
 
       delete $paref->{h};
+      delete $paref->{cpcf};
   }
 
   delete $paref->{aln};
@@ -10877,7 +10915,13 @@ sub _calcCaQcomplex {
   storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', 'done');
 
   if ($acu =~ /on_complex/xs) {
-      storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac, Sun Alt range: $sabin, Cloud range: $crang, Days in range: $dnum)");
+      if ($paref->{cpcf} !~ /manual/xs) {                                                            # pcf-Reading nur überschreiben wenn nicht 'manual xxx' gesetzt
+          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac, Sun Alt range: $sabin, Cloud range: $crang, Days in range: $dnum)");
+      }
+      else {
+          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $paref->{cpcf}." / flexmatic result $factor for Sun Alt range: $sabin, Cloud range: $crang, Days in range: $dnum");
+      }
+      
       storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h).'_autocalc', 'done');
   }
 
@@ -10939,7 +10983,13 @@ sub _calcCaQsimple {
   storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', 'done');
 
   if ($acu =~ /on_simple/xs) {
-      storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac, Days in range: $dnum)");
+      if ($paref->{cpcf} !~ /manual/xs) {                                                            # pcf-Reading nur überschreiben wenn nicht 'manual xxx' gesetzt
+          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac, Days in range: $dnum)");
+      }
+      else {
+          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $paref->{cpcf}." / flexmatic result $factor, Days in range: $dnum");
+      }
+      
       storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h).'_autocalc', 'done');
   }
 
@@ -18695,8 +18745,23 @@ to ensure that the system configuration is correct.
       <a id="SolarForecast-set-pvCorrectionFactor_" data-pattern="pvCorrectionFactor_.*"></a>
       <li><b>pvCorrectionFactor_XX &lt;Zahl&gt; </b> <br><br>
 
-      Manual correction factor for hour XX of the day to adjust the forecast to the individual installation. <br>
-      (default: 1.0)
+      Manual correction factor for hour XX of the day. <br>
+      (default: 1.0) <br><br>
+      
+      Depending on the setting <a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto </a> ('off' or 'on_.*'), 
+      a static or dynamic default setting is made: <br><br>
+
+      <ul>
+         <table>
+         <colgroup> <col width="10%"> <col width="90%"> </colgroup>
+            <tr><td> <b>off</b>     </td><td>The set correction factor is not overwritten by the auto-correction.                         </td></tr>
+            <tr><td>                </td><td>In the pvCorrectionFactor_XX reading, the status is signaled by the addition 'manual fix'.   </td></tr>
+            <tr><td>                </td><td>                                                                                             </td></tr>
+            <tr><td> <b>on_.*</b>   </td><td>The set correction factor is overwritten by the auto-correction or AI                        </td></tr>
+            <tr><td>                </td><td>if a calculated correction value is available in the system.                                 </td></tr>
+            <tr><td>                </td><td>In the pvCorrectionFactor_XX reading, the status is signaled by the addition 'manual flex'.  </td></tr>
+         </table>
+      </ul>
       </li>
     </ul>
     <br>
@@ -20964,8 +21029,23 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a id="SolarForecast-set-pvCorrectionFactor_" data-pattern="pvCorrectionFactor_.*"></a>
       <li><b>pvCorrectionFactor_XX &lt;Zahl&gt; </b> <br><br>
 
-      Manueller Korrekturfaktor für die Stunde XX des Tages zur Anpassung der Vorhersage an die individuelle Anlage. <br>
-      (default: 1.0)
+      Voreinstellung des Korrekturfaktors für die Stunde XX des Tages. <br>
+      (default: 1.0)  <br><br>
+      
+      In Abhängigkeit vom Setting <a href="#SolarForecast-set-pvCorrectionFactor_Auto ">pvCorrectionFactor_Auto </a> ('off' bzw. 'on_.*') erfolgt
+      eine statische oder dynamische Voreinstellung: <br><br>
+
+      <ul>
+         <table>
+         <colgroup> <col width="10%"> <col width="90%"> </colgroup>
+            <tr><td> <b>off</b>     </td><td>Der eingestellte Korrekturfaktor wird durch die Autokorrektur nicht überschrieben.             </td></tr>
+            <tr><td>                </td><td>Im Reading pvCorrectionFactor_XX wird der Status durch den Zusatz 'manual fix' signalisiert.   </td></tr>
+            <tr><td>                </td><td>                                                                                               </td></tr>
+            <tr><td> <b>on_.*</b>   </td><td>Der eingestellte Korrekturfaktor wird durch die Autokorrektur bzw. KI überschrieben            </td></tr>
+            <tr><td>                </td><td>sofern ein berechneter Korrekturwert im System verfügbar ist.                                  </td></tr>
+            <tr><td>                </td><td>Im Reading pvCorrectionFactor_XX wird der Status durch den Zusatz 'manual flex' signalisiert.  </td></tr>
+         </table>
+      </ul>
       </li>
     </ul>
     <br>
