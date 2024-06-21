@@ -45,7 +45,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.57.13c";
+my $ModulVersion = "07.57.13d";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -2976,10 +2976,10 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion,Productname)"; # DECT Handsets
 
    $queryStr .= "&wlanList=wlan:settings/wlanlist/list(mac,speed,speed_rx,rssi,is_guest,is_remote,is_repeater,is_ap)"; # WLAN devices
-   $queryStr .= "&wlanListNew=wlan:settings/wlanlist/list(mac,speed,rssi,is_remote,is_repeater,is_ap)"; # WLAN devices fw>=6.69
+   $queryStr .= "&wlanListNew=wlan:settings/wlanlist/list(mac,speed,rssi)"; # WLAN devices fw>=6.69 and <7
 
    $queryStr .= "&lanDevice=landevice:settings/landevice/list(mac,ip,ethernet,ethernet_port,ethernetport,guest,name,active,online,wlan,speed,UID,static_dhcp)"; # LAN devices
-   $queryStr .= "&lanDeviceNew=landevice:settings/landevice/list(mac,ip,ethernet,guest,name,active,online,wlan,speed,UID,static_dhcp)"; # LAN devices fw>=6.69
+   $queryStr .= "&lanDeviceNew=landevice:settings/landevice/list(mac,ip,ethernet,guest,name,active,online,wlan,speed,UID)"; # LAN devices fw>=6.69 and <7
 
    $queryStr .= "&init=telcfg:settings/Foncontrol"; # Init
    $queryStr .= "&box_stdDialPort=telcfg:settings/DialPort"; #Dial Port
@@ -3089,13 +3089,14 @@ sub FRITZBOX_Readout_Run_Web($)
       my $result2;
       my $newQueryPart;
 
-    # gets WLAN speed for fw>=6.69 and < 7
+      # gets WLAN speed for fw >= 6.69 and < 7
       $queryStr="";
       foreach ( @{ $result->{wlanListNew} } ) {
          $newQueryPart = "&" . $_->{_node} . "=wlan:settings/" . $_->{_node}."/speed_rx";
          if (length($queryStr . $newQueryPart) < 4050) {
             $queryStr .= $newQueryPart;
          } else {
+            FRITZBOX_Log $hash, 5, "getting WLAN speed for firmware >=6.69 and < 7: " . $queryStr;
             $result2 = FRITZBOX_call_Lua_Query( $hash, $queryStr );
 
             # Abbruch wenn Fehler beim Lesen der Fritzbox-Antwort
@@ -3108,13 +3109,14 @@ sub FRITZBOX_Readout_Run_Web($)
          }
       }
 
-    # gets LAN-Port for fw>=6.69 and fw<7
+      # gets LAN-Port for fw >= 6.69 and fw < 7
       foreach ( @{ $result->{lanDeviceNew} } ) {
          $newQueryPart = "&" . $_->{_node} . "=landevice:settings/" . $_->{_node}."/ethernet_port";
          if (length($queryStr . $newQueryPart) < 4050) {
             $queryStr .= $newQueryPart;
          }
          else {
+            FRITZBOX_Log $hash, 5, "getting LAN-Port for firmware >=6.69 and < 7: " . $queryStr;
             $result2 = FRITZBOX_call_Lua_Query( $hash, $queryStr );
 
             # Abbruch wenn Fehler beim Lesen der Fritzbox-Antwort
@@ -3127,7 +3129,7 @@ sub FRITZBOX_Readout_Run_Web($)
          }
       }
 
-    # get missing user-fields for fw>=6.69
+      # get missing user-fields for fw >= 6.69
       foreach ( @{ $result->{userProfilNew} } ) {
          $newQueryPart = "&"  . $_->{_node} . "_filter=user:settings/" . $_->{_node} . "/filter_profile_UID";
          $newQueryPart .= "&" . $_->{_node} . "_month=user:settings/"  . $_->{_node} . "/this_month_time";
@@ -3136,6 +3138,7 @@ sub FRITZBOX_Readout_Run_Web($)
             $queryStr .= $newQueryPart;
          }
          else {
+            FRITZBOX_Log $hash, 3, "getting user-field for firmware >=6.69 and < 7: " . $queryStr;
             $result2 = FRITZBOX_call_Lua_Query( $hash, $queryStr );
 
             # Abbruch wenn Fehler beim Lesen der Fritzbox-Antwort
@@ -3148,7 +3151,8 @@ sub FRITZBOX_Readout_Run_Web($)
          }
       }
 
-    # Final Web-Query
+      # Final Web-Query
+      FRITZBOX_Log $hash, 5, "final web-query for firmware >=6.69 and < 7: " . $queryStr;
       $result2 = FRITZBOX_call_Lua_Query( $hash, $queryStr );
 
       # Abbruch wenn Fehler beim Lesen der Fritzbox-Antwort
@@ -3158,19 +3162,19 @@ sub FRITZBOX_Readout_Run_Web($)
 
       %{$result} = ( %{$result}, %{$result2 } );
 
-    # create fields for wlanList-Entries (for fw 6.69)
+      # create fields for wlanList-Entries (for fw 6.69)
       $result->{wlanList} = $result->{wlanListNew};
       foreach ( @{ $result->{wlanList} } ) {
          $_->{speed_rx} = $result->{ $_->{_node} };
       }
 
-    # Create fields for lanDevice-Entries (for fw 6.69)
+      # Create fields for lanDevice-Entries (for fw 6.69)
       $result->{lanDevice} = $result->{lanDeviceNew};
       foreach ( @{ $result->{lanDevice} } ) {
          $_->{ethernet_port} = $result->{ $_->{_node} };
       }
 
-    # Create fields for user-Entries (for fw 6.69)
+      # Create fields for user-Entries (for fw 6.69)
       $result->{userProfil} = $result->{userProfilNew};
       foreach ( @{ $result->{userProfil} } ) {
          $_->{filter_profile_UID} = $result->{ $_->{_node}."_filter" };
@@ -3547,7 +3551,7 @@ sub FRITZBOX_Readout_Run_Web($)
          my $UID   = $_->{UID};         # FritzBoy lan device ID
          my $dName = $_->{name};        # name of the device
 
-         my $dhcp  = $_->{static_dhcp} eq "0" ? "statIP:off" : "statIP:on"; # IP is defined as static / dynamic
+         my $dhcp  = $_->{static_dhcp} eq "0" ? "statIP:off" : "statIP:on" if defined $_->{static_dhcp}; # IP is defined as static / dynamic
 
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$dIp", $dName;
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$UID", $dName;
@@ -3618,7 +3622,7 @@ sub FRITZBOX_Readout_Run_Web($)
                }
             }
 
-            $srTmp =~ s/statIP/${sep}${dhcp}/g;
+            $srTmp =~ s/statIP/${sep}${dhcp}/g if defined $dhcp;
 
             $srTmp =~ s/rssi${sep}|${sep}rssi|rssi//g;
 
@@ -4222,6 +4226,7 @@ sub FRITZBOX_Readout_Run_Web($)
            $oldSmartDevice{$_} = $hash->{READINGS}{$_}{VAL} if $_ =~ /^shdevice(\d+)|^shgroup(\d+)/ && defined $hash->{READINGS}{$_}{VAL};
          }
 
+         # xhr 1 lang de page sh_dev xhrid all
          @webCmdArray = ();
          push @webCmdArray, "xhr"         => "1";
          push @webCmdArray, "lang"        => "de";
@@ -5628,7 +5633,7 @@ sub FRITZBOX_Readout_Add_Reading ($$$$@)
    my ($hash, $roReadings, $rName, $rValue, $rFormat) = @_;
 
    # Handling | as valid character in FritzBox names
-   $rValue =~ s/\|/&#0124/g;
+   $rValue =~ s/\|/&#0124/g if defined $rValue;
 
    $rFormat = "" unless defined $rFormat;
    $rValue = FRITZBOX_Readout_Format ($hash, $rFormat, $rValue);
@@ -5909,7 +5914,7 @@ sub FRITZBOX_Set_check_APIs($)
      my $tmp = "";
         $tmp = "fritzBoxIP" if $host =~ /undefined/;
         $tmp .= ", " if $host =~ /undefined/ && $boxUser eq "";
-        $tmp .= " boxUser (bei Repeatern nicht unbedingt notwendig)" if $boxUser eq "";
+        $tmp .= " boxUser (bei Repeatern oder Fritz!OS < 7.25 nicht unbedingt notwendig)" if $boxUser eq "";
         $tmp .= " nicht definiert. Bitte auch das Passwort mit <set $name password> setzen.";
 
      FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "->HINWEIS_BOXUSER", $tmp);
@@ -8180,7 +8185,7 @@ sub FRITZBOX_Get_SmartHome_Devices_List($@) {
                    my $endTime     = $timeSchedule->[$i]{'timeSetting'}{'endTime'};
                
                    $ret{$holiday . "ID"}        = $i + 1;
-                   $ret{$holiday . "Enabled"}   = ( ( $timeSchedule->[$i]{'isEnabled'} ) ? 1 : 0 );
+                   $ret{$holiday . "Enabled"}   = ( ( $timeSchedule->[$i]{'timeSetting'}{'isEnabled'} ) ? 1 : 0 );
                    $ret{$holiday ."StartDay"}   = $startDate;
                    $ret{$holiday ."StartDay"}   =~ s/([0-9]{4})-([0-9]{2})-([0-9]{2})/$3/;
                    $ret{$holiday ."StartMonth"} = $startDate;
@@ -8217,7 +8222,7 @@ sub FRITZBOX_Get_SmartHome_Devices_List($@) {
                    $ret{SummerEndMonth}   = $endDate;
                    $ret{SummerEndMonth}   =~ s/([0-9]{4})-([0-9]{2})-([0-9]{2})/$2/;
                
-                   $ret{SummerEnabled}    = ( ( $timeSchedule->[$i]{'isEnabled'} ) ? 1 : 0 );
+                   $ret{SummerEnabled}    = ( ( $timeSchedule->[$i]{'timeSetting'}{'isEnabled'} ) ? 1 : 0 );
                  }
 
                }
@@ -9515,7 +9520,14 @@ sub FRITZBOX_open_Web_Connection ($)
    my $avmModel = InternalVal($name, "MODEL", $hash->{boxModel});
    my $user = AttrVal( $name, "boxUser", "" );
 
-   if ($user eq "" && $avmModel && $avmModel =~ "Box") {
+   my @fwV = split(/\./, ReadingsVal($name, "box_fwVersion", "0.0.0.error"));
+
+   my $FW1 = substr($fwV[1],0,2);
+   my $FW2 = substr($fwV[2],0,2);
+
+   FRITZBOX_Log $hash, 4, "FRITZBOX_Get_Lan_Device_Info (Fritz!OS: $FW1.$FW2) ";
+
+   if ($user eq "" && $avmModel && $avmModel =~ "Box" && ($FW1 >= 7 && $FW2 >= 25)) {
       FRITZBOX_Log $hash, 2, "No boxUser set. Please define it (once) with 'attr $name boxUser YourBoxUser'";
       %retHash = ( "Error" => "No attr boxUser set", "ResetSID" => "1" ) ;
       return \%retHash;
