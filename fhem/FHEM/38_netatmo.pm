@@ -461,6 +461,7 @@ netatmo_Define($$)
     $hash->{helper}{apiserver} = "api.netatmo.com";#AttrVal($name, "serverAPI", "api.netatmo.com");
 
   } else {
+    Log3 "netatmo", 1, "fatal error: netatmo device could not be initialized: ".$name;
     return "Usage: define <name> netatmo device\
        define <name> netatmo userid publickey\
        define <name> netatmo PUBLIC latitude longitude [radius]\
@@ -835,8 +836,8 @@ netatmo_refreshToken($;$)
   {
     $hash->{STATE} = "DNS error";
     $hash->{network} = "dns" if($hash->{SUBTYPE} eq "ACCOUNT");
-    delete($hash->{access_token});
-    delete($hash->{access_token_app});
+    #delete($hash->{access_token});
+    #delete($hash->{access_token_app});
     InternalTimer( gettimeofday() + 1800, "netatmo_refreshTokenTimer", $hash);
     Log3 $name, 1, "$name: DNS error, cannot resolve ".$hash->{helper}{apiserver};
     return undef;
