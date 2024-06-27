@@ -153,7 +153,8 @@ attr DEVICE readingList\
   $\DEVICETOPIC/bridge/groups:.* groups\
   $\DEVICETOPIC/bridge/event:.* { json2nameValue($EVENT) }\
   $\DEVICETOPIC/bridge/extensions:.* extensions\
-  $\DEVICETOPIC/bridge/response/permit_join:.* { json2nameValue($EVENT) }
+  $\DEVICETOPIC/bridge/response/permit_join:.* { json2nameValue($EVENT) }\
+  $\DEVICETOPIC/bridge/definitions:.* {}
 attr DEVICE setList\
   log_level:debug,info,warn,error $\DEVICETOPIC/bridge/config/log_level $EVTPART1\
   permit_join:true,false $\DEVICETOPIC/bridge/request/permit_join $EVTPART1\
@@ -179,7 +180,7 @@ attr DEVICE comment To check for new updates of the deamon software, you might w
 #set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
 set DEVICE attrTemplate do_general_mqtt_cleanup
 attr DEVICE model zigbee2mqtt_bridge
-setreading DEVICE attrTemplateVersion 20231205
+setreading DEVICE attrTemplateVersion 20240627
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371
 
 
@@ -3728,7 +3729,7 @@ setreading DEVICE attrTemplateVersion 20220404
 name:shellyPlus_1
 filter:TYPE=MQTT2_DEVICE
 desc:Early version of a base template for second generation shelly devices (names with "plus", without power measurement). NOTE: requires to activate generic status update in firmware settings (if not available: reset device to factory defaults).<br>NOTE: Please wait some seconds to allow Shelly device to complete reboot.
-par:DEV_TPC;Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+|shellyp(lus|ro4pm)[^/:_]{4,}+)> ? $1 : undef }
+par:DEV_TPC;Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+|shelly(plus|pro4pm|1pmmini)[^/:_]{4,}+)> ? $1 : undef }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 order:A_20
 par:ICON;ICON as set, defaults to message_socket;{ AttrVal('DEVICE','icon','message_socket') }
@@ -3761,7 +3762,7 @@ attr DEVICE jsonMap switch_state:state switch_temperature_tC:temperature switch_
 attr DEVICE setStateList on off toggle on-for-timer off-for-timer
 attr DEVICE webCmd :
 attr DEVICE model shellyPlus_1
-setreading DEVICE attrTemplateVersion 20220304
+setreading DEVICE attrTemplateVersion 20240627
 set DEVICE x_reboot
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
