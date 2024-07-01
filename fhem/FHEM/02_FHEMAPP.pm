@@ -676,7 +676,7 @@ sub update {
 		Log($name,"Requesting: $url",4);
 		my $param = {
 						url        => $url,
-						timeout    => 5,
+						timeout    => 60,
 						hash       => $hash,                                                                                 
 						method     => "GET",                                                                                 
 						header     => "User-Agent: TeleHeater/2.2.3\r\nAccept: application/json",                            
@@ -835,7 +835,7 @@ sub Request_Releases
 	Log($name,"Requesting: $url",4);
     my $param = {
                     url        => $url,
-                    timeout    => 5,
+                    timeout    => 60,
                     hash       => $hash,                                                                                 
                     method     => "GET",                                                                                 
                     header     => "User-Agent: TeleHeater/2.2.3\r\nAccept: application/json",                            
