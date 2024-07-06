@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 31_HUEDevice.pm: added addlight and removelight command for groups
  - bufgix:  72_FRITZBOX: Fehler behoben bei FritzOS >= 6.69 und < 7.00
  - feature: 76_SolarForecast: improve manual setting of pvCorrectionFactor_XX
  - feature: 98_RandomTimer:   add recomputeTimes setter

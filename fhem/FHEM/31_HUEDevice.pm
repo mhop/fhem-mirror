@@ -854,6 +854,40 @@ HUEDevice_Set($@)
       return $result->{error}{description} if( $result->{error} );
       return undef;
 
+    } elsif( $cmd eq 'addlight' || $cmd eq 'addlights' ) {
+      return "usage: $cmd <lights>" if( @args != 1 );
+
+      my $obj = { 'lights' => HUEBridge_string2array("$hash->{lights},$args[0]"), };
+
+      my $result = HUEDevice_ReadFromServer($hash,$hash->{ID},$obj);
+      if( $result->{success} ) {
+        RemoveInternalTimer($hash);
+        HUEDevice_GetUpdate($hash);
+      }
+
+      return $result->{error}{description} if( $result->{error} );
+      return undef;
+
+    } elsif( $cmd eq 'removelight' || $cmd eq 'removelights' ) {
+      return "usage: $cmd <lights>" if( @args != 1 );
+
+      my $current = HUEBridge_string2array($hash->{lights});
+      my %to_remove;
+         @to_remove{@{HUEBridge_string2array($args[0])}} = undef;
+      
+      my @new = grep {not exists $to_remove{$_}} @{$current};
+
+      my $obj = { 'lights' => \@new };
+
+      my $result = HUEDevice_ReadFromServer($hash,$hash->{ID},$obj);
+      if( $result->{success} ) {
+        RemoveInternalTimer($hash);
+        HUEDevice_GetUpdate($hash);
+      }
+
+      return $result->{error}{description} if( $result->{error} );
+      return undef;
+
     } elsif( $cmd eq 'savescene' ) {
       if( $hash->{IODev} && $hash->{IODev}{helper}{apiversion} && $hash->{IODev}{helper}{apiversion} >= (1<<16) + (11<<8) ) {
         return "usage: savescene <name>" if( @args < 1 );
@@ -1196,7 +1230,7 @@ HUEDevice_Set($@)
 
     $list .= " effect:none,colorloop" if( $subtype =~ m/color/ );
 
-    $list .= " lights" if( $hash->{helper}->{devtype} eq 'G' );
+    $list .= " lights addlight removelight" if( $hash->{helper}->{devtype} eq 'G' );
 
     $list .= " rename";
     #$list .= " setlight configlight config" if( !$hash->{helper}->{devtype} );
