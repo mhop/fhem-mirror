@@ -15,6 +15,9 @@ use GPUtils qw(:all);
 use File::Temp qw(tempfile tempdir cleanup);
 use File::Path qw(rmtree);
 
+use Encode qw(decode);
+
+
 #$dir = File::Temp->newdir();
 
 #https://www.perl-howto.de/2008/07/temporare-dateien-sicher-erzeugen.html
@@ -28,6 +31,7 @@ BEGIN {
 		defs
 		data
 		AttrVal
+		AttrNum
 		ReadingsVal
 		InternalVal
 		Log3
@@ -140,7 +144,7 @@ BEGIN {
 # Constants and defaults
 #########################################################################
 	use constant {
-		FA_VERSION 					=> '1.1.0',			#Version of this Modul
+		FA_VERSION 					=> '1.2.0',			#Version of this Modul
 		FA_VERSION_FILENAME 		=> 'CHANGELOG.md',	#Default Version Filename
 		FA_INIT_INTERVAL			=> 60,				#Default Startup Interval
 		FA_DEFAULT_INTERVAL		=> 3600,			#Default Interval
@@ -151,6 +155,7 @@ BEGIN {
 		FA_GITHUB_API_RELEASES  => 'releases',
 		FA_TAR_SUB_FOLDER			=> 'www/fhemapp4',
 		FA_VERSION_LOWEST    	=> '4.0.0',
+		FA_DEFAULT_TIMEOUT      => 60,
 		FA_MOD_TYPE 				=> (split('::',__PACKAGE__))[-1],
 		INT_SOURCE_URL				=> 'SOURCE_URL',	#INTERNAL NAME
 		INT_CONFIG_FILE			=> 'CONFIG_FILE',	#INTERNAL NAME
@@ -171,6 +176,8 @@ BEGIN {
 		updatePath:beta
 		exposeConfigFile:1
 		linkPath
+		dataEncoding:cp1252,utf8
+		requestTimeout
 	);
 
 	# autoUpdate:1 
@@ -278,6 +285,11 @@ BEGIN {
 				set_fhemapp_link($hash,$val);
 			} else {
 				set_fhemapp_link($hash,'%%DELETE%%');
+			}
+		} elsif($att eq 'requestTimeout') {
+			if($cmd eq 'set') {
+				$val+=0;
+				$val=5 if($val lt 5);
 			}
 		}
 		return undef;
@@ -414,14 +426,18 @@ BEGIN {
 			}
 			return "not available!"
 		}	
+		elsif($opt eq 'localtime') {
+			return localtime();
+		}
 		else
 		{
 			#my $loc_gets='version:noArg';
 			my $loc_gets='version:noArg';
+			my $fix_gets='rawconfig:noArg localtime:noArg';
 			if($localInst) {
-				return "Unknown argument $opt, choose one of rawconfig:noArg $loc_gets";
+				return "Unknown argument $opt, choose one of $fix_gets $loc_gets";
 			} else {
-				return "Unknown argument $opt, choose one of rawconfig:noArg";		
+				return "Unknown argument $opt, choose one of $fix_gets";		
 			}
 		}
 	}
@@ -454,7 +470,12 @@ BEGIN {
 			}
 		}
 		elsif($opt eq 'getConfig') {
-			return get_config($hash);
+			my $enc=AttrVal($name,'dataEncoding',undef);
+			if($enc)  {
+				return decode($enc,get_config($hash));
+			} else {
+				return get_config($hash);
+			}
 		}	
 		#elsif($opt eq 'forceVersion') {
 			#return forceVersion($hash,@args);
@@ -475,6 +496,10 @@ BEGIN {
 		}
 		elsif($opt eq "rereadCfg") {
 			ReadConfig($hash,1);
+		}
+		elsif($opt eq "purge") {
+			my $force=shift @args;
+			return delete_fhemapp_folder($hash,$force);	
 		}
 		else {
 			if($localInst) {
@@ -661,22 +686,20 @@ sub update {
 		Log($name,"Update ... got releases ... continuing...",4);
 	}
 
+	my $updatePath=AttrVal($name,'updatePath','stable');
 	#Find required tarball-URL
 	my $url=undef;
-	my $updatePath=AttrVal($name,'updatePath','stable');
-	if( $updatePath eq 'beta') {
-		$url=ReadingsVal($name,'.pre_tarball_url',undef);
-	} else {
-		$url=ReadingsVal($name,'.stable_tarball_url',undef);
-	}
+	$url=ReadingsVal($name,'.latest_tarball_url',undef);
 	
+	my $timeout=AttrNum($name,'requestTimeout',FA_DEFAULT_TIMEOUT);
+
 	#Build non-blocking request to download tarball from github
 	#Donwload is handled in callback sub 'update_response'
 	if($url) {
 		Log($name,"Requesting: $url",4);
 		my $param = {
 						url        => $url,
-						timeout    => 60,
+						timeout    => $timeout,
 						hash       => $hash,                                                                                 
 						method     => "GET",                                                                                 
 						header     => "User-Agent: TeleHeater/2.2.3\r\nAccept: application/json",                            
@@ -790,20 +813,63 @@ sub update_response{
 
 		#Trying to cleanup temp-folder ...
 		temp_cleanup($hash);
-		#Updating local version (Readings)
 
 		if($bpath && -d $bpath) {
 			Log($name,"Removing backup folder '$bpath' after sucessfull installlation",4);
 			my $res=rmtree($bpath,0,1);
 		}
+		#Updating local version (Readings)
 		check_local_version($hash);
 		check_update_available($hash);
 
+		readingsSingleUpdate($hash,'last_update',localtime(),1);
    }
 	return;
-}	
+}
 
- #========================================================================
+#========================================================================
+sub delete_fhemapp_folder
+#========================================================================
+{
+   my $hash = shift // return;
+	my $force = shift;
+   
+	my $name = $hash->{NAME};
+	my $ret="Delete FHEMApp folder";
+	
+	if($hash->{&INT_LOCAL_INST}) {
+	
+		$force //=0;
+
+		my $lpath=get_local_path($hash);
+		Log($name,"Trying to delete FHEMApp folder '$lpath'...",4);
+
+
+		if($lpath && -d $lpath ) {
+			if  ($force eq '1') {
+				Log($name,"Removing local fhemapp folder '$lpath' from file system",3);
+				my $res=rmtree($lpath,0,1);
+				Log($name,"'$lpath' successfully deleted ($res)!",4);
+				$ret="Successfully deleted folder '$lpath'";
+				check_local_version($hash);
+			} else {
+				$ret="force argument missing or not set to 1! '$lpath' is not deleted!";
+			}
+		} else {
+			$ret="'$lpath' not found or it is not a valid folder!";
+			Log($name,$ret,3);
+		}
+	} else {
+		$ret = "$name has no local insatallation of FHEMapp!"
+	}
+
+	return $ret;
+
+}
+
+
+
+#========================================================================
 sub temp_cleanup{
 #========================================================================
 	my $hash=shift // return;
@@ -832,10 +898,13 @@ sub Request_Releases
 	$url=~ s!/*$!/!;
 	$url.=FA_GITHUB_API_RELEASES;
 	
+	my $timeout=AttrNum($name,'requestTimeout',FA_DEFAULT_TIMEOUT);
+
+
 	Log($name,"Requesting: $url",4);
     my $param = {
                     url        => $url,
-                    timeout    => 60,
+                    timeout    => $timeout,
                     hash       => $hash,                                                                                 
                     method     => "GET",                                                                                 
                     header     => "User-Agent: TeleHeater/2.2.3\r\nAccept: application/json",                            
@@ -895,23 +964,32 @@ sub Request_Releases_Response($)
 
 			if($latestPre) {
 				Log($name,"Latest-Pre: " . $latestPre->{tag_name},4);
-				readingsBulkUpdateIfChanged($hash,'pre_tag_name',$latestPre->{tag_name},1);
-				readingsBulkUpdateIfChanged($hash,'pre_html_url',$latestPre->{html_url},1);
-				readingsBulkUpdateIfChanged($hash,'.pre_tarball_url',$latestPre->{tarball_url},0);
-				readingsBulkUpdateIfChanged($hash,'pre_info',$latestPre->{body},1);
-				readingsBulkUpdateIfChanged($hash,'pre_published_at',$latestPre->{published_at},1);
-			} else {
-				readingsBulkUpdateIfChanged($hash,'pre_tag_name','unknown',1);
+				if($updatePath eq 'beta') {
+					readingsBulkUpdateIfChanged($hash,'latest_tag_name',$latestPre->{tag_name},1);
+					readingsBulkUpdateIfChanged($hash,'latest_html_url',$latestPre->{html_url},1);
+					readingsBulkUpdateIfChanged($hash,'.latest_tarball_url',$latestPre->{tarball_url},0);
+					readingsBulkUpdateIfChanged($hash,'latest_info',$latestPre->{body},1);
+					readingsBulkUpdateIfChanged($hash,'latest_published_at',$latestPre->{published_at},1);
+				}
+ 			} else {
+				if($updatePath eq 'beta') { 
+					readingsBulkUpdateIfChanged($hash,'latest_tag_name','unknown',1);
+				}
+
 			}
 			if($latestFull) {
 				Log($name,"Latest-Stable: " . $latestFull->{tag_name},4);
-				readingsBulkUpdateIfChanged($hash,'stable_tag_name',$latestFull->{tag_name},1);
-				readingsBulkUpdateIfChanged($hash,'stable_html_url',$latestFull->{html_url},1);
-				readingsBulkUpdateIfChanged($hash,'.stable_tarball_url',$latestFull->{tarball_url},0);
-				readingsBulkUpdateIfChanged($hash,'stable_info',$latestFull->{body},1);
-				readingsBulkUpdateIfChanged($hash,'stable_published_at',$latestFull->{published_at},1);
+				if($updatePath eq 'stable') {
+					readingsBulkUpdateIfChanged($hash,'latest_tag_name',$latestFull->{tag_name},1);
+					readingsBulkUpdateIfChanged($hash,'latest_html_url',$latestFull->{html_url},1);
+					readingsBulkUpdateIfChanged($hash,'.latest_tarball_url',$latestFull->{tarball_url},0);
+					readingsBulkUpdateIfChanged($hash,'latest_info',$latestFull->{body},1);
+					readingsBulkUpdateIfChanged($hash,'latest_published_at',$latestFull->{published_at},1);
+				}
 			} else {
-				readingsBulkUpdateIfChanged($hash,'stable_tag_name','unknown',1);
+				if($updatePath eq 'stable') {
+					readingsBulkUpdateIfChanged($hash,'latest_tag_name','unknown',1);					
+				}
 			}
 
 			#In case of error ....
@@ -926,21 +1004,42 @@ sub Request_Releases_Response($)
 
 		#Delete un-fillable version information readings 
 		if(!$latestPre) {
-			readingsDelete($hash,'pre_html_url');
-			readingsDelete($hash,'.pre_tarball_url');
-			readingsDelete($hash,'pre_info');
-			readingsDelete($hash,'pre_published_at');
+			if($updatePath eq 'beta') {
+				readingsDelete($hash,'latest_html_url');
+				readingsDelete($hash,'.latest_tarball_url');
+				readingsDelete($hash,'latest_info');
+				readingsDelete($hash,'latest_published_at');
+			}
 		}
 		if(!$latestFull) {
-			readingsDelete($hash,'stable_html_url');
-			readingsDelete($hash,'.stable_tarball_url');
-			readingsDelete($hash,'stable_info');
-			readingsDelete($hash,'stable_published_at');
+			if($updatePath eq 'stable') {
+				readingsDelete($hash,'latest_html_url');
+				readingsDelete($hash,'.latest_tarball_url');
+				readingsDelete($hash,'latest_info');
+				readingsDelete($hash,'latest_published_at');
+			}
 		}
 		if(!$err) {
 			readingsDelete($hash,'request_error');
 		}
     }
+
+	#Cleanup of outdated readings used in previous versions of the module
+	if(ReadingsVal($name,'pre_tag_name',undef)) {
+		readingsDelete($hash,'pre_tag_name');
+		readingsDelete($hash,'pre_html_url');
+		readingsDelete($hash,'.pre_tarball_url');
+		readingsDelete($hash,'pre_info');
+		readingsDelete($hash,'pre_published_at');
+	}
+	if(ReadingsVal($name,'stable_tag_name',undef)) {
+		readingsDelete($hash,'stable_tag_name');
+		readingsDelete($hash,'stable_html_url');
+		readingsDelete($hash,'.stable_tarball_url');
+		readingsDelete($hash,'stable_info');
+		readingsDelete($hash,'stable_published_at');
+		
+	}
 
 	if($param->{continueUpdate}) {
 		#if called during update process ... continue with update
@@ -959,9 +1058,7 @@ sub check_update_available
 	my $hash=shift // return;
 	my $name=$hash->{NAME};
 
-	my $path=AttrVal($name,'updatePath','stable');
-	my $ver=ReadingsVal($name,'stable_tag_name','unknown');
-	$ver=ReadingsVal($name,'pre_tag_name','unknown') if($path eq "beta");
+	my $ver=ReadingsVal($name,'latest_tag_name','unknown');
 
 	return if($ver eq 'unknown');
 
@@ -970,7 +1067,7 @@ sub check_update_available
 	if ($local_ver eq 'unknown' || version_compare($ver,$local_ver) ) {
 		readingsSingleUpdate($hash,'update_available',1,1);
 	} else {
-		if(ReadingsVal($name,'update_available',undef) ne '0') {
+		if(ReadingsVal($name,'update_available','x') ne '0') {
 			readingsSingleUpdate($hash,'update_available','0',1);
 		}
 	}
@@ -1591,6 +1688,18 @@ sub StopLoop
 	Returns the current configuration JSON in the active window withoud surrounding
 	dialog.
 	</li>
+    <li>purge [force]<br>
+	Deletes the locally managed fhemapp inatallation. To really delete it the parameter
+	force must be specified as '1'.
+	Could be easily reinstalled with set update command.
+	<br><br>
+    Example:
+    <ul>
+      <code>set fa purge 1</code><br>
+    </ul>
+	 <br><br>
+	</li>
+
   </ul>
   <br>
 
@@ -1648,6 +1757,11 @@ sub StopLoop
 		missing and could therefore be set here the same way as in DEF for "full" instances.<br>
 		This is only relevant for instances without local FHEMApp-Installation.
 	 </li>
+    <li><a id="FHEMAPP-attr-requestTimeout">requestTimeout</a><br>
+		Timeout in seconds used for http requests collecting vesion and 
+		update informations.<br>
+		Default value (attribute is not set) is 60s<br>
+		Minimum allowed value is 5s.</li>
 
   </ul>
   <br>
@@ -1725,6 +1839,17 @@ sub StopLoop
 	Ruft die aktuell im Speicher vorhandene Config als JSON ab. Die Ausgabe
 	efolgt dabei direkt im Fenster, ohne umschließenden Diealog, wie bei get.
 	</li>
+    <li>purge [force]<br>
+	L&ouml;scht eine lokal verwaltete FHEMApp-Installation. Um die Installation 
+	wirklich zu l&ouml;schen, mu&szlig; der Parameter force mit '1' angebeben werden.<br>
+	FHEMApp kann ganz einfach per set update Kommando wieder neu installiert werden.
+	<br><br>
+    Beispiel:
+    <ul>
+      <code>set fa purge 1</code><br>
+    </ul>
+	 <br><br>
+	</li>
   </ul>
   <br>
 
@@ -1775,6 +1900,11 @@ sub StopLoop
 		fehlt die notwendige Information f&uuml;r den aufruf. Die kann hier analog zum DEF
 		nachgeholt werden.<br>
 		Bei Instanzen mit lokaler FHEMApp-Verwaltung hat dieses Attribut keine Relevanz</li>
+    <li><a id="FHEMAPP-attr-requestTimeout">requestTimeout</a><br>
+		Timeout in Sekunden der für die http-Requests für den Abruf von Versions- und 
+		Update-Informationen festgelegt wird.<br>
+		Der Default, wenn das Attribut nicht gestzt ist, liegt bei 60s.<br>
+		Der kleinste akzeptierte Wert sind 5s.</li>
 
   </ul>
   <br>
