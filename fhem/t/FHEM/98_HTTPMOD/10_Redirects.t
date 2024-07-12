@@ -1,5 +1,6 @@
 ##############################################
 # test redirects
+# perl /opt/fhem/fhem.pl -t /opt/fhem/t/...
 ##############################################
 use strict;
 use warnings;
