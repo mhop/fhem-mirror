@@ -111,7 +111,8 @@ FBDECT_SetHttp($@)
   if($p =~ m/HANFUNUnit/ && $unittype eq "BLIND") {
     $cmd{open} = $cmd{close} = $cmd{stop} = "noArg";
   }
-  if($p =~ m/HANFUNUnit/ && $unittype eq "DIMMABLE_COLOR_BULB") {
+  if(($p =~ m/HANFUNUnit/ && $unittype eq "DIMMABLE_COLOR_BULB") ||
+     ($p =~ m/colorswitch/ && $p =~ m/dimmer/)) {        # 138740
     $cmd{"color"} = "select,red,orange,yellow,lawngreen,green,turquoise,".
                         "cyan,azure,blue,violet,magenta,pink";
     $cmd{"satindex"}         = "slider,1,1,3,1";
