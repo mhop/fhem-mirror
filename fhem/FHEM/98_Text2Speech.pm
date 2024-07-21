@@ -56,7 +56,8 @@ my %ttsAddon        = ("Google"     => "client=tw-ob&ie=UTF-8",
                        "VoiceRSS"   => ""
                        );
 my %ttsAPIKey       = ("Google"     => "", # kein APIKey nötig
-                       "VoiceRSS"   => "key="
+                       "VoiceRSS"   => "key=",
+                       "maryTTS"    => ''
                        );
 my %ttsUser         = ("Google"     => "", # kein Username nötig
                        "VoiceRSS"   => ""  # kein Username nötig
@@ -70,7 +71,8 @@ my %ttsQuality       = ("Google"     => "",
 my %ttsMaxChar      = ("Google"     => 200,
                        "VoiceRSS"   => 300,
                        "SVOX-pico"  => 1000,
-                       "Amazon-Polly" => 3000
+                       "Amazon-Polly" => 3000,
+                       "maryTTS"    => 3000
                        );
 my %language        = ("Google"     =>  { "Deutsch"       => "de",
                                           "English-US"    => "en-us",
@@ -116,10 +118,11 @@ sub Text2Speech_Initialize($)
   $hash->{DefFn}     = "Text2Speech_Define";
   $hash->{SetFn}     = "Text2Speech_Set";
   $hash->{UndefFn}   = "Text2Speech_Undefine";
+  $hash->{RenameFn}  = "Text2Speech_Rename";
   $hash->{AttrFn}    = "Text2Speech_Attr";
   $hash->{AttrList}  = "disable:0,1".
                        " TTS_Delimiter".
-                       " TTS_Ressource:ESpeak,SVOX-pico,Amazon-Polly,". join(",", sort keys %ttsHost).
+                       " TTS_Ressource:ESpeak,SVOX-pico,Amazon-Polly,maryTTS,". join(",", sort keys %ttsHost).
                        " TTS_APIKey".
                        " TTS_User".
                        " TTS_Quality:".
@@ -166,6 +169,7 @@ sub Text2Speech_Initialize($)
                        " TTS_SpeakAsFastAsPossible:1,0".
                        " TTS_OutputFile".
                        " TTS_AWS_HomeDir".
+                       " TTS_RemotePlayerCall".
                        " ".$readingFnAttributes;
 }
 
@@ -227,6 +231,7 @@ sub Text2Speech_Define($$)
   if ($ret) {
     Log3 $hash->{NAME}, 3, $ret;
   }
+  Text2Speech_AddExtension( $hash->{NAME}, \&Text2Speech_getLastMp3, "$hash->{TYPE}/$hash->{NAME}/last.mp3" );
   return undef;
 }
 
@@ -296,9 +301,18 @@ sub Text2Speech_Undefine($$)
 
  RemoveInternalTimer($hash);
  BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
+ Text2Speech_RemoveExtension( "$hash->{TYPE}/$hash->{NAME}/last.mp3" );
  Text2Speech_CloseDev($hash);
 
  return undef;
+}
+
+sub Text2Speech_Rename(@) {
+  my ( $newname, $oldname ) = @_;
+  my $hash = $defs{$newname};
+  my $type = $hash->{TYPE};
+  Text2Speech_RemoveExtension( "$type/$oldname/last.mp3" );
+  Text2Speech_AddExtension( $newname, \&Text2Speech_getLastMp3, "$type/$newname/last.mp3" );
 }
 
 sub Text2Speech_Attr(@) {
@@ -373,6 +387,12 @@ sub Text2Speech_Attr(@) {
       if($TTS_FileTemplateDir =~ m/^\/.*/) { $newDir = $TTS_FileTemplateDir; } else { $newDir = $TTS_CacheFileDir ."/". $TTS_FileTemplateDir;}
       return "file does not exist: <".$newDir ."/". $FileTplPc[1] .">"
         unless (-e $newDir ."/". $FileTplPc[1]);
+    }
+  } elsif ($a[0] eq "set" && $a[2] eq "TTS_RemotePlayerCall") {
+    if( $init_done ) {
+      eval $value ;
+      return "Text2Speach_Attr evaluating TTS_RemotePlayerCall error: $@" if ( $@ );
+    
     }
   }
 
@@ -506,7 +526,7 @@ sub Text2Speech_Set($@)
   return "no set argument specified" if(int(@a) < 2);
 
   return "No APIKey specified"                  if (!defined($TTS_APIKey) && ($ttsAPIKey{$TTS_Ressource} || length($ttsAPIKey{$TTS_Ressource})>0));
-  return "No Username for TTS Access specified" if (!defined($TTS_User) && ($ttsUser{$TTS_Ressource} || length($ttsUser{$TTS_Ressource})>0));
+  return "No Username for TTS Access specified" if ( $TTS_Ressource ne 'maryTTS' && !defined($TTS_User) && ($ttsUser{$TTS_Ressource} || length($ttsUser{$TTS_Ressource})>0));
 
   my $ret = Text2Speech_loadmodules($hash, $TTS_Ressource);
   if ($ret) {
@@ -804,7 +824,6 @@ sub Text2Speech_BuildMplayerCmdString($$) {
 
   my $mp3Duration =  Text2Speech_CalcMP3Duration($hash, $file);
   BlockingInformParent("Text2Speech_readingsSingleUpdateByName", [$hash->{NAME}, "duration", "$mp3Duration"], 0);
-  BlockingInformParent("Text2Speech_readingsSingleUpdateByName", [$hash->{NAME}, "endTime", "00:00:00"], 0);
   return $cmd;
 }
 
@@ -959,6 +978,45 @@ sub Text2Speech_Download($$$) {
     $fh->print($res->AudioStream);
     Log3 $hash->{NAME}, 4, $hash->{NAME}.": Schreibe mp3 in die Datei $file mit ". $res->RequestCharacters ." Chars";
     close($fh);
+  } elsif ( $TTS_Ressource eq 'maryTTS' ) {
+    my $mTTSurl  = $TTS_User;
+    my($unnamed, $named) = parseParams($mTTSurl);
+    $named->{host}     //= shift @{$unnamed} // '127.0.0.1';
+    $named->{port}     //= shift @{$unnamed} // '59125';
+    $named->{lang}     //= shift @{$unnamed} // !$TTS_Language || $TTS_Language eq 'Deutsch' ? 'de_DE' : $TTS_Language;
+    $named->{voice}    //= shift @{$unnamed} // 'de_DE/thorsten_low';
+    $named->{endpoint} //= shift @{$unnamed} // 'process';
+
+    $mTTSurl = "http://$named->{host}:$named->{port}/$named->{endpoint}?INPUT_TYPE=TEXT&OUTPUT_TYPE=AUDIO&AUDIO=WAVE_FILE&LOCALE=$named->{lang}&VOICE=$named->{voice}&INPUT_TEXT="; # https://github.com/marytts/marytts-txt2wav/blob/python/txt2wav.py#L21
+    $mTTSurl .= uri_escape($text);
+
+    Log3( $hash->{NAME}, 4, "$hash->{NAME}: Hole URL: $mTTSurl" );
+    my $param = {     url         => $mTTSurl,
+                      timeout     => 5,
+                      hash        => $hash,     # Muss gesetzt werden, damit die Callback funktion wieder $hash hat
+                      method      => 'GET'      # POST can be found in https://github.com/marytts/marytts-txt2wav/blob/python/txt2wav.py#L33
+                  };
+    my ($maryTTSResponseErr, $maryTTSResponse) = HttpUtils_BlockingGet($param);
+
+    if(length($maryTTSResponseErr) > 0) {
+      Log3($hash->{NAME}, 3, "$hash->{NAME}: Fehler beim Abrufen der Daten von $TTS_Ressource: $maryTTSResponseErr");
+      return;
+    }
+
+    my $FileWav2 = $file . '.wav';
+    my $fh2 = new IO::File ">$FileWav2";
+    if ( !defined $FileWav2 ) {
+      Log3($hash->{NAME}, 2, "$hash->{NAME}: wav Datei <$FileWav2> konnte nicht angelegt werden.");
+      return;
+    }
+
+    $fh2->print($maryTTSResponse);
+    Log3($hash->{NAME}, 4, "$hash->{NAME}: Schreibe wav in die Datei $FileWav2 mit ".length $maryTTSResponse . ' Bytes');
+    close $fh2;
+    $cmd = qq(lame "$FileWav2" "$file");
+    Log3($hash, 4, "$hash->{NAME}:$cmd");
+    system $cmd;
+    return unlink $FileWav2;
   }
 }
 
@@ -1071,15 +1129,21 @@ sub Text2Speech_DoIt($) {
 
       my $t = substr($Mp3WrapFile, 0, length($Mp3WrapFile)-4)."_MP3WRAP.mp3";
       if(-e $t){
+
         Log3 $hash->{NAME}, 4, $hash->{NAME}.": Benenne Datei um von <".$t."> nach <".$Mp3WrapFile.">";
         rename($t, $Mp3WrapFile);
         #falls die Datei existiert den ID3V1 und ID3V2 Tag entfernen
-        eval{
-          remove_mp3tag($Mp3WrapFile, 2);
-          remove_mp3tag($Mp3WrapFile, 1);
-          Log3 $hash, 4, $hash->{NAME}.": Die ID3 Tags von $Mp3WrapFile wurden geloescht";
-        } or Log3 $hash->{NAME}, 3, "MP3::Info Modul fehlt, konnte MP3 Tags nicht entfernen";
-      } else {Log3 $hash->{NAME}, 3, $hash->{NAME}.": MP3WRAP Fehler!, Datei wurde nicht generiert.";}
+        my $ret = eval{ remove_mp3tag( $Mp3WrapFile, 'ALL' ) };
+        Log3 $hash, 1, $hash->{NAME}.": Fehle beim entfernen der ID3 Tags: $@" if ( $@ );
+        Log3 $hash, 4, $hash->{NAME}.": Die ID3 Tags ( $ret Bytes ) von $Mp3WrapFile wurden geloescht." if ( $ret > 0 );
+        Log3 $hash, 4, $hash->{NAME}.": Die ID3 Tags ( 0 Bytes ) von $Mp3WrapFile wurden geloescht." if ( $ret == -1 );
+        Log3 $hash->{NAME}, 3, "MP3::Info Modul fehlt, konnte MP3 Tags nicht entfernen!" if ( !$ret );
+
+      } else {
+
+        Log3 $hash->{NAME}, 3, $hash->{NAME}.": MP3WRAP Fehler!, Datei wurde nicht generiert.";
+
+      }
     }
 
     if ($TTS_OutputFile && $TTS_OutputFile ne $Mp3WrapFile) {
@@ -1124,7 +1188,6 @@ sub Text2Speech_DoIt($) {
     Log3 $hash->{NAME}, 4, $hash->{NAME}.":" .$cmd;
     system($cmd);
   }
-
   return $hash->{NAME}. "|".
          "1" ."|".
          $file;
@@ -1154,7 +1217,16 @@ sub Text2Speech_Done($) {
     }
     Text2Speech_WriteStats($hash, 1, $filename, join(" ", @text)) if (AttrVal($hash->{NAME},"TTS_noStatisticsLog", "0")==0);
 
-    readingsSingleUpdate($hash, "lastFilename", $filename, 1);
+    readingsBeginUpdate( $hash );
+      readingsBulkUpdate($hash, 'lastFilename', $filename );
+      # Update der Dauer im Servermode
+      readingsBulkUpdate( $hash, 'duration', Text2Speech_CalcMP3Duration( $hash, $filename ) ) if( $hash->{MODE} eq "SERVER" );
+    readingsEndUpdate( $hash, 1 );
+
+    # Aufruf eine eines Abspielgerätes wenn das Attibut gesetzt ist
+    my $playercall = AttrVal( $hash->{NAME}, 'TTS_RemotePlayerCall', '' );
+    eval $playercall if( $playercall );
+    Log3( $hash, 1, $hash->{NAME}." TTS_RemotePlayerCall: eval error $@.") if( $@ );
   }
 
   delete($hash->{helper}{RUNNING_PID});
@@ -1167,9 +1239,9 @@ sub Text2Speech_Done($) {
 
     $hash->{helper}{RUNNING_PID} = BlockingCall("Text2Speech_DoIt", $hash, "Text2Speech_Done", $TTS_TimeOut, "Text2Speech_AbortFn", $hash);
   } else {
+
     # alles wurde bearbeitet
     Log3($hash,4, $hash->{NAME}.": Es wurden alle Teile ausgegeben und der Befehl ist abgearbeitet.");
-
     readingsSingleUpdate($hash, "playing", "0", 1);
   }
 }
@@ -1224,6 +1296,91 @@ sub Text2Speech_WriteStats($$$$){
   DbLog_ExecSQL($defs{$DbLogDev}, $cmd);
 }
 
+#########################
+sub Text2Speech_readMp3(@) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  my $iam = "$type $name Text2Speech_readMp3:";
+  my $filename = ReadingsVal( $name, 'lastFilename', '' );
+
+  if ( $filename and -e $filename ) {
+
+    if( open my $fh, '<:raw', $filename ) {
+
+      my $content = '';
+
+      while (1) {
+        my $success = read $fh, $content, 1024, length( $content );
+        if( not defined $success ) {
+          close $fh;
+          Log3 $name, 1, "$iam read file \"$filename\" error: $!.";
+          return undef;
+        }
+
+        last if not $success;
+      }
+
+      close $fh;
+      Log3 $name, 4, "$iam file \"$filename\" content length: ".length( $content );
+      return \$content;
+
+    } else {
+      Log3 $name, 1, "$iam open file \"$filename\" error: $!.";
+    }
+
+  } else {
+    Log3 $name, 2, "$iam file \"$filename\" does not exist.";
+  }
+  return undef;
+}
+
+#########################
+sub Text2Speech_getLastMp3 {
+  my ($request) = @_;
+
+  if ( $request =~ /^\/(Text2Speech)\/(\w+)\/last.mp3/ ) {
+
+    my $type   = $1;
+    my $name   = $2;
+    my $hash = $defs{$name};
+    my $audioData = Text2Speech_readMp3( $hash );
+    return ( "text/plain; charset=utf-8","${type} ${name}: No MP3 file for webhook $request" ) if ( !$audioData );
+    my $audioMime = 'audio/mpeg';
+    
+    return ( $audioMime, $$audioData );
+  }
+  return ( "text/plain; charset=utf-8", "No Text2Speech device for webhook $request" );
+}
+
+#########################
+sub Text2Speech_AddExtension(@) {
+    my ( $name, $func, $link ) = @_;
+    my $hash = $defs{$name};
+    my $type = $hash->{TYPE};
+
+    my $url = "/$link";
+    Log3( $name, 2, "Registering $type $name for URL $url..." );
+    $::data{FWEXT}{$url}{deviceName} = $name;
+    $::data{FWEXT}{$url}{FUNC}       = $func;
+    $::data{FWEXT}{$url}{LINK}       = $link;
+
+    return;
+}
+
+#########################
+sub Text2SpeechRemoveExtension(@) {
+    my ($link) = @_;
+    my $url  = "/$link";
+    my $name = $::data{FWEXT}{$url}{deviceName};
+
+    Log3( $name, 2, "Unregistering URL $url..." );
+    delete $::data{FWEXT}{$url};
+
+    return;
+}
+
+
 1;
 
 =pod
@@ -1235,12 +1392,12 @@ the result on a local or remote loudspeaker
 über einen lokalen oder entfernten Lautsprecher wiedergibt
 =begin html
 
-<a name="Text2Speech"></a>
+<a id="Text2Speech"></a>
 <h3>Text2Speech</h3>
 <ul>
   <br>
-  <a name="Text2Speechdefine"></a>
-  <b>Define</b>
+  <a id="Text2Speech-define"></a>
+  <h4>Define</h4>
   <ul>
     <b>Local : </b><code>define &lt;name&gt; Text2Speech &lt;alsadevice&gt;</code><br>
     <b>Remote: </b><code>define &lt;name&gt; Text2Speech &lt;host&gt;[:&lt;portnr&gt;][:SSL] [portpassword]</code>
@@ -1308,30 +1465,29 @@ the result on a local or remote loudspeaker
   </ul>
 </ul>
 
-<a name="Text2Speechset"></a>
-<b>Set</b>
+<a id="Text2Speech-set"></a>
+<h4>Set</h4>
 <ul>
-  <li><b>tts</b>:<br>
+  <a id="Text2Speech-set-tts"></a><li><b>tts</b>:<br>
     Definition of text for voice output. To output mp3 files directly, they must be specified with
     leading and closing colons. Therefore, the text itself must not contain any double punctuation.
     The mp3 files must be stored in the <i>TTS_FileTemplateDir</i> directory.
     SSML can be used for the Amazon Polly language engine. See examples.
-
   </li>
-  <li><b>volume</b>:<br>
+  <a id="Text2Speech-set-volume"></a><li><b>volume</b>:<br>
     Setting up the volume audio response.<br>
     Notice: Only available in locally instances!
   </li>
 </ul><br>
 
-<a name="Text2Speechget"></a>
-<b>Get</b>
+<a id="Text2Speech-get"></a>
+<h4>Get</h4>
 <ul>N/A</ul><br>
 
-<a name="Text2Speechattr"></a>
-<b>Attributes</b>
+<a id="Text2Speech-attr"></a>
+<h4>Attributes</h4>
 <ul>
-  <li>TTS_Delimiter<br>
+  <a id="Text2Speech-attr-TTS_Delimiter"></a><li>TTS_Delimiter<br>
     Optional: By using the Google engine, its not possible to convert more than 100 characters in a single audio brick.
     With a delimiter the audio brick will be split at this character. A delimiter must be a single character!<br>
     By default, each audio brick will be split at sentence end. Is a single sentence longer than 100 characters,
@@ -1339,7 +1495,7 @@ the result on a local or remote loudspeaker
     Notice: Only available in locally instances with Google engine!
   </li>
 
-  <li>TTS_Ressource<br>
+  <a id="Text2Speech-attr-TTS_Ressource"></a><li>TTS_Ressource<br>
     Optional: Selection of the Translator Engine<br>
     Notice: Only available in locally instances!
     <ul>
@@ -1356,7 +1512,7 @@ the result on a local or remote loudspeaker
         eSpeak Engine. Prerequisite: Installation of Espeak and lame<br>
         eSpeak is an open source software speech synthesizer for English and other languages.
       </li>
-	  <li>SVOX-pico<br>
+      <li>SVOX-pico<br>
         SVOX-Pico TTS-Engine (from the AOSP). Prerequisite: Installation of SVOX-Pico and lame<br>
         <code>sudo apt-get install libttspico-utils lame</code><br><br>
         On ARM/Raspbian the package <code>libttspico-utils</code>,<br>
@@ -1376,36 +1532,42 @@ the result on a local or remote loudspeaker
          aws_access_key_id = xxxxxxxxxxxxxxx
        </code>
       </li>
+      <li>maryTTS<br>
+        <a target="_blank" href"https://github.com/marytts/marytts">maryTTS</a> or <a target="_blank" href"https://github.com/MycroftAI/mimic3">Mimic 3</a> Engine. Prerequisite: Installation of respective server and lame, appropriate settings in <a href="#Text2Speech-attr-TTS_User">TTS_User</a> attribute (if other than default settings shall be applied).<br>
+        Both are open source software speech synthesizers for English and other languages.
+      </li>
     </ul>
   </li>
 
-  <li>TTS_Language<br>
+  <a id="Text2Speech-attr-TTS_Language"></a><li>TTS_Language<br>
     Selection of different languages
   </li>
 
-  <li>TTS_Language_Custom<br>
+  <a id="Text2Speech-attr-TTS_Language_Custom"></a><li>TTS_Language_Custom<br>
     If you want another engine and speech of default languages, you can insert this here.<br>
     The definition depends on the used engine. This attribute overrides an TTS_Language attribute.<br>
     Please refer to the specific API reference.
   </li>
 
-  <li>TTS_APIKey<br>
+  <a id="Text2Speech-attr-TTS_APIKey"></a><li>TTS_APIKey<br>
     An APIKey is needed if you want to use VoiceRSS. You have to register at the following page:<br>
     http://www.voicerss.org/registration.aspx
   </li>
 
-  <li>TTS_User<br>
-    Actual without any usage. Needed in case if a TTS Engine needs a username and an APIKey for a request.
+  <a id="Text2Speech-attr-TTS_User"></a><li>TTS_User<br>
+    Actual only used for maryTTS (and Mimic 3). Needed in case if a TTS Engine needs a username and an APIKey for a request. <br>
+    <p>(Full) example for maryTTS (values are defaults and may be left out):</p>
+        <p><code>attr t2s TTS_User host=127.0.0.1 port=59125 lang=de_DE voice=de_DE/thorsten_low</code></p>
   </li>
 
-  <li>TTS_CacheFileDir<br>
+  <a id="Text2Speech-attr-TTS_CacheFileDir"></a><li>TTS_CacheFileDir<br>
     Optional: The downloaded Google audio bricks are saved in this folder.
     No automatic delete/cleanup available.<br>
     Default: <i>cache/</i><br>
     Notice: Available on local instances only!
   </li>
 
-  <li>TTS_UseMP3Wrap<br>
+  <a id="Text2Speech-attr-TTS_UseMP3Wrap"></a><li>TTS_UseMP3Wrap<br>
     For best voice output, it is recommended that the individual downloads are combined into a single file.
     Each downloaded audio bricks are concatinated to a single audio file to play with Mplayer.<br>
     Installtion of the mp3wrap package is required.<br>
@@ -1413,7 +1575,7 @@ the result on a local or remote loudspeaker
     Notice: Available on local instances only!
   </li>
 
-  <li>TTS_MplayerCall<br>
+  <a id="Text2Speech-attr-TTS_MplayerCall"></a><li>TTS_MplayerCall<br>
     Optional: Definition of the system call to Mplayer or a different tool.<br>
     If a tool other than Mplayer is used, the following templates apply:<br>
     <ul>
@@ -1434,13 +1596,13 @@ the result on a local or remote loudspeaker
 
   </li>
 
-  <li>TTS_SentenceAppendix<br>
+  <a id="Text2Speech-attr-TTS_SentenceAppendix"></a><li>TTS_SentenceAppendix<br>
     Optional: Definition of one mp3-file to append each time of audio response.<br>
     Mp3Wrap is required. The audio chunks must be downloaded to the CacheFileDir beforehand.
     Example: <code>silence.mp3</code>
   </li>
 
-  <li>TTS_FileMapping<br>
+  <a id="Text2Speech-attr-TTS_FileMapping"></a><li>TTS_FileMapping<br>
     Definition of mp3files with a custom template definition. Separated by space.
     All template definitions can be used in audiobricks by <i>tts</i> command.
     The definition must begin and end with a colon.
@@ -1449,35 +1611,42 @@ the result on a local or remote loudspeaker
     <code>set MyTTS tts Attention: This is my ringtone :ring: Its loud?</code>
   </li>
 
-  <li>TTS_FileTemplateDir<br>
+  <a id="Text2Speech-attr-TTS_FileTemplateDir"></a><li>TTS_FileTemplateDir<br>
     Directory to save all mp3-files are defined in <i>TTS_FileMapping</i> und <i>TTS_SentenceAppendix</i><br>
     Optional, Default: <code>cache/templates</code>
   </li>
 
-  <li>TTS_VolumeAdjust<br>
+  <a id="Text2Speech-attr-TTS_VolumeAdjust"></a><li>TTS_VolumeAdjust<br>
     Basic volume increase<br>
     Default: 110<br>
     <code>attr myTTS TTS_VolumeAdjust 400</code>
   </li>
 
-  <li>TTS_noStatisticsLog<br>
+  <a id="Text2Speech-attr-TTS_noStatisticsLog"></a><li>TTS_noStatisticsLog<br>
     If set to <b>1</b>, it prevents logging statistics to DbLog Devices, default is <b>0</b><br>
     Note: This logging is important to be able to delete cache files that have not been used for a longer period of time.
     If you disable this, you will have to clean your cache directory manually.
   </li>
 
-  <li>TTS_speakAsFastAsPossible<br>
+  <a id="Text2Speech-attr-TTS_speakAsFastAsPossible"></a><li>TTS_speakAsFastAsPossible<br>
       Trying to get a speech as fast as possible. In case of not present audio bricks, you can
       hear a short break as the audio brick will be downloaded at this time.
       In case of a presentation of all audio bricks at local cache, this attribute has no impact.<br>
       Attribute is only valid on local or server instances.
   </li>
 
-  <li>TTS_OutputFile<br>
+  <a id="Text2Speech-attr-TTS_OutputFile"></a><li>TTS_OutputFile<br>
       Definition of a fixed file name as mp3 output. The attribute is only relevant in conjunction with TTS_UseMP3Wrap.
       If a file name is specified, then TTS_CacheFileDir is also taken into account.<br>
       <code>attr myTTS TTS_OutputFile output.mp3</code><br>
       <code>attr myTTS TTS_OutputFile /media/miniDLNA/output.mp3</code><br>
+  </li>
+
+  <a id="Text2Speech-attr-TTS_RemotePlayerCall"></a><li>TTS_RemotePlayerCall<br>
+      The Text2Speech devices provide a URL to the last generated mp3 file:
+      <code>&lt;protocol&gt;://&lt;fhem server ip or name&gt;:&lt;fhem port&gt;/fhem/Text2Speech/&lt;device name&gt;/last.mp3.</code><br>
+      If this attibute contains a remote player call, it will be executed after the last mp3 file is generated.<br>
+      <code>attr &lt;device name&gt; TTS_RemotePlayerCall GetFileFromURL('&lt;protocol&gt;://&lt;remote player name or ip&gt;:&lt;remote player port&gt;/?cmd=playSound&url=&lt;protocol&gt;://&lt;fhem server name orip&gt;:&lt;fhem port&gt;/fhem/Text2Speech/&lt;device name&gt;/last.mp3&loop=false&password=&lt;password&gt;')</code><br>
   </li>
 
   <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
@@ -1495,8 +1664,8 @@ the result on a local or remote loudspeaker
 
 </ul><br>
 
-<a name="Text2SpeechExamples"></a>
-<b>Examples</b>
+<a id="Text2Speech-examples"></a>
+<h4>Examples</h4>
 <ul>
   <code>define TTS_EG_WZ Text2Speech hw=/dev/snd/controlC3</code><br>
   <code>attr TTS_EG_WZ TTS_Language English</code><br>
@@ -1507,19 +1676,28 @@ the result on a local or remote loudspeaker
   <code>define MyTTS Text2Speech hw=0.0</code><br>
   <code>set MyTTS tts The alarm system is ready.</code><br>
   <code>set MyTTS tts :beep.mp3:</code><br>
-  <code>set MyTTS tts :mytemplates/alarm.mp3:The alarm system is ready.:ring.mp3:</code><br>
+  <code>set MyTTS tts :mytemplates/alarm.mp3:The alarm system is ready.:ring.mp3:</code>
+  <br>
+  Example of MaryTTS and using SSML: <br>
+  <code>
+    define T2S Text2Speech default
+    attr T2S TTS_MplayerCall /usr/bin/mplayer
+    attr T2S TTS_Ressource maryTTS
+    attr T2S TTS_User host=192.168.100.1 port=59125 lang=de_DE voice=de_DE/thorsten_low ssml=1
+    set T2S tts '&lt;voice name="de_DE/m-ailabs_low#rebecca_braunert_plunkett"&gt;Das ist ein Test in deutsch &lt;/voice&gt;&lt;voice name="en_US/vctk_low#p236"&gt;and this is an test in english.&lt;/voice&gt;'
+  </code>
 </ul>
 
 =end html
 =begin html_DE
 
-<a name="Text2Speech"></a>
+<a id="Text2Speech"></a>
 <h3>Text2Speech</h3>
 <ul>
   <br>
-  <a name="Text2Speechdefine"></a>
-  <b>Define</b>
-  <ul>
+  <a id="Text2Speech-define"></a>
+  <h4>Define</h4>
+    <ul>
     <b>Local : </b><code>define &lt;name&gt; Text2Speech &lt;alsadevice&gt;</code><br>
     <b>Remote: </b><code>define &lt;name&gt; Text2Speech &lt;host&gt;[:&lt;portnr&gt;][:SSL] [portpassword]</code>
     <b>Server : </b><code>define &lt;name&gt; Text2Speech none</code><br>
@@ -1590,8 +1768,8 @@ the result on a local or remote loudspeaker
   </ul>
 </ul>
 
-<a name="Text2Speechset"></a>
-<b>Set</b>
+<a id="Text2Speech-set"></a>
+<h4>Set</h4>
 <ul>
   <li><b>tts</b>:<br>
     Setzen eines Textes zur Sprachausgabe. Um mp3-Dateien direkt auszugeben, müssen diese mit f&uuml;hrenden
@@ -1605,14 +1783,14 @@ the result on a local or remote loudspeaker
   </li>
 </ul><br>
 
-<a name="Text2Speechget"></a>
-<b>Get</b>
+<a id="Text2Speech-get"></a>
+<h4>Get</h4>
 <ul>N/A</ul><br>
 
-<a name="Text2Speechattr"></a>
-<b>Attribute</b>
+<a id="Text2Speech-attr"></a>
+<h4>Attribute</h4>
 <ul>
-  <li>TTS_Delimiter<br>
+  <a id="Text2Speech-attr-TTS_Delimiter"></a><li>TTS_Delimiter<br>
     Optional: Wird ein Delimiter angegeben, so wird der Sprachbaustein an dieser Stelle geteilt.
     Als Delimiter ist nur ein einzelnes Zeichen zul&auml;ssig.
     Hintergrund ist die Tatsache, dass die einige Sprachengines nur eine bestimmte Anzahl an Zeichen (z. B. Google nur 100Zeichen) zul&auml;sst.<br>
@@ -1630,7 +1808,7 @@ the result on a local or remote loudspeaker
     <code>attr myTTS TTS_Delimiter -al.</code>
   </li>
 
-  <li>TTS_Ressource<br>
+  <a id="Text2Speech-attr-TTS_Ressource"></a><li>TTS_Ressource<br>
     Optional: Auswahl der Sprachengine<br>
     Achtung: Nur bei einem lokal definierter Text2Speech Instanz m&ouml;glich!
     <ul>
@@ -1670,37 +1848,43 @@ the result on a local or remote loudspeaker
          aws_access_key_id = xxxxxxxxxxxxxxx
        </code>
       </li>
+      <li>maryTTS<br>
+        <a target="_blank" href"https://github.com/marytts/marytts">maryTTS</a> oder <a target="_blank" href"https://github.com/MycroftAI/mimic3">Mimic 3</a> Sprachsynthesizer, der betr. Server sowie lame muss separat installiert werden. Beides sind open source Lösungen für English und andere Sprachen.
+        Über das Attribut <a href="#Text2Speech-attr-TTS_User">TTS_User</a> können ergänzende Angaben zu Server, Port und verwendeten Stimme etc. gemacht werden.<br>
+      </li>
     </ul>
   </li>
 
-  <li>TTS_Language<br>
+  <a id="Text2Speech-attr-TTS_Language"></a><li>TTS_Language<br>
     Auswahl verschiedener Standardsprachen.
   </li>
 
-  <li>TTS_Language_Custom<br>
+  <a id="Text2Speech-attr-TTS_Language_Custom"></a><li>TTS_Language_Custom<br>
     Möchte man eine Sprache und Stimme abweichend der Standardsprachen verwenden, so kann man diese hier eintragen. <br>
     Die Definition ist abhängig der verwendeten Sprachengine. Dieses Attribut überschreibt ein ev. vorhandenes TTS_Langugae Attribut.<br>
     Siehe in die jeweilige API Referenz
   </li>
 
-  <li>TTS_APIKey<br>
+  <a id="Text2Speech-attr-TTS_APIKey"></a><li>TTS_APIKey<br>
     Wenn VoiceRSS genutzt wird, ist ein APIKey notwendig. Um diesen zu erhalten ist eine vorherige
     Registrierung notwendig. Anschließend erhält man den APIKey <br>
     http://www.voicerss.org/registration.aspx <br>
   </li>
 
-  <li>TTS_User<br>
-    Bisher ohne Benutzung. Falls eine Sprachengine zusätzlich zum APIKey einen Usernamen im Request verlangt.
+  <a id="Text2Speech-attr-TTS_User"></a><li>TTS_User<br>
+    Derzeit nur für maryTTS (bzw. Mimic 3) genutzt. Falls eine Sprachengine zusätzlich zum APIKey einen Usernamen im Request verlangt.<br>
+    <p>(Vollständiges) Beispiel für maryTTS (die angegebenen Werte entsprechen den defaults):</p>
+        <p><code>attr t2s TTS_User host=127.0.0.1 port=59125 lang=de_DE voice=de_DE/thorsten_low</code></p>
   </li>
 
-  <li>TTS_CacheFileDir<br>
+  <a id="Text2Speech-attr-TTS_CacheFileDir"></a><li>TTS_CacheFileDir<br>
     Optional: Die per Google geladenen Sprachbausteine werden in diesem Verzeichnis zur Wiederverwendung abgelegt.
     Es findet zurzeit keine automatisierte L&ouml;schung statt.<br>
     Default: <i>cache/</i><br>
     Achtung: Nur bei einer lokal definierten Text2Speech-Instanz m&ouml;glich!
   </li>
 
-  <li>TTS_UseMP3Wrap<br>
+  <a id="Text2Speech-attr-TTS_UseMP3Wrap"></a><li>TTS_UseMP3Wrap<br>
     Optional: F&uuml;r eine fl&uuml;ssige Sprachausgabe ist es zu empfehlen, die einzelnen vorher
     geladenen Sprachbausteine zu einem einzelnen Sprachbaustein zusammenfassen zu lassen bevor dieses per
     Mplayer ausgegeben werden. Dazu muss Mp3Wrap installiert werden.<br>
@@ -1708,7 +1892,7 @@ the result on a local or remote loudspeaker
     Achtung: Nur bei einer lokal definierten Text2Speech-Instanz m&ouml;glich!
   </li>
 
-  <li>TTS_MplayerCall<br>
+  <a id="Text2Speech-attr-TTS_MplayerCall"></a><li>TTS_MplayerCall<br>
     Optional: Angabe des Systemaufrufs für einen alternativen Player. Wird der Aufruf gesetzt,<br>
     können folgende Templates genutzt werden: <br>
     <ul>
@@ -1728,14 +1912,14 @@ the result on a local or remote loudspeaker
     <code>attr myTTS TTS_MplayerCall player {file} {options}</code><br>
   </li>
 
-  <li>TTS_SentenceAppendix<br>
+  <a id="Text2Speech-attr-TTS_SentenceAppendix"></a><li>TTS_SentenceAppendix<br>
     Optional: Angabe einer mp3-Datei die mit jeder Sprachausgabe am Ende ausgegeben wird.<br>
     Voraussetzung ist die Nutzung von MP3Wrap. Die Sprachbausteine müssen bereits als mp3 im
     CacheFileDir vorliegen.
     Beispiel: <code>silence.mp3</code>
   </li>
 
-  <li>TTS_FileMapping<br>
+  <a id="Text2Speech-attr-TTS_FileMapping"></a><li>TTS_FileMapping<br>
     Angabe von m&ouml;glichen MP3-Dateien mit deren Template-Definition. Getrennt durch Leerzeichen.
     Die Template-Definitionen können in den per <i>tts</i> &uuml;bergebenen Sprachbausteinen verwendet werden
     und m&uuml;ssen mit einem beginnenden und endenden Doppelpunkt angegeben werden.
@@ -1744,37 +1928,45 @@ the result on a local or remote loudspeaker
     <code>set MyTTS tts Achtung: hier kommt mein Klingelton :ring: War der laut?</code>
   </li>
 
-  <li>TTS_FileTemplateDir<br>
+  <a id="Text2Speech-attr-TTS_FileTemplateDir"></a><li>TTS_FileTemplateDir<br>
     Verzeichnis, in dem die per <i>TTS_FileMapping</i> und <i>TTS_SentenceAppendix</i> definierten
     MP3-Dateien gespeichert sind.<br>
     Optional, Default: <code>cache/templates</code>
   </li>
 
-  <li>TTS_VolumeAdjust<br>
+  <a id="Text2Speech-attr-TTS_VolumeAdjust"></a><li>TTS_VolumeAdjust<br>
     Anhebung der Grundlautstärke zur Anpassung an die angeschlossenen Lautsprecher. <br>
     Default: 110<br>
     <code>attr myTTS TTS_VolumeAdjust 400</code><br>
   </li>
 
-  <li>TTS_noStatisticsLog<br>
+  <a id="Text2Speech-attr-TTS_noStatisticsLog"></a><li>TTS_noStatisticsLog<br>
   <b>1</b>, verhindert das Loggen von Statistikdaten in DbLog Ger&auml;ten. Default ist <b>0</b><br>
   Hinweis: Das Logging ist wichtig um alte, lang nicht genutzte Cachedateien automatisiert zu l&ouml;schen.
   Wird die Option hier aktiviert, muss sich der Nutzer selbst darum k&uuml;ümmern.
   </li>
 
-  <li>TTS_speakAsFastAsPossible<br>
+  <a id="Text2Speech-attr-TTS_speakAsFastAsPossible"></a><li>TTS_speakAsFastAsPossible<br>
     Es wird versucht, so schnell als möglich eine Sprachausgabe zu erzielen. Bei Sprachbausteinen
     die nicht bereits lokal vorliegen, ist eine kurze Pause wahrnehmbar. Dann wird der benötigte
     Sprachbaustein nachgeladen. Liegen alle Sprachbausteine im Cache vor, so hat dieses Attribut keine Auswirkung.<br>
     Attribut nur verfügbar bei einer lokalen oder Server Instanz
   </li>
 
-  <li>TTS_OutputFile<br>
+  <a id="Text2Speech-attr-TTS_OutputFile"></a><li>TTS_OutputFile<br>
       Angabe eines fixen Dateinamens als mp3 Output. Das Attribut ist nur relevant in Verbindung mit TTS_UseMP3Wrap.<br>
       Wenn ein Dateiname angegeben wird, so wird zusätzlich TTS_CacheFileDir beachtet. Bei einer absoluten Pfadangabe
       muss der Dateipfad durch FHEM schreibbar sein.<br>
       <code>attr myTTS TTS_OutputFile output.mp3</code><br>
       <code>attr myTTS TTS_OutputFile /media/miniDLNA/output.mp3</code><br>
+  </li>
+
+  <a id="Text2Speech-attr-TTS_RemotePlayerCall"></a><li>TTS_RemotePlayerCall<br>
+      Die Text2Speech Geräte stellen eine URL bereit, die auf die letzte erzeugte mp3 Datei zeigt:<br>
+      <code>&lt;protocol&gt;://&lt;fhem server name or ip&gt;:&lt;fhem port&gt;/fhem/Text2Speech/&lt;device name&gt;/last.mp3</code><br>
+      Wenn dieses Attribut den Aufruf eines Remoteplayers enthält, wird er nach dem Erzeugen der letzten mp3 Datei ausgeführt.<br>
+      Beispiel zum Abspielen einer Datei auf einem Smartphone oder Tablet mit Fully Kiosk Browser App.<br>
+      <code>attr &lt;device name&gt; TTS_RemotePlayerCall GetFileFromURL('&lt;protocol&gt;://&lt;remote player name or ip&gt;:2323/?cmd=playSound&url=&lt;protocol&gt;://&lt;fhem server name or ip&gt;:&lt;fhem port&gt;/fhem/Text2Speech/&lt;device name&gt;/last.mp3&loop=false&password=&lt;password&gt;')</code><br>
   </li>
 
   <li><a href="#readingFnAttributes">readingFnAttributes</a>
@@ -1793,8 +1985,8 @@ the result on a local or remote loudspeaker
 
 </ul><br>
 
-<a name="Text2SpeechExamples"></a>
-<b>Beispiele</b>
+<a id="Text2Speech-examples"></a>
+<h4>Beispiele</h4>
 <ul>
   <code>define TTS_EG_WZ Text2Speech hw=/dev/snd/controlC3</code><br>
   <code>attr TTS_EG_WZ TTS_Language Deutsch</code><br>
@@ -1806,9 +1998,17 @@ the result on a local or remote loudspeaker
   <code>define MyTTS Text2Speech hw=0.0</code><br>
   <code>set MyTTS tts Die Alarmanlage ist bereit.</code><br>
   <code>set MyTTS tts :beep.mp3:</code><br>
-  <code>set MyTTS tts :mytemplates/alarm.mp3:Die Alarmanlage ist bereit.:ring.mp3:</code><br>
+  <code>set MyTTS tts :mytemplates/alarm.mp3:Die Alarmanlage ist bereit.:ring.mp3:</code>
+  <br>
+  Beispiel MaryTTS und SSML: <br>
+  <code>
+    define T2S Text2Speech default
+    attr T2S TTS_MplayerCall /usr/bin/mplayer
+    attr T2S TTS_Ressource maryTTS
+    attr T2S TTS_User host=192.168.100.1 port=59125 lang=de_DE voice=de_DE/thorsten_low ssml=1
+    set T2S tts '&lt;voice name="de_DE/m-ailabs_low#rebecca_braunert_plunkett"&gt;Das ist ein Test in deutsch &lt;/voice&gt;&lt;voice name="en_US/vctk_low#p236"&gt;and this is an test in english.&lt;/voice&gt;'
+  </code>
 </ul>
-
 
 =end html_DE
 =cut
