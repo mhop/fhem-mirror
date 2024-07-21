@@ -58,6 +58,7 @@ use vars qw($FW_ME $FW_subdir);                                      # predeclar
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.10.2"  => "21.07.2024 _DbLog_copyCache: Copy process changed to minimize memory usage after reopen ", 
   "5.10.1"  => "01.04.2024 _DbLog_plotData: avoid possible uninitialized value \$out_value (SVG: Argument '' isn't numeric) ".
                            "replace Smartmatch Forum:#137776 ",
   "5.10.0"  => "17.03.2024 support of MariaDB driver, optimize Timer execMemCacheAsync, optimize DbLog_configcheck,_DbLog_SBP_connectDB ".
@@ -2047,11 +2048,10 @@ sub _DbLog_copyCache {
 
   while (my ($key, $val) = each %{$data{DbLog}{$name}{cache}{memcache}} ) {
       $memc->{cdata}{$key} = $val;                                              # Subprocess Daten, z.B.:  2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
+      delete $data{DbLog}{$name}{cache}{memcache}{$key};
   }
 
   $memc->{cdataindex} = $data{DbLog}{$name}{cache}{index};                      # aktuellen Index an Subprozess übergeben
-
-  undef %{$data{DbLog}{$name}{cache}{memcache}};                                # Löschen mit Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
 
 return $memc;
 }
