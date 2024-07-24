@@ -78,7 +78,7 @@ Readonly my $DEFAULT_RSSI_THRESHOLD               => 10;
 Readonly my $DEFAULT_ABSENT_INTERVAL              => 60;
 
 Readonly my $ME                                   => 'ble2mqttd';
-Readonly my $VERSION                              => '0.15';
+Readonly my $VERSION                              => '0.16';
 Readonly my $PIDFILE                              => "/var/run/$ME.pid";
 
 my ($mqtt, $bluetoothctl, $loglevel, $logtarget, $debug);
@@ -151,7 +151,7 @@ sub usage_exit {
   printf("\t%s --mqttserver mqtt.domain:8883 --mqttfingerprint 'sha256\$11e20bbb668da517a0ae8536f3c79887d06ddec945fab60401deab92dc7e7c1f' --mqttuser user --mqttpass pass\n", $ME);
   printf("\t%s --mqttserver mqtt.domain:8883 --mqttfingerprint 'sha256\$11e20bbb668da517a0ae8536f3c79887d06ddec945fab60401deab92dc7e7c1f' --mqttuser user --mqttpass pass --mac 'AB:CD:EF:.*'\n", $ME);
   closelog();
-  exit(1);
+  exit(2);
 }
 
 sub parse_loglevel {
@@ -420,12 +420,13 @@ sub handle_match {
   $info =~ s/\s+$//;
   $mac = uc($mac);
 
+  $lastevent = time();
+
   if($macregex && $mac!~/$macregex/i) {
     printf("%s### Match (filtered): [%s] %s (%s)\n", tsprefix(), $type, $mac, $info) if ($debug >= 2);
     return(); 
   }
 
-  $lastevent = time();
   if (my ($rssi) = ($info =~ m/^RSSI: (-?[0-9]+)$/)) {
     printf("%s### Match RSSI:       [%s] %s -> %s\n", tsprefix(), $type, $mac, $rssi) if ($debug >= 2);
     $devices{$mac}{'rssi'}=$rssi;
