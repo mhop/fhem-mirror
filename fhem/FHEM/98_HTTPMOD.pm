@@ -1439,6 +1439,42 @@ sub EvalFunctionCall {
 }
 
 
+#########################################
+# Try to call a parse function if defined
+sub HandleParseFunctions {
+    my $hash    = shift;        # my own device hash
+    my $fName   = shift;        # name of parse function (attr / hash key)
+    my $header  = shift;
+    my $body    = shift;
+    my $request = shift;        # the request structure
+    my $name    = $hash->{NAME};
+
+    if ($request->{$fName} && ref($request->{$fName}) eq 'CODE') {  # defined in request hash
+        my $callHash = $request->{$fName . 'Hash'};                 # parseFunctionXHash from request
+        Log3 $name, 5, "$name: calling $fName for device $callHash->{NAME} via request structure";
+        &{$request->{$fName}}($callHash, $header, $body, $request);
+    }
+    if ($hash->{$fName} && ref($hash->{$fName}) eq 'CODE') {        # defined in device hash
+        my $callHash = $hash->{$fName . 'Hash'};                    # parseFunctionXHash from device hash
+        Log3 $name, 5, "$name: calling $fName for device $callHash->{NAME} via internal";
+        &{$hash->{$fName}}($callHash, $header, $body, $request);
+    }
+
+    my $callFName = AttrVal($name, $fName, undef);                   # attr
+    if ($callFName) {
+        my $buffer = ($header ? $header . "\r\n\r\n" . $body : $body);      # for matching sid / reauth
+        my $type   = $request->{'type'}; 
+        Log3 $name, 5, "$name: calling $fName as $callFName via attr for HTTP Response to $type";
+        no strict "refs";               ## no critic - function name needs to be string becase it comes from an attribute
+        eval { &{$callFName}($hash, $buffer) };
+        Log3 $name, 3, "$name: error calling $callFName: $@" if($@);
+        use strict "refs";
+    }
+    return;
+}
+
+
+
 ################################################
 # get a regex from attr and compile if not done
 # called from DoReplacement, ExtractReading, ExtractSid,
@@ -1677,7 +1713,7 @@ sub ExtractReading {
             my $eNum = $num . ($group ? "-".$group : "");
             $val  = FormatReading($hash, $context, $eNum, $val, $subReading);
                         
-            Log3 $name, 5, "$name: ExtractReading for $context$num sets reading for named capture group $subReading to $val";
+            Log3 $name, 5, "$name: ExtractReading for $context$num sets reading for named capture group $subReading to " . ($val // 'undef');
             readingsBulkUpdate( $hash, $subReading, $val );
             # point from reading name back to the parsing definition as reading01 or get02 ...
             $hash->{defptr}{readingBase}{$subReading} = $context;                   # used to find maxAge attr
@@ -2490,21 +2526,10 @@ sub ReadCallback {
     }
     
     #Log3 $name, 5, "$name: parseFunction2 ref is " . ref($hash->{'parseFunction2'});
-    EvalFunctionCall($hash, $buffer, 'parseFunction1', $type);
-    if ($hash->{'parseFunction1'} && ref($hash->{'parseFunction1'}) eq 'CODE') {
-        my $callHash = $hash->{'parseFunction1Hash'};
-        my $cName = $callHash->{NAME};
-        Log3 $name, 5, "$name: calling parseFunction1 for device $cName";
-        &{$hash->{'parseFunction1'}}($callHash, $header, $body, $request);
-    }
+    HandleParseFunctions($hash, 'parseFunction1', $header, $body, $request);
     readingsEndUpdate($hash, 1);
-    EvalFunctionCall($hash, $buffer, 'parseFunction2', $type);
-    if ($hash->{'parseFunction2'} && ref($hash->{'parseFunction2'}) eq 'CODE') {
-        my $callHash = $hash->{'parseFunction2Hash'};
-        my $cName = $callHash->{NAME};
-        Log3 $name, 5, "$name: calling parseFunction2 for device $cName";
-        &{$hash->{'parseFunction2'}}($callHash, $header, $body, $request);
-    }
+    HandleParseFunctions($hash, 'parseFunction2', $header, $body, $request);
+
     DoDeleteIfUnmatched($hash, $type, @matched) if ($hash->{DeleteIfUnmatched});
     HandleSendQueue("direct:".$name);  
     CleanupParsers($hash);
