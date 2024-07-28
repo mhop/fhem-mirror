@@ -1748,8 +1748,8 @@ sub ExtractReading {
             push @subrlist, $subReading;        # add every subReading name to list
             $val = FormatReading($hash, $context, $eNum, $val, $subReading);
                         
-            Log3 $name, 5, "$name: ExtractReading for $context$num-$group sets $subReading to $val";
-            Log3 $name, 5, "$name: ExtractReading value as hex is " . unpack ('H*', $val);
+            Log3 $name, 5, "$name: ExtractReading for $context$num-$group sets $subReading to " . ($val // 'undef');
+            Log3 $name, 5, "$name: ExtractReading value as hex is " . ($val ? unpack ('H*', $val) : 'undef');
             readingsBulkUpdate( $hash, $subReading, $val );
             # point from reading name back to the parsing definition as reading01 or get02 ...
             $hash->{defptr}{readingBase}{$subReading}   = $context;                 # used to find maxAge attr
