@@ -979,6 +979,8 @@ SVG_calcOffsets($$)
     }
 
     $fo = AttrVal( $wl, "fixedoffset", undef);
+    $FW_pos{off} = 0 if(!defined($FW_pos{off}));
+    $fo = AnalyzePerlCommand(undef,$1) if($fo && $fo =~ m/^{(.*)}$/); #134615
   }
 
   my $off = 0;
@@ -2677,7 +2679,10 @@ plotAsPng(@)
     <a id="SVG-attr-fixedoffset"></a>
     <li>fixedoffset &lt;offset&gt;<br>
         Set a fixed offset for the plot. The resolution is the currently
-        chosen zoom-level.
+        chosen zoom-level.<br>
+        Is evaluated as a perl expression, if enclosed in {}. If the current
+        resolution is day, fixedoffset with {$FW_pos{off}-1} will show the data
+        from the day before the current selection.
         </li><br>
 
     <a id="SVG-attr-label"></a>
@@ -2949,6 +2954,9 @@ plotAsPng(@)
     <li>fixedoffset &lt;offset&gt;<br>
       Verschiebt den Plot-Offset um einen festen Wert, die Einheit h&auml;ngt
       vom aktuellen Zoom-Level ab.
+      Wird als Perl-Ausdruck ausgewertet, falls der Wert in {} eingeschlossen
+      ist. Falls die aktuelle Aufl&ouml;sung Tag ist, dann zeigt
+      {$FW_pos{off}-1} den Tag vor den aktuell gew&auml;hlten an.
       </li><br>
 
     <a id="SVG-attr-fixedrange"></a>
