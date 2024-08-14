@@ -6307,21 +6307,21 @@ sub EnOcean_Set($@) {
       if ($cmd eq "desired-temp"|| $cmd eq "setpointTemp") {
         if (defined $a[1]) {
           if ($a[1] =~ m/^\d+(\.\d)?$/ && $a[1] >= 5 && $a[1] <= 40) {
-            $a[1] = sprintf "%d", $a[1];
+            $a[1] = sprintf "%.1f", (int(0.5 + 2 * $a[1]) / 2);
             readingsBeginUpdate($hash);
             if ($a[1] < 15) {
               $setpointBase = 15;
               $setpointShift =  $a[1] - $setpointBase;
-              $setpointShiftMax = $setpointBase - $a[1] if ($setpointShiftMax < -$setpointShift);
+              $setpointShiftMax = int(0.501 + $setpointBase - $a[1]) if ($setpointShiftMax < -$setpointShift);
               readingsBulkUpdate($hash, "setpointShiftMax", $setpointShiftMax);
             } elsif ($a[1] > 30) {
               $setpointBase = 30;
               $setpointShift =  $a[1] - $setpointBase;
-              $setpointShiftMax = $a[1] - $setpointBase  if ($setpointShiftMax < $setpointShift);
+              $setpointShiftMax = int(0.501 + $a[1] - $setpointBase) if ($setpointShiftMax < $setpointShift);
               readingsBulkUpdate($hash, "setpointShiftMax", $setpointShiftMax);
             } else {
-              $setpointBase = $a[1];
-              $setpointShift = 0;
+              $setpointBase = int($a[1]);
+              $setpointShift =  ($a[1] > int($a[1])) ? 0.5 : 0;
             }
             readingsBulkUpdate($hash, "setpointShift", $setpointShift);
             readingsBulkUpdate($hash, "setpointBase", $setpointBase);
@@ -6344,10 +6344,9 @@ sub EnOcean_Set($@) {
         if (defined $a[1]) {
           if ($a[1] =~ m/^\d+$/ && $a[1] >= 1 && $a[1] <= 10) {
             readingsBeginUpdate($hash);
-            if ($setpointTemp < 15 - $a[1]) {
-              $setpointShiftMax = 15 - $setpointTemp;
-            } elsif ($setpointTemp > 30 + $a[1]) {
-              $setpointShiftMax = $setpointTemp - 30;
+            my $requiredShiftMax = int(0.501 + abs($setpointShift));
+            if ($a[1] < $requiredShiftMax) {
+              $setpointShiftMax = $requiredShiftMax;
             } else {
               $setpointShiftMax = $a[1];
             }
@@ -6482,7 +6481,7 @@ sub EnOcean_Set($@) {
         }
 
       } else {
-        $cmdList .= "setpointTemp:slider,5,1,40 cooling:off,on desired-temp " .
+        $cmdList .= "setpointTemp:slider,5,0.5,40,1 cooling:off,on desired-temp " .
                     "fanSpeed:auto,off,1,2,3 heating:off,on occupancy:occupied,unoccupied " .
                     "setpointShiftMax:slider,1,1,10 setpointType:setpointShift,setpointTemp window:closed,open";
         return "Unknown argument $cmd, choose one of $cmdList";
@@ -6491,8 +6490,8 @@ sub EnOcean_Set($@) {
       $heating = $heating eq 'on' ? 0x40 : 0;
       $cooling = $cooling eq 'on' ? 0x20 : 0;
       $window = $window eq 'open' ? 0x10 : 0;
-      $setpointShift = int(($setpointShift + $setpointShiftMax) * 255 / ($setpointShiftMax * 2));
-      #$setpointShift = unpack('C', pack('c', $setpointShift));
+      #$setpointShift = int(($setpointShift + $setpointShiftMax) * 255 / ($setpointShiftMax * 2));
+      $setpointShift = int(128 + 127.5 * $setpointShift / $setpointShiftMax);
       my %fanSpeed = ('auto' => 0, 'off' => 1, 1 => 2, 2 => 3, 3 => 4);
       $occupancy = $occupancy eq 'occupied' ? 1 : 0;
       $data = sprintf "%02X%02X%02X%02X", $setpointType | $heating | $cooling | $window | 1,
@@ -12453,7 +12452,8 @@ sub EnOcean_Parse($$) {
           if (($waitingCmds & 3) == 0) {
             my $setpointShiftMax = ($db[0] & 0xF0) >> 4;
             push @event, "3:setpointShiftMax:$setpointShiftMax";
-            my $setpointShift = sprintf "%0.1f", (int(0.5 + $db[2] * $setpointShiftMax / 128 * 10) / 10 - $setpointShiftMax);
+            # my $setpointShift = sprintf "%0.1f", (int(0.5 + $db[2] * $setpointShiftMax / 128 * 10) / 10 - $setpointShiftMax);
+            my $setpointShift = sprintf "%0.1f", (int(0.5 + $db[2] * $setpointShiftMax / 128 * 2) / 2 - $setpointShiftMax);
             push @event, "3:setpointShift:$setpointShift";
             my $setpointBase = $db[1];
             push @event, "3:setpointBase:$setpointBase";
