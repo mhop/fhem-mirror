@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - redesign:36_Shelly.pm: Überarbeitung der HTTP-Kommunikation
+             zahlreiche Änderungen und Ergänzungen
+             siehe Forum ../Sonstige Systeme/Support-Thread Modul 36_Shelly.pm
  - feature: 31_HUEDevice.pm: added addlight and removelight command for groups
  - bufgix:  72_FRITZBOX: Fehler behoben bei FritzOS >= 6.69 und < 7.00
  - feature: 76_SolarForecast: improve manual setting of pvCorrectionFactor_XX
