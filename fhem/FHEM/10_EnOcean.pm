@@ -6491,7 +6491,8 @@ sub EnOcean_Set($@) {
       $cooling = $cooling eq 'on' ? 0x20 : 0;
       $window = $window eq 'open' ? 0x10 : 0;
       #$setpointShift = int(($setpointShift + $setpointShiftMax) * 255 / ($setpointShiftMax * 2));
-      $setpointShift = int(128 + 127.5 * $setpointShift / $setpointShiftMax);
+      my $offset = int(($setpointShiftMax - abs($setpointShift)) * 127.5 / $setpointShiftMax);
+      $setpointShift = ($setpointShift < 0) ? $offset : (255 - $offset);
       my %fanSpeed = ('auto' => 0, 'off' => 1, 1 => 2, 2 => 3, 3 => 4);
       $occupancy = $occupancy eq 'occupied' ? 1 : 0;
       $data = sprintf "%02X%02X%02X%02X", $setpointType | $heating | $cooling | $window | 1,
