@@ -456,7 +456,8 @@ FW_filterIcons()
 function
 FW_delete(cmd, fCmd)
 {
-  if($("body").attr("data-hiddenroom").match(/\binput\b/))
+  var hr = $("body").attr("data-hiddenroom"); // #138962
+  if(hr && hr.match(/\binput\b/))
     return FW_okDialog("Disabled");
 
   if(!fCmd)
