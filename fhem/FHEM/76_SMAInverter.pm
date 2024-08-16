@@ -32,6 +32,9 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.25.2" => "16.08.2024  fix IDC3 bug",
+  "2.25.1" => "21.04.2024  read Bat_Status",
+  "2.25.0" => "23.03.2024  PW Lengs set so max 18",
   "2.24.1" => "10.03.2024  GridConection (SI only)",
   "2.24.0" => "08.03.2024  add GridConection (SI/Hybrid-Inverter)",
   "2.23.8" => "21.01.2024  Voltage L1-L2-L3 bug",
@@ -394,6 +397,12 @@ sub SMAInverter_Define($$) {
 
  return "Wrong syntax: use define <name> SMAInverter <inv-userpwd> <inv-hostname/inv-ip > " if ((int(@a) < 4) and (int(@a) > 5));
 
+ my $Pass = $a[2];                        
+ my $password = SMAInverter_SMAencrypt($Pass);
+ $Pass = SMAInverter_SMAdecrypt( $password );
+ 
+ return "passwort longer then 18 char" if(length $Pass > 18); #check 1-18 Chars
+ 
  my $name                       = $hash->{NAME};
  $hash->{LASTUPDATE}            = 0;
  $hash->{INTERVAL}              = $hash->{HELPER}{INTERVAL} = AttrVal($name, "interval", 60);
@@ -414,8 +423,7 @@ sub SMAInverter_Define($$) {
 
  my ($IP,$Host,$Caps);
 
- my $Pass = $a[2];                        # to do: check 1-12 Chars
- my $password = SMAInverter_SMAencrypt($Pass);
+
  
  # extract IP or Hostname from $a[3]
  if (!defined $Host) {
@@ -723,6 +731,7 @@ sub SMAInverter_getstatusDoParse($) {
      $sup_SpotBatteryLoad,
      $sup_SpotBatteryUnload,
      $sup_DeviceStatus,
+	 $sup_BatStatus,
 	 $sup_Insulation_1,
 	 $sup_Insulation_2,
 	 $sup_EM_1,
@@ -746,7 +755,7 @@ sub SMAInverter_getstatusDoParse($) {
 	 $inv_SPOT_UAC1_2, $inv_SPOT_UAC2_3, $inv_SPOT_UAC3_1,
      $inv_SPOT_IAC1, $inv_SPOT_IAC2, $inv_SPOT_IAC3,
 	 $inv_SPOT_IAC1_Backup,$inv_SPOT_IAC2_Backup,$inv_SPOT_IAC3_Backup,
-	 $sup_SpotACCurrentBackup, $inv_BAT_rated_capacity, $inv_BAT_Typ,
+	 $sup_SpotACCurrentBackup, $inv_BAT_rated_capacity, $inv_BAT_Typ, $inv_BAT_STATUS,
 	 $inv_SPOT_CosPhi,
      $inv_BAT_UDC, $inv_BAT_UDC_A, $inv_BAT_UDC_B, $inv_BAT_UDC_C, 
      $inv_BAT_IDC, $inv_BAT_IDC_A, $inv_BAT_IDC_B, $inv_BAT_IDC_C,
@@ -951,8 +960,7 @@ sub SMAInverter_getstatusDoParse($) {
           push(@commands, "sup_MaxACPower2");           # Check MaxACPower2 ?
           push(@commands, "sup_GridRelayStatus");       # Check GridRelayStatus
           push(@commands, "sup_DeviceStatus");          # Check DeviceStatus
-          
-		  
+
 		  push(@commands, "sup_Firmware") if($readParameter == 1); #Read WR Firmwareversion
 		  
 		  if ($INVTYPE_NAME =~ /SBS(6\.0|5\.0|3\.7)/xs)
@@ -963,7 +971,8 @@ sub SMAInverter_getstatusDoParse($) {
 		  
 		  if ($INVCLASS eq "8007" || $INVCLASS eq "8009")
 		  {
-		    push(@commands, "sup_BatteryInfo_Capacity") if($readParameter == 1);  # Check BatteryInfo capacity
+		    push(@commands, "sup_BatStatus");          # Check DeviceStatus
+			push(@commands, "sup_BatteryInfo_Capacity") if($readParameter == 1);  # Check BatteryInfo capacity
 			#push(@commands, "sup_BatteryInfo_3");     
 			push(@commands, "sup_BatteryInfo_4") if($readParameter == 1);   # Check BatteryInfo rated apacity 
 			#push(@commands, "sup_BatteryInfo_5");    
@@ -1132,6 +1141,10 @@ sub SMAInverter_getstatusDoParse($) {
              elsif ($i eq "sup_DeviceStatus") {
 			     Log3 $name, 5, "$name -> sup_DeviceStatus";
                  ($sup_DeviceStatus,$inv_STATUS,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x00214800, 0x002148FF);
+             }
+			 elsif ($i eq "sup_BatStatus") {
+			     Log3 $name, 5, "$name -> sup_BatStatus";
+                 ($sup_BatStatus,$inv_BAT_STATUS,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x08214800, 0x082148FF);
              }
              elsif ($i eq "sup_SpotBatteryLoad") {
 			     Log3 $name, 5, "$name -> sup_SpotBatteryLoad";
@@ -1404,6 +1417,9 @@ sub SMAInverter_getstatusDoParse($) {
 					 push(@row_array, "bat_temp_b ".$inv_BAT_TEMP_B."\n") if ($inv_BAT_TEMP_B ne "-");
 					 push(@row_array, "bat_temp_c ".$inv_BAT_TEMP_C."\n") if ($inv_BAT_TEMP_C ne "-");
                  }
+				 if($sup_BatStatus) {
+                     push(@row_array, "bat_status ".SMAInverter_StatusText($inv_BAT_STATUS)."\n");
+                 }
                  if($sup_SpotGridFrequency) {
                      push(@row_array, "grid_freq ".sprintf("%.2f",$inv_SPOT_FREQ)."\n");
                  }
@@ -1623,6 +1639,9 @@ sub SMAInverter_getstatusDoParse($) {
 					 push(@row_array, "BAT_TEMP_B ".$inv_BAT_TEMP_B."\n") if ($inv_BAT_TEMP_B ne "-");
 					 push(@row_array, "BAT_TEMP_C ".$inv_BAT_TEMP_C."\n") if ($inv_BAT_TEMP_C ne "-");
                  }
+				 if($sup_BatStatus) {
+                     push(@row_array, "BAT_STATUS ".SMAInverter_StatusText($inv_BAT_STATUS)."\n");
+                 }
                  if($sup_SpotGridFrequency) {
                      push(@row_array, "SPOT_FREQ ".$inv_SPOT_FREQ."\n");
                  }
@@ -1829,7 +1848,7 @@ sub SMAInverter_SMAcommand($$$$$) {
      $inv_BAT_CYCLES, $inv_BAT_CYCLES_A, $inv_BAT_CYCLES_B, $inv_BAT_CYCLES_C,
      $inv_BAT_TEMP, $inv_BAT_TEMP_A, $inv_BAT_TEMP_B, $inv_BAT_TEMP_C,
      $inv_BAT_LOADTODAY, $inv_BAT_LOADTOTAL, $inv_BAT_CAPACITY,$inv_BAT_UNLOADTODAY,$inv_BAT_UNLOADTOTAL,
-	 $inv_BAT_rated_capacity,
+	 $inv_BAT_rated_capacity, $inv_BAT_STATUS,
      $inv_SPOT_FREQ, $inv_SPOT_OPERTM, $inv_SPOT_FEEDTM, $inv_TEMP, $inv_GRIDRELAY, $inv_STATUS,
 	 $inv_BACKUPRELAY, $inv_OperatingStatus, $inv_GeneralOperatingStatus, $inv_WaitingTimeUntilFeedIn, $inv_GridConection,
 	 $Meter_Grid_FeedIn, $Meter_Grid_Consumation, $Meter_Total_FeedIn, $Meter_Total_Consumation,
@@ -2297,14 +2316,14 @@ sub SMAInverter_SMAcommand($$$$$) {
 		$inv_SPOT_UDC3 = unpack("l*", substr $data, 118, 4);
         $inv_SPOT_IDC1 = unpack("l*", substr $data, 146, 4);
         $inv_SPOT_IDC2 = unpack("l*", substr $data, 170, 4);
-		$inv_SPOT_IDC2 = unpack("l*", substr $data, 202, 4);
+		$inv_SPOT_IDC3 = unpack("l*", substr $data, 202, 4);
      }
      if(($inv_SPOT_UDC1 eq -2147483648) || ($inv_SPOT_UDC1 eq 0xFFFFFFFF)) {$inv_SPOT_UDC1 = 0; } elsif($inv_SPOT_UDC1 ne "-") {$inv_SPOT_UDC1 = $inv_SPOT_UDC1 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
      if(($inv_SPOT_UDC2 eq -2147483648) || ($inv_SPOT_UDC2 eq 0xFFFFFFFF)) {$inv_SPOT_UDC2 = 0; } elsif($inv_SPOT_UDC2 ne "-") {$inv_SPOT_UDC2 = $inv_SPOT_UDC2 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
 	 if(($inv_SPOT_UDC3 eq -2147483648) || ($inv_SPOT_UDC3 eq 0xFFFFFFFF)) {$inv_SPOT_UDC3 = 0; } elsif($inv_SPOT_UDC3 ne "-") {$inv_SPOT_UDC3 = $inv_SPOT_UDC3 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
      if(($inv_SPOT_IDC1 eq -2147483648) || ($inv_SPOT_IDC1 eq 0xFFFFFFFF)) {$inv_SPOT_IDC1 = 0; } elsif($inv_SPOT_IDC1 ne "-") {$inv_SPOT_IDC1 = $inv_SPOT_IDC1 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
      if(($inv_SPOT_IDC2 eq -2147483648) || ($inv_SPOT_IDC2 eq 0xFFFFFFFF)) {$inv_SPOT_IDC2 = 0; } elsif($inv_SPOT_IDC2 ne "-") {$inv_SPOT_IDC2 = $inv_SPOT_IDC2 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IDC3 eq -2147483648) || ($inv_SPOT_IDC3 eq 0xFFFFFFFF)) {$inv_SPOT_IDC3 = 0; } elsif($inv_SPOT_IDC3 ne "-") {$inv_SPOT_IDC3 = $inv_SPOT_IDC2 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_IDC3 eq -2147483648) || ($inv_SPOT_IDC3 eq 0xFFFFFFFF)) {$inv_SPOT_IDC3 = 0; } elsif($inv_SPOT_IDC3 ne "-") {$inv_SPOT_IDC3 = $inv_SPOT_IDC3 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
 	 
      Log3 $name, 5, "$name - Found Data SPOT_UDC1=$inv_SPOT_UDC1, SPOT_UDC2=$inv_SPOT_UDC2, SPOT_UDC3=$inv_SPOT_UDC3, SPOT_IDC1=$inv_SPOT_IDC1, SPOT_IDC2=$inv_SPOT_IDC2 and SPOT_IDC3=$inv_SPOT_IDC3";
      return (1,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_UDC3,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_SPOT_IDC3,$inv_susyid,$inv_serial);
@@ -2580,6 +2599,19 @@ sub SMAInverter_SMAcommand($$$$$) {
          Log3 $name, 5, "$name - Found Data inv_STATUS=$inv_STATUS";
          return (1,$inv_STATUS,$inv_susyid,$inv_serial);
  }
+ 
+ if($data_ID eq 0x414D) {
+     $i = 0;
+     $temp = 0;
+     $inv_BAT_STATUS = 0x00FFFFFD;      # Code for No Information;
+     do {
+         $temp = unpack("V*", substr $data, 62 + $i*4, 4);
+         if(($temp & 0xFF000000) ne 0) { $inv_BAT_STATUS = $temp & 0x00FFFFFF; }
+         $i = $i + 1;
+     } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));    # 0x00FFFFFE is the end marker for attributes
+         Log3 $name, 5, "$name - Found Data inv_BAT_STATUS=$inv_BAT_STATUS";
+         return (1,$inv_BAT_STATUS,$inv_susyid,$inv_serial);
+ } 
 
  if($data_ID eq 0x4125) {
      $i = 0;
@@ -2651,7 +2683,7 @@ sub SMAInverter_SMAlogon($$$) {
  # Parameters: host - passcode
  my ($host,$pass,$hash)  = @_;
  my $cmdheader           = "534D4100000402A00000000100";
- my $pktlength           = "3A";                             # length = 58 for logon command
+ my $pktlength           = "42";                             # length = 66 for logon command (old 3A = 58)
  my $esignature          = "001060650EA0";
  my $name                = $hash->{NAME};
  my $mysusyid            = $hash->{HELPER}{MYSUSYID};
@@ -2668,10 +2700,10 @@ sub SMAInverter_SMAlogon($$$) {
 
  #Encode the password
  $pass = SMAInverter_SMAdecrypt( $pass );
- my $encpasswd = "888888888888888888888888"; # template for password
+ my $encpasswd = "8888888888888888888888888888888888888888"; # template for password
  for my $index (0..length $pass )        # encode password
  {
-     if ( (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1))) < 256 ) {
+    if ( (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1))) < 256 ) {
         substr($encpasswd,($index*2),2) = substr(sprintf ("%lX", (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1)))),0,2);
     } else {
         substr($encpasswd,($index*2),2) = substr(sprintf ("%lX", (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1)))),1,2);
@@ -3559,7 +3591,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.24.1",
+  "version": "v2.25.2",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
