@@ -1861,7 +1861,7 @@ sub SunRise($$$$$$$$){
       }
     }elsif ($zone<0) {
       #rise time was yesterday local time -> calculate rise time for previous UTC day
-      if ($rise<-$zone || $transit<-zone || $set<-zone) {
+      if ($rise<-$zone || $transit<-$zone || $set<-zone) {
         ($transittemp,$risetemp,$settemp) = SunRise($JD-1, $deltaT, $lon, $lat, $zone, $horM, $horE, 1);
       $transit = $transittemp
         if ($transit<-$zone);
