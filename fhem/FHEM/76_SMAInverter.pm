@@ -32,6 +32,7 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.25.3" => "16.08.2024  fix IDC2 bug 3MPP",
   "2.25.2" => "16.08.2024  fix IDC3 bug",
   "2.25.1" => "21.04.2024  read Bat_Status",
   "2.25.0" => "23.03.2024  PW Lengs set so max 18",
@@ -2315,7 +2316,7 @@ sub SMAInverter_SMAcommand($$$$$) {
 		$inv_SPOT_UDC2 = unpack("l*", substr $data, 90, 4);
 		$inv_SPOT_UDC3 = unpack("l*", substr $data, 118, 4);
         $inv_SPOT_IDC1 = unpack("l*", substr $data, 146, 4);
-        $inv_SPOT_IDC2 = unpack("l*", substr $data, 170, 4);
+        $inv_SPOT_IDC2 = unpack("l*", substr $data, 174, 4);
 		$inv_SPOT_IDC3 = unpack("l*", substr $data, 202, 4);
      }
      if(($inv_SPOT_UDC1 eq -2147483648) || ($inv_SPOT_UDC1 eq 0xFFFFFFFF)) {$inv_SPOT_UDC1 = 0; } elsif($inv_SPOT_UDC1 ne "-") {$inv_SPOT_UDC1 = $inv_SPOT_UDC1 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
@@ -3591,7 +3592,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.25.2",
+  "version": "v2.25.3",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
