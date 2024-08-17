@@ -100,6 +100,11 @@
 # 6.00 Beta_4  add: client without definition --> reading 'no definition'
 #           new: attr timeout controls write out readings with response times
 # 6.00      fix some details in commandref (german only)
+# 6.00.1    fix: selection of readings for command 'set clear responsetimes' improved; Debug commands removed
+
+# to do     roller: get maxtime open/close from shelly
+#           get status on stopp even when interval == 0
+#           check write out of reading /_nextUpdateTimer
 
 
 package main;
@@ -118,7 +123,7 @@ sub Log($$);
 sub Shelly_Set ($@);
 
 #-- globals on start
-my $version = "6.00 15.08.2024";
+my $version = "6.00.1 18.08.2024";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -1336,7 +1341,7 @@ sub Shelly_Attr(@) {
     }
   #---------------------------------------
   }elsif( $init_done == 0 ){
-	Log3 $name,5,"[Shelly_Attr Debug]leaving Shelly_Attr for cmd $attrName while init is not finished ";
+	Log3 $name,5,"[Shelly_Attr:noinit]leaving Shelly_Attr for cmd $attrName while init is not finished ";
        return undef;
 
   ########## following commands are only passed when init is done ! #############
@@ -1580,6 +1585,8 @@ sub Shelly_Attr(@) {
           return $error;
       }elsif( $attrVal == 0 ){
           readingsSingleUpdate( $hash,"state","disabled",1 );
+  readingsSingleUpdate($hash,"/_nextUpdateTimer","disabled",1)
+                                        if(0&& AttrVal($name,'timeout',undef) );
       }
       #-- update timer
       if(0&& $model eq "shellypro3em" && $attrVal > 0 ){
@@ -1827,9 +1834,19 @@ sub Shelly_Set ($@) {
   my $name  = shift @a;
   my $cmd   = shift @a;  my @args=@a;
 
-  my $parameters=( scalar(@a)?" and ".scalar(@a)." parameters: ".join(" ",@a) : ", no parameters" );
-  Log3 $name,4,"[Shelly_Set] calling for device $name with command \'$cmd\'$parameters"  if( defined($cmd) && $cmd ne "?");#4
+  my $parameters;  ##=( scalar(@a)?" and ".scalar(@a)." parameters: ".join(" ",@a) : ", no parameters" );
+  if( defined($cmd) && $cmd ne "?"){
+      if( scalar(@a) ){
+          $parameters= join(" ",@a); 
+          $parameters = " and ".scalar(@a)." parameters: ".$parameters;
+      }else{
+          $parameters=", no parameters" ;
+      }
+      readingsSingleUpdate($hash,"/_set.command",join(" ",$cmd,@a),1) if( AttrVal($name,"timeout",undef) );
+      Log3 $name,3,"[Shelly_Set] calling for device $name with command \'$cmd\'$parameters";  #4
+  }
 
+    
   my $value = shift @a;  # 1st parameter
 
   $name = $hash->{NAME}   if( !defined($name) );
@@ -1917,6 +1934,8 @@ sub Shelly_Set ($@) {
     Log3 $name,6,"[Shelly_Set] calling for device $name with command $cmd".( defined($value)?" and channel $value":", without channel" ).
                                                                             (defined($isWhat)?", iswhat=$isWhat":", isWhat not defined"); #6
     readingsBeginUpdate($hash);
+    
+    readingsBulkUpdateMonitored($hash,"/_set.command","$cmd $parameters") if(0&& AttrVal($name,"timeout",undef) );
     if( $cmd =~ /^(out)/ ){
        my $channels = maxNum($shelly_models{$model}[0],$shelly_models{$model}[2]); # device has one or more relay or dimmer - channels
        $channels = 1  if( !$value );  #no channel given - change of single channel device output
@@ -2066,17 +2085,17 @@ if(0){
       my $actionselect = shift @a;
       my $actionchannel = shift @a;
       $actionselect = "" if( !defined($actionselect) );
-      $actionselect = "info" if( $actioncmd eq "y" ); # for debugging only
+      $actionselect = "info" if( $actioncmd eq "y" ); # for_debugging only
       Log3 $name,4,"[Shelly_Set:actions] $name: \'set $cmd $actioncmd $actionselect\' called";
       my $gen=$shelly_models{$model}[4];
       #-- check parameter
       if( $actioncmd eq "y" ){ #ok
       }elsif( $actioncmd !~ /create|delete|disable|enable|update|y/ ){
           return "Command \'$actioncmd\' is not valid";
-      }elsif( $actioncmd !~ /create|enable/ && ReadingsNum($name,"webhook_cnt",0)==0 ){
+      }elsif( $actioncmd !~ /create|enable/ && ReadingsNum($name,"webhook_cnt",0)==0 ){  # commands:  delete, disable, update
           return "No enabled actions on device $name";
       }elsif( $actioncmd =~ /update/ ){
-          return "Please define attr webhook first"   if( !defined(AttrVal($name,"webhook",undef)) );
+          return "$name: Please define attr webhook first"   if( !defined(AttrVal($name,"webhook",undef)) );
       }
       if( $gen == 0 ){
           $actionchannel=0 unless( defined($actionchannel) );
@@ -2212,7 +2231,7 @@ if(0){
         $delta =~ m/(.*):(.*)/;
             $delta = $1;
             $transit=$2;
-            Debug "$1 - $2";
+            #Debug "$1 - $2";
             return "brightness-difference not given or not numerical" if( $delta =~ /\D/ );
             return "transit duration not given or not numerical" if( $transit !~ /[\d.]/ );
             return "transit duration must not exceed 5 sec" if( $transit>5 && ReadingsVal($name,"model_family","-") eq "Gen1" );
@@ -2728,6 +2747,9 @@ if(0){
           RemoveInternalTimer($hash,"Shelly_getEMData");
       if( $timer ){
         $msg = "(Re-)Starting cyclic timers: ";
+  #---------------------------
+  readingsSingleUpdate($hash,"/_nextUpdateTimer",$timer.$si_units{time}[$hash->{units}],1)
+                                        if(0&& AttrVal($name,'timeout',undef) );
         InternalTimer(time()+$timer, "Shelly_status", $hash);
         $msg .= "status-timer=$timer";
         if( $model eq "shellypro3em" ){
@@ -2744,8 +2766,10 @@ if(0){
         }
       }else{
            $msg =  "Device $name is disabled, timer canceled";
+#  readingsSingleUpdate($hash,"/_nextUpdateTimer","disabled",1)
+ #                                       if( AttrVal($name,'timeout',undef) );
       }
-      Log3 $name,4,"[Shelly_Set:startTimer] $name: $msg";
+      Log3 $name,3,"[Shelly_Set:startTimer] $name: $msg";
       return undef;
 
   }elsif( $cmd eq "calibrate" ){  # shelly-dimmer
@@ -2798,11 +2822,8 @@ if(0){
          readingsSingleUpdate($hash,"error","-",1);
       }elsif( $doreset eq "responsetimes" ){
          my $ptrclrcnt = 0;
-         foreach my $ptr ('/rpc/Shelly.GetStatus','/rpc/Shelly.GetConfig','/rpc/Shelly.GetDeviceInfo','/rpc/EM.GetStatus','/rpc/EMData.GetStatus',
-                          '/rpc/BLE.CloudRelay.List','/rpc/Webhook.List','/rpc/Webhook.Update','/rpc/Wifi.ListAPClients',
-                          '/rpc/PM1.ResetCounters',
-                          '/shelly','/status','/settings','/settings/actions','/_nextUpdateTimer' ){
-             if( ReadingsVal($name,$ptr,undef) ){
+         foreach my $ptr ( keys %{$defs{$name}{READINGS}} ){
+             if( $ptr =~ /^\// ){  # select all readings beginning with a '/'
                  readingsSingleUpdate($hash,$ptr,"-",1);  #clear process time reading
                  $ptrclrcnt++;
              }
@@ -3147,10 +3168,10 @@ sub Shelly_status1G {
          #-- timer
          my $remaining  = $jhash->{relays}[$i]{timer_remaining};
          readingsBulkUpdateMonitored($hash,"timer".$subs,$remaining.$si_units{time}[$hash->{units}]);
-         #-- nextUpdateTimer
+         #-- next update timer
          if( $remaining>0 && AttrVal($name,'verbose',1) > 5 ){
              $intervalN  = minNum($intervalN,$remaining+0.95);
-             readingsBulkUpdateMonitored($hash,"/_nextUpdateTimer",$intervalN.$si_units{time}[$hash->{units}]);
+      #       readingsBulkUpdateMonitored($hash,"/_nextUpdateTimer",$intervalN.$si_units{time}[$hash->{units}]);
          }
       }else{  # Shelly4pro
          my $onofftmr = 0;
@@ -3292,7 +3313,7 @@ sub Shelly_status1G {
       readingsBulkUpdateMonitored($hash,"timer".$subs,$remaining.$si_units{time}[$hash->{units}]);
       $intervalN  = minNum($intervalN,$remaining+0.95)   if( $remaining>0 );
       readingsBulkUpdateMonitored($hash,"/_nextUpdateTimer",$intervalN.$si_units{time}[$hash->{units}])
-                                               if( AttrVal($name,'timeout',undef) );
+                                               if(0&& AttrVal($name,'timeout',undef) );
 
       # source
       $source = $jhash->{'lights'}[$i]{'source'};  # 'timer' will occur as 'http'
@@ -4353,7 +4374,7 @@ sub Shelly_status2G {
     }
   }
   readingsSingleUpdate($hash,"/_nextUpdateTimer",$timer.$si_units{time}[$hash->{units}],1)
-                                                  if( AttrVal($name,'timeout',undef) ); ## for debugging only 
+                                                  if(0&& AttrVal($name,'timeout',undef) ); 
 
   if( $hash->{INTERVAL}>0 ){
       #-- initiate next run
@@ -4899,7 +4920,7 @@ sub Shelly_procEMvalues {
 
           $reading=$pr.$mapping{E1}{aprt_power}.$ps;
           $aprt_power=$jhash->{$emch.'aprt_power'};
-   Debug "may be system error" if( !defined($aprt_power) );
+   #Debug "may be system error" if( !defined($aprt_power) );
           $value  =sprintf("%4.1f%s",$aprt_power, $si_units{apparentpower}[$hash->{units}] );
           readingsBulkUpdateMonitored($hash,$reading,$value);
           $reading=$pr.$mapping{E1}{act_power}.$ps;
@@ -5353,14 +5374,14 @@ sub Shelly_response {
         }
 
         # check on successful execution
-        $urlcmd =~ m/\/(\d)\?turn=(o.*)(\&timer=)?(\d+)?/;  #
+        $urlcmd =~ m/\/(\d)\?turn=(o.*)(\&timer=)?(\d+)?/;
         my $channel = $1;
         my $turnstate=$2; #Debug $turnstate;
         $onofftimer = $4  if( $model eq "shelly4" && $urlcmd=~/timer/ ); # get remaining time from command (is not supported by /status call)
 
         Log3 $name,1,"[Shelly_response:onoff] returns with problem for device $name, timer not set"   if( $4 && !$hastimer );
         
-        $urlcmd =~ m/turn=(on|off)/; Debug $1;
+        $urlcmd =~ m/turn=(on|off)/; #Debug $1;
         Log3 $name,1,"[Shelly_response:onoff] returns without success for device $name, cmd=$urlcmd but ison=$ison vs $1" if( $ison ne $1 );
 
         if( defined($overpower) && $overpower eq "1") {
@@ -5521,7 +5542,7 @@ if(0){
   }
   #---------------------------
   readingsSingleUpdate($hash,"/_nextUpdateTimer",$timer.$si_units{time}[$hash->{units}],1)
-                                        if( AttrVal($name,'timeout',undef) ); ## for debugging only
+                                        if(0&& AttrVal($name,'timeout',undef) ); 
   #-- Call status after switch.
   Log3 $name,4,"[Shelly_response] scheduled status call for $name in $timer sec";
   RemoveInternalTimer($hash,"Shelly_status");
@@ -5927,8 +5948,11 @@ sub Shelly_webhook_update {
                 Log3 $name,4, "[Shelly_webhook_update] $name: checking action with hookid $sh_hookid";
             }
             $sh_hookname = $jhash->{hooks}[$i]{name};
-            if( $sh_hookname !~ /^_/ ){
-                Log3 $name,4,"[Shelly_webhook_update] hookname $sh_hookname not selected, skipping update";
+            if( !defined($sh_hookname) ){
+                Log3 $name,1,"[Shelly_webhook_update] $name: expected hookname for hook-ID=$sh_hookid ($i) not given, skipping"  ;
+                next;
+            }elsif( $sh_hookname !~ /^_/ ){
+                Log3 $name,4,"[Shelly_webhook_update] $name: hookname $sh_hookname not selected, skipping update";
                 next;
             }
             $urlcmd = "";
@@ -6021,7 +6045,6 @@ sub Shelly_webhook_update {
             }
         }
   }
-  #Debug $msg;
   #  FW_directNotify("FILTER=$name","#FHEMWEB:$FW_wname","FW_okDialog( \"$msg\" )", "");
   if( $ttlChanges == 0 ){
         Log3 $name,3,"[Shelly_webhook_update] $name: no actions to update";
@@ -7533,11 +7556,14 @@ sub Shelly_HttpResponse($){
                 </li>
              <li>
                 <a id="Shelly-attr-timeout"></a>
-                <code>attr &lt;name&gt; timeout &lt;timeout&gt;</code>
+                <code>attr &lt;name&gt; timeout &lt;seconds&gt;</code>
                 <br />Zeitlimit für nichtblockierende Anfragen an den Shelly. Der Standardwert ist 4 Sekunden.
                 Dieses Attribut sollte bei Timingproblemen ('connect to ... timed out' in der Logdatei) angepasst werden. 
-                <br />Durch das Setzen dieses Attributs werden für die diversen Anfragen an den Shelly Readings mit Angaben der Reaktionszeit geschrieben. 
-                Diese Readings werden durch Löschen des Attributes entfernt.
+                <br />Durch das Setzen dieses Attributs werden für die diversen Anfragen an den Shelly Readings (beginnend mit '/') 
+                      mit Angaben der Reaktionszeit, 
+                      der letzte Set-Befehl sowie die Zeitspanne bis zur nächsten Status-Aktualisierung geschrieben. 
+                      Diese Readings werden durch Löschen des Attributes entfernt und 
+                      mit <code>set &lt;name&gt; clear responsetimes</code> zurückgesetzt.
                 </li>
              <li>
                 <a id="Shelly-attr-webhook"></a>
