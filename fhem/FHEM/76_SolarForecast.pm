@@ -155,6 +155,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.30.0" => "18.08.2024  new attribute flowGraphicShift, Forum:https://forum.fhem.de/index.php?msg=1318597 ",
+  "1.29.4" => "03.08.2024  delete writeCacheToFile from _getRoofTopData, _specialActivities: avoid loop caused by \@widgetreadings ",
   "1.29.3" => "20.07.2024  eleminate hand over \$hash in _getRoofTopData routines, fix label 'gcon' to 'gcons' ",
   "1.29.2" => "17.06.2024  ___readCandQ: improve manual setting of pvCorrectionFactor_XX ",
   "1.29.1" => "17.06.2024  fix Warnings, Forum: https://forum.fhem.de/index.php?msg=1315283, fix roofIdentPair ",
@@ -1187,6 +1189,7 @@ sub Initialize {
                                 "flowGraphicSize ".
                                 "flowGraphicAnimate:1,0 ".
                                 "flowGraphicConsumerDistance:slider,80,10,500 ".
+                                "flowGraphicShift:slider,-80,5,80 ".
                                 "flowGraphicShowConsumer:1,0 ".
                                 "flowGraphicShowConsumerDummy:1,0 ".
                                 "flowGraphicShowConsumerPower:0,1 ".
@@ -2591,7 +2594,6 @@ sub __solCast_ApiRequest {
   my $hash       = $defs{$name};
   
   if (!$allstrings) {                                                   # alle Strings wurden abgerufen
-      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);         # Cache File SolCast API Werte schreiben
       return;
   }
 
@@ -3009,7 +3011,6 @@ sub __forecastSolar_ApiRequest {
   my $hash       = $defs{$name};
 
   if (!$allstrings) {                                                                  # alle Strings wurden abgerufen
-      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                        # Cache File API Werte schreiben
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1;
       return;
   }
@@ -3906,7 +3907,6 @@ sub __openMeteoDWD_ApiRequest {
   my $hash       = $defs{$name};
   
   if (!$allstrings) {                                                        # alle Strings wurden abgerufen
-      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);
       my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $ometeorepdef);
       readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1;
@@ -6160,8 +6160,6 @@ sub writeCacheToFile {
   }
 
   my $type = $hash->{TYPE};
-
-  my @data;
   my ($error, $err, $lw);
 
   if ($cachename eq 'aitrained') {
@@ -6188,12 +6186,12 @@ sub writeCacheToFile {
 
       if ($data) {
           $error = fileStore ($data, $file);
-      }
-
-      if ($error) {
-          $err = qq{ERROR while writing AI data to file "$file": $error};
-          Log3 ($name, 1, "$name - $err");
-          return $err;
+          
+          if ($error) {
+              $err = qq{ERROR while writing AI data to file "$file": $error};
+              Log3 ($name, 1, "$name - $err");
+              return $err;
+          }
       }
 
       $lw                 = gettimeofday();
@@ -6206,15 +6204,15 @@ sub writeCacheToFile {
   if ($cachename eq 'dwdcatalog') {
       if (scalar keys %{$data{$type}{$name}{dwdcatalog}}) {
           $error = fileStore ($data{$type}{$name}{dwdcatalog}, $file);
+          
+          if ($error) {
+              $err = qq{ERROR while writing DWD Station Catalog to file "$file": $error};
+              Log3 ($name, 1, "$name - $err");
+              return $err;
+          }
       }
       else {
           return "The DWD Station Catalog is empty";
-      }
-
-      if ($error) {
-          $err = qq{ERROR while writing DWD Station Catalog to file "$file": $error};
-          Log3 ($name, 1, "$name - $err");
-          return $err;
       }
 
       return;
@@ -6225,12 +6223,12 @@ sub writeCacheToFile {
 
       if (scalar keys %{$plantcfg}) {
           $error = fileStore ($plantcfg, $file);
-      }
-
-      if ($error) {
-          $err = qq{ERROR writing cache file "$file": $error};
-          Log3 ($name, 1, "$name - $err");
-          return $err;
+          
+          if ($error) {
+              $err = qq{ERROR writing cache file "$file": $error};
+              Log3 ($name, 1, "$name - $err");
+              return $err;
+          }
       }
 
       $lw                 = gettimeofday();
@@ -6241,10 +6239,11 @@ sub writeCacheToFile {
   }
 
   return if(!$data{$type}{$name}{$cachename});
-  my $json = encode_json ($data{$type}{$name}{$cachename});
-  push @data, $json;
-
-  $error = FileWrite ($file, @data);
+  
+  my @arr;
+  push @arr, encode_json ($data{$type}{$name}{$cachename});
+  
+  $error = FileWrite ($file, @arr);
 
   if ($error) {
       $err = qq{ERROR writing cache file "$file": $error};
@@ -6497,36 +6496,6 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  my $val = ReadingsVal ($name, 'currentMeterDev', '');                       # 01.06.2024
-  if ($val) {
-      CommandAttr (undef, "$name setupMeterDev $val");
-      readingsDelete ($hash, 'currentMeterDev');
-  }
-
-  my $val1 = ReadingsVal ($name, 'currentBatteryDev', '');                    # 02.06.2024
-  if ($val1) {
-      CommandAttr (undef, "$name setupBatteryDev $val1");
-      readingsDelete ($hash, 'currentBatteryDev');
-  }
-
-  my $idts = ReadingsTimestamp ($name, 'currentInverterDev', '');             # 02.06.2024
-  if ($idts) {
-      $idts = timestringToTimestamp ($idts);
-      $data{$type}{$name}{circular}{99}{attrInvChangedTs} = $idts;
-  }
-
-  my $val2 = ReadingsVal ($name, 'currentInverterDev', '');                    # 03.06.2024
-  if ($val2) {
-      CommandAttr (undef, "$name setupInverterDev $val2");
-      readingsDelete ($hash, 'currentInverterDev');
-  }
-
-  my $val3 = ReadingsVal ($name, 'inverterStrings', '');                    # 05.06.2024
-  if ($val3) {
-      CommandAttr (undef, "$name setupInverterStrings $val3");
-      readingsDelete ($hash, 'inverterStrings');
-  }
-
   my $val4 = ReadingsVal ($name, 'currentRadiationAPI', '');                    # 10.06.2024
   if ($val4) {
       CommandAttr (undef, "$name setupRadiationAPI $val4");
@@ -7145,7 +7114,7 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 1 started");
 
-          $date = strftime "%Y-%m-%d", localtime($t-7200);                                   # Vortag (2 h Differenz reichen aus)
+          $date = strftime "%Y-%m-%d", localtime($t-7200);                                         # Vortag (2 h Differenz reichen aus)
           $ts   = $date." 23:59:59";
 
           $pvfc = ReadingsNum ($name, "Today_Hour24_PVforecast", 0);
@@ -7162,8 +7131,13 @@ sub _specialActivities {
           readingsDelete    ($hash, 'Today_PVdeviation');
           readingsDelete    ($hash, 'Today_PVreal');
 
-          for my $wdr (@widgetreadings) {                                                     # Array der Hilfsreadings (Attributspeicher) löschen
-              readingsDelete ($hash, $wdr);
+          if (scalar(@widgetreadings)) {                                                          # vermeide Schleife falls FHEMWEB geöfffnet
+              my @acopy       = @widgetreadings;
+              @widgetreadings = ();                                                       
+              
+              for my $wdr (@acopy) {                                                              # Array der Hilfsreadings (Attributspeicher) löschen
+                  readingsDelete ($hash, $wdr);
+              }
           }
 
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests};
@@ -10319,17 +10293,7 @@ sub __getCyclesAndRuntime {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  my $nds = ConsumerVal ($hash, $c, 'numberDayStarts', 'leer');           # 28.05.2024
-  my $art = ConsumerVal ($hash, $c, 'avgruntime', 'leer');
-  if ($nds ne 'leer') {
-      $data{$type}{$name}{consumers}{$c}{cycleDayNum} = $nds;
-      delete $data{$type}{$name}{consumers}{$c}{numberDayStarts};
-  }
 
-  if ($art ne 'leer') {
-      $data{$type}{$name}{consumers}{$c}{runtimeAvgDay} = $art;
-      delete $data{$type}{$name}{consumers}{$c}{avgruntime};
-  }
   ##########################################################################################################################
 
   my ($starthour, $startday);
@@ -11540,6 +11504,7 @@ sub entryGraphic {
       hdrDetail      => AttrVal ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
       flowgsize      => AttrVal ($name, 'flowGraphicSize',        $flowGSizedef),                # Größe Energieflußgrafik
       flowgani       => AttrVal ($name, 'flowGraphicAnimate',                 0),                # Animation Energieflußgrafik
+      flowgshift     => AttrVal ($name, 'flowGraphicShift',                   0),                # Verschiebung der Flußgrafikbox (muß negiert werden)
       flowgcons      => AttrVal ($name, 'flowGraphicShowConsumer',            1),                # Verbraucher in der Energieflußgrafik anzeigen
       flowgconX      => AttrVal ($name, 'flowGraphicShowConsumerDummy',       1),                # Dummyverbraucher in der Energieflußgrafik anzeigen
       flowgconsPower => AttrVal ($name, 'flowGraphicShowConsumerPower'     ,  1),                # Verbraucher Leistung in der Energieflußgrafik anzeigen
@@ -11710,17 +11675,7 @@ sub _checkSetupNotComplete {
   my $type  = $hash->{TYPE};
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ##########################################################################################
-  my $val2 = ReadingsVal ($name, 'currentInverterDev', '');                    # 03.06.2024
-  if ($val2) {
-      CommandAttr (undef, "$name setupInverterDev $val2");
-  }
-
-  my $val3 = ReadingsVal ($name, 'inverterStrings', '');                       # 05.06.2024
-  if ($val3) {
-      CommandAttr (undef, "$name setupInverterStrings $val3");
-  }
-  
+  ##########################################################################################  
   my $dir = ReadingsVal ($name, 'moduleAzimuth', '');                         # 16.06.2024
   if ($dir) {
       readingsSingleUpdate ($hash, 'setupStringAzimuth', $dir, 0);
@@ -13610,10 +13565,11 @@ sub _flowGraphic {
   my $name          = $paref->{name};
   my $flowgsize     = $paref->{flowgsize};
   my $flowgani      = $paref->{flowgani};
-  my $flowgcons     = $paref->{flowgcons};
+  my $flowgshift    = $paref->{flowgshift};                   # Verschiebung der Flußgrafikbox (muß negiert werden)
+  my $flowgcons     = $paref->{flowgcons};                    # Verbraucher in der Energieflußgrafik anzeigen
+  my $flowgconTime  = $paref->{flowgconsTime};                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
   my $flowgconX     = $paref->{flowgconX};
   my $flowgconPower = $paref->{flowgconsPower};
-  my $flowgconTime  = $paref->{flowgconsTime};
   my $consDist      = $paref->{flowgconsDist};
   my $css           = $paref->{css};
   
@@ -13666,14 +13622,14 @@ sub _flowGraphic {
 
   my $batout_direction = 'M902,305 L730,510';                                                  # Batterientladung aus Netz
 
-  if($batin) {
+  if ($batin) {
       my $gbi = $batin - $cpv;
 
-      if($gbi > 1) {
-        $batin            -= $gbi;
-        $batout_style      = 'flowg active_in';
-        $batout_direction  = 'M730,510 L902,305';
-        $batout            = $gbi;
+      if ($gbi > 1) {
+          $batin            -= $gbi;
+          $batout_style      = 'flowg active_in';
+          $batout_direction  = 'M730,510 L902,305';
+          $batout            = $gbi;
       }
   }
 
@@ -13682,9 +13638,18 @@ sub _flowGraphic {
   my $csc_style    = $csc && $cpv  ? 'flowg active_out'              : 'flowg inactive_out';
   my $cgfi_style   = $cgfi         ? 'flowg active_out'              : 'flowg inactive_out';
 
-  my $vbox_default = !$flowgcons   ? '5 -25 800 480' :
-                     $flowgconTime ? '5 -25 800 700' :
-                     '5 -25 800 680';
+  my $vbminx  = -10 * $flowgshift;                             # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
+  my $vbminy  = -25;
+  my $vbwidth = 800;                                           # width and height specify the viewBox size
+  my $vbhight = !$flowgcons   ? 480 :                      
+                $flowgconTime ? 700 :
+                680;
+  
+  my $vbox = "$vbminx $vbminy $vbwidth $vbhight";
+  
+  #my $vbox = !$flowgcons   ? "$vbminx -25 800 480" :                      
+  #           $flowgconTime ? "$vbminx -25 800 700" :
+  #           "$vbminx -25 800 680";
 
   my $ret = << "END0";
       <style>
@@ -13692,7 +13657,7 @@ sub _flowGraphic {
       $animation
       </style>
 
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="$vbox_default" style="$style" id="SVGPLOT">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="$vbox" style="$style" id="SVGPLOT">
 
       <g transform="translate(400,50)">
         <g>
@@ -19911,6 +19876,13 @@ to ensure that the system configuration is correct.
          (default: 1)
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-flowGraphicShift"></a>
+       <li><b>flowGraphicShift &lt;Pixel/10&gt; </b><br>
+         Horizontal shift of the energy flow graph. <br>
+         (default: 0)
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-flowGraphicShowConsumerDummy"></a>
        <li><b>flowGraphicShowConsumerDummy </b><br>
@@ -22195,6 +22167,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>flowGraphicShowConsumer </b><br>
          Unterdrückt die Anzeige der Verbraucher in der Energieflußgrafik wenn auf "0" gesetzt. <br>
          (default: 1)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-flowGraphicShift"></a>
+       <li><b>flowGraphicShift &lt;Pixel/10&gt; </b><br>
+         Horizontale Verschiebung der Energieflußgrafik. <br>
+         (default: 0)
        </li>
        <br>
 
