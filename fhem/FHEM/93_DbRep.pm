@@ -58,6 +58,7 @@ use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.15" => "18.08.2024  DbRep_diffvalDone: change loglevel to 2, Forum:#138986 ",
   "8.53.14" => "29.05.2024  _DbRep_avgTimeWeightMean: accept if \$val1=0 (use looks_like_number) ",
   "8.53.13" => "25.05.2024  replace Smartmatch Forum:#137776 ",
   "8.53.12" => "09.05.2024  DbRep_dbConnect: change PRAGMA temp_store=MEMORY to FILE, Forum: https://forum.fhem.de/index.php?msg=1312722 ",
@@ -4846,7 +4847,7 @@ sub DbRep_diffvalDone {
   no warnings 'uninitialized';
 
   $rowsrej =~ s/_/ /g;
-  Log3 ($name, 3, "DbRep $name -> data ignored while calc diffValue due to threshold overrun (diffAccept = $difflimit): \n$rowsrej")
+  Log3 ($name, 2, "DbRep $name -> data ignored while calc diffValue due to threshold overrun (diffAccept = $difflimit): \n$rowsrej")
            if($rowsrej);
   $rowsrej =~ s/\n/ \|\| /g;
 
