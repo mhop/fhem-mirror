@@ -175,6 +175,10 @@
 # MH 20240425  remove Attr answerreading & conversion to putcmd (announced 5/2023)
 #              modify set cmd
 #              modified address converssion hex2Name() 
+# MH 20240819  add sub-dpts for dpt14, cmdref
+#              enforce gadName rules 
+#              prevent set- and get-cmd during fhem-start (e.g. in fhem.cfg)
+#              change dpt16 encoding - fix dblogsplit for dpt16
 #
 # todo-4/2024  remove support for oldsyntax cmd's: raw,value,string,rgb
 
@@ -250,7 +254,7 @@ my $PAT_GAD_OPTIONS = 'get|set|listenonly';
 #pattern for GAD-suffixes
 my $PAT_GAD_SUFFIX = 'nosuffix';
 #pattern for forbidden GAD-Names
-my $PAT_GAD_NONAME = 'on|off|on-for-timer|on-until|off-for-timer|off-until|toggle|raw|rgb|string|value';
+my $PAT_GAD_NONAME = 'on|off|on-for-timer|on-until|off-for-timer|off-until|toggle|raw|rgb|string|value|get|set|listenonly|nosuffix';
 #pattern for DPT
 my $PAT_GAD_DPT = 'dpt\d+\.?\d*';
 #pattern for dpt1 (standard)
@@ -300,6 +304,7 @@ my %dpttypes = (
 	'dpt1.022' => {CODE=>'dpt1', UNIT=>q{}, PATTERN=>qr/($PAT_DPT1_PAT|scene_A|scene_B)/ixms, MIN=>'scene_A', MAX=>'scene_B'},
 	'dpt1.023' => {CODE=>'dpt1', UNIT=>q{}, PATTERN=>qr/($PAT_DPT1_PAT|move_(up_down|and_step_mode))/ixms, MIN=>'move_up_down', MAX=>'move_and_step_mode'},
 	'dpt1.024' => {CODE=>'dpt1', UNIT=>q{}, PATTERN=>qr/($PAT_DPT1_PAT|Day|Night)/ixms, MIN=>'Day', MAX=>'Night'},
+	'dpt1.100' => {CODE=>'dpt1', UNIT=>q{}, PATTERN=>qr/($PAT_DPT1_PAT|Heat|Cool)/ixms, MIN=>'Heat', MAX=>'Cool'},
 
 	#Step value (two-bit)
 	'dpt2'     => {CODE=>'dpt2', UNIT=>q{}, PATTERN=>qr/(on|off|forceon|forceoff)/ixms, MIN=>undef, MAX=>undef, SETLIST=>'on,off,forceon,forceoff',
@@ -324,6 +329,8 @@ my %dpttypes = (
 	'dpt5.001' => {CODE=>'dpt5', UNIT=>q{%}, PATTERN=>qr/[+]?\d{1,3}/xms, FACTOR=>100/255, MIN=>0, MAX=>100},
 	'dpt5.003' => {CODE=>'dpt5', UNIT=>q{°}, PATTERN=>qr/[+]?\d{1,3}/xms, FACTOR=>360/255, MIN=>0, MAX=>360},
 	'dpt5.004' => {CODE=>'dpt5', UNIT=>q{%}, PATTERN=>qr/[+]?\d{1,3}/xms, MIN=>0, MAX=>255},
+	'dpt5.005' => {CODE=>'dpt5', UNIT=>q{}, PATTERN=>qr/[+]?\d{1,3}/xms, MIN=>0, MAX=>255}, # Decimal Factor
+	'dpt5.006' => {CODE=>'dpt5', UNIT=>q{}, PATTERN=>qr/[+]?\d{1,3}/xms, MIN=>0, MAX=>255}, # Tariff
 	'dpt5.010' => {CODE=>'dpt5', UNIT=>q{p}, PATTERN=>qr/[+]?\d{1,3}/xms, MIN=>0, MAX=>255}, # counter pulses
 
 	# 1-Octet signed value
@@ -388,12 +395,14 @@ my %dpttypes = (
 	'dpt9.030' => {CODE=>'dpt9', UNIT=>q{µg/m³}, PATTERN=>qr/[-+]?(?:\d*[.])?\d+/xms, MIN=>0, MAX=>670433.28}, # Dichte
 
 	# Time of Day
-	'dpt10'    => {CODE=>'dpt10', UNIT=>q{}, PATTERN=>qr/($PAT_TIME|now)/ixms, MIN=>undef, MAX=>undef,
-                       DEC=>\&dec_dpt10,ENC=>\&enc_dpt10,},
+	'dpt10'     => {CODE=>'dpt10', UNIT=>q{}, PATTERN=>qr/($PAT_TIME|now)/ixms, MIN=>undef, MAX=>undef,
+                        DEC=>\&dec_dpt10,ENC=>\&enc_dpt10,},
+	'dpt10.001' => {CODE=>'dpt10', UNIT=>q{}, PATTERN=>qr/($PAT_TIME|now)/ixms, MIN=>undef, MAX=>undef},
 
 	# Date  
-	'dpt11'    => {CODE=>'dpt11', UNIT=>q{}, PATTERN=>qr/($PAT_DATE2|now)/ixms, MIN=>undef, MAX=>undef,
-                       DEC=>\&dec_dpt11,ENC=>\&enc_dpt11,}, # year range 1990-2089 !
+	'dpt11'     => {CODE=>'dpt11', UNIT=>q{}, PATTERN=>qr/($PAT_DATE2|now)/ixms, MIN=>undef, MAX=>undef,
+                        DEC=>\&dec_dpt11,ENC=>\&enc_dpt11,}, # year range 1990-2089 !
+	'dpt11.001' => {CODE=>'dpt11', UNIT=>q{}, PATTERN=>qr/($PAT_DATE2|now)/ixms, MIN=>undef, MAX=>undef},
 
 	# 4-Octet unsigned value
 	'dpt12'     => {CODE=>'dpt12', UNIT=>q{},    PATTERN=>qr/[+]?\d{1,10}/xms, MIN=>0, MAX=>4294967295,
@@ -440,14 +449,38 @@ my %dpttypes = (
 	'dpt14.017' => {CODE=>'dpt14', UNIT=>q{kg/m²},  PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # density
 	'dpt14.018' => {CODE=>'dpt14', UNIT=>q{C},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electric charge
 	'dpt14.019' => {CODE=>'dpt14', UNIT=>q{A},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electric current
+	'dpt14.020' => {CODE=>'dpt14', UNIT=>q{A/m²},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electric current density
+	'dpt14.021' => {CODE=>'dpt14', UNIT=>q{Cm},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electric dipole moment
+	'dpt14.022' => {CODE=>'dpt14', UNIT=>q{C/m²},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electric displacement
+	'dpt14.023' => {CODE=>'dpt14', UNIT=>q{V/m},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electric field strength
+	'dpt14.024' => {CODE=>'dpt14', UNIT=>q{c},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electric flux
+	'dpt14.025' => {CODE=>'dpt14', UNIT=>q{C/m²},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electric flux density
+	'dpt14.016' => {CODE=>'dpt14', UNIT=>q{C/m²},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electric polarization
 	'dpt14.027' => {CODE=>'dpt14', UNIT=>q{V},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electric potential
+	'dpt14.028' => {CODE=>'dpt14', UNIT=>q{V},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electric potential difference
+	'dpt14.029' => {CODE=>'dpt14', UNIT=>q{A/m²},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electromagnetive moment
+	'dpt14.030' => {CODE=>'dpt14', UNIT=>q{V},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # electromotive force
 	'dpt14.031' => {CODE=>'dpt14', UNIT=>q{J},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # energy
 	'dpt14.032' => {CODE=>'dpt14', UNIT=>q{N},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # force
 	'dpt14.033' => {CODE=>'dpt14', UNIT=>q{Hz},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # frequency
 	'dpt14.034' => {CODE=>'dpt14', UNIT=>q{rad/s},  PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # frequency, angular
+	'dpt14.035' => {CODE=>'dpt14', UNIT=>q{J/K},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # heat capacity
+	'dpt14.036' => {CODE=>'dpt14', UNIT=>q{W},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # heat flow rate
+	'dpt14.037' => {CODE=>'dpt14', UNIT=>q{J},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # heat quantity
 	'dpt14.038' => {CODE=>'dpt14', UNIT=>qq{\xCE\xA9}, ## no critic (ValuesAndExpressions::ProhibitEscapedCharacters)
 	                                                PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # Impedance OHM
 	'dpt14.039' => {CODE=>'dpt14', UNIT=>q{m},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # length
+	'dpt14.040' => {CODE=>'dpt14', UNIT=>q{J},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # light quantity
+	'dpt14.041' => {CODE=>'dpt14', UNIT=>q{cd/m²},  PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # luminance
+	'dpt14.042' => {CODE=>'dpt14', UNIT=>q{lm},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # luminous flux
+	'dpt14.043' => {CODE=>'dpt14', UNIT=>q{cd},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # luminous intensity
+	'dpt14.044' => {CODE=>'dpt14', UNIT=>q{A/m},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # magnetic field strenght
+	'dpt14.045' => {CODE=>'dpt14', UNIT=>q{Wb},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # magnetic flux
+	'dpt14.046' => {CODE=>'dpt14', UNIT=>q{T},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # magnetic flux density
+	'dpt14.047' => {CODE=>'dpt14', UNIT=>q{A/m²},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # magnetic moment
+	'dpt14.048' => {CODE=>'dpt14', UNIT=>q{T},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # magnetic polarisation
+	'dpt14.049' => {CODE=>'dpt14', UNIT=>q{A/m},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # magnetization
+	'dpt14.050' => {CODE=>'dpt14', UNIT=>q{A},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # magneto motive force
 	'dpt14.051' => {CODE=>'dpt14', UNIT=>q{kg},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # mass
 	'dpt14.052' => {CODE=>'dpt14', UNIT=>q{kg/s},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # mass flux
 	'dpt14.053' => {CODE=>'dpt14', UNIT=>q{N/s},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # momentum
@@ -460,10 +493,19 @@ my %dpttypes = (
 	                                                PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # Reactance OHM
 	'dpt14.060' => {CODE=>'dpt14', UNIT=>qq{\xCE\xA9}, ## no critic (ValuesAndExpressions::ProhibitEscapedCharacters)
 	                                                PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # Resistance OHM
+	'dpt14.061' => {CODE=>'dpt14', UNIT=>q{kg},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # mass
+	'dpt14.062' => {CODE=>'dpt14', UNIT=>q{H},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # self inductance
+	'dpt14.063' => {CODE=>'dpt14', UNIT=>q{sr},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # solid angle
+	'dpt14.064' => {CODE=>'dpt14', UNIT=>q{W/m²},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # sound intensity
 	'dpt14.065' => {CODE=>'dpt14', UNIT=>q{m/s},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # speed
+	'dpt14.066' => {CODE=>'dpt14', UNIT=>q{N/m²},   PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # stress
+	'dpt14.067' => {CODE=>'dpt14', UNIT=>q{N/m},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # surface tension
 	'dpt14.068' => {CODE=>'dpt14', UNIT=>q{°C},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # temperature, common
 	'dpt14.069' => {CODE=>'dpt14', UNIT=>q{K},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # temperature (absolute)
 	'dpt14.070' => {CODE=>'dpt14', UNIT=>q{K},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # temperature difference
+	'dpt14.071' => {CODE=>'dpt14', UNIT=>q{J/K},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # thermal capacity
+	'dpt14.072' => {CODE=>'dpt14', UNIT=>q{1/K},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # thermal conductivity
+	'dpt14.073' => {CODE=>'dpt14', UNIT=>q{V/K},    PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # thermoelectric power
 	'dpt14.074' => {CODE=>'dpt14', UNIT=>q{s},      PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # time
 	'dpt14.075' => {CODE=>'dpt14', UNIT=>q{Nm},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # torque
 	'dpt14.076' => {CODE=>'dpt14', UNIT=>q{m³},     PATTERN=>qr/[-+]?(?:\d+(?:[.]\d*)?(?:e[+-]?\d+)?)/xms, MIN=>-3.4e38, MAX=>3.4e38}, # volume
@@ -556,7 +598,7 @@ sub Initialize {
 
 	$hash->{AttrList} = 'IODev ' .    #define IO-Device to communicate with. Deprecated at definition line.
            'disable:1 ' .                 #device disabled 
-           'showtime:1,0 ' .              #show event-time instead of value in device overview
+           'showtime:0,1 ' .              #show event-time instead of value in device overview
            'stateRegex:textField-long ' . #modifies state value
            'stateCmd:textField-long ' .   #modify state value
            'putCmd:textField-long ' .     #enable FHEM to answer KNX read telegrams
@@ -664,17 +706,16 @@ sub KNX_Define2 {
 		if (scalar(@gadArgs)) {
 			$gadNoSuffix = lc(pop(@gadArgs)) if ($gadArgs[-1] =~ /$PAT_GAD_SUFFIX/ixms);
 			$gadOption   = lc(pop(@gadArgs)) if (@gadArgs && $gadArgs[-1] =~ /^($PAT_GAD_OPTIONS)$/ixms);
-			$gadName     = pop(@gadArgs) if (@gadArgs);
+			$gadName     = shift(@gadArgs) // q{g} . $gadNo; # use first verb 
+		}
 
-			if ($gadName =~ /^($PAT_GAD_NONAME)$/xms) { # allow mixed case 
-				push(@logarr,qq{forbidden gadName $gadName});
-				next;
-			}
+		if (scalar(@gadArgs)) {
+			push(@logarr,q{syntax or parameter error in options definition: } . join(q{:},@gadArgs));
+		}
 
-			if ($gadName eq q{state} && defined($gadNoSuffix)) {
-				$gadName = q{g} . $gadNo;
-				push(@logarr,qq{forbidden gadName: state -  modified to: $gadName});
-			}
+		if (($gadName =~ /^($PAT_GAD_NONAME)$/xms) || ($gadName eq q{state} && defined($gadNoSuffix))) { # allow mixed case
+			push(@logarr,qq{forbidden gadName: $gadName - modified to: g} . $gadNo);
+			$gadName = q{g} . $gadNo;
 		}
 
 		if (defined($hash->{GADTABLE}->{$gadCode})) {
@@ -786,6 +827,7 @@ sub KNX_Get {
 
 		return qq{unknown argument $gadName choose one of $getter};
 	}
+	return qq{get cmd ($name) not allowed during fhem-start} if (! $init_done);
 	return qq{KNX_Get ($name): is disabled} if (IsDisabled($name) == 1);
 
 	KNX_Log ($name, 5, qq{enter: CMD= $gadName});
@@ -828,6 +870,7 @@ sub KNX_Set {
 		return qq{unknown argument $targetGadName choose one of $setter};
 	}
 
+	return qq{set cmd ($name) not allowed during fhem-start} if (! $init_done);
 	return qq{$name is disabled} if (IsDisabled($name) == 1);
 
 	KNX_Log ($name, 5, qq{enter: $targetGadName } . join(q{ }, @arg));
@@ -860,8 +903,6 @@ sub KNX_Set {
 	#Text neads special treatment - additional args may be blanked words - truncate to 14 char
 	if ($model =~ m/^dpt16/xms) {
 		$value .= q{ } . join (q{ }, @arg) if (scalar (@arg) > 0);
-		KNX_Log ($name, 3, qq{dpt16 string $value truncated to 14 characters}) if (length($value) > 14);
-		$value = substr($value,0,14);
 	}
 
 	#Special commands for dpt1 and dpt1.001
@@ -883,7 +924,6 @@ sub KNX_Set {
 	#apply post processing for state and set all readings
 	KNX_SetReadings($hash, $targetGadName, $value, undef, undef);
 
-#	KNX_Log ($name, 5, 'exit');
 	return;
 }
 
@@ -903,6 +943,7 @@ sub KNX_Set_oldsyntax {
 		$groupnr = pop (@arg);
 		KNX_Log ($name, 3, qq{you are still using old syntax, pls. change to "set $name $groupnr $cmd } . join(q{ },@arg) . q{"});
 		$groupnr =~ s/^[g]//ixms; #remove "g"
+		$na--;
 	}
 
 	# if cmd contains g1: the check for valid gadnames failed !
@@ -916,7 +957,7 @@ sub KNX_Set_oldsyntax {
 	return qq{gadName not found or invalid dpt used for group $groupnr} if(!defined($targetGadName));
 
 	# all of the following cmd's need at least 1 Argument (or more)
-	return (undef, $targetGadName, $cmd) if (scalar(@arg) <= 0);
+	return (undef, $targetGadName, $cmd) if ($na <= 0);
 	# pass thru -for-timer,-until,blink cmds...
 	return (undef, $targetGadName, $cmd) if ($cmd =~ m/(?:-until|-for-timer|$BLINK)$/ixms);
 
@@ -947,7 +988,7 @@ sub KNX_Set_oldsyntax {
 	}
 	else {
 		KNX_Log ($name, 2, qq{invalid cmd: "set $name $cmd" issued - ignored});
-		return qq{invalid cmd: "set $name $cmd" - ignored};
+		return qq{invalid cmd: "set $name $cmd } . join(q{ },@arg). q{" -ignored};
 	}
 
 	KNX_Log ($name, 3, qq{This cmd will be deprecated by 1/2024: "set $name $cmd } . join(q{ },@arg) .
@@ -1111,6 +1152,7 @@ sub KNX_DbLog_split {
 
 	my $reading = 'state'; # default
 	my $unit    = q{}; # default
+	my $dpt16flag = 0; # is it a dpt16 ?
 
 	# split event into pieces
 	$event =~ s/^\s?//xms; # remove leading blank if any
@@ -1121,10 +1163,17 @@ sub KNX_DbLog_split {
 	}
 	$strings[0] = q{} if (! defined($strings[0]));
 
-	#numeric value? and last value non numeric? - assume unit
-	if (looks_like_number($strings[0]) && (! looks_like_number($strings[scalar(@strings)-1]))) {
+	#numeric value? and last value non numeric? - assume unit - except for dpt16
+	my $devhash = $defs{$device};
+	foreach my $key (keys %{$devhash->{GADDETAILS}}) {
+		next if ($devhash->{GADDETAILS}->{$key}->{MODEL} !~ /^dpt16/xms);
+		$dpt16flag = 1;
+		last;
+	}
+	if (($dpt16flag == 0) && looks_like_number($strings[0]) && (! looks_like_number($strings[scalar(@strings)-1]))) {
 		$unit = pop(@strings);
 	}
+
 	my $value = join(q{ },@strings);
 	$unit = q{} if (!defined($unit));
 
@@ -1173,9 +1222,15 @@ sub KNX_Parse {
 			next;
 		}
 
+		# ignore input from "wrong" IO-dev
+#		if ($iohash ne $deviceHash->{IODev}) {
+#			KNX_Log ($deviceName, 2, qq{ioname mismatch device= $deviceName io= $ioName});
+#			next;
+#		}
+
 		my $getName = $deviceHash->{GADDETAILS}->{$gadName}->{RDNAMEGET};
 
-		KNX_Log ($deviceName, 4, qq{process gadName=$gadName cmd=$cmd readingName=$getName value=$val});
+		KNX_Log ($deviceName, 4, qq{process ioName=$ioName gadName=$gadName cmd=$cmd readingName=$getName value=$val});
 
 		my $trigger = 1; # default create events
 =begin comment
@@ -1743,6 +1798,7 @@ sub enc_dpt16 { #14-Octet String
 	my $model = shift;
 	my $numval = encode('iso-8859-1', decode('utf8', $value)); #always convert to latin-1
 	$numval =~ s/[\x80-\xff]/?/gxms if ($model ne 'dpt16.001'); #replace values >= 0x80 if ascii
+	$numval = substr($numval,0,14); # limit to 14 char
 
 	#convert to hex-string
 	my $dat = unpack('H*', $numval);
@@ -2154,17 +2210,17 @@ __END__
 <style>
   #KNX-dpt_ul {
     list-style-type: none;
-    padding-left: 10px;
+    padding-left: 2em;
     width:95%;
     column-count:2;
     column-gap:10px;
     -moz-column-count:2;
-    -moz-column-gap:20px;
+    -moz-column-gap:10px;
     -webkit-column-count:2;
-    -webkit-column-gap:20px;
+    -webkit-column-gap:10px;
   }
   #KNX-dpt_ul li {
-    padding-left: 1em; white-space: pre; overflow: clip;
+   overflow: clip;
   }
   #KNX-dpt_ul li b { 
     display: inline-block;
@@ -2173,7 +2229,7 @@ __END__
   }
   #KNX-attr_ul {
     list-style-type: none;
-    padding-left: 30px;
+    padding-left: 2em;
     width:95%;
     column-count:2;
     column-gap:10px;
@@ -2182,8 +2238,9 @@ __END__
     -webkit-column-count:2;
     -webkit-column-gap:20px;
   }
-  #KNX-attr_ul a {
-    padding-left: 1em; width: 100%;
+  #KNX-attr_ul li {
+    padding-left: 1em;
+    overflow: clip;
   }
   /* For mobile phones: */
   @media only screen and (max-width: 1070px) {
@@ -2243,16 +2300,15 @@ If you want to restrict the GAD, you can use the options "get", "set", or "liste
 <p>The first group is used for sending by default. If you want to send to a different group, you have to address it.
  E.g&colon; <code>set &lt;name&gt; &lt;gadName&gt; &lt;value&gt; </code>
  Without additional attributes, all incoming and outgoing messages are in addition copied into reading &lt;state&gt;.</p>
-<p>If enabled, the module <a href="#autocreate">autocreate</a> is creating a new definition for any unknown group-address.
+<p>If enabled, the module <a href="#autocreate">autocreate</a> is creating a new definition for each not already defined group-address.
  However, the new device will be disabled until you added a DPT to the definition and delete the
- <a href="#KNX-attr-disable">disable</a> attribute. The device name will be KNX_nnmmooo where nn is the line adress,
- mm the area and ooo the device.
+ <a href="#KNX-attr-disable">disable</a> attribute. The device name will be KNX_&lt;llaaddd&gt; where ll is the line-,
+ aa the area- and ddd the device-address.
  No FileLog or SVG definition is created for KNX-devices by autocreate. Use for example 
  <code>define &lt;name&gt; FileLog &lt;filename&gt; KNX_.*</code> to create a single FileLog-definition for all KNX-devices
  created by autocreate.<br/>  
  Another option is to disable autocreate for KNX-devices in production environments (when no changes / additions are expected)
- by using&colon;<br/>
- <code>attr &lt;autocreate&gt; ignoreTypes KNX_.*</code></p>
+ by using&colon;  <code>attr &lt;autocreate&gt; ignoreTypes KNX_.*</code></p>
 <pre>
 Examples&colon;
 <code>   define lamp1 KNX 0/10/11&colon;dpt1
@@ -2339,6 +2395,7 @@ Examples&colon;
 <li><a href="#readingFnAttributes">stateFormat</a></li>
 <li><a href="#readingFnAttributes">timestamp-on-change-reading</a></li> 
 <li><a href="#readingFnAttributes">userReadings</a></li> 
+<li><a href="#suppressReading">suppressReading</a></li>
 <li><a href="#userattr">userattr</a></li>
 <li><a href="#verbose">verbose</a></li> 
 <li><a href="#FHEMWEB-attr-webCmd">webCmd</a></li> 
@@ -2351,21 +2408,21 @@ Examples&colon;
 <li><strong>Special attributes</strong><br/>
 <ul>
 <li><a id="KNX-attr-stateRegex"></a><b>stateRegex</b><br/>
-  You can pass n pairs of regex-patterns and strings to replace, seperated by a space. 
+  You can pass mutiple pairs of regex-patterns and strings to replace, separated by a space. 
   A regex-pair is always in the format /&lt;readingName&gt;[&colon;&lt;value&gt;]/[2nd part]/.
   The first part of the regex must exactly match the readingname, and optional (separated by a colon) the readingValue. 
   If first part match, the matching part will be replaced by the 2nd part of the regex.
   If the 2nd part is empty, the value is ignored and reading state will not get updated.  
-  The substitution is done every time, a reading is updated. You can use this function for converting, adding units,
+  The substitution is done every time a reading is updated. You can use this function for converting, adding units,
   having more fun with icons, ...<br/>
   This function has only an impact on the content of reading state. 
   It is executed directly after replacing the reading-names and processing "format" Attr, but before stateCmd.
 <br/></li>
 <li><a id="KNX-attr-stateCmd"></a><b>stateCmd</b><br/>
   You can supply a perl-command for modifying state. This command is executed directly before updating the reading
-  - so after renaming, format and regex. 
+  - so after renaming, format and stateRegex. 
   Please supply a valid perl command like using the attribute stateFormat.<br/>
-  Unlike stateFormat the stateCmd modifies also the content of the reading <b>state</b>,
+  Unlike stateFormat the stateCmd modifies the content of the reading <b>state</b>,
   not only the hash-content for visualization.<br/>
   You can access the device-hash ( e.g&colon; $hash{IODev} ) in yr. perl-cmd. In addition the variables
   "$name", "$gadName" and "$state" are avaliable. A return value must be set and overrides reading state.
@@ -2377,34 +2434,34 @@ Examples&colon;
   Each device only knows one putCmd, so you have to take care about the different GAD's in the perl string.<br/>
   Like in stateCmd you can access the device hash ("$hash") in yr. perl-cmd. In addition the variables 
   "$name", "$gadName" and "$state" are avaliable. On entry, "$state" contains the current value of reading "state". 
-  The return-value will be sent to KNX-bus. The value has to be in the allowed range for the corresponding dpt,
+  The return-value will be sent to KNX-bus. The value has to be in the allowed range and format for the corresponding dpt,
   else the send is rejected. The reading "state" will NOT get updated!
 <pre>
 Examples&colon;
 <code>   attr &lt;device&gt; putCmd {return $state if($gadName eq 'status');}  #returns value of reading state on request from bus for gadName "status".
    attr &lt;device&gt; putCmd {return ReadingsVal('dummydev','state','error') if(...);}          #returns value of device "dummydev" reading "state".
-   attr &lt;device&gt; putCmd {return (split(/[\s]/xms,TimeNow()))[1] if ($gadName eq 'time');}  #returns systemtime-stamp ...
+   attr &lt;device&gt; putCmd {return (split(/[\s]/xms,TimeNow()))[1] if ($gadName eq 'time');}  #returns system timestamp (dpt10 format) ...
 </code></pre>
 </li>
 <li><a id="KNX-attr-format"></a><b>format</b><br/>
   The content of this attribute is appended to every sent/received value before readings are set, 
   it replaces the default unit-value! "format" will be appied to ALL readings, it is better to use the (more complex)
-  "stateCmd" or "stateRegex" Attributes if you have more than one GAD in your device.
+  "stateCmd" or "stateRegex" attributes if you have more than one GAD in your device.
 <br/></li>
 <li><a id="KNX-attr-disable"></a><b>disable</b><br/>
   Disable the device if set to <b>1</b>. No send/receive from bus and no set/get possible. Delete this attr to enable device again. 
-  Deleting this attribute is prevented in case the definition contains errors!
+  Deleting this attribute is prevented in case the definition is incomplete or contains errors!
   <br/>As an aid for debugging, an additional INTERNAL&colon; "RAWMSG" will show any message received from bus while the device is disabled.
 <br/></li>
 <li><a id="KNX-attr-KNX_toggle"></a><b>KNX_toggle</b><br/>
-  Lookup current value before issuing <code>set device &lt;gadName&gt; toggle</code> cmd.<br/> 
+  Lookup current value before issuing <code>set &lt;device&gt; &lt;gadName&gt; toggle</code> cmd.<br/> 
   FHEM has to retrieve a current value to make the toggle-cmd acting correctly. This attribute can be used to 
   define the source of the current value.<br/>
   Format is&colon; <b>&lt;devicename&gt;&colon;&lt;readingname&gt;</b>. If you want to use a reading from own device,
   you can use "$self" as devicename. Be aware that only <b>on</b> and <b>off</b> are supported as valid values
-  when defining device&colon;readingname.<br/>
-  If this attribute is not defined, the current value will be taken from owndevice&colon;readingName-get or,
-  if readingName-get is not defined, the value will be taken from readingName-set.
+  when defining &lt;device&gt;&colon;&lt;readingname&gt;.<br/>
+  If this attribute is not defined, the current value will be taken from &lt;owndevice&gt;&colon;&lt;readingName-get&gt; or,
+  if &lt;readingName-get&gt; is not defined, the value will be taken from &lt;readingName-set&gt;.
 <br/></li>
 <li><a id="KNX-attr-IODev"></a><b>IODev</b><br/>
   Due to changes in IO-Device handling, (default IO-Device will be stored in <b>reading IODev</b>), setting this Attribute
@@ -2457,6 +2514,7 @@ Examples&colon;
 <li><b>dpt1.022 </b>  scene_A, scene_B</li>
 <li><b>dpt1.023 </b>  move_up/down, move_and_step_mode</li>
 <li><b>dpt1.024 </b>  Day, Night</li>
+<li><b>dpt1.100 </b>  Heat, Cool</li>
 <li><b>dpt2     </b>  off, on, forceOff, forceOn</li>
 <li><b>dpt2.000 </b>  0,1,2,3</li>
 <li><b>dpt3     </b>  -100..+100</li>
@@ -2469,6 +2527,8 @@ Examples&colon;
 <li><b>dpt5.001 </b>  0..100 %</li>
 <li><b>dpt5.003 </b>  0..360 &deg;</li>
 <li><b>dpt5.004 </b>  0..255 %</li>
+<li><b>dpt5.005 </b>  0..255 (decimal factor)</li>
+<li><b>dpt5.006 </b>  0..255 (tariff info)</li>
 <li><b>dpt5.010 </b>  0..255 p (pulsecount)</li>
 <li><b>dpt6     </b>  -128..+127</li>
 <li><b>dpt6.001 </b>  -128 %..+127 %</li>
@@ -2519,8 +2579,8 @@ Examples&colon;
 <li><b>dpt9.028 </b>  0..+670433.28 km/h</li>
 <li><b>dpt9.029 </b>  0..+670433.28 g/m&sup3;</li>
 <li><b>dpt9.030 </b>  0..+670433.28 &mu;g/m&sup3;</li>
-<li><b>dpt10    </b>  HH:MM:SS (Time)</li>
-<li><b>dpt11    </b>  DD.MM.YYYY (Date)</li>
+<li><b>dpt10.001</b>  HH:MM:SS (Time)</li>
+<li><b>dpt11.001</b>  DD.MM.YYYY (Date)</li>
 <li><b>dpt12    </b>  0..+4294967295</li>
 <li><b>dpt12.001</b>  0..+4294967295 p (pulsecount)</li>
 <li><b>dpt12.100</b>  0..+4294967295 s</li>
@@ -2538,54 +2598,87 @@ Examples&colon;
 <li><b>dpt13.016</b>  -2147483648..2147483647 MWh</li>
 <li><b>dpt13.100</b>  -2147483648..2147483647 s</li>
 <li><b>dpt14    </b>  -1.4e-45..+1.7e+38 (IEE754 floatingPoint)</li>
-<li><b>dpt14.000</b>  -1.4e-45..+1.7e+38 m/s&sup2;</li>
-<li><b>dpt14.001</b>  -1.4e-45..+1.7e+38 rad/s&sup2;</li>
-<li><b>dpt14.002</b>  -1.4e-45..+1.7e+38 J/mol</li>
-<li><b>dpt14.003</b>  -1.4e-45..+1.7e+38 1/s</li>
-<li><b>dpt14.004</b>  -1.4e-45..+1.7e+38 mol</li>
-<li><b>dpt14.005</b>  -1.4e-45..+1.7e+38 -</li>
-<li><b>dpt14.006</b>  -1.4e-45..+1.7e+38 rad</li>
-<li><b>dpt14.007</b>  -1.4e-45..+1.7e+38 &deg;</li>
-<li><b>dpt14.008</b>  -1.4e-45..+1.7e+38 Js</li>
-<li><b>dpt14.009</b>  -1.4e-45..+1.7e+38 rad/s</li>
-<li><b>dpt14.010</b>  -1.4e-45..+1.7e+38 m&sup2;</li>
-<li><b>dpt14.011</b>  -1.4e-45..+1.7e+38 F</li>
-<li><b>dpt14.012</b>  -1.4e-45..+1.7e+38 C/m&sup2;</li>
-<li><b>dpt14.013</b>  -1.4e-45..+1.7e+38 C/m&sup3;</li>
-<li><b>dpt14.014</b>  -1.4e-45..+1.7e+38 m&sup2;/N</li>
-<li><b>dpt14.015</b>  -1.4e-45..+1.7e+38 S</li>
-<li><b>dpt14.016</b>  -1.4e-45..+1.7e+38 S/m</li>
-<li><b>dpt14.017</b>  -1.4e-45..+1.7e+38 kg/m&sup3;</li>
-<li><b>dpt14.018</b>  -1.4e-45..+1.7e+38 C</li>
-<li><b>dpt14.019</b>  -1.4e-45..+1.7e+38 A</li>
-<li><b>dpt14.027</b>  -1.4e-45..+1.7e+38 V</li>
-<li><b>dpt14.031</b>  -1.4e-45..+1.7e+38 J</li>
-<li><b>dpt14.032</b>  -1.4e-45..+1.7e+38 N</li>
-<li><b>dpt14.033</b>  -1.4e-45..+1.7e+38 Hz</li>
-<li><b>dpt14.034</b>  -1.4e-45..+1.7e+38 rad/s</li>
-<li><b>dpt14.038</b>  -1.4e-45..+1.7e+38 &Omega;</li>
-<li><b>dpt14.039</b>  -1.4e-45..+1.7e+38 m</li>
-<li><b>dpt14.051</b>  -1.4e-45..+1.7e+38 kg</li>
-<li><b>dpt14.052</b>  -1.4e-45..+1.7e+38 kg/s</li>
-<li><b>dpt14.053</b>  -1.4e-45..+1.7e+38 N/s</li>
-<li><b>dpt14.054</b>  -1.4e-45..+1.7e+38 rad</li>
-<li><b>dpt14.055</b>  -1.4e-45..+1.7e+38 &deg;</li>
-<li><b>dpt14.056</b>  -1.4e-45..+1.7e+38 W</li>
-<li><b>dpt14.057</b>  -1.4e-45..+1.7e+38 cos&phi;</li>
-<li><b>dpt14.058</b>  -1.4e-45..+1.7e+38 Pa</li>
-<li><b>dpt14.059</b>  -1.4e-45..+1.7e+38 &Omega;</li>
-<li><b>dpt14.060</b>  -1.4e-45..+1.7e+38 &Omega;</li>
-<li><b>dpt14.065</b>  -1.4e-45..+1.7e+38 m/s</li>
-<li><b>dpt14.068</b>  -1.4e-45..+1.7e+38 &deg;C</li>
-<li><b>dpt14.069</b>  -1.4e-45..+1.7e+38 K</li>
-<li><b>dpt14.070</b>  -1.4e-45..+1.7e+38 K</li>
-<li><b>dpt14.074</b>  -1.4e-45..+1.7e+38 s</li>
-<li><b>dpt14.075</b>  -1.4e-45..+1.7e+38 Nm</li>
-<li><b>dpt14.076</b>  -1.4e-45..+1.7e+38 m&sup3;</li>
-<li><b>dpt14.077</b>  -1.4e-45..+1.7e+38 m³/s</li>
-<li><b>dpt14.078</b>  -1.4e-45..+1.7e+38 N</li>
-<li><b>dpt14.079</b>  -1.4e-45..+1.7e+38 J</li>
-<li><b>dpt14.080</b>  -1.4e-45..+1.7e+38 VA</li>
+<li><b>dpt14.000</b>  -1.4e-45..+1.7e+38 m/s&sup2; (acceleration)</li>
+<li><b>dpt14.001</b>  -1.4e-45..+1.7e+38 rad/s&sup2; (acceleration) angular</li>
+<li><b>dpt14.002</b>  -1.4e-45..+1.7e+38 J/mol (activation energy)</li>
+<li><b>dpt14.003</b>  -1.4e-45..+1.7e+38 1/s (activity - radioactive)</li>
+<li><b>dpt14.004</b>  -1.4e-45..+1.7e+38 mol (amount of substance)</li>
+<li><b>dpt14.005</b>  -1.4e-45..+1.7e+38 - (amplitude)</li>
+<li><b>dpt14.006</b>  -1.4e-45..+1.7e+38 rad (angle radiant)</li>
+<li><b>dpt14.007</b>  -1.4e-45..+1.7e+38 &deg; (angle degree)</li>
+<li><b>dpt14.008</b>  -1.4e-45..+1.7e+38 Js (angular momentum)</li>
+<li><b>dpt14.009</b>  -1.4e-45..+1.7e+38 rad/s (angular velocity)</li>
+<li><b>dpt14.010</b>  -1.4e-45..+1.7e+38 m&sup2; (area)</li>
+<li><b>dpt14.011</b>  -1.4e-45..+1.7e+38 F (capacitance)</li>
+<li><b>dpt14.012</b>  -1.4e-45..+1.7e+38 C/m&sup2; (charge density - surface)</li>
+<li><b>dpt14.013</b>  -1.4e-45..+1.7e+38 C/m&sup3; ((charge density - volume)</li>
+<li><b>dpt14.014</b>  -1.4e-45..+1.7e+38 m&sup2;/N (compressibility)</li>
+<li><b>dpt14.015</b>  -1.4e-45..+1.7e+38 S (conductance - 1/&Omega;)</li>
+<li><b>dpt14.016</b>  -1.4e-45..+1.7e+38 S/m (conductivity - electrical)</li>
+<li><b>dpt14.017</b>  -1.4e-45..+1.7e+38 kg/m&sup3; (density)</li>
+<li><b>dpt14.018</b>  -1.4e-45..+1.7e+38 C (electric charge)</li>
+<li><b>dpt14.019</b>  -1.4e-45..+1.7e+38 A (electric current)</li>
+<li><b>dpt14.020</b>  -1.4e-45..+1.7e+38 A/m&sup2; (electric current density)</li>
+<li><b>dpt14.021</b>  -1.4e-45..+1.7e+38 C*m (dipole moment)</li>
+<li><b>dpt14.022</b>  -1.4e-45..+1.7e+38 C/m&sup2; (electric displacement)</li>
+<li><b>dpt14.023</b>  -1.4e-45..+1.7e+38 V/m (electric field strenght)</li>
+<li><b>dpt14.024</b>  -1.4e-45..+1.7e+38 c (electric flux)</li>
+<li><b>dpt14.025</b>  -1.4e-45..+1.7e+38 C/m&sup2; (electric flux density)</li>
+<li><b>dpt14.026</b>  -1.4e-45..+1.7e+38 C/m&sup2; (electric polarization)</li>
+<li><b>dpt14.027</b>  -1.4e-45..+1.7e+38 V (electric potential)</li>
+<li><b>dpt14.028</b>  -1.4e-45..+1.7e+38 V (electric potential difference)</li>
+<li><b>dpt14.029</b>  -1.4e-45..+1.7e+38 A/m&sup2; (electromagnetic moment)</li>
+<li><b>dpt14.030</b>  -1.4e-45..+1.7e+38 V (electromotive force)</li>
+<li><b>dpt14.031</b>  -1.4e-45..+1.7e+38 J (energy)</li>
+<li><b>dpt14.032</b>  -1.4e-45..+1.7e+38 N (force)</li>
+<li><b>dpt14.033</b>  -1.4e-45..+1.7e+38 Hz (frequency)</li>
+<li><b>dpt14.034</b>  -1.4e-45..+1.7e+38 rad/s (angular frequency)</li>
+<li><b>dpt14.035</b>  -1.4e-45..+1.7e+38 J/K (heat capacity)</li>
+<li><b>dpt14.036</b>  -1.4e-45..+1.7e+38 W (heat flow rate)</li>
+<li><b>dpt14.037</b>  -1.4e-45..+1.7e+38 J (heat quantity)</li>
+<li><b>dpt14.038</b>  -1.4e-45..+1.7e+38 &Omega; (impedance)</li>
+<li><b>dpt14.039</b>  -1.4e-45..+1.7e+38 m (lenght)</li>
+<li><b>dpt14.040</b>  -1.4e-45..+1.7e+38 J (light quantity)</li>
+<li><b>dpt14.041</b>  -1.4e-45..+1.7e+38 cd/m&sup2; (luminance)</li>
+<li><b>dpt14.042</b>  -1.4e-45..+1.7e+38 lm (luminous flux)</li>
+<li><b>dpt14.043</b>  -1.4e-45..+1.7e+38 cd (luminous intensity)</li>
+<li><b>dpt14.044</b>  -1.4e-45..+1.7e+38 A/m (magnetic field strength)</li>
+<li><b>dpt14.045</b>  -1.4e-45..+1.7e+38 Wb (magnetic flux)</li>
+<li><b>dpt14.046</b>  -1.4e-45..+1.7e+38 T (magnetic flux density)</li>
+<li><b>dpt14.047</b>  -1.4e-45..+1.7e+38 A/m&sup2; (magnetic moment)</li>
+<li><b>dpt14.048</b>  -1.4e-45..+1.7e+38 T (magnetic polarization)</li>
+<li><b>dpt14.049</b>  -1.4e-45..+1.7e+38 A/m (magnetization)</li>
+<li><b>dpt14.050</b>  -1.4e-45..+1.7e+38 A (magneto motive force)</li>
+<li><b>dpt14.051</b>  -1.4e-45..+1.7e+38 kg (mass)</li>
+<li><b>dpt14.052</b>  -1.4e-45..+1.7e+38 kg/s (mass flux)</li>
+<li><b>dpt14.053</b>  -1.4e-45..+1.7e+38 N/s (momentum)</li>
+<li><b>dpt14.054</b>  -1.4e-45..+1.7e+38 rad (phase angle radiant)</li>
+<li><b>dpt14.055</b>  -1.4e-45..+1.7e+38 &deg; (phase angle degrees)</li>
+<li><b>dpt14.056</b>  -1.4e-45..+1.7e+38 W (power)</li>
+<li><b>dpt14.057</b>  -1.4e-45..+1.7e+38 cos&phi; (power factor)</li>
+<li><b>dpt14.058</b>  -1.4e-45..+1.7e+38 Pa (pressure)</li>
+<li><b>dpt14.059</b>  -1.4e-45..+1.7e+38 &Omega; (reactance)</li>
+<li><b>dpt14.060</b>  -1.4e-45..+1.7e+38 &Omega; (resistance)</li>
+<li><b>dpt14.061</b>  -1.4e-45..+1.7e+38 &Omega;/m (resistivity)</li>
+<li><b>dpt14.062</b>  -1.4e-45..+1.7e+38 H (self inductance)</li>
+<li><b>dpt14.063</b>  -1.4e-45..+1.7e+38 sr (solid angle)</li>
+<li><b>dpt14.064</b>  -1.4e-45..+1.7e+38 W/m&sup2; (sound intensity)</li>
+<li><b>dpt14.065</b>  -1.4e-45..+1.7e+38 m/s (speed)</li>
+<li><b>dpt14.066</b>  -1.4e-45..+1.7e+38 N/m&sup2; (stress)</li>
+<li><b>dpt14.067</b>  -1.4e-45..+1.7e+38 N/m (surface tension)</li>
+<li><b>dpt14.068</b>  -1.4e-45..+1.7e+38 &deg;C (temperature)</li>
+<li><b>dpt14.069</b>  -1.4e-45..+1.7e+38 K (temperature absolute)</li>
+<li><b>dpt14.070</b>  -1.4e-45..+1.7e+38 K (temperature difference)</li>
+<li><b>dpt14.071</b>  -1.4e-45..+1.7e+38 J/K (thermal capacity)</li>
+<li><b>dpt14.072</b>  -1.4e-45..+1.7e+38 W/m (thermal conductivity)</li>
+<li><b>dpt14.073</b>  -1.4e-45..+1.7e+38 V/K (thermoelectric power)</li>
+<li><b>dpt14.074</b>  -1.4e-45..+1.7e+38 s (time)</li>
+<li><b>dpt14.075</b>  -1.4e-45..+1.7e+38 Nm (torque)</li>
+<li><b>dpt14.076</b>  -1.4e-45..+1.7e+38 m&sup3; (volume)</li>
+<li><b>dpt14.077</b>  -1.4e-45..+1.7e+38 m³/s (volume flux)</li>
+<li><b>dpt14.078</b>  -1.4e-45..+1.7e+38 N (weight)</li>
+<li><b>dpt14.079</b>  -1.4e-45..+1.7e+38 J (work)</li>
+<li><b>dpt14.080</b>  -1.4e-45..+1.7e+38 VA (apparent power)</li>
 <li><b>dpt15.000</b>  Access-code (readonly)</li>
 <li><b>dpt16    </b>  14 char ASCII string</li>
 <li><b>dpt16.000</b>  14 char ASCII string</li>
@@ -2606,6 +2699,7 @@ Examples&colon;
 </ol>
 <br/>
 <b>Note:&nbsp;</b>dptRAW is for testing/debugging only! You can send/receive hex strings of unlimited length (assuming the KNX-HW supports it).
+No conversion, limit-, plausibility-check is done, the hex values are sent unmodified to the KNX bus.
 <pre>  syntax: set &lt;device&gt; &lt;gadName&gt; &lt;hex-string&gt;
 <code>    Examples of valid / invalid hex-strings&colon;
       00..3f # valid, single byte range x00-x3f
