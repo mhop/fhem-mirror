@@ -81,6 +81,7 @@
 #            add a few debug msgs
 # 25/04/2024 changed _open for mode S
 #            replaced/removed experimental given/when
+# 19/08/2024 fix error-msg when mode S fails to open
 
 
 package KNXIO; ## no critic 'package'
@@ -132,7 +133,6 @@ BEGIN {
 
 #####################################
 # global vars/constants
-my $MODELERR = 'MODEL_NOT_DEFINED';
 my $PAT_IP   = '[\d]{1,3}(\.[\d]{1,3}){3}';
 my $PAT_PORT = '[\d]{4,5}';
 my $KNXID    = 'C';
@@ -847,7 +847,7 @@ sub KNXIO_openDev {
 		$ret = ::TcpServer_MCastAdd($hash,$host);
 		if (defined($ret)) { # error
 			KNXIO_Log ($name, 2, qq{MC add failed: $ret});
-			return qq{KNXIO_openDev ($name):  MC add failed: $ret};
+			return qq{KNXIO_openDev ($name): MC add failed: $ret};
 		}
 
 		::TcpServer_SetLoopbackMode($hash,0); # disable loopback
@@ -860,11 +860,11 @@ sub KNXIO_openDev {
 	if ($mode eq q{S}) { ### socket mode
 		if (!(-S -r -w $spath) ) {
 			KNXIO_Log ($name, 2, q{Socket not available - (knxd running?)});
-			KNXIO_disconnect($hash, 30);
-			readingsSingleUpdate($hash, 'state', 'disconnected', 1);
-			return qq{KNXIO_openDev ($name): Socket not available - (knxd running?)};
+			$ret = qq{KNXIO_openDev ($name): Socket not available - (knxd running?)};
 		}
-		$ret = ::DevIo_OpenDev($hash,$reopen,\&KNXIO_init); # no callback
+		else {
+			$ret = ::DevIo_OpenDev($hash,$reopen,\&KNXIO_init); # no callback
+		}
 	}
 
 	if ($mode eq q{H}) { ### host udp
@@ -1056,8 +1056,8 @@ sub KNXIO_processFIFO {
 		my $queentriesOld = $queentries;
 		@que = KNXIO_deldupes(@que);
 		$queentries = scalar(@que);
-		KNXIO_Log ($name, 5, q{deleted } . ($queentriesOld - $queentries) .
-                      qq{ duplicate msgs from queue, $queentries remain});
+		my $qdiff = $queentriesOld - $queentries;
+		KNXIO_Log ($name, 3, qq{deleted $qdiff duplicate msgs from queue, $queentries remain}) if ($qdiff > 0);;
 	}
 
 	if ($queentries > 0) { # process timer is not running & fifo not empty
@@ -1456,6 +1456,7 @@ __END__
   If you have a KNX-router that supports multicast, you do not need a KNXD installation. 
   Default address&colon;port is 224.0.23.12&colon;3671<br/>
   Pls. ensure that you have only <b>one</b> GW/KNXD in your LAN that feed the multicast tree!<br/>
+  If you run FHEM in Docker, note that multicast is not supported in network-mode bridge, but macvlan supports multicast.
 </li>
 <li><b>T</b> TCP mode - uses a TCP-connection to KNXD (default port&colon; 6720).<br/>
   This mode is the successor of the TUL-modul, but does not support direct Serial/USB connection to a TPUart-USB Stick.
@@ -1479,7 +1480,8 @@ __END__
 <b>phy-address</b>
 <ul>
 <li>The physical address is used as the source address of messages sent to KNX network. 
-  This address should be one of the defined client pool-addresses of KNXD or Router.</li>
+  Valid range: &lt;0-15.0-15.0-255&gt;. 15.15.255 should not be used, is used as mfg-default for "non-configured".
+  This address should be one of the defined client pool-addresses of KNXD (-E parameter) or Router.</li>
 </ul>
 
 <br/>All parameters are mandatory. Pls. ensure that you only have <b>one path</b> between your KNX-Installation and FHEM! 
