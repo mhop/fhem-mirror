@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bufgix:  76_SMAInverter: fix PW Lengs Bug
  - bugfix:  10_KNX: prevent set/get-cmd during fhem start
                     add sub dpts for dpt14, enfoce gadname rules 
  - bugfix:  00_KNXIO: fix error msg when mode S fails to open
